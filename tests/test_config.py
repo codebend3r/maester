@@ -6,7 +6,7 @@ from maester.config import MissingConfig, Settings, load_settings, require
 def test_defaults_when_env_is_empty():
     s = load_settings({})
     assert s == Settings()
-    assert s.model == "claude-sonnet-5"
+    assert s.model == "claude-opus-5"
     assert s.guardrails.replace_daily_cap == 3
     assert s.db_path == "/data/maester.db"
 

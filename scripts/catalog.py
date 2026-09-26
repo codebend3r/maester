@@ -128,7 +128,7 @@ EPICS = [
                     "`maester/agent/loop.py` runs the Messages API with `tools`, executes `tool_use` blocks and feeds `tool_result` back until `end_turn`",
                     "System prompt and tool definitions carry `cache_control` for prompt caching",
                     "Streaming is used so long replies start rendering early",
-                    "Model id comes from config, default `claude-sonnet-5`",
+                    "Model id comes from config, default `claude-opus-5`",
                     "Max tool iterations per turn is capped and the cap is logged",
                 ],
             },

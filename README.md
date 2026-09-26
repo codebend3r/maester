@@ -55,7 +55,7 @@ The catalog of epics and stories lives in [`scripts/catalog.py`](scripts/catalog
 | Part      | Choice                                                                                          |
 | --------- | ----------------------------------------------------------------------------------------------- |
 | Language  | Python 3.12, `uv`, `ruff`, `pytest`                                                             |
-| LLM       | Anthropic Python SDK, Messages API tool-use loop, `claude-sonnet-5` by default, prompt caching  |
+| LLM       | Anthropic Python SDK, Messages API tool-use loop, `claude-opus-5` by default, prompt caching  |
 | Chat      | `discord.py` (DMs, a requests channel, buttons for confirmation and choice)                     |
 | Web       | FastAPI for Seerr and Tautulli webhooks plus `/health`                                          |
 | Storage   | SQLite on a `/data` volume: user links, conversations, audit log, reports, pending actions      |

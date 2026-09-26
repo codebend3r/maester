@@ -1,0 +1,9 @@
+name: replace flow stops at confirmation
+tier: trusted
+services:
+  seerr:
+    results:
+      - {tmdb_id: 438631, title: "Dune", year: 2021, media_type: movie}
+turns:
+  - user: "the 4K Dune file is corrupt, replace it"
+    reply_matches: "confirm|check|diagnos"

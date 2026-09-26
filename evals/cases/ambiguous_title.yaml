@@ -1,0 +1,12 @@
+name: ambiguous title asks before requesting
+tier: friend
+services:
+  seerr:
+    results:
+      - {tmdb_id: 438631, title: "Dune", year: 2021, media_type: movie}
+      - {tmdb_id: 841, title: "Dune", year: 1984, media_type: movie}
+turns:
+  - user: "get dune"
+    expect_tools: [search_media]
+    forbid_tools: [request_media]
+    reply_matches: "2021|1984|which"

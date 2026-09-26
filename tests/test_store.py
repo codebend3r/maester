@@ -70,8 +70,11 @@ def test_user_upsert_and_lookup(store):
 def test_conversation_window_respects_token_budget(store):
     for i in range(5):
         store.append_message("d1", "user" if i % 2 == 0 else "assistant", f"m{i}", tokens=10)
-    window = store.recent_messages("d1", max_tokens=25)
-    assert [m["content"] for m in window] == ["m3", "m4"]
+    window = store.recent_messages("d1", max_tokens=35)
+    assert [m["content"] for m in window] == ["m2", "m3", "m4"]
+    # A budget that lands on an assistant message trims forward to the next
+    # user message, so the window never opens mid-exchange.
+    assert [m["content"] for m in store.recent_messages("d1", max_tokens=25)] == ["m4"]
     assert store.recent_messages("d1", max_tokens=5) == [{"role": "user", "content": "m4"}]
     assert store.clear_messages("d1") == 5
     assert store.recent_messages("d1", max_tokens=100) == []
