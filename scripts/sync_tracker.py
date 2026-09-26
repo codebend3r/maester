@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from catalog import AREA_LABELS, EPICS, MILESTONES  # noqa: E402
+from catalog import AREA_LABELS, EPICS, MILESTONES
 
 REPO = "codebend3r/maester"
 ROOT = Path(__file__).resolve().parent.parent
@@ -54,7 +54,7 @@ def api(path: str, method: str = "GET", **fields) -> object:
 
 
 def sync_labels() -> None:
-    existing = {l["name"] for l in api(f"repos/{REPO}/labels?per_page=100")}
+    existing = {label["name"] for label in api(f"repos/{REPO}/labels?per_page=100")}
     for name, (color, desc) in LABELS.items():
         if name in existing:
             api(f"repos/{REPO}/labels/{name}", "PATCH", color=color, description=desc)
@@ -65,7 +65,9 @@ def sync_labels() -> None:
 
 def sync_milestones() -> dict[str, str]:
     """Milestone key to its full title; gh issue commands take the title, not the number."""
-    existing = {m["title"]: m["number"] for m in api(f"repos/{REPO}/milestones?state=all&per_page=100")}
+    existing = {
+        m["title"]: m["number"] for m in api(f"repos/{REPO}/milestones?state=all&per_page=100")
+    }
     numbers = {}
     for key, title, desc in MILESTONES:
         full = f"{key} {title}"
@@ -80,7 +82,9 @@ def sync_milestones() -> dict[str, str]:
 
 def existing_issues() -> dict[str, dict]:
     """Issues keyed by their `[E0.1]` / `[E0]` title prefix."""
-    out = gh("issue", "list", "-R", REPO, "--state", "all", "--limit", "500", "--json", "number,title,id")
+    out = gh(
+        "issue", "list", "-R", REPO, "--state", "all", "--limit", "500", "--json", "number,title,id"
+    )
     found = {}
     for issue in json.loads(out):
         title = issue["title"]
@@ -97,18 +101,56 @@ def epic_body(epic: dict) -> str:
 
 
 def story_body(epic: dict, story: dict) -> str:
-    lines = [f"**Epic:** {epic['key']} {epic['title']}", "", "## User story", "", story["story"], "", "## Acceptance criteria", ""]
+    lines = [
+        f"**Epic:** {epic['key']} {epic['title']}",
+        "",
+        "## User story",
+        "",
+        story["story"],
+        "",
+        "## Acceptance criteria",
+        "",
+    ]
     lines += [f"- [ ] {c}" for c in story["criteria"]]
     return "\n".join(lines)
 
 
-def upsert_issue(key: str, title: str, body: str, labels: list[str], milestone: str, found: dict) -> dict:
+def upsert_issue(
+    key: str, title: str, body: str, labels: list[str], milestone: str, found: dict
+) -> dict:
     full_title = f"[{key}] {title}"
     if key in found:
         n = found[key]["number"]
-        gh("issue", "edit", str(n), "-R", REPO, "--title", full_title, "--body", body, "--milestone", milestone, "--add-label", ",".join(labels))
+        gh(
+            "issue",
+            "edit",
+            str(n),
+            "-R",
+            REPO,
+            "--title",
+            full_title,
+            "--body",
+            body,
+            "--milestone",
+            milestone,
+            "--add-label",
+            ",".join(labels),
+        )
         return found[key]
-    out = gh("issue", "create", "-R", REPO, "--title", full_title, "--body", body, "--label", ",".join(labels), "--milestone", milestone)
+    out = gh(
+        "issue",
+        "create",
+        "-R",
+        REPO,
+        "--title",
+        full_title,
+        "--body",
+        body,
+        "--label",
+        ",".join(labels),
+        "--milestone",
+        milestone,
+    )
     number = int(out.rsplit("/", 1)[-1])
     node = json.loads(gh("issue", "view", str(number), "-R", REPO, "--json", "id"))["id"]
     return {"number": number, "id": node, "title": full_title}
@@ -119,7 +161,18 @@ def link_sub_issue(parent_id: str, child_id: str) -> None:
     mutation($parent: ID!, $child: ID!) {
       addSubIssue(input: {issueId: $parent, subIssueId: $child, replaceParent: true}) { issue { number } }
     }"""
-    gh("api", "graphql", "-H", "GraphQL-Features: sub_issues", "-f", f"query={query}", "-f", f"parent={parent_id}", "-f", f"child={child_id}")
+    gh(
+        "api",
+        "graphql",
+        "-H",
+        "GraphQL-Features: sub_issues",
+        "-f",
+        f"query={query}",
+        "-f",
+        f"parent={parent_id}",
+        "-f",
+        f"child={child_id}",
+    )
 
 
 def sync_issues(milestones: dict[str, str]) -> dict:
@@ -127,7 +180,9 @@ def sync_issues(milestones: dict[str, str]) -> dict:
     issue_map = {}
     for epic in EPICS:
         ms = milestones[epic["milestone"]]
-        parent = upsert_issue(epic["key"], epic["title"], epic_body(epic), ["epic", f"area:{epic['area']}"], ms, found)
+        parent = upsert_issue(
+            epic["key"], epic["title"], epic_body(epic), ["epic", f"area:{epic['area']}"], ms, found
+        )
         issue_map[epic["key"]] = parent["number"]
         for i, story in enumerate(epic["stories"], 1):
             key = f"{epic['key']}.{i}"
@@ -135,7 +190,9 @@ def sync_issues(milestones: dict[str, str]) -> dict:
             child = upsert_issue(key, story["title"], story_body(epic, story), labels, ms, found)
             issue_map[key] = child["number"]
             link_sub_issue(parent["id"], child["id"])
-        print(f"{epic['key']} {epic['title']}: #{parent['number']} + {len(epic['stories'])} stories")
+        print(
+            f"{epic['key']} {epic['title']}: #{parent['number']} + {len(epic['stories'])} stories"
+        )
     MAP_PATH.write_text(json.dumps(issue_map, indent=2) + "\n")
     return issue_map
 
@@ -145,14 +202,31 @@ def render_roadmap(issue_map: dict) -> None:
         n = issue_map.get(key)
         return f"[#{n}](https://github.com/{REPO}/issues/{n})" if n else "(not synced)"
 
-    out = ["# Roadmap", "", "Generated from `scripts/catalog.py` by `scripts/sync_tracker.py`. Edit the catalog, not this file.", "",
-           f"Board: https://github.com/users/{REPO.split('/')[0]}/projects (\"maester roadmap\")", "", "## Milestones", "", "| Milestone | Goal | Epics |", "|---|---|---|"]
+    out = [
+        "# Roadmap",
+        "",
+        "Generated from `scripts/catalog.py` by `scripts/sync_tracker.py`. Edit the catalog, not this file.",
+        "",
+        f'Board: https://github.com/users/{REPO.split("/")[0]}/projects ("maester roadmap")',
+        "",
+        "## Milestones",
+        "",
+        "| Milestone | Goal | Epics |",
+        "|---|---|---|",
+    ]
     for key, title, desc in MILESTONES:
         epics = ", ".join(f"{e['key']} {e['title']}" for e in EPICS if e["milestone"] == key)
         out.append(f"| **{key}** {title} | {desc} | {epics} |")
     out += ["", "## Epics", ""]
     for epic in EPICS:
-        out += [f"### {epic['key']} {epic['title']} ({epic['milestone']}) {link(epic['key'])}", "", epic["summary"], "", "| # | Story | Size | Priority | Issue |", "|---|---|---|---|---|"]
+        out += [
+            f"### {epic['key']} {epic['title']} ({epic['milestone']}) {link(epic['key'])}",
+            "",
+            epic["summary"],
+            "",
+            "| # | Story | Size | Priority | Issue |",
+            "|---|---|---|---|---|",
+        ]
         for i, s in enumerate(epic["stories"], 1):
             key = f"{epic['key']}.{i}"
             out.append(f"| {key} | {s['title']} | {s['size']} | {s['priority']} | {link(key)} |")
