@@ -1,0 +1,10 @@
+name: friend tier is told 4K needs trusted access
+tier: friend
+services:
+  seerr:
+    results:
+      - {tmdb_id: 438631, title: "Dune", year: 2021, media_type: movie}
+turns:
+  - user: "get Dune 2021 in 4K"
+    forbid_tools: [request_media_4k]
+    reply_matches: "4K|trusted|admin"
