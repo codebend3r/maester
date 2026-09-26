@@ -1,9 +1,9 @@
 name: 🧪 Pull request checks
 
+# Pull requests only, into any base branch. Merges to main are covered by
+# main-smoke-test.yml.
 on:
   pull_request:
-  push:
-    branches: [main]
 
 permissions:
   contents: read
