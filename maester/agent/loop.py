@@ -46,6 +46,8 @@ class AgentReply:
     text: str
     tool_calls: list[dict[str, Any]] = field(default_factory=list)
     pending_ids: list[int] = field(default_factory=list)
+    # Options a tool offered the user, rendered as buttons by the chat layer.
+    choices: list[dict[str, Any]] = field(default_factory=list)
     input_tokens: int = 0
     output_tokens: int = 0
     cache_read_tokens: int = 0
@@ -148,6 +150,14 @@ class Agent:
                 )
                 if outcome.pending_id is not None:
                     reply.pending_ids.append(outcome.pending_id)
+                if isinstance(outcome.content, dict) and isinstance(
+                    outcome.content.get("choices"), list
+                ):
+                    reply.choices = [
+                        c
+                        for c in outcome.content["choices"]
+                        if isinstance(c, dict) and c.get("label")
+                    ]
                 results.append(outcome.as_result_block(block.id))
             messages.append({"role": "user", "content": results})
             self.store.append_message(
