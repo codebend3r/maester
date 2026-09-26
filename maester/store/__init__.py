@@ -240,13 +240,23 @@ class Store:
             )
             return int(cur.lastrowid)
 
-    def recent_messages(self, discord_id: str, *, max_tokens: int) -> list[dict[str, Any]]:
-        """The newest messages whose token sum fits the budget, oldest first."""
+    def recent_messages(
+        self, discord_id: str, *, max_tokens: int, since: datetime | None = None
+    ) -> list[dict[str, Any]]:
+        """The newest messages whose token sum fits the budget, oldest first.
+
+        Messages older than `since` are left out, which is how an idle
+        conversation starts fresh. The window is then trimmed to begin on a
+        plain user message: a `tool_result` without the `tool_use` it answers
+        is rejected by the API, so a cut inside a tool exchange is never sent.
+        """
+        sql = "SELECT role, content, tokens FROM conversations WHERE discord_id = ?"
+        params: tuple[Any, ...] = (discord_id,)
+        if since is not None:
+            sql += " AND created_at >= ?"
+            params += (since.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z",)
         with self._lock:
-            rows = self._conn.execute(
-                "SELECT role, content, tokens FROM conversations WHERE discord_id = ? ORDER BY id DESC LIMIT 200",
-                (discord_id,),
-            ).fetchall()
+            rows = self._conn.execute(sql + " ORDER BY id DESC LIMIT 200", params).fetchall()
         kept: list[dict[str, Any]] = []
         budget = max_tokens
         for r in rows:
@@ -255,6 +265,8 @@ class Store:
                 break
             kept.append({"role": r["role"], "content": json.loads(r["content"])})
         kept.reverse()
+        while kept and not (kept[0]["role"] == "user" and isinstance(kept[0]["content"], str)):
+            kept.pop(0)
         return kept
 
     def clear_messages(self, discord_id: str) -> int:
