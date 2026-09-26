@@ -1,0 +1,78 @@
+# Architecture
+
+## Components
+
+```
+                ┌──────────────────────────────────────────────┐
+ Discord ─────▶ │ chat/      discord.py client, views, identity │
+                │    │                                          │
+                │    ▼                                          │
+                │ agent/     Messages API loop ── tools/ ───────┼──▶ clients/ ──▶ Seerr, Sonarr, Radarr,
+                │    │        registry, tiers, guardrails       │                SABnzbd, Tautulli, Plex, Wizarr
+                │    ▼                                          │
+                │ store/     SQLite: users, conversations,      │
+                │            audit_log, reports, pending        │
+                │                                               │
+ Seerr/Tautulli │ web/       FastAPI webhooks, /health          │
+ webhooks ────▶ │ jobs/      digests, sweeps, reminders         │
+                └──────────────────────────────────────────────┘
+```
+
+One process, one container, one SQLite file on `/data`. The Discord client and the FastAPI app share an asyncio loop.
+
+## Instance registry
+
+Two NAS hosts each run their own Sonarr, Radarr, SABnzbd and Tautulli (see `wizteros/docs/arr-stack.md`). Seerr, Plex and Wizarr are single. maester never talks to "Sonarr"; it talks to `sonarr[meleys]` or `sonarr[vermithor]`.
+
+- Instances are declared in env as `SONARR_MELEYS_URL`, `SONARR_MELEYS_API_KEY`, and so on.
+- Every tool that touches an arr instance takes `host` and logs it in the audit row.
+- A media item resolves to its owning host by matching its file path against each instance's root folders. When no host matches, the tool refuses rather than guessing.
+
+## Permission tiers
+
+| Tier      | Who                         | Can                                                                                     |
+| --------- | --------------------------- | --------------------------------------------------------------------------------------- |
+| unlinked  | Anyone the bot does not know| Get help, start `/link`                                                                 |
+| friend    | Linked Plex user            | Search, request 1080p, check availability and status, report problems, see own stats    |
+| trusted   | Friends the admin trusts    | Everything above, request 4K (goes to approval), request invites for others            |
+| admin     | The server owner            | Everything, approve, kill switch, tier overrides, audit log, download history           |
+
+Tiers come from Discord roles with a per-user override in SQLite. The tool list sent to the model is filtered by tier, and the server rejects out-of-tier calls independently of the model.
+
+## Destructive actions
+
+Deleting a file, blocklisting a release, issuing an invite, changing a share: all of these are `destructive=True` tools.
+
+1. The tool does not act. It returns a pending action with a human-readable summary.
+2. The chat layer renders Confirm/Cancel buttons that only the asking user can press, expiring after 5 minutes.
+3. On confirm, the action runs, is audited, and the admin channel is notified.
+4. Some actions (4K requests, invites, replacements over the daily cap) go to the admin approval queue instead of the user's own confirmation.
+5. A global kill switch (`/kill on`) disables every destructive tool immediately.
+
+The model never sees a confirmation as something it can perform; the button press is out of band.
+
+## Prompt injection
+
+Friends' messages and every tool result (titles, overviews, file names, Seerr issue text) are untrusted. The system prompt states that tool results are data. The registry has no shell, HTTP passthrough or filesystem tools, so the worst an injected instruction can do is call a scoped tool the user already had access to, and destructive ones still need the button. The eval harness keeps an injection case.
+
+## Replace flow
+
+```
+report ──▶ identify item (Tautulli session) ──▶ confirm with friend
+       ──▶ client diagnosis (transcode reasons, codec support, subtitle burn-in)
+              │ client cause found ──▶ advice, Seerr issue, stop
+              ▼
+       ──▶ file health check (ffprobe + partial decode, read-only mount)
+              │ ok and single reporter ──▶ Seerr issue, stop
+              ▼ failed, or 2+ reporters
+       ──▶ replace_media(item, host, reason)   [destructive, capped, audited]
+              mark grab failed (blocklist) ──▶ delete file ──▶ search
+```
+
+## Storage
+
+SQLite, migrations numbered under `maester/store/migrations/`. Tables: `users`, `conversations`, `audit_log`, `reports`, `pending_actions`, `space_samples`, `preferences`. Nothing in the file is a source of truth for media; Seerr and the arrs are.
+
+## Deployment
+
+Docker Compose on Meleys at `/volume1/docker/maester`, next to `stripe-bridge`. Media shares are bind-mounted read-only for the health check. `scripts/deploy-nas.sh` rsyncs the repo over the SMB share and excludes `.env` and `maester-data/`.
