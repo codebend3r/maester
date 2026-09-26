@@ -51,7 +51,7 @@ class Guardrails:
 @dataclass(frozen=True)
 class Settings:
     anthropic_api_key: str = ""
-    model: str = "claude-opus-5"
+    model: str = "claude-opus-5-5"
     effort: str = "medium"  # low | medium | high | xhigh | max
 
     discord_bot_token: str = ""
@@ -89,7 +89,7 @@ REQUIRED = (
 def load_settings(env: Mapping[str, str]) -> Settings:
     return Settings(
         anthropic_api_key=env.get("ANTHROPIC_API_KEY", ""),
-        model=env.get("MAESTER_MODEL", "").strip() or "claude-opus-5",
+        model=env.get("MAESTER_MODEL", "").strip() or "claude-opus-5-5",
         effort=env.get("MAESTER_EFFORT", "").strip() or "medium",
         discord_bot_token=env.get("DISCORD_BOT_TOKEN", ""),
         discord_guild_id=_int(env, "DISCORD_GUILD_ID", 0),
