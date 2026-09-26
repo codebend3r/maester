@@ -12,7 +12,7 @@ import discord
 from discord import app_commands
 
 from maester.chat.service import ChatService
-from maester.chat.views import ApprovalView, chat_user, send_response, send_text
+from maester.chat.views import ApprovalView, resolve_chat_user, send_response, send_text
 from maester.store import PendingAction
 
 log = logging.getLogger("maester.bot")
@@ -64,7 +64,7 @@ class MaesterBot(discord.Client):
         text = re.sub(rf"<@!?{self.user.id}>", "", message.content).strip()
         if not text:
             text = "hello"
-        user = chat_user(message.author)
+        user = await resolve_chat_user(self, message.author)
         async with message.channel.typing():
             response = await self.service.handle_message(user, text)
         await send_response(message.channel, self.service, user, response)
@@ -91,19 +91,39 @@ class MaesterBot(discord.Client):
         @app_commands.describe(account="The email or username you use for Plex")
         async def link(interaction: discord.Interaction, account: str) -> None:
             await interaction.response.defer(ephemeral=True)
-            response = await self.service.link(chat_user(interaction.user), account)
+            user = await resolve_chat_user(self, interaction.user)
+            response = await self.service.link(user, account)
             await interaction.followup.send(response.text, ephemeral=True)
 
         @tree.command(
             name="whoami", description="Show which Plex account you're linked to and your tier"
         )
         async def whoami(interaction: discord.Interaction) -> None:
-            await interaction.response.send_message(
-                self.service.whoami(chat_user(interaction.user)), ephemeral=True
-            )
+            user = await resolve_chat_user(self, interaction.user)
+            await interaction.response.send_message(self.service.whoami(user), ephemeral=True)
 
         @tree.command(name="forget", description="Clear our conversation so far")
         async def forget(interaction: discord.Interaction) -> None:
-            await interaction.response.send_message(
-                self.service.forget(chat_user(interaction.user)), ephemeral=True
+            user = await resolve_chat_user(self, interaction.user)
+            await interaction.response.send_message(self.service.forget(user), ephemeral=True)
+
+        @tree.command(name="tier", description="Admin: set or clear a member's tier override")
+        @app_commands.describe(
+            member="Whose tier to change", tier="The tier to force, or 'from roles' to clear it"
+        )
+        @app_commands.choices(
+            tier=[
+                app_commands.Choice(name="friend", value="friend"),
+                app_commands.Choice(name="trusted", value="trusted"),
+                app_commands.Choice(name="admin", value="admin"),
+                app_commands.Choice(name="from roles", value="roles"),
+            ]
+        )
+        async def tier(
+            interaction: discord.Interaction, member: discord.User, tier: app_commands.Choice[str]
+        ) -> None:
+            admin = await resolve_chat_user(self, interaction.user)
+            text = await self.service.set_tier(
+                admin, str(member.id), None if tier.value == "roles" else tier.value
             )
+            await interaction.response.send_message(text, ephemeral=True)

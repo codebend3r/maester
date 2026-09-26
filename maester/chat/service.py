@@ -16,8 +16,8 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-from maester.agent.loop import Agent
-from maester.agent.runner import CONFIRMED_KEY
+from maester.agent.loop import STORED_RESULT_MAX_CHARS, Agent, estimate_tokens
+from maester.agent.runner import CONFIRMED_KEY, ToolOutcome
 from maester.agent.tools import Tier, ToolContext
 from maester.chat.identity import IdentityService
 from maester.chat.split import split_reply
@@ -47,6 +47,14 @@ class ChatUser:
 class Choice:
     label: str
     value: str
+    year: int | None = None
+    poster_url: str | None = None
+
+    @property
+    def display(self) -> str:
+        if self.year and str(self.year) not in self.label:
+            return f"{self.label} ({self.year})"
+        return self.label
 
 
 @dataclass
@@ -96,14 +104,15 @@ class ChatService:
 
         confirmations = [p for p in (self.store.get_pending(i) for i in reply.pending_ids) if p]
         choices = [
-            Choice(c["label"], c.get("value", c["label"])) for c in reply.choices[:MAX_CHOICES]
+            Choice(c["label"], c.get("value", c["label"]), c.get("year"), c.get("poster_url"))
+            for c in reply.choices[:MAX_CHOICES]
         ]
         return ChatResponse(
             chunks=split_reply(reply.text), confirmations=confirmations, choices=choices, tier=tier
         )
 
     async def pick(self, user: ChatUser, choice: Choice) -> ChatResponse:
-        return await self.handle_message(user, f"I pick: {choice.label} ({choice.value})")
+        return await self.handle_message(user, f"I pick: {choice.display} ({choice.value})")
 
     # -- confirmations ----------------------------------------------------
 
@@ -127,8 +136,7 @@ class ChatService:
             if isinstance(outcome.content, str)
             else json.dumps(outcome.content, default=str)
         )
-        note = f"[confirmed #{pending_id}: {pending.summary} -> {'failed: ' if outcome.is_error else ''}{content}]"
-        self.store.append_message(presser.id, "user", note[:600], len(note) // 4)
+        self._remember_button(presser.id, pending, outcome)
         if self.notify_admin:
             await self.notify_admin(
                 f"{presser.name} confirmed: {pending.summary}\n{content[:500]}", None
@@ -142,10 +150,28 @@ class ChatService:
         if pending.requester != presser.id:
             return "Only the person who asked can cancel this."
         self.store.decide_pending(pending_id, "denied", presser.id)
-        self.store.append_message(
-            presser.id, "user", f"[cancelled #{pending_id}: {pending.summary}]", 20
+        self._remember_button(
+            presser.id, pending, ToolOutcome("Cancelled by the user; nothing was done.")
         )
         return "Cancelled."
+
+    def _remember_button(self, user_id: str, pending: PendingAction, outcome: ToolOutcome) -> None:
+        """Record a button press as a tool call and its result in the user's memory.
+
+        The model's own call only got a "waiting for confirmation" result, so
+        the real outcome goes in as a fresh tool_use/tool_result pair; the next
+        turn sees what happened the same way it sees any other tool.
+        """
+        tool_use = {
+            "type": "tool_use",
+            "id": f"toolu_button_{pending.id}",
+            "name": pending.action,
+            "input": pending.payload,
+        }
+        result = outcome.as_result_block(tool_use["id"])
+        result["content"] = result["content"][:STORED_RESULT_MAX_CHARS]
+        self.store.append_message(user_id, "assistant", [tool_use], estimate_tokens(tool_use))
+        self.store.append_message(user_id, "user", [result], estimate_tokens(result))
 
     # -- commands ---------------------------------------------------------
 
@@ -162,6 +188,22 @@ class ChatService:
     def forget(self, user: ChatUser) -> str:
         n = self.agent.forget(user.id)
         return "Forgotten. We're starting fresh." if n else "Nothing to forget."
+
+    async def set_tier(self, admin: ChatUser, target_id: str, tier: str | None) -> str:
+        if not self.is_admin(admin):
+            return "Only the admin can change tiers."
+        try:
+            text = self.identity.set_tier_override(target_id, tier)
+        except ValueError:
+            return f"Unknown tier `{tier}`; use friend, trusted, or admin."
+        self.store.audit(
+            discord_id=admin.id,
+            tool="set_tier",
+            args={"target": target_id, "tier": tier},
+            result=text,
+            ok=True,
+        )
+        return text
 
     # -- admin approvals --------------------------------------------------
 
