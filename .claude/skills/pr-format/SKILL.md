@@ -1,6 +1,6 @@
 ---
 name: pr-format
-description: Use when opening, drafting, or editing a pull request in maester, "open a PR", "write the PR description", "gh pr create", "update the PR body", or when writing a squash-merge commit message from a PR. Keeps every PR body in one shape - What was changed, Why it was needed, how it was tested - as short bullets.
+description: Use when opening, drafting, or editing a pull request in maester, "open a PR", "write the PR description", "gh pr create", "update the PR body", or when writing a squash-merge commit message from a PR. Every PR title starts with `MAE:`, and every PR body has one shape - What was changed, Why it was needed, how it was tested - as short bullets.
 ---
 
 # PR format
@@ -9,9 +9,10 @@ Every maester PR body has the same four sections, taken from `.github/pull_reque
 
 ## Title
 
-- Imperative, sentence case, no trailing period: `Split CI into PR checks and a main smoke test`
-- Epic work that closes several stories: `E1 Agent core: tool registry, runner, loop, memory, evals`
-- 72 characters or fewer. No `feat:` / `fix:` prefixes.
+- Starts with `MAE:`, then a short fragment, no trailing period: `MAE: split CI into PR checks and a main smoke test`
+- Epic work that closes several stories: `MAE: E1 agent core: tool registry, runner, loop, memory, evals`
+- 72 characters or fewer. `MAE:` is the only prefix, no `feat:` / `fix:`
+- Prefix, bullet, backtick and no-attribution rules come from `git-commit-and-pr-format`
 
 ## Body
 
@@ -56,5 +57,5 @@ Closes #<n>
 
 1. Read the full change: `git log main..HEAD` and `git diff main...HEAD --stat`.
 2. Draft the body in a scratch file, then check it against the rules above.
-3. `gh pr create --base main --title "<title>" --body-file <file>` (or `gh pr edit <n> --body-file <file>` to fix an existing one).
-4. The squash-merge commit uses the same title with ` (#<pr>)` and the same body.
+3. `gh pr create --base main --title "MAE: <title>" --body-file <file>` (or `gh pr edit <n> --body-file <file>` to fix an existing one).
+4. The squash-merge commit uses the same `MAE:` title with ` (#<pr>)` and the same body.
