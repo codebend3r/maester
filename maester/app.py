@@ -38,6 +38,9 @@ from maester.registry import Registry
 from maester.store import Store
 from maester.web import create_app
 
+# Importing the tools package registers every tool module into app_registry.
+import maester.tools  # noqa: F401  isort: skip
+
 log = logging.getLogger("maester")
 
 
