@@ -1,0 +1,233 @@
+"""Tautulli: live sessions, watch history, users and recent additions.
+
+This is where playback diagnosis gets its facts: transcode decisions and
+reasons, LAN vs WAN, relay, bandwidth. Everything is one `/api/v2?cmd=` call.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any, Protocol
+
+from maester.clients.base import HttpClient
+
+
+def _int(value: Any, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+@dataclass(frozen=True)
+class Session:
+    session_key: str
+    user_id: int
+    user: str
+    rating_key: str
+    full_title: str
+    media_type: str
+    state: str
+    progress_percent: int
+    platform: str
+    player: str
+    product: str
+    location: str  # "lan" | "wan"
+    relayed: bool
+    secure: bool
+    bandwidth_kbps: int
+    stream_bitrate_kbps: int
+    transcode_decision: str  # "direct play" | "copy" | "transcode"
+    video_decision: str
+    audio_decision: str
+    subtitle_decision: str
+    transcode_reasons: tuple[str, ...]
+    container: str
+    video_codec: str
+    video_resolution: str
+    video_dynamic_range: str
+    audio_codec: str
+    audio_channels: int
+    subtitle_codec: str
+    quality_profile: str
+    file: str
+
+    @classmethod
+    def from_api(cls, raw: dict[str, Any]) -> Session:
+        return cls(
+            session_key=str(raw.get("session_key") or ""),
+            user_id=_int(raw.get("user_id")),
+            user=raw.get("friendly_name") or raw.get("user") or "",
+            rating_key=str(raw.get("rating_key") or ""),
+            full_title=raw.get("full_title") or raw.get("title") or "",
+            media_type=raw.get("media_type") or "",
+            state=raw.get("state") or "",
+            progress_percent=_int(raw.get("progress_percent")),
+            platform=raw.get("platform") or "",
+            player=raw.get("player") or "",
+            product=raw.get("product") or "",
+            location=raw.get("location") or "",
+            relayed=_int(raw.get("relayed")) == 1,
+            secure=_int(raw.get("secure")) == 1,
+            bandwidth_kbps=_int(raw.get("bandwidth")),
+            stream_bitrate_kbps=_int(raw.get("stream_bitrate")),
+            transcode_decision=raw.get("transcode_decision") or "",
+            video_decision=raw.get("stream_video_decision") or "",
+            audio_decision=raw.get("stream_audio_decision") or "",
+            subtitle_decision=raw.get("stream_subtitle_decision") or "",
+            transcode_reasons=tuple(r for r in (raw.get("transcode_reasons") or []) if r),
+            container=raw.get("container") or "",
+            video_codec=raw.get("video_codec") or "",
+            video_resolution=raw.get("video_full_resolution") or raw.get("video_resolution") or "",
+            video_dynamic_range=raw.get("video_dynamic_range") or "",
+            audio_codec=raw.get("audio_codec") or "",
+            audio_channels=_int(raw.get("audio_channels")),
+            subtitle_codec=raw.get("subtitle_codec") or "",
+            quality_profile=raw.get("quality_profile") or "",
+            file=raw.get("file") or "",
+        )
+
+
+@dataclass(frozen=True)
+class Activity:
+    sessions: tuple[Session, ...]
+    stream_count: int
+    transcode_count: int
+    total_bandwidth_kbps: int
+    wan_bandwidth_kbps: int
+
+    @classmethod
+    def from_api(cls, raw: dict[str, Any]) -> Activity:
+        return cls(
+            sessions=tuple(Session.from_api(s) for s in raw.get("sessions", [])),
+            stream_count=_int(raw.get("stream_count")),
+            transcode_count=_int(raw.get("stream_count_transcode")),
+            total_bandwidth_kbps=_int(raw.get("total_bandwidth")),
+            wan_bandwidth_kbps=_int(raw.get("wan_bandwidth")),
+        )
+
+
+@dataclass(frozen=True)
+class HistoryRow:
+    user_id: int
+    rating_key: str
+    full_title: str
+    media_type: str
+    started: int
+    stopped: int
+    percent_complete: int
+    transcode_decision: str
+    platform: str
+    player: str
+    location: str
+    relayed: bool
+
+    @classmethod
+    def from_api(cls, raw: dict[str, Any]) -> HistoryRow:
+        return cls(
+            user_id=_int(raw.get("user_id")),
+            rating_key=str(raw.get("rating_key") or ""),
+            full_title=raw.get("full_title") or "",
+            media_type=raw.get("media_type") or "",
+            started=_int(raw.get("started")),
+            stopped=_int(raw.get("stopped")),
+            percent_complete=_int(raw.get("percent_complete")),
+            transcode_decision=raw.get("transcode_decision") or "",
+            platform=raw.get("platform") or "",
+            player=raw.get("player") or "",
+            location=raw.get("location") or "",
+            relayed=_int(raw.get("relayed")) == 1,
+        )
+
+
+@dataclass(frozen=True)
+class TautulliUser:
+    user_id: int
+    username: str
+    friendly_name: str
+    email: str
+
+    @classmethod
+    def from_api(cls, raw: dict[str, Any]) -> TautulliUser:
+        return cls(
+            user_id=_int(raw.get("user_id")),
+            username=raw.get("username") or "",
+            friendly_name=raw.get("friendly_name") or "",
+            email=(raw.get("email") or "").lower(),
+        )
+
+
+class Tautulli(Protocol):
+    host: str
+
+    async def activity(self) -> Activity: ...
+    async def history(
+        self, *, user_id: int | None = None, length: int = 10
+    ) -> list[HistoryRow]: ...
+    async def users(self) -> list[TautulliUser]: ...
+    async def recently_added(self, count: int = 25) -> list[dict[str, Any]]: ...
+
+
+class TautulliClient(HttpClient):
+    service = "tautulli"
+
+    def __init__(self, host: str, base_url: str, api_key: str, **kwargs: Any):
+        super().__init__(base_url, params={"apikey": api_key}, **kwargs)
+        self.host = host
+
+    async def _cmd(self, cmd: str, **params: Any) -> Any:
+        data = await self.get_json("/api/v2", params={"cmd": cmd, **params})
+        response = data.get("response") or {}
+        if response.get("result") != "success":
+            from maester.clients.base import ClientError
+
+            raise ClientError(
+                self.service, "GET", f"/api/v2?cmd={cmd}", 200, response.get("message") or "error"
+            )
+        return response.get("data")
+
+    async def activity(self) -> Activity:
+        return Activity.from_api(await self._cmd("get_activity") or {})
+
+    async def history(self, *, user_id: int | None = None, length: int = 10) -> list[HistoryRow]:
+        params: dict[str, Any] = {"length": length, "order_column": "date", "order_dir": "desc"}
+        if user_id is not None:
+            params["user_id"] = user_id
+        data = await self._cmd("get_history", **params) or {}
+        return [HistoryRow.from_api(r) for r in data.get("data", [])]
+
+    async def users(self) -> list[TautulliUser]:
+        return [TautulliUser.from_api(u) for u in await self._cmd("get_users") or []]
+
+    async def recently_added(self, count: int = 25) -> list[dict[str, Any]]:
+        data = await self._cmd("get_recently_added", count=count) or {}
+        return list(data.get("recently_added", []))
+
+
+@dataclass
+class FakeTautulliClient:
+    host: str = "fake"
+    sessions: list[Session] = field(default_factory=list)
+    history_rows: list[HistoryRow] = field(default_factory=list)
+    user_list: list[TautulliUser] = field(default_factory=list)
+    recent: list[dict[str, Any]] = field(default_factory=list)
+
+    async def activity(self) -> Activity:
+        wan = sum(s.bandwidth_kbps for s in self.sessions if s.location == "wan")
+        return Activity(
+            sessions=tuple(self.sessions),
+            stream_count=len(self.sessions),
+            transcode_count=sum(1 for s in self.sessions if s.transcode_decision == "transcode"),
+            total_bandwidth_kbps=sum(s.bandwidth_kbps for s in self.sessions),
+            wan_bandwidth_kbps=wan,
+        )
+
+    async def history(self, *, user_id: int | None = None, length: int = 10) -> list[HistoryRow]:
+        rows = [r for r in self.history_rows if user_id is None or r.user_id == user_id]
+        return sorted(rows, key=lambda r: r.started, reverse=True)[:length]
+
+    async def users(self) -> list[TautulliUser]:
+        return list(self.user_list)
+
+    async def recently_added(self, count: int = 25) -> list[dict[str, Any]]:
+        return self.recent[:count]

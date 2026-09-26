@@ -1,0 +1,40 @@
+name: 🧪 Pull request checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# A newer push to the same branch cancels the in-flight run for that branch.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: 🚦 Lint and test
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🐍 Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      # Python version comes from .python-version so the pin lives in one place.
+      - name: 📦 Install
+        run: uv sync --frozen
+
+      - name: 🧹 Lint (ruff)
+        run: uv run ruff check .
+
+      - name: 💅 Format check (ruff)
+        run: uv run ruff format --check .
+
+      - name: 🧪 Test (pytest)
+        run: uv run pytest -q
