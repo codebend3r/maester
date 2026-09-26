@@ -8,7 +8,11 @@ Edit here, then re-run the sync.
 MILESTONES = [
     ("M1", "Walking skeleton", "A friend can DM the bot and it answers using a read-only tool."),
     ("M2", "Requests", "Friends request movies and shows in 1080p and 4K through the bot."),
-    ("M3", "Troubleshooting", "Playback problems are diagnosed before anything is replaced; lag is explained with live data."),
+    (
+        "M3",
+        "Troubleshooting",
+        "Playback problems are diagnosed before anything is replaced; lag is explained with live data.",
+    ),
     ("M4", "Admin and onboarding", "Approvals, digests and Wizarr invites run from chat."),
     ("M5", "Engagement", "The bot gives friends reasons to come back."),
 ]
@@ -144,7 +148,7 @@ EPICS = [
                 "title": "Per-user conversation memory",
                 "size": "S",
                 "priority": "P1",
-                "story": "As a friend, I want the bot to remember what we were just talking about so that \"the second one\" or \"yes, that one\" works.",
+                "story": 'As a friend, I want the bot to remember what we were just talking about so that "the second one" or "yes, that one" works.',
                 "criteria": [
                     "History stored per user in SQLite, trimmed to a token budget",
                     "A `/forget` command or an idle timeout clears the thread",
@@ -253,12 +257,12 @@ EPICS = [
                 "title": "Search and disambiguate titles",
                 "size": "M",
                 "priority": "P0",
-                "story": "As a friend, I want to say \"get Dune\" and be asked which one if there are several, so that the right title is requested.",
+                "story": 'As a friend, I want to say "get Dune" and be asked which one if there are several, so that the right title is requested.',
                 "criteria": [
                     "`search_media(query)` tool calls Seerr search (TMDB) and returns id, type, title, year, overview, poster",
                     "Results already available or already requested are labeled as such",
                     "When more than one plausible match exists the bot presents the picker instead of guessing",
-                    "Vague descriptions (\"the heist movie with the guy from Severance\") are handled by the model choosing search terms, then confirming",
+                    'Vague descriptions ("the heist movie with the guy from Severance") are handled by the model choosing search terms, then confirming',
                 ],
             },
             {
@@ -290,16 +294,16 @@ EPICS = [
                 "priority": "P0",
                 "story": "As a friend, I want to request all seasons, specific seasons, or only future episodes of a show, so that I get what I actually want.",
                 "criteria": [
-                    "Seasons parsed from natural language (\"season 2 and 3\", \"just the latest\", \"everything\")",
+                    'Seasons parsed from natural language ("season 2 and 3", "just the latest", "everything")',
                     "Existing seasons on the server are excluded from the request and mentioned in the reply",
-                    "\"Follow future seasons\" sets the show to monitored in the owning Sonarr",
+                    '"Follow future seasons" sets the show to monitored in the owning Sonarr',
                 ],
             },
             {
                 "title": "Availability lookup with a Plex deep link",
                 "size": "S",
                 "priority": "P0",
-                "story": "As a friend, I want to ask \"is Dune on the server?\" and get versions plus a link that opens Plex, so that I can start watching right away.",
+                "story": 'As a friend, I want to ask "is Dune on the server?" and get versions plus a link that opens Plex, so that I can start watching right away.',
                 "criteria": [
                     "`check_availability(tmdb_id)` reports available versions (1080p, 4K, HEVC re-encode) from Seerr and Plex",
                     "Reply includes a `https://app.plex.tv/desktop/#!/server/<machine>/details?key=...` link",
@@ -310,7 +314,7 @@ EPICS = [
                 "title": "Request status with an ETA",
                 "size": "M",
                 "priority": "P1",
-                "story": "As a friend, I want to ask \"where's my request?\" and get one answer combining Seerr, the arr queue and SABnzbd, so that I do not have to check three apps.",
+                "story": 'As a friend, I want to ask "where\'s my request?" and get one answer combining Seerr, the arr queue and SABnzbd, so that I do not have to check three apps.',
                 "criteria": [
                     "`request_status(user)` lists the user's open Seerr requests with state",
                     "For each, the owning host's Sonarr/Radarr queue and SABnzbd progress are merged into a percent and ETA",
@@ -333,7 +337,7 @@ EPICS = [
                 "title": "Collection requests",
                 "size": "S",
                 "priority": "P2",
-                "story": "As a friend, I want to say \"get all the Mission Impossible movies\" and have every entry requested, so that franchises are one ask.",
+                "story": 'As a friend, I want to say "get all the Mission Impossible movies" and have every entry requested, so that franchises are one ask.',
                 "criteria": [
                     "TMDB collection lookup through Seerr; the picker shows the entries with availability",
                     "One request per missing entry, summarized in a single reply",
@@ -344,7 +348,7 @@ EPICS = [
                 "title": "Dub-aware anime requests",
                 "size": "M",
                 "priority": "P1",
-                "story": "As a friend who watches dubbed anime, I want to ask for \"Frieren, English dub\" and be told up front if only Japanese audio is available, so that I am not surprised after it downloads.",
+                "story": 'As a friend who watches dubbed anime, I want to ask for "Frieren, English dub" and be told up front if only Japanese audio is available, so that I am not surprised after it downloads.',
                 "criteria": [
                     "Anime is detected from TMDB keywords or genre and the Sonarr series type",
                     "The bot checks existing files for an English audio track (same logic as the anime dub audit) and reports coverage per season",
@@ -358,16 +362,16 @@ EPICS = [
         "title": "Playback issues",
         "milestone": "M3",
         "area": "playback",
-        "summary": "Diagnose \"it won't play\" reports before touching anything, then replace the file through a guarded flow when it is really broken.",
+        "summary": 'Diagnose "it won\'t play" reports before touching anything, then replace the file through a guarded flow when it is really broken.',
         "stories": [
             {
                 "title": "Identify the item being reported",
                 "size": "S",
                 "priority": "P0",
-                "story": "As a friend, I want to say \"this won't play\" without naming the file, so that reporting a problem takes one message.",
+                "story": 'As a friend, I want to say "this won\'t play" without naming the file, so that reporting a problem takes one message.',
                 "criteria": [
                     "`recent_sessions(user)` pulls the user's current and last few sessions from Tautulli",
-                    "The bot confirms the item (\"Dune (2021), the 4K version?\") before doing anything",
+                    'The bot confirms the item ("Dune (2021), the 4K version?") before doing anything',
                     "If nothing recent exists, it asks for the title and uses the search picker",
                 ],
             },
@@ -387,10 +391,10 @@ EPICS = [
                 "title": "File health check",
                 "size": "M",
                 "priority": "P0",
-                "story": "As the maintainer, I want the bot to probe and partially decode the file on a read-only mount, so that \"broken\" is measured rather than assumed.",
+                "story": 'As the maintainer, I want the bot to probe and partially decode the file on a read-only mount, so that "broken" is measured rather than assumed.',
                 "criteria": [
                     "Media shares mounted read-only in the container",
-                    "`probe_file(path)` runs ffprobe and a short decode; \"freezes at 1:12:30\" runs the decode around that timestamp",
+                    '`probe_file(path)` runs ffprobe and a short decode; "freezes at 1:12:30" runs the decode around that timestamp',
                     "Result is one of ok, truncated, corrupt, unreadable, with the evidence",
                     "Probe time is capped and runs in a worker so the bot stays responsive",
                 ],
@@ -447,7 +451,7 @@ EPICS = [
                 "story": "As a friend, I want to report missing subtitles, out-of-sync audio or a missing English dub, so that the problem is tracked even before it can be auto-fixed.",
                 "criteria": [
                     "Reports are recorded and a Seerr issue opened with the track listing from ffprobe",
-                    "\"Does this have Spanish subs?\" is answered from the track listing",
+                    '"Does this have Spanish subs?" is answered from the track listing',
                     "Bazarr search or sync is triggered when Bazarr is configured; otherwise the admin is notified",
                 ],
             },
@@ -455,7 +459,7 @@ EPICS = [
                 "title": "Missing-episode reports",
                 "size": "S",
                 "priority": "P1",
-                "story": "As a friend, I want to say \"S02E07 of The Bear is missing\" and have the gap searched, so that I do not have to wait for the admin to notice.",
+                "story": 'As a friend, I want to say "S02E07 of The Bear is missing" and have the gap searched, so that I do not have to wait for the admin to notice.',
                 "criteria": [
                     "`find_gaps(series)` compares Sonarr's episode list with files present on the owning host",
                     "Only the missing episodes are searched, and the reply lists them",
@@ -475,7 +479,7 @@ EPICS = [
                 "title": "Live session report with relay detection",
                 "size": "M",
                 "priority": "P0",
-                "story": "As a friend, I want to say \"it's laggy\" and be told what my stream is actually doing, so that I know whether it is me, the server or the file.",
+                "story": 'As a friend, I want to say "it\'s laggy" and be told what my stream is actually doing, so that I know whether it is me, the server or the file.',
                 "criteria": [
                     "`session_report(user)` from Tautulli `get_activity`: bitrate, direct play/stream/transcode, LAN vs WAN, relay flag, client and player",
                     "Relayed streams are called out explicitly with the relay bandwidth cap",
@@ -511,7 +515,7 @@ EPICS = [
                 "story": "As a friend, I want one concrete fix instead of a wall of stats, so that I can get back to watching.",
                 "criteria": [
                     "Findings map to fixes: disable relay, set remote quality to Original or lower it, turn subtitles off, pick the 1080p or HEVC version, wait for the server",
-                    "The stats are available on request (\"show me the details\")",
+                    'The stats are available on request ("show me the details")',
                     "Advice text is covered by eval cases",
                 ],
             },
@@ -519,7 +523,7 @@ EPICS = [
                 "title": "Service health checks",
                 "size": "S",
                 "priority": "P1",
-                "story": "As a friend, I want to ask \"is Plex down?\" and get a real answer, so that I do not message the admin at midnight.",
+                "story": 'As a friend, I want to ask "is Plex down?" and get a real answer, so that I do not message the admin at midnight.',
                 "criteria": [
                     "`service_health()` pings Plex, Seerr, both Sonarr/Radarr/SABnzbd/Tautulli instances and Wizarr",
                     "Reply lists what is up and down and any known maintenance window (E6)",
@@ -623,7 +627,7 @@ EPICS = [
                 "title": "Download log reading",
                 "size": "M",
                 "priority": "P1",
-                "story": "As the admin, I want to ask \"why did Dune fail?\" and get a plain-English answer from SABnzbd and arr history, so that I do not have to read three logs.",
+                "story": 'As the admin, I want to ask "why did Dune fail?" and get a plain-English answer from SABnzbd and arr history, so that I do not have to read three logs.',
                 "criteria": [
                     "`download_history(item, host)` pulls SABnzbd history and arr events for the item",
                     "The model summarizes the failure cause and the next action",

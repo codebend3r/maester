@@ -1,0 +1,5 @@
+{"page":1,"totalPages":1,"totalResults":2,"results":[
+ {"id":438631,"mediaType":"movie","title":"Dune","releaseDate":"2021-10-22","overview":"Paul Atreides...","posterPath":"/d5NXSklXo0qyIYkgV94XAgMrLYk.jpg","mediaInfo":{"status":5,"status4k":1}},
+ {"id":841,"mediaType":"movie","title":"Dune","releaseDate":"1984-12-14","overview":"Lynch's Dune","posterPath":null},
+ {"id":12345,"mediaType":"person","name":"Someone"}
+]}
