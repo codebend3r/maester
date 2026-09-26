@@ -1,36 +1,45 @@
 ---
 name: pr-format
-description: Use when opening, drafting, or editing a pull request in maester, "open a PR", "write the PR description", "gh pr create", "update the PR body", or when writing a squash-merge commit message from a PR. Every PR title starts with `MAE:`, and every PR body has one shape - What was changed, Why it was needed, how it was tested - as short bullets.
+description: Use when opening, drafting, or editing a pull request in maester — "open a PR", "write the PR description", `gh pr create`, `gh pr edit`, "update the PR body", or after pushing new commits to a branch with an open PR. Covers the `MAE:` title, the What / Why / Testing body, keeping the PR in sync with the branch, and zero agent attribution. For commit messages, use `commit-format`.
 ---
 
 # PR format
 
-Every maester PR body has the same four sections, taken from `.github/pull_request_template.md`. A reviewer should know what changed and why in under a minute.
+## House style
+
+Shared with `commit-format`. Keep the two copies identical.
+
+- **`MAE:` prefix.** Every commit subject and PR title starts with `MAE: `. No other prefix (`feat:`, `fix:`, `chore:`)
+- **Short, concise sentences.** One idea per line. No filler ("This PR…", "I added…"), no restating
+- **Prefer bullets.** Use `-` bullets over paragraphs. Nest one level at most
+- **Backtick code.** File names, paths, commands, env vars, model ids, and code symbols
+- **No agent attribution.** Never mention Claude, Anthropic, Copilot, Cursor, Codex, or "AI-generated" anywhere: subject, body, or trailer. This overrides the default `Co-Authored-By: Claude` trailer and "Generated with Claude Code" footer. Human co-authors are fine
+- **No emoji** in commits, PR titles, or PR bodies
 
 ## Title
 
-- Starts with `MAE:`, then a short fragment, no trailing period: `MAE: split CI into PR checks and a main smoke test`
-- Epic work that closes several stories: `MAE: E1 agent core: tool registry, runner, loop, memory, evals`
-- 72 characters or fewer. `MAE:` is the only prefix, no `feat:` / `fix:`
-- Prefix, bullet, backtick and no-attribution rules come from `git-commit-and-pr-format`
+- `MAE: ` then a short summary of the whole branch, 72 chars max, no trailing period
+- Epic PRs name the epic: `MAE: E1 agent core: tool registry, runner, loop, memory, evals`
 
 ## Body
+
+Follows `.github/pull_request_template.md`. **What** and **Why** are always required.
 
 ```markdown
 ## What
 
-- <one bullet per change, what now happens that didn't before>
-- `path/or/symbol`: <what changed in it>
+- `path/or/symbol`: <what changed>
+- <what now happens that didn't before>
 
 ## Why
 
-- <the problem, bug, or need that made this necessary>
-- <any trade-off or follow-up a reviewer should know>
+- <the problem, bug, or need behind the change>
+- <trade-off or follow-up a reviewer should know>
 
 ## Testing
 
-- <commands run and their result, e.g. `uv run pytest` - 61 passed>
-- <what was NOT verified, and why>
+- `uv run pytest`: 61 passed
+- <what was not verified, and why>
 
 Closes #<n>
 
@@ -42,20 +51,37 @@ Closes #<n>
 - [x] Any new arr call names its host
 ```
 
-## Rules
+- **What** says what changed, not how the code works
+- **Why** gives the reason, not a restatement of What. "Friends could see tools they can't call" is a reason; "Filter tools by tier" is not
+- **Testing** lists what actually ran. Say plainly what was skipped
+- Link issues with `Closes #n` (one per issue), `Part of #n` for the parent epic, `Refs #n` when the PR doesn't finish it
+- Tick each checklist item or mark it `(n/a)`. Never delete one
 
-- **What** says what was fixed or added, not how the code works. One idea per bullet, one or two lines each. Lead with the file or symbol in backticks when it helps scanning.
-- **Why** is required and must give the reason, not restate What. "Friends could see tools they can't call" is a reason; "Filter tools by tier" is not.
-- **Testing** lists what actually ran. If something was skipped (Docker not running, no live stack), say so plainly.
-- Bullets only, no paragraphs. Nest a sub-bullet at most one level deep.
-- Link issues with `Closes #n` (one per issue: `Closes #2, closes #3`). Use `Part of #n` for the parent epic and `Refs #n` when the PR doesn't finish the issue.
-- Tick a checklist item or mark it `(n/a)`; never delete it.
-- No filler: no "This PR...", no summary of the summary, no emoji, no agent attribution lines.
-- Backticks for paths, commands, env vars, model ids, and code symbols only.
+## Creating
 
-## Creating it
+1. Read the whole branch: `git log --oneline origin/main..HEAD` and `git diff origin/main...HEAD --stat`
+2. Write the body to a file in the scratchpad and check it against the house style
+3. `gh pr create --base main --title "MAE: <title>" --body-file <file>`
 
-1. Read the full change: `git log main..HEAD` and `git diff main...HEAD --stat`.
-2. Draft the body in a scratch file, then check it against the rules above.
-3. `gh pr create --base main --title "MAE: <title>" --body-file <file>` (or `gh pr edit <n> --body-file <file>` to fix an existing one).
-4. The squash-merge commit uses the same `MAE:` title with ` (#<pr>)` and the same body.
+## Keeping it in sync
+
+The title and body describe the **current whole branch**, not the first commit. After every push that changes what the branch does:
+
+1. Re-read `origin/main...HEAD`
+2. Add, change, or remove bullets to match it
+3. Update the title if the scope changed
+4. `gh pr edit <n> --title "MAE: <title>" --body-file <file>`
+
+Strip any attribution line an older body had.
+
+## Checklist
+
+- [ ] Title starts with `MAE: `, 72 chars or fewer
+- [ ] What and Why both present, as short bullets
+- [ ] Testing says what ran and what didn't
+- [ ] Issues linked, checklist ticked or `(n/a)`
+- [ ] Zero agent attribution, zero emoji
+
+## Reporting back
+
+In chat only, one line per action: `🔀 PR #<n> created — MAE: <title>`, `📝 PR #<n> synced with the branch`.
