@@ -1,0 +1,23 @@
+name: Epic
+description: A parent issue that groups stories as sub-issues
+labels: ["epic"]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What this epic delivers and why
+    validations:
+      required: true
+  - type: input
+    id: milestone
+    attributes:
+      label: Milestone
+      placeholder: M2 Requests
+  - type: textarea
+    id: stories
+    attributes:
+      label: Stories
+      description: One line each; attach them as sub-issues once created
+      value: |
+        - [ ]

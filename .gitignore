@@ -1,0 +1,22 @@
+# secrets
+.env
+.env.local
+*.pem
+
+# runtime data
+maester-data/
+*.db
+
+# python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+dist/
+
+# editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp

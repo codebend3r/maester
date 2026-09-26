@@ -1,0 +1,27 @@
+name: Story
+description: A user story with acceptance criteria
+labels: ["story"]
+body:
+  - type: input
+    id: epic
+    attributes:
+      label: Epic
+      description: The parent epic, e.g. "E3 Requests"
+    validations:
+      required: true
+  - type: textarea
+    id: story
+    attributes:
+      label: User story
+      placeholder: As a <who>, I want <what> so that <why>.
+    validations:
+      required: true
+  - type: textarea
+    id: criteria
+    attributes:
+      label: Acceptance criteria
+      value: |
+        - [ ]
+        - [ ]
+    validations:
+      required: true
