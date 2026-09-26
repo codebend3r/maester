@@ -1,0 +1,68 @@
+name: 🚀 Main smoke test
+
+# Runs on merges into main and nowhere else: builds the production image and
+# checks that it starts and serves /health. Lint and tests run on the PR
+# before the merge (pull-request-checks.yml).
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# Every merge gets checked, so queue runs rather than cancelling them.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    name: 🩺 Build and health check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      IMAGE: maester:ci
+      PORT: 8020
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🐳 Build image
+        run: docker build -t "$IMAGE" .
+
+      - name: 🏷️ Entrypoint reports the release version
+        run: |
+          expected="maester $(cat VERSION)"
+          actual="$(docker run --rm "$IMAGE" maester --version)"
+          echo "expected: $expected"
+          echo "actual:   $actual"
+          test "$actual" = "$expected"
+
+      # The default CMD does not serve HTTP yet, so start the web app
+      # explicitly. /health is ungated, so no .env or Discord is needed.
+      - name: ▶️ Start web app
+        run: |
+          docker run -d --name maester -p "$PORT:$PORT" "$IMAGE" \
+            uvicorn maester.web:create_app --factory --host 0.0.0.0 --port "$PORT"
+
+      - name: 🩺 Wait for /health
+        run: |
+          for _ in $(seq 1 30); do
+            if body="$(curl -fsS "http://127.0.0.1:$PORT/health")"; then
+              echo "$body"
+              echo "$body" | jq -e --arg v "$(cat VERSION)" \
+                '.status == "ok" and .version == $v'
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::/health did not respond within 30s"
+          exit 1
+
+      - name: 📜 Container logs
+        if: always()
+        run: docker logs maester || true
+
+      - name: 🧹 Stop container
+        if: always()
+        run: docker rm -f maester || true
