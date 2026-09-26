@@ -38,7 +38,7 @@ Everything the bot can change goes through a small set of scoped tools with perm
 
 ## Roadmap and tracker
 
-Work is tracked in [GitHub Issues](https://github.com/codebend3r/maester/issues): one issue per epic (label `epic`) with stories attached as sub-issues, milestones M1 to M5 for phases, and a project board for status.
+Work is tracked in [GitHub Issues](https://github.com/codebend3r/maester/issues): one issue per epic (label `epic`) with stories attached as sub-issues, milestones M1 to M5 for phases, and the [maester roadmap board](https://github.com/users/codebend3r/projects/1) for status.
 
 The catalog of epics and stories lives in [`scripts/catalog.py`](scripts/catalog.py). [`docs/roadmap.md`](docs/roadmap.md) and the issues are both rendered from it by `scripts/sync_tracker.py`, so edit the catalog and re-run the sync rather than editing either by hand.
 
