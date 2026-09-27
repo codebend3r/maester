@@ -212,3 +212,14 @@ async def test_resolved_reports_no_longer_count_and_a_declined_file_stays(librar
     third = await report(library, DUNE_4K_ITEM, ReportKind.CAM)
     assert third.report.action == Action.RECORDED
     assert third.evidence.describe() == "the admin decided not to replace this file"
+
+
+async def test_one_friends_claims_never_make_a_healthy_file_replaceable(library):
+    # A moment past the end of a full, clean file.
+    past_the_end = await report(library, DUNE_4K_ITEM, ReportKind.WONT_PLAY, "freezes", at=12600.0)
+    assert past_the_end.report.health == "ok" and past_the_end.report.action == Action.RECORDED
+    # A decode line the audit doesn't know, or a flaky mount.
+    for line in ("[h264 @ 0x55] Could not find ref with POC 12", "Read error: Input/output error"):
+        library.services.probe.errors[FORKS] = (line,)
+        filed = await report(library, FORKS_ITEM, ReportKind.WONT_PLAY)
+        assert filed.report.health == "unreadable" and filed.report.action == Action.RECORDED

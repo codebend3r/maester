@@ -6,15 +6,20 @@ at the start, the middle and near the end. The verdict is one of four, with
 the evidence, and follows the maintainer's library audit
 (`movie-completeness-audit`):
 
-- `truncated`: it runs under 70% of the title's runtime, it ends before the
-  moment named, or a stretch inside its claimed length decodes nothing
-- `corrupt`: decoding prints errors that aren't known harmless noise
-- `unreadable`: it can't be judged (missing on the mount, outside the media
-  roots, a format ffmpeg can't parse, a check that ran out of time)
+- `truncated`: it runs under 70% of the title's runtime, or a stretch
+  inside its claimed length decodes nothing
+- `corrupt`: decoding prints a known sign of a damaged stream (`CORRUPTION`)
+- `unreadable`: it can't be judged: missing on the mount, outside the media
+  roots, a read error, a decoder or format ffmpeg lacks, a check that ran out
+  of time, or anything ffmpeg printed that is neither known noise nor a
+  known sign of damage
 - `ok`: every stretch decoded cleanly
 
-Only `truncated` and `corrupt` count as a failed check. `unreadable` never
-justifies a replacement: a missing mount looks the same as a missing file.
+Only `truncated` and `corrupt` count as a failed check, and only the file
+itself can produce them: nothing a friend says does. A moment named past the
+file's end is noted, not counted (the stretch decoded is then the file's
+end, which shows whether it's hollow). `unreadable` never justifies a
+replacement: a flaky mount must not look like a broken file.
 """
 
 from __future__ import annotations
@@ -43,7 +48,22 @@ NOISE = re.compile(
         )
     )
 )
-# ffmpeg can't parse this variant; other players may still play the file.
+# What a damaged stream makes ffmpeg's decoders say. Only these prove corruption;
+# any other line (a read error, a missing decoder, something new) proves nothing.
+CORRUPTION = re.compile(
+    "|".join(
+        (
+            r"Invalid NAL unit size",
+            r"error while decoding MB",
+            r"corrupt decoded frame",
+            r"Invalid data found when processing input",
+            r"concealing \d+ DC, \d+ AC, \d+ MV errors",
+            r"Packet corrupt",
+        )
+    ),
+    re.IGNORECASE,
+)
+# ffprobe can't parse this variant; other players may still play the file.
 UNSUPPORTED = re.compile(r"Not yet implemented in FFmpeg")
 
 
@@ -128,7 +148,7 @@ def decode_windows(duration: float, at: float | None) -> tuple[Window, ...]:
 
 
 def length_findings(duration: float, at: float | None, expected: float | None) -> list[Finding]:
-    """What the file's length alone says, against the runtime and the moment named."""
+    """What the file's length alone says against the runtime; a moment named is only noted."""
     findings = []
     if expected and duration < SHORT * expected:
         findings.append(
@@ -139,30 +159,37 @@ def length_findings(duration: float, at: float | None, expected: float | None) -
         )
     if at is not None and at > duration:
         findings.append(
-            Finding(Verdict.TRUNCATED, f"it ends at {clock(duration)}, before {clock(at)}")
+            Finding(Verdict.OK, f"the moment named, {clock(at)}, is past its {clock(duration)}")
         )
     return findings
+
+
+def _shown(lines: list[str]) -> str:
+    return " | ".join(lines[:EVIDENCE_LINES])
 
 
 def judge(window: Window, decoded: Decoded, duration: float) -> list[Finding]:
     """What decoding one stretch says about the file."""
     if decoded.exit_code is None:
         return [Finding(Verdict.UNREADABLE, f"decoding {window} ran out of time")]
-    errors = [line for line in decoded.errors if not NOISE.search(line)]
-    if unsupported := next((e for e in errors if UNSUPPORTED.search(e)), None):
-        return [
+    said = [line for line in decoded.errors if not NOISE.search(line)]
+    damage = [line for line in said if CORRUPTION.search(line)]
+    unclear = [line for line in said if not CORRUPTION.search(line)]
+    findings = []
+    if damage:
+        findings.append(Finding(Verdict.CORRUPT, f"decode errors at {window}: {_shown(damage)}"))
+    if unclear:
+        findings.append(
             Finding(
                 Verdict.UNREADABLE,
-                f"ffmpeg can't decode this format ({unsupported}); other players may",
+                f"ffmpeg at {window} said what proves nothing: {_shown(unclear)}",
             )
-        ]
-    findings = []
-    if errors:
-        shown = " | ".join(errors[:EVIDENCE_LINES])
-        findings.append(Finding(Verdict.CORRUPT, f"decode errors at {window}: {shown}"))
+        )
     if decoded.exit_code != 0:
         stopped = f"ffmpeg stopped at {window} with exit code {decoded.exit_code}"
         return findings or [Finding(Verdict.UNREADABLE, stopped)]
+    if unclear:  # frames missing after a read error say nothing about the file
+        return findings
     if decoded.frames == 0 and window.start < duration:
         findings.append(
             Finding(
@@ -174,13 +201,14 @@ def judge(window: Window, decoded: Decoded, duration: float) -> list[Finding]:
 
 
 def verdict_of(findings: list[Finding], windows: tuple[Window, ...]) -> Health:
-    """The worst finding decides; every finding is evidence."""
+    """The worst finding decides; every finding is evidence, notes last."""
+    ranked = [*SEVERITY, Verdict.OK]
+    evidence = tuple(f.evidence for f in sorted(findings, key=lambda f: ranked.index(f.verdict)))
     for verdict in SEVERITY:
         if any(f.verdict is verdict for f in findings):
-            ranked = sorted(findings, key=lambda f: SEVERITY.index(f.verdict))
-            return Health(verdict, tuple(f.evidence for f in ranked))
+            return Health(verdict, evidence)
     stretches = ", ".join(str(w) for w in windows)
-    return Health(Verdict.OK, (f"decoded {stretches} cleanly",))
+    return Health(Verdict.OK, (f"decoded {stretches} cleanly", *evidence))
 
 
 async def check_health(

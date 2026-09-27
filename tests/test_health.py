@@ -50,9 +50,24 @@ def test_each_stretch_is_judged_on_errors_frames_and_time():
     assert verdicts(Decoded(0, (), 0)) == [Verdict.TRUNCATED]
     assert verdicts(Decoded(0, (), None)) == [Verdict.UNREADABLE]
     assert verdicts(Decoded(0, (), 1)) == [Verdict.UNREADABLE]
-    assert verdicts(Decoded(0, ("Error while decoding",), 1)) == [Verdict.CORRUPT]
+    stream_error = "Error while decoding stream #0:0: Invalid data found when processing input"
+    assert verdicts(Decoded(0, (stream_error,), 1)) == [Verdict.CORRUPT]
     unsupported = Decoded(0, ("Not yet implemented in FFmpeg, patches welcome",), 0)
     assert verdicts(unsupported) == [Verdict.UNREADABLE]
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "[h264 @ 0x55] Could not find ref with POC 12",  # nothing the audit knows
+        "[matroska,webm @ 0x1] Read error at pos. 8812044 (0x867a0c): Input/output error",
+        "Decoder (codec av1) not found for input stream #0:0",
+    ],
+)
+def test_a_line_that_is_not_a_known_sign_of_damage_proves_nothing(line):
+    findings = judge(Window(0.0, 10.0), Decoded(0, (line,), 0), 9331.0)
+    assert [f.verdict for f in findings] == [Verdict.UNREADABLE]
+    assert not any(f.verdict.failed for f in findings)  # and no "nothing decodes" either
 
 
 async def test_a_clean_file_is_ok_and_only_the_stretches_are_decoded():
@@ -66,14 +81,20 @@ async def test_a_clean_file_is_ok_and_only_the_stretches_are_decoded():
 
 async def test_freezing_at_a_moment_decodes_around_it_and_finds_corruption():
     probe = FakeFileProbe(
-        errors={PATH: ("[hevc @ 0x5] Invalid NAL unit size (0 > 29)", "Error while decoding")}
+        errors={
+            PATH: (
+                "[hevc @ 0x5] Invalid NAL unit size (0 > 29)",
+                "[hevc @ 0x5] Error parsing NAL unit #3.",
+            )
+        }
     )
     health = await check_health(probe, DUNE, at=4350.0, expected=RUNTIME)
     assert probe.decoded == [(PATH, 4335.0, 30.0)]
     assert health.verdict == Verdict.CORRUPT and health.verdict.failed
+    # The known sign decides; the unknown line is kept as evidence, not as proof.
     assert health.evidence == (
-        "decode errors at 1:12:15-1:12:45: [hevc @ 0x5] Invalid NAL unit size (0 > 29) | "
-        "Error while decoding",
+        "decode errors at 1:12:15-1:12:45: [hevc @ 0x5] Invalid NAL unit size (0 > 29)",
+        "ffmpeg at 1:12:15-1:12:45 said what proves nothing: [hevc @ 0x5] Error parsing NAL unit #3.",
     )
     assert health.summary.startswith("corrupt: decode errors at 1:12:15")
 
@@ -84,15 +105,30 @@ async def test_a_short_or_hollow_file_is_truncated():
     assert health.verdict == Verdict.TRUNCATED
     assert health.evidence == ("it runs 51:40, well short of the 2:35:00 runtime",)
 
-    health = await check_health(FakeFileProbe(), half, at=4350.0)
-    assert health.evidence[0] == "it ends at 51:40, before 1:12:30"
-
     hollow = FakeFileProbe(empty={PATH})
     health = await check_health(hollow, DUNE, expected=RUNTIME)
     assert health.verdict == Verdict.TRUNCATED and len(health.evidence) == 3
     assert (
         health.evidence[0] == "nothing decodes at 0:00-0:10, though the file claims to run 2:35:31"
     )
+
+
+async def test_a_moment_named_past_the_end_is_noted_but_proves_nothing():
+    """A friend's "freezes at 3:30:00" on a full, clean 2:35:31 file."""
+    probe = FakeFileProbe()
+    health = await check_health(probe, DUNE, at=12600.0, expected=RUNTIME)
+    assert health.verdict == Verdict.OK and not health.verdict.failed
+    assert probe.decoded == [(PATH, 9301.0, 30.0)]  # the file's end was decoded instead
+    assert health.evidence[-1] == "the moment named, 3:30:00, is past its 2:35:31"
+    # Even on a file with no runtime to compare against.
+    short = Inspection(PATH, 3100.0, "hevc", 0, ())
+    assert not (await check_health(FakeFileProbe(), short, at=4350.0)).verdict.failed
+
+
+async def test_one_unknown_line_doesnt_make_a_copy_replaceable():
+    probe = FakeFileProbe(errors={PATH: ("[h264 @ 0x55] Could not find ref with POC 12",)})
+    health = await check_health(probe, DUNE, expected=RUNTIME)
+    assert health.verdict == Verdict.UNREADABLE and not health.verdict.failed
 
 
 async def test_a_file_ffmpeg_cannot_parse_is_unreadable_not_broken():
