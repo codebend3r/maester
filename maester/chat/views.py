@@ -91,8 +91,10 @@ class _DecisionButton(discord.ui.Button):
             return
         view._finish()
         await interaction.edit_original_response(view=view)
-        await interaction.followup.send(decision.text)
+        # Notices first: they carry the effect (a DM, an admin post) and must
+        # not wait on this reply going through.
         await bot.deliver(decision.notices)
+        await interaction.followup.send(decision.text)
 
 
 class ChoiceView(_AutoDisableView):
@@ -127,10 +129,12 @@ class _ChoiceButton(discord.ui.Button):
 
 
 async def send_response(target, bot: MaesterBot, user: ChatUser, response: ChatResponse) -> None:
-    """Send a ChatResponse's chunks with its views on the last one, then its notices.
+    """Deliver a ChatResponse's notices, then send its chunks with its views on the last one.
 
+    Notices go first so a failed send cannot swallow an admin approval.
     `target` is anything with `.send()`: a channel, a DM, or a webhook followup.
     """
+    await bot.deliver(response.notices)
     chunks = response.chunks or ["(no reply)"]
     for chunk in chunks[:-1]:
         await target.send(chunk)
@@ -149,7 +153,6 @@ async def send_response(target, bot: MaesterBot, user: ChatUser, response: ChatR
     for extra in response.confirmations[1:]:
         extra_view = DecisionView(extra)
         extra_view.message = await target.send(f"Also waiting: {extra.summary}", view=extra_view)
-    await bot.deliver(response.notices)
 
 
 def choice_embeds(choices: Sequence[Choice]) -> list[discord.Embed]:

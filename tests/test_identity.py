@@ -112,3 +112,13 @@ def test_tier_override(identity):
     assert svc.tier_for("d1", set()) == Tier.FRIEND
     with pytest.raises(ValueError):
         svc.set_tier_override("d1", "king")
+
+
+async def test_a_plex_account_links_to_one_discord_account(identity):
+    svc, store = identity
+    assert (await svc.start_link("d1", "Dany", "dany@example.com")).ok
+    taken = await svc.start_link("d9", "Imposter", "dany_t")
+    assert not taken.ok and "already linked to another Discord account" in taken.message
+    assert store.get_user("d9") is None
+    store.upsert_user("d1", status="revoked")
+    assert (await svc.start_link("d9", "Dany again", "dany_t")).ok

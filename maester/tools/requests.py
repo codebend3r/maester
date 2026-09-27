@@ -23,7 +23,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from maester.agent.tools import Approval, ForAdmin, Settled, Tier, ToolContext, tool
+from maester.agent.tools import (
+    Approval,
+    ForAdmin,
+    LinkedUser,
+    Settled,
+    Tier,
+    ToolContext,
+    tool,
+)
 from maester.clients import Services
 from maester.clients.seerr import (
     ANIME_KEYWORD,
@@ -39,7 +47,7 @@ from maester.clients.seerr import (
 from maester.config import Settings
 from maester.library import AmbiguousOwner, movie_owner, series_owner
 from maester.notify import Notice
-from maester.store import PendingAction, UserRow
+from maester.store import PendingAction
 
 # A 4K copy runs roughly four to six times the size of a 1080p encode.
 UHD_SIZE_FACTOR = (4, 6)
@@ -192,7 +200,7 @@ async def submit(
     )
 
 
-async def explain(seerr: Seerr, user: UserRow, refused: RequestRefused, media_type: str) -> str:
+async def explain(seerr: Seerr, user: LinkedUser, refused: RequestRefused, media_type: str) -> str:
     if refused.reason != Refusal.QUOTA:
         return REFUSALS[refused.reason]
     quota = (await seerr.quota(user.seerr_user_id)).of(media_type)
@@ -316,8 +324,7 @@ async def request_media_4k(
     request = submitted.request
     if request is None or request.status != RequestStatus.PENDING:
         return reply
-    user = ctx.linked_user()
-    who = user.plex_username or user.plex_email or ctx.user_id
+    who = ctx.linked_user().name
     notice = f"{who} asks for {details.display} in 4K (Seerr request #{request.id})."
     if "standard_copy_gb" in tradeoff:
         notice += (

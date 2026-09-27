@@ -59,6 +59,19 @@ class AgentReply:
     iterations: int = 0
 
 
+class TurnFailed(Exception):
+    """A turn broke partway through.
+
+    `reply` holds what the turn's tools had already done (pending
+    confirmations, notices for the admin), so a failure after a tool acted
+    does not lose the buttons or the notice that go with it.
+    """
+
+    def __init__(self, reply: AgentReply):
+        self.reply = reply
+        super().__init__("the turn failed partway through")
+
+
 class Agent:
     def __init__(
         self,
@@ -151,6 +164,25 @@ class Agent:
             except LimitExceeded as exc:
                 return AgentReply(LIMIT_REPLY.format(what=exc.what, hint=exc.retry_hint))
 
+        reply = AgentReply(text="")
+        try:
+            await self._turn(user_id, tier, text, reply, on_text)
+        except Exception as exc:
+            raise TurnFailed(reply) from exc
+        finally:
+            if self.limiter:
+                self.limiter.add_tokens(user_id, reply.input_tokens + reply.output_tokens)
+        return reply
+
+    async def _turn(
+        self,
+        user_id: str,
+        tier: Tier,
+        text: str,
+        reply: AgentReply,
+        on_text: Callable[[str], Any] | None,
+    ) -> None:
+        """Run one turn, recording into `reply` as it goes."""
         ctx = self._context(user_id, tier)
         history = self.store.recent_messages(
             user_id, max_tokens=HISTORY_TOKEN_BUDGET, since=self.now() - IDLE_RESET
@@ -160,7 +192,6 @@ class Agent:
         self.store.append_message(user_id, "user", text, estimate_tokens(text))
 
         tools = self.runner.registry.definitions(tier)
-        reply = AgentReply(text="")
         json_retries = 0
 
         for _ in range(MAX_TOOL_ITERATIONS + 1):
@@ -217,10 +248,6 @@ class Agent:
             reply.text = (
                 reply.text or "I ran out of steps on that one; try asking for a smaller piece."
             )
-
-        if self.limiter:
-            self.limiter.add_tokens(user_id, reply.input_tokens + reply.output_tokens)
-        return reply
 
     async def _stream_turn(
         self,

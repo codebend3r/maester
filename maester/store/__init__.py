@@ -240,11 +240,11 @@ class Store:
         return self._user(r)
 
     def user_by_seerr_id(self, seerr_user_id: int) -> UserRow | None:
-        """The active link for a Seerr user, if one exists: who to tell about their requests."""
+        """The live (pending or active) link to a Seerr user; linking allows one at a time."""
         with self._lock:
             r = self._conn.execute(
-                "SELECT * FROM users WHERE seerr_user_id = ? AND status = ?",
-                (seerr_user_id, LinkStatus.ACTIVE),
+                "SELECT * FROM users WHERE seerr_user_id = ? AND status != ?",
+                (seerr_user_id, LinkStatus.REVOKED),
             ).fetchone()
         return self._user(r)
 

@@ -87,6 +87,15 @@ class IdentityService:
                 "or ask the admin for an invite if you don't have access yet.",
             )
         seerr_user = matches[0]
+        holder = self.store.user_by_seerr_id(seerr_user.id)
+        if holder is not None and holder.discord_id != discord_id:
+            # One Discord account per Plex account, so requests and ready DMs
+            # can only belong to one person.
+            return LinkStart(
+                False,
+                "That Plex account is already linked to another Discord account. "
+                "Ask the admin if it should be yours.",
+            )
         tautulli_id = await self._tautulli_id(
             seerr_user.email, seerr_user.plex_username or seerr_user.username
         )

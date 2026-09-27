@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any
 
 from maester.config import Settings
 from maester.notify import Notice
-from maester.store import LinkStatus, PendingAction, UserRow
+from maester.store import LinkStatus, PendingAction
 
 if TYPE_CHECKING:
     from maester.clients import Services
@@ -45,6 +45,15 @@ class NotLinked(LookupError):
     """The caller has no active link to a Seerr user, so nothing can be done as them."""
 
 
+@dataclass(frozen=True)
+class LinkedUser:
+    """Who a tool acts as: the caller's Discord id and the Seerr user it is linked to."""
+
+    discord_id: str
+    seerr_user_id: int
+    name: str  # their Plex username, or email, as the admin knows them
+
+
 @dataclass
 class ToolContext:
     """What a tool handler gets besides its arguments.
@@ -61,12 +70,12 @@ class ToolContext:
     settings: Settings = field(default_factory=Settings)
     extra: dict[str, Any] = field(default_factory=dict)
 
-    def linked_user(self) -> UserRow:
+    def linked_user(self) -> LinkedUser:
         """The caller's active link: the one way a tool learns who to act as.
 
-        Requests go to Seerr as the row's `seerr_user_id`, so they carry the
-        friend's name, quotas and permissions. An admin who never linked, or
-        a link still waiting on approval, has none, and the tool refuses.
+        Requests go to Seerr as `seerr_user_id`, so they carry the friend's
+        name, quotas and permissions. An admin who never linked, or a link
+        still waiting on approval, has none, and the tool refuses.
         """
         user = self.store.get_user(self.user_id) if self.store else None
         if user is None or user.status != LinkStatus.ACTIVE or user.seerr_user_id is None:
@@ -74,7 +83,12 @@ class ToolContext:
                 "this Discord account isn't linked to a Plex account yet; "
                 "the user can link it with /link"
             )
-        return user
+        name = user.plex_username or user.plex_email or user.discord_id
+        return LinkedUser(user.discord_id, user.seerr_user_id, name)
+
+
+# Discord shows at most ten embeds on one message, one card per option.
+MAX_CHOICES = 10
 
 
 @dataclass(frozen=True)
@@ -97,12 +111,20 @@ class Choice:
 
 @dataclass(frozen=True)
 class Choices:
-    """Return this from a handler to offer the user a pick instead of a plain result."""
+    """Return this from a handler to offer the user a pick instead of a plain result.
+
+    At most `MAX_CHOICES` become buttons; the model is told which were left
+    off, so it never promises a button that isn't there.
+    """
 
     items: list[Choice]
 
+    @property
+    def shown(self) -> list[Choice]:
+        return self.items[:MAX_CHOICES]
+
     def as_content(self) -> dict[str, Any]:
-        return {
+        content: dict[str, Any] = {
             "choices": [
                 {
                     "label": c.label,
@@ -111,10 +133,13 @@ class Choices:
                     "poster_url": c.poster_url,
                     "detail": c.detail,
                 }
-                for c in self.items
+                for c in self.shown
             ],
             "note": "Shown to the user as numbered buttons; wait for their pick.",
         }
+        if left_off := self.items[MAX_CHOICES:]:
+            content["not_shown"] = [f"{c.display} ({c.value})" for c in left_off]
+        return content
 
 
 @dataclass(frozen=True)
@@ -158,6 +183,8 @@ class Settled:
 
 Handler = Callable[..., Awaitable[Any]]
 # Applies the admin's decision on an approval a tool raised: (context, pending, approved).
+# It must be safe to run again: when it raises, the decision is reopened and
+# the admin may press the button again after a partial effect.
 Settle = Callable[["ToolContext", PendingAction, bool], Awaitable[Settled]]
 
 

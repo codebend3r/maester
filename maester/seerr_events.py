@@ -17,7 +17,7 @@ from functools import partial
 from maester.clients import ClientError, Services
 from maester.clients.seerr import MediaRequest, SeerrNotification
 from maester.notify import Notice
-from maester.store import Store
+from maester.store import LinkStatus, Store
 
 log = logging.getLogger("maester.seerr")
 
@@ -44,7 +44,7 @@ async def ready_to_watch(
         return []
     request = await services.seerr.get_request(notification.request_id)
     user = store.user_by_seerr_id(request.requested_by_id)
-    if user is None:  # requested in Seerr by someone not linked here
+    if user is None or user.status != LinkStatus.ACTIVE:  # not linked here (yet)
         return []
     version = "4K" if request.is_4k else "1080p"
     link = await _plex_link(services, request)

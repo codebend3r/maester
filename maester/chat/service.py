@@ -16,9 +16,9 @@ from __future__ import annotations
 import logging
 import secrets
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
-from maester.agent.loop import Agent
+from maester.agent.loop import Agent, TurnFailed
 from maester.agent.tools import Choice, Settled, Tier
 from maester.chat.identity import IdentityService
 from maester.chat.split import split_reply
@@ -36,8 +36,6 @@ UNLINKED_HELP = (
 )
 ERROR_REPLY = "Sorry, something went wrong on my end (ref `{ref}`). The admin can look it up."
 SETTLE_FAILED = "Couldn't finish that (ref `{ref}`); it's still open, so you can press again."
-# Discord shows at most ten embeds on one message, one card per option.
-MAX_CHOICES = 10
 
 
 @dataclass(frozen=True)
@@ -120,16 +118,17 @@ class ChatService:
             return ChatResponse(chunks=split_reply(UNLINKED_HELP))
         try:
             reply = await self.agent.respond(user.id, tier, text)
-        except Exception:
+        except TurnFailed as failed:
             ref = secrets.token_hex(3)
             log.exception("agent failed for user %s (ref %s)", user.id, ref)
-            return ChatResponse(chunks=[ERROR_REPLY.format(ref=ref)])
+            # What the turn's tools already did still reaches the user and the admin.
+            reply = replace(failed.reply, text=ERROR_REPLY.format(ref=ref), choices=[])
 
         confirmations = [p for p in (self.store.get_pending(i) for i in reply.pending_ids) if p]
         return ChatResponse(
             chunks=split_reply(reply.text),
             confirmations=confirmations,
-            choices=reply.choices[:MAX_CHOICES],
+            choices=reply.choices,
             notices=tuple(reply.notices),
         )
 

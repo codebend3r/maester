@@ -164,7 +164,7 @@ class ToolRunner:
 
     def _outcome(self, ctx: ToolContext, spec: ToolSpec, result: Any) -> ToolOutcome:
         if isinstance(result, Choices):
-            return ToolOutcome(result.as_content(), choices=tuple(result.items))
+            return ToolOutcome(result.as_content(), choices=tuple(result.shown))
         if isinstance(result, ForAdmin):
             return self._for_admin(ctx, spec, result)
         return ToolOutcome(result)

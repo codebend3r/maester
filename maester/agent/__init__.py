@@ -7,7 +7,16 @@
 - `prompts.py` the system prompt
 """
 
-from maester.agent.loop import Agent, AgentReply
+from maester.agent.loop import Agent, AgentReply, TurnFailed
 from maester.agent.tools import Tier, ToolContext, ToolRegistry, ToolSpec, tool
 
-__all__ = ["Agent", "AgentReply", "Tier", "ToolContext", "ToolRegistry", "ToolSpec", "tool"]
+__all__ = [
+    "Agent",
+    "AgentReply",
+    "Tier",
+    "ToolContext",
+    "ToolRegistry",
+    "ToolSpec",
+    "TurnFailed",
+    "tool",
+]

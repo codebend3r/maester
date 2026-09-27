@@ -5,10 +5,12 @@ import pytest
 from maester.agent.limits import KillSwitch
 from maester.agent.runner import CONFIRMED_KEY, ToolRunner
 from maester.agent.tools import (
+    MAX_CHOICES,
     Approval,
     Choice,
     Choices,
     ForAdmin,
+    LinkedUser,
     NotLinked,
     Settled,
     Tier,
@@ -99,6 +101,15 @@ async def test_choices_result_is_typed_for_the_chat_and_serialized_for_the_model
     out = await runner.run(ctx, "pick", {})
     assert out.choices == (Choice("Dune", "438631", 2021),)
     assert '"value": "438631"' in out.text and "buttons" in out.text
+    assert "not_shown" not in out.content
+
+
+def test_choices_past_the_button_cap_are_named_to_the_model():
+    many = Choices([Choice(f"Part {n}", str(n)) for n in range(MAX_CHOICES + 2)])
+    assert len(many.shown) == MAX_CHOICES
+    content = many.as_content()
+    assert len(content["choices"]) == MAX_CHOICES
+    assert content["not_shown"] == ["Part 10 (10)", "Part 11 (11)"]
 
 
 async def test_out_of_tier_and_unknown_tools_are_rejected_and_audited(setup):
@@ -233,4 +244,6 @@ def test_linked_user_is_the_active_seerr_link_or_a_refusal(setup):
     with pytest.raises(NotLinked):
         ctx.linked_user()
     store.upsert_user("u1", status="active")
-    assert ctx.linked_user().seerr_user_id == 4
+    assert ctx.linked_user() == LinkedUser("u1", 4, "u1")
+    store.upsert_user("u1", plex_email="u1@example.com")
+    assert ctx.linked_user().name == "u1@example.com"

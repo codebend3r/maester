@@ -68,8 +68,8 @@ def world():
         )
 
     store = Store(":memory:")
-    for u in (FRIEND, TRUSTED):
-        store.upsert_user(u.id, status="active", seerr_user_id=4)
+    for seerr_id, u in enumerate((FRIEND, TRUSTED), 2):
+        store.upsert_user(u.id, status="active", seerr_user_id=seerr_id)
     services = SimpleNamespace(
         seerr=FakeSeerrClient(user_list=[SeerrUser(4, "new@example.com", "newbie", "")]),
         tautulli={},
@@ -303,3 +303,12 @@ async def test_a_failed_settle_leaves_the_approval_open(world):
     assert store.get_pending(pending.id).decision is None
     assert (await svc.decide(pending.id, ADMIN, approve=False)).text == "settled"
     assert calls == [("settle", ADMIN.id, 12, False)]
+
+
+async def test_a_turn_that_fails_after_a_tool_acted_still_reaches_the_admin(world):
+    make, *_ = world
+    svc = make(tool_message([("request_4k", {"tmdb_id": 1})]))  # then the model call fails
+    response = await svc.handle_message(TRUSTED, "dune in 4k")
+    assert response.chunks[0].startswith("Sorry, something went wrong")
+    (notice,) = response.notices
+    assert notice.approval is not None and notice.approval.action == "request_4k"
