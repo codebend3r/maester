@@ -71,13 +71,17 @@ class HostLoad:
         )
 
     @property
-    def strain(self) -> tuple[str, ...]:
-        """Why it's busy, in words; empty when nothing seen says so."""
-        reasons = []
-        if self.behind:
-            plural = "s" if self.behind > 1 else ""
-            reasons.append(f"{self.behind} stream{plural} converting slower than playback")
-        vitals = self.vitals or Vitals(None, None)
+    def conversions_behind(self) -> tuple[str, ...]:
+        """Its streams converting slower than playback, in words; empty when none are."""
+        if not self.behind:
+            return ()
+        plural = "s" if self.behind > 1 else ""
+        return (f"{self.behind} stream{plural} converting slower than playback",)
+
+    @property
+    def vitals_high(self) -> tuple[str, ...]:
+        """Its CPU or memory near the top, in words; empty when neither was read so."""
+        vitals, reasons = self.vitals or Vitals(None, None), []
         if vitals.cpu_percent is not None and vitals.cpu_percent >= BUSY_CPU_PERCENT:
             reasons.append(f"its CPU is at {vitals.cpu_percent:.0f}%")
         if vitals.memory_percent is not None and vitals.memory_percent >= BUSY_MEMORY_PERCENT:
@@ -85,11 +89,17 @@ class HostLoad:
         return tuple(reasons)
 
     @property
+    def strain(self) -> tuple[str, ...]:
+        """Why it's busy, in words; empty when nothing seen says so."""
+        return (*self.conversions_behind, *self.vitals_high)
+
+    @property
     def busy(self) -> bool:
         return bool(self.strain)
 
     def without(self, session: Session) -> HostLoad:
-        """This host's load from its other streams."""
+        """This host's load from its other streams. Its CPU and memory still include the
+        stream left out."""
         others = tuple(s for s in self.activity.sessions if s.session_key != session.session_key)
         return replace(self, activity=replace(self.activity, sessions=others))
 

@@ -23,7 +23,7 @@ async def test_server_status_reports_each_host_and_survives_a_dead_one(ctx):
     ctx.services.tautulli["vermithor"].sessions = [
         session(),
         session(relayed=True, transcode_decision="transcode", bandwidth_kbps=2000,
-                stream_bitrate_kbps=2000, transcode_speed=0.6),
+                stream_bitrate_kbps=2000, video_decision="transcode", transcode_speed=0.6),
     ]  # fmt: skip
     ctx.services.tautulli["meleys"] = Down()
     out = await server_status(ctx)
@@ -114,11 +114,12 @@ async def test_session_report_uses_a_recent_speed_test(ctx):
     ]
     ctx.services.speedtest.result = SpeedResult(2500, 300_000, 9.0, "Bell", "Bell", "u")
     await speed_test(ctx, "meleys")
-    (brief,) = (await session_report(ctx))["streams"]
-    assert (
-        brief["advice"]["fix"] == "lower_quality"
-        and "only 2.5 Mbps free" in brief["advice"]["cause"]
-    )
+    (brief,) = (await session_report(ctx, details=True))["streams"]
+    # Its 8 Mbps peaks past the 2.5 free plus its own 8, so the upload is what it's over.
+    heavy, full = brief["findings"]
+    assert "more than the servers' free upload at the last test" in heavy["cause"]
+    assert heavy["what_to_do"] == "Set remote quality to 4 Mbps 720p in the Plex app."
+    assert full["fix"] == "lower_quality" and "only 2.5 Mbps free" in full["cause"]
     assert "notes" not in await session_report(ctx)
 
 
@@ -144,3 +145,12 @@ async def test_a_heavy_remux_streamed_away_from_home_is_flagged_from_the_report(
     (notice,) = out.notices
     assert "candidate for the HEVC re-encode" in notice.text
     assert out.content["streams"][0]["advice"]["fix"] == "lower_quality"  # no lighter version
+
+
+async def test_a_speed_test_is_suggested_only_when_one_would_run(ctx):
+    """Bug: the report suggested speed_test right after one failed, which it would refuse."""
+    ctx.store.upsert_user("d1", tautulli_user_id=7)
+    ctx.services.tautulli["vermithor"].sessions = [session(user_id=7, location="wan")]
+    assert any("speed_test(host=meleys)" in n for n in (await session_report(ctx))["notes"])
+    await speed_test(ctx, "meleys")  # the fake's test fails, and is rationed
+    assert "notes" not in await session_report(ctx)

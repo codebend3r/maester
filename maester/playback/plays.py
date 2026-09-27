@@ -42,7 +42,7 @@ RECENT = 5
 # Where Tautulli places a friend away from the server's network.
 REMOTE = frozenset({"wan", "cellular"})
 # Plex's relay carries a stream when the server can't be reached directly, at
-# most 2 Mbps, for Plex Pass and free accounts alike
+# most 2 Mbps, for Plex Pass and Remote Watch Pass subscribers alike
 # (support.plex.tv/articles/216766168-accessing-a-server-through-relay/).
 RELAY_CAP_KBPS = 2000
 
@@ -69,8 +69,9 @@ class Playback:
     relayed: bool  # through Plex's relay, which caps it (`RELAY_CAP_KBPS`)
     bitrate_kbps: int  # what the stream is sent at
     source_bitrate_kbps: int  # the file's own bitrate
-    # How fast the server converts it against real time (under 1.0 it can't keep up);
-    # None for a finished play, a stream not converted, or one throttled for being ahead.
+    # How fast the server converts its video against real time (under 1.0 it can't keep
+    # up); None for a finished play, a video not converted (Tautulli gives a speed for any
+    # transcode, audio or a remux included), or a conversion throttled for being ahead.
     transcode_speed: float | None
 
     @classmethod
@@ -95,7 +96,11 @@ class Playback:
             bitrate_kbps=s.stream_bitrate_kbps,
             source_bitrate_kbps=s.source_bitrate_kbps,
             transcode_speed=(
-                s.transcode_speed if s.transcode_speed and not s.transcode_throttled else None
+                s.transcode_speed
+                if s.video_decision == "transcode"
+                and s.transcode_speed
+                and not s.transcode_throttled
+                else None
             ),
         )
 
@@ -142,9 +147,10 @@ class Playback:
     @property
     def squeezed(self) -> bool:
         """Cut down to fit a connection, or maybe so: Plex's relay caps it, or it's sent away
-        from home at less than the file's bitrate (a remote quality setting, or a player that
-        can't decode it; Tautulli can't say which). Either way its conversion says nothing
-        certain about the player's codecs. At home, a player gets the file's own quality."""
+        from home at less than the file's bitrate (the app's remote quality, or the player;
+        Tautulli can't say which). Either way its conversion says nothing certain about the
+        player. At home the player limits read a conversion as the player's (its codec, HDR
+        or 4K); a home quality set below the file is the case that misreads."""
         return self.relayed or (self.remote and self.reduced)
 
     def with_profile(self, dovi_profile: int) -> Playback:

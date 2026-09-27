@@ -12,17 +12,16 @@ had to do (transcode the video, burn in the subtitles, pass the audio
 through), and that is what the rules read. Where one limit forces what
 another rule looks for (burning in subtitles makes the server transcode the
 video), the forcing rule `explains` the other, so the friend hears the real
-cause once. A stream cut down to fit a connection (a lower quality asked
-for, or Plex's relay) is transcoded whatever the player decodes, so the
-codec rule leaves it to the lag rules (`maester/perf/lag.py`), which reuse
-this table's rules and `unexplained`.
+cause once. A stream that may be cut down to fit a connection (Plex's relay,
+or sent away from home below the file's bitrate) is transcoded whatever the
+player plays, so the HEVC rule leaves it to the lag rules
+(`maester/perf/lag.py`), which reuse two of this table's rules.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Protocol
 
 from maester.playback.plays import Playback
 
@@ -61,8 +60,8 @@ HEVC_UNSUPPORTED = ClientLimit(
     "hevc_unsupported",
     # A stream squeezed to fit a connection may transcode whatever the codec: that's lag.
     lambda p: p.video_codec == "hevc" and p.video_decision == "transcode" and not p.squeezed,
-    "The player can't decode HEVC (H.265), so the server converts the video on the fly, "
-    "which it can't keep up with.",
+    "This player can't play this HEVC file as it is (its codec, HDR or 4K), so the server "
+    "converts the video on the fly, which it can't keep up with.",
     "Pick the 1080p version, or use the Plex app on a newer device (a TV from 2017 on, an "
     "Apple TV 4K, a Shield or a recent Roku); web browsers usually can't play HEVC.",
 )
@@ -91,22 +90,8 @@ CLIENT_LIMITS: tuple[ClientLimit, ...] = (
 )
 
 
-class Explaining(Protocol):
-    """A rule that may account for what other rules see."""
-
-    @property
-    def name(self) -> str: ...
-    @property
-    def explains(self) -> frozenset[str]: ...
-
-
-def unexplained[R: Explaining](matched: Iterable[R]) -> tuple[R, ...]:
-    """The matched rules, in order, less those another matched rule explains."""
-    matched = list(matched)
-    explained = {name for rule in matched for name in rule.explains}
-    return tuple(rule for rule in matched if rule.name not in explained)
-
-
 def client_causes(playback: Playback) -> tuple[ClientLimit, ...]:
     """The limits this play ran into, in the table's order, less those another one explains."""
-    return unexplained(limit for limit in CLIENT_LIMITS if limit.applies(playback))
+    matched = [limit for limit in CLIENT_LIMITS if limit.applies(playback)]
+    explained = {name for limit in matched for name in limit.explains}
+    return tuple(limit for limit in matched if limit.name not in explained)

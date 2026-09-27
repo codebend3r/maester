@@ -156,7 +156,7 @@ async def test_the_slow_uplink_world_is_found_by_a_speed_test():
         "The upload is nearly full" in tested.text and '"remote_streams_mbps": 20.0' in tested.text
     )
     after = await runner.run(ctx, "session_report", {})
-    assert '"fix": "lower_quality"' in after.text and "2 Mbps 720p" in after.text
+    assert '"fix": "lower_quality"' in after.text and "4 Mbps 720p" in after.text
     store.close()
 
 

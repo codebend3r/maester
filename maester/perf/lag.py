@@ -1,34 +1,32 @@
-"""What slows one stream down, and the one fix to give: findings as a rules table.
+"""What slows one stream down, and the one fix to give: findings as rules tables.
 
 A friend saying "it's laggy" wants one thing to do, not a wall of stats. A
 live stream is read with everything that bears on it (`Stream`): how it
 plays (`Playback`), how busy its host is with its other streams
 (`HostLoad.without`), the servers' upload at the last speed test while
-that's recent, and the title's other versions. Each rule in `LAG_CAUSES`
-finds its cause in a stream or doesn't, says the cause and the fix in words
-(`Said`), and names the kind of fix (`Fix`): turn subtitles off, get around
-Plex's relay, set remote quality to Original or lower it, play another
-version, or wait for the server.
+that's recent, the title's other versions, and away from home what the
+connection is known or taken to carry (`limit`). Each rule finds its cause
+in a stream or doesn't, says the cause and the fix in words (`Said`), and
+names the kind of fix (`Fix`): turn subtitles off, get around Plex's
+relay, set remote quality to Original or lower it, play another version,
+watch on another player, or wait for the server.
 
-Tautulli says whether a stream is converted and how fast, but not why, and
-its quality label is only the bitrate sent. So the rules never claim what a
-player asked for: away from home, a video converted down may be the app's
-remote quality or a codec the player lacks, and the fix given is the one
-that's right either way (an H.264 version plays on anything without
-converting). Only an H.264 file, which every player decodes, converted down
-away from home is put down to the remote quality setting. At home a player
-gets the file's own quality, so there it's the codec.
+A stream at home and one away from home fail in different ways, so each has
+its table (`AT_HOME`, `AWAY`), picked once. A table's order is precedence:
+fixes that remove the stream's reason to be converted first, then what the
+connection carries, and waiting for a busy server last. The first rule that
+finds something is the advice; every one that does is in the details.
 
-The table's order is precedence. Fixes that remove the stream's reason to
-be converted come first, then what the connection carries, and waiting for
-a busy server last. A rule that `explains` what another sees hides it
-(`unexplained`, as in the player check): burning subtitles in forces the
-conversion that then falls behind, and the relay squeezes a stream whatever
-the upload has. The first rule left is the advice; the rest are details.
+Tautulli says whether a stream is converted and how fast, not why. At home
+the HEVC rule reads a conversion as the player's (its codec, HDR or 4K).
+Away from home a video converted down may be the app's remote quality or
+the player, so the fix given is the one right either way: an H.264 version
+that plays without converting. Only an H.264 file, which every player
+decodes, converted down away from home is put down to the remote quality.
 
-Two player limits (`CLIENT_LIMITS`) slow a stream as well as stop one, so
-the table reuses them as they are: picture subtitles burned in, and HEVC a
-player at home can't decode.
+Two player limits (`CLIENT_LIMITS`) slow a stream as well as stop one:
+picture subtitles burned in, and HEVC the player can't play as it is. Their
+causes are reused; their fixes are said here, naming only versions there are.
 
 Versions are named only for a stream served by the Plex server maester
 reads (`library_hosts`), whose file is one of them: a rating key means an
@@ -39,7 +37,7 @@ from __future__ import annotations
 
 import asyncio
 import enum
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -48,18 +46,11 @@ from maester.clients.tautulli import Session
 from maester.formatting import mbps
 from maester.perf.load import HostLoad, behind
 from maester.perf.uplink import Uplink
-from maester.perf.versions import (
-    REMOTE_COMFORT_KBPS,
-    Connection,
-    Limit,
-    needs_kbps,
-    quality_for,
-)
+from maester.perf.versions import Connection, Limit, best_fitting, needs_kbps, quality_for
 from maester.playback.client_limits import (
     HEVC_UNSUPPORTED,
     IMAGE_SUBTITLE_BURN_IN,
-    ClientLimit,
-    unexplained,
+    client_causes,
 )
 from maester.playback.plays import RELAY_CAP_KBPS, Play, Playback, identify
 from maester.plex_versions import TitleVersion, title_versions
@@ -73,6 +64,7 @@ class Fix(enum.StrEnum):
     ORIGINAL_QUALITY = "original_quality"
     LOWER_QUALITY = "lower_quality"
     OTHER_VERSION = "other_version"
+    OTHER_PLAYER = "other_player"
     WAIT = "wait"
 
 
@@ -87,12 +79,6 @@ def _mb(kbps: int) -> str:
     return f"{mbps(kbps):g} Mbps"
 
 
-def _best(versions: Iterable[TitleVersion], limit: Limit | None) -> TitleVersion | None:
-    """The best version a limit carries as it is; any, with no limit (at home)."""
-    fitting = [v for v in versions if limit is None or needs_kbps(v) <= limit.kbps]
-    return max(fitting, key=lambda v: v.bitrate_kbps, default=None)
-
-
 @dataclass(frozen=True)
 class Stream:
     """One live stream and everything that bears on how it plays."""
@@ -103,8 +89,11 @@ class Stream:
     uplink: Uplink | None  # the last speed test, while it's recent
     versions: tuple[TitleVersion, ...]  # the title's, when its server is the one maester reads
     playing: TitleVersion | None  # which of them it plays
-    lighter: TitleVersion | None  # a lighter one the connection carries as it is
-    easier: TitleVersion | None  # an H.264 one the connection carries, so nothing converts
+    # Away from home, what its connection is known or taken to carry, its own share of the
+    # upload included; None at home, where the network carries any version.
+    limit: Limit | None
+    lighter: TitleVersion | None  # a lighter version the connection carries as it is
+    easier: TitleVersion | None  # an H.264 version it carries, which plays without converting
 
     @classmethod
     def of(
@@ -118,30 +107,53 @@ class Stream:
         """A live session, with the version it plays and the ones worth switching to: only
         when its file is one of the versions, which proves they're on its server."""
         playback = Playback.from_session(session)
+        limit = None
+        if playback.remote:
+            known = Connection.of(
+                away=playback, uplink=uplink, streaming_kbps=playback.bitrate_kbps
+            )
+            limit = known.limit(lagging_away=True)
         playing = next((v for v in versions if v.version.file == session.file), None)
-        # Away from home, a version must fit what the connection is known or taken to carry.
-        limit = (
-            Connection.of(away=playback, uplink=uplink).limit(lagging_away=True)
-            if playback.remote
-            else None
-        )
         lighter = easier = None
         if playing is not None:
             others = [v for v in versions if v is not playing]
-            lighter = _best((v for v in others if v.bitrate_kbps < playing.bitrate_kbps), limit)
-            easier = _best((v for v in others if v.version.video_codec == "h264"), limit)
+            lighter = best_fitting(
+                (v for v in others if v.bitrate_kbps < playing.bitrate_kbps), limit
+            )
+            easier = best_fitting((v for v in others if v.version.video_codec == "h264"), limit)
         play = Play.from_session(host, session)
-        return cls(play, playback, load, uplink, versions, playing, lighter, easier)
+        return cls(play, playback, load, uplink, versions, playing, limit, lighter, easier)
 
     @property
     def converted(self) -> bool:
         return self.playback.video_decision == "transcode"
 
     @property
-    def heavy(self) -> bool:
-        """Sent as it is away from home, at more than most connections carry."""
-        p = self.playback
-        return p.remote and not self.converted and p.bitrate_kbps > REMOTE_COMFORT_KBPS
+    def cant_play_hevc(self) -> bool:
+        """The player check's HEVC limit, less when burned-in subtitles force the conversion."""
+        return HEVC_UNSUPPORTED in client_causes(self.playback)
+
+    @property
+    def easier_fixes_it(self) -> TitleVersion | None:
+        """An H.264 version that would play without converting: none while picture subtitles
+        are burned in, which another version burns in too."""
+        return None if IMAGE_SUBTITLE_BURN_IN.applies(self.playback) else self.easier
+
+    def carries(self, kbps: int) -> bool:
+        return self.limit is None or kbps <= self.limit.kbps
+
+    def lower_quality(self, within_kbps: int) -> str:
+        """The best Plex quality within a limit that's below what it's sent at now: a quality
+        at or above that bitrate would leave it as it is."""
+        return quality_for(min(within_kbps, self.playback.bitrate_kbps - 1))
+
+    @property
+    def over_limit(self) -> Limit | None:
+        """The limit it's sent over as it is, peaks included; None when it fits, or is
+        converted (Plex holds a conversion to its quality's bitrate)."""
+        if self.converted or self.carries(needs_kbps(self.playback.bitrate_kbps)):
+            return None
+        return self.limit
 
     def summary(self) -> str:
         """What the stream is doing, in a line: how, where, how fast, on what, from where."""
@@ -160,12 +172,15 @@ class Stream:
         )
 
     def as_dict(self) -> dict[str, Any]:
-        return {
+        facts: dict[str, Any] = {
             "playback": self.playback.as_dict(),
             "host_load": {"host": self.play.host, "other_streams": self.load.as_dict()},
             "uplink": self.uplink.as_dict() if self.uplink else "not tested in the last 10 minutes",
             "versions": [v.as_dict() for v in self.versions],
         }
+        if self.limit is not None:
+            facts["connection"] = f"about {_mb(self.limit.kbps)}: {self.limit.source}"
+        return facts
 
 
 @dataclass(frozen=True)
@@ -191,17 +206,31 @@ class LagCause:
     name: str
     fix: Fix
     find: Callable[[Stream], Said | None]
-    explains: frozenset[str] = frozenset()
 
 
-def lifted(limit: ClientLimit, fix: Fix, *, explains: Iterable[str]) -> LagCause:
-    """A player limit that slows a stream too, read off the stream's playback."""
-    said = Said(limit.cause, limit.fix)
-    return LagCause(
-        limit.name,
-        fix,
-        lambda s: said if limit.applies(s.playback) else None,
-        limit.explains | frozenset(explains),
+def _burn_in(s: Stream) -> Said | None:
+    limit = IMAGE_SUBTITLE_BURN_IN
+    return Said(limit.cause, limit.fix) if limit.applies(s.playback) else None
+
+
+def _hevc_easier(s: Stream) -> Said | None:
+    easier = s.easier_fixes_it
+    if not (s.cant_play_hevc and easier):
+        return None
+    return Said(
+        HEVC_UNSUPPORTED.cause,
+        f"Play the {easier.name} version instead ({_mb(easier.bitrate_kbps)}): it plays on "
+        "anything without being converted.",
+    )
+
+
+def _hevc_player(s: Stream) -> Said | None:
+    if not s.cant_play_hevc or s.easier_fixes_it:
+        return None
+    return Said(
+        HEVC_UNSUPPORTED.cause,
+        "Watch on a player that plays it as it is: the Plex app on a TV from 2017 on, an "
+        "Apple TV 4K, a Shield or a recent Roku; web browsers usually can't.",
     )
 
 
@@ -219,58 +248,64 @@ def _relayed(s: Stream) -> Said | None:
 
 
 def _behind_easier(s: Stream) -> Said | None:
-    if not (behind(s.playback) and s.easier):
+    easier = s.easier_fixes_it
+    if not (behind(s.playback) and easier):
         return None
     return Said(
         f"{s.play.host} can't convert this stream as fast as it plays.",
-        f"Play the {s.easier.name} version instead ({_mb(s.easier.bitrate_kbps)}): it plays "
-        "on anything without being converted.",
+        f"Play the {easier.name} version instead ({_mb(easier.bitrate_kbps)}): it plays on "
+        "anything without being converted.",
     )
 
 
 def _quality_below_file(s: Stream) -> Said | None:
     p = s.playback
-    light_h264 = p.video_codec == "h264" and p.source_bitrate_kbps <= REMOTE_COMFORT_KBPS
-    if not (p.remote and p.reduced and behind(p) and light_h264):
+    h264 = p.video_codec == "h264"
+    if not (h264 and p.reduced and behind(p) and s.carries(needs_kbps(p.source_bitrate_kbps))):
         return None
     return Said(
         f"Your Plex app's remote quality is set below this {_mb(p.source_bitrate_kbps)} file, "
         f"so {s.play.host} converts it down for you, and it can't keep up.",
-        "Set remote quality to Original (Maximum) in the Plex app: the file is light enough "
-        "to play as it is.",
+        "Set remote quality to Original (Maximum) in the Plex app: your connection carries "
+        "the file as it is.",
     )
 
 
-def _heavy_with_lighter(s: Stream) -> Said | None:
-    if not (s.heavy and s.lighter and s.playing):
+def _heavy_lighter(s: Stream) -> Said | None:
+    limit = s.over_limit
+    if not (limit and s.lighter and s.playing):
         return None
+    sent = s.playback.bitrate_kbps
     return Said(
-        f"You're playing the {s.playing.name} version at {_mb(s.playback.bitrate_kbps)}, more "
-        "than most connections away from home carry smoothly.",
+        f"You're playing the {s.playing.name} version at {_mb(sent)}; its busiest scenes need "
+        f"about {_mb(needs_kbps(sent))}, more than {limit.source} (about {_mb(limit.kbps)}).",
         f"Play the {s.lighter.name} version instead ({_mb(s.lighter.bitrate_kbps)}).",
     )
 
 
 def _heavy(s: Stream) -> Said | None:
-    if not s.heavy:
+    limit = s.over_limit
+    if limit is None:
         return None
+    sent = s.playback.bitrate_kbps
     return Said(
-        f"This stream sends {_mb(s.playback.bitrate_kbps)}, more than most connections away "
-        "from home carry smoothly.",
-        f"Set remote quality to {quality_for(REMOTE_COMFORT_KBPS)} in the Plex app.",
+        f"This stream sends {_mb(sent)}, and its busiest scenes need about "
+        f"{_mb(needs_kbps(sent))}, more than {limit.source} (about {_mb(limit.kbps)}).",
+        f"Set remote quality to {s.lower_quality(limit.kbps)} in the Plex app.",
     )
 
 
 def _uplink_full(s: Stream) -> Said | None:
-    uplink = s.uplink
-    if not (s.playback.remote and uplink and uplink.tight):
+    uplink, sent = s.uplink, s.playback.bitrate_kbps
+    budget = uplink.spare_kbps + sent if uplink else 0
+    if uplink is None or needs_kbps(sent) <= budget:
         return None
     return Said(
         f"The servers' upload is nearly full: the last speed test found only "
         f"{_mb(uplink.spare_kbps)} free alongside {_mb(uplink.streaming_kbps)} of remote "
-        "streams.",
-        f"Set remote quality to {quality_for(uplink.spare_kbps)} in the Plex app until other "
-        "streams finish.",
+        "streams, too little for this stream's busy scenes.",
+        f"Set remote quality to {s.lower_quality(budget)} in the Plex app until other streams "
+        "finish.",
     )
 
 
@@ -285,47 +320,47 @@ def _behind(s: Stream) -> Said | None:
 
 
 def _busy(s: Stream) -> Said | None:
-    if not s.load.busy:
+    load, host = s.load, s.play.host
+    others = bool(load.activity.sessions)
+    # With nothing else playing, a converted stream's own conversion may be what fills the CPU.
+    vitals = load.vitals_high if others or not s.converted else ()
+    reasons = "; ".join((*load.conversions_behind, *vitals))
+    if not reasons:
         return None
+    if others:
+        return Said(
+            f"{host} is busy with other streams: {reasons}.",
+            "Wait a few minutes for other streams to finish, then try again.",
+        )
     return Said(
-        f"{s.play.host} is busy with other streams: {'; '.join(s.load.strain)}.",
-        "Wait a few minutes for other streams to finish, then try again.",
+        f"{host} is busy with something besides Plex: {reasons}, and nothing else is playing.",
+        "Wait a few minutes, then try again.",
     )
 
 
-CONVERSION = ("behind_easier", "quality_below_file", "behind")
+BURN_IN = LagCause("image_subtitle_burn_in", Fix.SUBTITLES_OFF, _burn_in)
+BEHIND_EASIER = LagCause("behind_easier", Fix.OTHER_VERSION, _behind_easier)
+BEHIND = LagCause("behind", Fix.LOWER_QUALITY, _behind)
+BUSY = LagCause("server_busy", Fix.WAIT, _busy)
 
-LAG_CAUSES: tuple[LagCause, ...] = (
-    # Burning picture subtitles in forces the conversion.
-    lifted(IMAGE_SUBTITLE_BURN_IN, Fix.SUBTITLES_OFF, explains=CONVERSION),
-    # The relay squeezes the stream to 2 Mbps whatever the version or the upload.
-    LagCause(
-        "relayed",
-        Fix.AVOID_RELAY,
-        _relayed,
-        frozenset({"behind_easier", "quality_below_file", "uplink_full"}),
-    ),
-    # At home, HEVC converted is the player's codec, whatever else slows it.
-    lifted(HEVC_UNSUPPORTED, Fix.OTHER_VERSION, explains=CONVERSION),
-    LagCause(
-        "behind_easier",
-        Fix.OTHER_VERSION,
-        _behind_easier,
-        frozenset({"quality_below_file", "behind"}),
-    ),
-    LagCause(
-        "quality_below_file", Fix.ORIGINAL_QUALITY, _quality_below_file, frozenset({"behind"})
-    ),
-    LagCause(
-        "heavy_with_lighter",
-        Fix.OTHER_VERSION,
-        _heavy_with_lighter,
-        frozenset({"heavy_stream", "uplink_full"}),
-    ),
-    LagCause("heavy_stream", Fix.LOWER_QUALITY, _heavy, frozenset({"uplink_full"})),
+AT_HOME: tuple[LagCause, ...] = (
+    BURN_IN,
+    LagCause("hevc_other_version", Fix.OTHER_VERSION, _hevc_easier),
+    LagCause("hevc_other_player", Fix.OTHER_PLAYER, _hevc_player),
+    BEHIND_EASIER,
+    BEHIND,
+    BUSY,
+)
+AWAY: tuple[LagCause, ...] = (
+    BURN_IN,
+    LagCause("relayed", Fix.AVOID_RELAY, _relayed),
+    BEHIND_EASIER,
+    LagCause("quality_below_file", Fix.ORIGINAL_QUALITY, _quality_below_file),
+    LagCause("heavy_with_lighter", Fix.OTHER_VERSION, _heavy_lighter),
+    LagCause("heavy_stream", Fix.LOWER_QUALITY, _heavy),
     LagCause("uplink_full", Fix.LOWER_QUALITY, _uplink_full),
-    LagCause("behind", Fix.LOWER_QUALITY, _behind),
-    LagCause("server_busy", Fix.WAIT, _busy),
+    BEHIND,
+    BUSY,
 )
 
 NOTHING_FOUND = {
@@ -339,7 +374,7 @@ NOTHING_FOUND = {
 @dataclass(frozen=True)
 class Diagnosis:
     stream: Stream
-    findings: tuple[Finding, ...]  # every cause left after `explains`, advice first
+    findings: tuple[Finding, ...]  # every rule of its table that found something, in order
 
     def brief(self) -> dict[str, Any]:
         """The one fix, and what the stream is doing in a line."""
@@ -364,11 +399,14 @@ class Diagnosis:
 
 
 def diagnose(stream: Stream) -> Diagnosis:
-    found = [(rule, said) for rule in LAG_CAUSES if (said := rule.find(stream)) is not None]
-    kept = {rule.name for rule in unexplained(rule for rule, _ in found)}
+    table = AWAY if stream.playback.remote else AT_HOME
     return Diagnosis(
         stream,
-        tuple(Finding(rule.name, rule.fix, said) for rule, said in found if rule.name in kept),
+        tuple(
+            Finding(rule.name, rule.fix, said)
+            for rule in table
+            if (said := rule.find(stream)) is not None
+        ),
     )
 
 

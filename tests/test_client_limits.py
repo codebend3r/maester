@@ -64,8 +64,8 @@ def test_several_limits_come_back_in_table_order_less_what_one_explains():
 
 
 def test_hevc_converted_down_away_from_home_isnt_blamed_on_the_codec():
-    """Away from home, HEVC sent at 4 Mbps may be a quality setting as well as a codec
-    Tautulli can't tell apart; at home a player gets the file's quality, so it's the codec."""
+    """Away from home, HEVC sent at 4 Mbps may be the app's remote quality as well as the
+    player, which Tautulli can't tell apart; at home the rule reads it as the player's."""
     reduced = replace(CLEAN, video_decision="transcode", bitrate_kbps=4000)
     assert names(replace(reduced, location="wan")) == []
     assert names(reduced) == ["hevc_unsupported"]
@@ -101,14 +101,18 @@ async def test_a_live_play_is_read_from_its_session_and_a_finished_one_from_its_
 def test_a_play_says_how_it_travelled():
     live = Playback.from_session(
         session(location="wan", relayed=True, stream_bitrate_kbps=1800, source_bitrate_kbps=62000,
-                transcode_speed=0.8)
+                video_decision="transcode", transcode_speed=0.8)
     )  # fmt: skip
     assert (live.remote, live.relayed, live.bitrate_kbps, live.source_bitrate_kbps) == (
         True, True, 1800, 62000,
     )  # fmt: skip
-    assert (live.transcode_speed, live.reduced, live.squeezed) == (0.8, False, True)
+    assert (live.transcode_speed, live.reduced, live.squeezed) == (0.8, True, True)
     # Throttled: the transcoder is ahead and resting, so its low speed isn't a reading.
-    assert Playback.from_session(session(transcode_speed=0.4, transcode_throttled=True)).transcode_speed is None  # fmt: skip
+    throttled = session(video_decision="transcode", transcode_speed=0.4, transcode_throttled=True)
+    assert Playback.from_session(throttled).transcode_speed is None
+    # A direct stream (video copied, audio converted) has a speed that isn't the video's.
+    remux = session(video_decision="copy", audio_decision="transcode", transcode_speed=0.6)
+    assert Playback.from_session(remux).transcode_speed is None
     local = Playback.from_session(
         session(location="lan", video_decision="transcode", stream_bitrate_kbps=8000,
                 source_bitrate_kbps=62000)

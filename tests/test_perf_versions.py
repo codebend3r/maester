@@ -1,7 +1,9 @@
+import time
 from dataclasses import replace
 
 from maester.clients.plex import Version
 from maester.clients.speedtest import SpeedResult
+from maester.clients.tautulli import StreamData
 from maester.perf.uplink import Uplink
 from maester.perf.versions import (
     TYPICAL_AWAY,
@@ -13,7 +15,7 @@ from maester.perf.versions import (
 )
 from maester.playback.plays import Playback
 from maester.plex_versions import TitleVersion
-from tests.factories import session
+from tests.factories import history_row, session
 
 REMUX = TitleVersion("9001", Version("4k", "hevc", 62103, 1, "/m/Dune (2021) Bluray-2160p.mkv"))
 REENCODE = TitleVersion("9001", Version("4k", "hevc", 18412, 1, "/m/Dune (2021) 2160p HEVC.mkv"))
@@ -67,3 +69,16 @@ async def test_the_last_play_away_from_home_and_hosts_not_read(services):
     assert (await last_away(services, None)).playback is None
     services.tautulli["meleys"].sessions = [session(user_id=7, location="lan")]
     assert (await last_away(services, 7)).playback is None
+
+
+async def test_a_play_away_from_home_counts_only_while_recent(services):
+    """Bug: a relayed play months ago still capped every recommendation at 2 Mbps."""
+    meleys = services.tautulli["meleys"]
+    now = int(time.time())
+    meleys.history_rows = [
+        history_row(user_id=7, row_id=1, location="wan", relayed=True, started=now - 10 * 86400)
+    ]
+    meleys.streams[1] = StreamData("mkv", "h264", "transcode", "aac", "transcode", "", "")
+    assert (await last_away(services, 7)).playback is None  # older than RECENT_AWAY
+    meleys.history_rows = [replace(meleys.history_rows[0], started=now - 2 * 86400)]
+    assert (await last_away(services, 7)).playback.relayed

@@ -76,7 +76,8 @@ async def session_report(ctx: ToolContext, details: bool = False) -> dict[str, A
     elif not details:
         reply["note"] = IN_BRIEF
     notes = [f"couldn't reach Tautulli on {h}: {why}" for h, why in loads.unreachable.items()]
-    if tester is not None and measured is None and any(s.playback.remote for s in streams):
+    away = any(s.playback.remote for s in streams)
+    if tester is not None and measured is None and away and uplink.can_test(ctx.memo, tester):
         notes.append(
             "The servers' upload hasn't been tested in the last 10 minutes. If the advice "
             f"doesn't settle it, speed_test(host={tester.host}) checks it; then call "

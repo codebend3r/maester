@@ -243,3 +243,25 @@ async def test_one_friends_claims_never_make_a_healthy_file_replaceable(library)
         library.services.probe.errors[FORKS] = (line,)
         filed = await report(library, FORKS_ITEM, ReportKind.WONT_PLAY)
         assert filed.report.health == "unreadable" and filed.report.decision is Decision.RECORDED
+
+
+# HEVC converted below the file's bitrate: Tautulli says so, not why.
+SHIELD_HEVC = dict(user_id=DANY, rating_key="9001", tmdb_id=438631, player="SHIELD Android TV",
+                   video_decision="transcode", stream_bitrate_kbps=8000, source_bitrate_kbps=62103)  # fmt: skip
+
+
+async def test_hevc_converted_below_the_file_at_home_is_the_players(library):
+    # Meleys' Tautulli watches the Plex server Seerr's keys are of.
+    library.services.tautulli["meleys"].sessions = [session(**SHIELD_HEVC, location="lan")]
+    filed = await report(library, DUNE_4K_ITEM, ReportKind.WONT_PLAY, "it stutters")
+    assert isinstance(filed.diagnosis, PlayerLimit) and filed.report.decision is Decision.ADVISED
+    (cause,) = filed.diagnosis.causes
+    assert cause.name == "hevc_unsupported" and "can't play this HEVC file as it is" in cause.cause
+
+
+async def test_hevc_converted_below_the_file_away_from_home_checks_the_file(library):
+    """Away from home it may be the app's remote quality or the connection, not the player."""
+    library.services.tautulli["meleys"].sessions = [session(**SHIELD_HEVC, location="wan")]
+    filed = await report(library, DUNE_4K_ITEM, ReportKind.WONT_PLAY, "it stutters")
+    assert isinstance(filed.diagnosis, FileChecked) and filed.diagnosis.check.causes == ()
+    assert filed.diagnosis.check.play is not None  # the play was found, and read

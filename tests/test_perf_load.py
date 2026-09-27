@@ -7,7 +7,7 @@ from tests.factories import session
 
 
 def transcode(speed: float, *, throttled: bool = False, **kw):
-    return session(transcode_decision="transcode", transcode_speed=speed, transcode_throttled=throttled, **kw)  # fmt: skip
+    return session(transcode_decision="transcode", video_decision="transcode", transcode_speed=speed, transcode_throttled=throttled, **kw)  # fmt: skip
 
 
 async def test_a_conversion_slower_than_playback_makes_a_host_busy(services):
@@ -97,7 +97,7 @@ async def test_a_bug_reading_a_host_isnt_passed_off_as_the_host_being_down(servi
 
 
 async def test_a_streams_host_is_read_without_it(services):
-    mine = session(session_key="1", transcode_decision="transcode", transcode_speed=0.6)
+    mine = transcode(0.6, session_key="1")
     services.tautulli["vermithor"].sessions = [mine, session(session_key="2")]
     load = (await read_loads(services)).hosts["vermithor"]
     assert load.busy and not load.without(mine).busy
