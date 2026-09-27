@@ -15,6 +15,10 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from maester.config import Settings
+from maester.notify import Notice
+from maester.store import LinkStatus, PendingAction, UserRow
+
 if TYPE_CHECKING:
     from maester.clients import Services
 
@@ -37,19 +41,40 @@ class Tier(enum.IntEnum):
             raise ValueError(f"unknown tier {name!r}") from None
 
 
+class NotLinked(LookupError):
+    """The caller has no active link to a Seerr user, so nothing can be done as them."""
+
+
 @dataclass
 class ToolContext:
     """What a tool handler gets besides its arguments.
 
     `services` holds the clients the app wires up, real or fake. `user_id`
-    is the chat identity the audit row is written under.
+    is the chat identity the audit row is written under. `settings` is the
+    deployment's configuration, for the few tools that need a knob from it.
     """
 
     user_id: str
     tier: Tier
     services: Services
     store: Any = None
+    settings: Settings = field(default_factory=Settings)
     extra: dict[str, Any] = field(default_factory=dict)
+
+    def linked_user(self) -> UserRow:
+        """The caller's active link: the one way a tool learns who to act as.
+
+        Requests go to Seerr as the row's `seerr_user_id`, so they carry the
+        friend's name, quotas and permissions. An admin who never linked, or
+        a link still waiting on approval, has none, and the tool refuses.
+        """
+        user = self.store.get_user(self.user_id) if self.store else None
+        if user is None or user.status != LinkStatus.ACTIVE or user.seerr_user_id is None:
+            raise NotLinked(
+                "this Discord account isn't linked to a Plex account yet; "
+                "the user can link it with /link"
+            )
+        return user
 
 
 @dataclass(frozen=True)
@@ -60,6 +85,8 @@ class Choice:
     value: str
     year: int | None = None
     poster_url: str | None = None
+    # A line under the title: availability, a short overview.
+    detail: str = ""
 
     @property
     def display(self) -> str:
@@ -77,14 +104,61 @@ class Choices:
     def as_content(self) -> dict[str, Any]:
         return {
             "choices": [
-                {"label": c.label, "value": c.value, "year": c.year, "poster_url": c.poster_url}
+                {
+                    "label": c.label,
+                    "value": c.value,
+                    "year": c.year,
+                    "poster_url": c.poster_url,
+                    "detail": c.detail,
+                }
                 for c in self.items
             ],
             "note": "Shown to the user as numbered buttons; wait for their pick.",
         }
 
 
+@dataclass(frozen=True)
+class Approval:
+    """An action only the admin may allow, raised by a tool through `ForAdmin`.
+
+    The runner stores it as a pending action named after the tool; when the
+    admin presses Approve or Deny, the tool's `settle` handler gets the
+    decision along with `payload`.
+    """
+
+    summary: str
+    payload: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class ForAdmin:
+    """Return this from a handler when the admin must see, or decide, what the tool did.
+
+    The model sees `content`; `notice` is posted in the admin channel. With
+    `approval`, the notice carries Approve/Deny buttons and the model is
+    told the action now waits on the admin.
+    """
+
+    content: Any
+    notice: str
+    approval: Approval | None = None
+
+
+@dataclass(frozen=True)
+class Settled:
+    """What a `settle` handler did with the admin's decision.
+
+    `text` answers the admin in the channel; `notices` go out besides it,
+    typically a DM telling the requester how it went.
+    """
+
+    text: str
+    notices: tuple[Notice, ...] = ()
+
+
 Handler = Callable[..., Awaitable[Any]]
+# Applies the admin's decision on an approval a tool raised: (context, pending, approved).
+Settle = Callable[["ToolContext", PendingAction, bool], Awaitable[Settled]]
 
 
 @dataclass(frozen=True)
@@ -98,6 +172,8 @@ class ToolSpec:
     # Name of the argument that carries the arr host, so the audit row and
     # the confirmation summary can say which stack is being touched.
     host_param: str | None = None
+    # Settles the approvals this tool raises through `ForAdmin`.
+    settle: Settle | None = None
 
     def definition(self) -> dict[str, Any]:
         """The tool as the Messages API wants it, streaming its input eagerly."""
@@ -191,6 +267,7 @@ class ToolRegistry:
         tier: Tier = Tier.FRIEND,
         destructive: bool = False,
         host_param: str | None = None,
+        settle: Settle | None = None,
     ) -> Callable[[Handler], Handler]:
         def decorate(fn: Handler) -> Handler:
             self.register(
@@ -202,6 +279,7 @@ class ToolRegistry:
                     tier=tier,
                     destructive=destructive,
                     host_param=host_param,
+                    settle=settle,
                 )
             )
             return fn

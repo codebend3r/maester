@@ -4,11 +4,12 @@ import pytest
 
 from maester.agent.loop import Agent
 from maester.agent.runner import ToolRunner
-from maester.agent.tools import Choice, Choices, Tier, ToolRegistry
+from maester.agent.tools import Approval, Choice, Choices, ForAdmin, Settled, Tier, ToolRegistry
 from maester.chat.identity import IdentityService, RoleMap
 from maester.chat.service import UNLINKED_HELP, ChatService, ChatUser, Decision
 from maester.clients import FakeSeerrClient
 from maester.clients.seerr import SeerrUser
+from maester.notify import Notice
 from maester.store import Store
 from tests.fake_model import FakeModel, text_message, tool_message
 
@@ -44,6 +45,27 @@ def world():
     async def replace(ctx, file_id=0):
         calls.append(("replace", file_id))
         return f"replaced file {file_id}"
+
+    async def settle_4k(ctx, pending, approved):
+        if calls and calls[-1] == "seerr down":
+            calls.pop()
+            raise ConnectionError("seerr down")
+        calls.append(("settle", ctx.user_id, pending.payload["request_id"], approved))
+        return Settled("settled", (Notice("your 4K was decided", to=pending.requester),))
+
+    @reg.tool(
+        "request_4k",
+        "4K",
+        {"type": "object", "properties": {"tmdb_id": {"type": "integer"}}},
+        tier=Tier.TRUSTED,
+        settle=settle_4k,
+    )
+    async def request_4k(ctx, tmdb_id=0):
+        return ForAdmin(
+            {"request_id": 12},
+            "Trusty wants Dune in 4K",
+            Approval("4K Dune for Trusty", {"request_id": 12}),
+        )
 
     store = Store(":memory:")
     for u in (FRIEND, TRUSTED):
@@ -111,9 +133,9 @@ async def test_confirmation_round_trip(world):
     assert pending.action == "replace_media" and calls == []
 
     done = await svc.decide(pending.id, TRUSTED, approve=True)
-    assert done == Decision("Done: replaced file 7", admin_notices=done.admin_notices)
+    assert done == Decision("Done: replaced file 7", notices=done.notices)
     assert calls == [("replace", 7)]
-    (notice,) = done.admin_notices
+    (notice,) = done.notices
     assert notice.text.startswith("Trusty confirmed") and notice.approval is None
     assert await svc.decide(pending.id, TRUSTED, approve=True) == Decision(
         "That action is no longer waiting."
@@ -208,7 +230,7 @@ async def test_link_whoami_forget_and_admin_approval(world):
     svc = make(text_message("A"))
     newbie = ChatUser("n1", "Newbie")
     response = await svc.link(newbie, "new@example.com")
-    (notice,) = response.admin_notices
+    (notice,) = response.notices
     pending = notice.approval
     assert notice.text.startswith("Link request") and pending.action == "link_account"
     assert "waiting for admin" in svc.whoami(newbie)
@@ -216,7 +238,8 @@ async def test_link_whoami_forget_and_admin_approval(world):
     assert await svc.decide(pending.id, FRIEND, approve=True) == Decision(
         "Only the admin can approve this.", settled=False
     )
-    assert (await svc.decide(pending.id, ADMIN, approve=True)).text.startswith("Linked")
+    approved = await svc.decide(pending.id, ADMIN, approve=True)
+    assert approved.text.startswith("Linked") and approved.notices[0].to == "n1"
     assert svc.whoami(newbie).startswith("Linked to new@example.com (active). Tier: friend")
 
     await svc.handle_message(newbie, "hello")
@@ -228,9 +251,7 @@ async def test_link_whoami_forget_and_admin_approval(world):
 async def test_admin_denies_a_link(world):
     make, store, _ = world
     svc = make()
-    pending = (
-        (await svc.link(ChatUser("n1", "Newbie"), "new@example.com")).admin_notices[0].approval
-    )
+    pending = (await svc.link(ChatUser("n1", "Newbie"), "new@example.com")).notices[0].approval
     assert (await svc.decide(pending.id, ADMIN, approve=False)).text.startswith("Denied")
     assert store.get_user("n1").status == "revoked"
     assert await svc.decide(pending.id, ADMIN, approve=True) == Decision(
@@ -238,19 +259,47 @@ async def test_admin_denies_a_link(world):
     )
 
 
-async def test_link_approval_rolls_back_when_the_user_update_fails(world, monkeypatch):
+async def test_a_failed_link_approval_is_reopened_for_another_press(world, monkeypatch):
     make, store, _ = world
     svc = make()
-    pending = (
-        (await svc.link(ChatUser("n1", "Newbie"), "new@example.com")).admin_notices[0].approval
-    )
+    pending = (await svc.link(ChatUser("n1", "Newbie"), "new@example.com")).notices[0].approval
 
     def broken(*args, **kwargs):
         raise RuntimeError("disk full")
 
     monkeypatch.setattr(store, "upsert_user", broken)
-    with pytest.raises(RuntimeError):
-        await svc.decide(pending.id, ADMIN, approve=True)
+    decision = await svc.decide(pending.id, ADMIN, approve=True)
     monkeypatch.undo()
+    assert not decision.settled and "still open" in decision.text
     assert store.get_pending(pending.id).decision is None
     assert store.get_user("n1").status == "pending"
+    assert (await svc.decide(pending.id, ADMIN, approve=True)).text.startswith("Linked")
+
+
+async def test_an_approval_a_tool_raises_reaches_the_admin_and_its_settle_runs(world):
+    make, store, calls = world
+    svc = make(tool_message([("request_4k", {"tmdb_id": 1})]), text_message("Sent to the admin."))
+    response = await svc.handle_message(TRUSTED, "dune in 4k")
+    assert response.text == "Sent to the admin." and response.confirmations == []
+    (notice,) = response.notices
+    pending = notice.approval
+    assert notice.text == "Trusty wants Dune in 4K" and pending.requester == TRUSTED.id
+
+    assert (await svc.decide(pending.id, TRUSTED, approve=True)).settled is False
+    decision = await svc.decide(pending.id, ADMIN, approve=True)
+    assert decision == Decision("settled", notices=(Notice("your 4K was decided", to="t1"),))
+    assert calls == [("settle", ADMIN.id, 12, True)]
+    assert store.audit_recent(1)[0].tool == "request_4k"
+    assert (await svc.decide(pending.id, ADMIN, approve=False)).text.startswith("That request")
+
+
+async def test_a_failed_settle_leaves_the_approval_open(world):
+    make, store, calls = world
+    svc = make(tool_message([("request_4k", {"tmdb_id": 1})]), text_message("Sent."))
+    pending = (await svc.handle_message(TRUSTED, "dune in 4k")).notices[0].approval
+    calls.append("seerr down")
+    decision = await svc.decide(pending.id, ADMIN, approve=False)
+    assert not decision.settled and "still open" in decision.text
+    assert store.get_pending(pending.id).decision is None
+    assert (await svc.decide(pending.id, ADMIN, approve=False)).text == "settled"
+    assert calls == [("settle", ADMIN.id, 12, False)]

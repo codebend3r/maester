@@ -97,6 +97,7 @@ def build(
             cfg.guardrails.user_messages_per_hour, cfg.guardrails.user_tokens_per_day
         ),
         effort=cfg.effort,
+        settings=cfg,
     )
     identity = IdentityService(
         store, services, RoleMap(cfg.discord_role_admin, cfg.discord_role_trusted)

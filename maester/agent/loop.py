@@ -18,7 +18,9 @@ from typing import Any
 from maester.agent.limits import LimitExceeded, RateLimiter
 from maester.agent.prompts import SYSTEM_PROMPT
 from maester.agent.runner import CONFIRMED_KEY, ToolOutcome, ToolRunner
-from maester.agent.tools import Choice, Tier, ToolContext
+from maester.agent.tools import Choice, Settled, Tier, ToolContext
+from maester.config import Settings
+from maester.notify import Notice
 from maester.store import PendingAction
 
 log = logging.getLogger("maester.agent")
@@ -49,6 +51,8 @@ class AgentReply:
     pending_ids: list[int] = field(default_factory=list)
     # Options a tool offered the user, rendered as buttons by the chat layer.
     choices: list[Choice] = field(default_factory=list)
+    # What tools asked to post outside the reply: admin notices and approvals.
+    notices: list[Notice] = field(default_factory=list)
     input_tokens: int = 0
     output_tokens: int = 0
     cache_read_tokens: int = 0
@@ -67,6 +71,7 @@ class Agent:
         limiter: RateLimiter | None = None,
         effort: str = "medium",
         system_prompt: str = SYSTEM_PROMPT,
+        settings: Settings | None = None,
         now: Callable[[], datetime] = lambda: datetime.now(UTC),
     ):
         self.client = model_client
@@ -77,13 +82,31 @@ class Agent:
         self.limiter = limiter
         self.effort = effort
         self.system_prompt = system_prompt
+        self.settings = settings or Settings()
         self.now = now
 
     def forget(self, user_id: str) -> int:
         return self.store.clear_messages(user_id)
 
     def _context(self, user_id: str, tier: Tier) -> ToolContext:
-        return ToolContext(user_id=user_id, tier=tier, services=self.services, store=self.store)
+        return ToolContext(
+            user_id=user_id,
+            tier=tier,
+            services=self.services,
+            store=self.store,
+            settings=self.settings,
+        )
+
+    async def settle_approval(self, pending: PendingAction, approved: bool) -> Settled:
+        """Apply an admin's recorded decision on an approval a tool raised.
+
+        Runs as the admin who decided, so the audit row is theirs.
+        """
+        if pending.decided_by is None:
+            raise ValueError(f"pending action {pending.id} has no decision to settle")
+        return await self.runner.settle(
+            self._context(pending.decided_by, Tier.ADMIN), pending, approved
+        )
 
     async def resolve_confirmation(
         self, user_id: str, tier: Tier, pending: PendingAction, approved: bool
@@ -184,6 +207,7 @@ class Agent:
                     reply.pending_ids.append(outcome.pending_id)
                 if outcome.choices:  # the latest picker wins
                     reply.choices = list(outcome.choices)
+                reply.notices.extend(outcome.notices)
                 results.append(outcome.as_result_block(block.id))
             messages.append({"role": "user", "content": results})
             self.store.append_message(

@@ -9,7 +9,13 @@ Order of checks for a call:
 3. Destructive tools: the kill switch is off, and unless the call carries a
    confirmed pending-action id, the call is turned into a pending action
    and the model gets back "waiting for confirmation" instead of a result.
-4. The handler runs; its result or error is audited with timing.
+4. The handler runs; its result or error is audited with timing. A result
+   that offers choices, or that asks the admin through `ForAdmin`, is
+   turned into what the chat layer renders: buttons, notices, and for an
+   approval a pending action the admin settles.
+
+`settle()` is the other way in: the admin's decision on an approval a tool
+raised, applied by that tool's `settle` handler and audited the same way.
 """
 
 from __future__ import annotations
@@ -25,6 +31,8 @@ from maester.agent.limits import KillSwitch
 from maester.agent.tools import (
     Choice,
     Choices,
+    ForAdmin,
+    Settled,
     Tier,
     ToolContext,
     ToolRegistry,
@@ -32,10 +40,13 @@ from maester.agent.tools import (
     ValidationError,
     validate_input,
 )
+from maester.notify import Notice
+from maester.store import PendingAction
 
 log = logging.getLogger("maester.agent")
 
 CONFIRMATION_TTL = timedelta(minutes=5)
+APPROVAL_TTL = timedelta(days=7)
 CONFIRMED_KEY = "_confirmed_pending_id"
 
 
@@ -45,6 +56,7 @@ class ToolOutcome:
     is_error: bool = False
     pending_id: int | None = None
     choices: tuple[Choice, ...] = ()
+    notices: tuple[Notice, ...] = ()
 
     @property
     def text(self) -> str:
@@ -102,11 +114,7 @@ class ToolRunner:
 
         if spec.destructive:
             if self.kill_switch.enabled:
-                outcome = ToolOutcome(
-                    f"{name} is disabled right now"
-                    + (f": {self.kill_switch.reason}" if self.kill_switch.reason else ""),
-                    is_error=True,
-                )
+                outcome = ToolOutcome(self._disabled(name), is_error=True)
                 self._audit(ctx, name, args, outcome, host, 0)
                 return outcome
             if confirmed_id is None:
@@ -123,16 +131,67 @@ class ToolRunner:
 
         started = time.monotonic()
         try:
-            result = await spec.handler(ctx, **args)
-            if isinstance(result, Choices):
-                outcome = ToolOutcome(result.as_content(), choices=tuple(result.items))
-            else:
-                outcome = ToolOutcome(result)
+            outcome = self._outcome(ctx, spec, await spec.handler(ctx, **args))
         except Exception as exc:  # a tool failing must not take the turn down
             log.exception("tool %s failed", name)
             outcome = ToolOutcome(f"{type(exc).__name__}: {exc}", is_error=True)
-        self._audit(ctx, name, args, outcome, host, int((time.monotonic() - started) * 1000))
+        self._audit(ctx, name, args, outcome, host, self._ms(started))
         return outcome
+
+    async def settle(self, ctx: ToolContext, pending: PendingAction, approved: bool) -> Settled:
+        """Apply the admin's decision on an approval `pending.action` raised.
+
+        Raises when there is nothing to settle it with, when the kill switch
+        holds a destructive tool, or when the handler fails; the caller
+        reopens the pending action so the admin can try again.
+        """
+        spec = self.registry.get(pending.action)
+        if spec is None or spec.settle is None:
+            raise LookupError(f"no tool settles {pending.action!r} approvals")
+        if spec.destructive and self.kill_switch.enabled:
+            raise RuntimeError(self._disabled(spec.name))
+        args = {**pending.payload, "pending_id": pending.id, "approved": approved}
+        host = pending.payload.get(spec.host_param) if spec.host_param else None
+        started = time.monotonic()
+        try:
+            settled = await spec.settle(ctx, pending, approved)
+        except Exception as exc:
+            outcome = ToolOutcome(f"{type(exc).__name__}: {exc}", is_error=True)
+            self._audit(ctx, spec.name, args, outcome, host, self._ms(started))
+            raise
+        self._audit(ctx, spec.name, args, ToolOutcome(settled.text), host, self._ms(started))
+        return settled
+
+    def _outcome(self, ctx: ToolContext, spec: ToolSpec, result: Any) -> ToolOutcome:
+        if isinstance(result, Choices):
+            return ToolOutcome(result.as_content(), choices=tuple(result.items))
+        if isinstance(result, ForAdmin):
+            return self._for_admin(ctx, spec, result)
+        return ToolOutcome(result)
+
+    def _for_admin(self, ctx: ToolContext, spec: ToolSpec, result: ForAdmin) -> ToolOutcome:
+        if result.approval is None:
+            return ToolOutcome(result.content, notices=(Notice(result.notice),))
+        if spec.settle is None:
+            raise TypeError(f"{spec.name} asked the admin to approve but has no settle handler")
+        if ctx.store is None:
+            raise RuntimeError("an approval is required but no store is configured")
+        pending = ctx.store.create_pending(
+            kind="approve",
+            action=spec.name,
+            requester=ctx.user_id,
+            payload=result.approval.payload,
+            summary=result.approval.summary,
+            ttl=APPROVAL_TTL,
+        )
+        content = {
+            "status": "awaiting_admin_approval",
+            "result": result.content,
+            "note": "The admin has been asked to approve this in the admin channel. Tell the "
+            "user it now waits on the admin and that they'll get a DM once it's decided. "
+            "Do not call this tool again for it.",
+        }
+        return ToolOutcome(content, notices=(Notice(result.notice, approval=pending),))
 
     def _request_confirmation(
         self, ctx: ToolContext, spec: ToolSpec, args: dict[str, Any]
@@ -158,6 +217,14 @@ class ToolRunner:
             },
             pending_id=pending.id,
         )
+
+    def _disabled(self, name: str) -> str:
+        reason = self.kill_switch.reason
+        return f"{name} is disabled right now" + (f": {reason}" if reason else "")
+
+    @staticmethod
+    def _ms(started: float) -> int:
+        return int((time.monotonic() - started) * 1000)
 
     def _audit(
         self,

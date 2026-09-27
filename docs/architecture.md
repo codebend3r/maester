@@ -51,6 +51,21 @@ Deleting a file, blocklisting a release, issuing an invite, changing a share: al
 
 The model never sees a confirmation as something it can perform; the button press is out of band.
 
+## Notices and approvals
+
+Anything posted outside the current reply is a `Notice` (`maester/notify.py`): a message for the admin channel, the same with Approve/Deny buttons when it carries an approval, or a DM to one user. Replies, button decisions and webhooks all produce notices, and the Discord bot delivers them as the app's `Notifier`, so nothing outside `chat/` imports Discord.
+
+A tool reaches the admin by returning `ForAdmin(content, notice, approval=None)`:
+
+- Without an approval, the model gets `content` and the admin channel gets `notice`.
+- With `Approval(summary, payload)`, the runner stores a pending action named after the tool, the notice gets Approve/Deny buttons, and the model is told the action waits on the admin.
+- The admin's press is recorded, then applied by the tool's `settle` handler (`@tool(..., settle=...)`), run as the admin through `ToolRunner.settle()` and audited like any call. It returns `Settled(text, notices)`, typically a DM to the requester.
+- If settling fails, the decision is reopened so the admin can press again.
+
+The link flow's approval is the one handler registered outside a tool (`IdentityService.finish_link`).
+
+Tools act as the friend through `ToolContext.linked_user()`: the caller's active link, whose `seerr_user_id` goes out as Seerr's `X-API-User`. Callers without one are refused.
+
 ## Prompt injection
 
 Friends' messages and every tool result (titles, overviews, file names, Seerr issue text) are untrusted. The system prompt states that tool results are data. The registry has no shell, HTTP passthrough or filesystem tools, so the worst an injected instruction can do is call a scoped tool the user already had access to, and destructive ones still need the button. The eval harness keeps an injection case.

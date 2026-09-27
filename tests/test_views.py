@@ -4,8 +4,9 @@ import discord
 
 from maester.agent.tools import Choice
 from maester.chat.members import resolve_chat_user
-from maester.chat.service import AdminNotice, ChatResponse, Decision
+from maester.chat.service import ChatResponse, Decision
 from maester.chat.views import ChoiceView, DecisionView, send_response
+from maester.notify import Notice
 from maester.store import PendingAction
 
 
@@ -118,9 +119,9 @@ async def test_a_refused_press_is_answered_privately_and_keeps_the_buttons_live(
 
 
 async def test_a_settled_press_disables_the_buttons_and_delivers_notices():
-    notice = AdminNotice("Pal confirmed: replace it")
+    notice = Notice("Pal confirmed: replace it")
     view = DecisionView(pending())
-    bot = FakeBot(Decision("Done: replaced", admin_notices=(notice,)))
+    bot = FakeBot(Decision("Done: replaced", notices=(notice,)))
     interaction = FakeInteraction(bot, DM_AUTHOR)
     confirm, cancel = view.children
     await confirm.callback(interaction)
@@ -140,7 +141,9 @@ async def test_choices_render_numbered_buttons_and_poster_embeds():
     response = ChatResponse(
         chunks=["Which one?"],
         choices=[
-            Choice("Dune", "438631", 2021, "https://image.tmdb.org/t/p/w92/dune.jpg"),
+            Choice(
+                "Dune", "438631", 2021, "https://image.tmdb.org/t/p/w92/dune.jpg", "On the server"
+            ),
             Choice("Dune", "841", 1984),
         ],
     )
@@ -154,4 +157,5 @@ async def test_choices_render_numbered_buttons_and_poster_embeds():
     embeds = kwargs["embeds"]
     assert [e.title for e in embeds] == ["1. Dune (2021)", "2. Dune (1984)"]
     assert embeds[0].thumbnail.url == "https://image.tmdb.org/t/p/w92/dune.jpg"
+    assert embeds[0].description == "On the server" and embeds[1].description is None
     assert embeds[1].thumbnail.url is None

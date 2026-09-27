@@ -92,7 +92,7 @@ class _DecisionButton(discord.ui.Button):
         view._finish()
         await interaction.edit_original_response(view=view)
         await interaction.followup.send(decision.text)
-        await bot.deliver(decision.admin_notices)
+        await bot.deliver(decision.notices)
 
 
 class ChoiceView(_AutoDisableView):
@@ -127,7 +127,7 @@ class _ChoiceButton(discord.ui.Button):
 
 
 async def send_response(target, bot: MaesterBot, user: ChatUser, response: ChatResponse) -> None:
-    """Send a ChatResponse's chunks with its views on the last one, then its admin notices.
+    """Send a ChatResponse's chunks with its views on the last one, then its notices.
 
     `target` is anything with `.send()`: a channel, a DM, or a webhook followup.
     """
@@ -149,14 +149,16 @@ async def send_response(target, bot: MaesterBot, user: ChatUser, response: ChatR
     for extra in response.confirmations[1:]:
         extra_view = DecisionView(extra)
         extra_view.message = await target.send(f"Also waiting: {extra.summary}", view=extra_view)
-    await bot.deliver(response.admin_notices)
+    await bot.deliver(response.notices)
 
 
 def choice_embeds(choices: Sequence[Choice]) -> list[discord.Embed]:
-    """One small card per option, numbered like its button, with the poster when known."""
+    """One small card per option, numbered like its button, with its detail and poster."""
     embeds = []
     for n, choice in enumerate(choices, 1):
-        embed = discord.Embed(title=f"{n}. {choice.display}"[:256])
+        embed = discord.Embed(
+            title=f"{n}. {choice.display}"[:256], description=choice.detail or None
+        )
         if choice.poster_url:
             embed.set_thumbnail(url=choice.poster_url)
         embeds.append(embed)

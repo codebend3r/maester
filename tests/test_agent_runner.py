@@ -1,10 +1,24 @@
+from datetime import timedelta
+
 import pytest
 
 from maester.agent.limits import KillSwitch
 from maester.agent.runner import CONFIRMED_KEY, ToolRunner
-from maester.agent.tools import Choice, Choices, Tier, ToolContext, ToolRegistry
+from maester.agent.tools import (
+    Approval,
+    Choice,
+    Choices,
+    ForAdmin,
+    NotLinked,
+    Settled,
+    Tier,
+    ToolContext,
+    ToolRegistry,
+)
+from maester.notify import Notice
 from maester.store import Store
 
+SCHEMA_N = {"type": "object", "properties": {"n": {"type": "integer"}}, "required": ["n"]}
 SCHEMA = {
     "type": "object",
     "properties": {"file_id": {"type": "integer"}, "host": {"type": "string"}},
@@ -40,6 +54,24 @@ def setup():
     async def delete_file(ctx, file_id, host):
         calls.append(("delete_file", file_id, host))
         return "deleted"
+
+    async def settle_ask(ctx, pending, approved):
+        if pending.payload["n"] < 0:
+            raise RuntimeError("seerr down")
+        calls.append(("settle_ask", ctx.user_id, pending.payload["n"], approved))
+        return Settled(f"settled {approved}", (Notice("told you", to=pending.requester),))
+
+    @reg.tool("ask_admin", "needs the admin", SCHEMA_N, settle=settle_ask)
+    async def ask_admin(ctx, n):
+        return ForAdmin({"n": n}, f"u1 wants {n}", Approval(f"let u1 have {n}", {"n": n}))
+
+    @reg.tool("tell_admin", "admin should know", SCHEMA_N)
+    async def tell_admin(ctx, n):
+        return ForAdmin({"done": n}, f"heads up: {n}")
+
+    @reg.tool("ask_without_settle", "misdeclared", SCHEMA_N)
+    async def ask_without_settle(ctx, n):
+        return ForAdmin({}, "?", Approval("?", {}))
 
     store = Store(":memory:")
     kill = KillSwitch()
@@ -138,3 +170,67 @@ async def test_kill_switch_blocks_destructive_tools_only(setup):
     kill.off()
     out = await runner.run(ctx, "delete_file", {"file_id": 7, "host": "meleys"})
     assert out.pending_id
+
+
+async def test_a_notice_for_the_admin_rides_along_with_the_result(setup):
+    runner, ctx, store, *_ = setup
+    out = await runner.run(ctx, "tell_admin", {"n": 3})
+    assert out.content == {"done": 3} and out.notices == (Notice("heads up: 3"),)
+    assert store.open_pending() == []
+
+
+async def test_an_approval_becomes_a_pending_action_the_admin_sees(setup):
+    runner, ctx, store, *_ = setup
+    out = await runner.run(ctx, "ask_admin", {"n": 3})
+    assert out.content["status"] == "awaiting_admin_approval"
+    assert out.content["result"] == {"n": 3} and not out.is_error
+    (notice,) = out.notices
+    pending = notice.approval
+    assert notice.text == "u1 wants 3" and notice.to is None
+    assert (pending.kind, pending.action, pending.requester) == ("approve", "ask_admin", "u1")
+    assert pending.payload == {"n": 3} and pending.summary == "let u1 have 3"
+    assert store.open_pending("approve") == [pending]
+
+
+async def test_an_approval_from_a_tool_that_cannot_settle_it_is_an_error(setup):
+    runner, ctx, store, *_ = setup
+    out = await runner.run(ctx, "ask_without_settle", {"n": 1})
+    assert out.is_error and "no settle handler" in out.content
+    assert store.open_pending() == []
+
+
+async def test_settle_applies_the_decision_as_the_admin_and_audits_it(setup):
+    runner, ctx, store, calls, _ = setup
+    pending = (await runner.run(ctx, "ask_admin", {"n": 3})).notices[0].approval
+    admin = ToolContext(user_id="boss", tier=Tier.ADMIN, services=None, store=store)
+    settled = await runner.settle(admin, pending, True)
+    assert settled.text == "settled True" and settled.notices[0].to == "u1"
+    assert calls == [("settle_ask", "boss", 3, True)]
+    row = store.audit_recent(1)[0]
+    assert (row.tool, row.discord_id, row.ok) == ("ask_admin", "boss", True)
+    assert row.args == {"n": 3, "pending_id": pending.id, "approved": True}
+
+
+async def test_settle_failures_are_audited_and_raised(setup):
+    runner, ctx, store, *_ = setup
+    pending = (await runner.run(ctx, "ask_admin", {"n": -1})).notices[0].approval
+    admin = ToolContext(user_id="boss", tier=Tier.ADMIN, services=None, store=store)
+    with pytest.raises(RuntimeError, match="seerr down"):
+        await runner.settle(admin, pending, True)
+    assert store.audit_recent(1)[0].ok is False
+    stray = store.create_pending(
+        kind="approve", action="echo", requester="u1", payload={}, summary="?", ttl=timedelta(1)
+    )
+    with pytest.raises(LookupError, match="no tool settles"):
+        await runner.settle(admin, stray, True)
+
+
+def test_linked_user_is_the_active_seerr_link_or_a_refusal(setup):
+    _, ctx, store, *_ = setup
+    with pytest.raises(NotLinked):
+        ctx.linked_user()
+    store.upsert_user("u1", status="pending", seerr_user_id=4)
+    with pytest.raises(NotLinked):
+        ctx.linked_user()
+    store.upsert_user("u1", status="active")
+    assert ctx.linked_user().seerr_user_id == 4

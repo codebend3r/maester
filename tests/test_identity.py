@@ -88,13 +88,17 @@ async def test_link_unknown_account_and_empty_query(identity):
 async def test_finish_link_activates_or_revokes(identity):
     svc, store = identity
     pending = (await svc.start_link("d1", "Dany", "dany@example.com")).pending
-    assert svc.finish_link(pending, approved=True).startswith("Linked")
+    settled = await svc.finish_link(pending, approved=True)
+    assert settled.text.startswith("Linked")
+    (dm,) = settled.notices
+    assert dm.to == "d1" and "linked" in dm.text
     assert store.get_user("d1").status == "active"
     assert svc.tier_for("d1", {2}) == Tier.TRUSTED
     assert "already linked" in (await svc.start_link("d1", "Dany", "dany@example.com")).message
 
     pending2 = (await svc.start_link("d2", "Jon", "jon")).pending
-    assert svc.finish_link(pending2, approved=False).startswith("Denied")
+    denied = await svc.finish_link(pending2, approved=False)
+    assert denied.text.startswith("Denied") and denied.notices[0].to == "d2"
     assert store.get_user("d2").status == "revoked"
     assert "not linked" in svc.whoami("d2", set())
 

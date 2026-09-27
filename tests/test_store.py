@@ -121,3 +121,19 @@ def test_calls_inside_a_transaction_commit_or_roll_back_together(store):
     assert store.get_user("d3") is None
     store.upsert_user("d4")  # the store is usable again after a rollback
     assert store.get_user("d4")
+
+
+def test_a_decision_records_who_and_can_be_reopened(store):
+    p = store.create_pending(
+        kind="approve",
+        action="request_media_4k",
+        requester="d1",
+        payload={},
+        summary="4K Dune",
+        ttl=timedelta(days=1),
+    )
+    assert store.decide_pending(p.id, "approved", "boss").decided_by == "boss"
+    store.reopen_pending(p.id)
+    reopened = store.get_pending(p.id)
+    assert reopened.decision is None and reopened.decided_by is None
+    assert store.open_pending("approve") == [reopened]

@@ -12,8 +12,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
-from maester.agent.tools import Tier
+from maester.agent.tools import Settled, Tier
 from maester.clients import Services
+from maester.notify import Notice
 from maester.store import LinkStatus, PendingAction, Store, UserRow
 
 LINK_TTL = timedelta(days=7)
@@ -127,15 +128,17 @@ class IdentityService:
                 continue
         return None
 
-    def finish_link(self, pending: PendingAction, approved: bool) -> str:
-        """Apply an admin's already-recorded decision on a link request."""
+    async def finish_link(self, pending: PendingAction, approved: bool) -> Settled:
+        """Apply an admin's already-recorded decision on a link request, and tell the friend."""
         if approved:
             self.store.upsert_user(
                 pending.requester, status=LinkStatus.ACTIVE, linked_at=datetime.now(UTC).isoformat()
             )
-            return f"Linked: {pending.summary}"
+            dm = "You're linked! Ask me for movies and shows any time."
+            return Settled(f"Linked: {pending.summary}", (Notice(dm, to=pending.requester),))
         self.store.upsert_user(pending.requester, status=LinkStatus.REVOKED)
-        return f"Denied: {pending.summary}"
+        dm = "The admin didn't approve that link. Ask them if you think it's a mistake."
+        return Settled(f"Denied: {pending.summary}", (Notice(dm, to=pending.requester),))
 
     def set_tier_override(self, discord_id: str, tier: str | None) -> str:
         normalized = Tier.parse(tier).name.lower() if tier else None

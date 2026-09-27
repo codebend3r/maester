@@ -70,6 +70,7 @@ class PendingAction:
     summary: str
     decision: str | None
     expires_at: str
+    decided_by: str | None = None
 
 
 class Store:
@@ -236,6 +237,10 @@ class Store:
             r = self._conn.execute(
                 "SELECT * FROM users WHERE discord_id = ?", (discord_id,)
             ).fetchone()
+        return self._user(r)
+
+    @staticmethod
+    def _user(r: sqlite3.Row | None) -> UserRow | None:
         if r is None:
             return None
         return UserRow(
@@ -338,6 +343,7 @@ class Store:
             summary=r["summary"],
             decision=r["decision"],
             expires_at=r["expires_at"],
+            decided_by=r["decided_by"],
         )
 
     def decide_pending(
@@ -351,6 +357,15 @@ class Store:
                 (decision, decided_by, _now(), pending_id, _now()),
             ).rowcount
         return self.get_pending(pending_id) if updated else None
+
+    def reopen_pending(self, pending_id: int) -> None:
+        """Undo a decision whose effect failed, so the buttons can be pressed again."""
+        with self.transaction() as conn:
+            conn.execute(
+                "UPDATE pending_actions SET decision = NULL, decided_by = NULL, decided_at = NULL"
+                " WHERE id = ?",
+                (pending_id,),
+            )
 
     def open_pending(
         self, kind: str | None = None, *, action: str | None = None, requester: str | None = None
