@@ -21,8 +21,7 @@ from maester.agent.tools import Tier, ToolContext, tool
 )
 async def server_status(ctx: ToolContext) -> dict[str, Any]:
     hosts: dict[str, Any] = {}
-    tautullis = getattr(ctx.services, "tautulli", None) or {}
-    for host, client in sorted(tautullis.items()):
+    for host, client in sorted(ctx.services.tautulli.items()):
         try:
             activity = await client.activity()
         except Exception as exc:  # one host down must not hide the other

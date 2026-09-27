@@ -13,7 +13,10 @@ from __future__ import annotations
 import enum
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from maester.clients import Services
 
 
 class Tier(enum.IntEnum):
@@ -38,14 +41,13 @@ class Tier(enum.IntEnum):
 class ToolContext:
     """What a tool handler gets besides its arguments.
 
-    `services` is whatever bag of clients the app wires up (real or fake);
-    tools pull what they need from it by attribute. `user_id` is the chat
-    identity the audit row is written under.
+    `services` holds the clients the app wires up, real or fake. `user_id`
+    is the chat identity the audit row is written under.
     """
 
     user_id: str
     tier: Tier
-    services: Any
+    services: Services
     store: Any = None
     extra: dict[str, Any] = field(default_factory=dict)
 

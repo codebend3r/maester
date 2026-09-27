@@ -11,10 +11,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Any
 
 from maester.agent.tools import Tier
-from maester.store import PendingAction, UserRow
+from maester.clients import Services
+from maester.store import PendingAction, Store, UserRow
 
 LINK_TTL = timedelta(days=7)
 
@@ -50,7 +50,7 @@ class LinkStart:
 
 
 class IdentityService:
-    def __init__(self, store: Any, services: Any, roles: RoleMap):
+    def __init__(self, store: Store, services: Services, roles: RoleMap):
         self.store = store
         self.services = services
         self.roles = roles
@@ -116,8 +116,7 @@ class IdentityService:
         )
 
     async def _tautulli_id(self, email: str, username: str) -> int | None:
-        tautullis = getattr(self.services, "tautulli", None) or {}
-        for client in tautullis.values() if isinstance(tautullis, dict) else [tautullis]:
+        for client in self.services.tautulli.values():
             try:
                 for u in await client.users():
                     if (email and u.email == email) or (

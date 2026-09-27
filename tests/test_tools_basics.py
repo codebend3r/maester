@@ -54,7 +54,7 @@ async def test_server_status_reports_each_host_and_survives_a_dead_one():
 
 async def test_server_status_without_tautulli():
     out = await server_status(
-        ToolContext(user_id="u", tier=Tier.FRIEND, services=SimpleNamespace())
+        ToolContext(user_id="u", tier=Tier.FRIEND, services=SimpleNamespace(tautulli={}))
     )
     assert "error" in out
 

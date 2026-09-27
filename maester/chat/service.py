@@ -21,7 +21,7 @@ from maester.agent.runner import CONFIRMED_KEY, ToolOutcome
 from maester.agent.tools import Tier, ToolContext
 from maester.chat.identity import IdentityService
 from maester.chat.split import split_reply
-from maester.store import PendingAction
+from maester.store import PendingAction, Store
 
 log = logging.getLogger("maester.chat")
 
@@ -79,7 +79,7 @@ class ChatService:
         *,
         agent: Agent,
         identity: IdentityService,
-        store: Any,
+        store: Store,
         notify_admin: Notifier | None = None,
     ):
         self.agent = agent
