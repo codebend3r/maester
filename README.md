@@ -42,6 +42,8 @@ Work is tracked in [GitHub Issues](https://github.com/codebend3r/maester/issues)
 
 The catalog of epics and stories lives in [`scripts/catalog.py`](scripts/catalog.py). [`docs/roadmap.md`](docs/roadmap.md) and the issues are both rendered from it by `scripts/sync_tracker.py`, so edit the catalog and re-run the sync rather than editing either by hand.
 
+The board follows the issues. `uv run python scripts/sync_board.py` lists where it has drifted (status, fields, missing items, finished epics), and `--apply` fixes it.
+
 | Milestone | Goal                                                                                |
 | --------- | ----------------------------------------------------------------------------------- |
 | M1        | Walking skeleton: a friend can DM the bot and it answers using a read-only tool     |
@@ -80,7 +82,7 @@ maester/
 │   └── config.py       environment, read once
 ├── evals/              scripted conversations against the fakes
 ├── tests/
-├── scripts/            catalog.py, sync_tracker.py, deploy-nas.sh
+├── scripts/            catalog.py, sync_tracker.py, sync_board.py, deploy-nas.sh
 └── docs/
 ```
 
