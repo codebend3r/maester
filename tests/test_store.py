@@ -130,12 +130,16 @@ def test_a_decision_records_who_and_can_be_reopened(store):
     assert store.open_pending("approve") == [reopened]
 
 
-def test_webhook_events_are_claimed_once_until_released(store):
-    assert store.claim_event("seerr", "MEDIA_AVAILABLE:request:77")
-    assert not store.claim_event("seerr", "MEDIA_AVAILABLE:request:77")
-    assert store.claim_event("seerr", "MEDIA_AVAILABLE:request:78")
+def test_webhook_events_are_claimed_once_within_the_window(store):
+    day = timedelta(days=1)
+    assert store.claim_event("seerr", "MEDIA_AVAILABLE:request:77", window=day)
+    assert not store.claim_event("seerr", "MEDIA_AVAILABLE:request:77", window=day)
+    assert store.claim_event("seerr", "MEDIA_AVAILABLE:request:78", window=day)
     store.release_event("seerr", "MEDIA_AVAILABLE:request:77")
-    assert store.claim_event("seerr", "MEDIA_AVAILABLE:request:77")
+    assert store.claim_event("seerr", "MEDIA_AVAILABLE:request:77", window=day)
+    # Once the window has passed (here: it already has), the same event counts as new.
+    assert store.claim_event("seerr", "MEDIA_AVAILABLE:request:77", window=timedelta(seconds=-1))
+    assert store._conn.execute("SELECT COUNT(*) FROM webhook_events").fetchone()[0] == 1
 
 
 def test_user_by_seerr_id_finds_the_live_link(store):

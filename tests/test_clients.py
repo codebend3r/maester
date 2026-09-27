@@ -345,3 +345,14 @@ async def test_sonarr_episode_files_carry_season_and_audio_languages(fixture):
     assert (dual.season, dual.audio_languages) == (1, ("jpn", "eng"))
     assert (japanese.season, japanese.audio_languages) == (2, ("jpn",))
     assert unscanned.audio_languages is None and unscanned.media_id == 40
+
+
+@respx.mock
+async def test_plex_answers_none_for_a_key_it_no_longer_has():
+    respx.get(f"{BASE}/library/metadata/999").respond(status_code=404)
+    respx.get(f"{BASE}/library/metadata/999/children").respond(status_code=404)
+    respx.get(f"{BASE}/library/metadata/500").respond(status_code=500)
+    client = PlexClient(BASE, "tok")
+    assert await client.item("999") is None and await client.seasons("999") == []
+    with pytest.raises(ClientError, match="500"):
+        await client.item("500")

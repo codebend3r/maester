@@ -32,9 +32,8 @@ from maester.agent.tools import (
     ToolContext,
     tool,
 )
-from maester.clients import Services
+from maester.clients import ClientError, Services
 from maester.clients.seerr import (
-    ANIME_KEYWORD,
     MediaDetails,
     MediaRequest,
     MediaStatus,
@@ -137,10 +136,9 @@ async def dub_routing(
             "dub": f"{server.name} has no '{settings.dub_tag}' tag, so the dub preference "
             "couldn't be attached; the admin can add the tag."
         }
-    # Request tags replace the ones Seerr would apply, so keep those: Seerr
-    # uses its anime tags for shows TMDB tags anime, its default tags otherwise.
-    anime = details.media_type == "tv" and ANIME_KEYWORD in details.keyword_ids
-    tags = tuple(dict.fromkeys((*(options.anime_tags if anime else options.default_tags), tag.id)))
+    # Request tags replace the ones Seerr would apply, so keep those.
+    base = options.anime_tags if details.seerr_anime else options.default_tags
+    tags = tuple(dict.fromkeys((*base, tag.id)))
     profile = options.profile(settings.dub_profile) if settings.dub_profile else None
     routing = Routing(server.id, tags, profile.id if profile else None)
     return routing, {"dub": {"tag": tag.name, "profile": profile.name if profile else None}}
@@ -212,28 +210,29 @@ async def explain(seerr: Seerr, user: LinkedUser, refused: RequestRefused, media
 
 
 async def standard_copy_bytes(services: Services, details: MediaDetails) -> int | None:
-    """Size of the 1080p copy on the server, or None when it can't be pinned to one host."""
-    try:
-        if details.media_type == "movie":
-            movie = await movie_owner(services, details.tmdb_id)
-            if movie is None:
-                return None
-            files = await services.radarr[movie.host].movie_files(movie.item.id)
-        else:
-            show = await series_owner(services, details.tvdb_id) if details.tvdb_id else None
-            if show is None:
-                return None
-            files = await services.sonarr[show.host].episode_files(show.item.id)
-    except AmbiguousOwner:
-        return None
+    """Size of the 1080p copy on the server, or None when no arr has it."""
+    if details.media_type == "movie":
+        movie = await movie_owner(services, details.tmdb_id)
+        if movie is None:
+            return None
+        files = await services.radarr[movie.host].movie_files(movie.item.id)
+    else:
+        show = await series_owner(services, details.tvdb_id) if details.tvdb_id else None
+        if show is None:
+            return None
+        files = await services.sonarr[show.host].episode_files(show.item.id)
     return sum(f.size_bytes for f in files) or None
 
 
 async def size_tradeoff(services: Services, details: MediaDetails) -> dict[str, Any]:
+    """What a 1080p copy already takes, so the 4K request can be weighed against it."""
     if details.status not in (MediaStatus.AVAILABLE, MediaStatus.PARTIALLY_AVAILABLE):
         return {}
-    size = await standard_copy_bytes(services, details)
     tradeoff: dict[str, Any] = {"standard_copy": details.status.label}
+    try:
+        size = await standard_copy_bytes(services, details)
+    except (AmbiguousOwner, ClientError) as exc:  # an estimate is not worth failing the request
+        return {**tradeoff, "standard_copy_size": f"unknown ({exc})"}
     if size:
         gb = size / 1e9
         low, high = UHD_SIZE_FACTOR

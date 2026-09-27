@@ -3,6 +3,7 @@ from dataclasses import replace
 import pytest
 
 from maester.agent.tools import ForAdmin, NotLinked, Tier, registry
+from maester.clients import ClientError
 from maester.clients.arr import MediaFile
 from maester.clients.radarr import Movie
 from maester.clients.seerr import (
@@ -263,3 +264,17 @@ async def test_a_dub_request_keeps_default_tags_and_says_when_it_cannot_tag(ctx)
     ctx.services.seerr.server_list["sonarr"] = []
     out = await request_media(ctx, 136315, "tv", seasons=[3], english_dub=True)
     assert out["dub"].startswith("Seerr has no default server")
+
+
+async def test_a_size_that_cannot_be_measured_does_not_block_4k(ctx):
+    seed(ctx, replace(DUNE, status=S.AVAILABLE))
+    four_k_servers(ctx)
+
+    class Down:
+        async def movie_by_tmdb(self, tmdb_id):
+            raise ClientError("radarr", "GET", "/api/v3/movie", None, "timeout")
+
+    ctx.services.radarr["meleys"] = Down()
+    out = await request_media_4k(ctx, 438631, "movie")
+    assert isinstance(out, ForAdmin) and out.content["requested"] is True
+    assert out.content["standard_copy_size"].startswith("unknown (radarr GET")

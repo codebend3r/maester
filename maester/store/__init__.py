@@ -391,13 +391,17 @@ class Store:
 
     # -- webhook events ---------------------------------------------------
 
-    def claim_event(self, source: str, key: str) -> bool:
-        """Record a webhook event as handled; False when it already was.
+    def claim_event(self, source: str, key: str, *, window: timedelta) -> bool:
+        """Record a webhook event as handled; False when it already was within `window`.
 
-        The insert is the claim, so two concurrent deliveries of one event
-        cannot both act on it.
+        Claims older than the window are dropped first, which keeps the table
+        small and lets a genuinely new occurrence of the same event (an issue
+        resolved, reopened, then resolved again days later) through. The
+        insert is the claim, so two concurrent deliveries cannot both act.
         """
+        cutoff = (datetime.now(UTC) - window).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
         with self.transaction() as conn:
+            conn.execute("DELETE FROM webhook_events WHERE received_at < ?", (cutoff,))
             return (
                 conn.execute(
                     "INSERT OR IGNORE INTO webhook_events (source, event_key, received_at)"

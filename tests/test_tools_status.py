@@ -5,7 +5,7 @@ import pytest
 from maester.clients.arr import HistoryEvent, QueueItem
 from maester.clients.radarr import Movie
 from maester.clients.sabnzbd import Download
-from maester.clients.seerr import MediaDetails, MediaStatus, Season
+from maester.clients.seerr import MediaDetails, MediaStatus, RequestStatus, Season
 from maester.clients.sonarr import Series
 from maester.tools.status import humanized, request_status, seconds_left
 
@@ -142,3 +142,27 @@ async def test_only_the_callers_open_requests_are_listed(dune_on_meleys):
     ctx = dune_on_meleys
     await ctx.services.seerr.create_request("movie", 438631, as_user=99)
     assert (await request_status(ctx))["requests"] == []
+
+
+async def test_failed_requests_are_listed_and_queues_are_fetched_once(dune_on_meleys):
+    ctx = dune_on_meleys
+    seerr = ctx.services.seerr
+    await request(ctx, "movie", 438631)
+    await request(ctx, "movie", 438631, is_4k=True)
+    failed = await request(ctx, "movie", 438631)
+    seerr.requests[-1] = replace(failed, status=RequestStatus.FAILED)
+    radarr = ctx.services.radarr["meleys"]
+    radarr.queue_items = [queued(1, 8, 100, 50, "nzo_dune")]
+    fetches = []
+    real_queue = radarr.queue
+
+    async def counted_queue():
+        fetches.append("radarr")
+        return await real_queue()
+
+    radarr.queue = counted_queue
+    rows = (await request_status(ctx))["requests"]
+    assert [r["request_id"] for r in rows] == [3, 2, 1]
+    assert rows[0]["request"] == "failed" and rows[0]["failed"].startswith("Seerr couldn't")
+    assert rows[1]["percent"] == rows[2]["percent"] == 50.0
+    assert fetches == ["radarr"]

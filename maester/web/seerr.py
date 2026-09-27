@@ -8,9 +8,9 @@ which go out through the injected `Notifier`; types without a handler are
 acknowledged and ignored, so ticking more types in Seerr is harmless.
 
 A delivery is claimed in `webhook_events` before its handler runs, so a
-repeat of the same event (same type, same request or issue) is acknowledged
-without acting twice. A handler that fails releases its claim, so a later
-delivery can try again.
+repeat of the same event (same type, same request or issue) within a day is
+acknowledged without acting twice. A handler that fails releases its claim,
+so a later delivery can try again.
 """
 
 from __future__ import annotations
@@ -19,6 +19,7 @@ import hmac
 import logging
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException
@@ -31,6 +32,8 @@ from maester.store import Store
 log = logging.getLogger("maester.web")
 
 SOURCE = "seerr"
+# Seerr repeats an event within minutes (a rescan) or hours; later is news.
+DEDUPE_WINDOW = timedelta(hours=24)
 
 
 @dataclass(frozen=True)
@@ -49,7 +52,7 @@ class SeerrWebhook:
         if handler is None:
             return "ignored"
         key = notification.event_key
-        if not self.store.claim_event(SOURCE, key):
+        if not self.store.claim_event(SOURCE, key, window=DEDUPE_WINDOW):
             return "duplicate"
         try:
             notices = await handler(notification)

@@ -146,6 +146,11 @@ class MediaDetails:
         return f"{self.title} ({self.year})" if self.year else self.title
 
     @property
+    def seerr_anime(self) -> bool:
+        """Seerr's own rule for sending a show to its anime Sonarr settings: TMDB's keyword."""
+        return self.media_type == "tv" and ANIME_KEYWORD in self.keyword_ids
+
+    @property
     def anime_by_tmdb(self) -> bool:
         """TMDB tags it anime, or it is Japanese animation."""
         return ANIME_KEYWORD in self.keyword_ids or (
@@ -641,6 +646,8 @@ class FakeSeerrClient:
                 if r.status in (RequestStatus.PENDING, RequestStatus.APPROVED)
                 and r.media_status != MediaStatus.AVAILABLE
             ]
+        elif filter == "failed":
+            rows = [r for r in rows if r.status == RequestStatus.FAILED]
         return rows[-take:]
 
     async def approve_request(self, request_id: int) -> MediaRequest:

@@ -11,11 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
-from maester.clients.base import HttpClient
-
-# The server's own 4K re-encodes are written next to the original as
-# "<Movie> (<year>) 2160p HEVC.mkv"; the name is what sets them apart.
-REENCODE_MARKER = "2160p hevc"
+from maester.clients.base import ClientError, HttpClient
 
 
 @dataclass(frozen=True)
@@ -34,13 +30,6 @@ class Version:
     bitrate_kbps: int
     size_bytes: int
     file: str
-
-    @property
-    def label(self) -> str:
-        """How a friend would name this copy: "1080p", "4K", or "4K HEVC re-encode"."""
-        if REENCODE_MARKER in self.file.lower():
-            return "4K HEVC re-encode"
-        return {"4k": "4K", "sd": "SD"}.get(self.resolution.lower(), f"{self.resolution}p")
 
     @classmethod
     def from_api(cls, media: dict[str, Any]) -> Version:
@@ -126,12 +115,13 @@ class PlexClient(HttpClient):
         ]
 
     async def item(self, rating_key: str) -> PlexItem | None:
-        data = await self.get_json(f"/library/metadata/{rating_key}")
+        """The item, or None when Plex no longer has that key (Seerr's copy can go stale)."""
+        data = await self._metadata(f"/library/metadata/{rating_key}")
         rows = (data.get("MediaContainer") or {}).get("Metadata") or []
         return PlexItem.from_api(rows[0]) if rows else None
 
     async def seasons(self, rating_key: str) -> list[PlexSeason]:
-        data = await self.get_json(f"/library/metadata/{rating_key}/children")
+        data = await self._metadata(f"/library/metadata/{rating_key}/children")
         return [
             PlexSeason(int(s["index"]), int(s.get("leafCount") or 0))
             for s in (data.get("MediaContainer") or {}).get("Metadata") or []
@@ -140,6 +130,14 @@ class PlexClient(HttpClient):
 
     def deep_link(self, machine_id: str, rating_key: str) -> str:
         return deep_link(machine_id, rating_key)
+
+    async def _metadata(self, path: str) -> dict[str, Any]:
+        try:
+            return await self.get_json(path)
+        except ClientError as exc:
+            if exc.status == 404:
+                return {}
+            raise
 
 
 @dataclass

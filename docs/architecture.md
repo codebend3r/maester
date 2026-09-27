@@ -78,7 +78,8 @@ A tool reaches the admin by returning `ForAdmin(content, notice, approval=None)`
 - Without an approval, the model gets `content` and the admin channel gets `notice`.
 - With `Approval(summary, payload)`, the runner stores a pending action named after the tool, the notice gets Approve/Deny buttons, and the model is told the action waits on the admin.
 - The admin's press is recorded, then applied by the tool's `settle` handler (`@tool(..., settle=...)`), run as the admin through `ToolRunner.settle()` and audited like any call. It returns `Settled(text, notices)`, typically a DM to the requester.
-- If settling fails, the decision is reopened so the admin can press again.
+- If settling fails, the decision is reopened so the admin can press again; settle handlers must therefore be safe to run twice.
+- If a turn fails after a tool acted (a model error, say), the agent raises `TurnFailed` with the partial reply, and the error reply still carries its confirmations and notices. Views deliver notices before sending the reply text.
 
 The link flow's approval is the one handler registered outside a tool (`IdentityService.finish_link`).
 
@@ -110,7 +111,7 @@ SQLite, migrations numbered under `maester/store/migrations/`. Tables: `users`, 
 
 `POST /webhooks/seerr` serves every Seerr notification type. The `Authorization` header must equal `SEERR_WEBHOOK_SECRET`; with no secret configured, every call is refused. The payload is parsed into a `SeerrNotification` and dispatched by type through `seerr_handlers()` (`maester/seerr_events.py`); a handler returns notices, which go out through the bot as the `Notifier`. Types without a handler are acknowledged and ignored.
 
-Each delivery is claimed in `webhook_events` under its type plus the request or issue it concerns before the handler runs, so a repeat is acknowledged without a second DM. A handler that fails releases the claim.
+Each delivery is claimed in `webhook_events` under its type plus the request or issue it concerns before the handler runs, so a repeat within 24 hours is acknowledged without a second DM. Older claims are pruned, so a real recurrence (an issue resolved again after a reopen) gets through. A handler that fails releases the claim.
 
 | Type              | Handler         | Effect                                                                   |
 | ----------------- | --------------- | ------------------------------------------------------------------------ |
