@@ -91,6 +91,7 @@ git clone https://github.com/codebend3r/maester.git
 cd maester
 cp .env.example .env     # fill in service URLs, API keys, Discord and Anthropic tokens
 uv sync
+uv run lefthook install  # git hooks: ruff check --fix and ruff format on staged files
 uv run maester           # starts the Discord bot and the web app on one loop
 ```
 
