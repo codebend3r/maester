@@ -1,0 +1,25 @@
+name: a player limit gets a player fix and the file is left alone
+tier: friend
+services:
+  user: {tautulli_user_id: 8008135}
+  seerr:
+    results:
+      - {tmdb_id: 438631, title: "Dune", year: 2021, media_type: movie, status: 5, rating_key: "4348", media_id: 12, runtime: 155}
+  radarr:
+    meleys:
+      movies:
+        - {id: 8, tmdb_id: 438631, title: "Dune", year: 2021}
+      files:
+        - {id: 55, movie_id: 8, path: "/Meleys/Movies/Dune (2021)/Dune (2021) Bluray-1080p.mkv", size_gb: 14, release_group: FLUX}
+  tautulli:
+    meleys:
+      sessions:
+        - {rating_key: "4348", title: "Dune", subtitle_codec: pgs, subtitle_decision: burn, video_decision: transcode, transcode_decision: transcode}
+  probe:
+    files:
+      "/Meleys/Movies/Dune (2021)/Dune (2021) Bluray-1080p.mkv": {duration: 9331}
+turns:
+  - user: "Dune (2021), the 1080p copy I'm watching right now, keeps stalling as soon as I turn subtitles on. Can you look into it?"
+    expect_tools: [report_problem]
+    forbid_tools: [replace_media]
+    reply_matches: "subtitle|SRT"

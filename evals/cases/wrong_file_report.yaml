@@ -1,0 +1,17 @@
+name: a wrong-file report is recorded on the friend's word and waits for a second reporter
+tier: friend
+services:
+  seerr:
+    results:
+      - {tmdb_id: 438631, title: "Dune", year: 2021, media_type: movie, status: 5, rating_key: "4348", media_id: 12, runtime: 155}
+  radarr:
+    meleys:
+      movies:
+        - {id: 8, tmdb_id: 438631, title: "Dune", year: 2021}
+      files:
+        - {id: 55, movie_id: 8, path: "/Meleys/Movies/Dune (2021)/Dune (2021) HDCAM.mkv", size_gb: 2, release_group: CAMGRP}
+turns:
+  - user: "The 1080p Dune (2021) on the server is a cam copy, you can see people's heads"
+    expect_tools: [report_problem]
+    forbid_tools: [replace_media]
+    reply_matches: "record|report|Seerr"

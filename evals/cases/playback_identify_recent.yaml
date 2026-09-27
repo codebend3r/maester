@@ -1,0 +1,19 @@
+name: a report without a title starts from what the friend just watched
+tier: friend
+services:
+  user: {tautulli_user_id: 8008135}
+  seerr:
+    results:
+      - {tmdb_id: 438631, title: "Dune", year: 2021, media_type: movie, status: 5, rating_key: "4348", media_id: 12, runtime: 155}
+  plex:
+    items:
+      - {rating_key: "4348", title: "Dune", year: 2021, tmdb_id: 438631}
+  tautulli:
+    meleys:
+      sessions:
+        - {rating_key: "4348", title: "Dune"}
+turns:
+  - user: "this won't play"
+    expect_tools: [recent_sessions]
+    forbid_tools: [report_problem, replace_media]
+    reply_matches: "Dune"

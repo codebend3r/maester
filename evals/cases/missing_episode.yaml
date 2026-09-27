@@ -1,0 +1,19 @@
+name: a missing episode is searched on the owning host and listed
+tier: friend
+services:
+  seerr:
+    results:
+      - {tmdb_id: 136315, title: "The Bear", year: 2022, media_type: tv, status: 4, tvdb_id: 403245, rating_key: "5120"}
+  sonarr:
+    meleys:
+      series:
+        - {id: 12, tvdb_id: 403245, title: "The Bear", year: 2022, seasons: [1, 2]}
+      files:
+        - {id: 71, series_id: 12, season: 2}
+      episodes:
+        - {id: 701, series_id: 12, season: 2, number: 6, file_id: 71, aired: "2023-06-22T04:00:00+00:00"}
+        - {id: 702, series_id: 12, season: 2, number: 7, aired: "2023-06-22T04:00:00+00:00"}
+turns:
+  - user: "S02E07 of The Bear is missing"
+    expect_tools: [find_gaps]
+    reply_matches: "S02E07|episode 7|search"
