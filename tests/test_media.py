@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 import sys
@@ -132,17 +133,32 @@ async def test_inspect_refuses_what_it_cannot_read(share):
             await probe.inspect(video)
 
 
-async def test_decode_reports_frames_and_error_lines():
+async def test_decode_reports_frames_and_error_lines(share):
     progress = "frame=120\nfps=24\nprogress=continue\nframe=240\nprogress=end\n"
     run = Scripted(Completed(0, progress, "[hevc @ 0x1] Invalid NAL unit size\n\n"))
-    inspected = Inspection("/m/x.mkv", 9331.0, "hevc", 0, ())
-    decoded = await FileProbe(MediaPaths(["/"]), run, timeout=9).decode(inspected, 4335.0, 30.0)
+    video = os.path.realpath(share / "Vermithor" / "Movies" / "Dune (2021)" / f"{MOVIE}.mkv")
+    inspected = Inspection(video, 9331.0, "hevc", 0, ())
+    decoded = await FileProbe(paths(share), run, timeout=9).decode(inspected, 4335.0, 30.0)
     assert (decoded.frames, decoded.errors, decoded.exit_code) == (
         240, ("[hevc @ 0x1] Invalid NAL unit size",), 0,
     )  # fmt: skip
     ((argv, _),) = run.calls
     assert argv[argv.index("-ss") + 1] == "4335.000" and argv[argv.index("-t") + 1] == "30.000"
-    assert argv[argv.index("-i") + 1] == "file:/m/x.mkv"
+    assert argv[argv.index("-i") + 1] == f"file:{video}"
+
+
+async def test_decode_checks_the_path_again_since_an_inspection_is_only_a_record(share):
+    run = Scripted()
+    forged = Inspection(str(share / "secrets" / "key.txt"), 10.0, "h264", 0, ())
+    with pytest.raises(Unreadable, match="isn't under a media root"):
+        await FileProbe(paths(share), run, timeout=9).decode(forged, 0.0, 10.0)
+    assert run.calls == []
+
+
+@pytest.mark.parametrize("root", ["/", "//", "Movies", "./Vermithor"])
+def test_the_whole_filesystem_or_a_relative_path_is_no_media_root(root):
+    with pytest.raises(ValueError, match="not a media root"):
+        MediaPaths([root])
 
 
 async def test_run_process_captures_output_and_stops_what_runs_too_long():
@@ -150,3 +166,18 @@ async def test_run_process_captures_output_and_stops_what_runs_too_long():
     assert (done.exit_code, done.stdout.strip()) == (0, "hi")
     slow = await run_process([sys.executable, "-c", "import time; time.sleep(5)"], 0.2)
     assert slow.exit_code is None
+
+
+async def test_a_cancelled_run_kills_its_process(tmp_path):
+    pid_file = tmp_path / "pid"
+    script = (
+        f"import os, time; open({str(pid_file)!r}, 'w').write(str(os.getpid())); time.sleep(30)"
+    )
+    task = asyncio.create_task(run_process([sys.executable, "-c", script], 60))
+    while not pid_file.exists() or not pid_file.read_text():
+        await asyncio.sleep(0.02)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    with pytest.raises(ProcessLookupError):  # killed and reaped
+        os.kill(int(pid_file.read_text()), 0)

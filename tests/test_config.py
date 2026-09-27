@@ -43,6 +43,12 @@ def test_media_roots_and_path_map_are_lists():
     assert s.probe_timeout_seconds == 45 and Settings().media_roots == ()
 
 
+@pytest.mark.parametrize("roots", ["/", "/Meleys, Movies"])
+def test_media_roots_must_be_absolute_and_not_the_whole_filesystem(roots):
+    with pytest.raises(ValueError, match="MEDIA_ROOTS"):
+        load_settings({"MEDIA_ROOTS": roots})
+
+
 def test_require_names_every_missing_variable_at_once():
     with pytest.raises(MissingConfig) as exc:
         require({"A": "1", "B": ""}, "A", "B", "C")

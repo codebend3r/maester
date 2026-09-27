@@ -44,6 +44,22 @@ def _list(env: Mapping[str, str], name: str) -> tuple[str, ...]:
     return tuple(item.strip() for item in env.get(name, "").split(",") if item.strip())
 
 
+def media_root_problem(root: str) -> str | None:
+    """Why a path can't be a media root: it must be absolute, and not the whole filesystem."""
+    if not root.startswith("/"):
+        return f"{root!r} isn't an absolute path"
+    if root.rstrip("/") == "":
+        return "'/' would open the whole filesystem"
+    return None
+
+
+def _media_roots(env: Mapping[str, str]) -> tuple[str, ...]:
+    roots = _list(env, "MEDIA_ROOTS")
+    if problems := [p for p in map(media_root_problem, roots) if p]:
+        raise ValueError(f"MEDIA_ROOTS: {'; '.join(problems)}")
+    return roots
+
+
 def _pairs(env: Mapping[str, str], name: str) -> tuple[tuple[str, str], ...]:
     """`from=to,from=to`; an entry without both sides is skipped."""
     pairs = (item.split("=", 1) for item in _list(env, name) if "=" in item)
@@ -126,7 +142,7 @@ def load_settings(env: Mapping[str, str]) -> Settings:
         invite_expires_days=_int(env, "INVITE_EXPIRES_DAYS", 7),
         dub_tag=env.get("DUB_TAG", "").strip() or "dub",
         dub_profile=env.get("DUB_PROFILE", "").strip(),
-        media_roots=_list(env, "MEDIA_ROOTS"),
+        media_roots=_media_roots(env),
         media_path_map=_pairs(env, "MEDIA_PATH_MAP"),
         probe_timeout_seconds=_int(env, "PROBE_TIMEOUT_SECONDS", 120),
         guardrails=Guardrails(

@@ -24,6 +24,8 @@ from collections.abc import Awaitable, Callable, Iterable, Sequence
 from dataclasses import dataclass, field, replace
 from typing import Any, Protocol
 
+from maester.config import media_root_problem
+
 # ffprobe and ffmpeg processes running at once, across every check.
 MAX_PROCESSES = 2
 SIDECAR_EXTENSIONS = frozenset({".srt", ".ass", ".ssa", ".vtt", ".sub", ".sup"})
@@ -119,6 +121,9 @@ class MediaPaths:
     """Where this container may read media, and how an arr's paths map onto it."""
 
     def __init__(self, roots: Iterable[str], path_map: Iterable[tuple[str, str]] = ()):
+        roots = list(roots)
+        if problems := [p for p in map(media_root_problem, roots) if p]:
+            raise ValueError(f"not a media root: {'; '.join(problems)}")
         self.roots = tuple(os.path.realpath(r) for r in roots)
         # Longest prefix first, so a nested share wins over its parent.
         self.path_map = tuple(
@@ -139,9 +144,13 @@ class MediaPaths:
             if _within(path, arr_root):
                 path = mount + path[len(arr_root) :]
                 break
+        return self.contain(path, arr_path)
+
+    def contain(self, path: str, named: str | None = None) -> str:
+        """`path` with its links resolved, when that is inside a media root."""
         real = os.path.realpath(path)
         if not any(_within(real, root) for root in self.roots):
-            raise Unreadable(f"{arr_path} isn't under a media root this container mounts")
+            raise Unreadable(f"{named or path} isn't under a media root this container mounts")
         return real
 
 
@@ -197,9 +206,11 @@ async def run_process(argv: Sequence[str], timeout: float) -> Completed:
     try:
         out, err = await asyncio.wait_for(proc.communicate(), timeout)
     except TimeoutError:
-        proc.kill()
-        await proc.wait()
         return Completed(None, "", "")
+    finally:  # timed out, or the task asking was cancelled: don't leave it running
+        if proc.returncode is None:
+            proc.kill()
+            await proc.wait()
     return Completed(proc.returncode, out.decode(errors="replace"), err.decode(errors="replace"))
 
 
@@ -257,12 +268,14 @@ class FileProbe:
     async def decode(self, inspection: Inspection, start: float, length: float) -> Decoded:
         """Decode the first video and audio stream from `start` for `length` seconds.
 
-        Only an inspected file can be decoded: its path already passed `MediaPaths`.
+        Only an inspected file is decoded, and its path is checked against the media
+        roots again here, since an `Inspection` is only a record.
         """
+        path = await asyncio.to_thread(self.paths.contain, inspection.path)
         done = await self._run(
             [
                 "ffmpeg", "-nostdin", "-hide_banner", "-v", "error",
-                "-ss", f"{start:.3f}", "-i", f"file:{inspection.path}", "-t", f"{length:.3f}",
+                "-ss", f"{start:.3f}", "-i", f"file:{path}", "-t", f"{length:.3f}",
                 "-map", "0:v:0", "-map", "0:a:0?", "-f", "null", "-progress", "pipe:1", "-",
             ]
         )  # fmt: skip
