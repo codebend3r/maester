@@ -75,21 +75,32 @@ class Store:
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA foreign_keys=ON")
         self._lock = threading.RLock()
+        self._in_tx = False
         self.migrate()
 
     def close(self) -> None:
         self._conn.close()
 
     @contextmanager
-    def _tx(self) -> Iterator[sqlite3.Connection]:
+    def transaction(self) -> Iterator[sqlite3.Connection]:
+        """One atomic unit. Store calls made inside it join it instead of committing alone."""
         with self._lock:
-            self._conn.execute("BEGIN")
+            outer = not self._in_tx
+            if outer:
+                self._conn.execute("BEGIN")
+                self._in_tx = True
             try:
                 yield self._conn
             except BaseException:
-                self._conn.execute("ROLLBACK")
+                if outer:
+                    self._conn.execute("ROLLBACK")
                 raise
-            self._conn.execute("COMMIT")
+            else:
+                if outer:
+                    self._conn.execute("COMMIT")
+            finally:
+                if outer:
+                    self._in_tx = False
 
     # -- migrations -------------------------------------------------------
 
@@ -138,7 +149,7 @@ class Store:
             # Keep the row readable: a cut-off JSON string would fail to parse
             # on the way back out, so store a marker plus a preview instead.
             result_json = json.dumps({"truncated": True, "preview": result_json[:RESULT_MAX_CHARS]})
-        with self._tx() as conn:
+        with self.transaction() as conn:
             cur = conn.execute(
                 "INSERT INTO audit_log (ts, discord_id, tool, args, result, ok, host, duration_ms)"
                 " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
@@ -203,7 +214,7 @@ class Store:
         unknown = set(fields) - allowed
         if unknown:
             raise ValueError(f"unknown user fields: {sorted(unknown)}")
-        with self._tx() as conn:
+        with self.transaction() as conn:
             conn.execute("INSERT OR IGNORE INTO users (discord_id) VALUES (?)", (discord_id,))
             if fields:
                 assignments = ", ".join(f"{k} = ?" for k in fields)
@@ -233,7 +244,7 @@ class Store:
     # -- conversations ----------------------------------------------------
 
     def append_message(self, discord_id: str, role: str, content: Any, tokens: int = 0) -> int:
-        with self._tx() as conn:
+        with self.transaction() as conn:
             cur = conn.execute(
                 "INSERT INTO conversations (discord_id, role, content, tokens, created_at) VALUES (?, ?, ?, ?, ?)",
                 (discord_id, role, json.dumps(content, default=str), tokens, _now()),
@@ -270,7 +281,7 @@ class Store:
         return kept
 
     def clear_messages(self, discord_id: str) -> int:
-        with self._tx() as conn:
+        with self.transaction() as conn:
             return conn.execute(
                 "DELETE FROM conversations WHERE discord_id = ?", (discord_id,)
             ).rowcount
@@ -288,7 +299,7 @@ class Store:
         ttl: timedelta,
     ) -> PendingAction:
         expires = (datetime.now(UTC) + ttl).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
-        with self._tx() as conn:
+        with self.transaction() as conn:
             cur = conn.execute(
                 "INSERT INTO pending_actions (ts, kind, action, requester, payload, summary, expires_at)"
                 " VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -326,7 +337,7 @@ class Store:
         self, pending_id: int, decision: str, decided_by: str
     ) -> PendingAction | None:
         """Record a decision once; a second decision or an expired action is refused."""
-        with self._tx() as conn:
+        with self.transaction() as conn:
             updated = conn.execute(
                 "UPDATE pending_actions SET decision = ?, decided_by = ?, decided_at = ?"
                 " WHERE id = ? AND decision IS NULL AND expires_at > ?",

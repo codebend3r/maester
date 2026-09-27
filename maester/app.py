@@ -108,7 +108,6 @@ def build(
         requests_channel_id=cfg.discord_requests_channel_id,
         admin_channel_id=cfg.discord_admin_channel_id,
     )
-    chat.notify_admin = bot.notify_admin
     return App(cfg, store, services, agent, chat, bot, create_app(), kill)
 
 

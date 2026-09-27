@@ -127,19 +127,13 @@ class IdentityService:
                 continue
         return None
 
-    def approve_link(self, pending_id: int, admin_id: str) -> str:
-        pending = self.store.decide_pending(pending_id, "approved", admin_id)
-        if pending is None:
-            return "That link request is no longer open."
-        self.store.upsert_user(
-            pending.requester, status="active", linked_at=datetime.now(UTC).isoformat()
-        )
-        return f"Linked: {pending.summary}"
-
-    def deny_link(self, pending_id: int, admin_id: str) -> str:
-        pending = self.store.decide_pending(pending_id, "denied", admin_id)
-        if pending is None:
-            return "That link request is no longer open."
+    def finish_link(self, pending: PendingAction, approved: bool) -> str:
+        """Apply an admin's already-recorded decision on a link request."""
+        if approved:
+            self.store.upsert_user(
+                pending.requester, status="active", linked_at=datetime.now(UTC).isoformat()
+            )
+            return f"Linked: {pending.summary}"
         self.store.upsert_user(pending.requester, status="revoked")
         return f"Denied: {pending.summary}"
 

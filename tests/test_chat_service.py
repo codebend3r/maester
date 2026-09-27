@@ -6,7 +6,7 @@ from maester.agent.loop import Agent
 from maester.agent.runner import ToolRunner
 from maester.agent.tools import Choice, Choices, Tier, ToolRegistry
 from maester.chat.identity import IdentityService, RoleMap
-from maester.chat.service import UNLINKED_HELP, ChatService, ChatUser
+from maester.chat.service import UNLINKED_HELP, ChatService, ChatUser, Decision
 from maester.clients import FakeSeerrClient
 from maester.clients.seerr import SeerrUser
 from maester.store import Store
@@ -52,10 +52,6 @@ def world():
         seerr=FakeSeerrClient(user_list=[SeerrUser(4, "new@example.com", "newbie", "")]),
         tautulli={},
     )
-    notes = []
-
-    async def notify(text, pending):
-        notes.append((text, pending))
 
     def make(*script):
         agent = Agent(
@@ -66,9 +62,9 @@ def world():
             services=services,
         )
         identity = IdentityService(store, services, RoleMap(ADMIN_ROLE, TRUSTED_ROLE))
-        return ChatService(agent=agent, identity=identity, store=store, notify_admin=notify)
+        return ChatService(agent=agent, identity=identity, store=store)
 
-    yield make, store, calls, notes
+    yield make, store, calls
     store.close()
 
 
@@ -76,14 +72,14 @@ async def test_unlinked_user_gets_help_without_calling_the_model(world):
     make, *_ = world
     svc = make()  # no scripted responses: any model call would raise
     response = await svc.handle_message(ChatUser("nobody", "New"), "hi")
-    assert response.chunks == [UNLINKED_HELP] and response.tier == Tier.UNLINKED
+    assert response.chunks == [UNLINKED_HELP]
 
 
 async def test_message_runs_agent_and_offers_choices(world):
     make, *_ = world
     svc = make(tool_message([("search_media", {"query": "dune"})]), text_message("Which Dune?"))
     response = await svc.handle_message(FRIEND, "get dune")
-    assert response.text == "Which Dune?" and response.tier == Tier.FRIEND
+    assert response.text == "Which Dune?"
     assert response.choices == [
         Choice("Dune", "438631", 2021, "https://image.tmdb.org/t/p/w92/dune.jpg"),
         Choice("Dune", "841", 1984),
@@ -108,18 +104,20 @@ async def test_pick_sends_the_choice_back_as_a_message(world):
 
 
 async def test_confirmation_round_trip(world):
-    make, store, calls, notes = world
+    make, store, calls = world
     svc = make(tool_message([("replace_media", {"file_id": 7})]), text_message("Confirm below."))
     response = await svc.handle_message(TRUSTED, "replace it")
     (pending,) = response.confirmations
     assert pending.action == "replace_media" and calls == []
 
-    assert await svc.confirm(pending.id, FRIEND) == "Only the person who asked can confirm this."
-    assert calls == []
-    assert (await svc.confirm(pending.id, TRUSTED)) == "Done: replaced file 7"
+    done = await svc.decide(pending.id, TRUSTED, approve=True)
+    assert done == Decision("Done: replaced file 7", admin_notices=done.admin_notices)
     assert calls == [("replace", 7)]
-    assert notes[-1][0].startswith("Trusty confirmed")
-    assert await svc.confirm(pending.id, TRUSTED) == "That action is no longer waiting."
+    (notice,) = done.admin_notices
+    assert notice.text.startswith("Trusty confirmed") and notice.approval is None
+    assert await svc.decide(pending.id, TRUSTED, approve=True) == Decision(
+        "That action is no longer waiting."
+    )
 
     *_, use, result = store.recent_messages(TRUSTED.id, max_tokens=10_000)
     (use_block,) = use["content"]
@@ -139,7 +137,7 @@ async def test_confirmed_result_reaches_the_model_on_the_next_turn(world):
         text_message("It's replaced."),
     )
     (pending,) = (await svc.handle_message(TRUSTED, "replace it")).confirmations
-    await svc.confirm(pending.id, TRUSTED)
+    await svc.decide(pending.id, TRUSTED, approve=True)
     await svc.handle_message(TRUSTED, "did it work?")
     sent = svc.agent.client.messages.calls[-1]["messages"]
     results = [
@@ -152,11 +150,29 @@ async def test_confirmed_result_reaches_the_model_on_the_next_turn(world):
     assert results[-1]["content"] == "replaced file 7"
 
 
-async def test_cancel(world):
-    make, store, calls, _ = world
+async def test_someone_else_cannot_confirm_or_cancel(world):
+    make, store, calls = world
     svc = make(tool_message([("replace_media", {"file_id": 7})]), text_message("Confirm below."))
     (pending,) = (await svc.handle_message(TRUSTED, "replace it")).confirmations
-    assert await svc.cancel(pending.id, TRUSTED) == "Cancelled."
+    assert await svc.decide(pending.id, FRIEND, approve=True) == Decision(
+        "Only the person who asked can confirm this.", settled=False
+    )
+    assert await svc.decide(pending.id, FRIEND, approve=False) == Decision(
+        "Only the person who asked can cancel this.", settled=False
+    )
+    assert calls == [] and store.get_pending(pending.id).decision is None
+
+
+async def test_unknown_pending_action(world):
+    make, *_ = world
+    assert (await make().decide(999, TRUSTED, approve=True)).text == "That's no longer waiting."
+
+
+async def test_cancel(world):
+    make, store, calls = world
+    svc = make(tool_message([("replace_media", {"file_id": 7})]), text_message("Confirm below."))
+    (pending,) = (await svc.handle_message(TRUSTED, "replace it")).confirmations
+    assert await svc.decide(pending.id, TRUSTED, approve=False) == Decision("Cancelled.")
     assert store.get_pending(pending.id).decision == "denied" and calls == []
     last = store.recent_messages(TRUSTED.id, max_tokens=10_000)[-1]
     assert last["content"][0]["content"] == "Cancelled by the user; nothing was done."
@@ -188,19 +204,53 @@ async def test_agent_errors_become_a_reference_reply(world):
 
 
 async def test_link_whoami_forget_and_admin_approval(world):
-    make, _, _, notes = world
+    make, *_ = world
     svc = make(text_message("A"))
     newbie = ChatUser("n1", "Newbie")
     response = await svc.link(newbie, "new@example.com")
-    assert response.approvals and notes[-1][1] is not None
-    pending = response.approvals[0]
+    (notice,) = response.admin_notices
+    pending = notice.approval
+    assert notice.text.startswith("Link request") and pending.action == "link_account"
     assert "waiting for admin" in svc.whoami(newbie)
 
-    assert await svc.approve(pending.id, FRIEND) == "Only the admin can approve this."
-    assert (await svc.approve(pending.id, ADMIN)).startswith("Linked")
+    assert await svc.decide(pending.id, FRIEND, approve=True) == Decision(
+        "Only the admin can approve this.", settled=False
+    )
+    assert (await svc.decide(pending.id, ADMIN, approve=True)).text.startswith("Linked")
     assert svc.whoami(newbie).startswith("Linked to new@example.com (active). Tier: friend")
 
     await svc.handle_message(newbie, "hello")
     assert svc.forget(newbie) == "Forgotten. We're starting fresh."
     assert svc.forget(newbie) == "Nothing to forget."
     assert svc.is_admin(ADMIN) and not svc.is_admin(FRIEND)
+
+
+async def test_admin_denies_a_link(world):
+    make, store, _ = world
+    svc = make()
+    pending = (
+        (await svc.link(ChatUser("n1", "Newbie"), "new@example.com")).admin_notices[0].approval
+    )
+    assert (await svc.decide(pending.id, ADMIN, approve=False)).text.startswith("Denied")
+    assert store.get_user("n1").status == "revoked"
+    assert await svc.decide(pending.id, ADMIN, approve=True) == Decision(
+        "That request is no longer open."
+    )
+
+
+async def test_link_approval_rolls_back_when_the_user_update_fails(world, monkeypatch):
+    make, store, _ = world
+    svc = make()
+    pending = (
+        (await svc.link(ChatUser("n1", "Newbie"), "new@example.com")).admin_notices[0].approval
+    )
+
+    def broken(*args, **kwargs):
+        raise RuntimeError("disk full")
+
+    monkeypatch.setattr(store, "upsert_user", broken)
+    with pytest.raises(RuntimeError):
+        await svc.decide(pending.id, ADMIN, approve=True)
+    monkeypatch.undo()
+    assert store.get_pending(pending.id).decision is None
+    assert store.get_user("n1").status == "pending"

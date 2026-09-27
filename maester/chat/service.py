@@ -3,15 +3,16 @@
 Takes a message from a known chat user, resolves their tier, runs the
 agent, and hands back text chunks plus whatever buttons the reply needs:
 confirmations for destructive tools, a picker when a tool offered choices,
-and admin approvals for link requests. `bot.py` turns those into Discord
-messages and views; tests drive this class directly.
+and notices for the admin channel. Every button press lands in `decide()`,
+which owns who may press what. The service does no I/O of its own:
+`bot.py` delivers what it returns, and tests drive this class directly.
 """
 
 from __future__ import annotations
 
 import logging
 import secrets
-from collections.abc import Awaitable, Callable
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -41,100 +42,156 @@ class ChatUser:
     role_ids: frozenset[int] = frozenset()
 
 
+@dataclass(frozen=True)
+class AdminNotice:
+    """Something for the admin channel; with `approval`, it gets Approve/Deny buttons."""
+
+    text: str
+    approval: PendingAction | None = None
+
+
 @dataclass
 class ChatResponse:
     chunks: list[str]
     confirmations: list[PendingAction] = field(default_factory=list)
     choices: list[Choice] = field(default_factory=list)
-    approvals: list[PendingAction] = field(default_factory=list)
-    tier: Tier = Tier.UNLINKED
+    admin_notices: tuple[AdminNotice, ...] = ()
 
     @property
     def text(self) -> str:
         return "\n".join(self.chunks)
 
 
-Notifier = Callable[[str, PendingAction | None], Awaitable[None]]
+@dataclass(frozen=True)
+class Decision:
+    """The answer to a button press.
+
+    `settled` is False when the presser wasn't allowed to decide: the
+    buttons stay live for the person who is.
+    """
+
+    text: str
+    settled: bool = True
+    admin_notices: tuple[AdminNotice, ...] = ()
+
+
+@dataclass(frozen=True)
+class _Kind:
+    """How a kind of pending action reads to the people pressing its buttons."""
+
+    decider: str
+    verbs: tuple[str, str]  # (approve, deny)
+    stale: str
+    expired: str
+
+
+KINDS = {
+    "confirm": _Kind(
+        "the person who asked",
+        ("confirm", "cancel"),
+        "That action is no longer waiting.",
+        "That confirmation expired; ask again.",
+    ),
+    "approve": _Kind(
+        "the admin",
+        ("approve", "deny"),
+        "That request is no longer open.",
+        "That request expired.",
+    ),
+}
 
 
 class ChatService:
-    def __init__(
-        self,
-        *,
-        agent: Agent,
-        identity: IdentityService,
-        store: Store,
-        notify_admin: Notifier | None = None,
-    ):
+    def __init__(self, *, agent: Agent, identity: IdentityService, store: Store):
         self.agent = agent
         self.identity = identity
         self.store = store
-        self.notify_admin = notify_admin
+        # What an admin's decision does, by action. Anything else is just recorded.
+        self._on_approval: dict[str, Callable[[PendingAction, bool], str]] = {
+            "link_account": identity.finish_link,
+        }
 
     # -- messages ---------------------------------------------------------
 
     async def handle_message(
         self, user: ChatUser, text: str, on_text: Callable[[str], Any] | None = None
     ) -> ChatResponse:
-        tier = self.identity.tier_for(user.id, set(user.role_ids))
+        tier = self.tier_for(user)
         if tier == Tier.UNLINKED:
-            return ChatResponse(chunks=split_reply(UNLINKED_HELP), tier=tier)
+            return ChatResponse(chunks=split_reply(UNLINKED_HELP))
         try:
             reply = await self.agent.respond(user.id, tier, text, on_text=on_text)
         except Exception:
             ref = secrets.token_hex(3)
             log.exception("agent failed for user %s (ref %s)", user.id, ref)
-            return ChatResponse(chunks=[ERROR_REPLY.format(ref=ref)], tier=tier)
+            return ChatResponse(chunks=[ERROR_REPLY.format(ref=ref)])
 
         confirmations = [p for p in (self.store.get_pending(i) for i in reply.pending_ids) if p]
         return ChatResponse(
             chunks=split_reply(reply.text),
             confirmations=confirmations,
             choices=reply.choices[:MAX_CHOICES],
-            tier=tier,
         )
 
     async def pick(self, user: ChatUser, choice: Choice) -> ChatResponse:
         return await self.handle_message(user, f"I pick: {choice.display} ({choice.value})")
 
-    # -- confirmations ----------------------------------------------------
+    # -- buttons ----------------------------------------------------------
 
-    async def confirm(self, pending_id: int, presser: ChatUser) -> str:
+    async def decide(self, pending_id: int, presser: ChatUser, approve: bool) -> Decision:
+        """Settle a Confirm/Cancel or Approve/Deny press."""
         pending = self.store.get_pending(pending_id)
-        if pending is None or pending.decision is not None:
-            return "That action is no longer waiting."
-        if pending.requester != presser.id:
-            return "Only the person who asked can confirm this."
-        if self.store.decide_pending(pending_id, "approved", presser.id) is None:
-            return "That confirmation expired; ask again."
-        tier = self.identity.tier_for(presser.id, set(presser.role_ids))
-        outcome = await self.agent.resolve_confirmation(presser.id, tier, pending, approved=True)
-        content = outcome.text
-        if self.notify_admin:
-            await self.notify_admin(
-                f"{presser.name} confirmed: {pending.summary}\n{content[:500]}", None
+        if pending is None:
+            return Decision("That's no longer waiting.")
+        kind = KINDS[pending.kind]
+        if pending.decision is not None:
+            return Decision(kind.stale)
+        if not self._may_decide(pending, presser):
+            verb = kind.verbs[0 if approve else 1]
+            return Decision(f"Only {kind.decider} can {verb} this.", settled=False)
+
+        # No awaits inside: the decision and what it changes commit together.
+        with self.store.transaction():
+            decided = self.store.decide_pending(
+                pending_id, "approved" if approve else "denied", presser.id
             )
-        return ("Couldn't do it: " if outcome.is_error else "Done: ") + content[:1500]
+            if decided is None:
+                return Decision(kind.expired)
+            if decided.kind == "approve":
+                return Decision(self._apply_approval(decided, approve))
+        return await self._run_confirmation(decided, presser, approve)
 
-    async def cancel(self, pending_id: int, presser: ChatUser) -> str:
-        pending = self.store.get_pending(pending_id)
-        if pending is None or pending.decision is not None:
-            return "That action is no longer waiting."
-        if pending.requester != presser.id:
-            return "Only the person who asked can cancel this."
-        self.store.decide_pending(pending_id, "denied", presser.id)
-        tier = self.identity.tier_for(presser.id, set(presser.role_ids))
-        await self.agent.resolve_confirmation(presser.id, tier, pending, approved=False)
-        return "Cancelled."
+    def _may_decide(self, pending: PendingAction, presser: ChatUser) -> bool:
+        if pending.kind == "confirm":
+            return pending.requester == presser.id
+        return self.is_admin(presser)
+
+    def _apply_approval(self, pending: PendingAction, approve: bool) -> str:
+        if handler := self._on_approval.get(pending.action):
+            return handler(pending, approve)
+        # Other approval kinds (4K requests, invites) land with the admin console epic.
+        return f"{'Approved' if approve else 'Denied'}: {pending.summary}"
+
+    async def _run_confirmation(
+        self, pending: PendingAction, presser: ChatUser, approve: bool
+    ) -> Decision:
+        outcome = await self.agent.resolve_confirmation(
+            presser.id, self.tier_for(presser), pending, approve
+        )
+        if not approve:
+            return Decision("Cancelled.")
+        notice = AdminNotice(f"{presser.name} confirmed: {pending.summary}\n{outcome.text[:500]}")
+        prefix = "Couldn't do it: " if outcome.is_error else "Done: "
+        return Decision(prefix + outcome.text[:1500], admin_notices=(notice,))
 
     # -- commands ---------------------------------------------------------
 
     async def link(self, user: ChatUser, query: str) -> ChatResponse:
         result = await self.identity.start_link(user.id, user.name, query)
-        approvals = [result.pending] if result.pending else []
-        if result.pending and self.notify_admin:
-            await self.notify_admin(f"Link request: {result.pending.summary}", result.pending)
-        return ChatResponse(chunks=[result.message], approvals=approvals)
+        notices = ()
+        if result.pending:
+            notices = (AdminNotice(f"Link request: {result.pending.summary}", result.pending),)
+        return ChatResponse(chunks=[result.message], admin_notices=notices)
 
     def whoami(self, user: ChatUser) -> str:
         return self.identity.whoami(user.id, set(user.role_ids))
@@ -159,30 +216,10 @@ class ChatService:
         )
         return text
 
-    # -- admin approvals --------------------------------------------------
+    # -- tiers ------------------------------------------------------------
+
+    def tier_for(self, user: ChatUser) -> Tier:
+        return self.identity.tier_for(user.id, set(user.role_ids))
 
     def is_admin(self, user: ChatUser) -> bool:
-        return self.identity.tier_for(user.id, set(user.role_ids)) == Tier.ADMIN
-
-    async def approve(self, pending_id: int, admin: ChatUser) -> str:
-        if not self.is_admin(admin):
-            return "Only the admin can approve this."
-        pending = self.store.get_pending(pending_id)
-        if pending is None or pending.decision is not None:
-            return "That request is no longer open."
-        if pending.action == "link_account":
-            return self.identity.approve_link(pending_id, admin.id)
-        # Other approval kinds (4K requests, invites) land with the admin console epic.
-        decided = self.store.decide_pending(pending_id, "approved", admin.id)
-        return f"Approved: {decided.summary}" if decided else "That request expired."
-
-    async def deny(self, pending_id: int, admin: ChatUser) -> str:
-        if not self.is_admin(admin):
-            return "Only the admin can deny this."
-        pending = self.store.get_pending(pending_id)
-        if pending is None or pending.decision is not None:
-            return "That request is no longer open."
-        if pending.action == "link_account":
-            return self.identity.deny_link(pending_id, admin.id)
-        decided = self.store.decide_pending(pending_id, "denied", admin.id)
-        return f"Denied: {decided.summary}" if decided else "That request expired."
+        return self.tier_for(user) == Tier.ADMIN

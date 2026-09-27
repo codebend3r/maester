@@ -7,13 +7,13 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Sequence
 
 import discord
 from discord import app_commands
 
-from maester.chat.service import ChatService
-from maester.chat.views import ApprovalView, resolve_chat_user, send_response, send_text
-from maester.store import PendingAction
+from maester.chat.service import AdminNotice, ChatService
+from maester.chat.views import DecisionView, resolve_chat_user, send_response, send_text
 
 log = logging.getLogger("maester.bot")
 
@@ -67,20 +67,23 @@ class MaesterBot(discord.Client):
         user = await resolve_chat_user(self, message.author)
         async with message.channel.typing():
             response = await self.service.handle_message(user, text)
-        await send_response(message.channel, self.service, user, response)
+        await send_response(message.channel, self, user, response)
 
-    # -- admin notifications ----------------------------------------------
+    # -- admin channel ----------------------------------------------------
 
-    async def notify_admin(self, text: str, pending: PendingAction | None) -> None:
-        channel = self.get_channel(self.admin_channel_id) if self.admin_channel_id else None
-        if channel is None:
-            log.warning("no admin channel; dropped notification: %s", text[:120])
+    async def deliver(self, notices: Sequence[AdminNotice]) -> None:
+        """Post what the service wants the admin to see; approvals get buttons."""
+        if not notices:
             return
-        if pending is not None and pending.kind == "approve":
-            view = ApprovalView(self.service, pending.id)
-            view.message = await channel.send(text, view=view)
-        else:
-            await send_text(channel, text)
+        channel = self.get_channel(self.admin_channel_id) if self.admin_channel_id else None
+        for notice in notices:
+            if channel is None:
+                log.warning("no admin channel; dropped notification: %s", notice.text[:120])
+            elif notice.approval is not None:
+                view = DecisionView(notice.approval)
+                view.message = await channel.send(notice.text, view=view)
+            else:
+                await send_text(channel, notice.text)
 
     # -- slash commands ---------------------------------------------------
 
@@ -94,6 +97,7 @@ class MaesterBot(discord.Client):
             user = await resolve_chat_user(self, interaction.user)
             response = await self.service.link(user, account)
             await interaction.followup.send(response.text, ephemeral=True)
+            await self.deliver(response.admin_notices)
 
         @tree.command(
             name="whoami", description="Show which Plex account you're linked to and your tier"

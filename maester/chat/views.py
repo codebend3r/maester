@@ -1,24 +1,46 @@
-"""discord.ui views: Confirm/Cancel, a choice picker, and Approve/Deny.
+"""discord.ui views: Confirm/Cancel or Approve/Deny, and a choice picker.
 
 A DM author is a bare user with no roles, so `resolve_chat_user` looks the
-member up in the server to keep their tier the same in DMs. Every view times out after five minutes (a week for link approvals) and
-disables its buttons on timeout. The confirm and cancel buttons only answer
-the user who asked; approve and deny only answer an admin. Those checks
-live in the service so they hold whichever surface presses the button.
+member up in the server to keep their tier the same in DMs. Views reach the
+service through `interaction.client`, the running `MaesterBot`.
+
+Confirm/Cancel buttons time out after five minutes, Approve/Deny after a
+week, and both disable themselves when they do. Who may press a decision
+button is the service's call; a refused press is answered privately and
+leaves the buttons live for the person who may press them.
 """
 
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
 import discord
 
 from maester.agent.tools import Choice
-from maester.chat.service import ChatResponse, ChatService, ChatUser
+from maester.chat.service import ChatResponse, ChatUser
 from maester.chat.split import split_reply
+from maester.store import PendingAction
+
+if TYPE_CHECKING:
+    from maester.chat.bot import MaesterBot
 
 CONFIRM_TIMEOUT = 5 * 60
 APPROVAL_TIMEOUT = 7 * 24 * 3600
+
+# Per pending-action kind: the approve button, the deny button, the timeout.
+DECISION_BUTTONS = {
+    "confirm": (
+        ("Confirm", discord.ButtonStyle.danger),
+        ("Cancel", discord.ButtonStyle.secondary),
+        CONFIRM_TIMEOUT,
+    ),
+    "approve": (
+        ("Approve", discord.ButtonStyle.success),
+        ("Deny", discord.ButtonStyle.danger),
+        APPROVAL_TIMEOUT,
+    ),
+}
 
 
 def chat_user(user: discord.abc.User) -> ChatUser:
@@ -48,53 +70,60 @@ async def resolve_chat_user(client, user: discord.abc.User) -> ChatUser:
 class _AutoDisableView(discord.ui.View):
     message: discord.Message | None = None
 
-    async def on_timeout(self) -> None:
+    def _disable_buttons(self) -> None:
         for item in self.children:
             if isinstance(item, discord.ui.Button):
                 item.disabled = True
+
+    def _finish(self) -> None:
+        self._disable_buttons()
+        self.stop()
+
+    async def on_timeout(self) -> None:
+        self._disable_buttons()
         if self.message:
             try:
                 await self.message.edit(view=self)
             except discord.HTTPException:
                 pass
 
-    def _disable(self) -> None:
-        for item in self.children:
-            if isinstance(item, discord.ui.Button):
-                item.disabled = True
-        self.stop()
+
+class DecisionView(_AutoDisableView):
+    """Two buttons that settle one pending action through `ChatService.decide`."""
+
+    def __init__(self, pending: PendingAction):
+        yes, no, timeout = DECISION_BUTTONS[pending.kind]
+        super().__init__(timeout=timeout)
+        self.pending_id = pending.id
+        self.add_item(_DecisionButton(*yes, approve=True))
+        self.add_item(_DecisionButton(*no, approve=False))
 
 
-class ConfirmView(_AutoDisableView):
-    def __init__(self, service: ChatService, pending_id: int):
-        super().__init__(timeout=CONFIRM_TIMEOUT)
-        self.service = service
-        self.pending_id = pending_id
+class _DecisionButton(discord.ui.Button):
+    def __init__(self, label: str, style: discord.ButtonStyle, *, approve: bool):
+        super().__init__(label=label, style=style)
+        self.approve = approve
 
-    @discord.ui.button(label="Confirm", style=discord.ButtonStyle.danger)
-    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+    async def callback(self, interaction: discord.Interaction) -> None:
+        view: DecisionView = self.view  # type: ignore[assignment]
+        bot: MaesterBot = interaction.client  # type: ignore[assignment]
         await interaction.response.defer()
-        user = await resolve_chat_user(interaction.client, interaction.user)
-        text = await self.service.confirm(self.pending_id, user)
-        self._disable()
-        await interaction.edit_original_response(view=self)
-        await interaction.followup.send(text)
-
-    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)
-    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        user = await resolve_chat_user(interaction.client, interaction.user)
-        text = await self.service.cancel(self.pending_id, user)
-        self._disable()
-        await interaction.response.edit_message(view=self)
-        await interaction.followup.send(text)
+        user = await resolve_chat_user(bot, interaction.user)
+        decision = await bot.service.decide(view.pending_id, user, self.approve)
+        if not decision.settled:
+            await interaction.followup.send(decision.text, ephemeral=True)
+            return
+        view._finish()
+        await interaction.edit_original_response(view=view)
+        await interaction.followup.send(decision.text)
+        await bot.deliver(decision.admin_notices)
 
 
 class ChoiceView(_AutoDisableView):
-    def __init__(self, service: ChatService, user: ChatUser, choices: Sequence[Choice]):
+    def __init__(self, user: ChatUser, choices: Sequence[Choice]):
         super().__init__(timeout=CONFIRM_TIMEOUT)
-        self.service = service
         self.user = user
-        for n, choice in enumerate(choices[:5], 1):
+        for n, choice in enumerate(choices, 1):
             self.add_item(_ChoiceButton(n, choice))
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
@@ -113,71 +142,44 @@ class _ChoiceButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction) -> None:
         view: ChoiceView = self.view  # type: ignore[assignment]
+        bot: MaesterBot = interaction.client  # type: ignore[assignment]
         await interaction.response.defer()
-        view._disable()
+        view._finish()
         await interaction.edit_original_response(view=view)
-        response = await view.service.pick(view.user, self.choice)
-        await send_response(interaction.followup, view.service, view.user, response)
+        response = await bot.service.pick(view.user, self.choice)
+        await send_response(interaction.followup, bot, view.user, response)
 
 
-class ApprovalView(_AutoDisableView):
-    def __init__(self, service: ChatService, pending_id: int):
-        super().__init__(timeout=APPROVAL_TIMEOUT)
-        self.service = service
-        self.pending_id = pending_id
-
-    @discord.ui.button(label="Approve", style=discord.ButtonStyle.success)
-    async def approve(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        user = await resolve_chat_user(interaction.client, interaction.user)
-        text = await self.service.approve(self.pending_id, user)
-        await self._finish(interaction, text)
-
-    @discord.ui.button(label="Deny", style=discord.ButtonStyle.danger)
-    async def deny(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        user = await resolve_chat_user(interaction.client, interaction.user)
-        text = await self.service.deny(self.pending_id, user)
-        await self._finish(interaction, text)
-
-    async def _finish(self, interaction: discord.Interaction, text: str) -> None:
-        if text.startswith("Only the admin"):
-            await interaction.response.send_message(text, ephemeral=True)
-            return
-        self._disable()
-        await interaction.response.edit_message(view=self)
-        await interaction.followup.send(text)
-
-
-async def send_response(
-    target, service: ChatService, user: ChatUser, response: ChatResponse
-) -> None:
-    """Send a ChatResponse's chunks and attach the views it needs to the last one.
+async def send_response(target, bot: MaesterBot, user: ChatUser, response: ChatResponse) -> None:
+    """Send a ChatResponse's chunks with its views on the last one, then its admin notices.
 
     `target` is anything with `.send()`: a channel, a DM, or a webhook followup.
     """
     chunks = response.chunks or ["(no reply)"]
     for chunk in chunks[:-1]:
         await target.send(chunk)
-    view: discord.ui.View | None = None
+    view: _AutoDisableView | None = None
     extras: dict = {}
     if response.confirmations:
-        view = ConfirmView(service, response.confirmations[0].id)
+        view = DecisionView(response.confirmations[0])
     elif response.choices:
-        view = ChoiceView(service, user, response.choices)
+        view = ChoiceView(user, response.choices)
         extras["embeds"] = choice_embeds(response.choices)
     if view:
         extras["view"] = view
     message = await target.send(chunks[-1], **extras)
-    if isinstance(view, _AutoDisableView) and isinstance(message, discord.Message):
+    if view and isinstance(message, discord.Message):
         view.message = message
     for extra in response.confirmations[1:]:
-        extra_view = ConfirmView(service, extra.id)
+        extra_view = DecisionView(extra)
         extra_view.message = await target.send(f"Also waiting: {extra.summary}", view=extra_view)
+    await bot.deliver(response.admin_notices)
 
 
 def choice_embeds(choices: Sequence[Choice]) -> list[discord.Embed]:
     """One small card per option, numbered like its button, with the poster when known."""
     embeds = []
-    for n, choice in enumerate(choices[:5], 1):
+    for n, choice in enumerate(choices, 1):
         embed = discord.Embed(title=f"{n}. {choice.display}"[:256])
         if choice.poster_url:
             embed.set_thumbnail(url=choice.poster_url)
