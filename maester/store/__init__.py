@@ -1,4 +1,4 @@
-"""SQLite persistence: users, conversations, the audit log, reports, pending actions.
+"""SQLite persistence: users, conversations, the audit log, reports, pending actions, webhook events.
 
 One file on `/data`, schema managed by numbered SQL migrations under
 `migrations/`. Nothing here is a source of truth for media; Seerr and the
@@ -239,6 +239,15 @@ class Store:
             ).fetchone()
         return self._user(r)
 
+    def user_by_seerr_id(self, seerr_user_id: int) -> UserRow | None:
+        """The active link for a Seerr user, if one exists: who to tell about their requests."""
+        with self._lock:
+            r = self._conn.execute(
+                "SELECT * FROM users WHERE seerr_user_id = ? AND status = ?",
+                (seerr_user_id, LinkStatus.ACTIVE),
+            ).fetchone()
+        return self._user(r)
+
     @staticmethod
     def _user(r: sqlite3.Row | None) -> UserRow | None:
         if r is None:
@@ -379,3 +388,28 @@ class Store:
         with self._lock:
             ids = [r["id"] for r in self._conn.execute(sql + " ORDER BY id", params).fetchall()]
         return [p for p in (self.get_pending(i) for i in ids) if p]
+
+    # -- webhook events ---------------------------------------------------
+
+    def claim_event(self, source: str, key: str) -> bool:
+        """Record a webhook event as handled; False when it already was.
+
+        The insert is the claim, so two concurrent deliveries of one event
+        cannot both act on it.
+        """
+        with self.transaction() as conn:
+            return (
+                conn.execute(
+                    "INSERT OR IGNORE INTO webhook_events (source, event_key, received_at)"
+                    " VALUES (?, ?, ?)",
+                    (source, key, _now()),
+                ).rowcount
+                == 1
+            )
+
+    def release_event(self, source: str, key: str) -> None:
+        """Forget a claim whose handling failed, so a later delivery can try again."""
+        with self.transaction() as conn:
+            conn.execute(
+                "DELETE FROM webhook_events WHERE source = ? AND event_key = ?", (source, key)
+            )

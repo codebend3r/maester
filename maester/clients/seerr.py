@@ -397,6 +397,47 @@ class SeerrUser:
         )
 
 
+@dataclass(frozen=True)
+class SeerrNotification:
+    """One webhook delivery, read from Seerr's default JSON payload template.
+
+    The template renders every value as a string and leaves the `media`,
+    `request` and `issue` blocks null when the event has none.
+    """
+
+    type: str  # notification_type, e.g. "MEDIA_AVAILABLE"
+    subject: str  # for media events, "<title> (<year>)"
+    media_type: str | None
+    tmdb_id: int | None
+    request_id: int | None
+    issue_id: int | None
+
+    @property
+    def event_key(self) -> str:
+        """What makes two deliveries the same event: the type and what it concerns."""
+        if self.request_id is not None:
+            about = f"request:{self.request_id}"
+        elif self.issue_id is not None:
+            about = f"issue:{self.issue_id}"
+        else:
+            about = f"media:{self.media_type}:{self.tmdb_id}"
+        return f"{self.type}:{about}"
+
+    @classmethod
+    def from_webhook(cls, raw: dict[str, Any]) -> SeerrNotification:
+        media = raw.get("media") or {}
+        request = raw.get("request") or {}
+        issue = raw.get("issue") or {}
+        return cls(
+            type=str(raw["notification_type"]),
+            subject=raw.get("subject") or "",
+            media_type=media.get("media_type") or None,
+            tmdb_id=_int_or_none(media.get("tmdbId")),
+            request_id=_int_or_none(request.get("request_id")),
+            issue_id=_int_or_none(issue.get("issue_id")),
+        )
+
+
 class Seerr(Protocol):
     async def search(self, query: str) -> list[SearchResult]: ...
     async def media_details(self, media_type: str, tmdb_id: int) -> MediaDetails: ...

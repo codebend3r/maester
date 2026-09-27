@@ -128,3 +128,19 @@ def test_a_decision_records_who_and_can_be_reopened(store):
     reopened = store.get_pending(p.id)
     assert reopened.decision is None and reopened.decided_by is None
     assert store.open_pending("approve") == [reopened]
+
+
+def test_webhook_events_are_claimed_once_until_released(store):
+    assert store.claim_event("seerr", "MEDIA_AVAILABLE:request:77")
+    assert not store.claim_event("seerr", "MEDIA_AVAILABLE:request:77")
+    assert store.claim_event("seerr", "MEDIA_AVAILABLE:request:78")
+    store.release_event("seerr", "MEDIA_AVAILABLE:request:77")
+    assert store.claim_event("seerr", "MEDIA_AVAILABLE:request:77")
+
+
+def test_user_by_seerr_id_finds_only_active_links(store):
+    store.upsert_user("d1", seerr_user_id=4, status="pending")
+    assert store.user_by_seerr_id(4) is None
+    store.upsert_user("d1", status="active")
+    assert store.user_by_seerr_id(4).discord_id == "d1"
+    assert store.user_by_seerr_id(5) is None

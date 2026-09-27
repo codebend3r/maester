@@ -101,6 +101,8 @@ Checks: `uv run ruff check .`, `uv run ruff format --check .`, `uv run pytest`. 
 
 **Discord setup.** Create an application at discord.com/developers, add a bot, turn on the *Message Content* and *Server Members* privileged intents, and invite it with the `bot` and `applications.commands` scopes (permissions: View Channels, Send Messages, Read Message History, Embed Links). Put the bot token, your server id, the requests and admin channel ids, and the trusted and admin role ids in `.env`. Friends DM the bot or mention it in the requests channel; `/link`, `/whoami` and `/forget` are slash commands; the admin sets or clears a member's tier with `/tier`.
 
+**Seerr webhook.** In Seerr, Settings, Notifications, Webhook: set the URL to `http://<maester host>:8020/webhooks/seerr`, set *Authorization Header* to the value of `SEERR_WEBHOOK_SECRET`, keep the default JSON payload, and tick *Request Available*. Friends then get a DM with a Plex link when their request is ready. Other ticked types are acknowledged and ignored.
+
 **Deploy.** `docs/nas-deployment.md` covers running it as a container on the NAS.
 
 ## Docs

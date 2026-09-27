@@ -100,7 +100,17 @@ report ──▶ identify item (Tautulli session) ──▶ confirm with friend
 
 ## Storage
 
-SQLite, migrations numbered under `maester/store/migrations/`. Tables: `users`, `conversations`, `audit_log`, `reports`, `pending_actions`, `space_samples`, `preferences`. Nothing in the file is a source of truth for media; Seerr and the arrs are.
+SQLite, migrations numbered under `maester/store/migrations/`. Tables: `users`, `conversations`, `audit_log`, `reports`, `pending_actions`, `webhook_events`, `space_samples`, `preferences`. Nothing in the file is a source of truth for media; Seerr and the arrs are.
+
+## Seerr webhook
+
+`POST /webhooks/seerr` serves every Seerr notification type. The `Authorization` header must equal `SEERR_WEBHOOK_SECRET`; with no secret configured, every call is refused. The payload is parsed into a `SeerrNotification` and dispatched by type through `seerr_handlers()` (`maester/seerr_events.py`); a handler returns notices, which go out through the bot as the `Notifier`. Types without a handler are acknowledged and ignored.
+
+Each delivery is claimed in `webhook_events` under its type plus the request or issue it concerns before the handler runs, so a repeat is acknowledged without a second DM. A handler that fails releases the claim.
+
+| Type              | Handler         | Effect                                                                   |
+| ----------------- | --------------- | ------------------------------------------------------------------------ |
+| `MEDIA_AVAILABLE` | `ready_to_watch`| DMs the linked requester: title, version (1080p or 4K), a Plex deep link |
 
 ## Deployment
 
