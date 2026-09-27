@@ -14,7 +14,7 @@ from datetime import UTC, datetime, timedelta
 
 from maester.agent.tools import Settled, Tier
 from maester.clients import Services
-from maester.notify import Notice
+from maester.notify import DirectMessage
 from maester.store import LinkStatus, PendingAction, Store, UserRow
 
 LINK_TTL = timedelta(days=7)
@@ -144,10 +144,10 @@ class IdentityService:
                 pending.requester, status=LinkStatus.ACTIVE, linked_at=datetime.now(UTC).isoformat()
             )
             dm = "You're linked! Ask me for movies and shows any time."
-            return Settled(f"Linked: {pending.summary}", (Notice(dm, to=pending.requester),))
+            return Settled(f"Linked: {pending.summary}", (DirectMessage(pending.requester, dm),))
         self.store.upsert_user(pending.requester, status=LinkStatus.REVOKED)
         dm = "The admin didn't approve that link. Ask them if you think it's a mistake."
-        return Settled(f"Denied: {pending.summary}", (Notice(dm, to=pending.requester),))
+        return Settled(f"Denied: {pending.summary}", (DirectMessage(pending.requester, dm),))
 
     def set_tier_override(self, discord_id: str, tier: str | None) -> str:
         normalized = Tier.parse(tier).name.lower() if tier else None

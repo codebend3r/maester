@@ -3,7 +3,8 @@
 Thin on purpose. Everything that decides what to say is in `service.py`.
 The bot is also the app's `Notifier`: `deliver()` posts notices in the
 admin channel or DMs them, whoever produced them (a reply, a button press,
-a webhook).
+a webhook). Decision buttons are persistent: their custom ids carry the
+pending action, so a press after a restart still lands.
 """
 
 from __future__ import annotations
@@ -17,8 +18,8 @@ from discord import app_commands
 
 from maester.chat.members import resolve_chat_user
 from maester.chat.service import ChatService
-from maester.chat.views import DecisionView, send_response, send_text
-from maester.notify import Notice
+from maester.chat.views import DecisionButton, decision_view, send_response, send_text
+from maester.notify import AdminPost, ApprovalPost, DirectMessage, Notice
 
 log = logging.getLogger("maester.bot")
 
@@ -46,6 +47,7 @@ class MaesterBot(discord.Client):
     # -- lifecycle --------------------------------------------------------
 
     async def setup_hook(self) -> None:
+        self.add_dynamic_items(DecisionButton)
         if self.guild_id:
             guild = discord.Object(id=self.guild_id)
             self.tree.copy_global_to(guild=guild)
@@ -76,30 +78,35 @@ class MaesterBot(discord.Client):
 
     # -- notices ----------------------------------------------------------
 
-    async def deliver(self, notices: Sequence[Notice]) -> None:
-        """Post admin notices (approvals get buttons) and send DMs."""
-        for notice in notices:
-            if notice.to is None:
-                await self._post_admin(notice)
-            else:
-                await self._direct_message(notice.to, notice.text)
+    async def deliver(self, notices: Sequence[Notice]) -> list[Notice]:
+        """Post admin notices (approvals get buttons) and send DMs, each on its own.
 
-    async def _post_admin(self, notice: Notice) -> None:
+        Never raises: a notice that can't be sent is logged and returned.
+        """
+        failed = []
+        for notice in notices:
+            try:
+                await self._send(notice)
+            except Exception:
+                log.exception("could not deliver %s", notice)
+                failed.append(notice)
+        return failed
+
+    async def _send(self, notice: Notice) -> None:
+        match notice:
+            case AdminPost(text):
+                await send_text(self._admin_channel(), text)
+            case ApprovalPost(text, pending_id):
+                await self._admin_channel().send(text, view=decision_view(pending_id, "approve"))
+            case DirectMessage(to, text):
+                user = self.get_user(int(to)) or await self.fetch_user(int(to))
+                await send_text(user, text)
+
+    def _admin_channel(self) -> discord.abc.Messageable:
         channel = self.get_channel(self.admin_channel_id) if self.admin_channel_id else None
         if channel is None:
-            log.warning("no admin channel; dropped notification: %s", notice.text[:120])
-        elif notice.approval is not None:
-            view = DecisionView(notice.approval)
-            view.message = await channel.send(notice.text, view=view)
-        else:
-            await send_text(channel, notice.text)
-
-    async def _direct_message(self, discord_id: str, text: str) -> None:
-        try:
-            user = self.get_user(int(discord_id)) or await self.fetch_user(int(discord_id))
-            await send_text(user, text)
-        except discord.HTTPException as exc:  # closed DMs or a user who left
-            log.warning("could not DM %s (%s): %s", discord_id, exc, text[:120])
+            raise LookupError("no admin channel is configured or visible to the bot")
+        return channel  # type: ignore[return-value]
 
     # -- slash commands ---------------------------------------------------
 

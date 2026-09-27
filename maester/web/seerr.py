@@ -3,14 +3,14 @@
 Seerr's webhook agent sends its "Authorization Header" setting as the
 `Authorization` header; it must equal `SEERR_WEBHOOK_SECRET`, and with no
 secret configured the route refuses everything. Each notification type maps
-to a handler (`maester/seerr_events.py`) that returns the notices to send,
-which go out through the injected `Notifier`; types without a handler are
-acknowledged and ignored, so ticking more types in Seerr is harmless.
+to a route (`maester/seerr_events.py`) whose handler returns the notices to
+send, which go out through the injected `Notifier`; types without a route
+are acknowledged and ignored, so ticking more types in Seerr is harmless.
 
-A delivery is claimed in `webhook_events` before its handler runs, so a
-repeat of the same event (same type, same request or issue) within a day is
-acknowledged without acting twice. A handler that fails releases its claim,
-so a later delivery can try again.
+A route that dedupes claims the event in `webhook_events` before its
+handler runs, so a repeat inside its window is acknowledged without acting
+twice. The claim is released when the handler fails or a notice it produced
+could not be delivered, so a later delivery can try again.
 """
 
 from __future__ import annotations
@@ -19,26 +19,23 @@ import hmac
 import logging
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import timedelta
 from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException
 
 from maester.notify import Notifier
-from maester.seerr_events import SeerrHandler, SeerrNotification
+from maester.seerr_events import SeerrNotification, SeerrRoute
 from maester.store import Store
 
 log = logging.getLogger("maester.web")
 
 SOURCE = "seerr"
-# Seerr repeats an event within minutes (a rescan) or hours; later is news.
-DEDUPE_WINDOW = timedelta(hours=24)
 
 
 @dataclass(frozen=True)
 class SeerrWebhook:
     secret: str
-    handlers: Mapping[str, SeerrHandler]
+    routes: Mapping[str, SeerrRoute]
     store: Store
     notifier: Notifier
 
@@ -46,20 +43,25 @@ class SeerrWebhook:
         return bool(self.secret) and hmac.compare_digest(header.encode(), self.secret.encode())
 
     async def receive(self, notification: SeerrNotification) -> str:
-        """Handle one delivery once; returns what became of it."""
-        handler = self.handlers.get(notification.type)
-        if handler is None:
+        """Handle one delivery; returns what became of it."""
+        route = self.routes.get(notification.type)
+        if route is None:
             return "ignored"
         key = notification.event_key
-        if not self.store.claim_event(SOURCE, key, window=DEDUPE_WINDOW):
+        claimed = route.dedupe is not None
+        if claimed and not self.store.claim_event(SOURCE, key, window=route.dedupe):
             return "duplicate"
         try:
-            notices = await handler(notification)
+            notices = await route.handle(notification)
         except Exception:
-            self.store.release_event(SOURCE, key)
+            if claimed:
+                self.store.release_event(SOURCE, key)
             log.exception("seerr %s failed", key)
             raise
-        await self.notifier.deliver(notices)
+        if await self.notifier.deliver(notices):
+            if claimed:
+                self.store.release_event(SOURCE, key)
+            return "undelivered"
         return "handled"
 
     def router(self) -> APIRouter:

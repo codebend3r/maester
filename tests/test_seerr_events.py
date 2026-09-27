@@ -1,6 +1,6 @@
 from maester.clients import ClientError
 from maester.clients.seerr import MediaRequest, MediaStatus, RequestStatus
-from maester.seerr_events import SeerrNotification, ready_to_watch, seerr_handlers
+from maester.seerr_events import RESCAN_REPEAT, SeerrNotification, ready_to_watch, seerr_routes
 
 
 def notification(request_id="77", subject="Dune (2021)"):
@@ -63,7 +63,8 @@ async def test_nobody_to_tell(services, store):
 
 
 def test_dispatch_table_and_event_keys(services, store):
-    assert set(seerr_handlers(services, store)) == {"MEDIA_AVAILABLE"}
+    routes = seerr_routes(services, store)
+    assert set(routes) == {"MEDIA_AVAILABLE"} and routes["MEDIA_AVAILABLE"].dedupe == RESCAN_REPEAT
     assert notification().event_key == "MEDIA_AVAILABLE:request:77"
     assert notification(request_id=None).event_key == "MEDIA_AVAILABLE:media:movie:438631"
     issue = SeerrNotification.from_webhook(

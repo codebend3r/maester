@@ -22,7 +22,7 @@ from maester.agent.loop import Agent, TurnFailed
 from maester.agent.tools import Choice, Settled, Tier
 from maester.chat.identity import IdentityService
 from maester.chat.split import split_reply
-from maester.notify import Notice
+from maester.notify import AdminPost, ApprovalPost, Notice
 from maester.store import PendingAction, Store
 
 log = logging.getLogger("maester.chat")
@@ -183,7 +183,7 @@ class ChatService:
         )
         if not approve:
             return Decision("Cancelled.")
-        notice = Notice(f"{presser.name} confirmed: {pending.summary}\n{outcome.text[:500]}")
+        notice = AdminPost(f"{presser.name} confirmed: {pending.summary}\n{outcome.text[:500]}")
         prefix = "Couldn't do it: " if outcome.is_error else "Done: "
         return Decision(prefix + outcome.text[:1500], notices=(notice, *outcome.notices))
 
@@ -193,7 +193,7 @@ class ChatService:
         result = await self.identity.start_link(user.id, user.name, query)
         notices = ()
         if result.pending:
-            notices = (Notice(f"Link request: {result.pending.summary}", approval=result.pending),)
+            notices = (ApprovalPost(f"Link request: {result.pending.summary}", result.pending.id),)
         return ChatResponse(chunks=[result.message], notices=notices)
 
     def whoami(self, user: ChatUser) -> str:

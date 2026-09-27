@@ -1,11 +1,13 @@
 """What maester does with each Seerr notification type.
 
-`seerr_handlers()` is the dispatch table the webhook route serves, keyed by
-Seerr's notification type. A handler reads what it needs from Seerr, Plex
-and the store and returns the notices to send; delivering them, and making
-sure one event is handled once, is the route's job. Today one type is
-handled: MEDIA_AVAILABLE, a DM to the friend whose request is ready. Types
-without a handler are acknowledged and ignored.
+`seerr_routes()` is the dispatch table the webhook serves, keyed by Seerr's
+notification type. A handler reads what it needs from Seerr, Plex and the
+store and returns the notices to send; delivering them is the webhook's
+job. A route opts into deduplication when a repeat would reach a person
+twice: Seerr can send the same event again within minutes (a library
+rescan), while a later repeat is news (a replaced file ready again) and
+must get through. Today one type is handled: MEDIA_AVAILABLE, a DM to the
+friend whose request is ready. Types without a route are ignored.
 """
 
 from __future__ import annotations
@@ -13,12 +15,13 @@ from __future__ import annotations
 import logging
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
+from datetime import timedelta
 from functools import partial
 from typing import Any
 
 from maester.clients import ClientError, Services
 from maester.clients.seerr import MediaRequest
-from maester.notify import Notice
+from maester.notify import DirectMessage, Notice
 from maester.store import LinkStatus, Store
 
 log = logging.getLogger("maester.seerr")
@@ -70,10 +73,22 @@ class SeerrNotification:
 
 
 SeerrHandler = Callable[[SeerrNotification], Awaitable[Sequence[Notice]]]
+# A repeat of a DM-sending event inside this window is Seerr sending it twice.
+RESCAN_REPEAT = timedelta(minutes=15)
 
 
-def seerr_handlers(services: Services, store: Store) -> dict[str, SeerrHandler]:
-    return {"MEDIA_AVAILABLE": partial(ready_to_watch, services, store)}
+@dataclass(frozen=True)
+class SeerrRoute:
+    handle: SeerrHandler
+    # Deliveries of one event (type plus request or issue) within this window
+    # act once; None when every delivery should act (idempotent updates).
+    dedupe: timedelta | None = None
+
+
+def seerr_routes(services: Services, store: Store) -> dict[str, SeerrRoute]:
+    return {
+        "MEDIA_AVAILABLE": SeerrRoute(partial(ready_to_watch, services, store), RESCAN_REPEAT),
+    }
 
 
 def _what(notification: SeerrNotification, request: MediaRequest) -> str:
@@ -98,7 +113,7 @@ async def ready_to_watch(
     link = await _plex_link(services, request)
     where = f"\nOpen it in Plex: {link}" if link else " Look for it in Plex."
     text = f"{_what(notification, request)} is ready to watch in {version}.{where}"
-    return [Notice(text, to=user.discord_id)]
+    return [DirectMessage(user.discord_id, text)]
 
 
 async def _plex_link(services: Services, request: MediaRequest) -> str | None:

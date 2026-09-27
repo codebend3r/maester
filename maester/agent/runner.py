@@ -40,7 +40,7 @@ from maester.agent.tools import (
     ValidationError,
     validate_input,
 )
-from maester.notify import Notice
+from maester.notify import AdminPost, ApprovalPost, Notice
 from maester.store import PendingAction
 
 log = logging.getLogger("maester.agent")
@@ -171,7 +171,7 @@ class ToolRunner:
 
     def _for_admin(self, ctx: ToolContext, spec: ToolSpec, result: ForAdmin) -> ToolOutcome:
         if result.approval is None:
-            return ToolOutcome(result.content, notices=(Notice(result.notice),))
+            return ToolOutcome(result.content, notices=(AdminPost(result.notice),))
         if spec.settle is None:
             raise TypeError(f"{spec.name} asked the admin to approve but has no settle handler")
         if ctx.store is None:
@@ -191,7 +191,7 @@ class ToolRunner:
             "user it now waits on the admin and that they'll get a DM once it's decided. "
             "Do not call this tool again for it.",
         }
-        return ToolOutcome(content, notices=(Notice(result.notice, approval=pending),))
+        return ToolOutcome(content, notices=(ApprovalPost(result.notice, pending.id),))
 
     def _request_confirmation(
         self, ctx: ToolContext, spec: ToolSpec, args: dict[str, Any]

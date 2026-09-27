@@ -395,8 +395,7 @@ class Store:
         """Record a webhook event as handled; False when it already was within `window`.
 
         Claims older than the window are dropped first, which keeps the table
-        small and lets a genuinely new occurrence of the same event (an issue
-        resolved, reopened, then resolved again days later) through. The
+        small and lets a later occurrence of the same event through. The
         insert is the claim, so two concurrent deliveries cannot both act.
         """
         cutoff = (datetime.now(UTC) - window).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"

@@ -45,7 +45,7 @@ from maester.clients.seerr import (
 )
 from maester.config import Settings
 from maester.library import AmbiguousOwner, movie_owner, series_owner
-from maester.notify import Notice
+from maester.notify import DirectMessage
 from maester.store import PendingAction
 
 # A 4K copy runs roughly four to six times the size of a 1080p encode.
@@ -286,7 +286,7 @@ async def settle_4k(ctx: ToolContext, pending: PendingAction, approved: bool) ->
         dm = f"The admin declined {title} in 4K. You can still ask for the regular version."
     return Settled(
         f"{verb} in Seerr: {pending.summary} (request #{request_id}).",
-        (Notice(dm, to=pending.requester),),
+        (DirectMessage(pending.requester, dm),),
     )
 
 

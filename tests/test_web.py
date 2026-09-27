@@ -1,8 +1,11 @@
+from datetime import timedelta
+
 import pytest
 from fastapi.testclient import TestClient
 
 from maester import __version__
-from maester.notify import Notice
+from maester.notify import DirectMessage
+from maester.seerr_events import SeerrRoute
 from maester.web import create_app
 from maester.web.seerr import SeerrWebhook
 
@@ -10,11 +13,14 @@ SECRET = "s3cret"
 
 
 class Outbox:
-    def __init__(self):
+    def __init__(self, fails_for=()):
         self.sent = []
+        self.fails_for = set(fails_for)
 
     async def deliver(self, notices):
-        self.sent.extend(notices)
+        failed = [n for n in notices if n.to in self.fails_for]
+        self.sent.extend(n for n in notices if n not in failed)
+        return failed
 
 
 @pytest.fixture
@@ -25,10 +31,19 @@ def hook(store):
         if notification.request_id == 13:
             raise RuntimeError("seerr down")
         seen.append(notification)
-        return [Notice(f"{notification.subject} is ready", to="d1")]
+        to = "closed-dms" if notification.request_id == 99 else "d1"
+        return [DirectMessage(to, f"{notification.subject} is ready")]
 
-    outbox = Outbox()
-    webhook = SeerrWebhook(SECRET, {"MEDIA_AVAILABLE": ready}, store, outbox)
+    async def resolved(notification):
+        seen.append(notification)
+        return []
+
+    outbox = Outbox(fails_for={"closed-dms"})
+    routes = {
+        "MEDIA_AVAILABLE": SeerrRoute(ready, dedupe=timedelta(minutes=15)),
+        "ISSUE_RESOLVED": SeerrRoute(resolved),
+    }
+    webhook = SeerrWebhook(SECRET, routes, store, outbox)
     return TestClient(create_app(seerr=webhook), raise_server_exceptions=False), seen, outbox
 
 
@@ -51,7 +66,7 @@ def test_an_event_is_handled_once_and_its_notices_delivered(hook, fixture):
     (notification,) = seen
     assert notification.type == "MEDIA_AVAILABLE" and notification.request_id == 77
     assert notification.tmdb_id == 438631 and notification.media_type == "movie"
-    assert outbox.sent == [Notice("Dune (2021) is ready", to="d1")]
+    assert outbox.sent == [DirectMessage("d1", "Dune (2021) is ready")]
     other = {**payload, "request": {**payload["request"], "request_id": "78"}}
     assert post(client, other).json() == {"status": "handled"}
 
@@ -82,3 +97,20 @@ def test_a_failed_handler_releases_its_claim(hook, fixture):
     assert post(client, failing).status_code == 500
     assert post(client, failing).status_code == 500  # retried, not swallowed as a duplicate
     assert outbox.sent == []
+
+
+def test_routes_without_dedupe_act_on_every_delivery(hook):
+    client, seen, _ = hook
+    resolved = {"notification_type": "ISSUE_RESOLVED", "issue": {"issue_id": "5"}, "media": None}
+    assert post(client, resolved).json() == {"status": "handled"}
+    assert post(client, resolved).json() == {"status": "handled"}
+    assert len(seen) == 2
+
+
+def test_an_undelivered_notice_releases_the_claim(hook, fixture):
+    client, seen, outbox = hook
+    payload = fixture("seerr_webhook_available")
+    closed = {**payload, "request": {**payload["request"], "request_id": "99"}}
+    assert post(client, closed).json() == {"status": "undelivered"}
+    assert post(client, closed).json() == {"status": "undelivered"}  # not a duplicate
+    assert len(seen) == 2 and outbox.sent == []

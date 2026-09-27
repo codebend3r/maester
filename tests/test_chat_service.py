@@ -9,7 +9,7 @@ from maester.chat.identity import IdentityService, RoleMap
 from maester.chat.service import UNLINKED_HELP, ChatService, ChatUser, Decision
 from maester.clients import FakeSeerrClient
 from maester.clients.seerr import SeerrUser
-from maester.notify import Notice
+from maester.notify import AdminPost, DirectMessage
 from maester.store import Store
 from tests.fake_model import FakeModel, text_message, tool_message
 
@@ -51,7 +51,7 @@ def world():
             calls.pop()
             raise ConnectionError("seerr down")
         calls.append(("settle", ctx.user_id, pending.payload["request_id"], approved))
-        return Settled("settled", (Notice("your 4K was decided", to=pending.requester),))
+        return Settled("settled", (DirectMessage(pending.requester, "your 4K was decided"),))
 
     @reg.tool(
         "request_4k",
@@ -136,7 +136,7 @@ async def test_confirmation_round_trip(world):
     assert done == Decision("Done: replaced file 7", notices=done.notices)
     assert calls == [("replace", 7)]
     (notice,) = done.notices
-    assert notice.text.startswith("Trusty confirmed") and notice.approval is None
+    assert notice == AdminPost(notice.text) and notice.text.startswith("Trusty confirmed")
     assert await svc.decide(pending.id, TRUSTED, approve=True) == Decision(
         "That action is no longer waiting."
     )
@@ -226,12 +226,12 @@ async def test_agent_errors_become_a_reference_reply(world):
 
 
 async def test_link_whoami_forget_and_admin_approval(world):
-    make, *_ = world
+    make, store, _ = world
     svc = make(text_message("A"))
     newbie = ChatUser("n1", "Newbie")
     response = await svc.link(newbie, "new@example.com")
     (notice,) = response.notices
-    pending = notice.approval
+    pending = store.get_pending(notice.pending_id)
     assert notice.text.startswith("Link request") and pending.action == "link_account"
     assert "waiting for admin" in svc.whoami(newbie)
 
@@ -251,7 +251,9 @@ async def test_link_whoami_forget_and_admin_approval(world):
 async def test_admin_denies_a_link(world):
     make, store, _ = world
     svc = make()
-    pending = (await svc.link(ChatUser("n1", "Newbie"), "new@example.com")).notices[0].approval
+    pending = store.get_pending(
+        (await svc.link(ChatUser("n1", "Newbie"), "new@example.com")).notices[0].pending_id
+    )
     assert (await svc.decide(pending.id, ADMIN, approve=False)).text.startswith("Denied")
     assert store.get_user("n1").status == "revoked"
     assert await svc.decide(pending.id, ADMIN, approve=True) == Decision(
@@ -262,7 +264,9 @@ async def test_admin_denies_a_link(world):
 async def test_a_failed_link_approval_is_reopened_for_another_press(world, monkeypatch):
     make, store, _ = world
     svc = make()
-    pending = (await svc.link(ChatUser("n1", "Newbie"), "new@example.com")).notices[0].approval
+    pending = store.get_pending(
+        (await svc.link(ChatUser("n1", "Newbie"), "new@example.com")).notices[0].pending_id
+    )
 
     def broken(*args, **kwargs):
         raise RuntimeError("disk full")
@@ -282,12 +286,12 @@ async def test_an_approval_a_tool_raises_reaches_the_admin_and_its_settle_runs(w
     response = await svc.handle_message(TRUSTED, "dune in 4k")
     assert response.text == "Sent to the admin." and response.confirmations == []
     (notice,) = response.notices
-    pending = notice.approval
+    pending = store.get_pending(notice.pending_id)
     assert notice.text == "Trusty wants Dune in 4K" and pending.requester == TRUSTED.id
 
     assert (await svc.decide(pending.id, TRUSTED, approve=True)).settled is False
     decision = await svc.decide(pending.id, ADMIN, approve=True)
-    assert decision == Decision("settled", notices=(Notice("your 4K was decided", to="t1"),))
+    assert decision == Decision("settled", notices=(DirectMessage("t1", "your 4K was decided"),))
     assert calls == [("settle", ADMIN.id, 12, True)]
     assert store.audit_recent(1)[0].tool == "request_4k"
     assert (await svc.decide(pending.id, ADMIN, approve=False)).text.startswith("That request")
@@ -296,7 +300,9 @@ async def test_an_approval_a_tool_raises_reaches_the_admin_and_its_settle_runs(w
 async def test_a_failed_settle_leaves_the_approval_open(world):
     make, store, calls = world
     svc = make(tool_message([("request_4k", {"tmdb_id": 1})]), text_message("Sent."))
-    pending = (await svc.handle_message(TRUSTED, "dune in 4k")).notices[0].approval
+    pending = store.get_pending(
+        (await svc.handle_message(TRUSTED, "dune in 4k")).notices[0].pending_id
+    )
     calls.append("seerr down")
     decision = await svc.decide(pending.id, ADMIN, approve=False)
     assert not decision.settled and "still open" in decision.text
@@ -306,9 +312,9 @@ async def test_a_failed_settle_leaves_the_approval_open(world):
 
 
 async def test_a_turn_that_fails_after_a_tool_acted_still_reaches_the_admin(world):
-    make, *_ = world
+    make, store, _ = world
     svc = make(tool_message([("request_4k", {"tmdb_id": 1})]))  # then the model call fails
     response = await svc.handle_message(TRUSTED, "dune in 4k")
     assert response.chunks[0].startswith("Sorry, something went wrong")
     (notice,) = response.notices
-    assert notice.approval is not None and notice.approval.action == "request_4k"
+    assert store.get_pending(notice.pending_id).action == "request_4k"

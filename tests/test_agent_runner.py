@@ -17,7 +17,7 @@ from maester.agent.tools import (
     ToolContext,
     ToolRegistry,
 )
-from maester.notify import Notice
+from maester.notify import AdminPost, DirectMessage
 from maester.store import Store
 
 SCHEMA_N = {"type": "object", "properties": {"n": {"type": "integer"}}, "required": ["n"]}
@@ -61,7 +61,7 @@ def setup():
         if pending.payload["n"] < 0:
             raise RuntimeError("seerr down")
         calls.append(("settle_ask", ctx.user_id, pending.payload["n"], approved))
-        return Settled(f"settled {approved}", (Notice("told you", to=pending.requester),))
+        return Settled(f"settled {approved}", (DirectMessage(pending.requester, "told you"),))
 
     @reg.tool("ask_admin", "needs the admin", SCHEMA_N, settle=settle_ask)
     async def ask_admin(ctx, n):
@@ -186,7 +186,7 @@ async def test_kill_switch_blocks_destructive_tools_only(setup):
 async def test_a_notice_for_the_admin_rides_along_with_the_result(setup):
     runner, ctx, store, *_ = setup
     out = await runner.run(ctx, "tell_admin", {"n": 3})
-    assert out.content == {"done": 3} and out.notices == (Notice("heads up: 3"),)
+    assert out.content == {"done": 3} and out.notices == (AdminPost("heads up: 3"),)
     assert store.open_pending() == []
 
 
@@ -196,8 +196,8 @@ async def test_an_approval_becomes_a_pending_action_the_admin_sees(setup):
     assert out.content["status"] == "awaiting_admin_approval"
     assert out.content["result"] == {"n": 3} and not out.is_error
     (notice,) = out.notices
-    pending = notice.approval
-    assert notice.text == "u1 wants 3" and notice.to is None
+    pending = store.get_pending(notice.pending_id)
+    assert notice.text == "u1 wants 3"
     assert (pending.kind, pending.action, pending.requester) == ("approve", "ask_admin", "u1")
     assert pending.payload == {"n": 3} and pending.summary == "let u1 have 3"
     assert store.open_pending("approve") == [pending]
@@ -212,7 +212,9 @@ async def test_an_approval_from_a_tool_that_cannot_settle_it_is_an_error(setup):
 
 async def test_settle_applies_the_decision_as_the_admin_and_audits_it(setup):
     runner, ctx, store, calls, _ = setup
-    pending = (await runner.run(ctx, "ask_admin", {"n": 3})).notices[0].approval
+    pending = store.get_pending(
+        (await runner.run(ctx, "ask_admin", {"n": 3})).notices[0].pending_id
+    )
     admin = ToolContext(user_id="boss", tier=Tier.ADMIN, services=None, store=store)
     settled = await runner.settle(admin, pending, True)
     assert settled.text == "settled True" and settled.notices[0].to == "u1"
@@ -224,7 +226,9 @@ async def test_settle_applies_the_decision_as_the_admin_and_audits_it(setup):
 
 async def test_settle_failures_are_audited_and_raised(setup):
     runner, ctx, store, *_ = setup
-    pending = (await runner.run(ctx, "ask_admin", {"n": -1})).notices[0].approval
+    pending = store.get_pending(
+        (await runner.run(ctx, "ask_admin", {"n": -1})).notices[0].pending_id
+    )
     admin = ToolContext(user_id="boss", tier=Tier.ADMIN, services=None, store=store)
     with pytest.raises(RuntimeError, match="seerr down"):
         await runner.settle(admin, pending, True)

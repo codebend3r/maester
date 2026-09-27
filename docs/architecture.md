@@ -71,7 +71,9 @@ The model never sees a confirmation as something it can perform; the button pres
 
 ## Notices and approvals
 
-Anything posted outside the current reply is a `Notice` (`maester/notify.py`): a message for the admin channel, the same with Approve/Deny buttons when it carries an approval, or a DM to one user. Replies, button decisions and webhooks all produce notices, and the Discord bot delivers them as the app's `Notifier`, so nothing outside `chat/` imports Discord.
+Anything posted outside the current reply is a notice (`maester/notify.py`), one of three kinds: `AdminPost(text)`, `ApprovalPost(text, pending_id)` (an admin post with Approve/Deny buttons), or `DirectMessage(to, text)`. Replies, button decisions and webhooks all produce notices, and the Discord bot delivers them as the app's `Notifier`, so nothing outside `chat/` imports Discord. Delivery is best effort per notice: `deliver()` never raises and returns the notices it could not send. A reply is sent first, then its notices.
+
+Decision buttons are persistent: each carries `decide:<pending id>:<approve|deny>` as its custom id, and the bot registers `DecisionButton` at startup, so a press after a deploy still lands. A pending action's own expiry decides when a press is too late.
 
 A tool reaches the admin by returning `ForAdmin(content, notice, approval=None)`:
 
@@ -79,7 +81,7 @@ A tool reaches the admin by returning `ForAdmin(content, notice, approval=None)`
 - With `Approval(summary, payload)`, the runner stores a pending action named after the tool, the notice gets Approve/Deny buttons, and the model is told the action waits on the admin.
 - The admin's press is recorded, then applied by the tool's `settle` handler (`@tool(..., settle=...)`), run as the admin through `ToolRunner.settle()` and audited like any call. It returns `Settled(text, notices)`, typically a DM to the requester.
 - If settling fails, the decision is reopened so the admin can press again; settle handlers must therefore be safe to run twice.
-- If a turn fails after a tool acted (a model error, say), the agent raises `TurnFailed` with the partial reply, and the error reply still carries its confirmations and notices. Views deliver notices before sending the reply text.
+- If a turn fails after a tool acted (a model error, say), the agent raises `TurnFailed` with the partial reply, and the error reply still carries its confirmations and notices.
 
 The link flow's approval is the one handler registered outside a tool (`IdentityService.finish_link`).
 
@@ -109,13 +111,13 @@ SQLite, migrations numbered under `maester/store/migrations/`. Tables: `users`, 
 
 ## Seerr webhook
 
-`POST /webhooks/seerr` serves every Seerr notification type. The `Authorization` header must equal `SEERR_WEBHOOK_SECRET`; with no secret configured, every call is refused. The payload is parsed into a `SeerrNotification` and dispatched by type through `seerr_handlers()` (`maester/seerr_events.py`); a handler returns notices, which go out through the bot as the `Notifier`. Types without a handler are acknowledged and ignored.
+`POST /webhooks/seerr` serves every Seerr notification type. The `Authorization` header must equal `SEERR_WEBHOOK_SECRET`; with no secret configured, every call is refused. The payload is parsed into a `SeerrNotification` and dispatched by type through `seerr_routes()` (`maester/seerr_events.py`); a route's handler returns notices, which go out through the bot as the `Notifier`. Types without a route are acknowledged and ignored.
 
-Each delivery is claimed in `webhook_events` under its type plus the request or issue it concerns before the handler runs, so a repeat within 24 hours is acknowledged without a second DM. Older claims are pruned, so a real recurrence (an issue resolved again after a reopen) gets through. A handler that fails releases the claim.
+Deduplication is opt-in per route, for handlers whose repeat would reach a person twice. Such a route claims the event in `webhook_events` (type plus the request or issue it concerns) before its handler runs, so a repeat inside its window (15 minutes for the ready DM, sized for Seerr's rescans) is acknowledged without acting. A later repeat is news and gets through, and idempotent routes (a report-row update) take every delivery. The claim is released when the handler fails or one of its notices could not be delivered.
 
 | Type              | Handler         | Effect                                                                   |
 | ----------------- | --------------- | ------------------------------------------------------------------------ |
-| `MEDIA_AVAILABLE` | `ready_to_watch`| DMs the linked requester: title, version (1080p or 4K), a Plex deep link |
+| `MEDIA_AVAILABLE` | `ready_to_watch`| DMs the linked requester: title, version (1080p or 4K), a Plex deep link; dedupes for 15 minutes |
 
 ## Deployment
 
