@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from maester.clients import Services
 from maester.clients.arr import MediaFile
 from maester.clients.seerr import MediaDetails
-from maester.library import Library, Owner
+from maester.library import MovieOwner, NotLocated, Owner, owner_of
 
 
 def episode_code(season: int | None, episode: int | None) -> str:
@@ -80,7 +80,7 @@ class Item:
         return item_title(details, self.code)
 
 
-class NotOnServer(LookupError):
+class NotOnServer(NotLocated):
     """The owning arr has no file for this copy or episode; the message says what's missing."""
 
 
@@ -92,7 +92,9 @@ class LocatedFile:
     details: MediaDetails
     owner: Owner
     file: MediaFile
-    episode_ids: tuple[int, ...] = ()  # for a show: every episode this file holds
+    # What the owning arr searches to replace the file: the movie, or every
+    # episode the file holds.
+    search_ids: tuple[int, ...]
 
     @property
     def title(self) -> str:
@@ -104,11 +106,6 @@ class LocatedFile:
         return f"the {self.item.version} copy of {self.title}"
 
     @property
-    def search_ids(self) -> tuple[int, ...]:
-        """What the owning arr searches to replace the file: the movie, or its episodes."""
-        return (self.owner.media_id,) if self.item.media_type == "movie" else self.episode_ids
-
-    @property
     def runtime(self) -> float | None:
         """How long the file should run, in seconds: a movie's runtime.
 
@@ -116,22 +113,20 @@ class LocatedFile:
         for a truncated one, so episodes have none.
         """
         minutes = self.details.runtime_minutes
-        return minutes * 60.0 if minutes and self.item.media_type == "movie" else None
+        return minutes * 60.0 if minutes and isinstance(self.owner, MovieOwner) else None
 
 
 async def locate(services: Services, item: Item) -> LocatedFile:
-    """The item's file on its owning host; `NotOnServer` or `OwnerUnknown` when it can't be named."""
+    """The item's file on its owning host; a `NotLocated` says why it can't be named."""
     details = await services.seerr.media_details(item.media_type, item.tmdb_id)
-    owner = await (await Library.load(services)).owner(details, is_4k=item.is_4k)
-    if owner is None:
-        raise NotOnServer(f"no Radarr or Sonarr holds the {item.version} copy of {details.display}")
+    owner = await owner_of(services, details, is_4k=item.is_4k)
     files = {f.id: f for f in await owner.files()}
-    if item.media_type == "movie":
+    if isinstance(owner, MovieOwner):
         if not files:
             raise NotOnServer(f"{details.display} has no {item.version} file on {owner.host}")
         # Radarr keeps one file per movie.
-        return LocatedFile(item, details, owner, next(iter(files.values())))
-    episodes = await owner.arr.episodes(owner.media_id)  # type: ignore[union-attr]
+        return LocatedFile(item, details, owner, next(iter(files.values())), (owner.media_id,))
+    episodes = await owner.episodes()
     wanted = next(
         (e for e in episodes if (e.season, e.number) == (item.season, item.episode)), None
     )

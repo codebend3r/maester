@@ -215,7 +215,7 @@ def _frames(progress: str) -> int:
 
 class MediaProbe(Protocol):
     async def inspect(self, arr_path: str) -> Inspection: ...
-    async def decode(self, path: str, start: float, length: float) -> Decoded: ...
+    async def decode(self, inspection: Inspection, start: float, length: float) -> Decoded: ...
 
 
 class FileProbe:
@@ -254,15 +254,15 @@ class FileProbe:
         sidecars = await asyncio.to_thread(sidecar_subtitles, path)
         return replace(inspection, tracks=inspection.tracks + sidecars)
 
-    async def decode(self, path: str, start: float, length: float) -> Decoded:
+    async def decode(self, inspection: Inspection, start: float, length: float) -> Decoded:
         """Decode the first video and audio stream from `start` for `length` seconds.
 
-        `path` is an inspection's, already inside the media roots.
+        Only an inspected file can be decoded: its path already passed `MediaPaths`.
         """
         done = await self._run(
             [
                 "ffmpeg", "-nostdin", "-hide_banner", "-v", "error",
-                "-ss", f"{start:.3f}", "-i", f"file:{path}", "-t", f"{length:.3f}",
+                "-ss", f"{start:.3f}", "-i", f"file:{inspection.path}", "-t", f"{length:.3f}",
                 "-map", "0:v:0", "-map", "0:a:0?", "-f", "null", "-progress", "pipe:1", "-",
             ]
         )  # fmt: skip
@@ -284,7 +284,8 @@ class FakeFileProbe:
             raise Unreadable(f"there's no file at {arr_path} on the read-only media mount")
         return self.files[arr_path]
 
-    async def decode(self, path: str, start: float, length: float) -> Decoded:
+    async def decode(self, inspection: Inspection, start: float, length: float) -> Decoded:
+        path = inspection.path
         self.decoded.append((path, start, length))
         frames = 0 if path in self.empty else int(length * 24)
         return Decoded(frames, self.errors.get(path, ()), 0)

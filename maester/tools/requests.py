@@ -38,7 +38,7 @@ from maester.clients.seerr import (
     Seerr,
 )
 from maester.config import Settings
-from maester.library import Library, NotOwned, OwnerUnknown, owner_on
+from maester.library import Library, NotLocated, OwnerUnknown, owner_on
 from maester.notify import DirectMessage
 from maester.store import LinkedUser
 
@@ -370,7 +370,7 @@ async def follow_show(ctx: ToolContext, tmdb_id: int, host: str) -> dict[str, An
     details = await ctx.services.seerr.media_details("tv", tmdb_id)
     try:
         owner = await owner_on(ctx.services, details, host)
-    except (OwnerUnknown, NotOwned) as exc:
+    except NotLocated as exc:
         return {"followed": False, "reason": str(exc)}
     await ctx.services.sonarr[owner.host].follow(owner.media_id)
     return {"followed": True, "title": details.display, "host": owner.host}

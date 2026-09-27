@@ -196,9 +196,7 @@ async def check_health(
         why = f"ffprobe can't parse this format ({unsupported[0]}); other players may"
         return Health(Verdict.UNREADABLE, (why,))
     windows = decode_windows(inspection.duration, at)
-    decoded = await asyncio.gather(
-        *(probe.decode(inspection.path, w.start, w.length) for w in windows)
-    )
+    decoded = await asyncio.gather(*(probe.decode(inspection, w.start, w.length) for w in windows))
     findings = length_findings(inspection.duration, at, expected)
     for window, result in zip(windows, decoded, strict=True):
         findings.extend(judge(window, result, inspection.duration))

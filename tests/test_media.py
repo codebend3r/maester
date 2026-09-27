@@ -7,6 +7,7 @@ import pytest
 from maester.clients.media import (
     Completed,
     FileProbe,
+    Inspection,
     MediaPaths,
     Track,
     Unreadable,
@@ -134,7 +135,8 @@ async def test_inspect_refuses_what_it_cannot_read(share):
 async def test_decode_reports_frames_and_error_lines():
     progress = "frame=120\nfps=24\nprogress=continue\nframe=240\nprogress=end\n"
     run = Scripted(Completed(0, progress, "[hevc @ 0x1] Invalid NAL unit size\n\n"))
-    decoded = await FileProbe(MediaPaths(["/"]), run, timeout=9).decode("/m/x.mkv", 4335.0, 30.0)
+    inspected = Inspection("/m/x.mkv", 9331.0, "hevc", 0, ())
+    decoded = await FileProbe(MediaPaths(["/"]), run, timeout=9).decode(inspected, 4335.0, 30.0)
     assert (decoded.frames, decoded.errors, decoded.exit_code) == (
         240, ("[hevc @ 0x1] Invalid NAL unit size",), 0,
     )  # fmt: skip

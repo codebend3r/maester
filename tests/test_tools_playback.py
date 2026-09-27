@@ -4,7 +4,8 @@ from dataclasses import replace
 import pytest
 
 from maester.agent.tools import Choices
-from maester.playback.items import Item, NotOnServer, locate
+from maester.library import NotLocated
+from maester.playback.items import Item, locate
 from maester.playback.plays import copy_of, recent_plays
 from maester.tools.playback import list_tracks, recent_sessions
 from tests.factories import history_row, session
@@ -110,16 +111,16 @@ async def test_locate_finds_a_copys_file_through_its_owning_arr(library):
         "vermithor", 55, "the 4K copy of Dune (2021)",
     )  # fmt: skip
     forks = await locate(library.services, Item("tv", 136315, False, 2, 7))
-    assert (forks.owner.host, forks.file.path, forks.episode_ids) == ("meleys", FORKS, (702,))
+    assert (forks.owner.host, forks.file.path, forks.search_ids) == ("meleys", FORKS, (702,))
     assert forks.title == "The Bear (2022) S02E07"
 
     for item, why in (
         (Item("movie", 438631, False), "has no 1080p file on meleys"),
         (Item("tv", 136315, False, 2, 8), "S02E08 has no file on meleys"),
         (Item("tv", 136315, False, 9, 1), "has no S09E01 of The Bear"),
-        (Item("tv", 136315, True, 2, 7), "no Radarr or Sonarr holds the 4K copy"),
+        (Item("tv", 136315, True, 2, 7), "The 4K copy of The Bear \\(2022\\) isn't in Sonarr yet"),
     ):
-        with pytest.raises(NotOnServer, match=why):
+        with pytest.raises(NotLocated, match=why):
             await locate(library.services, item)
 
 

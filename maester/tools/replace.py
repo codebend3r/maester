@@ -23,9 +23,9 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from maester.agent.tools import Approval, Result, Tier, ToolContext, tool
-from maester.library import OwnerUnknown
+from maester.library import NotLocated
 from maester.notify import DirectMessage
-from maester.playback.items import LocatedFile, NotOnServer, locate
+from maester.playback.items import LocatedFile, locate
 from maester.playback.replace import admin_notice, gigabytes, item_of, replace_copy
 from maester.playback.reports import Action, Evidence, policy_of
 from maester.store import ReportRow
@@ -52,7 +52,7 @@ async def ready(ctx: ToolContext, report: ReportRow, host: str) -> Ready:
         raise Refused(f"{report.title} in {report.version} is on {report.host}, not {host}.")
     try:
         located = await locate(ctx.services, item_of(report))
-    except (NotOnServer, OwnerUnknown) as exc:
+    except NotLocated as exc:
         raise Refused(f"There's nothing to replace: {exc}.") from exc
     if located.owner.host != report.host or located.file.id != report.file_id:
         raise Refused(

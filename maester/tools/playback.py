@@ -23,10 +23,10 @@ from typing import Any
 from maester.agent.tools import Choice, Choices, Result, Tier, ToolContext, tool
 from maester.clients.media import Unreadable
 from maester.clients.seerr import MediaDetails
-from maester.library import OwnerUnknown
+from maester.library import NotLocated
 from maester.playback import tracks
 from maester.playback.health import parse_clock
-from maester.playback.items import Item, NotOnServer, episode_code, item_ref, item_title, locate
+from maester.playback.items import Item, episode_code, item_ref, item_title, locate
 from maester.playback.plays import Play, copy_of, identify, recent_plays
 from maester.playback.reports import ReportKind, file_report
 from maester.tools.status import humanized
@@ -127,7 +127,7 @@ async def list_tracks(
     item = Item.of(media_type, tmdb_id, version, season, episode)
     try:
         located = await locate(ctx.services, item)
-    except (NotOnServer, OwnerUnknown) as exc:
+    except NotLocated as exc:
         return {"tracks": None, "reason": str(exc)}
     reply: dict[str, Any] = {"title": located.title, "version": item.version}
     try:
@@ -178,7 +178,7 @@ async def report_problem(
     link = ctx.linked_user()
     try:
         located = await locate(ctx.services, item)
-    except (NotOnServer, OwnerUnknown) as exc:
+    except NotLocated as exc:
         return {"reported": False, "reason": str(exc)}
     filed = await file_report(
         ctx.services, ctx.store, link, located, ReportKind(kind), description, moment
