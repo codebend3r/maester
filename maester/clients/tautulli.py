@@ -1,7 +1,9 @@
-"""Tautulli: live sessions, watch history, users and recent additions.
+"""Tautulli: live sessions, watch history, stream details, users and recent additions.
 
 This is where playback diagnosis gets its facts: transcode decisions and
-reasons, LAN vs WAN, relay, bandwidth. Everything is one `/api/v2?cmd=` call.
+reasons, LAN vs WAN, relay, bandwidth. A finished play keeps only a summary
+in the history; `stream_data` fetches what it was sent (codecs, decisions)
+by its history row. Everything is one `/api/v2?cmd=` call.
 """
 
 from __future__ import annotations
@@ -17,6 +19,12 @@ def _int(value: Any, default: int = 0) -> int:
         return int(value)
     except (TypeError, ValueError):
         return default
+
+
+def _index(raw: dict[str, Any], key: str) -> int | None:
+    """A season or episode number; Tautulli leaves it empty for movies."""
+    value = raw.get(key)
+    return None if raw.get("media_type") != "episode" or value in (None, "") else int(value)
 
 
 @dataclass(frozen=True)
@@ -51,6 +59,12 @@ class Session:
     subtitle_codec: str
     quality_profile: str
     file: str
+    # For episodes: the show's Plex key, and which episode it is.
+    show_key: str = ""
+    season: int | None = None
+    episode: int | None = None
+    device: str = ""  # the hardware, e.g. "SHIELD Android TV"
+    dovi_profile: int = 0  # the file's Dolby Vision profile; 0 when it has none
 
     @classmethod
     def from_api(cls, raw: dict[str, Any]) -> Session:
@@ -85,6 +99,11 @@ class Session:
             subtitle_codec=raw.get("subtitle_codec") or "",
             quality_profile=raw.get("quality_profile") or "",
             file=raw.get("file") or "",
+            show_key=str(raw.get("grandparent_rating_key") or ""),
+            season=_index(raw, "parent_media_index"),
+            episode=_index(raw, "media_index"),
+            device=raw.get("device") or "",
+            dovi_profile=_int(raw.get("video_dovi_profile")),
         )
 
 
@@ -121,6 +140,11 @@ class HistoryRow:
     player: str
     location: str
     relayed: bool
+    row_id: int = 0  # what `stream_data` takes
+    product: str = ""
+    show_key: str = ""
+    season: int | None = None
+    episode: int | None = None
 
     @classmethod
     def from_api(cls, raw: dict[str, Any]) -> HistoryRow:
@@ -137,6 +161,34 @@ class HistoryRow:
             player=raw.get("player") or "",
             location=raw.get("location") or "",
             relayed=_int(raw.get("relayed")) == 1,
+            row_id=_int(raw.get("row_id")),
+            product=raw.get("product") or "",
+            show_key=str(raw.get("grandparent_rating_key") or ""),
+            season=_index(raw, "parent_media_index"),
+            episode=_index(raw, "media_index"),
+        )
+
+
+@dataclass(frozen=True)
+class StreamData:
+    """What a finished play was sent: the source's codecs and the server's decision on each."""
+
+    video_codec: str
+    video_decision: str  # "direct play" | "copy" | "transcode"
+    audio_codec: str
+    audio_decision: str
+    subtitle_codec: str
+    subtitle_decision: str  # adds "burn"; empty without subtitles
+
+    @classmethod
+    def from_api(cls, raw: dict[str, Any]) -> StreamData:
+        return cls(
+            video_codec=raw.get("video_codec") or "",
+            video_decision=raw.get("stream_video_decision") or "",
+            audio_codec=raw.get("audio_codec") or "",
+            audio_decision=raw.get("stream_audio_decision") or "",
+            subtitle_codec=raw.get("subtitle_codec") or "",
+            subtitle_decision=raw.get("stream_subtitle_decision") or "",
         )
 
 
@@ -164,6 +216,7 @@ class Tautulli(Protocol):
     async def history(
         self, *, user_id: int | None = None, length: int = 10
     ) -> list[HistoryRow]: ...
+    async def stream_data(self, row_id: int) -> StreamData: ...
     async def users(self) -> list[TautulliUser]: ...
     async def recently_added(self, count: int = 25) -> list[dict[str, Any]]: ...
 
@@ -196,6 +249,9 @@ class TautulliClient(HttpClient):
         data = await self._cmd("get_history", **params) or {}
         return [HistoryRow.from_api(r) for r in data.get("data", [])]
 
+    async def stream_data(self, row_id: int) -> StreamData:
+        return StreamData.from_api(await self._cmd("get_stream_data", row_id=row_id) or {})
+
     async def users(self) -> list[TautulliUser]:
         return [TautulliUser.from_api(u) for u in await self._cmd("get_users") or []]
 
@@ -209,6 +265,8 @@ class FakeTautulliClient:
     host: str = "fake"
     sessions: list[Session] = field(default_factory=list)
     history_rows: list[HistoryRow] = field(default_factory=list)
+    # What each history row's play was sent, by row id.
+    streams: dict[int, StreamData] = field(default_factory=dict)
     user_list: list[TautulliUser] = field(default_factory=list)
     recent: list[dict[str, Any]] = field(default_factory=list)
 
@@ -225,6 +283,9 @@ class FakeTautulliClient:
     async def history(self, *, user_id: int | None = None, length: int = 10) -> list[HistoryRow]:
         rows = [r for r in self.history_rows if user_id is None or r.user_id == user_id]
         return sorted(rows, key=lambda r: r.started, reverse=True)[:length]
+
+    async def stream_data(self, row_id: int) -> StreamData:
+        return self.streams[row_id]
 
     async def users(self) -> list[TautulliUser]:
         return list(self.user_list)

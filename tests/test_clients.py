@@ -205,11 +205,46 @@ async def test_sabnzbd_queue_carries_the_api_key_as_a_param(fixture):
 async def test_tautulli_activity_parses_the_diagnosis_fields(fixture):
     respx.get(f"{BASE}/api/v2").respond(json=fixture("tautulli_activity"))
     activity = await TautulliClient("vermithor", BASE, "k").activity()
-    (s,) = activity.sessions
+    s, episode = activity.sessions
     assert activity.transcode_count == 1
     assert s.relayed and s.location == "wan"
     assert s.subtitle_decision == "burn" and s.transcode_reasons == ("Subtitle burn-in required",)
     assert s.video_dynamic_range == "Dolby Vision" and s.audio_channels == 8
+    assert (s.dovi_profile, s.device, s.season, s.show_key) == (7, "Roku Ultra", None, "")
+    assert (episode.show_key, episode.season, episode.episode) == ("5120", 2, 7)
+    assert episode.dovi_profile == 0
+
+
+@respx.mock
+async def test_tautulli_history_and_stream_data_of_a_finished_play(fixture):
+    route = respx.get(f"{BASE}/api/v2", params={"cmd": "get_history"}).respond(
+        json=fixture("tautulli_history")
+    )
+    respx.get(f"{BASE}/api/v2", params={"cmd": "get_stream_data"}).respond(
+        json=fixture("tautulli_stream_data")
+    )
+    client = TautulliClient("meleys", BASE, "k")
+    episode, movie = await client.history(user_id=8008135, length=5)
+    assert route.calls.last.request.url.params["user_id"] == "8008135"
+    assert (episode.row_id, episode.show_key, episode.season, episode.episode) == (
+        1124,
+        "5120",
+        2,
+        7,
+    )
+    assert (movie.rating_key, movie.show_key, movie.season, movie.product) == (
+        "4348",
+        "",
+        None,
+        "Plex for Roku",
+    )
+    stream = await client.stream_data(1124)
+    assert (stream.video_codec, stream.video_decision) == ("hevc", "transcode")
+    assert (stream.audio_codec, stream.audio_decision, stream.subtitle_decision) == (
+        "eac3",
+        "direct play",
+        "",
+    )
 
 
 @respx.mock

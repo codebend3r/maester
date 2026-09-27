@@ -3,6 +3,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
+from maester.notify import MediaRef
 from maester.store import MIGRATIONS_DIR, SeerrUserTaken, Store
 
 
@@ -206,3 +207,15 @@ def test_the_migration_keeps_the_earliest_active_link_of_a_shared_seerr_user(tmp
     assert migrated.active_link_by_seerr_id(4).discord_id == "early"
     assert [migrated.get_user(d).status for d in ("late", "waiting")] == ["revoked", "revoked"]
     migrated.close()
+
+
+def test_a_dm_about_a_title_is_remembered_for_its_recipient_only(store):
+    dune = MediaRef("movie", 438631, True, "Dune (2021)")
+    store.remember_message("m1", "d1", dune)
+    assert store.message_about("m1", "d1") == dune
+    assert store.message_about("m1", "d2") is None and store.message_about("m9", "d1") is None
+    # A month on, the next write forgets it.
+    stale = (datetime.now(UTC) - timedelta(days=31)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    store._conn.execute("UPDATE sent_messages SET sent_at = ?", (stale,))
+    store.remember_message("m2", "d1", dune)
+    assert store.message_about("m1", "d1") is None and store.message_about("m2", "d1") == dune

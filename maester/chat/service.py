@@ -7,9 +7,13 @@ and notices (admin posts, approvals, DMs). Every button press lands in
 `decide()`, which owns who may press what, records the decision, and runs
 what it decided through the agent: the confirmed call, or the admin tool an
 approval named. The two kinds differ only in who presses and how it reads
-(`KINDS`). A run that failed in a way worth retrying is reopened. The
-service talks to no chat platform: `bot.py` delivers what it returns, and
-tests drive this class directly.
+(`KINDS`). A run that failed in a way worth retrying is reopened.
+
+A DM about a title is remembered by message id (`remember_dm`), so a
+reaction to it can mean something: a thumbs-down on "Dune is ready" becomes
+a message saying something's wrong with that copy, and the report flow
+starts from there (`react`). The service talks to no chat platform:
+`bot.py` delivers what it returns, and tests drive this class directly.
 """
 
 from __future__ import annotations
@@ -23,7 +27,7 @@ from maester.agent.runner import CANCELLED
 from maester.agent.tools import Choice, Tier
 from maester.chat.identity import IdentityService
 from maester.chat.split import split_reply
-from maester.notify import ApprovalPost, Notice
+from maester.notify import ApprovalPost, DirectMessage, Notice
 from maester.store import PendingAction, Store
 
 log = logging.getLogger("maester.chat")
@@ -36,6 +40,12 @@ UNLINKED_HELP = (
     "If you don't have access yet, ask the friend who invited you here, or the admin, for an invite."
 )
 ERROR_REPLY = "Sorry, something went wrong on my end (ref `{ref}`). The admin can look it up."
+# A thumbs-down (any skin tone) on a DM about a title reports a problem with it.
+THUMBS_DOWN = "\N{THUMBS DOWN SIGN}"
+REACTION_REPORT = (
+    "{emoji} on your message about {title} in {version} ({media_type} {tmdb_id}): "
+    "something's wrong with it."
+)
 
 
 @dataclass(frozen=True)
@@ -129,6 +139,29 @@ class ChatService:
 
     async def pick(self, user: ChatUser, choice: Choice) -> ChatResponse:
         return await self.handle_message(user, f"I pick: {choice.display} ({choice.value})")
+
+    # -- DMs and reactions ------------------------------------------------
+
+    def remember_dm(self, message_id: str, dm: DirectMessage) -> None:
+        """Note what a sent DM was about, when it was about a title."""
+        if dm.about is not None:
+            self.store.remember_message(message_id, dm.to, dm.about)
+
+    async def react(self, user: ChatUser, message_id: str, emoji: str) -> ChatResponse | None:
+        """A reaction to one of maester's DMs; None when it means nothing."""
+        if not emoji.startswith(THUMBS_DOWN):
+            return None
+        about = self.store.message_about(message_id, user.id)
+        if about is None:
+            return None
+        text = REACTION_REPORT.format(
+            emoji=emoji,
+            title=about.title,
+            version=about.version,
+            media_type=about.media_type,
+            tmdb_id=about.tmdb_id,
+        )
+        return await self.handle_message(user, text)
 
     # -- buttons ----------------------------------------------------------
 

@@ -9,6 +9,9 @@ implements, so `agent/`, `tools/` and `web/` never import Discord.
 Delivery is best effort, one notice at a time: `deliver()` never raises,
 and returns the notices it could not send so a caller that must know (the
 webhook, which keeps a claim only for events it fully handled) can act.
+
+A DM about a title carries it as `about`, so a reaction to the message (a
+thumbs-down on "Dune is ready") can be traced back to what it was about.
 """
 
 from __future__ import annotations
@@ -32,9 +35,24 @@ class ApprovalPost:
 
 
 @dataclass(frozen=True)
+class MediaRef:
+    """The title a message is about."""
+
+    media_type: str  # "movie" | "tv"
+    tmdb_id: int
+    is_4k: bool
+    title: str  # "Dune (2021)"
+
+    @property
+    def version(self) -> str:
+        return "4K" if self.is_4k else "1080p"
+
+
+@dataclass(frozen=True)
 class DirectMessage:
     to: str  # a Discord user id
     text: str
+    about: MediaRef | None = None
 
 
 Notice = AdminPost | ApprovalPost | DirectMessage

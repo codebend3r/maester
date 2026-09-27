@@ -10,6 +10,7 @@ from maester.tools import (  # noqa: F401
     availability,
     basics,
     collections,
+    playback,
     requests,
     search,
     status,

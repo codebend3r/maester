@@ -1,4 +1,4 @@
-"""SQLite persistence: users, conversations, the audit log, reports, pending actions, webhook events.
+"""SQLite persistence: users, conversations, the audit log, reports, pending actions, webhooks, DMs.
 
 One file on `/data`, schema managed by numbered SQL migrations under
 `migrations/`. Nothing here is a source of truth for media; Seerr and the
@@ -22,12 +22,20 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
+from maester.notify import MediaRef
+
 MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 RESULT_MAX_CHARS = 4000
+# How long a DM about a title can still be reacted to.
+SENT_MESSAGE_TTL = timedelta(days=30)
+
+
+def _stamp(when: datetime) -> str:
+    return when.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
 
 
 def _now() -> str:
-    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+    return _stamp(datetime.now(UTC))
 
 
 @dataclass(frozen=True)
@@ -237,7 +245,7 @@ class Store:
             row = self._conn.execute(
                 "SELECT COUNT(*) FROM audit_log"
                 " WHERE tool = ? AND ok = 1 AND pending_id IS NULL AND ts >= ?",
-                (tool, since.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"),
+                (tool, _stamp(since)),
             ).fetchone()
         return int(row[0])
 
@@ -347,7 +355,7 @@ class Store:
         params: tuple[Any, ...] = (discord_id,)
         if since is not None:
             sql += " AND created_at >= ?"
-            params += (since.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z",)
+            params += (_stamp(since),)
         with self._lock:
             rows = self._conn.execute(sql + " ORDER BY id DESC LIMIT 200", params).fetchall()
         kept: list[dict[str, Any]] = []
@@ -380,7 +388,7 @@ class Store:
         summary: str,
         ttl: timedelta,
     ) -> PendingAction:
-        expires = (datetime.now(UTC) + ttl).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+        expires = _stamp(datetime.now(UTC) + ttl)
         with self.transaction() as conn:
             cur = conn.execute(
                 "INSERT INTO pending_actions (ts, kind, action, requester, payload, summary, expires_at)"
@@ -459,7 +467,7 @@ class Store:
         small and lets a later occurrence of the same event through. The
         insert is the claim, so two concurrent deliveries cannot both act.
         """
-        cutoff = (datetime.now(UTC) - window).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+        cutoff = _stamp(datetime.now(UTC) - window)
         with self.transaction() as conn:
             conn.execute("DELETE FROM webhook_events WHERE received_at < ?", (cutoff,))
             return (
@@ -477,3 +485,36 @@ class Store:
             conn.execute(
                 "DELETE FROM webhook_events WHERE source = ? AND event_key = ?", (source, key)
             )
+
+    # -- sent messages ----------------------------------------------------
+
+    def remember_message(self, message_id: str, to: str, about: MediaRef) -> None:
+        """Record what a DM was about, and forget ones too old to react to."""
+        cutoff = _stamp(datetime.now(UTC) - SENT_MESSAGE_TTL)
+        with self.transaction() as conn:
+            conn.execute("DELETE FROM sent_messages WHERE sent_at < ?", (cutoff,))
+            conn.execute(
+                "INSERT OR REPLACE INTO sent_messages"
+                " (message_id, discord_id, media_type, tmdb_id, is_4k, title, sent_at)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (
+                    message_id,
+                    to,
+                    about.media_type,
+                    about.tmdb_id,
+                    int(about.is_4k),
+                    about.title,
+                    _now(),
+                ),
+            )
+
+    def message_about(self, message_id: str, discord_id: str) -> MediaRef | None:
+        """What a DM to `discord_id` was about; None for anyone else's or an unknown one."""
+        with self._lock:
+            r = self._conn.execute(
+                "SELECT * FROM sent_messages WHERE message_id = ? AND discord_id = ?",
+                (message_id, discord_id),
+            ).fetchone()
+        if r is None:
+            return None
+        return MediaRef(r["media_type"], r["tmdb_id"], bool(r["is_4k"]), r["title"])

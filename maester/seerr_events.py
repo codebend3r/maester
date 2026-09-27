@@ -21,7 +21,7 @@ from typing import Any
 
 from maester.clients import ClientError, Services
 from maester.clients.seerr import MediaRequest
-from maester.notify import DirectMessage, Notice
+from maester.notify import DirectMessage, MediaRef, Notice
 from maester.store import Store
 
 log = logging.getLogger("maester.seerr")
@@ -113,7 +113,8 @@ async def ready_to_watch(
     link = await _plex_link(services, request)
     where = f"\nOpen it in Plex: {link}" if link else " Look for it in Plex."
     text = f"{_what(notification, request)} is ready to watch in {version}.{where}"
-    return [DirectMessage(user.discord_id, text)]
+    about = MediaRef(request.media_type, request.tmdb_id, request.is_4k, notification.subject)
+    return [DirectMessage(user.discord_id, text, about)]
 
 
 async def _plex_link(services: Services, request: MediaRequest) -> str | None:
