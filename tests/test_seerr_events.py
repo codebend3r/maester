@@ -1,6 +1,6 @@
 from maester.clients import ClientError
-from maester.clients.seerr import MediaRequest, MediaStatus, RequestStatus, SeerrNotification
-from maester.seerr_events import ready_to_watch, seerr_handlers
+from maester.clients.seerr import MediaRequest, MediaStatus, RequestStatus
+from maester.seerr_events import SeerrNotification, ready_to_watch, seerr_handlers
 
 
 def notification(request_id="77", subject="Dune (2021)"):

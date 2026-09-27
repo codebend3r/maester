@@ -104,6 +104,7 @@ class MediaFile:
 
 @dataclass(frozen=True)
 class HistoryEvent:
+    id: int  # what `mark_failed` takes to blocklist the grabbed release
     event_type: str  # "grabbed", "downloadFailed", "downloadFolderImported", ...
     source_title: str
     date: str
@@ -113,6 +114,7 @@ class HistoryEvent:
     @classmethod
     def from_api(cls, raw: dict[str, Any]) -> HistoryEvent:
         return cls(
+            id=int(raw["id"]),
             event_type=raw.get("eventType") or "",
             source_title=raw.get("sourceTitle") or "",
             date=raw.get("date") or "",

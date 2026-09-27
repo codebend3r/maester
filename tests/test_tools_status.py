@@ -107,14 +107,14 @@ async def test_a_failed_download_gives_the_reason_from_history(dune_on_meleys):
     ctx = dune_on_meleys
     await request(ctx, "movie", 438631)
     radarr = ctx.services.radarr["meleys"]
-    radarr.events[8] = [HistoryEvent("downloadFailed", "Dune", "2026-09-20", "nzo_dune", "")]
+    radarr.events[8] = [HistoryEvent(1002, "downloadFailed", "Dune", "2026-09-20", "nzo_dune", "")]
     ctx.services.sabnzbd["meleys"].history_items = [
         Download("nzo_dune", "Dune", "Failed", 0, 0, None, "Out of retention")
     ]
     (row,) = (await request_status(ctx))["requests"]
     assert row["failed"] == "the last download failed: Out of retention"
 
-    radarr.events[8] = [HistoryEvent("grabbed", "Dune", "2026-09-21", "nzo_2", "")]
+    radarr.events[8] = [HistoryEvent(1003, "grabbed", "Dune", "2026-09-21", "nzo_2", "")]
     (row,) = (await request_status(ctx))["requests"]
     assert row["download"].startswith("nothing downloading right now")
 

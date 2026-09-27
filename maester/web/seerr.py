@@ -24,9 +24,8 @@ from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException
 
-from maester.clients.seerr import SeerrNotification
 from maester.notify import Notifier
-from maester.seerr_events import SeerrHandler
+from maester.seerr_events import SeerrHandler, SeerrNotification
 from maester.store import Store
 
 log = logging.getLogger("maester.web")

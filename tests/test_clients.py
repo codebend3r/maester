@@ -316,7 +316,7 @@ async def test_arr_queue_reads_stall_messages_and_history_is_typed(fixture):
     assert item.tracked_status == "warning" and item.media_id == 8
     assert item.error_messages == ("The download is stalled with no connections",)
     failed, grabbed = await client.history(8)
-    assert history.called and failed.event_type == "downloadFailed"
+    assert history.called and (failed.id, failed.event_type) == (1002, "downloadFailed")
     assert failed.message == "Unpacking failed, write error or disk is full?"
     assert grabbed.event_type == "grabbed" and grabbed.message == ""
 
