@@ -28,6 +28,7 @@ from maester.clients.plex import PlexItem, PlexSeason, Version
 from maester.clients.radarr import Movie
 from maester.clients.seerr import (
     ArrServer,
+    Collection,
     MediaDetails,
     MediaRequest,
     MediaStatus,
@@ -105,9 +106,14 @@ def _seerr(seed: dict[str, Any], seerr_user_id: int) -> FakeSeerrClient:
         ServerOptions(ArrServer(9, f"{kind} 4K", is_4k=True, is_default=True), (), ())
         for kind in ("radarr", "sonarr")
     ]
+    by_id = {result.tmdb_id: result for result, _ in titles}
     return FakeSeerrClient(
         results=[result for result, _ in titles],
         details={(d.media_type, d.tmdb_id): d for _, d in titles},
+        collections={
+            int(c["id"]): Collection(int(c["id"]), c["name"], tuple(by_id[t] for t in c["parts"]))
+            for c in seed.get("collections", [])
+        },
         user_list=[
             SeerrUser(
                 int(u["id"]), u.get("email", ""), u.get("username", ""), u.get("plex_username", "")

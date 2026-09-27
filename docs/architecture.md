@@ -50,6 +50,8 @@ Tiers come from Discord roles with a per-user override in SQLite. The tool list 
 | `follow_show`      | friend  | Monitors a show in its owning Sonarr so future seasons download; refuses any host but the owner        |
 | `check_availability` | friend | Versions on Plex (1080p, 4K, HEVC re-encode) with size and bitrate, episodes per season, a Plex deep link per copy |
 | `request_status`   | friend  | The friend's open Seerr requests; once approved, the owning host's queue and SABnzbd merged into a percent and ETA, with stalls and failures explained |
+| `find_collection`  | friend  | A movie's TMDB collection as a picker of its entries with availability, led by "all missing" |
+| `request_collection` | friend | One request per missing entry, summed up; refuses up front when the Seerr movie quota can't cover it |
 
 A title's owning host is the one Radarr (by TMDB id) or Sonarr (by TVDB id) that has it, asked of every instance at once (`maester/library.py`). Two owners, or an instance that cannot answer, is a refusal, never a guess.
 

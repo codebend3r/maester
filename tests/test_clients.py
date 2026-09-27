@@ -319,3 +319,18 @@ async def test_arr_queue_reads_stall_messages_and_history_is_typed(fixture):
     assert history.called and failed.event_type == "downloadFailed"
     assert failed.message == "Unpacking failed, write error or disk is full?"
     assert grabbed.event_type == "grabbed" and grabbed.message == ""
+
+
+@respx.mock
+async def test_seerr_collection_parts_in_release_order(fixture):
+    respx.get(f"{BASE}/api/v1/collection/87359").respond(json=fixture("seerr_collection"))
+    collection = await SeerrClient(BASE, "k").collection(87359)
+    assert collection.name == "Mission: Impossible Collection"
+    assert [(p.year, p.status) for p in collection.parts] == [
+        (1996, MediaStatus.AVAILABLE),
+        (2000, MediaStatus.UNKNOWN),
+        (2006, MediaStatus.AVAILABLE),
+        (2011, MediaStatus.PENDING),
+        (2015, MediaStatus.UNKNOWN),
+    ]
+    assert all(p.media_type == "movie" for p in collection.parts)

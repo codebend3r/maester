@@ -5,4 +5,11 @@ registry; `app.build()` does that import. Each module decorates plain
 async functions with `@tool(...)` from `maester.agent.tools`.
 """
 
-from maester.tools import availability, basics, requests, search, status  # noqa: F401
+from maester.tools import (  # noqa: F401
+    availability,
+    basics,
+    collections,
+    requests,
+    search,
+    status,
+)

@@ -592,7 +592,11 @@ class FakeSeerrClient:
             raise ClientError("seerr", "GET", f"/api/v1/{media_type}/{tmdb_id}", 404, "") from None
 
     async def collection(self, collection_id: int) -> Collection:
-        return self.collections[collection_id]
+        try:
+            return self.collections[collection_id]
+        except KeyError:
+            path = f"/api/v1/collection/{collection_id}"
+            raise ClientError("seerr", "GET", path, 404, "") from None
 
     async def create_request(
         self,
