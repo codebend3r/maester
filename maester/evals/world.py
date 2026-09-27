@@ -23,6 +23,7 @@ from maester.clients import (
     FakeWizarrClient,
     Services,
 )
+from maester.clients.plex import PlexItem, PlexSeason, Version
 from maester.clients.seerr import (
     ArrServer,
     MediaDetails,
@@ -101,11 +102,39 @@ def _seerr(seed: dict[str, Any]) -> FakeSeerrClient:
     )
 
 
+def _plex(seed: dict[str, Any]) -> FakePlexClient:
+    items = {
+        str(i["rating_key"]): PlexItem(
+            rating_key=str(i["rating_key"]),
+            title=i["title"],
+            type=i.get("type", "movie"),
+            year=i.get("year"),
+            guids=(),
+            versions=tuple(
+                Version(
+                    resolution=str(v["resolution"]),
+                    video_codec=v.get("codec", "h264"),
+                    bitrate_kbps=int(v.get("bitrate_mbps", 10) * 1000),
+                    size_bytes=int(v.get("size_gb", 10) * 1e9),
+                    file=v.get("file", ""),
+                )
+                for v in i.get("versions", [])
+            ),
+        )
+        for i in seed.get("items", [])
+    }
+    seasons = {
+        str(key): [PlexSeason(int(s["number"]), int(s["episodes"])) for s in rows]
+        for key, rows in seed.get("seasons", {}).items()
+    }
+    return FakePlexClient(items=items, show_seasons=seasons)
+
+
 def build_services(seed: dict[str, Any]) -> Services:
     hosts = seed.get("hosts", ["meleys", "vermithor"])
     return Services(
         seerr=_seerr(seed.get("seerr", {})),
-        plex=FakePlexClient(),
+        plex=_plex(seed.get("plex", {})),
         wizarr=FakeWizarrClient(),
         sonarr={h: FakeSonarrClient(host=h) for h in hosts},
         radarr={h: FakeRadarrClient(host=h) for h in hosts},

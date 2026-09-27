@@ -1,0 +1,18 @@
+name: availability lists versions and links to Plex
+tier: friend
+services:
+  seerr:
+    results:
+      - {tmdb_id: 438631, title: "Dune", year: 2021, media_type: movie, status: 5, rating_key: "4348"}
+  plex:
+    items:
+      - rating_key: "4348"
+        title: "Dune"
+        year: 2021
+        versions:
+          - {resolution: "1080", codec: h264, size_gb: 12.0, bitrate_mbps: 10.2, file: "/Movies/Dune (2021)/Dune (2021) WEBDL-1080p.mkv"}
+          - {resolution: "4k", codec: hevc, size_gb: 21.5, bitrate_mbps: 18.4, file: "/Movies/Dune (2021)/Dune (2021) 2160p HEVC.mkv"}
+turns:
+  - user: "is Dune (2021) on the server?"
+    expect_tools: [check_availability]
+    reply_matches: "app\\.plex\\.tv/desktop/#!/server/"

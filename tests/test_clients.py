@@ -226,7 +226,22 @@ async def test_plex_item_exposes_tmdb_id_and_deep_link(fixture):
     item = await client.item("4348")
     assert item.tmdb_id == 438631
     assert item.files[0].endswith("2160p.mkv")
-    assert client.deep_link("m1", "4348").endswith("details?key=%2Flibrary%2Fmetadata%2F4348")
+    assert [(v.resolution, v.video_codec, v.bitrate_kbps) for v in item.versions] == [
+        ("4k", "hevc", 62103),
+        ("4k", "hevc", 18412),
+        ("1080", "h264", 10240),
+    ]
+    assert item.versions[2].size_bytes == 11_980_000_000
+    assert client.deep_link("m1", "4348") == (
+        "https://app.plex.tv/desktop/#!/server/m1/details?key=%2Flibrary%2Fmetadata%2F4348"
+    )
+
+
+@respx.mock
+async def test_plex_seasons_count_episodes_in_the_library(fixture):
+    respx.get(f"{BASE}/library/metadata/5120/children").respond(json=fixture("plex_children"))
+    seasons = await PlexClient(BASE, "tok").seasons("5120")
+    assert [(s.number, s.episodes) for s in seasons] == [(1, 8), (2, 6)]
 
 
 @respx.mock
