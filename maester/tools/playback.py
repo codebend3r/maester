@@ -113,12 +113,7 @@ async def recent_sessions(ctx: ToolContext) -> dict[str, Any] | Choices:
     "subtitle files next to it: language, codec, title, forced, and for audio whether it is "
     "English. Answers 'does this have Spanish subs?' or 'is this one dubbed?'. For a show, "
     "name the episode.",
-    {
-        "type": "object",
-        "properties": ITEM_PROPERTIES,
-        "required": ITEM_REQUIRED,
-        "additionalProperties": False,
-    },
+    ITEM_SCHEMA,
     tier=Tier.FRIEND,
 )
 async def list_tracks(

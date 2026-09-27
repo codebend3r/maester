@@ -4,7 +4,7 @@
 -- it), and the release group is kept so repeat offenders can be counted.
 --   kind:   wont_play | wrong_title | wrong_episode | cam | hardcoded_subs
 --           | subtitles | audio | other
---   action: advised | replaceable | recorded | escalated | replaced | declined
+--   action: advised | replaceable | recorded | for_admin | escalated | replaced | declined
 ALTER TABLE reports ADD COLUMN title TEXT NOT NULL DEFAULT '';
 ALTER TABLE reports ADD COLUMN is_4k INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE reports ADD COLUMN season INTEGER;

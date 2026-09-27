@@ -133,7 +133,7 @@ async def test_over_the_daily_cap_the_admin_decides(library):
     assert out.approval.notice.startswith(
         "dany asks to replace the 4K copy of Dune (2021) on vermithor (won't play; a file check"
     )
-    assert "Today's 3 replacements are used up" in out.approval.notice
+    assert "The daily cap of 3 replacements is used up" in out.approval.notice
     assert library.services.radarr["vermithor"].deleted == []
     assert library.store.get_report(reported.id).action == Action.ESCALATED
 

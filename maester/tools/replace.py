@@ -95,11 +95,11 @@ def ask_admin(ctx: ToolContext, go: Ready) -> Result:
     where = f"{located.copy} on {located.owner.host}"
     notice = (
         f"{who} asks to replace {where} ({policy_of(go.report).label}; {go.evidence.describe()}). "
-        f"Today's {cap} replacements are used up, so it's your call. File: {located.file.path} "
+        f"The daily cap of {cap} replacements is used up, so it's your call. File: {located.file.path} "
         f"({gigabytes(located.file.size_bytes)})."
     )
     return Result(
-        f"Today's {cap} replacements are used up, so the admin decides on replacing {where}.",
+        f"The daily cap of {cap} replacements is used up, so the admin decides on replacing {where}.",
         approval=Approval(
             notice=notice,
             summary=f"Replace {where} for {who}",

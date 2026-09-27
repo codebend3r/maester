@@ -13,13 +13,15 @@ whether a new copy fixes it:
   `hardcoded_subs`) and `other` have nothing to measure: the friend's word
   is the evidence.
 
-The report is then stored, and its decision made from stored evidence
+The report is then stored and decided (`Action`), from stored evidence
 only (`Evidence`): a replaceable kind whose file failed a health check, or
-that two or more people reported, may be replaced (`replace.py`); anything
-else is recorded. A report the player explains doesn't count as a
-reporter. Every report opens a Seerr issue as the friend, with the
-diagnosis and the decision, so the admin's trail is in a tool they already
-use; resolving it there marks the report resolved (`seerr_events.py`).
+that two or more people reported, may be replaced (`replace.py`); a
+replaceable kind short of that is recorded, and anything else goes to the
+admin. A report the player explains doesn't count as a reporter. How each
+decision reads, to the Seerr issue and to the model, is data (`WORDING`).
+Every report opens a Seerr issue as the friend, with the diagnosis and the
+decision, so the admin's trail is in a tool they already use; resolving it
+there marks the report resolved (`seerr_events.py`).
 """
 
 from __future__ import annotations
@@ -60,7 +62,8 @@ class Action(enum.StrEnum):
 
     ADVISED = "advised"  # a player limit explains it; the friend got the fix
     REPLACEABLE = "replaceable"  # the evidence allows a new copy; offered to the friend
-    RECORDED = "recorded"  # tracked in Seerr, waiting on more evidence or the admin
+    RECORDED = "recorded"  # a new copy would fix it, once the evidence allows one
+    FOR_ADMIN = "for_admin"  # nothing fixes it automatically; the admin was asked
     ESCALATED = "escalated"  # a replacement waits on the admin (over the daily cap)
     REPLACED = "replaced"
     DECLINED = "declined"  # the admin turned the replacement down
@@ -129,15 +132,19 @@ async def player_then_file(
         inspection = await services.probe.inspect(located.file.path)
     except Unreadable as exc:
         inspection, unreadable = None, Health.unreadable(exc)
+    else:
+        unreadable = None
     player, playback = await _last_play(
         services, link, located, inspection.dovi_profile if inspection else None
     )
     causes = client_causes(playback) if playback else ()
     if causes:
         return Diagnosis(player, playback, causes)
-    if inspection is None:
-        return Diagnosis(player, playback, health=unreadable)
-    health = await check_health(services.probe, inspection, at=at, expected=located.runtime)
+    health = (
+        unreadable
+        if inspection is None
+        else await check_health(services.probe, inspection, at=at, expected=located.runtime)
+    )
     return Diagnosis(player, playback, health=health)
 
 
@@ -227,23 +234,43 @@ class Evidence:
 def decide(policy: KindPolicy, diagnosis: Diagnosis, evidence: Evidence) -> Action:
     if diagnosis.causes:
         return Action.ADVISED
-    if policy.replaceable and evidence.proven:
-        return Action.REPLACEABLE
-    return Action.RECORDED
+    if not policy.replaceable:
+        return Action.FOR_ADMIN
+    return Action.REPLACEABLE if evidence.proven else Action.RECORDED
 
 
-def decision_text(action: Action, policy: KindPolicy, evidence: Evidence) -> str:
-    """The decision as the Seerr issue and the admin read it."""
-    if action is Action.ADVISED:
-        return "a player limit explains it; the friend was given the fix"
-    if action is Action.REPLACEABLE:
-        return f"a replacement was offered to the friend ({evidence.describe()})"
-    if policy.replaceable:
-        return (
-            f"recorded ({evidence.describe()}); it can be replaced once a file check fails "
-            "or a second person reports it"
-        )
-    return "recorded for the admin: nothing fixes this automatically yet"
+@dataclass(frozen=True)
+class Wording:
+    """How a decision reads: in the Seerr issue, and as the model's next step.
+
+    `{evidence}`, `{report_id}` and `{host}` are filled in from the report.
+    """
+
+    issue: str
+    next: str
+
+
+WORDING: dict[Action, Wording] = {
+    Action.ADVISED: Wording(
+        "a player limit explains it; the friend was given the fix",
+        "Give them the player fix; offer to look again if it still fails after.",
+    ),
+    Action.REPLACEABLE: Wording(
+        "a replacement was offered to the friend ({evidence})",
+        "Offer a new copy: replace_media with report_id {report_id} and host {host} deletes "
+        "this copy and searches for another once they confirm.",
+    ),
+    Action.RECORDED: Wording(
+        "recorded ({evidence}); it can be replaced once a file check fails or a second "
+        "person reports it",
+        "Tell them it's recorded; the copy is replaced once a file check fails or someone "
+        "else reports it.",
+    ),
+    Action.FOR_ADMIN: Wording(
+        "recorded for the admin: nothing fixes this automatically yet",
+        "Tell them it's recorded and the admin has been asked to fix it.",
+    ),
+}
 
 
 @dataclass(frozen=True)
@@ -257,24 +284,26 @@ class Filed:
     issue: int | str = "not opened yet"  # the Seerr issue, or why none was opened
     notices: tuple[Notice, ...] = ()
 
+    @property
+    def action(self) -> Action:
+        return Action(self.report.action)
+
+    def _fill(self, template: str) -> str:
+        return template.format(
+            evidence=self.evidence.describe(),
+            report_id=self.report.id,
+            host=self.located.owner.host,
+        )
+
+    @property
+    def decision(self) -> str:
+        """The decision as the Seerr issue reads it."""
+        return self._fill(WORDING[self.action].issue)
+
+    @property
     def next_step(self) -> str:
-        """What the model should do with it."""
-        policy, host = policy_of(self.report), self.located.owner.host
-        match Action(self.report.action):
-            case Action.ADVISED:
-                return "Give them the player fix; offer to look again if it still fails after."
-            case Action.REPLACEABLE:
-                return (
-                    f"Offer a new copy: replace_media with report_id {self.report.id} and host "
-                    f"{host} deletes this copy and searches for another once they confirm."
-                )
-            case _ if policy.replaceable:
-                return (
-                    "Tell them it's recorded; the copy is replaced once a file check fails or "
-                    "someone else reports it."
-                )
-            case _:
-                return "Tell them it's recorded and the admin has been asked to fix it."
+        """What the model should do with the report."""
+        return self._fill(WORDING[self.action].next)
 
     def as_dict(self) -> dict[str, Any]:
         reply = {
@@ -284,11 +313,11 @@ class Filed:
             "host": self.located.owner.host,
             "problem": policy_of(self.report).label,
             "diagnosis": self.diagnosis.as_dict(),
-            "decision": self.report.action,
+            "decision": self.action,
             "seerr_issue": self.issue,
-            "next": self.next_step(),
+            "next": self.next_step,
         }
-        if policy_of(self.report).replaceable:
+        if self.action in (Action.REPLACEABLE, Action.RECORDED):
             reply["evidence"] = self.evidence.describe()
         return reply
 
@@ -309,7 +338,7 @@ def issue_message(filed: Filed, reporter: str) -> str:
         lines.append(f"Player: {filed.diagnosis.player}")
     lines += [
         f"Diagnosis: {filed.diagnosis.summary()}",
-        f"Decision: {decision_text(Action(report.action), policy, filed.evidence)}",
+        f"Decision: {filed.decision}",
     ]
     if filed.diagnosis.tracks:
         lines += ["Tracks:", *(f"- {line}" for line in tracks.lines(filed.diagnosis.tracks))]
@@ -335,7 +364,7 @@ async def open_issue(services: Services, link: LinkedUser, filed: Filed) -> int 
 
 
 def admin_notice(filed: Filed, reporter: str) -> AdminPost:
-    """For a problem nothing fixes automatically: the admin is asked."""
+    """For a problem nothing fixes automatically (`FOR_ADMIN`): the admin is asked."""
     report, located = filed.report, filed.located
     issue = f"Seerr issue #{filed.issue}" if isinstance(filed.issue, int) else "The report"
     return AdminPost(
@@ -387,6 +416,6 @@ async def file_report(
     if isinstance(issue, int):
         filed = replace(filed, report=store.update_report(report.id, seerr_issue_id=issue))
     filed = replace(filed, issue=issue)
-    if policy.replaceable:
+    if filed.action is not Action.FOR_ADMIN:
         return filed
     return replace(filed, notices=(admin_notice(filed, link.name),))

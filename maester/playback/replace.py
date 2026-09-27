@@ -12,7 +12,9 @@ be blocklisted isn't deleted and grabbed straight back:
 3. search: the movie, or every episode the file held.
 
 Each step's outcome is kept (`Step`), so the reply, the audit row, the
-admin's notice and the Seerr issue all say exactly what happened.
+admin's notice and the Seerr issue all say exactly what happened. These are
+the mechanics; the guards around them (stored evidence, the friend's
+Confirm, the daily cap, the kill switch) are `maester/tools/replace.py`'s.
 """
 
 from __future__ import annotations

@@ -109,7 +109,7 @@ async def test_wrong_file_reports_take_the_friends_word_and_keep_the_release_gro
 
 async def test_track_problems_list_the_tracks_and_ask_the_admin(library):
     filed = await report(library, DUNE_4K_ITEM, ReportKind.AUDIO, "no English dub")
-    assert filed.report.action == Action.RECORDED and "evidence" not in filed.as_dict()
+    assert filed.report.action == Action.FOR_ADMIN and "evidence" not in filed.as_dict()
     (issue,) = library.services.seerr.issues
     assert issue["issueType"] == ISSUE_AUDIO
     assert 'Tracks:\n- audio: eng truehd 8ch "TrueHD Atmos 7.1" (default)' in issue["message"]
