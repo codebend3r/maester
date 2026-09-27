@@ -50,40 +50,44 @@ class ClientLimit:
         return {"limit": self.name, "cause": self.cause, "fix": self.fix}
 
 
+DOLBY_VISION_PROFILE_7 = ClientLimit(
+    "dolby_vision_profile_7",
+    lambda p: p.dovi_profile == 7 and not any(d in p.hardware for d in DV7_DEVICES),
+    "This copy is Dolby Vision profile 7, a Blu-ray format most players can't show: the "
+    "picture turns purple or green, or it won't start.",
+    "Play the 1080p version, or watch on a player that handles profile 7 (an Nvidia Shield).",
+)
+HEVC_UNSUPPORTED = ClientLimit(
+    "hevc_unsupported",
+    # A stream squeezed to fit a connection transcodes whatever the codec: that's lag.
+    lambda p: p.video_codec == "hevc" and p.video_decision == "transcode" and not p.squeezed,
+    "The player can't decode HEVC (H.265), so the server converts the video on the fly, "
+    "which it can't keep up with.",
+    "Pick the 1080p version, or use the Plex app on a newer device (a TV from 2017 on, an "
+    "Apple TV 4K, a Shield or a recent Roku); web browsers usually can't play HEVC.",
+)
+LOSSLESS_AUDIO_PASSTHROUGH = ClientLimit(
+    "lossless_audio_passthrough",
+    lambda p: p.audio_codec in PASSTHROUGH_AUDIO and p.audio_decision in SENT_AS_IS,
+    "The audio is TrueHD or DTS and the player passes it straight through; a TV or "
+    "soundbar that can't decode it gives no sound or stops the playback.",
+    "In the Plex player's audio settings, turn passthrough off (or limit it to what your "
+    "speakers support), or switch to another audio track.",
+)
+IMAGE_SUBTITLE_BURN_IN = ClientLimit(
+    "image_subtitle_burn_in",
+    lambda p: p.subtitle_decision == "burn" and p.subtitle_codec in IMAGE_SUBTITLES,
+    "The subtitles are pictures (PGS), so the server has to burn them into the video and "
+    "convert all of it, which often stalls.",
+    "Turn subtitles off, or pick a text (SRT) subtitle track if there is one.",
+    # Burning subtitles in forces the video to be transcoded, whatever the player decodes.
+    explains=frozenset({HEVC_UNSUPPORTED.name}),
+)
 CLIENT_LIMITS: tuple[ClientLimit, ...] = (
-    ClientLimit(
-        "dolby_vision_profile_7",
-        lambda p: p.dovi_profile == 7 and not any(d in p.hardware for d in DV7_DEVICES),
-        "This copy is Dolby Vision profile 7, a Blu-ray format most players can't show: the "
-        "picture turns purple or green, or it won't start.",
-        "Play the 1080p version, or watch on a player that handles profile 7 (an Nvidia Shield).",
-    ),
-    ClientLimit(
-        "hevc_unsupported",
-        # A stream squeezed to fit a connection transcodes whatever the codec: that's lag.
-        lambda p: p.video_codec == "hevc" and p.video_decision == "transcode" and not p.squeezed,
-        "The player can't decode HEVC (H.265), so the server converts the video on the fly, "
-        "which it can't keep up with.",
-        "Pick the 1080p version, or use the Plex app on a newer device (a TV from 2017 on, an "
-        "Apple TV 4K, a Shield or a recent Roku); web browsers usually can't play HEVC.",
-    ),
-    ClientLimit(
-        "lossless_audio_passthrough",
-        lambda p: p.audio_codec in PASSTHROUGH_AUDIO and p.audio_decision in SENT_AS_IS,
-        "The audio is TrueHD or DTS and the player passes it straight through; a TV or "
-        "soundbar that can't decode it gives no sound or stops the playback.",
-        "In the Plex player's audio settings, turn passthrough off (or limit it to what your "
-        "speakers support), or switch to another audio track.",
-    ),
-    ClientLimit(
-        "image_subtitle_burn_in",
-        lambda p: p.subtitle_decision == "burn" and p.subtitle_codec in IMAGE_SUBTITLES,
-        "The subtitles are pictures (PGS), so the server has to burn them into the video and "
-        "convert all of it, which often stalls.",
-        "Turn subtitles off, or pick a text (SRT) subtitle track if there is one.",
-        # Burning subtitles in forces the video to be transcoded, whatever the player decodes.
-        explains=frozenset({"hevc_unsupported"}),
-    ),
+    DOLBY_VISION_PROFILE_7,
+    HEVC_UNSUPPORTED,
+    LOSSLESS_AUDIO_PASSTHROUGH,
+    IMAGE_SUBTITLE_BURN_IN,
 )
 
 

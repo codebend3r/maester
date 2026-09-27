@@ -9,7 +9,7 @@ from tests.factories import history_row, session
 
 CLEAN = Playback(
     platform="Roku", product="Plex for Roku", player="Living Room", device="Roku Ultra",
-    container="mkv", quality_profile="Original", video_codec="hevc",
+    container="mkv", quality_profile="Original", transcode_decision="direct play", video_codec="hevc",
     video_decision="direct play", dovi_profile=0, audio_codec="eac3",
     audio_decision="direct play", subtitle_codec="", subtitle_decision="", location="lan",
     relayed=False, bitrate_kbps=20000, source_bitrate_kbps=20000, transcode_speed=None,

@@ -1,7 +1,7 @@
 from maester.agent.tools import Tier, registry
 from maester.clients import ClientError
 from maester.clients.speedtest import SpeedResult
-from maester.tools.lag import server_status, speed_test
+from maester.tools.lag import server_status, session_report, speed_test
 from tests.factories import session
 
 
@@ -61,3 +61,53 @@ async def test_speed_test_refuses_when_it_fails_or_isnt_set_up(ctx):
     ctx.services.speedtest = None
     missing = await speed_test(ctx, "meleys")
     assert missing.is_error and "SPEEDTEST_HOST" in missing.content
+
+
+async def test_session_report_needs_their_tautulli_account(ctx):
+    out = await session_report(ctx)
+    assert out.is_error and "isn't matched to a Tautulli user" in out.content
+
+
+async def test_session_report_with_nothing_playing(ctx):
+    ctx.store.upsert_user("d1", tautulli_user_id=7)
+    ctx.services.tautulli["meleys"].sessions = [session(user_id=8)]  # someone else's
+    out = await session_report(ctx)
+    assert out["streams"] == [] and out["note"].startswith("Nothing is playing for them")
+
+
+async def test_session_report_gives_one_fix_and_the_details_on_request(ctx):
+    ctx.store.upsert_user("d1", tautulli_user_id=7)
+    ctx.services.tautulli["vermithor"].sessions = [
+        session(user_id=7, relayed=True, quality_profile="2 Mbps 720p", stream_bitrate_kbps=1800,
+                transcode_decision="transcode", video_decision="transcode"),
+    ]  # fmt: skip
+    ctx.services.tautulli["meleys"] = Down()
+    out = await session_report(ctx)
+    (brief,) = out["streams"]
+    assert brief["host"] == "vermithor" and brief["advice"]["fix"] == "avoid_relay"
+    assert "relayed through Plex, which carries at most 2 Mbps" in brief["stream"]
+    assert "playback" not in brief and "details=true" in out["note"]
+    speed, down = sorted(out["notes"])
+    assert "speed_test(host=meleys)" in speed and down.startswith(
+        "couldn't reach Tautulli on meleys"
+    )
+
+    detailed = await session_report(ctx, details=True)
+    (stream,) = detailed["streams"]
+    assert stream["findings"][0]["fix"] == "avoid_relay" and stream["playback"]["relayed"]
+    assert "note" not in detailed
+
+
+async def test_session_report_uses_a_recent_speed_test(ctx):
+    ctx.store.upsert_user("d1", tautulli_user_id=7)
+    ctx.services.tautulli["vermithor"].sessions = [
+        session(user_id=7, stream_bitrate_kbps=8000, source_bitrate_kbps=8000)
+    ]
+    ctx.services.speedtest.result = SpeedResult(2.5, 300.0, 9.0, "Bell", "Bell", "u")
+    await speed_test(ctx, "meleys")
+    (brief,) = (await session_report(ctx))["streams"]
+    assert (
+        brief["advice"]["fix"] == "lower_quality"
+        and "only 2.5 Mbps free" in brief["advice"]["cause"]
+    )
+    assert "notes" not in await session_report(ctx)

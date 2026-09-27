@@ -25,7 +25,7 @@ from typing import Any
 
 from maester.clients import Services
 from maester.clients.speedtest import SpeedResult, SpeedTester, SpeedTestFailed
-from maester.formatting import humanized
+from maester.formatting import humanized, megabits
 from maester.memo import Memo
 from maester.perf.load import mbps, read_loads
 
@@ -59,9 +59,9 @@ class Uplink:
         return self.spare_kbps < HD_STREAM_KBPS
 
     def headroom(self) -> str:
-        spare = mbps(self.spare_kbps)
+        spare = megabits(self.spare_kbps)
         alongside = (
-            f"alongside {mbps(self.streaming_kbps)} Mbps of remote streams"
+            f"alongside {megabits(self.streaming_kbps)} Mbps of remote streams"
             if self.streaming_kbps
             else "with no remote streams running"
         )

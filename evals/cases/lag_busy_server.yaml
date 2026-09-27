@@ -1,0 +1,16 @@
+name: lag on a busy server means waiting for it
+tier: friend
+services:
+  user: {tautulli_user_id: 8008135}
+  fleet:
+    vermithor: {cpu: 97, memory: 62}
+  tautulli:
+    vermithor:
+      sessions:
+        - {rating_key: "4348", title: "Dune", bitrate_mbps: 10}
+        - {rating_key: "7001", title: "Oppenheimer", user_id: 99, transcode_decision: transcode, video_decision: transcode, transcode_speed: 0.6}
+        - {rating_key: "7002", title: "The Bear - Forks", user_id: 98, transcode_decision: transcode, video_decision: transcode, transcode_speed: 0.5}
+turns:
+  - user: "why is Dune so laggy right now?"
+    expect_tools: [session_report]
+    reply_matches: "busy|wait"

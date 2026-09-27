@@ -1,0 +1,15 @@
+name: lag advice comes first and the stats only when asked
+tier: friend
+services:
+  user: {tautulli_user_id: 8008135}
+  tautulli:
+    meleys:
+      sessions:
+        - {rating_key: "4348", title: "Dune", location: wan, quality_profile: "4 Mbps 720p", bitrate_mbps: 4, source_mbps: 10.2, transcode_decision: transcode, video_decision: transcode, transcode_speed: 0.6}
+turns:
+  - user: "my stream of Dune keeps stuttering"
+    expect_tools: [session_report]
+    reply_matches: "Original|Maximum"
+  - user: "show me the details"
+    expect_tools: [session_report]
+    reply_matches: "Mbps|transcod|convert"

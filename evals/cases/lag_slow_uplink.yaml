@@ -1,0 +1,16 @@
+name: remote lag on a full upload is found by a speed test and fixed by lowering quality
+tier: friend
+services:
+  user: {tautulli_user_id: 8008135}
+  speedtest: {host: meleys, upload_mbps: 2.5}
+  tautulli:
+    meleys:
+      sessions:
+        - {rating_key: "4348", title: "Dune", location: wan, bitrate_mbps: 8}
+    vermithor:
+      sessions:
+        - {rating_key: "7001", title: "Oppenheimer", user_id: 99, location: wan, bitrate_mbps: 12}
+turns:
+  - user: "Dune keeps buffering at my parents' place. Is it the server's internet? Check the upload."
+    expect_tools: [session_report, speed_test]
+    reply_matches: "upload|quality|Mbps"

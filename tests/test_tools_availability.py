@@ -4,7 +4,8 @@ from maester.clients.arr import MediaFile
 from maester.clients.plex import PlexItem, PlexSeason, Version
 from maester.clients.seerr import ANIME_KEYWORD, MediaDetails, MediaStatus, Season
 from maester.clients.sonarr import Series
-from maester.tools.availability import check_availability, version_label
+from maester.perf.versions import version_name
+from maester.tools.availability import check_availability
 
 S = MediaStatus
 LINK = "https://app.plex.tv/desktop/#!/server/fake-machine/details?key=%2Flibrary%2Fmetadata%2F"
@@ -122,14 +123,12 @@ async def test_anime_reports_english_audio_per_season(ctx):
 
 
 def test_version_labels_only_call_the_servers_own_encode_a_re_encode():
-    assert version_label(version("4k", "hevc", 1, 1, "/m/Dune (2021) 2160p HEVC.mkv")) == (
+    assert version_name(version("4k", "hevc", 1, 1, "/m/Dune (2021) 2160p HEVC.mkv")) == (
         "4K HEVC re-encode"
     )
-    assert (
-        version_label(version("4k", "hevc", 1, 1, "/m/Dune (2021) Bluray-2160p HEVC.mkv")) == "4K"
-    )
-    assert version_label(version("1080", "h264", 1, 1, "/m/a.mkv")) == "1080p"
-    assert version_label(version("sd", "mpeg2", 1, 1, "/m/b.avi")) == "SD"
+    assert version_name(version("4k", "hevc", 1, 1, "/m/Dune (2021) Bluray-2160p HEVC.mkv")) == "4K"
+    assert version_name(version("1080", "h264", 1, 1, "/m/a.mkv")) == "1080p"
+    assert version_name(version("sd", "mpeg2", 1, 1, "/m/b.avi")) == "SD"
 
 
 async def test_a_stale_plex_key_leaves_that_copy_out(ctx):

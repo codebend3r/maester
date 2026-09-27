@@ -1,4 +1,10 @@
-"""Why things are slow: how busy the servers are, and how much upload is left.
+"""Why things are slow: the friend's stream, how busy the servers are, how much upload is left.
+
+`session_report` reads the friend's live streams on every host and gives one
+fix each (`maester/perf/lag.py`): what the stream is doing in a line (how it
+plays, where, its bitrate, Plex's relay, the app and player, the server
+sending it) and the advice. The stats behind it come only when asked
+(`details`), so the reply is a fix, not a wall of numbers.
 
 `server_status` reads every Plex host's load at once (`maester/perf/load.py`):
 its streams, conversions and bandwidth from Tautulli, CPU and memory from the
@@ -16,7 +22,65 @@ from typing import Any
 
 from maester.agent.tools import Result, Tier, ToolContext, tool
 from maester.perf import uplink
+from maester.perf.lag import diagnose, live_streams
 from maester.perf.load import read_loads
+
+NOTHING_PLAYING = (
+    "Nothing is playing for them on any server right now. Ask them to start it and tell you "
+    "once it stutters; server_status says whether the servers are busy."
+)
+IN_BRIEF = (
+    "Tell them the advice in a sentence or two, without the stats. If they ask for the "
+    "details, call session_report with details=true."
+)
+
+
+@tool(
+    "session_report",
+    "What the user's stream is doing right now, and the one fix for lag or stutter. For each "
+    "of their live streams: the server sending it, how it plays (direct play, direct stream "
+    "or transcode), over the home network or the internet, its bitrate, whether Plex relays "
+    "it (at most 2 Mbps), the app and player, and `advice`: the cause and what to do. Reply "
+    "with the advice, not the stats; with details=true it adds every finding and the numbers "
+    "behind them, for when they ask.",
+    {
+        "type": "object",
+        "properties": {
+            "details": {
+                "type": "boolean",
+                "description": "Every finding and the stats behind them, when they ask.",
+            }
+        },
+        "additionalProperties": False,
+    },
+    tier=Tier.FRIEND,
+)
+async def session_report(ctx: ToolContext, details: bool = False) -> dict[str, Any] | Result:
+    link = ctx.linked_user()
+    if link.tautulli_user_id is None:
+        return Result.refusal(
+            "Their Plex account isn't matched to a Tautulli user, so their stream can't be found."
+        )
+    loads = await read_loads(ctx.services)
+    tester = ctx.services.speedtest
+    measured = uplink.recent(ctx.memo, tester)
+    streams = await live_streams(ctx.services, loads.hosts, link.tautulli_user_id, measured)
+    found = [diagnose(stream) for stream in streams]
+    reply: dict[str, Any] = {"streams": [d.details() if details else d.brief() for d in found]}
+    if not streams:
+        reply["note"] = NOTHING_PLAYING
+    elif not details:
+        reply["note"] = IN_BRIEF
+    notes = [f"couldn't reach Tautulli on {h}: {why}" for h, why in loads.unreachable.items()]
+    if tester is not None and measured is None and any(s.playback.remote for s in streams):
+        notes.append(
+            "The servers' upload hasn't been tested in the last 10 minutes. If the advice "
+            f"doesn't settle it, speed_test(host={tester.host}) checks it; then call "
+            "session_report again."
+        )
+    if notes:
+        reply["notes"] = notes
+    return reply
 
 
 @tool(

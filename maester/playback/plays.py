@@ -49,6 +49,7 @@ class Playback:
     device: str  # the hardware, from a live session; empty for a finished play
     container: str
     quality_profile: str  # "Original", or the lower quality the player asked for
+    transcode_decision: str  # overall: "direct play" | "copy" (direct stream) | "transcode"
     video_codec: str
     video_decision: str  # "direct play" | "copy" | "transcode"
     dovi_profile: int | None  # the file's Dolby Vision profile: 0 for none, None if unknown
@@ -74,6 +75,7 @@ class Playback:
             device=s.device,
             container=s.container,
             quality_profile=s.quality_profile,
+            transcode_decision=s.transcode_decision,
             video_codec=s.video_codec,
             video_decision=s.video_decision,
             dovi_profile=s.dovi_profile,
@@ -101,6 +103,7 @@ class Playback:
             device="",
             container=stream.container,
             quality_profile=stream.quality_profile,
+            transcode_decision=row.transcode_decision,
             video_codec=stream.video_codec,
             video_decision=stream.video_decision,
             dovi_profile=None,

@@ -23,8 +23,8 @@ class Clock:
 @pytest.mark.parametrize(
     ("upload", "streaming", "said"),
     [
-        (40.0, 12000, "Plenty of room: about 40.0 Mbps of upload is free alongside 12.0 Mbps of remote streams."),
-        (10.0, 0, "Some room: about 10.0 Mbps of upload is free with no remote streams running, enough for another HD stream."),
+        (40.0, 12000, "Plenty of room: about 40 Mbps of upload is free alongside 12 Mbps of remote streams."),
+        (10.0, 0, "Some room: about 10 Mbps of upload is free with no remote streams running, enough for another HD stream."),
         (3.2, 18500, "The upload is nearly full: only about 3.2 Mbps is free alongside 18.5 Mbps of remote streams"),
     ],
 )  # fmt: skip

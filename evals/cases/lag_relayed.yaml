@@ -1,0 +1,12 @@
+name: a relayed stream is called out with the relay's cap and one fix
+tier: friend
+services:
+  user: {tautulli_user_id: 8008135}
+  tautulli:
+    vermithor:
+      sessions:
+        - {rating_key: "4348", title: "Dune", location: wan, relayed: true, quality_profile: "2 Mbps 720p", bitrate_mbps: 1.8, source_mbps: 10.2, transcode_decision: transcode, video_decision: transcode, transcode_speed: 2.1}
+turns:
+  - user: "Dune keeps buffering on my phone at my girlfriend's place, it's unwatchable"
+    expect_tools: [session_report]
+    reply_matches: "relay"

@@ -251,11 +251,13 @@ def _sonarr(host: str, seed: dict[str, Any]) -> FakeSonarrClient:
 
 
 def _session(n: int, x: dict[str, Any], user_id: int) -> Session:
-    """One of the eval user's live sessions; unset fields read as a direct-played 1080p file."""
+    """A live session, the eval user's unless it names another `user_id`; unset fields read
+    as a 1080p file direct-played on the home network. Bitrates are in Mbps."""
     direct = "direct play"
+    bitrate = int(x.get("bitrate_mbps", 20) * 1000)
     return Session(
         session_key=str(n),
-        user_id=user_id,
+        user_id=int(x.get("user_id", user_id)),
         user="eval",
         rating_key=str(x["rating_key"]),
         full_title=x["title"],
@@ -265,11 +267,11 @@ def _session(n: int, x: dict[str, Any], user_id: int) -> Session:
         platform=x.get("platform", "Roku"),
         player=x.get("player", "Living Room"),
         product=x.get("product", "Plex for Roku"),
-        location="lan",
-        relayed=False,
+        location=x.get("location", "lan"),
+        relayed=bool(x.get("relayed", False)),
         secure=True,
-        bandwidth_kbps=20000,
-        stream_bitrate_kbps=20000,
+        bandwidth_kbps=bitrate,
+        stream_bitrate_kbps=bitrate,
         transcode_decision=x.get("transcode_decision", direct),
         video_decision=x.get("video_decision", direct),
         audio_decision=x.get("audio_decision", direct),
@@ -281,12 +283,15 @@ def _session(n: int, x: dict[str, Any], user_id: int) -> Session:
         audio_codec=x.get("audio_codec", "eac3"),
         audio_channels=6,
         subtitle_codec=x.get("subtitle_codec", ""),
-        quality_profile="Original",
-        file="",
+        quality_profile=x.get("quality_profile", "Original"),
+        file=x.get("file", ""),
         show_key=str(x.get("show_key", "")),
         season=x.get("season"),
         episode=x.get("episode"),
         dovi_profile=int(x.get("dovi_profile", 0)),
+        source_bitrate_kbps=int(x.get("source_mbps", x.get("bitrate_mbps", 20)) * 1000),
+        transcode_speed=float(x.get("transcode_speed", 0)),
+        transcode_throttled=bool(x.get("throttled", False)),
     )
 
 

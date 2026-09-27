@@ -1,0 +1,14 @@
+name: the server's load is read per host and said to be the likely cause
+tier: friend
+services:
+  fleet:
+    vermithor: {cpu: 96, memory: 70}
+    meleys: {cpu: 14, memory: 50}
+  tautulli:
+    vermithor:
+      sessions:
+        - {rating_key: "7001", title: "Oppenheimer", user_id: 99, transcode_decision: transcode, video_decision: transcode, transcode_speed: 0.6}
+turns:
+  - user: "is the server busy right now? everything feels slow"
+    expect_tools: [server_status]
+    reply_matches: "busy|vermithor"

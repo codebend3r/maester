@@ -1,4 +1,4 @@
-"""How durations and sizes read to people, shared by every tool that says them."""
+"""How durations, sizes and speeds read to people, shared by every tool that says them."""
 
 from __future__ import annotations
 
@@ -17,3 +17,8 @@ def humanized(seconds: int) -> str:
 
 def gigabytes(size: int) -> str:
     return f"{size / 1e9:.1f} GB"
+
+
+def megabits(kbps: int) -> str:
+    """A bitrate in kbps as Mbps in words: "2", "10.2"."""
+    return f"{round(kbps / 1000, 1):g}"
