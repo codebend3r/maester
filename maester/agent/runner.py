@@ -23,6 +23,8 @@ from typing import Any
 
 from maester.agent.limits import KillSwitch
 from maester.agent.tools import (
+    Choice,
+    Choices,
     Tier,
     ToolContext,
     ToolRegistry,
@@ -42,15 +44,19 @@ class ToolOutcome:
     content: Any
     is_error: bool = False
     pending_id: int | None = None
+    choices: tuple[Choice, ...] = ()
+
+    @property
+    def text(self) -> str:
+        if isinstance(self.content, str):
+            return self.content
+        return json.dumps(self.content, default=str)
 
     def as_result_block(self, tool_use_id: str) -> dict[str, Any]:
-        content = (
-            self.content if isinstance(self.content, str) else json.dumps(self.content, default=str)
-        )
         block: dict[str, Any] = {
             "type": "tool_result",
             "tool_use_id": tool_use_id,
-            "content": content,
+            "content": self.text,
         }
         if self.is_error:
             block["is_error"] = True
@@ -118,7 +124,10 @@ class ToolRunner:
         started = time.monotonic()
         try:
             result = await spec.handler(ctx, **args)
-            outcome = ToolOutcome(result)
+            if isinstance(result, Choices):
+                outcome = ToolOutcome(result.as_content(), choices=tuple(result.items))
+            else:
+                outcome = ToolOutcome(result)
         except Exception as exc:  # a tool failing must not take the turn down
             log.exception("tool %s failed", name)
             outcome = ToolOutcome(f"{type(exc).__name__}: {exc}", is_error=True)

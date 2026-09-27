@@ -2,7 +2,7 @@ import pytest
 
 from maester.agent.limits import KillSwitch
 from maester.agent.runner import CONFIRMED_KEY, ToolRunner
-from maester.agent.tools import Tier, ToolContext, ToolRegistry
+from maester.agent.tools import Choice, Choices, Tier, ToolContext, ToolRegistry
 from maester.store import Store
 
 SCHEMA = {
@@ -25,6 +25,10 @@ def setup():
     async def echo(ctx, x):
         calls.append(("echo", x))
         return {"echoed": x}
+
+    @reg.tool("pick", "offers options", {"type": "object", "properties": {}})
+    async def pick(ctx):
+        return Choices([Choice("Dune", "438631", 2021)])
 
     @reg.tool("boom", "fails", {"type": "object", "properties": {}})
     async def boom(ctx):
@@ -56,6 +60,13 @@ async def test_runs_and_audits_a_plain_tool(setup):
         "tool_use_id": "t1",
         "content": '{"echoed": "hi"}',
     }
+
+
+async def test_choices_result_is_typed_for_the_chat_and_serialized_for_the_model(setup):
+    runner, ctx, *_ = setup
+    out = await runner.run(ctx, "pick", {})
+    assert out.choices == (Choice("Dune", "438631", 2021),)
+    assert '"value": "438631"' in out.text and "buttons" in out.text
 
 
 async def test_out_of_tier_and_unknown_tools_are_rejected_and_audited(setup):

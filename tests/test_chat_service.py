@@ -4,9 +4,9 @@ import pytest
 
 from maester.agent.loop import Agent
 from maester.agent.runner import ToolRunner
-from maester.agent.tools import Tier, ToolRegistry
+from maester.agent.tools import Choice, Choices, Tier, ToolRegistry
 from maester.chat.identity import IdentityService, RoleMap
-from maester.chat.service import UNLINKED_HELP, ChatService, ChatUser, Choice
+from maester.chat.service import UNLINKED_HELP, ChatService, ChatUser
 from maester.clients import FakeSeerrClient
 from maester.clients.seerr import SeerrUser
 from maester.store import Store
@@ -27,17 +27,12 @@ def world():
         "search_media", "search", {"type": "object", "properties": {"query": {"type": "string"}}}
     )
     async def search(ctx, query=""):
-        return {
-            "choices": [
-                {
-                    "label": "Dune",
-                    "value": "438631",
-                    "year": 2021,
-                    "poster_url": "https://image.tmdb.org/t/p/w92/dune.jpg",
-                },
-                {"label": "Dune", "value": "841", "year": 1984},
+        return Choices(
+            [
+                Choice("Dune", "438631", 2021, "https://image.tmdb.org/t/p/w92/dune.jpg"),
+                Choice("Dune", "841", 1984),
             ]
-        }
+        )
 
     @reg.tool(
         "replace_media",

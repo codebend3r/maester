@@ -2,7 +2,8 @@ from types import SimpleNamespace
 
 import discord
 
-from maester.chat.service import ChatResponse, Choice
+from maester.agent.tools import Choice
+from maester.chat.service import ChatResponse
 from maester.chat.views import ChoiceView, resolve_chat_user, send_response
 
 

@@ -9,16 +9,14 @@ messages and views; tests drive this class directly.
 
 from __future__ import annotations
 
-import json
 import logging
 import secrets
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-from maester.agent.loop import STORED_RESULT_MAX_CHARS, Agent, estimate_tokens
-from maester.agent.runner import CONFIRMED_KEY, ToolOutcome
-from maester.agent.tools import Tier, ToolContext
+from maester.agent.loop import Agent
+from maester.agent.tools import Choice, Tier
 from maester.chat.identity import IdentityService
 from maester.chat.split import split_reply
 from maester.store import PendingAction, Store
@@ -41,20 +39,6 @@ class ChatUser:
     id: str
     name: str
     role_ids: frozenset[int] = frozenset()
-
-
-@dataclass(frozen=True)
-class Choice:
-    label: str
-    value: str
-    year: int | None = None
-    poster_url: str | None = None
-
-    @property
-    def display(self) -> str:
-        if self.year and str(self.year) not in self.label:
-            return f"{self.label} ({self.year})"
-        return self.label
 
 
 @dataclass
@@ -103,12 +87,11 @@ class ChatService:
             return ChatResponse(chunks=[ERROR_REPLY.format(ref=ref)], tier=tier)
 
         confirmations = [p for p in (self.store.get_pending(i) for i in reply.pending_ids) if p]
-        choices = [
-            Choice(c["label"], c.get("value", c["label"]), c.get("year"), c.get("poster_url"))
-            for c in reply.choices[:MAX_CHOICES]
-        ]
         return ChatResponse(
-            chunks=split_reply(reply.text), confirmations=confirmations, choices=choices, tier=tier
+            chunks=split_reply(reply.text),
+            confirmations=confirmations,
+            choices=reply.choices[:MAX_CHOICES],
+            tier=tier,
         )
 
     async def pick(self, user: ChatUser, choice: Choice) -> ChatResponse:
@@ -125,18 +108,8 @@ class ChatService:
         if self.store.decide_pending(pending_id, "approved", presser.id) is None:
             return "That confirmation expired; ask again."
         tier = self.identity.tier_for(presser.id, set(presser.role_ids))
-        ctx = ToolContext(
-            user_id=presser.id, tier=tier, services=self.agent.services, store=self.store
-        )
-        outcome = await self.agent.runner.run(
-            ctx, pending.action, {**pending.payload, CONFIRMED_KEY: pending_id}
-        )
-        content = (
-            outcome.content
-            if isinstance(outcome.content, str)
-            else json.dumps(outcome.content, default=str)
-        )
-        self._remember_button(presser.id, pending, outcome)
+        outcome = await self.agent.resolve_confirmation(presser.id, tier, pending, approved=True)
+        content = outcome.text
         if self.notify_admin:
             await self.notify_admin(
                 f"{presser.name} confirmed: {pending.summary}\n{content[:500]}", None
@@ -150,28 +123,9 @@ class ChatService:
         if pending.requester != presser.id:
             return "Only the person who asked can cancel this."
         self.store.decide_pending(pending_id, "denied", presser.id)
-        self._remember_button(
-            presser.id, pending, ToolOutcome("Cancelled by the user; nothing was done.")
-        )
+        tier = self.identity.tier_for(presser.id, set(presser.role_ids))
+        await self.agent.resolve_confirmation(presser.id, tier, pending, approved=False)
         return "Cancelled."
-
-    def _remember_button(self, user_id: str, pending: PendingAction, outcome: ToolOutcome) -> None:
-        """Record a button press as a tool call and its result in the user's memory.
-
-        The model's own call only got a "waiting for confirmation" result, so
-        the real outcome goes in as a fresh tool_use/tool_result pair; the next
-        turn sees what happened the same way it sees any other tool.
-        """
-        tool_use = {
-            "type": "tool_use",
-            "id": f"toolu_button_{pending.id}",
-            "name": pending.action,
-            "input": pending.payload,
-        }
-        result = outcome.as_result_block(tool_use["id"])
-        result["content"] = result["content"][:STORED_RESULT_MAX_CHARS]
-        self.store.append_message(user_id, "assistant", [tool_use], estimate_tokens(tool_use))
-        self.store.append_message(user_id, "user", [result], estimate_tokens(result))
 
     # -- commands ---------------------------------------------------------
 

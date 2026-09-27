@@ -13,7 +13,8 @@ from collections.abc import Sequence
 
 import discord
 
-from maester.chat.service import ChatResponse, ChatService, ChatUser, Choice
+from maester.agent.tools import Choice
+from maester.chat.service import ChatResponse, ChatService, ChatUser
 from maester.chat.split import split_reply
 
 CONFIRM_TIMEOUT = 5 * 60
