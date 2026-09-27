@@ -13,10 +13,11 @@ import json
 import sqlite3
 from collections.abc import Iterable
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 from maester.media import Copy, Decision, ReportKind, ReportStatus
-from maester.store.base import Database, now
+from maester.store.base import Database, now, stamp
 
 
 @dataclass(frozen=True)
@@ -121,6 +122,16 @@ class Reports(Database):
             rows = self._conn.execute(
                 "SELECT * FROM reports WHERE host = ? AND media_type = ? AND file_id = ? ORDER BY id",
                 (host, media_type, file_id),
+            ).fetchall()
+        return [self._report(r) for r in rows]
+
+    def file_reports_since(self, since: datetime) -> list[ReportRow]:
+        """Reports since `since` that count against their file: all but those a player
+        limit explained, where the file was fine."""
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT * FROM reports WHERE ts >= ? AND decision != ? ORDER BY id",
+                (stamp(since), Decision.ADVISED),
             ).fetchall()
         return [self._report(r) for r in rows]
 

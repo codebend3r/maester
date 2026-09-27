@@ -177,6 +177,7 @@ def admin_notice(
         head,
         f"Reason: {POLICIES[report.kind].label}; {evidence.describe()}. "
         f"Reported by {', '.join(sorted(reporters))}.",
+        f"Release group: {report.release_group or 'unknown'}.",
         *(s.line for s in replacement.steps),
     ]
     if report.seerr_issue_id:
