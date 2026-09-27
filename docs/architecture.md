@@ -43,7 +43,7 @@ Tiers come from Discord roles with a per-user override in SQLite. The tool list 
 
 | Tool               | Tier    | What it does                                                                                              |
 | ------------------ | ------- | --------------------------------------------------------------------------------------------------------- |
-| `server_status`    | friend  | Streams, transcodes and bandwidth per host                                                                |
+| `server_status`    | friend  | Each host's load: streams, transcodes (and any running slower than playback), bandwidth, remote and relayed streams, CPU and memory from the fleet monitor; says whether load could be why things are slow |
 | `search_media`     | friend  | Seerr (TMDB) search; several plausible matches become a picker labeled with availability                |
 | `request_media`    | friend  | 1080p request as the friend (`X-API-User`); for shows, seasons already there are left out and listed    |
 | `request_media_4k` | trusted | 4K request as the friend; if Seerr leaves it pending, the admin approves or declines it with buttons    |
@@ -142,6 +142,13 @@ A report is one model (`maester/playback/`) about a `Copy` (`maester/media.py`, 
 ### File access
 
 There is no filesystem tool. The health check and `list_tracks` name a title and copy; the path always comes from the owning arr's file record, and `MediaPaths` maps it onto the container's read-only mounts (`MEDIA_PATH_MAP`, for arrs that see the shares under other names) and refuses anything that resolves outside `MEDIA_ROOTS`, symlinks and `..` included. `MEDIA_ROOTS` itself refuses `/` and relative paths, and a decode checks its path against the roots again. ffprobe and ffmpeg run without a shell as async subprocesses, each capped by `PROBE_TIMEOUT_SECONDS` and two at a time, with the path passed as `file:<path>`; a process whose asker was cancelled is killed.
+
+## Performance diagnostics
+
+"It's laggy" is answered from live data, not guesses (`maester/perf/`).
+
+- **Server load.** `server_status` reads every Plex host's Tautulli at once, with the fleet monitor, and a host that can't answer is named rather than hiding the rest (`perf/load.py`). A host is busy when a conversion (a transcode) runs slower than playback without being throttled (a throttled transcoder is ahead and resting), which is the one direct sign a server can't keep up whatever its hardware, or when its CPU reaches `BUSY_CPU_PERCENT` (85) or its memory `BUSY_MEMORY_PERCENT` (90). The reply says whether load is a plausible cause.
+- **Fleet monitor.** CPU and memory per NAS come from wizteros' fleet monitor (`clients/fleet.py`), only when `FLEET_MONITOR_URL` and its sign-in are set; without it, load rests on Tautulli alone and says CPU and memory are unknown. Every monitor route but `/health` wants a Supabase session (an ES256 bearer, audience `authenticated`) whose email is on the monitor's `FM_ADMIN_ALLOWED_EMAILS`, so maester signs in with Supabase Auth's password grant as an account of its own, the way the admin portal does; the monitor itself doesn't change. The token is renewed shortly before it expires (one sign-in however many reads ask at once), and a 401 signs in once more. A host's vitals are the last reading of the past five minutes, so a host the collector hasn't reached lately has none rather than an old number.
 
 ## Storage
 

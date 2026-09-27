@@ -6,11 +6,13 @@ no policy; that lives in the tools. Every client has a `Fake*` sibling with
 the same methods over in-memory data, so tools and evals run without a stack.
 `Services` is the bag of clients the app hands every tool, real or fake;
 `probe` reads the media files themselves, with ffprobe on the read-only mount.
+The fleet monitor is optional: `fleet` is None where it isn't set up.
 """
 
 from dataclasses import dataclass
 
 from maester.clients.base import ClientError, HttpClient
+from maester.clients.fleet import FakeFleetMonitor, FleetMonitor, FleetMonitorClient
 from maester.clients.media import FakeFileProbe, FileProbe, MediaProbe
 from maester.clients.plex import FakePlexClient, Plex, PlexClient
 from maester.clients.radarr import FakeRadarrClient, Radarr, RadarrClient
@@ -33,11 +35,13 @@ class Services:
     sabnzbd: dict[str, Sabnzbd]
     tautulli: dict[str, Tautulli]
     probe: MediaProbe
+    fleet: FleetMonitor | None  # CPU and memory per NAS; None when not set up
 
 
 __all__ = [
     "ClientError",
     "FakeFileProbe",
+    "FakeFleetMonitor",
     "FakePlexClient",
     "FakeRadarrClient",
     "FakeSabnzbdClient",
@@ -46,6 +50,7 @@ __all__ = [
     "FakeTautulliClient",
     "FakeWizarrClient",
     "FileProbe",
+    "FleetMonitorClient",
     "HttpClient",
     "PlexClient",
     "RadarrClient",

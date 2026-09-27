@@ -1,6 +1,6 @@
 import pytest
 
-from maester.config import MissingConfig, Settings, load_settings, require
+from maester.config import FleetMonitorAccess, MissingConfig, Settings, load_settings, require
 
 
 def test_defaults_when_env_is_empty():
@@ -58,3 +58,22 @@ def test_require_names_every_missing_variable_at_once():
 
 def test_require_passes_when_all_present():
     require({"A": "1"}, "A")
+
+
+FLEET = {
+    "FLEET_MONITOR_URL": "http://192.168.50.2:8010/",
+    "FLEET_MONITOR_SUPABASE_URL": "https://proj.supabase.co/",
+    "FLEET_MONITOR_SUPABASE_KEY": "anon",
+    "FLEET_MONITOR_EMAIL": " maester@example.com ",
+    "FLEET_MONITOR_PASSWORD": "pw",
+}
+
+
+def test_the_fleet_monitor_is_optional_but_whole_once_named():
+    assert load_settings({}).fleet_monitor is None
+    assert load_settings(FLEET).fleet_monitor == FleetMonitorAccess(
+        "http://192.168.50.2:8010", "https://proj.supabase.co", "anon", "maester@example.com", "pw"
+    )
+    with pytest.raises(MissingConfig) as exc:
+        load_settings({**FLEET, "FLEET_MONITOR_EMAIL": "", "FLEET_MONITOR_PASSWORD": ""})
+    assert exc.value.names == ["FLEET_MONITOR_EMAIL", "FLEET_MONITOR_PASSWORD"]

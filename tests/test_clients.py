@@ -235,6 +235,18 @@ async def test_tautulli_activity_parses_the_diagnosis_fields(fixture):
     assert (s.dovi_profile, s.device, s.season, s.show_key) == (7, "Roku Ultra", None, "")
     assert (episode.show_key, episode.season, episode.episode) == ("5120", 2, 7)
     assert episode.dovi_profile == 0
+    assert (s.source_bitrate_kbps, s.stream_bitrate_kbps, s.transcode_speed) == (62103, 11500, 0.8)
+    assert (episode.transcode_speed, episode.transcode_throttled) == (0.0, False)
+
+
+@respx.mock
+async def test_tautulli_history_of_one_plex_item(fixture):
+    route = respx.get(f"{BASE}/api/v2", params={"cmd": "get_history"}).respond(
+        json=fixture("tautulli_history")
+    )
+    await TautulliClient("meleys", BASE, "k").history(rating_key="4348", length=100)
+    params = route.calls.last.request.url.params
+    assert (params["rating_key"], params["length"], "user_id" in params) == ("4348", "100", False)
 
 
 @respx.mock
@@ -261,6 +273,7 @@ async def test_tautulli_history_and_stream_data_of_a_finished_play(fixture):
         "Plex for Roku",
     )
     stream = await client.stream_data(1124)
+    assert (stream.source_bitrate_kbps, stream.stream_bitrate_kbps) == (9200, 9200)
     assert (stream.container, stream.video_codec, stream.video_decision) == (
         "mkv",
         "hevc",

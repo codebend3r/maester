@@ -11,7 +11,8 @@ CLEAN = Playback(
     platform="Roku", product="Plex for Roku", player="Living Room", device="Roku Ultra",
     container="mkv", quality_profile="Original", video_codec="hevc",
     video_decision="direct play", dovi_profile=0, audio_codec="eac3",
-    audio_decision="direct play", subtitle_codec="", subtitle_decision="",
+    audio_decision="direct play", subtitle_codec="", subtitle_decision="", location="lan",
+    relayed=False, bitrate_kbps=20000, source_bitrate_kbps=20000, transcode_speed=None,
 )  # fmt: skip
 
 
@@ -68,6 +69,12 @@ def test_a_player_asking_for_less_quality_isnt_a_codec_limit():
     assert names(capped) == []
 
 
+def test_a_relayed_stream_isnt_blamed_on_the_players_codecs():
+    """Plex's relay caps a stream at 2 Mbps, so it is transcoded whatever the player decodes."""
+    relayed = replace(CLEAN, video_decision="transcode", location="wan", relayed=True)
+    assert relayed.squeezed and names(relayed) == []
+
+
 async def test_a_live_play_is_read_from_its_session_and_a_finished_one_from_its_stream(services):
     live = Play.from_session(
         "meleys", session(subtitle_codec="pgs", subtitle_decision="burn", dovi_profile=7)
@@ -87,3 +94,18 @@ async def test_a_live_play_is_read_from_its_session_and_a_finished_one_from_its_
     )  # fmt: skip
     assert playback.with_profile(0).dovi_profile == 0  # the file fills it in
     assert names(playback) == ["hevc_unsupported"]
+
+
+def test_a_play_says_how_it_travelled():
+    live = Playback.from_session(
+        session(location="wan", relayed=True, stream_bitrate_kbps=1800, source_bitrate_kbps=62000,
+                transcode_speed=0.8, quality_profile="2 Mbps 720p")
+    )  # fmt: skip
+    assert (live.remote, live.relayed, live.bitrate_kbps, live.source_bitrate_kbps) == (
+        True, True, 1800, 62000,
+    )  # fmt: skip
+    assert (live.transcode_speed, live.lowered, live.squeezed) == (0.8, True, True)
+    # Throttled: the transcoder is ahead and resting, so its low speed isn't a reading.
+    assert Playback.from_session(session(transcode_speed=0.4, transcode_throttled=True)).transcode_speed is None  # fmt: skip
+    local = Playback.from_session(session(location="lan", quality_profile="Original"))
+    assert not (local.remote or local.lowered or local.squeezed)

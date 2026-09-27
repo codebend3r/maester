@@ -6,6 +6,7 @@ import pytest
 from maester.agent.tools import Tier, ToolContext
 from maester.clients import (
     FakeFileProbe,
+    FakeFleetMonitor,
     FakePlexClient,
     FakeRadarrClient,
     FakeSabnzbdClient,
@@ -42,6 +43,7 @@ def services() -> Services:
         sabnzbd={h: FakeSabnzbdClient(host=h) for h in HOSTS},
         tautulli={h: FakeTautulliClient(host=h) for h in HOSTS},
         probe=FakeFileProbe(),
+        fleet=FakeFleetMonitor(),
     )
 
 

@@ -2,9 +2,11 @@
 
 This is where playback diagnosis gets its facts: the server's decision on
 each stream (Tautulli gives no reasons for a transcode), LAN vs WAN, relay,
-bandwidth. A finished play keeps only a summary
-in the history; `stream_data` fetches what it was sent (codecs, decisions)
-by its history row. Everything is one `/api/v2?cmd=` call.
+bandwidth, and how fast a transcode runs against real time. A finished play
+keeps only a summary in the history; `stream_data` fetches what it was sent
+(codecs, decisions, bitrates) by its history row. Every bitrate and
+bandwidth is Plex's own figure, in kbps. Everything is one `/api/v2?cmd=`
+call.
 """
 
 from __future__ import annotations
@@ -20,6 +22,13 @@ def _int(value: Any, default: int = 0) -> int:
         return int(value)
     except (TypeError, ValueError):
         return default
+
+
+def _float(value: Any) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def _index(raw: dict[str, Any], key: str) -> int | None:
@@ -41,11 +50,11 @@ class Session:
     platform: str
     player: str
     product: str
-    location: str  # "lan" | "wan"
-    relayed: bool
+    location: str  # "lan" | "wan" | "cellular"
+    relayed: bool  # sent through Plex's relay rather than straight from the server
     secure: bool
-    bandwidth_kbps: int
-    stream_bitrate_kbps: int
+    bandwidth_kbps: int  # what Plex reserves for the stream
+    stream_bitrate_kbps: int  # what the stream is sent at
     transcode_decision: str  # "direct play" | "copy" | "transcode"
     video_decision: str
     audio_decision: str
@@ -65,6 +74,11 @@ class Session:
     episode: int | None = None
     device: str = ""  # the hardware, e.g. "SHIELD Android TV"
     dovi_profile: int = 0  # the file's Dolby Vision profile; 0 when it has none
+    source_bitrate_kbps: int = 0  # the file's own bitrate
+    # A transcode's speed against real time (1.0 keeps pace); 0 when nothing is
+    # transcoded. A throttled transcoder is ahead and resting, so its speed reads low.
+    transcode_speed: float = 0.0
+    transcode_throttled: bool = False
 
     @classmethod
     def from_api(cls, raw: dict[str, Any]) -> Session:
@@ -103,6 +117,9 @@ class Session:
             episode=_index(raw, "media_index"),
             device=raw.get("device") or "",
             dovi_profile=_int(raw.get("video_dovi_profile")),
+            source_bitrate_kbps=_int(raw.get("bitrate")),
+            transcode_speed=_float(raw.get("transcode_speed")),
+            transcode_throttled=_int(raw.get("transcode_throttled")) == 1,
         )
 
 
@@ -180,6 +197,8 @@ class StreamData:
     subtitle_codec: str
     subtitle_decision: str  # adds "burn"; empty without subtitles
     quality_profile: str  # "Original", or the lower quality the player asked for
+    source_bitrate_kbps: int = 0  # the file's own bitrate
+    stream_bitrate_kbps: int = 0  # what it was sent at
 
     @classmethod
     def from_api(cls, raw: dict[str, Any]) -> StreamData:
@@ -192,6 +211,8 @@ class StreamData:
             subtitle_codec=raw.get("subtitle_codec") or "",
             subtitle_decision=raw.get("stream_subtitle_decision") or "",
             quality_profile=raw.get("quality_profile") or "",
+            source_bitrate_kbps=_int(raw.get("bitrate")),
+            stream_bitrate_kbps=_int(raw.get("stream_bitrate")),
         )
 
 
@@ -217,7 +238,7 @@ class Tautulli(Protocol):
 
     async def activity(self) -> Activity: ...
     async def history(
-        self, *, user_id: int | None = None, length: int = 10
+        self, *, user_id: int | None = None, rating_key: str | None = None, length: int = 10
     ) -> list[HistoryRow]: ...
     async def stream_data(self, row_id: int) -> StreamData: ...
     async def users(self) -> list[TautulliUser]: ...
@@ -245,10 +266,15 @@ class TautulliClient(HttpClient):
     async def activity(self) -> Activity:
         return Activity.from_api(await self._cmd("get_activity") or {})
 
-    async def history(self, *, user_id: int | None = None, length: int = 10) -> list[HistoryRow]:
+    async def history(
+        self, *, user_id: int | None = None, rating_key: str | None = None, length: int = 10
+    ) -> list[HistoryRow]:
+        """Finished plays, newest first: one user's, or one Plex item's, or everyone's."""
         params: dict[str, Any] = {"length": length, "order_column": "date", "order_dir": "desc"}
         if user_id is not None:
             params["user_id"] = user_id
+        if rating_key is not None:
+            params["rating_key"] = rating_key
         data = await self._cmd("get_history", **params) or {}
         return [HistoryRow.from_api(r) for r in data.get("data", [])]
 
@@ -283,8 +309,15 @@ class FakeTautulliClient:
             wan_bandwidth_kbps=wan,
         )
 
-    async def history(self, *, user_id: int | None = None, length: int = 10) -> list[HistoryRow]:
-        rows = [r for r in self.history_rows if user_id is None or r.user_id == user_id]
+    async def history(
+        self, *, user_id: int | None = None, rating_key: str | None = None, length: int = 10
+    ) -> list[HistoryRow]:
+        rows = [
+            r
+            for r in self.history_rows
+            if (user_id is None or r.user_id == user_id)
+            and (rating_key is None or r.rating_key == rating_key)
+        ]
         return sorted(rows, key=lambda r: r.started, reverse=True)[:length]
 
     async def stream_data(self, row_id: int) -> StreamData:

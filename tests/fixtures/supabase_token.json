@@ -1,0 +1,1 @@
+{"access_token":"eyJhbGciOiJFUzI1NiIsImtpZCI6ImsxIiwidHlwIjoiSldUIn0.eyJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZW1haWwiOiJtYWVzdGVyQGV4YW1wbGUuY29tIn0.c2ln","token_type":"bearer","expires_in":3600,"expires_at":1790003600,"refresh_token":"v7r3ksqmnlze","user":{"id":"6f1c2b9e-2d4a-4f0e-9d6b-2b8a1f4f7c11","aud":"authenticated","role":"authenticated","email":"maester@example.com"}}

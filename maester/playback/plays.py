@@ -7,7 +7,8 @@ instead of hiding the others. Tautulli knows a Plex item, not a title, so
 `identify` reads the item's TMDB id from Plex and asks Seerr for the title,
 and `copy_of` tells from Seerr's Plex keys whether the item is the 1080p or
 the 4K copy. `playback_of` reads how a play went (`Playback`), for the
-player check and for explaining lag.
+player check and for explaining lag: the one place Tautulli's session facts
+become a typed model.
 
 Tautulli keeps a play in its history only once it stops and outlasts the
 ignore interval, so a play that failed at once may not be here at all; the
@@ -27,11 +28,20 @@ from maester.media import Copy
 
 # Finished plays asked of each host.
 RECENT = 5
+# The quality a player asks for when it isn't limiting the bitrate.
+ORIGINAL = frozenset({"Original", ""})
+# Where Tautulli places a friend away from the server's network.
+REMOTE = frozenset({"wan", "cellular"})
+# Plex's relay carries a stream when the server can't be reached directly, at
+# most 2 Mbps, for Plex Pass and free accounts alike
+# (support.plex.tv/articles/216766168-accessing-a-server-through-relay/).
+RELAY_CAP_KBPS = 2000
 
 
 @dataclass(frozen=True)
 class Playback:
-    """One play's facts: the client, what the file holds, and what the server did with it."""
+    """One play's facts: the client, what the file holds, what the server did with it,
+    and how it travelled (LAN or the internet, Plex's relay, the bitrate sent)."""
 
     platform: str  # "Roku", "Chrome", "Android"
     product: str  # "Plex for Roku", "Plex Web"
@@ -46,6 +56,13 @@ class Playback:
     audio_decision: str
     subtitle_codec: str
     subtitle_decision: str  # adds "burn"; empty without subtitles
+    location: str  # "lan", or "wan"/"cellular" for a friend away from the server
+    relayed: bool  # through Plex's relay, which caps it (`RELAY_CAP_KBPS`)
+    bitrate_kbps: int  # what the stream is sent at
+    source_bitrate_kbps: int  # the file's own bitrate
+    # How fast the server converts it against real time (under 1.0 it can't keep up);
+    # None for a finished play, a stream not converted, or one throttled for being ahead.
+    transcode_speed: float | None
 
     @classmethod
     def from_session(cls, s: Session) -> Playback:
@@ -64,6 +81,13 @@ class Playback:
             audio_decision=s.audio_decision,
             subtitle_codec=s.subtitle_codec,
             subtitle_decision=s.subtitle_decision,
+            location=s.location,
+            relayed=s.relayed,
+            bitrate_kbps=s.stream_bitrate_kbps,
+            source_bitrate_kbps=s.source_bitrate_kbps,
+            transcode_speed=(
+                s.transcode_speed if s.transcode_speed and not s.transcode_throttled else None
+            ),
         )
 
     @classmethod
@@ -84,12 +108,33 @@ class Playback:
             audio_decision=stream.audio_decision,
             subtitle_codec=stream.subtitle_codec,
             subtitle_decision=stream.subtitle_decision,
+            location=row.location,
+            relayed=row.relayed,
+            bitrate_kbps=stream.stream_bitrate_kbps,
+            source_bitrate_kbps=stream.source_bitrate_kbps,
+            transcode_speed=None,
         )
 
     @property
     def hardware(self) -> str:
         """What names the hardware: the device, and the player's name, which often says it."""
         return f"{self.device} {self.player}".lower()
+
+    @property
+    def remote(self) -> bool:
+        """Away from the server: the stream crosses the internet and the server's upload."""
+        return self.location in REMOTE
+
+    @property
+    def lowered(self) -> bool:
+        """The player asked for less than the file's own quality."""
+        return self.quality_profile not in ORIGINAL
+
+    @property
+    def squeezed(self) -> bool:
+        """Its bitrate is cut to fit a connection (a lower quality asked for, or the relay),
+        so a transcode says nothing about what the player can decode."""
+        return self.lowered or self.relayed
 
     def with_profile(self, dovi_profile: int) -> Playback:
         """The file's Dolby Vision profile, where the play didn't say."""

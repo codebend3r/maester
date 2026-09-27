@@ -18,6 +18,7 @@ from maester.agent.tools import ToolRegistry
 from maester.agent.tools import registry as app_registry
 from maester.clients import (
     FakeFileProbe,
+    FakeFleetMonitor,
     FakePlexClient,
     FakeRadarrClient,
     FakeSabnzbdClient,
@@ -28,6 +29,7 @@ from maester.clients import (
     Services,
 )
 from maester.clients.arr import MediaFile, QueueItem
+from maester.clients.fleet import Vitals
 from maester.clients.media import Inspection, Track
 from maester.clients.plex import PlexItem, PlexSeason, Version
 from maester.clients.radarr import Movie
@@ -318,6 +320,13 @@ def _probe(seed: dict[str, Any]) -> FakeFileProbe:
     )
 
 
+def _fleet(seed: dict[str, Any]) -> FakeFleetMonitor:
+    """Each NAS's CPU and memory, in percent, as the fleet monitor reads them."""
+    return FakeFleetMonitor(
+        {host: Vitals(v.get("cpu"), v.get("memory")) for host, v in seed.items()}
+    )
+
+
 def build_services(seed: dict[str, Any], seerr_user_id: int = 4) -> Services:
     hosts = seed.get("hosts", ["meleys", "vermithor"])
     radarr, sonarr = seed.get("radarr", {}), seed.get("sonarr", {})
@@ -331,6 +340,7 @@ def build_services(seed: dict[str, Any], seerr_user_id: int = 4) -> Services:
         sabnzbd={h: FakeSabnzbdClient(host=h) for h in hosts},
         tautulli={h: _tautulli(h, tautulli.get(h, {}), tautulli_user or 0) for h in hosts},
         probe=_probe(seed.get("probe", {})),
+        fleet=_fleet(seed["fleet"]) if "fleet" in seed else None,
     )
 
 

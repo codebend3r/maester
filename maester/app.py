@@ -36,8 +36,9 @@ from maester.clients import (
     TautulliClient,
     WizarrClient,
 )
+from maester.clients.fleet import FleetMonitorClient, SupabaseLogin, SupabaseSession
 from maester.clients.media import MediaPaths
-from maester.config import REQUIRED, Settings, require, settings
+from maester.config import REQUIRED, FleetMonitorAccess, Settings, require, settings
 from maester.registry import Registry
 from maester.seerr_events import seerr_routes
 from maester.store import Store
@@ -48,6 +49,13 @@ from maester.web.seerr import SeerrWebhook
 import maester.tools  # noqa: F401  isort: skip
 
 log = logging.getLogger("maester")
+
+
+def fleet_monitor(access: FleetMonitorAccess | None) -> FleetMonitorClient | None:
+    if access is None:
+        return None
+    login = SupabaseLogin(access.supabase_url, access.supabase_key, access.email, access.password)
+    return FleetMonitorClient(access.url, SupabaseSession(login))
 
 
 def build_services(cfg: Settings, instances: Registry) -> Services:
@@ -65,6 +73,7 @@ def build_services(cfg: Settings, instances: Registry) -> Services:
         probe=FileProbe(
             MediaPaths(cfg.media_roots, cfg.media_path_map), timeout=cfg.probe_timeout_seconds
         ),
+        fleet=fleet_monitor(cfg.fleet_monitor),
     )
 
 
