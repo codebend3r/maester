@@ -119,7 +119,16 @@ async def pending_request(
     if request.status != RequestStatus.PENDING:
         return []
     _, post = await ask_about_request(services, store, request)
-    return [post] if post else []
+    if post is None:
+        return []
+    # Decided while this was raised (the admin's Approve on a held 4K request makes it and
+    # approves it at once): close it rather than post buttons for a settled request.
+    now = await services.seerr.get_request(request.id)
+    if now.status != RequestStatus.PENDING:
+        verdict = "approved" if now.status == RequestStatus.APPROVED else "denied"
+        store.decide_pending(post.pending_id, verdict, DECIDED_IN_SEERR)
+        return []
+    return [post]
 
 
 async def decided_in_seerr(

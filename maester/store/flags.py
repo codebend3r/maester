@@ -1,7 +1,8 @@
 """Flags: switches the admin flips from chat that must outlive a restart.
 
 The kill switch and a maintenance window are each one flag. A flag is up
-while its row exists; raising it again replaces its message.
+while its row exists; raising it again replaces its message but keeps when
+it went up.
 """
 
 from __future__ import annotations
@@ -30,9 +31,12 @@ class Flags(Database):
         return Flag(r["name"], r["message"], r["set_by"], r["set_at"]) if r else None
 
     def raise_flag(self, name: str, message: str = "", set_by: str | None = None) -> Flag:
+        """Raise the flag; raised already, it keeps when it went up and takes the new message."""
         with self.transaction() as conn:
             conn.execute(
-                "INSERT OR REPLACE INTO flags (name, message, set_by, set_at) VALUES (?, ?, ?, ?)",
+                "INSERT INTO flags (name, message, set_by, set_at) VALUES (?, ?, ?, ?)"
+                " ON CONFLICT (name) DO UPDATE SET message = excluded.message,"
+                " set_by = excluded.set_by",
                 (name, message, set_by, now()),
             )
         return self.flag(name)  # type: ignore[return-value]

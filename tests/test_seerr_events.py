@@ -145,3 +145,21 @@ async def test_a_decision_made_in_seerr_closes_the_approval_here_and_tells_the_f
     # Decided here first (a button), or never asked about: Seerr's echo does nothing.
     assert await routes["MEDIA_APPROVED"].handle(seerr_says("MEDIA_APPROVED")) == []
     assert await routes["MEDIA_APPROVED"].handle(seerr_says("MEDIA_APPROVED", "78")) == []
+
+
+async def test_a_request_decided_while_its_approval_was_raised_posts_nothing(services, store):
+    store.upsert_user("d1", status="active", seerr_user_id=4, plex_username="dany")
+    dune_pending(services, is_4k=True)
+    seerr = services.seerr
+    details = seerr.media_details
+
+    async def approved_meanwhile(media_type, tmdb_id):
+        await seerr.approve_request(77)
+        return await details(media_type, tmdb_id)
+
+    seerr.media_details = approved_meanwhile
+    route = seerr_routes(services, store)["MEDIA_PENDING"]
+    assert await route.handle(seerr_says("MEDIA_PENDING")) == []
+    (closed,) = [p for p in (store.get_pending(i) for i in (1,)) if p]
+    assert (closed.decision, closed.decided_by) == ("approved", "seerr")
+    assert store.pending_about("seerr-request:77") is None

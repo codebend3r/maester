@@ -242,17 +242,26 @@ class MaesterBot(discord.Client):
             if state.value == "start":
                 reply = self.console.start_maintenance(admin, message)
             else:
-                reply = await self.console.end_maintenance(admin)
+                reply = await self.console.end_maintenance(admin, self._member)
             await self._answer(interaction, reply)
+
+    async def _member(self, discord_id: str) -> ChatUser:
+        """Someone as the server knows them now, roles included."""
+        user = self.get_user(int(discord_id)) or await self.fetch_user(int(discord_id))
+        return await resolve_chat_user(self, user)
 
     async def _answer(self, interaction: discord.Interaction, reply: AdminReply) -> None:
         """An admin command's reply, privately, then each approval again with its buttons,
-        its notices, and its DMs to friends."""
-        for chunk in split_reply(reply.text):
-            await interaction.followup.send(chunk, ephemeral=True)
-        for offer in reply.offers:
-            view = decision_view(offer.id, offer.kind)
-            await interaction.followup.send(offer.summary, view=view, ephemeral=True)
+        its notices, and its DMs to friends. The notices and DMs go out even if the private
+        reply can't (the interaction expired during a long `/maintenance end`)."""
+        try:
+            for chunk in split_reply(reply.text):
+                await interaction.followup.send(chunk, ephemeral=True)
+            for offer in reply.offers:
+                view = decision_view(offer.id, offer.kind)
+                await interaction.followup.send(offer.summary, view=view, ephemeral=True)
+        except discord.HTTPException:
+            log.exception("couldn't answer the admin's command")
         await self.deliver(reply.notices)
         for user_id, response in reply.dms:
             try:

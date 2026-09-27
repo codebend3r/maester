@@ -11,8 +11,8 @@ into a slash command and delivers the reply.
 A maintenance window is a flag (`maintenance`): while it's up, requests and
 replacements are saved instead of run (the runner holds them). Starting one
 announces it in the requests channel; ending it runs every held call as its
-caller, then gives each of them a turn so the model tells them in a DM how
-it went.
+caller, at the tier they have then, and gives each of them a turn so the
+model tells them in a DM how it went.
 """
 
 from __future__ import annotations
@@ -20,6 +20,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -152,6 +153,8 @@ class AdminConsole:
         verdict = "ok" if row.ok else "refused or failed"
         if row.pending_id is not None:
             verdict = f"asked the admin (#{row.pending_id})"
+        elif row.held_id is not None:
+            verdict = f"held for maintenance (#{row.held_id})"
         host = f" on {row.host}" if row.host else ""
         args = json.dumps(row.args, default=str)
         args = args if len(args) <= 120 else args[:117] + "..."
@@ -165,21 +168,34 @@ class AdminConsole:
         """Everything waiting on the admin, with its buttons again.
 
         Seerr's pending requests are read too: one the webhook never delivered
-        (maester was down, or it isn't set up) gets its approval raised here.
+        (maester was down, or it isn't set up) gets its approval raised here,
+        and posted in the admin channel like any other.
         """
         if refused := self._refused(admin, "pending", {}):
             return refused
         note = ""
         try:
             requests = await self.services.seerr.list_requests(take=SEERR_PENDING, filter="pending")
-            await asyncio.gather(
-                *(ask_about_request(self.services, self.store, r) for r in requests)
-            )
         except ClientError as exc:
             log.warning("/pending couldn't read Seerr: %s", exc)
             note = (
                 f"\nCouldn't read Seerr's pending requests, so any made there may be missing: {exc}"
             )
+            requests = []
+        asked = await asyncio.gather(
+            *(ask_about_request(self.services, self.store, r) for r in requests),
+            return_exceptions=True,
+        )
+        if bug := next((a for a in asked if isinstance(a, BaseException)
+                        and not isinstance(a, ClientError)), None):  # fmt: skip
+            raise bug
+        failed = [
+            (r, a) for r, a in zip(requests, asked, strict=True) if isinstance(a, ClientError)
+        ]
+        raised = [post for a in asked if not isinstance(a, BaseException) and (post := a[1])]
+        if failed:
+            listed = ", ".join(f"#{r.id}" for r, _ in failed)
+            note += f"\nCouldn't raise an approval for Seerr request {listed}: {failed[0][1]}"
         waiting = self.store.open_pending("approve")
         if waiting:
             lines = [f"{len(waiting)} waiting on you:"]
@@ -188,7 +204,8 @@ class AdminConsole:
         else:
             text = "Nothing is waiting on you."
         self._audit(admin, "pending", {}, f"{len(waiting)} waiting", ok=True)
-        return AdminReply(text + note, offers=tuple(waiting))
+        # One raised here gets its admin channel post like any other; the list offers it too.
+        return AdminReply(text + note, offers=tuple(waiting), notices=tuple(raised))
 
     def _waiting_line(self, pending: PendingAction) -> str:
         now = datetime.now(UTC)
@@ -231,30 +248,62 @@ class AdminConsole:
         why = f" ({message})" if message else ""
         return AdminReply(text, notices=(Announcement(MAINTENANCE_ON.format(why=why)),))
 
-    async def end_maintenance(self, admin: ChatUser) -> AdminReply:
-        """Lower the flag, run what was held, and let each friend hear how theirs went."""
+    async def end_maintenance(
+        self, admin: ChatUser, member: Callable[[str], Awaitable[ChatUser]]
+    ) -> AdminReply:
+        """Lower the flag, run what was held, and let each friend hear how theirs went.
+
+        `member` looks a caller up as the chat platform knows them now, so each
+        call runs at the tier they have when it ends. A call that failed in a
+        way worth trying again (a service still starting) stays held, and
+        `/maintenance end` runs what's left even once the flag is down.
+        """
         args = {"state": "end"}
         if refused := self._refused(admin, "maintenance", args):
             return refused
-        if self.store.lower_flag(MAINTENANCE) is None:
-            text = "Maintenance wasn't on."
+        was_on = self.store.lower_flag(MAINTENANCE) is not None
+        waiting = self.store.held_calls()
+        if not was_on and not waiting:
+            text = "Maintenance wasn't on, and nothing is held."
             self._audit(admin, "maintenance", args, text, ok=True)
             return AdminReply(text)
         ran: list[tuple[HeldCall, ToolOutcome]] = []
-        for call in self.store.held_calls():
-            if self.store.start_held(call.id):  # another end already ran it
-                ran.append((call, await self.chat.agent.run_held(call)))
+        kept: list[tuple[HeldCall, ToolOutcome]] = []
+        callers: dict[str, ChatUser] = {}
+        for call in waiting:
+            if not self.store.start_held(call.id):  # another end is running it
+                continue
+            user = callers.get(call.discord_id) or await member(call.discord_id)
+            callers[call.discord_id] = user
+            outcome = await self.chat.agent.run_held(call, self.chat.tier_for(user))
+            if outcome.is_error and outcome.retryable:
+                self.store.keep_held(call.id)
+                kept.append((call, outcome))
+            else:
+                ran.append((call, outcome))
         dms = []
         for user_id in dict.fromkeys(call.discord_id for call, _ in ran):
-            tier = Tier.parse(next(c.tier for c, _ in ran if c.discord_id == user_id))
-            dms.append((user_id, await self.chat.follow_up(user_id, tier, HELD_RAN)))
-        lines = [f"- {self._name(c.discord_id)}: {c.summary}: {self._how(o)}" for c, o in ran]
-        text = "Maintenance off." + (
-            f" Ran {len(ran)} held:\n" + "\n".join(lines) if ran else " Nothing was held."
-        )
+            if self.chat.tier_for(callers[user_id]) != Tier.UNLINKED:  # they've left meanwhile
+                dms.append((user_id, await self.chat.handle_message(callers[user_id], HELD_RAN)))
+        text = "Maintenance off." if was_on else "Running what's still held."
+        if ran:
+            text += f" Ran {len(ran)} held:\n" + "\n".join(self._held_line(c, o) for c, o in ran)
+        elif not kept:
+            text += " Nothing was held."
+        if kept:
+            text += (
+                f"\nStill held, since it couldn't run yet ({len(kept)}); `/maintenance end` again "
+                "once the stack answers:\n" + "\n".join(self._held_line(c, o) for c, o in kept)
+            )
         self._audit(admin, "maintenance", args, text, ok=True)
-        notices = (Announcement(MAINTENANCE_OFF), *(n for _, o in ran for n in o.notices))
+        notices = (
+            *((Announcement(MAINTENANCE_OFF),) if was_on else ()),
+            *(n for _, o in ran for n in o.notices),
+        )
         return AdminReply(text, notices=notices, dms=tuple(dms))
+
+    def _held_line(self, call: HeldCall, outcome: ToolOutcome) -> str:
+        return f"- {self._name(call.discord_id)}: {call.summary}: {self._how(outcome)}"
 
     @staticmethod
     def _how(outcome: ToolOutcome) -> str:

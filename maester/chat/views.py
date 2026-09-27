@@ -69,7 +69,9 @@ class DecisionButton(
             await interaction.followup.send(decision.text, ephemeral=True)
             return
         await interaction.edit_original_response(view=None)
-        await interaction.followup.send(decision.text)
+        # A press on a private copy (from /pending) is answered privately too.
+        private = bool(interaction.message and interaction.message.flags.ephemeral)
+        await interaction.followup.send(decision.text, ephemeral=private)
         await bot.deliver(decision.notices)
 
 

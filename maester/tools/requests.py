@@ -346,7 +346,15 @@ async def decide_request(
     """
     seerr = ctx.services.seerr
     wanted = RequestStatus.APPROVED if approved else RequestStatus.DECLINED
-    current = (await seerr.get_request(request_id)).status
+    try:
+        current = (await seerr.get_request(request_id)).status
+    except ClientError as exc:
+        if exc.status != 404:
+            raise
+        return Result.refusal(
+            f"Seerr request #{request_id} ({title} in {version}) no longer exists in Seerr; "
+            "nothing to decide."
+        )
     if current == RequestStatus.PENDING:
         await (seerr.approve_request if approved else seerr.decline_request)(request_id)
     elif current != wanted:
@@ -422,9 +430,10 @@ async def no_room_for_4k(
     """
     limit = ctx.settings.guardrails.storage_pause_4k_percent
     server = next((s for s in uhd if s.is_default), uhd[0])
+    library = Library(ctx.services, {})
     try:
-        host = Library(ctx.services, {}).host_of(details.media_type, server)
-        arr = Library(ctx.services, {}).clients(details.media_type)[host]
+        host = library.host_of(details.media_type, server)
+        arr = library.clients(details.media_type)[host]
         roots, disks = await asyncio.gather(arr.root_folders(), arr.disk_space())
     except (OwnerUnknown, ClientError) as exc:
         return f"the 4K server's free space couldn't be read ({exc})"
@@ -518,8 +527,8 @@ async def decide_4k_over_storage(
 ) -> Result:
     """Request it in Seerr as the friend, approved, or tell them it's held off.
 
-    Safe to run again: a request that went through the first time is already
-    there, so the second run refuses rather than asking twice.
+    Safe to run again: a request an earlier press made but couldn't approve is
+    found among the friend's pending ones and approved, not asked for twice.
     """
     if not approved:
         dm = (
@@ -530,15 +539,22 @@ async def decide_4k_over_storage(
     user = ctx.link_of(requester)
     seerr = ctx.services.seerr
     details = await seerr.media_details(media_type, tmdb_id)
-    try:
-        # The seasons still missing now: something may have landed while it waited.
-        planned = plan_request(details, seasons, False, is_4k=True)
-        submitted = await submit(
-            ctx, details, planned, is_4k=True, english_dub=english_dub, user=user
-        )
-    except NotRequested as why:
-        return Result.refusal(str(why))
-    request = submitted.request
+    # An earlier press may have made the request and failed to approve it: finish that one.
+    earlier = await seerr.list_requests(user_id=user.seerr_user_id, take=50, filter="pending")
+    request = next(
+        (r for r in earlier if (r.media_type, r.tmdb_id, r.is_4k) == (media_type, tmdb_id, True)),
+        None,
+    )
+    if request is None:
+        try:
+            # The seasons still missing now: something may have landed while it waited.
+            planned = plan_request(details, seasons, False, is_4k=True)
+            submitted = await submit(
+                ctx, details, planned, is_4k=True, english_dub=english_dub, user=user
+            )
+        except NotRequested as why:
+            return Result.refusal(str(why))
+        request = submitted.request
     if request.status == RequestStatus.PENDING:  # the admin just approved it here
         await seerr.approve_request(request.id)
     # Seerr's webhook may have asked about the new request meanwhile; this settles it.

@@ -95,9 +95,11 @@ class FakeBot:
 
 
 class FakeInteraction:
-    def __init__(self, bot, user):
+    def __init__(self, bot, user, *, private=False):
         self.client = bot
         self.user = user
+        # The message the button is on; a private copy is ephemeral.
+        self.message = SimpleNamespace(flags=SimpleNamespace(ephemeral=private))
         self.response = SimpleNamespace(defer=self._defer)
         self.followup = FakeTarget()
         self.edits = []
@@ -129,8 +131,17 @@ async def test_a_settled_press_removes_the_buttons_replies_then_delivers():
     await cancel.callback(interaction)
     assert bot.pressed == [(7, "5", False)]
     assert interaction.edits == [{"view": None}]
-    assert interaction.followup.sent == [("Denied", {})]
+    assert interaction.followup.sent == [("Denied", {"ephemeral": False})]
     assert bot.log == [("deliver", [notice])]
+
+
+async def test_a_press_on_a_private_copy_is_answered_privately():
+    approve, _ = decision_view(7, "approve").children
+    bot = FakeBot(Decision("Approved Dune (2021) in 4K in Seerr (request #1)."))
+    interaction = FakeInteraction(bot, DM_AUTHOR, private=True)
+    await approve.callback(interaction)
+    ((_, kwargs),) = interaction.followup.sent
+    assert kwargs == {"ephemeral": True}
 
 
 async def test_decision_buttons_are_persistent_and_follow_the_kind():

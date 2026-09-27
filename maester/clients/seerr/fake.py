@@ -96,7 +96,10 @@ class FakeSeerrClient(Downable):
         return req
 
     async def get_request(self, request_id: int) -> MediaRequest:
-        return next(r for r in self.requests if r.id == request_id)
+        found = next((r for r in self.requests if r.id == request_id), None)
+        if found is None:
+            raise ClientError("seerr", "GET", f"/api/v1/request/{request_id}", 404, "not found")
+        return found
 
     async def list_requests(
         self, *, user_id: int | None = None, take: int = 20, filter: str = "all"

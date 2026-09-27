@@ -398,3 +398,29 @@ async def test_the_admin_holds_off_a_4k_request_and_the_friend_hears_why(ctx):
     out = await registry.get("decide_4k_over_storage").handler(admin, approved=False, **held)
     assert out.content == "Held off on Dune (2021) in 4K." and not ctx.services.seerr.requests
     assert "storage is nearly full" in out.notices[0].text
+
+
+async def test_a_request_deleted_in_seerr_closes_its_approval_for_good(ctx):
+    admin = replace(ctx, user_id="boss", tier=Tier.ADMIN)
+    args = {"request_id": 99, "title": "Dune (2021)", "version": "4K", "requester": "d1"}
+    out = await decide_request(admin, approved=True, **args)
+    assert out.is_error and not out.retryable and "no longer exists" in out.content
+
+
+async def test_a_second_press_approves_the_request_the_first_made_but_couldnt_approve(ctx):
+    seed(ctx, DUNE)
+    four_k_servers(ctx)
+    uhd_volume(ctx, free_tb=0.8)
+    held = (await request_media_4k(ctx, 438631, "movie")).approval.args
+    admin = replace(ctx, user_id="boss", tier=Tier.ADMIN)
+    seerr = ctx.services.seerr
+    seerr.down = True  # the request goes in, the approval doesn't
+    decide = registry.get("decide_4k_over_storage").handler
+    with pytest.raises(ClientError):
+        await decide(admin, approved=True, **held)
+    (made,) = seerr.requests
+    assert made.status == RequestStatus.PENDING
+    seerr.down = False
+    out = await decide(admin, approved=True, **held)
+    assert out.content.endswith("(request #1).") and len(seerr.requests) == 1
+    assert seerr.requests[0].status == RequestStatus.APPROVED

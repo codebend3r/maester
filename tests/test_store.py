@@ -252,10 +252,11 @@ def test_the_claims_migration_keeps_webhook_claims(tmp_path):
 
 def test_a_flag_is_up_until_lowered_and_raising_it_again_replaces_its_message(store):
     assert store.flag("maintenance") is None
-    store.raise_flag("maintenance", "swapping a drive", "a1")
+    first = store.raise_flag("maintenance", "swapping a drive", "a1")
     store.raise_flag("maintenance", "swapping two drives", "a1")
     flag = store.flag("maintenance")
     assert (flag.message, flag.set_by) == ("swapping two drives", "a1")
+    assert flag.set_at == first.set_at  # still up since the first time
     assert store.lower_flag("maintenance") == flag
     assert store.flag("maintenance") is None and store.lower_flag("maintenance") is None
 
@@ -292,3 +293,27 @@ def test_an_expired_approval_frees_its_subject(store):
     fresh, new = raise_about(store, "seerr-request:9")
     assert new and fresh.id != stale.id
     assert store.get_pending(stale.id).decision == "expired"
+
+
+def test_open_approvals_of_the_renamed_4k_decision_carry_over(tmp_path):
+    path = tmp_path / "m.db"
+    conn = sqlite3.connect(path)
+    conn.execute("CREATE TABLE schema_version (version INTEGER PRIMARY KEY)")
+    for sql in sorted(MIGRATIONS_DIR.glob("*.sql"))[:8]:  # the schema before 009
+        conn.executescript(sql.read_text())
+        conn.execute("INSERT INTO schema_version VALUES (?)", (int(sql.name.split("_")[0]),))
+    payload = '{"request_id": 7, "title": "Dune (2021)", "requester": "d1"}'
+    conn.execute(
+        "INSERT INTO pending_actions (kind, action, requester, payload, summary, expires_at)"
+        " VALUES ('approve', 'decide_4k_request', 'd1', ?, '4K Dune', '2999-01-01T00:00:00Z')",
+        (payload,),
+    )
+    conn.commit()
+    conn.close()
+    store = Store(path)
+    (carried,) = store.open_pending("approve")
+    assert carried.action == "decide_request" and carried.subject == "seerr-request:7"
+    assert carried.payload == {
+        "request_id": 7, "title": "Dune (2021)", "requester": "d1", "version": "4K"
+    }  # fmt: skip
+    store.close()

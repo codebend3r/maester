@@ -14,20 +14,32 @@ from maester.clients.seerr import MediaDetails, MediaRequest, MediaStatus, Reque
 from maester.config import Settings
 from maester.notify import Announcement, ApprovalPost
 from maester.store import SpaceSample
+from maester.store.base import stamp
+from tests.factories import seerr_server
 from tests.fake_model import FakeModel, text_message, tool_message
 
 # Importing the tools package registers the real tools into `app_registry`.
 import maester.tools  # noqa: F401  isort: skip
 
-ADMIN_ROLE = 1
+ADMIN_ROLE, TRUSTED_ROLE = 1, 2
 FRIEND = ChatUser("f1", "Friend")
 ADMIN = ChatUser("a1", "Boss", frozenset({ADMIN_ROLE}))
 DUNE = MediaDetails(438631, "movie", "Dune", 2021, "", MediaStatus.UNKNOWN, MediaStatus.UNKNOWN)
 
 
+def members(*users: ChatUser):
+    """Look people up as the chat platform knows them now."""
+    known = {u.id: u for u in users}
+
+    async def member(discord_id: str) -> ChatUser:
+        return known[discord_id]
+
+    return member
+
+
 def make_console(services, store, *script) -> AdminConsole:
     """The console, with a chat service whose model says what `script` says."""
-    identity = IdentityService(store, services, RoleMap(ADMIN_ROLE, 0))
+    identity = IdentityService(store, services, RoleMap(ADMIN_ROLE, TRUSTED_ROLE))
     kill = KillSwitch(store)
     agent = Agent(
         model_client=FakeModel.scripted(*script),
@@ -175,11 +187,12 @@ async def test_maintenance_holds_a_request_and_runs_it_when_it_ends(services, st
     assert asked.text == "The server's down for maintenance; I've saved it."
     assert services.seerr.requests == []  # held, not sent
     (held,) = store.held_calls()
-    assert (held.discord_id, held.tool, held.tier) == (FRIEND.id, "request_media", "friend")
+    assert (held.discord_id, held.tool) == (FRIEND.id, "request_media")
     audited = store.audit_recent(tool="request_media")[0]
     assert audited.held_id == held.id and audited.ok
+    assert f"held for maintenance (#{held.id})" in console.audit(ADMIN, 5).text
 
-    ended = await console.end_maintenance(ADMIN)
+    ended = await console.end_maintenance(ADMIN, members(FRIEND))
     assert store.flag("maintenance") is None and store.held_calls() == []
     (request,) = services.seerr.requests
     assert request.requested_by_id == 4 and not request.is_4k
@@ -200,4 +213,97 @@ async def test_maintenance_holds_a_request_and_runs_it_when_it_ends(services, st
         if isinstance(m["content"], list)
         for block in m["content"]
     )
-    assert (await console.end_maintenance(ADMIN)).text == "Maintenance wasn't on."
+    assert (await console.end_maintenance(ADMIN, members())).text == (
+        "Maintenance wasn't on, and nothing is held."
+    )
+
+
+async def test_a_held_call_runs_at_the_tier_its_caller_has_when_maintenance_ends(services, store):
+    trusted = ChatUser("t1", "Trusty", frozenset({TRUSTED_ROLE}))
+    store.upsert_user(trusted.id, status="active", seerr_user_id=7, plex_username="trusty")
+    services.seerr.details[("movie", 438631)] = DUNE
+    services.seerr.arr_servers["radarr"] = [seerr_server(1, "movie", "vermithor", is_4k=True)]
+    console = make_console(
+        services,
+        store,
+        tool_message([("request_media_4k", {"tmdb_id": 438631, "media_type": "movie"})]),
+        text_message("Saved for after maintenance."),
+        text_message("4K isn't open to you any more, so that one didn't go through."),
+    )
+    console.start_maintenance(ADMIN)
+    await console.chat.handle_message(trusted, "Dune in 4K")
+    # Their trusted role was taken away during the window: 4K is no longer theirs.
+    demoted = ChatUser(trusted.id, trusted.name)
+    ended = await console.end_maintenance(ADMIN, members(demoted))
+    assert services.seerr.requests == []
+    assert "request_media_4k" in ended.text and "didn't go through" in ended.text
+    ((to, dm),) = ended.dms  # they still hear how it went
+    assert to == trusted.id and "didn't go through" in dm.text
+
+
+async def test_a_held_call_whose_service_is_still_down_stays_held_for_the_next_end(services, store):
+    store.upsert_user(FRIEND.id, status="active", seerr_user_id=4, plex_username="dany")
+    services.seerr.details[("movie", 438631)] = DUNE
+    console = make_console(
+        services,
+        store,
+        tool_message([("request_media", {"tmdb_id": 438631, "media_type": "movie"})]),
+        text_message("Saved."),
+        text_message("It went through."),
+    )
+    console.start_maintenance(ADMIN)
+    await console.chat.handle_message(FRIEND, "get Dune")
+    services.seerr.down = True
+    real_details, services.seerr.media_details = services.seerr.media_details, None
+
+    async def down(media_type, tmdb_id):
+        services.seerr.refuse_if_down("/api/v1/movie")
+
+    services.seerr.media_details = down
+    first = await console.end_maintenance(ADMIN, members(FRIEND))
+    assert "Still held" in first.text and first.dms == () and len(store.held_calls()) == 1
+    services.seerr.down, services.seerr.media_details = False, real_details
+    second = await console.end_maintenance(ADMIN, members(FRIEND))
+    assert second.text.startswith("Running what's still held. Ran 1 held:")
+    assert store.held_calls() == [] and len(services.seerr.requests) == 1
+    assert [to for to, _ in second.dms] == [FRIEND.id]
+
+
+async def test_a_long_window_still_leaves_the_held_call_in_view_for_the_follow_up(services, store):
+    store.upsert_user(FRIEND.id, status="active", seerr_user_id=4, plex_username="dany")
+    services.seerr.details[("movie", 438631)] = DUNE
+    console = make_console(
+        services,
+        store,
+        tool_message([("request_media", {"tmdb_id": 438631, "media_type": "movie"})]),
+        text_message("Saved."),
+        text_message("It went through."),
+    )
+    console.start_maintenance(ADMIN)
+    await console.chat.handle_message(FRIEND, "get Dune")
+    # An overnight window: everything said before it is past the idle reset.
+    store._conn.execute(
+        "UPDATE conversations SET created_at = ?", (stamp(datetime.now(UTC) - timedelta(hours=9)),)
+    )
+    await console.end_maintenance(ADMIN, members(FRIEND))
+    history = store.recent_messages(
+        FRIEND.id, max_tokens=10_000, since=datetime.now(UTC) - timedelta(hours=6)
+    )
+    blocks = [b for m in history if isinstance(m["content"], list) for b in m["content"]]
+    assert any(b.get("type") == "tool_use" and b["name"] == "request_media" for b in blocks)
+    assert history[0]["content"].startswith("(What I asked for while the server was down")
+
+
+async def test_pending_posts_what_it_raises_and_one_bad_title_doesnt_stop_the_rest(
+    console, services, store
+):
+    services.seerr.details[("movie", 438631)] = DUNE
+    services.seerr.requests = [
+        MediaRequest(9, RequestStatus.PENDING, "movie", 438631, True, 4),
+        MediaRequest(10, RequestStatus.PENDING, "movie", 11, False, 4),  # Seerr can't find it
+    ]
+    reply = await console.pending(ADMIN)
+    (post,) = reply.notices
+    assert isinstance(post, ApprovalPost) and post.text.startswith("dany asks for Dune (2021)")
+    assert [p.summary for p in reply.offers] == ["4K Dune (2021) for dany"]
+    assert "Couldn't raise an approval for Seerr request #10" in reply.text

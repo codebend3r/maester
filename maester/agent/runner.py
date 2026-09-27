@@ -17,7 +17,8 @@ run and audit:
 
 During a maintenance window a tool marked `held_in_maintenance` doesn't
 run: its call is saved (a destructive one once the requester confirms it)
-and `run_held()` runs it as them when the window ends, with the same checks.
+and `run_held()` runs it as them when the window ends, at the tier they have
+then, with the same checks.
 
 A result that offers choices or carries a `Result` (notices, an approval
 to ask for) is turned into what the chat layer renders. An approval is
@@ -168,7 +169,8 @@ class ToolRunner:
         return outcome
 
     async def run_held(self, ctx: ToolContext, held: HeldCall) -> ToolOutcome:
-        """A call held for maintenance, run as its caller (`ctx`) now that it's over."""
+        """A call held for maintenance, run as its caller (`ctx`, at the tier they have now)
+        once it's over. A kill switch still on is worth trying again later."""
         spec = self.registry.get(held.tool)
         if spec is None or spec.button_only or spec.tier > ctx.tier:
             return self._refuse(ctx, held.tool, held.args, "that action is no longer available")
@@ -178,7 +180,7 @@ class ToolRunner:
             return self._refuse(ctx, spec.name, held.args, f"its arguments no longer fit: {exc}")
         async with self._one_at_a_time(spec):
             if spec.destructive and self.kill_switch.enabled:
-                return self._refuse(ctx, spec.name, args, self._disabled(spec.name))
+                return self._refuse(ctx, spec.name, args, self._disabled(spec.name), retryable=True)
             return await self._execute(ctx, spec, args)
 
     def _hold(
@@ -186,7 +188,6 @@ class ToolRunner:
     ) -> ToolOutcome:
         held = ctx.store.hold_call(
             discord_id=ctx.user_id,
-            tier=ctx.tier.name.lower(),
             tool=spec.name,
             args=args,
             summary=self.summarize(spec, args),
