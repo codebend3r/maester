@@ -29,7 +29,11 @@ maester runs as one container on **Meleys** (`192.168.50.2`) at `/volume1/docker
 
 The image carries Ookla's speedtest CLI (pinned in the `Dockerfile`), and `SPEEDTEST_HOST` names the NAS the container runs on (`meleys`), where `speed_test` measures the servers' shared internet connection. Leave it empty to turn speed tests off.
 
-CPU and memory per NAS come from the fleet monitor (wizteros' `fleet-monitor`, `http://192.168.50.2:8010` on the LAN), read with a static bearer token (`FLEET_MONITOR_TOKEN`) from `/fleet/cpu` and `/fleet/memory` only. The monitor has no guard for such a token yet, so leave `FLEET_MONITOR_URL` empty until wizteros adds one that opens only those two routes. Until then, server load comes from Tautulli alone.
+CPU and memory per NAS come from the fleet monitor (wizteros' `fleet-monitor`, `http://192.168.50.2:8010` on the LAN), read with a static bearer token (`FLEET_MONITOR_TOKEN`) from `/fleet/cpu` and `/fleet/memory`, and each NAS's health for the weekly report from `/fleet`. The monitor has no guard for such a token yet, so leave `FLEET_MONITOR_URL` empty until wizteros adds one that opens only those three routes. Until then, server load comes from Tautulli alone, and the NAS report covers the media volumes only.
+
+## Scheduled jobs
+
+The digest, the stalled-download sweeper, the nightly free-space sample and the weekly NAS report run inside the container. `TZ` sets the time zone their times are in (the image carries `tzdata`); a bad `TZ`, `DIGEST_TIME` or `NAS_REPORT_DAY` stops the container on boot, naming the variable. A digest or report missed while the container was down runs when it comes back, if it's within six hours.
 
 ## Data
 
