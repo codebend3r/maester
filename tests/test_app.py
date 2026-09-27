@@ -24,7 +24,15 @@ def test_build_wires_everything_with_injected_pieces():
 
 
 def test_build_services_creates_one_client_per_host():
-    cfg = load_settings({"SEERR_URL": "http://s", "PLEX_URL": "http://p", "WIZARR_URL": "http://w"})
+    cfg = load_settings(
+        {
+            "SEERR_URL": "http://s",
+            "PLEX_URL": "http://p",
+            "WIZARR_URL": "http://w",
+            "MEDIA_ROOTS": "/Meleys",
+            "PROBE_TIMEOUT_SECONDS": "30",
+        }
+    )
     reg = Registry.from_env(
         {
             "SONARR_MELEYS_URL": "http://m:1",
@@ -42,3 +50,4 @@ def test_build_services_creates_one_client_per_host():
     )
     assert set(services.tautulli) == {"vermithor"} and services.radarr == {}
     assert services.seerr.base_url == "http://s"
+    assert services.probe.paths.roots == ("/Meleys",) and services.probe.timeout == 30

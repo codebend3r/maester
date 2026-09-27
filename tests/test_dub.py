@@ -1,7 +1,7 @@
 from maester.clients.arr import MediaFile
 from maester.clients.seerr import ANIMATION_GENRE, ANIME_KEYWORD, MediaDetails, MediaStatus
 from maester.clients.sonarr import Series
-from maester.dub import dub_coverage, has_english_audio, is_anime
+from maester.dub import dub_coverage, has_english_audio, is_anime, is_english_track
 
 S = MediaStatus
 
@@ -21,6 +21,14 @@ def test_english_audio_follows_the_dub_audit_language_rule():
     assert has_english_audio(file(1, ("jpn",))) is False
     assert has_english_audio(file(1, ())) is False
     assert has_english_audio(file(1, None)) is None
+
+
+def test_a_track_title_says_english_when_its_tag_does_not():
+    assert is_english_track("eng") and is_english_track("EN-GB")
+    assert is_english_track("und", "English 2.0") and is_english_track("", "ENG")
+    assert is_english_track("jpn", "Funimation Dub")
+    assert not is_english_track("jpn", "Japanese 2.0") and not is_english_track("und", "Commentary")
+    assert not is_english_track("jpn", "Bengali")  # "eng" inside a word isn't English
 
 
 def test_coverage_per_season():

@@ -14,6 +14,7 @@ from typing import Any
 from maester.agent.tools import ToolRegistry
 from maester.agent.tools import registry as app_registry
 from maester.clients import (
+    FakeFileProbe,
     FakePlexClient,
     FakeRadarrClient,
     FakeSabnzbdClient,
@@ -229,6 +230,7 @@ def build_services(seed: dict[str, Any], seerr_user_id: int = 4) -> Services:
         radarr={h: _radarr(h, radarr.get(h, {})) for h in hosts},
         sabnzbd={h: FakeSabnzbdClient(host=h) for h in hosts},
         tautulli={h: FakeTautulliClient(host=h) for h in hosts},
+        probe=FakeFileProbe(),
     )
 
 

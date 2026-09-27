@@ -30,6 +30,19 @@ def test_values_are_parsed_and_urls_stripped():
     assert s.guardrails.user_tokens_per_day == 200_000
 
 
+def test_media_roots_and_path_map_are_lists():
+    s = load_settings(
+        {
+            "MEDIA_ROOTS": " /Vermithor, /Meleys ,,",
+            "MEDIA_PATH_MAP": "/data/media=/Meleys, broken, =/x, /tv = /Syrax/TV",
+            "PROBE_TIMEOUT_SECONDS": "45",
+        }
+    )
+    assert s.media_roots == ("/Vermithor", "/Meleys")
+    assert s.media_path_map == (("/data/media", "/Meleys"), ("/tv", "/Syrax/TV"))
+    assert s.probe_timeout_seconds == 45 and Settings().media_roots == ()
+
+
 def test_require_names_every_missing_variable_at_once():
     with pytest.raises(MissingConfig) as exc:
         require({"A": "1", "B": ""}, "A", "B", "C")

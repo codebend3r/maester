@@ -4,20 +4,59 @@ from dataclasses import replace
 import pytest
 
 from maester.agent.tools import Choices
+from maester.clients.arr import MediaFile
+from maester.clients.media import Inspection, Track
 from maester.clients.plex import PlexItem
-from maester.clients.seerr import MediaDetails, MediaStatus
-from maester.playback.items import Item
+from maester.clients.seerr import ArrRef, MediaDetails, MediaStatus
+from maester.clients.sonarr import Episode
+from maester.playback.items import Item, NotOnServer, locate
 from maester.playback.plays import copy_of, recent_plays
-from maester.tools.playback import recent_sessions
-from tests.factories import history_row, session
+from maester.tools.playback import list_tracks, recent_sessions
+from tests.factories import history_row, seerr_server, session
 
 S = MediaStatus
 DANY = 8008135
 DUNE = MediaDetails(
     438631, "movie", "Dune", 2021, "", S.AVAILABLE, S.AVAILABLE,
-    rating_key="4348", rating_key_4k="9001",
+    rating_key="4348", rating_key_4k="9001", arr=ArrRef(0, 8), arr_4k=ArrRef(1, 8),
 )  # fmt: skip
-BEAR = MediaDetails(136315, "tv", "The Bear", 2022, "", S.AVAILABLE, S.UNKNOWN, rating_key="5120")
+BEAR = MediaDetails(
+    136315, "tv", "The Bear", 2022, "", S.AVAILABLE, S.UNKNOWN,
+    rating_key="5120", arr=ArrRef(0, 12), tvdb_id=403245,
+)  # fmt: skip
+DUNE_4K = "/Vermithor/Movies/Dune (2021)/Dune (2021) Remux-2160p.mkv"
+FORKS = "/Meleys/TV/The Bear/Season 02/The Bear - S02E07 - Forks WEBDL-1080p.mkv"
+
+
+@pytest.fixture
+def library(ctx):
+    """Dune's 1080p copy on meleys and its 4K copy on vermithor; The Bear on meleys."""
+    services = ctx.services
+    services.seerr.arr_servers = {
+        "radarr": [seerr_server(0, "movie", "meleys"), seerr_server(1, "movie", "vermithor", is_4k=True)],
+        "sonarr": [seerr_server(0, "tv", "meleys")],
+    }  # fmt: skip
+    services.seerr.details.update({("movie", 438631): DUNE, ("tv", 136315): BEAR})
+    services.radarr["vermithor"].files = [
+        MediaFile(55, DUNE_4K, 68_500_000_000, "Remux-2160p", "FraMeSToR", 8)
+    ]
+    sonarr = services.sonarr["meleys"]
+    sonarr.episode_list = [
+        Episode(701, 12, 2, 6, "Sundae", True, 71, True),
+        Episode(702, 12, 2, 7, "Forks", True, 72, True),
+        Episode(703, 12, 2, 8, "Omelette", False, None, True),
+    ]
+    sonarr.files = [MediaFile(72, FORKS, 1_900_000_000, "WEBDL-1080p", "NTb", 12, 2)]
+    services.probe.files[DUNE_4K] = Inspection(
+        DUNE_4K, 9331.0, "hevc", 7,
+        (
+            Track("audio", "truehd", "eng", "TrueHD Atmos 7.1", default=True, channels=8),
+            Track("audio", "ac3", "und", "English Dub", channels=6),
+            Track("subtitle", "hdmv_pgs_subtitle", "eng", ""),
+            Track("subtitle", "srt", "es", "Dune.es.forced.srt", forced=True, external=True),
+        ),
+    )  # fmt: skip
+    return ctx
 
 
 class Down:
@@ -115,3 +154,43 @@ def test_items_name_their_copy_and_episode():
         Item("tv", 136315, False, 2)
     with pytest.raises(ValueError, match="no season"):
         Item("movie", 438631, False, 1, 1)
+
+
+async def test_locate_finds_a_copys_file_through_its_owning_arr(library):
+    dune = await locate(library.services, Item("movie", 438631, True))
+    assert (dune.owner.host, dune.file.id, dune.copy) == (
+        "vermithor", 55, "the 4K copy of Dune (2021)",
+    )  # fmt: skip
+    forks = await locate(library.services, Item("tv", 136315, False, 2, 7))
+    assert (forks.owner.host, forks.file.path, forks.episode_ids) == ("meleys", FORKS, (702,))
+    assert forks.title == "The Bear (2022) S02E07"
+
+    for item, why in (
+        (Item("movie", 438631, False), "has no 1080p file on meleys"),
+        (Item("tv", 136315, False, 2, 8), "S02E08 has no file on meleys"),
+        (Item("tv", 136315, False, 9, 1), "has no S09E01 of The Bear"),
+        (Item("tv", 136315, True, 2, 7), "no Radarr or Sonarr holds the 4K copy"),
+    ):
+        with pytest.raises(NotOnServer, match=why):
+            await locate(library.services, item)
+
+
+async def test_list_tracks_reads_the_files_own_tracks(library):
+    out = await list_tracks(library, 438631, "movie", "4K")
+    assert out["title"] == "Dune (2021)" and out["version"] == "4K"
+    assert out["audio"] == [
+        {"language": "eng", "codec": "truehd", "title": "TrueHD Atmos 7.1", "channels": 8,
+         "english": True, "flags": ["default"]},
+        {"language": "und", "codec": "ac3", "title": "English Dub", "channels": 6, "english": True},
+    ]  # fmt: skip
+    assert out["subtitles"] == [
+        {"language": "eng", "codec": "hdmv_pgs_subtitle"},
+        {"language": "es", "codec": "srt", "title": "Dune.es.forced.srt", "flags": ["forced", "file"]},
+    ]  # fmt: skip
+
+
+async def test_list_tracks_says_why_when_it_cannot(library):
+    out = await list_tracks(library, 136315, "tv", "1080p", 2, 7)
+    assert out["tracks"] is None and out["reason"].startswith("the file couldn't be read: ")
+    out = await list_tracks(library, 136315, "tv", "1080p", 2, 8)
+    assert out == {"tracks": None, "reason": "The Bear (2022) S02E08 has no file on meleys"}
