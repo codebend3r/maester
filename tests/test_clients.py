@@ -259,7 +259,11 @@ async def test_tautulli_history_and_stream_data_of_a_finished_play(fixture):
         "Plex for Roku",
     )
     stream = await client.stream_data(1124)
-    assert (stream.video_codec, stream.video_decision) == ("hevc", "transcode")
+    assert (stream.container, stream.video_codec, stream.video_decision) == (
+        "mkv",
+        "hevc",
+        "transcode",
+    )
     assert (stream.audio_codec, stream.audio_decision, stream.subtitle_decision) == (
         "eac3",
         "direct play",

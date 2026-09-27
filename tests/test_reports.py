@@ -32,6 +32,10 @@ async def test_a_player_limit_is_the_answer_and_the_file_is_left_alone(library):
     assert out["diagnosis"]["player_check"] == (
         "playing now, Plex for Roku on Living Room (Tautulli on vermithor)"
     )
+    playback = out["diagnosis"]["playback"]
+    assert (playback["platform"], playback["container"], playback["video_decision"]) == (
+        "Roku", "mkv", "direct play",
+    )  # fmt: skip
     assert out["next"].startswith("Give them the player fix")
     (issue,) = library.services.seerr.issues
     assert (issue["mediaId"], issue["issueType"], issue["userId"]) == (12, ISSUE_VIDEO, 4)
@@ -48,7 +52,7 @@ async def test_a_finished_play_is_read_from_the_history_with_the_files_profile(l
         history_row(user_id=DANY, rating_key="9001", row_id=77, product="Plex Web", player="Chrome")
     ]
     library.services.tautulli["vermithor"].streams[77] = StreamData(
-        "hevc", "direct play", "eac3", "direct play", "", ""
+        "mkv", "hevc", "direct play", "eac3", "direct play", "", ""
     )
     filed = await report(library, DUNE_4K_ITEM, ReportKind.WONT_PLAY)
     # Tautulli's history has no Dolby Vision profile; the file says 7.

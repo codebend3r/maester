@@ -89,6 +89,8 @@ class Diagnosis:
         checked: dict[str, Any] = {}
         if self.player:
             checked["player_check"] = self.player
+        if self.playback:
+            checked["playback"] = self.playback.as_dict()
         if self.causes:
             checked["player_causes"] = [c.as_dict() for c in self.causes]
         if self.health:

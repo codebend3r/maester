@@ -173,6 +173,7 @@ class HistoryRow:
 class StreamData:
     """What a finished play was sent: the source's codecs and the server's decision on each."""
 
+    container: str
     video_codec: str
     video_decision: str  # "direct play" | "copy" | "transcode"
     audio_codec: str
@@ -183,6 +184,7 @@ class StreamData:
     @classmethod
     def from_api(cls, raw: dict[str, Any]) -> StreamData:
         return cls(
+            container=raw.get("container") or "",
             video_codec=raw.get("video_codec") or "",
             video_decision=raw.get("stream_video_decision") or "",
             audio_codec=raw.get("audio_codec") or "",

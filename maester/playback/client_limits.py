@@ -38,6 +38,7 @@ class Playback:
     platform: str  # "Roku", "Chrome", "Android"
     product: str  # "Plex for Roku", "Plex Web"
     device: str  # "SHIELD Android TV"; empty when Tautulli didn't say
+    container: str
     video_codec: str
     video_decision: str  # "direct play" | "copy" | "transcode"
     dovi_profile: int | None  # the file's Dolby Vision profile: 0 for none, None if unknown
@@ -53,6 +54,7 @@ class Playback:
             platform=s.platform,
             product=s.product,
             device=s.device,
+            container=s.container,
             video_codec=s.video_codec,
             video_decision=s.video_decision,
             dovi_profile=s.dovi_profile,
@@ -71,6 +73,7 @@ class Playback:
             platform=row.platform,
             product=row.product,
             device="",
+            container=stream.container,
             video_codec=stream.video_codec,
             video_decision=stream.video_decision,
             dovi_profile=dovi_profile,

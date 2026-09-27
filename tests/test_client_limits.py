@@ -8,9 +8,9 @@ from maester.playback.plays import Play, playback_of
 from tests.factories import history_row, session
 
 CLEAN = Playback(
-    platform="Roku", product="Plex for Roku", device="Roku Ultra", video_codec="hevc",
-    video_decision="direct play", dovi_profile=0, audio_codec="eac3", audio_decision="direct play",
-    subtitle_codec="", subtitle_decision="",
+    platform="Roku", product="Plex for Roku", device="Roku Ultra", container="mkv",
+    video_codec="hevc", video_decision="direct play", dovi_profile=0, audio_codec="eac3",
+    audio_decision="direct play", subtitle_codec="", subtitle_decision="",
 )  # fmt: skip
 
 
@@ -62,7 +62,7 @@ async def test_a_live_play_is_read_from_its_session_and_a_finished_one_from_its_
 
     row = history_row(row_id=1124, platform="Chrome", product="Plex Web")
     services.tautulli["vermithor"].streams[1124] = StreamData(
-        "hevc", "transcode", "eac3", "direct play", "", ""
+        "mkv", "hevc", "transcode", "eac3", "direct play", "", ""
     )
     finished = Play.from_history("vermithor", row)
     playback = await playback_of(services, finished, file_dovi_profile=0)
