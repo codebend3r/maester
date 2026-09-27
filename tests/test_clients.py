@@ -195,13 +195,28 @@ async def test_sonarr_series_by_tvdb_and_follow(fixture):
 
 
 @respx.mock
-async def test_sonarr_queue_percent_and_host(fixture):
-    respx.get(f"{BASE}/api/v3/queue").respond(json=fixture("sonarr_queue"))
+async def test_sonarr_queue_percent_host_and_the_episode_it_is_for(fixture):
+    route = respx.get(f"{BASE}/api/v3/queue").respond(json=fixture("sonarr_queue"))
     client = SonarrClient("meleys", BASE, "k")
     (item,) = await client.queue()
     assert client.host == "meleys"
     assert item.percent == 80.0
     assert item.download_id == "SABnzbd_nzo_abc"
+    assert (item.episode_id, item.label) == (107, "The Bear (2022) S02E07")
+    sent = route.calls.last.request.url.params
+    assert sent["includeSeries"] == "true" and sent["includeEpisode"] == "true"
+
+
+@respx.mock
+async def test_removing_a_download_blocklists_it_and_leaves_the_search_to_the_caller():
+    route = respx.delete(f"{BASE}/api/v3/queue/402").respond(status_code=200)
+    await RadarrClient("meleys", BASE, "k").remove_from_queue(402)
+    params = route.calls.last.request.url.params
+    assert (params["removeFromClient"], params["blocklist"], params["skipRedownload"]) == (
+        "true",
+        "true",
+        "true",
+    )
 
 
 @respx.mock
@@ -413,6 +428,7 @@ async def test_arr_queue_reads_stall_messages_and_history_is_typed(fixture):
     client = RadarrClient("meleys", BASE, "k")
     (item,) = await client.queue()
     assert item.tracked_status == "warning" and item.media_id == 8
+    assert item.label == "Dune (2021)" and item.episode_id is None
     assert item.error_messages == ("The download is stalled with no connections",)
     failed, grabbed = await client.history(8)
     assert history.called and (failed.id, failed.event_type) == (1002, "downloadFailed")

@@ -25,6 +25,13 @@ class QueueItem:
     media_id: int  # movieId or seriesId
     # The arr's verdict on the download: "ok", "warning" (stalled, blocked) or "error".
     tracked_status: str = "ok"
+    episode_id: int | None = None  # Sonarr: the episode this record is for
+    # What it's a download of, as people name it: "Dune (2021)", "The Bear S02E07".
+    media_title: str = ""
+
+    @property
+    def label(self) -> str:
+        return self.media_title or self.title
 
     @property
     def percent(self) -> float:
@@ -56,7 +63,21 @@ class QueueItem:
             download_id=raw.get("downloadId"),
             media_id=int(raw.get("movieId") or raw.get("seriesId") or 0),
             tracked_status=raw.get("trackedDownloadStatus") or "ok",
+            episode_id=raw.get("episodeId"),
+            media_title=_queued_title(raw),
         )
+
+
+def _queued_title(raw: dict[str, Any]) -> str:
+    """The movie or episode a queue record is for, when the arr included it."""
+    media = raw.get("movie") or raw.get("series") or {}
+    if not media.get("title"):
+        return ""
+    title = f"{media['title']} ({media['year']})" if media.get("year") else media["title"]
+    episode = raw.get("episode") or {}
+    if episode.get("seasonNumber") is not None and episode.get("episodeNumber") is not None:
+        return f"{title} S{int(episode['seasonNumber']):02d}E{int(episode['episodeNumber']):02d}"
+    return title
 
 
 @dataclass(frozen=True)
@@ -153,6 +174,8 @@ class ArrClient(HttpClient):
     health_path = "/api/v3/system/status"  # checks the API key too
     # Per-title history lives at /history/movie?movieId= or /history/series?seriesId=.
     history_scope: tuple[str, str]
+    # What a queue read includes besides the downloads: the titles they're for.
+    queue_includes: tuple[str, ...]
 
     def __init__(self, host: str, base_url: str, api_key: str, **kwargs: Any):
         super().__init__(base_url, headers={"X-Api-Key": api_key}, **kwargs)
@@ -169,7 +192,8 @@ class ArrClient(HttpClient):
 
     async def queue(self) -> list[QueueItem]:
         data = await self.get_json(
-            f"{self.api}/queue", params={"pageSize": 200, "includeUnknownMovieItems": "true"}
+            f"{self.api}/queue",
+            params={"pageSize": 200, **dict.fromkeys(self.queue_includes, "true")},
         )
         return [QueueItem.from_api(r) for r in data.get("records", [])]
 
@@ -178,7 +202,13 @@ class ArrClient(HttpClient):
         await self.post_json(f"{self.api}/history/failed/{history_id}")
 
     async def remove_from_queue(self, queue_id: int, *, blocklist: bool = True) -> None:
-        params = {"removeFromClient": "true", "blocklist": "true" if blocklist else "false"}
+        """Remove a download from the client, blocklisting its release. The arr's own
+        search for a replacement is skipped: the caller searches, so it happens once."""
+        params = {
+            "removeFromClient": "true",
+            "blocklist": "true" if blocklist else "false",
+            "skipRedownload": "true",
+        }
         await self.delete(f"{self.api}/queue/{queue_id}", params=params)
 
     async def command(self, name: str, **params: Any) -> int:

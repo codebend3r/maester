@@ -13,6 +13,7 @@ arrs are. This is the bot's own memory of who asked for what and what it did.
 - `flags.py`          the kill switch and maintenance, kept across restarts
 - `messages.py`       DMs about a title, for reactions
 - `reports.py`        playback reports
+- `stalls.py`         the stalled-download sweeper's queue watch and what it did
 """
 
 from maester.store.audit import AuditLog, AuditRow
@@ -23,6 +24,7 @@ from maester.store.flags import KILL, MAINTENANCE, Flag, Flags
 from maester.store.messages import SentMessages
 from maester.store.pending import PendingAction, PendingActions
 from maester.store.reports import ReportRow, Reports
+from maester.store.stalls import StallAction, StallRow, Stalls, Watched
 from maester.store.users import (
     LinkedUser,
     LinkStatus,
@@ -42,6 +44,7 @@ class Store(
     Flags,
     SentMessages,
     Reports,
+    Stalls,
 ):
     """Every table's store over one connection."""
 
@@ -60,6 +63,9 @@ __all__ = [
     "PendingAction",
     "ReportRow",
     "SeerrUserTaken",
+    "StallAction",
+    "StallRow",
     "Store",
     "UserRow",
+    "Watched",
 ]
