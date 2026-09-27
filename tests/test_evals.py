@@ -8,6 +8,7 @@ from maester.agent.tools import ToolContext, ToolRegistry
 from maester.config import Settings
 from maester.evals import CASES_DIR, Case, load_cases, report, run_case
 from maester.evals.world import EVAL_USER, build_services, build_world
+from maester.memo import Memo
 from maester.store import Store
 from tests.fake_model import FakeModel, text_message, tool_message
 
@@ -115,7 +116,7 @@ async def test_playback_case_worlds_reach_what_their_cases_expect(case_file, cal
     """The tool each playback case expects, run on its world, reaches the case's decision."""
     case = Case.load(CASES_DIR / f"{case_file}.yaml")
     registry, services, store = build_world(case.services)
-    ctx = ToolContext(EVAL_USER, case.tier, services, store, Settings())
+    ctx = ToolContext(EVAL_USER, case.tier, services, store, Settings(), Memo())
     outcome = await ToolRunner(registry).run(ctx, *call)
     assert not outcome.is_error and expect in outcome.text
     store.close()

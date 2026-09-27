@@ -27,6 +27,7 @@ from maester.chat.identity import IdentityService, RoleMap
 from maester.chat.service import ChatService
 from maester.clients import (
     FileProbe,
+    OoklaSpeedTest,
     PlexClient,
     RadarrClient,
     SabnzbdClient,
@@ -74,6 +75,7 @@ def build_services(cfg: Settings, instances: Registry) -> Services:
             MediaPaths(cfg.media_roots, cfg.media_path_map), timeout=cfg.probe_timeout_seconds
         ),
         fleet=fleet_monitor(cfg.fleet_monitor),
+        speedtest=OoklaSpeedTest(cfg.speedtest_host) if cfg.speedtest_host else None,
     )
 
 

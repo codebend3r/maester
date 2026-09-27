@@ -6,7 +6,8 @@ no policy; that lives in the tools. Every client has a `Fake*` sibling with
 the same methods over in-memory data, so tools and evals run without a stack.
 `Services` is the bag of clients the app hands every tool, real or fake;
 `probe` reads the media files themselves, with ffprobe on the read-only mount.
-The fleet monitor is optional: `fleet` is None where it isn't set up.
+`speedtest` measures the internet connection from the container's own host.
+The fleet monitor and the speed test are optional: None where not set up.
 """
 
 from dataclasses import dataclass
@@ -19,6 +20,7 @@ from maester.clients.radarr import FakeRadarrClient, Radarr, RadarrClient
 from maester.clients.sabnzbd import FakeSabnzbdClient, Sabnzbd, SabnzbdClient
 from maester.clients.seerr import FakeSeerrClient, Seerr, SeerrClient
 from maester.clients.sonarr import FakeSonarrClient, Sonarr, SonarrClient
+from maester.clients.speedtest import FakeSpeedTest, OoklaSpeedTest, SpeedTester
 from maester.clients.tautulli import FakeTautulliClient, Tautulli, TautulliClient
 from maester.clients.wizarr import FakeWizarrClient, Wizarr, WizarrClient
 
@@ -36,6 +38,7 @@ class Services:
     tautulli: dict[str, Tautulli]
     probe: MediaProbe
     fleet: FleetMonitor | None  # CPU and memory per NAS; None when not set up
+    speedtest: SpeedTester | None  # None when SPEEDTEST_HOST isn't set
 
 
 __all__ = [
@@ -47,11 +50,13 @@ __all__ = [
     "FakeSabnzbdClient",
     "FakeSeerrClient",
     "FakeSonarrClient",
+    "FakeSpeedTest",
     "FakeTautulliClient",
     "FakeWizarrClient",
     "FileProbe",
     "FleetMonitorClient",
     "HttpClient",
+    "OoklaSpeedTest",
     "PlexClient",
     "RadarrClient",
     "SabnzbdClient",

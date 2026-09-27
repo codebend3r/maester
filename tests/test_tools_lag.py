@@ -1,6 +1,7 @@
 from maester.agent.tools import Tier, registry
 from maester.clients import ClientError
-from maester.tools.lag import server_status
+from maester.clients.speedtest import SpeedResult
+from maester.tools.lag import server_status, speed_test
 from tests.factories import session
 
 
@@ -40,3 +41,23 @@ async def test_server_status_without_tautulli(ctx):
 
 def test_tool_is_registered_for_friends():
     assert "server_status" in {s.name for s in registry.for_tier(Tier.FRIEND)}
+
+
+async def test_speed_test_runs_on_the_host_maester_runs_on(ctx):
+    ctx.services.speedtest.result = SpeedResult(3.2, 500.0, 11.0, "Bell, Toronto", "Bell", "u")
+    ctx.services.tautulli["vermithor"].sessions = [session(location="wan", stream_bitrate_kbps=18500)]  # fmt: skip
+    out = await speed_test(ctx, "Meleys")
+    assert (out["host"], out["upload_mbps"], out["remote_streams_mbps"]) == ("meleys", 3.2, 18.5)
+    assert out["headroom"].startswith("The upload is nearly full")
+    elsewhere = await speed_test(ctx, "vermithor")
+    assert elsewhere.is_error and "Speed tests run on meleys" in elsewhere.content
+    assert ctx.services.speedtest.runs == 1
+
+
+async def test_speed_test_refuses_when_it_fails_or_isnt_set_up(ctx):
+    failed = await speed_test(ctx, "meleys")
+    assert failed.is_error and "no test server answered" in failed.content
+    assert "the next can run in about 20 min" in failed.content
+    ctx.services.speedtest = None
+    missing = await speed_test(ctx, "meleys")
+    assert missing.is_error and "SPEEDTEST_HOST" in missing.content

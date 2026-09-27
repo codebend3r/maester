@@ -25,6 +25,12 @@ maester runs as one container on **Meleys** (`192.168.50.2`) at `/volume1/docker
 
 `docker-compose.yml` bind-mounts the media shares read-only so the file health check can probe a path exactly as Sonarr or Radarr reports it, and `MEDIA_ROOTS` in `.env` lists the same mounts: the check reads nothing outside them. If an arr reports its paths under other names (a `/data/media` inside its container), map them with `MEDIA_PATH_MAP`. If a share is not present on Meleys, remove its line rather than leaving a broken mount; the health check reports "unreadable" for paths it cannot see and never deletes on that basis.
 
+## Performance data
+
+The image carries Ookla's speedtest CLI (pinned in the `Dockerfile`), and `SPEEDTEST_HOST` names the NAS the container runs on (`meleys`), where `speed_test` measures the servers' shared internet connection. Leave it empty to turn speed tests off.
+
+CPU and memory per NAS come from the fleet monitor (wizteros' `fleet-monitor`, `http://192.168.50.2:8010` on the LAN). It only answers a Supabase session whose email is on its `FM_ADMIN_ALLOWED_EMAILS`, so create a Supabase account for maester in the same project, add its email to that list in the monitor's `.env` (then recreate the `fleet-monitor` container, which reads its env at start), and put the account and the project's URL and anon key in `FLEET_MONITOR_*`. Without them, server load comes from Tautulli alone.
+
 ## Data
 
 `maester-data/maester.db` is the only state. Back it up with the rest of `/volume1/docker`.

@@ -77,3 +77,8 @@ def test_the_fleet_monitor_is_optional_but_whole_once_named():
     with pytest.raises(MissingConfig) as exc:
         load_settings({**FLEET, "FLEET_MONITOR_EMAIL": "", "FLEET_MONITOR_PASSWORD": ""})
     assert exc.value.names == ["FLEET_MONITOR_EMAIL", "FLEET_MONITOR_PASSWORD"]
+
+
+def test_the_speed_test_runs_on_the_host_named():
+    assert load_settings({}).speedtest_host == ""
+    assert load_settings({"SPEEDTEST_HOST": " Meleys "}).speedtest_host == "meleys"

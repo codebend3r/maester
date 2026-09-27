@@ -24,6 +24,7 @@ from maester.clients import (
     FakeSabnzbdClient,
     FakeSeerrClient,
     FakeSonarrClient,
+    FakeSpeedTest,
     FakeTautulliClient,
     FakeWizarrClient,
     Services,
@@ -45,6 +46,7 @@ from maester.clients.seerr import (
     SeerrUser,
 )
 from maester.clients.sonarr import Episode, Series
+from maester.clients.speedtest import SpeedResult
 from maester.clients.tautulli import Session
 from maester.store import Store
 
@@ -327,6 +329,23 @@ def _fleet(seed: dict[str, Any]) -> FakeFleetMonitor:
     )
 
 
+def _speedtest(seed: dict[str, Any]) -> FakeSpeedTest:
+    """What a speed test from `host` finds, in Mbps; without `upload_mbps` it fails."""
+    result = (
+        SpeedResult(
+            upload_mbps=float(seed["upload_mbps"]),
+            download_mbps=float(seed.get("download_mbps", 300)),
+            ping_ms=float(seed.get("ping_ms", 9)),
+            server=seed.get("server", "Speedtest, Toronto, ON"),
+            isp=seed.get("isp", "Home ISP"),
+            url="https://www.speedtest.net/result/c/eval",
+        )
+        if "upload_mbps" in seed
+        else None
+    )
+    return FakeSpeedTest(host=seed.get("host", "meleys"), result=result)
+
+
 def build_services(seed: dict[str, Any], seerr_user_id: int = 4) -> Services:
     hosts = seed.get("hosts", ["meleys", "vermithor"])
     radarr, sonarr = seed.get("radarr", {}), seed.get("sonarr", {})
@@ -341,6 +360,7 @@ def build_services(seed: dict[str, Any], seerr_user_id: int = 4) -> Services:
         tautulli={h: _tautulli(h, tautulli.get(h, {}), tautulli_user or 0) for h in hosts},
         probe=_probe(seed.get("probe", {})),
         fleet=_fleet(seed["fleet"]) if "fleet" in seed else None,
+        speedtest=_speedtest(seed["speedtest"]) if "speedtest" in seed else None,
     )
 
 

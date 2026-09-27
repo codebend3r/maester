@@ -1,0 +1,78 @@
+from datetime import UTC, datetime, timedelta
+
+import pytest
+
+from maester.clients.speedtest import FakeSpeedTest, SpeedResult
+from maester.memo import Memo
+from maester.perf.uplink import MIN_GAP, REUSE, NotMeasured, Uplink, reading, recent
+from tests.factories import session
+
+
+def result(upload_mbps: float) -> SpeedResult:
+    return SpeedResult(upload_mbps, 900.0, 8.0, "Rogers, Toronto, ON", "Rogers", "https://st/r")
+
+
+class Clock:
+    def __init__(self):
+        self.now = datetime(2026, 9, 27, 10, 0, tzinfo=UTC)
+
+    def __call__(self):
+        return self.now
+
+
+@pytest.mark.parametrize(
+    ("upload", "streaming", "said"),
+    [
+        (40.0, 12000, "Plenty of room: about 40.0 Mbps of upload is free alongside 12.0 Mbps of remote streams."),
+        (10.0, 0, "Some room: about 10.0 Mbps of upload is free with no remote streams running, enough for another HD stream."),
+        (3.2, 18500, "The upload is nearly full: only about 3.2 Mbps is free alongside 18.5 Mbps of remote streams"),
+    ],
+)  # fmt: skip
+def test_headroom_in_plain_words(upload, streaming, said):
+    measured = Uplink("meleys", result(upload), streaming, ())
+    assert measured.headroom().startswith(said)
+    assert measured.tight is (upload < 8)
+
+
+async def test_a_test_reads_every_hosts_remote_streams_as_it_runs(services):
+    services.tautulli["meleys"].sessions = [session(location="wan", stream_bitrate_kbps=8000)]
+    services.tautulli["vermithor"].sessions = [
+        session(location="wan", stream_bitrate_kbps=6000),
+        session(location="lan", stream_bitrate_kbps=60000),
+    ]
+    services.speedtest = tester = FakeSpeedTest(result=result(22.0))
+    found = await reading(Memo(), services, tester)
+    assert found.found == Uplink("meleys", result(22.0), 14000, ())
+    facts = found.as_dict()
+    assert (facts["measured"], facts["remote_streams_mbps"], "next_test" in facts) == (
+        "just now", 14.0, False,
+    )  # fmt: skip
+
+
+async def test_tests_are_reused_then_rationed_then_run_again(services):
+    clock = Clock()
+    memo, tester = Memo(clock), FakeSpeedTest(result=result(30.0))
+    await reading(memo, services, tester)
+    clock.now += REUSE - timedelta(seconds=1)
+    assert (await reading(memo, services, tester)).found.result.upload_mbps == 30.0
+    assert recent(memo, tester) is not None
+    tester.result = result(5.0)
+    clock.now += timedelta(minutes=5)  # past REUSE, before MIN_GAP: the last one, flagged
+    rationed = await reading(memo, services, tester)
+    assert rationed.rationed and rationed.found.result.upload_mbps == 30.0
+    assert "the next can run in about 5 min" in rationed.as_dict()["next_test"]
+    assert recent(memo, tester) is None  # too old to describe the connection now
+    clock.now = memo.latest("speed_test:meleys").at + MIN_GAP
+    assert (await reading(memo, services, tester)).found.result.upload_mbps == 5.0
+    assert tester.runs == 2
+
+
+async def test_a_failed_test_is_rationed_too(services):
+    clock = Clock()
+    memo, tester = Memo(clock), FakeSpeedTest()
+    failed = await reading(memo, services, tester)
+    assert failed.found == NotMeasured("meleys", tester.why)
+    clock.now += timedelta(minutes=12)
+    assert (await reading(memo, services, tester)).found == failed.found
+    assert tester.runs == 1 and recent(memo, tester) is None
+    assert recent(memo, None) is None

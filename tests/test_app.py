@@ -51,7 +51,9 @@ def test_build_services_creates_one_client_per_host():
     assert set(services.tautulli) == {"vermithor"} and services.radarr == {}
     assert services.seerr.base_url == "http://s"
     assert services.probe.paths.roots == ("/Meleys",) and services.probe.timeout == 30
-    assert services.fleet is None  # no fleet monitor set up
+    assert services.fleet is None and services.speedtest is None  # neither set up
+    tester = build_services(load_settings({"SPEEDTEST_HOST": "meleys"}), reg).speedtest
+    assert tester.host == "meleys"
 
 
 def test_build_services_reads_the_fleet_monitor_when_it_is_set_up():

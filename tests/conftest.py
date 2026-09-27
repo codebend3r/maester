@@ -12,11 +12,13 @@ from maester.clients import (
     FakeSabnzbdClient,
     FakeSeerrClient,
     FakeSonarrClient,
+    FakeSpeedTest,
     FakeTautulliClient,
     FakeWizarrClient,
     Services,
 )
 from maester.config import Settings
+from maester.memo import Memo
 from maester.store import Store
 from tests.factories import HOSTS, RADARR_URL, SONARR_URL
 
@@ -44,6 +46,7 @@ def services() -> Services:
         tautulli={h: FakeTautulliClient(host=h) for h in HOSTS},
         probe=FakeFileProbe(),
         fleet=FakeFleetMonitor(),
+        speedtest=FakeSpeedTest(),
     )
 
 
@@ -58,4 +61,4 @@ def store():
 def ctx(services, store) -> ToolContext:
     """A linked friend (Seerr user 4) calling tools."""
     store.upsert_user("d1", status="active", seerr_user_id=4, plex_username="dany")
-    return ToolContext("d1", Tier.FRIEND, services, store, Settings())
+    return ToolContext("d1", Tier.FRIEND, services, store, Settings(), Memo())

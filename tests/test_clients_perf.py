@@ -13,6 +13,8 @@ from maester.clients.fleet import (
     SupabaseSession,
     Vitals,
 )
+from maester.clients.process import Completed
+from maester.clients.speedtest import FakeSpeedTest, OoklaSpeedTest, SpeedResult, SpeedTestFailed
 
 MONITOR, SUPABASE = "http://meleys.lan:8010", "https://proj.supabase.co"
 LOGIN = SupabaseLogin(SUPABASE, "anon-key", "maester@example.com", "s3cret")
@@ -93,3 +95,56 @@ async def test_fake_fleet_monitor_answers_or_is_down():
     fake.down = True
     with pytest.raises(ClientError, match="connection refused"):
         await fake.vitals()
+
+
+class Scripted:
+    """A process runner that answers once and records what it was asked to run."""
+
+    def __init__(self, answer):
+        self.answer, self.calls = answer, []
+
+    async def __call__(self, argv, timeout):
+        self.calls.append((list(argv), timeout))
+        if isinstance(self.answer, Exception):
+            raise self.answer
+        return self.answer
+
+
+async def test_ookla_result_is_read_in_mbps(fixture):
+    run = Scripted(Completed(0, json.dumps(fixture("ookla_result")) + "\n", ""))
+    result = await OoklaSpeedTest("meleys", run, timeout=60).measure()
+    # Ookla gives bytes per second: 4,318,211 B/s is 34.5 Mbps.
+    assert (result.upload_mbps, result.download_mbps, result.ping_ms) == (34.5, 943.0, 8.1)
+    assert (result.server, result.isp) == ("Rogers, Toronto, ON", "Rogers Communications")
+    assert result.url.startswith("https://www.speedtest.net/result/c/")
+    ((argv, timeout),) = run.calls
+    assert argv == ["speedtest", "--accept-license", "--accept-gdpr", "--format=json"]
+    assert timeout == 60
+
+
+@pytest.mark.parametrize(
+    ("answer", "why"),
+    [
+        (Completed(None, "", ""), "longer than 90 s"),
+        (
+            Completed(2, "", '{"type":"log","timestamp":"2026-09-27T10:00:00Z","message":'
+                      '"Configuration - Couldn\'t resolve host name (HostNotFoundException)",'
+                      '"level":"error"}\n'),
+            "Couldn't resolve host name",
+        ),
+        (Completed(1, "", "Segmentation fault\n"), "Segmentation fault"),
+        (Completed(0, '{"type":"result","upload":{}}', ""), "missing 'bandwidth'"),
+        (FileNotFoundError(2, "No such file or directory: 'speedtest'"), "couldn't start"),
+    ],
+)  # fmt: skip
+async def test_ookla_failures_say_why(answer, why):
+    with pytest.raises(SpeedTestFailed, match=why):
+        await OoklaSpeedTest("meleys", Scripted(answer)).measure()
+
+
+async def test_fake_speed_test_answers_or_fails():
+    result = SpeedResult(40.0, 900.0, 8.0, "Rogers, Toronto, ON", "Rogers", "u")
+    fake = FakeSpeedTest(result=result)
+    assert await fake.measure() == result and fake.runs == 1
+    with pytest.raises(SpeedTestFailed, match="no test server"):
+        await FakeSpeedTest().measure()

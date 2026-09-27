@@ -5,6 +5,7 @@ from maester.chat.identity import IdentityService, RoleMap
 from maester.clients import FakeSeerrClient
 from maester.clients.seerr import SeerrUser
 from maester.config import Settings
+from maester.memo import Memo
 from maester.notify import DirectMessage
 from maester.tools.accounts import link_account
 
@@ -20,7 +21,7 @@ async def test_a_link_request_is_decided_by_the_link_account_tool(store):
     assert spec.button_only and spec.tier == Tier.ADMIN
     validate_input(spec.input_schema, {**pending.payload, "approved": True})
 
-    admin = ToolContext("boss", Tier.ADMIN, services, store, Settings())
+    admin = ToolContext("boss", Tier.ADMIN, services, store, Settings(), Memo())
     linked = await link_account(admin, approved=True, **pending.payload)
     assert linked.content == "Linked Dany to dany@example.com."
     (dm,) = linked.notices

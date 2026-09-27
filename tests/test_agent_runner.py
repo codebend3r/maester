@@ -16,6 +16,7 @@ from maester.agent.tools import (
     ToolSpec,
 )
 from maester.config import Settings
+from maester.memo import Memo
 from maester.notify import AdminPost, ApprovalPost, DirectMessage
 from maester.store import LinkedUser, NotLinked, Store
 
@@ -101,7 +102,7 @@ def setup():
     runner = ToolRunner(reg, kill_switch=kill)
 
     def as_user(user_id, tier=Tier.TRUSTED):
-        return ToolContext(user_id, tier, None, store, Settings())
+        return ToolContext(user_id, tier, None, store, Settings(), Memo())
 
     yield runner, as_user, store, calls, kill
     store.close()
