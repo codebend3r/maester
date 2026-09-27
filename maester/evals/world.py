@@ -23,11 +23,15 @@ from maester.clients import (
     FakeWizarrClient,
     Services,
 )
+from maester.clients.arr import QueueItem
 from maester.clients.plex import PlexItem, PlexSeason, Version
+from maester.clients.radarr import Movie
 from maester.clients.seerr import (
     ArrServer,
     MediaDetails,
+    MediaRequest,
     MediaStatus,
+    RequestStatus,
     SearchResult,
     Season,
     SeerrUser,
@@ -82,7 +86,20 @@ def _title(r: dict[str, Any]) -> tuple[SearchResult, MediaDetails]:
     return result, details
 
 
-def _seerr(seed: dict[str, Any]) -> FakeSeerrClient:
+def _request(n: int, r: dict[str, Any], seerr_user_id: int) -> MediaRequest:
+    approved = r.get("status", "approved") == "approved"
+    return MediaRequest(
+        id=n,
+        status=RequestStatus.APPROVED if approved else RequestStatus.PENDING,
+        media_type=r.get("media_type", "movie"),
+        tmdb_id=int(r["tmdb_id"]),
+        is_4k=bool(r.get("is_4k", False)),
+        requested_by_id=seerr_user_id,
+        media_status=MediaStatus.PROCESSING if approved else MediaStatus.PENDING,
+    )
+
+
+def _seerr(seed: dict[str, Any], seerr_user_id: int) -> FakeSeerrClient:
     titles = [_title(r) for r in seed.get("results", [])]
     four_k = [
         ServerOptions(ArrServer(9, f"{kind} 4K", is_4k=True, is_default=True), (), ())
@@ -97,8 +114,35 @@ def _seerr(seed: dict[str, Any]) -> FakeSeerrClient:
             )
             for u in seed.get("users", [])
         ],
+        requests=[_request(n, r, seerr_user_id) for n, r in enumerate(seed.get("requests", []), 1)],
         server_list={"radarr": [four_k[0]], "sonarr": [four_k[1]]} if seed.get("four_k") else {},
         auto_approve=bool(seed.get("auto_approve", False)),
+    )
+
+
+def _radarr(host: str, seed: dict[str, Any]) -> FakeRadarrClient:
+    """A host's movies and what is downloading for them; sizes in GB."""
+    return FakeRadarrClient(
+        host=host,
+        movie_list=[
+            Movie(int(m["id"]), m["title"], int(m["tmdb_id"]), m.get("year"), "", True, False, None)
+            for m in seed.get("movies", [])
+        ],
+        queue_items=[
+            QueueItem(
+                id=n,
+                title=q.get("title", ""),
+                status=q.get("status", "downloading"),
+                size_bytes=int(q["size_gb"] * 1e9),
+                size_left_bytes=int(q["left_gb"] * 1e9),
+                time_left=q.get("time_left"),
+                error_messages=tuple(q.get("messages", [])),
+                download_id=q.get("download_id"),
+                media_id=int(q["movie_id"]),
+                tracked_status=q.get("tracked_status", "ok"),
+            )
+            for n, q in enumerate(seed.get("queue", []), 1)
+        ],
     )
 
 
@@ -130,14 +174,15 @@ def _plex(seed: dict[str, Any]) -> FakePlexClient:
     return FakePlexClient(items=items, show_seasons=seasons)
 
 
-def build_services(seed: dict[str, Any]) -> Services:
+def build_services(seed: dict[str, Any], seerr_user_id: int = 4) -> Services:
     hosts = seed.get("hosts", ["meleys", "vermithor"])
+    radarr = seed.get("radarr", {})
     return Services(
-        seerr=_seerr(seed.get("seerr", {})),
+        seerr=_seerr(seed.get("seerr", {}), seerr_user_id),
         plex=_plex(seed.get("plex", {})),
         wizarr=FakeWizarrClient(),
         sonarr={h: FakeSonarrClient(host=h) for h in hosts},
-        radarr={h: FakeRadarrClient(host=h) for h in hosts},
+        radarr={h: _radarr(h, radarr.get(h, {})) for h in hosts},
         sabnzbd={h: FakeSabnzbdClient(host=h) for h in hosts},
         tautulli={h: FakeTautulliClient(host=h) for h in hosts},
     )
@@ -146,10 +191,11 @@ def build_services(seed: dict[str, Any]) -> Services:
 def build_world(seed: dict[str, Any]) -> tuple[ToolRegistry, Services, Store]:
     store = Store(":memory:")
     user = seed.get("user", {})
+    seerr_user_id = int(user.get("seerr_user_id", 4))
     store.upsert_user(
         EVAL_USER,
         status="active",
-        seerr_user_id=int(user.get("seerr_user_id", 4)),
+        seerr_user_id=seerr_user_id,
         plex_username=user.get("plex_username", "eval"),
     )
-    return app_registry, build_services(seed), store
+    return app_registry, build_services(seed, seerr_user_id), store

@@ -303,3 +303,19 @@ async def test_fake_wizarr_invite():
     wizarr = FakeWizarrClient()
     inv = await wizarr.create_invite(expires_in_days=7, duration="35")
     assert inv.code == "FAKE001" and (await wizarr.list_invites()) == [inv]
+
+
+@respx.mock
+async def test_arr_queue_reads_stall_messages_and_history_is_typed(fixture):
+    respx.get(f"{BASE}/api/v3/queue").respond(json=fixture("radarr_queue_stalled"))
+    history = respx.get(f"{BASE}/api/v3/history/movie", params={"movieId": 8}).respond(
+        json=fixture("radarr_history")
+    )
+    client = RadarrClient("meleys", BASE, "k")
+    (item,) = await client.queue()
+    assert item.tracked_status == "warning" and item.media_id == 8
+    assert item.error_messages == ("The download is stalled with no connections",)
+    failed, grabbed = await client.history(8)
+    assert history.called and failed.event_type == "downloadFailed"
+    assert failed.message == "Unpacking failed, write error or disk is full?"
+    assert grabbed.event_type == "grabbed" and grabbed.message == ""

@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
-from maester.clients.arr import ArrClient, DiskSpace, MediaFile, QueueItem
+from maester.clients.arr import ArrClient, DiskSpace, HistoryEvent, MediaFile, QueueItem
 
 
 @dataclass(frozen=True)
@@ -37,6 +37,7 @@ class Radarr(Protocol):
     async def root_folders(self) -> list[str]: ...
     async def disk_space(self) -> list[DiskSpace]: ...
     async def queue(self) -> list[QueueItem]: ...
+    async def history(self, media_id: int) -> list[HistoryEvent]: ...
     async def movies(self) -> list[Movie]: ...
     async def movie_by_tmdb(self, tmdb_id: int) -> Movie | None: ...
     async def movie_files(self, movie_id: int) -> list[MediaFile]: ...
@@ -47,6 +48,7 @@ class Radarr(Protocol):
 
 class RadarrClient(ArrClient):
     service = "radarr"
+    history_scope = ("movie", "movieId")
 
     async def movies(self) -> list[Movie]:
         return [Movie.from_api(m) for m in await self.get_json(f"{self.api}/movie")]
@@ -72,6 +74,8 @@ class FakeRadarrClient:
     roots: list[str] = field(default_factory=lambda: ["/Movies"])
     disks: list[DiskSpace] = field(default_factory=list)
     queue_items: list[QueueItem] = field(default_factory=list)
+    # Download history per movie or series id, newest first.
+    events: dict[int, list[HistoryEvent]] = field(default_factory=dict)
     movie_list: list[Movie] = field(default_factory=list)
     files: list[MediaFile] = field(default_factory=list)
     failed: list[int] = field(default_factory=list)
@@ -86,6 +90,9 @@ class FakeRadarrClient:
 
     async def queue(self) -> list[QueueItem]:
         return list(self.queue_items)
+
+    async def history(self, media_id: int) -> list[HistoryEvent]:
+        return list(self.events.get(media_id, []))
 
     async def movies(self) -> list[Movie]:
         return list(self.movie_list)

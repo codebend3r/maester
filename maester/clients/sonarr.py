@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 from typing import Any, Protocol
 
-from maester.clients.arr import ArrClient, DiskSpace, MediaFile, QueueItem
+from maester.clients.arr import ArrClient, DiskSpace, HistoryEvent, MediaFile, QueueItem
 
 
 @dataclass(frozen=True)
@@ -62,6 +62,7 @@ class Sonarr(Protocol):
     async def root_folders(self) -> list[str]: ...
     async def disk_space(self) -> list[DiskSpace]: ...
     async def queue(self) -> list[QueueItem]: ...
+    async def history(self, media_id: int) -> list[HistoryEvent]: ...
     async def series(self) -> list[Series]: ...
     async def series_by_tvdb(self, tvdb_id: int) -> Series | None: ...
     async def lookup(self, term: str) -> list[Series]: ...
@@ -75,6 +76,7 @@ class Sonarr(Protocol):
 
 class SonarrClient(ArrClient):
     service = "sonarr"
+    history_scope = ("series", "seriesId")
 
     async def series(self) -> list[Series]:
         return [Series.from_api(s) for s in await self.get_json(f"{self.api}/series")]
@@ -119,6 +121,8 @@ class FakeSonarrClient:
     roots: list[str] = field(default_factory=lambda: ["/TV"])
     disks: list[DiskSpace] = field(default_factory=list)
     queue_items: list[QueueItem] = field(default_factory=list)
+    # Download history per movie or series id, newest first.
+    events: dict[int, list[HistoryEvent]] = field(default_factory=dict)
     series_list: list[Series] = field(default_factory=list)
     episode_list: list[Episode] = field(default_factory=list)
     files: list[MediaFile] = field(default_factory=list)
@@ -135,6 +139,9 @@ class FakeSonarrClient:
 
     async def queue(self) -> list[QueueItem]:
         return list(self.queue_items)
+
+    async def history(self, media_id: int) -> list[HistoryEvent]:
+        return list(self.events.get(media_id, []))
 
     async def series(self) -> list[Series]:
         return list(self.series_list)
