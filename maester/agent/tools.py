@@ -72,6 +72,11 @@ class ToolContext:
             raise NotLinked(f"Discord user {discord_id} isn't linked to a Plex account")
         return link
 
+    def name_of(self, discord_id: str) -> str:
+        """Someone as the admin knows them: their Plex name, or their Discord id if unlinked."""
+        link = self.store.active_link(discord_id)
+        return link.name if link else discord_id
+
 
 # Discord shows at most ten embeds on one message, one card per option.
 MAX_CHOICES = 10

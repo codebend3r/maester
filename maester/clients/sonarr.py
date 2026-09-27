@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
+from datetime import datetime
 from typing import Any, Protocol
 
 from maester.clients.arr import ArrClient, DiskSpace, HistoryEvent, MediaFile, QueueItem
@@ -41,9 +42,11 @@ class Episode:
     has_file: bool
     file_id: int | None
     monitored: bool
+    aired: datetime | None = None  # when it first aired; None when not yet known
 
     @classmethod
     def from_api(cls, raw: dict[str, Any]) -> Episode:
+        aired = raw.get("airDateUtc")
         return cls(
             id=int(raw["id"]),
             series_id=int(raw.get("seriesId") or 0),
@@ -53,6 +56,7 @@ class Episode:
             has_file=bool(raw.get("hasFile", False)),
             file_id=int(raw["episodeFileId"]) if raw.get("episodeFileId") else None,
             monitored=bool(raw.get("monitored", False)),
+            aired=datetime.fromisoformat(aired) if aired else None,
         )
 
 

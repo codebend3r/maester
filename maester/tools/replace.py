@@ -70,16 +70,10 @@ async def ready(ctx: ToolContext, report: ReportRow, host: str) -> Ready:
     return Ready(report, located, evidence)
 
 
-def name_of(ctx: ToolContext, discord_id: str) -> str:
-    """Someone as the admin knows them: their Plex name, or their Discord id."""
-    link = ctx.store.active_link(discord_id)
-    return link.name if link else discord_id
-
-
 async def carry_out(ctx: ToolContext, go: Ready) -> Result:
     """Replace the file; the result says every step, and the admin hears once."""
     replacement = await replace_copy(ctx.services, ctx.store, go.report, go.located)
-    reporters = [name_of(ctx, d) for d in go.evidence.reporters]
+    reporters = [ctx.name_of(d) for d in go.evidence.reporters]
     notice = admin_notice(replacement, go.report, go.evidence, reporters)
     return Result(replacement.text, (notice,), is_error=not replacement.deleted)
 
@@ -97,7 +91,7 @@ def ask_admin(ctx: ToolContext, go: Ready) -> Result:
     """Over the cap: the admin decides, with the same facts the friend confirmed."""
     ctx.store.update_report(go.report.id, action=Action.ESCALATED)
     located, cap = go.located, ctx.settings.guardrails.replace_daily_cap
-    who = name_of(ctx, ctx.user_id)
+    who = ctx.name_of(ctx.user_id)
     where = f"{located.copy} on {located.owner.host}"
     notice = (
         f"{who} asks to replace {where} ({policy_of(go.report).label}; {go.evidence.describe()}). "

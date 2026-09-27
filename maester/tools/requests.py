@@ -38,7 +38,7 @@ from maester.clients.seerr import (
     Seerr,
 )
 from maester.config import Settings
-from maester.library import Library, OwnerUnknown
+from maester.library import Library, NotOwned, OwnerUnknown, owner_on
 from maester.notify import DirectMessage
 from maester.store import LinkedUser
 
@@ -369,19 +369,8 @@ async def request_media_4k(
 async def follow_show(ctx: ToolContext, tmdb_id: int, host: str) -> dict[str, Any]:
     details = await ctx.services.seerr.media_details("tv", tmdb_id)
     try:
-        owner = await (await Library.load(ctx.services)).owner(details, is_4k=False)
-    except OwnerUnknown as exc:
+        owner = await owner_on(ctx.services, details, host)
+    except (OwnerUnknown, NotOwned) as exc:
         return {"followed": False, "reason": str(exc)}
-    if owner is None:
-        return {
-            "followed": False,
-            "reason": f"{details.display} isn't in Sonarr yet; it's added once a request for "
-            "it is approved.",
-        }
-    if owner.host != host.lower():
-        return {
-            "followed": False,
-            "reason": f"{details.display} is on the Sonarr on {owner.host}, not {host}.",
-        }
     await ctx.services.sonarr[owner.host].follow(owner.media_id)
     return {"followed": True, "title": details.display, "host": owner.host}

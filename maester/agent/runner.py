@@ -139,7 +139,7 @@ class ToolRunner:
             # The admin hears about every confirmed action; a tool that posts
             # its own account of it (a delete with path and size, or a request
             # for their approval) says it once.
-            who = link.name if (link := ctx.store.active_link(ctx.user_id)) else ctx.user_id
+            who = ctx.name_of(ctx.user_id)
             done = AdminPost(f"{who} confirmed: {pending.summary}\n{outcome.text[:500]}")
             outcome = replace(outcome, notices=(*outcome.notices, done))
         return outcome

@@ -15,6 +15,10 @@ for the 4K copy, there is no 4K copy in an arr.
 Whatever cannot be settled this way is refused with `OwnerUnknown`, never
 guessed: a Seerr server that matches no configured instance (or two), two
 instances holding the title, an instance that cannot answer.
+
+A tool that writes to an arr names the host, and `owner_on` holds it to
+that: the copy must be in an arr, and that arr must be on the named host
+(`NotOwned` otherwise).
 """
 
 from __future__ import annotations
@@ -36,6 +40,10 @@ _DEFAULT_PORTS = {"http": 80, "https": 443}
 
 class OwnerUnknown(LookupError):
     """Which instance holds the copy can't be settled; the message says why."""
+
+
+class NotOwned(LookupError):
+    """The copy isn't in an arr yet, or not in the one on the host named."""
 
 
 @dataclass(frozen=True)
@@ -135,3 +143,18 @@ class Library:
             hosts = " and ".join(o.host for o in owners)
             raise OwnerUnknown(f"{hosts} both have it; can't tell which one is meant")
         return owners[0] if owners else None
+
+
+async def owner_on(
+    services: Services, details: MediaDetails, host: str, *, is_4k: bool = False
+) -> Owner:
+    """The arr holding this copy, which must be the one on `host`."""
+    arr = "Radarr" if details.media_type == "movie" else "Sonarr"
+    owner = await (await Library.load(services)).owner(details, is_4k=is_4k)
+    if owner is None:
+        raise NotOwned(
+            f"{details.display} isn't in {arr} yet; it's added once a request for it is approved."
+        )
+    if owner.host != host.lower():
+        raise NotOwned(f"{details.display} is on the {arr} on {owner.host}, not {host}.")
+    return owner

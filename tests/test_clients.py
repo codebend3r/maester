@@ -406,6 +406,17 @@ async def test_seerr_collection_parts_in_release_order(fixture):
 
 
 @respx.mock
+async def test_sonarr_episodes_know_their_file_and_when_they_aired(fixture):
+    respx.get(f"{BASE}/api/v3/episode", params={"seriesId": 12}).respond(
+        json=fixture("sonarr_episode")
+    )
+    sundae, forks, unaired = await SonarrClient("meleys", BASE, "k").episodes(12)
+    assert (sundae.file_id, sundae.has_file, sundae.aired.year) == (71, True, 2023)
+    assert (forks.file_id, forks.has_file, forks.number) == (None, False, 7)
+    assert unaired.aired is None
+
+
+@respx.mock
 async def test_sonarr_episode_files_carry_season_and_audio_languages(fixture):
     respx.get(f"{BASE}/api/v3/episodefile", params={"seriesId": 40}).respond(
         json=fixture("sonarr_episodefile")
