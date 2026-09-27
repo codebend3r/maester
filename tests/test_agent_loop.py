@@ -6,6 +6,7 @@ from maester.agent.limits import RateLimiter
 from maester.agent.loop import MAX_TOOL_ITERATIONS, Agent, AgentReply
 from maester.agent.runner import ToolRunner
 from maester.agent.tools import Tier, ToolRegistry
+from maester.config import Settings
 from maester.store import Store
 from tests.fake_model import FakeModel, text_message, tool_message
 
@@ -38,6 +39,7 @@ def world():
             runner=ToolRunner(reg),
             store=store,
             services=None,
+            settings=Settings(),
             limiter=limiter,
             now=now or (lambda: datetime.now(UTC)),
         )

@@ -12,12 +12,12 @@ from __future__ import annotations
 
 import enum
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from maester.config import Settings
 from maester.notify import Notice
-from maester.store import LinkStatus, PendingAction
+from maester.store import LinkedUser, NotLinked, PendingAction, Store
 
 if TYPE_CHECKING:
     from maester.clients import Services
@@ -41,50 +41,36 @@ class Tier(enum.IntEnum):
             raise ValueError(f"unknown tier {name!r}") from None
 
 
-class NotLinked(LookupError):
-    """The caller has no active link to a Seerr user, so nothing can be done as them."""
-
-
 @dataclass(frozen=True)
-class LinkedUser:
-    """Who a tool acts as: the caller's Discord id and the Seerr user it is linked to."""
-
-    discord_id: str
-    seerr_user_id: int
-    name: str  # their Plex username, or email, as the admin knows them
-
-
-@dataclass
 class ToolContext:
     """What a tool handler gets besides its arguments.
 
     `services` holds the clients the app wires up, real or fake. `user_id`
-    is the chat identity the audit row is written under. `settings` is the
-    deployment's configuration, for the few tools that need a knob from it.
+    is the chat identity the call runs as and is audited under. `settings`
+    is the deployment's configuration, for the few tools that need a knob.
     """
 
     user_id: str
     tier: Tier
     services: Services
-    store: Any = None
-    settings: Settings = field(default_factory=Settings)
-    extra: dict[str, Any] = field(default_factory=dict)
+    store: Store
+    settings: Settings
 
     def linked_user(self) -> LinkedUser:
-        """The caller's active link: the one way a tool learns who to act as.
+        """The caller's active link: who requests go to Seerr as.
 
-        Requests go to Seerr as `seerr_user_id`, so they carry the friend's
-        name, quotas and permissions. An admin who never linked, or a link
+        Requests carry `X-API-User: seerr_user_id`, so the friend's name,
+        quotas and permissions apply. An admin who never linked, or a link
         still waiting on approval, has none, and the tool refuses.
         """
-        user = self.store.get_user(self.user_id) if self.store else None
-        if user is None or user.status != LinkStatus.ACTIVE or user.seerr_user_id is None:
-            raise NotLinked(
-                "this Discord account isn't linked to a Plex account yet; "
-                "the user can link it with /link"
-            )
-        name = user.plex_username or user.plex_email or user.discord_id
-        return LinkedUser(user.discord_id, user.seerr_user_id, name)
+        return self.link_of(self.user_id)
+
+    def link_of(self, discord_id: str) -> LinkedUser:
+        """Someone's active link, for a tool acting on their behalf (an admin's decision)."""
+        link = self.store.active_link(discord_id)
+        if link is None:
+            raise NotLinked(f"Discord user {discord_id} isn't linked to a Plex account")
+        return link
 
 
 # Discord shows at most ten embeds on one message, one card per option.

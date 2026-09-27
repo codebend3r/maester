@@ -242,7 +242,7 @@ def sonarr_with_tags(ctx, *, is_4k=False, tags=((1, "seerr"), (4, "anime"), (7, 
 async def test_an_english_dub_request_carries_the_dub_tag_and_profile(ctx):
     seed(ctx, replace(BEAR, keyword_ids=frozenset({ANIME_KEYWORD})))
     sonarr_with_tags(ctx)
-    ctx.settings = replace(ctx.settings, dub_profile="dual audio")
+    ctx = replace(ctx, settings=replace(ctx.settings, dub_profile="dual audio"))
     out = await request_media(ctx, 136315, "tv", english_dub=True)
     assert out["requested"] is True and out["dub"] == {"tag": "dub", "profile": "Dual Audio"}
     routing = ctx.services.seerr.routed[1]

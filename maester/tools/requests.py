@@ -23,15 +23,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from maester.agent.tools import (
-    Approval,
-    ForAdmin,
-    LinkedUser,
-    Settled,
-    Tier,
-    ToolContext,
-    tool,
-)
+from maester.agent.tools import Approval, ForAdmin, Settled, Tier, ToolContext, tool
 from maester.clients import ClientError, Services
 from maester.clients.seerr import (
     MediaDetails,
@@ -46,7 +38,7 @@ from maester.clients.seerr import (
 from maester.config import Settings
 from maester.library import AmbiguousOwner, movie_owner, series_owner
 from maester.notify import DirectMessage
-from maester.store import PendingAction
+from maester.store import LinkedUser, PendingAction
 
 # A 4K copy runs roughly four to six times the size of a 1080p encode.
 UHD_SIZE_FACTOR = (4, 6)

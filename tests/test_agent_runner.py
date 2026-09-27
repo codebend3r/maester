@@ -10,15 +10,14 @@ from maester.agent.tools import (
     Choice,
     Choices,
     ForAdmin,
-    LinkedUser,
-    NotLinked,
     Settled,
     Tier,
     ToolContext,
     ToolRegistry,
 )
+from maester.config import Settings
 from maester.notify import AdminPost, DirectMessage
-from maester.store import Store
+from maester.store import LinkedUser, NotLinked, Store
 
 SCHEMA_N = {"type": "object", "properties": {"n": {"type": "integer"}}, "required": ["n"]}
 SCHEMA = {
@@ -78,7 +77,7 @@ def setup():
     store = Store(":memory:")
     kill = KillSwitch()
     runner = ToolRunner(reg, kill_switch=kill)
-    ctx = ToolContext(user_id="u1", tier=Tier.TRUSTED, services=None, store=store)
+    ctx = ToolContext("u1", Tier.TRUSTED, None, store, Settings())
     yield runner, ctx, store, calls, kill
     store.close()
 
@@ -114,7 +113,7 @@ def test_choices_past_the_button_cap_are_named_to_the_model():
 
 async def test_out_of_tier_and_unknown_tools_are_rejected_and_audited(setup):
     runner, ctx, store, calls, _ = setup
-    friend = ToolContext(user_id="u2", tier=Tier.FRIEND, services=None, store=store)
+    friend = ToolContext("u2", Tier.FRIEND, None, store, Settings())
     out = await runner.run(friend, "delete_file", {"file_id": 1, "host": "meleys"})
     assert out.is_error and "not available" in out.content
     out = await runner.run(ctx, "nope", {})
@@ -162,7 +161,7 @@ async def test_confirmation_by_someone_else_or_denied_is_refused(setup):
     )
     assert out2.is_error and calls == []
 
-    other = ToolContext(user_id="u9", tier=Tier.TRUSTED, services=None, store=store)
+    other = ToolContext("u9", Tier.TRUSTED, None, store, Settings())
     out3 = await runner.run(other, "delete_file", {"file_id": 7, "host": "meleys"})
     store.decide_pending(out3.pending_id, "approved", "u9")
     out4 = await runner.run(
@@ -215,7 +214,7 @@ async def test_settle_applies_the_decision_as_the_admin_and_audits_it(setup):
     pending = store.get_pending(
         (await runner.run(ctx, "ask_admin", {"n": 3})).notices[0].pending_id
     )
-    admin = ToolContext(user_id="boss", tier=Tier.ADMIN, services=None, store=store)
+    admin = ToolContext("boss", Tier.ADMIN, None, store, Settings())
     settled = await runner.settle(admin, pending, True)
     assert settled.text == "settled True" and settled.notices[0].to == "u1"
     assert calls == [("settle_ask", "boss", 3, True)]
@@ -229,7 +228,7 @@ async def test_settle_failures_are_audited_and_raised(setup):
     pending = store.get_pending(
         (await runner.run(ctx, "ask_admin", {"n": -1})).notices[0].pending_id
     )
-    admin = ToolContext(user_id="boss", tier=Tier.ADMIN, services=None, store=store)
+    admin = ToolContext("boss", Tier.ADMIN, None, store, Settings())
     with pytest.raises(RuntimeError, match="seerr down"):
         await runner.settle(admin, pending, True)
     assert store.audit_recent(1)[0].ok is False
@@ -248,6 +247,6 @@ def test_linked_user_is_the_active_seerr_link_or_a_refusal(setup):
     with pytest.raises(NotLinked):
         ctx.linked_user()
     store.upsert_user("u1", status="active")
-    assert ctx.linked_user() == LinkedUser("u1", 4, "u1")
+    assert ctx.linked_user() == LinkedUser("u1", 4, None, "u1")
     store.upsert_user("u1", plex_email="u1@example.com")
-    assert ctx.linked_user().name == "u1@example.com"
+    assert ctx.link_of("u1").name == "u1@example.com"

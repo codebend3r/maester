@@ -7,32 +7,19 @@ from maester.chat.identity import IdentityService, RoleMap, resolve_tier
 from maester.clients import FakeSeerrClient, FakeTautulliClient
 from maester.clients.seerr import SeerrUser
 from maester.clients.tautulli import TautulliUser
-from maester.store import Store, UserRow
+from maester.store import Store
 
 ROLES = RoleMap(admin_role_id=1, trusted_role_id=2)
 
 
-def row(**kw) -> UserRow:
-    base = dict(
-        discord_id="d",
-        plex_email=None,
-        plex_username=None,
-        seerr_user_id=None,
-        tautulli_user_id=None,
-        status="active",
-        tier_override=None,
-    )
-    return UserRow(**{**base, **kw})
-
-
 def test_resolve_tier_rules():
-    assert resolve_tier(None, set(), ROLES) == Tier.UNLINKED
-    assert resolve_tier(None, {1}, ROLES) == Tier.ADMIN
-    assert resolve_tier(row(status="pending"), {2}, ROLES) == Tier.UNLINKED
-    assert resolve_tier(row(), set(), ROLES) == Tier.FRIEND
-    assert resolve_tier(row(), {2}, ROLES) == Tier.TRUSTED
-    assert resolve_tier(row(tier_override="admin"), set(), ROLES) == Tier.ADMIN
-    assert resolve_tier(row(tier_override="friend"), {1}, ROLES) == Tier.FRIEND
+    assert resolve_tier(None, False, set(), ROLES) == Tier.UNLINKED
+    assert resolve_tier(None, False, {1}, ROLES) == Tier.ADMIN
+    assert resolve_tier(None, False, {2}, ROLES) == Tier.UNLINKED
+    assert resolve_tier(None, True, set(), ROLES) == Tier.FRIEND
+    assert resolve_tier(None, True, {2}, ROLES) == Tier.TRUSTED
+    assert resolve_tier("admin", False, set(), ROLES) == Tier.ADMIN
+    assert resolve_tier("friend", True, {1}, ROLES) == Tier.FRIEND
 
 
 @pytest.fixture
@@ -105,7 +92,7 @@ async def test_finish_link_activates_or_revokes(identity):
 
 def test_tier_override(identity):
     svc, store = identity
-    store.upsert_user("d1", status="active")
+    store.upsert_user("d1", status="active", seerr_user_id=4)
     assert svc.set_tier_override("d1", "TRUSTED").endswith("trusted.")
     assert svc.tier_for("d1", set()) == Tier.TRUSTED
     svc.set_tier_override("d1", None)

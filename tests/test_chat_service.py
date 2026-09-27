@@ -9,6 +9,7 @@ from maester.chat.identity import IdentityService, RoleMap
 from maester.chat.service import UNLINKED_HELP, ChatService, ChatUser, Decision
 from maester.clients import FakeSeerrClient
 from maester.clients.seerr import SeerrUser
+from maester.config import Settings
 from maester.notify import AdminPost, DirectMessage
 from maester.store import Store
 from tests.fake_model import FakeModel, text_message, tool_message
@@ -82,6 +83,7 @@ def world():
             runner=ToolRunner(reg),
             store=store,
             services=services,
+            settings=Settings(),
         )
         identity = IdentityService(store, services, RoleMap(ADMIN_ROLE, TRUSTED_ROLE))
         return ChatService(agent=agent, identity=identity, store=store)

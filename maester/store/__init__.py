@@ -60,6 +60,24 @@ class UserRow:
     tier_override: str | None
 
 
+class NotLinked(LookupError):
+    """A Discord account with no active link to a Seerr user: nothing can be done as them."""
+
+
+@dataclass(frozen=True)
+class LinkedUser:
+    """An active link: who a Discord account is on Seerr (and Tautulli, when known)."""
+
+    discord_id: str
+    seerr_user_id: int
+    tautulli_user_id: int | None
+    name: str  # their Plex username, or email, as the admin knows them
+
+
+# The one rule for "linked": the admin approved it, and it names a Seerr user.
+_ACTIVE_LINK = "status = 'active' AND seerr_user_id IS NOT NULL"
+
+
 @dataclass(frozen=True)
 class PendingAction:
     id: int
@@ -239,8 +257,30 @@ class Store:
             ).fetchone()
         return self._user(r)
 
+    def active_link(self, discord_id: str) -> LinkedUser | None:
+        with self._lock:
+            r = self._conn.execute(
+                f"SELECT * FROM users WHERE discord_id = ? AND {_ACTIVE_LINK}", (discord_id,)
+            ).fetchone()
+        return self._link(r)
+
+    def active_link_by_seerr_id(self, seerr_user_id: int) -> LinkedUser | None:
+        """Whose request a Seerr user's is: the Discord account actively linked to it."""
+        with self._lock:
+            r = self._conn.execute(
+                f"SELECT * FROM users WHERE seerr_user_id = ? AND {_ACTIVE_LINK}", (seerr_user_id,)
+            ).fetchone()
+        return self._link(r)
+
+    @staticmethod
+    def _link(r: sqlite3.Row | None) -> LinkedUser | None:
+        if r is None:
+            return None
+        name = r["plex_username"] or r["plex_email"] or r["discord_id"]
+        return LinkedUser(r["discord_id"], r["seerr_user_id"], r["tautulli_user_id"], name)
+
     def user_by_seerr_id(self, seerr_user_id: int) -> UserRow | None:
-        """The live (pending or active) link to a Seerr user; linking allows one at a time."""
+        """Any live (pending or active) link to a Seerr user; linking allows one at a time."""
         with self._lock:
             r = self._conn.execute(
                 "SELECT * FROM users WHERE seerr_user_id = ? AND status != ?",

@@ -14,6 +14,7 @@ from maester.clients import (
     FakeWizarrClient,
     Services,
 )
+from maester.config import Settings
 from maester.store import Store
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -53,4 +54,4 @@ def store():
 def ctx(services, store) -> ToolContext:
     """A linked friend (Seerr user 4) calling tools."""
     store.upsert_user("d1", status="active", seerr_user_id=4, plex_username="dany")
-    return ToolContext(user_id="d1", tier=Tier.FRIEND, services=services, store=store)
+    return ToolContext("d1", Tier.FRIEND, services, store, Settings())

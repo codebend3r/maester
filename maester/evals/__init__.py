@@ -23,6 +23,7 @@ import yaml
 from maester.agent.loop import Agent
 from maester.agent.runner import ToolRunner
 from maester.agent.tools import Tier, ToolRegistry
+from maester.config import Settings
 from maester.evals.world import EVAL_USER
 
 CASES_DIR = Path(__file__).resolve().parent.parent.parent / "evals" / "cases"
@@ -140,6 +141,7 @@ def build_agent(model_name: str, registry: ToolRegistry, services: Any, store: A
         runner=ToolRunner(registry),
         store=store,
         services=services,
+        settings=Settings(),
     )
 
 

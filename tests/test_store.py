@@ -149,3 +149,19 @@ def test_user_by_seerr_id_finds_the_live_link(store):
     assert store.user_by_seerr_id(4).discord_id == "d1"
     store.upsert_user("d1", status="revoked")
     assert store.user_by_seerr_id(4) is None and store.user_by_seerr_id(5) is None
+
+
+def test_an_active_link_is_approved_and_names_a_seerr_user(store):
+    store.upsert_user("d1", status="active")  # an override-only row: no Seerr user
+    assert store.active_link("d1") is None
+    store.upsert_user("d1", seerr_user_id=4, plex_username="dany", tautulli_user_id=9)
+    link = store.active_link("d1")
+    assert (link.discord_id, link.seerr_user_id, link.tautulli_user_id, link.name) == (
+        "d1",
+        4,
+        9,
+        "dany",
+    )
+    assert store.active_link_by_seerr_id(4) == link
+    store.upsert_user("d1", status="pending")
+    assert store.active_link("d1") is None and store.active_link_by_seerr_id(4) is None

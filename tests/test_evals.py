@@ -5,6 +5,7 @@ import pytest
 from maester.agent.loop import Agent
 from maester.agent.runner import ToolRunner
 from maester.agent.tools import ToolRegistry
+from maester.config import Settings
 from maester.evals import CASES_DIR, Case, load_cases, report, run_case
 from maester.evals.world import EVAL_USER, build_services, build_world
 from maester.store import Store
@@ -47,6 +48,7 @@ async def test_run_case_checks_tools_and_reply(tmp_path: Path):
             runner=ToolRunner(reg),
             store=store,
             services=None,
+            settings=Settings(),
         )
 
     good = await run_case(
@@ -87,6 +89,7 @@ async def test_case_worlds_answer_the_tools_their_cases_expect(case_file, call):
         runner=ToolRunner(registry),
         store=store,
         services=services,
+        settings=Settings(),
     )
     reply = await agent.respond(EVAL_USER, case.tier, case.turns[0].user)
     assert reply.tool_calls == [{"name": call[0], "input": call[1], "ok": True}]

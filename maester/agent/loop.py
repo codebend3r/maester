@@ -19,9 +19,10 @@ from maester.agent.limits import LimitExceeded, RateLimiter
 from maester.agent.prompts import SYSTEM_PROMPT
 from maester.agent.runner import CONFIRMED_KEY, ToolOutcome, ToolRunner
 from maester.agent.tools import Choice, Settled, Tier, ToolContext
+from maester.clients import Services
 from maester.config import Settings
 from maester.notify import Notice
-from maester.store import PendingAction
+from maester.store import PendingAction, Store
 
 log = logging.getLogger("maester.agent")
 
@@ -79,12 +80,12 @@ class Agent:
         model_client: Any,
         model: str,
         runner: ToolRunner,
-        store: Any,
-        services: Any,
+        store: Store,
+        services: Services,
+        settings: Settings,
         limiter: RateLimiter | None = None,
         effort: str = "medium",
         system_prompt: str = SYSTEM_PROMPT,
-        settings: Settings | None = None,
         now: Callable[[], datetime] = lambda: datetime.now(UTC),
     ):
         self.client = model_client
@@ -95,7 +96,7 @@ class Agent:
         self.limiter = limiter
         self.effort = effort
         self.system_prompt = system_prompt
-        self.settings = settings or Settings()
+        self.settings = settings
         self.now = now
 
     def forget(self, user_id: str) -> int:

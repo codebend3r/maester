@@ -85,7 +85,7 @@ A tool reaches the admin by returning `ForAdmin(content, notice, approval=None)`
 
 The link flow's approval is the one handler registered outside a tool (`IdentityService.finish_link`).
 
-Tools act as the friend through `ToolContext.linked_user()`: the caller's active link, whose `seerr_user_id` goes out as Seerr's `X-API-User`. Callers without one are refused.
+Tools act as the friend through `ToolContext.linked_user()`: the caller's active link, whose `seerr_user_id` goes out as Seerr's `X-API-User`; `ctx.link_of(discord_id)` gives anyone else's, for a tool acting on someone's behalf. Callers without one are refused with `NotLinked`. "Active" is one rule in the store (approved, and naming a Seerr user), behind `Store.active_link()` and `Store.active_link_by_seerr_id()`, which tiers, tools and the ready DM all use. A `ToolContext` always carries the real store and settings; nothing mints its own.
 
 ## Prompt injection
 

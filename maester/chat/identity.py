@@ -15,7 +15,7 @@ from datetime import UTC, datetime, timedelta
 from maester.agent.tools import Settled, Tier
 from maester.clients import Services
 from maester.notify import DirectMessage
-from maester.store import LinkStatus, PendingAction, Store, UserRow
+from maester.store import LinkStatus, PendingAction, Store
 
 LINK_TTL = timedelta(days=7)
 
@@ -26,17 +26,17 @@ class RoleMap:
     trusted_role_id: int = 0
 
 
-def resolve_tier(user: UserRow | None, role_ids: set[int], roles: RoleMap) -> Tier:
-    """Override first, then roles; anyone not linked and active is UNLINKED.
+def resolve_tier(override: str | None, linked: bool, role_ids: set[int], roles: RoleMap) -> Tier:
+    """Override first, then roles; anyone without an active link is UNLINKED.
 
     The admin role stands on its own: the server owner is an admin whether
     or not they bothered to link, since they administer the thing.
     """
-    if user and user.tier_override:
-        return Tier.parse(user.tier_override)
+    if override:
+        return Tier.parse(override)
     if roles.admin_role_id and roles.admin_role_id in role_ids:
         return Tier.ADMIN
-    if not user or user.status != LinkStatus.ACTIVE:
+    if not linked:
         return Tier.UNLINKED
     if roles.trusted_role_id and roles.trusted_role_id in role_ids:
         return Tier.TRUSTED
@@ -57,7 +57,9 @@ class IdentityService:
         self.roles = roles
 
     def tier_for(self, discord_id: str, role_ids: set[int]) -> Tier:
-        return resolve_tier(self.store.get_user(discord_id), role_ids, self.roles)
+        user = self.store.get_user(discord_id)
+        linked = self.store.active_link(discord_id) is not None
+        return resolve_tier(user.tier_override if user else None, linked, role_ids, self.roles)
 
     async def start_link(self, discord_id: str, display_name: str, query: str) -> LinkStart:
         """Match `query` (Plex email or username) against Seerr users and queue approval."""
@@ -156,7 +158,7 @@ class IdentityService:
 
     def whoami(self, discord_id: str, role_ids: set[int]) -> str:
         user = self.store.get_user(discord_id)
-        tier = resolve_tier(user, role_ids, self.roles)
+        tier = self.tier_for(discord_id, role_ids)
         if not user or user.status == LinkStatus.REVOKED:
             return f"You're not linked yet (tier: {tier.name.lower()}). Use `/link <plex email or username>`."
         who = user.plex_email or user.plex_username or "?"
