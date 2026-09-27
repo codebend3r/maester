@@ -50,6 +50,19 @@ class Owner:
             return await self.arr.movie_files(self.media_id)  # type: ignore[union-attr]
         return await self.arr.episode_files(self.media_id)  # type: ignore[union-attr]
 
+    async def delete_file(self, file_id: int) -> None:
+        if self.kind == "movie":
+            await self.arr.delete_movie_file(file_id)  # type: ignore[union-attr]
+        else:
+            await self.arr.delete_episode_file(file_id)  # type: ignore[union-attr]
+
+    async def search(self, ids: tuple[int, ...]) -> None:
+        """Search for the movie (its id) or for these episodes."""
+        if self.kind == "movie":
+            await self.arr.movies_search(list(ids))  # type: ignore[union-attr]
+        else:
+            await self.arr.episode_search(list(ids))  # type: ignore[union-attr]
+
 
 def _address(url: str) -> tuple[str, int, str]:
     parts = urlsplit(url)

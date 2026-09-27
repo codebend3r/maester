@@ -1,11 +1,15 @@
 """A small library for playback tests: Dune in 1080p and 4K, and The Bear."""
 
+from dataclasses import replace
+
 from maester.agent.tools import ToolContext
 from maester.clients.arr import MediaFile
 from maester.clients.media import Inspection, Track
 from maester.clients.plex import PlexItem
 from maester.clients.seerr import ArrRef, MediaDetails, MediaStatus
 from maester.clients.sonarr import Episode
+from maester.playback.items import Item, locate
+from maester.playback.reports import Filed, ReportKind, file_report
 from tests.factories import seerr_server
 
 S = MediaStatus
@@ -21,6 +25,8 @@ BEAR = MediaDetails(
 )  # fmt: skip
 DUNE_4K = "/Vermithor/Movies/Dune (2021)/Dune (2021) Remux-2160p.mkv"
 FORKS = "/Meleys/TV/The Bear/Season 02/The Bear - S02E07 - Forks WEBDL-1080p.mkv"
+DUNE_4K_ITEM = Item("movie", 438631, True)
+FORKS_ITEM = Item("tv", 136315, False, 2, 7)
 DUNE_4K_TRACKS = (
     Track("audio", "truehd", "eng", "TrueHD Atmos 7.1", default=True, channels=8),
     Track("audio", "ac3", "und", "English Dub", channels=6),
@@ -58,3 +64,24 @@ def stock(ctx: ToolContext) -> ToolContext:
     )
     ctx.store.upsert_user(ctx.user_id, tautulli_user_id=DANY)
     return ctx
+
+
+def link_pal(ctx: ToolContext) -> None:
+    """A second linked friend, Discord id d2."""
+    ctx.store.upsert_user("d2", status="active", seerr_user_id=5, plex_username="pal")
+
+
+async def report(
+    ctx: ToolContext,
+    item: Item,
+    kind: ReportKind,
+    description: str = "it won't play",
+    at: float | None = None,
+    user: str = "d1",
+) -> Filed:
+    """File a report on `item` as `user`, through the real flow."""
+    ctx = replace(ctx, user_id=user)
+    located = await locate(ctx.services, item)
+    return await file_report(
+        ctx.services, ctx.store, ctx.linked_user(), located, kind, description, at
+    )

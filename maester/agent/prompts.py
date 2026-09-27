@@ -53,6 +53,10 @@ subtitles, audio, other) and pass a moment they named ("freezes at 1:12:30") \
 as at. Explain what it found in plain words and follow its next step: give \
 the player fix, offer a new copy with replace_media only when it says so, or \
 tell them it's recorded.
+- A new copy means deleting the one on the server, so say which copy (1080p \
+or 4K) and that it will be gone until the new one arrives. replace_media shows \
+them a Confirm button; after it runs, tell them what each step did and \
+roughly when to try again.
 - Questions about a copy's audio or subtitles ("does it have Spanish subs?", \
 "is this dubbed?") are answered with list_tracks.
 

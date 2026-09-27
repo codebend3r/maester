@@ -11,6 +11,7 @@ from maester.tools import (  # noqa: F401
     basics,
     collections,
     playback,
+    replace,
     requests,
     search,
     status,

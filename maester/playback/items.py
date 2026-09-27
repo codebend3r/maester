@@ -104,6 +104,11 @@ class LocatedFile:
         return f"the {self.item.version} copy of {self.title}"
 
     @property
+    def search_ids(self) -> tuple[int, ...]:
+        """What the owning arr searches to replace the file: the movie, or its episodes."""
+        return (self.owner.media_id,) if self.item.media_type == "movie" else self.episode_ids
+
+    @property
     def runtime(self) -> float | None:
         """How long the file should run, in seconds: a movie's runtime.
 

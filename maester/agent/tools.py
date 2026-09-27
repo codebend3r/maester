@@ -150,11 +150,16 @@ class Result:
 
     The model sees `content`. `notices` are posted or DMed. With `approval`,
     the admin is asked and the model is told the action now waits on them.
+    `is_error` marks a failure the tool explains itself (a refusal, a step
+    that failed): the model sees an error and the audit row is not ok, so a
+    daily cap never counts it. Unlike a raised exception, it is final: a
+    button press that ends this way is not offered again.
     """
 
     content: Any
     notices: tuple[Notice, ...] = ()
     approval: Approval | None = None
+    is_error: bool = False
 
 
 Handler = Callable[..., Awaitable[Any]]

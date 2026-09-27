@@ -40,6 +40,7 @@ UNLINKED_HELP = (
     "If you don't have access yet, ask the friend who invited you here, or the admin, for an invite."
 )
 ERROR_REPLY = "Sorry, something went wrong on my end (ref `{ref}`). The admin can look it up."
+ESCALATED = "That needs the admin's approval now; you'll get a DM once they decide."
 # A thumbs-down (any skin tone) on a DM about a title reports a problem with it.
 THUMBS_DOWN = "\N{THUMBS DOWN SIGN}"
 REACTION_REPORT = (
@@ -187,6 +188,8 @@ class ChatService:
         )
         if outcome is CANCELLED:
             return Decision("Cancelled.", notices=outcome.notices)
+        if outcome.approval_id is not None:  # the confirmed action went to the admin instead
+            return Decision(ESCALATED, notices=outcome.notices)
         if outcome.is_error and outcome.retryable:
             self.store.reopen_pending(decided.id)
             return Decision(

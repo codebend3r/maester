@@ -4,7 +4,7 @@ import pytest
 
 from maester.agent.loop import Agent
 from maester.agent.runner import ToolRunner
-from maester.agent.tools import Choice, Choices, Tier, ToolRegistry
+from maester.agent.tools import Approval, Choice, Choices, Result, Tier, ToolRegistry
 from maester.agent.tools import registry as app_registry
 from maester.chat.identity import IdentityService, RoleMap
 from maester.chat.service import UNLINKED_HELP, ChatService, ChatUser, Decision
@@ -62,6 +62,10 @@ def world(services, store):
     )
     async def replace(ctx, file_id=0):
         calls.append(("replace", file_id))
+        if file_id == 99:  # over the day's cap: the admin decides
+            approval = Approval("Trusty wants 99 gone", "replace 99", "link_account", {
+                "discord_id": "t1", "display_name": "Trusty", "account": "t@example.com"})  # fmt: skip
+            return Result("over the cap", approval=approval)
         return f"replaced file {file_id}"
 
     reg.register(app_registry.get("link_account"))
@@ -152,6 +156,16 @@ async def test_confirmation_round_trip(world):
     assert use_block["name"] == "replace_media" and use_block["input"] == {"file_id": 7}
     assert result["role"] == "user" and result_block["tool_use_id"] == use_block["id"]
     assert result_block["content"] == "replaced file 7"
+
+
+async def test_a_confirmation_that_goes_to_the_admin_says_so_plainly(world):
+    make, store, _ = world
+    svc = make(tool_message([("replace_media", {"file_id": 99})]), text_message("Confirm below."))
+    (pending,) = (await svc.handle_message(TRUSTED, "replace it")).confirmations
+    decision = await svc.decide(pending.id, TRUSTED, approve=True)
+    assert decision.text == "That needs the admin's approval now; you'll get a DM once they decide."
+    (post,) = decision.notices
+    assert isinstance(post, ApprovalPost) and store.get_pending(post.pending_id).kind == "approve"
 
 
 async def test_confirmed_result_reaches_the_model_on_the_next_turn(world):

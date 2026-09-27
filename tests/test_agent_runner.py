@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -63,6 +63,17 @@ def setup():
         if file_id == 9:
             return Result("deleted 9", (AdminPost("deleted /x/9.mkv, 4 GB, corrupt"),))
         return "deleted"
+
+    @reg.tool("refuse", "explains its own failure", SCHEMA_N)
+    async def refuse(ctx, n):
+        return Result(f"not doing {n}", (AdminPost("tried and refused"),), is_error=True)
+
+    @reg.tool(
+        "escalate", "confirmed, then asks the admin", SCHEMA, tier=Tier.TRUSTED, destructive=True
+    )
+    async def escalate(ctx, file_id, host):
+        approval = Approval("u1 wants a delete", "delete", "decide_n", {"n": file_id})
+        return Result({"asked": file_id}, approval=approval)
 
     @reg.tool("tell_admin", "admin should know", SCHEMA_N)
     async def tell_admin(ctx, n):
@@ -256,6 +267,24 @@ async def test_a_confirmed_tool_that_posts_its_own_notice_is_not_announced_twice
     pending = store.decide_pending(out.pending_id, "approved", "u1")
     (generic,) = (await runner.run_decision(as_user("u1"), pending, True)).notices
     assert generic.text.startswith("trusty confirmed")
+
+
+async def test_a_tool_can_fail_on_its_own_terms_and_is_audited_as_not_ok(setup):
+    runner, as_user, store, *_ = setup
+    out = await runner.run(as_user("u1"), "refuse", {"n": 3})
+    assert out.is_error and not out.retryable and out.content == "not doing 3"
+    assert out.notices == (AdminPost("tried and refused"),)
+    assert store.audit_recent(1)[0].ok is False
+    assert store.audit_count_since("refuse", datetime.now(UTC) - DAY) == 0
+
+
+async def test_a_confirmed_call_that_asks_the_admin_is_announced_by_its_approval_alone(setup):
+    runner, as_user, store, *_ = setup
+    out = await runner.run(as_user("u1"), "escalate", {"file_id": 4, "host": "meleys"})
+    pending = store.decide_pending(out.pending_id, "approved", "u1")
+    asked = await runner.run_decision(as_user("u1"), pending, True)
+    (post,) = asked.notices
+    assert isinstance(post, ApprovalPost) and post.pending_id == asked.approval_id
 
 
 async def test_a_cancel_runs_nothing_and_a_confirmation_is_the_requesters_own(setup):

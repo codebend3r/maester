@@ -133,9 +133,12 @@ class ToolRunner:
         if spec.destructive and self.kill_switch.enabled:
             return self._refuse(ctx, spec.name, args, self._disabled(spec.name), retryable=True)
         outcome = await self._execute(ctx, spec, args)
-        if pending.kind == "confirm" and not any(isinstance(n, AdminPost) for n in outcome.notices):
+        if pending.kind == "confirm" and not any(
+            isinstance(n, AdminPost | ApprovalPost) for n in outcome.notices
+        ):
             # The admin hears about every confirmed action; a tool that posts
-            # its own account of it (a delete with path and size) says it once.
+            # its own account of it (a delete with path and size, or a request
+            # for their approval) says it once.
             who = link.name if (link := ctx.store.active_link(ctx.user_id)) else ctx.user_id
             done = AdminPost(f"{who} confirmed: {pending.summary}\n{outcome.text[:500]}")
             outcome = replace(outcome, notices=(*outcome.notices, done))
@@ -168,7 +171,7 @@ class ToolRunner:
         if not isinstance(result, Result):
             return ToolOutcome(result)
         if result.approval is None:
-            return ToolOutcome(result.content, notices=result.notices)
+            return ToolOutcome(result.content, is_error=result.is_error, notices=result.notices)
         try:
             pending = self._ask_admin(ctx, result.approval)
         except (LookupError, ValidationError) as exc:

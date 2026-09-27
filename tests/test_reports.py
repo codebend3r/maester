@@ -6,32 +6,16 @@ from maester.agent.tools import Result, Tier
 from maester.clients.seerr import ISSUE_AUDIO, ISSUE_OTHER, ISSUE_VIDEO
 from maester.clients.tautulli import StreamData
 from maester.notify import AdminPost, DirectMessage
-from maester.playback.items import Item, locate
-from maester.playback.reports import Action, Evidence, ReportKind, file_report
+from maester.playback.reports import Action, Evidence, ReportKind
 from maester.seerr_events import SeerrNotification, issue_status
 from maester.tools.playback import report_problem
 from tests.factories import history_row, session
-from tests.playback_world import DANY, FORKS, stock
-
-DUNE_4K_ITEM = Item("movie", 438631, True)
-FORKS_ITEM = Item("tv", 136315, False, 2, 7)
+from tests.playback_world import DANY, DUNE_4K_ITEM, FORKS, FORKS_ITEM, link_pal, report, stock
 
 
 @pytest.fixture
 def library(ctx):
     return stock(ctx)
-
-
-async def report(ctx, item, kind, description="it won't play", at=None, user="d1"):
-    ctx = replace(ctx, user_id=user)
-    located = await locate(ctx.services, item)
-    return await file_report(
-        ctx.services, ctx.store, ctx.linked_user(), located, kind, description, at
-    )
-
-
-def link_pal(ctx):
-    ctx.store.upsert_user("d2", status="active", seerr_user_id=5, plex_username="pal")
 
 
 async def test_a_player_limit_is_the_answer_and_the_file_is_left_alone(library):

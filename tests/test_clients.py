@@ -379,6 +379,18 @@ async def test_arr_queue_reads_stall_messages_and_history_is_typed(fixture):
 
 
 @respx.mock
+async def test_an_import_in_the_history_names_the_file_it_made(fixture):
+    respx.get(f"{BASE}/api/v3/history/movie", params={"movieId": 8}).respond(
+        json=fixture("radarr_history_imported")
+    )
+    imported, grabbed = await RadarrClient("vermithor", BASE, "k").history(8)
+    assert (imported.event_type, imported.file_id, imported.download_id) == (
+        "downloadFolderImported", 55, "SABnzbd_nzo_x1",
+    )  # fmt: skip
+    assert (grabbed.event_type, grabbed.file_id, grabbed.episode_id) == ("grabbed", None, None)
+
+
+@respx.mock
 async def test_seerr_collection_parts_in_release_order(fixture):
     respx.get(f"{BASE}/api/v1/collection/87359").respond(json=fixture("seerr_collection"))
     collection = await SeerrClient(BASE, "k").collection(87359)
