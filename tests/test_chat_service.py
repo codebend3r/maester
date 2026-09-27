@@ -332,3 +332,24 @@ async def test_a_trusted_4k_request_is_approved_by_the_admin_end_to_end(services
     (dm,) = approved.notices
     assert dm.to == TRUSTED.id and "approved Dune (2021) in 4K" in dm.text
     assert seerr.requests[0].status == RequestStatus.APPROVED
+
+
+async def test_a_failed_press_that_cant_reopen_points_at_the_newer_approval(
+    services, store, monkeypatch
+):
+    store.upsert_user(TRUSTED.id, status="active", seerr_user_id=7, plex_username="trusty")
+    services.seerr.details[("movie", 438631)] = DUNE
+    services.seerr.arr_servers["radarr"] = [seerr_server(1, "movie", "vermithor", is_4k=True)]
+    svc = service(
+        app_registry,
+        services,
+        store,
+        tool_message([("request_media_4k", {"tmdb_id": 438631, "media_type": "movie"})]),
+        text_message("Asked."),
+    )
+    (post,) = (await svc.handle_message(TRUSTED, "Dune in 4K")).notices
+    services.seerr.down = True
+    # Seerr's webhook raised a fresh approval for the request while this press ran.
+    monkeypatch.setattr(store, "reopen_pending", lambda pending_id: False)
+    failed = await svc.decide(post.pending_id, ADMIN, approve=True)
+    assert failed.settled and "newer approval" in failed.text

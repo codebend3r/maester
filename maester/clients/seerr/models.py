@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import enum
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 # Issue types.
@@ -69,6 +70,17 @@ def _year(raw: dict[str, Any]) -> int | None:
 
 def _int_or_none(value: Any) -> int | None:
     return int(value) if value not in (None, "") else None
+
+
+def _user_name(raw: dict[str, Any]) -> str:
+    """A Seerr user as Seerr shows them."""
+    return (
+        raw.get("displayName")
+        or raw.get("plexUsername")
+        or raw.get("username")
+        or raw.get("email")
+        or ""
+    )
 
 
 @dataclass(frozen=True)
@@ -256,6 +268,12 @@ class MediaRequest:
     # Where this request's version (standard or 4K) stands, and its Plex key.
     media_status: MediaStatus = MediaStatus.UNKNOWN
     rating_key: str | None = None
+    requested_by_name: str = ""  # the requester as Seerr shows them
+    created_at: str = ""  # ISO 8601, as Seerr gives it
+
+    @property
+    def created(self) -> datetime | None:
+        return datetime.fromisoformat(self.created_at) if self.created_at else None
 
     @classmethod
     def from_api(cls, raw: dict[str, Any]) -> MediaRequest:
@@ -274,6 +292,8 @@ class MediaRequest:
                 media.get("status4k" if is_4k else "status", MediaStatus.UNKNOWN)
             ),
             rating_key=media.get("ratingKey4k" if is_4k else "ratingKey") or None,
+            requested_by_name=_user_name(raw.get("requestedBy") or {}),
+            created_at=raw.get("createdAt") or "",
         )
 
 

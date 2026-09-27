@@ -7,6 +7,9 @@ job. A route opts into deduplication when a repeat would reach a person
 twice: Seerr can send the same event again within minutes (a library
 rescan), while a later repeat is news (a replaced file ready again) and
 must get through. MEDIA_AVAILABLE DMs the friend whose request is ready;
+MEDIA_PENDING asks the admin about a request Seerr left pending, once per
+request whoever asked first (`maester/approvals.py`), and MEDIA_APPROVED and
+MEDIA_DECLINED close that approval when the admin decided in Seerr itself;
 ISSUE_RESOLVED and ISSUE_REOPENED follow a playback report's issue into
 its report row, idempotently, and tell the reporter once when theirs is
 resolved. Types without a route are ignored.
@@ -21,8 +24,9 @@ from datetime import timedelta
 from functools import partial
 from typing import Any
 
+from maester.approvals import decision_dm, raise_approval, request_approval, request_subject
 from maester.clients import ClientError, Services
-from maester.clients.seerr import MediaRequest
+from maester.clients.seerr import MediaRequest, RequestStatus
 from maester.media import Copy, Titled, version_label
 from maester.notify import DirectMessage, Notice
 from maester.store import Store
@@ -91,10 +95,54 @@ class SeerrRoute:
 def seerr_routes(services: Services, store: Store) -> dict[str, SeerrRoute]:
     return {
         "MEDIA_AVAILABLE": SeerrRoute(partial(ready_to_watch, services, store), RESCAN_REPEAT),
+        # One approval per request, and one decision per approval: repeats do nothing twice.
+        "MEDIA_PENDING": SeerrRoute(partial(pending_request, services, store)),
+        "MEDIA_APPROVED": SeerrRoute(partial(decided_in_seerr, store, True)),
+        "MEDIA_DECLINED": SeerrRoute(partial(decided_in_seerr, store, False)),
         # Only a change of state acts, so a repeated delivery does nothing twice.
         "ISSUE_RESOLVED": SeerrRoute(partial(issue_status, store, True)),
         "ISSUE_REOPENED": SeerrRoute(partial(issue_status, store, False)),
     }
+
+
+# Who decided a request the admin approved or declined in Seerr's own page.
+DECIDED_IN_SEERR = "seerr"
+
+
+async def pending_request(
+    services: Services, store: Store, notification: SeerrNotification
+) -> list[Notice]:
+    """Ask the admin about a request Seerr left pending, unless they already were."""
+    if notification.request_id is None:
+        return []
+    request = await services.seerr.get_request(notification.request_id)
+    if request.status != RequestStatus.PENDING:
+        return []
+    details = await services.seerr.media_details(request.media_type, request.tmdb_id)
+    link = store.active_link_by_seerr_id(request.requested_by_id)
+    requester = link.discord_id if link else ""
+    who = (
+        link.name if link else request.requested_by_name or f"Seerr user {request.requested_by_id}"
+    )
+    approval = request_approval(request, details.display, requester=requester, who=who)
+    _, post = raise_approval(store, approval, requester)
+    return [post] if post else []
+
+
+async def decided_in_seerr(
+    store: Store, approved: bool, notification: SeerrNotification
+) -> list[Notice]:
+    """The admin decided a request in Seerr: close its approval here, and tell the friend."""
+    if notification.request_id is None:
+        return []
+    pending = store.pending_about(request_subject(notification.request_id))
+    verdict = "approved" if approved else "denied"
+    if pending is None or store.decide_pending(pending.id, verdict, DECIDED_IN_SEERR) is None:
+        return []
+    args = pending.payload
+    if not args.get("requester"):
+        return []
+    return [DirectMessage(args["requester"], decision_dm(args["title"], args["version"], approved))]
 
 
 async def issue_status(

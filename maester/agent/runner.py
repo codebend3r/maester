@@ -192,7 +192,7 @@ class ToolRunner:
                 retryable=result.retryable,
             )
         try:
-            pending = self._ask_admin(ctx, result.approval)
+            pending, new = self._ask_admin(ctx, result.approval)
         except (LookupError, ValidationError) as exc:
             # The tool has acted but its approval can't be raised: say so to
             # the admin rather than leave the action stranded unseen.
@@ -213,15 +213,17 @@ class ToolRunner:
             "user it now waits on the admin and that they'll get a DM once it's decided. "
             "Do not call this tool again for it.",
         }
-        post = ApprovalPost(result.approval.notice, pending.id)
-        return ToolOutcome(content, approval_id=pending.id, notices=(*result.notices, post))
+        # An approval already open about the same subject has its post; don't post it twice.
+        post = (ApprovalPost(result.approval.notice, pending.id),) if new else ()
+        return ToolOutcome(content, approval_id=pending.id, notices=(*result.notices, *post))
 
-    def _ask_admin(self, ctx: ToolContext, approval: Approval) -> PendingAction:
+    def _ask_admin(self, ctx: ToolContext, approval: Approval) -> tuple[PendingAction, bool]:
+        """The pending action for `approval`, and whether it's new."""
         decide = self.registry.get(approval.decide)
         if decide is None or not decide.button_only:
             raise LookupError(f"{approval.decide!r} is not a registered admin decision tool")
         validate_input(decide.input_schema, {**approval.args, "approved": True})
-        return ctx.store.create_pending(
+        fields: dict[str, Any] = dict(
             kind="approve",
             action=decide.name,
             requester=ctx.user_id,
@@ -229,6 +231,9 @@ class ToolRunner:
             summary=approval.summary,
             ttl=APPROVAL_TTL,
         )
+        if approval.subject is None:
+            return ctx.store.create_pending(**fields), True
+        return ctx.store.create_pending_once(subject=approval.subject, **fields)
 
     def _request_confirmation(
         self, ctx: ToolContext, spec: ToolSpec, args: dict[str, Any]

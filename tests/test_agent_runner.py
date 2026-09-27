@@ -86,6 +86,11 @@ def setup():
         approval = Approval(f"u1 wants {n}", f"let u1 have {n}", "decide_n", {"n": n})
         return Result({"n": n}, approval=approval)
 
+    @reg.tool("ask_about", "asks the admin about one subject", SCHEMA_N)
+    async def ask_about(ctx, n):
+        approval = Approval(f"u1 wants {n}", f"{n} for u1", "decide_n", {"n": n}, f"thing:{n}")
+        return Result({"n": n}, approval=approval)
+
     @reg.tool("ask_badly", "names no decide tool", SCHEMA_N)
     async def ask_badly(ctx, n):
         return Result({}, approval=Approval("u1 wants it", "?", "echo", {"n": n}))
@@ -364,3 +369,14 @@ async def test_a_caller_with_no_link_is_refused_like_any_refusal(setup):
 
 async def acts(ctx):
     return {"as": ctx.linked_user().seerr_user_id}
+
+
+async def test_an_approval_about_a_subject_already_open_is_not_posted_twice(setup):
+    runner, as_user, *_ = setup
+    first = await runner.run(as_user("u1"), "ask_about", {"n": 5})
+    (post,) = first.notices
+    again = await runner.run(as_user("u2"), "ask_about", {"n": 5})
+    assert again.approval_id == first.approval_id == post.pending_id
+    assert again.notices == () and again.content["status"] == "awaiting_admin_approval"
+    other = await runner.run(as_user("u1"), "ask_about", {"n": 6})
+    assert isinstance(other.notices[0], ApprovalPost) and other.approval_id != first.approval_id

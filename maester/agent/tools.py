@@ -148,13 +148,16 @@ class Approval:
     `decide` names a button-only admin tool; `args` are its arguments except
     `approved`, which the press supplies. The runner checks them against that
     tool's schema before anything is stored, and on the press runs the tool
-    through the same checks and audit as any call.
+    through the same checks and audit as any call. With a `subject` (the Seerr
+    request it decides), an approval already open about it is reused rather
+    than posted twice, whoever raised it first.
     """
 
     notice: str
     summary: str
     decide: str
     args: dict[str, Any]
+    subject: str | None = None
 
 
 @dataclass(frozen=True)

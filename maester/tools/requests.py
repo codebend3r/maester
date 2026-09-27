@@ -1,12 +1,13 @@
 """Requests through Seerr, made as the friend who asked.
 
 `request_media` asks for the standard (1080p) copy. `request_media_4k` is a
-trusted-tier tool the friend tier never sees; when Seerr leaves a 4K request
-pending, it goes to the admin with Approve/Deny buttons, and the press runs
-`decide_4k_request`, a button-only admin tool that approves or declines it
-in Seerr and tells the requester. For
-shows, seasons already on the server or already requested are left out and
-reported, counted the way Seerr counts them. When nothing is requested
+trusted-tier tool the friend tier never sees. When Seerr leaves either
+request pending, it goes to the admin with Approve/Deny buttons
+(`maester/approvals.py`, shared with Seerr's MEDIA_PENDING webhook so each
+request is asked about once), and the press runs `decide_request`, a
+button-only admin tool that approves or declines it in Seerr and tells the
+requester. For shows, seasons already on the server or already requested
+are left out and reported, counted the way Seerr counts them. When nothing is requested
 (Seerr's refusals: quota, permission, duplicates; or nothing left to ask
 for), the tool refuses (`Result.refusal`) with one sentence to relay.
 
@@ -23,10 +24,11 @@ really is the owner.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
-from maester.agent.tools import Approval, Result, Tier, ToolContext, tool
+from maester.agent.tools import Result, Tier, ToolContext, tool
+from maester.approvals import decision_dm, request_approval
 from maester.clients import ClientError, Services
 from maester.clients.seerr import (
     MediaDetails,
@@ -271,28 +273,48 @@ async def request_media(
         )
     except NotRequested as why:
         return Result.refusal(str(why))
-    return submitted.reply
+    return awaiting_admin(ctx, submitted, details)
+
+
+def awaiting_admin(
+    ctx: ToolContext, submitted: Submitted, details: MediaDetails, note: str = ""
+) -> dict[str, Any] | Result:
+    """The reply; when Seerr left the request pending, the admin is asked too."""
+    if submitted.request.status != RequestStatus.PENDING:
+        return submitted.reply
+    approval = request_approval(
+        submitted.request,
+        details.display,
+        requester=ctx.user_id,
+        who=ctx.linked_user().name,
+        note=note,
+    )
+    return Result(submitted.reply, approval=approval)
 
 
 @tool(
-    "decide_4k_request",
-    "The admin's decision on a pending 4K request: approve or decline it in Seerr.",
+    "decide_request",
+    "The admin's decision on a request Seerr left pending: approve or decline it in Seerr.",
     {
         "type": "object",
         "properties": {
             "request_id": {"type": "integer", "description": "The Seerr request id."},
             "title": {"type": "string"},
-            "requester": {"type": "string", "description": "The requester's Discord id."},
+            "version": {"type": "string", "enum": ["1080p", "4K"]},
+            "requester": {
+                "type": "string",
+                "description": "The requester's Discord id; empty when they aren't linked here.",
+            },
             "approved": {"type": "boolean"},
         },
-        "required": ["request_id", "title", "requester", "approved"],
+        "required": ["request_id", "title", "version", "requester", "approved"],
         "additionalProperties": False,
     },
     tier=Tier.ADMIN,
     button_only=True,
 )
-async def decide_4k_request(
-    ctx: ToolContext, request_id: int, title: str, requester: str, approved: bool
+async def decide_request(
+    ctx: ToolContext, request_id: int, title: str, version: str, requester: str, approved: bool
 ) -> Result:
     """Approve or decline the request in Seerr, then tell the requester.
 
@@ -306,18 +328,13 @@ async def decide_4k_request(
         await (seerr.approve_request if approved else seerr.decline_request)(request_id)
     elif current != wanted:
         return Result.refusal(
-            f"Seerr request #{request_id} ({title} in 4K) was already {current.label} in Seerr; "
-            "nothing changed."
+            f"Seerr request #{request_id} ({title} in {version}) was already {current.label} in "
+            "Seerr; nothing changed."
         )
-    if approved:
-        dm = f"The admin approved {title} in 4K. It's on its way; I'll message you when it's ready."
-    else:
-        dm = f"The admin declined {title} in 4K. You can still ask for the regular version."
     verb = "Approved" if approved else "Declined"
-    return Result(
-        f"{verb} {title} in 4K in Seerr (request #{request_id}).",
-        (DirectMessage(requester, dm),),
-    )
+    dm = decision_dm(title, version, approved)
+    told = (DirectMessage(requester, dm),) if requester else ()
+    return Result(f"{verb} {title} in {version} in Seerr (request #{request_id}).", told)
 
 
 @tool(
@@ -351,26 +368,14 @@ async def request_media_4k(
         )
     except NotRequested as why:
         return Result.refusal(str(why))
-    reply = {**submitted.reply, **tradeoff}
-    request = submitted.request
-    if request.status != RequestStatus.PENDING:
-        return reply
-    who = ctx.linked_user().name
-    notice = f"{who} asks for {details.display} in 4K (Seerr request #{request.id})."
+    submitted = replace(submitted, reply={**submitted.reply, **tradeoff})
+    note = ""
     if "standard_copy_gb" in tradeoff:
-        notice += (
-            f" The 1080p copy is {tradeoff['standard_copy_gb']} GB;"
-            f" 4K would be about {tradeoff['estimated_4k_gb']} GB."
+        note = (
+            f"The 1080p copy is {tradeoff['standard_copy_gb']} GB; 4K would be about "
+            f"{tradeoff['estimated_4k_gb']} GB."
         )
-    return Result(
-        reply,
-        approval=Approval(
-            notice=notice,
-            summary=f"4K {details.display} for {who}",
-            decide="decide_4k_request",
-            args={"request_id": request.id, "title": details.display, "requester": ctx.user_id},
-        ),
-    )
+    return awaiting_admin(ctx, submitted, details, note)
 
 
 @tool(

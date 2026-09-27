@@ -198,10 +198,16 @@ class ChatService:
         if outcome.approval_id is not None:  # the confirmed action went to the admin instead
             return Decision(ESCALATED, notices=outcome.notices)
         if outcome.is_error and outcome.retryable:
-            self.store.reopen_pending(decided.id)
+            if self.store.reopen_pending(decided.id):
+                return Decision(
+                    f"Couldn't do it: {outcome.text[:1500]}\nIt's still open, so you can press "
+                    "again.",
+                    settled=False,
+                )
             return Decision(
-                f"Couldn't do it: {outcome.text[:1500]}\nIt's still open, so you can press again.",
-                settled=False,
+                f"Couldn't do it: {outcome.text[:1500]}\nA newer approval for the same thing is "
+                "open; use that one.",
+                notices=outcome.notices,
             )
         if outcome.is_error:
             return Decision(f"Couldn't do it: {outcome.text[:1500]}", notices=outcome.notices)
