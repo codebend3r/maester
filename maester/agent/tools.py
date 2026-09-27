@@ -13,7 +13,10 @@ from __future__ import annotations
 import enum
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from maester.clients import Services
 
 
 class Tier(enum.IntEnum):
@@ -38,16 +41,47 @@ class Tier(enum.IntEnum):
 class ToolContext:
     """What a tool handler gets besides its arguments.
 
-    `services` is whatever bag of clients the app wires up (real or fake);
-    tools pull what they need from it by attribute. `user_id` is the chat
-    identity the audit row is written under.
+    `services` holds the clients the app wires up, real or fake. `user_id`
+    is the chat identity the audit row is written under.
     """
 
     user_id: str
     tier: Tier
-    services: Any
+    services: Services
     store: Any = None
     extra: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class Choice:
+    """One option a tool offers the user; the chat layer shows it as a button."""
+
+    label: str
+    value: str
+    year: int | None = None
+    poster_url: str | None = None
+
+    @property
+    def display(self) -> str:
+        if self.year and str(self.year) not in self.label:
+            return f"{self.label} ({self.year})"
+        return self.label
+
+
+@dataclass(frozen=True)
+class Choices:
+    """Return this from a handler to offer the user a pick instead of a plain result."""
+
+    items: list[Choice]
+
+    def as_content(self) -> dict[str, Any]:
+        return {
+            "choices": [
+                {"label": c.label, "value": c.value, "year": c.year, "poster_url": c.poster_url}
+                for c in self.items
+            ],
+            "note": "Shown to the user as numbered buttons; wait for their pick.",
+        }
 
 
 Handler = Callable[..., Awaitable[Any]]

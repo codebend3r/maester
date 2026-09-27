@@ -14,7 +14,6 @@ def test_build_wires_everything_with_injected_pieces():
         cfg, services=SimpleNamespace(), model_client=object(), tools=ToolRegistry(), store=store
     )
     assert app.agent.model == "claude-opus-5-5" and app.agent.effort == "medium"
-    assert app.chat.notify_admin == app.bot.notify_admin
     assert app.bot.guild_id == 1 and app.chat.identity.roles.admin_role_id == 9
     assert app.web.title == "maester"
     store.close()

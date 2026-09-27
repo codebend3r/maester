@@ -7,13 +7,14 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Sequence
 
 import discord
 from discord import app_commands
 
-from maester.chat.service import ChatService
-from maester.chat.views import ApprovalView, chat_user, send_response, send_text
-from maester.store import PendingAction
+from maester.chat.members import resolve_chat_user
+from maester.chat.service import AdminNotice, ChatService
+from maester.chat.views import DecisionView, send_response, send_text
 
 log = logging.getLogger("maester.bot")
 
@@ -64,23 +65,26 @@ class MaesterBot(discord.Client):
         text = re.sub(rf"<@!?{self.user.id}>", "", message.content).strip()
         if not text:
             text = "hello"
-        user = chat_user(message.author)
+        user = await resolve_chat_user(self, message.author)
         async with message.channel.typing():
             response = await self.service.handle_message(user, text)
-        await send_response(message.channel, self.service, user, response)
+        await send_response(message.channel, self, user, response)
 
-    # -- admin notifications ----------------------------------------------
+    # -- admin channel ----------------------------------------------------
 
-    async def notify_admin(self, text: str, pending: PendingAction | None) -> None:
-        channel = self.get_channel(self.admin_channel_id) if self.admin_channel_id else None
-        if channel is None:
-            log.warning("no admin channel; dropped notification: %s", text[:120])
+    async def deliver(self, notices: Sequence[AdminNotice]) -> None:
+        """Post what the service wants the admin to see; approvals get buttons."""
+        if not notices:
             return
-        if pending is not None and pending.kind == "approve":
-            view = ApprovalView(self.service, pending.id)
-            view.message = await channel.send(text, view=view)
-        else:
-            await send_text(channel, text)
+        channel = self.get_channel(self.admin_channel_id) if self.admin_channel_id else None
+        for notice in notices:
+            if channel is None:
+                log.warning("no admin channel; dropped notification: %s", notice.text[:120])
+            elif notice.approval is not None:
+                view = DecisionView(notice.approval)
+                view.message = await channel.send(notice.text, view=view)
+            else:
+                await send_text(channel, notice.text)
 
     # -- slash commands ---------------------------------------------------
 
@@ -91,19 +95,40 @@ class MaesterBot(discord.Client):
         @app_commands.describe(account="The email or username you use for Plex")
         async def link(interaction: discord.Interaction, account: str) -> None:
             await interaction.response.defer(ephemeral=True)
-            response = await self.service.link(chat_user(interaction.user), account)
+            user = await resolve_chat_user(self, interaction.user)
+            response = await self.service.link(user, account)
             await interaction.followup.send(response.text, ephemeral=True)
+            await self.deliver(response.admin_notices)
 
         @tree.command(
             name="whoami", description="Show which Plex account you're linked to and your tier"
         )
         async def whoami(interaction: discord.Interaction) -> None:
-            await interaction.response.send_message(
-                self.service.whoami(chat_user(interaction.user)), ephemeral=True
-            )
+            user = await resolve_chat_user(self, interaction.user)
+            await interaction.response.send_message(self.service.whoami(user), ephemeral=True)
 
         @tree.command(name="forget", description="Clear our conversation so far")
         async def forget(interaction: discord.Interaction) -> None:
-            await interaction.response.send_message(
-                self.service.forget(chat_user(interaction.user)), ephemeral=True
+            user = await resolve_chat_user(self, interaction.user)
+            await interaction.response.send_message(self.service.forget(user), ephemeral=True)
+
+        @tree.command(name="tier", description="Admin: set or clear a member's tier override")
+        @app_commands.describe(
+            member="Whose tier to change", tier="The tier to force, or 'from roles' to clear it"
+        )
+        @app_commands.choices(
+            tier=[
+                app_commands.Choice(name="friend", value="friend"),
+                app_commands.Choice(name="trusted", value="trusted"),
+                app_commands.Choice(name="admin", value="admin"),
+                app_commands.Choice(name="from roles", value="roles"),
+            ]
+        )
+        async def tier(
+            interaction: discord.Interaction, member: discord.User, tier: app_commands.Choice[str]
+        ) -> None:
+            admin = await resolve_chat_user(self, interaction.user)
+            text = await self.service.set_tier(
+                admin, str(member.id), None if tier.value == "roles" else tier.value
             )
+            await interaction.response.send_message(text, ephemeral=True)

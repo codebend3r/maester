@@ -91,12 +91,13 @@ git clone https://github.com/codebend3r/maester.git
 cd maester
 cp .env.example .env     # fill in service URLs, API keys, Discord and Anthropic tokens
 uv sync
+uv run lefthook install  # git hooks: ruff check --fix and ruff format on staged files
 uv run maester           # starts the Discord bot and the web app on one loop
 ```
 
 Checks: `uv run ruff check .`, `uv run ruff format --check .`, `uv run pytest`. Evals: `uv run maester-eval` (real model against fake services) or `uv run maester-eval --model fake`.
 
-**Discord setup.** Create an application at discord.com/developers, add a bot, turn on the *Message Content* and *Server Members* privileged intents, and invite it with the `bot` and `applications.commands` scopes (permissions: View Channels, Send Messages, Read Message History, Embed Links). Put the bot token, your server id, the requests and admin channel ids, and the trusted and admin role ids in `.env`. Friends DM the bot or mention it in the requests channel; `/link`, `/whoami` and `/forget` are slash commands.
+**Discord setup.** Create an application at discord.com/developers, add a bot, turn on the *Message Content* and *Server Members* privileged intents, and invite it with the `bot` and `applications.commands` scopes (permissions: View Channels, Send Messages, Read Message History, Embed Links). Put the bot token, your server id, the requests and admin channel ids, and the trusted and admin role ids in `.env`. Friends DM the bot or mention it in the requests channel; `/link`, `/whoami` and `/forget` are slash commands; the admin sets or clears a member's tier with `/tier`.
 
 **Deploy.** `docs/nas-deployment.md` covers running it as a container on the NAS.
 

@@ -107,3 +107,17 @@ def test_expired_pending_action_cannot_be_decided(store):
     )
     assert store.open_pending() == []
     assert store.decide_pending(p.id, "approved", "admin") is None
+
+
+def test_calls_inside_a_transaction_commit_or_roll_back_together(store):
+    with store.transaction():
+        store.upsert_user("d1", status="pending")
+        store.upsert_user("d2", status="pending")
+    assert store.get_user("d1") and store.get_user("d2")
+
+    with pytest.raises(RuntimeError), store.transaction():
+        store.upsert_user("d3", status="pending")
+        raise RuntimeError("boom")
+    assert store.get_user("d3") is None
+    store.upsert_user("d4")  # the store is usable again after a rollback
+    assert store.get_user("d4")

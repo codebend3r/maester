@@ -72,23 +72,29 @@ async def test_link_matches_email_or_username_and_queues_approval(identity):
     assert result2.ok and store.get_user("d2").seerr_user_id == 5
 
 
+async def test_link_matches_a_mixed_case_seerr_email(identity):
+    svc, store = identity
+    svc.services.seerr.user_list.append(SeerrUser(6, "Arya@Example.com", "arya", ""))
+    result = await svc.start_link("d3", "Arya", "arya@example.com")
+    assert result.ok and store.get_user("d3").seerr_user_id == 6
+
+
 async def test_link_unknown_account_and_empty_query(identity):
     svc, _ = identity
     assert not (await svc.start_link("d1", "x", "nobody@example.com")).ok
     assert "Tell me" in (await svc.start_link("d1", "x", "   ")).message
 
 
-async def test_approve_and_deny_link(identity):
+async def test_finish_link_activates_or_revokes(identity):
     svc, store = identity
     pending = (await svc.start_link("d1", "Dany", "dany@example.com")).pending
-    assert svc.approve_link(pending.id, "admin").startswith("Linked")
+    assert svc.finish_link(pending, approved=True).startswith("Linked")
     assert store.get_user("d1").status == "active"
     assert svc.tier_for("d1", {2}) == Tier.TRUSTED
     assert "already linked" in (await svc.start_link("d1", "Dany", "dany@example.com")).message
-    assert svc.approve_link(pending.id, "admin") == "That link request is no longer open."
 
     pending2 = (await svc.start_link("d2", "Jon", "jon")).pending
-    assert svc.deny_link(pending2.id, "admin").startswith("Denied")
+    assert svc.finish_link(pending2, approved=False).startswith("Denied")
     assert store.get_user("d2").status == "revoked"
     assert "not linked" in svc.whoami("d2", set())
 

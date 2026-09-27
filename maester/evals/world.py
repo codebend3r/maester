@@ -7,7 +7,6 @@ Seeds in the case file are plain dicts turned into the fakes' records.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any
 
 from maester.agent.tools import ToolRegistry
@@ -20,20 +19,10 @@ from maester.clients import (
     FakeSonarrClient,
     FakeTautulliClient,
     FakeWizarrClient,
+    Services,
 )
 from maester.clients.seerr import SearchResult, SeerrUser
 from maester.store import Store
-
-
-@dataclass
-class Services:
-    seerr: FakeSeerrClient
-    plex: FakePlexClient
-    wizarr: FakeWizarrClient
-    sonarr: dict[str, FakeSonarrClient]
-    radarr: dict[str, FakeRadarrClient]
-    sabnzbd: dict[str, FakeSabnzbdClient]
-    tautulli: dict[str, FakeTautulliClient]
 
 
 def build_services(seed: dict[str, Any]) -> Services:

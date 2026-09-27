@@ -17,8 +17,9 @@ from typing import Any
 
 from maester.agent.limits import LimitExceeded, RateLimiter
 from maester.agent.prompts import SYSTEM_PROMPT
-from maester.agent.runner import ToolRunner
-from maester.agent.tools import Tier, ToolContext
+from maester.agent.runner import CONFIRMED_KEY, ToolOutcome, ToolRunner
+from maester.agent.tools import Choice, Tier, ToolContext
+from maester.store import PendingAction
 
 log = logging.getLogger("maester.agent")
 
@@ -47,7 +48,7 @@ class AgentReply:
     tool_calls: list[dict[str, Any]] = field(default_factory=list)
     pending_ids: list[int] = field(default_factory=list)
     # Options a tool offered the user, rendered as buttons by the chat layer.
-    choices: list[dict[str, Any]] = field(default_factory=list)
+    choices: list[Choice] = field(default_factory=list)
     input_tokens: int = 0
     output_tokens: int = 0
     cache_read_tokens: int = 0
@@ -81,6 +82,37 @@ class Agent:
     def forget(self, user_id: str) -> int:
         return self.store.clear_messages(user_id)
 
+    def _context(self, user_id: str, tier: Tier) -> ToolContext:
+        return ToolContext(user_id=user_id, tier=tier, services=self.services, store=self.store)
+
+    async def resolve_confirmation(
+        self, user_id: str, tier: Tier, pending: PendingAction, approved: bool
+    ) -> ToolOutcome:
+        """Run (or drop) a confirmed destructive call and remember what happened.
+
+        The model's own call only got a "waiting for confirmation" result, so
+        the real outcome goes in as a fresh tool_use/tool_result pair; the next
+        turn sees what happened the same way it sees any other tool.
+        """
+        if approved:
+            outcome = await self.runner.run(
+                self._context(user_id, tier),
+                pending.action,
+                {**pending.payload, CONFIRMED_KEY: pending.id},
+            )
+        else:
+            outcome = ToolOutcome("Cancelled by the user; nothing was done.")
+        tool_use = {
+            "type": "tool_use",
+            "id": f"toolu_button_{pending.id}",
+            "name": pending.action,
+            "input": pending.payload,
+        }
+        results = self._stub_results([outcome.as_result_block(tool_use["id"])])
+        self.store.append_message(user_id, "assistant", [tool_use], estimate_tokens(tool_use))
+        self.store.append_message(user_id, "user", results, estimate_tokens(results))
+        return outcome
+
     async def respond(
         self,
         user_id: str,
@@ -96,7 +128,7 @@ class Agent:
             except LimitExceeded as exc:
                 return AgentReply(LIMIT_REPLY.format(what=exc.what, hint=exc.retry_hint))
 
-        ctx = ToolContext(user_id=user_id, tier=tier, services=self.services, store=self.store)
+        ctx = self._context(user_id, tier)
         history = self.store.recent_messages(
             user_id, max_tokens=HISTORY_TOKEN_BUDGET, since=self.now() - IDLE_RESET
         )
@@ -150,14 +182,8 @@ class Agent:
                 )
                 if outcome.pending_id is not None:
                     reply.pending_ids.append(outcome.pending_id)
-                if isinstance(outcome.content, dict) and isinstance(
-                    outcome.content.get("choices"), list
-                ):
-                    reply.choices = [
-                        c
-                        for c in outcome.content["choices"]
-                        if isinstance(c, dict) and c.get("label")
-                    ]
+                if outcome.choices:  # the latest picker wins
+                    reply.choices = list(outcome.choices)
                 results.append(outcome.as_result_block(block.id))
             messages.append({"role": "user", "content": results})
             self.store.append_message(

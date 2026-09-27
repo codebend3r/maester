@@ -15,6 +15,7 @@ from typing import Any
 
 import anthropic
 import uvicorn
+from fastapi import FastAPI
 
 from maester.agent.limits import KillSwitch, RateLimiter
 from maester.agent.loop import Agent
@@ -29,6 +30,7 @@ from maester.clients import (
     RadarrClient,
     SabnzbdClient,
     SeerrClient,
+    Services,
     SonarrClient,
     TautulliClient,
     WizarrClient,
@@ -44,18 +46,6 @@ import maester.tools  # noqa: F401  isort: skip
 log = logging.getLogger("maester")
 
 
-@dataclass
-class Services:
-    seerr: Any
-    plex: Any
-    wizarr: Any
-    sonarr: dict[str, Any]
-    radarr: dict[str, Any]
-    sabnzbd: dict[str, Any]
-    tautulli: dict[str, Any]
-    registry: Registry
-
-
 def build_services(cfg: Settings, instances: Registry) -> Services:
     def per_host(service: str, cls: type) -> dict[str, Any]:
         return {i.host: cls(i.host, i.url, i.api_key) for i in instances.instances(service)}
@@ -68,7 +58,6 @@ def build_services(cfg: Settings, instances: Registry) -> Services:
         radarr=per_host("radarr", RadarrClient),
         sabnzbd=per_host("sabnzbd", SabnzbdClient),
         tautulli=per_host("tautulli", TautulliClient),
-        registry=instances,
     )
 
 
@@ -76,18 +65,18 @@ def build_services(cfg: Settings, instances: Registry) -> Services:
 class App:
     settings: Settings
     store: Store
-    services: Any
+    services: Services
     agent: Agent
     chat: ChatService
     bot: MaesterBot
-    web: Any
+    web: FastAPI
     kill_switch: KillSwitch
 
 
 def build(
     cfg: Settings | None = None,
     *,
-    services: Any = None,
+    services: Services | None = None,
     model_client: Any = None,
     tools: ToolRegistry | None = None,
     store: Store | None = None,
@@ -119,7 +108,6 @@ def build(
         requests_channel_id=cfg.discord_requests_channel_id,
         admin_channel_id=cfg.discord_admin_channel_id,
     )
-    chat.notify_admin = bot.notify_admin
     return App(cfg, store, services, agent, chat, bot, create_app(), kill)
 
 
@@ -132,8 +120,8 @@ async def serve(app: App) -> None:
     for task in pending:
         task.cancel()
     for task in done:
-        if task.exception():
-            raise task.exception()  # type: ignore[misc]
+        if not task.cancelled() and (exc := task.exception()):
+            raise exc
 
 
 def run() -> int:
