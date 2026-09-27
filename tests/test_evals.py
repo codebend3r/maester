@@ -166,3 +166,15 @@ async def test_the_health_world_has_what_its_case_says_is_down():
     outcome = await ToolRunner(registry).run(ctx, "service_health", {})
     assert [d["service"] for d in outcome.content["down"]] == ["Plex", "Radarr on vermithor"]
     store.close()
+
+
+async def test_the_version_world_recommends_what_its_case_expects_and_flags_the_remux():
+    case = Case.load(CASES_DIR / "version_for_slow_connection.yaml")
+    registry, services, store = build_world(case.services)
+    ctx = ToolContext(EVAL_USER, case.tier, services, store, Settings(), Memo())
+    call = {"tmdb_id": 438631, "connection_mbps": 20}
+    outcome = await ToolRunner(registry).run(ctx, "pick_version", call)
+    assert '"recommended": {"version": "1080p", "fits": true' in outcome.text
+    (notice,) = outcome.notices
+    assert "streamed away from home 3 times" in notice.text
+    store.close()

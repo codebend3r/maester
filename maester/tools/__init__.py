@@ -17,4 +17,5 @@ from maester.tools import (  # noqa: F401
     search,
     service_health,
     status,
+    versions,
 )

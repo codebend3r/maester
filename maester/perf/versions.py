@@ -15,7 +15,7 @@ spikes through, stays under the limit. `recommend` picks the best version
 that fits, or else the lightest, with the remote quality to set so Plex
 converts it down (`quality_for`, Plex's own quality steps). With nothing
 known, a connection away from home is taken to carry about
-`REMOTE_COMFORT_KBPS` (`or_typical`), and says so.
+`REMOTE_COMFORT_KBPS` (`TYPICAL_AWAY`), and says so.
 """
 
 from __future__ import annotations
@@ -26,12 +26,13 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
 
+from maester.clients import ClientError, Services
 from maester.clients.plex import Plex, PlexItem, Version
 from maester.clients.seerr import MediaDetails
 from maester.formatting import megabits
 from maester.perf.load import mbps
 from maester.perf.uplink import Uplink
-from maester.playback.plays import RELAY_CAP_KBPS, Playback
+from maester.playback.plays import RELAY_CAP_KBPS, REMOTE, Playback, playback_of, recent_plays
 
 # A stream needs about this much more than a file's average bitrate to get
 # through its busiest scenes without buffering.
@@ -126,6 +127,21 @@ async def title_versions(plex: Plex, details: MediaDetails) -> list[TitleVersion
     ]
 
 
+async def last_away(services: Services, tautulli_user_id: int | None) -> Playback | None:
+    """How the friend's latest play away from home went (live first), if one is recent;
+    None too when their Plex account isn't matched to a Tautulli user."""
+    if tautulli_user_id is None:
+        return None
+    found = await recent_plays(services, tautulli_user_id)
+    away = next((p for p in found.plays if p.source.location in REMOTE), None)
+    if away is None:
+        return None
+    try:
+        return await playback_of(services, away)
+    except ClientError:  # its stream data is only a limit's evidence; go without it
+        return None
+
+
 @dataclass(frozen=True)
 class Limit:
     kbps: int
@@ -142,13 +158,9 @@ class Connection:
 
     limits: tuple[Limit, ...]
 
-    def or_typical(self) -> Connection:
-        """This connection, or a typical one away from home when nothing is known."""
-        return self if self.limits else Connection((TYPICAL_AWAY,))
-
-    @property
-    def tightest(self) -> Limit | None:
-        return min(self.limits, key=lambda limit: limit.kbps, default=None)
+    def limit(self) -> Limit:
+        """The tightest known limit, or a typical connection away from home with none known."""
+        return min(self.limits, key=lambda limit: limit.kbps, default=TYPICAL_AWAY)
 
     @classmethod
     def of(
@@ -188,10 +200,10 @@ class Pick:
         return "Original" if self.fits else quality_for(self.limit.kbps)
 
 
-def recommend(versions: Iterable[TitleVersion], connection: Connection) -> Pick | None:
-    """The best version the connection carries, else the lightest; None with no limit known."""
-    versions, limit = list(versions), connection.tightest
-    if not versions or limit is None:
+def recommend(versions: Iterable[TitleVersion], limit: Limit) -> Pick | None:
+    """The best version within the limit, else the lightest; None with no versions."""
+    versions = list(versions)
+    if not versions:
         return None
     fitting = [v for v in versions if v.needs_kbps <= limit.kbps]
     if fitting:

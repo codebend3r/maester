@@ -94,7 +94,7 @@ class Stream:
         """The best lighter version a connection away from home carries, if any."""
         playing = self.playing.bitrate_kbps if self.playing else self.playback.source_bitrate_kbps
         away = Connection((TYPICAL_AWAY, *Connection.of(uplink=self.uplink).limits))
-        pick = recommend((v for v in self.versions if v.bitrate_kbps < playing), away)
+        pick = recommend((v for v in self.versions if v.bitrate_kbps < playing), away.limit())
         return pick.version if pick is not None and pick.fits else None
 
     @property

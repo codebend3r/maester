@@ -219,3 +219,11 @@ def test_a_dm_about_a_title_is_remembered_for_its_recipient_only(store):
     store._conn.execute("UPDATE sent_messages SET sent_at = ?", (stale,))
     store.remember_message("m2", "d1", dune)
     assert store.message_about("m1", "d1") is None and store.message_about("m2", "d1") == dune
+
+
+def test_a_reencode_candidate_is_flagged_once_a_window(store):
+    flag = dict(rating_key="9001", title="Dune (2021)", file="/m/Dune.mkv", bitrate_kbps=62103, wan_plays=3)  # fmt: skip
+    assert store.flag_reencode(**flag, window=timedelta(days=30))
+    assert not store.flag_reencode(**{**flag, "wan_plays": 4}, window=timedelta(days=30))
+    # A flag older than the window (here, any flag) lets it through again.
+    assert store.flag_reencode(**flag, window=timedelta(seconds=-1))

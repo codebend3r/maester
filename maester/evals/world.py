@@ -11,6 +11,7 @@ reads under `probe`.
 
 from __future__ import annotations
 
+import time
 from datetime import datetime
 from typing import Any
 
@@ -47,7 +48,7 @@ from maester.clients.seerr import (
 )
 from maester.clients.sonarr import Episode, Series
 from maester.clients.speedtest import SpeedResult
-from maester.clients.tautulli import Session
+from maester.clients.tautulli import HistoryRow, Session
 from maester.store import Store
 
 # Importing the tools package registers every tool module into app_registry.
@@ -80,6 +81,7 @@ def _title(r: dict[str, Any]) -> tuple[SearchResult, MediaDetails]:
         status=status,
         status_4k=status_4k,
         rating_key=r.get("rating_key"),
+        rating_key_4k=r.get("rating_key_4k"),
         media_id=r.get("media_id"),
         runtime_minutes=r.get("runtime"),
         tvdb_id=r.get("tvdb_id"),
@@ -295,9 +297,31 @@ def _session(n: int, x: dict[str, Any], user_id: int) -> Session:
     )
 
 
+def _played(n: int, x: dict[str, Any]) -> HistoryRow:
+    """A finished play by anyone (`user_id`), `days_ago` days back."""
+    started = int(time.time() - x.get("days_ago", 1) * 86400)
+    return HistoryRow(
+        user_id=int(x.get("user_id", 99)),
+        rating_key=str(x["rating_key"]),
+        full_title=x.get("title", ""),
+        media_type="movie",
+        started=started,
+        stopped=started + 3600,
+        percent_complete=90,
+        transcode_decision="direct play",
+        platform="Roku",
+        player="Living Room",
+        location=x.get("location", "lan"),
+        relayed=False,
+        row_id=n,
+    )
+
+
 def _tautulli(host: str, seed: dict[str, Any], user_id: int) -> FakeTautulliClient:
+    """A host's live sessions, and finished plays under `history`."""
     sessions = [_session(n, x, user_id) for n, x in enumerate(seed.get("sessions", []), 1)]
-    return FakeTautulliClient(host=host, sessions=sessions)
+    played = [_played(n, x) for n, x in enumerate(seed.get("history", []), 1)]
+    return FakeTautulliClient(host=host, sessions=sessions, history_rows=played)
 
 
 def _probe(seed: dict[str, Any]) -> FakeFileProbe:

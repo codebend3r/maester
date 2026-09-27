@@ -1,0 +1,28 @@
+name: a slow connection gets the version it can carry, and a much-streamed remux goes to the admin
+tier: friend
+services:
+  seerr:
+    results:
+      - {tmdb_id: 438631, title: "Dune", year: 2021, media_type: movie, status: 5, status_4k: 5, rating_key: "4348", rating_key_4k: "9001"}
+  plex:
+    items:
+      - rating_key: "4348"
+        title: "Dune"
+        year: 2021
+        versions:
+          - {resolution: "1080", codec: h264, size_gb: 12.0, bitrate_mbps: 10.2, file: "/Meleys/Movies/Dune (2021)/Dune (2021) WEBDL-1080p.mkv"}
+      - rating_key: "9001"
+        title: "Dune"
+        year: 2021
+        versions:
+          - {resolution: "4k", codec: hevc, size_gb: 72.6, bitrate_mbps: 62.1, file: "/Vermithor/Movies/Dune (2021)/Dune (2021) Bluray-2160p.mkv"}
+  tautulli:
+    vermithor:
+      history:
+        - {rating_key: "9001", title: "Dune", location: wan, user_id: 5, days_ago: 2}
+        - {rating_key: "9001", title: "Dune", location: wan, user_id: 6, days_ago: 9}
+        - {rating_key: "9001", title: "Dune", location: wan, user_id: 7, days_ago: 20}
+turns:
+  - user: "I'm on hotel wifi, fast.com says about 20 Mbps. Which version of Dune (2021) should I play?"
+    expect_tools: [pick_version]
+    reply_matches: "1080p"

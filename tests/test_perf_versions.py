@@ -21,8 +21,8 @@ WEBDL = TitleVersion("4348", Version("1080", "h264", 10240, 1, "/m/Dune (2021) W
 ALL = (REMUX, REENCODE, WEBDL)
 
 
-def at(mbps: float) -> Connection:
-    return Connection((Limit(round(mbps * 1000), "test"),))
+def at(mbps: float) -> Limit:
+    return Limit(round(mbps * 1000), "test")
 
 
 def test_the_best_version_that_fits_with_room_for_peaks():
@@ -37,7 +37,7 @@ def test_the_best_version_that_fits_with_room_for_peaks():
 def test_when_nothing_fits_the_lightest_is_turned_down_to_a_plex_quality():
     pick = recommend(ALL, at(5))
     assert (pick.version, pick.fits, pick.quality) == (WEBDL, False, "4 Mbps 720p")
-    assert recommend(ALL, Connection(())) is None and recommend((), at(50)) is None
+    assert recommend((), at(50)) is None
 
 
 def test_plex_qualities_and_what_a_player_asked_for():
@@ -54,7 +54,6 @@ def test_a_connection_is_its_tightest_known_limit():
     spare = Uplink("meleys", SpeedResult(30.0, 900.0, 9.0, "s", "i", "u"), 12000, ())
     connection = Connection.of(said_mbps=8, last_away=last, uplink=spare)
     assert [limit.kbps for limit in connection.limits] == [8000, 2000, 4000, 30000]
-    assert connection.tightest.source == "Plex relayed your last stream, at most 2 Mbps"
+    assert connection.limit().source == "Plex relayed your last stream, at most 2 Mbps"
     plain = Connection.of(last_away=replace(last, relayed=False, quality_profile="Original"))
-    assert plain.limits == () and plain.or_typical().tightest is TYPICAL_AWAY
-    assert connection.or_typical() is connection
+    assert plain.limits == () and plain.limit() is TYPICAL_AWAY
