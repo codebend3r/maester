@@ -38,8 +38,6 @@ class FakeSeerrClient:
     refusals: dict[int, RequestRefused] = field(default_factory=dict)
     routed: dict[int, Routing] = field(default_factory=dict)
     issues: list[dict[str, Any]] = field(default_factory=list)
-    # Seerr users whose accounts may not open issues: filing as them is refused.
-    no_issues: set[int] = field(default_factory=set)
     auto_approve: bool = False
     # While set, approving, declining and filing issues answer the way an
     # unreachable Seerr would.
@@ -143,14 +141,12 @@ class FakeSeerrClient:
         issue_type: int,
         message: str,
         *,
-        as_user: int | None,
+        as_user: int,
         season: int | None = None,
         episode: int | None = None,
     ) -> int:
         if self.down:
             raise ClientError("seerr", "POST", "/api/v1/issue", None, "connection refused")
-        if as_user in self.no_issues:
-            raise ClientError("seerr", "POST", "/api/v1/issue", 403, "Forbidden")
         self.issues.append(
             {
                 "id": len(self.issues) + 1,

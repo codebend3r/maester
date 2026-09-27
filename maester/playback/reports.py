@@ -21,10 +21,8 @@ status is `MAY_REPLACE`. The admin's no covers that
 one report: a later report of the same file stands on its own evidence.
 
 Every report opens a Seerr issue as the friend, with the diagnosis and the
-decision, so the admin's trail is in a tool they already use. When Seerr
-won't let the friend open issues, maester files it with its own key and
-names them. Resolving the issue in Seerr marks the report resolved
-(`seerr_events.py`).
+decision, so the admin's trail is in a tool they already use. Resolving the
+issue in Seerr marks the report resolved (`seerr_events.py`).
 """
 
 from __future__ import annotations
@@ -250,7 +248,7 @@ class Filed:
     diagnosis: Diagnosis
     evidence: Evidence
     issue_id: int | None = None  # the Seerr issue it opened
-    issue_note: str = ""  # why none was opened, or that maester opened it for them
+    issue_note: str = ""  # why none was opened
     notices: tuple[Notice, ...] = ()
 
     def _fill(self, template: str) -> str:
@@ -309,42 +307,24 @@ class IssueNotOpened(Exception):
     """The report couldn't be filed in Seerr; the message says why."""
 
 
-@dataclass(frozen=True)
-class Opened:
-    issue_id: int
-    note: str = ""
-
-
-async def open_issue(services: Services, link: LinkedUser, filed: Filed) -> Opened:
-    """File the report in Seerr as the friend, or as maester naming them when Seerr says no."""
+async def open_issue(services: Services, link: LinkedUser, filed: Filed) -> int:
+    """File the report in Seerr as the friend."""
     located, media_id = filed.located, filed.located.details.media_id
     if media_id is None:
         raise IssueNotOpened("not opened: Seerr doesn't track this title yet")
-    message = issue_message(filed, link.name)
-
-    async def file(text: str, as_user: int | None) -> int:
+    try:
         return await services.seerr.create_issue(
             media_id,
             POLICIES[filed.report.kind].issue_type,
-            text,
-            as_user=as_user,
+            issue_message(filed, link.name),
+            # As the friend through `userId`, which Seerr's issue route honors for
+            # maester's MANAGE_ISSUES key (requests use `X-API-User` instead).
+            as_user=link.seerr_user_id,
             season=located.copy.season,
             episode=located.copy.episode,
         )
-
-    try:
-        return Opened(await file(message, link.seerr_user_id))
-    except ClientError as exc:
-        if exc.status != 403:
-            raise IssueNotOpened(f"not opened: {exc}") from exc
-    for_them = f"Filed by maester for {link.name}, whose Seerr account can't open issues.\n\n"
-    try:
-        issue_id = await file(for_them + message, None)
     except ClientError as exc:
         raise IssueNotOpened(f"not opened: {exc}") from exc
-    return Opened(
-        issue_id, "filed by maester on their behalf: their Seerr account can't open issues"
-    )
 
 
 def admin_notice(filed: Filed, reporter: str) -> AdminPost:
@@ -397,12 +377,13 @@ async def file_report(
     )
     filed = Filed(report, located, diagnosis, evidence)
     try:
-        opened = await open_issue(services, link, filed)
+        issue_id = await open_issue(services, link, filed)
     except IssueNotOpened as why:
         filed = replace(filed, issue_note=str(why))
     else:
-        report = store.set_report_issue(report.id, opened.issue_id)
-        filed = replace(filed, report=report, issue_id=opened.issue_id, issue_note=opened.note)
+        filed = replace(
+            filed, report=store.set_report_issue(report.id, issue_id), issue_id=issue_id
+        )
     if policy.replaceable:
         return filed
     return replace(filed, notices=(admin_notice(filed, link.name),))

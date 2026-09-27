@@ -51,7 +51,7 @@ class Seerr(Protocol):
         issue_type: int,
         message: str,
         *,
-        as_user: int | None,
+        as_user: int,
         season: int | None = None,
         episode: int | None = None,
     ) -> int: ...
@@ -151,21 +151,25 @@ class SeerrClient(HttpClient):
         issue_type: int,
         message: str,
         *,
-        as_user: int | None,
+        as_user: int,
         season: int | None = None,
         episode: int | None = None,
     ) -> int:
-        """File an issue against Seerr's media id, as the user `X-API-User` names, the way
-        requests are made; `None` files it as maester's own key. Seerr answers 403 when
-        that user may not open issues. A show's issue can name the season and episode."""
-        body: dict[str, Any] = {"issueType": issue_type, "message": message, "mediaId": media_id}
+        """File an issue against Seerr's media id, created by `as_user`. A show's issue can
+        name the season and episode."""
+        body: dict[str, Any] = {
+            "issueType": issue_type,
+            "message": message,
+            "mediaId": media_id,
+            # Not `X-API-User`, as requests use: Seerr's issue route files as `userId` for a
+            # caller with MANAGE_ISSUES (maester's key), whatever the user's own permissions.
+            "userId": as_user,
+        }
         if season is not None:
             body["problemSeason"] = season
         if episode is not None:
             body["problemEpisode"] = episode
-        headers = {} if as_user is None else {"X-API-User": str(as_user)}
-        response = await self.request("POST", "/api/v1/issue", json=body, headers=headers)
-        return int(self._decode(response, "/api/v1/issue")["id"])
+        return int((await self.post_json("/api/v1/issue", body))["id"])
 
     async def comment_issue(self, issue_id: int, message: str) -> None:
         await self.post_json(f"/api/v1/issue/{issue_id}/comment", {"message": message})

@@ -241,16 +241,3 @@ async def test_one_friends_claims_never_make_a_healthy_file_replaceable(library)
         library.services.probe.errors[FORKS] = (line,)
         filed = await report(library, FORKS_ITEM, ReportKind.WONT_PLAY)
         assert filed.report.health == "unreadable" and filed.report.decision is Decision.RECORDED
-
-
-async def test_when_seerr_wont_let_the_friend_open_issues_maester_opens_it_for_them(library):
-    library.services.seerr.no_issues.add(4)  # dany's Seerr account
-    filed = await report(library, DUNE_4K_ITEM, ReportKind.CAM, "a cam")
-    (issue,) = library.services.seerr.issues
-    assert issue["as_user"] is None
-    assert issue["message"].startswith(
-        "Filed by maester for dany, whose Seerr account can't open issues.\n\na cam\n"
-    )
-    assert filed.report.seerr_issue_id == 1
-    out = filed.as_dict()
-    assert out["seerr_issue"] == 1 and "on their behalf" in out["seerr_issue_note"]

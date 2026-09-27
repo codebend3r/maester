@@ -164,18 +164,13 @@ async def test_seerr_issues_are_filed_as_the_user_against_seerrs_media_id():
     issue = await client.create_issue(31, 1, "S02E07 freezes", as_user=4, season=2, episode=7)
     assert issue == 34
     sent = route.calls.last.request
-    assert sent.headers["X-API-User"] == "4"  # as the friend, the way requests are made
+    assert "X-API-User" not in sent.headers  # the admin key files it, naming the friend
     assert json.loads(sent.content) == {
-        "issueType": 1, "message": "S02E07 freezes", "mediaId": 31,
+        "issueType": 1, "message": "S02E07 freezes", "mediaId": 31, "userId": 4,
         "problemSeason": 2, "problemEpisode": 7,
     }  # fmt: skip
-    await client.create_issue(12, 4, "wrong movie", as_user=None)
-    sent = route.calls.last.request
-    assert "X-API-User" not in sent.headers and "problemSeason" not in json.loads(sent.content)
-    route.respond(status_code=403, json={"message": "Forbidden"})
-    with pytest.raises(ClientError) as refused:
-        await client.create_issue(12, 4, "wrong movie", as_user=9)
-    assert refused.value.status == 403
+    await client.create_issue(12, 4, "wrong movie", as_user=4)
+    assert "problemSeason" not in json.loads(route.calls.last.request.content)
     await client.comment_issue(34, "Replaced.")
     assert json.loads(comment.calls.last.request.content) == {"message": "Replaced."}
 
