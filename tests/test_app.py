@@ -57,14 +57,7 @@ def test_build_services_creates_one_client_per_host():
 
 
 def test_build_services_reads_the_fleet_monitor_when_it_is_set_up():
-    cfg = load_settings(
-        {
-            "FLEET_MONITOR_URL": "http://m:8010",
-            "FLEET_MONITOR_SUPABASE_URL": "https://p.supabase.co",
-            "FLEET_MONITOR_SUPABASE_KEY": "anon",
-            "FLEET_MONITOR_EMAIL": "maester@example.com",
-            "FLEET_MONITOR_PASSWORD": "pw",
-        }
-    )
+    cfg = load_settings({"FLEET_MONITOR_URL": "http://m:8010", "FLEET_MONITOR_TOKEN": "tok"})
     fleet = build_services(cfg, Registry()).fleet
-    assert fleet.base_url == "http://m:8010" and fleet.session.base_url == "https://p.supabase.co"
+    assert fleet.base_url == "http://m:8010"
+    assert fleet.client.headers["Authorization"] == "Bearer tok"

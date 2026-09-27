@@ -60,23 +60,16 @@ def test_require_passes_when_all_present():
     require({"A": "1"}, "A")
 
 
-FLEET = {
-    "FLEET_MONITOR_URL": "http://192.168.50.2:8010/",
-    "FLEET_MONITOR_SUPABASE_URL": "https://proj.supabase.co/",
-    "FLEET_MONITOR_SUPABASE_KEY": "anon",
-    "FLEET_MONITOR_EMAIL": " maester@example.com ",
-    "FLEET_MONITOR_PASSWORD": "pw",
-}
-
-
-def test_the_fleet_monitor_is_optional_but_whole_once_named():
+def test_the_fleet_monitor_is_optional_but_needs_its_token_once_named():
     assert load_settings({}).fleet_monitor is None
-    assert load_settings(FLEET).fleet_monitor == FleetMonitorAccess(
-        "http://192.168.50.2:8010", "https://proj.supabase.co", "anon", "maester@example.com", "pw"
+    named = {"FLEET_MONITOR_URL": "http://192.168.50.2:8010/", "FLEET_MONITOR_TOKEN": " tok "}
+    assert load_settings(named).fleet_monitor == FleetMonitorAccess(
+        "http://192.168.50.2:8010", "tok"
     )
     with pytest.raises(MissingConfig) as exc:
-        load_settings({**FLEET, "FLEET_MONITOR_EMAIL": "", "FLEET_MONITOR_PASSWORD": ""})
-    assert exc.value.names == ["FLEET_MONITOR_EMAIL", "FLEET_MONITOR_PASSWORD"]
+        load_settings({**named, "FLEET_MONITOR_TOKEN": ""})
+    assert exc.value.names == ["FLEET_MONITOR_TOKEN"]
+    assert load_settings({"FLEET_MONITOR_TOKEN": "tok"}).fleet_monitor is None
 
 
 def test_the_speed_test_runs_on_the_host_named():

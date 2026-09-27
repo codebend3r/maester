@@ -29,7 +29,7 @@ maester runs as one container on **Meleys** (`192.168.50.2`) at `/volume1/docker
 
 The image carries Ookla's speedtest CLI (pinned in the `Dockerfile`), and `SPEEDTEST_HOST` names the NAS the container runs on (`meleys`), where `speed_test` measures the servers' shared internet connection. Leave it empty to turn speed tests off.
 
-CPU and memory per NAS come from the fleet monitor (wizteros' `fleet-monitor`, `http://192.168.50.2:8010` on the LAN). It only answers a Supabase session whose email is on its `FM_ADMIN_ALLOWED_EMAILS`, so create a Supabase account for maester in the same project, add its email to that list in the monitor's `.env` (then recreate the `fleet-monitor` container, which reads its env at start), and put the account and the project's URL and anon key in `FLEET_MONITOR_*`. Without them, server load comes from Tautulli alone.
+CPU and memory per NAS come from the fleet monitor (wizteros' `fleet-monitor`, `http://192.168.50.2:8010` on the LAN), read with a static bearer token (`FLEET_MONITOR_TOKEN`) from `/fleet/cpu` and `/fleet/memory` only. The monitor has no guard for such a token yet, so leave `FLEET_MONITOR_URL` empty until wizteros adds one that opens only those two routes. Until then, server load comes from Tautulli alone.
 
 ## Data
 

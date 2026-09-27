@@ -68,36 +68,19 @@ def _pairs(env: Mapping[str, str], name: str) -> tuple[tuple[str, str], ...]:
 
 @dataclass(frozen=True)
 class FleetMonitorAccess:
-    """Where the fleet monitor is, and the Supabase account maester reads it as."""
+    """Where the fleet monitor is, and the bearer token for its CPU and memory routes."""
 
     url: str
-    supabase_url: str
-    supabase_key: str  # the project's anon (publishable) key
-    email: str  # must be on the monitor's FM_ADMIN_ALLOWED_EMAILS
-    password: str
-
-
-FLEET_MONITOR_LOGIN = (
-    "FLEET_MONITOR_SUPABASE_URL",
-    "FLEET_MONITOR_SUPABASE_KEY",
-    "FLEET_MONITOR_EMAIL",
-    "FLEET_MONITOR_PASSWORD",
-)
+    token: str
 
 
 def _fleet_monitor(env: Mapping[str, str]) -> FleetMonitorAccess | None:
-    """The fleet monitor, when FLEET_MONITOR_URL is set; its sign-in must be set with it."""
+    """The fleet monitor, when FLEET_MONITOR_URL is set; its token must be set with it."""
     url = _url(env, "FLEET_MONITOR_URL")
     if not url:
         return None
-    require(env, *FLEET_MONITOR_LOGIN)
-    return FleetMonitorAccess(
-        url=url,
-        supabase_url=_url(env, "FLEET_MONITOR_SUPABASE_URL"),
-        supabase_key=env["FLEET_MONITOR_SUPABASE_KEY"],
-        email=env["FLEET_MONITOR_EMAIL"].strip(),
-        password=env["FLEET_MONITOR_PASSWORD"],
-    )
+    require(env, "FLEET_MONITOR_TOKEN")
+    return FleetMonitorAccess(url, env["FLEET_MONITOR_TOKEN"].strip())
 
 
 @dataclass(frozen=True)
