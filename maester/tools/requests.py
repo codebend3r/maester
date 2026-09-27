@@ -280,6 +280,7 @@ async def size_tradeoff(services: Services, details: MediaDetails) -> dict[str, 
     "was approved automatically; when nothing was requested, it refuses and says why.",
     REQUEST_SCHEMA,
     tier=Tier.FRIEND,
+    held_in_maintenance=True,
 )
 async def request_media(
     ctx: ToolContext,
@@ -369,6 +370,7 @@ async def decide_request(
     "estimate, so you can explain the storage trade-off.",
     REQUEST_SCHEMA,
     tier=Tier.TRUSTED,
+    held_in_maintenance=True,
 )
 async def request_media_4k(
     ctx: ToolContext,
@@ -565,6 +567,7 @@ async def decide_4k_over_storage(
     },
     tier=Tier.FRIEND,
     host_param="host",
+    held_in_maintenance=True,
 )
 async def follow_show(ctx: ToolContext, tmdb_id: int, host: str) -> dict[str, Any] | Result:
     details = await ctx.services.seerr.media_details("tv", tmdb_id)

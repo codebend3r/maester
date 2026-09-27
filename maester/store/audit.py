@@ -24,6 +24,7 @@ class AuditRow:
     host: str | None
     duration_ms: int | None
     pending_id: int | None = None
+    held_id: int | None = None
 
 
 class AuditLog(Database):
@@ -38,10 +39,12 @@ class AuditLog(Database):
         host: str | None = None,
         duration_ms: int | None = None,
         pending_id: int | None = None,
+        held_id: int | None = None,
     ) -> int:
         """Record one tool call. Called by the tool runner, never by tools.
 
-        `pending_id` marks a call that ended waiting on an admin approval.
+        `pending_id` marks a call that ended waiting on an admin approval, and
+        `held_id` one held for a maintenance window.
         """
         result_json = json.dumps(result, default=str)
         if len(result_json) > RESULT_MAX_CHARS:
@@ -50,9 +53,8 @@ class AuditLog(Database):
             result_json = json.dumps({"truncated": True, "preview": result_json[:RESULT_MAX_CHARS]})
         with self.transaction() as conn:
             cur = conn.execute(
-                "INSERT INTO audit_log"
-                " (ts, discord_id, tool, args, result, ok, host, duration_ms, pending_id)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO audit_log (ts, discord_id, tool, args, result, ok, host,"
+                " duration_ms, pending_id, held_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     now(),
                     discord_id,
@@ -63,6 +65,7 @@ class AuditLog(Database):
                     host,
                     duration_ms,
                     pending_id,
+                    held_id,
                 ),
             )
             return int(cur.lastrowid)
@@ -88,6 +91,7 @@ class AuditLog(Database):
                 host=r["host"],
                 duration_ms=r["duration_ms"],
                 pending_id=r["pending_id"],
+                held_id=r["held_id"],
             )
             for r in rows
         ]
@@ -95,12 +99,13 @@ class AuditLog(Database):
     def audit_count_since(self, tool: str, since: datetime) -> int:
         """How many times `tool` acted since `since`; used by daily caps.
 
-        A call that only asked for an approval did not act, so it is left out.
+        A call that only asked for an approval, or was held for maintenance, did
+        not act, so it is left out.
         """
         with self._lock:
             row = self._conn.execute(
-                "SELECT COUNT(*) FROM audit_log"
-                " WHERE tool = ? AND ok = 1 AND pending_id IS NULL AND ts >= ?",
+                "SELECT COUNT(*) FROM audit_log WHERE tool = ? AND ok = 1"
+                " AND pending_id IS NULL AND held_id IS NULL AND ts >= ?",
                 (tool, stamp(since)),
             ).fetchone()
         return int(row[0])

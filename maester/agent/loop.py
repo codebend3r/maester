@@ -23,7 +23,7 @@ from maester.clients import Services
 from maester.config import Settings
 from maester.memo import Memo
 from maester.notify import Notice
-from maester.store import PendingAction, Store
+from maester.store import HeldCall, PendingAction, Store
 
 log = logging.getLogger("maester.agent")
 
@@ -128,18 +128,28 @@ class Agent:
         """
         outcome = await self.runner.run_decision(self._context(user_id, tier), pending, approved)
         if pending.kind == "confirm":
-            self._remember(pending, outcome)
+            self._remember(
+                pending.requester,
+                f"toolu_button_{pending.id}",
+                pending.action,
+                pending.payload,
+                outcome,
+            )
         return outcome
 
-    def _remember(self, pending: PendingAction, outcome: ToolOutcome) -> None:
-        tool_use = {
-            "type": "tool_use",
-            "id": f"toolu_button_{pending.id}",
-            "name": pending.action,
-            "input": pending.payload,
-        }
-        results = self._stub_results([outcome.as_result_block(tool_use["id"])])
-        user_id = pending.requester
+    async def run_held(self, held: HeldCall) -> ToolOutcome:
+        """Run a call held for maintenance as its caller, and remember it like a confirmation."""
+        tier = Tier.parse(held.tier)
+        outcome = await self.runner.run_held(self._context(held.discord_id, tier), held)
+        self._remember(held.discord_id, f"toolu_held_{held.id}", held.tool, held.args, outcome)
+        return outcome
+
+    def _remember(
+        self, user_id: str, call_id: str, name: str, args: dict[str, Any], outcome: ToolOutcome
+    ) -> None:
+        """A call made outside a turn, put in the user's conversation so their next turn sees it."""
+        tool_use = {"type": "tool_use", "id": call_id, "name": name, "input": args}
+        results = self._stub_results([outcome.as_result_block(call_id)])
         self.store.append_message(user_id, "assistant", [tool_use], estimate_tokens(tool_use))
         self.store.append_message(user_id, "user", results, estimate_tokens(results))
 

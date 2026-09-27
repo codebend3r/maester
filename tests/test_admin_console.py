@@ -3,13 +3,21 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from maester.agent.limits import KillSwitch
+from maester.agent.loop import Agent
+from maester.agent.runner import ToolRunner
 from maester.agent.tools import Tier
+from maester.agent.tools import registry as app_registry
 from maester.chat.admin import AdminConsole
 from maester.chat.identity import IdentityService, RoleMap
-from maester.chat.service import ChatUser
+from maester.chat.service import ChatService, ChatUser
 from maester.clients.seerr import MediaDetails, MediaRequest, MediaStatus, RequestStatus
 from maester.config import Settings
+from maester.notify import Announcement, ApprovalPost
 from maester.store import SpaceSample
+from tests.fake_model import FakeModel, text_message, tool_message
+
+# Importing the tools package registers the real tools into `app_registry`.
+import maester.tools  # noqa: F401  isort: skip
 
 ADMIN_ROLE = 1
 FRIEND = ChatUser("f1", "Friend")
@@ -17,16 +25,32 @@ ADMIN = ChatUser("a1", "Boss", frozenset({ADMIN_ROLE}))
 DUNE = MediaDetails(438631, "movie", "Dune", 2021, "", MediaStatus.UNKNOWN, MediaStatus.UNKNOWN)
 
 
-@pytest.fixture
-def console(services, store):
-    store.upsert_user(FRIEND.id, status="active", seerr_user_id=4, plex_username="dany")
-    return AdminConsole(
-        identity=IdentityService(store, services, RoleMap(ADMIN_ROLE, 0)),
+def make_console(services, store, *script) -> AdminConsole:
+    """The console, with a chat service whose model says what `script` says."""
+    identity = IdentityService(store, services, RoleMap(ADMIN_ROLE, 0))
+    kill = KillSwitch(store)
+    agent = Agent(
+        model_client=FakeModel.scripted(*script),
+        model="fake",
+        runner=ToolRunner(app_registry, kill_switch=kill),
         store=store,
         services=services,
         settings=Settings(),
-        kill_switch=KillSwitch(store),
     )
+    return AdminConsole(
+        identity=identity,
+        chat=ChatService(agent=agent, identity=identity, store=store),
+        store=store,
+        services=services,
+        settings=Settings(),
+        kill_switch=kill,
+    )
+
+
+@pytest.fixture
+def console(services, store):
+    store.upsert_user(FRIEND.id, status="active", seerr_user_id=4, plex_username="dany")
+    return make_console(services, store)
 
 
 def test_every_command_is_the_admins_alone_and_a_refusal_is_audited(console, store):
@@ -128,3 +152,52 @@ def test_forecast_says_when_each_volume_fills_or_that_there_are_no_samples(conso
         "- /Vermithor (vermithor): 4.0 TB free; 1 day of samples so far, a forecast needs 7."
     )
     assert store.audit_recent(1)[0].tool == "/forecast"
+
+
+async def test_maintenance_holds_a_request_and_runs_it_when_it_ends(services, store):
+    store.upsert_user(FRIEND.id, status="active", seerr_user_id=4, plex_username="dany")
+    services.seerr.details[("movie", 438631)] = DUNE
+    console = make_console(
+        services,
+        store,
+        tool_message([("request_media", {"tmdb_id": 438631, "media_type": "movie"})]),
+        text_message("The server's down for maintenance; I've saved it."),
+        text_message("Dune went through; it's waiting on the admin."),
+    )
+    assert console.start_maintenance(FRIEND, "x").text == "Only the admin can use /maintenance."
+    started = console.start_maintenance(ADMIN, "swapping a drive")
+    assert started.text.startswith("Maintenance on") and store.flag("maintenance")
+    (announced,) = started.notices
+    assert isinstance(announced, Announcement) and "(swapping a drive)" in announced.text
+    assert console.start_maintenance(ADMIN, "two drives").text.startswith("Maintenance was")
+
+    asked = await console.chat.handle_message(FRIEND, "get Dune 2021")
+    assert asked.text == "The server's down for maintenance; I've saved it."
+    assert services.seerr.requests == []  # held, not sent
+    (held,) = store.held_calls()
+    assert (held.discord_id, held.tool, held.tier) == (FRIEND.id, "request_media", "friend")
+    audited = store.audit_recent(tool="request_media")[0]
+    assert audited.held_id == held.id and audited.ok
+
+    ended = await console.end_maintenance(ADMIN)
+    assert store.flag("maintenance") is None and store.held_calls() == []
+    (request,) = services.seerr.requests
+    assert request.requested_by_id == 4 and not request.is_4k
+    assert ended.text == (
+        "Maintenance off. Ran 1 held:\n"
+        '- dany: request_media: {"tmdb_id": 438631, "media_type": "movie"}: now waiting on your '
+        "approval"
+    )
+    off, approval = ended.notices
+    assert isinstance(off, Announcement) and isinstance(approval, ApprovalPost)
+    ((to, dm),) = ended.dms
+    assert to == FRIEND.id and dm.text == "Dune went through; it's waiting on the admin."
+    # The friend's next turn sees what ran, like a confirmation.
+    remembered = store.recent_messages(FRIEND.id, max_tokens=10_000)
+    assert any(
+        block.get("id") == f"toolu_held_{held.id}"
+        for m in remembered
+        if isinstance(m["content"], list)
+        for block in m["content"]
+    )
+    assert (await console.end_maintenance(ADMIN)).text == "Maintenance wasn't on."

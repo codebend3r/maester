@@ -84,6 +84,7 @@ async def find_collection(ctx: ToolContext, tmdb_id: int) -> dict[str, Any] | Ch
         "additionalProperties": False,
     },
     tier=Tier.FRIEND,
+    held_in_maintenance=True,
 )
 async def request_collection(ctx: ToolContext, collection_id: int) -> dict[str, Any] | Result:
     user = ctx.linked_user()

@@ -41,6 +41,10 @@ UNLINKED_HELP = (
 )
 ERROR_REPLY = "Sorry, something went wrong on my end (ref `{ref}`). The admin can look it up."
 ESCALATED = "That needs the admin's approval now; you'll get a DM once they decide."
+HELD = (
+    "The server is down for maintenance, so that's saved: it runs once maintenance is over, "
+    "and I'll DM you how it went."
+)
 # A thumbs-down (any skin tone) on a DM about a title reports a problem with it.
 THUMBS_DOWN = "\N{THUMBS DOWN SIGN}"
 
@@ -129,11 +133,16 @@ class ChatService:
         tier = self.tier_for(user)
         if tier == Tier.UNLINKED:
             return ChatResponse(chunks=split_reply(UNLINKED_HELP))
+        return await self.follow_up(user.id, tier, text)
+
+    async def follow_up(self, user_id: str, tier: Tier, text: str) -> ChatResponse:
+        """A turn as `user_id` at `tier`: their message, or one the server starts for them
+        (what they asked for during maintenance has run)."""
         try:
-            reply = await self.agent.respond(user.id, tier, text)
+            reply = await self.agent.respond(user_id, tier, text)
         except TurnFailed as failed:
             ref = secrets.token_hex(3)
-            log.exception("agent failed for user %s (ref %s)", user.id, ref)
+            log.exception("agent failed for user %s (ref %s)", user_id, ref)
             # What the turn's tools already did still reaches the user and the admin.
             reply = replace(failed.reply, text=ERROR_REPLY.format(ref=ref), choices=[])
 
@@ -197,6 +206,8 @@ class ChatService:
             return Decision("Cancelled.", notices=outcome.notices)
         if outcome.approval_id is not None:  # the confirmed action went to the admin instead
             return Decision(ESCALATED, notices=outcome.notices)
+        if outcome.held_id is not None:
+            return Decision(HELD)
         if outcome.is_error and outcome.retryable:
             if self.store.reopen_pending(decided.id):
                 return Decision(

@@ -55,3 +55,11 @@ async def test_the_answer_is_kept_for_a_minute(ctx):
 
 def test_tool_is_registered_for_friends():
     assert "service_health" in {s.name for s in registry.for_tier(Tier.FRIEND)}
+
+
+async def test_a_maintenance_window_is_named_with_the_admins_reason(ctx):
+    assert "maintenance" not in await service_health(ctx)
+    ctx.store.raise_flag("maintenance", "swapping a drive", "a1")
+    out = await service_health(ctx)
+    assert out["maintenance"]["message"] == "swapping a drive"
+    assert out["maintenance"]["since"] == ctx.store.flag("maintenance").set_at

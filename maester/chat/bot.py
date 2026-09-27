@@ -22,7 +22,7 @@ from discord import app_commands
 
 from maester.chat.admin import AdminConsole, AdminReply
 from maester.chat.members import resolve_chat_user
-from maester.chat.service import ChatService, reports_a_problem
+from maester.chat.service import ChatService, ChatUser, reports_a_problem
 from maester.chat.split import split_reply
 from maester.chat.views import DecisionButton, decision_view, send_response, send_text
 from maester.notify import AdminPost, Announcement, ApprovalPost, DirectMessage, Notice
@@ -223,11 +223,41 @@ class MaesterBot(discord.Client):
             admin = await resolve_chat_user(self, interaction.user)
             await self._answer(interaction, self.console.forecast(admin))
 
+        @tree.command(name="maintenance", description="Admin: start or end a maintenance window")
+        @app_commands.describe(
+            state="start holds requests and replacements; end runs them",
+            message="What friends are told, when starting",
+        )
+        @app_commands.choices(
+            state=[
+                app_commands.Choice(name="start", value="start"),
+                app_commands.Choice(name="end", value="end"),
+            ]
+        )
+        async def maintenance(
+            interaction: discord.Interaction, state: app_commands.Choice[str], message: str = ""
+        ) -> None:
+            await interaction.response.defer(ephemeral=True)
+            admin = await resolve_chat_user(self, interaction.user)
+            if state.value == "start":
+                reply = self.console.start_maintenance(admin, message)
+            else:
+                reply = await self.console.end_maintenance(admin)
+            await self._answer(interaction, reply)
+
     async def _answer(self, interaction: discord.Interaction, reply: AdminReply) -> None:
-        """An admin command's reply, privately, then each approval again with its buttons."""
+        """An admin command's reply, privately, then each approval again with its buttons,
+        its notices, and its DMs to friends."""
         for chunk in split_reply(reply.text):
             await interaction.followup.send(chunk, ephemeral=True)
         for offer in reply.offers:
             view = decision_view(offer.id, offer.kind)
             await interaction.followup.send(offer.summary, view=view, ephemeral=True)
         await self.deliver(reply.notices)
+        for user_id, response in reply.dms:
+            try:
+                user = self.get_user(int(user_id)) or await self.fetch_user(int(user_id))
+                friend = ChatUser(user_id, user.display_name)
+                await send_response(await user.create_dm(), self, friend, response)
+            except Exception:  # one friend's closed DMs mustn't keep the rest from hearing
+                log.exception("couldn't DM %s after maintenance", user_id)

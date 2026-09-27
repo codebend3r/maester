@@ -60,6 +60,7 @@ def world(services, store):
         {"type": "object", "properties": {"file_id": {"type": "integer"}}},
         tier=Tier.TRUSTED,
         destructive=True,
+        held_in_maintenance=True,
     )
     async def replace(ctx, file_id=0):
         calls.append(("replace", file_id))
@@ -337,3 +338,14 @@ async def test_a_failed_press_that_cant_reopen_points_at_the_newer_approval(
     monkeypatch.setattr(store, "reopen_pending", lambda pending_id: False)
     failed = await svc.decide(post.pending_id, ADMIN, approve=True)
     assert failed.settled and "newer approval" in failed.text
+
+
+async def test_a_confirm_pressed_during_maintenance_is_saved_for_later(world):
+    make, store, calls = world
+    svc = make(tool_message([("replace_media", {"file_id": 3})]), text_message("Press Confirm."))
+    confirmation = (await svc.handle_message(TRUSTED, "replace it")).confirmations[0]
+    store.raise_flag("maintenance", "drives")
+    decision = await svc.decide(confirmation.id, TRUSTED, approve=True)
+    assert decision.text.startswith("The server is down for maintenance") and calls == []
+    (held,) = store.held_calls()
+    assert held.tool == "replace_media" and held.args == {"file_id": 3}

@@ -1,5 +1,5 @@
 """The admin console's commands: the kill switch, tiers, the audit log, what waits on the
-admin, and when each volume fills.
+admin, when each volume fills, and maintenance windows.
 
 Every command is the admin's alone and is audited under its own name
 ("/kill"), refusals included, so the log shows who tried what. Replies are
@@ -7,6 +7,12 @@ private to the admin; `offers` are approvals to show again with their
 buttons, so a week-old request can be decided from a phone. Like the chat
 service, the console talks to no chat platform: `bot.py` turns each command
 into a slash command and delivers the reply.
+
+A maintenance window is a flag (`maintenance`): while it's up, requests and
+replacements are saved instead of run (the runner holds them). Starting one
+announces it in the requests channel; ending it runs every held call as its
+caller, then gives each of them a turn so the model tells them in a DM how
+it went.
 """
 
 from __future__ import annotations
@@ -19,16 +25,17 @@ from datetime import UTC, datetime
 from typing import Any
 
 from maester.agent.limits import KillSwitch
+from maester.agent.runner import ToolOutcome
 from maester.agent.tools import Tier
 from maester.approvals import ask_about_request
 from maester.chat.identity import IdentityService
-from maester.chat.service import ChatUser
+from maester.chat.service import ChatResponse, ChatService, ChatUser
 from maester.clients import ClientError, Services
 from maester.config import Settings
 from maester.formatting import ago, humanized, local_time
-from maester.notify import Notice
+from maester.notify import Announcement, Notice
 from maester.storage import FORECAST_WINDOW, forecasts
-from maester.store import AuditRow, PendingAction, Store
+from maester.store import MAINTENANCE, AuditRow, HeldCall, PendingAction, Store
 
 log = logging.getLogger("maester.admin")
 
@@ -37,6 +44,14 @@ AUDIT_DEFAULT, AUDIT_MAX = 10, 50
 # Seerr requests read by /pending, newest first.
 SEERR_PENDING = 50
 
+MAINTENANCE_ON = (
+    "Heads up: the server is going down for maintenance{why}. Requests and replacements you "
+    "ask for meanwhile are saved and run once it's back; I'll DM you how they went."
+)
+MAINTENANCE_OFF = "Maintenance is over and the server is back. Thanks for waiting!"
+# The turn each friend with held calls gets once they've run, as if they asked.
+HELD_RAN = "Maintenance is over, and what I asked for while it was on has now run. How did it go?"
+
 
 @dataclass(frozen=True)
 class AdminReply:
@@ -44,6 +59,8 @@ class AdminReply:
     # Approvals to show again with their Approve/Deny buttons.
     offers: tuple[PendingAction, ...] = ()
     notices: tuple[Notice, ...] = ()
+    # Replies to send friends in a DM, by Discord id.
+    dms: tuple[tuple[str, ChatResponse], ...] = ()
 
 
 class AdminConsole:
@@ -51,12 +68,14 @@ class AdminConsole:
         self,
         *,
         identity: IdentityService,
+        chat: ChatService,
         store: Store,
         services: Services,
         settings: Settings,
         kill_switch: KillSwitch,
     ):
         self.identity = identity
+        self.chat = chat
         self.store = store
         self.services = services
         self.settings = settings
@@ -192,3 +211,55 @@ class AdminConsole:
             text = "No free-space samples yet: the first is taken tonight at 03:00."
         self._audit(admin, "forecast", {}, f"{len(found)} volumes", ok=True)
         return AdminReply(text)
+
+    # -- /maintenance -------------------------------------------------------
+
+    def start_maintenance(self, admin: ChatUser, message: str = "") -> AdminReply:
+        args = {"state": "start", "message": message}
+        if refused := self._refused(admin, "maintenance", args):
+            return refused
+        again = self.store.flag(MAINTENANCE) is not None
+        self.store.raise_flag(MAINTENANCE, message, admin.id)
+        text = (
+            "Maintenance was already on; its message is updated."
+            if again
+            else "Maintenance on: requests and replacements are saved until `/maintenance end`."
+        )
+        self._audit(admin, "maintenance", args, text, ok=True)
+        if again:
+            return AdminReply(text)
+        why = f" ({message})" if message else ""
+        return AdminReply(text, notices=(Announcement(MAINTENANCE_ON.format(why=why)),))
+
+    async def end_maintenance(self, admin: ChatUser) -> AdminReply:
+        """Lower the flag, run what was held, and let each friend hear how theirs went."""
+        args = {"state": "end"}
+        if refused := self._refused(admin, "maintenance", args):
+            return refused
+        if self.store.lower_flag(MAINTENANCE) is None:
+            text = "Maintenance wasn't on."
+            self._audit(admin, "maintenance", args, text, ok=True)
+            return AdminReply(text)
+        ran: list[tuple[HeldCall, ToolOutcome]] = []
+        for call in self.store.held_calls():
+            if self.store.start_held(call.id):  # another end already ran it
+                ran.append((call, await self.chat.agent.run_held(call)))
+        dms = []
+        for user_id in dict.fromkeys(call.discord_id for call, _ in ran):
+            tier = Tier.parse(next(c.tier for c, _ in ran if c.discord_id == user_id))
+            dms.append((user_id, await self.chat.follow_up(user_id, tier, HELD_RAN)))
+        lines = [f"- {self._name(c.discord_id)}: {c.summary}: {self._how(o)}" for c, o in ran]
+        text = "Maintenance off." + (
+            f" Ran {len(ran)} held:\n" + "\n".join(lines) if ran else " Nothing was held."
+        )
+        self._audit(admin, "maintenance", args, text, ok=True)
+        notices = (Announcement(MAINTENANCE_OFF), *(n for _, o in ran for n in o.notices))
+        return AdminReply(text, notices=notices, dms=tuple(dms))
+
+    @staticmethod
+    def _how(outcome: ToolOutcome) -> str:
+        if outcome.approval_id is not None:
+            return "now waiting on your approval"
+        if outcome.is_error:
+            return f"didn't go through ({outcome.text[:200]})"
+        return "done"

@@ -122,7 +122,12 @@ def build(
     )
     chat = ChatService(agent=agent, identity=identity, store=store)
     console = AdminConsole(
-        identity=identity, store=store, services=services, settings=cfg, kill_switch=kill
+        identity=identity,
+        chat=chat,
+        store=store,
+        services=services,
+        settings=cfg,
+        kill_switch=kill,
     )
     bot = MaesterBot(
         chat,

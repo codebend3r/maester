@@ -161,6 +161,7 @@ REPLACE_SCHEMA: dict[str, Any] = {
     tier=Tier.FRIEND,
     destructive=True,
     host_param="host",
+    held_in_maintenance=True,
 )
 async def replace_media(ctx: ToolContext, report_id: int, host: str) -> Result:
     report = ctx.store.get_report(report_id)
