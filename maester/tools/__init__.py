@@ -9,6 +9,7 @@ from maester.tools import (  # noqa: F401
     accounts,
     availability,
     collections,
+    downloads,
     gaps,
     lag,
     playback,

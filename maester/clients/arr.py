@@ -153,6 +153,10 @@ class HistoryEvent:
     message: str  # why, for failures; empty otherwise
     file_id: int | None = None  # for an import: the movie or episode file it made
     episode_id: int | None = None  # Sonarr: which episode the event is about
+    indexer: str = ""  # for a grab: where it came from
+    reason: str = ""  # for a deleted file: why ("Upgrade", "Manual", "MissingFromDisk")
+    quality: str = ""
+    release_group: str = ""
 
     @classmethod
     def from_api(cls, raw: dict[str, Any]) -> HistoryEvent:
@@ -166,6 +170,10 @@ class HistoryEvent:
             message=data.get("message") or "",
             file_id=int(data["fileId"]) if data.get("fileId") else None,
             episode_id=raw.get("episodeId"),
+            indexer=data.get("indexer") or "",
+            reason=data.get("reason") or "",
+            quality=((raw.get("quality") or {}).get("quality") or {}).get("name") or "",
+            release_group=data.get("releaseGroup") or "",
         )
 
 

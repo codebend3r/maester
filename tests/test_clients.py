@@ -494,3 +494,15 @@ async def test_plex_answers_none_for_a_key_it_no_longer_has():
     assert await client.item("999") is None and await client.seasons("999") == []
     with pytest.raises(ClientError, match="500"):
         await client.item("500")
+
+
+@respx.mock
+async def test_sabnzbd_history_keeps_the_failure_and_the_steps_that_went_wrong(fixture):
+    respx.get(f"{BASE}/api").respond(json=fixture("sabnzbd_history"))
+    failed, done = await SabnzbdClient("meleys", BASE, "k").history()
+    assert failed.fail_message == "Unpacking failed, write error or disk is full?"
+    assert failed.trouble == (
+        "Repair: [Dune] Repaired in 41 seconds",
+        "Unpack: [Dune] Unpacking failed, write error or disk is full?",
+    )
+    assert failed.completed == 1790000000 and done.trouble == ()

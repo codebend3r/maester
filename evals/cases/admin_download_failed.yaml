@@ -1,0 +1,21 @@
+name: the admin asks why a download failed and hears the cause and the next step
+tier: admin
+services:
+  seerr:
+    results:
+      - {tmdb_id: 438631, title: "Dune", year: 2021, media_type: movie, status: 3}
+  radarr:
+    meleys:
+      movies:
+        - {id: 8, title: "Dune", tmdb_id: 438631, year: 2021}
+      history:
+        - {movie_id: 8, event: downloadFailed, release: "Dune.2021.1080p.BluRay.x264-GROUP", when: "2026-09-20T19:12:44Z", download_id: "SABnzbd_nzo_dune", why: "Unpacking failed, write error or disk is full?"}
+        - {movie_id: 8, event: grabbed, release: "Dune.2021.1080p.BluRay.x264-GROUP", when: "2026-09-20T18:00:00Z", download_id: "SABnzbd_nzo_dune", indexer: NZBgeek}
+  sabnzbd:
+    meleys:
+      history:
+        - {nzo_id: "SABnzbd_nzo_dune", name: "Dune.2021.1080p.BluRay.x264-GROUP", why: "Unpacking failed, write error or disk is full?", steps: ["Unpack: [Dune] Unpacking failed, write error or disk is full?"]}
+turns:
+  - user: "why did Dune 2021 fail to download?"
+    expect_tools: [download_history]
+    reply_matches: "(?i)unpack|disk|space"

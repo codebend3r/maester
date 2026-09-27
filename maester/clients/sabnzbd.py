@@ -7,6 +7,10 @@ from typing import Any, ClassVar, Protocol
 
 from maester.clients.base import ClientError, Downable, HttpClient
 
+# The stages of a finished download whose lines explain a failure; the rest
+# (download speed, the source) only repeat what worked.
+TROUBLE_STAGES = {"repair", "unpack", "script", "filejoin", "fail"}
+
 
 @dataclass(frozen=True)
 class Download:
@@ -17,6 +21,9 @@ class Download:
     size_mb: float
     time_left: str | None
     fail_message: str | None = None
+    # A finished download's steps that said something went wrong: "Repair: 18 blocks short".
+    trouble: tuple[str, ...] = ()
+    completed: int | None = None  # when it finished, as a Unix time
 
     @classmethod
     def from_queue(cls, raw: dict[str, Any]) -> Download:
@@ -39,6 +46,14 @@ class Download:
             size_mb=float(raw.get("bytes") or 0) / 1_048_576,
             time_left=None,
             fail_message=raw.get("fail_message") or None,
+            trouble=tuple(
+                f"{stage.get('name') or '?'}: {action}"
+                for stage in raw.get("stage_log") or []
+                if (stage.get("name") or "").lower() in TROUBLE_STAGES
+                for action in stage.get("actions") or []
+                if action
+            ),
+            completed=int(raw["completed"]) if raw.get("completed") else None,
         )
 
 
