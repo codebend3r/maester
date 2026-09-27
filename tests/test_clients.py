@@ -109,6 +109,8 @@ async def test_seerr_movie_details(fixture):
     assert movie.collection_id == 726871 and movie.seasons == () and not movie.anime_by_tmdb
     # Seerr sent the standard copy to its server 0, where the movie's id is 8; no 4K copy.
     assert movie.arr_for(False) == ArrRef(0, 8) and movie.arr_for(True) is None
+    # Seerr's own id for it (what issues are filed against), and its runtime.
+    assert (movie.media_id, movie.runtime_minutes) == (12, 155)
 
 
 @respx.mock
@@ -116,6 +118,7 @@ async def test_seerr_tv_details_merge_tmdb_seasons_with_server_status(fixture):
     respx.get(f"{BASE}/api/v1/tv/136315").respond(json=fixture("seerr_tv"))
     show = await SeerrClient(BASE, "k").media_details("tv", 136315)
     assert show.display == "The Bear (2022)" and show.tvdb_id == 403245
+    assert (show.media_id, show.runtime_minutes) == (31, 30)
     # No specials, nothing unaired.
     assert [(s.number, s.episodes) for s in show.seasons] == [(1, 8), (2, 10), (3, 10)]
     assert [s.status for s in show.seasons] == [
@@ -151,6 +154,23 @@ async def test_seerr_request_actions_quota_and_services(fixture):
     assert options.tag("DUB").id == 7 and options.profile("dual audio").id == 11
     assert options.default_tags == (1,) and options.anime_tags == (1, 4)
     assert options.tag("nope") is None
+
+
+@respx.mock
+async def test_seerr_issues_are_filed_as_the_user_against_seerrs_media_id():
+    route = respx.post(f"{BASE}/api/v1/issue").respond(status_code=201, json={"id": 34})
+    comment = respx.post(f"{BASE}/api/v1/issue/34/comment").respond(json={"id": 34})
+    client = SeerrClient(BASE, "k")
+    issue = await client.create_issue(31, 1, "S02E07 freezes", 4, season=2, episode=7)
+    assert issue == 34
+    assert json.loads(route.calls.last.request.content) == {
+        "issueType": 1, "message": "S02E07 freezes", "mediaId": 31, "userId": 4,
+        "problemSeason": 2, "problemEpisode": 7,
+    }  # fmt: skip
+    await client.create_issue(12, 4, "wrong movie", 4)
+    assert "problemSeason" not in json.loads(route.calls.last.request.content)
+    await client.comment_issue(34, "Replaced.")
+    assert json.loads(comment.calls.last.request.content) == {"message": "Replaced."}
 
 
 @respx.mock

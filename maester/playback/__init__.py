@@ -5,4 +5,5 @@
 - `client_limits.py`  known player limits as a rules table, each with its fix
 - `health.py`         the file health check: a short decode, judged
 - `tracks.py`         a file's audio and subtitle tracks, as people read them
+- `reports.py`        the report model and its one flow: diagnose, decide, record
 """

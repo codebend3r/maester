@@ -6,8 +6,10 @@ store and returns the notices to send; delivering them is the webhook's
 job. A route opts into deduplication when a repeat would reach a person
 twice: Seerr can send the same event again within minutes (a library
 rescan), while a later repeat is news (a replaced file ready again) and
-must get through. Today one type is handled: MEDIA_AVAILABLE, a DM to the
-friend whose request is ready. Types without a route are ignored.
+must get through. MEDIA_AVAILABLE DMs the friend whose request is ready;
+ISSUE_RESOLVED and ISSUE_REOPENED follow a playback report's issue into
+its report row, idempotently, and tell the reporter once when theirs is
+resolved. Types without a route are ignored.
 """
 
 from __future__ import annotations
@@ -88,7 +90,26 @@ class SeerrRoute:
 def seerr_routes(services: Services, store: Store) -> dict[str, SeerrRoute]:
     return {
         "MEDIA_AVAILABLE": SeerrRoute(partial(ready_to_watch, services, store), RESCAN_REPEAT),
+        # Only a change of state acts, so a repeated delivery does nothing twice.
+        "ISSUE_RESOLVED": SeerrRoute(partial(issue_status, store, True)),
+        "ISSUE_REOPENED": SeerrRoute(partial(issue_status, store, False)),
     }
+
+
+async def issue_status(
+    store: Store, resolved: bool, notification: SeerrNotification
+) -> list[Notice]:
+    """Mark the reports behind a Seerr issue resolved (or open again); tell each reporter
+    once when theirs is resolved."""
+    if notification.issue_id is None:
+        return []
+    changed = store.set_issue_resolved(notification.issue_id, resolved)
+    if not resolved:
+        return []
+    return [
+        DirectMessage(r.discord_id, f"Your report about {r.title} in {r.version} was resolved.")
+        for r in changed
+    ]
 
 
 def _what(notification: SeerrNotification, request: MediaRequest) -> str:

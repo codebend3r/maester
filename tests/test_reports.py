@@ -1,0 +1,188 @@
+from dataclasses import replace
+
+import pytest
+
+from maester.agent.tools import Result, Tier
+from maester.clients.seerr import ISSUE_AUDIO, ISSUE_OTHER, ISSUE_VIDEO
+from maester.clients.tautulli import StreamData
+from maester.notify import AdminPost, DirectMessage
+from maester.playback.items import Item, locate
+from maester.playback.reports import Action, Evidence, ReportKind, file_report
+from maester.seerr_events import SeerrNotification, issue_status
+from maester.tools.playback import report_problem
+from tests.factories import history_row, session
+from tests.playback_world import DANY, FORKS, stock
+
+DUNE_4K_ITEM = Item("movie", 438631, True)
+FORKS_ITEM = Item("tv", 136315, False, 2, 7)
+
+
+@pytest.fixture
+def library(ctx):
+    return stock(ctx)
+
+
+async def report(ctx, item, kind, description="it won't play", at=None, user="d1"):
+    ctx = replace(ctx, user_id=user)
+    located = await locate(ctx.services, item)
+    return await file_report(
+        ctx.services, ctx.store, ctx.linked_user(), located, kind, description, at
+    )
+
+
+def link_pal(ctx):
+    ctx.store.upsert_user("d2", status="active", seerr_user_id=5, plex_username="pal")
+
+
+async def test_a_player_limit_is_the_answer_and_the_file_is_left_alone(library):
+    library.services.tautulli["vermithor"].sessions = [
+        session(user_id=DANY, rating_key="9001", product="Plex for Roku", player="Living Room",
+                dovi_profile=7, video_decision="direct play")
+    ]  # fmt: skip
+    filed = await report(library, DUNE_4K_ITEM, ReportKind.WONT_PLAY, "purple picture")
+    assert filed.report.action == Action.ADVISED and filed.notices == ()
+    assert library.services.probe.decoded == []  # the file was never decoded
+    out = filed.as_dict()
+    (cause,) = out["diagnosis"]["player_causes"]
+    assert cause["limit"] == "dolby_vision_profile_7" and "1080p version" in cause["fix"]
+    assert out["diagnosis"]["player_check"] == (
+        "playing now, Plex for Roku on Living Room (Tautulli on vermithor)"
+    )
+    assert out["next"].startswith("Give them the player fix")
+    (issue,) = library.services.seerr.issues
+    assert (issue["mediaId"], issue["issueType"], issue["userId"]) == (12, ISSUE_VIDEO, 4)
+    assert issue["message"].startswith("purple picture\n\nReported through maester by dany")
+    assert "Decision: a player limit explains it" in issue["message"]
+    assert filed.report.seerr_issue_id == 1 and out["seerr_issue"] == 1
+    # The player explained it, so it doesn't count toward replacing the file.
+    assert not filed.evidence.proven
+    assert Evidence.of(library.store.reports_for_file("vermithor", "movie", 55)).reporters == set()
+
+
+async def test_a_finished_play_is_read_from_the_history_with_the_files_profile(library):
+    library.services.tautulli["vermithor"].history_rows = [
+        history_row(user_id=DANY, rating_key="9001", row_id=77, product="Plex Web", player="Chrome")
+    ]
+    library.services.tautulli["vermithor"].streams[77] = StreamData(
+        "hevc", "direct play", "eac3", "direct play", "", ""
+    )
+    filed = await report(library, DUNE_4K_ITEM, ReportKind.WONT_PLAY)
+    # Tautulli's history has no Dolby Vision profile; the file says 7.
+    assert filed.diagnosis.playback.dovi_profile == 7
+    assert filed.report.action == Action.ADVISED
+
+
+async def test_a_failed_file_check_makes_the_copy_replaceable(library):
+    library.services.probe.errors[FORKS] = ("[h264 @ 0x1] error while decoding MB 12 40",)
+    filed = await report(library, FORKS_ITEM, ReportKind.WONT_PLAY, "freezes", at=1200.0)
+    assert library.services.probe.decoded == [(FORKS, 1185.0, 30.0)]
+    assert filed.report.health == "corrupt" and filed.report.action == Action.REPLACEABLE
+    assert filed.diagnosis.player == "not checked: no recent play of this copy in Tautulli"
+    out = filed.as_dict()
+    assert out["evidence"].startswith("a file check found it corrupt: decode errors at 19:45")
+    assert "replace_media with report_id 1 and host meleys" in out["next"]
+    (issue,) = library.services.seerr.issues
+    assert (issue["mediaId"], issue["problemSeason"], issue["problemEpisode"]) == (31, 2, 7)
+    assert "(release group NTb)" in issue["message"]
+    assert "Decision: a replacement was offered to the friend" in issue["message"]
+
+
+async def test_a_healthy_file_needs_a_second_reporter(library):
+    link_pal(library)
+    first = await report(library, FORKS_ITEM, ReportKind.WONT_PLAY)
+    assert (first.report.health, first.report.action) == ("ok", Action.RECORDED)
+    assert first.as_dict()["evidence"] == "1 report and no failed file check"
+    again = await report(library, FORKS_ITEM, ReportKind.WONT_PLAY)  # the same friend again
+    assert again.report.action == Action.RECORDED
+    second = await report(library, FORKS_ITEM, ReportKind.WONT_PLAY, user="d2")
+    assert second.report.action == Action.REPLACEABLE
+    assert second.evidence.describe() == "2 people reported it"
+
+
+async def test_an_unreadable_file_is_never_proof(library):
+    library.services.probe.files.pop(FORKS)
+    filed = await report(library, FORKS_ITEM, ReportKind.WONT_PLAY)
+    assert filed.report.health == "unreadable" and filed.report.action == Action.RECORDED
+    assert filed.diagnosis.health.evidence == (
+        f"there's no file at {FORKS} on the read-only media mount",
+    )
+
+
+async def test_wrong_file_reports_take_the_friends_word_and_keep_the_release_group(library):
+    link_pal(library)
+    cam = await report(library, DUNE_4K_ITEM, ReportKind.CAM, "it's a cam, people's heads")
+    assert cam.report.action == Action.RECORDED and cam.diagnosis.as_dict() == {}
+    assert cam.report.release_group == "FraMeSToR" and library.services.probe.decoded == []
+    assert library.services.seerr.issues[0]["issueType"] == ISSUE_VIDEO
+    wrong = await report(library, DUNE_4K_ITEM, ReportKind.WRONG_TITLE, "it's Dune 1984", user="d2")
+    assert wrong.report.action == Action.REPLACEABLE  # two people, one file
+    assert library.services.seerr.issues[1]["issueType"] == ISSUE_OTHER
+
+
+async def test_track_problems_list_the_tracks_and_ask_the_admin(library):
+    filed = await report(library, DUNE_4K_ITEM, ReportKind.AUDIO, "no English dub")
+    assert filed.report.action == Action.RECORDED and "evidence" not in filed.as_dict()
+    (issue,) = library.services.seerr.issues
+    assert issue["issueType"] == ISSUE_AUDIO
+    assert 'Tracks:\n- audio: eng truehd 8ch "TrueHD Atmos 7.1" (default)' in issue["message"]
+    assert "- subtitle: es srt (forced, file)" in issue["message"]
+    assert "Decision: recorded for the admin" in issue["message"]
+    (notice,) = filed.notices
+    assert isinstance(notice, AdminPost) and notice.text.startswith(
+        "dany reports audio out of sync or a missing dub on the 4K copy of Dune (2021) "
+        '(vermithor): "no English dub". Nothing fixes this automatically'
+    )
+    assert (
+        filed.as_dict()["next"] == "Tell them it's recorded and the admin has been asked to fix it."
+    )
+
+
+async def test_a_report_is_kept_when_seerr_cannot_take_the_issue(library):
+    library.services.seerr.down = True
+    filed = await report(library, DUNE_4K_ITEM, ReportKind.CAM)
+    assert filed.issue.startswith("not opened: seerr POST /api/v1/issue failed")
+    assert library.store.get_report(filed.report.id).seerr_issue_id is None
+    library.services.seerr.down = False
+    library.services.seerr.details[("movie", 438631)] = replace(
+        library.services.seerr.details[("movie", 438631)], media_id=None
+    )
+    filed = await report(library, DUNE_4K_ITEM, ReportKind.CAM)
+    assert filed.issue == "not opened: Seerr doesn't track this title yet"
+
+
+async def test_resolving_the_issue_in_seerr_resolves_the_report_once(library):
+    filed = await report(library, DUNE_4K_ITEM, ReportKind.CAM)
+
+    def event(kind):
+        return SeerrNotification.from_webhook(
+            {"notification_type": kind, "issue": {"issue_id": str(filed.issue)}, "media": None}
+        )
+
+    (dm,) = await issue_status(library.store, True, event("ISSUE_RESOLVED"))
+    assert dm == DirectMessage("d1", "Your report about Dune (2021) in 4K was resolved.")
+    assert library.store.get_report(filed.report.id).resolved_at is not None
+    assert await issue_status(library.store, True, event("ISSUE_RESOLVED")) == []  # a repeat
+    assert await issue_status(library.store, False, event("ISSUE_REOPENED")) == []
+    assert library.store.get_report(filed.report.id).resolved_at is None
+
+
+async def test_report_problem_files_a_confirmed_copy(library):
+    out = await report_problem(
+        library, 136315, "tv", "1080p", "wont_play", "stops", season=2, episode=7, at="20:00"
+    )
+    assert isinstance(out, Result) and out.content["decision"] == "recorded"
+    assert library.services.probe.decoded[0][1] == 1185.0
+    out = await report_problem(library, 136315, "tv", "1080p", "cam", "cam", season=2, episode=8)
+    assert out == {"reported": False, "reason": "The Bear (2022) S02E08 has no file on meleys"}
+    with pytest.raises(ValueError, match="isn't a time"):
+        await report_problem(library, 438631, "movie", "4K", "wont_play", "x", at="later")
+
+
+def test_every_report_kind_has_a_policy_and_the_tool_offers_each():
+    from maester.agent.tools import registry
+    from maester.playback.reports import POLICIES
+
+    assert set(POLICIES) == set(ReportKind)
+    spec = registry.get("report_problem")
+    assert spec.input_schema["properties"]["kind"]["enum"] == [k.value for k in ReportKind]
+    assert spec.tier == Tier.FRIEND and not spec.destructive

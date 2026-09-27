@@ -4,59 +4,16 @@ from dataclasses import replace
 import pytest
 
 from maester.agent.tools import Choices
-from maester.clients.arr import MediaFile
-from maester.clients.media import Inspection, Track
-from maester.clients.plex import PlexItem
-from maester.clients.seerr import ArrRef, MediaDetails, MediaStatus
-from maester.clients.sonarr import Episode
 from maester.playback.items import Item, NotOnServer, locate
 from maester.playback.plays import copy_of, recent_plays
 from maester.tools.playback import list_tracks, recent_sessions
-from tests.factories import history_row, seerr_server, session
-
-S = MediaStatus
-DANY = 8008135
-DUNE = MediaDetails(
-    438631, "movie", "Dune", 2021, "", S.AVAILABLE, S.AVAILABLE,
-    rating_key="4348", rating_key_4k="9001", arr=ArrRef(0, 8), arr_4k=ArrRef(1, 8),
-)  # fmt: skip
-BEAR = MediaDetails(
-    136315, "tv", "The Bear", 2022, "", S.AVAILABLE, S.UNKNOWN,
-    rating_key="5120", arr=ArrRef(0, 12), tvdb_id=403245,
-)  # fmt: skip
-DUNE_4K = "/Vermithor/Movies/Dune (2021)/Dune (2021) Remux-2160p.mkv"
-FORKS = "/Meleys/TV/The Bear/Season 02/The Bear - S02E07 - Forks WEBDL-1080p.mkv"
+from tests.factories import history_row, session
+from tests.playback_world import BEAR, DANY, DUNE, FORKS, stock
 
 
 @pytest.fixture
 def library(ctx):
-    """Dune's 1080p copy on meleys and its 4K copy on vermithor; The Bear on meleys."""
-    services = ctx.services
-    services.seerr.arr_servers = {
-        "radarr": [seerr_server(0, "movie", "meleys"), seerr_server(1, "movie", "vermithor", is_4k=True)],
-        "sonarr": [seerr_server(0, "tv", "meleys")],
-    }  # fmt: skip
-    services.seerr.details.update({("movie", 438631): DUNE, ("tv", 136315): BEAR})
-    services.radarr["vermithor"].files = [
-        MediaFile(55, DUNE_4K, 68_500_000_000, "Remux-2160p", "FraMeSToR", 8)
-    ]
-    sonarr = services.sonarr["meleys"]
-    sonarr.episode_list = [
-        Episode(701, 12, 2, 6, "Sundae", True, 71, True),
-        Episode(702, 12, 2, 7, "Forks", True, 72, True),
-        Episode(703, 12, 2, 8, "Omelette", False, None, True),
-    ]
-    sonarr.files = [MediaFile(72, FORKS, 1_900_000_000, "WEBDL-1080p", "NTb", 12, 2)]
-    services.probe.files[DUNE_4K] = Inspection(
-        DUNE_4K, 9331.0, "hevc", 7,
-        (
-            Track("audio", "truehd", "eng", "TrueHD Atmos 7.1", default=True, channels=8),
-            Track("audio", "ac3", "und", "English Dub", channels=6),
-            Track("subtitle", "hdmv_pgs_subtitle", "eng", ""),
-            Track("subtitle", "srt", "es", "Dune.es.forced.srt", forced=True, external=True),
-        ),
-    )  # fmt: skip
-    return ctx
+    return stock(ctx)
 
 
 class Down:
@@ -68,18 +25,9 @@ class Down:
 
 
 @pytest.fixture
-def watching(ctx):
+def watching(library):
     """Dany plays Dune in 4K on meleys now; The Bear S02E07 finished two hours ago."""
-    ctx.store.upsert_user("d1", tautulli_user_id=DANY)
-    services = ctx.services
-    services.seerr.details.update({("movie", 438631): DUNE, ("tv", 136315): BEAR})
-    services.plex.items.update(
-        {
-            "9001": PlexItem("9001", "Dune", "movie", 2021, ("tmdb://438631",), ()),
-            "5120": PlexItem("5120", "The Bear", "show", 2022, ("tmdb://136315",), ()),
-        }
-    )
-    meleys = services.tautulli["meleys"]
+    meleys = library.services.tautulli["meleys"]
     meleys.sessions = [
         session(user_id=DANY, rating_key="9001", full_title="Dune", product="Plex for Roku",
                 player="Living Room"),
@@ -93,7 +41,7 @@ def watching(ctx):
         # Plex no longer knows this one, so it can't be offered.
         history_row(user_id=DANY, rating_key="31337", full_title="Gone", started=two_hours_ago - 60),
     ]  # fmt: skip
-    return ctx
+    return library
 
 
 async def test_recent_sessions_offers_each_play_as_its_copy_and_episode(watching):
@@ -190,6 +138,7 @@ async def test_list_tracks_reads_the_files_own_tracks(library):
 
 
 async def test_list_tracks_says_why_when_it_cannot(library):
+    library.services.probe.files.pop(FORKS)
     out = await list_tracks(library, 136315, "tv", "1080p", 2, 7)
     assert out["tracks"] is None and out["reason"].startswith("the file couldn't be read: ")
     out = await list_tracks(library, 136315, "tv", "1080p", 2, 8)

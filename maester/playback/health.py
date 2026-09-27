@@ -72,6 +72,11 @@ class Health:
     def unreadable(cls, why: Unreadable) -> Health:
         return cls(Verdict.UNREADABLE, (str(why),))
 
+    @classmethod
+    def from_dict(cls, raw: dict[str, Any]) -> Health:
+        """A check stored with a report (`as_dict`)."""
+        return cls(Verdict(raw["verdict"]), tuple(raw["evidence"]))
+
     @property
     def summary(self) -> str:
         return f"{self.verdict}: {'; '.join(self.evidence)}"

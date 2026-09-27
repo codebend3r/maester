@@ -103,6 +103,16 @@ class LocatedFile:
         """ "the 4K copy of Dune (2021)"."""
         return f"the {self.item.version} copy of {self.title}"
 
+    @property
+    def runtime(self) -> float | None:
+        """How long the file should run, in seconds: a movie's runtime.
+
+        A show's runtime is only typical, and a short episode must not pass
+        for a truncated one, so episodes have none.
+        """
+        minutes = self.details.runtime_minutes
+        return minutes * 60.0 if minutes and self.item.media_type == "movie" else None
+
 
 async def locate(services: Services, item: Item) -> LocatedFile:
     """The item's file on its owning host; `NotOnServer` or `OwnerUnknown` when it can't be named."""

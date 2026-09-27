@@ -65,7 +65,10 @@ async def test_nobody_to_tell(services, store):
 
 def test_dispatch_table_and_event_keys(services, store):
     routes = seerr_routes(services, store)
-    assert set(routes) == {"MEDIA_AVAILABLE"} and routes["MEDIA_AVAILABLE"].dedupe == RESCAN_REPEAT
+    assert set(routes) == {"MEDIA_AVAILABLE", "ISSUE_RESOLVED", "ISSUE_REOPENED"}
+    assert routes["MEDIA_AVAILABLE"].dedupe == RESCAN_REPEAT
+    # Following an issue into its report is idempotent, so every delivery acts.
+    assert routes["ISSUE_RESOLVED"].dedupe is None and routes["ISSUE_REOPENED"].dedupe is None
     assert notification().event_key == "MEDIA_AVAILABLE:request:77"
     assert notification(request_id=None).event_key == "MEDIA_AVAILABLE:media:movie:438631"
     issue = SeerrNotification.from_webhook(

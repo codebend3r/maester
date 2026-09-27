@@ -46,8 +46,16 @@ class Seerr(Protocol):
     async def server_options(self, kind: str, server_id: int) -> ServerOptions: ...
     async def users(self) -> list[SeerrUser]: ...
     async def create_issue(
-        self, media_id: int, issue_type: int, message: str, user_id: int
+        self,
+        media_id: int,
+        issue_type: int,
+        message: str,
+        user_id: int,
+        *,
+        season: int | None = None,
+        episode: int | None = None,
     ) -> int: ...
+    async def comment_issue(self, issue_id: int, message: str) -> None: ...
 
 
 class SeerrClient(HttpClient):
@@ -137,9 +145,32 @@ class SeerrClient(HttpClient):
         data = await self.get_json("/api/v1/user", params={"take": 500})
         return [SeerrUser.from_api(u) for u in data.get("results", [])]
 
-    async def create_issue(self, media_id: int, issue_type: int, message: str, user_id: int) -> int:
-        body = {"issueType": issue_type, "message": message, "mediaId": media_id, "userId": user_id}
+    async def create_issue(
+        self,
+        media_id: int,
+        issue_type: int,
+        message: str,
+        user_id: int,
+        *,
+        season: int | None = None,
+        episode: int | None = None,
+    ) -> int:
+        """File an issue as `user_id` (Seerr lets the admin's key do that) against Seerr's
+        media id; a show's issue can name the season and episode."""
+        body: dict[str, Any] = {
+            "issueType": issue_type,
+            "message": message,
+            "mediaId": media_id,
+            "userId": user_id,
+        }
+        if season is not None:
+            body["problemSeason"] = season
+        if episode is not None:
+            body["problemEpisode"] = episode
         return int((await self.post_json("/api/v1/issue", body))["id"])
+
+    async def comment_issue(self, issue_id: int, message: str) -> None:
+        await self.post_json(f"/api/v1/issue/{issue_id}/comment", {"message": message})
 
 
 def _message(detail: str) -> str:
