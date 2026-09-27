@@ -82,6 +82,7 @@ class PlexSeason:
 
 
 class Plex(Protocol):
+    async def ping(self) -> None: ...
     async def machine_identifier(self) -> str: ...
     async def sections(self) -> list[Section]: ...
     async def item(self, rating_key: str) -> PlexItem | None: ...
@@ -102,6 +103,10 @@ class PlexClient(HttpClient):
     def __init__(self, base_url: str, token: str, **kwargs: Any):
         headers = {"X-Plex-Token": token, "Accept": "application/json"}
         super().__init__(base_url, headers=headers, **kwargs)
+
+    async def ping(self) -> None:
+        """The server answers `/identity`, its one route that needs no token."""
+        await self.get_json("/identity")
 
     async def machine_identifier(self) -> str:
         data = await self.get_json("/identity")
@@ -146,6 +151,11 @@ class FakePlexClient:
     section_list: list[Section] = field(default_factory=list)
     items: dict[str, PlexItem] = field(default_factory=dict)
     show_seasons: dict[str, list[PlexSeason]] = field(default_factory=dict)
+    down: bool = False  # while set, it answers like an unreachable server
+
+    async def ping(self) -> None:
+        if self.down:
+            raise ClientError("plex", "GET", "/identity", None, "connection refused")
 
     async def machine_identifier(self) -> str:
         return self.machine_id

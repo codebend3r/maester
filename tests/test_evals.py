@@ -157,3 +157,12 @@ async def test_the_slow_uplink_world_is_found_by_a_speed_test():
     after = await runner.run(ctx, "session_report", {})
     assert '"fix": "lower_quality"' in after.text and "2 Mbps 720p" in after.text
     store.close()
+
+
+async def test_the_health_world_has_what_its_case_says_is_down():
+    case = Case.load(CASES_DIR / "service_health_down.yaml")
+    registry, services, store = build_world(case.services)
+    ctx = ToolContext(EVAL_USER, case.tier, services, store, Settings(), Memo())
+    outcome = await ToolRunner(registry).run(ctx, "service_health", {})
+    assert [d["service"] for d in outcome.content["down"]] == ["Plex", "Radarr on vermithor"]
+    store.close()

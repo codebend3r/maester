@@ -34,6 +34,7 @@ Seerr  Sonarr    Radarr    SABnzbd   Tautulli    Plex     Wizarr
 | "the Dune on the server is a cam"              | Records it as a Seerr issue, and swaps the copy once a second friend reports it                                    |
 | "S02E07 of The Bear is missing"                | Searches the missing episodes on the host that owns the show; tells the admin about whole missing seasons         |
 | "it's laggy"                                   | Reads the live stream from Tautulli (transcode, relay, bandwidth), server load, and gives one concrete fix         |
+| "is Plex down?"                                | Pings every service behind the server at once and says what is up and what is down                                |
 | "can my brother get access?"                   | Puts an invite request in the admin queue; on approval, issues a Wizarr invite                                     |
 
 Everything the bot can change goes through a small set of scoped tools with permission tiers and button confirmations. There is no shell, no generic API passthrough.

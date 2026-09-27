@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
+
 
 def humanized(seconds: int) -> str:
     """ "about 12 min", "about 2 h 5 min", "about 1 d 3 h"."""
@@ -13,6 +15,13 @@ def humanized(seconds: int) -> str:
         return f"about {hours} h {minutes} min" if minutes else f"about {hours} h"
     days, hours = divmod(hours, 24)
     return f"about {days} d {hours} h" if hours else f"about {days} d"
+
+
+def ago(age: timedelta) -> str:
+    """ "just now" under a minute, else "about 4 min ago"."""
+    if age < timedelta(minutes=1):
+        return "just now"
+    return f"{humanized(int(age.total_seconds()))} ago"
 
 
 def gigabytes(size: int) -> str:

@@ -1,11 +1,21 @@
-"""The performance epic's clients: the fleet monitor (respx) and the speed test (a scripted run)."""
+"""The performance epic's clients: every client's ping and the fleet monitor (respx), and
+the speed test (a scripted run)."""
 
 import json
 
 import pytest
 import respx
 
-from maester.clients import ClientError
+from maester.clients import (
+    ClientError,
+    PlexClient,
+    RadarrClient,
+    SabnzbdClient,
+    SeerrClient,
+    SonarrClient,
+    TautulliClient,
+    WizarrClient,
+)
 from maester.clients.fleet import (
     FakeFleetMonitor,
     FleetMonitorClient,
@@ -148,3 +158,42 @@ async def test_fake_speed_test_answers_or_fails():
     assert await fake.measure() == result and fake.runs == 1
     with pytest.raises(SpeedTestFailed, match="no test server"):
         await FakeSpeedTest().measure()
+
+
+BASE = "http://svc.test"
+
+
+@respx.mock
+async def test_each_client_pings_its_cheapest_live_route():
+    routes = [
+        respx.get(f"{BASE}/identity").respond(json={"MediaContainer": {"machineIdentifier": "m"}}),
+        respx.get(f"{BASE}/api/v1/status").respond(json={"version": "2.7.3", "commitTag": "x"}),
+        respx.get(f"{BASE}/api/status").respond(json={"users": 12, "invites": 3, "pending": 1, "expired": 0}),
+        respx.get(f"{BASE}/api/v3/system/status").respond(json={"appName": "Sonarr", "version": "4.0.9"}),
+        respx.get(f"{BASE}/api", params={"mode": "version"}).respond(json={"version": "4.3.3"}),
+        respx.get(f"{BASE}/api/v2", params={"cmd": "status"}).respond(
+            json={"response": {"result": "success", "message": "Ok", "data": {}}}
+        ),
+    ]  # fmt: skip
+    await PlexClient(BASE, "tok").ping()
+    await SeerrClient(BASE, "k").ping()
+    await WizarrClient(BASE, "k").ping()
+    await SonarrClient("meleys", BASE, "arr-key").ping()
+    await RadarrClient("meleys", BASE, "arr-key").ping()
+    await SabnzbdClient("meleys", BASE, "k").ping()
+    await TautulliClient("meleys", BASE, "k").ping()
+    assert all(route.called for route in routes)
+    assert routes[3].calls.last.request.headers["X-Api-Key"] == "arr-key"
+    assert routes[3].call_count == 2  # Sonarr and Radarr share the route
+
+
+@respx.mock
+async def test_a_ping_that_isnt_answered_is_a_client_error():
+    respx.get(f"{BASE}/api/v2").respond(
+        json={"response": {"result": "error", "message": "Invalid apikey", "data": {}}}
+    )
+    respx.get(f"{BASE}/api/v3/system/status").respond(status_code=401, text="Unauthorized")
+    with pytest.raises(ClientError, match="Invalid apikey"):
+        await TautulliClient("meleys", BASE, "bad").ping()
+    with pytest.raises(ClientError, match="401"):
+        await RadarrClient("meleys", BASE, "bad").ping()

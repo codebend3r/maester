@@ -25,7 +25,7 @@ from typing import Any
 
 from maester.clients import Services
 from maester.clients.speedtest import SpeedResult, SpeedTester, SpeedTestFailed
-from maester.formatting import humanized, megabits
+from maester.formatting import ago, humanized, megabits
 from maester.memo import Memo
 from maester.perf.load import mbps, read_loads
 
@@ -120,12 +120,6 @@ async def measure(services: Services, tester: SpeedTester) -> Measurement:
     if isinstance(result, NotMeasured):
         return result
     return Uplink(tester.host, result, loads.remote_kbps, tuple(sorted(loads.unreachable)))
-
-
-def ago(age: timedelta) -> str:
-    if age < timedelta(minutes=1):
-        return "just now"
-    return f"{humanized(int(age.total_seconds()))} ago"
 
 
 @dataclass(frozen=True)

@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
-from maester.clients.base import HttpClient
+from maester.clients.base import ClientError, HttpClient
 
 
 @dataclass(frozen=True)
@@ -45,6 +45,7 @@ class Download:
 class Sabnzbd(Protocol):
     host: str
 
+    async def ping(self) -> None: ...
     async def queue(self) -> list[Download]: ...
     async def history(self, limit: int = 50) -> list[Download]: ...
 
@@ -55,6 +56,10 @@ class SabnzbdClient(HttpClient):
     def __init__(self, host: str, base_url: str, api_key: str, **kwargs: Any):
         super().__init__(base_url, params={"apikey": api_key, "output": "json"}, **kwargs)
         self.host = host
+
+    async def ping(self) -> None:
+        """SABnzbd's version, which it gives without the API key: it answers while it runs."""
+        await self.get_json("/api", params={"mode": "version"})
 
     async def queue(self) -> list[Download]:
         data = await self.get_json("/api", params={"mode": "queue"})
@@ -70,6 +75,11 @@ class FakeSabnzbdClient:
     host: str = "fake"
     queue_items: list[Download] = field(default_factory=list)
     history_items: list[Download] = field(default_factory=list)
+    down: bool = False  # while set, it answers like an unreachable SABnzbd
+
+    async def ping(self) -> None:
+        if self.down:
+            raise ClientError("sabnzbd", "GET", "/api?mode=version", None, "connection refused")
 
     async def queue(self) -> list[Download]:
         return list(self.queue_items)

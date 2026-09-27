@@ -1,0 +1,8 @@
+name: asking whether Plex is down gets what is up and what is down
+tier: friend
+services:
+  down: [plex, "radarr:vermithor"]
+turns:
+  - user: "is Plex down? nothing loads for me"
+    expect_tools: [service_health]
+    reply_matches: "Plex.*(down|not (responding|answering))|(down|not (responding|answering)).*Plex"

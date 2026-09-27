@@ -22,6 +22,7 @@ from maester.clients.seerr.models import (
 
 
 class Seerr(Protocol):
+    async def ping(self) -> None: ...
     async def search(self, query: str) -> list[SearchResult]: ...
     async def media_details(self, media_type: str, tmdb_id: int) -> MediaDetails: ...
     async def collection(self, collection_id: int) -> Collection: ...
@@ -63,6 +64,10 @@ class SeerrClient(HttpClient):
 
     def __init__(self, base_url: str, api_key: str, **kwargs: Any):
         super().__init__(base_url, headers={"X-Api-Key": api_key}, **kwargs)
+
+    async def ping(self) -> None:
+        """Seerr's open status route: it answers while Seerr runs."""
+        await self.get_json("/api/v1/status")
 
     async def search(self, query: str) -> list[SearchResult]:
         data = await self.get_json("/api/v1/search", params={"query": query, "page": 1})

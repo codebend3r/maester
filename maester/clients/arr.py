@@ -137,6 +137,10 @@ class ArrClient(HttpClient):
         super().__init__(base_url, headers={"X-Api-Key": api_key}, **kwargs)
         self.host = host
 
+    async def ping(self) -> None:
+        """The arr's system status, which also checks the API key."""
+        await self.get_json(f"{self.api}/system/status")
+
     async def root_folders(self) -> list[str]:
         return [r["path"] for r in await self.get_json(f"{self.api}/rootfolder")]
 

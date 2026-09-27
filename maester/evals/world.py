@@ -355,7 +355,7 @@ def build_services(seed: dict[str, Any], seerr_user_id: int = 4) -> Services:
     hosts = seed.get("hosts", ["meleys", "vermithor"])
     radarr, sonarr = seed.get("radarr", {}), seed.get("sonarr", {})
     tautulli, tautulli_user = seed.get("tautulli", {}), _tautulli_user(seed)
-    return Services(
+    services = Services(
         seerr=_seerr(seed.get("seerr", {}), seerr_user_id, hosts),
         plex=_plex(seed.get("plex", {})),
         wizarr=FakeWizarrClient(),
@@ -367,6 +367,12 @@ def build_services(seed: dict[str, Any], seerr_user_id: int = 4) -> Services:
         fleet=_fleet(seed["fleet"]) if "fleet" in seed else None,
         speedtest=_speedtest(seed["speedtest"]) if "speedtest" in seed else None,
     )
+    # Services that answer like unreachable ones: "plex", or "radarr:vermithor" per host.
+    for name in seed.get("down", []):
+        service, _, host = name.partition(":")
+        client = getattr(services, service)
+        (client[host] if host else client).down = True
+    return services
 
 
 def _tautulli_user(seed: dict[str, Any]) -> int | None:

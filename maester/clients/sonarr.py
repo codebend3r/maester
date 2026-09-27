@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Any, Protocol
 
 from maester.clients.arr import ArrClient, DiskSpace, HistoryEvent, MediaFile, QueueItem
+from maester.clients.base import ClientError
 
 
 @dataclass(frozen=True)
@@ -64,6 +65,7 @@ class Sonarr(Protocol):
     host: str
     base_url: str
 
+    async def ping(self) -> None: ...
     async def root_folders(self) -> list[str]: ...
     async def disk_space(self) -> list[DiskSpace]: ...
     async def queue(self) -> list[QueueItem]: ...
@@ -135,7 +137,12 @@ class FakeSonarrClient:
     failed: list[int] = field(default_factory=list)
     searched: list[list[int]] = field(default_factory=list)
     deleted: list[int] = field(default_factory=list)
+    down: bool = False  # while set, it answers like an unreachable Sonarr
     followed: list[int] = field(default_factory=list)
+
+    async def ping(self) -> None:
+        if self.down:
+            raise ClientError("sonarr", "GET", "/api/v3/system/status", None, "connection refused")
 
     async def root_folders(self) -> list[str]:
         return list(self.roots)

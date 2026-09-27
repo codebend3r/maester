@@ -39,9 +39,13 @@ class FakeSeerrClient:
     routed: dict[int, Routing] = field(default_factory=dict)
     issues: list[dict[str, Any]] = field(default_factory=list)
     auto_approve: bool = False
-    # While set, approving, declining and filing issues answer the way an
-    # unreachable Seerr would.
+    # While set, pinging, approving, declining and filing issues answer the way
+    # an unreachable Seerr would.
     down: bool = False
+
+    async def ping(self) -> None:
+        if self.down:
+            raise ClientError("seerr", "GET", "/api/v1/status", None, "connection refused")
 
     async def search(self, query: str) -> list[SearchResult]:
         q = query.lower()

@@ -14,7 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
-from maester.clients.base import HttpClient
+from maester.clients.base import ClientError, HttpClient
 
 
 def _int(value: Any, default: int = 0) -> int:
@@ -236,6 +236,7 @@ class TautulliUser:
 class Tautulli(Protocol):
     host: str
 
+    async def ping(self) -> None: ...
     async def activity(self) -> Activity: ...
     async def history(
         self, *, user_id: int | None = None, rating_key: str | None = None, length: int = 10
@@ -256,12 +257,14 @@ class TautulliClient(HttpClient):
         data = await self.get_json("/api/v2", params={"cmd": cmd, **params})
         response = data.get("response") or {}
         if response.get("result") != "success":
-            from maester.clients.base import ClientError
-
             raise ClientError(
                 self.service, "GET", f"/api/v2?cmd={cmd}", 200, response.get("message") or "error"
             )
         return response.get("data")
+
+    async def ping(self) -> None:
+        """Tautulli's own status command, which also checks the API key."""
+        await self._cmd("status")
 
     async def activity(self) -> Activity:
         return Activity.from_api(await self._cmd("get_activity") or {})
@@ -298,6 +301,11 @@ class FakeTautulliClient:
     streams: dict[int, StreamData] = field(default_factory=dict)
     user_list: list[TautulliUser] = field(default_factory=list)
     recent: list[dict[str, Any]] = field(default_factory=list)
+    down: bool = False  # while set, it answers like an unreachable Tautulli
+
+    async def ping(self) -> None:
+        if self.down:
+            raise ClientError("tautulli", "GET", "/api/v2?cmd=status", None, "connection refused")
 
     async def activity(self) -> Activity:
         wan = sum(s.bandwidth_kbps for s in self.sessions if s.location == "wan")
