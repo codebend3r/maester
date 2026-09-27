@@ -5,6 +5,7 @@
 - `sweep.py`      stalled downloads blocklisted and searched again, or surfaced
 - `space.py`      the daily free-space sample the disk forecast fits
 - `digest.py`     the admin's daily digest
+- `nas.py`        the weekly NAS health report
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ from maester.agent.limits import KillSwitch
 from maester.clients import Services
 from maester.config import Settings
 from maester.jobs.digest import Digest
+from maester.jobs.nas import nas_report
 from maester.jobs.schedule import At, Every
 from maester.jobs.scheduler import Job, Scheduler
 from maester.jobs.space import sample_space
@@ -40,6 +42,11 @@ def scheduled(
         ),
         Job(
             "digest", At(jobs.digest_at, jobs.zone), Digest(services, store, settings, kill_switch)
+        ),
+        Job(
+            "nas_report",
+            At(jobs.digest_at, jobs.zone, weekday=jobs.nas_report_day),
+            partial(nas_report, services, settings),
         ),
     ]
 

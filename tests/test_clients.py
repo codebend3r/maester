@@ -10,6 +10,7 @@ from maester.clients import (
     FakeSeerrClient,
     FakeSonarrClient,
     FakeWizarrClient,
+    FleetMonitorClient,
     PlexClient,
     RadarrClient,
     SabnzbdClient,
@@ -515,3 +516,18 @@ async def test_seerr_open_issues_name_the_title_the_episode_and_who_raised_it(fi
     assert route.calls.last.request.url.params["filter"] == "open"
     assert (issue.id, issue.kind, issue.media_type, issue.tmdb_id) == (12, "video", "tv", 136315)
     assert (issue.season, issue.episode, issue.reporter) == (2, 7, "dany")
+
+
+@respx.mock
+async def test_the_fleet_view_names_each_hosts_state_temperatures_and_containers(fixture):
+    respx.get(f"{BASE}/fleet").respond(json=fixture("fleet_view"))
+    vermithor, caraxes = await FleetMonitorClient(BASE, "t").hosts()
+    assert (vermithor.status, vermithor.disk_percent, vermithor.disk_free_bytes) == (
+        "warn",
+        93.5,
+        6175000000000,
+    )
+    assert vermithor.temperatures == {"coretemp.temp1": 71.0, "coretemp.temp2": 64.5}
+    assert vermithor.containers_down == ("tautulli",)
+    assert vermithor.containers_unhealthy == ("seerr",) and vermithor.stale is None
+    assert not caraxes.collected and caraxes.status == "unknown" and caraxes.stale is None
