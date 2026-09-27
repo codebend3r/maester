@@ -2,15 +2,6 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from maester.store import Store
-
-
-@pytest.fixture
-def store():
-    s = Store(":memory:")
-    yield s
-    s.close()
-
 
 def test_migrations_apply_once(store):
     assert store.migrate() == []

@@ -1,8 +1,10 @@
 """Builds the fake service bag and the tool registry an eval case runs in.
 
-Tool modules register into the process-wide registry as they land (E3+);
-until then the world exposes the fakes plus whatever tools are registered.
-Seeds in the case file are plain dicts turned into the fakes' records.
+Every tool module registers into the process-wide registry, and the case's
+seed (plain dicts) is turned into the fakes' records. One `seerr.results`
+entry describes a title once: it is both what search finds and what the
+details lookup returns. The eval user is linked, so request tools act as a
+real friend would.
 """
 
 from __future__ import annotations
@@ -21,36 +23,88 @@ from maester.clients import (
     FakeWizarrClient,
     Services,
 )
-from maester.clients.seerr import SearchResult, SeerrUser
+from maester.clients.seerr import (
+    ArrServer,
+    MediaDetails,
+    MediaStatus,
+    SearchResult,
+    Season,
+    SeerrUser,
+    ServerOptions,
+)
 from maester.store import Store
 
+# Importing the tools package registers every tool module into app_registry.
+import maester.tools  # noqa: F401  isort: skip
 
-def build_services(seed: dict[str, Any]) -> Services:
-    seerr = FakeSeerrClient(
-        results=[
-            SearchResult(
-                tmdb_id=int(r["tmdb_id"]),
-                media_type=r.get("media_type", "movie"),
-                title=r["title"],
-                year=r.get("year"),
-                overview=r.get("overview", ""),
-                poster_path=r.get("poster_path"),
-                status=int(r.get("status", 1)),
-                status_4k=int(r.get("status_4k", 1)),
+EVAL_USER = "eval-user"
+
+
+def _title(r: dict[str, Any]) -> tuple[SearchResult, MediaDetails]:
+    media_type = r.get("media_type", "movie")
+    status = MediaStatus(int(r.get("status", MediaStatus.UNKNOWN)))
+    status_4k = MediaStatus(int(r.get("status_4k", MediaStatus.UNKNOWN)))
+    result = SearchResult(
+        tmdb_id=int(r["tmdb_id"]),
+        media_type=media_type,
+        title=r["title"],
+        year=r.get("year"),
+        overview=r.get("overview", ""),
+        poster_path=r.get("poster_path"),
+        status=status,
+        status_4k=status_4k,
+    )
+    details = MediaDetails(
+        tmdb_id=result.tmdb_id,
+        media_type=media_type,
+        title=result.title,
+        year=result.year,
+        overview=result.overview,
+        status=status,
+        status_4k=status_4k,
+        rating_key=r.get("rating_key"),
+        tvdb_id=r.get("tvdb_id"),
+        collection_id=r.get("collection_id"),
+        seasons=tuple(
+            Season(
+                int(s["number"]),
+                int(s["episodes"]),
+                MediaStatus(int(s.get("status", MediaStatus.UNKNOWN))),
+                MediaStatus.UNKNOWN,
             )
-            for r in seed.get("seerr", {}).get("results", [])
-        ],
+            for s in r.get("seasons", [])
+        ),
+        keyword_ids=frozenset(r.get("keywords", [])),
+        genre_ids=frozenset(r.get("genres", [])),
+        original_language=r.get("original_language", ""),
+    )
+    return result, details
+
+
+def _seerr(seed: dict[str, Any]) -> FakeSeerrClient:
+    titles = [_title(r) for r in seed.get("results", [])]
+    four_k = [
+        ServerOptions(ArrServer(9, f"{kind} 4K", is_4k=True, is_default=True), (), ())
+        for kind in ("radarr", "sonarr")
+    ]
+    return FakeSeerrClient(
+        results=[result for result, _ in titles],
+        details={(d.media_type, d.tmdb_id): d for _, d in titles},
         user_list=[
             SeerrUser(
                 int(u["id"]), u.get("email", ""), u.get("username", ""), u.get("plex_username", "")
             )
-            for u in seed.get("seerr", {}).get("users", [])
+            for u in seed.get("users", [])
         ],
-        auto_approve=bool(seed.get("seerr", {}).get("auto_approve", False)),
+        server_list={"radarr": [four_k[0]], "sonarr": [four_k[1]]} if seed.get("four_k") else {},
+        auto_approve=bool(seed.get("auto_approve", False)),
     )
+
+
+def build_services(seed: dict[str, Any]) -> Services:
     hosts = seed.get("hosts", ["meleys", "vermithor"])
     return Services(
-        seerr=seerr,
+        seerr=_seerr(seed.get("seerr", {})),
         plex=FakePlexClient(),
         wizarr=FakeWizarrClient(),
         sonarr={h: FakeSonarrClient(host=h) for h in hosts},
@@ -61,4 +115,12 @@ def build_services(seed: dict[str, Any]) -> Services:
 
 
 def build_world(seed: dict[str, Any]) -> tuple[ToolRegistry, Services, Store]:
-    return app_registry, build_services(seed), Store(":memory:")
+    store = Store(":memory:")
+    user = seed.get("user", {})
+    store.upsert_user(
+        EVAL_USER,
+        status="active",
+        seerr_user_id=int(user.get("seerr_user_id", 4)),
+        plex_username=user.get("plex_username", "eval"),
+    )
+    return app_registry, build_services(seed), store

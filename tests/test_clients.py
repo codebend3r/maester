@@ -18,7 +18,14 @@ from maester.clients import (
     TautulliClient,
     WizarrClient,
 )
-from maester.clients.seerr import STATUS_AVAILABLE, STATUS_UNKNOWN, SearchResult
+from maester.clients.seerr import (
+    MediaStatus,
+    Refusal,
+    RequestRefused,
+    RequestStatus,
+    Routing,
+    SearchResult,
+)
 from maester.clients.sonarr import Episode
 from maester.clients.wizarr import Invite, WizarrUser, honored_expiry_days, redeemer
 
@@ -30,8 +37,12 @@ async def test_seerr_search_drops_people_and_parses_status(fixture):
     respx.get(f"{BASE}/api/v1/search").respond(json=fixture("seerr_search"))
     results = await SeerrClient(BASE, "k").search("dune")
     assert [r.year for r in results] == [2021, 1984]
-    assert results[0].status == STATUS_AVAILABLE
-    assert results[1].status == STATUS_UNKNOWN
+    assert results[0].status == MediaStatus.AVAILABLE
+    assert results[1].status == MediaStatus.UNKNOWN
+    assert (
+        results[0].poster_url == "https://image.tmdb.org/t/p/w185/d5NXSklXo0qyIYkgV94XAgMrLYk.jpg"
+    )
+    assert results[1].poster_url is None
 
 
 @respx.mock
@@ -43,8 +54,120 @@ async def test_seerr_create_request_impersonates_and_sends_seasons(fixture):
     sent = route.calls.last.request
     assert sent.headers["X-API-User"] == "4"
     assert sent.headers["X-Api-Key"] == "k"
-    assert json.loads(sent.content)["seasons"] == [2, 3]
+    body = json.loads(sent.content)
+    assert body["seasons"] == [2, 3] and "serverId" not in body and "tags" not in body
     assert req.id == 77 and req.seasons == (2, 3) and req.requested_by_id == 4
+    assert req.status == RequestStatus.PENDING and req.media_status == MediaStatus.PENDING
+    assert req.tvdb_id == 371980 and req.rating_key is None
+
+
+@respx.mock
+async def test_seerr_create_request_sends_routing(fixture):
+    route = respx.post(f"{BASE}/api/v1/request").respond(
+        status_code=201, json=fixture("seerr_request")
+    )
+    routing = Routing(server_id=0, tags=(1, 4, 7), profile_id=11)
+    await SeerrClient(BASE, "k").create_request("tv", 95396, as_user=4, routing=routing)
+    body = json.loads(route.calls.last.request.content)
+    assert (body["serverId"], body["tags"], body["profileId"]) == (0, [1, 4, 7], 11)
+    assert body["seasons"] == "all"
+
+
+@pytest.mark.parametrize(
+    ("status", "message", "reason"),
+    [
+        (403, "Movie Quota exceeded.", Refusal.QUOTA),
+        (403, "You do not have permission to make 4K movie requests.", Refusal.PERMISSION),
+        (403, "This media is blocklisted.", Refusal.BLOCKLISTED),
+        (409, "Request for this media already exists.", Refusal.DUPLICATE),
+        (202, "No seasons available to request", Refusal.NO_SEASONS),
+    ],
+)
+@respx.mock
+async def test_seerr_refusals_become_typed(status, message, reason):
+    respx.post(f"{BASE}/api/v1/request").respond(status_code=status, json={"message": message})
+    with pytest.raises(RequestRefused) as refused:
+        await SeerrClient(BASE, "k").create_request("movie", 1, as_user=4)
+    assert refused.value.reason == reason and refused.value.message == message
+
+
+@respx.mock
+async def test_seerr_other_failures_stay_client_errors():
+    respx.post(f"{BASE}/api/v1/request").respond(status_code=500, json={"message": "boom"})
+    with pytest.raises(ClientError, match="500"):
+        await SeerrClient(BASE, "k").create_request("movie", 1, as_user=4)
+
+
+@respx.mock
+async def test_seerr_movie_details(fixture):
+    respx.get(f"{BASE}/api/v1/movie/438631").respond(json=fixture("seerr_movie"))
+    movie = await SeerrClient(BASE, "k").media_details("movie", 438631)
+    assert movie.display == "Dune (2021)" and movie.media_type == "movie"
+    assert movie.status == MediaStatus.AVAILABLE and movie.status_4k == MediaStatus.UNKNOWN
+    assert movie.rating_key == "4348" and movie.rating_key_for(True) is None
+    assert movie.collection_id == 726871 and movie.seasons == () and not movie.anime_by_tmdb
+
+
+@respx.mock
+async def test_seerr_tv_details_merge_tmdb_seasons_with_server_status(fixture):
+    respx.get(f"{BASE}/api/v1/tv/136315").respond(json=fixture("seerr_tv"))
+    show = await SeerrClient(BASE, "k").media_details("tv", 136315)
+    assert show.display == "The Bear (2022)" and show.tvdb_id == 403245
+    # No specials, nothing unaired.
+    assert [(s.number, s.episodes) for s in show.seasons] == [(1, 8), (2, 10), (3, 10)]
+    assert [s.status for s in show.seasons] == [
+        MediaStatus.AVAILABLE,
+        MediaStatus.PROCESSING,
+        MediaStatus.UNKNOWN,
+    ]
+
+
+@respx.mock
+async def test_seerr_request_actions_quota_and_services(fixture):
+    client = SeerrClient(BASE, "k")
+    respx.get(f"{BASE}/api/v1/request/77").respond(json=fixture("seerr_request"))
+    approved = {**fixture("seerr_request"), "status": 2}
+    approve = respx.post(f"{BASE}/api/v1/request/77/approve").respond(json=approved)
+    declined = {**fixture("seerr_request"), "status": 3}
+    decline = respx.post(f"{BASE}/api/v1/request/77/decline").respond(json=declined)
+    assert (await client.get_request(77)).status == RequestStatus.PENDING
+    assert (await client.approve_request(77)).status == RequestStatus.APPROVED and approve.called
+    assert (await client.decline_request(77)).status == RequestStatus.DECLINED and decline.called
+
+    respx.get(f"{BASE}/api/v1/user/4/quota").respond(json=fixture("seerr_quota"))
+    quotas = await client.quota(4)
+    assert (quotas.movie.used, quotas.movie.limit, quotas.movie.remaining) == (10, 10, 0)
+    assert quotas.movie.restricted and quotas.of("tv").limit is None
+
+    respx.get(f"{BASE}/api/v1/service/sonarr").respond(
+        json=[{"id": 0, "name": "Sonarr", "is4k": False, "isDefault": True, "activeTags": []}]
+    )
+    respx.get(f"{BASE}/api/v1/service/sonarr/0").respond(json=fixture("seerr_sonarr_service"))
+    (server,) = await client.servers("sonarr")
+    assert server.is_default and not server.is_4k
+    options = await client.server_options("sonarr", 0)
+    assert options.tag("DUB").id == 7 and options.profile("dual audio").id == 11
+    assert options.default_tags == (1,) and options.anime_tags == (1, 4)
+    assert options.tag("nope") is None
+
+
+@respx.mock
+async def test_sonarr_series_by_tvdb_and_follow(fixture):
+    client = SonarrClient("vermithor", BASE, "k")
+    lookup = respx.get(f"{BASE}/api/v3/series", params={"tvdbId": 403245}).respond(
+        json=fixture("sonarr_series")
+    )
+    series = await client.series_by_tvdb(403245)
+    assert series.id == 12 and not series.monitored and lookup.called
+    respx.get(f"{BASE}/api/v3/series", params={"tvdbId": 1}).respond(json=[])
+    assert await client.series_by_tvdb(1) is None
+
+    respx.get(f"{BASE}/api/v3/series/12").respond(json=fixture("sonarr_series")[0])
+    put = respx.put(f"{BASE}/api/v3/series/12").respond(json={})
+    await client.follow(12)
+    sent = json.loads(put.calls.last.request.content)
+    assert sent["monitored"] is True and sent["monitorNewItems"] == "all"
+    assert sent["path"] == "/Vermithor/TV/The Bear"
 
 
 @respx.mock
@@ -139,11 +262,16 @@ def test_honored_expiry_days():
 
 
 async def test_fake_seerr_round_trip():
-    seerr = FakeSeerrClient(results=[SearchResult(1, "movie", "Dune", 2021, "", None, 1, 1)])
+    unknown = MediaStatus.UNKNOWN
+    seerr = FakeSeerrClient(
+        results=[SearchResult(1, "movie", "Dune", 2021, "", None, unknown, unknown)]
+    )
     assert [r.title for r in await seerr.search("du")] == ["Dune"]
     req = await seerr.create_request("movie", 1, is_4k=True, as_user=4)
     assert (await seerr.list_requests(user_id=4)) == [req]
-    assert (await seerr.approve_request(req.id)).status == 2
+    assert (await seerr.approve_request(req.id)).status == RequestStatus.APPROVED
+    with pytest.raises(ClientError, match="404"):
+        await seerr.media_details("movie", 2)
 
 
 async def test_fake_sonarr_tracks_destructive_calls():

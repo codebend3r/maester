@@ -39,6 +39,18 @@ Two NAS hosts each run their own Sonarr, Radarr, SABnzbd and Tautulli (see `wizt
 
 Tiers come from Discord roles with a per-user override in SQLite. The tool list sent to the model is filtered by tier, and the server rejects out-of-tier calls independently of the model.
 
+## Tools
+
+| Tool               | Tier    | What it does                                                                                              |
+| ------------------ | ------- | --------------------------------------------------------------------------------------------------------- |
+| `server_status`    | friend  | Streams, transcodes and bandwidth per host                                                                |
+| `search_media`     | friend  | Seerr (TMDB) search; several plausible matches become a picker labeled with availability                |
+| `request_media`    | friend  | 1080p request as the friend (`X-API-User`); for shows, seasons already there are left out and listed    |
+| `request_media_4k` | trusted | 4K request as the friend; if Seerr leaves it pending, the admin approves or declines it with buttons    |
+| `follow_show`      | friend  | Monitors a show in its owning Sonarr so future seasons download; refuses any host but the owner        |
+
+A title's owning host is the one Radarr (by TMDB id) or Sonarr (by TVDB id) that has it, asked of every instance at once (`maester/library.py`). Two owners, or an instance that cannot answer, is a refusal, never a guess.
+
 ## Destructive actions
 
 Deleting a file, blocklisting a release, issuing an invite, changing a share: all of these are `destructive=True` tools.

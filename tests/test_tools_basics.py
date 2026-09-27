@@ -60,5 +60,4 @@ async def test_server_status_without_tautulli():
 
 
 def test_tool_is_registered_for_friends():
-    assert "server_status" in registry.names()
-    assert [s.name for s in registry.for_tier(Tier.FRIEND)] == ["server_status"]
+    assert "server_status" in {s.name for s in registry.for_tier(Tier.FRIEND)}
