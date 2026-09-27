@@ -506,3 +506,12 @@ async def test_sabnzbd_history_keeps_the_failure_and_the_steps_that_went_wrong(f
         "Unpack: [Dune] Unpacking failed, write error or disk is full?",
     )
     assert failed.completed == 1790000000 and done.trouble == ()
+
+
+@respx.mock
+async def test_seerr_open_issues_name_the_title_the_episode_and_who_raised_it(fixture):
+    route = respx.get(f"{BASE}/api/v1/issue").respond(json=fixture("seerr_issues"))
+    (issue,) = await SeerrClient(BASE, "k").open_issues()
+    assert route.calls.last.request.url.params["filter"] == "open"
+    assert (issue.id, issue.kind, issue.media_type, issue.tmdb_id) == (12, "video", "tv", 136315)
+    assert (issue.season, issue.episode, issue.reporter) == (2, 7, "dany")

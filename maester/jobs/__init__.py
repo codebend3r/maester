@@ -4,6 +4,7 @@
 - `scheduler.py`  runs each job on time and delivers its notices
 - `sweep.py`      stalled downloads blocklisted and searched again, or surfaced
 - `space.py`      the daily free-space sample the disk forecast fits
+- `digest.py`     the admin's daily digest
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ from functools import partial
 from maester.agent.limits import KillSwitch
 from maester.clients import Services
 from maester.config import Settings
+from maester.jobs.digest import Digest
 from maester.jobs.schedule import At, Every
 from maester.jobs.scheduler import Job, Scheduler
 from maester.jobs.space import sample_space
@@ -35,6 +37,9 @@ def scheduled(
             "space_sample",
             At(SPACE_SAMPLE_AT, jobs.zone),
             partial(sample_space, services, store, settings),
+        ),
+        Job(
+            "digest", At(jobs.digest_at, jobs.zone), Digest(services, store, settings, kill_switch)
         ),
     ]
 

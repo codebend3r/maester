@@ -9,6 +9,7 @@ from maester.clients.base import ClientError, HttpClient
 from maester.clients.seerr.models import (
     ArrServer,
     Collection,
+    Issue,
     MediaDetails,
     MediaRequest,
     Quota,
@@ -57,6 +58,7 @@ class Seerr(Protocol):
         episode: int | None = None,
     ) -> int: ...
     async def comment_issue(self, issue_id: int, message: str) -> None: ...
+    async def open_issues(self, take: int = 20) -> list[Issue]: ...
 
 
 class SeerrClient(HttpClient):
@@ -175,6 +177,13 @@ class SeerrClient(HttpClient):
 
     async def comment_issue(self, issue_id: int, message: str) -> None:
         await self.post_json(f"/api/v1/issue/{issue_id}/comment", {"message": message})
+
+    async def open_issues(self, take: int = 20) -> list[Issue]:
+        """Open issues, newest first."""
+        data = await self.get_json(
+            "/api/v1/issue", params={"take": take, "sort": "added", "filter": "open"}
+        )
+        return [Issue.from_api(i) for i in data.get("results", [])]
 
 
 def _message(detail: str) -> str:

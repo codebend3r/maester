@@ -449,3 +449,39 @@ class SeerrUser:
             username=raw.get("displayName") or raw.get("username") or "",
             plex_username=raw.get("plexUsername") or "",
         )
+
+
+ISSUE_KINDS = {
+    ISSUE_VIDEO: "video",
+    ISSUE_AUDIO: "audio",
+    ISSUE_SUBTITLE: "subtitles",
+    ISSUE_OTHER: "other",
+}
+
+
+@dataclass(frozen=True)
+class Issue:
+    """An open Seerr issue: what it's about and who raised it."""
+
+    id: int
+    kind: str  # video | audio | subtitles | other
+    media_type: str
+    tmdb_id: int
+    reporter: str
+    created_at: str = ""
+    season: int | None = None
+    episode: int | None = None
+
+    @classmethod
+    def from_api(cls, raw: dict[str, Any]) -> Issue:
+        media = raw.get("media") or {}
+        return cls(
+            id=int(raw["id"]),
+            kind=ISSUE_KINDS.get(int(raw.get("issueType") or ISSUE_OTHER), "other"),
+            media_type=media.get("mediaType") or "",
+            tmdb_id=int(media.get("tmdbId") or 0),
+            reporter=_user_name(raw.get("createdBy") or {}),
+            created_at=raw.get("createdAt") or "",
+            season=raw.get("problemSeason") or None,
+            episode=raw.get("problemEpisode") or None,
+        )

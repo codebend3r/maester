@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -79,22 +80,35 @@ class AuditLog(Database):
         sql += " ORDER BY id DESC LIMIT ?"
         with self._lock:
             rows = self._conn.execute(sql, (*params, limit)).fetchall()
-        return [
-            AuditRow(
-                id=r["id"],
-                ts=r["ts"],
-                discord_id=r["discord_id"],
-                tool=r["tool"],
-                args=json.loads(r["args"]),
-                result=json.loads(r["result"]) if r["result"] else None,
-                ok=bool(r["ok"]),
-                host=r["host"],
-                duration_ms=r["duration_ms"],
-                pending_id=r["pending_id"],
-                held_id=r["held_id"],
-            )
-            for r in rows
-        ]
+        return [self._row(r) for r in rows]
+
+    @staticmethod
+    def _row(r: sqlite3.Row) -> AuditRow:
+        return AuditRow(
+            id=r["id"],
+            ts=r["ts"],
+            discord_id=r["discord_id"],
+            tool=r["tool"],
+            args=json.loads(r["args"]),
+            result=json.loads(r["result"]) if r["result"] else None,
+            ok=bool(r["ok"]),
+            host=r["host"],
+            duration_ms=r["duration_ms"],
+            pending_id=r["pending_id"],
+            held_id=r["held_id"],
+        )
+
+    def acted_since(self, tools: tuple[str, ...], since: datetime) -> list[AuditRow]:
+        """The calls of `tools` that acted since `since`, oldest first: not refused or
+        failed, and not only asking for an approval or held for maintenance."""
+        marks = ", ".join("?" for _ in tools)
+        with self._lock:
+            rows = self._conn.execute(
+                f"SELECT * FROM audit_log WHERE tool IN ({marks}) AND ok = 1"
+                " AND pending_id IS NULL AND held_id IS NULL AND ts >= ? ORDER BY id",
+                (*tools, stamp(since)),
+            ).fetchall()
+        return [self._row(r) for r in rows]
 
     def audit_count_since(self, tool: str, since: datetime) -> int:
         """How many times `tool` acted since `since`; used by daily caps.
