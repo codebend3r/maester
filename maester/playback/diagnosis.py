@@ -164,7 +164,7 @@ async def player_check(case: Case) -> PlayerCheck:
     if link.tautulli_user_id is None:
         return PlayerCheck(None, "their Plex account isn't matched to a Tautulli user")
     found = await recent_plays(services, link.tautulli_user_id)
-    play = next((p for p in found.plays if p.is_of(located.details, located.copy)), None)
+    play = found.play_of(located.details, located.copy)
     if play is None:
         return PlayerCheck(None, "no recent play of this copy in Tautulli")
     try:

@@ -8,7 +8,7 @@ item was played over the internet `WAN_PLAYS_TO_FLAG` times within
 per window per item (`reencode_flags`).
 
 A rating key names an item on the Plex server maester reads, so its plays
-are counted only in the Tautulli watching that server (`library_host`).
+are counted only in a Tautulli watching that server (`library_hosts`).
 Tautulli's history names the item played, not the version, which is why an
 item holding a lighter version of its resolution isn't a candidate at all.
 When that Tautulli can't answer, nothing is flagged; the next ask counts again.
@@ -23,8 +23,8 @@ from datetime import UTC, datetime, timedelta
 from maester.clients import ClientError, Services
 from maester.formatting import mbps
 from maester.notify import AdminPost
-from maester.playback.plays import REMOTE
-from maester.plex_versions import TitleVersion, library_host
+from maester.playback.plays import REMOTE, library_hosts
+from maester.plex_versions import TitleVersion
 from maester.store import Store
 
 # A version this heavy is a remux in all but name: 40 Mbps and up.
@@ -85,7 +85,8 @@ async def flag(
 ) -> tuple[AdminPost, ...]:
     """Tell the admin about the title's heavy versions friends keep streaming away from home,
     each once per window."""
-    host, heavy = library_host(services), heavy_alone(versions)
+    library, heavy = await library_hosts(services), heavy_alone(versions)
+    host = min(library, default=None)
     if host is None or not heavy:
         return ()
     plays = await asyncio.gather(*(wan_plays(services, host, v.rating_key) for v in heavy))

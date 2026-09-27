@@ -17,7 +17,7 @@ services:
         versions:
           - {resolution: "4k", codec: hevc, size_gb: 72.6, bitrate_mbps: 62.1, file: "/Vermithor/Movies/Dune (2021)/Dune (2021) Bluray-2160p.mkv"}
   tautulli:
-    vermithor:
+    meleys:
       history:
         - {rating_key: "9001", title: "Dune", location: wan, user_id: 5, days_ago: 2}
         - {rating_key: "9001", title: "Dune", location: wan, user_id: 6, days_ago: 9}

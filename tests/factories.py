@@ -4,6 +4,8 @@ from maester.clients.seerr import ArrServer
 from maester.clients.tautulli import HistoryRow, Session
 
 HOSTS = ("meleys", "vermithor")
+# The Plex server maester reads (`PLEX_URL`) is meleys' own, watched by meleys' Tautulli.
+PLEX_ID = "fake-machine"
 # Where each fake arr says it lives, so Seerr's servers can be matched to a host.
 RADARR_URL, SONARR_URL = "http://{host}.lan:7878", "http://{host}.lan:8989"
 
@@ -23,7 +25,7 @@ def session(**kw) -> Session:
         transcode_decision="direct play", video_decision="", audio_decision="", subtitle_decision="",
         container="mkv", video_codec="hevc", video_resolution="4k",
         video_dynamic_range="SDR", audio_codec="eac3", audio_channels=6, subtitle_codec="",
-        quality_profile="Original", file="/x.mkv",
+        file="/x.mkv",
     )  # fmt: skip
     return Session(**{**base, **kw})
 

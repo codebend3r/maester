@@ -8,6 +8,7 @@ import respx
 
 from maester.clients import (
     ClientError,
+    FakeTautulliClient,
     PlexClient,
     RadarrClient,
     SabnzbdClient,
@@ -16,6 +17,7 @@ from maester.clients import (
     TautulliClient,
     WizarrClient,
 )
+from maester.clients.base import every_host
 from maester.clients.fleet import (
     FakeFleetMonitor,
     FleetMonitorClient,
@@ -170,7 +172,9 @@ async def test_each_client_pings_its_cheapest_live_route():
         respx.get(f"{BASE}/api/v1/status").respond(json={"version": "2.7.3", "commitTag": "x"}),
         respx.get(f"{BASE}/api/status").respond(json={"users": 12, "invites": 3, "pending": 1, "expired": 0}),
         respx.get(f"{BASE}/api/v3/system/status").respond(json={"appName": "Sonarr", "version": "4.0.9"}),
-        respx.get(f"{BASE}/api", params={"mode": "version"}).respond(json={"version": "4.3.3"}),
+        respx.get(f"{BASE}/api", params={"mode": "queue", "limit": "1"}).respond(
+            json={"queue": {"status": "Idle", "slots": []}}
+        ),
         respx.get(f"{BASE}/api/v2", params={"cmd": "status"}).respond(
             json={"response": {"result": "success", "message": "Ok", "data": {}}}
         ),
@@ -185,6 +189,48 @@ async def test_each_client_pings_its_cheapest_live_route():
     assert all(route.called for route in routes)
     assert routes[3].calls.last.request.headers["X-Api-Key"] == "arr-key"
     assert routes[3].call_count == 2  # Sonarr and Radarr share the route
+
+
+@respx.mock
+async def test_sabnzbd_refuses_a_wrong_key_in_its_answer_and_the_ping_says_so():
+    respx.get(f"{BASE}/api").respond(json={"status": False, "error": "API Key Incorrect"})
+    with pytest.raises(ClientError, match="API Key Incorrect"):
+        await SabnzbdClient("meleys", BASE, "bad").ping()
+
+
+@respx.mock
+async def test_plex_pings_by_naming_itself():
+    identity = respx.get(f"{BASE}/identity").respond(
+        json={"MediaContainer": {"machineIdentifier": "abc123", "version": "1.43.4"}}
+    )
+    await PlexClient(BASE, "tok").ping()
+    assert identity.call_count == 1
+
+
+async def test_every_host_names_the_hosts_that_cant_answer_and_raises_on_a_bug():
+    class Host:
+        def __init__(self, answer):
+            self.answer = answer
+
+        async def ask(self):
+            if isinstance(self.answer, Exception):
+                raise self.answer
+            return self.answer
+
+    refused = ClientError("tautulli", "GET", "/api/v2", None, "connection refused")
+    found = await every_host({"b": Host(2), "a": Host(1), "c": Host(refused)}, lambda h: h.ask())
+    assert found.answered == {"a": 1, "b": 2} and "connection refused" in found.unreachable["c"]
+    with pytest.raises(KeyError):
+        await every_host({"a": Host(KeyError("oops"))}, lambda h: h.ask())
+
+
+async def test_a_downable_fake_answers_like_an_unreachable_service():
+    tautulli = FakeTautulliClient(host="meleys")
+    await tautulli.ping()
+    tautulli.down = True
+    with pytest.raises(ClientError, match="tautulli GET ping failed"):
+        await tautulli.ping()
+    assert FakeTautulliClient().down is False  # one fake's outage is its own
 
 
 @respx.mock

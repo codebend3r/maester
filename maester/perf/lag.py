@@ -31,7 +31,7 @@ the table reuses them as they are: picture subtitles burned in, and HEVC a
 player at home can't decode.
 
 Versions are named only for a stream served by the Plex server maester
-reads (`library_host`), whose file is one of them: a rating key means an
+reads (`library_hosts`), whose file is one of them: a rating key means an
 item on that server alone.
 """
 
@@ -373,11 +373,11 @@ def diagnose(stream: Stream) -> Diagnosis:
 
 
 async def _versions(
-    services: Services, host: str, session: Session, library: str | None
+    services: Services, host: str, session: Session, library: frozenset[str]
 ) -> tuple[TitleVersion, ...]:
     """A movie's versions, when the play came from the Plex server maester reads."""
     play = Play.from_session(host, session)
-    if host != library or play.kind != "movie":
+    if host not in library or play.kind != "movie":
         return ()
     try:
         return tuple(await title_versions(services.plex, await identify(services, play)))
@@ -390,7 +390,7 @@ async def live_streams(
     loads: dict[str, HostLoad],
     tautulli_user_id: int,
     uplink: Uplink | None,
-    library: str | None,
+    library: frozenset[str],
 ) -> list[Stream]:
     """One friend's live streams on every host, read from the loads already fetched."""
     mine = [

@@ -25,7 +25,7 @@ from maester.agent.tools import Result, Tier, ToolContext, tool
 from maester.perf import reencode, uplink
 from maester.perf.lag import diagnose, live_streams
 from maester.perf.load import read_loads
-from maester.plex_versions import library_host
+from maester.playback.plays import library_hosts
 
 NOTHING_PLAYING = (
     "Nothing is playing for them on {where} right now. Ask them to start it and tell you once "
@@ -64,12 +64,10 @@ async def session_report(ctx: ToolContext, details: bool = False) -> dict[str, A
             "Their Plex account isn't matched to a Tautulli user, so their stream can't be found."
         )
     services = ctx.services
-    loads = await read_loads(services)
+    loads, library = await asyncio.gather(read_loads(services), library_hosts(services))
     tester = services.speedtest
     measured = uplink.recent(ctx.memo, tester)
-    streams = await live_streams(
-        services, loads.hosts, link.tautulli_user_id, measured, library_host(services)
-    )
+    streams = await live_streams(services, loads.hosts, link.tautulli_user_id, measured, library)
     found = [diagnose(stream) for stream in streams]
     reply: dict[str, Any] = {"streams": [d.details() if details else d.brief() for d in found]}
     if not streams:

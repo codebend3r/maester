@@ -50,9 +50,7 @@ async def test_with_nothing_known_a_typical_remote_connection_is_assumed(ctx):
 async def test_their_last_play_away_from_home_limits_it(ctx):
     dune(ctx)
     ctx.store.upsert_user("d1", tautulli_user_id=7)
-    ctx.services.tautulli["meleys"].sessions = [
-        session(user_id=7, location="wan", relayed=True, quality_profile="2 Mbps 720p")
-    ]
+    ctx.services.tautulli["meleys"].sessions = [session(user_id=7, location="wan", relayed=True)]
     pick = (await pick_version(ctx, 438631, connection_mbps=50))["recommended"]
     assert (pick["version"], pick["fits"], pick["remote_quality"]) == (
         "1080p",
@@ -74,15 +72,17 @@ async def test_a_heavy_remux_streamed_away_from_home_is_flagged_to_the_admin_onc
     now = int(time.time())
     wan = dict(rating_key="9001", location="wan")
     # Vermithor's Tautulli watches the Plex server whose rating keys these are.
-    ctx.services.tautulli["vermithor"].history_rows = [
+    ctx.services.tautulli["meleys"].history_rows = [
         history_row(**wan, user_id=5, started=now - 3600),
         history_row(**wan, user_id=6, started=now - 86400),
         history_row(**wan, user_id=8, started=now - 5 * 86400),
         history_row(**wan, user_id=5, started=now - 40 * 86400),  # too long ago
         history_row(rating_key="9001", location="lan", user_id=5, started=now - 7200),
     ]
-    # On meleys' own Plex server, 9001 is some other item: its plays don't count.
-    ctx.services.tautulli["meleys"].history_rows = [history_row(**wan, user_id=9, started=now - 60)]
+    # On vermithor's own Plex server, 9001 is some other item: its plays don't count.
+    ctx.services.tautulli["vermithor"].history_rows = [
+        history_row(**wan, user_id=9, started=now - 60)
+    ]
     out = await pick_version(ctx, 438631, connection_mbps=100)
     (notice,) = out.notices
     assert isinstance(notice, AdminPost)
@@ -94,7 +94,7 @@ async def test_a_heavy_remux_streamed_away_from_home_is_flagged_to_the_admin_onc
 async def test_a_remux_with_its_re_encode_beside_it_isnt_a_candidate(ctx):
     dune(ctx)
     now = int(time.time())
-    ctx.services.tautulli["vermithor"].history_rows = [
+    ctx.services.tautulli["meleys"].history_rows = [
         history_row(rating_key="9001", location="wan", user_id=u, started=now - 60)
         for u in (1, 2, 3)
     ]
@@ -108,14 +108,14 @@ def test_tool_is_registered_for_friends():
 async def test_no_flag_without_the_library_servers_tautulli(ctx):
     dune(ctx, REMUX)
     now = int(time.time())
-    ctx.services.tautulli["vermithor"].history_rows = [
+    ctx.services.tautulli["meleys"].history_rows = [
         history_row(rating_key="9001", location="wan", user_id=u, started=now - 60)
         for u in (1, 2, 3)
     ]
-    ctx.services.plex.base_url = "http://plex.elsewhere:32400"  # no Tautulli watches it
+    ctx.services.plex.machine_id = "elsewhere"  # no Tautulli watches it
     assert isinstance(await pick_version(ctx, 438631), dict)
-    ctx.services.plex.base_url = "http://vermithor.lan:32400"
-    ctx.services.tautulli["vermithor"].history = _refuse
+    ctx.services.plex.machine_id = "fake-machine"
+    ctx.services.tautulli["meleys"].history = _refuse
     assert isinstance(await pick_version(ctx, 438631), dict)
 
 

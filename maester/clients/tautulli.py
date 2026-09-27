@@ -13,9 +13,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
-from typing import Any, Protocol
+from typing import Any, ClassVar, Protocol
 
-from maester.clients.base import ClientError, HttpClient
+from maester.clients.base import ClientError, Downable, HttpClient
 
 
 def _int(value: Any, default: int = 0) -> int:
@@ -30,6 +30,16 @@ def _float(value: Any) -> float:
         return float(value)
     except (TypeError, ValueError):
         return 0.0
+
+
+def _title_tmdb_id(raw: dict[str, Any]) -> int | None:
+    """The title's TMDB id among Plex's guids ("tmdb://438631"): an episode's show's, from
+    `grandparent_guids`; None when the server has no TMDB match for it."""
+    key = "grandparent_guids" if raw.get("media_type") == "episode" else "guids"
+    for guid in raw.get(key) or []:
+        if isinstance(guid, str) and guid.startswith("tmdb://"):
+            return _int(guid.removeprefix("tmdb://"), 0) or None
+    return None
 
 
 def _index(raw: dict[str, Any], key: str) -> int | None:
@@ -67,7 +77,6 @@ class Session:
     audio_codec: str
     audio_channels: int
     subtitle_codec: str
-    quality_profile: str
     file: str
     # For episodes: the show's Plex key, and which episode it is.
     show_key: str = ""
@@ -80,6 +89,9 @@ class Session:
     # transcoded. A throttled transcoder is ahead and resting, so its speed reads low.
     transcode_speed: float = 0.0
     transcode_throttled: bool = False
+    # The title's TMDB id (a show's, for an episode) as the Plex server playing it knows it;
+    # None when it has no TMDB match.
+    tmdb_id: int | None = None
 
     @classmethod
     def from_api(cls, raw: dict[str, Any]) -> Session:
@@ -111,7 +123,6 @@ class Session:
             audio_codec=raw.get("audio_codec") or "",
             audio_channels=_int(raw.get("audio_channels")),
             subtitle_codec=raw.get("subtitle_codec") or "",
-            quality_profile=raw.get("quality_profile") or "",
             file=raw.get("file") or "",
             show_key=str(raw.get("grandparent_rating_key") or ""),
             season=_index(raw, "parent_media_index"),
@@ -121,6 +132,7 @@ class Session:
             source_bitrate_kbps=_int(raw.get("bitrate")),
             transcode_speed=_float(raw.get("transcode_speed")),
             transcode_throttled=_int(raw.get("transcode_throttled")) == 1,
+            tmdb_id=_title_tmdb_id(raw),
         )
 
 
@@ -197,7 +209,6 @@ class StreamData:
     audio_decision: str
     subtitle_codec: str
     subtitle_decision: str  # adds "burn"; empty without subtitles
-    quality_profile: str  # "Original", or the lower quality the player asked for
     source_bitrate_kbps: int = 0  # the file's own bitrate
     stream_bitrate_kbps: int = 0  # what it was sent at
 
@@ -211,10 +222,21 @@ class StreamData:
             audio_decision=raw.get("stream_audio_decision") or "",
             subtitle_codec=raw.get("subtitle_codec") or "",
             subtitle_decision=raw.get("stream_subtitle_decision") or "",
-            quality_profile=raw.get("quality_profile") or "",
             source_bitrate_kbps=_int(raw.get("bitrate")),
             stream_bitrate_kbps=_int(raw.get("stream_bitrate")),
         )
+
+
+@dataclass(frozen=True)
+class Metadata:
+    """A Plex item as the server that holds it knows it: which title it belongs to."""
+
+    rating_key: str
+    tmdb_id: int | None  # the movie's, or an episode's show's; None without a TMDB match
+
+    @classmethod
+    def from_api(cls, rating_key: str, raw: dict[str, Any]) -> Metadata:
+        return cls(rating_key, _title_tmdb_id(raw))
 
 
 @dataclass(frozen=True)
@@ -236,9 +258,10 @@ class TautulliUser:
 
 class Tautulli(Protocol):
     host: str
-    base_url: str
 
     async def ping(self) -> None: ...
+    async def server_identity(self) -> str: ...
+    async def metadata(self, rating_key: str) -> Metadata: ...
     async def activity(self) -> Activity: ...
     async def history(
         self,
@@ -272,6 +295,17 @@ class TautulliClient(HttpClient):
     async def ping(self) -> None:
         """Tautulli's own status command, which also checks the API key."""
         await self._cmd("status")
+
+    async def server_identity(self) -> str:
+        """The machine identifier of the Plex server this Tautulli watches."""
+        data = await self._cmd("get_server_identity") or {}
+        identity = data[0] if isinstance(data, list) and data else data
+        return str(identity.get("machine_identifier") or "") if isinstance(identity, dict) else ""
+
+    async def metadata(self, rating_key: str) -> Metadata:
+        """An item of the Plex server this Tautulli watches, by that server's rating key."""
+        data = await self._cmd("get_metadata", rating_key=rating_key) or {}
+        return Metadata.from_api(rating_key, data)
 
     async def activity(self) -> Activity:
         return Activity.from_api(await self._cmd("get_activity") or {})
@@ -308,20 +342,26 @@ class TautulliClient(HttpClient):
 
 
 @dataclass
-class FakeTautulliClient:
+class FakeTautulliClient(Downable):
+    service: ClassVar[str] = "tautulli"
     host: str = "fake"
-    base_url: str = ""
+    plex_id: str = ""  # the machine identifier of the Plex server it watches
     sessions: list[Session] = field(default_factory=list)
     history_rows: list[HistoryRow] = field(default_factory=list)
     # What each history row's play was sent, by row id.
     streams: dict[int, StreamData] = field(default_factory=dict)
     user_list: list[TautulliUser] = field(default_factory=list)
     recent: list[dict[str, Any]] = field(default_factory=list)
-    down: bool = False  # while set, it answers like an unreachable Tautulli
+    # The title's TMDB id per rating key of its Plex server's items.
+    titles: dict[str, int] = field(default_factory=dict)
 
-    async def ping(self) -> None:
-        if self.down:
-            raise ClientError("tautulli", "GET", "/api/v2?cmd=status", None, "connection refused")
+    async def server_identity(self) -> str:
+        self.refuse_if_down("/api/v2?cmd=get_server_identity")
+        return self.plex_id
+
+    async def metadata(self, rating_key: str) -> Metadata:
+        self.refuse_if_down("/api/v2?cmd=get_metadata")
+        return Metadata(rating_key, self.titles.get(rating_key))
 
     async def activity(self) -> Activity:
         wan = sum(s.bandwidth_kbps for s in self.sessions if s.location == "wan")

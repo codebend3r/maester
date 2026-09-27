@@ -5,14 +5,9 @@ its 4K copy's remux, and the server's own HEVC re-encode of it. Each is a
 Media entry (`plex.Version`) of the Plex item holding its copy, and friends
 name them "1080p", "4K" and "4K HEVC re-encode" (`version_name`).
 `check_availability` lists them; the performance tools weigh them against a
-connection (`maester/perf/versions.py`).
-
-maester reads one Plex server (`PLEX_URL`), the one Seerr's rating keys
-belong to, though a NAS may run a Plex server of its own. A rating key names
-an item on that server only, so a play is matched to these versions only
-when it was served from there: `library_host` is the host whose Tautulli
-watches that server, matched by host name the way Seerr's arr servers are
-matched to hosts (`maester/library.py`).
+connection (`maester/perf/versions.py`). They're read from the Plex server
+maester reads (`PLEX_URL`), by Seerr's rating keys, which name items on that
+server only (`playback/plays.py`'s `library_hosts`).
 """
 
 from __future__ import annotations
@@ -21,9 +16,7 @@ import asyncio
 import re
 from dataclasses import dataclass
 from typing import Any
-from urllib.parse import urlsplit
 
-from maester.clients import Services
 from maester.clients.plex import Plex, PlexItem, Version
 from maester.clients.seerr import MediaDetails
 from maester.formatting import mbps
@@ -81,15 +74,3 @@ async def title_versions(plex: Plex, details: MediaDetails) -> list[TitleVersion
         for item in await items_of(plex, details)
         for version in item.versions
     ]
-
-
-def library_host(services: Services) -> str | None:
-    """The host whose Tautulli watches the Plex server maester reads; None when no one
-    host's Tautulli shares its host name."""
-    plex = (urlsplit(services.plex.base_url).hostname or "").lower()
-    hosts = [
-        host
-        for host, tautulli in services.tautulli.items()
-        if (urlsplit(tautulli.base_url).hostname or "").lower() == plex
-    ]
-    return hosts[0] if plex and len(hosts) == 1 else None

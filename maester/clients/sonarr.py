@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 from datetime import datetime
-from typing import Any, Protocol
+from typing import Any, ClassVar, Protocol
 
 from maester.clients.arr import ArrClient, DiskSpace, HistoryEvent, MediaFile, QueueItem
-from maester.clients.base import ClientError
+from maester.clients.base import Downable
 
 
 @dataclass(frozen=True)
@@ -123,7 +123,9 @@ class SonarrClient(ArrClient):
 
 
 @dataclass
-class FakeSonarrClient:
+class FakeSonarrClient(Downable):
+    service: ClassVar[str] = "sonarr"
+
     host: str = "fake"
     base_url: str = ""
     roots: list[str] = field(default_factory=lambda: ["/TV"])
@@ -137,12 +139,7 @@ class FakeSonarrClient:
     failed: list[int] = field(default_factory=list)
     searched: list[list[int]] = field(default_factory=list)
     deleted: list[int] = field(default_factory=list)
-    down: bool = False  # while set, it answers like an unreachable Sonarr
     followed: list[int] = field(default_factory=list)
-
-    async def ping(self) -> None:
-        if self.down:
-            raise ClientError("sonarr", "GET", "/api/v3/system/status", None, "connection refused")
 
     async def root_folders(self) -> list[str]:
         return list(self.roots)

@@ -10,7 +10,10 @@ from tests.playback_world import DUNE
 
 
 class Down:
-    base_url = "http://meleys.lan:8181"
+    host = "meleys"
+
+    async def server_identity(self):
+        raise ClientError("tautulli", "GET", "/api/v2", None, "connection refused")
 
     async def activity(self):
         raise ClientError("tautulli", "GET", "/api/v2", None, "connection refused")
@@ -84,7 +87,7 @@ async def test_session_report_with_nothing_playing(ctx):
 async def test_session_report_gives_one_fix_and_the_details_on_request(ctx):
     ctx.store.upsert_user("d1", tautulli_user_id=7)
     ctx.services.tautulli["vermithor"].sessions = [
-        session(user_id=7, relayed=True, quality_profile="2 Mbps 720p", stream_bitrate_kbps=1800,
+        session(user_id=7, relayed=True, stream_bitrate_kbps=1800,
                 transcode_decision="transcode", video_decision="transcode"),
     ]  # fmt: skip
     ctx.services.tautulli["meleys"] = Down()
@@ -133,8 +136,8 @@ async def test_a_heavy_remux_streamed_away_from_home_is_flagged_from_the_report(
     ctx.services.seerr.details[("movie", 438631)] = DUNE
     remux = Version("4k", "hevc", 62103, 72_600_000_000, "/Vermithor/Movies/Dune (2021) Remux-2160p.mkv")  # fmt: skip
     ctx.services.plex.items = {"9001": PlexItem("9001", "Dune", "movie", 2021, ("tmdb://438631",), (remux,))}  # fmt: skip
-    tautulli = ctx.services.tautulli["vermithor"]
-    tautulli.sessions = [session(user_id=7, rating_key="9001", file=remux.file, stream_bitrate_kbps=62103)]  # fmt: skip
+    tautulli = ctx.services.tautulli["meleys"]  # the Plex server maester reads
+    tautulli.sessions = [session(user_id=7, rating_key="9001", file=remux.file, stream_bitrate_kbps=62103, tmdb_id=438631)]  # fmt: skip
     now = int(time.time())
     tautulli.history_rows = [history_row(rating_key="9001", location="wan", user_id=u, started=now - 60) for u in (1, 2, 3)]  # fmt: skip
     out = await session_report(ctx)

@@ -22,6 +22,7 @@ from dataclasses import dataclass, replace
 from typing import Any
 
 from maester.clients import ClientError, Services
+from maester.clients.base import every_host
 from maester.clients.fleet import FleetMonitor, Vitals
 from maester.clients.tautulli import Activity, Session
 from maester.formatting import mbps
@@ -180,18 +181,11 @@ async def _vitals(fleet: FleetMonitor | None) -> tuple[dict[str, Vitals], str]:
 
 async def read_loads(services: Services) -> Loads:
     """Every Plex host's load, all asked at once."""
-    hosts = sorted(services.tautulli)
     activities, (vitals, note) = await asyncio.gather(
-        asyncio.gather(*(services.tautulli[h].activity() for h in hosts), return_exceptions=True),
-        _vitals(services.fleet),
+        every_host(services.tautulli, lambda t: t.activity()), _vitals(services.fleet)
     )
-    loads, unreachable = {}, {}
-    for host, activity in zip(hosts, activities, strict=True):
-        match activity:
-            case Activity():
-                loads[host] = HostLoad(host, activity, vitals.get(host))
-            case ClientError():
-                unreachable[host] = str(activity)
-            case BaseException():
-                raise activity
-    return Loads(loads, unreachable, note)
+    loads = {
+        host: HostLoad(host, activity, vitals.get(host))
+        for host, activity in activities.answered.items()
+    }
+    return Loads(loads, activities.unreachable, note)

@@ -9,9 +9,9 @@ item), and a show's seasons with how many episodes each has.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from typing import Any, ClassVar, Protocol
 
-from maester.clients.base import ClientError, HttpClient
+from maester.clients.base import ClientError, Downable, HttpClient
 
 
 @dataclass(frozen=True)
@@ -82,8 +82,6 @@ class PlexSeason:
 
 
 class Plex(Protocol):
-    base_url: str
-
     async def ping(self) -> None: ...
     async def machine_identifier(self) -> str: ...
     async def sections(self) -> list[Section]: ...
@@ -107,8 +105,8 @@ class PlexClient(HttpClient):
         super().__init__(base_url, headers=headers, **kwargs)
 
     async def ping(self) -> None:
-        """The server answers `/identity`, its one route that needs no token."""
-        await self.get_json("/identity")
+        """It names itself (`/identity`, its one route that needs no token)."""
+        await self.machine_identifier()
 
     async def machine_identifier(self) -> str:
         data = await self.get_json("/identity")
@@ -148,19 +146,18 @@ class PlexClient(HttpClient):
 
 
 @dataclass
-class FakePlexClient:
-    base_url: str = "http://plex.test:32400"
+class FakePlexClient(Downable):
+    service: ClassVar[str] = "plex"
     machine_id: str = "fake-machine"
     section_list: list[Section] = field(default_factory=list)
     items: dict[str, PlexItem] = field(default_factory=dict)
     show_seasons: dict[str, list[PlexSeason]] = field(default_factory=dict)
-    down: bool = False  # while set, it answers like an unreachable server
 
     async def ping(self) -> None:
-        if self.down:
-            raise ClientError("plex", "GET", "/identity", None, "connection refused")
+        await self.machine_identifier()
 
     async def machine_identifier(self) -> str:
+        self.refuse_if_down("/identity")
         return self.machine_id
 
     async def sections(self) -> list[Section]:

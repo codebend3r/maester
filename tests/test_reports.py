@@ -30,9 +30,10 @@ def library(ctx):
 
 
 async def test_a_player_limit_is_the_answer_and_the_file_is_left_alone(library):
+    # Played on vermithor's own Plex server: known there by its TMDB id, not Seerr's keys.
     library.services.tautulli["vermithor"].sessions = [
         session(user_id=DANY, rating_key="9001", product="Plex for Roku", player="Living Room",
-                dovi_profile=7, video_decision="direct play")
+                dovi_profile=7, video_decision="direct play", tmdb_id=438631)
     ]  # fmt: skip
     filed = await report(library, DUNE_4K_ITEM, ReportKind.WONT_PLAY, "purple picture")
     assert filed.report.decision is Decision.ADVISED and filed.notices == ()
@@ -59,12 +60,12 @@ async def test_a_player_limit_is_the_answer_and_the_file_is_left_alone(library):
 
 
 async def test_a_finished_play_is_read_from_the_history_with_the_files_profile(library):
-    library.services.tautulli["vermithor"].history_rows = [
+    vermithor = library.services.tautulli["vermithor"]
+    vermithor.history_rows = [
         history_row(user_id=DANY, rating_key="9001", row_id=77, product="Plex Web", player="Chrome")
     ]
-    library.services.tautulli["vermithor"].streams[77] = StreamData(
-        "mkv", "hevc", "direct play", "eac3", "direct play", "", "", "Original"
-    )
+    vermithor.titles["9001"] = 438631  # what vermithor's Plex server says the item is
+    vermithor.streams[77] = StreamData("mkv", "hevc", "direct play", "eac3", "direct play", "", "")
     filed = await report(library, DUNE_4K_ITEM, ReportKind.WONT_PLAY)
     # Tautulli's history has no Dolby Vision profile; the file says 7.
     assert isinstance(filed.diagnosis, PlayerLimit)
@@ -203,8 +204,9 @@ def test_every_report_kind_has_a_policy_and_the_tool_offers_each():
 
 async def test_after_a_player_fix_a_second_report_checks_the_file(library):
     library.services.tautulli["vermithor"].sessions = [
-        session(user_id=DANY, rating_key="9001", dovi_profile=7, player="Living Room")
-    ]
+        session(user_id=DANY, rating_key="9001", dovi_profile=7, player="Living Room",
+                tmdb_id=438631)
+    ]  # fmt: skip
     library.services.probe.errors[DUNE_4K] = ("[hevc @ 0x1] Invalid NAL unit size",)
     first = await report(library, DUNE_4K_ITEM, ReportKind.WONT_PLAY, "purple")
     assert first.report.decision is Decision.ADVISED and library.services.probe.decoded == []

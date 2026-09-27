@@ -61,13 +61,10 @@ class Seerr(Protocol):
 
 class SeerrClient(HttpClient):
     service = "seerr"
+    health_path = "/api/v1/status"  # open: it answers while Seerr runs, key or not
 
     def __init__(self, base_url: str, api_key: str, **kwargs: Any):
         super().__init__(base_url, headers={"X-Api-Key": api_key}, **kwargs)
-
-    async def ping(self) -> None:
-        """Seerr's open status route: it answers while Seerr runs."""
-        await self.get_json("/api/v1/status")
 
     async def search(self, query: str) -> list[SearchResult]:
         data = await self.get_json("/api/v1/search", params={"query": query, "page": 1})

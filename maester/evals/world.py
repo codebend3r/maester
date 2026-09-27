@@ -55,6 +55,8 @@ from maester.store import Store
 import maester.tools  # noqa: F401  isort: skip
 
 EVAL_USER = "eval-user"
+# The Plex server maester reads (`PLEX_URL`): the first host's, watched by its Tautulli.
+PLEX_ID = "library-plex"
 ARR_URLS = {"radarr": "http://{host}.lan:7878", "sonarr": "http://{host}.lan:8989"}
 
 
@@ -210,8 +212,7 @@ def _plex(seed: dict[str, Any]) -> FakePlexClient:
         str(key): [PlexSeason(int(s["number"]), int(s["episodes"])) for s in rows]
         for key, rows in seed.get("seasons", {}).items()
     }
-    # The Plex server maester reads is vermithor's, like the live setup's `PLEX_URL`.
-    return FakePlexClient(base_url="http://vermithor.lan:32400", items=items, show_seasons=seasons)
+    return FakePlexClient(machine_id=PLEX_ID, items=items, show_seasons=seasons)
 
 
 def _sonarr(host: str, seed: dict[str, Any]) -> FakeSonarrClient:
@@ -286,7 +287,6 @@ def _session(n: int, x: dict[str, Any], user_id: int) -> Session:
         audio_codec=x.get("audio_codec", "eac3"),
         audio_channels=6,
         subtitle_codec=x.get("subtitle_codec", ""),
-        quality_profile=x.get("quality_profile", "Original"),
         file=x.get("file", ""),
         show_key=str(x.get("show_key", "")),
         season=x.get("season"),
@@ -295,6 +295,7 @@ def _session(n: int, x: dict[str, Any], user_id: int) -> Session:
         source_bitrate_kbps=int(x.get("source_mbps", x.get("bitrate_mbps", 20)) * 1000),
         transcode_speed=float(x.get("transcode_speed", 0)),
         transcode_throttled=bool(x.get("throttled", False)),
+        tmdb_id=x.get("tmdb_id"),
     )
 
 
@@ -318,12 +319,22 @@ def _played(n: int, x: dict[str, Any]) -> HistoryRow:
     )
 
 
-def _tautulli(host: str, seed: dict[str, Any], user_id: int) -> FakeTautulliClient:
-    """A host's live sessions, and finished plays under `history`."""
+def _tautulli(host: str, seed: dict[str, Any], user_id: int, library: str) -> FakeTautulliClient:
+    """A host's live sessions and finished plays (`history`), each naming its title's TMDB
+    id as `tmdb_id`. It watches its own host's Plex server; the `library` host's is the one
+    maester reads."""
     sessions = [_session(n, x, user_id) for n, x in enumerate(seed.get("sessions", []), 1)]
     played = [_played(n, x) for n, x in enumerate(seed.get("history", []), 1)]
     return FakeTautulliClient(
-        host=host, base_url=f"http://{host}.lan:8181", sessions=sessions, history_rows=played
+        host=host,
+        plex_id=PLEX_ID if host == library else f"{host}-plex",
+        sessions=sessions,
+        history_rows=played,
+        titles={
+            str(x["rating_key"]): int(x["tmdb_id"])
+            for x in (*seed.get("sessions", []), *seed.get("history", []))
+            if "tmdb_id" in x
+        },
     )
 
 
@@ -389,7 +400,9 @@ def build_services(seed: dict[str, Any], seerr_user_id: int = 4) -> Services:
         sonarr={h: _sonarr(h, sonarr.get(h, {})) for h in hosts},
         radarr={h: _radarr(h, radarr.get(h, {})) for h in hosts},
         sabnzbd={h: FakeSabnzbdClient(host=h) for h in hosts},
-        tautulli={h: _tautulli(h, tautulli.get(h, {}), tautulli_user or 0) for h in hosts},
+        tautulli={
+            h: _tautulli(h, tautulli.get(h, {}), tautulli_user or 0, hosts[0]) for h in hosts
+        },
         probe=_probe(seed.get("probe", {})),
         fleet=_fleet(seed["fleet"]) if "fleet" in seed else None,
         speedtest=_speedtest(seed["speedtest"]) if "speedtest" in seed else None,

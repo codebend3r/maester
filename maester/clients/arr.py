@@ -130,16 +130,13 @@ class HistoryEvent:
 
 class ArrClient(HttpClient):
     api = "/api/v3"
+    health_path = "/api/v3/system/status"  # checks the API key too
     # Per-title history lives at /history/movie?movieId= or /history/series?seriesId=.
     history_scope: tuple[str, str]
 
     def __init__(self, host: str, base_url: str, api_key: str, **kwargs: Any):
         super().__init__(base_url, headers={"X-Api-Key": api_key}, **kwargs)
         self.host = host
-
-    async def ping(self) -> None:
-        """The arr's system status, which also checks the API key."""
-        await self.get_json(f"{self.api}/system/status")
 
     async def root_folders(self) -> list[str]:
         return [r["path"] for r in await self.get_json(f"{self.api}/rootfolder")]

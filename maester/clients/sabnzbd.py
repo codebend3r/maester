@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from typing import Any, ClassVar, Protocol
 
-from maester.clients.base import ClientError, HttpClient
+from maester.clients.base import ClientError, Downable, HttpClient
 
 
 @dataclass(frozen=True)
@@ -58,8 +58,12 @@ class SabnzbdClient(HttpClient):
         self.host = host
 
     async def ping(self) -> None:
-        """SABnzbd's version, which it gives without the API key: it answers while it runs."""
-        await self.get_json("/api", params={"mode": "version"})
+        """The shortest queue read: it needs the API key, and SABnzbd refuses a wrong one
+        in the body (`"status": false`), not with an HTTP error."""
+        path = "/api?mode=queue"
+        data = await self.get_json("/api", params={"mode": "queue", "limit": 1})
+        if isinstance(data, dict) and data.get("status") is False:
+            raise ClientError(self.service, "GET", path, 200, data.get("error") or "refused")
 
     async def queue(self) -> list[Download]:
         data = await self.get_json("/api", params={"mode": "queue"})
@@ -71,15 +75,12 @@ class SabnzbdClient(HttpClient):
 
 
 @dataclass
-class FakeSabnzbdClient:
+class FakeSabnzbdClient(Downable):
+    service: ClassVar[str] = "sabnzbd"
+
     host: str = "fake"
     queue_items: list[Download] = field(default_factory=list)
     history_items: list[Download] = field(default_factory=list)
-    down: bool = False  # while set, it answers like an unreachable SABnzbd
-
-    async def ping(self) -> None:
-        if self.down:
-            raise ClientError("sabnzbd", "GET", "/api?mode=version", None, "connection refused")
 
     async def queue(self) -> list[Download]:
         return list(self.queue_items)

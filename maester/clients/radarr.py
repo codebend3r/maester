@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from typing import Any, ClassVar, Protocol
 
 from maester.clients.arr import ArrClient, DiskSpace, HistoryEvent, MediaFile, QueueItem
-from maester.clients.base import ClientError
+from maester.clients.base import Downable
 
 
 @dataclass(frozen=True)
@@ -72,7 +72,9 @@ class RadarrClient(ArrClient):
 
 
 @dataclass
-class FakeRadarrClient:
+class FakeRadarrClient(Downable):
+    service: ClassVar[str] = "radarr"
+
     host: str = "fake"
     base_url: str = ""
     roots: list[str] = field(default_factory=lambda: ["/Movies"])
@@ -85,11 +87,6 @@ class FakeRadarrClient:
     failed: list[int] = field(default_factory=list)
     searched: list[list[int]] = field(default_factory=list)
     deleted: list[int] = field(default_factory=list)
-    down: bool = False  # while set, it answers like an unreachable Radarr
-
-    async def ping(self) -> None:
-        if self.down:
-            raise ClientError("radarr", "GET", "/api/v3/system/status", None, "connection refused")
 
     async def root_folders(self) -> list[str]:
         return list(self.roots)

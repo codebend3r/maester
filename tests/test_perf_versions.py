@@ -12,7 +12,7 @@ from maester.perf.versions import (
     recommend,
 )
 from maester.playback.plays import Playback
-from maester.plex_versions import TitleVersion, library_host
+from maester.plex_versions import TitleVersion
 from tests.factories import session
 
 REMUX = TitleVersion("9001", Version("4k", "hevc", 62103, 1, "/m/Dune (2021) Bluray-2160p.mkv"))
@@ -53,19 +53,11 @@ def test_a_connection_is_its_tightest_known_limit():
     assert [limit.kbps for limit in connection.limits] == [8000, 2000, 30000]
     assert connection.limit().source == "Plex relays your stream, at most 2 Mbps"
     # Tautulli's quality label is only the bitrate sent, so it's no limit on the connection.
-    plain = Connection.of(away=replace(relayed, relayed=False, quality_profile="4 Mbps 720p"))
+    plain = Connection.of(away=replace(relayed, relayed=False))
     assert plain.limits == () and plain.limit() is TYPICAL_AWAY
     # A stream lagging away from home is held to a typical connection too.
     roomy = Connection.of(uplink=spare)
     assert roomy.limit().kbps == 30000 and roomy.limit(lagging_away=True) is TYPICAL_AWAY
-
-
-def test_the_library_host_is_the_one_whose_tautulli_shares_plexs_address(services):
-    assert library_host(services) == "vermithor"
-    services.tautulli["meleys"].base_url = "http://VERMITHOR.lan:9999"
-    assert library_host(services) is None  # two hosts claim it: none is named
-    services.tautulli = {}
-    assert library_host(services) is None
 
 
 async def test_the_last_play_away_from_home_and_hosts_not_read(services):

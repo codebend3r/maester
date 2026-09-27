@@ -85,9 +85,7 @@ def test_a_relayed_stream_is_called_out_with_the_relay_cap():
 def test_remote_hevc_converted_down_is_never_read_as_the_codec():
     """Tautulli can't say whether the app's quality or its codecs force it, so the fix is the
     one that's right either way: an H.264 version that plays without converting."""
-    squeezed = converted(
-        stream_bitrate_kbps=8000, quality_profile="8 Mbps 1080p", transcode_speed=0.5
-    )
+    squeezed = converted(stream_bitrate_kbps=8000, transcode_speed=0.5)
     found = advice(squeezed)
     assert (found.fix, found.name) == (Fix.OTHER_VERSION, "behind_easier")
     assert found.said.advice.startswith("Play the 1080p version instead (10.2 Mbps)")
@@ -190,14 +188,15 @@ async def test_live_streams_are_the_friends_own_with_versions_from_the_library_s
         "9001": PlexItem("9001", "Dune", "movie", 2021, ("tmdb://438631",), tuple(v.version for v in VERSIONS[:2])),
         "4348": PlexItem("4348", "Dune", "movie", 2021, ("tmdb://438631",), (VERSIONS[2].version,)),
     }  # fmt: skip
-    mine = session(session_key="1", user_id=7, rating_key="9001", file=REMUX, full_title="Dune")
+    mine = session(session_key="1", user_id=7, rating_key="9001", file=REMUX, full_title="Dune",
+                   tmdb_id=438631)  # fmt: skip
     theirs = session(session_key="2", user_id=8, rating_key="9001", transcode_speed=0.5,
                      transcode_decision="transcode")  # fmt: skip
     loads = {"vermithor": others(mine, theirs)}
-    (found,) = await live_streams(services, loads, 7, None, "vermithor")
+    (found,) = await live_streams(services, loads, 7, None, frozenset({"vermithor"}))
     assert (found.play.title, found.play.host, found.playing.name) == ("Dune", "vermithor", "4K")
     assert [v.name for v in found.versions] == ["1080p", "4K", "4K HEVC re-encode"]
     assert found.load.as_dict()["streams"] == 1 and found.load.busy  # theirs, not mine
     # Served from another Plex server, the rating key means nothing to maester's.
-    (found,) = await live_streams(services, loads, 7, None, "meleys")
+    (found,) = await live_streams(services, loads, 7, None, frozenset({"meleys"}))
     assert found.versions == () and found.playing is None
