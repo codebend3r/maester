@@ -18,6 +18,7 @@ from maester.store.base import Database, now, stamp
 
 class StallAction(enum.StrEnum):
     RESEARCHED = "researched"  # blocklisted, removed and searched again
+    REMOVED = "removed"  # blocklisted and removed, but the search didn't start
     SURFACED = "surfaced"  # it stalled before: left for the admin
     FAILED = "failed"  # the arr didn't answer; tried again next sweep
 
@@ -51,18 +52,25 @@ class Stalls(Database):
             r["download_id"]: Watched(r["size_left"], r["stuck_since"], r["acted_at"]) for r in rows
         }
 
-    def watch(self, host: str, kind: str, seen: Mapping[str, Watched]) -> None:
-        """The queue as it is now: downloads no longer in it are forgotten."""
+    def watch(
+        self, host: str, kind: str, seen: Mapping[str, Watched], *, forget_before: datetime
+    ) -> None:
+        """The queue as it is now. A download it no longer lists is kept until it's gone
+        unseen since `forget_before`: one missing from a single read keeps its clock."""
+        at = now()
         with self.transaction() as conn:
-            conn.execute("DELETE FROM queue_watch WHERE host = ? AND kind = ?", (host, kind))
             conn.executemany(
-                "INSERT INTO queue_watch"
-                " (host, kind, download_id, size_left, stuck_since, acted_at)"
-                " VALUES (?, ?, ?, ?, ?, ?)",
+                "INSERT OR REPLACE INTO queue_watch"
+                " (host, kind, download_id, size_left, stuck_since, acted_at, last_seen)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?)",
                 [
-                    (host, kind, download_id, w.size_left, w.stuck_since, w.acted_at)
+                    (host, kind, download_id, w.size_left, w.stuck_since, w.acted_at, at)
                     for download_id, w in seen.items()
                 ],
+            )
+            conn.execute(
+                "DELETE FROM queue_watch WHERE host = ? AND kind = ? AND last_seen < ?",
+                (host, kind, stamp(forget_before)),
             )
 
     def record_stall(
@@ -76,12 +84,13 @@ class Stalls(Database):
             )
 
     def researched_since(self, host: str, kind: str, item: str, since: datetime) -> str | None:
-        """When the sweeper last searched this title again after a stall, if since `since`."""
+        """When the sweeper last cleared this title for a new release after a stall, if since
+        `since`: searched again, or removed for the admin to search."""
         with self._lock:
             r = self._conn.execute(
-                "SELECT MAX(ts) FROM stalls"
-                " WHERE host = ? AND kind = ? AND item = ? AND action = ? AND ts >= ?",
-                (host, kind, item, StallAction.RESEARCHED, stamp(since)),
+                "SELECT MAX(ts) FROM stalls WHERE host = ? AND kind = ? AND item = ?"
+                " AND action IN (?, ?) AND ts >= ?",
+                (host, kind, item, StallAction.RESEARCHED, StallAction.REMOVED, stamp(since)),
             ).fetchone()
         return r[0]
 

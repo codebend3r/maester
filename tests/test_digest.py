@@ -148,3 +148,15 @@ async def test_the_forecast_and_a_bad_release_group_come_along_when_they_matter(
 async def test_the_digest_is_one_admin_post(digest):
     (post,) = await digest()
     assert isinstance(post, AdminPost) and post.text.startswith("**Daily digest")
+
+
+async def test_a_replacement_the_admin_declined_isnt_listed_as_replaced(digest, store):
+    report = store.add_report(
+        discord_id="d1", kind=ReportKind.WONT_PLAY, copy=Copy("movie", 438631, True),
+        title="Dune (2021)", rating_key=None, host="vermithor", file_id=55, file_path="",
+        release_group=None, health="corrupt", diagnosis={}, description="",
+        decision=Decision.REPLACEABLE,
+    )  # fmt: skip
+    args = {"report_id": report.id, "host": "vermithor", "requester": "d1", "approved": False}
+    store.audit(discord_id="a1", tool="decide_replacement", args=args, result="", ok=True)
+    assert "Replaced" not in sections(await digest.compose(NOW))

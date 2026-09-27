@@ -57,7 +57,12 @@ async def test_a_flagged_download_is_timed_then_blocklisted_and_searched_again(
     )
     row = store.audit_recent(1)[0]
     assert (row.tool, row.host, row.ok, row.discord_id) == ("sweep_stalled", "meleys", True, None)
-    await sweeper()  # it left the queue: forgotten
+    await sweeper()  # it left the queue: remembered a day, in case one read just missed it
+    assert store.watched("meleys", "movie")["nzo_a"].acted_at is not None
+    store._conn.execute(
+        "UPDATE queue_watch SET last_seen = ?", (stamp(datetime.now(UTC) - timedelta(days=2)),)
+    )
+    await sweeper()
     assert store.watched("meleys", "movie") == {}
 
 
@@ -161,3 +166,52 @@ async def test_a_removal_the_arr_refuses_is_recorded_and_tried_again(sweeper, se
     assert failed.action == StallAction.FAILED
     assert store.watched("meleys", "movie")["nzo_a"].acted_at is None  # tried again next sweep
     assert not store.audit_recent(1)[0].ok
+
+
+async def test_a_download_the_arr_didnt_grab_for_a_known_title_is_left_alone(
+    sweeper, services, store
+):
+    services.radarr["meleys"].queue_items = [
+        queued(1, "by_hand", 6 * GB, tracked="warning", media_id=0)
+    ]
+    services.sonarr["meleys"].queue_items = [queued(2, "no_episode", 6 * GB, tracked="warning")]
+    await sweeper()
+    assert store.watched("meleys", "movie") == {} and store.watched("meleys", "tv") == {}
+
+
+async def test_a_surfaced_download_missing_from_one_read_isnt_surfaced_again(
+    sweeper, services, store
+):
+    radarr = services.radarr["meleys"]
+    store.record_stall(
+        host="meleys", kind="movie", item="movie:8", title="Dune (2021)", reason="stalled",
+        action=StallAction.RESEARCHED,
+    )  # fmt: skip
+    stuck = [queued(5, "nzo_b", 6 * GB, tracked="warning")]
+    radarr.queue_items = list(stuck)
+    await sweeper()
+    age(store, "meleys", "movie", "nzo_b", hours=7)
+    assert len(await sweeper()) == 1
+    radarr.queue_items = []  # one read that didn't list it
+    await sweeper()
+    radarr.queue_items = list(stuck)
+    assert await sweeper() == []
+
+
+async def test_a_removal_whose_search_doesnt_start_goes_to_the_admin(sweeper, services, store):
+    radarr = services.radarr["meleys"]
+    radarr.queue_items = [queued(1, "nzo_a", 6 * GB, tracked="warning")]
+    await sweeper()
+    age(store, "meleys", "movie", "nzo_a", hours=7)
+
+    async def refuse(ids):
+        raise ClientError("radarr", "POST", "/api/v3/command", 503, "busy")
+
+    radarr.movies_search = refuse
+    (post,) = await sweeper()
+    assert radarr.removed == [1] and "search didn't start" in post.text
+    assert "Search for it in Radarr on meleys" in post.text
+    (removed,) = store.stalls_since(datetime.now(UTC) - timedelta(hours=1))
+    assert removed.action == StallAction.REMOVED
+    # It counts as cleared for a new release: stalling again surfaces it.
+    assert store.researched_since("meleys", "movie", "movie:8", datetime.now(UTC) - timedelta(1))

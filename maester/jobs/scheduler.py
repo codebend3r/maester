@@ -57,6 +57,8 @@ class Scheduler:
 
     async def run(self) -> None:
         """Keep every job on time; returns only when cancelled."""
+        if not self.jobs:  # nothing to run, but the app mustn't read that as stopping
+            await asyncio.Event().wait()
         await asyncio.gather(*(self._keep(job) for job in self.jobs))
 
     async def _keep(self, job: Job) -> None:

@@ -44,6 +44,8 @@ NEWEST = 50
 
 STALL_WORDS = {
     StallAction.RESEARCHED: "stalled, so its release was blocklisted and searched again",
+    StallAction.REMOVED: "stalled; its release was blocklisted and removed, but the search "
+    "didn't start, so search for it",
     StallAction.SURFACED: "stalled again after a re-search; it's left for you",
     StallAction.FAILED: "stalled, and couldn't be cleared",
 }
@@ -157,6 +159,8 @@ class Digest:
     def replacements(self, now: datetime) -> Section:
         section = Section("Replaced")
         for row in self.store.acted_since(("replace_media", "decide_replacement"), now - DAY):
+            if row.args.get("approved") is False:  # the admin's Deny: nothing was replaced
+                continue
             report = self.store.get_report(int(row.args.get("report_id", 0)))
             if report is not None:
                 section.lines.append(

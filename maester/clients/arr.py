@@ -177,6 +177,10 @@ class HistoryEvent:
         )
 
 
+# One read holds the whole queue: a download left off a page would look gone.
+QUEUE_PAGE = 1000
+
+
 class ArrClient(HttpClient):
     api = "/api/v3"
     health_path = "/api/v3/system/status"  # checks the API key too
@@ -201,7 +205,7 @@ class ArrClient(HttpClient):
     async def queue(self) -> list[QueueItem]:
         data = await self.get_json(
             f"{self.api}/queue",
-            params={"pageSize": 200, **dict.fromkeys(self.queue_includes, "true")},
+            params={"pageSize": QUEUE_PAGE, **dict.fromkeys(self.queue_includes, "true")},
         )
         return [QueueItem.from_api(r) for r in data.get("records", [])]
 

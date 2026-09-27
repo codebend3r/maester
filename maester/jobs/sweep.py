@@ -8,11 +8,14 @@ download client with its release blocklisted, and its movie or episodes are
 searched again on the same host. A title that stalls again within
 `STALL_MEMORY` of being searched again is surfaced to the admin instead:
 another release would likely stall too, and searching forever helps nobody.
+One removed whose search then didn't start goes to the admin too, since no
+later sweep would see it.
 
 Waiting isn't stalling: a paused download, one queued behind others, one a
 delay profile holds, or one whose client can't be reached (the client's
 problem, not the release's) is not stuck. A download is timed per sweep in
-`queue_watch`, so a restart doesn't reset the clock.
+`queue_watch`, so a restart doesn't reset the clock, and one missing from a
+single queue read keeps its row for `WATCH_GRACE` before it's forgotten.
 
 The kill switch stops removals (a stalled download waits until it's off),
 and a maintenance window pauses the sweep: services restarting look stuck.
@@ -43,6 +46,8 @@ log = logging.getLogger("maester.jobs")
 TOOL = "sweep_stalled"
 # How long a title's re-search is remembered: stalling again within it surfaces the title.
 STALL_MEMORY = timedelta(days=30)
+# How long a download the queue stopped listing is remembered, in case it's back next read.
+WATCH_GRACE = timedelta(days=1)
 # States in which a download waits its turn rather than stalls.
 WAITING = {"paused", "queued", "delay", "downloadclientunavailable"}
 
@@ -98,9 +103,12 @@ class Download:
 
 
 def downloads(host: str, kind: str, queue: Sequence[QueueItem]) -> list[Download]:
+    """The queue's downloads the arr grabbed for a title it knows: one it doesn't (added to
+    the client by hand) isn't the sweeper's to remove, nor a show's with no episode named."""
     by_id: dict[str, list[QueueItem]] = {}
     for record in queue:
-        if record.download_id:
+        known = record.media_id and (kind == "movie" or record.episode_id is not None)
+        if record.download_id and known:
             by_id.setdefault(record.download_id, []).append(record)
     return [Download(host, kind, d, tuple(rs)) for d, rs in by_id.items()]
 
@@ -161,7 +169,7 @@ class Sweeper:
                     watched = replace(watched, acted_at=stamp(now))
                 notices += notice
             seen[download.download_id] = watched
-        self.store.watch(host, kind, seen)
+        self.store.watch(host, kind, seen, forget_before=now - WATCH_GRACE)
         return notices
 
     async def act(self, arr: Any, download: Download, reason: str) -> tuple[bool, list[Notice]]:
@@ -180,14 +188,24 @@ class Sweeper:
             return False, []  # removing is destructive; it waits for the switch
         try:
             await arr.remove_from_queue(download.first.id, blocklist=True)
+        except ClientError as exc:
+            text = f"Couldn't clear {download.title} on {host}: {exc}"
+            self._record(download, reason, StallAction.FAILED, text, ok=False)
+            return False, []
+        try:
             if kind == "movie":
                 await arr.movies_search([download.first.media_id])
             else:
                 await arr.episode_search(list(download.episode_ids))
         except ClientError as exc:
-            text = f"Couldn't clear {download.title} on {host}: {exc}"
-            self._record(download, reason, StallAction.FAILED, text, ok=False)
-            return False, []
+            # It's out of the queue now, so no later sweep would search for it: the admin does.
+            text = (
+                f"{download.title} on {host} stalled ({reason}): blocklisted that release and "
+                f"removed it, but the search didn't start ({exc}). Search for it in "
+                f"{ARR_NAMES[kind]} on {host}."
+            )
+            self._record(download, reason, StallAction.REMOVED, text, ok=False)
+            return True, [AdminPost(text)]
         text = (
             f"{download.title} on {host} stalled ({reason}): blocklisted that release, removed "
             "it and searched again."
