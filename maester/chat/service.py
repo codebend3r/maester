@@ -158,9 +158,9 @@ class ChatService:
         text = REACTION_REPORT.format(
             emoji=emoji,
             title=about.title,
-            version=about.version,
-            media_type=about.media_type,
-            tmdb_id=about.tmdb_id,
+            version=about.copy.version,
+            media_type=about.copy.media_type,
+            tmdb_id=about.copy.tmdb_id,
         )
         return await self.handle_message(user, text)
 

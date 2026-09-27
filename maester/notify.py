@@ -20,6 +20,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Protocol
 
+from maester.media import Titled
+
 
 @dataclass(frozen=True)
 class AdminPost:
@@ -35,24 +37,10 @@ class ApprovalPost:
 
 
 @dataclass(frozen=True)
-class MediaRef:
-    """The title a message is about."""
-
-    media_type: str  # "movie" | "tv"
-    tmdb_id: int
-    is_4k: bool
-    title: str  # "Dune (2021)"
-
-    @property
-    def version(self) -> str:
-        return "4K" if self.is_4k else "1080p"
-
-
-@dataclass(frozen=True)
 class DirectMessage:
     to: str  # a Discord user id
     text: str
-    about: MediaRef | None = None
+    about: Titled | None = None
 
 
 Notice = AdminPost | ApprovalPost | DirectMessage

@@ -23,7 +23,8 @@ from typing import Any
 
 from maester.clients import ClientError, Services
 from maester.clients.seerr import MediaRequest
-from maester.notify import DirectMessage, MediaRef, Notice
+from maester.media import Copy, Titled, version_label
+from maester.notify import DirectMessage, Notice
 from maester.store import Store
 
 log = logging.getLogger("maester.seerr")
@@ -107,7 +108,9 @@ async def issue_status(
     if not resolved:
         return []
     return [
-        DirectMessage(r.discord_id, f"Your report about {r.title} in {r.version} was resolved.")
+        DirectMessage(
+            r.discord_id, f"Your report about {r.title} in {r.copy.version} was resolved."
+        )
         for r in changed
     ]
 
@@ -130,11 +133,11 @@ async def ready_to_watch(
     user = store.active_link_by_seerr_id(request.requested_by_id)
     if user is None:  # requested in Seerr by someone not linked here
         return []
-    version = "4K" if request.is_4k else "1080p"
+    version = version_label(request.is_4k)
     link = await _plex_link(services, request)
     where = f"\nOpen it in Plex: {link}" if link else " Look for it in Plex."
     text = f"{_what(notification, request)} is ready to watch in {version}.{where}"
-    about = MediaRef(request.media_type, request.tmdb_id, request.is_4k, notification.subject)
+    about = Titled(Copy(request.media_type, request.tmdb_id, request.is_4k), notification.subject)
     return [DirectMessage(user.discord_id, text, about)]
 
 

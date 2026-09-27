@@ -5,7 +5,8 @@ import pytest
 
 from maester.agent.tools import Choices
 from maester.library import NotLocated
-from maester.playback.items import Item, locate
+from maester.media import Copy
+from maester.playback.items import locate
 from maester.playback.plays import copy_of, recent_plays
 from maester.tools.playback import list_tracks, recent_sessions
 from tests.factories import history_row, session
@@ -84,10 +85,10 @@ async def test_plays_are_live_first_then_newest_and_one_per_plex_item(watching):
     ]
     live, bear, _ = found.plays
     assert live.live and live.plex_key == "9001" and bear.plex_key == "5120"
-    assert bear.is_of(BEAR, Item("tv", 136315, False, 2, 7))
-    assert not bear.is_of(BEAR, Item("tv", 136315, False, 2, 8))
-    assert live.is_of(DUNE, Item("movie", 438631, True))
-    assert not live.is_of(DUNE, Item("movie", 438631, False))
+    assert bear.is_of(BEAR, Copy("tv", 136315, False, 2, 7))
+    assert not bear.is_of(BEAR, Copy("tv", 136315, False, 2, 8))
+    assert live.is_of(DUNE, Copy("movie", 438631, True))
+    assert not live.is_of(DUNE, Copy("movie", 438631, False))
 
 
 def test_which_copy_a_plex_item_is():
@@ -96,32 +97,34 @@ def test_which_copy_a_plex_item_is():
     assert copy_of(replace(DUNE, rating_key_4k="4348"), "4348") is None  # one item, both copies
 
 
-def test_items_name_their_copy_and_episode():
-    assert Item.of("tv", 136315, "4k", 2, 7).ref == "tv:136315:4K:S02E07"
-    assert Item.of("movie", 438631, "1080p").title(DUNE) == "Dune (2021)"
+def test_a_copy_names_its_version_and_episode():
+    assert Copy.of("tv", 136315, "4k", 2, 7).ref == "tv:136315:4K:S02E07"
+    assert Copy.of("movie", 438631, "1080p").title(DUNE.display) == "Dune (2021)"
+    assert Copy("tv", 136315, False).ref == "tv:136315:1080p"  # a whole show
     with pytest.raises(ValueError, match="season and the episode"):
-        Item("tv", 136315, False, 2)
+        Copy("tv", 136315, False, 2)
     with pytest.raises(ValueError, match="no season"):
-        Item("movie", 438631, False, 1, 1)
+        Copy("movie", 438631, False, 1, 1)
 
 
 async def test_locate_finds_a_copys_file_through_its_owning_arr(library):
-    dune = await locate(library.services, Item("movie", 438631, True))
-    assert (dune.owner.host, dune.file.id, dune.copy) == (
+    dune = await locate(library.services, Copy("movie", 438631, True))
+    assert (dune.owner.host, dune.file.id, dune.label) == (
         "vermithor", 55, "the 4K copy of Dune (2021)",
     )  # fmt: skip
-    forks = await locate(library.services, Item("tv", 136315, False, 2, 7))
+    forks = await locate(library.services, Copy("tv", 136315, False, 2, 7))
     assert (forks.owner.host, forks.file.path, forks.search_ids) == ("meleys", FORKS, (702,))
     assert forks.title == "The Bear (2022) S02E07"
 
-    for item, why in (
-        (Item("movie", 438631, False), "has no 1080p file on meleys"),
-        (Item("tv", 136315, False, 2, 8), "S02E08 has no file on meleys"),
-        (Item("tv", 136315, False, 9, 1), "has no S09E01 of The Bear"),
-        (Item("tv", 136315, True, 2, 7), "The 4K copy of The Bear \\(2022\\) isn't in Sonarr yet"),
+    for copy, why in (
+        (Copy("movie", 438631, False), "has no 1080p file on meleys"),
+        (Copy("tv", 136315, False, 2, 8), "S02E08 has no file on meleys"),
+        (Copy("tv", 136315, False, 9, 1), "has no S09E01 of The Bear"),
+        (Copy("tv", 136315, False), "name the episode of The Bear"),
+        (Copy("tv", 136315, True, 2, 7), "The 4K copy of The Bear \\(2022\\) isn't in Sonarr yet"),
     ):
         with pytest.raises(NotLocated, match=why):
-            await locate(library.services, item)
+            await locate(library.services, copy)
 
 
 async def test_list_tracks_reads_the_files_own_tracks(library):

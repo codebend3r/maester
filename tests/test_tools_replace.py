@@ -12,8 +12,8 @@ from maester.clients.arr import HistoryEvent, MediaFile
 from maester.clients.media import Inspection
 from maester.clients.radarr import Movie
 from maester.config import Guardrails
+from maester.media import Copy
 from maester.notify import AdminPost, ApprovalPost, DirectMessage
-from maester.playback.items import Item
 from maester.playback.reports import Action, ReportKind
 from maester.tools.replace import decide_replacement, replace_media
 from tests.playback_world import DUNE_4K, DUNE_4K_ITEM, FORKS, FORKS_ITEM, link_pal, report, stock
@@ -222,7 +222,7 @@ async def test_two_confirmations_at_once_cannot_both_slip_under_the_cap(library)
     ctx.services.probe.files["/Meleys/Movies/Dune.mkv"] = Inspection(
         "/Meleys/Movies/Dune.mkv", 9300.0, "h264", 0, ()
     )
-    second = await broken(ctx, Item("movie", 438631, False), "/Meleys/Movies/Dune.mkv")
+    second = await broken(ctx, Copy("movie", 438631, False), "/Meleys/Movies/Dune.mkv")
     for radarr in ctx.services.radarr.values():  # a real arr answers later, letting others run
         radarr.history = pausing(radarr.history)
     runner = ToolRunner(registry)

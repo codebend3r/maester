@@ -21,8 +21,8 @@ from dataclasses import dataclass
 from maester.clients import Services
 from maester.clients.seerr import MediaDetails
 from maester.clients.tautulli import HistoryRow, Session, Tautulli
+from maester.media import Copy
 from maester.playback.client_limits import Playback
-from maester.playback.items import Item
 
 # Finished plays asked of each host.
 RECENT = 5
@@ -84,10 +84,10 @@ class Play:
             source=row,
         )
 
-    def is_of(self, details: MediaDetails, item: Item) -> bool:
+    def is_of(self, details: MediaDetails, copy: Copy) -> bool:
         """Whether this play was of that copy (and that episode)."""
-        key = details.rating_key_for(item.is_4k)
-        return key == self.plex_key and (self.season, self.episode) == (item.season, item.episode)
+        key = details.rating_key_for(copy.is_4k)
+        return key == self.plex_key and (self.season, self.episode) == (copy.season, copy.episode)
 
 
 @dataclass(frozen=True)

@@ -28,7 +28,9 @@ from maester.agent.tools import Tier, ToolContext, tool
 from maester.clients.arr import HistoryEvent, QueueItem
 from maester.clients.sabnzbd import Download
 from maester.clients.seerr import MediaDetails, MediaRequest, RequestStatus
+from maester.formatting import humanized
 from maester.library import Library, Owner, OwnerUnknown
+from maester.media import version_label
 
 OPEN_REQUESTS = 20
 # SABnzbd writes "0:03:10" (or "1:02:03:04" with days); the arrs write a
@@ -43,17 +45,6 @@ def seconds_left(text: str | None) -> int | None:
         return None
     days, hours, minutes, secs = (int(g or 0) for g in match.groups())
     return ((days * 24 + hours) * 60 + minutes) * 60 + secs
-
-
-def humanized(seconds: int) -> str:
-    minutes = max(1, round(seconds / 60))
-    if minutes < 60:
-        return f"about {minutes} min"
-    hours, minutes = divmod(minutes, 60)
-    if hours < 24:
-        return f"about {hours} h {minutes} min" if minutes else f"about {hours} h"
-    days, hours = divmod(hours, 24)
-    return f"about {days} d {hours} h" if hours else f"about {days} d"
 
 
 def merged_progress(queue: list[QueueItem], slots: dict[str, Download]) -> dict[str, Any]:
@@ -119,7 +110,7 @@ def last_failure(events: list[HistoryEvent], sab_history: Any) -> dict[str, Any]
 def request_row(located: Located | BaseException, request: MediaRequest) -> dict[str, Any]:
     row: dict[str, Any] = {
         "request_id": request.id,
-        "version": "4K" if request.is_4k else "1080p",
+        "version": version_label(request.is_4k),
         "request": request.status.label,
         "availability": request.media_status.label,
     }

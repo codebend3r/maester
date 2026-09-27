@@ -1,6 +1,6 @@
 from maester.clients import ClientError
 from maester.clients.seerr import MediaRequest, MediaStatus, RequestStatus
-from maester.notify import MediaRef
+from maester.media import Copy, Titled
 from maester.seerr_events import RESCAN_REPEAT, SeerrNotification, ready_to_watch, seerr_routes
 
 
@@ -27,7 +27,7 @@ async def test_the_linked_requester_gets_title_version_and_plex_link(services, s
     store.upsert_user("d1", status="active", seerr_user_id=4)
     ready(services, is_4k=True)
     (dm,) = await ready_to_watch(services, store, notification())
-    assert dm.to == "d1" and dm.about == MediaRef("movie", 438631, True, "Dune (2021)")
+    assert dm.to == "d1" and dm.about == Titled(Copy("movie", 438631, True), "Dune (2021)")
     assert dm.text == (
         "Dune (2021) is ready to watch in 4K.\nOpen it in Plex: "
         "https://app.plex.tv/desktop/#!/server/fake-machine/details?key=%2Flibrary%2Fmetadata%2F4348"

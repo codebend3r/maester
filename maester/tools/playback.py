@@ -23,13 +23,14 @@ from typing import Any
 from maester.agent.tools import Choice, Choices, Result, Tier, ToolContext, tool
 from maester.clients.media import Unreadable
 from maester.clients.seerr import MediaDetails
+from maester.formatting import humanized
 from maester.library import NotLocated
+from maester.media import Copy, copy_ref, episode_code, titled, version_label
 from maester.playback import tracks
 from maester.playback.health import parse_clock
-from maester.playback.items import Item, episode_code, item_ref, item_title, locate
+from maester.playback.items import locate
 from maester.playback.plays import Play, copy_of, identify, recent_plays
 from maester.playback.reports import ReportKind, file_report
-from maester.tools.status import humanized
 
 # The copy (and episode) a playback tool is about.
 ITEM_PROPERTIES: dict[str, Any] = {
@@ -58,13 +59,14 @@ NOTHING_RECENT = (
 
 def play_choice(play: Play, details: MediaDetails, now: float) -> Choice:
     """A pick for a play: the title and copy, when it was played, and on what."""
-    version = {True: "4K", False: "1080p", None: "?"}[copy_of(details, play.plex_key)]
+    is_4k = copy_of(details, play.plex_key)
+    version = "?" if is_4k is None else version_label(is_4k)
     code = episode_code(play.season, play.episode)
     when = "playing now" if play.live else f"{humanized(int(now) - play.started)} ago"
-    shown = "copy unclear: ask 1080p or 4K" if version == "?" else version
+    shown = "copy unclear: ask 1080p or 4K" if is_4k is None else version
     return Choice(
-        label=item_title(details, code),
-        value=item_ref(details.media_type, details.tmdb_id, version, code),
+        label=titled(details.display, code),
+        value=copy_ref(details.media_type, details.tmdb_id, version, code),
         year=details.year,
         detail=f"{shown} · {when} · {play.player}",
     )
@@ -124,12 +126,12 @@ async def list_tracks(
     season: int | None = None,
     episode: int | None = None,
 ) -> dict[str, Any]:
-    item = Item.of(media_type, tmdb_id, version, season, episode)
+    copy = Copy.of(media_type, tmdb_id, version, season, episode)
     try:
-        located = await locate(ctx.services, item)
+        located = await locate(ctx.services, copy)
     except NotLocated as exc:
         return {"tracks": None, "reason": str(exc)}
-    reply: dict[str, Any] = {"title": located.title, "version": item.version}
+    reply: dict[str, Any] = {"title": located.title, "version": copy.version}
     try:
         inspection = await ctx.services.probe.inspect(located.file.path)
     except Unreadable as exc:
@@ -173,11 +175,11 @@ async def report_problem(
     episode: int | None = None,
     at: str | None = None,
 ) -> dict[str, Any] | Result:
-    item = Item.of(media_type, tmdb_id, version, season, episode)
+    copy = Copy.of(media_type, tmdb_id, version, season, episode)
     moment = parse_clock(at) if at else None
     link = ctx.linked_user()
     try:
-        located = await locate(ctx.services, item)
+        located = await locate(ctx.services, copy)
     except NotLocated as exc:
         return {"reported": False, "reason": str(exc)}
     filed = await file_report(

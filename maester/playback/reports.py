@@ -40,6 +40,7 @@ from typing import Any
 from maester.clients import ClientError, Services
 from maester.clients.media import Track, Unreadable
 from maester.clients.seerr import ISSUE_AUDIO, ISSUE_OTHER, ISSUE_SUBTITLE, ISSUE_VIDEO
+from maester.media import ReportKind
 from maester.notify import AdminPost, Notice
 from maester.playback import tracks
 from maester.playback.client_limits import ClientLimit, Playback, client_causes
@@ -50,17 +51,6 @@ from maester.store import LinkedUser, ReportRow, Store
 
 # How many people reporting one file prove it needs a new copy.
 REPORTERS_TO_REPLACE = 2
-
-
-class ReportKind(enum.StrEnum):
-    WONT_PLAY = "wont_play"
-    WRONG_TITLE = "wrong_title"
-    WRONG_EPISODE = "wrong_episode"
-    CAM = "cam"
-    HARDCODED_SUBS = "hardcoded_subs"
-    SUBTITLES = "subtitles"
-    AUDIO = "audio"
-    OTHER = "other"
 
 
 class Action(enum.StrEnum):
@@ -129,7 +119,7 @@ async def _last_play(case: Case, dovi_profile: int | None) -> tuple[str, Playbac
     if link.tautulli_user_id is None:
         return "not checked: their Plex account isn't matched to a Tautulli user", None
     found = await recent_plays(services, link.tautulli_user_id)
-    play = next((p for p in found.plays if p.is_of(located.details, located.item)), None)
+    play = next((p for p in found.plays if p.is_of(located.details, located.copy)), None)
     if play is None:
         return "not checked: no recent play of this copy in Tautulli", None
     try:
@@ -206,7 +196,7 @@ POLICIES: dict[ReportKind, KindPolicy] = {
 
 
 def policy_of(report: ReportRow) -> KindPolicy:
-    return POLICIES[ReportKind(report.kind)]
+    return POLICIES[report.kind]
 
 
 @dataclass(frozen=True)
@@ -340,7 +330,7 @@ class Filed:
         reply = {
             "report_id": self.report.id,
             "title": self.located.title,
-            "version": self.located.item.version,
+            "version": self.located.copy.version,
             "host": self.located.owner.host,
             "problem": policy_of(self.report).label,
             "diagnosis": self.diagnosis.as_dict(),
@@ -361,7 +351,7 @@ def issue_message(filed: Filed, reporter: str) -> str:
     lines = [
         report.description,
         "",
-        f"Reported through maester by {reporter}: {policy.label}, {located.copy} "
+        f"Reported through maester by {reporter}: {policy.label}, {located.label} "
         f"on {located.owner.host}.",
         f"File: {located.file.path}{group}",
     ]
@@ -391,8 +381,8 @@ async def open_issue(services: Services, link: LinkedUser, filed: Filed) -> int:
             policy_of(filed.report).issue_type,
             issue_message(filed, link.name),
             link.seerr_user_id,
-            season=located.item.season,
-            episode=located.item.episode,
+            season=located.copy.season,
+            episode=located.copy.episode,
         )
     except ClientError as exc:
         raise IssueNotOpened(f"not opened: {exc}") from exc
@@ -403,7 +393,7 @@ def admin_notice(filed: Filed, reporter: str) -> AdminPost:
     report, located = filed.report, filed.located
     issue = f"Seerr issue #{filed.issue_id}" if filed.issue_id else "The report"
     return AdminPost(
-        f"{reporter} reports {policy_of(report).label} on {located.copy} "
+        f"{reporter} reports {policy_of(report).label} on {located.label} "
         f'({located.owner.host}): "{report.description}". Nothing fixes this automatically '
         f"(Bazarr isn't set up). {issue} has what maester found: "
         f"{filed.diagnosis.summary()}"
@@ -421,7 +411,7 @@ async def file_report(
 ) -> Filed:
     """Diagnose, store and decide a report, then open its Seerr issue."""
     policy, file = POLICIES[kind], located.file
-    host, media_type = located.owner.host, located.item.media_type
+    host, media_type = located.owner.host, located.copy.media_type
     advised = any(
         r.discord_id == link.discord_id and r.action == Action.ADVISED
         for r in store.reports_for_file(host, media_type, file.id)
@@ -432,13 +422,9 @@ async def file_report(
         report = store.add_report(
             discord_id=link.discord_id,
             kind=kind,
+            copy=located.copy,
             title=located.title,
-            media_type=media_type,
-            tmdb_id=located.item.tmdb_id,
-            is_4k=located.item.is_4k,
-            season=located.item.season,
-            episode=located.item.episode,
-            rating_key=located.details.rating_key_for(located.item.is_4k),
+            rating_key=located.details.rating_key_for(located.copy.is_4k),
             host=host,
             file_id=file.id,
             file_path=file.path,

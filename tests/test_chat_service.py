@@ -10,7 +10,8 @@ from maester.chat.identity import IdentityService, RoleMap
 from maester.chat.service import UNLINKED_HELP, ChatService, ChatUser, Decision
 from maester.clients.seerr import MediaDetails, MediaStatus, RequestStatus, SeerrUser
 from maester.config import Settings
-from maester.notify import AdminPost, ApprovalPost, DirectMessage, MediaRef
+from maester.media import Copy, Titled
+from maester.notify import AdminPost, ApprovalPost, DirectMessage
 from tests.factories import seerr_server
 from tests.fake_model import FakeModel, text_message, tool_message
 
@@ -117,7 +118,7 @@ async def test_pick_sends_the_choice_back_as_a_message(world):
 async def test_a_thumbs_down_on_a_ready_dm_reports_a_problem_with_that_copy(world):
     make, *_ = world
     svc = make(text_message("Sorry! What's wrong with it?"))
-    dune = MediaRef("movie", 438631, True, "Dune (2021)")
+    dune = Titled(Copy("movie", 438631, True), "Dune (2021)")
     svc.remember_dm("m1", DirectMessage(FRIEND.id, "Dune (2021) is ready", dune))
     svc.remember_dm("m2", DirectMessage(FRIEND.id, "no title here"))
 

@@ -7,6 +7,7 @@ import sqlite3
 from dataclasses import dataclass
 from typing import Any
 
+from maester.media import Copy, ReportKind
 from maester.store.base import Database, now
 
 
@@ -17,13 +18,9 @@ class ReportRow:
     id: int
     ts: str
     discord_id: str
-    kind: str
+    kind: ReportKind
+    copy: Copy
     title: str  # "Dune (2021)", "The Bear (2022) S02E07"
-    media_type: str
-    tmdb_id: int
-    is_4k: bool
-    season: int | None
-    episode: int | None
     host: str
     file_id: int
     file_path: str
@@ -36,23 +33,15 @@ class ReportRow:
     resolved_at: str | None
     replaced_at: str | None
 
-    @property
-    def version(self) -> str:
-        return "4K" if self.is_4k else "1080p"
-
 
 class Reports(Database):
     def add_report(
         self,
         *,
         discord_id: str,
-        kind: str,
+        kind: ReportKind,
+        copy: Copy,
         title: str,
-        media_type: str,
-        tmdb_id: int,
-        is_4k: bool,
-        season: int | None,
-        episode: int | None,
         rating_key: str | None,
         host: str,
         file_id: int,
@@ -73,11 +62,11 @@ class Reports(Database):
                     discord_id,
                     kind,
                     title,
-                    media_type,
-                    tmdb_id,
-                    int(is_4k),
-                    season,
-                    episode,
+                    copy.media_type,
+                    copy.tmdb_id,
+                    int(copy.is_4k),
+                    copy.season,
+                    copy.episode,
                     rating_key,
                     host,
                     file_id,
@@ -142,13 +131,9 @@ class Reports(Database):
             id=r["id"],
             ts=r["ts"],
             discord_id=r["discord_id"],
-            kind=r["kind"],
+            kind=ReportKind(r["kind"]),
+            copy=Copy(r["media_type"], r["tmdb_id"], bool(r["is_4k"]), r["season"], r["episode"]),
             title=r["title"],
-            media_type=r["media_type"],
-            tmdb_id=r["tmdb_id"],
-            is_4k=bool(r["is_4k"]),
-            season=r["season"],
-            episode=r["episode"],
             host=r["host"],
             file_id=r["file_id"],
             file_path=r["file_path"],

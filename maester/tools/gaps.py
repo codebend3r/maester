@@ -19,9 +19,9 @@ from typing import Any
 
 from maester.agent.tools import Result, Tier, ToolContext, tool
 from maester.clients.sonarr import Episode
-from maester.library import NotLocated, ShowOwner, owner_on
+from maester.library import NotLocated, show_owner_on
+from maester.media import episode_code
 from maester.notify import AdminPost
-from maester.playback.items import episode_code
 
 
 @dataclass(frozen=True)
@@ -92,10 +92,9 @@ async def find_gaps(
 ) -> dict[str, Any] | Result:
     details = await ctx.services.seerr.media_details("tv", tmdb_id)
     try:
-        owner = await owner_on(ctx.services, details, host)
+        owner = await show_owner_on(ctx.services, details, host)
     except NotLocated as exc:
         return {"searched": [], "reason": str(exc)}
-    assert isinstance(owner, ShowOwner)  # a show's copy is always in a Sonarr
     episodes = await owner.episodes()
     found = gaps_in(episodes, datetime.now(UTC), season)
     if found.scattered:

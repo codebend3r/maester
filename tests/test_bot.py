@@ -5,7 +5,8 @@ import discord
 from maester.chat.bot import MaesterBot
 from maester.chat.service import ChatResponse
 from maester.chat.views import DecisionButton
-from maester.notify import AdminPost, ApprovalPost, DirectMessage, MediaRef
+from maester.media import Copy, Titled
+from maester.notify import AdminPost, ApprovalPost, DirectMessage
 
 
 class Inbox:
@@ -92,7 +93,7 @@ async def test_a_dm_reaction_goes_to_the_service_and_its_answer_back_to_the_dm()
     friend.id, friend.display_name = 5, "Pal"
     bot = bot_with(None, {5: friend})
     bot._connection.user = SimpleNamespace(id=1)
-    about = MediaRef("movie", 438631, True, "Dune (2021)")
+    about = Titled(Copy("movie", 438631, True), "Dune (2021)")
     await bot.deliver([DirectMessage("5", "Dune is ready", about)])
 
     await bot.on_raw_reaction_add(reaction("\N{THUMBS DOWN SIGN}"))

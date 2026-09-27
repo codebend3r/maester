@@ -38,7 +38,8 @@ from maester.clients.seerr import (
     Seerr,
 )
 from maester.config import Settings
-from maester.library import Library, NotLocated, OwnerUnknown, owner_on
+from maester.library import Library, NotLocated, OwnerUnknown, show_owner_on
+from maester.media import version_label
 from maester.notify import DirectMessage
 from maester.store import LinkedUser
 
@@ -150,7 +151,7 @@ async def submit(
     """Request `details` in Seerr as the caller, leaving out what is already there."""
     user = ctx.linked_user()
     seerr = ctx.services.seerr
-    reply: dict[str, Any] = {"title": details.display, "version": "4K" if is_4k else "1080p"}
+    reply: dict[str, Any] = {"title": details.display, "version": version_label(is_4k)}
     wanted = None
     if details.media_type == "tv":
         plan = plan_seasons(details, seasons, latest_season, is_4k)
@@ -369,8 +370,8 @@ async def request_media_4k(
 async def follow_show(ctx: ToolContext, tmdb_id: int, host: str) -> dict[str, Any]:
     details = await ctx.services.seerr.media_details("tv", tmdb_id)
     try:
-        owner = await owner_on(ctx.services, details, host)
+        owner = await show_owner_on(ctx.services, details, host)
     except NotLocated as exc:
         return {"followed": False, "reason": str(exc)}
-    await ctx.services.sonarr[owner.host].follow(owner.media_id)
+    await owner.follow()
     return {"followed": True, "title": details.display, "host": owner.host}

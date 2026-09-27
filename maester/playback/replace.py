@@ -31,8 +31,9 @@ from dataclasses import dataclass
 
 from maester.clients import ClientError, Services
 from maester.clients.arr import HistoryEvent
+from maester.formatting import gigabytes
 from maester.notify import AdminPost
-from maester.playback.items import Item, LocatedFile
+from maester.playback.items import LocatedFile
 from maester.playback.reports import Evidence, policy_of
 from maester.store import ReportRow, Store
 
@@ -42,14 +43,6 @@ RETRY = (
     "A new copy usually lands within a few hours when a release is out there. Try again "
     "later today, and tell me if it's still broken tomorrow."
 )
-
-
-def item_of(report: ReportRow) -> Item:
-    return Item(report.media_type, report.tmdb_id, report.is_4k, report.season, report.episode)
-
-
-def gigabytes(size: int) -> str:
-    return f"{size / 1e9:.1f} GB"
 
 
 def grab_of(history: Iterable[HistoryEvent], file_id: int) -> HistoryEvent | None:
@@ -143,7 +136,7 @@ class Replacement:
     def text(self) -> str:
         """What the friend is told: each step, and when to try again."""
         located = self.located
-        lines = [f"Replacing {located.copy} on {located.owner.host}:"]
+        lines = [f"Replacing {located.label} on {located.owner.host}:"]
         lines += [s.line for s in self.steps]
         if not self.deleted:
             lines.append("Nothing was deleted; the admin has been told.")
@@ -177,9 +170,9 @@ def admin_notice(
     located, file = replacement.located, replacement.located.file
     host = located.owner.host
     if replacement.deleted:
-        head = f"Deleted {file.path} ({gigabytes(file.size_bytes)}) on {host}: {located.copy}."
+        head = f"Deleted {file.path} ({gigabytes(file.size_bytes)}) on {host}: {located.label}."
     else:
-        head = f"Replacing {located.copy} on {host} stopped before {file.path} was deleted."
+        head = f"Replacing {located.label} on {host} stopped before {file.path} was deleted."
     lines = [
         head,
         f"Reason: {policy_of(report).label}; {evidence.describe()}. "
@@ -197,7 +190,7 @@ async def replace_copy(
     """Run the steps, then record the outcome on the reports and the Seerr issue."""
     replacement = Replacement(located, await run_steps(located))
     if replacement.deleted:
-        store.mark_file_replaced(report.host, report.media_type, report.file_id)
+        store.mark_file_replaced(report.host, report.copy.media_type, report.file_id)
     if report.seerr_issue_id:
         try:
             await services.seerr.comment_issue(report.seerr_issue_id, replacement.text)

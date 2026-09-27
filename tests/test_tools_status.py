@@ -7,7 +7,8 @@ from maester.clients.radarr import Movie
 from maester.clients.sabnzbd import Download
 from maester.clients.seerr import ArrRef, MediaDetails, MediaStatus, RequestStatus, Season
 from maester.clients.sonarr import Series
-from maester.tools.status import humanized, request_status, seconds_left
+from maester.formatting import humanized
+from maester.tools.status import request_status, seconds_left
 from tests.factories import seerr_server
 
 S = MediaStatus

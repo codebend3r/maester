@@ -28,10 +28,11 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from maester.agent.tools import Approval, Result, Tier, ToolContext, tool
+from maester.formatting import gigabytes
 from maester.library import NotLocated
 from maester.notify import DirectMessage
 from maester.playback.items import LocatedFile, locate
-from maester.playback.replace import admin_notice, gigabytes, item_of, replace_copy
+from maester.playback.replace import admin_notice, replace_copy
 from maester.playback.reports import Action, Evidence, policy_of
 from maester.store import ReportRow
 
@@ -73,9 +74,9 @@ async def ready(
     if (action := Action(report.action)) not in allowed:
         raise Refused(f"Report {report.id} can't be acted on: {WHY_NOT[action]}.")
     if host.lower() != report.host:
-        raise Refused(f"{report.title} in {report.version} is on {report.host}, not {host}.")
+        raise Refused(f"{report.title} in {report.copy.version} is on {report.host}, not {host}.")
     try:
-        located = await locate(ctx.services, item_of(report))
+        located = await locate(ctx.services, report.copy)
     except NotLocated as exc:
         raise Refused(f"There's nothing to replace: {exc}.") from exc
     if located.owner.host != report.host or located.file.id != report.file_id:
@@ -84,11 +85,11 @@ async def ready(
             "changed since. If the new one is broken too, report it again."
         )
     evidence = Evidence.of(
-        ctx.store.reports_for_file(report.host, report.media_type, report.file_id)
+        ctx.store.reports_for_file(report.host, report.copy.media_type, report.file_id)
     )
     if not evidence.proven:
         raise Refused(
-            f"Not replacing {located.copy}: {evidence.describe()}. It can be replaced once a "
+            f"Not replacing {located.label}: {evidence.describe()}. It can be replaced once a "
             "file check fails or a second person reports the same copy."
         )
     return Ready(report, located, evidence)
@@ -121,7 +122,7 @@ def ask_admin(ctx: ToolContext, go: Ready) -> Result:
     ctx.store.update_report(go.report.id, action=Action.ESCALATED)
     located, cap = go.located, ctx.settings.guardrails.replace_daily_cap
     who = ctx.name_of(ctx.user_id)
-    where = f"{located.copy} on {located.owner.host}"
+    where = f"{located.label} on {located.owner.host}"
     notice = (
         f"{who} asks to replace {where} ({policy_of(go.report).label}; {go.evidence.describe()}). "
         f"The daily cap of {cap} replacements is used up, so it's your call. File: {located.file.path} "
@@ -208,11 +209,12 @@ async def decide_replacement(
     if not approved:
         ctx.store.update_report(report.id, action=Action.DECLINED)
         dm = (
-            f"The admin decided not to replace {report.title} in {report.version} for now; "
+            f"The admin decided not to replace {report.title} in {report.copy.version} for now; "
             "your report stays open in Seerr."
         )
         return Result(
-            f"Left {report.title} in {report.version} as it is.", (DirectMessage(requester, dm),)
+            f"Left {report.title} in {report.copy.version} as it is.",
+            (DirectMessage(requester, dm),),
         )
     async with _one_at_a_time:
         try:
