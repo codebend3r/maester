@@ -44,7 +44,7 @@ from maester.agent.tools import (
     validate_input,
 )
 from maester.notify import AdminPost, ApprovalPost, Notice
-from maester.store import PendingAction
+from maester.store import NotLinked, PendingAction
 
 log = logging.getLogger("maester.agent")
 
@@ -170,6 +170,8 @@ class ToolRunner:
         started = time.monotonic()
         try:
             outcome = self._outcome(ctx, spec, await spec.handler(ctx, **args))
+        except NotLinked as exc:  # no Seerr account to act as: the same refusal as any tool's
+            outcome = self._outcome(ctx, spec, Result.refusal(str(exc)))
         except Exception as exc:  # a tool failing must not take the turn down
             log.exception("tool %s failed", spec.name)
             outcome = ToolOutcome(f"{type(exc).__name__}: {exc}", is_error=True, retryable=True)

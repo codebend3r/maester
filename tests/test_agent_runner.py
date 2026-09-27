@@ -13,6 +13,7 @@ from maester.agent.tools import (
     Tier,
     ToolContext,
     ToolRegistry,
+    ToolSpec,
 )
 from maester.config import Settings
 from maester.notify import AdminPost, ApprovalPost, DirectMessage
@@ -348,3 +349,17 @@ def test_a_result_is_either_an_answer_a_failure_or_a_question_for_the_admin():
     assert Result.refusal("no", AdminPost("tried")) == Result(
         "no", (AdminPost("tried"),), is_error=True
     )
+
+
+async def test_a_caller_with_no_link_is_refused_like_any_refusal(setup):
+    runner, as_user, store, *_ = setup
+    runner.registry.register(
+        ToolSpec("acts", "acts as the caller", {"type": "object", "properties": {}}, acts)
+    )
+    out = await runner.run(as_user("nobody"), "acts", {})
+    assert out.is_error and not out.retryable and "isn't linked" in out.content
+    assert store.audit_recent(1)[0].ok is False
+
+
+async def acts(ctx):
+    return {"as": ctx.linked_user().seerr_user_id}

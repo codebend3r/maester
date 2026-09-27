@@ -44,7 +44,7 @@ async def test_server_status_without_tautulli(store):
     out = await server_status(
         ToolContext("u", Tier.FRIEND, SimpleNamespace(tautulli={}), store, Settings())
     )
-    assert "error" in out
+    assert out.is_error and "No Tautulli instance is configured" in out.content
 
 
 def test_tool_is_registered_for_friends():

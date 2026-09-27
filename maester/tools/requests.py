@@ -6,8 +6,9 @@ pending, it goes to the admin with Approve/Deny buttons, and the press runs
 `decide_4k_request`, a button-only admin tool that approves or declines it
 in Seerr and tells the requester. For
 shows, seasons already on the server or already requested are left out and
-reported, counted the way Seerr counts them. Seerr's refusals (quota,
-permission, duplicates) come back as sentences to relay, not as errors.
+reported, counted the way Seerr counts them. When nothing is requested
+(Seerr's refusals: quota, permission, duplicates; or nothing left to ask
+for), the tool refuses (`Result.refusal`) with one sentence to relay.
 
 A friend who wants an English dub gets the configured dub tag added to the
 request (Seerr stores it on the request and hands it to Sonarr or Radarr,
@@ -79,6 +80,10 @@ REQUEST_SCHEMA: dict[str, Any] = {
 }
 
 
+class NotRequested(Exception):
+    """Nothing was sent to Seerr; the message says why, in words to relay."""
+
+
 @dataclass(frozen=True)
 class SeasonPlan:
     request: list[int]
@@ -91,7 +96,7 @@ def plan_seasons(
 ) -> SeasonPlan:
     """Which asked-for seasons to request: those Seerr would not already count as present."""
     if asked is not None and latest:
-        raise ValueError("pass seasons or latest_season, not both")
+        raise NotRequested("pass seasons or latest_season, not both")
     known = {s.number: s for s in details.seasons}
     if latest:
         wanted = [max(known)] if known else []
@@ -100,7 +105,7 @@ def plan_seasons(
     else:
         missing = sorted(set(asked) - set(known))
         if missing:
-            raise ValueError(f"{details.display} has no season {missing}; it has {sorted(known)}")
+            raise NotRequested(f"{details.display} has no season {missing}; it has {sorted(known)}")
         wanted = sorted(set(asked))
     statuses = {n: known[n].status_for(is_4k) for n in wanted}
     return SeasonPlan(
@@ -111,7 +116,7 @@ def plan_seasons(
 
 @dataclass(frozen=True)
 class Submitted:
-    request: MediaRequest | None  # None when nothing was sent to Seerr
+    request: MediaRequest
     reply: dict[str, Any]
 
 
@@ -148,23 +153,33 @@ async def submit(
     is_4k: bool,
     english_dub: bool = False,
 ) -> Submitted:
-    """Request `details` in Seerr as the caller, leaving out what is already there."""
+    """Request `details` in Seerr as the caller, leaving out what is already there.
+
+    `NotRequested` says why nothing was sent.
+    """
     user = ctx.linked_user()
     seerr = ctx.services.seerr
-    reply: dict[str, Any] = {"title": details.display, "version": version_label(is_4k)}
+    version = version_label(is_4k)
+    reply: dict[str, Any] = {"title": details.display, "version": version}
+    nothing = f"Nothing was requested for {details.display} in {version}"
     wanted = None
     if details.media_type == "tv":
         plan = plan_seasons(details, seasons, latest_season, is_4k)
         if plan.left_out:
             reply["left_out"] = [{"season": n, "status": s} for n, s in plan.left_out.items()]
         if not plan.request:
-            reason = REFUSALS[Refusal.NO_SEASONS] if plan.left_out else "No seasons were asked for."
-            return Submitted(None, {**reply, "requested": False, "reason": reason})
+            there = "; ".join(f"season {n} is {s}" for n, s in plan.left_out.items())
+            why = (
+                f"{REFUSALS[Refusal.NO_SEASONS]} ({there})"
+                if there
+                else "no seasons were asked for."
+            )
+            raise NotRequested(f"{nothing}: {why}")
         wanted = plan.request
     elif seasons is not None or latest_season:
-        raise ValueError("seasons are for TV shows only")
+        raise NotRequested("seasons are for TV shows only")
     elif not (status := details.status_for(is_4k)).requestable:
-        return Submitted(None, {**reply, "requested": False, "status": status.label})
+        raise NotRequested(f"{nothing}: it's {status.label}.")
     routing = None
     if english_dub:
         routing, dub = await dub_routing(seerr, ctx.settings, details, is_4k)
@@ -180,7 +195,9 @@ async def submit(
         )
     except RequestRefused as refused:
         reason = await explain(seerr, user, refused, details.media_type)
-        return Submitted(None, {**reply, "requested": False, "reason": reason})
+        raise NotRequested(
+            f"Seerr didn't take the request for {details.display}: {reason}"
+        ) from refused
     return Submitted(
         request,
         {
@@ -235,7 +252,7 @@ async def size_tradeoff(services: Services, details: MediaDetails) -> dict[str, 
     "their quotas apply. For shows, pass the seasons asked for (or latest_season); seasons "
     "already on the server or requested are left out and listed in left_out. Set "
     "english_dub when they want English audio. Returns the Seerr request id and whether it "
-    "was approved automatically, or why Seerr refused.",
+    "was approved automatically; when nothing was requested, it refuses and says why.",
     REQUEST_SCHEMA,
     tier=Tier.FRIEND,
 )
@@ -246,11 +263,14 @@ async def request_media(
     seasons: list[int] | None = None,
     latest_season: bool = False,
     english_dub: bool = False,
-) -> dict[str, Any]:
+) -> dict[str, Any] | Result:
     details = await ctx.services.seerr.media_details(media_type, tmdb_id)
-    submitted = await submit(
-        ctx, details, seasons, latest_season, is_4k=False, english_dub=english_dub
-    )
+    try:
+        submitted = await submit(
+            ctx, details, seasons, latest_season, is_4k=False, english_dub=english_dub
+        )
+    except NotRequested as why:
+        return Result.refusal(str(why))
     return submitted.reply
 
 
@@ -285,7 +305,7 @@ async def decide_4k_request(
     if current == RequestStatus.PENDING:
         await (seerr.approve_request if approved else seerr.decline_request)(request_id)
     elif current != wanted:
-        return Result(
+        return Result.refusal(
             f"Seerr request #{request_id} ({title} in 4K) was already {current.label} in Seerr; "
             "nothing changed."
         )
@@ -321,16 +341,19 @@ async def request_media_4k(
     if not any(
         s.is_4k for s in await seerr.servers("radarr" if media_type == "movie" else "sonarr")
     ):
-        return {"requested": False, "reason": "4K requests aren't set up on this server."}
+        return Result.refusal("4K requests aren't set up on this server.")
     details = await seerr.media_details(media_type, tmdb_id)
     # Measured before the request exists, so a failed lookup cannot orphan it.
     tradeoff = await size_tradeoff(ctx.services, details)
-    submitted = await submit(
-        ctx, details, seasons, latest_season, is_4k=True, english_dub=english_dub
-    )
+    try:
+        submitted = await submit(
+            ctx, details, seasons, latest_season, is_4k=True, english_dub=english_dub
+        )
+    except NotRequested as why:
+        return Result.refusal(str(why))
     reply = {**submitted.reply, **tradeoff}
     request = submitted.request
-    if request is None or request.status != RequestStatus.PENDING:
+    if request.status != RequestStatus.PENDING:
         return reply
     who = ctx.linked_user().name
     notice = f"{who} asks for {details.display} in 4K (Seerr request #{request.id})."
@@ -367,11 +390,11 @@ async def request_media_4k(
     tier=Tier.FRIEND,
     host_param="host",
 )
-async def follow_show(ctx: ToolContext, tmdb_id: int, host: str) -> dict[str, Any]:
+async def follow_show(ctx: ToolContext, tmdb_id: int, host: str) -> dict[str, Any] | Result:
     details = await ctx.services.seerr.media_details("tv", tmdb_id)
     try:
         owner = await show_owner_on(ctx.services, details, host)
     except NotLocated as exc:
-        return {"followed": False, "reason": str(exc)}
+        return Result.refusal(str(exc))
     await owner.follow()
     return {"followed": True, "title": details.display, "host": owner.host}

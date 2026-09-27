@@ -23,6 +23,7 @@ from maester.clients.sonarr import Series
 from maester.notify import DirectMessage
 from maester.store import NotLinked
 from maester.tools.requests import (
+    NotRequested,
     decide_4k_request,
     follow_show,
     plan_seasons,
@@ -83,7 +84,9 @@ async def test_auto_approval_is_reported(ctx):
 async def test_a_movie_already_there_is_not_requested_again(ctx):
     seed(ctx, replace(DUNE, status=S.AVAILABLE))
     out = await request_media(ctx, 438631, "movie")
-    assert out["requested"] is False and out["status"] == "on the server"
+    assert out == Result.refusal(
+        "Nothing was requested for Dune (2021) in 1080p: it's on the server."
+    )
     assert ctx.services.seerr.requests == []
 
 
@@ -93,10 +96,14 @@ async def test_refusals_are_explained_in_plain_words(ctx):
     seerr.refusals[438631] = RequestRefused(Refusal.QUOTA, "Movie Quota exceeded.")
     seerr.quotas[4] = Quotas(Quota(10, 7, 10, 0, True), Quota(None, None, 0, None, False))
     out = await request_media(ctx, 438631, "movie")
-    assert out["requested"] is False
-    assert out["reason"].startswith("That's over this account's movie request quota: 10 of 10")
+    assert out.is_error and out.content.startswith(
+        "Seerr didn't take the request for Dune (2021): That's over this account's movie "
+        "request quota: 10 of 10"
+    )
     seerr.refusals[438631] = RequestRefused(Refusal.DUPLICATE, "exists")
-    assert (await request_media(ctx, 438631, "movie"))["reason"] == "It has already been requested."
+    assert (await request_media(ctx, 438631, "movie")) == Result.refusal(
+        "Seerr didn't take the request for Dune (2021): It has already been requested."
+    )
 
 
 async def test_an_unlinked_caller_is_refused(ctx):
@@ -115,9 +122,13 @@ async def test_tv_requests_leave_out_seasons_already_there(ctx):
         {"season": 2, "status": "requested, downloading"},
     ]
     out = await request_media(ctx, 136315, "tv", seasons=[1, 2])
-    assert out["requested"] is False and out["reason"].startswith("Every season asked for")
-    assert (await request_media(ctx, 136315, "tv", seasons=[]))["reason"] == (
-        "No seasons were asked for."
+    assert out == Result.refusal(
+        "Nothing was requested for The Bear (2022) in 1080p: Every season asked for is already "
+        "on the server or requested. (season 1 is on the server; season 2 is requested, "
+        "downloading)"
+    )
+    assert (await request_media(ctx, 136315, "tv", seasons=[])) == Result.refusal(
+        "Nothing was requested for The Bear (2022) in 1080p: no seasons were asked for."
     )
 
 
@@ -125,16 +136,19 @@ def test_season_plans():
     assert plan_seasons(BEAR, None, latest=True, is_4k=False).request == [3]
     assert plan_seasons(BEAR, [3, 3], latest=False, is_4k=False).request == [3]
     assert plan_seasons(BEAR, None, latest=False, is_4k=True).request == [1, 2, 3]
-    with pytest.raises(ValueError, match="no season \\[7\\]"):
+    with pytest.raises(NotRequested, match="no season \\[7\\]"):
         plan_seasons(BEAR, [7], latest=False, is_4k=False)
-    with pytest.raises(ValueError, match="not both"):
+    with pytest.raises(NotRequested, match="not both"):
         plan_seasons(BEAR, [3], latest=True, is_4k=False)
 
 
-async def test_seasons_are_refused_for_movies(ctx):
-    seed(ctx, DUNE)
-    with pytest.raises(ValueError, match="TV shows only"):
-        await request_media(ctx, 438631, "movie", seasons=[1])
+async def test_seasons_are_refused_for_movies_and_unknown_seasons_for_shows(ctx):
+    seed(ctx, DUNE, BEAR)
+    assert (await request_media(ctx, 438631, "movie", seasons=[1])) == Result.refusal(
+        "seasons are for TV shows only"
+    )
+    out = await request_media(ctx, 136315, "tv", seasons=[7])
+    assert out.is_error and "has no season [7]" in out.content
 
 
 async def test_4k_goes_to_the_admin_with_the_size_tradeoff(ctx):
@@ -164,7 +178,7 @@ async def test_4k_goes_to_the_admin_with_the_size_tradeoff(ctx):
 async def test_4k_without_a_4k_server_or_already_approved_needs_no_admin(ctx):
     seed(ctx, DUNE)
     out = await request_media_4k(ctx, 438631, "movie")
-    assert out == {"requested": False, "reason": "4K requests aren't set up on this server."}
+    assert out == Result.refusal("4K requests aren't set up on this server.")
     four_k_servers(ctx)
     ctx.services.seerr.auto_approve = True
     out = await request_media_4k(ctx, 438631, "movie")
@@ -190,7 +204,8 @@ async def test_decide_4k_request_approves_or_declines_in_seerr_and_tells_the_req
     assert await decide_4k_request(admin, approved=True, **first) == approved
     # Seerr went the other way in the meantime: say so, and tell nobody anything wrong.
     other_way = await decide_4k_request(admin, approved=False, **first)
-    assert "already approved in Seerr" in other_way.content and other_way.notices == ()
+    assert other_way.is_error and "already approved in Seerr" in other_way.content
+    assert other_way.notices == ()
 
     declined = await decide_4k_request(admin, approved=False, **{**first, "request_id": 2})
     assert declined.content.startswith("Declined") and "declined" in declined.notices[0].text
@@ -207,13 +222,10 @@ def bear_in(ctx, *hosts):
 async def test_follow_show_only_on_the_owning_host(ctx):
     seed(ctx, BEAR)
     out = await follow_show(ctx, 136315, "vermithor")
-    assert out["followed"] is False and "isn't in Sonarr yet" in out["reason"]
+    assert out.is_error and "isn't in Sonarr yet" in out.content
     bear_in(ctx, "vermithor")
     out = await follow_show(ctx, 136315, "meleys")
-    assert out == {
-        "followed": False,
-        "reason": "The Bear (2022) is on the Sonarr on vermithor, not meleys.",
-    }
+    assert out == Result.refusal("The Bear (2022) is on the Sonarr on vermithor, not meleys.")
     assert await follow_show(ctx, 136315, "Vermithor") == {
         "followed": True,
         "title": "The Bear (2022)",
@@ -222,7 +234,7 @@ async def test_follow_show_only_on_the_owning_host(ctx):
     assert ctx.services.sonarr["vermithor"].followed == [12]
     bear_in(ctx, "meleys")
     out = await follow_show(ctx, 136315, "vermithor")
-    assert out["followed"] is False and "meleys and vermithor both have it" in out["reason"]
+    assert out.is_error and "meleys and vermithor both have it" in out.content
 
 
 def test_4k_is_a_trusted_tool_the_friend_tier_never_sees():

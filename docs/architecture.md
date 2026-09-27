@@ -76,7 +76,7 @@ Deleting a file, blocklisting a release, issuing an invite, changing a share: al
 5. A global kill switch (`KillSwitch`, checked by the runner) disables every destructive tool immediately, including a button-only one an admin's Approve would run.
 6. Destructive runs (only button presses make them) go one at a time in the runner, the kill switch checked as each one's turn comes and each audited before the next starts, so a cap counted from the audit log can't be raced.
 
-A tool refuses one way: `Result.refusal(reason)` (a `Result` with `is_error=True`) reaches the model as an error and is audited as not ok, so a daily cap never counts it; bad arguments are refused this way at the tool boundary too. Such a failure is final unless the tool marks it `retryable` (a service that didn't answer); a raised exception always is retryable. A result can't both ask the admin and fail.
+Every tool refuses one way: `Result.refusal(reason)` (a `Result` with `is_error=True`) reaches the model as an error and is audited as not ok, so a daily cap never counts it; bad arguments are refused this way at the tool boundary too, and a caller with no Seerr link (`NotLinked`, raised by `ctx.linked_user()`) is turned into the same refusal by the runner. A refusal is for an action that can't be taken (nothing left to request, a quota, the wrong host, no evidence); a lookup that finds nothing (no search results, no open requests, no collection) answers with that. Such a failure is final unless the tool marks it `retryable` (a service that didn't answer); a raised exception always is retryable. A result can't both ask the admin and fail.
 
 The model never sees a confirmation as something it can perform; the button press is out of band.
 

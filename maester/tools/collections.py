@@ -6,13 +6,15 @@ more than one is missing. `request_collection` makes one Seerr request per
 missing entry, as the friend, and sums them up in one result. The friend's
 Seerr movie quota is checked first: a collection that needs more requests
 than the quota has left is not half-requested; the friend is told and picks.
+When nothing is requested (nothing missing, not enough quota, every request
+refused), the tool refuses (`Result.refusal`) and says why.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from maester.agent.tools import Choice, Choices, Tier, ToolContext, tool
+from maester.agent.tools import Choice, Choices, Result, Tier, ToolContext, tool
 from maester.clients.seerr import Collection, RequestRefused, RequestStatus, SearchResult
 from maester.tools.requests import explain
 from maester.tools.search import as_choice, availability
@@ -83,7 +85,7 @@ async def find_collection(ctx: ToolContext, tmdb_id: int) -> dict[str, Any] | Ch
     },
     tier=Tier.FRIEND,
 )
-async def request_collection(ctx: ToolContext, collection_id: int) -> dict[str, Any]:
+async def request_collection(ctx: ToolContext, collection_id: int) -> dict[str, Any] | Result:
     user = ctx.linked_user()
     seerr = ctx.services.seerr
     collection = await seerr.collection(collection_id)
@@ -97,17 +99,17 @@ async def request_collection(ctx: ToolContext, collection_id: int) -> dict[str, 
         ],
     }
     if not gaps:
-        return {**reply, "requested": []}
+        return Result.refusal(
+            f"Nothing was requested: every entry of {collection.name} is already on the server "
+            "or requested."
+        )
     quota = (await seerr.quota(user.seerr_user_id)).movie
     if quota.remaining is not None and len(gaps) > quota.remaining:
-        return {
-            **reply,
-            "requested": [],
-            "missing": [p.title for p in gaps],
-            "reason": f"The collection needs {len(gaps)} movie requests, but this account has "
-            f"{quota.remaining} of {quota.limit} left for the next {quota.days} days. "
-            "Ask which ones they want most.",
-        }
+        return Result.refusal(
+            f"Nothing was requested: {collection.name} needs {len(gaps)} movie requests "
+            f"({', '.join(p.title for p in gaps)}), but this account has {quota.remaining} of "
+            f"{quota.limit} left for the next {quota.days} days. Ask which ones they want most."
+        )
     requested, refused = [], []
     # One at a time: each request counts against the quota the next one sees.
     for part in gaps:
@@ -125,4 +127,7 @@ async def request_collection(ctx: ToolContext, collection_id: int) -> dict[str, 
                 "auto_approved": req.status == RequestStatus.APPROVED,
             }
         )
+    if not requested:
+        why = "; ".join(f"{r['title']}: {r['reason']}" for r in refused)
+        return Result.refusal(f"Seerr took none of {collection.name}'s requests. {why}")
     return {**reply, "requested": requested, **({"refused": refused} if refused else {})}
