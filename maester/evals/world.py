@@ -270,7 +270,6 @@ def _session(n: int, x: dict[str, Any], user_id: int) -> Session:
         video_decision=x.get("video_decision", direct),
         audio_decision=x.get("audio_decision", direct),
         subtitle_decision=x.get("subtitle_decision", ""),
-        transcode_reasons=(),
         container="mkv",
         video_codec=x.get("video_codec", "h264"),
         video_resolution="1080",

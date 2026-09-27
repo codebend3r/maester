@@ -1,7 +1,8 @@
 """Tautulli: live sessions, watch history, stream details, users and recent additions.
 
-This is where playback diagnosis gets its facts: transcode decisions and
-reasons, LAN vs WAN, relay, bandwidth. A finished play keeps only a summary
+This is where playback diagnosis gets its facts: the server's decision on
+each stream (Tautulli gives no reasons for a transcode), LAN vs WAN, relay,
+bandwidth. A finished play keeps only a summary
 in the history; `stream_data` fetches what it was sent (codecs, decisions)
 by its history row. Everything is one `/api/v2?cmd=` call.
 """
@@ -49,7 +50,6 @@ class Session:
     video_decision: str
     audio_decision: str
     subtitle_decision: str
-    transcode_reasons: tuple[str, ...]
     container: str
     video_codec: str
     video_resolution: str
@@ -89,7 +89,6 @@ class Session:
             video_decision=raw.get("stream_video_decision") or "",
             audio_decision=raw.get("stream_audio_decision") or "",
             subtitle_decision=raw.get("stream_subtitle_decision") or "",
-            transcode_reasons=tuple(r for r in (raw.get("transcode_reasons") or []) if r),
             container=raw.get("container") or "",
             video_codec=raw.get("video_codec") or "",
             video_resolution=raw.get("video_full_resolution") or raw.get("video_resolution") or "",
@@ -180,6 +179,7 @@ class StreamData:
     audio_decision: str
     subtitle_codec: str
     subtitle_decision: str  # adds "burn"; empty without subtitles
+    quality_profile: str  # "Original", or the lower quality the player asked for
 
     @classmethod
     def from_api(cls, raw: dict[str, Any]) -> StreamData:
@@ -191,6 +191,7 @@ class StreamData:
             audio_decision=raw.get("stream_audio_decision") or "",
             subtitle_codec=raw.get("subtitle_codec") or "",
             subtitle_decision=raw.get("stream_subtitle_decision") or "",
+            quality_profile=raw.get("quality_profile") or "",
         )
 
 

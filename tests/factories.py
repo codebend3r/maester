@@ -21,7 +21,7 @@ def session(**kw) -> Session:
         state="playing", progress_percent=10, platform="Roku", player="TV", product="Plex",
         location="wan", relayed=False, secure=True, bandwidth_kbps=8000, stream_bitrate_kbps=8000,
         transcode_decision="direct play", video_decision="", audio_decision="", subtitle_decision="",
-        transcode_reasons=(), container="mkv", video_codec="hevc", video_resolution="4k",
+        container="mkv", video_codec="hevc", video_resolution="4k",
         video_dynamic_range="SDR", audio_codec="eac3", audio_channels=6, subtitle_codec="",
         quality_profile="Original", file="/x.mkv",
     )  # fmt: skip

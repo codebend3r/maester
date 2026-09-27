@@ -3,14 +3,14 @@ from dataclasses import replace
 import pytest
 
 from maester.clients.tautulli import StreamData
-from maester.playback.client_limits import CLIENT_LIMITS, Playback, client_causes
-from maester.playback.plays import Play, playback_of
+from maester.playback.client_limits import CLIENT_LIMITS, client_causes
+from maester.playback.plays import Play, Playback, playback_of
 from tests.factories import history_row, session
 
 CLEAN = Playback(
     platform="Roku", product="Plex for Roku", player="Living Room", device="Roku Ultra",
-    container="mkv",
-    video_codec="hevc", video_decision="direct play", dovi_profile=0, audio_codec="eac3",
+    container="mkv", quality_profile="Original", video_codec="hevc",
+    video_decision="direct play", dovi_profile=0, audio_codec="eac3",
     audio_decision="direct play", subtitle_codec="", subtitle_decision="",
 )  # fmt: skip
 
@@ -50,26 +50,40 @@ def test_near_misses_are_not_blamed_on_the_player():
     assert names(replace(CLEAN, subtitle_codec="pgs", subtitle_decision="direct play")) == []
 
 
-def test_several_limits_come_back_in_table_order():
-    both = replace(CLEAN, dovi_profile=7, subtitle_codec="pgs", subtitle_decision="burn")
-    assert names(both) == ["dolby_vision_profile_7", "image_subtitle_burn_in"]
+def test_several_limits_come_back_in_table_order_less_what_one_explains():
+    # A real burn-in play: burning PGS in forces the HEVC video to be transcoded, which
+    # is the subtitles' doing, not a player that can't decode HEVC.
+    burn_in = replace(
+        CLEAN, dovi_profile=7, video_decision="transcode", subtitle_codec="pgs",
+        subtitle_decision="burn",
+    )  # fmt: skip
+    assert names(burn_in) == ["dolby_vision_profile_7", "image_subtitle_burn_in"]
+    assert names(replace(CLEAN, video_decision="transcode")) == ["hevc_unsupported"]
     assert len({limit.name for limit in CLIENT_LIMITS}) == len(CLIENT_LIMITS)
+
+
+def test_a_player_asking_for_less_quality_isnt_a_codec_limit():
+    """A remote player capped at 4 Mbps transcodes HEVC because of its bitrate: that's lag."""
+    capped = replace(CLEAN, video_decision="transcode", quality_profile="4 Mbps 720p")
+    assert names(capped) == []
 
 
 async def test_a_live_play_is_read_from_its_session_and_a_finished_one_from_its_stream(services):
     live = Play.from_session(
         "meleys", session(subtitle_codec="pgs", subtitle_decision="burn", dovi_profile=7)
     )
-    playback = await playback_of(services, live, file_dovi_profile=None)
+    playback = await playback_of(services, live)
     assert (playback.dovi_profile, playback.subtitle_decision) == (7, "burn")
+    assert playback.with_profile(0).dovi_profile == 7  # the play already said
 
     row = history_row(row_id=1124, platform="Chrome", product="Plex Web")
     services.tautulli["vermithor"].streams[1124] = StreamData(
-        "mkv", "hevc", "transcode", "eac3", "direct play", "", ""
+        "mkv", "hevc", "transcode", "eac3", "direct play", "", "", "Original"
     )
     finished = Play.from_history("vermithor", row)
-    playback = await playback_of(services, finished, file_dovi_profile=0)
+    playback = await playback_of(services, finished)
     assert (playback.platform, playback.video_decision, playback.dovi_profile) == (
-        "Chrome", "transcode", 0,
+        "Chrome", "transcode", None,
     )  # fmt: skip
+    assert playback.with_profile(0).dovi_profile == 0  # the file fills it in
     assert names(playback) == ["hevc_unsupported"]

@@ -98,3 +98,21 @@ class ReportKind(enum.StrEnum):
     SUBTITLES = "subtitles"
     AUDIO = "audio"
     OTHER = "other"
+
+
+class Decision(enum.StrEnum):
+    """What a report was found to be when it was filed; written once."""
+
+    ADVISED = "advised"  # a player limit explains it; the friend got the fix
+    REPLACEABLE = "replaceable"  # the evidence allowed a new copy, offered to the friend
+    RECORDED = "recorded"  # a new copy would fix it, once the evidence allows one
+    FOR_ADMIN = "for_admin"  # nothing fixes it automatically; the admin was asked
+
+
+class ReportStatus(enum.StrEnum):
+    """Where a report's replacement stands; it moves (`playback/reports.py`), never jumps."""
+
+    OPEN = "open"
+    ESCALATED = "escalated"  # over the daily cap, waiting on the admin
+    REPLACED = "replaced"
+    DECLINED = "declined"  # the admin said no to this report's replacement

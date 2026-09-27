@@ -337,3 +337,14 @@ def test_button_only_tools_are_admin_tools_hidden_from_every_tier():
     assert reg.for_tier(Tier.ADMIN) == [] and reg.get("decide").button_only
     with pytest.raises(ValueError, match="must be admin tier"):
         reg.tool("friendly", "f", DECIDE_SCHEMA, button_only=True)(decide)
+
+
+def test_a_result_is_either_an_answer_a_failure_or_a_question_for_the_admin():
+    ask = Approval("u1 wants it", "let u1", "decide_n", {"n": 1})
+    with pytest.raises(ValueError, match="isn't a failure"):
+        Result({}, approval=ask, is_error=True)
+    with pytest.raises(ValueError, match="only a failure can be retried"):
+        Result({}, retryable=True)
+    assert Result.refusal("no", AdminPost("tried")) == Result(
+        "no", (AdminPost("tried"),), is_error=True
+    )

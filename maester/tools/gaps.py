@@ -94,7 +94,7 @@ async def find_gaps(
     try:
         owner = await show_owner_on(ctx.services, details, host)
     except NotLocated as exc:
-        return {"searched": [], "reason": str(exc)}
+        return Result.refusal(str(exc))
     episodes = await owner.episodes()
     found = gaps_in(episodes, datetime.now(UTC), season)
     if found.scattered:

@@ -1,13 +1,21 @@
-"""Playback reports: who reported which file, what the checks found, what became of it."""
+"""Playback reports: who reported which file, what the checks found, what became of it.
+
+A report's `decision` is written once, when it is filed. Its `status` only
+moves through `move_report`, a compare-and-set: the move happens only from
+the statuses it names, so two presses can't both escalate one report and a
+stale read can't undo a newer move. Which moves exist is the playback
+flow's (`maester/playback/reports.py`).
+"""
 
 from __future__ import annotations
 
 import json
 import sqlite3
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
 
-from maester.media import Copy, ReportKind
+from maester.media import Copy, Decision, ReportKind, ReportStatus
 from maester.store.base import Database, now
 
 
@@ -28,10 +36,10 @@ class ReportRow:
     health: str | None  # the file check's verdict, when one ran
     diagnosis: dict[str, Any]
     description: str  # the problem in the friend's words
-    action: str
+    decision: Decision
+    status: ReportStatus
     seerr_issue_id: int | None
     resolved_at: str | None
-    replaced_at: str | None
 
 
 class Reports(Database):
@@ -50,13 +58,14 @@ class Reports(Database):
         health: str | None,
         diagnosis: dict[str, Any],
         description: str,
-        action: str,
+        decision: Decision,
     ) -> ReportRow:
         with self.transaction() as conn:
             cur = conn.execute(
                 "INSERT INTO reports (ts, discord_id, kind, title, media_type, tmdb_id, is_4k,"
-                " season, episode, rating_key, host, file_id, file_path, release_group, health,"
-                " diagnosis, description, action) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                " season, episode, rating_key, host, file_id, file_path, release_group,"
+                " health, diagnosis, description, decision)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     now(),
                     discord_id,
@@ -75,7 +84,7 @@ class Reports(Database):
                     health,
                     json.dumps(diagnosis, default=str),
                     description,
-                    action,
+                    decision,
                 ),
             )
             return self.get_report(int(cur.lastrowid))  # type: ignore[return-value]
@@ -85,17 +94,26 @@ class Reports(Database):
             r = self._conn.execute("SELECT * FROM reports WHERE id = ?", (report_id,)).fetchone()
         return self._report(r) if r else None
 
-    def update_report(
-        self, report_id: int, *, action: str | None = None, seerr_issue_id: int | None = None
-    ) -> ReportRow:
-        """Record what became of a report: its action, or the Seerr issue it opened."""
+    def set_report_issue(self, report_id: int, seerr_issue_id: int) -> ReportRow:
+        """The Seerr issue a report opened."""
         with self.transaction() as conn:
             conn.execute(
-                "UPDATE reports SET action = COALESCE(?, action),"
-                " seerr_issue_id = COALESCE(?, seerr_issue_id) WHERE id = ?",
-                (action, seerr_issue_id, report_id),
+                "UPDATE reports SET seerr_issue_id = ? WHERE id = ?", (seerr_issue_id, report_id)
             )
             return self.get_report(report_id)  # type: ignore[return-value]
+
+    def move_report(
+        self, report_id: int, from_: Iterable[ReportStatus], to: ReportStatus
+    ) -> ReportRow | None:
+        """Move a report's status to `to` only from one of `from_`; None when it wasn't there."""
+        start = list(from_)
+        marks = ", ".join("?" for _ in start)
+        with self.transaction() as conn:
+            moved = conn.execute(
+                f"UPDATE reports SET status = ? WHERE id = ? AND status IN ({marks}) RETURNING id",
+                (to, report_id, *start),
+            ).fetchone()
+            return self.get_report(report_id) if moved else None
 
     def reports_for_file(self, host: str, media_type: str, file_id: int) -> list[ReportRow]:
         """Every report about one file, oldest first: the evidence a replacement needs."""
@@ -105,15 +123,6 @@ class Reports(Database):
                 (host, media_type, file_id),
             ).fetchall()
         return [self._report(r) for r in rows]
-
-    def mark_file_replaced(self, host: str, media_type: str, file_id: int) -> None:
-        """Every report about a file that was just deleted and searched for again."""
-        with self.transaction() as conn:
-            conn.execute(
-                "UPDATE reports SET action = 'replaced', replaced_at = ?"
-                " WHERE host = ? AND media_type = ? AND file_id = ? AND replaced_at IS NULL",
-                (now(), host, media_type, file_id),
-            )
 
     def set_issue_resolved(self, seerr_issue_id: int, resolved: bool) -> list[ReportRow]:
         """Follow a Seerr issue being resolved or reopened; returns the reports that changed."""
@@ -141,8 +150,8 @@ class Reports(Database):
             health=r["health"],
             diagnosis=json.loads(r["diagnosis"]) if r["diagnosis"] else {},
             description=r["description"],
-            action=r["action"],
+            decision=Decision(r["decision"]),
+            status=ReportStatus(r["status"]),
             seerr_issue_id=r["seerr_issue_id"],
             resolved_at=r["resolved_at"],
-            replaced_at=r["replaced_at"],
         )

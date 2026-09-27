@@ -105,10 +105,12 @@ class Choices:
     """Return this from a handler to offer the user a pick instead of a plain result.
 
     At most `MAX_CHOICES` become buttons; the model is told which were left
-    off, so it never promises a button that isn't there.
+    off, so it never promises a button that isn't there. `notes` tell the
+    model what else it should know (what couldn't be looked up).
     """
 
     items: list[Choice]
+    notes: tuple[str, ...] = ()
 
     @property
     def shown(self) -> list[Choice]:
@@ -130,6 +132,8 @@ class Choices:
         }
         if left_off := self.items[MAX_CHOICES:]:
             content["not_shown"] = [f"{c.display} ({c.value})" for c in left_off]
+        if self.notes:
+            content["notes"] = list(self.notes)
         return content
 
 
@@ -156,10 +160,10 @@ class Result:
     The model sees `content`. `notices` are posted or DMed. With `approval`,
     the admin is asked and the model is told the action now waits on them.
     `is_error` marks a failure the tool explains itself (a refusal, a step
-    that failed): the model sees an error and the audit row is not ok, so a
-    daily cap never counts it. Such a failure is final unless `retryable`
-    (a service that didn't answer): only then is a button press that ended
-    this way offered again.
+    that failed): the model sees an error and the audit row is not ok. It is
+    final unless `retryable` (a service that didn't answer): only then is a
+    button press that ended this way offered again. Every refusal is one of
+    these (`refusal`), never an exception or a success that says no.
     """
 
     content: Any
@@ -167,6 +171,17 @@ class Result:
     approval: Approval | None = None
     is_error: bool = False
     retryable: bool = False
+
+    def __post_init__(self) -> None:
+        if self.approval is not None and self.is_error:
+            raise ValueError("a result that asks the admin isn't a failure")
+        if self.retryable and not self.is_error:
+            raise ValueError("only a failure can be retried")
+
+    @classmethod
+    def refusal(cls, reason: str, *notices: Notice) -> Result:
+        """The tool won't do it, and says why."""
+        return cls(reason, notices, is_error=True)
 
 
 Handler = Callable[..., Awaitable[Any]]

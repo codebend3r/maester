@@ -3,12 +3,13 @@ from dataclasses import replace
 
 import pytest
 
-from maester.agent.tools import Choices
+from maester.agent.tools import Choices, Result
+from maester.clients import FakeTautulliClient
 from maester.library import NotLocated
 from maester.media import Copy
 from maester.playback.items import locate
 from maester.playback.plays import copy_of, recent_plays
-from maester.tools.playback import list_tracks, recent_sessions
+from maester.tools.playback import NOTHING_RECENT, list_tracks, recent_sessions
 from tests.factories import history_row, session
 from tests.playback_world import BEAR, DANY, DUNE, FORKS, stock
 
@@ -55,6 +56,12 @@ async def test_recent_sessions_offers_each_play_as_its_copy_and_episode(watching
     assert dune.detail == "4K · playing now · Plex for Roku on Living Room"
     assert (bear.label, bear.value) == ("The Bear (2022) S02E07", "tv:136315:1080p:S02E07")
     assert bear.detail == "1080p · about 2 h ago · Plex Web on Chrome"
+    # What couldn't be looked up is said, not hidden behind "nothing recent".
+    assert picker.notes == (
+        "couldn't reach Tautulli on vermithor: ConnectionError: tautulli is down",
+        "couldn't tell what Gone is: Plex has no TMDB id for Gone",
+    )
+    assert picker.as_content()["notes"] == list(picker.notes)
 
 
 async def test_recent_sessions_without_plays_or_a_tautulli_match_points_to_search(watching):
@@ -63,11 +70,15 @@ async def test_recent_sessions_without_plays_or_a_tautulli_match_points_to_searc
     services.tautulli["vermithor"] = Down()
     out = await recent_sessions(watching)
     assert out["sessions"] == [] and "search_media" in out["note"]
-    assert out["unreachable"] == {"vermithor": "ConnectionError: tautulli is down"}
+    assert out["notes"] == [
+        "couldn't reach Tautulli on vermithor: ConnectionError: tautulli is down"
+    ]
+    services.tautulli["vermithor"] = FakeTautulliClient(host="vermithor")
+    assert await recent_sessions(watching) == {"sessions": [], "note": NOTHING_RECENT}
 
     watching.store.upsert_user("d1", tautulli_user_id=None)
     out = await recent_sessions(watching)
-    assert "isn't matched to a Tautulli user" in out["note"]
+    assert out.is_error and "isn't matched to a Tautulli user" in out.content
 
 
 async def test_plays_are_live_first_then_newest_and_one_per_plex_item(watching):
@@ -144,6 +155,8 @@ async def test_list_tracks_reads_the_files_own_tracks(library):
 async def test_list_tracks_says_why_when_it_cannot(library):
     library.services.probe.files.pop(FORKS)
     out = await list_tracks(library, 136315, "tv", "1080p", 2, 7)
-    assert out["tracks"] is None and out["reason"].startswith("the file couldn't be read: ")
+    assert out.is_error and out.content.startswith("The file couldn't be read: unreadable: ")
     out = await list_tracks(library, 136315, "tv", "1080p", 2, 8)
-    assert out == {"tracks": None, "reason": "The Bear (2022) S02E08 has no file on meleys"}
+    assert out == Result.refusal("The Bear (2022) S02E08 has no file on meleys")
+    out = await list_tracks(library, 438631, "movie", "4K", 1, 1)
+    assert out == Result.refusal("a movie has no season or episode")

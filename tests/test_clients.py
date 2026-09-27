@@ -161,14 +161,21 @@ async def test_seerr_issues_are_filed_as_the_user_against_seerrs_media_id():
     route = respx.post(f"{BASE}/api/v1/issue").respond(status_code=201, json={"id": 34})
     comment = respx.post(f"{BASE}/api/v1/issue/34/comment").respond(json={"id": 34})
     client = SeerrClient(BASE, "k")
-    issue = await client.create_issue(31, 1, "S02E07 freezes", 4, season=2, episode=7)
+    issue = await client.create_issue(31, 1, "S02E07 freezes", as_user=4, season=2, episode=7)
     assert issue == 34
-    assert json.loads(route.calls.last.request.content) == {
-        "issueType": 1, "message": "S02E07 freezes", "mediaId": 31, "userId": 4,
+    sent = route.calls.last.request
+    assert sent.headers["X-API-User"] == "4"  # as the friend, the way requests are made
+    assert json.loads(sent.content) == {
+        "issueType": 1, "message": "S02E07 freezes", "mediaId": 31,
         "problemSeason": 2, "problemEpisode": 7,
     }  # fmt: skip
-    await client.create_issue(12, 4, "wrong movie", 4)
-    assert "problemSeason" not in json.loads(route.calls.last.request.content)
+    await client.create_issue(12, 4, "wrong movie", as_user=None)
+    sent = route.calls.last.request
+    assert "X-API-User" not in sent.headers and "problemSeason" not in json.loads(sent.content)
+    route.respond(status_code=403, json={"message": "Forbidden"})
+    with pytest.raises(ClientError) as refused:
+        await client.create_issue(12, 4, "wrong movie", as_user=9)
+    assert refused.value.status == 403
     await client.comment_issue(34, "Replaced.")
     assert json.loads(comment.calls.last.request.content) == {"message": "Replaced."}
 
@@ -228,7 +235,7 @@ async def test_tautulli_activity_parses_the_diagnosis_fields(fixture):
     s, episode = activity.sessions
     assert activity.transcode_count == 1
     assert s.relayed and s.location == "wan"
-    assert s.subtitle_decision == "burn" and s.transcode_reasons == ("Subtitle burn-in required",)
+    assert s.subtitle_decision == "burn" and s.quality_profile == "Original"
     assert s.video_dynamic_range == "Dolby Vision" and s.audio_channels == 8
     assert (s.dovi_profile, s.device, s.season, s.show_key) == (7, "Roku Ultra", None, "")
     assert (episode.show_key, episode.season, episode.episode) == ("5120", 2, 7)

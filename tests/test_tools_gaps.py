@@ -72,8 +72,5 @@ async def test_find_gaps_for_one_season_or_a_complete_show(bear):
 
 async def test_find_gaps_only_on_the_owning_host(bear):
     out = await find_gaps(bear, 136315, "vermithor")
-    assert out == {
-        "searched": [],
-        "reason": "The Bear (2022) is on the Sonarr on meleys, not vermithor.",
-    }
+    assert out == Result.refusal("The Bear (2022) is on the Sonarr on meleys, not vermithor.")
     assert registry.get("find_gaps").host_param == "host"

@@ -21,12 +21,11 @@ import time
 from typing import Any
 
 from maester.agent.tools import Choice, Choices, Result, Tier, ToolContext, tool
-from maester.clients.media import Unreadable
 from maester.clients.seerr import MediaDetails
 from maester.formatting import humanized
 from maester.library import NotLocated
 from maester.media import Copy, copy_ref, episode_code, titled, version_label
-from maester.playback import tracks
+from maester.playback.diagnosis import FileChecked, TrackList, read_tracks
 from maester.playback.health import parse_clock
 from maester.playback.items import locate
 from maester.playback.plays import Play, copy_of, identify, recent_plays
@@ -78,35 +77,42 @@ def play_choice(play: Play, details: MediaDetails, now: float) -> Choice:
     "titles with their copy (1080p or 4K) and episode. Use it first when they report a "
     "problem without naming the title ('this won't play'), and have them confirm the "
     "title and copy before reporting it. A pick reads media_type:tmdb_id:version[:SxxEyy], "
-    "with version ? when the copy is unclear. "
-    "When it finds nothing, ask which title and use search_media.",
+    "with version ? when the copy is unclear. What couldn't be looked up is in notes. When "
+    "it finds nothing, ask which title and use search_media.",
     {"type": "object", "properties": {}, "additionalProperties": False},
     tier=Tier.FRIEND,
 )
-async def recent_sessions(ctx: ToolContext) -> dict[str, Any] | Choices:
+async def recent_sessions(ctx: ToolContext) -> dict[str, Any] | Choices | Result:
     link = ctx.linked_user()
     if link.tautulli_user_id is None:
-        return {
-            "sessions": [],
-            "note": "Your Plex account isn't matched to a Tautulli user, so what you watched "
-            f"can't be looked up. {NOTHING_RECENT}",
-        }
+        return Result.refusal(
+            "Their Plex account isn't matched to a Tautulli user, so what they watched can't "
+            f"be looked up. {NOTHING_RECENT}"
+        )
     found = await recent_plays(ctx.services, link.tautulli_user_id)
     titles = await asyncio.gather(
         *(identify(ctx.services, p) for p in found.plays), return_exceptions=True
     )
     now = time.time()
-    choices = [
-        play_choice(play, details, now)
-        for play, details in zip(found.plays, titles, strict=True)
-        if isinstance(details, MediaDetails)
-    ]
+    choices, notes = (
+        [],
+        [f"couldn't reach Tautulli on {h}: {why}" for h, why in found.unreachable.items()],
+    )
+    for play, title in zip(found.plays, titles, strict=True):
+        match title:
+            case MediaDetails():
+                choices.append(play_choice(play, title, now))
+            case BaseException():
+                notes.append(f"couldn't tell what {play.title} is: {title}")
     if choices:
-        return Choices(choices)
-    reply: dict[str, Any] = {"sessions": [], "note": NOTHING_RECENT}
-    if found.unreachable:
-        reply["unreachable"] = found.unreachable
-    return reply
+        return Choices(choices, tuple(notes))
+    if notes:
+        return {
+            "sessions": [],
+            "notes": notes,
+            "note": f"Some plays couldn't be read. {NOTHING_RECENT}",
+        }
+    return {"sessions": [], "note": NOTHING_RECENT}
 
 
 @tool(
@@ -125,18 +131,20 @@ async def list_tracks(
     version: str,
     season: int | None = None,
     episode: int | None = None,
-) -> dict[str, Any]:
-    copy = Copy.of(media_type, tmdb_id, version, season, episode)
+) -> dict[str, Any] | Result:
+    try:
+        copy = Copy.of(media_type, tmdb_id, version, season, episode)
+    except ValueError as bad:  # arguments that name no copy
+        return Result.refusal(str(bad))
     try:
         located = await locate(ctx.services, copy)
     except NotLocated as exc:
-        return {"tracks": None, "reason": str(exc)}
-    reply: dict[str, Any] = {"title": located.title, "version": copy.version}
-    try:
-        inspection = await ctx.services.probe.inspect(located.file.path)
-    except Unreadable as exc:
-        return {**reply, "tracks": None, "reason": f"the file couldn't be read: {exc}"}
-    return {**reply, **tracks.listing(inspection.tracks)}
+        return Result.refusal(str(exc))
+    match await read_tracks(ctx.services.probe, located):
+        case TrackList() as found:
+            return {"title": located.title, "version": copy.version, **found.as_dict()["tracks"]}
+        case FileChecked(health=health):
+            return Result.refusal(f"The file couldn't be read: {health.summary}")
 
 
 @tool(
@@ -174,14 +182,17 @@ async def report_problem(
     season: int | None = None,
     episode: int | None = None,
     at: str | None = None,
-) -> dict[str, Any] | Result:
-    copy = Copy.of(media_type, tmdb_id, version, season, episode)
-    moment = parse_clock(at) if at else None
+) -> Result:
+    try:
+        copy = Copy.of(media_type, tmdb_id, version, season, episode)
+        moment = parse_clock(at) if at else None
+    except ValueError as bad:  # arguments that name no copy, or no time
+        return Result.refusal(str(bad))
     link = ctx.linked_user()
     try:
         located = await locate(ctx.services, copy)
     except NotLocated as exc:
-        return {"reported": False, "reason": str(exc)}
+        return Result.refusal(str(exc))
     filed = await file_report(
         ctx.services, ctx.store, link, located, ReportKind(kind), description, moment
     )

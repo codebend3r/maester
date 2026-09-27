@@ -12,33 +12,71 @@ from maester.clients.arr import HistoryEvent, MediaFile
 from maester.clients.media import Inspection
 from maester.clients.radarr import Movie
 from maester.config import Guardrails
-from maester.media import Copy
+from maester.media import Copy, Decision, ReportKind, ReportStatus
 from maester.notify import AdminPost, ApprovalPost, DirectMessage
-from maester.playback.reports import Action, ReportKind
-from maester.tools.replace import decide_replacement, replace_media
+from maester.tools.replace import replace_media
 from tests.playback_world import DUNE_4K, DUNE_4K_ITEM, FORKS, FORKS_ITEM, link_pal, report, stock
 
 RELEASE = "Dune.2021.2160p.UHD.BluRay.REMUX.DV.HDR.TrueHD.7.1-FraMeSToR"
+FORKS_RELEASE = "The.Bear.S02E07.1080p.WEB.h264-NTb"
+DUNE_1080 = "/Meleys/Movies/Dune (2021)/Dune (2021) Bluray-1080p.mkv"
 
 
 @pytest.fixture
 def library(ctx):
-    """Dune 4K on vermithor came from one grab, imported as file 55."""
+    """Dune 4K on vermithor and 1080p on meleys, and The Bear S02E07: each from one grab."""
     stock(ctx)
     ctx.services.radarr["vermithor"].events[8] = [
         HistoryEvent(901, "downloadFolderImported", RELEASE, "2026-09-01T10:00:00Z", "sab_1", "", 55),
         HistoryEvent(900, "grabbed", RELEASE, "2026-09-01T09:00:00Z", "sab_1", ""),
         HistoryEvent(800, "grabbed", "Dune.2021.older-GRP", "2026-08-01T09:00:00Z", "sab_0", ""),
     ]  # fmt: skip
+    meleys = ctx.services.radarr["meleys"]
+    meleys.movie_list = [Movie(8, "Dune", 438631, 2021, "", True, True, 44)]
+    meleys.files = [MediaFile(44, DUNE_1080, 14_000_000_000, "Bluray-1080p", "FLUX", 8)]
+    meleys.events[8] = [
+        HistoryEvent(71, "downloadFolderImported", "Dune.1080p", "2026-09-01", "sab_9", "", 44),
+        HistoryEvent(70, "grabbed", "Dune.1080p", "2026-09-01", "sab_9", ""),
+    ]  # fmt: skip
+    ctx.services.probe.files[DUNE_1080] = Inspection(DUNE_1080, 9331.0, "h264", 0, ())
     return ctx
 
 
-async def broken(ctx, item=DUNE_4K_ITEM, path=DUNE_4K):
+def with_forks_history(ctx):
+    ctx.services.sonarr["meleys"].events[12] = [
+        HistoryEvent(31, "downloadFolderImported", FORKS_RELEASE, "2026-09-02", "sab_7", "", 72, 702),
+        HistoryEvent(30, "grabbed", FORKS_RELEASE, "2026-09-01", "sab_7", "", None, 702),
+    ]  # fmt: skip
+
+
+def capped(ctx, cap):
+    return replace(
+        ctx, settings=replace(ctx.settings, guardrails=Guardrails(replace_daily_cap=cap))
+    )
+
+
+async def broken(ctx, copy=DUNE_4K_ITEM, path=DUNE_4K):
     """A report whose file check failed: replaceable on the evidence alone."""
     ctx.services.probe.errors[path] = ("[hevc @ 0x1] Invalid NAL unit size",)
-    filed = await report(ctx, item, ReportKind.WONT_PLAY, "freezes", at=4350.0)
-    assert filed.report.action == Action.REPLACEABLE
+    filed = await report(ctx, copy, ReportKind.WONT_PLAY, "freezes", at=4350.0)
+    assert filed.report.decision is Decision.REPLACEABLE
     return filed.report
+
+
+async def confirmed(ctx, runner, reported):
+    """replace_media as the model asks for it, then the friend's Confirm, through the runner."""
+    asked = await runner.run(
+        ctx, "replace_media", {"report_id": reported.id, "host": reported.host}
+    )
+    assert asked.content["status"] == "awaiting_confirmation"
+    pending = ctx.store.decide_pending(asked.pending_id, "approved", ctx.user_id)
+    return await runner.run_decision(ctx, pending, True)
+
+
+async def use_up_the_cap(ctx, runner):
+    """A cap of one, spent on a real confirmed replacement of another file."""
+    await confirmed(ctx, runner, await broken(ctx, Copy("movie", 438631, False), DUNE_1080))
+    assert ctx.services.radarr["meleys"].deleted == [44]
 
 
 async def test_a_proven_report_blocklists_deletes_and_searches_on_the_owning_host(library):
@@ -64,21 +102,15 @@ async def test_a_proven_report_blocklists_deletes_and_searches_on_the_owning_hos
     )
     assert "Reported by dany." in notice.text and notice.text.endswith("Seerr issue #1.")
     stored = library.store.get_report(reported.id)
-    assert stored.action == Action.REPLACED and stored.replaced_at is not None
+    assert stored.status is ReportStatus.REPLACED and stored.decision is Decision.REPLACEABLE
     assert library.services.seerr.issues[0]["comments"] == [out.content]
 
 
-FORKS_RELEASE = "The.Bear.S02E07.1080p.WEB.h264-NTb"
-
-
 async def test_an_episode_file_is_replaced_with_every_episode_it_held(library):
-    sonarr = library.services.sonarr["meleys"]
-    sonarr.events[12] = [
-        HistoryEvent(31, "downloadFolderImported", FORKS_RELEASE, "2026-09-02", "sab_7", "", 72, 702),
-        HistoryEvent(30, "grabbed", FORKS_RELEASE, "2026-09-01", "sab_7", "", None, 702),
-    ]  # fmt: skip
+    with_forks_history(library)
     reported = await broken(library, FORKS_ITEM, FORKS)
     out = await replace_media(library, reported.id, "meleys")
+    sonarr = library.services.sonarr["meleys"]
     assert (sonarr.failed, sonarr.deleted, sonarr.searched) == ([30], [72], [[702]])
     assert out.content.startswith("Replacing the 1080p copy of The Bear (2022) S02E07 on meleys")
 
@@ -151,85 +183,90 @@ async def test_a_failed_delete_stops_before_the_search_and_says_so(library):
     assert out.content.endswith("Nothing was deleted; the admin has been told.")
     (notice,) = out.notices
     assert notice.text.startswith("Replacing the 4K copy of Dune (2021) on vermithor stopped")
-    assert library.store.get_report(reported.id).action == Action.REPLACEABLE
-
-
-def use_up_the_cap(ctx, n=3):
-    for _ in range(n):
-        ctx.store.audit(discord_id="x", tool="replace_media", args={}, result="", ok=True)
+    assert library.store.get_report(reported.id).status is ReportStatus.OPEN
 
 
 async def test_over_the_daily_cap_the_admin_decides(library):
-    reported = await broken(library)
-    use_up_the_cap(library)
-    out = await replace_media(library, reported.id, "vermithor")
-    assert out.approval.decide == "decide_replacement"
-    assert out.approval.args == {"report_id": reported.id, "host": "vermithor", "requester": "d1"}
-    assert out.approval.notice.startswith(
+    ctx, runner = capped(library, 1), ToolRunner(registry)
+    await use_up_the_cap(ctx, runner)
+    reported = await broken(ctx)
+    asked = await confirmed(ctx, runner, reported)
+    (post,) = asked.notices  # the approval is the admin's one notice
+    assert isinstance(post, ApprovalPost)
+    assert post.text.startswith(
         "dany asks to replace the 4K copy of Dune (2021) on vermithor (won't play; a file check"
     )
-    assert "The daily cap of 3 replacements is used up" in out.approval.notice
-    assert library.services.radarr["vermithor"].deleted == []
-    assert library.store.get_report(reported.id).action == Action.ESCALATED
+    assert "The daily cap of 1 replacements is used up" in post.text
+    assert ctx.services.radarr["vermithor"].deleted == []
+    assert ctx.store.get_report(reported.id).status is ReportStatus.ESCALATED
     # While it waits on the admin, asking again doesn't ask twice.
-    again = await replace_media(library, reported.id, "vermithor")
-    assert (
-        again.content
-        == f"Report {reported.id} can't be acted on: it's already waiting on the admin."
+    again = await confirmed(ctx, runner, reported)
+    assert again.is_error and again.content == (
+        f"Report {reported.id} can't be acted on: it's already waiting on the admin."
     )
 
-    admin = replace(library, user_id="boss", tier=Tier.ADMIN)
-    approved = await decide_replacement(admin, reported.id, "vermithor", "d1", approved=True)
-    assert library.services.radarr["vermithor"].deleted == [55]
+    admin = replace(ctx, user_id="boss", tier=Tier.ADMIN)
+    approval = ctx.store.decide_pending(post.pending_id, "approved", "boss")
+    approved = await runner.run_decision(admin, approval, True)
+    assert ctx.services.radarr["vermithor"].deleted == [55]
     notice, dm = approved.notices
     assert isinstance(notice, AdminPost) and notice.text.startswith("Deleted ")
-    assert dm == DirectMessage("d1", approved.content)
+    assert dm == DirectMessage("d1", approved.text)
+    assert ctx.store.get_report(reported.id).status is ReportStatus.REPLACED
 
 
-async def test_an_admins_no_stands_for_the_file(library):
-    reported = await broken(library)
-    use_up_the_cap(library)
-    await replace_media(library, reported.id, "vermithor")
-    admin = replace(library, user_id="boss", tier=Tier.ADMIN)
-    denied = await decide_replacement(admin, reported.id, "vermithor", "d1", approved=False)
+async def test_an_admins_no_covers_that_report_only(library):
+    ctx, runner = capped(library, 1), ToolRunner(registry)
+    await use_up_the_cap(ctx, runner)
+    reported = await broken(ctx)
+    (post,) = (await confirmed(ctx, runner, reported)).notices
+    admin = replace(ctx, user_id="boss", tier=Tier.ADMIN)
+    denial = ctx.store.decide_pending(post.pending_id, "denied", "boss")
+    denied = await runner.run_decision(admin, denial, False)
     assert denied.notices == (
         DirectMessage("d1", "The admin decided not to replace Dune (2021) in 4K for now; your report stays open in Seerr."),
     )  # fmt: skip
-    assert library.store.get_report(reported.id).action == Action.DECLINED
-    # The next day, under the cap: neither the same report nor a new one replaces it.
-    library.store._conn.execute("DELETE FROM audit_log")
-    out = await replace_media(library, reported.id, "vermithor")
+    assert ctx.store.get_report(reported.id).status is ReportStatus.DECLINED
+    # Under a bigger cap, that report still can't be replaced...
+    roomy = capped(ctx, 10)
+    out = await replace_media(roomy, reported.id, "vermithor")
     assert out.content.endswith("the admin decided not to replace it.")
-    link_pal(library)
-    pal = await report(library, DUNE_4K_ITEM, ReportKind.WONT_PLAY, user="d2")
-    assert pal.report.action == Action.RECORDED
-    assert library.services.radarr["vermithor"].deleted == []
+    # ...but it doesn't speak for the file: a new report stands on its own evidence.
+    link_pal(ctx)
+    pal = await report(roomy, DUNE_4K_ITEM, ReportKind.WONT_PLAY, user="d2")
+    assert pal.report.decision is Decision.REPLACEABLE  # its own file check failed
+    assert ctx.services.radarr["vermithor"].deleted == []
+
+
+async def test_an_approval_that_lapsed_leaves_the_report_open_again(library):
+    ctx, runner = capped(library, 1), ToolRunner(registry)
+    await use_up_the_cap(ctx, runner)
+    reported = await broken(ctx)
+    (post,) = (await confirmed(ctx, runner, reported)).notices
+    ctx.store.decide_pending(post.pending_id, "expired", "maester")  # no button left
+    out = await replace_media(capped(ctx, 10), reported.id, "vermithor")
+    assert not out.is_error and ctx.services.radarr["vermithor"].deleted == [55]
+
+
+async def test_an_approved_replacement_that_stops_for_good_reopens_the_report(library):
+    ctx, runner = capped(library, 1), ToolRunner(registry)
+    await use_up_the_cap(ctx, runner)
+    reported = await broken(ctx, FORKS_ITEM, FORKS)  # no grab in Sonarr's history
+    (post,) = (await confirmed(ctx, runner, reported)).notices
+    admin = replace(ctx, user_id="boss", tier=Tier.ADMIN)
+    approval = ctx.store.decide_pending(post.pending_id, "approved", "boss")
+    stopped = await runner.run_decision(admin, approval, True)
+    assert stopped.is_error and not stopped.retryable
+    assert ctx.store.get_report(reported.id).status is ReportStatus.OPEN
 
 
 async def test_two_confirmations_at_once_cannot_both_slip_under_the_cap(library):
-    ctx = replace(
-        library, settings=replace(library.settings, guardrails=Guardrails(replace_daily_cap=1))
-    )
+    ctx, runner = capped(library, 1), ToolRunner(registry)
     first = await broken(ctx)
-    ctx.services.radarr["meleys"].files = [
-        MediaFile(44, "/Meleys/Movies/Dune.mkv", 1, "Bluray-1080p", None, 8)
-    ]
-    ctx.services.radarr["meleys"].movie_list = [Movie(8, "Dune", 438631, 2021, "", True, True, 44)]
-    ctx.services.radarr["meleys"].events[8] = [
-        HistoryEvent(71, "downloadFolderImported", "Dune.1080p", "2026-09-01", "sab_9", "", 44),
-        HistoryEvent(70, "grabbed", "Dune.1080p", "2026-09-01", "sab_9", ""),
-    ]  # fmt: skip
-    ctx.services.probe.files["/Meleys/Movies/Dune.mkv"] = Inspection(
-        "/Meleys/Movies/Dune.mkv", 9300.0, "h264", 0, ()
-    )
-    second = await broken(ctx, Copy("movie", 438631, False), "/Meleys/Movies/Dune.mkv")
+    second = await broken(ctx, Copy("movie", 438631, False), DUNE_1080)
     for radarr in ctx.services.radarr.values():  # a real arr answers later, letting others run
         radarr.history = pausing(radarr.history)
-    runner = ToolRunner(registry)
-    both = await asyncio.gather(
-        runner.run_decision(ctx, *await confirmed(ctx, runner, first)),
-        runner.run_decision(ctx, *await confirmed(ctx, runner, second)),
-    )
+    both = await asyncio.gather(confirmed(ctx, runner, first), confirmed(ctx, runner, second))
     assert sorted(o.approval_id is not None for o in both) == [False, True]
     deleted = ctx.services.radarr["vermithor"].deleted + ctx.services.radarr["meleys"].deleted
     assert len(deleted) == 1
@@ -243,78 +280,54 @@ def pausing(call):
     return paused
 
 
-async def confirmed(ctx, runner, reported):
-    asked = await runner.run(
-        ctx, "replace_media", {"report_id": reported.id, "host": reported.host}
-    )
-    return ctx.store.decide_pending(asked.pending_id, "approved", ctx.user_id), True
-
-
-async def test_the_cap_counts_only_replacements_friends_confirmed(library):
-    ctx = replace(
-        library, settings=replace(library.settings, guardrails=Guardrails(replace_daily_cap=1))
-    )
-    reported = await broken(ctx)
-    # A refusal, and a replacement the admin approved, leave the day's cap alone.
-    ctx.store.audit(discord_id="x", tool="replace_media", args={}, result="", ok=False)
-    ctx.store.audit(discord_id="x", tool="decide_replacement", args={}, result="", ok=True)
-    assert not (await replace_media(ctx, reported.id, "vermithor")).is_error
-
-
-async def through_the_runner(ctx, kill=None):
-    """replace_media as the model asks for it: a confirmation, then the friend's press."""
-    runner = ToolRunner(registry, kill_switch=kill or KillSwitch())
-    reported = await broken(ctx)
-    asked = await runner.run(ctx, "replace_media", {"report_id": reported.id, "host": "vermithor"})
-    assert asked.content["status"] == "awaiting_confirmation"
-    pending = ctx.store.decide_pending(asked.pending_id, "approved", ctx.user_id)
-    return runner, reported, pending
-
-
 async def test_a_confirmed_replacement_is_audited_and_counted_once(library):
-    runner, _, pending = await through_the_runner(library)
-    done = await runner.run_decision(library, pending, True)
-    assert not done.is_error and library.services.radarr["vermithor"].deleted == [55]
+    ctx, runner = capped(library, 1), ToolRunner(registry)
+    done = await confirmed(ctx, runner, await broken(ctx))
+    assert not done.is_error and ctx.services.radarr["vermithor"].deleted == [55]
     # The tool's own account of the delete; no second "confirmed" post.
     (notice,) = done.notices
     assert notice.text.startswith("Deleted ")
-    row = library.store.audit_recent(1)[0]
+    row = ctx.store.audit_recent(1)[0]
     assert (row.tool, row.host, row.ok) == ("replace_media", "vermithor", True)
     assert "- delete: deleted" in row.result
+    assert ctx.store.audit_count_since("replace_media", datetime.now(UTC) - timedelta(1)) == 1
 
 
-async def test_a_confirmed_replacement_over_the_cap_asks_the_admin_once(library):
-    use_up_the_cap(library)
-    runner, _, pending = await through_the_runner(library)
-    asked = await runner.run_decision(library, pending, True)
-    assert asked.approval_id is not None and library.services.radarr["vermithor"].deleted == []
-    (post,) = asked.notices  # the approval is the admin's one notice
-    assert isinstance(post, ApprovalPost) and post.pending_id == asked.approval_id
-    # Asking didn't act, so the day still holds the three it had.
-    assert library.store.audit_count_since("replace_media", datetime.now(UTC) - timedelta(1)) == 3
+async def test_asking_the_admin_and_their_approval_leave_the_friends_count_alone(library):
+    ctx, runner = capped(library, 1), ToolRunner(registry)
+    await use_up_the_cap(ctx, runner)
+    (post,) = (await confirmed(ctx, runner, await broken(ctx))).notices
+    admin = replace(ctx, user_id="boss", tier=Tier.ADMIN)
+    await runner.run_decision(
+        admin, ctx.store.decide_pending(post.pending_id, "approved", "boss"), True
+    )
+    assert ctx.services.radarr["vermithor"].deleted == [55]
+    assert ctx.store.audit_count_since("replace_media", datetime.now(UTC) - timedelta(1)) == 1
 
 
 async def test_the_kill_switch_stops_replace_media_directly_and_through_an_approval(library):
     kill = KillSwitch()
-    runner, reported, pending = await through_the_runner(library, kill)
+    ctx, runner = capped(library, 1), ToolRunner(registry, kill_switch=kill)
+    await use_up_the_cap(ctx, runner)
+    reported = await broken(ctx)
+    asked = await runner.run(ctx, "replace_media", {"report_id": reported.id, "host": "vermithor"})
+    confirm = ctx.store.decide_pending(asked.pending_id, "approved", "d1")
     kill.on("bad day")
-    held = await runner.run_decision(library, pending, True)
+    held = await runner.run_decision(ctx, confirm, True)
     assert held.is_error and held.retryable and "bad day" in held.content
     refused = await runner.run(
-        library, "replace_media", {"report_id": reported.id, "host": "vermithor"}
+        ctx, "replace_media", {"report_id": reported.id, "host": "vermithor"}
     )
     assert refused.is_error and "disabled" in refused.content
 
-    admin = replace(library, user_id="boss", tier=Tier.ADMIN)
-    approval = library.store.create_pending(
-        kind="approve", action="decide_replacement", requester="d1",
-        payload={"report_id": reported.id, "host": "vermithor", "requester": "d1"},
-        summary="Replace Dune", ttl=timedelta(days=1),
-    )  # fmt: skip
-    decided = library.store.decide_pending(approval.id, "approved", "boss")
-    held = await runner.run_decision(admin, decided, True)
+    kill.off()
+    (post,) = (await confirmed(ctx, runner, reported)).notices  # over the cap: the admin decides
+    kill.on("bad day")
+    admin = replace(ctx, user_id="boss", tier=Tier.ADMIN)
+    approval = ctx.store.decide_pending(post.pending_id, "approved", "boss")
+    held = await runner.run_decision(admin, approval, True)
     assert held.is_error and held.retryable and "decide_replacement is disabled" in held.content
-    assert library.services.radarr["vermithor"].deleted == []
+    assert ctx.services.radarr["vermithor"].deleted == []
 
 
 def test_replacement_tools_are_destructive_and_the_decision_is_the_admins():

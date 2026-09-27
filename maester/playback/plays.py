@@ -6,7 +6,8 @@ sessions and last few finished plays; a host that can't answer is named
 instead of hiding the others. Tautulli knows a Plex item, not a title, so
 `identify` reads the item's TMDB id from Plex and asks Seerr for the title,
 and `copy_of` tells from Seerr's Plex keys whether the item is the 1080p or
-the 4K copy. `playback_of` reads how a play went, for the client check.
+the 4K copy. `playback_of` reads how a play went (`Playback`), for the
+player check and for explaining lag.
 
 Tautulli keeps a play in its history only once it stops and outlasts the
 ignore interval, so a play that failed at once may not be here at all; the
@@ -16,16 +17,86 @@ friend is then asked for the title.
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, replace
+from typing import Any
 
 from maester.clients import Services
 from maester.clients.seerr import MediaDetails
-from maester.clients.tautulli import HistoryRow, Session, Tautulli
+from maester.clients.tautulli import HistoryRow, Session, StreamData, Tautulli
 from maester.media import Copy
-from maester.playback.client_limits import Playback
 
 # Finished plays asked of each host.
 RECENT = 5
+
+
+@dataclass(frozen=True)
+class Playback:
+    """One play's facts: the client, what the file holds, and what the server did with it."""
+
+    platform: str  # "Roku", "Chrome", "Android"
+    product: str  # "Plex for Roku", "Plex Web"
+    player: str  # the player's name, often the hardware's: "SHIELD Android TV"
+    device: str  # the hardware, from a live session; empty for a finished play
+    container: str
+    quality_profile: str  # "Original", or the lower quality the player asked for
+    video_codec: str
+    video_decision: str  # "direct play" | "copy" | "transcode"
+    dovi_profile: int | None  # the file's Dolby Vision profile: 0 for none, None if unknown
+    audio_codec: str
+    audio_decision: str
+    subtitle_codec: str
+    subtitle_decision: str  # adds "burn"; empty without subtitles
+
+    @classmethod
+    def from_session(cls, s: Session) -> Playback:
+        """A live play: Tautulli knows all of it, the file's Dolby Vision profile included."""
+        return cls(
+            platform=s.platform,
+            product=s.product,
+            player=s.player,
+            device=s.device,
+            container=s.container,
+            quality_profile=s.quality_profile,
+            video_codec=s.video_codec,
+            video_decision=s.video_decision,
+            dovi_profile=s.dovi_profile,
+            audio_codec=s.audio_codec,
+            audio_decision=s.audio_decision,
+            subtitle_codec=s.subtitle_codec,
+            subtitle_decision=s.subtitle_decision,
+        )
+
+    @classmethod
+    def from_history(cls, row: HistoryRow, stream: StreamData) -> Playback:
+        """A finished play: its history row and stream data. Tautulli keeps no Dolby Vision
+        profile for it; `with_profile` fills that in from the file."""
+        return cls(
+            platform=row.platform,
+            product=row.product,
+            player=row.player,
+            device="",
+            container=stream.container,
+            quality_profile=stream.quality_profile,
+            video_codec=stream.video_codec,
+            video_decision=stream.video_decision,
+            dovi_profile=None,
+            audio_codec=stream.audio_codec,
+            audio_decision=stream.audio_decision,
+            subtitle_codec=stream.subtitle_codec,
+            subtitle_decision=stream.subtitle_decision,
+        )
+
+    @property
+    def hardware(self) -> str:
+        """What names the hardware: the device, and the player's name, which often says it."""
+        return f"{self.device} {self.player}".lower()
+
+    def with_profile(self, dovi_profile: int) -> Playback:
+        """The file's Dolby Vision profile, where the play didn't say."""
+        return self if self.dovi_profile is not None else replace(self, dovi_profile=dovi_profile)
+
+    def as_dict(self) -> dict[str, Any]:
+        return asdict(self)
 
 
 @dataclass(frozen=True)
@@ -143,12 +214,12 @@ def copy_of(details: MediaDetails, plex_key: str) -> bool | None:
     return None if standard == uhd else uhd
 
 
-async def playback_of(services: Services, play: Play, file_dovi_profile: int | None) -> Playback:
-    """How a play went. A live session says it all; a finished play's streams are read
-    by its history row, and its Dolby Vision profile comes from the file."""
+async def playback_of(services: Services, play: Play) -> Playback:
+    """How a play went: a live session says it all; a finished play's streams are read
+    by its history row."""
     match play.source:
         case Session() as live:
             return Playback.from_session(live)
         case HistoryRow() as row:
             stream = await services.tautulli[play.host].stream_data(row.row_id)
-            return Playback.from_history(row, stream, file_dovi_profile)
+            return Playback.from_history(row, stream)

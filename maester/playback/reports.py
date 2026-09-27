@@ -1,170 +1,59 @@
 """A playback report: one model and one flow, from what a friend said to what was decided.
 
 A report is about one copy's file (`items.py`) and has a kind. The kind's
-policy (`POLICIES`, data rather than branches) says how it is diagnosed and
-whether a new copy fixes it:
+policy (`POLICIES`, data rather than branches) names how it is diagnosed
+(`diagnosis.py`) and whether a new copy fixes it. A friend who already got
+a player fix for this file is diagnosed with the policy's `after_advice`
+strategy instead, so a fix can't shield a broken file for good.
 
-- `wont_play` checks the player first (`client_limits.py`): a known limit
-  gets its fix and nothing else happens. Only when the player explains
-  nothing is the file's health checked (`health.py`).
-- `subtitles` and `audio` read the file's tracks. Nothing fixes tracks
-  automatically, so the admin is asked.
-- the wrong-file kinds (`wrong_title`, `wrong_episode`, `cam`,
-  `hardcoded_subs`) and `other` have nothing to measure: the friend's word
-  is the evidence.
+The report is filed with its `Decision`, written once and made from stored
+evidence only (`Evidence`): a replaceable kind whose file failed a health
+check, or that two or more people reported, may be replaced (`replace.py`);
+a replaceable kind short of that is recorded; anything else goes to the
+admin. A report the player explains doesn't testify, nor does one whose
+Seerr issue was resolved or whose replacement the admin declined. How each
+decision reads, to the Seerr issue and to the model, is data (`WORDING`).
 
-A player fix must not shield a broken file for good: a friend who already
-got one for this file and reports it again has the file checked instead.
+A report's replacement then moves through statuses (`ReportStatus`) by the
+moves defined here (`ESCALATE`, `DECLINE`, `REOPEN`, `REPLACE`), each a
+compare-and-set in the store, and who may start a replacement from which
+status is `MAY_REPLACE`. The admin's no covers that
+one report: a later report of the same file stands on its own evidence.
 
-The report is then stored and decided (`Action`), from stored evidence
-only (`Evidence`): a replaceable kind whose file failed a health check, or
-that two or more people reported, may be replaced (`replace.py`); a
-replaceable kind short of that is recorded, and anything else goes to the
-admin. A report the player explains doesn't count as a reporter, a report
-whose issue was resolved no longer speaks for the file, and an admin's "no"
-to replacing the file stands for it. What each decision means downstream
-(its Seerr issue line, the model's next step, whether it shows evidence or
-asks the admin) is data (`WORDING`).
 Every report opens a Seerr issue as the friend, with the diagnosis and the
-decision, so the admin's trail is in a tool they already use; resolving it
-there marks the report resolved (`seerr_events.py`).
+decision, so the admin's trail is in a tool they already use. When Seerr
+won't let the friend open issues, maester files it with its own key and
+names them. Resolving the issue in Seerr marks the report resolved
+(`seerr_events.py`).
 """
 
 from __future__ import annotations
 
 import enum
-from collections.abc import Awaitable, Callable, Iterable
+from collections.abc import Iterable
 from dataclasses import dataclass, replace
 from typing import Any
 
 from maester.clients import ClientError, Services
-from maester.clients.media import Track, Unreadable
 from maester.clients.seerr import ISSUE_AUDIO, ISSUE_OTHER, ISSUE_SUBTITLE, ISSUE_VIDEO
-from maester.media import ReportKind
+from maester.media import Decision, ReportKind, ReportStatus
 from maester.notify import AdminPost, Notice
-from maester.playback import tracks
-from maester.playback.client_limits import ClientLimit, Playback, client_causes
-from maester.playback.health import Health, check_health
+from maester.playback.diagnosis import (
+    Case,
+    Diagnose,
+    Diagnosis,
+    PlayerLimit,
+    by_their_word,
+    file_only,
+    player_then_file,
+    track_listing,
+)
+from maester.playback.health import Health
 from maester.playback.items import LocatedFile
-from maester.playback.plays import playback_of, recent_plays
 from maester.store import LinkedUser, ReportRow, Store
 
 # How many people reporting one file prove it needs a new copy.
 REPORTERS_TO_REPLACE = 2
-
-
-class Action(enum.StrEnum):
-    """What became of a report."""
-
-    ADVISED = "advised"  # a player limit explains it; the friend got the fix
-    REPLACEABLE = "replaceable"  # the evidence allows a new copy; offered to the friend
-    RECORDED = "recorded"  # a new copy would fix it, once the evidence allows one
-    FOR_ADMIN = "for_admin"  # nothing fixes it automatically; the admin was asked
-    ESCALATED = "escalated"  # a replacement waits on the admin (over the daily cap)
-    REPLACED = "replaced"
-    DECLINED = "declined"  # the admin turned the replacement down
-
-
-@dataclass(frozen=True)
-class Diagnosis:
-    """What the checks found; a field left empty wasn't checked."""
-
-    player: str = ""  # which play the player check read, or why there was none
-    playback: Playback | None = None
-    causes: tuple[ClientLimit, ...] = ()
-    health: Health | None = None
-    tracks: tuple[Track, ...] = ()
-
-    def summary(self) -> str:
-        if self.causes:
-            return " ".join(f"Player limit: {c.cause} Fix: {c.fix}" for c in self.causes)
-        if self.health:
-            return f"File check: {self.health.summary}."
-        if self.tracks:
-            return f"The file has {len(self.tracks)} audio and subtitle tracks (listed below)."
-        return "Nothing to measure; the report itself is the evidence."
-
-    def as_dict(self) -> dict[str, Any]:
-        checked: dict[str, Any] = {}
-        if self.player:
-            checked["player_check"] = self.player
-        if self.playback:
-            checked["playback"] = self.playback.as_dict()
-        if self.causes:
-            checked["player_causes"] = [c.as_dict() for c in self.causes]
-        if self.health:
-            checked["file_check"] = self.health.as_dict()
-        if self.tracks:
-            checked["tracks"] = tracks.listing(self.tracks)
-        return checked
-
-
-@dataclass(frozen=True)
-class Case:
-    """What a diagnosis works from."""
-
-    services: Services
-    link: LinkedUser
-    located: LocatedFile
-    at: float | None  # the moment the friend named, in seconds
-    advised: bool  # they already had a player fix for this file, so it's the file's turn
-
-
-Diagnose = Callable[[Case], Awaitable[Diagnosis]]
-
-
-async def _last_play(case: Case, dovi_profile: int | None) -> tuple[str, Playback | None]:
-    """The friend's latest play of this copy, as the player check reads it, or why there's none."""
-    services, link, located = case.services, case.link, case.located
-    if link.tautulli_user_id is None:
-        return "not checked: their Plex account isn't matched to a Tautulli user", None
-    found = await recent_plays(services, link.tautulli_user_id)
-    play = next((p for p in found.plays if p.is_of(located.details, located.copy)), None)
-    if play is None:
-        return "not checked: no recent play of this copy in Tautulli", None
-    try:
-        playback = await playback_of(services, play, dovi_profile)
-    except ClientError as exc:
-        return f"not checked: Tautulli on {play.host} couldn't say how it played ({exc})", None
-    when = "playing now" if play.live else "their last play"
-    return f"{when}, {play.player} (Tautulli on {play.host})", playback
-
-
-async def player_then_file(case: Case) -> Diagnosis:
-    """The player first; the file's health only when no player limit explains it."""
-    probe = case.services.probe
-    try:
-        inspection = await probe.inspect(case.located.file.path)
-    except Unreadable as exc:
-        inspection, unreadable = None, Health.unreadable(exc)
-    else:
-        unreadable = None
-    player, playback = await _last_play(case, inspection.dovi_profile if inspection else None)
-    if case.advised:
-        player += "; they already had a player fix for this file, so the file is checked"
-    causes = client_causes(playback) if playback and not case.advised else ()
-    if causes:
-        return Diagnosis(player, playback, causes)
-    health = (
-        unreadable
-        if inspection is None
-        else await check_health(probe, inspection, at=case.at, expected=case.located.runtime)
-    )
-    return Diagnosis(player, playback, health=health)
-
-
-async def track_listing(case: Case) -> Diagnosis:
-    """The file's audio and subtitle tracks."""
-    try:
-        inspection = await case.services.probe.inspect(case.located.file.path)
-    except Unreadable as exc:
-        return Diagnosis(health=Health.unreadable(exc))
-    return Diagnosis(tracks=inspection.tracks)
-
-
-async def by_their_word(case: Case) -> Diagnosis:
-    """Nothing to measure: a cam or the wrong movie plays fine."""
-    return Diagnosis()
 
 
 @dataclass(frozen=True)
@@ -175,63 +64,90 @@ class KindPolicy:
     # A new copy fixes it, so it goes through the replace flow; otherwise the
     # admin is asked, since nothing fixes it automatically.
     replaceable: bool
+    after_advice: Diagnose  # for a friend who already had a player fix for this file
+
+
+def _kind(
+    label: str,
+    issue_type: int,
+    diagnose: Diagnose,
+    replaceable: bool,
+    after_advice: Diagnose | None = None,
+) -> KindPolicy:
+    return KindPolicy(label, issue_type, diagnose, replaceable, after_advice or diagnose)
 
 
 POLICIES: dict[ReportKind, KindPolicy] = {
-    ReportKind.WONT_PLAY: KindPolicy("won't play", ISSUE_VIDEO, player_then_file, True),
-    ReportKind.WRONG_TITLE: KindPolicy("the wrong movie or show", ISSUE_OTHER, by_their_word, True),
-    ReportKind.WRONG_EPISODE: KindPolicy("the wrong episode", ISSUE_OTHER, by_their_word, True),
-    ReportKind.CAM: KindPolicy("a cam or screener copy", ISSUE_VIDEO, by_their_word, True),
-    ReportKind.HARDCODED_SUBS: KindPolicy(
+    ReportKind.WONT_PLAY: _kind("won't play", ISSUE_VIDEO, player_then_file, True, file_only),
+    ReportKind.WRONG_TITLE: _kind("the wrong movie or show", ISSUE_OTHER, by_their_word, True),
+    ReportKind.WRONG_EPISODE: _kind("the wrong episode", ISSUE_OTHER, by_their_word, True),
+    ReportKind.CAM: _kind("a cam or screener copy", ISSUE_VIDEO, by_their_word, True),
+    ReportKind.HARDCODED_SUBS: _kind(
         "hardcoded foreign subtitles", ISSUE_SUBTITLE, by_their_word, True
     ),
-    ReportKind.SUBTITLES: KindPolicy(
+    ReportKind.SUBTITLES: _kind(
         "subtitles missing or out of sync", ISSUE_SUBTITLE, track_listing, False
     ),
-    ReportKind.AUDIO: KindPolicy(
+    ReportKind.AUDIO: _kind(
         "audio out of sync or a missing dub", ISSUE_AUDIO, track_listing, False
     ),
-    ReportKind.OTHER: KindPolicy("another problem", ISSUE_OTHER, by_their_word, True),
+    ReportKind.OTHER: _kind("another problem", ISSUE_OTHER, by_their_word, True),
 }
 
 
-def policy_of(report: ReportRow) -> KindPolicy:
-    return POLICIES[report.kind]
+@dataclass(frozen=True)
+class Testimony:
+    """What one report says about its file."""
+
+    reporter: str | None  # who it counts as reporting the file as broken, if anyone
+    failed_check: Health | None  # its health check, when that found the file broken
+
+    @classmethod
+    def of(cls, report: ReportRow) -> Testimony:
+        """A stored report's testimony. A resolved issue or a declined replacement is spent."""
+        if report.resolved_at is not None or report.status is ReportStatus.DECLINED:
+            return cls(None, None)
+        counts = POLICIES[report.kind].replaceable and report.decision is not Decision.ADVISED
+        check = Health.from_dict(report.diagnosis["file_check"]) if report.health else None
+        return cls(
+            report.discord_id if counts else None,
+            check if check and check.verdict.failed else None,
+        )
+
+    @classmethod
+    def new(cls, reporter: str, policy: KindPolicy, diagnosis: Diagnosis) -> Testimony:
+        """A report being filed. One the player explains says nothing about the file."""
+        match diagnosis:
+            case PlayerLimit():
+                return cls(None, None)
+        failed = diagnosis.health if diagnosis.health and diagnosis.health.verdict.failed else None
+        return cls(reporter if policy.replaceable else None, failed)
 
 
 @dataclass(frozen=True)
 class Evidence:
-    """What the stored reports of one file prove, whatever the model says."""
+    """What the reports of one file prove, whatever the model says."""
 
     failed_check: Health | None  # a health check of this very file that found it broken
     reporters: frozenset[str]  # who reported the file as needing a new copy
-    declined: bool = False  # the admin said no to replacing this file
 
     @classmethod
-    def of(cls, reports: Iterable[ReportRow]) -> Evidence:
-        reports = list(reports)
-        # A report whose Seerr issue was resolved no longer speaks for the file.
-        open_ = [r for r in reports if r.resolved_at is None]
-        checks = (Health.from_dict(r.diagnosis["file_check"]) for r in open_ if r.health)
+    def of(cls, testimonies: Iterable[Testimony]) -> Evidence:
+        said = list(testimonies)
         return cls(
-            failed_check=next((h for h in checks if h.verdict.failed), None),
-            reporters=frozenset(
-                r.discord_id
-                for r in open_
-                if policy_of(r).replaceable and r.action != Action.ADVISED
-            ),
-            declined=any(r.action == Action.DECLINED for r in reports),
+            failed_check=next((t.failed_check for t in said if t.failed_check), None),
+            reporters=frozenset(t.reporter for t in said if t.reporter),
         )
+
+    @classmethod
+    def for_file(cls, store: Store, host: str, media_type: str, file_id: int) -> Evidence:
+        return cls.of(map(Testimony.of, store.reports_for_file(host, media_type, file_id)))
 
     @property
     def proven(self) -> bool:
-        if self.declined:
-            return False
         return self.failed_check is not None or len(self.reporters) >= REPORTERS_TO_REPLACE
 
     def describe(self) -> str:
-        if self.declined:
-            return "the admin decided not to replace this file"
         if self.failed_check is not None:
             return f"a file check found it {self.failed_check.summary}"
         people = len(self.reporters)
@@ -240,53 +156,89 @@ class Evidence:
         return f"{people} report{'' if people == 1 else 's'} and no failed file check"
 
 
-def decide(policy: KindPolicy, diagnosis: Diagnosis, evidence: Evidence) -> Action:
-    if diagnosis.causes:
-        return Action.ADVISED
-    if not policy.replaceable:
-        return Action.FOR_ADMIN
-    return Action.REPLACEABLE if evidence.proven else Action.RECORDED
+def decide(policy: KindPolicy, diagnosis: Diagnosis, evidence: Evidence) -> Decision:
+    match diagnosis:
+        case PlayerLimit():
+            return Decision.ADVISED
+        case _ if not policy.replaceable:
+            return Decision.FOR_ADMIN
+        case _ if evidence.proven:
+            return Decision.REPLACEABLE
+        case _:
+            return Decision.RECORDED
 
 
 @dataclass(frozen=True)
 class Wording:
-    """What a decision means downstream.
+    """How a decision reads: its line in the Seerr issue, and the model's next step.
 
-    `issue` is its line in the Seerr issue and `next` the model's next step;
     `{evidence}`, `{report_id}` and `{host}` are filled in from the report.
     """
 
     issue: str
     next: str
-    shows_evidence: bool = False  # the model sees what the evidence proves
-    asks_admin: bool = False  # the admin gets a notice to fix it by hand
 
 
-WORDING: dict[Action, Wording] = {
-    Action.ADVISED: Wording(
+WORDING: dict[Decision, Wording] = {
+    Decision.ADVISED: Wording(
         "a player limit explains it; the friend was given the fix",
         "Give them the player fix. If it still fails after, report it again: the file is "
         "checked then.",
     ),
-    Action.REPLACEABLE: Wording(
+    Decision.REPLACEABLE: Wording(
         "a replacement was offered to the friend ({evidence})",
-        "Offer a new copy: replace_media with report_id {report_id} and host {host} deletes "
-        "this copy and searches for another once they confirm.",
-        shows_evidence=True,
+        "The evidence allows a new copy ({evidence}). Offer it: replace_media with report_id "
+        "{report_id} and host {host} deletes this copy and searches for another once they "
+        "confirm.",
     ),
-    Action.RECORDED: Wording(
+    Decision.RECORDED: Wording(
         "recorded ({evidence}); it can be replaced once a file check fails or a second "
         "person reports it",
-        "Tell them it's recorded; the copy is replaced once a file check fails or someone "
-        "else reports it.",
-        shows_evidence=True,
+        "Tell them it's recorded ({evidence}); the copy is replaced once a file check fails "
+        "or someone else reports it.",
     ),
-    Action.FOR_ADMIN: Wording(
+    Decision.FOR_ADMIN: Wording(
         "recorded for the admin: nothing fixes this automatically yet",
         "Tell them it's recorded and the admin has been asked to fix it.",
-        asks_admin=True,
     ),
 }
+
+
+class Actor(enum.StrEnum):
+    FRIEND = "friend"  # confirms a replacement of their own report
+    ADMIN = "admin"  # approves one over the daily cap
+
+
+@dataclass(frozen=True)
+class Move:
+    """One step a report's status may take, from the statuses it may start in."""
+
+    from_: frozenset[ReportStatus]
+    to: ReportStatus
+
+
+S = ReportStatus
+# Every move a report makes. Nothing else changes a report's status.
+ESCALATE = Move(frozenset({S.OPEN}), S.ESCALATED)  # over the cap: the admin decides
+DECLINE = Move(frozenset({S.ESCALATED}), S.DECLINED)  # the admin's no, for this report
+REOPEN = Move(frozenset({S.ESCALATED}), S.OPEN)  # its approval can't lead anywhere now
+REPLACE = Move(frozenset({S.OPEN, S.ESCALATED}), S.REPLACED)  # the file was deleted
+# Who may start a replacement from which status, and why no one else may.
+MAY_REPLACE: dict[Actor, frozenset[ReportStatus]] = {
+    Actor.FRIEND: frozenset({S.OPEN}),
+    Actor.ADMIN: frozenset({S.ESCALATED}),
+}
+NOT_NOW: dict[ReportStatus, str] = {
+    S.OPEN: "it isn't waiting on the admin",
+    S.ESCALATED: "it's already waiting on the admin",
+    S.REPLACED: "it was already replaced",
+    S.DECLINED: "the admin decided not to replace it",
+}
+
+
+def move(store: Store, report: ReportRow, step: Move) -> ReportRow | None:
+    """Make one move; None when the report wasn't in a status it starts from."""
+    return store.move_report(report.id, step.from_, step.to)
 
 
 @dataclass(frozen=True)
@@ -298,16 +250,8 @@ class Filed:
     diagnosis: Diagnosis
     evidence: Evidence
     issue_id: int | None = None  # the Seerr issue it opened
-    issue_note: str = ""  # why none was opened
+    issue_note: str = ""  # why none was opened, or that maester opened it for them
     notices: tuple[Notice, ...] = ()
-
-    @property
-    def action(self) -> Action:
-        return Action(self.report.action)
-
-    @property
-    def wording(self) -> Wording:
-        return WORDING[self.action]
 
     def _fill(self, template: str) -> str:
         return template.format(
@@ -319,73 +263,88 @@ class Filed:
     @property
     def decision(self) -> str:
         """The decision as the Seerr issue reads it."""
-        return self._fill(self.wording.issue)
+        return self._fill(WORDING[self.report.decision].issue)
 
     @property
     def next_step(self) -> str:
         """What the model should do with the report."""
-        return self._fill(self.wording.next)
+        return self._fill(WORDING[self.report.decision].next)
 
     def as_dict(self) -> dict[str, Any]:
-        reply = {
+        reply: dict[str, Any] = {
             "report_id": self.report.id,
             "title": self.located.title,
             "version": self.located.copy.version,
             "host": self.located.owner.host,
-            "problem": policy_of(self.report).label,
+            "problem": POLICIES[self.report.kind].label,
             "diagnosis": self.diagnosis.as_dict(),
-            "decision": self.action,
-            "seerr_issue": self.issue_id or self.issue_note,
+            "decision": self.report.decision,
+            "seerr_issue": self.issue_id,
             "next": self.next_step,
         }
-        if self.wording.shows_evidence:
-            reply["evidence"] = self.evidence.describe()
+        if self.issue_note:
+            reply["seerr_issue_note"] = self.issue_note
         return reply
 
 
 def issue_message(filed: Filed, reporter: str) -> str:
     """The Seerr issue: the friend's words, then what maester found and decided."""
     report, located = filed.report, filed.located
-    policy = policy_of(report)
     group = f" (release group {report.release_group})" if report.release_group else ""
-    lines = [
-        report.description,
-        "",
-        f"Reported through maester by {reporter}: {policy.label}, {located.label} "
-        f"on {located.owner.host}.",
-        f"File: {located.file.path}{group}",
-    ]
-    if filed.diagnosis.player:
-        lines.append(f"Player: {filed.diagnosis.player}")
-    lines += [
-        f"Diagnosis: {filed.diagnosis.summary()}",
-        f"Decision: {filed.decision}",
-    ]
-    if filed.diagnosis.tracks:
-        lines += ["Tracks:", *(f"- {line}" for line in tracks.lines(filed.diagnosis.tracks))]
-    return "\n".join(lines)
+    return "\n".join(
+        [
+            report.description,
+            "",
+            f"Reported through maester by {reporter}: {POLICIES[report.kind].label}, "
+            f"{located.label} on {located.owner.host}.",
+            f"File: {located.file.path}{group}",
+            f"Diagnosis: {filed.diagnosis.summary()}",
+            f"Decision: {filed.decision}",
+            *filed.diagnosis.details(),
+        ]
+    )
 
 
 class IssueNotOpened(Exception):
     """The report couldn't be filed in Seerr; the message says why."""
 
 
-async def open_issue(services: Services, link: LinkedUser, filed: Filed) -> int:
-    """File the report in Seerr as the friend."""
-    located = filed.located
-    if located.details.media_id is None:
+@dataclass(frozen=True)
+class Opened:
+    issue_id: int
+    note: str = ""
+
+
+async def open_issue(services: Services, link: LinkedUser, filed: Filed) -> Opened:
+    """File the report in Seerr as the friend, or as maester naming them when Seerr says no."""
+    located, media_id = filed.located, filed.located.details.media_id
+    if media_id is None:
         raise IssueNotOpened("not opened: Seerr doesn't track this title yet")
-    try:
+    message = issue_message(filed, link.name)
+
+    async def file(text: str, as_user: int | None) -> int:
         return await services.seerr.create_issue(
-            located.details.media_id,
-            policy_of(filed.report).issue_type,
-            issue_message(filed, link.name),
-            link.seerr_user_id,
+            media_id,
+            POLICIES[filed.report.kind].issue_type,
+            text,
+            as_user=as_user,
             season=located.copy.season,
             episode=located.copy.episode,
         )
+
+    try:
+        return Opened(await file(message, link.seerr_user_id))
+    except ClientError as exc:
+        if exc.status != 403:
+            raise IssueNotOpened(f"not opened: {exc}") from exc
+    for_them = f"Filed by maester for {link.name}, whose Seerr account can't open issues.\n\n"
+    try:
+        issue_id = await file(for_them + message, None)
     except ClientError as exc:
         raise IssueNotOpened(f"not opened: {exc}") from exc
+    return Opened(
+        issue_id, "filed by maester on their behalf: their Seerr account can't open issues"
+    )
 
 
 def admin_notice(filed: Filed, reporter: str) -> AdminPost:
@@ -393,7 +352,7 @@ def admin_notice(filed: Filed, reporter: str) -> AdminPost:
     report, located = filed.report, filed.located
     issue = f"Seerr issue #{filed.issue_id}" if filed.issue_id else "The report"
     return AdminPost(
-        f"{reporter} reports {policy_of(report).label} on {located.label} "
+        f"{reporter} reports {POLICIES[report.kind].label} on {located.label} "
         f'({located.owner.host}): "{report.description}". Nothing fixes this automatically '
         f"(Bazarr isn't set up). {issue} has what maester found: "
         f"{filed.diagnosis.summary()}"
@@ -409,44 +368,41 @@ async def file_report(
     description: str,
     at: float | None = None,
 ) -> Filed:
-    """Diagnose, store and decide a report, then open its Seerr issue."""
+    """Diagnose, decide and store a report, then open its Seerr issue."""
     policy, file = POLICIES[kind], located.file
     host, media_type = located.owner.host, located.copy.media_type
+    before = store.reports_for_file(host, media_type, file.id)
     advised = any(
-        r.discord_id == link.discord_id and r.action == Action.ADVISED
-        for r in store.reports_for_file(host, media_type, file.id)
+        r.discord_id == link.discord_id and r.decision is Decision.ADVISED and not r.resolved_at
+        for r in before
     )
-    diagnosis = await policy.diagnose(Case(services, link, located, at, advised))
-    with store.transaction():
-        # Stored first, so the evidence counts it; the decision replaces the action.
-        report = store.add_report(
-            discord_id=link.discord_id,
-            kind=kind,
-            copy=located.copy,
-            title=located.title,
-            rating_key=located.details.rating_key_for(located.copy.is_4k),
-            host=host,
-            file_id=file.id,
-            file_path=file.path,
-            release_group=file.release_group,
-            health=diagnosis.health.verdict if diagnosis.health else None,
-            diagnosis=diagnosis.as_dict(),
-            description=description,
-            action=Action.RECORDED,
-        )
-        evidence = Evidence.of(store.reports_for_file(host, media_type, file.id))
-        report = store.update_report(report.id, action=decide(policy, diagnosis, evidence))
+    strategy = policy.after_advice if advised else policy.diagnose
+    diagnosis = await strategy(Case(services, link, located, at))
+    said = [*map(Testimony.of, before), Testimony.new(link.discord_id, policy, diagnosis)]
+    evidence = Evidence.of(said)
+    report = store.add_report(
+        discord_id=link.discord_id,
+        kind=kind,
+        copy=located.copy,
+        title=located.title,
+        rating_key=located.details.rating_key_for(located.copy.is_4k),
+        host=host,
+        file_id=file.id,
+        file_path=file.path,
+        release_group=file.release_group,
+        health=diagnosis.health.verdict if diagnosis.health else None,
+        diagnosis=diagnosis.as_dict(),
+        description=description,
+        decision=decide(policy, diagnosis, evidence),
+    )
     filed = Filed(report, located, diagnosis, evidence)
     try:
-        issue_id = await open_issue(services, link, filed)
+        opened = await open_issue(services, link, filed)
     except IssueNotOpened as why:
         filed = replace(filed, issue_note=str(why))
     else:
-        filed = replace(
-            filed,
-            report=store.update_report(report.id, seerr_issue_id=issue_id),
-            issue_id=issue_id,
-        )
-    if filed.wording.asks_admin:
-        filed = replace(filed, notices=(admin_notice(filed, link.name),))
-    return filed
+        report = store.set_report_issue(report.id, opened.issue_id)
+        filed = replace(filed, report=report, issue_id=opened.issue_id, issue_note=opened.note)
+    if policy.replaceable:
+        return filed
+    return replace(filed, notices=(admin_notice(filed, link.name),))

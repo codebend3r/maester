@@ -34,7 +34,7 @@ from maester.clients.arr import HistoryEvent
 from maester.formatting import gigabytes
 from maester.notify import AdminPost
 from maester.playback.items import LocatedFile
-from maester.playback.reports import Evidence, policy_of
+from maester.playback.reports import POLICIES, REPLACE, Evidence, move
 from maester.store import ReportRow, Store
 
 log = logging.getLogger("maester.playback")
@@ -64,7 +64,7 @@ def grab_of(history: Iterable[HistoryEvent], file_id: int) -> HistoryEvent | Non
     )
 
 
-class Status(enum.StrEnum):
+class StepStatus(enum.StrEnum):
     DONE = "done"
     STOPPED = "stopped"  # this step can't go ahead; the admin takes it from here
     FAILED = "failed"  # the arr didn't answer; trying again may work
@@ -74,7 +74,7 @@ class Status(enum.StrEnum):
 @dataclass(frozen=True)
 class Step:
     name: str
-    status: Status
+    status: StepStatus
     detail: str
 
     @property
@@ -82,33 +82,33 @@ class Step:
         return f"- {self.name}: {self.detail}"
 
 
-async def _blocklist(located: LocatedFile) -> tuple[Status, str]:
+async def _blocklist(located: LocatedFile) -> tuple[StepStatus, str]:
     owner = located.owner
     history = await owner.arr.history(owner.media_id)
     grab = grab_of(history, located.file.id)
     if grab is None:
-        return Status.STOPPED, (
+        return StepStatus.STOPPED, (
             "no grab of this file in the history, so its release can't be blocklisted; "
             "left for the admin"
         )
     if any(e.event_type == "downloadFailed" and e.download_id == grab.download_id for e in history):
-        return Status.DONE, f"{grab.source_title} was already marked failed"
+        return StepStatus.DONE, f"{grab.source_title} was already marked failed"
     await owner.arr.mark_failed(grab.id)
-    return Status.DONE, f"marked {grab.source_title} failed so it isn't grabbed again"
+    return StepStatus.DONE, f"marked {grab.source_title} failed so it isn't grabbed again"
 
 
-async def _delete(located: LocatedFile) -> tuple[Status, str]:
+async def _delete(located: LocatedFile) -> tuple[StepStatus, str]:
     await located.owner.delete_file(located.file.id)
     file = located.file
-    return Status.DONE, f"deleted {file.path} ({gigabytes(file.size_bytes)})"
+    return StepStatus.DONE, f"deleted {file.path} ({gigabytes(file.size_bytes)})"
 
 
-async def _search(located: LocatedFile) -> tuple[Status, str]:
+async def _search(located: LocatedFile) -> tuple[StepStatus, str]:
     await located.owner.search(located.search_ids)
-    return Status.DONE, "searching for a new copy"
+    return StepStatus.DONE, "searching for a new copy"
 
 
-STEPS: tuple[tuple[str, Callable[[LocatedFile], Awaitable[tuple[Status, str]]]], ...] = (
+STEPS: tuple[tuple[str, Callable[[LocatedFile], Awaitable[tuple[StepStatus, str]]]], ...] = (
     ("blocklist", _blocklist),
     ("delete", _delete),
     ("search", _search),
@@ -121,7 +121,7 @@ class Replacement:
     steps: tuple[Step, ...]
 
     def _done(self, name: str) -> bool:
-        return any(s.name == name and s.status is Status.DONE for s in self.steps)
+        return any(s.name == name and s.status is StepStatus.DONE for s in self.steps)
 
     @property
     def deleted(self) -> bool:
@@ -130,7 +130,7 @@ class Replacement:
     @property
     def retryable(self) -> bool:
         """Nothing was deleted and an arr didn't answer, so trying again may work."""
-        return not self.deleted and any(s.status is Status.FAILED for s in self.steps)
+        return not self.deleted and any(s.status is StepStatus.FAILED for s in self.steps)
 
     @property
     def text(self) -> str:
@@ -151,15 +151,15 @@ async def run_steps(located: LocatedFile) -> tuple[Step, ...]:
     """Every step in order, stopping at the first failure."""
     steps: list[Step] = []
     for name, act in STEPS:
-        if steps and steps[-1].status is not Status.DONE:
+        if steps and steps[-1].status is not StepStatus.DONE:
             steps.append(
-                Step(name, Status.NOT_RUN, "not run, since the step before didn't go through")
+                Step(name, StepStatus.NOT_RUN, "not run, since the step before didn't go through")
             )
             continue
         try:
             steps.append(Step(name, *await act(located)))
         except ClientError as exc:
-            steps.append(Step(name, Status.FAILED, f"failed: {exc}"))
+            steps.append(Step(name, StepStatus.FAILED, f"failed: {exc}"))
     return tuple(steps)
 
 
@@ -175,7 +175,7 @@ def admin_notice(
         head = f"Replacing {located.label} on {host} stopped before {file.path} was deleted."
     lines = [
         head,
-        f"Reason: {policy_of(report).label}; {evidence.describe()}. "
+        f"Reason: {POLICIES[report.kind].label}; {evidence.describe()}. "
         f"Reported by {', '.join(sorted(reporters))}.",
         *(s.line for s in replacement.steps),
     ]
@@ -189,8 +189,9 @@ async def replace_copy(
 ) -> Replacement:
     """Run the steps, then record the outcome on the reports and the Seerr issue."""
     replacement = Replacement(located, await run_steps(located))
-    if replacement.deleted:
-        store.mark_file_replaced(report.host, report.copy.media_type, report.file_id)
+    if replacement.deleted:  # every report of the file is settled by its new copy
+        for other in store.reports_for_file(report.host, report.copy.media_type, report.file_id):
+            move(store, other, REPLACE)
     if report.seerr_issue_id:
         try:
             await services.seerr.comment_issue(report.seerr_issue_id, replacement.text)
