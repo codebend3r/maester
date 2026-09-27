@@ -2,7 +2,8 @@
 
 Limits are in memory: they exist to stop a runaway conversation or a
 crafted message from burning tokens, and losing the counters on restart is
-an acceptable reset. The audit log is the durable record.
+an acceptable reset. The audit log is the durable record. The kill switch is
+not a limit: the app keeps it in the store, so a restart can't turn it off.
 """
 
 from __future__ import annotations
@@ -10,6 +11,9 @@ from __future__ import annotations
 import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
+
+from maester.store import KILL, Flag, Flags
+from maester.store.base import now
 
 
 class LimitExceeded(Exception):
@@ -55,19 +59,39 @@ class RateLimiter:
         return count, day
 
 
-@dataclass
 class KillSwitch:
     """When on, every destructive tool refuses immediately.
 
-    Flipped by an admin command; checked by the runner on every destructive
+    Flipped by the admin's `/kill`; checked by the runner on every destructive
     call so there is no window where a queued confirmation can still fire.
+    Given the store, it is the store's `kill` flag, so a restart can't quietly
+    turn it back off; without one (tests), it lives in memory.
     """
 
-    enabled: bool = False
-    reason: str = ""
+    def __init__(self, flags: Flags | None = None):
+        self._flags = flags
+        self._held: Flag | None = None
 
-    def on(self, reason: str = "") -> None:
-        self.enabled, self.reason = True, reason
+    @property
+    def flag(self) -> Flag | None:
+        return self._flags.flag(KILL) if self._flags is not None else self._held
+
+    @property
+    def enabled(self) -> bool:
+        return self.flag is not None
+
+    @property
+    def reason(self) -> str:
+        flag = self.flag
+        return flag.message if flag else ""
+
+    def on(self, reason: str = "", by: str | None = None) -> None:
+        if self._flags is not None:
+            self._flags.raise_flag(KILL, reason, by)
+        else:
+            self._held = Flag(KILL, reason, by, now())
 
     def off(self) -> None:
-        self.enabled, self.reason = False, ""
+        if self._flags is not None:
+            self._flags.lower_flag(KILL)
+        self._held = None

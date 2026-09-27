@@ -1,8 +1,9 @@
 FROM python:3.12-slim AS base
 
-# ffprobe/ffmpeg for the file health check (E4.3); read-only media mounts.
+# ffprobe/ffmpeg for the file health check (E4.3); read-only media mounts. tzdata
+# so scheduled jobs (E6) run by the wall clock in TZ: slim images don't carry it.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ffmpeg \
+    && apt-get install -y --no-install-recommends ffmpeg tzdata \
     && rm -rf /var/lib/apt/lists/*
 
 # Ookla's speedtest CLI for the on-demand upload test (E5.3), pinned to 1.2.0 and

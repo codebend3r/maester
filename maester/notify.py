@@ -1,7 +1,8 @@
 """Messages maester sends outside a reply, and the one interface that delivers them.
 
-Tools, button decisions and webhooks all produce notices: a post in the
-admin channel, the same with Approve/Deny buttons for one pending action,
+Tools, button decisions, webhooks and scheduled jobs all produce notices: a
+post in the admin channel, the same with Approve/Deny buttons for one
+pending action, an announcement in the requests channel for every friend,
 or a DM to one user. Only the chat layer knows how to deliver them;
 everything else hands them to a `Notifier`, which the Discord bot
 implements, so `agent/`, `tools/` and `web/` never import Discord.
@@ -37,13 +38,20 @@ class ApprovalPost:
 
 
 @dataclass(frozen=True)
+class Announcement:
+    """A post in the requests channel, where every friend sees it (a maintenance window)."""
+
+    text: str
+
+
+@dataclass(frozen=True)
 class DirectMessage:
     to: str  # a Discord user id
     text: str
     about: Titled | None = None
 
 
-Notice = AdminPost | ApprovalPost | DirectMessage
+Notice = AdminPost | ApprovalPost | Announcement | DirectMessage
 
 
 class Notifier(Protocol):

@@ -14,7 +14,9 @@ from __future__ import annotations
 import os
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from datetime import time, timedelta
 from functools import lru_cache
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 
 class MissingConfig(KeyError):
@@ -64,6 +66,58 @@ def _pairs(env: Mapping[str, str], name: str) -> tuple[tuple[str, str], ...]:
     """`from=to,from=to`; an entry without both sides is skipped."""
     pairs = (item.split("=", 1) for item in _list(env, name) if "=" in item)
     return tuple((a.strip(), b.strip()) for a, b in pairs if a.strip() and b.strip())
+
+
+WEEKDAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+
+
+def _zone(env: Mapping[str, str]) -> str:
+    """The server's time zone (`TZ`, an IANA name), checked so a typo fails on boot."""
+    name = env.get("TZ", "").strip() or "UTC"
+    try:
+        ZoneInfo(name)
+    except (ZoneInfoNotFoundError, ValueError):
+        raise ValueError(f"TZ: {name!r} isn't a known time zone (try 'America/Toronto')") from None
+    return name
+
+
+def _clock(env: Mapping[str, str], name: str, default: time) -> time:
+    """A time of day as `HH:MM`."""
+    raw = env.get(name, "").strip()
+    if not raw:
+        return default
+    try:
+        return time.fromisoformat(raw)
+    except ValueError:
+        raise ValueError(f"{name}: {raw!r} isn't a time of day like 08:00") from None
+
+
+def _weekday(env: Mapping[str, str], name: str, default: int) -> int:
+    """A day of the week by name ("mon", "Monday"), as 0 for Monday through 6."""
+    raw = env.get(name, "").strip().lower()[:3]
+    if not raw:
+        return default
+    if raw not in WEEKDAYS:
+        raise ValueError(f"{name}: {env[name]!r} isn't a day of the week")
+    return WEEKDAYS.index(raw)
+
+
+@dataclass(frozen=True)
+class Jobs:
+    """When the admin console's scheduled jobs run, in the server's time zone."""
+
+    timezone: str = "UTC"
+    # The daily digest, and the weekly NAS health report on `nas_report_day` at the same time.
+    digest_at: time = time(8, 0)
+    nas_report_day: int = 0  # Monday
+    # How often the stalled-download sweeper looks, and how long a download may be
+    # stuck before it's blocklisted and searched again.
+    sweep_every: timedelta = timedelta(minutes=15)
+    stalled_after: timedelta = timedelta(hours=6)
+
+    @property
+    def zone(self) -> ZoneInfo:
+        return ZoneInfo(self.timezone)
 
 
 @dataclass(frozen=True)
@@ -125,6 +179,9 @@ class Settings:
     fleet_monitor: FleetMonitorAccess | None = None
     # The host maester's container runs on, where the speed test runs; empty for none.
     speedtest_host: str = ""
+    # Files reported from one release group in 30 days before the digest suggests blocking it.
+    bad_release_reports: int = 3
+    jobs: Jobs = field(default_factory=Jobs)
 
     guardrails: Guardrails = field(default_factory=Guardrails)
     db_path: str = "/data/maester.db"
@@ -168,6 +225,14 @@ def load_settings(env: Mapping[str, str]) -> Settings:
         probe_timeout_seconds=_int(env, "PROBE_TIMEOUT_SECONDS", 120),
         fleet_monitor=_fleet_monitor(env),
         speedtest_host=env.get("SPEEDTEST_HOST", "").strip().lower(),
+        bad_release_reports=_int(env, "BAD_RELEASE_REPORTS", 3),
+        jobs=Jobs(
+            timezone=_zone(env),
+            digest_at=_clock(env, "DIGEST_TIME", time(8, 0)),
+            nas_report_day=_weekday(env, "NAS_REPORT_DAY", 0),
+            sweep_every=timedelta(minutes=_int(env, "SWEEP_MINUTES", 15)),
+            stalled_after=timedelta(hours=_int(env, "STALLED_HOURS", 6)),
+        ),
         guardrails=Guardrails(
             replace_daily_cap=_int(env, "REPLACE_DAILY_CAP", 3),
             storage_pause_4k_percent=_int(env, "STORAGE_PAUSE_4K_PERCENT", 90),

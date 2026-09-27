@@ -11,6 +11,7 @@ so a press after a restart still lands.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 from collections.abc import Sequence
@@ -21,7 +22,7 @@ from discord import app_commands
 from maester.chat.members import resolve_chat_user
 from maester.chat.service import ChatService, reports_a_problem
 from maester.chat.views import DecisionButton, decision_view, send_response, send_text
-from maester.notify import AdminPost, ApprovalPost, DirectMessage, Notice
+from maester.notify import AdminPost, Announcement, ApprovalPost, DirectMessage, Notice
 
 log = logging.getLogger("maester.bot")
 
@@ -44,6 +45,9 @@ class MaesterBot(discord.Client):
         self.requests_channel_id = requests_channel_id
         self.admin_channel_id = admin_channel_id
         self.tree = app_commands.CommandTree(self)
+        # Set once the bot first connects: scheduled jobs wait on it so their
+        # first notices have a channel to go to.
+        self.online = asyncio.Event()
         self._register_commands()
 
     # -- lifecycle --------------------------------------------------------
@@ -59,6 +63,7 @@ class MaesterBot(discord.Client):
 
     async def on_ready(self) -> None:
         log.info("maester is online as %s", self.user)
+        self.online.set()
 
     # -- messages ---------------------------------------------------------
 
@@ -111,6 +116,8 @@ class MaesterBot(discord.Client):
                 await send_text(self._admin_channel(), text)
             case ApprovalPost(text, pending_id):
                 await self._admin_channel().send(text, view=decision_view(pending_id, "approve"))
+            case Announcement(text):
+                await send_text(self._channel(self.requests_channel_id, "requests"), text)
             case DirectMessage(to, text):
                 user = self.get_user(int(to)) or await self.fetch_user(int(to))
                 sent = await send_text(user, text)
@@ -121,9 +128,12 @@ class MaesterBot(discord.Client):
                     log.exception("DM to %s sent but not remembered", to)
 
     def _admin_channel(self) -> discord.abc.Messageable:
-        channel = self.get_channel(self.admin_channel_id) if self.admin_channel_id else None
+        return self._channel(self.admin_channel_id, "admin")
+
+    def _channel(self, channel_id: int, name: str) -> discord.abc.Messageable:
+        channel = self.get_channel(channel_id) if channel_id else None
         if channel is None:
-            raise LookupError("no admin channel is configured or visible to the bot")
+            raise LookupError(f"no {name} channel is configured or visible to the bot")
         return channel  # type: ignore[return-value]
 
     # -- slash commands ---------------------------------------------------

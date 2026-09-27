@@ -6,7 +6,7 @@ from maester.chat.bot import MaesterBot
 from maester.chat.service import ChatResponse
 from maester.chat.views import DecisionButton
 from maester.media import Copy, Titled
-from maester.notify import AdminPost, ApprovalPost, DirectMessage
+from maester.notify import AdminPost, Announcement, ApprovalPost, DirectMessage
 
 
 class Inbox:
@@ -38,10 +38,10 @@ class Service:
         return ChatResponse(["What's wrong with it?"]) if emoji == "\N{THUMBS DOWN SIGN}" else None
 
 
-def bot_with(channel, users):
+def bot_with(channel, users, requests=None):
     service = Service()
     bot = MaesterBot(service, guild_id=1, requests_channel_id=2, admin_channel_id=3)
-    bot.get_channel = lambda i: channel if i == 3 else None
+    bot.get_channel = lambda i: {3: channel, 2: requests}.get(i)
     bot.get_user = lambda i: None
     bot.get_guild = lambda i: None
 
@@ -119,3 +119,12 @@ async def test_a_dm_that_went_out_is_delivered_even_if_it_cant_be_remembered():
     about = Titled(Copy("movie", 438631, True), "Dune (2021)")
     assert await bot.deliver([DirectMessage("5", "Dune is ready", about)]) == []
     assert friend.sent == [("Dune is ready", {})]
+
+
+async def test_an_announcement_goes_to_the_requests_channel_for_everyone():
+    admin, requests = Inbox(), Inbox()
+    bot = bot_with(admin, {}, requests)
+    assert await bot.deliver([Announcement("Down for maintenance")]) == []
+    assert requests.sent == [("Down for maintenance", {})] and admin.sent == []
+    no_channel = bot_with(admin, {})
+    assert await no_channel.deliver([Announcement("x")]) == [Announcement("x")]

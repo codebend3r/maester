@@ -248,3 +248,13 @@ def test_the_claims_migration_keeps_webhook_claims(tmp_path):
     migrated = Store(path)
     assert not migrated.claim("seerr", "MEDIA_AVAILABLE:request:9", window=timedelta(minutes=15))
     migrated.close()
+
+
+def test_a_flag_is_up_until_lowered_and_raising_it_again_replaces_its_message(store):
+    assert store.flag("maintenance") is None
+    store.raise_flag("maintenance", "swapping a drive", "a1")
+    store.raise_flag("maintenance", "swapping two drives", "a1")
+    flag = store.flag("maintenance")
+    assert (flag.message, flag.set_by) == ("swapping two drives", "a1")
+    assert store.lower_flag("maintenance") == flag
+    assert store.flag("maintenance") is None and store.lower_flag("maintenance") is None
