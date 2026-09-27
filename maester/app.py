@@ -22,6 +22,7 @@ from maester.agent.loop import Agent
 from maester.agent.runner import ToolRunner
 from maester.agent.tools import ToolRegistry
 from maester.agent.tools import registry as app_registry
+from maester.chat.admin import AdminConsole
 from maester.chat.bot import MaesterBot
 from maester.chat.identity import IdentityService, RoleMap
 from maester.chat.service import ChatService
@@ -120,8 +121,12 @@ def build(
         store, services, RoleMap(cfg.discord_role_admin, cfg.discord_role_trusted)
     )
     chat = ChatService(agent=agent, identity=identity, store=store)
+    console = AdminConsole(
+        identity=identity, store=store, services=services, settings=cfg, kill_switch=kill
+    )
     bot = MaesterBot(
         chat,
+        console=console,
         guild_id=cfg.discord_guild_id,
         requests_channel_id=cfg.discord_requests_channel_id,
         admin_channel_id=cfg.discord_admin_channel_id,

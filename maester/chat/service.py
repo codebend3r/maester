@@ -234,22 +234,6 @@ class ChatService:
         n = self.agent.forget(user.id)
         return "Forgotten. We're starting fresh." if n else "Nothing to forget."
 
-    async def set_tier(self, admin: ChatUser, target_id: str, tier: str | None) -> str:
-        if not self.is_admin(admin):
-            return "Only the admin can change tiers."
-        try:
-            text = self.identity.set_tier_override(target_id, tier)
-        except ValueError:
-            return f"Unknown tier `{tier}`; use friend, trusted, or admin."
-        self.store.audit(
-            discord_id=admin.id,
-            tool="set_tier",
-            args={"target": target_id, "tier": tier},
-            result=text,
-            ok=True,
-        )
-        return text
-
     # -- tiers ------------------------------------------------------------
 
     def tier_for(self, user: ChatUser) -> Tier:

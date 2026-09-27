@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from maester.agent.runner import APPROVAL_TTL
 from maester.agent.tools import Approval
+from maester.clients import Services
 from maester.clients.seerr import MediaRequest
 from maester.media import version_label
 from maester.notify import ApprovalPost
@@ -69,3 +70,23 @@ def raise_approval(
         ttl=APPROVAL_TTL,
     )
     return pending, ApprovalPost(approval.notice, pending.id) if new else None
+
+
+async def ask_about_request(
+    services: Services, store: Store, request: MediaRequest
+) -> tuple[PendingAction, ApprovalPost | None]:
+    """The open approval of a pending Seerr request, raised when there's none yet.
+
+    For requests no friend's tool asked about: Seerr's webhook, or the admin's
+    `/pending` finding one the webhook never delivered.
+    """
+    if open_ := store.pending_about(request_subject(request.id)):
+        return open_, None
+    details = await services.seerr.media_details(request.media_type, request.tmdb_id)
+    link = store.active_link_by_seerr_id(request.requested_by_id)
+    requester = link.discord_id if link else ""
+    who = (
+        link.name if link else request.requested_by_name or f"Seerr user {request.requested_by_id}"
+    )
+    approval = request_approval(request, details.display, requester=requester, who=who)
+    return raise_approval(store, approval, requester)

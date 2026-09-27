@@ -107,6 +107,8 @@ class FakeSeerrClient(Downable):
             ]
         elif filter == "failed":
             rows = [r for r in rows if r.status == RequestStatus.FAILED]
+        elif filter == "pending":
+            rows = [r for r in rows if r.status == RequestStatus.PENDING]
         return rows[-take:]
 
     async def approve_request(self, request_id: int) -> MediaRequest:

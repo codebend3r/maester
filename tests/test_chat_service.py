@@ -218,22 +218,6 @@ async def test_cancel(world):
     assert last["content"][0]["content"] == "Cancelled by the user; nothing was done."
 
 
-async def test_admin_sets_and_clears_a_tier_override(world):
-    make, store, *_ = world
-    svc = make()
-    assert await svc.set_tier(FRIEND, TRUSTED.id, "admin") == "Only the admin can change tiers."
-    assert (await svc.set_tier(ADMIN, FRIEND.id, "trusted")).endswith("trusted.")
-    assert svc.identity.tier_for(FRIEND.id, set()) == Tier.TRUSTED
-    assert (await svc.set_tier(ADMIN, FRIEND.id, None)).endswith("from roles.")
-    assert svc.identity.tier_for(FRIEND.id, set()) == Tier.FRIEND
-    assert (await svc.set_tier(ADMIN, FRIEND.id, "king")).startswith("Unknown tier")
-    rows = store.audit_recent(tool="set_tier")
-    assert [r.args for r in rows] == [
-        {"target": FRIEND.id, "tier": None},
-        {"target": FRIEND.id, "tier": "trusted"},
-    ]
-
-
 async def test_agent_errors_become_a_reference_reply(world):
     make, *_ = world
     svc = make()  # model raises on use

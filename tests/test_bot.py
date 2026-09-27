@@ -40,7 +40,7 @@ class Service:
 
 def bot_with(channel, users, requests=None):
     service = Service()
-    bot = MaesterBot(service, guild_id=1, requests_channel_id=2, admin_channel_id=3)
+    bot = MaesterBot(service, console=None, guild_id=1, requests_channel_id=2, admin_channel_id=3)
     bot.get_channel = lambda i: {3: channel, 2: requests}.get(i)
     bot.get_user = lambda i: None
     bot.get_guild = lambda i: None

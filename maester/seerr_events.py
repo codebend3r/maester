@@ -24,7 +24,7 @@ from datetime import timedelta
 from functools import partial
 from typing import Any
 
-from maester.approvals import decision_dm, raise_approval, request_approval, request_subject
+from maester.approvals import ask_about_request, decision_dm, request_subject
 from maester.clients import ClientError, Services
 from maester.clients.seerr import MediaRequest, RequestStatus
 from maester.media import Copy, Titled, version_label
@@ -118,14 +118,7 @@ async def pending_request(
     request = await services.seerr.get_request(notification.request_id)
     if request.status != RequestStatus.PENDING:
         return []
-    details = await services.seerr.media_details(request.media_type, request.tmdb_id)
-    link = store.active_link_by_seerr_id(request.requested_by_id)
-    requester = link.discord_id if link else ""
-    who = (
-        link.name if link else request.requested_by_name or f"Seerr user {request.requested_by_id}"
-    )
-    approval = request_approval(request, details.display, requester=requester, who=who)
-    _, post = raise_approval(store, approval, requester)
+    _, post = await ask_about_request(services, store, request)
     return [post] if post else []
 
 
