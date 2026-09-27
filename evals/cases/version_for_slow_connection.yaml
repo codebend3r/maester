@@ -1,4 +1,4 @@
-name: a slow connection gets the version it can carry, and a much-streamed remux goes to the admin
+name: a slow connection gets the version it can carry
 tier: friend
 services:
   seerr:
@@ -16,12 +16,6 @@ services:
         year: 2021
         versions:
           - {resolution: "4k", codec: hevc, size_gb: 72.6, bitrate_mbps: 62.1, file: "/Vermithor/Movies/Dune (2021)/Dune (2021) Bluray-2160p.mkv"}
-  tautulli:
-    meleys:
-      history:
-        - {rating_key: "9001", title: "Dune", location: wan, user_id: 5, days_ago: 2}
-        - {rating_key: "9001", title: "Dune", location: wan, user_id: 6, days_ago: 9}
-        - {rating_key: "9001", title: "Dune", location: wan, user_id: 7, days_ago: 20}
 turns:
   - user: "I'm on hotel wifi, fast.com says about 20 Mbps. Which version of Dune (2021) should I play?"
     expect_tools: [pick_version]

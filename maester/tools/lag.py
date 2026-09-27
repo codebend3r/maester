@@ -66,7 +66,7 @@ async def session_report(ctx: ToolContext, details: bool = False) -> dict[str, A
     services = ctx.services
     loads, library = await asyncio.gather(read_loads(services), library_hosts(services))
     tester = services.speedtest
-    measured = uplink.recent(ctx.memo, tester)
+    measured = uplink.recent(ctx.memo)
     streams = await live_streams(services, loads.hosts, link.tautulli_user_id, measured, library)
     found = [diagnose(stream) for stream in streams]
     reply: dict[str, Any] = {"streams": [d.details() if details else d.brief() for d in found]}
@@ -84,13 +84,10 @@ async def session_report(ctx: ToolContext, details: bool = False) -> dict[str, A
         )
     if notes:
         reply["notes"] = notes
-    # A heavy remux streamed away from home may be one worth re-encoding.
-    heavy = [s for s in streams if s.heavy and s.playing]
-    notices = await asyncio.gather(
-        *(reencode.flag(services, ctx.store, s.play.title, list(s.versions)) for s in heavy)
-    )
-    flagged = tuple(n for found in notices for n in found)
-    return Result(reply, flagged) if flagged else reply
+    # The version a stream plays may be a remux worth re-encoding.
+    flagged = await asyncio.gather(*(reencode.flag(services, ctx.store, s) for s in streams))
+    notices = tuple(notice for notice in flagged if notice is not None)
+    return Result(reply, notices) if notices else reply
 
 
 @tool(

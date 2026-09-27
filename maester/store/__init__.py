@@ -9,18 +9,17 @@ arrs are. This is the bot's own memory of who asked for what and what it did.
 - `users.py`          links to Plex/Seerr/Tautulli and tier overrides
 - `conversations.py`  each user's conversation
 - `pending.py`        confirmations and approvals waiting on a button
-- `webhooks.py`       recently handled webhook deliveries
+- `claims.py`         what's done once a window: webhook deliveries, re-encode flags
 - `messages.py`       DMs about a title, for reactions
 - `reports.py`        playback reports
-- `reencodes.py`      heavy remuxes the admin was told are worth re-encoding
 """
 
 from maester.store.audit import AuditLog, AuditRow
 from maester.store.base import MIGRATIONS_DIR, Database
+from maester.store.claims import Claims
 from maester.store.conversations import Conversations
 from maester.store.messages import SentMessages
 from maester.store.pending import PendingAction, PendingActions
-from maester.store.reencodes import ReencodeFlags
 from maester.store.reports import ReportRow, Reports
 from maester.store.users import (
     LinkedUser,
@@ -30,7 +29,6 @@ from maester.store.users import (
     UserRow,
     Users,
 )
-from maester.store.webhooks import WebhookEvents
 
 
 class Store(
@@ -38,10 +36,9 @@ class Store(
     Users,
     Conversations,
     PendingActions,
-    WebhookEvents,
+    Claims,
     SentMessages,
     Reports,
-    ReencodeFlags,
 ):
     """Every table's store over one connection."""
 

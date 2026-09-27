@@ -1,4 +1,4 @@
-name: a remux too heavy to stream away from home is swapped for a lighter version
+name: a remux too heavy to stream away from home is swapped for a lighter version, and flagged
 tier: friend
 services:
   user: {tautulli_user_id: 8008135}
@@ -23,6 +23,10 @@ services:
     meleys:
       sessions:
         - {rating_key: "9001", title: "Dune", tmdb_id: 438631, location: wan, bitrate_mbps: 62.1, video_codec: hevc, file: "/Vermithor/Movies/Dune (2021)/Dune (2021) Bluray-2160p.mkv"}
+      history:
+        - {rating_key: "9001", title: "Dune", location: wan, user_id: 5, days_ago: 2}
+        - {rating_key: "9001", title: "Dune", location: wan, user_id: 6, days_ago: 9}
+        - {rating_key: "9001", title: "Dune", location: wan, user_id: 7, days_ago: 20}
 turns:
   - user: "Dune in 4K keeps buffering at my friend's place"
     expect_tools: [session_report]

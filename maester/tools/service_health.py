@@ -19,6 +19,7 @@ from typing import Any, Protocol
 from maester.agent.tools import Tier, ToolContext, tool
 from maester.clients import ClientError, Services
 from maester.formatting import ago
+from maester.memo import Key
 
 # How long one service may take to answer before it counts as down.
 PING_TIMEOUT = 5.0
@@ -70,6 +71,9 @@ async def check_all(services: Services) -> tuple[Check, ...]:
     return tuple(await asyncio.gather(*(check(name, c) for name, c in named(services))))
 
 
+HEALTH: Key[tuple[Check, ...]] = Key("service_health")
+
+
 @tool(
     "service_health",
     "Whether each service behind the server answers right now: Plex, Seerr, Wizarr, and "
@@ -80,8 +84,8 @@ async def check_all(services: Services) -> tuple[Check, ...]:
     tier=Tier.FRIEND,
 )
 async def service_health(ctx: ToolContext) -> dict[str, Any]:
-    kept = await ctx.memo.fresh("service_health", HEALTH_TTL, lambda: check_all(ctx.services))
-    checks: tuple[Check, ...] = kept.value
+    kept = await ctx.memo.fresh(HEALTH, HEALTH_TTL, lambda: check_all(ctx.services))
+    checks = kept.value
     down = [{"service": c.service, "why": c.down} for c in checks if c.down]
     return {
         "all_up": not down,

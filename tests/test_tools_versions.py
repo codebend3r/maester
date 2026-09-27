@@ -1,9 +1,8 @@
 import time
+from datetime import timedelta
 
 from maester.agent.tools import Tier, registry
-from maester.clients import ClientError
 from maester.clients.plex import PlexItem, Version
-from maester.notify import AdminPost
 from maester.tools.versions import GUESSED, pick_version
 from tests.factories import history_row, session
 from tests.playback_world import DUNE
@@ -67,57 +66,17 @@ async def test_nothing_on_plex_and_a_bad_speed(ctx):
     assert refused.is_error and "above 0" in refused.content
 
 
-async def test_a_heavy_remux_streamed_away_from_home_is_flagged_to_the_admin_once(ctx):
-    dune(ctx, REMUX)  # no re-encode beside it
-    now = int(time.time())
-    wan = dict(rating_key="9001", location="wan")
-    # Vermithor's Tautulli watches the Plex server whose rating keys these are.
-    ctx.services.tautulli["meleys"].history_rows = [
-        history_row(**wan, user_id=5, started=now - 3600),
-        history_row(**wan, user_id=6, started=now - 86400),
-        history_row(**wan, user_id=8, started=now - 5 * 86400),
-        history_row(**wan, user_id=5, started=now - 40 * 86400),  # too long ago
-        history_row(rating_key="9001", location="lan", user_id=5, started=now - 7200),
-    ]
-    # On vermithor's own Plex server, 9001 is some other item: its plays don't count.
-    ctx.services.tautulli["vermithor"].history_rows = [
-        history_row(**wan, user_id=9, started=now - 60)
-    ]
-    out = await pick_version(ctx, 438631, connection_mbps=100)
-    (notice,) = out.notices
-    assert isinstance(notice, AdminPost)
-    assert notice.text.startswith("Dune (2021)'s 4K version (62.1 Mbps, /Vermithor/Movies/")
-    assert "streamed away from home 3 times in the last 30 days" in notice.text
-    assert (await pick_version(ctx, 438631, connection_mbps=100))["recommended"]["version"] == "4K"
-
-
-async def test_a_remux_with_its_re_encode_beside_it_isnt_a_candidate(ctx):
-    dune(ctx)
-    now = int(time.time())
-    ctx.services.tautulli["meleys"].history_rows = [
-        history_row(rating_key="9001", location="wan", user_id=u, started=now - 60)
-        for u in (1, 2, 3)
-    ]
-    assert isinstance(await pick_version(ctx, 438631), dict)
-
-
-def test_tool_is_registered_for_friends():
-    assert "pick_version" in {s.name for s in registry.for_tier(Tier.FRIEND)}
-
-
-async def test_no_flag_without_the_library_servers_tautulli(ctx):
+async def test_asking_about_a_title_only_reads(ctx):
+    """Flagging remuxes is the lag report's job; asking which version to play changes nothing."""
     dune(ctx, REMUX)
     now = int(time.time())
     ctx.services.tautulli["meleys"].history_rows = [
         history_row(rating_key="9001", location="wan", user_id=u, started=now - 60)
         for u in (1, 2, 3)
     ]
-    ctx.services.plex.machine_id = "elsewhere"  # no Tautulli watches it
     assert isinstance(await pick_version(ctx, 438631), dict)
-    ctx.services.plex.machine_id = "fake-machine"
-    ctx.services.tautulli["meleys"].history = _refuse
-    assert isinstance(await pick_version(ctx, 438631), dict)
+    assert ctx.store.claim("reencode", "9001", window=timedelta(days=30))  # nothing claimed it
 
 
-async def _refuse(**kwargs):
-    raise ClientError("tautulli", "GET", "/api/v2?cmd=get_history", None, "connection refused")
+def test_tool_is_registered_for_friends():
+    assert "pick_version" in {s.name for s in registry.for_tier(Tier.FRIEND)}

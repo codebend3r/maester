@@ -10,11 +10,12 @@ bitrates, read while the test runs) and put in plain words. A Plex server
 no Tautulli watches isn't counted.
 
 A test briefly fills the upload for everyone's streams, so tests are
-rationed. A result answers for `REUSE`, and a new test runs at most every
-`MIN_GAP`, failed or not; in between, the last result is given with its age
-and when the next test can run. One test runs at a time, and everyone who
-asks while it runs gets its result (`Memo`). Other tools (the lag advice,
-version picking) use a result while it's within `REUSE`, and never start one.
+rationed: a new test runs at most every `MIN_GAP`, failed or not, and until
+then the last result answers (`SPEED_TEST` in the memo, which also runs one
+test at a time and gives everyone asking its result). Past `REUSE` that
+result comes with its age and when the next test can run. Other tools (the
+lag advice, version picking) use a result while it's within `REUSE`, and
+never start one.
 """
 
 from __future__ import annotations
@@ -27,7 +28,7 @@ from typing import Any
 from maester.clients import Services
 from maester.clients.speedtest import SpeedResult, SpeedTester, SpeedTestFailed
 from maester.formatting import ago, humanized, mbps
-from maester.memo import Memo
+from maester.memo import Key, Memo
 from maester.perf.load import read_loads
 
 # A result answers for this long; after it, it no longer describes the connection.
@@ -102,10 +103,8 @@ class NotMeasured:
 
 
 Measurement = Uplink | NotMeasured
-
-
-def memo_key(host: str) -> str:
-    return f"speed_test:{host}"
+# The last speed test: one tester per app, where maester runs.
+SPEED_TEST: Key[Measurement] = Key("speed_test")
 
 
 async def _run(tester: SpeedTester) -> SpeedResult | NotMeasured:
@@ -154,18 +153,21 @@ class Reading:
 
 
 async def reading(memo: Memo, services: Services, tester: SpeedTester) -> Reading:
-    """The last result while it's fresh or too soon to replace; else a new test's."""
-    key = memo_key(tester.host)
-    kept = memo.latest(key)
-    if kept is None or not REUSE <= memo.age(kept) < MIN_GAP:
-        kept = await memo.fresh(key, REUSE, lambda: measure(services, tester))
+    """The last result until another test may run; then a new test's."""
+    kept = await memo.fresh(SPEED_TEST, MIN_GAP, lambda: measure(services, tester))
     age = memo.age(kept)
     return Reading(kept.value, age, max(MIN_GAP - age, timedelta(0)))
 
 
-def recent(memo: Memo, tester: SpeedTester | None) -> Uplink | None:
+def recent(memo: Memo) -> Uplink | None:
     """The last test's result while it still describes the connection; never starts one."""
-    kept = memo.latest(memo_key(tester.host)) if tester is not None else None
+    kept = memo.latest(SPEED_TEST)
     if kept is None or memo.age(kept) >= REUSE or not isinstance(kept.value, Uplink):
         return None
     return kept.value
+
+
+def can_test(memo: Memo, tester: SpeedTester | None) -> bool:
+    """Whether a speed test would run now rather than be refused or rationed."""
+    kept = memo.latest(SPEED_TEST)
+    return tester is not None and (kept is None or memo.age(kept) >= MIN_GAP)

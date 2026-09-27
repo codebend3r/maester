@@ -3,9 +3,11 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from maester.memo import Memo
+from maester.memo import Key, Memo
 
 MINUTE = timedelta(minutes=1)
+COUNT: Key[int] = Key("count")
+ANSWER: Key[str] = Key("answer")
 
 
 class Clock:
@@ -24,14 +26,14 @@ async def test_an_answer_is_reused_while_fresh_and_fetched_again_after():
         return len(calls)
 
     memo = Memo(clock)
-    assert (await memo.fresh("k", MINUTE, fetch)).value == 1
+    assert (await memo.fresh(COUNT, MINUTE, fetch)).value == 1
     clock.now += timedelta(seconds=59)
-    assert (await memo.fresh("k", MINUTE, fetch)).value == 1
-    assert memo.age(memo.latest("k")) == timedelta(seconds=59)
+    assert (await memo.fresh(COUNT, MINUTE, fetch)).value == 1
+    assert memo.age(memo.latest(COUNT)) == timedelta(seconds=59)
     clock.now += timedelta(seconds=1)
-    kept = await memo.fresh("k", MINUTE, fetch)
+    kept = await memo.fresh(COUNT, MINUTE, fetch)
     assert (kept.value, kept.at, len(calls)) == (2, clock.now, 2)
-    assert memo.latest("other") is None
+    assert memo.latest(ANSWER) is None
 
 
 async def test_callers_asking_at_once_share_one_fetch():
@@ -44,9 +46,9 @@ async def test_callers_asking_at_once_share_one_fetch():
         return "answer"
 
     memo = Memo()
-    first = asyncio.create_task(memo.fresh("k", MINUTE, slow))
+    first = asyncio.create_task(memo.fresh(ANSWER, MINUTE, slow))
     await started.wait()
-    second = asyncio.create_task(memo.fresh("k", MINUTE, slow))
+    second = asyncio.create_task(memo.fresh(ANSWER, MINUTE, slow))
     release.set()
     assert [k.value for k in await asyncio.gather(first, second)] == ["answer", "answer"]
     assert calls == [1]
@@ -58,5 +60,5 @@ async def test_a_fetch_that_raises_keeps_nothing():
 
     memo = Memo()
     with pytest.raises(RuntimeError):
-        await memo.fresh("k", MINUTE, broken)
-    assert memo.latest("k") is None
+        await memo.fresh(ANSWER, MINUTE, broken)
+    assert memo.latest(ANSWER) is None

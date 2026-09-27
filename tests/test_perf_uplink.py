@@ -4,7 +4,16 @@ import pytest
 
 from maester.clients.speedtest import FakeSpeedTest, SpeedResult
 from maester.memo import Memo
-from maester.perf.uplink import MIN_GAP, REUSE, NotMeasured, Uplink, reading, recent
+from maester.perf.uplink import (
+    MIN_GAP,
+    REUSE,
+    SPEED_TEST,
+    NotMeasured,
+    Uplink,
+    can_test,
+    reading,
+    recent,
+)
 from tests.factories import session
 
 
@@ -55,14 +64,15 @@ async def test_tests_are_reused_then_rationed_then_run_again(services):
     await reading(memo, services, tester)
     clock.now += REUSE - timedelta(seconds=1)
     assert (await reading(memo, services, tester)).found.result.upload_kbps == 30_000
-    assert recent(memo, tester) is not None
+    assert recent(memo) is not None and not can_test(memo, tester)
     tester.result = result(5.0)
     clock.now += timedelta(minutes=5)  # past REUSE, before MIN_GAP: the last one, flagged
     rationed = await reading(memo, services, tester)
     assert rationed.rationed and rationed.found.result.upload_kbps == 30_000
     assert "the next can run in about 5 min" in rationed.as_dict()["next_test"]
-    assert recent(memo, tester) is None  # too old to describe the connection now
-    clock.now = memo.latest("speed_test:meleys").at + MIN_GAP
+    assert recent(memo) is None  # too old to describe the connection now
+    clock.now = memo.latest(SPEED_TEST).at + MIN_GAP
+    assert can_test(memo, tester)
     assert (await reading(memo, services, tester)).found.result.upload_kbps == 5_000
     assert tester.runs == 2
 
@@ -74,5 +84,6 @@ async def test_a_failed_test_is_rationed_too(services):
     assert failed.found == NotMeasured("meleys", tester.why)
     clock.now += timedelta(minutes=12)
     assert (await reading(memo, services, tester)).found == failed.found
-    assert tester.runs == 1 and recent(memo, tester) is None
-    assert recent(memo, None) is None
+    assert tester.runs == 1 and recent(memo) is None
+    assert not can_test(memo, tester)  # a speed test now would only be refused
+    assert not can_test(Memo(), None)  # nor is there one without a tester

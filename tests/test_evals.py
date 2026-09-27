@@ -169,13 +169,22 @@ async def test_the_health_world_has_what_its_case_says_is_down():
     store.close()
 
 
-async def test_the_version_world_recommends_what_its_case_expects_and_flags_the_remux():
+async def test_the_version_world_recommends_what_its_case_expects():
     case = Case.load(CASES_DIR / "version_for_slow_connection.yaml")
     registry, services, store = build_world(case.services)
     ctx = ToolContext(EVAL_USER, case.tier, services, store, Settings(), Memo())
     call = {"tmdb_id": 438631, "connection_mbps": 20}
     outcome = await ToolRunner(registry).run(ctx, "pick_version", call)
     assert '"recommended": {"version": "1080p", "fits": true' in outcome.text
+    assert outcome.notices == ()
+    store.close()
+
+
+async def test_the_heavy_remux_world_flags_the_remux_to_the_admin():
+    case = Case.load(CASES_DIR / "lag_heavy_remux.yaml")
+    registry, services, store = build_world(case.services)
+    ctx = ToolContext(EVAL_USER, case.tier, services, store, Settings(), Memo())
+    outcome = await ToolRunner(registry).run(ctx, "session_report", {})
     (notice,) = outcome.notices
-    assert "streamed away from home 3 times" in notice.text
+    assert "watched away from home 3 times" in notice.text
     store.close()
