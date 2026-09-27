@@ -13,17 +13,25 @@ and root folders sit on them.
 Which host's arr couldn't answer is named rather than hiding the rest, and
 a volume whose space no arr reported is left out: callers say it's unknown
 rather than guess.
+
+The forecast fits a straight line through a volume's daily free space over
+`FORECAST_WINDOW` (least squares) and says when it reaches zero at that
+rate. It needs `MIN_DAYS` of samples before it says anything, and a volume
+whose free space isn't falling isn't filling.
 """
 
 from __future__ import annotations
 
 import asyncio
+from collections import defaultdict
 from dataclasses import dataclass
+from datetime import date, timedelta
 from typing import Any
 
 from maester.clients import ClientError, Services
 from maester.clients.arr import DiskSpace, RootFolder
 from maester.formatting import gigabytes
+from maester.store import SpaceSample
 
 # How far apart two reads of one disk's free space may be: downloads move it between reads.
 SAME_DISK_SLACK = 10_000_000_000
@@ -153,3 +161,77 @@ async def read_space(services: Services) -> Space:
         else:
             volumes += result
     return Space(tuple(merged(volumes)), unreachable)
+
+
+FORECAST_WINDOW = timedelta(days=30)
+MIN_DAYS = 7
+
+
+def sample_of(volume: Volume, day: date) -> SpaceSample:
+    """A volume's free space today, keyed by its path, size and the hosts that see it."""
+    return SpaceSample(
+        f"{volume.path}|{volume.total_bytes}|{','.join(volume.hosts)}",
+        day,
+        volume.label,
+        volume.free_bytes,
+        volume.total_bytes,
+    )
+
+
+def slope(points: list[tuple[float, float]]) -> float:
+    """The least-squares slope of y over x."""
+    n = len(points)
+    mx = sum(x for x, _ in points) / n
+    my = sum(y for _, y in points) / n
+    spread = sum((x - mx) ** 2 for x, _ in points)
+    return sum((x - mx) * (y - my) for x, y in points) / spread if spread else 0.0
+
+
+@dataclass(frozen=True)
+class Forecast:
+    label: str
+    free_bytes: int  # at the latest sample
+    last_day: date
+    days: int  # days of samples behind it
+    used_per_day: float | None  # bytes a day; None without enough samples
+
+    @property
+    def days_left(self) -> float | None:
+        """Days until full at this rate; None when it isn't filling (or can't be told)."""
+        if not self.used_per_day or self.used_per_day <= 0:
+            return None
+        return self.free_bytes / self.used_per_day
+
+    def describe(self) -> str:
+        head = f"{self.label}: {terabytes(self.free_bytes)} free"
+        if self.used_per_day is None:
+            so_far = f"{self.days} day{'s' if self.days != 1 else ''}"
+            return f"{head}; {so_far} of samples so far, a forecast needs {MIN_DAYS}."
+        if self.days_left is None:
+            return f"{head}, not filling over the last {self.days} days."
+        full = self.last_day + timedelta(days=round(self.days_left))
+        return (
+            f"{head}, filling about {gigabytes(int(self.used_per_day))} a day: full in about "
+            f"{round(self.days_left)} days (around {full:%b %d})."
+        )
+
+
+def forecasts(samples: list[SpaceSample]) -> list[Forecast]:
+    """Each volume's forecast from its samples, soonest full first."""
+    by_volume: dict[str, list[SpaceSample]] = defaultdict(list)
+    for sample in samples:
+        by_volume[sample.volume].append(sample)
+    found = []
+    for series in by_volume.values():
+        series.sort(key=lambda s: s.day)
+        last = series[-1]
+        days = (last.day - series[0].day).days + 1
+        rate = None
+        if days >= MIN_DAYS and len(series) > 1:
+            rate = -slope([(float((s.day - last.day).days), float(s.free_bytes)) for s in series])
+        found.append(Forecast(last.label, last.free_bytes, last.day, days, rate))
+    # Filling soonest first, then not filling, then too young to tell.
+    return sorted(
+        found,
+        key=lambda f: (f.days_left is None, f.used_per_day is None, f.days_left or 0, f.label),
+    )

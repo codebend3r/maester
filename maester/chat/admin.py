@@ -1,4 +1,5 @@
-"""The admin console's commands: the kill switch, tiers, the audit log, what waits on the admin.
+"""The admin console's commands: the kill switch, tiers, the audit log, what waits on the
+admin, and when each volume fills.
 
 Every command is the admin's alone and is audited under its own name
 ("/kill"), refusals included, so the log shows who tried what. Replies are
@@ -26,6 +27,7 @@ from maester.clients import ClientError, Services
 from maester.config import Settings
 from maester.formatting import ago, humanized, local_time
 from maester.notify import Notice
+from maester.storage import FORECAST_WINDOW, forecasts
 from maester.store import AuditRow, PendingAction, Store
 
 log = logging.getLogger("maester.admin")
@@ -175,3 +177,18 @@ class AdminConsole:
         left = datetime.fromisoformat(pending.expires_at) - now
         expires = humanized(int(left.total_seconds()))
         return f"{pending.summary} (asked {raised}, expires in {expires})"
+
+    # -- /forecast ----------------------------------------------------------
+
+    def forecast(self, admin: ChatUser) -> AdminReply:
+        """Days until each volume is full, from a straight line through a month of samples."""
+        if refused := self._refused(admin, "forecast", {}):
+            return refused
+        today = datetime.now(self.settings.jobs.zone).date()
+        found = forecasts(self.store.space_since(today - FORECAST_WINDOW))
+        if found:
+            text = "\n".join(f"- {f.describe()}" for f in found)
+        else:
+            text = "No free-space samples yet: the first is taken tonight at 03:00."
+        self._audit(admin, "forecast", {}, f"{len(found)} volumes", ok=True)
+        return AdminReply(text)

@@ -217,6 +217,12 @@ class MaesterBot(discord.Client):
             admin = await resolve_chat_user(self, interaction.user)
             await self._answer(interaction, await self.console.pending(admin))
 
+        @tree.command(name="forecast", description="Admin: when each volume fills at this rate")
+        async def forecast(interaction: discord.Interaction) -> None:
+            await interaction.response.defer(ephemeral=True)
+            admin = await resolve_chat_user(self, interaction.user)
+            await self._answer(interaction, self.console.forecast(admin))
+
     async def _answer(self, interaction: discord.Interaction, reply: AdminReply) -> None:
         """An admin command's reply, privately, then each approval again with its buttons."""
         for chunk in split_reply(reply.text):

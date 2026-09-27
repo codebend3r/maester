@@ -1,6 +1,19 @@
+from datetime import date, timedelta
+
 from maester.clients.arr import DiskSpace, RootFolder
 from maester.clients.base import ClientError
-from maester.storage import Space, Volume, merged, read_space, volumes_of
+from maester.config import Settings
+from maester.jobs.space import sample_space
+from maester.storage import (
+    Space,
+    Volume,
+    forecasts,
+    merged,
+    read_space,
+    sample_of,
+    volumes_of,
+)
+from maester.store import SpaceSample
 
 TB = 1_000_000_000_000
 
@@ -78,3 +91,55 @@ async def test_a_bug_reading_space_is_raised_not_hidden(services):
     else:
         raise AssertionError("a bug must raise")
     assert ClientError  # the only failure that's named instead
+
+
+def samples(volume, start, frees, *, total=40 * TB, label="/Vermithor (vermithor)"):
+    return [
+        SpaceSample(volume, start + timedelta(days=n), label, int(free), total)
+        for n, free in enumerate(frees)
+    ]
+
+
+def test_a_forecast_fits_a_line_through_the_samples_and_says_when_it_fills():
+    start = date(2026, 9, 1)
+    # 4 TB free, losing 100 GB a day: 30 days of samples end at 1.1 TB.
+    filling = samples("v|40", start, [4 * TB - n * 100 * 10**9 for n in range(30)])
+    steady = samples("s|10", start, [6 * TB] * 10, total=10 * TB, label="/Syrax (meleys)")
+    young = samples("y|5", start + timedelta(days=27), [TB] * 3, total=5 * TB, label="/New (x)")
+    first, second, third = forecasts(young + steady + filling)
+    assert round(first.used_per_day) == 100 * 10**9 and round(first.days_left) == 11
+    assert first.describe() == (
+        "/Vermithor (vermithor): 1.1 TB free, filling about 100.0 GB a day: full in about 11 "
+        "days (around Oct 11)."
+    )
+    assert second.days_left is None and second.describe().endswith(
+        "not filling over the last 10 days."
+    )
+    assert third.describe() == (
+        "/New (x): 1.0 TB free; 3 days of samples so far, a forecast needs 7."
+    )
+
+
+def test_a_samples_key_is_its_path_size_and_hosts():
+    volume = Volume("/Syrax", 2 * TB, 10 * TB, ("meleys", "vermithor"), ("/Syrax/TV",))
+    sample = sample_of(volume, date(2026, 9, 27))
+    assert (sample.volume, sample.label) == (
+        f"/Syrax|{10 * TB}|meleys,vermithor",
+        "/Syrax (meleys, vermithor)",
+    )
+
+
+async def test_the_daily_sample_keeps_one_per_volume_per_day(services, store):
+    services.radarr["meleys"].disks = [DiskSpace("/Movies", 1 * TB, 16 * TB)]
+    await sample_space(services, store, Settings())
+    services.radarr["meleys"].disks = [DiskSpace("/Movies", TB // 2, 16 * TB)]
+    await sample_space(services, store, Settings())
+    kept = store.space_since(date(2000, 1, 1))
+    movies = [s for s in kept if s.label == "/Movies (meleys)"]
+    assert [s.free_bytes for s in movies] == [TB // 2]
+
+
+async def test_a_day_an_arr_cant_answer_is_skipped_whole(services, store):
+    services.sonarr["vermithor"].down = True
+    await sample_space(services, store, Settings())
+    assert store.space_since(date(2000, 1, 1)) == []

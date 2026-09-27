@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -9,6 +9,7 @@ from maester.chat.identity import IdentityService, RoleMap
 from maester.chat.service import ChatUser
 from maester.clients.seerr import MediaDetails, MediaRequest, MediaStatus, RequestStatus
 from maester.config import Settings
+from maester.store import SpaceSample
 
 ADMIN_ROLE = 1
 FRIEND = ChatUser("f1", "Friend")
@@ -113,3 +114,17 @@ async def test_pending_says_when_seerr_couldnt_be_read(console, services):
     reply = await console.pending(ADMIN)
     assert reply.text.startswith("Nothing is waiting on you.")
     assert "Couldn't read Seerr's pending requests" in reply.text
+
+
+def test_forecast_says_when_each_volume_fills_or_that_there_are_no_samples(console, store):
+    assert console.forecast(FRIEND).text == "Only the admin can use /forecast."
+    assert console.forecast(ADMIN).text.startswith("No free-space samples yet")
+    today = datetime.now(UTC).date()
+    store.record_space(
+        today,
+        [SpaceSample("v|40|vermithor", today, "/Vermithor (vermithor)", 4 * 10**12, 40 * 10**12)],
+    )
+    assert console.forecast(ADMIN).text == (
+        "- /Vermithor (vermithor): 4.0 TB free; 1 day of samples so far, a forecast needs 7."
+    )
+    assert store.audit_recent(1)[0].tool == "/forecast"
