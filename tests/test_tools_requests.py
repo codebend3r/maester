@@ -2,7 +2,7 @@ from dataclasses import replace
 
 import pytest
 
-from maester.agent.tools import ForAdmin, NotLinked, Tier, registry
+from maester.agent.tools import Result, Tier, registry
 from maester.clients import ClientError
 from maester.clients.arr import MediaFile
 from maester.clients.radarr import Movie
@@ -22,13 +22,14 @@ from maester.clients.seerr import (
 )
 from maester.clients.sonarr import Series
 from maester.library import AmbiguousOwner
-from maester.store import PendingAction
+from maester.notify import DirectMessage
+from maester.store import NotLinked
 from maester.tools.requests import (
+    decide_4k_request,
     follow_show,
     plan_seasons,
     request_media,
     request_media_4k,
-    settle_4k,
 )
 
 S = MediaStatus
@@ -149,13 +150,14 @@ async def test_4k_goes_to_the_admin_with_the_size_tradeoff(ctx):
         )
     ]
     out = await request_media_4k(ctx, 438631, "movie")
-    assert isinstance(out, ForAdmin)
+    assert isinstance(out, Result)
     assert out.content["requested"] is True and out.content["version"] == "4K"
     assert out.content["standard_copy_gb"] == 12.3 and out.content["estimated_4k_gb"] == "49-74"
-    assert out.notice.startswith("dany asks for Dune (2021) in 4K (Seerr request #1).")
-    assert "12.3 GB" in out.notice
-    assert out.approval.payload == {"request_id": 1, "title": "Dune (2021)"}
-    assert out.approval.summary == "4K Dune (2021) for dany"
+    approval = out.approval
+    assert approval.notice.startswith("dany asks for Dune (2021) in 4K (Seerr request #1).")
+    assert "12.3 GB" in approval.notice and approval.decide == "decide_4k_request"
+    assert approval.args == {"request_id": 1, "title": "Dune (2021)", "requester": "d1"}
+    assert approval.summary == "4K Dune (2021) for dany"
     assert ctx.services.seerr.requests[0].is_4k
 
 
@@ -169,25 +171,29 @@ async def test_4k_without_a_4k_server_or_already_approved_needs_no_admin(ctx):
     assert out["requested"] is True and out["auto_approved"] is True and "standard_copy" not in out
 
 
-async def test_settle_4k_approves_or_declines_in_seerr_and_tells_the_requester(ctx):
+async def test_decide_4k_request_approves_or_declines_in_seerr_and_tells_the_requester(ctx):
     seed(ctx, DUNE)
     four_k_servers(ctx)
     await request_media_4k(ctx, 438631, "movie")
     await request_media_4k(ctx, 438631, "movie")
-    pending = PendingAction(1, "approve", "request_media_4k", "d1", {"request_id": 1, "title": "Dune (2021)"}, "4K Dune (2021) for dany", "approved", "2099", "boss")  # fmt: skip
-    settled = await settle_4k(ctx, pending, True)
-    assert settled.text.startswith("Approved in Seerr: 4K Dune (2021) for dany")
-    (dm,) = settled.notices
-    assert dm.to == "d1" and "approved Dune (2021) in 4K" in dm.text
+    admin = replace(ctx, user_id="boss", tier=Tier.ADMIN)
+    first = {"request_id": 1, "title": "Dune (2021)", "requester": "d1"}
+
+    approved = await decide_4k_request(admin, approved=True, **first)
+    assert approved.content == "Approved Dune (2021) in 4K in Seerr (request #1)."
+    assert approved.notices == (
+        DirectMessage("d1", "The admin approved Dune (2021) in 4K. It's on its way; I'll message you when it's ready."),
+    )  # fmt: skip
     assert ctx.services.seerr.requests[0].status == RequestStatus.APPROVED
 
-    again = await settle_4k(ctx, pending, False)
-    assert "already approved in Seerr" in again.text and again.notices == ()
+    # Pressed again after Seerr already applied it: same answer, and the friend still hears.
+    assert await decide_4k_request(admin, approved=True, **first) == approved
+    # Seerr went the other way in the meantime: say so, and tell nobody anything wrong.
+    other_way = await decide_4k_request(admin, approved=False, **first)
+    assert "already approved in Seerr" in other_way.content and other_way.notices == ()
 
-    declined = await settle_4k(
-        ctx, replace(pending, payload={"request_id": 2, "title": "Dune (2021)"}), False
-    )
-    assert declined.text.startswith("Declined") and "declined" in declined.notices[0].text
+    declined = await decide_4k_request(admin, approved=False, **{**first, "request_id": 2})
+    assert declined.content.startswith("Declined") and "declined" in declined.notices[0].text
     assert ctx.services.seerr.requests[1].status == RequestStatus.DECLINED
 
 
@@ -224,7 +230,8 @@ def test_4k_is_a_trusted_tool_the_friend_tier_never_sees():
     trusted = {s.name for s in registry.for_tier(Tier.TRUSTED)}
     assert {"search_media", "request_media", "follow_show"} <= friend
     assert "request_media_4k" not in friend and "request_media_4k" in trusted
-    assert registry.get("request_media_4k").settle is settle_4k
+    decide = registry.get("decide_4k_request")
+    assert decide.button_only and decide.tier == Tier.ADMIN
     assert registry.get("follow_show").host_param == "host"
 
 
@@ -276,5 +283,5 @@ async def test_a_size_that_cannot_be_measured_does_not_block_4k(ctx):
 
     ctx.services.radarr["meleys"] = Down()
     out = await request_media_4k(ctx, 438631, "movie")
-    assert isinstance(out, ForAdmin) and out.content["requested"] is True
+    assert isinstance(out, Result) and out.content["requested"] is True
     assert out.content["standard_copy_size"].startswith("unknown (radarr GET")

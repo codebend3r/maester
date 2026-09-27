@@ -119,14 +119,14 @@ async def test_destructive_call_surfaces_pending_id_and_model_is_told_to_stop(wo
     assert store.open_pending("confirm")[0].action == "replace_media"
 
 
-async def test_resolve_confirmation_runs_the_tool_and_remembers_it_like_any_call(world):
+async def test_a_confirmed_call_runs_and_is_remembered_like_any_call(world):
     make, store = world
     agent, _ = make(
         tool_message([("replace_media", {"query": "dune"})]), text_message("Confirm below.")
     )
     (pending_id,) = (await agent.respond("u1", Tier.TRUSTED, "replace dune")).pending_ids
     pending = store.decide_pending(pending_id, "approved", "u1")
-    outcome = await agent.resolve_confirmation("u1", Tier.TRUSTED, pending, approved=True)
+    outcome = await agent.run_decision(pending, "u1", Tier.TRUSTED, approved=True)
     assert outcome.text.startswith("replaced") and not outcome.is_error
     *_, tool_use, result = store.recent_messages("u1", max_tokens=10_000)
     assert tool_use["content"][0]["name"] == "replace_media"
@@ -135,14 +135,14 @@ async def test_resolve_confirmation_runs_the_tool_and_remembers_it_like_any_call
     assert stored["content"].endswith("…[truncated in memory]")
 
 
-async def test_resolve_confirmation_records_a_cancel_without_running(world):
+async def test_a_cancel_is_remembered_without_running(world):
     make, store = world
     agent, _ = make(
         tool_message([("replace_media", {"query": "dune"})]), text_message("Confirm below.")
     )
     (pending_id,) = (await agent.respond("u1", Tier.TRUSTED, "replace dune")).pending_ids
     pending = store.decide_pending(pending_id, "denied", "u1")
-    outcome = await agent.resolve_confirmation("u1", Tier.TRUSTED, pending, approved=False)
+    outcome = await agent.run_decision(pending, "u1", Tier.TRUSTED, approved=False)
     assert "nothing was done" in outcome.text
     assert store.recent_messages("u1", max_tokens=10_000)[-1]["content"][0]["content"] == (
         outcome.text

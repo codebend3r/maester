@@ -47,6 +47,8 @@ Tiers come from Discord roles with a per-user override in SQLite. The tool list 
 | `search_media`     | friend  | Seerr (TMDB) search; several plausible matches become a picker labeled with availability                |
 | `request_media`    | friend  | 1080p request as the friend (`X-API-User`); for shows, seasons already there are left out and listed    |
 | `request_media_4k` | trusted | 4K request as the friend; if Seerr leaves it pending, the admin approves or declines it with buttons    |
+| `decide_4k_request` | admin, button-only | The admin's Approve/Deny on a pending 4K request: approves or declines it in Seerr and DMs the requester |
+| `link_account`     | admin, button-only | The admin's Approve/Deny on a /link request: activates or revokes the link and DMs the friend |
 | `follow_show`      | friend  | Monitors a show in its owning Sonarr so future seasons download; refuses any host but the owner        |
 | `check_availability` | friend | Versions on Plex (1080p, 4K, HEVC re-encode) with size and bitrate, episodes per season, a Plex deep link per copy; for anime, English-audio coverage per season |
 | `request_status`   | friend  | The friend's open Seerr requests; once approved, the owning host's queue and SABnzbd merged into a percent and ETA, with stalls and failures explained |
@@ -75,15 +77,18 @@ Anything posted outside the current reply is a notice (`maester/notify.py`), one
 
 Decision buttons are persistent: each carries `decide:<pending id>:<approve|deny>` as its custom id, and the bot registers `DecisionButton` at startup, so a press after a deploy still lands. A pending action's own expiry decides when a press is too late.
 
-A tool reaches the admin by returning `ForAdmin(content, notice, approval=None)`:
+A button press always runs a tool call through the runner, with the same checks and audit as the model's calls. The two kinds of pending action differ only in who presses and what runs:
 
-- Without an approval, the model gets `content` and the admin channel gets `notice`.
-- With `Approval(summary, payload)`, the runner stores a pending action named after the tool, the notice gets Approve/Deny buttons, and the model is told the action waits on the admin.
-- The admin's press is recorded, then applied by the tool's `settle` handler (`@tool(..., settle=...)`), run as the admin through `ToolRunner.settle()` and audited like any call. It returns `Settled(text, notices)`, typically a DM to the requester.
-- If settling fails, the decision is reopened so the admin can press again; settle handlers must therefore be safe to run twice.
+- **Confirm**: the requester presses Confirm, and the destructive call they asked for runs as them (Cancel runs nothing). The outcome goes into their conversation, so their next turn sees it. The runner adds a "confirmed" admin post unless the tool posted its own.
+- **Approve**: an admin presses Approve or Deny, and a button-only admin tool runs as that admin with `approved` set by the press. Button-only tools (`@tool(..., tier=Tier.ADMIN, button_only=True)`) are never shown to the model and never run from a model call. `link_account` (a /link request) and `decide_4k_request` are the two today.
+
+A tool asks the admin by returning `Result(content, notices=(), approval=None)`:
+
+- `notices` go out as they are (an `AdminPost`, a `DirectMessage`).
+- `Approval(notice, summary, decide, args)` names the decide tool and its arguments. The runner checks `args` against that tool's schema, stores the pending action, posts `notice` with Approve/Deny buttons, and tells the model the action waits on the admin. If the approval cannot be raised, the admin still gets `notice` as a plain post, and the call is an error.
+- The call that raised the approval is audited with the approval's id, so daily caps never count a call that only asked. The decision is audited under the decide tool's name.
+- A press whose run fails in the tool itself (Seerr down) is reopened, so the admin can press again; decide tools must be safe to run twice. A press whose tool no longer exists is closed.
 - If a turn fails after a tool acted (a model error, say), the agent raises `TurnFailed` with the partial reply, and the error reply still carries its confirmations and notices.
-
-The link flow's approval is the one handler registered outside a tool (`IdentityService.finish_link`).
 
 Tools act as the friend through `ToolContext.linked_user()`: the caller's active link, whose `seerr_user_id` goes out as Seerr's `X-API-User`; `ctx.link_of(discord_id)` gives anyone else's, for a tool acting on someone's behalf. Callers without one are refused with `NotLinked`. "Active" is one rule in the store (approved, and naming a Seerr user), behind `Store.active_link()` and `Store.active_link_by_seerr_id()`, which tiers, tools and the ready DM all use. A `ToolContext` always carries the real store and settings; nothing mints its own.
 

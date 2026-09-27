@@ -2,8 +2,9 @@
 
 `request_media` asks for the standard (1080p) copy. `request_media_4k` is a
 trusted-tier tool the friend tier never sees; when Seerr leaves a 4K request
-pending, it goes to the admin with Approve/Deny buttons, and the tool's
-`settle` approves or declines it in Seerr and tells the requester. For
+pending, it goes to the admin with Approve/Deny buttons, and the press runs
+`decide_4k_request`, a button-only admin tool that approves or declines it
+in Seerr and tells the requester. For
 shows, seasons already on the server or already requested are left out and
 reported, counted the way Seerr counts them. Seerr's refusals (quota,
 permission, duplicates) come back as sentences to relay, not as errors.
@@ -23,7 +24,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from maester.agent.tools import Approval, ForAdmin, Settled, Tier, ToolContext, tool
+from maester.agent.tools import Approval, Result, Tier, ToolContext, tool
 from maester.clients import ClientError, Services
 from maester.clients.seerr import (
     MediaDetails,
@@ -38,7 +39,7 @@ from maester.clients.seerr import (
 from maester.config import Settings
 from maester.library import AmbiguousOwner, movie_owner, series_owner
 from maester.notify import DirectMessage
-from maester.store import LinkedUser, PendingAction
+from maester.store import LinkedUser
 
 # A 4K copy runs roughly four to six times the size of a 1080p encode.
 UHD_SIZE_FACTOR = (4, 6)
@@ -258,27 +259,49 @@ async def request_media(
     return submitted.reply
 
 
-async def settle_4k(ctx: ToolContext, pending: PendingAction, approved: bool) -> Settled:
-    """Approve or decline the pending 4K request in Seerr, then tell the requester."""
+@tool(
+    "decide_4k_request",
+    "The admin's decision on a pending 4K request: approve or decline it in Seerr.",
+    {
+        "type": "object",
+        "properties": {
+            "request_id": {"type": "integer", "description": "The Seerr request id."},
+            "title": {"type": "string"},
+            "requester": {"type": "string", "description": "The requester's Discord id."},
+            "approved": {"type": "boolean"},
+        },
+        "required": ["request_id", "title", "requester", "approved"],
+        "additionalProperties": False,
+    },
+    tier=Tier.ADMIN,
+    button_only=True,
+)
+async def decide_4k_request(
+    ctx: ToolContext, request_id: int, title: str, requester: str, approved: bool
+) -> Result:
+    """Approve or decline the request in Seerr, then tell the requester.
+
+    Safe to run again: when Seerr already shows this decision (an earlier
+    press went through before failing), the requester is still told.
+    """
     seerr = ctx.services.seerr
-    request_id, title = pending.payload["request_id"], pending.payload["title"]
-    current = await seerr.get_request(request_id)
-    if current.status != RequestStatus.PENDING:
-        return Settled(
-            f"Seerr request #{request_id} ({title} in 4K) was already "
-            f"{current.status.label} in Seerr; nothing changed."
+    wanted = RequestStatus.APPROVED if approved else RequestStatus.DECLINED
+    current = (await seerr.get_request(request_id)).status
+    if current == RequestStatus.PENDING:
+        await (seerr.approve_request if approved else seerr.decline_request)(request_id)
+    elif current != wanted:
+        return Result(
+            f"Seerr request #{request_id} ({title} in 4K) was already {current.label} in Seerr; "
+            "nothing changed."
         )
     if approved:
-        await seerr.approve_request(request_id)
-        verb = "Approved"
         dm = f"The admin approved {title} in 4K. It's on its way; I'll message you when it's ready."
     else:
-        await seerr.decline_request(request_id)
-        verb = "Declined"
         dm = f"The admin declined {title} in 4K. You can still ask for the regular version."
-    return Settled(
-        f"{verb} in Seerr: {pending.summary} (request #{request_id}).",
-        (DirectMessage(pending.requester, dm),),
+    verb = "Approved" if approved else "Declined"
+    return Result(
+        f"{verb} {title} in 4K in Seerr (request #{request_id}).",
+        (DirectMessage(requester, dm),),
     )
 
 
@@ -290,7 +313,6 @@ async def settle_4k(ctx: ToolContext, pending: PendingAction, approved: bool) ->
     "estimate, so you can explain the storage trade-off.",
     REQUEST_SCHEMA,
     tier=Tier.TRUSTED,
-    settle=settle_4k,
 )
 async def request_media_4k(
     ctx: ToolContext,
@@ -299,7 +321,7 @@ async def request_media_4k(
     seasons: list[int] | None = None,
     latest_season: bool = False,
     english_dub: bool = False,
-) -> dict[str, Any] | ForAdmin:
+) -> dict[str, Any] | Result:
     seerr = ctx.services.seerr
     if not any(
         s.is_4k for s in await seerr.servers("radarr" if media_type == "movie" else "sonarr")
@@ -322,12 +344,13 @@ async def request_media_4k(
             f" The 1080p copy is {tradeoff['standard_copy_gb']} GB;"
             f" 4K would be about {tradeoff['estimated_4k_gb']} GB."
         )
-    return ForAdmin(
+    return Result(
         reply,
-        notice,
-        Approval(
+        approval=Approval(
+            notice=notice,
             summary=f"4K {details.display} for {who}",
-            payload={"request_id": request.id, "title": details.display},
+            decide="decide_4k_request",
+            args={"request_id": request.id, "title": details.display, "requester": ctx.user_id},
         ),
     )
 

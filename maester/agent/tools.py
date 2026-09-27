@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any
 
 from maester.config import Settings
 from maester.notify import Notice
-from maester.store import LinkedUser, NotLinked, PendingAction, Store
+from maester.store import LinkedUser, NotLinked, Store
 
 if TYPE_CHECKING:
     from maester.clients import Services
@@ -130,48 +130,34 @@ class Choices:
 
 @dataclass(frozen=True)
 class Approval:
-    """An action only the admin may allow, raised by a tool through `ForAdmin`.
+    """Ask the admin: `notice` goes up with Approve/Deny buttons, and the press runs `decide`.
 
-    The runner stores it as a pending action named after the tool; when the
-    admin presses Approve or Deny, the tool's `settle` handler gets the
-    decision along with `payload`.
+    `decide` names a button-only admin tool; `args` are its arguments except
+    `approved`, which the press supplies. The runner checks them against that
+    tool's schema before anything is stored, and on the press runs the tool
+    through the same checks and audit as any call.
     """
 
+    notice: str
     summary: str
-    payload: dict[str, Any]
+    decide: str
+    args: dict[str, Any]
 
 
 @dataclass(frozen=True)
-class ForAdmin:
-    """Return this from a handler when the admin must see, or decide, what the tool did.
+class Result:
+    """A handler's result plus what goes out besides it.
 
-    The model sees `content`; `notice` is posted in the admin channel. With
-    `approval`, the notice carries Approve/Deny buttons and the model is
-    told the action now waits on the admin.
+    The model sees `content`. `notices` are posted or DMed. With `approval`,
+    the admin is asked and the model is told the action now waits on them.
     """
 
     content: Any
-    notice: str
+    notices: tuple[Notice, ...] = ()
     approval: Approval | None = None
 
 
-@dataclass(frozen=True)
-class Settled:
-    """What a `settle` handler did with the admin's decision.
-
-    `text` answers the admin in the channel; `notices` go out besides it,
-    typically a DM telling the requester how it went.
-    """
-
-    text: str
-    notices: tuple[Notice, ...] = ()
-
-
 Handler = Callable[..., Awaitable[Any]]
-# Applies the admin's decision on an approval a tool raised: (context, pending, approved).
-# It must be safe to run again: when it raises, the decision is reopened and
-# the admin may press the button again after a partial effect.
-Settle = Callable[["ToolContext", PendingAction, bool], Awaitable[Settled]]
 
 
 @dataclass(frozen=True)
@@ -185,8 +171,10 @@ class ToolSpec:
     # Name of the argument that carries the arr host, so the audit row and
     # the confirmation summary can say which stack is being touched.
     host_param: str | None = None
-    # Settles the approvals this tool raises through `ForAdmin`.
-    settle: Settle | None = None
+    # Runs only from an admin's decision button, never from the model: it
+    # applies an `Approval` another tool raised, and must be safe to run
+    # again, since a failed run reopens the buttons.
+    button_only: bool = False
 
     def definition(self) -> dict[str, Any]:
         """The tool as the Messages API wants it, streaming its input eagerly."""
@@ -250,6 +238,8 @@ class ToolRegistry:
     def register(self, spec: ToolSpec) -> ToolSpec:
         if spec.name in self._specs:
             raise ValueError(f"tool {spec.name!r} is already registered")
+        if spec.button_only and spec.tier != Tier.ADMIN:
+            raise ValueError(f"button-only tool {spec.name!r} must be admin tier")
         self._specs[spec.name] = spec
         return spec
 
@@ -260,8 +250,12 @@ class ToolRegistry:
         return sorted(self._specs)
 
     def for_tier(self, tier: Tier) -> list[ToolSpec]:
-        """Tools this tier may call, in a stable order so the prompt prefix caches."""
-        return [self._specs[n] for n in sorted(self._specs) if self._specs[n].tier <= tier]
+        """Tools the model may call for this tier, in a stable order so the prompt caches."""
+        return [
+            spec
+            for spec in (self._specs[n] for n in sorted(self._specs))
+            if spec.tier <= tier and not spec.button_only
+        ]
 
     def definitions(self, tier: Tier) -> list[dict[str, Any]]:
         defs = [s.definition() for s in self.for_tier(tier)]
@@ -280,7 +274,7 @@ class ToolRegistry:
         tier: Tier = Tier.FRIEND,
         destructive: bool = False,
         host_param: str | None = None,
-        settle: Settle | None = None,
+        button_only: bool = False,
     ) -> Callable[[Handler], Handler]:
         def decorate(fn: Handler) -> Handler:
             self.register(
@@ -292,7 +286,7 @@ class ToolRegistry:
                     tier=tier,
                     destructive=destructive,
                     host_param=host_param,
-                    settle=settle,
+                    button_only=button_only,
                 )
             )
             return fn

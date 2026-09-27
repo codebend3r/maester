@@ -17,8 +17,8 @@ from typing import Any
 
 from maester.agent.limits import LimitExceeded, RateLimiter
 from maester.agent.prompts import SYSTEM_PROMPT
-from maester.agent.runner import CONFIRMED_KEY, ToolOutcome, ToolRunner
-from maester.agent.tools import Choice, Settled, Tier, ToolContext
+from maester.agent.runner import ToolOutcome, ToolRunner
+from maester.agent.tools import Choice, Tier, ToolContext
 from maester.clients import Services
 from maester.config import Settings
 from maester.notify import Notice
@@ -111,34 +111,23 @@ class Agent:
             settings=self.settings,
         )
 
-    async def settle_approval(self, pending: PendingAction, approved: bool) -> Settled:
-        """Apply an admin's recorded decision on an approval a tool raised.
-
-        Runs as the admin who decided, so the audit row is theirs.
-        """
-        if pending.decided_by is None:
-            raise ValueError(f"pending action {pending.id} has no decision to settle")
-        return await self.runner.settle(
-            self._context(pending.decided_by, Tier.ADMIN), pending, approved
-        )
-
-    async def resolve_confirmation(
-        self, user_id: str, tier: Tier, pending: PendingAction, approved: bool
+    async def run_decision(
+        self, pending: PendingAction, user_id: str, tier: Tier, approved: bool
     ) -> ToolOutcome:
-        """Run (or drop) a confirmed destructive call and remember what happened.
+        """Run what a button press decided, as the presser, and remember a confirmation.
 
-        The model's own call only got a "waiting for confirmation" result, so
-        the real outcome goes in as a fresh tool_use/tool_result pair; the next
-        turn sees what happened the same way it sees any other tool.
+        A confirmed call's model only got "waiting for confirmation", so the
+        real outcome goes into the requester's conversation as a fresh
+        tool_use/tool_result pair; their next turn sees it like any tool. An
+        approval's decide tool is the admin's, and its requester hears
+        through the DM it sends, not through their conversation.
         """
-        if approved:
-            outcome = await self.runner.run(
-                self._context(user_id, tier),
-                pending.action,
-                {**pending.payload, CONFIRMED_KEY: pending.id},
-            )
-        else:
-            outcome = ToolOutcome("Cancelled by the user; nothing was done.")
+        outcome = await self.runner.run_decision(self._context(user_id, tier), pending, approved)
+        if pending.kind == "confirm":
+            self._remember(pending, outcome)
+        return outcome
+
+    def _remember(self, pending: PendingAction, outcome: ToolOutcome) -> None:
         tool_use = {
             "type": "tool_use",
             "id": f"toolu_button_{pending.id}",
@@ -146,9 +135,9 @@ class Agent:
             "input": pending.payload,
         }
         results = self._stub_results([outcome.as_result_block(tool_use["id"])])
+        user_id = pending.requester
         self.store.append_message(user_id, "assistant", [tool_use], estimate_tokens(tool_use))
         self.store.append_message(user_id, "user", results, estimate_tokens(results))
-        return outcome
 
     async def respond(
         self,

@@ -37,6 +37,8 @@ class FakeSeerrClient:
     routed: dict[int, Routing] = field(default_factory=dict)
     issues: list[dict[str, Any]] = field(default_factory=list)
     auto_approve: bool = False
+    # While set, approving or declining answers the way an unreachable Seerr would.
+    down: bool = False
 
     async def search(self, query: str) -> list[SearchResult]:
         q = query.lower()
@@ -109,6 +111,9 @@ class FakeSeerrClient:
         return self._set_status(request_id, RequestStatus.DECLINED)
 
     def _set_status(self, request_id: int, status: RequestStatus) -> MediaRequest:
+        if self.down:
+            path = f"/api/v1/request/{request_id}"
+            raise ClientError("seerr", "POST", path, None, "connection refused")
         for i, r in enumerate(self.requests):
             if r.id == request_id:
                 self.requests[i] = replace(r, status=status)

@@ -4,17 +4,17 @@ Tier comes from Discord roles, resolved on every message so a role change
 takes effect immediately, with a per-user override in the store that an
 admin can set. Linking a Discord account to a Plex user is a two-step
 flow: the friend names their Plex email or username, maester matches it
-against Seerr's users, and the admin approves the link with a button.
+against Seerr's users, and the admin decides with a button, which runs the
+`link_account` admin tool.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 
-from maester.agent.tools import Settled, Tier
+from maester.agent.tools import Tier
 from maester.clients import Services
-from maester.notify import DirectMessage
 from maester.store import LinkStatus, PendingAction, Store
 
 LINK_TTL = timedelta(days=7)
@@ -109,21 +109,19 @@ class IdentityService:
             tautulli_user_id=tautulli_id,
             status=LinkStatus.PENDING,
         )
+        account = seerr_user.email or seerr_user.username
+        # Decided by the button-only `link_account` admin tool (maester/tools/accounts.py).
         pending = self.store.create_pending(
             kind="approve",
             action="link_account",
             requester=discord_id,
-            payload={
-                "discord_id": discord_id,
-                "display_name": display_name,
-                "seerr_user_id": seerr_user.id,
-            },
-            summary=f"Link Discord user {display_name} to Plex account {seerr_user.email or seerr_user.username}",
+            payload={"discord_id": discord_id, "display_name": display_name, "account": account},
+            summary=f"Link Discord user {display_name} to Plex account {account}",
             ttl=LINK_TTL,
         )
         return LinkStart(
             True,
-            f"Found {seerr_user.email or seerr_user.username}. The admin will confirm the link shortly.",
+            f"Found {account}. The admin will confirm the link shortly.",
             pending,
         )
 
@@ -138,18 +136,6 @@ class IdentityService:
             except Exception:  # a missing Tautulli must not block linking
                 continue
         return None
-
-    async def finish_link(self, pending: PendingAction, approved: bool) -> Settled:
-        """Apply an admin's already-recorded decision on a link request, and tell the friend."""
-        if approved:
-            self.store.upsert_user(
-                pending.requester, status=LinkStatus.ACTIVE, linked_at=datetime.now(UTC).isoformat()
-            )
-            dm = "You're linked! Ask me for movies and shows any time."
-            return Settled(f"Linked: {pending.summary}", (DirectMessage(pending.requester, dm),))
-        self.store.upsert_user(pending.requester, status=LinkStatus.REVOKED)
-        dm = "The admin didn't approve that link. Ask them if you think it's a mistake."
-        return Settled(f"Denied: {pending.summary}", (DirectMessage(pending.requester, dm),))
 
     def set_tier_override(self, discord_id: str, tier: str | None) -> str:
         normalized = Tier.parse(tier).name.lower() if tier else None

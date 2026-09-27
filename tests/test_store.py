@@ -44,8 +44,11 @@ def test_audit_result_is_truncated_and_non_json_is_stringified(store):
 def test_audit_count_since_counts_only_successes(store):
     store.audit(discord_id="u", tool="replace_media", args={}, result=None, ok=True)
     store.audit(discord_id="u", tool="replace_media", args={}, result=None, ok=False)
+    # Asked for an approval rather than acting: not a replacement.
+    store.audit(discord_id="u", tool="replace_media", args={}, result=None, ok=True, pending_id=3)
     since = datetime.now(UTC) - timedelta(days=1)
     assert store.audit_count_since("replace_media", since) == 1
+    assert store.audit_recent(1)[0].pending_id == 3
     assert store.audit_count_since("replace_media", datetime.now(UTC) + timedelta(minutes=1)) == 0
 
 
