@@ -59,7 +59,7 @@ DOLBY_VISION_PROFILE_7 = ClientLimit(
 )
 HEVC_UNSUPPORTED = ClientLimit(
     "hevc_unsupported",
-    # A stream squeezed to fit a connection transcodes whatever the codec: that's lag.
+    # A stream squeezed to fit a connection may transcode whatever the codec: that's lag.
     lambda p: p.video_codec == "hevc" and p.video_decision == "transcode" and not p.squeezed,
     "The player can't decode HEVC (H.265), so the server converts the video on the fly, "
     "which it can't keep up with.",

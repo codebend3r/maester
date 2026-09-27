@@ -1,3 +1,5 @@
+import pytest
+
 from maester.clients import ClientError
 from maester.clients.fleet import Vitals
 from maester.perf.load import read_loads
@@ -36,18 +38,31 @@ async def test_cpu_and_memory_from_the_fleet_monitor_count_where_known(services)
     assert (facts["cpu_percent"], facts["memory_percent"], facts["busy"]) == (97.0, 40.0, True)
 
 
-async def test_a_calm_server_is_unlikely_to_be_the_cause(services):
-    services.fleet.readings = {"meleys": Vitals(12.0, 50.0)}
+async def test_a_calm_server_is_unlikely_to_be_the_cause_and_only_what_was_read_is_fine(services):
+    services.fleet.readings = {"meleys": Vitals(12.0, 50.0), "vermithor": Vitals(20.0, 40.0)}
     loads = await read_loads(services)
-    assert loads.verdict() == "Unlikely: every conversion keeps up, and CPU and memory are fine."
+    assert loads.verdict() == (
+        "Unlikely: every conversion on meleys, vermithor keeps up, and their CPU and memory "
+        "are fine."
+    )
+    assert loads.as_dict()["load_is_a_plausible_cause"] is False
     assert "cpu_and_memory" not in loads.as_dict()
+    # The monitor answered but has nothing recent on vermithor: that isn't "fine".
+    services.fleet.readings = {"meleys": Vitals(12.0, 50.0)}
+    assert (await read_loads(services)).verdict() == (
+        "Unlikely: every conversion on meleys, vermithor keeps up (no recent CPU or memory "
+        "reading for vermithor)."
+    )
 
 
 async def test_without_the_fleet_monitor_cpu_and_memory_are_unknown(services):
     services.fleet = None
     loads = await read_loads(services)
     assert loads.vitals_note == "unknown: no fleet monitor is set up"
-    assert loads.verdict() == "Unlikely: every conversion keeps up."
+    assert loads.verdict() == (
+        "Unlikely: every conversion on meleys, vermithor keeps up (CPU and memory unknown: no "
+        "fleet monitor is set up)."
+    )
     assert "cpu_percent" not in loads.as_dict()["hosts"]["meleys"]
 
 
@@ -62,7 +77,31 @@ async def test_a_host_that_cant_answer_is_named_and_the_monitor_failing_is_noted
     loads = await read_loads(services)
     assert set(loads.hosts) == {"vermithor"} and "connection refused" in loads.unreachable["meleys"]
     assert loads.vitals_note.startswith("unknown: the fleet monitor didn't answer")
-    assert loads.verdict() == "Unlikely: every conversion keeps up (meleys couldn't be asked)."
+    verdict = loads.verdict()
+    assert verdict.startswith("Unknown: every conversion on vermithor keeps up")
+    assert verdict.endswith("but meleys couldn't be asked.")
+    assert loads.as_dict()["load_is_a_plausible_cause"] is None
+    services.tautulli["vermithor"] = Down()
+    assert (await read_loads(services)).verdict() == "Unknown: no server's Tautulli answered."
+
+
+class Broken:
+    async def activity(self):
+        raise KeyError("stream_count")
+
+
+async def test_a_bug_reading_a_host_isnt_passed_off_as_the_host_being_down(services):
+    services.tautulli["meleys"] = Broken()
+    with pytest.raises(KeyError):
+        await read_loads(services)
+
+
+async def test_a_streams_host_is_read_without_it(services):
+    mine = session(session_key="1", transcode_decision="transcode", transcode_speed=0.6)
+    services.tautulli["vermithor"].sessions = [mine, session(session_key="2")]
+    load = (await read_loads(services)).hosts["vermithor"]
+    assert load.busy and not load.without(mine).busy
+    assert load.without(mine).as_dict()["streams"] == 1
 
 
 async def test_remote_streams_are_summed_by_what_they_send(services):

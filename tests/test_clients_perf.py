@@ -120,11 +120,11 @@ class Scripted:
         return self.answer
 
 
-async def test_ookla_result_is_read_in_mbps(fixture):
+async def test_ookla_result_is_read_in_kbps(fixture):
     run = Scripted(Completed(0, json.dumps(fixture("ookla_result")) + "\n", ""))
     result = await OoklaSpeedTest("meleys", run, timeout=60).measure()
-    # Ookla gives bytes per second: 4,318,211 B/s is 34.5 Mbps.
-    assert (result.upload_mbps, result.download_mbps, result.ping_ms) == (34.5, 943.0, 8.1)
+    # Ookla gives bytes per second: 4,318,211 B/s is 34,546 kbps.
+    assert (result.upload_kbps, result.download_kbps, result.ping_ms) == (34546, 942970, 8.1)
     assert (result.server, result.isp) == ("Rogers, Toronto, ON", "Rogers Communications")
     assert result.url.startswith("https://www.speedtest.net/result/c/")
     ((argv, timeout),) = run.calls
@@ -153,7 +153,7 @@ async def test_ookla_failures_say_why(answer, why):
 
 
 async def test_fake_speed_test_answers_or_fails():
-    result = SpeedResult(40.0, 900.0, 8.0, "Rogers, Toronto, ON", "Rogers", "u")
+    result = SpeedResult(40_000, 900_000, 8.0, "Rogers, Toronto, ON", "Rogers", "u")
     fake = FakeSpeedTest(result=result)
     assert await fake.measure() == result and fake.runs == 1
     with pytest.raises(SpeedTestFailed, match="no test server"):

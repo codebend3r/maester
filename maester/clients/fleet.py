@@ -72,13 +72,17 @@ class SupabaseSession(HttpClient):
     async def token(self) -> str:
         async with self._signing_in:
             if not self._token or self._clock() >= self._expires_at - TOKEN_MARGIN:
+                path = "/auth/v1/token"
                 answer = await self.post_json(
-                    "/auth/v1/token",
+                    path,
                     {"email": self._login.email, "password": self._login.password},
                     params={"grant_type": "password"},
                 )
-                self._token = answer["access_token"]
-                self._expires_at = float(answer["expires_at"])
+                try:
+                    self._token = str(answer["access_token"])
+                    self._expires_at = float(answer["expires_at"])
+                except (KeyError, TypeError, ValueError) as exc:
+                    raise ClientError(self.service, "POST", path, 200, f"no token: {exc}") from exc
             return self._token
 
     def forget(self) -> None:
@@ -104,12 +108,16 @@ class FleetMonitorClient(HttpClient):
 
     async def _latest(self, kind: str) -> dict[str, float]:
         """Each host's last reading of one metric family in the window."""
-        data = await self._signed_in(f"/fleet/{kind}", params={"minutes": WINDOW_MINUTES})
-        return {
-            h["name"]: float(h["points"][-1]["value"])
-            for h in data.get("hosts") or []
-            if h.get("points")
-        }
+        path = f"/fleet/{kind}"
+        data = await self._signed_in(path, params={"minutes": WINDOW_MINUTES})
+        try:
+            return {
+                h["name"]: float(h["points"][-1]["value"])
+                for h in data.get("hosts") or []
+                if h.get("points")
+            }
+        except (AttributeError, KeyError, TypeError, ValueError) as exc:
+            raise ClientError(self.service, "GET", path, 200, f"unexpected shape: {exc}") from exc
 
     async def _signed_in(self, path: str, **kwargs: Any) -> Any:
         try:

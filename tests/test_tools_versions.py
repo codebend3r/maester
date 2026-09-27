@@ -1,6 +1,7 @@
 import time
 
 from maester.agent.tools import Tier, registry
+from maester.clients import ClientError
 from maester.clients.plex import PlexItem, Version
 from maester.notify import AdminPost
 from maester.tools.versions import GUESSED, pick_version
@@ -58,7 +59,7 @@ async def test_their_last_play_away_from_home_limits_it(ctx):
         False,
         "2 Mbps 720p",
     )
-    assert "Plex relayed your last stream" in pick["connection"]
+    assert pick["connection"] == "about 2 Mbps: Plex relays your stream, at most 2 Mbps"
 
 
 async def test_nothing_on_plex_and_a_bad_speed(ctx):
@@ -72,16 +73,16 @@ async def test_a_heavy_remux_streamed_away_from_home_is_flagged_to_the_admin_onc
     dune(ctx, REMUX)  # no re-encode beside it
     now = int(time.time())
     wan = dict(rating_key="9001", location="wan")
+    # Vermithor's Tautulli watches the Plex server whose rating keys these are.
     ctx.services.tautulli["vermithor"].history_rows = [
         history_row(**wan, user_id=5, started=now - 3600),
         history_row(**wan, user_id=6, started=now - 86400),
+        history_row(**wan, user_id=8, started=now - 5 * 86400),
         history_row(**wan, user_id=5, started=now - 40 * 86400),  # too long ago
         history_row(rating_key="9001", location="lan", user_id=5, started=now - 7200),
     ]
-    ctx.services.tautulli["meleys"].history_rows = [
-        history_row(**wan, user_id=5, started=now - 3600),  # the same play, seen twice
-        history_row(**wan, user_id=8, started=now - 5 * 86400),
-    ]
+    # On meleys' own Plex server, 9001 is some other item: its plays don't count.
+    ctx.services.tautulli["meleys"].history_rows = [history_row(**wan, user_id=9, started=now - 60)]
     out = await pick_version(ctx, 438631, connection_mbps=100)
     (notice,) = out.notices
     assert isinstance(notice, AdminPost)
@@ -102,3 +103,21 @@ async def test_a_remux_with_its_re_encode_beside_it_isnt_a_candidate(ctx):
 
 def test_tool_is_registered_for_friends():
     assert "pick_version" in {s.name for s in registry.for_tier(Tier.FRIEND)}
+
+
+async def test_no_flag_without_the_library_servers_tautulli(ctx):
+    dune(ctx, REMUX)
+    now = int(time.time())
+    ctx.services.tautulli["vermithor"].history_rows = [
+        history_row(rating_key="9001", location="wan", user_id=u, started=now - 60)
+        for u in (1, 2, 3)
+    ]
+    ctx.services.plex.base_url = "http://plex.elsewhere:32400"  # no Tautulli watches it
+    assert isinstance(await pick_version(ctx, 438631), dict)
+    ctx.services.plex.base_url = "http://vermithor.lan:32400"
+    ctx.services.tautulli["vermithor"].history = _refuse
+    assert isinstance(await pick_version(ctx, 438631), dict)
+
+
+async def _refuse(**kwargs):
+    raise ClientError("tautulli", "GET", "/api/v2?cmd=get_history", None, "connection refused")

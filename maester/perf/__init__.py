@@ -3,7 +3,7 @@
 - `load.py`      how busy each Plex host is (Tautulli, plus CPU and memory from the fleet
                  monitor), and whether that could be the cause
 - `uplink.py`    the on-demand speed test, rationed, against the remote streams it carries
-- `versions.py`  a title's versions with their bitrates, and which one a connection carries
+- `versions.py`  which of a title's versions (`maester/plex_versions.py`) a connection carries
 - `lag.py`       what slows one stream down, as a rules table of findings and fixes
 - `reencode.py`  heavy remuxes friends keep streaming away from home, flagged to the admin
 

@@ -38,12 +38,13 @@ def services() -> Services:
     """Every service faked, with the two real hosts' per-host clients empty."""
     return Services(
         seerr=FakeSeerrClient(),
-        plex=FakePlexClient(),
+        # maester reads vermithor's Plex server, which vermithor's Tautulli watches.
+        plex=FakePlexClient(base_url="http://vermithor.lan:32400"),
         wizarr=FakeWizarrClient(),
         sonarr={h: FakeSonarrClient(host=h, base_url=SONARR_URL.format(host=h)) for h in HOSTS},
         radarr={h: FakeRadarrClient(host=h, base_url=RADARR_URL.format(host=h)) for h in HOSTS},
         sabnzbd={h: FakeSabnzbdClient(host=h) for h in HOSTS},
-        tautulli={h: FakeTautulliClient(host=h) for h in HOSTS},
+        tautulli={h: FakeTautulliClient(host=h, base_url=f"http://{h}.lan:8181") for h in HOSTS},
         probe=FakeFileProbe(),
         fleet=FakeFleetMonitor(),
         speedtest=FakeSpeedTest(),

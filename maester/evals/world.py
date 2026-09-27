@@ -210,7 +210,8 @@ def _plex(seed: dict[str, Any]) -> FakePlexClient:
         str(key): [PlexSeason(int(s["number"]), int(s["episodes"])) for s in rows]
         for key, rows in seed.get("seasons", {}).items()
     }
-    return FakePlexClient(items=items, show_seasons=seasons)
+    # The Plex server maester reads is vermithor's, like the live setup's `PLEX_URL`.
+    return FakePlexClient(base_url="http://vermithor.lan:32400", items=items, show_seasons=seasons)
 
 
 def _sonarr(host: str, seed: dict[str, Any]) -> FakeSonarrClient:
@@ -321,7 +322,9 @@ def _tautulli(host: str, seed: dict[str, Any], user_id: int) -> FakeTautulliClie
     """A host's live sessions, and finished plays under `history`."""
     sessions = [_session(n, x, user_id) for n, x in enumerate(seed.get("sessions", []), 1)]
     played = [_played(n, x) for n, x in enumerate(seed.get("history", []), 1)]
-    return FakeTautulliClient(host=host, sessions=sessions, history_rows=played)
+    return FakeTautulliClient(
+        host=host, base_url=f"http://{host}.lan:8181", sessions=sessions, history_rows=played
+    )
 
 
 def _probe(seed: dict[str, Any]) -> FakeFileProbe:
@@ -362,8 +365,8 @@ def _speedtest(seed: dict[str, Any]) -> FakeSpeedTest:
     """What a speed test from `host` finds, in Mbps; without `upload_mbps` it fails."""
     result = (
         SpeedResult(
-            upload_mbps=float(seed["upload_mbps"]),
-            download_mbps=float(seed.get("download_mbps", 300)),
+            upload_kbps=round(seed["upload_mbps"] * 1000),
+            download_kbps=round(seed.get("download_mbps", 300) * 1000),
             ping_ms=float(seed.get("ping_ms", 9)),
             server=seed.get("server", "Speedtest, Toronto, ON"),
             isp=seed.get("isp", "Home ISP"),

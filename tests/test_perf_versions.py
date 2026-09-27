@@ -7,12 +7,12 @@ from maester.perf.versions import (
     TYPICAL_AWAY,
     Connection,
     Limit,
-    TitleVersion,
-    asked_kbps,
+    last_away,
     quality_for,
     recommend,
 )
 from maester.playback.plays import Playback
+from maester.plex_versions import TitleVersion, library_host
 from tests.factories import session
 
 REMUX = TitleVersion("9001", Version("4k", "hevc", 62103, 1, "/m/Dune (2021) Bluray-2160p.mkv"))
@@ -40,20 +40,38 @@ def test_when_nothing_fits_the_lightest_is_turned_down_to_a_plex_quality():
     assert recommend((), at(50)) is None
 
 
-def test_plex_qualities_and_what_a_player_asked_for():
+def test_plex_qualities_cap_a_converted_stream_without_room_for_peaks():
     assert [quality_for(k) for k in (25_000, 20_000, 2_000, 2_500, 100)] == [
-        "20 Mbps 1080p", "20 Mbps 1080p", "2 Mbps 720p", "2 Mbps 720p", "720 kbps",
-    ]  # fmt: skip
-    assert [asked_kbps(q) for q in ("4 Mbps 720p", "1.5 Mbps 480p", "720 kbps", "Original", "")] == [
-        4000, 1500, 720, None, None,
+        "20 Mbps 1080p", "20 Mbps 1080p", "2 Mbps 720p", "2 Mbps 720p", "0.7 Mbps 328p",
     ]  # fmt: skip
 
 
 def test_a_connection_is_its_tightest_known_limit():
-    last = Playback.from_session(session(relayed=True, quality_profile="4 Mbps 720p"))
-    spare = Uplink("meleys", SpeedResult(30.0, 900.0, 9.0, "s", "i", "u"), 12000, ())
-    connection = Connection.of(said_mbps=8, last_away=last, uplink=spare)
-    assert [limit.kbps for limit in connection.limits] == [8000, 2000, 4000, 30000]
-    assert connection.limit().source == "Plex relayed your last stream, at most 2 Mbps"
-    plain = Connection.of(last_away=replace(last, relayed=False, quality_profile="Original"))
+    relayed = Playback.from_session(session(relayed=True))
+    spare = Uplink("meleys", SpeedResult(30_000, 900_000, 9.0, "s", "i", "u"), 12000, ())
+    connection = Connection.of(said_mbps=8, away=relayed, uplink=spare)
+    assert [limit.kbps for limit in connection.limits] == [8000, 2000, 30000]
+    assert connection.limit().source == "Plex relays your stream, at most 2 Mbps"
+    # Tautulli's quality label is only the bitrate sent, so it's no limit on the connection.
+    plain = Connection.of(away=replace(relayed, relayed=False, quality_profile="4 Mbps 720p"))
     assert plain.limits == () and plain.limit() is TYPICAL_AWAY
+    # A stream lagging away from home is held to a typical connection too.
+    roomy = Connection.of(uplink=spare)
+    assert roomy.limit().kbps == 30000 and roomy.limit(lagging_away=True) is TYPICAL_AWAY
+
+
+def test_the_library_host_is_the_one_whose_tautulli_shares_plexs_address(services):
+    assert library_host(services) == "vermithor"
+    services.tautulli["meleys"].base_url = "http://VERMITHOR.lan:9999"
+    assert library_host(services) is None  # two hosts claim it: none is named
+    services.tautulli = {}
+    assert library_host(services) is None
+
+
+async def test_the_last_play_away_from_home_and_hosts_not_read(services):
+    services.tautulli["meleys"].sessions = [session(user_id=7, location="wan", relayed=True)]
+    found = await last_away(services, 7)
+    assert found.playback.relayed and found.unreachable == ()
+    assert (await last_away(services, None)).playback is None
+    services.tautulli["meleys"].sessions = [session(user_id=7, location="lan")]
+    assert (await last_away(services, 7)).playback is None

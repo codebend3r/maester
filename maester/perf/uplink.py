@@ -5,8 +5,9 @@ one network behind one internet connection, so one test measures it for
 all of them. The test runs in maester's own container (`SPEEDTEST_HOST`,
 `clients/speedtest.py`), alongside the streams already going out, so the
 upload it finds is what those streams leave free: the headroom. It's read
-next to what every host's remote streams send (their bitrates, from
-Tautulli, read while the test runs) and put in plain words.
+next to what the remote streams Tautulli sees on every host send (their
+bitrates, read while the test runs) and put in plain words. A Plex server
+no Tautulli watches isn't counted.
 
 A test briefly fills the upload for everyone's streams, so tests are
 rationed. A result answers for `REUSE`, and a new test runs at most every
@@ -25,9 +26,9 @@ from typing import Any
 
 from maester.clients import Services
 from maester.clients.speedtest import SpeedResult, SpeedTester, SpeedTestFailed
-from maester.formatting import ago, humanized, megabits
+from maester.formatting import ago, humanized, mbps
 from maester.memo import Memo
-from maester.perf.load import mbps, read_loads
+from maester.perf.load import read_loads
 
 # A result answers for this long; after it, it no longer describes the connection.
 REUSE = timedelta(minutes=10)
@@ -51,7 +52,7 @@ class Uplink:
     @property
     def spare_kbps(self) -> int:
         """The test shares the upload with the streams, so what it got is what they leave."""
-        return round(self.result.upload_mbps * 1000)
+        return self.result.upload_kbps
 
     @property
     def tight(self) -> bool:
@@ -59,9 +60,9 @@ class Uplink:
         return self.spare_kbps < HD_STREAM_KBPS
 
     def headroom(self) -> str:
-        spare = megabits(self.spare_kbps)
+        spare = f"{mbps(self.spare_kbps):g}"
         alongside = (
-            f"alongside {megabits(self.streaming_kbps)} Mbps of remote streams"
+            f"alongside {mbps(self.streaming_kbps):g} Mbps of remote streams"
             if self.streaming_kbps
             else "with no remote streams running"
         )
@@ -80,8 +81,8 @@ class Uplink:
     def as_dict(self) -> dict[str, Any]:
         result = self.result
         facts: dict[str, Any] = {
-            "upload_mbps": result.upload_mbps,
-            "download_mbps": result.download_mbps,
+            "upload_mbps": mbps(result.upload_kbps),
+            "download_mbps": mbps(result.download_kbps),
             "ping_ms": result.ping_ms,
             "test_server": result.server,
             "isp": result.isp,

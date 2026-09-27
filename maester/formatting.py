@@ -28,6 +28,6 @@ def gigabytes(size: int) -> str:
     return f"{size / 1e9:.1f} GB"
 
 
-def megabits(kbps: int) -> str:
-    """A bitrate in kbps as Mbps in words: "2", "10.2"."""
-    return f"{round(kbps / 1000, 1):g}"
+def mbps(kbps: int) -> float:
+    """A bitrate in kbps as Mbps to a tenth; `f"{mbps(k):g}"` reads "2" or "10.2"."""
+    return round(kbps / 1000, 1)

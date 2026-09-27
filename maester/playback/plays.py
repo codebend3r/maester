@@ -28,8 +28,6 @@ from maester.media import Copy
 
 # Finished plays asked of each host.
 RECENT = 5
-# The quality a player asks for when it isn't limiting the bitrate.
-ORIGINAL = frozenset({"Original", ""})
 # Where Tautulli places a friend away from the server's network.
 REMOTE = frozenset({"wan", "cellular"})
 # Plex's relay carries a stream when the server can't be reached directly, at
@@ -48,7 +46,9 @@ class Playback:
     player: str  # the player's name, often the hardware's: "SHIELD Android TV"
     device: str  # the hardware, from a live session; empty for a finished play
     container: str
-    quality_profile: str  # "Original", or the lower quality the player asked for
+    # Tautulli's label for the bitrate a converted video is sent at ("8 Mbps 1080p"), worked
+    # out from that bitrate, not what the player asked for; "Original" otherwise.
+    quality_profile: str
     transcode_decision: str  # overall: "direct play" | "copy" (direct stream) | "transcode"
     video_codec: str
     video_decision: str  # "direct play" | "copy" | "transcode"
@@ -129,15 +129,17 @@ class Playback:
         return self.location in REMOTE
 
     @property
-    def lowered(self) -> bool:
-        """The player asked for less than the file's own quality."""
-        return self.quality_profile not in ORIGINAL
+    def reduced(self) -> bool:
+        """The video is converted to less than the file's own bitrate."""
+        return self.video_decision == "transcode" and self.bitrate_kbps < self.source_bitrate_kbps
 
     @property
     def squeezed(self) -> bool:
-        """Its bitrate is cut to fit a connection (a lower quality asked for, or the relay),
-        so a transcode says nothing about what the player can decode."""
-        return self.lowered or self.relayed
+        """Cut down to fit a connection, or maybe so: Plex's relay caps it, or it's sent away
+        from home at less than the file's bitrate (a remote quality setting, or a player that
+        can't decode it; Tautulli can't say which). Either way its conversion says nothing
+        certain about the player's codecs. At home, a player gets the file's own quality."""
+        return self.relayed or (self.remote and self.reduced)
 
     def with_profile(self, dovi_profile: int) -> Playback:
         """The file's Dolby Vision profile, where the play didn't say."""

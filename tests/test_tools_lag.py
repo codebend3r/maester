@@ -1,11 +1,17 @@
+import time
+
 from maester.agent.tools import Tier, registry
 from maester.clients import ClientError
+from maester.clients.plex import PlexItem, Version
 from maester.clients.speedtest import SpeedResult
 from maester.tools.lag import server_status, session_report, speed_test
-from tests.factories import session
+from tests.factories import history_row, session
+from tests.playback_world import DUNE
 
 
 class Down:
+    base_url = "http://meleys.lan:8181"
+
     async def activity(self):
         raise ClientError("tautulli", "GET", "/api/v2", None, "connection refused")
 
@@ -44,7 +50,7 @@ def test_tool_is_registered_for_friends():
 
 
 async def test_speed_test_runs_on_the_host_maester_runs_on(ctx):
-    ctx.services.speedtest.result = SpeedResult(3.2, 500.0, 11.0, "Bell, Toronto", "Bell", "u")
+    ctx.services.speedtest.result = SpeedResult(3200, 500_000, 11.0, "Bell, Toronto", "Bell", "u")
     ctx.services.tautulli["vermithor"].sessions = [session(location="wan", stream_bitrate_kbps=18500)]  # fmt: skip
     out = await speed_test(ctx, "Meleys")
     assert (out["host"], out["upload_mbps"], out["remote_streams_mbps"]) == ("meleys", 3.2, 18.5)
@@ -103,7 +109,7 @@ async def test_session_report_uses_a_recent_speed_test(ctx):
     ctx.services.tautulli["vermithor"].sessions = [
         session(user_id=7, stream_bitrate_kbps=8000, source_bitrate_kbps=8000)
     ]
-    ctx.services.speedtest.result = SpeedResult(2.5, 300.0, 9.0, "Bell", "Bell", "u")
+    ctx.services.speedtest.result = SpeedResult(2500, 300_000, 9.0, "Bell", "Bell", "u")
     await speed_test(ctx, "meleys")
     (brief,) = (await session_report(ctx))["streams"]
     assert (
@@ -111,3 +117,27 @@ async def test_session_report_uses_a_recent_speed_test(ctx):
         and "only 2.5 Mbps free" in brief["advice"]["cause"]
     )
     assert "notes" not in await session_report(ctx)
+
+
+async def test_nothing_playing_says_which_servers_couldnt_be_asked(ctx):
+    ctx.store.upsert_user("d1", tautulli_user_id=7)
+    ctx.services.tautulli["meleys"] = Down()
+    out = await session_report(ctx)
+    assert out["note"].startswith(
+        "Nothing is playing for them on the servers that answered (vermithor)"
+    )
+
+
+async def test_a_heavy_remux_streamed_away_from_home_is_flagged_from_the_report(ctx):
+    ctx.store.upsert_user("d1", tautulli_user_id=7)
+    ctx.services.seerr.details[("movie", 438631)] = DUNE
+    remux = Version("4k", "hevc", 62103, 72_600_000_000, "/Vermithor/Movies/Dune (2021) Remux-2160p.mkv")  # fmt: skip
+    ctx.services.plex.items = {"9001": PlexItem("9001", "Dune", "movie", 2021, ("tmdb://438631",), (remux,))}  # fmt: skip
+    tautulli = ctx.services.tautulli["vermithor"]
+    tautulli.sessions = [session(user_id=7, rating_key="9001", file=remux.file, stream_bitrate_kbps=62103)]  # fmt: skip
+    now = int(time.time())
+    tautulli.history_rows = [history_row(rating_key="9001", location="wan", user_id=u, started=now - 60) for u in (1, 2, 3)]  # fmt: skip
+    out = await session_report(ctx)
+    (notice,) = out.notices
+    assert "candidate for the HEVC re-encode" in notice.text
+    assert out.content["streams"][0]["advice"]["fix"] == "lower_quality"  # no lighter version

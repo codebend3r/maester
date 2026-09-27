@@ -4,7 +4,7 @@ from maester.clients.arr import MediaFile
 from maester.clients.plex import PlexItem, PlexSeason, Version
 from maester.clients.seerr import ANIME_KEYWORD, MediaDetails, MediaStatus, Season
 from maester.clients.sonarr import Series
-from maester.perf.versions import version_name
+from maester.plex_versions import version_name
 from maester.tools.availability import check_availability
 
 S = MediaStatus

@@ -18,16 +18,18 @@ briefly fills the upload for everyone.
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from maester.agent.tools import Result, Tier, ToolContext, tool
-from maester.perf import uplink
+from maester.perf import reencode, uplink
 from maester.perf.lag import diagnose, live_streams
 from maester.perf.load import read_loads
+from maester.plex_versions import library_host
 
 NOTHING_PLAYING = (
-    "Nothing is playing for them on any server right now. Ask them to start it and tell you "
-    "once it stutters; server_status says whether the servers are busy."
+    "Nothing is playing for them on {where} right now. Ask them to start it and tell you once "
+    "it stutters; server_status says whether the servers are busy."
 )
 IN_BRIEF = (
     "Tell them the advice in a sentence or two, without the stats. If they ask for the "
@@ -61,14 +63,18 @@ async def session_report(ctx: ToolContext, details: bool = False) -> dict[str, A
         return Result.refusal(
             "Their Plex account isn't matched to a Tautulli user, so their stream can't be found."
         )
-    loads = await read_loads(ctx.services)
-    tester = ctx.services.speedtest
+    services = ctx.services
+    loads = await read_loads(services)
+    tester = services.speedtest
     measured = uplink.recent(ctx.memo, tester)
-    streams = await live_streams(ctx.services, loads.hosts, link.tautulli_user_id, measured)
+    streams = await live_streams(
+        services, loads.hosts, link.tautulli_user_id, measured, library_host(services)
+    )
     found = [diagnose(stream) for stream in streams]
     reply: dict[str, Any] = {"streams": [d.details() if details else d.brief() for d in found]}
     if not streams:
-        reply["note"] = NOTHING_PLAYING
+        seen = f"the servers that answered ({', '.join(sorted(loads.hosts))})"
+        reply["note"] = NOTHING_PLAYING.format(where=seen if loads.unreachable else "any server")
     elif not details:
         reply["note"] = IN_BRIEF
     notes = [f"couldn't reach Tautulli on {h}: {why}" for h, why in loads.unreachable.items()]
@@ -80,7 +86,13 @@ async def session_report(ctx: ToolContext, details: bool = False) -> dict[str, A
         )
     if notes:
         reply["notes"] = notes
-    return reply
+    # A heavy remux streamed away from home may be one worth re-encoding.
+    heavy = [s for s in streams if s.heavy and s.playing]
+    notices = await asyncio.gather(
+        *(reencode.flag(services, ctx.store, s.play.title, list(s.versions)) for s in heavy)
+    )
+    flagged = tuple(n for found in notices for n in found)
+    return Result(reply, flagged) if flagged else reply
 
 
 @tool(

@@ -12,6 +12,7 @@ call.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import UTC, date, datetime
 from typing import Any, Protocol
 
 from maester.clients.base import ClientError, HttpClient
@@ -235,11 +236,17 @@ class TautulliUser:
 
 class Tautulli(Protocol):
     host: str
+    base_url: str
 
     async def ping(self) -> None: ...
     async def activity(self) -> Activity: ...
     async def history(
-        self, *, user_id: int | None = None, rating_key: str | None = None, length: int = 10
+        self,
+        *,
+        user_id: int | None = None,
+        rating_key: str | None = None,
+        after: date | None = None,
+        length: int = 10,
     ) -> list[HistoryRow]: ...
     async def stream_data(self, row_id: int) -> StreamData: ...
     async def users(self) -> list[TautulliUser]: ...
@@ -270,14 +277,22 @@ class TautulliClient(HttpClient):
         return Activity.from_api(await self._cmd("get_activity") or {})
 
     async def history(
-        self, *, user_id: int | None = None, rating_key: str | None = None, length: int = 10
+        self,
+        *,
+        user_id: int | None = None,
+        rating_key: str | None = None,
+        after: date | None = None,
+        length: int = 10,
     ) -> list[HistoryRow]:
-        """Finished plays, newest first: one user's, or one Plex item's, or everyone's."""
+        """Finished plays, newest first: one user's, or one Plex item's, or everyone's, from
+        `after` (a day, included) on."""
         params: dict[str, Any] = {"length": length, "order_column": "date", "order_dir": "desc"}
         if user_id is not None:
             params["user_id"] = user_id
         if rating_key is not None:
             params["rating_key"] = rating_key
+        if after is not None:
+            params["after"] = after.isoformat()
         data = await self._cmd("get_history", **params) or {}
         return [HistoryRow.from_api(r) for r in data.get("data", [])]
 
@@ -295,6 +310,7 @@ class TautulliClient(HttpClient):
 @dataclass
 class FakeTautulliClient:
     host: str = "fake"
+    base_url: str = ""
     sessions: list[Session] = field(default_factory=list)
     history_rows: list[HistoryRow] = field(default_factory=list)
     # What each history row's play was sent, by row id.
@@ -318,13 +334,20 @@ class FakeTautulliClient:
         )
 
     async def history(
-        self, *, user_id: int | None = None, rating_key: str | None = None, length: int = 10
+        self,
+        *,
+        user_id: int | None = None,
+        rating_key: str | None = None,
+        after: date | None = None,
+        length: int = 10,
     ) -> list[HistoryRow]:
+        since = datetime.combine(after, datetime.min.time(), UTC).timestamp() if after else 0
         rows = [
             r
             for r in self.history_rows
             if (user_id is None or r.user_id == user_id)
             and (rating_key is None or r.rating_key == rating_key)
+            and r.started >= since
         ]
         return sorted(rows, key=lambda r: r.started, reverse=True)[:length]
 

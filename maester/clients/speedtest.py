@@ -4,7 +4,8 @@ maester runs in one container on one NAS and has no shell or SSH, so the
 test runs here, where it can be done honestly: the Dockerfile pins the CLI
 (version and checksum), and it runs like ffprobe does (`process.py`): no
 shell, a fixed argv, under a timeout. Its machine-readable output gives
-speeds in bytes per second, which are read here as Mbps. `host` is the NAS
+speeds in bytes per second, which are read here in kbps like every other
+bitrate in maester. `host` is the NAS
 the container runs on (`SPEEDTEST_HOST`); rationing the tests is the
 tool's job (`maester/perf/uplink.py`).
 """
@@ -28,14 +29,14 @@ class SpeedTestFailed(Exception):
     """The speed test didn't give a result; the message says why."""
 
 
-def _mbps(bytes_per_second: Any) -> float:
-    return round(float(bytes_per_second) * 8 / 1_000_000, 1)
+def _kbps(bytes_per_second: Any) -> int:
+    return round(float(bytes_per_second) * 8 / 1000)
 
 
 @dataclass(frozen=True)
 class SpeedResult:
-    upload_mbps: float
-    download_mbps: float
+    upload_kbps: int
+    download_kbps: int
     ping_ms: float
     server: str  # the test server: "Rogers, Toronto, ON"
     isp: str
@@ -45,8 +46,8 @@ class SpeedResult:
     def from_ookla(cls, raw: dict[str, Any]) -> SpeedResult:
         server = raw.get("server") or {}
         return cls(
-            upload_mbps=_mbps(raw["upload"]["bandwidth"]),
-            download_mbps=_mbps(raw["download"]["bandwidth"]),
+            upload_kbps=_kbps(raw["upload"]["bandwidth"]),
+            download_kbps=_kbps(raw["download"]["bandwidth"]),
             ping_ms=round(float((raw.get("ping") or {}).get("latency") or 0), 1),
             server=", ".join(p for p in (server.get("name"), server.get("location")) if p),
             isp=raw.get("isp") or "",

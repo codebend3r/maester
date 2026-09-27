@@ -18,7 +18,7 @@ from maester.clients.plex import Plex
 from maester.clients.seerr import MediaDetails
 from maester.dub import dub_coverage, is_anime
 from maester.library import Library, OwnerUnknown
-from maester.perf.versions import describe_version, items_of
+from maester.plex_versions import describe_version, items_of
 
 
 async def plex_copies(plex: Plex, details: MediaDetails) -> list[dict[str, Any]]:

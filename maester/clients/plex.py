@@ -82,6 +82,8 @@ class PlexSeason:
 
 
 class Plex(Protocol):
+    base_url: str
+
     async def ping(self) -> None: ...
     async def machine_identifier(self) -> str: ...
     async def sections(self) -> list[Section]: ...
@@ -147,6 +149,7 @@ class PlexClient(HttpClient):
 
 @dataclass
 class FakePlexClient:
+    base_url: str = "http://plex.test:32400"
     machine_id: str = "fake-machine"
     section_list: list[Section] = field(default_factory=list)
     items: dict[str, PlexItem] = field(default_factory=dict)

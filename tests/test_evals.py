@@ -129,6 +129,7 @@ async def test_playback_case_worlds_reach_what_their_cases_expect(case_file, cal
         ("lag_remote_quality", ("session_report", {}), '"fix": "original_quality"'),
         ("lag_subtitle_burn_in", ("session_report", {}), '"fix": "subtitles_off"'),
         ("lag_busy_server", ("session_report", {}), '"fix": "wait"'),
+        ("lag_heavy_remux", ("session_report", {}), '"what_to_do": "Play the 1080p version instead'),
         ("lag_details_on_request", ("session_report", {"details": True}), '"findings": [{"fix": "original_quality"'),
         ("server_load", ("server_status", {}), '"load_is_a_plausible_cause": true'),
     ],

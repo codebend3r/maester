@@ -9,7 +9,7 @@ from tests.factories import session
 
 
 def result(upload_mbps: float) -> SpeedResult:
-    return SpeedResult(upload_mbps, 900.0, 8.0, "Rogers, Toronto, ON", "Rogers", "https://st/r")
+    return SpeedResult(round(upload_mbps * 1000), 900_000, 8.0, "Rogers, Toronto", "Rogers", "u")
 
 
 class Clock:
@@ -54,16 +54,16 @@ async def test_tests_are_reused_then_rationed_then_run_again(services):
     memo, tester = Memo(clock), FakeSpeedTest(result=result(30.0))
     await reading(memo, services, tester)
     clock.now += REUSE - timedelta(seconds=1)
-    assert (await reading(memo, services, tester)).found.result.upload_mbps == 30.0
+    assert (await reading(memo, services, tester)).found.result.upload_kbps == 30_000
     assert recent(memo, tester) is not None
     tester.result = result(5.0)
     clock.now += timedelta(minutes=5)  # past REUSE, before MIN_GAP: the last one, flagged
     rationed = await reading(memo, services, tester)
-    assert rationed.rationed and rationed.found.result.upload_mbps == 30.0
+    assert rationed.rationed and rationed.found.result.upload_kbps == 30_000
     assert "the next can run in about 5 min" in rationed.as_dict()["next_test"]
     assert recent(memo, tester) is None  # too old to describe the connection now
     clock.now = memo.latest("speed_test:meleys").at + MIN_GAP
-    assert (await reading(memo, services, tester)).found.result.upload_mbps == 5.0
+    assert (await reading(memo, services, tester)).found.result.upload_kbps == 5_000
     assert tester.runs == 2
 
 
