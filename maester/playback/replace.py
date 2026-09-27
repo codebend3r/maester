@@ -40,8 +40,8 @@ from maester.store import ReportRow, Store
 log = logging.getLogger("maester.playback")
 
 RETRY = (
-    "A new copy usually lands within a few hours when a release is out there. Try again "
-    "later today, and tell me if it's still broken tomorrow."
+    "A new copy usually lands within a few hours when a release is out there; I'll DM you "
+    "once it's on the server. Tell me if that one's broken too."
 )
 
 
