@@ -19,7 +19,7 @@ import discord
 from discord import app_commands
 
 from maester.chat.members import resolve_chat_user
-from maester.chat.service import ChatService
+from maester.chat.service import ChatService, reports_a_problem
 from maester.chat.views import DecisionButton, decision_view, send_response, send_text
 from maester.notify import AdminPost, ApprovalPost, DirectMessage, Notice
 
@@ -81,6 +81,8 @@ class MaesterBot(discord.Client):
     async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent) -> None:
         if payload.guild_id is not None or self.user is None or payload.user_id == self.user.id:
             return
+        if not reports_a_problem(str(payload.emoji)):
+            return
         author = self.get_user(payload.user_id) or await self.fetch_user(payload.user_id)
         user = await resolve_chat_user(self, author)
         response = await self.service.react(user, str(payload.message_id), str(payload.emoji))
@@ -111,8 +113,12 @@ class MaesterBot(discord.Client):
                 await self._admin_channel().send(text, view=decision_view(pending_id, "approve"))
             case DirectMessage(to, text):
                 user = self.get_user(int(to)) or await self.fetch_user(int(to))
-                for sent in await send_text(user, text):
-                    self.service.remember_dm(str(sent.id), notice)
+                sent = await send_text(user, text)
+                try:
+                    for message in sent:
+                        self.service.remember_dm(str(message.id), notice)
+                except Exception:  # it was delivered; forgetting it only costs the reaction
+                    log.exception("DM to %s sent but not remembered", to)
 
     def _admin_channel(self) -> discord.abc.Messageable:
         channel = self.get_channel(self.admin_channel_id) if self.admin_channel_id else None

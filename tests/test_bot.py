@@ -100,7 +100,22 @@ async def test_a_dm_reaction_goes_to_the_service_and_its_answer_back_to_the_dm()
     assert bot.service.reactions == [("5", "77", "\N{THUMBS DOWN SIGN}")]
     assert friend.sent[-1] == ("What's wrong with it?", {})
 
-    await bot.on_raw_reaction_add(reaction("\N{THUMBS UP SIGN}"))  # means nothing: no reply
+    # A thumbs-up means nothing, so nobody is even looked up for it.
+    bot.fetch_user = None
+    await bot.on_raw_reaction_add(reaction("\N{THUMBS UP SIGN}"))
     await bot.on_raw_reaction_add(reaction("\N{THUMBS DOWN SIGN}", guild_id=1))  # not a DM
     await bot.on_raw_reaction_add(reaction("\N{THUMBS DOWN SIGN}", user_id=1))  # the bot's own
-    assert len(bot.service.reactions) == 2 and len(friend.sent) == 2
+    assert len(bot.service.reactions) == 1 and len(friend.sent) == 2
+
+
+async def test_a_dm_that_went_out_is_delivered_even_if_it_cant_be_remembered():
+    friend = Inbox()
+    bot = bot_with(None, {5: friend})
+
+    def broken(message_id, dm):
+        raise OSError("disk full")
+
+    bot.service.remember_dm = broken
+    about = Titled(Copy("movie", 438631, True), "Dune (2021)")
+    assert await bot.deliver([DirectMessage("5", "Dune is ready", about)]) == []
+    assert friend.sent == [("Dune is ready", {})]

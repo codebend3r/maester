@@ -43,6 +43,13 @@ ERROR_REPLY = "Sorry, something went wrong on my end (ref `{ref}`). The admin ca
 ESCALATED = "That needs the admin's approval now; you'll get a DM once they decide."
 # A thumbs-down (any skin tone) on a DM about a title reports a problem with it.
 THUMBS_DOWN = "\N{THUMBS DOWN SIGN}"
+
+
+def reports_a_problem(emoji: str) -> bool:
+    """Whether a reaction means anything at all, before anyone is looked up."""
+    return emoji.startswith(THUMBS_DOWN)
+
+
 REACTION_REPORT = (
     "{emoji} on your message about {title} in {version} ({media_type} {tmdb_id}): "
     "something's wrong with it."
@@ -150,7 +157,7 @@ class ChatService:
 
     async def react(self, user: ChatUser, message_id: str, emoji: str) -> ChatResponse | None:
         """A reaction to one of maester's DMs; None when it means nothing."""
-        if not emoji.startswith(THUMBS_DOWN):
+        if not reports_a_problem(emoji):
             return None
         about = self.store.message_about(message_id, user.id)
         if about is None:
