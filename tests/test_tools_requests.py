@@ -8,7 +8,6 @@ from maester.clients.arr import MediaFile
 from maester.clients.radarr import Movie
 from maester.clients.seerr import (
     ANIME_KEYWORD,
-    ArrServer,
     MediaDetails,
     MediaStatus,
     Named,
@@ -21,7 +20,6 @@ from maester.clients.seerr import (
     ServerOptions,
 )
 from maester.clients.sonarr import Series
-from maester.library import AmbiguousOwner
 from maester.notify import DirectMessage
 from maester.store import NotLinked
 from maester.tools.requests import (
@@ -31,6 +29,7 @@ from maester.tools.requests import (
     request_media,
     request_media_4k,
 )
+from tests.factories import seerr_server
 
 S = MediaStatus
 DUNE = MediaDetails(438631, "movie", "Dune", 2021, "", S.UNKNOWN, S.UNKNOWN)
@@ -56,8 +55,9 @@ def seed(ctx, *details):
 
 
 def four_k_servers(ctx, kind="radarr"):
-    server = ArrServer(1, "Radarr 4K", is_4k=True, is_default=True)
-    ctx.services.seerr.server_list[kind] = [ServerOptions(server, (), ())]
+    """Seerr sends 4K to vermithor; nothing yet records a 1080p server."""
+    media = "movie" if kind == "radarr" else "tv"
+    ctx.services.seerr.arr_servers[kind] = [seerr_server(1, media, "vermithor", is_4k=True)]
 
 
 async def test_movie_request_is_made_as_the_linked_friend(ctx):
@@ -221,8 +221,8 @@ async def test_follow_show_only_on_the_owning_host(ctx):
     }
     assert ctx.services.sonarr["vermithor"].followed == [12]
     bear_in(ctx, "meleys")
-    with pytest.raises(AmbiguousOwner, match="meleys and vermithor"):
-        await follow_show(ctx, 136315, "vermithor")
+    out = await follow_show(ctx, 136315, "vermithor")
+    assert out["followed"] is False and "meleys and vermithor both have it" in out["reason"]
 
 
 def test_4k_is_a_trusted_tool_the_friend_tier_never_sees():
@@ -237,13 +237,13 @@ def test_4k_is_a_trusted_tool_the_friend_tier_never_sees():
 
 def sonarr_with_tags(ctx, *, is_4k=False, tags=((1, "seerr"), (4, "anime"), (7, "dub"))):
     options = ServerOptions(
-        ArrServer(0, "Sonarr", is_4k=is_4k, is_default=True),
         profiles=(Named(6, "HD-1080p"), Named(11, "Dual Audio")),
         tags=tuple(Named(i, label) for i, label in tags),
         default_tags=(1,),
         anime_tags=(1, 4),
     )
-    ctx.services.seerr.server_list["sonarr"] = [options]
+    ctx.services.seerr.arr_servers["sonarr"] = [seerr_server(0, "tv", "meleys", is_4k=is_4k)]
+    ctx.services.seerr.options[("sonarr", 0)] = options
 
 
 async def test_an_english_dub_request_carries_the_dub_tag_and_profile(ctx):
@@ -268,7 +268,7 @@ async def test_a_dub_request_keeps_default_tags_and_says_when_it_cannot_tag(ctx)
     assert out["requested"] is True and "has no 'dub' tag" in out["dub"]
     assert 2 not in ctx.services.seerr.routed
 
-    ctx.services.seerr.server_list["sonarr"] = []
+    ctx.services.seerr.arr_servers["sonarr"] = []
     out = await request_media(ctx, 136315, "tv", seasons=[3], english_dub=True)
     assert out["dub"].startswith("Seerr has no default server")
 
@@ -278,10 +278,12 @@ async def test_a_size_that_cannot_be_measured_does_not_block_4k(ctx):
     four_k_servers(ctx)
 
     class Down:
+        base_url = "http://meleys.lan:7878"
+
         async def movie_by_tmdb(self, tmdb_id):
             raise ClientError("radarr", "GET", "/api/v3/movie", None, "timeout")
 
     ctx.services.radarr["meleys"] = Down()
     out = await request_media_4k(ctx, 438631, "movie")
     assert isinstance(out, Result) and out.content["requested"] is True
-    assert out.content["standard_copy_size"].startswith("unknown (radarr GET")
+    assert out.content["standard_copy_size"].startswith("unknown (couldn't ask the movie arr")

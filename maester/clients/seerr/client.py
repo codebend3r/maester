@@ -127,7 +127,8 @@ class SeerrClient(HttpClient):
         return Quotas(Quota.from_api(data.get("movie") or {}), Quota.from_api(data.get("tv") or {}))
 
     async def servers(self, kind: str) -> list[ArrServer]:
-        return [ArrServer.from_api(s) for s in await self.get_json(f"/api/v1/service/{kind}")]
+        """Seerr's Radarr or Sonarr servers, from its settings (the API key is an admin's)."""
+        return [ArrServer.from_api(s) for s in await self.get_json(f"/api/v1/settings/{kind}")]
 
     async def server_options(self, kind: str, server_id: int) -> ServerOptions:
         return ServerOptions.from_api(await self.get_json(f"/api/v1/service/{kind}/{server_id}"))

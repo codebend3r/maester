@@ -14,12 +14,11 @@ import re
 from typing import Any
 
 from maester.agent.tools import Tier, ToolContext, tool
-from maester.clients import ClientError, Services
+from maester.clients import Services
 from maester.clients.plex import Plex, Version
 from maester.clients.seerr import MediaDetails
-from maester.clients.sonarr import Series
 from maester.dub import dub_coverage, is_anime
-from maester.library import AmbiguousOwner, Owned, series_owner
+from maester.library import Library, OwnerUnknown
 
 # The server's own 4K re-encodes are written next to the original as
 # "<Movie> (<year>) 2160p HEVC.mkv"; that exact tail is what sets them apart
@@ -77,20 +76,25 @@ async def season_counts(plex: Plex, details: MediaDetails) -> list[dict[str, Any
 
 
 async def show_details(services: Services, details: MediaDetails) -> dict[str, Any]:
-    """The owning Sonarr host (or why none can be named), and English audio for anime."""
-    owner: Owned[Series] | None = None
-    facts: dict[str, Any] = {}
-    if details.tvdb_id is not None:
-        try:
-            owner = await series_owner(services, details.tvdb_id)
-        except (AmbiguousOwner, ClientError) as exc:
-            facts["sonarr_note"] = str(exc)
-    facts["sonarr_host"] = owner.host if owner else None
-    if is_anime(details, owner.item if owner else None):
+    """The Sonarr host with the standard copy (or why none can be named); for anime,
+    which seasons' files have English audio."""
+    facts: dict[str, Any] = {"sonarr_host": None}
+    try:
+        owner = await (await Library.load(services)).owner(details, is_4k=False)
+    except OwnerUnknown as exc:
+        owner, facts["sonarr_note"] = None, str(exc)
+    if owner is not None:
+        facts["sonarr_host"] = owner.host
+    # Sonarr's series type only matters when TMDB alone doesn't call it anime.
+    series = (
+        await owner.arr.series_by_tvdb(details.tvdb_id)
+        if owner is not None and not details.anime_by_tmdb
+        else None
+    )
+    if is_anime(details, series):
         facts["anime"] = True
         if owner is not None:
-            files = await services.sonarr[owner.host].episode_files(owner.item.id)
-            facts["english_audio"] = [s.as_dict() for s in dub_coverage(files)]
+            facts["english_audio"] = [s.as_dict() for s in dub_coverage(await owner.files())]
     return facts
 
 

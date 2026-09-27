@@ -19,6 +19,7 @@ from maester.clients import (
     WizarrClient,
 )
 from maester.clients.seerr import (
+    ArrRef,
     MediaStatus,
     Refusal,
     RequestRefused,
@@ -106,6 +107,8 @@ async def test_seerr_movie_details(fixture):
     assert movie.status == MediaStatus.AVAILABLE and movie.status_4k == MediaStatus.UNKNOWN
     assert movie.rating_key == "4348" and movie.rating_key_for(True) is None
     assert movie.collection_id == 726871 and movie.seasons == () and not movie.anime_by_tmdb
+    # Seerr sent the standard copy to its server 0, where the movie's id is 8; no 4K copy.
+    assert movie.arr_for(False) == ArrRef(0, 8) and movie.arr_for(True) is None
 
 
 @respx.mock
@@ -139,12 +142,11 @@ async def test_seerr_request_actions_quota_and_services(fixture):
     assert (quotas.movie.used, quotas.movie.limit, quotas.movie.remaining) == (10, 10, 0)
     assert quotas.movie.restricted and quotas.of("tv").limit is None
 
-    respx.get(f"{BASE}/api/v1/service/sonarr").respond(
-        json=[{"id": 0, "name": "Sonarr", "is4k": False, "isDefault": True, "activeTags": []}]
-    )
+    respx.get(f"{BASE}/api/v1/settings/sonarr").respond(json=fixture("seerr_sonarr_settings"))
     respx.get(f"{BASE}/api/v1/service/sonarr/0").respond(json=fixture("seerr_sonarr_service"))
-    (server,) = await client.servers("sonarr")
-    assert server.is_default and not server.is_4k
+    hd, uhd = await client.servers("sonarr")
+    assert hd.is_default and not hd.is_4k and hd.url == "http://192.168.50.3:27021"
+    assert uhd.is_4k and uhd.url == "https://meleys.lan:8989/sonarr4k"
     options = await client.server_options("sonarr", 0)
     assert options.tag("DUB").id == 7 and options.profile("dual audio").id == 11
     assert options.default_tags == (1,) and options.anime_tags == (1, 4)

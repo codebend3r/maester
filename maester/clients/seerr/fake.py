@@ -31,7 +31,9 @@ class FakeSeerrClient:
     user_list: list[SeerrUser] = field(default_factory=list)
     requests: list[MediaRequest] = field(default_factory=list)
     quotas: dict[int, Quotas] = field(default_factory=dict)
-    server_list: dict[str, list[ServerOptions]] = field(default_factory=dict)
+    # Seerr's Radarr/Sonarr servers by kind, and each one's profiles and tags.
+    arr_servers: dict[str, list[ArrServer]] = field(default_factory=dict)
+    options: dict[tuple[str, int], ServerOptions] = field(default_factory=dict)
     # A refusal to raise for a TMDB id, the way Seerr would answer.
     refusals: dict[int, RequestRefused] = field(default_factory=dict)
     routed: dict[int, Routing] = field(default_factory=dict)
@@ -124,10 +126,10 @@ class FakeSeerrClient:
         return self.quotas.get(user_id, Quotas(UNLIMITED, UNLIMITED))
 
     async def servers(self, kind: str) -> list[ArrServer]:
-        return [o.server for o in self.server_list.get(kind, [])]
+        return list(self.arr_servers.get(kind, []))
 
     async def server_options(self, kind: str, server_id: int) -> ServerOptions:
-        return next(o for o in self.server_list[kind] if o.server.id == server_id)
+        return self.options[(kind, server_id)]
 
     async def users(self) -> list[SeerrUser]:
         return list(self.user_list)

@@ -16,9 +16,9 @@ from maester.clients import (
 )
 from maester.config import Settings
 from maester.store import Store
+from tests.factories import HOSTS, RADARR_URL, SONARR_URL
 
 FIXTURES = Path(__file__).parent / "fixtures"
-HOSTS = ("meleys", "vermithor")
 
 
 @pytest.fixture
@@ -36,8 +36,8 @@ def services() -> Services:
         seerr=FakeSeerrClient(),
         plex=FakePlexClient(),
         wizarr=FakeWizarrClient(),
-        sonarr={h: FakeSonarrClient(host=h) for h in HOSTS},
-        radarr={h: FakeRadarrClient(host=h) for h in HOSTS},
+        sonarr={h: FakeSonarrClient(host=h, base_url=SONARR_URL.format(host=h)) for h in HOSTS},
+        radarr={h: FakeRadarrClient(host=h, base_url=RADARR_URL.format(host=h)) for h in HOSTS},
         sabnzbd={h: FakeSabnzbdClient(host=h) for h in HOSTS},
         tautulli={h: FakeTautulliClient(host=h) for h in HOSTS},
     )

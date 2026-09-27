@@ -36,7 +36,6 @@ from maester.clients.seerr import (
     SearchResult,
     Season,
     SeerrUser,
-    ServerOptions,
 )
 from maester.clients.sonarr import Series
 from maester.store import Store
@@ -45,6 +44,7 @@ from maester.store import Store
 import maester.tools  # noqa: F401  isort: skip
 
 EVAL_USER = "eval-user"
+ARR_URLS = {"radarr": "http://{host}.lan:7878", "sonarr": "http://{host}.lan:8989"}
 
 
 def _title(r: dict[str, Any]) -> tuple[SearchResult, MediaDetails]:
@@ -101,12 +101,14 @@ def _request(n: int, r: dict[str, Any], seerr_user_id: int) -> MediaRequest:
     )
 
 
-def _seerr(seed: dict[str, Any], seerr_user_id: int) -> FakeSeerrClient:
+def _seerr(seed: dict[str, Any], seerr_user_id: int, hosts: list[str]) -> FakeSeerrClient:
     titles = [_title(r) for r in seed.get("results", [])]
-    four_k = [
-        ServerOptions(ArrServer(9, f"{kind} 4K", is_4k=True, is_default=True), (), ())
+    # Seerr's 4K servers, when the case has them, point at the last host's arrs.
+    uhd_host = hosts[-1]
+    four_k = {
+        kind: [ArrServer(9, f"{kind} 4K", True, True, ARR_URLS[kind].format(host=uhd_host))]
         for kind in ("radarr", "sonarr")
-    ]
+    }
     by_id = {result.tmdb_id: result for result, _ in titles}
     return FakeSeerrClient(
         results=[result for result, _ in titles],
@@ -122,7 +124,7 @@ def _seerr(seed: dict[str, Any], seerr_user_id: int) -> FakeSeerrClient:
             for u in seed.get("users", [])
         ],
         requests=[_request(n, r, seerr_user_id) for n, r in enumerate(seed.get("requests", []), 1)],
-        server_list={"radarr": [four_k[0]], "sonarr": [four_k[1]]} if seed.get("four_k") else {},
+        arr_servers=four_k if seed.get("four_k") else {},
         auto_approve=bool(seed.get("auto_approve", False)),
     )
 
@@ -131,6 +133,7 @@ def _radarr(host: str, seed: dict[str, Any]) -> FakeRadarrClient:
     """A host's movies and what is downloading for them; sizes in GB."""
     return FakeRadarrClient(
         host=host,
+        base_url=ARR_URLS["radarr"].format(host=host),
         movie_list=[
             Movie(int(m["id"]), m["title"], int(m["tmdb_id"]), m.get("year"), "", True, False, None)
             for m in seed.get("movies", [])
@@ -185,6 +188,7 @@ def _sonarr(host: str, seed: dict[str, Any]) -> FakeSonarrClient:
     """A host's shows and their episode files; `audio` is Sonarr's "jpn/eng" form."""
     return FakeSonarrClient(
         host=host,
+        base_url=ARR_URLS["sonarr"].format(host=host),
         series_list=[
             Series(
                 id=int(x["id"]),
@@ -218,7 +222,7 @@ def build_services(seed: dict[str, Any], seerr_user_id: int = 4) -> Services:
     hosts = seed.get("hosts", ["meleys", "vermithor"])
     radarr, sonarr = seed.get("radarr", {}), seed.get("sonarr", {})
     return Services(
-        seerr=_seerr(seed.get("seerr", {}), seerr_user_id),
+        seerr=_seerr(seed.get("seerr", {}), seerr_user_id, hosts),
         plex=_plex(seed.get("plex", {})),
         wizarr=FakeWizarrClient(),
         sonarr={h: _sonarr(h, sonarr.get(h, {})) for h in hosts},

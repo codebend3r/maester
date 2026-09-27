@@ -8,16 +8,10 @@ from maester.agent.tools import Choice, Choices, Tier, ToolRegistry
 from maester.agent.tools import registry as app_registry
 from maester.chat.identity import IdentityService, RoleMap
 from maester.chat.service import UNLINKED_HELP, ChatService, ChatUser, Decision
-from maester.clients.seerr import (
-    ArrServer,
-    MediaDetails,
-    MediaStatus,
-    RequestStatus,
-    SeerrUser,
-    ServerOptions,
-)
+from maester.clients.seerr import MediaDetails, MediaStatus, RequestStatus, SeerrUser
 from maester.config import Settings
 from maester.notify import AdminPost, ApprovalPost, DirectMessage
+from tests.factories import seerr_server
 from tests.fake_model import FakeModel, text_message, tool_message
 
 # Importing the tools package registers the real tools into `app_registry`.
@@ -279,7 +273,7 @@ async def test_a_trusted_4k_request_is_approved_by_the_admin_end_to_end(services
     store.upsert_user(TRUSTED.id, status="active", seerr_user_id=7, plex_username="trusty")
     seerr = services.seerr
     seerr.details[("movie", 438631)] = DUNE
-    seerr.server_list["radarr"] = [ServerOptions(ArrServer(1, "Radarr 4K", True, True), (), ())]
+    seerr.arr_servers["radarr"] = [seerr_server(1, "movie", "vermithor", is_4k=True)]
     svc = service(
         app_registry,
         services,

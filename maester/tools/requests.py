@@ -15,8 +15,9 @@ where a release profile can prefer dual-audio releases), and the configured
 dual-audio quality profile when that server has one.
 
 `follow_show` is the one arr write here: it monitors a show in the Sonarr
-that owns it so future seasons download as they air, and only on the host
-the caller names when that host really is the owner.
+holding its standard copy (`maester/library.py`) so future seasons
+download as they air, and only on the host the caller names when that host
+really is the owner.
 """
 
 from __future__ import annotations
@@ -37,7 +38,7 @@ from maester.clients.seerr import (
     Seerr,
 )
 from maester.config import Settings
-from maester.library import AmbiguousOwner, movie_owner, series_owner
+from maester.library import Library, OwnerUnknown
 from maester.notify import DirectMessage
 from maester.store import LinkedUser
 
@@ -204,17 +205,10 @@ async def explain(seerr: Seerr, user: LinkedUser, refused: RequestRefused, media
 
 async def standard_copy_bytes(services: Services, details: MediaDetails) -> int | None:
     """Size of the 1080p copy on the server, or None when no arr has it."""
-    if details.media_type == "movie":
-        movie = await movie_owner(services, details.tmdb_id)
-        if movie is None:
-            return None
-        files = await services.radarr[movie.host].movie_files(movie.item.id)
-    else:
-        show = await series_owner(services, details.tvdb_id) if details.tvdb_id else None
-        if show is None:
-            return None
-        files = await services.sonarr[show.host].episode_files(show.item.id)
-    return sum(f.size_bytes for f in files) or None
+    owner = await (await Library.load(services)).owner(details, is_4k=False)
+    if owner is None:
+        return None
+    return sum(f.size_bytes for f in await owner.files()) or None
 
 
 async def size_tradeoff(services: Services, details: MediaDetails) -> dict[str, Any]:
@@ -224,7 +218,7 @@ async def size_tradeoff(services: Services, details: MediaDetails) -> dict[str, 
     tradeoff: dict[str, Any] = {"standard_copy": details.status.label}
     try:
         size = await standard_copy_bytes(services, details)
-    except (AmbiguousOwner, ClientError) as exc:  # an estimate is not worth failing the request
+    except (OwnerUnknown, ClientError) as exc:  # an estimate is not worth failing the request
         return {**tradeoff, "standard_copy_size": f"unknown ({exc})"}
     if size:
         gb = size / 1e9
@@ -374,7 +368,10 @@ async def request_media_4k(
 )
 async def follow_show(ctx: ToolContext, tmdb_id: int, host: str) -> dict[str, Any]:
     details = await ctx.services.seerr.media_details("tv", tmdb_id)
-    owner = await series_owner(ctx.services, details.tvdb_id) if details.tvdb_id else None
+    try:
+        owner = await (await Library.load(ctx.services)).owner(details, is_4k=False)
+    except OwnerUnknown as exc:
+        return {"followed": False, "reason": str(exc)}
     if owner is None:
         return {
             "followed": False,
@@ -386,5 +383,5 @@ async def follow_show(ctx: ToolContext, tmdb_id: int, host: str) -> dict[str, An
             "followed": False,
             "reason": f"{details.display} is on the Sonarr on {owner.host}, not {host}.",
         }
-    await ctx.services.sonarr[owner.host].follow(owner.item.id)
+    await ctx.services.sonarr[owner.host].follow(owner.media_id)
     return {"followed": True, "title": details.display, "host": owner.host}

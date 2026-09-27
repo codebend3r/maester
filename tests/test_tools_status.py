@@ -5,9 +5,10 @@ import pytest
 from maester.clients.arr import HistoryEvent, QueueItem
 from maester.clients.radarr import Movie
 from maester.clients.sabnzbd import Download
-from maester.clients.seerr import MediaDetails, MediaStatus, RequestStatus, Season
+from maester.clients.seerr import ArrRef, MediaDetails, MediaStatus, RequestStatus, Season
 from maester.clients.sonarr import Series
 from maester.tools.status import humanized, request_status, seconds_left
+from tests.factories import seerr_server
 
 S = MediaStatus
 DUNE = MediaDetails(438631, "movie", "Dune", 2021, "", S.PROCESSING, S.UNKNOWN)
@@ -148,7 +149,7 @@ async def test_failed_requests_are_listed_and_queues_are_fetched_once(dune_on_me
     ctx = dune_on_meleys
     seerr = ctx.services.seerr
     await request(ctx, "movie", 438631)
-    await request(ctx, "movie", 438631, is_4k=True)
+    await request(ctx, "movie", 438631)
     failed = await request(ctx, "movie", 438631)
     seerr.requests[-1] = replace(failed, status=RequestStatus.FAILED)
     radarr = ctx.services.radarr["meleys"]
@@ -166,3 +167,44 @@ async def test_failed_requests_are_listed_and_queues_are_fetched_once(dune_on_me
     assert rows[0]["request"] == "failed" and rows[0]["failed"].startswith("Seerr couldn't")
     assert rows[1]["percent"] == rows[2]["percent"] == 50.0
     assert fetches == ["radarr"]
+
+
+async def test_a_4k_request_follows_its_own_copy_to_the_4k_host(dune_on_meleys):
+    """1080p on meleys and 4K on vermithor: each request reads its own queue."""
+    ctx = dune_on_meleys
+    seerr = ctx.services.seerr
+    seerr.arr_servers["radarr"] = [
+        seerr_server(0, "movie", "meleys"),
+        seerr_server(1, "movie", "vermithor", is_4k=True),
+    ]
+    seerr.details[("movie", 438631)] = replace(DUNE, arr=ArrRef(0, 8), arr_4k=ArrRef(1, 31))
+    ctx.services.radarr["vermithor"].movie_list = [
+        Movie(31, "Dune", 438631, 2021, "/V/Movies 4K/Dune (2021)", True, False, None)
+    ]
+    ctx.services.radarr["vermithor"].queue_items = [queued(1, 31, 60_000, 15_000, "nzo_4k")]
+    await request(ctx, "movie", 438631, is_4k=True)
+    (row,) = (await request_status(ctx))["requests"]
+    assert (row["version"], row["host"], row["percent"]) == ("4K", "vermithor", 75.0)
+
+
+async def test_one_unreachable_host_only_spoils_its_own_rows(dune_on_meleys):
+    ctx = dune_on_meleys
+    seerr = ctx.services.seerr
+    seerr.details[("tv", 136315)] = BEAR
+    sonarr = ctx.services.sonarr["vermithor"]
+    sonarr.series_list = [
+        Series(12, "The Bear", 403245, 2022, "/V/TV/The Bear", True, "standard", (2,))
+    ]
+    sonarr.queue_items = [queued(1, 12, 100, 25, "nzo_bear")]
+    await request(ctx, "movie", 438631)
+    await request(ctx, "tv", 136315, seasons=[2])
+    await request(ctx, "movie", 999)  # Seerr no longer knows this one
+
+    async def down():
+        raise ConnectionError("meleys radarr is down")
+
+    ctx.services.radarr["meleys"].queue = down
+    missing, bear, dune = (await request_status(ctx))["requests"]
+    assert missing["title"] == "TMDB 999" and "couldn't look it up" in missing["error"]
+    assert bear["percent"] == 75.0
+    assert dune["error"] == "couldn't reach Radarr on meleys: meleys radarr is down"

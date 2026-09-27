@@ -26,7 +26,7 @@ Two NAS hosts each run their own Sonarr, Radarr, SABnzbd and Tautulli (see `wizt
 
 - Instances are declared in env as `SONARR_MELEYS_URL`, `SONARR_MELEYS_API_KEY`, and so on.
 - Every tool that touches an arr instance takes `host` and logs it in the audit row.
-- A media item resolves to its owning host by matching its file path against each instance's root folders. When no host matches, the tool refuses rather than guessing.
+- A title's owning host is resolved per copy (standard or 4K) through Seerr, the one ownership rule described under Tools. When it can't be settled, the tool refuses rather than guessing.
 
 ## Permission tiers
 
@@ -57,7 +57,7 @@ Tiers come from Discord roles with a per-user override in SQLite. The tool list 
 
 `english_dub` on either request tool adds the `DUB_TAG` tag to the Seerr request (Seerr passes request tags to Sonarr or Radarr, where a release profile can prefer dual-audio releases) and picks the `DUB_PROFILE` quality profile when the server has one. English audio is read from Sonarr's analysis of each episode file (`mediaInfo.audioLanguages`), with the language rule of the `anime-missing-dub` audit (`maester/dub.py`).
 
-A title's owning host is the one Radarr (by TMDB id) or Sonarr (by TVDB id) that has it, asked of every instance at once (`maester/library.py`). Two owners, or an instance that cannot answer, is a refusal, never a guess.
+A title's owning host is resolved per copy (`maester/library.py`). Seerr records, for the standard and the 4K copy, which of its Radarr/Sonarr servers took it and the title's id there (`serviceId`/`externalServiceId` and their `4k` twins). Each Seerr server (`/api/v1/settings/radarr` and `/sonarr`) is matched to the registry host whose URL has the same host, port and base path, so a title with a 1080p copy on one host and a 4K copy on the other resolves correctly for each. A title Seerr never sent anywhere is looked up by TMDB or TVDB id on every instance that is not one of Seerr's 4K servers. A Seerr server matching no configured instance, two instances holding the title, or an instance that can't answer is `OwnerUnknown`: refused, never guessed.
 
 ## Destructive actions
 

@@ -33,6 +33,7 @@ class Movie:
 
 class Radarr(Protocol):
     host: str
+    base_url: str
 
     async def root_folders(self) -> list[str]: ...
     async def disk_space(self) -> list[DiskSpace]: ...
@@ -71,6 +72,7 @@ class RadarrClient(ArrClient):
 @dataclass
 class FakeRadarrClient:
     host: str = "fake"
+    base_url: str = ""
     roots: list[str] = field(default_factory=lambda: ["/Movies"])
     disks: list[DiskSpace] = field(default_factory=list)
     queue_items: list[QueueItem] = field(default_factory=list)

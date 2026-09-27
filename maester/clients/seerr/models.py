@@ -102,6 +102,23 @@ class SearchResult:
 
 
 @dataclass(frozen=True)
+class ArrRef:
+    """Where Seerr sent one copy of a title: its Radarr/Sonarr server, and the title's id there."""
+
+    server_id: int
+    media_id: int
+
+    @classmethod
+    def from_media(cls, media: dict[str, Any], is_4k: bool) -> ArrRef | None:
+        suffix = "4k" if is_4k else ""
+        server_id = media.get(f"serviceId{suffix}")
+        media_id = media.get(f"externalServiceId{suffix}")
+        if server_id is None or media_id is None:
+            return None
+        return cls(int(server_id), int(media_id))
+
+
+@dataclass(frozen=True)
 class Season:
     """One TMDB season of a show, with where it stands on the server."""
 
@@ -127,6 +144,8 @@ class MediaDetails:
     status_4k: MediaStatus
     rating_key: str | None = None  # Plex, standard copy
     rating_key_4k: str | None = None
+    arr: ArrRef | None = None  # the arr holding the standard copy, when Seerr sent it
+    arr_4k: ArrRef | None = None
     tvdb_id: int | None = None
     collection_id: int | None = None
     seasons: tuple[Season, ...] = ()  # TV only; specials and unaired seasons left out
@@ -156,6 +175,9 @@ class MediaDetails:
     def rating_key_for(self, is_4k: bool) -> str | None:
         return self.rating_key_4k if is_4k else self.rating_key
 
+    def arr_for(self, is_4k: bool) -> ArrRef | None:
+        return self.arr_4k if is_4k else self.arr
+
     @classmethod
     def from_api(cls, media_type: str, raw: dict[str, Any]) -> MediaDetails:
         info = raw.get("mediaInfo") or {}
@@ -184,6 +206,8 @@ class MediaDetails:
             status_4k=MediaStatus(info.get("status4k", MediaStatus.UNKNOWN)),
             rating_key=info.get("ratingKey") or None,
             rating_key_4k=info.get("ratingKey4k") or None,
+            arr=ArrRef.from_media(info, is_4k=False),
+            arr_4k=ArrRef.from_media(info, is_4k=True),
             tvdb_id=_int_or_none(
                 (raw.get("externalIds") or {}).get("tvdbId") or info.get("tvdbId")
             ),
@@ -324,20 +348,24 @@ class Named:
 
 @dataclass(frozen=True)
 class ArrServer:
-    """A Radarr or Sonarr that Seerr sends approved requests to."""
+    """A Radarr or Sonarr that Seerr sends approved requests to, as its settings describe it."""
 
     id: int
     name: str
     is_4k: bool
     is_default: bool
+    url: str  # where Seerr reaches it: scheme, host, port and base path
 
     @classmethod
     def from_api(cls, raw: dict[str, Any]) -> ArrServer:
+        scheme = "https" if raw.get("useSsl") else "http"
+        base = (raw.get("baseUrl") or "").rstrip("/")
         return cls(
             id=int(raw["id"]),
             name=raw.get("name") or "",
             is_4k=bool(raw.get("is4k", False)),
             is_default=bool(raw.get("isDefault", False)),
+            url=f"{scheme}://{raw['hostname']}:{int(raw['port'])}{base}",
         )
 
 
@@ -345,7 +373,6 @@ class ArrServer:
 class ServerOptions:
     """A server's profiles and tags, and the tags Seerr applies by default."""
 
-    server: ArrServer
     profiles: tuple[Named, ...]
     tags: tuple[Named, ...]
     default_tags: tuple[int, ...] = ()
@@ -355,7 +382,6 @@ class ServerOptions:
     def from_api(cls, raw: dict[str, Any]) -> ServerOptions:
         server = raw.get("server") or {}
         return cls(
-            server=ArrServer.from_api(server),
             profiles=tuple(Named(int(p["id"]), p.get("name") or "") for p in raw["profiles"]),
             tags=tuple(Named(int(t["id"]), t.get("label") or "") for t in raw.get("tags") or []),
             default_tags=tuple(int(t) for t in server.get("activeTags") or []),

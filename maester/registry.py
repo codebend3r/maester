@@ -2,10 +2,10 @@
 
 Two NAS hosts each run their own Sonarr, Radarr, SABnzbd and Tautulli on the
 same ports. Every tool that touches one takes a host name, and this registry
-is the only place that turns (service, host) into a URL and key. It also maps
-a media path to the host whose arr owns it, and refuses when no host matches,
-because acting on the wrong stack has happened before (see wizteros
-docs/arr-stack.md).
+is the only place that turns (service, host) into a URL and key. Which host
+owns a title is `maester/library.py`'s question, answered through Seerr and
+never guessed, because acting on the wrong stack has happened before (see
+wizteros docs/arr-stack.md).
 
 Instances are discovered from the environment as `{SERVICE}_{HOST}_URL` plus
 `{SERVICE}_{HOST}_API_KEY`, so adding a third host is two variables, not code.
@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 PER_HOST_SERVICES = ("sonarr", "radarr", "sabnzbd", "tautulli")
 
@@ -29,28 +29,12 @@ class UnknownInstance(LookupError):
         super().__init__(f"no {service} instance on host {host!r}; known hosts: {hosts}")
 
 
-class NoOwningHost(LookupError):
-    def __init__(self, service: str, path: str):
-        self.service, self.path = service, path
-        super().__init__(f"no {service} instance has a root folder containing {path!r}")
-
-
 @dataclass(frozen=True)
 class Instance:
     service: str
     host: str
     url: str
     api_key: str
-    # Root folders are learned from the arr API after boot, so an instance can
-    # be addressed before its folders are known; owning-host lookups need them.
-    root_folders: tuple[str, ...] = field(default=())
-
-    def with_root_folders(self, folders: Iterable[str]) -> Instance:
-        normalized = tuple(f.rstrip("/") + "/" for f in folders)
-        return Instance(self.service, self.host, self.url, self.api_key, normalized)
-
-    def owns(self, path: str) -> bool:
-        return any(path.startswith(folder) for folder in self.root_folders)
 
 
 class Registry:
@@ -88,17 +72,6 @@ class Registry:
 
     def update(self, instance: Instance) -> None:
         self._by_key[(instance.service, instance.host)] = instance
-
-    def host_for_path(self, service: str, path: str) -> Instance:
-        """The instance whose root folders contain `path`, or NoOwningHost.
-
-        Never guesses: with two stacks mounting the same shares, a path that
-        matches nobody's root folders is a path nobody should act on.
-        """
-        owners = [i for i in self.instances(service.lower()) if i.owns(path)]
-        if len(owners) != 1:
-            raise NoOwningHost(service, path)
-        return owners[0]
 
     def missing_keys(self) -> list[str]:
         """Instances configured with a URL but no API key, as env variable names."""
