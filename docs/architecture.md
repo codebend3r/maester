@@ -48,10 +48,12 @@ Tiers come from Discord roles with a per-user override in SQLite. The tool list 
 | `request_media`    | friend  | 1080p request as the friend (`X-API-User`); for shows, seasons already there are left out and listed    |
 | `request_media_4k` | trusted | 4K request as the friend; if Seerr leaves it pending, the admin approves or declines it with buttons    |
 | `follow_show`      | friend  | Monitors a show in its owning Sonarr so future seasons download; refuses any host but the owner        |
-| `check_availability` | friend | Versions on Plex (1080p, 4K, HEVC re-encode) with size and bitrate, episodes per season, a Plex deep link per copy |
+| `check_availability` | friend | Versions on Plex (1080p, 4K, HEVC re-encode) with size and bitrate, episodes per season, a Plex deep link per copy; for anime, English-audio coverage per season |
 | `request_status`   | friend  | The friend's open Seerr requests; once approved, the owning host's queue and SABnzbd merged into a percent and ETA, with stalls and failures explained |
 | `find_collection`  | friend  | A movie's TMDB collection as a picker of its entries with availability, led by "all missing" |
 | `request_collection` | friend | One request per missing entry, summed up; refuses up front when the Seerr movie quota can't cover it |
+
+`english_dub` on either request tool adds the `DUB_TAG` tag to the Seerr request (Seerr passes request tags to Sonarr or Radarr, where a release profile can prefer dual-audio releases) and picks the `DUB_PROFILE` quality profile when the server has one. English audio is read from Sonarr's analysis of each episode file (`mediaInfo.audioLanguages`), with the language rule of the `anime-missing-dub` audit (`maester/dub.py`).
 
 A title's owning host is the one Radarr (by TMDB id) or Sonarr (by TVDB id) that has it, asked of every instance at once (`maester/library.py`). Two owners, or an instance that cannot answer, is a refusal, never a guess.
 

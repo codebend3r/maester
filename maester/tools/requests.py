@@ -8,6 +8,11 @@ shows, seasons already on the server or already requested are left out and
 reported, counted the way Seerr counts them. Seerr's refusals (quota,
 permission, duplicates) come back as sentences to relay, not as errors.
 
+A friend who wants an English dub gets the configured dub tag added to the
+request (Seerr stores it on the request and hands it to Sonarr or Radarr,
+where a release profile can prefer dual-audio releases), and the configured
+dual-audio quality profile when that server has one.
+
 `follow_show` is the one arr write here: it monitors a show in the Sonarr
 that owns it so future seasons download as they air, and only on the host
 the caller names when that host really is the owner.
@@ -21,14 +26,17 @@ from typing import Any
 from maester.agent.tools import Approval, ForAdmin, Settled, Tier, ToolContext, tool
 from maester.clients import Services
 from maester.clients.seerr import (
+    ANIME_KEYWORD,
     MediaDetails,
     MediaRequest,
     MediaStatus,
     Refusal,
     RequestRefused,
     RequestStatus,
+    Routing,
     Seerr,
 )
+from maester.config import Settings
 from maester.library import AmbiguousOwner, movie_owner, series_owner
 from maester.notify import Notice
 from maester.store import PendingAction, UserRow
@@ -58,6 +66,10 @@ REQUEST_SCHEMA: dict[str, Any] = {
         "latest_season": {
             "type": "boolean",
             "description": 'TV only: just the newest season ("just the latest").',
+        },
+        "english_dub": {
+            "type": "boolean",
+            "description": "The user wants English audio (anime): prefer dual-audio releases.",
         },
     },
     "required": ["tmdb_id", "media_type"],
@@ -101,6 +113,31 @@ class Submitted:
     reply: dict[str, Any]
 
 
+async def dub_routing(
+    seerr: Seerr, settings: Settings, details: MediaDetails, is_4k: bool
+) -> tuple[Routing | None, dict[str, Any]]:
+    """Where a dub request goes: Seerr's own tags plus the dub tag, and the dub profile."""
+    kind = "radarr" if details.media_type == "movie" else "sonarr"
+    servers = await seerr.servers(kind)
+    server = next((s for s in servers if s.is_4k == is_4k and s.is_default), None)
+    if server is None:
+        return None, {"dub": "Seerr has no default server for this; requested without the dub tag."}
+    options = await seerr.server_options(kind, server.id)
+    tag = options.tag(settings.dub_tag)
+    if tag is None:
+        return None, {
+            "dub": f"{server.name} has no '{settings.dub_tag}' tag, so the dub preference "
+            "couldn't be attached; the admin can add the tag."
+        }
+    # Request tags replace the ones Seerr would apply, so keep those: Seerr
+    # uses its anime tags for shows TMDB tags anime, its default tags otherwise.
+    anime = details.media_type == "tv" and ANIME_KEYWORD in details.keyword_ids
+    tags = tuple(dict.fromkeys((*(options.anime_tags if anime else options.default_tags), tag.id)))
+    profile = options.profile(settings.dub_profile) if settings.dub_profile else None
+    routing = Routing(server.id, tags, profile.id if profile else None)
+    return routing, {"dub": {"tag": tag.name, "profile": profile.name if profile else None}}
+
+
 async def submit(
     ctx: ToolContext,
     details: MediaDetails,
@@ -108,6 +145,7 @@ async def submit(
     latest_season: bool,
     *,
     is_4k: bool,
+    english_dub: bool = False,
 ) -> Submitted:
     """Request `details` in Seerr as the caller, leaving out what is already there."""
     user = ctx.linked_user()
@@ -126,6 +164,10 @@ async def submit(
         raise ValueError("seasons are for TV shows only")
     elif not (status := details.status_for(is_4k)).requestable:
         return Submitted(None, {**reply, "requested": False, "status": status.label})
+    routing = None
+    if english_dub:
+        routing, dub = await dub_routing(seerr, ctx.settings, details, is_4k)
+        reply.update(dub)
     try:
         request = await seerr.create_request(
             details.media_type,
@@ -133,6 +175,7 @@ async def submit(
             as_user=user.seerr_user_id,
             is_4k=is_4k,
             seasons=wanted,
+            routing=routing,
         )
     except RequestRefused as refused:
         reason = await explain(seerr, user, refused, details.media_type)
@@ -195,8 +238,9 @@ async def size_tradeoff(services: Services, details: MediaDetails) -> dict[str, 
     "request_media",
     "Request a movie or show in the standard (1080p) version through Seerr, as the user, so "
     "their quotas apply. For shows, pass the seasons asked for (or latest_season); seasons "
-    "already on the server or requested are left out and listed in left_out. Returns the "
-    "Seerr request id and whether it was approved automatically, or why Seerr refused.",
+    "already on the server or requested are left out and listed in left_out. Set "
+    "english_dub when they want English audio. Returns the Seerr request id and whether it "
+    "was approved automatically, or why Seerr refused.",
     REQUEST_SCHEMA,
     tier=Tier.FRIEND,
 )
@@ -206,9 +250,13 @@ async def request_media(
     media_type: str,
     seasons: list[int] | None = None,
     latest_season: bool = False,
+    english_dub: bool = False,
 ) -> dict[str, Any]:
     details = await ctx.services.seerr.media_details(media_type, tmdb_id)
-    return (await submit(ctx, details, seasons, latest_season, is_4k=False)).reply
+    submitted = await submit(
+        ctx, details, seasons, latest_season, is_4k=False, english_dub=english_dub
+    )
+    return submitted.reply
 
 
 async def settle_4k(ctx: ToolContext, pending: PendingAction, approved: bool) -> Settled:
@@ -251,6 +299,7 @@ async def request_media_4k(
     media_type: str,
     seasons: list[int] | None = None,
     latest_season: bool = False,
+    english_dub: bool = False,
 ) -> dict[str, Any] | ForAdmin:
     seerr = ctx.services.seerr
     if not any(
@@ -260,7 +309,9 @@ async def request_media_4k(
     details = await seerr.media_details(media_type, tmdb_id)
     # Measured before the request exists, so a failed lookup cannot orphan it.
     tradeoff = await size_tradeoff(ctx.services, details)
-    submitted = await submit(ctx, details, seasons, latest_season, is_4k=True)
+    submitted = await submit(
+        ctx, details, seasons, latest_season, is_4k=True, english_dub=english_dub
+    )
     reply = {**submitted.reply, **tradeoff}
     request = submitted.request
     if request is None or request.status != RequestStatus.PENDING:

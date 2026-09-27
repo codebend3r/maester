@@ -23,7 +23,7 @@ from maester.clients import (
     FakeWizarrClient,
     Services,
 )
-from maester.clients.arr import QueueItem
+from maester.clients.arr import MediaFile, QueueItem
 from maester.clients.plex import PlexItem, PlexSeason, Version
 from maester.clients.radarr import Movie
 from maester.clients.seerr import (
@@ -38,6 +38,7 @@ from maester.clients.seerr import (
     SeerrUser,
     ServerOptions,
 )
+from maester.clients.sonarr import Series
 from maester.store import Store
 
 # Importing the tools package registers every tool module into app_registry.
@@ -180,14 +181,47 @@ def _plex(seed: dict[str, Any]) -> FakePlexClient:
     return FakePlexClient(items=items, show_seasons=seasons)
 
 
+def _sonarr(host: str, seed: dict[str, Any]) -> FakeSonarrClient:
+    """A host's shows and their episode files; `audio` is Sonarr's "jpn/eng" form."""
+    return FakeSonarrClient(
+        host=host,
+        series_list=[
+            Series(
+                id=int(x["id"]),
+                title=x["title"],
+                tvdb_id=int(x["tvdb_id"]),
+                year=x.get("year"),
+                path="",
+                monitored=True,
+                series_type=x.get("type", "standard"),
+                season_numbers=tuple(x.get("seasons", [])),
+            )
+            for x in seed.get("series", [])
+        ],
+        files=[
+            MediaFile(
+                id=n,
+                path="",
+                size_bytes=int(f.get("size_gb", 1) * 1e9),
+                quality=f.get("quality", "WEBDL-1080p"),
+                release_group=None,
+                media_id=int(f["series_id"]),
+                season=int(f["season"]),
+                audio_languages=tuple(f["audio"].split("/")) if "audio" in f else None,
+            )
+            for n, f in enumerate(seed.get("files", []), 1)
+        ],
+    )
+
+
 def build_services(seed: dict[str, Any], seerr_user_id: int = 4) -> Services:
     hosts = seed.get("hosts", ["meleys", "vermithor"])
-    radarr = seed.get("radarr", {})
+    radarr, sonarr = seed.get("radarr", {}), seed.get("sonarr", {})
     return Services(
         seerr=_seerr(seed.get("seerr", {}), seerr_user_id),
         plex=_plex(seed.get("plex", {})),
         wizarr=FakeWizarrClient(),
-        sonarr={h: FakeSonarrClient(host=h) for h in hosts},
+        sonarr={h: _sonarr(h, sonarr.get(h, {})) for h in hosts},
         radarr={h: _radarr(h, radarr.get(h, {})) for h in hosts},
         sabnzbd={h: FakeSabnzbdClient(host=h) for h in hosts},
         tautulli={h: FakeTautulliClient(host=h) for h in hosts},

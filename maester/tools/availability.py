@@ -3,7 +3,8 @@
 `check_availability` puts Seerr's view (is the standard or the 4K copy
 there, which seasons) next to Plex's (every version of the item, how many
 episodes each season holds), with a deep link per Plex copy. For shows it
-also names the Sonarr host that owns the show, which `follow_show` needs.
+also names the Sonarr host that owns the show, which `follow_show` needs,
+and for anime it reports which seasons' files carry English audio.
 """
 
 from __future__ import annotations
@@ -15,7 +16,9 @@ from maester.agent.tools import Tier, ToolContext, tool
 from maester.clients import ClientError, Services
 from maester.clients.plex import Plex, Version
 from maester.clients.seerr import MediaDetails
-from maester.library import AmbiguousOwner, series_owner
+from maester.clients.sonarr import Series
+from maester.dub import dub_coverage, is_anime
+from maester.library import AmbiguousOwner, Owned, series_owner
 
 
 def describe_version(version: Version) -> dict[str, Any]:
@@ -60,15 +63,22 @@ async def season_counts(plex: Plex, details: MediaDetails) -> list[dict[str, Any
     ]
 
 
-async def sonarr_host(services: Services, details: MediaDetails) -> dict[str, Any]:
-    """The owning Sonarr host, or why there is none to name."""
-    if details.tvdb_id is None:
-        return {"sonarr_host": None}
-    try:
-        owner = await series_owner(services, details.tvdb_id)
-    except (AmbiguousOwner, ClientError) as exc:
-        return {"sonarr_host": None, "sonarr_note": str(exc)}
-    return {"sonarr_host": owner.host if owner else None}
+async def show_details(services: Services, details: MediaDetails) -> dict[str, Any]:
+    """The owning Sonarr host (or why none can be named), and English audio for anime."""
+    owner: Owned[Series] | None = None
+    facts: dict[str, Any] = {}
+    if details.tvdb_id is not None:
+        try:
+            owner = await series_owner(services, details.tvdb_id)
+        except (AmbiguousOwner, ClientError) as exc:
+            facts["sonarr_note"] = str(exc)
+    facts["sonarr_host"] = owner.host if owner else None
+    if is_anime(details, owner.item if owner else None):
+        facts["anime"] = True
+        if owner is not None:
+            files = await services.sonarr[owner.host].episode_files(owner.item.id)
+            facts["english_audio"] = [s.as_dict() for s in dub_coverage(files)]
+    return facts
 
 
 @tool(
@@ -76,7 +86,8 @@ async def sonarr_host(services: Services, details: MediaDetails) -> dict[str, An
     "Whether a movie or show is on the server: which versions (1080p, 4K, HEVC re-encode) "
     "with size and bitrate, for shows how many episodes of each season are present, and a "
     "plex_link per copy that opens it in Plex; include the link in your reply. For shows it "
-    "also gives sonarr_host, the host follow_show needs.",
+    "also gives sonarr_host, the host follow_show needs, and for anime how many files of "
+    "each season have English audio.",
     {
         "type": "object",
         "properties": {
@@ -99,5 +110,5 @@ async def check_availability(ctx: ToolContext, tmdb_id: int, media_type: str) ->
     }
     if media_type == "tv":
         reply["seasons"] = await season_counts(services.plex, details)
-        reply.update(await sonarr_host(services, details))
+        reply.update(await show_details(services, details))
     return reply

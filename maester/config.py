@@ -69,6 +69,10 @@ class Settings:
     wizarr_url: str = ""
     wizarr_api_key: str = ""
     invite_expires_days: int = 7
+    # A friend who wants an English dub gets this Sonarr/Radarr tag on the
+    # request, and the quality profile named here when it exists.
+    dub_tag: str = "dub"
+    dub_profile: str = ""
 
     guardrails: Guardrails = field(default_factory=Guardrails)
     db_path: str = "/data/maester.db"
@@ -105,6 +109,8 @@ def load_settings(env: Mapping[str, str]) -> Settings:
         wizarr_url=_url(env, "WIZARR_URL"),
         wizarr_api_key=env.get("WIZARR_API_KEY", ""),
         invite_expires_days=_int(env, "INVITE_EXPIRES_DAYS", 7),
+        dub_tag=env.get("DUB_TAG", "").strip() or "dub",
+        dub_profile=env.get("DUB_PROFILE", "").strip(),
         guardrails=Guardrails(
             replace_daily_cap=_int(env, "REPLACE_DAILY_CAP", 3),
             storage_pause_4k_percent=_int(env, "STORAGE_PAUSE_4K_PERCENT", 90),

@@ -334,3 +334,14 @@ async def test_seerr_collection_parts_in_release_order(fixture):
         (2015, MediaStatus.UNKNOWN),
     ]
     assert all(p.media_type == "movie" for p in collection.parts)
+
+
+@respx.mock
+async def test_sonarr_episode_files_carry_season_and_audio_languages(fixture):
+    respx.get(f"{BASE}/api/v3/episodefile", params={"seriesId": 40}).respond(
+        json=fixture("sonarr_episodefile")
+    )
+    dual, japanese, unscanned = await SonarrClient("meleys", BASE, "k").episode_files(40)
+    assert (dual.season, dual.audio_languages) == (1, ("jpn", "eng"))
+    assert (japanese.season, japanese.audio_languages) == (2, ("jpn",))
+    assert unscanned.audio_languages is None and unscanned.media_id == 40

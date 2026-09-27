@@ -6,9 +6,11 @@ from maester.agent.tools import ForAdmin, NotLinked, Tier, registry
 from maester.clients.arr import MediaFile
 from maester.clients.radarr import Movie
 from maester.clients.seerr import (
+    ANIME_KEYWORD,
     ArrServer,
     MediaDetails,
     MediaStatus,
+    Named,
     Quota,
     Quotas,
     Refusal,
@@ -223,3 +225,41 @@ def test_4k_is_a_trusted_tool_the_friend_tier_never_sees():
     assert "request_media_4k" not in friend and "request_media_4k" in trusted
     assert registry.get("request_media_4k").settle is settle_4k
     assert registry.get("follow_show").host_param == "host"
+
+
+def sonarr_with_tags(ctx, *, is_4k=False, tags=((1, "seerr"), (4, "anime"), (7, "dub"))):
+    options = ServerOptions(
+        ArrServer(0, "Sonarr", is_4k=is_4k, is_default=True),
+        profiles=(Named(6, "HD-1080p"), Named(11, "Dual Audio")),
+        tags=tuple(Named(i, label) for i, label in tags),
+        default_tags=(1,),
+        anime_tags=(1, 4),
+    )
+    ctx.services.seerr.server_list["sonarr"] = [options]
+
+
+async def test_an_english_dub_request_carries_the_dub_tag_and_profile(ctx):
+    seed(ctx, replace(BEAR, keyword_ids=frozenset({ANIME_KEYWORD})))
+    sonarr_with_tags(ctx)
+    ctx.settings = replace(ctx.settings, dub_profile="dual audio")
+    out = await request_media(ctx, 136315, "tv", english_dub=True)
+    assert out["requested"] is True and out["dub"] == {"tag": "dub", "profile": "Dual Audio"}
+    routing = ctx.services.seerr.routed[1]
+    assert (routing.server_id, routing.tags, routing.profile_id) == (0, (1, 4, 7), 11)
+
+
+async def test_a_dub_request_keeps_default_tags_and_says_when_it_cannot_tag(ctx):
+    seed(ctx, BEAR)
+    sonarr_with_tags(ctx)
+    out = await request_media(ctx, 136315, "tv", english_dub=True)
+    assert out["dub"] == {"tag": "dub", "profile": None}
+    assert ctx.services.seerr.routed[1].tags == (1, 7)
+
+    sonarr_with_tags(ctx, tags=((1, "seerr"),))
+    out = await request_media(ctx, 136315, "tv", seasons=[3], english_dub=True)
+    assert out["requested"] is True and "has no 'dub' tag" in out["dub"]
+    assert 2 not in ctx.services.seerr.routed
+
+    ctx.services.seerr.server_list["sonarr"] = []
+    out = await request_media(ctx, 136315, "tv", seasons=[3], english_dub=True)
+    assert out["dub"].startswith("Seerr has no default server")

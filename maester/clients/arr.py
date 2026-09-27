@@ -78,9 +78,14 @@ class MediaFile:
     quality: str
     release_group: str | None
     media_id: int
+    season: int | None = None  # episode files only
+    # Audio track languages as the arr read them ("eng", "jpn"; older Sonarr
+    # writes "English"); None until the arr has analyzed the file.
+    audio_languages: tuple[str, ...] | None = None
 
     @classmethod
     def from_api(cls, raw: dict[str, Any]) -> MediaFile:
+        info = raw.get("mediaInfo")
         return cls(
             id=int(raw["id"]),
             path=raw.get("path") or "",
@@ -88,6 +93,12 @@ class MediaFile:
             quality=((raw.get("quality") or {}).get("quality") or {}).get("name") or "",
             release_group=raw.get("releaseGroup"),
             media_id=int(raw.get("movieId") or raw.get("seriesId") or 0),
+            season=raw.get("seasonNumber"),
+            audio_languages=(
+                tuple(t.strip() for t in (info.get("audioLanguages") or "").split("/") if t.strip())
+                if info
+                else None
+            ),
         )
 
 

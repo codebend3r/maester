@@ -1,7 +1,8 @@
 from dataclasses import replace
 
+from maester.clients.arr import MediaFile
 from maester.clients.plex import PlexItem, PlexSeason, Version
-from maester.clients.seerr import MediaDetails, MediaStatus, Season
+from maester.clients.seerr import ANIME_KEYWORD, MediaDetails, MediaStatus, Season
 from maester.clients.sonarr import Series
 from maester.tools.availability import check_availability
 
@@ -95,3 +96,26 @@ async def test_show_seasons_count_episodes_and_name_the_sonarr_host(ctx):
     ctx.services.sonarr["vermithor"].series_list = ctx.services.sonarr["meleys"].series_list
     out = await check_availability(ctx, 136315, "tv")
     assert out["sonarr_host"] is None and "meleys and vermithor" in out["sonarr_note"]
+
+
+async def test_anime_reports_english_audio_per_season(ctx):
+    frieren = replace(BEAR, title="Frieren", tvdb_id=424536, keyword_ids=frozenset({ANIME_KEYWORD}))
+    ctx.services.seerr.details[("tv", 136315)] = frieren
+    out = await check_availability(ctx, 136315, "tv")
+    assert out["anime"] is True and "english_audio" not in out  # nothing in Sonarr to read
+
+    sonarr = ctx.services.sonarr["meleys"]
+    sonarr.series_list = [
+        Series(40, "Frieren", 424536, 2023, "/Syrax/Anime/Frieren", True, "anime", (1, 2))
+    ]
+    sonarr.files = [
+        MediaFile(1, "/a.mkv", 1, "Bluray-1080p", None, 40, 1, ("jpn", "eng")),
+        MediaFile(2, "/b.mkv", 1, "WEBDL-1080p", None, 40, 2, ("jpn",)),
+    ]
+    out = await check_availability(ctx, 136315, "tv")
+    assert out["english_audio"] == [
+        {"season": 1, "files": 1, "with_english_audio": 1, "not_analyzed": 0},
+        {"season": 2, "files": 1, "with_english_audio": 0, "not_analyzed": 0},
+    ]
+    ctx.services.seerr.details[("tv", 136315)] = BEAR
+    assert "anime" not in await check_availability(ctx, 136315, "tv")
