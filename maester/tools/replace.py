@@ -3,8 +3,10 @@
 `replace_media` is destructive, so the model's call only puts Confirm and
 Cancel in front of the friend; nothing happens until they press Confirm.
 Then, whatever the model said, it runs only on stored evidence about that
-very file (`Evidence`): a failed health check, or two people reporting it.
-It acts only on the friend's own report, only on the host that owns the
+very file (`Evidence`): a failed health check, or two people reporting it,
+and never once the admin has said no. It acts only on the friend's own
+report while that report can still lead to a new copy (not one already
+waiting on the admin, declined or replaced), only on the host that owns the
 copy, and only while the file is still the one reported.
 
 A day holds at most `REPLACE_DAILY_CAP` replacements that friends confirm
@@ -14,10 +16,13 @@ and their Approve runs `decide_replacement`, a button-only admin tool; what
 the admin approves is their own call, so it doesn't count toward the cap.
 Both tools are destructive, so the kill switch stops either at once, and
 each replacement sends the admin one notice with the path, size and reason.
+Checking and acting happen under one lock, so two confirmations at once
+can't both slip under the cap or both replace one file.
 """
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -31,6 +36,21 @@ from maester.playback.reports import Action, Evidence, policy_of
 from maester.store import ReportRow
 
 CAP_WINDOW = timedelta(days=1)
+# The report states a friend's confirmed replacement may start from, and why
+# the others can't.
+FRIEND_MAY_REPLACE = frozenset({Action.REPLACEABLE, Action.RECORDED})
+ADMIN_MAY_REPLACE = frozenset({Action.ESCALATED})
+WHY_NOT = {
+    Action.ADVISED: "it was a player problem, not the file",
+    Action.FOR_ADMIN: "a new copy doesn't fix that kind of problem",
+    Action.ESCALATED: "it's already waiting on the admin",
+    Action.DECLINED: "the admin decided not to replace it",
+    Action.REPLACED: "it was already replaced",
+    Action.REPLACEABLE: "it isn't waiting on the admin",
+    Action.RECORDED: "it isn't waiting on the admin",
+}
+# Checking the evidence and the cap, and replacing, happen one at a time.
+_one_at_a_time = asyncio.Lock()
 
 
 class Refused(Exception):
@@ -46,8 +66,12 @@ class Ready:
     evidence: Evidence
 
 
-async def ready(ctx: ToolContext, report: ReportRow, host: str) -> Ready:
+async def ready(
+    ctx: ToolContext, report: ReportRow, host: str, allowed: frozenset[Action]
+) -> Ready:
     """The report's file, still there on `host` and proven broken by stored evidence."""
+    if (action := Action(report.action)) not in allowed:
+        raise Refused(f"Report {report.id} can't be acted on: {WHY_NOT[action]}.")
     if host.lower() != report.host:
         raise Refused(f"{report.title} in {report.version} is on {report.host}, not {host}.")
     try:
@@ -75,7 +99,12 @@ async def carry_out(ctx: ToolContext, go: Ready) -> Result:
     replacement = await replace_copy(ctx.services, ctx.store, go.report, go.located)
     reporters = [ctx.name_of(d) for d in go.evidence.reporters]
     notice = admin_notice(replacement, go.report, go.evidence, reporters)
-    return Result(replacement.text, (notice,), is_error=not replacement.deleted)
+    return Result(
+        replacement.text,
+        (notice,),
+        is_error=not replacement.deleted,
+        retryable=replacement.retryable,
+    )
 
 
 def over_cap(ctx: ToolContext) -> bool:
@@ -139,13 +168,16 @@ async def replace_media(ctx: ToolContext, report_id: int, host: str) -> Result:
     report = ctx.store.get_report(report_id)
     if report is None or (report.discord_id != ctx.user_id and ctx.tier < Tier.ADMIN):
         return refused(f"There's no report {report_id} of yours to act on.")
-    try:
-        go = await ready(ctx, report, host)
-    except Refused as why:
-        return refused(why)
-    if over_cap(ctx):
-        return ask_admin(ctx, go)
-    return await carry_out(ctx, go)
+    async with _one_at_a_time:
+        try:
+            go = await ready(ctx, report, host, FRIEND_MAY_REPLACE)
+        except Refused as why:
+            return refused(why)
+        if over_cap(ctx):
+            return ask_admin(ctx, go)
+        # The audit row that counts this one is written as the tool returns,
+        # before anyone waiting on the lock can check the cap.
+        return await carry_out(ctx, go)
 
 
 @tool(
@@ -182,9 +214,10 @@ async def decide_replacement(
         return Result(
             f"Left {report.title} in {report.version} as it is.", (DirectMessage(requester, dm),)
         )
-    try:
-        go = await ready(ctx, report, host)
-    except Refused as why:
-        return refused(why)
-    result = await carry_out(ctx, go)
+    async with _one_at_a_time:
+        try:
+            go = await ready(ctx, report, host, ADMIN_MAY_REPLACE)
+        except Refused as why:
+            return refused(why)
+        result = await carry_out(ctx, go)
     return replace(result, notices=(*result.notices, DirectMessage(requester, result.content)))

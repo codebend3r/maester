@@ -171,7 +171,12 @@ class ToolRunner:
         if not isinstance(result, Result):
             return ToolOutcome(result)
         if result.approval is None:
-            return ToolOutcome(result.content, is_error=result.is_error, notices=result.notices)
+            return ToolOutcome(
+                result.content,
+                is_error=result.is_error,
+                notices=result.notices,
+                retryable=result.retryable,
+            )
         try:
             pending = self._ask_admin(ctx, result.approval)
         except (LookupError, ValidationError) as exc:

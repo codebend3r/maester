@@ -10,7 +10,16 @@ from maester.playback.reports import Action, Evidence, ReportKind
 from maester.seerr_events import SeerrNotification, issue_status
 from maester.tools.playback import report_problem
 from tests.factories import history_row, session
-from tests.playback_world import DANY, DUNE_4K_ITEM, FORKS, FORKS_ITEM, link_pal, report, stock
+from tests.playback_world import (
+    DANY,
+    DUNE_4K,
+    DUNE_4K_ITEM,
+    FORKS,
+    FORKS_ITEM,
+    link_pal,
+    report,
+    stock,
+)
 
 
 @pytest.fixture
@@ -128,14 +137,16 @@ async def test_track_problems_list_the_tracks_and_ask_the_admin(library):
 async def test_a_report_is_kept_when_seerr_cannot_take_the_issue(library):
     library.services.seerr.down = True
     filed = await report(library, DUNE_4K_ITEM, ReportKind.CAM)
-    assert filed.issue.startswith("not opened: seerr POST /api/v1/issue failed")
+    assert filed.issue_id is None
+    assert filed.issue_note.startswith("not opened: seerr POST /api/v1/issue failed")
+    assert filed.as_dict()["seerr_issue"] == filed.issue_note
     assert library.store.get_report(filed.report.id).seerr_issue_id is None
     library.services.seerr.down = False
     library.services.seerr.details[("movie", 438631)] = replace(
         library.services.seerr.details[("movie", 438631)], media_id=None
     )
     filed = await report(library, DUNE_4K_ITEM, ReportKind.CAM)
-    assert filed.issue == "not opened: Seerr doesn't track this title yet"
+    assert filed.issue_note == "not opened: Seerr doesn't track this title yet"
 
 
 async def test_resolving_the_issue_in_seerr_resolves_the_report_once(library):
@@ -143,7 +154,7 @@ async def test_resolving_the_issue_in_seerr_resolves_the_report_once(library):
 
     def event(kind):
         return SeerrNotification.from_webhook(
-            {"notification_type": kind, "issue": {"issue_id": str(filed.issue)}, "media": None}
+            {"notification_type": kind, "issue": {"issue_id": str(filed.issue_id)}, "media": None}
         )
 
     (dm,) = await issue_status(library.store, True, event("ISSUE_RESOLVED"))
@@ -174,3 +185,30 @@ def test_every_report_kind_has_a_policy_and_the_tool_offers_each():
     spec = registry.get("report_problem")
     assert spec.input_schema["properties"]["kind"]["enum"] == [k.value for k in ReportKind]
     assert spec.tier == Tier.FRIEND and not spec.destructive
+
+
+async def test_after_a_player_fix_a_second_report_checks_the_file(library):
+    library.services.tautulli["vermithor"].sessions = [
+        session(user_id=DANY, rating_key="9001", dovi_profile=7, player="Living Room")
+    ]
+    library.services.probe.errors[DUNE_4K] = ("[hevc @ 0x1] Invalid NAL unit size",)
+    first = await report(library, DUNE_4K_ITEM, ReportKind.WONT_PLAY, "purple")
+    assert first.report.action == Action.ADVISED and library.services.probe.decoded == []
+    again = await report(library, DUNE_4K_ITEM, ReportKind.WONT_PLAY, "the 1080p is fine, 4K isn't")
+    assert again.diagnosis.causes == () and again.report.health == "corrupt"
+    assert again.report.action == Action.REPLACEABLE
+    assert again.diagnosis.player.endswith(
+        "already had a player fix for this file, so the file is checked"
+    )
+
+
+async def test_resolved_reports_no_longer_count_and_a_declined_file_stays(library):
+    link_pal(library)
+    first = await report(library, DUNE_4K_ITEM, ReportKind.CAM)
+    library.store.set_issue_resolved(first.report.seerr_issue_id, True)
+    second = await report(library, DUNE_4K_ITEM, ReportKind.CAM, user="d2")
+    assert second.report.action == Action.RECORDED  # the resolved report doesn't count
+    library.store.update_report(second.report.id, action=Action.DECLINED)
+    third = await report(library, DUNE_4K_ITEM, ReportKind.CAM)
+    assert third.report.action == Action.RECORDED
+    assert third.evidence.describe() == "the admin decided not to replace this file"

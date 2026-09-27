@@ -1,3 +1,4 @@
+import asyncio
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
@@ -7,9 +8,12 @@ from maester.agent.limits import KillSwitch
 from maester.agent.runner import ToolRunner
 from maester.agent.tools import Result, Tier, registry
 from maester.clients import ClientError
-from maester.clients.arr import HistoryEvent
+from maester.clients.arr import HistoryEvent, MediaFile
+from maester.clients.media import Inspection
+from maester.clients.radarr import Movie
 from maester.config import Guardrails
 from maester.notify import AdminPost, ApprovalPost, DirectMessage
+from maester.playback.items import Item
 from maester.playback.reports import Action, ReportKind
 from maester.tools.replace import decide_replacement, replace_media
 from tests.playback_world import DUNE_4K, DUNE_4K_ITEM, FORKS, FORKS_ITEM, link_pal, report, stock
@@ -64,14 +68,44 @@ async def test_a_proven_report_blocklists_deletes_and_searches_on_the_owning_hos
     assert library.services.seerr.issues[0]["comments"] == [out.content]
 
 
+FORKS_RELEASE = "The.Bear.S02E07.1080p.WEB.h264-NTb"
+
+
 async def test_an_episode_file_is_replaced_with_every_episode_it_held(library):
+    sonarr = library.services.sonarr["meleys"]
+    sonarr.events[12] = [
+        HistoryEvent(31, "downloadFolderImported", FORKS_RELEASE, "2026-09-02", "sab_7", "", 72, 702),
+        HistoryEvent(30, "grabbed", FORKS_RELEASE, "2026-09-01", "sab_7", "", None, 702),
+    ]  # fmt: skip
     reported = await broken(library, FORKS_ITEM, FORKS)
     out = await replace_media(library, reported.id, "meleys")
-    sonarr = library.services.sonarr["meleys"]
-    assert (sonarr.deleted, sonarr.searched) == ([72], [[702]])
-    # Sonarr's history has no import of this file, so there's no release to block.
-    assert sonarr.failed == [] and "- blocklist: no grab of this file" in out.content
+    assert (sonarr.failed, sonarr.deleted, sonarr.searched) == ([30], [72], [[702]])
     assert out.content.startswith("Replacing the 1080p copy of The Bear (2022) S02E07 on meleys")
+
+
+async def test_a_file_with_no_grab_behind_it_is_left_for_the_admin(library):
+    reported = await broken(library, FORKS_ITEM, FORKS)  # Sonarr's history has no import of it
+    out = await replace_media(library, reported.id, "meleys")
+    sonarr = library.services.sonarr["meleys"]
+    assert (sonarr.failed, sonarr.deleted, sonarr.searched) == ([], [], [])
+    assert out.is_error and not out.retryable
+    assert "- blocklist: no grab of this file in the history" in out.content
+    assert "- delete: not run" in out.content and "- search: not run" in out.content
+    (notice,) = out.notices
+    assert notice.text.startswith(
+        "Replacing the 1080p copy of The Bear (2022) S02E07 on meleys stopped"
+    )
+
+
+async def test_a_release_already_marked_failed_is_not_marked_twice(library):
+    library.services.radarr["vermithor"].events[8].insert(
+        0, HistoryEvent(902, "downloadFailed", RELEASE, "2026-09-02T09:00:00Z", "sab_1", "")
+    )
+    reported = await broken(library)
+    out = await replace_media(library, reported.id, "vermithor")
+    assert library.services.radarr["vermithor"].failed == []
+    assert f"- blocklist: {RELEASE} was already marked failed" in out.content
+    assert library.services.radarr["vermithor"].deleted == [55]
 
 
 async def test_without_evidence_nothing_is_touched(library):
@@ -111,8 +145,9 @@ async def test_a_failed_delete_stops_before_the_search_and_says_so(library):
     library.services.radarr["vermithor"].delete_movie_file = refuse
     out = await replace_media(library, reported.id, "vermithor")
     assert out.is_error and library.services.radarr["vermithor"].searched == []
+    assert out.retryable  # Radarr didn't answer and nothing was deleted: try again
     assert "- delete: failed: radarr DELETE" in out.content
-    assert "- search: not run, since the step before failed" in out.content
+    assert "- search: not run, since the step before didn't go through" in out.content
     assert out.content.endswith("Nothing was deleted; the admin has been told.")
     (notice,) = out.notices
     assert notice.text.startswith("Replacing the 4K copy of Dune (2021) on vermithor stopped")
@@ -136,19 +171,83 @@ async def test_over_the_daily_cap_the_admin_decides(library):
     assert "The daily cap of 3 replacements is used up" in out.approval.notice
     assert library.services.radarr["vermithor"].deleted == []
     assert library.store.get_report(reported.id).action == Action.ESCALATED
+    # While it waits on the admin, asking again doesn't ask twice.
+    again = await replace_media(library, reported.id, "vermithor")
+    assert (
+        again.content
+        == f"Report {reported.id} can't be acted on: it's already waiting on the admin."
+    )
 
+    admin = replace(library, user_id="boss", tier=Tier.ADMIN)
+    approved = await decide_replacement(admin, reported.id, "vermithor", "d1", approved=True)
+    assert library.services.radarr["vermithor"].deleted == [55]
+    notice, dm = approved.notices
+    assert isinstance(notice, AdminPost) and notice.text.startswith("Deleted ")
+    assert dm == DirectMessage("d1", approved.content)
+
+
+async def test_an_admins_no_stands_for_the_file(library):
+    reported = await broken(library)
+    use_up_the_cap(library)
+    await replace_media(library, reported.id, "vermithor")
     admin = replace(library, user_id="boss", tier=Tier.ADMIN)
     denied = await decide_replacement(admin, reported.id, "vermithor", "d1", approved=False)
     assert denied.notices == (
         DirectMessage("d1", "The admin decided not to replace Dune (2021) in 4K for now; your report stays open in Seerr."),
     )  # fmt: skip
     assert library.store.get_report(reported.id).action == Action.DECLINED
+    # The next day, under the cap: neither the same report nor a new one replaces it.
+    library.store._conn.execute("DELETE FROM audit_log")
+    out = await replace_media(library, reported.id, "vermithor")
+    assert out.content.endswith("the admin decided not to replace it.")
+    link_pal(library)
+    pal = await report(library, DUNE_4K_ITEM, ReportKind.WONT_PLAY, user="d2")
+    assert pal.report.action == Action.RECORDED
+    assert library.services.radarr["vermithor"].deleted == []
 
-    approved = await decide_replacement(admin, reported.id, "vermithor", "d1", approved=True)
-    assert library.services.radarr["vermithor"].deleted == [55]
-    notice, dm = approved.notices
-    assert isinstance(notice, AdminPost) and notice.text.startswith("Deleted ")
-    assert dm == DirectMessage("d1", approved.content)
+
+async def test_two_confirmations_at_once_cannot_both_slip_under_the_cap(library):
+    ctx = replace(
+        library, settings=replace(library.settings, guardrails=Guardrails(replace_daily_cap=1))
+    )
+    first = await broken(ctx)
+    ctx.services.radarr["meleys"].files = [
+        MediaFile(44, "/Meleys/Movies/Dune.mkv", 1, "Bluray-1080p", None, 8)
+    ]
+    ctx.services.radarr["meleys"].movie_list = [Movie(8, "Dune", 438631, 2021, "", True, True, 44)]
+    ctx.services.radarr["meleys"].events[8] = [
+        HistoryEvent(71, "downloadFolderImported", "Dune.1080p", "2026-09-01", "sab_9", "", 44),
+        HistoryEvent(70, "grabbed", "Dune.1080p", "2026-09-01", "sab_9", ""),
+    ]  # fmt: skip
+    ctx.services.probe.files["/Meleys/Movies/Dune.mkv"] = Inspection(
+        "/Meleys/Movies/Dune.mkv", 9300.0, "h264", 0, ()
+    )
+    second = await broken(ctx, Item("movie", 438631, False), "/Meleys/Movies/Dune.mkv")
+    for radarr in ctx.services.radarr.values():  # a real arr answers later, letting others run
+        radarr.history = pausing(radarr.history)
+    runner = ToolRunner(registry)
+    both = await asyncio.gather(
+        runner.run_decision(ctx, *await confirmed(ctx, runner, first)),
+        runner.run_decision(ctx, *await confirmed(ctx, runner, second)),
+    )
+    assert sorted(o.approval_id is not None for o in both) == [False, True]
+    deleted = ctx.services.radarr["vermithor"].deleted + ctx.services.radarr["meleys"].deleted
+    assert len(deleted) == 1
+
+
+def pausing(call):
+    async def paused(*args):
+        await asyncio.sleep(0)
+        return await call(*args)
+
+    return paused
+
+
+async def confirmed(ctx, runner, reported):
+    asked = await runner.run(
+        ctx, "replace_media", {"report_id": reported.id, "host": reported.host}
+    )
+    return ctx.store.decide_pending(asked.pending_id, "approved", ctx.user_id), True
 
 
 async def test_the_cap_counts_only_replacements_friends_confirmed(library):

@@ -1,15 +1,20 @@
 """Replacing a broken copy: blocklist its release, delete the file, search again.
 
 Everything happens on the host that owns the copy (`items.locate`), in
-order, and stops at the first step that fails, so a release that couldn't
-be blocklisted isn't deleted and grabbed straight back:
+order, and stops at the first step that doesn't go through, so a release
+that couldn't be blocklisted isn't deleted and grabbed straight back:
 
 1. blocklist: the grab that brought the file in (its download, found
    through the arr's import history) is marked failed, which blocklists the
-   release. The arrs take no reason for it; the reason stays on maester's
-   report and in the admin's notice.
+   release. A file with no grab behind it (imported by hand) stops here and
+   is left to the admin. A release already marked failed isn't marked
+   twice, so a run can be repeated. The arrs take no reason for the
+   blocklist; the reason stays on maester's report and in the admin's notice.
 2. delete: the movie or episode file.
 3. search: the movie, or every episode the file held.
+
+A step whose arr didn't answer failed for now (`retryable`): nothing was
+deleted, so the replacement can simply be tried again.
 
 Each step's outcome is kept (`Step`), so the reply, the audit row, the
 admin's notice and the Seerr issue all say exactly what happened. These are
@@ -68,8 +73,8 @@ def grab_of(history: Iterable[HistoryEvent], file_id: int) -> HistoryEvent | Non
 
 class Status(enum.StrEnum):
     DONE = "done"
-    SKIPPED = "skipped"
-    FAILED = "failed"
+    STOPPED = "stopped"  # this step can't go ahead; the admin takes it from here
+    FAILED = "failed"  # the arr didn't answer; trying again may work
     NOT_RUN = "not run"
 
 
@@ -86,9 +91,15 @@ class Step:
 
 async def _blocklist(located: LocatedFile) -> tuple[Status, str]:
     owner = located.owner
-    grab = grab_of(await owner.arr.history(owner.media_id), located.file.id)
+    history = await owner.arr.history(owner.media_id)
+    grab = grab_of(history, located.file.id)
     if grab is None:
-        return Status.SKIPPED, "no grab of this file in the history, so no release to block"
+        return Status.STOPPED, (
+            "no grab of this file in the history, so its release can't be blocklisted; "
+            "left for the admin"
+        )
+    if any(e.event_type == "downloadFailed" and e.download_id == grab.download_id for e in history):
+        return Status.DONE, f"{grab.source_title} was already marked failed"
     await owner.arr.mark_failed(grab.id)
     return Status.DONE, f"marked {grab.source_title} failed so it isn't grabbed again"
 
@@ -124,6 +135,11 @@ class Replacement:
         return self._done("delete")
 
     @property
+    def retryable(self) -> bool:
+        """Nothing was deleted and an arr didn't answer, so trying again may work."""
+        return not self.deleted and any(s.status is Status.FAILED for s in self.steps)
+
+    @property
     def text(self) -> str:
         """What the friend is told: each step, and when to try again."""
         located = self.located
@@ -142,8 +158,10 @@ async def run_steps(located: LocatedFile) -> tuple[Step, ...]:
     """Every step in order, stopping at the first failure."""
     steps: list[Step] = []
     for name, act in STEPS:
-        if steps and steps[-1].status in (Status.FAILED, Status.NOT_RUN):
-            steps.append(Step(name, Status.NOT_RUN, "not run, since the step before failed"))
+        if steps and steps[-1].status is not Status.DONE:
+            steps.append(
+                Step(name, Status.NOT_RUN, "not run, since the step before didn't go through")
+            )
             continue
         try:
             steps.append(Step(name, *await act(located)))

@@ -27,7 +27,7 @@ IMAGE_SUBTITLES = frozenset({"pgs", "hdmv_pgs_subtitle", "vobsub", "dvd_subtitle
 # Lossless audio a player may pass through to a TV or receiver as-is (DTS is "dca" in Plex).
 PASSTHROUGH_AUDIO = frozenset({"truehd", "dca", "dca-ma", "dts", "dts-hd"})
 SENT_AS_IS = frozenset({"direct play", "copy"})
-# Hardware known to play Dolby Vision profile 7, matched in Tautulli's device name.
+# Hardware known to play Dolby Vision profile 7, matched in its device or player name.
 DV7_DEVICES = ("shield",)
 
 
@@ -37,7 +37,8 @@ class Playback:
 
     platform: str  # "Roku", "Chrome", "Android"
     product: str  # "Plex for Roku", "Plex Web"
-    device: str  # "SHIELD Android TV"; empty when Tautulli didn't say
+    player: str  # the player's name, often the hardware's: "SHIELD Android TV"
+    device: str  # the hardware, from a live session; empty for a finished play
     container: str
     video_codec: str
     video_decision: str  # "direct play" | "copy" | "transcode"
@@ -53,6 +54,7 @@ class Playback:
         return cls(
             platform=s.platform,
             product=s.product,
+            player=s.player,
             device=s.device,
             container=s.container,
             video_codec=s.video_codec,
@@ -72,6 +74,7 @@ class Playback:
         return cls(
             platform=row.platform,
             product=row.product,
+            player=row.player,
             device="",
             container=stream.container,
             video_codec=stream.video_codec,
@@ -82,6 +85,11 @@ class Playback:
             subtitle_codec=stream.subtitle_codec,
             subtitle_decision=stream.subtitle_decision,
         )
+
+    @property
+    def hardware(self) -> str:
+        """What names the hardware: the device, and the player's name, which often says it."""
+        return f"{self.device} {self.player}".lower()
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -103,7 +111,7 @@ class ClientLimit:
 CLIENT_LIMITS: tuple[ClientLimit, ...] = (
     ClientLimit(
         "dolby_vision_profile_7",
-        lambda p: p.dovi_profile == 7 and not any(d in p.device.lower() for d in DV7_DEVICES),
+        lambda p: p.dovi_profile == 7 and not any(d in p.hardware for d in DV7_DEVICES),
         "This copy is Dolby Vision profile 7, a Blu-ray format most players can't show: the "
         "picture turns purple or green, or it won't start.",
         "Play the 1080p version, or watch on a player that handles profile 7 (an Nvidia Shield).",

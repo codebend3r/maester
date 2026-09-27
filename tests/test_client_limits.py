@@ -8,7 +8,8 @@ from maester.playback.plays import Play, playback_of
 from tests.factories import history_row, session
 
 CLEAN = Playback(
-    platform="Roku", product="Plex for Roku", device="Roku Ultra", container="mkv",
+    platform="Roku", product="Plex for Roku", player="Living Room", device="Roku Ultra",
+    container="mkv",
     video_codec="hevc", video_decision="direct play", dovi_profile=0, audio_codec="eac3",
     audio_decision="direct play", subtitle_codec="", subtitle_decision="",
 )  # fmt: skip
@@ -40,6 +41,8 @@ def test_each_limit_matches_its_play_and_gives_a_fix(change, limit):
 
 def test_near_misses_are_not_blamed_on_the_player():
     assert names(replace(CLEAN, dovi_profile=7, device="SHIELD Android TV")) == []
+    # A finished play has no device, but the player's name usually says it.
+    assert names(replace(CLEAN, dovi_profile=7, device="", player="SHIELD Android TV")) == []
     assert names(replace(CLEAN, dovi_profile=8)) == []
     assert names(replace(CLEAN, video_codec="h264", video_decision="transcode")) == []
     assert names(replace(CLEAN, audio_codec="truehd", audio_decision="transcode")) == []
