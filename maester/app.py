@@ -120,8 +120,8 @@ async def serve(app: App) -> None:
     for task in pending:
         task.cancel()
     for task in done:
-        if task.exception():
-            raise task.exception()  # type: ignore[misc]
+        if not task.cancelled() and (exc := task.exception()):
+            raise exc
 
 
 def run() -> int:

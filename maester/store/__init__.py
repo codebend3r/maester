@@ -18,6 +18,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -42,6 +43,12 @@ class AuditRow:
     duration_ms: int | None
 
 
+class LinkStatus(StrEnum):
+    PENDING = "pending"
+    ACTIVE = "active"
+    REVOKED = "revoked"
+
+
 @dataclass(frozen=True)
 class UserRow:
     discord_id: str
@@ -49,7 +56,7 @@ class UserRow:
     plex_username: str | None
     seerr_user_id: int | None
     tautulli_user_id: int | None
-    status: str
+    status: LinkStatus
     tier_override: str | None
 
 
@@ -237,7 +244,7 @@ class Store:
             plex_username=r["plex_username"],
             seerr_user_id=r["seerr_user_id"],
             tautulli_user_id=r["tautulli_user_id"],
-            status=r["status"],
+            status=LinkStatus(r["status"]),
             tier_override=r["tier_override"],
         )
 
@@ -345,12 +352,15 @@ class Store:
             ).rowcount
         return self.get_pending(pending_id) if updated else None
 
-    def open_pending(self, kind: str | None = None) -> list[PendingAction]:
+    def open_pending(
+        self, kind: str | None = None, *, action: str | None = None, requester: str | None = None
+    ) -> list[PendingAction]:
         sql = "SELECT id FROM pending_actions WHERE decision IS NULL AND expires_at > ?"
         params: tuple[Any, ...] = (_now(),)
-        if kind:
-            sql += " AND kind = ?"
-            params += (kind,)
+        for column, value in (("kind", kind), ("action", action), ("requester", requester)):
+            if value:
+                sql += f" AND {column} = ?"
+                params += (value,)
         with self._lock:
             ids = [r["id"] for r in self._conn.execute(sql + " ORDER BY id", params).fetchall()]
         return [p for p in (self.get_pending(i) for i in ids) if p]

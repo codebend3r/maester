@@ -3,8 +3,9 @@ from types import SimpleNamespace
 import discord
 
 from maester.agent.tools import Choice
+from maester.chat.members import resolve_chat_user
 from maester.chat.service import AdminNotice, ChatResponse, Decision
-from maester.chat.views import ChoiceView, DecisionView, resolve_chat_user, send_response
+from maester.chat.views import ChoiceView, DecisionView, send_response
 from maester.store import PendingAction
 
 

@@ -72,6 +72,13 @@ async def test_link_matches_email_or_username_and_queues_approval(identity):
     assert result2.ok and store.get_user("d2").seerr_user_id == 5
 
 
+async def test_link_matches_a_mixed_case_seerr_email(identity):
+    svc, store = identity
+    svc.services.seerr.user_list.append(SeerrUser(6, "Arya@Example.com", "arya", ""))
+    result = await svc.start_link("d3", "Arya", "arya@example.com")
+    assert result.ok and store.get_user("d3").seerr_user_id == 6
+
+
 async def test_link_unknown_account_and_empty_query(identity):
     svc, _ = identity
     assert not (await svc.start_link("d1", "x", "nobody@example.com")).ok

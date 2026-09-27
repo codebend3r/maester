@@ -14,7 +14,6 @@ import logging
 import secrets
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any
 
 from maester.agent.loop import Agent
 from maester.agent.tools import Choice, Tier
@@ -113,14 +112,12 @@ class ChatService:
 
     # -- messages ---------------------------------------------------------
 
-    async def handle_message(
-        self, user: ChatUser, text: str, on_text: Callable[[str], Any] | None = None
-    ) -> ChatResponse:
+    async def handle_message(self, user: ChatUser, text: str) -> ChatResponse:
         tier = self.tier_for(user)
         if tier == Tier.UNLINKED:
             return ChatResponse(chunks=split_reply(UNLINKED_HELP))
         try:
-            reply = await self.agent.respond(user.id, tier, text, on_text=on_text)
+            reply = await self.agent.respond(user.id, tier, text)
         except Exception:
             ref = secrets.token_hex(3)
             log.exception("agent failed for user %s (ref %s)", user.id, ref)

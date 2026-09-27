@@ -14,7 +14,7 @@ from datetime import UTC, datetime, timedelta
 
 from maester.agent.tools import Tier
 from maester.clients import Services
-from maester.store import PendingAction, Store, UserRow
+from maester.store import LinkStatus, PendingAction, Store, UserRow
 
 LINK_TTL = timedelta(days=7)
 
@@ -35,7 +35,7 @@ def resolve_tier(user: UserRow | None, role_ids: set[int], roles: RoleMap) -> Ti
         return Tier.parse(user.tier_override)
     if roles.admin_role_id and roles.admin_role_id in role_ids:
         return Tier.ADMIN
-    if not user or user.status != "active":
+    if not user or user.status != LinkStatus.ACTIVE:
         return Tier.UNLINKED
     if roles.trusted_role_id and roles.trusted_role_id in role_ids:
         return Tier.TRUSTED
@@ -66,18 +66,18 @@ class IdentityService:
                 False, "Tell me your Plex email or username, e.g. `/link me@example.com`."
             )
         existing = self.store.get_user(discord_id)
-        if existing and existing.status == "active":
+        if existing and existing.status == LinkStatus.ACTIVE:
             return LinkStart(
                 False, f"You're already linked as {existing.plex_email or existing.plex_username}."
             )
-        if existing and existing.status == "pending" and self.store.open_pending("approve"):
-            for p in self.store.open_pending("approve"):
-                if p.action == "link_account" and p.requester == discord_id:
-                    return LinkStart(False, "Your link request is already waiting for the admin.")
+        if self.store.open_pending("approve", action="link_account", requester=discord_id):
+            return LinkStart(False, "Your link request is already waiting for the admin.")
 
         users = await self.services.seerr.users()
         matches = [
-            u for u in users if q in {u.email, u.username.lower(), u.plex_username.lower()} - {""}
+            u
+            for u in users
+            if q in {u.email.lower(), u.username.lower(), u.plex_username.lower()} - {""}
         ]
         if not matches:
             return LinkStart(
@@ -95,7 +95,7 @@ class IdentityService:
             plex_username=seerr_user.plex_username or seerr_user.username or None,
             seerr_user_id=seerr_user.id,
             tautulli_user_id=tautulli_id,
-            status="pending",
+            status=LinkStatus.PENDING,
         )
         pending = self.store.create_pending(
             kind="approve",
@@ -119,7 +119,7 @@ class IdentityService:
         for client in self.services.tautulli.values():
             try:
                 for u in await client.users():
-                    if (email and u.email == email) or (
+                    if (email and u.email.lower() == email.lower()) or (
                         username and u.username.lower() == username.lower()
                     ):
                         return u.user_id
@@ -131,10 +131,10 @@ class IdentityService:
         """Apply an admin's already-recorded decision on a link request."""
         if approved:
             self.store.upsert_user(
-                pending.requester, status="active", linked_at=datetime.now(UTC).isoformat()
+                pending.requester, status=LinkStatus.ACTIVE, linked_at=datetime.now(UTC).isoformat()
             )
             return f"Linked: {pending.summary}"
-        self.store.upsert_user(pending.requester, status="revoked")
+        self.store.upsert_user(pending.requester, status=LinkStatus.REVOKED)
         return f"Denied: {pending.summary}"
 
     def set_tier_override(self, discord_id: str, tier: str | None) -> str:
@@ -145,8 +145,8 @@ class IdentityService:
     def whoami(self, discord_id: str, role_ids: set[int]) -> str:
         user = self.store.get_user(discord_id)
         tier = resolve_tier(user, role_ids, self.roles)
-        if not user or user.status == "revoked":
+        if not user or user.status == LinkStatus.REVOKED:
             return f"You're not linked yet (tier: {tier.name.lower()}). Use `/link <plex email or username>`."
         who = user.plex_email or user.plex_username or "?"
-        state = "active" if user.status == "active" else "waiting for admin approval"
+        state = "active" if user.status == LinkStatus.ACTIVE else "waiting for admin approval"
         return f"Linked to {who} ({state}). Tier: {tier.name.lower()}."

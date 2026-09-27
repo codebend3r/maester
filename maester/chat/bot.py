@@ -12,8 +12,9 @@ from collections.abc import Sequence
 import discord
 from discord import app_commands
 
+from maester.chat.members import resolve_chat_user
 from maester.chat.service import AdminNotice, ChatService
-from maester.chat.views import DecisionView, resolve_chat_user, send_response, send_text
+from maester.chat.views import DecisionView, send_response, send_text
 
 log = logging.getLogger("maester.bot")
 
