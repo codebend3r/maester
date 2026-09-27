@@ -6,7 +6,7 @@ sessions and last few finished plays; a host that can't answer is named
 instead of hiding the others. Tautulli knows a Plex item, not a title, so
 `identify` reads the item's TMDB id from Plex and asks Seerr for the title,
 and `copy_of` tells from Seerr's Plex keys whether the item is the 1080p or
-the 4K copy.
+the 4K copy. `playback_of` reads how a play went, for the client check.
 
 Tautulli keeps a play in its history only once it stops and outlasts the
 ignore interval, so a play that failed at once may not be here at all; the
@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from maester.clients import Services
 from maester.clients.seerr import MediaDetails
 from maester.clients.tautulli import HistoryRow, Session, Tautulli
+from maester.playback.client_limits import Playback
 from maester.playback.items import Item
 
 # Finished plays asked of each host.
@@ -29,7 +30,7 @@ RECENT = 5
 
 @dataclass(frozen=True)
 class Play:
-    """One play on one host: `live` while it runs, `finished` once Tautulli logged it."""
+    """One play on one host: a live session, or a finished play from the history."""
 
     host: str
     title: str  # Tautulli's full title, "The Bear - Forks"
@@ -39,8 +40,11 @@ class Play:
     episode: int | None
     player: str  # "Plex for Roku on Living Room"
     started: int  # epoch seconds; 0 while live
-    live: Session | None = None
-    finished: HistoryRow | None = None
+    source: Session | HistoryRow
+
+    @property
+    def live(self) -> bool:
+        return isinstance(self.source, Session)
 
     @property
     def kind(self) -> str:
@@ -63,7 +67,7 @@ class Play:
             episode=s.episode,
             player=f"{s.product} on {s.player}",
             started=0,
-            live=s,
+            source=s,
         )
 
     @classmethod
@@ -77,7 +81,7 @@ class Play:
             episode=row.episode,
             player=f"{row.product} on {row.player}",
             started=row.started,
-            finished=row,
+            source=row,
         )
 
     def is_of(self, details: MediaDetails, item: Item) -> bool:
@@ -113,7 +117,7 @@ async def recent_plays(services: Services, tautulli_user_id: int) -> Plays:
             unreachable[host] = f"{type(result).__name__}: {result}"
         else:
             plays.extend(result)
-    plays.sort(key=lambda p: (p.live is None, -p.started))
+    plays.sort(key=lambda p: (not p.live, -p.started))
     # One Plex server, so a rating key is one item whichever Tautulli saw it.
     unique: dict[str, Play] = {}
     for play in plays:
@@ -137,3 +141,14 @@ def copy_of(details: MediaDetails, plex_key: str) -> bool | None:
     """
     standard, uhd = plex_key == details.rating_key, plex_key == details.rating_key_4k
     return None if standard == uhd else uhd
+
+
+async def playback_of(services: Services, play: Play, file_dovi_profile: int | None) -> Playback:
+    """How a play went. A live session says it all; a finished play's streams are read
+    by its history row, and its Dolby Vision profile comes from the file."""
+    match play.source:
+        case Session() as live:
+            return Playback.from_session(live)
+        case HistoryRow() as row:
+            stream = await services.tautulli[play.host].stream_data(row.row_id)
+            return Playback.from_history(row, stream, file_dovi_profile)
