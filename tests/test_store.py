@@ -1,6 +1,9 @@
+import sqlite3
 from datetime import UTC, datetime, timedelta
 
 import pytest
+
+from maester.store import MIGRATIONS_DIR, SeerrUserTaken, Store
 
 
 def test_migrations_apply_once(store):
@@ -140,9 +143,10 @@ def test_webhook_events_are_claimed_once_within_the_window(store):
     assert store.claim_event("seerr", "MEDIA_AVAILABLE:request:78", window=day)
     store.release_event("seerr", "MEDIA_AVAILABLE:request:77")
     assert store.claim_event("seerr", "MEDIA_AVAILABLE:request:77", window=day)
-    # Once the window has passed (here: it already has), the same event counts as new.
+    # Once the window has passed (here: it already has), the same event counts as new,
+    # and the stale claims are gone: request 78 is new again too.
     assert store.claim_event("seerr", "MEDIA_AVAILABLE:request:77", window=timedelta(seconds=-1))
-    assert store._conn.execute("SELECT COUNT(*) FROM webhook_events").fetchone()[0] == 1
+    assert store.claim_event("seerr", "MEDIA_AVAILABLE:request:78", window=day)
 
 
 def test_user_by_seerr_id_finds_the_live_link(store):
@@ -168,3 +172,37 @@ def test_an_active_link_is_approved_and_names_a_seerr_user(store):
     assert store.active_link_by_seerr_id(4) == link
     store.upsert_user("d1", status="pending")
     assert store.active_link("d1") is None and store.active_link_by_seerr_id(4) is None
+
+
+def test_a_seerr_user_has_one_live_link(store):
+    store.upsert_user("d1", seerr_user_id=4, status="active")
+    with pytest.raises(SeerrUserTaken):
+        store.upsert_user("d2", seerr_user_id=4, status="pending")
+    store.upsert_user("d1", status="revoked")
+    assert store.upsert_user("d2", seerr_user_id=4, status="pending").seerr_user_id == 4
+
+
+def test_the_migration_keeps_the_earliest_active_link_of_a_shared_seerr_user(tmp_path):
+    # A database from before the rule: migrations 001-003 only, then shared links.
+    path = tmp_path / "maester.db"
+    conn = sqlite3.connect(path)
+    conn.execute("CREATE TABLE schema_version (version INTEGER PRIMARY KEY)")
+    for version in (1, 2, 3):
+        (script,) = MIGRATIONS_DIR.glob(f"00{version}_*.sql")
+        conn.executescript(script.read_text())
+        conn.execute("INSERT INTO schema_version VALUES (?)", (version,))
+    conn.executemany(
+        "INSERT INTO users (discord_id, seerr_user_id, status, linked_at) VALUES (?, 4, ?, ?)",
+        [
+            ("late", "active", "2026-02-01"),
+            ("early", "active", "2026-01-01"),
+            ("waiting", "pending", None),
+        ],
+    )
+    conn.commit()
+    conn.close()
+
+    migrated = Store(path)
+    assert migrated.active_link_by_seerr_id(4).discord_id == "early"
+    assert [migrated.get_user(d).status for d in ("late", "waiting")] == ["revoked", "revoked"]
+    migrated.close()

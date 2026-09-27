@@ -61,6 +61,10 @@ class UserRow:
     tier_override: str | None
 
 
+class SeerrUserTaken(LookupError):
+    """Another Discord account already holds a live link to this Seerr user."""
+
+
 class NotLinked(LookupError):
     """A Discord account with no active link to a Seerr user: nothing can be done as them."""
 
@@ -252,14 +256,19 @@ class Store:
         unknown = set(fields) - allowed
         if unknown:
             raise ValueError(f"unknown user fields: {sorted(unknown)}")
-        with self.transaction() as conn:
-            conn.execute("INSERT OR IGNORE INTO users (discord_id) VALUES (?)", (discord_id,))
-            if fields:
-                assignments = ", ".join(f"{k} = ?" for k in fields)
-                conn.execute(
-                    f"UPDATE users SET {assignments} WHERE discord_id = ?",
-                    (*fields.values(), discord_id),
-                )
+        try:
+            with self.transaction() as conn:
+                conn.execute("INSERT OR IGNORE INTO users (discord_id) VALUES (?)", (discord_id,))
+                if fields:
+                    assignments = ", ".join(f"{k} = ?" for k in fields)
+                    conn.execute(
+                        f"UPDATE users SET {assignments} WHERE discord_id = ?",
+                        (*fields.values(), discord_id),
+                    )
+        except sqlite3.IntegrityError as exc:
+            if "seerr_user_id" in str(exc):
+                raise SeerrUserTaken(f"Seerr user {fields.get('seerr_user_id')} is taken") from exc
+            raise
         return self.get_user(discord_id)  # type: ignore[return-value]
 
     def get_user(self, discord_id: str) -> UserRow | None:

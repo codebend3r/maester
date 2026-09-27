@@ -90,7 +90,7 @@ A tool asks the admin by returning `Result(content, notices=(), approval=None)`:
 - A press whose run fails in the tool itself (Seerr down) is reopened, so the admin can press again; decide tools must be safe to run twice. A press whose tool no longer exists is closed.
 - If a turn fails after a tool acted (a model error, say), the agent raises `TurnFailed` with the partial reply, and the error reply still carries its confirmations and notices.
 
-Tools act as the friend through `ToolContext.linked_user()`: the caller's active link, whose `seerr_user_id` goes out as Seerr's `X-API-User`; `ctx.link_of(discord_id)` gives anyone else's, for a tool acting on someone's behalf. Callers without one are refused with `NotLinked`. "Active" is one rule in the store (approved, and naming a Seerr user), behind `Store.active_link()` and `Store.active_link_by_seerr_id()`, which tiers, tools and the ready DM all use. A `ToolContext` always carries the real store and settings; nothing mints its own.
+Tools act as the friend through `ToolContext.linked_user()`: the caller's active link, whose `seerr_user_id` goes out as Seerr's `X-API-User`; `ctx.link_of(discord_id)` gives anyone else's, for a tool acting on someone's behalf. Callers without one are refused with `NotLinked`. "Active" is one rule in the store (approved, and naming a Seerr user), behind `Store.active_link()` and `Store.active_link_by_seerr_id()`, which tiers, tools and the ready DM all use. A Seerr user has at most one live (pending or active) link, enforced by a unique index (migration `004`, which also revoked older duplicates), so a request and its ready DM belong to one person. A `ToolContext` always carries the real store and settings; nothing mints its own.
 
 ## Prompt injection
 

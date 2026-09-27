@@ -91,3 +91,17 @@ async def test_a_plex_account_links_to_one_discord_account(identity):
     assert store.get_user("d9") is None
     store.upsert_user("d1", status="revoked")
     assert (await svc.start_link("d9", "Dany again", "dany_t")).ok
+
+
+async def test_a_link_racing_another_for_the_same_account_loses_kindly(identity):
+    svc, store = identity
+
+    async def meanwhile(email, username):
+        # Another /link for the same Plex account lands while Tautulli is asked.
+        store.upsert_user("d9", seerr_user_id=4, status="pending")
+        return None
+
+    svc._tautulli_id = meanwhile
+    result = await svc.start_link("d1", "Dany", "dany@example.com")
+    assert not result.ok and "already linked to another Discord account" in result.message
+    assert store.open_pending() == []

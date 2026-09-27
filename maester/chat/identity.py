@@ -15,9 +15,13 @@ from datetime import timedelta
 
 from maester.agent.tools import Tier
 from maester.clients import Services
-from maester.store import LinkStatus, PendingAction, Store
+from maester.store import LinkStatus, PendingAction, SeerrUserTaken, Store
 
 LINK_TTL = timedelta(days=7)
+ALREADY_LINKED = (
+    "That Plex account is already linked to another Discord account. "
+    "Ask the admin if it should be yours."
+)
 
 
 @dataclass(frozen=True)
@@ -89,26 +93,26 @@ class IdentityService:
                 "or ask the admin for an invite if you don't have access yet.",
             )
         seerr_user = matches[0]
+        # One Discord account per Plex account, so requests and ready DMs can
+        # only belong to one person. The schema enforces it; this check only
+        # answers early and kindly.
         holder = self.store.user_by_seerr_id(seerr_user.id)
         if holder is not None and holder.discord_id != discord_id:
-            # One Discord account per Plex account, so requests and ready DMs
-            # can only belong to one person.
-            return LinkStart(
-                False,
-                "That Plex account is already linked to another Discord account. "
-                "Ask the admin if it should be yours.",
-            )
+            return LinkStart(False, ALREADY_LINKED)
         tautulli_id = await self._tautulli_id(
             seerr_user.email, seerr_user.plex_username or seerr_user.username
         )
-        self.store.upsert_user(
-            discord_id,
-            plex_email=seerr_user.email or None,
-            plex_username=seerr_user.plex_username or seerr_user.username or None,
-            seerr_user_id=seerr_user.id,
-            tautulli_user_id=tautulli_id,
-            status=LinkStatus.PENDING,
-        )
+        try:
+            self.store.upsert_user(
+                discord_id,
+                plex_email=seerr_user.email or None,
+                plex_username=seerr_user.plex_username or seerr_user.username or None,
+                seerr_user_id=seerr_user.id,
+                tautulli_user_id=tautulli_id,
+                status=LinkStatus.PENDING,
+            )
+        except SeerrUserTaken:  # someone else linked it while we asked Tautulli
+            return LinkStart(False, ALREADY_LINKED)
         account = seerr_user.email or seerr_user.username
         # Decided by the button-only `link_account` admin tool (maester/tools/accounts.py).
         pending = self.store.create_pending(
