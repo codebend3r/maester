@@ -3,7 +3,8 @@
 
 Idempotent: labels and milestones are created or updated in place, and issues
 are matched by their `[E0.1]`-style title prefix so re-running never creates a
-duplicate. Stories are attached to their epic as native sub-issues.
+duplicate. Stories are attached to their epic as native sub-issues. The roadmap
+ticks every epic and story whose issue is closed as completed.
 
     uv run python scripts/sync_tracker.py            # sync issues + write roadmap
     uv run python scripts/sync_tracker.py --doc-only  # write roadmap from the live issue map
@@ -197,53 +198,82 @@ def sync_issues(milestones: dict[str, str]) -> dict:
     return issue_map
 
 
-def render_roadmap(issue_map: dict) -> None:
+def load_issue_map() -> dict:
+    return json.loads(MAP_PATH.read_text()) if MAP_PATH.exists() else {}
+
+
+def is_done(issue: dict) -> bool:
+    """Closed as completed. An issue closed as not planned is not done."""
+    return issue["state"] == "CLOSED" and issue.get("stateReason") in (None, "", "COMPLETED")
+
+
+def completed_issues() -> set[int]:
+    out = gh(
+        "issue", "list", "-R", REPO, "--state", "closed", "--limit", "500",
+        "--json", "number,state,stateReason",
+    )  # fmt: skip
+    return {issue["number"] for issue in json.loads(out) if is_done(issue)}
+
+
+def render_roadmap(issue_map: dict, done: set[int]) -> str:
+    """The roadmap doc, with a box ticked for each issue number in `done`."""
+
     def link(key: str) -> str:
         n = issue_map.get(key)
         return f"[#{n}](https://github.com/{REPO}/issues/{n})" if n else "(not synced)"
+
+    def box(key: str) -> str:
+        return "[x]" if issue_map.get(key) in done else "[ ]"
 
     out = [
         "# Roadmap",
         "",
         "Generated from `scripts/catalog.py` by `scripts/sync_tracker.py`. Edit the catalog, not this file.",
+        "A box is ticked once its issue is closed as completed; `scripts/sync_board.py` keeps them current.",
         "",
         f'Board: https://github.com/users/{REPO.split("/")[0]}/projects ("maester roadmap")',
         "",
         "## Milestones",
         "",
-        "| Milestone | Goal | Epics |",
-        "|---|---|---|",
     ]
     for key, title, desc in MILESTONES:
-        epics = ", ".join(f"{e['key']} {e['title']}" for e in EPICS if e["milestone"] == key)
-        out.append(f"| **{key}** {title} | {desc} | {epics} |")
-    out += ["", "## Epics", ""]
+        out += [f"### {key} {title}", "", desc, ""]
+        out += [
+            f"- {box(e['key'])} {e['key']} {e['title']} {link(e['key'])}"
+            for e in EPICS
+            if e["milestone"] == key
+        ]
+        out.append("")
+    out += ["## Epics", ""]
     for epic in EPICS:
         out += [
             f"### {epic['key']} {epic['title']} ({epic['milestone']}) {link(epic['key'])}",
             "",
             epic["summary"],
             "",
-            "| # | Story | Size | Priority | Issue |",
-            "|---|---|---|---|---|",
         ]
         for i, s in enumerate(epic["stories"], 1):
             key = f"{epic['key']}.{i}"
-            out.append(f"| {key} | {s['title']} | {s['size']} | {s['priority']} | {link(key)} |")
+            out.append(
+                f"- {box(key)} {key} {s['title']} · {s['size']} · {s['priority']} · {link(key)}"
+            )
         out.append("")
-    ROADMAP_PATH.write_text("\n".join(out))
+    return "\n".join(out)
+
+
+def write_roadmap(issue_map: dict) -> None:
+    ROADMAP_PATH.write_text(render_roadmap(issue_map, completed_issues()))
     print(f"wrote {ROADMAP_PATH.relative_to(ROOT)}")
 
 
 def main() -> None:
     if "--doc-only" in sys.argv:
-        issue_map = json.loads(MAP_PATH.read_text()) if MAP_PATH.exists() else {}
-        render_roadmap(issue_map)
+        write_roadmap(load_issue_map())
         return
     sync_labels()
     milestones = sync_milestones()
     issue_map = sync_issues(milestones)
-    render_roadmap(issue_map)
+    write_roadmap(issue_map)
 
 
 if __name__ == "__main__":

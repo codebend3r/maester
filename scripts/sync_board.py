@@ -3,7 +3,8 @@
 
 The issues are the source of truth and the board follows them. The board's built-in
 workflows miss transitions (issues closed by a PR can stay In Progress), so this audits
-every item instead of trusting them.
+every item instead of trusting them. It also re-renders docs/roadmap.md when its boxes
+no longer match the closed issues.
 
 Read-only by default: prints a numbered plan and saves it. Applying re-audits first and
 runs only the saved steps that are still needed, so a stale plan never undoes anything.
@@ -23,6 +24,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+from sync_tracker import ROADMAP_PATH, completed_issues, is_done, load_issue_map, render_roadmap
+
 OWNER = "codebend3r"
 REPO = "codebend3r/maester"
 PROJECT = 1
@@ -30,6 +33,7 @@ PLAN_PATH = Path(tempfile.gettempdir()) / "maester-board-plan.json"
 
 # Apply order within one issue: an epic's checklist is ticked before it closes, and
 # it closes before its status moves, so the auto-close workflow has nothing to do.
+# The roadmap step comes after every issue, so it ticks the epics this run closes.
 KIND_ORDER = ["add", "field", "tick", "close", "status"]
 
 QUERY = """
@@ -94,7 +98,7 @@ def fetch() -> dict:
         values = item.pop("fieldValues")["nodes"]
         item["values"] = {v["field"]["name"]: v["name"] for v in values if v}
     issues = gh("issue", "list", "-R", REPO, "--state", "all", "--limit", "500",
-                "--json", "number,title,url")  # fmt: skip
+                "--json", "number,title,url,state,stateReason")  # fmt: skip
     return {"id": project["id"], "fields": fields, "items": items, "issues": json.loads(issues)}
 
 
@@ -193,6 +197,13 @@ def plan(board: dict) -> tuple[list[dict], list[dict]]:
                           "to": issue["url"], "why": "not on the board"})  # fmt: skip
 
     steps.sort(key=lambda s: (s["issue"], KIND_ORDER.index(s["kind"])))
+
+    done = {i["number"] for i in board["issues"] if is_done(i)}
+    done |= {s["issue"] for s in steps if s["kind"] == "close"}
+    current = ROADMAP_PATH.read_text() if ROADMAP_PATH.exists() else ""
+    if render_roadmap(load_issue_map(), done) != current:
+        steps.append({"issue": None, "title": "docs/roadmap.md", "kind": "roadmap", "to": None,
+                      "why": "boxes don't match the closed issues"})  # fmt: skip
     return steps, flags
 
 
@@ -208,6 +219,9 @@ def run(board: dict, step: dict) -> None:
         gh("issue", "edit", n, "-R", REPO, "--body-file", "-", input=step["to"])
     elif kind == "close":
         gh("issue", "close", n, "-R", REPO, "--reason", "completed", "--comment", step["to"])
+    elif kind == "roadmap":
+        # Rendered from live state, after this run's closes, not from the audit.
+        ROADMAP_PATH.write_text(render_roadmap(load_issue_map(), completed_issues()))
     else:
         field = board["fields"][step["field"]]
         option = next(o["id"] for o in field["options"] if o["name"] == step["to"])
@@ -222,7 +236,15 @@ def describe(step: dict) -> str:
         "tick": "update the story checklist",
         "close": "close the issue as completed",
         "status": f"set Status to {step['to']}",
+        "roadmap": "re-render the checkboxes",
     }[step["kind"]]
+
+
+def ref(step: dict, title: bool = False) -> str:
+    """How a step's target reads: `#15`, `#15 [E2] Chat and identity` or `docs/roadmap.md`."""
+    if step["issue"] is None:
+        return step["title"]
+    return f"#{step['issue']} {step['title']}" if title else f"#{step['issue']}"
 
 
 def report(steps: list[dict], flags: list[dict]) -> None:
@@ -232,7 +254,7 @@ def report(steps: list[dict], flags: list[dict]) -> None:
     if steps:
         print("| # | Issue | Change | Why |\n|---|---|---|---|")
         for i, s in enumerate(steps, 1):
-            print(f"| {i} | #{s['issue']} {s['title']} | {describe(s)} | {s['why']} |")
+            print(f"| {i} | {ref(s, title=True)} | {describe(s)} | {s['why']} |")
     if flags:
         print("\nNeeds a decision (never applied):")
         for f in flags:
@@ -267,9 +289,9 @@ def main() -> None:
         # Run the freshly planned step, not the saved one, so its data is current.
         if fresh := current.get(key(step)):
             run(board, fresh)
-            print(f"✓ {i}. #{step['issue']} {describe(fresh)}")
+            print(f"✓ {i}. {ref(step)} {describe(fresh)}")
         else:
-            print(f"· {i}. #{step['issue']} {describe(step)}: already done, skipped")
+            print(f"· {i}. {ref(step)} {describe(step)}: already done, skipped")
     PLAN_PATH.unlink()
 
 

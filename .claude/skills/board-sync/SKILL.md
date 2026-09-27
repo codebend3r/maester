@@ -1,21 +1,21 @@
 ---
 name: board-sync
-description: Use when the "maester roadmap" GitHub Project board (github.com/users/codebend3r/projects/1) may not match the issues. Triggers include "sync the board", "update the project", "move closed stories to Done", "what's in progress", "is the roadmap up to date", "close the epic", after merging a PR that closes stories, or when a board item looks stale (closed issue still In Progress, finished epic still Todo, issue missing from the board).
+description: Use when the "maester roadmap" GitHub Project board (github.com/users/codebend3r/projects/1) may not match the issues. Triggers include "sync the board", "update the project", "move closed stories to Done", "what's in progress", "is the roadmap up to date", "tick the roadmap", "close the epic", after merging a PR that closes stories, or when a board item looks stale (closed issue still In Progress, finished epic still Todo, issue missing from the board, a closed story still unticked in docs/roadmap.md).
 ---
 
 # Board sync
 
-The issues and their PRs are the source of truth, and the board follows them. The board's built-in workflows are on but miss transitions: PR #77 closed three stories and they stayed In Progress. Audit the board; don't trust the automation.
+The issues and their PRs are the source of truth, and the board and the checkboxes in `docs/roadmap.md` follow them. The board's built-in workflows are on but miss transitions: PR #77 closed three stories and they stayed In Progress. Audit the board; don't trust the automation.
 
 ## Pick the tool
 
 | What drifted | Run |
 | --- | --- |
-| Status, Epic/Phase/Size/Priority, an issue missing from the board, a finished epic still open | `scripts/sync_board.py` |
+| Status, Epic/Phase/Size/Priority, an issue missing from the board, a finished epic still open, a roadmap checkbox | `scripts/sync_board.py` |
 | An epic or story added, renamed, resized or reprioritized | Edit `scripts/catalog.py`, run `scripts/sync_tracker.py`, then `scripts/sync_board.py` |
 | Board deleted or being rebuilt | `scripts/setup_project.sh` |
 
-`sync_tracker.py` rewrites every issue body from the catalog, which unticks every epic checklist. Always follow it with `sync_board.py`, which ticks them back.
+`sync_tracker.py` rewrites every issue body from the catalog, which unticks every epic checklist. Always follow it with `sync_board.py`, which ticks them back. The roadmap it writes is ticked from the live issues already.
 
 ## Run it
 
@@ -24,6 +24,7 @@ The issues and their PRs are the source of truth, and the board follows them. Th
 3. Show the user the plan table and the "Needs a decision" list as printed, then ask which steps to apply. Closing an epic and editing its checklist change the issue itself, not just the board
 4. Apply what they approved: `uv run python scripts/sync_board.py --apply` or `--apply --only 1,3`. Steps already done since the audit are skipped
 5. Re-run the audit. An added issue gets its fields and status on this second pass. Stop when it prints `✓ board matches the issues`, or only flags remain
+6. The roadmap step edits `docs/roadmap.md` in the working tree. Tell the user it needs committing, using `commit-format`
 
 ## What the audit checks
 
@@ -36,6 +37,7 @@ The issues and their PRs are the source of truth, and the board follows them. Th
 | Open with no status | Todo |
 | Title `[E3.1]`, milestone `M2 …`, labels `size:M`, `P0` | Epic E3, Phase M2, Size M, Priority P0 |
 | Issue in the repo but not on the board | Added |
+| Epic or story closed as completed, unticked in `docs/roadmap.md` | Roadmap re-rendered with its box ticked |
 
 Only issue items are audited. PR and draft items on the board are left alone.
 
@@ -51,8 +53,9 @@ To answer "what's in progress" or "what's left", audit first so stale statuses a
 
 - **Setting Done on an open issue by hand.** The Auto-close issue workflow closes it. Close the issue instead, or let the script close the epic
 - **Trusting the built-in workflows.** "Item closed" is enabled and still missed #10, #11 and #13
+- **Ticking `docs/roadmap.md` by hand.** It is generated, so the next render overwrites it. Close the issue, then run the audit
 - **Editing the board to change scope.** Board fields come from labels and milestones, so the next audit reverts them. Change the catalog or the labels instead
 
 ## Reporting back
 
-In chat only, one line per applied step, as the script prints it: `✓ 2. #15 close the issue as completed`. End with the audit's final line.
+In chat only, one line per applied step, as the script prints it: `✓ 2. #15 close the issue as completed` or `✓ 3. docs/roadmap.md re-render the checkboxes`. End with the audit's final line.
