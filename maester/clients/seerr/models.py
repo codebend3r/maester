@@ -383,6 +383,7 @@ class ArrServer:
     is_4k: bool
     is_default: bool
     url: str  # where Seerr reaches it: scheme, host, port and base path
+    root_folder: str = ""  # where Seerr has it put what's requested (`activeDirectory`)
 
     @classmethod
     def from_api(cls, raw: dict[str, Any]) -> ArrServer:
@@ -394,6 +395,7 @@ class ArrServer:
             is_4k=bool(raw.get("is4k", False)),
             is_default=bool(raw.get("isDefault", False)),
             url=f"{scheme}://{raw['hostname']}:{int(raw['port'])}{base}",
+            root_folder=raw.get("activeDirectory") or "",
         )
 
 

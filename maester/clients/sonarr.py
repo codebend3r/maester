@@ -4,7 +4,14 @@ from dataclasses import dataclass, field, replace
 from datetime import datetime
 from typing import Any, ClassVar, Protocol
 
-from maester.clients.arr import ArrClient, DiskSpace, HistoryEvent, MediaFile, QueueItem
+from maester.clients.arr import (
+    ArrClient,
+    DiskSpace,
+    HistoryEvent,
+    MediaFile,
+    QueueItem,
+    RootFolder,
+)
 from maester.clients.base import Downable
 
 
@@ -66,7 +73,7 @@ class Sonarr(Protocol):
     base_url: str
 
     async def ping(self) -> None: ...
-    async def root_folders(self) -> list[str]: ...
+    async def root_folders(self) -> list[RootFolder]: ...
     async def disk_space(self) -> list[DiskSpace]: ...
     async def queue(self) -> list[QueueItem]: ...
     async def history(self, media_id: int) -> list[HistoryEvent]: ...
@@ -128,7 +135,10 @@ class FakeSonarrClient(Downable):
 
     host: str = "fake"
     base_url: str = ""
-    roots: list[str] = field(default_factory=lambda: ["/TV"])
+    # A fake arr has room unless a test says otherwise: 8 of 16 TB free.
+    roots: list[RootFolder] = field(
+        default_factory=lambda: [RootFolder("/TV", 8_000_000_000_000, 16_000_000_000_000)]
+    )
     disks: list[DiskSpace] = field(default_factory=list)
     queue_items: list[QueueItem] = field(default_factory=list)
     # Download history per movie or series id, newest first.
@@ -141,10 +151,12 @@ class FakeSonarrClient(Downable):
     deleted: list[int] = field(default_factory=list)
     followed: list[int] = field(default_factory=list)
 
-    async def root_folders(self) -> list[str]:
+    async def root_folders(self) -> list[RootFolder]:
+        self.refuse_if_down("/api/v3/rootfolder")
         return list(self.roots)
 
     async def disk_space(self) -> list[DiskSpace]:
+        self.refuse_if_down("/api/v3/diskspace")
         return list(self.disks)
 
     async def queue(self) -> list[QueueItem]:

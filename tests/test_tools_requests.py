@@ -4,7 +4,7 @@ import pytest
 
 from maester.agent.tools import Result, Tier, registry
 from maester.clients import ClientError
-from maester.clients.arr import MediaFile
+from maester.clients.arr import DiskSpace, MediaFile, RootFolder
 from maester.clients.radarr import Movie
 from maester.clients.seerr import (
     ANIME_KEYWORD,
@@ -322,3 +322,79 @@ async def test_a_size_that_cannot_be_measured_does_not_block_4k(ctx):
     out = await request_media_4k(ctx, 438631, "movie")
     assert isinstance(out, Result) and out.content["requested"] is True
     assert out.content["standard_copy_size"].startswith("unknown (couldn't ask the movie arr")
+
+
+def uhd_volume(ctx, free_tb, total_tb=16, host="vermithor", roots=("/Movies",)):
+    """The 4K Radarr's root folders, and the disk they sit on."""
+    radarr = ctx.services.radarr[host]
+    radarr.roots = [RootFolder(r) for r in roots]
+    radarr.disks = [DiskSpace("/Movies", int(free_tb * 1e12), int(total_tb * 1e12))]
+
+
+async def test_a_nearly_full_4k_volume_holds_the_request_for_the_admin(ctx):
+    seed(ctx, DUNE)
+    four_k_servers(ctx)
+    uhd_volume(ctx, free_tb=0.8)  # 95% used; the limit is 90%
+    out = await request_media_4k(ctx, 438631, "movie")
+    assert ctx.services.seerr.requests == []  # nothing goes to Seerr yet
+    assert out.content["requested"] is False
+    assert out.content["storage"] == (
+        "/Movies on vermithor, where 4K movies go, is 95% full (the limit is 90%), so 4K "
+        "requests wait for the admin's approval for now; it's requested once they approve."
+    )
+    approval = out.approval
+    assert approval.decide == "decide_4k_over_storage"
+    assert approval.notice.startswith("dany asks for Dune (2021) in 4K, but /Movies on vermithor")
+    assert approval.args == {
+        "tmdb_id": 438631, "media_type": "movie", "seasons": None, "english_dub": False,
+        "title": "Dune (2021)", "requester": "d1",
+    }  # fmt: skip
+    assert approval.subject == "4k-room:d1:movie:438631"
+
+
+async def test_4k_space_that_cant_be_told_holds_the_request_too(ctx):
+    seed(ctx, DUNE)
+    four_k_servers(ctx)
+    ctx.services.radarr["vermithor"].down = True
+    out = await request_media_4k(ctx, 438631, "movie")
+    assert "couldn't be read" in out.content["storage"] and not ctx.services.seerr.requests
+    ctx.services.radarr["vermithor"].down = False
+    uhd_volume(ctx, free_tb=8, roots=("/Movies", "/Movies/UHD"))  # which one? Seerr doesn't say
+    out = await request_media_4k(ctx, 438631, "movie")
+    assert "names no root folder" in out.content["storage"]
+    server = ctx.services.seerr.arr_servers["radarr"][0]
+    ctx.services.seerr.arr_servers["radarr"] = [replace(server, root_folder="/Movies/UHD")]
+    out = await request_media_4k(ctx, 438631, "movie")
+    assert out.content["requested"] is True and out.approval.decide == "decide_request"
+
+
+async def test_the_admin_approves_a_held_4k_request_and_it_goes_to_seerr_approved(ctx):
+    seed(ctx, DUNE)
+    four_k_servers(ctx)
+    uhd_volume(ctx, free_tb=0.8)
+    held = (await request_media_4k(ctx, 438631, "movie")).approval.args
+    admin = replace(ctx, user_id="boss", tier=Tier.ADMIN)
+    decide = registry.get("decide_4k_over_storage").handler
+    out = await decide(admin, approved=True, **held)
+    assert out.content == (
+        "Requested Dune (2021) in 4K for dany and approved it in Seerr (request #1)."
+    )
+    (req,) = ctx.services.seerr.requests
+    assert req.is_4k and req.requested_by_id == 4 and req.status == RequestStatus.APPROVED
+    assert out.notices[0].to == "d1" and "approved Dune (2021) in 4K" in out.notices[0].text
+    # A second press finds it requested already, and asks nothing twice.
+    seed(ctx, replace(DUNE, status_4k=S.PROCESSING))
+    again = await decide(admin, approved=True, **held)
+    assert again.is_error and "requested, downloading" in again.content
+    assert len(ctx.services.seerr.requests) == 1
+
+
+async def test_the_admin_holds_off_a_4k_request_and_the_friend_hears_why(ctx):
+    seed(ctx, DUNE)
+    four_k_servers(ctx)
+    uhd_volume(ctx, free_tb=0.8)
+    held = (await request_media_4k(ctx, 438631, "movie")).approval.args
+    admin = replace(ctx, user_id="boss", tier=Tier.ADMIN)
+    out = await registry.get("decide_4k_over_storage").handler(admin, approved=False, **held)
+    assert out.content == "Held off on Dune (2021) in 4K." and not ctx.services.seerr.requests
+    assert "storage is nearly full" in out.notices[0].text

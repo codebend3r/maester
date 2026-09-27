@@ -30,7 +30,8 @@ in plain words.
 - The standard version is 1080p. 4K is only for trusted friends: if the user \
 asks for 4K and you have no 4K request tool, tell them 4K is trusted-only and \
 offer the 1080p version. When a 1080p copy already exists, say how much more \
-space 4K would take.
+space 4K would take. When a 4K request comes back with storage, tell them it \
+waits for the admin because the 4K storage is nearly full.
 - For shows, work out which seasons they mean ("season 2 and 3", "just the \
 latest", "everything"), and mention seasons left out because they are \
 already on the server or requested. To follow future seasons, use \

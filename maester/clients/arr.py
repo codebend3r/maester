@@ -60,7 +60,27 @@ class QueueItem:
 
 
 @dataclass(frozen=True)
+class RootFolder:
+    """Where an arr puts media; free and total space as it read them, when it did."""
+
+    path: str
+    free_bytes: int | None = None
+    total_bytes: int | None = None
+
+    @classmethod
+    def from_api(cls, raw: dict[str, Any]) -> RootFolder:
+        free, total = raw.get("freeSpace"), raw.get("totalSpace")
+        return cls(
+            raw.get("path") or "",
+            int(free) if free is not None else None,
+            int(total) if total else None,
+        )
+
+
+@dataclass(frozen=True)
 class DiskSpace:
+    """A disk mounted in the arr's container."""
+
     path: str
     free_bytes: int
     total_bytes: int
@@ -138,8 +158,8 @@ class ArrClient(HttpClient):
         super().__init__(base_url, headers={"X-Api-Key": api_key}, **kwargs)
         self.host = host
 
-    async def root_folders(self) -> list[str]:
-        return [r["path"] for r in await self.get_json(f"{self.api}/rootfolder")]
+    async def root_folders(self) -> list[RootFolder]:
+        return [RootFolder.from_api(r) for r in await self.get_json(f"{self.api}/rootfolder")]
 
     async def disk_space(self) -> list[DiskSpace]:
         return [
