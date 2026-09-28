@@ -51,7 +51,7 @@ Work consciously left out of an epic's PR: acceptance criteria not fully met, an
 
 | ID | Source | Item | Why deferred | Lands in | Status |
 | --- | --- | --- | --- | --- | --- |
-| E6-1 | E6.1 criterion | Invites don't land in the approval queue | Wizarr invites are E7.1's. The queue takes them as one more button-only `decide_*` tool whose approval names its subject | E7.1 | done in E7: `request_invite` asks, `decide_invite` issues |
+| E6-1 | E6.1 criterion | Invites don't land in the approval queue | Wizarr invites are E7.1's. The queue takes them as one more button-only `decide_*` tool whose approval names its subject | E7.1 | done in E7 (#89): `request_invite` asks, `decide_invite` issues |
 | E6-2 | E6.10 criterion | Drive SMART health isn't read, over SSH or otherwise; the report says so | maester runs no shell and holds no NAS credentials by design, and reading SMART on DSM needs root. The fleet monitor's collector already reaches every NAS over SSH; a SMART probe there, carried in its `/fleet` view, is where it belongs, and `jobs/nas.py`'s `problems` would read it | wizteros: a fleet-monitor SMART probe | open |
 | E6-3 | E6.10 criterion | Until the fleet monitor's token guard exists (E5-3), the weekly report covers the media volumes only: no host state, temperatures, containers or uptime | The same guard as E5-3, opening `/fleet` too | wizteros guard (E5-3) | open |
 | E6-4 | E6.4 criterion | A 4K request made on Seerr's own page by someone Seerr auto-approves skips the storage check | Only maester's tool sees a request before Seerr acts on it; Seerr sends `MEDIA_AUTO_APPROVED` after the download is already on its way. The webhook could warn the admin when one lands on a full volume | unplanned | open |
