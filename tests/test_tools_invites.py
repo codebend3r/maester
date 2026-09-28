@@ -4,7 +4,8 @@ import pytest
 
 from maester.access import invite_libraries, title_of
 from maester.agent.runner import ToolRunner
-from maester.agent.tools import Result, Tier, registry
+from maester.agent.tools import Tier, registry
+from maester.clients import ClientError
 from maester.clients.wizarr import Library
 from maester.config import Access
 from maester.notify import ApprovalPost
@@ -20,10 +21,13 @@ LIBRARIES = [
 ]
 
 
+PUBLIC = Access(public_url="https://join.example")
+
+
 @pytest.fixture
 def trusted(ctx):
     ctx.services.wizarr.library_list = list(LIBRARIES)
-    return replace(ctx, tier=Tier.TRUSTED)
+    return replace(ctx, tier=Tier.TRUSTED, settings=replace(ctx.settings, access=PUBLIC))
 
 
 def test_an_invite_shares_every_library_that_isnt_4k_private_or_disabled():
@@ -40,6 +44,8 @@ async def test_asking_for_an_invite_goes_to_the_admin_and_sends_nothing(trusted)
     assert out.content == {"asked": True, "for": "my brother Rhaegar"}
     approval = out.approval
     assert approval.notice == "dany asks for a Plex invite for my brother Rhaegar: he lives with me"
+    long = await request_invite(trusted, "Rhaegar", "x" * 5000)
+    assert len(long.approval.notice) < 600  # a post Discord takes
     assert approval.decide == "decide_invite"
     assert approval.args == {"for_whom": "my brother Rhaegar", "requester": "d1"}
     assert approval.subject == "invite:d1:my brother rhaegar"
@@ -55,15 +61,20 @@ async def test_approved_the_link_goes_to_the_friend_with_its_dates(trusted):
     assert wizarr.asked == [
         {"expires_in_days": 7, "duration": "35", "library_ids": [1, 2, 5], "server_ids": [10, 20]}
     ]
-    assert out.content["code"] == invite.code and out.content["access"] == "35"
+    link = f"https://join.example/j/{invite.code}"
+    assert out.content["link"] == link and out.content["access"] == "35"
+    assert out.content["libraries"] == (
+        "01. Movies on Meleys, 02. TV Shows on Meleys, 07. Anime on Vermithor"
+    )
     (dm,) = out.notices
-    assert dm.to == "d1" and invite.url in dm.text
+    assert dm.to == "d1" and f"Send them this link: {link}\n" in dm.text
     assert "It works until" in dm.text and "(7 days)" in dm.text
     assert "their access lasts 35 days" in dm.text
 
 
 async def test_the_configured_expiry_is_snapped_up_and_access_can_be_open_ended(trusted):
-    settings = replace(trusted.settings, access=Access(invite_expires_days=10, access_days=0))
+    access = replace(PUBLIC, invite_expires_days=10, access_days=0)
+    settings = replace(trusted.settings, access=access)
     admin = replace(trusted, user_id="boss", tier=Tier.ADMIN, settings=settings)
     out = await decide_invite(admin, "Rhaegar", "d1", approved=True)
     assert trusted.services.wizarr.asked[0]["expires_in_days"] == 30
@@ -77,11 +88,35 @@ async def test_denied_or_with_nothing_to_share_no_invite_is_made(trusted):
     assert denied.content == "No invite for Rhaegar." and "didn't approve" in denied.notices[0].text
     trusted.services.wizarr.library_list = [Library(4, "90. Home Videos", 10, "Meleys")]
     out = await decide_invite(admin, "Rhaegar", "d1", approved=True)
-    assert out == Result.refusal(
-        "No library an invite may share was found in Wizarr (check INVITE_LIBRARIES), so no "
-        "invite was created."
-    )
+    assert out.is_error and not out.retryable and "check INVITE_SERVERS" in out.content
+    (snag,) = out.notices  # the friend isn't left waiting on a DM that never comes
+    assert snag.to == "d1" and "the admin will sort it out" in snag.text
     assert trusted.services.wizarr.invites == []
+
+
+async def test_an_invite_wizarr_didnt_confirm_isnt_made_twice(trusted):
+    admin = replace(trusted, user_id="boss", tier=Tier.ADMIN)
+
+    async def timed_out(**kw):
+        raise ClientError("wizarr", "POST", "/api/invitations", None, "read timeout")
+
+    trusted.services.wizarr.create_invite = timed_out
+    out = await decide_invite(admin, "Rhaegar", "d1", approved=True)
+    assert out.is_error and not out.retryable and "Check its invitations" in out.content
+    assert "the admin will sort it out" in out.notices[0].text
+
+
+def test_an_invite_shares_only_from_the_servers_named():
+    meleys = Access(servers=("meleys",))
+    assert [lib.id for lib in invite_libraries(LIBRARIES, meleys)] == [1, 2]
+
+
+async def test_the_link_is_on_wizarrs_public_address(trusted):
+    admin = replace(trusted, user_id="boss", tier=Tier.ADMIN)
+    lan = replace(admin, settings=replace(admin.settings, access=Access(),
+                                          wizarr_url="http://192.168.50.2:5690"))  # fmt: skip
+    out = await decide_invite(lan, "Rhaegar", "d1", approved=True)
+    assert out.content["link"] == "http://192.168.50.2:5690/j/FAKE001"
 
 
 async def test_the_whole_flow_through_the_runner(trusted, store):

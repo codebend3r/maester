@@ -75,7 +75,10 @@ async def test_approved_the_library_is_added_to_the_share_and_nothing_else_chang
 async def test_4k_adds_the_4k_libraries_and_the_trusted_role(friend):
     friend = replace(friend, settings=replace(friend.settings, discord_role_trusted=22))
     asked = await request_access(friend, "4k")
-    assert asked.approval.notice == "dany asks for 4K (4K requests and the 4K libraries)."
+    assert asked.approval.notice == (
+        "dany asks for 4K: the trusted tier (4K requests, and asking for invites for others) "
+        "and the 4K libraries."
+    )
     admin = replace(friend, user_id="boss", tier=Tier.ADMIN)
     out = await decide_access(admin, "4k", "4K", "d1", approved=True)
     assert friend.services.plextv.written == [(7, [101, 102, 103])]
@@ -86,7 +89,35 @@ async def test_4k_adds_the_4k_libraries_and_the_trusted_role(friend):
         "The admin approved 4K for you: ask me for any title in 4K now. The 4K libraries show "
         "up in the Plex app in a few minutes.",
     )
-    assert out.content == "Added 03. Movies 4K on Meleys and the trusted role for dany."
+    assert out.content == "Added 03. Movies 4K on Meleys for dany, with the trusted role."
+    assert friend.store.get_user("d1").tier_override is None  # the role does it
+
+
+async def test_4k_without_a_trusted_role_or_past_a_lower_override_sets_the_override(friend):
+    admin = replace(friend, user_id="boss", tier=Tier.ADMIN)
+    out = await decide_access(admin, "4k", "4K", "d1", approved=True)
+    assert not any(isinstance(n, RoleChange) for n in out.notices)
+    assert out.content.endswith("with a trusted tier override.")
+    assert friend.store.get_user("d1").tier_override == "trusted"
+    friend.store.upsert_user("d1", tier_override="friend")
+    with_role = replace(admin, settings=replace(admin.settings, discord_role_trusted=22))
+    out = await decide_access(with_role, "4k", "4K", "d1", approved=True)
+    assert out.content.endswith("with the trusted role and a trusted tier override.")
+    assert friend.store.get_user("d1").tier_override == "trusted"
+
+
+async def test_an_approval_that_cant_be_carried_out_tells_the_friend(friend):
+    admin = replace(friend, user_id="boss", tier=Tier.ADMIN)
+    out = await decide_access(admin, "library", "Documentaries", "d1", approved=True)
+    assert out.is_error and "takes an invite" in out.content
+    (snag,) = out.notices
+    assert snag.to == "d1" and "the admin will sort it out" in snag.text
+
+
+async def test_a_friend_is_found_by_email_never_by_a_username_someone_chose(friend):
+    friend.store.upsert_user("d1", plex_email="other@example.com", plex_username="dany")
+    out = await request_access(friend, "library", "Anime")
+    assert out.is_error and "isn't shared any server yet" in out.content
 
 
 async def test_a_trusted_friend_with_every_4k_library_already_has_4k(friend):
@@ -111,7 +142,7 @@ async def test_denied_or_not_set_up_nothing_changes(friend):
 
 
 async def test_someone_on_no_server_is_told_to_ask_for_an_invite(friend):
-    friend.store.upsert_user("d1", plex_email="new@example.com", plex_username="newbie")
+    friend.store.upsert_user("d1", plex_email="new@example.com")
     out = await request_access(friend, "library", "Anime")
     assert out.is_error and "isn't shared any server yet" in out.content
 

@@ -3,9 +3,9 @@
 A library is named with or without its "NN. " ordering prefix, ignoring case
 ("Anime" is "07. Anime"). A 4K library has "4K" in its name. A private one
 (`PRIVATE_LIBRARIES`, wizteros' "9X." libraries) is never shared, whatever is
-asked. An invite shares the libraries `INVITE_LIBRARIES` names, or when it
-names none, every enabled library that isn't 4K or private, on the servers
-that hold them.
+asked. An invite shares, from the servers `INVITE_SERVERS` names (every one
+when it names none), the libraries `INVITE_LIBRARIES` names, or when it
+names none, every enabled library there that isn't 4K or private.
 """
 
 from __future__ import annotations
@@ -32,8 +32,15 @@ def is_4k(name: str) -> bool:
 
 
 def invite_libraries(libraries: list[Library], access: Access) -> list[Library]:
-    """What a new invite shares."""
-    usable = [lib for lib in libraries if lib.enabled and not access.is_private(lib.name)]
+    """What a new invite shares: only on `INVITE_SERVERS` when it names any."""
+    servers = {name.lower() for name in access.servers}
+    usable = [
+        lib
+        for lib in libraries
+        if lib.enabled
+        and not access.is_private(lib.name)
+        and (not servers or lib.server_name.lower() in servers)
+    ]
     if access.libraries:
         return [lib for lib in usable if any(same_library(n, lib.name) for n in access.libraries)]
     return [lib for lib in usable if not is_4k(lib.name)]

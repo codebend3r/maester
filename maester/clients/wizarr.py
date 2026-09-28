@@ -215,7 +215,8 @@ class FakeWizarrClient(Downable):
     ) -> Invite:
         self.refuse_if_down("/api/invitations")
         code = f"FAKE{len(self.invites) + 1:03d}"
-        inv = Invite(id=len(self.invites) + 1, code=code, url=f"https://wizarr.example/j/{code}")
+        # Like Wizarr's API, the url is a path on Wizarr's own host.
+        inv = Invite(id=len(self.invites) + 1, code=code, url=f"/j/{code}")
         self.invites.append(inv)
         self.asked.append(
             {

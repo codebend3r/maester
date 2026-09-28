@@ -127,7 +127,12 @@ class MaesterBot(discord.Client):
             case AdminPost(text):
                 await send_text(self._admin_channel(), text)
             case ApprovalPost(text, pending_id):
-                await self._admin_channel().send(text, view=decision_view(pending_id, "approve"))
+                # A long one is split, and the buttons go on its last part.
+                *before, last = split_reply(text) or [""]
+                channel = self._admin_channel()
+                for chunk in before:
+                    await channel.send(chunk)
+                await channel.send(last, view=decision_view(pending_id, "approve"))
             case Announcement(text):
                 await send_text(self._channel(self.requests_channel_id, "requests"), text)
             case RoleChange():

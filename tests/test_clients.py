@@ -569,7 +569,9 @@ async def test_plex_tv_reads_servers_libraries_and_friends_shares_and_writes_one
         'allLibraries="0"><Section id="101" title="01. Movies" shared="1"/>'
         '<Section id="104" title="04. Anime" shared="0"/></SharedServer></MediaContainer>'
     )
-    write = respx.put(f"{PLEX_TV}/api/servers/m-1/shared_servers/7").respond(status_code=200)
+    write = respx.put(f"{PLEX_TV}/api/servers/m-1/shared_servers/7").respond(
+        text='<MediaContainer><SharedServer id="7"/></MediaContainer>'
+    )
     client = PlexTvClient(PLEX_TV, "owner-token")
     (meleys,) = await client.servers()
     assert meleys.machine_id == "m-1"
@@ -578,7 +580,8 @@ async def test_plex_tv_reads_servers_libraries_and_friends_shares_and_writes_one
         (104, "04. Anime"),
     ]
     (share,) = await client.shares("m-1")
-    assert share.section_ids == {101} and share.is_for("DANY@example.com", None)
+    assert share.section_ids == {101} and share.is_for("DANY@example.com")
+    assert not share.is_for(None) and not share.is_for("dany")
     await client.set_sections(share, [104, 101])
     request = write.calls.last.request
     assert request.headers["X-Plex-Token"] == "owner-token"

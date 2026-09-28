@@ -153,3 +153,12 @@ async def test_a_role_change_is_made_and_one_discord_refuses_is_left_to_the_admi
     assert await bot.deliver([change]) == [change]
     ((text, _),) = admin.sent
     assert text.startswith("Couldn't give <@5> the role <@&22>") and "by hand" in text
+
+
+async def test_a_long_approval_is_split_with_its_buttons_on_the_last_part():
+    admin = Inbox()
+    bot = bot_with(admin, {})
+    assert await bot.deliver([ApprovalPost("word " * 700, 3)]) == []
+    (first, first_kw), (last, last_kw) = admin.sent
+    assert "view" not in first_kw and "view" in last_kw
+    assert len(first) <= 2000 and len(last) <= 2000

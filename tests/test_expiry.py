@@ -16,7 +16,7 @@ def user(n, email, days, name=""):
 @pytest.fixture
 def friends(services, store):
     store.upsert_user("d1", status="active", seerr_user_id=4, plex_email="dany@example.com")
-    store.upsert_user("d2", status="active", seerr_user_id=5, plex_username="pal")
+    store.upsert_user("d2", status="active", seerr_user_id=5, plex_email="pal@example.com")
     store.upsert_user("d3", status="pending", seerr_user_id=6, plex_email="soon@example.com")
     return services
 
@@ -48,11 +48,11 @@ async def test_a_friend_hears_a_week_out_and_a_day_out_once_each(friends, store)
 async def test_a_missed_week_sends_only_the_nearest_reminder_and_a_renewal_starts_afresh(
     friends, store
 ):
-    friends.wizarr.user_list = [user(1, "x@example.com", 1, name="pal")]
+    friends.wizarr.user_list = [user(1, "pal@example.com", 1)]
     (dm,) = await remind_expiring(friends, store, Settings())
     assert dm.to == "d2" and "ends tomorrow" in dm.text
     assert await remind_expiring(friends, store, Settings()) == []
-    friends.wizarr.user_list = [user(1, "x@example.com", 7, name="pal")]  # renewed
+    friends.wizarr.user_list = [user(1, "pal@example.com", 7)]  # renewed
     (renewed,) = await remind_expiring(friends, store, Settings())
     assert "in 7 days" in renewed.text
 
@@ -86,3 +86,14 @@ async def test_wizarr_down_skips_a_day_and_a_bad_template_fails_on_boot(friends,
     assert await remind_expiring(friends, store, Settings()) == []
     with pytest.raises(ValueError, match="EXPIRY_REMINDER"):
         load_settings({"EXPIRY_REMINDER": "ends in {days}"})
+
+
+async def test_reminders_go_out_on_the_days_configured_and_only_by_email(friends, store):
+    settings = Settings(access=Access(remind_days=(4, 1)))
+    friends.wizarr.user_list = [user(1, "dany@example.com", 6)]
+    assert await remind_expiring(friends, store, settings) == []  # renewing monthly: not yet
+    friends.wizarr.user_list = [user(1, "someone@else.com", 1, name="dany")]
+    assert await remind_expiring(friends, store, Settings()) == []  # a username isn't enough
+    assert load_settings({"EXPIRY_REMIND_DAYS": "1, 4"}).access.remind_days == (4, 1)
+    with pytest.raises(ValueError, match="EXPIRY_REMIND_DAYS"):
+        load_settings({"EXPIRY_REMIND_DAYS": "a week"})

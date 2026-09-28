@@ -1,6 +1,6 @@
 # Roku
 
-1. From the Roku home screen, go to **Streaming Channels** (or **Search**), find **Plex**, and add it.
+1. From the Roku home screen, go to the **Streaming Store** (or **Search**), find **Plex**, and add it.
 2. Open Plex and choose **Sign In**. It shows a code: go to **plex.tv/link** on your phone or computer, sign in with your Plex account, and enter the code.
 3. The server's libraries show up once you've accepted the invite; pin the ones you use to Home from the sidebar.
 

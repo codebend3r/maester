@@ -133,6 +133,16 @@ def _pattern(env: Mapping[str, str], name: str, default: str) -> str:
     return raw
 
 
+def _days(env: Mapping[str, str], name: str, default: tuple[int, ...]) -> tuple[int, ...]:
+    """Whole days, "7,1"; most first."""
+    raw = _list(env, name)
+    if not raw:
+        return default
+    if not all(d.isdigit() for d in raw):
+        raise ValueError(f"{name}: {env[name]!r} isn't a list of days like 7,1")
+    return tuple(sorted({int(d) for d in raw}, reverse=True))
+
+
 def _reminder(env: Mapping[str, str]) -> str:
     """The expiry reminder's text, checked so a typo in a placeholder fails on boot."""
     text = env.get("EXPIRY_REMINDER", "").strip() or EXPIRY_REMINDER
@@ -150,6 +160,10 @@ class Access:
     """How invites and access changes are scoped, and how friends hear their access is ending."""
 
     invite_expires_days: int = 7  # how long an invite link works
+    # Where friends open an invite link (`<this>/j/<code>`): Wizarr's public address.
+    public_url: str = ""
+    # Wizarr server names an invite shares from; empty for every server.
+    servers: tuple[str, ...] = ()
     access_days: int = 35  # how long access lasts once joined; 0 for no end
     # Library names an invite shares; empty for every library that isn't 4K or private.
     libraries: tuple[str, ...] = ()
@@ -159,6 +173,8 @@ class Access:
     contribution_url: str = ""
     # The reminder DM: {when} ("in 7 days", "tomorrow", "today"), {date}, and {renew}.
     reminder: str = EXPIRY_REMINDER
+    # How many days before access ends a reminder goes out, each once.
+    remind_days: tuple[int, ...] = (7, 1)
 
     def is_private(self, library: str) -> bool:
         return re.search(self.private_pattern, library) is not None
@@ -266,11 +282,14 @@ def load_settings(env: Mapping[str, str]) -> Settings:
         plex_tv_url=_url(env, "PLEX_TV_URL") or "https://plex.tv",
         access=Access(
             invite_expires_days=_int(env, "INVITE_EXPIRES_DAYS", 7),
+            public_url=_url(env, "WIZARR_PUBLIC_URL"),
+            servers=_list(env, "INVITE_SERVERS"),
             access_days=_int(env, "INVITE_ACCESS_DAYS", 35),
             libraries=_list(env, "INVITE_LIBRARIES"),
             private_pattern=_pattern(env, "PRIVATE_LIBRARIES", r"^9\d\."),
             contribution_url=_url(env, "CONTRIBUTION_URL"),
             reminder=_reminder(env),
+            remind_days=_days(env, "EXPIRY_REMIND_DAYS", (7, 1)),
         ),
         dub_tag=env.get("DUB_TAG", "").strip() or "dub",
         dub_profile=env.get("DUB_PROFILE", "").strip(),

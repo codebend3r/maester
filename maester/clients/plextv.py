@@ -48,11 +48,10 @@ class Share:
     all_libraries: bool
     section_ids: frozenset[int]  # the libraries shared, when not all of them
 
-    def is_for(self, email: str | None, username: str | None) -> bool:
-        return bool(
-            (email and self.email.lower() == email.lower())
-            or (username and self.username.lower() == username.lower())
-        )
+    def is_for(self, email: str | None) -> bool:
+        """Whether this is the share of the Plex account with `email`. Only the email: a
+        username a Seerr user without a Plex account chose could be someone else's."""
+        return bool(email and self.email.lower() == email.lower())
 
 
 class PlexTv(Protocol):
@@ -117,7 +116,10 @@ class PlexTvClient(HttpClient):
             "server_id": share.machine_id,
             "shared_server": {"library_section_ids": sorted(section_ids)},
         }
-        await self.put_json(f"/api/servers/{share.machine_id}/shared_servers/{share.id}", body)
+        # plex.tv answers with the share as XML, which isn't needed: the request is the change.
+        await self.request(
+            "PUT", f"/api/servers/{share.machine_id}/shared_servers/{share.id}", json=body
+        )
 
 
 @dataclass

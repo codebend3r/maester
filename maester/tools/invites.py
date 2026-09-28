@@ -5,9 +5,12 @@ approval queue, one per friend and person. The admin's Approve runs
 `decide_invite`, a button-only admin tool, which creates a Wizarr invite
 scoped to the libraries an invite shares (`maester/access.py`) on the servers
 holding them, with the link's expiry (`INVITE_EXPIRES_DAYS`, snapped up to
-one Wizarr honors) and the access it grants (`INVITE_ACCESS_DAYS`). The link
-goes to the friend who asked, to forward, with both dates. Issuing an invite
-is destructive: it runs one at a time under the kill switch.
+one Wizarr honors) and the access it grants (`INVITE_ACCESS_DAYS`). The link,
+on Wizarr's public address (`WIZARR_PUBLIC_URL`), goes to the friend who
+asked, to forward, with both dates, and to the admin too in case the DM
+doesn't land. Issuing an invite is destructive: it runs one at a time under
+the kill switch. A create Wizarr didn't confirm isn't retried (it may exist
+already); the admin checks Wizarr, and the friend hears it's in hand.
 """
 
 from __future__ import annotations
@@ -16,8 +19,26 @@ from datetime import datetime, timedelta
 
 from maester.access import invite_libraries
 from maester.agent.tools import Approval, Result, Tier, ToolContext, tool
-from maester.clients.wizarr import honored_expiry_days
+from maester.clients import ClientError
+from maester.clients.wizarr import Invite, honored_expiry_days
 from maester.notify import DirectMessage
+
+# What the admin reads in the approval post; the rest is cut.
+NAME_MAX, NOTE_MAX = 100, 500
+
+
+def invite_link(ctx: ToolContext, invite: Invite) -> str:
+    """Where the new person opens the invite: Wizarr's public address, `/j/<code>`.
+
+    Wizarr's own `url` is a path on its host (`/j/<code>`), which is no use to
+    someone outside the LAN.
+    """
+    public = ctx.settings.access.public_url
+    if public:
+        return f"{public}/j/{invite.code}"
+    if invite.url.startswith(("http://", "https://")):
+        return invite.url
+    return f"{ctx.settings.wizarr_url}/j/{invite.code}"
 
 
 @tool(
@@ -38,7 +59,8 @@ from maester.notify import DirectMessage
     tier=Tier.TRUSTED,
 )
 async def request_invite(ctx: ToolContext, for_whom: str, note: str = "") -> Result:
-    for_whom = " ".join(for_whom.split())
+    for_whom = " ".join(for_whom.split())[:NAME_MAX]
+    note = note.strip()[:NOTE_MAX]
     if not for_whom:
         return Result.refusal("Say who the invite is for.")
     who = ctx.linked_user().name
@@ -79,19 +101,35 @@ async def decide_invite(ctx: ToolContext, for_whom: str, requester: str, approve
         return Result(f"No invite for {for_whom}.", (DirectMessage(requester, dm),))
     access = ctx.settings.access
     wizarr = ctx.services.wizarr
+    snag = DirectMessage(
+        requester,
+        f"The admin said yes to an invite for {for_whom}, but it couldn't be made just now; "
+        "the admin will sort it out.",
+    )
     libraries = invite_libraries(await wizarr.libraries(), access)
     if not libraries:
         return Result.refusal(
-            "No library an invite may share was found in Wizarr (check INVITE_LIBRARIES), so "
-            "no invite was created."
+            "No library an invite may share was found in Wizarr (check INVITE_SERVERS and "
+            "INVITE_LIBRARIES), so no invite was created.",
+            snag,
         )
     duration = str(access.access_days) if access.access_days else "unlimited"
-    invite = await wizarr.create_invite(
-        expires_in_days=access.invite_expires_days,
-        duration=duration,
-        library_ids=[lib.id for lib in libraries],
-        server_ids=sorted({lib.server_id for lib in libraries}),
-    )
+    try:
+        invite = await wizarr.create_invite(
+            expires_in_days=access.invite_expires_days,
+            duration=duration,
+            library_ids=[lib.id for lib in libraries],
+            server_ids=sorted({lib.server_id for lib in libraries}),
+        )
+    except ClientError as exc:
+        # Wizarr may have made it before failing to answer, so pressing again could make a
+        # second live invite: the admin checks Wizarr instead.
+        return Result.refusal(
+            f"Wizarr didn't confirm the invite ({exc}). Check its invitations for one it made "
+            f"anyway before making another for {for_whom}.",
+            snag,
+        )
+    link = invite_link(ctx, invite)
     days = honored_expiry_days(access.invite_expires_days)
     until = (datetime.now(ctx.settings.jobs.zone) + timedelta(days=days)).strftime("%b %d")
     lasts = (
@@ -100,15 +138,15 @@ async def decide_invite(ctx: ToolContext, for_whom: str, requester: str, approve
         else "their access doesn't end"
     )
     dm = (
-        f"The admin approved an invite for {for_whom}. Send them this link: {invite.url}\n"
+        f"The admin approved an invite for {for_whom}. Send them this link: {link}\n"
         f"It works until {until} ({days} days). Once they join with their Plex account, "
         f"{lasts}. Then they can talk to me here after linking with `/link`."
     )
-    shared = ", ".join(sorted({lib.name for lib in libraries}))
+    shared = ", ".join(sorted(f"{lib.name} on {lib.server_name}" for lib in libraries))
     return Result(
         {
             "invited": for_whom,
-            "code": invite.code,
+            "link": link,
             "link_until": until,
             "access": duration,
             "libraries": shared,

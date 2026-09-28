@@ -8,11 +8,13 @@ once per friend and change. The admin's Approve runs `decide_access`
 library, or every 4K library, to the friend's plex.tv share on each server
 they're shared that holds it (`maester/clients/plextv.py`). Their other
 libraries and their Wizarr expiry are left alone. 4K also gives them the
-trusted Discord role, which is what lets them request 4K. A server they
+trusted tier, which is what lets them request 4K (and ask for invites): the
+trusted Discord role, and a stored override when no role is configured or
+an override would outrank the role. A server they
 aren't shared at all takes an invite, not a change, so that's the admin's.
 
-The friend is found on plex.tv by the email or Plex username their link
-recorded. Private libraries (`PRIVATE_LIBRARIES`) are never added, and a
+The friend is found on plex.tv by the email their link recorded, never by a
+username (a Seerr user without a Plex account chooses their own). Private libraries (`PRIVATE_LIBRARIES`) are never added, and a
 friend asking for one hears there's no such library.
 """
 
@@ -29,6 +31,8 @@ from maester.config import Access
 from maester.notify import DirectMessage, RoleChange
 
 NOT_SET_UP = "Access changes aren't set up on this server (no Plex token), so ask the admin."
+# A note the admin reads in the approval post; the rest is cut.
+NOTE_MAX = 500
 
 
 @dataclass(frozen=True)
@@ -48,9 +52,7 @@ class Standing:
     everywhere: tuple[Section, ...]
 
 
-async def where_shared(
-    plextv: PlexTv, access: Access, email: str | None, username: str | None
-) -> Standing:
+async def where_shared(plextv: PlexTv, access: Access, email: str | None) -> Standing:
     """The friend's shares on every server, and every library that could be shared."""
     servers = await plextv.servers()
     read = await asyncio.gather(
@@ -64,7 +66,7 @@ async def where_shared(
     for server, (sections, shares) in zip(servers, read, strict=True):
         usable = tuple(s for s in sections if not access.is_private(s.title))
         everywhere += usable
-        share = next((s for s in shares if s.is_for(email, username)), None)
+        share = next((s for s in shares if s.is_for(email)), None)
         if share is not None:
             shared.append(Shared(server, share, usable))
     return Standing(tuple(shared), tuple(everywhere))
@@ -84,10 +86,10 @@ def missing(shared: Shared, sections: list[Section]) -> list[Section]:
     return [s for s in sections if s.id not in shared.share.section_ids]
 
 
-def identity(ctx: ToolContext, discord_id: str) -> tuple[str | None, str | None]:
-    """The email and Plex username a friend's link recorded."""
+def email_of(ctx: ToolContext, discord_id: str) -> str | None:
+    """The email a friend's link recorded, which finds their Plex account's share."""
     row = ctx.store.get_user(discord_id)
-    return (row.plex_email, row.plex_username) if row else (None, None)
+    return row.plex_email if row else None
 
 
 @tool(
@@ -118,7 +120,7 @@ async def request_access(
     library = " ".join(library.split())
     if change == "library" and not library:
         return Result.refusal("Say which library.")
-    stands = await where_shared(plextv, ctx.settings.access, *identity(ctx, ctx.user_id))
+    stands = await where_shared(plextv, ctx.settings.access, email_of(ctx, ctx.user_id))
     if not stands.shared:
         return Result.refusal(
             "Your Plex account isn't shared any server yet, so there's nothing to add to; "
@@ -143,7 +145,12 @@ async def request_access(
         gaps = any(missing(s, wanted(s, change, "")) for s in stands.shared)
         if ctx.tier >= Tier.TRUSTED and not gaps:
             return Result.refusal("You already have 4K: ask me for any title in 4K.")
-        what, summary = "4K (4K requests and the 4K libraries)", f"4K for {who}"
+        what = (
+            "4K: the trusted tier (4K requests, and asking for invites for others) and the 4K "
+            "libraries"
+        )
+        summary = f"4K for {who}"
+    note = note.strip()[:NOTE_MAX]
     notice = f"{who} asks for {what}" + (f": {note}" if note else ".")
     return Result(
         {"asked": True, "change": change, "library": title if change == "library" else None},
@@ -192,7 +199,7 @@ async def decide_access(
     if plextv is None:
         return Result.refusal(NOT_SET_UP)
     name = ctx.link_of(requester).name
-    stands = await where_shared(plextv, ctx.settings.access, *identity(ctx, requester))
+    stands = await where_shared(plextv, ctx.settings.access, email_of(ctx, requester))
     added: list[tuple[str, str]] = []  # (server, library)
     had = False
     for shared in stands.shared:
@@ -205,22 +212,40 @@ async def decide_access(
     notices: list[Any] = []
     if change == "library":
         if not had:
+            snag = (
+                f"The admin said yes to {library}, but it's on a server you aren't shared yet, "
+                "which takes an invite; the admin will sort it out."
+            )
             return Result.refusal(
-                f"{name} isn't shared a server with {library}; that takes an invite in Wizarr."
+                f"{name} isn't shared a server with {library}; that takes an invite in Wizarr.",
+                DirectMessage(requester, snag),
             )
         dm = (
             f"The admin added {library} to your Plex access. It shows up in the Plex app in a "
             "few minutes (restart the app if it doesn't)."
         )
     else:
-        role = ctx.settings.discord_role_trusted
-        if role:
-            notices.append(RoleChange(requester, role, why="4K approved in maester"))
+        notices, tier_note = make_trusted(ctx, requester)
         shows = " The 4K libraries show up in the Plex app in a few minutes." if added else ""
         dm = f"The admin approved 4K for you: ask me for any title in 4K now.{shows}"
     notices.append(DirectMessage(requester, dm))
     done = ", ".join(f"{title} on {server}" for server, title in added) or "nothing new to share"
-    role_note = (
-        " and the trusted role" if change == "4k" and ctx.settings.discord_role_trusted else ""
-    )
-    return Result(f"Added {done}{role_note} for {name}.", tuple(notices))
+    extra = tier_note if change == "4k" else ""
+    return Result(f"Added {done} for {name}{extra}.", tuple(notices))
+
+
+def make_trusted(ctx: ToolContext, discord_id: str) -> tuple[list[Any], str]:
+    """Put a friend on the trusted tier: the trusted Discord role when one is configured,
+    and the stored override when there's no role, or one that would outrank it."""
+    role = ctx.settings.discord_role_trusted
+    row = ctx.store.get_user(discord_id)
+    override = Tier.parse(row.tier_override) if row and row.tier_override else None
+    notices: list[Any] = []
+    notes = []
+    if role:
+        notices.append(RoleChange(discord_id, role, why="4K approved in maester"))
+        notes.append("the trusted role")
+    if not role or (override is not None and override < Tier.TRUSTED):
+        ctx.store.upsert_user(discord_id, tier_override="trusted")
+        notes.append("a trusted tier override")
+    return notices, f", with {' and '.join(notes)}"
