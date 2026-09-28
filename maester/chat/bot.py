@@ -162,6 +162,23 @@ class MaesterBot(discord.Client):
             user = await resolve_chat_user(self, interaction.user)
             await interaction.response.send_message(self.service.whoami(user), ephemeral=True)
 
+        @tree.command(name="setup", description="How to set up Plex on your TV, stick or phone")
+        @app_commands.describe(device="What you watch on")
+        @app_commands.choices(
+            device=[
+                app_commands.Choice(name="Apple TV", value="apple_tv"),
+                app_commands.Choice(name="Roku", value="roku"),
+                app_commands.Choice(name="Fire TV", value="fire_tv"),
+                app_commands.Choice(name="Android TV, Google TV, Shield", value="android_tv"),
+                app_commands.Choice(name="iPhone, iPad, Android phone", value="mobile"),
+                app_commands.Choice(name="Web browser", value="web"),
+            ]
+        )
+        async def setup(interaction: discord.Interaction, device: app_commands.Choice[str]) -> None:
+            await interaction.response.defer(ephemeral=True)
+            for chunk in self.service.setup_guide(device.value):
+                await interaction.followup.send(chunk, ephemeral=True)
+
         @tree.command(name="forget", description="Clear our conversation so far")
         async def forget(interaction: discord.Interaction) -> None:
             user = await resolve_chat_user(self, interaction.user)

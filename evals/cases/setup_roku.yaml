@@ -1,0 +1,6 @@
+name: setup help comes from the guides
+tier: friend
+turns:
+  - user: "how do I get plex working on my roku? it keeps asking me for a code"
+    expect_tools: [setup_guide]
+    reply_matches: "(?i)plex\\.tv/link"
