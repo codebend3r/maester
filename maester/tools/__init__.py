@@ -8,12 +8,14 @@ async functions with `@tool(...)` from `maester.agent.tools`.
 from maester.tools import (  # noqa: F401
     accounts,
     availability,
-    basics,
     collections,
     gaps,
+    lag,
     playback,
     replace,
     requests,
     search,
+    service_health,
     status,
+    versions,
 )

@@ -6,18 +6,21 @@ import pytest
 from maester.agent.tools import Tier, ToolContext
 from maester.clients import (
     FakeFileProbe,
+    FakeFleetMonitor,
     FakePlexClient,
     FakeRadarrClient,
     FakeSabnzbdClient,
     FakeSeerrClient,
     FakeSonarrClient,
+    FakeSpeedTest,
     FakeTautulliClient,
     FakeWizarrClient,
     Services,
 )
 from maester.config import Settings
+from maester.memo import Memo
 from maester.store import Store
-from tests.factories import HOSTS, RADARR_URL, SONARR_URL
+from tests.factories import HOSTS, PLEX_ID, RADARR_URL, SONARR_URL
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -35,13 +38,19 @@ def services() -> Services:
     """Every service faked, with the two real hosts' per-host clients empty."""
     return Services(
         seerr=FakeSeerrClient(),
-        plex=FakePlexClient(),
+        plex=FakePlexClient(machine_id=PLEX_ID),
         wizarr=FakeWizarrClient(),
         sonarr={h: FakeSonarrClient(host=h, base_url=SONARR_URL.format(host=h)) for h in HOSTS},
         radarr={h: FakeRadarrClient(host=h, base_url=RADARR_URL.format(host=h)) for h in HOSTS},
         sabnzbd={h: FakeSabnzbdClient(host=h) for h in HOSTS},
-        tautulli={h: FakeTautulliClient(host=h) for h in HOSTS},
+        # Each host's Tautulli watches its own Plex server; meleys' is the one maester reads.
+        tautulli={
+            h: FakeTautulliClient(host=h, plex_id=PLEX_ID if h == "meleys" else f"{h}-plex")
+            for h in HOSTS
+        },
         probe=FakeFileProbe(),
+        fleet=FakeFleetMonitor(),
+        speedtest=FakeSpeedTest(),
     )
 
 
@@ -56,4 +65,4 @@ def store():
 def ctx(services, store) -> ToolContext:
     """A linked friend (Seerr user 4) calling tools."""
     store.upsert_user("d1", status="active", seerr_user_id=4, plex_username="dany")
-    return ToolContext("d1", Tier.FRIEND, services, store, Settings())
+    return ToolContext("d1", Tier.FRIEND, services, store, Settings(), Memo())

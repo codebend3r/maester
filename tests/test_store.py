@@ -5,6 +5,7 @@ import pytest
 
 from maester.media import Copy, Titled
 from maester.store import MIGRATIONS_DIR, SeerrUserTaken, Store
+from maester.store.base import stamp
 
 
 def test_migrations_apply_once(store):
@@ -137,17 +138,17 @@ def test_a_decision_records_who_and_can_be_reopened(store):
     assert store.open_pending("approve") == [reopened]
 
 
-def test_webhook_events_are_claimed_once_within_the_window(store):
+def test_claims_are_made_once_within_the_window(store):
     day = timedelta(days=1)
-    assert store.claim_event("seerr", "MEDIA_AVAILABLE:request:77", window=day)
-    assert not store.claim_event("seerr", "MEDIA_AVAILABLE:request:77", window=day)
-    assert store.claim_event("seerr", "MEDIA_AVAILABLE:request:78", window=day)
-    store.release_event("seerr", "MEDIA_AVAILABLE:request:77")
-    assert store.claim_event("seerr", "MEDIA_AVAILABLE:request:77", window=day)
+    assert store.claim("seerr", "MEDIA_AVAILABLE:request:77", window=day)
+    assert not store.claim("seerr", "MEDIA_AVAILABLE:request:77", window=day)
+    assert store.claim("seerr", "MEDIA_AVAILABLE:request:78", window=day)
+    store.release("seerr", "MEDIA_AVAILABLE:request:77")
+    assert store.claim("seerr", "MEDIA_AVAILABLE:request:77", window=day)
     # Once the window has passed (here: it already has), the same event counts as new,
     # and the stale claims are gone: request 78 is new again too.
-    assert store.claim_event("seerr", "MEDIA_AVAILABLE:request:77", window=timedelta(seconds=-1))
-    assert store.claim_event("seerr", "MEDIA_AVAILABLE:request:78", window=day)
+    assert store.claim("seerr", "MEDIA_AVAILABLE:request:77", window=timedelta(seconds=-1))
+    assert store.claim("seerr", "MEDIA_AVAILABLE:request:78", window=day)
 
 
 def test_user_by_seerr_id_finds_the_live_link(store):
@@ -219,3 +220,31 @@ def test_a_dm_about_a_title_is_remembered_for_its_recipient_only(store):
     store._conn.execute("UPDATE sent_messages SET sent_at = ?", (stale,))
     store.remember_message("m2", "d1", dune)
     assert store.message_about("m1", "d1") is None and store.message_about("m2", "d1") == dune
+
+
+def test_each_source_prunes_only_its_own_claims(store):
+    assert store.claim("reencode", "9001", window=timedelta(days=30))
+    assert store.claim("seerr", "MEDIA_AVAILABLE:request:1", window=timedelta(minutes=15))
+    # A Seerr claim whose window has passed is pruned without touching the re-encode flag.
+    assert store.claim("seerr", "MEDIA_AVAILABLE:request:1", window=timedelta(seconds=-1))
+    assert not store.claim("reencode", "9001", window=timedelta(days=30))
+
+
+def test_the_claims_migration_keeps_webhook_claims(tmp_path):
+    """Migration 007 moves the rows of `webhook_events` into `claims`."""
+    path = tmp_path / "maester.db"
+    conn = sqlite3.connect(path)
+    conn.executescript(
+        "CREATE TABLE schema_version (version INTEGER PRIMARY KEY);"
+        + "".join(
+            f"{p.read_text()}\nINSERT INTO schema_version VALUES ({int(p.name[:3])});"
+            for p in sorted(MIGRATIONS_DIR.glob("*.sql"))
+            if int(p.name[:3]) < 7
+        )
+        + "INSERT INTO webhook_events VALUES ('seerr', 'MEDIA_AVAILABLE:request:9', "
+        f"'{stamp(datetime.now(UTC))}');"
+    )
+    conn.close()
+    migrated = Store(path)
+    assert not migrated.claim("seerr", "MEDIA_AVAILABLE:request:9", window=timedelta(minutes=15))
+    migrated.close()

@@ -11,7 +11,7 @@ services:
   tautulli:
     meleys:
       sessions:
-        - {rating_key: "4348", title: "Dune"}
+        - {rating_key: "4348", title: "Dune", tmdb_id: 438631}
 turns:
   - user: "this won't play"
     expect_tools: [recent_sessions]

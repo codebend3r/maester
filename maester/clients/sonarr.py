@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 from datetime import datetime
-from typing import Any, Protocol
+from typing import Any, ClassVar, Protocol
 
 from maester.clients.arr import ArrClient, DiskSpace, HistoryEvent, MediaFile, QueueItem
+from maester.clients.base import Downable
 
 
 @dataclass(frozen=True)
@@ -64,6 +65,7 @@ class Sonarr(Protocol):
     host: str
     base_url: str
 
+    async def ping(self) -> None: ...
     async def root_folders(self) -> list[str]: ...
     async def disk_space(self) -> list[DiskSpace]: ...
     async def queue(self) -> list[QueueItem]: ...
@@ -121,7 +123,9 @@ class SonarrClient(ArrClient):
 
 
 @dataclass
-class FakeSonarrClient:
+class FakeSonarrClient(Downable):
+    service: ClassVar[str] = "sonarr"
+
     host: str = "fake"
     base_url: str = ""
     roots: list[str] = field(default_factory=lambda: ["/TV"])

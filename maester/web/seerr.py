@@ -7,7 +7,7 @@ to a route (`maester/seerr_events.py`) whose handler returns the notices to
 send, which go out through the injected `Notifier`; types without a route
 are acknowledged and ignored, so ticking more types in Seerr is harmless.
 
-A route that dedupes claims the event in `webhook_events` before its
+A route that dedupes claims the event (`claims`, source "seerr") before its
 handler runs, so a repeat inside its window is acknowledged without acting
 twice. The claim is released when the handler fails or a notice it produced
 could not be delivered, so a later delivery can try again.
@@ -49,18 +49,18 @@ class SeerrWebhook:
             return "ignored"
         key = notification.event_key
         claimed = route.dedupe is not None
-        if claimed and not self.store.claim_event(SOURCE, key, window=route.dedupe):
+        if claimed and not self.store.claim(SOURCE, key, window=route.dedupe):
             return "duplicate"
         try:
             notices = await route.handle(notification)
         except Exception:
             if claimed:
-                self.store.release_event(SOURCE, key)
+                self.store.release(SOURCE, key)
             log.exception("seerr %s failed", key)
             raise
         if await self.notifier.deliver(notices):
             if claimed:
-                self.store.release_event(SOURCE, key)
+                self.store.release(SOURCE, key)
             return "undelivered"
         return "handled"
 

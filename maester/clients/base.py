@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from typing import Any
+import asyncio
+from collections.abc import Awaitable, Callable, Mapping
+from dataclasses import dataclass
+from typing import Any, ClassVar
 
 import httpx
 
@@ -19,12 +22,15 @@ class ClientError(RuntimeError):
 class HttpClient:
     """Base for the real clients: a base URL, fixed headers, and JSON helpers.
 
-    Subclasses set `service` for error messages and pass their auth headers.
+    Subclasses set `service` for error messages and pass their auth headers,
+    and `health_path`, the cheapest route that shows the service is up (and,
+    behind the client's auth, that its key still works), which `ping` reads.
     The httpx client is created lazily so constructing a client in tests or at
     import time opens no connections.
     """
 
     service = "http"
+    health_path = "/"
 
     def __init__(
         self,
@@ -52,6 +58,10 @@ class HttpClient:
                 transport=self._transport,
             )
         return self._client
+
+    async def ping(self) -> None:
+        """Whether the service answers: a `ClientError` when it doesn't."""
+        await self.get_json(self.health_path)
 
     async def aclose(self) -> None:
         if self._client is not None:
@@ -86,3 +96,44 @@ class HttpClient:
             return response.json()
         except ValueError as exc:
             raise ClientError(self.service, "GET", path, response.status_code, "not JSON") from exc
+
+
+class Downable:
+    """A fake that can answer the way an unreachable service would, while `down` is set."""
+
+    service: ClassVar[str]
+    down: bool = False
+
+    def refuse_if_down(self, path: str) -> None:
+        if self.down:
+            raise ClientError(self.service, "GET", path, None, "connection refused")
+
+    async def ping(self) -> None:
+        self.refuse_if_down("ping")
+
+
+@dataclass(frozen=True)
+class HostAnswers[T]:
+    """What each host's instance answered, and why the others couldn't."""
+
+    answered: dict[str, T]
+    unreachable: dict[str, str]  # host -> why
+
+
+async def every_host[C, T](
+    clients: Mapping[str, C], call: Callable[[C], Awaitable[T]]
+) -> HostAnswers[T]:
+    """Ask every host's instance at once. One that can't answer (`ClientError`) is named
+    instead of hiding the others; anything else is a bug, and raises."""
+    hosts = sorted(clients)
+    found = await asyncio.gather(*(call(clients[h]) for h in hosts), return_exceptions=True)
+    answered: dict[str, T] = {}
+    unreachable: dict[str, str] = {}
+    for host, result in zip(hosts, found, strict=True):
+        if isinstance(result, ClientError):
+            unreachable[host] = str(result)
+        elif isinstance(result, BaseException):
+            raise result
+        else:
+            answered[host] = result
+    return HostAnswers(answered, unreachable)

@@ -1,6 +1,6 @@
 import pytest
 
-from maester.config import MissingConfig, Settings, load_settings, require
+from maester.config import FleetMonitorAccess, MissingConfig, Settings, load_settings, require
 
 
 def test_defaults_when_env_is_empty():
@@ -58,3 +58,20 @@ def test_require_names_every_missing_variable_at_once():
 
 def test_require_passes_when_all_present():
     require({"A": "1"}, "A")
+
+
+def test_the_fleet_monitor_is_optional_but_needs_its_token_once_named():
+    assert load_settings({}).fleet_monitor is None
+    named = {"FLEET_MONITOR_URL": "http://192.168.50.2:8010/", "FLEET_MONITOR_TOKEN": " tok "}
+    assert load_settings(named).fleet_monitor == FleetMonitorAccess(
+        "http://192.168.50.2:8010", "tok"
+    )
+    with pytest.raises(MissingConfig) as exc:
+        load_settings({**named, "FLEET_MONITOR_TOKEN": ""})
+    assert exc.value.names == ["FLEET_MONITOR_TOKEN"]
+    assert load_settings({"FLEET_MONITOR_TOKEN": "tok"}).fleet_monitor is None
+
+
+def test_the_speed_test_runs_on_the_host_named():
+    assert load_settings({}).speedtest_host == ""
+    assert load_settings({"SPEEDTEST_HOST": " Meleys "}).speedtest_host == "meleys"

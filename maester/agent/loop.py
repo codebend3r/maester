@@ -21,6 +21,7 @@ from maester.agent.runner import ToolOutcome, ToolRunner
 from maester.agent.tools import Choice, Tier, ToolContext
 from maester.clients import Services
 from maester.config import Settings
+from maester.memo import Memo
 from maester.notify import Notice
 from maester.store import PendingAction, Store
 
@@ -98,6 +99,8 @@ class Agent:
         self.system_prompt = system_prompt
         self.settings = settings
         self.now = now
+        # What tools share across calls (a health check, a speed test), for the app's life.
+        self.memo = Memo()
 
     def forget(self, user_id: str) -> int:
         return self.store.clear_messages(user_id)
@@ -109,6 +112,7 @@ class Agent:
             services=self.services,
             store=self.store,
             settings=self.settings,
+            memo=self.memo,
         )
 
     async def run_decision(

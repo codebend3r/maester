@@ -130,6 +130,7 @@ class HistoryEvent:
 
 class ArrClient(HttpClient):
     api = "/api/v3"
+    health_path = "/api/v3/system/status"  # checks the API key too
     # Per-title history lives at /history/movie?movieId= or /history/series?seriesId=.
     history_scope: tuple[str, str]
 

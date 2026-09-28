@@ -1,0 +1,12 @@
+name: stutter from burned-in picture subtitles is fixed by turning them off
+tier: friend
+services:
+  user: {tautulli_user_id: 8008135}
+  tautulli:
+    vermithor:
+      sessions:
+        - {rating_key: "4348", title: "Dune", subtitle_codec: pgs, subtitle_decision: burn, video_codec: hevc, video_decision: transcode, transcode_decision: transcode, transcode_speed: 0.7}
+turns:
+  - user: "Dune stutters every few seconds, it's so laggy"
+    expect_tools: [session_report]
+    reply_matches: "subtitle"

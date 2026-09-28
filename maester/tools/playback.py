@@ -28,7 +28,7 @@ from maester.media import Copy, copy_ref, episode_code, titled, version_label
 from maester.playback.diagnosis import FileChecked, TrackList, read_tracks
 from maester.playback.health import parse_clock
 from maester.playback.items import locate
-from maester.playback.plays import Play, copy_of, identify, recent_plays
+from maester.playback.plays import Play, identify, recent_plays
 from maester.playback.reports import ReportKind, file_report
 
 # The copy (and episode) a playback tool is about.
@@ -56,9 +56,9 @@ NOTHING_RECENT = (
 )
 
 
-def play_choice(play: Play, details: MediaDetails, now: float) -> Choice:
-    """A pick for a play: the title and copy, when it was played, and on what."""
-    is_4k = copy_of(details, play.plex_key)
+def play_choice(play: Play, details: MediaDetails, is_4k: bool | None, now: float) -> Choice:
+    """A pick for a play: the title and copy (None when unclear), when it was played, and on
+    what."""
     version = "?" if is_4k is None else version_label(is_4k)
     code = episode_code(play.season, play.episode)
     when = "playing now" if play.live else f"{humanized(int(now) - play.started)} ago"
@@ -101,7 +101,7 @@ async def recent_sessions(ctx: ToolContext) -> dict[str, Any] | Choices | Result
     for play, title in zip(found.plays, titles, strict=True):
         match title:
             case MediaDetails():
-                choices.append(play_choice(play, title, now))
+                choices.append(play_choice(play, title, found.copy_of(play, title), now))
             case BaseException():
                 notes.append(f"couldn't tell what {play.title} is: {title}")
     if choices:

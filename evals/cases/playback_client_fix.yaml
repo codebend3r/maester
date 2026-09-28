@@ -14,7 +14,7 @@ services:
   tautulli:
     meleys:
       sessions:
-        - {rating_key: "4348", title: "Dune", subtitle_codec: pgs, subtitle_decision: burn, video_decision: transcode, transcode_decision: transcode}
+        - {rating_key: "4348", title: "Dune", tmdb_id: 438631, subtitle_codec: pgs, subtitle_decision: burn, video_decision: transcode, transcode_decision: transcode}
   probe:
     files:
       "/Meleys/Movies/Dune (2021)/Dune (2021) Bluray-1080p.mkv": {duration: 9331}

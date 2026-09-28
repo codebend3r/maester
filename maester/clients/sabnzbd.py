@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from typing import Any, ClassVar, Protocol
 
-from maester.clients.base import HttpClient
+from maester.clients.base import ClientError, Downable, HttpClient
 
 
 @dataclass(frozen=True)
@@ -45,6 +45,7 @@ class Download:
 class Sabnzbd(Protocol):
     host: str
 
+    async def ping(self) -> None: ...
     async def queue(self) -> list[Download]: ...
     async def history(self, limit: int = 50) -> list[Download]: ...
 
@@ -56,6 +57,14 @@ class SabnzbdClient(HttpClient):
         super().__init__(base_url, params={"apikey": api_key, "output": "json"}, **kwargs)
         self.host = host
 
+    async def ping(self) -> None:
+        """The shortest queue read: it needs the API key, and SABnzbd refuses a wrong one
+        in the body (`"status": false`), not with an HTTP error."""
+        path = "/api?mode=queue"
+        data = await self.get_json("/api", params={"mode": "queue", "limit": 1})
+        if isinstance(data, dict) and data.get("status") is False:
+            raise ClientError(self.service, "GET", path, 200, data.get("error") or "refused")
+
     async def queue(self) -> list[Download]:
         data = await self.get_json("/api", params={"mode": "queue"})
         return [Download.from_queue(s) for s in (data.get("queue") or {}).get("slots", [])]
@@ -66,7 +75,9 @@ class SabnzbdClient(HttpClient):
 
 
 @dataclass
-class FakeSabnzbdClient:
+class FakeSabnzbdClient(Downable):
+    service: ClassVar[str] = "sabnzbd"
+
     host: str = "fake"
     queue_items: list[Download] = field(default_factory=list)
     history_items: list[Download] = field(default_factory=list)

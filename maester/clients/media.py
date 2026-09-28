@@ -11,8 +11,8 @@ every audio and subtitle track, and subtitle files lying next to the video.
 `decode` runs ffmpeg over one stretch of the file and reports the frames
 it got out and the errors it printed; judging those is the health check's
 job (`maester/playback/health.py`). Both run as async subprocesses under a
-timeout, a few at a time, so the bot stays responsive and the NAS isn't
-swamped. The process runner is injected, so tests never need ffmpeg.
+timeout (`process.py`), a few at a time, so the bot stays responsive and the
+NAS isn't swamped. The process runner is injected, so tests never need ffmpeg.
 """
 
 from __future__ import annotations
@@ -20,10 +20,11 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-from collections.abc import Awaitable, Callable, Iterable, Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field, replace
 from typing import Any, Protocol
 
+from maester.clients.process import Completed, Runner, lines, run_process
 from maester.config import media_root_problem
 
 # ffprobe and ffmpeg processes running at once, across every check.
@@ -185,42 +186,9 @@ def sidecar_subtitles(path: str) -> tuple[Track, ...]:
     return tuple(tracks)
 
 
-@dataclass(frozen=True)
-class Completed:
-    exit_code: int | None  # None when it ran out of time and was killed
-    stdout: str
-    stderr: str
-
-
-Runner = Callable[[Sequence[str], float], Awaitable[Completed]]
-
-
-async def run_process(argv: Sequence[str], timeout: float) -> Completed:
-    """Run a program without a shell; kill it when it outlasts `timeout` seconds."""
-    proc = await asyncio.create_subprocess_exec(
-        *argv,
-        stdin=asyncio.subprocess.DEVNULL,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    try:
-        out, err = await asyncio.wait_for(proc.communicate(), timeout)
-    except TimeoutError:
-        return Completed(None, "", "")
-    finally:  # timed out, or the task asking was cancelled: don't leave it running
-        if proc.returncode is None:
-            proc.kill()
-            await proc.wait()
-    return Completed(proc.returncode, out.decode(errors="replace"), err.decode(errors="replace"))
-
-
-def _lines(text: str) -> tuple[str, ...]:
-    return tuple(line.strip() for line in text.splitlines() if line.strip())
-
-
 def _frames(progress: str) -> int:
     """The last frame count in ffmpeg's `-progress` output."""
-    counts = [line.split("=", 1)[1] for line in _lines(progress) if line.startswith("frame=")]
+    counts = [line.split("=", 1)[1] for line in lines(progress) if line.startswith("frame=")]
     return int(counts[-1]) if counts else 0
 
 
@@ -255,13 +223,13 @@ class FileProbe:
         if done.exit_code is None:
             raise Unreadable(f"ffprobe took longer than {self.timeout:.0f} s")
         if done.exit_code != 0:
-            why = next(iter(_lines(done.stderr)), f"exit code {done.exit_code}")
+            why = next(iter(lines(done.stderr)), f"exit code {done.exit_code}")
             raise Unreadable(f"ffprobe couldn't read it: {why}")
         try:
             raw = json.loads(done.stdout)
         except ValueError:
             raise Unreadable("ffprobe's answer wasn't JSON") from None
-        inspection = Inspection.from_ffprobe(path, raw, _lines(done.stderr))
+        inspection = Inspection.from_ffprobe(path, raw, lines(done.stderr))
         sidecars = await asyncio.to_thread(sidecar_subtitles, path)
         return replace(inspection, tracks=inspection.tracks + sidecars)
 
@@ -279,7 +247,7 @@ class FileProbe:
                 "-map", "0:v:0", "-map", "0:a:0?", "-f", "null", "-progress", "pipe:1", "-",
             ]
         )  # fmt: skip
-        return Decoded(_frames(done.stdout), _lines(done.stderr), done.exit_code)
+        return Decoded(_frames(done.stdout), lines(done.stderr), done.exit_code)
 
 
 @dataclass

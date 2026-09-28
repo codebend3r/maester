@@ -11,6 +11,7 @@ reads under `probe`.
 
 from __future__ import annotations
 
+import time
 from datetime import datetime
 from typing import Any
 
@@ -18,16 +19,19 @@ from maester.agent.tools import ToolRegistry
 from maester.agent.tools import registry as app_registry
 from maester.clients import (
     FakeFileProbe,
+    FakeFleetMonitor,
     FakePlexClient,
     FakeRadarrClient,
     FakeSabnzbdClient,
     FakeSeerrClient,
     FakeSonarrClient,
+    FakeSpeedTest,
     FakeTautulliClient,
     FakeWizarrClient,
     Services,
 )
 from maester.clients.arr import MediaFile, QueueItem
+from maester.clients.fleet import Vitals
 from maester.clients.media import Inspection, Track
 from maester.clients.plex import PlexItem, PlexSeason, Version
 from maester.clients.radarr import Movie
@@ -43,13 +47,16 @@ from maester.clients.seerr import (
     SeerrUser,
 )
 from maester.clients.sonarr import Episode, Series
-from maester.clients.tautulli import Session
+from maester.clients.speedtest import SpeedResult
+from maester.clients.tautulli import HistoryRow, Session
 from maester.store import Store
 
 # Importing the tools package registers every tool module into app_registry.
 import maester.tools  # noqa: F401  isort: skip
 
 EVAL_USER = "eval-user"
+# The Plex server maester reads (`PLEX_URL`): the first host's, watched by its Tautulli.
+PLEX_ID = "library-plex"
 ARR_URLS = {"radarr": "http://{host}.lan:7878", "sonarr": "http://{host}.lan:8989"}
 
 
@@ -76,6 +83,7 @@ def _title(r: dict[str, Any]) -> tuple[SearchResult, MediaDetails]:
         status=status,
         status_4k=status_4k,
         rating_key=r.get("rating_key"),
+        rating_key_4k=r.get("rating_key_4k"),
         media_id=r.get("media_id"),
         runtime_minutes=r.get("runtime"),
         tvdb_id=r.get("tvdb_id"),
@@ -204,7 +212,7 @@ def _plex(seed: dict[str, Any]) -> FakePlexClient:
         str(key): [PlexSeason(int(s["number"]), int(s["episodes"])) for s in rows]
         for key, rows in seed.get("seasons", {}).items()
     }
-    return FakePlexClient(items=items, show_seasons=seasons)
+    return FakePlexClient(machine_id=PLEX_ID, items=items, show_seasons=seasons)
 
 
 def _sonarr(host: str, seed: dict[str, Any]) -> FakeSonarrClient:
@@ -247,11 +255,13 @@ def _sonarr(host: str, seed: dict[str, Any]) -> FakeSonarrClient:
 
 
 def _session(n: int, x: dict[str, Any], user_id: int) -> Session:
-    """One of the eval user's live sessions; unset fields read as a direct-played 1080p file."""
+    """A live session, the eval user's unless it names another `user_id`; unset fields read
+    as a 1080p file direct-played on the home network. Bitrates are in Mbps."""
     direct = "direct play"
+    bitrate = int(x.get("bitrate_mbps", 20) * 1000)
     return Session(
         session_key=str(n),
-        user_id=user_id,
+        user_id=int(x.get("user_id", user_id)),
         user="eval",
         rating_key=str(x["rating_key"]),
         full_title=x["title"],
@@ -261,11 +271,11 @@ def _session(n: int, x: dict[str, Any], user_id: int) -> Session:
         platform=x.get("platform", "Roku"),
         player=x.get("player", "Living Room"),
         product=x.get("product", "Plex for Roku"),
-        location="lan",
-        relayed=False,
+        location=x.get("location", "lan"),
+        relayed=bool(x.get("relayed", False)),
         secure=True,
-        bandwidth_kbps=20000,
-        stream_bitrate_kbps=20000,
+        bandwidth_kbps=bitrate,
+        stream_bitrate_kbps=bitrate,
         transcode_decision=x.get("transcode_decision", direct),
         video_decision=x.get("video_decision", direct),
         audio_decision=x.get("audio_decision", direct),
@@ -277,18 +287,55 @@ def _session(n: int, x: dict[str, Any], user_id: int) -> Session:
         audio_codec=x.get("audio_codec", "eac3"),
         audio_channels=6,
         subtitle_codec=x.get("subtitle_codec", ""),
-        quality_profile="Original",
-        file="",
+        file=x.get("file", ""),
         show_key=str(x.get("show_key", "")),
         season=x.get("season"),
         episode=x.get("episode"),
         dovi_profile=int(x.get("dovi_profile", 0)),
+        source_bitrate_kbps=int(x.get("source_mbps", x.get("bitrate_mbps", 20)) * 1000),
+        transcode_speed=float(x.get("transcode_speed", 0)),
+        transcode_throttled=bool(x.get("throttled", False)),
+        tmdb_id=x.get("tmdb_id"),
     )
 
 
-def _tautulli(host: str, seed: dict[str, Any], user_id: int) -> FakeTautulliClient:
+def _played(n: int, x: dict[str, Any]) -> HistoryRow:
+    """A finished play by anyone (`user_id`), `days_ago` days back."""
+    started = int(time.time() - x.get("days_ago", 1) * 86400)
+    return HistoryRow(
+        user_id=int(x.get("user_id", 99)),
+        rating_key=str(x["rating_key"]),
+        full_title=x.get("title", ""),
+        media_type="movie",
+        started=started,
+        stopped=started + 3600,
+        percent_complete=90,
+        transcode_decision="direct play",
+        platform="Roku",
+        player="Living Room",
+        location=x.get("location", "lan"),
+        relayed=False,
+        row_id=n,
+    )
+
+
+def _tautulli(host: str, seed: dict[str, Any], user_id: int, library: str) -> FakeTautulliClient:
+    """A host's live sessions and finished plays (`history`), each naming its title's TMDB
+    id as `tmdb_id`. It watches its own host's Plex server; the `library` host's is the one
+    maester reads."""
     sessions = [_session(n, x, user_id) for n, x in enumerate(seed.get("sessions", []), 1)]
-    return FakeTautulliClient(host=host, sessions=sessions)
+    played = [_played(n, x) for n, x in enumerate(seed.get("history", []), 1)]
+    return FakeTautulliClient(
+        host=host,
+        plex_id=PLEX_ID if host == library else f"{host}-plex",
+        sessions=sessions,
+        history_rows=played,
+        titles={
+            str(x["rating_key"]): int(x["tmdb_id"])
+            for x in (*seed.get("sessions", []), *seed.get("history", []))
+            if "tmdb_id" in x
+        },
+    )
 
 
 def _probe(seed: dict[str, Any]) -> FakeFileProbe:
@@ -318,20 +365,54 @@ def _probe(seed: dict[str, Any]) -> FakeFileProbe:
     )
 
 
+def _fleet(seed: dict[str, Any]) -> FakeFleetMonitor:
+    """Each NAS's CPU and memory, in percent, as the fleet monitor reads them."""
+    return FakeFleetMonitor(
+        {host: Vitals(v.get("cpu"), v.get("memory")) for host, v in seed.items()}
+    )
+
+
+def _speedtest(seed: dict[str, Any]) -> FakeSpeedTest:
+    """What a speed test from `host` finds, in Mbps; without `upload_mbps` it fails."""
+    result = (
+        SpeedResult(
+            upload_kbps=round(seed["upload_mbps"] * 1000),
+            download_kbps=round(seed.get("download_mbps", 300) * 1000),
+            ping_ms=float(seed.get("ping_ms", 9)),
+            server=seed.get("server", "Speedtest, Toronto, ON"),
+            isp=seed.get("isp", "Home ISP"),
+            url="https://www.speedtest.net/result/c/eval",
+        )
+        if "upload_mbps" in seed
+        else None
+    )
+    return FakeSpeedTest(host=seed.get("host", "meleys"), result=result)
+
+
 def build_services(seed: dict[str, Any], seerr_user_id: int = 4) -> Services:
     hosts = seed.get("hosts", ["meleys", "vermithor"])
     radarr, sonarr = seed.get("radarr", {}), seed.get("sonarr", {})
     tautulli, tautulli_user = seed.get("tautulli", {}), _tautulli_user(seed)
-    return Services(
+    services = Services(
         seerr=_seerr(seed.get("seerr", {}), seerr_user_id, hosts),
         plex=_plex(seed.get("plex", {})),
         wizarr=FakeWizarrClient(),
         sonarr={h: _sonarr(h, sonarr.get(h, {})) for h in hosts},
         radarr={h: _radarr(h, radarr.get(h, {})) for h in hosts},
         sabnzbd={h: FakeSabnzbdClient(host=h) for h in hosts},
-        tautulli={h: _tautulli(h, tautulli.get(h, {}), tautulli_user or 0) for h in hosts},
+        tautulli={
+            h: _tautulli(h, tautulli.get(h, {}), tautulli_user or 0, hosts[0]) for h in hosts
+        },
         probe=_probe(seed.get("probe", {})),
+        fleet=_fleet(seed["fleet"]) if "fleet" in seed else None,
+        speedtest=_speedtest(seed["speedtest"]) if "speedtest" in seed else None,
     )
+    # Services that answer like unreachable ones: "plex", or "radarr:vermithor" per host.
+    for name in seed.get("down", []):
+        service, _, host = name.partition(":")
+        client = getattr(services, service)
+        (client[host] if host else client).down = True
+    return services
 
 
 def _tautulli_user(seed: dict[str, Any]) -> int | None:

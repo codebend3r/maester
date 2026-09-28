@@ -9,9 +9,9 @@ item), and a show's seasons with how many episodes each has.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from typing import Any, ClassVar, Protocol
 
-from maester.clients.base import ClientError, HttpClient
+from maester.clients.base import ClientError, Downable, HttpClient
 
 
 @dataclass(frozen=True)
@@ -82,6 +82,7 @@ class PlexSeason:
 
 
 class Plex(Protocol):
+    async def ping(self) -> None: ...
     async def machine_identifier(self) -> str: ...
     async def sections(self) -> list[Section]: ...
     async def item(self, rating_key: str) -> PlexItem | None: ...
@@ -102,6 +103,10 @@ class PlexClient(HttpClient):
     def __init__(self, base_url: str, token: str, **kwargs: Any):
         headers = {"X-Plex-Token": token, "Accept": "application/json"}
         super().__init__(base_url, headers=headers, **kwargs)
+
+    async def ping(self) -> None:
+        """It names itself (`/identity`, its one route that needs no token)."""
+        await self.machine_identifier()
 
     async def machine_identifier(self) -> str:
         data = await self.get_json("/identity")
@@ -141,13 +146,18 @@ class PlexClient(HttpClient):
 
 
 @dataclass
-class FakePlexClient:
+class FakePlexClient(Downable):
+    service: ClassVar[str] = "plex"
     machine_id: str = "fake-machine"
     section_list: list[Section] = field(default_factory=list)
     items: dict[str, PlexItem] = field(default_factory=dict)
     show_seasons: dict[str, list[PlexSeason]] = field(default_factory=dict)
 
+    async def ping(self) -> None:
+        await self.machine_identifier()
+
     async def machine_identifier(self) -> str:
+        self.refuse_if_down("/identity")
         return self.machine_id
 
     async def sections(self) -> list[Section]:

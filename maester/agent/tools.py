@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from maester.config import Settings
+from maester.memo import Memo
 from maester.notify import Notice
 from maester.store import LinkedUser, NotLinked, Store
 
@@ -48,6 +49,8 @@ class ToolContext:
     `services` holds the clients the app wires up, real or fake. `user_id`
     is the chat identity the call runs as and is audited under. `settings`
     is the deployment's configuration, for the few tools that need a knob.
+    `memo` keeps answers tools share across calls for a while (a health
+    check, a speed test), one per app.
     """
 
     user_id: str
@@ -55,6 +58,7 @@ class ToolContext:
     services: Services
     store: Store
     settings: Settings
+    memo: Memo
 
     def linked_user(self) -> LinkedUser:
         """The caller's active link: who requests go to Seerr as.

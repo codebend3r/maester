@@ -4,11 +4,11 @@ from dataclasses import replace
 import pytest
 
 from maester.agent.tools import Choices, Result
-from maester.clients import FakeTautulliClient
+from maester.clients import ClientError, FakeTautulliClient
 from maester.library import NotLocated
 from maester.media import Copy
 from maester.playback.items import locate
-from maester.playback.plays import copy_of, recent_plays
+from maester.playback.plays import copy_of, library_hosts, recent_plays
 from maester.tools.playback import NOTHING_RECENT, list_tracks, recent_sessions
 from tests.factories import history_row, session
 from tests.playback_world import BEAR, DANY, DUNE, FORKS, stock
@@ -20,22 +20,29 @@ def library(ctx):
 
 
 class Down:
+    host = "vermithor"
+
     async def activity(self):
-        raise ConnectionError("tautulli is down")
+        raise ClientError("tautulli", "GET", "/api/v2?cmd=get_activity", None, "connection refused")
 
     async def history(self, **kw):
-        raise ConnectionError("tautulli is down")
+        raise ClientError("tautulli", "GET", "/api/v2?cmd=get_history", None, "connection refused")
+
+    async def server_identity(self):
+        raise ClientError("tautulli", "GET", "/api/v2", None, "connection refused")
 
 
 @pytest.fixture
 def watching(library):
-    """Dany plays Dune in 4K on meleys now; The Bear S02E07 finished two hours ago."""
+    """Dany plays Dune in 4K on meleys now; The Bear S02E07 finished two hours ago. Meleys'
+    Tautulli watches the Plex server maester reads, so Seerr's rating keys apply there."""
     meleys = library.services.tautulli["meleys"]
     meleys.sessions = [
         session(user_id=DANY, rating_key="9001", full_title="Dune", product="Plex for Roku",
-                player="Living Room"),
+                player="Living Room", tmdb_id=438631),
         session(user_id=42, rating_key="777", full_title="Someone else's"),
     ]  # fmt: skip
+    meleys.titles["5188"] = 136315  # its Plex server knows the episode's show
     two_hours_ago = int(time.time()) - 7200
     meleys.history_rows = [
         history_row(user_id=DANY, rating_key="5188", full_title="The Bear - Forks",
@@ -58,8 +65,9 @@ async def test_recent_sessions_offers_each_play_as_its_copy_and_episode(watching
     assert bear.detail == "1080p · about 2 h ago · Plex Web on Chrome"
     # What couldn't be looked up is said, not hidden behind "nothing recent".
     assert picker.notes == (
-        "couldn't reach Tautulli on vermithor: ConnectionError: tautulli is down",
-        "couldn't tell what Gone is: Plex has no TMDB id for Gone",
+        "couldn't reach Tautulli on vermithor: tautulli GET /api/v2?cmd=get_activity failed "
+        "(None): connection refused",
+        "couldn't tell what Gone is: the Plex server on meleys has no TMDB id for Gone",
     )
     assert picker.as_content()["notes"] == list(picker.notes)
 
@@ -71,7 +79,8 @@ async def test_recent_sessions_without_plays_or_a_tautulli_match_points_to_searc
     out = await recent_sessions(watching)
     assert out["sessions"] == [] and "search_media" in out["note"]
     assert out["notes"] == [
-        "couldn't reach Tautulli on vermithor: ConnectionError: tautulli is down"
+        "couldn't reach Tautulli on vermithor: tautulli GET /api/v2?cmd=get_activity failed "
+        "(None): connection refused"
     ]
     services.tautulli["vermithor"] = FakeTautulliClient(host="vermithor")
     assert await recent_sessions(watching) == {"sessions": [], "note": NOTHING_RECENT}
@@ -81,25 +90,53 @@ async def test_recent_sessions_without_plays_or_a_tautulli_match_points_to_searc
     assert out.is_error and "isn't matched to a Tautulli user" in out.content
 
 
-async def test_plays_are_live_first_then_newest_and_one_per_plex_item(watching):
+async def test_plays_are_live_first_then_newest_and_one_per_item_on_each_host(watching):
     services = watching.services
-    # The other host logged the same Plex item too.
-    services.tautulli["vermithor"].history_rows = [
-        history_row(user_id=DANY, rating_key="5188", show_key="5120", season=2, episode=7,
-                    media_type="episode", started=1)
-    ]  # fmt: skip
+    # Vermithor's own Plex server numbers its items apart: its 5188 is another title.
+    vermithor = services.tautulli["vermithor"]
+    vermithor.history_rows = [history_row(user_id=DANY, rating_key="5188", started=1)]
+    vermithor.titles["5188"] = 603  # The Matrix
     found = await recent_plays(services, DANY)
-    assert [(p.host, p.rating_key, p.kind) for p in found.plays] == [
-        ("meleys", "9001", "movie"),
-        ("meleys", "5188", "tv"),
-        ("meleys", "31337", "movie"),
+    assert found.library == {"meleys"}
+    assert [(p.host, p.rating_key, p.kind, p.tmdb_id) for p in found.plays] == [
+        ("meleys", "9001", "movie", 438631),
+        ("meleys", "5188", "tv", 136315),
+        ("meleys", "31337", "movie", None),
+        ("vermithor", "5188", "movie", 603),
     ]
-    live, bear, _ = found.plays
-    assert live.live and live.plex_key == "9001" and bear.plex_key == "5120"
-    assert bear.is_of(BEAR, Copy("tv", 136315, False, 2, 7))
-    assert not bear.is_of(BEAR, Copy("tv", 136315, False, 2, 8))
-    assert live.is_of(DUNE, Copy("movie", 438631, True))
-    assert not live.is_of(DUNE, Copy("movie", 438631, False))
+    live, bear, _, matrix = found.plays
+    assert found.play_of(BEAR, Copy("tv", 136315, False, 2, 7)) is bear
+    assert found.play_of(BEAR, Copy("tv", 136315, False, 2, 8)) is None
+    assert found.play_of(DUNE, Copy("movie", 438631, True)) is live
+    assert found.play_of(DUNE, Copy("movie", 438631, False)) is None
+    assert (found.copy_of(live, DUNE), found.copy_of(matrix, DUNE)) == (True, None)
+
+
+async def test_a_play_on_another_hosts_plex_server_is_matched_by_title_not_by_key(watching):
+    """Seerr's keys belong to meleys' Plex server: on vermithor's, 9001 is no copy of Dune."""
+    services = watching.services
+    services.tautulli["meleys"].sessions = []
+    services.tautulli["vermithor"].sessions = [
+        session(user_id=DANY, rating_key="9001", full_title="Dune", tmdb_id=438631),
+    ]
+    found = await recent_plays(services, DANY)
+    dune = found.plays[0]
+    assert dune.host == "vermithor" and found.copy_of(dune, DUNE) is None
+    # Whichever copy it was, it's the friend's play of Dune.
+    assert found.play_of(DUNE, Copy("movie", 438631, False)) is dune
+    picker = await recent_sessions(watching)
+    first = picker.items[0]
+    assert (first.value, first.detail.split(" · ")[0]) == (
+        "movie:438631:?", "copy unclear: ask 1080p or 4K",
+    )  # fmt: skip
+
+
+async def test_the_library_hosts_are_matched_by_their_plex_servers_identity(services):
+    assert await library_hosts(services) == {"meleys"}
+    services.tautulli["vermithor"].plex_id = services.plex.machine_id  # both watch it
+    assert await library_hosts(services) == {"meleys", "vermithor"}
+    services.plex.down = True  # can't say which server it is: no key is trusted
+    assert await library_hosts(services) == frozenset()
 
 
 def test_which_copy_a_plex_item_is():

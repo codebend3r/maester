@@ -14,9 +14,9 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from typing import Any, ClassVar, Protocol
 
-from maester.clients.base import HttpClient
+from maester.clients.base import Downable, HttpClient
 
 EXPIRY_DAYS_HONORED = (1, 7, 30)
 # /api/users reconciles with every Plex server per call and routinely takes
@@ -82,6 +82,7 @@ def redeemer(invite: Invite, users: list[WizarrUser]) -> WizarrUser | None:
 
 
 class Wizarr(Protocol):
+    async def ping(self) -> None: ...
     async def create_invite(
         self, *, expires_in_days: int, duration: str, library_ids: list[int] | None = None
     ) -> Invite: ...
@@ -94,6 +95,7 @@ class Wizarr(Protocol):
 
 class WizarrClient(HttpClient):
     service = "wizarr"
+    health_path = "/api/status"  # checks the API key too
 
     def __init__(self, base_url: str, api_key: str, **kwargs: Any):
         headers = {"X-API-Key": api_key, "Content-Type": "application/json"}
@@ -146,7 +148,9 @@ class WizarrClient(HttpClient):
 
 
 @dataclass
-class FakeWizarrClient:
+class FakeWizarrClient(Downable):
+    service: ClassVar[str] = "wizarr"
+
     invites: list[Invite] = field(default_factory=list)
     user_list: list[WizarrUser] = field(default_factory=list)
     disabled: list[int] = field(default_factory=list)

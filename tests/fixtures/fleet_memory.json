@@ -1,0 +1,1 @@
+{"kind":"memory","unit":"percent","window_minutes":5,"hosts":[{"name":"meleys","points":[{"at":"2026-09-27T10:00:30.000000Z","value":61.0}]},{"name":"vermithor","points":[]},{"name":"caraxes","points":[]},{"name":"syrax","points":[]},{"name":"vhagar","points":[{"at":"2026-09-27T10:00:30.000000Z","value":48.5}]}]}

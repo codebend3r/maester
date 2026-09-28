@@ -10,51 +10,28 @@ and for anime it reports which seasons' files carry English audio.
 from __future__ import annotations
 
 import asyncio
-import re
 from typing import Any
 
 from maester.agent.tools import Tier, ToolContext, tool
 from maester.clients import Services
-from maester.clients.plex import Plex, Version
+from maester.clients.plex import Plex
 from maester.clients.seerr import MediaDetails
 from maester.dub import dub_coverage, is_anime
 from maester.library import Library, OwnerUnknown
-
-# The server's own 4K re-encodes are written next to the original as
-# "<Movie> (<year>) 2160p HEVC.mkv"; that exact tail is what sets them apart
-# from a download whose name merely mentions HEVC ("... Bluray-2160p HEVC").
-_REENCODE = re.compile(r"\(\d{4}\) 2160p HEVC\.\w+$", re.IGNORECASE)
-
-
-def version_label(version: Version) -> str:
-    """How a friend would name a copy: "1080p", "4K", or "4K HEVC re-encode"."""
-    if _REENCODE.search(version.file):
-        return "4K HEVC re-encode"
-    return {"4k": "4K", "sd": "SD"}.get(version.resolution.lower(), f"{version.resolution}p")
-
-
-def describe_version(version: Version) -> dict[str, Any]:
-    return {
-        "version": version_label(version),
-        "codec": version.video_codec,
-        "size_gb": round(version.size_bytes / 1e9, 1),
-        "bitrate_mbps": round(version.bitrate_kbps / 1000, 1),
-    }
+from maester.plex_versions import describe_version, items_of
 
 
 async def plex_copies(plex: Plex, details: MediaDetails) -> list[dict[str, Any]]:
     """Each Plex item holding the title (standard, 4K), with its link and versions."""
-    keys = list(dict.fromkeys(k for k in (details.rating_key, details.rating_key_4k) if k))
-    if not keys:
+    if not (details.rating_key or details.rating_key_4k):
         return []
-    machine, *items = await asyncio.gather(plex.machine_identifier(), *map(plex.item, keys))
+    machine, items = await asyncio.gather(plex.machine_identifier(), items_of(plex, details))
     return [
         {
-            "plex_link": plex.deep_link(machine, key),
+            "plex_link": plex.deep_link(machine, item.rating_key),
             **({"versions": [describe_version(v) for v in item.versions]} if item.versions else {}),
         }
-        for key, item in zip(keys, items, strict=True)
-        if item is not None
+        for item in items
     ]
 
 

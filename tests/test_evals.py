@@ -8,6 +8,7 @@ from maester.agent.tools import ToolContext, ToolRegistry
 from maester.config import Settings
 from maester.evals import CASES_DIR, Case, load_cases, report, run_case
 from maester.evals.world import EVAL_USER, build_services, build_world
+from maester.memo import Memo
 from maester.store import Store
 from tests.fake_model import FakeModel, text_message, tool_message
 
@@ -115,7 +116,75 @@ async def test_playback_case_worlds_reach_what_their_cases_expect(case_file, cal
     """The tool each playback case expects, run on its world, reaches the case's decision."""
     case = Case.load(CASES_DIR / f"{case_file}.yaml")
     registry, services, store = build_world(case.services)
-    ctx = ToolContext(EVAL_USER, case.tier, services, store, Settings())
+    ctx = ToolContext(EVAL_USER, case.tier, services, store, Settings(), Memo())
     outcome = await ToolRunner(registry).run(ctx, *call)
     assert not outcome.is_error and expect in outcome.text
+    store.close()
+
+
+@pytest.mark.parametrize(
+    ("case_file", "call", "expect"),
+    [
+        ("lag_relayed", ("session_report", {}), '"fix": "avoid_relay"'),
+        ("lag_remote_quality", ("session_report", {}), '"fix": "original_quality"'),
+        ("lag_subtitle_burn_in", ("session_report", {}), '"fix": "subtitles_off"'),
+        ("lag_busy_server", ("session_report", {}), '"fix": "wait"'),
+        ("lag_heavy_remux", ("session_report", {}), '"what_to_do": "Play the 1080p version instead'),
+        ("lag_details_on_request", ("session_report", {"details": True}), '"findings": [{"fix": "original_quality"'),
+        ("server_load", ("server_status", {}), '"load_is_a_plausible_cause": true'),
+    ],
+)  # fmt: skip
+async def test_lag_case_worlds_reach_the_advice_their_cases_expect(case_file, call, expect):
+    """The advice each lag case's reply is held to is what its world's stream calls for."""
+    case = Case.load(CASES_DIR / f"{case_file}.yaml")
+    registry, services, store = build_world(case.services)
+    ctx = ToolContext(EVAL_USER, case.tier, services, store, Settings(), Memo())
+    outcome = await ToolRunner(registry).run(ctx, *call)
+    assert not outcome.is_error and expect in outcome.text
+    store.close()
+
+
+async def test_the_slow_uplink_world_is_found_by_a_speed_test():
+    case = Case.load(CASES_DIR / "lag_slow_uplink.yaml")
+    registry, services, store = build_world(case.services)
+    ctx = ToolContext(EVAL_USER, case.tier, services, store, Settings(), Memo())
+    runner = ToolRunner(registry)
+    before = await runner.run(ctx, "session_report", {})
+    assert '"fix": null' in before.text and "speed_test(host=meleys)" in before.text
+    tested = await runner.run(ctx, "speed_test", {"host": "meleys"})
+    assert (
+        "The upload is nearly full" in tested.text and '"remote_streams_mbps": 20.0' in tested.text
+    )
+    after = await runner.run(ctx, "session_report", {})
+    assert '"fix": "lower_quality"' in after.text and "4 Mbps 720p" in after.text
+    store.close()
+
+
+async def test_the_health_world_has_what_its_case_says_is_down():
+    case = Case.load(CASES_DIR / "service_health_down.yaml")
+    registry, services, store = build_world(case.services)
+    ctx = ToolContext(EVAL_USER, case.tier, services, store, Settings(), Memo())
+    outcome = await ToolRunner(registry).run(ctx, "service_health", {})
+    assert [d["service"] for d in outcome.content["down"]] == ["Plex", "Radarr on vermithor"]
+    store.close()
+
+
+async def test_the_version_world_recommends_what_its_case_expects():
+    case = Case.load(CASES_DIR / "version_for_slow_connection.yaml")
+    registry, services, store = build_world(case.services)
+    ctx = ToolContext(EVAL_USER, case.tier, services, store, Settings(), Memo())
+    call = {"tmdb_id": 438631, "connection_mbps": 20}
+    outcome = await ToolRunner(registry).run(ctx, "pick_version", call)
+    assert '"recommended": {"version": "1080p", "fits": true' in outcome.text
+    assert outcome.notices == ()
+    store.close()
+
+
+async def test_the_heavy_remux_world_flags_the_remux_to_the_admin():
+    case = Case.load(CASES_DIR / "lag_heavy_remux.yaml")
+    registry, services, store = build_world(case.services)
+    ctx = ToolContext(EVAL_USER, case.tier, services, store, Settings(), Memo())
+    outcome = await ToolRunner(registry).run(ctx, "session_report", {})
+    (notice,) = outcome.notices
+    assert "watched away from home 3 times" in notice.text
     store.close()

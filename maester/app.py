@@ -27,6 +27,7 @@ from maester.chat.identity import IdentityService, RoleMap
 from maester.chat.service import ChatService
 from maester.clients import (
     FileProbe,
+    OoklaSpeedTest,
     PlexClient,
     RadarrClient,
     SabnzbdClient,
@@ -36,6 +37,7 @@ from maester.clients import (
     TautulliClient,
     WizarrClient,
 )
+from maester.clients.fleet import FleetMonitorClient
 from maester.clients.media import MediaPaths
 from maester.config import REQUIRED, Settings, require, settings
 from maester.registry import Registry
@@ -65,6 +67,12 @@ def build_services(cfg: Settings, instances: Registry) -> Services:
         probe=FileProbe(
             MediaPaths(cfg.media_roots, cfg.media_path_map), timeout=cfg.probe_timeout_seconds
         ),
+        fleet=(
+            FleetMonitorClient(cfg.fleet_monitor.url, cfg.fleet_monitor.token)
+            if cfg.fleet_monitor
+            else None
+        ),
+        speedtest=OoklaSpeedTest(cfg.speedtest_host) if cfg.speedtest_host else None,
     )
 
 

@@ -67,6 +67,23 @@ def _pairs(env: Mapping[str, str], name: str) -> tuple[tuple[str, str], ...]:
 
 
 @dataclass(frozen=True)
+class FleetMonitorAccess:
+    """Where the fleet monitor is, and the bearer token for its CPU and memory routes."""
+
+    url: str
+    token: str
+
+
+def _fleet_monitor(env: Mapping[str, str]) -> FleetMonitorAccess | None:
+    """The fleet monitor, when FLEET_MONITOR_URL is set; its token must be set with it."""
+    url = _url(env, "FLEET_MONITOR_URL")
+    if not url:
+        return None
+    require(env, "FLEET_MONITOR_TOKEN")
+    return FleetMonitorAccess(url, env["FLEET_MONITOR_TOKEN"].strip())
+
+
+@dataclass(frozen=True)
 class Guardrails:
     replace_daily_cap: int = 3
     storage_pause_4k_percent: int = 90
@@ -104,6 +121,10 @@ class Settings:
     media_roots: tuple[str, ...] = ()
     media_path_map: tuple[tuple[str, str], ...] = ()
     probe_timeout_seconds: int = 120
+    # CPU and memory per NAS, for server load; None when no monitor is set up.
+    fleet_monitor: FleetMonitorAccess | None = None
+    # The host maester's container runs on, where the speed test runs; empty for none.
+    speedtest_host: str = ""
 
     guardrails: Guardrails = field(default_factory=Guardrails)
     db_path: str = "/data/maester.db"
@@ -145,6 +166,8 @@ def load_settings(env: Mapping[str, str]) -> Settings:
         media_roots=_media_roots(env),
         media_path_map=_pairs(env, "MEDIA_PATH_MAP"),
         probe_timeout_seconds=_int(env, "PROBE_TIMEOUT_SECONDS", 120),
+        fleet_monitor=_fleet_monitor(env),
+        speedtest_host=env.get("SPEEDTEST_HOST", "").strip().lower(),
         guardrails=Guardrails(
             replace_daily_cap=_int(env, "REPLACE_DAILY_CAP", 3),
             storage_pause_4k_percent=_int(env, "STORAGE_PAUSE_4K_PERCENT", 90),

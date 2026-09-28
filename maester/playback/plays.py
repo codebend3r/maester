@@ -3,11 +3,22 @@
 "This won't play" rarely names the file, so a report starts from what the
 friend played. Every host's Tautulli is asked at once for the friend's live
 sessions and last few finished plays; a host that can't answer is named
-instead of hiding the others. Tautulli knows a Plex item, not a title, so
-`identify` reads the item's TMDB id from Plex and asks Seerr for the title,
-and `copy_of` tells from Seerr's Plex keys whether the item is the 1080p or
-the 4K copy. `playback_of` reads how a play went (`Playback`), for the
-player check and for explaining lag.
+instead of hiding the others.
+
+Plex runs on every NAS, and each Tautulli watches its own host's server, so
+a rating key names an item on one server only. A play is identified through
+the Tautulli that saw it: a live session carries its Plex server's guids,
+and a finished play's item is asked of that Tautulli (`metadata`). The
+title's TMDB id then finds it in Seerr (`identify`); maester's own Plex
+server isn't asked. Seerr's rating keys (which copy is 1080p, which 4K)
+belong to the Plex server maester reads (`PLEX_URL`), so they're compared
+only for plays on the hosts whose Tautulli watches that server
+(`library_hosts`, matched by machine identifier). Elsewhere a play is
+matched by title and episode, and which copy it was stays unknown.
+
+`playback_of` reads how a play went (`Playback`), for the player check and
+for explaining lag: the one place Tautulli's session facts become a typed
+model.
 
 Tautulli keeps a play in its history only once it stops and outlasts the
 ignore interval, so a play that failed at once may not be here at all; the
@@ -20,25 +31,33 @@ import asyncio
 from dataclasses import asdict, dataclass, replace
 from typing import Any
 
-from maester.clients import Services
+from maester.clients import ClientError, Services
+from maester.clients.base import every_host
 from maester.clients.seerr import MediaDetails
 from maester.clients.tautulli import HistoryRow, Session, StreamData, Tautulli
 from maester.media import Copy
 
 # Finished plays asked of each host.
 RECENT = 5
+# Where Tautulli places a friend away from the server's network.
+REMOTE = frozenset({"wan", "cellular"})
+# Plex's relay carries a stream when the server can't be reached directly, at
+# most 2 Mbps, for Plex Pass and Remote Watch Pass subscribers alike
+# (support.plex.tv/articles/216766168-accessing-a-server-through-relay/).
+RELAY_CAP_KBPS = 2000
 
 
 @dataclass(frozen=True)
 class Playback:
-    """One play's facts: the client, what the file holds, and what the server did with it."""
+    """One play's facts: the client, what the file holds, what the server did with it,
+    and how it travelled (LAN or the internet, Plex's relay, the bitrate sent)."""
 
     platform: str  # "Roku", "Chrome", "Android"
     product: str  # "Plex for Roku", "Plex Web"
     player: str  # the player's name, often the hardware's: "SHIELD Android TV"
     device: str  # the hardware, from a live session; empty for a finished play
     container: str
-    quality_profile: str  # "Original", or the lower quality the player asked for
+    transcode_decision: str  # overall: "direct play" | "copy" (direct stream) | "transcode"
     video_codec: str
     video_decision: str  # "direct play" | "copy" | "transcode"
     dovi_profile: int | None  # the file's Dolby Vision profile: 0 for none, None if unknown
@@ -46,6 +65,14 @@ class Playback:
     audio_decision: str
     subtitle_codec: str
     subtitle_decision: str  # adds "burn"; empty without subtitles
+    location: str  # "lan", or "wan"/"cellular" for a friend away from the server
+    relayed: bool  # through Plex's relay, which caps it (`RELAY_CAP_KBPS`)
+    bitrate_kbps: int  # what the stream is sent at
+    source_bitrate_kbps: int  # the file's own bitrate
+    # How fast the server converts its video against real time (under 1.0 it can't keep
+    # up); None for a finished play, a video not converted (Tautulli gives a speed for any
+    # transcode, audio or a remux included), or a conversion throttled for being ahead.
+    transcode_speed: float | None
 
     @classmethod
     def from_session(cls, s: Session) -> Playback:
@@ -56,7 +83,7 @@ class Playback:
             player=s.player,
             device=s.device,
             container=s.container,
-            quality_profile=s.quality_profile,
+            transcode_decision=s.transcode_decision,
             video_codec=s.video_codec,
             video_decision=s.video_decision,
             dovi_profile=s.dovi_profile,
@@ -64,6 +91,17 @@ class Playback:
             audio_decision=s.audio_decision,
             subtitle_codec=s.subtitle_codec,
             subtitle_decision=s.subtitle_decision,
+            location=s.location,
+            relayed=s.relayed,
+            bitrate_kbps=s.stream_bitrate_kbps,
+            source_bitrate_kbps=s.source_bitrate_kbps,
+            transcode_speed=(
+                s.transcode_speed
+                if s.video_decision == "transcode"
+                and s.transcode_speed
+                and not s.transcode_throttled
+                else None
+            ),
         )
 
     @classmethod
@@ -76,7 +114,7 @@ class Playback:
             player=row.player,
             device="",
             container=stream.container,
-            quality_profile=stream.quality_profile,
+            transcode_decision=row.transcode_decision,
             video_codec=stream.video_codec,
             video_decision=stream.video_decision,
             dovi_profile=None,
@@ -84,12 +122,36 @@ class Playback:
             audio_decision=stream.audio_decision,
             subtitle_codec=stream.subtitle_codec,
             subtitle_decision=stream.subtitle_decision,
+            location=row.location,
+            relayed=row.relayed,
+            bitrate_kbps=stream.stream_bitrate_kbps,
+            source_bitrate_kbps=stream.source_bitrate_kbps,
+            transcode_speed=None,
         )
 
     @property
     def hardware(self) -> str:
         """What names the hardware: the device, and the player's name, which often says it."""
         return f"{self.device} {self.player}".lower()
+
+    @property
+    def remote(self) -> bool:
+        """Away from the server: the stream crosses the internet and the server's upload."""
+        return self.location in REMOTE
+
+    @property
+    def reduced(self) -> bool:
+        """The video is converted to less than the file's own bitrate."""
+        return self.video_decision == "transcode" and self.bitrate_kbps < self.source_bitrate_kbps
+
+    @property
+    def squeezed(self) -> bool:
+        """Cut down to fit a connection, or maybe so: Plex's relay caps it, or it's sent away
+        from home at less than the file's bitrate (the app's remote quality, or the player;
+        Tautulli can't say which). Either way its conversion says nothing certain about the
+        player. At home the player limits read a conversion as the player's (its codec, HDR
+        or 4K); a home quality set below the file is the case that misreads."""
+        return self.relayed or (self.remote and self.reduced)
 
     def with_profile(self, dovi_profile: int) -> Playback:
         """The file's Dolby Vision profile, where the play didn't say."""
@@ -112,6 +174,9 @@ class Play:
     player: str  # "Plex for Roku on Living Room"
     started: int  # epoch seconds; 0 while live
     source: Session | HistoryRow
+    # The title's TMDB id (a show's, for an episode) as the Plex server that played it knows
+    # it; None when that server has no TMDB match or its Tautulli couldn't say.
+    tmdb_id: int | None
 
     @property
     def live(self) -> bool:
@@ -139,10 +204,11 @@ class Play:
             player=f"{s.product} on {s.player}",
             started=0,
             source=s,
+            tmdb_id=s.tmdb_id,
         )
 
     @classmethod
-    def from_history(cls, host: str, row: HistoryRow) -> Play:
+    def from_history(cls, host: str, row: HistoryRow, tmdb_id: int | None) -> Play:
         return cls(
             host=host,
             title=row.full_title,
@@ -153,55 +219,92 @@ class Play:
             player=f"{row.product} on {row.player}",
             started=row.started,
             source=row,
+            tmdb_id=tmdb_id,
         )
 
-    def is_of(self, details: MediaDetails, copy: Copy) -> bool:
-        """Whether this play was of that copy (and that episode)."""
-        key = details.rating_key_for(copy.is_4k)
-        return key == self.plex_key and (self.season, self.episode) == (copy.season, copy.episode)
+
+async def library_hosts(services: Services) -> frozenset[str]:
+    """The hosts whose Tautulli watches the Plex server maester reads (`PLEX_URL`), whose
+    rating keys Seerr knows: their servers' machine identifiers match. None of them when
+    Plex can't say which server it is."""
+    try:
+        machine, served = await asyncio.gather(
+            services.plex.machine_identifier(),
+            every_host(services.tautulli, lambda t: t.server_identity()),
+        )
+    except ClientError:
+        return frozenset()
+    return frozenset(
+        host for host, ident in served.answered.items() if machine and ident == machine
+    )
 
 
 @dataclass(frozen=True)
 class Plays:
-    plays: tuple[Play, ...]  # live first, then newest; one per Plex item
+    plays: tuple[Play, ...]  # live first, then newest; one per item on each host
     unreachable: dict[str, str]  # host -> why its Tautulli couldn't answer
+    library: frozenset[str]  # the hosts where Seerr's rating keys apply (`library_hosts`)
+
+    def copy_of(self, play: Play, details: MediaDetails) -> bool | None:
+        """Whether a play was of the 4K copy (True) or the 1080p one (False); None when it
+        can't be told, on a Plex server Seerr's keys don't belong to among others."""
+        return copy_of(details, play.plex_key) if play.host in self.library else None
+
+    def play_of(self, details: MediaDetails, copy: Copy) -> Play | None:
+        """The latest play of that copy (and episode): by Seerr's rating key where it applies,
+        else by title, whichever copy it was."""
+        return next((p for p in self.plays if self._is_of(p, details, copy)), None)
+
+    def _is_of(self, play: Play, details: MediaDetails, copy: Copy) -> bool:
+        if (play.season, play.episode) != (copy.season, copy.episode):
+            return False
+        if play.host in self.library:
+            return play.plex_key == details.rating_key_for(copy.is_4k)
+        return (play.kind, play.tmdb_id) == (details.media_type, details.tmdb_id)
 
 
-async def _host_plays(host: str, tautulli: Tautulli, user_id: int) -> list[Play]:
+async def _title_of(tautulli: Tautulli, rating_key: str) -> int | None:
+    try:
+        return (await tautulli.metadata(rating_key)).tmdb_id
+    except ClientError:  # the play is kept; it just can't be told what it was
+        return None
+
+
+async def _host_plays(tautulli: Tautulli, user_id: int) -> list[Play]:
+    """A host's live and recent plays by one user, each with its title's TMDB id."""
+    host = tautulli.host
     activity, history = await asyncio.gather(
         tautulli.activity(), tautulli.history(user_id=user_id, length=RECENT)
     )
+    keys = list(dict.fromkeys(row.rating_key for row in history))
+    titles = dict(
+        zip(keys, await asyncio.gather(*(_title_of(tautulli, k) for k in keys)), strict=True)
+    )
     live = [Play.from_session(host, s) for s in activity.sessions if s.user_id == user_id]
-    return [*live, *(Play.from_history(host, row) for row in history)]
+    return [*live, *(Play.from_history(host, row, titles[row.rating_key]) for row in history)]
 
 
 async def recent_plays(services: Services, tautulli_user_id: int) -> Plays:
-    hosts = sorted(services.tautulli)
-    found = await asyncio.gather(
-        *(_host_plays(h, services.tautulli[h], tautulli_user_id) for h in hosts),
-        return_exceptions=True,
+    found, library = await asyncio.gather(
+        every_host(services.tautulli, lambda t: _host_plays(t, tautulli_user_id)),
+        library_hosts(services),
     )
-    plays: list[Play] = []
-    unreachable: dict[str, str] = {}
-    for host, result in zip(hosts, found, strict=True):
-        if isinstance(result, BaseException):
-            unreachable[host] = f"{type(result).__name__}: {result}"
-        else:
-            plays.extend(result)
-    plays.sort(key=lambda p: (not p.live, -p.started))
-    # One Plex server, so a rating key is one item whichever Tautulli saw it.
-    unique: dict[str, Play] = {}
+    plays = sorted(
+        (play for plays in found.answered.values() for play in plays),
+        key=lambda p: (not p.live, -p.started),
+    )
+    # A rating key names an item on one host's Plex server.
+    unique: dict[tuple[str, str], Play] = {}
     for play in plays:
-        unique.setdefault(play.rating_key, play)
-    return Plays(tuple(unique.values()), unreachable)
+        unique.setdefault((play.host, play.rating_key), play)
+    return Plays(tuple(unique.values()), found.unreachable, library)
 
 
 async def identify(services: Services, play: Play) -> MediaDetails:
-    """The title a play was of, through its Plex item's TMDB id."""
-    item = await services.plex.item(play.plex_key)
-    if item is None or item.tmdb_id is None:
-        raise LookupError(f"Plex has no TMDB id for {play.title}")
-    return await services.seerr.media_details(play.kind, item.tmdb_id)
+    """The title a play was of: its TMDB id from the Plex server that played it, in Seerr."""
+    if play.tmdb_id is None:
+        raise LookupError(f"the Plex server on {play.host} has no TMDB id for {play.title}")
+    return await services.seerr.media_details(play.kind, play.tmdb_id)
 
 
 def copy_of(details: MediaDetails, plex_key: str) -> bool | None:
