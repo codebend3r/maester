@@ -6,8 +6,10 @@ store and returns the notices to send; delivering them is the webhook's
 job. A route opts into deduplication when a repeat would reach a person
 twice: Seerr can send the same event again within minutes (a library
 rescan), while a later repeat is news (a replaced file ready again) and
-must get through. Today one type is handled: MEDIA_AVAILABLE, a DM to the
-friend whose request is ready. Types without a route are ignored.
+must get through. MEDIA_AVAILABLE DMs the friend whose request is ready;
+ISSUE_RESOLVED and ISSUE_REOPENED follow a playback report's issue into
+its report row, idempotently, and tell the reporter once when theirs is
+resolved. Types without a route are ignored.
 """
 
 from __future__ import annotations
@@ -21,6 +23,7 @@ from typing import Any
 
 from maester.clients import ClientError, Services
 from maester.clients.seerr import MediaRequest
+from maester.media import Copy, Titled, version_label
 from maester.notify import DirectMessage, Notice
 from maester.store import Store
 
@@ -88,7 +91,28 @@ class SeerrRoute:
 def seerr_routes(services: Services, store: Store) -> dict[str, SeerrRoute]:
     return {
         "MEDIA_AVAILABLE": SeerrRoute(partial(ready_to_watch, services, store), RESCAN_REPEAT),
+        # Only a change of state acts, so a repeated delivery does nothing twice.
+        "ISSUE_RESOLVED": SeerrRoute(partial(issue_status, store, True)),
+        "ISSUE_REOPENED": SeerrRoute(partial(issue_status, store, False)),
     }
+
+
+async def issue_status(
+    store: Store, resolved: bool, notification: SeerrNotification
+) -> list[Notice]:
+    """Mark the reports behind a Seerr issue resolved (or open again); tell each reporter
+    once when theirs is resolved."""
+    if notification.issue_id is None:
+        return []
+    changed = store.set_issue_resolved(notification.issue_id, resolved)
+    if not resolved:
+        return []
+    return [
+        DirectMessage(
+            r.discord_id, f"Your report about {r.title} in {r.copy.version} was resolved."
+        )
+        for r in changed
+    ]
 
 
 def _what(notification: SeerrNotification, request: MediaRequest) -> str:
@@ -109,11 +133,12 @@ async def ready_to_watch(
     user = store.active_link_by_seerr_id(request.requested_by_id)
     if user is None:  # requested in Seerr by someone not linked here
         return []
-    version = "4K" if request.is_4k else "1080p"
+    version = version_label(request.is_4k)
     link = await _plex_link(services, request)
     where = f"\nOpen it in Plex: {link}" if link else " Look for it in Plex."
     text = f"{_what(notification, request)} is ready to watch in {version}.{where}"
-    return [DirectMessage(user.discord_id, text)]
+    about = Titled(Copy(request.media_type, request.tmdb_id, request.is_4k), notification.subject)
+    return [DirectMessage(user.discord_id, text, about)]
 
 
 async def _plex_link(services: Services, request: MediaRequest) -> str | None:

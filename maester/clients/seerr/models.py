@@ -152,6 +152,10 @@ class MediaDetails:
     keyword_ids: frozenset[int] = frozenset()
     genre_ids: frozenset[int] = frozenset()
     original_language: str = ""
+    # Seerr's own id for the title, which issues are filed against; None
+    # until Seerr tracks it (requested, or found in Plex).
+    media_id: int | None = None
+    runtime_minutes: int | None = None  # a movie's, or a show's typical episode
 
     @property
     def display(self) -> str:
@@ -216,6 +220,10 @@ class MediaDetails:
             keyword_ids=frozenset(int(k["id"]) for k in raw.get("keywords") or []),
             genre_ids=frozenset(int(g["id"]) for g in raw.get("genres") or []),
             original_language=raw.get("originalLanguage") or "",
+            media_id=_int_or_none(info.get("id")),
+            runtime_minutes=_int_or_none(
+                raw.get("runtime") or next(iter(raw.get("episodeRunTime") or []), None)
+            ),
         )
 
 

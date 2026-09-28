@@ -110,16 +110,21 @@ class HistoryEvent:
     date: str
     download_id: str | None
     message: str  # why, for failures; empty otherwise
+    file_id: int | None = None  # for an import: the movie or episode file it made
+    episode_id: int | None = None  # Sonarr: which episode the event is about
 
     @classmethod
     def from_api(cls, raw: dict[str, Any]) -> HistoryEvent:
+        data = raw.get("data") or {}
         return cls(
             id=int(raw["id"]),
             event_type=raw.get("eventType") or "",
             source_title=raw.get("sourceTitle") or "",
             date=raw.get("date") or "",
             download_id=raw.get("downloadId"),
-            message=(raw.get("data") or {}).get("message") or "",
+            message=data.get("message") or "",
+            file_id=int(data["fileId"]) if data.get("fileId") else None,
+            episode_id=raw.get("episodeId"),
         )
 
 

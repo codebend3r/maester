@@ -2,22 +2,9 @@ from types import SimpleNamespace
 
 from maester.agent.tools import Tier, ToolContext, registry
 from maester.clients import FakeTautulliClient
-from maester.clients.tautulli import Session
 from maester.config import Settings
 from maester.tools.basics import server_status
-
-
-def session(**kw) -> Session:
-    base = dict(
-        session_key="1", user_id=1, user="u", rating_key="1", full_title="Dune", media_type="movie",
-        state="playing", progress_percent=10, platform="Roku", player="TV", product="Plex",
-        location="wan", relayed=False, secure=True, bandwidth_kbps=8000, stream_bitrate_kbps=8000,
-        transcode_decision="direct play", video_decision="", audio_decision="", subtitle_decision="",
-        transcode_reasons=(), container="mkv", video_codec="hevc", video_resolution="4k",
-        video_dynamic_range="SDR", audio_codec="eac3", audio_channels=6, subtitle_codec="",
-        quality_profile="Original", file="/x.mkv",
-    )  # fmt: skip
-    return Session(**{**base, **kw})
+from tests.factories import session
 
 
 class Broken:
@@ -57,7 +44,7 @@ async def test_server_status_without_tautulli(store):
     out = await server_status(
         ToolContext("u", Tier.FRIEND, SimpleNamespace(tautulli={}), store, Settings())
     )
-    assert "error" in out
+    assert out.is_error and "No Tautulli instance is configured" in out.content
 
 
 def test_tool_is_registered_for_friends():

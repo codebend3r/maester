@@ -172,6 +172,6 @@ def choice_embeds(choices: Sequence[Choice]) -> list[discord.Embed]:
     return embeds
 
 
-async def send_text(target, text: str) -> None:
-    for chunk in split_reply(text):
-        await target.send(chunk)
+async def send_text(target, text: str) -> list[discord.Message]:
+    """Send `text` in as many messages as it takes; returns them."""
+    return [await target.send(chunk) for chunk in split_reply(text)]

@@ -26,6 +26,7 @@ from maester.chat.bot import MaesterBot
 from maester.chat.identity import IdentityService, RoleMap
 from maester.chat.service import ChatService
 from maester.clients import (
+    FileProbe,
     PlexClient,
     RadarrClient,
     SabnzbdClient,
@@ -35,6 +36,7 @@ from maester.clients import (
     TautulliClient,
     WizarrClient,
 )
+from maester.clients.media import MediaPaths
 from maester.config import REQUIRED, Settings, require, settings
 from maester.registry import Registry
 from maester.seerr_events import seerr_routes
@@ -60,6 +62,9 @@ def build_services(cfg: Settings, instances: Registry) -> Services:
         radarr=per_host("radarr", RadarrClient),
         sabnzbd=per_host("sabnzbd", SabnzbdClient),
         tautulli=per_host("tautulli", TautulliClient),
+        probe=FileProbe(
+            MediaPaths(cfg.media_roots, cfg.media_path_map), timeout=cfg.probe_timeout_seconds
+        ),
     )
 
 

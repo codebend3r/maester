@@ -9,6 +9,9 @@ implements, so `agent/`, `tools/` and `web/` never import Discord.
 Delivery is best effort, one notice at a time: `deliver()` never raises,
 and returns the notices it could not send so a caller that must know (the
 webhook, which keeps a claim only for events it fully handled) can act.
+
+A DM about a title carries it as `about`, so a reaction to the message (a
+thumbs-down on "Dune is ready") can be traced back to what it was about.
 """
 
 from __future__ import annotations
@@ -16,6 +19,8 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Protocol
+
+from maester.media import Titled
 
 
 @dataclass(frozen=True)
@@ -35,6 +40,7 @@ class ApprovalPost:
 class DirectMessage:
     to: str  # a Discord user id
     text: str
+    about: Titled | None = None
 
 
 Notice = AdminPost | ApprovalPost | DirectMessage

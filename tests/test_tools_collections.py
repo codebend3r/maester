@@ -1,6 +1,6 @@
 import pytest
 
-from maester.agent.tools import Choices
+from maester.agent.tools import Choices, Result
 from maester.clients.seerr import (
     Collection,
     MediaDetails,
@@ -85,11 +85,27 @@ async def test_one_request_per_missing_entry_summed_up(ctx, seerr):
 async def test_a_collection_over_the_quota_is_explained_not_half_requested(ctx, seerr):
     seerr.quotas[4] = Quotas(Quota(5, 7, 3, 2, False), UNLIMITED_TV)
     out = await request_collection(ctx, 87359)
-    assert out["requested"] == [] and seerr.requests == []
-    assert out["reason"].startswith(
-        "The collection needs 3 movie requests, but this account has 2 of 5"
+    assert out.is_error and seerr.requests == []
+    assert out.content == (
+        "Nothing was requested: Mission: Impossible Collection needs 3 movie requests "
+        "(Mission: Impossible II, Ghost Protocol, Rogue Nation), but this account has 2 of 5 "
+        "left for the next 7 days. Ask which ones they want most."
     )
-    assert out["missing"] == ["Mission: Impossible II", "Ghost Protocol", "Rogue Nation"]
 
     seerr.quotas[4] = Quotas(Quota(5, 7, 2, 3, False), UNLIMITED_TV)
     assert len((await request_collection(ctx, 87359))["requested"]) == 3
+
+
+async def test_nothing_requested_is_a_refusal(ctx, seerr):
+    seerr.collections[87359] = Collection(87359, "MI", MI.parts[:1])  # nothing missing
+    assert (await request_collection(ctx, 87359)) == Result.refusal(
+        "Nothing was requested: every entry of MI is already on the server or requested."
+    )
+    seerr.collections[87359] = MI
+    for tmdb_id in (955, 56292, 177677):
+        seerr.refusals[tmdb_id] = RequestRefused(Refusal.BLOCKLISTED, "blocklisted")
+    out = await request_collection(ctx, 87359)
+    assert out.is_error and out.content.startswith(
+        "Seerr took none of Mission: Impossible Collection's requests. Mission: Impossible II: "
+        "That title is blocklisted on this server."
+    )

@@ -4,12 +4,13 @@ import pytest
 
 from maester.agent.loop import Agent
 from maester.agent.runner import ToolRunner
-from maester.agent.tools import Choice, Choices, Tier, ToolRegistry
+from maester.agent.tools import Approval, Choice, Choices, Result, Tier, ToolRegistry
 from maester.agent.tools import registry as app_registry
 from maester.chat.identity import IdentityService, RoleMap
 from maester.chat.service import UNLINKED_HELP, ChatService, ChatUser, Decision
 from maester.clients.seerr import MediaDetails, MediaStatus, RequestStatus, SeerrUser
 from maester.config import Settings
+from maester.media import Copy, Titled
 from maester.notify import AdminPost, ApprovalPost, DirectMessage
 from tests.factories import seerr_server
 from tests.fake_model import FakeModel, text_message, tool_message
@@ -62,6 +63,10 @@ def world(services, store):
     )
     async def replace(ctx, file_id=0):
         calls.append(("replace", file_id))
+        if file_id == 99:  # over the day's cap: the admin decides
+            approval = Approval("Trusty wants 99 gone", "replace 99", "link_account", {
+                "discord_id": "t1", "display_name": "Trusty", "account": "t@example.com"})  # fmt: skip
+            return Result("over the cap", approval=approval)
         return f"replaced file {file_id}"
 
     reg.register(app_registry.get("link_account"))
@@ -110,6 +115,26 @@ async def test_pick_sends_the_choice_back_as_a_message(world):
     )
 
 
+async def test_a_thumbs_down_on_a_ready_dm_reports_a_problem_with_that_copy(world):
+    make, *_ = world
+    svc = make(text_message("Sorry! What's wrong with it?"))
+    dune = Titled(Copy("movie", 438631, True), "Dune (2021)")
+    svc.remember_dm("m1", DirectMessage(FRIEND.id, "Dune (2021) is ready", dune))
+    svc.remember_dm("m2", DirectMessage(FRIEND.id, "no title here"))
+
+    response = await svc.react(
+        FRIEND, "m1", "\N{THUMBS DOWN SIGN}\N{EMOJI MODIFIER FITZPATRICK TYPE-4}"
+    )
+    assert response.text == "Sorry! What's wrong with it?"
+    sent = svc.agent.client.messages.calls[0]["messages"][-1]["content"]
+    assert "Dune (2021) in 4K (movie 438631)" in sent and "something's wrong" in sent
+
+    # Other reactions, other messages and other people's DMs mean nothing.
+    assert await svc.react(FRIEND, "m1", "\N{THUMBS UP SIGN}") is None
+    assert await svc.react(FRIEND, "m2", "\N{THUMBS DOWN SIGN}") is None
+    assert await svc.react(TRUSTED, "m1", "\N{THUMBS DOWN SIGN}") is None
+
+
 async def test_confirmation_round_trip(world):
     make, store, calls = world
     svc = make(tool_message([("replace_media", {"file_id": 7})]), text_message("Confirm below."))
@@ -132,6 +157,16 @@ async def test_confirmation_round_trip(world):
     assert use_block["name"] == "replace_media" and use_block["input"] == {"file_id": 7}
     assert result["role"] == "user" and result_block["tool_use_id"] == use_block["id"]
     assert result_block["content"] == "replaced file 7"
+
+
+async def test_a_confirmation_that_goes_to_the_admin_says_so_plainly(world):
+    make, store, _ = world
+    svc = make(tool_message([("replace_media", {"file_id": 99})]), text_message("Confirm below."))
+    (pending,) = (await svc.handle_message(TRUSTED, "replace it")).confirmations
+    decision = await svc.decide(pending.id, TRUSTED, approve=True)
+    assert decision.text == "That needs the admin's approval now; you'll get a DM once they decide."
+    (post,) = decision.notices
+    assert isinstance(post, ApprovalPost) and store.get_pending(post.pending_id).kind == "approve"
 
 
 async def test_confirmed_result_reaches_the_model_on_the_next_turn(world):

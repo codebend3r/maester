@@ -39,7 +39,8 @@ class FakeSeerrClient:
     routed: dict[int, Routing] = field(default_factory=dict)
     issues: list[dict[str, Any]] = field(default_factory=list)
     auto_approve: bool = False
-    # While set, approving or declining answers the way an unreachable Seerr would.
+    # While set, approving, declining and filing issues answer the way an
+    # unreachable Seerr would.
     down: bool = False
 
     async def search(self, query: str) -> list[SearchResult]:
@@ -134,14 +135,31 @@ class FakeSeerrClient:
     async def users(self) -> list[SeerrUser]:
         return list(self.user_list)
 
-    async def create_issue(self, media_id: int, issue_type: int, message: str, user_id: int) -> int:
+    async def create_issue(
+        self,
+        media_id: int,
+        issue_type: int,
+        message: str,
+        *,
+        as_user: int,
+        season: int | None = None,
+        episode: int | None = None,
+    ) -> int:
+        if self.down:
+            raise ClientError("seerr", "POST", "/api/v1/issue", None, "connection refused")
         self.issues.append(
             {
                 "id": len(self.issues) + 1,
                 "mediaId": media_id,
                 "issueType": issue_type,
                 "message": message,
-                "userId": user_id,
+                "as_user": as_user,
+                "problemSeason": season,
+                "problemEpisode": episode,
+                "comments": [],
             }
         )
         return self.issues[-1]["id"]
+
+    async def comment_issue(self, issue_id: int, message: str) -> None:
+        self.issues[issue_id - 1]["comments"].append(message)

@@ -40,6 +40,32 @@ def _url(env: Mapping[str, str], name: str) -> str:
     return env.get(name, "").strip().rstrip("/")
 
 
+def _list(env: Mapping[str, str], name: str) -> tuple[str, ...]:
+    return tuple(item.strip() for item in env.get(name, "").split(",") if item.strip())
+
+
+def media_root_problem(root: str) -> str | None:
+    """Why a path can't be a media root: it must be absolute, and not the whole filesystem."""
+    if not root.startswith("/"):
+        return f"{root!r} isn't an absolute path"
+    if root.rstrip("/") == "":
+        return "'/' would open the whole filesystem"
+    return None
+
+
+def _media_roots(env: Mapping[str, str]) -> tuple[str, ...]:
+    roots = _list(env, "MEDIA_ROOTS")
+    if problems := [p for p in map(media_root_problem, roots) if p]:
+        raise ValueError(f"MEDIA_ROOTS: {'; '.join(problems)}")
+    return roots
+
+
+def _pairs(env: Mapping[str, str], name: str) -> tuple[tuple[str, str], ...]:
+    """`from=to,from=to`; an entry without both sides is skipped."""
+    pairs = (item.split("=", 1) for item in _list(env, name) if "=" in item)
+    return tuple((a.strip(), b.strip()) for a, b in pairs if a.strip() and b.strip())
+
+
 @dataclass(frozen=True)
 class Guardrails:
     replace_daily_cap: int = 3
@@ -73,6 +99,11 @@ class Settings:
     # request, and the quality profile named here when it exists.
     dub_tag: str = "dub"
     dub_profile: str = ""
+    # The file health check reads media only under these read-only mounts. An
+    # arr path that starts with a mapped prefix is read under its mount instead.
+    media_roots: tuple[str, ...] = ()
+    media_path_map: tuple[tuple[str, str], ...] = ()
+    probe_timeout_seconds: int = 120
 
     guardrails: Guardrails = field(default_factory=Guardrails)
     db_path: str = "/data/maester.db"
@@ -111,6 +142,9 @@ def load_settings(env: Mapping[str, str]) -> Settings:
         invite_expires_days=_int(env, "INVITE_EXPIRES_DAYS", 7),
         dub_tag=env.get("DUB_TAG", "").strip() or "dub",
         dub_profile=env.get("DUB_PROFILE", "").strip(),
+        media_roots=_media_roots(env),
+        media_path_map=_pairs(env, "MEDIA_PATH_MAP"),
+        probe_timeout_seconds=_int(env, "PROBE_TIMEOUT_SECONDS", 120),
         guardrails=Guardrails(
             replace_daily_cap=_int(env, "REPLACE_DAILY_CAP", 3),
             storage_pause_4k_percent=_int(env, "STORAGE_PAUSE_4K_PERCENT", 90),

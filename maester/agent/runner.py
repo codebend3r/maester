@@ -12,7 +12,8 @@ run and audit:
   the call the requester confirmed; an approval runs the button-only admin
   tool the approval named, with `approved` set by the press. Only whoever
   decided may run it, and only as their kind allows (the requester
-  confirms, an admin approves).
+  confirms, an admin approves). Destructive runs go one at a time, the kill
+  switch checked as each one's turn comes.
 
 A result that offers choices or carries a `Result` (notices, an approval
 to ask for) is turned into what the chat layer renders. An approval is
@@ -21,9 +22,11 @@ checked against its decide tool's schema before it is stored.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import time
+from contextlib import AbstractAsyncContextManager, nullcontext
 from dataclasses import dataclass, replace
 from datetime import timedelta
 from typing import Any
@@ -41,7 +44,7 @@ from maester.agent.tools import (
     validate_input,
 )
 from maester.notify import AdminPost, ApprovalPost, Notice
-from maester.store import PendingAction
+from maester.store import NotLinked, PendingAction
 
 log = logging.getLogger("maester.agent")
 
@@ -86,6 +89,13 @@ class ToolRunner:
     def __init__(self, registry: ToolRegistry, *, kill_switch: KillSwitch | None = None):
         self.registry = registry
         self.kill_switch = kill_switch or KillSwitch()
+        # Destructive runs (only button presses make them) go one at a time, each
+        # checked against the kill switch and audited before the next starts, so a
+        # daily cap counted from the audit log can't be raced.
+        self._destructive = asyncio.Lock()
+
+    def _one_at_a_time(self, spec: ToolSpec) -> AbstractAsyncContextManager[Any]:
+        return self._destructive if spec.destructive else nullcontext()
 
     def summarize(self, spec: ToolSpec, args: dict[str, Any]) -> str:
         host = (
@@ -130,13 +140,18 @@ class ToolRunner:
             args = validate_input(spec.input_schema, args)
         except ValidationError as exc:
             return self._refuse(ctx, spec.name, args, f"stored arguments no longer fit: {exc}")
-        if spec.destructive and self.kill_switch.enabled:
-            return self._refuse(ctx, spec.name, args, self._disabled(spec.name), retryable=True)
-        outcome = await self._execute(ctx, spec, args)
-        if pending.kind == "confirm" and not any(isinstance(n, AdminPost) for n in outcome.notices):
+        async with self._one_at_a_time(spec):
+            # Checked as its turn comes: a switch flipped while it waited still stops it.
+            if spec.destructive and self.kill_switch.enabled:
+                return self._refuse(ctx, spec.name, args, self._disabled(spec.name), retryable=True)
+            outcome = await self._execute(ctx, spec, args)
+        if pending.kind == "confirm" and not any(
+            isinstance(n, AdminPost | ApprovalPost) for n in outcome.notices
+        ):
             # The admin hears about every confirmed action; a tool that posts
-            # its own account of it (a delete with path and size) says it once.
-            who = link.name if (link := ctx.store.active_link(ctx.user_id)) else ctx.user_id
+            # its own account of it (a delete with path and size, or a request
+            # for their approval) says it once.
+            who = ctx.name_of(ctx.user_id)
             done = AdminPost(f"{who} confirmed: {pending.summary}\n{outcome.text[:500]}")
             outcome = replace(outcome, notices=(*outcome.notices, done))
         return outcome
@@ -155,6 +170,8 @@ class ToolRunner:
         started = time.monotonic()
         try:
             outcome = self._outcome(ctx, spec, await spec.handler(ctx, **args))
+        except NotLinked as exc:  # no Seerr account to act as: the same refusal as any tool's
+            outcome = self._outcome(ctx, spec, Result.refusal(str(exc)))
         except Exception as exc:  # a tool failing must not take the turn down
             log.exception("tool %s failed", spec.name)
             outcome = ToolOutcome(f"{type(exc).__name__}: {exc}", is_error=True, retryable=True)
@@ -168,7 +185,12 @@ class ToolRunner:
         if not isinstance(result, Result):
             return ToolOutcome(result)
         if result.approval is None:
-            return ToolOutcome(result.content, notices=result.notices)
+            return ToolOutcome(
+                result.content,
+                is_error=result.is_error,
+                notices=result.notices,
+                retryable=result.retryable,
+            )
         try:
             pending = self._ask_admin(ctx, result.approval)
         except (LookupError, ValidationError) as exc:

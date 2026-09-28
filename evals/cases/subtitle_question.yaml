@@ -1,0 +1,24 @@
+name: a question about subtitles is answered from the file's own tracks
+tier: friend
+services:
+  seerr:
+    results:
+      - {tmdb_id: 438631, title: "Dune", year: 2021, media_type: movie, status: 5, rating_key: "4348", media_id: 12}
+  radarr:
+    meleys:
+      movies:
+        - {id: 8, tmdb_id: 438631, title: "Dune", year: 2021}
+      files:
+        - {id: 55, movie_id: 8, path: "/Meleys/Movies/Dune (2021)/Dune (2021) Bluray-1080p.mkv"}
+  probe:
+    files:
+      "/Meleys/Movies/Dune (2021)/Dune (2021) Bluray-1080p.mkv":
+        duration: 9331
+        tracks:
+          - {kind: audio, codec: eac3, language: eng, channels: 6}
+          - {kind: subtitle, codec: subrip, language: eng}
+          - {kind: subtitle, codec: subrip, language: spa, title: "Castellano"}
+turns:
+  - user: "does the 1080p Dune (2021) have Spanish subtitles?"
+    expect_tools: [list_tracks]
+    reply_matches: "Spanish|yes|Castellano"

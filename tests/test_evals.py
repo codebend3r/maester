@@ -4,7 +4,7 @@ import pytest
 
 from maester.agent.loop import Agent
 from maester.agent.runner import ToolRunner
-from maester.agent.tools import ToolRegistry
+from maester.agent.tools import ToolContext, ToolRegistry
 from maester.config import Settings
 from maester.evals import CASES_DIR, Case, load_cases, report, run_case
 from maester.evals.world import EVAL_USER, build_services, build_world
@@ -93,4 +93,29 @@ async def test_case_worlds_answer_the_tools_their_cases_expect(case_file, call):
     )
     reply = await agent.respond(EVAL_USER, case.tier, case.turns[0].user)
     assert reply.tool_calls == [{"name": call[0], "input": call[1], "ok": True}]
+    store.close()
+
+
+DUNE_1080P = {"tmdb_id": 438631, "media_type": "movie", "version": "1080p"}
+FORKS = {"tmdb_id": 136315, "media_type": "tv", "version": "1080p", "season": 2, "episode": 7}
+
+
+@pytest.mark.parametrize(
+    ("case_file", "call", "expect"),
+    [
+        ("playback_identify_recent", ("recent_sessions", {}), "movie:438631:1080p"),
+        ("playback_client_fix", ("report_problem", {**DUNE_1080P, "kind": "wont_play", "description": "stalls"}), '"decision": "advised"'),
+        ("playback_broken_file", ("report_problem", {**FORKS, "kind": "wont_play", "description": "freezes", "at": "20:00"}), '"decision": "replaceable"'),
+        ("wrong_file_report", ("report_problem", {**DUNE_1080P, "kind": "cam", "description": "a cam"}), '"decision": "recorded"'),
+        ("subtitle_question", ("list_tracks", DUNE_1080P), '"language": "spa"'),
+        ("missing_episode", ("find_gaps", {"tmdb_id": 136315, "host": "meleys"}), '"searched": ["S02E07"]'),
+    ],
+)  # fmt: skip
+async def test_playback_case_worlds_reach_what_their_cases_expect(case_file, call, expect):
+    """The tool each playback case expects, run on its world, reaches the case's decision."""
+    case = Case.load(CASES_DIR / f"{case_file}.yaml")
+    registry, services, store = build_world(case.services)
+    ctx = ToolContext(EVAL_USER, case.tier, services, store, Settings())
+    outcome = await ToolRunner(registry).run(ctx, *call)
+    assert not outcome.is_error and expect in outcome.text
     store.close()

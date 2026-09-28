@@ -109,6 +109,8 @@ async def test_seerr_movie_details(fixture):
     assert movie.collection_id == 726871 and movie.seasons == () and not movie.anime_by_tmdb
     # Seerr sent the standard copy to its server 0, where the movie's id is 8; no 4K copy.
     assert movie.arr_for(False) == ArrRef(0, 8) and movie.arr_for(True) is None
+    # Seerr's own id for it (what issues are filed against), and its runtime.
+    assert (movie.media_id, movie.runtime_minutes) == (12, 155)
 
 
 @respx.mock
@@ -116,6 +118,7 @@ async def test_seerr_tv_details_merge_tmdb_seasons_with_server_status(fixture):
     respx.get(f"{BASE}/api/v1/tv/136315").respond(json=fixture("seerr_tv"))
     show = await SeerrClient(BASE, "k").media_details("tv", 136315)
     assert show.display == "The Bear (2022)" and show.tvdb_id == 403245
+    assert (show.media_id, show.runtime_minutes) == (31, 30)
     # No specials, nothing unaired.
     assert [(s.number, s.episodes) for s in show.seasons] == [(1, 8), (2, 10), (3, 10)]
     assert [s.status for s in show.seasons] == [
@@ -151,6 +154,25 @@ async def test_seerr_request_actions_quota_and_services(fixture):
     assert options.tag("DUB").id == 7 and options.profile("dual audio").id == 11
     assert options.default_tags == (1,) and options.anime_tags == (1, 4)
     assert options.tag("nope") is None
+
+
+@respx.mock
+async def test_seerr_issues_are_filed_as_the_user_against_seerrs_media_id():
+    route = respx.post(f"{BASE}/api/v1/issue").respond(status_code=201, json={"id": 34})
+    comment = respx.post(f"{BASE}/api/v1/issue/34/comment").respond(json={"id": 34})
+    client = SeerrClient(BASE, "k")
+    issue = await client.create_issue(31, 1, "S02E07 freezes", as_user=4, season=2, episode=7)
+    assert issue == 34
+    sent = route.calls.last.request
+    assert "X-API-User" not in sent.headers  # the admin key files it, naming the friend
+    assert json.loads(sent.content) == {
+        "issueType": 1, "message": "S02E07 freezes", "mediaId": 31, "userId": 4,
+        "problemSeason": 2, "problemEpisode": 7,
+    }  # fmt: skip
+    await client.create_issue(12, 4, "wrong movie", as_user=4)
+    assert "problemSeason" not in json.loads(route.calls.last.request.content)
+    await client.comment_issue(34, "Replaced.")
+    assert json.loads(comment.calls.last.request.content) == {"message": "Replaced."}
 
 
 @respx.mock
@@ -205,11 +227,50 @@ async def test_sabnzbd_queue_carries_the_api_key_as_a_param(fixture):
 async def test_tautulli_activity_parses_the_diagnosis_fields(fixture):
     respx.get(f"{BASE}/api/v2").respond(json=fixture("tautulli_activity"))
     activity = await TautulliClient("vermithor", BASE, "k").activity()
-    (s,) = activity.sessions
+    s, episode = activity.sessions
     assert activity.transcode_count == 1
     assert s.relayed and s.location == "wan"
-    assert s.subtitle_decision == "burn" and s.transcode_reasons == ("Subtitle burn-in required",)
+    assert s.subtitle_decision == "burn" and s.quality_profile == "Original"
     assert s.video_dynamic_range == "Dolby Vision" and s.audio_channels == 8
+    assert (s.dovi_profile, s.device, s.season, s.show_key) == (7, "Roku Ultra", None, "")
+    assert (episode.show_key, episode.season, episode.episode) == ("5120", 2, 7)
+    assert episode.dovi_profile == 0
+
+
+@respx.mock
+async def test_tautulli_history_and_stream_data_of_a_finished_play(fixture):
+    route = respx.get(f"{BASE}/api/v2", params={"cmd": "get_history"}).respond(
+        json=fixture("tautulli_history")
+    )
+    respx.get(f"{BASE}/api/v2", params={"cmd": "get_stream_data"}).respond(
+        json=fixture("tautulli_stream_data")
+    )
+    client = TautulliClient("meleys", BASE, "k")
+    episode, movie = await client.history(user_id=8008135, length=5)
+    assert route.calls.last.request.url.params["user_id"] == "8008135"
+    assert (episode.row_id, episode.show_key, episode.season, episode.episode) == (
+        1124,
+        "5120",
+        2,
+        7,
+    )
+    assert (movie.rating_key, movie.show_key, movie.season, movie.product) == (
+        "4348",
+        "",
+        None,
+        "Plex for Roku",
+    )
+    stream = await client.stream_data(1124)
+    assert (stream.container, stream.video_codec, stream.video_decision) == (
+        "mkv",
+        "hevc",
+        "transcode",
+    )
+    assert (stream.audio_codec, stream.audio_decision, stream.subtitle_decision) == (
+        "eac3",
+        "direct play",
+        "",
+    )
 
 
 @respx.mock
@@ -324,6 +385,18 @@ async def test_arr_queue_reads_stall_messages_and_history_is_typed(fixture):
 
 
 @respx.mock
+async def test_an_import_in_the_history_names_the_file_it_made(fixture):
+    respx.get(f"{BASE}/api/v3/history/movie", params={"movieId": 8}).respond(
+        json=fixture("radarr_history_imported")
+    )
+    imported, grabbed = await RadarrClient("vermithor", BASE, "k").history(8)
+    assert (imported.event_type, imported.file_id, imported.download_id) == (
+        "downloadFolderImported", 55, "SABnzbd_nzo_x1",
+    )  # fmt: skip
+    assert (grabbed.event_type, grabbed.file_id, grabbed.episode_id) == ("grabbed", None, None)
+
+
+@respx.mock
 async def test_seerr_collection_parts_in_release_order(fixture):
     respx.get(f"{BASE}/api/v1/collection/87359").respond(json=fixture("seerr_collection"))
     collection = await SeerrClient(BASE, "k").collection(87359)
@@ -336,6 +409,17 @@ async def test_seerr_collection_parts_in_release_order(fixture):
         (2015, MediaStatus.UNKNOWN),
     ]
     assert all(p.media_type == "movie" for p in collection.parts)
+
+
+@respx.mock
+async def test_sonarr_episodes_know_their_file_and_when_they_aired(fixture):
+    respx.get(f"{BASE}/api/v3/episode", params={"seriesId": 12}).respond(
+        json=fixture("sonarr_episode")
+    )
+    sundae, forks, unaired = await SonarrClient("meleys", BASE, "k").episodes(12)
+    assert (sundae.file_id, sundae.has_file, sundae.aired.year) == (71, True, 2023)
+    assert (forks.file_id, forks.has_file, forks.number) == (None, False, 7)
+    assert unaired.aired is None
 
 
 @respx.mock

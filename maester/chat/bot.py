@@ -1,10 +1,12 @@
-"""The discord.py client: DMs, mentions in the requests channel, slash commands.
+"""The discord.py client: DMs, mentions in the requests channel, reactions, slash commands.
 
 Thin on purpose. Everything that decides what to say is in `service.py`.
 The bot is also the app's `Notifier`: `deliver()` posts notices in the
 admin channel or DMs them, whoever produced them (a reply, a button press,
-a webhook). Decision buttons are persistent: their custom ids carry the
-pending action, so a press after a restart still lands.
+a webhook), and hands every sent DM to the service to remember. A reaction
+in a DM goes to the service, which decides whether it means anything.
+Decision buttons are persistent: their custom ids carry the pending action,
+so a press after a restart still lands.
 """
 
 from __future__ import annotations
@@ -17,7 +19,7 @@ import discord
 from discord import app_commands
 
 from maester.chat.members import resolve_chat_user
-from maester.chat.service import ChatService
+from maester.chat.service import ChatService, reports_a_problem
 from maester.chat.views import DecisionButton, decision_view, send_response, send_text
 from maester.notify import AdminPost, ApprovalPost, DirectMessage, Notice
 
@@ -76,6 +78,17 @@ class MaesterBot(discord.Client):
             response = await self.service.handle_message(user, text)
         await send_response(message.channel, self, user, response)
 
+    async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent) -> None:
+        if payload.guild_id is not None or self.user is None or payload.user_id == self.user.id:
+            return
+        if not reports_a_problem(str(payload.emoji)):
+            return
+        author = self.get_user(payload.user_id) or await self.fetch_user(payload.user_id)
+        user = await resolve_chat_user(self, author)
+        response = await self.service.react(user, str(payload.message_id), str(payload.emoji))
+        if response is not None:
+            await send_response(await author.create_dm(), self, user, response)
+
     # -- notices ----------------------------------------------------------
 
     async def deliver(self, notices: Sequence[Notice]) -> list[Notice]:
@@ -100,7 +113,12 @@ class MaesterBot(discord.Client):
                 await self._admin_channel().send(text, view=decision_view(pending_id, "approve"))
             case DirectMessage(to, text):
                 user = self.get_user(int(to)) or await self.fetch_user(int(to))
-                await send_text(user, text)
+                sent = await send_text(user, text)
+                try:
+                    for message in sent:
+                        self.service.remember_dm(str(message.id), notice)
+                except Exception:  # it was delivered; forgetting it only costs the reaction
+                    log.exception("DM to %s sent but not remembered", to)
 
     def _admin_channel(self) -> discord.abc.Messageable:
         channel = self.get_channel(self.admin_channel_id) if self.admin_channel_id else None

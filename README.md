@@ -31,6 +31,8 @@ Seerr  Sonarr    Radarr    SABnzbd   Tautulli    Plex     Wizarr
 | "is The Bear on the server?"                   | Reports the seasons and versions present, with a link that opens Plex                                              |
 | "where's my request?"                          | Merges Seerr status, the arr queue and SABnzbd progress into one ETA                                               |
 | "this won't play"                              | Finds their session, checks the client first (codec, Dolby Vision, subtitle burn-in), probes the file, then replaces it through a confirmed, capped, audited flow |
+| "the Dune on the server is a cam"              | Records it as a Seerr issue, and swaps the copy once a second friend reports it                                    |
+| "S02E07 of The Bear is missing"                | Searches the missing episodes on the host that owns the show; tells the admin about whole missing seasons         |
 | "it's laggy"                                   | Reads the live stream from Tautulli (transcode, relay, bandwidth), server load, and gives one concrete fix         |
 | "can my brother get access?"                   | Puts an invite request in the admin queue; on approval, issues a Wizarr invite                                     |
 
@@ -74,6 +76,7 @@ maester/
 │   ├── agent/          tool-use loop, tool registry, guardrails, prompts
 │   ├── clients/        one httpx client per service, each with an in-memory fake
 │   ├── tools/          the scoped tools the model can call, grouped by area
+│   ├── playback/       playback reports: plays, player limits, file health, the replace flow
 │   ├── chat/           discord bot, views (buttons, pickers), identity
 │   ├── web/            FastAPI app: webhooks and /health
 │   ├── jobs/           scheduled work: digests, sweeps, reminders
@@ -103,7 +106,9 @@ Checks: `uv run ruff check .`, `uv run ruff format --check .`, `uv run pytest`. 
 
 **Seerr and the arrs.** maester works out which host holds a title's 1080p or 4K copy from Seerr's own records, so each Radarr and Sonarr in Seerr's settings must use the same address (host, port and base path) as its `RADARR_<HOST>_URL` or `SONARR_<HOST>_URL` here. A server Seerr reaches by another name is refused rather than guessed.
 
-**Seerr webhook.** In Seerr, Settings, Notifications, Webhook: set the URL to `http://<maester host>:8020/webhooks/seerr`, set *Authorization Header* to the value of `SEERR_WEBHOOK_SECRET`, keep the default JSON payload, and tick *Request Available*. Friends then get a DM with a Plex link when their request is ready. Other ticked types are acknowledged and ignored.
+**Seerr webhook.** In Seerr, Settings, Notifications, Webhook: set the URL to `http://<maester host>:8020/webhooks/seerr`, set *Authorization Header* to the value of `SEERR_WEBHOOK_SECRET`, keep the default JSON payload, and tick *Request Available*, *Issue Resolved* and *Issue Reopened*. Friends then get a DM with a Plex link when their request is ready (a thumbs-down on it reports a problem), and resolving a playback report's issue in Seerr closes the report. Other ticked types are acknowledged and ignored.
+
+**File health check.** The container mounts the media shares read-only (`docker-compose.yml`) and `MEDIA_ROOTS` lists them; nothing outside them is read. When Sonarr or Radarr report paths under other names than the mounts, map them with `MEDIA_PATH_MAP`.
 
 **Deploy.** `docs/nas-deployment.md` covers running it as a container on the NAS.
 

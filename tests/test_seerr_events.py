@@ -1,5 +1,6 @@
 from maester.clients import ClientError
 from maester.clients.seerr import MediaRequest, MediaStatus, RequestStatus
+from maester.media import Copy, Titled
 from maester.seerr_events import RESCAN_REPEAT, SeerrNotification, ready_to_watch, seerr_routes
 
 
@@ -26,7 +27,7 @@ async def test_the_linked_requester_gets_title_version_and_plex_link(services, s
     store.upsert_user("d1", status="active", seerr_user_id=4)
     ready(services, is_4k=True)
     (dm,) = await ready_to_watch(services, store, notification())
-    assert dm.to == "d1"
+    assert dm.to == "d1" and dm.about == Titled(Copy("movie", 438631, True), "Dune (2021)")
     assert dm.text == (
         "Dune (2021) is ready to watch in 4K.\nOpen it in Plex: "
         "https://app.plex.tv/desktop/#!/server/fake-machine/details?key=%2Flibrary%2Fmetadata%2F4348"
@@ -64,7 +65,10 @@ async def test_nobody_to_tell(services, store):
 
 def test_dispatch_table_and_event_keys(services, store):
     routes = seerr_routes(services, store)
-    assert set(routes) == {"MEDIA_AVAILABLE"} and routes["MEDIA_AVAILABLE"].dedupe == RESCAN_REPEAT
+    assert set(routes) == {"MEDIA_AVAILABLE", "ISSUE_RESOLVED", "ISSUE_REOPENED"}
+    assert routes["MEDIA_AVAILABLE"].dedupe == RESCAN_REPEAT
+    # Following an issue into its report is idempotent, so every delivery acts.
+    assert routes["ISSUE_RESOLVED"].dedupe is None and routes["ISSUE_REOPENED"].dedupe is None
     assert notification().event_key == "MEDIA_AVAILABLE:request:77"
     assert notification(request_id=None).event_key == "MEDIA_AVAILABLE:media:movie:438631"
     issue = SeerrNotification.from_webhook(

@@ -1,0 +1,24 @@
+name: a file that fails its health check is offered for replacement, behind Confirm
+tier: friend
+services:
+  user: {tautulli_user_id: 8008135}
+  seerr:
+    results:
+      - {tmdb_id: 136315, title: "The Bear", year: 2022, media_type: tv, status: 5, tvdb_id: 403245, rating_key: "5120", media_id: 31, runtime: 30}
+  sonarr:
+    meleys:
+      series:
+        - {id: 12, tvdb_id: 403245, title: "The Bear", year: 2022, seasons: [1, 2]}
+      files:
+        - {id: 72, series_id: 12, season: 2, path: "/Meleys/TV/The Bear/Season 02/The Bear - S02E07 - Forks WEBDL-1080p.mkv", release_group: NTb}
+      episodes:
+        - {id: 702, series_id: 12, season: 2, number: 7, title: "Forks", file_id: 72, aired: "2023-06-22T04:00:00+00:00"}
+  probe:
+    files:
+      "/Meleys/TV/The Bear/Season 02/The Bear - S02E07 - Forks WEBDL-1080p.mkv": {duration: 2280}
+    errors:
+      "/Meleys/TV/The Bear/Season 02/The Bear - S02E07 - Forks WEBDL-1080p.mkv": ["[h264 @ 0x55] error while decoding MB 42 17, bytestream -7"]
+turns:
+  - user: "The Bear season 2 episode 7, the regular 1080p one, freezes at 20:00 every single time"
+    expect_tools: [report_problem]
+    reply_matches: "replac|new copy|confirm"

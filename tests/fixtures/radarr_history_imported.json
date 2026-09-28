@@ -1,0 +1,47 @@
+[
+ {
+  "id": 1101,
+  "movieId": 8,
+  "sourceTitle": "Dune.2021.2160p.UHD.BluRay.REMUX-FraMeSToR",
+  "quality": {
+   "quality": {
+    "id": 31,
+    "name": "Remux-2160p"
+   }
+  },
+  "date": "2026-09-01T10:02:11Z",
+  "downloadId": "SABnzbd_nzo_x1",
+  "eventType": "downloadFolderImported",
+  "data": {
+   "fileId": "55",
+   "droppedPath": "/downloads/complete/Dune.2021.2160p/Dune.mkv",
+   "importedPath": "/Vermithor/Movies/Dune (2021)/Dune (2021) Remux-2160p.mkv",
+   "downloadClient": "SABnzbd",
+   "downloadClientName": "SABnzbd",
+   "releaseGroup": "FraMeSToR",
+   "customFormatScore": "0",
+   "size": "68500000000",
+   "indexerFlags": "0"
+  }
+ },
+ {
+  "id": 1100,
+  "movieId": 8,
+  "sourceTitle": "Dune.2021.2160p.UHD.BluRay.REMUX-FraMeSToR",
+  "quality": {
+   "quality": {
+    "id": 31,
+    "name": "Remux-2160p"
+   }
+  },
+  "date": "2026-09-01T09:00:00Z",
+  "downloadId": "SABnzbd_nzo_x1",
+  "eventType": "grabbed",
+  "data": {
+   "indexer": "NZBgeek",
+   "releaseGroup": "FraMeSToR",
+   "downloadClient": "SABnzbd",
+   "size": "68500000000"
+  }
+ }
+]

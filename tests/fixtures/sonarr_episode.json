@@ -1,0 +1,46 @@
+[
+ {
+  "seriesId": 12,
+  "tvdbId": 9559200,
+  "episodeFileId": 71,
+  "seasonNumber": 2,
+  "episodeNumber": 6,
+  "title": "Sundae",
+  "airDate": "2023-06-22",
+  "airDateUtc": "2023-06-22T04:00:00Z",
+  "runtime": 32,
+  "overview": "...",
+  "hasFile": true,
+  "monitored": true,
+  "absoluteEpisodeNumber": 14,
+  "unverifiedSceneNumbering": false,
+  "id": 701
+ },
+ {
+  "seriesId": 12,
+  "tvdbId": 9559201,
+  "episodeFileId": 0,
+  "seasonNumber": 2,
+  "episodeNumber": 7,
+  "title": "Forks",
+  "airDate": "2023-06-22",
+  "airDateUtc": "2023-06-22T04:00:00Z",
+  "runtime": 38,
+  "hasFile": false,
+  "monitored": true,
+  "unverifiedSceneNumbering": false,
+  "id": 702
+ },
+ {
+  "seriesId": 12,
+  "tvdbId": 10432777,
+  "episodeFileId": 0,
+  "seasonNumber": 5,
+  "episodeNumber": 1,
+  "title": "TBA",
+  "hasFile": false,
+  "monitored": true,
+  "unverifiedSceneNumbering": false,
+  "id": 900
+ }
+]
