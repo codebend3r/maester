@@ -11,6 +11,7 @@ from maester.tools import (  # noqa: F401
     collections,
     downloads,
     gaps,
+    invites,
     lag,
     playback,
     replace,

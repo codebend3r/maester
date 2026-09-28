@@ -1,0 +1,117 @@
+"""Invites for someone new, asked for by a trusted friend and issued through Wizarr.
+
+`request_invite` doesn't invite anyone: it puts the ask in the admin's
+approval queue, one per friend and person. The admin's Approve runs
+`decide_invite`, a button-only admin tool, which creates a Wizarr invite
+scoped to the libraries an invite shares (`maester/access.py`) on the servers
+holding them, with the link's expiry (`INVITE_EXPIRES_DAYS`, snapped up to
+one Wizarr honors) and the access it grants (`INVITE_ACCESS_DAYS`). The link
+goes to the friend who asked, to forward, with both dates. Issuing an invite
+is destructive: it runs one at a time under the kill switch.
+"""
+
+from __future__ import annotations
+
+from datetime import datetime, timedelta
+
+from maester.access import invite_libraries
+from maester.agent.tools import Approval, Result, Tier, ToolContext, tool
+from maester.clients.wizarr import honored_expiry_days
+from maester.notify import DirectMessage
+
+
+@tool(
+    "request_invite",
+    "Ask the admin for a Plex invite for someone new (a friend of the user). Nothing is sent "
+    "until the admin approves; then the user gets the invite link in a DM to forward. "
+    "for_whom is who it's for, as the user names them; note is anything the admin should "
+    "know (how they know them).",
+    {
+        "type": "object",
+        "properties": {
+            "for_whom": {"type": "string", "description": "Who the invite is for."},
+            "note": {"type": "string", "description": "Anything the admin should know."},
+        },
+        "required": ["for_whom"],
+        "additionalProperties": False,
+    },
+    tier=Tier.TRUSTED,
+)
+async def request_invite(ctx: ToolContext, for_whom: str, note: str = "") -> Result:
+    for_whom = " ".join(for_whom.split())
+    if not for_whom:
+        return Result.refusal("Say who the invite is for.")
+    who = ctx.linked_user().name
+    notice = f"{who} asks for a Plex invite for {for_whom}" + (f": {note}" if note else ".")
+    return Result(
+        {"asked": True, "for": for_whom},
+        approval=Approval(
+            notice=notice,
+            summary=f"Invite for {for_whom}, from {who}",
+            decide="decide_invite",
+            args={"for_whom": for_whom, "requester": ctx.user_id},
+            subject=f"invite:{ctx.user_id}:{for_whom.lower()}",
+        ),
+    )
+
+
+@tool(
+    "decide_invite",
+    "The admin's decision on an invite a friend asked for.",
+    {
+        "type": "object",
+        "properties": {
+            "for_whom": {"type": "string"},
+            "requester": {"type": "string", "description": "The friend's Discord id."},
+            "approved": {"type": "boolean"},
+        },
+        "required": ["for_whom", "requester", "approved"],
+        "additionalProperties": False,
+    },
+    tier=Tier.ADMIN,
+    destructive=True,
+    button_only=True,
+)
+async def decide_invite(ctx: ToolContext, for_whom: str, requester: str, approved: bool) -> Result:
+    """Create the invite and send its link to the friend who asked, or tell them no."""
+    if not approved:
+        dm = f"The admin didn't approve an invite for {for_whom}. Ask them if you think it's a mistake."
+        return Result(f"No invite for {for_whom}.", (DirectMessage(requester, dm),))
+    access = ctx.settings.access
+    wizarr = ctx.services.wizarr
+    libraries = invite_libraries(await wizarr.libraries(), access)
+    if not libraries:
+        return Result.refusal(
+            "No library an invite may share was found in Wizarr (check INVITE_LIBRARIES), so "
+            "no invite was created."
+        )
+    duration = str(access.access_days) if access.access_days else "unlimited"
+    invite = await wizarr.create_invite(
+        expires_in_days=access.invite_expires_days,
+        duration=duration,
+        library_ids=[lib.id for lib in libraries],
+        server_ids=sorted({lib.server_id for lib in libraries}),
+    )
+    days = honored_expiry_days(access.invite_expires_days)
+    until = (datetime.now(ctx.settings.jobs.zone) + timedelta(days=days)).strftime("%b %d")
+    lasts = (
+        f"their access lasts {access.access_days} days"
+        if access.access_days
+        else "their access doesn't end"
+    )
+    dm = (
+        f"The admin approved an invite for {for_whom}. Send them this link: {invite.url}\n"
+        f"It works until {until} ({days} days). Once they join with their Plex account, "
+        f"{lasts}. Then they can talk to me here after linking with `/link`."
+    )
+    shared = ", ".join(sorted({lib.name for lib in libraries}))
+    return Result(
+        {
+            "invited": for_whom,
+            "code": invite.code,
+            "link_until": until,
+            "access": duration,
+            "libraries": shared,
+        },
+        (DirectMessage(requester, dm),),
+    )

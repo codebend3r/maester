@@ -12,6 +12,7 @@ import any module.
 from __future__ import annotations
 
 import os
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import time, timedelta
@@ -120,6 +121,49 @@ class Jobs:
         return ZoneInfo(self.timezone)
 
 
+EXPIRY_REMINDER = "Heads up: your Plex access ends in {days} ({date}). {renew}"
+
+
+def _pattern(env: Mapping[str, str], name: str, default: str) -> str:
+    raw = env.get(name, "").strip() or default
+    try:
+        re.compile(raw)
+    except re.error as exc:
+        raise ValueError(f"{name}: {raw!r} isn't a regular expression ({exc})") from None
+    return raw
+
+
+def _reminder(env: Mapping[str, str]) -> str:
+    """The expiry reminder's text, checked so a typo in a placeholder fails on boot."""
+    text = env.get("EXPIRY_REMINDER", "").strip() or EXPIRY_REMINDER
+    try:
+        text.format(days="7 days", date="Oct 04", renew="")
+    except (KeyError, IndexError, ValueError) as exc:
+        raise ValueError(
+            f"EXPIRY_REMINDER: only {{days}}, {{date}} and {{renew}} can be filled in ({exc!r})"
+        ) from None
+    return text
+
+
+@dataclass(frozen=True)
+class Access:
+    """How invites and access changes are scoped, and how friends hear their access is ending."""
+
+    invite_expires_days: int = 7  # how long an invite link works
+    access_days: int = 35  # how long access lasts once joined; 0 for no end
+    # Library names an invite shares; empty for every library that isn't 4K or private.
+    libraries: tuple[str, ...] = ()
+    # Library names never shared, whatever is asked (wizteros' "9X." libraries).
+    private_pattern: str = r"^9\d\."
+    # Where a friend keeps their access going, named in the expiry reminder.
+    contribution_url: str = ""
+    # The reminder DM: {days} ("7 days", "1 day"), {date}, and {renew}.
+    reminder: str = EXPIRY_REMINDER
+
+    def is_private(self, library: str) -> bool:
+        return re.search(self.private_pattern, library) is not None
+
+
 @dataclass(frozen=True)
 class FleetMonitorAccess:
     """Where the fleet monitor is, and the bearer token for its CPU and memory routes."""
@@ -165,7 +209,9 @@ class Settings:
     plex_token: str = ""
     wizarr_url: str = ""
     wizarr_api_key: str = ""
-    invite_expires_days: int = 7
+    # plex.tv, where friends' library shares live; the account is `PLEX_TOKEN`'s.
+    plex_tv_url: str = "https://plex.tv"
+    access: Access = field(default_factory=Access)
     # A friend who wants an English dub gets this Sonarr/Radarr tag on the
     # request, and the quality profile named here when it exists.
     dub_tag: str = "dub"
@@ -217,7 +263,15 @@ def load_settings(env: Mapping[str, str]) -> Settings:
         plex_token=env.get("PLEX_TOKEN", ""),
         wizarr_url=_url(env, "WIZARR_URL"),
         wizarr_api_key=env.get("WIZARR_API_KEY", ""),
-        invite_expires_days=_int(env, "INVITE_EXPIRES_DAYS", 7),
+        plex_tv_url=_url(env, "PLEX_TV_URL") or "https://plex.tv",
+        access=Access(
+            invite_expires_days=_int(env, "INVITE_EXPIRES_DAYS", 7),
+            access_days=_int(env, "INVITE_ACCESS_DAYS", 35),
+            libraries=_list(env, "INVITE_LIBRARIES"),
+            private_pattern=_pattern(env, "PRIVATE_LIBRARIES", r"^9\d\."),
+            contribution_url=_url(env, "CONTRIBUTION_URL"),
+            reminder=_reminder(env),
+        ),
         dub_tag=env.get("DUB_TAG", "").strip() or "dub",
         dub_profile=env.get("DUB_PROFILE", "").strip(),
         media_roots=_media_roots(env),

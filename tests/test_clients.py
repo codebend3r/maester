@@ -531,3 +531,20 @@ async def test_the_fleet_view_names_each_hosts_state_temperatures_and_containers
     assert vermithor.containers_down == ("tautulli",)
     assert vermithor.containers_unhealthy == ("seerr",) and vermithor.stale is None
     assert not caraxes.collected and caraxes.status == "unknown" and caraxes.stale is None
+
+
+@respx.mock
+async def test_wizarr_libraries_and_an_invite_scoped_to_their_servers():
+    respx.get(f"{BASE}/api/libraries").respond(
+        json={"libraries": [{"id": 5, "name": "07. Anime", "server_id": 2,
+                             "server_name": "Vermithor", "enabled": True}]}
+    )  # fmt: skip
+    route = respx.post(f"{BASE}/api/invitations").respond(
+        json={"invitation": {"id": 9, "code": "X", "url": "u"}}
+    )
+    client = WizarrClient(BASE, "k")
+    (anime,) = await client.libraries()
+    assert (anime.id, anime.server_name) == (5, "Vermithor")
+    await client.create_invite(expires_in_days=7, duration="35", library_ids=[5], server_ids=[2])
+    sent = json.loads(route.calls.last.request.content)
+    assert (sent["server_ids"], sent["library_ids"]) == ([2], [5])  # no /api/servers read
