@@ -63,14 +63,12 @@ The board follows the issues. `uv run python scripts/sync_board.py` lists where 
 | Language  | Python 3.12, `uv`, `ruff`, `pytest`                                                             |
 | LLM       | Anthropic Python SDK, Messages API tool-use loop, `claude-opus-5-5` by default, prompt caching  |
 | Chat      | `discord.py` (DMs, a requests channel, buttons for confirmation and choice)                     |
-| Web       | FastAPI for Seerr and Tautulli webhooks plus `/health`                                          |
+| Web       | FastAPI for the Seerr webhook plus `/health` (a Tautulli webhook comes later)                   |
 | Storage   | SQLite on a `/data` volume: user links, conversations, audit log, reports, pending actions      |
 | Services  | Seerr, Sonarr, Radarr, SABnzbd, Tautulli, Plex, Wizarr over their REST APIs                     |
 | Hosting   | Docker Compose on a Synology NAS                                                                 |
 
 ## Structure
-
-Planned layout; it fills in as the epics land.
 
 ```
 maester/
@@ -79,19 +77,25 @@ maester/
 │   ├── clients/        one httpx client per service, each with an in-memory fake
 │   ├── tools/          the scoped tools the model can call, grouped by area
 │   ├── playback/       playback reports: plays, player limits, file health, the replace flow
+│   ├── perf/           lag: host load, the speed test, which version a connection carries
 │   ├── chat/           discord bot, views (buttons, pickers), identity
-│   ├── web/            FastAPI app: webhooks and /health
-│   ├── jobs/           scheduled work: digests, sweeps, reminders
+│   ├── web/            FastAPI app: the Seerr webhook and /health
 │   ├── store/          SQLite schema, migrations, audit log
-│   ├── guides/         device setup guides the model answers from
-│   └── config.py       environment, read once
-├── evals/              scripted conversations against the fakes
+│   ├── evals/          the eval runner and the fake world a case runs in
+│   ├── app.py          wires settings into clients, store, agent, bot and web app
+│   ├── config.py       environment, read once
+│   └── *.py            shared modules: service registry, title ownership, media, notices
+├── evals/cases/        scripted conversations against the fakes, one YAML file each
 ├── tests/
-├── scripts/            catalog.py, sync_tracker.py, sync_board.py, deploy-nas.sh
+├── scripts/            tracker catalog and sync, board setup and sync, NAS deploy, version bump
 └── docs/
 ```
 
+Still to come: `maester/jobs/` for scheduled work (digests, sweeps, reminders, E6) and `maester/guides/` for the device setup guides the model answers from (E7).
+
 ## Getting started
+
+**Prerequisites.** [uv](https://docs.astral.sh/uv/) (`brew install uv`); `uv sync` fetches Python 3.12 from `.python-version` if it is missing. You also need an Anthropic API key, a Discord bot (below), and the URLs and API keys of the services. The file health check needs `ffmpeg` on your `PATH`; the Docker image ships it, along with Ookla's `speedtest` CLI. Outside Docker, leave `SPEEDTEST_HOST` empty so the speed test is off.
 
 ```bash
 git clone https://github.com/codebend3r/maester.git
@@ -118,3 +122,5 @@ Checks: `uv run ruff check .`, `uv run ruff format --check .`, `uv run pytest`. 
 
 - [`docs/roadmap.md`](docs/roadmap.md): milestones, epics, stories, with issue links
 - [`docs/architecture.md`](docs/architecture.md): components, instance registry, permission tiers, guardrails
+- [`docs/nas-deployment.md`](docs/nas-deployment.md): first boot, updates, media mounts and data for the container on the NAS
+- [`docs/deferred.md`](docs/deferred.md): work left out of each epic's PR, why, and where it lands
