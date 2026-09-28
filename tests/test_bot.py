@@ -6,7 +6,7 @@ from maester.chat.bot import MaesterBot
 from maester.chat.service import ChatResponse
 from maester.chat.views import DecisionButton
 from maester.media import Copy, Titled
-from maester.notify import AdminPost, Announcement, ApprovalPost, DirectMessage
+from maester.notify import AdminPost, Announcement, ApprovalPost, DirectMessage, RoleChange
 
 
 class Inbox:
@@ -128,3 +128,28 @@ async def test_an_announcement_goes_to_the_requests_channel_for_everyone():
     assert requests.sent == [("Down for maintenance", {})] and admin.sent == []
     no_channel = bot_with(admin, {})
     assert await no_channel.deliver([Announcement("x")]) == [Announcement("x")]
+
+
+class Member:
+    def __init__(self, fail=False):
+        self.added, self.fail = [], fail
+
+    async def add_roles(self, role, reason=""):
+        if self.fail:
+            raise discord.Forbidden(SimpleNamespace(status=403, reason="Forbidden"), "no perms")
+        self.added.append((role.id, reason))
+
+
+async def test_a_role_change_is_made_and_one_discord_refuses_is_left_to_the_admin():
+    admin = Inbox()
+    bot = bot_with(admin, {})
+    member = Member()
+    guild = SimpleNamespace(get_member=lambda i: member if i == 5 else None)
+    bot.get_guild = lambda i: guild
+    change = RoleChange("5", 22, why="4K approved")
+    assert await bot.deliver([change]) == []
+    assert member.added == [(22, "4K approved")] and admin.sent == []
+    member.fail = True
+    assert await bot.deliver([change]) == [change]
+    ((text, _),) = admin.sent
+    assert text.startswith("Couldn't give <@5> the role <@&22>") and "by hand" in text

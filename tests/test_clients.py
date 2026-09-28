@@ -12,6 +12,7 @@ from maester.clients import (
     FakeWizarrClient,
     FleetMonitorClient,
     PlexClient,
+    PlexTvClient,
     RadarrClient,
     SabnzbdClient,
     SeerrClient,
@@ -548,3 +549,40 @@ async def test_wizarr_libraries_and_an_invite_scoped_to_their_servers():
     await client.create_invite(expires_in_days=7, duration="35", library_ids=[5], server_ids=[2])
     sent = json.loads(route.calls.last.request.content)
     assert (sent["server_ids"], sent["library_ids"]) == ([2], [5])  # no /api/servers read
+
+
+PLEX_TV = "https://plex.test"
+
+
+@respx.mock
+async def test_plex_tv_reads_servers_libraries_and_friends_shares_and_writes_one():
+    respx.get(f"{PLEX_TV}/api/servers").respond(
+        text='<MediaContainer><Server name="Meleys" machineIdentifier="m-1"/>'
+        '<Server name="Old"/></MediaContainer>'
+    )
+    respx.get(f"{PLEX_TV}/api/servers/m-1").respond(
+        text='<MediaContainer><Server name="Meleys"><Section id="101" key="1" title="01. Movies"/>'
+        '<Section id="104" key="4" title="04. Anime"/></Server></MediaContainer>'
+    )
+    respx.get(f"{PLEX_TV}/api/servers/m-1/shared_servers").respond(
+        text='<MediaContainer><SharedServer id="7" username="dany" email="dany@example.com" '
+        'allLibraries="0"><Section id="101" title="01. Movies" shared="1"/>'
+        '<Section id="104" title="04. Anime" shared="0"/></SharedServer></MediaContainer>'
+    )
+    write = respx.put(f"{PLEX_TV}/api/servers/m-1/shared_servers/7").respond(status_code=200)
+    client = PlexTvClient(PLEX_TV, "owner-token")
+    (meleys,) = await client.servers()
+    assert meleys.machine_id == "m-1"
+    assert [(s.id, s.title) for s in await client.sections("m-1")] == [
+        (101, "01. Movies"),
+        (104, "04. Anime"),
+    ]
+    (share,) = await client.shares("m-1")
+    assert share.section_ids == {101} and share.is_for("DANY@example.com", None)
+    await client.set_sections(share, [104, 101])
+    request = write.calls.last.request
+    assert request.headers["X-Plex-Token"] == "owner-token"
+    assert json.loads(request.content) == {
+        "server_id": "m-1",
+        "shared_server": {"library_section_ids": [101, 104]},
+    }

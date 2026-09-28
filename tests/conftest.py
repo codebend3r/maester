@@ -8,6 +8,7 @@ from maester.clients import (
     FakeFileProbe,
     FakeFleetMonitor,
     FakePlexClient,
+    FakePlexTv,
     FakeRadarrClient,
     FakeSabnzbdClient,
     FakeSeerrClient,
@@ -51,6 +52,7 @@ def services() -> Services:
         probe=FakeFileProbe(),
         fleet=FakeFleetMonitor(),
         speedtest=FakeSpeedTest(),
+        plextv=FakePlexTv(),
     )
 
 

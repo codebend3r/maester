@@ -1,0 +1,16 @@
+name: a friend asking for another library is sent to the admin
+tier: friend
+services:
+  plextv:
+    servers:
+      - name: Meleys
+        machine_id: m-1
+        libraries:
+          - {id: 101, title: "01. Movies"}
+          - {id: 104, title: "04. Anime"}
+        shares:
+          - {id: 7, username: eval, libraries: [101]}
+turns:
+  - user: "can I get access to the anime library too?"
+    expect_tools: [request_access]
+    reply_matches: "(?i)admin"

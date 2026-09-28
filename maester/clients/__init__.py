@@ -7,7 +7,8 @@ the same methods over in-memory data, so tools and evals run without a stack.
 `Services` is the bag of clients the app hands every tool, real or fake;
 `probe` reads the media files themselves, with ffprobe on the read-only mount.
 `speedtest` measures the internet connection from the container's own host.
-The fleet monitor and the speed test are optional: None where not set up.
+`plextv` reads and changes friends' library shares as the server owner.
+The fleet monitor, the speed test and plex.tv are optional: None where not set up.
 """
 
 from dataclasses import dataclass
@@ -16,6 +17,7 @@ from maester.clients.base import ClientError, HttpClient
 from maester.clients.fleet import FakeFleetMonitor, FleetMonitor, FleetMonitorClient
 from maester.clients.media import FakeFileProbe, FileProbe, MediaProbe
 from maester.clients.plex import FakePlexClient, Plex, PlexClient
+from maester.clients.plextv import FakePlexTv, PlexTv, PlexTvClient
 from maester.clients.radarr import FakeRadarrClient, Radarr, RadarrClient
 from maester.clients.sabnzbd import FakeSabnzbdClient, Sabnzbd, SabnzbdClient
 from maester.clients.seerr import FakeSeerrClient, Seerr, SeerrClient
@@ -39,6 +41,7 @@ class Services:
     probe: MediaProbe
     fleet: FleetMonitor | None  # CPU and memory per NAS; None when not set up
     speedtest: SpeedTester | None  # None when SPEEDTEST_HOST isn't set
+    plextv: PlexTv | None = None  # None without the owner's PLEX_TOKEN
 
 
 __all__ = [
@@ -46,6 +49,7 @@ __all__ = [
     "FakeFileProbe",
     "FakeFleetMonitor",
     "FakePlexClient",
+    "FakePlexTv",
     "FakeRadarrClient",
     "FakeSabnzbdClient",
     "FakeSeerrClient",
@@ -58,6 +62,7 @@ __all__ = [
     "HttpClient",
     "OoklaSpeedTest",
     "PlexClient",
+    "PlexTvClient",
     "RadarrClient",
     "SabnzbdClient",
     "SeerrClient",

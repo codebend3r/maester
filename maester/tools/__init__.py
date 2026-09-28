@@ -6,6 +6,7 @@ async functions with `@tool(...)` from `maester.agent.tools`.
 """
 
 from maester.tools import (  # noqa: F401
+    access,
     accounts,
     availability,
     collections,

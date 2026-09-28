@@ -34,6 +34,7 @@ from maester.clients.arr import HistoryEvent, MediaFile, QueueItem
 from maester.clients.fleet import Vitals
 from maester.clients.media import Inspection, Track
 from maester.clients.plex import PlexItem, PlexSeason, Version
+from maester.clients.plextv import FakePlexTv, OwnedServer, Section, Share
 from maester.clients.radarr import Movie
 from maester.clients.sabnzbd import Download
 from maester.clients.seerr import (
@@ -223,6 +224,34 @@ def _sabnzbd(host: str, seed: dict[str, Any]) -> FakeSabnzbdClient:
             )
             for d in seed.get("history", [])
         ],
+    )
+
+
+def _plextv(seed: dict[str, Any]) -> FakePlexTv:
+    """The owner's servers on plex.tv: each one's libraries and who it's shared with."""
+    servers = seed.get("servers", [])
+    return FakePlexTv(
+        owned=[OwnedServer(s["name"], s["machine_id"]) for s in servers],
+        libraries={
+            s["machine_id"]: [
+                Section(int(lib["id"]), lib["title"]) for lib in s.get("libraries", [])
+            ]
+            for s in servers
+        },
+        shared={
+            s["machine_id"]: [
+                Share(
+                    int(x["id"]),
+                    s["machine_id"],
+                    x.get("email", ""),
+                    x.get("username", ""),
+                    bool(x.get("all", False)),
+                    frozenset(x.get("libraries", [])),
+                )
+                for x in s.get("shares", [])
+            ]
+            for s in servers
+        },
     )
 
 
@@ -445,6 +474,7 @@ def build_services(seed: dict[str, Any], seerr_user_id: int = 4) -> Services:
         probe=_probe(seed.get("probe", {})),
         fleet=_fleet(seed["fleet"]) if "fleet" in seed else None,
         speedtest=_speedtest(seed["speedtest"]) if "speedtest" in seed else None,
+        plextv=_plextv(seed.get("plextv", {})),
     )
     # Services that answer like unreachable ones: "plex", or "radarr:vermithor" per host.
     for name in seed.get("down", []):
