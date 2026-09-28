@@ -1,15 +1,9 @@
+import sqlite3
 from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from maester.store import Store
-
-
-@pytest.fixture
-def store():
-    s = Store(":memory:")
-    yield s
-    s.close()
+from maester.store import MIGRATIONS_DIR, SeerrUserTaken, Store
 
 
 def test_migrations_apply_once(store):
@@ -53,8 +47,11 @@ def test_audit_result_is_truncated_and_non_json_is_stringified(store):
 def test_audit_count_since_counts_only_successes(store):
     store.audit(discord_id="u", tool="replace_media", args={}, result=None, ok=True)
     store.audit(discord_id="u", tool="replace_media", args={}, result=None, ok=False)
+    # Asked for an approval rather than acting: not a replacement.
+    store.audit(discord_id="u", tool="replace_media", args={}, result=None, ok=True, pending_id=3)
     since = datetime.now(UTC) - timedelta(days=1)
     assert store.audit_count_since("replace_media", since) == 1
+    assert store.audit_recent(1)[0].pending_id == 3
     assert store.audit_count_since("replace_media", datetime.now(UTC) + timedelta(minutes=1)) == 0
 
 
@@ -121,3 +118,91 @@ def test_calls_inside_a_transaction_commit_or_roll_back_together(store):
     assert store.get_user("d3") is None
     store.upsert_user("d4")  # the store is usable again after a rollback
     assert store.get_user("d4")
+
+
+def test_a_decision_records_who_and_can_be_reopened(store):
+    p = store.create_pending(
+        kind="approve",
+        action="request_media_4k",
+        requester="d1",
+        payload={},
+        summary="4K Dune",
+        ttl=timedelta(days=1),
+    )
+    assert store.decide_pending(p.id, "approved", "boss").decided_by == "boss"
+    store.reopen_pending(p.id)
+    reopened = store.get_pending(p.id)
+    assert reopened.decision is None and reopened.decided_by is None
+    assert store.open_pending("approve") == [reopened]
+
+
+def test_webhook_events_are_claimed_once_within_the_window(store):
+    day = timedelta(days=1)
+    assert store.claim_event("seerr", "MEDIA_AVAILABLE:request:77", window=day)
+    assert not store.claim_event("seerr", "MEDIA_AVAILABLE:request:77", window=day)
+    assert store.claim_event("seerr", "MEDIA_AVAILABLE:request:78", window=day)
+    store.release_event("seerr", "MEDIA_AVAILABLE:request:77")
+    assert store.claim_event("seerr", "MEDIA_AVAILABLE:request:77", window=day)
+    # Once the window has passed (here: it already has), the same event counts as new,
+    # and the stale claims are gone: request 78 is new again too.
+    assert store.claim_event("seerr", "MEDIA_AVAILABLE:request:77", window=timedelta(seconds=-1))
+    assert store.claim_event("seerr", "MEDIA_AVAILABLE:request:78", window=day)
+
+
+def test_user_by_seerr_id_finds_the_live_link(store):
+    store.upsert_user("d1", seerr_user_id=4, status="pending")
+    assert store.user_by_seerr_id(4).status == "pending"
+    store.upsert_user("d1", status="active")
+    assert store.user_by_seerr_id(4).discord_id == "d1"
+    store.upsert_user("d1", status="revoked")
+    assert store.user_by_seerr_id(4) is None and store.user_by_seerr_id(5) is None
+
+
+def test_an_active_link_is_approved_and_names_a_seerr_user(store):
+    store.upsert_user("d1", status="active")  # an override-only row: no Seerr user
+    assert store.active_link("d1") is None
+    store.upsert_user("d1", seerr_user_id=4, plex_username="dany", tautulli_user_id=9)
+    link = store.active_link("d1")
+    assert (link.discord_id, link.seerr_user_id, link.tautulli_user_id, link.name) == (
+        "d1",
+        4,
+        9,
+        "dany",
+    )
+    assert store.active_link_by_seerr_id(4) == link
+    store.upsert_user("d1", status="pending")
+    assert store.active_link("d1") is None and store.active_link_by_seerr_id(4) is None
+
+
+def test_a_seerr_user_has_one_live_link(store):
+    store.upsert_user("d1", seerr_user_id=4, status="active")
+    with pytest.raises(SeerrUserTaken):
+        store.upsert_user("d2", seerr_user_id=4, status="pending")
+    store.upsert_user("d1", status="revoked")
+    assert store.upsert_user("d2", seerr_user_id=4, status="pending").seerr_user_id == 4
+
+
+def test_the_migration_keeps_the_earliest_active_link_of_a_shared_seerr_user(tmp_path):
+    # A database from before the rule: migrations 001-003 only, then shared links.
+    path = tmp_path / "maester.db"
+    conn = sqlite3.connect(path)
+    conn.execute("CREATE TABLE schema_version (version INTEGER PRIMARY KEY)")
+    for version in (1, 2, 3):
+        (script,) = MIGRATIONS_DIR.glob(f"00{version}_*.sql")
+        conn.executescript(script.read_text())
+        conn.execute("INSERT INTO schema_version VALUES (?)", (version,))
+    conn.executemany(
+        "INSERT INTO users (discord_id, seerr_user_id, status, linked_at) VALUES (?, 4, ?, ?)",
+        [
+            ("late", "active", "2026-02-01"),
+            ("early", "active", "2026-01-01"),
+            ("waiting", "pending", None),
+        ],
+    )
+    conn.commit()
+    conn.close()
+
+    migrated = Store(path)
+    assert migrated.active_link_by_seerr_id(4).discord_id == "early"
+    assert [migrated.get_user(d).status for d in ("late", "waiting")] == ["revoked", "revoked"]
+    migrated.close()

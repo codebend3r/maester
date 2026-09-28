@@ -1,0 +1,15 @@
+name: collection request shows the entries with availability
+tier: friend
+services:
+  seerr:
+    results:
+      - {tmdb_id: 954, title: "Mission: Impossible", year: 1996, media_type: movie, status: 5, collection_id: 87359}
+      - {tmdb_id: 955, title: "Mission: Impossible II", year: 2000, media_type: movie, collection_id: 87359}
+      - {tmdb_id: 956, title: "Mission: Impossible III", year: 2006, media_type: movie, collection_id: 87359}
+    collections:
+      - {id: 87359, name: "Mission: Impossible Collection", parts: [954, 955, 956]}
+turns:
+  - user: "get all the Mission Impossible movies"
+    expect_tools: [find_collection]
+    forbid_tools: [request_media]
+    reply_matches: "missing|pick|all"

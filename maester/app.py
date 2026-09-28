@@ -37,8 +37,10 @@ from maester.clients import (
 )
 from maester.config import REQUIRED, Settings, require, settings
 from maester.registry import Registry
+from maester.seerr_events import seerr_routes
 from maester.store import Store
 from maester.web import create_app
+from maester.web.seerr import SeerrWebhook
 
 # Importing the tools package registers every tool module into app_registry.
 import maester.tools  # noqa: F401  isort: skip
@@ -97,6 +99,7 @@ def build(
             cfg.guardrails.user_messages_per_hour, cfg.guardrails.user_tokens_per_day
         ),
         effort=cfg.effort,
+        settings=cfg,
     )
     identity = IdentityService(
         store, services, RoleMap(cfg.discord_role_admin, cfg.discord_role_trusted)
@@ -108,7 +111,9 @@ def build(
         requests_channel_id=cfg.discord_requests_channel_id,
         admin_channel_id=cfg.discord_admin_channel_id,
     )
-    return App(cfg, store, services, agent, chat, bot, create_app(), kill)
+    # The bot is the notifier: webhooks hand it notices without knowing Discord.
+    seerr = SeerrWebhook(cfg.seerr_webhook_secret, seerr_routes(services, store), store, bot)
+    return App(cfg, store, services, agent, chat, bot, create_app(seerr=seerr), kill)
 
 
 async def serve(app: App) -> None:

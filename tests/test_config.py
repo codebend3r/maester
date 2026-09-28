@@ -19,8 +19,10 @@ def test_values_are_parsed_and_urls_stripped():
             "SEERR_URL": "http://seerr:5055/ ",
             "REPLACE_DAILY_CAP": "5",
             "USER_TOKENS_PER_DAY": "",
+            "DUB_PROFILE": " Dual Audio ",
         }
     )
+    assert (s.dub_tag, s.dub_profile) == ("dub", "Dual Audio")
     assert s.model == "claude-sonnet-5"
     assert s.discord_guild_id == 123
     assert s.seerr_url == "http://seerr:5055"

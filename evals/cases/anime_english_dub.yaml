@@ -1,0 +1,26 @@
+name: anime asked with an English dub reports dub coverage up front
+tier: friend
+services:
+  seerr:
+    results:
+      - tmdb_id: 209867
+        title: "Frieren: Beyond Journey's End"
+        year: 2023
+        media_type: tv
+        status: 4
+        tvdb_id: 424536
+        keywords: [210024]
+        seasons:
+          - {number: 1, episodes: 28, status: 5}
+          - {number: 2, episodes: 12}
+  sonarr:
+    meleys:
+      series:
+        - {id: 40, tvdb_id: 424536, title: "Frieren: Beyond Journey's End", year: 2023, type: anime, seasons: [1, 2]}
+      files:
+        - {series_id: 40, season: 1, audio: "jpn"}
+        - {series_id: 40, season: 1, audio: "jpn"}
+turns:
+  - user: "can I get Frieren with the English dub?"
+    expect_tools: [check_availability]
+    reply_matches: "Japanese|no English|dub"

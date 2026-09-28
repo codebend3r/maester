@@ -12,6 +12,7 @@ class ClientError(RuntimeError):
 
     def __init__(self, service: str, method: str, path: str, status: int | None, detail: str):
         self.service, self.method, self.path, self.status = service, method, path, status
+        self.detail = detail
         super().__init__(f"{service} {method} {path} failed ({status}): {detail}")
 
 

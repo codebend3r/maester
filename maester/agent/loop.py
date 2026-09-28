@@ -17,9 +17,12 @@ from typing import Any
 
 from maester.agent.limits import LimitExceeded, RateLimiter
 from maester.agent.prompts import SYSTEM_PROMPT
-from maester.agent.runner import CONFIRMED_KEY, ToolOutcome, ToolRunner
+from maester.agent.runner import ToolOutcome, ToolRunner
 from maester.agent.tools import Choice, Tier, ToolContext
-from maester.store import PendingAction
+from maester.clients import Services
+from maester.config import Settings
+from maester.notify import Notice
+from maester.store import PendingAction, Store
 
 log = logging.getLogger("maester.agent")
 
@@ -49,10 +52,25 @@ class AgentReply:
     pending_ids: list[int] = field(default_factory=list)
     # Options a tool offered the user, rendered as buttons by the chat layer.
     choices: list[Choice] = field(default_factory=list)
+    # What tools asked to post outside the reply: admin notices and approvals.
+    notices: list[Notice] = field(default_factory=list)
     input_tokens: int = 0
     output_tokens: int = 0
     cache_read_tokens: int = 0
     iterations: int = 0
+
+
+class TurnFailed(Exception):
+    """A turn broke partway through.
+
+    `reply` holds what the turn's tools had already done (pending
+    confirmations, notices for the admin), so a failure after a tool acted
+    does not lose the buttons or the notice that go with it.
+    """
+
+    def __init__(self, reply: AgentReply):
+        self.reply = reply
+        super().__init__("the turn failed partway through")
 
 
 class Agent:
@@ -62,8 +80,9 @@ class Agent:
         model_client: Any,
         model: str,
         runner: ToolRunner,
-        store: Any,
-        services: Any,
+        store: Store,
+        services: Services,
+        settings: Settings,
         limiter: RateLimiter | None = None,
         effort: str = "medium",
         system_prompt: str = SYSTEM_PROMPT,
@@ -77,31 +96,38 @@ class Agent:
         self.limiter = limiter
         self.effort = effort
         self.system_prompt = system_prompt
+        self.settings = settings
         self.now = now
 
     def forget(self, user_id: str) -> int:
         return self.store.clear_messages(user_id)
 
     def _context(self, user_id: str, tier: Tier) -> ToolContext:
-        return ToolContext(user_id=user_id, tier=tier, services=self.services, store=self.store)
+        return ToolContext(
+            user_id=user_id,
+            tier=tier,
+            services=self.services,
+            store=self.store,
+            settings=self.settings,
+        )
 
-    async def resolve_confirmation(
-        self, user_id: str, tier: Tier, pending: PendingAction, approved: bool
+    async def run_decision(
+        self, pending: PendingAction, user_id: str, tier: Tier, approved: bool
     ) -> ToolOutcome:
-        """Run (or drop) a confirmed destructive call and remember what happened.
+        """Run what a button press decided, as the presser, and remember a confirmation.
 
-        The model's own call only got a "waiting for confirmation" result, so
-        the real outcome goes in as a fresh tool_use/tool_result pair; the next
-        turn sees what happened the same way it sees any other tool.
+        A confirmed call's model only got "waiting for confirmation", so the
+        real outcome goes into the requester's conversation as a fresh
+        tool_use/tool_result pair; their next turn sees it like any tool. An
+        approval's decide tool is the admin's, and its requester hears
+        through the DM it sends, not through their conversation.
         """
-        if approved:
-            outcome = await self.runner.run(
-                self._context(user_id, tier),
-                pending.action,
-                {**pending.payload, CONFIRMED_KEY: pending.id},
-            )
-        else:
-            outcome = ToolOutcome("Cancelled by the user; nothing was done.")
+        outcome = await self.runner.run_decision(self._context(user_id, tier), pending, approved)
+        if pending.kind == "confirm":
+            self._remember(pending, outcome)
+        return outcome
+
+    def _remember(self, pending: PendingAction, outcome: ToolOutcome) -> None:
         tool_use = {
             "type": "tool_use",
             "id": f"toolu_button_{pending.id}",
@@ -109,9 +135,9 @@ class Agent:
             "input": pending.payload,
         }
         results = self._stub_results([outcome.as_result_block(tool_use["id"])])
+        user_id = pending.requester
         self.store.append_message(user_id, "assistant", [tool_use], estimate_tokens(tool_use))
         self.store.append_message(user_id, "user", results, estimate_tokens(results))
-        return outcome
 
     async def respond(
         self,
@@ -128,6 +154,25 @@ class Agent:
             except LimitExceeded as exc:
                 return AgentReply(LIMIT_REPLY.format(what=exc.what, hint=exc.retry_hint))
 
+        reply = AgentReply(text="")
+        try:
+            await self._turn(user_id, tier, text, reply, on_text)
+        except Exception as exc:
+            raise TurnFailed(reply) from exc
+        finally:
+            if self.limiter:
+                self.limiter.add_tokens(user_id, reply.input_tokens + reply.output_tokens)
+        return reply
+
+    async def _turn(
+        self,
+        user_id: str,
+        tier: Tier,
+        text: str,
+        reply: AgentReply,
+        on_text: Callable[[str], Any] | None,
+    ) -> None:
+        """Run one turn, recording into `reply` as it goes."""
         ctx = self._context(user_id, tier)
         history = self.store.recent_messages(
             user_id, max_tokens=HISTORY_TOKEN_BUDGET, since=self.now() - IDLE_RESET
@@ -137,7 +182,6 @@ class Agent:
         self.store.append_message(user_id, "user", text, estimate_tokens(text))
 
         tools = self.runner.registry.definitions(tier)
-        reply = AgentReply(text="")
         json_retries = 0
 
         for _ in range(MAX_TOOL_ITERATIONS + 1):
@@ -184,6 +228,7 @@ class Agent:
                     reply.pending_ids.append(outcome.pending_id)
                 if outcome.choices:  # the latest picker wins
                     reply.choices = list(outcome.choices)
+                reply.notices.extend(outcome.notices)
                 results.append(outcome.as_result_block(block.id))
             messages.append({"role": "user", "content": results})
             self.store.append_message(
@@ -193,10 +238,6 @@ class Agent:
             reply.text = (
                 reply.text or "I ran out of steps on that one; try asking for a smaller piece."
             )
-
-        if self.limiter:
-            self.limiter.add_tokens(user_id, reply.input_tokens + reply.output_tokens)
-        return reply
 
     async def _stream_turn(
         self,

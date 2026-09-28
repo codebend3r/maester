@@ -1,0 +1,12 @@
+name: trusted 4K request waits for the admin and explains the size trade-off
+tier: trusted
+services:
+  seerr:
+    four_k: true
+    results:
+      - {tmdb_id: 438631, title: "Dune", year: 2021, media_type: movie, status: 5}
+turns:
+  - user: "get Dune 2021 in 4K"
+    expect_tools: [request_media_4k]
+    forbid_tools: [request_media]
+    reply_matches: "admin|approv"

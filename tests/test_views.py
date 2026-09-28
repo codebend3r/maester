@@ -4,9 +4,15 @@ import discord
 
 from maester.agent.tools import Choice
 from maester.chat.members import resolve_chat_user
-from maester.chat.service import AdminNotice, ChatResponse, Decision
-from maester.chat.views import ChoiceView, DecisionView, send_response
-from maester.store import PendingAction
+from maester.chat.service import ChatResponse, Decision
+from maester.chat.views import (
+    DECIDE_ID,
+    ChoiceView,
+    DecisionButton,
+    decision_view,
+    send_response,
+)
+from maester.notify import AdminPost
 
 
 def role(i):
@@ -73,16 +79,19 @@ class FakeBot:
 
     guild_id = 0
 
-    def __init__(self, decision=None):
+    def __init__(self, decision=None, log=None):
         self.decision = decision
-        self.delivered = []
+        self.log = log if log is not None else []
+        self.pressed = []
         self.service = SimpleNamespace(decide=self._decide)
 
     async def _decide(self, pending_id, user, approve):
+        self.pressed.append((pending_id, user.id, approve))
         return self.decision
 
     async def deliver(self, notices):
-        self.delivered.extend(notices)
+        self.log.append(("deliver", list(notices)))
+        return []
 
 
 class FakeInteraction:
@@ -100,38 +109,55 @@ class FakeInteraction:
         self.edits.append(kwargs)
 
 
-def pending(kind="confirm"):
-    return PendingAction(1, kind, "replace_media", "5", {}, "replace it", None, "2099")
-
-
 async def test_a_refused_press_is_answered_privately_and_keeps_the_buttons_live():
-    view = DecisionView(pending())
+    confirm, _ = decision_view(1, "confirm").children
     bot = FakeBot(Decision("Only the person who asked can confirm this.", settled=False))
     interaction = FakeInteraction(bot, DM_AUTHOR)
-    confirm, cancel = view.children
     await confirm.callback(interaction)
+    assert bot.pressed == [(1, "5", True)]
     assert interaction.followup.sent == [
         ("Only the person who asked can confirm this.", {"ephemeral": True})
     ]
-    assert interaction.edits == [] and not confirm.disabled and not cancel.disabled
-    assert not view.is_finished() and bot.delivered == []
+    assert interaction.edits == [] and bot.log == []
 
 
-async def test_a_settled_press_disables_the_buttons_and_delivers_notices():
-    notice = AdminNotice("Pal confirmed: replace it")
-    view = DecisionView(pending())
-    bot = FakeBot(Decision("Done: replaced", admin_notices=(notice,)))
+async def test_a_settled_press_removes_the_buttons_replies_then_delivers():
+    notice = AdminPost("Pal confirmed: replace it")
+    _, cancel = decision_view(7, "approve").children
+    bot = FakeBot(Decision("Denied", notices=(notice,)))
     interaction = FakeInteraction(bot, DM_AUTHOR)
-    confirm, cancel = view.children
-    await confirm.callback(interaction)
-    assert interaction.followup.sent == [("Done: replaced", {})]
-    assert interaction.edits == [{"view": view}] and confirm.disabled and cancel.disabled
-    assert view.is_finished() and bot.delivered == [notice]
+    await cancel.callback(interaction)
+    assert bot.pressed == [(7, "5", False)]
+    assert interaction.edits == [{"view": None}]
+    assert interaction.followup.sent == [("Denied", {})]
+    assert bot.log == [("deliver", [notice])]
 
 
-async def test_decision_buttons_follow_the_pending_kind():
-    assert [b.label for b in DecisionView(pending("confirm")).children] == ["Confirm", "Cancel"]
-    assert [b.label for b in DecisionView(pending("approve")).children] == ["Approve", "Deny"]
+async def test_decision_buttons_are_persistent_and_follow_the_kind():
+    confirm = decision_view(3, "confirm")
+    assert confirm.timeout is None
+    assert [b.item.label for b in confirm.children] == ["Confirm", "Cancel"]
+    assert [b.item.label for b in decision_view(3, "approve").children] == ["Approve", "Deny"]
+    button = discord.ui.Button(label="Approve", custom_id="decide:42:approve")
+    match = DECIDE_ID.fullmatch("decide:42:approve")
+    rebuilt = await DecisionButton.from_custom_id(None, button, match)
+    assert (rebuilt.pending_id, rebuilt.approve, rebuilt.item.label) == (42, True, "Approve")
+
+
+async def test_the_reply_goes_out_before_its_notices():
+    target = FakeTarget()
+    log = []
+    bot = FakeBot(log=log)
+
+    async def send(content, **kwargs):
+        log.append(("send", content))
+
+    target.send = send
+    notice = AdminPost("heads up")
+    await send_response(
+        target, bot, SimpleNamespace(id="5"), ChatResponse(["Done."], notices=(notice,))
+    )
+    assert log == [("send", "Done."), ("deliver", [notice])]
 
 
 async def test_choices_render_numbered_buttons_and_poster_embeds():
@@ -140,7 +166,9 @@ async def test_choices_render_numbered_buttons_and_poster_embeds():
     response = ChatResponse(
         chunks=["Which one?"],
         choices=[
-            Choice("Dune", "438631", 2021, "https://image.tmdb.org/t/p/w92/dune.jpg"),
+            Choice(
+                "Dune", "438631", 2021, "https://image.tmdb.org/t/p/w92/dune.jpg", "On the server"
+            ),
             Choice("Dune", "841", 1984),
         ],
     )
@@ -154,4 +182,5 @@ async def test_choices_render_numbered_buttons_and_poster_embeds():
     embeds = kwargs["embeds"]
     assert [e.title for e in embeds] == ["1. Dune (2021)", "2. Dune (1984)"]
     assert embeds[0].thumbnail.url == "https://image.tmdb.org/t/p/w92/dune.jpg"
+    assert embeds[0].description == "On the server" and embeds[1].description is None
     assert embeds[1].thumbnail.url is None

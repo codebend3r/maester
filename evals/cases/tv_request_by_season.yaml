@@ -1,0 +1,19 @@
+name: TV request by season leaves out what is already there
+tier: friend
+services:
+  seerr:
+    results:
+      - tmdb_id: 136315
+        title: "The Bear"
+        year: 2022
+        media_type: tv
+        status: 4
+        tvdb_id: 403245
+        seasons:
+          - {number: 1, episodes: 8, status: 5}
+          - {number: 2, episodes: 10, status: 5}
+          - {number: 3, episodes: 10}
+turns:
+  - user: "can you get seasons 2 and 3 of The Bear?"
+    expect_tools: [request_media]
+    reply_matches: "season 2|already"

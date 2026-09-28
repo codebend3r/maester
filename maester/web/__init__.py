@@ -1,13 +1,14 @@
-"""The FastAPI side: webhooks from Seerr and Tautulli, and /health."""
+"""The FastAPI side: webhooks from Seerr (and Tautulli, later), and /health."""
 
 from __future__ import annotations
 
 from fastapi import FastAPI
 
 from maester import __version__
+from maester.web.seerr import SeerrWebhook
 
 
-def create_app() -> FastAPI:
+def create_app(*, seerr: SeerrWebhook) -> FastAPI:
     app = FastAPI(title="maester", version=__version__, docs_url=None, redoc_url=None)
 
     @app.get("/health")
@@ -16,4 +17,5 @@ def create_app() -> FastAPI:
         # without a session or a Discord connection.
         return {"status": "ok", "version": __version__}
 
+    app.include_router(seerr.router())
     return app

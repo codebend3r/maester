@@ -1,0 +1,11 @@
+name: vague description is searched and confirmed before requesting
+tier: friend
+services:
+  seerr:
+    results:
+      - {tmdb_id: 157336, title: "Interstellar", year: 2014, media_type: movie, overview: "A team of explorers travel through a wormhole in space."}
+turns:
+  - user: "get me the space movie where Matthew McConaughey goes through a wormhole"
+    expect_tools: [search_media]
+    forbid_tools: [request_media]
+    reply_matches: "Interstellar"

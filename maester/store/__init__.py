@@ -1,4 +1,4 @@
-"""SQLite persistence: users, conversations, the audit log, reports, pending actions.
+"""SQLite persistence: users, conversations, the audit log, reports, pending actions, webhook events.
 
 One file on `/data`, schema managed by numbered SQL migrations under
 `migrations/`. Nothing here is a source of truth for media; Seerr and the
@@ -41,6 +41,7 @@ class AuditRow:
     ok: bool
     host: str | None
     duration_ms: int | None
+    pending_id: int | None = None
 
 
 class LinkStatus(StrEnum):
@@ -60,6 +61,28 @@ class UserRow:
     tier_override: str | None
 
 
+class SeerrUserTaken(LookupError):
+    """Another Discord account already holds a live link to this Seerr user."""
+
+
+class NotLinked(LookupError):
+    """A Discord account with no active link to a Seerr user: nothing can be done as them."""
+
+
+@dataclass(frozen=True)
+class LinkedUser:
+    """An active link: who a Discord account is on Seerr (and Tautulli, when known)."""
+
+    discord_id: str
+    seerr_user_id: int
+    tautulli_user_id: int | None
+    name: str  # their Plex username, or email, as the admin knows them
+
+
+# The one rule for "linked": the admin approved it, and it names a Seerr user.
+_ACTIVE_LINK = "status = 'active' AND seerr_user_id IS NOT NULL"
+
+
 @dataclass(frozen=True)
 class PendingAction:
     id: int
@@ -70,6 +93,7 @@ class PendingAction:
     summary: str
     decision: str | None
     expires_at: str
+    decided_by: str | None = None
 
 
 class Store:
@@ -149,8 +173,12 @@ class Store:
         ok: bool,
         host: str | None = None,
         duration_ms: int | None = None,
+        pending_id: int | None = None,
     ) -> int:
-        """Record one tool call. Called by the tool runner, never by tools."""
+        """Record one tool call. Called by the tool runner, never by tools.
+
+        `pending_id` marks a call that ended waiting on an admin approval.
+        """
         result_json = json.dumps(result, default=str)
         if len(result_json) > RESULT_MAX_CHARS:
             # Keep the row readable: a cut-off JSON string would fail to parse
@@ -158,8 +186,9 @@ class Store:
             result_json = json.dumps({"truncated": True, "preview": result_json[:RESULT_MAX_CHARS]})
         with self.transaction() as conn:
             cur = conn.execute(
-                "INSERT INTO audit_log (ts, discord_id, tool, args, result, ok, host, duration_ms)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO audit_log"
+                " (ts, discord_id, tool, args, result, ok, host, duration_ms, pending_id)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     _now(),
                     discord_id,
@@ -169,6 +198,7 @@ class Store:
                     int(ok),
                     host,
                     duration_ms,
+                    pending_id,
                 ),
             )
             return int(cur.lastrowid)
@@ -193,15 +223,20 @@ class Store:
                 ok=bool(r["ok"]),
                 host=r["host"],
                 duration_ms=r["duration_ms"],
+                pending_id=r["pending_id"],
             )
             for r in rows
         ]
 
     def audit_count_since(self, tool: str, since: datetime) -> int:
-        """How many successful calls of `tool` since `since`; used by daily caps."""
+        """How many times `tool` acted since `since`; used by daily caps.
+
+        A call that only asked for an approval did not act, so it is left out.
+        """
         with self._lock:
             row = self._conn.execute(
-                "SELECT COUNT(*) FROM audit_log WHERE tool = ? AND ok = 1 AND ts >= ?",
+                "SELECT COUNT(*) FROM audit_log"
+                " WHERE tool = ? AND ok = 1 AND pending_id IS NULL AND ts >= ?",
                 (tool, since.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"),
             ).fetchone()
         return int(row[0])
@@ -221,14 +256,19 @@ class Store:
         unknown = set(fields) - allowed
         if unknown:
             raise ValueError(f"unknown user fields: {sorted(unknown)}")
-        with self.transaction() as conn:
-            conn.execute("INSERT OR IGNORE INTO users (discord_id) VALUES (?)", (discord_id,))
-            if fields:
-                assignments = ", ".join(f"{k} = ?" for k in fields)
-                conn.execute(
-                    f"UPDATE users SET {assignments} WHERE discord_id = ?",
-                    (*fields.values(), discord_id),
-                )
+        try:
+            with self.transaction() as conn:
+                conn.execute("INSERT OR IGNORE INTO users (discord_id) VALUES (?)", (discord_id,))
+                if fields:
+                    assignments = ", ".join(f"{k} = ?" for k in fields)
+                    conn.execute(
+                        f"UPDATE users SET {assignments} WHERE discord_id = ?",
+                        (*fields.values(), discord_id),
+                    )
+        except sqlite3.IntegrityError as exc:
+            if "seerr_user_id" in str(exc):
+                raise SeerrUserTaken(f"Seerr user {fields.get('seerr_user_id')} is taken") from exc
+            raise
         return self.get_user(discord_id)  # type: ignore[return-value]
 
     def get_user(self, discord_id: str) -> UserRow | None:
@@ -236,6 +276,41 @@ class Store:
             r = self._conn.execute(
                 "SELECT * FROM users WHERE discord_id = ?", (discord_id,)
             ).fetchone()
+        return self._user(r)
+
+    def active_link(self, discord_id: str) -> LinkedUser | None:
+        with self._lock:
+            r = self._conn.execute(
+                f"SELECT * FROM users WHERE discord_id = ? AND {_ACTIVE_LINK}", (discord_id,)
+            ).fetchone()
+        return self._link(r)
+
+    def active_link_by_seerr_id(self, seerr_user_id: int) -> LinkedUser | None:
+        """Whose request a Seerr user's is: the Discord account actively linked to it."""
+        with self._lock:
+            r = self._conn.execute(
+                f"SELECT * FROM users WHERE seerr_user_id = ? AND {_ACTIVE_LINK}", (seerr_user_id,)
+            ).fetchone()
+        return self._link(r)
+
+    @staticmethod
+    def _link(r: sqlite3.Row | None) -> LinkedUser | None:
+        if r is None:
+            return None
+        name = r["plex_username"] or r["plex_email"] or r["discord_id"]
+        return LinkedUser(r["discord_id"], r["seerr_user_id"], r["tautulli_user_id"], name)
+
+    def user_by_seerr_id(self, seerr_user_id: int) -> UserRow | None:
+        """Any live (pending or active) link to a Seerr user; linking allows one at a time."""
+        with self._lock:
+            r = self._conn.execute(
+                "SELECT * FROM users WHERE seerr_user_id = ? AND status != ?",
+                (seerr_user_id, LinkStatus.REVOKED),
+            ).fetchone()
+        return self._user(r)
+
+    @staticmethod
+    def _user(r: sqlite3.Row | None) -> UserRow | None:
         if r is None:
             return None
         return UserRow(
@@ -338,6 +413,7 @@ class Store:
             summary=r["summary"],
             decision=r["decision"],
             expires_at=r["expires_at"],
+            decided_by=r["decided_by"],
         )
 
     def decide_pending(
@@ -352,6 +428,15 @@ class Store:
             ).rowcount
         return self.get_pending(pending_id) if updated else None
 
+    def reopen_pending(self, pending_id: int) -> None:
+        """Undo a decision whose effect failed, so the buttons can be pressed again."""
+        with self.transaction() as conn:
+            conn.execute(
+                "UPDATE pending_actions SET decision = NULL, decided_by = NULL, decided_at = NULL"
+                " WHERE id = ?",
+                (pending_id,),
+            )
+
     def open_pending(
         self, kind: str | None = None, *, action: str | None = None, requester: str | None = None
     ) -> list[PendingAction]:
@@ -364,3 +449,31 @@ class Store:
         with self._lock:
             ids = [r["id"] for r in self._conn.execute(sql + " ORDER BY id", params).fetchall()]
         return [p for p in (self.get_pending(i) for i in ids) if p]
+
+    # -- webhook events ---------------------------------------------------
+
+    def claim_event(self, source: str, key: str, *, window: timedelta) -> bool:
+        """Record a webhook event as handled; False when it already was within `window`.
+
+        Claims older than the window are dropped first, which keeps the table
+        small and lets a later occurrence of the same event through. The
+        insert is the claim, so two concurrent deliveries cannot both act.
+        """
+        cutoff = (datetime.now(UTC) - window).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+        with self.transaction() as conn:
+            conn.execute("DELETE FROM webhook_events WHERE received_at < ?", (cutoff,))
+            return (
+                conn.execute(
+                    "INSERT OR IGNORE INTO webhook_events (source, event_key, received_at)"
+                    " VALUES (?, ?, ?)",
+                    (source, key, _now()),
+                ).rowcount
+                == 1
+            )
+
+    def release_event(self, source: str, key: str) -> None:
+        """Forget a claim whose handling failed, so a later delivery can try again."""
+        with self.transaction() as conn:
+            conn.execute(
+                "DELETE FROM webhook_events WHERE source = ? AND event_key = ?", (source, key)
+            )

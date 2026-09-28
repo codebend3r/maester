@@ -6,5 +6,5 @@ services:
       - {tmdb_id: 438631, title: "Dune", year: 2021, media_type: movie}
 turns:
   - user: "can you get Dune (2021) in 1080p?"
-    expect_tools: [search_media]
+    expect_tools: [search_media, request_media]
     reply_not_matches: "error|failed"

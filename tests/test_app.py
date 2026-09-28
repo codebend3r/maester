@@ -1,5 +1,7 @@
 from types import SimpleNamespace
 
+from fastapi.testclient import TestClient
+
 from maester.agent.tools import ToolRegistry
 from maester.app import build, build_services
 from maester.config import load_settings
@@ -16,6 +18,8 @@ def test_build_wires_everything_with_injected_pieces():
     assert app.agent.model == "claude-opus-5-5" and app.agent.effort == "medium"
     assert app.bot.guild_id == 1 and app.chat.identity.roles.admin_role_id == 9
     assert app.web.title == "maester"
+    # Mounted and gated: without the secret, Seerr's route refuses rather than 404s.
+    assert TestClient(app.web).post("/webhooks/seerr", json={}).status_code == 401
     store.close()
 
 

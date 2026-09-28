@@ -3,6 +3,7 @@ from types import SimpleNamespace
 from maester.agent.tools import Tier, ToolContext, registry
 from maester.clients import FakeTautulliClient
 from maester.clients.tautulli import Session
+from maester.config import Settings
 from maester.tools.basics import server_status
 
 
@@ -24,7 +25,7 @@ class Broken:
         raise ConnectionError("down")
 
 
-async def test_server_status_reports_each_host_and_survives_a_dead_one():
+async def test_server_status_reports_each_host_and_survives_a_dead_one(store):
     services = SimpleNamespace(
         tautulli={
             "vermithor": FakeTautulliClient(
@@ -37,7 +38,7 @@ async def test_server_status_reports_each_host_and_survives_a_dead_one():
             "meleys": Broken(),
         }
     )
-    ctx = ToolContext(user_id="u", tier=Tier.FRIEND, services=services)
+    ctx = ToolContext("u", Tier.FRIEND, services, store, Settings())
     out = await server_status(ctx)
     assert out["hosts"]["vermithor"] == {
         "reachable": True,
@@ -52,13 +53,12 @@ async def test_server_status_reports_each_host_and_survives_a_dead_one():
     )
 
 
-async def test_server_status_without_tautulli():
+async def test_server_status_without_tautulli(store):
     out = await server_status(
-        ToolContext(user_id="u", tier=Tier.FRIEND, services=SimpleNamespace(tautulli={}))
+        ToolContext("u", Tier.FRIEND, SimpleNamespace(tautulli={}), store, Settings())
     )
     assert "error" in out
 
 
 def test_tool_is_registered_for_friends():
-    assert "server_status" in registry.names()
-    assert [s.name for s in registry.for_tier(Tier.FRIEND)] == ["server_status"]
+    assert "server_status" in {s.name for s in registry.for_tier(Tier.FRIEND)}

@@ -1,8 +1,10 @@
 """Builds the fake service bag and the tool registry an eval case runs in.
 
-Tool modules register into the process-wide registry as they land (E3+);
-until then the world exposes the fakes plus whatever tools are registered.
-Seeds in the case file are plain dicts turned into the fakes' records.
+Every tool module registers into the process-wide registry, and the case's
+seed (plain dicts) is turned into the fakes' records. One `seerr.results`
+entry describes a title once: it is both what search finds and what the
+details lookup returns. The eval user is linked, so request tools act as a
+real friend would.
 """
 
 from __future__ import annotations
@@ -21,44 +23,223 @@ from maester.clients import (
     FakeWizarrClient,
     Services,
 )
-from maester.clients.seerr import SearchResult, SeerrUser
+from maester.clients.arr import MediaFile, QueueItem
+from maester.clients.plex import PlexItem, PlexSeason, Version
+from maester.clients.radarr import Movie
+from maester.clients.seerr import (
+    ArrServer,
+    Collection,
+    MediaDetails,
+    MediaRequest,
+    MediaStatus,
+    RequestStatus,
+    SearchResult,
+    Season,
+    SeerrUser,
+)
+from maester.clients.sonarr import Series
 from maester.store import Store
 
+# Importing the tools package registers every tool module into app_registry.
+import maester.tools  # noqa: F401  isort: skip
 
-def build_services(seed: dict[str, Any]) -> Services:
-    seerr = FakeSeerrClient(
-        results=[
-            SearchResult(
-                tmdb_id=int(r["tmdb_id"]),
-                media_type=r.get("media_type", "movie"),
-                title=r["title"],
-                year=r.get("year"),
-                overview=r.get("overview", ""),
-                poster_path=r.get("poster_path"),
-                status=int(r.get("status", 1)),
-                status_4k=int(r.get("status_4k", 1)),
+EVAL_USER = "eval-user"
+ARR_URLS = {"radarr": "http://{host}.lan:7878", "sonarr": "http://{host}.lan:8989"}
+
+
+def _title(r: dict[str, Any]) -> tuple[SearchResult, MediaDetails]:
+    media_type = r.get("media_type", "movie")
+    status = MediaStatus(int(r.get("status", MediaStatus.UNKNOWN)))
+    status_4k = MediaStatus(int(r.get("status_4k", MediaStatus.UNKNOWN)))
+    result = SearchResult(
+        tmdb_id=int(r["tmdb_id"]),
+        media_type=media_type,
+        title=r["title"],
+        year=r.get("year"),
+        overview=r.get("overview", ""),
+        poster_path=r.get("poster_path"),
+        status=status,
+        status_4k=status_4k,
+    )
+    details = MediaDetails(
+        tmdb_id=result.tmdb_id,
+        media_type=media_type,
+        title=result.title,
+        year=result.year,
+        overview=result.overview,
+        status=status,
+        status_4k=status_4k,
+        rating_key=r.get("rating_key"),
+        tvdb_id=r.get("tvdb_id"),
+        collection_id=r.get("collection_id"),
+        seasons=tuple(
+            Season(
+                int(s["number"]),
+                int(s["episodes"]),
+                MediaStatus(int(s.get("status", MediaStatus.UNKNOWN))),
+                MediaStatus.UNKNOWN,
             )
-            for r in seed.get("seerr", {}).get("results", [])
-        ],
+            for s in r.get("seasons", [])
+        ),
+        keyword_ids=frozenset(r.get("keywords", [])),
+        genre_ids=frozenset(r.get("genres", [])),
+        original_language=r.get("original_language", ""),
+    )
+    return result, details
+
+
+def _request(n: int, r: dict[str, Any], seerr_user_id: int) -> MediaRequest:
+    approved = r.get("status", "approved") == "approved"
+    return MediaRequest(
+        id=n,
+        status=RequestStatus.APPROVED if approved else RequestStatus.PENDING,
+        media_type=r.get("media_type", "movie"),
+        tmdb_id=int(r["tmdb_id"]),
+        is_4k=bool(r.get("is_4k", False)),
+        requested_by_id=seerr_user_id,
+        media_status=MediaStatus.PROCESSING if approved else MediaStatus.PENDING,
+    )
+
+
+def _seerr(seed: dict[str, Any], seerr_user_id: int, hosts: list[str]) -> FakeSeerrClient:
+    titles = [_title(r) for r in seed.get("results", [])]
+    # Seerr's 4K servers, when the case has them, point at the last host's arrs.
+    uhd_host = hosts[-1]
+    four_k = {
+        kind: [ArrServer(9, f"{kind} 4K", True, True, ARR_URLS[kind].format(host=uhd_host))]
+        for kind in ("radarr", "sonarr")
+    }
+    by_id = {result.tmdb_id: result for result, _ in titles}
+    return FakeSeerrClient(
+        results=[result for result, _ in titles],
+        details={(d.media_type, d.tmdb_id): d for _, d in titles},
+        collections={
+            int(c["id"]): Collection(int(c["id"]), c["name"], tuple(by_id[t] for t in c["parts"]))
+            for c in seed.get("collections", [])
+        },
         user_list=[
             SeerrUser(
                 int(u["id"]), u.get("email", ""), u.get("username", ""), u.get("plex_username", "")
             )
-            for u in seed.get("seerr", {}).get("users", [])
+            for u in seed.get("users", [])
         ],
-        auto_approve=bool(seed.get("seerr", {}).get("auto_approve", False)),
+        requests=[_request(n, r, seerr_user_id) for n, r in enumerate(seed.get("requests", []), 1)],
+        arr_servers=four_k if seed.get("four_k") else {},
+        auto_approve=bool(seed.get("auto_approve", False)),
     )
+
+
+def _radarr(host: str, seed: dict[str, Any]) -> FakeRadarrClient:
+    """A host's movies and what is downloading for them; sizes in GB."""
+    return FakeRadarrClient(
+        host=host,
+        base_url=ARR_URLS["radarr"].format(host=host),
+        movie_list=[
+            Movie(int(m["id"]), m["title"], int(m["tmdb_id"]), m.get("year"), "", True, False, None)
+            for m in seed.get("movies", [])
+        ],
+        queue_items=[
+            QueueItem(
+                id=n,
+                title=q.get("title", ""),
+                status=q.get("status", "downloading"),
+                size_bytes=int(q["size_gb"] * 1e9),
+                size_left_bytes=int(q["left_gb"] * 1e9),
+                time_left=q.get("time_left"),
+                error_messages=tuple(q.get("messages", [])),
+                download_id=q.get("download_id"),
+                media_id=int(q["movie_id"]),
+                tracked_status=q.get("tracked_status", "ok"),
+            )
+            for n, q in enumerate(seed.get("queue", []), 1)
+        ],
+    )
+
+
+def _plex(seed: dict[str, Any]) -> FakePlexClient:
+    items = {
+        str(i["rating_key"]): PlexItem(
+            rating_key=str(i["rating_key"]),
+            title=i["title"],
+            type=i.get("type", "movie"),
+            year=i.get("year"),
+            guids=(),
+            versions=tuple(
+                Version(
+                    resolution=str(v["resolution"]),
+                    video_codec=v.get("codec", "h264"),
+                    bitrate_kbps=int(v.get("bitrate_mbps", 10) * 1000),
+                    size_bytes=int(v.get("size_gb", 10) * 1e9),
+                    file=v.get("file", ""),
+                )
+                for v in i.get("versions", [])
+            ),
+        )
+        for i in seed.get("items", [])
+    }
+    seasons = {
+        str(key): [PlexSeason(int(s["number"]), int(s["episodes"])) for s in rows]
+        for key, rows in seed.get("seasons", {}).items()
+    }
+    return FakePlexClient(items=items, show_seasons=seasons)
+
+
+def _sonarr(host: str, seed: dict[str, Any]) -> FakeSonarrClient:
+    """A host's shows and their episode files; `audio` is Sonarr's "jpn/eng" form."""
+    return FakeSonarrClient(
+        host=host,
+        base_url=ARR_URLS["sonarr"].format(host=host),
+        series_list=[
+            Series(
+                id=int(x["id"]),
+                title=x["title"],
+                tvdb_id=int(x["tvdb_id"]),
+                year=x.get("year"),
+                path="",
+                monitored=True,
+                series_type=x.get("type", "standard"),
+                season_numbers=tuple(x.get("seasons", [])),
+            )
+            for x in seed.get("series", [])
+        ],
+        files=[
+            MediaFile(
+                id=n,
+                path="",
+                size_bytes=int(f.get("size_gb", 1) * 1e9),
+                quality=f.get("quality", "WEBDL-1080p"),
+                release_group=None,
+                media_id=int(f["series_id"]),
+                season=int(f["season"]),
+                audio_languages=tuple(f["audio"].split("/")) if "audio" in f else None,
+            )
+            for n, f in enumerate(seed.get("files", []), 1)
+        ],
+    )
+
+
+def build_services(seed: dict[str, Any], seerr_user_id: int = 4) -> Services:
     hosts = seed.get("hosts", ["meleys", "vermithor"])
+    radarr, sonarr = seed.get("radarr", {}), seed.get("sonarr", {})
     return Services(
-        seerr=seerr,
-        plex=FakePlexClient(),
+        seerr=_seerr(seed.get("seerr", {}), seerr_user_id, hosts),
+        plex=_plex(seed.get("plex", {})),
         wizarr=FakeWizarrClient(),
-        sonarr={h: FakeSonarrClient(host=h) for h in hosts},
-        radarr={h: FakeRadarrClient(host=h) for h in hosts},
+        sonarr={h: _sonarr(h, sonarr.get(h, {})) for h in hosts},
+        radarr={h: _radarr(h, radarr.get(h, {})) for h in hosts},
         sabnzbd={h: FakeSabnzbdClient(host=h) for h in hosts},
         tautulli={h: FakeTautulliClient(host=h) for h in hosts},
     )
 
 
 def build_world(seed: dict[str, Any]) -> tuple[ToolRegistry, Services, Store]:
-    return app_registry, build_services(seed), Store(":memory:")
+    store = Store(":memory:")
+    user = seed.get("user", {})
+    seerr_user_id = int(user.get("seerr_user_id", 4))
+    store.upsert_user(
+        EVAL_USER,
+        status="active",
+        seerr_user_id=seerr_user_id,
+        plex_username=user.get("plex_username", "eval"),
+    )
+    return app_registry, build_services(seed, seerr_user_id), store

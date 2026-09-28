@@ -7,32 +7,19 @@ from maester.chat.identity import IdentityService, RoleMap, resolve_tier
 from maester.clients import FakeSeerrClient, FakeTautulliClient
 from maester.clients.seerr import SeerrUser
 from maester.clients.tautulli import TautulliUser
-from maester.store import Store, UserRow
+from maester.store import Store
 
 ROLES = RoleMap(admin_role_id=1, trusted_role_id=2)
 
 
-def row(**kw) -> UserRow:
-    base = dict(
-        discord_id="d",
-        plex_email=None,
-        plex_username=None,
-        seerr_user_id=None,
-        tautulli_user_id=None,
-        status="active",
-        tier_override=None,
-    )
-    return UserRow(**{**base, **kw})
-
-
 def test_resolve_tier_rules():
-    assert resolve_tier(None, set(), ROLES) == Tier.UNLINKED
-    assert resolve_tier(None, {1}, ROLES) == Tier.ADMIN
-    assert resolve_tier(row(status="pending"), {2}, ROLES) == Tier.UNLINKED
-    assert resolve_tier(row(), set(), ROLES) == Tier.FRIEND
-    assert resolve_tier(row(), {2}, ROLES) == Tier.TRUSTED
-    assert resolve_tier(row(tier_override="admin"), set(), ROLES) == Tier.ADMIN
-    assert resolve_tier(row(tier_override="friend"), {1}, ROLES) == Tier.FRIEND
+    assert resolve_tier(None, False, set(), ROLES) == Tier.UNLINKED
+    assert resolve_tier(None, False, {1}, ROLES) == Tier.ADMIN
+    assert resolve_tier(None, False, {2}, ROLES) == Tier.UNLINKED
+    assert resolve_tier(None, True, set(), ROLES) == Tier.FRIEND
+    assert resolve_tier(None, True, {2}, ROLES) == Tier.TRUSTED
+    assert resolve_tier("admin", False, set(), ROLES) == Tier.ADMIN
+    assert resolve_tier("friend", True, {1}, ROLES) == Tier.FRIEND
 
 
 @pytest.fixture
@@ -85,26 +72,36 @@ async def test_link_unknown_account_and_empty_query(identity):
     assert "Tell me" in (await svc.start_link("d1", "x", "   ")).message
 
 
-async def test_finish_link_activates_or_revokes(identity):
-    svc, store = identity
-    pending = (await svc.start_link("d1", "Dany", "dany@example.com")).pending
-    assert svc.finish_link(pending, approved=True).startswith("Linked")
-    assert store.get_user("d1").status == "active"
-    assert svc.tier_for("d1", {2}) == Tier.TRUSTED
-    assert "already linked" in (await svc.start_link("d1", "Dany", "dany@example.com")).message
-
-    pending2 = (await svc.start_link("d2", "Jon", "jon")).pending
-    assert svc.finish_link(pending2, approved=False).startswith("Denied")
-    assert store.get_user("d2").status == "revoked"
-    assert "not linked" in svc.whoami("d2", set())
-
-
 def test_tier_override(identity):
     svc, store = identity
-    store.upsert_user("d1", status="active")
+    store.upsert_user("d1", status="active", seerr_user_id=4)
     assert svc.set_tier_override("d1", "TRUSTED").endswith("trusted.")
     assert svc.tier_for("d1", set()) == Tier.TRUSTED
     svc.set_tier_override("d1", None)
     assert svc.tier_for("d1", set()) == Tier.FRIEND
     with pytest.raises(ValueError):
         svc.set_tier_override("d1", "king")
+
+
+async def test_a_plex_account_links_to_one_discord_account(identity):
+    svc, store = identity
+    assert (await svc.start_link("d1", "Dany", "dany@example.com")).ok
+    taken = await svc.start_link("d9", "Imposter", "dany_t")
+    assert not taken.ok and "already linked to another Discord account" in taken.message
+    assert store.get_user("d9") is None
+    store.upsert_user("d1", status="revoked")
+    assert (await svc.start_link("d9", "Dany again", "dany_t")).ok
+
+
+async def test_a_link_racing_another_for_the_same_account_loses_kindly(identity):
+    svc, store = identity
+
+    async def meanwhile(email, username):
+        # Another /link for the same Plex account lands while Tautulli is asked.
+        store.upsert_user("d9", seerr_user_id=4, status="pending")
+        return None
+
+    svc._tautulli_id = meanwhile
+    result = await svc.start_link("d1", "Dany", "dany@example.com")
+    assert not result.ok and "already linked to another Discord account" in result.message
+    assert store.open_pending() == []

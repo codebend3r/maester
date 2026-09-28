@@ -1,0 +1,18 @@
+name: request status merges Seerr, the queue and SABnzbd into one answer
+tier: friend
+services:
+  seerr:
+    results:
+      - {tmdb_id: 438631, title: "Dune", year: 2021, media_type: movie, status: 3}
+    requests:
+      - {tmdb_id: 438631, media_type: movie, status: approved}
+  radarr:
+    meleys:
+      movies:
+        - {id: 8, tmdb_id: 438631, title: "Dune", year: 2021}
+      queue:
+        - {movie_id: 8, title: "Dune.2021.1080p.BluRay", size_gb: 12.0, left_gb: 3.0, time_left: "00:12:00", download_id: "nzo_dune"}
+turns:
+  - user: "where's my request?"
+    expect_tools: [request_status]
+    reply_matches: "75|12 min|Dune"
