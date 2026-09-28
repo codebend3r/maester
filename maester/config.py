@@ -121,7 +121,7 @@ class Jobs:
         return ZoneInfo(self.timezone)
 
 
-EXPIRY_REMINDER = "Heads up: your Plex access ends in {days} ({date}). {renew}"
+EXPIRY_REMINDER = "Heads up: your Plex access ends {when} ({date}). {renew}"
 
 
 def _pattern(env: Mapping[str, str], name: str, default: str) -> str:
@@ -137,10 +137,10 @@ def _reminder(env: Mapping[str, str]) -> str:
     """The expiry reminder's text, checked so a typo in a placeholder fails on boot."""
     text = env.get("EXPIRY_REMINDER", "").strip() or EXPIRY_REMINDER
     try:
-        text.format(days="7 days", date="Oct 04", renew="")
+        text.format(when="in 7 days", date="Sat Oct 04", renew="")
     except (KeyError, IndexError, ValueError) as exc:
         raise ValueError(
-            f"EXPIRY_REMINDER: only {{days}}, {{date}} and {{renew}} can be filled in ({exc!r})"
+            f"EXPIRY_REMINDER: only {{when}}, {{date}} and {{renew}} can be filled in ({exc!r})"
         ) from None
     return text
 
@@ -157,7 +157,7 @@ class Access:
     private_pattern: str = r"^9\d\."
     # Where a friend keeps their access going, named in the expiry reminder.
     contribution_url: str = ""
-    # The reminder DM: {days} ("7 days", "1 day"), {date}, and {renew}.
+    # The reminder DM: {when} ("in 7 days", "tomorrow", "today"), {date}, and {renew}.
     reminder: str = EXPIRY_REMINDER
 
     def is_private(self, library: str) -> bool:

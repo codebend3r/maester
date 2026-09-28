@@ -107,6 +107,12 @@ class Users(Database):
         name = r["plex_username"] or r["plex_email"] or r["discord_id"]
         return LinkedUser(r["discord_id"], r["seerr_user_id"], r["tautulli_user_id"], name)
 
+    def active_users(self) -> list[UserRow]:
+        """Every Discord account with an active link."""
+        with self._lock:
+            rows = self._conn.execute(f"SELECT * FROM users WHERE {_ACTIVE_LINK}").fetchall()
+        return [u for u in map(self._user, rows) if u is not None]
+
     def user_by_seerr_id(self, seerr_user_id: int) -> UserRow | None:
         """Any live (pending or active) link to a Seerr user; linking allows one at a time."""
         with self._lock:
