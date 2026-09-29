@@ -4,7 +4,14 @@ from dataclasses import dataclass, field, replace
 from datetime import datetime
 from typing import Any, ClassVar, Protocol
 
-from maester.clients.arr import ArrClient, DiskSpace, HistoryEvent, MediaFile, QueueItem
+from maester.clients.arr import (
+    ArrClient,
+    DiskSpace,
+    HistoryEvent,
+    MediaFile,
+    QueueItem,
+    RootFolder,
+)
 from maester.clients.base import Downable
 
 
@@ -66,7 +73,7 @@ class Sonarr(Protocol):
     base_url: str
 
     async def ping(self) -> None: ...
-    async def root_folders(self) -> list[str]: ...
+    async def root_folders(self) -> list[RootFolder]: ...
     async def disk_space(self) -> list[DiskSpace]: ...
     async def queue(self) -> list[QueueItem]: ...
     async def history(self, media_id: int) -> list[HistoryEvent]: ...
@@ -78,12 +85,14 @@ class Sonarr(Protocol):
     async def delete_episode_file(self, file_id: int) -> None: ...
     async def episode_search(self, episode_ids: list[int]) -> int: ...
     async def mark_failed(self, history_id: int) -> None: ...
+    async def remove_from_queue(self, queue_id: int, *, blocklist: bool = True) -> None: ...
     async def follow(self, series_id: int) -> None: ...
 
 
 class SonarrClient(ArrClient):
     service = "sonarr"
     history_scope = ("series", "seriesId")
+    queue_includes = ("includeUnknownSeriesItems", "includeSeries", "includeEpisode")
 
     async def series(self) -> list[Series]:
         return [Series.from_api(s) for s in await self.get_json(f"{self.api}/series")]
@@ -128,7 +137,10 @@ class FakeSonarrClient(Downable):
 
     host: str = "fake"
     base_url: str = ""
-    roots: list[str] = field(default_factory=lambda: ["/TV"])
+    # A fake arr has room unless a test says otherwise: 8 of 16 TB free.
+    roots: list[RootFolder] = field(
+        default_factory=lambda: [RootFolder("/TV", 8_000_000_000_000, 16_000_000_000_000)]
+    )
     disks: list[DiskSpace] = field(default_factory=list)
     queue_items: list[QueueItem] = field(default_factory=list)
     # Download history per movie or series id, newest first.
@@ -137,18 +149,29 @@ class FakeSonarrClient(Downable):
     episode_list: list[Episode] = field(default_factory=list)
     files: list[MediaFile] = field(default_factory=list)
     failed: list[int] = field(default_factory=list)
+    removed: list[int] = field(default_factory=list)  # queue ids, blocklisted
     searched: list[list[int]] = field(default_factory=list)
     deleted: list[int] = field(default_factory=list)
     followed: list[int] = field(default_factory=list)
 
-    async def root_folders(self) -> list[str]:
+    async def root_folders(self) -> list[RootFolder]:
+        self.refuse_if_down("/api/v3/rootfolder")
         return list(self.roots)
 
     async def disk_space(self) -> list[DiskSpace]:
+        self.refuse_if_down("/api/v3/diskspace")
         return list(self.disks)
 
     async def queue(self) -> list[QueueItem]:
+        self.refuse_if_down("/api/v3/queue")
         return list(self.queue_items)
+
+    async def remove_from_queue(self, queue_id: int, *, blocklist: bool = True) -> None:
+        self.refuse_if_down(f"/api/v3/queue/{queue_id}")
+        gone = next(q for q in self.queue_items if q.id == queue_id)
+        self.removed.append(queue_id)
+        # A download goes with every record of it (a season pack is one per episode).
+        self.queue_items = [q for q in self.queue_items if q.download_id != gone.download_id]
 
     async def history(self, media_id: int) -> list[HistoryEvent]:
         return list(self.events.get(media_id, []))

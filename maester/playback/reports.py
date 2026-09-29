@@ -48,6 +48,7 @@ from maester.playback.diagnosis import (
 )
 from maester.playback.health import Health
 from maester.playback.items import LocatedFile
+from maester.releases import release_group
 from maester.store import LinkedUser, ReportRow, Store
 
 # How many people reporting one file prove it needs a new copy.
@@ -369,7 +370,7 @@ async def file_report(
         host=host,
         file_id=file.id,
         file_path=file.path,
-        release_group=file.release_group,
+        release_group=release_group(file.release_group, file.path),
         health=diagnosis.health.verdict if diagnosis.health else None,
         diagnosis=diagnosis.as_dict(),
         description=description,

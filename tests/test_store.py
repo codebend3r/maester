@@ -248,3 +248,72 @@ def test_the_claims_migration_keeps_webhook_claims(tmp_path):
     migrated = Store(path)
     assert not migrated.claim("seerr", "MEDIA_AVAILABLE:request:9", window=timedelta(minutes=15))
     migrated.close()
+
+
+def test_a_flag_is_up_until_lowered_and_raising_it_again_replaces_its_message(store):
+    assert store.flag("maintenance") is None
+    first = store.raise_flag("maintenance", "swapping a drive", "a1")
+    store.raise_flag("maintenance", "swapping two drives", "a1")
+    flag = store.flag("maintenance")
+    assert (flag.message, flag.set_by) == ("swapping two drives", "a1")
+    assert flag.set_at == first.set_at  # still up since the first time
+    assert store.lower_flag("maintenance") == flag
+    assert store.flag("maintenance") is None and store.lower_flag("maintenance") is None
+
+
+def raise_about(store, subject, **kw):
+    fields = dict(kind="approve", action="decide_request", requester="d1", payload={"n": 1})
+    return store.create_pending_once(
+        subject=subject, summary="4K Dune", ttl=timedelta(days=7), **{**fields, **kw}
+    )
+
+
+def test_one_open_approval_per_subject_and_the_second_raiser_gets_it_back(store):
+    first, new = raise_about(store, "seerr-request:7")
+    again, fresh = raise_about(store, "seerr-request:7", requester="webhook")
+    assert new and not fresh and again.id == first.id and again.requester == "d1"
+    assert store.pending_about("seerr-request:7") == first
+    other, new_other = raise_about(store, "seerr-request:8")
+    assert new_other and other.id != first.id
+    store.decide_pending(first.id, "approved", "a1")
+    assert store.pending_about("seerr-request:7") is None
+    later, new_later = raise_about(store, "seerr-request:7")
+    assert new_later and later.id != first.id
+    # The first press failed meanwhile: it can't reopen over the newer approval.
+    assert not store.reopen_pending(first.id)
+    assert store.get_pending(first.id).decision == "approved"
+
+
+def test_an_expired_approval_frees_its_subject(store):
+    stale, _ = raise_about(store, "seerr-request:9")
+    store._conn.execute(
+        "UPDATE pending_actions SET expires_at = ? WHERE id = ?",
+        (stamp(datetime.now(UTC) - timedelta(seconds=1)), stale.id),
+    )
+    fresh, new = raise_about(store, "seerr-request:9")
+    assert new and fresh.id != stale.id
+    assert store.get_pending(stale.id).decision == "expired"
+
+
+def test_open_approvals_of_the_renamed_4k_decision_carry_over(tmp_path):
+    path = tmp_path / "m.db"
+    conn = sqlite3.connect(path)
+    conn.execute("CREATE TABLE schema_version (version INTEGER PRIMARY KEY)")
+    for sql in sorted(MIGRATIONS_DIR.glob("*.sql"))[:8]:  # the schema before 009
+        conn.executescript(sql.read_text())
+        conn.execute("INSERT INTO schema_version VALUES (?)", (int(sql.name.split("_")[0]),))
+    payload = '{"request_id": 7, "title": "Dune (2021)", "requester": "d1"}'
+    conn.execute(
+        "INSERT INTO pending_actions (kind, action, requester, payload, summary, expires_at)"
+        " VALUES ('approve', 'decide_4k_request', 'd1', ?, '4K Dune', '2999-01-01T00:00:00Z')",
+        (payload,),
+    )
+    conn.commit()
+    conn.close()
+    store = Store(path)
+    (carried,) = store.open_pending("approve")
+    assert carried.action == "decide_request" and carried.subject == "seerr-request:7"
+    assert carried.payload == {
+        "request_id": 7, "title": "Dune (2021)", "requester": "d1", "version": "4K"
+    }  # fmt: skip
+    store.close()

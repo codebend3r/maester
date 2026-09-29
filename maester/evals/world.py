@@ -30,11 +30,12 @@ from maester.clients import (
     FakeWizarrClient,
     Services,
 )
-from maester.clients.arr import MediaFile, QueueItem
+from maester.clients.arr import HistoryEvent, MediaFile, QueueItem
 from maester.clients.fleet import Vitals
 from maester.clients.media import Inspection, Track
 from maester.clients.plex import PlexItem, PlexSeason, Version
 from maester.clients.radarr import Movie
+from maester.clients.sabnzbd import Download
 from maester.clients.seerr import (
     ArrServer,
     Collection,
@@ -159,9 +160,27 @@ def _file(f: dict[str, Any], media_id: int) -> MediaFile:
     )
 
 
+def _event(n: int, e: dict[str, Any]) -> HistoryEvent:
+    """One entry of a title's download history, newest first as seeded."""
+    return HistoryEvent(
+        id=n,
+        event_type=e.get("event", "grabbed"),
+        source_title=e.get("release", ""),
+        date=e.get("when", ""),
+        download_id=e.get("download_id"),
+        message=e.get("why", ""),
+        indexer=e.get("indexer", ""),
+    )
+
+
 def _radarr(host: str, seed: dict[str, Any]) -> FakeRadarrClient:
-    """A host's movies, their files and what is downloading for them; sizes in GB."""
+    """A host's movies, their files, what is downloading and what happened to past
+    downloads (`history`, per movie id); sizes in GB."""
+    events: dict[int, list[HistoryEvent]] = {}
+    for n, e in enumerate(seed.get("history", []), 1):
+        events.setdefault(int(e["movie_id"]), []).append(_event(n, e))
     return FakeRadarrClient(
+        events=events,
         host=host,
         base_url=ARR_URLS["radarr"].format(host=host),
         files=[_file(f, int(f["movie_id"])) for f in seed.get("files", [])],
@@ -183,6 +202,26 @@ def _radarr(host: str, seed: dict[str, Any]) -> FakeRadarrClient:
                 tracked_status=q.get("tracked_status", "ok"),
             )
             for n, q in enumerate(seed.get("queue", []), 1)
+        ],
+    )
+
+
+def _sabnzbd(host: str, seed: dict[str, Any]) -> FakeSabnzbdClient:
+    """What a host's SABnzbd finished (`history`: its failure and the steps that went wrong)."""
+    return FakeSabnzbdClient(
+        host=host,
+        history_items=[
+            Download(
+                nzo_id=d["nzo_id"],
+                name=d.get("name", ""),
+                status=d.get("status", "Failed"),
+                percent=0.0,
+                size_mb=0.0,
+                time_left=None,
+                fail_message=d.get("why"),
+                trouble=tuple(d.get("steps", [])),
+            )
+            for d in seed.get("history", [])
         ],
     )
 
@@ -399,7 +438,7 @@ def build_services(seed: dict[str, Any], seerr_user_id: int = 4) -> Services:
         wizarr=FakeWizarrClient(),
         sonarr={h: _sonarr(h, sonarr.get(h, {})) for h in hosts},
         radarr={h: _radarr(h, radarr.get(h, {})) for h in hosts},
-        sabnzbd={h: FakeSabnzbdClient(host=h) for h in hosts},
+        sabnzbd={h: _sabnzbd(h, seed.get("sabnzbd", {}).get(h, {})) for h in hosts},
         tautulli={
             h: _tautulli(h, tautulli.get(h, {}), tautulli_user or 0, hosts[0]) for h in hosts
         },

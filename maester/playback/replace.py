@@ -40,8 +40,8 @@ from maester.store import ReportRow, Store
 log = logging.getLogger("maester.playback")
 
 RETRY = (
-    "A new copy usually lands within a few hours when a release is out there. Try again "
-    "later today, and tell me if it's still broken tomorrow."
+    "A new copy usually lands within a few hours when a release is out there; I'll DM you "
+    "once it's on the server. Tell me if that one's broken too."
 )
 
 
@@ -177,6 +177,7 @@ def admin_notice(
         head,
         f"Reason: {POLICIES[report.kind].label}; {evidence.describe()}. "
         f"Reported by {', '.join(sorted(reporters))}.",
+        f"Release group: {report.release_group or 'unknown'}.",
         *(s.line for s in replacement.steps),
     ]
     if report.seerr_issue_id:

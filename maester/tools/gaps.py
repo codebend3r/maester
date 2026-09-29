@@ -86,6 +86,7 @@ def note(found: Gaps) -> str:
     },
     tier=Tier.FRIEND,
     host_param="host",
+    held_in_maintenance=True,
 )
 async def find_gaps(
     ctx: ToolContext, tmdb_id: int, host: str, season: int | None = None

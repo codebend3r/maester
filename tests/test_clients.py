@@ -10,6 +10,7 @@ from maester.clients import (
     FakeSeerrClient,
     FakeSonarrClient,
     FakeWizarrClient,
+    FleetMonitorClient,
     PlexClient,
     RadarrClient,
     SabnzbdClient,
@@ -195,13 +196,28 @@ async def test_sonarr_series_by_tvdb_and_follow(fixture):
 
 
 @respx.mock
-async def test_sonarr_queue_percent_and_host(fixture):
-    respx.get(f"{BASE}/api/v3/queue").respond(json=fixture("sonarr_queue"))
+async def test_sonarr_queue_percent_host_and_the_episode_it_is_for(fixture):
+    route = respx.get(f"{BASE}/api/v3/queue").respond(json=fixture("sonarr_queue"))
     client = SonarrClient("meleys", BASE, "k")
     (item,) = await client.queue()
     assert client.host == "meleys"
     assert item.percent == 80.0
     assert item.download_id == "SABnzbd_nzo_abc"
+    assert (item.episode_id, item.label) == (107, "The Bear (2022) S02E07")
+    sent = route.calls.last.request.url.params
+    assert sent["includeSeries"] == "true" and sent["includeEpisode"] == "true"
+
+
+@respx.mock
+async def test_removing_a_download_blocklists_it_and_leaves_the_search_to_the_caller():
+    route = respx.delete(f"{BASE}/api/v3/queue/402").respond(status_code=200)
+    await RadarrClient("meleys", BASE, "k").remove_from_queue(402)
+    params = route.calls.last.request.url.params
+    assert (params["removeFromClient"], params["blocklist"], params["skipRedownload"]) == (
+        "true",
+        "true",
+        "true",
+    )
 
 
 @respx.mock
@@ -413,6 +429,7 @@ async def test_arr_queue_reads_stall_messages_and_history_is_typed(fixture):
     client = RadarrClient("meleys", BASE, "k")
     (item,) = await client.queue()
     assert item.tracked_status == "warning" and item.media_id == 8
+    assert item.label == "Dune (2021)" and item.episode_id is None
     assert item.error_messages == ("The download is stalled with no connections",)
     failed, grabbed = await client.history(8)
     assert history.called and (failed.id, failed.event_type) == (1002, "downloadFailed")
@@ -478,3 +495,39 @@ async def test_plex_answers_none_for_a_key_it_no_longer_has():
     assert await client.item("999") is None and await client.seasons("999") == []
     with pytest.raises(ClientError, match="500"):
         await client.item("500")
+
+
+@respx.mock
+async def test_sabnzbd_history_keeps_the_failure_and_the_steps_that_went_wrong(fixture):
+    respx.get(f"{BASE}/api").respond(json=fixture("sabnzbd_history"))
+    failed, done = await SabnzbdClient("meleys", BASE, "k").history()
+    assert failed.fail_message == "Unpacking failed, write error or disk is full?"
+    assert failed.trouble == (
+        "Repair: [Dune] Repaired in 41 seconds",
+        "Unpack: [Dune] Unpacking failed, write error or disk is full?",
+    )
+    assert failed.completed == 1790000000 and done.trouble == ()
+
+
+@respx.mock
+async def test_seerr_open_issues_name_the_title_the_episode_and_who_raised_it(fixture):
+    route = respx.get(f"{BASE}/api/v1/issue").respond(json=fixture("seerr_issues"))
+    (issue,) = await SeerrClient(BASE, "k").open_issues()
+    assert route.calls.last.request.url.params["filter"] == "open"
+    assert (issue.id, issue.kind, issue.media_type, issue.tmdb_id) == (12, "video", "tv", 136315)
+    assert (issue.season, issue.episode, issue.reporter) == (2, 7, "dany")
+
+
+@respx.mock
+async def test_the_fleet_view_names_each_hosts_state_temperatures_and_containers(fixture):
+    respx.get(f"{BASE}/fleet").respond(json=fixture("fleet_view"))
+    vermithor, caraxes = await FleetMonitorClient(BASE, "t").hosts()
+    assert (vermithor.status, vermithor.disk_percent, vermithor.disk_free_bytes) == (
+        "warn",
+        93.5,
+        6175000000000,
+    )
+    assert vermithor.temperatures == {"coretemp.temp1": 71.0, "coretemp.temp2": 64.5}
+    assert vermithor.containers_down == ("tautulli",)
+    assert vermithor.containers_unhealthy == ("seerr",) and vermithor.stale is None
+    assert not caraxes.collected and caraxes.status == "unknown" and caraxes.stale is None

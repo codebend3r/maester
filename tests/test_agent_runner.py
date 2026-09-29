@@ -86,6 +86,29 @@ def setup():
         approval = Approval(f"u1 wants {n}", f"let u1 have {n}", "decide_n", {"n": n})
         return Result({"n": n}, approval=approval)
 
+    @reg.tool("order", "asks a service for something", SCHEMA_N, held_in_maintenance=True)
+    async def order(ctx, n):
+        calls.append(("order", n))
+        return {"ordered": n}
+
+    @reg.tool(
+        "swap_file",
+        "destructive, and held in maintenance",
+        SCHEMA,
+        tier=Tier.TRUSTED,
+        destructive=True,
+        host_param="host",
+        held_in_maintenance=True,
+    )
+    async def swap_file(ctx, file_id, host):
+        calls.append(("swap_file", file_id))
+        return "swapped"
+
+    @reg.tool("ask_about", "asks the admin about one subject", SCHEMA_N)
+    async def ask_about(ctx, n):
+        approval = Approval(f"u1 wants {n}", f"{n} for u1", "decide_n", {"n": n}, f"thing:{n}")
+        return Result({"n": n}, approval=approval)
+
     @reg.tool("ask_badly", "names no decide tool", SCHEMA_N)
     async def ask_badly(ctx, n):
         return Result({}, approval=Approval("u1 wants it", "?", "echo", {"n": n}))
@@ -364,3 +387,56 @@ async def test_a_caller_with_no_link_is_refused_like_any_refusal(setup):
 
 async def acts(ctx):
     return {"as": ctx.linked_user().seerr_user_id}
+
+
+async def test_an_approval_about_a_subject_already_open_is_not_posted_twice(setup):
+    runner, as_user, *_ = setup
+    first = await runner.run(as_user("u1"), "ask_about", {"n": 5})
+    (post,) = first.notices
+    again = await runner.run(as_user("u2"), "ask_about", {"n": 5})
+    assert again.approval_id == first.approval_id == post.pending_id
+    assert again.notices == () and again.content["status"] == "awaiting_admin_approval"
+    other = await runner.run(as_user("u1"), "ask_about", {"n": 6})
+    assert isinstance(other.notices[0], ApprovalPost) and other.approval_id != first.approval_id
+
+
+async def test_maintenance_holds_a_call_and_it_runs_as_its_caller_afterwards(setup):
+    runner, as_user, store, calls, _ = setup
+    store.raise_flag("maintenance", "new drives")
+    out = await runner.run(as_user("u1"), "order", {"n": 3})
+    assert out.content["status"] == "held_for_maintenance" and out.held_id is not None
+    assert out.content["maintenance"] == "new drives" and calls == []
+    assert not (await runner.run(as_user("u1"), "echo", {"x": "still answers"})).is_error
+    (held,) = store.held_calls()
+    assert store.audit_count_since("order", datetime.now(UTC) - DAY) == 0  # held, not done
+    store.lower_flag("maintenance")
+    done = await runner.run_held(as_user("u1"), held)
+    assert done.content == {"ordered": 3} and calls[-1] == ("order", 3)
+    assert store.audit_count_since("order", datetime.now(UTC) - DAY) == 1
+
+
+async def test_a_destructive_call_is_confirmed_first_and_held_on_the_press(setup):
+    runner, as_user, store, calls, kill = setup
+    store.raise_flag("maintenance")
+    asked = await runner.run(as_user("u1"), "swap_file", {"file_id": 7, "host": "meleys"})
+    assert asked.pending_id is not None  # the friend still confirms it
+    pending = store.decide_pending(asked.pending_id, "approved", "u1")
+    held = await runner.run_decision(as_user("u1"), pending, True)
+    assert held.held_id is not None and held.notices == () and calls == []
+    store.lower_flag("maintenance")
+    (call,) = store.held_calls()
+    kill.on("not now")
+    stopped = await runner.run_held(as_user("u1"), call)
+    assert stopped.is_error and "not now" in stopped.content and calls == []
+    kill.off()
+    assert (await runner.run_held(as_user("u1"), call)).content == "swapped"
+
+
+async def test_a_held_call_that_no_longer_fits_its_caller_is_refused(setup):
+    runner, as_user, store, calls, _ = setup
+    store.raise_flag("maintenance")
+    await runner.run(as_user("u1"), "order", {"n": 1})
+    (held,) = store.held_calls()
+    store.lower_flag("maintenance")
+    out = await runner.run_held(as_user("u1", Tier.UNLINKED), held)
+    assert out.is_error and "no longer available" in out.content and calls == []

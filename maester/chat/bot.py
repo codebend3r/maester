@@ -1,6 +1,7 @@
 """The discord.py client: DMs, mentions in the requests channel, reactions, slash commands.
 
-Thin on purpose. Everything that decides what to say is in `service.py`.
+Thin on purpose. Everything that decides what to say is in `service.py`, and
+the admin's commands are `admin.py`'s.
 The bot is also the app's `Notifier`: `deliver()` posts notices in the
 admin channel or DMs them, whoever produced them (a reply, a button press,
 a webhook), and hands every sent DM to the service to remember. A reaction
@@ -11,6 +12,7 @@ so a press after a restart still lands.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 from collections.abc import Sequence
@@ -18,10 +20,12 @@ from collections.abc import Sequence
 import discord
 from discord import app_commands
 
+from maester.chat.admin import AdminConsole, AdminReply
 from maester.chat.members import resolve_chat_user
-from maester.chat.service import ChatService, reports_a_problem
+from maester.chat.service import ChatService, ChatUser, reports_a_problem
+from maester.chat.split import split_reply
 from maester.chat.views import DecisionButton, decision_view, send_response, send_text
-from maester.notify import AdminPost, ApprovalPost, DirectMessage, Notice
+from maester.notify import AdminPost, Announcement, ApprovalPost, DirectMessage, Notice
 
 log = logging.getLogger("maester.bot")
 
@@ -31,6 +35,7 @@ class MaesterBot(discord.Client):
         self,
         service: ChatService,
         *,
+        console: AdminConsole,
         guild_id: int,
         requests_channel_id: int,
         admin_channel_id: int,
@@ -40,10 +45,14 @@ class MaesterBot(discord.Client):
         intents.members = True
         super().__init__(intents=intents)
         self.service = service
+        self.console = console
         self.guild_id = guild_id
         self.requests_channel_id = requests_channel_id
         self.admin_channel_id = admin_channel_id
         self.tree = app_commands.CommandTree(self)
+        # Set once the bot first connects: scheduled jobs wait on it so their
+        # first notices have a channel to go to.
+        self.online = asyncio.Event()
         self._register_commands()
 
     # -- lifecycle --------------------------------------------------------
@@ -59,6 +68,7 @@ class MaesterBot(discord.Client):
 
     async def on_ready(self) -> None:
         log.info("maester is online as %s", self.user)
+        self.online.set()
 
     # -- messages ---------------------------------------------------------
 
@@ -111,6 +121,8 @@ class MaesterBot(discord.Client):
                 await send_text(self._admin_channel(), text)
             case ApprovalPost(text, pending_id):
                 await self._admin_channel().send(text, view=decision_view(pending_id, "approve"))
+            case Announcement(text):
+                await send_text(self._channel(self.requests_channel_id, "requests"), text)
             case DirectMessage(to, text):
                 user = self.get_user(int(to)) or await self.fetch_user(int(to))
                 sent = await send_text(user, text)
@@ -121,9 +133,12 @@ class MaesterBot(discord.Client):
                     log.exception("DM to %s sent but not remembered", to)
 
     def _admin_channel(self) -> discord.abc.Messageable:
-        channel = self.get_channel(self.admin_channel_id) if self.admin_channel_id else None
+        return self._channel(self.admin_channel_id, "admin")
+
+    def _channel(self, channel_id: int, name: str) -> discord.abc.Messageable:
+        channel = self.get_channel(channel_id) if channel_id else None
         if channel is None:
-            raise LookupError("no admin channel is configured or visible to the bot")
+            raise LookupError(f"no {name} channel is configured or visible to the bot")
         return channel  # type: ignore[return-value]
 
     # -- slash commands ---------------------------------------------------
@@ -167,8 +182,91 @@ class MaesterBot(discord.Client):
         async def tier(
             interaction: discord.Interaction, member: discord.User, tier: app_commands.Choice[str]
         ) -> None:
+            await interaction.response.defer(ephemeral=True)
             admin = await resolve_chat_user(self, interaction.user)
-            text = await self.service.set_tier(
-                admin, str(member.id), None if tier.value == "roles" else tier.value
-            )
-            await interaction.response.send_message(text, ephemeral=True)
+            value = None if tier.value == "roles" else tier.value
+            await self._answer(interaction, self.console.set_tier(admin, str(member.id), value))
+
+        @tree.command(name="kill", description="Admin: stop every destructive tool, or allow them")
+        @app_commands.describe(
+            state="on stops them, off lets them run", reason="Why; friends are told it"
+        )
+        @app_commands.choices(
+            state=[
+                app_commands.Choice(name="on", value="on"),
+                app_commands.Choice(name="off", value="off"),
+            ]
+        )
+        async def kill(
+            interaction: discord.Interaction, state: app_commands.Choice[str], reason: str = ""
+        ) -> None:
+            await interaction.response.defer(ephemeral=True)
+            admin = await resolve_chat_user(self, interaction.user)
+            await self._answer(interaction, self.console.kill(admin, state.value == "on", reason))
+
+        @tree.command(name="audit", description="Admin: the latest tool calls and commands")
+        @app_commands.describe(n="How many rows (default 10, at most 50)")
+        async def audit(interaction: discord.Interaction, n: int = 10) -> None:
+            await interaction.response.defer(ephemeral=True)
+            admin = await resolve_chat_user(self, interaction.user)
+            await self._answer(interaction, self.console.audit(admin, n))
+
+        @tree.command(name="pending", description="Admin: everything waiting on your decision")
+        async def pending(interaction: discord.Interaction) -> None:
+            await interaction.response.defer(ephemeral=True)
+            admin = await resolve_chat_user(self, interaction.user)
+            await self._answer(interaction, await self.console.pending(admin))
+
+        @tree.command(name="forecast", description="Admin: when each volume fills at this rate")
+        async def forecast(interaction: discord.Interaction) -> None:
+            await interaction.response.defer(ephemeral=True)
+            admin = await resolve_chat_user(self, interaction.user)
+            await self._answer(interaction, self.console.forecast(admin))
+
+        @tree.command(name="maintenance", description="Admin: start or end a maintenance window")
+        @app_commands.describe(
+            state="start holds requests and replacements; end runs them",
+            message="What friends are told, when starting",
+        )
+        @app_commands.choices(
+            state=[
+                app_commands.Choice(name="start", value="start"),
+                app_commands.Choice(name="end", value="end"),
+            ]
+        )
+        async def maintenance(
+            interaction: discord.Interaction, state: app_commands.Choice[str], message: str = ""
+        ) -> None:
+            await interaction.response.defer(ephemeral=True)
+            admin = await resolve_chat_user(self, interaction.user)
+            if state.value == "start":
+                reply = self.console.start_maintenance(admin, message)
+            else:
+                reply = await self.console.end_maintenance(admin, self._member)
+            await self._answer(interaction, reply)
+
+    async def _member(self, discord_id: str) -> ChatUser:
+        """Someone as the server knows them now, roles included."""
+        user = self.get_user(int(discord_id)) or await self.fetch_user(int(discord_id))
+        return await resolve_chat_user(self, user)
+
+    async def _answer(self, interaction: discord.Interaction, reply: AdminReply) -> None:
+        """An admin command's reply, privately, then each approval again with its buttons,
+        its notices, and its DMs to friends. The notices and DMs go out even if the private
+        reply can't (the interaction expired during a long `/maintenance end`)."""
+        try:
+            for chunk in split_reply(reply.text):
+                await interaction.followup.send(chunk, ephemeral=True)
+            for offer in reply.offers:
+                view = decision_view(offer.id, offer.kind)
+                await interaction.followup.send(offer.summary, view=view, ephemeral=True)
+        except discord.HTTPException:
+            log.exception("couldn't answer the admin's command")
+        await self.deliver(reply.notices)
+        for user_id, response in reply.dms:
+            try:
+                user = self.get_user(int(user_id)) or await self.fetch_user(int(user_id))
+                friend = ChatUser(user_id, user.display_name)
+                await send_response(await user.create_dm(), self, friend, response)
+            except Exception:  # one friend's closed DMs mustn't keep the rest from hearing
+                log.exception("couldn't DM %s after maintenance", user_id)

@@ -38,6 +38,15 @@ Seerr  Sonarr    Radarr    SABnzbd   Tautulli    Plex     Wizarr
 | "which Dune should I watch on hotel wifi?"     | Lists each version's bitrate and recommends the one the connection carries; tells the admin about much-streamed remuxes |
 | "can my brother get access?"                   | Puts an invite request in the admin queue; on approval, issues a Wizarr invite                                     |
 
+For the admin, in one private channel:
+
+- every approval (4K and pending requests, `/link` requests, replacements over the daily cap) with Approve/Deny buttons, and `/pending` to see them all again
+- a daily digest: requests, issues, replacements, stalled or failed downloads per host, free space and when each volume fills
+- a weekly NAS report, anything degraded at the top
+- stalled downloads blocklisted and searched again on their own, and 4K requests held while their volume is nearly full
+- "why did Dune fail?" answered from SABnzbd and the arr's history
+- `/kill`, `/tier`, `/audit`, `/forecast`, and `/maintenance`, which holds requests and replacements until the stack is back
+
 Everything the bot can change goes through a small set of scoped tools with permission tiers and button confirmations. There is no shell, no generic API passthrough.
 
 ## Roadmap and tracker
@@ -79,7 +88,8 @@ maester/
 │   ├── playback/       playback reports: plays, player limits, file health, the replace flow
 │   ├── perf/           lag: host load, the speed test, which version a connection carries
 │   ├── chat/           discord bot, views (buttons, pickers), identity
-│   ├── web/            FastAPI app: the Seerr webhook and /health
+│   ├── web/            FastAPI app: webhooks and /health
+│   ├── jobs/           scheduled work: the digest, the sweeper, space samples, the NAS report
 │   ├── store/          SQLite schema, migrations, audit log
 │   ├── evals/          the eval runner and the fake world a case runs in
 │   ├── app.py          wires settings into clients, store, agent, bot and web app
@@ -91,7 +101,7 @@ maester/
 └── docs/
 ```
 
-Still to come: `maester/jobs/` for scheduled work (digests, sweeps, reminders, E6) and `maester/guides/` for the device setup guides the model answers from (E7).
+Still to come: `maester/guides/` for the device setup guides the model answers from (E7).
 
 ## Getting started
 
@@ -108,11 +118,11 @@ uv run maester           # starts the Discord bot and the web app on one loop
 
 Checks: `uv run ruff check .`, `uv run ruff format --check .`, `uv run pytest`. Evals: `uv run maester-eval` (real model against fake services) or `uv run maester-eval --model fake`.
 
-**Discord setup.** Create an application at discord.com/developers, add a bot, turn on the *Message Content* and *Server Members* privileged intents, and invite it with the `bot` and `applications.commands` scopes (permissions: View Channels, Send Messages, Read Message History, Embed Links). Put the bot token, your server id, the requests and admin channel ids, and the trusted and admin role ids in `.env`. Friends DM the bot or mention it in the requests channel; `/link`, `/whoami` and `/forget` are slash commands; the admin sets or clears a member's tier with `/tier`.
+**Discord setup.** Create an application at discord.com/developers, add a bot, turn on the *Message Content* and *Server Members* privileged intents, and invite it with the `bot` and `applications.commands` scopes (permissions: View Channels, Send Messages, Read Message History, Embed Links). Put the bot token, your server id, the requests and admin channel ids, and the trusted and admin role ids in `.env`. Friends DM the bot or mention it in the requests channel; `/link`, `/whoami` and `/forget` are slash commands. The admin's commands are `/tier`, `/kill`, `/audit`, `/pending`, `/forecast` and `/maintenance`; approvals, the digest and the NAS report post in the admin channel, and maintenance announcements in the requests channel.
 
 **Seerr and the arrs.** maester works out which host holds a title's 1080p or 4K copy from Seerr's own records, so each Radarr and Sonarr in Seerr's settings must use the same address (host, port and base path) as its `RADARR_<HOST>_URL` or `SONARR_<HOST>_URL` here. A server Seerr reaches by another name is refused rather than guessed.
 
-**Seerr webhook.** In Seerr, Settings, Notifications, Webhook: set the URL to `http://<maester host>:8020/webhooks/seerr`, set *Authorization Header* to the value of `SEERR_WEBHOOK_SECRET`, keep the default JSON payload, and tick *Request Available*, *Issue Resolved* and *Issue Reopened*. Friends then get a DM with a Plex link when their request is ready (a thumbs-down on it reports a problem), and resolving a playback report's issue in Seerr closes the report. Other ticked types are acknowledged and ignored.
+**Seerr webhook.** In Seerr, Settings, Notifications, Webhook: set the URL to `http://<maester host>:8020/webhooks/seerr`, set *Authorization Header* to the value of `SEERR_WEBHOOK_SECRET`, keep the default JSON payload, and tick *Request Pending Approval*, *Request Approved*, *Request Declined*, *Request Available*, *Issue Resolved* and *Issue Reopened*. Every request waiting on approval then reaches the admin channel with buttons, wherever it was made; friends get a DM with a Plex link when their request is ready (a thumbs-down on it reports a problem); and resolving a playback report's issue in Seerr closes the report. Other ticked types are acknowledged and ignored.
 
 **File health check.** The container mounts the media shares read-only (`docker-compose.yml`) and `MEDIA_ROOTS` lists them; nothing outside them is read. When Sonarr or Radarr report paths under other names than the mounts, map them with `MEDIA_PATH_MAP`.
 

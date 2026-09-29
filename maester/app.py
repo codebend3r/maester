@@ -1,8 +1,8 @@
 """Wires settings into clients, store, agent, chat service, bot and web app.
 
 `build()` is pure construction and safe to call in tests with fake
-clients; `run()` starts the Discord client and the web server on one
-asyncio loop and returns when either stops.
+clients; `run()` starts the Discord client, the web server and the
+scheduled jobs on one asyncio loop and returns when any of them stops.
 """
 
 from __future__ import annotations
@@ -22,6 +22,7 @@ from maester.agent.loop import Agent
 from maester.agent.runner import ToolRunner
 from maester.agent.tools import ToolRegistry
 from maester.agent.tools import registry as app_registry
+from maester.chat.admin import AdminConsole
 from maester.chat.bot import MaesterBot
 from maester.chat.identity import IdentityService, RoleMap
 from maester.chat.service import ChatService
@@ -40,6 +41,7 @@ from maester.clients import (
 from maester.clients.fleet import FleetMonitorClient
 from maester.clients.media import MediaPaths
 from maester.config import REQUIRED, Settings, require, settings
+from maester.jobs import Scheduler, scheduled
 from maester.registry import Registry
 from maester.seerr_events import seerr_routes
 from maester.store import Store
@@ -86,6 +88,7 @@ class App:
     bot: MaesterBot
     web: FastAPI
     kill_switch: KillSwitch
+    scheduler: Scheduler
 
 
 def build(
@@ -99,7 +102,7 @@ def build(
     cfg = cfg or settings()
     store = store or Store(cfg.db_path)
     services = services or build_services(cfg, Registry.from_env(os.environ))
-    kill = KillSwitch()
+    kill = KillSwitch(store)
     runner = ToolRunner(tools or app_registry, kill_switch=kill)
     agent = Agent(
         model_client=model_client
@@ -118,15 +121,25 @@ def build(
         store, services, RoleMap(cfg.discord_role_admin, cfg.discord_role_trusted)
     )
     chat = ChatService(agent=agent, identity=identity, store=store)
+    console = AdminConsole(
+        identity=identity,
+        chat=chat,
+        store=store,
+        services=services,
+        settings=cfg,
+        kill_switch=kill,
+    )
     bot = MaesterBot(
         chat,
+        console=console,
         guild_id=cfg.discord_guild_id,
         requests_channel_id=cfg.discord_requests_channel_id,
         admin_channel_id=cfg.discord_admin_channel_id,
     )
     # The bot is the notifier: webhooks hand it notices without knowing Discord.
     seerr = SeerrWebhook(cfg.seerr_webhook_secret, seerr_routes(services, store), store, bot)
-    return App(cfg, store, services, agent, chat, bot, create_app(seerr=seerr), kill)
+    scheduler = Scheduler(scheduled(services, store, cfg, kill), store=store, notifier=bot)
+    return App(cfg, store, services, agent, chat, bot, create_app(seerr=seerr), kill, scheduler)
 
 
 async def serve(app: App) -> None:
@@ -134,12 +147,21 @@ async def serve(app: App) -> None:
     server = uvicorn.Server(config)
     web_task = asyncio.create_task(server.serve(), name="web")
     bot_task = asyncio.create_task(app.bot.start(app.settings.discord_bot_token), name="discord")
-    done, pending = await asyncio.wait({web_task, bot_task}, return_when=asyncio.FIRST_COMPLETED)
+    jobs_task = asyncio.create_task(run_jobs(app), name="jobs")
+    done, pending = await asyncio.wait(
+        {web_task, bot_task, jobs_task}, return_when=asyncio.FIRST_COMPLETED
+    )
     for task in pending:
         task.cancel()
     for task in done:
         if not task.cancelled() and (exc := task.exception()):
             raise exc
+
+
+async def run_jobs(app: App) -> None:
+    """The scheduled jobs, once the bot is online to deliver what they say."""
+    await app.bot.online.wait()
+    await app.scheduler.run()
 
 
 def run() -> int:

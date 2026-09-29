@@ -148,13 +148,16 @@ class Approval:
     `decide` names a button-only admin tool; `args` are its arguments except
     `approved`, which the press supplies. The runner checks them against that
     tool's schema before anything is stored, and on the press runs the tool
-    through the same checks and audit as any call.
+    through the same checks and audit as any call. With a `subject` (the Seerr
+    request it decides), an approval already open about it is reused rather
+    than posted twice, whoever raised it first.
     """
 
     notice: str
     summary: str
     decide: str
     args: dict[str, Any]
+    subject: str | None = None
 
 
 @dataclass(frozen=True)
@@ -206,6 +209,9 @@ class ToolSpec:
     # applies an `Approval` another tool raised, and must be safe to run
     # again, since a failed run reopens the buttons.
     button_only: bool = False
+    # Changes something the stack must be up for (a request, a replacement): during a
+    # maintenance window the call is saved and runs when it ends.
+    held_in_maintenance: bool = False
 
     def definition(self) -> dict[str, Any]:
         """The tool as the Messages API wants it, streaming its input eagerly."""
@@ -306,6 +312,7 @@ class ToolRegistry:
         destructive: bool = False,
         host_param: str | None = None,
         button_only: bool = False,
+        held_in_maintenance: bool = False,
     ) -> Callable[[Handler], Handler]:
         def decorate(fn: Handler) -> Handler:
             self.register(
@@ -318,6 +325,7 @@ class ToolRegistry:
                     destructive=destructive,
                     host_param=host_param,
                     button_only=button_only,
+                    held_in_maintenance=held_in_maintenance,
                 )
             )
             return fn

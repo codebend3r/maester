@@ -23,7 +23,7 @@ from maester.clients import Services
 from maester.config import Settings
 from maester.memo import Memo
 from maester.notify import Notice
-from maester.store import PendingAction, Store
+from maester.store import HeldCall, PendingAction, Store
 
 log = logging.getLogger("maester.agent")
 
@@ -38,6 +38,8 @@ IDLE_RESET = timedelta(hours=6)
 REFUSAL_REPLY = "I can't help with that one."
 LIMIT_REPLY = "You've hit the {what} limit for now; {hint}."
 TRUNCATED_REPLY = "That reply got too long and was cut off; ask me again more narrowly."
+# What leads a held call in the caller's conversation when it finally runs.
+HELD_LEAD = "(What I asked for while the server was down for maintenance, run now that it's back.)"
 
 
 def estimate_tokens(content: Any) -> int:
@@ -128,18 +130,47 @@ class Agent:
         """
         outcome = await self.runner.run_decision(self._context(user_id, tier), pending, approved)
         if pending.kind == "confirm":
-            self._remember(pending, outcome)
+            self._remember(
+                pending.requester,
+                f"toolu_button_{pending.id}",
+                pending.action,
+                pending.payload,
+                outcome,
+            )
         return outcome
 
-    def _remember(self, pending: PendingAction, outcome: ToolOutcome) -> None:
-        tool_use = {
-            "type": "tool_use",
-            "id": f"toolu_button_{pending.id}",
-            "name": pending.action,
-            "input": pending.payload,
-        }
-        results = self._stub_results([outcome.as_result_block(tool_use["id"])])
-        user_id = pending.requester
+    async def run_held(self, held: HeldCall, tier: Tier) -> ToolOutcome:
+        """Run a call held for maintenance as its caller, and remember it.
+
+        A window can outlast the conversation's idle reset, so the call is led
+        by a plain message saying what it was; history read back starts at one,
+        and the call stays in view for the turn that tells them how it went.
+        """
+        outcome = await self.runner.run_held(self._context(held.discord_id, tier), held)
+        self._remember(
+            held.discord_id,
+            f"toolu_held_{held.id}",
+            held.tool,
+            held.args,
+            outcome,
+            lead=HELD_LEAD,
+        )
+        return outcome
+
+    def _remember(
+        self,
+        user_id: str,
+        call_id: str,
+        name: str,
+        args: dict[str, Any],
+        outcome: ToolOutcome,
+        lead: str | None = None,
+    ) -> None:
+        """A call made outside a turn, put in the user's conversation so their next turn sees it."""
+        if lead:
+            self.store.append_message(user_id, "user", lead, estimate_tokens(lead))
+        tool_use = {"type": "tool_use", "id": call_id, "name": name, "input": args}
+        results = self._stub_results([outcome.as_result_block(call_id)])
         self.store.append_message(user_id, "assistant", [tool_use], estimate_tokens(tool_use))
         self.store.append_message(user_id, "user", results, estimate_tokens(results))
 

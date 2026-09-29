@@ -60,6 +60,7 @@ def world(services, store):
         {"type": "object", "properties": {"file_id": {"type": "integer"}}},
         tier=Tier.TRUSTED,
         destructive=True,
+        held_in_maintenance=True,
     )
     async def replace(ctx, file_id=0):
         calls.append(("replace", file_id))
@@ -218,22 +219,6 @@ async def test_cancel(world):
     assert last["content"][0]["content"] == "Cancelled by the user; nothing was done."
 
 
-async def test_admin_sets_and_clears_a_tier_override(world):
-    make, store, *_ = world
-    svc = make()
-    assert await svc.set_tier(FRIEND, TRUSTED.id, "admin") == "Only the admin can change tiers."
-    assert (await svc.set_tier(ADMIN, FRIEND.id, "trusted")).endswith("trusted.")
-    assert svc.identity.tier_for(FRIEND.id, set()) == Tier.TRUSTED
-    assert (await svc.set_tier(ADMIN, FRIEND.id, None)).endswith("from roles.")
-    assert svc.identity.tier_for(FRIEND.id, set()) == Tier.FRIEND
-    assert (await svc.set_tier(ADMIN, FRIEND.id, "king")).startswith("Unknown tier")
-    rows = store.audit_recent(tool="set_tier")
-    assert [r.args for r in rows] == [
-        {"target": FRIEND.id, "tier": None},
-        {"target": FRIEND.id, "tier": "trusted"},
-    ]
-
-
 async def test_agent_errors_become_a_reference_reply(world):
     make, *_ = world
     svc = make()  # model raises on use
@@ -332,3 +317,35 @@ async def test_a_trusted_4k_request_is_approved_by_the_admin_end_to_end(services
     (dm,) = approved.notices
     assert dm.to == TRUSTED.id and "approved Dune (2021) in 4K" in dm.text
     assert seerr.requests[0].status == RequestStatus.APPROVED
+
+
+async def test_a_failed_press_that_cant_reopen_points_at_the_newer_approval(
+    services, store, monkeypatch
+):
+    store.upsert_user(TRUSTED.id, status="active", seerr_user_id=7, plex_username="trusty")
+    services.seerr.details[("movie", 438631)] = DUNE
+    services.seerr.arr_servers["radarr"] = [seerr_server(1, "movie", "vermithor", is_4k=True)]
+    svc = service(
+        app_registry,
+        services,
+        store,
+        tool_message([("request_media_4k", {"tmdb_id": 438631, "media_type": "movie"})]),
+        text_message("Asked."),
+    )
+    (post,) = (await svc.handle_message(TRUSTED, "Dune in 4K")).notices
+    services.seerr.down = True
+    # Seerr's webhook raised a fresh approval for the request while this press ran.
+    monkeypatch.setattr(store, "reopen_pending", lambda pending_id: False)
+    failed = await svc.decide(post.pending_id, ADMIN, approve=True)
+    assert failed.settled and "newer approval" in failed.text
+
+
+async def test_a_confirm_pressed_during_maintenance_is_saved_for_later(world):
+    make, store, calls = world
+    svc = make(tool_message([("replace_media", {"file_id": 3})]), text_message("Press Confirm."))
+    confirmation = (await svc.handle_message(TRUSTED, "replace it")).confirmations[0]
+    store.raise_flag("maintenance", "drives")
+    decision = await svc.decide(confirmation.id, TRUSTED, approve=True)
+    assert decision.text.startswith("The server is down for maintenance") and calls == []
+    (held,) = store.held_calls()
+    assert held.tool == "replace_media" and held.args == {"file_id": 3}

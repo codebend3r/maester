@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
+from datetime import UTC, datetime
 from typing import Any, ClassVar
 
 from maester.clients.base import ClientError, Downable
@@ -10,6 +11,7 @@ from maester.clients.seerr.models import (
     UNLIMITED,
     ArrServer,
     Collection,
+    Issue,
     MediaDetails,
     MediaRequest,
     MediaStatus,
@@ -43,6 +45,7 @@ class FakeSeerrClient(Downable):
     refusals: dict[int, RequestRefused] = field(default_factory=dict)
     routed: dict[int, Routing] = field(default_factory=dict)
     issues: list[dict[str, Any]] = field(default_factory=list)
+    open_issue_list: list[Issue] = field(default_factory=list)  # as Seerr lists them
     auto_approve: bool = False
 
     async def search(self, query: str) -> list[SearchResult]:
@@ -85,6 +88,7 @@ class FakeSeerrClient(Downable):
             seasons=tuple(seasons or ()),
             tvdb_id=known.tvdb_id if known else None,
             media_status=MediaStatus.PROCESSING if self.auto_approve else MediaStatus.PENDING,
+            created_at=datetime.now(UTC).isoformat(),
         )
         self.requests.append(req)
         if routing is not None:
@@ -92,7 +96,10 @@ class FakeSeerrClient(Downable):
         return req
 
     async def get_request(self, request_id: int) -> MediaRequest:
-        return next(r for r in self.requests if r.id == request_id)
+        found = next((r for r in self.requests if r.id == request_id), None)
+        if found is None:
+            raise ClientError("seerr", "GET", f"/api/v1/request/{request_id}", 404, "not found")
+        return found
 
     async def list_requests(
         self, *, user_id: int | None = None, take: int = 20, filter: str = "all"
@@ -107,6 +114,8 @@ class FakeSeerrClient(Downable):
             ]
         elif filter == "failed":
             rows = [r for r in rows if r.status == RequestStatus.FAILED]
+        elif filter == "pending":
+            rows = [r for r in rows if r.status == RequestStatus.PENDING]
         return rows[-take:]
 
     async def approve_request(self, request_id: int) -> MediaRequest:
@@ -165,3 +174,7 @@ class FakeSeerrClient(Downable):
 
     async def comment_issue(self, issue_id: int, message: str) -> None:
         self.issues[issue_id - 1]["comments"].append(message)
+
+    async def open_issues(self, take: int = 20) -> list[Issue]:
+        self.refuse_if_down("/api/v1/issue")
+        return list(self.open_issue_list[:take])

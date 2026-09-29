@@ -41,6 +41,10 @@ UNLINKED_HELP = (
 )
 ERROR_REPLY = "Sorry, something went wrong on my end (ref `{ref}`). The admin can look it up."
 ESCALATED = "That needs the admin's approval now; you'll get a DM once they decide."
+HELD = (
+    "The server is down for maintenance, so that's saved: it runs once maintenance is over, "
+    "and I'll DM you how it went."
+)
 # A thumbs-down (any skin tone) on a DM about a title reports a problem with it.
 THUMBS_DOWN = "\N{THUMBS DOWN SIGN}"
 
@@ -129,11 +133,16 @@ class ChatService:
         tier = self.tier_for(user)
         if tier == Tier.UNLINKED:
             return ChatResponse(chunks=split_reply(UNLINKED_HELP))
+        return await self.follow_up(user.id, tier, text)
+
+    async def follow_up(self, user_id: str, tier: Tier, text: str) -> ChatResponse:
+        """A turn as `user_id` at `tier`: their message, or one the server starts for them
+        (what they asked for during maintenance has run)."""
         try:
-            reply = await self.agent.respond(user.id, tier, text)
+            reply = await self.agent.respond(user_id, tier, text)
         except TurnFailed as failed:
             ref = secrets.token_hex(3)
-            log.exception("agent failed for user %s (ref %s)", user.id, ref)
+            log.exception("agent failed for user %s (ref %s)", user_id, ref)
             # What the turn's tools already did still reaches the user and the admin.
             reply = replace(failed.reply, text=ERROR_REPLY.format(ref=ref), choices=[])
 
@@ -197,11 +206,19 @@ class ChatService:
             return Decision("Cancelled.", notices=outcome.notices)
         if outcome.approval_id is not None:  # the confirmed action went to the admin instead
             return Decision(ESCALATED, notices=outcome.notices)
+        if outcome.held_id is not None:
+            return Decision(HELD)
         if outcome.is_error and outcome.retryable:
-            self.store.reopen_pending(decided.id)
+            if self.store.reopen_pending(decided.id):
+                return Decision(
+                    f"Couldn't do it: {outcome.text[:1500]}\nIt's still open, so you can press "
+                    "again.",
+                    settled=False,
+                )
             return Decision(
-                f"Couldn't do it: {outcome.text[:1500]}\nIt's still open, so you can press again.",
-                settled=False,
+                f"Couldn't do it: {outcome.text[:1500]}\nA newer approval for the same thing is "
+                "open; use that one.",
+                notices=outcome.notices,
             )
         if outcome.is_error:
             return Decision(f"Couldn't do it: {outcome.text[:1500]}", notices=outcome.notices)
@@ -227,22 +244,6 @@ class ChatService:
     def forget(self, user: ChatUser) -> str:
         n = self.agent.forget(user.id)
         return "Forgotten. We're starting fresh." if n else "Nothing to forget."
-
-    async def set_tier(self, admin: ChatUser, target_id: str, tier: str | None) -> str:
-        if not self.is_admin(admin):
-            return "Only the admin can change tiers."
-        try:
-            text = self.identity.set_tier_override(target_id, tier)
-        except ValueError:
-            return f"Unknown tier `{tier}`; use friend, trusted, or admin."
-        self.store.audit(
-            discord_id=admin.id,
-            tool="set_tier",
-            args={"target": target_id, "tier": tier},
-            result=text,
-            ok=True,
-        )
-        return text
 
     # -- tiers ------------------------------------------------------------
 

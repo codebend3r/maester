@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import enum
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 # Issue types.
@@ -69,6 +70,17 @@ def _year(raw: dict[str, Any]) -> int | None:
 
 def _int_or_none(value: Any) -> int | None:
     return int(value) if value not in (None, "") else None
+
+
+def _user_name(raw: dict[str, Any]) -> str:
+    """A Seerr user as Seerr shows them."""
+    return (
+        raw.get("displayName")
+        or raw.get("plexUsername")
+        or raw.get("username")
+        or raw.get("email")
+        or ""
+    )
 
 
 @dataclass(frozen=True)
@@ -256,6 +268,12 @@ class MediaRequest:
     # Where this request's version (standard or 4K) stands, and its Plex key.
     media_status: MediaStatus = MediaStatus.UNKNOWN
     rating_key: str | None = None
+    requested_by_name: str = ""  # the requester as Seerr shows them
+    created_at: str = ""  # ISO 8601, as Seerr gives it
+
+    @property
+    def created(self) -> datetime | None:
+        return datetime.fromisoformat(self.created_at) if self.created_at else None
 
     @classmethod
     def from_api(cls, raw: dict[str, Any]) -> MediaRequest:
@@ -274,6 +292,8 @@ class MediaRequest:
                 media.get("status4k" if is_4k else "status", MediaStatus.UNKNOWN)
             ),
             rating_key=media.get("ratingKey4k" if is_4k else "ratingKey") or None,
+            requested_by_name=_user_name(raw.get("requestedBy") or {}),
+            created_at=raw.get("createdAt") or "",
         )
 
 
@@ -363,6 +383,7 @@ class ArrServer:
     is_4k: bool
     is_default: bool
     url: str  # where Seerr reaches it: scheme, host, port and base path
+    root_folder: str = ""  # where Seerr has it put what's requested (`activeDirectory`)
 
     @classmethod
     def from_api(cls, raw: dict[str, Any]) -> ArrServer:
@@ -374,6 +395,7 @@ class ArrServer:
             is_4k=bool(raw.get("is4k", False)),
             is_default=bool(raw.get("isDefault", False)),
             url=f"{scheme}://{raw['hostname']}:{int(raw['port'])}{base}",
+            root_folder=raw.get("activeDirectory") or "",
         )
 
 
@@ -426,4 +448,40 @@ class SeerrUser:
             email=(raw.get("email") or "").lower(),
             username=raw.get("displayName") or raw.get("username") or "",
             plex_username=raw.get("plexUsername") or "",
+        )
+
+
+ISSUE_KINDS = {
+    ISSUE_VIDEO: "video",
+    ISSUE_AUDIO: "audio",
+    ISSUE_SUBTITLE: "subtitles",
+    ISSUE_OTHER: "other",
+}
+
+
+@dataclass(frozen=True)
+class Issue:
+    """An open Seerr issue: what it's about and who raised it."""
+
+    id: int
+    kind: str  # video | audio | subtitles | other
+    media_type: str
+    tmdb_id: int
+    reporter: str
+    created_at: str = ""
+    season: int | None = None
+    episode: int | None = None
+
+    @classmethod
+    def from_api(cls, raw: dict[str, Any]) -> Issue:
+        media = raw.get("media") or {}
+        return cls(
+            id=int(raw["id"]),
+            kind=ISSUE_KINDS.get(int(raw.get("issueType") or ISSUE_OTHER), "other"),
+            media_type=media.get("mediaType") or "",
+            tmdb_id=int(media.get("tmdbId") or 0),
+            reporter=_user_name(raw.get("createdBy") or {}),
+            created_at=raw.get("createdAt") or "",
+            season=raw.get("problemSeason") or None,
+            episode=raw.get("problemEpisode") or None,
         )

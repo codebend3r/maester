@@ -1,6 +1,16 @@
+from datetime import time, timedelta
+from zoneinfo import ZoneInfo
+
 import pytest
 
-from maester.config import FleetMonitorAccess, MissingConfig, Settings, load_settings, require
+from maester.config import (
+    FleetMonitorAccess,
+    Jobs,
+    MissingConfig,
+    Settings,
+    load_settings,
+    require,
+)
 
 
 def test_defaults_when_env_is_empty():
@@ -75,3 +85,29 @@ def test_the_fleet_monitor_is_optional_but_needs_its_token_once_named():
 def test_the_speed_test_runs_on_the_host_named():
     assert load_settings({}).speedtest_host == ""
     assert load_settings({"SPEEDTEST_HOST": " Meleys "}).speedtest_host == "meleys"
+
+
+def test_jobs_run_in_the_named_time_zone_at_the_named_times():
+    cfg = load_settings(
+        {
+            "TZ": "America/Toronto",
+            "DIGEST_TIME": "07:30",
+            "NAS_REPORT_DAY": "Sunday",
+            "SWEEP_MINUTES": "10",
+            "STALLED_HOURS": "3",
+        }
+    )
+    jobs = cfg.jobs
+    assert jobs.zone == ZoneInfo("America/Toronto") and jobs.digest_at == time(7, 30)
+    assert jobs.nas_report_day == 6
+    assert (jobs.sweep_every, jobs.stalled_after) == (timedelta(minutes=10), timedelta(hours=3))
+    assert load_settings({}).jobs == Jobs()
+
+
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [("TZ", "Mars/Olympus"), ("DIGEST_TIME", "8am"), ("NAS_REPORT_DAY", "someday")],
+)
+def test_a_bad_schedule_fails_on_boot_naming_the_variable(name, value):
+    with pytest.raises(ValueError, match=name):
+        load_settings({name: value})

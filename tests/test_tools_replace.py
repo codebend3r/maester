@@ -12,7 +12,8 @@ from maester.clients.arr import HistoryEvent, MediaFile
 from maester.clients.media import Inspection
 from maester.clients.radarr import Movie
 from maester.config import Guardrails
-from maester.media import Copy, Decision, ReportKind, ReportStatus
+from maester.jobs.landed import tell_landed
+from maester.media import Copy, Decision, ReportKind, ReportStatus, Titled
 from maester.notify import AdminPost, ApprovalPost, DirectMessage
 from maester.tools.replace import replace_media
 from tests.playback_world import DUNE_4K, DUNE_4K_ITEM, FORKS, FORKS_ITEM, link_pal, report, stock
@@ -91,8 +92,8 @@ async def test_a_proven_report_blocklists_deletes_and_searches_on_the_owning_hos
         f"- blocklist: marked {RELEASE} failed so it isn't grabbed again\n"
         f"- delete: deleted {DUNE_4K} (68.5 GB)\n"
         "- search: searching for a new copy\n"
-        "A new copy usually lands within a few hours when a release is out there. Try again "
-        "later today, and tell me if it's still broken tomorrow."
+        "A new copy usually lands within a few hours when a release is out there; I'll DM you "
+        "once it's on the server. Tell me if that one's broken too."
     )
     (notice,) = out.notices
     assert isinstance(notice, AdminPost)
@@ -336,3 +337,21 @@ def test_replacement_tools_are_destructive_and_the_decision_is_the_admins():
     assert replace_spec.host_param == "host"
     assert decide.destructive and decide.button_only and decide.tier == Tier.ADMIN
     assert "decide_replacement" not in {s.name for s in registry.for_tier(Tier.ADMIN)}
+
+
+async def test_the_friend_hears_once_when_the_new_copy_lands(library):
+    runner = ToolRunner(registry)
+    reported = await broken(library)
+    link_pal(library)
+    await report(library, DUNE_4K_ITEM, ReportKind.WONT_PLAY, "same here", user="d2")
+    await confirmed(library, runner, reported)
+    radarr = library.services.radarr["vermithor"]
+    assert await tell_landed(library.services, library.store) == []  # nothing yet
+    radarr.files = [MediaFile(56, "/Vermithor/Movies/Dune (2021)/new.mkv", 60_000_000_000,
+                              "Remux-2160p", "FLUX", 8)]  # fmt: skip
+    told = await tell_landed(library.services, library.store)
+    assert sorted(dm.to for dm in told) == ["d1", "d2"]
+    dm = next(dm for dm in told if dm.to == "d1")
+    assert dm.text.startswith("The new 4K copy of Dune (2021) is on the server now.")
+    assert dm.about == Titled(Copy("movie", 438631, True), "Dune (2021)")
+    assert await tell_landed(library.services, library.store) == []  # once each

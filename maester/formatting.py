@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta, tzinfo
 
 
 def humanized(seconds: int) -> str:
@@ -31,3 +31,8 @@ def gigabytes(size: int) -> str:
 def mbps(kbps: int) -> float:
     """A bitrate in kbps as Mbps to a tenth; `f"{mbps(k):g}"` reads "2" or "10.2"."""
     return round(kbps / 1000, 1)
+
+
+def local_time(when: datetime, zone: tzinfo) -> str:
+    """ "Sep 27 10:02", in the server's time zone."""
+    return when.astimezone(zone).strftime("%b %d %H:%M")
