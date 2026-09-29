@@ -30,6 +30,7 @@ from maester.clients import (
     FileProbe,
     OoklaSpeedTest,
     PlexClient,
+    PlexTvClient,
     RadarrClient,
     SabnzbdClient,
     SeerrClient,
@@ -75,6 +76,7 @@ def build_services(cfg: Settings, instances: Registry) -> Services:
             else None
         ),
         speedtest=OoklaSpeedTest(cfg.speedtest_host) if cfg.speedtest_host else None,
+        plextv=PlexTvClient(cfg.plex_tv_url, cfg.plex_token) if cfg.plex_token else None,
     )
 
 

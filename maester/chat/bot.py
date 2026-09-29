@@ -25,7 +25,14 @@ from maester.chat.members import resolve_chat_user
 from maester.chat.service import ChatService, ChatUser, reports_a_problem
 from maester.chat.split import split_reply
 from maester.chat.views import DecisionButton, decision_view, send_response, send_text
-from maester.notify import AdminPost, Announcement, ApprovalPost, DirectMessage, Notice
+from maester.notify import (
+    AdminPost,
+    Announcement,
+    ApprovalPost,
+    DirectMessage,
+    Notice,
+    RoleChange,
+)
 
 log = logging.getLogger("maester.bot")
 
@@ -120,9 +127,16 @@ class MaesterBot(discord.Client):
             case AdminPost(text):
                 await send_text(self._admin_channel(), text)
             case ApprovalPost(text, pending_id):
-                await self._admin_channel().send(text, view=decision_view(pending_id, "approve"))
+                # A long one is split, and the buttons go on its last part.
+                *before, last = split_reply(text) or [""]
+                channel = self._admin_channel()
+                for chunk in before:
+                    await channel.send(chunk)
+                await channel.send(last, view=decision_view(pending_id, "approve"))
             case Announcement(text):
                 await send_text(self._channel(self.requests_channel_id, "requests"), text)
+            case RoleChange():
+                await self._change_role(notice)
             case DirectMessage(to, text):
                 user = self.get_user(int(to)) or await self.fetch_user(int(to))
                 sent = await send_text(user, text)
@@ -131,6 +145,26 @@ class MaesterBot(discord.Client):
                         self.service.remember_dm(str(message.id), notice)
                 except Exception:  # it was delivered; forgetting it only costs the reaction
                     log.exception("DM to %s sent but not remembered", to)
+
+    async def _change_role(self, change: RoleChange) -> None:
+        """Give or take a role; when Discord won't (the bot lacks Manage Roles, or the role
+        sits above its own), the admin is told to do it by hand."""
+        try:
+            guild = self.get_guild(self.guild_id)
+            if guild is None:
+                raise LookupError("the bot isn't in the configured server")
+            member = guild.get_member(int(change.to)) or await guild.fetch_member(int(change.to))
+            role = discord.Object(id=change.role_id)
+            edit = member.add_roles if change.add else member.remove_roles
+            await edit(role, reason=change.why or "maester")
+        except (discord.HTTPException, LookupError) as exc:
+            verb = "give" if change.add else "take away from"
+            await send_text(
+                self._admin_channel(),
+                f"Couldn't {verb} <@{change.to}> the role <@&{change.role_id}> ({exc}); "
+                "change it by hand in the server's settings.",
+            )
+            raise
 
     def _admin_channel(self) -> discord.abc.Messageable:
         return self._channel(self.admin_channel_id, "admin")
@@ -161,6 +195,23 @@ class MaesterBot(discord.Client):
         async def whoami(interaction: discord.Interaction) -> None:
             user = await resolve_chat_user(self, interaction.user)
             await interaction.response.send_message(self.service.whoami(user), ephemeral=True)
+
+        @tree.command(name="setup", description="How to set up Plex on your TV, stick or phone")
+        @app_commands.describe(device="What you watch on")
+        @app_commands.choices(
+            device=[
+                app_commands.Choice(name="Apple TV", value="apple_tv"),
+                app_commands.Choice(name="Roku", value="roku"),
+                app_commands.Choice(name="Fire TV", value="fire_tv"),
+                app_commands.Choice(name="Android TV, Google TV, Shield", value="android_tv"),
+                app_commands.Choice(name="iPhone, iPad, Android phone", value="mobile"),
+                app_commands.Choice(name="Web browser", value="web"),
+            ]
+        )
+        async def setup(interaction: discord.Interaction, device: app_commands.Choice[str]) -> None:
+            await interaction.response.defer(ephemeral=True)
+            for chunk in self.service.setup_guide(device.value):
+                await interaction.followup.send(chunk, ephemeral=True)
 
         @tree.command(name="forget", description="Clear our conversation so far")
         async def forget(interaction: discord.Interaction) -> None:

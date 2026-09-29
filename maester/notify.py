@@ -3,7 +3,8 @@
 Tools, button decisions, webhooks and scheduled jobs all produce notices: a
 post in the admin channel, the same with Approve/Deny buttons for one
 pending action, an announcement in the requests channel for every friend,
-or a DM to one user. Only the chat layer knows how to deliver them;
+a DM to one user, or a Discord role given or taken (an approved change of
+access), which the bot makes and reports to the admin when it can't. Only the chat layer knows how to deliver them;
 everything else hands them to a `Notifier`, which the Discord bot
 implements, so `agent/`, `tools/` and `web/` never import Discord.
 
@@ -51,7 +52,17 @@ class DirectMessage:
     about: Titled | None = None
 
 
-Notice = AdminPost | ApprovalPost | Announcement | DirectMessage
+@dataclass(frozen=True)
+class RoleChange:
+    """A Discord role given to (or taken from) one member, by the bot."""
+
+    to: str  # a Discord user id
+    role_id: int
+    add: bool = True
+    why: str = ""  # for the server's audit log
+
+
+Notice = AdminPost | ApprovalPost | Announcement | DirectMessage | RoleChange
 
 
 class Notifier(Protocol):

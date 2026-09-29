@@ -7,6 +7,7 @@
 - `digest.py`     the admin's daily digest
 - `nas.py`        the weekly NAS health report
 - `landed.py`     a friend told when the new copy of a replaced file lands
+- `expiry.py`     reminders before a friend's access ends
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ from maester.agent.limits import KillSwitch
 from maester.clients import Services
 from maester.config import Settings
 from maester.jobs.digest import Digest
+from maester.jobs.expiry import remind_expiring
 from maester.jobs.landed import CHECK_EVERY, tell_landed
 from maester.jobs.nas import nas_report
 from maester.jobs.schedule import At, Every
@@ -46,6 +48,11 @@ def scheduled(
             "digest", At(jobs.digest_at, jobs.zone), Digest(services, store, settings, kill_switch)
         ),
         Job("landed", Every(CHECK_EVERY), partial(tell_landed, services, store)),
+        Job(
+            "expiry_reminders",
+            At(jobs.digest_at, jobs.zone),
+            partial(remind_expiring, services, store, settings),
+        ),
         Job(
             "nas_report",
             At(jobs.digest_at, jobs.zone, weekday=jobs.nas_report_day),

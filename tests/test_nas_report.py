@@ -61,5 +61,12 @@ async def test_without_the_fleet_monitor_the_volumes_are_still_reported(services
 
 def test_every_job_is_scheduled_from_the_settings(services, store):
     jobs = {j.name: j.when for j in scheduled(services, store, Settings(), KillSwitch(store))}
-    assert set(jobs) == {"sweep", "space_sample", "digest", "landed", "nas_report"}
+    assert set(jobs) == {
+        "sweep",
+        "space_sample",
+        "digest",
+        "landed",
+        "expiry_reminders",
+        "nas_report",
+    }
     assert jobs["nas_report"].weekday == 0 and jobs["digest"].weekday is None

@@ -36,7 +36,9 @@ Seerr  Sonarr    Radarr    SABnzbd   Tautulli    Plex     Wizarr
 | "it's laggy"                                   | Reads the live stream from Tautulli (transcode, relay, bandwidth), server load, and gives one concrete fix         |
 | "is Plex down?"                                | Pings every service behind the server at once and says what is up and what is down                                |
 | "which Dune should I watch on hotel wifi?"     | Lists each version's bitrate and recommends the one the connection carries; tells the admin about much-streamed remuxes |
-| "can my brother get access?"                   | Puts an invite request in the admin queue; on approval, issues a Wizarr invite                                     |
+| "can my brother get access?"                   | Puts an invite request in the admin queue; on approval, issues a Wizarr invite and DMs the link                    |
+| "can I get the anime library too?"             | Asks the admin; on approval, adds it to the friend's Plex share without touching the rest                          |
+| "how do I set up Plex on my Roku?"             | Walks through it from the server's own guide, quality and relay settings included                                  |
 
 For the admin, in one private channel:
 
@@ -46,6 +48,7 @@ For the admin, in one private channel:
 - stalled downloads blocklisted and searched again on their own, and 4K requests held while their volume is nearly full
 - "why did Dune fail?" answered from SABnzbd and the arr's history
 - `/kill`, `/tier`, `/audit`, `/forecast`, and `/maintenance`, which holds requests and replacements until the stack is back
+- invites and access changes to approve, and friends reminded a week and a day before their access ends
 
 Everything the bot can change goes through a small set of scoped tools with permission tiers and button confirmations. There is no shell, no generic API passthrough.
 
@@ -118,7 +121,7 @@ uv run maester           # starts the Discord bot and the web app on one loop
 
 Checks: `uv run ruff check .`, `uv run ruff format --check .`, `uv run pytest`. Evals: `uv run maester-eval` (real model against fake services) or `uv run maester-eval --model fake`.
 
-**Discord setup.** Create an application at discord.com/developers, add a bot, turn on the *Message Content* and *Server Members* privileged intents, and invite it with the `bot` and `applications.commands` scopes (permissions: View Channels, Send Messages, Read Message History, Embed Links). Put the bot token, your server id, the requests and admin channel ids, and the trusted and admin role ids in `.env`. Friends DM the bot or mention it in the requests channel; `/link`, `/whoami` and `/forget` are slash commands. The admin's commands are `/tier`, `/kill`, `/audit`, `/pending`, `/forecast` and `/maintenance`; approvals, the digest and the NAS report post in the admin channel, and maintenance announcements in the requests channel.
+**Discord setup.** Create an application at discord.com/developers, add a bot, turn on the *Message Content* and *Server Members* privileged intents, and invite it with the `bot` and `applications.commands` scopes (permissions: View Channels, Send Messages, Read Message History, Embed Links, Manage Roles; the bot's role must sit above the trusted role so it can give it). Put the bot token, your server id, the requests and admin channel ids, and the trusted and admin role ids in `.env`. Friends DM the bot or mention it in the requests channel; `/link`, `/whoami`, `/setup` and `/forget` are slash commands. The admin's commands are `/tier`, `/kill`, `/audit`, `/pending`, `/forecast` and `/maintenance`; approvals, the digest and the NAS report post in the admin channel, and maintenance announcements in the requests channel.
 
 **Seerr and the arrs.** maester works out which host holds a title's 1080p or 4K copy from Seerr's own records, so each Radarr and Sonarr in Seerr's settings must use the same address (host, port and base path) as its `RADARR_<HOST>_URL` or `SONARR_<HOST>_URL` here. A server Seerr reaches by another name is refused rather than guessed.
 

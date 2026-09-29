@@ -52,6 +52,27 @@ class Invite:
 
 
 @dataclass(frozen=True)
+class Library:
+    """A library Wizarr can share, on one of its Plex servers."""
+
+    id: int
+    name: str  # as Plex names it, "01. Movies"
+    server_id: int
+    server_name: str
+    enabled: bool = True
+
+    @classmethod
+    def from_api(cls, raw: dict[str, Any]) -> Library:
+        return cls(
+            id=int(raw["id"]),
+            name=raw.get("name") or "",
+            server_id=int(raw.get("server_id") or 0),
+            server_name=raw.get("server_name") or "",
+            enabled=bool(raw.get("enabled", True)),
+        )
+
+
+@dataclass(frozen=True)
 class WizarrUser:
     id: int
     username: str
@@ -83,8 +104,14 @@ def redeemer(invite: Invite, users: list[WizarrUser]) -> WizarrUser | None:
 
 class Wizarr(Protocol):
     async def ping(self) -> None: ...
+    async def libraries(self) -> list[Library]: ...
     async def create_invite(
-        self, *, expires_in_days: int, duration: str, library_ids: list[int] | None = None
+        self,
+        *,
+        expires_in_days: int,
+        duration: str,
+        library_ids: list[int] | None = None,
+        server_ids: list[int] | None = None,
     ) -> Invite: ...
     async def list_invites(self) -> list[Invite]: ...
     async def list_users(self) -> list[WizarrUser]: ...
@@ -105,11 +132,26 @@ class WizarrClient(HttpClient):
         data = await self.get_json("/api/servers")
         return [int(s["id"]) for s in data.get("servers", [])]
 
+    async def libraries(self) -> list[Library]:
+        """Every library Wizarr knows, on every server."""
+        return [
+            Library.from_api(lib)
+            for lib in (await self.get_json("/api/libraries")).get("libraries", [])
+        ]
+
     async def create_invite(
-        self, *, expires_in_days: int, duration: str, library_ids: list[int] | None = None
+        self,
+        *,
+        expires_in_days: int,
+        duration: str,
+        library_ids: list[int] | None = None,
+        server_ids: list[int] | None = None,
     ) -> Invite:
+        """An invite to `server_ids` (every server when None), scoped to `library_ids`
+        (Wizarr's defaults when None). `duration` is days of access once joined, or
+        "unlimited"."""
         body: dict[str, Any] = {
-            "server_ids": await self.server_ids(),
+            "server_ids": server_ids if server_ids is not None else await self.server_ids(),
             "expires_in_days": honored_expiry_days(expires_in_days),
             "duration": duration,
             "unlimited": False,
@@ -153,21 +195,44 @@ class FakeWizarrClient(Downable):
 
     invites: list[Invite] = field(default_factory=list)
     user_list: list[WizarrUser] = field(default_factory=list)
+    library_list: list[Library] = field(default_factory=list)
     disabled: list[int] = field(default_factory=list)
     expiries: dict[int, str | None] = field(default_factory=dict)
+    # What each invite was asked for: expiry, duration, libraries and servers.
+    asked: list[dict[str, Any]] = field(default_factory=list)
+
+    async def libraries(self) -> list[Library]:
+        self.refuse_if_down("/api/libraries")
+        return list(self.library_list)
 
     async def create_invite(
-        self, *, expires_in_days: int, duration: str, library_ids: list[int] | None = None
+        self,
+        *,
+        expires_in_days: int,
+        duration: str,
+        library_ids: list[int] | None = None,
+        server_ids: list[int] | None = None,
     ) -> Invite:
+        self.refuse_if_down("/api/invitations")
         code = f"FAKE{len(self.invites) + 1:03d}"
-        inv = Invite(id=len(self.invites) + 1, code=code, url=f"https://wizarr.example/j/{code}")
+        # Like Wizarr's API, the url is a path on Wizarr's own host.
+        inv = Invite(id=len(self.invites) + 1, code=code, url=f"/j/{code}")
         self.invites.append(inv)
+        self.asked.append(
+            {
+                "expires_in_days": honored_expiry_days(expires_in_days),
+                "duration": duration,
+                "library_ids": library_ids,
+                "server_ids": server_ids,
+            }
+        )
         return inv
 
     async def list_invites(self) -> list[Invite]:
         return list(self.invites)
 
     async def list_users(self) -> list[WizarrUser]:
+        self.refuse_if_down("/api/users")
         return list(self.user_list)
 
     async def find_users_by_email(self, email: str) -> list[WizarrUser]:

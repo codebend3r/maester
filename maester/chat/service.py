@@ -27,6 +27,7 @@ from maester.agent.runner import CANCELLED
 from maester.agent.tools import Choice, Tier
 from maester.chat.identity import IdentityService
 from maester.chat.split import split_reply
+from maester.guides import guide
 from maester.notify import ApprovalPost, DirectMessage, Notice
 from maester.store import PendingAction, Store
 
@@ -37,7 +38,8 @@ UNLINKED_HELP = (
     "account is yours yet.\n\n"
     "If you already have access, link it with `/link <the email or username you use for Plex>` "
     "and the admin will approve it.\n\n"
-    "If you don't have access yet, ask the friend who invited you here, or the admin, for an invite."
+    "If you don't have access yet, ask the friend who invited you here, or the admin, for an invite.\n\n"
+    "Setting Plex up on a TV, stick or phone? `/setup` has a guide for each."
 )
 ERROR_REPLY = "Sorry, something went wrong on my end (ref `{ref}`). The admin can look it up."
 ESCALATED = "That needs the admin's approval now; you'll get a DM once they decide."
@@ -240,6 +242,10 @@ class ChatService:
 
     def whoami(self, user: ChatUser) -> str:
         return self.identity.whoami(user.id, set(user.role_ids))
+
+    def setup_guide(self, device: str) -> list[str]:
+        """A device's setup guide, for anyone, linked or not; in chunks that fit a message."""
+        return split_reply(guide(device))
 
     def forget(self, user: ChatUser) -> str:
         n = self.agent.forget(user.id)
