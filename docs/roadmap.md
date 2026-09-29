@@ -19,21 +19,21 @@ A friend can DM the bot and it answers using a read-only tool.
 
 Friends request movies and shows in 1080p and 4K through the bot.
 
-- [ ] E3 Requests [#21](https://github.com/codebend3r/maester/issues/21)
+- [x] E3 Requests [#21](https://github.com/codebend3r/maester/issues/21)
 
 ### M3 Troubleshooting
 
 Playback problems are diagnosed before anything is replaced; lag is explained with live data.
 
-- [ ] E4 Playback issues [#31](https://github.com/codebend3r/maester/issues/31)
-- [ ] E5 Performance diagnostics [#41](https://github.com/codebend3r/maester/issues/41)
+- [x] E4 Playback issues [#31](https://github.com/codebend3r/maester/issues/31)
+- [x] E5 Performance diagnostics [#41](https://github.com/codebend3r/maester/issues/41)
 
 ### M4 Admin and onboarding
 
 Approvals, digests and Wizarr invites run from chat.
 
-- [ ] E6 Admin console [#48](https://github.com/codebend3r/maester/issues/48)
-- [ ] E7 Onboarding and accounts [#59](https://github.com/codebend3r/maester/issues/59)
+- [x] E6 Admin console [#48](https://github.com/codebend3r/maester/issues/48)
+- [x] E7 Onboarding and accounts [#59](https://github.com/codebend3r/maester/issues/59)
 
 ### M5 Engagement
 
@@ -79,64 +79,64 @@ The Discord surface, account linking to Plex/Seerr users, roles to tiers, and in
 
 Searching, disambiguating and requesting movies and shows in 1080p and 4K through Seerr, with status and ready notifications.
 
-- [ ] E3.1 Search and disambiguate titles · M · P0 · [#22](https://github.com/codebend3r/maester/issues/22)
-- [ ] E3.2 Request a movie in 1080p · M · P0 · [#23](https://github.com/codebend3r/maester/issues/23)
-- [ ] E3.3 Request in 4K with admin approval · M · P0 · [#24](https://github.com/codebend3r/maester/issues/24)
-- [ ] E3.4 TV requests by season · M · P0 · [#25](https://github.com/codebend3r/maester/issues/25)
-- [ ] E3.5 Availability lookup with a Plex deep link · S · P0 · [#26](https://github.com/codebend3r/maester/issues/26)
-- [ ] E3.6 Request status with an ETA · M · P1 · [#27](https://github.com/codebend3r/maester/issues/27)
-- [ ] E3.7 Ready notifications · M · P1 · [#28](https://github.com/codebend3r/maester/issues/28)
-- [ ] E3.8 Collection requests · S · P2 · [#29](https://github.com/codebend3r/maester/issues/29)
-- [ ] E3.9 Dub-aware anime requests · M · P1 · [#30](https://github.com/codebend3r/maester/issues/30)
+- [x] E3.1 Search and disambiguate titles · M · P0 · [#22](https://github.com/codebend3r/maester/issues/22)
+- [x] E3.2 Request a movie in 1080p · M · P0 · [#23](https://github.com/codebend3r/maester/issues/23)
+- [x] E3.3 Request in 4K with admin approval · M · P0 · [#24](https://github.com/codebend3r/maester/issues/24)
+- [x] E3.4 TV requests by season · M · P0 · [#25](https://github.com/codebend3r/maester/issues/25)
+- [x] E3.5 Availability lookup with a Plex deep link · S · P0 · [#26](https://github.com/codebend3r/maester/issues/26)
+- [x] E3.6 Request status with an ETA · M · P1 · [#27](https://github.com/codebend3r/maester/issues/27)
+- [x] E3.7 Ready notifications · M · P1 · [#28](https://github.com/codebend3r/maester/issues/28)
+- [x] E3.8 Collection requests · S · P2 · [#29](https://github.com/codebend3r/maester/issues/29)
+- [x] E3.9 Dub-aware anime requests · M · P1 · [#30](https://github.com/codebend3r/maester/issues/30)
 
 ### E4 Playback issues (M3) [#31](https://github.com/codebend3r/maester/issues/31)
 
 Diagnose "it won't play" reports before touching anything, then replace the file through a guarded flow when it is really broken.
 
-- [ ] E4.1 Identify the item being reported · S · P0 · [#32](https://github.com/codebend3r/maester/issues/32)
-- [ ] E4.2 Diagnose the client side first · L · P0 · [#33](https://github.com/codebend3r/maester/issues/33)
-- [ ] E4.3 File health check · M · P0 · [#34](https://github.com/codebend3r/maester/issues/34)
-- [ ] E4.4 Open a Seerr issue for every report · S · P1 · [#35](https://github.com/codebend3r/maester/issues/35)
-- [ ] E4.5 Guarded replace flow · L · P0 · [#36](https://github.com/codebend3r/maester/issues/36)
-- [ ] E4.6 Replacement guardrails · S · P0 · [#37](https://github.com/codebend3r/maester/issues/37)
-- [ ] E4.7 Wrong-file reports · M · P1 · [#38](https://github.com/codebend3r/maester/issues/38)
-- [ ] E4.8 Subtitle and audio issue reports · M · P2 · [#39](https://github.com/codebend3r/maester/issues/39)
-- [ ] E4.9 Missing-episode reports · S · P1 · [#40](https://github.com/codebend3r/maester/issues/40)
+- [x] E4.1 Identify the item being reported · S · P0 · [#32](https://github.com/codebend3r/maester/issues/32)
+- [x] E4.2 Diagnose the client side first · L · P0 · [#33](https://github.com/codebend3r/maester/issues/33)
+- [x] E4.3 File health check · M · P0 · [#34](https://github.com/codebend3r/maester/issues/34)
+- [x] E4.4 Open a Seerr issue for every report · S · P1 · [#35](https://github.com/codebend3r/maester/issues/35)
+- [x] E4.5 Guarded replace flow · L · P0 · [#36](https://github.com/codebend3r/maester/issues/36)
+- [x] E4.6 Replacement guardrails · S · P0 · [#37](https://github.com/codebend3r/maester/issues/37)
+- [x] E4.7 Wrong-file reports · M · P1 · [#38](https://github.com/codebend3r/maester/issues/38)
+- [x] E4.8 Subtitle and audio issue reports · M · P2 · [#39](https://github.com/codebend3r/maester/issues/39)
+- [x] E4.9 Missing-episode reports · S · P1 · [#40](https://github.com/codebend3r/maester/issues/40)
 
 ### E5 Performance diagnostics (M3) [#41](https://github.com/codebend3r/maester/issues/41)
 
 Explain lag and choppy playback with live session, server and network data, and give a concrete fix.
 
-- [ ] E5.1 Live session report with relay detection · M · P0 · [#42](https://github.com/codebend3r/maester/issues/42)
-- [ ] E5.2 Server load per host · M · P0 · [#43](https://github.com/codebend3r/maester/issues/43)
-- [ ] E5.3 On-demand speed test · S · P1 · [#44](https://github.com/codebend3r/maester/issues/44)
-- [ ] E5.4 Advice generation · M · P0 · [#45](https://github.com/codebend3r/maester/issues/45)
-- [ ] E5.5 Service health checks · S · P1 · [#46](https://github.com/codebend3r/maester/issues/46)
-- [ ] E5.6 Version picking for slow connections · S · P2 · [#47](https://github.com/codebend3r/maester/issues/47)
+- [x] E5.1 Live session report with relay detection · M · P0 · [#42](https://github.com/codebend3r/maester/issues/42)
+- [x] E5.2 Server load per host · M · P0 · [#43](https://github.com/codebend3r/maester/issues/43)
+- [x] E5.3 On-demand speed test · S · P1 · [#44](https://github.com/codebend3r/maester/issues/44)
+- [x] E5.4 Advice generation · M · P0 · [#45](https://github.com/codebend3r/maester/issues/45)
+- [x] E5.5 Service health checks · S · P1 · [#46](https://github.com/codebend3r/maester/issues/46)
+- [x] E5.6 Version picking for slow connections · S · P2 · [#47](https://github.com/codebend3r/maester/issues/47)
 
 ### E6 Admin console (M4) [#48](https://github.com/codebend3r/maester/issues/48)
 
 Everything the admin does from chat: approvals, digests, limits, stalled downloads, log reading and NAS health.
 
-- [ ] E6.1 Approval queue with buttons · M · P0 · [#49](https://github.com/codebend3r/maester/issues/49)
-- [ ] E6.2 Daily digest · M · P1 · [#50](https://github.com/codebend3r/maester/issues/50)
-- [ ] E6.3 Admin commands · S · P0 · [#51](https://github.com/codebend3r/maester/issues/51)
-- [ ] E6.4 Storage-aware limits · S · P1 · [#52](https://github.com/codebend3r/maester/issues/52)
-- [ ] E6.5 Stalled download sweeper · M · P1 · [#53](https://github.com/codebend3r/maester/issues/53)
-- [ ] E6.6 Disk usage forecast · S · P2 · [#54](https://github.com/codebend3r/maester/issues/54)
-- [ ] E6.7 Bad-release detection · S · P2 · [#55](https://github.com/codebend3r/maester/issues/55)
-- [ ] E6.8 Download log reading · M · P1 · [#56](https://github.com/codebend3r/maester/issues/56)
-- [ ] E6.9 Maintenance windows · S · P2 · [#57](https://github.com/codebend3r/maester/issues/57)
-- [ ] E6.10 Weekly NAS health report · M · P2 · [#58](https://github.com/codebend3r/maester/issues/58)
+- [x] E6.1 Approval queue with buttons · M · P0 · [#49](https://github.com/codebend3r/maester/issues/49)
+- [x] E6.2 Daily digest · M · P1 · [#50](https://github.com/codebend3r/maester/issues/50)
+- [x] E6.3 Admin commands · S · P0 · [#51](https://github.com/codebend3r/maester/issues/51)
+- [x] E6.4 Storage-aware limits · S · P1 · [#52](https://github.com/codebend3r/maester/issues/52)
+- [x] E6.5 Stalled download sweeper · M · P1 · [#53](https://github.com/codebend3r/maester/issues/53)
+- [x] E6.6 Disk usage forecast · S · P2 · [#54](https://github.com/codebend3r/maester/issues/54)
+- [x] E6.7 Bad-release detection · S · P2 · [#55](https://github.com/codebend3r/maester/issues/55)
+- [x] E6.8 Download log reading · M · P1 · [#56](https://github.com/codebend3r/maester/issues/56)
+- [x] E6.9 Maintenance windows · S · P2 · [#57](https://github.com/codebend3r/maester/issues/57)
+- [x] E6.10 Weekly NAS health report · M · P2 · [#58](https://github.com/codebend3r/maester/issues/58)
 
 ### E7 Onboarding and accounts (M4) [#59](https://github.com/codebend3r/maester/issues/59)
 
 Wizarr invites, device setup help, access changes and expiry reminders.
 
-- [ ] E7.1 Invite requests through Wizarr · M · P0 · [#60](https://github.com/codebend3r/maester/issues/60)
-- [ ] E7.2 Device setup help · S · P1 · [#61](https://github.com/codebend3r/maester/issues/61)
-- [ ] E7.3 Library and 4K access requests · S · P1 · [#62](https://github.com/codebend3r/maester/issues/62)
-- [ ] E7.4 Access expiry reminders · S · P2 · [#63](https://github.com/codebend3r/maester/issues/63)
+- [x] E7.1 Invite requests through Wizarr · M · P0 · [#60](https://github.com/codebend3r/maester/issues/60)
+- [x] E7.2 Device setup help · S · P1 · [#61](https://github.com/codebend3r/maester/issues/61)
+- [x] E7.3 Library and 4K access requests · S · P1 · [#62](https://github.com/codebend3r/maester/issues/62)
+- [x] E7.4 Access expiry reminders · S · P2 · [#63](https://github.com/codebend3r/maester/issues/63)
 
 ### E8 Engagement (M5) [#64](https://github.com/codebend3r/maester/issues/64)
 
