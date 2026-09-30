@@ -1,3 +1,4 @@
+import os
 from datetime import time, timedelta
 from zoneinfo import ZoneInfo
 
@@ -111,3 +112,22 @@ def test_jobs_run_in_the_named_time_zone_at_the_named_times():
 def test_a_bad_schedule_fails_on_boot_naming_the_variable(name, value):
     with pytest.raises(ValueError, match=name):
         load_settings({name: value})
+
+
+def test_load_env_file_reads_dotenv_from_the_working_directory(tmp_path, monkeypatch):
+    from maester.config import load_env_file
+
+    (tmp_path / ".env").write_text("SEERR_API_KEY=from-file\nDISCORD_GUILD_ID=42\n")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("DISCORD_GUILD_ID", "7")
+    monkeypatch.delenv("SEERR_API_KEY", raising=False)
+    assert load_env_file() is True
+    assert os.environ["SEERR_API_KEY"] == "from-file"
+    assert os.environ["DISCORD_GUILD_ID"] == "7"  # what the process already had wins
+
+
+def test_load_env_file_is_a_no_op_without_a_file(tmp_path, monkeypatch):
+    from maester.config import load_env_file
+
+    monkeypatch.chdir(tmp_path)
+    assert load_env_file() is False

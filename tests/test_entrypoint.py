@@ -10,7 +10,8 @@ def test_version_flag_prints_version(capsys):
     assert capsys.readouterr().out.strip() == f"maester {__version__}"
 
 
-def test_default_run_fails_fast_naming_missing_config(monkeypatch):
+def test_default_run_fails_fast_naming_missing_config(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)  # away from any developer `.env` the entrypoint would load
     for name in (
         "ANTHROPIC_API_KEY",
         "DISCORD_BOT_TOKEN",

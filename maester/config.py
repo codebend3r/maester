@@ -17,7 +17,20 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import time, timedelta
 from functools import lru_cache
+from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+from dotenv import load_dotenv
+
+
+def load_env_file(path: str | Path = ".env") -> bool:
+    """Read a `.env` in the working directory into os.environ, for `uv run` outside Docker.
+
+    Compose feeds the container the same file through `env_file`, so on the NAS
+    there is nothing to read; wherever there is, what the process already has
+    wins over the file. Returns whether a file was read.
+    """
+    return load_dotenv(Path(path), override=False)
 
 
 class MissingConfig(KeyError):
