@@ -41,7 +41,7 @@ from maester.clients import (
 )
 from maester.clients.fleet import FleetMonitorClient
 from maester.clients.media import MediaPaths
-from maester.config import REQUIRED, Settings, require, settings
+from maester.config import REQUIRED, Settings, load_env_file, require, settings
 from maester.jobs import Scheduler, scheduled
 from maester.registry import Registry
 from maester.seerr_events import seerr_routes
@@ -168,6 +168,7 @@ async def run_jobs(app: App) -> None:
 
 def run() -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
+    load_env_file()
     require(os.environ, *REQUIRED)
     app = build()
     log.info("starting maester (model %s) on port %s", app.settings.model, app.settings.web_port)

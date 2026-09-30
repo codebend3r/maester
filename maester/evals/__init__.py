@@ -153,9 +153,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--model", default=None, help="model id, or 'fake' for the scripted model")
     args = parser.parse_args(argv)
 
-    from maester.config import settings
+    from maester.config import load_env_file, settings
     from maester.evals.world import build_world
 
+    load_env_file()
     model_name = args.model or settings().model
     cases = load_cases(args.cases or None)
     results = []
