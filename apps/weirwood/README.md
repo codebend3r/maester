@@ -2,10 +2,12 @@
 
 A light, self-hosted video library and player. Point it at folders of videos; it indexes them, makes a thumbnail for each, and plays them in the browser straight from disk, with no transcoding.
 
+weirwood is the `apps/weirwood/` folder of an Nx workspace; the [root README](../../README.md) covers the workspace.
+
 ## Run it with Docker
 
-1. Edit the volumes in `docker-compose.yml` so each media folder is mounted read-only under `/media`.
-2. `docker compose up -d --build` (or `bun run docker:up`).
+1. Edit the volumes in `apps/weirwood/docker-compose.yml` so each media folder is mounted read-only under `/media`.
+2. From `apps/weirwood/`, `docker compose up -d --build`. The image builds from the repo root, where the workspace's `bun.lock` lives.
 3. Open `http://<host>:8484`, choose **Add library**, and pick folders under `/media` with the folder browser.
 
 Deleting a video from the app removes the file, so leave `:ro` off any mount where that should work. On a read-only mount the app keeps the video and says why.
@@ -51,28 +53,32 @@ One JPEG per video, 480px wide, generated in the background after indexing and c
 
 ## Develop
 
+From the repo root:
+
 ```bash
 bun install
-bun run dev        # server on :8484 (watch mode) and Vite on :5173, proxying /api
-bun run verify     # lint, stylelint, format check, typecheck, tests and build for every project
+bun run dev:weirwood   # server on :8484 (watch mode) and Vite on :5173, proxying /api
+bun run verify         # lint, stylelint, format check, typecheck, tests and build for every project
 ```
 
-Run a single target through Nx: `bunx nx run server:test`, `bunx nx run web:typecheck`, `bunx nx show project server`.
+Run a single target through Nx: `bunx nx run @weirwood/server:test`, `bunx nx run @weirwood/web:typecheck`, `bunx nx show project @weirwood/server`.
 
 The server and core tests need `ffmpeg` and `ffprobe` on the PATH: the end-to-end suite encodes real clips and drives the API against them.
 
 ## Layout
 
 ```
-apps/
-  server/   NestJS on Fastify: SQLite index, scanner, ffprobe, thumbnails, range-request file serving
-  web/      React 19 + Vite: libraries, the grid, the player
-libs/
-  core/     @weirwood/core: API types and guards, the typed API client, the direct-play check,
-            formatting. No DOM or Node APIs, so a React Native app can use it unchanged.
+apps/weirwood/
+  server/        @weirwood/server: NestJS on Fastify: SQLite index, scanner, ffprobe, thumbnails,
+                 range-request file serving
+  web/           @weirwood/web: React 19 + Vite: libraries, the grid, the player
+  Dockerfile, docker-compose.yml
+libs/weirwood/
+  core/          @weirwood/core: API types and guards, the typed API client, the direct-play check,
+                 formatting. No DOM or Node APIs, so a React Native app can use it unchanged.
 ```
 
-A native iOS or Android app would be another `apps/` entry that imports `@weirwood/core` and answers the direct-play check from its own player (AVPlayer takes MKV-free HEVC and Dolby audio; ExoPlayer takes almost everything).
+A native iOS or Android app would be another `apps/weirwood/` entry that imports `@weirwood/core` and answers the direct-play check from its own player (AVPlayer takes MKV-free HEVC and Dolby audio; ExoPlayer takes almost everything).
 
 ## Configuration
 

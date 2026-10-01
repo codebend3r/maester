@@ -10,17 +10,11 @@ A self-hosted video library and direct-play web player. See README.md for how pl
 
 ## Structure
 
-An Nx 23 monorepo over bun workspaces (`workspaces: ["apps/*", "libs/*"]`). Projects have no `project.json`: Nx infers targets from each `package.json`'s scripts, whitelisted by its `nx.includedScripts`. A new script that should be a target goes in that list too.
+weirwood's projects live in the workspace described by the root `CLAUDE.md`, which covers Nx, the project table and how to run tasks: `@weirwood/server` in `apps/weirwood/server`, `@weirwood/web` in `apps/weirwood/web`, and `@weirwood/core` in `libs/weirwood/core`.
 
-| Project          | Path          | What                                                                          |
-| ---------------- | ------------- | ----------------------------------------------------------------------------- |
-| `server`         | `apps/server` | NestJS 12 on Fastify, SQLite (better-sqlite3), ffprobe/ffmpeg, vitest         |
-| `web`            | `apps/web`    | React 19, Vite 8, TanStack Query, zustand, SCSS modules, bun test + happy-dom |
-| `@weirwood/core` | `libs/core`   | Shared by every client: API types and guards, API client, direct-play check   |
+`libs/weirwood/core` must stay platform-agnostic: no DOM, no Node APIs, not even `URLSearchParams` (use `toQueryString`). Its tsconfig has `lib: ["ES2023"]` and no `types` so a slip fails the typecheck.
 
-`libs/core` must stay platform-agnostic: no DOM, no Node APIs, not even `URLSearchParams` (use `toQueryString`). Its tsconfig has `lib: ["ES2023"]` and no `types` so a slip fails the typecheck.
-
-Run tasks through Nx: `bunx nx run server:test`, `bunx nx run-many -t test typecheck`, `bun run verify`.
+The image builds from the repo root: `docker build -f apps/weirwood/Dockerfile .`. `Dockerfile.dockerignore` allowlists what it copies; a new path the image needs goes there too.
 
 ## Conventions
 
@@ -30,7 +24,7 @@ Run tasks through Nx: `bunx nx run server:test`, `bunx nx run-many -t test typec
 - One object parameter instead of several positional ones.
 - `!!value` for booleans; `&&` rather than a ternary with a null branch in JSX; `?.` always paired with `??`.
 - Server constructors inject with explicit `@Inject(Token)`, so DI never depends on decorator metadata under vitest.
-- Web modules import via `@/`; styles are `*.module.scss` using the tokens in `apps/web/src/styles/globals.scss`.
+- Web modules import via `@/`; styles are `*.module.scss` using the tokens in `apps/weirwood/web/src/styles/globals.scss`.
 - CSS layout is grid with `gap` and container padding; no flex layouts and no margins for spacing. Every page works at 320px wide.
 - Accessibility: semantic elements, labels on every control, visible `:focus-visible`, reduced motion respected.
 - Writing: no em dashes or en dashes anywhere, including comments and UI copy.

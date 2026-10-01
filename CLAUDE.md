@@ -11,10 +11,13 @@
 
 An Nx 23 monorepo over Bun workspaces (`apps/*/*`, `libs/*/*`, `scripts`). Projects have no `project.json`: Nx infers targets from each `package.json`'s scripts, whitelisted by its `nx.includedScripts`. A new script that should be a target goes in that list too.
 
-| Project        | Path               | What                                                                     |
-| -------------- | ------------------ | ------------------------------------------------------------------------ |
-| `@maester/api` | `apps/maester/api` | Python 3.12 package run through uv: agent, tools, chat, FastAPI, SQLite |
-| `scripts`      | `scripts`          | Repo tooling; its Python is linted with maester's pinned ruff and config |
+| Project            | Path                    | What                                                                          |
+| ------------------ | ----------------------- | ----------------------------------------------------------------------------- |
+| `@maester/api`     | `apps/maester/api`      | Python 3.12 package run through uv: agent, tools, chat, FastAPI, SQLite       |
+| `@weirwood/server` | `apps/weirwood/server`  | NestJS 12 on Fastify, SQLite (better-sqlite3), ffprobe/ffmpeg, vitest         |
+| `@weirwood/web`    | `apps/weirwood/web`     | React 19, Vite 8, TanStack Query, zustand, SCSS modules, bun test + happy-dom |
+| `@weirwood/core`   | `libs/weirwood/core`    | weirwood's shared core: API types and guards, API client, direct-play check   |
+| `scripts`          | `scripts`               | Repo tooling; its Python is linted with maester's pinned ruff and config      |
 
 Python projects declare `package.json` scripts that call uv (`uv run pytest -q`, `uv run ruff check .`); Nx runs them in the project's folder. There is no Python Nx plugin and no uv workspace.
 

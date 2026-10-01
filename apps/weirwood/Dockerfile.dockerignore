@@ -4,9 +4,12 @@
 *
 !package.json
 !bun.lock
-!libs/core
-!apps/server
-!apps/web
+!apps/*/*/package.json
+!libs/*/*/package.json
+!scripts/package.json
+!libs/weirwood/core
+!apps/weirwood/server
+!apps/weirwood/web
 **/node_modules
 **/dist
 **/data

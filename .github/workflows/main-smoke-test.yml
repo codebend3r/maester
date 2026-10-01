@@ -1,8 +1,8 @@
 name: 🚀 Main smoke test
 
-# Runs on merges into main and nowhere else: builds the production image and
-# checks that it starts and serves /health. Lint and tests run on the PR
-# before the merge (pull-request-checks.yml).
+# Runs on merges into main and nowhere else: builds each product's production
+# image and checks that it starts and serves its health route. Lint and tests
+# run on the PR before the merge (pull-request-checks.yml).
 on:
   push:
     branches: [main]
@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   smoke:
-    name: 🩺 Build and health check
+    name: 🩺 maester build and health check
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -69,3 +69,45 @@ jobs:
       - name: 🧹 Stop container
         if: always()
         run: docker rm -f maester || true
+
+  weirwood:
+    name: 🩺 weirwood build and health check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      IMAGE: weirwood:ci
+      PORT: 8484
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      # Built from the repo root, as compose does; the Dockerfile's own
+      # ignore file keeps the context to what it copies.
+      - name: 🐳 Build image
+        run: docker build -f apps/weirwood/Dockerfile -t "$IMAGE" .
+
+      - name: ▶️ Start server
+        run: docker run -d --name weirwood -p "$PORT:$PORT" "$IMAGE"
+
+      # The image's Debian ffmpeg has zscale, so HDR thumbnails are tone mapped.
+      - name: 🩺 Wait for /api/health
+        run: |
+          for _ in $(seq 1 30); do
+            if body="$(curl -fsS "http://127.0.0.1:$PORT/api/health")"; then
+              echo "$body"
+              echo "$body" | jq -e '.status == "ok" and .ffmpeg != null and .tonemap == true'
+              curl -fsS -o /dev/null "http://127.0.0.1:$PORT/"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::/api/health did not respond within 30s"
+          exit 1
+
+      - name: 📜 Container logs
+        if: always()
+        run: docker logs weirwood || true
+
+      - name: 🧹 Stop container
+        if: always()
+        run: docker rm -f weirwood || true
