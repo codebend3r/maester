@@ -3,9 +3,20 @@
 .env.local
 *.pem
 
-# runtime data
+# runtime data: maester's SQLite file, weirwood's index and thumbnail cache
 maester-data/
+data/
 *.db
+*.db-shm
+*.db-wal
+
+# node
+node_modules/
+dist/
+
+# nx
+.nx/cache
+.nx/workspace-data
 
 # python
 __pycache__/
@@ -13,10 +24,12 @@ __pycache__/
 .venv/
 .pytest_cache/
 .ruff_cache/
-dist/
 
 # editor / OS
 .DS_Store
 .idea/
 .vscode/
 *.swp
+
+# claude code worktrees
+.claude/worktrees/

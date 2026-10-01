@@ -1,0 +1,39 @@
+{
+  "name": "maester",
+  "private": true,
+  "description": "Nx workspace for maester, an AI concierge for a private Plex server, and the apps and libraries around it",
+  "workspaces": [
+    "apps/*/*",
+    "libs/*/*",
+    "scripts"
+  ],
+  "type": "module",
+  "scripts": {
+    "dev:maester": "nx run @maester/api:dev",
+    "build": "nx run-many -t build",
+    "test": "nx run-many -t test",
+    "typecheck": "nx run-many -t typecheck",
+    "lint": "nx run-many -t lint:py lint:ts lint:css",
+    "lint:fix": "nx run-many -t lint:py:fix lint:ts:fix lint:css:fix",
+    "format": "nx run-many -t format",
+    "format:check": "nx run-many -t format:check",
+    "verify": "nx run-many -t lint:py lint:ts lint:css format:check typecheck test build",
+    "affected": "nx affected -t lint:py lint:ts lint:css format:check typecheck test build",
+    "graph": "nx graph"
+  },
+  "devDependencies": {
+    "lefthook": "2.1.15",
+    "nx": "23.2.1",
+    "oxfmt": "0.68.0",
+    "oxlint": "1.83.0"
+  },
+  "packageManager": "bun@1.4.2",
+  "nx": {
+    "includedScripts": []
+  },
+  "trustedDependencies": [
+    "@parcel/watcher",
+    "lefthook",
+    "nx"
+  ]
+}

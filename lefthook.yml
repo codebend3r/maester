@@ -1,12 +1,28 @@
-# Install once after cloning: uv run lefthook install
+# Installed by `bun install` through lefthook's postinstall; `bunx lefthook install` reinstalls.
+# Each job is rooted at its project, so uv finds that project's ruff and config,
+# and {staged_files} are relative to it.
 pre-commit:
   jobs:
-    - name: ruff check
+    - name: ruff check (maester api)
+      root: apps/maester/api/
       glob: "*.{py,pyi}"
       run: uv run ruff check --fix {staged_files}
       stage_fixed: true
 
-    - name: ruff format
+    - name: ruff format (maester api)
+      root: apps/maester/api/
       glob: "*.{py,pyi}"
       run: uv run ruff format {staged_files}
+      stage_fixed: true
+
+    - name: ruff check (scripts)
+      root: scripts/
+      glob: "*.py"
+      run: uv run --project ../apps/maester/api ruff check --config ../apps/maester/api/pyproject.toml --fix {staged_files}
+      stage_fixed: true
+
+    - name: ruff format (scripts)
+      root: scripts/
+      glob: "*.py"
+      run: uv run --project ../apps/maester/api ruff format --config ../apps/maester/api/pyproject.toml {staged_files}
       stage_fixed: true
