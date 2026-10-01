@@ -1,0 +1,50 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "oxc", "unicorn", "import", "promise"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "warn",
+    "pedantic": "off",
+    "style": "off"
+  },
+  // No `browser` or `node` env on purpose: this library runs in the web
+  // client, the server, and any future native client, so it may only lean on
+  // what every JavaScript runtime has.
+  "env": {
+    "es2024": true
+  },
+  "rules": {
+    // The house style is `!!value` for boolean conversion, including in guards.
+    "no-extra-boolean-cast": "off",
+
+    // Conventions from CLAUDE.md.
+    "typescript/no-explicit-any": "error",
+    "typescript/consistent-type-definitions": ["error", "type"],
+    "typescript/no-non-null-assertion": "error",
+    "no-var": "error",
+    "prefer-const": "error",
+    "eqeqeq": ["error", "always", { "null": "ignore" }],
+    "no-console": "error",
+    "no-iterator": "error",
+    "unicorn/prefer-array-flat-map": "error",
+    "import/no-default-export": "error"
+  },
+  "ignorePatterns": ["dist"],
+  "overrides": [
+    {
+      // Vitest reads its config from a default export.
+      "files": ["vitest.config.ts"],
+      "rules": {
+        "import/no-default-export": "off"
+      }
+    },
+    {
+      "files": ["src/**/*.test.ts"],
+      "rules": {
+        "typescript/no-non-null-assertion": "off",
+        "unicorn/consistent-function-scoping": "off"
+      }
+    }
+  ]
+}

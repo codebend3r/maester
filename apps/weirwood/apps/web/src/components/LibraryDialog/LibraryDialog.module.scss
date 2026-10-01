@@ -1,0 +1,123 @@
+.dialog {
+  width: min(var(--measure), calc(100vw - 2 * var(--space-3)));
+  max-height: calc(100dvh - 2 * var(--space-3));
+  padding: 0;
+  border: 1px solid var(--color-moss);
+  border-radius: var(--radius-md);
+  background: var(--color-canopy);
+  color: var(--color-bark);
+
+  &::backdrop {
+    background: var(--color-scrim);
+  }
+}
+
+.form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+  padding: var(--space-4);
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: var(--font-size-xl);
+  font-weight: 400;
+  line-height: var(--line-tight);
+}
+
+.field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-1);
+  min-width: 0;
+  padding: 0;
+  border: 0;
+
+  label,
+  legend {
+    padding: 0;
+    font-weight: 600;
+    font-size: var(--font-size-sm);
+  }
+}
+
+.hint {
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+}
+
+.input {
+  width: 100%;
+  min-height: 2.5rem;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-moss);
+  border-radius: var(--radius-md);
+  background: var(--color-night);
+
+  &::placeholder {
+    color: var(--color-lichen);
+  }
+}
+
+.paths {
+  display: grid;
+  gap: var(--space-0);
+}
+
+.pathRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-1);
+  align-items: center;
+  padding-left: var(--space-2);
+  border-left: 2px solid var(--color-leaf-bright);
+}
+
+.pathText {
+  overflow-wrap: anywhere;
+}
+
+.typed {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-1);
+}
+
+.errors {
+  display: grid;
+  gap: var(--space-0);
+  padding: var(--space-2) var(--space-3);
+  border-left: 2px solid var(--color-leaf-bright);
+  background: var(--color-night);
+  font-size: var(--font-size-sm);
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  grid-template-areas: 'delete cancel save';
+  gap: var(--space-1);
+
+  > :nth-last-child(2) {
+    grid-area: cancel;
+  }
+
+  > :last-child {
+    grid-area: save;
+  }
+}
+
+.delete {
+  grid-area: delete;
+  justify-self: start;
+}
+
+@media (max-width: 30rem) {
+  .actions {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      'cancel save'
+      'delete delete';
+  }
+}

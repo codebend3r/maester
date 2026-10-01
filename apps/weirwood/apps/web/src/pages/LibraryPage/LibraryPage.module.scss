@@ -1,0 +1,120 @@
+.page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+.back {
+  justify-self: start;
+  border-color: transparent;
+  padding-left: 0;
+}
+
+.header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'title actions'
+    'count actions'
+    'status actions';
+  gap: var(--space-1) var(--space-4);
+  align-items: end;
+}
+
+.title {
+  grid-area: title;
+  font-family: var(--font-display);
+  font-size: var(--font-size-hero);
+  font-weight: 400;
+  line-height: var(--line-tight);
+  overflow-wrap: anywhere;
+}
+
+.count {
+  grid-area: count;
+  color: var(--color-lichen);
+}
+
+.status {
+  grid-area: status;
+}
+
+.actions {
+  grid-area: actions;
+  display: grid;
+  grid-auto-flow: column;
+  gap: var(--space-1);
+}
+
+.toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 24rem) auto auto;
+  justify-content: start;
+  gap: var(--space-2);
+  align-items: center;
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-moss);
+}
+
+.search,
+.sort {
+  min-height: 2.5rem;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-moss);
+  border-radius: var(--radius-md);
+  background: var(--color-canopy);
+}
+
+.search {
+  width: 100%;
+
+  &::placeholder {
+    color: var(--color-lichen);
+  }
+}
+
+.sortLabel {
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+}
+
+.message {
+  max-width: var(--measure);
+  color: var(--color-lichen);
+}
+
+@media (max-width: 48rem) {
+  .header {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'title'
+      'count'
+      'status'
+      'actions';
+  }
+
+  .actions {
+    justify-content: start;
+  }
+
+  .toolbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    justify-content: stretch;
+    grid-template-areas:
+      'search search'
+      'label sort';
+  }
+
+  .search {
+    grid-area: search;
+  }
+
+  .sortLabel {
+    grid-area: label;
+    justify-self: end;
+  }
+
+  .sort {
+    grid-area: sort;
+  }
+}

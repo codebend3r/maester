@@ -1,0 +1,134 @@
+// Design tokens and the few true primitives. Component styles live next to
+// their component as *.module.scss and use only these values.
+
+// The palette is the weirwood itself: a godswood at night for the ground,
+// bone-white bark for text, and red leaves kept for exactly two jobs, where
+// you stopped watching and the one action a screen is for.
+:root {
+  --color-night: #15201e;
+  --color-canopy: #1c2b28;
+  --color-moss: #2c3e3a;
+  --color-bark: #e6e1d6;
+  // 7:1 on --color-night, 6:1 on --color-canopy.
+  --color-lichen: #9db0a8;
+  // Fills behind bark text: 5.4:1.
+  --color-leaf: #a8262f;
+  // Thin marks on the dark ground (progress lines): 3.7:1 on --color-night.
+  --color-leaf-bright: #d8414a;
+  // Letterboxing around the video is real black, not a tint.
+  --color-stage: #000000;
+  --color-scrim: rgb(0 0 0 / 55%);
+
+  --space-0: 0.25rem;
+  --space-1: 0.5rem;
+  --space-2: 0.75rem;
+  --space-3: 1rem;
+  --space-4: 1.5rem;
+  --space-5: 2rem;
+  --space-6: 3rem;
+  --space-8: 5rem;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+
+  --font-display: 'Young Serif', georgia, serif;
+  --font-body: 'Instrument Sans Variable', system-ui, sans-serif;
+
+  --font-size-xs: 0.8rem;
+  --font-size-sm: 0.9rem;
+  --font-size-md: 1rem;
+  --font-size-lg: 1.25rem;
+  --font-size-xl: 1.75rem;
+  --font-size-hero: clamp(2.25rem, 6vw, 4.5rem);
+
+  --line-tight: 1.1;
+  --line-body: 1.5;
+
+  --max-width: 110rem;
+  // A readable measure for prose: empty states, errors, the dialog.
+  --measure: 38rem;
+  --focus-ring: 2px solid var(--color-bark);
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--color-night);
+  color: var(--color-bark);
+  font-family: var(--font-body);
+  font-size: var(--font-size-md);
+  line-height: var(--line-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+p,
+ul,
+ol,
+figure,
+dl,
+dd {
+  margin: 0;
+}
+
+ul,
+ol {
+  padding: 0;
+  list-style: none;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+a {
+  color: inherit;
+}
+
+:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 3px;
+}
+
+img,
+video {
+  display: block;
+  max-width: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms;
+    animation-duration: 0.01ms;
+  }
+}
+
+// For labels a sighted user gets from context (a search field beside its
+// results) but a screen reader still needs spelled out.
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}

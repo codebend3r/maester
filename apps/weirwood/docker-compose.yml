@@ -1,0 +1,22 @@
+services:
+  weirwood:
+    build: .
+    image: weirwood:latest
+    container_name: weirwood
+    ports:
+      - '8484:8484'
+    volumes:
+      # The index and the thumbnail cache. Survives rebuilds; delete it to start over.
+      - ./data:/config
+      # Every folder a library should read, mounted read-only under /media.
+      # Libraries use the container path on the right, e.g. /media/movies.
+      - /path/to/Movies:/media/movies:ro
+      - /path/to/TV:/media/tv:ro
+    environment:
+      # Rescan every library on a timer (minutes); 0 means only on boot and on demand.
+      - RESCAN_INTERVAL_MINUTES=0
+    # The image runs as the unprivileged `node` user (1000:1000). On a
+    # Synology or any host where ./data belongs to someone else, run as the
+    # owner instead, e.g. user: '1026:100'.
+    # user: '1026:100'
+    restart: unless-stopped

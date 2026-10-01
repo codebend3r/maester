@@ -1,0 +1,16 @@
+.page {
+  display: grid;
+  grid-template-columns: minmax(0, var(--measure));
+  gap: var(--space-4);
+  justify-items: start;
+  padding-top: var(--space-6);
+  color: var(--color-lichen);
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: var(--font-size-hero);
+  font-weight: 400;
+  line-height: var(--line-tight);
+  color: var(--color-bark);
+}

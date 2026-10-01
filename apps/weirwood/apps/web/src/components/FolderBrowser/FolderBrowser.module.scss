@@ -1,0 +1,60 @@
+.browser {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-moss);
+  border-radius: var(--radius-md);
+  background: var(--color-night);
+
+  > :last-child {
+    justify-self: start;
+  }
+}
+
+.location {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.path {
+  font-size: var(--font-size-sm);
+  overflow-wrap: anywhere;
+}
+
+.list {
+  display: grid;
+  max-height: 16rem;
+  overflow-y: auto;
+  border-top: 1px solid var(--color-moss);
+}
+
+.entry {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-1);
+  align-items: center;
+  width: 100%;
+  padding: var(--space-1) var(--space-0);
+  border: 0;
+  border-bottom: 1px solid var(--color-moss);
+  background: transparent;
+  color: var(--color-bark);
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--color-canopy);
+  }
+}
+
+.name {
+  overflow-wrap: anywhere;
+}
+
+.message {
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+}

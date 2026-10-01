@@ -1,0 +1,62 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "oxc", "unicorn", "react", "jsx-a11y", "import", "promise"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "warn",
+    "pedantic": "off",
+    "style": "off"
+  },
+  "env": {
+    "browser": true,
+    "es2024": true
+  },
+  "rules": {
+    // React 19 with the automatic JSX runtime: React is never in scope.
+    "react/react-in-jsx-scope": "off",
+    // Side-effect imports are how fonts and globals.scss get pulled into main.tsx.
+    "import/no-unassigned-import": "off",
+    // The house style is `!!value` for boolean conversion, including in guards.
+    "no-extra-boolean-cast": "off",
+    // Fetch chains here exist for their side effects, not to pass values on.
+    "promise/always-return": "off",
+
+    // Conventions from CLAUDE.md.
+    "typescript/no-explicit-any": "error",
+    "typescript/consistent-type-definitions": ["error", "type"],
+    "typescript/no-non-null-assertion": "error",
+    "no-var": "error",
+    "prefer-const": "error",
+    "eqeqeq": ["error", "always", { "null": "ignore" }],
+    "no-console": ["warn", { "allow": ["warn", "error"] }],
+    "no-iterator": "error",
+    "unicorn/prefer-array-flat-map": "error",
+    "import/no-default-export": "error"
+  },
+  "ignorePatterns": ["dist", "public"],
+  "overrides": [
+    {
+      // Vite needs a default export; ambient .d.ts files declare, they don't export.
+      "files": ["vite.config.ts", "**/*.d.ts"],
+      "rules": {
+        "import/no-default-export": "off"
+      }
+    },
+    {
+      // Declaration merging into bun:test's Matchers requires `interface`.
+      "files": ["**/*.d.ts"],
+      "rules": {
+        "typescript/consistent-type-definitions": "off"
+      }
+    },
+    {
+      "files": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/test/**", "src/test-setup.ts"],
+      "rules": {
+        "no-console": "off",
+        "typescript/no-non-null-assertion": "off",
+        "unicorn/consistent-function-scoping": "off"
+      }
+    }
+  ]
+}

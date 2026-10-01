@@ -1,0 +1,35 @@
+.status {
+  display: grid;
+  grid-template-columns: minmax(0, max-content);
+  gap: var(--space-0);
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+}
+
+.bar {
+  width: 12rem;
+  max-width: 100%;
+  height: 3px;
+  appearance: none;
+  border: 0;
+  border-radius: 2px;
+  background: var(--color-moss);
+  overflow: hidden;
+
+  &::-webkit-progress-bar {
+    background: var(--color-moss);
+  }
+
+  &::-webkit-progress-value {
+    background: var(--color-bark);
+  }
+
+  &::-moz-progress-bar {
+    background: var(--color-bark);
+  }
+}
+
+.error {
+  color: var(--color-bark);
+  overflow-wrap: anywhere;
+}

@@ -1,0 +1,26 @@
+import type { MediaItem } from '@weirwood/core'
+
+export const mediaItem = (overrides: Partial<MediaItem> = {}): MediaItem => ({
+  id: 7,
+  libraryId: 2,
+  title: 'Busboys (2026)',
+  fileName: 'Busboys (2026) 1080p WEBRip.mkv',
+  folder: '',
+  size: 1_609_721_462,
+  container: 'mkv',
+  duration: 5812.768,
+  width: 1920,
+  height: 1038,
+  videoCodec: 'hevc',
+  videoBitDepth: 10,
+  hdr: false,
+  audioCodec: 'aac',
+  audioChannels: 6,
+  bitrate: 2_215_000,
+  thumbnail: 'ready',
+  thumbnailVersion: 1,
+  position: 0,
+  favourite: false,
+  addedAt: '2026-09-27T00:00:00.000Z',
+  ...overrides,
+})
