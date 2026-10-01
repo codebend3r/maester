@@ -56,9 +56,9 @@ Everything the bot can change goes through a small set of scoped tools with perm
 
 Work is tracked in [GitHub Issues](https://github.com/codebend3r/maester/issues): one issue per epic (label `epic`) with stories attached as sub-issues, milestones M1 to M5 for phases, and the [maester roadmap board](https://github.com/users/codebend3r/projects/1) for status.
 
-The catalog of epics and stories lives in [`scripts/catalog.py`](scripts/catalog.py). [`docs/roadmap.md`](docs/roadmap.md) and the issues are both rendered from it by `scripts/sync_tracker.py`, so edit the catalog and re-run the sync rather than editing either by hand.
+The catalog of epics and stories lives in [`scripts/catalog.py`](../../scripts/catalog.py) at the repo root. [`docs/roadmap.md`](../../docs/roadmap.md) and the issues are both rendered from it by `scripts/sync_tracker.py`, so edit the catalog and re-run the sync rather than editing either by hand.
 
-The board follows the issues. `uv run python scripts/sync_board.py` lists where it has drifted (status, fields, missing items, finished epics, roadmap checkboxes), and `--apply` fixes it.
+The board follows the issues. `uv run python scripts/sync_board.py`, run from the repo root, lists where it has drifted (status, fields, missing items, finished epics, roadmap checkboxes), and `--apply` fixes it.
 
 | Milestone | Goal                                                                                |
 | --------- | ----------------------------------------------------------------------------------- |
@@ -72,7 +72,7 @@ The board follows the issues. `uv run python scripts/sync_board.py` lists where 
 
 | Part      | Choice                                                                                          |
 | --------- | ----------------------------------------------------------------------------------------------- |
-| Language  | Python 3.12, `uv`, `ruff`, `pytest`                                                             |
+| Language  | Python 3.12, `uv`, `ruff`, `pytest`, run through the workspace's Nx and Bun                     |
 | LLM       | Anthropic Python SDK, Messages API tool-use loop, `claude-opus-5-5` by default, prompt caching  |
 | Chat      | `discord.py` (DMs, a requests channel, buttons for confirmation and choice)                     |
 | Web       | FastAPI for the Seerr webhook plus `/health` (a Tautulli webhook comes later)                   |
@@ -82,44 +82,55 @@ The board follows the issues. `uv run python scripts/sync_board.py` lists where 
 
 ## Structure
 
+maester is the `apps/maester/` folder of an Nx workspace; the [root README](../../README.md) covers the workspace.
+
 ```
-maester/
-├── maester/
-│   ├── agent/          tool-use loop, tool registry, guardrails, prompts
-│   ├── clients/        one httpx client per service, each with an in-memory fake
-│   ├── tools/          the scoped tools the model can call, grouped by area
-│   ├── playback/       playback reports: plays, player limits, file health, the replace flow
-│   ├── perf/           lag: host load, the speed test, which version a connection carries
-│   ├── chat/           discord bot, views (buttons, pickers), identity
-│   ├── web/            FastAPI app: webhooks and /health
-│   ├── jobs/           scheduled work: the digest, the sweeper, space samples, the NAS report
-│   ├── store/          SQLite schema, migrations, audit log
-│   ├── evals/          the eval runner and the fake world a case runs in
-│   ├── app.py          wires settings into clients, store, agent, bot and web app
-│   ├── config.py       environment, read once
-│   └── *.py            shared modules: service registry, title ownership, media, notices
-├── evals/cases/        scripted conversations against the fakes, one YAML file each
-├── tests/
-├── scripts/            tracker catalog and sync, board setup and sync, NAS deploy, version bump
-└── docs/
+apps/maester/
+├── api/                    the @maester/api Nx project: a Python 3.12 package run through uv
+│   ├── package.json        Nx targets: dev, test, eval, lint:py, format
+│   ├── pyproject.toml, uv.lock
+│   ├── maester/
+│   │   ├── agent/          tool-use loop, tool registry, guardrails, prompts
+│   │   ├── clients/        one httpx client per service, each with an in-memory fake
+│   │   ├── tools/          the scoped tools the model can call, grouped by area
+│   │   ├── playback/       playback reports: plays, player limits, file health, the replace flow
+│   │   ├── perf/           lag: host load, the speed test, which version a connection carries
+│   │   ├── chat/           discord bot, views (buttons, pickers), identity
+│   │   ├── web/            FastAPI app: webhooks and /health
+│   │   ├── jobs/           scheduled work: the digest, the sweeper, space samples, the NAS report
+│   │   ├── store/          SQLite schema, migrations, audit log
+│   │   ├── evals/          the eval runner and the fake world a case runs in
+│   │   ├── app.py          wires settings into clients, store, agent, bot and web app
+│   │   ├── config.py       environment, read once
+│   │   └── *.py            shared modules: service registry, title ownership, media, notices
+│   ├── evals/cases/        scripted conversations against the fakes, one YAML file each
+│   └── tests/
+├── docs/                   architecture, deferred work, NAS deployment
+├── Dockerfile              the image, built from the repo root
+├── docker-compose.yml      the container on Meleys
+├── .env.example            copy to .env beside it
+└── VERSION
 ```
 
-Still to come: `maester/guides/` for the device setup guides the model answers from (E7).
+Repo tooling (tracker catalog and sync, board setup and sync, NAS deploy, version bump) lives in [`scripts/`](../../scripts) at the repo root.
+
+Still to come: `api/maester/guides/` for the device setup guides the model answers from (E7).
 
 ## Getting started
 
-**Prerequisites.** [uv](https://docs.astral.sh/uv/) (`brew install uv`); `uv sync` fetches Python 3.12 from `.python-version` if it is missing. You also need an Anthropic API key, a Discord bot (below), and the URLs and API keys of the services. The file health check needs `ffmpeg` on your `PATH`; the Docker image ships it, along with Ookla's `speedtest` CLI. Outside Docker, leave `SPEEDTEST_HOST` empty so the speed test is off.
+**Prerequisites.** [Bun](https://bun.sh) at the version the root `package.json` pins, and [uv](https://docs.astral.sh/uv/) (`brew install uv`); uv fetches Python 3.12 from `api/.python-version` if it is missing. You also need an Anthropic API key, a Discord bot (below), and the URLs and API keys of the services. The file health check needs `ffmpeg` on your `PATH`; the Docker image ships it, along with Ookla's `speedtest` CLI. Outside Docker, leave `SPEEDTEST_HOST` empty so the speed test is off.
 
 ```bash
 git clone https://github.com/codebend3r/maester.git
 cd maester
-cp .env.example .env     # fill in service URLs, API keys, Discord and Anthropic tokens
-uv sync
-uv run lefthook install  # git hooks: ruff check --fix and ruff format on staged files
-uv run maester           # starts the Discord bot and the web app on one loop
+bun install                                     # Nx, and the git hooks: ruff on staged Python files
+cp apps/maester/.env.example apps/maester/.env  # fill in service URLs, API keys, Discord and Anthropic tokens
+bun run dev:maester                             # starts the Discord bot and the web app on one loop
 ```
 
-Checks: `uv run ruff check .`, `uv run ruff format --check .`, `uv run pytest`. Evals: `uv run maester-eval` (real model against fake services) or `uv run maester-eval --model fake`.
+`.env` lives beside `docker-compose.yml`, in `apps/maester/`, where compose reads it too. Keep none at the repo root: Nx loads a root `.env` into every task it runs.
+
+Checks run through Nx from the repo root: `bunx nx run @maester/api:test`, `bunx nx run @maester/api:lint:py`, `bunx nx run @maester/api:format:check`, or `bun run verify` for every project. Evals: `bunx nx run @maester/api:eval` (fake model), or from `apps/maester/`, `uv run --project api maester-eval` for the real model against fake services.
 
 **Discord setup.** Create an application at discord.com/developers, add a bot, turn on the *Message Content* and *Server Members* privileged intents, and invite it with the `bot` and `applications.commands` scopes (permissions: View Channels, Send Messages, Read Message History, Embed Links, Manage Roles; the bot's role must sit above the trusted role so it can give it). Put the bot token, your server id, the requests and admin channel ids, and the trusted and admin role ids in `.env`. Friends DM the bot or mention it in the requests channel; `/link`, `/whoami`, `/setup` and `/forget` are slash commands. The admin's commands are `/tier`, `/kill`, `/audit`, `/pending`, `/forecast` and `/maintenance`; approvals, the digest and the NAS report post in the admin channel, and maintenance announcements in the requests channel.
 
@@ -127,13 +138,13 @@ Checks: `uv run ruff check .`, `uv run ruff format --check .`, `uv run pytest`. 
 
 **Seerr webhook.** In Seerr, Settings, Notifications, Webhook: set the URL to `http://<maester host>:8020/webhooks/seerr`, set *Authorization Header* to the value of `SEERR_WEBHOOK_SECRET`, keep the default JSON payload, and tick *Request Pending Approval*, *Request Approved*, *Request Declined*, *Request Available*, *Issue Resolved* and *Issue Reopened*. Every request waiting on approval then reaches the admin channel with buttons, wherever it was made; friends get a DM with a Plex link when their request is ready (a thumbs-down on it reports a problem); and resolving a playback report's issue in Seerr closes the report. Other ticked types are acknowledged and ignored.
 
-**File health check.** The container mounts the media shares read-only (`docker-compose.yml`) and `MEDIA_ROOTS` lists them; nothing outside them is read. When Sonarr or Radarr report paths under other names than the mounts, map them with `MEDIA_PATH_MAP`.
+**File health check.** The container mounts the media shares read-only (`apps/maester/docker-compose.yml`) and `MEDIA_ROOTS` lists them; nothing outside them is read. When Sonarr or Radarr report paths under other names than the mounts, map them with `MEDIA_PATH_MAP`.
 
-**Deploy.** `docs/nas-deployment.md` covers running it as a container on the NAS.
+**Deploy.** [`docs/nas-deployment.md`](docs/nas-deployment.md) covers running it as a container on the NAS.
 
 ## Docs
 
-- [`docs/roadmap.md`](docs/roadmap.md): milestones, epics, stories, with issue links
+- [`docs/roadmap.md`](../../docs/roadmap.md): milestones, epics, stories, with issue links (at the repo root)
 - [`docs/architecture.md`](docs/architecture.md): components, instance registry, permission tiers, guardrails
 - [`docs/nas-deployment.md`](docs/nas-deployment.md): first boot, updates, media mounts and data for the container on the NAS
 - [`docs/deferred.md`](docs/deferred.md): work left out of each epic's PR, why, and where it lands
