@@ -2,7 +2,11 @@ name: maester
 
 services:
   maester:
-    build: .
+    # Built from the repo root so the image can reach workspace files; the
+    # Dockerfile's own ignore file keeps the context to what it copies.
+    build:
+      context: ../..
+      dockerfile: apps/maester/Dockerfile
     image: maester
     container_name: maester
     restart: unless-stopped

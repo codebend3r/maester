@@ -1,6 +1,14 @@
 # Web chat replaces Discord
 
 Date: 2026-09-30. Status: approved in conversation, awaiting written review.
+Amended 2026-10-01 for the Nx workspace
+(`2026-10-01-nx-workspace-design.md`): the frontend is React on Vite instead
+of Next.js, served by the maester container instead of a second one, and
+every path now sits under `apps/maester/`.
+
+Paths: module paths such as `maester/chat/service.py` and `tests/` are
+relative to `apps/maester/api/`; `docs/`, `.env.example` and compose are
+relative to `apps/maester/`.
 
 ## Goal
 
@@ -31,34 +39,35 @@ contracts.
 | Sign-in | Plex PIN flow, owned by the API |
 | Admin approvals | An admin view in the same web app |
 | Ready and resolved notices | In-app inbox, no email |
-| Frontend | Next.js app under `web/` in this repo |
-| Hosting | Second container on Meleys, one HTTPS origin via the reverse proxy or tunnel |
-| Ownership of auth and sessions | FastAPI owns everything; Next.js is a thin client |
+| Frontend | React on Vite in `apps/maester/web/`, with weirwood's web tooling and conventions |
+| Hosting | The existing maester container serves the built app; one HTTPS origin via the reverse proxy or tunnel |
+| Ownership of auth and sessions | FastAPI owns everything; the web app is a thin client |
 | Existing data | Not migrated; users start fresh, keyed by Plex account id |
 
 The "FastAPI owns everything" choice was made over a Next.js
 backend-for-frontend (auth split across two languages, a service token
 to trust) and over server components forwarding cookies (complexity a
 chat page does not need). The tier rules, store and tests already live in
-Python, so the security-relevant logic stays there and the Next.js side
-stays a UI project.
+Python, so the security-relevant logic stays there and the web side
+stays a UI project. Nothing in the app uses server rendering, so the
+amendment drops Next.js for a static React build the API serves, which
+matches weirwood's web app in the same workspace.
 
 ## 1. Deployment and routing
 
-Two services in `docker-compose.yml`:
+One service in `docker-compose.yml`, as today: `maester`, the FastAPI app
+on port 8020. It serves the API under `/api/*`, `/health`, and the built
+web app for every other path, with `index.html` as the fallback for the
+app's client-side routes. The image builds the web app in a Bun stage from
+the repo root and copies its `dist/` in.
 
-- `maester`: the FastAPI API on port 8020, the existing image plus the new
-  routes.
-- `maester-web`: the Next.js app on port 3000, built from `web/` with
-  standalone output in a multi-stage Dockerfile.
+The reverse proxy or tunnel exposes one HTTPS origin and forwards
+everything to `maester`. One origin means the session cookie needs no CORS.
+The proxy itself is out of scope; `PUBLIC_URL` tells the API what origin it
+is served as.
 
-The reverse proxy or tunnel exposes one HTTPS origin. `/api/*` goes to
-`maester`; everything else to `maester-web`. One origin means the session
-cookie needs no CORS. The proxy itself is out of scope; `PUBLIC_URL` tells
-the API what origin it is served as.
-
-Local development: `next dev` rewrites `/api/*` to `http://localhost:8020`
-so the same frontend code runs unchanged.
+Local development: Vite's dev server proxies `/api/*` to
+`http://localhost:8020` so the same frontend code runs unchanged.
 
 The API keeps `/health`. The Seerr webhook moves to `/api/webhooks/seerr`
 so the one proxy rule covers it; the Seerr notification agent's URL is
@@ -202,9 +211,12 @@ shows.
 Admin tools that already run through chat (kill switch, digests, limits)
 keep doing so from the admin's chat box.
 
-## 5. The Next.js app
+## 5. The web app
 
-`web/`: Next.js App Router, TypeScript, plain CSS modules, no UI library.
+`apps/maester/web/` (`@maester/web`): React 19 on Vite, TypeScript, SCSS
+modules, no UI library, client-side routes. Tooling and code conventions
+follow weirwood's web app (`apps/weirwood/web`): oxlint, oxfmt, `tsgo`,
+targets inferred from `package.json` scripts.
 
 - `/login`: a "Sign in with Plex" button. Calls start, opens `auth_url`
   in a new tab, polls complete every two seconds until `ok`, then goes to
@@ -221,12 +233,15 @@ keep doing so from the admin's chat box.
   header only when `/api/me` says ADMIN.
 - A small client module wraps fetch, SSE parsing and the JSON content
   type. No global state library; React state per page.
-- `next.config.ts` rewrites `/api/*` to `API_URL` (default
+- `vite.config.ts` proxies `/api/*` to `API_URL` (default
   `http://localhost:8020`) in development only.
-- Build: `output: "standalone"`, a multi-stage `web/Dockerfile`, a
-  `maester-web` service in compose. CI runs `tsc --noEmit`, `next lint`
-  and `next build` beside the Python checks. No JS unit tests in this
-  pass; the logic that matters lives in the API.
+- Build: `vite build` to `dist/`. `apps/maester/Dockerfile` gains a Bun
+  stage that installs the workspace and builds `@maester/web`, and the
+  final image copies `dist/` to the directory FastAPI serves (`WEB_DIR`,
+  unset in development, as weirwood's server does). No second container.
+  CI runs `typecheck`, `lint:ts`, `lint:css`, `format:check` and `build`
+  through Nx with the Python checks. No JS unit tests in this pass; the
+  logic that matters lives in the API.
 
 ## 6. Removal and docs
 
@@ -239,10 +254,11 @@ Config: `REQUIRED` becomes `ANTHROPIC_API_KEY`, `SEERR_URL`,
 `SEERR_API_KEY`, `PLEX_URL`, `PLEX_TOKEN`, `PLEX_CLIENT_ID`,
 `SESSION_SECRET`, `PUBLIC_URL`. `.env.example` follows.
 
-Docs: README, `docs/architecture.md` and `docs/nas-deployment.md` are
-rewritten for the two-container layout and the Plex sign-in. The Seerr
+Docs: `apps/maester/README.md`, `docs/architecture.md` and
+`docs/nas-deployment.md` are rewritten for the web app and the Plex
+sign-in. The Seerr
 webhook URL in the README becomes `/api/webhooks/seerr`. In the roadmap
-catalog (`scripts/catalog.py`), E2 becomes "Web chat and identity" with
+catalog (`scripts/catalog.py` at the repo root), E2 becomes "Web chat and identity" with
 stories for sign-in, sessions and tiers, the chat API, the inbox, and the
 web app; E6 and E7 lose their channel and role wording. Milestone M1's
 sentence becomes "A friend can sign in and chat with maester, and it
@@ -270,6 +286,9 @@ Pytest, against a fake plex.tv client in `maester/clients`:
   changes the next request's tier.
 - Seerr webhook: one case where a ready notification lands in the
   requester's inbox with `about` filled.
+- Static app: with `WEB_DIR` set, a client route returns `index.html`,
+  an asset returns itself, and an unknown `/api/*` path is still a JSON
+  404.
 - Evals and every existing tool test are unchanged.
 
 ## Order of work
@@ -292,5 +311,5 @@ per step.
    report route, the Seerr webhook wired to it.
 6. Admin routes.
 7. Config, compose, docs and the roadmap catalog.
-8. Next.js app: scaffold and login, then chat, then admin, then the
-   Dockerfile and compose service.
+8. Web app: scaffold and login, then chat, then admin, then the Bun stage
+   in the maester image and FastAPI serving the build.

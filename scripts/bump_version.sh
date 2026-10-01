@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# Bump the project version with semver, commit the bump and tag that commit.
+# Bump a product's version with semver, commit the bump and tag that commit.
 #
-#   scripts/bump_version.sh patch            # 0.3.1 -> 0.3.2
-#   scripts/bump_version.sh minor            # 0.3.1 -> 0.4.0
-#   scripts/bump_version.sh major            # 0.3.1 -> 1.0.0
-#   scripts/bump_version.sh 1.0.0-rc.1       # explicit version
-#   scripts/bump_version.sh --dry-run minor  # show the plan, change nothing
-#   scripts/bump_version.sh --push patch     # also push the commit and tag
+#   scripts/bump_version.sh maester patch            # 0.3.1 -> 0.3.2
+#   scripts/bump_version.sh maester minor            # 0.3.1 -> 0.4.0
+#   scripts/bump_version.sh maester major            # 0.3.1 -> 1.0.0
+#   scripts/bump_version.sh maester 1.0.0-rc.1       # explicit version
+#   scripts/bump_version.sh --dry-run maester minor  # show the plan, change nothing
+#   scripts/bump_version.sh --push maester patch     # also push the commit and tag
 #
-# The current version comes from VERSION, else the newest vX.Y.Z tag, else
-# 0.0.0. The bump writes VERSION (and the [project] version in pyproject.toml
-# when there is one), commits it as "Release vX.Y.Z" and puts an annotated
-# vX.Y.Z tag on that commit.
+# The current version comes from apps/<product>/VERSION; a product without one
+# is refused. The bump writes VERSION, the [project] version of every
+# pyproject.toml under the product and its uv.lock entry, commits it as
+# "Release <product> vX.Y.Z" and puts an annotated <product>-vX.Y.Z tag on it.
 set -euo pipefail
 
 SEMVER_RE='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'
@@ -25,6 +25,7 @@ die() { echo "✗ $*" >&2; exit 1; }
 
 dry_run=0
 push=0
+product=""
 target=""
 for arg in "$@"; do
   case "$arg" in
@@ -32,22 +33,30 @@ for arg in "$@"; do
     --push) push=1 ;;
     -h|--help) usage 0 ;;
     -*) die "unknown flag: $arg" ;;
-    *) [ -z "$target" ] || die "only one bump target allowed"; target=$arg ;;
+    *)
+      if [ -z "$product" ]; then product=$arg
+      elif [ -z "$target" ]; then target=$arg
+      else die "expected a product and one bump target"
+      fi
+      ;;
   esac
 done
-[ -n "$target" ] || usage 1
+[ -n "$product" ] && [ -n "$target" ] || usage 1
 
 root=$(git rev-parse --show-toplevel 2>/dev/null) || die "not inside a git repository"
 cd "$root"
 
+dir="apps/$product"
+version_file="$dir/VERSION"
+[ -f "$version_file" ] || die "$version_file not found; '$product' is not a released product"
+
 current_version() {
-  if [ -f VERSION ]; then
-    tr -d '[:space:]' < VERSION
-    return
-  fi
-  local tag
-  tag=$(git tag --list 'v[0-9]*' --sort=-v:refname | head -1)
-  if [ -n "$tag" ]; then echo "${tag#v}"; else echo "0.0.0"; fi
+  tr -d '[:space:]' < "$version_file"
+}
+
+# Every Python project in the product carries the version in pyproject.toml.
+pyprojects() {
+  find "$dir" -name pyproject.toml -not -path '*/.venv/*' -not -path '*/node_modules/*' | sort
 }
 
 # Precedence per semver 2.0.0 section 11: core numbers, then a release beats a
@@ -111,7 +120,8 @@ case "$target" in
 esac
 
 [ "$(compare "$next" "$current")" = 1 ] || die "$next does not move forward from $current"
-tag="v$next"
+tag="$product-v$next"
+title="Release $product v$next"
 git rev-parse -q --verify "refs/tags/$tag" >/dev/null && die "tag $tag already exists"
 [ -z "$(git status --porcelain)" ] || die "working tree is not clean; commit or stash first"
 
@@ -123,23 +133,36 @@ fi
 
 echo "→ $current -> $next on $branch"
 if ((dry_run)); then
-  echo "  would write VERSION$([ -f pyproject.toml ] && echo ' and pyproject.toml')"
-  echo "  would commit \"Release $tag\" and tag it $tag"
+  echo "  would write $version_file"
+  for p in $(pyprojects); do echo "  would write $p$([ -f "$(dirname "$p")/uv.lock" ] && echo " and its uv.lock")"; done
+  echo "  would commit \"$title\" and tag it $tag"
   ((push)) && echo "  would push $branch and $tag"
   exit 0
 fi
 
-echo "$next" > VERSION
-git add VERSION
-if [ -f pyproject.toml ] && grep -q '^version = ' pyproject.toml; then
+echo "$next" > "$version_file"
+git add "$version_file"
+for p in $(pyprojects); do
+  grep -q '^version = ' "$p" || continue
   # Only the first match, which is the [project] table's version.
   awk -v v="$next" '!done && /^version = / { print "version = \"" v "\""; done = 1; next } { print }' \
-    pyproject.toml > pyproject.toml.tmp && mv pyproject.toml.tmp pyproject.toml
-  git add pyproject.toml
-fi
+    "$p" > "$p.tmp" && mv "$p.tmp" "$p"
+  git add "$p"
+  lock="$(dirname "$p")/uv.lock"
+  if [ -f "$lock" ]; then
+    # The project's own entry is the one installed from "."; its version line
+    # sits just above that source line.
+    awk -v v="$next" '
+      { line[NR] = $0 }
+      /^source = \{ editable = "\." \}$/ && line[NR - 1] ~ /^version = / { line[NR - 1] = "version = \"" v "\"" }
+      END { for (i = 1; i <= NR; i++) print line[i] }
+    ' "$lock" > "$lock.tmp" && mv "$lock.tmp" "$lock"
+    git add "$lock"
+  fi
+done
 
-git commit -q -m "Release $tag"
-git tag -a "$tag" -m "Release $tag"
+git commit -q -m "$title"
+git tag -a "$tag" -m "$title"
 echo "✓ committed $(git rev-parse --short HEAD) and tagged $tag"
 
 if ((push)); then

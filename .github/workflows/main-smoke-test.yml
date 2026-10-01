@@ -23,16 +23,19 @@ jobs:
     env:
       IMAGE: maester:ci
       PORT: 8020
+      VERSION_FILE: apps/maester/VERSION
     steps:
       - name: 📥 Checkout
         uses: actions/checkout@v4
 
+      # Built from the repo root, as compose does; the Dockerfile's own
+      # ignore file keeps the context to what it copies.
       - name: 🐳 Build image
-        run: docker build -t "$IMAGE" .
+        run: docker build -f apps/maester/Dockerfile -t "$IMAGE" .
 
       - name: 🏷️ Entrypoint reports the release version
         run: |
-          expected="maester $(cat VERSION)"
+          expected="maester $(cat "$VERSION_FILE")"
           actual="$(docker run --rm "$IMAGE" maester --version)"
           echo "expected: $expected"
           echo "actual:   $actual"
@@ -50,7 +53,7 @@ jobs:
           for _ in $(seq 1 30); do
             if body="$(curl -fsS "http://127.0.0.1:$PORT/health")"; then
               echo "$body"
-              echo "$body" | jq -e --arg v "$(cat VERSION)" \
+              echo "$body" | jq -e --arg v "$(cat "$VERSION_FILE")" \
                 '.status == "ok" and .version == $v'
               exit 0
             fi

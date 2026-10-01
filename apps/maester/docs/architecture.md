@@ -219,4 +219,4 @@ Deduplication is opt-in per route, for handlers whose repeat would reach a perso
 
 ## Deployment
 
-Docker Compose on Meleys at `/volume1/docker/maester`, next to `stripe-bridge`. Media shares are bind-mounted read-only for the health check, and `MEDIA_ROOTS` lists them; the image installs ffmpeg and the pinned speedtest CLI (`SPEEDTEST_HOST=meleys`). `scripts/deploy-nas.sh` rsyncs the repo over the SMB share and excludes `.env` and `maester-data/`.
+Docker Compose on Meleys, run from `apps/maester/` in the repo copy at `/volume1/docker/maester`, next to `stripe-bridge`. Media shares are bind-mounted read-only for the health check, and `MEDIA_ROOTS` lists them; the image installs ffmpeg and the pinned speedtest CLI (`SPEEDTEST_HOST=meleys`). `scripts/deploy-nas.sh` rsyncs the repo over the SMB share and excludes `.env` and `maester-data/`.

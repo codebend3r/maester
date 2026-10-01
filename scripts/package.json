@@ -1,0 +1,24 @@
+{
+  "name": "scripts",
+  "private": true,
+  "description": "Repo tooling: the tracker catalog and sync, board setup and sync, NAS deploy, version bump. Linted with maester's pinned ruff and config",
+  "scripts": {
+    "lint:py": "uv run --project ../apps/maester/api ruff check --config ../apps/maester/api/pyproject.toml .",
+    "lint:py:fix": "uv run --project ../apps/maester/api ruff check --config ../apps/maester/api/pyproject.toml --fix .",
+    "format": "uv run --project ../apps/maester/api ruff format --config ../apps/maester/api/pyproject.toml .",
+    "format:check": "uv run --project ../apps/maester/api ruff format --config ../apps/maester/api/pyproject.toml --check ."
+  },
+  "nx": {
+    "projectType": "library",
+    "tags": [
+      "scope:repo",
+      "lang:py"
+    ],
+    "includedScripts": [
+      "lint:py",
+      "lint:py:fix",
+      "format",
+      "format:check"
+    ]
+  }
+}
