@@ -1,3 +1,6 @@
+# Built from the repo root (see docker-compose.yml) so a later stage can reach
+# the workspace's bun.lock for the web app; Dockerfile.dockerignore allowlists
+# what the context may carry.
 FROM python:3.12-slim AS base
 
 # ffprobe/ffmpeg for the file health check (E4.3); read-only media mounts. tzdata
@@ -27,10 +30,10 @@ ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PROJECT_ENVIRONMENT=/opt/venv \
     PATH="/opt/venv/bin:$PATH" PYTHONUNBUFFERED=1
 
 # Dependencies first so code changes do not invalidate the layer.
-COPY pyproject.toml uv.lock ./
+COPY apps/maester/api/pyproject.toml apps/maester/api/uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 
-COPY maester ./maester
+COPY apps/maester/api/maester ./maester
 RUN uv sync --frozen --no-dev
 
 RUN useradd --create-home --uid 1000 maester \

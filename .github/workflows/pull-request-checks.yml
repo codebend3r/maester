@@ -15,26 +15,37 @@ concurrency:
 
 jobs:
   checks:
-    name: 🚦 Lint and test
+    name: 🚦 Lint, test and build
     runs-on: ubuntu-latest
+    env:
+      # uv runs against the committed lockfiles, never re-resolving them.
+      UV_FROZEN: '1'
     steps:
+      # Full history so Nx can diff against the base branch.
       - name: 📥 Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
+      # Bun's version comes from `packageManager` in package.json.
+      - name: 🍞 Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      # Each Python project's .python-version picks its interpreter.
       - name: 🐍 Set up uv
         uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
+          cache-dependency-glob: '**/uv.lock'
 
-      # Python version comes from .python-version so the pin lives in one place.
       - name: 📦 Install
-        run: uv sync --frozen
+        run: bun install --frozen-lockfile
 
-      - name: 🧹 Lint (ruff)
-        run: uv run ruff check .
+      - name: 🧭 Base and head for affected
+        uses: nrwl/nx-set-shas@v5
 
-      - name: 💅 Format check (ruff)
-        run: uv run ruff format --check .
-
-      - name: 🧪 Test (pytest)
-        run: uv run pytest -q
+      # Lint, format, typecheck, test and build every project the PR touches.
+      - name: 🚦 Affected targets
+        run: bun run affected
