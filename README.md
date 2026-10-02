@@ -22,7 +22,17 @@ bun run verify     # lint, format check, typecheck, tests and build for every pr
 bun run affected   # the same, for the projects changed since main
 ```
 
-Start a product with `bun run dev:maester` or `bun run dev:weirwood`. Run one target through Nx: `bunx nx run @maester/api:test`, `bunx nx run @weirwood/server:test`, `bunx nx show project @weirwood/web`, `bun run graph`.
+Start a product with `bun run dev:maester` or `bun run dev:weirwood`, then open it here:
+
+| Project            | Started by             | URL                                | What's there                                                  |
+| ------------------ | ---------------------- | ---------------------------------- | ------------------------------------------------------------- |
+| `@weirwood/web`    | `bun run dev:weirwood` | <http://localhost:5173>            | The library and player, hot reloaded; proxies `/api` to :8484 |
+| `@weirwood/server` | `bun run dev:weirwood` | <http://localhost:8484/api/health> | The API only; in dev it serves no pages                       |
+| `@maester/api`     | `bun run dev:maester`  | <http://localhost:8020/health>     | The health check; otherwise it serves only the Seerr webhook  |
+
+If 5173 is taken, Vite moves to the next free port; select `@weirwood/web:dev` in Nx's task view to see the URL it printed. `WEB_PORT` in `apps/maester/.env` moves maester's.
+
+Run one target through Nx: `bunx nx run @maester/api:test`, `bunx nx run @weirwood/server:test`, `bunx nx show project @weirwood/web`, `bun run graph`.
 
 ## Layout
 
