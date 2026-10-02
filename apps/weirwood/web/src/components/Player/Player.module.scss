@@ -1,0 +1,155 @@
+.stage {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template-areas: 'stage';
+  background: var(--color-stage);
+}
+
+.idle {
+  cursor: none;
+}
+
+.video {
+  grid-area: stage;
+  width: 100%;
+  height: 100dvh;
+  object-fit: contain;
+  background: var(--color-stage);
+
+  // The page is all video; a focus ring around it would frame the film.
+  &:focus-visible {
+    outline: none;
+  }
+}
+
+.chrome {
+  grid-area: stage;
+  align-self: start;
+  // A <video> gets its own compositing layer; without a stacking order the
+  // bar would paint underneath it.
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    'back title'
+    '. resumed';
+  gap: var(--space-1) var(--space-2);
+  align-items: center;
+  padding: var(--space-3) clamp(var(--space-3), 3vw, var(--space-5)) var(--space-6);
+  background: linear-gradient(to bottom, rgb(0 0 0 / 70%), rgb(0 0 0 / 0%));
+  transition: opacity 250ms ease-out;
+}
+
+.chromeHidden {
+  opacity: 0;
+  pointer-events: none;
+
+  // Tabbing to the back button brings the bar back with it.
+  &:focus-within {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+.back {
+  grid-area: back;
+  border-color: transparent;
+}
+
+.title {
+  grid-area: title;
+  font-family: var(--font-display);
+  font-size: var(--font-size-lg);
+  font-weight: 400;
+  line-height: var(--line-tight);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resumed {
+  grid-area: resumed;
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  gap: var(--space-2);
+  align-items: center;
+  color: var(--color-bark);
+  font-size: var(--font-size-sm);
+}
+
+.unplayable {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template-areas: 'panel';
+  place-items: center;
+  padding: var(--space-3);
+  background: var(--color-night);
+  overflow-y: auto;
+}
+
+.backdrop {
+  grid-area: panel;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: blur(24px) brightness(0.35);
+  transform: scale(1.1);
+}
+
+.panel {
+  grid-area: panel;
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+  width: min(var(--measure), 100%);
+  padding: var(--space-5);
+  border: 1px solid var(--color-moss);
+  border-radius: var(--radius-md);
+  background: var(--color-canopy);
+}
+
+.panelBack {
+  justify-self: start;
+  border-color: transparent;
+  padding-left: 0;
+}
+
+.panelTitle {
+  font-family: var(--font-display);
+  font-size: var(--font-size-xl);
+  font-weight: 400;
+  line-height: var(--line-tight);
+  overflow-wrap: anywhere;
+}
+
+.problems {
+  display: grid;
+  gap: var(--space-0);
+  padding-left: var(--space-3);
+  border-left: 2px solid var(--color-leaf-bright);
+}
+
+.hint {
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+  overflow-wrap: anywhere;
+}
+
+.panelActions {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  gap: var(--space-1);
+}
+
+@media (max-width: 30rem) {
+  .panelActions {
+    grid-auto-flow: row;
+    justify-content: stretch;
+  }
+}

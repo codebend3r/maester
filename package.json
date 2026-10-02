@@ -1,7 +1,7 @@
 {
   "name": "maester",
   "private": true,
-  "description": "Nx workspace for maester, an AI concierge for a private Plex server, and the apps and libraries around it",
+  "description": "Nx workspace for maester, an AI concierge for a private Plex server, weirwood, a self-hosted video library and player, and the apps and libraries around them",
   "workspaces": [
     "apps/*/*",
     "libs/*/*",
@@ -10,6 +10,7 @@
   "type": "module",
   "scripts": {
     "dev:maester": "nx run @maester/api:dev",
+    "dev:weirwood": "nx run-many -t dev -p @weirwood/server @weirwood/web",
     "build": "nx run-many -t build",
     "test": "nx run-many -t test",
     "typecheck": "nx run-many -t typecheck",

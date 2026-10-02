@@ -1,0 +1,27 @@
+.page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+.header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-1);
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: var(--font-size-hero);
+  font-weight: 400;
+  line-height: var(--line-tight);
+}
+
+.count {
+  color: var(--color-lichen);
+}
+
+.message {
+  max-width: var(--measure);
+  color: var(--color-lichen);
+}

@@ -1,0 +1,10 @@
+.page {
+  display: grid;
+  gap: var(--space-3);
+  place-content: center;
+  justify-items: center;
+  min-height: 100dvh;
+  padding: var(--space-3);
+  background: var(--color-stage);
+  color: var(--color-lichen);
+}
