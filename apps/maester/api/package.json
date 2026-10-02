@@ -1,5 +1,6 @@
 {
   "name": "@maester/api",
+  "version": "0.2.1",
   "private": true,
   "description": "maester's agent, tools, chat and FastAPI app: a Python 3.12 project run through uv",
   "scripts": {
