@@ -84,7 +84,7 @@ async def request_invite(ctx: ToolContext, for_whom: str, note: str = "") -> Res
         "type": "object",
         "properties": {
             "for_whom": {"type": "string"},
-            "requester": {"type": "string", "description": "The friend's Discord id."},
+            "requester": {"type": "string", "description": "The friend's user id."},
             "approved": {"type": "boolean"},
         },
         "required": ["for_whom", "requester", "approved"],

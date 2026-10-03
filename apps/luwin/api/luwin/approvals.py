@@ -30,7 +30,7 @@ def request_approval(
 ) -> Approval:
     """Ask the admin about a pending Seerr request.
 
-    `requester` is the friend's Discord id, empty when the Seerr user isn't
+    `requester` is the friend's user id, empty when the Seerr user isn't
     linked here (nobody to DM); `who` is how the admin knows them.
     """
     version = version_label(request.is_4k)

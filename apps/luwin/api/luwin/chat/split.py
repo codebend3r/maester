@@ -1,11 +1,11 @@
-"""Discord caps a message at 2000 characters; split long replies cleanly."""
+"""Split long replies into messages of at most 2000 characters, cleanly."""
 
 from __future__ import annotations
 
-DISCORD_LIMIT = 2000
+MESSAGE_LIMIT = 2000
 
 
-def split_reply(text: str, limit: int = DISCORD_LIMIT) -> list[str]:
+def split_reply(text: str, limit: int = MESSAGE_LIMIT) -> list[str]:
     """Split on paragraph, then line, then word boundaries, never mid-word if avoidable."""
     text = text.strip()
     if not text:

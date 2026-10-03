@@ -1,10 +1,17 @@
-# Web chat replaces Discord
+# luwin's web chat
 
 Date: 2026-09-30. Status: approved in conversation, awaiting written review.
 Amended 2026-10-01 for the Nx workspace
 (`2026-10-01-nx-workspace-design.md`): the frontend is React on Vite instead
 of Next.js, served by the maester container instead of a second one, and
 every path now sits under `apps/maester/`.
+Amended 2026-10-03 by the suite rename
+(`2026-10-02-suite-rename-design.md`): the assistant is luwin, in
+`apps/luwin/`. Its first chat surface is gone and its store started fresh,
+keyed by `user_id`, which covers most of steps 1 and 2 below. luwin is now
+meant to be a standalone chat app and a helper window inside raven and
+rookery, and rookery may own sign-in, so sections 2 and 5 are revisited
+before they are built.
 
 Paths: module paths such as `maester/chat/service.py` and `tests/` are
 relative to `apps/maester/api/`; `docs/`, `.env.example` and compose are
@@ -12,15 +19,15 @@ relative to `apps/maester/`.
 
 ## Goal
 
-Maester stops being a Discord bot. Friends open a web page, sign in with
+luwin gets its own chat app. Friends open a web page, sign in with
 Plex, and chat with maester to request movies and shows or to report a
 title that won't play. The admin signs in the same way and gets an
-approval queue. Everything Discord is removed, not hidden behind a flag.
+approval queue.
 
 Who it is for: the same people as today, the Plex server's friends, most
 of them away from the LAN and on a phone. Success is a friend opening the
 page, signing in once, and getting the same request and report flows the
-Discord bot gave, with ready notices waiting for them on their next visit.
+first chat surface gave, with ready notices waiting for them on their next visit.
 
 ## What stays
 
@@ -123,9 +130,9 @@ cookie value so a tampered cookie is rejected before a database lookup.
 - `LinkStatus`, the link status on `users`, `SeerrUserTaken` and the
   one-link-per-Seerr-user migration go away. `NotLinked` stays as the
   error tools raise for an UNLINKED user.
-- Every `discord_id` column (`conversations`, `audit_log`, `reports`,
-  `pending_actions`, `sent_messages`) becomes `user_id`, holding the
-  Plex id. `sent_messages` is replaced by the inbox (section 3).
+- Every table's chat account column (`conversations`, `audit_log`,
+  `reports`, `pending_actions`, `held_calls`) is `user_id`, holding the
+  Plex id. Ready notices go to the inbox (section 3).
 - Since nothing is migrated, this is one new initial migration replacing
   `001` to `007`, and the deployed `maester-data/maester.db` is removed
   on deploy.
@@ -245,10 +252,10 @@ targets inferred from `package.json` scripts.
 
 ## 6. Removal and docs
 
-Removed: `maester/chat/bot.py`, `chat/views.py`, `chat/members.py`,
-`tests/test_bot.py`, `tests/test_views.py`, the `discord.py` dependency,
-every `DISCORD_*` setting, `RoleMap`, the link flow and `link_account`
-tool, `remember_dm` and `react`, and `sent_messages`.
+Removed by the suite rename: the first chat surface's modules, tests,
+dependency and settings, role-based tiers, emoji reactions and
+`sent_messages`. Still to remove here: the link flow and the
+`link_account` tool, once sign-in replaces them.
 
 Config: `REQUIRED` becomes `ANTHROPIC_API_KEY`, `SEERR_URL`,
 `SEERR_API_KEY`, `PLEX_URL`, `PLEX_TOKEN`, `PLEX_CLIENT_ID`,
@@ -265,7 +272,7 @@ sentence becomes "A friend can sign in and chat with maester, and it
 answers using a read-only tool."
 
 Existing branches `e6-admin-console` and `e7-onboarding-accounts` were
-started against the Discord surface. They are not touched by this work;
+started against the first chat surface. They are not touched by this work;
 whatever survives in them is rebased or re-cut afterwards.
 
 ## 7. Testing
@@ -293,17 +300,16 @@ Pytest, against a fake plex.tv client in `maester/clients`:
 
 ## Order of work
 
-Discord comes out first, because the store and identity changes break the
-bot code, and the app must stay bootable at every step. After that the
+The first chat surface comes out first, because the store and identity
+changes break its code, and the app must stay bootable at every step. After that the
 API is built before any UI, so each step is testable with curl. One PR
 per step.
 
-1. Discord removal: delete the bot, views and members modules and their
-   tests, the dependency and the `DISCORD_*` settings; a `LogNotifier`
-   stands in for the bot so the webhook still works; the app boots as
-   the web server alone.
-2. Store: the new initial migration, `users` by Plex id, `sessions`,
-   `inbox`, `user_id` everywhere.
+1. Done in the suite rename: the first chat surface, its tests,
+   dependency and settings are deleted; a `LogNotifier` stands in so the
+   webhook still works; the app boots as the web server and the jobs.
+2. Store: `users` by Plex id, `sessions` and `inbox` on top of the fresh
+   initial migration, which already has `user_id` everywhere.
 3. Identity: fake and real plex.tv client, `sign_in`, sessions, tiers, the
    auth routes and `/api/me`.
 4. Chat: SSE `/api/chat`, `/api/chat/decide`, history.

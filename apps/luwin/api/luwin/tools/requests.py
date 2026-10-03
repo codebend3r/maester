@@ -326,7 +326,7 @@ def awaiting_admin(
             "version": {"type": "string", "enum": ["1080p", "4K"]},
             "requester": {
                 "type": "string",
-                "description": "The requester's Discord id; empty when they aren't linked here.",
+                "description": "The requester's user id; empty when they aren't linked here.",
             },
             "approved": {"type": "boolean"},
         },
@@ -506,7 +506,7 @@ def held_for_room(
             "seasons": {"type": "array", "items": {"type": "integer"}},
             "english_dub": {"type": "boolean"},
             "title": {"type": "string"},
-            "requester": {"type": "string", "description": "The friend's Discord id."},
+            "requester": {"type": "string", "description": "The friend's user id."},
             "approved": {"type": "boolean"},
         },
         "required": ["tmdb_id", "media_type", "english_dub", "title", "requester", "approved"],

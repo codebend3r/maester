@@ -15,7 +15,7 @@ def create_app(*, seerr: SeerrWebhook | None = None) -> FastAPI:
     @app.get("/health")
     async def health() -> dict[str, str]:
         # The one ungated route, so the container healthcheck can probe it
-        # without a session or a Discord connection.
+        # without a session.
         return {"status": "ok", "version": __version__}
 
     if seerr is not None:

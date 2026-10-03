@@ -1,7 +1,7 @@
-"""The admin's decision on a /link request, run from the Approve/Deny buttons.
+"""The admin's decision on a link request, run from its Approve/Deny choices.
 
 `link_account` is button-only: the model never sees it, and it runs only
-when the admin presses a button on a link request `IdentityService` raised,
+when the admin decides a link request `IdentityService` raised,
 through the same runner checks and audit as any tool.
 """
 
@@ -16,7 +16,7 @@ from luwin.store import LinkStatus
 
 @tool(
     "link_account",
-    "The admin's decision on a request to link a Discord account to a Plex account.",
+    "The admin's decision on a request to link a chat account to a Plex account.",
     {
         "type": "object",
         "properties": {

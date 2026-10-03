@@ -68,7 +68,7 @@ def stock(ctx: ToolContext) -> ToolContext:
 
 
 def link_pal(ctx: ToolContext) -> None:
-    """A second linked friend, Discord id d2."""
+    """A second linked friend, user id d2."""
     ctx.store.upsert_user("d2", status="active", seerr_user_id=5, plex_username="pal")
 
 

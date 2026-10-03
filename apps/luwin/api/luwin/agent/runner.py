@@ -267,7 +267,7 @@ class ToolRunner:
         content = {
             "status": "awaiting_admin_approval",
             "result": result.content,
-            "note": "The admin has been asked to approve this in the admin channel. Tell the "
+            "note": "The admin has been asked to approve this. Tell the "
             "user it now waits on the admin and that they'll get a DM once it's decided. "
             "Do not call this tool again for it.",
         }
