@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from luwin.config import (
+    REQUIRED,
     FleetMonitorAccess,
     Jobs,
     MissingConfig,
@@ -28,7 +29,6 @@ def test_values_are_parsed_and_urls_stripped():
     s = load_settings(
         {
             "LUWIN_MODEL": "claude-sonnet-5",
-            "DISCORD_GUILD_ID": "123",
             "SEERR_URL": "http://seerr:5055/ ",
             "REPLACE_DAILY_CAP": "5",
             "USER_TOKENS_PER_DAY": "",
@@ -37,7 +37,6 @@ def test_values_are_parsed_and_urls_stripped():
     )
     assert (s.dub_tag, s.dub_profile) == ("dub", "Dual Audio")
     assert s.model == "claude-sonnet-5"
-    assert s.discord_guild_id == 123
     assert s.seerr_url == "http://seerr:5055"
     assert s.guardrails.replace_daily_cap == 5
     assert s.guardrails.user_tokens_per_day == 200_000
@@ -119,13 +118,13 @@ def test_a_bad_schedule_fails_on_boot_naming_the_variable(name, value):
 def test_load_env_file_reads_dotenv_from_the_working_directory(tmp_path, monkeypatch):
     from luwin.config import load_env_file
 
-    (tmp_path / ".env").write_text("SEERR_API_KEY=from-file\nDISCORD_GUILD_ID=42\n")
+    (tmp_path / ".env").write_text("SEERR_API_KEY=from-file\nWEB_PORT=42\n")
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("DISCORD_GUILD_ID", "7")
+    monkeypatch.setenv("WEB_PORT", "7")
     monkeypatch.delenv("SEERR_API_KEY", raising=False)
     assert load_env_file() is True
     assert os.environ["SEERR_API_KEY"] == "from-file"
-    assert os.environ["DISCORD_GUILD_ID"] == "7"  # what the process already had wins
+    assert os.environ["WEB_PORT"] == "7"  # what the process already had wins
 
 
 def test_load_env_file_is_a_no_op_without_a_file(tmp_path, monkeypatch):
@@ -151,3 +150,7 @@ def test_new_variable_names_pass_and_are_read():
     refuse_renamed(env)
     s = load_settings(env)
     assert (s.model, s.effort, s.db_path) == ("claude-sonnet-5", "low", "/data/x.db")
+
+
+def test_luwin_needs_only_the_model_key_and_seerr_to_boot():
+    assert REQUIRED == ("ANTHROPIC_API_KEY", "SEERR_URL", "SEERR_API_KEY")

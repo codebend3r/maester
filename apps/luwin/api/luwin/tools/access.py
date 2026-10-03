@@ -8,9 +8,8 @@ once per friend and change. The admin's Approve runs `decide_access`
 library, or every 4K library, to the friend's plex.tv share on each server
 they're shared that holds it (`luwin/clients/plextv.py`). Their other
 libraries and their Wizarr expiry are left alone. 4K also gives them the
-trusted tier, which is what lets them request 4K (and ask for invites): the
-trusted Discord role, and a stored override when no role is configured or
-an override would outrank the role. A server they
+trusted tier, which is what lets them request 4K (and ask for invites), as a
+stored override; one already trusted or above keeps theirs. A server they
 aren't shared at all takes an invite, not a change, so that's the admin's.
 
 The friend is found on plex.tv by the email their link recorded, never by a
@@ -28,7 +27,7 @@ from luwin.access import is_4k, same_library, title_of
 from luwin.agent.tools import Approval, Result, Tier, ToolContext, tool
 from luwin.clients.plextv import OwnedServer, PlexTv, Section, Share
 from luwin.config import Access
-from luwin.notify import DirectMessage, RoleChange
+from luwin.notify import DirectMessage
 
 NOT_SET_UP = "Access changes aren't set up on this server (no Plex token), so ask the admin."
 # A note the admin reads in the approval post; the rest is cut.
@@ -225,7 +224,7 @@ async def decide_access(
             "few minutes (restart the app if it doesn't)."
         )
     else:
-        notices, tier_note = make_trusted(ctx, requester)
+        tier_note = make_trusted(ctx, requester)
         shows = " The 4K libraries show up in the Plex app in a few minutes." if added else ""
         dm = f"The admin approved 4K for you: ask me for any title in 4K now.{shows}"
     notices.append(DirectMessage(requester, dm))
@@ -234,18 +233,12 @@ async def decide_access(
     return Result(f"Added {done} for {name}{extra}.", tuple(notices))
 
 
-def make_trusted(ctx: ToolContext, discord_id: str) -> tuple[list[Any], str]:
-    """Put a friend on the trusted tier: the trusted Discord role when one is configured,
-    and the stored override when there's no role, or one that would outrank it."""
-    role = ctx.settings.discord_role_trusted
-    row = ctx.store.get_user(discord_id)
+def make_trusted(ctx: ToolContext, user_id: str) -> str:
+    """Put a friend on the trusted tier with a stored override; one already trusted
+    or above keeps theirs. Returns how it went, for the admin's reply."""
+    row = ctx.store.get_user(user_id)
     override = Tier.parse(row.tier_override) if row and row.tier_override else None
-    notices: list[Any] = []
-    notes = []
-    if role:
-        notices.append(RoleChange(discord_id, role, why="4K approved in luwin"))
-        notes.append("the trusted role")
-    if not role or (override is not None and override < Tier.TRUSTED):
-        ctx.store.upsert_user(discord_id, tier_override="trusted")
-        notes.append("a trusted tier override")
-    return notices, f", with {' and '.join(notes)}"
+    if override is not None and override >= Tier.TRUSTED:
+        return ", already trusted or above"
+    ctx.store.upsert_user(user_id, tier_override="trusted")
+    return ", with a trusted tier override"

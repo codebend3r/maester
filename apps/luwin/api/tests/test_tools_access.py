@@ -4,7 +4,7 @@ import pytest
 
 from luwin.agent.tools import Result, Tier, registry
 from luwin.clients.plextv import OwnedServer, Section, Share
-from luwin.notify import DirectMessage, RoleChange
+from luwin.notify import DirectMessage
 from luwin.tools.access import decide_access, request_access
 
 MELEYS, VERMITHOR = OwnedServer("Meleys", "m-1"), OwnedServer("Vermithor", "v-1")
@@ -72,8 +72,7 @@ async def test_approved_the_library_is_added_to_the_share_and_nothing_else_chang
     assert len(friend.services.plextv.written) == 1 and "nothing new" in again.content
 
 
-async def test_4k_adds_the_4k_libraries_and_the_trusted_role(friend):
-    friend = replace(friend, settings=replace(friend.settings, discord_role_trusted=22))
+async def test_4k_adds_the_4k_libraries_and_the_trusted_tier(friend):
     asked = await request_access(friend, "4k")
     assert asked.approval.notice == (
         "dany asks for 4K: the trusted tier (4K requests, and asking for invites for others) "
@@ -82,28 +81,26 @@ async def test_4k_adds_the_4k_libraries_and_the_trusted_role(friend):
     admin = replace(friend, user_id="boss", tier=Tier.ADMIN)
     out = await decide_access(admin, "4k", "4K", "d1", approved=True)
     assert friend.services.plextv.written == [(7, [101, 102, 103])]
-    role, dm = out.notices
-    assert role == RoleChange("d1", 22, why="4K approved in luwin")
+    (dm,) = out.notices
     assert dm == DirectMessage(
         "d1",
         "The admin approved 4K for you: ask me for any title in 4K now. The 4K libraries show "
         "up in the Plex app in a few minutes.",
     )
-    assert out.content == "Added 03. Movies 4K on Meleys for dany, with the trusted role."
-    assert friend.store.get_user("d1").tier_override is None  # the role does it
+    assert out.content == "Added 03. Movies 4K on Meleys for dany, with a trusted tier override."
+    assert friend.store.get_user("d1").tier_override == "trusted"
 
 
-async def test_4k_without_a_trusted_role_or_past_a_lower_override_sets_the_override(friend):
+async def test_4k_raises_a_lower_override_and_never_lowers_a_higher_one(friend):
     admin = replace(friend, user_id="boss", tier=Tier.ADMIN)
+    friend.store.upsert_user("d1", tier_override="friend")
     out = await decide_access(admin, "4k", "4K", "d1", approved=True)
-    assert not any(isinstance(n, RoleChange) for n in out.notices)
     assert out.content.endswith("with a trusted tier override.")
     assert friend.store.get_user("d1").tier_override == "trusted"
-    friend.store.upsert_user("d1", tier_override="friend")
-    with_role = replace(admin, settings=replace(admin.settings, discord_role_trusted=22))
-    out = await decide_access(with_role, "4k", "4K", "d1", approved=True)
-    assert out.content.endswith("with the trusted role and a trusted tier override.")
-    assert friend.store.get_user("d1").tier_override == "trusted"
+    friend.store.upsert_user("d1", tier_override="admin")
+    out = await decide_access(admin, "4k", "4K", "d1", approved=True)
+    assert out.content.endswith("already trusted or above.")
+    assert friend.store.get_user("d1").tier_override == "admin"
 
 
 async def test_an_approval_that_cant_be_carried_out_tells_the_friend(friend):
