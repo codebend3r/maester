@@ -41,7 +41,7 @@ from luwin.clients import (
 )
 from luwin.clients.fleet import FleetMonitorClient
 from luwin.clients.media import MediaPaths
-from luwin.config import REQUIRED, Settings, load_env_file, require, settings
+from luwin.config import REQUIRED, Settings, load_env_file, refuse_renamed, require, settings
 from luwin.jobs import Scheduler, scheduled
 from luwin.registry import Registry
 from luwin.seerr_events import seerr_routes
@@ -169,6 +169,7 @@ async def run_jobs(app: App) -> None:
 def run() -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
     load_env_file()
+    refuse_renamed(os.environ)
     require(os.environ, *REQUIRED)
     app = build()
     log.info("starting luwin (model %s) on port %s", app.settings.model, app.settings.web_port)

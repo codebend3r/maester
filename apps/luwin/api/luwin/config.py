@@ -47,6 +47,31 @@ def require(env: Mapping[str, str], *names: str) -> None:
         raise MissingConfig(missing)
 
 
+# Renamed when the assistant became luwin. A leftover old name would be read by
+# nothing, so the model, effort or database would quietly fall back to the
+# defaults; boot refuses it instead, naming the new one.
+RENAMED = {
+    "MAESTER_MODEL": "LUWIN_MODEL",
+    "MAESTER_EFFORT": "LUWIN_EFFORT",
+    "MAESTER_DB_PATH": "LUWIN_DB_PATH",
+}
+
+
+class RenamedConfig(KeyError):
+    """Raised by `refuse_renamed()` naming every old variable still set, and its new name."""
+
+    def __init__(self, names: list[str]):
+        self.names = names
+        renames = ", ".join(f"{name} is now {RENAMED[name]}" for name in names)
+        super().__init__(f"renamed environment variables: {renames}")
+
+
+def refuse_renamed(env: Mapping[str, str]) -> None:
+    leftover = [name for name in RENAMED if name in env]
+    if leftover:
+        raise RenamedConfig(leftover)
+
+
 def _int(env: Mapping[str, str], name: str, default: int) -> int:
     raw = env.get(name, "")
     return int(raw) if raw.strip() else default
@@ -277,8 +302,8 @@ REQUIRED = (
 def load_settings(env: Mapping[str, str]) -> Settings:
     return Settings(
         anthropic_api_key=env.get("ANTHROPIC_API_KEY", ""),
-        model=env.get("MAESTER_MODEL", "").strip() or "claude-opus-5-5",
-        effort=env.get("MAESTER_EFFORT", "").strip() or "medium",
+        model=env.get("LUWIN_MODEL", "").strip() or "claude-opus-5-5",
+        effort=env.get("LUWIN_EFFORT", "").strip() or "medium",
         discord_bot_token=env.get("DISCORD_BOT_TOKEN", ""),
         discord_guild_id=_int(env, "DISCORD_GUILD_ID", 0),
         discord_requests_channel_id=_int(env, "DISCORD_REQUESTS_CHANNEL_ID", 0),
@@ -325,7 +350,7 @@ def load_settings(env: Mapping[str, str]) -> Settings:
             user_messages_per_hour=_int(env, "USER_MESSAGES_PER_HOUR", 30),
             user_tokens_per_day=_int(env, "USER_TOKENS_PER_DAY", 200_000),
         ),
-        db_path=env.get("MAESTER_DB_PATH", "").strip() or "/data/luwin.db",
+        db_path=env.get("LUWIN_DB_PATH", "").strip() or "/data/luwin.db",
         web_port=_int(env, "WEB_PORT", 8020),
     )
 
