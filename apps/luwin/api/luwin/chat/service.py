@@ -1,4 +1,4 @@
-"""The chat logic without any Discord in it.
+"""The chat logic, for whichever app shows luwin.
 
 Takes a message from a known chat user, resolves their tier, runs the
 agent, and hands back text chunks plus whatever buttons the reply needs:
@@ -9,11 +9,8 @@ what it decided through the agent: the confirmed call, or the admin tool an
 approval named. The two kinds differ only in who presses and how it reads
 (`KINDS`). A run that failed in a way worth retrying is reopened.
 
-A DM about a title is remembered by message id (`remember_dm`), so a
-reaction to it can mean something: a thumbs-down on "Dune is ready" becomes
-a message saying something's wrong with that copy, and the report flow
-starts from there (`react`). The service talks to no chat platform:
-`bot.py` delivers what it returns, and tests drive this class directly.
+The service talks to no chat platform: the app that shows luwin delivers
+what it returns, and tests drive this class directly.
 """
 
 from __future__ import annotations
@@ -28,7 +25,7 @@ from luwin.agent.tools import Choice, Tier
 from luwin.chat.identity import IdentityService
 from luwin.chat.split import split_reply
 from luwin.guides import guide
-from luwin.notify import ApprovalPost, DirectMessage, Notice
+from luwin.notify import ApprovalPost, Notice
 from luwin.store import PendingAction, Store
 
 log = logging.getLogger("luwin.chat")
@@ -36,29 +33,16 @@ log = logging.getLogger("luwin.chat")
 UNLINKED_HELP = (
     "Hi! I'm luwin, the concierge for this Plex server. I don't know which Plex "
     "account is yours yet.\n\n"
-    "If you already have access, link it with `/link <the email or username you use for Plex>` "
-    "and the admin will approve it.\n\n"
-    "If you don't have access yet, ask the friend who invited you here, or the admin, for an invite.\n\n"
-    "Setting Plex up on a TV, stick or phone? `/setup` has a guide for each."
+    "If you already have access, link the email or username you use for Plex and the admin "
+    "will approve it.\n\n"
+    "If you don't have access yet, ask the friend who invited you, or the admin, for an invite.\n\n"
+    "Setting Plex up on a TV, stick or phone? There's a setup guide for each."
 )
 ERROR_REPLY = "Sorry, something went wrong on my end (ref `{ref}`). The admin can look it up."
-ESCALATED = "That needs the admin's approval now; you'll get a DM once they decide."
+ESCALATED = "That needs the admin's approval now; you'll hear back once they decide."
 HELD = (
     "The server is down for maintenance, so that's saved: it runs once maintenance is over, "
-    "and I'll DM you how it went."
-)
-# A thumbs-down (any skin tone) on a DM about a title reports a problem with it.
-THUMBS_DOWN = "\N{THUMBS DOWN SIGN}"
-
-
-def reports_a_problem(emoji: str) -> bool:
-    """Whether a reaction means anything at all, before anyone is looked up."""
-    return emoji.startswith(THUMBS_DOWN)
-
-
-REACTION_REPORT = (
-    "{emoji} on your message about {title} in {version} ({media_type} {tmdb_id}): "
-    "something's wrong with it."
+    "and I'll let you know how it went."
 )
 
 
@@ -66,7 +50,6 @@ REACTION_REPORT = (
 class ChatUser:
     id: str
     name: str
-    role_ids: frozenset[int] = frozenset()
 
 
 @dataclass
@@ -159,29 +142,6 @@ class ChatService:
     async def pick(self, user: ChatUser, choice: Choice) -> ChatResponse:
         return await self.handle_message(user, f"I pick: {choice.display} ({choice.value})")
 
-    # -- DMs and reactions ------------------------------------------------
-
-    def remember_dm(self, message_id: str, dm: DirectMessage) -> None:
-        """Note what a sent DM was about, when it was about a title."""
-        if dm.about is not None:
-            self.store.remember_message(message_id, dm.to, dm.about)
-
-    async def react(self, user: ChatUser, message_id: str, emoji: str) -> ChatResponse | None:
-        """A reaction to one of luwin's DMs; None when it means nothing."""
-        if not reports_a_problem(emoji):
-            return None
-        about = self.store.message_about(message_id, user.id)
-        if about is None:
-            return None
-        text = REACTION_REPORT.format(
-            emoji=emoji,
-            title=about.title,
-            version=about.copy.version,
-            media_type=about.copy.media_type,
-            tmdb_id=about.copy.tmdb_id,
-        )
-        return await self.handle_message(user, text)
-
     # -- buttons ----------------------------------------------------------
 
     async def decide(self, pending_id: int, presser: ChatUser, approve: bool) -> Decision:
@@ -241,7 +201,7 @@ class ChatService:
         return ChatResponse(chunks=[result.message], notices=notices)
 
     def whoami(self, user: ChatUser) -> str:
-        return self.identity.whoami(user.id, set(user.role_ids))
+        return self.identity.whoami(user.id)
 
     def setup_guide(self, device: str) -> list[str]:
         """A device's setup guide, for anyone, linked or not; in chunks that fit a message."""
@@ -254,7 +214,7 @@ class ChatService:
     # -- tiers ------------------------------------------------------------
 
     def tier_for(self, user: ChatUser) -> Tier:
-        return self.identity.tier_for(user.id, set(user.role_ids))
+        return self.identity.tier_for(user.id)
 
     def is_admin(self, user: ChatUser) -> bool:
         return self.tier_for(user) == Tier.ADMIN

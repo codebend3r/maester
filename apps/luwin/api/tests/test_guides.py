@@ -1,7 +1,7 @@
 import pytest
 
 from luwin.agent.tools import Tier, registry
-from luwin.chat.identity import IdentityService, RoleMap
+from luwin.chat.identity import IdentityService
 from luwin.chat.service import UNLINKED_HELP, ChatService
 from luwin.guides import DEVICES, GUIDES_DIR, guide
 from luwin.tools.guides import setup_guide
@@ -28,9 +28,7 @@ async def test_the_model_gets_the_guide_to_answer_from(ctx):
 
 
 def test_anyone_can_read_a_guide_and_newcomers_are_pointed_at_it(services, store):
-    chat = ChatService(
-        agent=None, identity=IdentityService(store, services, RoleMap()), store=store
-    )
+    chat = ChatService(agent=None, identity=IdentityService(store, services), store=store)
     chunks = chat.setup_guide("apple_tv")
     assert "".join(chunks).startswith("# Apple TV") and all(len(c) <= 2000 for c in chunks)
-    assert "`/setup`" in UNLINKED_HELP
+    assert "setup guide" in UNLINKED_HELP

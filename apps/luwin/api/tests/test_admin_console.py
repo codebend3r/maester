@@ -8,7 +8,7 @@ from luwin.agent.runner import ToolRunner
 from luwin.agent.tools import Tier
 from luwin.agent.tools import registry as app_registry
 from luwin.chat.admin import AdminConsole
-from luwin.chat.identity import IdentityService, RoleMap
+from luwin.chat.identity import IdentityService
 from luwin.chat.service import ChatService, ChatUser
 from luwin.clients.seerr import MediaDetails, MediaRequest, MediaStatus, RequestStatus
 from luwin.config import Settings
@@ -21,25 +21,15 @@ from tests.fake_model import FakeModel, text_message, tool_message
 # Importing the tools package registers the real tools into `app_registry`.
 import luwin.tools  # noqa: F401  isort: skip
 
-ADMIN_ROLE, TRUSTED_ROLE = 1, 2
 FRIEND = ChatUser("f1", "Friend")
-ADMIN = ChatUser("a1", "Boss", frozenset({ADMIN_ROLE}))
+ADMIN = ChatUser("a1", "Boss")
 DUNE = MediaDetails(438631, "movie", "Dune", 2021, "", MediaStatus.UNKNOWN, MediaStatus.UNKNOWN)
-
-
-def members(*users: ChatUser):
-    """Look people up as the chat platform knows them now."""
-    known = {u.id: u for u in users}
-
-    async def member(discord_id: str) -> ChatUser:
-        return known[discord_id]
-
-    return member
 
 
 def make_console(services, store, *script) -> AdminConsole:
     """The console, with a chat service whose model says what `script` says."""
-    identity = IdentityService(store, services, RoleMap(ADMIN_ROLE, TRUSTED_ROLE))
+    identity = IdentityService(store, services)
+    store.upsert_user(ADMIN.id, tier_override="admin")
     kill = KillSwitch(store)
     agent = Agent(
         model_client=FakeModel.scripted(*script),
@@ -90,9 +80,9 @@ def test_admin_sets_and_clears_a_tier_override(console, store):
     identity = console.identity
     assert console.set_tier(FRIEND, ADMIN.id, "admin").text == "Only the admin can use /tier."
     assert console.set_tier(ADMIN, FRIEND.id, "trusted").text.endswith("trusted.")
-    assert identity.tier_for(FRIEND.id, set()) == Tier.TRUSTED
-    assert console.set_tier(ADMIN, FRIEND.id, None).text.endswith("from roles.")
-    assert identity.tier_for(FRIEND.id, set()) == Tier.FRIEND
+    assert identity.tier_for(FRIEND.id) == Tier.TRUSTED
+    assert console.set_tier(ADMIN, FRIEND.id, None).text.endswith("the default.")
+    assert identity.tier_for(FRIEND.id) == Tier.FRIEND
     assert console.set_tier(ADMIN, FRIEND.id, "king").text.startswith("Unknown tier")
     rows = store.audit_recent(tool="/tier")
     assert [(r.args["tier"], r.ok) for r in rows] == [
@@ -122,7 +112,7 @@ async def test_pending_lists_open_approvals_and_raises_ones_seerr_holds_without_
 ):
     store.create_pending(
         kind="approve", action="link_account", requester="n1", payload={},
-        summary="Link Discord user Newbie to Plex account new@example.com", ttl=timedelta(days=7),
+        summary="Link Newbie to Plex account new@example.com", ttl=timedelta(days=7),
     )  # fmt: skip
     services.seerr.details[("movie", 438631)] = DUNE
     services.seerr.requests = [
@@ -132,7 +122,7 @@ async def test_pending_lists_open_approvals_and_raises_ones_seerr_holds_without_
     reply = await console.pending(ADMIN)
     lines = reply.text.splitlines()
     assert lines[0] == "2 waiting on you:"
-    assert lines[1].startswith("- Link Discord user Newbie") and "expires in about 7 d" in lines[1]
+    assert lines[1].startswith("- Link Newbie") and "expires in about 7 d" in lines[1]
     assert lines[2].startswith("- 4K Dune (2021) for dany (asked just now")
     assert [p.summary for p in reply.offers] == [line[2:].split(" (asked")[0] for line in lines[1:]]
     assert store.pending_about("seerr-request:9") == reply.offers[1]
@@ -192,7 +182,7 @@ async def test_maintenance_holds_a_request_and_runs_it_when_it_ends(services, st
     assert audited.held_id == held.id and audited.ok
     assert f"held for maintenance (#{held.id})" in console.audit(ADMIN, 5).text
 
-    ended = await console.end_maintenance(ADMIN, members(FRIEND))
+    ended = await console.end_maintenance(ADMIN)
     assert store.flag("maintenance") is None and store.held_calls() == []
     (request,) = services.seerr.requests
     assert request.requested_by_id == 4 and not request.is_4k
@@ -213,14 +203,20 @@ async def test_maintenance_holds_a_request_and_runs_it_when_it_ends(services, st
         if isinstance(m["content"], list)
         for block in m["content"]
     )
-    assert (await console.end_maintenance(ADMIN, members())).text == (
+    assert (await console.end_maintenance(ADMIN)).text == (
         "Maintenance wasn't on, and nothing is held."
     )
 
 
 async def test_a_held_call_runs_at_the_tier_its_caller_has_when_maintenance_ends(services, store):
-    trusted = ChatUser("t1", "Trusty", frozenset({TRUSTED_ROLE}))
-    store.upsert_user(trusted.id, status="active", seerr_user_id=7, plex_username="trusty")
+    trusted = ChatUser("t1", "Trusty")
+    store.upsert_user(
+        trusted.id,
+        status="active",
+        seerr_user_id=7,
+        plex_username="trusty",
+        tier_override="trusted",
+    )
     services.seerr.details[("movie", 438631)] = DUNE
     services.seerr.arr_servers["radarr"] = [seerr_server(1, "movie", "vermithor", is_4k=True)]
     console = make_console(
@@ -232,9 +228,9 @@ async def test_a_held_call_runs_at_the_tier_its_caller_has_when_maintenance_ends
     )
     console.start_maintenance(ADMIN)
     await console.chat.handle_message(trusted, "Dune in 4K")
-    # Their trusted role was taken away during the window: 4K is no longer theirs.
-    demoted = ChatUser(trusted.id, trusted.name)
-    ended = await console.end_maintenance(ADMIN, members(demoted))
+    # Their trusted tier was taken away during the window: 4K is no longer theirs.
+    store.upsert_user(trusted.id, tier_override=None)
+    ended = await console.end_maintenance(ADMIN)
     assert services.seerr.requests == []
     assert "request_media_4k" in ended.text and "didn't go through" in ended.text
     ((to, dm),) = ended.dms  # they still hear how it went
@@ -260,10 +256,10 @@ async def test_a_held_call_whose_service_is_still_down_stays_held_for_the_next_e
         services.seerr.refuse_if_down("/api/v1/movie")
 
     services.seerr.media_details = down
-    first = await console.end_maintenance(ADMIN, members(FRIEND))
+    first = await console.end_maintenance(ADMIN)
     assert "Still held" in first.text and first.dms == () and len(store.held_calls()) == 1
     services.seerr.down, services.seerr.media_details = False, real_details
-    second = await console.end_maintenance(ADMIN, members(FRIEND))
+    second = await console.end_maintenance(ADMIN)
     assert second.text.startswith("Running what's still held. Ran 1 held:")
     assert store.held_calls() == [] and len(services.seerr.requests) == 1
     assert [to for to, _ in second.dms] == [FRIEND.id]
@@ -285,7 +281,7 @@ async def test_a_long_window_still_leaves_the_held_call_in_view_for_the_follow_u
     store._conn.execute(
         "UPDATE conversations SET created_at = ?", (stamp(datetime.now(UTC) - timedelta(hours=9)),)
     )
-    await console.end_maintenance(ADMIN, members(FRIEND))
+    await console.end_maintenance(ADMIN)
     history = store.recent_messages(
         FRIEND.id, max_tokens=10_000, since=datetime.now(UTC) - timedelta(hours=6)
     )

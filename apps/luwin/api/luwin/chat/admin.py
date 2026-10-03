@@ -5,14 +5,14 @@ Every command is the admin's alone and is audited under its own name
 ("/kill"), refusals included, so the log shows who tried what. Replies are
 private to the admin; `offers` are approvals to show again with their
 buttons, so a week-old request can be decided from a phone. Like the chat
-service, the console talks to no chat platform: `bot.py` turns each command
-into a slash command and delivers the reply.
+service, the console talks to no chat platform: the app that shows luwin
+offers each command and delivers the reply.
 
 A maintenance window is a flag (`maintenance`): while it's up, requests and
 replacements are saved instead of run (the runner holds them). Starting one
-announces it in the requests channel; ending it runs every held call as its
-caller, at the tier they have then, and gives each of them a turn so the
-model tells them in a DM how it went.
+announces it to every friend; ending it runs every held call as its caller,
+at the tier they have then, and gives each of them a turn so the model tells
+them in a DM how it went.
 """
 
 from __future__ import annotations
@@ -20,7 +20,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -47,7 +46,7 @@ SEERR_PENDING = 50
 
 MAINTENANCE_ON = (
     "Heads up: the server is going down for maintenance{why}. Requests and replacements you "
-    "ask for meanwhile are saved and run once it's back; I'll DM you how they went."
+    "ask for meanwhile are saved and run once it's back; I'll let you know how they went."
 )
 MAINTENANCE_OFF = "Maintenance is over and the server is back. Thanks for waiting!"
 # The turn each friend with held calls gets once they've run, as if they asked.
@@ -60,7 +59,7 @@ class AdminReply:
     # Approvals to show again with their Approve/Deny buttons.
     offers: tuple[PendingAction, ...] = ()
     notices: tuple[Notice, ...] = ()
-    # Replies to send friends in a DM, by Discord id.
+    # Replies to send friends in a DM, by user id.
     dms: tuple[tuple[str, ChatResponse], ...] = ()
 
 
@@ -83,7 +82,7 @@ class AdminConsole:
         self.kill_switch = kill_switch
 
     def is_admin(self, user: ChatUser) -> bool:
-        return self.identity.tier_for(user.id, set(user.role_ids)) == Tier.ADMIN
+        return self.identity.tier_for(user.id) == Tier.ADMIN
 
     def _audit(self, user: ChatUser, command: str, args: dict[str, Any], reply: str, ok: bool):
         self.store.audit(discord_id=user.id, tool=f"/{command}", args=args, result=reply, ok=ok)
@@ -248,15 +247,12 @@ class AdminConsole:
         why = f" ({message})" if message else ""
         return AdminReply(text, notices=(Announcement(MAINTENANCE_ON.format(why=why)),))
 
-    async def end_maintenance(
-        self, admin: ChatUser, member: Callable[[str], Awaitable[ChatUser]]
-    ) -> AdminReply:
+    async def end_maintenance(self, admin: ChatUser) -> AdminReply:
         """Lower the flag, run what was held, and let each friend hear how theirs went.
 
-        `member` looks a caller up as the chat platform knows them now, so each
-        call runs at the tier they have when it ends. A call that failed in a
-        way worth trying again (a service still starting) stays held, and
-        `/maintenance end` runs what's left even once the flag is down.
+        Each call runs as its caller at the tier they have when it ends. A call
+        that failed in a way worth trying again (a service still starting) stays
+        held, and `/maintenance end` runs what's left even once the flag is down.
         """
         args = {"state": "end"}
         if refused := self._refused(admin, "maintenance", args):
@@ -273,7 +269,9 @@ class AdminConsole:
         for call in waiting:
             if not self.store.start_held(call.id):  # another end is running it
                 continue
-            user = callers.get(call.discord_id) or await member(call.discord_id)
+            user = callers.get(call.discord_id) or ChatUser(
+                call.discord_id, self._name(call.discord_id)
+            )
             callers[call.discord_id] = user
             outcome = await self.chat.agent.run_held(call, self.chat.tier_for(user))
             if outcome.is_error and outcome.retryable:

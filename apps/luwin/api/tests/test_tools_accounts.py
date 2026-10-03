@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 
 from luwin.agent.tools import Tier, ToolContext, registry, validate_input
-from luwin.chat.identity import IdentityService, RoleMap
+from luwin.chat.identity import IdentityService
 from luwin.clients import FakeSeerrClient
 from luwin.clients.seerr import SeerrUser
 from luwin.config import Settings
@@ -15,7 +15,7 @@ async def test_a_link_request_is_decided_by_the_link_account_tool(store):
         seerr=FakeSeerrClient(user_list=[SeerrUser(4, "dany@example.com", "Dany", "dany_t")]),
         tautulli={},
     )
-    identity = IdentityService(store, services, RoleMap(1, 2))
+    identity = IdentityService(store, services)
     pending = (await identity.start_link("d1", "Dany", "dany@example.com")).pending
     spec = registry.get(pending.action)
     assert spec.button_only and spec.tier == Tier.ADMIN
@@ -27,7 +27,7 @@ async def test_a_link_request_is_decided_by_the_link_account_tool(store):
     (dm,) = linked.notices
     assert isinstance(dm, DirectMessage) and dm.to == "d1" and "linked" in dm.text
     assert store.active_link("d1").seerr_user_id == 4
-    assert identity.tier_for("d1", {2}) == Tier.TRUSTED
+    assert identity.tier_for("d1") == Tier.FRIEND
     assert "already linked" in (await identity.start_link("d1", "Dany", "dany")).message
 
     denied = await link_account(admin, approved=False, **pending.payload)

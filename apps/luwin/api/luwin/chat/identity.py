@@ -1,10 +1,11 @@
 """Who a chat account is on Plex/Seerr, and which tier they get.
 
-Tier comes from Discord roles, resolved on every message so a role change
-takes effect immediately, with a per-user override in the store that an
-admin can set. Linking a Discord account to a Plex user is a two-step
+Tier is resolved on every message, so a change takes effect immediately: a
+stored override, which an admin sets, wins; otherwise an account linked to a
+Seerr user is a friend, and anyone else is unlinked. Trusted and admin come
+only from the override. Linking a chat account to a Plex user is a two-step
 flow: the friend names their Plex email or username, luwin matches it
-against Seerr's users, and the admin decides with a button, which runs the
+against Seerr's users, and the admin decides, which runs the
 `link_account` admin tool.
 """
 
@@ -19,32 +20,20 @@ from luwin.store import LinkStatus, PendingAction, SeerrUserTaken, Store
 
 LINK_TTL = timedelta(days=7)
 ALREADY_LINKED = (
-    "That Plex account is already linked to another Discord account. "
+    "That Plex account is already linked to another account here. "
     "Ask the admin if it should be yours."
 )
 
 
-@dataclass(frozen=True)
-class RoleMap:
-    admin_role_id: int = 0
-    trusted_role_id: int = 0
+def resolve_tier(override: str | None, linked: bool) -> Tier:
+    """The stored override first; otherwise a linked account is a friend, anyone else UNLINKED.
 
-
-def resolve_tier(override: str | None, linked: bool, role_ids: set[int], roles: RoleMap) -> Tier:
-    """Override first, then roles; anyone without an active link is UNLINKED.
-
-    The admin role stands on its own: the server owner is an admin whether
-    or not they bothered to link, since they administer the thing.
+    An admin override stands on its own: the admin is an admin whether or not
+    they bothered to link, since they administer the thing.
     """
     if override:
         return Tier.parse(override)
-    if roles.admin_role_id and roles.admin_role_id in role_ids:
-        return Tier.ADMIN
-    if not linked:
-        return Tier.UNLINKED
-    if roles.trusted_role_id and roles.trusted_role_id in role_ids:
-        return Tier.TRUSTED
-    return Tier.FRIEND
+    return Tier.FRIEND if linked else Tier.UNLINKED
 
 
 @dataclass(frozen=True)
@@ -55,23 +44,20 @@ class LinkStart:
 
 
 class IdentityService:
-    def __init__(self, store: Store, services: Services, roles: RoleMap):
+    def __init__(self, store: Store, services: Services):
         self.store = store
         self.services = services
-        self.roles = roles
 
-    def tier_for(self, discord_id: str, role_ids: set[int]) -> Tier:
+    def tier_for(self, discord_id: str) -> Tier:
         user = self.store.get_user(discord_id)
         linked = self.store.active_link(discord_id) is not None
-        return resolve_tier(user.tier_override if user else None, linked, role_ids, self.roles)
+        return resolve_tier(user.tier_override if user else None, linked)
 
     async def start_link(self, discord_id: str, display_name: str, query: str) -> LinkStart:
         """Match `query` (Plex email or username) against Seerr users and queue approval."""
         q = query.strip().lower()
         if not q:
-            return LinkStart(
-                False, "Tell me your Plex email or username, e.g. `/link me@example.com`."
-            )
+            return LinkStart(False, "Tell me your Plex email or username, e.g. me@example.com.")
         existing = self.store.get_user(discord_id)
         if existing and existing.status == LinkStatus.ACTIVE:
             return LinkStart(
@@ -93,7 +79,7 @@ class IdentityService:
                 "or ask the admin for an invite if you don't have access yet.",
             )
         seerr_user = matches[0]
-        # One Discord account per Plex account, so requests and ready DMs can
+        # One chat account per Plex account, so requests and ready DMs can
         # only belong to one person. The schema enforces it; this check only
         # answers early and kindly.
         holder = self.store.user_by_seerr_id(seerr_user.id)
@@ -120,7 +106,7 @@ class IdentityService:
             action="link_account",
             requester=discord_id,
             payload={"discord_id": discord_id, "display_name": display_name, "account": account},
-            summary=f"Link Discord user {display_name} to Plex account {account}",
+            summary=f"Link {display_name} to Plex account {account}",
             ttl=LINK_TTL,
         )
         return LinkStart(
@@ -144,13 +130,16 @@ class IdentityService:
     def set_tier_override(self, discord_id: str, tier: str | None) -> str:
         normalized = Tier.parse(tier).name.lower() if tier else None
         self.store.upsert_user(discord_id, tier_override=normalized)
-        return f"Tier for {discord_id} is now {normalized or 'from roles'}."
+        return f"Tier for {discord_id} is now {normalized or 'the default'}."
 
-    def whoami(self, discord_id: str, role_ids: set[int]) -> str:
+    def whoami(self, discord_id: str) -> str:
         user = self.store.get_user(discord_id)
-        tier = self.tier_for(discord_id, role_ids)
+        tier = self.tier_for(discord_id)
         if not user or user.status == LinkStatus.REVOKED:
-            return f"You're not linked yet (tier: {tier.name.lower()}). Use `/link <plex email or username>`."
+            return (
+                f"You're not linked yet (tier: {tier.name.lower()}). Link the email or "
+                "username you use for Plex and the admin will approve it."
+            )
         who = user.plex_email or user.plex_username or "?"
         state = "active" if user.status == LinkStatus.ACTIVE else "waiting for admin approval"
         return f"Linked to {who} ({state}). Tier: {tier.name.lower()}."

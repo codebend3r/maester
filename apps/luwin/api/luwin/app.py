@@ -23,7 +23,7 @@ from luwin.agent.runner import ToolRunner
 from luwin.agent.tools import ToolRegistry
 from luwin.agent.tools import registry as app_registry
 from luwin.chat.admin import AdminConsole
-from luwin.chat.identity import IdentityService, RoleMap
+from luwin.chat.identity import IdentityService
 from luwin.chat.service import ChatService
 from luwin.clients import (
     FileProbe,
@@ -119,7 +119,7 @@ def build(
         effort=cfg.effort,
         settings=cfg,
     )
-    identity = IdentityService(store, services, RoleMap())
+    identity = IdentityService(store, services)
     chat = ChatService(agent=agent, identity=identity, store=store)
     console = AdminConsole(
         identity=identity,
