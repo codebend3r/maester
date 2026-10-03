@@ -1,4 +1,4 @@
-import { mkdirSync } from 'node:fs'
+import { existsSync, mkdirSync, renameSync } from 'node:fs'
 import { join } from 'node:path'
 import { Inject, Injectable, type OnModuleDestroy } from '@nestjs/common'
 import Sqlite from 'better-sqlite3'
@@ -78,6 +78,32 @@ const migrate = (db: Sqlite.Database): void => {
   })
 }
 
+/** The index's file in the data folder. Before raven was renamed it was `weirwood.db`. */
+export const DATABASE_FILE = 'raven.db'
+const LEGACY_FILE = 'weirwood.db'
+
+/**
+ * SQLite keeps recent writes in `-wal` until they are copied into the
+ * database, and an index of them in `-shm`, both named after the database, so
+ * they move with it. The database itself moves last: a move cut short leaves
+ * it under its old name, and the next start finishes the job.
+ */
+const MOVE_ORDER: readonly string[] = ['-wal', '-shm', '']
+
+/**
+ * Renames weirwood's database in `dataDir` to raven's, once, so the index,
+ * progress and favourites carry over. Does nothing when raven's file is
+ * already there or there is nothing to adopt. Call it before opening.
+ */
+export const adoptLegacyDatabase = ({ dataDir }: { dataDir: string }): void => {
+  const target = join(dataDir, DATABASE_FILE)
+  const legacy = join(dataDir, LEGACY_FILE)
+  if (existsSync(target) || !existsSync(legacy)) return
+  MOVE_ORDER.filter((suffix) => existsSync(legacy + suffix)).forEach((suffix) =>
+    renameSync(legacy + suffix, target + suffix),
+  )
+}
+
 /** The one SQLite connection: the library index, media metadata, playback progress and favourites. */
 @Injectable()
 export class DatabaseService implements OnModuleDestroy {
@@ -85,7 +111,8 @@ export class DatabaseService implements OnModuleDestroy {
 
   constructor(@Inject(SERVER_CONFIG) config: ServerConfig) {
     mkdirSync(config.dataDir, { recursive: true })
-    this.db = new Sqlite(join(config.dataDir, 'weirwood.db'))
+    adoptLegacyDatabase({ dataDir: config.dataDir })
+    this.db = new Sqlite(join(config.dataDir, DATABASE_FILE))
     // WAL lets the API read while a scan writes, which is most of the time.
     this.db.pragma('journal_mode = WAL')
     this.db.pragma('foreign_keys = ON')

@@ -14,6 +14,16 @@ Deleting a video from the app removes the file, so leave `:ro` off any mount whe
 
 The index and thumbnails live in `./data` (mounted at `/config`). The image runs as the unprivileged `node` user (1000:1000); on a Synology, set `user:` in the compose file to the owner of `./data`.
 
+### Coming from weirwood
+
+raven was called weirwood. Its database is now `raven.db`, and the server renames a `weirwood.db` it finds in the data folder, with its `-wal` and `-shm` files, the first time it starts. To move a running weirwood container over:
+
+1. `docker compose down` in `apps/weirwood/`.
+2. Move `apps/weirwood/data` to `apps/raven/data`, and copy your media volume lines from `apps/weirwood/docker-compose.yml` into `apps/raven/docker-compose.yml`.
+3. `docker compose up -d --build` in `apps/raven/`.
+
+The player forgets its volume and mute setting once, since the browser now keeps it under raven's name.
+
 ## How playback works
 
 Direct play only. The browser is handed the original file over HTTP range requests, so playback starts as soon as the first bytes arrive (about half a second for a 1080p file on the NAS over SMB) and seeking is just another range request. Nothing is converted on the server.
