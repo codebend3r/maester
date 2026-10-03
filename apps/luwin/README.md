@@ -1,13 +1,13 @@
-# maester
+# luwin
 
-An AI concierge for a private Plex server. Friends talk to it on Discord in plain language; it requests movies and shows, works out why something will not play, explains lag with live server data, and hands the admin an approval queue instead of a group chat thread.
+The AI assistant of the maester suite, a concierge for a private Plex server. Friends talk to it on Discord in plain language; it requests movies and shows, works out why something will not play, explains lag with live server data, and hands the admin an approval queue instead of a group chat thread.
 
-A maester serves the house, answers its questions, and sends the ravens.
+luwin is the suite's maester: it serves the house, answers its questions, and sends the ravens.
 
 ```
 Friends (Discord DMs, #requests)
         │
-   maester  (Claude tool-use agent, FastAPI for webhooks, SQLite)
+   luwin  (Claude tool-use agent, FastAPI for webhooks, SQLite)
         │
  ┌──────┼──────────┬──────────┬──────────┬──────────┬──────────┐
 Seerr  Sonarr    Radarr    SABnzbd   Tautulli    Plex     Wizarr
@@ -25,7 +25,7 @@ Seerr  Sonarr    Radarr    SABnzbd   Tautulli    Plex     Wizarr
 
 ## What it does
 
-| A friend says                                  | maester does                                                                                                      |
+| A friend says                                  | luwin does                                                                                                      |
 | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
 | "get Dune in 4K"                               | Finds the title through Seerr, asks which one if ambiguous, requests it as that friend, queues 4K for approval    |
 | "is The Bear on the server?"                   | Reports the seasons and versions present, with a link that opens Plex                                              |
@@ -82,14 +82,14 @@ The board follows the issues. `uv run python scripts/sync_board.py`, run from th
 
 ## Structure
 
-maester is the `apps/maester/` folder of an Nx workspace; the [root README](../../README.md) covers the workspace.
+luwin is the `apps/luwin/` folder of an Nx workspace; the [root README](../../README.md) covers the workspace.
 
 ```
-apps/maester/
-├── api/                    the @maester/api Nx project: a Python 3.12 package run through uv
+apps/luwin/
+├── api/                    the @luwin/api Nx project: a Python 3.12 package run through uv
 │   ├── package.json        Nx targets: dev, test, eval, lint:py, format
 │   ├── pyproject.toml, uv.lock
-│   ├── maester/
+│   ├── luwin/
 │   │   ├── agent/          tool-use loop, tool registry, guardrails, prompts
 │   │   ├── clients/        one httpx client per service, each with an in-memory fake
 │   │   ├── tools/          the scoped tools the model can call, grouped by area
@@ -114,7 +114,7 @@ apps/maester/
 
 Repo tooling (tracker catalog and sync, board setup and sync, NAS deploy, version bump) lives in [`scripts/`](../../scripts) at the repo root.
 
-Still to come: `api/maester/guides/` for the device setup guides the model answers from (E7).
+Still to come: `api/luwin/guides/` for the device setup guides the model answers from (E7).
 
 ## Getting started
 
@@ -122,23 +122,23 @@ Still to come: `api/maester/guides/` for the device setup guides the model answe
 
 ```bash
 git clone https://github.com/codebend3r/maester.git
-cd maester
+cd luwin
 bun install                                     # Nx, and the git hooks: ruff on staged Python files
-cp apps/maester/.env.example apps/maester/.env  # fill in service URLs, API keys, Discord and Anthropic tokens
-bun run dev:maester                             # starts the Discord bot and the web app on one loop
+cp apps/luwin/.env.example apps/luwin/.env  # fill in service URLs, API keys, Discord and Anthropic tokens
+bun run dev:luwin                             # starts the Discord bot and the web app on one loop
 ```
 
-`.env` lives beside `docker-compose.yml`, in `apps/maester/`, where compose reads it too. Keep none at the repo root: Nx loads a root `.env` into every task it runs.
+`.env` lives beside `docker-compose.yml`, in `apps/luwin/`, where compose reads it too. Keep none at the repo root: Nx loads a root `.env` into every task it runs.
 
-Checks run through Nx from the repo root: `bunx nx run @maester/api:test`, `bunx nx run @maester/api:lint:py`, `bunx nx run @maester/api:format:check`, or `bun run verify` for every project. Evals: `bunx nx run @maester/api:eval` (fake model), or from `apps/maester/`, `uv run --project api maester-eval` for the real model against fake services.
+Checks run through Nx from the repo root: `bunx nx run @luwin/api:test`, `bunx nx run @luwin/api:lint:py`, `bunx nx run @luwin/api:format:check`, or `bun run verify` for every project. Evals: `bunx nx run @luwin/api:eval` (fake model), or from `apps/luwin/`, `uv run --project api luwin-eval` for the real model against fake services.
 
 **Discord setup.** Create an application at discord.com/developers, add a bot, turn on the *Message Content* and *Server Members* privileged intents, and invite it with the `bot` and `applications.commands` scopes (permissions: View Channels, Send Messages, Read Message History, Embed Links, Manage Roles; the bot's role must sit above the trusted role so it can give it). Put the bot token, your server id, the requests and admin channel ids, and the trusted and admin role ids in `.env`. Friends DM the bot or mention it in the requests channel; `/link`, `/whoami`, `/setup` and `/forget` are slash commands. The admin's commands are `/tier`, `/kill`, `/audit`, `/pending`, `/forecast` and `/maintenance`; approvals, the digest and the NAS report post in the admin channel, and maintenance announcements in the requests channel.
 
-**Seerr and the arrs.** maester works out which host holds a title's 1080p or 4K copy from Seerr's own records, so each Radarr and Sonarr in Seerr's settings must use the same address (host, port and base path) as its `RADARR_<HOST>_URL` or `SONARR_<HOST>_URL` here. A server Seerr reaches by another name is refused rather than guessed.
+**Seerr and the arrs.** luwin works out which host holds a title's 1080p or 4K copy from Seerr's own records, so each Radarr and Sonarr in Seerr's settings must use the same address (host, port and base path) as its `RADARR_<HOST>_URL` or `SONARR_<HOST>_URL` here. A server Seerr reaches by another name is refused rather than guessed.
 
-**Seerr webhook.** In Seerr, Settings, Notifications, Webhook: set the URL to `http://<maester host>:8020/webhooks/seerr`, set *Authorization Header* to the value of `SEERR_WEBHOOK_SECRET`, keep the default JSON payload, and tick *Request Pending Approval*, *Request Approved*, *Request Declined*, *Request Available*, *Issue Resolved* and *Issue Reopened*. Every request waiting on approval then reaches the admin channel with buttons, wherever it was made; friends get a DM with a Plex link when their request is ready (a thumbs-down on it reports a problem); and resolving a playback report's issue in Seerr closes the report. Other ticked types are acknowledged and ignored.
+**Seerr webhook.** In Seerr, Settings, Notifications, Webhook: set the URL to `http://<luwin host>:8020/webhooks/seerr`, set *Authorization Header* to the value of `SEERR_WEBHOOK_SECRET`, keep the default JSON payload, and tick *Request Pending Approval*, *Request Approved*, *Request Declined*, *Request Available*, *Issue Resolved* and *Issue Reopened*. Every request waiting on approval then reaches the admin channel with buttons, wherever it was made; friends get a DM with a Plex link when their request is ready (a thumbs-down on it reports a problem); and resolving a playback report's issue in Seerr closes the report. Other ticked types are acknowledged and ignored.
 
-**File health check.** The container mounts the media shares read-only (`apps/maester/docker-compose.yml`) and `MEDIA_ROOTS` lists them; nothing outside them is read. When Sonarr or Radarr report paths under other names than the mounts, map them with `MEDIA_PATH_MAP`.
+**File health check.** The container mounts the media shares read-only (`apps/luwin/docker-compose.yml`) and `MEDIA_ROOTS` lists them; nothing outside them is read. When Sonarr or Radarr report paths under other names than the mounts, map them with `MEDIA_PATH_MAP`.
 
 **Deploy.** [`docs/nas-deployment.md`](docs/nas-deployment.md) covers running it as a container on the NAS.
 
