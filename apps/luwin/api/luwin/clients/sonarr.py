@@ -4,7 +4,7 @@ from dataclasses import dataclass, field, replace
 from datetime import datetime
 from typing import Any, ClassVar, Protocol
 
-from maester.clients.arr import (
+from luwin.clients.arr import (
     ArrClient,
     DiskSpace,
     HistoryEvent,
@@ -12,7 +12,7 @@ from maester.clients.arr import (
     QueueItem,
     RootFolder,
 )
-from maester.clients.base import Downable
+from luwin.clients.base import Downable
 
 
 @dataclass(frozen=True)

@@ -1,11 +1,11 @@
 from dataclasses import replace
 
-from maester.agent.limits import KillSwitch
-from maester.clients.arr import DiskSpace
-from maester.clients.fleet import HostHealth
-from maester.config import Settings
-from maester.jobs import scheduled
-from maester.jobs.nas import nas_report
+from luwin.agent.limits import KillSwitch
+from luwin.clients.arr import DiskSpace
+from luwin.clients.fleet import HostHealth
+from luwin.config import Settings
+from luwin.jobs import scheduled
+from luwin.jobs.nas import nas_report
 
 TB = 10**12
 HEALTHY = HostHealth(
@@ -45,7 +45,7 @@ async def test_anything_degraded_comes_first_and_the_rest_is_fine(services):
         "up 100% of the last day"
     )
     assert found["Not checked"] == [
-        "Drive SMART health isn't read: the fleet monitor has no SMART probe yet, and maester "
+        "Drive SMART health isn't read: the fleet monitor has no SMART probe yet, and luwin "
         "runs no SSH."
     ]
 

@@ -3,13 +3,13 @@ from dataclasses import replace
 
 import pytest
 
-from maester.agent.tools import Choices, Result
-from maester.clients import ClientError, FakeTautulliClient
-from maester.library import NotLocated
-from maester.media import Copy
-from maester.playback.items import locate
-from maester.playback.plays import copy_of, library_hosts, recent_plays
-from maester.tools.playback import NOTHING_RECENT, list_tracks, recent_sessions
+from luwin.agent.tools import Choices, Result
+from luwin.clients import ClientError, FakeTautulliClient
+from luwin.library import NotLocated
+from luwin.media import Copy
+from luwin.playback.items import locate
+from luwin.playback.plays import copy_of, library_hosts, recent_plays
+from luwin.tools.playback import NOTHING_RECENT, list_tracks, recent_sessions
 from tests.factories import history_row, session
 from tests.playback_world import BEAR, DANY, DUNE, FORKS, stock
 
@@ -35,7 +35,7 @@ class Down:
 @pytest.fixture
 def watching(library):
     """Dany plays Dune in 4K on meleys now; The Bear S02E07 finished two hours ago. Meleys'
-    Tautulli watches the Plex server maester reads, so Seerr's rating keys apply there."""
+    Tautulli watches the Plex server luwin reads, so Seerr's rating keys apply there."""
     meleys = library.services.tautulli["meleys"]
     meleys.sessions = [
         session(user_id=DANY, rating_key="9001", full_title="Dune", product="Plex for Roku",

@@ -3,7 +3,7 @@
 `request_media` asks for the standard (1080p) copy. `request_media_4k` is a
 trusted-tier tool the friend tier never sees. When Seerr leaves either
 request pending, it goes to the admin with Approve/Deny buttons
-(`maester/approvals.py`, shared with Seerr's MEDIA_PENDING webhook so each
+(`luwin/approvals.py`, shared with Seerr's MEDIA_PENDING webhook so each
 request is asked about once), and the press runs `decide_request`, a
 button-only admin tool that approves or declines it in Seerr and tells the
 requester. For shows, seasons already on the server or already requested
@@ -22,7 +22,7 @@ where a release profile can prefer dual-audio releases), and the configured
 dual-audio quality profile when that server has one.
 
 `follow_show` is the one arr write here: it monitors a show in the Sonarr
-holding its standard copy (`maester/library.py`) so future seasons
+holding its standard copy (`luwin/library.py`) so future seasons
 download as they air, and only on the host the caller names when that host
 really is the owner.
 """
@@ -33,10 +33,10 @@ import asyncio
 from dataclasses import dataclass, replace
 from typing import Any
 
-from maester.agent.tools import Approval, Result, Tier, ToolContext, tool
-from maester.approvals import decision_dm, request_approval, request_subject
-from maester.clients import ClientError, Services
-from maester.clients.seerr import (
+from luwin.agent.tools import Approval, Result, Tier, ToolContext, tool
+from luwin.approvals import decision_dm, request_approval, request_subject
+from luwin.clients import ClientError, Services
+from luwin.clients.seerr import (
     ArrServer,
     MediaDetails,
     MediaRequest,
@@ -47,12 +47,12 @@ from maester.clients.seerr import (
     Routing,
     Seerr,
 )
-from maester.config import Settings
-from maester.library import ARR_NAMES, Library, NotLocated, OwnerUnknown, show_owner_on
-from maester.media import version_label
-from maester.notify import DirectMessage
-from maester.storage import Space, volumes_of
-from maester.store import LinkedUser
+from luwin.config import Settings
+from luwin.library import ARR_NAMES, Library, NotLocated, OwnerUnknown, show_owner_on
+from luwin.media import version_label
+from luwin.notify import DirectMessage
+from luwin.storage import Space, volumes_of
+from luwin.store import LinkedUser
 
 # A 4K copy runs roughly four to six times the size of a 1080p encode.
 UHD_SIZE_FACTOR = (4, 6)

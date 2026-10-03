@@ -2,12 +2,12 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from maester.agent.limits import RateLimiter
-from maester.agent.loop import MAX_TOOL_ITERATIONS, Agent, AgentReply
-from maester.agent.runner import ToolRunner
-from maester.agent.tools import Tier, ToolRegistry
-from maester.config import Settings
-from maester.store import Store
+from luwin.agent.limits import RateLimiter
+from luwin.agent.loop import MAX_TOOL_ITERATIONS, Agent, AgentReply
+from luwin.agent.runner import ToolRunner
+from luwin.agent.tools import Tier, ToolRegistry
+from luwin.config import Settings
+from luwin.store import Store
 from tests.fake_model import FakeModel, text_message, tool_message
 
 SEARCH_SCHEMA = {

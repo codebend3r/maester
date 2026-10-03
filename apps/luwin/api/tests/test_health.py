@@ -1,7 +1,7 @@
 import pytest
 
-from maester.clients.media import Decoded, FakeFileProbe, Inspection, Unreadable
-from maester.playback.health import (
+from luwin.clients.media import Decoded, FakeFileProbe, Inspection, Unreadable
+from luwin.playback.health import (
     Health,
     Verdict,
     Window,

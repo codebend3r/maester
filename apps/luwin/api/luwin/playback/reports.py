@@ -32,11 +32,11 @@ from collections.abc import Iterable
 from dataclasses import dataclass, replace
 from typing import Any
 
-from maester.clients import ClientError, Services
-from maester.clients.seerr import ISSUE_AUDIO, ISSUE_OTHER, ISSUE_SUBTITLE, ISSUE_VIDEO
-from maester.media import Decision, ReportKind, ReportStatus
-from maester.notify import AdminPost, Notice
-from maester.playback.diagnosis import (
+from luwin.clients import ClientError, Services
+from luwin.clients.seerr import ISSUE_AUDIO, ISSUE_OTHER, ISSUE_SUBTITLE, ISSUE_VIDEO
+from luwin.media import Decision, ReportKind, ReportStatus
+from luwin.notify import AdminPost, Notice
+from luwin.playback.diagnosis import (
     Case,
     Diagnose,
     Diagnosis,
@@ -46,10 +46,10 @@ from maester.playback.diagnosis import (
     player_then_file,
     track_listing,
 )
-from maester.playback.health import Health
-from maester.playback.items import LocatedFile
-from maester.releases import release_group
-from maester.store import LinkedUser, ReportRow, Store
+from luwin.playback.health import Health
+from luwin.playback.items import LocatedFile
+from luwin.releases import release_group
+from luwin.store import LinkedUser, ReportRow, Store
 
 # How many people reporting one file prove it needs a new copy.
 REPORTERS_TO_REPLACE = 2
@@ -287,14 +287,14 @@ class Filed:
 
 
 def issue_message(filed: Filed, reporter: str) -> str:
-    """The Seerr issue: the friend's words, then what maester found and decided."""
+    """The Seerr issue: the friend's words, then what luwin found and decided."""
     report, located = filed.report, filed.located
     group = f" (release group {report.release_group})" if report.release_group else ""
     return "\n".join(
         [
             report.description,
             "",
-            f"Reported through maester by {reporter}: {POLICIES[report.kind].label}, "
+            f"Reported through luwin by {reporter}: {POLICIES[report.kind].label}, "
             f"{located.label} on {located.owner.host}.",
             f"File: {located.file.path}{group}",
             f"Diagnosis: {filed.diagnosis.summary()}",
@@ -319,7 +319,7 @@ async def open_issue(services: Services, link: LinkedUser, filed: Filed) -> int:
             POLICIES[filed.report.kind].issue_type,
             issue_message(filed, link.name),
             # As the friend through `userId`, which Seerr's issue route honors for
-            # maester's MANAGE_ISSUES key (requests use `X-API-User` instead).
+            # luwin's MANAGE_ISSUES key (requests use `X-API-User` instead).
             as_user=link.seerr_user_id,
             season=located.copy.season,
             episode=located.copy.episode,
@@ -335,7 +335,7 @@ def admin_notice(filed: Filed, reporter: str) -> AdminPost:
     return AdminPost(
         f"{reporter} reports {POLICIES[report.kind].label} on {located.label} "
         f'({located.owner.host}): "{report.description}". Nothing fixes this automatically '
-        f"(Bazarr isn't set up). {issue} has what maester found: "
+        f"(Bazarr isn't set up). {issue} has what luwin found: "
         f"{filed.diagnosis.summary()}"
     )
 

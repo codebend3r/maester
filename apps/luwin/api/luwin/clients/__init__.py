@@ -1,4 +1,4 @@
-"""Thin async clients for every service maester talks to, each with a fake.
+"""Thin async clients for every service luwin talks to, each with a fake.
 
 A client does one thing: turn a method call into an HTTP request and the
 response into a typed record. No retries beyond httpx defaults, no caching,
@@ -13,18 +13,18 @@ The fleet monitor, the speed test and plex.tv are optional: None where not set u
 
 from dataclasses import dataclass
 
-from maester.clients.base import ClientError, HttpClient
-from maester.clients.fleet import FakeFleetMonitor, FleetMonitor, FleetMonitorClient
-from maester.clients.media import FakeFileProbe, FileProbe, MediaProbe
-from maester.clients.plex import FakePlexClient, Plex, PlexClient
-from maester.clients.plextv import FakePlexTv, PlexTv, PlexTvClient
-from maester.clients.radarr import FakeRadarrClient, Radarr, RadarrClient
-from maester.clients.sabnzbd import FakeSabnzbdClient, Sabnzbd, SabnzbdClient
-from maester.clients.seerr import FakeSeerrClient, Seerr, SeerrClient
-from maester.clients.sonarr import FakeSonarrClient, Sonarr, SonarrClient
-from maester.clients.speedtest import FakeSpeedTest, OoklaSpeedTest, SpeedTester
-from maester.clients.tautulli import FakeTautulliClient, Tautulli, TautulliClient
-from maester.clients.wizarr import FakeWizarrClient, Wizarr, WizarrClient
+from luwin.clients.base import ClientError, HttpClient
+from luwin.clients.fleet import FakeFleetMonitor, FleetMonitor, FleetMonitorClient
+from luwin.clients.media import FakeFileProbe, FileProbe, MediaProbe
+from luwin.clients.plex import FakePlexClient, Plex, PlexClient
+from luwin.clients.plextv import FakePlexTv, PlexTv, PlexTvClient
+from luwin.clients.radarr import FakeRadarrClient, Radarr, RadarrClient
+from luwin.clients.sabnzbd import FakeSabnzbdClient, Sabnzbd, SabnzbdClient
+from luwin.clients.seerr import FakeSeerrClient, Seerr, SeerrClient
+from luwin.clients.sonarr import FakeSonarrClient, Sonarr, SonarrClient
+from luwin.clients.speedtest import FakeSpeedTest, OoklaSpeedTest, SpeedTester
+from luwin.clients.tautulli import FakeTautulliClient, Tautulli, TautulliClient
+from luwin.clients.wizarr import FakeWizarrClient, Wizarr, WizarrClient
 
 
 @dataclass

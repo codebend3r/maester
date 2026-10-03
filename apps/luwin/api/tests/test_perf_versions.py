@@ -1,11 +1,11 @@
 import time
 from dataclasses import replace
 
-from maester.clients.plex import Version
-from maester.clients.speedtest import SpeedResult
-from maester.clients.tautulli import StreamData
-from maester.perf.uplink import Uplink
-from maester.perf.versions import (
+from luwin.clients.plex import Version
+from luwin.clients.speedtest import SpeedResult
+from luwin.clients.tautulli import StreamData
+from luwin.perf.uplink import Uplink
+from luwin.perf.versions import (
     TYPICAL_AWAY,
     Connection,
     Limit,
@@ -13,8 +13,8 @@ from maester.perf.versions import (
     quality_for,
     recommend,
 )
-from maester.playback.plays import Playback
-from maester.plex_versions import TitleVersion
+from luwin.playback.plays import Playback
+from luwin.plex_versions import TitleVersion
 from tests.factories import history_row, session
 
 REMUX = TitleVersion("9001", Version("4k", "hevc", 62103, 1, "/m/Dune (2021) Bluray-2160p.mkv"))

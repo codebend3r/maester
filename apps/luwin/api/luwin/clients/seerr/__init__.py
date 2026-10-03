@@ -8,9 +8,9 @@ request); `create_request` turns those into a typed `RequestRefused` so tools
 can explain them in plain words.
 """
 
-from maester.clients.seerr.client import Seerr, SeerrClient
-from maester.clients.seerr.fake import FakeSeerrClient
-from maester.clients.seerr.models import (
+from luwin.clients.seerr.client import Seerr, SeerrClient
+from luwin.clients.seerr.fake import FakeSeerrClient
+from luwin.clients.seerr.models import (
     ANIMATION_GENRE,
     ANIME_KEYWORD,
     ISSUE_AUDIO,

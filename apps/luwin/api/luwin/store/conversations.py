@@ -6,7 +6,7 @@ import json
 from datetime import datetime
 from typing import Any
 
-from maester.store.base import Database, now, stamp
+from luwin.store.base import Database, now, stamp
 
 
 class Conversations(Database):

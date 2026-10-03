@@ -22,13 +22,13 @@ import logging
 from collections.abc import Callable
 from datetime import UTC, date, datetime, timedelta
 
-from maester.clients import ClientError, Services
-from maester.clients.wizarr import WizarrUser
-from maester.config import Settings
-from maester.notify import DirectMessage, Notice
-from maester.store import Store, UserRow
+from luwin.clients import ClientError, Services
+from luwin.clients.wizarr import WizarrUser
+from luwin.config import Settings
+from luwin.notify import DirectMessage, Notice
+from luwin.store import Store, UserRow
 
-log = logging.getLogger("maester.jobs")
+log = logging.getLogger("luwin.jobs")
 
 SOURCE = "expiry"
 # Longer than any access period, so each reminder of one expiry goes out once.

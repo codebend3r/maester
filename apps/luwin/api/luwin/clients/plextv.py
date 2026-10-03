@@ -20,7 +20,7 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from typing import Any, ClassVar, Protocol
 
-from maester.clients.base import ClientError, Downable, HttpClient
+from luwin.clients.base import ClientError, Downable, HttpClient
 
 
 @dataclass(frozen=True)

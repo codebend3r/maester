@@ -2,14 +2,14 @@ from pathlib import Path
 
 import pytest
 
-from maester.agent.loop import Agent
-from maester.agent.runner import ToolRunner
-from maester.agent.tools import ToolContext, ToolRegistry
-from maester.config import Settings
-from maester.evals import CASES_DIR, Case, load_cases, report, run_case
-from maester.evals.world import EVAL_USER, build_services, build_world
-from maester.memo import Memo
-from maester.store import Store
+from luwin.agent.loop import Agent
+from luwin.agent.runner import ToolRunner
+from luwin.agent.tools import ToolContext, ToolRegistry
+from luwin.config import Settings
+from luwin.evals import CASES_DIR, Case, load_cases, report, run_case
+from luwin.evals.world import EVAL_USER, build_services, build_world
+from luwin.memo import Memo
+from luwin.store import Store
 from tests.fake_model import FakeModel, text_message, tool_message
 
 

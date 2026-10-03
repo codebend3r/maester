@@ -3,7 +3,7 @@
 `request_invite` doesn't invite anyone: it puts the ask in the admin's
 approval queue, one per friend and person. The admin's Approve runs
 `decide_invite`, a button-only admin tool, which creates a Wizarr invite
-scoped to the libraries an invite shares (`maester/access.py`) on the servers
+scoped to the libraries an invite shares (`luwin/access.py`) on the servers
 holding them, with the link's expiry (`INVITE_EXPIRES_DAYS`, snapped up to
 one Wizarr honors) and the access it grants (`INVITE_ACCESS_DAYS`). The link,
 on Wizarr's public address (`WIZARR_PUBLIC_URL`), goes to the friend who
@@ -17,11 +17,11 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
-from maester.access import invite_libraries
-from maester.agent.tools import Approval, Result, Tier, ToolContext, tool
-from maester.clients import ClientError
-from maester.clients.wizarr import Invite, honored_expiry_days
-from maester.notify import DirectMessage
+from luwin.access import invite_libraries
+from luwin.agent.tools import Approval, Result, Tier, ToolContext, tool
+from luwin.clients import ClientError
+from luwin.clients.wizarr import Invite, honored_expiry_days
+from luwin.notify import DirectMessage
 
 # What the admin reads in the approval post; the rest is cut.
 NAME_MAX, NOTE_MAX = 100, 500

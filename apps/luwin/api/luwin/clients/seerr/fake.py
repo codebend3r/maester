@@ -6,8 +6,8 @@ from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from typing import Any, ClassVar
 
-from maester.clients.base import ClientError, Downable
-from maester.clients.seerr.models import (
+from luwin.clients.base import ClientError, Downable
+from luwin.clients.seerr.models import (
     UNLIMITED,
     ArrServer,
     Collection,

@@ -3,7 +3,7 @@
 Tier comes from Discord roles, resolved on every message so a role change
 takes effect immediately, with a per-user override in the store that an
 admin can set. Linking a Discord account to a Plex user is a two-step
-flow: the friend names their Plex email or username, maester matches it
+flow: the friend names their Plex email or username, luwin matches it
 against Seerr's users, and the admin decides with a button, which runs the
 `link_account` admin tool.
 """
@@ -13,9 +13,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import timedelta
 
-from maester.agent.tools import Tier
-from maester.clients import Services
-from maester.store import LinkStatus, PendingAction, SeerrUserTaken, Store
+from luwin.agent.tools import Tier
+from luwin.clients import Services
+from luwin.store import LinkStatus, PendingAction, SeerrUserTaken, Store
 
 LINK_TTL = timedelta(days=7)
 ALREADY_LINKED = (
@@ -114,7 +114,7 @@ class IdentityService:
         except SeerrUserTaken:  # someone else linked it while we asked Tautulli
             return LinkStart(False, ALREADY_LINKED)
         account = seerr_user.email or seerr_user.username
-        # Decided by the button-only `link_account` admin tool (maester/tools/accounts.py).
+        # Decided by the button-only `link_account` admin tool (luwin/tools/accounts.py).
         pending = self.store.create_pending(
             kind="approve",
             action="link_account",

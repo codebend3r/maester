@@ -3,11 +3,11 @@ from datetime import timedelta
 import pytest
 from fastapi.testclient import TestClient
 
-from maester import __version__
-from maester.notify import DirectMessage
-from maester.seerr_events import SeerrRoute
-from maester.web import create_app
-from maester.web.seerr import SeerrWebhook
+from luwin import __version__
+from luwin.notify import DirectMessage
+from luwin.seerr_events import SeerrRoute
+from luwin.web import create_app
+from luwin.web.seerr import SeerrWebhook
 
 SECRET = "s3cret"
 

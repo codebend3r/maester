@@ -1,4 +1,4 @@
-"""What maester does with each Seerr notification type.
+"""What luwin does with each Seerr notification type.
 
 `seerr_routes()` is the dispatch table the webhook serves, keyed by Seerr's
 notification type. A handler reads what it needs from Seerr, Plex and the
@@ -8,7 +8,7 @@ twice: Seerr can send the same event again within minutes (a library
 rescan), while a later repeat is news (a replaced file ready again) and
 must get through. MEDIA_AVAILABLE DMs the friend whose request is ready;
 MEDIA_PENDING asks the admin about a request Seerr left pending, once per
-request whoever asked first (`maester/approvals.py`), and MEDIA_APPROVED and
+request whoever asked first (`luwin/approvals.py`), and MEDIA_APPROVED and
 MEDIA_DECLINED close that approval when the admin decided in Seerr itself;
 ISSUE_RESOLVED and ISSUE_REOPENED follow a playback report's issue into
 its report row, idempotently, and tell the reporter once when theirs is
@@ -24,14 +24,14 @@ from datetime import timedelta
 from functools import partial
 from typing import Any
 
-from maester.approvals import ask_about_request, decision_dm, request_subject
-from maester.clients import ClientError, Services
-from maester.clients.seerr import MediaRequest, RequestStatus
-from maester.media import Copy, Titled, version_label
-from maester.notify import DirectMessage, Notice
-from maester.store import Store
+from luwin.approvals import ask_about_request, decision_dm, request_subject
+from luwin.clients import ClientError, Services
+from luwin.clients.seerr import MediaRequest, RequestStatus
+from luwin.media import Copy, Titled, version_label
+from luwin.notify import DirectMessage, Notice
+from luwin.store import Store
 
-log = logging.getLogger("maester.seerr")
+log = logging.getLogger("luwin.seerr")
 
 
 def _int_or_none(value: Any) -> int | None:

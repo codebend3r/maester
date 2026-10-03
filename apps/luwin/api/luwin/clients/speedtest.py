@@ -1,13 +1,13 @@
 """A speed test of the internet connection, run by Ookla's speedtest CLI in this container.
 
-maester runs in one container on one NAS and has no shell or SSH, so the
+luwin runs in one container on one NAS and has no shell or SSH, so the
 test runs here, where it can be done honestly: the Dockerfile pins the CLI
 (version and checksum), and it runs like ffprobe does (`process.py`): no
 shell, a fixed argv, under a timeout. Its machine-readable output gives
 speeds in bytes per second, which are read here in kbps like every other
-bitrate in maester. `host` is the NAS
+bitrate in luwin. `host` is the NAS
 the container runs on (`SPEEDTEST_HOST`); rationing the tests is the
-tool's job (`maester/perf/uplink.py`).
+tool's job (`luwin/perf/uplink.py`).
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ import json
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from maester.clients.process import Runner, lines, run_process
+from luwin.clients.process import Runner, lines, run_process
 
 # Ookla's CLI asks to accept its license and the GDPR notice on first run; a
 # service can't answer a prompt, so they're accepted on the command line.

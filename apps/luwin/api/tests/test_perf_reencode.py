@@ -1,12 +1,12 @@
 import time
 
-from maester.clients import ClientError
-from maester.clients.plex import Version
-from maester.clients.tautulli import Activity
-from maester.perf.lag import Stream
-from maester.perf.load import HostLoad
-from maester.perf.reencode import candidate, flag, wan_watches
-from maester.plex_versions import TitleVersion
+from luwin.clients import ClientError
+from luwin.clients.plex import Version
+from luwin.clients.tautulli import Activity
+from luwin.perf.lag import Stream
+from luwin.perf.load import HostLoad
+from luwin.perf.reencode import candidate, flag, wan_watches
+from luwin.plex_versions import TitleVersion
 from tests.factories import history_row, session
 
 REMUX = TitleVersion("9001", Version("4k", "hevc", 62103, 1, "/m/Dune (2021) Bluray-2160p.mkv"))
@@ -15,7 +15,7 @@ WEBDL = TitleVersion("4348", Version("1080", "h264", 10240, 1, "/m/Dune (2021) W
 
 
 def stream(playing: TitleVersion, *versions: TitleVersion) -> Stream:
-    """The friend streaming `playing` from meleys, the server maester reads."""
+    """The friend streaming `playing` from meleys, the server luwin reads."""
     live = session(user_id=7, rating_key=playing.rating_key, file=playing.version.file,
                    full_title="Dune (2021)", location="wan")  # fmt: skip
     load = HostLoad("meleys", Activity((), 0, 0, 0, 0), None)

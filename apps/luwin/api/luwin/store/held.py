@@ -11,7 +11,7 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
-from maester.store.base import Database, now
+from luwin.store.base import Database, now
 
 
 @dataclass(frozen=True)

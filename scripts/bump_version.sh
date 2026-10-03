@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Bump a product's version with semver, commit the bump and tag that commit.
 #
-#   scripts/bump_version.sh maester patch            # 0.3.1 -> 0.3.2
-#   scripts/bump_version.sh maester minor            # 0.3.1 -> 0.4.0
-#   scripts/bump_version.sh maester major            # 0.3.1 -> 1.0.0
-#   scripts/bump_version.sh maester 1.0.0-rc.1       # explicit version
-#   scripts/bump_version.sh --dry-run maester minor  # show the plan, change nothing
-#   scripts/bump_version.sh --push maester patch     # also push the commit and tag
+#   scripts/bump_version.sh luwin patch            # 0.3.1 -> 0.3.2
+#   scripts/bump_version.sh luwin minor            # 0.3.1 -> 0.4.0
+#   scripts/bump_version.sh luwin major            # 0.3.1 -> 1.0.0
+#   scripts/bump_version.sh luwin 1.0.0-rc.1       # explicit version
+#   scripts/bump_version.sh --dry-run luwin minor  # show the plan, change nothing
+#   scripts/bump_version.sh --push luwin patch     # also push the commit and tag
 #
 # The current version comes from apps/<product>/VERSION; a product without one
 # is refused. The bump writes VERSION, the [project] version of every

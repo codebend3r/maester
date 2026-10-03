@@ -1,4 +1,4 @@
-"""Running a program maester ships with, without a shell and never for longer than asked.
+"""Running a program luwin ships with, without a shell and never for longer than asked.
 
 ffprobe and ffmpeg (`media.py`) and the speed test (`speedtest.py`) run this
 way: an argv list, no shell, stdin closed, output captured. A run that

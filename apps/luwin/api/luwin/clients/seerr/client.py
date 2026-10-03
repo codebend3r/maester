@@ -5,8 +5,8 @@ from __future__ import annotations
 import json
 from typing import Any, Protocol
 
-from maester.clients.base import ClientError, HttpClient
-from maester.clients.seerr.models import (
+from luwin.clients.base import ClientError, HttpClient
+from luwin.clients.seerr.models import (
     ArrServer,
     Collection,
     Issue,
@@ -166,7 +166,7 @@ class SeerrClient(HttpClient):
             "message": message,
             "mediaId": media_id,
             # Not `X-API-User`, as requests use: Seerr's issue route files as `userId` for a
-            # caller with MANAGE_ISSUES (maester's key), whatever the user's own permissions.
+            # caller with MANAGE_ISSUES (luwin's key), whatever the user's own permissions.
             "userId": as_user,
         }
         if season is not None:

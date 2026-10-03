@@ -1,6 +1,6 @@
-"""Setting up a TV, stick, phone or browser: answered from maester's own guides.
+"""Setting up a TV, stick, phone or browser: answered from luwin's own guides.
 
-The guides (`maester/guides/`) are the source, so the model relays them
+The guides (`luwin/guides/`) are the source, so the model relays them
 instead of recalling menus from memory; anyone, linked or not, reads the
 same text through `/setup`.
 """
@@ -9,8 +9,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from maester.agent.tools import Tier, ToolContext, tool
-from maester.guides import DEVICES, guide
+from luwin.agent.tools import Tier, ToolContext, tool
+from luwin.guides import DEVICES, guide
 
 
 @tool(

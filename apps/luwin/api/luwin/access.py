@@ -12,8 +12,8 @@ from __future__ import annotations
 
 import re
 
-from maester.clients.wizarr import Library
-from maester.config import Access
+from luwin.clients.wizarr import Library
+from luwin.config import Access
 
 _PREFIX = re.compile(r"^\d+\.\s*")
 

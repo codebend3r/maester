@@ -10,7 +10,7 @@ symlinks and `..` included. Nothing here takes a path from the model.
 every audio and subtitle track, and subtitle files lying next to the video.
 `decode` runs ffmpeg over one stretch of the file and reports the frames
 it got out and the errors it printed; judging those is the health check's
-job (`maester/playback/health.py`). Both run as async subprocesses under a
+job (`luwin/playback/health.py`). Both run as async subprocesses under a
 timeout (`process.py`), a few at a time, so the bot stays responsive and the
 NAS isn't swamped. The process runner is injected, so tests never need ffmpeg.
 """
@@ -24,8 +24,8 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field, replace
 from typing import Any, Protocol
 
-from maester.clients.process import Completed, Runner, lines, run_process
-from maester.config import media_root_problem
+from luwin.clients.process import Completed, Runner, lines, run_process
+from luwin.config import media_root_problem
 
 # ffprobe and ffmpeg processes running at once, across every check.
 MAX_PROCESSES = 2

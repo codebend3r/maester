@@ -11,8 +11,8 @@
         "oxlint": "1.83.0",
       },
     },
-    "apps/maester/api": {
-      "name": "@maester/api",
+    "apps/luwin/api": {
+      "name": "@luwin/api",
     },
     "apps/raven/server": {
       "name": "@raven/server",
@@ -217,7 +217,7 @@
 
     "@lukeed/ms": ["@lukeed/ms@2.0.2", "", {}, "sha512-9I2Zn6+NJLfaGoz9jN3lpwDgAYvfGeNYdbAIjJOqzs4Tpc+VU3Jqq4IofSUBKajiDS8k9fZIg18/z13mpk1bsA=="],
 
-    "@maester/api": ["@maester/api@workspace:apps/maester/api"],
+    "@luwin/api": ["@luwin/api@workspace:apps/luwin/api"],
 
     "@napi-rs/wasm-runtime": ["@napi-rs/wasm-runtime@0.2.4", "", { "dependencies": { "@emnapi/core": "^1.1.0", "@emnapi/runtime": "^1.1.0", "@tybys/wasm-util": "^0.9.0" } }, "sha512-9zESzOO5aDByvhIAsOy9TbpZ0Ur2AJbUI7UT73kcUTS2mxAMHOBaa1st/jAymNoCtvrit99kkzT1FZuXVcgfIQ=="],
 

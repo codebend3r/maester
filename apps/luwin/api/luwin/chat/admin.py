@@ -25,20 +25,20 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from maester.agent.limits import KillSwitch
-from maester.agent.runner import ToolOutcome
-from maester.agent.tools import Tier
-from maester.approvals import ask_about_request
-from maester.chat.identity import IdentityService
-from maester.chat.service import ChatResponse, ChatService, ChatUser
-from maester.clients import ClientError, Services
-from maester.config import Settings
-from maester.formatting import ago, humanized, local_time
-from maester.notify import Announcement, Notice
-from maester.storage import FORECAST_WINDOW, forecasts
-from maester.store import MAINTENANCE, AuditRow, HeldCall, PendingAction, Store
+from luwin.agent.limits import KillSwitch
+from luwin.agent.runner import ToolOutcome
+from luwin.agent.tools import Tier
+from luwin.approvals import ask_about_request
+from luwin.chat.identity import IdentityService
+from luwin.chat.service import ChatResponse, ChatService, ChatUser
+from luwin.clients import ClientError, Services
+from luwin.config import Settings
+from luwin.formatting import ago, humanized, local_time
+from luwin.notify import Announcement, Notice
+from luwin.storage import FORECAST_WINDOW, forecasts
+from luwin.store import MAINTENANCE, AuditRow, HeldCall, PendingAction, Store
 
-log = logging.getLogger("maester.admin")
+log = logging.getLogger("luwin.admin")
 
 NOT_ADMIN = "Only the admin can use /{command}."
 AUDIT_DEFAULT, AUDIT_MAX = 10, 50
@@ -98,7 +98,7 @@ class AdminConsole:
 
     def _name(self, discord_id: str | None) -> str:
         if discord_id is None:
-            return "maester"
+            return "luwin"
         link = self.store.active_link(discord_id)
         return link.name if link else discord_id
 
@@ -168,7 +168,7 @@ class AdminConsole:
         """Everything waiting on the admin, with its buttons again.
 
         Seerr's pending requests are read too: one the webhook never delivered
-        (maester was down, or it isn't set up) gets its approval raised here,
+        (luwin was down, or it isn't set up) gets its approval raised here,
         and posted in the admin channel like any other.
         """
         if refused := self._refused(admin, "pending", {}):

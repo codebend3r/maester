@@ -2,24 +2,24 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from maester.agent.limits import KillSwitch
-from maester.agent.loop import Agent
-from maester.agent.runner import ToolRunner
-from maester.agent.tools import Tier
-from maester.agent.tools import registry as app_registry
-from maester.chat.admin import AdminConsole
-from maester.chat.identity import IdentityService, RoleMap
-from maester.chat.service import ChatService, ChatUser
-from maester.clients.seerr import MediaDetails, MediaRequest, MediaStatus, RequestStatus
-from maester.config import Settings
-from maester.notify import Announcement, ApprovalPost
-from maester.store import SpaceSample
-from maester.store.base import stamp
+from luwin.agent.limits import KillSwitch
+from luwin.agent.loop import Agent
+from luwin.agent.runner import ToolRunner
+from luwin.agent.tools import Tier
+from luwin.agent.tools import registry as app_registry
+from luwin.chat.admin import AdminConsole
+from luwin.chat.identity import IdentityService, RoleMap
+from luwin.chat.service import ChatService, ChatUser
+from luwin.clients.seerr import MediaDetails, MediaRequest, MediaStatus, RequestStatus
+from luwin.config import Settings
+from luwin.notify import Announcement, ApprovalPost
+from luwin.store import SpaceSample
+from luwin.store.base import stamp
 from tests.factories import seerr_server
 from tests.fake_model import FakeModel, text_message, tool_message
 
 # Importing the tools package registers the real tools into `app_registry`.
-import maester.tools  # noqa: F401  isort: skip
+import luwin.tools  # noqa: F401  isort: skip
 
 ADMIN_ROLE, TRUSTED_ROLE = 1, 2
 FRIEND = ChatUser("f1", "Friend")
@@ -110,7 +110,7 @@ def test_audit_lists_the_latest_rows_newest_first_named_as_the_admin_knows_them(
     store.audit(discord_id=None, tool="sweep_stalled", args={}, result="", ok=False, host="meleys")
     reply = console.audit(ADMIN, 2)
     first, second = reply.text.splitlines()
-    assert "maester: `sweep_stalled` on meleys, refused or failed" in first
+    assert "luwin: `sweep_stalled` on meleys, refused or failed" in first
     assert 'dany: `request_media`, ok {"tmdb_id": 438631}' in second
     # Asking is audited too, after the listing.
     assert store.audit_recent(1)[0].tool == "/audit"

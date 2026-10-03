@@ -15,7 +15,7 @@ video), the forcing rule `explains` the other, so the friend hears the real
 cause once. A stream that may be cut down to fit a connection (Plex's relay,
 or sent away from home below the file's bitrate) is transcoded whatever the
 player plays, so the HEVC rule leaves it to the lag rules
-(`maester/perf/lag.py`), which reuse two of this table's rules.
+(`luwin/perf/lag.py`), which reuse two of this table's rules.
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from maester.playback.plays import Playback
+from luwin.playback.plays import Playback
 
 # Subtitle formats that are pictures, not text: a player that can't draw them
 # makes the server burn them into the video.

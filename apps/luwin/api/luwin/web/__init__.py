@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 
-from maester import __version__
-from maester.web.seerr import SeerrWebhook
+from luwin import __version__
+from luwin.web.seerr import SeerrWebhook
 
 
 def create_app(*, seerr: SeerrWebhook | None = None) -> FastAPI:
     """Build the app; with no `seerr`, only /health is served (the CI smoke test)."""
-    app = FastAPI(title="maester", version=__version__, docs_url=None, redoc_url=None)
+    app = FastAPI(title="luwin", version=__version__, docs_url=None, redoc_url=None)
 
     @app.get("/health")
     async def health() -> dict[str, str]:

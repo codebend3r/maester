@@ -5,7 +5,7 @@ import sys
 
 import pytest
 
-from maester.clients.media import (
+from luwin.clients.media import (
     FileProbe,
     Inspection,
     MediaPaths,
@@ -13,7 +13,7 @@ from maester.clients.media import (
     Unreadable,
     sidecar_subtitles,
 )
-from maester.clients.process import Completed, run_process
+from luwin.clients.process import Completed, run_process
 
 MOVIE = "Dune (2021) Remux-2160p"
 

@@ -2,11 +2,11 @@ from dataclasses import replace
 
 import pytest
 
-from maester.agent.tools import Result, Tier, registry
-from maester.clients import ClientError
-from maester.clients.arr import DiskSpace, MediaFile, RootFolder
-from maester.clients.radarr import Movie
-from maester.clients.seerr import (
+from luwin.agent.tools import Result, Tier, registry
+from luwin.clients import ClientError
+from luwin.clients.arr import DiskSpace, MediaFile, RootFolder
+from luwin.clients.radarr import Movie
+from luwin.clients.seerr import (
     ANIME_KEYWORD,
     MediaDetails,
     MediaStatus,
@@ -19,10 +19,10 @@ from maester.clients.seerr import (
     Season,
     ServerOptions,
 )
-from maester.clients.sonarr import Series
-from maester.notify import DirectMessage
-from maester.store import NotLinked
-from maester.tools.requests import (
+from luwin.clients.sonarr import Series
+from luwin.notify import DirectMessage
+from luwin.store import NotLinked
+from luwin.tools.requests import (
     NotRequested,
     decide_request,
     follow_show,

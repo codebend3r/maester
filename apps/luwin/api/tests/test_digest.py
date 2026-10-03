@@ -2,15 +2,15 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from maester.agent.limits import KillSwitch
-from maester.clients.arr import DiskSpace, QueueItem
-from maester.clients.sabnzbd import Download
-from maester.clients.seerr import Issue, MediaDetails, MediaRequest, MediaStatus, RequestStatus
-from maester.config import Guardrails, Settings
-from maester.jobs.digest import Digest
-from maester.media import Copy, Decision, ReportKind
-from maester.notify import AdminPost
-from maester.store import SpaceSample, StallAction
+from luwin.agent.limits import KillSwitch
+from luwin.clients.arr import DiskSpace, QueueItem
+from luwin.clients.sabnzbd import Download
+from luwin.clients.seerr import Issue, MediaDetails, MediaRequest, MediaStatus, RequestStatus
+from luwin.config import Guardrails, Settings
+from luwin.jobs.digest import Digest
+from luwin.media import Copy, Decision, ReportKind
+from luwin.notify import AdminPost
+from luwin.store import SpaceSample, StallAction
 
 NOW = datetime(2026, 9, 27, 12, 0, tzinfo=UTC)
 TB = 10**12

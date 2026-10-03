@@ -1,11 +1,11 @@
 from dataclasses import replace
 
-from maester.agent.tools import Result, Tier, registry
-from maester.clients.arr import HistoryEvent, QueueItem
-from maester.clients.radarr import Movie
-from maester.clients.sabnzbd import Download
-from maester.clients.seerr import MediaDetails, MediaStatus
-from maester.tools.downloads import download_history
+from luwin.agent.tools import Result, Tier, registry
+from luwin.clients.arr import HistoryEvent, QueueItem
+from luwin.clients.radarr import Movie
+from luwin.clients.sabnzbd import Download
+from luwin.clients.seerr import MediaDetails, MediaStatus
+from luwin.tools.downloads import download_history
 from tests.factories import seerr_server
 
 DUNE = MediaDetails(438631, "movie", "Dune", 2021, "", MediaStatus.PROCESSING, MediaStatus.UNKNOWN)

@@ -14,12 +14,12 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-from maester.clients import ClientError, Services
-from maester.library import NotLocated
-from maester.media import ReportStatus, Titled
-from maester.notify import DirectMessage, Notice
-from maester.playback.items import locate
-from maester.store import Store
+from luwin.clients import ClientError, Services
+from luwin.library import NotLocated
+from luwin.media import ReportStatus, Titled
+from luwin.notify import DirectMessage, Notice
+from luwin.playback.items import locate
+from luwin.store import Store
 
 CHECK_EVERY = timedelta(minutes=30)
 FOLLOW_FOR = timedelta(days=14)

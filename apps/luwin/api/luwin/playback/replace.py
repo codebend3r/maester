@@ -9,7 +9,7 @@ that couldn't be blocklisted isn't deleted and grabbed straight back:
    release. A file with no grab behind it (imported by hand) stops here and
    is left to the admin. A release already marked failed isn't marked
    twice, so a run can be repeated. The arrs take no reason for the
-   blocklist; the reason stays on maester's report and in the admin's notice.
+   blocklist; the reason stays on luwin's report and in the admin's notice.
 2. delete: the movie or episode file.
 3. search: the movie, or every episode the file held.
 
@@ -19,7 +19,7 @@ deleted, so the replacement can simply be tried again.
 Each step's outcome is kept (`Step`), so the reply, the audit row, the
 admin's notice and the Seerr issue all say exactly what happened. These are
 the mechanics; the guards around them (stored evidence, the friend's
-Confirm, the daily cap, the kill switch) are `maester/tools/replace.py`'s.
+Confirm, the daily cap, the kill switch) are `luwin/tools/replace.py`'s.
 """
 
 from __future__ import annotations
@@ -29,15 +29,15 @@ import logging
 from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
 
-from maester.clients import ClientError, Services
-from maester.clients.arr import HistoryEvent
-from maester.formatting import gigabytes
-from maester.notify import AdminPost
-from maester.playback.items import LocatedFile
-from maester.playback.reports import POLICIES, REPLACE, Evidence, move
-from maester.store import ReportRow, Store
+from luwin.clients import ClientError, Services
+from luwin.clients.arr import HistoryEvent
+from luwin.formatting import gigabytes
+from luwin.notify import AdminPost
+from luwin.playback.items import LocatedFile
+from luwin.playback.reports import POLICIES, REPLACE, Evidence, move
+from luwin.store import ReportRow, Store
 
-log = logging.getLogger("maester.playback")
+log = logging.getLogger("luwin.playback")
 
 RETRY = (
     "A new copy usually lands within a few hours when a release is out there; I'll DM you "

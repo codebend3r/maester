@@ -1,11 +1,11 @@
-from maester.clients.fleet import Vitals
-from maester.clients.plex import PlexItem, Version
-from maester.clients.speedtest import SpeedResult
-from maester.clients.tautulli import Activity
-from maester.perf.lag import AT_HOME, AWAY, Fix, Stream, diagnose, live_streams
-from maester.perf.load import HostLoad
-from maester.perf.uplink import Uplink
-from maester.plex_versions import TitleVersion
+from luwin.clients.fleet import Vitals
+from luwin.clients.plex import PlexItem, Version
+from luwin.clients.speedtest import SpeedResult
+from luwin.clients.tautulli import Activity
+from luwin.perf.lag import AT_HOME, AWAY, Fix, Stream, diagnose, live_streams
+from luwin.perf.load import HostLoad
+from luwin.perf.uplink import Uplink
+from luwin.plex_versions import TitleVersion
 from tests.factories import session
 from tests.playback_world import DUNE
 
@@ -255,6 +255,6 @@ async def test_live_streams_are_the_friends_own_with_versions_from_the_library_s
     assert (found.play.title, found.play.host, found.playing.name) == ("Dune", "vermithor", "4K")
     assert [v.name for v in found.versions] == ["1080p", "4K", "4K HEVC re-encode"]
     assert found.load.as_dict()["streams"] == 1 and found.load.busy  # theirs, not mine
-    # Served from another Plex server, the rating key means nothing to maester's.
+    # Served from another Plex server, the rating key means nothing to luwin's.
     (found,) = await live_streams(services, loads, 7, None, frozenset({"meleys"}))
     assert found.versions == () and found.playing is None

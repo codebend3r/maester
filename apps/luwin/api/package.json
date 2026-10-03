@@ -1,11 +1,11 @@
 {
-  "name": "@maester/api",
+  "name": "@luwin/api",
   "private": true,
-  "description": "maester's agent, tools, chat and FastAPI app: a Python 3.12 project run through uv",
+  "description": "luwin's agent, tools, chat and FastAPI app: a Python 3.12 project run through uv",
   "scripts": {
-    "dev": "cd .. && uv run --project api maester",
+    "dev": "cd .. && uv run --project api luwin",
     "test": "uv run pytest -q",
-    "eval": "uv run maester-eval --model fake",
+    "eval": "uv run luwin-eval --model fake",
     "lint:py": "uv run ruff check .",
     "lint:py:fix": "uv run ruff check --fix .",
     "format": "uv run ruff format .",
@@ -14,7 +14,7 @@
   "nx": {
     "projectType": "application",
     "tags": [
-      "scope:maester",
+      "scope:luwin",
       "lang:py"
     ],
     "includedScripts": [

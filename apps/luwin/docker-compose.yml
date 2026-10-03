@@ -1,21 +1,21 @@
-name: maester
+name: luwin
 
 services:
-  maester:
+  luwin:
     # Built from the repo root so the image can reach workspace files; the
     # Dockerfile's own ignore file keeps the context to what it copies.
     build:
       context: ../..
-      dockerfile: apps/maester/Dockerfile
-    image: maester
-    container_name: maester
+      dockerfile: apps/luwin/Dockerfile
+    image: luwin
+    container_name: luwin
     restart: unless-stopped
     ports:
       - '8020:8020'
     env_file:
       - .env
     volumes:
-      - ./maester-data:/data
+      - ./luwin-data:/data
       # Media shares, read-only, for the file health check. Match the paths
       # the arr instances report so a Sonarr/Radarr file path resolves here.
       - /volume1/Vermithor:/Vermithor:ro
@@ -38,6 +38,6 @@ services:
       retries: 3
 
   # Seerr, Sonarr, Radarr, SABnzbd, Tautulli and Wizarr live in the NAS-side
-  # "westeroz" (Meleys) and "essoz" (Vermithor) projects, so maester reaches
+  # "westeroz" (Meleys) and "essoz" (Vermithor) projects, so luwin reaches
   # them through their host-published ports (the *_URL values in .env), not
   # container DNS. See wizteros/docs/arr-stack.md for the map.

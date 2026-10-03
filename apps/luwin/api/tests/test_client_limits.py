@@ -2,9 +2,9 @@ from dataclasses import replace
 
 import pytest
 
-from maester.clients.tautulli import StreamData
-from maester.playback.client_limits import CLIENT_LIMITS, client_causes
-from maester.playback.plays import Play, Playback, playback_of
+from luwin.clients.tautulli import StreamData
+from luwin.playback.client_limits import CLIENT_LIMITS, client_causes
+from luwin.playback.plays import Play, Playback, playback_of
 from tests.factories import history_row, session
 
 CLEAN = Playback(

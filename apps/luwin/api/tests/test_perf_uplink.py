@@ -2,9 +2,9 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from maester.clients.speedtest import FakeSpeedTest, SpeedResult
-from maester.memo import Memo
-from maester.perf.uplink import (
+from luwin.clients.speedtest import FakeSpeedTest, SpeedResult
+from luwin.memo import Memo
+from luwin.perf.uplink import (
     MIN_GAP,
     REUSE,
     SPEED_TEST,

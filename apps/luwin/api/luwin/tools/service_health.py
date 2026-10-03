@@ -1,7 +1,7 @@
 """Is Plex down? Every service behind the server, asked at once whether it answers.
 
 Each client has one liveness call, `ping`, on the cheapest route that shows
-the service is up (and, where the route needs it, that maester's key still
+the service is up (and, where the route needs it, that luwin's key still
 works). Every service is pinged at once, each under its own `PING_TIMEOUT`,
 so one that hangs can't hold up the answer or hide the others. The answer
 is kept for `HEALTH_TTL` in the memo, so friends asking together at
@@ -17,11 +17,11 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any, Protocol
 
-from maester.agent.tools import Tier, ToolContext, tool
-from maester.clients import ClientError, Services
-from maester.formatting import ago
-from maester.memo import Key
-from maester.store import MAINTENANCE
+from luwin.agent.tools import Tier, ToolContext, tool
+from luwin.clients import ClientError, Services
+from luwin.formatting import ago
+from luwin.memo import Key
+from luwin.store import MAINTENANCE
 
 # How long one service may take to answer before it counts as down.
 PING_TIMEOUT = 5.0
@@ -40,7 +40,7 @@ class Check:
 
 
 def named(services: Services) -> list[tuple[str, Pingable]]:
-    """Every service maester uses, by the name people know it by."""
+    """Every service luwin uses, by the name people know it by."""
     found: list[tuple[str, Pingable]] = [
         ("Plex", services.plex),
         ("Seerr", services.seerr),

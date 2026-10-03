@@ -2,14 +2,14 @@ from dataclasses import replace
 
 import pytest
 
-from maester.access import invite_libraries, title_of
-from maester.agent.runner import ToolRunner
-from maester.agent.tools import Tier, registry
-from maester.clients import ClientError
-from maester.clients.wizarr import Library
-from maester.config import Access
-from maester.notify import ApprovalPost
-from maester.tools.invites import decide_invite, request_invite
+from luwin.access import invite_libraries, title_of
+from luwin.agent.runner import ToolRunner
+from luwin.agent.tools import Tier, registry
+from luwin.clients import ClientError
+from luwin.clients.wizarr import Library
+from luwin.config import Access
+from luwin.notify import ApprovalPost
+from luwin.tools.invites import decide_invite, request_invite
 
 LIBRARIES = [
     Library(1, "01. Movies", 10, "Meleys"),

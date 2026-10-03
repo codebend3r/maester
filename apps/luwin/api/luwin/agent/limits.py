@@ -12,8 +12,8 @@ import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 
-from maester.store import KILL, Flag, Flags
-from maester.store.base import now
+from luwin.store import KILL, Flag, Flags
+from luwin.store.base import now
 
 
 class LimitExceeded(Exception):

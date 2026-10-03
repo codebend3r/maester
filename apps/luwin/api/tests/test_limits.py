@@ -1,7 +1,7 @@
 import pytest
 
-from maester.agent.limits import KillSwitch, LimitExceeded, RateLimiter
-from maester.store import Store
+from luwin.agent.limits import KillSwitch, LimitExceeded, RateLimiter
+from luwin.store import Store
 
 
 def test_message_window_slides():

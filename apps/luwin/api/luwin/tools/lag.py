@@ -1,18 +1,18 @@
 """Why things are slow: the friend's stream, how busy the servers are, how much upload is left.
 
 `session_report` reads the friend's live streams on every host and gives one
-fix each (`maester/perf/lag.py`): what the stream is doing in a line (how it
+fix each (`luwin/perf/lag.py`): what the stream is doing in a line (how it
 plays, where, its bitrate, Plex's relay, the app and player, the server
 sending it) and the advice. The stats behind it come only when asked
 (`details`), so the reply is a fix, not a wall of numbers.
 
-`server_status` reads every Plex host's load at once (`maester/perf/load.py`):
+`server_status` reads every Plex host's load at once (`luwin/perf/load.py`):
 its streams, conversions and bandwidth from Tautulli, CPU and memory from the
 fleet monitor where one is set up, and says whether load could be the cause.
 
 `speed_test` measures the servers' shared internet connection from the NAS
-maester runs on and puts the upload it finds next to the remote streams
-going out (`maester/perf/uplink.py`). Tests are rationed, since each one
+luwin runs on and puts the upload it finds next to the remote streams
+going out (`luwin/perf/uplink.py`). Tests are rationed, since each one
 briefly fills the upload for everyone.
 """
 
@@ -21,11 +21,11 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from maester.agent.tools import Result, Tier, ToolContext, tool
-from maester.perf import reencode, uplink
-from maester.perf.lag import diagnose, live_streams
-from maester.perf.load import read_loads
-from maester.playback.plays import library_hosts
+from luwin.agent.tools import Result, Tier, ToolContext, tool
+from luwin.perf import reencode, uplink
+from luwin.perf.lag import diagnose, live_streams
+from luwin.perf.load import read_loads
+from luwin.playback.plays import library_hosts
 
 NOTHING_PLAYING = (
     "Nothing is playing for them on {where} right now. Ask them to start it and tell you once "
@@ -109,12 +109,12 @@ async def server_status(ctx: ToolContext) -> dict[str, Any] | Result:
 
 @tool(
     "speed_test",
-    "Test the servers' internet connection now, from the NAS maester runs on: upload, "
+    "Test the servers' internet connection now, from the NAS luwin runs on: upload, "
     "download and ping, next to the remote streams going out, with `headroom` saying in plain "
     "words how much upload is left. Use it when a friend away from home reports lag. It "
     "takes about 30 seconds and briefly fills the upload, so it's rationed: a result is "
     "reused for 10 minutes and a new test runs at most every 20 (`next_test`). host is the "
-    "NAS to test from; only the one maester runs on can.",
+    "NAS to test from; only the one luwin runs on can.",
     {
         "type": "object",
         "properties": {"host": {"type": "string", "description": "The NAS to test from."}},
@@ -130,7 +130,7 @@ async def speed_test(ctx: ToolContext, host: str) -> dict[str, Any] | Result:
         return Result.refusal("No speed test is set up on this server (SPEEDTEST_HOST).")
     if host.lower() != tester.host:
         return Result.refusal(
-            f"Speed tests run on {tester.host}, where maester runs; the servers share one "
+            f"Speed tests run on {tester.host}, where luwin runs; the servers share one "
             f"internet connection, so test from {tester.host}."
         )
     found = await uplink.reading(ctx.memo, ctx.services, tester)

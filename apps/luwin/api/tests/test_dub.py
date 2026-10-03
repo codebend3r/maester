@@ -1,7 +1,7 @@
-from maester.clients.arr import MediaFile
-from maester.clients.seerr import ANIMATION_GENRE, ANIME_KEYWORD, MediaDetails, MediaStatus
-from maester.clients.sonarr import Series
-from maester.dub import dub_coverage, has_english_audio, is_anime, is_english_track
+from luwin.clients.arr import MediaFile
+from luwin.clients.seerr import ANIMATION_GENRE, ANIME_KEYWORD, MediaDetails, MediaStatus
+from luwin.clients.sonarr import Series
+from luwin.dub import dub_coverage, has_english_audio, is_anime, is_english_track
 
 S = MediaStatus
 

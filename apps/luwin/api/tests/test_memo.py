@@ -3,7 +3,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from maester.memo import Key, Memo
+from luwin.memo import Key, Memo
 
 MINUTE = timedelta(minutes=1)
 COUNT: Key[int] = Key("count")

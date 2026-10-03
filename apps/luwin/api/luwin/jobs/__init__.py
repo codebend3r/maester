@@ -15,18 +15,18 @@ from __future__ import annotations
 from datetime import time
 from functools import partial
 
-from maester.agent.limits import KillSwitch
-from maester.clients import Services
-from maester.config import Settings
-from maester.jobs.digest import Digest
-from maester.jobs.expiry import remind_expiring
-from maester.jobs.landed import CHECK_EVERY, tell_landed
-from maester.jobs.nas import nas_report
-from maester.jobs.schedule import At, Every
-from maester.jobs.scheduler import Job, Scheduler
-from maester.jobs.space import sample_space
-from maester.jobs.sweep import Sweeper
-from maester.store import Store
+from luwin.agent.limits import KillSwitch
+from luwin.clients import Services
+from luwin.config import Settings
+from luwin.jobs.digest import Digest
+from luwin.jobs.expiry import remind_expiring
+from luwin.jobs.landed import CHECK_EVERY, tell_landed
+from luwin.jobs.nas import nas_report
+from luwin.jobs.schedule import At, Every
+from luwin.jobs.scheduler import Job, Scheduler
+from luwin.jobs.space import sample_space
+from luwin.jobs.sweep import Sweeper
+from luwin.store import Store
 
 # The daily free-space sample, in the quiet of the night.
 SPACE_SAMPLE_AT = time(3, 0)

@@ -4,7 +4,7 @@ A report's `decision` is written once, when it is filed. Its `status` only
 moves through `move_report`, a compare-and-set: the move happens only from
 the statuses it names, so two presses can't both escalate one report and a
 stale read can't undo a newer move. Which moves exist is the playback
-flow's (`maester/playback/reports.py`).
+flow's (`luwin/playback/reports.py`).
 """
 
 from __future__ import annotations
@@ -16,8 +16,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from maester.media import Copy, Decision, ReportKind, ReportStatus
-from maester.store.base import Database, now, stamp
+from luwin.media import Copy, Decision, ReportKind, ReportStatus
+from luwin.store.base import Database, now, stamp
 
 
 @dataclass(frozen=True)

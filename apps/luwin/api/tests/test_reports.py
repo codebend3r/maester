@@ -2,15 +2,15 @@ from dataclasses import replace
 
 import pytest
 
-from maester.agent.tools import Result, Tier
-from maester.clients.seerr import ISSUE_AUDIO, ISSUE_OTHER, ISSUE_VIDEO
-from maester.clients.tautulli import StreamData
-from maester.media import Decision, ReportKind, ReportStatus
-from maester.notify import AdminPost, DirectMessage
-from maester.playback.diagnosis import FileChecked, PlayerLimit, TheirWord
-from maester.playback.reports import Evidence
-from maester.seerr_events import SeerrNotification, issue_status
-from maester.tools.playback import report_problem
+from luwin.agent.tools import Result, Tier
+from luwin.clients.seerr import ISSUE_AUDIO, ISSUE_OTHER, ISSUE_VIDEO
+from luwin.clients.tautulli import StreamData
+from luwin.media import Decision, ReportKind, ReportStatus
+from luwin.notify import AdminPost, DirectMessage
+from luwin.playback.diagnosis import FileChecked, PlayerLimit, TheirWord
+from luwin.playback.reports import Evidence
+from luwin.seerr_events import SeerrNotification, issue_status
+from luwin.tools.playback import report_problem
 from tests.factories import history_row, session
 from tests.playback_world import (
     DANY,
@@ -51,7 +51,7 @@ async def test_a_player_limit_is_the_answer_and_the_file_is_left_alone(library):
     assert out["next"].startswith("Give them the player fix")
     (issue,) = library.services.seerr.issues
     assert (issue["mediaId"], issue["issueType"], issue["as_user"]) == (12, ISSUE_VIDEO, 4)
-    assert issue["message"].startswith("purple picture\n\nReported through maester by dany")
+    assert issue["message"].startswith("purple picture\n\nReported through luwin by dany")
     assert "Decision: a player limit explains it" in issue["message"]
     assert filed.report.seerr_issue_id == 1 and out["seerr_issue"] == 1
     # The player explained it, so it doesn't count toward replacing the file.
@@ -193,8 +193,8 @@ async def test_report_problem_files_a_confirmed_copy(library):
 
 
 def test_every_report_kind_has_a_policy_and_the_tool_offers_each():
-    from maester.agent.tools import registry
-    from maester.playback.reports import POLICIES
+    from luwin.agent.tools import registry
+    from luwin.playback.reports import POLICIES
 
     assert set(POLICIES) == set(ReportKind)
     spec = registry.get("report_problem")

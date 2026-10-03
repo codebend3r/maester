@@ -2,9 +2,9 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from maester.agent.tools import Result, registry
-from maester.clients.sonarr import Episode
-from maester.tools.gaps import find_gaps, gaps_in
+from luwin.agent.tools import Result, registry
+from luwin.clients.sonarr import Episode
+from luwin.tools.gaps import find_gaps, gaps_in
 from tests.playback_world import stock
 
 NOW = datetime(2026, 9, 27, tzinfo=UTC)

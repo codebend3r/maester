@@ -1,10 +1,10 @@
 from datetime import date, timedelta
 
-from maester.clients.arr import DiskSpace, RootFolder
-from maester.clients.base import ClientError
-from maester.config import Settings
-from maester.jobs.space import sample_space
-from maester.storage import (
+from luwin.clients.arr import DiskSpace, RootFolder
+from luwin.clients.base import ClientError
+from luwin.config import Settings
+from luwin.jobs.space import sample_space
+from luwin.storage import (
     Space,
     Volume,
     forecasts,
@@ -13,7 +13,7 @@ from maester.storage import (
     sample_of,
     volumes_of,
 )
-from maester.store import SpaceSample
+from luwin.store import SpaceSample
 
 TB = 1_000_000_000_000
 

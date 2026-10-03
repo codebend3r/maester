@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
-from maester.store.base import Database
+from luwin.store.base import Database
 
 
 class LinkStatus(StrEnum):

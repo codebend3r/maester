@@ -1,6 +1,6 @@
 import pytest
 
-from maester.registry import Instance, Registry, UnknownInstance
+from luwin.registry import Instance, Registry, UnknownInstance
 
 ENV = {
     "SONARR_MELEYS_URL": "http://192.168.50.2:27021/",

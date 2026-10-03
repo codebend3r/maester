@@ -20,12 +20,12 @@ from collections.abc import Sequence
 import discord
 from discord import app_commands
 
-from maester.chat.admin import AdminConsole, AdminReply
-from maester.chat.members import resolve_chat_user
-from maester.chat.service import ChatService, ChatUser, reports_a_problem
-from maester.chat.split import split_reply
-from maester.chat.views import DecisionButton, decision_view, send_response, send_text
-from maester.notify import (
+from luwin.chat.admin import AdminConsole, AdminReply
+from luwin.chat.members import resolve_chat_user
+from luwin.chat.service import ChatService, ChatUser, reports_a_problem
+from luwin.chat.split import split_reply
+from luwin.chat.views import DecisionButton, decision_view, send_response, send_text
+from luwin.notify import (
     AdminPost,
     Announcement,
     ApprovalPost,
@@ -34,10 +34,10 @@ from maester.notify import (
     RoleChange,
 )
 
-log = logging.getLogger("maester.bot")
+log = logging.getLogger("luwin.bot")
 
 
-class MaesterBot(discord.Client):
+class LuwinBot(discord.Client):
     def __init__(
         self,
         service: ChatService,
@@ -74,7 +74,7 @@ class MaesterBot(discord.Client):
             await self.tree.sync()
 
     async def on_ready(self) -> None:
-        log.info("maester is online as %s", self.user)
+        log.info("luwin is online as %s", self.user)
         self.online.set()
 
     # -- messages ---------------------------------------------------------
@@ -156,7 +156,7 @@ class MaesterBot(discord.Client):
             member = guild.get_member(int(change.to)) or await guild.fetch_member(int(change.to))
             role = discord.Object(id=change.role_id)
             edit = member.add_roles if change.add else member.remove_roles
-            await edit(role, reason=change.why or "maester")
+            await edit(role, reason=change.why or "luwin")
         except (discord.HTTPException, LookupError) as exc:
             verb = "give" if change.add else "take away from"
             await send_text(

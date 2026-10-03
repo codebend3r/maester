@@ -1,10 +1,10 @@
 import pytest
 
-from maester.agent.tools import Tier, registry
-from maester.chat.identity import IdentityService, RoleMap
-from maester.chat.service import UNLINKED_HELP, ChatService
-from maester.guides import DEVICES, GUIDES_DIR, guide
-from maester.tools.guides import setup_guide
+from luwin.agent.tools import Tier, registry
+from luwin.chat.identity import IdentityService, RoleMap
+from luwin.chat.service import UNLINKED_HELP, ChatService
+from luwin.guides import DEVICES, GUIDES_DIR, guide
+from luwin.tools.guides import setup_guide
 
 
 @pytest.mark.parametrize("device", sorted(DEVICES))

@@ -2,10 +2,10 @@ from dataclasses import replace
 
 import pytest
 
-from maester.agent.tools import Result, Tier, registry
-from maester.clients.plextv import OwnedServer, Section, Share
-from maester.notify import DirectMessage, RoleChange
-from maester.tools.access import decide_access, request_access
+from luwin.agent.tools import Result, Tier, registry
+from luwin.clients.plextv import OwnedServer, Section, Share
+from luwin.notify import DirectMessage, RoleChange
+from luwin.tools.access import decide_access, request_access
 
 MELEYS, VERMITHOR = OwnedServer("Meleys", "m-1"), OwnedServer("Vermithor", "v-1")
 
@@ -83,7 +83,7 @@ async def test_4k_adds_the_4k_libraries_and_the_trusted_role(friend):
     out = await decide_access(admin, "4k", "4K", "d1", approved=True)
     assert friend.services.plextv.written == [(7, [101, 102, 103])]
     role, dm = out.notices
-    assert role == RoleChange("d1", 22, why="4K approved in maester")
+    assert role == RoleChange("d1", 22, why="4K approved in luwin")
     assert dm == DirectMessage(
         "d1",
         "The admin approved 4K for you: ask me for any title in 4K now. The 4K libraries show "

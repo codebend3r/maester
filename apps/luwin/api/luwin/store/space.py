@@ -6,7 +6,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date, timedelta
 
-from maester.store.base import Database
+from luwin.store.base import Database
 
 # Kept a while past the forecast's 30 days, so a longer look back stays possible.
 SAMPLES_KEPT = timedelta(days=90)

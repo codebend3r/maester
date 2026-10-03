@@ -1,11 +1,11 @@
 ---
 name: version-bump
-description: Use when cutting a release or bumping a product's version in this workspace (maester today), "bump the version", "cut a release", "tag a new version", "release a patch/minor/major", "tag maester v1.2.0". Bumps the version with semver, makes a "Release <product> vX.Y.Z" commit and puts an annotated <product>-vX.Y.Z tag on that commit.
+description: Use when cutting a release or bumping a product's version in this workspace (luwin today), "bump the version", "cut a release", "tag a new version", "release a patch/minor/major", "tag luwin v1.2.0". Bumps the version with semver, makes a "Release <product> vX.Y.Z" commit and puts an annotated <product>-vX.Y.Z tag on that commit.
 ---
 
 # Version bump
 
-Each released product follows [semver 2.0.0](https://semver.org). Its version lives in `apps/<product>/VERSION`, and every release is one commit, `Release <product> vX.Y.Z`, carrying an annotated tag `<product>-vX.Y.Z`. `scripts/bump_version.sh` does the whole thing; do not edit `VERSION` or create release tags by hand. Only maester has a `VERSION` file today; the script refuses any product without one. Releases before the workspace move were tagged plain `vX.Y.Z`; those tags stay as they are.
+Each released product follows [semver 2.0.0](https://semver.org). Its version lives in `apps/<product>/VERSION`, and every release is one commit, `Release <product> vX.Y.Z`, carrying an annotated tag `<product>-vX.Y.Z`. `scripts/bump_version.sh` does the whole thing; do not edit `VERSION` or create release tags by hand. Only luwin has a `VERSION` file today; the script refuses any product without one. Releases before the workspace move were tagged plain `vX.Y.Z`; those tags stay as they are.
 
 ## Pick the bump
 

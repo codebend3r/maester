@@ -1,6 +1,6 @@
 """Playback problems: which copy a friend means, why it fails, and what to do about it.
 
-- `items.py`          a copy's file on its owning host (the copy itself is `maester/media.py`)
+- `items.py`          a copy's file on its owning host (the copy itself is `luwin/media.py`)
 - `plays.py`          a friend's live and recent plays across every Tautulli host, and
                       how each went (`Playback`)
 - `client_limits.py`  known player limits as a rules table, each with its fix

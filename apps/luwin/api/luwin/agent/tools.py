@@ -15,13 +15,13 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from maester.config import Settings
-from maester.memo import Memo
-from maester.notify import Notice
-from maester.store import LinkedUser, NotLinked, Store
+from luwin.config import Settings
+from luwin.memo import Memo
+from luwin.notify import Notice
+from luwin.store import LinkedUser, NotLinked, Store
 
 if TYPE_CHECKING:
-    from maester.clients import Services
+    from luwin.clients import Services
 
 
 class Tier(enum.IntEnum):

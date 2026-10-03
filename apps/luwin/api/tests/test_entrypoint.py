@@ -1,13 +1,13 @@
 import pytest
 
-from maester import __version__
-from maester.__main__ import main
-from maester.config import MissingConfig
+from luwin import __version__
+from luwin.__main__ import main
+from luwin.config import MissingConfig
 
 
 def test_version_flag_prints_version(capsys):
     assert main(["--version"]) == 0
-    assert capsys.readouterr().out.strip() == f"maester {__version__}"
+    assert capsys.readouterr().out.strip() == f"luwin {__version__}"
 
 
 def test_default_run_fails_fast_naming_missing_config(monkeypatch, tmp_path):

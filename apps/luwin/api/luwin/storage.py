@@ -28,10 +28,10 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Any
 
-from maester.clients import ClientError, Services
-from maester.clients.arr import DiskSpace, RootFolder
-from maester.formatting import gigabytes
-from maester.store import SpaceSample
+from luwin.clients import ClientError, Services
+from luwin.clients.arr import DiskSpace, RootFolder
+from luwin.formatting import gigabytes
+from luwin.store import SpaceSample
 
 # How far apart two reads of one disk's free space may be: downloads move it between reads.
 SAME_DISK_SLACK = 10_000_000_000

@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from maester.store.base import Database, now, stamp
+from luwin.store.base import Database, now, stamp
 
 RESULT_MAX_CHARS = 4000
 

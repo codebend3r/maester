@@ -1,7 +1,7 @@
 """discord.ui components: Confirm/Cancel or Approve/Deny buttons, and a choice picker.
 
 Components reach the service through `interaction.client`, the running
-`MaesterBot`.
+`LuwinBot`.
 
 Decision buttons are persistent. Their custom id, `decide:<pending id>:
 <approve|deny>`, is all a press needs, and `DecisionButton` is registered
@@ -22,13 +22,13 @@ from typing import TYPE_CHECKING, Any
 
 import discord
 
-from maester.agent.tools import Choice
-from maester.chat.members import resolve_chat_user
-from maester.chat.service import ChatResponse, ChatUser
-from maester.chat.split import split_reply
+from luwin.agent.tools import Choice
+from luwin.chat.members import resolve_chat_user
+from luwin.chat.service import ChatResponse, ChatUser
+from luwin.chat.split import split_reply
 
 if TYPE_CHECKING:
-    from maester.chat.bot import MaesterBot
+    from luwin.chat.bot import LuwinBot
 
 PICK_TIMEOUT = 5 * 60
 # A decision button's custom id: which pending action, and which way.
@@ -61,7 +61,7 @@ class DecisionButton(
         return cls(int(match["id"]), match["verdict"] == "approve", item.label or "", item.style)
 
     async def callback(self, interaction: discord.Interaction) -> Any:
-        bot: MaesterBot = interaction.client  # type: ignore[assignment]
+        bot: LuwinBot = interaction.client  # type: ignore[assignment]
         await interaction.response.defer()
         user = await resolve_chat_user(bot, interaction.user)
         decision = await bot.service.decide(self.pending_id, user, self.approve)
@@ -125,7 +125,7 @@ class _ChoiceButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction) -> None:
         view: ChoiceView = self.view  # type: ignore[assignment]
-        bot: MaesterBot = interaction.client  # type: ignore[assignment]
+        bot: LuwinBot = interaction.client  # type: ignore[assignment]
         await interaction.response.defer()
         view.finish()
         await interaction.edit_original_response(view=view)
@@ -133,7 +133,7 @@ class _ChoiceButton(discord.ui.Button):
         await send_response(interaction.followup, bot, view.user, response)
 
 
-async def send_response(target, bot: MaesterBot, user: ChatUser, response: ChatResponse) -> None:
+async def send_response(target, bot: LuwinBot, user: ChatUser, response: ChatResponse) -> None:
     """Send a ChatResponse's chunks with its buttons on the last one, then its notices.
 
     `target` is anything with `.send()`: a channel, a DM, or a webhook followup.

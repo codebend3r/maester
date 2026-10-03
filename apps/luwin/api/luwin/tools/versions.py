@@ -1,9 +1,9 @@
 """Which version of a movie will stream well on a friend's connection.
 
 `pick_version` lists every version of the movie on Plex with its bitrate
-(the listing `check_availability` gives, `maester/plex_versions.py`) and
+(the listing `check_availability` gives, `luwin/plex_versions.py`) and
 recommends the best one the friend's connection carries
-(`maester/perf/versions.py`): the tightest of the speed they give, Plex's
+(`luwin/perf/versions.py`): the tightest of the speed they give, Plex's
 relay on their last play away from home, and the servers' free upload at the
 last speed test. With none of those, a typical connection away from home is
 assumed, and the reply says so. It only reads.
@@ -14,12 +14,12 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from maester.agent.tools import Result, Tier, ToolContext, tool
-from maester.clients.seerr import MediaDetails
-from maester.formatting import mbps
-from maester.perf.uplink import recent
-from maester.perf.versions import Connection, last_away, recommend
-from maester.plex_versions import TitleVersion, title_versions
+from luwin.agent.tools import Result, Tier, ToolContext, tool
+from luwin.clients.seerr import MediaDetails
+from luwin.formatting import mbps
+from luwin.perf.uplink import recent
+from luwin.perf.versions import Connection, last_away, recommend
+from luwin.plex_versions import TitleVersion, title_versions
 
 GUESSED = (
     "Nothing about their connection is known, so this assumes a typical connection away from "

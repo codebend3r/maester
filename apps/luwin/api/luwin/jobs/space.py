@@ -5,13 +5,13 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 
-from maester.clients import Services
-from maester.config import Settings
-from maester.notify import Notice
-from maester.storage import read_space, sample_of
-from maester.store import Store
+from luwin.clients import Services
+from luwin.config import Settings
+from luwin.notify import Notice
+from luwin.storage import read_space, sample_of
+from luwin.store import Store
 
-log = logging.getLogger("maester.jobs")
+log = logging.getLogger("luwin.jobs")
 
 
 async def sample_space(services: Services, store: Store, settings: Settings) -> list[Notice]:

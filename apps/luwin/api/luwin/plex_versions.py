@@ -5,8 +5,8 @@ its 4K copy's remux, and the server's own HEVC re-encode of it. Each is a
 Media entry (`plex.Version`) of the Plex item holding its copy, and friends
 name them "1080p", "4K" and "4K HEVC re-encode" (`version_name`).
 `check_availability` lists them; the performance tools weigh them against a
-connection (`maester/perf/versions.py`). They're read from the Plex server
-maester reads (`PLEX_URL`), by Seerr's rating keys, which name items on that
+connection (`luwin/perf/versions.py`). They're read from the Plex server
+luwin reads (`PLEX_URL`), by Seerr's rating keys, which name items on that
 server only (`playback/plays.py`'s `library_hosts`).
 """
 
@@ -17,9 +17,9 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from maester.clients.plex import Plex, PlexItem, Version
-from maester.clients.seerr import MediaDetails
-from maester.formatting import mbps
+from luwin.clients.plex import Plex, PlexItem, Version
+from luwin.clients.seerr import MediaDetails
+from luwin.formatting import mbps
 
 # The server's own 4K re-encodes are written next to the original as
 # "<Movie> (<year>) 2160p HEVC.mkv"; that exact tail is what sets them apart

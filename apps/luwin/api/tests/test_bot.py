@@ -2,11 +2,11 @@ from types import SimpleNamespace
 
 import discord
 
-from maester.chat.bot import MaesterBot
-from maester.chat.service import ChatResponse
-from maester.chat.views import DecisionButton
-from maester.media import Copy, Titled
-from maester.notify import AdminPost, Announcement, ApprovalPost, DirectMessage, RoleChange
+from luwin.chat.bot import LuwinBot
+from luwin.chat.service import ChatResponse
+from luwin.chat.views import DecisionButton
+from luwin.media import Copy, Titled
+from luwin.notify import AdminPost, Announcement, ApprovalPost, DirectMessage, RoleChange
 
 
 class Inbox:
@@ -40,7 +40,7 @@ class Service:
 
 def bot_with(channel, users, requests=None):
     service = Service()
-    bot = MaesterBot(service, console=None, guild_id=1, requests_channel_id=2, admin_channel_id=3)
+    bot = LuwinBot(service, console=None, guild_id=1, requests_channel_id=2, admin_channel_id=3)
     bot.get_channel = lambda i: {3: channel, 2: requests}.get(i)
     bot.get_user = lambda i: None
     bot.get_guild = lambda i: None

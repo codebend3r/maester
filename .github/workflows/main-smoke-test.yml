@@ -17,13 +17,13 @@ concurrency:
 
 jobs:
   smoke:
-    name: 🩺 maester build and health check
+    name: 🩺 luwin build and health check
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      IMAGE: maester:ci
+      IMAGE: luwin:ci
       PORT: 8020
-      VERSION_FILE: apps/maester/VERSION
+      VERSION_FILE: apps/luwin/VERSION
     steps:
       - name: 📥 Checkout
         uses: actions/checkout@v4
@@ -31,12 +31,12 @@ jobs:
       # Built from the repo root, as compose does; the Dockerfile's own
       # ignore file keeps the context to what it copies.
       - name: 🐳 Build image
-        run: docker build -f apps/maester/Dockerfile -t "$IMAGE" .
+        run: docker build -f apps/luwin/Dockerfile -t "$IMAGE" .
 
       - name: 🏷️ Entrypoint reports the release version
         run: |
-          expected="maester $(cat "$VERSION_FILE")"
-          actual="$(docker run --rm "$IMAGE" maester --version)"
+          expected="luwin $(cat "$VERSION_FILE")"
+          actual="$(docker run --rm "$IMAGE" luwin --version)"
           echo "expected: $expected"
           echo "actual:   $actual"
           test "$actual" = "$expected"
@@ -45,8 +45,8 @@ jobs:
       # explicitly. /health is ungated, so no .env or Discord is needed.
       - name: ▶️ Start web app
         run: |
-          docker run -d --name maester -p "$PORT:$PORT" "$IMAGE" \
-            uvicorn maester.web:create_app --factory --host 0.0.0.0 --port "$PORT"
+          docker run -d --name luwin -p "$PORT:$PORT" "$IMAGE" \
+            uvicorn luwin.web:create_app --factory --host 0.0.0.0 --port "$PORT"
 
       - name: 🩺 Wait for /health
         run: |
@@ -64,11 +64,11 @@ jobs:
 
       - name: 📜 Container logs
         if: always()
-        run: docker logs maester || true
+        run: docker logs luwin || true
 
       - name: 🧹 Stop container
         if: always()
-        run: docker rm -f maester || true
+        run: docker rm -f luwin || true
 
   raven:
     name: 🩺 raven build and health check
