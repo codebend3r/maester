@@ -6,7 +6,11 @@ Edit here, then re-run the sync.
 """
 
 MILESTONES = [
-    ("M1", "Walking skeleton", "A friend can DM the bot and it answers using a read-only tool."),
+    (
+        "M1",
+        "Walking skeleton",
+        "A friend can chat with luwin and it answers using a read-only tool.",
+    ),
     ("M2", "Requests", "Friends request movies and shows in 1080p and 4K through the bot."),
     (
         "M3",
@@ -184,16 +188,16 @@ EPICS = [
         "key": "E2",
         "title": "Chat and identity",
         "milestone": "M1",
-        "area": "discord",
-        "summary": "The Discord surface, account linking to Plex/Seerr users, roles to tiers, and interactive buttons.",
+        "area": "chat",
+        "summary": "luwin's first chat surface, account linking to Plex/Seerr users, tiers, and interactive buttons. The surface has since been removed so luwin can become its own app.",
         "stories": [
             {
-                "title": "Discord bot with DMs and a requests channel",
+                "title": "First chat surface with DMs and a requests channel",
                 "size": "M",
                 "priority": "P0",
-                "story": "As a friend, I want to DM the bot or mention it in #requests and get an answer, so that I can use it where the group already talks.",
+                "story": "As a friend, I want to message luwin directly or mention it in the requests channel and get an answer, so that I can use it where the group already talks.",
                 "criteria": [
-                    "discord.py client with message content intent; responds to DMs and to mentions in configured channels",
+                    "A chat client that answers direct messages and mentions in configured channels",
                     "Typing indicator while the agent works",
                     "Replies over 2000 chars are split on paragraph boundaries",
                     "Errors reply with a short apology and are logged with the trace id",
@@ -203,7 +207,7 @@ EPICS = [
                 "title": "Account linking",
                 "size": "M",
                 "priority": "P0",
-                "story": "As a friend, I want to link my Discord account to my Plex user once so that requests are made as me and the bot knows what I have watched.",
+                "story": "As a friend, I want to link my chat account to my Plex user once so that requests are made as me and luwin knows what I have watched.",
                 "criteria": [
                     "`/link` asks for the Plex email or username, matches against Seerr users, and stores the pair pending admin confirmation",
                     "Admin gets an approve/deny button; on approve the link becomes active",
@@ -212,12 +216,12 @@ EPICS = [
                 ],
             },
             {
-                "title": "Discord roles map to tiers",
+                "title": "Tiers for friends, trusted friends and the admin",
                 "size": "S",
                 "priority": "P1",
-                "story": "As the maintainer, I want tiers (friend, trusted, admin) derived from Discord roles so that I manage permissions where I already manage the server.",
+                "story": "As the maintainer, I want tiers (friend, trusted, admin) so that what someone can do follows who they are to the server.",
                 "criteria": [
-                    "Role ids for each tier come from config",
+                    "Each tier is resolved from config and the store",
                     "Tier is resolved on every message, never cached across role changes",
                     "A stored override per user can raise or lower the tier from an admin command",
                 ],
@@ -328,7 +332,7 @@ EPICS = [
                 "story": "As a friend, I want a DM when my request is ready to watch, so that I do not have to keep asking.",
                 "criteria": [
                     "FastAPI route receives the Seerr webhook (media available event) with a shared secret",
-                    "The requester is resolved to a Discord user and gets a DM with title, version and Plex link",
+                    "The requester is resolved to their chat account and gets a DM with title, version and Plex link",
                     "Duplicate webhooks do not produce duplicate DMs",
                     "A 👎 reaction on the DM opens a playback report (E4)",
                 ],
@@ -690,7 +694,7 @@ EPICS = [
                 "priority": "P1",
                 "story": "As a friend, I want to ask for access to another library or the 4K tier and have it go to the admin, so that access changes are one message.",
                 "criteria": [
-                    "Pending action with the requested change; on approval the Wizarr or Plex share is updated and the Discord role changed",
+                    "Pending action with the requested change; on approval the Wizarr or Plex share is updated and, for 4K, the tier raised",
                 ],
             },
             {
@@ -828,7 +832,7 @@ EPICS = [
 
 AREA_LABELS = {
     "agent": "The Claude tool-use loop, registry and guardrails",
-    "discord": "The Discord surface and identity",
+    "chat": "luwin's chat surface and identity",
     "requests": "Requesting and finding media",
     "playback": "Playback issue reports and file replacement",
     "perf": "Lag and network diagnostics",

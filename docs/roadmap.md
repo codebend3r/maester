@@ -9,7 +9,7 @@ Board: https://github.com/users/codebend3r/projects ("maester roadmap")
 
 ### M1 Walking skeleton
 
-A friend can DM the bot and it answers using a read-only tool.
+A friend can chat with luwin and it answers using a read-only tool.
 
 - [x] E0 Foundation [#1](https://github.com/codebend3r/maester/issues/1)
 - [x] E1 Agent core [#9](https://github.com/codebend3r/maester/issues/9)
@@ -67,11 +67,11 @@ The Claude tool-use loop, the tool registry with permission tiers, memory, guard
 
 ### E2 Chat and identity (M1) [#15](https://github.com/codebend3r/maester/issues/15)
 
-The Discord surface, account linking to Plex/Seerr users, roles to tiers, and interactive buttons.
+luwin's first chat surface, account linking to Plex/Seerr users, tiers, and interactive buttons. The surface has since been removed so luwin can become its own app.
 
-- [x] E2.1 Discord bot with DMs and a requests channel · M · P0 · [#16](https://github.com/codebend3r/maester/issues/16)
+- [x] E2.1 First chat surface with DMs and a requests channel · M · P0 · [#16](https://github.com/codebend3r/maester/issues/16)
 - [x] E2.2 Account linking · M · P0 · [#17](https://github.com/codebend3r/maester/issues/17)
-- [x] E2.3 Discord roles map to tiers · S · P1 · [#18](https://github.com/codebend3r/maester/issues/18)
+- [x] E2.3 Tiers for friends, trusted friends and the admin · S · P1 · [#18](https://github.com/codebend3r/maester/issues/18)
 - [x] E2.4 Confirmation and choice buttons · M · P0 · [#19](https://github.com/codebend3r/maester/issues/19)
 - [x] E2.5 Unlinked-user flow · S · P1 · [#20](https://github.com/codebend3r/maester/issues/20)
 
