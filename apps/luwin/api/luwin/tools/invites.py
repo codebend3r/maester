@@ -140,7 +140,7 @@ async def decide_invite(ctx: ToolContext, for_whom: str, requester: str, approve
     dm = (
         f"The admin approved an invite for {for_whom}. Send them this link: {link}\n"
         f"It works until {until} ({days} days). Once they join with their Plex account, "
-        f"{lasts}. Then they can talk to me here after linking with `/link`."
+        f"{lasts}. Then they can talk to me here once they link the email or username they use for Plex."
     )
     shared = ", ".join(sorted(f"{lib.name} on {lib.server_name}" for lib in libraries))
     return Result(

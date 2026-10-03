@@ -5,7 +5,7 @@ friend is told it's coming. This job follows up: every `CHECK_EVERY` it
 looks at the replacements of the last `FOLLOW_FOR`, and once the copy's
 owning arr holds a file other than the one deleted, it DMs everyone who
 reported the old file, once each (claim source `landed`, per reporter and
-file). The DM is about the copy, so a thumbs-down on it reports the new file.
+file). The DM is about the copy, so a report about it reaches the new file.
 A copy whose search never finds a release stops being followed after two
 weeks; its Seerr issue stays open in the digest.
 """

@@ -70,6 +70,9 @@ async def test_approved_the_link_goes_to_the_friend_with_its_dates(trusted):
     assert dm.to == "d1" and f"Send them this link: {link}\n" in dm.text
     assert "It works until" in dm.text and "(7 days)" in dm.text
     assert "their access lasts 35 days" in dm.text
+    assert dm.text.endswith(
+        "Then they can talk to me here once they link the email or username they use for Plex."
+    )
 
 
 async def test_the_configured_expiry_is_snapped_up_and_access_can_be_open_ended(trusted):

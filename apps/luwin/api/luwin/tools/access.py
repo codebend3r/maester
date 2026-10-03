@@ -184,7 +184,7 @@ async def request_access(
 async def decide_access(
     ctx: ToolContext, change: str, library: str, requester: str, approved: bool
 ) -> Result:
-    """Add the libraries to their shares (and the trusted role, for 4K), or tell them no.
+    """Add the libraries to their shares (and the trusted tier, for 4K), or tell them no.
 
     Safe to run again: what they have already isn't added twice.
     """

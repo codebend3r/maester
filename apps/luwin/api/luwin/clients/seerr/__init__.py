@@ -2,7 +2,7 @@
 
 Requests are made on a friend's behalf with the `X-API-User` header so Seerr
 applies that user's quotas and permissions, and the request shows under their
-name rather than the bot's. When Seerr refuses a request it answers with a
+name rather than luwin's. When Seerr refuses a request it answers with a
 status and one sentence (quota, permission, duplicate, nothing left to
 request); `create_request` turns those into a typed `RequestRefused` so tools
 can explain them in plain words.
