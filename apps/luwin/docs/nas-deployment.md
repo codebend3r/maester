@@ -23,44 +23,36 @@ luwin runs as one container on **Meleys** (`192.168.50.2`). The whole repo is co
 
 ## Moving to luwin (once)
 
-Until the rename, the assistant ran as `maester` from `apps/maester/`, with its state in `apps/maester/.env` and `apps/maester/maester-data/maester.db`. luwin reads `.env` and `luwin-data/` beside `apps/luwin/docker-compose.yml`, its model and database variables are `LUWIN_*`, and an old `MAESTER_*` name stops it on boot. On first open it renames `maester.db`, with its `-wal` and `-shm` files, to `luwin.db`. Move the rest once, with the old container down so the SQLite file is quiet. The chained move stops at the first step that fails, before anything starts; fix what it printed and run its remaining steps by hand:
+Until the rename, the assistant ran as `maester` from `apps/maester/`, with its settings in `apps/maester/.env` and its database in `apps/maester/maester-data/`. luwin starts fresh: its database lives in a new `luwin-data/`, nothing in the old one carries over, and it refuses to open a database from before. Its model and database variables are `LUWIN_*`, and an old `MAESTER_*` name stops it on boot. Move the settings once, with the old container down. The old folder stays as it is, so going back is one command:
 
 ```bash
 scripts/deploy-nas.sh
 ssh crivas@192.168.50.2
 cd /volume1/docker/maester/apps
-sudo -n /usr/local/bin/docker exec maester python -c "import sqlite3; print(sqlite3.connect('file:/data/maester.db?mode=ro', uri=True).execute('select count(*) from users').fetchone()[0])"
 (cd maester && sudo -n /usr/local/bin/docker compose down) \
-  && mkdir -p ~/maester-backup && cp -p maester/maester-data/maester.db* ~/maester-backup/ \
-  && mv maester/.env luwin/.env \
-  && mv maester/maester-data luwin/luwin-data \
-  && sed -i -e 's/^MAESTER_/LUWIN_/' -e 's#^LUWIN_DB_PATH=/data/maester.db$#LUWIN_DB_PATH=/data/luwin.db#' luwin/.env \
-  && test -f luwin/luwin-data/maester.db \
+  && cp -p maester/.env luwin/.env \
+  && sed -i -e 's/^MAESTER_/LUWIN_/' -e '/^LUWIN_DB_PATH=/d' luwin/.env \
   && grep -n 'LUWIN_' luwin/.env
 ```
 
-Check the `LUWIN_` lines it printed. If `.env` set `MAESTER_DB_PATH` to anything other than `/data/maester.db`, fix `LUWIN_DB_PATH` by hand now. Then start luwin and compare the counts:
+The chain stops at the first step that fails, before anything starts. `LUWIN_DB_PATH` is dropped so the default, `/data/luwin.db`, applies. The copied `.env` still holds the old chat bot's token and ids: luwin ignores them, but delete those lines from `luwin/.env` so the token doesn't linger. Then start luwin:
 
 ```bash
 cd /volume1/docker/maester/apps/luwin && sudo -n /usr/local/bin/docker compose up -d --build
 for i in $(seq 1 30); do curl -fs http://127.0.0.1:8020/health && echo && break; sleep 2; done
-sudo -n /usr/local/bin/docker exec luwin python -c "import sqlite3; print(sqlite3.connect('file:/data/luwin.db?mode=ro', uri=True).execute('select count(*) from users').fetchone()[0])"
+sudo -n /usr/local/bin/docker logs luwin 2>&1 | tail -5
 ```
 
-The loop prints the health line once luwin answers; if it prints nothing within a minute, luwin did not come up. The two counts match. Both queries open the database read-only, so a wrong path fails instead of leaving an empty file behind.
+The loop prints the health line once luwin answers; if it prints nothing within a minute, luwin did not come up, and its log says why. Compose creates `luwin-data/` the way it first created `maester-data/`.
 
-If luwin will not come up healthy, put maester back; its old files and image are still on the NAS:
+To go back to maester, whose files and image are untouched:
 
 ```bash
 cd /volume1/docker/maester/apps
-(cd luwin && sudo -n /usr/local/bin/docker compose down)
-mv luwin/.env maester/.env && mv luwin/luwin-data maester/maester-data
-for f in maester/maester-data/luwin.db*; do mv "$f" "maester/maester-data/maester.db${f##*luwin.db}"; done
-sed -i -e 's/^LUWIN_/MAESTER_/' -e 's#^MAESTER_DB_PATH=/data/luwin.db$#MAESTER_DB_PATH=/data/maester.db#' maester/.env
-(cd maester && sudo -n /usr/local/bin/docker compose up -d)
+(cd luwin && sudo -n /usr/local/bin/docker compose down) && (cd maester && sudo -n /usr/local/bin/docker compose up -d)
 ```
 
-The sync never deletes, so `apps/maester/`, and `apps/weirwood/` and `libs/weirwood/` from raven's rename, stay behind. Once luwin has been healthy for a few days, remove them, `~/maester-backup` and the old image: `rm -rf /volume1/docker/maester/apps/maester /volume1/docker/maester/apps/weirwood /volume1/docker/maester/libs/weirwood ~/maester-backup && sudo -n /usr/local/bin/docker image rm maester`.
+The sync never deletes, so `apps/maester/` (with its `maester-data/`), and `apps/weirwood/` and `libs/weirwood/` from raven's rename, stay behind. Once luwin has run well for a few days, remove them and the old image: `rm -rf /volume1/docker/maester/apps/maester /volume1/docker/maester/apps/weirwood /volume1/docker/maester/libs/weirwood && sudo -n /usr/local/bin/docker image rm maester`.
 
 ## Media mounts
 

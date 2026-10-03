@@ -1,6 +1,6 @@
 """The admin's daily digest: the state of the server in one message.
 
-Posted to the admin channel at `DIGEST_TIME`. A section is there only when
+Sent to the admin at `DIGEST_TIME`. A section is there only when
 it has something to say, in this order:
 
 - switches left on: the kill switch, a maintenance window

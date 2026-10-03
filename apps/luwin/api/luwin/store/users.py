@@ -1,4 +1,4 @@
-"""Who a Discord account is on Plex, Seerr and Tautulli, and its tier override."""
+"""Who a chat account is on Plex, Seerr and Tautulli, and its tier override."""
 
 from __future__ import annotations
 
@@ -28,16 +28,16 @@ class UserRow:
 
 
 class SeerrUserTaken(LookupError):
-    """Another Discord account already holds a live link to this Seerr user."""
+    """Another chat account already holds a live link to this Seerr user."""
 
 
 class NotLinked(LookupError):
-    """A Discord account with no active link to a Seerr user: nothing can be done as them."""
+    """A chat account with no active link to a Seerr user: nothing can be done as them."""
 
 
 @dataclass(frozen=True)
 class LinkedUser:
-    """An active link: who a Discord account is on Seerr (and Tautulli, when known)."""
+    """An active link: who a chat account is on Seerr (and Tautulli, when known)."""
 
     user_id: str
     seerr_user_id: int
@@ -91,7 +91,7 @@ class Users(Database):
         return self._link(r)
 
     def active_link_by_seerr_id(self, seerr_user_id: int) -> LinkedUser | None:
-        """Whose request a Seerr user's is: the Discord account actively linked to it."""
+        """Whose request a Seerr user's is: the chat account actively linked to it."""
         with self._lock:
             r = self._conn.execute(
                 f"SELECT * FROM users WHERE seerr_user_id = ? AND {_ACTIVE_LINK}", (seerr_user_id,)
@@ -106,7 +106,7 @@ class Users(Database):
         return LinkedUser(r["user_id"], r["seerr_user_id"], r["tautulli_user_id"], name)
 
     def active_users(self) -> list[UserRow]:
-        """Every Discord account with an active link."""
+        """Every chat account with an active link."""
         with self._lock:
             rows = self._conn.execute(f"SELECT * FROM users WHERE {_ACTIVE_LINK}").fetchall()
         return [u for u in map(self._user, rows) if u is not None]

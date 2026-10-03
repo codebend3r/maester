@@ -42,7 +42,7 @@ jobs:
           test "$actual" = "$expected"
 
       # The default CMD does not serve HTTP yet, so start the web app
-      # explicitly. /health is ungated, so no .env or Discord is needed.
+      # explicitly. /health is ungated, so no .env is needed.
       - name: ▶️ Start web app
         run: |
           docker run -d --name luwin -p "$PORT:$PORT" "$IMAGE" \

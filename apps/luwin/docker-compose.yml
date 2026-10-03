@@ -25,7 +25,7 @@ services:
       - /volume1/Vhagar:/Vhagar:ro
     healthcheck:
       # /health is the one ungated route, which is what lets this probe run
-      # without a Discord connection.
+      # without any credentials.
       test:
         [
           'CMD',

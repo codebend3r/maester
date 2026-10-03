@@ -166,7 +166,7 @@ class AdminConsole:
 
         Seerr's pending requests are read too: one the webhook never delivered
         (luwin was down, or it isn't set up) gets its approval raised here,
-        and posted in the admin channel like any other.
+        and sent to the admin like any other.
         """
         if refused := self._refused(admin, "pending", {}):
             return refused
@@ -201,7 +201,7 @@ class AdminConsole:
         else:
             text = "Nothing is waiting on you."
         self._audit(admin, "pending", {}, f"{len(waiting)} waiting", ok=True)
-        # One raised here gets its admin channel post like any other; the list offers it too.
+        # One raised here reaches the admin like any other; the list offers it too.
         return AdminReply(text + note, offers=tuple(waiting), notices=tuple(raised))
 
     def _waiting_line(self, pending: PendingAction) -> str:

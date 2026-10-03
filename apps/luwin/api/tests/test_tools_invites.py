@@ -45,7 +45,7 @@ async def test_asking_for_an_invite_goes_to_the_admin_and_sends_nothing(trusted)
     approval = out.approval
     assert approval.notice == "dany asks for a Plex invite for my brother Rhaegar: he lives with me"
     long = await request_invite(trusted, "Rhaegar", "x" * 5000)
-    assert len(long.approval.notice) < 600  # a post Discord takes
+    assert len(long.approval.notice) < 600  # a post that fits one message
     assert approval.decide == "decide_invite"
     assert approval.args == {"for_whom": "my brother Rhaegar", "requester": "d1"}
     assert approval.subject == "invite:d1:my brother rhaegar"

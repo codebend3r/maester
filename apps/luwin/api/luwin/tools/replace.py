@@ -185,7 +185,7 @@ async def replace_media(ctx: ToolContext, report_id: int, host: str) -> Result:
         "type": "object",
         "properties": {
             **REPLACE_SCHEMA["properties"],
-            "requester": {"type": "string", "description": "The friend's Discord id."},
+            "requester": {"type": "string", "description": "The friend's user id."},
             "approved": {"type": "boolean"},
         },
         "required": ["report_id", "host", "requester", "approved"],

@@ -171,7 +171,7 @@ async def request_access(
         "properties": {
             "change": {"type": "string", "enum": ["library", "4k"]},
             "library": {"type": "string"},
-            "requester": {"type": "string", "description": "The friend's Discord id."},
+            "requester": {"type": "string", "description": "The friend's user id."},
             "approved": {"type": "boolean"},
         },
         "required": ["change", "library", "requester", "approved"],

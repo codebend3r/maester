@@ -2,11 +2,11 @@
 
 maester is a self-hosted media suite: a library and player, an AI assistant for the friends who share the server, and soon their accounts. This repo is its workspace, an [Nx](https://nx.dev) 23 monorepo over [Bun](https://bun.sh) workspaces.
 
-| App     | What it is                                                                        |
-| ------- | --------------------------------------------------------------------------------- |
-| raven   | A self-hosted media library and direct-play player                                |
-| luwin   | The AI assistant: requests, playback fixes and lag answers for friends on Discord |
-| rookery | Sign-in and account management (planned)                                          |
+| App     | What it is                                                                                                   |
+| ------- | ------------------------------------------------------------------------------------------------------------ |
+| raven   | A self-hosted media library and direct-play player                                                           |
+| luwin   | The AI assistant: requests, playback fixes and lag answers, in its own chat app and inside raven and rookery |
+| rookery | Sign-in and account management (planned)                                                                     |
 
 | Project         | Path                | What                                                                   |
 | --------------- | ------------------- | ---------------------------------------------------------------------- |

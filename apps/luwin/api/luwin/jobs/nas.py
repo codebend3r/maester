@@ -1,6 +1,6 @@
 """The weekly NAS health report: every NAS and media volume, anything degraded at the top.
 
-Posted to the admin channel on `NAS_REPORT_DAY` at `DIGEST_TIME`. Each NAS
+Sent to the admin on `NAS_REPORT_DAY` at `DIGEST_TIME`. Each NAS
 comes from the fleet monitor (`/fleet`), which watches all five: whether it
 has been heard from, its `/volume1` usage, memory and load, the hottest chip
 it reports, containers down or failing their healthcheck, and how much of
