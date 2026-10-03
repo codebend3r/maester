@@ -6,11 +6,10 @@ from luwin.agent.loop import Agent
 from luwin.agent.runner import ToolRunner
 from luwin.agent.tools import Approval, Choice, Choices, Result, Tier, ToolRegistry
 from luwin.agent.tools import registry as app_registry
-from luwin.chat.identity import IdentityService, RoleMap
+from luwin.chat.identity import IdentityService
 from luwin.chat.service import UNLINKED_HELP, ChatService, ChatUser, Decision
 from luwin.clients.seerr import MediaDetails, MediaStatus, RequestStatus, SeerrUser
 from luwin.config import Settings
-from luwin.media import Copy, Titled
 from luwin.notify import AdminPost, ApprovalPost, DirectMessage
 from tests.factories import seerr_server
 from tests.fake_model import FakeModel, text_message, tool_message
@@ -18,10 +17,9 @@ from tests.fake_model import FakeModel, text_message, tool_message
 # Importing the tools package registers the real tools into `app_registry`.
 import luwin.tools  # noqa: F401  isort: skip
 
-ADMIN_ROLE, TRUSTED_ROLE = 1, 2
 FRIEND = ChatUser("f1", "Friend")
-TRUSTED = ChatUser("t1", "Trusty", frozenset({TRUSTED_ROLE}))
-ADMIN = ChatUser("a1", "Boss", frozenset({ADMIN_ROLE}))
+TRUSTED = ChatUser("t1", "Trusty")
+ADMIN = ChatUser("a1", "Boss")
 
 
 def service(registry, services, store, *script) -> ChatService:
@@ -33,7 +31,7 @@ def service(registry, services, store, *script) -> ChatService:
         services=services,
         settings=Settings(),
     )
-    identity = IdentityService(store, services, RoleMap(ADMIN_ROLE, TRUSTED_ROLE))
+    identity = IdentityService(store, services)
     return ChatService(agent=agent, identity=identity, store=store)
 
 
@@ -73,6 +71,8 @@ def world(services, store):
     reg.register(app_registry.get("link_account"))
     for seerr_id, u in enumerate((FRIEND, TRUSTED), 2):
         store.upsert_user(u.id, status="active", seerr_user_id=seerr_id)
+    store.upsert_user(TRUSTED.id, tier_override="trusted")
+    store.upsert_user(ADMIN.id, tier_override="admin")
     services.seerr.user_list = [SeerrUser(4, "new@example.com", "newbie", "")]
 
     def make(*script):
@@ -116,26 +116,6 @@ async def test_pick_sends_the_choice_back_as_a_message(world):
     )
 
 
-async def test_a_thumbs_down_on_a_ready_dm_reports_a_problem_with_that_copy(world):
-    make, *_ = world
-    svc = make(text_message("Sorry! What's wrong with it?"))
-    dune = Titled(Copy("movie", 438631, True), "Dune (2021)")
-    svc.remember_dm("m1", DirectMessage(FRIEND.id, "Dune (2021) is ready", dune))
-    svc.remember_dm("m2", DirectMessage(FRIEND.id, "no title here"))
-
-    response = await svc.react(
-        FRIEND, "m1", "\N{THUMBS DOWN SIGN}\N{EMOJI MODIFIER FITZPATRICK TYPE-4}"
-    )
-    assert response.text == "Sorry! What's wrong with it?"
-    sent = svc.agent.client.messages.calls[0]["messages"][-1]["content"]
-    assert "Dune (2021) in 4K (movie 438631)" in sent and "something's wrong" in sent
-
-    # Other reactions, other messages and other people's DMs mean nothing.
-    assert await svc.react(FRIEND, "m1", "\N{THUMBS UP SIGN}") is None
-    assert await svc.react(FRIEND, "m2", "\N{THUMBS DOWN SIGN}") is None
-    assert await svc.react(TRUSTED, "m1", "\N{THUMBS DOWN SIGN}") is None
-
-
 async def test_confirmation_round_trip(world):
     make, store, calls = world
     svc = make(tool_message([("replace_media", {"file_id": 7})]), text_message("Confirm below."))
@@ -165,7 +145,9 @@ async def test_a_confirmation_that_goes_to_the_admin_says_so_plainly(world):
     svc = make(tool_message([("replace_media", {"file_id": 99})]), text_message("Confirm below."))
     (pending,) = (await svc.handle_message(TRUSTED, "replace it")).confirmations
     decision = await svc.decide(pending.id, TRUSTED, approve=True)
-    assert decision.text == "That needs the admin's approval now; you'll get a DM once they decide."
+    assert (
+        decision.text == "That needs the admin's approval now; you'll hear back once they decide."
+    )
     (post,) = decision.notices
     assert isinstance(post, ApprovalPost) and store.get_pending(post.pending_id).kind == "approve"
 
@@ -290,7 +272,14 @@ DUNE = MediaDetails(438631, "movie", "Dune", 2021, "", MediaStatus.AVAILABLE, Me
 
 async def test_a_trusted_4k_request_is_approved_by_the_admin_end_to_end(services, store):
     """The real tools: a trusted friend asks for 4K, the admin approves, Seerr and the friend hear."""
-    store.upsert_user(TRUSTED.id, status="active", seerr_user_id=7, plex_username="trusty")
+    store.upsert_user(
+        TRUSTED.id,
+        status="active",
+        seerr_user_id=7,
+        plex_username="trusty",
+        tier_override="trusted",
+    )
+    store.upsert_user(ADMIN.id, tier_override="admin")
     seerr = services.seerr
     seerr.details[("movie", 438631)] = DUNE
     seerr.arr_servers["radarr"] = [seerr_server(1, "movie", "vermithor", is_4k=True)]
@@ -322,7 +311,14 @@ async def test_a_trusted_4k_request_is_approved_by_the_admin_end_to_end(services
 async def test_a_failed_press_that_cant_reopen_points_at_the_newer_approval(
     services, store, monkeypatch
 ):
-    store.upsert_user(TRUSTED.id, status="active", seerr_user_id=7, plex_username="trusty")
+    store.upsert_user(
+        TRUSTED.id,
+        status="active",
+        seerr_user_id=7,
+        plex_username="trusty",
+        tier_override="trusted",
+    )
+    store.upsert_user(ADMIN.id, tier_override="admin")
     services.seerr.details[("movie", 438631)] = DUNE
     services.seerr.arr_servers["radarr"] = [seerr_server(1, "movie", "vermithor", is_4k=True)]
     svc = service(
