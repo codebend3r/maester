@@ -6,15 +6,19 @@ Edit here, then re-run the sync.
 """
 
 MILESTONES = [
-    ("M1", "Walking skeleton", "A friend can DM the bot and it answers using a read-only tool."),
-    ("M2", "Requests", "Friends request movies and shows in 1080p and 4K through the bot."),
+    (
+        "M1",
+        "Walking skeleton",
+        "A friend can chat with luwin and it answers using a read-only tool.",
+    ),
+    ("M2", "Requests", "Friends request movies and shows in 1080p and 4K through luwin."),
     (
         "M3",
         "Troubleshooting",
         "Playback problems are diagnosed before anything is replaced; lag is explained with live data.",
     ),
     ("M4", "Admin and onboarding", "Approvals, digests and Wizarr invites run from chat."),
-    ("M5", "Engagement", "The bot gives friends reasons to come back."),
+    ("M5", "Engagement", "luwin gives friends reasons to come back."),
 ]
 
 # Each epic: key, title, milestone, area label, summary, stories.
@@ -151,7 +155,7 @@ EPICS = [
                 "story": 'As a friend, I want the bot to remember what we were just talking about so that "the second one" or "yes, that one" works.',
                 "criteria": [
                     "History stored per user in SQLite, trimmed to a token budget",
-                    "A `/forget` command or an idle timeout clears the thread",
+                    "A forget command or an idle timeout clears the thread",
                     "Tool results larger than a threshold are summarized before being stored",
                 ],
             },
@@ -184,16 +188,16 @@ EPICS = [
         "key": "E2",
         "title": "Chat and identity",
         "milestone": "M1",
-        "area": "discord",
-        "summary": "The Discord surface, account linking to Plex/Seerr users, roles to tiers, and interactive buttons.",
+        "area": "chat",
+        "summary": "luwin's first chat surface, account linking to Plex/Seerr users, tiers, and interactive buttons. The surface has since been removed so luwin can become its own app.",
         "stories": [
             {
-                "title": "Discord bot with DMs and a requests channel",
+                "title": "First chat surface with DMs and a requests channel",
                 "size": "M",
                 "priority": "P0",
-                "story": "As a friend, I want to DM the bot or mention it in #requests and get an answer, so that I can use it where the group already talks.",
+                "story": "As a friend, I want to message luwin directly or mention it in the requests channel and get an answer, so that I can use it where the group already talks.",
                 "criteria": [
-                    "discord.py client with message content intent; responds to DMs and to mentions in configured channels",
+                    "A chat client that answers direct messages and mentions in configured channels",
                     "Typing indicator while the agent works",
                     "Replies over 2000 chars are split on paragraph boundaries",
                     "Errors reply with a short apology and are logged with the trace id",
@@ -203,22 +207,22 @@ EPICS = [
                 "title": "Account linking",
                 "size": "M",
                 "priority": "P0",
-                "story": "As a friend, I want to link my Discord account to my Plex user once so that requests are made as me and the bot knows what I have watched.",
+                "story": "As a friend, I want to link my chat account to my Plex user once so that requests are made as me and luwin knows what I have watched.",
                 "criteria": [
-                    "`/link` asks for the Plex email or username, matches against Seerr users, and stores the pair pending admin confirmation",
+                    "Linking asks for the Plex email or username, matches against Seerr users, and stores the pair pending admin confirmation",
                     "Admin gets an approve/deny button; on approve the link becomes active",
                     "Unlinked users get the unlinked-user flow",
-                    "`/whoami` shows the linked identity and tier",
+                    "Asking who I am shows the linked identity and tier",
                 ],
             },
             {
-                "title": "Discord roles map to tiers",
+                "title": "Tiers for friends, trusted friends and the admin",
                 "size": "S",
                 "priority": "P1",
-                "story": "As the maintainer, I want tiers (friend, trusted, admin) derived from Discord roles so that I manage permissions where I already manage the server.",
+                "story": "As the maintainer, I want tiers (friend, trusted, admin) so that what someone can do follows who they are to the server.",
                 "criteria": [
-                    "Role ids for each tier come from config",
-                    "Tier is resolved on every message, never cached across role changes",
+                    "Each tier is resolved from config and the store",
+                    "Tier is resolved on every message, never cached across tier changes",
                     "A stored override per user can raise or lower the tier from an admin command",
                 ],
             },
@@ -239,7 +243,7 @@ EPICS = [
                 "priority": "P1",
                 "story": "As a newcomer, I want the bot to tell me how to get access when it does not know me, so that I am not stuck.",
                 "criteria": [
-                    "Unlinked users get a short explanation and the `/link` instructions",
+                    "Unlinked users get a short explanation and how to link",
                     "If they have no Plex access at all, the reply points at the invite request flow (E7)",
                     "No tools other than help are exposed to unlinked users",
                 ],
@@ -328,9 +332,9 @@ EPICS = [
                 "story": "As a friend, I want a DM when my request is ready to watch, so that I do not have to keep asking.",
                 "criteria": [
                     "FastAPI route receives the Seerr webhook (media available event) with a shared secret",
-                    "The requester is resolved to a Discord user and gets a DM with title, version and Plex link",
+                    "The requester is resolved to their chat account and gets a DM with title, version and Plex link",
                     "Duplicate webhooks do not produce duplicate DMs",
-                    "A 👎 reaction on the DM opens a playback report (E4)",
+                    "Reporting a problem from the DM opens a playback report (E4)",
                 ],
             },
             {
@@ -429,7 +433,7 @@ EPICS = [
                 "story": "As the maintainer, I want a daily cap on replacements, a notification on every delete and a kill switch, so that a bad day cannot empty a library.",
                 "criteria": [
                     "Configurable cap per day; hitting it queues the request for admin approval instead",
-                    "Admin channel gets a message per delete with the file path, size and reason",
+                    "The admin gets a message per delete with the file path, size and reason",
                     "The E1 kill switch disables `replace_media` immediately",
                 ],
             },
@@ -556,7 +560,7 @@ EPICS = [
                 "story": "As the admin, I want 4K requests, invites and over-cap replacements to land in one channel with approve/deny buttons, so that I can act from my phone.",
                 "criteria": [
                     "Pending actions table in SQLite with type, requester, payload, decision",
-                    "Admin channel message per pending action; buttons resolve it and notify the requester",
+                    "A message to the admin per pending action; Approve/Deny resolves it and notifies the requester",
                     "Approvals for Seerr requests call the Seerr approve endpoint",
                 ],
             },
@@ -566,7 +570,7 @@ EPICS = [
                 "priority": "P1",
                 "story": "As the admin, I want a morning summary of requests, issues, replacements, failed downloads and disk space, so that I see the state of the server in one message.",
                 "criteria": [
-                    "Scheduled job posts to the admin channel at a configured time",
+                    "A scheduled job sends it to the admin at a configured time",
                     "Sections: new requests, open issues, replacements, stalled or failed downloads per host, free space per volume",
                     "Empty sections are omitted",
                 ],
@@ -651,7 +655,7 @@ EPICS = [
                 "story": "As the admin, I want a weekly SMART, temperature and volume report across all five NASes, so that failing drives are caught early.",
                 "criteria": [
                     "Data from the fleet monitor API where present, otherwise over SSH using the synology helper pattern",
-                    "Posted to the admin channel with anything degraded at the top",
+                    "Sent to the admin with anything degraded at the top",
                 ],
             },
         ],
@@ -690,7 +694,7 @@ EPICS = [
                 "priority": "P1",
                 "story": "As a friend, I want to ask for access to another library or the 4K tier and have it go to the admin, so that access changes are one message.",
                 "criteria": [
-                    "Pending action with the requested change; on approval the Wizarr or Plex share is updated and the Discord role changed",
+                    "Pending action with the requested change; on approval the Wizarr or Plex share is updated and, for 4K, the tier raised",
                 ],
             },
             {
@@ -808,7 +812,7 @@ EPICS = [
                 "priority": "P2",
                 "story": "As a friend, I want a monthly post with the most-watched title and a vote for best request, so that the group has something to argue about.",
                 "criteria": [
-                    "Monthly job posts top titles from Tautulli and a reaction vote for best request of the month",
+                    "A monthly job shares top titles from Tautulli and a vote for best request of the month",
                     "Results announced a week later",
                 ],
             },
@@ -828,7 +832,7 @@ EPICS = [
 
 AREA_LABELS = {
     "agent": "The Claude tool-use loop, registry and guardrails",
-    "discord": "The Discord surface and identity",
+    "chat": "luwin's chat surface and identity",
     "requests": "Requesting and finding media",
     "playback": "Playback issue reports and file replacement",
     "perf": "Lag and network diagnostics",

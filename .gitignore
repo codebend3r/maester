@@ -3,8 +3,8 @@
 .env.local
 *.pem
 
-# runtime data: maester's SQLite file, raven's index and thumbnail cache
-maester-data/
+# runtime data: luwin's SQLite file, raven's index and thumbnail cache
+luwin-data/
 data/
 *.db
 *.db-shm
