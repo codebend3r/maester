@@ -13,7 +13,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 
-from maester.store.base import Database, now, stamp
+from luwin.store.base import Database, now, stamp
 
 
 class StallAction(enum.StrEnum):

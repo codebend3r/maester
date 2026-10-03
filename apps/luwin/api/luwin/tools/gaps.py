@@ -17,11 +17,11 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from maester.agent.tools import Result, Tier, ToolContext, tool
-from maester.clients.sonarr import Episode
-from maester.library import NotLocated, show_owner_on
-from maester.media import episode_code
-from maester.notify import AdminPost
+from luwin.agent.tools import Result, Tier, ToolContext, tool
+from luwin.clients.sonarr import Episode
+from luwin.library import NotLocated, show_owner_on
+from luwin.media import episode_code
+from luwin.notify import AdminPost
 
 
 @dataclass(frozen=True)

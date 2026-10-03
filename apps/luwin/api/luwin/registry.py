@@ -3,7 +3,7 @@
 Two NAS hosts each run their own Sonarr, Radarr, SABnzbd and Tautulli on the
 same ports. Every tool that touches one takes a host name, and this registry
 is the only place that turns (service, host) into a URL and key. Which host
-owns a title is `maester/library.py`'s question, answered through Seerr and
+owns a title is `luwin/library.py`'s question, answered through Seerr and
 never guessed, because acting on the wrong stack has happened before (see
 wizteros docs/arr-stack.md).
 

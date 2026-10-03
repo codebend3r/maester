@@ -2,9 +2,9 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from maester.clients.wizarr import WizarrUser
-from maester.config import Access, Settings, load_settings
-from maester.jobs.expiry import remind_expiring
+from luwin.clients.wizarr import WizarrUser
+from luwin.config import Access, Settings, load_settings
+from luwin.jobs.expiry import remind_expiring
 
 # Midday, so the hours added below never carry an expiry into the next calendar day.
 NOW = datetime(2026, 10, 1, 12, 0, tzinfo=UTC)

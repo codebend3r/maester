@@ -1,6 +1,6 @@
 import pytest
 
-from maester.agent.tools import Tier, ToolRegistry, ValidationError, validate_input
+from luwin.agent.tools import Tier, ToolRegistry, ValidationError, validate_input
 
 SCHEMA = {
     "type": "object",

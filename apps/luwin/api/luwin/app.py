@@ -17,16 +17,16 @@ import anthropic
 import uvicorn
 from fastapi import FastAPI
 
-from maester.agent.limits import KillSwitch, RateLimiter
-from maester.agent.loop import Agent
-from maester.agent.runner import ToolRunner
-from maester.agent.tools import ToolRegistry
-from maester.agent.tools import registry as app_registry
-from maester.chat.admin import AdminConsole
-from maester.chat.bot import MaesterBot
-from maester.chat.identity import IdentityService, RoleMap
-from maester.chat.service import ChatService
-from maester.clients import (
+from luwin.agent.limits import KillSwitch, RateLimiter
+from luwin.agent.loop import Agent
+from luwin.agent.runner import ToolRunner
+from luwin.agent.tools import ToolRegistry
+from luwin.agent.tools import registry as app_registry
+from luwin.chat.admin import AdminConsole
+from luwin.chat.bot import LuwinBot
+from luwin.chat.identity import IdentityService, RoleMap
+from luwin.chat.service import ChatService
+from luwin.clients import (
     FileProbe,
     OoklaSpeedTest,
     PlexClient,
@@ -39,20 +39,20 @@ from maester.clients import (
     TautulliClient,
     WizarrClient,
 )
-from maester.clients.fleet import FleetMonitorClient
-from maester.clients.media import MediaPaths
-from maester.config import REQUIRED, Settings, load_env_file, require, settings
-from maester.jobs import Scheduler, scheduled
-from maester.registry import Registry
-from maester.seerr_events import seerr_routes
-from maester.store import Store
-from maester.web import create_app
-from maester.web.seerr import SeerrWebhook
+from luwin.clients.fleet import FleetMonitorClient
+from luwin.clients.media import MediaPaths
+from luwin.config import REQUIRED, Settings, load_env_file, require, settings
+from luwin.jobs import Scheduler, scheduled
+from luwin.registry import Registry
+from luwin.seerr_events import seerr_routes
+from luwin.store import Store
+from luwin.web import create_app
+from luwin.web.seerr import SeerrWebhook
 
 # Importing the tools package registers every tool module into app_registry.
-import maester.tools  # noqa: F401  isort: skip
+import luwin.tools  # noqa: F401  isort: skip
 
-log = logging.getLogger("maester")
+log = logging.getLogger("luwin")
 
 
 def build_services(cfg: Settings, instances: Registry) -> Services:
@@ -87,7 +87,7 @@ class App:
     services: Services
     agent: Agent
     chat: ChatService
-    bot: MaesterBot
+    bot: LuwinBot
     web: FastAPI
     kill_switch: KillSwitch
     scheduler: Scheduler
@@ -131,7 +131,7 @@ def build(
         settings=cfg,
         kill_switch=kill,
     )
-    bot = MaesterBot(
+    bot = LuwinBot(
         chat,
         console=console,
         guild_id=cfg.discord_guild_id,
@@ -171,7 +171,7 @@ def run() -> int:
     load_env_file()
     require(os.environ, *REQUIRED)
     app = build()
-    log.info("starting maester (model %s) on port %s", app.settings.model, app.settings.web_port)
+    log.info("starting luwin (model %s) on port %s", app.settings.model, app.settings.web_port)
     try:
         asyncio.run(serve(app))
     except KeyboardInterrupt:

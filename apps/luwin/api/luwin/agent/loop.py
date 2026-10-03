@@ -15,17 +15,17 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from maester.agent.limits import LimitExceeded, RateLimiter
-from maester.agent.prompts import SYSTEM_PROMPT
-from maester.agent.runner import ToolOutcome, ToolRunner
-from maester.agent.tools import Choice, Tier, ToolContext
-from maester.clients import Services
-from maester.config import Settings
-from maester.memo import Memo
-from maester.notify import Notice
-from maester.store import HeldCall, PendingAction, Store
+from luwin.agent.limits import LimitExceeded, RateLimiter
+from luwin.agent.prompts import SYSTEM_PROMPT
+from luwin.agent.runner import ToolOutcome, ToolRunner
+from luwin.agent.tools import Choice, Tier, ToolContext
+from luwin.clients import Services
+from luwin.config import Settings
+from luwin.memo import Memo
+from luwin.notify import Notice
+from luwin.store import HeldCall, PendingAction, Store
 
-log = logging.getLogger("maester.agent")
+log = logging.getLogger("luwin.agent")
 
 MAX_TOOL_ITERATIONS = 8
 MAX_TOKENS = 4096

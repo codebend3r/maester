@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, ClassVar, Protocol
 
-from maester.clients.base import ClientError, Downable, HttpClient
+from luwin.clients.base import ClientError, Downable, HttpClient
 
 # The stages of a finished download whose lines explain a failure; the rest
 # (download speed, the source) only repeat what worked.

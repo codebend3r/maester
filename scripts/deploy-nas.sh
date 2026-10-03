@@ -2,20 +2,20 @@
 # Push this repo to the Synology NAS over a mounted SMB share, then print the
 # command that rebuilds a product there. Safe to re-run.
 #
-#   scripts/deploy-nas.sh             # maester
+#   scripts/deploy-nas.sh             # luwin
 #   scripts/deploy-nas.sh <product>   # any folder under apps/ with a docker-compose.yml
 #
 # The whole repo is synced because each product's image builds from the repo
 # root. Deliberately EXCLUDED so live NAS state is never clobbered, at any depth:
 #   .env            each product's own (service URLs as the NAS sees them)
-#   maester-data/   maester's SQLite file
+#   luwin-data/   luwin's SQLite file
 #   data/           raven's index and thumbnail cache
 #
 # Prereq: mount the share first: Finder > Cmd+K > smb://192.168.50.2 > "docker".
 # Override the destination with:  NAS_MOUNT=/Volumes/docker/maester scripts/deploy-nas.sh
 set -euo pipefail
 
-PRODUCT="${1:-maester}"
+PRODUCT="${1:-luwin}"
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 DEST="${NAS_MOUNT:-/Volumes/docker/maester}"
 MOUNT_ROOT="$(dirname "$DEST")"
@@ -42,7 +42,7 @@ rsync -av \
   --exclude 'dist' \
   --exclude '.nx' \
   --exclude '.env' \
-  --exclude 'maester-data' \
+  --exclude 'luwin-data' \
   --exclude 'data' \
   "$REPO/" \
   "$DEST/"

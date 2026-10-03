@@ -19,14 +19,14 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-from maester.clients import ClientError, Services
-from maester.clients.tautulli import Tautulli
-from maester.formatting import mbps
-from maester.notify import AdminPost
-from maester.perf.lag import Stream
-from maester.playback.plays import REMOTE
-from maester.plex_versions import TitleVersion
-from maester.store import Store
+from luwin.clients import ClientError, Services
+from luwin.clients.tautulli import Tautulli
+from luwin.formatting import mbps
+from luwin.notify import AdminPost
+from luwin.perf.lag import Stream
+from luwin.playback.plays import REMOTE
+from luwin.plex_versions import TitleVersion
+from luwin.store import Store
 
 # A version this heavy is a remux in all but name: 40 Mbps and up.
 HEAVY_KBPS = 40_000

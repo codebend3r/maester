@@ -24,14 +24,14 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
 from typing import Any
 
-from maester.clients import ClientError, Services
-from maester.clients.media import Inspection, MediaProbe, Track, Unreadable
-from maester.playback import tracks
-from maester.playback.client_limits import ClientLimit, client_causes
-from maester.playback.health import Health, check_health
-from maester.playback.items import LocatedFile
-from maester.playback.plays import Play, Playback, playback_of, recent_plays
-from maester.store import LinkedUser
+from luwin.clients import ClientError, Services
+from luwin.clients.media import Inspection, MediaProbe, Track, Unreadable
+from luwin.playback import tracks
+from luwin.playback.client_limits import ClientLimit, client_causes
+from luwin.playback.health import Health, check_health
+from luwin.playback.items import LocatedFile
+from luwin.playback.plays import Play, Playback, playback_of, recent_plays
+from luwin.store import LinkedUser
 
 
 @dataclass(frozen=True)

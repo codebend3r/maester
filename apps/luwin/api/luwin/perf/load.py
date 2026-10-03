@@ -21,12 +21,12 @@ import asyncio
 from dataclasses import dataclass, replace
 from typing import Any
 
-from maester.clients import ClientError, Services
-from maester.clients.base import every_host
-from maester.clients.fleet import FleetMonitor, Vitals
-from maester.clients.tautulli import Activity, Session
-from maester.formatting import mbps
-from maester.playback.plays import Playback
+from luwin.clients import ClientError, Services
+from luwin.clients.base import every_host
+from luwin.clients.fleet import FleetMonitor, Vitals
+from luwin.clients.tautulli import Activity, Session
+from luwin.formatting import mbps
+from luwin.playback.plays import Playback
 
 # A conversion slower than this against real time can't keep the stream fed.
 REAL_TIME = 1.0

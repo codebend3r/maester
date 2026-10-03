@@ -10,7 +10,7 @@ repair and unpack steps that went wrong. The model reads it and says what
 happened and what to do next. Read-only: it changes nothing anywhere.
 
 A host the admin names must be the one holding the copy; with none named,
-the owner is found (`maester/library.py`) and named in the answer.
+the owner is found (`luwin/library.py`) and named in the answer.
 """
 
 from __future__ import annotations
@@ -19,11 +19,11 @@ import asyncio
 from datetime import UTC, datetime
 from typing import Any
 
-from maester.agent.tools import Result, Tier, ToolContext, tool
-from maester.clients import ClientError
-from maester.clients.arr import HistoryEvent, QueueItem
-from maester.clients.sabnzbd import Download
-from maester.library import ARR_NAMES, NotLocated, Owner, owner_of, owner_on
+from luwin.agent.tools import Result, Tier, ToolContext, tool
+from luwin.clients import ClientError
+from luwin.clients.arr import HistoryEvent, QueueItem
+from luwin.clients.sabnzbd import Download
+from luwin.library import ARR_NAMES, NotLocated, Owner, owner_of, owner_on
 
 # The newest history events shown, and how far back SABnzbd's history is read.
 EVENTS_SHOWN = 15

@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import PurePosixPath
 
-from maester.store import ReportRow, Store
+from luwin.store import ReportRow, Store
 
 WINDOW = timedelta(days=30)
 # Claimed per group when suggested, so the digest says it once a window.

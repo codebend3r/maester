@@ -1,10 +1,10 @@
 """Small builders for records tests need often, with defaults worth overriding."""
 
-from maester.clients.seerr import ArrServer
-from maester.clients.tautulli import HistoryRow, Session
+from luwin.clients.seerr import ArrServer
+from luwin.clients.tautulli import HistoryRow, Session
 
 HOSTS = ("meleys", "vermithor")
-# The Plex server maester reads (`PLEX_URL`) is meleys' own, watched by meleys' Tautulli.
+# The Plex server luwin reads (`PLEX_URL`) is meleys' own, watched by meleys' Tautulli.
 PLEX_ID = "fake-machine"
 # Where each fake arr says it lives, so Seerr's servers can be matched to a host.
 RADARR_URL, SONARR_URL = "http://{host}.lan:7878", "http://{host}.lan:8989"

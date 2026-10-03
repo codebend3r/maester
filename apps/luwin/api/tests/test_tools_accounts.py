@@ -1,13 +1,13 @@
 from types import SimpleNamespace
 
-from maester.agent.tools import Tier, ToolContext, registry, validate_input
-from maester.chat.identity import IdentityService, RoleMap
-from maester.clients import FakeSeerrClient
-from maester.clients.seerr import SeerrUser
-from maester.config import Settings
-from maester.memo import Memo
-from maester.notify import DirectMessage
-from maester.tools.accounts import link_account
+from luwin.agent.tools import Tier, ToolContext, registry, validate_input
+from luwin.chat.identity import IdentityService, RoleMap
+from luwin.clients import FakeSeerrClient
+from luwin.clients.seerr import SeerrUser
+from luwin.config import Settings
+from luwin.memo import Memo
+from luwin.notify import DirectMessage
+from luwin.tools.accounts import link_account
 
 
 async def test_a_link_request_is_decided_by_the_link_account_tool(store):

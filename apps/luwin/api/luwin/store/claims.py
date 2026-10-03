@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-from maester.store.base import Database, now, stamp
+from luwin.store.base import Database, now, stamp
 
 
 class Claims(Database):

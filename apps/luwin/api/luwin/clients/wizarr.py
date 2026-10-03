@@ -16,7 +16,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, ClassVar, Protocol
 
-from maester.clients.base import Downable, HttpClient
+from luwin.clients.base import Downable, HttpClient
 
 EXPIRY_DAYS_HONORED = (1, 7, 30)
 # /api/users reconciles with every Plex server per call and routinely takes

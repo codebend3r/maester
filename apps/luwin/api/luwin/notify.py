@@ -1,4 +1,4 @@
-"""Messages maester sends outside a reply, and the one interface that delivers them.
+"""Messages luwin sends outside a reply, and the one interface that delivers them.
 
 Tools, button decisions, webhooks and scheduled jobs all produce notices: a
 post in the admin channel, the same with Approve/Deny buttons for one
@@ -22,7 +22,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Protocol
 
-from maester.media import Titled
+from luwin.media import Titled
 
 
 @dataclass(frozen=True)

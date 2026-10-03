@@ -36,8 +36,8 @@ from dataclasses import dataclass, replace
 from datetime import timedelta
 from typing import Any
 
-from maester.agent.limits import KillSwitch
-from maester.agent.tools import (
+from luwin.agent.limits import KillSwitch
+from luwin.agent.tools import (
     Approval,
     Choice,
     Choices,
@@ -48,10 +48,10 @@ from maester.agent.tools import (
     ValidationError,
     validate_input,
 )
-from maester.notify import AdminPost, ApprovalPost, Notice
-from maester.store import MAINTENANCE, Flag, HeldCall, NotLinked, PendingAction
+from luwin.notify import AdminPost, ApprovalPost, Notice
+from luwin.store import MAINTENANCE, Flag, HeldCall, NotLinked, PendingAction
 
-log = logging.getLogger("maester.agent")
+log = logging.getLogger("luwin.agent")
 
 CONFIRMATION_TTL = timedelta(minutes=5)
 APPROVAL_TTL = timedelta(days=7)

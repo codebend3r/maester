@@ -30,16 +30,16 @@ ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PROJECT_ENVIRONMENT=/opt/venv \
     PATH="/opt/venv/bin:$PATH" PYTHONUNBUFFERED=1
 
 # Dependencies first so code changes do not invalidate the layer.
-COPY apps/maester/api/pyproject.toml apps/maester/api/uv.lock ./
+COPY apps/luwin/api/pyproject.toml apps/luwin/api/uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 
-COPY apps/maester/api/maester ./maester
+COPY apps/luwin/api/luwin ./luwin
 RUN uv sync --frozen --no-dev
 
-RUN useradd --create-home --uid 1000 maester \
-    && mkdir -p /data && chown maester:maester /data
-USER maester
+RUN useradd --create-home --uid 1000 luwin \
+    && mkdir -p /data && chown luwin:luwin /data
+USER luwin
 VOLUME ["/data"]
 EXPOSE 8020
 
-CMD ["maester"]
+CMD ["luwin"]

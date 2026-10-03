@@ -1,16 +1,16 @@
-"""Process entrypoint. `uv run maester` lands here."""
+"""Process entrypoint. `uv run luwin` lands here."""
 
 import sys
 
-from maester import __version__
+from luwin import __version__
 
 
 def main(argv: list[str] | None = None) -> int:
     args = sys.argv[1:] if argv is None else argv
     if "--version" in args:
-        print(f"maester {__version__}")
+        print(f"luwin {__version__}")
         return 0
-    from maester.app import run
+    from luwin.app import run
 
     return run()
 

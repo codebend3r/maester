@@ -31,17 +31,17 @@ from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from maester.agent.limits import KillSwitch
-from maester.clients import ClientError, Services
-from maester.clients.arr import QueueItem
-from maester.config import Settings
-from maester.formatting import humanized
-from maester.library import ARR_NAMES
-from maester.notify import AdminPost, Notice
-from maester.store import MAINTENANCE, StallAction, Store, Watched
-from maester.store.base import stamp
+from luwin.agent.limits import KillSwitch
+from luwin.clients import ClientError, Services
+from luwin.clients.arr import QueueItem
+from luwin.config import Settings
+from luwin.formatting import humanized
+from luwin.library import ARR_NAMES
+from luwin.notify import AdminPost, Notice
+from luwin.store import MAINTENANCE, StallAction, Store, Watched
+from luwin.store.base import stamp
 
-log = logging.getLogger("maester.jobs")
+log = logging.getLogger("luwin.jobs")
 
 TOOL = "sweep_stalled"
 # How long a title's re-search is remembered: stalling again within it surfaces the title.

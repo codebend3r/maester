@@ -3,8 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from maester.agent.tools import Tier, ToolContext
-from maester.clients import (
+from luwin.agent.tools import Tier, ToolContext
+from luwin.clients import (
     FakeFileProbe,
     FakeFleetMonitor,
     FakePlexClient,
@@ -18,9 +18,9 @@ from maester.clients import (
     FakeWizarrClient,
     Services,
 )
-from maester.config import Settings
-from maester.memo import Memo
-from maester.store import Store
+from luwin.config import Settings
+from luwin.memo import Memo
+from luwin.store import Store
 from tests.factories import HOSTS, PLEX_ID, RADARR_URL, SONARR_URL
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -44,7 +44,7 @@ def services() -> Services:
         sonarr={h: FakeSonarrClient(host=h, base_url=SONARR_URL.format(host=h)) for h in HOSTS},
         radarr={h: FakeRadarrClient(host=h, base_url=RADARR_URL.format(host=h)) for h in HOSTS},
         sabnzbd={h: FakeSabnzbdClient(host=h) for h in HOSTS},
-        # Each host's Tautulli watches its own Plex server; meleys' is the one maester reads.
+        # Each host's Tautulli watches its own Plex server; meleys' is the one luwin reads.
         tautulli={
             h: FakeTautulliClient(host=h, plex_id=PLEX_ID if h == "meleys" else f"{h}-plex")
             for h in HOSTS

@@ -328,7 +328,7 @@ wheels = [
 ]
 
 [[package]]
-name = "maester"
+name = "luwin"
 version = "0.2.1"
 source = { editable = "." }
 dependencies = [

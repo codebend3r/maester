@@ -1,4 +1,4 @@
-from maester.chat.split import split_reply
+from luwin.chat.split import split_reply
 
 
 def test_short_text_is_one_chunk():

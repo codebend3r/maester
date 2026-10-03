@@ -28,7 +28,7 @@ Two player limits (`CLIENT_LIMITS`) slow a stream as well as stop one:
 picture subtitles burned in, and HEVC the player can't play as it is. Their
 causes are reused; their fixes are said here, naming only versions there are.
 
-Versions are named only for a stream served by the Plex server maester
+Versions are named only for a stream served by the Plex server luwin
 reads (`library_hosts`), whose file is one of them: a rating key means an
 item on that server alone.
 """
@@ -41,19 +41,19 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from maester.clients import ClientError, Services
-from maester.clients.tautulli import Session
-from maester.formatting import mbps
-from maester.perf.load import HostLoad, behind
-from maester.perf.uplink import Uplink
-from maester.perf.versions import Connection, Limit, best_fitting, needs_kbps, quality_for
-from maester.playback.client_limits import (
+from luwin.clients import ClientError, Services
+from luwin.clients.tautulli import Session
+from luwin.formatting import mbps
+from luwin.perf.load import HostLoad, behind
+from luwin.perf.uplink import Uplink
+from luwin.perf.versions import Connection, Limit, best_fitting, needs_kbps, quality_for
+from luwin.playback.client_limits import (
     HEVC_UNSUPPORTED,
     IMAGE_SUBTITLE_BURN_IN,
     client_causes,
 )
-from maester.playback.plays import RELAY_CAP_KBPS, Play, Playback, identify
-from maester.plex_versions import TitleVersion, title_versions
+from luwin.playback.plays import RELAY_CAP_KBPS, Play, Playback, identify
+from luwin.plex_versions import TitleVersion, title_versions
 
 
 class Fix(enum.StrEnum):
@@ -87,7 +87,7 @@ class Stream:
     playback: Playback
     load: HostLoad  # its host's other streams
     uplink: Uplink | None  # the last speed test, while it's recent
-    versions: tuple[TitleVersion, ...]  # the title's, when its server is the one maester reads
+    versions: tuple[TitleVersion, ...]  # the title's, when its server is the one luwin reads
     playing: TitleVersion | None  # which of them it plays
     # Away from home, what its connection is known or taken to carry, its own share of the
     # upload included; None at home, where the network carries any version.
@@ -413,7 +413,7 @@ def diagnose(stream: Stream) -> Diagnosis:
 async def _versions(
     services: Services, host: str, session: Session, library: frozenset[str]
 ) -> tuple[TitleVersion, ...]:
-    """A movie's versions, when the play came from the Plex server maester reads."""
+    """A movie's versions, when the play came from the Plex server luwin reads."""
     play = Play.from_session(host, session)
     if host not in library or play.kind != "movie":
         return ()

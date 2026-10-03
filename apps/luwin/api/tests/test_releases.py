@@ -2,8 +2,8 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from maester.media import Copy, Decision, ReportKind
-from maester.releases import bad_releases, group_from_name, new_bad_releases, release_group
+from luwin.media import Copy, Decision, ReportKind
+from luwin.releases import bad_releases, group_from_name, new_bad_releases, release_group
 
 
 @pytest.mark.parametrize(

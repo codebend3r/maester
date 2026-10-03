@@ -15,9 +15,9 @@ import time
 from datetime import datetime
 from typing import Any
 
-from maester.agent.tools import ToolRegistry
-from maester.agent.tools import registry as app_registry
-from maester.clients import (
+from luwin.agent.tools import ToolRegistry
+from luwin.agent.tools import registry as app_registry
+from luwin.clients import (
     FakeFileProbe,
     FakeFleetMonitor,
     FakePlexClient,
@@ -30,14 +30,14 @@ from maester.clients import (
     FakeWizarrClient,
     Services,
 )
-from maester.clients.arr import HistoryEvent, MediaFile, QueueItem
-from maester.clients.fleet import Vitals
-from maester.clients.media import Inspection, Track
-from maester.clients.plex import PlexItem, PlexSeason, Version
-from maester.clients.plextv import FakePlexTv, OwnedServer, Section, Share
-from maester.clients.radarr import Movie
-from maester.clients.sabnzbd import Download
-from maester.clients.seerr import (
+from luwin.clients.arr import HistoryEvent, MediaFile, QueueItem
+from luwin.clients.fleet import Vitals
+from luwin.clients.media import Inspection, Track
+from luwin.clients.plex import PlexItem, PlexSeason, Version
+from luwin.clients.plextv import FakePlexTv, OwnedServer, Section, Share
+from luwin.clients.radarr import Movie
+from luwin.clients.sabnzbd import Download
+from luwin.clients.seerr import (
     ArrServer,
     Collection,
     MediaDetails,
@@ -48,16 +48,16 @@ from maester.clients.seerr import (
     Season,
     SeerrUser,
 )
-from maester.clients.sonarr import Episode, Series
-from maester.clients.speedtest import SpeedResult
-from maester.clients.tautulli import HistoryRow, Session
-from maester.store import Store
+from luwin.clients.sonarr import Episode, Series
+from luwin.clients.speedtest import SpeedResult
+from luwin.clients.tautulli import HistoryRow, Session
+from luwin.store import Store
 
 # Importing the tools package registers every tool module into app_registry.
-import maester.tools  # noqa: F401  isort: skip
+import luwin.tools  # noqa: F401  isort: skip
 
 EVAL_USER = "eval-user"
-# The Plex server maester reads (`PLEX_URL`): the first host's, watched by its Tautulli.
+# The Plex server luwin reads (`PLEX_URL`): the first host's, watched by its Tautulli.
 PLEX_ID = "library-plex"
 ARR_URLS = {"radarr": "http://{host}.lan:7878", "sonarr": "http://{host}.lan:8989"}
 
@@ -390,7 +390,7 @@ def _played(n: int, x: dict[str, Any]) -> HistoryRow:
 def _tautulli(host: str, seed: dict[str, Any], user_id: int, library: str) -> FakeTautulliClient:
     """A host's live sessions and finished plays (`history`), each naming its title's TMDB
     id as `tmdb_id`. It watches its own host's Plex server; the `library` host's is the one
-    maester reads."""
+    luwin reads."""
     sessions = [_session(n, x, user_id) for n, x in enumerate(seed.get("sessions", []), 1)]
     played = [_played(n, x) for n, x in enumerate(seed.get("history", []), 1)]
     return FakeTautulliClient(

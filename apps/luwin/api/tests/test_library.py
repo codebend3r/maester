@@ -2,11 +2,11 @@ from dataclasses import replace
 
 import pytest
 
-from maester.clients.arr import MediaFile
-from maester.clients.radarr import Movie
-from maester.clients.seerr import ArrRef, MediaDetails, MediaStatus
-from maester.clients.sonarr import Series
-from maester.library import Library, OwnerUnknown
+from luwin.clients.arr import MediaFile
+from luwin.clients.radarr import Movie
+from luwin.clients.seerr import ArrRef, MediaDetails, MediaStatus
+from luwin.clients.sonarr import Series
+from luwin.library import Library, OwnerUnknown
 from tests.factories import seerr_server
 
 S = MediaStatus

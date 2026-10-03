@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from maester.clients.base import HttpClient
+from luwin.clients.base import HttpClient
 
 
 @dataclass(frozen=True)

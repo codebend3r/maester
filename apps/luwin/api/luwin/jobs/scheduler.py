@@ -19,12 +19,12 @@ from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
-from maester.jobs.schedule import At, Every
-from maester.notify import Notice, Notifier
-from maester.store import Store
-from maester.store.base import stamp
+from luwin.jobs.schedule import At, Every
+from luwin.notify import Notice, Notifier
+from luwin.store import Store
+from luwin.store.base import stamp
 
-log = logging.getLogger("maester.jobs")
+log = logging.getLogger("luwin.jobs")
 
 SOURCE = "job"
 CATCH_UP = timedelta(hours=6)

@@ -22,19 +22,19 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 
-from maester.agent.limits import KillSwitch
-from maester.clients import ClientError, Services
-from maester.clients.seerr import MediaRequest, RequestStatus
-from maester.config import Settings
-from maester.formatting import ago, local_time
-from maester.jobs.sweep import downloads as queued_downloads
-from maester.library import ARR_NAMES
-from maester.media import episode_code, version_label
-from maester.notify import AdminPost, Notice
-from maester.playback.reports import POLICIES
-from maester.releases import new_bad_releases
-from maester.storage import FORECAST_WINDOW, forecasts, read_space
-from maester.store import MAINTENANCE, StallAction, Store
+from luwin.agent.limits import KillSwitch
+from luwin.clients import ClientError, Services
+from luwin.clients.seerr import MediaRequest, RequestStatus
+from luwin.config import Settings
+from luwin.formatting import ago, local_time
+from luwin.jobs.sweep import downloads as queued_downloads
+from luwin.library import ARR_NAMES
+from luwin.media import episode_code, version_label
+from luwin.notify import AdminPost, Notice
+from luwin.playback.reports import POLICIES
+from luwin.releases import new_bad_releases
+from luwin.storage import FORECAST_WINDOW, forecasts, read_space
+from luwin.store import MAINTENANCE, StallAction, Store
 
 DAY = timedelta(days=1)
 # A volume that fills sooner than this gets its forecast in the digest.

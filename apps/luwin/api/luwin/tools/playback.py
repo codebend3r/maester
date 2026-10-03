@@ -6,7 +6,7 @@ one tap before anything is checked. With nothing recent, the model asks for
 the title and uses the search picker instead.
 
 `report_problem` files a report on a confirmed copy through the one report
-flow (`maester/playback/reports.py`): the player first, then the file, a
+flow (`luwin/playback/reports.py`): the player first, then the file, a
 decision from stored evidence, and a Seerr issue as the friend.
 
 `list_tracks` reads one copy's audio and subtitle tracks with ffprobe, to
@@ -20,16 +20,16 @@ import asyncio
 import time
 from typing import Any
 
-from maester.agent.tools import Choice, Choices, Result, Tier, ToolContext, tool
-from maester.clients.seerr import MediaDetails
-from maester.formatting import humanized
-from maester.library import NotLocated
-from maester.media import Copy, copy_ref, episode_code, titled, version_label
-from maester.playback.diagnosis import FileChecked, TrackList, read_tracks
-from maester.playback.health import parse_clock
-from maester.playback.items import locate
-from maester.playback.plays import Play, identify, recent_plays
-from maester.playback.reports import ReportKind, file_report
+from luwin.agent.tools import Choice, Choices, Result, Tier, ToolContext, tool
+from luwin.clients.seerr import MediaDetails
+from luwin.formatting import humanized
+from luwin.library import NotLocated
+from luwin.media import Copy, copy_ref, episode_code, titled, version_label
+from luwin.playback.diagnosis import FileChecked, TrackList, read_tracks
+from luwin.playback.health import parse_clock
+from luwin.playback.items import locate
+from luwin.playback.plays import Play, identify, recent_plays
+from luwin.playback.reports import ReportKind, file_report
 
 # The copy (and episode) a playback tool is about.
 ITEM_PROPERTIES: dict[str, Any] = {

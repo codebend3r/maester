@@ -9,13 +9,13 @@ it came in, and the press runs `decide_request` either way.
 
 from __future__ import annotations
 
-from maester.agent.runner import APPROVAL_TTL
-from maester.agent.tools import Approval
-from maester.clients import Services
-from maester.clients.seerr import MediaRequest
-from maester.media import version_label
-from maester.notify import ApprovalPost
-from maester.store import PendingAction, Store
+from luwin.agent.runner import APPROVAL_TTL
+from luwin.agent.tools import Approval
+from luwin.clients import Services
+from luwin.clients.seerr import MediaRequest
+from luwin.media import version_label
+from luwin.notify import ApprovalPost
+from luwin.store import PendingAction, Store
 
 DECIDE = "decide_request"
 

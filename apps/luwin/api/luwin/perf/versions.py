@@ -5,7 +5,7 @@ each limit saying where it came from: the speed the friend gives, Plex's
 relay on their stream away from home (their last within `RECENT_AWAY`),
 and the servers' free upload at the last speed test, plus the share of it
 their own stream takes when one is playing. A version
-(`maester/plex_versions.py`) fits when its average bitrate, allowing
+(`luwin/plex_versions.py`) fits when its average bitrate, allowing
 `PEAK_ALLOWANCE` for the busy scenes a file spikes through, stays under the
 tightest limit (`best_fitting`). `recommend` picks the best version that
 fits, or else the lightest, with the remote quality to set so Plex converts
@@ -24,11 +24,11 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import timedelta
 
-from maester.clients import ClientError, Services
-from maester.formatting import mbps
-from maester.perf.uplink import Uplink
-from maester.playback.plays import RELAY_CAP_KBPS, REMOTE, Playback, playback_of, recent_plays
-from maester.plex_versions import TitleVersion
+from luwin.clients import ClientError, Services
+from luwin.formatting import mbps
+from luwin.perf.uplink import Uplink
+from luwin.playback.plays import RELAY_CAP_KBPS, REMOTE, Playback, playback_of, recent_plays
+from luwin.plex_versions import TitleVersion
 
 # A stream needs about this much more than a file's average bitrate to get
 # through its busiest scenes without buffering.

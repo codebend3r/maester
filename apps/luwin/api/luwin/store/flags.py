@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from maester.store.base import Database, now
+from luwin.store.base import Database, now
 
 KILL = "kill"
 MAINTENANCE = "maintenance"

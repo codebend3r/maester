@@ -5,7 +5,7 @@ import json
 import pytest
 import respx
 
-from maester.clients import (
+from luwin.clients import (
     ClientError,
     FakeSeerrClient,
     FakeSonarrClient,
@@ -20,7 +20,7 @@ from maester.clients import (
     TautulliClient,
     WizarrClient,
 )
-from maester.clients.seerr import (
+from luwin.clients.seerr import (
     ArrRef,
     MediaStatus,
     Refusal,
@@ -29,8 +29,8 @@ from maester.clients.seerr import (
     Routing,
     SearchResult,
 )
-from maester.clients.sonarr import Episode
-from maester.clients.wizarr import Invite, WizarrUser, honored_expiry_days, redeemer
+from luwin.clients.sonarr import Episode
+from luwin.clients.wizarr import Invite, WizarrUser, honored_expiry_days, redeemer
 
 BASE = "http://svc.test"
 

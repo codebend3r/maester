@@ -1,9 +1,9 @@
 import time
 from datetime import timedelta
 
-from maester.agent.tools import Tier, registry
-from maester.clients.plex import PlexItem, Version
-from maester.tools.versions import GUESSED, pick_version
+from luwin.agent.tools import Tier, registry
+from luwin.clients.plex import PlexItem, Version
+from luwin.tools.versions import GUESSED, pick_version
 from tests.factories import history_row, session
 from tests.playback_world import DUNE
 

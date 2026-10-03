@@ -1,8 +1,8 @@
 import pytest
 
-from maester.clients import ClientError
-from maester.clients.fleet import Vitals
-from maester.perf.load import read_loads
+from luwin.clients import ClientError
+from luwin.clients.fleet import Vitals
+from luwin.perf.load import read_loads
 from tests.factories import session
 
 
@@ -28,7 +28,7 @@ async def test_cpu_and_memory_from_the_fleet_monitor_count_where_known(services)
     services.fleet.readings = {
         "meleys": Vitals(97.0, 40.0),
         "vermithor": Vitals(30.0, 93.5),
-        "caraxes": Vitals(99.0, 99.0),  # no Plex host maester knows
+        "caraxes": Vitals(99.0, 99.0),  # no Plex host luwin knows
     }
     loads = await read_loads(services)
     assert loads.hosts["meleys"].strain == ("its CPU is at 97%",)

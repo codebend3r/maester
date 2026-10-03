@@ -1,6 +1,6 @@
 """The file health check: is this file broken, measured rather than assumed.
 
-After ffprobe's read (`maester/clients/media.py`), a few short stretches are
+After ffprobe's read (`luwin/clients/media.py`), a few short stretches are
 decoded: around the moment a friend named ("freezes at 1:12:30"), or else
 at the start, the middle and near the end. The verdict is one of four, with
 the evidence, and follows the maintainer's library audit
@@ -30,7 +30,7 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from maester.clients.media import Decoded, Inspection, MediaProbe, Unreadable
+from luwin.clients.media import Decoded, Inspection, MediaProbe, Unreadable
 
 WINDOW = 10.0  # seconds decoded per stretch
 AROUND = 15.0  # seconds decoded either side of a moment a friend named

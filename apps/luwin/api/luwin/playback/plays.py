@@ -9,9 +9,9 @@ Plex runs on every NAS, and each Tautulli watches its own host's server, so
 a rating key names an item on one server only. A play is identified through
 the Tautulli that saw it: a live session carries its Plex server's guids,
 and a finished play's item is asked of that Tautulli (`metadata`). The
-title's TMDB id then finds it in Seerr (`identify`); maester's own Plex
+title's TMDB id then finds it in Seerr (`identify`); luwin's own Plex
 server isn't asked. Seerr's rating keys (which copy is 1080p, which 4K)
-belong to the Plex server maester reads (`PLEX_URL`), so they're compared
+belong to the Plex server luwin reads (`PLEX_URL`), so they're compared
 only for plays on the hosts whose Tautulli watches that server
 (`library_hosts`, matched by machine identifier). Elsewhere a play is
 matched by title and episode, and which copy it was stays unknown.
@@ -31,11 +31,11 @@ import asyncio
 from dataclasses import asdict, dataclass, replace
 from typing import Any
 
-from maester.clients import ClientError, Services
-from maester.clients.base import every_host
-from maester.clients.seerr import MediaDetails
-from maester.clients.tautulli import HistoryRow, Session, StreamData, Tautulli
-from maester.media import Copy
+from luwin.clients import ClientError, Services
+from luwin.clients.base import every_host
+from luwin.clients.seerr import MediaDetails
+from luwin.clients.tautulli import HistoryRow, Session, StreamData, Tautulli
+from luwin.media import Copy
 
 # Finished plays asked of each host.
 RECENT = 5
@@ -224,7 +224,7 @@ class Play:
 
 
 async def library_hosts(services: Services) -> frozenset[str]:
-    """The hosts whose Tautulli watches the Plex server maester reads (`PLEX_URL`), whose
+    """The hosts whose Tautulli watches the Plex server luwin reads (`PLEX_URL`), whose
     rating keys Seerr knows: their servers' machine identifiers match. None of them when
     Plex can't say which server it is."""
     try:

@@ -12,8 +12,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from maester.agent.tools import Choice, Choices, Tier, ToolContext, tool
-from maester.clients.seerr import MediaStatus, SearchResult
+from luwin.agent.tools import Choice, Choices, Tier, ToolContext, tool
+from luwin.clients.seerr import MediaStatus, SearchResult
 
 # The disambiguation picker shows at most this many options.
 SEARCH_PICKS = 5

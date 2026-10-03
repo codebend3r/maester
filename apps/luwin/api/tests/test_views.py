@@ -2,17 +2,17 @@ from types import SimpleNamespace
 
 import discord
 
-from maester.agent.tools import Choice
-from maester.chat.members import resolve_chat_user
-from maester.chat.service import ChatResponse, Decision
-from maester.chat.views import (
+from luwin.agent.tools import Choice
+from luwin.chat.members import resolve_chat_user
+from luwin.chat.service import ChatResponse, Decision
+from luwin.chat.views import (
     DECIDE_ID,
     ChoiceView,
     DecisionButton,
     decision_view,
     send_response,
 )
-from maester.notify import AdminPost
+from luwin.notify import AdminPost
 
 
 def role(i):
@@ -75,7 +75,7 @@ class FakeTarget:
 
 
 class FakeBot:
-    """The bits of `MaesterBot` the views use."""
+    """The bits of `LuwinBot` the views use."""
 
     guild_id = 0
 

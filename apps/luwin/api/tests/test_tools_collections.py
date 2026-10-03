@@ -1,7 +1,7 @@
 import pytest
 
-from maester.agent.tools import Choices, Result
-from maester.clients.seerr import (
+from luwin.agent.tools import Choices, Result
+from luwin.clients.seerr import (
     Collection,
     MediaDetails,
     MediaStatus,
@@ -11,7 +11,7 @@ from maester.clients.seerr import (
     RequestRefused,
     SearchResult,
 )
-from maester.tools.collections import find_collection, request_collection
+from luwin.tools.collections import find_collection, request_collection
 
 S = MediaStatus
 UNLIMITED_TV = Quota(None, None, 0, None, False)

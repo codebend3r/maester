@@ -6,7 +6,7 @@ it's on a server they're shared) and puts it in the admin's approval queue,
 once per friend and change. The admin's Approve runs `decide_access`
 (button-only, and destructive, since it changes a share), which adds the
 library, or every 4K library, to the friend's plex.tv share on each server
-they're shared that holds it (`maester/clients/plextv.py`). Their other
+they're shared that holds it (`luwin/clients/plextv.py`). Their other
 libraries and their Wizarr expiry are left alone. 4K also gives them the
 trusted tier, which is what lets them request 4K (and ask for invites): the
 trusted Discord role, and a stored override when no role is configured or
@@ -24,11 +24,11 @@ import asyncio
 from dataclasses import dataclass
 from typing import Any
 
-from maester.access import is_4k, same_library, title_of
-from maester.agent.tools import Approval, Result, Tier, ToolContext, tool
-from maester.clients.plextv import OwnedServer, PlexTv, Section, Share
-from maester.config import Access
-from maester.notify import DirectMessage, RoleChange
+from luwin.access import is_4k, same_library, title_of
+from luwin.agent.tools import Approval, Result, Tier, ToolContext, tool
+from luwin.clients.plextv import OwnedServer, PlexTv, Section, Share
+from luwin.config import Access
+from luwin.notify import DirectMessage, RoleChange
 
 NOT_SET_UP = "Access changes aren't set up on this server (no Plex token), so ask the admin."
 # A note the admin reads in the approval post; the rest is cut.
@@ -243,7 +243,7 @@ def make_trusted(ctx: ToolContext, discord_id: str) -> tuple[list[Any], str]:
     notices: list[Any] = []
     notes = []
     if role:
-        notices.append(RoleChange(discord_id, role, why="4K approved in maester"))
+        notices.append(RoleChange(discord_id, role, why="4K approved in luwin"))
         notes.append("the trusted role")
     if not role or (override is not None and override < Tier.TRUSTED):
         ctx.store.upsert_user(discord_id, tier_override="trusted")

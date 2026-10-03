@@ -1,11 +1,11 @@
 from dataclasses import replace
 
-from maester.clients.arr import MediaFile
-from maester.clients.plex import PlexItem, PlexSeason, Version
-from maester.clients.seerr import ANIME_KEYWORD, MediaDetails, MediaStatus, Season
-from maester.clients.sonarr import Series
-from maester.plex_versions import version_name
-from maester.tools.availability import check_availability
+from luwin.clients.arr import MediaFile
+from luwin.clients.plex import PlexItem, PlexSeason, Version
+from luwin.clients.seerr import ANIME_KEYWORD, MediaDetails, MediaStatus, Season
+from luwin.clients.sonarr import Series
+from luwin.plex_versions import version_name
+from luwin.tools.availability import check_availability
 
 S = MediaStatus
 LINK = "https://app.plex.tv/desktop/#!/server/fake-machine/details?key=%2Flibrary%2Fmetadata%2F"

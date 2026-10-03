@@ -4,18 +4,18 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from maester.agent.limits import KillSwitch
-from maester.agent.runner import ToolRunner
-from maester.agent.tools import Result, Tier, registry
-from maester.clients import ClientError
-from maester.clients.arr import HistoryEvent, MediaFile
-from maester.clients.media import Inspection
-from maester.clients.radarr import Movie
-from maester.config import Guardrails
-from maester.jobs.landed import tell_landed
-from maester.media import Copy, Decision, ReportKind, ReportStatus, Titled
-from maester.notify import AdminPost, ApprovalPost, DirectMessage
-from maester.tools.replace import replace_media
+from luwin.agent.limits import KillSwitch
+from luwin.agent.runner import ToolRunner
+from luwin.agent.tools import Result, Tier, registry
+from luwin.clients import ClientError
+from luwin.clients.arr import HistoryEvent, MediaFile
+from luwin.clients.media import Inspection
+from luwin.clients.radarr import Movie
+from luwin.config import Guardrails
+from luwin.jobs.landed import tell_landed
+from luwin.media import Copy, Decision, ReportKind, ReportStatus, Titled
+from luwin.notify import AdminPost, ApprovalPost, DirectMessage
+from luwin.tools.replace import replace_media
 from tests.playback_world import DUNE_4K, DUNE_4K_ITEM, FORKS, FORKS_ITEM, link_pal, report, stock
 
 RELEASE = "Dune.2021.2160p.UHD.BluRay.REMUX.DV.HDR.TrueHD.7.1-FraMeSToR"
@@ -244,7 +244,7 @@ async def test_an_approval_that_lapsed_leaves_the_report_open_again(library):
     await use_up_the_cap(ctx, runner)
     reported = await broken(ctx)
     (post,) = (await confirmed(ctx, runner, reported)).notices
-    ctx.store.decide_pending(post.pending_id, "expired", "maester")  # no button left
+    ctx.store.decide_pending(post.pending_id, "expired", "luwin")  # no button left
     out = await replace_media(capped(ctx, 10), reported.id, "vermithor")
     assert not out.is_error and ctx.services.radarr["vermithor"].deleted == [55]
 

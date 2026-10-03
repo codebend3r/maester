@@ -9,7 +9,7 @@ reads them. Anything past a limit goes under "Needs a look", the rest under
 "Fine", and what couldn't be read is named at the end.
 
 Drive SMART health isn't read: the fleet monitor has no SMART probe, and
-maester has no SSH (it runs no shell at all), so the report says so rather
+luwin has no SSH (it runs no shell at all), so the report says so rather
 than implying the drives are fine.
 """
 
@@ -17,11 +17,11 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from maester.clients import ClientError, Services
-from maester.clients.fleet import HostHealth
-from maester.config import Settings
-from maester.notify import AdminPost, Notice
-from maester.storage import read_space, terabytes
+from luwin.clients import ClientError, Services
+from luwin.clients.fleet import HostHealth
+from luwin.config import Settings
+from luwin.notify import AdminPost, Notice
+from luwin.storage import read_space, terabytes
 
 # Past these, a NAS needs a look.
 DISK_PERCENT = 90.0
@@ -30,7 +30,7 @@ LOAD_PER_CORE = 1.0
 UPTIME_PERCENT = 99.0
 
 NO_SMART = (
-    "Drive SMART health isn't read: the fleet monitor has no SMART probe yet, and maester "
+    "Drive SMART health isn't read: the fleet monitor has no SMART probe yet, and luwin "
     "runs no SSH."
 )
 

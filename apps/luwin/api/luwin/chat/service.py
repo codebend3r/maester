@@ -22,19 +22,19 @@ import logging
 import secrets
 from dataclasses import dataclass, field, replace
 
-from maester.agent.loop import Agent, TurnFailed
-from maester.agent.runner import CANCELLED
-from maester.agent.tools import Choice, Tier
-from maester.chat.identity import IdentityService
-from maester.chat.split import split_reply
-from maester.guides import guide
-from maester.notify import ApprovalPost, DirectMessage, Notice
-from maester.store import PendingAction, Store
+from luwin.agent.loop import Agent, TurnFailed
+from luwin.agent.runner import CANCELLED
+from luwin.agent.tools import Choice, Tier
+from luwin.chat.identity import IdentityService
+from luwin.chat.split import split_reply
+from luwin.guides import guide
+from luwin.notify import ApprovalPost, DirectMessage, Notice
+from luwin.store import PendingAction, Store
 
-log = logging.getLogger("maester.chat")
+log = logging.getLogger("luwin.chat")
 
 UNLINKED_HELP = (
-    "Hi! I'm maester, the concierge for this Plex server. I don't know which Plex "
+    "Hi! I'm luwin, the concierge for this Plex server. I don't know which Plex "
     "account is yours yet.\n\n"
     "If you already have access, link it with `/link <the email or username you use for Plex>` "
     "and the admin will approve it.\n\n"
@@ -167,7 +167,7 @@ class ChatService:
             self.store.remember_message(message_id, dm.to, dm.about)
 
     async def react(self, user: ChatUser, message_id: str, emoji: str) -> ChatResponse | None:
-        """A reaction to one of maester's DMs; None when it means nothing."""
+        """A reaction to one of luwin's DMs; None when it means nothing."""
         if not reports_a_problem(emoji):
             return None
         about = self.store.message_about(message_id, user.id)

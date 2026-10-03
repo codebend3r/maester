@@ -1,8 +1,8 @@
-from maester.clients import ClientError
-from maester.clients.seerr import MediaDetails, MediaRequest, MediaStatus, RequestStatus
-from maester.media import Copy, Titled
-from maester.notify import DirectMessage
-from maester.seerr_events import RESCAN_REPEAT, SeerrNotification, ready_to_watch, seerr_routes
+from luwin.clients import ClientError
+from luwin.clients.seerr import MediaDetails, MediaRequest, MediaStatus, RequestStatus
+from luwin.media import Copy, Titled
+from luwin.notify import DirectMessage
+from luwin.seerr_events import RESCAN_REPEAT, SeerrNotification, ready_to_watch, seerr_routes
 
 
 def notification(request_id="77", subject="Dune (2021)"):

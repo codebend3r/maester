@@ -2,7 +2,7 @@
 
 A friend away from home streams over the servers' upload: the hosts share
 one network behind one internet connection, so one test measures it for
-all of them. The test runs in maester's own container (`SPEEDTEST_HOST`,
+all of them. The test runs in luwin's own container (`SPEEDTEST_HOST`,
 `clients/speedtest.py`), alongside the streams already going out, so the
 upload it finds is what those streams leave free: the headroom. It's read
 next to what the remote streams Tautulli sees on every host send (their
@@ -25,11 +25,11 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
 
-from maester.clients import Services
-from maester.clients.speedtest import SpeedResult, SpeedTester, SpeedTestFailed
-from maester.formatting import ago, humanized, mbps
-from maester.memo import Key, Memo
-from maester.perf.load import read_loads
+from luwin.clients import Services
+from luwin.clients.speedtest import SpeedResult, SpeedTester, SpeedTestFailed
+from luwin.formatting import ago, humanized, mbps
+from luwin.memo import Key, Memo
+from luwin.perf.load import read_loads
 
 # A result answers for this long; after it, it no longer describes the connection.
 REUSE = timedelta(minutes=10)
@@ -103,7 +103,7 @@ class NotMeasured:
 
 
 Measurement = Uplink | NotMeasured
-# The last speed test: one tester per app, where maester runs.
+# The last speed test: one tester per app, where luwin runs.
 SPEED_TEST: Key[Measurement] = Key("speed_test")
 
 

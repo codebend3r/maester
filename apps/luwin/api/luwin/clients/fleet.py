@@ -3,7 +3,7 @@
 The monitor keeps every host's vitals as history (`/fleet/cpu`,
 `/fleet/memory`, one series of points per host), and its judgment of each
 host now (`/fleet`: reachable or not, `/volume1` usage, chip temperatures,
-containers, uptime over the last day). maester reads those three routes and
+containers, uptime over the last day). luwin reads those three routes and
 nothing else, with a static bearer token (`FLEET_MONITOR_TOKEN`) meant for a
 guard on the monitor that opens only them. The monitor has no such guard
 yet (its routes want an admin's Supabase session, which also reads every
@@ -19,7 +19,7 @@ import asyncio
 from dataclasses import dataclass, field
 from typing import Any, ClassVar, Protocol
 
-from maester.clients.base import ClientError, Downable, HttpClient
+from luwin.clients.base import ClientError, Downable, HttpClient
 
 # The collector samples every 30 s; a reading older than this doesn't describe "now".
 WINDOW_MINUTES = 5

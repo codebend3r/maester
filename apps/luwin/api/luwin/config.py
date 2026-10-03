@@ -1,4 +1,4 @@
-"""The environment maester runs on, read once and shared.
+"""The environment luwin runs on, read once and shared.
 
 Every module that needs a URL, a token or a limit imports it from here instead
 of reading os.environ itself, so the Discord client, the web app and the tools
@@ -252,14 +252,14 @@ class Settings:
     probe_timeout_seconds: int = 120
     # CPU and memory per NAS, for server load; None when no monitor is set up.
     fleet_monitor: FleetMonitorAccess | None = None
-    # The host maester's container runs on, where the speed test runs; empty for none.
+    # The host luwin's container runs on, where the speed test runs; empty for none.
     speedtest_host: str = ""
     # Files reported from one release group in 30 days before the digest suggests blocking it.
     bad_release_reports: int = 3
     jobs: Jobs = field(default_factory=Jobs)
 
     guardrails: Guardrails = field(default_factory=Guardrails)
-    db_path: str = "/data/maester.db"
+    db_path: str = "/data/luwin.db"
     web_port: int = 8020
 
 
@@ -325,7 +325,7 @@ def load_settings(env: Mapping[str, str]) -> Settings:
             user_messages_per_hour=_int(env, "USER_MESSAGES_PER_HOUR", 30),
             user_tokens_per_day=_int(env, "USER_TOKENS_PER_DAY", 200_000),
         ),
-        db_path=env.get("MAESTER_DB_PATH", "").strip() or "/data/maester.db",
+        db_path=env.get("MAESTER_DB_PATH", "").strip() or "/data/luwin.db",
         web_port=_int(env, "WEB_PORT", 8020),
     )
 

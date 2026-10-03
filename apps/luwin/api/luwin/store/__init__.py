@@ -18,18 +18,18 @@ arrs are. This is the bot's own memory of who asked for what and what it did.
 - `space.py`          free space per volume, a sample a day, for the forecast
 """
 
-from maester.store.audit import AuditLog, AuditRow
-from maester.store.base import MIGRATIONS_DIR, Database
-from maester.store.claims import Claims
-from maester.store.conversations import Conversations
-from maester.store.flags import KILL, MAINTENANCE, Flag, Flags
-from maester.store.held import HeldCall, HeldCalls
-from maester.store.messages import SentMessages
-from maester.store.pending import PendingAction, PendingActions
-from maester.store.reports import ReportRow, Reports
-from maester.store.space import SpaceSample, SpaceSamples
-from maester.store.stalls import StallAction, StallRow, Stalls, Watched
-from maester.store.users import (
+from luwin.store.audit import AuditLog, AuditRow
+from luwin.store.base import MIGRATIONS_DIR, Database
+from luwin.store.claims import Claims
+from luwin.store.conversations import Conversations
+from luwin.store.flags import KILL, MAINTENANCE, Flag, Flags
+from luwin.store.held import HeldCall, HeldCalls
+from luwin.store.messages import SentMessages
+from luwin.store.pending import PendingAction, PendingActions
+from luwin.store.reports import ReportRow, Reports
+from luwin.store.space import SpaceSample, SpaceSamples
+from luwin.store.stalls import StallAction, StallRow, Stalls, Watched
+from luwin.store.users import (
     LinkedUser,
     LinkStatus,
     NotLinked,

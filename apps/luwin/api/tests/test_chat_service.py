@@ -2,21 +2,21 @@ from datetime import timedelta
 
 import pytest
 
-from maester.agent.loop import Agent
-from maester.agent.runner import ToolRunner
-from maester.agent.tools import Approval, Choice, Choices, Result, Tier, ToolRegistry
-from maester.agent.tools import registry as app_registry
-from maester.chat.identity import IdentityService, RoleMap
-from maester.chat.service import UNLINKED_HELP, ChatService, ChatUser, Decision
-from maester.clients.seerr import MediaDetails, MediaStatus, RequestStatus, SeerrUser
-from maester.config import Settings
-from maester.media import Copy, Titled
-from maester.notify import AdminPost, ApprovalPost, DirectMessage
+from luwin.agent.loop import Agent
+from luwin.agent.runner import ToolRunner
+from luwin.agent.tools import Approval, Choice, Choices, Result, Tier, ToolRegistry
+from luwin.agent.tools import registry as app_registry
+from luwin.chat.identity import IdentityService, RoleMap
+from luwin.chat.service import UNLINKED_HELP, ChatService, ChatUser, Decision
+from luwin.clients.seerr import MediaDetails, MediaStatus, RequestStatus, SeerrUser
+from luwin.config import Settings
+from luwin.media import Copy, Titled
+from luwin.notify import AdminPost, ApprovalPost, DirectMessage
 from tests.factories import seerr_server
 from tests.fake_model import FakeModel, text_message, tool_message
 
 # Importing the tools package registers the real tools into `app_registry`.
-import maester.tools  # noqa: F401  isort: skip
+import luwin.tools  # noqa: F401  isort: skip
 
 ADMIN_ROLE, TRUSTED_ROLE = 1, 2
 FRIEND = ChatUser("f1", "Friend")

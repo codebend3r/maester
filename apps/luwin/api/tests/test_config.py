@@ -4,7 +4,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from maester.config import (
+from luwin.config import (
     FleetMonitorAccess,
     Jobs,
     MissingConfig,
@@ -19,7 +19,7 @@ def test_defaults_when_env_is_empty():
     assert s == Settings()
     assert s.model == "claude-opus-5-5"
     assert s.guardrails.replace_daily_cap == 3
-    assert s.db_path == "/data/maester.db"
+    assert s.db_path == "/data/luwin.db"
 
 
 def test_values_are_parsed_and_urls_stripped():
@@ -115,7 +115,7 @@ def test_a_bad_schedule_fails_on_boot_naming_the_variable(name, value):
 
 
 def test_load_env_file_reads_dotenv_from_the_working_directory(tmp_path, monkeypatch):
-    from maester.config import load_env_file
+    from luwin.config import load_env_file
 
     (tmp_path / ".env").write_text("SEERR_API_KEY=from-file\nDISCORD_GUILD_ID=42\n")
     monkeypatch.chdir(tmp_path)
@@ -127,7 +127,7 @@ def test_load_env_file_reads_dotenv_from_the_working_directory(tmp_path, monkeyp
 
 
 def test_load_env_file_is_a_no_op_without_a_file(tmp_path, monkeypatch):
-    from maester.config import load_env_file
+    from luwin.config import load_env_file
 
     monkeypatch.chdir(tmp_path)
     assert load_env_file() is False

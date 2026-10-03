@@ -2,9 +2,9 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from maester.agent.limits import KillSwitch
-from maester.agent.runner import CANCELLED, ToolRunner
-from maester.agent.tools import (
+from luwin.agent.limits import KillSwitch
+from luwin.agent.runner import CANCELLED, ToolRunner
+from luwin.agent.tools import (
     MAX_CHOICES,
     Approval,
     Choice,
@@ -15,10 +15,10 @@ from maester.agent.tools import (
     ToolRegistry,
     ToolSpec,
 )
-from maester.config import Settings
-from maester.memo import Memo
-from maester.notify import AdminPost, ApprovalPost, DirectMessage
-from maester.store import LinkedUser, NotLinked, Store
+from luwin.config import Settings
+from luwin.memo import Memo
+from luwin.notify import AdminPost, ApprovalPost, DirectMessage
+from luwin.store import LinkedUser, NotLinked, Store
 
 SCHEMA_N = {"type": "object", "properties": {"n": {"type": "integer"}}, "required": ["n"]}
 SCHEMA = {

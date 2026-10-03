@@ -2,12 +2,12 @@ from types import SimpleNamespace
 
 import pytest
 
-from maester.agent.tools import Tier
-from maester.chat.identity import IdentityService, RoleMap, resolve_tier
-from maester.clients import FakeSeerrClient, FakeTautulliClient
-from maester.clients.seerr import SeerrUser
-from maester.clients.tautulli import TautulliUser
-from maester.store import Store
+from luwin.agent.tools import Tier
+from luwin.chat.identity import IdentityService, RoleMap, resolve_tier
+from luwin.clients import FakeSeerrClient, FakeTautulliClient
+from luwin.clients.seerr import SeerrUser
+from luwin.clients.tautulli import TautulliUser
+from luwin.store import Store
 
 ROLES = RoleMap(admin_role_id=1, trusted_role_id=2)
 

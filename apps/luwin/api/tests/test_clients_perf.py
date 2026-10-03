@@ -6,7 +6,7 @@ import json
 import pytest
 import respx
 
-from maester.clients import (
+from luwin.clients import (
     ClientError,
     FakeTautulliClient,
     PlexClient,
@@ -17,10 +17,10 @@ from maester.clients import (
     TautulliClient,
     WizarrClient,
 )
-from maester.clients.base import every_host
-from maester.clients.fleet import FakeFleetMonitor, FleetMonitorClient, Vitals
-from maester.clients.process import Completed
-from maester.clients.speedtest import FakeSpeedTest, OoklaSpeedTest, SpeedResult, SpeedTestFailed
+from luwin.clients.base import every_host
+from luwin.clients.fleet import FakeFleetMonitor, FleetMonitorClient, Vitals
+from luwin.clients.process import Completed
+from luwin.clients.speedtest import FakeSpeedTest, OoklaSpeedTest, SpeedResult, SpeedTestFailed
 
 MONITOR = "http://meleys.lan:8010"
 

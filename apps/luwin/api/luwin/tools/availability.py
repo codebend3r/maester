@@ -12,13 +12,13 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from maester.agent.tools import Tier, ToolContext, tool
-from maester.clients import Services
-from maester.clients.plex import Plex
-from maester.clients.seerr import MediaDetails
-from maester.dub import dub_coverage, is_anime
-from maester.library import Library, OwnerUnknown
-from maester.plex_versions import describe_version, items_of
+from luwin.agent.tools import Tier, ToolContext, tool
+from luwin.clients import Services
+from luwin.clients.plex import Plex
+from luwin.clients.seerr import MediaDetails
+from luwin.dub import dub_coverage, is_anime
+from luwin.library import Library, OwnerUnknown
+from luwin.plex_versions import describe_version, items_of
 
 
 async def plex_copies(plex: Plex, details: MediaDetails) -> list[dict[str, Any]]:

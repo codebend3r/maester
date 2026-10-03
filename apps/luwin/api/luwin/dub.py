@@ -4,7 +4,7 @@ Anime is what TMDB tags with its anime keyword or files as Japanese
 animation, or what the owning Sonarr treats as an anime series. English
 audio follows the maintainer's anime dub audit (`anime-missing-dub`): an
 audio track is English when its language tag says so, or its title does
-("English 2.0", "ENG", "Dub"). Where maester reads a file's tracks with
+("English 2.0", "ENG", "Dub"). Where luwin reads a file's tracks with
 ffprobe (`list_tracks`, audio reports) both rules apply. A show's season
 coverage comes from Sonarr's own analysis of each episode file
 (`mediaInfo.audioLanguages`) instead, since probing every file would take
@@ -19,9 +19,9 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass
 
-from maester.clients.arr import MediaFile
-from maester.clients.seerr import MediaDetails
-from maester.clients.sonarr import Series
+from luwin.clients.arr import MediaFile
+from luwin.clients.seerr import MediaDetails
+from luwin.clients.sonarr import Series
 
 # The audit's English language tags, plus the full name older Sonarr reports.
 ENGLISH_AUDIO = frozenset({"eng", "en", "en-us", "en-gb", "english"})

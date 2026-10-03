@@ -1,10 +1,10 @@
 import time
 
-from maester.agent.tools import Tier, registry
-from maester.clients import ClientError
-from maester.clients.plex import PlexItem, Version
-from maester.clients.speedtest import SpeedResult
-from maester.tools.lag import server_status, session_report, speed_test
+from luwin.agent.tools import Tier, registry
+from luwin.clients import ClientError
+from luwin.clients.plex import PlexItem, Version
+from luwin.clients.speedtest import SpeedResult
+from luwin.tools.lag import server_status, session_report, speed_test
 from tests.factories import history_row, session
 from tests.playback_world import DUNE
 
@@ -52,7 +52,7 @@ def test_tool_is_registered_for_friends():
     assert "server_status" in {s.name for s in registry.for_tier(Tier.FRIEND)}
 
 
-async def test_speed_test_runs_on_the_host_maester_runs_on(ctx):
+async def test_speed_test_runs_on_the_host_luwin_runs_on(ctx):
     ctx.services.speedtest.result = SpeedResult(3200, 500_000, 11.0, "Bell, Toronto", "Bell", "u")
     ctx.services.tautulli["vermithor"].sessions = [session(location="wan", stream_bitrate_kbps=18500)]  # fmt: skip
     out = await speed_test(ctx, "Meleys")
@@ -137,7 +137,7 @@ async def test_a_heavy_remux_streamed_away_from_home_is_flagged_from_the_report(
     ctx.services.seerr.details[("movie", 438631)] = DUNE
     remux = Version("4k", "hevc", 62103, 72_600_000_000, "/Vermithor/Movies/Dune (2021) Remux-2160p.mkv")  # fmt: skip
     ctx.services.plex.items = {"9001": PlexItem("9001", "Dune", "movie", 2021, ("tmdb://438631",), (remux,))}  # fmt: skip
-    tautulli = ctx.services.tautulli["meleys"]  # the Plex server maester reads
+    tautulli = ctx.services.tautulli["meleys"]  # the Plex server luwin reads
     tautulli.sessions = [session(user_id=7, rating_key="9001", file=remux.file, stream_bitrate_kbps=62103, tmdb_id=438631)]  # fmt: skip
     now = int(time.time())
     tautulli.history_rows = [history_row(rating_key="9001", location="wan", user_id=u, started=now - 60) for u in (1, 2, 3)]  # fmt: skip

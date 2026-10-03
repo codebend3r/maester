@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import discord
 
-from maester.chat.service import ChatUser
+from luwin.chat.service import ChatUser
 
 
 def chat_user(user: discord.abc.User) -> ChatUser:

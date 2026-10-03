@@ -3,8 +3,8 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from maester.jobs import At, Every, Job, Scheduler
-from maester.notify import AdminPost
+from luwin.jobs import At, Every, Job, Scheduler
+from luwin.notify import AdminPost
 
 TORONTO = ZoneInfo("America/Toronto")
 

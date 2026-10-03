@@ -2,14 +2,14 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from maester.agent.limits import KillSwitch
-from maester.clients import ClientError
-from maester.clients.arr import QueueItem
-from maester.config import Settings
-from maester.jobs.sweep import Sweeper
-from maester.notify import AdminPost
-from maester.store import StallAction
-from maester.store.base import stamp
+from luwin.agent.limits import KillSwitch
+from luwin.clients import ClientError
+from luwin.clients.arr import QueueItem
+from luwin.config import Settings
+from luwin.jobs.sweep import Sweeper
+from luwin.notify import AdminPost
+from luwin.store import StallAction
+from luwin.store.base import stamp
 
 GB = 1_000_000_000
 

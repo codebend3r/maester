@@ -32,12 +32,12 @@ from dataclasses import dataclass
 from typing import Any, ClassVar
 from urllib.parse import urlsplit
 
-from maester.clients import Services
-from maester.clients.arr import MediaFile
-from maester.clients.radarr import Radarr
-from maester.clients.seerr import ArrServer, MediaDetails
-from maester.clients.sonarr import Episode, Sonarr
-from maester.media import Copy, version_label
+from luwin.clients import Services
+from luwin.clients.arr import MediaFile
+from luwin.clients.radarr import Radarr
+from luwin.clients.seerr import ArrServer, MediaDetails
+from luwin.clients.sonarr import Episode, Sonarr
+from luwin.media import Copy, version_label
 
 _DEFAULT_PORTS = {"http": 80, "https": 443}
 

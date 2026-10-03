@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-from maester.media import Copy, Titled
-from maester.store.base import Database, now, stamp
+from luwin.media import Copy, Titled
+from luwin.store.base import Database, now, stamp
 
 # How long a DM about a title can still be reacted to.
 SENT_MESSAGE_TTL = timedelta(days=30)

@@ -14,10 +14,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from maester.agent.tools import Choice, Choices, Result, Tier, ToolContext, tool
-from maester.clients.seerr import Collection, RequestRefused, RequestStatus, SearchResult
-from maester.tools.requests import explain
-from maester.tools.search import as_choice, availability
+from luwin.agent.tools import Choice, Choices, Result, Tier, ToolContext, tool
+from luwin.clients.seerr import Collection, RequestRefused, RequestStatus, SearchResult
+from luwin.tools.requests import explain
+from luwin.tools.search import as_choice, availability
 
 
 def missing(collection: Collection) -> list[SearchResult]:

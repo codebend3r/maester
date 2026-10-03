@@ -9,9 +9,9 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from maester.agent.tools import Result, Tier, ToolContext, tool
-from maester.notify import DirectMessage
-from maester.store import LinkStatus
+from luwin.agent.tools import Result, Tier, ToolContext, tool
+from luwin.notify import DirectMessage
+from luwin.store import LinkStatus
 
 
 @tool(

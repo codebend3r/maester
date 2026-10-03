@@ -3,9 +3,9 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from maester.media import Copy, Titled
-from maester.store import MIGRATIONS_DIR, SeerrUserTaken, Store
-from maester.store.base import stamp
+from luwin.media import Copy, Titled
+from luwin.store import MIGRATIONS_DIR, SeerrUserTaken, Store
+from luwin.store.base import stamp
 
 
 def test_migrations_apply_once(store):
@@ -186,7 +186,7 @@ def test_a_seerr_user_has_one_live_link(store):
 
 def test_the_migration_keeps_the_earliest_active_link_of_a_shared_seerr_user(tmp_path):
     # A database from before the rule: migrations 001-003 only, then shared links.
-    path = tmp_path / "maester.db"
+    path = tmp_path / "luwin.db"
     conn = sqlite3.connect(path)
     conn.execute("CREATE TABLE schema_version (version INTEGER PRIMARY KEY)")
     for version in (1, 2, 3):
@@ -232,7 +232,7 @@ def test_each_source_prunes_only_its_own_claims(store):
 
 def test_the_claims_migration_keeps_webhook_claims(tmp_path):
     """Migration 007 moves the rows of `webhook_events` into `claims`."""
-    path = tmp_path / "maester.db"
+    path = tmp_path / "luwin.db"
     conn = sqlite3.connect(path)
     conn.executescript(
         "CREATE TABLE schema_version (version INTEGER PRIMARY KEY);"

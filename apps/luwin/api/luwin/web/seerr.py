@@ -3,7 +3,7 @@
 Seerr's webhook agent sends its "Authorization Header" setting as the
 `Authorization` header; it must equal `SEERR_WEBHOOK_SECRET`, and with no
 secret configured the route refuses everything. Each notification type maps
-to a route (`maester/seerr_events.py`) whose handler returns the notices to
+to a route (`luwin/seerr_events.py`) whose handler returns the notices to
 send, which go out through the injected `Notifier`; types without a route
 are acknowledged and ignored, so ticking more types in Seerr is harmless.
 
@@ -23,11 +23,11 @@ from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException
 
-from maester.notify import Notifier
-from maester.seerr_events import SeerrNotification, SeerrRoute
-from maester.store import Store
+from luwin.notify import Notifier
+from luwin.seerr_events import SeerrNotification, SeerrRoute
+from luwin.store import Store
 
-log = logging.getLogger("maester.web")
+log = logging.getLogger("luwin.web")
 
 SOURCE = "seerr"
 

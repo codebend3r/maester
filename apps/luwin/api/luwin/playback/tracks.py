@@ -1,8 +1,8 @@
 """A file's audio and subtitle tracks, as a friend (or a Seerr issue) should read them.
 
-ffprobe's tracks (`maester/clients/media.py`) answer "does this have Spanish
+ffprobe's tracks (`luwin/clients/media.py`) answer "does this have Spanish
 subs?" and go into subtitle and audio reports. Each audio track says
-whether it is English by the dub audit's rules (`maester/dub.py`), title
+whether it is English by the dub audit's rules (`luwin/dub.py`), title
 rule included.
 """
 
@@ -11,8 +11,8 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any
 
-from maester.clients.media import Track
-from maester.dub import is_english_track
+from luwin.clients.media import Track
+from luwin.dub import is_english_track
 
 
 def _flags(track: Track) -> list[str]:

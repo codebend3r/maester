@@ -2,8 +2,8 @@
 
 A case is a YAML file: a user tier, one or more user messages, and for each
 message the tool calls expected and a regex the reply must match. Services
-are always the fakes from `maester.clients`, seeded from the case file. The
-model is real by default (`uv run maester-eval`), which is what makes the
+are always the fakes from `luwin.clients`, seeded from the case file. The
+model is real by default (`uv run luwin-eval`), which is what makes the
 harness worth having; `--model fake` runs the same cases against a scripted
 model so CI can check the plumbing without an API key.
 """
@@ -20,11 +20,11 @@ from typing import Any
 
 import yaml
 
-from maester.agent.loop import Agent
-from maester.agent.runner import ToolRunner
-from maester.agent.tools import Tier, ToolRegistry
-from maester.config import Settings
-from maester.evals.world import EVAL_USER
+from luwin.agent.loop import Agent
+from luwin.agent.runner import ToolRunner
+from luwin.agent.tools import Tier, ToolRegistry
+from luwin.config import Settings
+from luwin.evals.world import EVAL_USER
 
 CASES_DIR = Path(__file__).resolve().parent.parent.parent / "evals" / "cases"
 
@@ -146,15 +146,15 @@ def build_agent(model_name: str, registry: ToolRegistry, services: Any, store: A
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Run maester eval cases against fake services.")
+    parser = argparse.ArgumentParser(description="Run luwin eval cases against fake services.")
     parser.add_argument(
         "cases", nargs="*", type=Path, help="case files (default: all under evals/cases)"
     )
     parser.add_argument("--model", default=None, help="model id, or 'fake' for the scripted model")
     args = parser.parse_args(argv)
 
-    from maester.config import load_env_file, settings
-    from maester.evals.world import build_world
+    from luwin.config import load_env_file, settings
+    from luwin.evals.world import build_world
 
     load_env_file()
     model_name = args.model or settings().model

@@ -1,7 +1,7 @@
 """The file behind a copy a friend reports on.
 
-`locate` finds a copy's file the only way maester ever finds a file:
-through the arr that owns the copy (`maester/library.py`, never guessed)
+`locate` finds a copy's file the only way luwin ever finds a file:
+through the arr that owns the copy (`luwin/library.py`, never guessed)
 and that arr's file records. Every probe and every replacement starts here.
 """
 
@@ -9,11 +9,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from maester.clients import Services
-from maester.clients.arr import MediaFile
-from maester.clients.seerr import MediaDetails
-from maester.library import Owner, owner_of
-from maester.media import Copy
+from luwin.clients import Services
+from luwin.clients.arr import MediaFile
+from luwin.clients.seerr import MediaDetails
+from luwin.library import Owner, owner_of
+from luwin.media import Copy
 
 
 @dataclass(frozen=True)

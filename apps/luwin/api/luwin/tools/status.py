@@ -1,7 +1,7 @@
 """Where a friend's requests are: Seerr's state merged with the download.
 
 For each open Seerr request, the arr holding that request's copy (standard
-or 4K, found by `maester/library.py`, never guessed) says whether it is in
+or 4K, found by `luwin/library.py`, never guessed) says whether it is in
 the download queue. Queue entries are matched to that host's SABnzbd by
 download id, and SABnzbd's live percent and time left win over the arr's.
 The request's percent is weighted by size across its entries (a season is
@@ -24,13 +24,13 @@ from collections.abc import Awaitable, Callable, Hashable, Iterable
 from dataclasses import dataclass
 from typing import Any
 
-from maester.agent.tools import Tier, ToolContext, tool
-from maester.clients.arr import HistoryEvent, QueueItem
-from maester.clients.sabnzbd import Download
-from maester.clients.seerr import MediaDetails, MediaRequest, RequestStatus
-from maester.formatting import humanized
-from maester.library import Library, Owner, OwnerUnknown
-from maester.media import version_label
+from luwin.agent.tools import Tier, ToolContext, tool
+from luwin.clients.arr import HistoryEvent, QueueItem
+from luwin.clients.sabnzbd import Download
+from luwin.clients.seerr import MediaDetails, MediaRequest, RequestStatus
+from luwin.formatting import humanized
+from luwin.library import Library, Owner, OwnerUnknown
+from luwin.media import version_label
 
 OPEN_REQUESTS = 20
 # SABnzbd writes "0:03:10" (or "1:02:03:04" with days); the arrs write a

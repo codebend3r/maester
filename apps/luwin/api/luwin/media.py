@@ -1,6 +1,6 @@
 """A copy of a title, and the kinds of report made about one: words every layer shares.
 
-A leaf module: it imports nothing else from maester, so the store, the
+A leaf module: it imports nothing else from luwin, so the store, the
 notices, the arr owners and the playback flow can all speak of a copy
 without importing each other.
 

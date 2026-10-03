@@ -1,4 +1,4 @@
--- DMs maester sent about a title, so a reaction to one (a thumbs-down on
+-- DMs luwin sent about a title, so a reaction to one (a thumbs-down on
 -- "Dune is ready") can be traced back to that title and copy. Rows older
 -- than a month are pruned as new ones are written.
 CREATE TABLE sent_messages (

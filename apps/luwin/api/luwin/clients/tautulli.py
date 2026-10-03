@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from typing import Any, ClassVar, Protocol
 
-from maester.clients.base import ClientError, Downable, HttpClient
+from luwin.clients.base import ClientError, Downable, HttpClient
 
 
 def _int(value: Any, default: int = 0) -> int:

@@ -1,6 +1,6 @@
-from maester.agent.tools import Choices
-from maester.clients.seerr import MediaStatus, SearchResult
-from maester.tools.search import SEARCH_PICKS, search_media
+from luwin.agent.tools import Choices
+from luwin.clients.seerr import MediaStatus, SearchResult
+from luwin.tools.search import SEARCH_PICKS, search_media
 
 UNKNOWN, AVAILABLE, PENDING = MediaStatus.UNKNOWN, MediaStatus.AVAILABLE, MediaStatus.PENDING
 

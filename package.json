@@ -9,7 +9,7 @@
   ],
   "type": "module",
   "scripts": {
-    "dev:maester": "nx run @maester/api:dev",
+    "dev:luwin": "nx run @luwin/api:dev",
     "dev:raven": "nx run-many -t dev -p @raven/server @raven/web",
     "build": "nx run-many -t build",
     "test": "nx run-many -t test",
