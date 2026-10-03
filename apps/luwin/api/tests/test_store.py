@@ -3,8 +3,8 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from luwin.store import MIGRATIONS_DIR, SeerrUserTaken, Store
-from luwin.store.base import adopt_legacy, stamp
+from luwin.store import SeerrUserTaken, Store
+from luwin.store.base import APPLICATION_ID, OldDatabase, stamp
 
 
 def test_migrations_apply_once(store):
@@ -16,12 +16,33 @@ def test_migrations_apply_once(store):
     assert {"users", "conversations", "audit_log", "reports", "pending_actions"} <= tables
 
 
+def test_a_new_database_is_luwins_and_keyed_by_user_id(tmp_path):
+    store = Store(tmp_path / "luwin.db")
+    assert store._conn.execute("PRAGMA application_id").fetchone()[0] == APPLICATION_ID
+    for table in ("users", "conversations", "audit_log", "reports", "held_calls"):
+        columns = {r["name"] for r in store._conn.execute(f"PRAGMA table_info({table})")}
+        assert "user_id" in columns, table
+    store.close()
+
+
+def test_a_database_from_before_the_fresh_start_is_refused(tmp_path):
+    path = tmp_path / "old.db"
+    old = sqlite3.connect(path)
+    old.execute("CREATE TABLE schema_version (version INTEGER PRIMARY KEY)")
+    old.execute("INSERT INTO schema_version VALUES (12)")
+    old.commit()
+    old.close()
+    with pytest.raises(OldDatabase, match="before luwin's fresh start"):
+        Store(path)
+    left = sqlite3.connect(path)
+    assert left.execute("SELECT version FROM schema_version").fetchall() == [(12,)]
+    left.close()
+
+
 def test_audit_records_and_reads_back_newest_first(store):
+    store.audit(user_id="u1", tool="search_media", args={"query": "dune"}, result=[1, 2], ok=True)
     store.audit(
-        discord_id="u1", tool="search_media", args={"query": "dune"}, result=[1, 2], ok=True
-    )
-    store.audit(
-        discord_id="u1",
+        user_id="u1",
         tool="replace_media",
         args={"id": 5},
         result="boom",
@@ -36,20 +57,20 @@ def test_audit_records_and_reads_back_newest_first(store):
 
 
 def test_audit_result_is_truncated_and_non_json_is_stringified(store):
-    store.audit(discord_id=None, tool="t", args={}, result={"blob": "x" * 10_000}, ok=True)
+    store.audit(user_id=None, tool="t", args={}, result={"blob": "x" * 10_000}, ok=True)
     stored = store.audit_recent(1)[0].result
     assert stored["truncated"] is True and len(stored["preview"]) == 4000
     store.audit(
-        discord_id=None, tool="t", args={"when": datetime(2026, 1, 1)}, result=object(), ok=True
+        user_id=None, tool="t", args={"when": datetime(2026, 1, 1)}, result=object(), ok=True
     )
     assert "2026-01-01" in store.audit_recent(1)[0].args["when"]
 
 
 def test_audit_count_since_counts_only_successes(store):
-    store.audit(discord_id="u", tool="replace_media", args={}, result=None, ok=True)
-    store.audit(discord_id="u", tool="replace_media", args={}, result=None, ok=False)
+    store.audit(user_id="u", tool="replace_media", args={}, result=None, ok=True)
+    store.audit(user_id="u", tool="replace_media", args={}, result=None, ok=False)
     # Asked for an approval rather than acting: not a replacement.
-    store.audit(discord_id="u", tool="replace_media", args={}, result=None, ok=True, pending_id=3)
+    store.audit(user_id="u", tool="replace_media", args={}, result=None, ok=True, pending_id=3)
     since = datetime.now(UTC) - timedelta(days=1)
     assert store.audit_count_since("replace_media", since) == 1
     assert store.audit_recent(1)[0].pending_id == 3
@@ -154,7 +175,7 @@ def test_user_by_seerr_id_finds_the_live_link(store):
     store.upsert_user("d1", seerr_user_id=4, status="pending")
     assert store.user_by_seerr_id(4).status == "pending"
     store.upsert_user("d1", status="active")
-    assert store.user_by_seerr_id(4).discord_id == "d1"
+    assert store.user_by_seerr_id(4).user_id == "d1"
     store.upsert_user("d1", status="revoked")
     assert store.user_by_seerr_id(4) is None and store.user_by_seerr_id(5) is None
 
@@ -164,7 +185,7 @@ def test_an_active_link_is_approved_and_names_a_seerr_user(store):
     assert store.active_link("d1") is None
     store.upsert_user("d1", seerr_user_id=4, plex_username="dany", tautulli_user_id=9)
     link = store.active_link("d1")
-    assert (link.discord_id, link.seerr_user_id, link.tautulli_user_id, link.name) == (
+    assert (link.user_id, link.seerr_user_id, link.tautulli_user_id, link.name) == (
         "d1",
         4,
         9,
@@ -183,58 +204,12 @@ def test_a_seerr_user_has_one_live_link(store):
     assert store.upsert_user("d2", seerr_user_id=4, status="pending").seerr_user_id == 4
 
 
-def test_the_migration_keeps_the_earliest_active_link_of_a_shared_seerr_user(tmp_path):
-    # A database from before the rule: migrations 001-003 only, then shared links.
-    path = tmp_path / "luwin.db"
-    conn = sqlite3.connect(path)
-    conn.execute("CREATE TABLE schema_version (version INTEGER PRIMARY KEY)")
-    for version in (1, 2, 3):
-        (script,) = MIGRATIONS_DIR.glob(f"00{version}_*.sql")
-        conn.executescript(script.read_text())
-        conn.execute("INSERT INTO schema_version VALUES (?)", (version,))
-    conn.executemany(
-        "INSERT INTO users (discord_id, seerr_user_id, status, linked_at) VALUES (?, 4, ?, ?)",
-        [
-            ("late", "active", "2026-02-01"),
-            ("early", "active", "2026-01-01"),
-            ("waiting", "pending", None),
-        ],
-    )
-    conn.commit()
-    conn.close()
-
-    migrated = Store(path)
-    assert migrated.active_link_by_seerr_id(4).discord_id == "early"
-    assert [migrated.get_user(d).status for d in ("late", "waiting")] == ["revoked", "revoked"]
-    migrated.close()
-
-
 def test_each_source_prunes_only_its_own_claims(store):
     assert store.claim("reencode", "9001", window=timedelta(days=30))
     assert store.claim("seerr", "MEDIA_AVAILABLE:request:1", window=timedelta(minutes=15))
     # A Seerr claim whose window has passed is pruned without touching the re-encode flag.
     assert store.claim("seerr", "MEDIA_AVAILABLE:request:1", window=timedelta(seconds=-1))
     assert not store.claim("reencode", "9001", window=timedelta(days=30))
-
-
-def test_the_claims_migration_keeps_webhook_claims(tmp_path):
-    """Migration 007 moves the rows of `webhook_events` into `claims`."""
-    path = tmp_path / "luwin.db"
-    conn = sqlite3.connect(path)
-    conn.executescript(
-        "CREATE TABLE schema_version (version INTEGER PRIMARY KEY);"
-        + "".join(
-            f"{p.read_text()}\nINSERT INTO schema_version VALUES ({int(p.name[:3])});"
-            for p in sorted(MIGRATIONS_DIR.glob("*.sql"))
-            if int(p.name[:3]) < 7
-        )
-        + "INSERT INTO webhook_events VALUES ('seerr', 'MEDIA_AVAILABLE:request:9', "
-        f"'{stamp(datetime.now(UTC))}');"
-    )
-    conn.close()
-    migrated = Store(path)
-    assert not migrated.claim("seerr", "MEDIA_AVAILABLE:request:9", window=timedelta(minutes=15))
-    migrated.close()
 
 
 def test_a_flag_is_up_until_lowered_and_raising_it_again_replaces_its_message(store):
@@ -280,81 +255,3 @@ def test_an_expired_approval_frees_its_subject(store):
     fresh, new = raise_about(store, "seerr-request:9")
     assert new and fresh.id != stale.id
     assert store.get_pending(stale.id).decision == "expired"
-
-
-def test_open_approvals_of_the_renamed_4k_decision_carry_over(tmp_path):
-    path = tmp_path / "m.db"
-    conn = sqlite3.connect(path)
-    conn.execute("CREATE TABLE schema_version (version INTEGER PRIMARY KEY)")
-    for sql in sorted(MIGRATIONS_DIR.glob("*.sql"))[:8]:  # the schema before 009
-        conn.executescript(sql.read_text())
-        conn.execute("INSERT INTO schema_version VALUES (?)", (int(sql.name.split("_")[0]),))
-    payload = '{"request_id": 7, "title": "Dune (2021)", "requester": "d1"}'
-    conn.execute(
-        "INSERT INTO pending_actions (kind, action, requester, payload, summary, expires_at)"
-        " VALUES ('approve', 'decide_4k_request', 'd1', ?, '4K Dune', '2999-01-01T00:00:00Z')",
-        (payload,),
-    )
-    conn.commit()
-    conn.close()
-    store = Store(path)
-    (carried,) = store.open_pending("approve")
-    assert carried.action == "decide_request" and carried.subject == "seerr-request:7"
-    assert carried.payload == {
-        "request_id": 7, "title": "Dune (2021)", "requester": "d1", "version": "4K"
-    }  # fmt: skip
-    store.close()
-
-
-def _files(folder):
-    return sorted(p.name for p in folder.iterdir())
-
-
-def test_a_maester_database_opens_under_its_new_name_with_its_rows(tmp_path):
-    conn = sqlite3.connect(tmp_path / "maester.db")
-    conn.execute("CREATE TABLE marker (note TEXT)")
-    conn.execute("INSERT INTO marker VALUES ('kept')")
-    conn.commit()
-    conn.close()
-    Store(tmp_path / "luwin.db").close()
-    assert not (tmp_path / "maester.db").exists()
-    check = sqlite3.connect(tmp_path / "luwin.db")
-    assert check.execute("SELECT note FROM marker").fetchall() == [("kept",)]
-    check.close()
-
-
-def test_the_wal_and_shm_files_move_with_the_database(tmp_path):
-    for name in ("maester.db", "maester.db-wal", "maester.db-shm"):
-        (tmp_path / name).write_text(name)
-    adopt_legacy(tmp_path / "luwin.db")
-    assert _files(tmp_path) == ["luwin.db", "luwin.db-shm", "luwin.db-wal"]
-    assert (tmp_path / "luwin.db-wal").read_text() == "maester.db-wal"
-
-
-def test_an_existing_luwin_database_is_never_replaced(tmp_path):
-    (tmp_path / "luwin.db").write_text("new")
-    (tmp_path / "maester.db").write_text("old")
-    adopt_legacy(tmp_path / "luwin.db")
-    assert _files(tmp_path) == ["luwin.db", "maester.db"]
-    assert (tmp_path / "luwin.db").read_text() == "new"
-
-
-def test_a_move_cut_short_finishes_on_the_next_open(tmp_path):
-    (tmp_path / "luwin.db-wal").write_text("maester.db-wal")
-    (tmp_path / "maester.db").write_text("maester.db")
-    adopt_legacy(tmp_path / "luwin.db")
-    assert _files(tmp_path) == ["luwin.db", "luwin.db-wal"]
-
-
-def test_nothing_to_adopt_leaves_the_folder_empty(tmp_path):
-    adopt_legacy(tmp_path / "luwin.db")
-    assert _files(tmp_path) == []
-
-
-def test_an_empty_luwin_file_from_a_stray_connect_is_replaced(tmp_path):
-    # `sqlite3.connect` creates a zero-byte file, which holds no database yet.
-    sqlite3.connect(tmp_path / "luwin.db").close()
-    (tmp_path / "maester.db").write_text("old")
-    adopt_legacy(tmp_path / "luwin.db")
-    assert _files(tmp_path) == ["luwin.db"]
-    assert (tmp_path / "luwin.db").read_text() == "old"

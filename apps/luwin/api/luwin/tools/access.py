@@ -85,9 +85,9 @@ def missing(shared: Shared, sections: list[Section]) -> list[Section]:
     return [s for s in sections if s.id not in shared.share.section_ids]
 
 
-def email_of(ctx: ToolContext, discord_id: str) -> str | None:
+def email_of(ctx: ToolContext, user_id: str) -> str | None:
     """The email a friend's link recorded, which finds their Plex account's share."""
-    row = ctx.store.get_user(discord_id)
+    row = ctx.store.get_user(user_id)
     return row.plex_email if row else None
 
 

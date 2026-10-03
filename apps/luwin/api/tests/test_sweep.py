@@ -56,7 +56,7 @@ async def test_a_flagged_download_is_timed_then_blocklisted_and_searched_again(
         "The download is stalled with no connections",
     )
     row = store.audit_recent(1)[0]
-    assert (row.tool, row.host, row.ok, row.discord_id) == ("sweep_stalled", "meleys", True, None)
+    assert (row.tool, row.host, row.ok, row.user_id) == ("sweep_stalled", "meleys", True, None)
     await sweeper()  # it left the queue: remembered a day, in case one read just missed it
     assert store.watched("meleys", "movie")["nzo_a"].acted_at is not None
     store._conn.execute(

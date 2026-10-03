@@ -18,7 +18,7 @@ class LinkStatus(StrEnum):
 
 @dataclass(frozen=True)
 class UserRow:
-    discord_id: str
+    user_id: str
     plex_email: str | None
     plex_username: str | None
     seerr_user_id: int | None
@@ -39,7 +39,7 @@ class NotLinked(LookupError):
 class LinkedUser:
     """An active link: who a Discord account is on Seerr (and Tautulli, when known)."""
 
-    discord_id: str
+    user_id: str
     seerr_user_id: int
     tautulli_user_id: int | None
     name: str  # their Plex username, or email, as the admin knows them
@@ -50,7 +50,7 @@ _ACTIVE_LINK = "status = 'active' AND seerr_user_id IS NOT NULL"
 
 
 class Users(Database):
-    def upsert_user(self, discord_id: str, **fields: Any) -> UserRow:
+    def upsert_user(self, user_id: str, **fields: Any) -> UserRow:
         allowed = {
             "plex_email",
             "plex_username",
@@ -65,30 +65,28 @@ class Users(Database):
             raise ValueError(f"unknown user fields: {sorted(unknown)}")
         try:
             with self.transaction() as conn:
-                conn.execute("INSERT OR IGNORE INTO users (discord_id) VALUES (?)", (discord_id,))
+                conn.execute("INSERT OR IGNORE INTO users (user_id) VALUES (?)", (user_id,))
                 if fields:
                     assignments = ", ".join(f"{k} = ?" for k in fields)
                     conn.execute(
-                        f"UPDATE users SET {assignments} WHERE discord_id = ?",
-                        (*fields.values(), discord_id),
+                        f"UPDATE users SET {assignments} WHERE user_id = ?",
+                        (*fields.values(), user_id),
                     )
         except sqlite3.IntegrityError as exc:
             if "seerr_user_id" in str(exc):
                 raise SeerrUserTaken(f"Seerr user {fields.get('seerr_user_id')} is taken") from exc
             raise
-        return self.get_user(discord_id)  # type: ignore[return-value]
+        return self.get_user(user_id)  # type: ignore[return-value]
 
-    def get_user(self, discord_id: str) -> UserRow | None:
+    def get_user(self, user_id: str) -> UserRow | None:
         with self._lock:
-            r = self._conn.execute(
-                "SELECT * FROM users WHERE discord_id = ?", (discord_id,)
-            ).fetchone()
+            r = self._conn.execute("SELECT * FROM users WHERE user_id = ?", (user_id,)).fetchone()
         return self._user(r)
 
-    def active_link(self, discord_id: str) -> LinkedUser | None:
+    def active_link(self, user_id: str) -> LinkedUser | None:
         with self._lock:
             r = self._conn.execute(
-                f"SELECT * FROM users WHERE discord_id = ? AND {_ACTIVE_LINK}", (discord_id,)
+                f"SELECT * FROM users WHERE user_id = ? AND {_ACTIVE_LINK}", (user_id,)
             ).fetchone()
         return self._link(r)
 
@@ -104,8 +102,8 @@ class Users(Database):
     def _link(r: sqlite3.Row | None) -> LinkedUser | None:
         if r is None:
             return None
-        name = r["plex_username"] or r["plex_email"] or r["discord_id"]
-        return LinkedUser(r["discord_id"], r["seerr_user_id"], r["tautulli_user_id"], name)
+        name = r["plex_username"] or r["plex_email"] or r["user_id"]
+        return LinkedUser(r["user_id"], r["seerr_user_id"], r["tautulli_user_id"], name)
 
     def active_users(self) -> list[UserRow]:
         """Every Discord account with an active link."""
@@ -127,7 +125,7 @@ class Users(Database):
         if r is None:
             return None
         return UserRow(
-            discord_id=r["discord_id"],
+            user_id=r["user_id"],
             plex_email=r["plex_email"],
             plex_username=r["plex_username"],
             seerr_user_id=r["seerr_user_id"],

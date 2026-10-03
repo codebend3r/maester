@@ -10,16 +10,16 @@ from luwin.store.base import Database, now, stamp
 
 
 class Conversations(Database):
-    def append_message(self, discord_id: str, role: str, content: Any, tokens: int = 0) -> int:
+    def append_message(self, user_id: str, role: str, content: Any, tokens: int = 0) -> int:
         with self.transaction() as conn:
             cur = conn.execute(
-                "INSERT INTO conversations (discord_id, role, content, tokens, created_at) VALUES (?, ?, ?, ?, ?)",
-                (discord_id, role, json.dumps(content, default=str), tokens, now()),
+                "INSERT INTO conversations (user_id, role, content, tokens, created_at) VALUES (?, ?, ?, ?, ?)",
+                (user_id, role, json.dumps(content, default=str), tokens, now()),
             )
             return int(cur.lastrowid)
 
     def recent_messages(
-        self, discord_id: str, *, max_tokens: int, since: datetime | None = None
+        self, user_id: str, *, max_tokens: int, since: datetime | None = None
     ) -> list[dict[str, Any]]:
         """The newest messages whose token sum fits the budget, oldest first.
 
@@ -28,8 +28,8 @@ class Conversations(Database):
         plain user message: a `tool_result` without the `tool_use` it answers
         is rejected by the API, so a cut inside a tool exchange is never sent.
         """
-        sql = "SELECT role, content, tokens FROM conversations WHERE discord_id = ?"
-        params: tuple[Any, ...] = (discord_id,)
+        sql = "SELECT role, content, tokens FROM conversations WHERE user_id = ?"
+        params: tuple[Any, ...] = (user_id,)
         if since is not None:
             sql += " AND created_at >= ?"
             params += (stamp(since),)
@@ -47,8 +47,6 @@ class Conversations(Database):
             kept.pop(0)
         return kept
 
-    def clear_messages(self, discord_id: str) -> int:
+    def clear_messages(self, user_id: str) -> int:
         with self.transaction() as conn:
-            return conn.execute(
-                "DELETE FROM conversations WHERE discord_id = ?", (discord_id,)
-            ).rowcount
+            return conn.execute("DELETE FROM conversations WHERE user_id = ?", (user_id,)).rowcount

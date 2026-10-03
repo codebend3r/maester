@@ -2,7 +2,8 @@
 
 Access is synchronous sqlite3 behind a lock. Every call is a handful of
 rows, so it stays off the event loop for microseconds, and the lock keeps
-the Discord and web sides from interleaving statements on one connection.
+the web app and the scheduled jobs from interleaving statements on one
+connection.
 """
 
 from __future__ import annotations
@@ -16,13 +17,13 @@ from pathlib import Path
 
 MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 
-# The database's name before the assistant became luwin.
-LEGACY_NAME = "maester.db"
-# SQLite keeps recent writes in `-wal` until they are copied into the database,
-# and an index of them in `-shm`, both named after the database, so they move
-# with it. The database itself moves last: a move cut short leaves it under its
-# old name, and the next open finishes the job.
-_MOVE_ORDER = ("-wal", "-shm", "")
+# Set by the initial migration ('luwn'). A database with migrations recorded
+# but not this id was made before luwin's fresh start.
+APPLICATION_ID = 0x6C75776E
+
+
+class OldDatabase(RuntimeError):
+    """A database from before luwin's fresh start, whose tables this code can't read."""
 
 
 def stamp(when: datetime) -> str:
@@ -34,23 +35,6 @@ def now() -> str:
     return stamp(datetime.now(UTC))
 
 
-def adopt_legacy(path: str | Path) -> None:
-    """Rename a `maester.db` beside `path` to `path`, once, so its rows carry over.
-
-    Nothing happens when `path` already holds a database or there is no old file
-    beside it. A zero-byte `path` holds none yet (SQLite writes its header on
-    first use; a stray `sqlite3.connect` leaves exactly that), so it is replaced.
-    """
-    new = Path(path)
-    old = new.with_name(LEGACY_NAME)
-    if (new.exists() and new.stat().st_size > 0) or not old.exists():
-        return
-    for suffix in _MOVE_ORDER:
-        source = old.with_name(old.name + suffix)
-        if source.exists():
-            source.rename(new.with_name(new.name + suffix))
-
-
 class Database:
     """One SQLite file, migrated on open; each table's store mixes this in."""
 
@@ -58,14 +42,31 @@ class Database:
         self.path = str(path)
         if self.path != ":memory:":
             Path(self.path).parent.mkdir(parents=True, exist_ok=True)
-            adopt_legacy(self.path)
         self._conn = sqlite3.connect(self.path, check_same_thread=False, isolation_level=None)
         self._conn.row_factory = sqlite3.Row
-        self._conn.execute("PRAGMA journal_mode=WAL")
-        self._conn.execute("PRAGMA foreign_keys=ON")
         self._lock = threading.RLock()
         self._in_tx = False
+        try:
+            self._refuse_old()
+        except OldDatabase:
+            self._conn.close()
+            raise
+        self._conn.execute("PRAGMA journal_mode=WAL")
+        self._conn.execute("PRAGMA foreign_keys=ON")
         self.migrate()
+
+    def _refuse_old(self) -> None:
+        """Refuse a database whose migrations ran before luwin's fresh start."""
+        has_versions = self._conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'schema_version'"
+        ).fetchone()
+        if not has_versions or not self._conn.execute("SELECT 1 FROM schema_version").fetchone():
+            return  # a new file
+        if self._conn.execute("PRAGMA application_id").fetchone()[0] != APPLICATION_ID:
+            raise OldDatabase(
+                f"{self.path} was made before luwin's fresh start, and luwin can't read it. "
+                "Move it aside and luwin creates a new one (apps/luwin/docs/nas-deployment.md)."
+            )
 
     def close(self) -> None:
         self._conn.close()

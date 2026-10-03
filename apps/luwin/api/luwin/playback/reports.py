@@ -109,7 +109,7 @@ class Testimony:
         counts = POLICIES[report.kind].replaceable and report.decision is not Decision.ADVISED
         check = Health.from_dict(report.diagnosis["file_check"]) if report.health else None
         return cls(
-            report.discord_id if counts else None,
+            report.user_id if counts else None,
             check if check and check.verdict.failed else None,
         )
 
@@ -354,15 +354,15 @@ async def file_report(
     host, media_type = located.owner.host, located.copy.media_type
     before = store.reports_for_file(host, media_type, file.id)
     advised = any(
-        r.discord_id == link.discord_id and r.decision is Decision.ADVISED and not r.resolved_at
+        r.user_id == link.user_id and r.decision is Decision.ADVISED and not r.resolved_at
         for r in before
     )
     strategy = policy.after_advice if advised else policy.diagnose
     diagnosis = await strategy(Case(services, link, located, at))
-    said = [*map(Testimony.of, before), Testimony.new(link.discord_id, policy, diagnosis)]
+    said = [*map(Testimony.of, before), Testimony.new(link.user_id, policy, diagnosis)]
     evidence = Evidence.of(said)
     report = store.add_report(
-        discord_id=link.discord_id,
+        user_id=link.user_id,
         kind=kind,
         copy=located.copy,
         title=located.title,

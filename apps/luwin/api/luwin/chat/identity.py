@@ -48,22 +48,22 @@ class IdentityService:
         self.store = store
         self.services = services
 
-    def tier_for(self, discord_id: str) -> Tier:
-        user = self.store.get_user(discord_id)
-        linked = self.store.active_link(discord_id) is not None
+    def tier_for(self, user_id: str) -> Tier:
+        user = self.store.get_user(user_id)
+        linked = self.store.active_link(user_id) is not None
         return resolve_tier(user.tier_override if user else None, linked)
 
-    async def start_link(self, discord_id: str, display_name: str, query: str) -> LinkStart:
+    async def start_link(self, user_id: str, display_name: str, query: str) -> LinkStart:
         """Match `query` (Plex email or username) against Seerr users and queue approval."""
         q = query.strip().lower()
         if not q:
             return LinkStart(False, "Tell me your Plex email or username, e.g. me@example.com.")
-        existing = self.store.get_user(discord_id)
+        existing = self.store.get_user(user_id)
         if existing and existing.status == LinkStatus.ACTIVE:
             return LinkStart(
                 False, f"You're already linked as {existing.plex_email or existing.plex_username}."
             )
-        if self.store.open_pending("approve", action="link_account", requester=discord_id):
+        if self.store.open_pending("approve", action="link_account", requester=user_id):
             return LinkStart(False, "Your link request is already waiting for the admin.")
 
         users = await self.services.seerr.users()
@@ -83,14 +83,14 @@ class IdentityService:
         # only belong to one person. The schema enforces it; this check only
         # answers early and kindly.
         holder = self.store.user_by_seerr_id(seerr_user.id)
-        if holder is not None and holder.discord_id != discord_id:
+        if holder is not None and holder.user_id != user_id:
             return LinkStart(False, ALREADY_LINKED)
         tautulli_id = await self._tautulli_id(
             seerr_user.email, seerr_user.plex_username or seerr_user.username
         )
         try:
             self.store.upsert_user(
-                discord_id,
+                user_id,
                 plex_email=seerr_user.email or None,
                 plex_username=seerr_user.plex_username or seerr_user.username or None,
                 seerr_user_id=seerr_user.id,
@@ -104,8 +104,8 @@ class IdentityService:
         pending = self.store.create_pending(
             kind="approve",
             action="link_account",
-            requester=discord_id,
-            payload={"discord_id": discord_id, "display_name": display_name, "account": account},
+            requester=user_id,
+            payload={"user_id": user_id, "display_name": display_name, "account": account},
             summary=f"Link {display_name} to Plex account {account}",
             ttl=LINK_TTL,
         )
@@ -127,14 +127,14 @@ class IdentityService:
                 continue
         return None
 
-    def set_tier_override(self, discord_id: str, tier: str | None) -> str:
+    def set_tier_override(self, user_id: str, tier: str | None) -> str:
         normalized = Tier.parse(tier).name.lower() if tier else None
-        self.store.upsert_user(discord_id, tier_override=normalized)
-        return f"Tier for {discord_id} is now {normalized or 'the default'}."
+        self.store.upsert_user(user_id, tier_override=normalized)
+        return f"Tier for {user_id} is now {normalized or 'the default'}."
 
-    def whoami(self, discord_id: str) -> str:
-        user = self.store.get_user(discord_id)
-        tier = self.tier_for(discord_id)
+    def whoami(self, user_id: str) -> str:
+        user = self.store.get_user(user_id)
+        tier = self.tier_for(user_id)
         if not user or user.status == LinkStatus.REVOKED:
             return (
                 f"You're not linked yet (tier: {tier.name.lower()}). Link the email or "

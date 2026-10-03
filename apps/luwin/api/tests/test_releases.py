@@ -32,7 +32,7 @@ def test_the_arrs_word_for_a_group_wins_over_the_file_name():
 
 def filed(store, file_id, group, *, who="d1", decision=Decision.RECORDED, host="vermithor"):
     return store.add_report(
-        discord_id=who, kind=ReportKind.WONT_PLAY, copy=Copy("movie", file_id, True),
+        user_id=who, kind=ReportKind.WONT_PLAY, copy=Copy("movie", file_id, True),
         title=f"Movie {file_id} (2021)", rating_key=None, host=host, file_id=file_id,
         file_path=f"/m/{file_id}.mkv", release_group=group, health="corrupt", diagnosis={},
         description="", decision=decision,

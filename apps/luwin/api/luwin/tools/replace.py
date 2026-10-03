@@ -165,7 +165,7 @@ REPLACE_SCHEMA: dict[str, Any] = {
 )
 async def replace_media(ctx: ToolContext, report_id: int, host: str) -> Result:
     report = ctx.store.get_report(report_id)
-    if report is None or (report.discord_id != ctx.user_id and ctx.tier < Tier.ADMIN):
+    if report is None or (report.user_id != ctx.user_id and ctx.tier < Tier.ADMIN):
         return Result.refusal(f"There's no report {report_id} of yours to act on.")
     if report.status is ReportStatus.ESCALATED and not waiting_on_admin(ctx, report):
         report = move(ctx.store, report, REOPEN) or report  # its approval lapsed: open again

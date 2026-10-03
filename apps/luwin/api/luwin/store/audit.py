@@ -17,7 +17,7 @@ RESULT_MAX_CHARS = 4000
 class AuditRow:
     id: int
     ts: str
-    discord_id: str | None
+    user_id: str | None
     tool: str
     args: dict[str, Any]
     result: Any
@@ -32,7 +32,7 @@ class AuditLog(Database):
     def audit(
         self,
         *,
-        discord_id: str | None,
+        user_id: str | None,
         tool: str,
         args: dict[str, Any],
         result: Any,
@@ -54,11 +54,11 @@ class AuditLog(Database):
             result_json = json.dumps({"truncated": True, "preview": result_json[:RESULT_MAX_CHARS]})
         with self.transaction() as conn:
             cur = conn.execute(
-                "INSERT INTO audit_log (ts, discord_id, tool, args, result, ok, host,"
+                "INSERT INTO audit_log (ts, user_id, tool, args, result, ok, host,"
                 " duration_ms, pending_id, held_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     now(),
-                    discord_id,
+                    user_id,
                     tool,
                     json.dumps(args, default=str),
                     result_json,
@@ -87,7 +87,7 @@ class AuditLog(Database):
         return AuditRow(
             id=r["id"],
             ts=r["ts"],
-            discord_id=r["discord_id"],
+            user_id=r["user_id"],
             tool=r["tool"],
             args=json.loads(r["args"]),
             result=json.loads(r["result"]) if r["result"] else None,

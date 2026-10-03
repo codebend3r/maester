@@ -187,7 +187,7 @@ class ToolRunner:
         self, ctx: ToolContext, spec: ToolSpec, args: dict[str, Any], window: Flag
     ) -> ToolOutcome:
         held = ctx.store.hold_call(
-            discord_id=ctx.user_id,
+            user_id=ctx.user_id,
             tool=spec.name,
             args=args,
             summary=self.summarize(spec, args),
@@ -204,7 +204,7 @@ class ToolRunner:
         )
         host = args.get(spec.host_param) if spec.host_param else None
         ctx.store.audit(
-            discord_id=ctx.user_id,
+            user_id=ctx.user_id,
             tool=spec.name,
             args=args,
             result=outcome.content,
@@ -341,7 +341,7 @@ class ToolRunner:
         ms: int,
     ) -> None:
         ctx.store.audit(
-            discord_id=ctx.user_id,
+            user_id=ctx.user_id,
             tool=name,
             args=args,
             result=outcome.content,

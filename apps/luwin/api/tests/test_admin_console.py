@@ -60,7 +60,7 @@ def test_every_command_is_the_admins_alone_and_a_refusal_is_audited(console, sto
     assert console.audit(FRIEND).text == "Only the admin can use /audit."
     assert not console.kill_switch.enabled
     rows = store.audit_recent(2)
-    assert [(r.tool, r.ok, r.discord_id) for r in rows] == [
+    assert [(r.tool, r.ok, r.user_id) for r in rows] == [
         ("/audit", False, FRIEND.id),
         ("/kill", False, FRIEND.id),
     ]
@@ -95,9 +95,9 @@ def test_admin_sets_and_clears_a_tier_override(console, store):
 
 def test_audit_lists_the_latest_rows_newest_first_named_as_the_admin_knows_them(console, store):
     store.audit(
-        discord_id=FRIEND.id, tool="request_media", args={"tmdb_id": 438631}, result={}, ok=True
+        user_id=FRIEND.id, tool="request_media", args={"tmdb_id": 438631}, result={}, ok=True
     )
-    store.audit(discord_id=None, tool="sweep_stalled", args={}, result="", ok=False, host="meleys")
+    store.audit(user_id=None, tool="sweep_stalled", args={}, result="", ok=False, host="meleys")
     reply = console.audit(ADMIN, 2)
     first, second = reply.text.splitlines()
     assert "luwin: `sweep_stalled` on meleys, refused or failed" in first
@@ -177,7 +177,7 @@ async def test_maintenance_holds_a_request_and_runs_it_when_it_ends(services, st
     assert asked.text == "The server's down for maintenance; I've saved it."
     assert services.seerr.requests == []  # held, not sent
     (held,) = store.held_calls()
-    assert (held.discord_id, held.tool) == (FRIEND.id, "request_media")
+    assert (held.user_id, held.tool) == (FRIEND.id, "request_media")
     audited = store.audit_recent(tool="request_media")[0]
     assert audited.held_id == held.id and audited.ok
     assert f"held for maintenance (#{held.id})" in console.audit(ADMIN, 5).text

@@ -85,7 +85,7 @@ class AdminConsole:
         return self.identity.tier_for(user.id) == Tier.ADMIN
 
     def _audit(self, user: ChatUser, command: str, args: dict[str, Any], reply: str, ok: bool):
-        self.store.audit(discord_id=user.id, tool=f"/{command}", args=args, result=reply, ok=ok)
+        self.store.audit(user_id=user.id, tool=f"/{command}", args=args, result=reply, ok=ok)
 
     def _refused(self, user: ChatUser, command: str, args: dict[str, Any]) -> AdminReply | None:
         """The refusal a non-admin gets, audited; None for the admin."""
@@ -95,11 +95,11 @@ class AdminConsole:
         self._audit(user, command, args, text, ok=False)
         return AdminReply(text)
 
-    def _name(self, discord_id: str | None) -> str:
-        if discord_id is None:
+    def _name(self, user_id: str | None) -> str:
+        if user_id is None:
             return "luwin"
-        link = self.store.active_link(discord_id)
-        return link.name if link else discord_id
+        link = self.store.active_link(user_id)
+        return link.name if link else user_id
 
     # -- /kill --------------------------------------------------------------
 
@@ -157,9 +157,7 @@ class AdminConsole:
         host = f" on {row.host}" if row.host else ""
         args = json.dumps(row.args, default=str)
         args = args if len(args) <= 120 else args[:117] + "..."
-        return (
-            f"`#{row.id}` {when} {self._name(row.discord_id)}: `{row.tool}`{host}, {verdict} {args}"
-        )
+        return f"`#{row.id}` {when} {self._name(row.user_id)}: `{row.tool}`{host}, {verdict} {args}"
 
     # -- /pending -----------------------------------------------------------
 
@@ -269,10 +267,8 @@ class AdminConsole:
         for call in waiting:
             if not self.store.start_held(call.id):  # another end is running it
                 continue
-            user = callers.get(call.discord_id) or ChatUser(
-                call.discord_id, self._name(call.discord_id)
-            )
-            callers[call.discord_id] = user
+            user = callers.get(call.user_id) or ChatUser(call.user_id, self._name(call.user_id))
+            callers[call.user_id] = user
             outcome = await self.chat.agent.run_held(call, self.chat.tier_for(user))
             if outcome.is_error and outcome.retryable:
                 self.store.keep_held(call.id)
@@ -280,7 +276,7 @@ class AdminConsole:
             else:
                 ran.append((call, outcome))
         dms = []
-        for user_id in dict.fromkeys(call.discord_id for call, _ in ran):
+        for user_id in dict.fromkeys(call.user_id for call, _ in ran):
             if self.chat.tier_for(callers[user_id]) != Tier.UNLINKED:  # they've left meanwhile
                 dms.append((user_id, await self.chat.handle_message(callers[user_id], HELD_RAN)))
         text = "Maintenance off." if was_on else "Running what's still held."
@@ -301,7 +297,7 @@ class AdminConsole:
         return AdminReply(text, notices=notices, dms=tuple(dms))
 
     def _held_line(self, call: HeldCall, outcome: ToolOutcome) -> str:
-        return f"- {self._name(call.discord_id)}: {call.summary}: {self._how(outcome)}"
+        return f"- {self._name(call.user_id)}: {call.summary}: {self._how(outcome)}"
 
     @staticmethod
     def _how(outcome: ToolOutcome) -> str:

@@ -64,7 +64,7 @@ def world(services, store):
         calls.append(("replace", file_id))
         if file_id == 99:  # over the day's cap: the admin decides
             approval = Approval("Trusty wants 99 gone", "replace 99", "link_account", {
-                "discord_id": "t1", "display_name": "Trusty", "account": "t@example.com"})  # fmt: skip
+                "user_id": "t1", "display_name": "Trusty", "account": "t@example.com"})  # fmt: skip
             return Result("over the cap", approval=approval)
         return f"replaced file {file_id}"
 

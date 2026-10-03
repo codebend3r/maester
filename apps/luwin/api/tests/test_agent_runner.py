@@ -136,7 +136,7 @@ async def test_runs_and_audits_a_plain_tool(setup):
     out = await runner.run(as_user("u1"), "echo", {"x": "hi"})
     assert out.content == {"echoed": "hi"} and not out.is_error
     row = store.audit_recent(1)[0]
-    assert row.tool == "echo" and row.ok and row.args == {"x": "hi"} and row.discord_id == "u1"
+    assert row.tool == "echo" and row.ok and row.args == {"x": "hi"} and row.user_id == "u1"
     assert out.as_result_block("t1") == {
         "type": "tool_result",
         "tool_use_id": "t1",
@@ -229,7 +229,7 @@ async def test_an_admin_press_runs_the_decide_tool_as_the_admin(setup):
     assert out.content == "decided True" and out.notices == (DirectMessage("u1", "told you"),)
     assert calls == [("decide_n", "boss", 3, True)]
     row = store.audit_recent(1)[0]
-    assert (row.tool, row.discord_id, row.args) == ("decide_n", "boss", {"n": 3, "approved": True})
+    assert (row.tool, row.user_id, row.args) == ("decide_n", "boss", {"n": 3, "approved": True})
 
     denied = await decided(store, runner, as_user, verdict="denied")
     await runner.run_decision(as_user("boss", Tier.ADMIN), denied, False)

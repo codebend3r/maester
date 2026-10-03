@@ -26,7 +26,7 @@ class ReportRow:
 
     id: int
     ts: str
-    discord_id: str
+    user_id: str
     kind: ReportKind
     copy: Copy
     title: str  # "Dune (2021)", "The Bear (2022) S02E07"
@@ -47,7 +47,7 @@ class Reports(Database):
     def add_report(
         self,
         *,
-        discord_id: str,
+        user_id: str,
         kind: ReportKind,
         copy: Copy,
         title: str,
@@ -63,13 +63,13 @@ class Reports(Database):
     ) -> ReportRow:
         with self.transaction() as conn:
             cur = conn.execute(
-                "INSERT INTO reports (ts, discord_id, kind, title, media_type, tmdb_id, is_4k,"
+                "INSERT INTO reports (ts, user_id, kind, title, media_type, tmdb_id, is_4k,"
                 " season, episode, rating_key, host, file_id, file_path, release_group,"
                 " health, diagnosis, description, decision)"
                 " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     now(),
-                    discord_id,
+                    user_id,
                     kind,
                     title,
                     copy.media_type,
@@ -150,7 +150,7 @@ class Reports(Database):
         return ReportRow(
             id=r["id"],
             ts=r["ts"],
-            discord_id=r["discord_id"],
+            user_id=r["user_id"],
             kind=ReportKind(r["kind"]),
             copy=Copy(r["media_type"], r["tmdb_id"], bool(r["is_4k"]), r["season"], r["episode"]),
             title=r["title"],

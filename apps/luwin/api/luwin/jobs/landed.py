@@ -44,7 +44,7 @@ async def tell_landed(services: Services, store: Store) -> list[Notice]:
         if located.file.id == report.file_id:
             continue
         reporters = {
-            r.discord_id
+            r.user_id
             for r in store.reports_for_file(report.host, report.copy.media_type, report.file_id)
         }
         for who in sorted(reporters):
