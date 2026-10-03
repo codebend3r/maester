@@ -17,9 +17,10 @@ serves the house.
 | luwin   | The AI assistant: a standalone chat app and a helper window in raven and rookery | maester's agent, `apps/maester`  |
 | rookery | Sign-in and account management                                                   | Not built yet                    |
 
-Success: every project builds, tests and deploys under its new name, the
-deployed assistant keeps its database across the move, and nothing about
-either app's behaviour changes except the names it uses.
+Success: every project builds, tests and deploys under its new name. raven
+keeps its database across the move; luwin starts fresh, without its first
+chat surface, ready to become its own app. Nothing else about either app's
+behaviour changes except the names it uses.
 
 ## Decisions made
 
