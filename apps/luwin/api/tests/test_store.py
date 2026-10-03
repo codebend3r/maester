@@ -362,3 +362,12 @@ def test_a_move_cut_short_finishes_on_the_next_open(tmp_path):
 def test_nothing_to_adopt_leaves_the_folder_empty(tmp_path):
     adopt_legacy(tmp_path / "luwin.db")
     assert _files(tmp_path) == []
+
+
+def test_an_empty_luwin_file_from_a_stray_connect_is_replaced(tmp_path):
+    # `sqlite3.connect` creates a zero-byte file, which holds no database yet.
+    sqlite3.connect(tmp_path / "luwin.db").close()
+    (tmp_path / "maester.db").write_text("old")
+    adopt_legacy(tmp_path / "luwin.db")
+    assert _files(tmp_path) == ["luwin.db"]
+    assert (tmp_path / "luwin.db").read_text() == "old"

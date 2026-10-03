@@ -23,25 +23,31 @@ luwin runs as one container on **Meleys** (`192.168.50.2`). The whole repo is co
 
 ## Moving to luwin (once)
 
-Until the rename, the assistant ran as `maester` from `apps/maester/`, with its state in `apps/maester/.env` and `apps/maester/maester-data/maester.db`. luwin reads `.env` and `luwin-data/` beside `apps/luwin/docker-compose.yml`, its model and database variables are `LUWIN_*`, and an old `MAESTER_*` name stops it on boot. On first open it renames `maester.db`, with its `-wal` and `-shm` files, to `luwin.db`. Move the rest once, with the old container down so the SQLite file is quiet:
+Until the rename, the assistant ran as `maester` from `apps/maester/`, with its state in `apps/maester/.env` and `apps/maester/maester-data/maester.db`. luwin reads `.env` and `luwin-data/` beside `apps/luwin/docker-compose.yml`, its model and database variables are `LUWIN_*`, and an old `MAESTER_*` name stops it on boot. On first open it renames `maester.db`, with its `-wal` and `-shm` files, to `luwin.db`. Move the rest once, with the old container down so the SQLite file is quiet. The chained move stops at the first step that fails, before anything starts; fix what it printed and run its remaining steps by hand:
 
 ```bash
 scripts/deploy-nas.sh
 ssh crivas@192.168.50.2
 cd /volume1/docker/maester/apps
-sudo -n /usr/local/bin/docker exec maester python -c "import sqlite3; print(sqlite3.connect('/data/maester.db').execute('select count(*) from users').fetchone()[0])"
-(cd maester && sudo -n /usr/local/bin/docker compose down)
-mkdir -p ~/maester-backup && cp -p maester/maester-data/maester.db* ~/maester-backup/
-mv maester/.env luwin/.env
-mv maester/maester-data luwin/luwin-data
-sed -i -e 's/^MAESTER_/LUWIN_/' -e 's#^LUWIN_DB_PATH=/data/maester.db$#LUWIN_DB_PATH=/data/luwin.db#' luwin/.env
-grep -n 'LUWIN_' luwin/.env
-cd luwin && sudo -n /usr/local/bin/docker compose up -d --build
-curl -fsS http://127.0.0.1:8020/health
-sudo -n /usr/local/bin/docker exec luwin python -c "import sqlite3; print(sqlite3.connect('/data/luwin.db').execute('select count(*) from users').fetchone()[0])"
+sudo -n /usr/local/bin/docker exec maester python -c "import sqlite3; print(sqlite3.connect('file:/data/maester.db?mode=ro', uri=True).execute('select count(*) from users').fetchone()[0])"
+(cd maester && sudo -n /usr/local/bin/docker compose down) \
+  && mkdir -p ~/maester-backup && cp -p maester/maester-data/maester.db* ~/maester-backup/ \
+  && mv maester/.env luwin/.env \
+  && mv maester/maester-data luwin/luwin-data \
+  && sed -i -e 's/^MAESTER_/LUWIN_/' -e 's#^LUWIN_DB_PATH=/data/maester.db$#LUWIN_DB_PATH=/data/luwin.db#' luwin/.env \
+  && test -f luwin/luwin-data/maester.db \
+  && grep -n 'LUWIN_' luwin/.env
 ```
 
-The two counts match. If `.env` set `MAESTER_DB_PATH` to anything other than `/data/maester.db`, fix `LUWIN_DB_PATH` by hand before `compose up`.
+Check the `LUWIN_` lines it printed. If `.env` set `MAESTER_DB_PATH` to anything other than `/data/maester.db`, fix `LUWIN_DB_PATH` by hand now. Then start luwin and compare the counts:
+
+```bash
+cd /volume1/docker/maester/apps/luwin && sudo -n /usr/local/bin/docker compose up -d --build
+for i in $(seq 1 30); do curl -fs http://127.0.0.1:8020/health && echo && break; sleep 2; done
+sudo -n /usr/local/bin/docker exec luwin python -c "import sqlite3; print(sqlite3.connect('file:/data/luwin.db?mode=ro', uri=True).execute('select count(*) from users').fetchone()[0])"
+```
+
+The loop prints the health line once luwin answers; if it prints nothing within a minute, luwin did not come up. The two counts match. Both queries open the database read-only, so a wrong path fails instead of leaving an empty file behind.
 
 If luwin will not come up healthy, put maester back; its old files and image are still on the NAS:
 

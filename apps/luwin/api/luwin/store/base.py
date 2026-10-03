@@ -37,11 +37,13 @@ def now() -> str:
 def adopt_legacy(path: str | Path) -> None:
     """Rename a `maester.db` beside `path` to `path`, once, so its rows carry over.
 
-    Nothing happens when `path` already exists or there is no old file beside it.
+    Nothing happens when `path` already holds a database or there is no old file
+    beside it. A zero-byte `path` holds none yet (SQLite writes its header on
+    first use; a stray `sqlite3.connect` leaves exactly that), so it is replaced.
     """
     new = Path(path)
     old = new.with_name(LEGACY_NAME)
-    if new.exists() or not old.exists():
+    if (new.exists() and new.stat().st_size > 0) or not old.exists():
         return
     for suffix in _MOVE_ORDER:
         source = old.with_name(old.name + suffix)
