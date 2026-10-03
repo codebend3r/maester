@@ -18,24 +18,21 @@ from luwin.store.base import Database, now
 class HeldCall:
     id: int
     ts: str
-    discord_id: str
+    user_id: str
     tool: str
     args: dict[str, Any]
     summary: str
 
 
 class HeldCalls(Database):
-    def hold_call(
-        self, *, discord_id: str, tool: str, args: dict[str, Any], summary: str
-    ) -> HeldCall:
+    def hold_call(self, *, user_id: str, tool: str, args: dict[str, Any], summary: str) -> HeldCall:
         ts = now()
         with self.transaction() as conn:
             cur = conn.execute(
-                "INSERT INTO held_calls (ts, discord_id, tool, args, summary)"
-                " VALUES (?, ?, ?, ?, ?)",
-                (ts, discord_id, tool, json.dumps(args, default=str), summary),
+                "INSERT INTO held_calls (ts, user_id, tool, args, summary) VALUES (?, ?, ?, ?, ?)",
+                (ts, user_id, tool, json.dumps(args, default=str), summary),
             )
-            return HeldCall(int(cur.lastrowid), ts, discord_id, tool, args, summary)
+            return HeldCall(int(cur.lastrowid), ts, user_id, tool, args, summary)
 
     def held_calls(self) -> list[HeldCall]:
         """Every call still waiting for maintenance to end, oldest first."""
@@ -47,7 +44,7 @@ class HeldCalls(Database):
             HeldCall(
                 r["id"],
                 r["ts"],
-                r["discord_id"],
+                r["user_id"],
                 r["tool"],
                 json.loads(r["args"]),
                 r["summary"],

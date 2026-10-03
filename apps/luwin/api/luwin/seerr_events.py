@@ -158,9 +158,7 @@ async def issue_status(
     if not resolved:
         return []
     return [
-        DirectMessage(
-            r.discord_id, f"Your report about {r.title} in {r.copy.version} was resolved."
-        )
+        DirectMessage(r.user_id, f"Your report about {r.title} in {r.copy.version} was resolved.")
         for r in changed
     ]
 
@@ -188,7 +186,7 @@ async def ready_to_watch(
     where = f"\nOpen it in Plex: {link}" if link else " Look for it in Plex."
     text = f"{_what(notification, request)} is ready to watch in {version}.{where}"
     about = Titled(Copy(request.media_type, request.tmdb_id, request.is_4k), notification.subject)
-    return [DirectMessage(user.discord_id, text, about)]
+    return [DirectMessage(user.user_id, text, about)]
 
 
 async def _plex_link(services: Services, request: MediaRequest) -> str | None:

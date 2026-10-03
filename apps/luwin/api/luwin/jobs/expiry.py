@@ -92,7 +92,7 @@ async def remind_expiring(
         if not due:
             continue
         nearest = min(due)
-        key = f"{link.discord_id}:{end.isoformat()}:{nearest}"
+        key = f"{link.user_id}:{end.isoformat()}:{nearest}"
         if store.claim(SOURCE, key, window=REMEMBERED):
-            notices.append(DirectMessage(link.discord_id, reminder(settings, days, local)))
+            notices.append(DirectMessage(link.user_id, reminder(settings, days, local)))
     return notices

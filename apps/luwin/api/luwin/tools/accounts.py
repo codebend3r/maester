@@ -20,25 +20,25 @@ from luwin.store import LinkStatus
     {
         "type": "object",
         "properties": {
-            "discord_id": {"type": "string"},
+            "user_id": {"type": "string"},
             "display_name": {"type": "string"},
             "account": {"type": "string", "description": "The Plex email or username."},
             "approved": {"type": "boolean"},
         },
-        "required": ["discord_id", "display_name", "account", "approved"],
+        "required": ["user_id", "display_name", "account", "approved"],
         "additionalProperties": False,
     },
     tier=Tier.ADMIN,
     button_only=True,
 )
 async def link_account(
-    ctx: ToolContext, discord_id: str, display_name: str, account: str, approved: bool
+    ctx: ToolContext, user_id: str, display_name: str, account: str, approved: bool
 ) -> Result:
     if approved:
         linked_at = datetime.now(UTC).isoformat()
-        ctx.store.upsert_user(discord_id, status=LinkStatus.ACTIVE, linked_at=linked_at)
+        ctx.store.upsert_user(user_id, status=LinkStatus.ACTIVE, linked_at=linked_at)
         dm = "You're linked! Ask me for movies and shows any time."
-        return Result(f"Linked {display_name} to {account}.", (DirectMessage(discord_id, dm),))
-    ctx.store.upsert_user(discord_id, status=LinkStatus.REVOKED)
+        return Result(f"Linked {display_name} to {account}.", (DirectMessage(user_id, dm),))
+    ctx.store.upsert_user(user_id, status=LinkStatus.REVOKED)
     dm = "The admin didn't approve that link. Ask them if you think it's a mistake."
-    return Result(f"Denied linking {display_name} to {account}.", (DirectMessage(discord_id, dm),))
+    return Result(f"Denied linking {display_name} to {account}.", (DirectMessage(user_id, dm),))

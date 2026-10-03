@@ -225,7 +225,7 @@ class Sweeper:
             action=action,
         )
         self.store.audit(
-            discord_id=None,
+            user_id=None,
             tool=TOOL,
             args={"title": download.title, "download_id": download.download_id, "action": action},
             result=text,

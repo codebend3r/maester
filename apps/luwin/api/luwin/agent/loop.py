@@ -146,9 +146,9 @@ class Agent:
         by a plain message saying what it was; history read back starts at one,
         and the call stays in view for the turn that tells them how it went.
         """
-        outcome = await self.runner.run_held(self._context(held.discord_id, tier), held)
+        outcome = await self.runner.run_held(self._context(held.user_id, tier), held)
         self._remember(
-            held.discord_id,
+            held.user_id,
             f"toolu_held_{held.id}",
             held.tool,
             held.args,

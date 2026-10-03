@@ -69,17 +69,17 @@ class ToolContext:
         """
         return self.link_of(self.user_id)
 
-    def link_of(self, discord_id: str) -> LinkedUser:
+    def link_of(self, user_id: str) -> LinkedUser:
         """Someone's active link, for a tool acting on their behalf (an admin's decision)."""
-        link = self.store.active_link(discord_id)
+        link = self.store.active_link(user_id)
         if link is None:
-            raise NotLinked(f"Discord user {discord_id} isn't linked to a Plex account")
+            raise NotLinked(f"Discord user {user_id} isn't linked to a Plex account")
         return link
 
-    def name_of(self, discord_id: str) -> str:
+    def name_of(self, user_id: str) -> str:
         """Someone as the admin knows them: their Plex name, or their Discord id if unlinked."""
-        link = self.store.active_link(discord_id)
-        return link.name if link else discord_id
+        link = self.store.active_link(user_id)
+        return link.name if link else user_id
 
 
 # Discord shows at most ten embeds on one message, one card per option.

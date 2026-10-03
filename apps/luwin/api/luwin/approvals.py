@@ -84,7 +84,7 @@ async def ask_about_request(
         return open_, None
     details = await services.seerr.media_details(request.media_type, request.tmdb_id)
     link = store.active_link_by_seerr_id(request.requested_by_id)
-    requester = link.discord_id if link else ""
+    requester = link.user_id if link else ""
     who = (
         link.name if link else request.requested_by_name or f"Seerr user {request.requested_by_id}"
     )
