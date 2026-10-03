@@ -14,8 +14,6 @@ def test_default_run_fails_fast_naming_missing_config(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)  # away from any developer `.env` the entrypoint would load
     for name in (
         "ANTHROPIC_API_KEY",
-        "DISCORD_BOT_TOKEN",
-        "DISCORD_GUILD_ID",
         "SEERR_URL",
         "SEERR_API_KEY",
         *RENAMED,  # an old name in a developer's env would be refused before these
@@ -23,4 +21,4 @@ def test_default_run_fails_fast_naming_missing_config(monkeypatch, tmp_path):
         monkeypatch.delenv(name, raising=False)
     with pytest.raises(MissingConfig) as exc:
         main([])
-    assert "ANTHROPIC_API_KEY" in exc.value.names and "SEERR_API_KEY" in exc.value.names
+    assert exc.value.names == ["ANTHROPIC_API_KEY", "SEERR_URL", "SEERR_API_KEY"]

@@ -1,7 +1,7 @@
 """The environment luwin runs on, read once and shared.
 
 Every module that needs a URL, a token or a limit imports it from here instead
-of reading os.environ itself, so the Discord client, the web app and the tools
+of reading os.environ itself, so the web app, the scheduled jobs and the tools
 cannot disagree about what the deployment is configured as. Reads are lenient
 (missing values become empty or default) and the entrypoint calls `require()`
 for what it cannot run without, so a misconfigured container dies on boot
@@ -249,13 +249,6 @@ class Settings:
     model: str = "claude-opus-5-5"
     effort: str = "medium"  # low | medium | high | xhigh | max
 
-    discord_bot_token: str = ""
-    discord_guild_id: int = 0
-    discord_requests_channel_id: int = 0
-    discord_admin_channel_id: int = 0
-    discord_role_trusted: int = 0
-    discord_role_admin: int = 0
-
     seerr_url: str = ""
     seerr_api_key: str = ""
     seerr_webhook_secret: str = ""
@@ -288,12 +281,10 @@ class Settings:
     web_port: int = 8020
 
 
-# What the bot cannot start without. Per-host arr instances are discovered by
+# What luwin cannot start without. Per-host arr instances are discovered by
 # the registry and validated there, so they are not listed here.
 REQUIRED = (
     "ANTHROPIC_API_KEY",
-    "DISCORD_BOT_TOKEN",
-    "DISCORD_GUILD_ID",
     "SEERR_URL",
     "SEERR_API_KEY",
 )
@@ -304,12 +295,6 @@ def load_settings(env: Mapping[str, str]) -> Settings:
         anthropic_api_key=env.get("ANTHROPIC_API_KEY", ""),
         model=env.get("LUWIN_MODEL", "").strip() or "claude-opus-5-5",
         effort=env.get("LUWIN_EFFORT", "").strip() or "medium",
-        discord_bot_token=env.get("DISCORD_BOT_TOKEN", ""),
-        discord_guild_id=_int(env, "DISCORD_GUILD_ID", 0),
-        discord_requests_channel_id=_int(env, "DISCORD_REQUESTS_CHANNEL_ID", 0),
-        discord_admin_channel_id=_int(env, "DISCORD_ADMIN_CHANNEL_ID", 0),
-        discord_role_trusted=_int(env, "DISCORD_ROLE_TRUSTED", 0),
-        discord_role_admin=_int(env, "DISCORD_ROLE_ADMIN", 0),
         seerr_url=_url(env, "SEERR_URL"),
         seerr_api_key=env.get("SEERR_API_KEY", ""),
         seerr_webhook_secret=env.get("SEERR_WEBHOOK_SECRET", ""),

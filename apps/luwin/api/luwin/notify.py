@@ -1,23 +1,23 @@
 """Messages luwin sends outside a reply, and the one interface that delivers them.
 
-Tools, button decisions, webhooks and scheduled jobs all produce notices: a
-post in the admin channel, the same with Approve/Deny buttons for one
-pending action, an announcement in the requests channel for every friend,
-a DM to one user, or a Discord role given or taken (an approved change of
-access), which the bot makes and reports to the admin when it can't. Only the chat layer knows how to deliver them;
-everything else hands them to a `Notifier`, which the Discord bot
-implements, so `agent/`, `tools/` and `web/` never import Discord.
+Tools, decisions, webhooks and scheduled jobs all produce notices: a note for
+the admin, the same with Approve/Deny choices for one pending action, an
+announcement every friend sees, or a direct message to one user. Everything
+hands them to a `Notifier`, so `agent/`, `tools/` and `web/` never know how a
+notice reaches anyone. Until luwin's own app delivers them, `LogNotifier`
+writes them to the log.
 
 Delivery is best effort, one notice at a time: `deliver()` never raises,
 and returns the notices it could not send so a caller that must know (the
 webhook, which keeps a claim only for events it fully handled) can act.
 
-A DM about a title carries it as `about`, so a reaction to the message (a
-thumbs-down on "Dune is ready") can be traced back to what it was about.
+A direct message about a title carries it as `about`, so the app can offer a
+way to report a problem with that copy from the message itself.
 """
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Protocol
@@ -32,7 +32,7 @@ class AdminPost:
 
 @dataclass(frozen=True)
 class ApprovalPost:
-    """An admin-channel post whose Approve/Deny buttons settle one pending action."""
+    """A note for the admin whose Approve/Deny choices settle one pending action."""
 
     text: str
     pending_id: int
@@ -40,32 +40,38 @@ class ApprovalPost:
 
 @dataclass(frozen=True)
 class Announcement:
-    """A post in the requests channel, where every friend sees it (a maintenance window)."""
+    """A notice every friend sees (a maintenance window)."""
 
     text: str
 
 
 @dataclass(frozen=True)
 class DirectMessage:
-    to: str  # a Discord user id
+    to: str  # a user id
     text: str
     about: Titled | None = None
 
 
-@dataclass(frozen=True)
-class RoleChange:
-    """A Discord role given to (or taken from) one member, by the bot."""
-
-    to: str  # a Discord user id
-    role_id: int
-    add: bool = True
-    why: str = ""  # for the server's audit log
-
-
-Notice = AdminPost | ApprovalPost | Announcement | DirectMessage | RoleChange
+Notice = AdminPost | ApprovalPost | Announcement | DirectMessage
 
 
 class Notifier(Protocol):
     async def deliver(self, notices: Sequence[Notice]) -> list[Notice]:
         """Send each notice; never raises. Returns the ones that could not be sent."""
         ...
+
+
+log = logging.getLogger("luwin.notify")
+
+
+class LogNotifier:
+    """Writes each notice to the log, until luwin's own app delivers them.
+
+    Every notice counts as delivered, so the webhook settles its claims and
+    nothing is retried for want of a reader.
+    """
+
+    async def deliver(self, notices: Sequence[Notice]) -> list[Notice]:
+        for notice in notices:
+            log.info("notice: %s", notice)
+        return []
