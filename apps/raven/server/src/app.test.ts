@@ -10,7 +10,7 @@ import {
   isLibraryList,
   isMediaItem,
   isMediaList,
-} from '@weirwood/core'
+} from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '@/app.js'
 import { type ServerConfig, readServerConfig } from '@/config.js'
@@ -76,7 +76,7 @@ describe('the media server', () => {
     })
 
   beforeAll(async () => {
-    state.root = await mkdtemp(join(tmpdir(), 'weirwood-app-'))
+    state.root = await mkdtemp(join(tmpdir(), 'raven-app-'))
     state.media = join(state.root, 'media')
     state.data = join(state.root, 'data')
     await encodeClip({ path: join(state.media, 'Movies', 'Big.Buck.Test.2008.mp4') })
@@ -477,10 +477,10 @@ describe('serving the web app', () => {
   const state = { root: '', app: null as NestFastifyApplication | null }
 
   beforeAll(async () => {
-    state.root = await mkdtemp(join(tmpdir(), 'weirwood-web-'))
+    state.root = await mkdtemp(join(tmpdir(), 'raven-web-'))
     const web = join(state.root, 'web')
     await mkdir(join(web, 'assets'), { recursive: true })
-    await writeFile(join(web, 'index.html'), '<!doctype html><title>weirwood</title>')
+    await writeFile(join(web, 'index.html'), '<!doctype html><title>raven</title>')
     await writeFile(join(web, 'assets', 'app-1234.js'), 'console.log(1)')
     state.app = await createApp({
       config: testConfig({ dataDir: join(state.root, 'data'), mediaDir: state.root, webDir: web }),
@@ -498,7 +498,7 @@ describe('serving the web app', () => {
   it('answers client-side routes with index.html', async () => {
     const response = await state.app!.inject({ method: 'GET', url: '/library/3' })
     expect(response.statusCode).toBe(200)
-    expect(response.body).toContain('<title>weirwood</title>')
+    expect(response.body).toContain('<title>raven</title>')
   })
 
   it('caches fingerprinted assets for good', async () => {

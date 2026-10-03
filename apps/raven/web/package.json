@@ -1,5 +1,5 @@
 {
-  "name": "@weirwood/web",
+  "name": "@raven/web",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -20,8 +20,8 @@
   "dependencies": {
     "@fontsource-variable/instrument-sans": "5.3.0",
     "@fontsource/young-serif": "5.3.0",
+    "@raven/core": "workspace:*",
     "@tanstack/react-query": "5.103.1",
-    "@weirwood/core": "workspace:*",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-router-dom": "7.18.4",

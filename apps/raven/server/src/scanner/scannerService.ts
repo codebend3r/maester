@@ -5,7 +5,7 @@ import {
   type OnApplicationBootstrap,
   type OnModuleDestroy,
 } from '@nestjs/common'
-import type { ScanStatus } from '@weirwood/core'
+import type { ScanStatus } from '@raven/core'
 import { SERVER_CONFIG, type ServerConfig } from '@/config.js'
 import { FfmpegService, FfmpegTimeoutError } from '@/ffmpeg/ffmpegService.js'
 import { LibrariesRepository } from '@/libraries/librariesRepository.js'

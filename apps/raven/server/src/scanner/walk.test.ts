@@ -9,7 +9,7 @@ describe('walkVideos', () => {
   const at = (...parts: string[]) => join(state.root, ...parts)
 
   beforeAll(async () => {
-    state.root = await mkdtemp(join(tmpdir(), 'weirwood-walk-'))
+    state.root = await mkdtemp(join(tmpdir(), 'raven-walk-'))
     await mkdir(at('Movies', 'Heat (1995)'), { recursive: true })
     await mkdir(at('Movies', '@eaDir'), { recursive: true })
     await mkdir(at('Movies', '.trash'), { recursive: true })

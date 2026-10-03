@@ -1,5 +1,5 @@
 import { QueryClient } from '@tanstack/react-query'
-import { ApiError } from '@weirwood/core'
+import { ApiError } from '@raven/core'
 
 export const createQueryClient = (): QueryClient =>
   new QueryClient({

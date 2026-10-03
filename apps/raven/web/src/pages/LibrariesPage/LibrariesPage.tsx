@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { Library } from '@weirwood/core'
+import type { Library } from '@raven/core'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/Button/Button'
@@ -71,7 +71,7 @@ export const LibrariesPage = () => {
   if (libraries.data?.length === 0) {
     return (
       <section className={styles.empty}>
-        <h1 className={styles.emptyTitle}>Point weirwood at your videos</h1>
+        <h1 className={styles.emptyTitle}>Point raven at your videos</h1>
         <p>
           A library is a set of folders. Pick the ones that hold your movies or shows, and every
           video inside is indexed, given a thumbnail, and ready to play.

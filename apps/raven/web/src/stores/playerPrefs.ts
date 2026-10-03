@@ -16,7 +16,7 @@ export const usePlayerPrefs = create<PlayerPrefs>()(
       setVolume: ({ volume, muted }) => set({ volume, muted }),
     }),
     {
-      name: 'weirwood-player',
+      name: 'raven-player',
       storage: createJSONStorage(() => window.localStorage),
       partialize: ({ volume, muted }) => ({ volume, muted }),
     },

@@ -10,7 +10,7 @@ export default defineConfig({
     },
   },
   server: {
-    // The server runs on its own port in development (`nx run @weirwood/server:dev`);
+    // The server runs on its own port in development (`nx run @raven/server:dev`);
     // in Docker it serves this app itself and nothing is proxied.
     proxy: {
       '/api': 'http://localhost:8484',

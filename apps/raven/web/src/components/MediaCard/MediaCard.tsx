@@ -1,4 +1,4 @@
-import { type MediaItem, checkDirectPlay, formatRuntime, resolutionLabel } from '@weirwood/core'
+import { type MediaItem, checkDirectPlay, formatRuntime, resolutionLabel } from '@raven/core'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Icon } from '@/components/Icon/Icon'

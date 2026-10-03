@@ -1,4 +1,4 @@
-import type { ScanStatus as Status } from '@weirwood/core'
+import type { ScanStatus as Status } from '@raven/core'
 import styles from './ScanStatus.module.scss'
 
 const count = new Intl.NumberFormat()

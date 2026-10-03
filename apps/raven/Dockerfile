@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # One image: the media server, which also serves the built web app, so there
 # is a single port and no CORS. Built from the repo root because the server
-# and the web app both depend on libs/weirwood/core through the bun workspace.
+# and the web app both depend on libs/raven/core through the bun workspace.
 #
 # Bun installs and builds; Node runs, since that is the runtime NestJS
 # supports. Bun is installed at the version the root package.json pins in
@@ -12,20 +12,20 @@ WORKDIR /repo
 COPY package.json bun.lock ./
 RUN npm install --global "$(node -p "require('./package.json').packageManager")"
 # Every workspace manifest, so the frozen install sees the same workspace the
-# lockfile describes; only weirwood's sources are copied after this.
+# lockfile describes; only raven's sources are copied after this.
 COPY --parents apps/*/*/package.json libs/*/*/package.json scripts/package.json ./
 
 FROM bun AS build
 RUN bun install --frozen-lockfile --ignore-scripts
-COPY libs/weirwood/core/ libs/weirwood/core/
-COPY apps/weirwood/server/ apps/weirwood/server/
-COPY apps/weirwood/web/ apps/weirwood/web/
-RUN cd libs/weirwood/core && bun run build \
- && cd ../../../apps/weirwood/server && bun run build \
+COPY libs/raven/core/ libs/raven/core/
+COPY apps/raven/server/ apps/raven/server/
+COPY apps/raven/web/ apps/raven/web/
+RUN cd libs/raven/core && bun run build \
+ && cd ../../../apps/raven/server && bun run build \
  && cd ../web && bun run build
 
 FROM bun AS deps
-RUN bun install --frozen-lockfile --ignore-scripts --production --filter @weirwood/server
+RUN bun install --frozen-lockfile --ignore-scripts --production --filter @raven/server
 
 FROM node:24-slim
 # Debian's ffmpeg is built with zimg, so HDR thumbnails are tone mapped to
@@ -43,10 +43,10 @@ ENV NODE_ENV=production \
     BROWSE_ROOT=/media
 WORKDIR /repo
 COPY --from=deps /repo ./
-COPY --from=build /repo/libs/weirwood/core/dist libs/weirwood/core/dist
-COPY --from=build /repo/apps/weirwood/server/dist apps/weirwood/server/dist
-COPY --from=build /repo/apps/weirwood/web/dist /app/web
-WORKDIR /repo/apps/weirwood/server
+COPY --from=build /repo/libs/raven/core/dist libs/raven/core/dist
+COPY --from=build /repo/apps/raven/server/dist apps/raven/server/dist
+COPY --from=build /repo/apps/raven/web/dist /app/web
+WORKDIR /repo/apps/raven/server
 USER node
 EXPOSE 8484
 VOLUME /config

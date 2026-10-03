@@ -1,7 +1,7 @@
 import { describe, expect, it, spyOn } from 'bun:test'
 import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { ApiError, type MediaItem } from '@weirwood/core'
+import { ApiError, type MediaItem } from '@raven/core'
 import { useState } from 'react'
 import { MediaMenu } from '@/components/MediaMenu/MediaMenu'
 import { api } from '@/lib/api'

@@ -19,7 +19,7 @@ import {
   type MediaItem,
   type MediaSort,
   validateLibraryInput,
-} from '@weirwood/core'
+} from '@raven/core'
 import { type LibraryRecord, LibrariesRepository } from '@/libraries/librariesRepository.js'
 import { MediaRepository, toMediaItem } from '@/media/mediaRepository.js'
 import { ScannerService } from '@/scanner/scannerService.js'

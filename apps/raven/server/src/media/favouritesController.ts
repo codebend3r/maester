@@ -1,5 +1,5 @@
 import { Controller, Get, Inject } from '@nestjs/common'
-import type { MediaItem } from '@weirwood/core'
+import type { MediaItem } from '@raven/core'
 import { MediaRepository, toMediaItem } from '@/media/mediaRepository.js'
 
 /** Favourites cut across libraries, so they hang off their own root rather than a library's. */

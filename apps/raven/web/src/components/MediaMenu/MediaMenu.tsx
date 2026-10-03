@@ -1,5 +1,5 @@
 import type { UseMutationResult } from '@tanstack/react-query'
-import type { MediaItem } from '@weirwood/core'
+import type { MediaItem } from '@raven/core'
 import { type KeyboardEvent, useEffect, useId, useRef, useState } from 'react'
 import { Button } from '@/components/Button/Button'
 import { Icon } from '@/components/Icon/Icon'

@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common'
-import type { LibraryInput } from '@weirwood/core'
+import type { LibraryInput } from '@raven/core'
 import { DatabaseService } from '@/db/database.js'
 
 /** A library as stored, before the scanner's live status is merged in. */

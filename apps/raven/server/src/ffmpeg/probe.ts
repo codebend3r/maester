@@ -1,4 +1,4 @@
-import { isNumber, isRecord, isString } from '@weirwood/core'
+import { isNumber, isRecord, isString } from '@raven/core'
 
 /** What the index keeps from an ffprobe run: enough to pick a playback mode and label a card. */
 export type ProbeResult = {

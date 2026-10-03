@@ -1,4 +1,4 @@
-import type { MediaItem } from '@weirwood/core'
+import type { MediaItem } from '@raven/core'
 
 export const mediaItem = (overrides: Partial<MediaItem> = {}): MediaItem => ({
   id: 7,

@@ -1,4 +1,4 @@
-import type { CanPlay } from '@weirwood/core'
+import type { CanPlay } from '@raven/core'
 
 const probe = typeof document === 'undefined' ? null : document.createElement('video')
 const answers = new Map<string, boolean>()

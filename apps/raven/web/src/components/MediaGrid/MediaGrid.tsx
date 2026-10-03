@@ -1,4 +1,4 @@
-import type { MediaItem } from '@weirwood/core'
+import type { MediaItem } from '@raven/core'
 import { MediaCard } from '@/components/MediaCard/MediaCard'
 import styles from './MediaGrid.module.scss'
 

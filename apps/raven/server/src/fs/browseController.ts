@@ -9,7 +9,7 @@ import {
   NotFoundException,
   Query,
 } from '@nestjs/common'
-import type { DirectoryEntry, DirectoryListing } from '@weirwood/core'
+import type { DirectoryEntry, DirectoryListing } from '@raven/core'
 import { SERVER_CONFIG, type ServerConfig } from '@/config.js'
 
 const isInside = ({ root, path }: { root: string; path: string }): boolean =>

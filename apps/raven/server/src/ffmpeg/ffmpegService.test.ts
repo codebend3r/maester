@@ -9,7 +9,7 @@ describe('FfmpegService', () => {
   const state = { dir: '' }
 
   beforeAll(async () => {
-    state.dir = await mkdtemp(join(tmpdir(), 'weirwood-ffmpeg-'))
+    state.dir = await mkdtemp(join(tmpdir(), 'raven-ffmpeg-'))
     // Stands in for ffprobe on a share that never answers.
     await writeFile(join(state.dir, 'slow'), '#!/bin/sh\nsleep 5\n')
     await writeFile(

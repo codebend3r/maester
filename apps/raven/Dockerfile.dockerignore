@@ -7,9 +7,9 @@
 !apps/*/*/package.json
 !libs/*/*/package.json
 !scripts/package.json
-!libs/weirwood/core
-!apps/weirwood/server
-!apps/weirwood/web
+!libs/raven/core
+!apps/raven/server
+!apps/raven/web
 **/node_modules
 **/dist
 **/data

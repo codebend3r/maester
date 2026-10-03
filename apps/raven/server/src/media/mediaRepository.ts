@@ -7,7 +7,7 @@ import {
   containerOf,
   isThumbnailState,
   titleFromFileName,
-} from '@weirwood/core'
+} from '@raven/core'
 import { DatabaseService } from '@/db/database.js'
 import type { ProbeResult } from '@/ffmpeg/probe.js'
 

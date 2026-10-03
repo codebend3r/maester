@@ -18,7 +18,7 @@ import {
   Req,
   Res,
 } from '@nestjs/common'
-import { type MediaItem, containerMimeType, isNumber, isRecord, isString } from '@weirwood/core'
+import { type MediaItem, containerMimeType, isNumber, isRecord, isString } from '@raven/core'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { type MediaRecord, MediaRepository, toMediaItem } from '@/media/mediaRepository.js'
 import { parseRange } from '@/media/range.js'

@@ -1,5 +1,5 @@
 import { mock } from 'bun:test'
-import type { CanPlay } from '@weirwood/core'
+import type { CanPlay } from '@raven/core'
 
 const everything: CanPlay = () => true
 const support = { current: everything }

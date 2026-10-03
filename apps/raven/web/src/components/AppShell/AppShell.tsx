@@ -30,7 +30,7 @@ export const AppShell = () => (
   <div className={styles.shell}>
     <header className={styles.header}>
       <Link to="/" className={styles.wordmark}>
-        weirwood
+        raven
       </Link>
     </header>
     <nav className={styles.nav} aria-label="Main">

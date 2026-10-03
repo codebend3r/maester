@@ -1,4 +1,4 @@
-import { createApiClient } from '@weirwood/core'
+import { createApiClient } from '@raven/core'
 
 /**
  * Same origin in every setup: Docker serves this app from the media server,

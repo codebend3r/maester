@@ -1,7 +1,7 @@
 import { describe, expect, it, mock } from 'bun:test'
 import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { createApiClient } from '@weirwood/core'
+import { createApiClient } from '@raven/core'
 import { renderWithProviders } from '@/test/render'
 
 const created: unknown[] = []

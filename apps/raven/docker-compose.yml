@@ -1,12 +1,12 @@
 services:
-  weirwood:
+  raven:
     # Built from the repo root, which holds the workspace's bun.lock; the
     # Dockerfile's own ignore file keeps the context to what it copies.
     build:
       context: ../..
-      dockerfile: apps/weirwood/Dockerfile
-    image: weirwood:latest
-    container_name: weirwood
+      dockerfile: apps/raven/Dockerfile
+    image: raven:latest
+    container_name: raven
     ports:
       - '8484:8484'
     volumes:

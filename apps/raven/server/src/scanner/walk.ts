@@ -1,7 +1,7 @@
 import type { Dirent } from 'node:fs'
 import { readdir, stat } from 'node:fs/promises'
 import { join } from 'node:path'
-import { extensionOf, isVideoFile } from '@weirwood/core'
+import { extensionOf, isVideoFile } from '@raven/core'
 import type { FoundFile } from '@/media/mediaRepository.js'
 import { mapWithConcurrency } from '@/scanner/concurrency.js'
 

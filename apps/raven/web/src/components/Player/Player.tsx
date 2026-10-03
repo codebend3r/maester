@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { type MediaItem, checkDirectPlay, formatDuration } from '@weirwood/core'
+import { type MediaItem, checkDirectPlay, formatDuration } from '@raven/core'
 import { type SyntheticEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, ButtonLink } from '@/components/Button/Button'

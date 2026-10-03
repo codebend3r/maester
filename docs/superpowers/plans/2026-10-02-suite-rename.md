@@ -81,7 +81,7 @@ Expected: `git status --short | grep -v '^R '` prints nothing (every change is a
 
 ```bash
 git ls-files -z -- . ':!docs/superpowers' ':!docs/roadmap.md' ':!docs/issue-map.json' ':!scripts/catalog.py' ':!bun.lock' \
-  | xargs -0 grep -lZ weirwood \
+  | xargs -0 grep -l --null weirwood \
   | xargs -0 perl -pi -e 's{weirwood\.db}{\x00DB\x00}g; s{weirwood itself}{\x00TREE\x00}g; s{weirwood}{raven}g; s{\x00DB\x00}{weirwood.db}g; s{\x00TREE\x00}{weirwood itself}g'
 ```
 
@@ -119,7 +119,7 @@ Expected: every target passes, with the same test counts as Step 2.
 ```bash
 docker build -f apps/raven/Dockerfile -t raven:check .
 docker run -d --name raven-check -p 18484:8484 raven:check
-curl --retry 20 --retry-connrefused --retry-delay 1 -fsS http://127.0.0.1:18484/api/health
+curl --retry 20 --retry-all-errors --retry-delay 1 -fsS http://127.0.0.1:18484/api/health
 curl -fsS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:18484/
 docker rm -f raven-check
 ```
@@ -394,7 +394,7 @@ Lowercase `maester` becomes `luwin` and `Maester` becomes `Luwin` (`MaesterBot` 
 git ls-files -z -- apps/luwin/api apps/luwin/Dockerfile apps/luwin/Dockerfile.dockerignore apps/luwin/docker-compose.yml \
     lefthook.yml scripts/package.json scripts/deploy-nas.sh scripts/bump_version.sh \
     .github/workflows/main-smoke-test.yml .gitignore .claude/skills/version-bump/SKILL.md \
-  | xargs -0 grep -lZ -i maester \
+  | xargs -0 grep -l --null -i maester \
   | xargs -0 perl -pi -e 'next if /X-Plex-/; s{docker/maester}{\x00NAS\x00}g; s{codebend3r/maester}{\x00REPO\x00}g; s{maester roadmap}{\x00BOARD\x00}g; s{maester-v}{\x00TAG\x00}g; s{maester}{luwin}g; s{Maester}{Luwin}g; s{\x00NAS\x00}{docker/maester}g; s{\x00REPO\x00}{codebend3r/maester}g; s{\x00BOARD\x00}{maester roadmap}g; s{\x00TAG\x00}{maester-v}g'
 ```
 
@@ -436,7 +436,7 @@ If `lint:py` reports import order (I001), run `bunx nx run @luwin/api:lint:py:fi
 docker build -f apps/luwin/Dockerfile -t luwin:check .
 docker run --rm luwin:check luwin --version
 docker run -d --name luwin-check -p 18020:8020 luwin:check uvicorn luwin.web:create_app --factory --host 0.0.0.0 --port 8020
-curl --retry 20 --retry-connrefused --retry-delay 1 -fsS http://127.0.0.1:18020/health
+curl --retry 20 --retry-all-errors --retry-delay 1 -fsS http://127.0.0.1:18020/health
 docker rm -f luwin-check
 ```
 

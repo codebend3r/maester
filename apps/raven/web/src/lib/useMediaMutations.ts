@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import type { MediaItem } from '@weirwood/core'
+import type { MediaItem } from '@raven/core'
 import { api } from '@/lib/api'
 import { queryKeys } from '@/lib/queryClient'
 
