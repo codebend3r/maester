@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, renameSync } from 'node:fs'
+import { existsSync, mkdirSync, renameSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { Inject, Injectable, type OnModuleDestroy } from '@nestjs/common'
 import Sqlite from 'better-sqlite3'
@@ -92,13 +92,16 @@ const MOVE_ORDER: readonly string[] = ['-wal', '-shm', '']
 
 /**
  * Renames weirwood's database in `dataDir` to raven's, once, so the index,
- * progress and favourites carry over. Does nothing when raven's file is
- * already there or there is nothing to adopt. Call it before opening.
+ * progress and favourites carry over. Does nothing when raven's file already
+ * holds a database or there is nothing to adopt. A zero-byte file holds none
+ * yet (SQLite writes its header on first use), so it is replaced. Call it
+ * before opening.
  */
 export const adoptLegacyDatabase = ({ dataDir }: { dataDir: string }): void => {
   const target = join(dataDir, DATABASE_FILE)
   const legacy = join(dataDir, LEGACY_FILE)
-  if (existsSync(target) || !existsSync(legacy)) return
+  const holdsDatabase = existsSync(target) && statSync(target).size > 0
+  if (holdsDatabase || !existsSync(legacy)) return
   MOVE_ORDER.filter((suffix) => existsSync(legacy + suffix)).forEach((suffix) =>
     renameSync(legacy + suffix, target + suffix),
   )

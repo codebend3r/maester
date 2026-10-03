@@ -48,6 +48,14 @@ describe('the database file', () => {
     expect(await readFile(at('raven.db'), 'utf8')).toBe('new')
   })
 
+  it('replaces an empty raven.db, which holds no database yet', async () => {
+    await writeFile(at('raven.db'), '')
+    await writeFile(at('weirwood.db'), 'old')
+    adoptLegacyDatabase({ dataDir: state.dir })
+    expect(await files()).toEqual(['raven.db'])
+    expect(await readFile(at('raven.db'), 'utf8')).toBe('old')
+  })
+
   it('finishes a move that stopped before the database itself', async () => {
     await seed({ names: ['raven.db-wal', 'weirwood.db'] })
     adoptLegacyDatabase({ dataDir: state.dir })
