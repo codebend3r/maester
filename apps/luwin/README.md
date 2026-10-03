@@ -122,7 +122,7 @@ Still to come: `api/luwin/guides/` for the device setup guides the model answers
 
 ```bash
 git clone https://github.com/codebend3r/maester.git
-cd luwin
+cd maester
 bun install                                     # Nx, and the git hooks: ruff on staged Python files
 cp apps/luwin/.env.example apps/luwin/.env  # fill in service URLs, API keys, Discord and Anthropic tokens
 bun run dev:luwin                             # starts the Discord bot and the web app on one loop
