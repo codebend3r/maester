@@ -717,7 +717,7 @@ maester is a self-hosted media suite: a library and player, an AI assistant for 
 | App     | What it is                                                                   |
 | ------- | ---------------------------------------------------------------------------- |
 | raven   | A self-hosted media library and direct-play player                           |
-| luwin   | The AI assistant: requests, playback fixes and lag answers for friends on Discord |
+| luwin   | The AI assistant: requests, playback fixes and lag answers for friends |
 | rookery | Sign-in and account management (planned)                                     |
 
 | Project         | Path                | What                                                                   |
@@ -742,7 +742,7 @@ Root `package.json`, set the description:
 `apps/luwin/README.md`: lines 3 and 5 become:
 
 ```markdown
-The AI assistant of the maester suite, a concierge for a private Plex server. Friends talk to it on Discord in plain language; it requests movies and shows, works out why something will not play, explains lag with live server data, and hands the admin an approval queue instead of a group chat thread.
+The AI assistant of the maester suite, a concierge for a private Plex server. Friends talk to it in plain language; it requests movies and shows, works out why something will not play, explains lag with live server data, and hands the admin an approval queue instead of a group chat thread.
 
 luwin is the suite's maester: it serves the house, answers its questions, and sends the ravens.
 ```
