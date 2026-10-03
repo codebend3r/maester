@@ -8,8 +8,10 @@ from luwin.config import (
     FleetMonitorAccess,
     Jobs,
     MissingConfig,
+    RenamedConfig,
     Settings,
     load_settings,
+    refuse_renamed,
     require,
 )
 
@@ -25,7 +27,7 @@ def test_defaults_when_env_is_empty():
 def test_values_are_parsed_and_urls_stripped():
     s = load_settings(
         {
-            "MAESTER_MODEL": "claude-sonnet-5",
+            "LUWIN_MODEL": "claude-sonnet-5",
             "DISCORD_GUILD_ID": "123",
             "SEERR_URL": "http://seerr:5055/ ",
             "REPLACE_DAILY_CAP": "5",
@@ -131,3 +133,21 @@ def test_load_env_file_is_a_no_op_without_a_file(tmp_path, monkeypatch):
 
     monkeypatch.chdir(tmp_path)
     assert load_env_file() is False
+
+
+def test_old_variable_names_are_refused_with_their_new_names():
+    with pytest.raises(RenamedConfig) as exc:
+        refuse_renamed(
+            {"MAESTER_DB_PATH": "", "MAESTER_MODEL": "claude-sonnet-5", "LUWIN_EFFORT": "low"}
+        )
+    assert exc.value.names == ["MAESTER_MODEL", "MAESTER_DB_PATH"]
+    assert "MAESTER_MODEL is now LUWIN_MODEL, MAESTER_DB_PATH is now LUWIN_DB_PATH" in str(
+        exc.value
+    )
+
+
+def test_new_variable_names_pass_and_are_read():
+    env = {"LUWIN_MODEL": "claude-sonnet-5", "LUWIN_EFFORT": "low", "LUWIN_DB_PATH": "/data/x.db"}
+    refuse_renamed(env)
+    s = load_settings(env)
+    assert (s.model, s.effort, s.db_path) == ("claude-sonnet-5", "low", "/data/x.db")

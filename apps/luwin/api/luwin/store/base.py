@@ -16,6 +16,14 @@ from pathlib import Path
 
 MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 
+# The database's name before the assistant became luwin.
+LEGACY_NAME = "maester.db"
+# SQLite keeps recent writes in `-wal` until they are copied into the database,
+# and an index of them in `-shm`, both named after the database, so they move
+# with it. The database itself moves last: a move cut short leaves it under its
+# old name, and the next open finishes the job.
+_MOVE_ORDER = ("-wal", "-shm", "")
+
 
 def stamp(when: datetime) -> str:
     """How times are stored: UTC, milliseconds, a trailing Z, so text order is time order."""
@@ -26,6 +34,21 @@ def now() -> str:
     return stamp(datetime.now(UTC))
 
 
+def adopt_legacy(path: str | Path) -> None:
+    """Rename a `maester.db` beside `path` to `path`, once, so its rows carry over.
+
+    Nothing happens when `path` already exists or there is no old file beside it.
+    """
+    new = Path(path)
+    old = new.with_name(LEGACY_NAME)
+    if new.exists() or not old.exists():
+        return
+    for suffix in _MOVE_ORDER:
+        source = old.with_name(old.name + suffix)
+        if source.exists():
+            source.rename(new.with_name(new.name + suffix))
+
+
 class Database:
     """One SQLite file, migrated on open; each table's store mixes this in."""
 
@@ -33,6 +56,7 @@ class Database:
         self.path = str(path)
         if self.path != ":memory:":
             Path(self.path).parent.mkdir(parents=True, exist_ok=True)
+            adopt_legacy(self.path)
         self._conn = sqlite3.connect(self.path, check_same_thread=False, isolation_level=None)
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA journal_mode=WAL")

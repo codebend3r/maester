@@ -2,7 +2,7 @@ import pytest
 
 from luwin import __version__
 from luwin.__main__ import main
-from luwin.config import MissingConfig
+from luwin.config import RENAMED, MissingConfig
 
 
 def test_version_flag_prints_version(capsys):
@@ -18,6 +18,7 @@ def test_default_run_fails_fast_naming_missing_config(monkeypatch, tmp_path):
         "DISCORD_GUILD_ID",
         "SEERR_URL",
         "SEERR_API_KEY",
+        *RENAMED,  # an old name in a developer's env would be refused before these
     ):
         monkeypatch.delenv(name, raising=False)
     with pytest.raises(MissingConfig) as exc:

@@ -1,10 +1,11 @@
 from types import SimpleNamespace
 
+import pytest
 from fastapi.testclient import TestClient
 
 from luwin.agent.tools import ToolRegistry
-from luwin.app import build, build_services
-from luwin.config import load_settings
+from luwin.app import build, build_services, run
+from luwin.config import RenamedConfig, load_settings
 from luwin.registry import Registry
 from luwin.store import Store
 
@@ -61,3 +62,11 @@ def test_build_services_reads_the_fleet_monitor_when_it_is_set_up():
     fleet = build_services(cfg, Registry()).fleet
     assert fleet.base_url == "http://m:8010"
     assert fleet.client.headers["Authorization"] == "Bearer tok"
+
+
+def test_boot_refuses_an_old_variable_name_before_anything_else(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)  # no `.env` here to read
+    monkeypatch.setenv("MAESTER_DB_PATH", "/data/maester.db")
+    # Required variables are missing too; the rename is reported first.
+    with pytest.raises(RenamedConfig, match="MAESTER_DB_PATH is now LUWIN_DB_PATH"):
+        run()

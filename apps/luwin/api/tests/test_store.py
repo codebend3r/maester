@@ -5,7 +5,7 @@ import pytest
 
 from luwin.media import Copy, Titled
 from luwin.store import MIGRATIONS_DIR, SeerrUserTaken, Store
-from luwin.store.base import stamp
+from luwin.store.base import adopt_legacy, stamp
 
 
 def test_migrations_apply_once(store):
@@ -317,3 +317,48 @@ def test_open_approvals_of_the_renamed_4k_decision_carry_over(tmp_path):
         "request_id": 7, "title": "Dune (2021)", "requester": "d1", "version": "4K"
     }  # fmt: skip
     store.close()
+
+
+def _files(folder):
+    return sorted(p.name for p in folder.iterdir())
+
+
+def test_a_maester_database_opens_under_its_new_name_with_its_rows(tmp_path):
+    conn = sqlite3.connect(tmp_path / "maester.db")
+    conn.execute("CREATE TABLE marker (note TEXT)")
+    conn.execute("INSERT INTO marker VALUES ('kept')")
+    conn.commit()
+    conn.close()
+    Store(tmp_path / "luwin.db").close()
+    assert not (tmp_path / "maester.db").exists()
+    check = sqlite3.connect(tmp_path / "luwin.db")
+    assert check.execute("SELECT note FROM marker").fetchall() == [("kept",)]
+    check.close()
+
+
+def test_the_wal_and_shm_files_move_with_the_database(tmp_path):
+    for name in ("maester.db", "maester.db-wal", "maester.db-shm"):
+        (tmp_path / name).write_text(name)
+    adopt_legacy(tmp_path / "luwin.db")
+    assert _files(tmp_path) == ["luwin.db", "luwin.db-shm", "luwin.db-wal"]
+    assert (tmp_path / "luwin.db-wal").read_text() == "maester.db-wal"
+
+
+def test_an_existing_luwin_database_is_never_replaced(tmp_path):
+    (tmp_path / "luwin.db").write_text("new")
+    (tmp_path / "maester.db").write_text("old")
+    adopt_legacy(tmp_path / "luwin.db")
+    assert _files(tmp_path) == ["luwin.db", "maester.db"]
+    assert (tmp_path / "luwin.db").read_text() == "new"
+
+
+def test_a_move_cut_short_finishes_on_the_next_open(tmp_path):
+    (tmp_path / "luwin.db-wal").write_text("maester.db-wal")
+    (tmp_path / "maester.db").write_text("maester.db")
+    adopt_legacy(tmp_path / "luwin.db")
+    assert _files(tmp_path) == ["luwin.db", "luwin.db-wal"]
+
+
+def test_nothing_to_adopt_leaves_the_folder_empty(tmp_path):
+    adopt_legacy(tmp_path / "luwin.db")
+    assert _files(tmp_path) == []
