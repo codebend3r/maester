@@ -589,3 +589,12 @@ async def test_plex_tv_reads_servers_libraries_and_friends_shares_and_writes_one
         "server_id": "m-1",
         "shared_server": {"library_section_ids": [101, 104]},
     }
+
+
+@respx.mock
+async def test_plex_tv_sees_the_suite_name_in_its_client_headers():
+    # plex.tv tells clients apart by these headers; they carry the suite's name.
+    route = respx.get(f"{PLEX_TV}/api/servers").respond(text="<MediaContainer/>")
+    await PlexTvClient(PLEX_TV, "owner-token").servers()
+    sent = route.calls.last.request.headers
+    assert sent["X-Plex-Product"] == sent["X-Plex-Client-Identifier"] == "maester"
