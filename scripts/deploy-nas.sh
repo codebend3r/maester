@@ -9,7 +9,7 @@
 # root. Deliberately EXCLUDED so live NAS state is never clobbered, at any depth:
 #   .env            each product's own (service URLs as the NAS sees them)
 #   maester-data/   maester's SQLite file
-#   data/           weirwood's index and thumbnail cache
+#   data/           raven's index and thumbnail cache
 #
 # Prereq: mount the share first: Finder > Cmd+K > smb://192.168.50.2 > "docker".
 # Override the destination with:  NAS_MOUNT=/Volumes/docker/maester scripts/deploy-nas.sh

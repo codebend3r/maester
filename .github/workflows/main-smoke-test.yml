@@ -70,12 +70,12 @@ jobs:
         if: always()
         run: docker rm -f maester || true
 
-  weirwood:
-    name: 🩺 weirwood build and health check
+  raven:
+    name: 🩺 raven build and health check
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      IMAGE: weirwood:ci
+      IMAGE: raven:ci
       PORT: 8484
     steps:
       - name: 📥 Checkout
@@ -84,10 +84,10 @@ jobs:
       # Built from the repo root, as compose does; the Dockerfile's own
       # ignore file keeps the context to what it copies.
       - name: 🐳 Build image
-        run: docker build -f apps/weirwood/Dockerfile -t "$IMAGE" .
+        run: docker build -f apps/raven/Dockerfile -t "$IMAGE" .
 
       - name: ▶️ Start server
-        run: docker run -d --name weirwood -p "$PORT:$PORT" "$IMAGE"
+        run: docker run -d --name raven -p "$PORT:$PORT" "$IMAGE"
 
       # The image's Debian ffmpeg has zscale, so HDR thumbnails are tone mapped.
       - name: 🩺 Wait for /api/health
@@ -106,8 +106,8 @@ jobs:
 
       - name: 📜 Container logs
         if: always()
-        run: docker logs weirwood || true
+        run: docker logs raven || true
 
       - name: 🧹 Stop container
         if: always()
-        run: docker rm -f weirwood || true
+        run: docker rm -f raven || true

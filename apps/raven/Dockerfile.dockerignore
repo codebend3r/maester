@@ -1,0 +1,17 @@
+# The build context is the repo root, so this allowlists rather than
+# excludes: nothing reaches the image unless it is named here, which keeps
+# local data, databases and env files out of it.
+*
+!package.json
+!bun.lock
+!apps/*/*/package.json
+!libs/*/*/package.json
+!scripts/package.json
+!libs/raven/core
+!apps/raven/server
+!apps/raven/web
+**/node_modules
+**/dist
+**/data
+**/.env*
+**/*.db*

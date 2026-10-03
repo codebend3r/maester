@@ -5,16 +5,16 @@ The workspace for maester, an AI concierge for a private Plex server, and the ap
 | Project            | Path                   | What                                                                      |
 | ------------------ | ---------------------- | ------------------------------------------------------------------------- |
 | `@maester/api`     | `apps/maester/api`     | maester's agent, tools, chat and FastAPI app; Python 3.12 run through uv  |
-| `@weirwood/server` | `apps/weirwood/server` | weirwood's media server: NestJS on Fastify, SQLite index, ffmpeg          |
-| `@weirwood/web`    | `apps/weirwood/web`    | weirwood's library and player: React 19 on Vite                           |
-| `@weirwood/core`   | `libs/weirwood/core`   | weirwood's platform-agnostic core: API types, client, direct-play check   |
+| `@raven/server`    | `apps/raven/server`    | raven's media server: NestJS on Fastify, SQLite index, ffmpeg             |
+| `@raven/web`       | `apps/raven/web`       | raven's library and player: React 19 on Vite                              |
+| `@raven/core`      | `libs/raven/core`      | raven's platform-agnostic core: API types, client, direct-play check      |
 | `scripts`          | `scripts`              | Repo tooling: tracker and board sync, NAS deploy, version bump            |
 
-Beside maester sits weirwood, a self-hosted direct-play video library. Each product has a README of its own: [maester](apps/maester/README.md), [weirwood](apps/weirwood/README.md).
+Beside maester sits raven, a self-hosted direct-play video library. Each product has a README of its own: [maester](apps/maester/README.md), [raven](apps/raven/README.md).
 
 ## Develop
 
-You need Bun at the version `package.json` pins in `packageManager`, [uv](https://docs.astral.sh/uv/) for the Python projects, and `ffmpeg` and `ffprobe` on the PATH for weirwood's server and core tests.
+You need Bun at the version `package.json` pins in `packageManager`, [uv](https://docs.astral.sh/uv/) for the Python projects, and `ffmpeg` and `ffprobe` on the PATH for raven's server and core tests.
 
 ```bash
 bun install        # Nx, oxlint, oxfmt, and the git hooks
@@ -22,17 +22,17 @@ bun run verify     # lint, format check, typecheck, tests and build for every pr
 bun run affected   # the same, for the projects changed since main
 ```
 
-Start a product with `bun run dev:maester` or `bun run dev:weirwood`, then open it here:
+Start a product with `bun run dev:maester` or `bun run dev:raven`, then open it here:
 
 | Project            | Started by             | URL                                | What's there                                                  |
 | ------------------ | ---------------------- | ---------------------------------- | ------------------------------------------------------------- |
-| `@weirwood/web`    | `bun run dev:weirwood` | <http://localhost:5173>            | The library and player, hot reloaded; proxies `/api` to :8484 |
-| `@weirwood/server` | `bun run dev:weirwood` | <http://localhost:8484/api/health> | The API only; in dev it serves no pages                       |
+| `@raven/web`       | `bun run dev:raven`    | <http://localhost:5173>            | The library and player, hot reloaded; proxies `/api` to :8484 |
+| `@raven/server`    | `bun run dev:raven`    | <http://localhost:8484/api/health> | The API only; in dev it serves no pages                       |
 | `@maester/api`     | `bun run dev:maester`  | <http://localhost:8020/health>     | The health check; otherwise it serves only the Seerr webhook  |
 
-If 5173 is taken, Vite moves to the next free port; select `@weirwood/web:dev` in Nx's task view to see the URL it printed. `WEB_PORT` in `apps/maester/.env` moves maester's.
+If 5173 is taken, Vite moves to the next free port; select `@raven/web:dev` in Nx's task view to see the URL it printed. `WEB_PORT` in `apps/maester/.env` moves maester's.
 
-Run one target through Nx: `bunx nx run @maester/api:test`, `bunx nx run @weirwood/server:test`, `bunx nx show project @weirwood/web`, `bun run graph`.
+Run one target through Nx: `bunx nx run @maester/api:test`, `bunx nx run @raven/server:test`, `bunx nx show project @raven/web`, `bun run graph`.
 
 ## Layout
 

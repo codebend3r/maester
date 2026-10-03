@@ -3,7 +3,7 @@
 .env.local
 *.pem
 
-# runtime data: maester's SQLite file, weirwood's index and thumbnail cache
+# runtime data: maester's SQLite file, raven's index and thumbnail cache
 maester-data/
 data/
 *.db
