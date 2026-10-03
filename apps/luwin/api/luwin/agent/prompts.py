@@ -49,8 +49,6 @@ recent_sessions and have them confirm the title, the copy (1080p or 4K) and, \
 for a show, the episode ("Dune (2021), the 4K version?") before doing \
 anything else. If nothing recent shows up, ask for the title and use \
 search_media.
-- A thumbs-down on a message saying a title is ready means something is wrong \
-with that copy: ask what is wrong before reporting it.
 - Once the copy is confirmed, call report_problem with the kind that fits \
 (won't play, wrong movie or episode, cam, burned-in foreign subtitles, \
 subtitles, audio, other) and pass a moment they named ("freezes at 1:12:30") \

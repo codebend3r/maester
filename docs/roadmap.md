@@ -17,7 +17,7 @@ A friend can chat with luwin and it answers using a read-only tool.
 
 ### M2 Requests
 
-Friends request movies and shows in 1080p and 4K through the bot.
+Friends request movies and shows in 1080p and 4K through luwin.
 
 - [x] E3 Requests [#21](https://github.com/codebend3r/maester/issues/21)
 
@@ -37,7 +37,7 @@ Approvals, digests and Wizarr invites run from chat.
 
 ### M5 Engagement
 
-The bot gives friends reasons to come back.
+luwin gives friends reasons to come back.
 
 - [ ] E8 Engagement [#64](https://github.com/codebend3r/maester/issues/64)
 

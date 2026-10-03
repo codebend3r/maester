@@ -2,7 +2,7 @@
 
 The guides (`luwin/guides/`) are the source, so the model relays them
 instead of recalling menus from memory; anyone, linked or not, reads the
-same text through `/setup`.
+same text through `ChatService.setup_guide`.
 """
 
 from __future__ import annotations

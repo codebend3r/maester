@@ -184,13 +184,12 @@ Routes:
 - `GET /api/inbox` returns unread notices, newest last, and `unread`.
 - `POST /api/inbox/read` with `{ids}` marks them read.
 - `POST /api/inbox/{id}/report` starts the report flow for a ready
-  notice, replacing the thumbs-down reaction: it builds the same
-  `REACTION_REPORT` message from `about` and runs it through
-  `ChatService.reply()` as that user, streaming events like `/api/chat`.
+  notice: it builds a report message from `about` (title, copy and
+  TMDB id) and runs it through `ChatService.reply()` as that user,
+  streaming events like `/api/chat`.
 
-`ChatService` loses `remember_dm` and `react`. `UNLINKED_HELP` changes
-from the `/link` instruction to "ask the admin or the friend who invited
-you for an invite".
+`UNLINKED_HELP` tells a stranger to "ask the admin or the friend who
+invited you for an invite".
 
 ### Protection
 
@@ -287,7 +286,7 @@ Pytest, against a fake plex.tv client in `maester/clients`:
   a failed turn, through the TestClient with the fake model; decide
   rejects the wrong user; history pages.
 - Inbox: `WebNotifier` files DMs, admin posts and approvals to the right
-  user and never raises; the report route runs the reaction message as
+  user and never raises; the report route runs the report message as
   the user.
 - Admin: pending lists and decides; non-admin gets 403; tier override
   changes the next request's tier.
