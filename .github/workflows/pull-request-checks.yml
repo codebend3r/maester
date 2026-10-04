@@ -40,7 +40,7 @@ jobs:
           enable-cache: true
           cache-dependency-glob: '**/uv.lock'
 
-      # weirwood's server and core tests encode real clips with ffmpeg.
+      # raven's server and core tests encode real clips with ffmpeg.
       - name: 🎞️ Install ffmpeg
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
 
