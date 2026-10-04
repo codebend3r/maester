@@ -1,6 +1,6 @@
 {
   "name": "@luwin/api",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "private": true,
   "description": "luwin's agent, tools, chat and FastAPI app: a Python 3.12 project run through uv",
   "scripts": {
