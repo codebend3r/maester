@@ -1,0 +1,200 @@
+"""What luwin does with each Seerr notification type.
+
+`seerr_routes()` is the dispatch table the webhook serves, keyed by Seerr's
+notification type. A handler reads what it needs from Seerr, Plex and the
+store and returns the notices to send; delivering them is the webhook's
+job. A route opts into deduplication when a repeat would reach a person
+twice: Seerr can send the same event again within minutes (a library
+rescan), while a later repeat is news (a replaced file ready again) and
+must get through. MEDIA_AVAILABLE DMs the friend whose request is ready;
+MEDIA_PENDING asks the admin about a request Seerr left pending, once per
+request whoever asked first (`luwin/approvals.py`), and MEDIA_APPROVED and
+MEDIA_DECLINED close that approval when the admin decided in Seerr itself;
+ISSUE_RESOLVED and ISSUE_REOPENED follow a playback report's issue into
+its report row, idempotently, and tell the reporter once when theirs is
+resolved. Types without a route are ignored.
+"""
+
+from __future__ import annotations
+
+import logging
+from collections.abc import Awaitable, Callable, Sequence
+from dataclasses import dataclass
+from datetime import timedelta
+from functools import partial
+from typing import Any
+
+from luwin.approvals import ask_about_request, decision_dm, request_subject
+from luwin.clients import ClientError, Services
+from luwin.clients.seerr import MediaRequest, RequestStatus
+from luwin.media import Copy, Titled, version_label
+from luwin.notify import DirectMessage, Notice
+from luwin.store import Store
+
+log = logging.getLogger("luwin.seerr")
+
+
+def _int_or_none(value: Any) -> int | None:
+    return int(value) if value not in (None, "") else None
+
+
+@dataclass(frozen=True)
+class SeerrNotification:
+    """One webhook delivery, read from Seerr's default JSON payload template.
+
+    The template renders every value as a string and leaves the `media`,
+    `request` and `issue` blocks null when the event has none.
+    """
+
+    type: str  # notification_type, e.g. "MEDIA_AVAILABLE"
+    subject: str  # for media events, "<title> (<year>)"
+    media_type: str | None
+    tmdb_id: int | None
+    request_id: int | None
+    issue_id: int | None
+
+    @property
+    def event_key(self) -> str:
+        """What makes two deliveries the same event: the type and what it concerns."""
+        if self.request_id is not None:
+            about = f"request:{self.request_id}"
+        elif self.issue_id is not None:
+            about = f"issue:{self.issue_id}"
+        else:
+            about = f"media:{self.media_type}:{self.tmdb_id}"
+        return f"{self.type}:{about}"
+
+    @classmethod
+    def from_webhook(cls, raw: dict[str, Any]) -> SeerrNotification:
+        media = raw.get("media") or {}
+        request = raw.get("request") or {}
+        issue = raw.get("issue") or {}
+        return cls(
+            type=str(raw["notification_type"]),
+            subject=raw.get("subject") or "",
+            media_type=media.get("media_type") or None,
+            tmdb_id=_int_or_none(media.get("tmdbId")),
+            request_id=_int_or_none(request.get("request_id")),
+            issue_id=_int_or_none(issue.get("issue_id")),
+        )
+
+
+SeerrHandler = Callable[[SeerrNotification], Awaitable[Sequence[Notice]]]
+# A repeat of a DM-sending event inside this window is Seerr sending it twice.
+RESCAN_REPEAT = timedelta(minutes=15)
+
+
+@dataclass(frozen=True)
+class SeerrRoute:
+    handle: SeerrHandler
+    # Deliveries of one event (type plus request or issue) within this window
+    # act once; None when every delivery should act (idempotent updates).
+    dedupe: timedelta | None = None
+
+
+def seerr_routes(services: Services, store: Store) -> dict[str, SeerrRoute]:
+    return {
+        "MEDIA_AVAILABLE": SeerrRoute(partial(ready_to_watch, services, store), RESCAN_REPEAT),
+        # One approval per request, and one decision per approval: repeats do nothing twice.
+        "MEDIA_PENDING": SeerrRoute(partial(pending_request, services, store)),
+        "MEDIA_APPROVED": SeerrRoute(partial(decided_in_seerr, store, True)),
+        "MEDIA_DECLINED": SeerrRoute(partial(decided_in_seerr, store, False)),
+        # Only a change of state acts, so a repeated delivery does nothing twice.
+        "ISSUE_RESOLVED": SeerrRoute(partial(issue_status, store, True)),
+        "ISSUE_REOPENED": SeerrRoute(partial(issue_status, store, False)),
+    }
+
+
+# Who decided a request the admin approved or declined in Seerr's own page.
+DECIDED_IN_SEERR = "seerr"
+
+
+async def pending_request(
+    services: Services, store: Store, notification: SeerrNotification
+) -> list[Notice]:
+    """Ask the admin about a request Seerr left pending, unless they already were."""
+    if notification.request_id is None:
+        return []
+    request = await services.seerr.get_request(notification.request_id)
+    if request.status != RequestStatus.PENDING:
+        return []
+    _, post = await ask_about_request(services, store, request)
+    if post is None:
+        return []
+    # Decided while this was raised (the admin's Approve on a held 4K request makes it and
+    # approves it at once): close it rather than post buttons for a settled request.
+    now = await services.seerr.get_request(request.id)
+    if now.status != RequestStatus.PENDING:
+        verdict = "approved" if now.status == RequestStatus.APPROVED else "denied"
+        store.decide_pending(post.pending_id, verdict, DECIDED_IN_SEERR)
+        return []
+    return [post]
+
+
+async def decided_in_seerr(
+    store: Store, approved: bool, notification: SeerrNotification
+) -> list[Notice]:
+    """The admin decided a request in Seerr: close its approval here, and tell the friend."""
+    if notification.request_id is None:
+        return []
+    pending = store.pending_about(request_subject(notification.request_id))
+    verdict = "approved" if approved else "denied"
+    if pending is None or store.decide_pending(pending.id, verdict, DECIDED_IN_SEERR) is None:
+        return []
+    args = pending.payload
+    if not args.get("requester"):
+        return []
+    return [DirectMessage(args["requester"], decision_dm(args["title"], args["version"], approved))]
+
+
+async def issue_status(
+    store: Store, resolved: bool, notification: SeerrNotification
+) -> list[Notice]:
+    """Mark the reports behind a Seerr issue resolved (or open again); tell each reporter
+    once when theirs is resolved."""
+    if notification.issue_id is None:
+        return []
+    changed = store.set_issue_resolved(notification.issue_id, resolved)
+    if not resolved:
+        return []
+    return [
+        DirectMessage(r.user_id, f"Your report about {r.title} in {r.copy.version} was resolved.")
+        for r in changed
+    ]
+
+
+def _what(notification: SeerrNotification, request: MediaRequest) -> str:
+    seasons = request.seasons
+    if not seasons:
+        return notification.subject
+    numbers = ", ".join(str(n) for n in seasons)
+    return f"{notification.subject}, season{'s' if len(seasons) > 1 else ''} {numbers},"
+
+
+async def ready_to_watch(
+    services: Services, store: Store, notification: SeerrNotification
+) -> list[Notice]:
+    """DM the requester that their request can be watched: title, version, Plex link."""
+    if notification.request_id is None:
+        return []
+    request = await services.seerr.get_request(notification.request_id)
+    user = store.active_link_by_seerr_id(request.requested_by_id)
+    if user is None:  # requested in Seerr by someone not linked here
+        return []
+    version = version_label(request.is_4k)
+    link = await _plex_link(services, request)
+    where = f"\nOpen it in Plex: {link}" if link else " Look for it in Plex."
+    text = f"{_what(notification, request)} is ready to watch in {version}.{where}"
+    about = Titled(Copy(request.media_type, request.tmdb_id, request.is_4k), notification.subject)
+    return [DirectMessage(user.user_id, text, about)]
+
+
+async def _plex_link(services: Services, request: MediaRequest) -> str | None:
+    if request.rating_key is None:
+        return None
+    try:
+        machine = await services.plex.machine_identifier()
+    except ClientError as exc:  # the news matters more than the link
+        log.warning("no Plex link for request %s: %s", request.id, exc)
+        return None
+    return services.plex.deep_link(machine, request.rating_key)

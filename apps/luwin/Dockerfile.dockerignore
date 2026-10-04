@@ -1,0 +1,9 @@
+# The build context is the repo root, so this allowlists rather than excludes:
+# nothing reaches the image unless it is named here, which keeps .env files,
+# luwin-data, node_modules and the other products out of it.
+*
+!apps/luwin/api/pyproject.toml
+!apps/luwin/api/uv.lock
+!apps/luwin/api/luwin
+**/__pycache__
+**/*.pyc

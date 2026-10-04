@@ -1,0 +1,31 @@
+{
+  "name": "@luwin/api",
+  "version": "0.2.1",
+  "private": true,
+  "description": "luwin's agent, tools, chat and FastAPI app: a Python 3.12 project run through uv",
+  "scripts": {
+    "dev": "cd .. && uv run --project api luwin",
+    "test": "uv run pytest -q",
+    "eval": "uv run luwin-eval --model fake",
+    "lint:py": "uv run ruff check .",
+    "lint:py:fix": "uv run ruff check --fix .",
+    "format": "uv run ruff format .",
+    "format:check": "uv run ruff format --check ."
+  },
+  "nx": {
+    "projectType": "application",
+    "tags": [
+      "scope:luwin",
+      "lang:py"
+    ],
+    "includedScripts": [
+      "dev",
+      "test",
+      "eval",
+      "lint:py",
+      "lint:py:fix",
+      "format",
+      "format:check"
+    ]
+  }
+}
