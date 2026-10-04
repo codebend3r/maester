@@ -18,7 +18,7 @@ concurrency:
 jobs:
   smoke:
     name: 🩺 luwin build and health check
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
       IMAGE: luwin:ci
@@ -26,7 +26,7 @@ jobs:
       VERSION_FILE: apps/luwin/VERSION
     steps:
       - name: 📥 Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # Built from the repo root, as compose does; the Dockerfile's own
       # ignore file keeps the context to what it copies.
@@ -72,14 +72,14 @@ jobs:
 
   raven:
     name: 🩺 raven build and health check
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
       IMAGE: raven:ci
       PORT: 8484
     steps:
       - name: 📥 Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # Built from the repo root, as compose does; the Dockerfile's own
       # ignore file keeps the context to what it copies.
