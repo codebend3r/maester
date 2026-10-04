@@ -3,14 +3,14 @@
 # and {staged_files} are relative to it.
 pre-commit:
   jobs:
-    - name: ruff check (maester api)
-      root: apps/maester/api/
+    - name: ruff check (luwin api)
+      root: apps/luwin/api/
       glob: "*.{py,pyi}"
       run: uv run ruff check --fix {staged_files}
       stage_fixed: true
 
-    - name: ruff format (maester api)
-      root: apps/maester/api/
+    - name: ruff format (luwin api)
+      root: apps/luwin/api/
       glob: "*.{py,pyi}"
       run: uv run ruff format {staged_files}
       stage_fixed: true
@@ -18,11 +18,11 @@ pre-commit:
     - name: ruff check (scripts)
       root: scripts/
       glob: "*.py"
-      run: uv run --project ../apps/maester/api ruff check --config ../apps/maester/api/pyproject.toml --fix {staged_files}
+      run: uv run --project ../apps/luwin/api ruff check --config ../apps/luwin/api/pyproject.toml --fix {staged_files}
       stage_fixed: true
 
     - name: ruff format (scripts)
       root: scripts/
       glob: "*.py"
-      run: uv run --project ../apps/maester/api ruff format --config ../apps/maester/api/pyproject.toml {staged_files}
+      run: uv run --project ../apps/luwin/api ruff format --config ../apps/luwin/api/pyproject.toml {staged_files}
       stage_fixed: true

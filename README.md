@@ -1,16 +1,22 @@
 # maester
 
-The workspace for maester, an AI concierge for a private Plex server, and the apps and libraries that grow around it. An [Nx](https://nx.dev) 23 monorepo over [Bun](https://bun.sh) workspaces.
+maester is a self-hosted media suite: a library and player, an AI assistant for the friends who share the server, and soon their accounts. This repo is its workspace, an [Nx](https://nx.dev) 23 monorepo over [Bun](https://bun.sh) workspaces.
 
-| Project            | Path                   | What                                                                      |
-| ------------------ | ---------------------- | ------------------------------------------------------------------------- |
-| `@maester/api`     | `apps/maester/api`     | maester's agent, tools, chat and FastAPI app; Python 3.12 run through uv  |
-| `@raven/server`    | `apps/raven/server`    | raven's media server: NestJS on Fastify, SQLite index, ffmpeg             |
-| `@raven/web`       | `apps/raven/web`       | raven's library and player: React 19 on Vite                              |
-| `@raven/core`      | `libs/raven/core`      | raven's platform-agnostic core: API types, client, direct-play check      |
-| `scripts`          | `scripts`              | Repo tooling: tracker and board sync, NAS deploy, version bump            |
+| App     | What it is                                                                                                   |
+| ------- | ------------------------------------------------------------------------------------------------------------ |
+| raven   | A self-hosted media library and direct-play player                                                           |
+| luwin   | The AI assistant: requests, playback fixes and lag answers, in its own chat app and inside raven and rookery |
+| rookery | Sign-in and account management (planned)                                                                     |
 
-Beside maester sits raven, a self-hosted direct-play video library. Each product has a README of its own: [maester](apps/maester/README.md), [raven](apps/raven/README.md).
+| Project         | Path                | What                                                                   |
+| --------------- | ------------------- | ---------------------------------------------------------------------- |
+| `@luwin/api`    | `apps/luwin/api`    | luwin's agent, tools, chat and FastAPI app; Python 3.12 run through uv |
+| `@raven/server` | `apps/raven/server` | raven's media server: NestJS on Fastify, SQLite index, ffmpeg          |
+| `@raven/web`    | `apps/raven/web`    | raven's library and player: React 19 on Vite                           |
+| `@raven/core`   | `libs/raven/core`   | raven's platform-agnostic core: API types, client, direct-play check   |
+| `scripts`       | `scripts`           | Repo tooling: tracker and board sync, NAS deploy, version bump         |
+
+Each app has a README of its own: [luwin](apps/luwin/README.md), [raven](apps/raven/README.md).
 
 ## Develop
 
@@ -22,23 +28,23 @@ bun run verify     # lint, format check, typecheck, tests and build for every pr
 bun run affected   # the same, for the projects changed since main
 ```
 
-Start a product with `bun run dev:maester` or `bun run dev:raven`, then open it here:
+Start a product with `bun run dev:luwin` or `bun run dev:raven`, then open it here:
 
 | Project            | Started by             | URL                                | What's there                                                  |
 | ------------------ | ---------------------- | ---------------------------------- | ------------------------------------------------------------- |
 | `@raven/web`       | `bun run dev:raven`    | <http://localhost:5173>            | The library and player, hot reloaded; proxies `/api` to :8484 |
 | `@raven/server`    | `bun run dev:raven`    | <http://localhost:8484/api/health> | The API only; in dev it serves no pages                       |
-| `@maester/api`     | `bun run dev:maester`  | <http://localhost:8020/health>     | The health check; otherwise it serves only the Seerr webhook  |
+| `@luwin/api`       | `bun run dev:luwin`    | <http://localhost:8020/health>     | The health check; otherwise it serves only the Seerr webhook  |
 
-If 5173 is taken, Vite moves to the next free port; select `@raven/web:dev` in Nx's task view to see the URL it printed. `WEB_PORT` in `apps/maester/.env` moves maester's.
+If 5173 is taken, Vite moves to the next free port; select `@raven/web:dev` in Nx's task view to see the URL it printed. `WEB_PORT` in `apps/luwin/.env` moves luwin's.
 
-Run one target through Nx: `bunx nx run @maester/api:test`, `bunx nx run @raven/server:test`, `bunx nx show project @raven/web`, `bun run graph`.
+Run one target through Nx: `bunx nx run @luwin/api:test`, `bunx nx run @raven/server:test`, `bunx nx show project @raven/web`, `bun run graph`.
 
 ## Layout
 
 ```
 apps/<product>/            one folder per product: its Dockerfile, compose, .env.example, VERSION, docs
-apps/<product>/<project>/  its Nx projects, e.g. apps/maester/api
+apps/<product>/<project>/  its Nx projects, e.g. apps/luwin/api
 libs/<product>/<lib>/      libraries a product shares between its projects
 libs/shared/<lib>/         libraries more than one product uses
 scripts/                   repo tooling
@@ -51,7 +57,7 @@ Keep `.env` files in their product's folder. Nx loads a `.env` at the repo root 
 
 ## Tracker
 
-Work is tracked in [GitHub Issues](https://github.com/codebend3r/maester/issues) and on the [maester roadmap board](https://github.com/users/codebend3r/projects/1). [`docs/roadmap.md`](docs/roadmap.md) and the issues are rendered from [`scripts/catalog.py`](scripts/catalog.py); see [maester's README](apps/maester/README.md#roadmap-and-tracker).
+Work is tracked in [GitHub Issues](https://github.com/codebend3r/maester/issues) and on the [maester roadmap board](https://github.com/users/codebend3r/projects/1). [`docs/roadmap.md`](docs/roadmap.md) and the issues are rendered from [`scripts/catalog.py`](scripts/catalog.py); see [luwin's README](apps/luwin/README.md#roadmap-and-tracker).
 
 ## Releases
 

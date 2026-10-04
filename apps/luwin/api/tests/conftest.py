@@ -1,0 +1,70 @@
+import json
+from pathlib import Path
+
+import pytest
+
+from luwin.agent.tools import Tier, ToolContext
+from luwin.clients import (
+    FakeFileProbe,
+    FakeFleetMonitor,
+    FakePlexClient,
+    FakePlexTv,
+    FakeRadarrClient,
+    FakeSabnzbdClient,
+    FakeSeerrClient,
+    FakeSonarrClient,
+    FakeSpeedTest,
+    FakeTautulliClient,
+    FakeWizarrClient,
+    Services,
+)
+from luwin.config import Settings
+from luwin.memo import Memo
+from luwin.store import Store
+from tests.factories import HOSTS, PLEX_ID, RADARR_URL, SONARR_URL
+
+FIXTURES = Path(__file__).parent / "fixtures"
+
+
+@pytest.fixture
+def fixture():
+    def load(name: str):
+        return json.loads((FIXTURES / f"{name}.json").read_text())
+
+    return load
+
+
+@pytest.fixture
+def services() -> Services:
+    """Every service faked, with the two real hosts' per-host clients empty."""
+    return Services(
+        seerr=FakeSeerrClient(),
+        plex=FakePlexClient(machine_id=PLEX_ID),
+        wizarr=FakeWizarrClient(),
+        sonarr={h: FakeSonarrClient(host=h, base_url=SONARR_URL.format(host=h)) for h in HOSTS},
+        radarr={h: FakeRadarrClient(host=h, base_url=RADARR_URL.format(host=h)) for h in HOSTS},
+        sabnzbd={h: FakeSabnzbdClient(host=h) for h in HOSTS},
+        # Each host's Tautulli watches its own Plex server; meleys' is the one luwin reads.
+        tautulli={
+            h: FakeTautulliClient(host=h, plex_id=PLEX_ID if h == "meleys" else f"{h}-plex")
+            for h in HOSTS
+        },
+        probe=FakeFileProbe(),
+        fleet=FakeFleetMonitor(),
+        speedtest=FakeSpeedTest(),
+        plextv=FakePlexTv(),
+    )
+
+
+@pytest.fixture
+def store():
+    s = Store(":memory:")
+    yield s
+    s.close()
+
+
+@pytest.fixture
+def ctx(services, store) -> ToolContext:
+    """A linked friend (Seerr user 4) calling tools."""
+    store.upsert_user("d1", status="active", seerr_user_id=4, plex_username="dany")
+    return ToolContext("d1", Tier.FRIEND, services, store, Settings(), Memo())

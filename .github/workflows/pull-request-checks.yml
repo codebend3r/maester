@@ -16,14 +16,14 @@ concurrency:
 jobs:
   checks:
     name: 🚦 Lint, test and build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       # uv runs against the committed lockfiles, never re-resolving them.
       UV_FROZEN: '1'
     steps:
       # Full history so Nx can diff against the base branch.
       - name: 📥 Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -35,7 +35,7 @@ jobs:
 
       # Each Python project's .python-version picks its interpreter.
       - name: 🐍 Set up uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v10.2.0
         with:
           enable-cache: true
           cache-dependency-glob: '**/uv.lock'
