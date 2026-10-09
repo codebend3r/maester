@@ -12,3 +12,5 @@ extend-exclude = [".git/"]
 fre = "fre"
 mis = "mis"
 tha = "tha"
+# The media element's `seeked` event, as React's `onSeeked`.
+seeked = "seeked"

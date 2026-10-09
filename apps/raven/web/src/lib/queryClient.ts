@@ -26,6 +26,14 @@ export const queryKeys = {
   /** The prefix every media list of a library shares, whatever its search and sort. */
   mediaLists: (libraryId: number) => ['libraries', libraryId, 'media'],
   mediaItem: (id: number) => ['media', id],
+  mediaTracks: (id: number) => ['media', id, 'tracks'],
+  subtitles: ({ id, trackId, window }: { id: number; trackId: string; window: number }) => [
+    'media',
+    id,
+    'subtitles',
+    trackId,
+    window,
+  ],
   favourites: ['favourites'],
   browse: (path: string | null) => ['browse', path],
 }

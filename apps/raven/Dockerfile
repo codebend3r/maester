@@ -28,9 +28,10 @@ FROM bun AS deps
 RUN bun install --frozen-lockfile --ignore-scripts --production --filter @raven/server
 
 FROM node:24-slim
-# Debian's ffmpeg is built with zimg, so HDR thumbnails are tone mapped to
-# SDR instead of coming out grey. It is only used for probing and
-# thumbnails; playback never touches it.
+# Debian's ffmpeg is built with zimg, so HDR thumbnails and transcodes are
+# tone mapped to SDR instead of coming out grey, and with libx264 for the
+# transcodes. Direct play never touches it; remuxes, transcodes, subtitles
+# and probing do.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ffmpeg \
  && rm -rf /var/lib/apt/lists/* \

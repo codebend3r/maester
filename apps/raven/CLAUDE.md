@@ -6,7 +6,7 @@
 
 ## What this is
 
-A self-hosted video library and direct-play web player. See README.md for how playback, scanning and thumbnails work.
+A self-hosted video library and web player: direct play, with an on-the-fly remux or transcode for what the browser cannot play. See README.md for how playback, scanning and thumbnails work.
 
 ## Structure
 

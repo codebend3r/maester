@@ -23,13 +23,34 @@
   }
 }
 
+// A red arc turning on the night: the stream is filling.
+.spinner {
+  grid-area: stage;
+  place-self: center;
+  position: relative;
+  z-index: 1;
+  width: 3rem;
+  height: 3rem;
+  border: 3px solid rgb(230 225 214 / 18%);
+  border-top-color: var(--color-leaf-bright);
+  border-radius: 50%;
+  animation: spin 900ms linear infinite;
+  pointer-events: none;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
 .chrome {
   grid-area: stage;
   align-self: start;
   // A <video> gets its own compositing layer; without a stacking order the
   // bar would paint underneath it.
   position: relative;
-  z-index: 1;
+  z-index: 2;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   grid-template-areas:

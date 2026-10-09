@@ -177,7 +177,7 @@ text into italic, bold and underlined runs; every other tag is dropped.
 | `c`                         | Subtitles on or off                         |
 | `0` to `9`                  | Jump to 0% to 90%                           |
 | Home / End                  | Start / end                                 |
-| `,` / `.` while paused      | One frame back / forward                    |
+| `,` / `.`                   | Pause, then one frame back / forward        |
 | `<` / `>`                   | Slower / faster (0.25 to 2)                 |
 | `+` / `-`                   | Bigger / smaller subtitles                  |
 | `?`                         | Shortcut list                               |
@@ -202,15 +202,15 @@ replace it.
 | Where                                     | What                                                                                      |
 | ----------------------------------------- | ----------------------------------------------------------------------------------------- |
 | `libs/raven/core/src/types.ts`            | `AudioTrack`, `SubtitleTrack`, `MediaTracks`, `SubtitleCue`, `PlaybackMode`               |
-| `libs/raven/core/src/playback.ts`         | `planPlayback`, `nextFallback`, `STREAM_TIME_SHIFT`, `streamMimeType`                     |
-| `libs/raven/core/src/subtitles.ts`        | `parseWebVtt`, `cueRuns`, `SUBTITLE_WINDOW_SECONDS`, `subtitleWindows`                   |
-| `libs/raven/core/src/tracks.ts`           | `languageTag`, `channelLayout`                                                           |
+| `libs/raven/core/src/playback.ts`         | `planPlayback`, `describeMode`, `STREAM_TIME_SHIFT`, `streamMimeType`                     |
+| `libs/raven/core/src/subtitles.ts`        | `parseWebVtt`, `cueRuns`, `mergeCues`, `activeCues`, `subtitleWindows`, `subtitleWindowRange`                   |
+| `libs/raven/core/src/tracks.ts`           | `languageTag`, `isKnownLanguage`                                                           |
 | `libs/raven/core/src/apiClient.ts`        | `getTracks`, `getSubtitles`, `streamUrl`                                                  |
 | `apps/raven/server/src/ffmpeg/tracks.ts`  | `parseTracks` from ffprobe JSON                                                           |
 | `apps/raven/server/src/ffmpeg/args.ts`    | `streamArgs`, `subtitleWindowArgs`, `subtitleFileArgs`                                    |
 | `apps/raven/server/src/playback/`         | `sidecars.ts`, `TracksService`, `SubtitlesService`, `PlaybackController` (tracks, subtitles, stream) |
-| `apps/raven/web/src/components/Player/`   | `Player` (mode, fallback, the can't-play panel), `Stage`, `Controls`, `Scrubber`, `SettingsMenu`, `SubtitleOverlay`, `ShortcutsDialog`, `Bezel` |
-| `apps/raven/web/src/lib/`                 | `streamSource.ts` (the MSE pump), `shortcuts.ts` (key to action, pure), `trackLabels.ts` |
+| `apps/raven/web/src/components/Player/`   | `Player` (track choices, mode and fallback), `Stage`, `Controls`, `Scrubber`, `SettingsMenu`, `SubtitleOverlay`, `ShortcutsDialog`, `Bezel`, `Unplayable`, `selection.ts`, `useSubtitleCues` |
+| `apps/raven/web/src/lib/`                 | `streamSource.ts` (the MSE pump), `shortcuts.ts` (key to action, pure), `trackLabels.ts`, `canPlay.ts` (`browserCanStream`) |
 
 ## Errors
 

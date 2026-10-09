@@ -1,6 +1,6 @@
 # raven
 
-A light, self-hosted video library and player. Point it at folders of videos; it indexes them, makes a thumbnail for each, and plays them in the browser straight from disk, with no transcoding.
+A light, self-hosted video library and player. Point it at folders of videos; it indexes them, makes a thumbnail for each, and plays them in the browser straight from disk, converting on the fly only what the browser cannot play.
 
 raven is the `apps/raven/` folder of an Nx workspace; the [root README](../../README.md) covers the workspace.
 
@@ -26,9 +26,19 @@ The player forgets its volume and mute setting once, since the browser now keeps
 
 ## How playback works
 
-Direct play only. The browser is handed the original file over HTTP range requests, so playback starts as soon as the first bytes arrive (about half a second for a 1080p file on the NAS over SMB) and seeking is just another range request. Nothing is converted on the server.
+Three ways, cheapest first:
 
-Before loading a file, the player asks the browser whether it can decode that exact container, video codec, and audio codec (`canPlayType`), using codec strings built from the ffprobe data in the index. When the answer is no, it says why ("Dolby Digital Plus audio isn't supported here") and offers the file link for VLC or IINA, rather than showing a spinner. Cards in the grid carry the same check, so you know before you click.
+| Mode      | When                                                                                     | What the server does                                                       |
+| --------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Direct    | The browser plays the file as it is, and the default audio track is wanted               | Serves the original file over HTTP range requests                          |
+| Remux     | The container or audio is the problem, or another audio track is picked                  | ffmpeg copies the video untouched and converts the chosen audio to AAC     |
+| Transcode | The browser cannot decode the video either                                                | ffmpeg re-encodes the video to H.264 (at most 1080p, HDR tone mapped) too   |
+
+Direct play starts as soon as the first bytes arrive (about half a second for a 1080p file on the NAS over SMB), and seeking is just another range request. A remux costs little more than reading the file. A transcode is CPU heavy: fine for 1080p on a modern x86 core, not for 4K.
+
+Before loading a file, the player asks the browser whether it can decode that exact container, video codec, and audio codec (`canPlayType`), using codec strings built from the ffprobe data in the index, and whether it could play a converted stream (`MediaSource.isTypeSupported`). Cards in the grid carry the same check: "Converted on the server" or, when nothing will work, "Won't play in this browser". If a mode fails once playing (the browser said "maybe" and could not decode after all), the player steps down to the next one from the same spot; only when every mode has failed does it say why and offer the file link for VLC or IINA.
+
+Converted streams are fragmented MP4 fed to the browser through Media Source Extensions (`ManagedMediaSource` on iOS). ffmpeg keeps the file's own timestamps (`-copyts -start_at_zero`, `frag_discont`, no edit list), shifted by one second so nothing goes negative, so a stream started anywhere lands at the right place on one timeline. Seeking inside what is buffered is instant; seeking outside it starts a new stream there, and the server kills the old ffmpeg as soon as its request closes. The player reads at most a minute ahead, which holds ffmpeg back through the pipe.
 
 What that means in practice. Chrome and Firefox 156 were measured on a Mac with `canPlayType`; Safari is Apple's documented support. The player asks the browser itself, so treat this as a guide rather than a rule:
 
@@ -45,7 +55,33 @@ What that means in practice. Chrome and Firefox 156 were measured on a Mac with 
 
 Audio is the usual blocker: most remuxes and many WEB-DLs carry EAC3, DTS or TrueHD.
 
-Keyboard: `space` or `k` play/pause, `j`/`l` or arrows skip 10s, `f` fullscreen, `m` mute, `Esc` back to the library. Playback resumes where you stopped; the last 5% counts as finished.
+Playback resumes where you stopped; the last 5% counts as finished.
+
+## Audio tracks and subtitles
+
+The settings button (or `c` for subtitles) lists every audio and subtitle track in the file, read with ffprobe when the player opens it. Picking an audio track other than the file's default plays through a remux. The player remembers the last audio language picked, whether subtitles were on, in which language, and how big.
+
+Subtitles come from the file itself (SRT, ASS, WebVTT, MP4 text) or from files beside it named after the video: `Movie (2020).en.srt`, `Movie (2020).en.forced.srt`, `Movie (2020).English.sdh.ass`. They are drawn by the player rather than the browser, so they look the same everywhere and follow `+` and `-`. Embedded tracks are extracted five minutes at a time, so the first cues arrive after reading minutes of the file rather than all of it, and cached under `<data>/subtitles/`. Picture subtitles (PGS, VobSub) are listed but cannot be shown.
+
+## Keyboard
+
+YouTube's shortcuts, and `?` shows them in the player.
+
+| Key                    | Action                                                 |
+| ---------------------- | ------------------------------------------------------ |
+| `k`, space             | Play or pause                                          |
+| `j` / `l`              | Back / forward 10 seconds                              |
+| left / right           | Back / forward 5 seconds                               |
+| up / down              | Volume                                                 |
+| `m`                    | Mute                                                   |
+| `f`                    | Full screen (double click too)                         |
+| `c`                    | Subtitles on or off                                    |
+| `+` / `-`              | Bigger / smaller subtitles                             |
+| `0` to `9`             | Jump to 0% to 90%                                      |
+| Home / End             | Start / end                                            |
+| `,` / `.`              | Pause, then one frame back / forward                   |
+| `<` / `>`              | Slower / faster                                        |
+| `Esc`                  | Close a menu, leave full screen, or back to the library |
 
 ## Favourites and deleting
 
@@ -80,8 +116,8 @@ The server and core tests need `ffmpeg` and `ffprobe` on the PATH: the end-to-en
 ```
 apps/raven/
   server/        @raven/server: NestJS on Fastify: SQLite index, scanner, ffprobe, thumbnails,
-                 range-request file serving
-  web/           @raven/web: React 19 + Vite: libraries, the grid, the player
+                 range-request file serving, tracks, subtitles and converted streams
+  web/           @raven/web: React 19 + Vite: libraries, the grid, the player and its stream source
   Dockerfile, docker-compose.yml
 libs/raven/
   core/          @raven/core: API types and guards, the typed API client, the direct-play check,
@@ -109,5 +145,5 @@ A native iOS or Android app would be another `apps/raven/` entry that imports `@
 ## Not there yet
 
 - No accounts or auth: keep it on the LAN or behind Tailscale.
-- No subtitles: embedded tracks would need extracting to WebVTT.
-- Files a browser cannot decode are reported, not converted. An on-the-fly audio-only remux (video copied, audio to AAC) would unlock most of those at almost no CPU cost, if direct play alone turns out too strict.
+- Picture subtitles (PGS, VobSub) would need burning in or OCR.
+- Transcoding uses the CPU only; no VAAPI, QSV or VideoToolbox yet.

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'bun:test'
 import { fireEvent, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MediaCard } from '@/components/MediaCard/MediaCard'
-import { setBrowserSupport } from '@/test/canPlay'
+import { setBrowserSupport, setStreamSupport } from '@/test/canPlay'
 import { mediaItem } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 
@@ -21,6 +21,16 @@ describe('MediaCard', () => {
   it('warns before a click when the browser cannot decode the audio', () => {
     renderWithProviders(<MediaCard media={mediaItem({ audioCodec: 'eac3' })} />)
     expect(screen.getByText("Won't play in this browser")).toHaveAttribute(
+      'title',
+      "Dolby Digital Plus audio isn't supported here.",
+    )
+  })
+
+  it('says the server converts what the browser cannot decode but can stream', () => {
+    setStreamSupport(() => true)
+    renderWithProviders(<MediaCard media={mediaItem({ audioCodec: 'eac3' })} />)
+    expect(screen.queryByText("Won't play in this browser")).toBeNull()
+    expect(screen.getByText('Converted on the server')).toHaveAttribute(
       'title',
       "Dolby Digital Plus audio isn't supported here.",
     )
