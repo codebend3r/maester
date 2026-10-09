@@ -54,9 +54,36 @@ const firstPacketTimes = async (path: string): Promise<{ video: number; audio: n
   return { video: await first('v:0'), audio: await first('a:0') }
 }
 
+/**
+ * How far into the file its video starts. Muxing can shift a whole file
+ * later than the source: ffmpeg 6 makes room for the AAC encoder's
+ * priming by moving every stream, subtitles included, 23ms on, while
+ * ffmpeg 9 keeps it at zero. Times the server reports are the file's own,
+ * so expectations are measured from here.
+ */
+const videoLead = async (path: string): Promise<number> => {
+  const { stdout } = await run('ffprobe', [
+    '-v',
+    'error',
+    '-select_streams',
+    'v:0',
+    '-show_entries',
+    'stream=start_time',
+    '-of',
+    'csv=p=0',
+    path,
+  ])
+  const lead = Number(stdout.trim())
+  return Number.isFinite(lead) ? lead : 0
+}
+
+/** Rounded to the millisecond, as WebVTT is. */
+const ms = (seconds: number): number => Math.round(seconds * 1000) / 1000
+
 describe('playback', () => {
   const state = {
     root: '',
+    lead: 0,
     app: null as NestFastifyApplication | null,
     movie: null as MediaItem | null,
   }
@@ -70,6 +97,7 @@ describe('playback', () => {
     state.root = await mkdtemp(join(tmpdir(), 'raven-playback-'))
     const media = join(state.root, 'media')
     await encodeRichClip({ path: join(media, 'Rich (2026).mkv'), cues: CUES })
+    state.lead = await videoLead(join(media, 'Rich (2026).mkv'))
     // Latin-1 rather than UTF-8, as plenty of old sidecars are.
     await writeFile(join(media, 'Rich (2026).en.forced.srt'), Buffer.from(SIDECAR, 'latin1'))
     state.app = await createApp({
@@ -146,7 +174,14 @@ describe('playback', () => {
     })
     expect(response.statusCode).toBe(200)
     expect(response.headers['content-type']).toContain('text/vtt')
-    expect(parseWebVtt(response.body)).toEqual([
+    // The source SRT's times, moved wherever muxing put the file's start.
+    expect(
+      parseWebVtt(response.body).map((cue) => ({
+        ...cue,
+        start: ms(cue.start - state.lead),
+        end: ms(cue.end - state.lead),
+      })),
+    ).toEqual([
       { start: 1, end: 3, text: 'First <i>line</i>' },
       { start: 12.5, end: 14, text: 'Second line' },
     ])
@@ -197,17 +232,18 @@ describe('playback', () => {
 
     it('starts a remux on the file clock, shifted, from the keyframe before the start', async () => {
       const times = await firstPacketTimes(await fetchStream('mode=remux&start=12&audio=1'))
-      const video = times.video - STREAM_TIME_SHIFT
-      // Keyframes fall every two seconds; ffmpeg starts at one before the target.
+      const video = times.video - STREAM_TIME_SHIFT - state.lead
+      // Keyframes fall every two seconds from the video's start; ffmpeg
+      // starts at one before the target.
       expect(video).toBeGreaterThanOrEqual(8)
       expect(video).toBeLessThanOrEqual(12)
-      expect(Number.isInteger(Math.round(video * 1000) / 1000)).toBe(true)
+      expect(Number.isInteger(ms(video))).toBe(true)
       expect(times.audio - STREAM_TIME_SHIFT).toBeGreaterThan(7.9)
     })
 
     it('starts at the shift itself from the top of the file', async () => {
       const times = await firstPacketTimes(await fetchStream('mode=transcode&start=0'))
-      expect(times.video).toBeCloseTo(STREAM_TIME_SHIFT, 1)
+      expect(times.video).toBeCloseTo(STREAM_TIME_SHIFT + state.lead, 1)
       expect(times.audio).toBeGreaterThan(0)
     })
 
