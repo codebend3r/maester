@@ -5,7 +5,7 @@ import { Icon } from '@/components/Icon/Icon'
 import { MediaMenu } from '@/components/MediaMenu/MediaMenu'
 import { api } from '@/lib/api'
 import { browserCanPlay } from '@/lib/canPlay'
-import styles from './MediaCard.module.scss'
+import styles from '@/components/MediaCard/MediaCard.module.scss'
 
 /** How far through the video playback stopped, as a fraction for the resume line. */
 const progressOf = (media: MediaItem): number =>

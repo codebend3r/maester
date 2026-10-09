@@ -23,8 +23,9 @@ The image builds from the repo root: `docker build -f apps/raven/Dockerfile .`. 
 - No `for`/`for...of`/`for...in` loops; use array methods. Prefer immutable updates.
 - One object parameter instead of several positional ones.
 - `!!value` for booleans; `&&` rather than a ternary with a null branch in JSX; `?.` always paired with `??`.
-- Server constructors inject with explicit `@Inject(Token)`, so DI never depends on decorator metadata under vitest.
-- Web modules import via `@/`; styles are `*.module.scss` using the tokens in `apps/raven/web/src/styles/globals.scss`.
+- Server constructors inject with explicit `@Inject(Token)`, so DI never depends on decorator metadata, which neither vitest nor `tsx` emits.
+- All three projects import their own modules via `@/` with no extension (see the root `CLAUDE.md`); `tsconfig.json` uses `"moduleResolution": "bundler"` so TypeScript allows it. The server's `dev` runs through `tsx`, and its `build` is `tsc` then `tsc-alias`.
+- Styles are `*.module.scss` using the tokens in `apps/raven/web/src/styles/globals.scss`.
 - CSS layout is grid with `gap` and container padding; no flex layouts and no margins for spacing. Every page works at 320px wide.
 - Accessibility: semantic elements, labels on every control, visible `:focus-visible`, reduced motion respected.
 - Writing: no em dashes or en dashes anywhere, including comments and UI copy.

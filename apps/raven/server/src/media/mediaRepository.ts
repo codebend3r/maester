@@ -8,8 +8,8 @@ import {
   isThumbnailState,
   titleFromFileName,
 } from '@raven/core'
-import { DatabaseService } from '@/db/database.js'
-import type { ProbeResult } from '@/ffmpeg/probe.js'
+import { DatabaseService } from '@/db/database'
+import type { ProbeResult } from '@/ffmpeg/probe'
 
 /** A media row with the server-only fields a client never sees. */
 export type MediaRecord = MediaItem & {

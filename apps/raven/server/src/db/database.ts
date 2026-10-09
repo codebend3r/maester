@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, renameSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { Inject, Injectable, type OnModuleDestroy } from '@nestjs/common'
 import Sqlite from 'better-sqlite3'
-import { SERVER_CONFIG, type ServerConfig } from '@/config.js'
+import { SERVER_CONFIG, type ServerConfig } from '@/config'
 
 /**
  * Each entry moves the schema one version forward and runs exactly once,

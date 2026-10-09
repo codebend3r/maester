@@ -6,7 +6,7 @@ import { Button, ButtonLink } from '@/components/Button/Button'
 import { api } from '@/lib/api'
 import { browserCanPlay } from '@/lib/canPlay'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
-import styles from './Player.module.scss'
+import styles from '@/components/Player/Player.module.scss'
 
 /** How long the top bar and cursor linger after the last mouse move or key press. */
 const IDLE_MS = 2500

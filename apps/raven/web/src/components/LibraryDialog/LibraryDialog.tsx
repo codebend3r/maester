@@ -6,7 +6,7 @@ import { Button } from '@/components/Button/Button'
 import { FolderBrowser } from '@/components/FolderBrowser/FolderBrowser'
 import { api } from '@/lib/api'
 import { queryKeys } from '@/lib/queryClient'
-import styles from './LibraryDialog.module.scss'
+import styles from '@/components/LibraryDialog/LibraryDialog.module.scss'
 
 /**
  * Creates a library, or edits one when `library` is given. A native modal

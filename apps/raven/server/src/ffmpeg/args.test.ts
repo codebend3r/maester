@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { TONEMAP_FILTER, thumbnailArgs, thumbnailSeek } from '@/ffmpeg/args.js'
+import { TONEMAP_FILTER, thumbnailArgs, thumbnailSeek } from '@/ffmpeg/args'
 
 describe('thumbnailSeek', () => {
   it('lands a tenth of the way in', () => {

@@ -1,7 +1,7 @@
 import type { ComponentProps, ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { Icon, type IconName } from '@/components/Icon/Icon'
-import styles from './Button.module.scss'
+import styles from '@/components/Button/Button.module.scss'
 
 export type ButtonTone = 'primary' | 'quiet' | 'danger'
 

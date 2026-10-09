@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { validateLibraryInput } from './libraryInput.js'
+import { validateLibraryInput } from '@/libraryInput'
 
 describe('validateLibraryInput', () => {
   it('trims the name and tidies the paths', () => {

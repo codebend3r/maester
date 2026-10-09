@@ -20,10 +20,10 @@ import {
 } from '@nestjs/common'
 import { type MediaItem, containerMimeType, isNumber, isRecord, isString } from '@raven/core'
 import type { FastifyReply, FastifyRequest } from 'fastify'
-import { type MediaRecord, MediaRepository, toMediaItem } from '@/media/mediaRepository.js'
-import { parseRange } from '@/media/range.js'
-import { ScannerService } from '@/scanner/scannerService.js'
-import { ThumbnailService } from '@/thumbnails/thumbnailService.js'
+import { type MediaRecord, MediaRepository, toMediaItem } from '@/media/mediaRepository'
+import { parseRange } from '@/media/range'
+import { ScannerService } from '@/scanner/scannerService'
+import { ThumbnailService } from '@/thumbnails/thumbnailService'
 
 const errorCode = (error: unknown): string =>
   isRecord(error) && isString(error.code) ? error.code : ''

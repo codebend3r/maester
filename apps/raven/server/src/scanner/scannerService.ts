@@ -6,13 +6,13 @@ import {
   type OnModuleDestroy,
 } from '@nestjs/common'
 import type { ScanStatus } from '@raven/core'
-import { SERVER_CONFIG, type ServerConfig } from '@/config.js'
-import { FfmpegService, FfmpegTimeoutError } from '@/ffmpeg/ffmpegService.js'
-import { LibrariesRepository } from '@/libraries/librariesRepository.js'
-import { type FoundFile, MediaRepository } from '@/media/mediaRepository.js'
-import { mapWithConcurrency } from '@/scanner/concurrency.js'
-import { walkVideos } from '@/scanner/walk.js'
-import { ThumbnailService } from '@/thumbnails/thumbnailService.js'
+import { SERVER_CONFIG, type ServerConfig } from '@/config'
+import { FfmpegService, FfmpegTimeoutError } from '@/ffmpeg/ffmpegService'
+import { LibrariesRepository } from '@/libraries/librariesRepository'
+import { type FoundFile, MediaRepository } from '@/media/mediaRepository'
+import { mapWithConcurrency } from '@/scanner/concurrency'
+import { walkVideos } from '@/scanner/walk'
+import { ThumbnailService } from '@/thumbnails/thumbnailService'
 
 const IDLE: ScanStatus = {
   state: 'idle',

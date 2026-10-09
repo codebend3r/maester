@@ -4,7 +4,7 @@ import { type KeyboardEvent, useEffect, useId, useRef, useState } from 'react'
 import { Button } from '@/components/Button/Button'
 import { Icon } from '@/components/Icon/Icon'
 import { useMediaMutations } from '@/lib/useMediaMutations'
-import styles from './MediaMenu.module.scss'
+import styles from '@/components/MediaMenu/MediaMenu.module.scss'
 
 /** Deleting is the one action here that cannot be undone, so it asks first. */
 const ConfirmDelete = ({

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { checkDirectPlay, videoCodecString } from './playback.js'
-import { chromeLike, mediaItem, safariLike } from './test/fixtures.js'
+import { checkDirectPlay, videoCodecString } from '@/playback'
+import { chromeLike, mediaItem, safariLike } from '@/test/fixtures'
 
 describe('checkDirectPlay', () => {
   it('plays an H.264/AAC MP4', () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { isMediaItem } from './guards.js'
-import { mediaItem } from './test/fixtures.js'
+import { isMediaItem } from '@/guards'
+import { mediaItem } from '@/test/fixtures'
 
 describe('isMediaItem', () => {
   it('accepts an item that carries its favourite flag', () => {

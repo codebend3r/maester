@@ -4,8 +4,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import Sqlite from 'better-sqlite3'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { readServerConfig } from '@/config.js'
-import { adoptLegacyDatabase, DatabaseService } from '@/db/database.js'
+import { readServerConfig } from '@/config'
+import { adoptLegacyDatabase, DatabaseService } from '@/db/database'
 
 describe('the database file', () => {
   const state = { dir: '' }

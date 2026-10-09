@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseProbe } from '@/ffmpeg/probe.js'
+import { parseProbe } from '@/ffmpeg/probe'
 
 /** Trimmed from a real ffprobe run on a 4K HDR episode on the NAS. */
 const hdrEpisode = {

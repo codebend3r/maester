@@ -10,7 +10,7 @@ import { api } from '@/lib/api'
 import { queryKeys } from '@/lib/queryClient'
 import { useDebouncedValue } from '@/lib/useDebouncedValue'
 import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
-import styles from './LibraryPage.module.scss'
+import styles from '@/pages/LibraryPage/LibraryPage.module.scss'
 
 const count = new Intl.NumberFormat()
 

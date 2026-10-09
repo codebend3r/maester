@@ -5,7 +5,7 @@ import type {
   MediaItem,
   ScanStatus,
   ThumbnailState,
-} from './types.js'
+} from '@/types'
 
 /**
  * Type guards for everything that crosses the network. `response.json()` and

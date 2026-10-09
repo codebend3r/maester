@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { walkVideos } from '@/scanner/walk.js'
+import { walkVideos } from '@/scanner/walk'
 
 describe('walkVideos', () => {
   const state = { root: '' }

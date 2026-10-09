@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatBytes, formatChannels, formatDuration, formatRuntime } from './format.js'
+import { formatBytes, formatChannels, formatDuration, formatRuntime } from '@/format'
 
 describe('formatDuration', () => {
   it.each([

@@ -32,7 +32,23 @@
     "no-console": ["warn", { "allow": ["warn", "error"] }],
     "no-iterator": "error",
     "unicorn/prefer-array-flat-map": "error",
-    "import/no-default-export": "error"
+    "import/no-default-export": "error",
+    // Every local import goes through the `@/` alias and names no extension.
+    "no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          {
+            "regex": "^\\.{1,2}(/|$)",
+            "message": "Import through the @/ alias, not a relative path."
+          },
+          {
+            "regex": "\\.(?:[cm]?[jt]sx?)$",
+            "message": "Leave the extension off: @/lib/api, not @/lib/api.js."
+          }
+        ]
+      }
+    ]
   },
   "ignorePatterns": ["dist", "public"],
   "overrides": [

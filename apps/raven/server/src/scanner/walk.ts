@@ -2,8 +2,8 @@ import type { Dirent } from 'node:fs'
 import { readdir, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { extensionOf, isVideoFile } from '@raven/core'
-import type { FoundFile } from '@/media/mediaRepository.js'
-import { mapWithConcurrency } from '@/scanner/concurrency.js'
+import type { FoundFile } from '@/media/mediaRepository'
+import { mapWithConcurrency } from '@/scanner/concurrency'
 
 /**
  * Folders that are never media: NAS housekeeping (Synology's @eaDir holds

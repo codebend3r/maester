@@ -2,9 +2,9 @@ import { join } from 'node:path'
 import fastifyStatic from '@fastify/static'
 import { NestFactory } from '@nestjs/core'
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify'
-import { AppModule } from '@/appModule.js'
-import type { ServerConfig } from '@/config.js'
-import { SpaFallbackFilter } from '@/spa/spaFallbackFilter.js'
+import { AppModule } from '@/appModule'
+import type { ServerConfig } from '@/config'
+import { SpaFallbackFilter } from '@/spa/spaFallbackFilter'
 
 /**
  * The configured application, not yet listening, so a test can drive it

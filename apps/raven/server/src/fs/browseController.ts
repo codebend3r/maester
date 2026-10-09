@@ -10,7 +10,7 @@ import {
   Query,
 } from '@nestjs/common'
 import type { DirectoryEntry, DirectoryListing } from '@raven/core'
-import { SERVER_CONFIG, type ServerConfig } from '@/config.js'
+import { SERVER_CONFIG, type ServerConfig } from '@/config'
 
 const isInside = ({ root, path }: { root: string; path: string }): boolean =>
   path === root || path.startsWith(root.endsWith(sep) ? root : `${root}${sep}`)

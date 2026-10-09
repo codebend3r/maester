@@ -1,6 +1,6 @@
 import { Controller, Get, Inject } from '@nestjs/common'
-import { FfmpegService } from '@/ffmpeg/ffmpegService.js'
-import { ThumbnailService } from '@/thumbnails/thumbnailService.js'
+import { FfmpegService } from '@/ffmpeg/ffmpegService'
+import { ThumbnailService } from '@/thumbnails/thumbnailService'
 
 export type Health = {
   status: 'ok'

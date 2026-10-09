@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseRange } from '@/media/range.js'
+import { parseRange } from '@/media/range'
 
 describe('parseRange', () => {
   const size = 1000

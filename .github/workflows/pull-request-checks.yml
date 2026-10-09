@@ -30,6 +30,12 @@ jobs:
           # typos over the whole repo, dotfiles included.
           - name: 🔤 Spellcheck
             run: bun run spellcheck
+          # No tracked .js, .jsx, .mjs or .cjs file anywhere.
+          - name: 🟦 TypeScript only
+            run: bun run typescript-only
+          # No package.json script chained with `&&`, `||` or `;`.
+          - name: 🧩 One command per script
+            run: bun run one-command-per-script
           # ruff, oxlint and stylelint.
           - name: 🧹 Lint
             run: bun run lint

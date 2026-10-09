@@ -1,8 +1,8 @@
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { Inject, Injectable } from '@nestjs/common'
-import { SERVER_CONFIG, type ServerConfig } from '@/config.js'
-import { type ProbeResult, parseProbe } from '@/ffmpeg/probe.js'
+import { SERVER_CONFIG, type ServerConfig } from '@/config'
+import { type ProbeResult, parseProbe } from '@/ffmpeg/probe'
 
 const run = promisify(execFile)
 

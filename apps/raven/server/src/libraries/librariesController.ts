@@ -20,10 +20,10 @@ import {
   type MediaSort,
   validateLibraryInput,
 } from '@raven/core'
-import { type LibraryRecord, LibrariesRepository } from '@/libraries/librariesRepository.js'
-import { MediaRepository, toMediaItem } from '@/media/mediaRepository.js'
-import { ScannerService } from '@/scanner/scannerService.js'
-import { ThumbnailService } from '@/thumbnails/thumbnailService.js'
+import { type LibraryRecord, LibrariesRepository } from '@/libraries/librariesRepository'
+import { MediaRepository, toMediaItem } from '@/media/mediaRepository'
+import { ScannerService } from '@/scanner/scannerService'
+import { ThumbnailService } from '@/thumbnails/thumbnailService'
 
 const parseInput = (body: unknown): LibraryInput => {
   const result = validateLibraryInput(body)

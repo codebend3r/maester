@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { containerOf, isVideoFile, resolutionLabel, titleFromFileName } from './media.js'
+import { containerOf, isVideoFile, resolutionLabel, titleFromFileName } from '@/media'
 
 describe('isVideoFile', () => {
   it.each(['a.mkv', 'b.MP4', 'c.m4v', 'd.webm', 'e.ts'])('accepts %s', (name) => {

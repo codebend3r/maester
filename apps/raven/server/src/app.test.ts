@@ -12,11 +12,11 @@ import {
   isMediaList,
 } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { createApp } from '@/app.js'
-import { type ServerConfig, readServerConfig } from '@/config.js'
-import { ScannerService } from '@/scanner/scannerService.js'
-import { encodeClip } from '@/test/clips.js'
-import { ThumbnailService } from '@/thumbnails/thumbnailService.js'
+import { createApp } from '@/app'
+import { type ServerConfig, readServerConfig } from '@/config'
+import { ScannerService } from '@/scanner/scannerService'
+import { encodeClip } from '@/test/clips'
+import { ThumbnailService } from '@/thumbnails/thumbnailService'
 
 type Injected = {
   statusCode: number

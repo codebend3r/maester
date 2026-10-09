@@ -3,6 +3,14 @@
 # and {staged_files} are relative to it.
 pre-commit:
   jobs:
+    - name: typescript only
+      glob: '*.{js,jsx,mjs,cjs}'
+      run: 'echo "Only TypeScript belongs in the repo; convert these to .ts or .tsx: {staged_files}" && exit 1'
+
+    - name: one command per script
+      glob: ['package.json', '**/package.json']
+      run: '! grep -nE "&&|\|\||; " {staged_files} || { echo "Split chained scripts and run them with bun run --sequential"; exit 1; }'
+
     - name: ruff check (luwin api)
       root: apps/luwin/api/
       glob: '*.{py,pyi}'

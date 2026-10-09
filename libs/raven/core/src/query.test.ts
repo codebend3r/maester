@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fromQueryString, toQueryString } from './query.js'
+import { fromQueryString, toQueryString } from '@/query'
 
 describe('query strings', () => {
   it('encodes and decodes paths with spaces and ampersands', () => {

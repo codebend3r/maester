@@ -7,7 +7,7 @@ import { LibraryDialog } from '@/components/LibraryDialog/LibraryDialog'
 import { ScanStatus } from '@/components/ScanStatus/ScanStatus'
 import { api } from '@/lib/api'
 import { queryKeys } from '@/lib/queryClient'
-import styles from './LibrariesPage.module.scss'
+import styles from '@/pages/LibrariesPage/LibrariesPage.module.scss'
 
 const count = new Intl.NumberFormat()
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createTaskQueue, mapWithConcurrency } from '@/scanner/concurrency.js'
+import { createTaskQueue, mapWithConcurrency } from '@/scanner/concurrency'
 
 const tick = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 

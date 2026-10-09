@@ -1,5 +1,5 @@
-import type { CanPlay } from '../playback.js'
-import type { MediaItem } from '../types.js'
+import type { CanPlay } from '@/playback'
+import type { MediaItem } from '@/types'
 
 export const mediaItem = (overrides: Partial<MediaItem> = {}): MediaItem => ({
   id: 1,

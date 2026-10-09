@@ -2,11 +2,11 @@ import { mkdirSync } from 'node:fs'
 import { rename, rm, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Inject, Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common'
-import { SERVER_CONFIG, type ServerConfig } from '@/config.js'
-import { thumbnailArgs, thumbnailSeek } from '@/ffmpeg/args.js'
-import { FfmpegService, FfmpegTimeoutError } from '@/ffmpeg/ffmpegService.js'
-import { MediaRepository } from '@/media/mediaRepository.js'
-import { createTaskQueue } from '@/scanner/concurrency.js'
+import { SERVER_CONFIG, type ServerConfig } from '@/config'
+import { thumbnailArgs, thumbnailSeek } from '@/ffmpeg/args'
+import { FfmpegService, FfmpegTimeoutError } from '@/ffmpeg/ffmpegService'
+import { MediaRepository } from '@/media/mediaRepository'
+import { createTaskQueue } from '@/scanner/concurrency'
 
 const exists = async (path: string): Promise<boolean> =>
   stat(path).then(

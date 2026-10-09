@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { Link, Outlet, matchPath, useLocation } from 'react-router-dom'
-import styles from './AppShell.module.scss'
+import styles from '@/components/AppShell/AppShell.module.scss'
 
 /** A link in the side menu, marked as current when the location matches any of its patterns. */
 const NavItem = ({

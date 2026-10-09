@@ -7,9 +7,9 @@ import {
   isRecord,
   isString,
   isStringArray,
-} from './guards.js'
-import { toQueryString } from './query.js'
-import type { DirectoryListing, Library, LibraryInput, MediaItem, MediaSort } from './types.js'
+} from '@/guards'
+import { toQueryString } from '@/query'
+import type { DirectoryListing, Library, LibraryInput, MediaItem, MediaSort } from '@/types'
 
 /**
  * The slice of `fetch` the client uses, spelled out structurally so this

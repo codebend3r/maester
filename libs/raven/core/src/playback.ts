@@ -1,4 +1,4 @@
-import type { MediaItem } from './types.js'
+import type { MediaItem } from '@/types'
 
 /**
  * Asks the client whether it can decode a MIME type such as

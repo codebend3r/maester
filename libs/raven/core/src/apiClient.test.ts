@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { ApiError, type FetchInit, type FetchResponse, createApiClient } from './apiClient.js'
-import { mediaItem } from './test/fixtures.js'
+import { ApiError, type FetchInit, type FetchResponse, createApiClient } from '@/apiClient'
+import { mediaItem } from '@/test/fixtures'
 
 type Call = { url: string; init?: FetchInit }
 

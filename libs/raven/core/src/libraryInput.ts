@@ -1,5 +1,5 @@
-import { isRecord, isString } from './guards.js'
-import type { LibraryInput } from './types.js'
+import { isRecord, isString } from '@/guards'
+import type { LibraryInput } from '@/types'
 
 export const LIBRARY_NAME_MAX = 80
 
