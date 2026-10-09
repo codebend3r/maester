@@ -40,11 +40,12 @@ export const createApp = async ({
     if (PRIVATE_PREFIXES.some((prefix) => request.url.startsWith(prefix))) {
       reply.header('cache-control', 'no-store')
     }
-    if (READS.has(request.method)) return
     const type = request.headers['content-type']?.toLowerCase() ?? ''
-    if (!type.startsWith('application/json')) {
-      await reply.code(415).send({ reason: 'json_required' })
+    // Returning the reply ends the request here instead of running the route.
+    if (!READS.has(request.method) && !type.startsWith('application/json')) {
+      return reply.code(415).send({ reason: 'json_required' })
     }
+    return undefined
   })
 
   // In Docker the server hands out the built web app too, so there is one
