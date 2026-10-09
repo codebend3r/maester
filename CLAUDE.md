@@ -14,13 +14,15 @@
 
 An Nx 23 monorepo over Bun workspaces (`apps/*/*`, `libs/*/*`, `scripts`). Projects have no `project.json`: Nx infers targets from each `package.json`'s scripts, whitelisted by its `nx.includedScripts`. A new script that should be a target goes in that list too.
 
-| Project         | Path                | What                                                                          |
-| --------------- | ------------------- | ----------------------------------------------------------------------------- |
-| `@luwin/api`    | `apps/luwin/api`    | Python 3.12 package run through uv: agent, tools, chat, FastAPI, SQLite       |
-| `@raven/server` | `apps/raven/server` | NestJS 12 on Fastify, SQLite (better-sqlite3), ffprobe/ffmpeg, vitest         |
-| `@raven/web`    | `apps/raven/web`    | React 19, Vite 8, TanStack Query, zustand, SCSS modules, bun test + happy-dom |
-| `@raven/core`   | `libs/raven/core`   | raven's shared core: API types and guards, API client, direct-play check      |
-| `scripts`       | `scripts`           | Repo tooling; its Python is linted with luwin's pinned ruff and config        |
+| Project           | Path                  | What                                                                          |
+| ----------------- | --------------------- | ----------------------------------------------------------------------------- |
+| `@luwin/api`      | `apps/luwin/api`      | Python 3.12 package run through uv: agent, tools, chat, FastAPI, SQLite       |
+| `@raven/server`   | `apps/raven/server`   | NestJS 12 on Fastify, SQLite (better-sqlite3), ffprobe/ffmpeg, vitest         |
+| `@raven/web`      | `apps/raven/web`      | React 19, Vite 8, TanStack Query, zustand, SCSS modules, bun test + happy-dom |
+| `@raven/core`     | `libs/raven/core`     | raven's shared core: API types and guards, API client, direct-play check      |
+| `@rookery/server` | `apps/rookery/server` | The suite's sign-in: NestJS 12 on Fastify, SQLite (better-sqlite3), vitest    |
+| `@rookery/web`    | `apps/rookery/web`    | rookery's login and logout pages: React 19, Vite 8, bun test + happy-dom      |
+| `scripts`         | `scripts`             | Repo tooling; its Python is linted with luwin's pinned ruff and config        |
 
 Python projects declare `package.json` scripts that call uv (`uv run pytest -q`, `uv run ruff check .`); Nx runs them in the project's folder. There is no Python Nx plugin and no uv workspace.
 

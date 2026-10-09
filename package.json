@@ -1,7 +1,7 @@
 {
   "name": "maester",
   "private": true,
-  "description": "Nx workspace for maester, a self-hosted media suite: raven, a media library and direct-play player, luwin, an AI assistant for a private Plex server, and the apps and libraries around them",
+  "description": "Nx workspace for maester, a self-hosted media suite: raven, a media library and direct-play player, luwin, an AI assistant for a private Plex server, rookery, the suite's sign-in, and the apps and libraries around them",
   "workspaces": [
     "apps/*/*",
     "libs/*/*",
@@ -11,6 +11,7 @@
   "scripts": {
     "dev:luwin": "nx run @luwin/api:dev",
     "dev:raven": "nx run-many -t dev -p @raven/server @raven/web",
+    "dev:rookery": "nx run-many -t dev -p @rookery/server @rookery/web",
     "build": "nx run-many -t build",
     "test": "nx run-many -t test",
     "typecheck": "nx run-many -t typecheck",

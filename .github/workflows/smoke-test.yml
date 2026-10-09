@@ -129,3 +129,48 @@ jobs:
       - name: 🧹 Stop container
         if: always()
         run: docker rm -f raven || true
+
+  rookery:
+    name: 🩺 rookery build and health check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      IMAGE: rookery:ci
+      PORT: 8030
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v7
+
+      # Built from the repo root, as compose does; the Dockerfile's own
+      # ignore file keeps the context to what it copies.
+      - name: 🐳 Build image
+        run: docker build -f apps/rookery/Dockerfile -t "$IMAGE" .
+
+      # rookery refuses to boot without its required settings, so the check
+      # passes placeholders; nothing here signs anyone in.
+      - name: ▶️ Start server
+        run: |
+          docker run -d --name rookery -p "$PORT:$PORT" \
+            -e PUBLIC_URL=http://127.0.0.1:8030 -e SERVICE_TOKEN=ci "$IMAGE"
+
+      - name: 🩺 Wait for /health
+        run: |
+          for _ in $(seq 1 30); do
+            if body="$(curl -fsS "http://127.0.0.1:$PORT/health")"; then
+              echo "$body"
+              echo "$body" | jq -e '.status == "ok"'
+              curl -fsS -o /dev/null "http://127.0.0.1:$PORT/login"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::/health did not respond within 30s"
+          exit 1
+
+      - name: 📜 Container logs
+        if: always()
+        run: docker logs rookery || true
+
+      - name: 🧹 Stop container
+        if: always()
+        run: docker rm -f rookery || true

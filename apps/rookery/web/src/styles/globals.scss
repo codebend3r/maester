@@ -1,0 +1,97 @@
+// Design tokens and the few true primitives. Component styles live next to
+// their component as *.module.scss and use only these values.
+
+// The palette is the rookery itself: night stone for the ground, a lit
+// window's parchment for text, and Plex's amber kept for the one thing this
+// app is for, signing in with Plex.
+:root {
+  --color-ground: #16181d;
+  --color-wall: #1f232a;
+  --color-mortar: #353b46;
+  --color-parchment: #ece6da;
+  // 7.8:1 on --color-ground, 6.9:1 on --color-wall.
+  --color-ash: #a7adb8;
+  // Fills behind ground-coloured text: 8:1.
+  --color-plex: #e5a00d;
+  --color-plex-hover: #f2b632;
+  // Error text on --color-wall: 7.4:1.
+  --color-alert: #f3aaa2;
+
+  --space-1: 0.5rem;
+  --space-2: 0.75rem;
+  --space-3: 1rem;
+  --space-4: 1.5rem;
+  --space-5: 2rem;
+  --space-6: 3rem;
+
+  --radius-md: 8px;
+  --radius-lg: 14px;
+
+  --font-display: 'Young Serif', georgia, serif;
+  --font-body: 'Instrument Sans Variable', system-ui, sans-serif;
+
+  --font-size-sm: 0.9rem;
+  --font-size-md: 1rem;
+  --font-size-lg: 1.25rem;
+  --font-size-xl: 2rem;
+
+  --line-tight: 1.1;
+  --line-body: 1.5;
+
+  --measure: 26rem;
+  --focus-ring: 2px solid var(--color-parchment);
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--color-ground);
+  color: var(--color-parchment);
+  font-family: var(--font-body);
+  font-size: var(--font-size-md);
+  line-height: var(--line-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+p {
+  margin: 0;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+a {
+  color: inherit;
+}
+
+:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 3px;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms;
+    animation-duration: 0.01ms;
+  }
+}
