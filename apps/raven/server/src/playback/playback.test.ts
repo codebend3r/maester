@@ -54,35 +54,19 @@ const firstPacketTimes = async (path: string): Promise<{ video: number; audio: n
   return { video: await first('v:0'), audio: await first('a:0') }
 }
 
-/**
- * How far into the file its video starts. Muxing can shift a whole file
- * later than the source: ffmpeg 6 makes room for the AAC encoder's
- * priming by moving every stream, subtitles included, 23ms on, while
- * ffmpeg 9 keeps it at zero. Times the server reports are the file's own,
- * so expectations are measured from here.
- */
-const videoLead = async (path: string): Promise<number> => {
-  const { stdout } = await run('ffprobe', [
-    '-v',
-    'error',
-    '-select_streams',
-    'v:0',
-    '-show_entries',
-    'stream=start_time',
-    '-of',
-    'csv=p=0',
-    path,
-  ])
-  const lead = Number(stdout.trim())
-  return Number.isFinite(lead) ? lead : 0
-}
-
 /** Rounded to the millisecond, as WebVTT is. */
 const ms = (seconds: number): number => Math.round(seconds * 1000) / 1000
 
 describe('playback', () => {
   const state = {
     root: '',
+    /**
+     * Where the server's clock puts the video's first frame. Usually 0, but
+     * the clock counts from the file's earliest packet, and ffmpeg 6 reads
+     * the test clip's AAC priming as starting 23ms before the video
+     * (ffmpeg 9 does not). Subtitles and streams share that clock, which is
+     * what the player needs, so expectations are measured from here.
+     */
     lead: 0,
     app: null as NestFastifyApplication | null,
     movie: null as MediaItem | null,
@@ -97,7 +81,6 @@ describe('playback', () => {
     state.root = await mkdtemp(join(tmpdir(), 'raven-playback-'))
     const media = join(state.root, 'media')
     await encodeRichClip({ path: join(media, 'Rich (2026).mkv'), cues: CUES })
-    state.lead = await videoLead(join(media, 'Rich (2026).mkv'))
     // Latin-1 rather than UTF-8, as plenty of old sidecars are.
     await writeFile(join(media, 'Rich (2026).en.forced.srt'), Buffer.from(SIDECAR, 'latin1'))
     state.app = await createApp({
@@ -126,6 +109,13 @@ describe('playback', () => {
     ).json()
     if (!isMediaList(listed) || !listed[0]) throw new Error('nothing indexed')
     state.movie = listed[0]
+    const fromTop = await state.app.inject({
+      method: 'GET',
+      url: `/api/media/${listed[0].id}/stream?mode=remux&start=0`,
+    })
+    const top = join(state.root, 'top.mp4')
+    await writeFile(top, fromTop.rawPayload)
+    state.lead = (await firstPacketTimes(top)).video - STREAM_TIME_SHIFT
   })
 
   afterAll(async () => {
@@ -174,7 +164,7 @@ describe('playback', () => {
     })
     expect(response.statusCode).toBe(200)
     expect(response.headers['content-type']).toContain('text/vtt')
-    // The source SRT's times, moved wherever muxing put the file's start.
+    // The source SRT's times, on the same clock as the server's streams.
     expect(
       parseWebVtt(response.body).map((cue) => ({
         ...cue,
