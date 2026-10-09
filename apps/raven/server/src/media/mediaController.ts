@@ -22,6 +22,7 @@ import { type MediaItem, containerMimeType, isNumber, isRecord, isString } from 
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { type MediaRecord, MediaRepository, toMediaItem } from '@/media/mediaRepository'
 import { parseRange } from '@/media/range'
+import { SubtitlesService } from '@/playback/subtitlesService'
 import { ScannerService } from '@/scanner/scannerService'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
 
@@ -46,6 +47,7 @@ export class MediaController {
     @Inject(MediaRepository) private readonly media: MediaRepository,
     @Inject(ThumbnailService) private readonly thumbnails: ThumbnailService,
     @Inject(ScannerService) private readonly scanner: ScannerService,
+    @Inject(SubtitlesService) private readonly subtitles: SubtitlesService,
   ) {}
 
   private find(id: number): MediaRecord {
@@ -102,6 +104,7 @@ export class MediaController {
       }
     }
     await this.thumbnails.discard([id])
+    await this.subtitles.discard([id])
     this.media.removeMany([id])
   }
 
@@ -129,9 +132,8 @@ export class MediaController {
   /**
    * Direct play: the file itself, with byte ranges. The browser asks for the
    * first bytes, finds the index, and starts playing; seeking is just another
-   * range request, so the server does nothing but read. There is no
-   * transcoding: a file the client cannot decode is reported as such by
-   * `checkDirectPlay` rather than converted.
+   * range request, so the server does nothing but read. Files the client
+   * cannot decode as they are go through `PlaybackController`'s stream.
    */
   @Get(':id/file')
   async file(

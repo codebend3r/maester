@@ -22,6 +22,7 @@ import {
 } from '@raven/core'
 import { type LibraryRecord, LibrariesRepository } from '@/libraries/librariesRepository'
 import { MediaRepository, toMediaItem } from '@/media/mediaRepository'
+import { SubtitlesService } from '@/playback/subtitlesService'
 import { ScannerService } from '@/scanner/scannerService'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
 
@@ -38,6 +39,7 @@ export class LibrariesController {
     @Inject(MediaRepository) private readonly media: MediaRepository,
     @Inject(ScannerService) private readonly scanner: ScannerService,
     @Inject(ThumbnailService) private readonly thumbnails: ThumbnailService,
+    @Inject(SubtitlesService) private readonly subtitles: SubtitlesService,
   ) {}
 
   private withStatus(record: LibraryRecord): Library {
@@ -81,7 +83,9 @@ export class LibrariesController {
   async remove(@Param('id', ParseIntPipe) id: number): Promise<void> {
     this.find(id)
     await this.scanner.whenIdle(id)
-    await this.thumbnails.discard(this.media.idsForLibrary(id))
+    const ids = this.media.idsForLibrary(id)
+    await this.thumbnails.discard(ids)
+    await this.subtitles.discard(ids)
     this.libraries.remove(id)
     this.scanner.forget(id)
   }

@@ -1,9 +1,12 @@
 import type {
+  AudioTrack,
   DirectoryEntry,
   DirectoryListing,
   Library,
   MediaItem,
+  MediaTracks,
   ScanStatus,
+  SubtitleTrack,
   ThumbnailState,
 } from '@/types'
 
@@ -95,3 +98,33 @@ export const isDirectoryListing = (value: unknown): value is DirectoryListing =>
     (entry): entry is DirectoryEntry =>
       isRecord(entry) && isString(entry.name) && isString(entry.path),
   )(value.directories)
+
+const isBoolean = (value: unknown): value is boolean => typeof value === 'boolean'
+
+export const isAudioTrack = (value: unknown): value is AudioTrack =>
+  isRecord(value) &&
+  isNumber(value.index) &&
+  isNullableString(value.codec) &&
+  isNullableNumber(value.channels) &&
+  isNullableString(value.language) &&
+  isNullableString(value.title) &&
+  isBoolean(value.default)
+
+export const isSubtitleTrack = (value: unknown): value is SubtitleTrack =>
+  isRecord(value) &&
+  isString(value.id) &&
+  (value.source === 'embedded' || value.source === 'external') &&
+  isNullableString(value.codec) &&
+  isNullableString(value.language) &&
+  isNullableString(value.title) &&
+  isBoolean(value.default) &&
+  isBoolean(value.forced) &&
+  isBoolean(value.hearingImpaired) &&
+  isBoolean(value.supported)
+
+export const isMediaTracks = (value: unknown): value is MediaTracks =>
+  isRecord(value) &&
+  arrayOf(isAudioTrack)(value.audio) &&
+  arrayOf(isSubtitleTrack)(value.subtitles) &&
+  isNullableNumber(value.defaultAudio) &&
+  isNullableNumber(value.frameRate)

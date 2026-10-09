@@ -1,6 +1,7 @@
-import { execFile } from 'node:child_process'
+import { type ChildProcessByStdio, execFile, spawn } from 'node:child_process'
+import type { Readable } from 'node:stream'
 import { promisify } from 'node:util'
-import { Inject, Injectable } from '@nestjs/common'
+import { Inject, Injectable, Logger, type OnModuleDestroy } from '@nestjs/common'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { type ProbeResult, parseProbe } from '@/ffmpeg/probe'
 
@@ -41,29 +42,67 @@ const failureText = (error: unknown): string => {
   return error instanceof Error ? error.message : String(error)
 }
 
+/** A running ffmpeg whose output is read as it is written. */
+export type FfmpegStream = ChildProcessByStdio<null, Readable, Readable>
+
 /** Everything that shells out to ffmpeg or ffprobe goes through here. */
 @Injectable()
-export class FfmpegService {
+export class FfmpegService implements OnModuleDestroy {
+  private readonly logger = new Logger(FfmpegService.name)
   private filters: Promise<ReadonlySet<string>> | null = null
+  private readonly streams = new Set<FfmpegStream>()
 
   constructor(@Inject(SERVER_CONFIG) private readonly config: ServerConfig) {}
 
-  async probe(path: string): Promise<ProbeResult> {
+  /** ffprobe's full `-show_format -show_streams` report, parsed but unchecked. */
+  async probeJson(path: string): Promise<unknown> {
     try {
       const { stdout } = await run(
         this.config.ffprobePath,
         ['-v', 'error', '-show_format', '-show_streams', '-of', 'json', path],
         { maxBuffer: 16 * 1024 * 1024, timeout: this.config.ffmpegTimeoutSeconds * 1000 },
       )
-      const result = parseProbe(JSON.parse(stdout))
-      if (!result) throw new Error('No audio or video streams')
-      return result
+      const parsed: unknown = JSON.parse(stdout)
+      return parsed
     } catch (error) {
       if (wasKilled(error)) {
         throw new FfmpegTimeoutError({ tool: 'ffprobe', seconds: this.config.ffmpegTimeoutSeconds })
       }
       throw new Error(failureText(error), { cause: error })
     }
+  }
+
+  async probe(path: string): Promise<ProbeResult> {
+    const result = parseProbe(await this.probeJson(path))
+    if (!result) throw new Error('No audio or video streams')
+    return result
+  }
+
+  /**
+   * Starts ffmpeg writing to stdout, with no time limit: a stream lasts as
+   * long as someone watches. The caller kills it when its reader goes
+   * away; anything still running when the server stops is killed then.
+   * A failure is logged with ffmpeg's own last line.
+   */
+  stream(args: string[]): FfmpegStream {
+    const child = spawn(this.config.ffmpegPath, args, { stdio: ['ignore', 'pipe', 'pipe'] })
+    const stderr = { tail: '' }
+    child.stderr.on('data', (chunk: Buffer) => {
+      stderr.tail = (stderr.tail + chunk.toString()).slice(-4096)
+    })
+    child.on('error', (error) => this.logger.warn(`ffmpeg did not start: ${error.message}`))
+    this.streams.add(child)
+    child.on('close', (code, signal) => {
+      this.streams.delete(child)
+      if (code !== 0 && signal == null) {
+        this.logger.warn(`ffmpeg stream failed (${code}): ${lastLine(stderr.tail)}`)
+      }
+    })
+    return child
+  }
+
+  onModuleDestroy(): void {
+    this.streams.forEach((child) => child.kill('SIGKILL'))
   }
 
   /** Runs ffmpeg to completion, rejecting with its own error line. */

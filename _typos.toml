@@ -6,3 +6,9 @@
 # .github and .claude hold the workflows and the skills, so check dotfiles too.
 ignore-hidden = false
 extend-exclude = [".git/"]
+
+[default.extend-words]
+# ISO 639-2 language codes raven matches track languages against.
+fre = "fre"
+mis = "mis"
+tha = "tha"

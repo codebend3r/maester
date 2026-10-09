@@ -9,6 +9,9 @@ import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { FavouritesController } from '@/media/favouritesController'
 import { MediaController } from '@/media/mediaController'
 import { MediaRepository } from '@/media/mediaRepository'
+import { PlaybackController } from '@/playback/playbackController'
+import { SubtitlesService } from '@/playback/subtitlesService'
+import { TracksService } from '@/playback/tracksService'
 import { ScannerService } from '@/scanner/scannerService'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
 
@@ -21,6 +24,7 @@ export class AppModule {
       controllers: [
         LibrariesController,
         MediaController,
+        PlaybackController,
         FavouritesController,
         BrowseController,
         HealthController,
@@ -32,6 +36,8 @@ export class AppModule {
         MediaRepository,
         FfmpegService,
         ThumbnailService,
+        TracksService,
+        SubtitlesService,
         ScannerService,
       ],
     }

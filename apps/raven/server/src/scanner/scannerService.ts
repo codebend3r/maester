@@ -10,6 +10,7 @@ import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { FfmpegService, FfmpegTimeoutError } from '@/ffmpeg/ffmpegService'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { type FoundFile, MediaRepository } from '@/media/mediaRepository'
+import { SubtitlesService } from '@/playback/subtitlesService'
 import { mapWithConcurrency } from '@/scanner/concurrency'
 import { walkVideos } from '@/scanner/walk'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
@@ -48,6 +49,7 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
     @Inject(MediaRepository) private readonly media: MediaRepository,
     @Inject(FfmpegService) private readonly ffmpeg: FfmpegService,
     @Inject(ThumbnailService) private readonly thumbnails: ThumbnailService,
+    @Inject(SubtitlesService) private readonly subtitles: SubtitlesService,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -113,6 +115,7 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
         .filter(([path]) => !found.has(path) && !isUnder({ path, roots: walk.unreadableRoots }))
         .map(([, file]) => file.id)
       await this.thumbnails.discard(gone)
+      await this.subtitles.discard(gone)
       this.media.removeMany(gone)
 
       const toProbe = walk.files.flatMap((file: FoundFile) => {

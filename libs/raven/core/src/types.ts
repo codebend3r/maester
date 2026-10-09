@@ -86,3 +86,60 @@ export type ApiErrorBody = {
   statusCode: number
   message: string | string[]
 }
+
+export type AudioTrack = {
+  /** Position among the file's audio tracks, as ffmpeg's `0:a:N` counts them. */
+  index: number
+  /** ffprobe codec name: 'aac', 'eac3', 'truehd', ... */
+  codec: string | null
+  channels: number | null
+  /** Normalised by `languageTag`: 'en' for 'eng', 'English' or 'en-US'; null when untagged. */
+  language: string | null
+  title: string | null
+  default: boolean
+}
+
+/** Embedded in the video file, or a file of its own beside it. */
+export type SubtitleSource = 'embedded' | 'external'
+
+export type SubtitleTrack = {
+  /** Stable for the file: `embedded-N` for the Nth subtitle stream, `external-N` for the Nth sidecar. */
+  id: string
+  source: SubtitleSource
+  /** ffprobe codec name ('subrip', 'ass', 'hdmv_pgs_subtitle', ...), or the sidecar's extension. */
+  codec: string | null
+  /** Normalised by `languageTag`, like an audio track's. */
+  language: string | null
+  title: string | null
+  default: boolean
+  forced: boolean
+  hearingImpaired: boolean
+  /** Text tracks convert to WebVTT; image tracks (PGS, VobSub, DVB) cannot be shown. */
+  supported: boolean
+}
+
+/** What a player can choose between, read from the file when it is opened. */
+export type MediaTracks = {
+  audio: AudioTrack[]
+  subtitles: SubtitleTrack[]
+  /** The audio track direct play gets: the one flagged default, else the first. */
+  defaultAudio: number | null
+  /** Frames per second, for stepping a frame at a time. */
+  frameRate: number | null
+}
+
+/** One subtitle, timed against the file. `text` may hold `<i>`, `<b>` and `<u>`. */
+export type SubtitleCue = {
+  start: number
+  end: number
+  text: string
+}
+
+/**
+ * How a file reaches the player: the original bytes, a remux with the video
+ * copied and the audio converted, or a full conversion of both.
+ */
+export type PlaybackMode = 'direct' | 'remux' | 'transcode'
+
+/** The two ways the server can convert a file on the fly. */
+export type StreamMode = Exclude<PlaybackMode, 'direct'>

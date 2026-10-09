@@ -1,4 +1,4 @@
-import type { MediaItem } from '@/types'
+import type { MediaItem, PlaybackMode, StreamMode } from '@/types'
 
 /**
  * Asks the client whether it can decode a MIME type such as
@@ -144,4 +144,93 @@ export const checkDirectPlay = ({
 
   const problems = [...videoProblems, ...audioProblems]
   return { playable: problems.length === 0, problems }
+}
+
+/**
+ * Converted streams are shifted this many seconds later than the file.
+ * Their first frames can carry slightly negative timestamps (B-frame
+ * reordering, AAC priming) and Media Source Extensions refuse those; the
+ * server adds this and the player takes it off again.
+ */
+export const STREAM_TIME_SHIFT = 1
+
+/** Codecs the server can copy into fragmented MP4 untouched. */
+const COPYABLE_VIDEO: ReadonlySet<string> = new Set(['h264', 'hevc', 'av1', 'vp9'])
+
+/** Every converted stream's audio is stereo AAC. */
+const STREAM_AUDIO = 'mp4a.40.2'
+
+/**
+ * The MIME type a converted stream is fed to Media Source Extensions as.
+ * A transcode is always 8-bit H.264; a remux keeps the file's video, or is
+ * assumed to be H.264 when the file has not been probed yet.
+ */
+export const streamMimeType = ({ media, mode }: { media: MediaItem; mode: StreamMode }): string => {
+  const video =
+    mode === 'transcode' || media.videoCodec == null
+      ? videoCodecString({ codec: 'h264', bitDepth: 8 })
+      : videoCodecString({ codec: media.videoCodec, bitDepth: media.videoBitDepth })
+  const codecs = [video, media.audioCodec == null ? null : STREAM_AUDIO].filter(
+    (codec): codec is string => codec != null,
+  )
+  return `video/mp4; codecs="${codecs.join(',')}"`
+}
+
+/** Best first: cheapest for the server and truest to the file. */
+const PLAYBACK_ORDER: readonly PlaybackMode[] = ['direct', 'remux', 'transcode']
+
+export type PlaybackPlan = {
+  /**
+   * The ways to try, best first. The player starts with the first and
+   * steps down when one fails. Empty when nothing is expected to work.
+   */
+  modes: PlaybackMode[]
+  /** Why the original file cannot play as it is; empty when it can. */
+  problems: string[]
+}
+
+/**
+ * How to play a file here. Direct play when the browser takes the file as
+ * it is and the default audio track is wanted; otherwise a remux when the
+ * browser can decode the video inside fragmented MP4, and a transcode as
+ * the last resort. `canStream` answers for Media Source Extensions
+ * (`MediaSource.isTypeSupported`), and says no to everything where they
+ * are missing.
+ */
+export const planPlayback = ({
+  media,
+  canPlay,
+  canStream,
+  defaultAudio,
+}: {
+  media: MediaItem
+  canPlay: CanPlay
+  canStream: CanPlay
+  /** Whether the chosen audio track is the one the file plays by default. */
+  defaultAudio: boolean
+}): PlaybackPlan => {
+  const check = checkDirectPlay({ media, canPlay })
+  const direct = check.playable && defaultAudio
+  const remux =
+    (media.videoCodec == null || COPYABLE_VIDEO.has(media.videoCodec)) &&
+    canStream(streamMimeType({ media, mode: 'remux' }))
+  const transcode = canStream(streamMimeType({ media, mode: 'transcode' }))
+  const available: Record<PlaybackMode, boolean> = { direct, remux, transcode }
+  const modes = PLAYBACK_ORDER.filter((mode) => available[mode])
+  // Without any way to convert, a file that would play as it is still
+  // plays, on its default audio track.
+  return {
+    modes: modes.length === 0 && check.playable ? ['direct'] : modes,
+    problems: check.problems,
+  }
+}
+
+/** What each mode means for the viewer, for the settings menu. */
+export const describeMode = (mode: PlaybackMode): string => {
+  const descriptions: Record<PlaybackMode, string> = {
+    direct: 'Playing the original file',
+    remux: 'Video untouched, audio converted on the server',
+    transcode: 'Video and audio converted on the server',
+  }
+  return descriptions[mode]
 }

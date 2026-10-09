@@ -9,6 +9,7 @@ const respond = ({ status = 200, body }: { status?: number; body?: unknown }): F
   status,
   statusText: status === 200 ? 'OK' : 'Error',
   json: async () => body,
+  text: async () => (typeof body === 'string' ? body : JSON.stringify(body)),
 })
 
 const clientReturning = (response: FetchResponse) => {
@@ -90,5 +91,63 @@ describe('createApiClient', () => {
       url: 'http://nas:8484/api/media/9',
       init: { method: 'DELETE' },
     })
+  })
+})
+
+describe('playback calls', () => {
+  it('checks the track list against the contract', async () => {
+    const tracks = {
+      audio: [
+        { index: 0, codec: 'truehd', channels: 8, language: 'eng', title: null, default: true },
+      ],
+      subtitles: [
+        {
+          id: 'external-0',
+          source: 'external',
+          codec: 'srt',
+          language: 'en',
+          title: null,
+          default: false,
+          forced: true,
+          hearingImpaired: false,
+          supported: true,
+        },
+      ],
+      defaultAudio: 0,
+      frameRate: 23.976,
+    }
+    const { client, calls } = clientReturning(respond({ body: tracks }))
+    await expect(client.getTracks(7)).resolves.toEqual(tracks)
+    expect(calls[0]?.url).toBe('http://nas:8484/api/media/7/tracks')
+    const { client: broken } = clientReturning(respond({ body: { audio: 'eng' } }))
+    await expect(broken.getTracks(7)).rejects.toBeInstanceOf(ApiError)
+  })
+
+  it('fetches a subtitle window and parses it', async () => {
+    const vtt = 'WEBVTT\n\n05:01.000 --> 05:02.000\nHello'
+    const { client, calls } = clientReturning(respond({ body: vtt }))
+    await expect(client.getSubtitles({ id: 7, trackId: 'embedded-2', window: 1 })).resolves.toEqual(
+      [{ start: 301, end: 302, text: 'Hello' }],
+    )
+    expect(calls[0]?.url).toBe('http://nas:8484/api/media/7/subtitles/embedded-2?window=1')
+  })
+
+  it('fails a subtitle request with the server message', async () => {
+    const { client } = clientReturning(
+      respond({ status: 404, body: { statusCode: 404, message: 'No subtitle track x' } }),
+    )
+    await expect(client.getSubtitles({ id: 7, trackId: 'x' })).rejects.toThrow(
+      'No subtitle track x',
+    )
+  })
+
+  it('builds stream URLs', () => {
+    const { client } = clientReturning(respond({}))
+    expect(client.streamUrl({ id: 7, mode: 'remux', start: 61.23456, audio: 2 })).toBe(
+      'http://nas:8484/api/media/7/stream?mode=remux&start=61.235&audio=2',
+    )
+    expect(client.streamUrl({ id: 7, mode: 'transcode', start: -3, audio: null })).toBe(
+      'http://nas:8484/api/media/7/stream?mode=transcode&start=0',
+    )
   })
 })

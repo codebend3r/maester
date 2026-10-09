@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { checkDirectPlay, videoCodecString } from '@/playback'
+import { checkDirectPlay, planPlayback, streamMimeType, videoCodecString } from '@/playback'
 import { chromeLike, mediaItem, safariLike } from '@/test/fixtures'
 
 describe('checkDirectPlay', () => {
@@ -90,5 +90,89 @@ describe('videoCodecString', () => {
     expect(videoCodecString({ codec: 'h264', bitDepth: 8 })).toBe('avc1.640028')
     expect(videoCodecString({ codec: 'h264', bitDepth: 10 })).toBe('avc1.6E0028')
     expect(videoCodecString({ codec: 'mpeg2video', bitDepth: 8 })).toBeNull()
+  })
+})
+
+describe('planPlayback', () => {
+  const everything = (): boolean => true
+  const nothing = (): boolean => false
+
+  it('plays the original file when it can, keeping conversions in reserve', () => {
+    expect(
+      planPlayback({
+        media: mediaItem(),
+        canPlay: chromeLike,
+        canStream: everything,
+        defaultAudio: true,
+      }),
+    ).toEqual({ modes: ['direct', 'remux', 'transcode'], problems: [] })
+  })
+
+  it('remuxes when only the audio stands in the way', () => {
+    const media = mediaItem({ container: 'mkv', videoCodec: 'hevc', audioCodec: 'truehd' })
+    expect(
+      planPlayback({ media, canPlay: chromeLike, canStream: everything, defaultAudio: true }),
+    ).toEqual({
+      modes: ['remux', 'transcode'],
+      problems: ["Dolby TrueHD audio isn't supported here."],
+    })
+  })
+
+  it('goes through the server for any audio track but the default', () => {
+    const plan = planPlayback({
+      media: mediaItem(),
+      canPlay: chromeLike,
+      canStream: everything,
+      defaultAudio: false,
+    })
+    expect(plan.modes).toEqual(['remux', 'transcode'])
+  })
+
+  it('transcodes video the server cannot copy or the browser cannot decode', () => {
+    const vc1 = mediaItem({ container: 'mkv', videoCodec: 'vc1' })
+    expect(
+      planPlayback({ media: vc1, canPlay: chromeLike, canStream: everything, defaultAudio: true })
+        .modes,
+    ).toEqual(['transcode'])
+    const hevc = mediaItem({ container: 'mkv', videoCodec: 'hevc', audioCodec: 'dts' })
+    const h264Only = (mime: string): boolean => !mime.includes('hvc1')
+    expect(
+      planPlayback({ media: hevc, canPlay: chromeLike, canStream: h264Only, defaultAudio: true })
+        .modes,
+    ).toEqual(['transcode'])
+  })
+
+  it('falls back to the default track without Media Source Extensions', () => {
+    expect(
+      planPlayback({
+        media: mediaItem(),
+        canPlay: chromeLike,
+        canStream: nothing,
+        defaultAudio: false,
+      }).modes,
+    ).toEqual(['direct'])
+    const dts = mediaItem({ audioCodec: 'dts' })
+    expect(
+      planPlayback({ media: dts, canPlay: chromeLike, canStream: nothing, defaultAudio: true })
+        .modes,
+    ).toEqual([])
+  })
+})
+
+describe('streamMimeType', () => {
+  it('keeps the video for a remux and always uses AAC audio', () => {
+    const media = mediaItem({ videoCodec: 'hevc', videoBitDepth: 10, audioCodec: 'truehd' })
+    expect(streamMimeType({ media, mode: 'remux' })).toBe(
+      'video/mp4; codecs="hvc1.2.4.L153.B0,mp4a.40.2"',
+    )
+    expect(streamMimeType({ media, mode: 'transcode' })).toBe(
+      'video/mp4; codecs="avc1.640028,mp4a.40.2"',
+    )
+  })
+
+  it('leaves the audio out when the file has none', () => {
+    expect(streamMimeType({ media: mediaItem({ audioCodec: null }), mode: 'remux' })).toBe(
+      'video/mp4; codecs="avc1.640028"',
+    )
   })
 })
