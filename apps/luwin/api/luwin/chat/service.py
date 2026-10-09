@@ -25,17 +25,16 @@ from luwin.agent.tools import Choice, Tier
 from luwin.chat.identity import IdentityService
 from luwin.chat.split import split_reply
 from luwin.guides import guide
-from luwin.notify import ApprovalPost, Notice
+from luwin.notify import Notice
 from luwin.store import PendingAction, Store
 
 log = logging.getLogger("luwin.chat")
 
 UNLINKED_HELP = (
-    "Hi! I'm luwin, the concierge for this Plex server. I don't know which Plex "
-    "account is yours yet.\n\n"
-    "If you already have access, link the email or username you use for Plex and the admin "
-    "will approve it.\n\n"
-    "If you don't have access yet, ask the friend who invited you, or the admin, for an invite.\n\n"
+    "Hi! I'm luwin, the concierge for this Plex server. Your Plex account doesn't have "
+    "access to it yet.\n\n"
+    "Ask the admin or the friend who invited you for an invite. Once you're in, I'll know "
+    "you the next time you write.\n\n"
     "Setting Plex up on a TV, stick or phone? There's a setup guide for each."
 )
 ERROR_REPLY = "Sorry, something went wrong on my end (ref `{ref}`). The admin can look it up."
@@ -192,16 +191,6 @@ class ChatService:
         return self.is_admin(presser)
 
     # -- commands ---------------------------------------------------------
-
-    async def link(self, user: ChatUser, query: str) -> ChatResponse:
-        result = await self.identity.start_link(user.id, user.name, query)
-        notices = ()
-        if result.pending:
-            notices = (ApprovalPost(f"Link request: {result.pending.summary}", result.pending.id),)
-        return ChatResponse(chunks=[result.message], notices=notices)
-
-    def whoami(self, user: ChatUser) -> str:
-        return self.identity.whoami(user.id)
 
     def setup_guide(self, device: str) -> list[str]:
         """A device's setup guide, for anyone, linked or not; in chunks that fit a message."""

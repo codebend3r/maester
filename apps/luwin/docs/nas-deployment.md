@@ -21,6 +21,18 @@ luwin runs as one container on **Meleys** (`192.168.50.2`). The whole repo is co
 
 `scripts/deploy-nas.sh` again, then the same `compose up -d --build`. The `.env` and `luwin-data/` directory on the NAS are never touched by the sync.
 
+## Sign-in through rookery
+
+luwin trusts rookery's sign-in and won't boot without it, so rookery runs on Meleys first (`apps/rookery/README.md`). Then add three variables to `apps/luwin/.env` and restart luwin:
+
+- `ROOKERY_URL`: rookery on the LAN, as the NAS sees it, such as `http://127.0.0.1:8030`
+- `ROOKERY_PUBLIC_URL`: where browsers sign in, rookery's public address, such as `https://rookery.maester.example.com`
+- `ROOKERY_SERVICE_TOKEN`: the same value as rookery's `SERVICE_TOKEN`
+
+The first start after this change rebuilds luwin's `users` table (migration `002`); it was empty, since nothing has signed in yet, and every other table stays as it was. `curl -i http://127.0.0.1:8020/api/me` should then answer 401 with rookery's login page as `sign_in`.
+
+luwin's public address must sit under rookery's `COOKIE_DOMAIN` (`luwin.maester.example.com` beside `rookery.maester.example.com`), so the browser sends it the session cookie, and must be in rookery's `APP_ORIGINS`, so sign-in can send the browser back.
+
 ## Moving to luwin (once)
 
 Until the rename, the assistant ran as `maester` from `apps/maester/`, with its settings in `apps/maester/.env` and its database in `apps/maester/maester-data/`. luwin starts fresh: its database lives in a new `luwin-data/`, nothing in the old one carries over, and it refuses to open a database from before. Its model and database variables are `LUWIN_*`, and an old `MAESTER_*` name stops it on boot. Move the settings once, with the old container down. The old folder stays as it is, so going back is one command:

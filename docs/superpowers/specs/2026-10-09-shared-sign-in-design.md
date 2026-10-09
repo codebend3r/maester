@@ -227,7 +227,8 @@ change.
 
 ### Users and tiers
 
-luwin's `users` table, in the fresh initial migration:
+luwin's `users` table, rebuilt by a new migration (`002`, since v0.3.0
+already shipped `001`; the table is still empty in production):
 
 - `user_id` holds rookery's user id.
 - `status` and `linked_at` go. `plex_id`, `thumb`, `last_seen_at` and

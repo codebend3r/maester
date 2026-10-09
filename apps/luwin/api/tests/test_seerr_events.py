@@ -25,7 +25,7 @@ def ready(services, **kw):
 
 
 async def test_the_linked_requester_gets_title_version_and_plex_link(services, store):
-    store.upsert_user("d1", status="active", seerr_user_id=4)
+    store.upsert_user("d1", seerr_user_id=4)
     ready(services, is_4k=True)
     (dm,) = await ready_to_watch(services, store, notification())
     assert dm.to == "d1" and dm.about == Titled(Copy("movie", 438631, True), "Dune (2021)")
@@ -36,7 +36,7 @@ async def test_the_linked_requester_gets_title_version_and_plex_link(services, s
 
 
 async def test_seasons_are_named_and_a_missing_link_is_said_plainly(services, store):
-    store.upsert_user("d1", status="active", seerr_user_id=4)
+    store.upsert_user("d1", seerr_user_id=4)
     ready(services, media_type="tv", seasons=(2, 3), rating_key=None)
     (dm,) = await ready_to_watch(services, store, notification(subject="The Bear (2022)"))
     assert dm.text == (
@@ -45,7 +45,7 @@ async def test_seasons_are_named_and_a_missing_link_is_said_plainly(services, st
 
 
 async def test_plex_being_down_does_not_hold_back_the_news(services, store):
-    store.upsert_user("d1", status="active", seerr_user_id=4)
+    store.upsert_user("d1", seerr_user_id=4)
     ready(services)
 
     async def down():
@@ -59,7 +59,7 @@ async def test_plex_being_down_does_not_hold_back_the_news(services, store):
 async def test_nobody_to_tell(services, store):
     ready(services)
     assert await ready_to_watch(services, store, notification()) == []  # not linked here
-    store.upsert_user("d1", status="revoked", seerr_user_id=4)
+    store.upsert_user("d1", plex_username="dany")  # signed in, but matched to no Seerr user
     assert await ready_to_watch(services, store, notification()) == []
     assert await ready_to_watch(services, store, notification(request_id=None)) == []
 
@@ -101,7 +101,7 @@ def dune_pending(services, **kw):
 
 
 async def test_a_pending_request_asks_the_admin_once_however_often_seerr_says_so(services, store):
-    store.upsert_user("d1", status="active", seerr_user_id=4, plex_username="dany")
+    store.upsert_user("d1", seerr_user_id=4, plex_username="dany")
     dune_pending(services, is_4k=True)
     routes = seerr_routes(services, store)
     (post,) = await routes["MEDIA_PENDING"].handle(seerr_says("MEDIA_PENDING"))
@@ -134,7 +134,7 @@ async def test_a_request_decided_before_the_webhook_lands_asks_nobody(services, 
 async def test_a_decision_made_in_seerr_closes_the_approval_here_and_tells_the_friend(
     services, store
 ):
-    store.upsert_user("d1", status="active", seerr_user_id=4, plex_username="dany")
+    store.upsert_user("d1", seerr_user_id=4, plex_username="dany")
     dune_pending(services)
     routes = seerr_routes(services, store)
     (post,) = await routes["MEDIA_PENDING"].handle(seerr_says("MEDIA_PENDING"))
@@ -148,7 +148,7 @@ async def test_a_decision_made_in_seerr_closes_the_approval_here_and_tells_the_f
 
 
 async def test_a_request_decided_while_its_approval_was_raised_posts_nothing(services, store):
-    store.upsert_user("d1", status="active", seerr_user_id=4, plex_username="dany")
+    store.upsert_user("d1", seerr_user_id=4, plex_username="dany")
     dune_pending(services, is_4k=True)
     seerr = services.seerr
     details = seerr.media_details

@@ -152,5 +152,25 @@ def test_new_variable_names_pass_and_are_read():
     assert (s.model, s.effort, s.db_path) == ("claude-sonnet-5", "low", "/data/x.db")
 
 
-def test_luwin_needs_only_the_model_key_and_seerr_to_boot():
-    assert REQUIRED == ("ANTHROPIC_API_KEY", "SEERR_URL", "SEERR_API_KEY")
+def test_luwin_needs_the_model_key_seerr_and_rookery_to_boot():
+    assert REQUIRED == (
+        "ANTHROPIC_API_KEY",
+        "SEERR_URL",
+        "SEERR_API_KEY",
+        "ROOKERY_URL",
+        "ROOKERY_PUBLIC_URL",
+        "ROOKERY_SERVICE_TOKEN",
+    )
+
+
+def test_rookery_is_read_with_its_urls_stripped():
+    s = load_settings(
+        {
+            "ROOKERY_URL": "http://192.168.50.2:8030/",
+            "ROOKERY_PUBLIC_URL": " https://rookery.maester.example.com/ ",
+            "ROOKERY_SERVICE_TOKEN": " tok ",
+        }
+    )
+    assert s.rookery_url == "http://192.168.50.2:8030"
+    assert s.rookery_public_url == "https://rookery.maester.example.com"
+    assert s.rookery_service_token == "tok"

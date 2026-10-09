@@ -1,4 +1,4 @@
-"""plex.tv: which libraries each friend is shared, per server, read and changed as the owner.
+"""plex.tv: who owns the server, and which libraries each friend is shared, per server.
 
 Friends' shares live on plex.tv, not on the servers, and Wizarr has no call
 that changes one; so a library added to a friend's access is written here,
@@ -12,6 +12,8 @@ own apps and plexapi use:
 - `PUT /api/servers/{machine}/shared_servers/{id}`: a friend's libraries on
   that server replaced (plexapi's `updateFriend`); nothing else about the
   share (downloads, Wizarr's expiry) changes
+- `GET /api/v2/user`: the token's own account, which is the server's owner,
+  as JSON; luwin's admin is whoever signs in with that account
 """
 
 from __future__ import annotations
@@ -21,6 +23,15 @@ from dataclasses import dataclass, field
 from typing import Any, ClassVar, Protocol
 
 from luwin.clients.base import ClientError, Downable, HttpClient
+
+
+@dataclass(frozen=True)
+class PlexAccount:
+    """A Plex account, by the id plex.tv gives it."""
+
+    id: str
+    username: str
+    email: str
 
 
 @dataclass(frozen=True)
@@ -55,6 +66,7 @@ class Share:
 
 
 class PlexTv(Protocol):
+    async def account(self) -> PlexAccount: ...
     async def servers(self) -> list[OwnedServer]: ...
     async def sections(self, machine_id: str) -> list[Section]: ...
     async def shares(self, machine_id: str) -> list[Share]: ...
@@ -78,6 +90,13 @@ class PlexTvClient(HttpClient):
             return ET.fromstring(response.text)
         except ET.ParseError as exc:
             raise ClientError(self.service, "GET", path, response.status_code, "not XML") from exc
+
+    async def account(self) -> PlexAccount:
+        raw = await self.get_json("/api/v2/user", headers={"Accept": "application/json"})
+        try:
+            return PlexAccount(str(raw["id"]), raw.get("username") or "", raw.get("email") or "")
+        except (KeyError, TypeError) as exc:
+            raise ClientError(self.service, "GET", "/api/v2/user", 200, "no account id") from exc
 
     async def servers(self) -> list[OwnedServer]:
         root = await self._xml("/api/servers")
@@ -126,11 +145,17 @@ class PlexTvClient(HttpClient):
 class FakePlexTv(Downable):
     service: ClassVar[str] = "plex.tv"
 
+    # The account `PLEX_TOKEN` belongs to: the server's owner.
+    owner: PlexAccount = field(default_factory=lambda: PlexAccount("1", "boss", "boss@example.com"))
     owned: list[OwnedServer] = field(default_factory=list)
     libraries: dict[str, list[Section]] = field(default_factory=dict)  # by machine id
     shared: dict[str, list[Share]] = field(default_factory=dict)  # by machine id
     # Each change written: the share and the libraries it now holds.
     written: list[tuple[int, list[int]]] = field(default_factory=list)
+
+    async def account(self) -> PlexAccount:
+        self.refuse_if_down("/api/v2/user")
+        return self.owner
 
     async def servers(self) -> list[OwnedServer]:
         self.refuse_if_down("/api/servers")

@@ -61,16 +61,16 @@ class ToolContext:
     memo: Memo
 
     def linked_user(self) -> LinkedUser:
-        """The caller's active link: who requests go to Seerr as.
+        """The caller's link: who requests go to Seerr as.
 
         Requests carry `X-API-User: seerr_user_id`, so the friend's name,
-        quotas and permissions apply. An admin who never linked, or a link
-        still waiting on approval, has none, and the tool refuses.
+        quotas and permissions apply. Someone whose Plex account matches no
+        Seerr user has none, and the tool refuses.
         """
         return self.link_of(self.user_id)
 
     def link_of(self, user_id: str) -> LinkedUser:
-        """Someone's active link, for a tool acting on their behalf (an admin's decision)."""
+        """Someone's link, for a tool acting on their behalf (an admin's decision)."""
         link = self.store.active_link(user_id)
         if link is None:
             raise NotLinked(f"User {user_id} isn't linked to a Plex account")

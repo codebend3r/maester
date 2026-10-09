@@ -3,8 +3,8 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from luwin.store import SeerrUserTaken, Store
-from luwin.store.base import APPLICATION_ID, OldDatabase, stamp
+from luwin.store import Store
+from luwin.store.base import APPLICATION_ID, MIGRATIONS_DIR, OldDatabase, stamp
 
 
 def test_migrations_apply_once(store):
@@ -37,6 +37,25 @@ def test_a_database_from_before_the_fresh_start_is_refused(tmp_path):
     left = sqlite3.connect(path)
     assert left.execute("SELECT version FROM schema_version").fetchall() == [(12,)]
     left.close()
+
+
+def test_a_database_from_v0_3_gets_users_from_rookery_and_keeps_the_rest(tmp_path):
+    path = tmp_path / "luwin.db"
+    shipped = sqlite3.connect(path, isolation_level=None)
+    shipped.executescript((MIGRATIONS_DIR / "001_initial.sql").read_text())
+    shipped.execute("CREATE TABLE schema_version (version INTEGER PRIMARY KEY)")
+    shipped.execute("INSERT INTO schema_version VALUES (1)")
+    shipped.execute(
+        "INSERT INTO audit_log (user_id, tool, args, result, ok) VALUES ('u1', 't', '{}', '', 1)"
+    )
+    shipped.close()
+    store = Store(path)
+    columns = {r["name"] for r in store._conn.execute("PRAGMA table_info(users)")}
+    assert {"plex_id", "thumb", "seerr_checked_at", "last_seen_at"} <= columns
+    assert not {"status", "linked_at"} & columns
+    assert store.upsert_user("r-1", seerr_user_id=4).seerr_user_id == 4
+    assert len(store.audit_recent(5)) == 1
+    store.close()
 
 
 def test_audit_records_and_reads_back_newest_first(store):
@@ -79,8 +98,8 @@ def test_audit_count_since_counts_only_successes(store):
 
 def test_user_upsert_and_lookup(store):
     assert store.get_user("d1") is None
-    row = store.upsert_user("d1", plex_email="a@b.c", seerr_user_id=4, status="active")
-    assert row.seerr_user_id == 4 and row.status == "active" and row.tier_override is None
+    row = store.upsert_user("d1", plex_id="77", plex_email="a@b.c", seerr_user_id=4)
+    assert row.seerr_user_id == 4 and row.plex_id == "77" and row.tier_override is None
     assert store.upsert_user("d1", tier_override="trusted").tier_override == "trusted"
     with pytest.raises(ValueError, match="unknown user fields"):
         store.upsert_user("d1", nope=1)
@@ -130,12 +149,12 @@ def test_expired_pending_action_cannot_be_decided(store):
 
 def test_calls_inside_a_transaction_commit_or_roll_back_together(store):
     with store.transaction():
-        store.upsert_user("d1", status="pending")
-        store.upsert_user("d2", status="pending")
+        store.upsert_user("d1", plex_username="one")
+        store.upsert_user("d2", plex_username="two")
     assert store.get_user("d1") and store.get_user("d2")
 
     with pytest.raises(RuntimeError), store.transaction():
-        store.upsert_user("d3", status="pending")
+        store.upsert_user("d3", plex_username="three")
         raise RuntimeError("boom")
     assert store.get_user("d3") is None
     store.upsert_user("d4")  # the store is usable again after a rollback
@@ -171,18 +190,9 @@ def test_claims_are_made_once_within_the_window(store):
     assert store.claim("seerr", "MEDIA_AVAILABLE:request:78", window=day)
 
 
-def test_user_by_seerr_id_finds_the_live_link(store):
-    store.upsert_user("d1", seerr_user_id=4, status="pending")
-    assert store.user_by_seerr_id(4).status == "pending"
-    store.upsert_user("d1", status="active")
-    assert store.user_by_seerr_id(4).user_id == "d1"
-    store.upsert_user("d1", status="revoked")
-    assert store.user_by_seerr_id(4) is None and store.user_by_seerr_id(5) is None
-
-
-def test_an_active_link_is_approved_and_names_a_seerr_user(store):
-    store.upsert_user("d1", status="active")  # an override-only row: no Seerr user
-    assert store.active_link("d1") is None
+def test_a_user_is_linked_once_matched_to_a_seerr_user(store):
+    store.upsert_user("d1", tier_override="admin")  # an override-only row: no Seerr user
+    assert store.active_link("d1") is None and store.active_users() == []
     store.upsert_user("d1", seerr_user_id=4, plex_username="dany", tautulli_user_id=9)
     link = store.active_link("d1")
     assert (link.user_id, link.seerr_user_id, link.tautulli_user_id, link.name) == (
@@ -192,16 +202,15 @@ def test_an_active_link_is_approved_and_names_a_seerr_user(store):
         "dany",
     )
     assert store.active_link_by_seerr_id(4) == link
-    store.upsert_user("d1", status="pending")
+    assert [u.user_id for u in store.active_users()] == ["d1"]
+    store.upsert_user("d1", seerr_user_id=None)  # Seerr no longer lists them
     assert store.active_link("d1") is None and store.active_link_by_seerr_id(4) is None
 
 
-def test_a_seerr_user_has_one_live_link(store):
-    store.upsert_user("d1", seerr_user_id=4, status="active")
-    with pytest.raises(SeerrUserTaken):
-        store.upsert_user("d2", seerr_user_id=4, status="pending")
-    store.upsert_user("d1", status="revoked")
-    assert store.upsert_user("d2", seerr_user_id=4, status="pending").seerr_user_id == 4
+def test_a_seerr_user_s_requests_belong_to_whoever_was_seen_last(store):
+    store.upsert_user("d1", seerr_user_id=4, plex_username="old", last_seen_at="2026-10-01Z")
+    store.upsert_user("d2", seerr_user_id=4, plex_username="new", last_seen_at="2026-10-08Z")
+    assert store.active_link_by_seerr_id(4).user_id == "d2"
 
 
 def test_each_source_prunes_only_its_own_claims(store):

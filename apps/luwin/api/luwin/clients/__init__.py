@@ -9,6 +9,8 @@ the same methods over in-memory data, so tools and evals run without a stack.
 `speedtest` measures the internet connection from the container's own host.
 `plextv` reads and changes friends' library shares as the server owner.
 The fleet monitor, the speed test and plex.tv are optional: None where not set up.
+`rookery` (who a session cookie belongs to) is the web app's, not the tools',
+so it sits outside `Services`.
 """
 
 from dataclasses import dataclass
@@ -17,8 +19,9 @@ from luwin.clients.base import ClientError, HttpClient
 from luwin.clients.fleet import FakeFleetMonitor, FleetMonitor, FleetMonitorClient
 from luwin.clients.media import FakeFileProbe, FileProbe, MediaProbe
 from luwin.clients.plex import FakePlexClient, Plex, PlexClient
-from luwin.clients.plextv import FakePlexTv, PlexTv, PlexTvClient
+from luwin.clients.plextv import FakePlexTv, PlexAccount, PlexTv, PlexTvClient
 from luwin.clients.radarr import FakeRadarrClient, Radarr, RadarrClient
+from luwin.clients.rookery import Account, FakeRookery, Rookery, RookeryClient
 from luwin.clients.sabnzbd import FakeSabnzbdClient, Sabnzbd, SabnzbdClient
 from luwin.clients.seerr import FakeSeerrClient, Seerr, SeerrClient
 from luwin.clients.sonarr import FakeSonarrClient, Sonarr, SonarrClient
@@ -45,12 +48,14 @@ class Services:
 
 
 __all__ = [
+    "Account",
     "ClientError",
     "FakeFileProbe",
     "FakeFleetMonitor",
     "FakePlexClient",
     "FakePlexTv",
     "FakeRadarrClient",
+    "FakeRookery",
     "FakeSabnzbdClient",
     "FakeSeerrClient",
     "FakeSonarrClient",
@@ -61,9 +66,12 @@ __all__ = [
     "FleetMonitorClient",
     "HttpClient",
     "OoklaSpeedTest",
+    "PlexAccount",
     "PlexClient",
     "PlexTvClient",
     "RadarrClient",
+    "Rookery",
+    "RookeryClient",
     "SabnzbdClient",
     "SeerrClient",
     "Services",

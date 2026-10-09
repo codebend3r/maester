@@ -27,8 +27,8 @@ from luwin.clients.seerr.models import (
 
 @dataclass
 class FakeSeerrClient(Downable):
-    """While `down`, pinging, approving, declining and filing issues answer the way an
-    unreachable Seerr would."""
+    """While `down`, pinging, approving, declining, filing issues and listing users answer
+    the way an unreachable Seerr would."""
 
     service: ClassVar[str] = "seerr"
 
@@ -144,6 +144,7 @@ class FakeSeerrClient(Downable):
         return self.options[(kind, server_id)]
 
     async def users(self) -> list[SeerrUser]:
+        self.refuse_if_down("/api/v1/user")
         return list(self.user_list)
 
     async def create_issue(

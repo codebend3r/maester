@@ -18,9 +18,10 @@ def user(n, email, days, name=""):
 
 @pytest.fixture
 def friends(services, store):
-    store.upsert_user("d1", status="active", seerr_user_id=4, plex_email="dany@example.com")
-    store.upsert_user("d2", status="active", seerr_user_id=5, plex_email="pal@example.com")
-    store.upsert_user("d3", status="pending", seerr_user_id=6, plex_email="soon@example.com")
+    store.upsert_user("d1", seerr_user_id=4, plex_email="dany@example.com")
+    store.upsert_user("d2", seerr_user_id=5, plex_email="pal@example.com")
+    # d3 signed in, but Seerr has no user for them yet: not a friend, no reminders.
+    store.upsert_user("d3", plex_email="soon@example.com")
     return services
 
 
@@ -64,7 +65,7 @@ async def test_nobody_far_off_unlimited_expired_or_unlinked_hears_anything(frien
     friends.wizarr.user_list = [
         user(1, "dany@example.com", 20),
         user(2, "pal@example.com", None, name="pal"),
-        user(3, "soon@example.com", 2),  # their link isn't approved
+        user(3, "soon@example.com", 2),  # not matched to a Seerr user
     ]
     assert await remind_expiring(friends, store, Settings(), lambda: NOW) == []
     friends.wizarr.user_list = [user(1, "dany@example.com", -3)]

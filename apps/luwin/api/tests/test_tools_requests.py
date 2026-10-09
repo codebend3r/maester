@@ -120,7 +120,7 @@ async def test_refusals_are_explained_in_plain_words(ctx):
 
 async def test_an_unlinked_caller_is_refused(ctx):
     seed(ctx, DUNE)
-    ctx.store.upsert_user("d1", status="revoked")
+    ctx.store.upsert_user("d1", seerr_user_id=None)  # Seerr no longer lists them
     with pytest.raises(NotLinked):
         await request_media(ctx, 438631, "movie")
 

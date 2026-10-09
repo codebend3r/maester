@@ -37,7 +37,7 @@ def service(registry, services, store, *script) -> ChatService:
 
 @pytest.fixture
 def world(services, store):
-    """Two stand-in tools (a picker, a destructive call) plus the real link decision."""
+    """Three stand-in tools: a picker, a destructive call, and an admin's button-only decision."""
     reg = ToolRegistry()
     calls = []
 
@@ -63,14 +63,32 @@ def world(services, store):
     async def replace(ctx, file_id=0):
         calls.append(("replace", file_id))
         if file_id == 99:  # over the day's cap: the admin decides
-            approval = Approval("Trusty wants 99 gone", "replace 99", "link_account", {
-                "user_id": "t1", "display_name": "Trusty", "account": "t@example.com"})  # fmt: skip
+            approval = Approval("Trusty wants 99 gone", "replace 99", "allow_replace", {
+                "user_id": "t1", "file_id": 99})  # fmt: skip
             return Result("over the cap", approval=approval)
         return f"replaced file {file_id}"
 
-    reg.register(app_registry.get("link_account"))
+    @reg.tool(
+        "allow_replace",
+        "the admin's decision on a replacement over the cap",
+        {
+            "type": "object",
+            "properties": {
+                "user_id": {"type": "string"},
+                "file_id": {"type": "integer"},
+                "approved": {"type": "boolean"},
+            },
+        },
+        tier=Tier.ADMIN,
+        button_only=True,
+    )
+    async def allow_replace(ctx, user_id="", file_id=0, approved=False):
+        calls.append(("allow", file_id, approved))
+        verdict = "Allowed" if approved else "Denied"
+        return Result(f"{verdict} replacing {file_id}.", (DirectMessage(user_id, verdict),))
+
     for seerr_id, u in enumerate((FRIEND, TRUSTED), 2):
-        store.upsert_user(u.id, status="active", seerr_user_id=seerr_id)
+        store.upsert_user(u.id, seerr_user_id=seerr_id)
     store.upsert_user(TRUSTED.id, tier_override="trusted")
     store.upsert_user(ADMIN.id, tier_override="admin")
     services.seerr.user_list = [SeerrUser(4, "new@example.com", "newbie", "")]
@@ -217,39 +235,48 @@ async def test_a_turn_that_fails_after_a_tool_acted_keeps_what_it_raised(world):
     assert pending.action == "replace_media"
 
 
-async def test_link_whoami_forget_and_admin_approval(world):
-    make, *_ = world
-    svc = make(text_message("A"))
-    newbie = ChatUser("n1", "Newbie")
-    response = await svc.link(newbie, "new@example.com")
-    (notice,) = response.notices
-    assert isinstance(notice, ApprovalPost) and notice.text.startswith("Link request")
-    assert "waiting for admin" in svc.whoami(newbie)
+def approval(store, file_id=99):
+    return store.create_pending(
+        kind="approve",
+        action="allow_replace",
+        requester=TRUSTED.id,
+        payload={"user_id": TRUSTED.id, "file_id": file_id},
+        summary=f"Trusty wants {file_id} gone",
+        ttl=timedelta(days=1),
+    )
 
-    assert await svc.decide(notice.pending_id, FRIEND, approve=True) == Decision(
+
+async def test_only_the_admin_decides_an_approval_and_the_requester_hears(world):
+    make, store, calls = world
+    svc = make()
+    pending = approval(store)
+    assert await svc.decide(pending.id, FRIEND, approve=True) == Decision(
         "Only the admin can approve this.", settled=False
     )
-    approved = await svc.decide(notice.pending_id, ADMIN, approve=True)
-    assert approved.text == "Linked Newbie to new@example.com."
+    approved = await svc.decide(pending.id, ADMIN, approve=True)
+    assert approved.text == "Allowed replacing 99." and calls == [("allow", 99, True)]
     (dm,) = approved.notices
-    assert isinstance(dm, DirectMessage) and dm.to == "n1"
-    assert svc.whoami(newbie).startswith("Linked to new@example.com (active). Tier: friend")
-
-    await svc.handle_message(newbie, "hello")
-    assert svc.forget(newbie) == "Forgotten. We're starting fresh."
-    assert svc.forget(newbie) == "Nothing to forget."
+    assert isinstance(dm, DirectMessage) and dm.to == TRUSTED.id
     assert svc.is_admin(ADMIN) and not svc.is_admin(FRIEND)
 
 
-async def test_admin_denies_a_link(world):
-    make, store, _ = world
+async def test_the_admin_denies_and_a_second_press_is_stale(world):
+    make, store, calls = world
     svc = make()
-    (notice,) = (await svc.link(ChatUser("n1", "Newbie"), "new@example.com")).notices
-    assert (await svc.decide(notice.pending_id, ADMIN, approve=False)).text.startswith("Denied")
-    assert store.get_user("n1").status == "revoked"
-    assert await svc.decide(notice.pending_id, ADMIN, approve=True) == Decision(
+    pending = approval(store)
+    denied = await svc.decide(pending.id, ADMIN, approve=False)
+    assert denied.text == "Denied replacing 99." and calls == [("allow", 99, False)]
+    assert await svc.decide(pending.id, ADMIN, approve=True) == Decision(
         "That request is no longer open."
     )
+
+
+async def test_forget(world):
+    make, *_ = world
+    svc = make(text_message("A"))
+    await svc.handle_message(FRIEND, "hello")
+    assert svc.forget(FRIEND) == "Forgotten. We're starting fresh."
+    assert svc.forget(FRIEND) == "Nothing to forget."
 
 
 async def test_a_decision_whose_action_is_gone_is_closed_not_reopened(world):
@@ -274,7 +301,6 @@ async def test_a_trusted_4k_request_is_approved_by_the_admin_end_to_end(services
     """The real tools: a trusted friend asks for 4K, the admin approves, Seerr and the friend hear."""
     store.upsert_user(
         TRUSTED.id,
-        status="active",
         seerr_user_id=7,
         plex_username="trusty",
         tier_override="trusted",
@@ -313,7 +339,6 @@ async def test_a_failed_press_that_cant_reopen_points_at_the_newer_approval(
 ):
     store.upsert_user(
         TRUSTED.id,
-        status="active",
         seerr_user_id=7,
         plex_username="trusty",
         tier_override="trusted",

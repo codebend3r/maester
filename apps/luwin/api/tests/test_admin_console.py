@@ -51,7 +51,7 @@ def make_console(services, store, *script) -> AdminConsole:
 
 @pytest.fixture
 def console(services, store):
-    store.upsert_user(FRIEND.id, status="active", seerr_user_id=4, plex_username="dany")
+    store.upsert_user(FRIEND.id, seerr_user_id=4, plex_username="dany")
     return make_console(services, store)
 
 
@@ -111,8 +111,8 @@ async def test_pending_lists_open_approvals_and_raises_ones_seerr_holds_without_
     console, services, store
 ):
     store.create_pending(
-        kind="approve", action="link_account", requester="n1", payload={},
-        summary="Link Newbie to Plex account new@example.com", ttl=timedelta(days=7),
+        kind="approve", action="replace_media", requester="n1", payload={},
+        summary="Replace Newbie's copy of Dune, over the cap", ttl=timedelta(days=7),
     )  # fmt: skip
     services.seerr.details[("movie", 438631)] = DUNE
     services.seerr.requests = [
@@ -122,7 +122,7 @@ async def test_pending_lists_open_approvals_and_raises_ones_seerr_holds_without_
     reply = await console.pending(ADMIN)
     lines = reply.text.splitlines()
     assert lines[0] == "2 waiting on you:"
-    assert lines[1].startswith("- Link Newbie") and "expires in about 7 d" in lines[1]
+    assert lines[1].startswith("- Replace Newbie's") and "expires in about 7 d" in lines[1]
     assert lines[2].startswith("- 4K Dune (2021) for dany (asked just now")
     assert [p.summary for p in reply.offers] == [line[2:].split(" (asked")[0] for line in lines[1:]]
     assert store.pending_about("seerr-request:9") == reply.offers[1]
@@ -157,7 +157,7 @@ def test_forecast_says_when_each_volume_fills_or_that_there_are_no_samples(conso
 
 
 async def test_maintenance_holds_a_request_and_runs_it_when_it_ends(services, store):
-    store.upsert_user(FRIEND.id, status="active", seerr_user_id=4, plex_username="dany")
+    store.upsert_user(FRIEND.id, seerr_user_id=4, plex_username="dany")
     services.seerr.details[("movie", 438631)] = DUNE
     console = make_console(
         services,
@@ -212,7 +212,6 @@ async def test_a_held_call_runs_at_the_tier_its_caller_has_when_maintenance_ends
     trusted = ChatUser("t1", "Trusty")
     store.upsert_user(
         trusted.id,
-        status="active",
         seerr_user_id=7,
         plex_username="trusty",
         tier_override="trusted",
@@ -238,7 +237,7 @@ async def test_a_held_call_runs_at_the_tier_its_caller_has_when_maintenance_ends
 
 
 async def test_a_held_call_whose_service_is_still_down_stays_held_for_the_next_end(services, store):
-    store.upsert_user(FRIEND.id, status="active", seerr_user_id=4, plex_username="dany")
+    store.upsert_user(FRIEND.id, seerr_user_id=4, plex_username="dany")
     services.seerr.details[("movie", 438631)] = DUNE
     console = make_console(
         services,
@@ -266,7 +265,7 @@ async def test_a_held_call_whose_service_is_still_down_stays_held_for_the_next_e
 
 
 async def test_a_long_window_still_leaves_the_held_call_in_view_for_the_follow_up(services, store):
-    store.upsert_user(FRIEND.id, status="active", seerr_user_id=4, plex_username="dany")
+    store.upsert_user(FRIEND.id, seerr_user_id=4, plex_username="dany")
     services.seerr.details[("movie", 438631)] = DUNE
     console = make_console(
         services,

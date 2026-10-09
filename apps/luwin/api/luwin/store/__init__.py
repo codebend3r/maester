@@ -6,7 +6,7 @@ arrs are. This is luwin's own memory of who asked for what and what it did.
 
 - `base.py`           the connection, transactions, migrations, timestamps
 - `audit.py`          every tool call
-- `users.py`          links to Plex/Seerr/Tautulli and tier overrides
+- `users.py`          who a signed-in user is on Plex/Seerr/Tautulli, and tier overrides
 - `conversations.py`  each user's conversation
 - `pending.py`        confirmations and approvals waiting on a button
 - `claims.py`         what's done once a window: webhook deliveries, re-encode flags
@@ -27,14 +27,7 @@ from luwin.store.pending import PendingAction, PendingActions
 from luwin.store.reports import ReportRow, Reports
 from luwin.store.space import SpaceSample, SpaceSamples
 from luwin.store.stalls import StallAction, StallRow, Stalls, Watched
-from luwin.store.users import (
-    LinkedUser,
-    LinkStatus,
-    NotLinked,
-    SeerrUserTaken,
-    UserRow,
-    Users,
-)
+from luwin.store.users import LinkedUser, NotLinked, UserRow, Users
 
 
 class Store(
@@ -61,12 +54,10 @@ __all__ = [
     "Flag",
     "Flags",
     "HeldCall",
-    "LinkStatus",
     "LinkedUser",
     "NotLinked",
     "PendingAction",
     "ReportRow",
-    "SeerrUserTaken",
     "SpaceSample",
     "StallAction",
     "StallRow",

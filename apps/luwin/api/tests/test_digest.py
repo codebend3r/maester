@@ -20,7 +20,7 @@ BEAR = MediaDetails(136315, "tv", "The Bear", 2022, "", MediaStatus.AVAILABLE, M
 
 @pytest.fixture
 def digest(services, store):
-    store.upsert_user("d1", status="active", seerr_user_id=4, plex_username="dany")
+    store.upsert_user("d1", seerr_user_id=4, plex_username="dany")
     services.seerr.details.update({("movie", 438631): DUNE, ("tv", 136315): BEAR})
     settings = Settings(guardrails=Guardrails(storage_pause_4k_percent=90))
     return Digest(services, store, settings, KillSwitch(store))

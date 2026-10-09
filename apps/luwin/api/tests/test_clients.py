@@ -1,6 +1,7 @@
 """One recorded call per real client through respx, plus the fakes' behavior."""
 
 import json
+from datetime import UTC, datetime
 
 import pytest
 import respx
@@ -14,6 +15,7 @@ from luwin.clients import (
     PlexClient,
     PlexTvClient,
     RadarrClient,
+    RookeryClient,
     SabnzbdClient,
     SeerrClient,
     SonarrClient,
@@ -598,3 +600,59 @@ async def test_plex_tv_sees_the_suite_name_in_its_client_headers():
     await PlexTvClient(PLEX_TV, "owner-token").servers()
     sent = route.calls.last.request.headers
     assert sent["X-Plex-Product"] == sent["X-Plex-Client-Identifier"] == "maester"
+
+
+@respx.mock
+async def test_plex_tv_names_the_token_s_own_account_as_the_owner():
+    route = respx.get(f"{PLEX_TV}/api/v2/user").respond(
+        json={"id": 1234, "uuid": "abc", "username": "boss", "email": "boss@example.com"}
+    )
+    owner = await PlexTvClient(PLEX_TV, "owner-token").account()
+    assert (owner.id, owner.username, owner.email) == ("1234", "boss", "boss@example.com")
+    sent = route.calls.last.request.headers
+    assert sent["Accept"] == "application/json" and sent["X-Plex-Token"] == "owner-token"
+    respx.get(f"{PLEX_TV}/api/v2/user").respond(json={"username": "nobody"})
+    with pytest.raises(ClientError, match="no account id"):
+        await PlexTvClient(PLEX_TV, "owner-token").account()
+
+
+ROOKERY = "http://rookery.test"
+SESSION = {
+    "user": {"id": "r-1", "display_name": "dany_t", "email": "dany@example.com", "thumb": "t"},
+    "plex": {"id": 44, "username": "dany_t", "email": "dany@example.com"},
+    "expires_at": "2026-11-08T12:00:00.000Z",
+}
+
+
+@respx.mock
+async def test_rookery_names_a_session_s_account_with_the_token_in_the_body():
+    route = respx.post(f"{ROOKERY}/internal/session").respond(json=SESSION)
+    account = await RookeryClient(ROOKERY, "svc-token").session("cookie-value")
+    assert (account.user_id, account.plex_id, account.plex_username) == ("r-1", "44", "dany_t")
+    assert account.expires_at == datetime(2026, 11, 8, 12, 0, tzinfo=UTC)
+    request = route.calls.last.request
+    assert request.headers["Authorization"] == "Bearer svc-token"
+    assert json.loads(request.content) == {"token": "cookie-value"}
+    assert "cookie-value" not in str(request.url)
+
+
+@respx.mock
+async def test_rookery_unknown_session_is_none_and_anything_else_raises():
+    route = respx.post(f"{ROOKERY}/internal/session")
+    client = RookeryClient(ROOKERY, "svc-token")
+    route.respond(404, json={"reason": "expired"})
+    assert await client.session("gone") is None
+    route.respond(401, json={})
+    with pytest.raises(ClientError):
+        await client.session("t")  # the service token was refused
+    route.respond(json={"user": {}})
+    with pytest.raises(ClientError, match="unexpected body"):
+        await client.session("t")
+
+
+@respx.mock
+async def test_rookery_reads_a_time_without_an_offset_as_utc():
+    naive = {**SESSION, "expires_at": "2026-11-08T12:00:00"}
+    respx.post(f"{ROOKERY}/internal/session").respond(json=naive)
+    account = await RookeryClient(ROOKERY, "svc-token").session("t")
+    assert account.expires_at.tzinfo is UTC
