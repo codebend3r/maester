@@ -18,6 +18,7 @@ import {
   type LibraryInput,
   type MediaItem,
   type MediaSort,
+  isMediaSort,
   validateLibraryInput,
 } from '@raven/core'
 import { type LibraryRecord, LibrariesRepository } from '@/libraries/librariesRepository'
@@ -31,6 +32,9 @@ const parseInput = (body: unknown): LibraryInput => {
   if (!result.ok) throw new BadRequestException(result.errors)
   return result.value
 }
+
+const samePaths = (a: readonly string[], b: readonly string[]): boolean =>
+  a.length === b.length && a.every((path, index) => path === b[index])
 
 @Controller('api/libraries')
 export class LibrariesController {
@@ -70,11 +74,14 @@ export class LibrariesController {
     return this.withStatus(record)
   }
 
+  /** Only a change of folders rescans; a rename or a settings change leaves the index as it is. */
   @Put(':id')
   update(@Param('id', ParseIntPipe) id: number, @Body() body: unknown): Library {
-    const record = this.libraries.update({ id, input: parseInput(body) })
+    const input = parseInput(body)
+    const before = this.find(id)
+    const record = this.libraries.update({ id, input })
     if (!record) throw new NotFoundException(`No library ${id}`)
-    this.scanner.scan(id)
+    if (!samePaths(before.paths, record.paths)) this.scanner.scan(id)
     return this.withStatus(record)
   }
 
@@ -103,9 +110,18 @@ export class LibrariesController {
     @Param('id', ParseIntPipe) id: number,
     @Query('q') search?: string,
     @Query('sort') sort?: string,
+    @Query('seed') seed?: string,
   ): MediaItem[] {
     this.find(id)
-    const order: MediaSort = sort === 'added' ? 'added' : 'title'
-    return this.media.list({ libraryId: id, search: search ?? '', sort: order }).map(toMediaItem)
+    const order: MediaSort = isMediaSort(sort) ? sort : 'title'
+    const dealt = Number.parseInt(seed ?? '', 10)
+    return this.media
+      .list({
+        libraryId: id,
+        search: search ?? '',
+        sort: order,
+        seed: Number.isInteger(dealt) ? dealt : 0,
+      })
+      .map(toMediaItem)
   }
 }

@@ -24,6 +24,12 @@ export type IconName =
   | 'fullscreen'
   | 'fullscreenExit'
   | 'keyboard'
+  | 'pin'
+  | 'grid'
+  | 'list'
+  | 'tiles'
+  | 'grouped'
+  | 'shuffle'
 
 const PATHS: Record<IconName, string> = {
   back: 'M15 18l-6-6 6-6',
@@ -52,7 +58,18 @@ const PATHS: Record<IconName, string> = {
   fullscreen: 'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5',
   fullscreenExit: 'M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5',
   keyboard: 'M3 6.5h18v11H3zM7 10.5h.01M11 10.5h.01M15 10.5h.01M8 14h8',
+  pin: 'M12 17v5M9 4h6M10 4v6l-4 4v3h12v-3l-4-4V4',
+  grid: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
+  list: 'M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01',
+  tiles: 'M3 5h7v5H3zM13 6h8M13 9h5M3 14h7v5H3zM13 15h8M13 18h5',
+  grouped: 'M4 4h7M4 7h7v5H4zM13 7h7v5h-7zM4 15h7M4 18h7v2H4zM13 18h7v2h-7z',
+  shuffle: 'M4 7h3l10 10h3M4 17h3l3-3M14 10l3-3h3M18 4l3 3-3 3M18 14l3 3-3 3',
 }
+
+const isIconName = (name: string): name is IconName => name in PATHS
+
+/** Every icon there is, for the design page. */
+export const ICON_NAMES: readonly IconName[] = Object.keys(PATHS).filter(isIconName)
 
 /** Line icons. Decorative by default: pair them with text or an aria-label on the control. */
 export const Icon = ({ name, size = 20 }: { name: IconName; size?: number }) => (

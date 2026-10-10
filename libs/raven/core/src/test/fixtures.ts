@@ -1,5 +1,29 @@
 import type { CanPlay } from '@/playback'
-import type { MediaItem } from '@/types'
+import type { Library, MediaItem } from '@/types'
+
+export const library = (overrides: Partial<Library> = {}): Library => ({
+  id: 1,
+  name: 'Movies',
+  paths: ['/media/movies'],
+  itemCount: 0,
+  createdAt: '2026-09-27T00:00:00.000Z',
+  scan: {
+    state: 'idle',
+    discovered: 0,
+    processed: 0,
+    startedAt: null,
+    finishedAt: null,
+    error: null,
+  },
+  settings: {
+    saveProgress: true,
+    pinned: true,
+    sort: 'title',
+    view: 'grid',
+    groupBy: 'resolution',
+  },
+  ...overrides,
+})
 
 export const mediaItem = (overrides: Partial<MediaItem> = {}): MediaItem => ({
   id: 1,

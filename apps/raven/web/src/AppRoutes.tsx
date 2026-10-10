@@ -1,5 +1,6 @@
 import { Route, Routes } from 'react-router-dom'
 import { AppShell } from '@/components/AppShell/AppShell'
+import { DesignPage } from '@/pages/DesignPage/DesignPage'
 import { FavouritesPage } from '@/pages/FavouritesPage/FavouritesPage'
 import { LibrariesPage } from '@/pages/LibrariesPage/LibrariesPage'
 import { LibraryPage } from '@/pages/LibraryPage/LibraryPage'
@@ -12,6 +13,7 @@ export const AppRoutes = () => (
       <Route index element={<LibrariesPage />} />
       <Route path="libraries/:id" element={<LibraryPage />} />
       <Route path="favourites" element={<FavouritesPage />} />
+      <Route path="design" element={<DesignPage />} />
       <Route path="*" element={<NotFoundPage />} />
     </Route>
     {/* The player takes the whole screen, outside the browsing frame. */}

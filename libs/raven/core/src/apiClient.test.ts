@@ -32,6 +32,12 @@ describe('createApiClient', () => {
     expect(calls[0]?.url).toBe('http://nas:8484/api/libraries/3/media?sort=title&q=matrix')
   })
 
+  it('sends the shuffle seed with a random sort', async () => {
+    const { client, calls } = clientReturning(respond({ body: [] }))
+    await client.listMedia({ libraryId: 3, sort: 'random', seed: 42 })
+    expect(calls[0]?.url).toBe('http://nas:8484/api/libraries/3/media?sort=random&seed=42')
+  })
+
   it('sends JSON bodies', async () => {
     const { client, calls } = clientReturning(respond({ status: 204 }))
     await client.saveProgress({ id: 7, position: 93.5 })

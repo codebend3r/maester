@@ -47,17 +47,11 @@
   font-size: var(--font-size-sm);
 }
 
+// Fields take their look from elements.scss; on the dialog's canopy they sit
+// on night instead, or they would vanish into it.
 .input {
   width: 100%;
-  min-height: 2.5rem;
-  padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--color-moss);
-  border-radius: var(--radius-md);
-  background: var(--color-night);
-
-  &::placeholder {
-    color: var(--color-lichen);
-  }
+  background-color: var(--color-night);
 }
 
 .paths {
@@ -76,6 +70,32 @@
 
 .pathText {
   overflow-wrap: anywhere;
+}
+
+.setting {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    'box label'
+    '. hint';
+  gap: var(--space-0) var(--space-1);
+  align-items: center;
+
+  label {
+    grid-area: label;
+    font-size: var(--font-size-md);
+    font-weight: 400;
+  }
+}
+
+.checkbox {
+  grid-area: box;
+}
+
+.settingHint {
+  grid-area: hint;
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
 }
 
 .typed {

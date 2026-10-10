@@ -177,16 +177,23 @@ export const createApiClient = ({
         guard: isLibrary,
       }),
 
+    /** `seed` only counts with a random sort: the same seed deals the same order. */
     listMedia: ({
       libraryId,
       search = '',
       sort = 'title',
+      seed,
     }: {
       libraryId: number
       search?: string
       sort?: MediaSort
+      seed?: number
     }): Promise<MediaItem[]> => {
-      const query = toQueryString({ sort, ...(search.trim() ? { q: search.trim() } : {}) })
+      const query = toQueryString({
+        sort,
+        ...(sort === 'random' && seed !== undefined ? { seed: String(seed) } : {}),
+        ...(search.trim() ? { q: search.trim() } : {}),
+      })
       return expect({
         request: send({ path: `/api/libraries/${libraryId}/media?${query}` }),
         guard: isMediaList,

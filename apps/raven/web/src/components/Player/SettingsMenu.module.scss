@@ -118,7 +118,6 @@
 
 .radio {
   grid-area: radio;
-  accent-color: var(--color-leaf-bright);
 
   // The label's outline shows focus instead.
   &:focus-visible {

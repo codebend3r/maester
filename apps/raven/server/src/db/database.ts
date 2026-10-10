@@ -9,7 +9,7 @@ import { SERVER_CONFIG, type ServerConfig } from '@/config'
  * tracked by SQLite's `user_version`. Append new migrations; never edit a
  * shipped one, since existing databases have already run it.
  */
-const MIGRATIONS: readonly string[] = [
+export const MIGRATIONS: readonly string[] = [
   `
   CREATE TABLE libraries (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -66,6 +66,16 @@ const MIGRATIONS: readonly string[] = [
     added_at TEXT NOT NULL
   );
   `,
+  `
+  ALTER TABLE libraries ADD COLUMN save_progress INTEGER NOT NULL DEFAULT 1;
+  ALTER TABLE libraries ADD COLUMN pinned INTEGER NOT NULL DEFAULT 1;
+  `,
+  // VIEW is an SQL keyword, so the view setting's column is view_mode.
+  `
+  ALTER TABLE libraries ADD COLUMN sort TEXT NOT NULL DEFAULT 'title';
+  ALTER TABLE libraries ADD COLUMN view_mode TEXT NOT NULL DEFAULT 'grid';
+  ALTER TABLE libraries ADD COLUMN group_by TEXT NOT NULL DEFAULT 'resolution';
+  `,
 ]
 
 const migrate = (db: Sqlite.Database): void => {
@@ -107,7 +117,7 @@ export const adoptLegacyDatabase = ({ dataDir }: { dataDir: string }): void => {
   )
 }
 
-/** The one SQLite connection: the library index, media metadata, playback progress and favourites. */
+/** The one SQLite connection: libraries and their settings, media metadata, playback progress and favourites. */
 @Injectable()
 export class DatabaseService implements OnModuleDestroy {
   readonly db: Sqlite.Database

@@ -33,6 +33,67 @@ describe('validateLibraryInput', () => {
     })
   })
 
+  it('keeps the settings that were sent and drops unknown ones', () => {
+    const result = validateLibraryInput({
+      name: 'Clips',
+      paths: ['/media/clips'],
+      settings: { saveProgress: false, colour: 'red' },
+    })
+    expect(result).toEqual({
+      ok: true,
+      value: { name: 'Clips', paths: ['/media/clips'], settings: { saveProgress: false } },
+    })
+  })
+
+  it('rejects a setting that is not on or off', () => {
+    const result = validateLibraryInput({
+      name: 'Clips',
+      paths: ['/media/clips'],
+      settings: { saveProgress: 'no', pinned: 1 },
+    })
+    expect(result).toEqual({
+      ok: false,
+      errors: ['Save progress must be on or off.', 'Pinned must be on or off.'],
+    })
+  })
+
+  it('keeps a sort, view and grouping that are among the choices', () => {
+    const result = validateLibraryInput({
+      name: 'Clips',
+      paths: ['/media/clips'],
+      settings: { sort: 'bitrate-high', view: 'grouped', groupBy: 'codec' },
+    })
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        name: 'Clips',
+        paths: ['/media/clips'],
+        settings: { sort: 'bitrate-high', view: 'grouped', groupBy: 'codec' },
+      },
+    })
+  })
+
+  it('rejects a sort, view or grouping that is not one of the choices', () => {
+    const result = validateLibraryInput({
+      name: 'Clips',
+      paths: ['/media/clips'],
+      settings: { sort: 'loudest', view: 'poster', groupBy: true },
+    })
+    expect(result).toEqual({
+      ok: false,
+      errors: [
+        'Sort is not one of the choices.',
+        'View is not one of the choices.',
+        'Group by is not one of the choices.',
+      ],
+    })
+  })
+
+  it('rejects settings that are not an object', () => {
+    const result = validateLibraryInput({ name: 'Clips', paths: ['/media/clips'], settings: 'off' })
+    expect(result).toEqual({ ok: false, errors: ['Settings must be an object.'] })
+  })
+
   it('rejects something that is not an object', () => {
     expect(validateLibraryInput('Movies').ok).toBe(false)
   })

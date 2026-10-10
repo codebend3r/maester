@@ -1,0 +1,107 @@
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+
+  th,
+  td {
+    padding: var(--space-1) var(--space-2);
+    text-align: left;
+    vertical-align: middle;
+  }
+
+  thead th {
+    color: var(--color-lichen);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--color-moss);
+  }
+
+  tbody tr {
+    border-bottom: 1px solid var(--color-moss);
+
+    &:hover {
+      background: var(--color-canopy);
+    }
+  }
+
+  td {
+    color: var(--color-lichen);
+    white-space: nowrap;
+  }
+}
+
+.number {
+  font-variant-numeric: tabular-nums;
+
+  &:is(th, td) {
+    text-align: right;
+  }
+}
+
+// The th stays a table cell so the columns size properly; its title, heart
+// and resume line are laid out in here.
+.titleCell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-0) var(--space-1);
+  align-items: center;
+  font-weight: 400;
+}
+
+.title {
+  font-weight: 600;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+
+  &:hover {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+}
+
+.favourite {
+  display: grid;
+  color: var(--color-bark);
+}
+
+// Where playback stopped, as a thin line under the title.
+.resume {
+  grid-column: 1 / -1;
+  display: grid;
+  height: 3px;
+  max-width: 12rem;
+  background: var(--color-moss);
+}
+
+.resumeFill {
+  display: block;
+  height: 100%;
+  background: var(--color-leaf-bright);
+}
+
+.menuCell {
+  width: 1px;
+}
+
+@media (max-width: 48rem) {
+  .extra {
+    display: none;
+  }
+
+  .table {
+    th,
+    td {
+      padding: var(--space-1);
+    }
+  }
+}
+
+@media (max-width: 30rem) {
+  .roomy {
+    display: none;
+  }
+}

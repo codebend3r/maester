@@ -1,10 +1,20 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ApiError, type MediaSort } from '@raven/core'
+import {
+  ApiError,
+  DEFAULT_LIBRARY_SETTINGS,
+  type Library,
+  type LibrarySettings,
+  type MediaItem,
+} from '@raven/core'
 import { useId, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { Button, ButtonLink } from '@/components/Button/Button'
 import { LibraryDialog } from '@/components/LibraryDialog/LibraryDialog'
+import { LibraryToolbar } from '@/components/LibraryToolbar/LibraryToolbar'
 import { MediaGrid } from '@/components/MediaGrid/MediaGrid'
+import { MediaGroups } from '@/components/MediaGroups/MediaGroups'
+import { MediaList } from '@/components/MediaList/MediaList'
+import { MediaTiles } from '@/components/MediaTiles/MediaTiles'
 import { ScanStatus } from '@/components/ScanStatus/ScanStatus'
 import { api } from '@/lib/api'
 import { queryKeys } from '@/lib/queryClient'
@@ -14,15 +24,33 @@ import styles from '@/pages/LibraryPage/LibraryPage.module.scss'
 
 const count = new Intl.NumberFormat()
 
-const isSort = (value: string): value is MediaSort => value === 'title' || value === 'added'
+/** A fresh deal for a random sort; the order holds until the next one. */
+const dealSeed = (): number => Math.floor(Math.random() * 2 ** 31)
+
+/** The library's videos laid out the way its view setting says. */
+const MediaView = ({
+  settings,
+  items,
+  busy,
+}: {
+  settings: LibrarySettings
+  items: MediaItem[]
+  busy: boolean
+}) => {
+  if (settings.view === 'list') return <MediaList items={items} busy={busy} />
+  if (settings.view === 'tiles') return <MediaTiles items={items} busy={busy} />
+  if (settings.view === 'grouped')
+    return <MediaGroups items={items} by={settings.groupBy} busy={busy} />
+  return <MediaGrid items={items} busy={busy} />
+}
 
 export const LibraryPage = () => {
   const params = useParams()
   const libraryId = Number(params.id)
-  const ids = { search: useId(), sort: useId() }
+  const ids = { title: useId() }
   const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
-  const [sort, setSort] = useState<MediaSort>('title')
+  const [seed, setSeed] = useState(dealSeed)
   const [editing, setEditing] = useState(false)
   const query = useDebouncedValue({ value: search.trim(), delayMs: 200 })
 
@@ -33,10 +61,13 @@ export const LibraryPage = () => {
     refetchInterval: (current) => (current.state.data?.scan.state === 'scanning' ? 1500 : false),
   })
   const scanning = library.data?.scan.state === 'scanning'
+  const settings = library.data?.settings ?? DEFAULT_LIBRARY_SETTINGS
+  const sort = settings.sort
+  const dealt = sort === 'random' ? seed : 0
 
   const media = useQuery({
-    queryKey: queryKeys.media({ libraryId, search: query, sort }),
-    queryFn: () => api.listMedia({ libraryId, search: query, sort }),
+    queryKey: queryKeys.media({ libraryId, search: query, sort, seed: dealt }),
+    queryFn: () => api.listMedia({ libraryId, search: query, sort, seed: dealt }),
     enabled: library.isSuccess,
     placeholderData: keepPreviousData,
     // While a scan runs or thumbnails are still being made, keep the grid filling in.
@@ -50,6 +81,28 @@ export const LibraryPage = () => {
       queryClient.setQueryData(queryKeys.library(libraryId), updated)
       return queryClient.invalidateQueries({ queryKey: queryKeys.libraries })
     },
+  })
+
+  // Sort, view and grouping switch at once and save behind; a failed save
+  // puts the library back as it was and says so.
+  const saveSettings = useMutation({
+    mutationFn: ({ current, change }: { current: Library; change: Partial<LibrarySettings> }) =>
+      api.updateLibrary({
+        id: current.id,
+        input: { name: current.name, paths: current.paths, settings: change },
+      }),
+    onMutate: async ({ current, change }) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.library(libraryId), exact: true })
+      queryClient.setQueryData<Library>(queryKeys.library(libraryId), {
+        ...current,
+        settings: { ...current.settings, ...change },
+      })
+      return { previous: current }
+    },
+    onError: (_error, _variables, context) => {
+      if (context) queryClient.setQueryData(queryKeys.library(libraryId), context.previous)
+    },
+    onSuccess: (updated) => queryClient.setQueryData(queryKeys.library(libraryId), updated),
   })
 
   const missing = library.error instanceof ApiError && library.error.status === 404
@@ -74,13 +127,13 @@ export const LibraryPage = () => {
   })()
 
   return (
-    <section className={styles.page} aria-labelledby={`${ids.search}-title`}>
+    <section className={styles.page} aria-labelledby={ids.title}>
       <ButtonLink to="/" icon="back" className={styles.back}>
         Libraries
       </ButtonLink>
 
       <header className={styles.header}>
-        <h1 id={`${ids.search}-title`} className={styles.title}>
+        <h1 id={ids.title} className={styles.title}>
           {library.data.name}
         </h1>
         <p className={styles.count}>
@@ -103,36 +156,27 @@ export const LibraryPage = () => {
         </div>
       </header>
 
-      <search className={styles.toolbar}>
-        <label htmlFor={ids.search} className="visually-hidden">
-          Search {library.data.name}
-        </label>
-        <input
-          id={ids.search}
-          type="search"
-          className={styles.search}
-          placeholder={`Search ${library.data.name}`}
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-        />
-        <label htmlFor={ids.sort} className={styles.sortLabel}>
-          Sort
-        </label>
-        <select
-          id={ids.sort}
-          className={styles.sort}
-          value={sort}
-          onChange={(event) => isSort(event.target.value) && setSort(event.target.value)}
-        >
-          <option value="title">Title</option>
-          <option value="added">Recently added</option>
-        </select>
-      </search>
+      <LibraryToolbar
+        name={library.data.name}
+        search={search}
+        onSearch={setSearch}
+        settings={settings}
+        onChange={(change) => {
+          if (library.data) saveSettings.mutate({ current: library.data, change })
+        }}
+        onShuffle={() => setSeed((current) => (current + 1 + dealSeed()) % 2 ** 31)}
+      />
+
+      {saveSettings.isError && (
+        <p className={styles.message} role="alert">
+          Could not save how this library is shown: {saveSettings.error.message}
+        </p>
+      )}
 
       {emptyState ? (
         <p className={styles.message}>{emptyState}</p>
       ) : (
-        <MediaGrid items={items} busy={media.isFetching && !media.data} />
+        <MediaView settings={settings} items={items} busy={media.isFetching && !media.data} />
       )}
 
       {editing && <LibraryDialog library={library.data} onClose={() => setEditing(false)} />}

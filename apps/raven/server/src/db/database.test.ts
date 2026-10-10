@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import Sqlite from 'better-sqlite3'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { readServerConfig } from '@/config'
-import { adoptLegacyDatabase, DatabaseService } from '@/db/database'
+import { adoptLegacyDatabase, DatabaseService, MIGRATIONS } from '@/db/database'
 
 describe('the database file', () => {
   const state = { dir: '' }
@@ -65,5 +65,41 @@ describe('the database file', () => {
   it('leaves an empty data folder empty', async () => {
     adoptLegacyDatabase({ dataDir: state.dir })
     expect(await files()).toEqual([])
+  })
+})
+
+describe('migrations', () => {
+  const state = { dir: '' }
+
+  beforeEach(async () => {
+    state.dir = await mkdtemp(join(tmpdir(), 'raven-migrate-'))
+  })
+
+  afterEach(async () => {
+    await rm(state.dir, { recursive: true, force: true })
+  })
+
+  it('gives a library made before settings existed the default settings', () => {
+    const before = new Sqlite(join(state.dir, 'raven.db'))
+    MIGRATIONS.slice(0, 2).forEach((sql) => before.exec(sql))
+    before.pragma('user_version = 2')
+    before.exec(
+      "INSERT INTO libraries (name, created_at) VALUES ('Old', '2026-01-01T00:00:00.000Z')",
+    )
+    before.close()
+
+    const database = new DatabaseService({ ...readServerConfig({}), dataDir: state.dir })
+    expect(
+      database.db
+        .prepare('SELECT save_progress, pinned, sort, view_mode, group_by FROM libraries')
+        .get(),
+    ).toEqual({
+      save_progress: 1,
+      pinned: 1,
+      sort: 'title',
+      view_mode: 'grid',
+      group_by: 'resolution',
+    })
+    database.onModuleDestroy()
   })
 })

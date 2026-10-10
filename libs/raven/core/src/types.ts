@@ -26,12 +26,36 @@ export type Library = {
   itemCount: number
   createdAt: string
   scan: ScanStatus
+  settings: LibrarySettings
 }
 
-/** What a client sends to create a library or replace its name and paths. */
+/** How a library behaves, each one set per library. */
+export type LibrarySettings = {
+  /** Remember where each video stopped and resume there. Off keeps saved spots without using them. */
+  saveProgress: boolean
+  /** Give the library its own link in the side menu. */
+  pinned: boolean
+  /** The order its videos are listed in. */
+  sort: MediaSort
+  /** How its videos are laid out: cards, a table, tiles, or cards in groups. */
+  view: LibraryView
+  /** What the grouped view buckets videos by. */
+  groupBy: MediaGroupBy
+}
+
+export type LibraryView = 'grid' | 'list' | 'tiles' | 'grouped'
+
+export type MediaGroupBy = 'resolution' | 'codec' | 'month'
+
+/**
+ * What a client sends to create a library or replace its name and paths.
+ * Settings left out keep their defaults on create and their current values
+ * on update, so a client can change one without knowing the rest.
+ */
 export type LibraryInput = {
   name: string
   paths: string[]
+  settings?: Partial<LibrarySettings>
 }
 
 export type ThumbnailState = 'pending' | 'ready' | 'failed'
@@ -68,7 +92,22 @@ export type MediaItem = {
   addedAt: string
 }
 
-export type MediaSort = 'title' | 'added'
+/**
+ * `added` is newest first and `oldest` the reverse. Resolution ranks by
+ * pixel count. `random` shuffles by a seed the client sends, so the order
+ * holds across refetches until the client deals a new one.
+ */
+export type MediaSort =
+  | 'title'
+  | 'added'
+  | 'oldest'
+  | 'largest'
+  | 'smallest'
+  | 'bitrate-high'
+  | 'bitrate-low'
+  | 'resolution-high'
+  | 'resolution-low'
+  | 'random'
 
 export type DirectoryEntry = {
   name: string

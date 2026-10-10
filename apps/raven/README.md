@@ -83,6 +83,17 @@ YouTube's shortcuts, and `?` shows them in the player.
 | `<` / `>`              | Slower / faster                                        |
 | `Esc`                  | Close a menu, leave full screen, or back to the library |
 
+## Library settings and views
+
+Each library keeps its own settings on the server, so every browser opens it the same way.
+
+- **Save where each video stopped**, on by default: leave a video and come back to pick up where it stopped. Turned off, nothing new is saved and nothing resumes, but saved spots are kept for when it is turned back on.
+- **Pin to the side menu**, on by default: the library gets its own link under Favourites. Pin or unpin from the Libraries page, or in **Edit**.
+- **Sort**: title, recently or oldest added, largest or smallest file, highest or lowest bitrate, highest or lowest resolution (by pixel count), or random. Videos not yet probed go last. Random holds its order until **Shuffle** deals again, and each visit starts a fresh deal.
+- **View**: a grid of cards, a list, tiles (rows with a small thumbnail), or grouped by resolution, video codec or month added.
+
+Sort, view and grouping are picked on the library page and saved as they change; the first two are in **Edit**. Changing a setting or the name never rescans; only a change of folders does.
+
 ## Favourites and deleting
 
 Every card has a menu, from the button in its corner or a right click, with two actions. **Favourite** marks the video and lists it under **Favourites** in the side menu, most recently marked first, across every library. **Delete** asks first, then removes the file from disk and the video from the index, along with its thumbnail, progress and favourite. There is no undo.
@@ -107,6 +118,8 @@ bun run dev:raven   # server on :8484 (watch mode) and Vite on :5173, proxying /
 bun run verify         # spellcheck, lint, stylelint, format check, typecheck, tests and build for every project
 ```
 
+`/design` shows the palette, every token, how each HTML element is drawn and every shared component. It is not in the side menu. Element styles live in `apps/raven/web/src/styles/elements.scss`, written in `:where()` so a component's own class always wins.
+
 Run a single target through Nx: `bunx nx run @raven/server:test`, `bunx nx run @raven/web:typecheck`, `bunx nx show project @raven/server`.
 
 The server and core tests need `ffmpeg` and `ffprobe` on the PATH: the end-to-end suite encodes real clips and drives the API against them.
@@ -117,7 +130,8 @@ The server and core tests need `ffmpeg` and `ffprobe` on the PATH: the end-to-en
 apps/raven/
   server/        @raven/server: NestJS on Fastify: SQLite index, scanner, ffprobe, thumbnails,
                  range-request file serving, tracks, subtitles and converted streams
-  web/           @raven/web: React 19 + Vite: libraries, the grid, the player and its stream source
+  web/           @raven/web: React 19 + Vite: libraries, the grid, list, tiles and groups, the player
+                 and its stream source, the /design page
   Dockerfile, docker-compose.yml
 libs/raven/
   core/          @raven/core: API types and guards, the typed API client, the direct-play check,

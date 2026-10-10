@@ -256,6 +256,90 @@ describe('the media server', () => {
       expect(bad.statusCode).toBe(400)
     })
 
+    describe('settings', () => {
+      const putLibrary = async (settings: Record<string, unknown>): Promise<Library> =>
+        expectShape({
+          response: await app().inject({
+            method: 'PUT',
+            url: `/api/libraries/${library.id}`,
+            payload: {
+              name: 'Everything',
+              paths: [join(state.media, 'Movies'), join(state.media, 'TV')],
+              settings,
+            },
+          }),
+          guard: isLibrary,
+        })
+      const positionOf = async (id: number): Promise<number> =>
+        expectShape({
+          response: await app().inject({ method: 'GET', url: `/api/media/${id}` }),
+          guard: isMediaItem,
+        }).position
+      const saveProgress = (id: number, position: number) =>
+        app().inject({ method: 'PUT', url: `/api/media/${id}/progress`, payload: { position } })
+
+      it('starts a library with progress saved and the library pinned', async () => {
+        const current = expectShape({
+          response: await app().inject({ method: 'GET', url: `/api/libraries/${library.id}` }),
+          guard: isLibrary,
+        })
+        expect(current.settings).toEqual({
+          saveProgress: true,
+          pinned: true,
+          sort: 'title',
+          view: 'grid',
+          groupBy: 'resolution',
+        })
+      })
+
+      it('remembers how the library is sorted and shown', async () => {
+        const updated = await putLibrary({ sort: 'largest', view: 'tiles', groupBy: 'codec' })
+        expect(updated.settings).toMatchObject({ sort: 'largest', view: 'tiles', groupBy: 'codec' })
+        await putLibrary({ sort: 'title', view: 'grid', groupBy: 'resolution' })
+      })
+
+      it('shuffles by the seed it is sent', async () => {
+        const order = async (seed: number) =>
+          expectShape({
+            response: await app().inject({
+              method: 'GET',
+              url: `/api/libraries/${library.id}/media?sort=random&seed=${seed}`,
+            }),
+            guard: isMediaList,
+          }).map((item) => item.id)
+        const first = await order(11)
+        expect(first).toHaveLength(2)
+        expect(await order(11)).toEqual(first)
+      })
+
+      it('changes one setting, keeps the rest, and does not rescan', async () => {
+        const updated = await putLibrary({ pinned: false })
+        expect(updated.settings).toEqual({
+          saveProgress: true,
+          pinned: false,
+          sort: 'title',
+          view: 'grid',
+          groupBy: 'resolution',
+        })
+        expect(updated.scan.state).toBe('idle')
+        expect((await putLibrary({ pinned: true })).settings.pinned).toBe(true)
+      })
+
+      it('with progress saving off, hides saved spots, saves nothing, and keeps them for later', async () => {
+        const [movie] = await listMedia(library.id)
+        const id = movie?.id ?? -1
+        expect((await saveProgress(id, 2)).statusCode).toBe(204)
+
+        await putLibrary({ saveProgress: false })
+        expect(await positionOf(id)).toBe(0)
+        expect((await listMedia(library.id)).every((item) => item.position === 0)).toBe(true)
+        expect((await saveProgress(id, 4)).statusCode).toBe(204)
+
+        await putLibrary({ saveProgress: true })
+        expect(await positionOf(id)).toBe(2)
+      })
+    })
+
     it('drops files that disappear on the next scan, and their thumbnails', async () => {
       const added = join(state.media, 'Movies', 'Extra Clip.mp4')
       await encodeClip({ path: added, seconds: 2 })

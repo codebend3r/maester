@@ -1,0 +1,29 @@
+.groups {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.group {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.heading {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding-bottom: var(--space-1);
+  border-bottom: 1px solid var(--color-moss);
+  font-family: var(--font-display);
+  font-size: var(--font-size-xl);
+  font-weight: 400;
+  line-height: var(--line-tight);
+}
+
+.count {
+  color: var(--color-lichen);
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm);
+}

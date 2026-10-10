@@ -7,6 +7,17 @@
   justify-items: end;
 }
 
+// In a list row or a tile the menu takes its own cell instead.
+.inline {
+  position: relative;
+  top: auto;
+  right: auto;
+
+  .trigger {
+    background: transparent;
+  }
+}
+
 .trigger {
   display: grid;
   place-items: center;

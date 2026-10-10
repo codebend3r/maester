@@ -7,6 +7,7 @@ import '@fontsource-variable/instrument-sans/wdth.css'
 import { AppRoutes } from '@/AppRoutes'
 import { createQueryClient } from '@/lib/queryClient'
 import '@/styles/globals.scss'
+import '@/styles/elements.scss'
 
 const queryClient = createQueryClient()
 const rootElement = document.getElementById('root')

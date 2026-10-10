@@ -1,5 +1,6 @@
 export * from '@/apiClient'
 export * from '@/format'
+export * from '@/grouping'
 export * from '@/guards'
 export * from '@/libraryInput'
 export * from '@/media'

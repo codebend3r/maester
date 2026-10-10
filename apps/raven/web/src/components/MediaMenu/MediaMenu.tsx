@@ -60,10 +60,13 @@ export const MediaMenu = ({
   media,
   open,
   onOpenChange,
+  inline = false,
 }: {
   media: MediaItem
   open: boolean
   onOpenChange: (open: boolean) => void
+  /** In a row of its own (list, tiles) instead of over a card's thumbnail. */
+  inline?: boolean
 }) => {
   const id = useId()
   const root = useRef<HTMLDivElement>(null)
@@ -116,7 +119,7 @@ export const MediaMenu = ({
   }
 
   return (
-    <div ref={root} className={styles.root}>
+    <div ref={root} className={inline ? `${styles.root} ${styles.inline}` : styles.root}>
       <button
         ref={trigger}
         type="button"

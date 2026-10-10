@@ -1,5 +1,5 @@
-import { isRecord, isString } from '@/guards'
-import type { LibraryInput } from '@/types'
+import { isBoolean, isLibraryView, isMediaGroupBy, isMediaSort, isRecord, isString } from '@/guards'
+import type { LibraryInput, LibrarySettings } from '@/types'
 
 export const LIBRARY_NAME_MAX = 80
 
@@ -10,6 +10,47 @@ const normalisePath = (path: string): string => {
   const trimmed = path.trim()
   const stripped = trimmed.replace(/\/+$/, '')
   return stripped === '' && trimmed.startsWith('/') ? '/' : stripped
+}
+
+/** What a new library starts with, and what a library made before settings existed has. */
+export const DEFAULT_LIBRARY_SETTINGS: LibrarySettings = {
+  saveProgress: true,
+  pinned: true,
+  sort: 'title',
+  view: 'grid',
+  groupBy: 'resolution',
+}
+
+/** Each setting's check, and what to say when a value fails it. */
+const SETTING_CHECKS: Record<
+  keyof LibrarySettings,
+  { valid: (value: unknown) => boolean; problem: string }
+> = {
+  saveProgress: { valid: isBoolean, problem: 'Save progress must be on or off.' },
+  pinned: { valid: isBoolean, problem: 'Pinned must be on or off.' },
+  sort: { valid: isMediaSort, problem: 'Sort is not one of the choices.' },
+  view: { valid: isLibraryView, problem: 'View is not one of the choices.' },
+  groupBy: { valid: isMediaGroupBy, problem: 'Group by is not one of the choices.' },
+}
+
+type SettingsResult = { settings: Partial<LibrarySettings>; errors: string[] }
+
+/** The known settings that were sent, and a problem for each one that is not a valid value. */
+const readSettings = (input: unknown): SettingsResult => {
+  if (input === undefined) return { settings: {}, errors: [] }
+  if (!isRecord(input)) return { settings: {}, errors: ['Settings must be an object.'] }
+  return {
+    settings: {
+      ...(isBoolean(input.saveProgress) ? { saveProgress: input.saveProgress } : {}),
+      ...(isBoolean(input.pinned) ? { pinned: input.pinned } : {}),
+      ...(isMediaSort(input.sort) ? { sort: input.sort } : {}),
+      ...(isLibraryView(input.view) ? { view: input.view } : {}),
+      ...(isMediaGroupBy(input.groupBy) ? { groupBy: input.groupBy } : {}),
+    },
+    errors: Object.entries(SETTING_CHECKS)
+      .filter(([key, check]) => input[key] !== undefined && !check.valid(input[key]))
+      .map(([, check]) => check.problem),
+  }
 }
 
 /**
@@ -28,6 +69,8 @@ export const validateLibraryInput = (input: unknown): LibraryInputResult => {
     .filter((path) => path !== '')
     .filter((path, index, all) => all.indexOf(path) === index)
 
+  const settings = readSettings(input.settings)
+
   const errors = [
     ...(name === '' ? ['Give the library a name.'] : []),
     ...(name.length > LIBRARY_NAME_MAX
@@ -37,7 +80,16 @@ export const validateLibraryInput = (input: unknown): LibraryInputResult => {
     ...paths
       .filter((path) => !path.startsWith('/'))
       .map((path) => `"${path}" is not an absolute path.`),
+    ...settings.errors,
   ]
 
-  return errors.length > 0 ? { ok: false, errors } : { ok: true, value: { name, paths } }
+  if (errors.length > 0) return { ok: false, errors }
+  return {
+    ok: true,
+    value: {
+      name,
+      paths,
+      ...(input.settings === undefined ? {} : { settings: settings.settings }),
+    },
+  }
 }

@@ -10,6 +10,7 @@ import {
 } from '@raven/core'
 import { DatabaseService } from '@/db/database'
 import type { ProbeResult } from '@/ffmpeg/probe'
+import { shuffle } from '@/media/shuffle'
 
 /** A media row with the server-only fields a client never sees. */
 export type MediaRecord = MediaItem & {
@@ -62,9 +63,12 @@ type MediaRow = {
   favourited_at: string | null
 }
 
+/** A saved spot counts only while its library saves progress; turned off, it is kept but not shown. */
 const SELECT_MEDIA = `
-  SELECT m.*, p.position, f.added_at AS favourited_at
+  SELECT m.*, CASE WHEN l.save_progress = 1 THEN p.position END AS position,
+         f.added_at AS favourited_at
     FROM media m
+    JOIN libraries l ON l.id = m.library_id
     LEFT JOIN playback_progress p ON p.media_id = m.id
     LEFT JOIN favourites f ON f.media_id = m.id`
 
@@ -105,6 +109,26 @@ export const toMediaItem = ({
   ...item
 }: MediaRecord): MediaItem => item
 
+const BY_TITLE = 'm.title COLLATE NOCASE, m.id'
+
+/**
+ * ORDER BY for each sort. Ties fall back to title. Bitrate and resolution are
+ * unknown until a file is probed, and those files go last either way.
+ * Random lists by title here and is shuffled after.
+ */
+const ORDER_BY: Record<MediaSort, string> = {
+  title: BY_TITLE,
+  added: 'm.added_at DESC, m.id DESC',
+  oldest: 'm.added_at, m.id',
+  largest: `m.size DESC, ${BY_TITLE}`,
+  smallest: `m.size, ${BY_TITLE}`,
+  'bitrate-high': `m.bitrate IS NULL, m.bitrate DESC, ${BY_TITLE}`,
+  'bitrate-low': `m.bitrate IS NULL, m.bitrate, ${BY_TITLE}`,
+  'resolution-high': `m.width * m.height IS NULL, m.width * m.height DESC, ${BY_TITLE}`,
+  'resolution-low': `m.width * m.height IS NULL, m.width * m.height, ${BY_TITLE}`,
+  random: BY_TITLE,
+}
+
 /** `%` and `_` are LIKE wildcards; a search for "50%" should match the text "50%". */
 const likePattern = (search: string): string =>
   `%${search.replace(/[\\%_]/g, (char) => `\\${char}`)}%`
@@ -117,24 +141,27 @@ export class MediaRepository {
     return this.database.db
   }
 
+  /** A library's videos in `sort` order; `seed` decides a random one. */
   list({
     libraryId,
     search = '',
     sort = 'title',
+    seed = 0,
   }: {
     libraryId: number
     search?: string
     sort?: MediaSort
+    seed?: number
   }): MediaRecord[] {
-    const order = sort === 'added' ? 'm.added_at DESC, m.id DESC' : 'm.title COLLATE NOCASE, m.id'
-    return this.db
+    const records = this.db
       .prepare<[number, string], MediaRow>(
         `${SELECT_MEDIA}
           WHERE m.library_id = ? AND m.title LIKE ? ESCAPE '\\'
-          ORDER BY ${order}`,
+          ORDER BY ${ORDER_BY[sort]}`,
       )
       .all(libraryId, likePattern(search.trim()))
       .map(toRecord)
+    return sort === 'random' ? shuffle({ items: records, seed }) : records
   }
 
   get(id: number): MediaRecord | null {
@@ -272,9 +299,22 @@ export class MediaRepository {
    * The last 5% counts as finished, so the next play starts from the top; so
    * do the first few seconds (5s, or 5% of a short clip), which are a
    * misclick rather than a place to come back to.
+   *
+   * A library with progress saving off records nothing, not even the
+   * clearing of a finished video, so turning it back on resumes from the
+   * spots it had.
    */
   saveProgress({ id, position }: { id: number; position: number }): void {
-    const duration = this.get(id)?.duration ?? null
+    const target = this.db
+      .prepare<[number], { duration: number | null; save_progress: number }>(
+        `SELECT m.duration, l.save_progress
+           FROM media m
+           JOIN libraries l ON l.id = m.library_id
+          WHERE m.id = ?`,
+      )
+      .get(id)
+    if (!target || target.save_progress !== 1) return
+    const duration = target.duration
     const finished = duration != null && position >= duration * 0.95
     const barelyStarted = position < Math.min(5, (duration ?? 100) * 0.05)
     if (finished || barelyStarted) {

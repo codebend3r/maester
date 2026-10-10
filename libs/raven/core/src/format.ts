@@ -30,6 +30,14 @@ export const formatBytes = (bytes: number): string => {
   return exponent >= 2 ? `${value.toFixed(1)} ${unit}` : `${Math.round(value)} ${unit}`
 }
 
+/** "2.2 Mb/s", or "640 kb/s" under a megabit; null until the file is probed. */
+export const formatBitrate = (bitsPerSecond: number | null): string | null => {
+  if (bitsPerSecond == null) return null
+  return bitsPerSecond >= 1_000_000
+    ? `${(bitsPerSecond / 1_000_000).toFixed(1)} Mb/s`
+    : `${Math.round(bitsPerSecond / 1000)} kb/s`
+}
+
 /** "Mono", "Stereo", "5.1", "7.1", or "N ch" for anything unusual. */
 export const formatChannels = (channels: number | null): string | null => {
   if (channels == null || channels <= 0) return null

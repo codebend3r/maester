@@ -17,6 +17,15 @@ const LibraryRow = ({ library }: { library: Library }) => {
     mutationFn: () => api.scanLibrary(library.id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.libraries }),
   })
+  // Only the pin is sent as a setting; the server keeps the others as they are.
+  const pin = useMutation({
+    mutationFn: (pinned: boolean) =>
+      api.updateLibrary({
+        id: library.id,
+        input: { name: library.name, paths: library.paths, settings: { pinned } },
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.libraries }),
+  })
 
   return (
     <li className={styles.row}>
@@ -34,14 +43,24 @@ const LibraryRow = ({ library }: { library: Library }) => {
       <div className={styles.status}>
         <ScanStatus scan={library.scan} />
       </div>
-      <Button
-        icon="rescan"
-        className={styles.rescan}
-        disabled={library.scan.state === 'scanning' || rescan.isPending}
-        onClick={() => rescan.mutate()}
-      >
-        Rescan
-      </Button>
+      <div className={styles.actions}>
+        <Button
+          icon="pin"
+          className={styles.pin}
+          aria-pressed={library.settings.pinned}
+          disabled={pin.isPending}
+          onClick={() => pin.mutate(!library.settings.pinned)}
+        >
+          Pin<span className="visually-hidden"> {library.name}</span>
+        </Button>
+        <Button
+          icon="rescan"
+          disabled={library.scan.state === 'scanning' || rescan.isPending}
+          onClick={() => rescan.mutate()}
+        >
+          Rescan
+        </Button>
+      </div>
     </li>
   )
 }
