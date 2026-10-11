@@ -234,6 +234,57 @@ export type PersonDetails = {
 /** The pictures an item can have. */
 export type ItemImageKind = 'poster' | 'backdrop' | 'still'
 
+/** One picture a movie or show could show: a file beside the media, or one of TMDB's. */
+export type ImageOption = {
+  source: 'local' | 'tmdb'
+  /** The file's path for `local`; TMDB's path for `tmdb`, served through `imageOptionUrl`. */
+  ref: string
+  width: number | null
+  height: number | null
+  /** ISO 639-1, or null for a picture with no text. */
+  language: string | null
+  /** Whether the item shows this one now. */
+  current: boolean
+}
+
+/** Everything a movie or show could show as its poster and backdrop. */
+export type ItemImageOptions = {
+  poster: ImageOption[]
+  backdrop: ImageOption[]
+}
+
+/** The fields Edit metadata can write over: what a page shows for a movie or show. */
+export type ItemMetadata = {
+  title: string
+  year: number | null
+  tagline: string | null
+  summary: string | null
+  contentRating: string | null
+}
+
+/** Edit metadata: what the page shows, what TMDB says, and which fields were written over. */
+export type ItemMetadataState = {
+  shown: ItemMetadata
+  original: ItemMetadata
+  overridden: (keyof ItemMetadata)[]
+}
+
+/**
+ * What Edit metadata sends: each field given is written over, or cleared
+ * back to TMDB's with null. An empty field over TMDB's words is '', or 0 for
+ * the year, and shows as nothing; a title cannot be empty.
+ */
+export type ItemMetadataChange = {
+  title?: string | null
+  year?: number | null
+  tagline?: string | null
+  summary?: string | null
+  contentRating?: string | null
+}
+
+/** What Edit images picks: one of TMDB's pictures, or the one beside the media. */
+export type ImageChoice = { source: 'tmdb'; ref: string } | { source: 'local' }
+
 /** One of TMDB's search results, offered by Fix match. */
 export type MatchCandidate = {
   tmdbId: string

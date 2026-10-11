@@ -6,6 +6,8 @@ import {
   type Library,
   type MediaItem,
   isItemDetails,
+  isItemImageOptions,
+  isItemMetadataState,
   isLibrary,
   isMatchCandidateList,
   isMediaItem,
@@ -329,6 +331,125 @@ describe('movie metadata', () => {
       url: `/api/items/${matrix?.item?.id}/images/still`,
     })
     expect(still.statusCode).toBe(404)
+  })
+
+  it('offers every picture a movie could show, and keeps the chosen one through a refresh', async () => {
+    const matrix = (await list()).find((item) => item.item?.title === 'The Matrix')
+    const id = matrix?.item?.id
+    const options = shape({
+      response: await app().inject({ method: 'GET', url: `/api/items/${id}/images` }),
+      guard: isItemImageOptions,
+    })
+    // The poster beside the files comes first and is the current one; TMDB's own poster is listed too.
+    expect(options.poster.map((option) => [option.source, option.ref, option.current])).toEqual([
+      ['local', join(state.media, 'The Matrix (1999)', 'poster.jpg'), true],
+      ['tmdb', '/poster603.jpg', false],
+      ['tmdb', '/alt603.jpg', false],
+    ])
+    expect(options.poster[1]).toMatchObject({ width: 2000, height: 3000, language: 'en' })
+    expect(options.backdrop.map((option) => [option.ref, option.current])).toEqual([
+      ['/backdrop603.jpg', true],
+      ['/scene603.jpg', false],
+    ])
+    expect(options.backdrop[1]).toMatchObject({ width: 2000, height: 3000, language: 'en' })
+
+    const chosen = shape({
+      response: await app().inject({
+        method: 'PUT',
+        url: `/api/items/${id}/images/poster`,
+        payload: { source: 'tmdb', ref: '/alt603.jpg' },
+      }),
+      guard: isItemDetails,
+    })
+    expect(chosen.posterVersion).not.toBe(matrix?.item?.posterVersion)
+    const poster = await app().inject({
+      method: 'GET',
+      url: `/api/items/${id}/images/poster?v=${chosen.posterVersion}`,
+    })
+    expect(poster.rawPayload.equals(FAKE_JPEG)).toBe(true)
+    expect(tmdb.state.calls.some((url) => url.includes('/alt603.jpg'))).toBe(true)
+    const local = await app().inject({ method: 'GET', url: `/api/items/${id}/images/poster/local` })
+    expect(local.statusCode).toBe(200)
+    expect(local.rawPayload.equals(FAKE_JPEG)).toBe(false)
+
+    await app().inject({ method: 'POST', url: `/api/items/${id}/refresh` })
+    const after = shape({
+      response: await app().inject({ method: 'GET', url: `/api/items/${id}/images` }),
+      guard: isItemImageOptions,
+    })
+    expect(after.poster.find((option) => option.current)?.ref).toBe('/alt603.jpg')
+
+    const back = shape({
+      response: await app().inject({
+        method: 'PUT',
+        url: `/api/items/${id}/images/poster`,
+        payload: { source: 'local' },
+      }),
+      guard: isItemDetails,
+    })
+    expect(back.posterVersion).toBe(matrix?.item?.posterVersion)
+
+    const refused = await app().inject({
+      method: 'PUT',
+      url: `/api/items/${id}/images/poster`,
+      payload: { source: 'tmdb', ref: 'https://evil.example/x.jpg' },
+    })
+    expect(refused.statusCode).toBe(400)
+  })
+
+  it('writes metadata over TMDB’s, keeps it through a refresh, and gives it back on null', async () => {
+    const heat = await byFile('Heat.mp4')
+    const id = heat.item?.id
+    const before = shape({
+      response: await app().inject({ method: 'GET', url: `/api/items/${id}/metadata` }),
+      guard: isItemMetadataState,
+    })
+    expect(before).toMatchObject({
+      shown: { title: 'Heat' },
+      original: { title: 'Heat' },
+      overridden: [],
+    })
+
+    const edited = shape({
+      response: await app().inject({
+        method: 'PUT',
+        url: `/api/items/${id}/metadata`,
+        payload: { title: 'Heat (Director’s Cut)', tagline: 'A Los Angeles crime saga' },
+      }),
+      guard: isItemDetails,
+    })
+    expect(edited).toMatchObject({
+      title: 'Heat (Director’s Cut)',
+      tagline: 'A Los Angeles crime saga',
+    })
+    expect((await byFile('Heat.mp4')).item?.title).toBe('Heat (Director’s Cut)')
+    const written = shape({
+      response: await app().inject({ method: 'GET', url: `/api/items/${id}/metadata` }),
+      guard: isItemMetadataState,
+    })
+    expect(written.original.title).toBe('Heat')
+    expect(written.overridden).toEqual(['title', 'tagline'])
+
+    await app().inject({ method: 'POST', url: `/api/items/${id}/refresh` })
+    expect((await byFile('Heat.mp4')).item?.title).toBe('Heat (Director’s Cut)')
+
+    const refused = await app().inject({
+      method: 'PUT',
+      url: `/api/items/${id}/metadata`,
+      payload: { title: '   ' },
+    })
+    expect(refused.statusCode).toBe(400)
+
+    const back = shape({
+      response: await app().inject({
+        method: 'PUT',
+        url: `/api/items/${id}/metadata`,
+        payload: { title: null, tagline: null },
+      }),
+      guard: isItemDetails,
+    })
+    expect(back.title).toBe('Heat')
+    expect((await byFile('Heat.mp4')).item?.title).toBe('Heat')
   })
 
   it('serves a cast photo', async () => {

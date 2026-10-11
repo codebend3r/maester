@@ -70,13 +70,27 @@ export class MatchController {
   /** A search result's poster, through the cache, so the browser never talks to TMDB. */
   @Get('images/poster/:file')
   async candidatePoster(@Param('file') file: string, @Res() reply: FastifyReply): Promise<void> {
+    await this.candidate({ file, use: 'poster', reply })
+  }
+
+  /** A backdrop Edit images offers, through the cache. */
+  @Get('images/backdrop/:file')
+  async candidateBackdrop(@Param('file') file: string, @Res() reply: FastifyReply): Promise<void> {
+    await this.candidate({ file, use: 'backdrop', reply })
+  }
+
+  private async candidate({
+    file,
+    use,
+    reply,
+  }: {
+    file: string
+    use: 'poster' | 'backdrop'
+    reply: FastifyReply
+  }): Promise<void> {
     const path = `/${file}`
     if (!TMDB_IMAGE_PATH.test(path)) throw new NotFoundException('No such picture')
-    await sendImage({
-      reply,
-      path: await this.images.tmdb({ path, use: 'poster' }),
-      version: file,
-    })
+    await sendImage({ reply, path: await this.images.tmdb({ path, use }), version: file })
   }
 
   /**
