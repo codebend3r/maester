@@ -4,6 +4,8 @@
 *
 !package.json
 !bun.lock
+!tsconfig.base.json
+!tooling
 !nx.json
 !apps/*/*/package.json
 !libs/*/*/package.json

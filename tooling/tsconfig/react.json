@@ -1,0 +1,12 @@
+{
+  // A React app built by Vite and tested with bun test.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "useDefineForClassFields": true,
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "jsx": "react-jsx",
+    "types": ["bun", "@testing-library/jest-dom"]
+  }
+}

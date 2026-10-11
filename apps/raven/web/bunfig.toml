@@ -5,6 +5,6 @@
 preload = [
   "./src/test/happy-dom.ts",
   "./src/test/eventSource.ts",
-  "./src/test/scss-modules.ts",
+  "../../../tooling/web/scss-modules.ts",
   "./src/test-setup.ts",
 ]

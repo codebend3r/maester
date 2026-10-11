@@ -24,5 +24,5 @@ The image builds from the repo root: `docker build -f apps/rookery/Dockerfile .`
 
 The TypeScript, code style and CSS rules are in the root `CLAUDE.md`. rookery adds:
 
-- Server constructors inject with explicit `@Inject(Token)`, so DI never depends on decorator metadata under vitest. plex.tv and the clock are injected (`PLEX_TV_CLIENT`, `CLOCK`) so tests use `FakePlexTv` and a movable clock.
+- Server constructors inject with explicit `@Inject(Token)`, so DI never depends on decorator metadata, which neither vitest nor `tsx` emits. The server's `dev` runs through `tsx`, and its `build` is `tsc` then `tsc-alias`, as raven's is. plex.tv and the clock are injected (`PLEX_TV_CLIENT`, `CLOCK`) so tests use `FakePlexTv` and a movable clock.
 - The tokens are in `apps/rookery/web/src/styles/globals.scss`.

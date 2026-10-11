@@ -17,7 +17,9 @@ COPY --parents apps/*/*/package.json libs/*/*/package.json scripts/package.json 
 
 FROM bun AS build
 RUN bun install --frozen-lockfile --ignore-scripts
-COPY nx.json ./
+# Nx's workspace config, and the compiler options and presets every project extends.
+COPY nx.json tsconfig.base.json ./
+COPY tooling/ tooling/
 COPY apps/rookery/server/ apps/rookery/server/
 COPY apps/rookery/web/ apps/rookery/web/
 # Nx runs each project's own `build`, in the order the workspace graph gives.

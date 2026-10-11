@@ -17,6 +17,9 @@ COPY --parents apps/*/*/package.json libs/*/*/package.json scripts/package.json 
 
 FROM bun AS build
 RUN bun install --frozen-lockfile --ignore-scripts
+# The shared compiler options and lint presets every project extends.
+COPY tsconfig.base.json ./
+COPY tooling/ tooling/
 COPY libs/raven/core/ libs/raven/core/
 COPY apps/raven/server/ apps/raven/server/
 COPY apps/raven/web/ apps/raven/web/

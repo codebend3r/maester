@@ -1,0 +1,18 @@
+{
+  // What every TypeScript project compiles with. A project extends this, or a
+  // preset in tooling/tsconfig that does, and names its own `paths` and
+  // `include`: those resolve beside the file that names them.
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  }
+}

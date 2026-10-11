@@ -66,6 +66,14 @@ These apply to the web apps, `@raven/web` and `@rookery/web`. Each app has its o
 
 An Nx 23 monorepo over Bun workspaces (`apps/*/*`, `libs/*/*`, `scripts`). Projects have no `project.json`: Nx infers targets from each `package.json`'s scripts, whitelisted by its `nx.includedScripts`. A new script that should be a target goes in that list too.
 
+Shared tool config lives at the root, so every project lints and compiles by the same rules:
+
+- `tsconfig.base.json` holds the compiler options; `tooling/tsconfig/nest.json` and `tooling/tsconfig/react.json` add a server's or a web app's. A project's `tsconfig.json` extends one and adds its `paths`, its `include` and whatever sets it apart (core's empty `types`).
+- `tooling/oxlint/base.json` holds the lint rules, `nest.json` and `react.json` add a server's or a web app's. A project's `.oxlintrc.json` extends one and adds its ignores, its file overrides and whatever sets it apart.
+- `tooling/stylelint/rules.json` holds the SCSS rules both web apps extend, and `tooling/web` the asset declarations and the bun test SCSS loader they share.
+- oxfmt has no `extends`, so each project keeps its own `.oxfmtrc.json`; keep their options identical.
+- `nx.json` lists `tsconfig.base.json` and `tooling/` as shared inputs, so a change there reruns every project's tasks.
+
 | Project           | Path                  | What                                                                          |
 | ----------------- | --------------------- | ----------------------------------------------------------------------------- |
 | `@luwin/api`      | `apps/luwin/api`      | Python 3.12 package run through uv: agent, tools, chat, FastAPI, SQLite       |
