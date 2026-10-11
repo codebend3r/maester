@@ -22,7 +22,8 @@ then, with the same checks.
 
 A result that offers choices or carries a `Result` (notices, an approval
 to ask for) is turned into what the chat layer renders. An approval is
-checked against its decide tool's schema before it is stored.
+checked against its decide tool's signature before it is stored
+(`open_approval`, which Seerr's webhook raises its approvals through too).
 """
 
 from __future__ import annotations
@@ -46,10 +47,9 @@ from luwin.agent.tools import (
     ToolRegistry,
     ToolSpec,
     ValidationError,
-    validate_input,
 )
 from luwin.notify import AdminPost, ApprovalPost, Notice
-from luwin.store import MAINTENANCE, Flag, HeldCall, NotLinked, PendingAction
+from luwin.store import MAINTENANCE, Flag, HeldCall, NotLinked, PendingAction, Store
 
 log = logging.getLogger("luwin.agent")
 
@@ -92,6 +92,28 @@ class ToolOutcome:
 CANCELLED = ToolOutcome("Cancelled by the user; nothing was done.")
 
 
+def open_approval(store: Store, approval: Approval, requester: str) -> tuple[PendingAction, bool]:
+    """The pending action asking the admin about `approval`, and whether it's new.
+
+    Its arguments must fit its decide tool (`LookupError` when that isn't a
+    button-only admin tool, `ValidationError` when they don't fit). With a
+    subject, an approval already open about it is reused.
+    """
+    decide = approval.decide_spec()
+    decide.validate({**approval.args, "approved": True})
+    fields: dict[str, Any] = dict(
+        kind="approve",
+        action=decide.name,
+        requester=requester,
+        payload=approval.args,
+        summary=approval.summary,
+        ttl=APPROVAL_TTL,
+    )
+    if approval.subject is None:
+        return store.create_pending(**fields), True
+    return store.create_pending_once(subject=approval.subject, **fields)
+
+
 class ToolRunner:
     def __init__(self, registry: ToolRegistry, *, kill_switch: KillSwitch | None = None):
         self.registry = registry
@@ -117,7 +139,7 @@ class ToolRunner:
         if spec is None or spec.button_only or spec.tier > ctx.tier:
             return self._refuse(ctx, name, raw_input, f"tool {name!r} is not available to you")
         try:
-            args = validate_input(spec.input_schema, raw_input)
+            args = spec.validate(raw_input)
         except ValidationError as exc:
             return ToolOutcome(
                 json.dumps({"INVALID_JSON": json.dumps(raw_input, default=str), "error": str(exc)}),
@@ -146,7 +168,7 @@ class ToolRunner:
             return self._refuse(ctx, spec.name, pending.payload, "that action was not decided")
         args = {**pending.payload, "approved": approved} if spec.button_only else pending.payload
         try:
-            args = validate_input(spec.input_schema, args)
+            args = spec.validate(args)
         except ValidationError as exc:
             return self._refuse(ctx, spec.name, args, f"stored arguments no longer fit: {exc}")
         async with self._one_at_a_time(spec):
@@ -175,7 +197,7 @@ class ToolRunner:
         if spec is None or spec.button_only or spec.tier > ctx.tier:
             return self._refuse(ctx, held.tool, held.args, "that action is no longer available")
         try:
-            args = validate_input(spec.input_schema, held.args)
+            args = spec.validate(held.args)
         except ValidationError as exc:
             return self._refuse(ctx, spec.name, held.args, f"its arguments no longer fit: {exc}")
         async with self._one_at_a_time(spec):
@@ -227,7 +249,7 @@ class ToolRunner:
     async def _execute(self, ctx: ToolContext, spec: ToolSpec, args: dict[str, Any]) -> ToolOutcome:
         started = time.monotonic()
         try:
-            outcome = self._outcome(ctx, spec, await spec.handler(ctx, **args))
+            outcome = self._outcome(ctx, spec, await spec.call(ctx, args))
         except NotLinked as exc:  # no Seerr account to act as: the same refusal as any tool's
             outcome = self._outcome(ctx, spec, Result.refusal(str(exc)))
         except Exception as exc:  # a tool failing must not take the turn down
@@ -250,7 +272,7 @@ class ToolRunner:
                 retryable=result.retryable,
             )
         try:
-            pending, new = self._ask_admin(ctx, result.approval)
+            pending, new = open_approval(ctx.store, result.approval, ctx.user_id)
         except (LookupError, ValidationError) as exc:
             # The tool has acted but its approval can't be raised: say so to
             # the admin rather than leave the action stranded unseen.
@@ -274,24 +296,6 @@ class ToolRunner:
         # An approval already open about the same subject has its post; don't post it twice.
         post = (ApprovalPost(result.approval.notice, pending.id),) if new else ()
         return ToolOutcome(content, approval_id=pending.id, notices=(*result.notices, *post))
-
-    def _ask_admin(self, ctx: ToolContext, approval: Approval) -> tuple[PendingAction, bool]:
-        """The pending action for `approval`, and whether it's new."""
-        decide = self.registry.get(approval.decide)
-        if decide is None or not decide.button_only:
-            raise LookupError(f"{approval.decide!r} is not a registered admin decision tool")
-        validate_input(decide.input_schema, {**approval.args, "approved": True})
-        fields: dict[str, Any] = dict(
-            kind="approve",
-            action=decide.name,
-            requester=ctx.user_id,
-            payload=approval.args,
-            summary=approval.summary,
-            ttl=APPROVAL_TTL,
-        )
-        if approval.subject is None:
-            return ctx.store.create_pending(**fields), True
-        return ctx.store.create_pending_once(subject=approval.subject, **fields)
 
     def _request_confirmation(
         self, ctx: ToolContext, spec: ToolSpec, args: dict[str, Any]

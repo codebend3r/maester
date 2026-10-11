@@ -24,7 +24,8 @@ from datetime import timedelta
 from functools import partial
 from typing import Any
 
-from luwin.approvals import ask_about_request, decision_dm, request_subject
+from luwin.agent.tools import spec_of
+from luwin.approvals import ask_about_request, decide_request, decision_dm, request_subject
 from luwin.clients import ClientError, Services
 from luwin.clients.seerr import MediaRequest, RequestStatus
 from luwin.media import Copy, Titled, version_label
@@ -141,10 +142,10 @@ async def decided_in_seerr(
     verdict = "approved" if approved else "denied"
     if pending is None or store.decide_pending(pending.id, verdict, DECIDED_IN_SEERR) is None:
         return []
-    args = pending.payload
-    if not args.get("requester"):
+    decided = spec_of(decide_request).parse({**pending.payload, "approved": approved})
+    if not decided.requester:
         return []
-    return [DirectMessage(args["requester"], decision_dm(args["title"], args["version"], approved))]
+    return [DirectMessage(decided.requester, decision_dm(decided.title, decided.version, approved))]
 
 
 async def issue_status(

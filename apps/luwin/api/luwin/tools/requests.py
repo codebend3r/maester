@@ -31,7 +31,9 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, replace
-from typing import Any
+from typing import Annotated, Any
+
+from pydantic import Field
 
 from luwin.agent.tools import Approval, Result, Tier, ToolContext, tool
 from luwin.approvals import decision_dm, request_approval, request_subject
@@ -49,10 +51,11 @@ from luwin.clients.seerr import (
 )
 from luwin.config import Settings
 from luwin.library import ARR_NAMES, Library, NotLocated, OwnerUnknown, show_owner_on
-from luwin.media import version_label
+from luwin.media import MediaType, version_label
 from luwin.notify import DirectMessage
 from luwin.storage import Space, volumes_of
 from luwin.store import LinkedUser
+from luwin.tools.args import FriendId, TmdbId
 
 # A 4K copy runs roughly four to six times the size of a 1080p encode.
 UHD_SIZE_FACTOR = (4, 6)
@@ -65,29 +68,20 @@ REFUSALS = {
     Refusal.BLOCKLISTED: "That title is blocklisted on this server.",
 }
 
-REQUEST_SCHEMA: dict[str, Any] = {
-    "type": "object",
-    "properties": {
-        "tmdb_id": {"type": "integer", "description": "The TMDB id from search_media."},
-        "media_type": {"type": "string", "enum": ["movie", "tv"]},
-        "seasons": {
-            "type": "array",
-            "items": {"type": "integer"},
-            "description": 'TV only: the season numbers asked for ("season 2 and 3" is [2, 3]). '
-            "Omit for every season; [] requests none, for following future seasons only.",
-        },
-        "latest_season": {
-            "type": "boolean",
-            "description": 'TV only: just the newest season ("just the latest").',
-        },
-        "english_dub": {
-            "type": "boolean",
-            "description": "The user wants English audio (anime): prefer dual-audio releases.",
-        },
-    },
-    "required": ["tmdb_id", "media_type"],
-    "additionalProperties": False,
-}
+# What request_media and request_media_4k take besides the title.
+Seasons = Annotated[
+    list[int] | None,
+    Field(
+        description='TV only: the season numbers asked for ("season 2 and 3" is [2, 3]). '
+        "Omit for every season; [] requests none, for following future seasons only."
+    ),
+]
+LatestSeason = Annotated[
+    bool, Field(description='TV only: just the newest season ("just the latest").')
+]
+EnglishDub = Annotated[
+    bool, Field(description="The user wants English audio (anime): prefer dual-audio releases.")
+]
 
 
 class NotRequested(Exception):
@@ -278,17 +272,16 @@ async def size_tradeoff(services: Services, details: MediaDetails) -> dict[str, 
     "already on the server or requested are left out and listed in left_out. Set "
     "english_dub when they want English audio. Returns the Seerr request id and whether it "
     "was approved automatically; when nothing was requested, it refuses and says why.",
-    REQUEST_SCHEMA,
     tier=Tier.FRIEND,
     held_in_maintenance=True,
 )
 async def request_media(
     ctx: ToolContext,
-    tmdb_id: int,
-    media_type: str,
-    seasons: list[int] | None = None,
-    latest_season: bool = False,
-    english_dub: bool = False,
+    tmdb_id: TmdbId,
+    media_type: MediaType,
+    seasons: Seasons = None,
+    latest_season: LatestSeason = False,
+    english_dub: EnglishDub = False,
 ) -> dict[str, Any] | Result:
     details = await ctx.services.seerr.media_details(media_type, tmdb_id)
     try:
@@ -316,59 +309,6 @@ def awaiting_admin(
 
 
 @tool(
-    "decide_request",
-    "The admin's decision on a request Seerr left pending: approve or decline it in Seerr.",
-    {
-        "type": "object",
-        "properties": {
-            "request_id": {"type": "integer", "description": "The Seerr request id."},
-            "title": {"type": "string"},
-            "version": {"type": "string", "enum": ["1080p", "4K"]},
-            "requester": {
-                "type": "string",
-                "description": "The requester's user id; empty when they aren't linked here.",
-            },
-            "approved": {"type": "boolean"},
-        },
-        "required": ["request_id", "title", "version", "requester", "approved"],
-        "additionalProperties": False,
-    },
-    tier=Tier.ADMIN,
-    button_only=True,
-)
-async def decide_request(
-    ctx: ToolContext, request_id: int, title: str, version: str, requester: str, approved: bool
-) -> Result:
-    """Approve or decline the request in Seerr, then tell the requester.
-
-    Safe to run again: when Seerr already shows this decision (an earlier
-    press went through before failing), the requester is still told.
-    """
-    seerr = ctx.services.seerr
-    wanted = RequestStatus.APPROVED if approved else RequestStatus.DECLINED
-    try:
-        current = (await seerr.get_request(request_id)).status
-    except ClientError as exc:
-        if exc.status != 404:
-            raise
-        return Result.refusal(
-            f"Seerr request #{request_id} ({title} in {version}) no longer exists in Seerr; "
-            "nothing to decide."
-        )
-    if current == RequestStatus.PENDING:
-        await (seerr.approve_request if approved else seerr.decline_request)(request_id)
-    elif current != wanted:
-        return Result.refusal(
-            f"Seerr request #{request_id} ({title} in {version}) was already {current.label} in "
-            "Seerr; nothing changed."
-        )
-    verb = "Approved" if approved else "Declined"
-    dm = decision_dm(title, version, approved)
-    told = (DirectMessage(requester, dm),) if requester else ()
-    return Result(f"{verb} {title} in {version} in Seerr (request #{request_id}).", told)
-
-
-@tool(
     "request_media_4k",
     "Request the 4K version of a movie or show through Seerr, as the user. Seerr sends it to "
     "its 4K server; unless Seerr approves it automatically, it then waits for the admin. "
@@ -376,17 +316,16 @@ async def decide_request(
     "result's storage says why. "
     "When a 1080p copy is already on the server the result gives its size and the 4K "
     "estimate, so you can explain the storage trade-off.",
-    REQUEST_SCHEMA,
     tier=Tier.TRUSTED,
     held_in_maintenance=True,
 )
 async def request_media_4k(
     ctx: ToolContext,
-    tmdb_id: int,
-    media_type: str,
-    seasons: list[int] | None = None,
-    latest_season: bool = False,
-    english_dub: bool = False,
+    tmdb_id: TmdbId,
+    media_type: MediaType,
+    seasons: Seasons = None,
+    latest_season: LatestSeason = False,
+    english_dub: EnglishDub = False,
 ) -> dict[str, Any] | Result:
     seerr = ctx.services.seerr
     kind = "radarr" if media_type == "movie" else "sonarr"
@@ -481,7 +420,7 @@ def held_for_room(
         approval=Approval(
             notice=notice,
             summary=f"4K {details.display} for {who}, over the storage limit",
-            decide="decide_4k_over_storage",
+            decide=decide_4k_over_storage,
             args={
                 "tmdb_id": details.tmdb_id,
                 "media_type": details.media_type,
@@ -498,30 +437,16 @@ def held_for_room(
 @tool(
     "decide_4k_over_storage",
     "The admin's decision on a 4K request held because its volume is nearly full.",
-    {
-        "type": "object",
-        "properties": {
-            "tmdb_id": {"type": "integer"},
-            "media_type": {"type": "string", "enum": ["movie", "tv"]},
-            "seasons": {"type": "array", "items": {"type": "integer"}},
-            "english_dub": {"type": "boolean"},
-            "title": {"type": "string"},
-            "requester": {"type": "string", "description": "The friend's user id."},
-            "approved": {"type": "boolean"},
-        },
-        "required": ["tmdb_id", "media_type", "english_dub", "title", "requester", "approved"],
-        "additionalProperties": False,
-    },
     tier=Tier.ADMIN,
     button_only=True,
 )
 async def decide_4k_over_storage(
     ctx: ToolContext,
     tmdb_id: int,
-    media_type: str,
+    media_type: MediaType,
     english_dub: bool,
     title: str,
-    requester: str,
+    requester: FriendId,
     approved: bool,
     seasons: list[int] | None = None,
 ) -> Result:
@@ -572,20 +497,15 @@ async def decide_4k_over_storage(
     "Monitor a show in the Sonarr that owns it so future seasons download as they air "
     '("follow future seasons"). host is the owning Sonarr host that check_availability '
     "reports; the show must already be in Sonarr, which happens once a request is approved.",
-    {
-        "type": "object",
-        "properties": {
-            "tmdb_id": {"type": "integer", "description": "The show's TMDB id."},
-            "host": {"type": "string", "description": "The Sonarr host that owns the show."},
-        },
-        "required": ["tmdb_id", "host"],
-        "additionalProperties": False,
-    },
     tier=Tier.FRIEND,
     host_param="host",
     held_in_maintenance=True,
 )
-async def follow_show(ctx: ToolContext, tmdb_id: int, host: str) -> dict[str, Any] | Result:
+async def follow_show(
+    ctx: ToolContext,
+    tmdb_id: Annotated[int, Field(description="The show's TMDB id.")],
+    host: Annotated[str, Field(description="The Sonarr host that owns the show.")],
+) -> dict[str, Any] | Result:
     details = await ctx.services.seerr.media_details("tv", tmdb_id)
     try:
         owner = await show_owner_on(ctx.services, details, host)

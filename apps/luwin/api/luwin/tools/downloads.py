@@ -17,13 +17,17 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime
-from typing import Any
+from typing import Annotated, Any
+
+from pydantic import Field
 
 from luwin.agent.tools import Result, Tier, ToolContext, tool
 from luwin.clients import ClientError
 from luwin.clients.arr import HistoryEvent, QueueItem
 from luwin.clients.sabnzbd import Download
 from luwin.library import ARR_NAMES, NotLocated, Owner, owner_of, owner_on
+from luwin.media import MediaType, Version
+from luwin.tools.args import TmdbId
 
 # The newest history events shown, and how far back SABnzbd's history is read.
 EVENTS_SHOWN = 15
@@ -114,26 +118,15 @@ async def owner_for(ctx: ToolContext, details: Any, host: str | None, is_4k: boo
     "those downloads on that host (its failure message and the repair and unpack steps that "
     "went wrong). Give host when known; otherwise the owner is found. Summarize the cause "
     "and the next step in plain words.",
-    {
-        "type": "object",
-        "properties": {
-            "tmdb_id": {"type": "integer", "description": "The TMDB id from search_media."},
-            "media_type": {"type": "string", "enum": ["movie", "tv"]},
-            "version": {"type": "string", "enum": ["1080p", "4K"]},
-            "host": {"type": "string", "description": "The host holding that copy, if known."},
-        },
-        "required": ["tmdb_id", "media_type"],
-        "additionalProperties": False,
-    },
     tier=Tier.ADMIN,
     host_param="host",
 )
 async def download_history(
     ctx: ToolContext,
-    tmdb_id: int,
-    media_type: str,
-    version: str = "1080p",
-    host: str | None = None,
+    tmdb_id: TmdbId,
+    media_type: MediaType,
+    version: Version = "1080p",
+    host: Annotated[str | None, Field(description="The host holding that copy, if known.")] = None,
 ) -> dict[str, Any] | Result:
     details = await ctx.services.seerr.media_details(media_type, tmdb_id)
     try:

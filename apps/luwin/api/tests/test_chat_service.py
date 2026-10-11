@@ -41,10 +41,8 @@ def world(services, store):
     reg = ToolRegistry()
     calls = []
 
-    @reg.tool(
-        "search_media", "search", {"type": "object", "properties": {"query": {"type": "string"}}}
-    )
-    async def search(ctx, query=""):
+    @reg.tool("search_media", "search")
+    async def search(ctx, query: str = ""):
         return Choices(
             [
                 Choice("Dune", "438631", 2021, "https://image.tmdb.org/t/p/w92/dune.jpg"),
@@ -55,15 +53,14 @@ def world(services, store):
     @reg.tool(
         "replace_media",
         "replace",
-        {"type": "object", "properties": {"file_id": {"type": "integer"}}},
         tier=Tier.TRUSTED,
         destructive=True,
         held_in_maintenance=True,
     )
-    async def replace(ctx, file_id=0):
+    async def replace(ctx, file_id: int = 0):
         calls.append(("replace", file_id))
         if file_id == 99:  # over the day's cap: the admin decides
-            approval = Approval("Trusty wants 99 gone", "replace 99", "allow_replace", {
+            approval = Approval("Trusty wants 99 gone", "replace 99", allow_replace, {
                 "user_id": "t1", "file_id": 99})  # fmt: skip
             return Result("over the cap", approval=approval)
         return f"replaced file {file_id}"
@@ -71,18 +68,10 @@ def world(services, store):
     @reg.tool(
         "allow_replace",
         "the admin's decision on a replacement over the cap",
-        {
-            "type": "object",
-            "properties": {
-                "user_id": {"type": "string"},
-                "file_id": {"type": "integer"},
-                "approved": {"type": "boolean"},
-            },
-        },
         tier=Tier.ADMIN,
         button_only=True,
     )
-    async def allow_replace(ctx, user_id="", file_id=0, approved=False):
+    async def allow_replace(ctx, user_id: str = "", file_id: int = 0, approved: bool = False):
         calls.append(("allow", file_id, approved))
         verdict = "Allowed" if approved else "Denied"
         return Result(f"{verdict} replacing {file_id}.", (DirectMessage(user_id, verdict),))

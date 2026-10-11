@@ -19,7 +19,9 @@ briefly fills the upload for everyone.
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import Annotated, Any
+
+from pydantic import Field
 
 from luwin.agent.tools import Result, Tier, ToolContext, tool
 from luwin.perf import reencode, uplink
@@ -45,19 +47,14 @@ IN_BRIEF = (
     "it (at most 2 Mbps), the app and player, and `advice`: the cause and what to do. Reply "
     "with the advice, not the stats; with details=true it adds every finding and the numbers "
     "behind them, for when they ask.",
-    {
-        "type": "object",
-        "properties": {
-            "details": {
-                "type": "boolean",
-                "description": "Every finding and the stats behind them, when they ask.",
-            }
-        },
-        "additionalProperties": False,
-    },
     tier=Tier.FRIEND,
 )
-async def session_report(ctx: ToolContext, details: bool = False) -> dict[str, Any] | Result:
+async def session_report(
+    ctx: ToolContext,
+    details: Annotated[
+        bool, Field(description="Every finding and the stats behind them, when they ask.")
+    ] = False,
+) -> dict[str, Any] | Result:
     link = ctx.linked_user()
     if link.tautulli_user_id is None:
         return Result.refusal(
@@ -98,7 +95,6 @@ async def session_report(ctx: ToolContext, details: bool = False) -> dict[str, A
     "and memory where the fleet monitor is set up. `verdict` says whether load could be why "
     "things are slow. Use when someone asks if the server is up or busy, or why everything "
     "is slow.",
-    {"type": "object", "properties": {}, "additionalProperties": False},
     tier=Tier.FRIEND,
 )
 async def server_status(ctx: ToolContext) -> dict[str, Any] | Result:
@@ -115,16 +111,12 @@ async def server_status(ctx: ToolContext) -> dict[str, Any] | Result:
     "takes about 30 seconds and briefly fills the upload, so it's rationed: a result is "
     "reused for 10 minutes and a new test runs at most every 20 (`next_test`). host is the "
     "NAS to test from; only the one luwin runs on can.",
-    {
-        "type": "object",
-        "properties": {"host": {"type": "string", "description": "The NAS to test from."}},
-        "required": ["host"],
-        "additionalProperties": False,
-    },
     tier=Tier.FRIEND,
     host_param="host",
 )
-async def speed_test(ctx: ToolContext, host: str) -> dict[str, Any] | Result:
+async def speed_test(
+    ctx: ToolContext, host: Annotated[str, Field(description="The NAS to test from.")]
+) -> dict[str, Any] | Result:
     tester = ctx.services.speedtest
     if tester is None:
         return Result.refusal("No speed test is set up on this server (SPEEDTEST_HOST).")

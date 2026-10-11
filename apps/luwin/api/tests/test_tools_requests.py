@@ -3,6 +3,7 @@ from dataclasses import replace
 import pytest
 
 from luwin.agent.tools import Result, Tier, registry
+from luwin.approvals import decide_request
 from luwin.clients import ClientError
 from luwin.clients.arr import DiskSpace, MediaFile, RootFolder
 from luwin.clients.radarr import Movie
@@ -24,7 +25,7 @@ from luwin.notify import DirectMessage
 from luwin.store import NotLinked
 from luwin.tools.requests import (
     NotRequested,
-    decide_request,
+    decide_4k_over_storage,
     follow_show,
     plan_seasons,
     request_media,
@@ -80,7 +81,7 @@ async def test_movie_request_is_made_as_the_linked_friend_and_a_pending_one_asks
     assert req.requested_by_id == 4 and not req.is_4k
     approval = out.approval
     assert approval.notice == "dany asks for Dune (2021) in 1080p (Seerr request #1)."
-    assert approval.decide == "decide_request" and approval.subject == "seerr-request:1"
+    assert approval.decide is decide_request and approval.subject == "seerr-request:1"
     assert approval.args == {
         "request_id": 1, "title": "Dune (2021)", "version": "1080p", "requester": "d1"
     }  # fmt: skip
@@ -181,7 +182,7 @@ async def test_4k_goes_to_the_admin_with_the_size_tradeoff(ctx):
     assert out.content["standard_copy_gb"] == 12.3 and out.content["estimated_4k_gb"] == "49-74"
     approval = out.approval
     assert approval.notice.startswith("dany asks for Dune (2021) in 4K (Seerr request #1).")
-    assert "12.3 GB" in approval.notice and approval.decide == "decide_request"
+    assert "12.3 GB" in approval.notice and approval.decide is decide_request
     assert approval.args == {
         "request_id": 1, "title": "Dune (2021)", "version": "4K", "requester": "d1"
     }  # fmt: skip
@@ -343,7 +344,7 @@ async def test_a_nearly_full_4k_volume_holds_the_request_for_the_admin(ctx):
         "requests wait for the admin's approval for now; it's requested once they approve."
     )
     approval = out.approval
-    assert approval.decide == "decide_4k_over_storage"
+    assert approval.decide is decide_4k_over_storage
     assert approval.notice.startswith("dany asks for Dune (2021) in 4K, but /Movies on vermithor")
     assert approval.args == {
         "tmdb_id": 438631, "media_type": "movie", "seasons": None, "english_dub": False,
@@ -365,7 +366,7 @@ async def test_4k_space_that_cant_be_told_holds_the_request_too(ctx):
     server = ctx.services.seerr.arr_servers["radarr"][0]
     ctx.services.seerr.arr_servers["radarr"] = [replace(server, root_folder="/Movies/UHD")]
     out = await request_media_4k(ctx, 438631, "movie")
-    assert out.content["requested"] is True and out.approval.decide == "decide_request"
+    assert out.content["requested"] is True and out.approval.decide is decide_request
 
 
 async def test_the_admin_approves_a_held_4k_request_and_it_goes_to_seerr_approved(ctx):

@@ -15,7 +15,9 @@ from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any
+from typing import Annotated, Any
+
+from pydantic import Field
 
 from luwin.agent.tools import Result, Tier, ToolContext, tool
 from luwin.clients.sonarr import Episode
@@ -74,22 +76,15 @@ def note(found: Gaps) -> str:
     "Sonarr expects with the files on the host that owns the show, searches the missing "
     "ones and lists them. A season missing entirely goes to the admin instead. host is the "
     "owning Sonarr host that check_availability reports; season narrows it to one season.",
-    {
-        "type": "object",
-        "properties": {
-            "tmdb_id": {"type": "integer", "description": "The show's TMDB id."},
-            "host": {"type": "string", "description": "The Sonarr host that owns the show."},
-            "season": {"type": "integer", "description": "Only this season."},
-        },
-        "required": ["tmdb_id", "host"],
-        "additionalProperties": False,
-    },
     tier=Tier.FRIEND,
     host_param="host",
     held_in_maintenance=True,
 )
 async def find_gaps(
-    ctx: ToolContext, tmdb_id: int, host: str, season: int | None = None
+    ctx: ToolContext,
+    tmdb_id: Annotated[int, Field(description="The show's TMDB id.")],
+    host: Annotated[str, Field(description="The Sonarr host that owns the show.")],
+    season: Annotated[int | None, Field(description="Only this season.")] = None,
 ) -> dict[str, Any] | Result:
     details = await ctx.services.seerr.media_details("tv", tmdb_id)
     try:

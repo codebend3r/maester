@@ -1,0 +1,610 @@
+{
+  "check_availability": {
+    "additionalProperties": false,
+    "properties": {
+      "media_type": {
+        "enum": [
+          "movie",
+          "tv"
+        ],
+        "type": "string"
+      },
+      "tmdb_id": {
+        "description": "The TMDB id from search_media.",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "tmdb_id",
+      "media_type"
+    ],
+    "type": "object"
+  },
+  "decide_4k_over_storage": {
+    "additionalProperties": false,
+    "properties": {
+      "approved": {
+        "type": "boolean"
+      },
+      "english_dub": {
+        "type": "boolean"
+      },
+      "media_type": {
+        "enum": [
+          "movie",
+          "tv"
+        ],
+        "type": "string"
+      },
+      "requester": {
+        "description": "The friend's user id.",
+        "type": "string"
+      },
+      "seasons": {
+        "items": {
+          "type": "integer"
+        },
+        "type": "array"
+      },
+      "title": {
+        "type": "string"
+      },
+      "tmdb_id": {
+        "type": "integer"
+      }
+    },
+    "required": [
+      "tmdb_id",
+      "media_type",
+      "english_dub",
+      "title",
+      "requester",
+      "approved"
+    ],
+    "type": "object"
+  },
+  "decide_access": {
+    "additionalProperties": false,
+    "properties": {
+      "approved": {
+        "type": "boolean"
+      },
+      "change": {
+        "enum": [
+          "library",
+          "4k"
+        ],
+        "type": "string"
+      },
+      "library": {
+        "type": "string"
+      },
+      "requester": {
+        "description": "The friend's user id.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "change",
+      "library",
+      "requester",
+      "approved"
+    ],
+    "type": "object"
+  },
+  "decide_invite": {
+    "additionalProperties": false,
+    "properties": {
+      "approved": {
+        "type": "boolean"
+      },
+      "for_whom": {
+        "type": "string"
+      },
+      "requester": {
+        "description": "The friend's user id.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "for_whom",
+      "requester",
+      "approved"
+    ],
+    "type": "object"
+  },
+  "decide_replacement": {
+    "additionalProperties": false,
+    "properties": {
+      "approved": {
+        "type": "boolean"
+      },
+      "host": {
+        "description": "The host report_problem named.",
+        "type": "string"
+      },
+      "report_id": {
+        "description": "The report_id report_problem gave.",
+        "type": "integer"
+      },
+      "requester": {
+        "description": "The friend's user id.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "report_id",
+      "host",
+      "requester",
+      "approved"
+    ],
+    "type": "object"
+  },
+  "decide_request": {
+    "additionalProperties": false,
+    "properties": {
+      "approved": {
+        "type": "boolean"
+      },
+      "request_id": {
+        "description": "The Seerr request id.",
+        "type": "integer"
+      },
+      "requester": {
+        "description": "The requester's user id; empty when they aren't linked here.",
+        "type": "string"
+      },
+      "title": {
+        "type": "string"
+      },
+      "version": {
+        "enum": [
+          "1080p",
+          "4K"
+        ],
+        "type": "string"
+      }
+    },
+    "required": [
+      "request_id",
+      "title",
+      "version",
+      "requester",
+      "approved"
+    ],
+    "type": "object"
+  },
+  "download_history": {
+    "additionalProperties": false,
+    "properties": {
+      "host": {
+        "description": "The host holding that copy, if known.",
+        "type": "string"
+      },
+      "media_type": {
+        "enum": [
+          "movie",
+          "tv"
+        ],
+        "type": "string"
+      },
+      "tmdb_id": {
+        "description": "The TMDB id from search_media.",
+        "type": "integer"
+      },
+      "version": {
+        "enum": [
+          "1080p",
+          "4K"
+        ],
+        "type": "string"
+      }
+    },
+    "required": [
+      "tmdb_id",
+      "media_type"
+    ],
+    "type": "object"
+  },
+  "find_collection": {
+    "additionalProperties": false,
+    "properties": {
+      "tmdb_id": {
+        "description": "TMDB id of any movie in it.",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "tmdb_id"
+    ],
+    "type": "object"
+  },
+  "find_gaps": {
+    "additionalProperties": false,
+    "properties": {
+      "host": {
+        "description": "The Sonarr host that owns the show.",
+        "type": "string"
+      },
+      "season": {
+        "description": "Only this season.",
+        "type": "integer"
+      },
+      "tmdb_id": {
+        "description": "The show's TMDB id.",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "tmdb_id",
+      "host"
+    ],
+    "type": "object"
+  },
+  "follow_show": {
+    "additionalProperties": false,
+    "properties": {
+      "host": {
+        "description": "The Sonarr host that owns the show.",
+        "type": "string"
+      },
+      "tmdb_id": {
+        "description": "The show's TMDB id.",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "tmdb_id",
+      "host"
+    ],
+    "type": "object"
+  },
+  "list_tracks": {
+    "additionalProperties": false,
+    "properties": {
+      "episode": {
+        "description": "Shows only: the episode.",
+        "type": "integer"
+      },
+      "media_type": {
+        "enum": [
+          "movie",
+          "tv"
+        ],
+        "type": "string"
+      },
+      "season": {
+        "description": "Shows only: the season.",
+        "type": "integer"
+      },
+      "tmdb_id": {
+        "description": "The TMDB id, from recent_sessions or search_media.",
+        "type": "integer"
+      },
+      "version": {
+        "description": "Which copy.",
+        "enum": [
+          "1080p",
+          "4K"
+        ],
+        "type": "string"
+      }
+    },
+    "required": [
+      "tmdb_id",
+      "media_type",
+      "version"
+    ],
+    "type": "object"
+  },
+  "pick_version": {
+    "additionalProperties": false,
+    "properties": {
+      "connection_mbps": {
+        "description": "Their download speed in Mbps, when they give one.",
+        "type": "number"
+      },
+      "tmdb_id": {
+        "description": "The movie's TMDB id.",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "tmdb_id"
+    ],
+    "type": "object"
+  },
+  "recent_sessions": {
+    "additionalProperties": false,
+    "properties": {},
+    "type": "object"
+  },
+  "replace_media": {
+    "additionalProperties": false,
+    "properties": {
+      "host": {
+        "description": "The host report_problem named.",
+        "type": "string"
+      },
+      "report_id": {
+        "description": "The report_id report_problem gave.",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "report_id",
+      "host"
+    ],
+    "type": "object"
+  },
+  "report_problem": {
+    "additionalProperties": false,
+    "properties": {
+      "at": {
+        "description": "When it breaks, as H:MM:SS ('freezes at 1:12:30').",
+        "type": "string"
+      },
+      "description": {
+        "description": "The problem in the user's words.",
+        "type": "string"
+      },
+      "episode": {
+        "description": "Shows only: the episode.",
+        "type": "integer"
+      },
+      "kind": {
+        "enum": [
+          "wont_play",
+          "wrong_title",
+          "wrong_episode",
+          "cam",
+          "hardcoded_subs",
+          "subtitles",
+          "audio",
+          "other"
+        ],
+        "type": "string"
+      },
+      "media_type": {
+        "enum": [
+          "movie",
+          "tv"
+        ],
+        "type": "string"
+      },
+      "season": {
+        "description": "Shows only: the season.",
+        "type": "integer"
+      },
+      "tmdb_id": {
+        "description": "The TMDB id, from recent_sessions or search_media.",
+        "type": "integer"
+      },
+      "version": {
+        "description": "Which copy.",
+        "enum": [
+          "1080p",
+          "4K"
+        ],
+        "type": "string"
+      }
+    },
+    "required": [
+      "tmdb_id",
+      "media_type",
+      "version",
+      "kind",
+      "description"
+    ],
+    "type": "object"
+  },
+  "request_access": {
+    "additionalProperties": false,
+    "properties": {
+      "change": {
+        "enum": [
+          "library",
+          "4k"
+        ],
+        "type": "string"
+      },
+      "library": {
+        "description": "The library, for change=library.",
+        "type": "string"
+      },
+      "note": {
+        "description": "Anything the admin should know.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "change"
+    ],
+    "type": "object"
+  },
+  "request_collection": {
+    "additionalProperties": false,
+    "properties": {
+      "collection_id": {
+        "description": "The collection id, from find_collection's collection:<id> option.",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "collection_id"
+    ],
+    "type": "object"
+  },
+  "request_invite": {
+    "additionalProperties": false,
+    "properties": {
+      "for_whom": {
+        "description": "Who the invite is for.",
+        "type": "string"
+      },
+      "note": {
+        "description": "Anything the admin should know.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "for_whom"
+    ],
+    "type": "object"
+  },
+  "request_media": {
+    "additionalProperties": false,
+    "properties": {
+      "english_dub": {
+        "description": "The user wants English audio (anime): prefer dual-audio releases.",
+        "type": "boolean"
+      },
+      "latest_season": {
+        "description": "TV only: just the newest season (\"just the latest\").",
+        "type": "boolean"
+      },
+      "media_type": {
+        "enum": [
+          "movie",
+          "tv"
+        ],
+        "type": "string"
+      },
+      "seasons": {
+        "description": "TV only: the season numbers asked for (\"season 2 and 3\" is [2, 3]). Omit for every season; [] requests none, for following future seasons only.",
+        "items": {
+          "type": "integer"
+        },
+        "type": "array"
+      },
+      "tmdb_id": {
+        "description": "The TMDB id from search_media.",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "tmdb_id",
+      "media_type"
+    ],
+    "type": "object"
+  },
+  "request_media_4k": {
+    "additionalProperties": false,
+    "properties": {
+      "english_dub": {
+        "description": "The user wants English audio (anime): prefer dual-audio releases.",
+        "type": "boolean"
+      },
+      "latest_season": {
+        "description": "TV only: just the newest season (\"just the latest\").",
+        "type": "boolean"
+      },
+      "media_type": {
+        "enum": [
+          "movie",
+          "tv"
+        ],
+        "type": "string"
+      },
+      "seasons": {
+        "description": "TV only: the season numbers asked for (\"season 2 and 3\" is [2, 3]). Omit for every season; [] requests none, for following future seasons only.",
+        "items": {
+          "type": "integer"
+        },
+        "type": "array"
+      },
+      "tmdb_id": {
+        "description": "The TMDB id from search_media.",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "tmdb_id",
+      "media_type"
+    ],
+    "type": "object"
+  },
+  "request_status": {
+    "additionalProperties": false,
+    "properties": {},
+    "type": "object"
+  },
+  "search_media": {
+    "additionalProperties": false,
+    "properties": {
+      "media_type": {
+        "description": "Only movies or only shows, when the user said which.",
+        "enum": [
+          "movie",
+          "tv"
+        ],
+        "type": "string"
+      },
+      "query": {
+        "description": "The title to look for.",
+        "type": "string"
+      },
+      "year": {
+        "description": "Release year, when the user gave one.",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "type": "object"
+  },
+  "server_status": {
+    "additionalProperties": false,
+    "properties": {},
+    "type": "object"
+  },
+  "service_health": {
+    "additionalProperties": false,
+    "properties": {},
+    "type": "object"
+  },
+  "session_report": {
+    "additionalProperties": false,
+    "properties": {
+      "details": {
+        "description": "Every finding and the stats behind them, when they ask.",
+        "type": "boolean"
+      }
+    },
+    "type": "object"
+  },
+  "setup_guide": {
+    "additionalProperties": false,
+    "properties": {
+      "device": {
+        "enum": [
+          "android_tv",
+          "apple_tv",
+          "fire_tv",
+          "mobile",
+          "roku",
+          "web"
+        ],
+        "type": "string"
+      }
+    },
+    "required": [
+      "device"
+    ],
+    "type": "object"
+  },
+  "speed_test": {
+    "additionalProperties": false,
+    "properties": {
+      "host": {
+        "description": "The NAS to test from.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "host"
+    ],
+    "type": "object"
+  }
+}

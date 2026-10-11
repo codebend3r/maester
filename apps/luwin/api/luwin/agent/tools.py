@@ -1,9 +1,13 @@
-"""Tool declarations: name, schema, handler, minimum tier, destructive flag.
+"""Tool declarations: name, handler, minimum tier, destructive flag.
 
 A tool is a plain async function that takes a `ToolContext` plus keyword
-arguments matching its JSON schema. The registry is the only way the model
-learns about tools, and it filters by tier: a friend never sees a tool they
-cannot call, and the runner rejects out-of-tier calls anyway.
+arguments. Its signature is its contract: the registry builds a pydantic
+model from the parameters' type hints (`Annotated[..., Field(description=...)]`
+for what the model should read about one), and that model is both the JSON
+schema the model sees and the check every call goes through. The registry is
+the only way the model learns about tools, and it filters by tier: a friend
+never sees a tool they cannot call, and the runner rejects out-of-tier calls
+anyway.
 
 There is deliberately no shell, HTTP passthrough or filesystem tool.
 """
@@ -11,9 +15,14 @@ There is deliberately no shell, HTTP passthrough or filesystem tool.
 from __future__ import annotations
 
 import enum
+import inspect
+import typing
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Annotated, Any
+
+import pydantic
+from pydantic import BaseModel, ConfigDict, Strict
 
 from luwin.config import Settings
 from luwin.memo import Memo
@@ -145,19 +154,27 @@ class Choices:
 class Approval:
     """Ask the admin: `notice` goes up with Approve/Deny buttons, and the press runs `decide`.
 
-    `decide` names a button-only admin tool; `args` are its arguments except
-    `approved`, which the press supplies. The runner checks them against that
-    tool's schema before anything is stored, and on the press runs the tool
-    through the same checks and audit as any call. With a `subject` (the Seerr
-    request it decides), an approval already open about it is reused rather
-    than posted twice, whoever raised it first.
+    `decide` is a button-only admin tool's handler; `args` are its arguments
+    except `approved`, which the press supplies. They are checked against that
+    tool's signature before anything is stored (`open_approval` in
+    `luwin/agent/runner.py`), and on the press the tool runs through the same
+    checks and audit as any call. With a `subject` (the Seerr request it
+    decides), an approval already open about it is reused rather than posted
+    twice, whoever raised it first.
     """
 
     notice: str
     summary: str
-    decide: str
+    decide: Handler
     args: dict[str, Any]
     subject: str | None = None
+
+    def decide_spec(self) -> ToolSpec:
+        """The admin tool the press runs; `LookupError` when `decide` isn't a button-only tool."""
+        spec = spec_of(self.decide)
+        if not spec.button_only:
+            raise LookupError(f"{spec.name!r} is not a registered admin decision tool")
+        return spec
 
 
 @dataclass(frozen=True)
@@ -194,11 +211,82 @@ class Result:
 Handler = Callable[..., Awaitable[Any]]
 
 
+class ValidationError(ValueError):
+    """Arguments that don't fit a tool's signature."""
+
+
+# JSON types match exactly: no coercion, and a bool is not an int. Eager input
+# streaming turns off server-side validation, so a truncated or mistyped input
+# can arrive parsed; nothing reaches a handler that its signature doesn't take.
+_ARGS_CONFIG = ConfigDict(extra="forbid", strict=True)
+
+
+def _field_type(hint: Any) -> Any:
+    """A parameter's type for the args model: an enum takes its values, as JSON carries them."""
+    if isinstance(hint, type) and issubclass(hint, enum.Enum):
+        return Annotated[hint, Strict(False)]
+    return hint
+
+
+def model_of(name: str, handler: Handler) -> type[BaseModel]:
+    """The model of a handler's keyword arguments: every parameter after the context."""
+    hints = typing.get_type_hints(handler, include_extras=True)
+    params = list(inspect.signature(handler).parameters.values())[1:]
+    fields: dict[str, Any] = {
+        p.name: (
+            _field_type(hints.get(p.name, Any)),
+            ... if p.default is inspect.Parameter.empty else p.default,
+        )
+        for p in params
+    }
+    return pydantic.create_model(f"{name}_args", __config__=_ARGS_CONFIG, **fields)
+
+
+def schema_of(model: type[BaseModel]) -> dict[str, Any]:
+    """The JSON schema the model sees: pydantic's, without its titles, defaults and `$defs`,
+    and with an optional parameter written as its type (leaving it out is how to skip it)."""
+    schema = model.model_json_schema()
+    defs = schema.pop("$defs", {})
+
+    def clean(node: dict[str, Any]) -> dict[str, Any]:
+        if ref := node.get("$ref"):
+            node = {
+                **defs[ref.rsplit("/", 1)[-1]],
+                **{k: v for k, v in node.items() if k != "$ref"},
+            }
+        if options := node.get("anyOf"):
+            present = [o for o in options if o != {"type": "null"}]
+            if len(present) == 1:
+                node = {**{k: v for k, v in node.items() if k != "anyOf"}, **present[0]}
+        node = {k: v for k, v in node.items() if k not in ("title", "default")}
+        if "items" in node:
+            node["items"] = clean(node["items"])
+        if "properties" in node:
+            node["properties"] = {k: clean(v) for k, v in node["properties"].items()}
+        return node
+
+    return clean(schema)
+
+
+def _explain(error: pydantic.ValidationError) -> str:
+    """The first problem with some arguments, in the words the model and the admin read."""
+    first = error.errors()[0]
+    where = ".".join(str(part) for part in first["loc"])
+    match first["type"]:
+        case "missing":
+            return f"missing required argument {where!r}"
+        case "extra_forbidden":
+            return f"unexpected argument {where!r}"
+        case "model_type" | "dict_type" if not first["loc"]:
+            return "input is not an object"
+        case _:
+            return f"argument {where!r}: {first['msg']}"
+
+
 @dataclass(frozen=True)
 class ToolSpec:
     name: str
     description: str
-    input_schema: dict[str, Any]
     handler: Handler
     tier: Tier = Tier.FRIEND
     destructive: bool = False
@@ -212,6 +300,35 @@ class ToolSpec:
     # Changes something the stack must be up for (a request, a replacement): during a
     # maintenance window the call is saved and runs when it ends.
     held_in_maintenance: bool = False
+    # Built from the handler's signature: the check every call goes through, and the
+    # schema the model sees.
+    args_model: type[BaseModel] = field(init=False, repr=False, compare=False)
+    input_schema: dict[str, Any] = field(init=False, repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        model = model_of(self.name, self.handler)
+        object.__setattr__(self, "args_model", model)
+        object.__setattr__(self, "input_schema", schema_of(model))
+
+    def validate(self, data: Any) -> dict[str, Any]:
+        """`data` as stored and audited, once it fits the handler's signature."""
+        try:
+            self.args_model.model_validate(data)
+        except pydantic.ValidationError as exc:
+            raise ValidationError(_explain(exc)) from None
+        return dict(data)
+
+    def parse(self, data: dict[str, Any]) -> BaseModel:
+        """Validated arguments, typed, for code that reads a stored call (an approval's payload)."""
+        try:
+            return self.args_model.model_validate(data)
+        except pydantic.ValidationError as exc:
+            raise ValidationError(_explain(exc)) from None
+
+    async def call(self, ctx: ToolContext, args: dict[str, Any]) -> Any:
+        """Run the handler with `args` as its signature takes them (an enum as its member)."""
+        parsed = self.parse(args)
+        return await self.handler(ctx, **{k: getattr(parsed, k) for k in parsed.model_fields_set})
 
     def definition(self) -> dict[str, Any]:
         """The tool as the Messages API wants it, streaming its input eagerly."""
@@ -223,49 +340,18 @@ class ToolSpec:
         }
 
 
-class ValidationError(ValueError):
-    pass
+# Every registered tool by its handler, so an `Approval` can name its decide tool by the
+# function itself rather than by a string that a rename would silently break.
+_SPECS: dict[Handler, ToolSpec] = {}
 
 
-_JSON_TYPES: dict[str, type | tuple[type, ...]] = {
-    "string": str,
-    "integer": int,
-    "number": (int, float),
-    "boolean": bool,
-    "array": list,
-    "object": dict,
-}
-
-
-def validate_input(schema: dict[str, Any], data: Any) -> dict[str, Any]:
-    """A small JSON-schema check: object shape, required keys, property types.
-
-    Eager input streaming turns off server-side validation, so a truncated
-    or mistyped input can arrive parsed. This catches the shapes that
-    matter for calling a handler with keyword arguments; anything deeper
-    is the handler's job.
-    """
-    if not isinstance(data, dict):
-        raise ValidationError("input is not an object")
-    props = schema.get("properties", {})
-    for key in schema.get("required", []):
-        if key not in data:
-            raise ValidationError(f"missing required argument {key!r}")
-    for key, value in data.items():
-        if key not in props:
-            raise ValidationError(f"unexpected argument {key!r}")
-        expected = props[key].get("type")
-        if expected in _JSON_TYPES and value is not None:
-            py = _JSON_TYPES[expected]
-            # bool is an int subclass; an integer field must not accept True.
-            if not isinstance(value, py) or (
-                expected in ("integer", "number") and isinstance(value, bool)
-            ):
-                raise ValidationError(f"argument {key!r} should be {expected}")
-        enum_values = props[key].get("enum")
-        if enum_values is not None and value not in enum_values:
-            raise ValidationError(f"argument {key!r} must be one of {enum_values}")
-    return data
+def spec_of(handler: Handler) -> ToolSpec:
+    """The tool a handler was registered as; `LookupError` when it never was."""
+    spec = _SPECS.get(handler)
+    if spec is None:
+        name = getattr(handler, "__name__", repr(handler))
+        raise LookupError(f"{name!r} is not a registered tool")
+    return spec
 
 
 class ToolRegistry:
@@ -278,6 +364,7 @@ class ToolRegistry:
         if spec.button_only and spec.tier != Tier.ADMIN:
             raise ValueError(f"button-only tool {spec.name!r} must be admin tier")
         self._specs[spec.name] = spec
+        _SPECS[spec.handler] = spec
         return spec
 
     def get(self, name: str) -> ToolSpec | None:
@@ -306,7 +393,6 @@ class ToolRegistry:
         self,
         name: str,
         description: str,
-        input_schema: dict[str, Any],
         *,
         tier: Tier = Tier.FRIEND,
         destructive: bool = False,
@@ -319,7 +405,6 @@ class ToolRegistry:
                 ToolSpec(
                     name=name,
                     description=description,
-                    input_schema=input_schema,
                     handler=fn,
                     tier=tier,
                     destructive=destructive,

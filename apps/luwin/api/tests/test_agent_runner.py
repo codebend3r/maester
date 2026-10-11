@@ -20,19 +20,7 @@ from luwin.memo import Memo
 from luwin.notify import AdminPost, ApprovalPost, DirectMessage
 from luwin.store import LinkedUser, NotLinked, Store
 
-SCHEMA_N = {"type": "object", "properties": {"n": {"type": "integer"}}, "required": ["n"]}
-SCHEMA = {
-    "type": "object",
-    "properties": {"file_id": {"type": "integer"}, "host": {"type": "string"}},
-    "required": ["file_id", "host"],
-}
 DAY = timedelta(days=1)
-DECIDE_SCHEMA = {
-    "type": "object",
-    "properties": {"n": {"type": "integer"}, "approved": {"type": "boolean"}},
-    "required": ["n", "approved"],
-    "additionalProperties": False,
-}
 
 
 @pytest.fixture
@@ -40,81 +28,72 @@ def setup():
     reg = ToolRegistry()
     calls = []
 
-    @reg.tool(
-        "echo",
-        "echo",
-        {"type": "object", "properties": {"x": {"type": "string"}}, "required": ["x"]},
-    )
-    async def echo(ctx, x):
+    @reg.tool("echo", "echo")
+    async def echo(ctx, x: str):
         calls.append(("echo", x))
         return {"echoed": x}
 
-    @reg.tool("pick", "offers options", {"type": "object", "properties": {}})
+    @reg.tool("pick", "offers options")
     async def pick(ctx):
         return Choices([Choice("Dune", "438631", 2021)])
 
-    @reg.tool("boom", "fails", {"type": "object", "properties": {}})
+    @reg.tool("boom", "fails")
     async def boom(ctx):
         raise RuntimeError("kaput")
 
-    @reg.tool(
-        "delete_file", "destructive", SCHEMA, tier=Tier.TRUSTED, destructive=True, host_param="host"
-    )
-    async def delete_file(ctx, file_id, host):
+    @reg.tool("delete_file", "destructive", tier=Tier.TRUSTED, destructive=True, host_param="host")
+    async def delete_file(ctx, file_id: int, host: str):
         calls.append(("delete_file", file_id, host))
         if file_id == 9:
             return Result("deleted 9", (AdminPost("deleted /x/9.mkv, 4 GB, corrupt"),))
         return "deleted"
 
-    @reg.tool("refuse", "explains its own failure", SCHEMA_N)
-    async def refuse(ctx, n):
+    @reg.tool("refuse", "explains its own failure")
+    async def refuse(ctx, n: int):
         return Result(f"not doing {n}", (AdminPost("tried and refused"),), is_error=True)
 
-    @reg.tool(
-        "escalate", "confirmed, then asks the admin", SCHEMA, tier=Tier.TRUSTED, destructive=True
-    )
-    async def escalate(ctx, file_id, host):
-        approval = Approval("u1 wants a delete", "delete", "decide_n", {"n": file_id})
+    @reg.tool("escalate", "confirmed, then asks the admin", tier=Tier.TRUSTED, destructive=True)
+    async def escalate(ctx, file_id: int, host: str):
+        approval = Approval("u1 wants a delete", "delete", decide_n, {"n": file_id})
         return Result({"asked": file_id}, approval=approval)
 
-    @reg.tool("tell_admin", "admin should know", SCHEMA_N)
-    async def tell_admin(ctx, n):
+    @reg.tool("tell_admin", "admin should know")
+    async def tell_admin(ctx, n: int):
         return Result({"done": n}, (AdminPost(f"heads up: {n}"),))
 
-    @reg.tool("ask_admin", "needs the admin", SCHEMA_N)
-    async def ask_admin(ctx, n):
-        approval = Approval(f"u1 wants {n}", f"let u1 have {n}", "decide_n", {"n": n})
+    @reg.tool("ask_admin", "needs the admin")
+    async def ask_admin(ctx, n: int):
+        approval = Approval(f"u1 wants {n}", f"let u1 have {n}", decide_n, {"n": n})
         return Result({"n": n}, approval=approval)
 
-    @reg.tool("order", "asks a service for something", SCHEMA_N, held_in_maintenance=True)
-    async def order(ctx, n):
+    @reg.tool("order", "asks a service for something", held_in_maintenance=True)
+    async def order(ctx, n: int):
         calls.append(("order", n))
         return {"ordered": n}
 
     @reg.tool(
         "swap_file",
         "destructive, and held in maintenance",
-        SCHEMA,
         tier=Tier.TRUSTED,
         destructive=True,
         host_param="host",
         held_in_maintenance=True,
     )
-    async def swap_file(ctx, file_id, host):
+    async def swap_file(ctx, file_id: int, host: str):
         calls.append(("swap_file", file_id))
         return "swapped"
 
-    @reg.tool("ask_about", "asks the admin about one subject", SCHEMA_N)
-    async def ask_about(ctx, n):
-        approval = Approval(f"u1 wants {n}", f"{n} for u1", "decide_n", {"n": n}, f"thing:{n}")
+    @reg.tool("ask_about", "asks the admin about one subject")
+    async def ask_about(ctx, n: int):
+        approval = Approval(f"u1 wants {n}", f"{n} for u1", decide_n, {"n": n}, f"thing:{n}")
         return Result({"n": n}, approval=approval)
 
-    @reg.tool("ask_badly", "names no decide tool", SCHEMA_N)
-    async def ask_badly(ctx, n):
-        return Result({}, approval=Approval("u1 wants it", "?", "echo", {"n": n}))
+    @reg.tool("ask_badly", "names no decide tool")
+    async def ask_badly(ctx, n: int):
+        return Result({}, approval=Approval("u1 wants it", "?", echo, {"n": n}))
 
-    @reg.tool("decide_n", "the admin decides", DECIDE_SCHEMA, tier=Tier.ADMIN, button_only=True)
-    async def decide_n(ctx, n, approved):
+    @reg.tool("decide_n", "the admin decides", tier=Tier.ADMIN, button_only=True)
+    async def decide_n(ctx, n: int, approved: bool):
         if n < 0:
             raise ConnectionError("seerr down")
         calls.append(("decide_n", ctx.user_id, n, approved))
@@ -355,17 +334,17 @@ def test_linked_user_is_the_active_seerr_link_or_a_refusal(setup):
 def test_button_only_tools_are_admin_tools_hidden_from_every_tier():
     reg = ToolRegistry()
 
-    @reg.tool("decide", "d", DECIDE_SCHEMA, tier=Tier.ADMIN, button_only=True)
-    async def decide(ctx, n, approved):
+    @reg.tool("decide", "d", tier=Tier.ADMIN, button_only=True)
+    async def decide(ctx, n: int, approved: bool):
         return None
 
     assert reg.for_tier(Tier.ADMIN) == [] and reg.get("decide").button_only
     with pytest.raises(ValueError, match="must be admin tier"):
-        reg.tool("friendly", "f", DECIDE_SCHEMA, button_only=True)(decide)
+        reg.tool("friendly", "f", button_only=True)(decide)
 
 
 def test_a_result_is_either_an_answer_a_failure_or_a_question_for_the_admin():
-    ask = Approval("u1 wants it", "let u1", "decide_n", {"n": 1})
+    ask = Approval("u1 wants it", "let u1", acts, {"n": 1})
     with pytest.raises(ValueError, match="isn't a failure"):
         Result({}, approval=ask, is_error=True)
     with pytest.raises(ValueError, match="only a failure can be retried"):
@@ -377,9 +356,7 @@ def test_a_result_is_either_an_answer_a_failure_or_a_question_for_the_admin():
 
 async def test_a_caller_with_no_link_is_refused_like_any_refusal(setup):
     runner, as_user, store, *_ = setup
-    runner.registry.register(
-        ToolSpec("acts", "acts as the caller", {"type": "object", "properties": {}}, acts)
-    )
+    runner.registry.register(ToolSpec("acts", "acts as the caller", acts))
     out = await runner.run(as_user("nobody"), "acts", {})
     assert out.is_error and not out.retryable and "isn't linked" in out.content
     assert store.audit_recent(1)[0].ok is False

@@ -22,7 +22,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Annotated
+
+from pydantic import Field
 
 from luwin.agent.tools import Approval, Result, Tier, ToolContext, tool
 from luwin.formatting import gigabytes
@@ -43,6 +45,7 @@ from luwin.playback.reports import (
     move,
 )
 from luwin.store import ReportRow
+from luwin.tools.args import FriendId
 
 CAP_WINDOW = timedelta(days=1)
 
@@ -134,21 +137,15 @@ def ask_admin(ctx: ToolContext, go: Ready) -> Result:
         approval=Approval(
             notice=notice,
             summary=f"Replace {where} for {who}",
-            decide="decide_replacement",
+            decide=decide_replacement,
             args={"report_id": go.report.id, "host": go.report.host, "requester": ctx.user_id},
         ),
     )
 
 
-REPLACE_SCHEMA: dict[str, Any] = {
-    "type": "object",
-    "properties": {
-        "report_id": {"type": "integer", "description": "The report_id report_problem gave."},
-        "host": {"type": "string", "description": "The host report_problem named."},
-    },
-    "required": ["report_id", "host"],
-    "additionalProperties": False,
-}
+# The report a replacement is about, and the host report_problem named for its copy.
+ReportId = Annotated[int, Field(description="The report_id report_problem gave.")]
+ReportHost = Annotated[str, Field(description="The host report_problem named.")]
 
 
 @tool(
@@ -157,13 +154,12 @@ REPLACE_SCHEMA: dict[str, Any] = {
     "search for a new copy, on the host that owns it. Only when report_problem offered it; "
     "the user must press Confirm, and it still runs only if a file check failed or two "
     "people reported the same copy. Over the daily cap it goes to the admin instead.",
-    REPLACE_SCHEMA,
     tier=Tier.FRIEND,
     destructive=True,
     host_param="host",
     held_in_maintenance=True,
 )
-async def replace_media(ctx: ToolContext, report_id: int, host: str) -> Result:
+async def replace_media(ctx: ToolContext, report_id: ReportId, host: ReportHost) -> Result:
     report = ctx.store.get_report(report_id)
     if report is None or (report.user_id != ctx.user_id and ctx.tier < Tier.ADMIN):
         return Result.refusal(f"There's no report {report_id} of yours to act on.")
@@ -181,23 +177,13 @@ async def replace_media(ctx: ToolContext, report_id: int, host: str) -> Result:
 @tool(
     "decide_replacement",
     "The admin's decision on a replacement over the daily cap.",
-    {
-        "type": "object",
-        "properties": {
-            **REPLACE_SCHEMA["properties"],
-            "requester": {"type": "string", "description": "The friend's user id."},
-            "approved": {"type": "boolean"},
-        },
-        "required": ["report_id", "host", "requester", "approved"],
-        "additionalProperties": False,
-    },
     tier=Tier.ADMIN,
     destructive=True,
     host_param="host",
     button_only=True,
 )
 async def decide_replacement(
-    ctx: ToolContext, report_id: int, host: str, requester: str, approved: bool
+    ctx: ToolContext, report_id: ReportId, host: ReportHost, requester: FriendId, approved: bool
 ) -> Result:
     """Replace the file, or decline this report's replacement, and tell the friend."""
     report = ctx.store.get_report(report_id)

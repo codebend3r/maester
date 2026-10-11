@@ -164,7 +164,6 @@ def download(
     "The user's open requests: each with its Seerr state (waiting for approval, approved, "
     "failed) and, once approved, the download from the owning host's Radarr/Sonarr queue "
     "and SABnzbd merged into a percent and ETA. Stalled or failed downloads say why.",
-    {"type": "object", "properties": {}, "additionalProperties": False},
     tier=Tier.FRIEND,
 )
 async def request_status(ctx: ToolContext) -> dict[str, Any]:

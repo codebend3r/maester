@@ -41,7 +41,7 @@ async def test_asking_for_a_library_checks_it_then_goes_to_the_admin(friend):
     approval = out.approval
     assert approval.notice == "dany asks for the Anime library: for the kids"
     assert approval.args == {"change": "library", "library": "Anime", "requester": "d1"}
-    assert approval.subject == "access:d1:library:anime" and approval.decide == "decide_access"
+    assert approval.subject == "access:d1:library:anime" and approval.decide is decide_access
     assert friend.services.plextv.written == []
 
 

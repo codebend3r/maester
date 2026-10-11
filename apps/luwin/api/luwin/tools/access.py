@@ -21,17 +21,23 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
-from typing import Any
+from typing import Annotated, Any, Literal
+
+from pydantic import Field
 
 from luwin.access import is_4k, same_library, title_of
 from luwin.agent.tools import Approval, Result, Tier, ToolContext, tool
 from luwin.clients.plextv import OwnedServer, PlexTv, Section, Share
 from luwin.config import Access
 from luwin.notify import DirectMessage
+from luwin.tools.args import FriendId
 
 NOT_SET_UP = "Access changes aren't set up on this server (no Plex token), so ask the admin."
 # A note the admin reads in the approval post; the rest is cut.
 NOTE_MAX = 500
+
+# What a friend asks for: one more library, or 4K.
+Change = Literal["library", "4k"]
 
 
 @dataclass(frozen=True)
@@ -71,7 +77,7 @@ async def where_shared(plextv: PlexTv, access: Access, email: str | None) -> Sta
     return Standing(tuple(shared), tuple(everywhere))
 
 
-def wanted(shared: Shared, change: str, library: str) -> list[Section]:
+def wanted(shared: Shared, change: Change, library: str) -> list[Section]:
     """The libraries on this server the change is about."""
     if change == "4k":
         return [s for s in shared.sections if is_4k(s.title)]
@@ -97,20 +103,13 @@ def email_of(ctx: ToolContext, user_id: str) -> str | None:
     "(change=4k: the 4K libraries, and 4K requests). Nothing changes until the admin "
     "approves; the user gets a DM then. Refuses when they have it already, or when the "
     "library isn't on the server.",
-    {
-        "type": "object",
-        "properties": {
-            "change": {"type": "string", "enum": ["library", "4k"]},
-            "library": {"type": "string", "description": "The library, for change=library."},
-            "note": {"type": "string", "description": "Anything the admin should know."},
-        },
-        "required": ["change"],
-        "additionalProperties": False,
-    },
     tier=Tier.FRIEND,
 )
 async def request_access(
-    ctx: ToolContext, change: str, library: str = "", note: str = ""
+    ctx: ToolContext,
+    change: Change,
+    library: Annotated[str, Field(description="The library, for change=library.")] = "",
+    note: Annotated[str, Field(description="Anything the admin should know.")] = "",
 ) -> Result:
     plextv = ctx.services.plextv
     if plextv is None:
@@ -156,7 +155,7 @@ async def request_access(
         approval=Approval(
             notice=notice,
             summary=summary,
-            decide="decide_access",
+            decide=decide_access,
             args={"change": change, "library": title, "requester": ctx.user_id},
             subject=f"access:{ctx.user_id}:{change}:{title.lower()}",
         ),
@@ -166,23 +165,12 @@ async def request_access(
 @tool(
     "decide_access",
     "The admin's decision on a friend's ask for another library or for 4K.",
-    {
-        "type": "object",
-        "properties": {
-            "change": {"type": "string", "enum": ["library", "4k"]},
-            "library": {"type": "string"},
-            "requester": {"type": "string", "description": "The friend's user id."},
-            "approved": {"type": "boolean"},
-        },
-        "required": ["change", "library", "requester", "approved"],
-        "additionalProperties": False,
-    },
     tier=Tier.ADMIN,
     destructive=True,
     button_only=True,
 )
 async def decide_access(
-    ctx: ToolContext, change: str, library: str, requester: str, approved: bool
+    ctx: ToolContext, change: Change, library: str, requester: FriendId, approved: bool
 ) -> Result:
     """Add the libraries to their shares (and the trusted tier, for 4K), or tell them no.
 
