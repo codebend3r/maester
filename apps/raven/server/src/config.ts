@@ -37,6 +37,10 @@ export type ServerConfig = {
   metadataLanguage: string
   /** Whose content rating and release date to show: `US`, `GB`. */
   metadataCountry: string
+  /** OMDb's key, for IMDb, Rotten Tomatoes and Metacritic scores; null leaves them out. */
+  omdbApiKey: string | null
+  /** OMDb calls a day; a free key allows 1,000. */
+  omdbDailyLimit: number
 }
 
 /** The DI token the config is provided under. */
@@ -90,4 +94,6 @@ export const readServerConfig = (env: NodeJS.ProcessEnv = process.env): ServerCo
   tmdbApiToken: env.TMDB_API_TOKEN?.trim() || null,
   metadataLanguage: env.METADATA_LANGUAGE?.trim() || 'en-US',
   metadataCountry: (env.METADATA_COUNTRY?.trim() || 'US').toUpperCase(),
+  omdbApiKey: env.OMDB_API_KEY?.trim() || null,
+  omdbDailyLimit: Math.max(1, wholeNumber({ value: env.OMDB_DAILY_LIMIT, fallback: 1000 })),
 })

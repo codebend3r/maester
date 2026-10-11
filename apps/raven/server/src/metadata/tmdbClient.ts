@@ -51,6 +51,18 @@ export type FetchedCredit = {
   role: string | null
 }
 
+/** A review by a TMDB member, as TMDB hands it on. */
+export type FetchedReview = {
+  tmdbId: string
+  author: string
+  /** TMDB's path for the avatar; anything else TMDB passes on is dropped. */
+  avatar: string | null
+  rating: number | null
+  content: string
+  url: string
+  writtenAt: string
+}
+
 /** A movie, show, season or episode as TMDB describes it, ready to store. */
 export type FetchedItem = {
   type: ItemType
@@ -74,6 +86,7 @@ export type FetchedItem = {
   credits: FetchedCredit[]
   /** TMDB's own score out of 10, when anyone has voted. */
   rating: { value: number; votes: number | null } | null
+  reviews: FetchedReview[]
 }
 
 export type SearchResult = {
@@ -114,6 +127,30 @@ export const yearOf = (date: string | null): number | null => {
   const year = Number(date?.slice(0, 4) ?? '')
   return date != null && /^\d{4}/.test(date) && year > 0 ? year : null
 }
+
+/** Reviews appended to a movie or show, newest first. */
+export const toReviews = (reviews: unknown): FetchedReview[] =>
+  records(record(reviews).results)
+    .flatMap((entry): FetchedReview[] => {
+      const tmdbId = text(entry.id)
+      const details = record(entry.author_details)
+      const author = text(details.name) ?? text(details.username) ?? text(entry.author)
+      const content = text(entry.content)
+      const writtenAt = text(entry.created_at)
+      if (tmdbId == null || author == null || content == null || writtenAt == null) return []
+      return [
+        {
+          tmdbId,
+          author,
+          avatar: imagePath(details.avatar_path),
+          rating: number(details.rating),
+          content,
+          url: text(entry.url) ?? `https://www.themoviedb.org/review/${tmdbId}`,
+          writtenAt,
+        },
+      ]
+    })
+    .toSorted((a, b) => b.writtenAt.localeCompare(a.writtenAt))
 
 /** How many cast members are kept, and how many producers. */
 const CAST_LIMIT = 50
@@ -308,6 +345,7 @@ export const toShow = ({
     },
     credits: mergeCredits([...creators, ...aggregateCredits(record(show.aggregate_credits))]),
     rating: tmdbRating(show),
+    reviews: toReviews(show.reviews),
   }
 }
 
@@ -340,6 +378,7 @@ const toEpisode = (entry: Record<string, unknown>): FetchedItem | null => {
       ...crewCredits(entry.crew),
     ]),
     rating: tmdbRating(entry),
+    reviews: [],
   }
 }
 
@@ -373,6 +412,7 @@ export const toSeason = (
       images: { poster: imagePath(season.poster_path), backdrop: null, still: null },
       credits: [],
       rating: null,
+      reviews: [],
     },
     episodes: records(season.episodes).flatMap((entry) => toEpisode(entry) ?? []),
   }
@@ -420,6 +460,7 @@ export const toMovie = ({
       ...crewCredits(credits.crew),
     ]),
     rating: tmdbRating(movie),
+    reviews: toReviews(movie.reviews),
   }
 }
 
@@ -580,7 +621,7 @@ export class TmdbClient {
 
   async show(tmdbId: string): Promise<FetchedItem> {
     const body = await this.get(`/tv/${encodeURIComponent(tmdbId)}`, {
-      append_to_response: 'aggregate_credits,content_ratings,external_ids',
+      append_to_response: 'aggregate_credits,content_ratings,external_ids,reviews',
     })
     const show = toShow({ body, country: this.config.metadataCountry })
     if (!show) {
@@ -631,7 +672,7 @@ export class TmdbClient {
 
   async movie(tmdbId: string): Promise<FetchedItem> {
     const body = await this.get(`/movie/${encodeURIComponent(tmdbId)}`, {
-      append_to_response: 'credits,release_dates,external_ids',
+      append_to_response: 'credits,release_dates,external_ids,reviews',
     })
     const movie = toMovie({ body, country: this.config.metadataCountry })
     if (!movie) {

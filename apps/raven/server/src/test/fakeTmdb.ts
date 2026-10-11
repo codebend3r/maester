@@ -32,6 +32,36 @@ export const movieBody = (movie: FakeMovie): Record<string, unknown> => ({
   vote_average: 8.2,
   vote_count: 1000,
   external_ids: { imdb_id: movie.imdbId ?? null },
+  reviews: {
+    results: [
+      {
+        id: `review-${movie.id}-1`,
+        author: 'filmfan',
+        author_details: {
+          name: 'A Film Fan',
+          username: 'filmfan',
+          avatar_path: '/avatar1.jpg',
+          rating: 8,
+        },
+        content: `${movie.title} holds up.\n\nThe second act drags, but the end lands.`,
+        created_at: '2024-01-02T10:00:00.000Z',
+        url: `https://www.themoviedb.org/review/review-${movie.id}-1`,
+      },
+      {
+        id: `review-${movie.id}-2`,
+        author: 'latecomer',
+        author_details: {
+          name: '',
+          username: 'latecomer',
+          avatar_path: 'https://elsewhere.example/x.png',
+          rating: null,
+        },
+        content: '<b>Not</b> for me.',
+        created_at: '2025-06-01T10:00:00.000Z',
+        url: `https://www.themoviedb.org/review/review-${movie.id}-2`,
+      },
+    ],
+  },
   release_dates: {
     results: [
       {
@@ -168,13 +198,45 @@ const yearOf = (released: string): number => Number(released.slice(0, 4))
  * IMDb id, and movies by id. `down` makes every call fail as if TMDB were
  * unreachable; `calls` records each URL asked for.
  */
-export const fakeTmdb = ({ movies, shows = [] }: { movies: FakeMovie[]; shows?: FakeShow[] }) => {
-  const state = { down: false, calls: [] as string[], movies, shows }
+/** OMDb's answer for an IMDb id, as its `Ratings` strings. */
+export type FakeOmdb = Record<
+  string,
+  { imdb?: string; rottenTomatoes?: string; metacritic?: string }
+>
+
+export const fakeTmdb = ({
+  movies,
+  shows = [],
+  omdb = {},
+}: {
+  movies: FakeMovie[]
+  shows?: FakeShow[]
+  omdb?: FakeOmdb
+}) => {
+  const state = { down: false, calls: [] as string[], movies, shows, omdb, omdbCalls: 0 }
 
   const fetch: MetadataFetch = async (url) => {
     state.calls.push(url)
     if (state.down) throw new TypeError('fetch failed')
     const parsed = new URL(url)
+    if (parsed.host === 'www.omdbapi.com') {
+      state.omdbCalls += 1
+      if (parsed.searchParams.get('apikey') !== 'omdb-key') {
+        return json({ Response: 'False', Error: 'Invalid API key!' }, 401)
+      }
+      const scores = state.omdb[parsed.searchParams.get('i') ?? '']
+      if (!scores) return json({ Response: 'False', Error: 'Error getting data.' })
+      return json({
+        Response: 'True',
+        Ratings: [
+          ...(scores.imdb ? [{ Source: 'Internet Movie Database', Value: scores.imdb }] : []),
+          ...(scores.rottenTomatoes
+            ? [{ Source: 'Rotten Tomatoes', Value: scores.rottenTomatoes }]
+            : []),
+          ...(scores.metacritic ? [{ Source: 'Metacritic', Value: scores.metacritic }] : []),
+        ],
+      })
+    }
     if (parsed.host === 'image.tmdb.org') {
       return new Response(FAKE_JPEG, { headers: { 'content-type': 'image/jpeg' } })
     }

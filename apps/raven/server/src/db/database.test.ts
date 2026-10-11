@@ -103,6 +103,24 @@ describe('migrations', () => {
     database.onModuleDestroy()
   })
 
+  it('gives a library made before ratings sources the TMDB one', () => {
+    const before = new Sqlite(join(state.dir, 'raven.db'))
+    MIGRATIONS.slice(0, 8).forEach((sql) => before.exec(sql))
+    before.pragma('user_version = 8')
+    before.exec(
+      "INSERT INTO libraries (name, created_at, kind) VALUES ('Films', '2026-01-01T00:00:00.000Z', 'movies')",
+    )
+    before.close()
+    const database = new DatabaseService({ ...readServerConfig({}), dataDir: state.dir })
+    expect(database.db.prepare('SELECT ratings_source FROM libraries').get()).toEqual({
+      ratings_source: 'tmdb',
+    })
+    expect(database.db.prepare('SELECT COUNT(*) AS reviews FROM reviews').get()).toEqual({
+      reviews: 0,
+    })
+    database.onModuleDestroy()
+  })
+
   it('turns matching on for Movies and TV libraries and off for the rest', () => {
     const before = new Sqlite(join(state.dir, 'raven.db'))
     MIGRATIONS.slice(0, 7).forEach((sql) => before.exec(sql))

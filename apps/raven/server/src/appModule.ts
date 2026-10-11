@@ -7,6 +7,7 @@ import { HealthController } from '@/health/healthController'
 import { ItemsController } from '@/items/itemsController'
 import { MatchController } from '@/items/matchController'
 import { PeopleController } from '@/items/peopleController'
+import { ReviewsController } from '@/items/reviewsController'
 import { LibrariesController } from '@/libraries/librariesController'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { FavouritesController } from '@/media/favouritesController'
@@ -15,6 +16,7 @@ import { MediaRepository } from '@/media/mediaRepository'
 import { ImageCache } from '@/metadata/imageCache'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 import { MetadataService } from '@/metadata/metadataService'
+import { OmdbClient } from '@/metadata/omdbClient'
 import { METADATA_FETCH, type MetadataFetch, TmdbClient } from '@/metadata/tmdbClient'
 import { PlaybackController } from '@/playback/playbackController'
 import { SubtitlesService } from '@/playback/subtitlesService'
@@ -47,6 +49,7 @@ export class AppModule {
         ItemsController,
         MatchController,
         PeopleController,
+        ReviewsController,
       ],
       providers: [
         { provide: SERVER_CONFIG, useValue: config },
@@ -56,6 +59,7 @@ export class AppModule {
         MetadataRepository,
         MediaRepository,
         TmdbClient,
+        OmdbClient,
         ImageCache,
         MetadataService,
         FfmpegService,
