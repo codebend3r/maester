@@ -2,7 +2,7 @@ import { Inject, Injectable, Logger, type OnApplicationBootstrap } from '@nestjs
 import {
   isMatchedKind,
   type LibraryKind,
-  MATCHED_KINDS as MATCHED_LIBRARY_KINDS,
+  MATCHED_KINDS,
   type MatchedKind,
   type MetadataHealth,
 } from '@raven/core'
@@ -19,12 +19,6 @@ import { PASS_CONCURRENCY } from '@/metadata/passGuard'
 import { showPlace } from '@/metadata/places'
 import { TmdbClient } from '@/metadata/tmdbClient'
 import { createTaskQueue, mapWithConcurrency } from '@/scanner/concurrency'
-
-/**
- * The library types whose files get matched, typed wide for callers that ask
- * of any library's type. `isMatchedKind` from `@raven/core` narrows instead.
- */
-export const MATCHED_KINDS: readonly LibraryKind[] = MATCHED_LIBRARY_KINDS
 
 /**
  * Matches the files in Movies and TV shows libraries to TMDB, one library

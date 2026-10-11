@@ -95,13 +95,13 @@ describe('TV show metadata', () => {
       },
     ],
   })
-  const state = {
-    root: '',
-    media: '',
-    data: '',
-    app: null as NestFastifyApplication | null,
-    library: 0,
-  }
+  const state: {
+    root: string
+    media: string
+    data: string
+    app: NestFastifyApplication | null
+    library: number
+  } = { root: '', media: '', data: '', app: null, library: 0 }
   const app = (): NestFastifyApplication => {
     if (!state.app) throw new Error('app not started')
     return state.app

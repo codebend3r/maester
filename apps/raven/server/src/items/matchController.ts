@@ -15,12 +15,12 @@ import {
 import {
   type ChoosableImageKind,
   isMatchChoice,
+  isMatchItemType,
   isMatchedKind,
   type MatchCandidate,
   type MediaItem,
 } from '@raven/core'
 import type { FastifyReply } from 'fastify'
-import { isMatchItemType } from '@/items/matchItemType'
 import { sendImage } from '@/items/sendImage'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { PrivateBy, Public } from '@/lock/lockGuard'

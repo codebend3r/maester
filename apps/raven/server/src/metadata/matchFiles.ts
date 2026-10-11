@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { type LibraryKind, type MatchState, isMatchState } from '@raven/core'
+import { type LibraryKind, type MatchedKind, type MatchState, isMatchState } from '@raven/core'
 import { DatabaseService } from '@/db/database'
 import { BEST_FIRST, escapeLike } from '@/media/mediaSql'
 import { namedAs } from '@/media/namedAs'
@@ -184,7 +184,7 @@ export class MatchFiles {
   }
 
   /** How many files wait to be matched in libraries of `kinds`. */
-  countPending(kinds: readonly LibraryKind[]): number {
+  countPending(kinds: readonly MatchedKind[]): number {
     return (
       this.db
         .prepare<[string], { count: number }>(

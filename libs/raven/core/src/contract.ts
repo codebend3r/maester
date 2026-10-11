@@ -96,15 +96,6 @@ export type RatingSource = Infer<typeof isRatingSource>
 
 export const RATING_SOURCES = isRatingSource.values
 
-/** @deprecated The same as `RatingSource`; use that. */
-export type ShownRatings = RatingSource
-
-/** @deprecated The same as `isRatingSource`; use that. */
-export const isShownRatings = isRatingSource
-
-/** @deprecated The same as `RATING_SOURCES`; use that. */
-export const SHOWN_RATINGS = RATING_SOURCES
-
 /** A whole percentage from 1 to 100. */
 export const isWatchedPercent = (value: unknown): value is number =>
   isNumber(value) && Number.isInteger(value) && value >= 1 && value <= 100

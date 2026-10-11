@@ -10,6 +10,7 @@ import {
   type MatchItemType,
   type MediaSort,
 } from '@/contract'
+import { oneOf } from '@/schema'
 
 /** What a type of library can do: the one place each rule about Movies, TV shows and Other lives. */
 export type KindRules = {
@@ -91,6 +92,9 @@ export const MATCHED_KINDS: readonly MatchedKind[] = LIBRARY_KINDS.filter(isMatc
 export const matchedItemType = <K extends MatchedKind>(
   kind: K,
 ): (typeof KIND_RULES)[K]['matches'] => KIND_RULES[kind].matches
+
+/** What Fix match searches and Edit images chooses pictures for: the types matched libraries' files are matched to. */
+export const isMatchItemType = oneOf(MATCHED_KINDS.map((kind) => matchedItemType(kind)))
 
 export const sortsFor = (kind: LibraryKind): readonly MediaSort[] => KIND_RULES[kind].sorts
 

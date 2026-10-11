@@ -56,13 +56,13 @@ describe('movie metadata', () => {
     ],
     omdb: { tt0133093: { imdb: '8.7/10', rottenTomatoes: '83%', metacritic: '73/100' } },
   })
-  const state = {
-    root: '',
-    media: '',
-    data: '',
-    app: null as NestFastifyApplication | null,
-    library: 0,
-  }
+  const state: {
+    root: string
+    media: string
+    data: string
+    app: NestFastifyApplication | null
+    library: number
+  } = { root: '', media: '', data: '', app: null, library: 0 }
   const app = (): NestFastifyApplication => {
     if (!state.app) throw new Error('app not started')
     return state.app

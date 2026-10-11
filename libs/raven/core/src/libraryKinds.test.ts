@@ -7,6 +7,7 @@ import {
   coherentSettings,
   defaultLibrarySettings,
   groupingsFor,
+  isMatchItemType,
   isMatchedKind,
   matchedItemType,
   sortsFor,
@@ -120,5 +121,19 @@ describe('coherentSettings', () => {
       groupBy: 'codec',
     }
     expect(coherentSettings(movies)).toEqual(movies)
+  })
+})
+
+describe('isMatchItemType', () => {
+  it('takes what matched libraries are matched to, movies and shows, and nothing else', () => {
+    expect(isMatchItemType.values).toEqual(['movie', 'show'])
+    expect(['movie', 'show', 'season', 'episode', 'other', 7].map(isMatchItemType)).toEqual([
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+    ])
   })
 })

@@ -22,6 +22,7 @@ import {
   isItemImageKind,
   isItemImageOptions,
   isItemMetadataChange,
+  isMatchItemType,
   isShowMatchChoice,
   type ItemDetails,
   type ItemImageOptions,
@@ -31,7 +32,6 @@ import {
 } from '@raven/core'
 import type { FastifyReply } from 'fastify'
 import { itemChildren } from '@/items/itemChildren'
-import { isMatchItemType } from '@/items/matchItemType'
 import { sendImage } from '@/items/sendImage'
 import { PrivateBy } from '@/lock/lockGuard'
 import { LockService } from '@/lock/lockService'
