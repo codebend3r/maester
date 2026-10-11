@@ -55,7 +55,7 @@ describe('LibraryDialog', () => {
       within(select)
         .getAllByRole('option')
         .map((option) => option.textContent),
-    ).toEqual(['TMDB', 'IMDb', 'Rotten Tomatoes'])
+    ).toEqual(['TMDB', 'IMDb', 'Rotten Tomatoes', 'Metacritic'])
     await userEvent.click(screen.getByRole('radio', { name: 'Other' }))
     expect(screen.queryByRole('combobox', { name: 'Ratings shown' })).toBeNull()
   })

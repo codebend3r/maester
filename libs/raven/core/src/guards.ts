@@ -107,7 +107,12 @@ export const MEDIA_GROUPINGS: readonly MediaGroupBy[] = ['resolution', 'codec', 
 export const isMediaGroupBy = (value: unknown): value is MediaGroupBy =>
   MEDIA_GROUPINGS.some((grouping) => grouping === value)
 
-export const SHOWN_RATINGS: readonly ShownRatings[] = ['tmdb', 'imdb', 'rottenTomatoes']
+export const SHOWN_RATINGS: readonly ShownRatings[] = [
+  'tmdb',
+  'imdb',
+  'rottenTomatoes',
+  'metacritic',
+]
 
 export const isShownRatings = (value: unknown): value is ShownRatings =>
   SHOWN_RATINGS.some((source) => source === value)
