@@ -1,13 +1,13 @@
 import {
-  LIBRARY_VIEWS,
   type LibrarySettings,
   type LibraryView,
-  MEDIA_GROUPINGS,
-  MEDIA_SORTS,
   type MediaGroupBy,
   type MediaSort,
+  groupingsFor,
   isMediaGroupBy,
   isMediaSort,
+  sortsFor,
+  viewsFor,
 } from '@raven/core'
 import { useId } from 'react'
 import { Button } from '@/components/Button/Button'
@@ -32,48 +32,6 @@ const SORTS: Record<MediaSort, string> = {
   random: 'Random',
 }
 
-/** Release years come from names, and scores from TMDB, which only Movies and TV shows libraries read. */
-const YEAR_SORTS: ReadonlySet<MediaSort> = new Set([
-  'year-new',
-  'year-old',
-  'rating-high',
-  'rating-low',
-])
-
-/** Sorts that only mean something per file, which a TV library's show cards cannot use. */
-const FILE_SORTS: ReadonlySet<MediaSort> = new Set([
-  'largest',
-  'smallest',
-  'bitrate-high',
-  'bitrate-low',
-  'resolution-high',
-  'resolution-low',
-])
-
-/** The sorts a library offers; the one it has stays on offer whatever its type. */
-const sortsFor = ({ kind, sort }: LibrarySettings): MediaSort[] =>
-  MEDIA_SORTS.filter(
-    (option) =>
-      option === sort ||
-      (kind === 'other'
-        ? !YEAR_SORTS.has(option)
-        : kind === 'shows'
-          ? !FILE_SORTS.has(option)
-          : true),
-  )
-
-/** Only a Movies or TV shows library is matched, so only those bucket by match. */
-const groupingsFor = ({ kind, groupBy }: LibrarySettings): MediaGroupBy[] =>
-  MEDIA_GROUPINGS.filter((option) => option === groupBy || kind !== 'other' || option !== 'match')
-
-/**
- * A TV library lays its shows out as posters, already split into matched and
- * not, so it has no grouped view, even when its settings say so (one made
- * before a change of type swapped it).
- */
-const viewsFor = ({ kind }: LibrarySettings): LibraryView[] =>
-  LIBRARY_VIEWS.filter((option) => kind !== 'shows' || option !== 'grouped')
-
 const VIEWS: Record<LibraryView, { label: string; icon: IconName }> = {
   grid: { label: 'Grid', icon: 'grid' },
   list: { label: 'List', icon: 'list' },
@@ -90,8 +48,9 @@ const GROUPINGS: Record<MediaGroupBy, string> = {
 
 /**
  * Search, then how the library is ordered and laid out. Sort, view and
- * grouping are the library's own settings: `onChange` gets just the one that
- * changed. Group by shows only in the grouped view. Play and Shuffle are
+ * grouping are the library's own settings, already coherent with its type,
+ * so the options are its type's: `onChange` gets just the one that changed.
+ * Group by shows only in the grouped view. Play and Shuffle are
  * always there, and wait until there is something to play.
  */
 export const LibraryToolbar = ({
@@ -143,14 +102,14 @@ export const LibraryToolbar = ({
               isMediaSort(event.target.value) && onChange({ sort: event.target.value })
             }
           >
-            {sortsFor(settings).map((sort) => (
+            {sortsFor(settings.kind).map((sort) => (
               <option key={sort} value={sort}>
                 {SORTS[sort]}
               </option>
             ))}
           </select>
         </div>
-        {settings.view === 'grouped' && settings.kind !== 'shows' && (
+        {settings.view === 'grouped' && (
           <div className={styles.field}>
             <label htmlFor={ids.group} className={styles.label}>
               Group by
@@ -163,7 +122,7 @@ export const LibraryToolbar = ({
                 isMediaGroupBy(event.target.value) && onChange({ groupBy: event.target.value })
               }
             >
-              {groupingsFor(settings).map((grouping) => (
+              {groupingsFor(settings.kind).map((grouping) => (
                 <option key={grouping} value={grouping}>
                   {GROUPINGS[grouping]}
                 </option>
@@ -183,7 +142,7 @@ export const LibraryToolbar = ({
 
       <fieldset className={styles.views}>
         <legend className="visually-hidden">View</legend>
-        {viewsFor(settings).map((view) => (
+        {viewsFor(settings.kind).map((view) => (
           <Button
             key={view}
             icon={VIEWS[view].icon}
