@@ -1,7 +1,8 @@
 # syntax=docker/dockerfile:1
 # One image: the media server, which also serves the built web app, so there
 # is a single port and no CORS. Built from the repo root because the server
-# and the web app both depend on libs/raven/core through the bun workspace.
+# and the web app depend on libs/raven/core, and the server on libs/shared/server,
+# through the bun workspace.
 #
 # Bun installs and builds; Node runs, since that is the runtime NestJS
 # supports. Bun is installed at the version the root package.json pins in
@@ -17,12 +18,17 @@ COPY --parents apps/*/*/package.json libs/*/*/package.json scripts/package.json 
 
 FROM bun AS build
 RUN bun install --frozen-lockfile --ignore-scripts
+COPY nx.json ./
+# The shared compiler options and lint presets every project extends.
+COPY tsconfig.base.json ./
+COPY tooling/ tooling/
+COPY libs/shared/server/ libs/shared/server/
 COPY libs/raven/core/ libs/raven/core/
 COPY apps/raven/server/ apps/raven/server/
 COPY apps/raven/web/ apps/raven/web/
-RUN cd libs/raven/core && bun run build \
- && cd ../../../apps/raven/server && bun run build \
- && cd ../web && bun run build
+# Nx builds what the server and the web app depend on first (`^build` in
+# nx.json), so the build order lives in the project graph, not here.
+RUN NX_DAEMON=false NX_NO_CLOUD=true bunx nx run-many -t build -p @raven/server @raven/web
 
 FROM bun AS deps
 RUN bun install --frozen-lockfile --ignore-scripts --production --filter @raven/server
@@ -55,6 +61,7 @@ ENV NODE_ENV=production \
 WORKDIR /repo
 COPY --from=deps /repo ./
 COPY --from=build /repo/libs/raven/core/dist libs/raven/core/dist
+COPY --from=build /repo/libs/shared/server/dist libs/shared/server/dist
 COPY --from=build /repo/apps/raven/server/dist apps/raven/server/dist
 COPY --from=build /repo/apps/raven/web/dist /app/web
 WORKDIR /repo/apps/raven/server

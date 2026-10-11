@@ -43,17 +43,19 @@ jobs:
         uses: actions/checkout@v7
 
       # Only what goes into the image counts: the paths
-      # apps/raven/Dockerfile.dockerignore lets through, and the Dockerfile.
-      # A docs or luwin merge then leaves Vhagar's raven running as it is.
+      # apps/raven/Dockerfile.dockerignore lets through, read from its `!` lines
+      # so the two never disagree, and the Dockerfile itself. A docs or luwin
+      # merge then leaves Vhagar's raven running as it is.
       - name: 🔎 Check whether raven's image changed
         id: changed
         env:
           BEFORE: ${{ github.event.before }}
+          IGNORE_FILE: apps/raven/Dockerfile.dockerignore
         run: |
+          mapfile -t inputs < <(sed -n 's/^!//p' "$IGNORE_FILE")
           if git fetch --no-tags --depth=1 origin "$BEFORE" 2>/dev/null &&
-            git diff --quiet "$BEFORE" HEAD -- package.json bun.lock '*/package.json' \
-              libs/raven apps/raven/server apps/raven/web \
-              apps/raven/Dockerfile apps/raven/Dockerfile.dockerignore; then
+            git diff --quiet "$BEFORE" HEAD -- "${inputs[@]}" \
+              apps/raven/Dockerfile "$IGNORE_FILE"; then
             echo "Nothing that goes into raven's image changed; not publishing."
             echo "publish=false" >> "$GITHUB_OUTPUT"
           else

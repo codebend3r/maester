@@ -4,9 +4,13 @@
 *
 !package.json
 !bun.lock
+!tsconfig.base.json
+!tooling
+!nx.json
 !apps/*/*/package.json
 !libs/*/*/package.json
 !scripts/package.json
+!libs/shared/server
 !apps/rookery/server
 !apps/rookery/web
 **/node_modules

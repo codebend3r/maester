@@ -8,7 +8,7 @@ rookery authenticates; it never decides what someone may do in an app. Tiers, ow
 
 ## Structure
 
-rookery's projects live in the workspace described by the root `CLAUDE.md`, which covers Nx, the project table and how to run tasks: `@rookery/server` in `apps/rookery/server` and `@rookery/web` in `apps/rookery/web`.
+rookery's projects live in the workspace described by the root `CLAUDE.md`, which covers Nx, the project table and how to run tasks: `@rookery/server` in `apps/rookery/server` and `@rookery/web` in `apps/rookery/web`. The server depends on `@shared/server` (`libs/shared/server`), which it shares with raven: it serves the built web app (`SERVER_PREFIXES` in `app.ts` names rookery's own routes), opens SQLite and runs `MIGRATIONS`, reads the listen config and cookies, and checks the service token with `sameSecret`.
 
 The image builds from the repo root: `docker build -f apps/rookery/Dockerfile .`. `Dockerfile.dockerignore` allowlists what it copies; a new path the image needs goes there too.
 
@@ -24,5 +24,5 @@ The image builds from the repo root: `docker build -f apps/rookery/Dockerfile .`
 
 The TypeScript, code style and CSS rules are in the root `CLAUDE.md`. rookery adds:
 
-- Server constructors inject with explicit `@Inject(Token)`, so DI never depends on decorator metadata under vitest. plex.tv and the clock are injected (`PLEX_TV_CLIENT`, `CLOCK`) so tests use `FakePlexTv` and a movable clock.
+- Server constructors inject with explicit `@Inject(Token)`, so DI never depends on decorator metadata, which neither vitest nor `tsx` emits. The server's `dev` runs through `tsx`, and its `build` is `tsc` then `tsc-alias`, as raven's is. plex.tv and the clock are injected (`PLEX_TV_CLIENT`, `CLOCK`) so tests use `FakePlexTv` and a movable clock.
 - The tokens are in `apps/rookery/web/src/styles/globals.scss`.

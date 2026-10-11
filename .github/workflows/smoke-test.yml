@@ -16,24 +16,60 @@ permissions:
   contents: read
 
 jobs:
-  luwin:
-    name: 🩺 luwin build and health check
+  smoke:
+    name: 🩺 ${{ matrix.product }} build and health check
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    strategy:
+      # Each product is checked on its own; one failing doesn't cancel the others.
+      fail-fast: false
+      matrix:
+        include:
+          # The default CMD does not serve HTTP yet, so the web app is started
+          # explicitly. /health is ungated, so no .env is needed.
+          - product: luwin
+            port: 8020
+            health: /health
+            expect: .status == "ok" and .version == $version
+            version-file: apps/luwin/VERSION
+            command: uvicorn luwin.web:create_app --factory --host 0.0.0.0 --port 8020
+          # The image's Debian ffmpeg has zscale, so HDR thumbnails are tone mapped.
+          - product: raven
+            port: 8484
+            health: /api/health
+            expect: .status == "ok" and .ffmpeg != null and .tonemap == true
+            page: /
+          # rookery refuses to boot without its required settings, so the check
+          # passes placeholders; nothing here signs anyone in.
+          - product: rookery
+            port: 8030
+            health: /health
+            expect: .status == "ok"
+            page: /login
+            run-args: -e PUBLIC_URL=http://127.0.0.1:8030 -e SERVICE_TOKEN=ci
     env:
-      IMAGE: luwin:ci
-      PORT: 8020
-      VERSION_FILE: apps/luwin/VERSION
+      PRODUCT: ${{ matrix.product }}
+      IMAGE: ${{ matrix.product }}:ci
+      PORT: ${{ matrix.port }}
+      HEALTH: ${{ matrix.health }}
+      EXPECT: ${{ matrix.expect }}
+      PAGE: ${{ matrix.page }}
+      VERSION_FILE: ${{ matrix.version-file }}
     steps:
       - name: 📥 Checkout
         uses: actions/checkout@v7
 
       # Built from the repo root, as compose does; the Dockerfile's own
       # ignore file keeps the context to what it copies.
+      # The source label links a published package to this repo.
       - name: 🐳 Build image
-        run: docker build -f apps/luwin/Dockerfile -t "$IMAGE" .
+        run: |
+          docker build -f "apps/$PRODUCT/Dockerfile" -t "$IMAGE" \
+            --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" .
 
       - name: 🏷️ Entrypoint reports the release version
+        if: matrix.product == 'luwin'
         run: |
           expected="luwin $(cat "$VERSION_FILE")"
           actual="$(docker run --rm "$IMAGE" luwin --version)"
@@ -41,79 +77,34 @@ jobs:
           echo "actual:   $actual"
           test "$actual" = "$expected"
 
-      # The default CMD does not serve HTTP yet, so start the web app
-      # explicitly. /health is ungated, so no .env is needed.
-      - name: ▶️ Start web app
-        run: |
-          docker run -d --name luwin -p "$PORT:$PORT" "$IMAGE" \
-            uvicorn luwin.web:create_app --factory --host 0.0.0.0 --port "$PORT"
-
-      - name: 🩺 Wait for /health
-        run: |
-          for _ in $(seq 1 30); do
-            if body="$(curl -fsS "http://127.0.0.1:$PORT/health")"; then
-              echo "$body"
-              echo "$body" | jq -e --arg v "$(cat "$VERSION_FILE")" \
-                '.status == "ok" and .version == $v'
-              exit 0
-            fi
-            sleep 1
-          done
-          echo "::error::/health did not respond within 30s"
-          exit 1
-
-      - name: 📜 Container logs
-        if: always()
-        run: docker logs luwin || true
-
-      - name: 🧹 Stop container
-        if: always()
-        run: docker rm -f luwin || true
-
-  raven:
-    name: 🩺 raven build and health check
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    env:
-      IMAGE: raven:ci
-      PORT: 8484
-    steps:
-      - name: 📥 Checkout
-        uses: actions/checkout@v7
-
-      # Built from the repo root, as compose does; the Dockerfile's own
-      # ignore file keeps the context to what it copies.
-      # The source label links the published package to this repo.
-      - name: 🐳 Build image
-        run: |
-          docker build -f apps/raven/Dockerfile -t "$IMAGE" \
-            --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
-            --label "org.opencontainers.image.revision=$GITHUB_SHA" .
-
+      # The matrix's own constants, split into words on purpose.
       - name: ▶️ Start server
-        run: docker run -d --name raven -p "$PORT:$PORT" "$IMAGE"
-
-      # The image's Debian ffmpeg has zscale, so HDR thumbnails are tone mapped.
-      - name: 🩺 Wait for /api/health
         run: |
+          docker run -d --name "$PRODUCT" -p "$PORT:$PORT" \
+            ${{ matrix.run-args }} "$IMAGE" ${{ matrix.command }}
+
+      - name: 🩺 Wait for the health route
+        run: |
+          version=""
+          if [ -n "$VERSION_FILE" ]; then version="$(cat "$VERSION_FILE")"; fi
           for _ in $(seq 1 30); do
-            if body="$(curl -fsS "http://127.0.0.1:$PORT/api/health")"; then
+            if body="$(curl -fsS "http://127.0.0.1:$PORT$HEALTH")"; then
               echo "$body"
-              echo "$body" | jq -e '.status == "ok" and .ffmpeg != null and .tonemap == true'
-              curl -fsS -o /dev/null "http://127.0.0.1:$PORT/"
+              echo "$body" | jq -e --arg version "$version" "$EXPECT"
+              if [ -n "$PAGE" ]; then curl -fsS -o /dev/null "http://127.0.0.1:$PORT$PAGE"; fi
               exit 0
             fi
             sleep 1
           done
-          echo "::error::/api/health did not respond within 30s"
+          echo "::error::$HEALTH did not respond within 30s"
           exit 1
 
       - name: 💾 Save image
-        if: inputs.save-raven-image
+        if: matrix.product == 'raven' && inputs.save-raven-image
         run: docker save "$IMAGE" | gzip -1 > raven-image.tar.gz
 
       - name: 📤 Upload image
-        if: inputs.save-raven-image
+        if: matrix.product == 'raven' && inputs.save-raven-image
         uses: actions/upload-artifact@v7
         with:
           name: raven-image
@@ -124,53 +115,8 @@ jobs:
 
       - name: 📜 Container logs
         if: always()
-        run: docker logs raven || true
+        run: docker logs "$PRODUCT" || true
 
       - name: 🧹 Stop container
         if: always()
-        run: docker rm -f raven || true
-
-  rookery:
-    name: 🩺 rookery build and health check
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    env:
-      IMAGE: rookery:ci
-      PORT: 8030
-    steps:
-      - name: 📥 Checkout
-        uses: actions/checkout@v7
-
-      # Built from the repo root, as compose does; the Dockerfile's own
-      # ignore file keeps the context to what it copies.
-      - name: 🐳 Build image
-        run: docker build -f apps/rookery/Dockerfile -t "$IMAGE" .
-
-      # rookery refuses to boot without its required settings, so the check
-      # passes placeholders; nothing here signs anyone in.
-      - name: ▶️ Start server
-        run: |
-          docker run -d --name rookery -p "$PORT:$PORT" \
-            -e PUBLIC_URL=http://127.0.0.1:8030 -e SERVICE_TOKEN=ci "$IMAGE"
-
-      - name: 🩺 Wait for /health
-        run: |
-          for _ in $(seq 1 30); do
-            if body="$(curl -fsS "http://127.0.0.1:$PORT/health")"; then
-              echo "$body"
-              echo "$body" | jq -e '.status == "ok"'
-              curl -fsS -o /dev/null "http://127.0.0.1:$PORT/login"
-              exit 0
-            fi
-            sleep 1
-          done
-          echo "::error::/health did not respond within 30s"
-          exit 1
-
-      - name: 📜 Container logs
-        if: always()
-        run: docker logs rookery || true
-
-      - name: 🧹 Stop container
-        if: always()
-        run: docker rm -f rookery || true
+        run: docker rm -f "$PRODUCT" || true

@@ -4,9 +4,13 @@
 *
 !package.json
 !bun.lock
+!nx.json
+!tsconfig.base.json
+!tooling
 !apps/*/*/package.json
 !libs/*/*/package.json
 !scripts/package.json
+!libs/shared/server
 !libs/raven/core
 !apps/raven/server
 !apps/raven/web

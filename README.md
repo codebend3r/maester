@@ -16,6 +16,7 @@ maester is a self-hosted media suite: a library and player, an AI assistant for 
 | `@raven/core`     | `libs/raven/core`     | raven's platform-agnostic core: API types, client, direct-play check   |
 | `@rookery/server` | `apps/rookery/server` | rookery's sign-in server: NestJS on Fastify, SQLite, Plex PIN flow     |
 | `@rookery/web`    | `apps/rookery/web`    | rookery's login and logout pages: React 19 on Vite                     |
+| `@shared/server`  | `libs/shared/server`  | What raven's and rookery's servers share: web app serving, SQLite      |
 | `scripts`         | `scripts`             | Repo tooling: tracker and board sync, NAS deploy, version bump         |
 
 Each app has a README of its own: [luwin](apps/luwin/README.md), [raven](apps/raven/README.md), [rookery](apps/rookery/README.md).
