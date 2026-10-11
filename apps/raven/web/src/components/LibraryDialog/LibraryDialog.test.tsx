@@ -102,6 +102,7 @@ describe('LibraryDialog', () => {
           watchedPercent: 90,
           kind: 'other',
           ratingsSource: 'tmdb',
+          autoRefresh: true,
         },
       },
     ])
@@ -113,6 +114,7 @@ describe('LibraryDialog', () => {
     await userEvent.type(screen.getByLabelText('Folder path'), '/media/Clips')
     await userEvent.click(screen.getByRole('button', { name: 'Add' }))
     await userEvent.click(screen.getByRole('checkbox', { name: 'Save where each video stopped' }))
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Refresh automatically' }))
     await userEvent.click(screen.getByRole('button', { name: 'Add library' }))
     expect(created.at(-1)).toEqual({
       name: 'Clips',
@@ -126,6 +128,7 @@ describe('LibraryDialog', () => {
         watchedPercent: 90,
         kind: 'other',
         ratingsSource: 'tmdb',
+        autoRefresh: false,
       },
     })
   })
@@ -208,7 +211,9 @@ describe('LibraryDialog', () => {
   it("shows the library's own settings when editing it", () => {
     renderWithProviders(
       <LibraryDialog
-        library={library({ settings: { ...library().settings, saveProgress: false } })}
+        library={library({
+          settings: { ...library().settings, saveProgress: false, autoRefresh: false },
+        })}
         onClose={() => undefined}
       />,
     )
@@ -216,6 +221,7 @@ describe('LibraryDialog', () => {
       screen.getByRole('checkbox', { name: 'Save where each video stopped' }),
     ).not.toBeChecked()
     expect(screen.getByRole('checkbox', { name: 'Pin to the side menu' })).toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Refresh automatically' })).not.toBeChecked()
   })
 
   it("shows the library's own watched percentage when editing it", () => {

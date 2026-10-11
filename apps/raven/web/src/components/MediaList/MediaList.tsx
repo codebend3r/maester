@@ -12,7 +12,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { MatchType } from '@/components/FixMatchDialog/FixMatchDialog'
 import { Icon } from '@/components/Icon/Icon'
-import { MediaMenu } from '@/components/MediaMenu/MediaMenu'
+import { MENU_HOST, MediaMenu } from '@/components/MediaMenu/MediaMenu'
 import { ScoreChip } from '@/components/RatingChips/RatingChips'
 import { SortHeader } from '@/components/SortHeader/SortHeader'
 import { openPath } from '@/lib/itemLinks'
@@ -20,7 +20,7 @@ import { progressOf } from '@/lib/mediaProgress'
 import { type SortColumn, useTableSort } from '@/lib/tableSort'
 import styles from '@/components/MediaList/MediaList.module.scss'
 
-const added = new Intl.DateTimeFormat(undefined, {
+const day = new Intl.DateTimeFormat(undefined, {
   day: 'numeric',
   month: 'short',
   year: 'numeric',
@@ -45,7 +45,7 @@ const MediaRow = ({
   const to = movies ? openPath(media) : `/watch/${media.id}`
   const { title, year } = cardTitle(media)
   return (
-    <tr className={styles.row}>
+    <tr className={`${styles.row} ${MENU_HOST}`}>
       <th scope="row">
         <div className={styles.titleCell}>
           <Link
@@ -87,7 +87,8 @@ const MediaRow = ({
       <td className={styles.roomy}>{resolutionLabel(media)}</td>
       <td className={`${styles.number} ${styles.extra}`}>{formatBytes(media.size)}</td>
       <td className={`${styles.number} ${styles.extra}`}>{formatBitrate(media.bitrate)}</td>
-      <td className={styles.extra}>{added.format(new Date(media.addedAt))}</td>
+      <td className={styles.extra}>{day.format(new Date(media.addedAt))}</td>
+      <td className={styles.extra}>{day.format(new Date(media.changedAt))}</td>
       <td className={styles.menuCell}>
         <MediaMenu
           media={media}
@@ -120,6 +121,7 @@ type Column =
   | 'size'
   | 'bitrate'
   | 'added'
+  | 'changed'
 
 const score = (media: MediaItem, source: RatingSource): number | null =>
   media.item?.ratings.find((rating) => rating.source === source)?.value ?? null
@@ -140,6 +142,7 @@ const COLUMNS: Record<Column, SortColumn<MediaItem>> = {
   size: { value: (media) => media.size, first: 'desc' },
   bitrate: { value: (media) => media.bitrate, first: 'desc' },
   added: { value: (media) => media.addedAt, first: 'desc' },
+  changed: { value: (media) => media.changedAt, first: 'desc' },
 }
 
 /**
@@ -163,7 +166,7 @@ export const MediaList = ({
 }) => {
   const { sorted, toggle, ariaSort } = useTableSort({ rows: items, columns: COLUMNS })
   const header = (key: Column, label: string, className?: string) => (
-    <SortHeader sort={ariaSort(key)} onToggle={() => toggle(key)} className={className}>
+    <SortHeader key={key} sort={ariaSort(key)} onToggle={() => toggle(key)} className={className}>
       {label}
     </SortHeader>
   )
@@ -182,6 +185,7 @@ export const MediaList = ({
           {header('size', 'Size', `${styles.number} ${styles.extra}`)}
           {header('bitrate', 'Bitrate', `${styles.number} ${styles.extra}`)}
           {header('added', 'Added', styles.extra)}
+          {header('changed', 'Changed', styles.extra)}
           <th scope="col">
             <span className="visually-hidden">Actions</span>
           </th>

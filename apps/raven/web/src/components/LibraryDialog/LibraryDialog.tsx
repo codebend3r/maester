@@ -245,6 +245,23 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
               Pinned libraries get their own link in the side menu.
             </p>
           </div>
+          <div className={styles.setting}>
+            <input
+              id={`${ids.settings}-refresh`}
+              type="checkbox"
+              className={styles.checkbox}
+              checked={settings.autoRefresh}
+              onChange={(event) =>
+                setSettings((current) => ({ ...current, autoRefresh: event.target.checked }))
+              }
+              aria-describedby={`${ids.settings}-refresh-hint`}
+            />
+            <label htmlFor={`${ids.settings}-refresh`}>Refresh automatically</label>
+            <p id={`${ids.settings}-refresh-hint`} className={styles.settingHint}>
+              Watch the folders and take in videos as they are added, removed, renamed or replaced.
+              A share that does not report its changes still needs a rescan.
+            </p>
+          </div>
           <div className={styles.watched}>
             <label htmlFor={`${ids.settings}-watched`}>Watched at</label>
             <span className={styles.percent}>

@@ -11,7 +11,7 @@ import { type MouseEvent, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { MatchType } from '@/components/FixMatchDialog/FixMatchDialog'
 import { Icon } from '@/components/Icon/Icon'
-import { MediaMenu } from '@/components/MediaMenu/MediaMenu'
+import { MENU_HOST, MediaMenu } from '@/components/MediaMenu/MediaMenu'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
 import { PosterFrame } from '@/components/PosterCard/PosterCard'
 import { RatingChips } from '@/components/RatingChips/RatingChips'
@@ -58,7 +58,11 @@ const MediaTile = ({
   ].filter((fact): fact is string => fact != null)
 
   return (
-    <li className={posters ? `${styles.tile} ${styles.posterTile}` : styles.tile}>
+    <li
+      className={[styles.tile, posters ? styles.posterTile : '', MENU_HOST]
+        .filter(Boolean)
+        .join(' ')}
+    >
       <Link
         to={to}
         state={state}

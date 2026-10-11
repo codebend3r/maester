@@ -5,6 +5,7 @@ import { Route, Routes } from 'react-router-dom'
 import { AppShell } from '@/components/AppShell/AppShell'
 import { api } from '@/lib/api'
 import { useSideMenu } from '@/stores/sideMenu'
+import { FakeEventSource } from '@/test/eventSource'
 import { library } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 
@@ -150,5 +151,21 @@ describe('AppShell', () => {
     renderShell('/')
     await userEvent.keyboard('b')
     expect(screen.queryByRole('complementary', { name: 'Tip' })).toBeNull()
+  })
+
+  it('reads the libraries again when the server says one changed, and hangs up on leaving', async () => {
+    spies.list.mockImplementation(async () => [library({ id: 3, name: 'Movies' })])
+    const shell = renderShell('/')
+    await within(nav()).findByRole('link', { name: 'Movies' })
+    expect(spies.list).toHaveBeenCalledTimes(1)
+    const [stream] = FakeEventSource.opened
+    expect(stream?.url).toBe('/api/events')
+
+    spies.list.mockImplementation(async () => [library({ id: 3, name: 'Films' })])
+    stream?.send({ type: 'library', libraryId: 3 })
+    await within(nav()).findByRole('link', { name: 'Films' })
+
+    shell.unmount()
+    expect(stream?.closed).toBe(true)
   })
 })

@@ -18,6 +18,7 @@ import {
   seasonFolderNumber,
   sortTitle,
 } from '@raven/core'
+import { groupBy } from '@/groupBy'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { MediaRepository, type PendingFile } from '@/media/mediaRepository'
 import { ImageCache } from '@/metadata/imageCache'
@@ -76,12 +77,6 @@ const stopsThePass = (error: unknown): boolean =>
 
 const notFound = (error: unknown): boolean =>
   error instanceof TmdbError && error.kind === 'not-found'
-
-const groupBy = <T>(items: readonly T[], key: (item: T) => string): Map<string, T[]> =>
-  items.reduce((groups, item) => {
-    const k = key(item)
-    return groups.set(k, [...(groups.get(k) ?? []), item])
-  }, new Map<string, T[]>())
 
 const blank = (item: Pick<FetchedItem, 'type' | 'tmdbId' | 'number' | 'title'>): FetchedItem => ({
   ...item,

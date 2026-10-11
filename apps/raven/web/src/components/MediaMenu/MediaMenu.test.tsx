@@ -1,5 +1,5 @@
 import { describe, expect, it, spyOn } from 'bun:test'
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ApiError, type MediaItem } from '@raven/core'
 import { useState } from 'react'
@@ -84,5 +84,31 @@ describe('MediaMenu', () => {
     expect(document.activeElement).toBe(
       screen.getByRole('button', { name: 'Options for Busboys (2026)' }),
     )
+  })
+
+  it('shows where the file lives, and copies the path', async () => {
+    const path = '/media/Movies/Busboys (2026) 1080p WEBRip.mkv'
+    const asked: number[] = []
+    const copied: string[] = []
+    const location = spyOn(api, 'getMediaLocation').mockImplementation(async (id) => {
+      asked.push(id)
+      return { path }
+    })
+    const clipboard = spyOn(navigator.clipboard, 'writeText').mockImplementation(async (text) => {
+      copied.push(text)
+    })
+    // As raven is over HTTPS or on localhost, where the Clipboard API is allowed.
+    Object.defineProperty(window, 'isSecureContext', { value: true, configurable: true })
+    renderWithProviders(<Harness media={mediaItem()} />)
+    await openMenu()
+    const item = await screen.findByRole('menuitem', { name: /Copy file path/ })
+    expect(await within(item).findByText(path)).toBeInTheDocument()
+    await userEvent.click(item)
+    location.mockRestore()
+    clipboard.mockRestore()
+    Reflect.deleteProperty(window, 'isSecureContext')
+    expect(asked).toEqual([7])
+    expect(copied).toEqual([path])
+    expect(screen.getByRole('menuitem', { name: /Copied/ })).toBeInTheDocument()
   })
 })

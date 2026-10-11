@@ -21,6 +21,7 @@ import type {
   MatchState,
   MediaGroupBy,
   MediaItem,
+  MediaLocation,
   MediaSort,
   MediaTracks,
   MetadataHealth,
@@ -32,6 +33,7 @@ import type {
   RatingSource,
   Review,
   ScanStatus,
+  ServerEvent,
   ShowEntry,
   ShowListing,
   ShownRatings,
@@ -83,6 +85,7 @@ export const MEDIA_SORTS: readonly MediaSort[] = [
   'title',
   'added',
   'oldest',
+  'changed',
   'largest',
   'smallest',
   'bitrate-high',
@@ -137,7 +140,8 @@ export const isLibrarySettings = (value: unknown): value is LibrarySettings =>
   isMediaGroupBy(value.groupBy) &&
   isWatchedPercent(value.watchedPercent) &&
   isLibraryKind(value.kind) &&
-  isShownRatings(value.ratingsSource)
+  isShownRatings(value.ratingsSource) &&
+  isBoolean(value.autoRefresh)
 
 export const isLibrary = (value: unknown): value is Library =>
   isRecord(value) &&
@@ -351,6 +355,7 @@ export const isMediaItem = (value: unknown): value is MediaItem =>
   isNumber(value.position) &&
   typeof value.favourite === 'boolean' &&
   isString(value.addedAt) &&
+  isString(value.changedAt) &&
   isMatchState(value.match) &&
   isNullableNumber(value.year) &&
   isNullableString(value.edition) &&
@@ -358,6 +363,12 @@ export const isMediaItem = (value: unknown): value is MediaItem =>
   isNumber(value.versions)
 
 export const isMediaList = arrayOf(isMediaItem)
+
+export const isMediaLocation = (value: unknown): value is MediaLocation =>
+  isRecord(value) && isString(value.path)
+
+export const isServerEvent = (value: unknown): value is ServerEvent =>
+  isRecord(value) && value.type === 'library' && isNumber(value.libraryId)
 
 export const isPersonDetails = (value: unknown): value is PersonDetails =>
   isRecord(value) &&

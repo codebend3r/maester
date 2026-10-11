@@ -45,6 +45,8 @@ export const queryKeys = {
   showLists: (libraryId: number) => ['libraries', libraryId, 'shows'],
   mediaItem: (id: number) => ['media', id],
   mediaTracks: (id: number) => ['media', id, 'tracks'],
+  /** Where a video's file lives, for its menu. */
+  mediaLocation: (id: number) => ['media', id, 'location'],
   subtitles: ({ id, trackId, window }: { id: number; trackId: string; window: number }) => [
     'media',
     id,

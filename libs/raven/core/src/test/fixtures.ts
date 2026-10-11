@@ -25,6 +25,7 @@ export const library = (overrides: Partial<Library> = {}): Library => ({
     watchedPercent: 90,
     kind: 'other',
     ratingsSource: 'tmdb',
+    autoRefresh: true,
   },
   ...overrides,
 })
@@ -51,6 +52,7 @@ export const mediaItem = (overrides: Partial<MediaItem> = {}): MediaItem => ({
   position: 0,
   favourite: false,
   addedAt: '2026-09-27T00:00:00.000Z',
+  changedAt: '2026-09-27T00:00:00.000Z',
   match: 'off',
   year: null,
   edition: null,

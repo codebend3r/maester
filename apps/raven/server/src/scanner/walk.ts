@@ -1,8 +1,8 @@
 import type { Dirent } from 'node:fs'
-import { readdir, stat } from 'node:fs/promises'
-import { join } from 'node:path'
+import { lstat, readdir, stat } from 'node:fs/promises'
+import { basename, join, relative, sep } from 'node:path'
 import { extensionOf, isVideoFile } from '@raven/core'
-import type { FoundFile } from '@/media/mediaRepository'
+import type { FoundFile } from '@/media/mediaIndex'
 import { type Gate, createGate, mapWithConcurrency } from '@/scanner/concurrency'
 
 /**
@@ -37,10 +37,24 @@ const isSample = (fileName: string): boolean => {
   return /(^|[-._ ])sample$/i.test(stem)
 }
 
+const isIndexed = (fileName: string): boolean => isVideoFile(fileName) && !isSample(fileName)
+
+/** Whether `path` is `root` or lies under it. */
+export const isUnder = ({ path, root }: { path: string; root: string }): boolean =>
+  path === root || path.startsWith(root.endsWith('/') ? root : `${root}/`)
+
+/** Whether a walk from `root` would skip `path`: it sits in, or is, a hidden or NAS folder. */
+export const isSkippedPlace = ({ root, path }: { root: string; path: string }): boolean =>
+  relative(root, path).split(sep).some(isSkippedName)
+
 export type WalkResult = {
   files: FoundFile[]
-  /** Library paths that could not be read at all (unmounted share, typo, missing volume). */
-  unreadableRoots: string[]
+  /**
+   * Places that could not be read at all (unmounted share, typo, missing
+   * volume): a library path, or a folder under one. What the index holds
+   * under them stays.
+   */
+  unreadable: string[]
   /** Subfolders that failed mid-walk, as "path: reason". */
   errors: string[]
 }
@@ -82,9 +96,7 @@ const list = async ({ dir, gate }: { dir: string; gate: Gate }): Promise<Listing
     return {
       dirs: kinds.filter(({ kind }) => kind === 'dir').map(({ entry }) => join(dir, entry.name)),
       files: kinds
-        .filter(
-          ({ kind, entry }) => kind === 'file' && isVideoFile(entry.name) && !isSample(entry.name),
-        )
+        .filter(({ kind, entry }) => kind === 'file' && isIndexed(entry.name))
         .map(({ entry }) => join(dir, entry.name)),
       error: null,
     }
@@ -93,8 +105,10 @@ const list = async ({ dir, gate }: { dir: string; gate: Gate }): Promise<Listing
   }
 }
 
+type Tree = { files: string[]; folders: string[]; errors: string[]; readable: boolean }
+
 /** Breadth-first, one level at a time, so no more than `limit` folders are open at once. */
-const walkRoot = async ({
+const walkTree = async ({
   root,
   limit,
   gate,
@@ -102,17 +116,14 @@ const walkRoot = async ({
   root: string
   limit: number
   gate: Gate
-}): Promise<{ files: string[]; errors: string[]; readable: boolean }> => {
+}): Promise<Tree> => {
   const level = async ({
     dirs,
     files,
+    folders,
     errors,
-  }: {
-    dirs: string[]
-    files: string[]
-    errors: string[]
-  }): Promise<{ files: string[]; errors: string[] }> => {
-    if (dirs.length === 0) return { files, errors }
+  }: Omit<Tree, 'readable'> & { dirs: string[] }): Promise<Omit<Tree, 'readable'>> => {
+    if (dirs.length === 0) return { files, folders, errors }
     const listings = await mapWithConcurrency({
       items: dirs,
       limit,
@@ -121,37 +132,114 @@ const walkRoot = async ({
     return level({
       dirs: listings.flatMap((listing) => listing.dirs),
       files: [...files, ...listings.flatMap((listing) => listing.files)],
+      folders: [...folders, ...dirs],
       errors: [...errors, ...listings.flatMap((listing) => (listing.error ? [listing.error] : []))],
     })
   }
 
   const top = await list({ dir: root, gate })
-  if (top.error) return { files: [], errors: [top.error], readable: false }
-  const rest = await level({ dirs: top.dirs, files: top.files, errors: [] })
+  if (top.error) return { files: [], folders: [], errors: [top.error], readable: false }
+  const rest = await level({ dirs: top.dirs, files: top.files, folders: [root], errors: [] })
   return { ...rest, readable: true }
 }
 
+/** Every folder at and under `root` that a walk enters, for watching them one by one. */
+export const foldersUnder = async ({
+  root,
+  limit = 16,
+  gate = SCAN_FILESYSTEM,
+}: {
+  root: string
+  limit?: number
+  gate?: Gate
+}): Promise<string[]> => (await walkTree({ root, limit, gate })).folders
+
 /**
- * Every video file under the given library paths, with the size and mtime
- * the scanner diffs against the index. A file reachable from two overlapping
- * paths is reported once, under the first. `limit` caps the folders and
- * files this walk has open; `gate` caps filesystem calls across every walk
- * that shares it.
+ * What is at a place: a folder, a file, or nothing. A library path is
+ * followed wherever it leads; below one, a symlink counts only when it leads
+ * to a file, as in the walk.
+ */
+const kindOf = async ({
+  place,
+  root,
+  gate,
+}: {
+  place: string
+  root: string
+  gate: Gate
+}): Promise<'dir' | 'file' | null> => {
+  const info = await gate.run(() => (place === root ? stat(place) : lstat(place))).catch(() => null)
+  if (info?.isDirectory()) return 'dir'
+  if (info?.isFile()) return 'file'
+  if (!info?.isSymbolicLink()) return null
+  const target = await gate.run(() => stat(place)).catch(() => null)
+  return target?.isFile() ? 'file' : null
+}
+
+type Look = { files: string[]; errors: string[]; unreadable: string | null }
+
+/**
+ * The videos at one place under a library path. A folder is walked and a
+ * file taken as it is. A place that is not there holds nothing, so what the
+ * index had there has gone, unless its library path is missing too, which
+ * says the share is down rather than the files deleted.
+ */
+const lookAt = async ({
+  place,
+  root,
+  limit,
+  gate,
+}: {
+  place: string
+  root: string
+  limit: number
+  gate: Gate
+}): Promise<Look> => {
+  const kind = await kindOf({ place, root, gate })
+  if (kind === 'dir') {
+    const tree = await walkTree({ root: place, limit, gate })
+    return { files: tree.files, errors: tree.errors, unreadable: tree.readable ? null : place }
+  }
+  if (kind === 'file') {
+    return { files: isIndexed(basename(place)) ? [place] : [], errors: [], unreadable: null }
+  }
+  const rootThere = place !== root && (await kindOf({ place: root, root, gate })) === 'dir'
+  return { files: [], errors: [], unreadable: rootThere ? null : root }
+}
+
+/**
+ * Every video file at the given places under a library's paths, with the
+ * size and mtime the scanner diffs against the index; a full scan's places
+ * are the paths themselves. Places outside the paths, or in a folder the
+ * walk skips, are passed over. A file reachable from two overlapping paths
+ * is reported once, under the first. `limit` caps the folders and files
+ * this walk has open; `gate` caps filesystem calls across every walk that
+ * shares it.
  */
 export const walkVideos = async ({
   roots,
+  places = roots,
   limit = 16,
   gate = SCAN_FILESYSTEM,
 }: {
   roots: readonly string[]
+  places?: readonly string[]
   limit?: number
   gate?: Gate
 }): Promise<WalkResult> => {
-  const walked = await Promise.all(
-    roots.map(async (root) => ({ root, ...(await walkRoot({ root, limit, gate })) })),
+  const looked = await Promise.all(
+    places
+      .flatMap((place) => {
+        const root = roots.find((candidate) => isUnder({ path: place, root: candidate }))
+        return root == null || isSkippedPlace({ root, path: place }) ? [] : [{ place, root }]
+      })
+      .map(async ({ place, root }) => ({
+        root,
+        ...(await lookAt({ place, root, limit, gate })),
+      })),
   )
   const seen = new Set<string>()
-  const candidates = walked.flatMap(({ root, files }) =>
+  const candidates = looked.flatMap(({ root, files }) =>
     files
       .filter((path) => {
         if (seen.has(path)) return false
@@ -170,7 +258,7 @@ export const walkVideos = async ({
   })
   return {
     files: stated.flat(),
-    unreadableRoots: walked.filter(({ readable }) => !readable).map(({ root }) => root),
-    errors: walked.flatMap(({ errors }) => errors),
+    unreadable: [...new Set(looked.flatMap(({ unreadable }) => unreadable ?? []))],
+    errors: looked.flatMap(({ errors }) => errors),
   }
 }

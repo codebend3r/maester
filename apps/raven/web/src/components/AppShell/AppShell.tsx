@@ -7,6 +7,7 @@ import { api } from '@/lib/api'
 import { useKeyShortcut } from '@/lib/keyboard'
 import { KINDS } from '@/lib/libraryKinds'
 import { queryKeys } from '@/lib/queryClient'
+import { useServerEvents } from '@/lib/useServerEvents'
 import { useSideMenu } from '@/stores/sideMenu'
 import styles from '@/components/AppShell/AppShell.module.scss'
 
@@ -64,8 +65,9 @@ const ShortcutTip = ({ onDismiss }: { onDismiss: () => void }) => (
  * beside the page (below it on a narrow screen). Pinned libraries get their
  * own links there, each with its type's icon, and an open one is marked
  * instead of Libraries. The menu collapses to its icons with the toggle or
- * B, and stays that way across visits. The player leaves the frame behind
- * for the whole screen.
+ * B, and stays that way across visits. While it is open, what the pages
+ * show follows the server's changes. The player leaves the frame behind for
+ * the whole screen.
  */
 export const AppShell = () => {
   const navId = useId()
@@ -78,6 +80,7 @@ export const AppShell = () => {
   )
 
   useKeyShortcut({ key: 'b', onPress: toggle })
+  useServerEvents()
 
   return (
     <div className={collapsed ? `${styles.shell} ${styles.collapsed}` : styles.shell}>

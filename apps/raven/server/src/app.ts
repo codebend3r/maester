@@ -5,6 +5,7 @@ import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fa
 import { AppModule } from '@/appModule'
 import type { ServerConfig } from '@/config'
 import type { MetadataFetch } from '@/metadata/tmdbClient'
+import type { WatchOptions } from '@/scanner/libraryWatcher'
 import { SpaFallbackFilter } from '@/spa/spaFallbackFilter'
 
 /**
@@ -15,14 +16,17 @@ export const createApp = async ({
   config,
   quiet = false,
   metadataFetch,
+  watch,
 }: {
   config: ServerConfig
   quiet?: boolean
   /** Stands in for TMDB in tests; left out, metadata calls go to the network. */
   metadataFetch?: MetadataFetch
+  /** Shorter waits for the folder watcher in tests. */
+  watch?: Partial<WatchOptions>
 }): Promise<NestFastifyApplication> => {
   const app = await NestFactory.create<NestFastifyApplication>(
-    AppModule.register({ config, metadataFetch }),
+    AppModule.register({ config, metadataFetch, watch }),
     new FastifyAdapter(),
     { logger: quiet ? false : ['log', 'warn', 'error'] },
   )

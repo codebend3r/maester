@@ -32,6 +32,7 @@ const sample = (overrides: Partial<MediaItem> & Pick<MediaItem, 'id' | 'title'>)
   position: 0,
   favourite: false,
   addedAt: '2026-10-02T12:00:00.000Z',
+  changedAt: '2026-10-02T12:00:00.000Z',
   match: 'off',
   year: null,
   edition: null,

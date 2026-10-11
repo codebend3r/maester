@@ -13,7 +13,7 @@ describe('MediaList', () => {
       within(table)
         .getAllByRole('columnheader')
         .map((header) => header.textContent),
-    ).toEqual(['Title', 'Length', 'Resolution', 'Size', 'Bitrate', 'Added', 'Actions'])
+    ).toEqual(['Title', 'Length', 'Resolution', 'Size', 'Bitrate', 'Added', 'Changed', 'Actions'])
     const [, row] = within(table).getAllByRole('row')
     if (!row) throw new Error('no data row')
     expect(within(row).getByRole('link', { name: 'Busboys (2026)' })).toHaveAttribute(
@@ -66,6 +66,7 @@ describe('MediaList', () => {
       'Size',
       'Bitrate',
       'Added',
+      'Changed',
       'Actions',
     ])
     const titles = () =>

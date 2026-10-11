@@ -32,6 +32,7 @@ export const DEFAULT_LIBRARY_SETTINGS: LibrarySettings = {
   watchedPercent: 90,
   kind: 'other',
   ratingsSource: 'tmdb',
+  autoRefresh: true,
 }
 
 /**
@@ -81,6 +82,7 @@ const SETTING_CHECKS: Record<
   },
   kind: { valid: isLibraryKind, problem: 'Type is not one of the choices.' },
   ratingsSource: { valid: isShownRatings, problem: 'Ratings shown is not one of the choices.' },
+  autoRefresh: { valid: isBoolean, problem: 'Refresh automatically must be on or off.' },
 }
 
 type SettingsResult = { settings: Partial<LibrarySettings>; errors: string[] }
@@ -99,6 +101,7 @@ const readSettings = (input: unknown): SettingsResult => {
       ...(isWatchedPercent(input.watchedPercent) ? { watchedPercent: input.watchedPercent } : {}),
       ...(isLibraryKind(input.kind) ? { kind: input.kind } : {}),
       ...(isShownRatings(input.ratingsSource) ? { ratingsSource: input.ratingsSource } : {}),
+      ...(isBoolean(input.autoRefresh) ? { autoRefresh: input.autoRefresh } : {}),
     },
     errors: Object.entries(SETTING_CHECKS)
       .filter(([key, check]) => input[key] !== undefined && !check.valid(input[key]))

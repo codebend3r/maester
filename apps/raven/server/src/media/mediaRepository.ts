@@ -1,4 +1,3 @@
-import { basename, dirname, relative } from 'node:path'
 import { Inject, Injectable } from '@nestjs/common'
 import {
   type ItemSummary,
@@ -8,7 +7,6 @@ import {
   type MediaSort,
   type MediaTracks,
   type ThumbnailState,
-  containerOf,
   isExtra,
   isMatchState,
   isMediaTracks,
@@ -41,22 +39,6 @@ export type HistoryRecord = {
   watched: boolean
 }
 
-/** What the scanner compares against the disk to find new, changed, and gone files. */
-export type IndexedFile = {
-  id: number
-  size: number
-  mtimeMs: number
-  probed: boolean
-}
-
-export type FoundFile = {
-  path: string
-  /** The library path the walk found it under. */
-  root: string
-  size: number
-  mtimeMs: number
-}
-
 type MediaRow = {
   id: number
   library_id: number
@@ -80,6 +62,7 @@ type MediaRow = {
   bitrate: number | null
   thumbnail: string
   added_at: string
+  changed_at: string
   year: number | null
   edition: string | null
   match: string
@@ -159,6 +142,7 @@ const toRecord = (row: MediaRow): MediaRecord => ({
   probed: row.probed === 1,
   probeError: row.probe_error,
   addedAt: row.added_at,
+  changedAt: row.changed_at,
   match: isMatchState(row.match) ? row.match : 'pending',
   year: row.year,
   edition: row.edition,
@@ -203,6 +187,7 @@ const SHOW_ORDER_BY: Record<MediaSort, string> = {
   title: 'sh.sort_title COLLATE NOCASE, sh.id',
   added: 'added_at DESC, sh.id DESC',
   oldest: 'added_at, sh.id',
+  changed: 'changed_at DESC, sh.id DESC',
   largest: 'sh.sort_title COLLATE NOCASE, sh.id',
   smallest: 'sh.sort_title COLLATE NOCASE, sh.id',
   'bitrate-high': 'sh.sort_title COLLATE NOCASE, sh.id',
@@ -218,7 +203,7 @@ const SHOW_ORDER_BY: Record<MediaSort, string> = {
 
 /** The files of a library that are episodes, with their show and numbers. */
 const EPISODE_FILES = `
-  SELECT m.id AS media_id, m.added_at, e.id AS episode_id, s.parent_id AS show_id,
+  SELECT m.id AS media_id, m.added_at, m.changed_at, e.id AS episode_id, s.parent_id AS show_id,
          s.number AS season, e.number AS episode
     FROM media m
     JOIN media_items mi ON mi.media_id = m.id
@@ -269,6 +254,7 @@ const ORDER_BY: Record<MediaSort, string> = {
   title: BY_TITLE,
   added: 'added_at DESC, id DESC',
   oldest: 'added_at, id',
+  changed: 'changed_at DESC, id DESC',
   largest: `size DESC, ${BY_TITLE}`,
   smallest: `size, ${BY_TITLE}`,
   'bitrate-high': `bitrate IS NULL, bitrate DESC, ${BY_TITLE}`,
@@ -371,6 +357,7 @@ export class MediaRepository {
       .prepare<[number, number, string, string], ShowRow>(
         `WITH files AS (${EPISODE_FILES})
          SELECT sh.id, sh.ended, COUNT(DISTINCT f.episode_id) AS episodes, MAX(f.added_at) AS added_at,
+                MAX(f.changed_at) AS changed_at,
                 COALESCE((SELECT r.value FROM ratings r WHERE r.item_id = sh.id
                            AND r.source = (SELECT l.ratings_source FROM libraries l WHERE l.id = ?)),
                          (SELECT r.value FROM ratings r WHERE r.item_id = sh.id AND r.source = 'tmdb')) AS score
@@ -593,57 +580,6 @@ export class MediaRepository {
       .map((row) => row.id)
   }
 
-  /** Every indexed file in a library, keyed by absolute path. */
-  indexForLibrary(libraryId: number): Map<string, IndexedFile> {
-    const rows = this.db
-      .prepare<
-        [number],
-        { id: number; path: string; size: number; mtime_ms: number; probed: number }
-      >('SELECT id, path, size, mtime_ms, probed FROM media WHERE library_id = ?')
-      .all(libraryId)
-    return new Map(
-      rows.map((row) => [
-        row.path,
-        { id: row.id, size: row.size, mtimeMs: row.mtime_ms, probed: row.probed === 1 },
-      ]),
-    )
-  }
-
-  insert({
-    libraryId,
-    kind,
-    file,
-  }: {
-    libraryId: number
-    kind: LibraryKind
-    file: FoundFile
-  }): number {
-    const fileName = basename(file.path)
-    const folder = relative(file.root, dirname(file.path))
-    const named = namedAs({ kind, fileName, folder })
-    const result = this.db
-      .prepare(
-        `INSERT INTO media (library_id, path, file_name, folder, title, year, edition, match, container,
-                            size, mtime_ms, added_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .run(
-        libraryId,
-        file.path,
-        fileName,
-        folder,
-        named.title,
-        named.year,
-        named.edition,
-        named.match,
-        containerOf(fileName),
-        file.size,
-        Math.round(file.mtimeMs),
-        new Date().toISOString(),
-      )
-    return Number(result.lastInsertRowid)
-  }
-
   /**
    * Reads every file's name again for the library's type, and starts its
    * matching over: links go, and files are pending, or off in a library that
@@ -810,17 +746,6 @@ export class MediaRepository {
         )
         .run(libraryId).changes,
     )
-  }
-
-  /** The file was replaced on disk: forget what the old one held so it gets probed again. */
-  markChanged({ id, size, mtimeMs }: { id: number; size: number; mtimeMs: number }): void {
-    this.db
-      .prepare(
-        `UPDATE media SET size = ?, mtime_ms = ?, probed = 0, probe_error = NULL, thumbnail = 'pending',
-                tracks = NULL
-          WHERE id = ?`,
-      )
-      .run(size, Math.round(mtimeMs), id)
   }
 
   /** What a probe found, and the tracks it found when the caller has them. */

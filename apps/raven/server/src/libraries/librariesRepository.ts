@@ -39,6 +39,7 @@ type LibraryRow = {
   watched_percent: number
   kind: string
   ratings_source: string
+  auto_refresh: number
 }
 
 /** A row's settings; a value the database holds but this version does not know falls back to the default. */
@@ -55,12 +56,13 @@ const toSettings = (row: LibraryRow): LibrarySettings => ({
   ratingsSource: isShownRatings(row.ratings_source)
     ? row.ratings_source
     : DEFAULT_LIBRARY_SETTINGS.ratingsSource,
+  autoRefresh: row.auto_refresh === 1,
 })
 
 /** The settings columns in the order the statements below bind them. */
 const settingValues = (
   settings: LibrarySettings,
-): [number, number, string, string, string, number, string, string] => [
+): [number, number, string, string, string, number, string, string, number] => [
   Number(settings.saveProgress),
   Number(settings.pinned),
   settings.sort,
@@ -69,7 +71,12 @@ const settingValues = (
   settings.watchedPercent,
   settings.kind,
   settings.ratingsSource,
+  Number(settings.autoRefresh),
 ]
+
+/** Whether two lists of library paths are the same, in the same order. */
+export const samePaths = (a: readonly string[], b: readonly string[]): boolean =>
+  a.length === b.length && a.every((path, index) => path === b[index])
 
 type PathRow = {
   library_id: number
@@ -89,7 +96,7 @@ export class LibrariesRepository {
     const libraries = this.db
       .prepare<[number | null, number | null], LibraryRow>(
         `SELECT l.id, l.name, l.created_at, l.save_progress, l.pinned, l.sort, l.view_mode, l.group_by,
-                l.watched_percent, l.kind, l.ratings_source,
+                l.watched_percent, l.kind, l.ratings_source, l.auto_refresh,
                 (SELECT COUNT(*) FROM media m WHERE m.library_id = l.id) AS item_count,
                 (SELECT COUNT(*) FROM media m WHERE m.library_id = l.id AND m.match = 'unmatched')
                   AS unmatched_count
@@ -141,8 +148,8 @@ export class LibrariesRepository {
       const result = this.db
         .prepare(
           `INSERT INTO libraries (name, created_at, save_progress, pinned, sort, view_mode, group_by,
-                                  watched_percent, kind, ratings_source)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                                  watched_percent, kind, ratings_source, auto_refresh)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(input.name, new Date().toISOString(), ...settingValues(settings))
       const created = Number(result.lastInsertRowid)
@@ -173,7 +180,7 @@ export class LibrariesRepository {
         .prepare(
           `UPDATE libraries
               SET name = ?, save_progress = ?, pinned = ?, sort = ?, view_mode = ?, group_by = ?,
-                  watched_percent = ?, kind = ?, ratings_source = ?
+                  watched_percent = ?, kind = ?, ratings_source = ?, auto_refresh = ?
             WHERE id = ?`,
         )
         .run(input.name, ...settingValues(settings), id)

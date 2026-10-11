@@ -7,14 +7,17 @@ import {
 } from '@nestjs/common'
 import type { ScanStatus } from '@raven/core'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
+import { ServerEvents } from '@/events/serverEvents'
 import { FfmpegService, FfmpegTimeoutError } from '@/ffmpeg/ffmpegService'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
-import { type FoundFile, MediaRepository } from '@/media/mediaRepository'
+import { MediaIndex } from '@/media/mediaIndex'
+import { MediaRepository } from '@/media/mediaRepository'
 import { MetadataService } from '@/metadata/metadataService'
 import { SubtitlesService } from '@/playback/subtitlesService'
 import { TracksService } from '@/playback/tracksService'
 import { mapWithConcurrency } from '@/scanner/concurrency'
-import { walkVideos } from '@/scanner/walk'
+import { changesAnything, reconcile } from '@/scanner/reconcile'
+import { isUnder, walkVideos } from '@/scanner/walk'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
 
 const IDLE: ScanStatus = {
@@ -28,27 +31,51 @@ const IDLE: ScanStatus = {
 
 const message = (error: unknown): string => (error instanceof Error ? error.message : String(error))
 
-/** Is `path` inside one of `roots`? Media under an unreadable root is kept, not deleted. */
-const isUnder = ({ path, roots }: { path: string; roots: readonly string[] }): boolean =>
-  roots.some((root) => path === root || path.startsWith(root.endsWith('/') ? root : `${root}/`))
+/** What a scan looks at: every path of the library, or just the places under them that changed. */
+type Scope = { kind: 'library' } | { kind: 'places'; places: readonly string[] }
 
 /**
- * Indexes a library: walks its paths, adds new files, re-probes changed
- * ones, drops deleted ones, hands every freshly probed file to the
- * thumbnail queue, and the library to metadata for matching. Scans are incremental (an unchanged size and mtime skips
- * ffprobe), so a rescan of a settled library is mostly directory listing.
+ * Whether a scan of `scope` speaks for an indexed path. A library scan
+ * speaks for everything, so files under a path since dropped go too; a
+ * refresh only for its places. Nothing under a place that could not be
+ * read is touched.
+ */
+const inScope = ({
+  path,
+  scope,
+  unreadable,
+}: {
+  path: string
+  scope: Scope
+  unreadable: readonly string[]
+}): boolean =>
+  (scope.kind === 'library' || scope.places.some((place) => isUnder({ path, root: place }))) &&
+  !unreadable.some((place) => isUnder({ path, root: place }))
+
+/**
+ * Indexes a library: walks its paths, adds new files, follows renamed and
+ * moved ones, re-probes replaced ones, drops deleted ones, hands every
+ * freshly probed file to the thumbnail queue, and the library to metadata
+ * for matching. Scans are incremental (an unchanged size and mtime skips
+ * ffprobe), so a rescan of a settled library is mostly directory listing,
+ * and a refresh looks only at the places its watcher saw change.
  */
 @Injectable()
 export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger(ScannerService.name)
   private readonly statuses = new Map<number, ScanStatus>()
-  private readonly running = new Map<number, Promise<void>>()
+  /** Each library's last scan in line: a library's scans run one after another. */
+  private readonly queue = new Map<number, Promise<void>>()
+  /** Libraries with a full scan running or waiting its turn, which asking again adds nothing to. */
+  private readonly fullScans = new Set<number>()
   private timer: NodeJS.Timeout | null = null
 
   constructor(
     @Inject(SERVER_CONFIG) private readonly config: ServerConfig,
     @Inject(LibrariesRepository) private readonly libraries: LibrariesRepository,
     @Inject(MediaRepository) private readonly media: MediaRepository,
+    @Inject(MediaIndex) private readonly index: MediaIndex,
+    @Inject(ServerEvents) private readonly events: ServerEvents,
     @Inject(FfmpegService) private readonly ffmpeg: FfmpegService,
     @Inject(ThumbnailService) private readonly thumbnails: ThumbnailService,
     @Inject(SubtitlesService) private readonly subtitles: SubtitlesService,
@@ -76,18 +103,45 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
     this.libraries.list().forEach((library) => this.scan(library.id))
   }
 
-  /** Starts a scan unless one is already running, and returns the status either way. */
+  /**
+   * Starts a full scan, after any refresh under way, unless one is already
+   * running or waiting; returns the status either way.
+   */
   scan(libraryId: number): ScanStatus {
-    if (!this.running.has(libraryId)) {
-      const run = this.run(libraryId).finally(() => this.running.delete(libraryId))
-      this.running.set(libraryId, run)
+    if (!this.fullScans.has(libraryId)) {
+      this.fullScans.add(libraryId)
+      void this.enqueue({ libraryId, scope: { kind: 'library' } }).finally(() =>
+        this.fullScans.delete(libraryId),
+      )
     }
     return this.status(libraryId)
   }
 
-  /** Resolves when the library's current scan (if any) has finished. */
+  /** Looks again at just the places that changed, in its turn. Resolves once it has. */
+  refresh({ libraryId, places }: { libraryId: number; places: readonly string[] }): Promise<void> {
+    return this.enqueue({ libraryId, scope: { kind: 'places', places } })
+  }
+
+  /** Runs at once when the library is idle, so its status says scanning straight away. */
+  private enqueue({ libraryId, scope }: { libraryId: number; scope: Scope }): Promise<void> {
+    const ahead = this.queue.get(libraryId)
+    const run = ahead
+      ? ahead.then(() => this.run({ libraryId, scope }))
+      : this.run({ libraryId, scope })
+    const settled = run.catch(() => undefined)
+    this.queue.set(libraryId, settled)
+    void settled.finally(() => {
+      if (this.queue.get(libraryId) === settled) this.queue.delete(libraryId)
+    })
+    return run
+  }
+
+  /** Resolves once the library has no scan running or waiting. */
   async whenIdle(libraryId: number): Promise<void> {
-    await this.running.get(libraryId)
+    const last = this.queue.get(libraryId)
+    if (!last) return
+    await last
+    return this.whenIdle(libraryId)
   }
 
   forget(libraryId: number): void {
@@ -98,7 +152,7 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
     this.statuses.set(libraryId, { ...this.status(libraryId), ...patch })
   }
 
-  private async run(libraryId: number): Promise<void> {
+  private async run({ libraryId, scope }: { libraryId: number; scope: Scope }): Promise<void> {
     const library = this.libraries.get(libraryId)
     if (!library) return
     this.update(libraryId, {
@@ -111,29 +165,21 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
     })
 
     try {
-      const walk = await walkVideos({ roots: library.paths })
-      const known = this.media.indexForLibrary(libraryId)
-      const found = new Set(walk.files.map((file) => file.path))
-
-      const gone = [...known.entries()]
-        .filter(([path]) => !found.has(path) && !isUnder({ path, roots: walk.unreadableRoots }))
-        .map(([, file]) => file.id)
-      await this.thumbnails.discard(gone)
-      await this.subtitles.discard(gone)
-      this.media.removeMany(gone)
-
-      const toProbe = walk.files.flatMap((file: FoundFile) => {
-        const existing = known.get(file.path)
-        if (!existing) {
-          const id = this.media.insert({ libraryId, kind: library.settings.kind, file })
-          return [{ id, path: file.path }]
-        }
-        if (existing.size !== file.size || existing.mtimeMs !== file.mtimeMs) {
-          this.media.markChanged({ id: existing.id, size: file.size, mtimeMs: file.mtimeMs })
-          return [{ id: existing.id, path: file.path }]
-        }
-        return existing.probed ? [] : [{ id: existing.id, path: file.path }]
+      const walk = await walkVideos({
+        roots: library.paths,
+        places: scope.kind === 'library' ? library.paths : scope.places,
       })
+      const known = new Map(
+        Array.from(this.index.forLibrary(libraryId)).filter(([path]) =>
+          inScope({ path, scope, unreadable: walk.unreadable }),
+        ),
+      )
+      const changes = reconcile({ known, found: walk.files })
+
+      await this.thumbnails.discard(changes.gone)
+      await this.subtitles.discard(changes.gone)
+      const toProbe = this.index.apply({ libraryId, kind: library.settings.kind, changes })
+      if (changesAnything(changes)) this.events.libraryChanged(libraryId)
 
       this.update(libraryId, {
         discovered: walk.files.length,
@@ -167,14 +213,14 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
       this.media.pendingThumbnailIds().forEach((id) => this.thumbnails.enqueue(id))
       this.tracks.backfill(this.media.idsMissingTracks(libraryId))
 
-      const unreadable = walk.unreadableRoots.map((root) => `Could not read ${root}.`)
+      const unreadable = walk.unreadable.map((place) => `Could not read ${place}.`)
       this.update(libraryId, {
         state: 'idle',
         finishedAt: new Date().toISOString(),
         error: unreadable.length > 0 ? unreadable.join(' ') : null,
       })
       this.logger.log(
-        `Scanned "${library.name}": ${walk.files.length} files, ${toProbe.length} probed, ${gone.length} removed`,
+        `Scanned "${library.name}": ${walk.files.length} files, ${changes.added.length} added, ${changes.moved.length} moved, ${toProbe.length} probed, ${changes.gone.length} removed`,
       )
     } catch (error) {
       this.update(libraryId, {

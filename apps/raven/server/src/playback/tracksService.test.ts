@@ -7,6 +7,7 @@ import { DatabaseService } from '@/db/database'
 import { DEFAULT_PLAYBACK_SETTINGS } from '@raven/core'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
+import { MediaIndex } from '@/media/mediaIndex'
 import { type MediaRecord, MediaRepository } from '@/media/mediaRepository'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 import { TracksService } from '@/playback/tracksService'
@@ -36,6 +37,10 @@ describe('TracksService', () => {
   const media = (): MediaRepository => {
     if (!state.media) throw new Error('not set up')
     return state.media
+  }
+  const index = (): MediaIndex => {
+    if (!state.database) throw new Error('not set up')
+    return new MediaIndex(state.database)
   }
   const record = (id: number): MediaRecord => {
     const found = media().get(id)
@@ -72,7 +77,7 @@ describe('TracksService', () => {
   })
 
   it('serves the tracks the scan stored without running ffprobe', async () => {
-    const id = media().insert({
+    const id = index().insert({
       libraryId: state.libraryId,
       kind: 'other',
       file: { path: state.clip, root: join(state.dir, 'media'), size: 1, mtimeMs: 1 },
@@ -91,7 +96,7 @@ describe('TracksService', () => {
   })
 
   it('probes a video that has no stored tracks once, and keeps what it found', async () => {
-    const id = media().insert({
+    const id = index().insert({
       libraryId: state.libraryId,
       kind: 'other',
       file: { path: state.other, root: join(state.dir, 'media'), size: 2, mtimeMs: 2 },

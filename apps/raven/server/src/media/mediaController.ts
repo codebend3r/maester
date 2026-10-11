@@ -19,7 +19,14 @@ import {
   Req,
   Res,
 } from '@nestjs/common'
-import { type MediaItem, containerMimeType, isNumber, isRecord, isString } from '@raven/core'
+import {
+  type MediaItem,
+  type MediaLocation,
+  containerMimeType,
+  isNumber,
+  isRecord,
+  isString,
+} from '@raven/core'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { type MediaRecord, MediaRepository, toMediaItem } from '@/media/mediaRepository'
 import { parseRange } from '@/media/range'
@@ -69,6 +76,12 @@ export class MediaController {
   @Get(':id')
   get(@Param('id', ParseIntPipe) id: number): MediaItem {
     return toMediaItem(this.find(id))
+  }
+
+  /** Where the file lives, for the card's menu: the one call that hands a client a path. */
+  @Get(':id/location')
+  location(@Param('id', ParseIntPipe) id: number): MediaLocation {
+    return { path: this.find(id).path }
   }
 
   @Put(':id/progress')

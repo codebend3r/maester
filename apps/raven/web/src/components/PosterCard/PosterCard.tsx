@@ -2,7 +2,7 @@ import { type MediaItem, type ShownRatings, cardTitle, formatRuntime, pickScore 
 import { type MouseEvent, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Icon } from '@/components/Icon/Icon'
-import { MediaMenu } from '@/components/MediaMenu/MediaMenu'
+import { MENU_HOST, MediaMenu } from '@/components/MediaMenu/MediaMenu'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
 import { ScoreChip } from '@/components/RatingChips/RatingChips'
 import { api } from '@/lib/api'
@@ -84,7 +84,7 @@ export const PosterCard = ({
   ].filter((fact): fact is string => fact != null)
 
   return (
-    <li className={styles.card}>
+    <li className={`${styles.card} ${MENU_HOST}`}>
       <Link
         to={to}
         state={hasPage ? undefined : { media }}
