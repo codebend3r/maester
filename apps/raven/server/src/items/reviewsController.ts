@@ -1,10 +1,13 @@
 import { Controller, Get, Inject, Param, ParseIntPipe, Query, Res } from '@nestjs/common'
 import type { FastifyReply } from 'fastify'
 import { sendImage } from '@/items/sendImage'
+import { Public } from '@/lock/lockGuard'
 import { ImageCache } from '@/metadata/imageCache'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 
+/** A review's id names only its author's avatar, which is TMDB's and in no library. */
 @Controller('api/reviews')
+@Public()
 export class ReviewsController {
   constructor(
     @Inject(MetadataRepository) private readonly metadata: MetadataRepository,

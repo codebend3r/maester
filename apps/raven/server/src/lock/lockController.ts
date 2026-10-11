@@ -9,9 +9,10 @@ import {
   Post,
   Res,
 } from '@nestjs/common'
-import { type LockState, isRecord, isString } from '@raven/core'
+import { type LockState, isUnlockRequest } from '@raven/core'
 import type { FastifyReply } from 'fastify'
 import { LockService } from '@/lock/lockService'
+import { parseBody } from '@/parseBody'
 
 @Controller('api/lock')
 export class LockController {
@@ -26,7 +27,7 @@ export class LockController {
   @Post('unlock')
   @HttpCode(200)
   unlock(@Body() body: unknown, @Res({ passthrough: true }) reply: FastifyReply): LockState {
-    const pin = isRecord(body) && isString(body.pin) ? body.pin : ''
+    const { pin } = parseBody({ guard: isUnlockRequest, body, message: 'pin must be text' })
     const unlocking = this.lock.unlock(pin)
     if (!unlocking.ok) throw new HttpException(unlocking.message, unlocking.status)
     reply.header('set-cookie', unlocking.cookie)

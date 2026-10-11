@@ -1,9 +1,10 @@
-import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
+import { createHmac, randomBytes } from 'node:crypto'
 import { Inject, Injectable } from '@nestjs/common'
 import type { LockState } from '@raven/core'
+import { readCookie, sameSecret } from '@shared/server'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
-import { MediaRepository } from '@/media/mediaRepository'
+import { MediaIndex } from '@/media/mediaIndex'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 
 /** What a route's `:id` names, so its library can be found: a library, a video, or a movie or show. */
@@ -36,15 +37,6 @@ const WAIT_MS = 60_000
 /** With nothing locked, or the PIN entered: everything shows, and nothing more is looked up. */
 const EVERYTHING: Viewer = { seesLibrary: () => true, seesItem: () => true, sees: () => true }
 
-const digest = (text: string): Buffer => createHash('sha256').update(text).digest()
-
-const cookieValue = (header: string | undefined): string | null =>
-  header
-    ?.split(';')
-    .map((part) => part.trim())
-    .find((part) => part.startsWith(`${COOKIE}=`))
-    ?.slice(COOKIE.length + 1) ?? null
-
 /**
  * Keeps locked libraries behind the server's PIN. Entering it gives the
  * browser a session cookie signed with a key that lives only as long as
@@ -59,7 +51,7 @@ export class LockService {
   constructor(
     @Inject(SERVER_CONFIG) private readonly config: ServerConfig,
     @Inject(LibrariesRepository) private readonly libraries: LibrariesRepository,
-    @Inject(MediaRepository) private readonly media: MediaRepository,
+    @Inject(MediaIndex) private readonly index: MediaIndex,
     @Inject(MetadataRepository) private readonly metadata: MetadataRepository,
   ) {}
 
@@ -79,7 +71,7 @@ export class LockService {
     if (Date.now() < this.tries.waitUntil) {
       return { ok: false, status: 429, message: 'Too many wrong PINs. Try again in a minute.' }
     }
-    if (!timingSafeEqual(digest(pin), digest(expected))) {
+    if (!sameSecret({ given: pin, expected })) {
       this.tries.failed += 1
       if (this.tries.failed >= TRIES) {
         this.tries.failed = 0
@@ -110,7 +102,7 @@ export class LockService {
         case 'library':
           return seesLibrary(id)
         case 'media': {
-          const libraryId = this.media.libraryOf(id)
+          const libraryId = this.index.libraryOf(id)
           return libraryId == null || seesLibrary(libraryId)
         }
         case 'item':
@@ -134,12 +126,10 @@ export class LockService {
   }
 
   private isUnlocked(cookie: string | undefined): boolean {
-    const [expires = '', signature = ''] = cookieValue(cookie)?.split('.') ?? []
-    const expected = this.sign(expires)
+    const [expires = '', signature = ''] =
+      readCookie({ header: cookie, name: COOKIE })?.split('.') ?? []
     return (
-      Number(expires) > Date.now() &&
-      signature.length === expected.length &&
-      timingSafeEqual(Buffer.from(signature), Buffer.from(expected))
+      Number(expires) > Date.now() && sameSecret({ given: signature, expected: this.sign(expires) })
     )
   }
 }
