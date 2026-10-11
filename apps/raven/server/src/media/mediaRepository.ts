@@ -126,7 +126,7 @@ const FROM_MEDIA = `
     LEFT JOIN favourites f ON f.media_id = m.id
     LEFT JOIN (SELECT media_id, MIN(item_id) AS item_id FROM media_items GROUP BY media_id) mi
       ON mi.media_id = m.id
-    LEFT JOIN items i ON i.id = mi.item_id`
+    LEFT JOIN shown_items i ON i.id = mi.item_id`
 
 const SELECT_MEDIA = `${SELECT_COLUMNS}${FROM_MEDIA}`
 
@@ -222,8 +222,8 @@ const EPISODE_FILES = `
          s.number AS season, e.number AS episode
     FROM media m
     JOIN media_items mi ON mi.media_id = m.id
-    JOIN items e ON e.id = mi.item_id AND e.type = 'episode'
-    JOIN items s ON s.id = e.parent_id
+    JOIN shown_items e ON e.id = mi.item_id AND e.type = 'episode'
+    JOIN shown_items s ON s.id = e.parent_id
    WHERE m.library_id = ?`
 
 /** What `listShows` returns before the records are attached. */
@@ -374,7 +374,7 @@ export class MediaRepository {
                 COALESCE((SELECT r.value FROM ratings r WHERE r.item_id = sh.id
                            AND r.source = (SELECT l.ratings_source FROM libraries l WHERE l.id = ?)),
                          (SELECT r.value FROM ratings r WHERE r.item_id = sh.id AND r.source = 'tmdb')) AS score
-           FROM files f JOIN items sh ON sh.id = f.show_id
+           FROM files f JOIN shown_items sh ON sh.id = f.show_id
           WHERE sh.title LIKE ? ESCAPE '\\' OR sh.original_title LIKE ? ESCAPE '\\'
           GROUP BY sh.id
           ORDER BY ${SHOW_ORDER_BY[sort]}`,
@@ -421,8 +421,8 @@ export class MediaRepository {
            FROM media m
            JOIN libraries l ON l.id = m.library_id
            JOIN media_items mi ON mi.media_id = m.id
-           JOIN items e ON e.id = mi.item_id AND e.type = 'episode'
-           JOIN items s ON s.id = e.parent_id
+           JOIN shown_items e ON e.id = mi.item_id AND e.type = 'episode'
+           JOIN shown_items s ON s.id = e.parent_id
            LEFT JOIN (SELECT media_id, MAX(furthest) AS furthest FROM plays GROUP BY media_id) p
              ON p.media_id = m.id
           WHERE s.parent_id = ?

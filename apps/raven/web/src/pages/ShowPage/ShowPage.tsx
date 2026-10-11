@@ -5,7 +5,9 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Button, ButtonLink } from '@/components/Button/Button'
 import { CastRow } from '@/components/CastRow/CastRow'
 import { FixMatchDialog } from '@/components/FixMatchDialog/FixMatchDialog'
+import { ImageEditor } from '@/components/ImageEditor/ImageEditor'
 import { ItemHeader } from '@/components/ItemHeader/ItemHeader'
+import { MetadataEditor } from '@/components/MetadataEditor/MetadataEditor'
 import { ReviewCards } from '@/components/ReviewCards/ReviewCards'
 import { Summary } from '@/components/Summary/Summary'
 import { TmdbCredit } from '@/components/TmdbCredit/TmdbCredit'
@@ -61,6 +63,8 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
   const ids = { title: useId(), seasons: useId() }
   const navigate = useNavigate()
   const [fixing, setFixing] = useState(false)
+  const [editingImages, setEditingImages] = useState(false)
+  const [editingMetadata, setEditingMetadata] = useState(false)
   const next = useQuery({
     queryKey: queryKeys.nextEpisode(details.id),
     queryFn: () => api.nextEpisode(details.id),
@@ -106,10 +110,40 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
             {code ? `Play ${code}` : 'Play'}
           </ButtonLink>
         )}
+        <Button
+          icon="edit"
+          aria-pressed={editingImages}
+          onClick={() => setEditingImages((editing) => !editing)}
+        >
+          Edit images
+        </Button>
+        <Button
+          icon="edit"
+          aria-pressed={editingMetadata}
+          onClick={() => setEditingMetadata((editing) => !editing)}
+        >
+          Edit metadata
+        </Button>
         <Button icon="search" onClick={() => setFixing(true)}>
           Fix match
         </Button>
       </ItemHeader>
+
+      {editingImages && (
+        <ImageEditor
+          details={details}
+          libraries={[]}
+          itemKind="show"
+          onDone={() => setEditingImages(false)}
+        />
+      )}
+      {editingMetadata && (
+        <MetadataEditor
+          details={details}
+          itemKind="show"
+          onDone={() => setEditingMetadata(false)}
+        />
+      )}
 
       <Summary tagline={details.tagline} summary={details.summary} />
 

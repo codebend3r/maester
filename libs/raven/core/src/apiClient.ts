@@ -2,12 +2,14 @@ import {
   isDirectoryListing,
   isHistory,
   isItemDetails,
+  isItemImageOptions,
+  isItemMetadataState,
   isLibrary,
   isLibraryList,
+  isMatchCandidateList,
   isMediaItem,
   isMediaList,
   isMediaTracks,
-  isMatchCandidateList,
   isMetadataHealth,
   isPersonDetails,
   isRecord,
@@ -20,8 +22,13 @@ import { parseWebVtt } from '@/subtitles'
 import type {
   DirectoryListing,
   HistoryEntry,
+  ImageChoice,
+  ImageOption,
   ItemDetails,
   ItemImageKind,
+  ItemImageOptions,
+  ItemMetadataChange,
+  ItemMetadataState,
   Library,
   LibraryInput,
   MatchCandidate,
@@ -430,6 +437,59 @@ export const createApiClient = ({
     /** A Fix match result's poster, through the server's image cache. */
     candidatePosterUrl: (poster: string | null): string | null =>
       poster == null ? null : url(`/api/images/poster${poster}`),
+
+    /** Edit metadata: what the page shows, what TMDB says, and which fields were written over. */
+    getItemMetadata: (id: number): Promise<ItemMetadataState> =>
+      expect({
+        request: send({ path: `/api/items/${id}/metadata` }),
+        guard: isItemMetadataState,
+      }),
+
+    /** Edit metadata: writes the fields given over TMDB's, or clears each sent as null. */
+    setItemMetadata: ({
+      id,
+      change,
+    }: {
+      id: number
+      change: ItemMetadataChange
+    }): Promise<ItemDetails> =>
+      expect({
+        request: send({ path: `/api/items/${id}/metadata`, method: 'PUT', body: change }),
+        guard: isItemDetails,
+      }),
+
+    /** Every poster and backdrop a movie or show could show, the current one marked. */
+    getItemImages: (id: number): Promise<ItemImageOptions> =>
+      expect({ request: send({ path: `/api/items/${id}/images` }), guard: isItemImageOptions }),
+
+    /** Edit images: the item shows `choice` for `kind` from now on; refreshes keep it. */
+    chooseItemImage: ({
+      id,
+      kind,
+      choice,
+    }: {
+      id: number
+      kind: 'poster' | 'backdrop'
+      choice: ImageChoice
+    }): Promise<ItemDetails> =>
+      expect({
+        request: send({ path: `/api/items/${id}/images/${kind}`, method: 'PUT', body: choice }),
+        guard: isItemDetails,
+      }),
+
+    /** A picture Edit images offers, through the server's cache (TMDB's) or scaled (a local one). */
+    imageOptionUrl: ({
+      id,
+      kind,
+      option,
+    }: {
+      id: number
+      kind: 'poster' | 'backdrop'
+      option: ImageOption
+    }): string =>
+      option.source === 'local'
+        ? url(`/api/items/${id}/images/${kind}/local`)
+        : url(`/api/images/${kind}${option.ref}`),
 
     /** The original file, served with byte ranges: what a player loads for direct play. */
     fileUrl: (mediaId: number): string => url(`/api/media/${mediaId}/file`),

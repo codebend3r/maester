@@ -96,6 +96,17 @@ export type FetchedItem = {
   reviews: FetchedReview[]
 }
 
+/** One of TMDB's pictures for a movie or show. */
+export type TmdbImage = {
+  path: string
+  width: number | null
+  height: number | null
+  /** ISO 639-1, or null for a picture with no text. */
+  language: string | null
+}
+
+export type TmdbImages = { posters: TmdbImage[]; backdrops: TmdbImage[] }
+
 export type SearchResult = {
   tmdbId: string
   title: string
@@ -681,6 +692,34 @@ export class TmdbClient {
     const ids = (results: unknown): string[] =>
       records(results).flatMap((entry) => idOf(entry.id) ?? [])
     return { movies: ids(body.movie_results), shows: ids(body.tv_results) }
+  }
+
+  /**
+   * Every poster and backdrop TMDB holds for a movie or show, in the
+   * language details come in and without text, most voted first.
+   */
+  async images({ type, tmdbId }: { type: 'movie' | 'show'; tmdbId: string }): Promise<TmdbImages> {
+    const language = this.config.metadataLanguage.slice(0, 2)
+    const body = record(
+      await this.get(`/${type === 'movie' ? 'movie' : 'tv'}/${encodeURIComponent(tmdbId)}/images`, {
+        include_image_language: `${language},null`,
+      }),
+    )
+    const toImages = (entries: unknown): TmdbImage[] =>
+      records(entries).flatMap((entry) => {
+        const path = imagePath(entry.file_path)
+        return path == null
+          ? []
+          : [
+              {
+                path,
+                width: number(entry.width),
+                height: number(entry.height),
+                language: text(entry.iso_639_1),
+              },
+            ]
+      })
+    return { posters: toImages(body.posters), backdrops: toImages(body.backdrops) }
   }
 
   async movie(tmdbId: string): Promise<FetchedItem> {

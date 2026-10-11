@@ -44,7 +44,7 @@ const DAY_MS = 24 * 60 * 60 * 1000
 const PASS_CONCURRENCY = 4
 
 /** Items raven made up for episodes and seasons TMDB does not list; never fetched. */
-const LOCAL = 'local:'
+export const LOCAL = 'local:'
 
 const stemOf = (fileName: string): string => {
   const dot = fileName.lastIndexOf('.')
