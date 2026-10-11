@@ -1,26 +1,6 @@
 import { describe, expect, it } from 'bun:test'
-import {
-  episodeByline,
-  episodeFacts,
-  formatAirDate,
-  primaryVersion,
-  runtimeFact,
-} from '@/lib/itemFacts'
+import { episodeByline, episodeFacts, formatAirDate, runtimeFact } from '@/lib/itemFacts'
 import { itemDetails, mediaItem } from '@/test/fixtures'
-
-describe('primaryVersion', () => {
-  it('starts from a saved spot, in whichever version holds it', () => {
-    const first = mediaItem({ id: 1 })
-    const resumed = mediaItem({ id: 2, position: 600 })
-    expect(primaryVersion([first, resumed])).toBe(resumed)
-  })
-
-  it('falls back to the best version, and to nothing without any', () => {
-    const first = mediaItem({ id: 1 })
-    expect(primaryVersion([first, mediaItem({ id: 2 })])).toBe(first)
-    expect(primaryVersion([])).toBeUndefined()
-  })
-})
 
 describe('runtimeFact', () => {
   it("prefers the file's own length to TMDB's runtime", () => {

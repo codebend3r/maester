@@ -369,15 +369,26 @@ export class MediaRepository {
 
   /** Every file that is an item, in any library, best first. */
   forItem(itemId: number): MediaItem[] {
-    return this.items(
-      this.db
-        .prepare<[number], MediaRow>(
-          `${SELECT_MEDIA}
-            WHERE m.id IN (SELECT media_id FROM media_items WHERE item_id = ?)
-            ORDER BY ${BEST_FIRST}`,
-        )
-        .all(itemId),
-    )
+    return this.forItems([itemId]).get(itemId) ?? []
+  }
+
+  /** Every file that is each of the items, in any library, best first, in one read. */
+  forItems(itemIds: readonly number[]): Map<number, MediaItem[]> {
+    if (itemIds.length === 0) return new Map()
+    const rows = this.db
+      .prepare<[string], MediaRow & { linked_item: number }>(
+        `${SELECT_COLUMNS}, x.item_id AS linked_item${FROM_MEDIA}
+           JOIN media_items x ON x.media_id = m.id
+          WHERE x.item_id IN (SELECT value FROM json_each(?))
+          ORDER BY ${BEST_FIRST}`,
+      )
+      .all(JSON.stringify(itemIds))
+    const items = this.items(rows)
+    return rows.reduce((byItem, row, index) => {
+      const item = items[index]
+      if (!item) return byItem
+      return byItem.set(row.linked_item, [...(byItem.get(row.linked_item) ?? []), item])
+    }, new Map<number, MediaItem[]>())
   }
 
   /** Every favourite across every library, most recently marked first. */

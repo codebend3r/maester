@@ -13,10 +13,6 @@ import { languageName } from '@/lib/trackLabels'
 const present = (facts: ReadonlyArray<string | null>): string[] =>
   facts.filter((fact): fact is string => fact != null)
 
-/** The version Play starts: a saved spot wins, so Play resumes where the viewer stopped, in whichever version. */
-export const primaryVersion = (versions: readonly MediaItem[]): MediaItem | undefined =>
-  versions.find((version) => version.position > 0) ?? versions[0]
-
 /** How long it runs: the file's own length when probed, else TMDB's runtime in minutes. */
 export const runtimeFact = ({
   file,

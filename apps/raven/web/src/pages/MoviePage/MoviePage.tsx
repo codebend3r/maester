@@ -1,6 +1,6 @@
+import { primaryVersion } from '@raven/core'
 import { PlayableItemView } from '@/components/PlayableItemView/PlayableItemView'
 import { RouteState } from '@/components/RouteState/RouteState'
-import { primaryVersion } from '@/lib/itemFacts'
 import { useRouteItem } from '@/lib/routeQuery'
 import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
 

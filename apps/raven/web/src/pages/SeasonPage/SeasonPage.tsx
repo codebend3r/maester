@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import type { ItemDetails, ItemSummary } from '@raven/core'
+import type { EpisodeSummary, ItemDetails } from '@raven/core'
 import { useId } from 'react'
 import { Link } from 'react-router-dom'
 import { ButtonLink } from '@/components/Button/Button'
@@ -10,7 +10,7 @@ import { RouteState } from '@/components/RouteState/RouteState'
 import { Summary } from '@/components/Summary/Summary'
 import { TmdbCredit } from '@/components/TmdbCredit/TmdbCredit'
 import { api } from '@/lib/api'
-import { formatAirDate, primaryVersion, runtimeFact } from '@/lib/itemFacts'
+import { formatAirDate, runtimeFact } from '@/lib/itemFacts'
 import { watchLink } from '@/lib/itemLinks'
 import { itemQuery } from '@/lib/queries'
 import { routeState, useRouteId } from '@/lib/routeQuery'
@@ -18,14 +18,18 @@ import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
 import styles from '@/pages/SeasonPage/SeasonPage.module.scss'
 
 /** One episode on disk: its still, number and title, air date and length, two lines of summary, and Play. */
-const EpisodeRow = ({ episode }: { episode: ItemSummary }) => {
-  const details = useQuery(itemQuery(episode.id))
-  const file = primaryVersion(details.data?.versions ?? [])
+const EpisodeRow = ({ episode }: { episode: EpisodeSummary }) => {
+  const file = episode.primary ?? undefined
+  // The still, from TMDB or beside the file; else a frame of the file itself.
   const picture =
-    stillUrl({ episode, details: details.data }) ?? (file ? api.thumbnailUrl(file) : null)
+    episode.stillVersion == null
+      ? file
+        ? api.thumbnailUrl(file)
+        : null
+      : api.itemImageUrl({ id: episode.id, kind: 'still', version: episode.stillVersion })
   const facts = [
-    formatAirDate(details.data?.released ?? null),
-    runtimeFact({ file, runtime: details.data?.runtime ?? null }),
+    formatAirDate(episode.released),
+    runtimeFact({ file, runtime: episode.runtime }),
   ].filter((fact): fact is string => fact != null)
   const number = episode.episode == null ? '' : `${episode.episode}. `
 
@@ -56,7 +60,7 @@ const EpisodeRow = ({ episode }: { episode: ItemSummary }) => {
             ))}
           </span>
         )}
-        {details.data?.summary && <p className={styles.overview}>{details.data.summary}</p>}
+        {episode.summary && <p className={styles.overview}>{episode.summary}</p>}
         {file && <PartlyWatched media={file} />}
       </div>
       {file && (
@@ -68,21 +72,10 @@ const EpisodeRow = ({ episode }: { episode: ItemSummary }) => {
   )
 }
 
-/** The episode's still from TMDB or beside the file; null until its page has loaded. */
-const stillUrl = ({
-  episode,
-  details,
-}: {
-  episode: ItemSummary
-  details: ItemDetails | undefined
-}): string | null =>
-  details?.backdropVersion == null
-    ? null
-    : api.itemImageUrl({ id: episode.id, kind: 'still', version: details.backdropVersion })
-
 const SeasonView = ({ show, season }: { show: ItemDetails; season: ItemDetails }) => {
   const ids = { title: useId(), episodes: useId() }
-  const count = season.children.length
+  const episodes = season.children.flatMap((child) => (child.type === 'episode' ? [child] : []))
+  const count = episodes.length
   return (
     <article className={styles.page} aria-labelledby={ids.title}>
       <ButtonLink to={`/shows/${show.id}`} icon="back" className={styles.back}>
@@ -114,7 +107,7 @@ const SeasonView = ({ show, season }: { show: ItemDetails; season: ItemDetails }
           Episodes
         </h2>
         <ol className={styles.list}>
-          {season.children.map((episode) => (
+          {episodes.map((episode) => (
             <EpisodeRow key={episode.id} episode={episode} />
           ))}
         </ol>

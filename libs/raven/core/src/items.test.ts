@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { cardTitle, episodeCode, formatScore, itemLabel, mediaLabel, pickScore } from '@/items'
+import {
+  cardTitle,
+  episodeCode,
+  formatScore,
+  itemLabel,
+  mediaLabel,
+  pickScore,
+  primaryVersion,
+} from '@/items'
 import { itemSummary, mediaItem } from '@/test/fixtures'
 
 describe('episodeCode', () => {
@@ -68,5 +76,15 @@ describe('mediaLabel and cardTitle', () => {
     expect(mediaLabel(parsed)).toBe('Heat (1995)')
     expect(cardTitle(parsed)).toEqual({ title: 'Heat', year: 1995 })
     expect(mediaLabel(mediaItem({ title: 'Clip' }))).toBe('Clip')
+  })
+})
+
+describe('primaryVersion', () => {
+  it('plays the version with a saved spot, else the best, and nothing without a version', () => {
+    const best = mediaItem({ id: 1 })
+    const resumed = mediaItem({ id: 2, position: 600 })
+    expect(primaryVersion([best, resumed])).toBe(resumed)
+    expect(primaryVersion([best, mediaItem({ id: 3 })])).toBe(best)
+    expect(primaryVersion([])).toBeUndefined()
   })
 })

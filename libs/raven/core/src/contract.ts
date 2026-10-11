@@ -216,8 +216,6 @@ export const isItemSummary = object({
 
 export type ItemSummary = Infer<typeof isItemSummary>
 
-export const isItemSummaryList = listOf(isItemSummary)
-
 export const isMediaItem = object({
   id: isNumber,
   libraryId: isNumber,
@@ -298,6 +296,37 @@ export const isReview = object({
 
 export type Review = Infer<typeof isReview>
 
+/** A season on its show's page: its card, and how many of its episodes are on disk. */
+export const isSeasonSummary = object({
+  ...isItemSummary.shape,
+  type: oneOf(['season']),
+  /** Its episodes with a file this browser may see. */
+  episodeCount: isNumber,
+})
+
+export type SeasonSummary = Infer<typeof isSeasonSummary>
+
+/** An episode on its season's page: what its row shows, and the file Play starts. */
+export const isEpisodeSummary = object({
+  ...isItemSummary.shape,
+  type: oneOf(['episode']),
+  summary: nullable(isString),
+  released: nullable(isString),
+  /** Minutes, from TMDB; the row prefers the file's own length. */
+  runtime: nullable(isNumber),
+  /** Changes whenever the still does, beside the file or TMDB's; null when there is none. */
+  stillVersion: nullable(isString),
+  /** The version Play starts, by `primaryVersion`; null when none of its files may be seen. */
+  primary: nullable(isMediaItem),
+})
+
+export type EpisodeSummary = Infer<typeof isEpisodeSummary>
+
+/** A show's season or a season's episode, as its parent's page lists it. */
+export const isItemChild = union(isSeasonSummary, isEpisodeSummary)
+
+export type ItemChild = Infer<typeof isItemChild>
+
 /** Everything a movie, show, season or episode page shows. */
 export const isItemDetails = object({
   ...isItemSummary.shape,
@@ -320,8 +349,8 @@ export const isItemDetails = object({
   reviews: listOf(isReview),
   /** Every file that is this item, in any library, best first. */
   versions: isMediaList,
-  /** A show's seasons, or a season's episodes, in order. */
-  children: isItemSummaryList,
+  /** A show's seasons, or a season's episodes, on disk, in order; none for a movie or episode. */
+  children: listOf(isItemChild),
 })
 
 export type ItemDetails = Infer<typeof isItemDetails>

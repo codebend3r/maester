@@ -38,6 +38,10 @@ export const mediaLabel = (media: MediaItem): string => {
   return media.year == null ? media.title : `${media.title} (${media.year})`
 }
 
+/** The version Play starts: a saved spot wins, so Play resumes where the viewer stopped, in whichever version. */
+export const primaryVersion = (versions: readonly MediaItem[]): MediaItem | undefined =>
+  versions.find((version) => version.position > 0) ?? versions[0]
+
 /** The title a card shows, and the year beneath it. */
 export const cardTitle = (media: MediaItem): { title: string; year: number | null } =>
   media.item

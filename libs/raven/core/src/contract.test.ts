@@ -20,6 +20,8 @@ import {
   isTmdbId,
   isUnlockRequest,
   isHistoryEntry,
+  isEpisodeSummary,
+  isItemChild,
   isItemDetails,
   isItemSummary,
   isLibrary,
@@ -30,10 +32,20 @@ import {
   isPersonDetails,
   isRating,
   isReview,
+  isSeasonSummary,
   isServerEvent,
   isShowListing,
 } from '@/contract'
-import { itemDetails, itemSummary, library, mediaItem, review, showEntry } from '@/test/fixtures'
+import {
+  episodeSummary,
+  itemDetails,
+  itemSummary,
+  library,
+  mediaItem,
+  review,
+  seasonSummary,
+  showEntry,
+} from '@/test/fixtures'
 
 describe('isMediaItem', () => {
   it('accepts an item that carries its favourite flag', () => {
@@ -165,6 +177,23 @@ describe('the metadata guards', () => {
       isCredit({ personId: 1, name: 'X', job: 'gaffer', role: null, photoVersion: null }),
     ).toBe(false)
     expect(isRating({ source: 'imdb', kind: 'audience', value: 7.5, votes: null })).toBe(true)
+  })
+
+  it("accepts a page's children: seasons with their episode count, episodes with their row", () => {
+    expect(isSeasonSummary(seasonSummary())).toBe(true)
+    expect(isEpisodeSummary(episodeSummary())).toBe(true)
+    expect(isEpisodeSummary(episodeSummary({ primary: null, stillVersion: null }))).toBe(true)
+    expect(isItemDetails(itemDetails({ children: [seasonSummary(), episodeSummary()] }))).toBe(true)
+  })
+
+  it('refuses a child that is not a season or an episode, or lacks what its row needs', () => {
+    expect(isItemChild({ ...seasonSummary(), type: 'movie' })).toBe(false)
+    const { episodeCount: _count, ...countless } = seasonSummary()
+    expect(isItemChild(countless)).toBe(false)
+    const { primary: _primary, ...unplayable } = episodeSummary()
+    expect(isItemChild(unplayable)).toBe(false)
+    expect(isItemDetails(itemDetails({ children: [] }))).toBe(true)
+    expect(isItemDetails({ ...itemDetails(), children: [itemSummary()] })).toBe(false)
   })
 
   it('accepts a show listing and refuses one whose next episode is malformed', () => {

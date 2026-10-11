@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { type ItemDetails, type ItemSummary, episodeCode } from '@raven/core'
+import { type ItemDetails, type SeasonSummary, episodeCode } from '@raven/core'
 import { useId, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button, ButtonLink } from '@/components/Button/Button'
@@ -15,16 +15,15 @@ import { TmdbCredit } from '@/components/TmdbCredit/TmdbCredit'
 import { api } from '@/lib/api'
 import { createdBy, showFacts } from '@/lib/itemFacts'
 import { itemPath, watchLink } from '@/lib/itemLinks'
-import { itemQuery, nextEpisodeQuery } from '@/lib/queries'
+import { nextEpisodeQuery } from '@/lib/queries'
 import { useRouteItem } from '@/lib/routeQuery'
 import styles from '@/pages/ShowPage/ShowPage.module.scss'
 
 /** One season in the row: its poster, name and how many episodes are on disk. */
-const SeasonCard = ({ season, show }: { season: ItemSummary; show: ItemDetails }) => {
-  const details = useQuery(itemQuery(season.id))
+const SeasonCard = ({ season, show }: { season: SeasonSummary; show: ItemDetails }) => {
   const poster = api.itemImageUrl({ id: season.id, kind: 'poster', version: season.posterVersion })
   const to = itemPath(season) ?? `/shows/${show.id}`
-  const count = details.data?.children.length
+  const count = season.episodeCount
   return (
     <li className={styles.season}>
       <Link to={to} className={styles.seasonLink}>
@@ -36,11 +35,9 @@ const SeasonCard = ({ season, show }: { season: ItemSummary; show: ItemDetails }
           )}
         </span>
         <span className={styles.seasonTitle}>{season.title}</span>
-        {count != null && (
-          <span className={styles.seasonCount}>
-            {count} {count === 1 ? 'episode' : 'episodes'}
-          </span>
-        )}
+        <span className={styles.seasonCount}>
+          {count} {count === 1 ? 'episode' : 'episodes'}
+        </span>
       </Link>
     </li>
   )
@@ -55,6 +52,7 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
   const next = useQuery(nextEpisodeQuery(details.id))
   const libraryId = next.data?.libraryId ?? details.versions[0]?.libraryId
   const code = next.data?.item ? episodeCode(next.data.item) : null
+  const seasons = details.children.flatMap((child) => (child.type === 'season' ? [child] : []))
 
   return (
     <article className={styles.page} aria-labelledby={ids.title}>
@@ -126,13 +124,13 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
 
       <Summary tagline={details.tagline} summary={details.summary} />
 
-      {details.children.length > 0 && (
+      {seasons.length > 0 && (
         <section className={styles.seasons} aria-labelledby={ids.seasons}>
           <h2 id={ids.seasons} className={styles.heading}>
             Seasons
           </h2>
           <ul className={styles.seasonRow}>
-            {details.children.map((season) => (
+            {seasons.map((season) => (
               <SeasonCard key={season.id} season={season} show={details} />
             ))}
           </ul>

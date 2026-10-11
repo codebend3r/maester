@@ -174,6 +174,58 @@ export class MetadataRepository {
     return ids.flatMap((id) => summaries.get(id) ?? [])
   }
 
+  /** Each season's episodes with a file, by season, in one read: what a season card counts. */
+  episodesOnDisk(seasonIds: readonly number[]): Map<number, number[]> {
+    if (seasonIds.length === 0) return new Map()
+    return this.db
+      .prepare<[string], { season_id: number; episode_id: number }>(
+        `SELECT DISTINCT e.parent_id AS season_id, e.id AS episode_id
+           FROM items e JOIN media_items mi ON mi.item_id = e.id
+          WHERE e.type = 'episode' AND e.parent_id IN (SELECT value FROM json_each(?))
+          ORDER BY e.number IS NULL, e.number, e.id`,
+      )
+      .all(JSON.stringify(seasonIds))
+      .reduce(
+        (bySeason, row) =>
+          bySeason.set(row.season_id, [...(bySeason.get(row.season_id) ?? []), row.episode_id]),
+        new Map<number, number[]>(),
+      )
+  }
+
+  /** What an episode's row on its season's page shows beside its card, for each episode, in two reads. */
+  episodeRows(ids: readonly number[]): Map<
+    number,
+    {
+      summary: string | null
+      released: string | null
+      runtime: number | null
+      stillVersion: string | null
+    }
+  > {
+    if (ids.length === 0) return new Map()
+    const stills = this.versions({ ids, kind: 'still' })
+    return new Map(
+      this.db
+        .prepare<
+          [string],
+          { id: number; summary: string | null; released: string | null; runtime: number | null }
+        >(
+          `SELECT id, summary, released, runtime FROM shown_items
+            WHERE id IN (SELECT value FROM json_each(?))`,
+        )
+        .all(JSON.stringify(ids))
+        .map((row) => [
+          row.id,
+          {
+            summary: row.summary,
+            released: row.released,
+            runtime: row.runtime,
+            stillVersion: stills.get(row.id) ?? null,
+          },
+        ]),
+    )
+  }
+
   /** The child of `parentId` with `number`: a show's season, or a season's episode. */
   child({
     parentId,

@@ -4,7 +4,7 @@ import { Route, Routes } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { SeasonPage } from '@/pages/SeasonPage/SeasonPage'
 import { renderWithProviders } from '@/test/render'
-import { EPISODE_ONE, EPISODE_TWO, SEASON_ONE, SEVERANCE, episodeDetails } from '@/test/tv'
+import { SEASON_ONE, SEVERANCE } from '@/test/tv'
 
 describe('SeasonPage', () => {
   const spies = { item: spyOn(api, 'getItem') }
@@ -13,8 +13,6 @@ describe('SeasonPage', () => {
     spies.item.mockImplementation(async (id) => {
       if (id === 4) return SEVERANCE
       if (id === 5) return SEASON_ONE
-      if (id === 6) return episodeDetails(EPISODE_ONE)
-      if (id === 7) return episodeDetails(EPISODE_TWO)
       throw new Error(`no item ${id}`)
     })
     renderWithProviders(
@@ -44,6 +42,17 @@ describe('SeasonPage', () => {
       '/watch/13',
     )
     expect(within(rows[1] ?? list).getByText('Partly watched')).toBeInTheDocument()
+  })
+
+  it('shows every row from the season alone, asking for no episode', async () => {
+    open()
+    const list = await screen.findByRole('list')
+    const [first] = within(list).getAllByRole('listitem')
+    expect(
+      within(first ?? list).getByText('Good News About Hell is an episode.'),
+    ).toBeInTheDocument()
+    expect(first?.querySelector('img')?.getAttribute('src')).toContain('/images/still?v=still1')
+    expect(spies.item.mock.calls.map(([id]) => id).toSorted()).toEqual([4, 5])
   })
 
   it('is not found for a season the show has no files of', async () => {

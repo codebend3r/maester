@@ -30,6 +30,7 @@ import {
   type MediaItem,
 } from '@raven/core'
 import type { FastifyReply } from 'fastify'
+import { itemChildren } from '@/items/itemChildren'
 import { isMatchItemType } from '@/items/matchItemType'
 import { sendImage } from '@/items/sendImage'
 import { PrivateBy } from '@/lock/lockGuard'
@@ -73,7 +74,7 @@ export class ItemsController {
     return {
       ...details,
       versions: this.media.forItem(id).filter((item) => viewer.seesLibrary(item.libraryId)),
-      children: this.metadata.childrenOnDisk(id).filter((child) => viewer.seesItem(child.id)),
+      children: itemChildren({ parentId: id, viewer, metadata: this.metadata, media: this.media }),
     }
   }
 
