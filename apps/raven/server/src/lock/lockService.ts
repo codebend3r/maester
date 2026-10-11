@@ -33,6 +33,9 @@ const SESSION_MS = 12 * 60 * 60_000
 const TRIES = 5
 const WAIT_MS = 60_000
 
+/** With nothing locked, or the PIN entered: everything shows, and nothing more is looked up. */
+const EVERYTHING: Viewer = { seesLibrary: () => true, seesItem: () => true, sees: () => true }
+
 const digest = (text: string): Buffer => createHash('sha256').update(text).digest()
 
 const cookieValue = (header: string | undefined): string | null =>
@@ -96,14 +99,13 @@ export class LockService {
 
   viewer({ cookie }: { cookie: string | undefined }): Viewer {
     const locked = this.libraries.lockedIds()
-    const unlocked = locked.size > 0 && this.isUnlocked(cookie)
-    const seesLibrary = (libraryId: number): boolean => unlocked || !locked.has(libraryId)
+    if (locked.size === 0 || this.isUnlocked(cookie)) return EVERYTHING
+    const seesLibrary = (libraryId: number): boolean => !locked.has(libraryId)
     const seesItem = (itemId: number): boolean => {
       const holding = this.metadata.librariesHolding(itemId)
       return holding.length === 0 || holding.some(seesLibrary)
     }
     const sees = ({ privacy, id }: { privacy: Privacy; id: number }): boolean => {
-      if (locked.size === 0) return true
       switch (privacy) {
         case 'library':
           return seesLibrary(id)
