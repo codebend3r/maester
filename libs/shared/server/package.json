@@ -1,0 +1,62 @@
+{
+  "name": "@shared/server",
+  "version": "0.4.3",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "bun run --sequential build:clean build:compile build:aliases",
+    "build:clean": "rm -rf dist",
+    "build:compile": "tsc -p tsconfig.build.json",
+    "build:aliases": "tsc-alias -p tsconfig.build.json",
+    "typecheck": "tsgo --noEmit",
+    "lint:ts": "oxlint",
+    "lint:ts:fix": "oxlint --fix",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check .",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@fastify/static": "10.1.5",
+    "@nestjs/common": "12.1.0",
+    "@nestjs/core": "12.1.0",
+    "@nestjs/platform-fastify": "12.1.0",
+    "better-sqlite3": "13.0.3",
+    "fastify": "5.12.5",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.2"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "9.6.0",
+    "@types/node": "24.19.0",
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "oxfmt": "0.68.0",
+    "oxlint": "1.83.0",
+    "tsc-alias": "1.9.7",
+    "typescript": "6.0.3",
+    "vitest": "5.0.2"
+  },
+  "nx": {
+    "projectType": "library",
+    "tags": [
+      "scope:server",
+      "lang:ts"
+    ],
+    "includedScripts": [
+      "build",
+      "typecheck",
+      "lint:ts",
+      "lint:ts:fix",
+      "format",
+      "format:check",
+      "test",
+      "test:watch"
+    ]
+  }
+}

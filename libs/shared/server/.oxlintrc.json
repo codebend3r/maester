@@ -1,0 +1,21 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "extends": ["../../../tooling/oxlint/nest.json"],
+  "ignorePatterns": ["dist"],
+  "overrides": [
+    {
+      // Vitest reads its config from a default export.
+      "files": ["vitest.config.ts"],
+      "rules": {
+        "import/no-default-export": "off"
+      }
+    },
+    {
+      "files": ["src/**/*.test.ts"],
+      "rules": {
+        "typescript/no-non-null-assertion": "off",
+        "unicorn/consistent-function-scoping": "off"
+      }
+    }
+  ]
+}
