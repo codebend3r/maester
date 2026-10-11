@@ -3,9 +3,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import {
+  type HistoryEntry,
   type Library,
   type MediaItem,
   isDirectoryListing,
+  isHistory,
   isLibrary,
   isLibraryList,
   isMediaItem,
@@ -282,7 +284,7 @@ describe('the media server', () => {
       const saveProgress = (id: number, position: number) =>
         app().inject({ method: 'PUT', url: `/api/media/${id}/progress`, payload: { position } })
 
-      it('starts a library with progress saved and the library pinned', async () => {
+      it('starts a library with progress saved, the library pinned, and watched at 90%', async () => {
         const current = expectShape({
           response: await app().inject({ method: 'GET', url: `/api/libraries/${library.id}` }),
           guard: isLibrary,
@@ -293,6 +295,7 @@ describe('the media server', () => {
           sort: 'title',
           view: 'grid',
           groupBy: 'resolution',
+          watchedPercent: 90,
         })
       })
 
@@ -324,6 +327,7 @@ describe('the media server', () => {
           sort: 'title',
           view: 'grid',
           groupBy: 'resolution',
+          watchedPercent: 90,
         })
         expect(updated.scan.state).toBe('idle')
         expect((await putLibrary({ pinned: true })).settings.pinned).toBe(true)
@@ -453,6 +457,49 @@ describe('the media server', () => {
             })
           ).statusCode,
         ).toBe(404)
+      })
+    })
+
+    describe('history', () => {
+      const history = async (query = ''): Promise<HistoryEntry[]> =>
+        expectShape({
+          response: await app().inject({
+            method: 'GET',
+            url: `/api/libraries/${library.id}/history${query}`,
+          }),
+          guard: isHistory,
+        })
+      const entryFor = async ({ id, query }: { id: number; query?: string }) =>
+        (await history(query)).find((entry) => entry.media.id === id)
+
+      it('records a play, and lists it as watched once playback gets far enough', async () => {
+        const [, episode] = await listMedia(library.id)
+        const id = episode?.id ?? -1
+        const played = await app().inject({ method: 'POST', url: `/api/media/${id}/plays` })
+        expect(played.statusCode).toBe(204)
+        expect(await entryFor({ id })).toMatchObject({ plays: 1, furthest: 0, watched: false })
+        expect(await entryFor({ id, query: '?watched=true' })).toBeUndefined()
+
+        await app().inject({
+          method: 'PUT',
+          url: `/api/media/${id}/progress`,
+          payload: { position: episode?.duration ?? 0 },
+        })
+        expect(await entryFor({ id, query: '?watched=true' })).toMatchObject({
+          plays: 1,
+          watched: true,
+        })
+      })
+
+      it('keeps to the limit it is asked for', async () => {
+        expect(await history('?limit=1')).toHaveLength(1)
+      })
+
+      it('says when the video or the library is not there', async () => {
+        const play = await app().inject({ method: 'POST', url: '/api/media/999999/plays' })
+        expect(play.statusCode).toBe(404)
+        const list = await app().inject({ method: 'GET', url: '/api/libraries/999999/history' })
+        expect(list.statusCode).toBe(404)
       })
     })
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isLibrary, isMediaItem } from '@/guards'
+import { isHistoryEntry, isLibrary, isMediaItem } from '@/guards'
 import { library, mediaItem } from '@/test/fixtures'
 
 describe('isMediaItem', () => {
@@ -24,10 +24,17 @@ describe('isLibrary', () => {
             sort: 'random',
             view: 'tiles',
             groupBy: 'month',
+            watchedPercent: 80,
           },
         }),
       ),
     ).toBe(true)
+  })
+
+  it('rejects a library whose watched percentage is out of range', () => {
+    expect(isLibrary(library({ settings: { ...library().settings, watchedPercent: 150 } }))).toBe(
+      false,
+    )
   })
 
   it('rejects a library whose settings are missing', () => {
@@ -45,5 +52,30 @@ describe('isLibrary', () => {
     expect(isLibrary({ ...library(), settings: { ...library().settings, view: 'poster' } })).toBe(
       false,
     )
+  })
+})
+
+describe('isHistoryEntry', () => {
+  it('accepts a video with when it was last played and how often', () => {
+    expect(
+      isHistoryEntry({
+        media: mediaItem(),
+        lastPlayedAt: '2026-10-10T19:00:00.000Z',
+        plays: 2,
+        furthest: 5000,
+        watched: true,
+      }),
+    ).toBe(true)
+  })
+
+  it('rejects an entry that does not say whether it was watched', () => {
+    expect(
+      isHistoryEntry({
+        media: mediaItem(),
+        lastPlayedAt: '2026-10-10T19:00:00.000Z',
+        plays: 2,
+        furthest: 5000,
+      }),
+    ).toBe(false)
   })
 })

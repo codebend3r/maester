@@ -187,6 +187,34 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
               Pinned libraries get their own link in the side menu.
             </p>
           </div>
+          <div className={styles.watched}>
+            <label htmlFor={`${ids.settings}-watched`}>Watched at</label>
+            <span className={styles.percent}>
+              <input
+                id={`${ids.settings}-watched`}
+                type="number"
+                inputMode="numeric"
+                className={styles.input}
+                min={1}
+                max={100}
+                step={1}
+                value={Number.isNaN(settings.watchedPercent) ? '' : settings.watchedPercent}
+                onChange={(event) => {
+                  const typed = event.target.value
+                  setSettings((current) => ({
+                    ...current,
+                    watchedPercent: typed === '' ? Number.NaN : Number(typed),
+                  }))
+                }}
+                aria-describedby={`${ids.settings}-watched-hint`}
+              />
+              <span aria-hidden="true">%</span>
+            </span>
+            <p id={`${ids.settings}-watched-hint`} className={styles.settingHint}>
+              A video counts as watched in the library's history once playback gets this far through
+              it.
+            </p>
+          </div>
         </fieldset>
 
         {errors.length > 0 && (

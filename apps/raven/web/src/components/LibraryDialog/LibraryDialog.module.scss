@@ -92,6 +92,32 @@
   grid-area: box;
 }
 
+// The percentage sits beside its label like a checkbox's label beside its box.
+.watched {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    'label input'
+    'hint hint';
+  gap: var(--space-0) var(--space-2);
+  align-items: center;
+
+  label {
+    grid-area: label;
+    font-size: var(--font-size-md);
+    font-weight: 400;
+  }
+}
+
+.percent {
+  grid-area: input;
+  display: grid;
+  grid-template-columns: 6rem auto;
+  justify-content: start;
+  gap: var(--space-1);
+  align-items: center;
+}
+
 .settingHint {
   grid-area: hint;
   color: var(--color-lichen);

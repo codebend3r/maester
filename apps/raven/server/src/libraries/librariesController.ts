@@ -14,6 +14,7 @@ import {
   Query,
 } from '@nestjs/common'
 import {
+  type HistoryEntry,
   type Library,
   type LibraryInput,
   type MediaItem,
@@ -31,6 +32,16 @@ const parseInput = (body: unknown): LibraryInput => {
   const result = validateLibraryInput(body)
   if (!result.ok) throw new BadRequestException(result.errors)
   return result.value
+}
+
+/** How many history entries a request gets unless it asks, and the most it may ask for. */
+const HISTORY_LIMIT = { fallback: 100, most: 500 }
+
+const historyLimit = (asked: string | undefined): number => {
+  const limit = Number.parseInt(asked ?? '', 10)
+  return Number.isInteger(limit)
+    ? Math.min(Math.max(limit, 1), HISTORY_LIMIT.most)
+    : HISTORY_LIMIT.fallback
 }
 
 const samePaths = (a: readonly string[], b: readonly string[]): boolean =>
@@ -103,6 +114,25 @@ export class LibrariesController {
     const record = this.find(id)
     this.scanner.scan(id)
     return this.withStatus(record)
+  }
+
+  /** The library's played videos, last played first; `watched=true` keeps the ones watched. */
+  @Get(':id/history')
+  history(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('limit') limit?: string,
+    @Query('watched') watched?: string,
+  ): HistoryEntry[] {
+    this.find(id)
+    return this.media
+      .history({ libraryId: id, limit: historyLimit(limit), watchedOnly: watched === 'true' })
+      .map((entry) => ({
+        media: toMediaItem(entry.record),
+        lastPlayedAt: entry.lastPlayedAt,
+        plays: entry.plays,
+        furthest: entry.furthest,
+        watched: entry.watched,
+      }))
   }
 
   @Get(':id/media')

@@ -2,6 +2,7 @@ import type {
   AudioTrack,
   DirectoryEntry,
   DirectoryListing,
+  HistoryEntry,
   Library,
   LibrarySettings,
   LibraryView,
@@ -80,13 +81,18 @@ export const MEDIA_GROUPINGS: readonly MediaGroupBy[] = ['resolution', 'codec', 
 export const isMediaGroupBy = (value: unknown): value is MediaGroupBy =>
   MEDIA_GROUPINGS.some((grouping) => grouping === value)
 
+/** A whole percentage from 1 to 100. */
+export const isWatchedPercent = (value: unknown): value is number =>
+  isNumber(value) && Number.isInteger(value) && value >= 1 && value <= 100
+
 export const isLibrarySettings = (value: unknown): value is LibrarySettings =>
   isRecord(value) &&
   isBoolean(value.saveProgress) &&
   isBoolean(value.pinned) &&
   isMediaSort(value.sort) &&
   isLibraryView(value.view) &&
-  isMediaGroupBy(value.groupBy)
+  isMediaGroupBy(value.groupBy) &&
+  isWatchedPercent(value.watchedPercent)
 
 export const isLibrary = (value: unknown): value is Library =>
   isRecord(value) &&
@@ -130,6 +136,16 @@ export const isMediaItem = (value: unknown): value is MediaItem =>
   isString(value.addedAt)
 
 export const isMediaList = arrayOf(isMediaItem)
+
+export const isHistoryEntry = (value: unknown): value is HistoryEntry =>
+  isRecord(value) &&
+  isMediaItem(value.media) &&
+  isString(value.lastPlayedAt) &&
+  isNumber(value.plays) &&
+  isNumber(value.furthest) &&
+  isBoolean(value.watched)
+
+export const isHistory = arrayOf(isHistoryEntry)
 
 export const isDirectoryListing = (value: unknown): value is DirectoryListing =>
   isRecord(value) &&

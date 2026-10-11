@@ -21,6 +21,7 @@ export const library = (overrides: Partial<Library> = {}): Library => ({
     sort: 'title',
     view: 'grid',
     groupBy: 'resolution',
+    watchedPercent: 90,
   },
   ...overrides,
 })

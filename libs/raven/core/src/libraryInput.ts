@@ -1,4 +1,12 @@
-import { isBoolean, isLibraryView, isMediaGroupBy, isMediaSort, isRecord, isString } from '@/guards'
+import {
+  isBoolean,
+  isLibraryView,
+  isMediaGroupBy,
+  isMediaSort,
+  isRecord,
+  isString,
+  isWatchedPercent,
+} from '@/guards'
 import type { LibraryInput, LibrarySettings } from '@/types'
 
 export const LIBRARY_NAME_MAX = 80
@@ -19,6 +27,7 @@ export const DEFAULT_LIBRARY_SETTINGS: LibrarySettings = {
   sort: 'title',
   view: 'grid',
   groupBy: 'resolution',
+  watchedPercent: 90,
 }
 
 /** Each setting's check, and what to say when a value fails it. */
@@ -31,6 +40,10 @@ const SETTING_CHECKS: Record<
   sort: { valid: isMediaSort, problem: 'Sort is not one of the choices.' },
   view: { valid: isLibraryView, problem: 'View is not one of the choices.' },
   groupBy: { valid: isMediaGroupBy, problem: 'Group by is not one of the choices.' },
+  watchedPercent: {
+    valid: isWatchedPercent,
+    problem: 'Watched at must be a whole percentage from 1 to 100.',
+  },
 }
 
 type SettingsResult = { settings: Partial<LibrarySettings>; errors: string[] }
@@ -46,6 +59,7 @@ const readSettings = (input: unknown): SettingsResult => {
       ...(isMediaSort(input.sort) ? { sort: input.sort } : {}),
       ...(isLibraryView(input.view) ? { view: input.view } : {}),
       ...(isMediaGroupBy(input.groupBy) ? { groupBy: input.groupBy } : {}),
+      ...(isWatchedPercent(input.watchedPercent) ? { watchedPercent: input.watchedPercent } : {}),
     },
     errors: Object.entries(SETTING_CHECKS)
       .filter(([key, check]) => input[key] !== undefined && !check.valid(input[key]))

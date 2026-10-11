@@ -60,6 +60,7 @@ describe('LibraryDialog', () => {
           sort: 'title',
           view: 'grid',
           groupBy: 'resolution',
+          watchedPercent: 90,
         },
       },
     ])
@@ -81,8 +82,33 @@ describe('LibraryDialog', () => {
         sort: 'title',
         view: 'grid',
         groupBy: 'resolution',
+        watchedPercent: 90,
       },
     })
+  })
+
+  it('sets how far into a video counts as watched', async () => {
+    renderWithProviders(<LibraryDialog onClose={() => undefined} />)
+    await userEvent.type(screen.getByLabelText('Name'), 'Clips')
+    await userEvent.type(screen.getByLabelText('Folder path'), '/media/Clips')
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }))
+    const watched = screen.getByRole('spinbutton', { name: 'Watched at' })
+    expect(watched).toHaveValue(90)
+    await userEvent.clear(watched)
+    await userEvent.type(watched, '75')
+    await userEvent.click(screen.getByRole('button', { name: 'Add library' }))
+    expect(created.at(-1)).toMatchObject({ settings: { watchedPercent: 75 } })
+  })
+
+  it('will not count less than 1% or more than 100% as watched', async () => {
+    renderWithProviders(<LibraryDialog library={library()} onClose={() => undefined} />)
+    const watched = screen.getByRole('spinbutton', { name: 'Watched at' })
+    await userEvent.clear(watched)
+    await userEvent.type(watched, '150')
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Watched at must be a whole percentage from 1 to 100.',
+    )
   })
 
   it("shows the library's own settings when editing it", () => {
@@ -96,5 +122,15 @@ describe('LibraryDialog', () => {
       screen.getByRole('checkbox', { name: 'Save where each video stopped' }),
     ).not.toBeChecked()
     expect(screen.getByRole('checkbox', { name: 'Pin to the side menu' })).toBeChecked()
+  })
+
+  it("shows the library's own watched percentage when editing it", () => {
+    renderWithProviders(
+      <LibraryDialog
+        library={library({ settings: { ...library().settings, watchedPercent: 60 } })}
+        onClose={() => undefined}
+      />,
+    )
+    expect(screen.getByRole('spinbutton', { name: 'Watched at' })).toHaveValue(60)
   })
 })

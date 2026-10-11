@@ -22,6 +22,15 @@ export type MediaRecord = MediaItem & {
   mtimeMs: number
 }
 
+/** A played video in a library's history, with the server-only record. */
+export type HistoryRecord = {
+  record: MediaRecord
+  lastPlayedAt: string
+  plays: number
+  furthest: number
+  watched: boolean
+}
+
 /** What the scanner compares against the disk to find new, changed, and gone files. */
 export type IndexedFile = {
   id: number
@@ -111,6 +120,17 @@ export const toMediaItem = ({
   ...item
 }: MediaRecord): MediaItem => item
 
+/** A video played again within this long of its last report is the same sitting, so the same play. */
+const SITTING_MS = 30 * 60 * 1000
+
+type HistoryRow = {
+  id: number
+  last_played_at: string
+  plays: number
+  furthest: number
+  watched: number
+}
+
 const BY_TITLE = 'm.title COLLATE NOCASE, m.id'
 
 /**
@@ -193,6 +213,106 @@ export class MediaRepository {
          ON CONFLICT (media_id) DO NOTHING`,
       )
       .run(id, new Date().toISOString())
+  }
+
+  /** The play a report at `at` belongs to: the video's latest, while it is in the same sitting, or a new one. */
+  private sittingPlay({ id, at }: { id: number; at: Date }): number {
+    const since = new Date(at.getTime() - SITTING_MS).toISOString()
+    const latest = this.db
+      .prepare<[number, string], { id: number }>(
+        `SELECT id FROM plays WHERE media_id = ? AND played_at >= ?
+          ORDER BY played_at DESC, id DESC LIMIT 1`,
+      )
+      .get(id, since)
+    if (latest) return latest.id
+    const result = this.db
+      .prepare('INSERT INTO plays (media_id, played_at) VALUES (?, ?)')
+      .run(id, at.toISOString())
+    return Number(result.lastInsertRowid)
+  }
+
+  /** A video started playing. */
+  recordPlay({ id, at = new Date() }: { id: number; at?: Date }): void {
+    this.db.transaction(() => {
+      const play = this.sittingPlay({ id, at })
+      this.db.prepare('UPDATE plays SET played_at = ? WHERE id = ?').run(at.toISOString(), play)
+    })()
+  }
+
+  /**
+   * How far playback has got, for the history. Kept whatever the library's
+   * progress setting, which is only about resuming.
+   */
+  notePlayedTo({
+    id,
+    position,
+    at = new Date(),
+  }: {
+    id: number
+    position: number
+    at?: Date
+  }): void {
+    this.db.transaction(() => {
+      const play = this.sittingPlay({ id, at })
+      this.db
+        .prepare('UPDATE plays SET played_at = ?, furthest = MAX(furthest, ?) WHERE id = ?')
+        .run(at.toISOString(), position, play)
+    })()
+  }
+
+  /**
+   * A library's played videos, each once, by when it last played. One counts
+   * as watched once a play got past the library's watched percentage; one
+   * whose length is still unknown never does.
+   */
+  history({
+    libraryId,
+    limit,
+    watchedOnly = false,
+  }: {
+    libraryId: number
+    limit: number
+    watchedOnly?: boolean
+  }): HistoryRecord[] {
+    const rows = this.db
+      .prepare<[number, number], HistoryRow>(
+        `SELECT pl.media_id AS id, MAX(pl.played_at) AS last_played_at, COUNT(*) AS plays,
+                MAX(pl.furthest) AS furthest,
+                CASE WHEN m.duration > 0
+                      AND MAX(pl.furthest) >= m.duration * l.watched_percent / 100.0
+                     THEN 1 ELSE 0 END AS watched
+           FROM plays pl
+           JOIN media m ON m.id = pl.media_id
+           JOIN libraries l ON l.id = m.library_id
+          WHERE m.library_id = ?
+          GROUP BY pl.media_id
+          ${watchedOnly ? 'HAVING watched = 1' : ''}
+          ORDER BY last_played_at DESC, pl.media_id DESC
+          LIMIT ?`,
+      )
+      .all(libraryId, limit)
+    const records = new Map(
+      this.db
+        .prepare<[string], MediaRow>(
+          `${SELECT_MEDIA} WHERE m.id IN (SELECT value FROM json_each(?))`,
+        )
+        .all(JSON.stringify(rows.map((row) => row.id)))
+        .map((row) => [row.id, toRecord(row)]),
+    )
+    return rows.flatMap((row) => {
+      const record = records.get(row.id)
+      return record
+        ? [
+            {
+              record,
+              lastPlayedAt: row.last_played_at,
+              plays: row.plays,
+              furthest: row.furthest,
+              watched: row.watched === 1,
+            },
+          ]
+        : []
+    })
   }
 
   idsForLibrary(libraryId: number): number[] {

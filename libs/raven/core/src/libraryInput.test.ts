@@ -89,6 +89,30 @@ describe('validateLibraryInput', () => {
     })
   })
 
+  it('keeps a watched percentage that is a whole number from 1 to 100', () => {
+    const result = validateLibraryInput({
+      name: 'Clips',
+      paths: ['/media/clips'],
+      settings: { watchedPercent: 75 },
+    })
+    expect(result).toEqual({
+      ok: true,
+      value: { name: 'Clips', paths: ['/media/clips'], settings: { watchedPercent: 75 } },
+    })
+  })
+
+  it.each([0, 101, 90.5, '90'])('rejects %p as a watched percentage', (watchedPercent) => {
+    const result = validateLibraryInput({
+      name: 'Clips',
+      paths: ['/media/clips'],
+      settings: { watchedPercent },
+    })
+    expect(result).toEqual({
+      ok: false,
+      errors: ['Watched at must be a whole percentage from 1 to 100.'],
+    })
+  })
+
   it('rejects settings that are not an object', () => {
     const result = validateLibraryInput({ name: 'Clips', paths: ['/media/clips'], settings: 'off' })
     expect(result).toEqual({ ok: false, errors: ['Settings must be an object.'] })

@@ -41,6 +41,8 @@ export type LibrarySettings = {
   view: LibraryView
   /** What the grouped view buckets videos by. */
   groupBy: MediaGroupBy
+  /** How far into a video, as a whole percentage, a play must get for it to count as watched. */
+  watchedPercent: number
 }
 
 export type LibraryView = 'grid' | 'list' | 'tiles' | 'grouped'
@@ -90,6 +92,17 @@ export type MediaItem = {
   position: number
   favourite: boolean
   addedAt: string
+}
+
+/** A video in a library's history: when it last played, how often, and how far it got. */
+export type HistoryEntry = {
+  media: MediaItem
+  lastPlayedAt: string
+  plays: number
+  /** The furthest any play got, in seconds. */
+  furthest: number
+  /** Whether a play got past the library's watched percentage. */
+  watched: boolean
 }
 
 /**

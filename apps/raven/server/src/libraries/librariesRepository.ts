@@ -6,6 +6,7 @@ import {
   isLibraryView,
   isMediaGroupBy,
   isMediaSort,
+  isWatchedPercent,
 } from '@raven/core'
 import { DatabaseService } from '@/db/database'
 
@@ -29,6 +30,7 @@ type LibraryRow = {
   sort: string
   view_mode: string
   group_by: string
+  watched_percent: number
 }
 
 /** A row's settings; a value the database holds but this version does not know falls back to the default. */
@@ -38,15 +40,21 @@ const toSettings = (row: LibraryRow): LibrarySettings => ({
   sort: isMediaSort(row.sort) ? row.sort : DEFAULT_LIBRARY_SETTINGS.sort,
   view: isLibraryView(row.view_mode) ? row.view_mode : DEFAULT_LIBRARY_SETTINGS.view,
   groupBy: isMediaGroupBy(row.group_by) ? row.group_by : DEFAULT_LIBRARY_SETTINGS.groupBy,
+  watchedPercent: isWatchedPercent(row.watched_percent)
+    ? row.watched_percent
+    : DEFAULT_LIBRARY_SETTINGS.watchedPercent,
 })
 
 /** The settings columns in the order the statements below bind them. */
-const settingValues = (settings: LibrarySettings): [number, number, string, string, string] => [
+const settingValues = (
+  settings: LibrarySettings,
+): [number, number, string, string, string, number] => [
   Number(settings.saveProgress),
   Number(settings.pinned),
   settings.sort,
   settings.view,
   settings.groupBy,
+  settings.watchedPercent,
 ]
 
 type PathRow = {
@@ -67,6 +75,7 @@ export class LibrariesRepository {
     const libraries = this.db
       .prepare<[number | null, number | null], LibraryRow>(
         `SELECT l.id, l.name, l.created_at, l.save_progress, l.pinned, l.sort, l.view_mode, l.group_by,
+                l.watched_percent,
                 (SELECT COUNT(*) FROM media m WHERE m.library_id = l.id) AS item_count
            FROM libraries l
           WHERE ? IS NULL OR l.id = ?
@@ -111,8 +120,9 @@ export class LibrariesRepository {
     const id = this.db.transaction(() => {
       const result = this.db
         .prepare(
-          `INSERT INTO libraries (name, created_at, save_progress, pinned, sort, view_mode, group_by)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO libraries (name, created_at, save_progress, pinned, sort, view_mode, group_by,
+                                  watched_percent)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(input.name, new Date().toISOString(), ...settingValues(settings))
       const created = Number(result.lastInsertRowid)
@@ -137,7 +147,8 @@ export class LibrariesRepository {
       this.db
         .prepare(
           `UPDATE libraries
-              SET name = ?, save_progress = ?, pinned = ?, sort = ?, view_mode = ?, group_by = ?
+              SET name = ?, save_progress = ?, pinned = ?, sort = ?, view_mode = ?, group_by = ?,
+                  watched_percent = ?
             WHERE id = ?`,
         )
         .run(input.name, ...settingValues(settings), id)

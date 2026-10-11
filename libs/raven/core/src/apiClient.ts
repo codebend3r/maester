@@ -1,5 +1,6 @@
 import {
   isDirectoryListing,
+  isHistory,
   isLibrary,
   isLibraryList,
   isMediaItem,
@@ -13,6 +14,7 @@ import { toQueryString } from '@/query'
 import { parseWebVtt } from '@/subtitles'
 import type {
   DirectoryListing,
+  HistoryEntry,
   Library,
   LibraryInput,
   MediaItem,
@@ -216,6 +218,34 @@ export const createApiClient = ({
     /** Every favourite across every library, most recently favourited first. */
     listFavourites: (): Promise<MediaItem[]> =>
       expect({ request: send({ path: '/api/favourites' }), guard: isMediaList }),
+
+    /** Notes that a video started playing, for its library's history. */
+    recordPlay: async (id: number): Promise<void> => {
+      await send({ path: `/api/media/${id}/plays`, method: 'POST' })
+    },
+
+    /**
+     * A library's played videos by when they last played, most recent first,
+     * at most `limit` of them; `watchedOnly` keeps those that count as watched.
+     */
+    listHistory: ({
+      libraryId,
+      limit,
+      watchedOnly = false,
+    }: {
+      libraryId: number
+      limit: number
+      watchedOnly?: boolean
+    }): Promise<HistoryEntry[]> => {
+      const query = toQueryString({
+        limit: String(limit),
+        ...(watchedOnly ? { watched: 'true' } : {}),
+      })
+      return expect({
+        request: send({ path: `/api/libraries/${libraryId}/history?${query}` }),
+        guard: isHistory,
+      })
+    },
 
     /** Removes the file from disk and the video from its library. */
     deleteMedia: async (id: number): Promise<void> => {

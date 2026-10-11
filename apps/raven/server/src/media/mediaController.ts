@@ -13,6 +13,7 @@ import {
   NotFoundException,
   Param,
   ParseIntPipe,
+  Post,
   Put,
   Query,
   Req,
@@ -77,7 +78,16 @@ export class MediaController {
     if (!isRecord(body) || !isNumber(body.position) || body.position < 0) {
       throw new BadRequestException('position must be a number of seconds')
     }
+    this.media.notePlayedTo({ id, position: body.position })
     this.media.saveProgress({ id, position: body.position })
+  }
+
+  /** The player says a video started, for its library's history. */
+  @Post(':id/plays')
+  @HttpCode(204)
+  recordPlay(@Param('id', ParseIntPipe) id: number): void {
+    this.find(id)
+    this.media.recordPlay({ id })
   }
 
   @Put(':id/favourite')

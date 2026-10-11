@@ -90,6 +90,30 @@ describe('createApiClient', () => {
     expect(calls[0]?.url).toBe('http://nas:8484/api/favourites')
   })
 
+  it('records that a video started playing', async () => {
+    const { client, calls } = clientReturning(respond({ status: 204 }))
+    await client.recordPlay(6)
+    expect(calls[0]).toMatchObject({
+      url: 'http://nas:8484/api/media/6/plays',
+      init: { method: 'POST' },
+    })
+  })
+
+  it("lists a library's history, asking for as many as it wants", async () => {
+    const entry = {
+      media: mediaItem(),
+      lastPlayedAt: '2026-10-10T19:00:00.000Z',
+      plays: 1,
+      furthest: 30,
+      watched: false,
+    }
+    const { client, calls } = clientReturning(respond({ body: [entry] }))
+    await expect(client.listHistory({ libraryId: 3, limit: 50 })).resolves.toEqual([entry])
+    expect(calls[0]?.url).toBe('http://nas:8484/api/libraries/3/history?limit=50')
+    await client.listHistory({ libraryId: 3, limit: 50, watchedOnly: true })
+    expect(calls[1]?.url).toBe('http://nas:8484/api/libraries/3/history?limit=50&watched=true')
+  })
+
   it('deletes a video', async () => {
     const { client, calls } = clientReturning(respond({ status: 204 }))
     await client.deleteMedia(9)
