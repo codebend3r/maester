@@ -20,6 +20,30 @@
   --color-scrim: rgb(0 0 0 / 55%);
   // The dark track under a line drawn over a picture (the resume line).
   --color-shade: rgb(0 0 0 / 45%);
+  // The ground as glass over a picture: the bezel, score chips over posters.
+  --color-night-glass: rgb(21 32 30 / 72%);
+  // Deep enough to read bark-white subtitles over snow.
+  --color-night-veil: rgb(21 32 30 / 78%);
+  // The canopy over the picture: the player's settings menu, and a control
+  // button under the pointer.
+  --color-canopy-glass: rgb(28 43 40 / 96%);
+  --color-canopy-haze: rgb(28 43 40 / 85%);
+  // Faint marks over the picture: the timeline's track and the spinner's
+  // ring, and what of the timeline is loaded.
+  --color-bark-faint: rgb(230 225 214 / 22%);
+  --color-lichen-faint: rgb(157 176 168 / 45%);
+  // Darkness rising from the bottom of the picture, or falling from its top,
+  // so the controls and the title read over anything.
+  --fade-from-bottom: linear-gradient(to top, rgb(0 0 0 / 75%), rgb(0 0 0 / 0%));
+  --fade-from-top: linear-gradient(to bottom, rgb(0 0 0 / 70%), rgb(0 0 0 / 0%));
+
+  // Shadows under what floats: a menu, and a larger panel or poster.
+  --shadow-menu: 0 8px 24px rgb(0 0 0 / 40%);
+  --shadow-panel: 0 12px 32px rgb(0 0 0 / 45%);
+  // A hairline that keeps a light mark apart from a light picture.
+  --shadow-outline: 0 0 0 2px rgb(0 0 0 / 35%);
+  // Lifts subtitle text off a bright frame.
+  --shadow-text: 0 1px 2px rgb(0 0 0 / 60%);
 
   --space-0: 0.25rem;
   --space-1: 0.5rem;

@@ -9,10 +9,16 @@
   min-width: 5.5rem;
   padding: var(--space-3) var(--space-3) var(--space-2);
   border-radius: 999px;
-  background: rgb(21 32 30 / 72%);
+  background: var(--color-night-glass);
   color: var(--color-bark);
   pointer-events: none;
-  animation: bezel 700ms ease-out forwards;
+  // Without motion it stays out of sight, as it always ended; the player's
+  // live region says the same words.
+  opacity: 0;
+
+  @media (prefers-reduced-motion: no-preference) {
+    animation: bezel 700ms ease-out forwards;
+  }
 }
 
 .text {

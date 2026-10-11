@@ -40,8 +40,21 @@
 .form {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 6rem auto;
+  grid-template-areas: 'title year submit';
   align-items: end;
   gap: var(--space-1);
+}
+
+.titleField {
+  grid-area: title;
+}
+
+.yearField {
+  grid-area: year;
+}
+
+.submit {
+  grid-area: submit;
 }
 
 .field {
@@ -67,10 +80,9 @@
 @media (max-width: 30rem) {
   .form {
     grid-template-columns: minmax(0, 1fr) 5rem;
-  }
-
-  .submit {
-    grid-column: 1 / -1;
+    grid-template-areas:
+      'title year'
+      'submit submit';
   }
 }
 

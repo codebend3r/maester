@@ -124,7 +124,7 @@ export const FixMatchDialog = <T,>({
 
         <search>
           <form className={styles.form} onSubmit={search}>
-            <div className={styles.field}>
+            <div className={`${styles.field} ${styles.titleField}`}>
               <label htmlFor={ids.query}>Title</label>
               <input
                 id={ids.query}
@@ -134,7 +134,7 @@ export const FixMatchDialog = <T,>({
                 autoComplete="off"
               />
             </div>
-            <div className={styles.field}>
+            <div className={`${styles.field} ${styles.yearField}`}>
               <label htmlFor={ids.year}>Year</label>
               <input
                 id={ids.year}

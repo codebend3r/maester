@@ -31,10 +31,14 @@
   z-index: 1;
   width: 3rem;
   height: 3rem;
-  border: 3px solid rgb(230 225 214 / 18%);
+  border: 3px solid var(--color-bark-faint);
   border-top-color: var(--color-leaf-bright);
   border-radius: 50%;
-  animation: spin 900ms linear infinite;
+
+  @media (prefers-reduced-motion: no-preference) {
+    animation: spin 900ms linear infinite;
+  }
+
   pointer-events: none;
 }
 
@@ -59,8 +63,11 @@
   gap: var(--space-1) var(--space-2);
   align-items: center;
   padding: var(--space-3) clamp(var(--space-3), 3vw, var(--space-5)) var(--space-6);
-  background: linear-gradient(to bottom, rgb(0 0 0 / 70%), rgb(0 0 0 / 0%));
-  transition: opacity 250ms ease-out;
+  background: var(--fade-from-top);
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition: opacity 250ms ease-out;
+  }
 }
 
 .chromeHidden {
