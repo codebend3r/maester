@@ -19,34 +19,6 @@
   color: var(--color-leaf-bright);
 }
 
-.summary {
-  display: grid;
-  justify-items: start;
-  gap: var(--space-1);
-  max-width: 48rem;
-}
-
-.tagline {
-  color: var(--color-lichen);
-  font-style: italic;
-}
-
-.text {
-  line-height: var(--line-body);
-}
-
-.clamped {
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.more {
-  min-height: 2rem;
-  padding: 0 var(--space-2);
-}
-
 .file {
   display: grid;
 }

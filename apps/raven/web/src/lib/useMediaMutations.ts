@@ -12,6 +12,7 @@ import { queryKeys } from '@/lib/queryClient'
 export const useMediaMutations = ({ media }: { media: MediaItem }) => {
   const queryClient = useQueryClient()
   const lists = { queryKey: queryKeys.mediaLists(media.libraryId) }
+  const showLists = { queryKey: queryKeys.showLists(media.libraryId) }
   const without = (items: MediaItem[] | undefined): MediaItem[] | undefined =>
     items?.filter((item) => item.id !== media.id)
 
@@ -26,6 +27,7 @@ export const useMediaMutations = ({ media }: { media: MediaItem }) => {
       return Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.favourites }),
         queryClient.invalidateQueries({ queryKey: queryKeys.items }),
+        queryClient.invalidateQueries(showLists),
       ])
     },
   })
@@ -39,6 +41,7 @@ export const useMediaMutations = ({ media }: { media: MediaItem }) => {
       return Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.libraries }),
         queryClient.invalidateQueries({ queryKey: queryKeys.items }),
+        queryClient.invalidateQueries(showLists),
       ])
     },
   })
@@ -50,6 +53,7 @@ export const useMediaMutations = ({ media }: { media: MediaItem }) => {
       queryClient.setQueryData(queryKeys.item(details.id), details)
       return Promise.all([
         queryClient.invalidateQueries({ queryKey: lists.queryKey }),
+        queryClient.invalidateQueries(showLists),
         queryClient.invalidateQueries({ queryKey: queryKeys.items }),
       ])
     },

@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { Library, LibraryInput, LibrarySettings, MediaItem, MediaSort } from '@raven/core'
 import { Route, Routes, useParams } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { LibraryPage } from '@/pages/LibraryPage/LibraryPage'
-import { library, mediaItem } from '@/test/fixtures'
+import { library, mediaItem, showEntry } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 
 const WIDE = mediaItem({ id: 1, title: 'Wide', width: 3840, height: 2160 })
@@ -140,5 +140,63 @@ describe('LibraryPage', () => {
     await screen.findByText(/No videos in these folders yet/)
     expect(screen.getByRole('button', { name: 'Play' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Shuffle' })).toBeDisabled()
+  })
+})
+
+describe('LibraryPage for TV shows', () => {
+  const spies = {
+    get: spyOn(api, 'getLibrary'),
+    shows: spyOn(api, 'listShows'),
+    list: spyOn(api, 'listMedia'),
+  }
+
+  afterEach(() => {
+    spies.get.mockReset()
+    spies.shows.mockReset()
+    spies.list.mockReset()
+  })
+
+  const serve = () => {
+    spies.get.mockImplementation(async () =>
+      library({ id: 2, name: 'TV', settings: { ...library().settings, kind: 'shows' } }),
+    )
+    spies.shows.mockImplementation(async () => ({
+      shows: [showEntry()],
+      unmatched: [mediaItem({ id: 30, title: 'Unknown Show - S01E01', match: 'unmatched' })],
+    }))
+    renderWithProviders(
+      <Routes>
+        <Route path="libraries/:id" element={<LibraryPage />} />
+        <Route path="watch/:id" element={<Watching />} />
+      </Routes>,
+      { route: '/libraries/2' },
+    )
+  }
+
+  it('lists shows as posters, with the files no show was found for after', async () => {
+    serve()
+    expect(await screen.findByRole('link', { name: 'Severance' })).toHaveAttribute(
+      'href',
+      '/shows/4',
+    )
+    expect(screen.getByRole('heading', { name: 'Not matched' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Unknown Show - S01E01' })).toHaveAttribute(
+      'href',
+      '/watch/30',
+    )
+    expect(spies.list).not.toHaveBeenCalled()
+  })
+
+  it('offers no file sorts and no grouped view, and plays the next episode', async () => {
+    serve()
+    await screen.findByRole('link', { name: 'Severance' })
+    const sorts = within(screen.getByLabelText('Sort'))
+      .getAllByRole('option')
+      .map((o) => o.textContent)
+    expect(sorts).toContain('Newest release')
+    expect(sorts).not.toContain('Largest file')
+    expect(screen.queryByRole('button', { name: 'Grouped' })).toBeNull()
+    await userEvent.click(screen.getByRole('button', { name: 'Play' }))
+    expect(screen.getByText('Watching 12')).toBeInTheDocument()
   })
 })

@@ -1,4 +1,4 @@
-import type { Credit, ItemSummary, MediaItem, Rating, ScanStatus } from '@raven/core'
+import type { Credit, ItemSummary, MediaItem, Rating, ScanStatus, ShowEntry } from '@raven/core'
 
 /**
  * Made-up videos for the design page. Negative ids never match a real
@@ -158,6 +158,35 @@ export const SAMPLE_MOVIES: MediaItem[] = [
     versions: 2,
   }),
   sample({ id: -13, title: 'Ravens of the North', year: 2024, match: 'unmatched' }),
+]
+
+/** A TV library's cards: one still airing with an episode to watch next, one ended and all watched. */
+export const SAMPLE_SHOWS: ShowEntry[] = [
+  {
+    show: { ...sampleMovie({ id: -21, title: 'The Long Winter' }), type: 'show', year: 2019 },
+    episodes: 18,
+    endedYear: null,
+    addedAt: '2026-10-02T12:00:00.000Z',
+    next: sample({
+      id: -22,
+      title: 'The Long Winter - S02E03 - Thaw',
+      match: 'matched',
+      item: {
+        ...sampleMovie({ id: -23, title: 'Thaw' }),
+        type: 'episode',
+        show: { id: -21, title: 'The Long Winter' },
+        season: 2,
+        episode: 3,
+      },
+    }),
+  },
+  {
+    show: { ...sampleMovie({ id: -24, title: 'Ravens of the North' }), type: 'show', year: 2014 },
+    episodes: 10,
+    endedYear: 2016,
+    addedAt: '2026-09-14T09:00:00.000Z',
+    next: null,
+  },
 ]
 
 export const SAMPLE_RATINGS: Rating[] = [

@@ -27,21 +27,24 @@ export const ItemHeader = ({
   contentRating: string | null
   facts: readonly string[]
   ratings: readonly Rating[]
-  poster: string | null
+  /** The poster's URL, null for none yet, or left out for a page with no poster at all (an episode's). */
+  poster?: string | null
   backdrop: string | null
   /** The page's actions: Play, favourite, the menu. */
   children?: ReactNode
 }) => (
   <header className={styles.hero}>
     {backdrop && <img className={styles.backdrop} src={backdrop} alt="" decoding="async" />}
-    <div className={styles.content}>
-      <div className={styles.poster}>
-        {poster ? (
-          <img src={poster} alt="" decoding="async" />
-        ) : (
-          <span aria-hidden="true">{title.slice(0, 1)}</span>
-        )}
-      </div>
+    <div className={poster === undefined ? `${styles.content} ${styles.noPoster}` : styles.content}>
+      {poster !== undefined && (
+        <div className={styles.poster}>
+          {poster ? (
+            <img src={poster} alt="" decoding="async" />
+          ) : (
+            <span aria-hidden="true">{title.slice(0, 1)}</span>
+          )}
+        </div>
+      )}
       <div className={styles.details}>
         <h1 id={titleId} className={styles.title}>
           {title}

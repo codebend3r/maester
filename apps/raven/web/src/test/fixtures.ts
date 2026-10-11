@@ -1,4 +1,4 @@
-import type { ItemDetails, ItemSummary, Library, MediaItem } from '@raven/core'
+import type { ItemDetails, ItemSummary, Library, MediaItem, ShowEntry } from '@raven/core'
 
 export const library = (overrides: Partial<Library> = {}): Library => ({
   id: 2,
@@ -95,5 +95,28 @@ export const itemDetails = (overrides: Partial<ItemDetails> = {}): ItemDetails =
   ],
   versions: [matchedMovie()],
   children: [],
+  ...overrides,
+})
+
+export const showEntry = (overrides: Partial<ShowEntry> = {}): ShowEntry => ({
+  show: itemSummary({ id: 4, type: 'show', title: 'Severance', year: 2022, posterVersion: 'p1' }),
+  episodes: 9,
+  endedYear: null,
+  addedAt: '2026-09-27T00:00:00.000Z',
+  next: mediaItem({
+    id: 12,
+    title: 'Severance - S01E02 - Half Loop',
+    match: 'matched',
+    item: itemSummary({
+      id: 6,
+      type: 'episode',
+      title: 'Half Loop',
+      year: 2022,
+      show: { id: 4, title: 'Severance' },
+      season: 1,
+      episode: 2,
+      posterVersion: null,
+    }),
+  }),
   ...overrides,
 })

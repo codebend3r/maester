@@ -1,6 +1,7 @@
 import { type MediaItem, formatRuntime, mediaLabel, resolutionLabel } from '@raven/core'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import type { MatchType } from '@/components/FixMatchDialog/FixMatchDialog'
 import { Icon } from '@/components/Icon/Icon'
 import { MediaMenu } from '@/components/MediaMenu/MediaMenu'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
@@ -14,7 +15,14 @@ import styles from '@/components/MediaCard/MediaCard.module.scss'
  * another request. A right click on it, or the button in the corner, opens
  * the card's menu.
  */
-export const MediaCard = ({ media }: { media: MediaItem }) => {
+export const MediaCard = ({
+  media,
+  matchType = null,
+}: {
+  media: MediaItem
+  /** What the library matches its files to, for the menu's Fix match. */
+  matchType?: MatchType | null
+}) => {
   const [menuOpen, setMenuOpen] = useState(false)
   const thumbnail = api.thumbnailUrl(media)
   const progress = progressOf(media)
@@ -70,7 +78,7 @@ export const MediaCard = ({ media }: { media: MediaItem }) => {
         {progress > 0 && <span className="visually-hidden">Partly watched</span>}
       </span>
       <PlaybackNote media={media} />
-      <MediaMenu media={media} open={menuOpen} onOpenChange={setMenuOpen} />
+      <MediaMenu media={media} open={menuOpen} onOpenChange={setMenuOpen} matchType={matchType} />
     </li>
   )
 }

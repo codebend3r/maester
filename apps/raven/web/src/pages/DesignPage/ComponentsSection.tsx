@@ -14,6 +14,7 @@ import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
 import { Controls } from '@/components/Player/Controls'
 import { RatingChips } from '@/components/RatingChips/RatingChips'
 import { ScanStatus } from '@/components/ScanStatus/ScanStatus'
+import { ShowGrid } from '@/components/ShowCard/ShowCard'
 import { DesignSection, Specimen } from '@/pages/DesignPage/DesignSection'
 import {
   FEATURED_SAMPLE,
@@ -22,6 +23,7 @@ import {
   SAMPLE_MOVIES,
   SAMPLE_RATINGS,
   SAMPLE_SCANS,
+  SAMPLE_SHOWS,
 } from '@/pages/DesignPage/samples'
 import styles from '@/pages/DesignPage/DesignPage.module.scss'
 
@@ -151,6 +153,13 @@ export const ComponentsSection = () => (
       note="A Movies library's cards: with no poster they fall back to the frame grab, then the letter."
     >
       <MediaGrid items={SAMPLE_MOVIES} posters />
+    </Specimen>
+
+    <Specimen
+      name="ShowCard"
+      note="A TV library's cards: the years, the episode count, and Play for the next episode."
+    >
+      <ShowGrid shows={SAMPLE_SHOWS} />
     </Specimen>
 
     <Specimen name="ItemHeader" note="The top of a movie's page, without its backdrop here.">

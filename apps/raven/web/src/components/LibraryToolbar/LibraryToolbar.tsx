@@ -32,9 +32,31 @@ const SORTS: Record<MediaSort, string> = {
 /** Release years come from names, which only Movies and TV shows libraries read. */
 const YEAR_SORTS: ReadonlySet<MediaSort> = new Set(['year-new', 'year-old'])
 
+/** Sorts that only mean something per file, which a TV library's show cards cannot use. */
+const FILE_SORTS: ReadonlySet<MediaSort> = new Set([
+  'largest',
+  'smallest',
+  'bitrate-high',
+  'bitrate-low',
+  'resolution-high',
+  'resolution-low',
+])
+
 /** The sorts a library offers; the one it has stays on offer whatever its type. */
 const sortsFor = ({ kind, sort }: LibrarySettings): MediaSort[] =>
-  MEDIA_SORTS.filter((option) => kind !== 'other' || !YEAR_SORTS.has(option) || option === sort)
+  MEDIA_SORTS.filter(
+    (option) =>
+      option === sort ||
+      (kind === 'other'
+        ? !YEAR_SORTS.has(option)
+        : kind === 'shows'
+          ? !FILE_SORTS.has(option)
+          : true),
+  )
+
+/** A TV library lays its shows out as posters, so it has no grouped view. */
+const viewsFor = ({ kind, view }: LibrarySettings): LibraryView[] =>
+  LIBRARY_VIEWS.filter((option) => option === view || kind !== 'shows' || option !== 'grouped')
 
 const VIEWS: Record<LibraryView, { label: string; icon: IconName }> = {
   grid: { label: 'Grid', icon: 'grid' },
@@ -144,7 +166,7 @@ export const LibraryToolbar = ({
 
       <fieldset className={styles.views}>
         <legend className="visually-hidden">View</legend>
-        {LIBRARY_VIEWS.map((view) => (
+        {viewsFor(settings).map((view) => (
           <Button
             key={view}
             icon={VIEWS[view].icon}

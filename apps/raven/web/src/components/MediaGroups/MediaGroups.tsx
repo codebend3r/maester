@@ -1,5 +1,6 @@
 import { type MediaGroupBy, type MediaItem, groupMedia } from '@raven/core'
 import { useId } from 'react'
+import type { MatchType } from '@/components/FixMatchDialog/FixMatchDialog'
 import { MediaGrid } from '@/components/MediaGrid/MediaGrid'
 import styles from '@/components/MediaGroups/MediaGroups.module.scss'
 
@@ -11,11 +12,13 @@ export const MediaGroups = ({
   by,
   busy = false,
   posters = false,
+  matchType = null,
 }: {
   items: MediaItem[]
   by: MediaGroupBy
   busy?: boolean
   posters?: boolean
+  matchType?: MatchType | null
 }) => {
   const id = useId()
   return (
@@ -29,7 +32,7 @@ export const MediaGroups = ({
               {count.format(group.items.length)} {group.items.length === 1 ? 'video' : 'videos'}
             </span>
           </h2>
-          <MediaGrid items={group.items} posters={posters} />
+          <MediaGrid items={group.items} posters={posters} matchType={matchType} />
         </section>
       ))}
     </div>

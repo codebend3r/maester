@@ -31,6 +31,12 @@
   padding: var(--space-8) var(--space-4) 0;
 }
 
+// An episode's page has a still for a backdrop and no poster.
+.noPoster {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: 'details';
+}
+
 .poster {
   grid-area: poster;
   display: grid;

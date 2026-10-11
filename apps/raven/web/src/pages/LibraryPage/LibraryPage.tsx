@@ -3,6 +3,7 @@ import {
   ApiError,
   DEFAULT_LIBRARY_SETTINGS,
   type Library,
+  type LibraryKind,
   type LibrarySettings,
   type MediaItem,
   groupMedia,
@@ -10,6 +11,7 @@ import {
 import { useId, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button, ButtonLink } from '@/components/Button/Button'
+import type { MatchType } from '@/components/FixMatchDialog/FixMatchDialog'
 import { LibraryDialog } from '@/components/LibraryDialog/LibraryDialog'
 import { LibraryToolbar } from '@/components/LibraryToolbar/LibraryToolbar'
 import { MediaGrid } from '@/components/MediaGrid/MediaGrid'
@@ -17,6 +19,7 @@ import { MediaGroups } from '@/components/MediaGroups/MediaGroups'
 import { MediaList } from '@/components/MediaList/MediaList'
 import { MediaTiles } from '@/components/MediaTiles/MediaTiles'
 import { ScanStatus } from '@/components/ScanStatus/ScanStatus'
+import { ShowGrid } from '@/components/ShowCard/ShowCard'
 import { api } from '@/lib/api'
 import { KIND_LABELS } from '@/lib/libraryKinds'
 import { queryKeys } from '@/lib/queryClient'
@@ -43,7 +46,14 @@ const firstShown = ({
         .at(0)
     : items.at(0)
 
-/** The library's videos laid out the way its view setting says; a Movies library's as posters. */
+/** What a library's files are matched to, for the cards' Fix match. */
+const matchTypeOf = (kind: LibraryKind): MatchType | null =>
+  kind === 'movies' ? 'movie' : kind === 'shows' ? 'show' : null
+
+/**
+ * The library's videos laid out the way its view setting says: a Movies
+ * library's as posters, and a TV library's leftover files never grouped.
+ */
 const MediaView = ({
   settings,
   items,
@@ -54,17 +64,28 @@ const MediaView = ({
   busy: boolean
 }) => {
   const movies = settings.kind === 'movies'
-  if (settings.view === 'list') return <MediaList items={items} busy={busy} movies={movies} />
-  if (settings.view === 'tiles') return <MediaTiles items={items} busy={busy} posters={movies} />
-  if (settings.view === 'grouped')
-    return <MediaGroups items={items} by={settings.groupBy} busy={busy} posters={movies} />
-  return <MediaGrid items={items} busy={busy} posters={movies} />
+  const matchType = matchTypeOf(settings.kind)
+  if (settings.view === 'list')
+    return <MediaList items={items} busy={busy} movies={movies} matchType={matchType} />
+  if (settings.view === 'tiles')
+    return <MediaTiles items={items} busy={busy} posters={movies} matchType={matchType} />
+  if (settings.view === 'grouped' && settings.kind !== 'shows')
+    return (
+      <MediaGroups
+        items={items}
+        by={settings.groupBy}
+        busy={busy}
+        posters={movies}
+        matchType={matchType}
+      />
+    )
+  return <MediaGrid items={items} busy={busy} posters={movies} matchType={matchType} />
 }
 
 export const LibraryPage = () => {
   const params = useParams()
   const libraryId = Number(params.id)
-  const ids = { title: useId() }
+  const ids = { title: useId(), unmatched: useId() }
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
@@ -90,11 +111,25 @@ export const LibraryPage = () => {
     staleTime: 60_000,
   })
   const matching = metadata.data?.tmdb === 'ok'
+  const tv = settings.kind === 'shows'
+
+  // A TV library lists its shows, with the files no show was found for after.
+  const showsQuery = useQuery({
+    queryKey: queryKeys.shows({ libraryId, search: query, sort, seed: dealt }),
+    queryFn: () => api.listShows({ libraryId, search: query, sort, seed: dealt }),
+    enabled: library.isSuccess && tv,
+    placeholderData: keepPreviousData,
+    refetchInterval: (current) =>
+      scanning ||
+      (matching && current.state.data?.unmatched.some((item) => item.match === 'pending'))
+        ? 3000
+        : false,
+  })
 
   const media = useQuery({
     queryKey: queryKeys.media({ libraryId, search: query, sort, seed: dealt }),
     queryFn: () => api.listMedia({ libraryId, search: query, sort, seed: dealt }),
-    enabled: library.isSuccess,
+    enabled: library.isSuccess && !tv,
     placeholderData: keepPreviousData,
     // While a scan runs, or thumbnails are still being made or files matched, keep the grid filling in.
     refetchInterval: (current) =>
@@ -149,13 +184,27 @@ export const LibraryPage = () => {
   }
   if (!library.data) return <p className={styles.message}>Opening the library</p>
 
-  const items = media.data ?? []
+  const shows = showsQuery.data?.shows ?? []
+  const items = tv ? (showsQuery.data?.unmatched ?? []) : (media.data ?? [])
+  const loaded = tv ? showsQuery.isSuccess : media.isSuccess
   const emptyState = ((): string | null => {
-    if (!media.isSuccess || items.length > 0) return null
+    if (!loaded || items.length > 0 || shows.length > 0) return null
     if (query) return `Nothing here matches "${query}".`
     if (scanning) return 'Looking through the folders. Videos appear here as they are found.'
     return 'No videos in these folders yet. Check the paths, or add a folder that holds videos.'
   })()
+  // In a TV library, Play and Shuffle start a show's next episode.
+  const playable = tv
+    ? shows.some((entry) => entry.next != null) || items.length > 0
+    : items.length > 0
+  const firstPlayable = (): MediaItem | undefined =>
+    tv
+      ? (shows.find((entry) => entry.next != null)?.next ?? items.at(0))
+      : firstShown({ settings, items })
+  const randomPlayable = (): MediaItem | undefined => {
+    const choices = tv ? [...shows.flatMap((entry) => entry.next ?? []), ...items] : items
+    return choices.at(Math.floor(Math.random() * choices.length))
+  }
 
   // The item rides along in router state, as a card click hands it over, so
   // the player starts without fetching it again.
@@ -205,9 +254,9 @@ export const LibraryPage = () => {
         onChange={(change) => {
           if (library.data) saveSettings.mutate({ current: library.data, change })
         }}
-        playable={items.length > 0}
-        onPlay={() => watch(firstShown({ settings, items }))}
-        onShuffle={() => watch(items.at(Math.floor(Math.random() * items.length)))}
+        playable={playable}
+        onPlay={() => watch(firstPlayable())}
+        onShuffle={() => watch(randomPlayable())}
       />
 
       {saveSettings.isError && (
@@ -216,9 +265,21 @@ export const LibraryPage = () => {
         </p>
       )}
 
-      {emptyState ? (
-        <p className={styles.message}>{emptyState}</p>
-      ) : (
+      {emptyState && <p className={styles.message}>{emptyState}</p>}
+      {!emptyState && tv && (
+        <>
+          <ShowGrid shows={shows} busy={showsQuery.isFetching && !showsQuery.data} />
+          {items.length > 0 && (
+            <section className={styles.unmatched} aria-labelledby={ids.unmatched}>
+              <h2 id={ids.unmatched} className={styles.subheading}>
+                Not matched
+              </h2>
+              <MediaView settings={settings} items={items} busy={false} />
+            </section>
+          )}
+        </>
+      )}
+      {!emptyState && !tv && (
         <MediaView settings={settings} items={items} busy={media.isFetching && !media.data} />
       )}
 
