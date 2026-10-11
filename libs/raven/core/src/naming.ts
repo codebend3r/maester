@@ -256,8 +256,16 @@ export const foldTitle = (title: string): string =>
     .join(' ')
     .trim()
 
-/** A title as it sorts: without a leading "The", "A" or "An". */
-export const sortTitle = (title: string): string => title.trim().replace(LEADING_ARTICLE, '')
+/** Quotes, brackets and other marks before a title's first letter or digit. */
+const LEADING_PUNCTUATION = /^[^\p{L}\p{N}]+/u
+
+/**
+ * A title as it sorts: without the quotes or punctuation it opens with, nor
+ * a leading "The", "A" or "An", so “Wuthering Heights” sits under W and
+ * "(500) Days of Summer" under 5.
+ */
+export const sortTitle = (title: string): string =>
+  title.trim().replace(LEADING_PUNCTUATION, '').replace(LEADING_ARTICLE, '')
 
 export type ParsedEpisodeName = {
   show: string

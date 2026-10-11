@@ -203,6 +203,7 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
    * library gets a pass for what is pending, and the sweep starts.
    */
   onApplicationBootstrap(): void {
+    this.metadata.resortTitles()
     this.libraries
       .list()
       .filter((library) => MATCHED_KINDS.includes(library.settings.kind))

@@ -180,6 +180,14 @@ describe('sortTitle', () => {
     expect(sortTitle('An American Werewolf in London')).toBe('American Werewolf in London')
     expect(sortTitle('Annie Hall')).toBe('Annie Hall')
   })
+
+  it('ignores the quotes and punctuation a title opens with', () => {
+    expect(sortTitle('“Wuthering Heights”')).toBe('Wuthering Heights”')
+    expect(sortTitle('"The Matrix"')).toBe('Matrix"')
+    expect(sortTitle('(500) Days of Summer')).toBe('500) Days of Summer')
+    expect(sortTitle('...And Justice for All')).toBe('And Justice for All')
+    expect(sortTitle('¡Three Amigos!')).toBe('Three Amigos!')
+  })
 })
 
 describe('seasonFolderNumber', () => {
