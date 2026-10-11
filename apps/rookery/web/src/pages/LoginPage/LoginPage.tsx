@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { Frame } from '@/components/Frame/Frame'
 import { AuthError, startSignIn } from '@/lib/api'
 import { browser } from '@/lib/browser'
-import styles from './LoginPage.module.scss'
+import styles from '@/pages/LoginPage/LoginPage.module.scss'
 
 /** What went wrong, keyed by the `error` the server puts on `/login`, or by `AuthError.code`. */
 export const ERROR_MESSAGES: Record<string, string> = {
