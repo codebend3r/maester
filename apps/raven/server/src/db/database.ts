@@ -270,6 +270,10 @@ export const MIGRATIONS: readonly string[] = [
   UPDATE media SET changed_at = added_at;
   CREATE INDEX media_library_changed ON media (library_id, changed_at);
   `,
+  // A private library keeps its videos behind the server's PIN.
+  `
+  ALTER TABLE libraries ADD COLUMN locked INTEGER NOT NULL DEFAULT 0;
+  `,
 ]
 
 const migrate = (db: Sqlite.Database): void => {

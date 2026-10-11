@@ -814,6 +814,20 @@ export class MetadataRepository {
    * and people left with no credits. Returns what is still stored, for the
    * image cache's sweep.
    */
+  /** The libraries holding a file of the item, or of any season or episode under it. */
+  librariesHolding(itemId: number): number[] {
+    return this.db
+      .prepare<[number], { library_id: number }>(
+        `WITH RECURSIVE tree(id) AS (
+           SELECT ? UNION SELECT i.id FROM items i JOIN tree t ON i.parent_id = t.id)
+         SELECT DISTINCT m.library_id FROM tree
+           JOIN media_items mi ON mi.item_id = tree.id
+           JOIN media m ON m.id = mi.media_id`,
+      )
+      .all(itemId)
+      .map((row) => row.library_id)
+  }
+
   clearUp(): { tmdbPaths: Set<string>; itemIds: Set<number> } {
     this.db.transaction(() => {
       this.db.exec(`

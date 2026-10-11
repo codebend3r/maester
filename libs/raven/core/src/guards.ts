@@ -17,6 +17,7 @@ import type {
   LibraryKind,
   LibrarySettings,
   LibraryView,
+  LockState,
   MatchCandidate,
   MatchState,
   MediaGroupBy,
@@ -141,7 +142,8 @@ export const isLibrarySettings = (value: unknown): value is LibrarySettings =>
   isWatchedPercent(value.watchedPercent) &&
   isLibraryKind(value.kind) &&
   isShownRatings(value.ratingsSource) &&
-  isBoolean(value.autoRefresh)
+  isBoolean(value.autoRefresh) &&
+  isBoolean(value.locked)
 
 export const isLibrary = (value: unknown): value is Library =>
   isRecord(value) &&
@@ -366,6 +368,9 @@ export const isMediaList = arrayOf(isMediaItem)
 
 export const isMediaLocation = (value: unknown): value is MediaLocation =>
   isRecord(value) && isString(value.path)
+
+export const isLockState = (value: unknown): value is LockState =>
+  isRecord(value) && isBoolean(value.available) && isBoolean(value.unlocked)
 
 export const isServerEvent = (value: unknown): value is ServerEvent =>
   isRecord(value) && value.type === 'library' && isNumber(value.libraryId)

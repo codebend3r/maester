@@ -41,6 +41,8 @@ export type ServerConfig = {
   omdbApiKey: string | null
   /** OMDb calls a day; a free key allows 1,000. */
   omdbDailyLimit: number
+  /** The PIN that opens locked libraries; null leaves them shut and none can be locked. Never logged or sent to a client. */
+  libraryPin: string | null
 }
 
 /** The DI token the config is provided under. */
@@ -96,4 +98,5 @@ export const readServerConfig = (env: NodeJS.ProcessEnv = process.env): ServerCo
   metadataCountry: (env.METADATA_COUNTRY?.trim() || 'US').toUpperCase(),
   omdbApiKey: env.OMDB_API_KEY?.trim() || null,
   omdbDailyLimit: Math.max(1, wholeNumber({ value: env.OMDB_DAILY_LIMIT, fallback: 1000 })),
+  libraryPin: env.LIBRARY_PIN?.trim() || null,
 })

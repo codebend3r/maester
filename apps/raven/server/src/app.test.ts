@@ -22,12 +22,14 @@ import {
   isLibraryList,
   isMediaItem,
   isMediaList,
+  isLockState,
   isMediaLocation,
   parseServerEvent,
 } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '@/app'
 import { type ServerConfig, readServerConfig } from '@/config'
+import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { MediaRepository } from '@/media/mediaRepository'
 import { TracksService } from '@/playback/tracksService'
 import { ScannerService } from '@/scanner/scannerService'
@@ -203,6 +205,38 @@ describe('the media server', () => {
       expect(response.body).not.toContain(state.media)
     })
 
+    it('will not lock a library while the server has no PIN', async () => {
+      const response = await app().inject({
+        method: 'POST',
+        url: '/api/libraries',
+        payload: { name: 'Private', paths: [state.media], settings: { locked: true } },
+      })
+      expect(response.statusCode).toBe(400)
+      expect(response.json()).toMatchObject({
+        message: "Set LIBRARY_PIN in raven's .env to lock a library.",
+      })
+    })
+
+    it('keeps a locked library shut when the server has no PIN to open it', async () => {
+      const libraries = app().get(LibrariesRepository)
+      const current = libraries.get(library.id)
+      if (!current) throw new Error('no library')
+      const input = { name: current.name, paths: current.paths }
+      libraries.update({ id: library.id, input: { ...input, settings: { locked: true } } })
+      const media = await app().inject({
+        method: 'GET',
+        url: `/api/libraries/${library.id}/media`,
+      })
+      const unlock = await app().inject({
+        method: 'POST',
+        url: '/api/lock/unlock',
+        payload: { pin: '' },
+      })
+      libraries.update({ id: library.id, input: { ...input, settings: { locked: false } } })
+      expect(media.statusCode).toBe(423)
+      expect(unlock.statusCode).toBe(503)
+    })
+
     it("tells a client where a video's file lives when it asks", async () => {
       const [movie] = await listMedia(library.id)
       const location = expectShape({
@@ -348,6 +382,7 @@ describe('the media server', () => {
           kind: 'other',
           ratingsSource: 'tmdb',
           autoRefresh: true,
+          locked: false,
         })
       })
 
@@ -404,6 +439,7 @@ describe('the media server', () => {
           kind: 'other',
           ratingsSource: 'tmdb',
           autoRefresh: true,
+          locked: false,
         })
         expect(updated.scan.state).toBe('idle')
         expect((await putLibrary({ pinned: true })).settings.pinned).toBe(true)
@@ -821,6 +857,138 @@ describe('refreshing a library as its folders change', () => {
     await copyFile(at('Heat (1995) 1080p.mp4'), at('Unwatched.mp4'))
     await new Promise((resolve) => setTimeout(resolve, 600))
     expect(fileNames(await listMedia())).toEqual(before)
+  })
+})
+
+describe('a library locked behind the PIN', () => {
+  const state = {
+    root: '',
+    open: 0,
+    private: 0,
+    privateVideo: 0,
+    app: null as NestFastifyApplication | null,
+  }
+  const app = (): NestFastifyApplication => {
+    if (!state.app) throw new Error('app not started')
+    return state.app
+  }
+  const at = (...parts: string[]) => join(state.root, 'media', ...parts)
+  const get = (url: string, cookie?: string) =>
+    app().inject({ method: 'GET', url, headers: cookie ? { cookie } : {} })
+  const unlock = async (pin: string) => {
+    const response = await app().inject({
+      method: 'POST',
+      url: '/api/lock/unlock',
+      payload: { pin },
+    })
+    const header = response.headers['set-cookie']
+    return { response, cookie: typeof header === 'string' ? (header.split(';')[0] ?? '') : '' }
+  }
+  const createLibrary = async (payload: Record<string, unknown>): Promise<number> => {
+    const created = expectShape({
+      response: await app().inject({ method: 'POST', url: '/api/libraries', payload }),
+      guard: isLibrary,
+    })
+    await app().get(ScannerService).whenIdle(created.id)
+    return created.id
+  }
+
+  beforeAll(async () => {
+    state.root = await mkdtemp(join(tmpdir(), 'raven-locked-'))
+    await encodeClip({ path: at('Open', 'Heat (1995).mp4'), seconds: 2 })
+    await encodeClip({ path: at('Private', 'Lesson One.mp4'), seconds: 2 })
+    state.app = await createApp({
+      config: {
+        ...testConfig({ dataDir: join(state.root, 'data'), mediaDir: state.root }),
+        libraryPin: '3001',
+      },
+      quiet: true,
+      watch: NOT_WATCHING,
+    })
+    await state.app.init()
+    state.open = await createLibrary({ name: 'Open', paths: [at('Open')] })
+    state.private = await createLibrary({
+      name: 'Tutorials',
+      paths: [at('Private')],
+      settings: { locked: true },
+    })
+    const [video] = app().get(MediaRepository).list({ libraryId: state.private })
+    state.privateVideo = video?.id ?? 0
+  })
+
+  afterAll(async () => {
+    await state.app?.close()
+    await rm(state.root, { recursive: true, force: true })
+  })
+
+  it('lists the library, saying it is locked', async () => {
+    const libraries = expectShape({ response: await get('/api/libraries'), guard: isLibraryList })
+    expect(libraries.map((library) => [library.name, library.settings.locked])).toEqual([
+      ['Open', false],
+      ['Tutorials', true],
+    ])
+    expect(expectShape({ response: await get('/api/lock'), guard: isLockState })).toEqual({
+      available: true,
+      unlocked: false,
+    })
+  })
+
+  it('holds back its videos, their files, pictures and paths, and its history', async () => {
+    const id = state.privateVideo
+    const urls = [
+      `/api/libraries/${state.private}/media`,
+      `/api/libraries/${state.private}/history`,
+      `/api/media/${id}`,
+      `/api/media/${id}/file`,
+      `/api/media/${id}/thumbnail`,
+      `/api/media/${id}/location`,
+      `/api/media/${id}/tracks`,
+      `/api/media/${id}/stream?mode=remux`,
+    ]
+    const statuses = await Promise.all(urls.map(async (url) => (await get(url)).statusCode))
+    expect(statuses).toEqual(urls.map(() => 423))
+    expect((await get(`/api/libraries/${state.open}/media`)).statusCode).toBe(200)
+  })
+
+  it('opens with the PIN, and shuts again when locked', async () => {
+    const wrong = await unlock('1234')
+    expect(wrong.response.statusCode).toBe(401)
+    const { response, cookie } = await unlock('3001')
+    expect(response.statusCode).toBe(200)
+    expect(response.headers['set-cookie']).toContain('HttpOnly')
+    expect((await get(`/api/libraries/${state.private}/media`, cookie)).statusCode).toBe(200)
+    expect(expectShape({ response: await get('/api/lock', cookie), guard: isLockState })).toEqual({
+      available: true,
+      unlocked: true,
+    })
+
+    await app().inject({
+      method: 'PUT',
+      url: `/api/media/${state.privateVideo}/favourite`,
+      payload: { favourite: true },
+      headers: { cookie },
+    })
+    const favourites = async (with_: string | undefined) =>
+      expectShape({ response: await get('/api/favourites', with_), guard: isMediaList }).map(
+        (item) => item.id,
+      )
+    expect(await favourites(cookie)).toEqual([state.privateVideo])
+    expect(await favourites(undefined)).toEqual([])
+
+    const locked = await app().inject({ method: 'POST', url: '/api/lock/lock' })
+    expect(locked.headers['set-cookie']).toContain('Max-Age=0')
+    expect(
+      (await get(`/api/libraries/${state.private}/media`, 'raven_unlock=1.forged')).statusCode,
+    ).toBe(423)
+  })
+
+  it('waits a minute after five wrong PINs in a row', async () => {
+    const statuses = await Array.from({ length: 6 }).reduce<Promise<number[]>>(
+      async (done) => [...(await done), (await unlock('0000')).response.statusCode],
+      Promise.resolve([]),
+    )
+    expect(statuses).toEqual([401, 401, 401, 401, 401, 429])
+    expect((await unlock('3001')).response.statusCode).toBe(429)
   })
 })
 

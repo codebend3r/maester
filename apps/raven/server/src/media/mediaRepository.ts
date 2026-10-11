@@ -331,6 +331,15 @@ export class MediaRepository {
     return sort === 'random' ? shuffle({ items: records, seed }) : records
   }
 
+  /** The library a video is in, or null when there is no such video. */
+  libraryOf(id: number): number | null {
+    return (
+      this.db
+        .prepare<[number], { library_id: number }>('SELECT library_id FROM media WHERE id = ?')
+        .get(id)?.library_id ?? null
+    )
+  }
+
   get(id: number): MediaRecord | null {
     const row = this.db.prepare<[number], MediaRow>(`${SELECT_MEDIA} WHERE m.id = ?`).get(id)
     return row ? (this.records([row])[0] ?? null) : null

@@ -25,6 +25,8 @@ import {
   validateLibraryInput,
 } from '@raven/core'
 import { type LibraryRecord, LibrariesRepository, samePaths } from '@/libraries/librariesRepository'
+import { PrivateBy } from '@/lock/lockGuard'
+import { LockService } from '@/lock/lockService'
 import { MediaRepository, toMediaItem } from '@/media/mediaRepository'
 import { MATCHED_KINDS, MetadataService } from '@/metadata/metadataService'
 import { SubtitlesService } from '@/playback/subtitlesService'
@@ -58,7 +60,17 @@ export class LibrariesController {
     @Inject(SubtitlesService) private readonly subtitles: SubtitlesService,
     @Inject(MetadataService) private readonly metadata: MetadataService,
     @Inject(LibraryWatcher) private readonly watcher: LibraryWatcher,
+    @Inject(LockService) private readonly lock: LockService,
   ) {}
+
+  /** A library can only be locked behind a PIN that can open it again. */
+  private parseLockable(body: unknown): LibraryInput {
+    const input = parseInput(body)
+    if (input.settings?.locked && !this.lock.available) {
+      throw new BadRequestException("Set LIBRARY_PIN in raven's .env to lock a library.")
+    }
+    return input
+  }
 
   private withStatus(record: LibraryRecord): Library {
     return { ...record, scan: this.scanner.status(record.id) }
@@ -83,7 +95,7 @@ export class LibrariesController {
   /** Creating a library starts its first scan; the response already reports it as scanning. */
   @Post()
   create(@Body() body: unknown): Library {
-    const record = this.libraries.create(parseInput(body))
+    const record = this.libraries.create(this.parseLockable(body))
     this.scanner.scan(record.id)
     this.watcher.sync()
     return this.withStatus(record)
@@ -93,9 +105,10 @@ export class LibrariesController {
    * Only a change of folders rescans, and only a change of type matches the
    * files again; a rename or another setting leaves the index as it is.
    */
+  @PrivateBy('library')
   @Put(':id')
   update(@Param('id', ParseIntPipe) id: number, @Body() body: unknown): Library {
-    const input = parseInput(body)
+    const input = this.parseLockable(body)
     const before = this.find(id)
     const record = this.libraries.update({ id, input })
     if (!record) throw new NotFoundException(`No library ${id}`)
@@ -107,6 +120,7 @@ export class LibrariesController {
     return this.withStatus(record)
   }
 
+  @PrivateBy('library')
   @Delete(':id')
   @HttpCode(204)
   async remove(@Param('id', ParseIntPipe) id: number): Promise<void> {
@@ -122,6 +136,7 @@ export class LibrariesController {
     this.metadata.enqueue(id)
   }
 
+  @PrivateBy('library')
   @Post(':id/scan')
   @HttpCode(200)
   scan(@Param('id', ParseIntPipe) id: number): Library {
@@ -134,6 +149,7 @@ export class LibrariesController {
    * Match again: the files no movie or show was found for go back in the
    * queue, and TMDB is searched for them once more. Fix match choices stay.
    */
+  @PrivateBy('library')
   @Post(':id/match')
   @HttpCode(200)
   rematch(@Param('id', ParseIntPipe) id: number): Library {
@@ -150,6 +166,7 @@ export class LibrariesController {
   }
 
   /** The library's played videos, last played first; `watched=true` keeps the ones watched. */
+  @PrivateBy('library')
   @Get(':id/history')
   history(
     @Param('id', ParseIntPipe) id: number,
@@ -169,6 +186,7 @@ export class LibrariesController {
   }
 
   /** A TV shows library as its shows, with the files no show was found for after. */
+  @PrivateBy('library')
   @Get(':id/shows')
   listShows(
     @Param('id', ParseIntPipe) id: number,
@@ -193,6 +211,7 @@ export class LibrariesController {
     }
   }
 
+  @PrivateBy('library')
   @Get(':id/media')
   listMedia(
     @Param('id', ParseIntPipe) id: number,

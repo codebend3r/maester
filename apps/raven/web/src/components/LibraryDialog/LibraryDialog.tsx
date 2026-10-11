@@ -52,6 +52,8 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
     queryFn: api.getMetadataHealth,
     staleTime: 60_000,
   })
+  const lock = useQuery({ queryKey: queryKeys.lock, queryFn: api.getLock })
+  const lockable = !!lock.data?.available
 
   useEffect(() => {
     dialog.current?.showModal()
@@ -260,6 +262,29 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
             <p id={`${ids.settings}-refresh-hint`} className={styles.settingHint}>
               Watch the folders and take in videos as they are added, removed, renamed or replaced.
               A share that does not report its changes still needs a rescan.
+            </p>
+          </div>
+          <div className={styles.setting}>
+            <input
+              id={`${ids.settings}-locked`}
+              type="checkbox"
+              className={styles.checkbox}
+              checked={settings.locked}
+              disabled={!lockable && !settings.locked}
+              onChange={(event) =>
+                setSettings((current) => ({ ...current, locked: event.target.checked }))
+              }
+              aria-describedby={`${ids.settings}-locked-hint`}
+            />
+            <label htmlFor={`${ids.settings}-locked`}>Lock with the PIN</label>
+            <p id={`${ids.settings}-locked-hint`} className={styles.settingHint}>
+              {lockable ? (
+                'Keep its videos private: they stay hidden until the PIN is entered in this browser.'
+              ) : (
+                <>
+                  Set <code>LIBRARY_PIN</code> in raven's <code>.env</code> to lock a library.
+                </>
+              )}
             </p>
           </div>
           <div className={styles.watched}>

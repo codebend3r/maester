@@ -16,6 +16,7 @@ import type { FastifyReply } from 'fastify'
 import { streamArgs } from '@/ffmpeg/args'
 import { SOFTWARE } from '@/ffmpeg/encoder'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
+import { PrivateBy } from '@/lock/lockGuard'
 import { SettingsRepository } from '@/settings/settingsRepository'
 import { type MediaRecord, MediaRepository } from '@/media/mediaRepository'
 import { SubtitlesService } from '@/playback/subtitlesService'
@@ -53,12 +54,14 @@ export class PlaybackController {
     return record
   }
 
+  @PrivateBy('media')
   @Get(':id/tracks')
   async listTracks(@Param('id', ParseIntPipe) id: number): Promise<MediaTracks> {
     return (await this.tracks.tracksFor(this.find(id))).tracks
   }
 
   /** WebVTT for one track; `window` picks the stretch of an embedded one. */
+  @PrivateBy('media')
   @Get(':id/subtitles/:trackId')
   async subtitle(
     @Param('id', ParseIntPipe) id: number,
@@ -81,6 +84,7 @@ export class PlaybackController {
    * response is open and is killed the moment the client lets go, which
    * happens on every seek outside what is buffered.
    */
+  @PrivateBy('media')
   @Get(':id/stream')
   async stream(
     @Param('id', ParseIntPipe) id: number,

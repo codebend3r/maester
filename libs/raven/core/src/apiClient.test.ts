@@ -4,6 +4,7 @@ import {
   type FetchInit,
   type FetchResponse,
   createApiClient,
+  isLockedError,
   parseServerEvent,
 } from '@/apiClient'
 import { itemDetails, library, mediaItem, showEntry } from '@/test/fixtures'
@@ -205,6 +206,26 @@ describe('createApiClient', () => {
     })
     expect(parseServerEvent('{"type":"party"}')).toBeNull()
     expect(parseServerEvent('not json')).toBeNull()
+  })
+
+  it('unlocks with a PIN, and locks again', async () => {
+    const { client, calls } = clientReturning(
+      respond({ body: { available: true, unlocked: true } }),
+    )
+    await expect(client.unlock('3001')).resolves.toEqual({ available: true, unlocked: true })
+    expect(calls[0]?.url).toBe('http://nas:8484/api/lock/unlock')
+    expect(calls[0]?.init?.body).toBe(JSON.stringify({ pin: '3001' }))
+    await client.lock()
+    expect(calls[1]?.url).toBe('http://nas:8484/api/lock/lock')
+  })
+
+  it('tells a locked library apart from other failures', async () => {
+    const { client } = clientReturning(
+      respond({ status: 423, body: { statusCode: 423, message: 'This library is locked.' } }),
+    )
+    const failure = await client.getMedia(7).catch((error: unknown) => error)
+    expect(isLockedError(failure)).toBe(true)
+    expect(isLockedError(new ApiError({ status: 403, message: 'No' }))).toBe(false)
   })
 
   it('deletes a video', async () => {

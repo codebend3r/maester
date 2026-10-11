@@ -1,5 +1,6 @@
 import { Route, Routes } from 'react-router-dom'
 import { AppShell } from '@/components/AppShell/AppShell'
+import { UnlockDialog } from '@/components/UnlockDialog/UnlockDialog'
 import { DesignPage } from '@/pages/DesignPage/DesignPage'
 import { FavouritesPage } from '@/pages/FavouritesPage/FavouritesPage'
 import { HistoryPage } from '@/pages/HistoryPage/HistoryPage'
@@ -15,22 +16,26 @@ import { PersonPage } from '@/pages/PersonPage/PersonPage'
 import { WatchPage } from '@/pages/WatchPage/WatchPage'
 
 export const AppRoutes = () => (
-  <Routes>
-    <Route element={<AppShell />}>
-      <Route index element={<LibrariesPage />} />
-      <Route path="libraries/:id" element={<LibraryPage />} />
-      <Route path="libraries/:id/history" element={<HistoryPage />} />
-      <Route path="movies/:id" element={<MoviePage />} />
-      <Route path="shows/:id" element={<ShowPage />} />
-      <Route path="shows/:id/seasons/:number" element={<SeasonPage />} />
-      <Route path="episodes/:id" element={<EpisodePage />} />
-      <Route path="people/:id" element={<PersonPage />} />
-      <Route path="favourites" element={<FavouritesPage />} />
-      <Route path="settings" element={<SettingsPage />} />
-      <Route path="design" element={<DesignPage />} />
-      <Route path="*" element={<NotFoundPage />} />
-    </Route>
-    {/* The player takes the whole screen, outside the browsing frame. */}
-    <Route path="watch/:id" element={<WatchPage />} />
-  </Routes>
+  <>
+    <Routes>
+      <Route element={<AppShell />}>
+        <Route index element={<LibrariesPage />} />
+        <Route path="libraries/:id" element={<LibraryPage />} />
+        <Route path="libraries/:id/history" element={<HistoryPage />} />
+        <Route path="movies/:id" element={<MoviePage />} />
+        <Route path="shows/:id" element={<ShowPage />} />
+        <Route path="shows/:id/seasons/:number" element={<SeasonPage />} />
+        <Route path="episodes/:id" element={<EpisodePage />} />
+        <Route path="people/:id" element={<PersonPage />} />
+        <Route path="favourites" element={<FavouritesPage />} />
+        <Route path="settings" element={<SettingsPage />} />
+        <Route path="design" element={<DesignPage />} />
+        <Route path="*" element={<NotFoundPage />} />
+      </Route>
+      {/* The player takes the whole screen, outside the browsing frame. */}
+      <Route path="watch/:id" element={<WatchPage />} />
+    </Routes>
+    {/* Over any page, the player too: whatever sits in a locked library asks for the PIN. */}
+    <UnlockDialog />
+  </>
 )

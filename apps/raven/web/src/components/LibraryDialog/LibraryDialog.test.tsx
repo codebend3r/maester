@@ -6,6 +6,8 @@ import { library } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 
 const created: unknown[] = []
+/** Whether the server has a PIN, as the next dialog will find. */
+const lockAvailable = { now: true }
 const updated: unknown[] = []
 const offline = createApiClient({
   fetch: async () => {
@@ -34,6 +36,7 @@ mock.module('@/lib/api', () => ({
       updated.push(input)
       return { id }
     },
+    getLock: async () => ({ available: lockAvailable.now, unlocked: false }),
     getMetadataHealth: async () => ({
       tmdb: 'off',
       omdb: 'off',
@@ -103,6 +106,7 @@ describe('LibraryDialog', () => {
           kind: 'other',
           ratingsSource: 'tmdb',
           autoRefresh: true,
+          locked: false,
         },
       },
     ])
@@ -115,6 +119,7 @@ describe('LibraryDialog', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Add' }))
     await userEvent.click(screen.getByRole('checkbox', { name: 'Save where each video stopped' }))
     await userEvent.click(screen.getByRole('checkbox', { name: 'Refresh automatically' }))
+    await userEvent.click(await screen.findByRole('checkbox', { name: 'Lock with the PIN' }))
     await userEvent.click(screen.getByRole('button', { name: 'Add library' }))
     expect(created.at(-1)).toEqual({
       name: 'Clips',
@@ -129,6 +134,7 @@ describe('LibraryDialog', () => {
         kind: 'other',
         ratingsSource: 'tmdb',
         autoRefresh: false,
+        locked: true,
       },
     })
   })
@@ -232,5 +238,15 @@ describe('LibraryDialog', () => {
       />,
     )
     expect(screen.getByRole('spinbutton', { name: 'Watched at' })).toHaveValue(60)
+  })
+
+  it('cannot lock a library until the server has a PIN', async () => {
+    lockAvailable.now = false
+    renderWithProviders(<LibraryDialog onClose={() => undefined} />)
+    expect(await screen.findByText(/to lock a library/, { selector: 'p' })).toHaveTextContent(
+      "Set LIBRARY_PIN in raven's .env to lock a library.",
+    )
+    expect(screen.getByRole('checkbox', { name: 'Lock with the PIN' })).toBeDisabled()
+    lockAvailable.now = true
   })
 })
