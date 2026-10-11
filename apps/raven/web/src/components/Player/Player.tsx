@@ -38,10 +38,25 @@ export const Player = ({ media, backTo }: { media: MediaItem; backTo: string }) 
   const subtitle = tracks?.subtitles.find((track) => track.id === subtitleId) ?? null
 
   const defaultAudio = audio == null || audio === tracks?.defaultAudio
+  // The server's playback settings: whether to force the original file, and what it converts.
+  const settings = useQuery({
+    queryKey: queryKeys.playbackSettings,
+    queryFn: api.getPlaybackSettings,
+    staleTime: 60_000,
+  })
+  const policy = settings.data?.settings
   const plan = useMemo(
     () =>
-      planPlayback({ media, canPlay: browserCanPlay, canStream: browserCanStream, defaultAudio }),
-    [media, defaultAudio],
+      planPlayback({
+        media,
+        canPlay: browserCanPlay,
+        canStream: browserCanStream,
+        defaultAudio,
+        ...(policy
+          ? { policy: { directPlay: policy.directPlay, transcoding: policy.transcoding } }
+          : {}),
+      }),
+    [media, defaultAudio, policy],
   )
   const [forced, setForced] = useState(false)
   const modes: PlaybackMode[] = plan.modes.length === 0 && forced ? ['direct'] : plan.modes
