@@ -450,6 +450,35 @@ describe('movie metadata', () => {
     })
     expect(back.title).toBe('Heat')
     expect((await byFile('Heat.mp4')).item?.title).toBe('Heat')
+
+    // An emptied field shows nothing, where null would bring TMDB's back.
+    const emptied = shape({
+      response: await app().inject({
+        method: 'PUT',
+        url: `/api/items/${id}/metadata`,
+        payload: { tagline: '', year: 0 },
+      }),
+      guard: isItemDetails,
+    })
+    expect(emptied).toMatchObject({ tagline: null, year: null })
+    const empty = shape({
+      response: await app().inject({ method: 'GET', url: `/api/items/${id}/metadata` }),
+      guard: isItemMetadataState,
+    })
+    expect(empty).toMatchObject({
+      shown: { tagline: null, year: null },
+      original: { tagline: 'A tagline.', year: 1995 },
+    })
+    expect(empty.overridden.toSorted()).toEqual(['tagline', 'year'])
+    const restored = shape({
+      response: await app().inject({
+        method: 'PUT',
+        url: `/api/items/${id}/metadata`,
+        payload: { tagline: null, year: null },
+      }),
+      guard: isItemDetails,
+    })
+    expect(restored).toMatchObject({ tagline: 'A tagline.', year: 1995 })
   })
 
   it('serves a cast photo', async () => {
