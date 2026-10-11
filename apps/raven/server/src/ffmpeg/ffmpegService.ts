@@ -1,8 +1,17 @@
 import { type ChildProcessByStdio, execFile, spawn } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import type { Readable } from 'node:stream'
 import { promisify } from 'node:util'
-import { Inject, Injectable, Logger, type OnModuleDestroy } from '@nestjs/common'
+import {
+  Inject,
+  Injectable,
+  Logger,
+  type OnApplicationBootstrap,
+  type OnModuleDestroy,
+} from '@nestjs/common'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
+import { encoderTestArgs } from '@/ffmpeg/args'
+import { SOFTWARE, type VideoEncoder, encoderCandidates } from '@/ffmpeg/encoder'
 import { type ProbeResult, parseProbe } from '@/ffmpeg/probe'
 
 const run = promisify(execFile)
@@ -47,9 +56,10 @@ export type FfmpegStream = ChildProcessByStdio<null, Readable, Readable>
 
 /** Everything that shells out to ffmpeg or ffprobe goes through here. */
 @Injectable()
-export class FfmpegService implements OnModuleDestroy {
+export class FfmpegService implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger(FfmpegService.name)
   private filters: Promise<ReadonlySet<string>> | null = null
+  private encoder: Promise<VideoEncoder> | null = null
   private readonly streams = new Set<FfmpegStream>()
 
   constructor(@Inject(SERVER_CONFIG) private readonly config: ServerConfig) {}
@@ -101,8 +111,51 @@ export class FfmpegService implements OnModuleDestroy {
     return child
   }
 
+  /** Settles the encoder at start, so the log says which one transcodes will use. */
+  onApplicationBootstrap(): void {
+    void this.videoEncoder()
+  }
+
   onModuleDestroy(): void {
     this.streams.forEach((child) => child.kill('SIGKILL'))
+  }
+
+  /**
+   * How transcodes encode: the first GPU encoder whose test encode works,
+   * else libx264. Decided once per run, since the hardware does not change.
+   */
+  videoEncoder(): Promise<VideoEncoder> {
+    this.encoder ??= this.chooseEncoder()
+    return this.encoder
+  }
+
+  private async chooseEncoder(): Promise<VideoEncoder> {
+    const candidates = encoderCandidates({
+      hwAccel: this.config.hwAccel,
+      platform: process.platform,
+      vaapiDevice: this.config.vaapiDevice,
+      deviceExists: existsSync(this.config.vaapiDevice),
+    })
+    const working = await candidates.reduce<Promise<VideoEncoder | null>>(
+      async (found, candidate) =>
+        (await found) ?? ((await this.encodes(candidate)) ? candidate : null),
+      Promise.resolve(null),
+    )
+    const chosen = working ?? SOFTWARE
+    this.logger.log(
+      `Transcodes encode with ${chosen.kind === 'software' ? 'libx264 on the CPU' : chosen.kind}`,
+    )
+    return chosen
+  }
+
+  private async encodes(encoder: VideoEncoder): Promise<boolean> {
+    try {
+      await run(this.config.ffmpegPath, encoderTestArgs(encoder), { timeout: 30_000 })
+      return true
+    } catch (error) {
+      this.logger.warn(`${encoder.kind} cannot encode here: ${failureText(error)}`)
+      return false
+    }
   }
 
   /** Runs ffmpeg to completion, rejecting with its own error line. */

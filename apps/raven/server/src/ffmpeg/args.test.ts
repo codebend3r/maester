@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { VideoEncoder } from '@/ffmpeg/encoder'
 import {
   TONEMAP_FILTER,
   streamArgs,
@@ -56,6 +57,57 @@ describe('streamArgs', () => {
     streamShift: 1,
   }
   const after = (args: string[], flag: string): string | undefined => args[args.indexOf(flag) + 1]
+
+  describe('on a GPU', () => {
+    const vaapi: VideoEncoder = { kind: 'vaapi', device: '/dev/dri/renderD128' }
+    const beforeInput = (args: string[]) => args.slice(0, args.indexOf('-i'))
+
+    it('keeps an H.264 or HEVC transcode on the GPU from decode to encode', () => {
+      const args = streamArgs({ ...base, mode: 'transcode', encoder: vaapi })
+      expect(beforeInput(args)).toEqual(
+        expect.arrayContaining(['-hwaccel', 'vaapi', '-hwaccel_output_format', 'vaapi']),
+      )
+      expect(after(args, '-init_hw_device')).toBe('vaapi=va:/dev/dri/renderD128')
+      expect(after(args, '-vf')).toBe("scale_vaapi=w=-2:h='min(1080,ih)':format=nv12")
+      expect(after(args, '-c:v')).toBe('h264_vaapi')
+      expect(args).not.toContain('-pix_fmt')
+    })
+
+    it('keeps HDR on the GPU too, converting its colours to BT.709 rather than tone mapping on the CPU', () => {
+      const args = streamArgs({ ...base, mode: 'transcode', tonemap: true, encoder: vaapi })
+      expect(beforeInput(args)).toEqual(expect.arrayContaining(['-hwaccel_output_format', 'vaapi']))
+      expect(after(args, '-vf')).toBe(
+        "scale_vaapi=w=-2:h='min(1080,ih)':format=nv12:out_color_matrix=bt709:out_color_primaries=bt709:out_color_transfer=bt709:out_range=tv",
+      )
+      expect(after(args, '-vf')).not.toContain('zscale')
+    })
+
+    it('decodes a codec the GPU may not know on the CPU, then uploads it to encode', () => {
+      const args = streamArgs({ ...base, mode: 'transcode', videoCodec: 'mpeg4', encoder: vaapi })
+      expect(beforeInput(args)).not.toContain('-hwaccel')
+      expect(after(args, '-filter_hw_device')).toBe('va')
+      expect(after(args, '-vf')).toBe("scale=w=-2:h='min(1080,ih)',format=nv12,hwupload")
+      expect(after(args, '-c:v')).toBe('h264_vaapi')
+    })
+
+    it('decodes and encodes on the Apple media engine with VideoToolbox', () => {
+      const args = streamArgs({
+        ...base,
+        mode: 'transcode',
+        encoder: { kind: 'videotoolbox' },
+      })
+      expect(after(beforeInput(args), '-hwaccel')).toBe('videotoolbox')
+      expect(after(args, '-c:v')).toBe('h264_videotoolbox')
+      expect(after(args, '-vf')).toBe("scale=w=-2:h='min(1080,ih)'")
+    })
+
+    it('leaves a remux alone, since nothing is encoded', () => {
+      const args = streamArgs({ ...base, mode: 'remux', encoder: vaapi })
+      expect(args).not.toContain('-hwaccel')
+      expect(args).not.toContain('-init_hw_device')
+      expect(after(args, '-c:v')).toBe('copy')
+    })
+  })
 
   it('copies the video, keeps the file clock and converts the chosen audio', () => {
     const args = streamArgs({ ...base, mode: 'remux' })

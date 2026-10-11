@@ -86,6 +86,7 @@ describe('playback', () => {
     state.app = await createApp({
       config: {
         ...readServerConfig({}),
+        hwAccel: 'none',
         dataDir: join(state.root, 'data'),
         webDir: null,
         browseRoot: media,

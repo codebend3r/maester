@@ -1,4 +1,5 @@
 import { Controller, Get, Inject } from '@nestjs/common'
+import type { VideoEncoder } from '@/ffmpeg/encoder'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
 
@@ -8,6 +9,8 @@ export type Health = {
   ffmpeg: string | null
   /** Whether HDR thumbnails and transcodes get tone mapped to SDR. */
   tonemap: boolean
+  /** What transcodes encode with: the CPU, or a GPU through VAAPI or VideoToolbox. */
+  encoder: VideoEncoder['kind']
   thumbnailsPending: number
 }
 
@@ -20,7 +23,17 @@ export class HealthController {
 
   @Get()
   async get(): Promise<Health> {
-    const [ffmpeg, tonemap] = await Promise.all([this.ffmpeg.version(), this.ffmpeg.canTonemap()])
-    return { status: 'ok', ffmpeg, tonemap, thumbnailsPending: this.thumbnails.pending() }
+    const [ffmpeg, tonemap, encoder] = await Promise.all([
+      this.ffmpeg.version(),
+      this.ffmpeg.canTonemap(),
+      this.ffmpeg.videoEncoder(),
+    ])
+    return {
+      status: 'ok',
+      ffmpeg,
+      tonemap,
+      encoder: encoder.kind,
+      thumbnailsPending: this.thumbnails.pending(),
+    }
   }
 }

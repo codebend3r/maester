@@ -47,6 +47,7 @@ const testConfig = ({
   webDir?: string | null
 }): ServerConfig => ({
   ...readServerConfig({}),
+  hwAccel: 'none',
   dataDir,
   webDir,
   browseRoot: mediaDir,

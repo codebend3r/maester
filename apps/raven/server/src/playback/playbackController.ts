@@ -13,6 +13,7 @@ import {
 import { type MediaTracks, STREAM_TIME_SHIFT, type StreamMode } from '@raven/core'
 import type { FastifyReply } from 'fastify'
 import { streamArgs } from '@/ffmpeg/args'
+import { SOFTWARE } from '@/ffmpeg/encoder'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import { type MediaRecord, MediaRepository } from '@/media/mediaRepository'
 import { SubtitlesService } from '@/playback/subtitlesService'
@@ -103,6 +104,7 @@ export class PlaybackController {
       throw new BadRequestException(`No audio track ${audio}`)
     }
     const tonemap = mode === 'transcode' && record.hdr && (await this.ffmpeg.canTonemap())
+    const encoder = mode === 'transcode' ? await this.ffmpeg.videoEncoder() : SOFTWARE
 
     const child = this.ffmpeg.stream(
       streamArgs({
@@ -113,6 +115,7 @@ export class PlaybackController {
         videoCodec: record.videoCodec,
         tonemap,
         streamShift: STREAM_TIME_SHIFT,
+        encoder,
       }),
     )
     // The response closes when it finishes or when the client goes away;

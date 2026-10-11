@@ -14,6 +14,19 @@ Deleting a video from the app removes the file, so leave `:ro` off any mount whe
 
 The index and thumbnails live in `./data` (mounted at `/config`). The image runs as the unprivileged `node` user (1000:1000); on a Synology, set `user:` in the compose file to the owner of `./data`.
 
+### Running on Vhagar
+
+raven runs on Vhagar, the NAS with an Intel GPU, from `docker-compose.vhagar.yml`, which lives there as `/volume1/docker/raven/docker-compose.yml`. Every NAS's share is mounted read-write under `/media/<nas>`: Vhagar's own share directly, the other four through the cifs mounts Vhagar already has of them in `/volume1/Vhagar/`. Each share also holds folders for the others, so pick a library's folders inside one share rather than a whole share.
+
+Vhagar's docker has no buildx, which the Dockerfile needs, so the image is built on a Mac and loaded there. From the repo root:
+
+```bash
+docker buildx build --builder desktop-linux --platform linux/amd64 -f apps/raven/Dockerfile -t raven:latest --load .
+docker save raven:latest | gzip -1 | ssh vhagar 'cat > /volume1/docker/raven/raven-image.tar.gz'
+```
+
+Then, on Vhagar, `sudo docker load -i /volume1/docker/raven/raven-image.tar.gz` and `sudo docker compose up -d` in `/volume1/docker/raven/`.
+
 ### Coming from weirwood
 
 raven was called weirwood. Its database is now `raven.db`, and the server renames a `weirwood.db` it finds in the data folder, with its `-wal` and `-shm` files, the first time it starts. To move a running weirwood container over:
@@ -132,7 +145,7 @@ apps/raven/
                  range-request file serving, tracks, subtitles and converted streams
   web/           @raven/web: React 19 + Vite: libraries, the grid, list, tiles and groups, the player
                  and its stream source, the /design page
-  Dockerfile, docker-compose.yml
+  Dockerfile, docker-compose.yml, docker-compose.vhagar.yml
 libs/raven/
   core/          @raven/core: API types and guards, the typed API client, the direct-play check,
                  formatting. No DOM or Node APIs, so a React Native app can use it unchanged.
@@ -151,6 +164,8 @@ A native iOS or Android app would be another `apps/raven/` entry that imports `@
 | `SCAN_ON_START`               | `true`                         | Rescan every library on boot                 |
 | `RESCAN_INTERVAL_MINUTES`     | `0`                            | Periodic rescans; `0` turns them off         |
 | `PROBE_CONCURRENCY`           | `4`                            | Parallel ffprobe runs during a scan          |
+| `HW_ACCEL`                    | `auto`                         | `auto`, `vaapi`, `videotoolbox` or `none`: how transcodes encode. `auto` tries VideoToolbox on a Mac and VAAPI when the render node exists, after a test encode; else libx264 |
+| `VAAPI_DEVICE`                | `/dev/dri/renderD128`          | The GPU's render node for VAAPI              |
 | `UV_THREADPOOL_SIZE`          | `16`                           | Node's file I/O threads; scans may hold four of them, so playback never waits behind a scan |
 | `THUMBNAIL_CONCURRENCY`       | `2`                            | Parallel thumbnail runs                      |
 | `THUMBNAIL_WIDTH`             | `480`                          |                                              |
@@ -161,4 +176,5 @@ A native iOS or Android app would be another `apps/raven/` entry that imports `@
 
 - No accounts or auth: keep it on the LAN or behind Tailscale.
 - Picture subtitles (PGS, VobSub) would need burning in or OCR.
-- Transcoding uses the CPU only; no VAAPI, QSV or VideoToolbox yet.
+- On VAAPI, HDR is converted to BT.709 on the GPU rather than tone mapped. That suits HLG; HDR10 (PQ) comes out flat.
+- No QSV; Intel GPUs go through VAAPI.
