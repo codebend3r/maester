@@ -250,6 +250,14 @@ export const streamArgs = ({
  * One window of an embedded subtitle track as WebVTT. Reads only the
  * window's stretch of the file and keeps cue times as file times.
  */
+/**
+ * One window of an embedded track as WebVTT. `-ss` before the input seeks
+ * through the container index; `-copyts` keeps the cues on the file's
+ * clock; and the end is `-to` on the output, an absolute position. A
+ * duration before the input does not stop a subtitle-only read: ffmpeg
+ * went on to the end of a 74 GB file, 160 seconds for one minute of cues,
+ * where `-to` takes under two.
+ */
 export const subtitleWindowArgs = ({
   input,
   stream,
@@ -267,14 +275,14 @@ export const subtitleWindowArgs = ({
   ...QUIET,
   '-y',
   ...(start > 0 ? ['-ss', String(start)] : []),
-  '-t',
-  String(duration),
   '-copyts',
   '-start_at_zero',
   '-i',
   input,
   '-map',
   `0:s:${stream}`,
+  '-to',
+  String(start + duration),
   '-f',
   'webvtt',
   output,
