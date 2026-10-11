@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import type { LibrarySettings, MediaItem } from '@raven/core'
+import { type LibrarySettings, type MediaItem, isMatchedKind } from '@raven/core'
 import { useEffect, useRef } from 'react'
 import { afterMatchingPass } from '@/lib/invalidate'
 import { mediaListQuery, metadataHealthQuery, showListQuery } from '@/lib/queries'
@@ -40,7 +40,7 @@ export const useLibraryListing = ({
   const queryClient = useQueryClient()
   const listsShows = settings.kind === 'shows'
   // Files only leave pending while TMDB answers; without it they wait for good.
-  const metadata = useQuery({ ...metadataHealthQuery, enabled: settings.kind !== 'other' })
+  const metadata = useQuery({ ...metadataHealthQuery, enabled: isMatchedKind(settings.kind) })
   const canMatch = metadata.data?.tmdb === 'ok'
   const listing = { libraryId, search, sort: settings.sort, seed }
 

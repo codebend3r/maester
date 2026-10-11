@@ -1,10 +1,15 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { type ItemDetails, type Library, type MediaItem, formatDuration } from '@raven/core'
+import {
+  type ItemDetails,
+  type Library,
+  type MatchItemType,
+  type MediaItem,
+  formatDuration,
+} from '@raven/core'
 import { useId, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, ButtonLink } from '@/components/Button/Button'
 import { CastRow } from '@/components/CastRow/CastRow'
-import type { MatchType } from '@/components/FixMatchDialog/FixMatchDialog'
 import { ImageEditor } from '@/components/ImageEditor/ImageEditor'
 import { ItemHeader } from '@/components/ItemHeader/ItemHeader'
 import { MediaMenu } from '@/components/MediaMenu/MediaMenu'
@@ -25,7 +30,7 @@ type Facts = { details: ItemDetails; primary: MediaItem }
 
 /** How a movie's page and an episode's page differ; everything else they share. */
 type PlayableConfig = {
-  matchType: MatchType
+  matchType: MatchItemType
   back: (facts: Facts & { libraries: readonly Library[] }) => { to: string; label: string }
   byline: (details: ItemDetails) => string | null
   facts: (facts: Facts) => string[]

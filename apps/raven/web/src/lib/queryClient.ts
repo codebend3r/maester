@@ -1,5 +1,5 @@
 import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query'
-import { ApiError, type MediaSort, isLockedError } from '@raven/core'
+import { type MatchItemType, type MediaSort, ApiError, isLockedError } from '@raven/core'
 import { useUnlockPrompt } from '@/stores/unlockPrompt'
 
 /** Anything refused for sitting in a locked library asks for the PIN, wherever it was asked for. */
@@ -99,7 +99,7 @@ export const queryKeys = {
     query,
     year,
   }: {
-    type: 'movie' | 'show'
+    type: MatchItemType
     query: string
     year: number | null
   }) => ['match', type, query, year],

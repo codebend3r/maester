@@ -1,4 +1,4 @@
-import type { LibrarySettings, MediaItem, ShowEntry } from '@raven/core'
+import { KIND_RULES, type LibrarySettings, type MediaItem, type ShowEntry } from '@raven/core'
 import { Bucket } from '@/components/Bucket/Bucket'
 import { MediaGrid } from '@/components/MediaGrid/MediaGrid'
 import { MediaGroups } from '@/components/MediaGroups/MediaGroups'
@@ -6,7 +6,7 @@ import { MediaList } from '@/components/MediaList/MediaList'
 import { MediaTiles } from '@/components/MediaTiles/MediaTiles'
 import { ShowGrid } from '@/components/ShowCard/ShowCard'
 import { ShowList, ShowTiles } from '@/components/ShowCard/ShowViews'
-import { matchTypeOf, shownGrouping } from '@/pages/LibraryPage/libraryShape'
+import { KINDS } from '@/lib/libraryKinds'
 import styles from '@/pages/LibraryPage/LibraryPage.module.scss'
 
 const count = new Intl.NumberFormat()
@@ -27,8 +27,9 @@ const ShowsView = ({
 }
 
 /**
- * The library's videos laid out the way its view setting says: a Movies
- * library's as posters, and a TV library's leftover files never grouped.
+ * The library's videos laid out the way its view setting says, a Movies
+ * library's as posters. The settings are coherent with the library's type,
+ * so a TV library's leftover files are never grouped.
  */
 const MediaView = ({
   settings,
@@ -39,18 +40,17 @@ const MediaView = ({
   items: MediaItem[]
   busy: boolean
 }) => {
-  const movies = settings.kind === 'movies'
-  const matchType = matchTypeOf(settings.kind)
-  const grouping = shownGrouping(settings)
+  const movies = KINDS[settings.kind].posters
+  const matchType = KIND_RULES[settings.kind].matches
   if (settings.view === 'list')
     return <MediaList items={items} busy={busy} movies={movies} matchType={matchType} />
   if (settings.view === 'tiles')
     return <MediaTiles items={items} busy={busy} posters={movies} matchType={matchType} />
-  if (grouping != null)
+  if (settings.view === 'grouped')
     return (
       <MediaGroups
         items={items}
-        by={grouping}
+        by={settings.groupBy}
         busy={busy}
         posters={movies}
         matchType={matchType}

@@ -1,5 +1,5 @@
 import { type UseMutationResult, useQuery } from '@tanstack/react-query'
-import { type MediaItem, mediaLabel } from '@raven/core'
+import { type MatchItemType, type MediaItem, mediaLabel } from '@raven/core'
 import {
   Fragment,
   type KeyboardEvent,
@@ -10,7 +10,7 @@ import {
   useState,
 } from 'react'
 import { Button } from '@/components/Button/Button'
-import { FixMatchDialog, type MatchType } from '@/components/FixMatchDialog/FixMatchDialog'
+import { FixMatchDialog } from '@/components/FixMatchDialog/FixMatchDialog'
 import { Icon, type IconName } from '@/components/Icon/Icon'
 import { api } from '@/lib/api'
 import { copyText } from '@/lib/clipboard'
@@ -143,7 +143,7 @@ type MenuProps = {
   /** In a row of its own (list, tiles) instead of over a card's thumbnail. */
   inline?: boolean
   /** What the library matches its files to; null leaves Fix match and Refresh details out. */
-  matchType?: MatchType | null
+  matchType?: MatchItemType | null
   /** Off where the page has its own favourite button. */
   withFavourite?: boolean
   onMatched?: (updated: MediaItem) => void

@@ -1,4 +1,5 @@
 import {
+  type MatchItemType,
   type MediaItem,
   type RatingSource,
   cardTitle,
@@ -10,7 +11,6 @@ import {
 } from '@raven/core'
 import { Link } from 'react-router-dom'
 import { FavouriteMark } from '@/components/FavouriteMark/FavouriteMark'
-import type { MatchType } from '@/components/FixMatchDialog/FixMatchDialog'
 import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
 import { ScoreChip } from '@/components/RatingChips/RatingChips'
 import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
@@ -37,7 +37,7 @@ const MediaRow = ({
 }: {
   media: MediaItem
   movies: boolean
-  matchType: MatchType | null
+  matchType: MatchItemType | null
 }) => {
   const menu = useCardMenu({ media, matchType, inline: true })
   const { title, year } = cardTitle(media)
@@ -140,7 +140,7 @@ export const MediaList = ({
   /** A Movies library: titles open the movie's page, and the year and ratings get columns. */
   movies?: boolean
   /** What the library matches its files to, for the menu's Fix match. */
-  matchType?: MatchType | null
+  matchType?: MatchItemType | null
 }) => {
   const { sorted, toggle, ariaSort } = useTableSort({ rows: items, columns: COLUMNS })
   const header = (key: Column, label: string, className?: string) => (

@@ -1,11 +1,10 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import type { Library, LibrarySettings } from '@raven/core'
+import { KIND_RULES, type Library, type LibrarySettings } from '@raven/core'
 import { Button, ButtonLink } from '@/components/Button/Button'
 import { ScanStatus } from '@/components/ScanStatus/ScanStatus'
 import { api } from '@/lib/api'
 import { KINDS } from '@/lib/libraryKinds'
 import { queryKeys } from '@/lib/queryClient'
-import { matchTypeOf } from '@/pages/LibraryPage/libraryShape'
 import styles from '@/pages/LibraryPage/LibraryPage.module.scss'
 
 const count = new Intl.NumberFormat()
@@ -65,7 +64,7 @@ export const LibraryHeader = ({
   onEdit: () => void
 }) => {
   const scanning = library.scan.state === 'scanning'
-  const matchType = matchTypeOf(settings.kind)
+  const matchType = KIND_RULES[settings.kind].matches
   const unmatched = library.unmatchedCount
 
   return (

@@ -1,27 +1,11 @@
 import { describe, expect, it } from 'bun:test'
 import { DEFAULT_LIBRARY_SETTINGS, type LibrarySettings } from '@raven/core'
-import { playQueue, shownGrouping } from '@/pages/LibraryPage/libraryShape'
+import { playQueue } from '@/pages/LibraryPage/libraryShape'
 import { mediaItem, showEntry } from '@/test/fixtures'
 
 const settings = (change: Partial<LibrarySettings>): LibrarySettings => ({
   ...DEFAULT_LIBRARY_SETTINGS,
   ...change,
-})
-
-describe('shownGrouping', () => {
-  it('groups only in the grouped view, and never a TV library', () => {
-    expect(shownGrouping(settings({ view: 'grid', kind: 'movies' }))).toBeNull()
-    expect(shownGrouping(settings({ view: 'grouped', kind: 'shows' }))).toBeNull()
-    expect(shownGrouping(settings({ view: 'grouped', kind: 'movies', groupBy: 'match' }))).toBe(
-      'match',
-    )
-  })
-
-  it('groups a library of no particular type by resolution in place of match', () => {
-    expect(shownGrouping(settings({ view: 'grouped', kind: 'other', groupBy: 'match' }))).toBe(
-      'resolution',
-    )
-  })
 })
 
 describe('playQueue', () => {

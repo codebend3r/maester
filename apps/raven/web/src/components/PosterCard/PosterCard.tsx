@@ -1,4 +1,11 @@
-import { type MediaItem, type ShownRatings, cardTitle, formatRuntime, pickScore } from '@raven/core'
+import {
+  type MatchItemType,
+  type MediaItem,
+  type RatingSource,
+  cardTitle,
+  formatRuntime,
+  pickScore,
+} from '@raven/core'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { FavouriteMark } from '@/components/FavouriteMark/FavouriteMark'
@@ -54,13 +61,16 @@ export const PosterFrame = ({ media }: { media: MediaItem }) => {
  */
 export const PosterCard = ({
   media,
+  matchType = null,
   ratingsSource = 'tmdb',
 }: {
   media: MediaItem
+  /** What the library matches its files to, for the menu's Fix match. */
+  matchType?: MatchItemType | null
   /** Whose score the card shows, from the library's settings. */
-  ratingsSource?: ShownRatings
+  ratingsSource?: RatingSource
 }) => {
-  const menu = useCardMenu({ media, matchType: 'movie' })
+  const menu = useCardMenu({ media, matchType })
   const { title, year } = cardTitle(media)
   const score = media.item
     ? pickScore({ ratings: media.item.ratings, source: ratingsSource })

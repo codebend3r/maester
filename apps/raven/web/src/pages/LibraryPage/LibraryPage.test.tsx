@@ -181,6 +181,17 @@ describe('LibraryPage', () => {
     expect(groupings).not.toContain('Matched or not')
   })
 
+  it('shows the grouping an Other library really uses when the address asks for match', async () => {
+    serve({ kind: 'other' }, ITEMS, '/libraries/2?view=grouped&group=match')
+    await screen.findByRole('link', { name: 'Wide' })
+    const select = screen.getByLabelText('Group by')
+    expect(select).toHaveValue('resolution')
+    expect(within(select).getByRole('option', { selected: true })).toHaveTextContent('Resolution')
+    expect(
+      screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent),
+    ).toEqual(['4K, 1 video', '1080p, 2 videos'])
+  })
+
   it('plays the first video in the order shown', async () => {
     serve({ sort: 'largest' })
     await screen.findByRole('link', { name: 'Wide' })

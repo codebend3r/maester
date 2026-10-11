@@ -1,5 +1,5 @@
 import { keepPreviousData, queryOptions, skipToken } from '@tanstack/react-query'
-import type { MediaSort } from '@raven/core'
+import type { MatchItemType, MediaSort } from '@raven/core'
 import { api } from '@/lib/api'
 import { queryKeys } from '@/lib/queryClient'
 
@@ -136,7 +136,7 @@ export const matchSearchQuery = ({
   query,
   year,
 }: {
-  type: 'movie' | 'show'
+  type: MatchItemType
   query: string
   year: number | null
 }) =>

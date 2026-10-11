@@ -1,7 +1,12 @@
-import { type MediaItem, formatRuntime, mediaLabel, resolutionLabel } from '@raven/core'
+import {
+  type MatchItemType,
+  type MediaItem,
+  formatRuntime,
+  mediaLabel,
+  resolutionLabel,
+} from '@raven/core'
 import { Link } from 'react-router-dom'
 import { FavouriteMark } from '@/components/FavouriteMark/FavouriteMark'
-import type { MatchType } from '@/components/FixMatchDialog/FixMatchDialog'
 import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
 import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
@@ -21,7 +26,7 @@ export const MediaCard = ({
 }: {
   media: MediaItem
   /** What the library matches its files to, for the menu's Fix match. */
-  matchType?: MatchType | null
+  matchType?: MatchItemType | null
 }) => {
   const menu = useCardMenu({ media, matchType })
   const thumbnail = api.thumbnailUrl(media)

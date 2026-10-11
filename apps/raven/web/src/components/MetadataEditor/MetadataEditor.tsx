@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { ItemDetails, ItemMetadata, ItemMetadataChange } from '@raven/core'
+import type { ItemDetails, ItemMetadata, ItemMetadataChange, MatchItemType } from '@raven/core'
 import { type FormEvent, useId, useState } from 'react'
 import { Button } from '@/components/Button/Button'
 import { api } from '@/lib/api'
@@ -53,7 +53,7 @@ export const MetadataEditor = ({
   onDone,
 }: {
   details: ItemDetails
-  itemKind: 'movie' | 'show'
+  itemKind: MatchItemType
   onDone: () => void
 }) => {
   const ids = { heading: useId(), form: useId() }

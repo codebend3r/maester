@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { MatchCandidate } from '@raven/core'
+import type { MatchCandidate, MatchItemType } from '@raven/core'
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react'
 import { Button } from '@/components/Button/Button'
 import { api } from '@/lib/api'
@@ -7,10 +7,7 @@ import { afterMatch } from '@/lib/invalidate'
 import { matchSearchQuery } from '@/lib/queries'
 import styles from '@/components/FixMatchDialog/FixMatchDialog.module.scss'
 
-/** What the dialog searches for: a movie, or a show. */
-export type MatchType = 'movie' | 'show'
-
-const NOT_A: Record<MatchType, string> = { movie: 'Not a movie', show: 'Not a show' }
+const NOT_A: Record<MatchItemType, string> = { movie: 'Not a movie', show: 'Not a show' }
 
 const yearFrom = (text: string): number | null => {
   const year = Number.parseInt(text.trim(), 10)
@@ -72,7 +69,8 @@ export const FixMatchDialog = <T,>({
   onClose,
   onMatched,
 }: {
-  type: MatchType
+  /** What the dialog searches for: a movie, or a show. */
+  type: MatchItemType
   /** What the search box starts with: the parsed title. */
   title: string
   year: number | null

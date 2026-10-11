@@ -1,4 +1,5 @@
 import {
+  type MatchItemType,
   type MediaItem,
   cardTitle,
   codecLabel,
@@ -9,7 +10,6 @@ import {
 } from '@raven/core'
 import { Link } from 'react-router-dom'
 import { FavouriteMark } from '@/components/FavouriteMark/FavouriteMark'
-import type { MatchType } from '@/components/FixMatchDialog/FixMatchDialog'
 import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
 import { PosterFrame } from '@/components/PosterCard/PosterCard'
@@ -34,7 +34,7 @@ const MediaTile = ({
   media: MediaItem
   note: string | null
   posters: boolean
-  matchType: MatchType | null
+  matchType: MatchItemType | null
 }) => {
   const menu = useCardMenu({ media, matchType, inline: true })
   const thumbnail = api.thumbnailUrl(media)
@@ -117,7 +117,7 @@ export const MediaTiles = ({
   /** A Movies library's tiles: small posters, opening the movie's page. */
   posters?: boolean
   /** What the library matches its files to, for the menu's Fix match. */
-  matchType?: MatchType | null
+  matchType?: MatchItemType | null
 }) => (
   <ul className={styles.tiles} aria-busy={busy}>
     {items.map((item) => (

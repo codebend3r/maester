@@ -155,7 +155,7 @@ export const ComponentsSection = () => (
       name="PosterCard"
       note="A Movies library's cards: with no poster they fall back to the frame grab, then the letter."
     >
-      <MediaGrid items={SAMPLE_MOVIES} posters />
+      <MediaGrid items={SAMPLE_MOVIES} posters matchType="movie" />
     </Specimen>
 
     <Specimen

@@ -1,6 +1,11 @@
-import { type MediaGroupBy, type MediaItem, type ShownRatings, groupMedia } from '@raven/core'
+import {
+  type MatchItemType,
+  type MediaGroupBy,
+  type MediaItem,
+  type RatingSource,
+  groupMedia,
+} from '@raven/core'
 import { Bucket } from '@/components/Bucket/Bucket'
-import type { MatchType } from '@/components/FixMatchDialog/FixMatchDialog'
 import { MediaGrid } from '@/components/MediaGrid/MediaGrid'
 import styles from '@/components/MediaGroups/MediaGroups.module.scss'
 
@@ -19,8 +24,8 @@ export const MediaGroups = ({
   by: MediaGroupBy
   busy?: boolean
   posters?: boolean
-  matchType?: MatchType | null
-  ratingsSource?: ShownRatings
+  matchType?: MatchItemType | null
+  ratingsSource?: RatingSource
 }) => (
   <div className={styles.groups} aria-busy={busy}>
     {groupMedia({ items, by }).map((group) => (

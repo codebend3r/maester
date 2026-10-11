@@ -1,5 +1,4 @@
-import type { MediaItem, ShownRatings } from '@raven/core'
-import type { MatchType } from '@/components/FixMatchDialog/FixMatchDialog'
+import type { MatchItemType, MediaItem, RatingSource } from '@raven/core'
 import { MediaCard } from '@/components/MediaCard/MediaCard'
 import { PosterCard } from '@/components/PosterCard/PosterCard'
 import styles from '@/components/MediaGrid/MediaGrid.module.scss'
@@ -15,13 +14,18 @@ export const MediaGrid = ({
   items: MediaItem[]
   busy?: boolean
   posters?: boolean
-  matchType?: MatchType | null
-  ratingsSource?: ShownRatings
+  matchType?: MatchItemType | null
+  ratingsSource?: RatingSource
 }) => (
   <ul className={posters ? `${styles.grid} ${styles.posters}` : styles.grid} aria-busy={busy}>
     {items.map((item) =>
       posters ? (
-        <PosterCard key={item.id} media={item} ratingsSource={ratingsSource} />
+        <PosterCard
+          key={item.id}
+          media={item}
+          matchType={matchType}
+          ratingsSource={ratingsSource}
+        />
       ) : (
         <MediaCard key={item.id} media={item} matchType={matchType} />
       ),

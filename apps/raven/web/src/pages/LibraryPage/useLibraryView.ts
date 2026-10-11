@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   type Library,
   type LibrarySettings,
+  coherentSettings,
   isLibraryView,
   isMediaGroupBy,
   isMediaSort,
@@ -58,7 +59,8 @@ export const useLibraryView = ({ library }: { library: Library }) => {
   const [search, setSearch] = useState(address.get('q') ?? '')
   const [seed] = useState(dealSeed)
   const query = useDebouncedValue({ value: search.trim(), delayMs: 200 })
-  const settings = { ...library.settings, ...viewFromUrl(address) }
+  // The address may ask for what the library's type cannot show; that is settled here, once.
+  const settings = coherentSettings({ ...library.settings, ...viewFromUrl(address) })
   const key = queryKeys.library(library.id)
 
   // The search rides in the address once it settles, replacing rather than

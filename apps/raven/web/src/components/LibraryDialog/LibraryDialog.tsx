@@ -2,14 +2,15 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   DEFAULT_LIBRARY_SETTINGS,
   LIBRARY_KINDS,
-  type LibraryKind,
-  SHOWN_RATINGS,
-  type ShownRatings,
   type Library,
   type LibraryInput,
+  type LibraryKind,
   type LibrarySettings,
+  RATING_SOURCES,
+  type RatingSource,
   defaultLibrarySettings,
-  isShownRatings,
+  isMatchedKind,
+  isRatingSource,
   validateLibraryInput,
   withLibraryKind,
 } from '@raven/core'
@@ -23,7 +24,7 @@ import { afterLibrarySaved } from '@/lib/invalidate'
 import { lockQuery, metadataHealthQuery } from '@/lib/queries'
 import styles from '@/components/LibraryDialog/LibraryDialog.module.scss'
 
-const RATINGS_LABELS: Record<ShownRatings, string> = {
+const RATINGS_LABELS: Record<RatingSource, string> = {
   tmdb: 'TMDB',
   imdb: 'IMDb',
   rottenTomatoes: 'Rotten Tomatoes',
@@ -305,7 +306,7 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
               it.
             </p>
           </div>
-          {settings.kind !== 'other' && (
+          {isMatchedKind(settings.kind) && (
             <div className={styles.watched}>
               <label htmlFor={`${ids.settings}-ratings`}>Ratings shown</label>
               <select
@@ -314,13 +315,13 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
                 value={settings.ratingsSource}
                 onChange={(event) => {
                   const ratingsSource = event.target.value
-                  if (isShownRatings(ratingsSource)) {
+                  if (isRatingSource(ratingsSource)) {
                     setSettings((current) => ({ ...current, ratingsSource }))
                   }
                 }}
                 aria-describedby={`${ids.settings}-ratings-hint`}
               >
-                {SHOWN_RATINGS.map((source) => (
+                {RATING_SOURCES.map((source) => (
                   <option key={source} value={source}>
                     {RATINGS_LABELS[source]}
                   </option>

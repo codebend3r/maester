@@ -1,9 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  type ChoosableImageKind,
   type ImageChoice,
   type ImageOption,
   type ItemDetails,
   type Library,
+  type MatchItemType,
   codecLabel,
   formatBytes,
   resolutionLabel,
@@ -15,9 +17,7 @@ import { afterItemEdited } from '@/lib/invalidate'
 import { itemImagesQuery } from '@/lib/queries'
 import styles from '@/components/ImageEditor/ImageEditor.module.scss'
 
-type Kind = 'poster' | 'backdrop'
-
-const KIND_LABELS: Record<Kind, string> = { poster: 'Poster', backdrop: 'Backdrop' }
+const KIND_LABELS: Record<ChoosableImageKind, string> = { poster: 'Poster', backdrop: 'Backdrop' }
 
 const LANGUAGE_NAMES = new Intl.DisplayNames(['en'], { type: 'language' })
 
@@ -43,7 +43,7 @@ const describe = (option: ImageOption): string =>
 const choiceOf = (option: ImageOption): ImageChoice =>
   option.source === 'local' ? { source: 'local' } : { source: 'tmdb', ref: option.ref }
 
-const KINDS: readonly Kind[] = ['poster', 'backdrop']
+const KINDS: readonly ChoosableImageKind[] = ['poster', 'backdrop']
 
 /** One tab's pictures to pick from. */
 const Options = ({
@@ -54,7 +54,7 @@ const Options = ({
   onChoose,
 }: {
   itemId: number
-  kind: Kind
+  kind: ChoosableImageKind
   options: readonly ImageOption[]
   busy: boolean
   onChoose: (option: ImageOption) => void
@@ -102,15 +102,15 @@ export const ImageEditor = ({
   details: ItemDetails
   libraries: readonly Library[]
   /** A show's pictures are its own; there are no linked files to list. */
-  itemKind?: 'movie' | 'show'
+  itemKind?: MatchItemType
   onDone: () => void
 }) => {
   const ids = { heading: useId(), versions: useId(), tabs: useId() }
-  const [tab, setTab] = useState<Kind>('poster')
+  const [tab, setTab] = useState<ChoosableImageKind>('poster')
   const queryClient = useQueryClient()
   const options = useQuery(itemImagesQuery(details.id))
   const choose = useMutation({
-    mutationFn: ({ kind, option }: { kind: Kind; option: ImageOption }) =>
+    mutationFn: ({ kind, option }: { kind: ChoosableImageKind; option: ImageOption }) =>
       api.chooseItemImage({ id: details.id, kind, choice: choiceOf(option) }),
     onSuccess: (updated) => afterItemEdited({ queryClient, updated, part: 'images' }),
   })

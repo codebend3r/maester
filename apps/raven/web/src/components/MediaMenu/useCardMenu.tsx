@@ -1,6 +1,5 @@
-import type { MediaItem } from '@raven/core'
+import type { MatchItemType, MediaItem } from '@raven/core'
 import { type MouseEvent, useState } from 'react'
-import type { MatchType } from '@/components/FixMatchDialog/FixMatchDialog'
 import { MENU_HOST, MediaMenu } from '@/components/MediaMenu/MediaMenu'
 
 /**
@@ -13,7 +12,7 @@ export const useCardMenu = ({
   inline = false,
 }: {
   media: MediaItem
-  matchType: MatchType | null
+  matchType: MatchItemType | null
   inline?: boolean
 }) => {
   const [open, setOpen] = useState(false)
