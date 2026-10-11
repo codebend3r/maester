@@ -134,6 +134,20 @@ const unsortTitle = (title: string): string => {
   return sorted ? `${sorted[2]} ${sorted[1]}` : title
 }
 
+/** A DVD region code left in a title: `Alien Resurrection R2`. */
+const REGION_TAG = /\s+R[1-6]$/i
+
+/**
+ * A title that repeats its own year ends there: `Alexander 2004 Revisited
+ * the Final Cut (2004)` is `Alexander`. A year that is the title, `2012`,
+ * or a different number, `Blade Runner 2049`, stays.
+ */
+const beforeOwnYear = ({ title, year }: { title: string; year: number | null }): string => {
+  if (year == null) return title
+  const at = title.search(new RegExp(`(?<=\\s)${year}(?=\\s|$)`))
+  return at > 0 ? tidy(title.slice(0, at)) : title
+}
+
 /** Reads one name, a folder's or a file's stem: title, year, edition and ids. */
 const readName = (name: string): ParsedMovieName => {
   const ids = readIds(name)
@@ -141,8 +155,12 @@ const readName = (name: string): ParsedMovieName => {
   const bare = stripTags(name)
   const year = findYear(bare)
   const named = readBareEdition(tidy(bare.slice(0, year ? year.at : firstTagAt(bare))))
+  const title = beforeOwnYear({ title: named.title, year: year?.year ?? null }).replace(
+    REGION_TAG,
+    '',
+  )
   return {
-    title: unsortTitle(named.title),
+    title: unsortTitle(title),
     year: year?.year ?? null,
     edition: edition ?? named.edition,
     ids,
@@ -200,11 +218,28 @@ export const isExtra = ({ fileName, folder }: { fileName: string; folder: string
 
 const LEADING_ARTICLE = /^(the|a|an)\s+/i
 
+const NUMBER_WORDS: Record<string, string> = {
+  one: '1',
+  two: '2',
+  three: '3',
+  four: '4',
+  five: '5',
+  six: '6',
+  seven: '7',
+  eight: '8',
+  nine: '9',
+  ten: '10',
+  eleven: '11',
+  twelve: '12',
+}
+
 /**
  * A title folded for comparison: no case, accents or punctuation, `&` as
- * "and", and no leading "The", "A" or "An", so "The Lord of the Rings: The
- * Return of the King" and "lord of the rings the return of the king" agree.
- * An apostrophe goes without a trace, so "The King's Man" is "The Kings Man".
+ * "and", a number spelt out as its digits, and no leading "The", "A" or
+ * "An", so "The Lord of the Rings: The Return of the King" and "lord of the
+ * rings the return of the king" agree, as do "Fantastic Four" and
+ * "Fantastic 4". An apostrophe goes without a trace, so "The King's Man" is
+ * "The Kings Man".
  */
 export const foldTitle = (title: string): string =>
   title
@@ -216,6 +251,9 @@ export const foldTitle = (title: string): string =>
     .replace(/[^a-z0-9]+/g, ' ')
     .trim()
     .replace(LEADING_ARTICLE, '')
+    .split(' ')
+    .map((word) => NUMBER_WORDS[word] ?? word)
+    .join(' ')
     .trim()
 
 /** A title as it sorts: without a leading "The", "A" or "An". */

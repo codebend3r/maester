@@ -50,6 +50,7 @@ describe('movie metadata', () => {
       { id: 680, title: 'Pulp Fiction', released: '1994-09-10' },
       { id: 11, title: 'Unknown Thing One', released: '2020-01-01' },
       { id: 12, title: 'Unknown Thing Two', released: '2020-06-01' },
+      { id: 881, title: 'A Few Good Men', released: '1992-12-11' },
     ],
     omdb: { tt0133093: { imdb: '8.7/10', rottenTomatoes: '83%', metacritic: '73/100' } },
   })
@@ -120,6 +121,10 @@ describe('movie metadata', () => {
         seconds: 1,
       }),
       encodeClip({
+        path: join(state.media, 'The Few Good Men (1992)', 'The Few Good Men (1992).mp4'),
+        seconds: 1,
+      }),
+      encodeClip({
         path: join(state.media, 'Unknown Thing (2020)', 'Unknown Thing (2020).mp4'),
         seconds: 1,
       }),
@@ -163,6 +168,7 @@ describe('movie metadata', () => {
     expect(
       items.map((item) => [item.item?.title ?? item.title, item.match, item.versions]),
     ).toEqual([
+      ['A Few Good Men', 'matched', 1],
       ['Heat', 'matched', 1],
       ['Making Of', 'off', 1],
       ['The Matrix', 'matched', 2],
@@ -176,6 +182,14 @@ describe('movie metadata', () => {
       width: 640,
     })
     expect(items.find((item) => item.title === 'Unknown Thing')?.year).toBe(2020)
+  })
+
+  it('asked again without the article when "The Few Good Men" found nothing', () => {
+    const asked = tmdb.state.calls
+      .filter((url) => url.includes('/search/movie'))
+      .map((url) => new URL(url).searchParams.get('query'))
+    expect(asked).toContain('The Few Good Men')
+    expect(asked).toContain('Few Good Men')
   })
 
   it('matched Heat by the id in its folder name, without a search', () => {
@@ -398,6 +412,7 @@ describe('movie metadata', () => {
       1999,
       1995,
       1994,
+      1992,
       null,
     ])
   })

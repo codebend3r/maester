@@ -32,6 +32,22 @@ describe('pickMatch', () => {
     expect(pickMatch({ title: 'The Matrix', year: 1999, results: [near, exact] })).toBe(exact)
   })
 
+  it('accepts the nearest year within three, as a festival and a release can differ', () => {
+    const release = result({ tmdbId: 'release', title: 'The Evil Dead', year: 1983 })
+    expect(pickMatch({ title: 'The Evil Dead', year: 1981, results: [release] })).toBe(release)
+    const remake = result({ tmdbId: 'remake', title: 'Evil Dead', year: 2013 })
+    expect(pickMatch({ title: 'The Evil Dead', year: 1981, results: [remake, release] })).toBe(
+      release,
+    )
+    expect(
+      pickMatch({
+        title: 'The Evil Dead',
+        year: 1981,
+        results: [result({ title: 'The Evil Dead', year: 1985 })],
+      }),
+    ).toBeNull()
+  })
+
   it('accepts an original title', () => {
     const amelie = result({
       title: 'Amélie',

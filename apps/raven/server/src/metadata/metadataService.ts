@@ -7,15 +7,16 @@ import {
   type OnModuleDestroy,
 } from '@nestjs/common'
 import {
+  foldTitle,
+  isExtra,
   type LibraryKind,
   type MatchState,
   type MetadataHealth,
   type NameIds,
-  foldTitle,
-  isExtra,
   parseEpisodeName,
   parseMovieName,
   seasonFolderNumber,
+  sortTitle,
 } from '@raven/core'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { MediaRepository, type PendingFile } from '@/media/mediaRepository'
@@ -31,7 +32,7 @@ import { pickMatch } from '@/metadata/matcher'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 import { readNfoIds } from '@/metadata/nfo'
 import { OmdbClient } from '@/metadata/omdbClient'
-import { type FetchedItem, TmdbClient, TmdbError } from '@/metadata/tmdbClient'
+import { type FetchedItem, type SearchResult, TmdbClient, TmdbError } from '@/metadata/tmdbClient'
 import { createTaskQueue, mapWithConcurrency } from '@/scanner/concurrency'
 
 /** The library types whose files get matched. */
@@ -425,11 +426,16 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
       cache: context.searches,
       key: `${type}|${foldTitle(title)}|${year ?? ''}`,
       make: async () => {
-        const results =
+        const ask = (query: string): Promise<SearchResult[]> =>
           type === 'movie'
-            ? await this.tmdb.searchMovies({ query: title, year })
-            : await this.tmdb.searchShows({ query: title, year })
-        return pickMatch({ title, year, results })?.tmdbId ?? null
+            ? this.tmdb.searchMovies({ query, year })
+            : this.tmdb.searchShows({ query, year })
+        const results = await ask(title)
+        // TMDB finds nothing for "The Few Good Men"; without the article it
+        // offers "A Few Good Men", which folds to the same title.
+        const bare = sortTitle(title)
+        const retried = results.length === 0 && bare !== title ? await ask(bare) : results
+        return pickMatch({ title, year, results: retried })?.tmdbId ?? null
       },
     })
   }

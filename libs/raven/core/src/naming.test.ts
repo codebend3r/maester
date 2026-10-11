@@ -99,6 +99,20 @@ describe('parseMovieName', () => {
     expect(movie(path)).toMatchObject({ title, edition })
   })
 
+  it('ends a title at its own year, and drops a region code', () => {
+    expect(movie('Alexander 2004 Revisited the Final Cut (2004) WEBDL-2160p.mkv')).toMatchObject({
+      title: 'Alexander',
+      year: 2004,
+      edition: 'Final Cut',
+    })
+    expect(movie('Blade Runner 2049 (2017).mkv')).toMatchObject({ title: 'Blade Runner 2049' })
+    expect(movie('2012 (2012).mkv')).toMatchObject({ title: '2012', year: 2012 })
+    expect(movie('Alien Resurrection R2 Special Edition (1997).mkv')).toMatchObject({
+      title: 'Alien Resurrection',
+      edition: 'Special Edition',
+    })
+  })
+
   it('leaves a title that only ends in Cut or Edition alone', () => {
     expect(movie('The Final Cut (2004).mkv')).toMatchObject({
       title: 'The Final Cut',
@@ -138,6 +152,12 @@ describe('isExtra', () => {
 })
 
 describe('foldTitle', () => {
+  it('reads a number spelt out as its digits', () => {
+    expect(foldTitle('The Fantastic Four: First Steps')).toBe(foldTitle('Fantastic 4 First Steps'))
+    expect(foldTitle("Ocean's Eleven")).toBe('oceans 11')
+    expect(foldTitle('Se7en')).toBe('se7en')
+  })
+
   it('drops an apostrophe rather than splitting the word at it', () => {
     expect(foldTitle("The King's Man")).toBe(foldTitle('The Kings Man'))
     expect(foldTitle('The World’s End')).toBe('worlds end')
