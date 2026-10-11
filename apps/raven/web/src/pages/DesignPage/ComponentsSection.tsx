@@ -1,7 +1,9 @@
 import { DEFAULT_LIBRARY_SETTINGS, type LibrarySettings } from '@raven/core'
 import { useRef, useState } from 'react'
 import { Button, ButtonLink } from '@/components/Button/Button'
+import { CastRow } from '@/components/CastRow/CastRow'
 import { ICON_NAMES, Icon } from '@/components/Icon/Icon'
+import { ItemHeader } from '@/components/ItemHeader/ItemHeader'
 import { LibraryToolbar } from '@/components/LibraryToolbar/LibraryToolbar'
 import { MediaCard } from '@/components/MediaCard/MediaCard'
 import { MediaGrid } from '@/components/MediaGrid/MediaGrid'
@@ -10,9 +12,17 @@ import { MediaList } from '@/components/MediaList/MediaList'
 import { MediaTiles } from '@/components/MediaTiles/MediaTiles'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
 import { Controls } from '@/components/Player/Controls'
+import { RatingChips } from '@/components/RatingChips/RatingChips'
 import { ScanStatus } from '@/components/ScanStatus/ScanStatus'
 import { DesignSection, Specimen } from '@/pages/DesignPage/DesignSection'
-import { FEATURED_SAMPLE, SAMPLE_MEDIA, SAMPLE_SCANS } from '@/pages/DesignPage/samples'
+import {
+  FEATURED_SAMPLE,
+  SAMPLE_CREDITS,
+  SAMPLE_MEDIA,
+  SAMPLE_MOVIES,
+  SAMPLE_RATINGS,
+  SAMPLE_SCANS,
+} from '@/pages/DesignPage/samples'
 import styles from '@/pages/DesignPage/DesignPage.module.scss'
 
 const noop = () => undefined
@@ -134,6 +144,39 @@ export const ComponentsSection = () => (
       <ul className={styles.cardSample}>
         <MediaCard media={FEATURED_SAMPLE} />
       </ul>
+    </Specimen>
+
+    <Specimen
+      name="PosterCard"
+      note="A Movies library's cards: with no poster they fall back to the frame grab, then the letter."
+    >
+      <MediaGrid items={SAMPLE_MOVIES} posters />
+    </Specimen>
+
+    <Specimen name="ItemHeader" note="The top of a movie's page, without its backdrop here.">
+      <ItemHeader
+        titleId="design-item-header"
+        title="Weirwood at Night"
+        byline="Directed by Mark Kimball"
+        contentRating="PG-13"
+        facts={['2026', '1h 42m', 'Drama', 'Mystery']}
+        ratings={SAMPLE_RATINGS}
+        poster={null}
+        backdrop={null}
+      >
+        <Button tone="primary" icon="play">
+          Resume from 40:00
+        </Button>
+        <Button icon="heart" aria-label="Favourite" aria-pressed />
+      </ItemHeader>
+    </Specimen>
+
+    <Specimen name="RatingChips" note="TMDB's score; the others join when OMDb is set up.">
+      <RatingChips ratings={SAMPLE_RATINGS} />
+    </Specimen>
+
+    <Specimen name="CastRow" note="Someone who acts and directs is one person with both roles.">
+      <CastRow credits={SAMPLE_CREDITS} />
     </Specimen>
 
     <Specimen name="MediaGrid">

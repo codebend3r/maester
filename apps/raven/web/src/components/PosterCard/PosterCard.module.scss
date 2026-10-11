@@ -1,0 +1,147 @@
+// Areas stack the picture, the play button over it, then the words.
+.card {
+  position: relative;
+  display: grid;
+  grid-template-areas:
+    'frame'
+    'title'
+    'facts'
+    'note';
+  grid-template-rows: auto auto auto auto;
+  align-content: start;
+  gap: var(--space-0);
+  min-width: 0;
+
+  &:hover .image,
+  &:focus-within .image {
+    filter: brightness(1.12);
+  }
+}
+
+.picture {
+  grid-area: frame;
+  display: grid;
+  border-radius: var(--radius-md);
+}
+
+.frame {
+  display: grid;
+  grid-template-areas: 'frame';
+  aspect-ratio: 2 / 3;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-canopy);
+}
+
+.image,
+.placeholder,
+.resume {
+  grid-area: frame;
+}
+
+.image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: filter 150ms ease-out;
+}
+
+.placeholder {
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-size: var(--font-size-xl);
+  color: var(--color-lichen);
+}
+
+// Where playback stopped: the one red mark in the grid.
+.resume {
+  align-self: end;
+  display: grid;
+  height: 4px;
+  background: rgb(0 0 0 / 45%);
+}
+
+.resumeFill {
+  display: block;
+  height: 100%;
+  background: var(--color-leaf-bright);
+}
+
+// Lies over the poster and lets clicks through, but for the button itself.
+.overlay {
+  grid-area: frame;
+  display: grid;
+  align-items: end;
+  justify-items: start;
+  padding: var(--space-1);
+  pointer-events: none;
+}
+
+.play {
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  background: var(--color-scrim);
+  color: var(--color-bark);
+  opacity: 0;
+  pointer-events: auto;
+  transition:
+    opacity 120ms ease-out,
+    background-color 120ms ease-out;
+
+  &:hover {
+    background: var(--color-leaf);
+  }
+
+  &:focus-visible {
+    opacity: 1;
+  }
+}
+
+.card:hover .play {
+  opacity: 1;
+}
+
+// Touch screens have no hover to reveal it.
+@media (hover: none) {
+  .play {
+    opacity: 1;
+  }
+}
+
+.title {
+  grid-area: title;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-weight: 600;
+  line-height: 1.3;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+
+  &:hover {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+}
+
+.facts {
+  grid-area: facts;
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  gap: var(--space-2);
+  color: var(--color-lichen);
+  font-size: var(--font-size-xs);
+  font-stretch: 90%;
+}
+
+.favourite {
+  display: grid;
+  align-items: center;
+  color: var(--color-bark);
+}

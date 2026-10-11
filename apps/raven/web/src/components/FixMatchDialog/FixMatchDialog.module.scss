@@ -1,0 +1,153 @@
+.dialog {
+  width: min(44rem, calc(100vw - 2 * var(--space-3)));
+  max-height: calc(100dvh - 2 * var(--space-3));
+  padding: 0;
+  border: 1px solid var(--color-moss);
+  border-radius: var(--radius-md);
+  background: var(--color-canopy);
+  color: var(--color-bark);
+
+  &::backdrop {
+    background: var(--color-scrim);
+  }
+}
+
+.body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.header {
+  display: grid;
+  gap: var(--space-0);
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: var(--font-size-xl);
+  font-weight: 400;
+  line-height: var(--line-tight);
+}
+
+.file {
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+  overflow-wrap: anywhere;
+}
+
+.form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 6rem auto;
+  align-items: end;
+  gap: var(--space-1);
+}
+
+.field {
+  display: grid;
+  gap: var(--space-0);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+
+  input {
+    min-height: 2.5rem;
+    padding: var(--space-1) var(--space-2);
+    border: 1px solid var(--color-moss);
+    border-radius: var(--radius-md);
+    background: var(--color-night);
+    font-weight: 400;
+  }
+}
+
+.yearInput {
+  width: 100%;
+}
+
+@media (max-width: 30rem) {
+  .form {
+    grid-template-columns: minmax(0, 1fr) 5rem;
+  }
+
+  .submit {
+    grid-column: 1 / -1;
+  }
+}
+
+.results {
+  display: grid;
+}
+
+.hint {
+  color: var(--color-lichen);
+}
+
+.list {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.candidate {
+  display: grid;
+  grid-template-columns: 3.5rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1);
+  border-radius: var(--radius-md);
+  background: var(--color-night);
+}
+
+.poster {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 2 / 3;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--color-moss);
+  color: var(--color-lichen);
+  font-family: var(--font-display);
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+.details {
+  display: grid;
+  gap: 2px;
+}
+
+.name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.year {
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+}
+
+.overview {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: var(--color-lichen);
+  font-size: var(--font-size-xs);
+}
+
+.error {
+  padding: var(--space-2) var(--space-3);
+  border-left: 2px solid var(--color-leaf-bright);
+  background: var(--color-night);
+  font-size: var(--font-size-sm);
+}
+
+.actions {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: space-between;
+  gap: var(--space-1);
+}

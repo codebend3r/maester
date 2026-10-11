@@ -1,4 +1,4 @@
-import type { MediaItem, ScanStatus } from '@raven/core'
+import type { Credit, ItemSummary, MediaItem, Rating, ScanStatus } from '@raven/core'
 
 /**
  * Made-up videos for the design page. Negative ids never match a real
@@ -24,6 +24,11 @@ const sample = (overrides: Partial<MediaItem> & Pick<MediaItem, 'id' | 'title'>)
   position: 0,
   favourite: false,
   addedAt: '2026-10-02T12:00:00.000Z',
+  match: 'off',
+  year: null,
+  edition: null,
+  item: null,
+  versions: 1,
   ...overrides,
 })
 
@@ -118,4 +123,52 @@ export const SAMPLE_SCANS: Array<{ label: string; scan: ScanStatus }> = [
       error: 'Could not read /media/movies.',
     },
   },
+]
+
+/** A made-up movie for the poster and page specimens; no poster, so nothing loads. */
+const sampleMovie = (
+  overrides: Partial<ItemSummary> & Pick<ItemSummary, 'id' | 'title'>,
+): ItemSummary => ({
+  type: 'movie',
+  year: 2026,
+  show: null,
+  season: null,
+  episode: null,
+  posterVersion: null,
+  ...overrides,
+})
+
+/** A Movies library's cards: matched, kept twice, and one nothing matched. */
+export const SAMPLE_MOVIES: MediaItem[] = [
+  sample({
+    id: -11,
+    title: 'Weirwood at Night',
+    year: 2026,
+    match: 'matched',
+    item: sampleMovie({ id: -11, title: 'Weirwood at Night' }),
+    position: 2400,
+    favourite: true,
+  }),
+  sample({
+    id: -12,
+    title: 'The Long Winter',
+    year: 2019,
+    match: 'matched',
+    item: sampleMovie({ id: -12, title: 'The Long Winter', year: 2019 }),
+    versions: 2,
+  }),
+  sample({ id: -13, title: 'Ravens of the North', year: 2024, match: 'unmatched' }),
+]
+
+export const SAMPLE_RATINGS: Rating[] = [
+  { source: 'tmdb', kind: 'audience', value: 7.8, votes: 1840 },
+]
+
+export const SAMPLE_CREDITS: Credit[] = [
+  { personId: -1, name: 'Arya Hollow', job: 'cast', role: 'The Watcher', photoVersion: null },
+  { personId: -2, name: 'Bran Stone', job: 'cast', role: 'Old Nan', photoVersion: null },
+  { personId: -3, name: 'Mark Kimball', job: 'cast', role: 'Ferryman', photoVersion: null },
+  { personId: -3, name: 'Mark Kimball', job: 'director', role: 'Director', photoVersion: null },
+  { personId: -4, name: 'Jeyne Pool', job: 'writer', role: 'Screenplay', photoVersion: null },
+  { personId: -5, name: 'Osha Vale', job: 'producer', role: 'Producer', photoVersion: null },
 ]

@@ -3,3 +3,9 @@
   grid-template-columns: repeat(auto-fill, minmax(min(15rem, 100%), 1fr));
   gap: var(--space-5) var(--space-4);
 }
+
+// Posters are narrower than frame grabs, so more fit a row.
+.posters {
+  grid-template-columns: repeat(auto-fill, minmax(min(10rem, 100%), 1fr));
+  gap: var(--space-4) var(--space-3);
+}

@@ -49,4 +49,14 @@ export const queryKeys = {
   /** The prefix every page of a library's history shares. */
   histories: (libraryId: number) => ['libraries', libraryId, 'history'],
   browse: (path: string | null) => ['browse', path],
+  /** Every item page shares this prefix, so a match or refresh refetches them all. */
+  items: ['items'],
+  item: (id: number) => ['items', id],
+  matchSearch: ({ type, query, year }: { type: string; query: string; year: number | null }) => [
+    'match',
+    type,
+    query,
+    year,
+  ],
+  metadataHealth: ['health', 'metadata'],
 }

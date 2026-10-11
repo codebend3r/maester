@@ -1,4 +1,4 @@
-import { type MediaItem, formatRuntime, resolutionLabel } from '@raven/core'
+import { type MediaItem, formatRuntime, mediaLabel, resolutionLabel } from '@raven/core'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Icon } from '@/components/Icon/Icon'
@@ -46,7 +46,7 @@ export const MediaCard = ({ media }: { media: MediaItem }) => {
             />
           ) : (
             <span className={styles.placeholder} aria-hidden="true">
-              {media.title.slice(0, 1)}
+              {mediaLabel(media).slice(0, 1)}
             </span>
           )}
           {progress > 0 && (
@@ -55,7 +55,7 @@ export const MediaCard = ({ media }: { media: MediaItem }) => {
             </span>
           )}
         </span>
-        <span className={styles.title}>{media.title}</span>
+        <span className={styles.title}>{mediaLabel(media)}</span>
       </Link>
       <span className={styles.facts}>
         {media.favourite && (
