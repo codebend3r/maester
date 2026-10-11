@@ -1,5 +1,5 @@
 import { describe, expect, it, mock } from 'bun:test'
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createApiClient } from '@raven/core'
 import { library } from '@/test/fixtures'
@@ -42,6 +42,24 @@ mock.module('@/lib/api', () => ({
 const { LibraryDialog } = await import('@/components/LibraryDialog/LibraryDialog')
 
 describe('LibraryDialog', () => {
+  it('offers Ratings shown for a Movies library, and not for Other', async () => {
+    renderWithProviders(
+      <LibraryDialog
+        library={library({ settings: { ...library().settings, kind: 'movies' } })}
+        onClose={() => undefined}
+      />,
+    )
+    const select = screen.getByRole('combobox', { name: 'Ratings shown' })
+    expect(select).toHaveValue('tmdb')
+    expect(
+      within(select)
+        .getAllByRole('option')
+        .map((option) => option.textContent),
+    ).toEqual(['TMDB', 'IMDb', 'Rotten Tomatoes'])
+    await userEvent.click(screen.getByRole('radio', { name: 'Other' }))
+    expect(screen.queryByRole('combobox', { name: 'Ratings shown' })).toBeNull()
+  })
+
   it('says how to turn on posters and details while TMDB is off', async () => {
     renderWithProviders(<LibraryDialog onClose={() => undefined} />)
     const type = screen.getByRole('group', { name: 'Type' })
@@ -78,6 +96,7 @@ describe('LibraryDialog', () => {
           groupBy: 'resolution',
           watchedPercent: 90,
           kind: 'other',
+          ratingsSource: 'tmdb',
         },
       },
     ])
@@ -101,6 +120,7 @@ describe('LibraryDialog', () => {
         groupBy: 'resolution',
         watchedPercent: 90,
         kind: 'other',
+        ratingsSource: 'tmdb',
       },
     })
   })

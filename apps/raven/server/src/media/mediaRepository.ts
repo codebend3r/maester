@@ -87,6 +87,7 @@ type MediaRow = {
   favourited_at: string | null
   item_id: number | null
   versions: number
+  score: number | null
 }
 
 /** A file waiting to be matched, with what matching needs: its name and where it sits. */
@@ -114,7 +115,9 @@ const SELECT_COLUMNS = `
          CASE WHEN i.type = 'movie'
               THEN (SELECT COUNT(*) FROM media_items x JOIN media y ON y.id = x.media_id
                      WHERE x.item_id = i.id AND y.library_id = m.library_id)
-              ELSE 1 END AS versions`
+              ELSE 1 END AS versions,
+         COALESCE((SELECT r.value FROM ratings r WHERE r.item_id = i.id AND r.source = l.ratings_source),
+                  (SELECT r.value FROM ratings r WHERE r.item_id = i.id AND r.source = 'tmdb')) AS score`
 
 const FROM_MEDIA = `
     FROM media m
@@ -208,6 +211,8 @@ const SHOW_ORDER_BY: Record<MediaSort, string> = {
   'resolution-low': 'sh.sort_title COLLATE NOCASE, sh.id',
   'year-new': 'sh.year IS NULL, sh.year DESC, sh.sort_title COLLATE NOCASE, sh.id',
   'year-old': 'sh.year IS NULL, sh.year, sh.sort_title COLLATE NOCASE, sh.id',
+  'rating-high': 'score IS NULL, score DESC, sh.sort_title COLLATE NOCASE, sh.id',
+  'rating-low': 'score IS NULL, score, sh.sort_title COLLATE NOCASE, sh.id',
   random: 'sh.sort_title COLLATE NOCASE, sh.id',
 }
 
@@ -272,6 +277,8 @@ const ORDER_BY: Record<MediaSort, string> = {
   'resolution-low': `width * height IS NULL, width * height, ${BY_TITLE}`,
   'year-new': `${YEAR} IS NULL, ${YEAR} DESC, ${BY_TITLE}`,
   'year-old': `${YEAR} IS NULL, ${YEAR}, ${BY_TITLE}`,
+  'rating-high': `score IS NULL, score DESC, ${BY_TITLE}`,
+  'rating-low': `score IS NULL, score, ${BY_TITLE}`,
   random: BY_TITLE,
 }
 
@@ -361,15 +368,18 @@ export class MediaRepository {
   }): ShowRecord[] {
     const pattern = likePattern(search.trim())
     const rows = this.db
-      .prepare<[number, string, string], ShowRow>(
+      .prepare<[number, number, string, string], ShowRow>(
         `WITH files AS (${EPISODE_FILES})
-         SELECT sh.id, sh.ended, COUNT(DISTINCT f.episode_id) AS episodes, MAX(f.added_at) AS added_at
+         SELECT sh.id, sh.ended, COUNT(DISTINCT f.episode_id) AS episodes, MAX(f.added_at) AS added_at,
+                COALESCE((SELECT r.value FROM ratings r WHERE r.item_id = sh.id
+                           AND r.source = (SELECT l.ratings_source FROM libraries l WHERE l.id = ?)),
+                         (SELECT r.value FROM ratings r WHERE r.item_id = sh.id AND r.source = 'tmdb')) AS score
            FROM files f JOIN items sh ON sh.id = f.show_id
           WHERE sh.title LIKE ? ESCAPE '\\' OR sh.original_title LIKE ? ESCAPE '\\'
           GROUP BY sh.id
           ORDER BY ${SHOW_ORDER_BY[sort]}`,
       )
-      .all(libraryId, pattern, pattern)
+      .all(libraryId, libraryId, pattern, pattern)
     const summaries = this.metadata.summaries(rows.map((row) => row.id))
     const nextUnwatched = this.db.prepare<[number, number], { media_id: number }>(
       `WITH files AS (${EPISODE_FILES})

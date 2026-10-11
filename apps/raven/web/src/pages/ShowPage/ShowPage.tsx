@@ -6,6 +6,7 @@ import { Button, ButtonLink } from '@/components/Button/Button'
 import { CastRow } from '@/components/CastRow/CastRow'
 import { FixMatchDialog } from '@/components/FixMatchDialog/FixMatchDialog'
 import { ItemHeader } from '@/components/ItemHeader/ItemHeader'
+import { ReviewCards } from '@/components/ReviewCards/ReviewCards'
 import { Summary } from '@/components/Summary/Summary'
 import { TmdbCredit } from '@/components/TmdbCredit/TmdbCredit'
 import { api } from '@/lib/api'
@@ -83,7 +84,7 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
         byline={createdBy(details)}
         contentRating={details.contentRating}
         facts={showFacts(details)}
-        ratings={details.ratings.filter((rating) => rating.source === 'tmdb')}
+        ratings={details.ratings}
         poster={api.itemImageUrl({
           id: details.id,
           kind: 'poster',
@@ -126,6 +127,7 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
       )}
 
       <CastRow credits={details.credits} />
+      <ReviewCards reviews={details.reviews} />
       <TmdbCredit />
 
       {fixing && (

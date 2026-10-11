@@ -5,6 +5,7 @@ import {
   isMediaGroupBy,
   isMediaSort,
   isRecord,
+  isShownRatings,
   isString,
   isWatchedPercent,
 } from '@/guards'
@@ -30,6 +31,7 @@ export const DEFAULT_LIBRARY_SETTINGS: LibrarySettings = {
   groupBy: 'resolution',
   watchedPercent: 90,
   kind: 'other',
+  ratingsSource: 'tmdb',
 }
 
 /** Each setting's check, and what to say when a value fails it. */
@@ -47,6 +49,7 @@ const SETTING_CHECKS: Record<
     problem: 'Watched at must be a whole percentage from 1 to 100.',
   },
   kind: { valid: isLibraryKind, problem: 'Type is not one of the choices.' },
+  ratingsSource: { valid: isShownRatings, problem: 'Ratings shown is not one of the choices.' },
 }
 
 type SettingsResult = { settings: Partial<LibrarySettings>; errors: string[] }
@@ -64,6 +67,7 @@ const readSettings = (input: unknown): SettingsResult => {
       ...(isMediaGroupBy(input.groupBy) ? { groupBy: input.groupBy } : {}),
       ...(isWatchedPercent(input.watchedPercent) ? { watchedPercent: input.watchedPercent } : {}),
       ...(isLibraryKind(input.kind) ? { kind: input.kind } : {}),
+      ...(isShownRatings(input.ratingsSource) ? { ratingsSource: input.ratingsSource } : {}),
     },
     errors: Object.entries(SETTING_CHECKS)
       .filter(([key, check]) => input[key] !== undefined && !check.valid(input[key]))

@@ -9,6 +9,7 @@ import {
   isMediaTracks,
   isMatchCandidateList,
   isMetadataHealth,
+  isPersonDetails,
   isRecord,
   isShowListing,
   isString,
@@ -28,6 +29,7 @@ import type {
   MediaSort,
   MediaTracks,
   MetadataHealth,
+  PersonDetails,
   ShowListing,
   StreamMode,
   SubtitleCue,
@@ -389,6 +391,22 @@ export const createApiClient = ({
       version == null
         ? null
         : url(`/api/items/${id}/images/${kind}?${toQueryString({ v: version })}`),
+
+    /** A person, and everything in raven they are credited on. */
+    getPerson: (id: number): Promise<PersonDetails> =>
+      expect({ request: send({ path: `/api/people/${id}` }), guard: isPersonDetails }),
+
+    /** A reviewer's avatar, when TMDB hosts it. */
+    reviewAvatarUrl: ({
+      reviewId,
+      avatarVersion,
+    }: {
+      reviewId: number
+      avatarVersion: string | null
+    }): string | null =>
+      avatarVersion == null
+        ? null
+        : url(`/api/reviews/${reviewId}/avatar?${toQueryString({ v: avatarVersion })}`),
 
     /** A person's photo; null when TMDB has none. */
     photoUrl: ({

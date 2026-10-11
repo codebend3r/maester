@@ -1,4 +1,4 @@
-import type { ItemDetails, ItemSummary, Library, MediaItem, ShowEntry } from '@raven/core'
+import type { ItemDetails, ItemSummary, Library, MediaItem, Review, ShowEntry } from '@raven/core'
 
 export const library = (overrides: Partial<Library> = {}): Library => ({
   id: 2,
@@ -22,6 +22,7 @@ export const library = (overrides: Partial<Library> = {}): Library => ({
     groupBy: 'resolution',
     watchedPercent: 90,
     kind: 'other',
+    ratingsSource: 'tmdb',
   },
   ...overrides,
 })
@@ -65,6 +66,7 @@ export const itemSummary = (overrides: Partial<ItemSummary> = {}): ItemSummary =
   season: null,
   episode: null,
   posterVersion: 'p1',
+  ratings: [{ source: 'tmdb', kind: 'audience', value: 8.2, votes: 1200 }],
   ...overrides,
 })
 
@@ -86,7 +88,7 @@ export const itemDetails = (overrides: Partial<ItemDetails> = {}): ItemDetails =
   studio: 'Night Shift Pictures',
   genres: ['Comedy', 'Drama', 'Crime', 'Romance'],
   backdropVersion: 'b1',
-  ratings: [{ source: 'tmdb', kind: 'audience', value: 8.2, votes: 1200 }],
+  reviews: [],
   credits: [
     { personId: 1, name: 'Mark Kimball', job: 'cast', role: 'Rudy', photoVersion: 'k1' },
     { personId: 2, name: 'Ana Ortiz', job: 'cast', role: 'Lena', photoVersion: null },
@@ -118,5 +120,16 @@ export const showEntry = (overrides: Partial<ShowEntry> = {}): ShowEntry => ({
       posterVersion: null,
     }),
   }),
+  ...overrides,
+})
+
+export const review = (overrides: Partial<Review> = {}): Review => ({
+  id: 1,
+  author: 'A TMDB member',
+  avatarVersion: null,
+  rating: 8,
+  content: 'A fine film, if a little long.',
+  url: 'https://www.themoviedb.org/review/abc',
+  writtenAt: '2026-10-01T12:00:00.000Z',
   ...overrides,
 })

@@ -50,6 +50,7 @@ describe('movie metadata', () => {
       { id: 11, title: 'Unknown Thing One', released: '2020-01-01' },
       { id: 12, title: 'Unknown Thing Two', released: '2020-06-01' },
     ],
+    omdb: { tt0133093: { imdb: '8.7/10', rottenTomatoes: '83%', metacritic: '73/100' } },
   })
   const state = {
     root: '',
@@ -132,6 +133,7 @@ describe('movie metadata', () => {
         scanOnStart: false,
         rescanIntervalMinutes: 0,
         tmdbApiToken: 'test-token',
+        omdbApiKey: 'omdb-key',
       },
       quiet: true,
       metadataFetch: tmdb.fetch,
@@ -192,7 +194,6 @@ describe('movie metadata', () => {
       imdbId: 'tt0133093',
       contentRating: 'R',
       genres: ['Action', 'Science Fiction'],
-      ratings: [{ source: 'tmdb', kind: 'audience', value: 8.2, votes: 1000 }],
     })
     expect(details.credits.map((credit) => `${credit.name}:${credit.job}`)).toEqual([
       'Keanu Reeves:cast',
@@ -204,6 +205,78 @@ describe('movie metadata', () => {
     expect(details.versions.map((version) => version.width)).toEqual([640, 320])
     expect(details.posterVersion).not.toBeNull()
     expect(details.backdropVersion).not.toBeNull()
+  })
+
+  it("carries OMDb's scores for a movie with an IMDb id, and only TMDB's for the rest", async () => {
+    const matrix = (await list()).find((item) => item.item?.title === 'The Matrix')
+    expect(matrix?.item?.ratings.map((rating) => [rating.source, rating.value])).toEqual([
+      ['rottenTomatoes', 8.3],
+      ['imdb', 8.7],
+      ['metacritic', 7.3],
+      ['tmdb', 8.2],
+    ])
+    const heat = (await list()).find((item) => item.item?.title === 'Heat')
+    expect(heat?.item?.ratings.map((rating) => rating.source)).toEqual(['tmdb'])
+    expect(tmdb.state.omdbCalls).toBe(1)
+  })
+
+  it("sorts by the library's chosen score, falling back to TMDB's", async () => {
+    const put = async (ratingsSource: string) =>
+      app().inject({
+        method: 'PUT',
+        url: `/api/libraries/${state.library}`,
+        payload: { name: 'Films', paths: [state.media], settings: { ratingsSource } },
+      })
+    expect((await put('rottenTomatoes')).statusCode).toBe(200)
+    const high = await list('?sort=rating-high')
+    expect(high[0]?.item?.title).toBe('The Matrix')
+    expect(high.at(-1)?.match).toBe('unmatched')
+    const low = await list('?sort=rating-low')
+    expect(low.find((item) => item.item)?.item?.title).not.toBe('The Matrix')
+    await put('tmdb')
+  })
+
+  it('keeps reviews by TMDB members, newest first, as plain text, with only TMDB avatars', async () => {
+    const matrix = (await list()).find((item) => item.item?.title === 'The Matrix')
+    const details = shape({
+      response: await app().inject({ method: 'GET', url: `/api/items/${matrix?.item?.id}` }),
+      guard: isItemDetails,
+    })
+    expect(
+      details.reviews.map((review) => [review.author, review.rating, review.avatarVersion != null]),
+    ).toEqual([
+      ['latecomer', null, false],
+      ['A Film Fan', 8, true],
+    ])
+    expect(details.reviews[0]?.content).toBe('<b>Not</b> for me.')
+    const avatar = await app().inject({
+      method: 'GET',
+      url: `/api/reviews/${details.reviews[1]?.id}/avatar?v=${details.reviews[1]?.avatarVersion}`,
+    })
+    expect(avatar.statusCode).toBe(200)
+    expect(avatar.rawPayload.equals(FAKE_JPEG)).toBe(true)
+  })
+
+  it("serves a person's page with what raven holds of theirs", async () => {
+    const matrix = (await list()).find((item) => item.item?.title === 'The Matrix')
+    const details = shape({
+      response: await app().inject({ method: 'GET', url: `/api/items/${matrix?.item?.id}` }),
+      guard: isItemDetails,
+    })
+    const keanu = details.credits.find((credit) => credit.name === 'Keanu Reeves')
+    const response = await app().inject({ method: 'GET', url: `/api/people/${keanu?.personId}` })
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).toMatchObject({
+      name: 'Keanu Reeves',
+      credits: expect.arrayContaining([
+        expect.objectContaining({
+          item: expect.objectContaining({ title: 'The Matrix' }),
+          job: 'cast',
+          role: 'Neo',
+        }),
+      ]),
+    })
+    expect((await app().inject({ method: 'GET', url: '/api/people/99999' })).statusCode).toBe(404)
   })
 
   it("serves the poster beside the movie, scaled, and TMDB's backdrop from the cache", async () => {
@@ -270,7 +343,7 @@ describe('movie metadata', () => {
     const metadata = isRecord(body) ? body.metadata : null
     expect(isMetadataHealth(metadata) && metadata).toMatchObject({
       tmdb: 'ok',
-      omdb: 'off',
+      omdb: 'ok',
       pending: 0,
     })
     expect(health.body).not.toContain('test-token')

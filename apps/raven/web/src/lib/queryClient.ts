@@ -66,6 +66,7 @@ export const queryKeys = {
   items: ['items'],
   item: (id: number) => ['items', id],
   nextEpisode: (showId: number) => ['items', showId, 'next'],
+  person: (id: number) => ['people', id],
   matchSearch: ({ type, query, year }: { type: string; query: string; year: number | null }) => [
     'match',
     type,

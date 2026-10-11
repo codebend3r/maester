@@ -10,6 +10,7 @@ import { MoviePage } from '@/pages/MoviePage/MoviePage'
 import { SeasonPage } from '@/pages/SeasonPage/SeasonPage'
 import { ShowPage } from '@/pages/ShowPage/ShowPage'
 import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
+import { PersonPage } from '@/pages/PersonPage/PersonPage'
 import { WatchPage } from '@/pages/WatchPage/WatchPage'
 
 export const AppRoutes = () => (
@@ -22,6 +23,7 @@ export const AppRoutes = () => (
       <Route path="shows/:id" element={<ShowPage />} />
       <Route path="shows/:id/seasons/:number" element={<SeasonPage />} />
       <Route path="episodes/:id" element={<EpisodePage />} />
+      <Route path="people/:id" element={<PersonPage />} />
       <Route path="favourites" element={<FavouritesPage />} />
       <Route path="design" element={<DesignPage />} />
       <Route path="*" element={<NotFoundPage />} />

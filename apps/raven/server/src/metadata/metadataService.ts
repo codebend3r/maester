@@ -30,6 +30,7 @@ import {
 import { pickMatch } from '@/metadata/matcher'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 import { readNfoIds } from '@/metadata/nfo'
+import { OmdbClient } from '@/metadata/omdbClient'
 import { type FetchedItem, TmdbClient, TmdbError } from '@/metadata/tmdbClient'
 import { createTaskQueue, mapWithConcurrency } from '@/scanner/concurrency'
 
@@ -98,6 +99,7 @@ const blank = (item: Pick<FetchedItem, 'type' | 'tmdbId' | 'number' | 'title'>):
   images: { poster: null, backdrop: null, still: null },
   credits: [],
   rating: null,
+  reviews: [],
 })
 
 /** A season TMDB does not list, so its files still have somewhere to sit. */
@@ -192,6 +194,7 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
     @Inject(MetadataRepository) private readonly metadata: MetadataRepository,
     @Inject(TmdbClient) private readonly tmdb: TmdbClient,
     @Inject(ImageCache) private readonly images: ImageCache,
+    @Inject(OmdbClient) private readonly omdb: OmdbClient,
   ) {}
 
   /**
@@ -240,7 +243,7 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
     const tmdb = this.tmdb.state()
     return {
       tmdb: tmdb.state,
-      omdb: 'off',
+      omdb: this.omdb.state().state,
       pending: this.media.countPending(MATCHED_KINDS),
       error: tmdb.error,
       lastOk: tmdb.lastOk,
@@ -435,7 +438,9 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
         try {
           const item =
             type === 'movie' ? await this.tmdb.movie(tmdbId) : await this.tmdb.show(tmdbId)
-          return this.metadata.save({ item })
+          const id = this.metadata.save({ item })
+          await this.scoresFor({ itemId: id, imdbId: item.imdbId })
+          return id
         } catch (error) {
           if (notFound(error)) return null
           throw error
@@ -874,11 +879,15 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
     if (item.tmdbId.startsWith(LOCAL)) return true
     try {
       if (item.type === 'movie') {
-        this.metadata.save({ item: await this.tmdb.movie(item.tmdbId) })
+        const movie = await this.tmdb.movie(item.tmdbId)
+        this.metadata.save({ item: movie })
         await this.rereadMovieImages(itemId)
+        await this.scoresFor({ itemId, imdbId: movie.imdbId })
       } else if (item.type === 'show') {
-        this.metadata.save({ item: await this.tmdb.show(item.tmdbId) })
+        const show = await this.tmdb.show(item.tmdbId)
+        this.metadata.save({ item: show })
         await this.refreshSeasons(itemId)
+        await this.scoresFor({ itemId, imdbId: show.imdbId })
       } else if (item.type === 'season') {
         await this.refreshSeason(itemId)
       } else if (item.parentId != null) {
@@ -989,7 +998,46 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
         })
       },
     })
+    await this.fillScores()
     await this.clearUp()
+  }
+
+  /**
+   * IMDb, Rotten Tomatoes and Metacritic scores from OMDb, for a movie or
+   * show with an IMDb id, while the key and today's calls allow. A call that
+   * fails is noted on the client and tried again another day.
+   */
+  private async scoresFor({
+    itemId,
+    imdbId,
+  }: {
+    itemId: number
+    imdbId: string | null
+  }): Promise<void> {
+    if (imdbId == null || !this.omdb.enabled) return
+    try {
+      this.metadata.saveScores({ itemId, scores: await this.omdb.ratings(imdbId) })
+    } catch (error) {
+      this.logger.warn(`No OMDb scores for ${imdbId}: ${message(error)}`)
+    }
+  }
+
+  /** Items whose OMDb scores are missing or a month old, as far as today's calls go. */
+  private async fillScores(): Promise<void> {
+    if (!this.omdb.enabled) return
+    const due = this.metadata.needingScores({
+      before: new Date(Date.now() - 30 * DAY_MS).toISOString(),
+      limit: this.omdb.remaining(),
+    })
+    await due.reduce(
+      (previous, item) =>
+        previous.then(() =>
+          this.omdb.enabled
+            ? this.scoresFor({ itemId: item.id, imdbId: item.imdbId })
+            : Promise.resolve(),
+        ),
+      Promise.resolve(),
+    )
   }
 
   private async clearUp(): Promise<void> {

@@ -2,9 +2,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   DEFAULT_LIBRARY_SETTINGS,
   LIBRARY_KINDS,
+  SHOWN_RATINGS,
+  type ShownRatings,
   type Library,
   type LibraryInput,
   type LibrarySettings,
+  isShownRatings,
   validateLibraryInput,
 } from '@raven/core'
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react'
@@ -15,6 +18,12 @@ import { api } from '@/lib/api'
 import { KIND_LABELS } from '@/lib/libraryKinds'
 import { queryKeys } from '@/lib/queryClient'
 import styles from '@/components/LibraryDialog/LibraryDialog.module.scss'
+
+const RATINGS_LABELS: Record<ShownRatings, string> = {
+  tmdb: 'TMDB',
+  imdb: 'IMDb',
+  rottenTomatoes: 'Rotten Tomatoes',
+}
 
 /**
  * Creates a library, or edits one when `library` is given. A native modal
@@ -251,6 +260,33 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
               it.
             </p>
           </div>
+          {settings.kind !== 'other' && (
+            <div className={styles.watched}>
+              <label htmlFor={`${ids.settings}-ratings`}>Ratings shown</label>
+              <select
+                id={`${ids.settings}-ratings`}
+                className={styles.input}
+                value={settings.ratingsSource}
+                onChange={(event) => {
+                  const ratingsSource = event.target.value
+                  if (isShownRatings(ratingsSource)) {
+                    setSettings((current) => ({ ...current, ratingsSource }))
+                  }
+                }}
+                aria-describedby={`${ids.settings}-ratings-hint`}
+              >
+                {SHOWN_RATINGS.map((source) => (
+                  <option key={source} value={source}>
+                    {RATINGS_LABELS[source]}
+                  </option>
+                ))}
+              </select>
+              <p id={`${ids.settings}-ratings-hint`} className={styles.settingHint}>
+                The score on cards, and the one the rating sorts use. Where that source has none,
+                TMDB's stands in. IMDb and Rotten Tomatoes need <code>OMDB_API_KEY</code>.
+              </p>
+            </div>
+          )}
         </fieldset>
 
         {errors.length > 0 && (

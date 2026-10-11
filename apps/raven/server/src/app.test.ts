@@ -297,6 +297,7 @@ describe('the media server', () => {
           groupBy: 'resolution',
           watchedPercent: 90,
           kind: 'other',
+          ratingsSource: 'tmdb',
         })
       })
 
@@ -340,6 +341,7 @@ describe('the media server', () => {
           groupBy: 'resolution',
           watchedPercent: 90,
           kind: 'other',
+          ratingsSource: 'tmdb',
         })
         expect(updated.scan.state).toBe('idle')
         expect((await putLibrary({ pinned: true })).settings.pinned).toBe(true)

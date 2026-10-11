@@ -1,4 +1,4 @@
-import type { ItemSummary, MediaItem } from '@/types'
+import type { ItemSummary, MediaItem, Rating, ShownRatings } from '@/types'
 
 const pad = (value: number): string => String(value).padStart(2, '0')
 
@@ -43,3 +43,22 @@ export const cardTitle = (media: MediaItem): { title: string; year: number | nul
   media.item
     ? { title: media.item.title, year: media.item.year }
     : { title: media.title, year: media.year }
+
+/** The score a card shows: the library's chosen source, else TMDB's, else none. */
+export const pickScore = ({
+  ratings,
+  source,
+}: {
+  ratings: readonly Rating[]
+  source: ShownRatings
+}): Rating | null =>
+  ratings.find((rating) => rating.source === source) ??
+  ratings.find((rating) => rating.source === 'tmdb') ??
+  null
+
+/** How a score reads for its source: "82%", "7.5" out of 10, or "74" out of 100. */
+export const formatScore = (rating: Rating): string => {
+  if (rating.source === 'imdb') return rating.value.toFixed(1)
+  if (rating.source === 'metacritic') return String(Math.round(rating.value * 10))
+  return `${Math.round(rating.value * 10)}%`
+}

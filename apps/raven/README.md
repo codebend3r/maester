@@ -137,7 +137,7 @@ Every card has a menu, from the button in its corner or a right click. In a Movi
 
 ## Metadata
 
-A Movies library knows what each of its files is: posters, titles and years on its cards, and a page for every movie with its backdrop, director, content rating, runtime, genres, TMDB's score, summary, the file's video, audio and subtitles, its other versions, and a cast and crew row with photos. A TV shows library lists its shows the same way, with a page for every show, season and episode. Other libraries stay as they were.
+A Movies library knows what each of its files is: posters, titles and years on its cards, and a page for every movie with its backdrop, director, content rating, runtime, genres, its scores, summary, the file's video, audio and subtitles, its other versions, a cast and crew row with photos, and reviews. A TV shows library lists its shows the same way, with a page for every show, season and episode. Every person in a cast row has a page listing what raven holds of theirs. Other libraries stay as they were.
 
 - **Turning it on.** Put TMDB's API Read Access Token, or its 32-character API key, in `apps/raven/.env` as `TMDB_API_TOKEN` (copy `.env.example`; on Vhagar the file sits beside the compose file, and `update.sh` makes an empty one if there is none). Without a token, or without the internet, raven works as before, with movie names tidied into titles and years.
 - **Names.** Radarr's `Movie (Year)/Movie (Year) Quality.mkv`, scene names like `The.Matrix.1999.1080p.BluRay.x264-GROUP.mkv`, Plex's `{edition-...}`, and id tags (`{tmdb-603}`, `{imdb-tt0133093}`, `[tmdbid-603]`) are all read. A movie's own folder is read first when it has a year. Episodes read Sonarr's `Show (Year)/Season 01/Show - S01E02 - Title Quality.mkv`, scene names, `S01E01-E02` and `S01E01E02` for a file holding two episodes, `1x02`, three-digit episodes (`S01E012`) and a `Season N` or `Specials` folder when the name has no code; the show comes from the first folder, then the file name, then the library folder. Plex's extras folders (`Featurettes`, `Trailers`, ...) and suffixes (`-trailer`, ...) are never matched.
@@ -149,7 +149,10 @@ A Movies library knows what each of its files is: posters, titles and years on i
 - **Fix match.** From a card's menu or the movie's page: search TMDB, pick the right one, or say it is not a movie. The choice is kept by folder (or by file at a library's root), so renames and re-downloads keep it, and nothing automatic replaces it. For a show, Fix match on its page or on any of its files moves every file under the show's folder, keeping their season and episode numbers.
 - **Keeping fresh.** **Refresh details** fetches a movie or show again now, a show with its seasons. A sweep on start and every day refreshes movies and shows fetched more than 30 days ago, or 7 for those out in the last 90 or still airing. A file for an episode the stored season lacks has the season fetched again once, in case it has aired since. Movies and episodes with no file left, seasons and shows with nothing under them, people with no credits, and their pictures are cleared up.
 - **TMDB's limits.** raven keeps to 20 calls a second with 4 in flight, waits out a 429, and gives each call 10 seconds. A wrong token (401) stops matching until a restart. `/api/health` reports `metadata`: whether TMDB is `off`, `ok` or `failing` (and why), and how many files wait to be matched. The token never reaches the browser, the logs or the health check.
-- **Outbound calls.** These are raven's first: the container must reach `api.themoviedb.org` and `image.tmdb.org`.
+- **Scores.** TMDB's score is always there. With `OMDB_API_KEY` set, IMDb, Rotten Tomatoes (critics) and Metacritic join it for movies and shows with an IMDb id, fetched as each is matched and topped up by the daily sweep. A free OMDb key allows 1,000 calls a day; raven counts its own (`OMDB_DAILY_LIMIT`) and waits for midnight UTC, so a big library fills over a few days. Rotten Tomatoes' audience score has no free source and is left out. Each library's **Ratings shown** setting (TMDB, IMDb or Rotten Tomatoes) picks the score on its cards and the one **Highest rated** and **Lowest rated** sort by; where that source has none, TMDB's stands in.
+- **Reviews.** Up to ten reviews by TMDB members sit under a movie's or show's cast, newest first, each with the author's score as stars and **Read** for the whole review and a link to it on TMDB. They are shown as plain text, never as HTML. Rotten Tomatoes' critics' reviews have no public API, and raven's own reviews wait until rookery signs viewers in.
+- **People.** Each person in a cast and crew row links to a page with their photo and everything in raven they are credited on, grouped by job.
+- **Outbound calls.** These are raven's first: the container must reach `api.themoviedb.org`, `image.tmdb.org` and, with a key, `www.omdbapi.com`.
 
 This product uses the TMDB API but is not endorsed or certified by TMDB; every page showing its data says so, with TMDB's logo.
 
@@ -218,6 +221,8 @@ A native iOS or Android app would be another `apps/raven/` entry that imports `@
 | `TMDB_API_TOKEN`              | unset                          | TMDB's API Read Access Token or API key; unset turns metadata off |
 | `METADATA_LANGUAGE`           | `en-US`                        | Language for titles and summaries            |
 | `METADATA_COUNTRY`            | `US`                           | Whose content rating and release date to show |
+| `OMDB_API_KEY`                | unset                          | OMDb's key, for IMDb, Rotten Tomatoes and Metacritic scores |
+| `OMDB_DAILY_LIMIT`            | `1000`                         | OMDb calls a day                             |
 
 ## Not there yet
 

@@ -216,6 +216,22 @@ describe('the metadata calls', () => {
     expect(calls[0]?.url).toBe('http://nas:8484/api/libraries/3/shows?sort=added&q=sev')
   })
 
+  it('fetches a person and builds avatar URLs', async () => {
+    const person = {
+      id: 5,
+      name: 'Keanu Reeves',
+      photoVersion: 'k',
+      credits: [{ item: itemDetails().versions[0]?.item, job: 'cast', role: 'Neo' }],
+    }
+    const { client, calls } = clientReturning(respond({ body: person }))
+    await expect(client.getPerson(5)).resolves.toEqual(person)
+    expect(calls[0]?.url).toBe('http://nas:8484/api/people/5')
+    expect(client.reviewAvatarUrl({ reviewId: 3, avatarVersion: 'a1' })).toBe(
+      'http://nas:8484/api/reviews/3/avatar?v=a1',
+    )
+    expect(client.reviewAvatarUrl({ reviewId: 3, avatarVersion: null })).toBeNull()
+  })
+
   it('asks for the next episode of a show, which may be none', async () => {
     const { client, calls } = clientReturning(respond({ body: null }))
     await expect(client.nextEpisode(4)).resolves.toBeNull()

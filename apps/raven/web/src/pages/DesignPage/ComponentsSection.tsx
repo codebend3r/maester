@@ -13,6 +13,7 @@ import { MediaTiles } from '@/components/MediaTiles/MediaTiles'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
 import { Controls } from '@/components/Player/Controls'
 import { RatingChips } from '@/components/RatingChips/RatingChips'
+import { ReviewCards } from '@/components/ReviewCards/ReviewCards'
 import { ScanStatus } from '@/components/ScanStatus/ScanStatus'
 import { ShowGrid } from '@/components/ShowCard/ShowCard'
 import { DesignSection, Specimen } from '@/pages/DesignPage/DesignSection'
@@ -22,6 +23,8 @@ import {
   SAMPLE_MEDIA,
   SAMPLE_MOVIES,
   SAMPLE_RATINGS,
+  SAMPLE_RATINGS_LOW,
+  SAMPLE_REVIEWS,
   SAMPLE_SCANS,
   SAMPLE_SHOWS,
 } from '@/pages/DesignPage/samples'
@@ -180,8 +183,18 @@ export const ComponentsSection = () => (
       </ItemHeader>
     </Specimen>
 
-    <Specimen name="RatingChips" note="TMDB's score; the others join when OMDb is set up.">
-      <RatingChips ratings={SAMPLE_RATINGS} />
+    <Specimen
+      name="RatingChips"
+      note="One chip per source. Rotten Tomatoes is a tomato from 60% and a splat below; Metacritic's square is green from 61, yellow from 40, red under."
+    >
+      <div className={styles.stack}>
+        <RatingChips ratings={SAMPLE_RATINGS} />
+        <RatingChips ratings={SAMPLE_RATINGS_LOW} />
+      </div>
+    </Specimen>
+
+    <Specimen name="ReviewCards" note="Reviews by TMDB members; Read opens the whole review.">
+      <ReviewCards reviews={SAMPLE_REVIEWS} />
     </Specimen>
 
     <Specimen name="CastRow" note="Someone who acts and directs is one person with both roles.">

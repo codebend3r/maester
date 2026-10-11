@@ -1,4 +1,14 @@
-import { Controller, Get, Inject, Param, ParseIntPipe, Query, Res } from '@nestjs/common'
+import {
+  Controller,
+  Get,
+  Inject,
+  NotFoundException,
+  Param,
+  ParseIntPipe,
+  Query,
+  Res,
+} from '@nestjs/common'
+import type { PersonDetails } from '@raven/core'
 import type { FastifyReply } from 'fastify'
 import { sendImage } from '@/items/sendImage'
 import { ImageCache } from '@/metadata/imageCache'
@@ -10,6 +20,14 @@ export class PeopleController {
     @Inject(MetadataRepository) private readonly metadata: MetadataRepository,
     @Inject(ImageCache) private readonly images: ImageCache,
   ) {}
+
+  /** A person, and the movies and shows in raven they are credited on. */
+  @Get(':id')
+  get(@Param('id', ParseIntPipe) id: number): PersonDetails {
+    const person = this.metadata.person(id)
+    if (!person) throw new NotFoundException(`No person ${id}`)
+    return person
+  }
 
   /** A person's photo from TMDB, fetched and cached on first use. */
   @Get(':id/photo')

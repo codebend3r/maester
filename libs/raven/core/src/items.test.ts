@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cardTitle, episodeCode, itemLabel, mediaLabel } from '@/items'
+import { cardTitle, episodeCode, formatScore, itemLabel, mediaLabel, pickScore } from '@/items'
 import { itemSummary, mediaItem } from '@/test/fixtures'
 
 describe('episodeCode', () => {
@@ -29,6 +29,30 @@ describe('itemLabel', () => {
         }),
       ),
     ).toBe('Severance · S01E02 · Half Loop')
+  })
+})
+
+describe('pickScore and formatScore', () => {
+  const ratings = [
+    { source: 'tmdb' as const, kind: 'audience' as const, value: 8.2, votes: 10 },
+    { source: 'rottenTomatoes' as const, kind: 'critic' as const, value: 4.1, votes: null },
+    { source: 'metacritic' as const, kind: 'critic' as const, value: 7.4, votes: null },
+  ]
+
+  it("picks the library's source, and falls back to TMDB's", () => {
+    expect(pickScore({ ratings, source: 'rottenTomatoes' })?.value).toBe(4.1)
+    expect(pickScore({ ratings, source: 'imdb' })?.source).toBe('tmdb')
+    expect(pickScore({ ratings: [], source: 'tmdb' })).toBeNull()
+  })
+
+  it('reads each source its own way', () => {
+    expect(
+      formatScore(ratings[0] ?? { source: 'tmdb', kind: 'audience', value: 0, votes: 0 }),
+    ).toBe('82%')
+    expect(formatScore({ source: 'imdb', kind: 'audience', value: 7.5, votes: null })).toBe('7.5')
+    expect(formatScore({ source: 'metacritic', kind: 'critic', value: 7.4, votes: null })).toBe(
+      '74',
+    )
   })
 })
 
