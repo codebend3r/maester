@@ -1,10 +1,18 @@
-import { type ShowEntry, type ShownRatings, episodeCode } from '@raven/core'
+import {
+  type RatingSource,
+  type ShowEntry,
+  type ShownRatings,
+  episodeCode,
+  sortTitle,
+} from '@raven/core'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Icon } from '@/components/Icon/Icon'
-import { RatingChips } from '@/components/RatingChips/RatingChips'
+import { RatingChips, ScoreChip } from '@/components/RatingChips/RatingChips'
+import { SortHeader } from '@/components/SortHeader/SortHeader'
 import { api } from '@/lib/api'
 import { showYears } from '@/lib/itemLinks'
+import { type SortColumn, useTableSort } from '@/lib/tableSort'
 import styles from '@/components/ShowCard/ShowViews.module.scss'
 
 const episodesLabel = (entry: ShowEntry): string =>
@@ -50,7 +58,29 @@ const SmallPoster = ({ entry }: { entry: ShowEntry }) => {
   )
 }
 
-/** Every show as a row of facts: title, years, episodes on disk and its score. */
+const RATING_COLUMNS: readonly { source: RatingSource; label: string }[] = [
+  { source: 'rottenTomatoes', label: 'RT' },
+  { source: 'imdb', label: 'IMDb' },
+  { source: 'metacritic', label: 'Metacritic' },
+  { source: 'tmdb', label: 'TMDB' },
+]
+
+type Column = 'title' | 'years' | 'episodes' | RatingSource
+
+const score = (entry: ShowEntry, source: RatingSource): number | null =>
+  entry.show.ratings.find((rating) => rating.source === source)?.value ?? null
+
+const COLUMNS: Record<Column, SortColumn<ShowEntry>> = {
+  title: { value: (entry) => sortTitle(entry.show.title), first: 'asc' },
+  years: { value: (entry) => entry.show.year, first: 'desc' },
+  episodes: { value: (entry) => entry.episodes, first: 'desc' },
+  rottenTomatoes: { value: (entry) => score(entry, 'rottenTomatoes'), first: 'desc' },
+  imdb: { value: (entry) => score(entry, 'imdb'), first: 'desc' },
+  metacritic: { value: (entry) => score(entry, 'metacritic'), first: 'desc' },
+  tmdb: { value: (entry) => score(entry, 'tmdb'), first: 'desc' },
+}
+
+/** Every show as a row of facts: title, years, episodes on disk and each of its scores, every column sortable. */
 export const ShowList = ({
   shows,
   busy = false,
@@ -61,33 +91,35 @@ export const ShowList = ({
   /** Kept for the callers that pass it; every rating shows here. */
   ratingsSource?: ShownRatings
   labelledBy?: string
-}) => (
-  <table
-    className={styles.table}
-    aria-label={labelledBy ? undefined : 'Shows'}
-    aria-labelledby={labelledBy}
-    aria-busy={busy}
-  >
-    <thead>
-      <tr>
-        <th scope="col">Title</th>
-        <th scope="col" className={styles.number}>
-          Years
-        </th>
-        <th scope="col" className={styles.number}>
-          Episodes
-        </th>
-        <th scope="col" className={styles.roomy}>
-          Ratings
-        </th>
-        <th scope="col">
-          <span className="visually-hidden">Play</span>
-        </th>
-      </tr>
-    </thead>
-    <tbody>
-      {shows.map((entry) => {
-        return (
+}) => {
+  const { sorted, toggle, ariaSort } = useTableSort({ rows: shows, columns: COLUMNS })
+  const header = (key: Column, label: string, className?: string) => (
+    <SortHeader sort={ariaSort(key)} onToggle={() => toggle(key)} className={className}>
+      {label}
+    </SortHeader>
+  )
+  return (
+    <table
+      className={styles.table}
+      aria-label={labelledBy ? undefined : 'Shows'}
+      aria-labelledby={labelledBy}
+      aria-busy={busy}
+    >
+      <thead>
+        <tr>
+          {header('title', 'Title')}
+          {header('years', 'Years', styles.number)}
+          {header('episodes', 'Episodes', styles.number)}
+          {RATING_COLUMNS.map((column) =>
+            header(column.source, column.label, `${styles.number} ${styles.roomy}`),
+          )}
+          <th scope="col">
+            <span className="visually-hidden">Play</span>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {sorted.map((entry) => (
           <tr key={entry.show.id} className={styles.row}>
             <th scope="row">
               <Link to={`/shows/${entry.show.id}`} className={styles.title}>
@@ -98,18 +130,23 @@ export const ShowList = ({
               {showYears({ year: entry.show.year, endedYear: entry.endedYear }) ?? ''}
             </td>
             <td className={styles.number}>{entry.episodes}</td>
-            <td className={styles.roomy}>
-              <RatingChips ratings={entry.show.ratings} />
-            </td>
+            {RATING_COLUMNS.map((column) => {
+              const rating = entry.show.ratings.find((it) => it.source === column.source)
+              return (
+                <td key={column.source} className={`${styles.number} ${styles.roomy}`}>
+                  {rating && <ScoreChip rating={rating} />}
+                </td>
+              )
+            })}
             <td className={styles.playCell}>
               <NextPlay entry={entry} />
             </td>
           </tr>
-        )
-      })}
-    </tbody>
-  </table>
-)
+        ))}
+      </tbody>
+    </table>
+  )
+}
 
 /** Every show as a row with a small poster, its title and facts beside it. */
 export const ShowTiles = ({
