@@ -8,7 +8,7 @@ import {
   formatBytes,
   resolutionLabel,
 } from '@raven/core'
-import { useId } from 'react'
+import { useId, useState } from 'react'
 import { Button } from '@/components/Button/Button'
 import { api } from '@/lib/api'
 import { queryKeys } from '@/lib/queryClient'
@@ -42,6 +42,9 @@ const describe = (option: ImageOption): string =>
 const choiceOf = (option: ImageOption): ImageChoice =>
   option.source === 'local' ? { source: 'local' } : { source: 'tmdb', ref: option.ref }
 
+const KINDS: readonly Kind[] = ['poster', 'backdrop']
+
+/** One tab's pictures to pick from. */
 const Options = ({
   itemId,
   kind,
@@ -54,42 +57,36 @@ const Options = ({
   options: readonly ImageOption[]
   busy: boolean
   onChoose: (option: ImageOption) => void
-}) => {
-  const id = useId()
-  return (
-    <section className={styles.group} aria-labelledby={id}>
-      <h3 id={id} className={styles.groupHeading}>
-        {KIND_LABELS[kind]}
-      </h3>
-      {options.length === 0 ? (
-        <p className={styles.hint}>No {kind}s to choose from.</p>
-      ) : (
-        <ul className={kind === 'poster' ? styles.posters : styles.backdrops}>
-          {options.map((option) => (
-            <li key={`${option.source}:${option.ref}`}>
-              <button
-                type="button"
-                className={styles.option}
-                aria-pressed={option.current}
-                aria-label={`${KIND_LABELS[kind]}: ${describe(option)}`}
-                disabled={busy || option.current}
-                onClick={() => onChoose(option)}
-              >
-                <img
-                  src={api.imageOptionUrl({ id: itemId, kind, option })}
-                  alt=""
-                  loading="lazy"
-                  decoding="async"
-                />
-                <span className={styles.caption}>{describe(option)}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  )
-}
+}) => (
+  <>
+    {options.length === 0 ? (
+      <p className={styles.hint}>No {kind}s to choose from.</p>
+    ) : (
+      <ul className={kind === 'poster' ? styles.posters : styles.backdrops}>
+        {options.map((option) => (
+          <li key={`${option.source}:${option.ref}`}>
+            <button
+              type="button"
+              className={styles.option}
+              aria-pressed={option.current}
+              aria-label={`${KIND_LABELS[kind]}: ${describe(option)}`}
+              disabled={busy || option.current}
+              onClick={() => onChoose(option)}
+            >
+              <img
+                src={api.imageOptionUrl({ id: itemId, kind, option })}
+                alt=""
+                loading="lazy"
+                decoding="async"
+              />
+              <span className={styles.caption}>{describe(option)}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    )}
+  </>
+)
 
 /**
  * Edit images: every poster and backdrop a movie could show, the current
@@ -104,7 +101,8 @@ export const ImageEditor = ({
   libraries: readonly Library[]
   onDone: () => void
 }) => {
-  const ids = { heading: useId(), versions: useId() }
+  const ids = { heading: useId(), versions: useId(), tabs: useId() }
+  const [tab, setTab] = useState<Kind>('poster')
   const queryClient = useQueryClient()
   const options = useQuery({
     queryKey: queryKeys.itemImages(details.id),
@@ -182,22 +180,47 @@ export const ImageEditor = ({
         <p className={styles.hint}>Asking TMDB for pictures</p>
       )}
       {options.data && (
-        <>
-          <Options
-            itemId={details.id}
-            kind="poster"
-            options={options.data.poster}
-            busy={choose.isPending}
-            onChoose={(option) => choose.mutate({ kind: 'poster', option })}
-          />
-          <Options
-            itemId={details.id}
-            kind="backdrop"
-            options={options.data.backdrop}
-            busy={choose.isPending}
-            onChoose={(option) => choose.mutate({ kind: 'backdrop', option })}
-          />
-        </>
+        <section className={styles.group}>
+          <div role="tablist" aria-label="Pictures" className={styles.tabs}>
+            {KINDS.map((kind) => (
+              <button
+                key={kind}
+                type="button"
+                role="tab"
+                id={`${ids.tabs}-${kind}`}
+                aria-selected={tab === kind}
+                aria-controls={`${ids.tabs}-${kind}-panel`}
+                tabIndex={tab === kind ? 0 : -1}
+                className={styles.tab}
+                onClick={() => setTab(kind)}
+                onKeyDown={(event) => {
+                  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+                  event.preventDefault()
+                  const next = KINDS[(KINDS.indexOf(kind) + 1) % KINDS.length] ?? kind
+                  setTab(next)
+                  document.getElementById(`${ids.tabs}-${next}`)?.focus()
+                }}
+              >
+                {KIND_LABELS[kind]}
+                <span className={styles.tabCount}>{options.data[kind].length}</span>
+              </button>
+            ))}
+          </div>
+          <div
+            role="tabpanel"
+            id={`${ids.tabs}-${tab}-panel`}
+            aria-labelledby={`${ids.tabs}-${tab}`}
+            className={styles.panel}
+          >
+            <Options
+              itemId={details.id}
+              kind={tab}
+              options={options.data[tab]}
+              busy={choose.isPending}
+              onChoose={(option) => choose.mutate({ kind: tab, option })}
+            />
+          </div>
+        </section>
       )}
     </section>
   )

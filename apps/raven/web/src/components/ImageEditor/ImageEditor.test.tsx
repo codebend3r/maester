@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ItemImageOptions } from '@raven/core'
 import { ImageEditor } from '@/components/ImageEditor/ImageEditor'
@@ -59,9 +59,17 @@ describe('ImageEditor', () => {
     expect(
       screen.getByRole('button', { name: 'Poster: TMDB, 2000 by 3000, English' }),
     ).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.queryByRole('button', { name: /^Backdrop:/ })).toBeNull()
+    const tabs = screen.getByRole('tablist', { name: 'Pictures' })
+    expect(within(tabs).getByRole('tab', { name: 'Poster 2' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
+    await userEvent.click(within(tabs).getByRole('tab', { name: 'Backdrop 1' }))
     expect(
       screen.getByRole('button', { name: 'Backdrop: TMDB, 3840 by 2160, No text' }),
     ).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByRole('button', { name: /^Poster:/ })).toBeNull()
   })
 
   it('chooses a picture of TMDB’s, and goes back to the one beside the files', async () => {
