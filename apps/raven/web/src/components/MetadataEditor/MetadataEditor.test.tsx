@@ -87,6 +87,26 @@ describe('MetadataEditor', () => {
     await waitFor(() => expect(done.count).toBe(1))
   })
 
+  it('sends an emptied field as empty, so TMDB’s words do not come back, and keeps an empty one empty', async () => {
+    open()
+    await screen.findByLabelText('Title')
+    await userEvent.clear(screen.getByLabelText('Tagline'))
+    await userEvent.clear(screen.getByLabelText('Year'))
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(spies.save).toHaveBeenCalledTimes(1))
+    expect(spies.save.mock.calls[0]?.[0]).toEqual({
+      id: 40,
+      change: { title: null, year: 0, contentRating: null, tagline: '', summary: null },
+    })
+  })
+
+  it('saves nothing with the title emptied', async () => {
+    open()
+    await userEvent.clear(await screen.findByLabelText('Title'))
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(spies.save).not.toHaveBeenCalled()
+  })
+
   it('offers no wand without an edition, and Use TMDB’s puts a field back', async () => {
     open(null)
     const title = await screen.findByLabelText('Title')
