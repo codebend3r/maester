@@ -45,4 +45,16 @@ describe('LibrariesPage', () => {
       'false',
     )
   })
+
+  it('says what type each library is', async () => {
+    spies.list.mockImplementation(async () => [
+      library({
+        name: 'Shows',
+        itemCount: 1268,
+        settings: { ...library().settings, kind: 'shows' },
+      }),
+    ])
+    renderWithProviders(<LibrariesPage />)
+    expect(await screen.findByText('TV shows · 1,268 videos')).toBeInTheDocument()
+  })
 })

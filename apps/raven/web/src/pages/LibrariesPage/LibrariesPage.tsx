@@ -6,6 +6,7 @@ import { Button } from '@/components/Button/Button'
 import { LibraryDialog } from '@/components/LibraryDialog/LibraryDialog'
 import { ScanStatus } from '@/components/ScanStatus/ScanStatus'
 import { api } from '@/lib/api'
+import { KIND_LABELS } from '@/lib/libraryKinds'
 import { queryKeys } from '@/lib/queryClient'
 import styles from '@/pages/LibrariesPage/LibrariesPage.module.scss'
 
@@ -33,7 +34,8 @@ const LibraryRow = ({ library }: { library: Library }) => {
         {library.name}
       </Link>
       <span className={styles.count}>
-        {count.format(library.itemCount)} {library.itemCount === 1 ? 'video' : 'videos'}
+        {KIND_LABELS[library.settings.kind]} · {count.format(library.itemCount)}{' '}
+        {library.itemCount === 1 ? 'video' : 'videos'}
       </span>
       <ul className={styles.paths} aria-label="Folders">
         {library.paths.map((path) => (

@@ -25,10 +25,17 @@ describe('isLibrary', () => {
             view: 'tiles',
             groupBy: 'month',
             watchedPercent: 80,
+            kind: 'shows',
           },
         }),
       ),
     ).toBe(true)
+  })
+
+  it('rejects a library whose type is not one of the three', () => {
+    expect(isLibrary({ ...library(), settings: { ...library().settings, kind: 'music' } })).toBe(
+      false,
+    )
   })
 
   it('rejects a library whose watched percentage is out of range', () => {

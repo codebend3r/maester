@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   DEFAULT_LIBRARY_SETTINGS,
+  LIBRARY_KINDS,
   type Library,
   type LibraryInput,
   type LibrarySettings,
@@ -11,6 +12,7 @@ import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/Button/Button'
 import { FolderBrowser } from '@/components/FolderBrowser/FolderBrowser'
 import { api } from '@/lib/api'
+import { KIND_LABELS } from '@/lib/libraryKinds'
 import { queryKeys } from '@/lib/queryClient'
 import styles from '@/components/LibraryDialog/LibraryDialog.module.scss'
 
@@ -21,7 +23,7 @@ import styles from '@/components/LibraryDialog/LibraryDialog.module.scss'
  */
 export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose: () => void }) => {
   const dialog = useRef<HTMLDialogElement>(null)
-  const ids = { name: useId(), errors: useId(), folders: useId(), settings: useId() }
+  const ids = { name: useId(), errors: useId(), folders: useId(), settings: useId(), kind: useId() }
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [name, setName] = useState(library?.name ?? '')
@@ -106,6 +108,25 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
             aria-describedby={errors.length > 0 ? ids.errors : undefined}
           />
         </div>
+
+        <fieldset className={styles.field}>
+          <legend>Type</legend>
+          <div className={styles.kinds}>
+            {LIBRARY_KINDS.map((kind) => (
+              <div key={kind} className={styles.kind}>
+                <input
+                  id={`${ids.kind}-${kind}`}
+                  type="radio"
+                  name={ids.kind}
+                  value={kind}
+                  checked={settings.kind === kind}
+                  onChange={() => setSettings((current) => ({ ...current, kind }))}
+                />
+                <label htmlFor={`${ids.kind}-${kind}`}>{KIND_LABELS[kind]}</label>
+              </div>
+            ))}
+          </div>
+        </fieldset>
 
         <fieldset className={styles.field} aria-describedby={ids.folders}>
           <legend>Folders</legend>

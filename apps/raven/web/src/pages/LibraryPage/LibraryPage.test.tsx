@@ -122,6 +122,11 @@ describe('LibraryPage', () => {
     expect(await screen.findByText('Watching 3')).toBeInTheDocument()
   })
 
+  it('says what type of library it is', async () => {
+    serve({ kind: 'movies' })
+    expect(await screen.findByText('Movies · 12 videos')).toBeInTheDocument()
+  })
+
   it("links to the library's history", async () => {
     serve()
     expect(await screen.findByRole('link', { name: 'History' })).toHaveAttribute(

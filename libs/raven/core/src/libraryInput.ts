@@ -1,5 +1,6 @@
 import {
   isBoolean,
+  isLibraryKind,
   isLibraryView,
   isMediaGroupBy,
   isMediaSort,
@@ -28,6 +29,7 @@ export const DEFAULT_LIBRARY_SETTINGS: LibrarySettings = {
   view: 'grid',
   groupBy: 'resolution',
   watchedPercent: 90,
+  kind: 'other',
 }
 
 /** Each setting's check, and what to say when a value fails it. */
@@ -44,6 +46,7 @@ const SETTING_CHECKS: Record<
     valid: isWatchedPercent,
     problem: 'Watched at must be a whole percentage from 1 to 100.',
   },
+  kind: { valid: isLibraryKind, problem: 'Type is not one of the choices.' },
 }
 
 type SettingsResult = { settings: Partial<LibrarySettings>; errors: string[] }
@@ -60,6 +63,7 @@ const readSettings = (input: unknown): SettingsResult => {
       ...(isLibraryView(input.view) ? { view: input.view } : {}),
       ...(isMediaGroupBy(input.groupBy) ? { groupBy: input.groupBy } : {}),
       ...(isWatchedPercent(input.watchedPercent) ? { watchedPercent: input.watchedPercent } : {}),
+      ...(isLibraryKind(input.kind) ? { kind: input.kind } : {}),
     },
     errors: Object.entries(SETTING_CHECKS)
       .filter(([key, check]) => input[key] !== undefined && !check.valid(input[key]))

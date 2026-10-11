@@ -18,6 +18,7 @@ import { MediaList } from '@/components/MediaList/MediaList'
 import { MediaTiles } from '@/components/MediaTiles/MediaTiles'
 import { ScanStatus } from '@/components/ScanStatus/ScanStatus'
 import { api } from '@/lib/api'
+import { KIND_LABELS } from '@/lib/libraryKinds'
 import { queryKeys } from '@/lib/queryClient'
 import { useDebouncedValue } from '@/lib/useDebouncedValue'
 import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
@@ -159,7 +160,8 @@ export const LibraryPage = () => {
           {library.data.name}
         </h1>
         <p className={styles.count}>
-          {count.format(library.data.itemCount)} {library.data.itemCount === 1 ? 'video' : 'videos'}
+          {KIND_LABELS[settings.kind]} · {count.format(library.data.itemCount)}{' '}
+          {library.data.itemCount === 1 ? 'video' : 'videos'}
         </p>
         <div className={styles.status}>
           <ScanStatus scan={library.data.scan} />

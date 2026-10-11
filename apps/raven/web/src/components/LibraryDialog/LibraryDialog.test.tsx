@@ -61,6 +61,7 @@ describe('LibraryDialog', () => {
           view: 'grid',
           groupBy: 'resolution',
           watchedPercent: 90,
+          kind: 'other',
         },
       },
     ])
@@ -83,8 +84,30 @@ describe('LibraryDialog', () => {
         view: 'grid',
         groupBy: 'resolution',
         watchedPercent: 90,
+        kind: 'other',
       },
     })
+  })
+
+  it('makes a library of the type chosen', async () => {
+    renderWithProviders(<LibraryDialog onClose={() => undefined} />)
+    expect(screen.getByRole('radio', { name: 'Other' })).toBeChecked()
+    await userEvent.type(screen.getByLabelText('Name'), 'Shows')
+    await userEvent.type(screen.getByLabelText('Folder path'), '/media/Shows')
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }))
+    await userEvent.click(screen.getByRole('radio', { name: 'TV shows' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Add library' }))
+    expect(created.at(-1)).toMatchObject({ settings: { kind: 'shows' } })
+  })
+
+  it("shows the library's own type when editing it", () => {
+    renderWithProviders(
+      <LibraryDialog
+        library={library({ settings: { ...library().settings, kind: 'movies' } })}
+        onClose={() => undefined}
+      />,
+    )
+    expect(screen.getByRole('radio', { name: 'Movies' })).toBeChecked()
   })
 
   it('sets how far into a video counts as watched', async () => {

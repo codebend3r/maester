@@ -100,6 +100,7 @@ YouTube's shortcuts, and `?` shows them in the player.
 
 Each library keeps its own settings on the server, so every browser opens it the same way.
 
+- **Type**: Movies, TV shows or Other. New libraries, and those made before types, are Other. It shows beside the video count and can be changed in **Edit** at any time; it does not change how a library behaves yet.
 - **Save where each video stopped**, on by default: leave a video and come back to pick up where it stopped. Turned off, nothing new is saved and nothing resumes, but saved spots are kept for when it is turned back on.
 - **Pin to the side menu**, on by default: the library gets its own link under Favourites. Pin or unpin from the Libraries page, or in **Edit**.
 - **Watched at**, 90% by default: how far into a video playback must get for it to count as watched in the library's history, as a whole percentage from 1 to 100.

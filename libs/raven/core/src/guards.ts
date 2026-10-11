@@ -4,6 +4,7 @@ import type {
   DirectoryListing,
   HistoryEntry,
   Library,
+  LibraryKind,
   LibrarySettings,
   LibraryView,
   MediaGroupBy,
@@ -76,6 +77,11 @@ export const LIBRARY_VIEWS: readonly LibraryView[] = ['grid', 'list', 'tiles', '
 export const isLibraryView = (value: unknown): value is LibraryView =>
   LIBRARY_VIEWS.some((view) => view === value)
 
+export const LIBRARY_KINDS: readonly LibraryKind[] = ['movies', 'shows', 'other']
+
+export const isLibraryKind = (value: unknown): value is LibraryKind =>
+  LIBRARY_KINDS.some((kind) => kind === value)
+
 export const MEDIA_GROUPINGS: readonly MediaGroupBy[] = ['resolution', 'codec', 'month']
 
 export const isMediaGroupBy = (value: unknown): value is MediaGroupBy =>
@@ -92,7 +98,8 @@ export const isLibrarySettings = (value: unknown): value is LibrarySettings =>
   isMediaSort(value.sort) &&
   isLibraryView(value.view) &&
   isMediaGroupBy(value.groupBy) &&
-  isWatchedPercent(value.watchedPercent)
+  isWatchedPercent(value.watchedPercent) &&
+  isLibraryKind(value.kind)
 
 export const isLibrary = (value: unknown): value is Library =>
   isRecord(value) &&

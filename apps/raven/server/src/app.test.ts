@@ -284,7 +284,7 @@ describe('the media server', () => {
       const saveProgress = (id: number, position: number) =>
         app().inject({ method: 'PUT', url: `/api/media/${id}/progress`, payload: { position } })
 
-      it('starts a library with progress saved, the library pinned, and watched at 90%', async () => {
+      it('starts a library with progress saved, pinned, watched at 90%, and of no particular type', async () => {
         const current = expectShape({
           response: await app().inject({ method: 'GET', url: `/api/libraries/${library.id}` }),
           guard: isLibrary,
@@ -296,7 +296,18 @@ describe('the media server', () => {
           view: 'grid',
           groupBy: 'resolution',
           watchedPercent: 90,
+          kind: 'other',
         })
+      })
+
+      it('changes what type of library it is after it was made', async () => {
+        expect((await putLibrary({ kind: 'shows' })).settings.kind).toBe('shows')
+        const current = expectShape({
+          response: await app().inject({ method: 'GET', url: `/api/libraries/${library.id}` }),
+          guard: isLibrary,
+        })
+        expect(current.settings.kind).toBe('shows')
+        expect((await putLibrary({ kind: 'other' })).settings.kind).toBe('other')
       })
 
       it('remembers how the library is sorted and shown', async () => {
@@ -328,6 +339,7 @@ describe('the media server', () => {
           view: 'grid',
           groupBy: 'resolution',
           watchedPercent: 90,
+          kind: 'other',
         })
         expect(updated.scan.state).toBe('idle')
         expect((await putLibrary({ pinned: true })).settings.pinned).toBe(true)

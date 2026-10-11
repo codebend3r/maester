@@ -94,6 +94,10 @@ export const MIGRATIONS: readonly string[] = [
   CREATE INDEX plays_media ON plays (media_id, played_at);
   ALTER TABLE libraries ADD COLUMN watched_percent INTEGER NOT NULL DEFAULT 90;
   `,
+  // What a library holds: 'movies', 'shows' or 'other', the last for those made before.
+  `
+  ALTER TABLE libraries ADD COLUMN kind TEXT NOT NULL DEFAULT 'other';
+  `,
 ]
 
 const migrate = (db: Sqlite.Database): void => {

@@ -42,6 +42,25 @@
   }
 }
 
+// The three types side by side, wrapping on a narrow screen.
+.kinds {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(7rem, 100%), max-content));
+  gap: var(--space-1) var(--space-4);
+}
+
+.kind {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-1);
+  align-items: center;
+
+  label {
+    font-size: var(--font-size-md);
+    font-weight: 400;
+  }
+}
+
 .hint {
   color: var(--color-lichen);
   font-size: var(--font-size-sm);

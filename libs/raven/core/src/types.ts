@@ -43,7 +43,11 @@ export type LibrarySettings = {
   groupBy: MediaGroupBy
   /** How far into a video, as a whole percentage, a play must get for it to count as watched. */
   watchedPercent: number
+  /** What the library holds: movies, TV shows, or anything else. */
+  kind: LibraryKind
 }
+
+export type LibraryKind = 'movies' | 'shows' | 'other'
 
 export type LibraryView = 'grid' | 'list' | 'tiles' | 'grouped'
 

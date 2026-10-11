@@ -89,6 +89,27 @@ describe('validateLibraryInput', () => {
     })
   })
 
+  it('keeps a type that is one of the three', () => {
+    const result = validateLibraryInput({
+      name: 'Shows',
+      paths: ['/media/shows'],
+      settings: { kind: 'shows' },
+    })
+    expect(result).toEqual({
+      ok: true,
+      value: { name: 'Shows', paths: ['/media/shows'], settings: { kind: 'shows' } },
+    })
+  })
+
+  it('rejects a type that is not one of the three', () => {
+    const result = validateLibraryInput({
+      name: 'Music',
+      paths: ['/media/music'],
+      settings: { kind: 'music' },
+    })
+    expect(result).toEqual({ ok: false, errors: ['Type is not one of the choices.'] })
+  })
+
   it('keeps a watched percentage that is a whole number from 1 to 100', () => {
     const result = validateLibraryInput({
       name: 'Clips',
