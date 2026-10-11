@@ -11,7 +11,8 @@ import {
 import { useId, useState } from 'react'
 import { Button } from '@/components/Button/Button'
 import { api } from '@/lib/api'
-import { queryKeys } from '@/lib/queryClient'
+import { afterItemEdited } from '@/lib/invalidate'
+import { itemImagesQuery } from '@/lib/queries'
 import styles from '@/components/ImageEditor/ImageEditor.module.scss'
 
 type Kind = 'poster' | 'backdrop'
@@ -107,20 +108,11 @@ export const ImageEditor = ({
   const ids = { heading: useId(), versions: useId(), tabs: useId() }
   const [tab, setTab] = useState<Kind>('poster')
   const queryClient = useQueryClient()
-  const options = useQuery({
-    queryKey: queryKeys.itemImages(details.id),
-    queryFn: () => api.getItemImages(details.id),
-  })
+  const options = useQuery(itemImagesQuery(details.id))
   const choose = useMutation({
     mutationFn: ({ kind, option }: { kind: Kind; option: ImageOption }) =>
       api.chooseItemImage({ id: details.id, kind, choice: choiceOf(option) }),
-    onSuccess: (updated) => {
-      queryClient.setQueryData(queryKeys.item(details.id), updated)
-      return Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.itemImages(details.id) }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.libraries }),
-      ])
-    },
+    onSuccess: (updated) => afterItemEdited({ queryClient, updated, part: 'images' }),
   })
   const libraryName = (libraryId: number) =>
     libraries.find((library) => library.id === libraryId)?.name ?? ''

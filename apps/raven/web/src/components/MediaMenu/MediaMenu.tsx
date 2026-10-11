@@ -6,7 +6,7 @@ import { FixMatchDialog, type MatchType } from '@/components/FixMatchDialog/FixM
 import { Icon, type IconName } from '@/components/Icon/Icon'
 import { api } from '@/lib/api'
 import { copyText } from '@/lib/clipboard'
-import { queryKeys } from '@/lib/queryClient'
+import { mediaLocationQuery } from '@/lib/queries'
 import { useMediaMutations } from '@/lib/useMediaMutations'
 import styles from '@/components/MediaMenu/MediaMenu.module.scss'
 
@@ -108,11 +108,7 @@ const WrappingPath = ({ path }: { path: string }) =>
  */
 const LocationItem = ({ media }: { media: MediaItem }) => {
   const [copied, setCopied] = useState(false)
-  const location = useQuery({
-    queryKey: queryKeys.mediaLocation(media.id),
-    queryFn: () => api.getMediaLocation(media.id),
-    staleTime: 0,
-  })
+  const location = useQuery(mediaLocationQuery(media.id))
   const path = location.data?.path ?? null
   const waiting = location.isError ? location.error.message : 'Finding the file'
   return (

@@ -5,9 +5,8 @@ import styles from '@/components/Player/Player.module.scss'
 import { preferredAudio, preferredSubtitle } from '@/components/Player/selection'
 import { Stage } from '@/components/Player/Stage'
 import { Unplayable } from '@/components/Player/Unplayable'
-import { api } from '@/lib/api'
 import { browserCanPlay, browserCanStream } from '@/lib/canPlay'
-import { queryKeys } from '@/lib/queryClient'
+import { tracksQuery } from '@/lib/queries'
 import { usePlaybackPolicy } from '@/lib/usePlaybackPolicy'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
 
@@ -28,13 +27,8 @@ const Waiting = () => (
  */
 export const Player = ({ media, backTo }: { media: MediaItem; backTo: string }) => {
   const prefs = usePlayerPrefs()
-  const tracksQuery = useQuery({
-    queryKey: queryKeys.mediaTracks(media.id),
-    queryFn: () => api.getTracks(media.id),
-    staleTime: Infinity,
-    retry: false,
-  })
-  const tracks = tracksQuery.data ?? null
+  const trackList = useQuery(tracksQuery(media.id))
+  const tracks = trackList.data ?? null
 
   // Picks by hand win over the remembered preferences.
   const [audioPick, setAudioPick] = useState<number | null>(null)
@@ -126,7 +120,7 @@ export const Player = ({ media, backTo }: { media: MediaItem; backTo: string }) 
 
   // A remembered audio language may mean a converted stream; wait for the
   // track list rather than start one source only to swap it.
-  if (prefs.audioLanguage != null && tracksQuery.isPending && audioPick == null) {
+  if (prefs.audioLanguage != null && trackList.isPending && audioPick == null) {
     return <Waiting />
   }
 
@@ -137,7 +131,7 @@ export const Player = ({ media, backTo }: { media: MediaItem; backTo: string }) 
       mode={mode}
       audio={audio}
       tracks={tracks}
-      tracksFailed={tracksQuery.isError}
+      tracksFailed={trackList.isError}
       subtitle={subtitle}
       onFailure={onFailure}
       onPickAudio={pickAudio}

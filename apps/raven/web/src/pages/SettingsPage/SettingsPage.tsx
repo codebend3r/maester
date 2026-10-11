@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { PlaybackSettings } from '@raven/core'
 import { useId } from 'react'
 import { api } from '@/lib/api'
+import { playbackSettingsQuery } from '@/lib/queries'
 import { queryKeys } from '@/lib/queryClient'
 import styles from '@/pages/SettingsPage/SettingsPage.module.scss'
 
@@ -121,7 +122,7 @@ const Setting = <K extends keyof PlaybackSettings>({
 export const SettingsPage = () => {
   const ids = { title: useId(), playback: useId() }
   const queryClient = useQueryClient()
-  const state = useQuery({ queryKey: queryKeys.playbackSettings, queryFn: api.getPlaybackSettings })
+  const state = useQuery(playbackSettingsQuery)
   const save = useMutation({
     mutationFn: (change: Partial<PlaybackSettings>) => api.setPlaybackSettings(change),
     onSuccess: (updated) => queryClient.setQueryData(queryKeys.playbackSettings, updated),

@@ -2,8 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Button } from '@/components/Button/Button'
 import { Icon } from '@/components/Icon/Icon'
-import { api } from '@/lib/api'
-import { queryKeys } from '@/lib/queryClient'
+import { browseQuery } from '@/lib/queries'
 import styles from '@/components/FolderBrowser/FolderBrowser.module.scss'
 
 /**
@@ -18,10 +17,7 @@ export const FolderBrowser = ({
   exclude: readonly string[]
 }) => {
   const [path, setPath] = useState<string | null>(null)
-  const listing = useQuery({
-    queryKey: queryKeys.browse(path),
-    queryFn: () => api.browse(path ?? undefined),
-  })
+  const listing = useQuery(browseQuery(path))
   const current = listing.data?.path ?? path ?? ''
   const alreadyAdded = exclude.includes(current)
 

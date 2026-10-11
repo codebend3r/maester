@@ -2,7 +2,7 @@ import { type QueryClient, useQueryClient } from '@tanstack/react-query'
 import { type ServerEvent, parseServerEvent } from '@raven/core'
 import { useEffect } from 'react'
 import { api } from '@/lib/api'
-import { queryKeys } from '@/lib/queryClient'
+import { afterLibraryEvent, afterReconnect } from '@/lib/invalidate'
 
 /** Reads again what an event says changed. */
 const follow = ({
@@ -14,26 +14,13 @@ const follow = ({
 }): Promise<unknown> => {
   switch (event.type) {
     case 'library':
-      return Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.library(event.libraryId) }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.libraries, exact: true }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.favourites }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.items }),
-      ])
+      return afterLibraryEvent({ queryClient, libraryId: event.libraryId })
     default: {
       const unknown: never = event.type
       return Promise.resolve(unknown)
     }
   }
 }
-
-/** After the stream was down, anything may have changed. */
-const catchUp = (queryClient: QueryClient): Promise<unknown> =>
-  Promise.all([
-    queryClient.invalidateQueries({ queryKey: queryKeys.libraries }),
-    queryClient.invalidateQueries({ queryKey: queryKeys.favourites }),
-    queryClient.invalidateQueries({ queryKey: queryKeys.items }),
-  ])
 
 /**
  * Keeps the browsing pages in step with the server as it changes: a library
@@ -55,7 +42,7 @@ export const useServerEvents = (): void => {
       stream.dropped = true
     })
     source.addEventListener('open', () => {
-      if (stream.dropped) void catchUp(queryClient)
+      if (stream.dropped) void afterReconnect(queryClient)
       stream.dropped = false
     })
     return () => source.close()

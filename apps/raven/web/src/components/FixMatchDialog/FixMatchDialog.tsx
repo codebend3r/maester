@@ -3,7 +3,8 @@ import type { MatchCandidate } from '@raven/core'
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react'
 import { Button } from '@/components/Button/Button'
 import { api } from '@/lib/api'
-import { queryKeys } from '@/lib/queryClient'
+import { afterMatch } from '@/lib/invalidate'
+import { matchSearchQuery } from '@/lib/queries'
 import styles from '@/components/FixMatchDialog/FixMatchDialog.module.scss'
 
 /** What the dialog searches for: a movie, or a show. */
@@ -95,22 +96,12 @@ export const FixMatchDialog = <T,>({
     dialog.current?.showModal()
   }, [])
 
-  const results = useQuery({
-    queryKey: queryKeys.matchSearch({ type, query: asked.query, year: asked.year }),
-    queryFn: () => api.searchMatches({ type, query: asked.query, year: asked.year }),
-    enabled: asked.query !== '',
-    staleTime: 5 * 60_000,
-  })
+  const results = useQuery(matchSearchQuery({ type, query: asked.query, year: asked.year }))
 
   const choose = useMutation({
     mutationFn: match,
     onSuccess: async (result) => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.libraries }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.items }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.favourites }),
-        queryClient.invalidateQueries({ queryKey: ['media'] }),
-      ])
+      await afterMatch(queryClient)
       onMatched?.(result)
       onClose()
     },

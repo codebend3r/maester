@@ -3,7 +3,8 @@ import type { ItemDetails, ItemMetadata, ItemMetadataChange } from '@raven/core'
 import { type FormEvent, useId, useState } from 'react'
 import { Button } from '@/components/Button/Button'
 import { api } from '@/lib/api'
-import { queryKeys } from '@/lib/queryClient'
+import { afterItemEdited } from '@/lib/invalidate'
+import { itemMetadataQuery } from '@/lib/queries'
 import styles from '@/components/MetadataEditor/MetadataEditor.module.scss'
 
 type Field = keyof ItemMetadata
@@ -57,10 +58,7 @@ export const MetadataEditor = ({
 }) => {
   const ids = { heading: useId(), form: useId() }
   const queryClient = useQueryClient()
-  const state = useQuery({
-    queryKey: queryKeys.itemMetadata(details.id),
-    queryFn: () => api.getItemMetadata(details.id),
-  })
+  const state = useQuery(itemMetadataQuery(details.id))
   // What the viewer has typed; until then, what the page shows.
   const [edited, setDraft] = useState<Draft | null>(null)
   const draft = edited ?? (state.data ? toDraft(state.data.shown) : null)
@@ -68,11 +66,7 @@ export const MetadataEditor = ({
   const save = useMutation({
     mutationFn: (change: ItemMetadataChange) => api.setItemMetadata({ id: details.id, change }),
     onSuccess: async (updated) => {
-      queryClient.setQueryData(queryKeys.item(details.id), updated)
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.itemMetadata(details.id) }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.libraries }),
-      ])
+      await afterItemEdited({ queryClient, updated, part: 'metadata' })
       onDone()
     },
   })

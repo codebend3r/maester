@@ -19,7 +19,8 @@ import { Button } from '@/components/Button/Button'
 import { FolderBrowser } from '@/components/FolderBrowser/FolderBrowser'
 import { api } from '@/lib/api'
 import { KINDS } from '@/lib/libraryKinds'
-import { queryKeys } from '@/lib/queryClient'
+import { afterLibrarySaved } from '@/lib/invalidate'
+import { lockQuery, metadataHealthQuery } from '@/lib/queries'
 import styles from '@/components/LibraryDialog/LibraryDialog.module.scss'
 
 const RATINGS_LABELS: Record<ShownRatings, string> = {
@@ -47,26 +48,15 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
   const [typedPath, setTypedPath] = useState('')
   const [errors, setErrors] = useState<string[]>([])
   const [confirmingDelete, setConfirmingDelete] = useState(false)
-  const metadata = useQuery({
-    queryKey: queryKeys.metadataHealth,
-    queryFn: api.getMetadataHealth,
-    staleTime: 60_000,
-  })
-  const lock = useQuery({ queryKey: queryKeys.lock, queryFn: api.getLock })
+  const metadata = useQuery(metadataHealthQuery)
+  const lock = useQuery(lockQuery)
   const lockable = !!lock.data?.available
 
   useEffect(() => {
     dialog.current?.showModal()
   }, [])
 
-  // Saved spots show or hide with the library's progress setting, so cached
-  // videos and favourites are refetched along with the libraries.
-  const refresh = () =>
-    Promise.all([
-      queryClient.invalidateQueries({ queryKey: queryKeys.libraries }),
-      queryClient.invalidateQueries({ queryKey: ['media'] }),
-      queryClient.invalidateQueries({ queryKey: queryKeys.favourites }),
-    ])
+  const refresh = () => afterLibrarySaved(queryClient)
 
   const save = useMutation({
     mutationFn: (input: LibraryInput) =>

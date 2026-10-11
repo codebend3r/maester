@@ -20,6 +20,7 @@ import { ShortcutsDialog } from '@/components/Player/ShortcutsDialog'
 import { SubtitleOverlay } from '@/components/Player/SubtitleOverlay'
 import { useSubtitleCues } from '@/components/Player/useSubtitleCues'
 import { api } from '@/lib/api'
+import { afterWatching } from '@/lib/invalidate'
 import { isTypingTarget } from '@/lib/keyboard'
 import { type PlayerAction, shortcutFor, stepCaptionScale, stepSpeed } from '@/lib/shortcuts'
 import { createStreamSession } from '@/lib/streamSource'
@@ -191,9 +192,7 @@ export const Stage = ({
       window.clearTimeout(resumedTimer)
       if (idleTimer.current != null) window.clearTimeout(idleTimer.current)
       if (element && element.readyState > 0) save(position.current)
-      // Resume lines on the library grid, and the history, should reflect where this stopped.
-      void queryClient.invalidateQueries({ queryKey: ['libraries', media.libraryId, 'media'] })
-      void queryClient.invalidateQueries({ queryKey: ['libraries', media.libraryId, 'history'] })
+      void afterWatching({ queryClient, libraryId: media.libraryId })
     }
   }, [label, media.libraryId, queryClient, save, scheduleIdle])
 

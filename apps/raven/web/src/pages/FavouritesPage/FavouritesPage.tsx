@@ -1,8 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useId } from 'react'
 import { MediaGrid } from '@/components/MediaGrid/MediaGrid'
-import { api } from '@/lib/api'
-import { queryKeys } from '@/lib/queryClient'
+import { favouritesQuery } from '@/lib/queries'
 import styles from '@/pages/FavouritesPage/FavouritesPage.module.scss'
 
 const count = new Intl.NumberFormat()
@@ -10,7 +9,7 @@ const count = new Intl.NumberFormat()
 /** Every favourite across every library, most recently marked first. */
 export const FavouritesPage = () => {
   const id = useId()
-  const favourites = useQuery({ queryKey: queryKeys.favourites, queryFn: api.listFavourites })
+  const favourites = useQuery(favouritesQuery)
   const items = favourites.data ?? []
 
   return (
