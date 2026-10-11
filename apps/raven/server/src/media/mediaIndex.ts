@@ -1,13 +1,52 @@
 import { basename, dirname, relative } from 'node:path'
 import { Inject, Injectable } from '@nestjs/common'
-import { type LibraryKind, containerOf } from '@raven/core'
+import {
+  type LibraryKind,
+  type MediaTracks,
+  type ThumbnailState,
+  containerOf,
+  isMediaTracks,
+  isThumbnailState,
+} from '@raven/core'
 import { DatabaseService } from '@/db/database'
-import { namedAs } from '@/media/mediaRepository'
+import type { ProbeResult } from '@/ffmpeg/probe'
+import { namedAs } from '@/media/namedAs'
 import type { IndexedFile, Reconciled } from '@/scanner/reconcile'
 import type { FoundFile } from '@/scanner/walk'
 
 /** A file waiting on ffprobe. */
 export type ProbeTarget = { id: number; path: string }
+
+/**
+ * A video as the server works with the file itself: where it is and what
+ * reading, converting and picturing it need. Never sent to a client.
+ */
+export type MediaFile = {
+  id: number
+  libraryId: number
+  path: string
+  fileName: string
+  container: string
+  /** Changes whenever the file does, so it keys what is cached of it. */
+  mtimeMs: number
+  duration: number | null
+  videoCodec: string | null
+  hdr: boolean
+  thumbnail: ThumbnailState
+}
+
+type FileRow = {
+  id: number
+  library_id: number
+  path: string
+  file_name: string
+  container: string
+  mtime_ms: number
+  duration: number | null
+  video_codec: string | null
+  hdr: number
+  thumbnail: string
+}
 
 /** Its name, and the folder it sits in under the library path that found it. */
 const placeOf = (file: FoundFile): { fileName: string; folder: string } => ({
@@ -16,8 +55,9 @@ const placeOf = (file: FoundFile): { fileName: string; folder: string } => ({
 })
 
 /**
- * The scanner's side of the media table: the index it diffs the disk
- * against, and the changes it writes back.
+ * The media table as files: the index the scanner diffs the disk against
+ * and the changes it writes back, what a probe found, and the file state
+ * playing, picturing and deleting a video need.
  */
 @Injectable()
 export class MediaIndex {
@@ -27,13 +67,62 @@ export class MediaIndex {
     return this.database.db
   }
 
-  /** Every indexed file in a library, keyed by absolute path. */
+  /** The file behind a video, or null when there is no such video. */
+  fileOf(id: number): MediaFile | null {
+    const row = this.db
+      .prepare<[number], FileRow>(
+        `SELECT id, library_id, path, file_name, container, mtime_ms, duration, video_codec, hdr,
+                thumbnail
+           FROM media WHERE id = ?`,
+      )
+      .get(id)
+    return row
+      ? {
+          id: row.id,
+          libraryId: row.library_id,
+          path: row.path,
+          fileName: row.file_name,
+          container: row.container,
+          mtimeMs: row.mtime_ms,
+          duration: row.duration,
+          videoCodec: row.video_codec,
+          hdr: row.hdr === 1,
+          thumbnail: isThumbnailState(row.thumbnail) ? row.thumbnail : 'pending',
+        }
+      : null
+  }
+
+  /** The library a video is in, or null when there is no such video. */
+  libraryOf(id: number): number | null {
+    return (
+      this.db
+        .prepare<[number], { library_id: number }>('SELECT library_id FROM media WHERE id = ?')
+        .get(id)?.library_id ?? null
+    )
+  }
+
+  idsForLibrary(libraryId: number): number[] {
+    return this.db
+      .prepare<[number], { id: number }>('SELECT id FROM media WHERE library_id = ?')
+      .all(libraryId)
+      .map((row) => row.id)
+  }
+
+  /**
+   * Every indexed file in a library, keyed by absolute path. A file probed
+   * before tracks were stored counts as unprobed, so the scan probes it
+   * again and stores them.
+   */
   forLibrary(libraryId: number): Map<string, IndexedFile> {
     const rows = this.db
       .prepare<
         [number],
         { id: number; path: string; size: number; mtime_ms: number; probed: number }
-      >('SELECT id, path, size, mtime_ms, probed FROM media WHERE library_id = ?')
+      >(
+        `SELECT id, path, size, mtime_ms,
+                probed = 1 AND (tracks IS NOT NULL OR probe_error IS NOT NULL) AS probed
+           FROM media WHERE library_id = ?`,
+      )
       .all(libraryId)
     return new Map(
       rows.map((row) => [
@@ -156,9 +245,8 @@ export class MediaIndex {
     changes: Reconciled
   }): ProbeTarget[] {
     const at = new Date()
-    const remove = this.db.prepare('DELETE FROM media WHERE id = ?')
     return this.db.transaction(() => {
-      changes.gone.forEach((id) => remove.run(id))
+      this.remove(changes.gone)
       changes.moved.forEach(({ id, file }) => this.move({ id, kind, file, at }))
       changes.changed.forEach(({ id, file }) =>
         this.markChanged({ id, size: file.size, mtimeMs: file.mtimeMs, at }),
@@ -173,5 +261,73 @@ export class MediaIndex {
         ...changes.unprobed,
       ]
     })()
+  }
+
+  /** What a probe found, and the tracks it found. */
+  saveProbe({ id, probe, tracks }: { id: number; probe: ProbeResult; tracks: MediaTracks }): void {
+    this.db
+      .prepare(
+        `UPDATE media SET probed = 1, probe_error = NULL, duration = ?, width = ?, height = ?,
+                video_codec = ?, video_bit_depth = ?, hdr = ?, audio_codec = ?, audio_channels = ?,
+                bitrate = ?, tracks = ?
+          WHERE id = ?`,
+      )
+      .run(
+        probe.duration,
+        probe.width,
+        probe.height,
+        probe.videoCodec,
+        probe.videoBitDepth,
+        probe.hdr ? 1 : 0,
+        probe.audioCodec,
+        probe.audioChannels,
+        probe.bitrate,
+        JSON.stringify(tracks),
+        id,
+      )
+  }
+
+  saveProbeError({ id, error }: { id: number; error: string }): void {
+    this.db
+      .prepare(`UPDATE media SET probed = 1, probe_error = ?, thumbnail = 'failed' WHERE id = ?`)
+      .run(error, id)
+  }
+
+  /** The embedded tracks a probe stored, or null when there are none yet (or they no longer read). */
+  storedTracks(id: number): MediaTracks | null {
+    const row = this.db
+      .prepare<[number], { tracks: string | null }>('SELECT tracks FROM media WHERE id = ?')
+      .get(id)
+    if (row?.tracks == null) return null
+    try {
+      const parsed: unknown = JSON.parse(row.tracks)
+      return isMediaTracks(parsed) ? parsed : null
+    } catch {
+      return null
+    }
+  }
+
+  saveTracks({ id, tracks }: { id: number; tracks: MediaTracks }): void {
+    this.db.prepare('UPDATE media SET tracks = ? WHERE id = ?').run(JSON.stringify(tracks), id)
+  }
+
+  setThumbnail({ id, state }: { id: number; state: ThumbnailState }): void {
+    this.db.prepare('UPDATE media SET thumbnail = ? WHERE id = ?').run(state, id)
+  }
+
+  /** Probed files still waiting on a thumbnail, oldest first, so a restart picks the queue back up. */
+  pendingThumbnailIds(): number[] {
+    return this.db
+      .prepare<[], { id: number }>(
+        `SELECT id FROM media WHERE thumbnail = 'pending' AND probed = 1 ORDER BY id`,
+      )
+      .all()
+      .map((row) => row.id)
+  }
+
+  /** Drops the rows, and with them each video's progress, favourite and plays. */
+  remove(ids: readonly number[]): void {
+    const remove = this.db.prepare('DELETE FROM media WHERE id = ?')
+    this.db.transaction(() => ids.forEach((id) => remove.run(id)))()
   }
 }

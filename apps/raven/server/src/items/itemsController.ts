@@ -30,7 +30,7 @@ import type { FastifyReply } from 'fastify'
 import { sendImage } from '@/items/sendImage'
 import { PrivateBy } from '@/lock/lockGuard'
 import { LockService } from '@/lock/lockService'
-import { MediaRepository, toMediaItem } from '@/media/mediaRepository'
+import { MediaRepository } from '@/media/mediaRepository'
 import { ImageCache } from '@/metadata/imageCache'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 import { MetadataService } from '@/metadata/metadataService'
@@ -66,10 +66,7 @@ export class ItemsController {
     const viewer = this.lock.viewer({ cookie })
     return {
       ...details,
-      versions: this.media
-        .forItem(id)
-        .filter((record) => viewer.seesLibrary(record.libraryId))
-        .map(toMediaItem),
+      versions: this.media.forItem(id).filter((item) => viewer.seesLibrary(item.libraryId)),
       children: this.metadata.childrenOnDisk(id).filter((child) => viewer.seesItem(child.id)),
     }
   }
@@ -118,10 +115,8 @@ export class ItemsController {
     @Headers('cookie') cookie: string | undefined,
   ): MediaItem | null {
     this.requireItem(id)
-    const record = this.media.nextEpisode(id)
-    return record && this.lock.viewer({ cookie }).seesLibrary(record.libraryId)
-      ? toMediaItem(record)
-      : null
+    const next = this.media.nextEpisode(id)
+    return next && this.lock.viewer({ cookie }).seesLibrary(next.libraryId) ? next : null
   }
 
   /** Fetches the item from TMDB again now. One TMDB no longer has is gone after, so 404. */

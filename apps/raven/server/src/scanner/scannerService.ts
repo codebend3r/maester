@@ -11,11 +11,9 @@ import { errorMessage } from '@/errorMessage'
 import { ServerEvents } from '@/events/serverEvents'
 import { FfmpegService, FfmpegTimeoutError } from '@/ffmpeg/ffmpegService'
 import { type LibraryRecord, LibrariesRepository } from '@/libraries/librariesRepository'
+import { MediaArtifacts } from '@/media/mediaArtifacts'
 import { MediaIndex, type ProbeTarget } from '@/media/mediaIndex'
-import { MediaRepository } from '@/media/mediaRepository'
 import { MetadataService } from '@/metadata/metadataService'
-import { SubtitlesService } from '@/playback/subtitlesService'
-import { TracksService } from '@/playback/tracksService'
 import { mapWithConcurrency } from '@/scanner/concurrency'
 import { type Reconciled, changesAnything, reconcile } from '@/scanner/reconcile'
 import { type WalkResult, isUnder, outermost, walkVideos } from '@/scanner/walk'
@@ -91,13 +89,11 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
   constructor(
     @Inject(SERVER_CONFIG) private readonly config: ServerConfig,
     @Inject(LibrariesRepository) private readonly libraries: LibrariesRepository,
-    @Inject(MediaRepository) private readonly media: MediaRepository,
     @Inject(MediaIndex) private readonly index: MediaIndex,
+    @Inject(MediaArtifacts) private readonly artifacts: MediaArtifacts,
     @Inject(ServerEvents) private readonly events: ServerEvents,
     @Inject(FfmpegService) private readonly ffmpeg: FfmpegService,
     @Inject(ThumbnailService) private readonly thumbnails: ThumbnailService,
-    @Inject(SubtitlesService) private readonly subtitles: SubtitlesService,
-    @Inject(TracksService) private readonly tracks: TracksService,
     @Inject(MetadataService) private readonly metadata: MetadataService,
   ) {}
 
@@ -215,10 +211,8 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
         onProbed: () =>
           this.update(library.id, { processed: this.status(library.id).processed + 1 }),
       })
-      // Thumbnails that timed out on an earlier pass get another go, and
-      // videos indexed before tracks were stored get theirs.
-      this.media.pendingThumbnailIds().forEach((id) => this.thumbnails.enqueue(id))
-      this.tracks.backfill(this.media.idsMissingTracks(library.id))
+      // Thumbnails that timed out on an earlier pass get another go.
+      this.thumbnails.retryPending()
 
       const unreadable = walk.unreadable.map((place) => `Could not read ${place}.`)
       this.update(library.id, {
@@ -263,7 +257,12 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
     }
   }
 
-  /** Brings the index in line with the disk over `scope` in one write, and tells clients when it changed. */
+  /**
+   * Brings the index in line with the disk over `scope` in one write, then
+   * forgets what was kept of the files that went, and tells clients when it
+   * changed. The rows go first, so a failed write leaves no row pointing at
+   * a thumbnail that was already deleted.
+   */
   private async reindex({
     library,
     scope,
@@ -281,12 +280,12 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
       ),
     )
     const changes = reconcile({ known, found: walk.files })
-    await Promise.all([this.thumbnails.discard(changes.gone), this.subtitles.discard(changes.gone)])
     const toProbe = this.index.apply({
       libraryId: library.id,
       kind: library.settings.kind,
       changes,
     })
+    await this.artifacts.discard(changes.gone)
     if (changesAnything(changes)) this.events.libraryChanged(library.id)
     return { walk, changes, toProbe }
   }
@@ -305,11 +304,11 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
       fn: async ({ id, path }) => {
         try {
           const { probe, tracks } = await this.ffmpeg.probeFile(path)
-          this.media.saveProbe({ id, probe, tracks })
+          this.index.saveProbe({ id, probe, tracks })
           this.thumbnails.enqueue(id)
         } catch (error) {
           if (!(error instanceof FfmpegTimeoutError)) {
-            this.media.saveProbeError({ id, error: errorMessage(error) })
+            this.index.saveProbeError({ id, error: errorMessage(error) })
           }
           this.logger.warn(`Could not probe ${path}: ${errorMessage(error)}`)
         }

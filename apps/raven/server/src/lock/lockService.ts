@@ -3,7 +3,7 @@ import { Inject, Injectable } from '@nestjs/common'
 import type { LockState } from '@raven/core'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
-import { MediaRepository } from '@/media/mediaRepository'
+import { MediaIndex } from '@/media/mediaIndex'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 
 /** What a route's `:id` names, so its library can be found: a library, a video, or a movie or show. */
@@ -59,7 +59,7 @@ export class LockService {
   constructor(
     @Inject(SERVER_CONFIG) private readonly config: ServerConfig,
     @Inject(LibrariesRepository) private readonly libraries: LibrariesRepository,
-    @Inject(MediaRepository) private readonly media: MediaRepository,
+    @Inject(MediaIndex) private readonly index: MediaIndex,
     @Inject(MetadataRepository) private readonly metadata: MetadataRepository,
   ) {}
 
@@ -110,7 +110,7 @@ export class LockService {
         case 'library':
           return seesLibrary(id)
         case 'media': {
-          const libraryId = this.media.libraryOf(id)
+          const libraryId = this.index.libraryOf(id)
           return libraryId == null || seesLibrary(libraryId)
         }
         case 'item':

@@ -26,16 +26,17 @@ import {
   isMediaLocation,
   parseServerEvent,
 } from '@raven/core'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createApp } from '@/app'
 import { CONTROLLERS } from '@/appModule'
 import { type ServerConfig, readServerConfig } from '@/config'
+import { DatabaseService } from '@/db/database'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { routeMarks } from '@/lock/lockGuard'
 import type { Privacy } from '@/lock/lockService'
+import { MediaIndex } from '@/media/mediaIndex'
 import { MediaRepository } from '@/media/mediaRepository'
 import { MetadataRepository } from '@/metadata/metadataRepository'
-import { TracksService } from '@/playback/tracksService'
 import { ScannerService } from '@/scanner/scannerService'
 import { encodeClip } from '@/test/clips'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
@@ -120,7 +121,6 @@ describe('the media server', () => {
   const settle = async (libraryId: number) => {
     await app().get(ScannerService).whenIdle(libraryId)
     await app().get(ThumbnailService).whenIdle()
-    await app().get(TracksService).whenIdle()
   }
   const listMedia = async (libraryId: number): Promise<MediaItem[]> =>
     expectShape({
@@ -473,7 +473,7 @@ describe('the media server', () => {
       const [movie] = await listMedia(library.id)
       expect(
         app()
-          .get(MediaRepository)
+          .get(MediaIndex)
           .storedTracks(movie?.id ?? -1)?.audio,
       ).toHaveLength(1)
     })
@@ -481,11 +481,12 @@ describe('the media server', () => {
     it('fills in tracks a video indexed before they were stored is missing, on the next scan', async () => {
       const [movie] = await listMedia(library.id)
       const id = movie?.id ?? -1
-      app().get(MediaRepository).forgetTracks(id)
-      expect(app().get(MediaRepository).storedTracks(id)).toBeNull()
+      // As a row probed before tracks were stored is.
+      app().get(DatabaseService).db.prepare('UPDATE media SET tracks = NULL WHERE id = ?').run(id)
+      expect(app().get(MediaIndex).storedTracks(id)).toBeNull()
       await app().inject({ method: 'POST', url: `/api/libraries/${library.id}/scan` })
       await settle(library.id)
-      expect(app().get(MediaRepository).storedTracks(id)?.audio).toHaveLength(1)
+      expect(app().get(MediaIndex).storedTracks(id)?.audio).toHaveLength(1)
     })
 
     it('drops files that disappear on the next scan, and their thumbnails', async () => {
@@ -501,6 +502,16 @@ describe('the media server', () => {
       await expect(stat(thumbnail)).resolves.toBeTruthy()
 
       await rm(added)
+      // A scan whose write fails keeps the row, and so the thumbnail the row says is ready.
+      const failing = vi.spyOn(app().get(MediaIndex), 'apply').mockImplementationOnce(() => {
+        throw new Error('disk I/O error')
+      })
+      await app().inject({ method: 'POST', url: `/api/libraries/${library.id}/scan` })
+      await settle(library.id)
+      failing.mockRestore()
+      expect((await listMedia(library.id)).map((item) => item.title)).toContain('Extra Clip')
+      await expect(stat(thumbnail)).resolves.toBeTruthy()
+
       await app().inject({ method: 'POST', url: `/api/libraries/${library.id}/scan` })
       await settle(library.id)
       expect((await listMedia(library.id)).map((item) => item.title)).not.toContain('Extra Clip')

@@ -17,7 +17,7 @@ import type { FastifyReply } from 'fastify'
 import { sendImage } from '@/items/sendImage'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { PrivateBy, Public } from '@/lock/lockGuard'
-import { MediaRepository, toMediaItem } from '@/media/mediaRepository'
+import { MediaRepository } from '@/media/mediaRepository'
 import { ImageCache } from '@/metadata/imageCache'
 import { MetadataService } from '@/metadata/metadataService'
 import { TMDB_IMAGE_PATH, TmdbClient, TmdbError } from '@/metadata/tmdbClient'
@@ -121,6 +121,6 @@ export class MatchController {
     await this.service.fixMatch({ mediaId: id, tmdbId }).catch(tmdbFailure)
     const updated = this.media.get(id)
     if (!updated) throw new NotFoundException(`No media ${id}`)
-    return toMediaItem(updated)
+    return updated
   }
 }

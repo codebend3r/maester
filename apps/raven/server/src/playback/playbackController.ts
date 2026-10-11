@@ -18,7 +18,7 @@ import { SOFTWARE } from '@/ffmpeg/encoder'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import { PrivateBy } from '@/lock/lockGuard'
 import { SettingsRepository } from '@/settings/settingsRepository'
-import { type MediaRecord, MediaRepository } from '@/media/mediaRepository'
+import { type MediaFile, MediaIndex } from '@/media/mediaIndex'
 import { SubtitlesService } from '@/playback/subtitlesService'
 import { TracksService } from '@/playback/tracksService'
 
@@ -43,21 +43,21 @@ const wholeNumber = (value: string | undefined): number | null => {
 export class PlaybackController {
   constructor(
     @Inject(SettingsRepository) private readonly settings: SettingsRepository,
-    @Inject(MediaRepository) private readonly media: MediaRepository,
+    @Inject(MediaIndex) private readonly index: MediaIndex,
     @Inject(TracksService) private readonly tracks: TracksService,
     @Inject(SubtitlesService) private readonly subtitles: SubtitlesService,
     @Inject(FfmpegService) private readonly ffmpeg: FfmpegService,
   ) {}
 
-  private find(id: number): MediaRecord {
-    const record = this.media.get(id)
-    if (!record) throw new NotFoundException(`No media ${id}`)
-    return record
+  private fileOf(id: number): MediaFile {
+    const file = this.index.fileOf(id)
+    if (!file) throw new NotFoundException(`No media ${id}`)
+    return file
   }
 
   @Get(':id/tracks')
   async listTracks(@Param('id', ParseIntPipe) id: number): Promise<MediaTracks> {
-    return (await this.tracks.tracksFor(this.find(id))).tracks
+    return (await this.tracks.tracksFor(this.fileOf(id))).tracks
   }
 
   /** WebVTT for one track; `window` picks the stretch of an embedded one. */
@@ -70,7 +70,7 @@ export class PlaybackController {
   ): Promise<void> {
     const part = window == null ? 0 : wholeNumber(window)
     if (part == null) throw new BadRequestException('window must be a whole number')
-    const vtt = await this.subtitles.vtt({ record: this.find(id), trackId, window: part })
+    const vtt = await this.subtitles.vtt({ file: this.fileOf(id), trackId, window: part })
     await reply
       .header('content-type', 'text/vtt; charset=utf-8')
       .header('cache-control', 'private, max-age=300')
@@ -103,11 +103,11 @@ export class PlaybackController {
     if (!Number.isFinite(from) || from < 0) {
       throw new BadRequestException('start must be a number of seconds')
     }
-    const record = this.find(id)
-    const info = await stat(record.path).catch(() => null)
+    const file = this.fileOf(id)
+    const info = await stat(file.path).catch(() => null)
     if (!info?.isFile()) throw new NotFoundException('The file is no longer on disk')
 
-    const { tracks } = await this.tracks.tracksFor(record)
+    const { tracks } = await this.tracks.tracksFor(file)
     const chosen = audio == null ? tracks.defaultAudio : wholeNumber(audio)
     if (
       audio != null &&
@@ -116,16 +116,16 @@ export class PlaybackController {
       throw new BadRequestException(`No audio track ${audio}`)
     }
     const tonemap =
-      mode === 'transcode' && record.hdr && playback.tonemap && (await this.ffmpeg.canTonemap())
+      mode === 'transcode' && file.hdr && playback.tonemap && (await this.ffmpeg.canTonemap())
     const encoder = mode === 'transcode' ? await this.ffmpeg.videoEncoder() : SOFTWARE
 
     const child = this.ffmpeg.stream(
       streamArgs({
-        input: record.path,
+        input: file.path,
         start: from,
         mode,
         audio: chosen,
-        videoCodec: record.videoCodec,
+        videoCodec: file.videoCodec,
         tonemap,
         streamShift: STREAM_TIME_SHIFT,
         encoder,

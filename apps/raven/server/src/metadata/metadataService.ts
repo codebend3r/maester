@@ -21,7 +21,6 @@ import {
 import { errorMessage } from '@/errorMessage'
 import { groupBy } from '@/groupBy'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
-import { MediaRepository, type PendingFile } from '@/media/mediaRepository'
 import { ImageCache } from '@/metadata/imageCache'
 import {
   episodeStill,
@@ -30,6 +29,7 @@ import {
   seasonPoster,
   showAssets,
 } from '@/metadata/localAssets'
+import { type MatchFile, MatchFiles } from '@/metadata/matchFiles'
 import { pickMatch } from '@/metadata/matcher'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 import { readNfoIds } from '@/metadata/nfo'
@@ -68,7 +68,7 @@ const showFolderOf = (file: { folder: string }): string | null => {
 }
 
 /** Where a show's files are kept together: the show's folder, or the file itself at a root. */
-const showPlace = (file: PendingFile): string => showFolderOf(file) ?? filePlace(file)
+const showPlace = (file: MatchFile): string => showFolderOf(file) ?? filePlace(file)
 
 /** Whether a TMDB failure means the rest of a pass should wait for the next one. */
 const stopsThePass = (error: unknown): boolean =>
@@ -185,7 +185,7 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
 
   constructor(
     @Inject(LibrariesRepository) private readonly libraries: LibrariesRepository,
-    @Inject(MediaRepository) private readonly media: MediaRepository,
+    @Inject(MatchFiles) private readonly files: MatchFiles,
     @Inject(MetadataRepository) private readonly metadata: MetadataRepository,
     @Inject(TmdbClient) private readonly tmdb: TmdbClient,
     @Inject(ImageCache) private readonly images: ImageCache,
@@ -202,7 +202,7 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
       .list()
       .filter((library) => MATCHED_KINDS.includes(library.settings.kind))
       .forEach((library) => {
-        this.media.retitle({ libraryId: library.id, kind: library.settings.kind })
+        this.files.retitle({ libraryId: library.id, kind: library.settings.kind })
         this.enqueue(library.id)
       })
     if (!this.tmdb.enabled) return
@@ -227,10 +227,10 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
    */
   retryUnmatched(libraryId: number): number {
     const kind = this.libraries.get(libraryId)?.settings.kind
-    const count = this.media.retryUnmatched(libraryId)
+    const count = this.files.retryUnmatched(libraryId)
     if (count === 0 || kind == null) return count
     // Names are read again first, so a parser that now reads the name right gets its say.
-    this.media.retitle({ libraryId, kind })
+    this.files.retitle({ libraryId, kind })
     // A pass already running has tried these files, so another follows it.
     this.queue.again(`library:${libraryId}`, () => this.pass(libraryId))
     return count
@@ -242,7 +242,7 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
    */
   changeKind({ libraryId, kind }: { libraryId: number; kind: LibraryKind }): void {
     this.queue.push(`kind:${libraryId}:${kind}`, async () => {
-      this.media.rename({ libraryId, kind })
+      this.files.rename({ libraryId, kind })
       await this.pass(libraryId)
     })
   }
@@ -256,7 +256,7 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
     return {
       tmdb: tmdb.state,
       omdb: this.omdb.state().state,
-      pending: this.media.countPending(MATCHED_KINDS),
+      pending: this.files.countPending(MATCHED_KINDS),
       error: tmdb.error,
       lastOk: tmdb.lastOk,
     }
@@ -282,7 +282,7 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
     const context = newContext()
     const attempted = new Set<number>()
     const round = async (): Promise<void> => {
-      const files = this.media.pending(libraryId).filter((file) => !attempted.has(file.id))
+      const files = this.files.pending(libraryId).filter((file) => !attempted.has(file.id))
       if (files.length === 0 || context.stopped.error != null) return
       files.forEach((file) => attempted.add(file.id))
       if (kind === 'shows') {
@@ -351,7 +351,7 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
     const known = context.ownFolders.get(key)
     if (known != null) return known
     const movies = new Set(
-      this.media
+      this.files
         .inFolder({ libraryId, folder })
         .filter((file) => !isExtra(file))
         .map((file) => {
@@ -365,13 +365,7 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
   }
 
   /** The Fix match for a movie file: its own place first, then its folder's. */
-  private overrideFor({
-    file,
-    own,
-  }: {
-    file: PendingFile
-    own: boolean
-  }): string | null | undefined {
+  private overrideFor({ file, own }: { file: MatchFile; own: boolean }): string | null | undefined {
     const forFile = this.metadata.override({ libraryId: file.libraryId, place: filePlace(file) })
     if (forFile !== undefined || !own) return forFile
     return this.metadata.override({ libraryId: file.libraryId, place: file.folder })
@@ -472,11 +466,11 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
     file,
     context,
   }: {
-    file: PendingFile
+    file: MatchFile
     context: PassContext
   }): Promise<void> {
     if (isExtra(file)) {
-      this.media.setMatch({ ids: [file.id], match: 'off' })
+      this.files.setMatch({ ids: [file.id], match: 'off' })
       return
     }
     const dir = dirname(file.path)
@@ -531,11 +525,11 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
     files,
     context,
   }: {
-    files: PendingFile[]
+    files: MatchFile[]
     context: PassContext
   }): Promise<void> {
     const extras = files.filter((file) => isExtra(file))
-    if (extras.length > 0) this.media.setMatch({ ids: extras.map((file) => file.id), match: 'off' })
+    if (extras.length > 0) this.files.setMatch({ ids: extras.map((file) => file.id), match: 'off' })
     const episodes = files.filter((file) => !isExtra(file))
     const [first] = episodes
     if (!first) return
@@ -613,7 +607,7 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
     match,
     context,
   }: {
-    file: PendingFile
+    file: MatchFile
     showId: number
     showTmdbId: string
     showDir: string
@@ -789,7 +783,7 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
   }): void {
     if (itemIds.length === 0) this.metadata.unlink(mediaIds)
     else this.metadata.link({ mediaIds, itemIds })
-    this.media.setMatch({ ids: mediaIds, match })
+    this.files.setMatch({ ids: mediaIds, match })
   }
 
   /** Posters are fetched as soon as an item is matched, so a library's first visit is quick. */
@@ -804,16 +798,10 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
   }
 
   /** Matches a set of files again from scratch, as one group, with a fresh pass. */
-  private async rematch({
-    files,
-    kind,
-  }: {
-    files: PendingFile[]
-    kind: LibraryKind
-  }): Promise<void> {
+  private async rematch({ files, kind }: { files: MatchFile[]; kind: LibraryKind }): Promise<void> {
     if (files.length === 0) return
     this.metadata.unlink(files.map((file) => file.id))
-    this.media.setMatch({ ids: files.map((file) => file.id), match: 'pending' })
+    this.files.setMatch({ ids: files.map((file) => file.id), match: 'pending' })
     const context = newContext()
     if (kind === 'shows') {
       await this.matchShowGroup({ files, context })
@@ -826,7 +814,7 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
   }
 
   /** The files a Fix match on `record` covers, and the place it is kept under. */
-  private groupOf(record: PendingFile): { place: string; files: PendingFile[]; kind: LibraryKind } {
+  private groupOf(record: MatchFile): { place: string; files: MatchFile[]; kind: LibraryKind } {
     const kind = this.libraries.get(record.libraryId)?.settings.kind ?? 'other'
     if (kind === 'shows') {
       const showFolder = showFolderOf(record)
@@ -836,7 +824,7 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
         files:
           showFolder == null
             ? [record]
-            : this.media.underFolder({ libraryId: record.libraryId, folder: showFolder }),
+            : this.files.underFolder({ libraryId: record.libraryId, folder: showFolder }),
       }
     }
     const context = newContext()
@@ -845,7 +833,7 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
       place: own ? record.folder : filePlace(record),
       kind,
       files: own
-        ? this.media
+        ? this.files
             .inFolder({ libraryId: record.libraryId, folder: record.folder })
             .filter((file) => !isExtra(file))
         : [record],
@@ -858,7 +846,7 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
    * `null`, and keeps that by place so renames and re-downloads keep it.
    */
   async fixMatch({ mediaId, tmdbId }: { mediaId: number; tmdbId: string | null }): Promise<void> {
-    const record = this.media.get(mediaId)
+    const record = this.files.byId(mediaId)
     if (!record) return
     const group = this.groupOf(record)
     this.metadata.saveOverride({ libraryId: record.libraryId, place: group.place, tmdbId })
@@ -878,7 +866,7 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
     showId: number
     tmdbId: string
   }): Promise<number | null> {
-    const files = this.metadata.mediaUnderShow(showId).flatMap((id) => this.media.get(id) ?? [])
+    const files = this.files.byIds(this.metadata.mediaUnderShow(showId))
     const groups = [
       ...groupBy({ items: files, key: (file) => `${file.libraryId}|${showPlace(file)}` }).values(),
     ]
@@ -891,13 +879,7 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
   }
 
   /** Keeps a Fix match for one show folder, and matches its files again under it. */
-  private async rePoint({
-    group,
-    tmdbId,
-  }: {
-    group: PendingFile[]
-    tmdbId: string
-  }): Promise<void> {
+  private async rePoint({ group, tmdbId }: { group: MatchFile[]; tmdbId: string }): Promise<void> {
     const [first] = group
     if (!first) return
     this.metadata.saveOverride({ libraryId: first.libraryId, place: showPlace(first), tmdbId })
@@ -967,7 +949,7 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
   }
 
   private async rereadMovieImages(itemId: number): Promise<void> {
-    const files = this.media.forItem(itemId)
+    const files = this.files.forItem(itemId)
     const context = newContext()
     const found = await Promise.all(
       files.map(async (file) => {
@@ -999,12 +981,12 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
     const item = this.metadata.get(itemId)
     const mediaIds =
       item?.type === 'show' ? this.metadata.mediaUnderShow(itemId) : this.metadata.mediaFor(itemId)
-    const files = mediaIds.flatMap((id) => this.media.get(id) ?? [])
+    const files = this.files.byIds(mediaIds)
     this.metadata.remove(itemId)
     const manual = files.filter((file) => file.match === 'manual').map((file) => file.id)
     const automatic = files.filter((file) => file.match !== 'manual').map((file) => file.id)
-    this.media.setMatch({ ids: manual, match: 'unmatched' })
-    this.media.setMatch({ ids: automatic, match: 'pending' })
+    this.files.setMatch({ ids: manual, match: 'unmatched' })
+    this.files.setMatch({ ids: automatic, match: 'pending' })
     new Set(files.map((file) => file.libraryId)).forEach((libraryId) => this.enqueue(libraryId))
   }
 

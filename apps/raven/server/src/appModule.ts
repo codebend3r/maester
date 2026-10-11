@@ -17,10 +17,13 @@ import { LockController } from '@/lock/lockController'
 import { LockGuard, assertLockMarked } from '@/lock/lockGuard'
 import { LockService } from '@/lock/lockService'
 import { FavouritesController } from '@/media/favouritesController'
+import { MediaArtifacts } from '@/media/mediaArtifacts'
 import { MediaController } from '@/media/mediaController'
 import { MediaIndex } from '@/media/mediaIndex'
 import { MediaRepository } from '@/media/mediaRepository'
+import { ViewingRepository } from '@/media/viewingRepository'
 import { ImageCache } from '@/metadata/imageCache'
+import { MatchFiles } from '@/metadata/matchFiles'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 import { MetadataService } from '@/metadata/metadataService'
 import { OmdbClient } from '@/metadata/omdbClient'
@@ -88,7 +91,9 @@ export class AppModule {
         SettingsRepository,
         MetadataRepository,
         MediaRepository,
+        ViewingRepository,
         MediaIndex,
+        MatchFiles,
         TmdbClient,
         OmdbClient,
         ImageCache,
@@ -97,6 +102,7 @@ export class AppModule {
         ThumbnailService,
         TracksService,
         SubtitlesService,
+        MediaArtifacts,
         ScannerService,
         LibraryWatcher,
         LockService,
