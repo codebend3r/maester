@@ -1,16 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common'
 import {
   DEFAULT_LIBRARY_SETTINGS,
-  defaultLibrarySettings,
   type LibraryInput,
   type LibrarySettings,
-  isLibraryKind,
-  isLibraryView,
-  isMediaGroupBy,
-  isMediaSort,
-  isShownRatings,
-  isWatchedPercent,
-  withLibraryKind,
+  coherentSettings,
+  defaultLibrarySettings,
+  isLibrarySettings,
+  keyOf,
 } from '@raven/core'
 import { DatabaseService } from '@/db/database'
 
@@ -43,39 +39,62 @@ type LibraryRow = {
   locked: number
 }
 
-/** A row's settings; a value the database holds but this version does not know falls back to the default. */
-const toSettings = (row: LibraryRow): LibrarySettings => ({
-  saveProgress: row.save_progress === 1,
-  pinned: row.pinned === 1,
-  sort: isMediaSort(row.sort) ? row.sort : DEFAULT_LIBRARY_SETTINGS.sort,
-  view: isLibraryView(row.view_mode) ? row.view_mode : DEFAULT_LIBRARY_SETTINGS.view,
-  groupBy: isMediaGroupBy(row.group_by) ? row.group_by : DEFAULT_LIBRARY_SETTINGS.groupBy,
-  watchedPercent: isWatchedPercent(row.watched_percent)
-    ? row.watched_percent
-    : DEFAULT_LIBRARY_SETTINGS.watchedPercent,
-  kind: isLibraryKind(row.kind) ? row.kind : DEFAULT_LIBRARY_SETTINGS.kind,
-  ratingsSource: isShownRatings(row.ratings_source)
-    ? row.ratings_source
-    : DEFAULT_LIBRARY_SETTINGS.ratingsSource,
-  autoRefresh: row.auto_refresh === 1,
-  locked: row.locked === 1,
+const isSettingName = keyOf(isLibrarySettings.shape)
+
+/**
+ * A row's settings. Each column is read as its setting, and checked with
+ * that setting's guard from the contract: a value this version does not
+ * know is the default's, and a sort, view or grouping the library's type
+ * cannot show is its type's.
+ */
+const toSettings = (row: LibraryRow): LibrarySettings => {
+  const stored = {
+    saveProgress: row.save_progress === 1,
+    pinned: row.pinned === 1,
+    sort: row.sort,
+    view: row.view_mode,
+    groupBy: row.group_by,
+    watchedPercent: row.watched_percent,
+    kind: row.kind,
+    ratingsSource: row.ratings_source,
+    autoRefresh: row.auto_refresh === 1,
+    locked: row.locked === 1,
+  } satisfies Record<keyof LibrarySettings, unknown>
+  const known = Object.fromEntries(
+    Object.entries(stored).filter(
+      ([name, value]) => isSettingName(name) && isLibrarySettings.shape[name](value),
+    ),
+  )
+  const settings = { ...DEFAULT_LIBRARY_SETTINGS, ...known }
+  return coherentSettings(isLibrarySettings(settings) ? settings : DEFAULT_LIBRARY_SETTINGS)
+}
+
+/**
+ * The settings as the columns that hold them, bound by name. The statements
+ * below are built from its keys, so a new setting is added here, in
+ * `LibraryRow` and in `toSettings`, and in no statement.
+ */
+const settingParams = (settings: LibrarySettings) => ({
+  save_progress: Number(settings.saveProgress),
+  pinned: Number(settings.pinned),
+  sort: settings.sort,
+  view_mode: settings.view,
+  group_by: settings.groupBy,
+  watched_percent: settings.watchedPercent,
+  kind: settings.kind,
+  ratings_source: settings.ratingsSource,
+  auto_refresh: Number(settings.autoRefresh),
+  locked: Number(settings.locked),
 })
 
-/** The settings columns in the order the statements below bind them. */
-const settingValues = (
-  settings: LibrarySettings,
-): [number, number, string, string, string, number, string, string, number, number] => [
-  Number(settings.saveProgress),
-  Number(settings.pinned),
-  settings.sort,
-  settings.view,
-  settings.groupBy,
-  settings.watchedPercent,
-  settings.kind,
-  settings.ratingsSource,
-  Number(settings.autoRefresh),
-  Number(settings.locked),
-]
+const SETTING_COLUMNS = Object.keys(settingParams(DEFAULT_LIBRARY_SETTINGS))
+
+const INSERT_LIBRARY = `INSERT INTO libraries (name, created_at, ${SETTING_COLUMNS.join(', ')})
+  VALUES (@name, @created_at, ${SETTING_COLUMNS.map((column) => `@${column}`).join(', ')})`
+
+const UPDATE_LIBRARY = `UPDATE libraries
+    SET name = @name, ${SETTING_COLUMNS.map((column) => `${column} = @${column}`).join(', ')}
+  WHERE id = @id`
 
 /** Whether a library's paths are the same, in the same order, as they were. */
 export const samePaths = ({
@@ -104,8 +123,7 @@ export class LibrariesRepository {
   private rows(id: number | null): LibraryRecord[] {
     const libraries = this.db
       .prepare<[number | null, number | null], LibraryRow>(
-        `SELECT l.id, l.name, l.created_at, l.save_progress, l.pinned, l.sort, l.view_mode, l.group_by,
-                l.watched_percent, l.kind, l.ratings_source, l.auto_refresh, l.locked,
+        `SELECT l.id, l.name, l.created_at, ${SETTING_COLUMNS.map((column) => `l.${column}`).join(', ')},
                 (SELECT COUNT(*) FROM media m WHERE m.library_id = l.id) AS item_count,
                 (SELECT COUNT(*) FROM media m WHERE m.library_id = l.id AND m.match = 'unmatched')
                   AS unmatched_count
@@ -148,19 +166,18 @@ export class LibrariesRepository {
     paths.forEach((path, position) => insert.run(id, path, position))
   }
 
+  /** A new library starts with its type's defaults, under whatever settings were sent. */
   create(input: LibraryInput): LibraryRecord {
-    const settings = {
+    const settings = coherentSettings({
       ...defaultLibrarySettings(input.settings?.kind ?? DEFAULT_LIBRARY_SETTINGS.kind),
       ...input.settings,
-    }
+    })
     const id = this.db.transaction(() => {
-      const result = this.db
-        .prepare(
-          `INSERT INTO libraries (name, created_at, save_progress, pinned, sort, view_mode, group_by,
-                                  watched_percent, kind, ratings_source, auto_refresh, locked)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        )
-        .run(input.name, new Date().toISOString(), ...settingValues(settings))
+      const result = this.db.prepare(INSERT_LIBRARY).run({
+        name: input.name,
+        created_at: new Date().toISOString(),
+        ...settingParams(settings),
+      })
       const created = Number(result.lastInsertRowid)
       this.replacePaths({ id: created, paths: input.paths })
       return created
@@ -172,27 +189,16 @@ export class LibrariesRepository {
 
   /**
    * Renames the library, replaces its paths, and lays the settings sent over
-   * the ones it has. Media found only under a dropped path stays until the
-   * rescan that follows removes it.
+   * the ones it has. Whatever the type cannot show is swapped for its own,
+   * so a new type keeps the view and grouping it can show. Media found only
+   * under a dropped path stays until the rescan that follows removes it.
    */
   update({ id, input }: { id: number; input: LibraryInput }): LibraryRecord | null {
     const current = this.get(id)
     if (!current) return null
-    const laid = { ...current.settings, ...input.settings }
-    // A new type keeps the view and grouping it can show, and swaps the others for its own.
-    const settings =
-      laid.kind === current.settings.kind
-        ? laid
-        : withLibraryKind({ settings: laid, kind: laid.kind })
+    const settings = coherentSettings({ ...current.settings, ...input.settings })
     this.db.transaction(() => {
-      this.db
-        .prepare(
-          `UPDATE libraries
-              SET name = ?, save_progress = ?, pinned = ?, sort = ?, view_mode = ?, group_by = ?,
-                  watched_percent = ?, kind = ?, ratings_source = ?, auto_refresh = ?, locked = ?
-            WHERE id = ?`,
-        )
-        .run(input.name, ...settingValues(settings), id)
+      this.db.prepare(UPDATE_LIBRARY).run({ id, name: input.name, ...settingParams(settings) })
       this.replacePaths({ id, paths: input.paths })
     })()
     return this.get(id)
