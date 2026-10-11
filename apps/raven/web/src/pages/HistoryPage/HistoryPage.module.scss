@@ -1,0 +1,73 @@
+.page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+.back {
+  justify-self: start;
+  border-color: transparent;
+  padding-left: 0;
+}
+
+.header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-1);
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: var(--font-size-hero);
+  font-weight: 400;
+  line-height: var(--line-tight);
+}
+
+.intro {
+  max-width: var(--measure);
+  color: var(--color-lichen);
+}
+
+.shows {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: 0;
+  border: 0;
+}
+
+// The list shown reads as switched on, like the library's chosen view.
+.show[aria-pressed='true'] {
+  background: var(--color-canopy);
+  border-color: var(--color-lichen);
+}
+
+.days {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.day {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.heading {
+  padding-bottom: var(--space-1);
+  border-bottom: 1px solid var(--color-moss);
+  font-family: var(--font-display);
+  font-size: var(--font-size-xl);
+  font-weight: 400;
+  line-height: var(--line-tight);
+}
+
+.more {
+  justify-self: start;
+}
+
+.message {
+  max-width: var(--measure);
+  color: var(--color-lichen);
+}

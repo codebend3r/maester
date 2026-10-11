@@ -95,6 +95,23 @@ describe('Player progress', () => {
   })
 })
 
+describe('Player history', () => {
+  it('records a play the first time the video plays, and only then', async () => {
+    stubTracks()
+    const played = spyOn(api, 'recordPlay').mockImplementation(async () => undefined)
+    const { container } = renderWithProviders(
+      <Player media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />,
+    )
+    const video = container.querySelector('video')
+    expect(played).not.toHaveBeenCalled()
+    video?.dispatchEvent(new Event('playing'))
+    video?.dispatchEvent(new Event('playing'))
+    const calls = [...played.mock.calls]
+    played.mockRestore()
+    expect(calls).toEqual([[7]])
+  })
+})
+
 describe('the player controls', () => {
   beforeEach(() => stubTracks())
 

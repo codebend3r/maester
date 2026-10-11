@@ -19,7 +19,7 @@ import styles from '@/components/MediaTiles/MediaTiles.module.scss'
  * to the same place, so it stays out of the tab order and the reading order;
  * the title is the link. A right click on either opens the row's menu.
  */
-const MediaTile = ({ media }: { media: MediaItem }) => {
+const MediaTile = ({ media, note }: { media: MediaItem; note: string | null }) => {
   const [menuOpen, setMenuOpen] = useState(false)
   const openMenu = (event: MouseEvent) => {
     event.preventDefault()
@@ -84,6 +84,7 @@ const MediaTile = ({ media }: { media: MediaItem }) => {
           {progress > 0 && <span className="visually-hidden">Partly watched</span>}
         </span>
         {media.folder !== '' && <span className={styles.folder}>{media.folder}</span>}
+        {note !== null && <span className={styles.note}>{note}</span>}
         <PlaybackNote media={media} />
       </div>
       <MediaMenu media={media} open={menuOpen} onOpenChange={setMenuOpen} inline />
@@ -91,11 +92,22 @@ const MediaTile = ({ media }: { media: MediaItem }) => {
   )
 }
 
-/** Every video as a taller row with a small thumbnail beside its facts. */
-export const MediaTiles = ({ items, busy = false }: { items: MediaItem[]; busy?: boolean }) => (
+/**
+ * Every video as a taller row with a small thumbnail beside its facts.
+ * `note` adds a line of the caller's own under a video, as the history does.
+ */
+export const MediaTiles = ({
+  items,
+  busy = false,
+  note,
+}: {
+  items: MediaItem[]
+  busy?: boolean
+  note?: (media: MediaItem) => string | null
+}) => (
   <ul className={styles.tiles} aria-busy={busy}>
     {items.map((item) => (
-      <MediaTile key={item.id} media={item} />
+      <MediaTile key={item.id} media={item} note={note ? note(item) : null} />
     ))}
   </ul>
 )

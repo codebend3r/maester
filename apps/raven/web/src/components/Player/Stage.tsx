@@ -190,8 +190,9 @@ export const Stage = ({
       window.clearTimeout(resumedTimer)
       if (idleTimer.current != null) window.clearTimeout(idleTimer.current)
       if (element && element.readyState > 0) save(position.current)
-      // Resume lines on the library grid should reflect where this stopped.
+      // Resume lines on the library grid, and the history, should reflect where this stopped.
       void queryClient.invalidateQueries({ queryKey: ['libraries', media.libraryId, 'media'] })
+      void queryClient.invalidateQueries({ queryKey: ['libraries', media.libraryId, 'history'] })
     }
   }, [media.title, media.libraryId, queryClient, save, scheduleIdle])
 
@@ -501,6 +502,8 @@ export const Stage = ({
           playing.current = true
         }}
         onPlaying={() => {
+          // The first time the video really plays, it joins its library's history.
+          if (!started.current) api.recordPlay(media.id).catch(() => undefined)
           started.current = true
           setWaiting(false)
         }}

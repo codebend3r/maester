@@ -122,6 +122,14 @@ describe('LibraryPage', () => {
     expect(await screen.findByText('Watching 3')).toBeInTheDocument()
   })
 
+  it("links to the library's history", async () => {
+    serve()
+    expect(await screen.findByRole('link', { name: 'History' })).toHaveAttribute(
+      'href',
+      '/libraries/2/history',
+    )
+  })
+
   it('has nothing to play or shuffle in an empty library', async () => {
     serve({}, [])
     await screen.findByText(/No videos in these folders yet/)

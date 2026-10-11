@@ -110,6 +110,14 @@ Sort, view and grouping are picked on the library page and saved as they change;
 
 Beside the sort, **Play** starts the first video as the page shows it (the top of the first group in the grouped view) and **Shuffle** starts a random one, whatever the sort. Both keep to the search.
 
+## History
+
+Each library's **History**, linked from its page, lists the videos played in it, last played first and split into days. **Watched** shows the ones that count as watched by the library's **Watched at** setting; **All played** adds the ones that stopped short, with how far they got.
+
+- A play is recorded when a video starts, and its furthest point as the player saves its position (every 10 seconds, on pause, and on leaving). Starting the same video again within half an hour of its last report is the same play.
+- A video counts as watched once any play gets past the library's percentage. One whose length is not known yet never does.
+- History is kept whatever **Save where each video stopped** says; that setting is only about resuming. A video's plays go when the video leaves the library.
+
 ## Favourites and deleting
 
 Every card has a menu, from the button in its corner or a right click, with two actions. **Favourite** marks the video and lists it under **Favourites** in the side menu, most recently marked first, across every library. **Delete** asks first, then removes the file from disk and the video from the index, along with its thumbnail, progress and favourite. There is no undo.
@@ -146,8 +154,8 @@ The server and core tests need `ffmpeg` and `ffprobe` on the PATH: the end-to-en
 apps/raven/
   server/        @raven/server: NestJS on Fastify: SQLite index, scanner, ffprobe, thumbnails,
                  range-request file serving, tracks, subtitles and converted streams
-  web/           @raven/web: React 19 + Vite: libraries, the grid, list, tiles and groups, the player
-                 and its stream source, the /design page
+  web/           @raven/web: React 19 + Vite: libraries, the grid, list, tiles and groups, history,
+                 the player and its stream source, the /design page
   Dockerfile, docker-compose.yml, docker-compose.vhagar.yml
 libs/raven/
   core/          @raven/core: API types and guards, the typed API client, the direct-play check,

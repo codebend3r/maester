@@ -165,6 +165,9 @@ export const LibraryPage = () => {
           <ScanStatus scan={library.data.scan} />
         </div>
         <div className={styles.actions}>
+          <ButtonLink to={`/libraries/${libraryId}/history`} icon="history">
+            History
+          </ButtonLink>
           <Button
             icon="rescan"
             disabled={scanning || rescan.isPending}

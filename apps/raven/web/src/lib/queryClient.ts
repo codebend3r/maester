@@ -40,5 +40,13 @@ export const queryKeys = {
     window,
   ],
   favourites: ['favourites'],
+  history: ({ libraryId, show, limit }: { libraryId: number; show: string; limit: number }) => [
+    'libraries',
+    libraryId,
+    'history',
+    { show, limit },
+  ],
+  /** The prefix every page of a library's history shares. */
+  histories: (libraryId: number) => ['libraries', libraryId, 'history'],
   browse: (path: string | null) => ['browse', path],
 }

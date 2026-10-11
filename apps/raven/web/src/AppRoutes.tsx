@@ -2,6 +2,7 @@ import { Route, Routes } from 'react-router-dom'
 import { AppShell } from '@/components/AppShell/AppShell'
 import { DesignPage } from '@/pages/DesignPage/DesignPage'
 import { FavouritesPage } from '@/pages/FavouritesPage/FavouritesPage'
+import { HistoryPage } from '@/pages/HistoryPage/HistoryPage'
 import { LibrariesPage } from '@/pages/LibrariesPage/LibrariesPage'
 import { LibraryPage } from '@/pages/LibraryPage/LibraryPage'
 import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
@@ -12,6 +13,7 @@ export const AppRoutes = () => (
     <Route element={<AppShell />}>
       <Route index element={<LibrariesPage />} />
       <Route path="libraries/:id" element={<LibraryPage />} />
+      <Route path="libraries/:id/history" element={<HistoryPage />} />
       <Route path="favourites" element={<FavouritesPage />} />
       <Route path="design" element={<DesignPage />} />
       <Route path="*" element={<NotFoundPage />} />

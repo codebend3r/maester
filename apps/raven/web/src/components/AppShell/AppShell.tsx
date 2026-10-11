@@ -24,6 +24,12 @@ const NavItem = ({
   )
 }
 
+/** A library's own pages: its videos and its history. */
+const libraryPages = (id: number | string): string[] => [
+  `/libraries/${id}`,
+  `/libraries/${id}/history`,
+]
+
 /**
  * The frame around every browsing page: the wordmark, then the side menu
  * beside the page (below it on a narrow screen). Pinned libraries get their
@@ -34,8 +40,8 @@ export const AppShell = () => {
   const { pathname } = useLocation()
   const libraries = useQuery({ queryKey: queryKeys.libraries, queryFn: api.listLibraries })
   const pinned = (libraries.data ?? []).filter((library) => library.settings.pinned)
-  const pinnedOpen = pinned.some(
-    (library) => matchPath(`/libraries/${library.id}`, pathname) != null,
+  const pinnedOpen = pinned.some((library) =>
+    libraryPages(library.id).some((pattern) => matchPath(pattern, pathname) != null),
   )
 
   return (
@@ -46,7 +52,7 @@ export const AppShell = () => {
         </Link>
       </header>
       <nav className={styles.nav} aria-label="Main">
-        <NavItem to="/" patterns={pinnedOpen ? ['/'] : ['/', '/libraries/:id']}>
+        <NavItem to="/" patterns={pinnedOpen ? ['/'] : ['/', ...libraryPages(':id')]}>
           Libraries
         </NavItem>
         <NavItem to="/favourites" patterns={['/favourites']}>
@@ -56,7 +62,7 @@ export const AppShell = () => {
           <ul className={styles.pinned} aria-label="Pinned">
             {pinned.map((library) => (
               <li key={library.id} className={styles.pinnedItem}>
-                <NavItem to={`/libraries/${library.id}`} patterns={[`/libraries/${library.id}`]}>
+                <NavItem to={`/libraries/${library.id}`} patterns={libraryPages(library.id)}>
                   {library.name}
                 </NavItem>
               </li>
