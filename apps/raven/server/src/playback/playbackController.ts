@@ -11,27 +11,17 @@ import {
   Query,
   Res,
 } from '@nestjs/common'
-import { type MediaTracks, STREAM_TIME_SHIFT, type StreamMode } from '@raven/core'
+import { type MediaTracks, STREAM_TIME_SHIFT, isStreamMode } from '@raven/core'
+import { wholeNumber } from '@shared/server'
 import type { FastifyReply } from 'fastify'
 import { streamArgs } from '@/ffmpeg/args'
 import { SOFTWARE } from '@/ffmpeg/encoder'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import { PrivateBy } from '@/lock/lockGuard'
 import { SettingsRepository } from '@/settings/settingsRepository'
-import { type MediaRecord, MediaRepository } from '@/media/mediaRepository'
+import { type MediaFile, MediaIndex } from '@/media/mediaIndex'
 import { SubtitlesService } from '@/playback/subtitlesService'
 import { TracksService } from '@/playback/tracksService'
-
-const STREAM_MODES: readonly StreamMode[] = ['remux', 'transcode']
-
-const isStreamMode = (value: unknown): value is StreamMode =>
-  STREAM_MODES.some((mode) => mode === value)
-
-/** A query value as a whole number at or above zero, or null when it is not one. */
-const wholeNumber = (value: string | undefined): number | null => {
-  const parsed = Number(value)
-  return value != null && value !== '' && Number.isInteger(parsed) && parsed >= 0 ? parsed : null
-}
 
 /**
  * What a player needs beyond the file itself: the tracks to choose from,
@@ -39,29 +29,28 @@ const wholeNumber = (value: string | undefined): number | null => {
  * browser cannot play directly.
  */
 @Controller('api/media')
+@PrivateBy('media')
 export class PlaybackController {
   constructor(
     @Inject(SettingsRepository) private readonly settings: SettingsRepository,
-    @Inject(MediaRepository) private readonly media: MediaRepository,
+    @Inject(MediaIndex) private readonly index: MediaIndex,
     @Inject(TracksService) private readonly tracks: TracksService,
     @Inject(SubtitlesService) private readonly subtitles: SubtitlesService,
     @Inject(FfmpegService) private readonly ffmpeg: FfmpegService,
   ) {}
 
-  private find(id: number): MediaRecord {
-    const record = this.media.get(id)
-    if (!record) throw new NotFoundException(`No media ${id}`)
-    return record
+  private fileOf(id: number): MediaFile {
+    const file = this.index.fileOf(id)
+    if (!file) throw new NotFoundException(`No media ${id}`)
+    return file
   }
 
-  @PrivateBy('media')
   @Get(':id/tracks')
   async listTracks(@Param('id', ParseIntPipe) id: number): Promise<MediaTracks> {
-    return (await this.tracks.tracksFor(this.find(id))).tracks
+    return (await this.tracks.tracksFor(this.fileOf(id))).tracks
   }
 
   /** WebVTT for one track; `window` picks the stretch of an embedded one. */
-  @PrivateBy('media')
   @Get(':id/subtitles/:trackId')
   async subtitle(
     @Param('id', ParseIntPipe) id: number,
@@ -71,7 +60,7 @@ export class PlaybackController {
   ): Promise<void> {
     const part = window == null ? 0 : wholeNumber(window)
     if (part == null) throw new BadRequestException('window must be a whole number')
-    const vtt = await this.subtitles.vtt({ record: this.find(id), trackId, window: part })
+    const vtt = await this.subtitles.vtt({ file: this.fileOf(id), trackId, window: part })
     await reply
       .header('content-type', 'text/vtt; charset=utf-8')
       .header('cache-control', 'private, max-age=300')
@@ -84,7 +73,6 @@ export class PlaybackController {
    * response is open and is killed the moment the client lets go, which
    * happens on every seek outside what is buffered.
    */
-  @PrivateBy('media')
   @Get(':id/stream')
   async stream(
     @Param('id', ParseIntPipe) id: number,
@@ -105,11 +93,11 @@ export class PlaybackController {
     if (!Number.isFinite(from) || from < 0) {
       throw new BadRequestException('start must be a number of seconds')
     }
-    const record = this.find(id)
-    const info = await stat(record.path).catch(() => null)
+    const file = this.fileOf(id)
+    const info = await stat(file.path).catch(() => null)
     if (!info?.isFile()) throw new NotFoundException('The file is no longer on disk')
 
-    const { tracks } = await this.tracks.tracksFor(record)
+    const { tracks } = await this.tracks.tracksFor(file)
     const chosen = audio == null ? tracks.defaultAudio : wholeNumber(audio)
     if (
       audio != null &&
@@ -118,16 +106,16 @@ export class PlaybackController {
       throw new BadRequestException(`No audio track ${audio}`)
     }
     const tonemap =
-      mode === 'transcode' && record.hdr && playback.tonemap && (await this.ffmpeg.canTonemap())
+      mode === 'transcode' && file.hdr && playback.tonemap && (await this.ffmpeg.canTonemap())
     const encoder = mode === 'transcode' ? await this.ffmpeg.videoEncoder() : SOFTWARE
 
     const child = this.ffmpeg.stream(
       streamArgs({
-        input: record.path,
+        input: file.path,
         start: from,
         mode,
         audio: chosen,
-        videoCodec: record.videoCodec,
+        videoCodec: file.videoCodec,
         tonemap,
         streamShift: STREAM_TIME_SHIFT,
         encoder,

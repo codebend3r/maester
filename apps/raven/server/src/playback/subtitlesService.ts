@@ -6,7 +6,7 @@ import { subtitleWindowRange } from '@raven/core'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { subtitleFileArgs, subtitleWindowArgs } from '@/ffmpeg/args'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
-import type { MediaRecord } from '@/media/mediaRepository'
+import type { MediaFile } from '@/media/mediaIndex'
 import { TracksService } from '@/playback/tracksService'
 
 /** Most sidecars that are not UTF-8 are Windows Latin-1, from the DVD-rip years. */
@@ -35,15 +35,15 @@ export class SubtitlesService {
 
   /** One track's WebVTT; for an embedded track, only window `window`. */
   async vtt({
-    record,
+    file,
     trackId,
     window,
   }: {
-    record: MediaRecord
+    file: MediaFile
     trackId: string
     window: number
   }): Promise<string> {
-    const { tracks, sidecars } = await this.tracks.tracksFor(record)
+    const { tracks, sidecars } = await this.tracks.tracksFor(file)
     const track = tracks.subtitles.find((candidate) => candidate.id === trackId)
     if (!track) throw new NotFoundException(`No subtitle track ${trackId}`)
     if (!track.supported) {
@@ -54,8 +54,8 @@ export class SubtitlesService {
     const number = Number(trackId.split('-')[1])
     const sidecar = track.source === 'external' ? sidecars[number] : undefined
     const part = sidecar ? 'all' : String(window)
-    const folder = join(this.dir, String(record.id))
-    const path = join(folder, `${record.mtimeMs}-${trackId}-${part}.vtt`)
+    const folder = join(this.dir, String(file.id))
+    const path = join(folder, `${file.mtimeMs}-${trackId}-${part}.vtt`)
 
     const cached = await readFile(path, 'utf8').catch(() => null)
     if (cached != null) return cached
@@ -65,7 +65,7 @@ export class SubtitlesService {
     const work = this.extract({
       folder,
       path,
-      version: String(record.mtimeMs),
+      version: String(file.mtimeMs),
       args: (output) =>
         sidecar
           ? [
@@ -74,7 +74,7 @@ export class SubtitlesService {
             ]
           : [
               subtitleWindowArgs({
-                input: record.path,
+                input: file.path,
                 stream: number,
                 ...subtitleWindowRange(window),
                 output,

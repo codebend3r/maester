@@ -87,10 +87,6 @@ export class FfmpegService implements OnApplicationBootstrap, OnModuleDestroy {
     }
   }
 
-  async probe(path: string): Promise<ProbeResult> {
-    return (await this.probeFile(path)).probe
-  }
-
   /** One ffprobe run, read twice: what the index keeps, and the file's tracks. */
   async probeFile(path: string): Promise<{ probe: ProbeResult; tracks: FileTracks }> {
     const output = await this.probeJson(path)

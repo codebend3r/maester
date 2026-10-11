@@ -6,7 +6,7 @@ import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { errorMessage } from '@/errorMessage'
 import { thumbnailArgs, thumbnailSeek } from '@/ffmpeg/args'
 import { FfmpegService, FfmpegTimeoutError } from '@/ffmpeg/ffmpegService'
-import { MediaRepository } from '@/media/mediaRepository'
+import { MediaIndex } from '@/media/mediaIndex'
 import { createTaskQueue } from '@/scanner/concurrency'
 
 const exists = async (path: string): Promise<boolean> =>
@@ -29,7 +29,7 @@ export class ThumbnailService implements OnApplicationBootstrap {
 
   constructor(
     @Inject(SERVER_CONFIG) private readonly config: ServerConfig,
-    @Inject(MediaRepository) private readonly media: MediaRepository,
+    @Inject(MediaIndex) private readonly index: MediaIndex,
     @Inject(FfmpegService) private readonly ffmpeg: FfmpegService,
   ) {
     this.queue = createTaskQueue({ concurrency: config.thumbnailConcurrency })
@@ -38,7 +38,12 @@ export class ThumbnailService implements OnApplicationBootstrap {
   }
 
   onApplicationBootstrap(): void {
-    this.media.pendingThumbnailIds().forEach((id) => this.enqueue(id))
+    this.retryPending()
+  }
+
+  /** Queues every probed file still waiting on a thumbnail, such as one that timed out before. */
+  retryPending(): void {
+    this.index.pendingThumbnailIds().forEach((id) => this.enqueue(id))
   }
 
   pathFor(id: number): string {
@@ -90,27 +95,26 @@ export class ThumbnailService implements OnApplicationBootstrap {
   }
 
   private async generate(id: number): Promise<void> {
-    const record = this.media.get(id)
-    if (!record || record.thumbnail === 'ready') return
-    const tonemap = record.hdr && (await this.ffmpeg.canTonemap())
-    const seek = thumbnailSeek(record.duration)
+    const file = this.index.fileOf(id)
+    if (!file || file.thumbnail === 'ready') return
+    const tonemap = file.hdr && (await this.ffmpeg.canTonemap())
+    const seek = thumbnailSeek(file.duration)
     try {
       // A duration that overstates the real stream can seek past the last
       // frame; the first frame beats no thumbnail at all.
-      const temp = await this.render({ input: record.path, seek, tonemap }).catch(
-        (error: unknown) =>
-          seek > 0 && !(error instanceof FfmpegTimeoutError)
-            ? this.render({ input: record.path, seek: 0, tonemap })
-            : Promise.reject(error),
+      const temp = await this.render({ input: file.path, seek, tonemap }).catch((error: unknown) =>
+        seek > 0 && !(error instanceof FfmpegTimeoutError)
+          ? this.render({ input: file.path, seek: 0, tonemap })
+          : Promise.reject(error),
       )
       // Written aside and renamed into place, so a half-written JPEG is never served.
       await rename(temp, this.pathFor(id))
-      this.media.setThumbnail({ id, state: 'ready' })
+      this.index.setThumbnail({ id, state: 'ready' })
     } catch (error) {
       // A slow share is not a broken file: leave it pending for the next scan.
       const retryLater = error instanceof FfmpegTimeoutError
-      this.logger.warn(`No thumbnail for ${record.fileName}: ${errorMessage(error)}`)
-      this.media.setThumbnail({ id, state: retryLater ? 'pending' : 'failed' })
+      this.logger.warn(`No thumbnail for ${file.fileName}: ${errorMessage(error)}`)
+      this.index.setThumbnail({ id, state: retryLater ? 'pending' : 'failed' })
     }
   }
 }

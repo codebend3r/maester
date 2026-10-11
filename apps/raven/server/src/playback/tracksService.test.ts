@@ -1,17 +1,13 @@
-import { mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { DEFAULT_PLAYBACK_SETTINGS } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { readServerConfig } from '@/config'
-import { DatabaseService } from '@/db/database'
-import { DEFAULT_PLAYBACK_SETTINGS } from '@raven/core'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
-import { MediaIndex } from '@/media/mediaIndex'
-import { type MediaRecord, MediaRepository } from '@/media/mediaRepository'
-import { MetadataRepository } from '@/metadata/metadataRepository'
+import { type MediaFile, MediaIndex } from '@/media/mediaIndex'
 import { TracksService } from '@/playback/tracksService'
 import { encodeClip } from '@/test/clips'
+import { testDatabase } from '@/test/database'
 
 const PROBE = {
   duration: 6,
@@ -26,62 +22,45 @@ const PROBE = {
 }
 
 describe('TracksService', () => {
-  const state = {
-    dir: '',
-    clip: '',
-    other: '',
-    libraryId: 0,
-    database: null as DatabaseService | null,
-    media: null as MediaRepository | null,
-  }
-  const media = (): MediaRepository => {
-    if (!state.media) throw new Error('not set up')
-    return state.media
-  }
-  const index = (): MediaIndex => {
-    if (!state.database) throw new Error('not set up')
-    return new MediaIndex(state.database)
-  }
-  const record = (id: number): MediaRecord => {
-    const found = media().get(id)
+  const database = testDatabase('raven-tracks-service-')
+  const state = { media: '', libraryId: 0 }
+  const index = () => new MediaIndex(database.get())
+  const fileOf = (id: number): MediaFile => {
+    const found = index().fileOf(id)
     if (!found) throw new Error(`no media ${id}`)
     return found
   }
+  const add = ({ name, mtimeMs }: { name: string; mtimeMs: number }): number =>
+    index().insert({
+      libraryId: state.libraryId,
+      kind: 'other',
+      file: { path: join(state.media, name), root: state.media, size: 1, mtimeMs },
+    })
   const tracksWith = (ffprobePath: string): TracksService =>
     new TracksService(
       new FfmpegService(
-        { ...readServerConfig({}), dataDir: state.dir, ffprobePath },
+        { ...readServerConfig({}), ffprobePath },
         { playback: () => DEFAULT_PLAYBACK_SETTINGS },
       ),
-      media(),
+      index(),
     )
 
   beforeAll(async () => {
-    state.dir = await mkdtemp(join(tmpdir(), 'raven-tracks-service-'))
-    state.clip = join(state.dir, 'media', 'Clip.mp4')
-    state.other = join(state.dir, 'media', 'Other.mp4')
-    await encodeClip({ path: state.clip })
-    await encodeClip({ path: state.other, seconds: 2 })
-    const database = new DatabaseService({ ...readServerConfig({}), dataDir: state.dir })
-    state.database = database
-    state.media = new MediaRepository(database, new MetadataRepository(database))
-    state.libraryId = new LibrariesRepository(database).create({
+    await database.open()
+    state.media = join(database.dir(), 'media')
+    await encodeClip({ path: join(state.media, 'Clip.mp4') })
+    await encodeClip({ path: join(state.media, 'Other.mp4'), seconds: 2 })
+    await encodeClip({ path: join(state.media, 'Third.mp4'), seconds: 2 })
+    state.libraryId = new LibrariesRepository(database.get()).create({
       name: 'Test',
-      paths: [join(state.dir, 'media')],
+      paths: [state.media],
     }).id
   })
 
-  afterAll(async () => {
-    state.database?.onModuleDestroy()
-    await rm(state.dir, { recursive: true, force: true })
-  })
+  afterAll(database.close)
 
   it('serves the tracks the scan stored without running ffprobe', async () => {
-    const id = index().insert({
-      libraryId: state.libraryId,
-      kind: 'other',
-      file: { path: state.clip, root: join(state.dir, 'media'), size: 1, mtimeMs: 1 },
-    })
+    const id = add({ name: 'Clip.mp4', mtimeMs: 1 })
     const stored = {
       audio: [
         { index: 0, codec: 'aac', language: 'jpn', title: 'Stored', channels: 2, default: true },
@@ -90,20 +69,26 @@ describe('TracksService', () => {
       defaultAudio: 0,
       frameRate: 24,
     }
-    media().saveProbe({ id, probe: PROBE, tracks: stored })
-    const resolved = await tracksWith('/nowhere/ffprobe').tracksFor(record(id))
+    index().saveProbe({ id, probe: PROBE, tracks: stored })
+    const resolved = await tracksWith('/nowhere/ffprobe').tracksFor(fileOf(id))
     expect(resolved.tracks.audio.map((track) => track.title)).toEqual(['Stored'])
   })
 
-  it('probes a video that has no stored tracks once, and keeps what it found', async () => {
-    const id = index().insert({
-      libraryId: state.libraryId,
-      kind: 'other',
-      file: { path: state.other, root: join(state.dir, 'media'), size: 2, mtimeMs: 2 },
-    })
-    media().saveProbe({ id, probe: PROBE })
-    const resolved = await tracksWith(readServerConfig({}).ffprobePath).tracksFor(record(id))
+  it('probes a video the scan has not got to on its first play, and keeps what it found', async () => {
+    const id = add({ name: 'Other.mp4', mtimeMs: 2 })
+    const resolved = await tracksWith(readServerConfig({}).ffprobePath).tracksFor(fileOf(id))
     expect(resolved.tracks.audio).toHaveLength(1)
-    expect(media().storedTracks(id)?.audio).toHaveLength(1)
+    expect(index().storedTracks(id)?.audio).toHaveLength(1)
+  })
+
+  it('forgets what it cached of media that is gone', async () => {
+    const id = add({ name: 'Third.mp4', mtimeMs: 3 })
+    const tracks = tracksWith(readServerConfig({}).ffprobePath)
+    const first = tracks.tracksFor(fileOf(id))
+    expect(tracks.tracksFor(fileOf(id))).toBe(first)
+    tracks.forget([id])
+    const again = tracks.tracksFor(fileOf(id))
+    expect(again).not.toBe(first)
+    await Promise.all([first, again])
   })
 })

@@ -3,8 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { readServerConfig } from '@/config'
-import type { HwAccel } from '@/ffmpeg/encoder'
-import { DEFAULT_PLAYBACK_SETTINGS } from '@raven/core'
+import { DEFAULT_PLAYBACK_SETTINGS, type HwAccel } from '@raven/core'
 import { FfmpegService, FfmpegTimeoutError } from '@/ffmpeg/ffmpegService'
 
 describe('FfmpegService', () => {
@@ -41,12 +40,14 @@ describe('FfmpegService', () => {
     )
 
   it('reports a timeout as a timeout, so the scan can retry later', async () => {
-    await expect(service('slow').probe('/media/a.mkv')).rejects.toBeInstanceOf(FfmpegTimeoutError)
+    await expect(service('slow').probeFile('/media/a.mkv')).rejects.toBeInstanceOf(
+      FfmpegTimeoutError,
+    )
     await expect(service('slow').exec(['-version'])).rejects.toThrow('ffmpeg gave up after 1s')
   })
 
   it("passes on ffprobe's own reason for a broken file", async () => {
-    const failure = service('broken').probe('/media/a.mkv')
+    const failure = service('broken').probeFile('/media/a.mkv')
     await expect(failure).rejects.toThrow('Invalid data found when processing input')
     await expect(failure).rejects.not.toBeInstanceOf(FfmpegTimeoutError)
   })
