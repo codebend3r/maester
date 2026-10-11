@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  DEFAULT_LIBRARY_SETTINGS,
-  defaultLibrarySettings,
-  validateLibraryInput,
-  withLibraryKind,
-} from '@/libraryInput'
-import type { LibrarySettings } from '@/contract'
+import { validateLibraryInput } from '@/libraryInput'
 
 describe('validateLibraryInput', () => {
   it('trims the name and tidies the paths', () => {
@@ -147,44 +141,5 @@ describe('validateLibraryInput', () => {
 
   it('rejects something that is not an object', () => {
     expect(validateLibraryInput('Movies').ok).toBe(false)
-  })
-})
-
-describe('defaultLibrarySettings', () => {
-  it('groups a new Movies library by match, and lays the others out in a grid', () => {
-    expect(defaultLibrarySettings('movies')).toMatchObject({
-      kind: 'movies',
-      view: 'grouped',
-      groupBy: 'match',
-    })
-    expect(defaultLibrarySettings('shows')).toMatchObject({
-      kind: 'shows',
-      view: 'grid',
-      groupBy: 'resolution',
-    })
-    expect(defaultLibrarySettings('other')).toEqual(DEFAULT_LIBRARY_SETTINGS)
-  })
-})
-
-describe('withLibraryKind', () => {
-  it('swaps a view or grouping the new type cannot show for its own, and keeps the rest', () => {
-    const movies: LibrarySettings = { ...defaultLibrarySettings('movies'), sort: 'added' }
-    expect(withLibraryKind({ settings: movies, kind: 'other' })).toMatchObject({
-      kind: 'other',
-      view: 'grouped',
-      groupBy: 'resolution',
-      sort: 'added',
-    })
-    expect(withLibraryKind({ settings: movies, kind: 'shows' })).toMatchObject({
-      kind: 'shows',
-      view: 'grid',
-      groupBy: 'match',
-    })
-    const list: LibrarySettings = { ...DEFAULT_LIBRARY_SETTINGS, view: 'list' }
-    expect(withLibraryKind({ settings: list, kind: 'movies' })).toMatchObject({
-      kind: 'movies',
-      view: 'list',
-      groupBy: 'resolution',
-    })
   })
 })

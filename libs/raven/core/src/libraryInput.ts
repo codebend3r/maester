@@ -1,6 +1,5 @@
 import {
   type LibraryInput,
-  type LibraryKind,
   type LibrarySettings,
   isLibrarySettings,
   isLibrarySettingsChange,
@@ -16,51 +15,6 @@ const normalisePath = (path: string): string => {
   const trimmed = path.trim()
   const stripped = trimmed.replace(/\/+$/, '')
   return stripped === '' && trimmed.startsWith('/') ? '/' : stripped
-}
-
-/** What a new library starts with, and what a library made before settings existed has. */
-export const DEFAULT_LIBRARY_SETTINGS: LibrarySettings = {
-  saveProgress: true,
-  pinned: true,
-  sort: 'title',
-  view: 'grid',
-  groupBy: 'resolution',
-  watchedPercent: 90,
-  kind: 'other',
-  ratingsSource: 'tmdb',
-  autoRefresh: true,
-  locked: false,
-}
-
-/**
- * What a new library of `kind` starts with: a Movies library grouped into
- * matched and not, the others in a grid, as an Other library is never
- * matched and a TV library has no grouped view.
- */
-export const defaultLibrarySettings = (kind: LibraryKind): LibrarySettings => ({
-  ...DEFAULT_LIBRARY_SETTINGS,
-  kind,
-  ...(kind === 'movies' ? { view: 'grouped', groupBy: 'match' } : {}),
-})
-
-/**
- * Settings with the library's type changed, and the view or grouping the
- * new type cannot show swapped for its own.
- */
-export const withLibraryKind = ({
-  settings,
-  kind,
-}: {
-  settings: LibrarySettings
-  kind: LibraryKind
-}): LibrarySettings => {
-  const own = defaultLibrarySettings(kind)
-  return {
-    ...settings,
-    kind,
-    view: kind === 'shows' && settings.view === 'grouped' ? own.view : settings.view,
-    groupBy: kind === 'other' && settings.groupBy === 'match' ? own.groupBy : settings.groupBy,
-  }
 }
 
 /** What to say about each setting sent with a value it does not take. */
