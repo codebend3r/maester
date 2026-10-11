@@ -1,4 +1,5 @@
 import os
+from dataclasses import fields, is_dataclass
 from datetime import time, timedelta
 from zoneinfo import ZoneInfo
 
@@ -174,3 +175,18 @@ def test_rookery_is_read_with_its_urls_stripped():
     assert s.rookery_url == "http://192.168.50.2:8030"
     assert s.rookery_public_url == "https://rookery.maester.example.com"
     assert s.rookery_service_token == "tok"
+
+
+def test_every_setting_is_read_from_one_variable_of_its_own():
+    def names(cls):
+        for f in fields(cls):
+            if "env" in f.metadata:
+                yield f.metadata["env"]
+            elif is_dataclass(f.default_factory):
+                yield from names(f.default_factory)
+            else:
+                raise AssertionError(f"{cls.__name__}.{f.name} is read from nowhere")
+
+    read = list(names(Settings))
+    assert len(read) == len(set(read))
+    assert set(REQUIRED) <= set(read)

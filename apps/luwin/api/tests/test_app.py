@@ -6,9 +6,9 @@ from fastapi.testclient import TestClient
 
 from luwin.agent.tools import ToolRegistry
 from luwin.app import build, build_services, run
-from luwin.config import RenamedConfig, load_settings
+from luwin.config import REQUIRED, MissingConfig, RenamedConfig, load_settings
 from luwin.notify import AdminPost, LogNotifier
-from luwin.registry import Registry
+from luwin.registry import instances_from_env
 from luwin.store import Store
 
 
@@ -36,7 +36,7 @@ def test_build_services_creates_one_client_per_host():
             "PROBE_TIMEOUT_SECONDS": "30",
         }
     )
-    reg = Registry.from_env(
+    reg = instances_from_env(
         {
             "SONARR_MELEYS_URL": "http://m:1",
             "SONARR_MELEYS_API_KEY": "k",
@@ -61,7 +61,7 @@ def test_build_services_creates_one_client_per_host():
 
 def test_build_services_reads_the_fleet_monitor_when_it_is_set_up():
     cfg = load_settings({"FLEET_MONITOR_URL": "http://m:8010", "FLEET_MONITOR_TOKEN": "tok"})
-    fleet = build_services(cfg, Registry()).fleet
+    fleet = build_services(cfg, []).fleet
     assert fleet.base_url == "http://m:8010"
     assert fleet.client.headers["Authorization"] == "Bearer tok"
 
@@ -72,6 +72,17 @@ def test_boot_refuses_an_old_variable_name_before_anything_else(monkeypatch, tmp
     # Required variables are missing too; the rename is reported first.
     with pytest.raises(RenamedConfig, match="MAESTER_DB_PATH is now LUWIN_DB_PATH"):
         run()
+
+
+def test_boot_names_an_instance_configured_without_its_api_key(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    for name in REQUIRED:
+        monkeypatch.setenv(name, "set")
+    monkeypatch.setenv("RADARR_SYRAX_URL", "http://s:7878")
+    monkeypatch.delenv("RADARR_SYRAX_API_KEY", raising=False)
+    with pytest.raises(MissingConfig) as exc:
+        run()
+    assert "RADARR_SYRAX_API_KEY" in exc.value.names
 
 
 async def test_notices_go_to_the_log_until_luwin_has_an_app(caplog):

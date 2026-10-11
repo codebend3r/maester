@@ -1,6 +1,4 @@
-import pytest
-
-from luwin.registry import Instance, Registry, UnknownInstance
+from luwin.registry import Instance, api_keys_needed, instances_from_env
 
 ENV = {
     "SONARR_MELEYS_URL": "http://192.168.50.2:27021/",
@@ -15,21 +13,16 @@ ENV = {
 
 
 def test_discovers_per_host_instances_from_env():
-    reg = Registry.from_env(ENV)
-    assert reg.hosts() == ["meleys", "vermithor"]
-    assert reg.hosts("radarr") == ["vermithor"]
-    assert reg.get("sonarr", "Meleys") == Instance(
-        "sonarr", "meleys", "http://192.168.50.2:27021", "m-son"
-    )
+    assert instances_from_env(ENV) == [
+        Instance("radarr", "vermithor", "http://192.168.50.3:7878", ""),
+        Instance("sonarr", "meleys", "http://192.168.50.2:27021", "m-son"),
+        Instance("sonarr", "vermithor", "http://192.168.50.3:27021", "v-son"),
+    ]
 
 
-def test_unknown_host_names_the_known_ones():
-    reg = Registry.from_env(ENV)
-    with pytest.raises(UnknownInstance, match="known hosts: meleys, vermithor"):
-        reg.get("sonarr", "syrax")
-    with pytest.raises(UnknownInstance, match="known hosts: vermithor"):
-        reg.get("radarr", "meleys")
-
-
-def test_missing_keys_lists_instances_without_an_api_key():
-    assert Registry.from_env(ENV).missing_keys() == ["RADARR_VERMITHOR_API_KEY"]
+def test_every_instance_configured_with_a_url_needs_its_api_key():
+    assert api_keys_needed(ENV) == [
+        "RADARR_VERMITHOR_API_KEY",
+        "SONARR_MELEYS_API_KEY",
+        "SONARR_VERMITHOR_API_KEY",
+    ]
