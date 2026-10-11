@@ -11,9 +11,9 @@ import {
   UnauthorizedException,
 } from '@nestjs/common'
 import type { FastifyRequest } from 'fastify'
-import { SERVER_CONFIG, type ServerConfig } from '@/config.js'
-import type { PublicUser } from '@/auth/authController.js'
-import { AccountService } from '@/sessions/accountService.js'
+import { SERVER_CONFIG, type ServerConfig } from '@/config'
+import type { PublicUser } from '@/auth/authController'
+import { AccountService } from '@/sessions/accountService'
 
 /** What an app learns about the person behind a session cookie. */
 export type SessionInfo = {

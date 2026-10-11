@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import styles from './Frame.module.scss'
+import styles from '@/components/Frame/Frame.module.scss'
 
 /** The one layout: the wordmark above a centred card holding the page. */
 export const Frame = ({ children }: { children: ReactNode }) => (

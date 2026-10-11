@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { CLOCK, type Clock } from '@/clock.js'
-import { SessionsRepository } from '@/sessions/sessionsRepository.js'
-import { type PlexLogin, type User, UsersRepository } from '@/users/usersRepository.js'
+import { CLOCK, type Clock } from '@/clock'
+import { SessionsRepository } from '@/sessions/sessionsRepository'
+import { type PlexLogin, type User, UsersRepository } from '@/users/usersRepository'
 
 /** Who a session token belongs to, as `/api/me` and `/internal/session` report it. */
 export type Account =

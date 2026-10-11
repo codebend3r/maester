@@ -1,5 +1,5 @@
-import { createApp } from '@/app.js'
-import { ConfigError, loadEnvFile, readServerConfig } from '@/config.js'
+import { createApp } from '@/app'
+import { ConfigError, loadEnvFile, readServerConfig } from '@/config'
 
 loadEnvFile()
 

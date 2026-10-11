@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { Frame } from '@/components/Frame/Frame'
 import { signOut } from '@/lib/api'
 import { browser } from '@/lib/browser'
-import styles from './LogoutPage.module.scss'
+import styles from '@/pages/LogoutPage/LogoutPage.module.scss'
 
 /**
  * Apps link here to sign out, since the session cookie is rookery's to

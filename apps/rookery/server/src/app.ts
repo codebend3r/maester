@@ -2,11 +2,11 @@ import { join } from 'node:path'
 import fastifyStatic from '@fastify/static'
 import { NestFactory } from '@nestjs/core'
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify'
-import { AppModule } from '@/appModule.js'
-import { type Clock, systemClock } from '@/clock.js'
-import type { ServerConfig } from '@/config.js'
-import { HttpPlexTv, type PlexTv } from '@/plex/plexTv.js'
-import { SpaFallbackFilter } from '@/spa/spaFallbackFilter.js'
+import { AppModule } from '@/appModule'
+import { type Clock, systemClock } from '@/clock'
+import type { ServerConfig } from '@/config'
+import { HttpPlexTv, type PlexTv } from '@/plex/plexTv'
+import { SpaFallbackFilter } from '@/spa/spaFallbackFilter'
 
 const READS = new Set(['GET', 'HEAD', 'OPTIONS'])
 // Where the server's own routes live: never cached, and a miss under one is a

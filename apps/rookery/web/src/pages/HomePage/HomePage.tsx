@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Frame } from '@/components/Frame/Frame'
 import { type User, fetchMe } from '@/lib/api'
-import styles from './HomePage.module.scss'
+import styles from '@/pages/HomePage/HomePage.module.scss'
 
 type State = { kind: 'loading' } | { kind: 'signed_in'; user: User } | { kind: 'failed' }
 

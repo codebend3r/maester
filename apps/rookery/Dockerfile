@@ -17,10 +17,11 @@ COPY --parents apps/*/*/package.json libs/*/*/package.json scripts/package.json 
 
 FROM bun AS build
 RUN bun install --frozen-lockfile --ignore-scripts
+COPY nx.json ./
 COPY apps/rookery/server/ apps/rookery/server/
 COPY apps/rookery/web/ apps/rookery/web/
-RUN cd apps/rookery/server && bun run build \
- && cd ../web && bun run build
+# Nx runs each project's own `build`, in the order the workspace graph gives.
+RUN NX_DAEMON=false NX_NO_CLOUD=true bunx nx run-many -t build -p @rookery/server @rookery/web
 
 FROM bun AS deps
 RUN bun install --frozen-lockfile --ignore-scripts --production --filter @rookery/server

@@ -92,7 +92,7 @@ export const readServerConfig = (env: NodeJS.ProcessEnv = process.env): ServerCo
 }
 
 /**
- * Reads `apps/rookery/.env`, beside the compose file, when `nest start` runs
+ * Reads `apps/rookery/.env`, beside the compose file, when the server runs
  * outside Docker. What the process already has wins over the file, and the
  * image carries no such file.
  */

@@ -1,4 +1,4 @@
-import { type PlexAccount, type PlexPin, type PlexTv, PlexUnavailable } from '@/plex/plexTv.js'
+import { type PlexAccount, type PlexPin, type PlexTv, PlexUnavailable } from '@/plex/plexTv'
 
 /**
  * plex.tv in memory. A test approves a PIN with `approve`, optionally only

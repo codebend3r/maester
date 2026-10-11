@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto'
 import { Inject, Injectable } from '@nestjs/common'
-import { addMs } from '@/clock.js'
-import { DatabaseService } from '@/db/database.js'
+import { addMs } from '@/clock'
+import { DatabaseService } from '@/db/database'
 
 /** A session lasts this long from sign-in, then the friend signs in again. */
 export const SESSION_MS = 30 * 24 * 60 * 60 * 1000

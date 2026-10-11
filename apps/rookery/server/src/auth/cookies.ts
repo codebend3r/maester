@@ -1,6 +1,6 @@
-import type { ServerConfig } from '@/config.js'
-import { SESSION_MS } from '@/sessions/sessionsRepository.js'
-import { PENDING_MS } from '@/auth/pendingSignIns.js'
+import type { ServerConfig } from '@/config'
+import { SESSION_MS } from '@/sessions/sessionsRepository'
+import { PENDING_MS } from '@/auth/pendingSignIns'
 
 /** The suite's session cookie, shared with every app under `COOKIE_DOMAIN`. */
 export const SESSION_COOKIE = 'maester_session'

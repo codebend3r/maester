@@ -4,6 +4,7 @@
 *
 !package.json
 !bun.lock
+!nx.json
 !apps/*/*/package.json
 !libs/*/*/package.json
 !scripts/package.json
