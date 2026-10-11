@@ -27,6 +27,50 @@ export const mapWithConcurrency = async <T, R>({
   return [...results.entries()].toSorted(([a], [b]) => a - b).map(([, value]) => value)
 }
 
+export type Gate = {
+  /** Runs `task` once fewer than the gate's limit are running, queueing it until then. */
+  run: <T>(task: () => Promise<T>) => Promise<T>
+}
+
+/**
+ * A limit shared by every caller that holds the same gate, unlike
+ * `mapWithConcurrency`, whose limit covers one call. Waiters go in arrival
+ * order, and a task that fails still frees its place.
+ */
+export const createGate = ({ limit }: { limit: number }): Gate => {
+  const state = { running: 0 }
+  const waiting: Array<() => void> = []
+
+  const release = (): void => {
+    state.running -= 1
+    waiting.shift()?.()
+  }
+
+  const acquire = (): Promise<void> => {
+    if (state.running < Math.max(1, limit)) {
+      state.running += 1
+      return Promise.resolve()
+    }
+    return new Promise((resolve) => {
+      waiting.push(() => {
+        state.running += 1
+        resolve()
+      })
+    })
+  }
+
+  return {
+    run: async (task) => {
+      await acquire()
+      try {
+        return await task()
+      } finally {
+        release()
+      }
+    },
+  }
+}
+
 export type TaskQueue = {
   /** Queues `task` under `key`; a key already queued or running is ignored. */
   push: (key: string, task: () => Promise<void>) => void

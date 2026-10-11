@@ -29,6 +29,15 @@ import { ThumbnailService } from '@/thumbnails/thumbnailService'
 const errorCode = (error: unknown): string =>
   isRecord(error) && isString(error.code) ? error.code : ''
 
+/**
+ * Video bytes come off the share in 1 MiB reads rather than Node's default
+ * 64 KiB: over SMB every read is a round trip, so bigger reads mean fewer.
+ */
+const READ_CHUNK = 1024 * 1024
+
+const readFile = ({ path, start, end }: { path: string; start?: number; end?: number }) =>
+  createReadStream(path, { start, end, highWaterMark: READ_CHUNK })
+
 /** What a client is told when the file stays put. Never the path: that stays server-side. */
 const deleteFailure = (error: unknown): string => {
   const code = errorCode(error)
@@ -157,13 +166,13 @@ export class MediaController {
       return
     }
     if (range == null) {
-      await reply.header('content-length', size).send(createReadStream(record.path))
+      await reply.header('content-length', size).send(readFile({ path: record.path }))
       return
     }
     await reply
       .code(206)
       .header('content-range', `bytes ${range.start}-${range.end}/${size}`)
       .header('content-length', range.end - range.start + 1)
-      .send(createReadStream(record.path, { start: range.start, end: range.end }))
+      .send(readFile({ path: record.path, start: range.start, end: range.end }))
   }
 }

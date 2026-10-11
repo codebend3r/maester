@@ -8,7 +8,7 @@
     "build:clean": "rm -rf dist",
     "build:compile": "tsc -p tsconfig.build.json",
     "build:aliases": "tsc-alias -p tsconfig.build.json",
-    "dev": "tsx watch src/main.ts",
+    "dev": "SCAN_ON_START=false tsx watch src/main.ts",
     "start": "node dist/main.js",
     "typecheck": "tsgo --noEmit",
     "lint:ts": "oxlint",

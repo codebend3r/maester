@@ -114,8 +114,8 @@ From the repo root:
 
 ```bash
 bun install
-bun run dev:raven   # server on :8484 (watch mode) and Vite on :5173, proxying /api
-bun run verify         # spellcheck, lint, stylelint, format check, typecheck, tests and build for every project
+bun run dev:raven   # server on :8484 (watch mode, no scan on start) and Vite on :5173, proxying /api
+bun run verify         # spellcheck, TypeScript only, one command per script, lint, stylelint, format check, typecheck, tests and build for every project
 ```
 
 `/design` shows the palette, every token, how each HTML element is drawn and every shared component. It is not in the side menu. Element styles live in `apps/raven/web/src/styles/elements.scss`, written in `:where()` so a component's own class always wins.
@@ -151,6 +151,7 @@ A native iOS or Android app would be another `apps/raven/` entry that imports `@
 | `SCAN_ON_START`               | `true`                         | Rescan every library on boot                 |
 | `RESCAN_INTERVAL_MINUTES`     | `0`                            | Periodic rescans; `0` turns them off         |
 | `PROBE_CONCURRENCY`           | `4`                            | Parallel ffprobe runs during a scan          |
+| `UV_THREADPOOL_SIZE`          | `16`                           | Node's file I/O threads; scans may hold four of them, so playback never waits behind a scan |
 | `THUMBNAIL_CONCURRENCY`       | `2`                            | Parallel thumbnail runs                      |
 | `THUMBNAIL_WIDTH`             | `480`                          |                                              |
 | `FFMPEG_TIMEOUT_SECONDS`      | `90`                           | Per ffprobe or thumbnail run                 |
