@@ -196,7 +196,8 @@ const yearOf = (released: string): number => Number(released.slice(0, 4))
 /**
  * TMDB in miniature: searches by exact title (year optional), `/find` by
  * IMDb id, and movies by id. `down` makes every call fail as if TMDB were
- * unreachable; `calls` records each URL asked for.
+ * unreachable; `omdbSpent` makes OMDb answer as it does once a key's day is
+ * used up; `calls` records each URL asked for.
  */
 /** OMDb's answer for an IMDb id, as its `Ratings` strings. */
 export type FakeOmdb = Record<
@@ -213,7 +214,15 @@ export const fakeTmdb = ({
   shows?: FakeShow[]
   omdb?: FakeOmdb
 }) => {
-  const state = { down: false, calls: [] as string[], movies, shows, omdb, omdbCalls: 0 }
+  const state = {
+    down: false,
+    omdbSpent: false,
+    calls: [] as string[],
+    movies,
+    shows,
+    omdb,
+    omdbCalls: 0,
+  }
 
   const fetch: MetadataFetch = async (url) => {
     state.calls.push(url)
@@ -224,6 +233,7 @@ export const fakeTmdb = ({
       if (parsed.searchParams.get('apikey') !== 'omdb-key') {
         return json({ Response: 'False', Error: 'Invalid API key!' }, 401)
       }
+      if (state.omdbSpent) return json({ Response: 'False', Error: 'Request limit reached!' }, 401)
       const scores = state.omdb[parsed.searchParams.get('i') ?? '']
       if (!scores) return json({ Response: 'False', Error: 'Error getting data.' })
       return json({
