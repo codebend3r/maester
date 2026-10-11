@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { readServerConfig } from '@/config'
 import { DatabaseService } from '@/db/database'
+import { DEFAULT_PLAYBACK_SETTINGS } from '@raven/core'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { type MediaRecord, MediaRepository } from '@/media/mediaRepository'
@@ -43,7 +44,10 @@ describe('TracksService', () => {
   }
   const tracksWith = (ffprobePath: string): TracksService =>
     new TracksService(
-      new FfmpegService({ ...readServerConfig({}), dataDir: state.dir, ffprobePath }),
+      new FfmpegService(
+        { ...readServerConfig({}), dataDir: state.dir, ffprobePath },
+        { playback: () => DEFAULT_PLAYBACK_SETTINGS },
+      ),
       media(),
     )
 

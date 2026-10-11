@@ -22,6 +22,8 @@ import { PlaybackController } from '@/playback/playbackController'
 import { SubtitlesService } from '@/playback/subtitlesService'
 import { TracksService } from '@/playback/tracksService'
 import { ScannerService } from '@/scanner/scannerService'
+import { SettingsController } from '@/settings/settingsController'
+import { SettingsRepository } from '@/settings/settingsRepository'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
 
 /**
@@ -50,12 +52,14 @@ export class AppModule {
         MatchController,
         PeopleController,
         ReviewsController,
+        SettingsController,
       ],
       providers: [
         { provide: SERVER_CONFIG, useValue: config },
         { provide: METADATA_FETCH, useValue: metadataFetch },
         DatabaseService,
         LibrariesRepository,
+        SettingsRepository,
         MetadataRepository,
         MediaRepository,
         TmdbClient,

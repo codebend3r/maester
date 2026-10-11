@@ -64,7 +64,17 @@ export const thumbnailArgs = ({
   output,
 ]
 
-const SCALE_TO_1080 = "w=-2:h='min(1080,ih)'"
+/** The scale filter that caps a transcode at `maxHeight` lines without ever upscaling. */
+const scaleTo = (maxHeight: number): string => `w=-2:h='min(${maxHeight},ih)'`
+
+export type TranscodeQuality = 'low' | 'medium' | 'high'
+
+/** How hard each encoder squeezes at each quality: a CRF or QP, and a bitrate for VideoToolbox. */
+const QUALITY: Record<TranscodeQuality, { crf: string; qp: string; bitrate: string }> = {
+  low: { crf: '28', qp: '28', bitrate: '4M' },
+  medium: { crf: '23', qp: '23', bitrate: '8M' },
+  high: { crf: '18', qp: '18', bitrate: '16M' },
+}
 
 /** Codecs every Intel GPU recent enough for VAAPI decodes; anything else decodes on the CPU. */
 const GPU_DECODES: ReadonlySet<string> = new Set(['h264', 'hevc'])
@@ -85,12 +95,18 @@ const transcodeVideo = ({
   encoder,
   videoCodec,
   tonemap,
+  maxHeight,
+  quality,
 }: {
   encoder: VideoEncoder
   videoCodec: string | null
   tonemap: boolean
+  maxHeight: number
+  quality: TranscodeQuality
 }): { input: string[]; output: string[] } => {
-  const cpuFilters = [`scale=${SCALE_TO_1080}`, ...(tonemap ? [TONEMAP_FILTER] : [])]
+  const scale = scaleTo(maxHeight)
+  const squeeze = QUALITY[quality]
+  const cpuFilters = [`scale=${scale}`, ...(tonemap ? [TONEMAP_FILTER] : [])]
   // A keyframe every two seconds keeps fragments small, so playback starts
   // and seeks quickly.
   const shared = ['-profile:v', 'high', '-g', '48']
@@ -102,7 +118,7 @@ const transcodeVideo = ({
         '-c:v',
         'h264_videotoolbox',
         '-b:v',
-        '8M',
+        squeeze.bitrate,
         ...shared,
         '-pix_fmt',
         'yuv420p',
@@ -119,7 +135,7 @@ const transcodeVideo = ({
       ? ':out_color_matrix=bt709:out_color_primaries=bt709:out_color_transfer=bt709:out_range=tv'
       : ''
     const filters = gpuDecode
-      ? [`scale_vaapi=${SCALE_TO_1080}:format=nv12${toBt709}`]
+      ? [`scale_vaapi=${scale}:format=nv12${toBt709}`]
       : [...cpuFilters, 'format=nv12', 'hwupload']
     return {
       input: [
@@ -128,7 +144,7 @@ const transcodeVideo = ({
           ? ['-hwaccel', 'vaapi', '-hwaccel_device', 'va', '-hwaccel_output_format', 'vaapi']
           : []),
       ],
-      output: ['-c:v', 'h264_vaapi', '-qp', '23', ...shared, '-vf', filters.join(',')],
+      output: ['-c:v', 'h264_vaapi', '-qp', squeeze.qp, ...shared, '-vf', filters.join(',')],
     }
   }
 
@@ -140,7 +156,7 @@ const transcodeVideo = ({
       '-preset',
       'veryfast',
       '-crf',
-      '23',
+      squeeze.crf,
       ...shared,
       '-pix_fmt',
       'yuv420p',
@@ -156,7 +172,13 @@ const transcodeVideo = ({
  * its driver or the device permissions are missing.
  */
 export const encoderTestArgs = (encoder: VideoEncoder): string[] => {
-  const { input, output } = transcodeVideo({ encoder, videoCodec: null, tonemap: false })
+  const { input, output } = transcodeVideo({
+    encoder,
+    videoCodec: null,
+    tonemap: false,
+    maxHeight: 1080,
+    quality: 'medium',
+  })
   return [
     ...QUIET,
     ...input,
@@ -191,6 +213,8 @@ export const streamArgs = ({
   tonemap,
   streamShift,
   encoder = SOFTWARE,
+  maxHeight = 1080,
+  quality = 'medium',
 }: {
   input: string
   start: number
@@ -202,6 +226,9 @@ export const streamArgs = ({
   streamShift: number
   /** How a transcode encodes; a remux encodes nothing. */
   encoder?: VideoEncoder
+  /** The frame a transcode is scaled down to, and how hard it is squeezed: the playback settings. */
+  maxHeight?: number
+  quality?: TranscodeQuality
 }): string[] => {
   const video =
     mode === 'remux'
@@ -210,7 +237,7 @@ export const streamArgs = ({
           input: [],
           output: ['-c:v', 'copy', ...(videoCodec === 'hevc' ? ['-tag:v', 'hvc1'] : [])],
         }
-      : transcodeVideo({ encoder, videoCodec, tonemap })
+      : transcodeVideo({ encoder, videoCodec, tonemap, maxHeight, quality })
   return [
     ...QUIET,
     ...video.input,
