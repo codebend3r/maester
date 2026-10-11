@@ -27,9 +27,9 @@ describe('LibraryPage', () => {
     lockState: spyOn(api, 'getLock'),
     lock: spyOn(api, 'lock'),
   }
-  const state = {
-    sent: [] as LibraryInput[],
-    listed: [] as Array<{ sort?: MediaSort; seed?: number }>,
+  const state: { sent: LibraryInput[]; listed: Array<{ sort?: MediaSort; seed?: number }> } = {
+    sent: [],
+    listed: [],
   }
 
   /** Serves one library whose settings change as the page saves them. */

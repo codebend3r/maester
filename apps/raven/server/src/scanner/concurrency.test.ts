@@ -124,7 +124,7 @@ describe('createTaskQueue', () => {
 describe('createRateLimit', () => {
   /** A clock that only moves when the limit sleeps, so the test reads its schedule. */
   const fakeClock = () => {
-    const clock = { now: 0, slept: [] as number[] }
+    const clock: { now: number; slept: number[] } = { now: 0, slept: [] }
     return {
       clock,
       now: () => clock.now,
