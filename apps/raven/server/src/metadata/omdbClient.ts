@@ -107,6 +107,11 @@ export class OmdbClient {
       throw new Error(this.status.error)
     })
     if (response.status === 401) {
+      // A spent day answers 401 too; only the reason tells it from a wrong key.
+      const body: unknown = await response.json().catch(() => null)
+      if (isRecord(body) && isString(body.Error) && /limit/i.test(body.Error)) {
+        this.spend(body.Error)
+      }
       this.status.refused = true
       this.status.error = 'OMDb refused the key (401). Check OMDB_API_KEY and restart.'
       throw new Error(this.status.error)
@@ -118,21 +123,24 @@ export class OmdbClient {
     const body: unknown = await response.json().catch(() => null)
     if (isRecord(body) && body.Response === 'False') {
       const reason = isString(body.Error) ? body.Error : 'OMDb said no.'
-      // A wrong key answers 200 with an error, as a limit hit does.
+      // Should a wrong key or a limit hit answer 200, the reason still tells.
       if (/api key/i.test(reason)) {
         this.status.refused = true
         this.status.error = `OMDb refused the key: ${reason} Check OMDB_API_KEY and restart.`
         throw new Error(this.status.error)
       }
-      if (/limit/i.test(reason)) {
-        this.budget.used = this.config.omdbDailyLimit
-        this.status.error = `OMDb's daily limit is spent: ${reason}`
-        throw new Error(this.status.error)
-      }
+      if (/limit/i.test(reason)) this.spend(reason)
       this.status.error = null
       return []
     }
     this.status.error = null
     return parseOmdbRatings(body)
+  }
+
+  /** Counts today as used up once OMDb says so, so calls wait for midnight UTC. */
+  private spend(reason: string): never {
+    this.budget.used = this.config.omdbDailyLimit
+    this.status.error = `OMDb's daily limit is spent: ${reason}`
+    throw new Error(this.status.error)
   }
 }

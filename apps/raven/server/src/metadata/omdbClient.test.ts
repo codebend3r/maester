@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readServerConfig } from '@/config'
 import { OmdbClient, parseOmdbRatings } from '@/metadata/omdbClient'
 import { fakeTmdb } from '@/test/fakeTmdb'
@@ -33,6 +33,10 @@ describe('parseOmdbRatings', () => {
 })
 
 describe('OmdbClient', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('is off without a key', () => {
     const client = new OmdbClient(config({ key: null }), fakeTmdb({ movies: [] }).fetch)
     expect(client.enabled).toBe(false)
@@ -64,5 +68,22 @@ describe('OmdbClient', () => {
     expect(client.enabled).toBe(false)
     expect(client.state().state).toBe('failing')
     expect(client.state().error).not.toContain('wrong')
+  })
+
+  it('waits for midnight UTC when OMDb answers a spent day with a 401', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-11T20:00:00Z'))
+    const tmdb = fakeTmdb({ movies: [], omdb: { tt1: { imdb: '8.0/10' } } })
+    tmdb.state.omdbSpent = true
+    const client = new OmdbClient(config(), tmdb.fetch)
+    await expect(client.ratings('tt1')).rejects.toThrow('daily limit')
+    expect(client.enabled).toBe(false)
+    expect(client.remaining()).toBe(0)
+
+    tmdb.state.omdbSpent = false
+    vi.setSystemTime(new Date('2026-10-12T00:00:01Z'))
+    expect(client.enabled).toBe(true)
+    await expect(client.ratings('tt1')).resolves.toEqual([{ source: 'imdb', value: 8 }])
+    expect(client.state()).toEqual({ state: 'ok', error: null, used: 1 })
   })
 })
