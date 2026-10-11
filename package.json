@@ -18,8 +18,9 @@
     "lint:fix": "nx run-many -t lint:py:fix lint:ts:fix lint:css:fix",
     "format": "nx run-many -t format",
     "format:check": "nx run-many -t format:check",
-    "verify": "nx run-many -t lint:py lint:ts lint:css format:check typecheck test build",
-    "affected": "nx affected -t lint:py lint:ts lint:css format:check typecheck test build",
+    "spellcheck": "nx run maester:spellcheck",
+    "verify": "nx run-many -t spellcheck lint:py lint:ts lint:css format:check typecheck test build",
+    "affected": "nx run maester:spellcheck && nx affected -t lint:py lint:ts lint:css format:check typecheck test build",
     "graph": "nx graph"
   },
   "devDependencies": {
@@ -30,7 +31,19 @@
   },
   "packageManager": "bun@1.4.2",
   "nx": {
-    "includedScripts": []
+    "includedScripts": [],
+    "targets": {
+      "format": {
+        "command": "oxfmt ."
+      },
+      "format:check": {
+        "command": "oxfmt --check ."
+      },
+      "spellcheck": {
+        "command": "uvx typos@1.51.1",
+        "cache": false
+      }
+    }
   },
   "trustedDependencies": [
     "@parcel/watcher",

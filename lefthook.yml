@@ -5,24 +5,24 @@ pre-commit:
   jobs:
     - name: ruff check (luwin api)
       root: apps/luwin/api/
-      glob: "*.{py,pyi}"
+      glob: '*.{py,pyi}'
       run: uv run ruff check --fix {staged_files}
       stage_fixed: true
 
     - name: ruff format (luwin api)
       root: apps/luwin/api/
-      glob: "*.{py,pyi}"
+      glob: '*.{py,pyi}'
       run: uv run ruff format {staged_files}
       stage_fixed: true
 
     - name: ruff check (scripts)
       root: scripts/
-      glob: "*.py"
+      glob: '*.py'
       run: uv run --project ../apps/luwin/api ruff check --config ../apps/luwin/api/pyproject.toml --fix {staged_files}
       stage_fixed: true
 
     - name: ruff format (scripts)
       root: scripts/
-      glob: "*.py"
+      glob: '*.py'
       run: uv run --project ../apps/luwin/api ruff format --config ../apps/luwin/api/pyproject.toml {staged_files}
       stage_fixed: true

@@ -68,7 +68,7 @@ From the repo root:
 ```bash
 bun install
 bun run dev:raven   # server on :8484 (watch mode) and Vite on :5173, proxying /api
-bun run verify         # lint, stylelint, format check, typecheck, tests and build for every project
+bun run verify         # spellcheck, lint, stylelint, format check, typecheck, tests and build for every project
 ```
 
 Run a single target through Nx: `bunx nx run @raven/server:test`, `bunx nx run @raven/web:typecheck`, `bunx nx show project @raven/server`.

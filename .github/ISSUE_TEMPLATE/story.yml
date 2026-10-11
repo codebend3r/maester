@@ -1,6 +1,6 @@
 name: Story
 description: A user story with acceptance criteria
-labels: ["story"]
+labels: ['story']
 body:
   - type: input
     id: epic

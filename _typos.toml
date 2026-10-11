@@ -1,0 +1,8 @@
+# typos checks the whole repo for misspellings: `bun run spellcheck`, pinned in
+# the root package.json. It flags known misspellings only, so new names and
+# jargon need no allowlist. A real false positive goes under
+# [default.extend-words] as `word = "word"`.
+[files]
+# .github and .claude hold the workflows and the skills, so check dotfiles too.
+ignore-hidden = false
+extend-exclude = [".git/"]

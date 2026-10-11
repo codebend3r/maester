@@ -24,17 +24,19 @@ You need Bun at the version `package.json` pins in `packageManager`, [uv](https:
 
 ```bash
 bun install        # Nx, oxlint, oxfmt, and the git hooks
-bun run verify     # lint, format check, typecheck, tests and build for every project
-bun run affected   # the same, for the projects changed since main
+bun run verify     # spellcheck, lint, format check, typecheck, tests and build for every project
+bun run affected   # the same for the projects changed since main; spellcheck still covers the whole repo
 ```
+
+Every pull request runs all of these on every project, then builds and health checks both production images (`.github/workflows/pull-request-checks.yml`).
 
 Start a product with `bun run dev:luwin` or `bun run dev:raven`, then open it here:
 
-| Project            | Started by             | URL                                | What's there                                                  |
-| ------------------ | ---------------------- | ---------------------------------- | ------------------------------------------------------------- |
-| `@raven/web`       | `bun run dev:raven`    | <http://localhost:5173>            | The library and player, hot reloaded; proxies `/api` to :8484 |
-| `@raven/server`    | `bun run dev:raven`    | <http://localhost:8484/api/health> | The API only; in dev it serves no pages                       |
-| `@luwin/api`       | `bun run dev:luwin`    | <http://localhost:8020/health>     | The health check; otherwise it serves only the Seerr webhook  |
+| Project         | Started by          | URL                                | What's there                                                  |
+| --------------- | ------------------- | ---------------------------------- | ------------------------------------------------------------- |
+| `@raven/web`    | `bun run dev:raven` | <http://localhost:5173>            | The library and player, hot reloaded; proxies `/api` to :8484 |
+| `@raven/server` | `bun run dev:raven` | <http://localhost:8484/api/health> | The API only; in dev it serves no pages                       |
+| `@luwin/api`    | `bun run dev:luwin` | <http://localhost:8020/health>     | The health check; otherwise it serves only the Seerr webhook  |
 
 If 5173 is taken, Vite moves to the next free port; select `@raven/web:dev` in Nx's task view to see the URL it printed. `WEB_PORT` in `apps/luwin/.env` moves luwin's.
 

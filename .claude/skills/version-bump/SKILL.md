@@ -9,12 +9,12 @@ Each released product follows [semver 2.0.0](https://semver.org). Its version li
 
 ## Pick the bump
 
-| Change since the last tag                                              | Bump    |
-| ---------------------------------------------------------------------- | ------- |
-| Breaking: removed or renamed a tool, env var, command or webhook shape  | `major` |
-| New tool, command or behaviour that stays backward compatible           | `minor` |
-| Fixes, prompt tweaks, docs, dependency bumps                            | `patch` |
-| A prerelease or a specific number                                       | `X.Y.Z[-pre]` |
+| Change since the last tag                                              | Bump          |
+| ---------------------------------------------------------------------- | ------------- |
+| Breaking: removed or renamed a tool, env var, command or webhook shape | `major`       |
+| New tool, command or behaviour that stays backward compatible          | `minor`       |
+| Fixes, prompt tweaks, docs, dependency bumps                           | `patch`       |
+| A prerelease or a specific number                                      | `X.Y.Z[-pre]` |
 
 While the version is `0.y.z`, breaking changes may go in a `minor`. Read `git log $(git describe --tags --abbrev=0 --match '<product>-v*' 2>/dev/null || git describe --tags --abbrev=0)..HEAD --oneline -- apps/<product>` (or the whole log when there is no tag yet) to decide, and say which bump you chose and why.
 
