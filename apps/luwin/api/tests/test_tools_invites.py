@@ -4,7 +4,7 @@ import pytest
 
 from luwin.access import invite_libraries, title_of
 from luwin.agent.runner import ToolRunner
-from luwin.agent.tools import Tier, registry
+from luwin.agent.tools import Refused, Tier, registry
 from luwin.clients import ClientError
 from luwin.clients.wizarr import Library
 from luwin.config import Access
@@ -46,11 +46,11 @@ async def test_asking_for_an_invite_goes_to_the_admin_and_sends_nothing(trusted)
     assert approval.notice == "dany asks for a Plex invite for my brother Rhaegar: he lives with me"
     long = await request_invite(trusted, "Rhaegar", "x" * 5000)
     assert len(long.approval.notice) < 600  # a post that fits one message
-    assert approval.decide == "decide_invite"
+    assert approval.decide is decide_invite
     assert approval.args == {"for_whom": "my brother Rhaegar", "requester": "d1"}
     assert approval.subject == "invite:d1:my brother rhaegar"
     assert trusted.services.wizarr.invites == []
-    assert (await request_invite(trusted, "  ")).is_error
+    assert isinstance(await request_invite(trusted, "  "), Refused)
 
 
 async def test_approved_the_link_goes_to_the_friend_with_its_dates(trusted):
@@ -91,7 +91,7 @@ async def test_denied_or_with_nothing_to_share_no_invite_is_made(trusted):
     assert denied.content == "No invite for Rhaegar." and "didn't approve" in denied.notices[0].text
     trusted.services.wizarr.library_list = [Library(4, "90. Home Videos", 10, "Meleys")]
     out = await decide_invite(admin, "Rhaegar", "d1", approved=True)
-    assert out.is_error and not out.retryable and "check INVITE_SERVERS" in out.content
+    assert isinstance(out, Refused) and "check INVITE_SERVERS" in out.content
     (snag,) = out.notices  # the friend isn't left waiting on a DM that never comes
     assert snag.to == "d1" and "the admin will sort it out" in snag.text
     assert trusted.services.wizarr.invites == []
@@ -105,7 +105,7 @@ async def test_an_invite_wizarr_didnt_confirm_isnt_made_twice(trusted):
 
     trusted.services.wizarr.create_invite = timed_out
     out = await decide_invite(admin, "Rhaegar", "d1", approved=True)
-    assert out.is_error and not out.retryable and "Check its invitations" in out.content
+    assert isinstance(out, Refused) and "Check its invitations" in out.content
     assert "the admin will sort it out" in out.notices[0].text
 
 

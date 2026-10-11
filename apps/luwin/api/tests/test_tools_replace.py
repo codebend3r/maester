@@ -5,8 +5,8 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from luwin.agent.limits import KillSwitch
-from luwin.agent.runner import ToolRunner
-from luwin.agent.tools import Result, Tier, registry
+from luwin.agent.runner import AwaitingApproval, Errored, ToolRunner
+from luwin.agent.tools import Failed, Ok, Refused, Tier, registry
 from luwin.clients import ClientError
 from luwin.clients.arr import HistoryEvent, MediaFile
 from luwin.clients.media import Inspection
@@ -34,7 +34,7 @@ def library(ctx):
     ]  # fmt: skip
     meleys = ctx.services.radarr["meleys"]
     meleys.movie_list = [Movie(8, "Dune", 438631, 2021, "", True, True, 44)]
-    meleys.files = [MediaFile(44, DUNE_1080, 14_000_000_000, "Bluray-1080p", "FLUX", 8)]
+    meleys.file_list = [MediaFile(44, DUNE_1080, 14_000_000_000, "Bluray-1080p", "FLUX", 8)]
     meleys.events[8] = [
         HistoryEvent(71, "downloadFolderImported", "Dune.1080p", "2026-09-01", "sab_9", "", 44),
         HistoryEvent(70, "grabbed", "Dune.1080p", "2026-09-01", "sab_9", ""),
@@ -70,7 +70,7 @@ async def confirmed(ctx, runner, reported):
         ctx, "replace_media", {"report_id": reported.id, "host": reported.host}
     )
     assert asked.content["status"] == "awaiting_confirmation"
-    pending = ctx.store.decide_pending(asked.pending_id, "approved", ctx.user_id)
+    pending = ctx.store.decide_pending(asked.status.pending_id, "approved", ctx.user_id)
     return await runner.run_decision(ctx, pending, True)
 
 
@@ -86,7 +86,7 @@ async def test_a_proven_report_blocklists_deletes_and_searches_on_the_owning_hos
     radarr = library.services.radarr["vermithor"]
     assert (radarr.failed, radarr.deleted, radarr.searched) == ([900], [55], [[8]])
     assert library.services.radarr["meleys"].deleted == []
-    assert isinstance(out, Result) and not out.is_error
+    assert isinstance(out, Ok)
     assert out.content == (
         "Replacing the 4K copy of Dune (2021) on vermithor:\n"
         f"- blocklist: marked {RELEASE} failed so it isn't grabbed again\n"
@@ -121,7 +121,7 @@ async def test_a_file_with_no_grab_behind_it_is_left_for_the_admin(library):
     out = await replace_media(library, reported.id, "meleys")
     sonarr = library.services.sonarr["meleys"]
     assert (sonarr.failed, sonarr.deleted, sonarr.searched) == ([], [], [])
-    assert out.is_error and not out.retryable
+    assert isinstance(out, Failed) and not out.retryable
     assert "- blocklist: no grab of this file in the history" in out.content
     assert "- delete: not run" in out.content and "- search: not run" in out.content
     (notice,) = out.notices
@@ -144,7 +144,7 @@ async def test_a_release_already_marked_failed_is_not_marked_twice(library):
 async def test_without_evidence_nothing_is_touched(library):
     filed = await report(library, DUNE_4K_ITEM, ReportKind.CAM)
     out = await replace_media(library, filed.report.id, "vermithor")
-    assert out.is_error and out.content.startswith(
+    assert isinstance(out, Refused) and out.content.startswith(
         "Not replacing the 4K copy of Dune (2021): 1 report and no failed file check."
     )
     assert library.services.radarr["vermithor"].deleted == []
@@ -157,15 +157,15 @@ async def test_only_the_reporters_own_report_on_its_own_host_and_file(library):
     assert (await replace_media(pal, reported.id, "vermithor")).content == (
         f"There's no report {reported.id} of yours to act on."
     )
-    assert (await replace_media(library, 999, "vermithor")).is_error
+    assert isinstance(await replace_media(library, 999, "vermithor"), Refused)
     out = await replace_media(library, reported.id, "meleys")
     assert out.content == "Dune (2021) in 4K is on vermithor, not meleys."
     # The file changed since it was reported (it was replaced already).
-    library.services.radarr["vermithor"].files[0] = replace(
-        library.services.radarr["vermithor"].files[0], id=56
+    library.services.radarr["vermithor"].file_list[0] = replace(
+        library.services.radarr["vermithor"].file_list[0], id=56
     )
     out = await replace_media(library, reported.id, "vermithor")
-    assert out.is_error and "no longer there" in out.content
+    assert isinstance(out, Refused) and "no longer there" in out.content
     assert library.services.radarr["vermithor"].deleted == []
 
 
@@ -175,9 +175,9 @@ async def test_a_failed_delete_stops_before_the_search_and_says_so(library):
     async def refuse(file_id):
         raise ClientError("radarr", "DELETE", f"/api/v3/moviefile/{file_id}", 500, "locked")
 
-    library.services.radarr["vermithor"].delete_movie_file = refuse
+    library.services.radarr["vermithor"].delete_file = refuse
     out = await replace_media(library, reported.id, "vermithor")
-    assert out.is_error and library.services.radarr["vermithor"].searched == []
+    assert isinstance(out, Failed) and library.services.radarr["vermithor"].searched == []
     assert out.retryable  # Radarr didn't answer and nothing was deleted: try again
     assert "- delete: failed: radarr DELETE" in out.content
     assert "- search: not run, since the step before didn't go through" in out.content
@@ -246,7 +246,7 @@ async def test_an_approval_that_lapsed_leaves_the_report_open_again(library):
     (post,) = (await confirmed(ctx, runner, reported)).notices
     ctx.store.decide_pending(post.pending_id, "expired", "luwin")  # no button left
     out = await replace_media(capped(ctx, 10), reported.id, "vermithor")
-    assert not out.is_error and ctx.services.radarr["vermithor"].deleted == [55]
+    assert isinstance(out, Ok) and ctx.services.radarr["vermithor"].deleted == [55]
 
 
 async def test_an_approved_replacement_that_stops_for_good_reopens_the_report(library):
@@ -257,7 +257,7 @@ async def test_an_approved_replacement_that_stops_for_good_reopens_the_report(li
     admin = replace(ctx, user_id="boss", tier=Tier.ADMIN)
     approval = ctx.store.decide_pending(post.pending_id, "approved", "boss")
     stopped = await runner.run_decision(admin, approval, True)
-    assert stopped.is_error and not stopped.retryable
+    assert stopped.status == Errored()
     assert ctx.store.get_report(reported.id).status is ReportStatus.OPEN
 
 
@@ -268,7 +268,7 @@ async def test_two_confirmations_at_once_cannot_both_slip_under_the_cap(library)
     for radarr in ctx.services.radarr.values():  # a real arr answers later, letting others run
         radarr.history = pausing(radarr.history)
     both = await asyncio.gather(confirmed(ctx, runner, first), confirmed(ctx, runner, second))
-    assert sorted(o.approval_id is not None for o in both) == [False, True]
+    assert sorted(isinstance(o.status, AwaitingApproval) for o in both) == [False, True]
     deleted = ctx.services.radarr["vermithor"].deleted + ctx.services.radarr["meleys"].deleted
     assert len(deleted) == 1
 
@@ -312,10 +312,10 @@ async def test_the_kill_switch_stops_replace_media_directly_and_through_an_appro
     await use_up_the_cap(ctx, runner)
     reported = await broken(ctx)
     asked = await runner.run(ctx, "replace_media", {"report_id": reported.id, "host": "vermithor"})
-    confirm = ctx.store.decide_pending(asked.pending_id, "approved", "d1")
+    confirm = ctx.store.decide_pending(asked.status.pending_id, "approved", "d1")
     kill.on("bad day")
     held = await runner.run_decision(ctx, confirm, True)
-    assert held.is_error and held.retryable and "bad day" in held.content
+    assert held.status == Errored(retryable=True) and "bad day" in held.content
     refused = await runner.run(
         ctx, "replace_media", {"report_id": reported.id, "host": "vermithor"}
     )
@@ -327,7 +327,9 @@ async def test_the_kill_switch_stops_replace_media_directly_and_through_an_appro
     admin = replace(ctx, user_id="boss", tier=Tier.ADMIN)
     approval = ctx.store.decide_pending(post.pending_id, "approved", "boss")
     held = await runner.run_decision(admin, approval, True)
-    assert held.is_error and held.retryable and "decide_replacement is disabled" in held.content
+    assert (
+        held.status == Errored(retryable=True) and "decide_replacement is disabled" in held.content
+    )
     assert ctx.services.radarr["vermithor"].deleted == []
 
 
@@ -347,7 +349,7 @@ async def test_the_friend_hears_once_when_the_new_copy_lands(library):
     await confirmed(library, runner, reported)
     radarr = library.services.radarr["vermithor"]
     assert await tell_landed(library.services, library.store) == []  # nothing yet
-    radarr.files = [MediaFile(56, "/Vermithor/Movies/Dune (2021)/new.mkv", 60_000_000_000,
+    radarr.file_list = [MediaFile(56, "/Vermithor/Movies/Dune (2021)/new.mkv", 60_000_000_000,
                               "Remux-2160p", "FLUX", 8)]  # fmt: skip
     told = await tell_landed(library.services, library.store)
     assert sorted(dm.to for dm in told) == ["d1", "d2"]

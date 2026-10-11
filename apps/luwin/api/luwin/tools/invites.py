@@ -16,12 +16,16 @@ already); the admin checks Wizarr, and the friend hears it's in hand.
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from typing import Annotated
+
+from pydantic import Field
 
 from luwin.access import invite_libraries
-from luwin.agent.tools import Approval, Result, Tier, ToolContext, tool
+from luwin.agent.tools import Approval, NeedsApproval, Ok, Refused, Result, Tier, ToolContext, tool
 from luwin.clients import ClientError
 from luwin.clients.wizarr import Invite, honored_expiry_days
 from luwin.notify import DirectMessage
+from luwin.tools.args import FriendId
 
 # What the admin reads in the approval post; the rest is cut.
 NAME_MAX, NOTE_MAX = 100, 500
@@ -47,30 +51,25 @@ def invite_link(ctx: ToolContext, invite: Invite) -> str:
     "until the admin approves; then the user gets the invite link in a DM to forward. "
     "for_whom is who it's for, as the user names them; note is anything the admin should "
     "know (how they know them).",
-    {
-        "type": "object",
-        "properties": {
-            "for_whom": {"type": "string", "description": "Who the invite is for."},
-            "note": {"type": "string", "description": "Anything the admin should know."},
-        },
-        "required": ["for_whom"],
-        "additionalProperties": False,
-    },
     tier=Tier.TRUSTED,
 )
-async def request_invite(ctx: ToolContext, for_whom: str, note: str = "") -> Result:
+async def request_invite(
+    ctx: ToolContext,
+    for_whom: Annotated[str, Field(description="Who the invite is for.")],
+    note: Annotated[str, Field(description="Anything the admin should know.")] = "",
+) -> Result:
     for_whom = " ".join(for_whom.split())[:NAME_MAX]
     note = note.strip()[:NOTE_MAX]
     if not for_whom:
-        return Result.refusal("Say who the invite is for.")
+        return Refused("Say who the invite is for.")
     who = ctx.linked_user().name
     notice = f"{who} asks for a Plex invite for {for_whom}" + (f": {note}" if note else ".")
-    return Result(
+    return NeedsApproval(
         {"asked": True, "for": for_whom},
         approval=Approval(
             notice=notice,
             summary=f"Invite for {for_whom}, from {who}",
-            decide="decide_invite",
+            decide=decide_invite,
             args={"for_whom": for_whom, "requester": ctx.user_id},
             subject=f"invite:{ctx.user_id}:{for_whom.lower()}",
         ),
@@ -80,25 +79,17 @@ async def request_invite(ctx: ToolContext, for_whom: str, note: str = "") -> Res
 @tool(
     "decide_invite",
     "The admin's decision on an invite a friend asked for.",
-    {
-        "type": "object",
-        "properties": {
-            "for_whom": {"type": "string"},
-            "requester": {"type": "string", "description": "The friend's user id."},
-            "approved": {"type": "boolean"},
-        },
-        "required": ["for_whom", "requester", "approved"],
-        "additionalProperties": False,
-    },
     tier=Tier.ADMIN,
     destructive=True,
     button_only=True,
 )
-async def decide_invite(ctx: ToolContext, for_whom: str, requester: str, approved: bool) -> Result:
+async def decide_invite(
+    ctx: ToolContext, for_whom: str, requester: FriendId, approved: bool
+) -> Result:
     """Create the invite and send its link to the friend who asked, or tell them no."""
     if not approved:
         dm = f"The admin didn't approve an invite for {for_whom}. Ask them if you think it's a mistake."
-        return Result(f"No invite for {for_whom}.", (DirectMessage(requester, dm),))
+        return Ok(f"No invite for {for_whom}.", (DirectMessage(requester, dm),))
     access = ctx.settings.access
     wizarr = ctx.services.wizarr
     snag = DirectMessage(
@@ -108,10 +99,10 @@ async def decide_invite(ctx: ToolContext, for_whom: str, requester: str, approve
     )
     libraries = invite_libraries(await wizarr.libraries(), access)
     if not libraries:
-        return Result.refusal(
+        return Refused(
             "No library an invite may share was found in Wizarr (check INVITE_SERVERS and "
             "INVITE_LIBRARIES), so no invite was created.",
-            snag,
+            (snag,),
         )
     duration = str(access.access_days) if access.access_days else "unlimited"
     try:
@@ -124,10 +115,10 @@ async def decide_invite(ctx: ToolContext, for_whom: str, requester: str, approve
     except ClientError as exc:
         # Wizarr may have made it before failing to answer, so pressing again could make a
         # second live invite: the admin checks Wizarr instead.
-        return Result.refusal(
+        return Refused(
             f"Wizarr didn't confirm the invite ({exc}). Check its invitations for one it made "
             f"anyway before making another for {for_whom}.",
-            snag,
+            (snag,),
         )
     link = invite_link(ctx, invite)
     days = honored_expiry_days(access.invite_expires_days)
@@ -143,7 +134,7 @@ async def decide_invite(ctx: ToolContext, for_whom: str, requester: str, approve
         f"{lasts}. Then they can talk to me here once they link the email or username they use for Plex."
     )
     shared = ", ".join(sorted(f"{lib.name} on {lib.server_name}" for lib in libraries))
-    return Result(
+    return Ok(
         {
             "invited": for_whom,
             "link": link,

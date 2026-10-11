@@ -4,20 +4,23 @@ A friend's request tool raises it when Seerr leaves their request pending,
 and Seerr's MEDIA_PENDING webhook raises it for a request made anywhere else
 (Seerr's own page, a collection, a friend not linked here). Both build it
 here about the same subject, so the admin gets one post with buttons however
-it came in, and the press runs `decide_request` either way.
+it came in, and the press runs `decide_request`, the button-only admin tool
+here, either way.
 """
 
 from __future__ import annotations
 
-from luwin.agent.runner import APPROVAL_TTL
-from luwin.agent.tools import Approval
-from luwin.clients import Services
-from luwin.clients.seerr import MediaRequest
-from luwin.media import version_label
-from luwin.notify import ApprovalPost
-from luwin.store import PendingAction, Store
+from typing import Annotated
 
-DECIDE = "decide_request"
+from pydantic import Field
+
+from luwin.agent.runner import open_approval
+from luwin.agent.tools import Approval, Ok, Refused, Result, Tier, ToolContext, tool
+from luwin.clients import ClientError, Services
+from luwin.clients.seerr import MediaRequest, RequestStatus
+from luwin.media import Version, version_label
+from luwin.notify import ApprovalPost, DirectMessage
+from luwin.store import PendingAction, Store
 
 
 def request_subject(request_id: int) -> str:
@@ -38,10 +41,55 @@ def request_approval(
     return Approval(
         notice=f"{notice} {note}" if note else notice,
         summary=f"{version} {title} for {who}",
-        decide=DECIDE,
+        decide=decide_request,
         args={"request_id": request.id, "title": title, "version": version, "requester": requester},
         subject=request_subject(request.id),
     )
+
+
+@tool(
+    "decide_request",
+    "The admin's decision on a request Seerr left pending: approve or decline it in Seerr.",
+    tier=Tier.ADMIN,
+    button_only=True,
+)
+async def decide_request(
+    ctx: ToolContext,
+    request_id: Annotated[int, Field(description="The Seerr request id.")],
+    title: str,
+    version: Version,
+    requester: Annotated[
+        str, Field(description="The requester's user id; empty when they aren't linked here.")
+    ],
+    approved: bool,
+) -> Result:
+    """Approve or decline the request in Seerr, then tell the requester.
+
+    Safe to run again: when Seerr already shows this decision (an earlier
+    press went through before failing), the requester is still told.
+    """
+    seerr = ctx.services.seerr
+    wanted = RequestStatus.APPROVED if approved else RequestStatus.DECLINED
+    try:
+        current = (await seerr.get_request(request_id)).status
+    except ClientError as exc:
+        if exc.status != 404:
+            raise
+        return Refused(
+            f"Seerr request #{request_id} ({title} in {version}) no longer exists in Seerr; "
+            "nothing to decide."
+        )
+    if current == RequestStatus.PENDING:
+        await (seerr.approve_request if approved else seerr.decline_request)(request_id)
+    elif current != wanted:
+        return Refused(
+            f"Seerr request #{request_id} ({title} in {version}) was already {current.label} in "
+            "Seerr; nothing changed."
+        )
+    verb = "Approved" if approved else "Declined"
+    dm = decision_dm(title, version, approved)
+    told = (DirectMessage(requester, dm),) if requester else ()
+    return Ok(f"{verb} {title} in {version} in Seerr (request #{request_id}).", told)
 
 
 def decision_dm(title: str, version: str, approved: bool) -> str:
@@ -54,22 +102,6 @@ def decision_dm(title: str, version: str, approved: bool) -> str:
     if version == "4K":
         return f"The admin declined {title} in 4K. You can still ask for the regular version."
     return f"The admin declined {title} in {version}."
-
-
-def raise_approval(
-    store: Store, approval: Approval, requester: str
-) -> tuple[PendingAction, ApprovalPost | None]:
-    """Raise an approval outside a tool call (a webhook): its post, unless one is open already."""
-    pending, new = store.create_pending_once(
-        subject=approval.subject or "",
-        kind="approve",
-        action=approval.decide,
-        requester=requester,
-        payload=approval.args,
-        summary=approval.summary,
-        ttl=APPROVAL_TTL,
-    )
-    return pending, ApprovalPost(approval.notice, pending.id) if new else None
 
 
 async def ask_about_request(
@@ -89,4 +121,5 @@ async def ask_about_request(
         link.name if link else request.requested_by_name or f"Seerr user {request.requested_by_id}"
     )
     approval = request_approval(request, details.display, requester=requester, who=who)
-    return raise_approval(store, approval, requester)
+    pending, new = open_approval(store, approval, requester)
+    return pending, ApprovalPost(approval.notice, pending.id) if new else None
