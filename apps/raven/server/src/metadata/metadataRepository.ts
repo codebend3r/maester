@@ -8,9 +8,6 @@ import {
   isStringArray,
   type ItemDetails,
   type ItemImageKind,
-  type ItemMetadata,
-  type ItemMetadataChange,
-  type ItemMetadataState,
   type ItemSummary,
   type ItemType,
   type PersonDetails,
@@ -63,16 +60,6 @@ type ItemRow = {
   fetched_at: string
 }
 
-type OverrideRow = {
-  item_id: number
-  title: string | null
-  sort_title: string | null
-  year: number | null
-  tagline: string | null
-  summary: string | null
-  content_rating: string | null
-}
-
 type SummaryRow = {
   id: number
   type: string
@@ -89,6 +76,26 @@ const IMAGE_REFS = `
   SELECT item_id, source, ref FROM item_images
    WHERE kind = ? AND item_id IN (SELECT value FROM json_each(?))
    ORDER BY item_id, CASE source WHEN 'chosen' THEN 0 WHEN 'local' THEN 1 ELSE 2 END`
+
+/**
+ * `under(root, id)`: each item `roots` selects (as `root, id` pairs of
+ * itself), and every item beneath it. "A file somewhere under it" is then
+ * one join to `media_items`, whichever level the file is linked at: a show,
+ * a season or an episode.
+ */
+const under = (roots: string): string => `under(root, id) AS (
+  ${roots}
+  UNION SELECT u.root, i.id FROM items i JOIN under u ON i.parent_id = u.id)`
+
+/** A stored item as matching and refreshing need it. */
+export type StoredItem = {
+  id: number
+  type: ItemType
+  tmdbId: string
+  parentId: number | null
+  /** A season's or episode's number; null for a movie or show. */
+  number: number | null
+}
 
 const toImageSource = (source: string): ImageSource =>
   source === 'local' ? 'local' : source === 'chosen' ? 'chosen' : 'tmdb'
@@ -127,27 +134,38 @@ export class MetadataRepository {
     return row ? { id: row.id, fetchedAt: row.fetched_at } : null
   }
 
-  /** A show's seasons, or a season's episodes, in order, as cards need them. */
-  children(parentId: number): ItemSummary[] {
-    const ids = this.db
+  /** A show's seasons, or a season's episodes, in order. */
+  childIds(parentId: number): number[] {
+    return this.db
       .prepare<[number], { id: number }>(
         'SELECT id FROM items WHERE parent_id = ? ORDER BY number IS NULL, number, id',
       )
       .all(parentId)
       .map((row) => row.id)
-    const summaries = this.summaries(ids)
-    return ids.flatMap((id) => summaries.get(id) ?? [])
+  }
+
+  /**
+   * A season's episodes, or a show's seasons, by number. Of two with one
+   * number, the later wins: TMDB's, once it lists one raven made up before.
+   */
+  childNumbers(parentId: number): Map<number, number> {
+    return new Map(
+      this.db
+        .prepare<[number], { id: number; number: number }>(
+          'SELECT id, number FROM items WHERE parent_id = ? AND number IS NOT NULL ORDER BY id',
+        )
+        .all(parentId)
+        .map((row) => [row.number, row.id]),
+    )
   }
 
   /** The children with a file somewhere beneath them: a show's seasons on disk, a season's episodes on disk. */
   childrenOnDisk(parentId: number): ItemSummary[] {
     const ids = this.db
       .prepare<[number], { id: number }>(
-        `SELECT c.id FROM items c
-          WHERE c.parent_id = ?
-            AND (EXISTS (SELECT 1 FROM media_items mi WHERE mi.item_id = c.id)
-                 OR EXISTS (SELECT 1 FROM items g JOIN media_items mi ON mi.item_id = g.id
-                             WHERE g.parent_id = c.id))
+        `WITH RECURSIVE ${under('SELECT id, id FROM items WHERE parent_id = ?')}
+         SELECT c.id FROM items c
+          WHERE c.id IN (SELECT u.root FROM under u JOIN media_items mi ON mi.item_id = u.id)
           ORDER BY c.number IS NULL, c.number, c.id`,
       )
       .all(parentId)
@@ -172,27 +190,48 @@ export class MetadataRepository {
     return row ? { id: row.id, tmdbId: row.tmdb_id, fetchedAt: row.fetched_at } : null
   }
 
-  /** Every file linked to the show, one of its seasons, or one of its episodes. */
-  mediaUnderShow(showId: number): number[] {
+  /** Every file linked to the item or to anything under it: a show's, its seasons' and its episodes'. */
+  mediaUnder(itemId: number): number[] {
     return this.db
-      .prepare<[number, number, number], { media_id: number }>(
-        `SELECT DISTINCT mi.media_id FROM media_items mi
-           JOIN items i ON i.id = mi.item_id
-           LEFT JOIN items p ON p.id = i.parent_id
-          WHERE i.id = ? OR i.parent_id = ? OR p.parent_id = ?`,
+      .prepare<[number], { media_id: number }>(
+        `WITH RECURSIVE ${under('SELECT id, id FROM items WHERE id = ?')}
+         SELECT DISTINCT mi.media_id FROM under u JOIN media_items mi ON mi.item_id = u.id`,
       )
-      .all(showId, showId, showId)
+      .all(itemId)
       .map((row) => row.media_id)
   }
 
-  get(id: number): { id: number; type: ItemType; tmdbId: string; parentId: number | null } | null {
-    const row = this.db
-      .prepare<[number], { id: number; type: string; tmdb_id: string; parent_id: number | null }>(
-        'SELECT id, type, tmdb_id, parent_id FROM items WHERE id = ?',
+  /** The item and everything under it: a show, its seasons and their episodes. */
+  itemsUnder(itemId: number): number[] {
+    return this.db
+      .prepare<[number], { id: number }>(
+        `WITH RECURSIVE ${under('SELECT id, id FROM items WHERE id = ?')} SELECT id FROM under`,
       )
+      .all(itemId)
+      .map((row) => row.id)
+  }
+
+  get(id: number): StoredItem | null {
+    const row = this.db
+      .prepare<
+        [number],
+        {
+          id: number
+          type: string
+          tmdb_id: string
+          parent_id: number | null
+          number: number | null
+        }
+      >('SELECT id, type, tmdb_id, parent_id, number FROM items WHERE id = ?')
       .get(id)
     return row && isItemType(row.type)
-      ? { id: row.id, type: row.type, tmdbId: row.tmdb_id, parentId: row.parent_id }
+      ? {
+          id: row.id,
+          type: row.type,
+          tmdbId: row.tmdb_id,
+          parentId: row.parent_id,
+          number: row.number,
+        }
       : null
   }
 
@@ -298,72 +337,26 @@ export class MetadataRepository {
     })()
   }
 
-  /** Edit metadata: TMDB's own words for an item beside what was written over them, and which fields were. */
-  metadata(itemId: number): ItemMetadataState | null {
-    const original = this.db
-      .prepare<[number], ItemRow>('SELECT * FROM items WHERE id = ?')
-      .get(itemId)
-    if (!original) return null
-    const shown = this.db
-      .prepare<[number], ItemRow>('SELECT * FROM shown_items WHERE id = ?')
-      .get(itemId)
-    const override = this.db
-      .prepare<[number], OverrideRow>('SELECT * FROM item_overrides WHERE item_id = ?')
-      .get(itemId)
-    const fields = (row: ItemRow | undefined): ItemMetadata => ({
-      title: row?.title ?? original.title,
-      year: row?.year ?? null,
-      tagline: row?.tagline ?? null,
-      summary: row?.summary ?? null,
-      contentRating: row?.content_rating ?? null,
-    })
-    const overridden: (keyof ItemMetadata)[] = [
-      ...(override?.title != null ? ['title' as const] : []),
-      ...(override?.year != null ? ['year' as const] : []),
-      ...(override?.tagline != null ? ['tagline' as const] : []),
-      ...(override?.summary != null ? ['summary' as const] : []),
-      ...(override?.content_rating != null ? ['contentRating' as const] : []),
-    ]
-    return { shown: fields(shown), original: fields(original), overridden }
-  }
-
   /**
-   * Writes a field over TMDB's, or clears one back to TMDB's with null; ''
-   * (0 for the year) is written over TMDB's too, and shows as nothing. A
-   * field left out stays as it is; an item with nothing written over keeps
-   * no row.
+   * Stores season `number` of a show and its episodes as TMDB lists them, in
+   * one transaction, and answers with the season and every episode under it
+   * by number, those raven made up before included.
    */
-  setMetadata({ itemId, change }: { itemId: number; change: ItemMetadataChange }): void {
-    this.db.transaction(() => {
-      const current = this.db
-        .prepare<[number], OverrideRow>('SELECT * FROM item_overrides WHERE item_id = ?')
-        .get(itemId)
-      const next = {
-        title: 'title' in change ? (change.title ?? null) : (current?.title ?? null),
-        year: 'year' in change ? (change.year ?? null) : (current?.year ?? null),
-        tagline: 'tagline' in change ? (change.tagline ?? null) : (current?.tagline ?? null),
-        summary: 'summary' in change ? (change.summary ?? null) : (current?.summary ?? null),
-        content_rating:
-          'contentRating' in change
-            ? (change.contentRating ?? null)
-            : (current?.content_rating ?? null),
-      }
-      this.db.prepare('DELETE FROM item_overrides WHERE item_id = ?').run(itemId)
-      if (Object.values(next).every((value) => value == null)) return
-      this.db
-        .prepare(
-          `INSERT INTO item_overrides (item_id, title, sort_title, year, tagline, summary, content_rating)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        )
-        .run(
-          itemId,
-          next.title,
-          next.title == null ? null : sortTitle(next.title),
-          next.year,
-          next.tagline,
-          next.summary,
-          next.content_rating,
-        )
+  saveSeason({
+    showId,
+    number,
+    season,
+    episodes,
+  }: {
+    showId: number
+    number: number
+    season: FetchedItem
+    episodes: readonly FetchedItem[]
+  }): { id: number; number: number; episodes: Map<number, number> } {
+    return this.db.transaction(() => {
+      const id = this.save({ item: season, parentId: showId })
+      episodes.forEach((episode) => this.save({ item: episode, parentId: id }))
+      return { id, number, episodes: this.childNumbers(id) }
     })()
   }
 
@@ -665,16 +658,15 @@ export class MetadataRepository {
       .get(id)
     if (!row) return null
     const credits = this.db
-      .prepare<[number], { item_id: number; job: string; role: string | null }>(
-        `SELECT c.item_id, c.job, c.role
+      .prepare<[number, number], { item_id: number; job: string; role: string | null }>(
+        `WITH RECURSIVE ${under('SELECT item_id, item_id FROM credits WHERE person_id = ?')}
+         SELECT c.item_id, c.job, c.role
            FROM credits c JOIN items i ON i.id = c.item_id
           WHERE c.person_id = ? AND i.type IN ('movie', 'show')
-            AND (EXISTS (SELECT 1 FROM media_items mi WHERE mi.item_id = i.id)
-                 OR EXISTS (SELECT 1 FROM items s JOIN items e ON e.parent_id = s.id
-                             JOIN media_items mi ON mi.item_id = e.id WHERE s.parent_id = i.id))
+            AND c.item_id IN (SELECT u.root FROM under u JOIN media_items mi ON mi.item_id = u.id)
           ORDER BY i.released DESC, i.title`,
       )
-      .all(id)
+      .all(id, id)
     const summaries = this.summaries(credits.map((credit) => credit.item_id))
     return {
       id: row.id,
@@ -744,41 +736,6 @@ export class MetadataRepository {
       .run(JSON.stringify(mediaIds))
   }
 
-  /** The files linked to an item. */
-  mediaFor(itemId: number): number[] {
-    return this.db
-      .prepare<[number], { media_id: number }>('SELECT media_id FROM media_items WHERE item_id = ?')
-      .all(itemId)
-      .map((row) => row.media_id)
-  }
-
-  /** The Fix match saved for a place: undefined when there is none, null for "not a movie". */
-  override({ libraryId, place }: { libraryId: number; place: string }): string | null | undefined {
-    const row = this.db
-      .prepare<[number, string], { tmdb_id: string | null }>(
-        'SELECT tmdb_id FROM match_overrides WHERE library_id = ? AND place = ?',
-      )
-      .get(libraryId, place)
-    return row ? row.tmdb_id : undefined
-  }
-
-  saveOverride({
-    libraryId,
-    place,
-    tmdbId,
-  }: {
-    libraryId: number
-    place: string
-    tmdbId: string | null
-  }): void {
-    this.db
-      .prepare(
-        `INSERT INTO match_overrides (library_id, place, tmdb_id) VALUES (?, ?, ?)
-         ON CONFLICT (library_id, place) DO UPDATE SET tmdb_id = excluded.tmdb_id`,
-      )
-      .run(libraryId, place, tmdbId)
-  }
-
   /**
    * Items of `type` fetched before `before`, or before `recentBefore` when
    * released after `releasedAfter` or, for a show, while it still airs.
@@ -809,25 +766,24 @@ export class MetadataRepository {
     this.db.prepare('DELETE FROM items WHERE id = ?').run(id)
   }
 
-  /**
-   * Removes movies with no file, shows and seasons with nothing under them,
-   * and people left with no credits. Returns what is still stored, for the
-   * image cache's sweep.
-   */
   /** The libraries holding a file of the item, or of any season or episode under it. */
   librariesHolding(itemId: number): number[] {
     return this.db
       .prepare<[number], { library_id: number }>(
-        `WITH RECURSIVE tree(id) AS (
-           SELECT ? UNION SELECT i.id FROM items i JOIN tree t ON i.parent_id = t.id)
-         SELECT DISTINCT m.library_id FROM tree
-           JOIN media_items mi ON mi.item_id = tree.id
+        `WITH RECURSIVE ${under('SELECT id, id FROM items WHERE id = ?')}
+         SELECT DISTINCT m.library_id FROM under u
+           JOIN media_items mi ON mi.item_id = u.id
            JOIN media m ON m.id = mi.media_id`,
       )
       .all(itemId)
       .map((row) => row.library_id)
   }
 
+  /**
+   * Removes movies with no file, shows and seasons with nothing under them,
+   * and people left with no credits. Returns what is still stored, for the
+   * image cache's sweep.
+   */
   clearUp(): { tmdbPaths: Set<string>; itemIds: Set<number> } {
     this.db.transaction(() => {
       this.db.exec(`

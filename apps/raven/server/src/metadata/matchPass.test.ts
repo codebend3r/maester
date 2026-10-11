@@ -1,0 +1,154 @@
+import { writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import { Logger } from '@nestjs/common'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { readServerConfig } from '@/config'
+import { MatchFiles } from '@/metadata/matchFiles'
+import { MatchPass } from '@/metadata/matchPass'
+import { MetadataRepository } from '@/metadata/metadataRepository'
+import { OmdbClient } from '@/metadata/omdbClient'
+import { OmdbScores } from '@/metadata/omdbScores'
+import { TmdbClient } from '@/metadata/tmdbClient'
+import { testDatabase } from '@/test/database'
+import { fakeTmdb } from '@/test/fakeTmdb'
+
+const NO_IDS = { tmdb: null, imdb: null, tvdb: null }
+
+describe('a matching pass', () => {
+  const database = testDatabase('raven-match-pass-')
+  const tmdb = fakeTmdb({
+    movies: [
+      { id: 949, title: 'Heat', released: '1995-12-15', imdbId: 'tt0113277' },
+      { id: 881, title: 'A Few Good Men', released: '1992-12-11' },
+    ],
+    shows: [{ id: 95396, title: 'Severance', first: '2022-02-18', tvdbId: '371980', seasons: {} }],
+  })
+  const pass = (): MatchPass => {
+    const config = { ...readServerConfig({}), tmdbApiToken: 'test-token' }
+    const metadata = new MetadataRepository(database.get())
+    return new MatchPass({
+      tmdb: new TmdbClient(config, tmdb.fetch),
+      metadata,
+      files: new MatchFiles(database.get(), metadata),
+      scores: new OmdbScores(metadata, new OmdbClient(config, tmdb.fetch)),
+      logger: new Logger('MatchPassTest'),
+    })
+  }
+  const searches = (): string[] => tmdb.state.calls.filter((url) => url.includes('/search/'))
+
+  beforeAll(database.open)
+  afterAll(database.close)
+
+  it('leaves files unmatched, asking TMDB nothing, when a Fix match says they are none', async () => {
+    const before = tmdb.state.calls.length
+    await expect(
+      pass().resolve({
+        type: 'movie',
+        fix: { kind: 'not-a-match' },
+        ids: { ...NO_IDS, tmdb: '949' },
+        nfoPath: null,
+        titles: [{ title: 'Heat', year: 1995 }],
+      }),
+    ).resolves.toEqual({ kind: 'unmatched' })
+    expect(tmdb.state.calls).toHaveLength(before)
+  })
+
+  it('takes a Fix match as manual, fetching the movie once', async () => {
+    const resolved = await pass().resolve({
+      type: 'movie',
+      fix: { kind: 'tmdb', tmdbId: '949' },
+      ids: NO_IDS,
+      nfoPath: null,
+      titles: [{ title: 'Something Else', year: null }],
+    })
+    expect(resolved).toMatchObject({ kind: 'matched', tmdbId: '949', match: 'manual' })
+    expect(searches()).toEqual([])
+  })
+
+  it('takes the id a name gives without a search, and the one in an NFO next', async () => {
+    const fromName = await pass().resolve({
+      type: 'movie',
+      fix: { kind: 'none' },
+      ids: { ...NO_IDS, tmdb: '881' },
+      nfoPath: null,
+      titles: [{ title: 'Nothing Like It', year: null }],
+    })
+    expect(fromName).toMatchObject({ kind: 'matched', tmdbId: '881', match: 'matched' })
+    const nfo = join(database.dir(), 'movie.nfo')
+    await writeFile(nfo, '<movie><uniqueid type="tmdb">949</uniqueid></movie>')
+    const fromNfo = await pass().resolve({
+      type: 'movie',
+      fix: { kind: 'none' },
+      ids: NO_IDS,
+      nfoPath: nfo,
+      titles: [{ title: 'Nothing Like It', year: null }],
+    })
+    expect(fromNfo).toMatchObject({ kind: 'matched', tmdbId: '949' })
+    expect(searches()).toEqual([])
+  })
+
+  it('searches each title in turn, once a pass, and takes the first sure answer', async () => {
+    const one = pass()
+    const ask = () =>
+      one.resolve({
+        type: 'show',
+        fix: { kind: 'none' },
+        ids: NO_IDS,
+        nfoPath: null,
+        titles: [
+          { title: 'Severence', year: null },
+          { title: 'Severance', year: null },
+        ],
+      })
+    await expect(ask()).resolves.toMatchObject({ kind: 'matched', tmdbId: '95396' })
+    const asked = searches().length
+    await expect(ask()).resolves.toMatchObject({ kind: 'matched', tmdbId: '95396' })
+    expect(searches()).toHaveLength(asked)
+  })
+
+  it('leaves files unmatched when nothing is found, or TMDB has no such id', async () => {
+    await expect(
+      pass().resolve({
+        type: 'movie',
+        fix: { kind: 'none' },
+        ids: NO_IDS,
+        nfoPath: null,
+        titles: [{ title: 'Unheard Of', year: 2001 }],
+      }),
+    ).resolves.toEqual({ kind: 'unmatched' })
+    await expect(
+      pass().resolve({
+        type: 'movie',
+        fix: { kind: 'tmdb', tmdbId: '424242' },
+        ids: NO_IDS,
+        nfoPath: null,
+        titles: [],
+      }),
+    ).resolves.toEqual({ kind: 'unmatched' })
+  })
+
+  it('stops every task after TMDB goes away, and lets a task fail on its own', async () => {
+    const one = pass()
+    const failed = { ran: 0 }
+    await one.guard.run(async () => {
+      throw new Error('one file went wrong')
+    })
+    expect(one.guard.isStopped).toBe(false)
+    tmdb.state.down = true
+    await one.guard.run(() =>
+      one.resolve({
+        type: 'movie',
+        fix: { kind: 'none' },
+        ids: NO_IDS,
+        nfoPath: null,
+        titles: [{ title: 'Ronin', year: 1998 }],
+      }),
+    )
+    tmdb.state.down = false
+    expect(one.guard.isStopped).toBe(true)
+    await one.guard.run(async () => {
+      failed.ran += 1
+    })
+    expect(failed.ran).toBe(0)
+  })
+})

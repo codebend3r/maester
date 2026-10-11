@@ -1,0 +1,82 @@
+import { describe, expect, it } from 'vitest'
+import {
+  filePlace,
+  holdsOneMovie,
+  rootOf,
+  showDirOf,
+  showFolderOf,
+  showPlace,
+  stemOf,
+} from '@/metadata/places'
+
+const file = (path: string, root = '/tv') => {
+  const inside = path.slice(root.length + 1)
+  const slash = inside.lastIndexOf('/')
+  return {
+    path,
+    folder: slash < 0 ? '' : inside.slice(0, slash),
+    fileName: inside.slice(slash + 1),
+  }
+}
+
+describe('where a file sits', () => {
+  it('takes the extension off a name, but not a leading dot', () => {
+    expect(stemOf('Heat (1995).mkv')).toBe('Heat (1995)')
+    expect(stemOf('Heat.1995.1080p.mkv')).toBe('Heat.1995.1080p')
+    expect(stemOf('.hidden')).toBe('.hidden')
+    expect(stemOf('README')).toBe('README')
+  })
+
+  it('places a file by its path inside the library, and finds the root from it', () => {
+    const inFolder = file('/tv/Severance/Season 01/Severance - S01E01.mkv')
+    expect(filePlace(inFolder)).toBe('Severance/Season 01/Severance - S01E01.mkv')
+    expect(rootOf(inFolder)).toBe('/tv')
+    const atRoot = file('/tv/Severance - S01E01.mkv')
+    expect(filePlace(atRoot)).toBe('Severance - S01E01.mkv')
+    expect(rootOf(atRoot)).toBe('/tv')
+  })
+
+  it('keeps a show by its folder, every season under it included', () => {
+    const episode = file('/tv/Severance/Season 01/Severance - S01E01.mkv')
+    expect(showFolderOf(episode)).toBe('Severance')
+    expect(showPlace(episode)).toBe('Severance')
+    expect(showDirOf(episode)).toBe('/tv/Severance')
+  })
+
+  it('keeps a file at the root, or in a bare season folder, by itself', () => {
+    const atRoot = file('/tv/Severance - S01E01.mkv')
+    expect(showFolderOf(atRoot)).toBeNull()
+    expect(showPlace(atRoot)).toBe('Severance - S01E01.mkv')
+    expect(showDirOf(atRoot)).toBe('/tv')
+    const seasonOnly = file('/tv/Season 01/Severance - S01E01.mkv')
+    expect(showFolderOf(seasonOnly)).toBeNull()
+    expect(showPlace(seasonOnly)).toBe('Season 01/Severance - S01E01.mkv')
+    expect(showDirOf(seasonOnly)).toBe('/tv/Season 01')
+  })
+
+  it('tells a folder of one movie, in any number of qualities, from one of several', () => {
+    const matrix = 'The Matrix (1999)'
+    expect(
+      holdsOneMovie({
+        folder: matrix,
+        files: [
+          { folder: matrix, fileName: 'The Matrix (1999) Bluray-1080p.mkv' },
+          { folder: matrix, fileName: 'The Matrix (1999) Remux-2160p.mkv' },
+          { folder: `${matrix}/Featurettes`, fileName: 'Making Of.mkv' },
+        ],
+      }),
+    ).toBe(true)
+    expect(
+      holdsOneMovie({
+        folder: 'Films',
+        files: [
+          { folder: 'Films', fileName: 'Heat (1995).mkv' },
+          { folder: 'Films', fileName: 'Ronin (1998).mkv' },
+        ],
+      }),
+    ).toBe(false)
+    expect(
+      holdsOneMovie({ folder: '', files: [{ folder: '', fileName: 'Heat (1995).mkv' }] }),
+    ).toBe(false)
+  })
+})

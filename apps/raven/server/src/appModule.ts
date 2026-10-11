@@ -23,10 +23,14 @@ import { MediaIndex } from '@/media/mediaIndex'
 import { MediaRepository } from '@/media/mediaRepository'
 import { ViewingRepository } from '@/media/viewingRepository'
 import { ImageCache } from '@/metadata/imageCache'
+import { ItemOverrides } from '@/metadata/itemOverrides'
+import { ItemPictures } from '@/metadata/itemPictures'
+import { ItemRefresher } from '@/metadata/itemRefresher'
 import { MatchFiles } from '@/metadata/matchFiles'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 import { MetadataService } from '@/metadata/metadataService'
 import { OmdbClient } from '@/metadata/omdbClient'
+import { OmdbScores } from '@/metadata/omdbScores'
 import { METADATA_FETCH, type MetadataFetch, TmdbClient } from '@/metadata/tmdbClient'
 import { PlaybackController } from '@/playback/playbackController'
 import { SubtitlesService } from '@/playback/subtitlesService'
@@ -90,6 +94,7 @@ export class AppModule {
         LibrariesRepository,
         SettingsRepository,
         MetadataRepository,
+        ItemOverrides,
         MediaRepository,
         ViewingRepository,
         MediaIndex,
@@ -97,7 +102,10 @@ export class AppModule {
         TmdbClient,
         OmdbClient,
         ImageCache,
+        OmdbScores,
+        ItemPictures,
         MetadataService,
+        ItemRefresher,
         FfmpegService,
         ThumbnailService,
         TracksService,

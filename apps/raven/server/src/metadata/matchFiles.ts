@@ -5,6 +5,12 @@ import { BEST_FIRST, escapeLike } from '@/media/mediaSql'
 import { namedAs } from '@/media/namedAs'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 
+/** A Fix match kept for a place: none, "this is not a movie or show", or a TMDB id. */
+export type FixMatch = { kind: 'none' } | { kind: 'not-a-match' } | { kind: 'tmdb'; tmdbId: string }
+
+/** What Fix match can keep for a place. */
+export type FixMatchChoice = Exclude<FixMatch, { kind: 'none' }>
+
 /** A file as matching sees it: its name, where it sits, and how matching went so far. */
 export type MatchFile = {
   id: number
@@ -44,7 +50,8 @@ const toMatchFile = (row: FileRow): MatchFile => ({
 
 /**
  * The match queue: which files wait to be matched, the files that share a
- * place with one, and how matching went. Only metadata matching uses it.
+ * place with one, the Fix match kept for a place, and how matching went.
+ * Only metadata matching uses it.
  */
 @Injectable()
 export class MatchFiles {
@@ -114,6 +121,17 @@ export class MatchFiles {
     })
   }
 
+  /** Every file linked to the item or to anything under it, in any library, best first. */
+  under(itemId: number): MatchFile[] {
+    const ids = this.metadata.mediaUnder(itemId)
+    if (ids.length === 0) return []
+    return this.files({
+      where: 'm.id IN (SELECT value FROM json_each(?))',
+      params: [JSON.stringify(ids)],
+      order: BEST_FIRST,
+    })
+  }
+
   /** A library's files waiting to be matched, by place so a folder's files come together. */
   pending(libraryId: number): MatchFile[] {
     return this.files({ where: `m.library_id = ? AND m.match = 'pending'`, params: [libraryId] })
@@ -136,6 +154,35 @@ export class MatchFiles {
     })
   }
 
+  /** The Fix match kept for a place in a library. */
+  fixMatchAt({ libraryId, place }: { libraryId: number; place: string }): FixMatch {
+    const row = this.db
+      .prepare<[number, string], { tmdb_id: string | null }>(
+        'SELECT tmdb_id FROM match_overrides WHERE library_id = ? AND place = ?',
+      )
+      .get(libraryId, place)
+    if (!row) return { kind: 'none' }
+    return row.tmdb_id == null ? { kind: 'not-a-match' } : { kind: 'tmdb', tmdbId: row.tmdb_id }
+  }
+
+  /** Keeps a Fix match for a place, replacing the one it had. */
+  saveFixMatch({
+    libraryId,
+    place,
+    fix,
+  }: {
+    libraryId: number
+    place: string
+    fix: FixMatchChoice
+  }): void {
+    this.db
+      .prepare(
+        `INSERT INTO match_overrides (library_id, place, tmdb_id) VALUES (?, ?, ?)
+         ON CONFLICT (library_id, place) DO UPDATE SET tmdb_id = excluded.tmdb_id`,
+      )
+      .run(libraryId, place, fix.kind === 'tmdb' ? fix.tmdbId : null)
+  }
+
   /** How many files wait to be matched in libraries of `kinds`. */
   countPending(kinds: readonly LibraryKind[]): number {
     return (
@@ -146,6 +193,48 @@ export class MatchFiles {
         )
         .get(JSON.stringify(kinds))?.count ?? 0
     )
+  }
+
+  /** Links files to their items, or to none, and records how matching went, together. */
+  settle({
+    ids,
+    itemIds,
+    match,
+  }: {
+    ids: readonly number[]
+    itemIds: readonly number[]
+    match: MatchState
+  }): void {
+    this.db.transaction(() => {
+      if (itemIds.length === 0) this.metadata.unlink(ids)
+      else this.metadata.link({ mediaIds: ids, itemIds })
+      this.setMatch({ ids, match })
+    })()
+  }
+
+  /** Starts files' matching over: their links go and they wait to be matched again. */
+  reset(ids: readonly number[]): void {
+    this.db.transaction(() => {
+      this.metadata.unlink(ids)
+      this.setMatch({ ids, match: 'pending' })
+    })()
+  }
+
+  /**
+   * Removes an item TMDB no longer has, and puts its files back: to pending,
+   * or to unmatched where a Fix match pointed at it, in one go. The
+   * libraries they are in, for another pass.
+   */
+  forgetItem(itemId: number): number[] {
+    return this.db.transaction(() => {
+      const files = this.byIds(this.metadata.mediaUnder(itemId))
+      this.metadata.remove(itemId)
+      const manual = files.filter((file) => file.match === 'manual').map((file) => file.id)
+      const automatic = files.filter((file) => file.match !== 'manual').map((file) => file.id)
+      this.setMatch({ ids: manual, match: 'unmatched' })
+      this.setMatch({ ids: automatic, match: 'pending' })
+      return [...new Set(files.map((file) => file.libraryId))]
+    })()
   }
 
   setMatch({ ids, match }: { ids: readonly number[]; match: MatchState }): void {

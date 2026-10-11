@@ -33,8 +33,10 @@ import { LockService } from '@/lock/lockService'
 import { MediaRepository } from '@/media/mediaRepository'
 import { ImageCache } from '@/metadata/imageCache'
 import { MetadataRepository } from '@/metadata/metadataRepository'
+import { ItemOverrides } from '@/metadata/itemOverrides'
+import { ItemRefresher } from '@/metadata/itemRefresher'
+import { isLocal } from '@/metadata/localItems'
 import { MetadataService } from '@/metadata/metadataService'
-import { LOCAL } from '@/metadata/metadataService'
 import { TMDB_IMAGE_PATH, TmdbClient, TmdbError } from '@/metadata/tmdbClient'
 
 const IMAGE_KINDS: readonly ItemImageKind[] = ['poster', 'backdrop', 'still']
@@ -50,6 +52,8 @@ export class ItemsController {
     @Inject(MetadataRepository) private readonly metadata: MetadataRepository,
     @Inject(MediaRepository) private readonly media: MediaRepository,
     @Inject(MetadataService) private readonly service: MetadataService,
+    @Inject(ItemRefresher) private readonly refresher: ItemRefresher,
+    @Inject(ItemOverrides) private readonly overrides: ItemOverrides,
     @Inject(ImageCache) private readonly images: ImageCache,
     @Inject(TmdbClient) private readonly tmdb: TmdbClient,
     @Inject(LockService) private readonly lock: LockService,
@@ -131,7 +135,7 @@ export class ItemsController {
       throw new ServiceUnavailableException('Set TMDB_API_TOKEN to fetch details from TMDB.')
     }
     try {
-      const kept = await this.service.refresh(id)
+      const kept = await this.refresher.refresh(id)
       if (!kept) throw new NotFoundException('TMDB no longer has this; it will be matched again.')
     } catch (error) {
       if (error instanceof TmdbError) throw new ServiceUnavailableException(error.message)
@@ -143,7 +147,7 @@ export class ItemsController {
   /** Edit metadata: what the page shows, what TMDB says, and which fields were written over. */
   @Get(':id/metadata')
   getMetadata(@Param('id', ParseIntPipe) id: number): ItemMetadataState {
-    const state = this.metadata.metadata(id)
+    const state = this.overrides.state(id)
     if (!state) throw new NotFoundException(`No item ${id}`)
     return state
   }
@@ -167,7 +171,7 @@ export class ItemsController {
     if (body.title != null && body.title.trim() === '') {
       throw new BadRequestException('A title cannot be blank; send null to go back to TMDB’s.')
     }
-    this.metadata.setMetadata({
+    this.overrides.write({
       itemId: id,
       change: { ...body, ...(body.title == null ? {} : { title: body.title.trim() }) },
     })
@@ -186,7 +190,7 @@ export class ItemsController {
       throw new BadRequestException('Only a movie or show has pictures to choose from.')
     }
     const fetched =
-      this.tmdb.enabled && !item.tmdbId.startsWith(LOCAL)
+      this.tmdb.enabled && !isLocal(item.tmdbId)
         ? await this.tmdb
             .images({ type: item.type, tmdbId: item.tmdbId })
             .catch((error: unknown) => {
