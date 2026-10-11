@@ -245,6 +245,13 @@ describe('parseEpisodeName', () => {
     expect(episode('Season 1/S01E02.mkv', 'Severance').show).toBe('Severance')
   })
 
+  it('keeps the show as the file names it, for when the folder is misspelt', () => {
+    const parsed = episode('Muderbot/Season 1/Murderbot - S01E01 - FreeCommerce WEBDL-2160p.mkv')
+    expect(parsed).toMatchObject({ show: 'Muderbot', showFromFile: 'Murderbot' })
+    expect(episode('Severance (2022)/Season 01/Severance - S01E02.mkv').showFromFile).toBeNull()
+    expect(episode('Fargo/Fargo.S02E09E10.1080p.mkv').showFromFile).toBeNull()
+  })
+
   it('drops a country suffix from a show name, as TMDB does not search on it', () => {
     expect(episode('Euphoria (US)/Season 1/Euphoria (US) - S01E01 - Pilot.mkv').show).toBe(
       'Euphoria',

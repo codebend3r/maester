@@ -71,6 +71,12 @@ describe('TV show metadata', () => {
         },
       },
       {
+        id: 247718,
+        title: 'Murderbot',
+        first: '2025-05-16',
+        seasons: { 1: [{ number: 1, title: 'FreeCommerce', aired: '2025-05-16' }] },
+      },
+      {
         id: 209867,
         title: 'Frieren',
         first: '2023-09-29',
@@ -170,6 +176,10 @@ describe('TV show metadata', () => {
         seconds: 1,
       }),
       encodeClip({
+        path: join(state.media, 'Muderbot', 'Season 1', 'Murderbot - S01E01 - FreeCommerce.mp4'),
+        seconds: 1,
+      }),
+      encodeClip({
         path: join(state.media, 'Unknown Show', 'Season 1', 'Unknown Show - S01E01.mp4'),
         seconds: 1,
       }),
@@ -219,10 +229,22 @@ describe('TV show metadata', () => {
     ).toEqual([
       ['Fargo', 2, 2014, 2024],
       ['Frieren', 1, 2023, null],
+      ['Murderbot', 1, 2025, null],
       ['Severance', 3, 2022, null],
     ])
     expect(listing.unmatched.map((entry) => entry.fileName)).toEqual(['Unknown Show - S01E01.mp4'])
     expect(listing.shows.every((entry) => entry.show.posterVersion != null)).toBe(true)
+  })
+
+  it('matches a misspelt folder by the name its files carry', async () => {
+    const episode = await byFile('Murderbot - S01E01 - FreeCommerce.mp4')
+    expect(episode.match).toBe('matched')
+    expect(episode.item).toMatchObject({ show: { title: 'Murderbot' }, season: 1, episode: 1 })
+    const asked = tmdb.state.calls
+      .filter((url) => url.includes('/search/tv'))
+      .map((url) => new URL(url).searchParams.get('query'))
+    expect(asked).toContain('Muderbot')
+    expect(asked).toContain('Murderbot')
   })
 
   it('searches once per show folder, and fetches each season once', () => {
@@ -349,7 +371,7 @@ describe('TV show metadata', () => {
   it('searches shows and sorts them by year', async () => {
     expect((await shows('?q=sev')).shows.map((entry) => entry.show.title)).toEqual(['Severance'])
     expect((await shows('?sort=year-new')).shows.map((entry) => entry.show.year)).toEqual([
-      2023, 2022, 2014,
+      2025, 2023, 2022, 2014,
     ])
   })
 
@@ -395,7 +417,11 @@ describe('TV show metadata', () => {
     expect(halfLoop.match).toBe('manual')
     const gone = await app().inject({ method: 'GET', url: `/api/items/${severance.show.id}` })
     expect(gone.statusCode).toBe(404)
-    expect((await shows()).shows.map((entry) => entry.show.title)).toEqual(['Fargo', 'Frieren'])
+    expect((await shows()).shows.map((entry) => entry.show.title)).toEqual([
+      'Fargo',
+      'Frieren',
+      'Murderbot',
+    ])
   })
 
   it('keeps the re-pointing through a rescan', async () => {

@@ -563,10 +563,19 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
       const nfoIds = await this.nfoIds({ path: join(showDir, assets.nfo), context })
       return nfoIds ? this.idFromIds({ ids: nfoIds, type: 'show' }) : null
     }
-    const tmdbId =
-      override ??
-      (await fromNames()) ??
-      (await this.search({ type: 'show', title: parsed.show, year: parsed.year, context }))
+    // The folder names the show first; when that finds nothing, the file's
+    // own name is tried, as a folder is misspelt more often than every file.
+    const bySearch = async (): Promise<string | null> =>
+      (await this.search({ type: 'show', title: parsed.show, year: parsed.year, context })) ??
+      (parsed.showFromFile == null
+        ? null
+        : await this.search({
+            type: 'show',
+            title: parsed.showFromFile,
+            year: parsed.year,
+            context,
+          }))
+    const tmdbId = override ?? (await fromNames()) ?? (await bySearch())
     const showId = tmdbId == null ? null : await this.ensure({ type: 'show', tmdbId, context })
     if (tmdbId == null || showId == null) {
       this.settle({ mediaIds, itemIds: [], match: 'unmatched' })

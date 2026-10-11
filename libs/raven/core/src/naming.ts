@@ -261,6 +261,8 @@ export const sortTitle = (title: string): string => title.trim().replace(LEADING
 
 export type ParsedEpisodeName = {
   show: string
+  /** The show as the file itself names it, when that differs from the folder: a misspelt folder, `Muderbot/Murderbot - S01E01.mkv`. */
+  showFromFile: string | null
   /** The show's year, from its folder or the name: "Severance (2022)". */
   year: number | null
   season: number | null
@@ -333,6 +335,8 @@ export const parseEpisodeName = ({
   const fromFolder =
     showFolder !== '' && seasonFolderNumber(showFolder) == null ? readName(showFolder) : null
   const show = (fromFolder?.title || fromFile.title || fallbackShow).replace(COUNTRY_SUFFIX, '')
+  const fileShow = fromFile.title.replace(COUNTRY_SUFFIX, '')
+  const showFromFile = fileShow !== '' && fileShow !== show ? fileShow : null
 
   const season = code ? Number(code[1] ?? code[4]) : seasonFolder
   const episodes = code
@@ -345,6 +349,7 @@ export const parseEpisodeName = ({
 
   return {
     show,
+    showFromFile,
     year: fromFolder?.year ?? fromFile.year,
     season,
     episodes,
