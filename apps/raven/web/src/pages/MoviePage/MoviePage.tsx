@@ -7,6 +7,7 @@ import { CastRow } from '@/components/CastRow/CastRow'
 import { ImageEditor } from '@/components/ImageEditor/ImageEditor'
 import { ItemHeader } from '@/components/ItemHeader/ItemHeader'
 import { MediaMenu } from '@/components/MediaMenu/MediaMenu'
+import { MetadataEditor } from '@/components/MetadataEditor/MetadataEditor'
 import { ReviewCards } from '@/components/ReviewCards/ReviewCards'
 import { Summary } from '@/components/Summary/Summary'
 import { TmdbCredit } from '@/components/TmdbCredit/TmdbCredit'
@@ -26,6 +27,7 @@ const MovieView = ({ details, primary }: { details: ItemDetails; primary: MediaI
   const queryClient = useQueryClient()
   const [menuOpen, setMenuOpen] = useState(false)
   const [editingImages, setEditingImages] = useState(false)
+  const [editingMetadata, setEditingMetadata] = useState(false)
   const { favourite } = useMediaMutations({ media: primary })
   const libraries = useQuery({ queryKey: queryKeys.libraries, queryFn: api.listLibraries })
   const tracks = useQuery({
@@ -82,6 +84,13 @@ const MovieView = ({ details, primary }: { details: ItemDetails; primary: MediaI
         >
           Edit images
         </Button>
+        <Button
+          icon="edit"
+          aria-pressed={editingMetadata}
+          onClick={() => setEditingMetadata((editing) => !editing)}
+        >
+          Edit metadata
+        </Button>
         <MediaMenu
           media={primary}
           open={menuOpen}
@@ -105,6 +114,13 @@ const MovieView = ({ details, primary }: { details: ItemDetails; primary: MediaI
           details={details}
           libraries={libraries.data ?? []}
           onDone={() => setEditingImages(false)}
+        />
+      )}
+      {editingMetadata && (
+        <MetadataEditor
+          details={details}
+          itemKind="movie"
+          onDone={() => setEditingMetadata(false)}
         />
       )}
 

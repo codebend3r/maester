@@ -32,12 +32,14 @@ export type IconName =
   | 'shuffle'
   | 'history'
   | 'next'
+  | 'wand'
 
 const PATHS: Record<IconName, string> = {
   back: 'M15 18l-6-6 6-6',
   plus: 'M12 5v14M5 12h14',
   rescan: 'M20 11a8 8 0 1 0-2.3 5.7M20 5v6h-6',
   edit: 'M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4',
+  wand: 'M4 20l10-10M14 10l1.5-1.5M17 3v2M17 9v2M14 6h2M20 6h2M19 15v2M19 21v2M16 18h2M22 18h2',
   close: 'M6 6l12 12M18 6L6 18',
   folder: 'M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z',
   up: 'M12 19V5M5 12l7-7 7 7',

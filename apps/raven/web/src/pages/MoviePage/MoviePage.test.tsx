@@ -117,6 +117,25 @@ describe('MoviePage', () => {
     images.mockRestore()
   })
 
+  it('opens Edit metadata from the header', async () => {
+    const state = spyOn(api, 'getItemMetadata').mockImplementation(async () => ({
+      shown: { title: 'The Matrix', year: 1999, tagline: null, summary: null, contentRating: null },
+      original: {
+        title: 'The Matrix',
+        year: 1999,
+        tagline: null,
+        summary: null,
+        contentRating: null,
+      },
+      overridden: [],
+    }))
+    open(itemDetails())
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit metadata' }))
+    expect(await screen.findByRole('heading', { name: 'Edit metadata' })).toBeInTheDocument()
+    expect(state).toHaveBeenCalledWith(40)
+    state.mockRestore()
+  })
+
   it('lists the versions only when there is more than one', async () => {
     open(itemDetails())
     await screen.findByRole('heading', { level: 1, name: 'Busboys' })
