@@ -1,14 +1,12 @@
 import { resolve } from 'node:path'
-import { type HwAccel, isHwAccel } from '@/ffmpeg/encoder'
+import { type HwAccel, isHwAccel } from '@raven/core'
+import { flag, type ListenConfig, readListenConfig, wholeNumber } from '@shared/server'
 
-/** Everything the server reads from its environment, resolved once at start. */
-export type ServerConfig = {
-  port: number
-  host: string
-  /** Holds the SQLite index and the thumbnail cache; mount it as a volume under Docker. */
-  dataDir: string
-  /** The built web client to serve, or null when the Vite dev server serves it instead. */
-  webDir: string | null
+/**
+ * Everything the server reads from its environment, resolved once at start.
+ * `dataDir` holds the SQLite index and the thumbnail cache.
+ */
+export type ServerConfig = ListenConfig & {
   /** The folder picker never lists anything above this. */
   browseRoot: string
   ffmpegPath: string
@@ -48,26 +46,6 @@ export type ServerConfig = {
 /** The DI token the config is provided under. */
 export const SERVER_CONFIG = Symbol('SERVER_CONFIG')
 
-const wholeNumber = ({
-  value,
-  fallback,
-}: {
-  value: string | undefined
-  fallback: number
-}): number => {
-  const parsed = Number(value)
-  return value != null && value.trim() !== '' && Number.isInteger(parsed) && parsed >= 0
-    ? parsed
-    : fallback
-}
-
-const flag = ({ value, fallback }: { value: string | undefined; fallback: boolean }): boolean => {
-  const normalised = value?.trim().toLowerCase() ?? ''
-  if (['1', 'true', 'yes', 'on'].includes(normalised)) return true
-  if (['0', 'false', 'no', 'off'].includes(normalised)) return false
-  return fallback
-}
-
 /** An unknown or missing HW_ACCEL means `auto`. */
 const hwAccelFrom = (value: string | undefined): HwAccel => {
   const trimmed = value?.trim() ?? ''
@@ -75,28 +53,22 @@ const hwAccelFrom = (value: string | undefined): HwAccel => {
 }
 
 export const readServerConfig = (env: NodeJS.ProcessEnv = process.env): ServerConfig => ({
-  port: wholeNumber({ value: env.PORT, fallback: 8484 }),
-  host: env.HOST?.trim() || '0.0.0.0',
-  dataDir: resolve(env.DATA_DIR?.trim() || './data'),
-  webDir: env.WEB_DIR?.trim() ? resolve(env.WEB_DIR.trim()) : null,
+  ...readListenConfig({ env, defaultPort: 8484 }),
   browseRoot: resolve(env.BROWSE_ROOT?.trim() || '/'),
   ffmpegPath: env.FFMPEG_PATH?.trim() || 'ffmpeg',
   ffprobePath: env.FFPROBE_PATH?.trim() || 'ffprobe',
-  probeConcurrency: Math.max(1, wholeNumber({ value: env.PROBE_CONCURRENCY, fallback: 4 })),
-  thumbnailConcurrency: Math.max(1, wholeNumber({ value: env.THUMBNAIL_CONCURRENCY, fallback: 2 })),
-  ffmpegTimeoutSeconds: Math.max(
-    1,
-    wholeNumber({ value: env.FFMPEG_TIMEOUT_SECONDS, fallback: 90 }),
-  ),
-  thumbnailWidth: Math.max(160, wholeNumber({ value: env.THUMBNAIL_WIDTH, fallback: 480 })),
+  probeConcurrency: Math.max(1, wholeNumber(env.PROBE_CONCURRENCY) ?? 4),
+  thumbnailConcurrency: Math.max(1, wholeNumber(env.THUMBNAIL_CONCURRENCY) ?? 2),
+  ffmpegTimeoutSeconds: Math.max(1, wholeNumber(env.FFMPEG_TIMEOUT_SECONDS) ?? 90),
+  thumbnailWidth: Math.max(160, wholeNumber(env.THUMBNAIL_WIDTH) ?? 480),
   scanOnStart: flag({ value: env.SCAN_ON_START, fallback: true }),
-  rescanIntervalMinutes: wholeNumber({ value: env.RESCAN_INTERVAL_MINUTES, fallback: 0 }),
+  rescanIntervalMinutes: wholeNumber(env.RESCAN_INTERVAL_MINUTES) ?? 0,
   hwAccel: hwAccelFrom(env.HW_ACCEL),
   vaapiDevice: env.VAAPI_DEVICE?.trim() || '/dev/dri/renderD128',
   tmdbApiToken: env.TMDB_API_TOKEN?.trim() || null,
   metadataLanguage: env.METADATA_LANGUAGE?.trim() || 'en-US',
   metadataCountry: (env.METADATA_COUNTRY?.trim() || 'US').toUpperCase(),
   omdbApiKey: env.OMDB_API_KEY?.trim() || null,
-  omdbDailyLimit: Math.max(1, wholeNumber({ value: env.OMDB_DAILY_LIMIT, fallback: 1000 })),
+  omdbDailyLimit: Math.max(1, wholeNumber(env.OMDB_DAILY_LIMIT) ?? 1000),
   libraryPin: env.LIBRARY_PIN?.trim() || null,
 })

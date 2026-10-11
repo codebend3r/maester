@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { type HwAccel, encoderCandidates } from '@/ffmpeg/encoder'
+import type { HwAccel } from '@raven/core'
+import { encoderCandidates } from '@/ffmpeg/encoder'
 
 const DEVICE = '/dev/dri/renderD128'
 

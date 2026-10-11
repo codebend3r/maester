@@ -1,12 +1,10 @@
-import { join } from 'node:path'
-import fastifyStatic from '@fastify/static'
 import { NestFactory } from '@nestjs/core'
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify'
+import { serveWebApp } from '@shared/server'
 import { AppModule } from '@/appModule'
 import type { ServerConfig } from '@/config'
 import type { MetadataFetch } from '@/metadata/tmdbClient'
 import type { WatchOptions } from '@/scanner/libraryWatcher'
-import { SpaFallbackFilter } from '@/spa/spaFallbackFilter'
 
 /**
  * The configured application, not yet listening, so a test can drive it
@@ -33,25 +31,7 @@ export const createApp = async ({
 
   // In Docker the server hands out the built web app too, so there is one
   // port and no CORS. In development Vite serves it and proxies /api here.
-  if (config.webDir) {
-    // Registered straight on Fastify and awaited: Nest's own useStaticAssets
-    // imports the plugin lazily and drops the promise, so the plugin lands
-    // after Fastify has started booting and `ready()` never resolves.
-    await app.register(fastifyStatic, {
-      root: config.webDir,
-      prefix: '/',
-      // Vite fingerprints everything under /assets, so it never goes stale.
-      setHeaders: (reply, path) => {
-        reply.header(
-          'cache-control',
-          path.includes('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache',
-        )
-      },
-    })
-  }
-  app.useGlobalFilters(
-    new SpaFallbackFilter(config.webDir ? join(config.webDir, 'index.html') : null),
-  )
+  await serveWebApp({ app, webDir: config.webDir, serverPrefixes: ['/api/'] })
   app.enableShutdownHooks()
   return app
 }
