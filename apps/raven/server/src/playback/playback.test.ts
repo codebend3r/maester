@@ -4,19 +4,13 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
-import {
-  type MediaItem,
-  STREAM_TIME_SHIFT,
-  isLibrary,
-  isMediaList,
-  isMediaTracks,
-  parseWebVtt,
-} from '@raven/core'
+import { type ApiClient, type MediaItem, STREAM_TIME_SHIFT, type StreamMode } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '@/app'
 import { readServerConfig } from '@/config'
 import { ScannerService } from '@/scanner/scannerService'
 import { encodeRichClip } from '@/test/clips'
+import { apiFor } from '@/test/server'
 
 const run = promisify(execFile)
 
@@ -58,7 +52,12 @@ const firstPacketTimes = async (path: string): Promise<{ video: number; audio: n
 const ms = (seconds: number): number => Math.round(seconds * 1000) / 1000
 
 describe('playback', () => {
-  const state = {
+  const state: {
+    root: string
+    lead: number
+    app: NestFastifyApplication | null
+    movie: MediaItem | null
+  } = {
     root: '',
     /**
      * Where the server's clock puts the video's first frame. Usually 0, but
@@ -68,14 +67,25 @@ describe('playback', () => {
      * what the player needs, so expectations are measured from here.
      */
     lead: 0,
-    app: null as NestFastifyApplication | null,
-    movie: null as MediaItem | null,
+    app: null,
+    movie: null,
   }
   const app = (): NestFastifyApplication => {
     if (!state.app) throw new Error('app not started')
     return state.app
   }
+  const api = (): ApiClient => apiFor({ app: app() })
   const movieId = (): number => state.movie?.id ?? -1
+  /** A converted stream's address, built as the player builds it. */
+  const streamUrl = ({
+    mode,
+    start = 0,
+    audio = null,
+  }: {
+    mode: StreamMode
+    start?: number
+    audio?: number | null
+  }) => api().streamUrl({ id: movieId(), mode, start, audio })
 
   beforeAll(async () => {
     state.root = await mkdtemp(join(tmpdir(), 'raven-playback-'))
@@ -97,23 +107,12 @@ describe('playback', () => {
     })
     await state.app.init()
     await state.app.getHttpAdapter().getInstance().ready()
-    const created = await state.app.inject({
-      method: 'POST',
-      url: '/api/libraries',
-      payload: { name: 'Films', paths: [media] },
-    })
-    const library: unknown = created.json()
-    if (!isLibrary(library)) throw new Error(created.body)
-    await state.app.get(ScannerService).whenIdle(library.id)
-    const listed: unknown = (
-      await state.app.inject({ method: 'GET', url: `/api/libraries/${library.id}/media` })
-    ).json()
-    if (!isMediaList(listed) || !listed[0]) throw new Error('nothing indexed')
-    state.movie = listed[0]
-    const fromTop = await state.app.inject({
-      method: 'GET',
-      url: `/api/media/${listed[0].id}/stream?mode=remux&start=0`,
-    })
+    const library = await api().createLibrary({ name: 'Films', paths: [media] })
+    await app().get(ScannerService).whenIdle(library.id)
+    const [movie] = await api().listMedia({ libraryId: library.id })
+    if (!movie) throw new Error('nothing indexed')
+    state.movie = movie
+    const fromTop = await app().inject({ method: 'GET', url: streamUrl({ mode: 'remux' }) })
     const top = join(state.root, 'top.mp4')
     await writeFile(top, fromTop.rawPayload)
     state.lead = (await firstPacketTimes(top)).video - STREAM_TIME_SHIFT
@@ -125,9 +124,7 @@ describe('playback', () => {
   })
 
   it('lists the audio and subtitle tracks, sidecars included', async () => {
-    const response = await app().inject({ method: 'GET', url: `/api/media/${movieId()}/tracks` })
-    const tracks: unknown = response.json()
-    if (!isMediaTracks(tracks)) throw new Error(response.body)
+    const tracks = await api().getTracks(movieId())
     expect(
       tracks.audio.map(({ index, codec, language, title, default: flagged }) => ({
         index,
@@ -165,9 +162,10 @@ describe('playback', () => {
     })
     expect(response.statusCode).toBe(200)
     expect(response.headers['content-type']).toContain('text/vtt')
+    const cues = await api().getSubtitles({ id: movieId(), trackId: 'embedded-0', window: 0 })
     // The source SRT's times, on the same clock as the server's streams.
     expect(
-      parseWebVtt(response.body).map((cue) => ({
+      cues.map((cue) => ({
         ...cue,
         start: ms(cue.start - state.lead),
         end: ms(cue.end - state.lead),
@@ -177,60 +175,42 @@ describe('playback', () => {
       { start: 12.5, end: 14, text: 'Second line' },
     ])
     // The next window is past the end of a 30 second clip: empty, not an error.
-    const later = await app().inject({
-      method: 'GET',
-      url: `/api/media/${movieId()}/subtitles/embedded-0?window=1`,
-    })
-    expect(later.statusCode).toBe(200)
-    expect(parseWebVtt(later.body)).toEqual([])
+    expect(await api().getSubtitles({ id: movieId(), trackId: 'embedded-0', window: 1 })).toEqual(
+      [],
+    )
   })
 
   it('converts a sidecar, falling back from UTF-8', async () => {
-    const response = await app().inject({
-      method: 'GET',
-      url: `/api/media/${movieId()}/subtitles/external-0`,
-    })
-    expect(response.statusCode).toBe(200)
-    expect(parseWebVtt(response.body)).toEqual([{ start: 5, end: 6, text: 'Café forced' }])
+    expect(await api().getSubtitles({ id: movieId(), trackId: 'external-0' })).toEqual([
+      { start: 5, end: 6, text: 'Café forced' },
+    ])
   })
 
   it('refuses unknown tracks and bad windows', async () => {
-    const unknown = await app().inject({
-      method: 'GET',
-      url: `/api/media/${movieId()}/subtitles/embedded-9`,
-    })
-    expect(unknown.statusCode).toBe(404)
-    const bad = await app().inject({
-      method: 'GET',
-      url: `/api/media/${movieId()}/subtitles/embedded-0?window=-1`,
-    })
-    expect(bad.statusCode).toBe(400)
+    await expect(
+      api().getSubtitles({ id: movieId(), trackId: 'embedded-9' }),
+    ).rejects.toMatchObject({ status: 404 })
+    await expect(
+      api().getSubtitles({ id: movieId(), trackId: 'embedded-0', window: -1 }),
+    ).rejects.toMatchObject({ status: 400 })
   })
 
   it('refuses a converted stream while Settings have conversion off, and again after', async () => {
     const turn = (transcoding: 'on' | 'remuxOnly' | 'off') =>
-      app().inject({ method: 'PUT', url: '/api/settings/playback', payload: { transcoding } })
+      api().setPlaybackSettings({ transcoding })
     await turn('off')
-    const off = await app().inject({
-      method: 'GET',
-      url: `/api/media/${movieId()}/stream?mode=remux&start=0`,
-    })
+    const off = await app().inject({ method: 'GET', url: streamUrl({ mode: 'remux' }) })
     expect(off.statusCode).toBe(403)
     await turn('remuxOnly')
-    const noTranscode = await app().inject({
-      method: 'GET',
-      url: `/api/media/${movieId()}/stream?mode=transcode&start=0`,
-    })
+    const noTranscode = await app().inject({ method: 'GET', url: streamUrl({ mode: 'transcode' }) })
     expect(noTranscode.statusCode).toBe(403)
     await turn('on')
   })
 
   describe('converted streams', () => {
-    const fetchStream = async (query: string): Promise<string> => {
-      const response = await app().inject({
-        method: 'GET',
-        url: `/api/media/${movieId()}/stream?${query}`,
-      })
+    /** A stream is binary and endless to a player, so a test reads it by hand. */
+    const fetchStream = async (url: string): Promise<string> => {
+      const response = await app().inject({ method: 'GET', url })
       expect(response.statusCode).toBe(200)
       expect(response.headers['content-type']).toBe('video/mp4')
       expect(response.rawPayload.subarray(4, 8).toString()).toBe('ftyp')
@@ -240,7 +220,9 @@ describe('playback', () => {
     }
 
     it('starts a remux on the file clock, shifted, from the keyframe before the start', async () => {
-      const times = await firstPacketTimes(await fetchStream('mode=remux&start=12&audio=1'))
+      const times = await firstPacketTimes(
+        await fetchStream(streamUrl({ mode: 'remux', start: 12, audio: 1 })),
+      )
       const video = times.video - STREAM_TIME_SHIFT - state.lead
       // Keyframes fall every two seconds from the video's start; ffmpeg
       // starts at one before the target.
@@ -251,11 +233,12 @@ describe('playback', () => {
     })
 
     it('starts at the shift itself from the top of the file', async () => {
-      const times = await firstPacketTimes(await fetchStream('mode=transcode&start=0'))
+      const times = await firstPacketTimes(await fetchStream(streamUrl({ mode: 'transcode' })))
       expect(times.video).toBeCloseTo(STREAM_TIME_SHIFT + state.lead, 1)
       expect(times.audio).toBeGreaterThan(0)
     })
 
+    // Addresses the client would never build, so written by hand.
     it('rejects a bad mode, start or audio track', async () => {
       const statuses = await Promise.all(
         ['mode=burn', 'mode=remux&start=soon', 'mode=remux&audio=7'].map(

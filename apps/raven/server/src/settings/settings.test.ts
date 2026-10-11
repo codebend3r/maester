@@ -2,23 +2,20 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
-import { isPlaybackSettingsState } from '@raven/core'
+import type { ApiClient } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '@/app'
 import { readServerConfig } from '@/config'
+import { apiFor } from '@/test/server'
 
 describe('playback settings', () => {
-  const state = { root: '', app: null as NestFastifyApplication | null }
+  const state: { root: string; app: NestFastifyApplication | null } = { root: '', app: null }
   const app = (): NestFastifyApplication => {
     if (!state.app) throw new Error('app not started')
     return state.app
   }
-  const read = async () => {
-    const response = await app().inject({ method: 'GET', url: '/api/settings/playback' })
-    const body: unknown = response.json()
-    if (!isPlaybackSettingsState(body)) throw new Error(`Unexpected body: ${response.body}`)
-    return body
-  }
+  const api = (): ApiClient => apiFor({ app: app() })
+  const read = () => api().getPlaybackSettings()
 
   beforeAll(async () => {
     state.root = await mkdtemp(join(tmpdir(), 'raven-settings-'))
@@ -56,18 +53,19 @@ describe('playback settings', () => {
   })
 
   it('changes the fields sent, keeps the rest, and refuses a value a setting does not take', async () => {
-    const changed = await app().inject({
-      method: 'PUT',
-      url: '/api/settings/playback',
-      payload: { transcoding: 'remuxOnly', quality: 'high', hwAccel: 'none' },
+    const changed = await api().setPlaybackSettings({
+      transcoding: 'remuxOnly',
+      quality: 'high',
+      hwAccel: 'none',
     })
-    expect(changed.statusCode).toBe(200)
+    expect(changed.settings).toEqual((await read()).settings)
     expect((await read()).settings).toMatchObject({
       transcoding: 'remuxOnly',
       quality: 'high',
       hwAccel: 'none',
       maxHeight: 1080,
     })
+    // Values the client's types will not let it send, so sent by hand.
     const refused = await app().inject({
       method: 'PUT',
       url: '/api/settings/playback',

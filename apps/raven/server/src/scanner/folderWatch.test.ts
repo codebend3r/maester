@@ -22,11 +22,11 @@ const WAYS: Array<[string, WatchFolder]> = [
 ]
 
 describe.each(WAYS)('watching %s', (_way, watchFolder) => {
-  const state = {
+  const state: { root: string; seen: string[]; errors: unknown[]; watch: Watching | null } = {
     root: '',
-    seen: [] as string[],
-    errors: [] as unknown[],
-    watch: null as Watching | null,
+    seen: [],
+    errors: [],
+    watch: null,
   }
 
   beforeEach(async () => {

@@ -217,10 +217,11 @@ export const fakeTmdb = ({
   shows?: FakeShow[]
   omdb?: FakeOmdb
 }) => {
+  const calls: string[] = []
   const state = {
     down: false,
     omdbSpent: false,
-    calls: [] as string[],
+    calls,
     movies,
     shows,
     omdb,
