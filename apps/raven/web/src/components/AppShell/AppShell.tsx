@@ -1,25 +1,44 @@
 import { useQuery } from '@tanstack/react-query'
-import type { ReactNode } from 'react'
+import { useId } from 'react'
 import { Link, Outlet, matchPath, useLocation } from 'react-router-dom'
+import { Button } from '@/components/Button/Button'
+import { Icon, type IconName } from '@/components/Icon/Icon'
 import { api } from '@/lib/api'
+import { useKeyShortcut } from '@/lib/keyboard'
+import { KINDS } from '@/lib/libraryKinds'
 import { queryKeys } from '@/lib/queryClient'
+import { useSideMenu } from '@/stores/sideMenu'
 import styles from '@/components/AppShell/AppShell.module.scss'
 
-/** A link in the side menu, marked as current when the location matches any of its patterns. */
+/**
+ * A link in the side menu, marked as current when the location matches any
+ * of its patterns. Collapsed to its icon, it keeps its name for screen
+ * readers and as a tooltip.
+ */
 const NavItem = ({
   to,
   patterns,
-  children,
+  icon,
+  label,
+  collapsed,
 }: {
   to: string
   patterns: readonly string[]
-  children: ReactNode
+  icon: IconName
+  label: string
+  collapsed: boolean
 }) => {
   const { pathname } = useLocation()
   const current = patterns.some((pattern) => matchPath(pattern, pathname) != null)
   return (
-    <Link to={to} className={styles.navLink} aria-current={current ? 'page' : undefined}>
-      {children}
+    <Link
+      to={to}
+      className={styles.navLink}
+      aria-current={current ? 'page' : undefined}
+      title={collapsed ? label : undefined}
+    >
+      <Icon name={icon} />
+      <span className={collapsed ? 'visually-hidden' : undefined}>{label}</span>
     </Link>
   )
 }
@@ -30,44 +49,87 @@ const libraryPages = (id: number | string): string[] => [
   `/libraries/${id}/history`,
 ]
 
+/** Hangs under the toggle until it is first used or put away. */
+const ShortcutTip = ({ onDismiss }: { onDismiss: () => void }) => (
+  <aside className={styles.tip} aria-label="Tip">
+    <p>
+      Press <kbd>B</kbd> to collapse or expand the side menu.
+    </p>
+    <Button onClick={onDismiss}>Got it</Button>
+  </aside>
+)
+
 /**
  * The frame around every browsing page: the wordmark, then the side menu
  * beside the page (below it on a narrow screen). Pinned libraries get their
- * own links there, and an open one is marked instead of Libraries. The
- * player leaves the frame behind for the whole screen.
+ * own links there, each with its type's icon, and an open one is marked
+ * instead of Libraries. The menu collapses to its icons with the toggle or
+ * B, and stays that way across visits. The player leaves the frame behind
+ * for the whole screen.
  */
 export const AppShell = () => {
+  const navId = useId()
   const { pathname } = useLocation()
+  const { collapsed, tipSeen, toggle, dismissTip } = useSideMenu()
   const libraries = useQuery({ queryKey: queryKeys.libraries, queryFn: api.listLibraries })
   const pinned = (libraries.data ?? []).filter((library) => library.settings.pinned)
   const pinnedOpen = pinned.some((library) =>
     libraryPages(library.id).some((pattern) => matchPath(pattern, pathname) != null),
   )
 
+  useKeyShortcut({ key: 'b', onPress: toggle })
+
   return (
-    <div className={styles.shell}>
+    <div className={collapsed ? `${styles.shell} ${styles.collapsed}` : styles.shell}>
       <header className={styles.header}>
+        <Button
+          icon="sidebar"
+          className={styles.toggle}
+          aria-label="Side menu"
+          aria-expanded={!collapsed}
+          aria-controls={navId}
+          aria-keyshortcuts="B"
+          title={`${collapsed ? 'Expand' : 'Collapse'} the side menu (B)`}
+          onClick={toggle}
+        />
         <Link to="/" className={styles.wordmark}>
           raven
         </Link>
+        {!tipSeen && <ShortcutTip onDismiss={dismissTip} />}
       </header>
-      <nav className={styles.nav} aria-label="Main">
-        <NavItem to="/" patterns={pinnedOpen ? ['/'] : ['/', ...libraryPages(':id')]}>
-          Libraries
-        </NavItem>
-        <NavItem to="/favourites" patterns={['/favourites']}>
-          Favourites
-        </NavItem>
-        <NavItem to="/settings" patterns={['/settings']}>
-          Settings
-        </NavItem>
+      <nav id={navId} className={styles.nav} aria-label="Main">
+        <NavItem
+          to="/"
+          patterns={pinnedOpen ? ['/'] : ['/', ...libraryPages(':id')]}
+          icon="libraries"
+          label="Libraries"
+          collapsed={collapsed}
+        />
+        <NavItem
+          to="/favourites"
+          patterns={['/favourites']}
+          icon="heart"
+          label="Favourites"
+          collapsed={collapsed}
+        />
+        <NavItem
+          to="/settings"
+          patterns={['/settings']}
+          icon="settings"
+          label="Settings"
+          collapsed={collapsed}
+        />
         {pinned.length > 0 && (
           <ul className={styles.pinned} aria-label="Pinned">
             {pinned.map((library) => (
               <li key={library.id} className={styles.pinnedItem}>
-                <NavItem to={`/libraries/${library.id}`} patterns={libraryPages(library.id)}>
-                  {library.name}
-                </NavItem>
+                <NavItem
+                  to={`/libraries/${library.id}`}
+                  patterns={libraryPages(library.id)}
+                  icon={KINDS[library.settings.kind].icon}
+                  label={library.name}
+                  collapsed={collapsed}
+                />
               </li>
             ))}
           </ul>

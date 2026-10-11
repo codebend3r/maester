@@ -27,7 +27,7 @@ import { ScanStatus } from '@/components/ScanStatus/ScanStatus'
 import { ShowGrid } from '@/components/ShowCard/ShowCard'
 import { ShowList, ShowTiles } from '@/components/ShowCard/ShowViews'
 import { api } from '@/lib/api'
-import { KIND_LABELS } from '@/lib/libraryKinds'
+import { KINDS } from '@/lib/libraryKinds'
 import { queryKeys } from '@/lib/queryClient'
 import { useDebouncedValue } from '@/lib/useDebouncedValue'
 import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
@@ -340,7 +340,7 @@ export const LibraryPage = () => {
           {library.data.name}
         </h1>
         <p className={styles.count}>
-          {KIND_LABELS[settings.kind]} · {count.format(library.data.itemCount)}{' '}
+          {KINDS[settings.kind].label} · {count.format(library.data.itemCount)}{' '}
           {library.data.itemCount === 1 ? 'video' : 'videos'}
           {unmatched > 0 && ` · ${count.format(unmatched)} not matched`}
         </p>
