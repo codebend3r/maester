@@ -2,7 +2,7 @@ from dataclasses import replace
 
 import pytest
 
-from luwin.agent.tools import Result, Tier
+from luwin.agent.tools import Refused, Result, Tier
 from luwin.clients.seerr import ISSUE_AUDIO, ISSUE_OTHER, ISSUE_VIDEO
 from luwin.clients.tautulli import StreamData
 from luwin.media import Decision, ReportKind, ReportStatus
@@ -189,7 +189,7 @@ async def test_report_problem_files_a_confirmed_copy(library):
     ):
         tmdb_id = 136315 if call["media_type"] == "tv" else 438631
         out = await report_problem(library, tmdb_id, version="1080p", description="x", **call)
-        assert out.is_error and why in out.content
+        assert isinstance(out, Refused) and why in out.content
 
 
 def test_every_report_kind_has_a_policy_and_the_tool_offers_each():

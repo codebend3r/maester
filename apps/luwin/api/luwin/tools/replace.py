@@ -26,7 +26,17 @@ from typing import Annotated
 
 from pydantic import Field
 
-from luwin.agent.tools import Approval, Result, Tier, ToolContext, tool
+from luwin.agent.tools import (
+    Approval,
+    Failed,
+    NeedsApproval,
+    Ok,
+    Refused,
+    Result,
+    Tier,
+    ToolContext,
+    tool,
+)
 from luwin.formatting import gigabytes
 from luwin.library import NotLocated
 from luwin.media import ReportStatus
@@ -50,7 +60,7 @@ from luwin.tools.args import FriendId
 CAP_WINDOW = timedelta(days=1)
 
 
-class Refused(Exception):
+class NotReady(Exception):
     """The replacement can't go ahead; the message says why."""
 
 
@@ -74,21 +84,21 @@ def waiting_on_admin(ctx: ToolContext, report: ReportRow) -> bool:
 async def ready(ctx: ToolContext, report: ReportRow, host: str, actor: Actor) -> Ready:
     """The report's file, still there on `host` and proven broken by stored evidence."""
     if report.status not in MAY_REPLACE[actor]:
-        raise Refused(f"Report {report.id} can't be acted on: {NOT_NOW[report.status]}.")
+        raise NotReady(f"Report {report.id} can't be acted on: {NOT_NOW[report.status]}.")
     if host.lower() != report.host:
-        raise Refused(f"{report.title} in {report.copy.version} is on {report.host}, not {host}.")
+        raise NotReady(f"{report.title} in {report.copy.version} is on {report.host}, not {host}.")
     try:
         located = await locate(ctx.services, report.copy)
     except NotLocated as exc:
-        raise Refused(f"There's nothing to replace: {exc}.") from exc
+        raise NotReady(f"There's nothing to replace: {exc}.") from exc
     if located.owner.host != report.host or located.file.id != report.file_id:
-        raise Refused(
+        raise NotReady(
             f"The file reported in report {report.id} is no longer there; it was replaced or "
             "changed since. If the new one is broken too, report it again."
         )
     evidence = Evidence.for_file(ctx.store, report.host, report.copy.media_type, report.file_id)
     if not evidence.proven:
-        raise Refused(
+        raise NotReady(
             f"Not replacing {located.label}: {evidence.describe()}. It can be replaced once a "
             "file check fails or a second person reports the same copy."
         )
@@ -103,12 +113,9 @@ async def carry_out(ctx: ToolContext, go: Ready) -> Result:
     if not replacement.deleted and not replacement.retryable:
         # It stopped for good (no grab to blocklist): no approval should wait on it.
         move(ctx.store, go.report, REOPEN)
-    return Result(
-        replacement.text,
-        (notice,),
-        is_error=not replacement.deleted,
-        retryable=replacement.retryable,
-    )
+    if replacement.deleted:
+        return Ok(replacement.text, (notice,))
+    return Failed(replacement.text, (notice,), retryable=replacement.retryable)
 
 
 def over_cap(ctx: ToolContext) -> bool:
@@ -121,7 +128,7 @@ def over_cap(ctx: ToolContext) -> bool:
 def ask_admin(ctx: ToolContext, go: Ready) -> Result:
     """Over the cap: the report escalates, and the admin decides with the same facts."""
     if move(ctx.store, go.report, ESCALATE) is None:
-        return Result.refusal(f"Report {go.report.id} is no longer open.")
+        return Refused(f"Report {go.report.id} is no longer open.")
     located, cap = go.located, ctx.settings.guardrails.replace_daily_cap
     who = ctx.name_of(ctx.user_id)
     where = f"{located.label} on {located.owner.host}"
@@ -131,7 +138,7 @@ def ask_admin(ctx: ToolContext, go: Ready) -> Result:
         f"of {cap} replacements is used up, so it's your call. File: {located.file.path} "
         f"({gigabytes(located.file.size_bytes)})."
     )
-    return Result(
+    return NeedsApproval(
         f"The daily cap of {cap} replacements is used up, so the admin decides on "
         f"replacing {where}.",
         approval=Approval(
@@ -162,13 +169,13 @@ ReportHost = Annotated[str, Field(description="The host report_problem named.")]
 async def replace_media(ctx: ToolContext, report_id: ReportId, host: ReportHost) -> Result:
     report = ctx.store.get_report(report_id)
     if report is None or (report.user_id != ctx.user_id and ctx.tier < Tier.ADMIN):
-        return Result.refusal(f"There's no report {report_id} of yours to act on.")
+        return Refused(f"There's no report {report_id} of yours to act on.")
     if report.status is ReportStatus.ESCALATED and not waiting_on_admin(ctx, report):
         report = move(ctx.store, report, REOPEN) or report  # its approval lapsed: open again
     try:
         go = await ready(ctx, report, host, Actor.FRIEND)
-    except Refused as why:
-        return Result.refusal(str(why))
+    except NotReady as why:
+        return Refused(str(why))
     if over_cap(ctx):
         return ask_admin(ctx, go)
     return await carry_out(ctx, go)
@@ -188,21 +195,19 @@ async def decide_replacement(
     """Replace the file, or decline this report's replacement, and tell the friend."""
     report = ctx.store.get_report(report_id)
     if report is None:
-        return Result.refusal(f"Report {report_id} no longer exists.")
+        return Refused(f"Report {report_id} no longer exists.")
     if not approved:
         if move(ctx.store, report, DECLINE) is None:
-            return Result.refusal(
-                f"Report {report.id} isn't waiting on you: {NOT_NOW[report.status]}."
-            )
+            return Refused(f"Report {report.id} isn't waiting on you: {NOT_NOW[report.status]}.")
         dm = (
             f"The admin decided not to replace {report.title} in {report.copy.version} for "
             "now; your report stays open in Seerr."
         )
         left = f"Left {report.title} in {report.copy.version} as it is."
-        return Result(left, (DirectMessage(requester, dm),))
+        return Ok(left, (DirectMessage(requester, dm),))
     try:
         go = await ready(ctx, report, host, Actor.ADMIN)
-    except Refused as why:
-        return Result.refusal(str(why))
+    except NotReady as why:
+        return Refused(str(why))
     result = await carry_out(ctx, go)
     return replace(result, notices=(*result.notices, DirectMessage(requester, result.content)))

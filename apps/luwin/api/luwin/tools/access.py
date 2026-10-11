@@ -26,7 +26,7 @@ from typing import Annotated, Any, Literal
 from pydantic import Field
 
 from luwin.access import is_4k, same_library, title_of
-from luwin.agent.tools import Approval, Result, Tier, ToolContext, tool
+from luwin.agent.tools import Approval, NeedsApproval, Ok, Refused, Result, Tier, ToolContext, tool
 from luwin.clients.plextv import OwnedServer, PlexTv, Section, Share
 from luwin.config import Access
 from luwin.notify import DirectMessage
@@ -113,36 +113,36 @@ async def request_access(
 ) -> Result:
     plextv = ctx.services.plextv
     if plextv is None:
-        return Result.refusal(NOT_SET_UP)
+        return Refused(NOT_SET_UP)
     who = ctx.linked_user().name
     library = " ".join(library.split())
     if change == "library" and not library:
-        return Result.refusal("Say which library.")
+        return Refused("Say which library.")
     stands = await where_shared(plextv, ctx.settings.access, email_of(ctx, ctx.user_id))
     if not stands.shared:
-        return Result.refusal(
+        return Refused(
             "Your Plex account isn't shared any server yet, so there's nothing to add to; "
             "ask the admin for an invite."
         )
     if change == "library":
         named = next((s for s in stands.everywhere if same_library(library, s.title)), None)
         if named is None:
-            return Result.refusal(f"There's no library called {library} on the server.")
+            return Refused(f"There's no library called {library} on the server.")
         title = title_of(named.title)
         on_theirs = [s for s in stands.shared if wanted(s, change, title)]
         if not on_theirs:
-            return Result.refusal(
+            return Refused(
                 f"{title} is on a server you aren't shared yet; that takes an invite, so ask "
                 "the admin."
             )
         if not any(missing(s, wanted(s, change, title)) for s in on_theirs):
-            return Result.refusal(f"You already have {title}.")
+            return Refused(f"You already have {title}.")
         what, summary = f"the {title} library", f"{title} for {who}"
     else:
         title = "4K"
         gaps = any(missing(s, wanted(s, change, "")) for s in stands.shared)
         if ctx.tier >= Tier.TRUSTED and not gaps:
-            return Result.refusal("You already have 4K: ask me for any title in 4K.")
+            return Refused("You already have 4K: ask me for any title in 4K.")
         what = (
             "4K: the trusted tier (4K requests, and asking for invites for others) and the 4K "
             "libraries"
@@ -150,7 +150,7 @@ async def request_access(
         summary = f"4K for {who}"
     note = note.strip()[:NOTE_MAX]
     notice = f"{who} asks for {what}" + (f": {note}" if note else ".")
-    return Result(
+    return NeedsApproval(
         {"asked": True, "change": change, "library": title if change == "library" else None},
         approval=Approval(
             notice=notice,
@@ -179,12 +179,10 @@ async def decide_access(
     what = "4K" if change == "4k" else library
     if not approved:
         dm = f"The admin didn't add {what} to your access for now."
-        return Result(
-            f"Left {what} off for {ctx.name_of(requester)}.", (DirectMessage(requester, dm),)
-        )
+        return Ok(f"Left {what} off for {ctx.name_of(requester)}.", (DirectMessage(requester, dm),))
     plextv = ctx.services.plextv
     if plextv is None:
-        return Result.refusal(NOT_SET_UP)
+        return Refused(NOT_SET_UP)
     name = ctx.link_of(requester).name
     stands = await where_shared(plextv, ctx.settings.access, email_of(ctx, requester))
     added: list[tuple[str, str]] = []  # (server, library)
@@ -203,9 +201,9 @@ async def decide_access(
                 f"The admin said yes to {library}, but it's on a server you aren't shared yet, "
                 "which takes an invite; the admin will sort it out."
             )
-            return Result.refusal(
+            return Refused(
                 f"{name} isn't shared a server with {library}; that takes an invite in Wizarr.",
-                DirectMessage(requester, snag),
+                (DirectMessage(requester, snag),),
             )
         dm = (
             f"The admin added {library} to your Plex access. It shows up in the Plex app in a "
@@ -218,7 +216,7 @@ async def decide_access(
     notices.append(DirectMessage(requester, dm))
     done = ", ".join(f"{title} on {server}" for server, title in added) or "nothing new to share"
     extra = tier_note if change == "4k" else ""
-    return Result(f"Added {done} for {name}{extra}.", tuple(notices))
+    return Ok(f"Added {done} for {name}{extra}.", tuple(notices))
 
 
 def make_trusted(ctx: ToolContext, user_id: str) -> str:

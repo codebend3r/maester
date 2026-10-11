@@ -22,7 +22,7 @@ from typing import Annotated, Any
 
 from pydantic import Field
 
-from luwin.agent.tools import Choice, Choices, Result, Tier, ToolContext, tool
+from luwin.agent.tools import Choice, Choices, Ok, Refused, Result, Tier, ToolContext, tool
 from luwin.clients.seerr import MediaDetails
 from luwin.formatting import humanized
 from luwin.library import NotLocated
@@ -75,7 +75,7 @@ def play_choice(play: Play, details: MediaDetails, is_4k: bool | None, now: floa
 async def recent_sessions(ctx: ToolContext) -> dict[str, Any] | Choices | Result:
     link = ctx.linked_user()
     if link.tautulli_user_id is None:
-        return Result.refusal(
+        return Refused(
             "Their Plex account isn't matched to a Tautulli user, so what they watched can't "
             f"be looked up. {NOTHING_RECENT}"
         )
@@ -124,16 +124,16 @@ async def list_tracks(
     try:
         copy = Copy.of(media_type, tmdb_id, version, season, episode)
     except ValueError as bad:  # arguments that name no copy
-        return Result.refusal(str(bad))
+        return Refused(str(bad))
     try:
         located = await locate(ctx.services, copy)
     except NotLocated as exc:
-        return Result.refusal(str(exc))
+        return Refused(str(exc))
     match await read_tracks(ctx.services.probe, located):
         case TrackList() as found:
             return {"title": located.title, "version": copy.version, **found.as_dict()["tracks"]}
         case FileChecked(health=health):
-            return Result.refusal(f"The file couldn't be read: {health.summary}")
+            return Refused(f"The file couldn't be read: {health.summary}")
 
 
 @tool(
@@ -164,11 +164,11 @@ async def report_problem(
         copy = Copy.of(media_type, tmdb_id, version, season, episode)
         moment = parse_clock(at) if at else None
     except ValueError as bad:  # arguments that name no copy, or no time
-        return Result.refusal(str(bad))
+        return Refused(str(bad))
     link = ctx.linked_user()
     try:
         located = await locate(ctx.services, copy)
     except NotLocated as exc:
-        return Result.refusal(str(exc))
+        return Refused(str(exc))
     filed = await file_report(ctx.services, ctx.store, link, located, kind, description, moment)
-    return Result(filed.as_dict(), filed.notices)
+    return Ok(filed.as_dict(), filed.notices)

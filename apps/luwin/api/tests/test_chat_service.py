@@ -4,7 +4,15 @@ import pytest
 
 from luwin.agent.loop import Agent
 from luwin.agent.runner import ToolRunner
-from luwin.agent.tools import Approval, Choice, Choices, Result, Tier, ToolRegistry
+from luwin.agent.tools import (
+    Approval,
+    Choice,
+    Choices,
+    NeedsApproval,
+    Ok,
+    Tier,
+    ToolRegistry,
+)
 from luwin.agent.tools import registry as app_registry
 from luwin.chat.identity import IdentityService
 from luwin.chat.service import UNLINKED_HELP, ChatService, ChatUser, Decision
@@ -62,7 +70,7 @@ def world(services, store):
         if file_id == 99:  # over the day's cap: the admin decides
             approval = Approval("Trusty wants 99 gone", "replace 99", allow_replace, {
                 "user_id": "t1", "file_id": 99})  # fmt: skip
-            return Result("over the cap", approval=approval)
+            return NeedsApproval("over the cap", approval)
         return f"replaced file {file_id}"
 
     @reg.tool(
@@ -74,7 +82,7 @@ def world(services, store):
     async def allow_replace(ctx, user_id: str = "", file_id: int = 0, approved: bool = False):
         calls.append(("allow", file_id, approved))
         verdict = "Allowed" if approved else "Denied"
-        return Result(f"{verdict} replacing {file_id}.", (DirectMessage(user_id, verdict),))
+        return Ok(f"{verdict} replacing {file_id}.", (DirectMessage(user_id, verdict),))
 
     for seerr_id, u in enumerate((FRIEND, TRUSTED), 2):
         store.upsert_user(u.id, seerr_user_id=seerr_id)

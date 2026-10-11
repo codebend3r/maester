@@ -21,7 +21,7 @@ from typing import Annotated, Any
 
 from pydantic import Field
 
-from luwin.agent.tools import Result, Tier, ToolContext, tool
+from luwin.agent.tools import Failed, Refused, Result, Tier, ToolContext, tool
 from luwin.clients import ClientError
 from luwin.clients.arr import HistoryEvent, QueueItem
 from luwin.clients.sabnzbd import Download
@@ -132,12 +132,12 @@ async def download_history(
     try:
         owner = await owner_for(ctx, details, host, is_4k=version == "4K")
     except NotLocated as exc:
-        return Result.refusal(str(exc))
+        return Refused(str(exc))
     arr = f"{owner.kind.arr_name} on {owner.host}"
     try:
         history, queue = await asyncio.gather(owner.arr.history(owner.media_id), owner.arr.queue())
     except ClientError as exc:
-        return Result(f"{arr} didn't answer: {exc}", is_error=True, retryable=True)
+        return Failed(f"{arr} didn't answer: {exc}", retryable=True)
     mine = [q for q in queue if q.media_id == owner.media_id]
     ids = {e.download_id for e in history if e.download_id}
     ids |= {q.download_id for q in mine if q.download_id}

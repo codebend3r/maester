@@ -21,7 +21,7 @@ from typing import Annotated
 from pydantic import Field
 
 from luwin.access import invite_libraries
-from luwin.agent.tools import Approval, Result, Tier, ToolContext, tool
+from luwin.agent.tools import Approval, NeedsApproval, Ok, Refused, Result, Tier, ToolContext, tool
 from luwin.clients import ClientError
 from luwin.clients.wizarr import Invite, honored_expiry_days
 from luwin.notify import DirectMessage
@@ -61,10 +61,10 @@ async def request_invite(
     for_whom = " ".join(for_whom.split())[:NAME_MAX]
     note = note.strip()[:NOTE_MAX]
     if not for_whom:
-        return Result.refusal("Say who the invite is for.")
+        return Refused("Say who the invite is for.")
     who = ctx.linked_user().name
     notice = f"{who} asks for a Plex invite for {for_whom}" + (f": {note}" if note else ".")
-    return Result(
+    return NeedsApproval(
         {"asked": True, "for": for_whom},
         approval=Approval(
             notice=notice,
@@ -89,7 +89,7 @@ async def decide_invite(
     """Create the invite and send its link to the friend who asked, or tell them no."""
     if not approved:
         dm = f"The admin didn't approve an invite for {for_whom}. Ask them if you think it's a mistake."
-        return Result(f"No invite for {for_whom}.", (DirectMessage(requester, dm),))
+        return Ok(f"No invite for {for_whom}.", (DirectMessage(requester, dm),))
     access = ctx.settings.access
     wizarr = ctx.services.wizarr
     snag = DirectMessage(
@@ -99,10 +99,10 @@ async def decide_invite(
     )
     libraries = invite_libraries(await wizarr.libraries(), access)
     if not libraries:
-        return Result.refusal(
+        return Refused(
             "No library an invite may share was found in Wizarr (check INVITE_SERVERS and "
             "INVITE_LIBRARIES), so no invite was created.",
-            snag,
+            (snag,),
         )
     duration = str(access.access_days) if access.access_days else "unlimited"
     try:
@@ -115,10 +115,10 @@ async def decide_invite(
     except ClientError as exc:
         # Wizarr may have made it before failing to answer, so pressing again could make a
         # second live invite: the admin checks Wizarr instead.
-        return Result.refusal(
+        return Refused(
             f"Wizarr didn't confirm the invite ({exc}). Check its invitations for one it made "
             f"anyway before making another for {for_whom}.",
-            snag,
+            (snag,),
         )
     link = invite_link(ctx, invite)
     days = honored_expiry_days(access.invite_expires_days)
@@ -134,7 +134,7 @@ async def decide_invite(
         f"{lasts}. Then they can talk to me here once they link the email or username they use for Plex."
     )
     shared = ", ".join(sorted(f"{lib.name} on {lib.server_name}" for lib in libraries))
-    return Result(
+    return Ok(
         {
             "invited": for_whom,
             "link": link,

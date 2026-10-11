@@ -17,7 +17,7 @@ from typing import Any
 
 from luwin.agent.limits import LimitExceeded, RateLimiter
 from luwin.agent.prompts import SYSTEM_PROMPT
-from luwin.agent.runner import ToolOutcome, ToolRunner
+from luwin.agent.runner import AwaitingConfirmation, ToolOutcome, ToolRunner
 from luwin.agent.tools import Choice, Tier, ToolContext
 from luwin.clients import Services
 from luwin.config import Settings
@@ -259,8 +259,8 @@ class Agent:
                 reply.tool_calls.append(
                     {"name": block.name, "input": block.input, "ok": not outcome.is_error}
                 )
-                if outcome.pending_id is not None:
-                    reply.pending_ids.append(outcome.pending_id)
+                if isinstance(outcome.status, AwaitingConfirmation):
+                    reply.pending_ids.append(outcome.status.pending_id)
                 if outcome.choices:  # the latest picker wins
                     reply.choices = list(outcome.choices)
                 reply.notices.extend(outcome.notices)

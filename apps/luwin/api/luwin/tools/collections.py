@@ -16,7 +16,7 @@ from typing import Annotated, Any
 
 from pydantic import Field
 
-from luwin.agent.tools import Choice, Choices, Result, Tier, ToolContext, tool
+from luwin.agent.tools import Choice, Choices, Refused, Result, Tier, ToolContext, tool
 from luwin.clients.seerr import Collection, RequestRefused, RequestStatus, SearchResult
 from luwin.tools.requests import explain
 from luwin.tools.search import as_choice, availability
@@ -92,13 +92,13 @@ async def request_collection(
         ],
     }
     if not gaps:
-        return Result.refusal(
+        return Refused(
             f"Nothing was requested: every entry of {collection.name} is already on the server "
             "or requested."
         )
     quota = (await seerr.quota(user.seerr_user_id)).movie
     if quota.remaining is not None and len(gaps) > quota.remaining:
-        return Result.refusal(
+        return Refused(
             f"Nothing was requested: {collection.name} needs {len(gaps)} movie requests "
             f"({', '.join(p.title for p in gaps)}), but this account has {quota.remaining} of "
             f"{quota.limit} left for the next {quota.days} days. Ask which ones they want most."
@@ -122,5 +122,5 @@ async def request_collection(
         )
     if not requested:
         why = "; ".join(f"{r['title']}: {r['reason']}" for r in refused)
-        return Result.refusal(f"Seerr took none of {collection.name}'s requests. {why}")
+        return Refused(f"Seerr took none of {collection.name}'s requests. {why}")
     return {**reply, "requested": requested, **({"refused": refused} if refused else {})}

@@ -3,7 +3,7 @@ from dataclasses import replace
 
 import pytest
 
-from luwin.agent.tools import Choices, Result
+from luwin.agent.tools import Choices, Refused
 from luwin.clients import ClientError, FakeTautulliClient
 from luwin.library import NotLocated
 from luwin.media import Copy
@@ -87,7 +87,7 @@ async def test_recent_sessions_without_plays_or_a_tautulli_match_points_to_searc
 
     watching.store.upsert_user("d1", tautulli_user_id=None)
     out = await recent_sessions(watching)
-    assert out.is_error and "isn't matched to a Tautulli user" in out.content
+    assert isinstance(out, Refused) and "isn't matched to a Tautulli user" in out.content
 
 
 async def test_plays_are_live_first_then_newest_and_one_per_item_on_each_host(watching):
@@ -192,8 +192,10 @@ async def test_list_tracks_reads_the_files_own_tracks(library):
 async def test_list_tracks_says_why_when_it_cannot(library):
     library.services.probe.files.pop(FORKS)
     out = await list_tracks(library, 136315, "tv", "1080p", 2, 7)
-    assert out.is_error and out.content.startswith("The file couldn't be read: unreadable: ")
+    assert isinstance(out, Refused) and out.content.startswith(
+        "The file couldn't be read: unreadable: "
+    )
     out = await list_tracks(library, 136315, "tv", "1080p", 2, 8)
-    assert out == Result.refusal("The Bear (2022) S02E08 has no file on meleys")
+    assert out == Refused("The Bear (2022) S02E08 has no file on meleys")
     out = await list_tracks(library, 438631, "movie", "4K", 1, 1)
-    assert out == Result.refusal("a movie has no season or episode")
+    assert out == Refused("a movie has no season or episode")

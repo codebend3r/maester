@@ -23,7 +23,7 @@ from typing import Annotated, Any
 
 from pydantic import Field
 
-from luwin.agent.tools import Result, Tier, ToolContext, tool
+from luwin.agent.tools import Ok, Refused, Result, Tier, ToolContext, tool
 from luwin.perf import reencode, uplink
 from luwin.perf.lag import diagnose, live_streams
 from luwin.perf.load import read_loads
@@ -57,7 +57,7 @@ async def session_report(
 ) -> dict[str, Any] | Result:
     link = ctx.linked_user()
     if link.tautulli_user_id is None:
-        return Result.refusal(
+        return Refused(
             "Their Plex account isn't matched to a Tautulli user, so their stream can't be found."
         )
     services = ctx.services
@@ -85,7 +85,7 @@ async def session_report(
     # The version a stream plays may be a remux worth re-encoding.
     flagged = await asyncio.gather(*(reencode.flag(services, ctx.store, s) for s in streams))
     notices = tuple(notice for notice in flagged if notice is not None)
-    return Result(reply, notices) if notices else reply
+    return Ok(reply, notices) if notices else reply
 
 
 @tool(
@@ -99,7 +99,7 @@ async def session_report(
 )
 async def server_status(ctx: ToolContext) -> dict[str, Any] | Result:
     if not ctx.services.tautulli:
-        return Result.refusal("No Tautulli instance is configured, so there's nothing to read.")
+        return Refused("No Tautulli instance is configured, so there's nothing to read.")
     return (await read_loads(ctx.services)).as_dict()
 
 
@@ -119,15 +119,15 @@ async def speed_test(
 ) -> dict[str, Any] | Result:
     tester = ctx.services.speedtest
     if tester is None:
-        return Result.refusal("No speed test is set up on this server (SPEEDTEST_HOST).")
+        return Refused("No speed test is set up on this server (SPEEDTEST_HOST).")
     if host.lower() != tester.host:
-        return Result.refusal(
+        return Refused(
             f"Speed tests run on {tester.host}, where luwin runs; the servers share one "
             f"internet connection, so test from {tester.host}."
         )
     found = await uplink.reading(ctx.memo, ctx.services, tester)
     match found.found:
         case uplink.NotMeasured(why=why):
-            return Result.refusal(f"The speed test on {tester.host} failed: {why}. {found.wait()}")
+            return Refused(f"The speed test on {tester.host} failed: {why}. {found.wait()}")
         case uplink.Uplink():
             return found.as_dict()

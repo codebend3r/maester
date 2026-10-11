@@ -25,7 +25,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from luwin.agent.limits import KillSwitch
-from luwin.agent.runner import ToolOutcome
+from luwin.agent.runner import AwaitingApproval, Errored, ToolOutcome
 from luwin.agent.tools import Tier
 from luwin.approvals import ask_about_request
 from luwin.chat.identity import IdentityService
@@ -270,7 +270,7 @@ class AdminConsole:
             user = callers.get(call.user_id) or ChatUser(call.user_id, self._name(call.user_id))
             callers[call.user_id] = user
             outcome = await self.chat.agent.run_held(call, self.chat.tier_for(user))
-            if outcome.is_error and outcome.retryable:
+            if outcome.status == Errored(retryable=True):
                 self.store.keep_held(call.id)
                 kept.append((call, outcome))
             else:
@@ -301,8 +301,10 @@ class AdminConsole:
 
     @staticmethod
     def _how(outcome: ToolOutcome) -> str:
-        if outcome.approval_id is not None:
-            return "now waiting on your approval"
-        if outcome.is_error:
-            return f"didn't go through ({outcome.text[:200]})"
-        return "done"
+        match outcome.status:
+            case AwaitingApproval():
+                return "now waiting on your approval"
+            case Errored():
+                return f"didn't go through ({outcome.text[:200]})"
+            case _:
+                return "done"

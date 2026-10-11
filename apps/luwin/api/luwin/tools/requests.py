@@ -35,7 +35,7 @@ from typing import Annotated, Any
 
 from pydantic import Field
 
-from luwin.agent.tools import Approval, Result, Tier, ToolContext, tool
+from luwin.agent.tools import Approval, NeedsApproval, Ok, Refused, Result, Tier, ToolContext, tool
 from luwin.approvals import decision_dm, request_approval, request_subject
 from luwin.clients import ClientError, Services
 from luwin.clients.seerr import (
@@ -289,7 +289,7 @@ async def request_media(
         planned = plan_request(details, seasons, latest_season, is_4k=False)
         submitted = await submit(ctx, details, planned, is_4k=False, english_dub=english_dub)
     except NotRequested as why:
-        return Result.refusal(str(why))
+        return Refused(str(why))
     return awaiting_admin(ctx, submitted, details)
 
 
@@ -306,7 +306,7 @@ def awaiting_admin(
         who=ctx.linked_user().name,
         note=note,
     )
-    return Result(submitted.reply, approval=approval)
+    return NeedsApproval(submitted.reply, approval=approval)
 
 
 @tool(
@@ -331,12 +331,12 @@ async def request_media_4k(
     seerr = ctx.services.seerr
     uhd = [s for s in await seerr.servers(KINDS[media_type].service) if s.is_4k]
     if not uhd:
-        return Result.refusal("4K requests aren't set up on this server.")
+        return Refused("4K requests aren't set up on this server.")
     details = await seerr.media_details(media_type, tmdb_id)
     try:
         planned = plan_request(details, seasons, latest_season, is_4k=True)
     except NotRequested as why:
-        return Result.refusal(str(why))
+        return Refused(str(why))
     # Measured before the request exists, so a failed lookup cannot orphan it.
     tradeoff = await size_tradeoff(ctx.services, details)
     if full := await no_room_for_4k(ctx, details, uhd):
@@ -344,7 +344,7 @@ async def request_media_4k(
     try:
         submitted = await submit(ctx, details, planned, is_4k=True, english_dub=english_dub)
     except NotRequested as why:
-        return Result.refusal(str(why))
+        return Refused(str(why))
     submitted = replace(submitted, reply={**submitted.reply, **tradeoff})
     return awaiting_admin(ctx, submitted, details, size_note(tradeoff))
 
@@ -415,7 +415,7 @@ def held_for_room(
         f"{who} asks for {details.display} in 4K, but {full}. Approve to request it anyway. "
         f"{size_note(tradeoff)}"
     ).strip()
-    return Result(
+    return NeedsApproval(
         reply,
         approval=Approval(
             notice=notice,
@@ -460,7 +460,7 @@ async def decide_4k_over_storage(
             f"The admin held off on {title} in 4K for now: the server's 4K storage is nearly "
             "full. You can still ask for the regular version."
         )
-        return Result(f"Held off on {title} in 4K.", (DirectMessage(requester, dm),))
+        return Ok(f"Held off on {title} in 4K.", (DirectMessage(requester, dm),))
     user = ctx.link_of(requester)
     seerr = ctx.services.seerr
     details = await seerr.media_details(media_type, tmdb_id)
@@ -478,7 +478,7 @@ async def decide_4k_over_storage(
                 ctx, details, planned, is_4k=True, english_dub=english_dub, user=user
             )
         except NotRequested as why:
-            return Result.refusal(str(why))
+            return Refused(str(why))
         request = submitted.request
     if request.status == RequestStatus.PENDING:  # the admin just approved it here
         await seerr.approve_request(request.id)
@@ -486,7 +486,7 @@ async def decide_4k_over_storage(
     if raised := ctx.store.pending_about(request_subject(request.id)):
         ctx.store.decide_pending(raised.id, "approved", ctx.user_id)
     dm = decision_dm(title, "4K", approved=True)
-    return Result(
+    return Ok(
         f"Requested {title} in 4K for {user.name} and approved it in Seerr (request #{request.id}).",
         (DirectMessage(requester, dm),),
     )
@@ -510,6 +510,6 @@ async def follow_show(
     try:
         owner = await show_owner_on(ctx.services, details, host)
     except NotLocated as exc:
-        return Result.refusal(str(exc))
+        return Refused(str(exc))
     await owner.follow()
     return {"followed": True, "title": details.display, "host": owner.host}

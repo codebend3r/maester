@@ -16,7 +16,7 @@ from typing import Annotated, Any
 
 from pydantic import Field
 
-from luwin.agent.tools import Result, Tier, ToolContext, tool
+from luwin.agent.tools import Refused, Result, Tier, ToolContext, tool
 from luwin.clients.seerr import MediaDetails
 from luwin.formatting import mbps
 from luwin.perf.uplink import recent
@@ -47,7 +47,7 @@ async def pick_version(
     ] = None,
 ) -> dict[str, Any] | Result:
     if connection_mbps is not None and connection_mbps <= 0:
-        return Result.refusal("connection_mbps must be a speed above 0.")
+        return Refused("connection_mbps must be a speed above 0.")
     services, link = ctx.services, ctx.linked_user()
     (details, versions), away = await asyncio.gather(
         _title(ctx, tmdb_id), last_away(services, link.tautulli_user_id)

@@ -15,7 +15,7 @@ from typing import Annotated
 from pydantic import Field
 
 from luwin.agent.runner import open_approval
-from luwin.agent.tools import Approval, Result, Tier, ToolContext, tool
+from luwin.agent.tools import Approval, Ok, Refused, Result, Tier, ToolContext, tool
 from luwin.clients import ClientError, Services
 from luwin.clients.seerr import MediaRequest, RequestStatus
 from luwin.media import Version, version_label
@@ -75,21 +75,21 @@ async def decide_request(
     except ClientError as exc:
         if exc.status != 404:
             raise
-        return Result.refusal(
+        return Refused(
             f"Seerr request #{request_id} ({title} in {version}) no longer exists in Seerr; "
             "nothing to decide."
         )
     if current == RequestStatus.PENDING:
         await (seerr.approve_request if approved else seerr.decline_request)(request_id)
     elif current != wanted:
-        return Result.refusal(
+        return Refused(
             f"Seerr request #{request_id} ({title} in {version}) was already {current.label} in "
             "Seerr; nothing changed."
         )
     verb = "Approved" if approved else "Declined"
     dm = decision_dm(title, version, approved)
     told = (DirectMessage(requester, dm),) if requester else ()
-    return Result(f"{verb} {title} in {version} in Seerr (request #{request_id}).", told)
+    return Ok(f"{verb} {title} in {version} in Seerr (request #{request_id}).", told)
 
 
 def decision_dm(title: str, version: str, approved: bool) -> str:

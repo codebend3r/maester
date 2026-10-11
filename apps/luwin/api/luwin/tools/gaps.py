@@ -19,7 +19,7 @@ from typing import Annotated, Any
 
 from pydantic import Field
 
-from luwin.agent.tools import Result, Tier, ToolContext, tool
+from luwin.agent.tools import Ok, Refused, Result, Tier, ToolContext, tool
 from luwin.clients.sonarr import Episode
 from luwin.library import NotLocated, show_owner_on
 from luwin.media import episode_code
@@ -90,7 +90,7 @@ async def find_gaps(
     try:
         owner = await show_owner_on(ctx.services, details, host)
     except NotLocated as exc:
-        return Result.refusal(str(exc))
+        return Refused(str(exc))
     episodes = await owner.episodes()
     found = gaps_in(episodes, datetime.now(UTC), season)
     if found.scattered:
@@ -114,4 +114,4 @@ async def find_gaps(
         f"None of {seasons} is there, so it wasn't searched: likely a request that never went "
         "through, or a season Sonarr can't find."
     )
-    return Result(reply, (notice,))
+    return Ok(reply, (notice,))

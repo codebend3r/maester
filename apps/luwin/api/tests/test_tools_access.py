@@ -2,7 +2,7 @@ from dataclasses import replace
 
 import pytest
 
-from luwin.agent.tools import Result, Tier, registry
+from luwin.agent.tools import Refused, Tier, registry
 from luwin.clients.plextv import OwnedServer, Section, Share
 from luwin.notify import DirectMessage
 from luwin.tools.access import decide_access, request_access
@@ -57,7 +57,7 @@ async def test_asking_for_a_library_checks_it_then_goes_to_the_admin(friend):
     ],
 )  # fmt: skip
 async def test_an_ask_that_makes_no_sense_is_refused_before_the_admin_sees_it(friend, library, why):
-    assert await request_access(friend, "library", library) == Result.refusal(why)
+    assert await request_access(friend, "library", library) == Refused(why)
 
 
 async def test_approved_the_library_is_added_to_the_share_and_nothing_else_changes(friend):
@@ -106,7 +106,7 @@ async def test_4k_raises_a_lower_override_and_never_lowers_a_higher_one(friend):
 async def test_an_approval_that_cant_be_carried_out_tells_the_friend(friend):
     admin = replace(friend, user_id="boss", tier=Tier.ADMIN)
     out = await decide_access(admin, "library", "Documentaries", "d1", approved=True)
-    assert out.is_error and "takes an invite" in out.content
+    assert isinstance(out, Refused) and "takes an invite" in out.content
     (snag,) = out.notices
     assert snag.to == "d1" and "the admin will sort it out" in snag.text
 
@@ -114,7 +114,7 @@ async def test_an_approval_that_cant_be_carried_out_tells_the_friend(friend):
 async def test_a_friend_is_found_by_email_never_by_a_username_someone_chose(friend):
     friend.store.upsert_user("d1", plex_email="other@example.com", plex_username="dany")
     out = await request_access(friend, "library", "Anime")
-    assert out.is_error and "isn't shared any server yet" in out.content
+    assert isinstance(out, Refused) and "isn't shared any server yet" in out.content
 
 
 async def test_a_trusted_friend_with_every_4k_library_already_has_4k(friend):
@@ -122,7 +122,7 @@ async def test_a_trusted_friend_with_every_4k_library_already_has_4k(friend):
     friend.services.plextv.shared["m-1"][0] = replace(
         friend.services.plextv.shared["m-1"][0], all_libraries=True
     )
-    assert await request_access(trusted, "4k") == Result.refusal(
+    assert await request_access(trusted, "4k") == Refused(
         "You already have 4K: ask me for any title in 4K."
     )
 
@@ -134,14 +134,14 @@ async def test_denied_or_not_set_up_nothing_changes(friend):
         DirectMessage("d1", "The admin didn't add Anime to your access for now."),
     )
     friend.services.plextv = None
-    assert (await request_access(friend, "library", "Anime")).is_error
-    assert (await decide_access(admin, "library", "Anime", "d1", approved=True)).is_error
+    assert isinstance(await request_access(friend, "library", "Anime"), Refused)
+    assert isinstance(await decide_access(admin, "library", "Anime", "d1", approved=True), Refused)
 
 
 async def test_someone_on_no_server_is_told_to_ask_for_an_invite(friend):
     friend.store.upsert_user("d1", plex_email="new@example.com")
     out = await request_access(friend, "library", "Anime")
-    assert out.is_error and "isn't shared any server yet" in out.content
+    assert isinstance(out, Refused) and "isn't shared any server yet" in out.content
 
 
 def test_access_changes_are_the_admins_to_make():

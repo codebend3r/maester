@@ -1,6 +1,6 @@
 from dataclasses import replace
 
-from luwin.agent.tools import Result, Tier, registry
+from luwin.agent.tools import Refused, Tier, registry
 from luwin.clients.arr import HistoryEvent, QueueItem
 from luwin.clients.radarr import Movie
 from luwin.clients.sabnzbd import Download
@@ -73,7 +73,7 @@ async def test_a_stuck_download_shows_its_queue_entry(ctx):
 async def test_a_host_that_doesnt_hold_it_is_refused_and_a_silent_sabnzbd_is_named(ctx):
     admin = dune_on_meleys(ctx)
     out = await download_history(admin, 438631, "movie", host="vermithor")
-    assert out == Result.refusal("Dune (2021) is on the Radarr on meleys, not vermithor.")
+    assert out == Refused("Dune (2021) is on the Radarr on meleys, not vermithor.")
     ctx.services.sabnzbd["meleys"].down = True
 
     async def down(limit=50):
@@ -91,4 +91,4 @@ async def test_download_history_is_the_admins_alone(ctx):
     ctx.services.seerr.arr_servers["radarr"] = [seerr_server(1, "movie", "vermithor", is_4k=True)]
     admin = dune_on_meleys(ctx)
     out = await download_history(admin, 438631, "movie", version="4K")
-    assert out.is_error and "4K copy" in out.content
+    assert isinstance(out, Refused) and "4K copy" in out.content

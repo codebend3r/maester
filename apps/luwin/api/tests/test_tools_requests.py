@@ -2,7 +2,7 @@ from dataclasses import replace
 
 import pytest
 
-from luwin.agent.tools import Result, Tier, registry
+from luwin.agent.tools import Refused, Result, Tier, registry
 from luwin.approvals import decide_request
 from luwin.clients import ClientError
 from luwin.clients.arr import DiskSpace, MediaFile, RootFolder
@@ -97,9 +97,7 @@ async def test_auto_approval_is_reported(ctx):
 async def test_a_movie_already_there_is_not_requested_again(ctx):
     seed(ctx, replace(DUNE, status=S.AVAILABLE))
     out = await request_media(ctx, 438631, "movie")
-    assert out == Result.refusal(
-        "Nothing was requested for Dune (2021) in 1080p: it's on the server."
-    )
+    assert out == Refused("Nothing was requested for Dune (2021) in 1080p: it's on the server.")
     assert ctx.services.seerr.requests == []
 
 
@@ -109,12 +107,12 @@ async def test_refusals_are_explained_in_plain_words(ctx):
     seerr.refusals[438631] = RequestRefused(Refusal.QUOTA, "Movie Quota exceeded.")
     seerr.quotas[4] = Quotas(Quota(10, 7, 10, 0, True), Quota(None, None, 0, None, False))
     out = await request_media(ctx, 438631, "movie")
-    assert out.is_error and out.content.startswith(
+    assert isinstance(out, Refused) and out.content.startswith(
         "Seerr didn't take the request for Dune (2021): That's over this account's movie "
         "request quota: 10 of 10"
     )
     seerr.refusals[438631] = RequestRefused(Refusal.DUPLICATE, "exists")
-    assert (await request_media(ctx, 438631, "movie")) == Result.refusal(
+    assert (await request_media(ctx, 438631, "movie")) == Refused(
         "Seerr didn't take the request for Dune (2021): It has already been requested."
     )
 
@@ -135,12 +133,12 @@ async def test_tv_requests_leave_out_seasons_already_there(ctx):
         {"season": 2, "status": "requested, downloading"},
     ]
     out = await request_media(ctx, 136315, "tv", seasons=[1, 2])
-    assert out == Result.refusal(
+    assert out == Refused(
         "Nothing was requested for The Bear (2022) in 1080p: Every season asked for is already "
         "on the server or requested. (season 1 is on the server; season 2 is requested, "
         "downloading)"
     )
-    assert (await request_media(ctx, 136315, "tv", seasons=[])) == Result.refusal(
+    assert (await request_media(ctx, 136315, "tv", seasons=[])) == Refused(
         "Nothing was requested for The Bear (2022) in 1080p: no seasons were asked for."
     )
 
@@ -157,11 +155,11 @@ def test_season_plans():
 
 async def test_seasons_are_refused_for_movies_and_unknown_seasons_for_shows(ctx):
     seed(ctx, DUNE, BEAR)
-    assert (await request_media(ctx, 438631, "movie", seasons=[1])) == Result.refusal(
+    assert (await request_media(ctx, 438631, "movie", seasons=[1])) == Refused(
         "seasons are for TV shows only"
     )
     out = await request_media(ctx, 136315, "tv", seasons=[7])
-    assert out.is_error and "has no season [7]" in out.content
+    assert isinstance(out, Refused) and "has no season [7]" in out.content
 
 
 async def test_4k_goes_to_the_admin_with_the_size_tradeoff(ctx):
@@ -193,7 +191,7 @@ async def test_4k_goes_to_the_admin_with_the_size_tradeoff(ctx):
 async def test_4k_without_a_4k_server_or_already_approved_needs_no_admin(ctx):
     seed(ctx, DUNE)
     out = await request_media_4k(ctx, 438631, "movie")
-    assert out == Result.refusal("4K requests aren't set up on this server.")
+    assert out == Refused("4K requests aren't set up on this server.")
     four_k_servers(ctx)
     ctx.services.seerr.auto_approve = True
     out = await request_media_4k(ctx, 438631, "movie")
@@ -219,7 +217,7 @@ async def test_decide_request_approves_or_declines_in_seerr_and_tells_the_reques
     assert await decide_request(admin, approved=True, **first) == approved
     # Seerr went the other way in the meantime: say so, and tell nobody anything wrong.
     other_way = await decide_request(admin, approved=False, **first)
-    assert other_way.is_error and "already approved in Seerr" in other_way.content
+    assert isinstance(other_way, Refused) and "already approved in Seerr" in other_way.content
     assert other_way.notices == ()
 
     declined = await decide_request(admin, approved=False, **{**first, "request_id": 2})
@@ -246,10 +244,10 @@ def bear_in(ctx, *hosts):
 async def test_follow_show_only_on_the_owning_host(ctx):
     seed(ctx, BEAR)
     out = await follow_show(ctx, 136315, "vermithor")
-    assert out.is_error and "isn't in Sonarr yet" in out.content
+    assert isinstance(out, Refused) and "isn't in Sonarr yet" in out.content
     bear_in(ctx, "vermithor")
     out = await follow_show(ctx, 136315, "meleys")
-    assert out == Result.refusal("The Bear (2022) is on the Sonarr on vermithor, not meleys.")
+    assert out == Refused("The Bear (2022) is on the Sonarr on vermithor, not meleys.")
     assert await follow_show(ctx, 136315, "Vermithor") == {
         "followed": True,
         "title": "The Bear (2022)",
@@ -258,7 +256,7 @@ async def test_follow_show_only_on_the_owning_host(ctx):
     assert ctx.services.sonarr["vermithor"].followed == [12]
     bear_in(ctx, "meleys")
     out = await follow_show(ctx, 136315, "vermithor")
-    assert out.is_error and "meleys and vermithor both have it" in out.content
+    assert isinstance(out, Refused) and "meleys and vermithor both have it" in out.content
 
 
 def test_4k_is_a_trusted_tool_the_friend_tier_never_sees():
@@ -386,7 +384,7 @@ async def test_the_admin_approves_a_held_4k_request_and_it_goes_to_seerr_approve
     # A second press finds it requested already, and asks nothing twice.
     seed(ctx, replace(DUNE, status_4k=S.PROCESSING))
     again = await decide(admin, approved=True, **held)
-    assert again.is_error and "requested, downloading" in again.content
+    assert isinstance(again, Refused) and "requested, downloading" in again.content
     assert len(ctx.services.seerr.requests) == 1
 
 
@@ -405,7 +403,7 @@ async def test_a_request_deleted_in_seerr_closes_its_approval_for_good(ctx):
     admin = replace(ctx, user_id="boss", tier=Tier.ADMIN)
     args = {"request_id": 99, "title": "Dune (2021)", "version": "4K", "requester": "d1"}
     out = await decide_request(admin, approved=True, **args)
-    assert out.is_error and not out.retryable and "no longer exists" in out.content
+    assert isinstance(out, Refused) and "no longer exists" in out.content
 
 
 async def test_a_second_press_approves_the_request_the_first_made_but_couldnt_approve(ctx):

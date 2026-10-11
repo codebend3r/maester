@@ -178,34 +178,48 @@ class Approval:
 
 
 @dataclass(frozen=True)
-class Result:
-    """A handler's result plus what goes out besides it.
-
-    The model sees `content`. `notices` are posted or DMed. With `approval`,
-    the admin is asked and the model is told the action now waits on them.
-    `is_error` marks a failure the tool explains itself (a refusal, a step
-    that failed): the model sees an error and the audit row is not ok. It is
-    final unless `retryable` (a service that didn't answer): only then is a
-    button press that ended this way offered again. Every refusal is one of
-    these (`refusal`), never an exception or a success that says no.
-    """
+class Ok:
+    """The tool did it: the model sees `content`, and `notices` are posted or DMed."""
 
     content: Any
     notices: tuple[Notice, ...] = ()
-    approval: Approval | None = None
-    is_error: bool = False
+
+
+@dataclass(frozen=True)
+class Refused:
+    """The tool won't do it, and says why (a quota, the wrong host, nothing left to request).
+
+    Every refusal is one of these, never an exception or a success that says no. The model
+    sees an error, the audit row is not ok, and it is final: a press that ended this way
+    isn't offered again.
+    """
+
+    content: str
+    notices: tuple[Notice, ...] = ()
+
+
+@dataclass(frozen=True)
+class Failed:
+    """A step the tool took failed, and it says which. Final unless `retryable` (a service
+    that didn't answer): only then is a button press that ended this way offered again."""
+
+    content: Any
+    notices: tuple[Notice, ...] = ()
     retryable: bool = False
 
-    def __post_init__(self) -> None:
-        if self.approval is not None and self.is_error:
-            raise ValueError("a result that asks the admin isn't a failure")
-        if self.retryable and not self.is_error:
-            raise ValueError("only a failure can be retried")
 
-    @classmethod
-    def refusal(cls, reason: str, *notices: Notice) -> Result:
-        """The tool won't do it, and says why."""
-        return cls(reason, notices, is_error=True)
+@dataclass(frozen=True)
+class NeedsApproval:
+    """The admin is asked (`approval`), and the model is told the action now waits on them."""
+
+    content: Any
+    approval: Approval
+    notices: tuple[Notice, ...] = ()
+
+
+# What a handler returns besides a plain answer or `Choices`: exactly one of these, so a
+# result can't both ask the admin and fail, or be retried without having failed.
+Result = Ok | Refused | Failed | NeedsApproval
 
 
 Handler = Callable[..., Awaitable[Any]]
