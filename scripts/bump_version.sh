@@ -1,23 +1,24 @@
 #!/usr/bin/env bash
-# Bump a product's version with semver, commit the bump and tag that commit.
+# Bump the workspace version with semver, commit the bump and tag that commit.
 #
-#   scripts/bump_version.sh luwin patch            # 0.3.1 -> 0.3.2
-#   scripts/bump_version.sh luwin minor            # 0.3.1 -> 0.4.0
-#   scripts/bump_version.sh luwin major            # 0.3.1 -> 1.0.0
-#   scripts/bump_version.sh luwin 1.0.0-rc.1       # explicit version
-#   scripts/bump_version.sh --dry-run luwin minor  # show the plan, change nothing
-#   scripts/bump_version.sh --push luwin patch     # also push the commit and tag
+#   scripts/bump_version.sh patch            # 0.3.1 -> 0.3.2
+#   scripts/bump_version.sh minor            # 0.3.1 -> 0.4.0
+#   scripts/bump_version.sh major            # 0.3.1 -> 1.0.0
+#   scripts/bump_version.sh 1.0.0-rc.1       # explicit version
+#   scripts/bump_version.sh --dry-run minor  # show the plan, change nothing
+#   scripts/bump_version.sh --push patch     # also push the commit and tag
 #
-# The current version comes from apps/<product>/VERSION; a product without one
-# is refused. The bump writes VERSION, the [project] version of every
-# pyproject.toml under the product and its uv.lock entry, commits it as
-# "Release <product> vX.Y.Z" and puts an annotated <product>-vX.Y.Z tag on it.
+# Every app, lib and API shares one version. The current one is the latest
+# vX.Y.Z tag reachable from HEAD. The bump writes it to every package.json
+# under apps/ and libs/ (and their bun.lock entries), every apps/<product>/VERSION,
+# and the [project] version of every pyproject.toml (and its uv.lock entry),
+# commits it as "Release vX.Y.Z" and puts an annotated vX.Y.Z tag on it.
 set -euo pipefail
 
 SEMVER_RE='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'
 
 usage() {
-  sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'
   exit "${1:-0}"
 }
 
@@ -25,7 +26,6 @@ die() { echo "✗ $*" >&2; exit 1; }
 
 dry_run=0
 push=0
-product=""
 target=""
 for arg in "$@"; do
   case "$arg" in
@@ -34,30 +34,20 @@ for arg in "$@"; do
     -h|--help) usage 0 ;;
     -*) die "unknown flag: $arg" ;;
     *)
-      if [ -z "$product" ]; then product=$arg
-      elif [ -z "$target" ]; then target=$arg
-      else die "expected a product and one bump target"
-      fi
+      [ -z "$target" ] || die "expected one bump target"
+      target=$arg
       ;;
   esac
 done
-[ -n "$product" ] && [ -n "$target" ] || usage 1
+[ -n "$target" ] || usage 1
 
 root=$(git rev-parse --show-toplevel 2>/dev/null) || die "not inside a git repository"
 cd "$root"
 
-dir="apps/$product"
-version_file="$dir/VERSION"
-[ -f "$version_file" ] || die "$version_file not found; '$product' is not a released product"
-
-current_version() {
-  tr -d '[:space:]' < "$version_file"
-}
-
-# Every Python project in the product carries the version in pyproject.toml.
-pyprojects() {
-  find "$dir" -name pyproject.toml -not -path '*/.venv/*' -not -path '*/node_modules/*' | sort
-}
+# Every project of the workspace, as tracked files.
+package_jsons() { git ls-files 'apps/*/*/package.json' 'libs/*/*/package.json'; }
+version_files() { git ls-files 'apps/*/VERSION' 'libs/*/VERSION'; }
+pyprojects() { git ls-files 'apps/**/pyproject.toml' 'libs/**/pyproject.toml'; }
 
 # Precedence per semver 2.0.0 section 11: core numbers, then a release beats a
 # prerelease, then prerelease identifiers left to right. Build metadata is
@@ -102,8 +92,10 @@ compare() {
   echo 0
 }
 
-current=$(current_version)
-[[ $current =~ $SEMVER_RE ]] || die "current version '$current' is not valid semver"
+last_tag=$(git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null) \
+  || die "no vX.Y.Z tag reachable from HEAD; run git fetch --tags or pass an explicit version"
+current=${last_tag#v}
+[[ $current =~ $SEMVER_RE ]] || die "latest tag '$last_tag' is not valid semver"
 major=${BASH_REMATCH[1]} minor=${BASH_REMATCH[2]} patch=${BASH_REMATCH[3]} pre=${BASH_REMATCH[4]}
 
 case "$target" in
@@ -120,8 +112,8 @@ case "$target" in
 esac
 
 [ "$(compare "$next" "$current")" = 1 ] || die "$next does not move forward from $current"
-tag="$product-v$next"
-title="Release $product v$next"
+tag="v$next"
+title="Release v$next"
 git rev-parse -q --verify "refs/tags/$tag" >/dev/null && die "tag $tag already exists"
 [ -z "$(git status --porcelain)" ] || die "working tree is not clean; commit or stash first"
 
@@ -133,15 +125,39 @@ fi
 
 echo "→ $current -> $next on $branch"
 if ((dry_run)); then
-  echo "  would write $version_file"
+  for p in $(package_jsons); do echo "  would write $p ($(jq -r '.version // "no version"' "$p"))"; done
+  [ -f bun.lock ] && echo "  would write bun.lock"
+  for v in $(version_files); do echo "  would write $v"; done
   for p in $(pyprojects); do echo "  would write $p$([ -f "$(dirname "$p")/uv.lock" ] && echo " and its uv.lock")"; done
   echo "  would commit \"$title\" and tag it $tag"
   ((push)) && echo "  would push $branch and $tag"
   exit 0
 fi
 
-echo "$next" > "$version_file"
-git add "$version_file"
+for p in $(package_jsons); do
+  grep -q '^  "version": ' "$p" || die "$p has no top-level \"version\""
+  # Only the first match, which is the top-level field.
+  awk -v v="$next" '!done && /^  "version": / { sub(/"version": "[^"]*"/, "\"version\": \"" v "\""); done = 1 } { print }' \
+    "$p" > "$p.tmp" && mv "$p.tmp" "$p"
+  git add "$p"
+  if [ -f bun.lock ]; then
+    # The workspace entry is keyed by the project's folder; its version line
+    # comes right after its name.
+    awk -v key="    \"$(dirname "$p")\": {" -v v="$next" '
+      $0 == key { inside = 1 }
+      inside && /^      "version": / { sub(/"version": "[^"]*"/, "\"version\": \"" v "\""); inside = 0 }
+      inside && /^    }/ { inside = 0 }
+      { print }
+    ' bun.lock > bun.lock.tmp && mv bun.lock.tmp bun.lock
+  fi
+done
+[ -f bun.lock ] && git add bun.lock
+
+for v in $(version_files); do
+  echo "$next" > "$v"
+  git add "$v"
+done
+
 for p in $(pyprojects); do
   grep -q '^version = ' "$p" || continue
   # Only the first match, which is the [project] table's version.

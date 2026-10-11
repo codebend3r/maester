@@ -65,4 +65,4 @@ Work is tracked in [GitHub Issues](https://github.com/codebend3r/maester/issues)
 
 ## Releases
 
-`scripts/bump_version.sh <product> <patch|minor|major>` bumps a product's `VERSION`, commits `Release <product> vX.Y.Z` and tags `<product>-vX.Y.Z`.
+Every app, lib and API shares one semver version. `scripts/bump_version.sh <patch|minor|major>` sets it in every project's `package.json`, `VERSION` and `pyproject.toml` (and their lockfiles), commits `Release vX.Y.Z` and tags `vX.Y.Z`.
