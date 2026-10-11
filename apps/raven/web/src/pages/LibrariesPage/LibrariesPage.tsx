@@ -7,6 +7,7 @@ import { LibraryDialog } from '@/components/LibraryDialog/LibraryDialog'
 import { ScanStatus } from '@/components/ScanStatus/ScanStatus'
 import { api } from '@/lib/api'
 import { KINDS } from '@/lib/libraryKinds'
+import { librariesQuery } from '@/lib/queries'
 import { queryKeys } from '@/lib/queryClient'
 import styles from '@/pages/LibrariesPage/LibrariesPage.module.scss'
 
@@ -72,8 +73,7 @@ const LibraryRow = ({ library }: { library: Library }) => {
 export const LibrariesPage = () => {
   const [adding, setAdding] = useState(false)
   const libraries = useQuery({
-    queryKey: queryKeys.libraries,
-    queryFn: api.listLibraries,
+    ...librariesQuery,
     // Poll only while something is scanning, so the counts climb live.
     refetchInterval: (query) =>
       query.state.data?.some((library) => library.scan.state === 'scanning') ? 1500 : false,

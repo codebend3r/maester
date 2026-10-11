@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { DEFAULT_PLAYBACK_SETTINGS, type PlaybackPolicy } from '@raven/core'
-import { api } from '@/lib/api'
-import { queryKeys } from '@/lib/queryClient'
+import { playbackSettingsQuery } from '@/lib/queries'
 
 /**
  * The server's playback policy, for planning how a file plays here. Null
@@ -9,10 +8,6 @@ import { queryKeys } from '@/lib/queryClient'
  * server falls back to them too.
  */
 export const usePlaybackPolicy = (): PlaybackPolicy | null => {
-  const settings = useQuery({
-    queryKey: queryKeys.playbackSettings,
-    queryFn: api.getPlaybackSettings,
-    staleTime: 60_000,
-  })
+  const settings = useQuery(playbackSettingsQuery)
   return settings.data?.settings ?? (settings.isError ? DEFAULT_PLAYBACK_SETTINGS : null)
 }

@@ -2,14 +2,15 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   DEFAULT_LIBRARY_SETTINGS,
   LIBRARY_KINDS,
-  type LibraryKind,
-  SHOWN_RATINGS,
-  type ShownRatings,
   type Library,
   type LibraryInput,
+  type LibraryKind,
   type LibrarySettings,
+  RATING_SOURCES,
+  type RatingSource,
   defaultLibrarySettings,
-  isShownRatings,
+  isMatchedKind,
+  isRatingSource,
   validateLibraryInput,
   withLibraryKind,
 } from '@raven/core'
@@ -19,10 +20,11 @@ import { Button } from '@/components/Button/Button'
 import { FolderBrowser } from '@/components/FolderBrowser/FolderBrowser'
 import { api } from '@/lib/api'
 import { KINDS } from '@/lib/libraryKinds'
-import { queryKeys } from '@/lib/queryClient'
+import { afterLibrarySaved } from '@/lib/invalidate'
+import { lockQuery, metadataHealthQuery } from '@/lib/queries'
 import styles from '@/components/LibraryDialog/LibraryDialog.module.scss'
 
-const RATINGS_LABELS: Record<ShownRatings, string> = {
+const RATINGS_LABELS: Record<RatingSource, string> = {
   tmdb: 'TMDB',
   imdb: 'IMDb',
   rottenTomatoes: 'Rotten Tomatoes',
@@ -47,26 +49,15 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
   const [typedPath, setTypedPath] = useState('')
   const [errors, setErrors] = useState<string[]>([])
   const [confirmingDelete, setConfirmingDelete] = useState(false)
-  const metadata = useQuery({
-    queryKey: queryKeys.metadataHealth,
-    queryFn: api.getMetadataHealth,
-    staleTime: 60_000,
-  })
-  const lock = useQuery({ queryKey: queryKeys.lock, queryFn: api.getLock })
+  const metadata = useQuery(metadataHealthQuery)
+  const lock = useQuery(lockQuery)
   const lockable = !!lock.data?.available
 
   useEffect(() => {
     dialog.current?.showModal()
   }, [])
 
-  // Saved spots show or hide with the library's progress setting, so cached
-  // videos and favourites are refetched along with the libraries.
-  const refresh = () =>
-    Promise.all([
-      queryClient.invalidateQueries({ queryKey: queryKeys.libraries }),
-      queryClient.invalidateQueries({ queryKey: ['media'] }),
-      queryClient.invalidateQueries({ queryKey: queryKeys.favourites }),
-    ])
+  const refresh = () => afterLibrarySaved(queryClient)
 
   const save = useMutation({
     mutationFn: (input: LibraryInput) =>
@@ -315,7 +306,7 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
               it.
             </p>
           </div>
-          {settings.kind !== 'other' && (
+          {isMatchedKind(settings.kind) && (
             <div className={styles.watched}>
               <label htmlFor={`${ids.settings}-ratings`}>Ratings shown</label>
               <select
@@ -324,13 +315,13 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
                 value={settings.ratingsSource}
                 onChange={(event) => {
                   const ratingsSource = event.target.value
-                  if (isShownRatings(ratingsSource)) {
+                  if (isRatingSource(ratingsSource)) {
                     setSettings((current) => ({ ...current, ratingsSource }))
                   }
                 }}
                 aria-describedby={`${ids.settings}-ratings-hint`}
               >
-                {SHOWN_RATINGS.map((source) => (
+                {RATING_SOURCES.map((source) => (
                   <option key={source} value={source}>
                     {RATINGS_LABELS[source]}
                   </option>

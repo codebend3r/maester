@@ -4,10 +4,9 @@ import { Link, Outlet, matchPath, useLocation } from 'react-router-dom'
 import { Button } from '@/components/Button/Button'
 import { Icon, type IconName } from '@/components/Icon/Icon'
 import { Logo } from '@/components/Logo/Logo'
-import { api } from '@/lib/api'
 import { useKeyShortcut } from '@/lib/keyboard'
 import { KINDS } from '@/lib/libraryKinds'
-import { queryKeys } from '@/lib/queryClient'
+import { librariesQuery } from '@/lib/queries'
 import { useServerEvents } from '@/lib/useServerEvents'
 import { useSideMenu } from '@/stores/sideMenu'
 import styles from '@/components/AppShell/AppShell.module.scss'
@@ -75,7 +74,7 @@ export const AppShell = () => {
   const navId = useId()
   const { pathname } = useLocation()
   const { collapsed, tipSeen, toggle, dismissTip } = useSideMenu()
-  const libraries = useQuery({ queryKey: queryKeys.libraries, queryFn: api.listLibraries })
+  const libraries = useQuery(librariesQuery)
   const pinned = (libraries.data ?? []).filter((library) => library.settings.pinned)
   const pinnedOpen = pinned.some((library) =>
     libraryPages(library.id).some((pattern) => matchPath(pattern, pathname) != null),

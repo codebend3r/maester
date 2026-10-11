@@ -1,5 +1,5 @@
 import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query'
-import { ApiError, isLockedError } from '@raven/core'
+import { type MatchItemType, type MediaSort, ApiError, isLockedError } from '@raven/core'
 import { useUnlockPrompt } from '@/stores/unlockPrompt'
 
 /** Anything refused for sitting in a locked library asks for the PIN, wherever it was asked for. */
@@ -22,9 +22,13 @@ export const createQueryClient = (): QueryClient =>
     },
   })
 
+/**
+ * Every cache key, in one place. An id may be null for a query that waits on
+ * it (`skipToken`); the key still names what it would hold.
+ */
 export const queryKeys = {
   libraries: ['libraries'],
-  library: (id: number) => ['libraries', id],
+  library: (id: number | null) => ['libraries', id],
   media: ({
     libraryId,
     search,
@@ -33,7 +37,7 @@ export const queryKeys = {
   }: {
     libraryId: number
     search: string
-    sort: string
+    sort: MediaSort
     seed: number
   }) => ['libraries', libraryId, 'media', { search, sort, seed }],
   /** The prefix every media list of a library shares, whatever its search and sort. */
@@ -46,12 +50,14 @@ export const queryKeys = {
   }: {
     libraryId: number
     search: string
-    sort: string
+    sort: MediaSort
     seed: number
   }) => ['libraries', libraryId, 'shows', { search, sort, seed }],
   /** The prefix a library's show listings share. */
   showLists: (libraryId: number) => ['libraries', libraryId, 'shows'],
-  mediaItem: (id: number) => ['media', id],
+  /** Every video's own queries: the item, its tracks, subtitles and location. */
+  allMedia: ['media'],
+  mediaItem: (id: number | null) => ['media', id],
   mediaTracks: (id: number) => ['media', id, 'tracks'],
   /** Where a video's file lives, for its menu. */
   mediaLocation: (id: number) => ['media', id, 'location'],
@@ -63,18 +69,21 @@ export const queryKeys = {
     window,
   ],
   favourites: ['favourites'],
-  history: ({ libraryId, show, limit }: { libraryId: number; show: string; limit: number }) => [
-    'libraries',
+  history: ({
     libraryId,
-    'history',
-    { show, limit },
-  ],
+    show,
+    limit,
+  }: {
+    libraryId: number | null
+    show: string
+    limit: number
+  }) => ['libraries', libraryId, 'history', { show, limit }],
   /** The prefix every page of a library's history shares. */
   histories: (libraryId: number) => ['libraries', libraryId, 'history'],
   browse: (path: string | null) => ['browse', path],
   /** Every item page shares this prefix, so a match or refresh refetches them all. */
   items: ['items'],
-  item: (id: number) => ['items', id],
+  item: (id: number | null) => ['items', id],
   /** Edit images: what an item could show. */
   itemImages: (id: number) => ['items', id, 'images'],
   /** Edit metadata: what the page shows against what TMDB says. */
@@ -84,12 +93,15 @@ export const queryKeys = {
   /** How the server plays video, for every viewer. */
   playbackSettings: ['settings', 'playback'],
   nextEpisode: (showId: number) => ['items', showId, 'next'],
-  person: (id: number) => ['people', id],
-  matchSearch: ({ type, query, year }: { type: string; query: string; year: number | null }) => [
-    'match',
+  person: (id: number | null) => ['people', id],
+  matchSearch: ({
     type,
     query,
     year,
-  ],
+  }: {
+    type: MatchItemType
+    query: string
+    year: number | null
+  }) => ['match', type, query, year],
   metadataHealth: ['health', 'metadata'],
 }

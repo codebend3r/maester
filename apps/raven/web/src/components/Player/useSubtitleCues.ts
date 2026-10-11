@@ -1,7 +1,6 @@
 import { useQueries } from '@tanstack/react-query'
 import { type SubtitleCue, type SubtitleTrack, mergeCues, subtitleWindows } from '@raven/core'
-import { api } from '@/lib/api'
-import { queryKeys } from '@/lib/queryClient'
+import { subtitlesQuery } from '@/lib/queries'
 
 export type SubtitleStatus = 'off' | 'loading' | 'ready' | 'error'
 
@@ -25,13 +24,10 @@ export const useSubtitleCues = ({
   const windows =
     track == null ? [] : track.source === 'external' ? [0] : subtitleWindows({ time, duration })
   return useQueries({
-    queries: windows.map((window) => ({
-      queryKey: queryKeys.subtitles({ id: mediaId, trackId: track?.id ?? '', window }),
-      queryFn: () => api.getSubtitles({ id: mediaId, trackId: track?.id ?? '', window }),
-      staleTime: Infinity,
-      gcTime: 30 * 60 * 1000,
-      retry: 1,
-    })),
+    queries:
+      track == null
+        ? []
+        : windows.map((window) => subtitlesQuery({ id: mediaId, trackId: track.id, window })),
     combine: (results) => {
       const [playing] = results
       const status: SubtitleStatus =

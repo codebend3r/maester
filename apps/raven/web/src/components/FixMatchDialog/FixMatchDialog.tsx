@@ -1,15 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { MatchCandidate } from '@raven/core'
+import type { MatchCandidate, MatchItemType } from '@raven/core'
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react'
 import { Button } from '@/components/Button/Button'
 import { api } from '@/lib/api'
-import { queryKeys } from '@/lib/queryClient'
+import { afterMatch } from '@/lib/invalidate'
+import { matchSearchQuery } from '@/lib/queries'
 import styles from '@/components/FixMatchDialog/FixMatchDialog.module.scss'
 
-/** What the dialog searches for: a movie, or a show. */
-export type MatchType = 'movie' | 'show'
-
-const NOT_A: Record<MatchType, string> = { movie: 'Not a movie', show: 'Not a show' }
+const NOT_A: Record<MatchItemType, string> = { movie: 'Not a movie', show: 'Not a show' }
 
 const yearFrom = (text: string): number | null => {
   const year = Number.parseInt(text.trim(), 10)
@@ -71,7 +69,8 @@ export const FixMatchDialog = <T,>({
   onClose,
   onMatched,
 }: {
-  type: MatchType
+  /** What the dialog searches for: a movie, or a show. */
+  type: MatchItemType
   /** What the search box starts with: the parsed title. */
   title: string
   year: number | null
@@ -95,22 +94,12 @@ export const FixMatchDialog = <T,>({
     dialog.current?.showModal()
   }, [])
 
-  const results = useQuery({
-    queryKey: queryKeys.matchSearch({ type, query: asked.query, year: asked.year }),
-    queryFn: () => api.searchMatches({ type, query: asked.query, year: asked.year }),
-    enabled: asked.query !== '',
-    staleTime: 5 * 60_000,
-  })
+  const results = useQuery(matchSearchQuery({ type, query: asked.query, year: asked.year }))
 
   const choose = useMutation({
     mutationFn: match,
     onSuccess: async (result) => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.libraries }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.items }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.favourites }),
-        queryClient.invalidateQueries({ queryKey: ['media'] }),
-      ])
+      await afterMatch(queryClient)
       onMatched?.(result)
       onClose()
     },
@@ -133,7 +122,7 @@ export const FixMatchDialog = <T,>({
 
         <search>
           <form className={styles.form} onSubmit={search}>
-            <div className={styles.field}>
+            <div className={`${styles.field} ${styles.titleField}`}>
               <label htmlFor={ids.query}>Title</label>
               <input
                 id={ids.query}
@@ -143,7 +132,7 @@ export const FixMatchDialog = <T,>({
                 autoComplete="off"
               />
             </div>
-            <div className={styles.field}>
+            <div className={`${styles.field} ${styles.yearField}`}>
               <label htmlFor={ids.year}>Year</label>
               <input
                 id={ids.year}
