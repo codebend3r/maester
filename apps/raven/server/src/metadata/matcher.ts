@@ -1,4 +1,4 @@
-import { foldTitle } from '@raven/core'
+import { foldTitle, type MatchItemType } from '@raven/core'
 import type { SearchResult } from '@/metadata/tmdbClient'
 
 /** The most popular of `results`, TMDB's own order (popularity first) breaking a tie. */
@@ -34,7 +34,7 @@ export const pickMatch = ({
   country = null,
   results,
 }: {
-  type: 'movie' | 'show'
+  type: MatchItemType
   title: string
   year: number | null
   /** The country the name gives, as TMDB writes it: `GB` for "(UK)". */

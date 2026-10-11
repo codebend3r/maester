@@ -16,33 +16,35 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common'
 import {
+  type ChoosableImageKind,
   type ImageOption,
+  isImageChoice,
+  isItemImageKind,
+  isItemImageOptions,
   isItemMetadataChange,
-  isRecord,
-  isString,
+  isShowMatchChoice,
   type ItemDetails,
-  type ItemImageKind,
   type ItemImageOptions,
   type ItemMetadataState,
+  keyOf,
   type MediaItem,
 } from '@raven/core'
 import type { FastifyReply } from 'fastify'
+import { isMatchItemType } from '@/items/matchItemType'
 import { sendImage } from '@/items/sendImage'
 import { PrivateBy } from '@/lock/lockGuard'
 import { LockService } from '@/lock/lockService'
 import { MediaRepository } from '@/media/mediaRepository'
 import { ImageCache } from '@/metadata/imageCache'
-import { MetadataRepository } from '@/metadata/metadataRepository'
 import { ItemOverrides } from '@/metadata/itemOverrides'
 import { ItemRefresher } from '@/metadata/itemRefresher'
 import { isLocal } from '@/metadata/localItems'
+import { MetadataRepository } from '@/metadata/metadataRepository'
 import { MetadataService } from '@/metadata/metadataService'
 import { TMDB_IMAGE_PATH, TmdbClient, TmdbError } from '@/metadata/tmdbClient'
 
-const IMAGE_KINDS: readonly ItemImageKind[] = ['poster', 'backdrop', 'still']
-
-const isImageKind = (value: string): value is ItemImageKind =>
-  IMAGE_KINDS.some((kind) => kind === value)
+/** The pictures Edit images chooses between: a poster and a backdrop. */
+const isChoosableImageKind = keyOf(isItemImageOptions.shape)
 
 /** Movies, shows, seasons and episodes: their pages, their pictures, and fetching them again. */
 @Controller('api/items')
@@ -89,9 +91,7 @@ export class ItemsController {
     const item = this.metadata.get(id)
     if (!item) throw new NotFoundException(`No item ${id}`)
     if (item.type !== 'show') throw new BadRequestException('Only a show can be re-pointed here.')
-    if (!isRecord(body) || !isString(body.tmdbId) || !/^\d+$/.test(body.tmdbId)) {
-      throw new BadRequestException('tmdbId must be a TMDB id')
-    }
+    if (!isShowMatchChoice(body)) throw new BadRequestException('tmdbId must be a TMDB id')
     if (!this.tmdb.enabled)
       throw new ServiceUnavailableException('Set TMDB_API_TOKEN to search TMDB.')
     const moved = await this.service
@@ -186,19 +186,18 @@ export class ItemsController {
   async imageOptions(@Param('id', ParseIntPipe) id: number): Promise<ItemImageOptions> {
     const item = this.metadata.get(id)
     if (!item) throw new NotFoundException(`No item ${id}`)
-    if (item.type !== 'movie' && item.type !== 'show') {
+    const { type } = item
+    if (!isMatchItemType(type)) {
       throw new BadRequestException('Only a movie or show has pictures to choose from.')
     }
     const fetched =
       this.tmdb.enabled && !isLocal(item.tmdbId)
-        ? await this.tmdb
-            .images({ type: item.type, tmdbId: item.tmdbId })
-            .catch((error: unknown) => {
-              if (error instanceof TmdbError) throw new ServiceUnavailableException(error.message)
-              throw error
-            })
+        ? await this.tmdb.images({ type, tmdbId: item.tmdbId }).catch((error: unknown) => {
+            if (error instanceof TmdbError) throw new ServiceUnavailableException(error.message)
+            throw error
+          })
         : { posters: [], backdrops: [] }
-    const options = (kind: 'poster' | 'backdrop'): ImageOption[] => {
+    const options = (kind: ChoosableImageKind): ImageOption[] => {
       const current = this.metadata.image({ itemId: id, kind })
       const local = this.metadata.imageFrom({ itemId: id, kind, source: 'local' })
       const own = this.metadata.imageFrom({ itemId: id, kind, source: 'tmdb' })
@@ -242,18 +241,19 @@ export class ItemsController {
     @Body() body: unknown,
     @Headers('cookie') cookie: string | undefined,
   ): Promise<ItemDetails> {
-    if (kind !== 'poster' && kind !== 'backdrop') {
-      throw new NotFoundException(`No ${kind} pictures to choose`)
-    }
+    if (!isChoosableImageKind(kind)) throw new NotFoundException(`No ${kind} pictures to choose`)
     this.requireItem(id)
-    if (!isRecord(body) || (body.source !== 'tmdb' && body.source !== 'local')) {
-      throw new BadRequestException('source must be tmdb or local')
+    if (!isImageChoice(body)) {
+      throw new BadRequestException('Send { source: "tmdb", ref } or { source: "local" }')
     }
-    if (body.source === 'tmdb' && (!isString(body.ref) || !TMDB_IMAGE_PATH.test(body.ref))) {
+    if (body.source === 'tmdb' && !TMDB_IMAGE_PATH.test(body.ref)) {
       throw new BadRequestException('ref must be a TMDB image path')
     }
-    const ref = body.source === 'tmdb' && isString(body.ref) ? body.ref : null
-    this.metadata.chooseImage({ itemId: id, kind, ref })
+    this.metadata.chooseImage({
+      itemId: id,
+      kind,
+      ref: body.source === 'tmdb' ? body.ref : null,
+    })
     return this.details({ id, cookie })
   }
 
@@ -264,7 +264,7 @@ export class ItemsController {
     @Param('kind') kind: string,
     @Res() reply: FastifyReply,
   ): Promise<void> {
-    if (!isImageKind(kind)) throw new NotFoundException(`No ${kind} pictures`)
+    if (!isItemImageKind(kind)) throw new NotFoundException(`No ${kind} pictures`)
     const local = this.metadata.imageFrom({ itemId: id, kind, source: 'local' })
     const path =
       local == null ? null : await this.images.local({ itemId: id, kind, source: local, use: kind })
@@ -279,7 +279,7 @@ export class ItemsController {
     @Query('v') version: string | undefined,
     @Res() reply: FastifyReply,
   ): Promise<void> {
-    if (!isImageKind(kind)) throw new NotFoundException(`No ${kind} pictures`)
+    if (!isItemImageKind(kind)) throw new NotFoundException(`No ${kind} pictures`)
     const image = this.metadata.image({ itemId: id, kind })
     const chosen =
       image?.source === 'chosen' ? await this.images.tmdb({ path: image.ref, use: kind }) : null

@@ -12,8 +12,15 @@ import {
   Res,
   ServiceUnavailableException,
 } from '@nestjs/common'
-import { type MatchCandidate, type MediaItem, isRecord, isString } from '@raven/core'
+import {
+  type ChoosableImageKind,
+  isMatchChoice,
+  isMatchedKind,
+  type MatchCandidate,
+  type MediaItem,
+} from '@raven/core'
 import type { FastifyReply } from 'fastify'
+import { isMatchItemType } from '@/items/matchItemType'
 import { sendImage } from '@/items/sendImage'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { PrivateBy, Public } from '@/lock/lockGuard'
@@ -50,8 +57,7 @@ export class MatchController {
     @Query('query') query: string | undefined,
     @Query('year') year: string | undefined,
   ): Promise<MatchCandidate[]> {
-    if (type !== 'movie' && type !== 'show')
-      throw new BadRequestException('type must be movie or show')
+    if (!isMatchItemType(type)) throw new BadRequestException('type must be movie or show')
     if (!query?.trim()) throw new BadRequestException('Search for a title.')
     this.requireTmdb()
     const parsedYear = Number.parseInt(year ?? '', 10)
@@ -88,7 +94,7 @@ export class MatchController {
     reply,
   }: {
     file: string
-    use: 'poster' | 'backdrop'
+    use: ChoosableImageKind
     reply: FastifyReply
   }): Promise<void> {
     const path = `/${file}`
@@ -106,14 +112,9 @@ export class MatchController {
   async setMatch(@Param('id', ParseIntPipe) id: number, @Body() body: unknown): Promise<MediaItem> {
     const record = this.media.get(id)
     if (!record) throw new NotFoundException(`No media ${id}`)
-    if (
-      !isRecord(body) ||
-      !(body.tmdbId === null || (isString(body.tmdbId) && /^\d+$/.test(body.tmdbId)))
-    ) {
-      throw new BadRequestException('tmdbId must be a TMDB id or null')
-    }
-    const kind = this.libraries.get(record.libraryId)?.settings.kind ?? 'other'
-    if (kind === 'other') {
+    if (!isMatchChoice(body)) throw new BadRequestException('tmdbId must be a TMDB id or null')
+    const kind = this.libraries.get(record.libraryId)?.settings.kind
+    if (kind == null || !isMatchedKind(kind)) {
       throw new BadRequestException('Only files in a Movies or TV shows library can be matched.')
     }
     const tmdbId = body.tmdbId

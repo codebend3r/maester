@@ -1,5 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { type CreditJob, type ItemType, isNumber, isRecord, isString } from '@raven/core'
+import {
+  type CreditJob,
+  type ItemType,
+  isNumber,
+  isRecord,
+  isString,
+  type MatchItemType,
+} from '@raven/core'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { type RateLimit, createRateLimit } from '@/scanner/concurrency'
 
@@ -698,7 +705,7 @@ export class TmdbClient {
    * Every poster and backdrop TMDB holds for a movie or show, in the
    * language details come in and without text, most voted first.
    */
-  async images({ type, tmdbId }: { type: 'movie' | 'show'; tmdbId: string }): Promise<TmdbImages> {
+  async images({ type, tmdbId }: { type: MatchItemType; tmdbId: string }): Promise<TmdbImages> {
     const language = this.config.metadataLanguage.slice(0, 2)
     const body = record(
       await this.get(`/${type === 'movie' ? 'movie' : 'tv'}/${encodeURIComponent(tmdbId)}/images`, {
