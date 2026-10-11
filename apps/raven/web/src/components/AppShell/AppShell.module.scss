@@ -1,39 +1,43 @@
 .shell {
+  // The side menu's padding and its links', which the logo lines up with.
+  --side-inline: var(--space-3);
+  --link-inline: var(--space-2);
+
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   grid-template-rows: auto 1fr;
   grid-template-areas:
     'header header'
-    'nav main';
+    'side main';
   min-height: 100dvh;
 }
 
+// The mark starts where the side menu's icons do, so the page has one left
+// edge from the logo down.
 .header {
-  --header-inline: clamp(var(--space-3), 4vw, var(--space-6));
-
-  position: relative;
   grid-area: header;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  grid-template-areas: 'toggle wordmark';
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--header-inline);
+  padding: var(--space-3) calc(var(--side-inline) + var(--link-inline));
   border-bottom: 1px solid var(--color-moss);
 }
 
-.toggle {
-  grid-area: toggle;
+.home {
+  justify-self: start;
+  text-decoration: none;
 }
 
-.wordmark {
-  grid-area: wordmark;
-  justify-self: start;
-  font-family: var(--font-display);
-  font-size: var(--font-size-lg);
-  line-height: var(--line-tight);
-  text-decoration: none;
-  letter-spacing: 0.01em;
+// The menu's column: its links, then the toggle at its foot.
+.side {
+  grid-area: side;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas:
+    'nav'
+    'dock';
+  gap: var(--space-3);
+  min-width: 11rem;
+  padding: var(--space-5) var(--side-inline) var(--space-3);
+  border-right: 1px solid var(--color-moss);
 }
 
 .nav {
@@ -41,9 +45,19 @@
   display: grid;
   align-content: start;
   gap: var(--space-0);
-  min-width: 11rem;
-  padding: var(--space-5) var(--space-3);
-  border-right: 1px solid var(--color-moss);
+}
+
+// Its row runs down to the foot of the page, which gives it room to stick to
+// the bottom of the screen on a long page instead of waiting at the end. Over
+// the page (for the tip), but under a card's open menu.
+.dock {
+  position: sticky;
+  bottom: var(--space-3);
+  z-index: 1;
+  grid-area: dock;
+  align-self: end;
+  justify-self: start;
+  display: grid;
 }
 
 .navLink {
@@ -51,7 +65,7 @@
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: var(--space-1);
-  padding: var(--space-1) var(--space-2);
+  padding: var(--space-1) var(--link-inline);
   border-radius: var(--radius-md);
   color: var(--color-lichen);
   font-weight: 600;
@@ -93,29 +107,33 @@
 
 // Down to its icons: each link keeps its name for screen readers and as a tooltip.
 .collapsed {
-  .nav {
+  --side-inline: var(--space-1);
+
+  .side {
     min-width: 0;
-    padding-inline: var(--space-1);
   }
 
   .navLink {
     grid-template-columns: auto;
     justify-content: center;
   }
+
+  .dock {
+    justify-self: center;
+  }
 }
 
-// The first visit's tip about the B key, pointing up at the toggle.
+// The first visit's tip about the B key, pointing down at the toggle.
 .tip {
   position: absolute;
-  top: calc(100% + var(--space-1));
-  left: var(--header-inline);
-  z-index: 2;
+  bottom: calc(100% + var(--space-1));
+  left: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-2);
   width: max-content;
-  max-width: min(30rem, calc(100vw - 2 * var(--header-inline)));
+  max-width: min(30rem, calc(100vw - 2 * var(--space-3)));
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--color-moss);
   border-radius: var(--radius-md);
@@ -123,16 +141,16 @@
   box-shadow: 0 8px 24px rgb(0 0 0 / 40%);
   font-size: var(--font-size-sm);
 
-  // Centred under the toggle, which is 2.5rem wide.
+  // Centred over the toggle, which is 2.5rem wide.
   &::before {
     content: '';
     position: absolute;
-    top: calc(-1 * var(--space-0) - 1px);
+    bottom: calc(-1 * var(--space-0) - 1px);
     left: calc(1.25rem - var(--space-0));
     width: var(--space-1);
     height: var(--space-1);
-    border-top: 1px solid var(--color-moss);
-    border-left: 1px solid var(--color-moss);
+    border-right: 1px solid var(--color-moss);
+    border-bottom: 1px solid var(--color-moss);
     background: var(--color-canopy);
     rotate: 45deg;
   }
@@ -147,7 +165,7 @@
 @keyframes tip-in {
   from {
     opacity: 0;
-    translate: 0 calc(-1 * var(--space-0));
+    translate: 0 var(--space-0);
   }
 }
 
@@ -166,20 +184,47 @@
     grid-template-rows: auto auto 1fr;
     grid-template-areas:
       'header'
-      'nav'
+      'side'
       'main';
   }
 
-  // One row across the top; with many pinned libraries it scrolls sideways
-  // by itself, so the page never does.
-  .nav {
-    grid-auto-flow: column;
-    justify-content: start;
+  // In line with the toggle that leads the menu row.
+  .header {
+    padding-inline: clamp(var(--space-3), 4vw, var(--space-6));
+  }
+
+  // One row across the top, the toggle first.
+  .side {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: auto;
+    grid-template-areas: 'dock nav';
+    align-items: center;
+    gap: 0;
     min-width: 0;
-    padding: var(--space-1) clamp(var(--space-3), 4vw, var(--space-6));
     border-right: 0;
     border-bottom: 1px solid var(--color-moss);
+  }
+
+  // Collapsing narrows the column on a wide screen; the row keeps its edge.
+  .side,
+  .collapsed .side {
+    padding: 0 0 0 clamp(var(--space-3), 4vw, var(--space-6));
+  }
+
+  // With many pinned libraries the links scroll sideways by themselves, so
+  // the page never does. Each column is as wide as its link, so the links sit
+  // side by side instead of shrinking over each other.
+  .nav {
+    grid-auto-flow: column;
+    grid-auto-columns: max-content;
+    justify-content: start;
+    padding: var(--space-1) clamp(var(--space-3), 4vw, var(--space-6)) var(--space-1) var(--space-1);
     overflow-x: auto;
+  }
+
+  .dock {
+    position: static;
+    align-self: center;
   }
 
   .navLink {
@@ -188,19 +233,11 @@
 
   .pinned {
     grid-auto-flow: column;
+    grid-auto-columns: max-content;
     padding-top: 0;
     padding-left: var(--space-1);
     border-top: 0;
     border-left: 1px solid var(--color-moss);
-  }
-
-  // Full width in the row, so the links sit side by side instead of shrinking over each other.
-  .pinnedItem {
-    min-width: auto;
-
-    .navLink {
-      overflow-wrap: normal;
-    }
   }
 }
 
