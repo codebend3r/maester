@@ -1,6 +1,14 @@
 import { type UseMutationResult, useQuery } from '@tanstack/react-query'
 import { type MediaItem, mediaLabel } from '@raven/core'
-import { Fragment, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react'
+import {
+  Fragment,
+  type KeyboardEvent,
+  type RefObject,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from 'react'
 import { Button } from '@/components/Button/Button'
 import { FixMatchDialog, type MatchType } from '@/components/FixMatchDialog/FixMatchDialog'
 import { Icon, type IconName } from '@/components/Icon/Icon'
@@ -128,23 +136,7 @@ const LocationItem = ({ media }: { media: MediaItem }) => {
   )
 }
 
-/**
- * A card's context menu: mark or unmark a favourite, fix the match or fetch
- * the details again where the library matches its files, delete the video,
- * or see and copy where its file lives. The card owns `open`, so a right click anywhere on it opens this
- * same menu; the button here is the discoverable way in for touch and
- * keyboard.
- */
-export const MediaMenu = ({
-  media,
-  open,
-  onOpenChange,
-  inline = false,
-  matchType = null,
-  withFavourite = true,
-  onMatched,
-  onDeleted,
-}: {
+type MenuProps = {
   media: MediaItem
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -156,15 +148,35 @@ export const MediaMenu = ({
   withFavourite?: boolean
   onMatched?: (updated: MediaItem) => void
   onDeleted?: () => void
+}
+
+/**
+ * The menu's list and what it opens: the delete confirmation, Fix match,
+ * and a failed refresh's message. It holds the video's mutations, so a grid
+ * of cards whose menus were never opened holds none.
+ */
+const MenuBody = ({
+  media,
+  open,
+  onOpenChange,
+  matchType = null,
+  withFavourite = true,
+  onMatched,
+  onDeleted,
+  id,
+  label,
+  root,
+  trigger,
+}: MenuProps & {
+  id: string
+  label: string
+  root: RefObject<HTMLDivElement | null>
+  trigger: RefObject<HTMLButtonElement | null>
 }) => {
-  const id = useId()
-  const root = useRef<HTMLDivElement>(null)
-  const trigger = useRef<HTMLButtonElement>(null)
   const list = useRef<HTMLUListElement>(null)
   const [confirming, setConfirming] = useState(false)
   const [fixing, setFixing] = useState(false)
   const { favourite, remove, refresh } = useMediaMutations({ media })
-  const label = `Options for ${mediaLabel(media)}`
   const matchable = matchType != null && media.match !== 'off'
   const item = media.item
 
@@ -190,7 +202,7 @@ export const MediaMenu = ({
     }
     document.addEventListener('pointerdown', onPointerDown)
     return () => document.removeEventListener('pointerdown', onPointerDown)
-  }, [open, onOpenChange])
+  }, [open, onOpenChange, root])
 
   const onKeyDown = (event: KeyboardEvent<HTMLUListElement>) => {
     const buttons = items()
@@ -210,20 +222,7 @@ export const MediaMenu = ({
   }
 
   return (
-    <div ref={root} className={inline ? `${styles.root} ${styles.inline}` : styles.root}>
-      <button
-        ref={trigger}
-        type="button"
-        className={styles.trigger}
-        aria-label={label}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-controls={open ? id : undefined}
-        onClick={() => onOpenChange(!open)}
-      >
-        <Icon name="more" size={18} />
-      </button>
-
+    <>
       {open && (
         <ul
           ref={list}
@@ -307,6 +306,42 @@ export const MediaMenu = ({
           }}
         />
       )}
+    </>
+  )
+}
+
+/**
+ * A card's context menu: mark or unmark a favourite, fix the match or fetch
+ * the details again where the library matches its files, delete the video,
+ * or see and copy where its file lives. The card owns `open`, so a right
+ * click anywhere on it opens this same menu; the button here is the
+ * discoverable way in for touch and keyboard. Until it first opens it is
+ * only that button.
+ */
+export const MediaMenu = (props: MenuProps) => {
+  const { media, open, onOpenChange, inline = false } = props
+  const id = useId()
+  const root = useRef<HTMLDivElement>(null)
+  const trigger = useRef<HTMLButtonElement>(null)
+  const [woken, setWoken] = useState(open)
+  if (open && !woken) setWoken(true)
+  const label = `Options for ${mediaLabel(media)}`
+
+  return (
+    <div ref={root} className={inline ? `${styles.root} ${styles.inline}` : styles.root}>
+      <button
+        ref={trigger}
+        type="button"
+        className={styles.trigger}
+        aria-label={label}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={open ? id : undefined}
+        onClick={() => onOpenChange(!open)}
+      >
+        <Icon name="more" size={18} />
+      </button>
+      {woken && <MenuBody {...props} id={id} label={label} root={root} trigger={trigger} />}
     </div>
   )
 }

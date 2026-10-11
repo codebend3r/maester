@@ -1,0 +1,17 @@
+.bar {
+  display: grid;
+}
+
+.overlay {
+  background: var(--color-shade);
+}
+
+.inline {
+  background: var(--color-moss);
+}
+
+.fill {
+  display: block;
+  height: 100%;
+  background: var(--color-leaf-bright);
+}

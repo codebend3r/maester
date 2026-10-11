@@ -18,6 +18,8 @@
   // Letterboxing around the video is real black, not a tint.
   --color-stage: #000000;
   --color-scrim: rgb(0 0 0 / 55%);
+  // The dark track under a line drawn over a picture (the resume line).
+  --color-shade: rgb(0 0 0 / 45%);
 
   --space-0: 0.25rem;
   --space-1: 0.5rem;

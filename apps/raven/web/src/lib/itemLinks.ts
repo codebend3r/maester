@@ -37,12 +37,6 @@ export const watchLink = (media: MediaItem): { to: string; state: { media: Media
   state: { media },
 })
 
-/** Where a card goes: a matched item's page, or straight to the player for anything else. */
-export const openPath = (media: MediaItem): string => {
-  const page = media.item ? itemPath(media.item) : null
-  return page ?? `/watch/${media.id}`
-}
-
 /** "2011 to 2019", "2022 to now", or just the year for a show that began and ended in one. */
 export const showYears = ({
   year,
@@ -54,4 +48,19 @@ export const showYears = ({
   if (year == null) return null
   if (endedYear == null) return `${year} to now`
   return endedYear === year ? String(year) : `${year} to ${endedYear}`
+}
+
+/**
+ * Where a card goes: a matched item's page where the library has pages, or
+ * straight to the player, with the video handed over, for anything else.
+ */
+export const cardLink = ({
+  media,
+  pages,
+}: {
+  media: MediaItem
+  pages: boolean
+}): { to: string; state?: { media: MediaItem } } => {
+  const page = pages && media.item ? itemPath(media.item) : null
+  return page == null ? watchLink(media) : { to: page }
 }

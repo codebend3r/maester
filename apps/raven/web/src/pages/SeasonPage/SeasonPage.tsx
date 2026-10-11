@@ -5,13 +5,13 @@ import { Link } from 'react-router-dom'
 import { ButtonLink } from '@/components/Button/Button'
 import { Icon } from '@/components/Icon/Icon'
 import { ItemHeader } from '@/components/ItemHeader/ItemHeader'
+import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { RouteState } from '@/components/RouteState/RouteState'
 import { Summary } from '@/components/Summary/Summary'
 import { TmdbCredit } from '@/components/TmdbCredit/TmdbCredit'
 import { api } from '@/lib/api'
 import { formatAirDate, primaryVersion, runtimeFact } from '@/lib/itemFacts'
 import { watchLink } from '@/lib/itemLinks'
-import { progressOf } from '@/lib/mediaProgress'
 import { itemQuery } from '@/lib/queries'
 import { routeState, useRouteId } from '@/lib/routeQuery'
 import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
@@ -23,7 +23,6 @@ const EpisodeRow = ({ episode }: { episode: ItemSummary }) => {
   const file = primaryVersion(details.data?.versions ?? [])
   const picture =
     stillUrl({ episode, details: details.data }) ?? (file ? api.thumbnailUrl(file) : null)
-  const progress = file ? progressOf(file) : 0
   const facts = [
     formatAirDate(details.data?.released ?? null),
     runtimeFact({ file, runtime: details.data?.runtime ?? null }),
@@ -43,11 +42,7 @@ const EpisodeRow = ({ episode }: { episode: ItemSummary }) => {
         ) : (
           <span className={styles.stillPlaceholder}>{episode.episode ?? ''}</span>
         )}
-        {progress > 0 && (
-          <span className={styles.resume}>
-            <span className={styles.resumeFill} style={{ width: `${progress * 100}%` }} />
-          </span>
-        )}
+        {file && <ResumeBar media={file} className={styles.resume} />}
       </Link>
       <div className={styles.body}>
         <Link to={`/episodes/${episode.id}`} className={styles.title}>
@@ -62,7 +57,7 @@ const EpisodeRow = ({ episode }: { episode: ItemSummary }) => {
           </span>
         )}
         {details.data?.summary && <p className={styles.overview}>{details.data.summary}</p>}
-        {progress > 0 && <span className="visually-hidden">Partly watched</span>}
+        {file && <PartlyWatched media={file} />}
       </div>
       {file && (
         <Link {...watchLink(file)} className={styles.play} aria-label={`Play ${episode.title}`}>
