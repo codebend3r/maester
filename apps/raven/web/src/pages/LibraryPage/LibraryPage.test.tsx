@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { Library, LibraryInput, LibrarySettings, MediaItem, MediaSort } from '@raven/core'
 import { Route, Routes, useParams } from 'react-router-dom'
@@ -99,6 +99,31 @@ describe('LibraryPage', () => {
     expect(state.sent.at(-1)?.settings).toEqual({ groupBy: 'codec' })
   })
 
+  it('buckets a Movies library by matched and not matched, which is where a new one opens', async () => {
+    serve({ view: 'grouped', groupBy: 'match', kind: 'movies' }, [
+      mediaItem({ id: 1, title: 'Found', match: 'matched' }),
+      mediaItem({ id: 2, title: 'Lost', match: 'unmatched' }),
+      mediaItem({ id: 3, title: 'Also found', match: 'manual' }),
+    ])
+    await screen.findByRole('link', { name: 'Found' })
+    expect(
+      screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent),
+    ).toEqual(['Matched, 2 videos', 'Not matched, 1 video'])
+    const groupings = within(screen.getByLabelText('Group by'))
+      .getAllByRole('option')
+      .map((option) => option.textContent)
+    expect(groupings[0]).toBe('Matched or not')
+  })
+
+  it('does not offer match buckets to a library of no particular type', async () => {
+    serve({ view: 'grouped', groupBy: 'resolution', kind: 'other' })
+    await screen.findByRole('link', { name: 'Wide' })
+    const groupings = within(screen.getByLabelText('Group by'))
+      .getAllByRole('option')
+      .map((option) => option.textContent)
+    expect(groupings).not.toContain('Matched or not')
+  })
+
   it('plays the first video in the order shown', async () => {
     serve({ sort: 'largest' })
     await screen.findByRole('link', { name: 'Wide' })
@@ -148,16 +173,35 @@ describe('LibraryPage for TV shows', () => {
     get: spyOn(api, 'getLibrary'),
     shows: spyOn(api, 'listShows'),
     list: spyOn(api, 'listMedia'),
+    health: spyOn(api, 'getMetadataHealth'),
+    match: spyOn(api, 'matchLibrary'),
   }
 
   afterEach(() => {
     spies.get.mockReset()
     spies.shows.mockReset()
     spies.list.mockReset()
+    spies.health.mockReset()
+    spies.match.mockReset()
   })
 
-  const serve = () => {
+  const serve = (settings: Partial<LibrarySettings> = {}) => {
     spies.get.mockImplementation(async () =>
+      library({
+        id: 2,
+        name: 'TV',
+        unmatchedCount: 1,
+        settings: { ...library().settings, kind: 'shows', ...settings },
+      }),
+    )
+    spies.health.mockImplementation(async () => ({
+      tmdb: 'ok',
+      omdb: 'off',
+      pending: 0,
+      error: null,
+      lastOk: null,
+    }))
+    spies.match.mockImplementation(async () =>
       library({ id: 2, name: 'TV', settings: { ...library().settings, kind: 'shows' } }),
     )
     spies.shows.mockImplementation(async () => ({
@@ -179,12 +223,46 @@ describe('LibraryPage for TV shows', () => {
       'href',
       '/shows/4',
     )
-    expect(screen.getByRole('heading', { name: 'Not matched' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Matched 1 show' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Not matched 1' })).toBeInTheDocument()
+    expect(screen.getByText('TV shows · 12 videos · 1 not matched')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Unknown Show - S01E01' })).toHaveAttribute(
       'href',
       '/watch/30',
     )
     expect(spies.list).not.toHaveBeenCalled()
+  })
+
+  it('asks the server to match the files no show was found for again', async () => {
+    serve()
+    await screen.findByRole('heading', { name: 'Not matched 1' })
+    const button = screen.getByRole('button', { name: 'Match again' })
+    await waitFor(() => expect(button).toBeEnabled())
+    await userEvent.click(button)
+    expect(spies.match).toHaveBeenCalledWith(2)
+  })
+
+  it('lays the shows out as a list when asked, each row playable', async () => {
+    serve({ view: 'list' })
+    const table = await screen.findByRole('table', { name: 'Shows' })
+    expect(within(table).getByRole('link', { name: 'Severance' })).toHaveAttribute(
+      'href',
+      '/shows/4',
+    )
+    expect(within(table).getByRole('link', { name: 'Play Severance S01E02' })).toHaveAttribute(
+      'href',
+      '/watch/12',
+    )
+  })
+
+  it('lays the shows out as tiles when asked', async () => {
+    serve({ view: 'tiles' })
+    const tiles = await screen.findByRole('list', { name: 'Shows' })
+    expect(within(tiles).getByRole('link', { name: 'Severance' })).toHaveAttribute(
+      'href',
+      '/shows/4',
+    )
+    expect(within(tiles).getByText('9 episodes')).toBeInTheDocument()
   })
 
   it('offers no file sorts and no grouped view, and plays the next episode', async () => {

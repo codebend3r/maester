@@ -30,6 +30,17 @@ describe('parseMovieName', () => {
     expect(movie(path)).toMatchObject({ title, year })
   })
 
+  it('puts an article sorted to the end back in front', () => {
+    expect(movie('Whale, The (2022)/Whale, The (2022) WEBDL-2160p.mkv')).toMatchObject({
+      title: 'The Whale',
+      year: 2022,
+    })
+    expect(movie('Knights Tale, A (2001).mkv')).toMatchObject({ title: 'A Knights Tale' })
+    expect(movie('Dances with Wolves, The Directors Cut (1990).mkv')).toMatchObject({
+      title: 'Dances with Wolves, The Directors Cut',
+    })
+  })
+
   it('reads a name with no year up to its release tags', () => {
     expect(movie('Some.Home.Movie.1080p.WEB-DL.mkv')).toMatchObject({
       title: 'Some Home Movie',
@@ -96,6 +107,11 @@ describe('isExtra', () => {
 })
 
 describe('foldTitle', () => {
+  it('drops an apostrophe rather than splitting the word at it', () => {
+    expect(foldTitle("The King's Man")).toBe(foldTitle('The Kings Man'))
+    expect(foldTitle('The World’s End')).toBe('worlds end')
+  })
+
   it('folds case, accents, punctuation, ampersands and a leading article', () => {
     expect(foldTitle('The Lord of the Rings: The Return of the King')).toBe(
       'lord of the rings the return of the king',
@@ -183,6 +199,14 @@ describe('parseEpisodeName', () => {
     expect(episode('Severance - S01E02 - Half Loop.mkv').show).toBe('Severance')
     expect(episode('Season 1/Severance - S01E02.mkv').show).toBe('Severance')
     expect(episode('Season 1/S01E02.mkv', 'Severance').show).toBe('Severance')
+  })
+
+  it('puts a show article sorted to the end back in front', () => {
+    expect(episode('Office, The/Season 1/Office, The - S01E01 - Pilot.mkv')).toMatchObject({
+      show: 'The Office',
+      season: 1,
+      episodes: [1],
+    })
   })
 
   it('takes the season from the folder when the name has no code', () => {

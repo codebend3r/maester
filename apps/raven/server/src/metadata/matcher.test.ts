@@ -71,4 +71,22 @@ describe('pickMatch', () => {
       pickMatch({ title: 'The Matrix', year: null, results: [result({}), result({ year: 2021 })] }),
     ).toBeNull()
   })
+
+  it('takes the one result with the title among others without it, as show folders rarely carry a year', () => {
+    const andor = result({ tmdbId: '83867', title: 'Andor', year: 2022 })
+    expect(
+      pickMatch({
+        title: 'Andor',
+        year: null,
+        results: [andor, result({ tmdbId: '2', title: 'Andorra Between Two Evils', year: 2000 })],
+      }),
+    ).toBe(andor)
+    expect(
+      pickMatch({
+        title: 'Andor',
+        year: null,
+        results: [result({ tmdbId: '2', title: 'Andorra Between Two Evils', year: 2000 })],
+      }),
+    ).toBeNull()
+  })
 })

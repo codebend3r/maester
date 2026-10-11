@@ -98,13 +98,19 @@ const firstTagAt = (name: string): number => {
   return found?.index ?? name.length
 }
 
+/** A title sorted by hand, "Whale, The", with its article back in front: "The Whale". */
+const unsortTitle = (title: string): string => {
+  const sorted = /^(.+?),\s+(the|a|an)$/i.exec(title)
+  return sorted ? `${sorted[2]} ${sorted[1]}` : title
+}
+
 /** Reads one name, a folder's or a file's stem: title, year, edition and ids. */
 const readName = (name: string): ParsedMovieName => {
   const ids = readIds(name)
   const edition = EDITION_PATTERN.exec(name)?.[1]?.trim() ?? null
   const bare = stripTags(name)
   const year = findYear(bare)
-  const title = tidy(bare.slice(0, year ? year.at : firstTagAt(bare)))
+  const title = unsortTitle(tidy(bare.slice(0, year ? year.at : firstTagAt(bare))))
   return { title, year: year?.year ?? null, edition, ids }
 }
 
@@ -163,12 +169,14 @@ const LEADING_ARTICLE = /^(the|a|an)\s+/i
  * A title folded for comparison: no case, accents or punctuation, `&` as
  * "and", and no leading "The", "A" or "An", so "The Lord of the Rings: The
  * Return of the King" and "lord of the rings the return of the king" agree.
+ * An apostrophe goes without a trace, so "The King's Man" is "The Kings Man".
  */
 export const foldTitle = (title: string): string =>
   title
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
     .toLowerCase()
+    .replace(/['’‘`]/g, '')
     .replace(/&/g, ' and ')
     .replace(/[^a-z0-9]+/g, ' ')
     .trim()

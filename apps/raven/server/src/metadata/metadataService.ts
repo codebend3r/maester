@@ -43,7 +43,7 @@ const DAY_MS = 24 * 60 * 60 * 1000
 const PASS_CONCURRENCY = 4
 
 /** Items raven made up for episodes and seasons TMDB does not list; never fetched. */
-const LOCAL = 'local:'
+export const LOCAL = 'local:'
 
 const stemOf = (fileName: string): string => {
   const dot = fileName.lastIndexOf('.')
@@ -222,6 +222,21 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
   /** Queues a pass over the library: its pending files, then the clear-up. */
   enqueue(libraryId: number): void {
     this.queue.push(`library:${libraryId}`, () => this.pass(libraryId))
+  }
+
+  /**
+   * Searches TMDB again for a library's files no movie or show was found
+   * for, say after a rename or once TMDB lists a new show; Fix match choices
+   * stay. How many files are queued.
+   */
+  retryUnmatched(libraryId: number): number {
+    const kind = this.libraries.get(libraryId)?.settings.kind
+    const count = this.media.retryUnmatched(libraryId)
+    if (count === 0 || kind == null) return count
+    // Names are read again first, so a parser that now reads the name right gets its say.
+    this.media.retitle({ libraryId, kind })
+    this.enqueue(libraryId)
+    return count
   }
 
   /**

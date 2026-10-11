@@ -65,6 +65,8 @@ export const queryKeys = {
   /** Every item page shares this prefix, so a match or refresh refetches them all. */
   items: ['items'],
   item: (id: number) => ['items', id],
+  /** Edit images: what an item could show. */
+  itemImages: (id: number) => ['items', id, 'images'],
   nextEpisode: (showId: number) => ['items', showId, 'next'],
   person: (id: number) => ['people', id],
   matchSearch: ({ type, query, year }: { type: string; query: string; year: number | null }) => [

@@ -5,7 +5,9 @@ import type {
   DirectoryEntry,
   DirectoryListing,
   HistoryEntry,
+  ImageOption,
   ItemDetails,
+  ItemImageOptions,
   ItemSummary,
   ItemType,
   Library,
@@ -102,7 +104,7 @@ export const LIBRARY_KINDS: readonly LibraryKind[] = ['movies', 'shows', 'other'
 export const isLibraryKind = (value: unknown): value is LibraryKind =>
   LIBRARY_KINDS.some((kind) => kind === value)
 
-export const MEDIA_GROUPINGS: readonly MediaGroupBy[] = ['resolution', 'codec', 'month']
+export const MEDIA_GROUPINGS: readonly MediaGroupBy[] = ['match', 'resolution', 'codec', 'month']
 
 export const isMediaGroupBy = (value: unknown): value is MediaGroupBy =>
   MEDIA_GROUPINGS.some((grouping) => grouping === value)
@@ -133,6 +135,7 @@ export const isLibrary = (value: unknown): value is Library =>
   isString(value.name) &&
   isStringArray(value.paths) &&
   isNumber(value.itemCount) &&
+  isNumber(value.unmatchedCount) &&
   isString(value.createdAt) &&
   isScanStatus(value.scan) &&
   isLibrarySettings(value.settings)
@@ -220,6 +223,18 @@ export const isMatchCandidate = (value: unknown): value is MatchCandidate =>
   isNullableString(value.poster)
 
 export const isMatchCandidateList = arrayOf(isMatchCandidate)
+
+export const isImageOption = (value: unknown): value is ImageOption =>
+  isRecord(value) &&
+  (value.source === 'local' || value.source === 'tmdb') &&
+  isString(value.ref) &&
+  isNullableNumber(value.width) &&
+  isNullableNumber(value.height) &&
+  isNullableString(value.language) &&
+  isBoolean(value.current)
+
+export const isItemImageOptions = (value: unknown): value is ItemImageOptions =>
+  isRecord(value) && arrayOf(isImageOption)(value.poster) && arrayOf(isImageOption)(value.backdrop)
 
 const isServiceState = (value: unknown): value is MetadataServiceState =>
   value === 'off' || value === 'ok' || value === 'failing'

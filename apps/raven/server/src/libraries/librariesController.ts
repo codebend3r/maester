@@ -12,6 +12,7 @@ import {
   Post,
   Put,
   Query,
+  ServiceUnavailableException,
 } from '@nestjs/common'
 import {
   type HistoryEntry,
@@ -25,7 +26,7 @@ import {
 } from '@raven/core'
 import { type LibraryRecord, LibrariesRepository } from '@/libraries/librariesRepository'
 import { MediaRepository, toMediaItem } from '@/media/mediaRepository'
-import { MetadataService } from '@/metadata/metadataService'
+import { MATCHED_KINDS, MetadataService } from '@/metadata/metadataService'
 import { SubtitlesService } from '@/playback/subtitlesService'
 import { ScannerService } from '@/scanner/scannerService'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
@@ -124,6 +125,24 @@ export class LibrariesController {
   scan(@Param('id', ParseIntPipe) id: number): Library {
     const record = this.find(id)
     this.scanner.scan(id)
+    return this.withStatus(record)
+  }
+
+  /**
+   * Match again: the files no movie or show was found for go back in the
+   * queue, and TMDB is searched for them once more. Fix match choices stay.
+   */
+  @Post(':id/match')
+  @HttpCode(200)
+  rematch(@Param('id', ParseIntPipe) id: number): Library {
+    const record = this.find(id)
+    if (!MATCHED_KINDS.includes(record.settings.kind)) {
+      throw new BadRequestException('Only a Movies or TV shows library is matched.')
+    }
+    if (this.metadata.health().tmdb === 'off') {
+      throw new ServiceUnavailableException('Set TMDB_API_TOKEN to match files.')
+    }
+    this.metadata.retryUnmatched(id)
     return this.withStatus(record)
   }
 

@@ -8,7 +8,8 @@ import type { SearchResult } from '@/metadata/tmdbClient'
  *   released in the name's year or one either side (release dates differ by
  *   country). The exact year wins over a neighbour.
  * - Otherwise, the only result there is, when its year is the name's.
- * - Without a year, only a lone result with the same title.
+ * - Without a year (Sonarr's show folders carry none), the one result with
+ *   the same title; two of them, as with a remake, is unsure.
  *
  * Anything else is unmatched: raven never guesses.
  */
@@ -29,7 +30,7 @@ export const pickMatch = ({
   )
 
   if (year == null) {
-    return results.length === 1 && sameTitle.length === 1 ? (sameTitle[0] ?? null) : null
+    return sameTitle.length === 1 ? (sameTitle[0] ?? null) : null
   }
 
   const exact = sameTitle.find((result) => result.year === year)

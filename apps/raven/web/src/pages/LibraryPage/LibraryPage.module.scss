@@ -59,6 +59,12 @@
   font-weight: 400;
 }
 
+.subcount {
+  color: var(--color-lichen);
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm);
+}
+
 .message {
   max-width: var(--measure);
   color: var(--color-lichen);

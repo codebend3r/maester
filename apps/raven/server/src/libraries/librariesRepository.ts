@@ -18,6 +18,7 @@ export type LibraryRecord = {
   name: string
   paths: string[]
   itemCount: number
+  unmatchedCount: number
   createdAt: string
   settings: LibrarySettings
 }
@@ -27,6 +28,7 @@ type LibraryRow = {
   name: string
   created_at: string
   item_count: number
+  unmatched_count: number
   save_progress: number
   pinned: number
   sort: string
@@ -86,7 +88,9 @@ export class LibrariesRepository {
       .prepare<[number | null, number | null], LibraryRow>(
         `SELECT l.id, l.name, l.created_at, l.save_progress, l.pinned, l.sort, l.view_mode, l.group_by,
                 l.watched_percent, l.kind, l.ratings_source,
-                (SELECT COUNT(*) FROM media m WHERE m.library_id = l.id) AS item_count
+                (SELECT COUNT(*) FROM media m WHERE m.library_id = l.id) AS item_count,
+                (SELECT COUNT(*) FROM media m WHERE m.library_id = l.id AND m.match = 'unmatched')
+                  AS unmatched_count
            FROM libraries l
           WHERE ? IS NULL OR l.id = ?
           ORDER BY l.name COLLATE NOCASE`,
@@ -104,6 +108,7 @@ export class LibrariesRepository {
       name: row.name,
       createdAt: row.created_at,
       itemCount: row.item_count,
+      unmatchedCount: row.unmatched_count,
       settings: toSettings(row),
       paths: paths.filter((path) => path.library_id === row.id).map((path) => path.path),
     }))

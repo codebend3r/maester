@@ -2,11 +2,12 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import {
   ApiError,
   DEFAULT_LIBRARY_SETTINGS,
+  groupMedia,
   type Library,
   type LibraryKind,
   type LibrarySettings,
   type MediaItem,
-  groupMedia,
+  type ShowEntry,
 } from '@raven/core'
 import { useId, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -20,6 +21,7 @@ import { MediaList } from '@/components/MediaList/MediaList'
 import { MediaTiles } from '@/components/MediaTiles/MediaTiles'
 import { ScanStatus } from '@/components/ScanStatus/ScanStatus'
 import { ShowGrid } from '@/components/ShowCard/ShowCard'
+import { ShowList, ShowTiles } from '@/components/ShowCard/ShowViews'
 import { api } from '@/lib/api'
 import { KIND_LABELS } from '@/lib/libraryKinds'
 import { queryKeys } from '@/lib/queryClient'
@@ -41,7 +43,13 @@ const firstShown = ({
   items: MediaItem[]
 }): MediaItem | undefined =>
   settings.view === 'grouped'
-    ? groupMedia({ items, by: settings.groupBy })
+    ? groupMedia({
+        items,
+        by:
+          settings.groupBy === 'match' && settings.kind === 'other'
+            ? 'resolution'
+            : settings.groupBy,
+      })
         .flatMap((group) => group.items)
         .at(0)
     : items.at(0)
@@ -49,6 +57,24 @@ const firstShown = ({
 /** What a library's files are matched to, for the cards' Fix match. */
 const matchTypeOf = (kind: LibraryKind): MatchType | null =>
   kind === 'movies' ? 'movie' : kind === 'shows' ? 'show' : null
+
+/** A TV library's shows laid out the way its view setting says; the grouped view is the grid, as the page itself splits matched from not. */
+const ShowsView = ({
+  settings,
+  shows,
+  busy,
+  labelledBy,
+}: {
+  settings: LibrarySettings
+  shows: ShowEntry[]
+  busy: boolean
+  labelledBy: string | undefined
+}) => {
+  const props = { shows, busy, ratingsSource: settings.ratingsSource, labelledBy }
+  if (settings.view === 'list') return <ShowList {...props} />
+  if (settings.view === 'tiles') return <ShowTiles {...props} />
+  return <ShowGrid {...props} />
+}
 
 /**
  * The library's videos laid out the way its view setting says: a Movies
@@ -73,7 +99,11 @@ const MediaView = ({
     return (
       <MediaGroups
         items={items}
-        by={settings.groupBy}
+        by={
+          settings.groupBy === 'match' && settings.kind === 'other'
+            ? 'resolution'
+            : settings.groupBy
+        }
         busy={busy}
         posters={movies}
         matchType={matchType}
@@ -94,7 +124,7 @@ const MediaView = ({
 export const LibraryPage = () => {
   const params = useParams()
   const libraryId = Number(params.id)
-  const ids = { title: useId(), unmatched: useId() }
+  const ids = { title: useId(), matched: useId(), unmatched: useId() }
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
@@ -158,6 +188,18 @@ export const LibraryPage = () => {
     },
   })
 
+  // Match again sends the files no movie or show was found for back to TMDB;
+  // the listing then polls while any of them is pending.
+  const rematch = useMutation({
+    mutationFn: () => api.matchLibrary(libraryId),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(queryKeys.library(libraryId), updated)
+      return queryClient.invalidateQueries({
+        queryKey: tv ? queryKeys.showLists(libraryId) : queryKeys.mediaLists(libraryId),
+      })
+    },
+  })
+
   // Sort, view and grouping switch at once and save behind; a failed save
   // puts the library back as it was and says so.
   const saveSettings = useMutation({
@@ -196,6 +238,7 @@ export const LibraryPage = () => {
   const shows = showsQuery.data?.shows ?? []
   const items = tv ? (showsQuery.data?.unmatched ?? []) : (media.data ?? [])
   const loaded = tv ? showsQuery.isSuccess : media.isSuccess
+  const unmatched = library.data.unmatchedCount
   const emptyState = ((): string | null => {
     if (!loaded || items.length > 0 || shows.length > 0) return null
     if (query) return `Nothing here matches "${query}".`
@@ -234,6 +277,7 @@ export const LibraryPage = () => {
         <p className={styles.count}>
           {KIND_LABELS[settings.kind]} · {count.format(library.data.itemCount)}{' '}
           {library.data.itemCount === 1 ? 'video' : 'videos'}
+          {unmatched > 0 && ` · ${count.format(unmatched)} not matched`}
         </p>
         <div className={styles.status}>
           <ScanStatus scan={library.data.scan} />
@@ -249,6 +293,16 @@ export const LibraryPage = () => {
           >
             Rescan
           </Button>
+          {settings.kind !== 'other' && (
+            <Button
+              icon="search"
+              disabled={!matching || unmatched === 0 || rematch.isPending}
+              title={`Search TMDB again for the files no ${tv ? 'show' : 'movie'} was found for`}
+              onClick={() => rematch.mutate()}
+            >
+              Match again
+            </Button>
+          )}
           <Button icon="edit" onClick={() => setEditing(true)}>
             Edit
           </Button>
@@ -273,19 +327,33 @@ export const LibraryPage = () => {
           Could not save how this library is shown: {saveSettings.error.message}
         </p>
       )}
+      {rematch.isError && (
+        <p className={styles.message} role="alert">
+          Could not match again: {rematch.error.message}
+        </p>
+      )}
 
       {emptyState && <p className={styles.message}>{emptyState}</p>}
       {!emptyState && tv && (
         <>
-          <ShowGrid
+          {items.length > 0 && shows.length > 0 && (
+            <h2 id={ids.matched} className={styles.subheading}>
+              Matched{' '}
+              <span className={styles.subcount}>
+                {count.format(shows.length)} {shows.length === 1 ? 'show' : 'shows'}
+              </span>
+            </h2>
+          )}
+          <ShowsView
+            settings={settings}
             shows={shows}
             busy={showsQuery.isFetching && !showsQuery.data}
-            ratingsSource={settings.ratingsSource}
+            labelledBy={items.length > 0 && shows.length > 0 ? ids.matched : undefined}
           />
           {items.length > 0 && (
             <section className={styles.unmatched} aria-labelledby={ids.unmatched}>
               <h2 id={ids.unmatched} className={styles.subheading}>
-                Not matched
+                Not matched <span className={styles.subcount}>{count.format(unmatched)}</span>
               </h2>
               <MediaView settings={settings} items={items} busy={false} />
             </section>

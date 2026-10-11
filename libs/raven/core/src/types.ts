@@ -24,6 +24,8 @@ export type Library = {
   /** Absolute folder paths as the server sees them (container paths under Docker). */
   paths: string[]
   itemCount: number
+  /** Files no movie or show was found for; 0 in a library that is not matched. */
+  unmatchedCount: number
   createdAt: string
   scan: ScanStatus
   settings: LibrarySettings
@@ -56,7 +58,8 @@ export type LibraryKind = 'movies' | 'shows' | 'other'
 
 export type LibraryView = 'grid' | 'list' | 'tiles' | 'grouped'
 
-export type MediaGroupBy = 'resolution' | 'codec' | 'month'
+/** `match` buckets a Movies or TV shows library by how far matching got. */
+export type MediaGroupBy = 'match' | 'resolution' | 'codec' | 'month'
 
 /**
  * What a client sends to create a library or replace its name and paths.
@@ -230,6 +233,28 @@ export type PersonDetails = {
 
 /** The pictures an item can have. */
 export type ItemImageKind = 'poster' | 'backdrop' | 'still'
+
+/** One picture a movie or show could show: a file beside the media, or one of TMDB's. */
+export type ImageOption = {
+  source: 'local' | 'tmdb'
+  /** The file's path for `local`; TMDB's path for `tmdb`, served through `imageOptionUrl`. */
+  ref: string
+  width: number | null
+  height: number | null
+  /** ISO 639-1, or null for a picture with no text. */
+  language: string | null
+  /** Whether the item shows this one now. */
+  current: boolean
+}
+
+/** Everything a movie or show could show as its poster and backdrop. */
+export type ItemImageOptions = {
+  poster: ImageOption[]
+  backdrop: ImageOption[]
+}
+
+/** What Edit images picks: one of TMDB's pictures, or the one beside the media. */
+export type ImageChoice = { source: 'tmdb'; ref: string } | { source: 'local' }
 
 /** One of TMDB's search results, offered by Fix match. */
 export type MatchCandidate = {

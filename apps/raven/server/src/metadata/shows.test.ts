@@ -403,4 +403,40 @@ describe('TV show metadata', () => {
     const halfLoop = await byFile('Severance - S01E02 - Half Loop.mp4')
     expect(halfLoop.item).toMatchObject({ show: { title: 'Fargo' } })
   })
+  it('searches TMDB again for the files no show was found for, and only those', async () => {
+    await encodeClip({
+      path: join(state.media, 'Late Show', 'Season 1', 'Late Show - S01E01.mp4'),
+      seconds: 1,
+    })
+    await rescan()
+    expect((await byFile('Late Show - S01E01.mp4')).match).toBe('unmatched')
+    const before = tmdb.state.calls.length
+
+    const response = await app().inject({
+      method: 'POST',
+      url: `/api/libraries/${state.library}/match`,
+    })
+    expect(response.statusCode).toBe(200)
+    const library = shape({ response, guard: isLibrary })
+    expect(library.unmatchedCount).toBe(1)
+    await settle()
+    const searched = tmdb.state.calls
+      .slice(before)
+      .filter((url) => url.includes('/search/tv'))
+      .map((url) => new URL(url).searchParams.get('query'))
+    expect(searched).toEqual(['Late Show'])
+    expect((await byFile('Late Show - S01E01.mp4')).match).toBe('unmatched')
+    expect((await byFile('Unknown Show - S01E01.mp4')).match).toBe('manual')
+
+    tmdb.state.shows.push({ id: 4242, title: 'Late Show', first: '2024-03-01', seasons: { 1: [] } })
+    await app().inject({ method: 'POST', url: `/api/libraries/${state.library}/match` })
+    await settle()
+    expect((await byFile('Late Show - S01E01.mp4')).match).toBe('matched')
+    expect((await shows()).shows.map((entry) => entry.show.title)).toContain('Late Show')
+    const after = shape({
+      response: await app().inject({ method: 'GET', url: `/api/libraries/${state.library}` }),
+      guard: isLibrary,
+    })
+    expect(after.unmatchedCount).toBe(0)
+  })
 })
