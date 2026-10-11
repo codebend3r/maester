@@ -6,7 +6,7 @@
     "libsDir": "libs"
   },
   "namedInputs": {
-    "sharedGlobals": [],
+    "sharedGlobals": ["{workspaceRoot}/tsconfig.base.json", "{workspaceRoot}/tooling/**/*"],
     "default": ["{projectRoot}/**/*", "sharedGlobals"],
     "production": [
       "default",

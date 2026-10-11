@@ -1,0 +1,12 @@
+{
+  "$schema": "../../node_modules/oxlint/configuration_schema.json",
+  "extends": ["./base.json"],
+  "env": {
+    "node": true
+  },
+  "rules": {
+    // Nest declares a module as a decorated class that is empty or holds only
+    // a static factory; an undecorated one is still a finding.
+    "typescript/no-extraneous-class": ["error", { "allowWithDecorator": true }]
+  }
+}
