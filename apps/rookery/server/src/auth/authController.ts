@@ -10,20 +10,20 @@ import {
   ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common'
+import { readCookie } from '@shared/server'
 import type { FastifyReply, FastifyRequest } from 'fastify'
-import { SERVER_CONFIG, type ServerConfig } from '@/config.js'
+import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import {
   PIN_COOKIE,
   SESSION_COOKIE,
   clearedPinCookie,
   clearedSessionCookie,
   pinCookie,
-  readCookie,
   sessionCookie,
-} from '@/auth/cookies.js'
-import { CALLBACK_PATH, SignInService } from '@/auth/signInService.js'
-import { PlexUnavailable } from '@/plex/plexTv.js'
-import { AccountService } from '@/sessions/accountService.js'
+} from '@/auth/cookies'
+import { CALLBACK_PATH, SignInService } from '@/auth/signInService'
+import { PlexUnavailable } from '@/plex/plexTv'
+import { AccountService } from '@/sessions/accountService'
 
 export type PublicUser = {
   id: string

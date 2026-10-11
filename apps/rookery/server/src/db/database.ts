@@ -1,13 +1,12 @@
-import { mkdirSync } from 'node:fs'
-import { join } from 'node:path'
 import { Inject, Injectable, type OnModuleDestroy } from '@nestjs/common'
-import Sqlite from 'better-sqlite3'
-import { SERVER_CONFIG, type ServerConfig } from '@/config.js'
+import { openSqlite } from '@shared/server'
+import type Sqlite from 'better-sqlite3'
+import { SERVER_CONFIG, type ServerConfig } from '@/config'
 
 /**
- * Each entry moves the schema one version forward and runs exactly once,
- * tracked by SQLite's `user_version`. Append new migrations; never edit a
- * shipped one, since existing databases have already run it.
+ * rookery's schema, one version per entry; `openSqlite` runs the ones a
+ * database has not run yet. Append new migrations; never edit a shipped one,
+ * since existing databases have already run it.
  */
 const MIGRATIONS: readonly string[] = [
   `
@@ -57,16 +56,6 @@ const MIGRATIONS: readonly string[] = [
   `,
 ]
 
-const migrate = (db: Sqlite.Database): void => {
-  const current = Number(db.pragma('user_version', { simple: true }))
-  MIGRATIONS.slice(current).forEach((sql, offset) => {
-    db.transaction(() => {
-      db.exec(sql)
-      db.pragma(`user_version = ${current + offset + 1}`)
-    })()
-  })
-}
-
 export const DATABASE_FILE = 'rookery.db'
 
 /** The one SQLite connection: users, their logins, sessions and sign-ins under way. */
@@ -75,11 +64,7 @@ export class DatabaseService implements OnModuleDestroy {
   readonly db: Sqlite.Database
 
   constructor(@Inject(SERVER_CONFIG) config: ServerConfig) {
-    mkdirSync(config.dataDir, { recursive: true })
-    this.db = new Sqlite(join(config.dataDir, DATABASE_FILE))
-    this.db.pragma('journal_mode = WAL')
-    this.db.pragma('foreign_keys = ON')
-    migrate(this.db)
+    this.db = openSqlite({ dataDir: config.dataDir, file: DATABASE_FILE, migrations: MIGRATIONS })
   }
 
   onModuleDestroy(): void {

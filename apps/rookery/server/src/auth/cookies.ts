@@ -1,6 +1,6 @@
-import type { ServerConfig } from '@/config.js'
-import { SESSION_MS } from '@/sessions/sessionsRepository.js'
-import { PENDING_MS } from '@/auth/pendingSignIns.js'
+import type { ServerConfig } from '@/config'
+import { SESSION_MS } from '@/sessions/sessionsRepository'
+import { PENDING_MS } from '@/auth/pendingSignIns'
 
 /** The suite's session cookie, shared with every app under `COOKIE_DOMAIN`. */
 export const SESSION_COOKIE = 'maester_session'
@@ -8,22 +8,6 @@ export const SESSION_COOKIE = 'maester_session'
 export const PIN_COOKIE = 'rookery_pin'
 /** The pin cookie only needs to reach the callback. */
 const PIN_PATH = '/auth/plex'
-
-/** The value of cookie `name` in a `Cookie` header, or null. */
-export const readCookie = ({
-  header,
-  name,
-}: {
-  header: string | undefined
-  name: string
-}): string | null => {
-  const found = (header ?? '')
-    .split(';')
-    .map((part) => part.trim())
-    .find((part) => part.startsWith(`${name}=`))
-  const value = found?.slice(name.length + 1) ?? ''
-  return value === '' ? null : value
-}
 
 const serialize = ({
   name,
