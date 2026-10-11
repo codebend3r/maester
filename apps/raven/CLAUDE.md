@@ -18,14 +18,9 @@ The image builds from the repo root: `docker build -f apps/raven/Dockerfile .`. 
 
 ## Conventions
 
-- Type aliases, never interfaces (except `.d.ts` augmentations that require one). No `any`, no casts (`as`), no non-null assertions: narrow with the guards in `@raven/core`.
-- Named exports only (config files that need a default export are exempt in `.oxlintrc.json`).
-- No `for`/`for...of`/`for...in` loops; use array methods. Prefer immutable updates.
-- One object parameter instead of several positional ones.
-- `!!value` for booleans; `&&` rather than a ternary with a null branch in JSX; `?.` always paired with `??`.
+The TypeScript, code style and CSS rules are in the root `CLAUDE.md`. raven adds:
+
+- Narrow with the guards in `@raven/core`: the API types in `libs/raven/core/src/types.ts` have their `is<Type>` guards in `guards.ts`, and a new API type gets one there too.
 - Server constructors inject with explicit `@Inject(Token)`, so DI never depends on decorator metadata, which neither vitest nor `tsx` emits.
-- All three projects import their own modules via `@/` with no extension (see the root `CLAUDE.md`); `tsconfig.json` uses `"moduleResolution": "bundler"` so TypeScript allows it. The server's `dev` runs through `tsx`, and its `build` is `tsc` then `tsc-alias`.
-- Styles are `*.module.scss` using the tokens in `apps/raven/web/src/styles/globals.scss`.
-- CSS layout is grid with `gap` and container padding; no flex layouts and no margins for spacing. Every page works at 320px wide.
-- Accessibility: semantic elements, labels on every control, visible `:focus-visible`, reduced motion respected.
-- Writing: no em dashes or en dashes anywhere, including comments and UI copy.
+- All three projects import their own modules via `@/` with no extension; `tsconfig.json` uses `"moduleResolution": "bundler"` so TypeScript allows it. The server's `dev` runs through `tsx`, and its `build` is `tsc` then `tsc-alias`.
+- The tokens are in `apps/raven/web/src/styles/globals.scss`, and element defaults in `elements.scss` beside it. The `/design` page reads `globals.scss` itself, so a new token shows up there with no extra step.
