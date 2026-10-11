@@ -25,7 +25,8 @@ import type { FetchedItem } from '@/metadata/tmdbClient'
 export const versionOf = (ref: string): string =>
   createHash('sha1').update(ref).digest('base64url').slice(0, 11)
 
-export type ImageSource = 'tmdb' | 'local'
+/** `chosen` is what Edit images picked, a TMDB path; it beats a local picture, which beats TMDB's own. */
+export type ImageSource = 'tmdb' | 'local' | 'chosen'
 
 /** Where an item's picture comes from: a file beside the media wins over TMDB's. */
 export type ImageRef = { source: ImageSource; ref: string }
@@ -70,11 +71,14 @@ type SummaryRow = {
   show_title: string | null
 }
 
-/** The picture each item shows for `kind`: local first, then TMDB's. */
+/** The picture each item shows for `kind`: the chosen one first, then local, then TMDB's. */
 const IMAGE_REFS = `
   SELECT item_id, source, ref FROM item_images
    WHERE kind = ? AND item_id IN (SELECT value FROM json_each(?))
-   ORDER BY item_id, CASE source WHEN 'local' THEN 0 ELSE 1 END`
+   ORDER BY item_id, CASE source WHEN 'chosen' THEN 0 WHEN 'local' THEN 1 ELSE 2 END`
+
+const toImageSource = (source: string): ImageSource =>
+  source === 'local' ? 'local' : source === 'chosen' ? 'chosen' : 'tmdb'
 
 const genresOf = (json: string): string[] => {
   try {
@@ -304,7 +308,50 @@ export class MetadataRepository {
       .prepare<[string, string], { item_id: number; source: string; ref: string }>(IMAGE_REFS)
       .get(kind, JSON.stringify([itemId]))
     if (!row) return null
-    return { source: row.source === 'local' ? 'local' : 'tmdb', ref: row.ref }
+    return { source: toImageSource(row.source), ref: row.ref }
+  }
+
+  /** The picture of `source` an item holds for `kind`, whatever it shows. */
+  imageFrom({
+    itemId,
+    kind,
+    source,
+  }: {
+    itemId: number
+    kind: ItemImageKind
+    source: ImageSource
+  }): string | null {
+    return (
+      this.db
+        .prepare<[number, string, string], { ref: string }>(
+          `SELECT ref FROM item_images WHERE item_id = ? AND kind = ? AND source = ?`,
+        )
+        .get(itemId, kind, source)?.ref ?? null
+    )
+  }
+
+  /** Edit images: the item shows TMDB's picture at `ref` for `kind` from now on, or, for null, whatever it would by itself. */
+  chooseImage({
+    itemId,
+    kind,
+    ref,
+  }: {
+    itemId: number
+    kind: ItemImageKind
+    ref: string | null
+  }): void {
+    this.db.transaction(() => {
+      this.db
+        .prepare(`DELETE FROM item_images WHERE item_id = ? AND kind = ? AND source = 'chosen'`)
+        .run(itemId, kind)
+      if (ref != null) {
+        this.db
+          .prepare(
+            `INSERT INTO item_images (item_id, kind, source, ref) VALUES (?, ?, 'chosen', ?)`,
+          )
+          .run(itemId, kind, ref)
+      }
+    })()
   }
 
   /** An item's TMDB picture for `kind`, whatever is beside the media. */
@@ -687,7 +734,7 @@ export class MetadataRepository {
     const tmdbPaths = new Set(
       this.db
         .prepare<[], { ref: string }>(
-          `SELECT ref FROM item_images WHERE source = 'tmdb'
+          `SELECT ref FROM item_images WHERE source IN ('tmdb', 'chosen')
            UNION SELECT photo AS ref FROM people WHERE photo IS NOT NULL`,
         )
         .all()

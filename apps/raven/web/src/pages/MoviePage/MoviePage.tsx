@@ -4,6 +4,7 @@ import { useId, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button, ButtonLink } from '@/components/Button/Button'
 import { CastRow } from '@/components/CastRow/CastRow'
+import { ImageEditor } from '@/components/ImageEditor/ImageEditor'
 import { ItemHeader } from '@/components/ItemHeader/ItemHeader'
 import { MediaMenu } from '@/components/MediaMenu/MediaMenu'
 import { ReviewCards } from '@/components/ReviewCards/ReviewCards'
@@ -24,6 +25,7 @@ const MovieView = ({ details, primary }: { details: ItemDetails; primary: MediaI
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [editingImages, setEditingImages] = useState(false)
   const { favourite } = useMediaMutations({ media: primary })
   const libraries = useQuery({ queryKey: queryKeys.libraries, queryFn: api.listLibraries })
   const tracks = useQuery({
@@ -73,6 +75,13 @@ const MovieView = ({ details, primary }: { details: ItemDetails; primary: MediaI
           disabled={favourite.isPending}
           onClick={() => favourite.mutate(!primary.favourite)}
         />
+        <Button
+          icon="edit"
+          aria-pressed={editingImages}
+          onClick={() => setEditingImages((editing) => !editing)}
+        >
+          Edit images
+        </Button>
         <MediaMenu
           media={primary}
           open={menuOpen}
@@ -90,6 +99,14 @@ const MovieView = ({ details, primary }: { details: ItemDetails; primary: MediaI
           }}
         />
       </ItemHeader>
+
+      {editingImages && (
+        <ImageEditor
+          details={details}
+          libraries={libraries.data ?? []}
+          onDone={() => setEditingImages(false)}
+        />
+      )}
 
       <Summary tagline={details.tagline} summary={details.summary} />
 

@@ -313,6 +313,28 @@ export const fakeTmdb = ({
       return found ? json(showBody(found)) : json({ status_code: 34 }, 404)
     }
 
+    const images = /^\/(movie|tv)\/(\d+)\/images$/.exec(path)
+    if (images) {
+      const id = Number(images[2])
+      const known =
+        images[1] === 'movie'
+          ? state.movies.some((entry) => entry.id === id)
+          : state.shows.some((entry) => entry.id === id)
+      if (!known) return json({ status_code: 34 }, 404)
+      const picture = (name: string, language: string | null) => ({
+        file_path: `/${name}${id}.jpg`,
+        width: 2000,
+        height: 3000,
+        iso_639_1: language,
+        vote_average: 5,
+      })
+      return json({
+        id,
+        posters: [picture('poster', 'en'), picture('alt', null)],
+        backdrops: [picture('backdrop', null), picture('scene', 'en')],
+      })
+    }
+
     const movie = /^\/movie\/(\d+)$/.exec(path)
     if (movie) {
       const found = state.movies.find((entry) => String(entry.id) === movie[1])
