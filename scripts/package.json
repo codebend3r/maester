@@ -1,12 +1,13 @@
 {
   "name": "scripts",
   "private": true,
-  "description": "Repo tooling: the tracker catalog and sync, board setup and sync, NAS deploy, version bump. Linted with luwin's pinned ruff and config",
+  "description": "Repo tooling: the tracker catalog and its issue and board sync, NAS deploy, version bump. Linted and tested with luwin's pinned ruff, pytest and config",
   "scripts": {
     "lint:py": "uv run --project ../apps/luwin/api ruff check --config ../apps/luwin/api/pyproject.toml .",
     "lint:py:fix": "uv run --project ../apps/luwin/api ruff check --config ../apps/luwin/api/pyproject.toml --fix .",
     "format": "uv run --project ../apps/luwin/api ruff format --config ../apps/luwin/api/pyproject.toml .",
-    "format:check": "uv run --project ../apps/luwin/api ruff format --config ../apps/luwin/api/pyproject.toml --check ."
+    "format:check": "uv run --project ../apps/luwin/api ruff format --config ../apps/luwin/api/pyproject.toml --check .",
+    "test": "uv run --project ../apps/luwin/api pytest -q tests"
   },
   "nx": {
     "projectType": "library",
@@ -18,7 +19,8 @@
       "lint:py",
       "lint:py:fix",
       "format",
-      "format:check"
+      "format:check",
+      "test"
     ]
   }
 }

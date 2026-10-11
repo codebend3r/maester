@@ -1,6 +1,6 @@
 # Project board setup
 
-The "maester roadmap" board is a GitHub Projects (v2) user project linked to this repo. It is created once with `scripts/setup_project.sh` (needs `gh auth refresh -s project`). Fields:
+The "maester roadmap" board is a GitHub Projects (v2) user project linked to this repo. `scripts/sync_board.py` creates it, links it and adds its fields when it is missing (needs `gh auth refresh -s project`). The Epic, Phase, Size and Priority options come from `scripts/catalog.py`. Fields:
 
 | Field    | Type          | Options                 |
 | -------- | ------------- | ----------------------- |

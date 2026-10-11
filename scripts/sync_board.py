@@ -9,6 +9,9 @@ no longer match the closed issues.
 Read-only by default: prints a numbered plan and saves it. Applying re-audits first and
 runs only the saved steps that are still needed, so a stale plan never undoes anything.
 
+It also builds the board when it is missing: the first audit plans creating it, the next
+its fields (with the options the catalog defines) and its items, the one after their fields.
+
     uv run python scripts/sync_board.py                     # audit, print and save the plan
     uv run python scripts/sync_board.py --apply             # apply the saved plan
     uv run python scripts/sync_board.py --apply --only 1,3  # apply part of it
@@ -19,22 +22,35 @@ Needs `gh` authenticated with the `project` scope (`gh auth refresh -s project`)
 import argparse
 import json
 import re
-import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
-from sync_tracker import ROADMAP_PATH, completed_issues, is_done, load_issue_map, render_roadmap
+from catalog import EPICS
+from tracker import (
+    BOARD_TITLE,
+    OWNER,
+    REPO,
+    ROADMAP_PATH,
+    by_key,
+    epic_body,
+    field_options,
+    gh,
+    is_closed,
+    is_done,
+    issue_key,
+    list_issues,
+    render_roadmap,
+    unticked,
+)
 
-OWNER = "codebend3r"
-REPO = "codebend3r/maester"
-PROJECT = 1
+EPIC_KEY = re.compile(r"E\d+")
 PLAN_PATH = Path(tempfile.gettempdir()) / "maester-board-plan.json"
 
 # Apply order within one issue: an epic's checklist is ticked before it closes, and
 # it closes before its status moves, so the auto-close workflow has nothing to do.
 # The roadmap step comes after every issue, so it ticks the epics this run closes.
-KIND_ORDER = ["add", "field", "tick", "close", "status"]
+KIND_ORDER = ["board", "create-field", "add", "field", "tick", "close", "status"]
 
 QUERY = """
 query($owner: String!, $number: Int!, $after: String) {
@@ -74,19 +90,26 @@ query($owner: String!, $number: Int!, $after: String) {
 }"""
 
 
-def gh(*args: str, input: str | None = None) -> str:
-    r = subprocess.run(["gh", *args], capture_output=True, text=True, input=input)
-    if r.returncode != 0:
-        raise RuntimeError(f"gh {' '.join(args)}\n{r.stderr}")
-    return r.stdout.strip()
+def find_board() -> int | None:
+    """The board's number, found by its title, or None when it doesn't exist yet."""
+    out = gh("project", "list", "--owner", OWNER, "--format", "json", "--limit", "100")
+    boards = json.loads(out)["projects"]
+    return next((b["number"] for b in boards if b["title"] == BOARD_TITLE), None)
 
 
 def fetch() -> dict:
-    """The board's id, its single-select fields, its issue items and every repo issue."""
+    """The board's number and id, its single-select fields, its issue items and every issue.
+
+    Without a board, its number and id are None and it has no fields or items.
+    """
+    issues = list_issues()
+    number = find_board()
+    if number is None:
+        return {"number": None, "id": None, "fields": {}, "items": [], "issues": issues}
     items, after = [], None
     while True:
         args = ["api", "graphql", "-f", f"query={QUERY}", "-f", f"owner={OWNER}"]
-        args += ["-F", f"number={PROJECT}"] + (["-f", f"after={after}"] if after else [])
+        args += ["-F", f"number={number}"] + (["-f", f"after={after}"] if after else [])
         project = json.loads(gh(*args))["data"]["user"]["projectV2"]
         items += [i for i in project["items"]["nodes"] if i["content"]]
         page = project["items"]["pageInfo"]
@@ -97,21 +120,16 @@ def fetch() -> dict:
     for item in items:
         values = item.pop("fieldValues")["nodes"]
         item["values"] = {v["field"]["name"]: v["name"] for v in values if v}
-    issues = gh("issue", "list", "-R", REPO, "--state", "all", "--limit", "500",
-                "--json", "number,title,url,state,stateReason")  # fmt: skip
-    return {"id": project["id"], "fields": fields, "items": items, "issues": json.loads(issues)}
-
-
-def bare_title(title: str) -> str:
-    return re.sub(r"^\[[^\]]+\]\s*", "", title)
+    return {"number": number, "id": project["id"], "fields": fields, "items": items,
+            "issues": issues}  # fmt: skip
 
 
 def expected_fields(issue: dict) -> dict[str, str]:
     """Epic, Phase, Size and Priority as the issue's title, milestone and labels imply."""
     labels = [label["name"] for label in issue["labels"]["nodes"]]
     out = {}
-    if m := re.match(r"^\[(E\d+)", issue["title"]):
-        out["Epic"] = m[1]
+    if (key := issue_key(issue["title"])) and (epic := EPIC_KEY.match(key)):
+        out["Epic"] = epic[0]
     if issue["milestone"]:
         out["Phase"] = issue["milestone"]["title"].split()[0]
     for name in labels:
@@ -122,32 +140,24 @@ def expected_fields(issue: dict) -> dict[str, str]:
     return out
 
 
-def ticked_body(epic: dict) -> str:
-    """The epic body with each story's checklist line matching whether it is closed."""
-    body = epic["body"]
-    for sub in epic["subIssues"]["nodes"]:
-        text = bare_title(sub["title"])
-        mark = "x" if sub["state"] == "CLOSED" else " "
-        line = re.compile(rf"^- \[[ xX]\] {re.escape(text)}$", re.M)
-        body = line.sub(lambda _, new=f"- [{mark}] {text}": new, body)
-    return body
+def catalog_epic(issue: dict) -> dict | None:
+    """The catalog epic an issue renders, or None for any other issue."""
+    return next((e for e in EPICS if e["key"] == issue_key(issue["title"])), None)
 
 
 def want_status(issue: dict, status: str | None, statuses: dict[int, str | None]):
     """The status the issue should have, or a reason a human has to decide, or None."""
     subs = issue["subIssues"]["nodes"]
-    if issue["state"] == "CLOSED":
-        if issue["stateReason"] not in (None, "COMPLETED"):
+    if is_closed(issue):
+        if not is_done(issue):
             return None if status == "Done" else ("flag", "closed as not planned: Done or archive?")
-        if any(s["state"] == "OPEN" for s in subs):
+        if not all(is_closed(s) for s in subs):
             return ("flag", "epic is closed but has open stories")
         return ("Done", "issue is closed")
     if status == "Done":
         return ("flag", "issue is open but shows Done: reopened, or moved too early?")
     if subs:
-        started = [
-            s for s in subs if s["state"] == "CLOSED" or statuses.get(s["number"]) == "In Progress"
-        ]
+        started = [s for s in subs if is_closed(s) or statuses.get(s["number"]) == "In Progress"]
         if started and status != "In Progress":
             return ("In Progress", f"{len(started)} of {len(subs)} stories started or closed")
     elif prs := issue["closedByPullRequestsReferences"]["nodes"]:
@@ -160,7 +170,21 @@ def want_status(issue: dict, status: str | None, statuses: dict[int, str | None]
 
 def plan(board: dict) -> tuple[list[dict], list[dict]]:
     """Steps that would bring the board in line, and drift that needs a human decision."""
+    if board["id"] is None:
+        return [{"issue": None, "title": BOARD_TITLE, "kind": "board", "to": None,
+                 "why": "no board with this title"}], []  # fmt: skip
+
     steps, flags = [], []
+    options = {name: {o["name"] for o in f["options"]} for name, f in board["fields"].items()}
+    missing = set()
+    for field, wanted in field_options().items():
+        if field not in options:
+            steps.append({"issue": None, "title": f"{field} field", "kind": "create-field",
+                          "field": field, "to": wanted, "why": "the board has no such field"})  # fmt: skip
+        else:
+            missing |= {(field, value) for value in wanted if value not in options[field]}
+
+    closed = {key for key, issue in by_key(board["issues"]).items() if is_closed(issue)}
     statuses = {i["content"]["number"]: i["values"].get("Status") for i in board["items"]}
     for item in sorted(board["items"], key=lambda i: i["content"]["number"]):
         issue, values = item["content"], item["values"]
@@ -168,14 +192,24 @@ def plan(board: dict) -> tuple[list[dict], list[dict]]:
         step = {"issue": n, "title": title, "item": item["id"]}
 
         for field, value in expected_fields(issue).items():
-            if values.get(field) != value:
-                steps.append(step | {"kind": "field", "field": field, "to": value,
-                                     "why": f"{field} {values.get(field) or '(empty)'} → {value}"})  # fmt: skip
+            if values.get(field) == value or field not in options:
+                continue
+            if value not in options[field]:
+                missing.add((field, value))
+                continue
+            steps.append(step | {"kind": "field", "field": field, "to": value,
+                                 "why": f"{field} {values.get(field) or '(empty)'} → {value}"})  # fmt: skip
 
-        if subs and (body := ticked_body(issue)) != issue["body"]:
-            steps.append(step | {"kind": "tick", "to": body, "why": "checklist out of date"})
+        if subs and (epic := catalog_epic(issue)):
+            body = epic_body(epic, closed)
+            if unticked(body) != unticked(issue["body"]):
+                # Only the ticks are the board's to fix; the rest is the tracker's.
+                flags.append({"issue": n, "title": title,
+                              "why": "body differs from the catalog: run scripts/sync_tracker.py"})  # fmt: skip
+            elif body != issue["body"]:
+                steps.append(step | {"kind": "tick", "to": body, "why": "checklist out of date"})
 
-        if issue["state"] == "OPEN" and subs and all(s["state"] == "CLOSED" for s in subs):
+        if issue["state"] == "OPEN" and subs and all(is_closed(s) for s in subs):
             done = ", ".join(f"#{s['number']}" for s in subs)
             steps.append(step | {"kind": "close", "to": f"All stories are closed: {done}.",
                                  "why": f"all {len(subs)} stories closed"})  # fmt: skip
@@ -196,12 +230,14 @@ def plan(board: dict) -> tuple[list[dict], list[dict]]:
             steps.append({"issue": issue["number"], "title": issue["title"], "kind": "add",
                           "to": issue["url"], "why": "not on the board"})  # fmt: skip
 
-    steps.sort(key=lambda s: (s["issue"], KIND_ORDER.index(s["kind"])))
+    steps.sort(key=lambda s: (s["issue"] or 0, KIND_ORDER.index(s["kind"])))
+    flags += [{"issue": None, "title": f"{field} field",
+               "why": f"no {value} option: add it on the board, then audit again"}
+              for field, value in sorted(missing)]  # fmt: skip
 
-    done = {i["number"] for i in board["issues"] if is_done(i)}
-    done |= {s["issue"] for s in steps if s["kind"] == "close"}
+    closing = {s["issue"] for s in steps if s["kind"] == "close"}
     current = ROADMAP_PATH.read_text() if ROADMAP_PATH.exists() else ""
-    if render_roadmap(load_issue_map(), done) != current:
+    if render_roadmap(board["issues"], closing) != current:
         steps.append({"issue": None, "title": "docs/roadmap.md", "kind": "roadmap", "to": None,
                       "why": "boxes don't match the closed issues"})  # fmt: skip
     return steps, flags
@@ -213,15 +249,23 @@ def key(step: dict) -> tuple:
 
 def run(board: dict, step: dict) -> None:
     n, kind = str(step["issue"]), step["kind"]
-    if kind == "add":
-        gh("project", "item-add", str(PROJECT), "--owner", OWNER, "--url", step["to"])
+    if kind == "board":
+        out = gh("project", "create", "--owner", OWNER, "--title", BOARD_TITLE, "--format", "json")
+        number = str(json.loads(out)["number"])
+        gh("project", "link", number, "--owner", OWNER, "--repo", REPO)
+    elif kind == "create-field":
+        gh("project", "field-create", str(board["number"]), "--owner", OWNER,
+           "--name", step["field"], "--data-type", "SINGLE_SELECT",
+           "--single-select-options", ",".join(step["to"]))  # fmt: skip
+    elif kind == "add":
+        gh("project", "item-add", str(board["number"]), "--owner", OWNER, "--url", step["to"])
     elif kind == "tick":
         gh("issue", "edit", n, "-R", REPO, "--body-file", "-", input=step["to"])
     elif kind == "close":
         gh("issue", "close", n, "-R", REPO, "--reason", "completed", "--comment", step["to"])
     elif kind == "roadmap":
         # Rendered from live state, after this run's closes, not from the audit.
-        ROADMAP_PATH.write_text(render_roadmap(load_issue_map(), completed_issues()))
+        ROADMAP_PATH.write_text(render_roadmap(list_issues()))
     else:
         field = board["fields"][step["field"]]
         option = next(o["id"] for o in field["options"] if o["name"] == step["to"])
@@ -231,6 +275,8 @@ def run(board: dict, step: dict) -> None:
 
 def describe(step: dict) -> str:
     return {
+        "board": "create the board and link it to the repo",
+        "create-field": f"create the field with options {', '.join(step['to'] or [])}",
         "add": "add to the board",
         "field": f"set {step.get('field')} to {step['to']}",
         "tick": "update the story checklist",
@@ -258,7 +304,7 @@ def report(steps: list[dict], flags: list[dict]) -> None:
     if flags:
         print("\nNeeds a decision (never applied):")
         for f in flags:
-            print(f"- #{f['issue']} {f['title']}: {f['why']}")
+            print(f"- {ref(f, title=True)}: {f['why']}")
     if steps:
         print(f"\nNothing changed. Plan saved to {PLAN_PATH}")
 
