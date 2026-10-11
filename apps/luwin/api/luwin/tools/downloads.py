@@ -25,7 +25,7 @@ from luwin.agent.tools import Result, Tier, ToolContext, tool
 from luwin.clients import ClientError
 from luwin.clients.arr import HistoryEvent, QueueItem
 from luwin.clients.sabnzbd import Download
-from luwin.library import ARR_NAMES, NotLocated, Owner, owner_of, owner_on
+from luwin.library import NotLocated, Owner, owner_of, owner_on
 from luwin.media import MediaType, Version
 from luwin.tools.args import TmdbId
 
@@ -133,7 +133,7 @@ async def download_history(
         owner = await owner_for(ctx, details, host, is_4k=version == "4K")
     except NotLocated as exc:
         return Result.refusal(str(exc))
-    arr = f"{ARR_NAMES[media_type]} on {owner.host}"
+    arr = f"{owner.kind.arr_name} on {owner.host}"
     try:
         history, queue = await asyncio.gather(owner.arr.history(owner.media_id), owner.arr.queue())
     except ClientError as exc:

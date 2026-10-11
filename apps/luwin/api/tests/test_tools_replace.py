@@ -34,7 +34,7 @@ def library(ctx):
     ]  # fmt: skip
     meleys = ctx.services.radarr["meleys"]
     meleys.movie_list = [Movie(8, "Dune", 438631, 2021, "", True, True, 44)]
-    meleys.files = [MediaFile(44, DUNE_1080, 14_000_000_000, "Bluray-1080p", "FLUX", 8)]
+    meleys.file_list = [MediaFile(44, DUNE_1080, 14_000_000_000, "Bluray-1080p", "FLUX", 8)]
     meleys.events[8] = [
         HistoryEvent(71, "downloadFolderImported", "Dune.1080p", "2026-09-01", "sab_9", "", 44),
         HistoryEvent(70, "grabbed", "Dune.1080p", "2026-09-01", "sab_9", ""),
@@ -161,8 +161,8 @@ async def test_only_the_reporters_own_report_on_its_own_host_and_file(library):
     out = await replace_media(library, reported.id, "meleys")
     assert out.content == "Dune (2021) in 4K is on vermithor, not meleys."
     # The file changed since it was reported (it was replaced already).
-    library.services.radarr["vermithor"].files[0] = replace(
-        library.services.radarr["vermithor"].files[0], id=56
+    library.services.radarr["vermithor"].file_list[0] = replace(
+        library.services.radarr["vermithor"].file_list[0], id=56
     )
     out = await replace_media(library, reported.id, "vermithor")
     assert out.is_error and "no longer there" in out.content
@@ -175,7 +175,7 @@ async def test_a_failed_delete_stops_before_the_search_and_says_so(library):
     async def refuse(file_id):
         raise ClientError("radarr", "DELETE", f"/api/v3/moviefile/{file_id}", 500, "locked")
 
-    library.services.radarr["vermithor"].delete_movie_file = refuse
+    library.services.radarr["vermithor"].delete_file = refuse
     out = await replace_media(library, reported.id, "vermithor")
     assert out.is_error and library.services.radarr["vermithor"].searched == []
     assert out.retryable  # Radarr didn't answer and nothing was deleted: try again
@@ -347,7 +347,7 @@ async def test_the_friend_hears_once_when_the_new_copy_lands(library):
     await confirmed(library, runner, reported)
     radarr = library.services.radarr["vermithor"]
     assert await tell_landed(library.services, library.store) == []  # nothing yet
-    radarr.files = [MediaFile(56, "/Vermithor/Movies/Dune (2021)/new.mkv", 60_000_000_000,
+    radarr.file_list = [MediaFile(56, "/Vermithor/Movies/Dune (2021)/new.mkv", 60_000_000_000,
                               "Remux-2160p", "FLUX", 8)]  # fmt: skip
     told = await tell_landed(library.services, library.store)
     assert sorted(dm.to for dm in told) == ["d1", "d2"]

@@ -171,7 +171,7 @@ async def test_4k_goes_to_the_admin_with_the_size_tradeoff(ctx):
     radarr.movie_list = [
         Movie(8, "Dune", 438631, 2021, "/Meleys/Movies/Dune (2021)", True, True, 55)
     ]
-    radarr.files = [
+    radarr.file_list = [
         MediaFile(
             55, "/Meleys/Movies/Dune (2021)/Dune.mkv", 12_300_000_000, "Bluray-1080p", None, 8
         )
@@ -316,7 +316,7 @@ async def test_a_size_that_cannot_be_measured_does_not_block_4k(ctx):
     class Down:
         base_url = "http://meleys.lan:7878"
 
-        async def movie_by_tmdb(self, tmdb_id):
+        async def find_id(self, details):
             raise ClientError("radarr", "GET", "/api/v3/movie", None, "timeout")
 
     ctx.services.radarr["meleys"] = Down()

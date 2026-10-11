@@ -184,7 +184,7 @@ def _radarr(host: str, seed: dict[str, Any]) -> FakeRadarrClient:
         events=events,
         host=host,
         base_url=ARR_URLS["radarr"].format(host=host),
-        files=[_file(f, int(f["movie_id"])) for f in seed.get("files", [])],
+        file_list=[_file(f, int(f["movie_id"])) for f in seed.get("files", [])],
         movie_list=[
             Movie(int(m["id"]), m["title"], int(m["tmdb_id"]), m.get("year"), "", True, False, None)
             for m in seed.get("movies", [])
@@ -301,7 +301,7 @@ def _sonarr(host: str, seed: dict[str, Any]) -> FakeSonarrClient:
             )
             for x in seed.get("series", [])
         ],
-        files=[
+        file_list=[
             _file({"id": n, **f}, int(f["series_id"]))
             for n, f in enumerate(seed.get("files", []), 1)
         ],

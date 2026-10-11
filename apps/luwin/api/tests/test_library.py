@@ -36,7 +36,7 @@ async def test_each_copy_resolves_through_seerr_to_its_own_host(two_stacks):
     # Seerr's record says: standard copy is movie 8 on server 0, 4K copy is movie 31 on server 1.
     both = replace(DUNE, arr=ArrRef(0, 8), arr_4k=ArrRef(1, 31))
     standard, uhd = await owner(two_stacks, both), await owner(two_stacks, both, is_4k=True)
-    assert (standard.host, standard.kind, standard.media_id) == ("meleys", "movie", 8)
+    assert (standard.host, standard.kind.media_type, standard.media_id) == ("meleys", "movie", 8)
     assert (uhd.host, uhd.media_id) == ("vermithor", 31)
     assert uhd.arr is two_stacks.radarr["vermithor"]
 
@@ -57,9 +57,9 @@ async def test_shows_and_their_files(two_stacks):
     sonarr.series_list = [
         Series(12, "The Bear", 403245, 2022, "/TV/The Bear", True, "standard", (1,))
     ]
-    sonarr.files = [MediaFile(1, "/TV/The Bear/S01E01.mkv", 2_000, "WEBDL-1080p", None, 12, 1)]
+    sonarr.file_list = [MediaFile(1, "/TV/The Bear/S01E01.mkv", 2_000, "WEBDL-1080p", None, 12, 1)]
     found = await owner(two_stacks, BEAR)
-    assert (found.host, found.kind, found.media_id) == ("meleys", "tv", 12)
+    assert (found.host, found.kind.media_type, found.media_id) == ("meleys", "tv", 12)
     assert [f.size_bytes for f in await found.files()] == [2_000]
     assert await owner(two_stacks, replace(BEAR, tvdb_id=None)) is None
 
@@ -83,7 +83,7 @@ async def test_an_instance_that_cannot_answer_is_refused(services):
     class Down:
         base_url = "http://meleys.lan:7878"
 
-        async def movie_by_tmdb(self, tmdb_id):
+        async def find_id(self, details):
             raise ConnectionError("meleys is down")
 
     services.radarr["meleys"] = Down()

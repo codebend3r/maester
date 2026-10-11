@@ -207,7 +207,7 @@ async def test_a_removal_whose_search_doesnt_start_goes_to_the_admin(sweeper, se
     async def refuse(ids):
         raise ClientError("radarr", "POST", "/api/v3/command", 503, "busy")
 
-    radarr.movies_search = refuse
+    radarr.search = refuse
     (post,) = await sweeper()
     assert radarr.removed == [1] and "search didn't start" in post.text
     assert "Search for it in Radarr on meleys" in post.text

@@ -28,7 +28,7 @@ from luwin.clients.seerr import MediaRequest, RequestStatus
 from luwin.config import Settings
 from luwin.formatting import ago, local_time
 from luwin.jobs.sweep import downloads as queued_downloads
-from luwin.library import ARR_NAMES
+from luwin.kinds import KINDS
 from luwin.media import episode_code, version_label
 from luwin.notify import AdminPost, Notice
 from luwin.playback.reports import POLICIES
@@ -180,21 +180,20 @@ class Digest:
             of(stall.host).lines.append(
                 f"{stall.title}: {STALL_WORDS[stall.action]} ({stall.reason})"
             )
-        for kind, clients in (("movie", self.services.radarr), ("tv", self.services.sonarr)):
-            for host, arr in sorted(clients.items()):
-                arr_name = f"{ARR_NAMES[kind]} on {host}"
+        for kind in KINDS.values():
+            for host, arr in sorted(kind.arrs(self.services).items()):
                 try:
                     queue = await arr.queue()
                 except ClientError as exc:
-                    missed.lines.append(f"{arr_name}'s queue: {exc}")
+                    missed.lines.append(f"{kind.arr_name} on {host}'s queue: {exc}")
                     continue
-                handled = self.store.watched(host, kind)
-                for d in queued_downloads(host, kind, queue):
+                handled = self.store.watched(host, kind.media_type)
+                for d in queued_downloads(host, kind.media_type, queue):
                     seen = handled.get(d.download_id)
                     if d.flagged and not d.waiting and not (seen and seen.acted_at):
                         why = "; ".join(m for r in d.records for m in r.error_messages)
-                        why = why or f"{ARR_NAMES[kind]} marks it {d.first.tracked_status}"
-                        of(host).lines.append(f"{d.title}: stuck in {ARR_NAMES[kind]} ({why})")
+                        why = why or f"{kind.arr_name} marks it {d.first.tracked_status}"
+                        of(host).lines.append(f"{d.title}: stuck in {kind.arr_name} ({why})")
         for host, sab in sorted(self.services.sabnzbd.items()):
             try:
                 history = await sab.history(limit=NEWEST)

@@ -16,9 +16,11 @@ Whatever cannot be settled this way is refused with `OwnerUnknown`, never
 guessed: a Seerr server that matches no configured instance (or two), two
 instances holding the title, an instance that cannot answer.
 
-An owner is a `MovieOwner` (a Radarr) or a `ShowOwner` (a Sonarr), each
-speaking its own arr's API: the copy's files, the one file a copy names
-(`locate`), deletes and searches. `owner_of` wants the copy to be in an arr
+An owner is the arr holding a copy and the title's id there: its files,
+deletes and searches are the same verbs for either arr. Only finding the one
+file a copy names (`locate`) differs, a `MovieOwner` (a Radarr) holding one
+file per movie and a `ShowOwner` (a Sonarr) one per episode, which also
+follows the show. `owner_of` wants the copy to be in an arr
 (`NotOwned` otherwise), and a tool that writes to an arr names the host,
 which `owner_on` (and `show_owner_on`, typed for a show) holds it to. Every
 "can't name it" is a `NotLocated`.
@@ -29,15 +31,15 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, ClassVar
+from typing import ClassVar
 from urllib.parse import urlsplit
 
 from luwin.clients import Services
-from luwin.clients.arr import MediaFile
-from luwin.clients.radarr import Radarr
+from luwin.clients.arr import Arr, MediaFile
 from luwin.clients.seerr import ArrServer, MediaDetails
 from luwin.clients.sonarr import Episode, Sonarr
-from luwin.media import Copy, version_label
+from luwin.kinds import KINDS, Kind
+from luwin.media import Copy, MediaType, version_label
 
 _DEFAULT_PORTS = {"http": 80, "https": 443}
 
@@ -67,16 +69,33 @@ class Held:
 
 
 @dataclass(frozen=True)
-class MovieOwner:
-    """The Radarr holding a movie's copy."""
+class Owner:
+    """The arr holding a copy, and the title's id there."""
 
-    kind: ClassVar[str] = "movie"
+    kind: ClassVar[Kind]
     host: str
-    media_id: int  # the movie's id in that Radarr
-    arr: Radarr
+    media_id: int  # the movie's or the series' id in that arr
+    arr: Arr
 
     async def files(self) -> list[MediaFile]:
-        return await self.arr.movie_files(self.media_id)
+        return await self.arr.files(self.media_id)
+
+    async def delete_file(self, file_id: int) -> None:
+        await self.arr.delete_file(file_id)
+
+    async def search(self, ids: tuple[int, ...]) -> None:
+        """Search for the movie, or for these episodes."""
+        await self.arr.search(list(ids))
+
+    async def locate(self, copy: Copy, title: str) -> Held:
+        raise NotImplementedError
+
+
+@dataclass(frozen=True)
+class MovieOwner(Owner):
+    """The Radarr holding a movie's copy."""
+
+    kind: ClassVar[Kind] = KINDS["movie"]
 
     async def locate(self, copy: Copy, title: str) -> Held:
         """The movie's file; Radarr keeps one per movie."""
@@ -85,25 +104,13 @@ class MovieOwner:
             raise NotOnServer(f"{title} has no {copy.version} file on {self.host}")
         return Held(files[0], (self.media_id,))
 
-    async def delete_file(self, file_id: int) -> None:
-        await self.arr.delete_movie_file(file_id)
-
-    async def search(self, ids: tuple[int, ...]) -> None:
-        """Search for the movie; `ids` is its own id."""
-        await self.arr.movies_search(list(ids))
-
 
 @dataclass(frozen=True)
-class ShowOwner:
+class ShowOwner(Owner):
     """The Sonarr holding a show's copy."""
 
-    kind: ClassVar[str] = "tv"
-    host: str
-    media_id: int  # the series' id in that Sonarr
+    kind: ClassVar[Kind] = KINDS["tv"]
     arr: Sonarr
-
-    async def files(self) -> list[MediaFile]:
-        return await self.arr.episode_files(self.media_id)
 
     async def episodes(self) -> list[Episode]:
         return await self.arr.episodes(self.media_id)
@@ -123,21 +130,12 @@ class ShowOwner:
             raise NotOnServer(f"{copy.title(title)} has no file on {self.host}")
         return Held(file, tuple(e.id for e in episodes if e.file_id == file.id))
 
-    async def delete_file(self, file_id: int) -> None:
-        await self.arr.delete_episode_file(file_id)
-
-    async def search(self, ids: tuple[int, ...]) -> None:
-        """Search for these episodes."""
-        await self.arr.episode_search(list(ids))
-
     async def follow(self) -> None:
         """Monitor the show and every season Sonarr learns of from now on."""
         await self.arr.follow(self.media_id)
 
 
-Owner = MovieOwner | ShowOwner
-OWNERS: dict[str, type[MovieOwner] | type[ShowOwner]] = {"movie": MovieOwner, "tv": ShowOwner}
-ARR_NAMES = {"movie": "Radarr", "tv": "Sonarr"}
+OWNERS: dict[MediaType, type[Owner]] = {"movie": MovieOwner, "tv": ShowOwner}
 
 
 def _address(url: str) -> tuple[str, int, str]:
@@ -155,15 +153,13 @@ class Library:
 
     @classmethod
     async def load(cls, services: Services) -> Library:
-        radarr, sonarr = await asyncio.gather(
-            services.seerr.servers("radarr"), services.seerr.servers("sonarr")
-        )
-        return cls(services, {"movie": radarr, "tv": sonarr})
+        found = await asyncio.gather(*(services.seerr.servers(k.service) for k in KINDS.values()))
+        return cls(services, dict(zip(KINDS, found, strict=True)))
 
-    def clients(self, kind: str) -> Mapping[str, Any]:
-        return self.services.radarr if kind == "movie" else self.services.sonarr
+    def clients(self, kind: MediaType) -> Mapping[str, Arr]:
+        return KINDS[kind].arrs(self.services)
 
-    def host_of(self, kind: str, server: ArrServer) -> str:
+    def host_of(self, kind: MediaType, server: ArrServer) -> str:
         """The registry host whose client points where Seerr's server does."""
         want = _address(server.url)
         hosts = [h for h, c in self.clients(kind).items() if _address(c.base_url) == want]
@@ -197,23 +193,19 @@ class Library:
 
     async def _ask_standard_instances(self, details: MediaDetails) -> tuple[str, int] | None:
         kind = details.media_type
-        if kind == "tv" and details.tvdb_id is None:
-            return None
         uhd = {self.host_of(kind, s) for s in self.servers[kind] if s.is_4k}
         clients = {h: c for h, c in sorted(self.clients(kind).items()) if h not in uhd}
-
-        async def lookup(client: Any) -> Any:
-            if kind == "movie":
-                return await client.movie_by_tmdb(details.tmdb_id)
-            return await client.series_by_tvdb(details.tvdb_id)
-
-        found = await asyncio.gather(*map(lookup, clients.values()), return_exceptions=True)
+        found = await asyncio.gather(
+            *(c.find_id(details) for c in clients.values()), return_exceptions=True
+        )
         holders = []
-        for host, item in zip(clients, found, strict=True):
-            if isinstance(item, Exception):
-                raise OwnerUnknown(f"couldn't ask the {kind} arr on {host}: {item}") from item
-            if item is not None:
-                holders.append((host, item.id))
+        for host, media_id in zip(clients, found, strict=True):
+            if isinstance(media_id, Exception):
+                raise OwnerUnknown(
+                    f"couldn't ask the {kind} arr on {host}: {media_id}"
+                ) from media_id
+            if media_id is not None:
+                holders.append((host, media_id))
         if len(holders) > 1:
             hosts = " and ".join(host for host, _ in holders)
             raise OwnerUnknown(f"{hosts} both have it; can't tell which one is meant")
@@ -221,7 +213,7 @@ class Library:
 
 
 def _not_in_arr(details: MediaDetails, is_4k: bool) -> NotOwned:
-    version, arr = version_label(is_4k), ARR_NAMES[details.media_type]
+    version, arr = version_label(is_4k), KINDS[details.media_type].arr_name
     return NotOwned(
         f"The {version} copy of {details.display} isn't in {arr} yet; it's added once a "
         "request for it is approved."
@@ -230,7 +222,7 @@ def _not_in_arr(details: MediaDetails, is_4k: bool) -> NotOwned:
 
 def _held_to(details: MediaDetails, found: str, host: str) -> None:
     if found != host.lower():
-        arr = ARR_NAMES[details.media_type]
+        arr = KINDS[details.media_type].arr_name
         raise NotOwned(f"{details.display} is on the {arr} on {found}, not {host}.")
 
 

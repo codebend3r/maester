@@ -50,7 +50,8 @@ from luwin.clients.seerr import (
     Seerr,
 )
 from luwin.config import Settings
-from luwin.library import ARR_NAMES, Library, NotLocated, OwnerUnknown, show_owner_on
+from luwin.kinds import KINDS
+from luwin.library import Library, NotLocated, OwnerUnknown, show_owner_on
 from luwin.media import MediaType, version_label
 from luwin.notify import DirectMessage
 from luwin.storage import Space, volumes_of
@@ -128,7 +129,7 @@ async def dub_routing(
     seerr: Seerr, settings: Settings, details: MediaDetails, is_4k: bool
 ) -> tuple[Routing | None, dict[str, Any]]:
     """Where a dub request goes: Seerr's own tags plus the dub tag, and the dub profile."""
-    kind = "radarr" if details.media_type == "movie" else "sonarr"
+    kind = KINDS[details.media_type].service
     servers = await seerr.servers(kind)
     server = next((s for s in servers if s.is_4k == is_4k and s.is_default), None)
     if server is None:
@@ -328,8 +329,7 @@ async def request_media_4k(
     english_dub: EnglishDub = False,
 ) -> dict[str, Any] | Result:
     seerr = ctx.services.seerr
-    kind = "radarr" if media_type == "movie" else "sonarr"
-    uhd = [s for s in await seerr.servers(kind) if s.is_4k]
+    uhd = [s for s in await seerr.servers(KINDS[media_type].service) if s.is_4k]
     if not uhd:
         return Result.refusal("4K requests aren't set up on this server.")
     details = await seerr.media_details(media_type, tmdb_id)
@@ -381,7 +381,7 @@ async def no_room_for_4k(
         return f"Seerr names no root folder for {server.name}, so its free space can't be told"
     volume = Space(tuple(volumes_of(host, roots, disks)), {}).holding(host, root)
     if volume is None:
-        return f"{ARR_NAMES[details.media_type]} on {host} reports no free space for {root}"
+        return f"{KINDS[details.media_type].arr_name} on {host} reports no free space for {root}"
     if volume.used_percent < limit:
         return None
     return (

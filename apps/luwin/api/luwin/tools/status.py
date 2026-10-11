@@ -148,7 +148,7 @@ def download(
     sab_history: Any,
 ) -> dict[str, Any]:
     """An approved request's download, from what the phases fetched (failures included)."""
-    arr = f"{'Radarr' if owner.kind == 'movie' else 'Sonarr'} on {owner.host}"
+    arr = f"{owner.kind.arr_name} on {owner.host}"
     if isinstance(items, BaseException):
         return {"host": owner.host, "error": f"couldn't reach {arr}: {items}"}
     if items:
