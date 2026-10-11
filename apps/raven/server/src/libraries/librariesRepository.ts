@@ -40,6 +40,7 @@ type LibraryRow = {
   kind: string
   ratings_source: string
   auto_refresh: number
+  locked: number
 }
 
 /** A row's settings; a value the database holds but this version does not know falls back to the default. */
@@ -57,12 +58,13 @@ const toSettings = (row: LibraryRow): LibrarySettings => ({
     ? row.ratings_source
     : DEFAULT_LIBRARY_SETTINGS.ratingsSource,
   autoRefresh: row.auto_refresh === 1,
+  locked: row.locked === 1,
 })
 
 /** The settings columns in the order the statements below bind them. */
 const settingValues = (
   settings: LibrarySettings,
-): [number, number, string, string, string, number, string, string, number] => [
+): [number, number, string, string, string, number, string, string, number, number] => [
   Number(settings.saveProgress),
   Number(settings.pinned),
   settings.sort,
@@ -72,6 +74,7 @@ const settingValues = (
   settings.kind,
   settings.ratingsSource,
   Number(settings.autoRefresh),
+  Number(settings.locked),
 ]
 
 /** Whether a library's paths are the same, in the same order, as they were. */
@@ -102,7 +105,7 @@ export class LibrariesRepository {
     const libraries = this.db
       .prepare<[number | null, number | null], LibraryRow>(
         `SELECT l.id, l.name, l.created_at, l.save_progress, l.pinned, l.sort, l.view_mode, l.group_by,
-                l.watched_percent, l.kind, l.ratings_source, l.auto_refresh,
+                l.watched_percent, l.kind, l.ratings_source, l.auto_refresh, l.locked,
                 (SELECT COUNT(*) FROM media m WHERE m.library_id = l.id) AS item_count,
                 (SELECT COUNT(*) FROM media m WHERE m.library_id = l.id AND m.match = 'unmatched')
                   AS unmatched_count
@@ -154,8 +157,8 @@ export class LibrariesRepository {
       const result = this.db
         .prepare(
           `INSERT INTO libraries (name, created_at, save_progress, pinned, sort, view_mode, group_by,
-                                  watched_percent, kind, ratings_source, auto_refresh)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                                  watched_percent, kind, ratings_source, auto_refresh, locked)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(input.name, new Date().toISOString(), ...settingValues(settings))
       const created = Number(result.lastInsertRowid)
@@ -186,13 +189,23 @@ export class LibrariesRepository {
         .prepare(
           `UPDATE libraries
               SET name = ?, save_progress = ?, pinned = ?, sort = ?, view_mode = ?, group_by = ?,
-                  watched_percent = ?, kind = ?, ratings_source = ?, auto_refresh = ?
+                  watched_percent = ?, kind = ?, ratings_source = ?, auto_refresh = ?, locked = ?
             WHERE id = ?`,
         )
         .run(input.name, ...settingValues(settings), id)
       this.replacePaths({ id, paths: input.paths })
     })()
     return this.get(id)
+  }
+
+  /** The libraries kept behind the PIN. */
+  lockedIds(): Set<number> {
+    return new Set(
+      this.db
+        .prepare<[], { id: number }>('SELECT id FROM libraries WHERE locked = 1')
+        .all()
+        .map((row) => row.id),
+    )
   }
 
   remove(id: number): boolean {

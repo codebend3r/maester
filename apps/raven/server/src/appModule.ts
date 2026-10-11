@@ -1,4 +1,5 @@
 import { type DynamicModule, Module } from '@nestjs/common'
+import { APP_GUARD } from '@nestjs/core'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { DatabaseService } from '@/db/database'
 import { EventsController } from '@/events/eventsController'
@@ -12,6 +13,9 @@ import { PeopleController } from '@/items/peopleController'
 import { ReviewsController } from '@/items/reviewsController'
 import { LibrariesController } from '@/libraries/librariesController'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
+import { LockController } from '@/lock/lockController'
+import { LockGuard } from '@/lock/lockGuard'
+import { LockService } from '@/lock/lockService'
 import { FavouritesController } from '@/media/favouritesController'
 import { MediaController } from '@/media/mediaController'
 import { MediaIndex } from '@/media/mediaIndex'
@@ -69,6 +73,7 @@ export class AppModule {
         ReviewsController,
         SettingsController,
         EventsController,
+        LockController,
       ],
       providers: [
         { provide: SERVER_CONFIG, useValue: config },
@@ -91,6 +96,9 @@ export class AppModule {
         SubtitlesService,
         ScannerService,
         LibraryWatcher,
+        LockService,
+        // Every route passes the lock first; only those marked PrivateBy are held.
+        { provide: APP_GUARD, useClass: LockGuard },
       ],
     }
   }

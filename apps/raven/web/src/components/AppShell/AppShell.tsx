@@ -63,7 +63,7 @@ const ShortcutTip = ({ onDismiss }: { onDismiss: () => void }) => (
 /**
  * The frame around every browsing page: the wordmark, then the side menu
  * beside the page (below it on a narrow screen). Pinned libraries get their
- * own links there, each with its type's icon, and an open one is marked
+ * own links there, each with its type's icon (a lock for a locked one), and an open one is marked
  * instead of Libraries. The menu collapses to its icons with the toggle or
  * B, and stays that way across visits. While it is open, what the pages
  * show follows the server's changes. The player leaves the frame behind for
@@ -129,7 +129,7 @@ export const AppShell = () => {
                 <NavItem
                   to={`/libraries/${library.id}`}
                   patterns={libraryPages(library.id)}
-                  icon={KINDS[library.settings.kind].icon}
+                  icon={library.settings.locked ? 'lock' : KINDS[library.settings.kind].icon}
                   label={library.name}
                   collapsed={collapsed}
                 />

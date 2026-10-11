@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Headers,
   Inject,
   NotFoundException,
   Param,
@@ -11,6 +12,7 @@ import {
 import type { PersonDetails } from '@raven/core'
 import type { FastifyReply } from 'fastify'
 import { sendImage } from '@/items/sendImage'
+import { LockService } from '@/lock/lockService'
 import { ImageCache } from '@/metadata/imageCache'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 
@@ -19,14 +21,22 @@ export class PeopleController {
   constructor(
     @Inject(MetadataRepository) private readonly metadata: MetadataRepository,
     @Inject(ImageCache) private readonly images: ImageCache,
+    @Inject(LockService) private readonly lock: LockService,
   ) {}
 
-  /** A person, and the movies and shows in raven they are credited on. */
+  /** A person, and the movies and shows in raven they are credited on, but for locked ones. */
   @Get(':id')
-  get(@Param('id', ParseIntPipe) id: number): PersonDetails {
+  get(
+    @Param('id', ParseIntPipe) id: number,
+    @Headers('cookie') cookie: string | undefined,
+  ): PersonDetails {
     const person = this.metadata.person(id)
     if (!person) throw new NotFoundException(`No person ${id}`)
-    return person
+    const viewer = this.lock.viewer({ cookie })
+    return {
+      ...person,
+      credits: person.credits.filter((credit) => viewer.seesItem(credit.item.id)),
+    }
   }
 
   /** A person's photo from TMDB, fetched and cached on first use. */

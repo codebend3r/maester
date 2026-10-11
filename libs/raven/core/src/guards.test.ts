@@ -43,6 +43,7 @@ describe('isLibrary', () => {
             kind: 'shows',
             ratingsSource: 'imdb',
             autoRefresh: false,
+            locked: true,
           },
         }),
       ),

@@ -5,6 +5,7 @@ import type { Library, LibraryInput, LibrarySettings, MediaItem, MediaSort } fro
 import { Route, Routes, useLocation, useParams } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { LibraryPage } from '@/pages/LibraryPage/LibraryPage'
+import { useUnlockPrompt } from '@/stores/unlockPrompt'
 import { library, mediaItem, showEntry } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 
@@ -23,6 +24,8 @@ describe('LibraryPage', () => {
     get: spyOn(api, 'getLibrary'),
     list: spyOn(api, 'listMedia'),
     update: spyOn(api, 'updateLibrary'),
+    lockState: spyOn(api, 'getLock'),
+    lock: spyOn(api, 'lock'),
   }
   const state = {
     sent: [] as LibraryInput[],
@@ -67,6 +70,8 @@ describe('LibraryPage', () => {
     spies.get.mockReset()
     spies.list.mockReset()
     spies.update.mockReset()
+    spies.lockState.mockReset()
+    spies.lock.mockReset()
     state.sent = []
     state.listed = []
   })
@@ -217,6 +222,26 @@ describe('LibraryPage', () => {
     await screen.findByText(/No videos in these folders yet/)
     expect(screen.getByRole('button', { name: 'Play' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Shuffle' })).toBeDisabled()
+  })
+
+  it('keeps a locked library shut, asking for nothing, until the PIN is entered', async () => {
+    spies.lockState.mockImplementation(async () => ({ available: true, unlocked: false }))
+    serve({ locked: true })
+    const locked = await screen.findByRole('region', { name: 'Locked' })
+    expect(locked).toHaveTextContent('Movies is locked.')
+    expect(screen.queryByRole('search')).toBeNull()
+    expect(state.listed).toEqual([])
+    await userEvent.click(within(locked).getByRole('button', { name: 'Unlock' }))
+    expect(useUnlockPrompt.getState().open).toBe(true)
+  })
+
+  it('shows an unlocked library, with a way to lock it again', async () => {
+    spies.lockState.mockImplementation(async () => ({ available: true, unlocked: true }))
+    spies.lock.mockImplementation(async () => ({ available: true, unlocked: false }))
+    serve({ locked: true })
+    expect(await screen.findByRole('link', { name: /Wide/ })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Lock' }))
+    expect(spies.lock).toHaveBeenCalledTimes(1)
   })
 })
 

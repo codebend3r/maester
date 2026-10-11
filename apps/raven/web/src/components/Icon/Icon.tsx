@@ -38,6 +38,8 @@ export type IconName =
   | 'video'
   | 'libraries'
   | 'sidebar'
+  | 'lock'
+  | 'unlock'
 
 const PATHS: Record<IconName, string> = {
   back: 'M15 18l-6-6 6-6',
@@ -80,6 +82,8 @@ const PATHS: Record<IconName, string> = {
   video: 'M3 7h12v10H3zM15 10.5l6-3.5v10l-6-3.5',
   libraries: 'M3 4h4v16H3zM9 4h4v16H9zM14.6 5l3.6-1 3.4 15-3.6 1z',
   sidebar: 'M4 5h16v14H4zM9.5 5v14',
+  lock: 'M5 11h14v10H5zM8 11V7.5a4 4 0 0 1 8 0V11M12 15v2',
+  unlock: 'M5 11h14v10H5zM8 11V7.5a4 4 0 0 1 7.7-1.5M12 15v2',
 }
 
 const isIconName = (name: string): name is IconName => name in PATHS

@@ -19,6 +19,7 @@ import { Button, ButtonLink } from '@/components/Button/Button'
 import type { MatchType } from '@/components/FixMatchDialog/FixMatchDialog'
 import { LibraryDialog } from '@/components/LibraryDialog/LibraryDialog'
 import { LibraryToolbar } from '@/components/LibraryToolbar/LibraryToolbar'
+import { LockedLibrary } from '@/components/LockedLibrary/LockedLibrary'
 import { MediaGrid } from '@/components/MediaGrid/MediaGrid'
 import { MediaGroups } from '@/components/MediaGroups/MediaGroups'
 import { MediaList } from '@/components/MediaList/MediaList'
@@ -177,6 +178,13 @@ export const LibraryPage = () => {
   const scanning = library.data?.scan.state === 'scanning'
   const saved = library.data?.settings ?? DEFAULT_LIBRARY_SETTINGS
   const settings = { ...saved, ...viewFromUrl(address) }
+  // A locked library's videos are not asked for until this browser has the PIN.
+  const lock = useQuery({
+    queryKey: queryKeys.lock,
+    queryFn: api.getLock,
+    enabled: settings.locked,
+  })
+  const shut = settings.locked && !lock.data?.unlocked
 
   // The search rides in the address once it settles, replacing rather than
   // stacking history entries as the viewer types.
@@ -207,7 +215,7 @@ export const LibraryPage = () => {
   const showsQuery = useQuery({
     queryKey: queryKeys.shows({ libraryId, search: query, sort, seed: dealt }),
     queryFn: () => api.listShows({ libraryId, search: query, sort, seed: dealt }),
-    enabled: library.isSuccess && tv,
+    enabled: library.isSuccess && !shut && tv,
     placeholderData: keepPreviousData,
     refetchInterval: (current) =>
       scanning ||
@@ -219,7 +227,7 @@ export const LibraryPage = () => {
   const media = useQuery({
     queryKey: queryKeys.media({ libraryId, search: query, sort, seed: dealt }),
     queryFn: () => api.listMedia({ libraryId, search: query, sort, seed: dealt }),
-    enabled: library.isSuccess && !tv,
+    enabled: library.isSuccess && !shut && !tv,
     placeholderData: keepPreviousData,
     // While a scan runs, or thumbnails are still being made or files matched, keep the grid filling in.
     refetchInterval: (current) =>
@@ -244,6 +252,11 @@ export const LibraryPage = () => {
     }
     wasMatchingFiles.current = isMatchingFiles
   }, [isMatchingFiles, libraryId, queryClient])
+
+  const relock = useMutation({
+    mutationFn: api.lock,
+    onSuccess: () => queryClient.invalidateQueries(),
+  })
 
   const rescan = useMutation({
     mutationFn: () => api.scanLibrary(libraryId),
@@ -371,68 +384,81 @@ export const LibraryPage = () => {
           <Button icon="edit" onClick={() => setEditing(true)}>
             Edit
           </Button>
+          {settings.locked && !shut && (
+            <Button icon="lock" disabled={relock.isPending} onClick={() => relock.mutate()}>
+              Lock
+            </Button>
+          )}
         </div>
       </header>
 
-      <LibraryToolbar
-        name={library.data.name}
-        search={search}
-        onSearch={setSearch}
-        settings={settings}
-        onChange={(change) => {
-          setAddress(writeView({ params: address, change }), { replace: true })
-          if (library.data) saveSettings.mutate({ current: library.data, change })
-        }}
-        playable={playable}
-        onPlay={() => watch(firstPlayable())}
-        onShuffle={() => watch(randomPlayable())}
-      />
-
-      {saveSettings.isError && (
-        <p className={styles.message} role="alert">
-          Could not save how this library is shown: {saveSettings.error.message}
-        </p>
-      )}
-      {rematch.isError && (
-        <p className={styles.message} role="alert">
-          Could not match again: {rematch.error.message}
-        </p>
+      {shut && lock.data && (
+        <LockedLibrary name={library.data.name} available={lock.data.available} />
       )}
 
-      {emptyState && <p className={styles.message}>{emptyState}</p>}
-      {!emptyState && tv && items.length === 0 && (
-        <ShowsView
-          settings={settings}
-          shows={shows}
-          busy={showsQuery.isFetching && !showsQuery.data}
-          labelledBy={undefined}
-        />
-      )}
-      {!emptyState && tv && items.length > 0 && (
-        <div className={styles.buckets}>
-          {shows.length > 0 && (
-            <Bucket
-              label="Matched"
-              count={`${count.format(shows.length)} ${shows.length === 1 ? 'show' : 'shows'}`}
-            >
-              <ShowsView
-                settings={settings}
-                shows={shows}
-                busy={showsQuery.isFetching && !showsQuery.data}
-                labelledBy={undefined}
-              />
-            </Bucket>
+      {!shut && (
+        <>
+          <LibraryToolbar
+            name={library.data.name}
+            search={search}
+            onSearch={setSearch}
+            settings={settings}
+            onChange={(change) => {
+              setAddress(writeView({ params: address, change }), { replace: true })
+              if (library.data) saveSettings.mutate({ current: library.data, change })
+            }}
+            playable={playable}
+            onPlay={() => watch(firstPlayable())}
+            onShuffle={() => watch(randomPlayable())}
+          />
+
+          {saveSettings.isError && (
+            <p className={styles.message} role="alert">
+              Could not save how this library is shown: {saveSettings.error.message}
+            </p>
           )}
-          <Bucket
-            label="Not matched"
-            count={`${count.format(items.length)} ${items.length === 1 ? 'video' : 'videos'}`}
-          >
-            <MediaView settings={settings} items={items} busy={false} />
-          </Bucket>
-        </div>
-      )}
-      {!emptyState && !tv && (
-        <MediaView settings={settings} items={items} busy={media.isFetching && !media.data} />
+          {rematch.isError && (
+            <p className={styles.message} role="alert">
+              Could not match again: {rematch.error.message}
+            </p>
+          )}
+
+          {emptyState && <p className={styles.message}>{emptyState}</p>}
+          {!emptyState && tv && items.length === 0 && (
+            <ShowsView
+              settings={settings}
+              shows={shows}
+              busy={showsQuery.isFetching && !showsQuery.data}
+              labelledBy={undefined}
+            />
+          )}
+          {!emptyState && tv && items.length > 0 && (
+            <div className={styles.buckets}>
+              {shows.length > 0 && (
+                <Bucket
+                  label="Matched"
+                  count={`${count.format(shows.length)} ${shows.length === 1 ? 'show' : 'shows'}`}
+                >
+                  <ShowsView
+                    settings={settings}
+                    shows={shows}
+                    busy={showsQuery.isFetching && !showsQuery.data}
+                    labelledBy={undefined}
+                  />
+                </Bucket>
+              )}
+              <Bucket
+                label="Not matched"
+                count={`${count.format(items.length)} ${items.length === 1 ? 'video' : 'videos'}`}
+              >
+                <MediaView settings={settings} items={items} busy={false} />
+              </Bucket>
+            </div>
+          )}
+          {!emptyState && !tv && (
+            <MediaView settings={settings} items={items} busy={media.isFetching && !media.data} />
+          )}
+        </>
       )}
 
       {editing && <LibraryDialog library={library.data} onClose={() => setEditing(false)} />}

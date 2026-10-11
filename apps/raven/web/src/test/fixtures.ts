@@ -25,6 +25,7 @@ export const library = (overrides: Partial<Library> = {}): Library => ({
     kind: 'other',
     ratingsSource: 'tmdb',
     autoRefresh: true,
+    locked: false,
   },
   ...overrides,
 })

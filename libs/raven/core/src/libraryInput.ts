@@ -33,6 +33,7 @@ export const DEFAULT_LIBRARY_SETTINGS: LibrarySettings = {
   kind: 'other',
   ratingsSource: 'tmdb',
   autoRefresh: true,
+  locked: false,
 }
 
 /**
@@ -83,6 +84,7 @@ const SETTING_CHECKS: Record<
   kind: { valid: isLibraryKind, problem: 'Type is not one of the choices.' },
   ratingsSource: { valid: isShownRatings, problem: 'Ratings shown is not one of the choices.' },
   autoRefresh: { valid: isBoolean, problem: 'Refresh automatically must be on or off.' },
+  locked: { valid: isBoolean, problem: 'Lock with the PIN must be on or off.' },
 }
 
 type SettingsResult = { settings: Partial<LibrarySettings>; errors: string[] }
@@ -102,6 +104,7 @@ const readSettings = (input: unknown): SettingsResult => {
       ...(isLibraryKind(input.kind) ? { kind: input.kind } : {}),
       ...(isShownRatings(input.ratingsSource) ? { ratingsSource: input.ratingsSource } : {}),
       ...(isBoolean(input.autoRefresh) ? { autoRefresh: input.autoRefresh } : {}),
+      ...(isBoolean(input.locked) ? { locked: input.locked } : {}),
     },
     errors: Object.entries(SETTING_CHECKS)
       .filter(([key, check]) => input[key] !== undefined && !check.valid(input[key]))

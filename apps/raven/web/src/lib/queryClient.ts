@@ -1,8 +1,16 @@
-import { QueryClient } from '@tanstack/react-query'
-import { ApiError } from '@raven/core'
+import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query'
+import { ApiError, isLockedError } from '@raven/core'
+import { useUnlockPrompt } from '@/stores/unlockPrompt'
+
+/** Anything refused for sitting in a locked library asks for the PIN, wherever it was asked for. */
+const askForPin = (error: Error): void => {
+  if (isLockedError(error)) useUnlockPrompt.getState().ask()
+}
 
 export const createQueryClient = (): QueryClient =>
   new QueryClient({
+    queryCache: new QueryCache({ onError: askForPin }),
+    mutationCache: new MutationCache({ onError: askForPin }),
     defaultOptions: {
       queries: {
         staleTime: 30_000,
@@ -71,6 +79,8 @@ export const queryKeys = {
   itemImages: (id: number) => ['items', id, 'images'],
   /** Edit metadata: what the page shows against what TMDB says. */
   itemMetadata: (id: number) => ['items', id, 'metadata'],
+  /** Whether locked libraries can be opened, and are, in this browser. */
+  lock: ['lock'],
   /** How the server plays video, for every viewer. */
   playbackSettings: ['settings', 'playback'],
   nextEpisode: (showId: number) => ['items', showId, 'next'],

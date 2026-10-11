@@ -16,6 +16,7 @@ import { type MatchCandidate, type MediaItem, isRecord, isString } from '@raven/
 import type { FastifyReply } from 'fastify'
 import { sendImage } from '@/items/sendImage'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
+import { PrivateBy } from '@/lock/lockGuard'
 import { MediaRepository, toMediaItem } from '@/media/mediaRepository'
 import { ImageCache } from '@/metadata/imageCache'
 import { MetadataService } from '@/metadata/metadataService'
@@ -98,6 +99,7 @@ export class MatchController {
    * that holds one movie or show) at a TMDB movie or show; `{ tmdbId: null }`
    * says it is not one. Kept through renames, and never replaced by matching.
    */
+  @PrivateBy('media')
   @Put('media/:id/match')
   async setMatch(@Param('id', ParseIntPipe) id: number, @Body() body: unknown): Promise<MediaItem> {
     const record = this.media.get(id)

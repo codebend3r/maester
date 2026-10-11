@@ -51,6 +51,8 @@ export type LibrarySettings = {
   ratingsSource: ShownRatings
   /** Watch the folders and take in videos added, removed, renamed or replaced there as it happens. */
   autoRefresh: boolean
+  /** Private: its videos stay hidden until the server's PIN is entered. */
+  locked: boolean
 }
 
 /** The scores a library can show on its cards: Metacritic has no card of its own. */
@@ -360,6 +362,15 @@ export type HistoryEntry = {
   furthest: number
   /** Whether a play got past the library's watched percentage. */
   watched: boolean
+}
+
+/**
+ * Whether locked libraries can be opened here: `available` once the server
+ * has a PIN, `unlocked` once this browser has entered it.
+ */
+export type LockState = {
+  available: boolean
+  unlocked: boolean
 }
 
 /** Where a video's file lives, as the server sees it (a container path under Docker). */

@@ -6,6 +6,7 @@ import {
   isItemMetadataState,
   isLibrary,
   isLibraryList,
+  isLockState,
   isMatchCandidateList,
   isMediaItem,
   isMediaList,
@@ -34,6 +35,7 @@ import type {
   ItemMetadataState,
   Library,
   LibraryInput,
+  LockState,
   MatchCandidate,
   MediaItem,
   MediaLocation,
@@ -79,6 +81,13 @@ export class ApiError extends Error {
     this.status = status
   }
 }
+
+/** HTTP's Locked: what the server answers for a locked library's videos until its PIN is entered. */
+export const LOCKED_STATUS = 423
+
+/** A call refused because what it asked for sits in a locked library. */
+export const isLockedError = (error: unknown): boolean =>
+  error instanceof ApiError && error.status === LOCKED_STATUS
 
 /** Nest's error body carries `message` as a string or, for validation, a list. */
 const errorMessage = ({ body, fallback }: { body: unknown; fallback: string }): string => {
@@ -207,6 +216,20 @@ export const createApiClient = ({
     deleteLibrary: async (id: number): Promise<void> => {
       await send({ path: `/api/libraries/${id}`, method: 'DELETE' })
     },
+
+    getLock: (): Promise<LockState> =>
+      expect({ request: send({ path: '/api/lock' }), guard: isLockState }),
+
+    /** Opens every locked library for this browser; a wrong PIN fails with the server's reason. */
+    unlock: (pin: string): Promise<LockState> =>
+      expect({
+        request: send({ path: '/api/lock/unlock', method: 'POST', body: { pin } }),
+        guard: isLockState,
+      }),
+
+    /** Closes the locked libraries again. */
+    lock: (): Promise<LockState> =>
+      expect({ request: send({ path: '/api/lock/lock', method: 'POST' }), guard: isLockState }),
 
     scanLibrary: (id: number): Promise<Library> =>
       expect({

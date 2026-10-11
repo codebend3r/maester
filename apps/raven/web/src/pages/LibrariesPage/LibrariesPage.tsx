@@ -34,7 +34,8 @@ const LibraryRow = ({ library }: { library: Library }) => {
         {library.name}
       </Link>
       <span className={styles.count}>
-        {KINDS[library.settings.kind].label} · {count.format(library.itemCount)}{' '}
+        {KINDS[library.settings.kind].label}
+        {library.settings.locked && ' · Locked'} · {count.format(library.itemCount)}{' '}
         {library.itemCount === 1 ? 'video' : 'videos'}
         {library.unmatchedCount > 0 && ` · ${count.format(library.unmatchedCount)} not matched`}
       </span>

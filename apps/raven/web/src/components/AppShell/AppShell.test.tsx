@@ -101,6 +101,15 @@ describe('AppShell', () => {
     expect(within(pinned).getAllByRole('link').map(iconOf)).toEqual(['film', 'tv', 'video'])
   })
 
+  it('wears a lock for a locked library, whatever its type', async () => {
+    spies.list.mockImplementation(async () => [
+      library({ id: 1, name: 'Tutorials', settings: { ...library().settings, locked: true } }),
+    ])
+    renderShell('/')
+    const link = await within(nav()).findByRole('link', { name: 'Tutorials' })
+    expect(iconOf(link)).toBe('lock')
+  })
+
   it('collapses to its icons with the toggle, keeping every link named', async () => {
     spies.list.mockImplementation(async () => [library({ id: 3, name: 'Movies' })])
     renderShell('/')
