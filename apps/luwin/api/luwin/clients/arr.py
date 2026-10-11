@@ -1,15 +1,20 @@
-"""What Sonarr and Radarr share: the v3 API shape, queue, history and commands.
+"""What Sonarr and Radarr share: the v3 API shape, queue, history, files and searches.
 
 Every instance is constructed with its host name so errors and audit rows can
-say which stack was touched.
+say which stack was touched. The two speak the same verbs (`files`,
+`delete_file`, `search`, `find_id`) over their own routes, so code that works
+on a title's copy needn't know which arr holds it.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any, Protocol
 
 from luwin.clients.base import HttpClient
+
+if TYPE_CHECKING:
+    from luwin.clients.seerr import MediaDetails
 
 
 @dataclass(frozen=True)
@@ -181,6 +186,25 @@ class HistoryEvent:
 QUEUE_PAGE = 1000
 
 
+class Arr(Protocol):
+    """What every Sonarr and Radarr answers, by the title's id in it."""
+
+    host: str
+    base_url: str
+
+    async def ping(self) -> None: ...
+    async def root_folders(self) -> list[RootFolder]: ...
+    async def disk_space(self) -> list[DiskSpace]: ...
+    async def queue(self) -> list[QueueItem]: ...
+    async def history(self, media_id: int) -> list[HistoryEvent]: ...
+    async def find_id(self, details: MediaDetails) -> int | None: ...
+    async def files(self, media_id: int) -> list[MediaFile]: ...
+    async def delete_file(self, file_id: int) -> None: ...
+    async def search(self, ids: list[int]) -> int: ...
+    async def mark_failed(self, history_id: int) -> None: ...
+    async def remove_from_queue(self, queue_id: int, *, blocklist: bool = True) -> None: ...
+
+
 class ArrClient(HttpClient):
     api = "/api/v3"
     health_path = "/api/v3/system/status"  # checks the API key too
@@ -188,6 +212,10 @@ class ArrClient(HttpClient):
     history_scope: tuple[str, str]
     # What a queue read includes besides the downloads: the titles they're for.
     queue_includes: tuple[str, ...]
+    # A title's files live at /moviefile?movieId= or /episodefile?seriesId=.
+    file_scope: tuple[str, str]
+    # The command that searches for a movie (by its id) or for episodes (by theirs).
+    search_command: tuple[str, str]
 
     def __init__(self, host: str, base_url: str, api_key: str, **kwargs: Any):
         super().__init__(base_url, headers={"X-Api-Key": api_key}, **kwargs)
@@ -226,6 +254,20 @@ class ArrClient(HttpClient):
     async def command(self, name: str, **params: Any) -> int:
         result = await self.post_json(f"{self.api}/command", {"name": name, **params})
         return int(result["id"])
+
+    async def files(self, media_id: int) -> list[MediaFile]:
+        """A title's files: a movie's one, or every episode file of a series."""
+        route, key = self.file_scope
+        rows = await self.get_json(f"{self.api}/{route}", params={key: media_id})
+        return [MediaFile.from_api(r) for r in rows]
+
+    async def delete_file(self, file_id: int) -> None:
+        await self.delete(f"{self.api}/{self.file_scope[0]}/{file_id}")
+
+    async def search(self, ids: list[int]) -> int:
+        """Search for these movies, or these episodes; the command's id."""
+        name, key = self.search_command
+        return await self.command(name, **{key: ids})
 
     async def history(self, media_id: int) -> list[HistoryEvent]:
         """One title's download history, newest first."""

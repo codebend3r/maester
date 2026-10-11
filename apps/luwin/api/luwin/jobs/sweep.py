@@ -29,14 +29,15 @@ import logging
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
-from typing import Any
 
 from luwin.agent.limits import KillSwitch
 from luwin.clients import ClientError, Services
-from luwin.clients.arr import QueueItem
+from luwin.clients.arr import Arr, QueueItem
+from luwin.clients.base import Answers, gather_each
 from luwin.config import Settings
 from luwin.formatting import humanized
-from luwin.library import ARR_NAMES
+from luwin.kinds import KINDS, Kind
+from luwin.media import MediaType
 from luwin.notify import AdminPost, Notice
 from luwin.store import MAINTENANCE, StallAction, Store, Watched
 from luwin.store.base import stamp
@@ -57,7 +58,7 @@ class Download:
     """One download in a host's queue: every queue record that shares its download id."""
 
     host: str
-    kind: str  # movie | tv
+    kind: MediaType
     download_id: str
     records: tuple[QueueItem, ...]
 
@@ -87,6 +88,11 @@ class Download:
         return tuple(sorted({r.episode_id for r in self.records if r.episode_id is not None}))
 
     @property
+    def search_ids(self) -> tuple[int, ...]:
+        """What its arr searches for again: the movie, or the episodes."""
+        return (self.first.media_id,) if self.kind == "movie" else self.episode_ids
+
+    @property
     def item(self) -> str:
         """The title it's for, so the same movie or episodes stalling again is recognized."""
         if self.kind == "movie":
@@ -98,11 +104,11 @@ class Download:
         if messages:
             return "; ".join(messages)
         if self.flagged:
-            return f"{ARR_NAMES[self.kind]} marks it {self.first.tracked_status}"
+            return f"{KINDS[self.kind].arr_name} marks it {self.first.tracked_status}"
         return f"no progress for {humanized(int(stuck.total_seconds()))}"
 
 
-def downloads(host: str, kind: str, queue: Sequence[QueueItem]) -> list[Download]:
+def downloads(host: str, kind: MediaType, queue: Sequence[QueueItem]) -> list[Download]:
     """The queue's downloads the arr grabbed for a title it knows: one it doesn't (added to
     the client by hand) isn't the sweeper's to remove, nor a show's with no episode named."""
     by_id: dict[str, list[QueueItem]] = {}
@@ -111,6 +117,19 @@ def downloads(host: str, kind: str, queue: Sequence[QueueItem]) -> list[Download
         if record.download_id and known:
             by_id.setdefault(record.download_id, []).append(record)
     return [Download(host, kind, d, tuple(rs)) for d, rs in by_id.items()]
+
+
+Queues = Answers[tuple[Kind, str], list[QueueItem]]
+
+
+async def read_queues(services: Services) -> Queues:
+    """Every host's Radarr and Sonarr queue, asked at once, by kind and host."""
+    arrs = {
+        (kind, host): arr
+        for kind in KINDS.values()
+        for host, arr in sorted(kind.arrs(services).items())
+    }
+    return await gather_each(arrs, lambda key: arrs[key].queue())
 
 
 def stuck_since(download: Download, before: Watched | None, now: str) -> str | None:
@@ -140,19 +159,17 @@ class Sweeper:
         """One sweep of every host's queues; the notices are titles surfaced to the admin."""
         if self.store.flag(MAINTENANCE):
             return []
+        queues = await read_queues(self.services)
+        for (kind, host), why in queues.unreachable.items():
+            log.warning("sweep: %s on %s didn't answer: %s", kind.arr_name, host, why)
         notices: list[Notice] = []
-        for kind, clients in (("movie", self.services.radarr), ("tv", self.services.sonarr)):
-            for host, arr in sorted(clients.items()):
-                try:
-                    queue = await arr.queue()
-                except ClientError as exc:
-                    log.warning("sweep: %s on %s didn't answer: %s", ARR_NAMES[kind], host, exc)
-                    continue
-                notices += await self.sweep(host, kind, arr, queue)
+        for (kind, host), queue in queues.answered.items():
+            arr = kind.arrs(self.services)[host]
+            notices += await self.sweep(host, kind.media_type, arr, queue)
         return notices
 
     async def sweep(
-        self, host: str, kind: str, arr: Any, queue: Sequence[QueueItem]
+        self, host: str, kind: MediaType, arr: Arr, queue: Sequence[QueueItem]
     ) -> list[Notice]:
         now = datetime.now(UTC)
         before = self.store.watched(host, kind)
@@ -172,15 +189,17 @@ class Sweeper:
         self.store.watch(host, kind, seen, forget_before=now - WATCH_GRACE)
         return notices
 
-    async def act(self, arr: Any, download: Download, reason: str) -> tuple[bool, list[Notice]]:
+    async def act(self, arr: Arr, download: Download, reason: str) -> tuple[bool, list[Notice]]:
         """Search it again, or surface it; True once it's handled."""
-        host, kind, item = download.host, download.kind, download.item
-        earlier = self.store.researched_since(host, kind, item, datetime.now(UTC) - STALL_MEMORY)
+        host, arr_name, item = download.host, KINDS[download.kind].arr_name, download.item
+        earlier = self.store.researched_since(
+            host, download.kind, item, datetime.now(UTC) - STALL_MEMORY
+        )
         if earlier:
             text = (
                 f"{download.title} stalled again on {host} ({reason}). It was blocklisted and "
                 f"searched again on {earlier[:10]}, so another release may stall too; it's left "
-                f"in {ARR_NAMES[kind]}'s queue for you."
+                f"in {arr_name}'s queue for you."
             )
             self._record(download, reason, StallAction.SURFACED, text, ok=True)
             return True, [AdminPost(text)]
@@ -193,16 +212,13 @@ class Sweeper:
             self._record(download, reason, StallAction.FAILED, text, ok=False)
             return False, []
         try:
-            if kind == "movie":
-                await arr.movies_search([download.first.media_id])
-            else:
-                await arr.episode_search(list(download.episode_ids))
+            await arr.search(list(download.search_ids))
         except ClientError as exc:
             # It's out of the queue now, so no later sweep would search for it: the admin does.
             text = (
                 f"{download.title} on {host} stalled ({reason}): blocklisted that release and "
                 f"removed it, but the search didn't start ({exc}). Search for it in "
-                f"{ARR_NAMES[kind]} on {host}."
+                f"{arr_name} on {host}."
             )
             self._record(download, reason, StallAction.REMOVED, text, ok=False)
             return True, [AdminPost(text)]

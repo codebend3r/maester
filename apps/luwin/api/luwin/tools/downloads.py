@@ -17,13 +17,17 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime
-from typing import Any
+from typing import Annotated, Any
 
-from luwin.agent.tools import Result, Tier, ToolContext, tool
+from pydantic import Field
+
+from luwin.agent.tools import Failed, Refused, Result, Tier, ToolContext, tool
 from luwin.clients import ClientError
 from luwin.clients.arr import HistoryEvent, QueueItem
 from luwin.clients.sabnzbd import Download
-from luwin.library import ARR_NAMES, NotLocated, Owner, owner_of, owner_on
+from luwin.library import NotLocated, Owner, owner_of, owner_on
+from luwin.media import MediaType, Version
+from luwin.tools.args import TmdbId
 
 # The newest history events shown, and how far back SABnzbd's history is read.
 EVENTS_SHOWN = 15
@@ -114,37 +118,26 @@ async def owner_for(ctx: ToolContext, details: Any, host: str | None, is_4k: boo
     "those downloads on that host (its failure message and the repair and unpack steps that "
     "went wrong). Give host when known; otherwise the owner is found. Summarize the cause "
     "and the next step in plain words.",
-    {
-        "type": "object",
-        "properties": {
-            "tmdb_id": {"type": "integer", "description": "The TMDB id from search_media."},
-            "media_type": {"type": "string", "enum": ["movie", "tv"]},
-            "version": {"type": "string", "enum": ["1080p", "4K"]},
-            "host": {"type": "string", "description": "The host holding that copy, if known."},
-        },
-        "required": ["tmdb_id", "media_type"],
-        "additionalProperties": False,
-    },
     tier=Tier.ADMIN,
     host_param="host",
 )
 async def download_history(
     ctx: ToolContext,
-    tmdb_id: int,
-    media_type: str,
-    version: str = "1080p",
-    host: str | None = None,
+    tmdb_id: TmdbId,
+    media_type: MediaType,
+    version: Version = "1080p",
+    host: Annotated[str | None, Field(description="The host holding that copy, if known.")] = None,
 ) -> dict[str, Any] | Result:
     details = await ctx.services.seerr.media_details(media_type, tmdb_id)
     try:
         owner = await owner_for(ctx, details, host, is_4k=version == "4K")
     except NotLocated as exc:
-        return Result.refusal(str(exc))
-    arr = f"{ARR_NAMES[media_type]} on {owner.host}"
+        return Refused(str(exc))
+    arr = f"{owner.kind.arr_name} on {owner.host}"
     try:
         history, queue = await asyncio.gather(owner.arr.history(owner.media_id), owner.arr.queue())
     except ClientError as exc:
-        return Result(f"{arr} didn't answer: {exc}", is_error=True, retryable=True)
+        return Failed(f"{arr} didn't answer: {exc}", retryable=True)
     mine = [q for q in queue if q.media_id == owner.media_id]
     ids = {e.download_id for e in history if e.download_id}
     ids |= {q.download_id for q in mine if q.download_id}

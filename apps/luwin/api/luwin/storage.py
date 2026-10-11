@@ -28,9 +28,11 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Any
 
-from luwin.clients import ClientError, Services
+from luwin.clients import Services
 from luwin.clients.arr import DiskSpace, RootFolder
+from luwin.clients.base import gather_each
 from luwin.formatting import gigabytes
+from luwin.kinds import KINDS
 from luwin.store import SpaceSample
 
 # How far apart two reads of one disk's free space may be: downloads move it between reads.
@@ -143,24 +145,14 @@ class Space:
 
 async def read_space(services: Services) -> Space:
     """Every host's arrs asked at once, their volumes merged."""
-    arrs = [
-        (f"{label} on {host}", host, arr)
-        for label, clients in (("Sonarr", services.sonarr), ("Radarr", services.radarr))
-        for host, arr in sorted(clients.items())
-    ]
-    found = await asyncio.gather(
-        *(arr_volumes(host, arr) for _, host, arr in arrs), return_exceptions=True
-    )
-    volumes: list[Volume] = []
-    unreachable: dict[str, str] = {}
-    for (name, _, _), result in zip(arrs, found, strict=True):
-        if isinstance(result, ClientError):
-            unreachable[name] = str(result)
-        elif isinstance(result, BaseException):
-            raise result
-        else:
-            volumes += result
-    return Space(tuple(merged(volumes)), unreachable)
+    arrs = {
+        f"{kind.arr_name} on {host}": (host, arr)
+        for kind in KINDS.values()
+        for host, arr in sorted(kind.arrs(services).items())
+    }
+    found = await gather_each(arrs, lambda name: arr_volumes(*arrs[name]))
+    volumes = [v for each in found.answered.values() for v in each]
+    return Space(tuple(merged(volumes)), found.unreachable)
 
 
 FORECAST_WINDOW = timedelta(days=30)

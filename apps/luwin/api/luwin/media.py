@@ -13,9 +13,15 @@ from __future__ import annotations
 
 import enum
 from dataclasses import dataclass
+from typing import Literal
+
+# A title is a movie or a show, as Seerr and every tool name it.
+MediaType = Literal["movie", "tv"]
+# How people name a copy.
+Version = Literal["1080p", "4K"]
 
 
-def version_label(is_4k: bool) -> str:
+def version_label(is_4k: bool) -> Version:
     """How people name a copy: "4K" or "1080p"."""
     return "4K" if is_4k else "1080p"
 

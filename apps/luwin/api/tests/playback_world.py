@@ -45,7 +45,7 @@ def stock(ctx: ToolContext) -> ToolContext:
         "sonarr": [seerr_server(0, "tv", "meleys")],
     }  # fmt: skip
     services.seerr.details.update({("movie", 438631): DUNE, ("tv", 136315): BEAR})
-    services.radarr["vermithor"].files = [
+    services.radarr["vermithor"].file_list = [
         MediaFile(55, DUNE_4K, 68_500_000_000, "Remux-2160p", "FraMeSToR", 8)
     ]
     sonarr = services.sonarr["meleys"]
@@ -54,7 +54,7 @@ def stock(ctx: ToolContext) -> ToolContext:
         Episode(702, 12, 2, 7, "Forks", True, 72, True),
         Episode(703, 12, 2, 8, "Omelette", False, None, True),
     ]
-    sonarr.files = [MediaFile(72, FORKS, 1_900_000_000, "WEBDL-1080p", "NTb", 12, 2)]
+    sonarr.file_list = [MediaFile(72, FORKS, 1_900_000_000, "WEBDL-1080p", "NTb", 12, 2)]
     services.probe.files[DUNE_4K] = Inspection(DUNE_4K, 9331.0, "hevc", 7, DUNE_4K_TRACKS)
     services.probe.files[FORKS] = Inspection(FORKS, 1980.0, "h264", 0, ())
     services.plex.items.update(

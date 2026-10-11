@@ -19,16 +19,18 @@ it has something to say, in this order:
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 
 from luwin.agent.limits import KillSwitch
 from luwin.clients import ClientError, Services
+from luwin.clients.base import every_host
 from luwin.clients.seerr import MediaRequest, RequestStatus
 from luwin.config import Settings
 from luwin.formatting import ago, local_time
 from luwin.jobs.sweep import downloads as queued_downloads
-from luwin.library import ARR_NAMES
+from luwin.jobs.sweep import read_queues
 from luwin.media import episode_code, version_label
 from luwin.notify import AdminPost, Notice
 from luwin.playback.reports import POLICIES
@@ -60,6 +62,14 @@ class Section:
         return "\n".join([f"**{self.title}**", *(f"- {line}" for line in self.lines)])
 
 
+@dataclass(frozen=True)
+class Checked:
+    """What a part of the digest that asks services found, and what it couldn't ask."""
+
+    sections: list[Section]
+    missed: list[str] = field(default_factory=list)
+
+
 class Digest:
     def __init__(
         self, services: Services, store: Store, settings: Settings, kill_switch: KillSwitch
@@ -74,16 +84,25 @@ class Digest:
         return [AdminPost(await self.compose(datetime.now(UTC)))]
 
     async def compose(self, now: datetime) -> str:
-        missed = Section("Couldn't check")
         titles = Titles(self.services)
+        # The parts that ask services are independent: asked at once, then laid out in order.
+        requests, issues, downloads, space = await asyncio.gather(
+            self.new_requests(now, titles),
+            self.open_issues(now, titles),
+            self.downloads(now),
+            self.space(now),
+        )
+        missed = Section(
+            "Couldn't check", [m for c in (requests, issues, downloads, space) for m in c.missed]
+        )
         sections = [
             self.switches(),
             self.waiting(now),
-            await self.new_requests(now, titles, missed),
-            await self.open_issues(now, titles, missed),
+            *requests.sections,
+            *issues.sections,
             self.replacements(now),
-            *await self.downloads(now, missed),
-            await self.space(now, missed),
+            *downloads.sections,
+            *space.sections,
             self.bad_releases(),
             missed,
         ]
@@ -111,20 +130,21 @@ class Digest:
             [f"{p.summary} (asked {ago(now - datetime.fromisoformat(p.ts))})" for p in waiting],
         )
 
-    async def new_requests(self, now: datetime, titles: Titles, missed: Section) -> Section:
+    async def new_requests(self, now: datetime, titles: Titles) -> Checked:
         section = Section("New requests")
         try:
             requests = await self.services.seerr.list_requests(take=NEWEST, filter="all")
         except ClientError as exc:
-            missed.lines.append(f"Seerr's requests: {exc}")
-            return section
-        new = [r for r in requests if r.created and now - r.created <= DAY]
-        for r in sorted(new, key=lambda r: r.id):
-            title = await titles.of(r.media_type, r.tmdb_id)
-            section.lines.append(
-                f"{title} in {version_label(r.is_4k)} for {self._who(r)}: {self._stands(r)}"
-            )
-        return section
+            return Checked([section], [f"Seerr's requests: {exc}"])
+        new = sorted(
+            (r for r in requests if r.created and now - r.created <= DAY), key=lambda r: r.id
+        )
+        named = await asyncio.gather(*(titles.of(r.media_type, r.tmdb_id) for r in new))
+        section.lines += [
+            f"{title} in {version_label(r.is_4k)} for {self._who(r)}: {self._stands(r)}"
+            for r, title in zip(new, named, strict=True)
+        ]
+        return Checked([section])
 
     def _who(self, request: MediaRequest) -> str:
         link = self.store.active_link_by_seerr_id(request.requested_by_id)
@@ -138,15 +158,14 @@ class Digest:
             return request.media_status.label
         return request.status.label
 
-    async def open_issues(self, now: datetime, titles: Titles, missed: Section) -> Section:
+    async def open_issues(self, now: datetime, titles: Titles) -> Checked:
         section = Section("Open issues")
         try:
             issues = await self.services.seerr.open_issues(take=NEWEST)
         except ClientError as exc:
-            missed.lines.append(f"Seerr's issues: {exc}")
-            return section
-        for issue in issues:
-            title = await titles.of(issue.media_type, issue.tmdb_id)
+            return Checked([section], [f"Seerr's issues: {exc}"])
+        named = await asyncio.gather(*(titles.of(i.media_type, i.tmdb_id) for i in issues))
+        for issue, title in zip(issues, named, strict=True):
             code = episode_code(issue.season, issue.episode)
             raised = datetime.fromisoformat(issue.created_at) if issue.created_at else None
             when = f", {ago(now - raised)}" if raised else ""
@@ -154,7 +173,7 @@ class Digest:
                 f"#{issue.id} {title}{f' {code}' if code else ''}: {issue.kind}, raised by "
                 f"{issue.reporter or 'someone'}{when}"
             )
-        return section
+        return Checked([section])
 
     def replacements(self, now: datetime) -> Section:
         section = Section("Replaced")
@@ -169,7 +188,7 @@ class Digest:
                 )
         return section
 
-    async def downloads(self, now: datetime, missed: Section) -> list[Section]:
+    async def downloads(self, now: datetime) -> Checked:
         by_host: dict[str, Section] = {}
 
         def of(host: str) -> Section:
@@ -180,40 +199,35 @@ class Digest:
             of(stall.host).lines.append(
                 f"{stall.title}: {STALL_WORDS[stall.action]} ({stall.reason})"
             )
-        for kind, clients in (("movie", self.services.radarr), ("tv", self.services.sonarr)):
-            for host, arr in sorted(clients.items()):
-                arr_name = f"{ARR_NAMES[kind]} on {host}"
-                try:
-                    queue = await arr.queue()
-                except ClientError as exc:
-                    missed.lines.append(f"{arr_name}'s queue: {exc}")
-                    continue
-                handled = self.store.watched(host, kind)
-                for d in queued_downloads(host, kind, queue):
-                    seen = handled.get(d.download_id)
-                    if d.flagged and not d.waiting and not (seen and seen.acted_at):
-                        why = "; ".join(m for r in d.records for m in r.error_messages)
-                        why = why or f"{ARR_NAMES[kind]} marks it {d.first.tracked_status}"
-                        of(host).lines.append(f"{d.title}: stuck in {ARR_NAMES[kind]} ({why})")
-        for host, sab in sorted(self.services.sabnzbd.items()):
-            try:
-                history = await sab.history(limit=NEWEST)
-            except ClientError as exc:
-                missed.lines.append(f"SABnzbd on {host}: {exc}")
-                continue
+        queues, histories = await asyncio.gather(
+            read_queues(self.services),
+            every_host(self.services.sabnzbd, lambda sab: sab.history(limit=NEWEST)),
+        )
+        missed = [
+            f"{kind.arr_name} on {host}'s queue: {why}"
+            for (kind, host), why in queues.unreachable.items()
+        ]
+        for (kind, host), queue in queues.answered.items():
+            handled = self.store.watched(host, kind.media_type)
+            for d in queued_downloads(host, kind.media_type, queue):
+                seen = handled.get(d.download_id)
+                if d.flagged and not d.waiting and not (seen and seen.acted_at):
+                    why = "; ".join(m for r in d.records for m in r.error_messages)
+                    why = why or f"{kind.arr_name} marks it {d.first.tracked_status}"
+                    of(host).lines.append(f"{d.title}: stuck in {kind.arr_name} ({why})")
+        missed += [f"SABnzbd on {host}: {why}" for host, why in histories.unreachable.items()]
+        for host, history in histories.answered.items():
             for d in history:
                 finished = datetime.fromtimestamp(d.completed, UTC) if d.completed else None
                 if d.status.lower() == "failed" and finished and now - finished <= DAY:
                     why = d.fail_message or "no reason given"
                     of(host).lines.append(f"{d.name}: failed in SABnzbd ({why})")
-        return [by_host[h] for h in sorted(by_host)]
+        return Checked([by_host[h] for h in sorted(by_host)], missed)
 
-    async def space(self, now: datetime, missed: Section) -> Section:
+    async def space(self, now: datetime) -> Checked:
         section = Section("Space")
         space = await read_space(self.services)
         limit = self.settings.guardrails.storage_pause_4k_percent
-        for name, why in space.unreachable.items():
-            missed.lines.append(f"{name}'s free space: {why}")
         for v in sorted(space.volumes, key=lambda v: -v.used_percent):
             over = " (at or past the 4K limit)" if v.used_percent >= limit else ""
             section.lines.append(v.describe() + over)
@@ -221,7 +235,8 @@ class Digest:
         for f in forecasts(self.store.space_since(today - FORECAST_WINDOW)):
             if f.days_left is not None and f.days_left < SOON.days:
                 section.lines.append(f"Filling: {f.describe()}")
-        return section
+        missed = [f"{name}'s free space: {why}" for name, why in space.unreachable.items()]
+        return Checked([section], missed)
 
     def bad_releases(self) -> Section:
         found = new_bad_releases(self.store, self.settings.bad_release_reports)
@@ -229,18 +244,20 @@ class Digest:
 
 
 class Titles:
-    """Titles by TMDB id, each asked of Seerr once per digest."""
+    """Titles by TMDB id, each asked of Seerr once per digest, however many parts ask at once."""
 
     def __init__(self, services: Services):
         self.services = services
-        self._known: dict[tuple[str, int], str] = {}
+        self._known: dict[tuple[str, int], asyncio.Task[str]] = {}
 
     async def of(self, media_type: str, tmdb_id: int) -> str:
         key = (media_type, tmdb_id)
         if key not in self._known:
-            try:
-                details = await self.services.seerr.media_details(media_type, tmdb_id)
-                self._known[key] = details.display
-            except ClientError:
-                self._known[key] = f"TMDB {tmdb_id}"
-        return self._known[key]
+            self._known[key] = asyncio.create_task(self._look_up(media_type, tmdb_id))
+        return await self._known[key]
+
+    async def _look_up(self, media_type: str, tmdb_id: int) -> str:
+        try:
+            return (await self.services.seerr.media_details(media_type, tmdb_id)).display
+        except ClientError:
+            return f"TMDB {tmdb_id}"

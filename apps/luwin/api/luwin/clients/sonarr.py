@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 from datetime import datetime
-from typing import Any, ClassVar, Protocol
+from typing import TYPE_CHECKING, Any, ClassVar, Protocol
 
 from luwin.clients.arr import (
+    Arr,
     ArrClient,
     DiskSpace,
     HistoryEvent,
@@ -13,6 +14,9 @@ from luwin.clients.arr import (
     RootFolder,
 )
 from luwin.clients.base import Downable
+
+if TYPE_CHECKING:
+    from luwin.clients.seerr import MediaDetails
 
 
 @dataclass(frozen=True)
@@ -68,24 +72,11 @@ class Episode:
         )
 
 
-class Sonarr(Protocol):
-    host: str
-    base_url: str
-
-    async def ping(self) -> None: ...
-    async def root_folders(self) -> list[RootFolder]: ...
-    async def disk_space(self) -> list[DiskSpace]: ...
-    async def queue(self) -> list[QueueItem]: ...
-    async def history(self, media_id: int) -> list[HistoryEvent]: ...
+class Sonarr(Arr, Protocol):
     async def series(self) -> list[Series]: ...
     async def series_by_tvdb(self, tvdb_id: int) -> Series | None: ...
     async def lookup(self, term: str) -> list[Series]: ...
     async def episodes(self, series_id: int) -> list[Episode]: ...
-    async def episode_files(self, series_id: int) -> list[MediaFile]: ...
-    async def delete_episode_file(self, file_id: int) -> None: ...
-    async def episode_search(self, episode_ids: list[int]) -> int: ...
-    async def mark_failed(self, history_id: int) -> None: ...
-    async def remove_from_queue(self, queue_id: int, *, blocklist: bool = True) -> None: ...
     async def follow(self, series_id: int) -> None: ...
 
 
@@ -93,6 +84,8 @@ class SonarrClient(ArrClient):
     service = "sonarr"
     history_scope = ("series", "seriesId")
     queue_includes = ("includeUnknownSeriesItems", "includeSeries", "includeEpisode")
+    file_scope = ("episodefile", "seriesId")
+    search_command = ("EpisodeSearch", "episodeIds")
 
     async def series(self) -> list[Series]:
         return [Series.from_api(s) for s in await self.get_json(f"{self.api}/series")]
@@ -113,15 +106,13 @@ class SonarrClient(ArrClient):
             for e in await self.get_json(f"{self.api}/episode", params={"seriesId": series_id})
         ]
 
-    async def episode_files(self, series_id: int) -> list[MediaFile]:
-        rows = await self.get_json(f"{self.api}/episodefile", params={"seriesId": series_id})
-        return [MediaFile.from_api(r) for r in rows]
-
-    async def delete_episode_file(self, file_id: int) -> None:
-        await self.delete(f"{self.api}/episodefile/{file_id}")
-
-    async def episode_search(self, episode_ids: list[int]) -> int:
-        return await self.command("EpisodeSearch", episodeIds=episode_ids)
+    async def find_id(self, details: MediaDetails) -> int | None:
+        """The series' id here, by its TVDB id; None when this Sonarr hasn't it (or Seerr
+        knows no TVDB id to ask by)."""
+        if details.tvdb_id is None:
+            return None
+        series = await self.series_by_tvdb(details.tvdb_id)
+        return series.id if series else None
 
     async def follow(self, series_id: int) -> None:
         """Monitor the show and every season Sonarr learns of from now on."""
@@ -147,7 +138,7 @@ class FakeSonarrClient(Downable):
     events: dict[int, list[HistoryEvent]] = field(default_factory=dict)
     series_list: list[Series] = field(default_factory=list)
     episode_list: list[Episode] = field(default_factory=list)
-    files: list[MediaFile] = field(default_factory=list)
+    file_list: list[MediaFile] = field(default_factory=list)
     failed: list[int] = field(default_factory=list)
     removed: list[int] = field(default_factory=list)  # queue ids, blocklisted
     searched: list[list[int]] = field(default_factory=list)
@@ -188,15 +179,21 @@ class FakeSonarrClient(Downable):
     async def episodes(self, series_id: int) -> list[Episode]:
         return [e for e in self.episode_list if e.series_id == series_id]
 
-    async def episode_files(self, series_id: int) -> list[MediaFile]:
-        return [f for f in self.files if f.media_id == series_id]
+    async def find_id(self, details: MediaDetails) -> int | None:
+        if details.tvdb_id is None:
+            return None
+        series = await self.series_by_tvdb(details.tvdb_id)
+        return series.id if series else None
 
-    async def delete_episode_file(self, file_id: int) -> None:
+    async def files(self, media_id: int) -> list[MediaFile]:
+        return [f for f in self.file_list if f.media_id == media_id]
+
+    async def delete_file(self, file_id: int) -> None:
         self.deleted.append(file_id)
-        self.files = [f for f in self.files if f.id != file_id]
+        self.file_list = [f for f in self.file_list if f.id != file_id]
 
-    async def episode_search(self, episode_ids: list[int]) -> int:
-        self.searched.append(list(episode_ids))
+    async def search(self, ids: list[int]) -> int:
+        self.searched.append(list(ids))
         return len(self.searched)
 
     async def mark_failed(self, history_id: int) -> None:

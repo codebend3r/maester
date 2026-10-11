@@ -22,8 +22,10 @@ from luwin.clients import (
     TautulliClient,
     WizarrClient,
 )
+from luwin.clients.base import gather_each
 from luwin.clients.seerr import (
     ArrRef,
+    MediaDetails,
     MediaStatus,
     Refusal,
     RequestRefused,
@@ -224,14 +226,21 @@ async def test_removing_a_download_blocklists_it_and_leaves_the_search_to_the_ca
 
 
 @respx.mock
-async def test_radarr_movie_files_and_delete(fixture):
-    respx.get(f"{BASE}/api/v3/moviefile").respond(json=fixture("radarr_moviefile"))
+async def test_radarr_movie_files_delete_and_search(fixture):
+    files = respx.get(f"{BASE}/api/v3/moviefile").respond(json=fixture("radarr_moviefile"))
     delete = respx.delete(f"{BASE}/api/v3/moviefile/55").respond(status_code=200)
+    search = respx.post(f"{BASE}/api/v3/command").respond(json={"id": 3})
     client = RadarrClient("vermithor", BASE, "k")
-    (f,) = await client.movie_files(8)
+    (f,) = await client.files(8)
+    assert files.calls.last.request.url.params["movieId"] == "8"
     assert f.quality == "Bluray-2160p" and f.release_group == "FLUX"
-    await client.delete_movie_file(f.id)
+    await client.delete_file(f.id)
     assert delete.called
+    assert await client.search([8]) == 3
+    assert json.loads(search.calls.last.request.content) == {
+        "name": "MoviesSearch",
+        "movieIds": [8],
+    }
 
 
 @respx.mock
@@ -413,7 +422,7 @@ async def test_fake_sonarr_tracks_destructive_calls():
     )
     assert (await sonarr.episodes(12))[0].number == 7
     await sonarr.mark_failed(99)
-    await sonarr.episode_search([1])
+    await sonarr.search([1])
     assert sonarr.failed == [99] and sonarr.searched == [[1]]
 
 
@@ -483,7 +492,7 @@ async def test_sonarr_episode_files_carry_season_and_audio_languages(fixture):
     respx.get(f"{BASE}/api/v3/episodefile", params={"seriesId": 40}).respond(
         json=fixture("sonarr_episodefile")
     )
-    dual, japanese, unscanned = await SonarrClient("meleys", BASE, "k").episode_files(40)
+    dual, japanese, unscanned = await SonarrClient("meleys", BASE, "k").files(40)
     assert (dual.season, dual.audio_languages) == (1, ("jpn", "eng"))
     assert (japanese.season, japanese.audio_languages) == (2, ("jpn",))
     assert unscanned.audio_languages is None and unscanned.media_id == 40
@@ -656,3 +665,33 @@ async def test_rookery_reads_a_time_without_an_offset_as_utc():
     respx.post(f"{ROOKERY}/internal/session").respond(json=naive)
     account = await RookeryClient(ROOKERY, "svc-token").session("t")
     assert account.expires_at.tzinfo is UTC
+
+
+@respx.mock
+async def test_sonarr_searches_episodes_and_finds_a_series_only_by_its_tvdb_id():
+    search = respx.post(f"{BASE}/api/v3/command").respond(json={"id": 4})
+    sonarr = SonarrClient("meleys", BASE, "k")
+    assert await sonarr.search([1, 2]) == 4
+    assert json.loads(search.calls.last.request.content) == {
+        "name": "EpisodeSearch",
+        "episodeIds": [1, 2],
+    }
+    no_tvdb = MediaDetails(
+        136315, "tv", "The Bear", 2022, "", MediaStatus.UNKNOWN, MediaStatus.UNKNOWN
+    )
+    assert await sonarr.find_id(no_tvdb) is None  # nothing to ask by, so nothing asked
+
+
+async def test_gather_each_names_who_couldnt_answer_and_raises_a_bug():
+    async def ask(key):
+        if key == "down":
+            raise ClientError("sonarr", "GET", "/api/v3/queue", None, "timeout")
+        if key == "bug":
+            raise KeyError(key)
+        return key.upper()
+
+    found = await gather_each(["a", "down", "a"], ask)
+    assert found.answered == {"a": "A"}
+    assert found.unreachable == {"down": "sonarr GET /api/v3/queue failed (None): timeout"}
+    with pytest.raises(KeyError):
+        await gather_each(["a", "bug"], ask)
