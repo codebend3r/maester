@@ -9,7 +9,9 @@ import { HttpPlexTv, type PlexTv } from '@/plex/plexTv.js'
 import { SpaFallbackFilter } from '@/spa/spaFallbackFilter.js'
 
 const READS = new Set(['GET', 'HEAD', 'OPTIONS'])
-const PRIVATE_PREFIXES = ['/api/', '/internal/', '/auth/']
+// Where the server's own routes live: never cached, and a miss under one is a
+// JSON 404 rather than the web app.
+const SERVER_PREFIXES = ['/api/', '/internal/', '/auth/']
 
 /**
  * The configured application, not yet listening, so a test can drive it
@@ -37,7 +39,7 @@ export const createApp = async ({
   // credentialed JSON request after a CORS preflight, which rookery never
   // answers, so this is its CSRF protection along with SameSite=Lax.
   fastify.addHook('onRequest', async (request, reply) => {
-    if (PRIVATE_PREFIXES.some((prefix) => request.url.startsWith(prefix))) {
+    if (SERVER_PREFIXES.some((prefix) => request.url.startsWith(prefix))) {
       reply.header('cache-control', 'no-store')
     }
     const type = request.headers['content-type']?.toLowerCase() ?? ''
@@ -67,7 +69,10 @@ export const createApp = async ({
     })
   }
   app.useGlobalFilters(
-    new SpaFallbackFilter(config.webDir ? join(config.webDir, 'index.html') : null),
+    new SpaFallbackFilter({
+      indexPath: config.webDir ? join(config.webDir, 'index.html') : null,
+      serverPrefixes: SERVER_PREFIXES,
+    }),
   )
   app.enableShutdownHooks()
   return app

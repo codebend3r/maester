@@ -427,7 +427,7 @@ describe('the internal session lookup', () => {
 })
 
 describe('serving the web app', () => {
-  it('answers client routes with index.html and keeps API 404s as JSON', async () => {
+  it('answers client routes with index.html and keeps server 404s as JSON', async () => {
     const root = await mkdtemp(join(tmpdir(), 'rookery-web-'))
     await mkdir(join(root, 'assets'), { recursive: true })
     await writeFile(join(root, 'index.html'), '<!doctype html><title>rookery</title>')
@@ -441,9 +441,15 @@ describe('serving the web app', () => {
       const asset = await harness.app.inject({ method: 'GET', url: '/assets/app.js' })
       expect(asset.body).toBe('console.log("rookery")')
 
-      const missing = await harness.app.inject({ method: 'GET', url: '/api/nope' })
-      expect(missing.statusCode).toBe(404)
-      expect(missing.headers['content-type']).toContain('application/json')
+      const misses = await Promise.all(
+        ['/api/nope', '/internal/nope', '/auth/nope'].map((url) =>
+          harness.app.inject({ method: 'GET', url }),
+        ),
+      )
+      misses.forEach((missing) => {
+        expect(missing.statusCode).toBe(404)
+        expect(missing.headers['content-type']).toContain('application/json')
+      })
     } finally {
       await rm(root, { recursive: true, force: true })
     }
