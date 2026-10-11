@@ -228,5 +228,6 @@ A native iOS or Android app would be another `apps/raven/` entry that imports `@
 
 - No accounts or auth: keep it on the LAN or behind Tailscale.
 - Picture subtitles (PGS, VobSub) would need burning in or OCR.
+- Thumbnails decode on the same hardware: VideoToolbox for anything a Mac plays, VAAPI for H.264 and HEVC; a file the device refuses is decoded on the CPU.
 - On VAAPI, HDR is converted to BT.709 on the GPU rather than tone mapped. That suits HLG; HDR10 (PQ) comes out flat.
 - No QSV; Intel GPUs go through VAAPI.

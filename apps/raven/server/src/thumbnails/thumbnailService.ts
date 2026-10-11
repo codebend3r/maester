@@ -3,7 +3,7 @@ import { rename, rm, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Inject, Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
-import { thumbnailArgs, thumbnailSeek } from '@/ffmpeg/args'
+import { hardwareDecodeArgs, thumbnailArgs, thumbnailSeek } from '@/ffmpeg/args'
 import { FfmpegService, FfmpegTimeoutError } from '@/ffmpeg/ffmpegService'
 import { MediaRepository } from '@/media/mediaRepository'
 import { createTaskQueue } from '@/scanner/concurrency'
@@ -66,20 +66,28 @@ export class ThumbnailService implements OnApplicationBootstrap {
     input,
     seek,
     tonemap,
+    videoCodec,
   }: {
     input: string
     seek: number
     tonemap: boolean
+    videoCodec: string | null
   }): Promise<string> {
     // ffmpeg picks the image muxer from the extension, so the temp file keeps .jpg.
     const temp = join(
       this.dir,
       `.${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`,
     )
+    const width = this.config.thumbnailWidth
+    const decode = hardwareDecodeArgs({ encoder: await this.ffmpeg.videoEncoder(), videoCodec })
     try {
-      await this.ffmpeg.exec(
-        thumbnailArgs({ input, output: temp, seek, width: this.config.thumbnailWidth, tonemap }),
-      )
+      // The GPU decodes when there is one; a file it refuses is tried on the CPU.
+      await this.ffmpeg
+        .exec(thumbnailArgs({ input, output: temp, seek, width, tonemap, decode }))
+        .catch(async (error: unknown) => {
+          if (decode.length === 0) throw error
+          await this.ffmpeg.exec(thumbnailArgs({ input, output: temp, seek, width, tonemap }))
+        })
       if (!(await exists(temp))) throw new Error('ffmpeg wrote no frame')
       return temp
     } catch (error) {
@@ -96,11 +104,15 @@ export class ThumbnailService implements OnApplicationBootstrap {
     try {
       // A duration that overstates the real stream can seek past the last
       // frame; the first frame beats no thumbnail at all.
-      const temp = await this.render({ input: record.path, seek, tonemap }).catch(
-        (error: unknown) =>
-          seek > 0 && !(error instanceof FfmpegTimeoutError)
-            ? this.render({ input: record.path, seek: 0, tonemap })
-            : Promise.reject(error),
+      const temp = await this.render({
+        input: record.path,
+        seek,
+        tonemap,
+        videoCodec: record.videoCodec,
+      }).catch((error: unknown) =>
+        seek > 0 && !(error instanceof FfmpegTimeoutError)
+          ? this.render({ input: record.path, seek: 0, tonemap, videoCodec: record.videoCodec })
+          : Promise.reject(error),
       )
       // Written aside and renamed into place, so a half-written JPEG is never served.
       await rename(temp, this.pathFor(id))
