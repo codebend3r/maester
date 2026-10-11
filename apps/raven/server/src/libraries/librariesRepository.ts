@@ -61,21 +61,32 @@ const toSettings = (row: LibraryRow): LibrarySettings => ({
   locked: row.locked === 1,
 })
 
-/** The settings columns in the order the statements below bind them. */
-const settingValues = (
-  settings: LibrarySettings,
-): [number, number, string, string, string, number, string, string, number, number] => [
-  Number(settings.saveProgress),
-  Number(settings.pinned),
-  settings.sort,
-  settings.view,
-  settings.groupBy,
-  settings.watchedPercent,
-  settings.kind,
-  settings.ratingsSource,
-  Number(settings.autoRefresh),
-  Number(settings.locked),
-]
+/**
+ * The settings as the columns that hold them, bound by name. The statements
+ * below are built from its keys, so a new setting is added here, in
+ * `LibraryRow` and in `toSettings`, and in no statement.
+ */
+const settingParams = (settings: LibrarySettings) => ({
+  save_progress: Number(settings.saveProgress),
+  pinned: Number(settings.pinned),
+  sort: settings.sort,
+  view_mode: settings.view,
+  group_by: settings.groupBy,
+  watched_percent: settings.watchedPercent,
+  kind: settings.kind,
+  ratings_source: settings.ratingsSource,
+  auto_refresh: Number(settings.autoRefresh),
+  locked: Number(settings.locked),
+})
+
+const SETTING_COLUMNS = Object.keys(settingParams(DEFAULT_LIBRARY_SETTINGS))
+
+const INSERT_LIBRARY = `INSERT INTO libraries (name, created_at, ${SETTING_COLUMNS.join(', ')})
+  VALUES (@name, @created_at, ${SETTING_COLUMNS.map((column) => `@${column}`).join(', ')})`
+
+const UPDATE_LIBRARY = `UPDATE libraries
+    SET name = @name, ${SETTING_COLUMNS.map((column) => `${column} = @${column}`).join(', ')}
+  WHERE id = @id`
 
 /** Whether a library's paths are the same, in the same order, as they were. */
 export const samePaths = ({
@@ -104,8 +115,7 @@ export class LibrariesRepository {
   private rows(id: number | null): LibraryRecord[] {
     const libraries = this.db
       .prepare<[number | null, number | null], LibraryRow>(
-        `SELECT l.id, l.name, l.created_at, l.save_progress, l.pinned, l.sort, l.view_mode, l.group_by,
-                l.watched_percent, l.kind, l.ratings_source, l.auto_refresh, l.locked,
+        `SELECT l.id, l.name, l.created_at, ${SETTING_COLUMNS.map((column) => `l.${column}`).join(', ')},
                 (SELECT COUNT(*) FROM media m WHERE m.library_id = l.id) AS item_count,
                 (SELECT COUNT(*) FROM media m WHERE m.library_id = l.id AND m.match = 'unmatched')
                   AS unmatched_count
@@ -154,13 +164,11 @@ export class LibrariesRepository {
       ...input.settings,
     }
     const id = this.db.transaction(() => {
-      const result = this.db
-        .prepare(
-          `INSERT INTO libraries (name, created_at, save_progress, pinned, sort, view_mode, group_by,
-                                  watched_percent, kind, ratings_source, auto_refresh, locked)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        )
-        .run(input.name, new Date().toISOString(), ...settingValues(settings))
+      const result = this.db.prepare(INSERT_LIBRARY).run({
+        name: input.name,
+        created_at: new Date().toISOString(),
+        ...settingParams(settings),
+      })
       const created = Number(result.lastInsertRowid)
       this.replacePaths({ id: created, paths: input.paths })
       return created
@@ -185,14 +193,7 @@ export class LibrariesRepository {
         ? laid
         : withLibraryKind({ settings: laid, kind: laid.kind })
     this.db.transaction(() => {
-      this.db
-        .prepare(
-          `UPDATE libraries
-              SET name = ?, save_progress = ?, pinned = ?, sort = ?, view_mode = ?, group_by = ?,
-                  watched_percent = ?, kind = ?, ratings_source = ?, auto_refresh = ?, locked = ?
-            WHERE id = ?`,
-        )
-        .run(input.name, ...settingValues(settings), id)
+      this.db.prepare(UPDATE_LIBRARY).run({ id, name: input.name, ...settingParams(settings) })
       this.replacePaths({ id, paths: input.paths })
     })()
     return this.get(id)
