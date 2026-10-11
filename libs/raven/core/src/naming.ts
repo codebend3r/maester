@@ -245,6 +245,10 @@ export const seasonFolderNumber = (name: string): number | null => {
   return match ? Number(match[1]) : null
 }
 
+/** Sonarr's country suffix telling two shows of a name apart: `Euphoria (US)`, `The Office (UK)`. */
+const COUNTRY_SUFFIX =
+  /\s*\((?:US|UK|AU|CA|NZ|IE|JP|KR|FR|DE|IT|ES|BR|MX|IN|CN|SE|NO|DK|NL|BE|PL|RU|TR|ZA)\)$/i
+
 /** `S01E02`, `S1E2`, `S01E123`, `S01E01-E02`, `S01E01E02`, and `1x02`. */
 const EPISODE_CODE =
   /(?<![A-Za-z0-9])(?:S(\d{1,2})[ ._-]?E(\d{1,3})(?:(?:[ ._-]?E|-E?|E)(\d{1,3}))?|(?<!\d)(\d{1,2})x(\d{2,3}))(?![A-Za-z0-9])/i
@@ -290,7 +294,7 @@ export const parseEpisodeName = ({
   const fromFile = readName(before.replace(ABSOLUTE, ' ').replace(AIR_DATE, ' '))
   const fromFolder =
     showFolder !== '' && seasonFolderNumber(showFolder) == null ? readName(showFolder) : null
-  const show = fromFolder?.title || fromFile.title || fallbackShow
+  const show = (fromFolder?.title || fromFile.title || fallbackShow).replace(COUNTRY_SUFFIX, '')
 
   const season = code ? Number(code[1] ?? code[4]) : seasonFolder
   const episodes = code

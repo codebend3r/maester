@@ -199,14 +199,7 @@ describe('parseEpisodeName', () => {
       [12],
       'A Real Hero',
     ],
-    [
-      'The Office (US)/Specials/The Office (US) - S00E03.mkv',
-      'The Office (US)',
-      null,
-      0,
-      [3],
-      null,
-    ],
+    ['The Office (US)/Specials/The Office (US) - S00E03.mkv', 'The Office', null, 0, [3], null],
     ['Fargo/Fargo.S02E09E10.1080p.mkv', 'Fargo', 2, 2, [9, 10], null],
     [
       'Fargo/Season 2/Fargo - S02E01-E02 - Waiting for Dutch.mkv',
@@ -230,6 +223,14 @@ describe('parseEpisodeName', () => {
     expect(episode('Severance - S01E02 - Half Loop.mkv').show).toBe('Severance')
     expect(episode('Season 1/Severance - S01E02.mkv').show).toBe('Severance')
     expect(episode('Season 1/S01E02.mkv', 'Severance').show).toBe('Severance')
+  })
+
+  it('drops a country suffix from a show name, as TMDB does not search on it', () => {
+    expect(episode('Euphoria (US)/Season 1/Euphoria (US) - S01E01 - Pilot.mkv').show).toBe(
+      'Euphoria',
+    )
+    expect(episode('The Office (UK)/Season 1/The Office (UK) - S01E01.mkv').show).toBe('The Office')
+    expect(episode('Us/Season 1/Us - S01E01.mkv').show).toBe('Us')
   })
 
   it('puts a show article sorted to the end back in front', () => {
