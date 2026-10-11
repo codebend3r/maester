@@ -200,6 +200,13 @@ export const MIGRATIONS: readonly string[] = [
   ALTER TABLE libraries ADD COLUMN ratings_source TEXT NOT NULL DEFAULT 'tmdb';
   ALTER TABLE items ADD COLUMN omdb_fetched_at TEXT;
   `,
+  // A Movies library opens on its matched and not matched buckets; one
+  // still on the old defaults moves over, a chosen view stays. A TV library
+  // is always split that way, so it keeps its grid.
+  `
+  UPDATE libraries SET view_mode = 'grouped', group_by = 'match'
+   WHERE view_mode = 'grid' AND group_by = 'resolution' AND kind = 'movies';
+  `,
 ]
 
 const migrate = (db: Sqlite.Database): void => {

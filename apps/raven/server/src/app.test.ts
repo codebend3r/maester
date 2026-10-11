@@ -293,8 +293,8 @@ describe('the media server', () => {
           saveProgress: true,
           pinned: true,
           sort: 'title',
-          view: 'grid',
-          groupBy: 'resolution',
+          view: 'grouped',
+          groupBy: 'match',
           watchedPercent: 90,
           kind: 'other',
           ratingsSource: 'tmdb',
@@ -314,7 +314,7 @@ describe('the media server', () => {
       it('remembers how the library is sorted and shown', async () => {
         const updated = await putLibrary({ sort: 'largest', view: 'tiles', groupBy: 'codec' })
         expect(updated.settings).toMatchObject({ sort: 'largest', view: 'tiles', groupBy: 'codec' })
-        await putLibrary({ sort: 'title', view: 'grid', groupBy: 'resolution' })
+        await putLibrary({ sort: 'title', view: 'grouped', groupBy: 'match' })
       })
 
       it('shuffles by the seed it is sent', async () => {
@@ -337,8 +337,8 @@ describe('the media server', () => {
           saveProgress: true,
           pinned: false,
           sort: 'title',
-          view: 'grid',
-          groupBy: 'resolution',
+          view: 'grouped',
+          groupBy: 'match',
           watchedPercent: 90,
           kind: 'other',
           ratingsSource: 'tmdb',
