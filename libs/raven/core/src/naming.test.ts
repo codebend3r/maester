@@ -37,7 +37,8 @@ describe('parseMovieName', () => {
     })
     expect(movie('Knights Tale, A (2001).mkv')).toMatchObject({ title: 'A Knights Tale' })
     expect(movie('Dances with Wolves, The Directors Cut (1990).mkv')).toMatchObject({
-      title: 'Dances with Wolves, The Directors Cut',
+      title: 'The Dances with Wolves',
+      edition: 'Directors Cut',
     })
   })
 
@@ -75,6 +76,36 @@ describe('parseMovieName', () => {
       imdb: null,
       tvdb: '169',
     })
+  })
+
+  it.each([
+    ['Avatar Theatrical Cut (2009) 2160p HEVC.mkv', 'Avatar', 'Theatrical Cut'],
+    [
+      'Dances with Wolves (Directors Cut) (1990) WEBDL-2160p.mkv',
+      'Dances with Wolves',
+      'Directors Cut',
+    ],
+    ['Spy (Extended) (2015) WEBDL-2160p.mkv', 'Spy', 'Extended'],
+    ['Martian, The (Extended Cut) (2015).mkv', 'The Martian', 'Extended Cut'],
+    [
+      'Hobbit an Unexpected Journey, The (Extended) (2012).mkv',
+      'The Hobbit an Unexpected Journey',
+      'Extended',
+    ],
+    ['Invitation (Unrated Edition) (2022).mkv', 'Invitation', 'Unrated Edition'],
+    ['Aliens 20th Anniversary Edition (1986).mkv', 'Aliens', '20th Anniversary Edition'],
+    ['Blade Runner [Final Cut] (1982).mkv', 'Blade Runner', 'Final Cut'],
+  ])('reads the edition named bare in %s', (path, title, edition) => {
+    expect(movie(path)).toMatchObject({ title, edition })
+  })
+
+  it('leaves a title that only ends in Cut or Edition alone', () => {
+    expect(movie('The Final Cut (2004).mkv')).toMatchObject({
+      title: 'The Final Cut',
+      edition: null,
+    })
+    expect(movie('Special (2006).mkv')).toMatchObject({ title: 'Special', edition: null })
+    expect(movie('Director (2021).mkv')).toMatchObject({ title: 'Director', edition: null })
   })
 
   it('takes the edition out of the title', () => {

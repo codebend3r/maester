@@ -14,7 +14,7 @@ export type NameIds = {
 export type ParsedMovieName = {
   title: string
   year: number | null
-  /** Plex's `{edition-Director's Cut}`. */
+  /** Plex's `{edition-Director's Cut}`, or an edition named bare in the title: `Avatar Theatrical Cut`, `Spy (Extended)`. */
   edition: string | null
   ids: NameIds
 }
@@ -24,6 +24,36 @@ const NO_IDS: NameIds = { tmdb: null, imdb: null, tvdb: null }
 const ID_PATTERN = /\{(tmdb|imdb|tvdb)-([^}\s]+)\}|\[(tmdb|imdb|tvdb)id[-=]([^\]\s]+)\]/gi
 
 const EDITION_PATTERN = /\{edition-([^}]+)\}/i
+
+/**
+ * An edition named in the title itself, as Radarr's `{Edition Tags}` or a
+ * hand-named file puts it, at the end, in brackets or bare: `(Extended Cut)`,
+ * `Directors Cut`, `(Unrated)`, `20th Anniversary Edition`.
+ */
+const EDITION_WORDS =
+  "director'?s|extended|theatrical|final|ultimate|unrated|uncut|special|collector'?s|anniversary|remastered|definitive|redux|imax|\\d+(?:st|[nr]d|th) anniversary"
+const BARE_EDITION = new RegExp(
+  `^(.*?)[\\s(\\[]+((?:${EDITION_WORDS})(?: (?:cut|edition|version))?|(?:cut|edition|version))[)\\]]*$`,
+  'i',
+)
+
+/** The edition a title names at its end, and the title without it. */
+const readBareEdition = (title: string): { title: string; edition: string | null } => {
+  const found = BARE_EDITION.exec(title)
+  const rest = found?.[1]?.trim() ?? ''
+  const edition = found?.[2]?.trim() ?? null
+  // A lone "Cut" or "Edition" only counts in brackets, as "The Final Cut" is a film.
+  const bracketed = found != null && /[([]/.test(title.slice(rest.length))
+  if (
+    edition == null ||
+    rest === '' ||
+    /^(the|a|an)$/i.test(rest) ||
+    (!bracketed && /^(cut|edition|version)$/i.test(edition))
+  ) {
+    return { title, edition: null }
+  }
+  return { title: tidy(rest), edition }
+}
 
 /**
  * Words that start the release details in a name: resolutions, sources,
@@ -110,8 +140,13 @@ const readName = (name: string): ParsedMovieName => {
   const edition = EDITION_PATTERN.exec(name)?.[1]?.trim() ?? null
   const bare = stripTags(name)
   const year = findYear(bare)
-  const title = unsortTitle(tidy(bare.slice(0, year ? year.at : firstTagAt(bare))))
-  return { title, year: year?.year ?? null, edition, ids }
+  const named = readBareEdition(tidy(bare.slice(0, year ? year.at : firstTagAt(bare))))
+  return {
+    title: unsortTitle(named.title),
+    year: year?.year ?? null,
+    edition: edition ?? named.edition,
+    ids,
+  }
 }
 
 /** The last segment of a relative folder, or '' at a library's root. */

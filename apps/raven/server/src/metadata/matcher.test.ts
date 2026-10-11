@@ -9,6 +9,7 @@ const result = (overrides: Partial<SearchResult>): SearchResult => ({
   year: 1999,
   overview: null,
   poster: null,
+  popularity: null,
   ...overrides,
 })
 
@@ -65,11 +66,33 @@ describe('pickMatch', () => {
     expect(pickMatch({ title: 'The Matrix', year: 1990, results: [result({})] })).toBeNull()
   })
 
-  it('takes a name without a year only when one result has its title', () => {
+  it('takes a name without a year to the result with its title', () => {
     expect(pickMatch({ title: 'The Matrix', year: null, results: [result({})] })).not.toBeNull()
     expect(
-      pickMatch({ title: 'The Matrix', year: null, results: [result({}), result({ year: 2021 })] }),
+      pickMatch({
+        title: 'The Matrix',
+        year: null,
+        results: [result({ title: 'Matrix Reloaded' })],
+      }),
     ).toBeNull()
+  })
+
+  it('settles two results with the same title by popularity, in or out of a year', () => {
+    const popular = result({ tmdbId: 'popular', title: 'Snowfall', year: 2017, popularity: 80 })
+    const obscure = result({ tmdbId: 'obscure', title: 'Snowfall', year: 2016, popularity: 2 })
+    expect(pickMatch({ title: 'Snowfall', year: null, results: [obscure, popular] })).toBe(popular)
+    expect(pickMatch({ title: 'Snowfall', year: 2017, results: [obscure, popular] })).toBe(popular)
+    const remake = result({ tmdbId: 'remake', title: 'Snowfall', year: 2017, popularity: 1 })
+    expect(pickMatch({ title: 'Snowfall', year: 2017, results: [remake, popular] })).toBe(popular)
+    // Without scores, TMDB's own order (most popular first) decides.
+    const first = result({ tmdbId: 'first', title: 'Silo' })
+    expect(
+      pickMatch({
+        title: 'Silo',
+        year: null,
+        results: [first, result({ tmdbId: 'second', title: 'Silo' })],
+      }),
+    ).toBe(first)
   })
 
   it('takes the one result with the title among others without it, as show folders rarely carry a year', () => {

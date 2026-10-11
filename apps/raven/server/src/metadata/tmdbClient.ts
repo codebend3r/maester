@@ -107,6 +107,8 @@ export type SearchResult = {
   year: number | null
   overview: string | null
   poster: string | null
+  /** TMDB's popularity score, which settles a title two results share. */
+  popularity: number | null
 }
 
 export type TmdbState = {
@@ -486,6 +488,7 @@ const toSearchResult = (entry: Record<string, unknown>): SearchResult | null => 
     year: yearOf(text(entry.release_date) ?? text(entry.first_air_date)),
     overview: text(entry.overview),
     poster: imagePath(entry.poster_path),
+    popularity: number(entry.popularity),
   }
 }
 
