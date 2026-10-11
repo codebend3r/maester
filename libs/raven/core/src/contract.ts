@@ -407,7 +407,7 @@ export const PLAYBACK_CHOICES = {
   transcoding: ['on', 'remuxOnly', 'off'],
   maxHeight: [2160, 1080, 720],
   quality: ['low', 'medium', 'high'],
-  hwAccel: ['auto', 'none', 'vaapi', 'videotoolbox'],
+  hwAccel: ['auto', 'videotoolbox', 'vaapi', 'none'],
 } as const
 
 export const isHwAccel = oneOf(PLAYBACK_CHOICES.hwAccel)
