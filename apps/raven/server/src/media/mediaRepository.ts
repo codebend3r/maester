@@ -3,8 +3,10 @@ import { Inject, Injectable } from '@nestjs/common'
 import {
   type MediaItem,
   type MediaSort,
+  type MediaTracks,
   type ThumbnailState,
   containerOf,
+  isMediaTracks,
   isThumbnailState,
   titleFromFileName,
 } from '@raven/core'
@@ -242,18 +244,20 @@ export class MediaRepository {
   markChanged({ id, size, mtimeMs }: { id: number; size: number; mtimeMs: number }): void {
     this.db
       .prepare(
-        `UPDATE media SET size = ?, mtime_ms = ?, probed = 0, probe_error = NULL, thumbnail = 'pending'
+        `UPDATE media SET size = ?, mtime_ms = ?, probed = 0, probe_error = NULL, thumbnail = 'pending',
+                tracks = NULL
           WHERE id = ?`,
       )
       .run(size, Math.round(mtimeMs), id)
   }
 
-  saveProbe({ id, probe }: { id: number; probe: ProbeResult }): void {
+  /** What a probe found, and the tracks it found when the caller has them. */
+  saveProbe({ id, probe, tracks }: { id: number; probe: ProbeResult; tracks?: MediaTracks }): void {
     this.db
       .prepare(
         `UPDATE media SET probed = 1, probe_error = NULL, duration = ?, width = ?, height = ?,
                 video_codec = ?, video_bit_depth = ?, hdr = ?, audio_codec = ?, audio_channels = ?,
-                bitrate = ?
+                bitrate = ?, tracks = ?
           WHERE id = ?`,
       )
       .run(
@@ -266,8 +270,43 @@ export class MediaRepository {
         probe.audioCodec,
         probe.audioChannels,
         probe.bitrate,
+        tracks ? JSON.stringify(tracks) : null,
         id,
       )
+  }
+
+  /** The embedded tracks a probe stored, or null when there are none yet (or they no longer read). */
+  storedTracks(id: number): MediaTracks | null {
+    const row = this.db
+      .prepare<[number], { tracks: string | null }>('SELECT tracks FROM media WHERE id = ?')
+      .get(id)
+    if (row?.tracks == null) return null
+    try {
+      const parsed: unknown = JSON.parse(row.tracks)
+      return isMediaTracks(parsed) ? parsed : null
+    } catch {
+      return null
+    }
+  }
+
+  saveTracks({ id, tracks }: { id: number; tracks: MediaTracks }): void {
+    this.db.prepare('UPDATE media SET tracks = ? WHERE id = ?').run(JSON.stringify(tracks), id)
+  }
+
+  forgetTracks(id: number): void {
+    this.db.prepare('UPDATE media SET tracks = NULL WHERE id = ?').run(id)
+  }
+
+  /** Videos probed without trouble whose tracks are not stored yet: indexed before they were. */
+  idsMissingTracks(libraryId: number): number[] {
+    return this.db
+      .prepare<[number], { id: number }>(
+        `SELECT id FROM media
+          WHERE library_id = ? AND probed = 1 AND probe_error IS NULL AND tracks IS NULL
+          ORDER BY id`,
+      )
+      .all(libraryId)
+      .map((row) => row.id)
   }
 
   saveProbeError({ id, error }: { id: number; error: string }): void {

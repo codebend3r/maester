@@ -14,6 +14,8 @@ import {
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '@/app'
 import { type ServerConfig, readServerConfig } from '@/config'
+import { MediaRepository } from '@/media/mediaRepository'
+import { TracksService } from '@/playback/tracksService'
 import { ScannerService } from '@/scanner/scannerService'
 import { encodeClip } from '@/test/clips'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
@@ -69,6 +71,7 @@ describe('the media server', () => {
   const settle = async (libraryId: number) => {
     await app().get(ScannerService).whenIdle(libraryId)
     await app().get(ThumbnailService).whenIdle()
+    await app().get(TracksService).whenIdle()
   }
   const listMedia = async (libraryId: number): Promise<MediaItem[]> =>
     expectShape({
@@ -339,6 +342,25 @@ describe('the media server', () => {
         await putLibrary({ saveProgress: true })
         expect(await positionOf(id)).toBe(2)
       })
+    })
+
+    it("stores each video's tracks when the scan probes it", async () => {
+      const [movie] = await listMedia(library.id)
+      expect(
+        app()
+          .get(MediaRepository)
+          .storedTracks(movie?.id ?? -1)?.audio,
+      ).toHaveLength(1)
+    })
+
+    it('fills in tracks a video indexed before they were stored is missing, on the next scan', async () => {
+      const [movie] = await listMedia(library.id)
+      const id = movie?.id ?? -1
+      app().get(MediaRepository).forgetTracks(id)
+      expect(app().get(MediaRepository).storedTracks(id)).toBeNull()
+      await app().inject({ method: 'POST', url: `/api/libraries/${library.id}/scan` })
+      await settle(library.id)
+      expect(app().get(MediaRepository).storedTracks(id)?.audio).toHaveLength(1)
     })
 
     it('drops files that disappear on the next scan, and their thumbnails', async () => {

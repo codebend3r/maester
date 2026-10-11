@@ -13,6 +13,7 @@ import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { encoderTestArgs } from '@/ffmpeg/args'
 import { SOFTWARE, type VideoEncoder, encoderCandidates } from '@/ffmpeg/encoder'
 import { type ProbeResult, parseProbe } from '@/ffmpeg/probe'
+import { type FileTracks, parseTracks } from '@/ffmpeg/tracks'
 
 const run = promisify(execFile)
 
@@ -83,9 +84,15 @@ export class FfmpegService implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   async probe(path: string): Promise<ProbeResult> {
-    const result = parseProbe(await this.probeJson(path))
-    if (!result) throw new Error('No audio or video streams')
-    return result
+    return (await this.probeFile(path)).probe
+  }
+
+  /** One ffprobe run, read twice: what the index keeps, and the file's tracks. */
+  async probeFile(path: string): Promise<{ probe: ProbeResult; tracks: FileTracks }> {
+    const output = await this.probeJson(path)
+    const probe = parseProbe(output)
+    if (!probe) throw new Error('No audio or video streams')
+    return { probe, tracks: parseTracks(output) }
   }
 
   /**

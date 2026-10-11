@@ -112,3 +112,70 @@ describe('listing a library', () => {
     expect(new Set(orders).size).toBeGreaterThan(1)
   })
 })
+
+describe('stored tracks', () => {
+  const state = {
+    dir: '',
+    libraryId: 0,
+    database: null as DatabaseService | null,
+    media: null as MediaRepository | null,
+  }
+  const media = (): MediaRepository => {
+    if (!state.media) throw new Error('not set up')
+    return state.media
+  }
+  const TRACKS = {
+    audio: [{ index: 0, codec: 'aac', language: 'eng', title: null, channels: 2, default: true }],
+    subtitles: [],
+    defaultAudio: 0,
+    frameRate: 24,
+  }
+  const PROBE = {
+    duration: 60,
+    width: 1920,
+    height: 1080,
+    videoCodec: 'h264',
+    videoBitDepth: 8,
+    hdr: false,
+    audioCodec: 'aac',
+    audioChannels: 2,
+    bitrate: 5_000_000,
+  }
+  const add = (name: string): number =>
+    media().insert({
+      libraryId: state.libraryId,
+      file: { path: `/m/${name}.mp4`, root: '/m', size: 100, mtimeMs: 1 },
+    })
+
+  beforeAll(async () => {
+    state.dir = await mkdtemp(join(tmpdir(), 'raven-tracks-'))
+    const database = new DatabaseService({ ...readServerConfig({}), dataDir: state.dir })
+    state.database = database
+    state.media = new MediaRepository(database)
+    state.libraryId = new LibrariesRepository(database).create({ name: 'Test', paths: ['/m'] }).id
+  })
+
+  afterAll(async () => {
+    state.database?.onModuleDestroy()
+    await rm(state.dir, { recursive: true, force: true })
+  })
+
+  it('keeps the tracks a probe found, and forgets them when the file changes', () => {
+    const id = add('kept')
+    media().saveProbe({ id, probe: PROBE, tracks: TRACKS })
+    expect(media().storedTracks(id)).toEqual(TRACKS)
+    media().markChanged({ id, size: 200, mtimeMs: 2 })
+    expect(media().storedTracks(id)).toBeNull()
+  })
+
+  it('lists probed videos that have no tracks yet, and only those', () => {
+    const withTracks = add('with')
+    media().saveProbe({ id: withTracks, probe: PROBE, tracks: TRACKS })
+    const without = add('without')
+    media().saveProbe({ id: without, probe: PROBE })
+    add('unprobed')
+    const failed = add('failed')
+    media().saveProbeError({ id: failed, error: 'No audio or video streams' })
+    expect(media().idsMissingTracks(state.libraryId)).toEqual([without])
+  })
+})

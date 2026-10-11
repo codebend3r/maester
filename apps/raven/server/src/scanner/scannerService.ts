@@ -11,6 +11,7 @@ import { FfmpegService, FfmpegTimeoutError } from '@/ffmpeg/ffmpegService'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { type FoundFile, MediaRepository } from '@/media/mediaRepository'
 import { SubtitlesService } from '@/playback/subtitlesService'
+import { TracksService } from '@/playback/tracksService'
 import { mapWithConcurrency } from '@/scanner/concurrency'
 import { walkVideos } from '@/scanner/walk'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
@@ -50,6 +51,7 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
     @Inject(FfmpegService) private readonly ffmpeg: FfmpegService,
     @Inject(ThumbnailService) private readonly thumbnails: ThumbnailService,
     @Inject(SubtitlesService) private readonly subtitles: SubtitlesService,
+    @Inject(TracksService) private readonly tracks: TracksService,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -138,7 +140,8 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
         limit: this.config.probeConcurrency,
         fn: async ({ id, path }) => {
           try {
-            this.media.saveProbe({ id, probe: await this.ffmpeg.probe(path) })
+            const { probe, tracks } = await this.ffmpeg.probeFile(path)
+            this.media.saveProbe({ id, probe, tracks })
             this.thumbnails.enqueue(id)
           } catch (error) {
             // A timeout leaves the file unprobed, so the next scan tries it again.
@@ -151,8 +154,10 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
         },
       })
 
-      // Thumbnails that timed out on an earlier pass get another go.
+      // Thumbnails that timed out on an earlier pass get another go, and
+      // videos indexed before tracks were stored get theirs.
       this.media.pendingThumbnailIds().forEach((id) => this.thumbnails.enqueue(id))
+      this.tracks.backfill(this.media.idsMissingTracks(libraryId))
 
       const unreadable = walk.unreadableRoots.map((root) => `Could not read ${root}.`)
       this.update(libraryId, {

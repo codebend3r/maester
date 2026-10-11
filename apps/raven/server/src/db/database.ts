@@ -76,6 +76,11 @@ export const MIGRATIONS: readonly string[] = [
   ALTER TABLE libraries ADD COLUMN view_mode TEXT NOT NULL DEFAULT 'grid';
   ALTER TABLE libraries ADD COLUMN group_by TEXT NOT NULL DEFAULT 'resolution';
   `,
+  // A video's embedded audio and subtitle tracks as JSON, found by the scan's
+  // probe so the player need not run ffprobe again. NULL until known.
+  `
+  ALTER TABLE media ADD COLUMN tracks TEXT;
+  `,
 ]
 
 const migrate = (db: Sqlite.Database): void => {
