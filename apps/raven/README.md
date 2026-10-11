@@ -9,6 +9,7 @@ raven is the `apps/raven/` folder of an Nx workspace; the [root README](../../RE
 1. Edit the volumes in `apps/raven/docker-compose.yml` so each media folder is mounted read-only under `/media`.
 2. From `apps/raven/`, `docker compose up -d --build`. The image builds from the repo root, where the workspace's `bun.lock` lives.
 3. Open `http://<host>:8484`, choose **Add library**, and pick folders under `/media` with the folder browser.
+4. For posters and details in Movies libraries, copy `.env.example` to `.env` beside the compose file and set `TMDB_API_TOKEN` (see [Metadata](#metadata)). Without it raven works as before.
 
 Deleting a video from the app removes the file, so leave `:ro` off any mount where that should work. On a read-only mount the app keeps the video and says why.
 
@@ -111,11 +112,11 @@ YouTube's shortcuts, and `?` shows them in the player.
 
 Each library keeps its own settings on the server, so every browser opens it the same way.
 
-- **Type**: Movies, TV shows or Other. New libraries, and those made before types, are Other. It shows beside the video count and can be changed in **Edit** at any time; it does not change how a library behaves yet.
+- **Type**: Movies, TV shows or Other. New libraries, and those made before types, are Other. It shows beside the video count and can be changed in **Edit** at any time. A Movies library reads its files' names and matches them to TMDB (see [Metadata](#metadata)); changing the type matches the files again, or goes back to plain file names for Other.
 - **Save where each video stopped**, on by default: leave a video and come back to pick up where it stopped. Turned off, nothing new is saved and nothing resumes, but saved spots are kept for when it is turned back on.
 - **Pin to the side menu**, on by default: the library gets its own link under Favourites. Pin or unpin from the Libraries page, or in **Edit**.
 - **Watched at**, 90% by default: how far into a video playback must get for it to count as watched in the library's history, as a whole percentage from 1 to 100.
-- **Sort**: title, recently or oldest added, largest or smallest file, highest or lowest bitrate, highest or lowest resolution (by pixel count), or random. Videos not yet probed go last. Random holds its order while the page is open, and each visit starts a fresh deal.
+- **Sort**: title, recently or oldest added, largest or smallest file, highest or lowest bitrate, highest or lowest resolution (by pixel count), newest or oldest release (Movies and TV shows), or random. Videos not yet probed, and files with no year, go last. Titles sort without a leading "The", "A" or "An". Random holds its order while the page is open, and each visit starts a fresh deal.
 - **View**: a grid of cards, a list, tiles (rows with a small thumbnail), or grouped by resolution, video codec or month added.
 
 Sort, view and grouping are picked on the library page and saved as they change; the others are in **Edit**. Changing a setting or the name never rescans; only a change of folders does.
@@ -132,7 +133,23 @@ Each library's **History**, linked from its page, lists the videos played in it,
 
 ## Favourites and deleting
 
-Every card has a menu, from the button in its corner or a right click, with two actions. **Favourite** marks the video and lists it under **Favourites** in the side menu, most recently marked first, across every library. **Delete** asks first, then removes the file from disk and the video from the index, along with its thumbnail, progress and favourite. There is no undo.
+Every card has a menu, from the button in its corner or a right click. In a Movies library it also has **Fix match** and **Refresh details** (see [Metadata](#metadata)). **Favourite** marks the video and lists it under **Favourites** in the side menu, most recently marked first, across every library. **Delete** asks first, then removes the file from disk and the video from the index, along with its thumbnail, progress and favourite. There is no undo.
+
+## Metadata
+
+A Movies library knows what each of its files is: posters, titles and years on its cards, and a page for every movie with its backdrop, director, content rating, runtime, genres, TMDB's score, summary, the file's video, audio and subtitles, its other versions, and a cast and crew row with photos. Other libraries stay as they were. TV shows are next.
+
+- **Turning it on.** Put TMDB's API Read Access Token in `apps/raven/.env` as `TMDB_API_TOKEN` (copy `.env.example`; on Vhagar the file sits beside the compose file, and `update.sh` makes an empty one if there is none). Without a token, or without the internet, raven works as before, with names tidied into titles and years.
+- **Names.** Radarr's `Movie (Year)/Movie (Year) Quality.mkv`, scene names like `The.Matrix.1999.1080p.BluRay.x264-GROUP.mkv`, Plex's `{edition-...}`, and id tags (`{tmdb-603}`, `{imdb-tt0133093}`, `[tmdbid-603]`) are all read. A movie's own folder is read first when it has a year. Plex's extras folders (`Featurettes`, `Trailers`, ...) and suffixes (`-trailer`, ...) are never matched.
+- **Matching.** A Fix match wins, then an id in a name or in a Radarr NFO (`movie.nfo` or `<file>.nfo`, ids only), then a search by title and year that takes only a sure answer: the same title (ignoring case, accents, punctuation and a leading article) in the same year or one either side, or the only result in the right year. Anything else is **Not matched**; raven never guesses. Matching needs only the name, so new files match while they are still being probed.
+- **One card per movie.** A movie kept in two qualities is one card, its best version (most pixels, then biggest file), saying how many there are; the page lists them all, each playable.
+- **Pictures.** `poster`, `folder` or `cover`, and `fanart`, `backdrop` or `background` (`jpg`, `png`, `webp`) beside a movie win over TMDB's, as do `<file>-poster` and `<file>-fanart`; folder-wide ones count only when the folder holds that one movie. Posters are fetched as soon as a movie matches (about 60 KB each); backdrops and photos the first time they are shown. They sit in `<data>/images/`, and the browser only ever talks to raven.
+- **Fix match.** From a card's menu or the movie's page: search TMDB, pick the right one, or say it is not a movie. The choice is kept by folder (or by file at a library's root), so renames and re-downloads keep it, and nothing automatic replaces it.
+- **Keeping fresh.** **Refresh details** fetches a movie again now. A sweep on start and every day refreshes movies fetched more than 30 days ago, or 7 for those out in the last 90. Movies with no file left, people with no credits, and their pictures are cleared up.
+- **TMDB's limits.** raven keeps to 20 calls a second with 4 in flight, waits out a 429, and gives each call 10 seconds. A wrong token (401) stops matching until a restart. `/api/health` reports `metadata`: whether TMDB is `off`, `ok` or `failing` (and why), and how many files wait to be matched. The token never reaches the browser, the logs or the health check.
+- **Outbound calls.** These are raven's first: the container must reach `api.themoviedb.org` and `image.tmdb.org`.
+
+This product uses the TMDB API but is not endorsed or certified by TMDB; every page showing its data says so, with TMDB's logo.
 
 ## Thumbnails
 
@@ -165,13 +182,15 @@ The server and core tests need `ffmpeg` and `ffprobe` on the PATH: the end-to-en
 ```
 apps/raven/
   server/        @raven/server: NestJS on Fastify: SQLite index, scanner, ffprobe, thumbnails,
-                 range-request file serving, tracks, subtitles and converted streams
+                 range-request file serving, tracks, subtitles and converted streams, and
+                 metadata: the TMDB client, matching, the image cache and the item routes
   web/           @raven/web: React 19 + Vite: libraries, the grid, list, tiles and groups, history,
-                 the player and its stream source, the /design page
-  Dockerfile, docker-compose.yml, docker-compose.vhagar.yml, vhagar-update.sh
+                 movie pages and Fix match, the player and its stream source, the /design page
+  Dockerfile, docker-compose.yml, docker-compose.vhagar.yml, vhagar-update.sh, .env.example
 libs/raven/
   core/          @raven/core: API types and guards, the typed API client, the direct-play check,
-                 formatting. No DOM or Node APIs, so a React Native app can use it unchanged.
+                 reading names, formatting. No DOM or Node APIs, so a React Native app can use
+                 it unchanged.
 ```
 
 A native iOS or Android app would be another `apps/raven/` entry that imports `@raven/core` and answers the direct-play check from its own player (AVPlayer takes MKV-free HEVC and Dolby audio; ExoPlayer takes almost everything).
@@ -194,6 +213,9 @@ A native iOS or Android app would be another `apps/raven/` entry that imports `@
 | `THUMBNAIL_WIDTH`             | `480`                          |                                              |
 | `FFMPEG_TIMEOUT_SECONDS`      | `90`                           | Per ffprobe or thumbnail run                 |
 | `FFMPEG_PATH`, `FFPROBE_PATH` | `ffmpeg`, `ffprobe`            |                                              |
+| `TMDB_API_TOKEN`              | unset                          | TMDB's API Read Access Token; unset turns metadata off |
+| `METADATA_LANGUAGE`           | `en-US`                        | Language for titles and summaries            |
+| `METADATA_COUNTRY`            | `US`                           | Whose content rating and release date to show |
 
 ## Not there yet
 

@@ -16,6 +16,10 @@ services:
       - /dev/dri/renderD128:/dev/dri/renderD128
     ports:
       - '8484:8484'
+    # TMDB_API_TOKEN and the other optional keys in .env.example. Compose
+    # 2.20 here needs the file to exist, so update.sh makes an empty one.
+    env_file:
+      - .env
     environment:
       - RESCAN_INTERVAL_MINUTES=0
     volumes:

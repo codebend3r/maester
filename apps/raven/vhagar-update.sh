@@ -30,6 +30,11 @@ exec >> update.log 2>&1
 log() { echo "$(date '+%F %T') $*"; }
 trap 'log "✗ update failed on line $LINENO"' ERR
 
+# The compose file reads .env for raven's optional keys (TMDB_API_TOKEN), and
+# Compose 2.20 here cannot treat a missing one as optional: an empty file
+# means none are set.
+[ -f .env ] || touch .env
+
 image="$("$DOCKER" compose config --images "$SERVICE")"
 "$DOCKER" compose pull --quiet "$SERVICE"
 pulled="$("$DOCKER" image inspect --format '{{.Id}}' "$image")"
