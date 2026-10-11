@@ -11,6 +11,7 @@ import { Link } from 'react-router-dom'
 import type { MatchType } from '@/components/FixMatchDialog/FixMatchDialog'
 import { Icon } from '@/components/Icon/Icon'
 import { MediaMenu } from '@/components/MediaMenu/MediaMenu'
+import { RatingChips } from '@/components/RatingChips/RatingChips'
 import { openPath } from '@/lib/itemLinks'
 import { progressOf } from '@/lib/mediaProgress'
 import styles from '@/components/MediaList/MediaList.module.scss'
@@ -69,6 +70,11 @@ const MediaRow = ({
         </div>
       </th>
       {movies && <td className={styles.number}>{year ?? ''}</td>}
+      {movies && (
+        <td className={styles.roomy}>
+          {media.item && <RatingChips ratings={media.item.ratings} />}
+        </td>
+      )}
       <td className={styles.number}>{formatRuntime(media.duration)}</td>
       <td className={styles.roomy}>{resolutionLabel(media)}</td>
       <td className={`${styles.number} ${styles.extra}`}>{formatBytes(media.size)}</td>
@@ -111,6 +117,11 @@ export const MediaList = ({
         {movies && (
           <th scope="col" className={styles.number}>
             Year
+          </th>
+        )}
+        {movies && (
+          <th scope="col" className={styles.roomy}>
+            Ratings
           </th>
         )}
         <th scope="col" className={styles.number}>

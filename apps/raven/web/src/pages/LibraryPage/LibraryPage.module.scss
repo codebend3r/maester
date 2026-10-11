@@ -46,23 +46,9 @@
   gap: var(--space-1);
 }
 
-.unmatched {
+.buckets {
   display: grid;
   gap: var(--space-3);
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--color-moss);
-}
-
-.subheading {
-  font-family: var(--font-display);
-  font-size: var(--font-size-lg);
-  font-weight: 400;
-}
-
-.subcount {
-  color: var(--color-lichen);
-  font-family: var(--font-body);
-  font-size: var(--font-size-sm);
 }
 
 .message {

@@ -52,7 +52,7 @@ export type LibrarySettings = {
 }
 
 /** The scores a library can show on its cards: Metacritic has no card of its own. */
-export type ShownRatings = 'tmdb' | 'imdb' | 'rottenTomatoes'
+export type ShownRatings = 'tmdb' | 'imdb' | 'rottenTomatoes' | 'metacritic'
 
 export type LibraryKind = 'movies' | 'shows' | 'other'
 

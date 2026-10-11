@@ -275,8 +275,9 @@ describe('LibraryPage for TV shows', () => {
       'href',
       '/shows/4',
     )
-    expect(screen.getByRole('heading', { name: 'Matched 1 show' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Not matched 1' })).toBeInTheDocument()
+    const headings = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
+    expect(headings).toEqual(['Matched, 1 show', 'Not matched, 1 video'])
+    expect(screen.getByText('Matched').closest('details')).not.toHaveAttribute('open')
     expect(screen.getByText('TV shows · 12 videos · 1 not matched')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Unknown Show - S01E01' })).toHaveAttribute(
       'href',
@@ -287,7 +288,7 @@ describe('LibraryPage for TV shows', () => {
 
   it('asks the server to match the files no show was found for again', async () => {
     serve()
-    await screen.findByRole('heading', { name: 'Not matched 1' })
+    await screen.findByText('Not matched')
     const button = screen.getByRole('button', { name: 'Match again' })
     await waitFor(() => expect(button).toBeEnabled())
     await userEvent.click(button)
@@ -296,6 +297,7 @@ describe('LibraryPage for TV shows', () => {
 
   it('lays the shows out as a list when asked, each row playable', async () => {
     serve({ view: 'list' })
+    await userEvent.click(await screen.findByText('Matched'))
     const table = await screen.findByRole('table', { name: 'Shows' })
     expect(within(table).getByRole('link', { name: 'Severance' })).toHaveAttribute(
       'href',
@@ -309,6 +311,7 @@ describe('LibraryPage for TV shows', () => {
 
   it('lays the shows out as tiles when asked', async () => {
     serve({ view: 'tiles' })
+    await userEvent.click(await screen.findByText('Matched'))
     const tiles = await screen.findByRole('list', { name: 'Shows' })
     expect(within(tiles).getByRole('link', { name: 'Severance' })).toHaveAttribute(
       'href',

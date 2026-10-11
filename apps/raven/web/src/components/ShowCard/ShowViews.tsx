@@ -1,8 +1,8 @@
-import { type ShowEntry, type ShownRatings, episodeCode, pickScore } from '@raven/core'
+import { type ShowEntry, type ShownRatings, episodeCode } from '@raven/core'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Icon } from '@/components/Icon/Icon'
-import { ScoreChip } from '@/components/RatingChips/RatingChips'
+import { RatingChips } from '@/components/RatingChips/RatingChips'
 import { api } from '@/lib/api'
 import { showYears } from '@/lib/itemLinks'
 import styles from '@/components/ShowCard/ShowViews.module.scss'
@@ -54,11 +54,11 @@ const SmallPoster = ({ entry }: { entry: ShowEntry }) => {
 export const ShowList = ({
   shows,
   busy = false,
-  ratingsSource = 'tmdb',
   labelledBy,
 }: {
   shows: ShowEntry[]
   busy?: boolean
+  /** Kept for the callers that pass it; every rating shows here. */
   ratingsSource?: ShownRatings
   labelledBy?: string
 }) => (
@@ -78,7 +78,7 @@ export const ShowList = ({
           Episodes
         </th>
         <th scope="col" className={styles.roomy}>
-          Score
+          Ratings
         </th>
         <th scope="col">
           <span className="visually-hidden">Play</span>
@@ -87,7 +87,6 @@ export const ShowList = ({
     </thead>
     <tbody>
       {shows.map((entry) => {
-        const score = pickScore({ ratings: entry.show.ratings, source: ratingsSource })
         return (
           <tr key={entry.show.id} className={styles.row}>
             <th scope="row">
@@ -99,7 +98,9 @@ export const ShowList = ({
               {showYears({ year: entry.show.year, endedYear: entry.endedYear }) ?? ''}
             </td>
             <td className={styles.number}>{entry.episodes}</td>
-            <td className={styles.roomy}>{score && <ScoreChip rating={score} />}</td>
+            <td className={styles.roomy}>
+              <RatingChips ratings={entry.show.ratings} />
+            </td>
             <td className={styles.playCell}>
               <NextPlay entry={entry} />
             </td>
@@ -114,11 +115,11 @@ export const ShowList = ({
 export const ShowTiles = ({
   shows,
   busy = false,
-  ratingsSource = 'tmdb',
   labelledBy,
 }: {
   shows: ShowEntry[]
   busy?: boolean
+  /** Kept for the callers that pass it; every rating shows here. */
   ratingsSource?: ShownRatings
   labelledBy?: string
 }) => (
@@ -129,7 +130,6 @@ export const ShowTiles = ({
     aria-busy={busy}
   >
     {shows.map((entry) => {
-      const score = pickScore({ ratings: entry.show.ratings, source: ratingsSource })
       const facts = [
         showYears({ year: entry.show.year, endedYear: entry.endedYear }),
         episodesLabel(entry),
@@ -145,8 +145,8 @@ export const ShowTiles = ({
               {facts.map((fact) => (
                 <span key={fact}>{fact}</span>
               ))}
-              {score && <ScoreChip rating={score} />}
             </span>
+            <RatingChips ratings={entry.show.ratings} />
           </div>
           <NextPlay entry={entry} />
         </li>

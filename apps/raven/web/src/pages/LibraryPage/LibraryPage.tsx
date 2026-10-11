@@ -14,6 +14,7 @@ import {
 } from '@raven/core'
 import { useEffect, useId, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Bucket } from '@/components/Bucket/Bucket'
 import { Button, ButtonLink } from '@/components/Button/Button'
 import type { MatchType } from '@/components/FixMatchDialog/FixMatchDialog'
 import { LibraryDialog } from '@/components/LibraryDialog/LibraryDialog'
@@ -158,7 +159,7 @@ const MediaView = ({
 export const LibraryPage = () => {
   const params = useParams()
   const libraryId = Number(params.id)
-  const ids = { title: useId(), matched: useId(), unmatched: useId() }
+  const ids = { title: useId() }
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [address, setAddress] = useSearchParams()
@@ -385,31 +386,36 @@ export const LibraryPage = () => {
       )}
 
       {emptyState && <p className={styles.message}>{emptyState}</p>}
-      {!emptyState && tv && (
-        <>
-          {items.length > 0 && shows.length > 0 && (
-            <h2 id={ids.matched} className={styles.subheading}>
-              Matched{' '}
-              <span className={styles.subcount}>
-                {count.format(shows.length)} {shows.length === 1 ? 'show' : 'shows'}
-              </span>
-            </h2>
+      {!emptyState && tv && items.length === 0 && (
+        <ShowsView
+          settings={settings}
+          shows={shows}
+          busy={showsQuery.isFetching && !showsQuery.data}
+          labelledBy={undefined}
+        />
+      )}
+      {!emptyState && tv && items.length > 0 && (
+        <div className={styles.buckets}>
+          {shows.length > 0 && (
+            <Bucket
+              label="Matched"
+              count={`${count.format(shows.length)} ${shows.length === 1 ? 'show' : 'shows'}`}
+            >
+              <ShowsView
+                settings={settings}
+                shows={shows}
+                busy={showsQuery.isFetching && !showsQuery.data}
+                labelledBy={undefined}
+              />
+            </Bucket>
           )}
-          <ShowsView
-            settings={settings}
-            shows={shows}
-            busy={showsQuery.isFetching && !showsQuery.data}
-            labelledBy={items.length > 0 && shows.length > 0 ? ids.matched : undefined}
-          />
-          {items.length > 0 && (
-            <section className={styles.unmatched} aria-labelledby={ids.unmatched}>
-              <h2 id={ids.unmatched} className={styles.subheading}>
-                Not matched <span className={styles.subcount}>{count.format(unmatched)}</span>
-              </h2>
-              <MediaView settings={settings} items={items} busy={false} />
-            </section>
-          )}
-        </>
+          <Bucket
+            label="Not matched"
+            count={`${count.format(items.length)} ${items.length === 1 ? 'video' : 'videos'}`}
+          >
+            <MediaView settings={settings} items={items} busy={false} />
+          </Bucket>
+        </div>
       )}
       {!emptyState && !tv && (
         <MediaView settings={settings} items={items} busy={media.isFetching && !media.data} />
