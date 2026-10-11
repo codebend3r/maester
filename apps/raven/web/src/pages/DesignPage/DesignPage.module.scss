@@ -123,6 +123,72 @@
   align-items: start;
 }
 
+// Logo.
+.marks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(15rem, 100%), 1fr));
+  gap: var(--space-4) var(--space-3);
+}
+
+.markCard {
+  display: grid;
+  align-content: start;
+  gap: var(--space-0);
+}
+
+// Each mark is drawn for one ground, so the ground is part of the specimen.
+.markGround {
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+  border: 1px solid var(--color-moss);
+  border-radius: var(--radius-md);
+}
+
+.groundNight {
+  background: var(--color-night);
+}
+
+.groundBark {
+  background: var(--color-bark);
+}
+
+.markName {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.markImage {
+  width: auto;
+  height: 8rem;
+}
+
+// On bark, so the night tile shows its edges.
+.favicons {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  align-items: end;
+  gap: var(--space-4);
+  justify-self: start;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-bark);
+  color: var(--color-night);
+}
+
+.favicon {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-1);
+  font-size: var(--font-size-xs);
+}
+
+.lockup {
+  display: grid;
+  justify-items: start;
+}
+
 // Colour.
 .swatches {
   display: grid;

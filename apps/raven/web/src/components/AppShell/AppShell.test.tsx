@@ -40,6 +40,14 @@ describe('AppShell', () => {
     spies.list.mockReset()
   })
 
+  it('links home from the logo, named by its word alone', () => {
+    spies.list.mockImplementation(async () => [])
+    renderShell('/favourites')
+    const home = screen.getByRole('link', { name: 'raven' })
+    expect(home).toHaveAttribute('href', '/')
+    expect(home.querySelector('img')).toHaveAttribute('src', '/brand/raven-mark-on-dark.svg')
+  })
+
   it('links to the libraries and the favourites, marking the current page', () => {
     spies.list.mockImplementation(async () => [])
     renderShell('/favourites')

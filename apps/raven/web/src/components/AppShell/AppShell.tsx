@@ -3,6 +3,7 @@ import { useId } from 'react'
 import { Link, Outlet, matchPath, useLocation } from 'react-router-dom'
 import { Button } from '@/components/Button/Button'
 import { Icon, type IconName } from '@/components/Icon/Icon'
+import { Logo } from '@/components/Logo/Logo'
 import { api } from '@/lib/api'
 import { useKeyShortcut } from '@/lib/keyboard'
 import { KINDS } from '@/lib/libraryKinds'
@@ -61,7 +62,7 @@ const ShortcutTip = ({ onDismiss }: { onDismiss: () => void }) => (
 )
 
 /**
- * The frame around every browsing page: the wordmark, then the side menu
+ * The frame around every browsing page: the logo, then the side menu
  * beside the page (below it on a narrow screen). Pinned libraries get their
  * own links there, each with its type's icon (a lock for a locked one), and an open one is marked
  * instead of Libraries. The menu collapses to its icons with B or the toggle
@@ -86,8 +87,8 @@ export const AppShell = () => {
   return (
     <div className={collapsed ? `${styles.shell} ${styles.collapsed}` : styles.shell}>
       <header className={styles.header}>
-        <Link to="/" className={styles.wordmark}>
-          raven
+        <Link to="/" className={styles.home}>
+          <Logo />
         </Link>
       </header>
       <div className={styles.side}>

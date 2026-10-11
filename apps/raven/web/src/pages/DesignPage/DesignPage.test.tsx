@@ -32,6 +32,22 @@ describe('DesignPage', () => {
     expect(swatches[1]).toHaveTextContent('Text on everything.')
   })
 
+  it('shows each version of the logo and the favicon at its sizes', () => {
+    renderWithProviders(<DesignPage />)
+    const logo = screen.getByRole('region', { name: 'Logo' })
+    const images = within(logo).getAllByRole('img')
+    expect(images.map((image) => [image.getAttribute('alt'), image.getAttribute('src')])).toEqual([
+      ['The mark on dark', '/brand/raven-mark-on-dark.svg'],
+      ['The mark on light', '/brand/raven-mark-on-light.svg'],
+      ['The mark in one colour', '/brand/raven-mark-mono.svg'],
+      ['The favicon at 16 pixels', '/favicon.svg'],
+      ['The favicon at 32 pixels', '/favicon.svg'],
+      ['The favicon at 48 pixels', '/favicon.svg'],
+      ['The home screen icon', '/apple-touch-icon.png'],
+    ])
+    expect(logo).toHaveTextContent('raven')
+  })
+
   it('lists the other tokens with their values', () => {
     renderWithProviders(<DesignPage />)
     const tokens = screen.getByRole('region', { name: 'Tokens' })
