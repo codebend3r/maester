@@ -2,7 +2,8 @@
 
 `build()` is pure construction and safe to call in tests with fake
 clients; `run()` starts the web server and the scheduled jobs on one
-asyncio loop and returns when either stops.
+asyncio loop and returns when either stops. Before serving, it asks plex.tv
+who owns the server, so the owner is the admin from the first request.
 """
 
 from __future__ import annotations
@@ -31,6 +32,8 @@ from luwin.clients import (
     PlexClient,
     PlexTvClient,
     RadarrClient,
+    Rookery,
+    RookeryClient,
     SabnzbdClient,
     SeerrClient,
     Services,
@@ -47,6 +50,8 @@ from luwin.registry import Registry
 from luwin.seerr_events import seerr_routes
 from luwin.store import Store
 from luwin.web import create_app
+from luwin.web.api import Api
+from luwin.web.auth import Auth, SessionVerifier
 from luwin.web.seerr import SeerrWebhook
 
 # Importing the tools package registers every tool module into app_registry.
@@ -100,6 +105,7 @@ def build(
     model_client: Any = None,
     tools: ToolRegistry | None = None,
     store: Store | None = None,
+    rookery: Rookery | None = None,
 ) -> App:
     cfg = cfg or settings()
     store = store or Store(cfg.db_path)
@@ -133,10 +139,14 @@ def build(
     notifier = LogNotifier()
     seerr = SeerrWebhook(cfg.seerr_webhook_secret, seerr_routes(services, store), store, notifier)
     scheduler = Scheduler(scheduled(services, store, cfg, kill), store=store, notifier=notifier)
-    return App(cfg, store, services, agent, chat, console, create_app(seerr=seerr), kill, scheduler)
+    rookery = rookery or RookeryClient(cfg.rookery_url, cfg.rookery_service_token)
+    auth = Auth(SessionVerifier(rookery), identity, sign_in=f"{cfg.rookery_public_url}/login")
+    web = create_app(seerr=seerr, api=Api(auth, console))
+    return App(cfg, store, services, agent, chat, console, web, kill, scheduler)
 
 
 async def serve(app: App) -> None:
+    await app.chat.identity.load_owner()
     config = uvicorn.Config(app.web, host="0.0.0.0", port=app.settings.web_port, log_level="info")
     server = uvicorn.Server(config)
     web_task = asyncio.create_task(server.serve(), name="web")

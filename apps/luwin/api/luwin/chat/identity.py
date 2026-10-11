@@ -1,129 +1,150 @@
-"""Who a chat account is on Plex/Seerr, and which tier they get.
+"""Who a signed-in user is on Plex/Seerr, and which tier they get.
 
-Tier is resolved on every message, so a change takes effect immediately: a
-stored override, which an admin sets, wins; otherwise an account linked to a
-Seerr user is a friend, and anyone else is unlinked. Trusted and admin come
-only from the override. Linking a chat account to a Plex user is a two-step
-flow: the friend names their Plex email or username, luwin matches it
-against Seerr's users, and the admin decides, which runs the
-`link_account` admin tool.
+rookery says who someone is: their rookery user id and the Plex account they
+signed in with. luwin decides what they may do. Tier is resolved on every
+request, so a change takes effect immediately: a stored override, which the
+admin sets, wins; then the owner of the Plex server is the admin; then a
+user whose Plex account matches a Seerr user is a friend; anyone else is
+unlinked. Trusted comes only from the override.
+
+The Seerr match, and the Tautulli user id beside it, are cached on the
+user's row and checked again when due: daily once matched, so a friend Seerr
+no longer lists loses access, and at most once a minute while unmatched, so
+a friend invited a minute ago gets in on their next message. Only verified
+Plex facts match: the account's email against a Seerr user's email, and its
+Plex username against a Seerr user's Plex username, never a display name a
+local Seerr user chose.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import timedelta
+import logging
+from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
 
 from luwin.agent.tools import Tier
-from luwin.clients import Services
-from luwin.store import LinkStatus, PendingAction, SeerrUserTaken, Store
+from luwin.clients import Account, ClientError, PlexAccount, Services
+from luwin.store import Store, UserRow
+from luwin.store.base import stamp
 
-LINK_TTL = timedelta(days=7)
-ALREADY_LINKED = (
-    "That Plex account is already linked to another account here. "
-    "Ask the admin if it should be yours."
-)
+log = logging.getLogger("luwin.identity")
+
+MATCHED_RECHECK = timedelta(days=1)
+UNMATCHED_RECHECK = timedelta(minutes=1)
+OWNER_RETRY = timedelta(minutes=1)
 
 
-def resolve_tier(override: str | None, linked: bool) -> Tier:
-    """The stored override first; otherwise a linked account is a friend, anyone else UNLINKED.
-
-    An admin override stands on its own: the admin is an admin whether or not
-    they bothered to link, since they administer the thing.
-    """
+def resolve_tier(override: str | None, *, owner: bool, linked: bool) -> Tier:
+    """The stored override first; then the server's owner is the admin; then a linked user
+    is a friend, and anyone else UNLINKED."""
     if override:
         return Tier.parse(override)
+    if owner:
+        return Tier.ADMIN
     return Tier.FRIEND if linked else Tier.UNLINKED
 
 
-@dataclass(frozen=True)
-class LinkStart:
-    ok: bool
-    message: str
-    pending: PendingAction | None = None
+def _utcnow() -> datetime:
+    return datetime.now(UTC)
 
 
 class IdentityService:
-    def __init__(self, store: Store, services: Services):
+    def __init__(
+        self, store: Store, services: Services, *, clock: Callable[[], datetime] = _utcnow
+    ):
         self.store = store
         self.services = services
+        self.clock = clock
+        # The Plex server's owner, once plex.tv has said; see `load_owner`.
+        self.owner: PlexAccount | None = None
+        self._owner_asked: datetime | None = None
+
+    async def load_owner(self) -> PlexAccount | None:
+        """The server's owner: `PLEX_TOKEN`'s account on plex.tv. Asked once at boot, and
+        again at most once a minute while plex.tv couldn't say, so a blip at boot doesn't
+        leave luwin without its admin."""
+        plextv = getattr(self.services, "plextv", None)
+        if self.owner is not None or plextv is None:
+            return self.owner
+        now = self.clock()
+        if self._owner_asked is not None and now - self._owner_asked < OWNER_RETRY:
+            return None
+        self._owner_asked = now
+        try:
+            self.owner = await plextv.account()
+        except ClientError:
+            log.warning("plex.tv couldn't say who owns the server; asking again in a minute")
+        return self.owner
 
     def tier_for(self, user_id: str) -> Tier:
         user = self.store.get_user(user_id)
-        linked = self.store.active_link(user_id) is not None
-        return resolve_tier(user.tier_override if user else None, linked)
+        if user is None:
+            return Tier.UNLINKED
+        owner = self.owner is not None and user.plex_id == self.owner.id
+        return resolve_tier(user.tier_override, owner=owner, linked=user.seerr_user_id is not None)
 
-    async def start_link(self, user_id: str, display_name: str, query: str) -> LinkStart:
-        """Match `query` (Plex email or username) against Seerr users and queue approval."""
-        q = query.strip().lower()
-        if not q:
-            return LinkStart(False, "Tell me your Plex email or username, e.g. me@example.com.")
-        existing = self.store.get_user(user_id)
-        if existing and existing.status == LinkStatus.ACTIVE:
-            return LinkStart(
-                False, f"You're already linked as {existing.plex_email or existing.plex_username}."
-            )
-        if self.store.open_pending("approve", action="link_account", requester=user_id):
-            return LinkStart(False, "Your link request is already waiting for the admin.")
-
-        users = await self.services.seerr.users()
-        matches = [
-            u
-            for u in users
-            if q in {u.email.lower(), u.username.lower(), u.plex_username.lower()} - {""}
-        ]
-        if not matches:
-            return LinkStart(
-                False,
-                "I couldn't find that Plex account. Use the email or username you sign in to Plex with, "
-                "or ask the admin for an invite if you don't have access yet.",
-            )
-        seerr_user = matches[0]
-        # One chat account per Plex account, so requests and ready DMs can
-        # only belong to one person. The schema enforces it; this check only
-        # answers early and kindly.
-        holder = self.store.user_by_seerr_id(seerr_user.id)
-        if holder is not None and holder.user_id != user_id:
-            return LinkStart(False, ALREADY_LINKED)
-        tautulli_id = await self._tautulli_id(
-            seerr_user.email, seerr_user.plex_username or seerr_user.username
+    async def refresh(self, account: Account) -> UserRow:
+        """The user `account` names, upserted from it, with their Seerr match checked when due."""
+        now = self.clock()
+        user = self.store.upsert_user(
+            account.user_id,
+            plex_id=account.plex_id,
+            plex_email=account.plex_email or None,
+            plex_username=account.plex_username or None,
+            thumb=account.thumb or None,
+            last_seen_at=stamp(now),
         )
+        if self._match_due(user, now):
+            user = await self._match(user, now)
+        return user
+
+    @staticmethod
+    def _match_due(user: UserRow, now: datetime) -> bool:
+        if user.seerr_checked_at is None:
+            return True
+        wait = MATCHED_RECHECK if user.seerr_user_id is not None else UNMATCHED_RECHECK
+        return now - datetime.fromisoformat(user.seerr_checked_at) >= wait
+
+    async def _match(self, user: UserRow, now: datetime) -> UserRow:
+        checked = stamp(now)
         try:
-            self.store.upsert_user(
-                user_id,
-                plex_email=seerr_user.email or None,
-                plex_username=seerr_user.plex_username or seerr_user.username or None,
-                seerr_user_id=seerr_user.id,
-                tautulli_user_id=tautulli_id,
-                status=LinkStatus.PENDING,
-            )
-        except SeerrUserTaken:  # someone else linked it while we asked Tautulli
-            return LinkStart(False, ALREADY_LINKED)
-        account = seerr_user.email or seerr_user.username
-        # Decided by the button-only `link_account` admin tool (luwin/tools/accounts.py).
-        pending = self.store.create_pending(
-            kind="approve",
-            action="link_account",
-            requester=user_id,
-            payload={"user_id": user_id, "display_name": display_name, "account": account},
-            summary=f"Link {display_name} to Plex account {account}",
-            ttl=LINK_TTL,
+            seerr_users = await self.services.seerr.users()
+        except ClientError:
+            # Keep whatever match they had; the next check is due as usual.
+            log.warning("Seerr couldn't list its users to match %s", user.user_id)
+            return self.store.upsert_user(user.user_id, seerr_checked_at=checked)
+        email = (user.plex_email or "").lower()
+        username = (user.plex_username or "").lower()
+        match = next(
+            (
+                u
+                for u in seerr_users
+                if (email and u.email.lower() == email)
+                or (username and u.plex_username.lower() == username)
+            ),
+            None,
         )
-        return LinkStart(
-            True,
-            f"Found {account}. The admin will confirm the link shortly.",
-            pending,
+        if match is None:
+            return self.store.upsert_user(
+                user.user_id, seerr_user_id=None, tautulli_user_id=None, seerr_checked_at=checked
+            )
+        tautulli_id = await self._tautulli_id(email, username)
+        return self.store.upsert_user(
+            user.user_id,
+            seerr_user_id=match.id,
+            tautulli_user_id=tautulli_id,
+            seerr_checked_at=checked,
         )
 
     async def _tautulli_id(self, email: str, username: str) -> int | None:
         for client in self.services.tautulli.values():
             try:
                 for u in await client.users():
-                    if (email and u.email.lower() == email.lower()) or (
-                        username and u.username.lower() == username.lower()
+                    if (email and u.email.lower() == email) or (
+                        username and u.username.lower() == username
                     ):
                         return u.user_id
-            except Exception:  # a missing Tautulli must not block linking
+            except Exception:  # a missing Tautulli must not block the match
                 continue
         return None
 
@@ -131,15 +152,3 @@ class IdentityService:
         normalized = Tier.parse(tier).name.lower() if tier else None
         self.store.upsert_user(user_id, tier_override=normalized)
         return f"Tier for {user_id} is now {normalized or 'the default'}."
-
-    def whoami(self, user_id: str) -> str:
-        user = self.store.get_user(user_id)
-        tier = self.tier_for(user_id)
-        if not user or user.status == LinkStatus.REVOKED:
-            return (
-                f"You're not linked yet (tier: {tier.name.lower()}). Link the email or "
-                "username you use for Plex and the admin will approve it."
-            )
-        who = user.plex_email or user.plex_username or "?"
-        state = "active" if user.status == LinkStatus.ACTIVE else "waiting for admin approval"
-        return f"Linked to {who} ({state}). Tier: {tier.name.lower()}."

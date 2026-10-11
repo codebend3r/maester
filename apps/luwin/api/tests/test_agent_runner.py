@@ -283,7 +283,7 @@ async def test_destructive_tool_needs_confirmation_then_runs_on_the_press(setup)
 
 async def test_a_confirmed_tool_that_posts_its_own_notice_is_not_announced_twice(setup):
     runner, as_user, store, *_ = setup
-    store.upsert_user("u1", status="active", seerr_user_id=4, plex_username="trusty")
+    store.upsert_user("u1", seerr_user_id=4, plex_username="trusty")
     out = await runner.run(as_user("u1"), "delete_file", {"file_id": 9, "host": "meleys"})
     pending = store.decide_pending(out.pending_id, "approved", "u1")
     done = await runner.run_decision(as_user("u1"), pending, True)
@@ -343,10 +343,10 @@ def test_linked_user_is_the_active_seerr_link_or_a_refusal(setup):
     ctx = as_user("u1")
     with pytest.raises(NotLinked):
         ctx.linked_user()
-    store.upsert_user("u1", status="pending", seerr_user_id=4)
+    store.upsert_user("u1", tier_override="trusted")  # an override alone links nobody
     with pytest.raises(NotLinked):
         ctx.linked_user()
-    store.upsert_user("u1", status="active")
+    store.upsert_user("u1", seerr_user_id=4)
     assert ctx.linked_user() == LinkedUser("u1", 4, None, "u1")
     store.upsert_user("u1", plex_email="u1@example.com")
     assert ctx.link_of("u1").name == "u1@example.com"

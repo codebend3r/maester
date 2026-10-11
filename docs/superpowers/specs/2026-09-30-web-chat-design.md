@@ -12,6 +12,13 @@ keyed by `user_id`, which covers most of steps 1 and 2 below. luwin is now
 meant to be a standalone chat app and a helper window inside raven and
 rookery, and rookery may own sign-in, so sections 2 and 5 are revisited
 before they are built.
+Amended 2026-10-09 by the shared sign-in
+(`2026-10-09-shared-sign-in-design.md`): rookery owns sign-in and luwin
+trusts its session. That spec replaces section 2, the `/login` page in
+section 5, and the sign-in decisions and config below (`PLEX_CLIENT_ID`,
+`SESSION_SECRET`, `PUBLIC_URL`); users are keyed by rookery's user id.
+In the order of work, step 2 is only the `inbox` table and step 3 is that
+spec's luwin step.
 
 Paths: module paths such as `maester/chat/service.py` and `tests/` are
 relative to `apps/maester/api/`; `docs/`, `.env.example` and compose are

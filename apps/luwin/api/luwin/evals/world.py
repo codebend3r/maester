@@ -495,7 +495,6 @@ def build_world(seed: dict[str, Any]) -> tuple[ToolRegistry, Services, Store]:
     seerr_user_id = int(user.get("seerr_user_id", 4))
     store.upsert_user(
         EVAL_USER,
-        status="active",
         seerr_user_id=seerr_user_id,
         tautulli_user_id=_tautulli_user(seed),
         plex_username=user.get("plex_username", "eval"),

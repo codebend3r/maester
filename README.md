@@ -1,22 +1,24 @@
 # maester
 
-maester is a self-hosted media suite: a library and player, an AI assistant for the friends who share the server, and soon their accounts. This repo is its workspace, an [Nx](https://nx.dev) 23 monorepo over [Bun](https://bun.sh) workspaces.
+maester is a self-hosted media suite: a library and player, an AI assistant for the friends who share the server, and one sign-in for them all. This repo is its workspace, an [Nx](https://nx.dev) 23 monorepo over [Bun](https://bun.sh) workspaces.
 
 | App     | What it is                                                                                                   |
 | ------- | ------------------------------------------------------------------------------------------------------------ |
 | raven   | A self-hosted media library and direct-play player                                                           |
 | luwin   | The AI assistant: requests, playback fixes and lag answers, in its own chat app and inside raven and rookery |
-| rookery | Sign-in and account management (planned)                                                                     |
+| rookery | Sign-in: one Plex sign-in shared by luwin and the rest of the suite                                          |
 
-| Project         | Path                | What                                                                   |
-| --------------- | ------------------- | ---------------------------------------------------------------------- |
-| `@luwin/api`    | `apps/luwin/api`    | luwin's agent, tools, chat and FastAPI app; Python 3.12 run through uv |
-| `@raven/server` | `apps/raven/server` | raven's media server: NestJS on Fastify, SQLite index, ffmpeg          |
-| `@raven/web`    | `apps/raven/web`    | raven's library and player: React 19 on Vite                           |
-| `@raven/core`   | `libs/raven/core`   | raven's platform-agnostic core: API types, client, direct-play check   |
-| `scripts`       | `scripts`           | Repo tooling: tracker and board sync, NAS deploy, version bump         |
+| Project           | Path                  | What                                                                   |
+| ----------------- | --------------------- | ---------------------------------------------------------------------- |
+| `@luwin/api`      | `apps/luwin/api`      | luwin's agent, tools, chat and FastAPI app; Python 3.12 run through uv |
+| `@raven/server`   | `apps/raven/server`   | raven's media server: NestJS on Fastify, SQLite index, ffmpeg          |
+| `@raven/web`      | `apps/raven/web`      | raven's library and player: React 19 on Vite                           |
+| `@raven/core`     | `libs/raven/core`     | raven's platform-agnostic core: API types, client, direct-play check   |
+| `@rookery/server` | `apps/rookery/server` | rookery's sign-in server: NestJS on Fastify, SQLite, Plex PIN flow     |
+| `@rookery/web`    | `apps/rookery/web`    | rookery's login and logout pages: React 19 on Vite                     |
+| `scripts`         | `scripts`             | Repo tooling: tracker and board sync, NAS deploy, version bump         |
 
-Each app has a README of its own: [luwin](apps/luwin/README.md), [raven](apps/raven/README.md).
+Each app has a README of its own: [luwin](apps/luwin/README.md), [raven](apps/raven/README.md), [rookery](apps/rookery/README.md).
 
 ## Develop
 

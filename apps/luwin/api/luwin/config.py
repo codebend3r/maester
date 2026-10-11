@@ -258,6 +258,11 @@ class Settings:
     wizarr_api_key: str = ""
     # plex.tv, where friends' library shares live; the account is `PLEX_TOKEN`'s.
     plex_tv_url: str = "https://plex.tv"
+    # rookery, which owns sign-in: its LAN address, which luwin asks who a session
+    # belongs to with the service token; and the public address browsers sign in at.
+    rookery_url: str = ""
+    rookery_public_url: str = ""
+    rookery_service_token: str = ""
     access: Access = field(default_factory=Access)
     # A friend who wants an English dub gets this Sonarr/Radarr tag on the
     # request, and the quality profile named here when it exists.
@@ -287,6 +292,9 @@ REQUIRED = (
     "ANTHROPIC_API_KEY",
     "SEERR_URL",
     "SEERR_API_KEY",
+    "ROOKERY_URL",
+    "ROOKERY_PUBLIC_URL",
+    "ROOKERY_SERVICE_TOKEN",
 )
 
 
@@ -303,6 +311,9 @@ def load_settings(env: Mapping[str, str]) -> Settings:
         wizarr_url=_url(env, "WIZARR_URL"),
         wizarr_api_key=env.get("WIZARR_API_KEY", ""),
         plex_tv_url=_url(env, "PLEX_TV_URL") or "https://plex.tv",
+        rookery_url=_url(env, "ROOKERY_URL"),
+        rookery_public_url=_url(env, "ROOKERY_PUBLIC_URL"),
+        rookery_service_token=env.get("ROOKERY_SERVICE_TOKEN", "").strip(),
         access=Access(
             invite_expires_days=_int(env, "INVITE_EXPIRES_DAYS", 7),
             public_url=_url(env, "WIZARR_PUBLIC_URL"),

@@ -66,5 +66,5 @@ def store():
 @pytest.fixture
 def ctx(services, store) -> ToolContext:
     """A linked friend (Seerr user 4) calling tools."""
-    store.upsert_user("d1", status="active", seerr_user_id=4, plex_username="dany")
+    store.upsert_user("d1", seerr_user_id=4, plex_username="dany")
     return ToolContext("d1", Tier.FRIEND, services, store, Settings(), Memo())

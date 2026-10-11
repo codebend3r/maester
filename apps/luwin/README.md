@@ -2,7 +2,7 @@
 
 The AI assistant of the maester suite, a concierge for a private Plex server. Friends talk to it in plain language; it requests movies and shows, works out why something will not play, explains lag with live server data, and hands the admin an approval queue instead of a group chat thread.
 
-Its chat app comes next: a standalone app, and a helper window that drops into raven and rookery. Until then luwin runs its agent and tools, the Seerr webhook and the scheduled jobs, and writes the notices it would send to its log.
+Its chat app comes next: a standalone app, and a helper window that drops into raven and rookery. Sign-in is already rookery's: friends sign in once with Plex, and luwin trusts that session. Until the chat app lands, luwin runs its agent and tools, its API, the Seerr webhook and the scheduled jobs, and writes the notices it would send to its log.
 
 luwin is the suite's maester: it serves the house, answers its questions, and sends the ravens.
 
@@ -44,7 +44,7 @@ Seerr  Sonarr    Radarr    SABnzbd   Tautulli    Plex     Wizarr
 
 For the admin:
 
-- every approval (4K and pending requests, link requests, replacements over the daily cap) to approve or deny, and the pending list to see them all again
+- every approval (4K and pending requests, replacements over the daily cap) to approve or deny, and the pending list to see them all again
 - a daily digest: requests, issues, replacements, stalled or failed downloads per host, free space and when each volume fills
 - a weekly NAS report, anything degraded at the top
 - stalled downloads blocklisted and searched again on their own, and 4K requests held while their volume is nearly full
@@ -77,8 +77,9 @@ The board follows the issues. `uv run python scripts/sync_board.py`, run from th
 | Language  | Python 3.12, `uv`, `ruff`, `pytest`, run through the workspace's Nx and Bun                     |
 | LLM       | Anthropic Python SDK, Messages API tool-use loop, `claude-opus-5-5` by default, prompt caching  |
 | Chat      | luwin's own app, next: standalone, or a helper window inside raven and rookery                  |
-| Web       | FastAPI for the Seerr webhook plus `/health` (a Tautulli webhook comes later)                   |
-| Storage   | SQLite on a `/data` volume: user links, conversations, audit log, reports, pending actions      |
+| Web       | FastAPI: luwin's `/api`, the Seerr webhook, `/health` (a Tautulli webhook comes later)          |
+| Sign-in   | rookery's `maester_session` cookie, checked with rookery's internal session lookup              |
+| Storage   | SQLite on a `/data` volume: users, conversations, audit log, reports, pending actions           |
 | Services  | Seerr, Sonarr, Radarr, SABnzbd, Tautulli, Plex, Wizarr over their REST APIs                     |
 | Hosting   | Docker Compose on a Synology NAS                                                                |
 
@@ -98,7 +99,7 @@ apps/luwin/
 │   │   ├── playback/       playback reports: plays, player limits, file health, the replace flow
 │   │   ├── perf/           lag: host load, the speed test, which version a connection carries
 │   │   ├── chat/           the chat service, identity and tiers, the admin console
-│   │   ├── web/            FastAPI app: webhooks and /health
+│   │   ├── web/            FastAPI app: the API, the session check against rookery, webhooks, /health
 │   │   ├── jobs/           scheduled work: the digest, the sweeper, space samples, the NAS report
 │   │   ├── store/          SQLite schema, migrations, audit log
 │   │   ├── evals/          the eval runner and the fake world a case runs in
@@ -120,7 +121,7 @@ Still to come: `api/luwin/guides/` for the device setup guides the model answers
 
 ## Getting started
 
-**Prerequisites.** [Bun](https://bun.sh) at the version the root `package.json` pins, and [uv](https://docs.astral.sh/uv/) (`brew install uv`); uv fetches Python 3.12 from `api/.python-version` if it is missing. You also need an Anthropic API key and the URLs and API keys of the services. The file health check needs `ffmpeg` on your `PATH`; the Docker image ships it, along with Ookla's `speedtest` CLI. Outside Docker, leave `SPEEDTEST_HOST` empty so the speed test is off.
+**Prerequisites.** [Bun](https://bun.sh) at the version the root `package.json` pins, and [uv](https://docs.astral.sh/uv/) (`brew install uv`); uv fetches Python 3.12 from `api/.python-version` if it is missing. You also need an Anthropic API key, the URLs and API keys of the services, and a running rookery with the service token it gave luwin. The file health check needs `ffmpeg` on your `PATH`; the Docker image ships it, along with Ookla's `speedtest` CLI. Outside Docker, leave `SPEEDTEST_HOST` empty so the speed test is off.
 
 ```bash
 git clone https://github.com/codebend3r/maester.git
@@ -133,6 +134,8 @@ bun run dev:luwin                             # starts the web app and the sched
 `.env` lives beside `docker-compose.yml`, in `apps/luwin/`, where compose reads it too. Keep none at the repo root: Nx loads a root `.env` into every task it runs.
 
 Checks run through Nx from the repo root: `bunx nx run @luwin/api:test`, `bunx nx run @luwin/api:lint:py`, `bunx nx run @luwin/api:format:check`, or `bun run verify` for every project. Evals: `bunx nx run @luwin/api:eval` (fake model), or from `apps/luwin/`, `uv run --project api luwin-eval` for the real model against fake services.
+
+**Sign-in.** luwin runs no sign-in of its own. rookery signs friends in with Plex and sets the `maester_session` cookie; luwin reads it and asks rookery whose it is, at `ROOKERY_URL` with `ROOKERY_SERVICE_TOKEN`, caching each answer for 30 seconds. A request without a live session gets a 401 naming `ROOKERY_PUBLIC_URL`'s login page. What someone may do is luwin's call: the account that owns the Plex server (`PLEX_TOKEN`'s) is the admin, a Plex account whose email or Plex username matches a Seerr user is a friend, and the admin can set any user's tier with `POST /api/admin/users/{user_id}/tier`. Anyone else is signed in but turned away with whom to ask for an invite. The design is in [`docs/superpowers/specs/2026-10-09-shared-sign-in-design.md`](../../docs/superpowers/specs/2026-10-09-shared-sign-in-design.md).
 
 **Chat.** There is no chat front end yet; luwin's own app comes next. Until it does, everything luwin would tell someone (approvals, ready messages, the digest, the NAS report) goes to its log.
 

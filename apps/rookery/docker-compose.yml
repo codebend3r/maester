@@ -1,0 +1,22 @@
+services:
+  rookery:
+    # Built from the repo root, which holds the workspace's bun.lock; the
+    # Dockerfile's own ignore file keeps the context to what it copies.
+    build:
+      context: ../..
+      dockerfile: apps/rookery/Dockerfile
+    image: rookery:latest
+    container_name: rookery
+    ports:
+      - '8030:8030'
+    # PUBLIC_URL, SERVICE_TOKEN and the rest; see .env.example.
+    env_file:
+      - .env
+    volumes:
+      # Users, logins and sessions. Survives rebuilds; delete it and everyone signs in again.
+      - ./data:/config
+    # The image runs as the unprivileged `node` user (1000:1000). On a
+    # Synology or any host where ./data belongs to someone else, run as the
+    # owner instead, e.g. user: '1026:100'.
+    # user: '1026:100'
+    restart: unless-stopped
