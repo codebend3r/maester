@@ -49,16 +49,15 @@ export class MatchController {
     @Query('query') query: string | undefined,
     @Query('year') year: string | undefined,
   ): Promise<MatchCandidate[]> {
-    if (type !== 'movie') throw new BadRequestException('type must be movie')
+    if (type !== 'movie' && type !== 'show')
+      throw new BadRequestException('type must be movie or show')
     if (!query?.trim()) throw new BadRequestException('Search for a title.')
     this.requireTmdb()
     const parsedYear = Number.parseInt(year ?? '', 10)
-    const results = await this.tmdb
-      .searchMovies({
-        query: query.trim(),
-        year: Number.isInteger(parsedYear) ? parsedYear : null,
-      })
-      .catch(tmdbFailure)
+    const asked = { query: query.trim(), year: Number.isInteger(parsedYear) ? parsedYear : null }
+    const results = await (
+      type === 'movie' ? this.tmdb.searchMovies(asked) : this.tmdb.searchShows(asked)
+    ).catch(tmdbFailure)
     return results.map(({ tmdbId, title, year: released, overview, poster }) => ({
       tmdbId,
       title,
@@ -82,8 +81,8 @@ export class MatchController {
 
   /**
    * Saves a Fix match: `{ tmdbId }` points the file (and its folder, when
-   * that holds one movie) at a TMDB movie; `{ tmdbId: null }` says it is not
-   * one. Kept through renames, and never replaced by matching.
+   * that holds one movie or show) at a TMDB movie or show; `{ tmdbId: null }`
+   * says it is not one. Kept through renames, and never replaced by matching.
    */
   @Put('media/:id/match')
   async setMatch(@Param('id', ParseIntPipe) id: number, @Body() body: unknown): Promise<MediaItem> {
@@ -95,8 +94,9 @@ export class MatchController {
     ) {
       throw new BadRequestException('tmdbId must be a TMDB id or null')
     }
-    if ((this.libraries.get(record.libraryId)?.settings.kind ?? null) !== 'movies') {
-      throw new BadRequestException('Only files in a Movies library can be matched.')
+    const kind = this.libraries.get(record.libraryId)?.settings.kind ?? 'other'
+    if (kind === 'other') {
+      throw new BadRequestException('Only files in a Movies or TV shows library can be matched.')
     }
     const tmdbId = body.tmdbId
     if (tmdbId != null) this.requireTmdb()

@@ -51,3 +51,48 @@ export const movieAssets = ({
       .map((wanted) => names.find((name) => name.toLowerCase() === wanted.toLowerCase()))
       .find((name) => name != null) ?? null,
 })
+
+export type ShowAssets = {
+  poster: string | null
+  backdrop: string | null
+  nfo: string | null
+}
+
+/** A show's pictures and NFO among its folder's file names. */
+export const showAssets = (names: readonly string[]): ShowAssets => ({
+  poster: firstImage({ names, stems: ['poster', 'folder', 'show'] }),
+  backdrop: firstImage({ names, stems: ['fanart', 'backdrop', 'background'] }),
+  nfo: names.find((name) => name.toLowerCase() === 'tvshow.nfo') ?? null,
+})
+
+/** A season's poster: `Season01`, `season01-poster`, or `season-specials-poster` for season 0. */
+export const seasonPoster = ({
+  names,
+  number,
+}: {
+  names: readonly string[]
+  number: number
+}): string | null => {
+  const padded = String(number).padStart(2, '0')
+  return firstImage({
+    names,
+    stems:
+      number === 0
+        ? ['season-specials-poster', 'season00-poster', 'Season00']
+        : [
+            `season${padded}-poster`,
+            `Season${padded}`,
+            `season${number}-poster`,
+            `Season${number}`,
+          ],
+  })
+}
+
+/** An episode's still beside it: `<stem>-thumb`. */
+export const episodeStill = ({
+  names,
+  stem,
+}: {
+  names: readonly string[]
+  stem: string
+}): string | null => firstImage({ names, stems: [`${stem}-thumb`] })

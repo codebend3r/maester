@@ -232,6 +232,152 @@ const tmdbRating = (entry: Record<string, unknown>): FetchedItem['rating'] => {
   return value != null && votes != null && votes > 0 ? { value, votes } : null
 }
 
+/** The content rating for `country`, then for the US, from a show's `content_ratings`. */
+const showCertification = ({
+  ratings,
+  country,
+}: {
+  ratings: unknown
+  country: string
+}): string | null => {
+  const results = records(record(ratings).results)
+  const forCountry = (code: string) =>
+    results
+      .map((entry) => (entry.iso_3166_1 === code ? text(entry.rating) : null))
+      .find((value) => value != null) ?? null
+  return forCountry(country) ?? forCountry('US')
+}
+
+/** TMDB's statuses for a show that will air no more. */
+const OVER: ReadonlySet<string> = new Set(['Ended', 'Canceled'])
+
+/** Credits over a show's whole run: each person's first role, and each crew job raven keeps. */
+const aggregateCredits = (credits: Record<string, unknown>): FetchedCredit[] => [
+  ...castCredits({
+    cast: records(credits.cast).map((entry) => ({
+      ...entry,
+      character: text(records(entry.roles)[0]?.character ?? null),
+    })),
+    job: 'cast',
+  }),
+  ...records(credits.crew).flatMap((entry) =>
+    records(entry.jobs).flatMap((job) => crewCredits([{ ...entry, job: job.job }])),
+  ),
+]
+
+/** A show with its aggregate credits, content ratings and external ids appended. */
+export const toShow = ({
+  body,
+  country,
+}: {
+  body: unknown
+  country: string
+}): FetchedItem | null => {
+  const show = record(body)
+  const tmdbId = idOf(show.id)
+  const title = text(show.name)
+  if (tmdbId == null || title == null) return null
+  const first = text(show.first_air_date)
+  const status = text(show.status) ?? ''
+  const external = record(show.external_ids)
+  const creators = records(show.created_by).flatMap((entry) => {
+    const found = person(entry)
+    return found ? [{ ...found, job: 'creator' as const, role: 'Creator' }] : []
+  })
+  return {
+    type: 'show',
+    tmdbId,
+    number: null,
+    title,
+    originalTitle: text(show.original_name),
+    year: yearOf(first),
+    released: first,
+    ended: OVER.has(status) ? text(show.last_air_date) : null,
+    summary: text(show.overview),
+    tagline: text(show.tagline),
+    contentRating: showCertification({ ratings: show.content_ratings, country }),
+    runtime: number(list(show.episode_run_time)[0]) || null,
+    studio: text(records(show.networks)[0]?.name ?? null),
+    genres: records(show.genres).flatMap((genre) => text(genre.name) ?? []),
+    imdbId: text(external.imdb_id),
+    tvdbId: idOf(external.tvdb_id),
+    images: {
+      poster: imagePath(show.poster_path),
+      backdrop: imagePath(show.backdrop_path),
+      still: null,
+    },
+    credits: mergeCredits([...creators, ...aggregateCredits(record(show.aggregate_credits))]),
+    rating: tmdbRating(show),
+  }
+}
+
+/** An episode as a season's listing gives it: its still, guest stars and crew. */
+const toEpisode = (entry: Record<string, unknown>): FetchedItem | null => {
+  const tmdbId = idOf(entry.id)
+  const episode = number(entry.episode_number)
+  if (tmdbId == null || episode == null) return null
+  const aired = text(entry.air_date)
+  return {
+    type: 'episode',
+    tmdbId,
+    number: episode,
+    title: text(entry.name) ?? `Episode ${episode}`,
+    originalTitle: null,
+    year: yearOf(aired),
+    released: aired,
+    ended: null,
+    summary: text(entry.overview),
+    tagline: null,
+    contentRating: null,
+    runtime: number(entry.runtime) || null,
+    studio: null,
+    genres: [],
+    imdbId: null,
+    tvdbId: null,
+    images: { poster: null, backdrop: null, still: imagePath(entry.still_path) },
+    credits: mergeCredits([
+      ...castCredits({ cast: entry.guest_stars, job: 'guest' }),
+      ...crewCredits(entry.crew),
+    ]),
+    rating: tmdbRating(entry),
+  }
+}
+
+/** A season with its episodes, from `/tv/{id}/season/{n}`. */
+export const toSeason = (
+  body: unknown,
+): { season: FetchedItem; episodes: FetchedItem[] } | null => {
+  const season = record(body)
+  const tmdbId = idOf(season.id)
+  const seasonNumber = number(season.season_number)
+  if (tmdbId == null || seasonNumber == null) return null
+  const aired = text(season.air_date)
+  return {
+    season: {
+      type: 'season',
+      tmdbId,
+      number: seasonNumber,
+      title: text(season.name) ?? (seasonNumber === 0 ? 'Specials' : `Season ${seasonNumber}`),
+      originalTitle: null,
+      year: yearOf(aired),
+      released: aired,
+      ended: null,
+      summary: text(season.overview),
+      tagline: null,
+      contentRating: null,
+      runtime: null,
+      studio: null,
+      genres: [],
+      imdbId: null,
+      tvdbId: null,
+      images: { poster: imagePath(season.poster_path), backdrop: null, still: null },
+      credits: [],
+      rating: null,
+    },
+    episodes: records(season.episodes).flatMap((entry) => toEpisode(entry) ?? []),
+  }
+}
+
 /** A movie with its credits, release dates and external ids appended. */
 export const toMovie = ({
   body,
@@ -415,6 +561,56 @@ export class TmdbClient {
       ...(year == null ? {} : { year: String(year) }),
     })
     return records(record(body).results).flatMap((entry) => toSearchResult(entry) ?? [])
+  }
+
+  async searchShows({
+    query,
+    year,
+  }: {
+    query: string
+    year: number | null
+  }): Promise<SearchResult[]> {
+    const body = await this.get('/search/tv', {
+      query,
+      include_adult: 'false',
+      ...(year == null ? {} : { first_air_date_year: String(year) }),
+    })
+    return records(record(body).results).flatMap((entry) => toSearchResult(entry) ?? [])
+  }
+
+  async show(tmdbId: string): Promise<FetchedItem> {
+    const body = await this.get(`/tv/${encodeURIComponent(tmdbId)}`, {
+      append_to_response: 'aggregate_credits,content_ratings,external_ids',
+    })
+    const show = toShow({ body, country: this.config.metadataCountry })
+    if (!show) {
+      throw new TmdbError({
+        kind: 'unavailable',
+        message: `TMDB sent an unreadable show ${tmdbId}.`,
+      })
+    }
+    return show
+  }
+
+  /** A season and every episode in it, as TMDB lists them. */
+  async season({
+    showTmdbId,
+    number: seasonNumber,
+  }: {
+    showTmdbId: string
+    number: number
+  }): Promise<{ season: FetchedItem; episodes: FetchedItem[] }> {
+    const body = await this.get(`/tv/${encodeURIComponent(showTmdbId)}/season/${seasonNumber}`, {
+      append_to_response: 'credits',
+    })
+    const season = toSeason(body)
+    if (!season) {
+      throw new TmdbError({
+        kind: 'unavailable',
+        message: `TMDB sent an unreadable season ${seasonNumber} of show ${showTmdbId}.`,
+      })
+    }
+    return season
   }
 
   /** TMDB's ids for an IMDb or TVDB id, by kind. */

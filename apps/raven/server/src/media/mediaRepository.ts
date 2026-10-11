@@ -1,6 +1,7 @@
 import { basename, dirname, relative } from 'node:path'
 import { Inject, Injectable } from '@nestjs/common'
 import {
+  type ItemSummary,
   type LibraryKind,
   type MatchState,
   type MediaItem,
@@ -12,6 +13,7 @@ import {
   isMatchState,
   isMediaTracks,
   isThumbnailState,
+  parseEpisodeName,
   parseMovieName,
   titleFromFileName,
 } from '@raven/core'
@@ -19,6 +21,7 @@ import { DatabaseService } from '@/db/database'
 import type { ProbeResult } from '@/ffmpeg/probe'
 import { shuffle } from '@/media/shuffle'
 import { MetadataRepository } from '@/metadata/metadataRepository'
+import { shuffle as shuffleShows } from '@/media/shuffle'
 
 /** A media row with the server-only fields a client never sees. */
 export type MediaRecord = MediaItem & {
@@ -178,7 +181,53 @@ export const namedAs = ({
     const parsed = parseMovieName({ fileName, folder })
     return { title: parsed.title, year: parsed.year, edition: parsed.edition, match: 'pending' }
   }
-  return { title: titleFromFileName(fileName), year: null, edition: null, match: 'pending' }
+  // An episode keeps its tidied file name until it is matched, since the
+  // name alone rarely says which show it is; the year is the show's.
+  const parsed = parseEpisodeName({ fileName, folder })
+  return { title: titleFromFileName(fileName), year: parsed.year, edition: null, match: 'pending' }
+}
+
+/** A show in a TV library's listing, before its next episode is looked up. */
+type ShowRow = {
+  id: number
+  ended: string | null
+  episodes: number
+  added_at: string
+}
+
+/** A show's listing order: sorts that only mean something per file fall back to title. */
+const SHOW_ORDER_BY: Record<MediaSort, string> = {
+  title: 'sh.sort_title COLLATE NOCASE, sh.id',
+  added: 'added_at DESC, sh.id DESC',
+  oldest: 'added_at, sh.id',
+  largest: 'sh.sort_title COLLATE NOCASE, sh.id',
+  smallest: 'sh.sort_title COLLATE NOCASE, sh.id',
+  'bitrate-high': 'sh.sort_title COLLATE NOCASE, sh.id',
+  'bitrate-low': 'sh.sort_title COLLATE NOCASE, sh.id',
+  'resolution-high': 'sh.sort_title COLLATE NOCASE, sh.id',
+  'resolution-low': 'sh.sort_title COLLATE NOCASE, sh.id',
+  'year-new': 'sh.year IS NULL, sh.year DESC, sh.sort_title COLLATE NOCASE, sh.id',
+  'year-old': 'sh.year IS NULL, sh.year, sh.sort_title COLLATE NOCASE, sh.id',
+  random: 'sh.sort_title COLLATE NOCASE, sh.id',
+}
+
+/** The files of a library that are episodes, with their show and numbers. */
+const EPISODE_FILES = `
+  SELECT m.id AS media_id, m.added_at, e.id AS episode_id, s.parent_id AS show_id,
+         s.number AS season, e.number AS episode
+    FROM media m
+    JOIN media_items mi ON mi.media_id = m.id
+    JOIN items e ON e.id = mi.item_id AND e.type = 'episode'
+    JOIN items s ON s.id = e.parent_id
+   WHERE m.library_id = ?`
+
+/** What `listShows` returns before the records are attached. */
+export type ShowRecord = {
+  show: ItemSummary
+  episodes: number
+  endedYear: number | null
+  addedAt: string
+  next: MediaRecord | null
 }
 
 /** The client-facing view of a record: no absolute paths or internal bookkeeping. */
@@ -292,6 +341,101 @@ export class MediaRepository {
   get(id: number): MediaRecord | null {
     const row = this.db.prepare<[number], MediaRow>(`${SELECT_MEDIA} WHERE m.id = ?`).get(id)
     return row ? (this.records([row])[0] ?? null) : null
+  }
+
+  /**
+   * A TV library as its shows: how many episodes each has on disk, when
+   * its newest file came, and the first episode not yet watched by the
+   * library's measure (specials last). Search matches show titles.
+   */
+  listShows({
+    libraryId,
+    search = '',
+    sort = 'title',
+    seed = 0,
+  }: {
+    libraryId: number
+    search?: string
+    sort?: MediaSort
+    seed?: number
+  }): ShowRecord[] {
+    const pattern = likePattern(search.trim())
+    const rows = this.db
+      .prepare<[number, string, string], ShowRow>(
+        `WITH files AS (${EPISODE_FILES})
+         SELECT sh.id, sh.ended, COUNT(DISTINCT f.episode_id) AS episodes, MAX(f.added_at) AS added_at
+           FROM files f JOIN items sh ON sh.id = f.show_id
+          WHERE sh.title LIKE ? ESCAPE '\\' OR sh.original_title LIKE ? ESCAPE '\\'
+          GROUP BY sh.id
+          ORDER BY ${SHOW_ORDER_BY[sort]}`,
+      )
+      .all(libraryId, pattern, pattern)
+    const summaries = this.metadata.summaries(rows.map((row) => row.id))
+    const nextUnwatched = this.db.prepare<[number, number], { media_id: number }>(
+      `WITH files AS (${EPISODE_FILES})
+       SELECT f.media_id FROM files f
+         JOIN media m ON m.id = f.media_id
+         JOIN libraries l ON l.id = m.library_id
+         LEFT JOIN (SELECT media_id, MAX(furthest) AS furthest FROM plays GROUP BY media_id) p
+           ON p.media_id = m.id
+        WHERE f.show_id = ?
+          AND NOT (m.duration > 0 AND COALESCE(p.furthest, 0) >= m.duration * l.watched_percent / 100.0)
+        ORDER BY f.season = 0, f.season, f.episode, COALESCE(m.width * m.height, 0) DESC, m.id
+        LIMIT 1`,
+    )
+    const entries = rows.flatMap((row): ShowRecord[] => {
+      const show = summaries.get(row.id)
+      if (!show) return []
+      const next = nextUnwatched.get(libraryId, row.id)
+      return [
+        {
+          show,
+          episodes: row.episodes,
+          endedYear: row.ended == null ? null : Number(row.ended.slice(0, 4)) || null,
+          addedAt: row.added_at,
+          next: next ? this.get(next.media_id) : null,
+        },
+      ]
+    })
+    return sort === 'random' ? shuffleShows({ items: entries, seed }) : entries
+  }
+
+  /**
+   * The first episode of a show not yet watched, by the measure of whichever
+   * library holds the file, specials last; null once every one is watched.
+   */
+  nextEpisode(showId: number): MediaRecord | null {
+    const row = this.db
+      .prepare<[number], { media_id: number }>(
+        `SELECT m.id AS media_id
+           FROM media m
+           JOIN libraries l ON l.id = m.library_id
+           JOIN media_items mi ON mi.media_id = m.id
+           JOIN items e ON e.id = mi.item_id AND e.type = 'episode'
+           JOIN items s ON s.id = e.parent_id
+           LEFT JOIN (SELECT media_id, MAX(furthest) AS furthest FROM plays GROUP BY media_id) p
+             ON p.media_id = m.id
+          WHERE s.parent_id = ?
+            AND NOT (m.duration > 0 AND COALESCE(p.furthest, 0) >= m.duration * l.watched_percent / 100.0)
+          ORDER BY s.number = 0, s.number, e.number, COALESCE(m.width * m.height, 0) DESC, m.id
+          LIMIT 1`,
+      )
+      .get(showId)
+    return row ? this.get(row.media_id) : null
+  }
+
+  /** A library's files no show or movie was found for, pending ones included, by title. */
+  listUnmatched({ libraryId, search = '' }: { libraryId: number; search?: string }): MediaRecord[] {
+    return this.records(
+      this.db
+        .prepare<[number, string], MediaRow>(
+          `${SELECT_MEDIA}
+            WHERE m.library_id = ? AND m.match IN ('pending', 'unmatched')
+              AND m.title LIKE ? ESCAPE '\\'
+            ORDER BY ${BY_TITLE.replace(/\b(item_sort_title|title|id)\b/g, 'm.$1').replace('m.item_sort_title', 'NULL')}`,
+        )
+        .all(libraryId, likePattern(search.trim())),
+    )
   }
 
   /** Every file that is an item, in any library, best first. */
@@ -596,6 +740,37 @@ export class MediaRepository {
           WHERE library_id = ? AND folder = ? ORDER BY file_name`,
       )
       .all(libraryId, folder)
+      .map((row) => ({
+        id: row.id,
+        libraryId: row.library_id,
+        path: row.path,
+        fileName: row.file_name,
+        folder: row.folder,
+        title: row.title,
+        year: row.year,
+      }))
+  }
+
+  /** A library's files in `folder` and every folder under it: a show's, season folders included. */
+  underFolder({ libraryId, folder }: { libraryId: number; folder: string }): PendingFile[] {
+    return this.db
+      .prepare<
+        [number, string, string],
+        {
+          id: number
+          library_id: number
+          path: string
+          file_name: string
+          folder: string
+          title: string
+          year: number | null
+        }
+      >(
+        `SELECT id, library_id, path, file_name, folder, title, year FROM media
+          WHERE library_id = ? AND (folder = ? OR folder LIKE ? ESCAPE '\\')
+          ORDER BY folder, file_name`,
+      )
+      .all(libraryId, folder, `${likePattern(folder).slice(1, -1)}/%`)
       .map((row) => ({
         id: row.id,
         libraryId: row.library_id,

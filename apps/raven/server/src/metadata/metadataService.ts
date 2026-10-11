@@ -1,4 +1,4 @@
-import { dirname, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import {
   Inject,
   Injectable,
@@ -13,25 +13,36 @@ import {
   type NameIds,
   foldTitle,
   isExtra,
+  parseEpisodeName,
   parseMovieName,
+  seasonFolderNumber,
 } from '@raven/core'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { MediaRepository, type PendingFile } from '@/media/mediaRepository'
 import { ImageCache } from '@/metadata/imageCache'
-import { listFolder, movieAssets } from '@/metadata/localAssets'
+import {
+  episodeStill,
+  listFolder,
+  movieAssets,
+  seasonPoster,
+  showAssets,
+} from '@/metadata/localAssets'
 import { pickMatch } from '@/metadata/matcher'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 import { readNfoIds } from '@/metadata/nfo'
-import { TmdbClient, TmdbError } from '@/metadata/tmdbClient'
+import { type FetchedItem, TmdbClient, TmdbError } from '@/metadata/tmdbClient'
 import { createTaskQueue, mapWithConcurrency } from '@/scanner/concurrency'
 
 /** The library types whose files get matched. */
-export const MATCHED_KINDS: readonly LibraryKind[] = ['movies']
+export const MATCHED_KINDS: readonly LibraryKind[] = ['movies', 'shows']
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
-/** How many files of a pass are worked on at once; TMDB's own limit spaces the calls. */
+/** How many files, or shows, of a pass are worked on at once; TMDB's own limit spaces the calls. */
 const PASS_CONCURRENCY = 4
+
+/** Items raven made up for episodes and seasons TMDB does not list; never fetched. */
+const LOCAL = 'local:'
 
 const stemOf = (fileName: string): string => {
   const dot = fileName.lastIndexOf('.')
@@ -42,18 +53,92 @@ const stemOf = (fileName: string): string => {
 const filePlace = (file: { folder: string; fileName: string }): string =>
   file.folder === '' ? file.fileName : join(file.folder, file.fileName)
 
+/** The library path a file was found under, which its path starts with. */
+const rootOf = (file: { path: string; folder: string; fileName: string }): string =>
+  file.path.slice(0, file.path.length - filePlace(file).length - 1)
+
+/** The first segment of a file's folder when it names a show, so a Fix match covers every season under it. */
+const showFolderOf = (file: { folder: string }): string | null => {
+  const first = file.folder.split(/[\\/]/).find((segment) => segment !== '') ?? ''
+  return first !== '' && seasonFolderNumber(first) == null ? first : null
+}
+
+/** Where a show's files are kept together: the show's folder, or the file itself at a root. */
+const showPlace = (file: PendingFile): string => showFolderOf(file) ?? filePlace(file)
+
 const message = (error: unknown): string => (error instanceof Error ? error.message : String(error))
 
 /** Whether a TMDB failure means the rest of a pass should wait for the next one. */
 const stopsThePass = (error: unknown): boolean =>
   error instanceof TmdbError && (error.kind === 'unavailable' || error.kind === 'unauthorized')
 
-/** What one pass remembers, so a folder is read and a title searched once. */
+const notFound = (error: unknown): boolean =>
+  error instanceof TmdbError && error.kind === 'not-found'
+
+const groupBy = <T>(items: readonly T[], key: (item: T) => string): Map<string, T[]> =>
+  items.reduce((groups, item) => {
+    const k = key(item)
+    return groups.set(k, [...(groups.get(k) ?? []), item])
+  }, new Map<string, T[]>())
+
+const blank = (item: Pick<FetchedItem, 'type' | 'tmdbId' | 'number' | 'title'>): FetchedItem => ({
+  ...item,
+  originalTitle: null,
+  year: null,
+  released: null,
+  ended: null,
+  summary: null,
+  tagline: null,
+  contentRating: null,
+  runtime: null,
+  studio: null,
+  genres: [],
+  imdbId: null,
+  tvdbId: null,
+  images: { poster: null, backdrop: null, still: null },
+  credits: [],
+  rating: null,
+})
+
+/** A season TMDB does not list, so its files still have somewhere to sit. */
+const localSeason = ({ showTmdbId, number }: { showTmdbId: string; number: number }): FetchedItem =>
+  blank({
+    type: 'season',
+    tmdbId: `${LOCAL}${showTmdbId}:S${number}`,
+    number,
+    title: number === 0 ? 'Specials' : `Season ${number}`,
+  })
+
+/** An episode TMDB does not list (another order, or absolute numbering), with its parsed name. */
+const localEpisode = ({
+  showTmdbId,
+  season,
+  number,
+  title,
+}: {
+  showTmdbId: string
+  season: number
+  number: number
+  title: string | null
+}): FetchedItem =>
+  blank({
+    type: 'episode',
+    tmdbId: `${LOCAL}${showTmdbId}:S${season}E${number}`,
+    number,
+    title: title ?? `Episode ${number}`,
+  })
+
+/** A stored season, its number, and its episodes by number. */
+type SeasonData = { id: number; number: number; local: boolean; episodes: Map<number, number> }
+
+/** What one pass remembers, so a folder is read, a title searched and a season fetched once. */
 type PassContext = {
   folders: Map<string, Promise<string[]>>
   ownFolders: Map<string, boolean>
   searches: Map<string, Promise<string | null>>
   fetches: Map<string, Promise<number | null>>
+  seasons: Map<string, Promise<SeasonData>>
+  refetched: Set<string>
   nfos: Map<string, Promise<NameIds | null>>
   stopped: { error: unknown }
 }
@@ -63,6 +148,8 @@ const newContext = (): PassContext => ({
   ownFolders: new Map(),
   searches: new Map(),
   fetches: new Map(),
+  seasons: new Map(),
+  refetched: new Set(),
   nfos: new Map(),
   stopped: { error: null },
 })
@@ -85,11 +172,12 @@ const remember = <T>({
 }
 
 /**
- * Matches the files in Movies libraries to TMDB, one library pass at a
- * time, in the background. A Fix match wins, then an id in a name or NFO,
- * then a search by title and year that only takes a sure answer. Items are
- * shared, so a second file of the same movie costs a search and no fetch.
- * A daily sweep refreshes what has gone stale, and every pass ends by
+ * Matches the files in Movies and TV shows libraries to TMDB, one library
+ * pass at a time, in the background. A Fix match wins, then an id in a name
+ * or NFO, then a search by title and year that only takes a sure answer.
+ * Items are shared, so a second file of the same movie costs a search and
+ * no fetch; a show is matched once per show folder, and each season fetched
+ * once. A daily sweep refreshes what has gone stale, and every pass ends by
  * removing items, people and pictures nothing uses any more.
  */
 @Injectable()
@@ -107,7 +195,7 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
   ) {}
 
   /**
-   * Names indexed before they were parsed are read again, every Movies
+   * Names indexed before they were parsed are read again, every matched
    * library gets a pass for what is pending, and the sweep starts.
    */
   onApplicationBootstrap(): void {
@@ -161,26 +249,41 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
 
   private async pass(libraryId: number): Promise<void> {
     const library = this.libraries.get(libraryId)
-    if (library && library.settings.kind === 'movies' && this.tmdb.enabled) {
+    if (library && MATCHED_KINDS.includes(library.settings.kind) && this.tmdb.enabled) {
       this.tmdb.newPass()
-      await this.matchPending(libraryId)
+      await this.matchPending({ libraryId, kind: library.settings.kind })
     }
     await this.clearUp()
   }
 
   /** Matches the library's pending files, and any that turn up while it runs. */
-  private async matchPending(libraryId: number): Promise<void> {
+  private async matchPending({
+    libraryId,
+    kind,
+  }: {
+    libraryId: number
+    kind: LibraryKind
+  }): Promise<void> {
     const context = newContext()
     const attempted = new Set<number>()
     const round = async (): Promise<void> => {
       const files = this.media.pending(libraryId).filter((file) => !attempted.has(file.id))
       if (files.length === 0 || context.stopped.error != null) return
       files.forEach((file) => attempted.add(file.id))
-      await mapWithConcurrency({
-        items: files,
-        limit: PASS_CONCURRENCY,
-        fn: (file) => this.matchFile({ file, context }),
-      })
+      if (kind === 'shows') {
+        await mapWithConcurrency({
+          items: [...groupBy(files, showPlace).values()],
+          limit: PASS_CONCURRENCY,
+          fn: (group) =>
+            this.guarded({ context, run: () => this.matchShowGroup({ files: group, context }) }),
+        })
+      } else {
+        await mapWithConcurrency({
+          items: files,
+          limit: PASS_CONCURRENCY,
+          fn: (file) => this.guarded({ context, run: () => this.matchMovie({ file, context }) }),
+        })
+      }
       return round()
     }
     await round()
@@ -190,22 +293,22 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
   }
 
   /** A file's own failure leaves it pending for the next pass; TMDB going away stops this one. */
-  private async matchFile({
-    file,
+  private async guarded({
     context,
+    run,
   }: {
-    file: PendingFile
     context: PassContext
+    run: () => Promise<void>
   }): Promise<void> {
     if (context.stopped.error != null) return
     try {
-      await this.matchMovie({ file, context })
+      await run()
     } catch (error) {
       if (stopsThePass(error)) {
         context.stopped.error = error
         return
       }
-      this.logger.warn(`Could not match ${file.path}: ${message(error)}`)
+      this.logger.warn(`Could not match: ${message(error)}`)
     }
   }
 
@@ -246,7 +349,7 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
     return own
   }
 
-  /** The Fix match for a file: its own place first, then its folder's. */
+  /** The Fix match for a movie file: its own place first, then its folder's. */
   private overrideFor({
     file,
     own,
@@ -259,55 +362,82 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
     return this.metadata.override({ libraryId: file.libraryId, place: file.folder })
   }
 
-  /** TMDB's id for the first id a name or NFO gives, or null. */
-  private async idFromIds(ids: NameIds): Promise<string | null> {
+  /** TMDB's id for the first id a name or NFO gives, as a movie or a show. */
+  private async idFromIds({
+    ids,
+    type,
+  }: {
+    ids: NameIds
+    type: 'movie' | 'show'
+  }): Promise<string | null> {
     if (ids.tmdb != null) return ids.tmdb
-    if (ids.imdb != null) {
-      return (await this.tmdb.find({ id: ids.imdb, source: 'imdb_id' })).movies[0] ?? null
+    const pick = (found: { movies: string[]; shows: string[] }): string | null =>
+      (type === 'movie' ? found.movies[0] : found.shows[0]) ?? null
+    if (type === 'show' && ids.tvdb != null) {
+      return pick(await this.tmdb.find({ id: ids.tvdb, source: 'tvdb_id' }))
     }
-    if (ids.tvdb != null) {
-      return (await this.tmdb.find({ id: ids.tvdb, source: 'tvdb_id' })).movies[0] ?? null
-    }
+    if (ids.imdb != null) return pick(await this.tmdb.find({ id: ids.imdb, source: 'imdb_id' }))
+    if (ids.tvdb != null) return pick(await this.tmdb.find({ id: ids.tvdb, source: 'tvdb_id' }))
     return null
   }
 
-  private async searchMovie({
+  /** The ids in an NFO, read once a pass. */
+  private nfoIds({
+    path,
+    context,
+  }: {
+    path: string
+    context: PassContext
+  }): Promise<NameIds | null> {
+    return remember({ cache: context.nfos, key: path, make: () => readNfoIds(path) })
+  }
+
+  private search({
+    type,
     title,
     year,
     context,
   }: {
+    type: 'movie' | 'show'
     title: string
     year: number | null
     context: PassContext
   }): Promise<string | null> {
     return remember({
       cache: context.searches,
-      key: `${foldTitle(title)}|${year ?? ''}`,
+      key: `${type}|${foldTitle(title)}|${year ?? ''}`,
       make: async () => {
-        const results = await this.tmdb.searchMovies({ query: title, year })
+        const results =
+          type === 'movie'
+            ? await this.tmdb.searchMovies({ query: title, year })
+            : await this.tmdb.searchShows({ query: title, year })
         return pickMatch({ title, year, results })?.tmdbId ?? null
       },
     })
   }
 
-  /** The stored movie for a TMDB id, fetched first when raven does not have it; null when TMDB has no such movie. */
-  private ensureMovie({
+  /** The stored movie or show for a TMDB id, fetched first when raven does not have it; null when TMDB has no such one. */
+  private ensure({
+    type,
     tmdbId,
     context,
   }: {
+    type: 'movie' | 'show'
     tmdbId: string
     context: PassContext
   }): Promise<number | null> {
     return remember({
       cache: context.fetches,
-      key: tmdbId,
+      key: `${type}:${tmdbId}`,
       make: async () => {
-        const stored = this.metadata.find({ type: 'movie', tmdbId })
+        const stored = this.metadata.find({ type, tmdbId })
         if (stored) return stored.id
         try {
-          return this.metadata.save({ item: await this.tmdb.movie(tmdbId) })
+          const item =
+            type === 'movie' ? await this.tmdb.movie(tmdbId) : await this.tmdb.show(tmdbId)
+          return this.metadata.save({ item })
         } catch (error) {
-          if (error instanceof TmdbError && error.kind === 'not-found') return null
+          if (notFound(error)) return null
           throw error
         }
       },
@@ -334,29 +464,24 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
     })
     const override = this.overrideFor({ file, own })
     if (override === null) {
-      this.settle({ mediaIds: [file.id], itemId: null, match: 'unmatched' })
+      this.settle({ mediaIds: [file.id], itemIds: [], match: 'unmatched' })
       return
     }
 
     const parsed = parseMovieName(file)
     const fromNames = async (): Promise<string | null> => {
-      const fromName = await this.idFromIds(parsed.ids)
+      const fromName = await this.idFromIds({ ids: parsed.ids, type: 'movie' })
       if (fromName != null || assets.nfo == null) return fromName
-      const nfoPath = join(dir, assets.nfo)
-      const nfoIds = await remember({
-        cache: context.nfos,
-        key: nfoPath,
-        make: () => readNfoIds(nfoPath),
-      })
-      return nfoIds ? this.idFromIds(nfoIds) : null
+      const nfoIds = await this.nfoIds({ path: join(dir, assets.nfo), context })
+      return nfoIds ? this.idFromIds({ ids: nfoIds, type: 'movie' }) : null
     }
     const tmdbId =
       override ??
       (await fromNames()) ??
-      (await this.searchMovie({ title: file.title, year: file.year, context }))
-    const itemId = tmdbId == null ? null : await this.ensureMovie({ tmdbId, context })
+      (await this.search({ type: 'movie', title: file.title, year: file.year, context }))
+    const itemId = tmdbId == null ? null : await this.ensure({ type: 'movie', tmdbId, context })
     if (itemId == null) {
-      this.settle({ mediaIds: [file.id], itemId: null, match: 'unmatched' })
+      this.settle({ mediaIds: [file.id], itemIds: [], match: 'unmatched' })
       return
     }
     this.metadata.setLocalImages({
@@ -366,22 +491,264 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
         ...(assets.backdrop ? { backdrop: join(dir, assets.backdrop) } : {}),
       },
     })
-    this.settle({ mediaIds: [file.id], itemId, match: override != null ? 'manual' : 'matched' })
+    this.settle({
+      mediaIds: [file.id],
+      itemIds: [itemId],
+      match: override != null ? 'manual' : 'matched',
+    })
     this.warmPoster(itemId)
   }
 
-  /** Links files to their item, or to none, and records how matching went. */
+  /**
+   * The files of one show folder (or one file at a root): the show is found
+   * once, then each file is placed in its season and episode.
+   */
+  private async matchShowGroup({
+    files,
+    context,
+  }: {
+    files: PendingFile[]
+    context: PassContext
+  }): Promise<void> {
+    const extras = files.filter((file) => isExtra(file))
+    if (extras.length > 0) this.media.setMatch({ ids: extras.map((file) => file.id), match: 'off' })
+    const episodes = files.filter((file) => !isExtra(file))
+    const [first] = episodes
+    if (!first) return
+    const mediaIds = episodes.map((file) => file.id)
+
+    const root = rootOf(first)
+    const fallbackShow = basename(root)
+    const showFolder = showFolderOf(first)
+    const showDir = showFolder == null ? dirname(first.path) : join(root, showFolder)
+    const place = showPlace(first)
+    const names = await this.names({ dir: showDir, context })
+    const assets = showAssets(names)
+    const parsed = parseEpisodeName({ ...first, fallbackShow })
+
+    const override = this.metadata.override({ libraryId: first.libraryId, place })
+    if (override === null) {
+      this.settle({ mediaIds, itemIds: [], match: 'unmatched' })
+      return
+    }
+    const fromNames = async (): Promise<string | null> => {
+      const fromName = await this.idFromIds({ ids: parsed.ids, type: 'show' })
+      if (fromName != null || assets.nfo == null) return fromName
+      const nfoIds = await this.nfoIds({ path: join(showDir, assets.nfo), context })
+      return nfoIds ? this.idFromIds({ ids: nfoIds, type: 'show' }) : null
+    }
+    const tmdbId =
+      override ??
+      (await fromNames()) ??
+      (await this.search({ type: 'show', title: parsed.show, year: parsed.year, context }))
+    const showId = tmdbId == null ? null : await this.ensure({ type: 'show', tmdbId, context })
+    if (tmdbId == null || showId == null) {
+      this.settle({ mediaIds, itemIds: [], match: 'unmatched' })
+      return
+    }
+    this.metadata.setLocalImages({
+      itemId: showId,
+      images: {
+        ...(assets.poster ? { poster: join(showDir, assets.poster) } : {}),
+        ...(assets.backdrop ? { backdrop: join(showDir, assets.backdrop) } : {}),
+      },
+    })
+    const match: MatchState = override != null ? 'manual' : 'matched'
+    const show = { showId, showTmdbId: tmdbId, showDir, showNames: names, fallbackShow, match }
+    await episodes.reduce(
+      (previous, file) => previous.then(() => this.placeEpisode({ file, ...show, context })),
+      Promise.resolve(),
+    )
+    this.warmPoster(showId)
+  }
+
+  /** Links one file to its episode (or episodes), making the season and episode when TMDB has none. */
+  private async placeEpisode({
+    file,
+    showId,
+    showTmdbId,
+    showDir,
+    showNames,
+    fallbackShow,
+    match,
+    context,
+  }: {
+    file: PendingFile
+    showId: number
+    showTmdbId: string
+    showDir: string
+    showNames: string[]
+    fallbackShow: string
+    match: MatchState
+    context: PassContext
+  }): Promise<void> {
+    const parsed = parseEpisodeName({ ...file, fallbackShow })
+    if (parsed.season == null) {
+      this.settle({ mediaIds: [file.id], itemIds: [showId], match })
+      return
+    }
+    const season = await this.ensureSeason({ showId, showTmdbId, number: parsed.season, context })
+    const dir = dirname(file.path)
+    const ownNames = dir === showDir ? showNames : await this.names({ dir, context })
+    // A season poster sits in the show's folder, or in the season's own.
+    const inShowFolder = seasonPoster({ names: showNames, number: parsed.season })
+    const poster = inShowFolder ?? seasonPoster({ names: ownNames, number: parsed.season })
+    this.metadata.setLocalImages({
+      itemId: season.id,
+      images: poster ? { poster: join(inShowFolder ? showDir : dir, poster) } : {},
+    })
+    if (parsed.episodes.length === 0) {
+      this.settle({ mediaIds: [file.id], itemIds: [season.id], match })
+      return
+    }
+    const episodeIds = await parsed.episodes.reduce<Promise<number[]>>(
+      (previous, number) =>
+        previous.then(async (ids) => [
+          ...ids,
+          await this.episodeFor({
+            season,
+            showId,
+            showTmdbId,
+            number,
+            title: parsed.title,
+            context,
+          }),
+        ]),
+      Promise.resolve([]),
+    )
+    const still = episodeStill({ names: ownNames, stem: stemOf(file.fileName) })
+    const [firstEpisode] = episodeIds
+    if (firstEpisode != null) {
+      this.metadata.setLocalImages({
+        itemId: firstEpisode,
+        images: still ? { still: join(dir, still) } : {},
+      })
+    }
+    this.settle({ mediaIds: [file.id], itemIds: episodeIds, match })
+  }
+
+  private episodesOf(seasonId: number): Map<number, number> {
+    return new Map(
+      this.metadata
+        .children(seasonId)
+        .flatMap((episode) =>
+          episode.episode == null ? [] : [[episode.episode, episode.id] as const],
+        ),
+    )
+  }
+
+  /** Stores a season and its episodes as TMDB lists them, and answers with them by number. */
+  private saveSeason({
+    showId,
+    fetched,
+  }: {
+    showId: number
+    fetched: { season: FetchedItem; episodes: FetchedItem[] }
+  }): SeasonData {
+    const id = this.metadata.save({ item: fetched.season, parentId: showId })
+    fetched.episodes.forEach((episode) => this.metadata.save({ item: episode, parentId: id }))
+    return { id, number: fetched.season.number ?? 0, local: false, episodes: this.episodesOf(id) }
+  }
+
+  /**
+   * A show's season, stored already, fetched once a pass, or made up when
+   * TMDB has no such season.
+   */
+  private ensureSeason({
+    showId,
+    showTmdbId,
+    number,
+    context,
+  }: {
+    showId: number
+    showTmdbId: string
+    number: number
+    context: PassContext
+  }): Promise<SeasonData> {
+    return remember({
+      cache: context.seasons,
+      key: `${showId}:${number}`,
+      make: async () => {
+        const stored = this.metadata.child({ parentId: showId, number })
+        if (stored && !stored.tmdbId.startsWith(LOCAL)) {
+          return { id: stored.id, number, local: false, episodes: this.episodesOf(stored.id) }
+        }
+        try {
+          context.refetched.add(`${showId}:${number}`)
+          return this.saveSeason({
+            showId,
+            fetched: await this.tmdb.season({ showTmdbId, number }),
+          })
+        } catch (error) {
+          if (!notFound(error)) throw error
+          const id =
+            stored?.id ??
+            this.metadata.save({ item: localSeason({ showTmdbId, number }), parentId: showId })
+          return { id, number, local: true, episodes: this.episodesOf(id) }
+        }
+      },
+    })
+  }
+
+  /**
+   * The season's episode with `number`. One the stored season lacks makes
+   * the season fetched again once a pass (it may have aired since), and
+   * failing that is made up with the name the file gave.
+   */
+  private async episodeFor({
+    season,
+    showId,
+    showTmdbId,
+    number,
+    title,
+    context,
+  }: {
+    season: SeasonData
+    showId: number
+    showTmdbId: string
+    number: number
+    title: string | null
+    context: PassContext
+  }): Promise<number> {
+    const known = season.episodes.get(number)
+    if (known != null) return known
+    const key = `${showId}:${season.number}`
+    if (!season.local && !context.refetched.has(key)) {
+      context.refetched.add(key)
+      const fetched = await this.tmdb
+        .season({ showTmdbId, number: season.number })
+        .catch((error: unknown) => {
+          if (notFound(error)) return null
+          throw error
+        })
+      if (fetched) {
+        this.saveSeason({ showId, fetched }).episodes.forEach((id, episodeNumber) =>
+          season.episodes.set(episodeNumber, id),
+        )
+        const found = season.episodes.get(number)
+        if (found != null) return found
+      }
+    }
+    const id = this.metadata.save({
+      item: localEpisode({ showTmdbId, season: season.number, number, title }),
+      parentId: season.id,
+    })
+    season.episodes.set(number, id)
+    return id
+  }
+
+  /** Links files to their items, or to none, and records how matching went. */
   private settle({
     mediaIds,
-    itemId,
+    itemIds,
     match,
   }: {
     mediaIds: readonly number[]
-    itemId: number | null
+    itemIds: readonly number[]
     match: MatchState
   }): void {
-    if (itemId == null) this.metadata.unlink(mediaIds)
-    else this.metadata.link({ mediaIds, itemIds: [itemId] })
+    if (itemIds.length === 0) this.metadata.unlink(mediaIds)
+    else this.metadata.link({ mediaIds, itemIds })
     this.media.setMatch({ ids: mediaIds, match })
   }
 
@@ -396,50 +763,164 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
     void made.catch(() => null)
   }
 
+  /** Matches a set of files again from scratch, as one group, with a fresh pass. */
+  private async rematch({
+    files,
+    kind,
+  }: {
+    files: PendingFile[]
+    kind: LibraryKind
+  }): Promise<void> {
+    if (files.length === 0) return
+    this.metadata.unlink(files.map((file) => file.id))
+    this.media.setMatch({ ids: files.map((file) => file.id), match: 'pending' })
+    const context = newContext()
+    if (kind === 'shows') {
+      await this.matchShowGroup({ files, context })
+    } else {
+      await files.reduce(
+        (previous, file) => previous.then(() => this.matchMovie({ file, context })),
+        Promise.resolve(),
+      )
+    }
+  }
+
+  /** The files a Fix match on `record` covers, and the place it is kept under. */
+  private groupOf(record: PendingFile): { place: string; files: PendingFile[]; kind: LibraryKind } {
+    const kind = this.libraries.get(record.libraryId)?.settings.kind ?? 'other'
+    if (kind === 'shows') {
+      const showFolder = showFolderOf(record)
+      return {
+        place: showPlace(record),
+        kind,
+        files:
+          showFolder == null
+            ? [record]
+            : this.media.underFolder({ libraryId: record.libraryId, folder: showFolder }),
+      }
+    }
+    const context = newContext()
+    const own = this.ownFolder({ libraryId: record.libraryId, folder: record.folder, context })
+    return {
+      place: own ? record.folder : filePlace(record),
+      kind,
+      files: own
+        ? this.media
+            .inFolder({ libraryId: record.libraryId, folder: record.folder })
+            .filter((file) => !isExtra(file))
+        : [record],
+    }
+  }
+
   /**
-   * Fix match: points a file, and its folder's other files when the folder
-   * holds one movie, at a TMDB id, or at nothing for `null`, and keeps that
-   * by place so renames and re-downloads keep it.
+   * Fix match: points a file, and the files kept with it (a movie's folder,
+   * or a show's whole folder), at a TMDB movie or show, or at nothing for
+   * `null`, and keeps that by place so renames and re-downloads keep it.
    */
   async fixMatch({ mediaId, tmdbId }: { mediaId: number; tmdbId: string | null }): Promise<void> {
     const record = this.media.get(mediaId)
     if (!record) return
-    const context = newContext()
-    const own = this.ownFolder({ libraryId: record.libraryId, folder: record.folder, context })
-    this.metadata.saveOverride({
-      libraryId: record.libraryId,
-      place: own ? record.folder : filePlace(record),
-      tmdbId,
-    })
-    const files: PendingFile[] = own
-      ? this.media
-          .inFolder({ libraryId: record.libraryId, folder: record.folder })
-          .filter((file) => !isExtra(file))
-      : [record]
-    this.metadata.unlink(files.map((file) => file.id))
-    this.media.setMatch({ ids: files.map((file) => file.id), match: 'pending' })
-    await files.reduce(
-      (previous, file) => previous.then(() => this.matchMovie({ file, context })),
-      Promise.resolve(),
-    )
+    const group = this.groupOf(record)
+    this.metadata.saveOverride({ libraryId: record.libraryId, place: group.place, tmdbId })
+    await this.rematch({ files: group.files, kind: group.kind })
     await this.clearUp()
   }
 
   /**
-   * Fetches an item again now, and reads the pictures beside its files
-   * again. One TMDB no longer has goes, and its files go back to pending, or
-   * to unmatched when a Fix match pointed there. False when it went.
+   * Fix match for a show: every file under it, in every library, moves to
+   * the show with `tmdbId`, keeping its numbers. Answers with the stored id
+   * of the show they moved to, or null when TMDB has no such show.
+   */
+  async fixShowMatch({
+    showId,
+    tmdbId,
+  }: {
+    showId: number
+    tmdbId: string
+  }): Promise<number | null> {
+    const files = this.metadata.mediaUnderShow(showId).flatMap((id) => this.media.get(id) ?? [])
+    const groups = [...groupBy(files, (file) => `${file.libraryId}|${showPlace(file)}`).values()]
+    await groups.reduce(
+      (previous, group) => previous.then(() => this.rePoint({ group, tmdbId })),
+      Promise.resolve(),
+    )
+    await this.clearUp()
+    return this.metadata.find({ type: 'show', tmdbId })?.id ?? null
+  }
+
+  /** Keeps a Fix match for one show folder, and matches its files again under it. */
+  private async rePoint({
+    group,
+    tmdbId,
+  }: {
+    group: PendingFile[]
+    tmdbId: string
+  }): Promise<void> {
+    const [first] = group
+    if (!first) return
+    this.metadata.saveOverride({ libraryId: first.libraryId, place: showPlace(first), tmdbId })
+    await this.rematch({ files: group, kind: 'shows' })
+  }
+
+  /**
+   * Fetches an item again now: a movie or show with its pictures beside the
+   * files read again, a show's seasons with it, a season with its episodes.
+   * One TMDB no longer has goes, and its files go back to pending, or to
+   * unmatched when a Fix match pointed there. False when it went.
    */
   async refresh(itemId: number): Promise<boolean> {
     const item = this.metadata.get(itemId)
-    if (!item || item.type !== 'movie') return false
+    if (!item) return false
+    if (item.tmdbId.startsWith(LOCAL)) return true
     try {
-      this.metadata.save({ item: await this.tmdb.movie(item.tmdbId) })
+      if (item.type === 'movie') {
+        this.metadata.save({ item: await this.tmdb.movie(item.tmdbId) })
+        await this.rereadMovieImages(itemId)
+      } else if (item.type === 'show') {
+        this.metadata.save({ item: await this.tmdb.show(item.tmdbId) })
+        await this.refreshSeasons(itemId)
+      } else if (item.type === 'season') {
+        await this.refreshSeason(itemId)
+      } else if (item.parentId != null) {
+        await this.refreshSeason(item.parentId)
+      }
     } catch (error) {
-      if (!(error instanceof TmdbError && error.kind === 'not-found')) throw error
+      if (!notFound(error)) throw error
       this.forget(itemId)
       return false
     }
+    this.warmPoster(itemId)
+    return true
+  }
+
+  private async refreshSeasons(showId: number): Promise<void> {
+    await this.metadata
+      .children(showId)
+      .reduce(
+        (previous, season) => previous.then(() => this.refreshSeason(season.id)),
+        Promise.resolve(),
+      )
+  }
+
+  /** Fetches one season again; a season TMDB has dropped, or a made-up one, is left as it is. */
+  private async refreshSeason(seasonId: number): Promise<void> {
+    const season = this.metadata.get(seasonId)
+    if (!season || season.parentId == null || season.tmdbId.startsWith(LOCAL)) return
+    const show = this.metadata.get(season.parentId)
+    const number = this.metadata
+      .children(season.parentId)
+      .find((child) => child.id === seasonId)?.season
+    if (!show || number == null) return
+    const fetched = await this.tmdb
+      .season({ showTmdbId: show.tmdbId, number })
+      .catch((error: unknown) => {
+        if (notFound(error)) return null
+        throw error
+      })
+    if (fetched) this.saveSeason({ showId: show.id, fetched })
+  }
+
+  private async rereadMovieImages(itemId: number): Promise<void> {
     const files = this.media.forItem(itemId)
     const context = newContext()
     const found = await Promise.all(
@@ -466,33 +947,37 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
           : {}),
       },
     })
-    this.warmPoster(itemId)
-    return true
   }
 
   private forget(itemId: number): void {
-    const files = this.metadata.mediaFor(itemId).flatMap((id) => this.media.get(id) ?? [])
+    const item = this.metadata.get(itemId)
+    const mediaIds =
+      item?.type === 'show' ? this.metadata.mediaUnderShow(itemId) : this.metadata.mediaFor(itemId)
+    const files = mediaIds.flatMap((id) => this.media.get(id) ?? [])
     this.metadata.remove(itemId)
     const manual = files.filter((file) => file.match === 'manual').map((file) => file.id)
     const automatic = files.filter((file) => file.match !== 'manual').map((file) => file.id)
     this.media.setMatch({ ids: manual, match: 'unmatched' })
     this.media.setMatch({ ids: automatic, match: 'pending' })
-    files.forEach((file) => this.enqueue(file.libraryId))
+    new Set(files.map((file) => file.libraryId)).forEach((libraryId) => this.enqueue(libraryId))
   }
 
   /**
-   * Refreshes movies fetched more than 30 days ago, or more than 7 days ago
-   * when they came out in the last 90 days, while their details still move.
+   * Refreshes movies and shows fetched more than 30 days ago, or more than 7
+   * days ago when they came out in the last 90 days or the show still airs.
    */
   async sweep(): Promise<void> {
     if (!this.tmdb.enabled) return
     const now = Date.now()
-    const stale = this.metadata.stale({
-      type: 'movie',
+    const window = {
       before: new Date(now - 30 * DAY_MS).toISOString(),
       recentBefore: new Date(now - 7 * DAY_MS).toISOString(),
       releasedAfter: new Date(now - 90 * DAY_MS).toISOString().slice(0, 10),
-    })
+    }
+    const stale = [
+      ...this.metadata.stale({ type: 'movie', ...window }),
+      ...this.metadata.stale({ type: 'show', ...window }),
+    ]
     const stopped: { error: unknown } = { error: null }
     await mapWithConcurrency({
       items: stale,

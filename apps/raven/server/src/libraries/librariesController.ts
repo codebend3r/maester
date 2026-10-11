@@ -19,6 +19,7 @@ import {
   type LibraryInput,
   type MediaItem,
   type MediaSort,
+  type ShowListing,
   isMediaSort,
   validateLibraryInput,
 } from '@raven/core'
@@ -143,6 +144,31 @@ export class LibrariesController {
         furthest: entry.furthest,
         watched: entry.watched,
       }))
+  }
+
+  /** A TV shows library as its shows, with the files no show was found for after. */
+  @Get(':id/shows')
+  listShows(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('q') search?: string,
+    @Query('sort') sort?: string,
+    @Query('seed') seed?: string,
+  ): ShowListing {
+    this.find(id)
+    const order: MediaSort = isMediaSort(sort) ? sort : 'title'
+    const dealt = Number.parseInt(seed ?? '', 10)
+    const shows = this.media
+      .listShows({
+        libraryId: id,
+        search: search ?? '',
+        sort: order,
+        seed: Number.isInteger(dealt) ? dealt : 0,
+      })
+      .map((entry) => ({ ...entry, next: entry.next ? toMediaItem(entry.next) : null }))
+    return {
+      shows,
+      unmatched: this.media.listUnmatched({ libraryId: id, search: search ?? '' }).map(toMediaItem),
+    }
   }
 
   @Get(':id/media')
