@@ -2,6 +2,7 @@ import { stat } from 'node:fs/promises'
 import {
   BadRequestException,
   Controller,
+  ForbiddenException,
   Get,
   Inject,
   NotFoundException,
@@ -15,6 +16,7 @@ import type { FastifyReply } from 'fastify'
 import { streamArgs } from '@/ffmpeg/args'
 import { SOFTWARE } from '@/ffmpeg/encoder'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
+import { SettingsRepository } from '@/settings/settingsRepository'
 import { type MediaRecord, MediaRepository } from '@/media/mediaRepository'
 import { SubtitlesService } from '@/playback/subtitlesService'
 import { TracksService } from '@/playback/tracksService'
@@ -38,6 +40,7 @@ const wholeNumber = (value: string | undefined): number | null => {
 @Controller('api/media')
 export class PlaybackController {
   constructor(
+    @Inject(SettingsRepository) private readonly settings: SettingsRepository,
     @Inject(MediaRepository) private readonly media: MediaRepository,
     @Inject(TracksService) private readonly tracks: TracksService,
     @Inject(SubtitlesService) private readonly subtitles: SubtitlesService,
@@ -87,6 +90,13 @@ export class PlaybackController {
     @Res() reply: FastifyReply,
   ): Promise<void> {
     if (!isStreamMode(mode)) throw new BadRequestException('mode must be remux or transcode')
+    const playback = this.settings.playback()
+    if (playback.transcoding === 'off') {
+      throw new ForbiddenException('Server conversion is off in Settings; only direct play is on.')
+    }
+    if (playback.transcoding === 'remuxOnly' && mode === 'transcode') {
+      throw new ForbiddenException('Transcoding is off in Settings; only remuxing is on.')
+    }
     const from = start == null ? 0 : Number(start)
     if (!Number.isFinite(from) || from < 0) {
       throw new BadRequestException('start must be a number of seconds')
@@ -103,7 +113,8 @@ export class PlaybackController {
     ) {
       throw new BadRequestException(`No audio track ${audio}`)
     }
-    const tonemap = mode === 'transcode' && record.hdr && (await this.ffmpeg.canTonemap())
+    const tonemap =
+      mode === 'transcode' && record.hdr && playback.tonemap && (await this.ffmpeg.canTonemap())
     const encoder = mode === 'transcode' ? await this.ffmpeg.videoEncoder() : SOFTWARE
 
     const child = this.ffmpeg.stream(
@@ -116,6 +127,8 @@ export class PlaybackController {
         tonemap,
         streamShift: STREAM_TIME_SHIFT,
         encoder,
+        maxHeight: playback.maxHeight,
+        quality: playback.quality,
       }),
     )
     // The response closes when it finishes or when the client goes away;

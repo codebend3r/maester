@@ -123,6 +123,36 @@ describe('streamArgs', () => {
     expect(args.at(-1)).toBe('pipe:1')
   })
 
+  it('scales a transcode to the settings’ height and squeezes to their quality', () => {
+    const args = streamArgs({
+      input: '/m/a.mkv',
+      start: 0,
+      mode: 'transcode',
+      audio: 0,
+      videoCodec: 'hevc',
+      tonemap: false,
+      streamShift: 1,
+      maxHeight: 720,
+      quality: 'high',
+    })
+    expect(after(args, '-vf')).toBe("scale=w=-2:h='min(720,ih)'")
+    expect(after(args, '-crf')).toBe('18')
+    const low = streamArgs({
+      input: '/m/a.mkv',
+      start: 0,
+      mode: 'transcode',
+      audio: 0,
+      videoCodec: 'hevc',
+      tonemap: false,
+      streamShift: 1,
+      encoder: { kind: 'videotoolbox' },
+      maxHeight: 2160,
+      quality: 'low',
+    })
+    expect(after(low, '-b:v')).toBe('4M')
+    expect(after(low, '-vf')).toBe("scale=w=-2:h='min(2160,ih)'")
+  })
+
   it('re-encodes the video for a transcode, tone mapping HDR', () => {
     const args = streamArgs({ ...base, mode: 'transcode', start: 0, tonemap: true })
     expect(args).not.toContain('-ss')

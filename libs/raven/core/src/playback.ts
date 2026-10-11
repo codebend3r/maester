@@ -1,4 +1,4 @@
-import type { MediaItem, PlaybackMode, StreamMode } from '@/types'
+import type { MediaItem, PlaybackMode, PlaybackSettings, StreamMode } from '@/types'
 
 /**
  * Asks the client whether it can decode a MIME type such as
@@ -202,19 +202,26 @@ export const planPlayback = ({
   canPlay,
   canStream,
   defaultAudio,
+  policy = { directPlay: 'auto', transcoding: 'on' },
 }: {
   media: MediaItem
   canPlay: CanPlay
   canStream: CanPlay
   /** Whether the chosen audio track is the one the file plays by default. */
   defaultAudio: boolean
+  /** The server's playback settings: whether to force the original file, and what it will convert. */
+  policy?: Pick<PlaybackSettings, 'directPlay' | 'transcoding'>
 }): PlaybackPlan => {
   const check = checkDirectPlay({ media, canPlay })
+  // Forced, the original file is the only way, whatever the check says.
+  if (policy.directPlay === 'force') return { modes: ['direct'], problems: check.problems }
   const direct = check.playable && defaultAudio
   const remux =
+    policy.transcoding !== 'off' &&
     (media.videoCodec == null || COPYABLE_VIDEO.has(media.videoCodec)) &&
     canStream(streamMimeType({ media, mode: 'remux' }))
-  const transcode = canStream(streamMimeType({ media, mode: 'transcode' }))
+  const transcode =
+    policy.transcoding === 'on' && canStream(streamMimeType({ media, mode: 'transcode' }))
   const available: Record<PlaybackMode, boolean> = { direct, remux, transcode }
   const modes = PLAYBACK_ORDER.filter((mode) => available[mode])
   // Without any way to convert, a file that would play as it is still

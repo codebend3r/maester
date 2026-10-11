@@ -26,6 +26,8 @@ import type {
   MetadataHealth,
   MetadataServiceState,
   PersonDetails,
+  PlaybackSettings,
+  PlaybackSettingsState,
   Rating,
   RatingSource,
   Review,
@@ -231,6 +233,44 @@ export const isMatchCandidate = (value: unknown): value is MatchCandidate =>
   isNullableString(value.poster)
 
 export const isMatchCandidateList = arrayOf(isMatchCandidate)
+
+export const DEFAULT_PLAYBACK_SETTINGS: PlaybackSettings = {
+  directPlay: 'auto',
+  transcoding: 'on',
+  maxHeight: 1080,
+  quality: 'medium',
+  hwAccel: 'auto',
+  tonemap: true,
+}
+
+export const isPlaybackSettings = (value: unknown): value is PlaybackSettings =>
+  isRecord(value) &&
+  (value.directPlay === 'auto' || value.directPlay === 'force') &&
+  (value.transcoding === 'on' ||
+    value.transcoding === 'remuxOnly' ||
+    value.transcoding === 'off') &&
+  (value.maxHeight === 2160 || value.maxHeight === 1080 || value.maxHeight === 720) &&
+  (value.quality === 'low' || value.quality === 'medium' || value.quality === 'high') &&
+  (value.hwAccel === 'auto' ||
+    value.hwAccel === 'none' ||
+    value.hwAccel === 'vaapi' ||
+    value.hwAccel === 'videotoolbox') &&
+  isBoolean(value.tonemap)
+
+/** A change sends any of the fields; each given must be a value the setting takes. */
+export const isPlaybackSettingsChange = (value: unknown): value is Partial<PlaybackSettings> =>
+  isRecord(value) &&
+  Object.keys(value).every((key) => key in DEFAULT_PLAYBACK_SETTINGS) &&
+  isPlaybackSettings({ ...DEFAULT_PLAYBACK_SETTINGS, ...value })
+
+export const isPlaybackSettingsState = (value: unknown): value is PlaybackSettingsState =>
+  isRecord(value) &&
+  isPlaybackSettings(value.settings) &&
+  isRecord(value.effective) &&
+  (value.effective.encoder === 'software' ||
+    value.effective.encoder === 'vaapi' ||
+    value.effective.encoder === 'videotoolbox') &&
+  isBoolean(value.effective.tonemapAvailable)
 
 const METADATA_FIELDS: readonly (keyof ItemMetadata)[] = [
   'title',

@@ -253,6 +253,43 @@ export type ItemImageOptions = {
   backdrop: ImageOption[]
 }
 
+/**
+ * How the server plays video, set once for every viewer in Settings.
+ *
+ * - `directPlay`: `auto` plays the original file when the browser takes it
+ *   and converts otherwise; `force` always sends the original file, for a
+ *   browser the check underrates.
+ * - `transcoding`: `on` remuxes and transcodes as needed; `remuxOnly` never
+ *   re-encodes video; `off` converts nothing, so only files the browser
+ *   plays as they are play.
+ * - `maxHeight`: the frame a transcode is scaled down to.
+ * - `quality`: how hard a transcode is squeezed: `low` for a slow network,
+ *   `high` for a big screen.
+ * - `hwAccel`: what encodes a transcode: `auto` takes the GPU the machine
+ *   has, `none` keeps to the CPU.
+ * - `tonemap`: whether HDR is tone mapped to SDR on a transcode when the
+ *   build can.
+ */
+export type PlaybackSettings = {
+  directPlay: 'auto' | 'force'
+  transcoding: 'on' | 'remuxOnly' | 'off'
+  maxHeight: 2160 | 1080 | 720
+  quality: 'low' | 'medium' | 'high'
+  hwAccel: 'auto' | 'none' | 'vaapi' | 'videotoolbox'
+  tonemap: boolean
+}
+
+/** The settings as kept, with what they come to on this machine. */
+export type PlaybackSettingsState = {
+  settings: PlaybackSettings
+  effective: {
+    /** What transcodes encode with, after the test encode. */
+    encoder: 'software' | 'vaapi' | 'videotoolbox'
+    /** Whether this ffmpeg can tone map at all. */
+    tonemapAvailable: boolean
+  }
+}
+
 /** The fields Edit metadata can write over: what a page shows for a movie or show. */
 export type ItemMetadata = {
   title: string

@@ -94,6 +94,22 @@ describe('videoCodecString', () => {
 })
 
 describe('planPlayback', () => {
+  it('follows the server policy: forced direct, remux only, or nothing converted', () => {
+    const media = mediaItem({ container: 'mkv', videoCodec: 'hevc', audioCodec: 'eac3' })
+    // Safari takes no Matroska, so the file cannot play as it is; Chrome can stream both ways.
+    const base = { media, canPlay: safariLike, canStream: chromeLike, defaultAudio: true }
+    expect(planPlayback(base).modes).toEqual(['remux', 'transcode'])
+    expect(
+      planPlayback({ ...base, policy: { directPlay: 'force', transcoding: 'on' } }).modes,
+    ).toEqual(['direct'])
+    expect(
+      planPlayback({ ...base, policy: { directPlay: 'auto', transcoding: 'remuxOnly' } }).modes,
+    ).toEqual(['remux'])
+    expect(
+      planPlayback({ ...base, policy: { directPlay: 'auto', transcoding: 'off' } }).modes,
+    ).toEqual([])
+  })
+
   const everything = (): boolean => true
   const nothing = (): boolean => false
 
