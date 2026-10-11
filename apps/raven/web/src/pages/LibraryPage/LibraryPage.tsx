@@ -392,7 +392,9 @@ export const LibraryPage = () => {
         </div>
       </header>
 
-      {shut && <LockedLibrary name={library.data.name} available={!!lock.data?.available} />}
+      {shut && lock.data && (
+        <LockedLibrary name={library.data.name} available={lock.data.available} />
+      )}
 
       {!shut && (
         <>
