@@ -28,15 +28,26 @@ FROM bun AS deps
 RUN bun install --frozen-lockfile --ignore-scripts --production --filter @raven/server
 
 FROM node:24-slim
-# Debian's ffmpeg is built with zimg, so HDR thumbnails are tone mapped to
-# SDR instead of coming out grey. It is only used for probing and
-# thumbnails; playback never touches it.
-RUN apt-get update \
+# Debian's ffmpeg is built with zimg, so HDR thumbnails and transcodes are
+# tone mapped to SDR instead of coming out grey, with libx264 for transcodes
+# on the CPU and VAAPI for transcodes on a GPU. Direct play never touches it;
+# remuxes, transcodes, subtitles and probing do.
+#
+# Intel's VAAPI driver comes from non-free: its free build lacks the shaders
+# older chips (a NAS's Celeron J4125, say) need to encode H.264. Only amd64
+# has it; on arm64 transcodes stay on the CPU. A GPU is used only when the
+# container is given /dev/dri (see docker-compose.yml).
+RUN sed -i 's/^Components: main$/Components: main non-free/' /etc/apt/sources.list.d/debian.sources \
+ && apt-get update \
  && apt-get install -y --no-install-recommends ffmpeg \
+ && if [ "$(dpkg --print-architecture)" = amd64 ]; then \
+      apt-get install -y --no-install-recommends intel-media-va-driver-non-free; \
+    fi \
  && rm -rf /var/lib/apt/lists/* \
  && mkdir -p /config /media \
  && chown node:node /config
 ENV NODE_ENV=production \
+    LIBVA_DRIVER_NAME=iHD \
     PORT=8484 \
     DATA_DIR=/config \
     WEB_DIR=/app/web \

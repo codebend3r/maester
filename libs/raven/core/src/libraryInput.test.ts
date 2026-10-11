@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { validateLibraryInput } from './libraryInput.js'
+import { validateLibraryInput } from '@/libraryInput'
 
 describe('validateLibraryInput', () => {
   it('trims the name and tidies the paths', () => {
@@ -31,6 +31,112 @@ describe('validateLibraryInput', () => {
       ok: false,
       errors: ['Add at least one folder.'],
     })
+  })
+
+  it('keeps the settings that were sent and drops unknown ones', () => {
+    const result = validateLibraryInput({
+      name: 'Clips',
+      paths: ['/media/clips'],
+      settings: { saveProgress: false, colour: 'red' },
+    })
+    expect(result).toEqual({
+      ok: true,
+      value: { name: 'Clips', paths: ['/media/clips'], settings: { saveProgress: false } },
+    })
+  })
+
+  it('rejects a setting that is not on or off', () => {
+    const result = validateLibraryInput({
+      name: 'Clips',
+      paths: ['/media/clips'],
+      settings: { saveProgress: 'no', pinned: 1 },
+    })
+    expect(result).toEqual({
+      ok: false,
+      errors: ['Save progress must be on or off.', 'Pinned must be on or off.'],
+    })
+  })
+
+  it('keeps a sort, view and grouping that are among the choices', () => {
+    const result = validateLibraryInput({
+      name: 'Clips',
+      paths: ['/media/clips'],
+      settings: { sort: 'bitrate-high', view: 'grouped', groupBy: 'codec' },
+    })
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        name: 'Clips',
+        paths: ['/media/clips'],
+        settings: { sort: 'bitrate-high', view: 'grouped', groupBy: 'codec' },
+      },
+    })
+  })
+
+  it('rejects a sort, view or grouping that is not one of the choices', () => {
+    const result = validateLibraryInput({
+      name: 'Clips',
+      paths: ['/media/clips'],
+      settings: { sort: 'loudest', view: 'poster', groupBy: true },
+    })
+    expect(result).toEqual({
+      ok: false,
+      errors: [
+        'Sort is not one of the choices.',
+        'View is not one of the choices.',
+        'Group by is not one of the choices.',
+      ],
+    })
+  })
+
+  it('keeps a type that is one of the three', () => {
+    const result = validateLibraryInput({
+      name: 'Shows',
+      paths: ['/media/shows'],
+      settings: { kind: 'shows' },
+    })
+    expect(result).toEqual({
+      ok: true,
+      value: { name: 'Shows', paths: ['/media/shows'], settings: { kind: 'shows' } },
+    })
+  })
+
+  it('rejects a type that is not one of the three', () => {
+    const result = validateLibraryInput({
+      name: 'Music',
+      paths: ['/media/music'],
+      settings: { kind: 'music' },
+    })
+    expect(result).toEqual({ ok: false, errors: ['Type is not one of the choices.'] })
+  })
+
+  it('keeps a watched percentage that is a whole number from 1 to 100', () => {
+    const result = validateLibraryInput({
+      name: 'Clips',
+      paths: ['/media/clips'],
+      settings: { watchedPercent: 75 },
+    })
+    expect(result).toEqual({
+      ok: true,
+      value: { name: 'Clips', paths: ['/media/clips'], settings: { watchedPercent: 75 } },
+    })
+  })
+
+  it.each([0, 101, 90.5, '90'])('rejects %p as a watched percentage', (watchedPercent) => {
+    const result = validateLibraryInput({
+      name: 'Clips',
+      paths: ['/media/clips'],
+      settings: { watchedPercent },
+    })
+    expect(result).toEqual({
+      ok: false,
+      errors: ['Watched at must be a whole percentage from 1 to 100.'],
+    })
+  })
+
+  it('rejects settings that are not an object', () => {
+    const result = validateLibraryInput({ name: 'Clips', paths: ['/media/clips'], settings: 'off' })
+    expect(result).toEqual({ ok: false, errors: ['Settings must be an object.'] })
   })
 
   it('rejects something that is not an object', () => {

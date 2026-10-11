@@ -1,12 +1,20 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { type Library, type LibraryInput, validateLibraryInput } from '@raven/core'
+import {
+  DEFAULT_LIBRARY_SETTINGS,
+  LIBRARY_KINDS,
+  type Library,
+  type LibraryInput,
+  type LibrarySettings,
+  validateLibraryInput,
+} from '@raven/core'
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/Button/Button'
 import { FolderBrowser } from '@/components/FolderBrowser/FolderBrowser'
 import { api } from '@/lib/api'
+import { KIND_LABELS } from '@/lib/libraryKinds'
 import { queryKeys } from '@/lib/queryClient'
-import styles from './LibraryDialog.module.scss'
+import styles from '@/components/LibraryDialog/LibraryDialog.module.scss'
 
 /**
  * Creates a library, or edits one when `library` is given. A native modal
@@ -15,11 +23,14 @@ import styles from './LibraryDialog.module.scss'
  */
 export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose: () => void }) => {
   const dialog = useRef<HTMLDialogElement>(null)
-  const ids = { name: useId(), errors: useId(), folders: useId() }
+  const ids = { name: useId(), errors: useId(), folders: useId(), settings: useId(), kind: useId() }
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [name, setName] = useState(library?.name ?? '')
   const [paths, setPaths] = useState<string[]>(library?.paths ?? [])
+  const [settings, setSettings] = useState<LibrarySettings>(
+    library?.settings ?? DEFAULT_LIBRARY_SETTINGS,
+  )
   const [typedPath, setTypedPath] = useState('')
   const [errors, setErrors] = useState<string[]>([])
   const [confirmingDelete, setConfirmingDelete] = useState(false)
@@ -28,7 +39,14 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
     dialog.current?.showModal()
   }, [])
 
-  const refresh = () => queryClient.invalidateQueries({ queryKey: queryKeys.libraries })
+  // Saved spots show or hide with the library's progress setting, so cached
+  // videos and favourites are refetched along with the libraries.
+  const refresh = () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.libraries }),
+      queryClient.invalidateQueries({ queryKey: ['media'] }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.favourites }),
+    ])
 
   const save = useMutation({
     mutationFn: (input: LibraryInput) =>
@@ -58,7 +76,7 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
 
   const submit = (event: FormEvent) => {
     event.preventDefault()
-    const result = validateLibraryInput({ name, paths })
+    const result = validateLibraryInput({ name, paths, settings })
     if (!result.ok) {
       setErrors(result.errors)
       return
@@ -90,6 +108,25 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
             aria-describedby={errors.length > 0 ? ids.errors : undefined}
           />
         </div>
+
+        <fieldset className={styles.field}>
+          <legend>Type</legend>
+          <div className={styles.kinds}>
+            {LIBRARY_KINDS.map((kind) => (
+              <div key={kind} className={styles.kind}>
+                <input
+                  id={`${ids.kind}-${kind}`}
+                  type="radio"
+                  name={ids.kind}
+                  value={kind}
+                  checked={settings.kind === kind}
+                  onChange={() => setSettings((current) => ({ ...current, kind }))}
+                />
+                <label htmlFor={`${ids.kind}-${kind}`}>{KIND_LABELS[kind]}</label>
+              </div>
+            ))}
+          </div>
+        </fieldset>
 
         <fieldset className={styles.field} aria-describedby={ids.folders}>
           <legend>Folders</legend>
@@ -133,6 +170,71 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
             >
               Add
             </Button>
+          </div>
+        </fieldset>
+
+        <fieldset className={styles.field}>
+          <legend>Settings</legend>
+          <div className={styles.setting}>
+            <input
+              id={`${ids.settings}-progress`}
+              type="checkbox"
+              className={styles.checkbox}
+              checked={settings.saveProgress}
+              onChange={(event) =>
+                setSettings((current) => ({ ...current, saveProgress: event.target.checked }))
+              }
+              aria-describedby={`${ids.settings}-progress-hint`}
+            />
+            <label htmlFor={`${ids.settings}-progress`}>Save where each video stopped</label>
+            <p id={`${ids.settings}-progress-hint`} className={styles.settingHint}>
+              Leave a video and come back to pick up where you stopped. Turning this off keeps saved
+              spots for later.
+            </p>
+          </div>
+          <div className={styles.setting}>
+            <input
+              id={`${ids.settings}-pinned`}
+              type="checkbox"
+              className={styles.checkbox}
+              checked={settings.pinned}
+              onChange={(event) =>
+                setSettings((current) => ({ ...current, pinned: event.target.checked }))
+              }
+              aria-describedby={`${ids.settings}-pinned-hint`}
+            />
+            <label htmlFor={`${ids.settings}-pinned`}>Pin to the side menu</label>
+            <p id={`${ids.settings}-pinned-hint`} className={styles.settingHint}>
+              Pinned libraries get their own link in the side menu.
+            </p>
+          </div>
+          <div className={styles.watched}>
+            <label htmlFor={`${ids.settings}-watched`}>Watched at</label>
+            <span className={styles.percent}>
+              <input
+                id={`${ids.settings}-watched`}
+                type="number"
+                inputMode="numeric"
+                className={styles.input}
+                min={1}
+                max={100}
+                step={1}
+                value={Number.isNaN(settings.watchedPercent) ? '' : settings.watchedPercent}
+                onChange={(event) => {
+                  const typed = event.target.value
+                  setSettings((current) => ({
+                    ...current,
+                    watchedPercent: typed === '' ? Number.NaN : Number(typed),
+                  }))
+                }}
+                aria-describedby={`${ids.settings}-watched-hint`}
+              />
+              <span aria-hidden="true">%</span>
+            </span>
+            <p id={`${ids.settings}-watched-hint`} className={styles.settingHint}>
+              A video counts as watched in the library's history once playback gets this far through
+              it.
+            </p>
           </div>
         </fieldset>
 

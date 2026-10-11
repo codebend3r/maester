@@ -4,7 +4,7 @@
   "private": true,
   "description": "luwin's agent, tools, chat and FastAPI app: a Python 3.12 project run through uv",
   "scripts": {
-    "dev": "cd .. && uv run --project api luwin",
+    "dev": "uv run --directory .. --project api luwin",
     "test": "uv run pytest -q",
     "eval": "uv run luwin-eval --model fake",
     "lint:py": "uv run ruff check .",

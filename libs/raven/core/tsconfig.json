@@ -2,8 +2,8 @@
   "compilerOptions": {
     "target": "ES2022",
     "lib": ["ES2023"],
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
+    "module": "esnext",
+    "moduleResolution": "bundler",
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
@@ -11,6 +11,9 @@
     "isolatedModules": true,
     "skipLibCheck": true,
     "noEmit": true,
+    "paths": {
+      "@/*": ["./src/*"]
+    },
     "types": []
   },
   "include": ["src", "vitest.config.ts"]

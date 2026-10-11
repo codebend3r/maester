@@ -3,7 +3,7 @@ import { useId } from 'react'
 import { MediaGrid } from '@/components/MediaGrid/MediaGrid'
 import { api } from '@/lib/api'
 import { queryKeys } from '@/lib/queryClient'
-import styles from './FavouritesPage.module.scss'
+import styles from '@/pages/FavouritesPage/FavouritesPage.module.scss'
 
 const count = new Intl.NumberFormat()
 

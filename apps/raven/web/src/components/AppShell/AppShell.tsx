@@ -1,6 +1,9 @@
+import { useQuery } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { Link, Outlet, matchPath, useLocation } from 'react-router-dom'
-import styles from './AppShell.module.scss'
+import { api } from '@/lib/api'
+import { queryKeys } from '@/lib/queryClient'
+import styles from '@/components/AppShell/AppShell.module.scss'
 
 /** A link in the side menu, marked as current when the location matches any of its patterns. */
 const NavItem = ({
@@ -21,28 +24,55 @@ const NavItem = ({
   )
 }
 
+/** A library's own pages: its videos and its history. */
+const libraryPages = (id: number | string): string[] => [
+  `/libraries/${id}`,
+  `/libraries/${id}/history`,
+]
+
 /**
  * The frame around every browsing page: the wordmark, then the side menu
- * beside the page (below it on a narrow screen). The player leaves the
- * frame behind for the whole screen.
+ * beside the page (below it on a narrow screen). Pinned libraries get their
+ * own links there, and an open one is marked instead of Libraries. The
+ * player leaves the frame behind for the whole screen.
  */
-export const AppShell = () => (
-  <div className={styles.shell}>
-    <header className={styles.header}>
-      <Link to="/" className={styles.wordmark}>
-        raven
-      </Link>
-    </header>
-    <nav className={styles.nav} aria-label="Main">
-      <NavItem to="/" patterns={['/', '/libraries/:id']}>
-        Libraries
-      </NavItem>
-      <NavItem to="/favourites" patterns={['/favourites']}>
-        Favourites
-      </NavItem>
-    </nav>
-    <main className={styles.main}>
-      <Outlet />
-    </main>
-  </div>
-)
+export const AppShell = () => {
+  const { pathname } = useLocation()
+  const libraries = useQuery({ queryKey: queryKeys.libraries, queryFn: api.listLibraries })
+  const pinned = (libraries.data ?? []).filter((library) => library.settings.pinned)
+  const pinnedOpen = pinned.some((library) =>
+    libraryPages(library.id).some((pattern) => matchPath(pattern, pathname) != null),
+  )
+
+  return (
+    <div className={styles.shell}>
+      <header className={styles.header}>
+        <Link to="/" className={styles.wordmark}>
+          raven
+        </Link>
+      </header>
+      <nav className={styles.nav} aria-label="Main">
+        <NavItem to="/" patterns={pinnedOpen ? ['/'] : ['/', ...libraryPages(':id')]}>
+          Libraries
+        </NavItem>
+        <NavItem to="/favourites" patterns={['/favourites']}>
+          Favourites
+        </NavItem>
+        {pinned.length > 0 && (
+          <ul className={styles.pinned} aria-label="Pinned">
+            {pinned.map((library) => (
+              <li key={library.id} className={styles.pinnedItem}>
+                <NavItem to={`/libraries/${library.id}`} patterns={libraryPages(library.id)}>
+                  {library.name}
+                </NavItem>
+              </li>
+            ))}
+          </ul>
+        )}
+      </nav>
+      <main className={styles.main}>
+        <Outlet />
+      </main>
+    </div>
+  )
+}

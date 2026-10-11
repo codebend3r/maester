@@ -3,20 +3,24 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import {
+  type HistoryEntry,
   type Library,
   type MediaItem,
   isDirectoryListing,
+  isHistory,
   isLibrary,
   isLibraryList,
   isMediaItem,
   isMediaList,
 } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { createApp } from '@/app.js'
-import { type ServerConfig, readServerConfig } from '@/config.js'
-import { ScannerService } from '@/scanner/scannerService.js'
-import { encodeClip } from '@/test/clips.js'
-import { ThumbnailService } from '@/thumbnails/thumbnailService.js'
+import { createApp } from '@/app'
+import { type ServerConfig, readServerConfig } from '@/config'
+import { MediaRepository } from '@/media/mediaRepository'
+import { TracksService } from '@/playback/tracksService'
+import { ScannerService } from '@/scanner/scannerService'
+import { encodeClip } from '@/test/clips'
+import { ThumbnailService } from '@/thumbnails/thumbnailService'
 
 type Injected = {
   statusCode: number
@@ -47,6 +51,7 @@ const testConfig = ({
   webDir?: string | null
 }): ServerConfig => ({
   ...readServerConfig({}),
+  hwAccel: 'none',
   dataDir,
   webDir,
   browseRoot: mediaDir,
@@ -68,6 +73,7 @@ describe('the media server', () => {
   const settle = async (libraryId: number) => {
     await app().get(ScannerService).whenIdle(libraryId)
     await app().get(ThumbnailService).whenIdle()
+    await app().get(TracksService).whenIdle()
   }
   const listMedia = async (libraryId: number): Promise<MediaItem[]> =>
     expectShape({
@@ -256,6 +262,123 @@ describe('the media server', () => {
       expect(bad.statusCode).toBe(400)
     })
 
+    describe('settings', () => {
+      const putLibrary = async (settings: Record<string, unknown>): Promise<Library> =>
+        expectShape({
+          response: await app().inject({
+            method: 'PUT',
+            url: `/api/libraries/${library.id}`,
+            payload: {
+              name: 'Everything',
+              paths: [join(state.media, 'Movies'), join(state.media, 'TV')],
+              settings,
+            },
+          }),
+          guard: isLibrary,
+        })
+      const positionOf = async (id: number): Promise<number> =>
+        expectShape({
+          response: await app().inject({ method: 'GET', url: `/api/media/${id}` }),
+          guard: isMediaItem,
+        }).position
+      const saveProgress = (id: number, position: number) =>
+        app().inject({ method: 'PUT', url: `/api/media/${id}/progress`, payload: { position } })
+
+      it('starts a library with progress saved, pinned, watched at 90%, and of no particular type', async () => {
+        const current = expectShape({
+          response: await app().inject({ method: 'GET', url: `/api/libraries/${library.id}` }),
+          guard: isLibrary,
+        })
+        expect(current.settings).toEqual({
+          saveProgress: true,
+          pinned: true,
+          sort: 'title',
+          view: 'grid',
+          groupBy: 'resolution',
+          watchedPercent: 90,
+          kind: 'other',
+        })
+      })
+
+      it('changes what type of library it is after it was made', async () => {
+        expect((await putLibrary({ kind: 'shows' })).settings.kind).toBe('shows')
+        const current = expectShape({
+          response: await app().inject({ method: 'GET', url: `/api/libraries/${library.id}` }),
+          guard: isLibrary,
+        })
+        expect(current.settings.kind).toBe('shows')
+        expect((await putLibrary({ kind: 'other' })).settings.kind).toBe('other')
+      })
+
+      it('remembers how the library is sorted and shown', async () => {
+        const updated = await putLibrary({ sort: 'largest', view: 'tiles', groupBy: 'codec' })
+        expect(updated.settings).toMatchObject({ sort: 'largest', view: 'tiles', groupBy: 'codec' })
+        await putLibrary({ sort: 'title', view: 'grid', groupBy: 'resolution' })
+      })
+
+      it('shuffles by the seed it is sent', async () => {
+        const order = async (seed: number) =>
+          expectShape({
+            response: await app().inject({
+              method: 'GET',
+              url: `/api/libraries/${library.id}/media?sort=random&seed=${seed}`,
+            }),
+            guard: isMediaList,
+          }).map((item) => item.id)
+        const first = await order(11)
+        expect(first).toHaveLength(2)
+        expect(await order(11)).toEqual(first)
+      })
+
+      it('changes one setting, keeps the rest, and does not rescan', async () => {
+        const updated = await putLibrary({ pinned: false })
+        expect(updated.settings).toEqual({
+          saveProgress: true,
+          pinned: false,
+          sort: 'title',
+          view: 'grid',
+          groupBy: 'resolution',
+          watchedPercent: 90,
+          kind: 'other',
+        })
+        expect(updated.scan.state).toBe('idle')
+        expect((await putLibrary({ pinned: true })).settings.pinned).toBe(true)
+      })
+
+      it('with progress saving off, hides saved spots, saves nothing, and keeps them for later', async () => {
+        const [movie] = await listMedia(library.id)
+        const id = movie?.id ?? -1
+        expect((await saveProgress(id, 2)).statusCode).toBe(204)
+
+        await putLibrary({ saveProgress: false })
+        expect(await positionOf(id)).toBe(0)
+        expect((await listMedia(library.id)).every((item) => item.position === 0)).toBe(true)
+        expect((await saveProgress(id, 4)).statusCode).toBe(204)
+
+        await putLibrary({ saveProgress: true })
+        expect(await positionOf(id)).toBe(2)
+      })
+    })
+
+    it("stores each video's tracks when the scan probes it", async () => {
+      const [movie] = await listMedia(library.id)
+      expect(
+        app()
+          .get(MediaRepository)
+          .storedTracks(movie?.id ?? -1)?.audio,
+      ).toHaveLength(1)
+    })
+
+    it('fills in tracks a video indexed before they were stored is missing, on the next scan', async () => {
+      const [movie] = await listMedia(library.id)
+      const id = movie?.id ?? -1
+      app().get(MediaRepository).forgetTracks(id)
+      expect(app().get(MediaRepository).storedTracks(id)).toBeNull()
+      await app().inject({ method: 'POST', url: `/api/libraries/${library.id}/scan` })
+      await settle(library.id)
+      expect(app().get(MediaRepository).storedTracks(id)?.audio).toHaveLength(1)
+    })
+
     it('drops files that disappear on the next scan, and their thumbnails', async () => {
       const added = join(state.media, 'Movies', 'Extra Clip.mp4')
       await encodeClip({ path: added, seconds: 2 })
@@ -346,6 +469,49 @@ describe('the media server', () => {
             })
           ).statusCode,
         ).toBe(404)
+      })
+    })
+
+    describe('history', () => {
+      const history = async (query = ''): Promise<HistoryEntry[]> =>
+        expectShape({
+          response: await app().inject({
+            method: 'GET',
+            url: `/api/libraries/${library.id}/history${query}`,
+          }),
+          guard: isHistory,
+        })
+      const entryFor = async ({ id, query }: { id: number; query?: string }) =>
+        (await history(query)).find((entry) => entry.media.id === id)
+
+      it('records a play, and lists it as watched once playback gets far enough', async () => {
+        const [, episode] = await listMedia(library.id)
+        const id = episode?.id ?? -1
+        const played = await app().inject({ method: 'POST', url: `/api/media/${id}/plays` })
+        expect(played.statusCode).toBe(204)
+        expect(await entryFor({ id })).toMatchObject({ plays: 1, furthest: 0, watched: false })
+        expect(await entryFor({ id, query: '?watched=true' })).toBeUndefined()
+
+        await app().inject({
+          method: 'PUT',
+          url: `/api/media/${id}/progress`,
+          payload: { position: episode?.duration ?? 0 },
+        })
+        expect(await entryFor({ id, query: '?watched=true' })).toMatchObject({
+          plays: 1,
+          watched: true,
+        })
+      })
+
+      it('keeps to the limit it is asked for', async () => {
+        expect(await history('?limit=1')).toHaveLength(1)
+      })
+
+      it('says when the video or the library is not there', async () => {
+        const play = await app().inject({ method: 'POST', url: '/api/media/999999/plays' })
+        expect(play.statusCode).toBe(404)
+        const list = await app().inject({ method: 'GET', url: '/api/libraries/999999/history' })
+        expect(list.statusCode).toBe(404)
       })
     })
 

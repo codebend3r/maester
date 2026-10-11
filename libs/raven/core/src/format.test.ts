@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatBytes, formatChannels, formatDuration, formatRuntime } from './format.js'
+import { formatBitrate, formatBytes, formatChannels, formatDuration, formatRuntime } from '@/format'
 
 describe('formatDuration', () => {
   it.each([
@@ -29,6 +29,18 @@ describe('formatBytes', () => {
     expect(formatBytes(4_924_174_846)).toBe('4.9 GB')
     expect(formatBytes(512_000)).toBe('512 KB')
     expect(formatBytes(0)).toBe('0 B')
+  })
+})
+
+describe('formatBitrate', () => {
+  it('reads in megabits, or kilobits under one', () => {
+    expect(formatBitrate(2_215_000)).toBe('2.2 Mb/s')
+    expect(formatBitrate(48_712_000)).toBe('48.7 Mb/s')
+    expect(formatBitrate(640_000)).toBe('640 kb/s')
+  })
+
+  it('has nothing to say before the file is probed', () => {
+    expect(formatBitrate(null)).toBeNull()
   })
 })
 

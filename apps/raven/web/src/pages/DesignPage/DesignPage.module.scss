@@ -1,0 +1,323 @@
+.page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-6);
+}
+
+.header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: var(--font-size-hero);
+  font-weight: 400;
+  line-height: var(--line-tight);
+}
+
+.lede {
+  max-width: var(--measure);
+  color: var(--color-lichen);
+}
+
+.contents {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  gap: var(--space-1);
+  overflow-x: auto;
+}
+
+.contentsLink {
+  display: block;
+  padding: var(--space-0) var(--space-2);
+  border: 1px solid var(--color-moss);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+
+  &:hover {
+    background: var(--color-canopy);
+  }
+}
+
+.section {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-5);
+  scroll-margin-top: var(--space-4);
+}
+
+.sectionHeader {
+  display: grid;
+  gap: var(--space-1);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-moss);
+}
+
+.sectionTitle {
+  font-family: var(--font-display);
+  font-size: var(--font-size-xl);
+  font-weight: 400;
+}
+
+.intro {
+  max-width: var(--measure);
+  color: var(--color-lichen);
+}
+
+.specimen {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+}
+
+.specimenHeader {
+  display: grid;
+  gap: var(--space-0);
+}
+
+.specimenName {
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-lichen);
+}
+
+.specimenBody {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.note,
+.hint {
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+}
+
+.stack {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+}
+
+.row {
+  display: grid;
+  grid-auto-flow: row;
+  grid-template-columns: repeat(auto-fill, minmax(min(10rem, 100%), max-content));
+  gap: var(--space-1);
+  align-items: center;
+}
+
+.columns {
+  max-width: none;
+  grid-template-columns: repeat(auto-fit, minmax(min(14rem, 100%), 1fr));
+  align-items: start;
+}
+
+// Colour.
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(15rem, 100%), 1fr));
+  gap: var(--space-4) var(--space-3);
+}
+
+.swatch {
+  display: grid;
+  align-content: start;
+  gap: var(--space-0);
+}
+
+.chip {
+  display: block;
+  height: 5rem;
+  border: 1px solid var(--color-moss);
+  border-radius: var(--radius-md);
+}
+
+.tokenName {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.tokenValue {
+  justify-self: start;
+  overflow-wrap: anywhere;
+}
+
+.contrast {
+  display: grid;
+  gap: 0;
+  font-size: var(--font-size-xs);
+}
+
+.contrastRow {
+  display: grid;
+  grid-template-columns: 6rem auto;
+  justify-content: start;
+
+  dt {
+    font-weight: 400;
+    color: var(--color-lichen);
+  }
+
+  dd {
+    color: var(--color-bark);
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+// Tokens.
+.tokenTable {
+  td,
+  th {
+    vertical-align: middle;
+  }
+}
+
+.rowNote {
+  display: block;
+  max-width: 24rem;
+  color: var(--color-lichen);
+  font-size: var(--font-size-xs);
+}
+
+.spaceBar {
+  display: block;
+  height: 0.75rem;
+  background: var(--color-lichen);
+}
+
+.radiusBox {
+  display: block;
+  width: 3rem;
+  height: 3rem;
+  border: 1.5px solid var(--color-lichen);
+}
+
+.typeSample {
+  display: block;
+  color: var(--color-bark);
+  line-height: var(--line-tight);
+}
+
+.lineSample {
+  display: block;
+  max-width: 14rem;
+  color: var(--color-bark);
+}
+
+.focusSample {
+  display: block;
+  width: 3rem;
+  height: 2rem;
+  border-radius: var(--radius-md);
+  outline-offset: 3px;
+}
+
+.noSample {
+  display: none;
+}
+
+// Forms.
+.form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-5);
+}
+
+.fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(15rem, 100%), 1fr));
+  gap: var(--space-3);
+  align-items: start;
+}
+
+.field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-0);
+
+  > label {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+  }
+}
+
+.choices {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.choice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-1);
+  align-items: center;
+  justify-self: start;
+}
+
+// Content.
+.figureFrame {
+  display: grid;
+  place-items: center;
+  max-width: 24rem;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-md);
+  background: var(--color-canopy);
+  color: var(--color-lichen);
+  font-family: var(--font-display);
+  font-size: var(--font-size-xl);
+}
+
+.dialogBody {
+  display: grid;
+  gap: var(--space-3);
+}
+
+// Components.
+.icons {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr));
+  gap: var(--space-2);
+}
+
+.icon {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: 1px solid var(--color-moss);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-xs);
+}
+
+.noteRow {
+  display: grid;
+  grid-template-columns: minmax(0, 12rem) minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.cardSample {
+  display: grid;
+  max-width: 20rem;
+}
+
+.stage {
+  display: grid;
+  align-content: end;
+  min-height: 9rem;
+  border-radius: var(--radius-md);
+  background: var(--color-stage);
+  overflow: hidden;
+}

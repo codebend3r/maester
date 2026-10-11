@@ -2,14 +2,14 @@ import { existsSync, mkdirSync, renameSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { Inject, Injectable, type OnModuleDestroy } from '@nestjs/common'
 import Sqlite from 'better-sqlite3'
-import { SERVER_CONFIG, type ServerConfig } from '@/config.js'
+import { SERVER_CONFIG, type ServerConfig } from '@/config'
 
 /**
  * Each entry moves the schema one version forward and runs exactly once,
  * tracked by SQLite's `user_version`. Append new migrations; never edit a
  * shipped one, since existing databases have already run it.
  */
-const MIGRATIONS: readonly string[] = [
+export const MIGRATIONS: readonly string[] = [
   `
   CREATE TABLE libraries (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -66,6 +66,38 @@ const MIGRATIONS: readonly string[] = [
     added_at TEXT NOT NULL
   );
   `,
+  `
+  ALTER TABLE libraries ADD COLUMN save_progress INTEGER NOT NULL DEFAULT 1;
+  ALTER TABLE libraries ADD COLUMN pinned INTEGER NOT NULL DEFAULT 1;
+  `,
+  // VIEW is an SQL keyword, so the view setting's column is view_mode.
+  `
+  ALTER TABLE libraries ADD COLUMN sort TEXT NOT NULL DEFAULT 'title';
+  ALTER TABLE libraries ADD COLUMN view_mode TEXT NOT NULL DEFAULT 'grid';
+  ALTER TABLE libraries ADD COLUMN group_by TEXT NOT NULL DEFAULT 'resolution';
+  `,
+  // A video's embedded audio and subtitle tracks as JSON, found by the scan's
+  // probe so the player need not run ffprobe again. NULL until known.
+  `
+  ALTER TABLE media ADD COLUMN tracks TEXT;
+  `,
+  // One row per sitting with a video: when it was last playing and the
+  // furthest it got, so a library's history can say what was watched, by
+  // the library's own measure of watched.
+  `
+  CREATE TABLE plays (
+    id INTEGER PRIMARY KEY,
+    media_id INTEGER NOT NULL REFERENCES media (id) ON DELETE CASCADE,
+    played_at TEXT NOT NULL,
+    furthest REAL NOT NULL DEFAULT 0
+  );
+  CREATE INDEX plays_media ON plays (media_id, played_at);
+  ALTER TABLE libraries ADD COLUMN watched_percent INTEGER NOT NULL DEFAULT 90;
+  `,
+  // What a library holds: 'movies', 'shows' or 'other', the last for those made before.
+  `
+  ALTER TABLE libraries ADD COLUMN kind TEXT NOT NULL DEFAULT 'other';
+  `,
 ]
 
 const migrate = (db: Sqlite.Database): void => {
@@ -107,7 +139,7 @@ export const adoptLegacyDatabase = ({ dataDir }: { dataDir: string }): void => {
   )
 }
 
-/** The one SQLite connection: the library index, media metadata, playback progress and favourites. */
+/** The one SQLite connection: libraries and their settings, media metadata, playback progress, favourites and plays. */
 @Injectable()
 export class DatabaseService implements OnModuleDestroy {
   readonly db: Sqlite.Database

@@ -1,4 +1,30 @@
-import type { MediaItem } from '@raven/core'
+import type { Library, MediaItem } from '@raven/core'
+
+export const library = (overrides: Partial<Library> = {}): Library => ({
+  id: 2,
+  name: 'Movies',
+  paths: ['/media/Movies'],
+  itemCount: 12,
+  createdAt: '2026-09-27T00:00:00.000Z',
+  scan: {
+    state: 'idle',
+    discovered: 12,
+    processed: 12,
+    startedAt: null,
+    finishedAt: null,
+    error: null,
+  },
+  settings: {
+    saveProgress: true,
+    pinned: true,
+    sort: 'title',
+    view: 'grid',
+    groupBy: 'resolution',
+    watchedPercent: 90,
+    kind: 'other',
+  },
+  ...overrides,
+})
 
 export const mediaItem = (overrides: Partial<MediaItem> = {}): MediaItem => ({
   id: 7,

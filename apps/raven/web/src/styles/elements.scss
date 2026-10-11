@@ -1,0 +1,495 @@
+// What every element looks like before a component says otherwise. Every
+// rule sits in :where(), which carries no weight, so a component's own class
+// always wins. Tokens only, from globals.scss; /design shows all of it.
+
+// Anything that takes typing, plus select and textarea, shares one field look.
+$field: "input:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file'], [type='button'], [type='submit'], [type='reset'], [type='image'], [type='hidden']), select, textarea";
+
+// Headings: the display serif for the top three, the body face below.
+:where(h1, h2, h3, h4, h5, h6) {
+  margin: 0;
+  line-height: var(--line-tight);
+  text-wrap: balance;
+}
+
+:where(h1, h2, h3) {
+  font-family: var(--font-display);
+  font-weight: 400;
+}
+
+:where(h1) {
+  font-size: var(--font-size-hero);
+}
+
+:where(h2) {
+  font-size: var(--font-size-xl);
+}
+
+:where(h3) {
+  font-size: var(--font-size-lg);
+}
+
+:where(h4, h5, h6) {
+  font-family: var(--font-body);
+  font-weight: 600;
+}
+
+:where(h4) {
+  font-size: var(--font-size-md);
+}
+
+:where(h5) {
+  font-size: var(--font-size-sm);
+}
+
+:where(h6) {
+  color: var(--color-lichen);
+  font-size: var(--font-size-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+// Text.
+:where(a) {
+  text-decoration-color: var(--color-lichen);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+
+:where(a:hover) {
+  text-decoration-color: currentcolor;
+}
+
+:where(strong, b) {
+  font-weight: 600;
+}
+
+:where(small) {
+  font-size: var(--font-size-sm);
+}
+
+:where(mark) {
+  padding: 0 var(--space-0);
+  border-radius: var(--radius-sm);
+  background: var(--color-lichen);
+  color: var(--color-night);
+}
+
+:where(code, kbd, samp, pre) {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+
+:where(code, samp) {
+  padding: 0.1em var(--space-0);
+  border-radius: var(--radius-sm);
+  background: var(--color-canopy);
+}
+
+:where(kbd) {
+  padding: 0.1em var(--space-1);
+  border: 1px solid var(--color-moss);
+  border-bottom-width: 2px;
+  border-radius: var(--radius-sm);
+  background: var(--color-canopy);
+}
+
+:where(pre) {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  overflow-x: auto;
+  border: 1px solid var(--color-moss);
+  border-radius: var(--radius-md);
+  background: var(--color-canopy);
+  line-height: var(--line-body);
+}
+
+:where(pre code) {
+  padding: 0;
+  background: none;
+}
+
+:where(abbr[title]) {
+  text-decoration: underline dotted;
+  text-underline-offset: 0.2em;
+  cursor: help;
+}
+
+:where(del, s) {
+  color: var(--color-lichen);
+}
+
+:where(ins) {
+  text-decoration-color: var(--color-lichen);
+}
+
+:where(sub, sup) {
+  line-height: 0;
+}
+
+:where(blockquote) {
+  margin: 0;
+  padding-left: var(--space-3);
+  border-left: 2px solid var(--color-moss);
+  color: var(--color-lichen);
+}
+
+:where(hr) {
+  width: 100%;
+  height: 0;
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--color-moss);
+}
+
+:where(dt) {
+  font-weight: 600;
+}
+
+:where(dd) {
+  color: var(--color-lichen);
+}
+
+:where(figure) {
+  display: grid;
+  gap: var(--space-1);
+}
+
+:where(figcaption) {
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+}
+
+// Lists are bare by default, since most lists here are layout. Long-form
+// text opts back in to bullets, numbers and a reading measure with .prose.
+.prose {
+  display: grid;
+  gap: var(--space-2);
+  max-width: var(--measure);
+
+  :where(ul, ol) {
+    display: grid;
+    gap: var(--space-0);
+    padding-left: var(--space-4);
+  }
+
+  :where(ul) {
+    list-style: disc;
+  }
+
+  :where(ol) {
+    list-style: decimal;
+  }
+
+  li::marker {
+    color: var(--color-lichen);
+  }
+}
+
+// Tables.
+:where(table) {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+}
+
+:where(caption) {
+  padding-bottom: var(--space-1);
+  color: var(--color-lichen);
+  text-align: left;
+}
+
+:where(th, td) {
+  padding: var(--space-1) var(--space-2);
+  text-align: left;
+  vertical-align: middle;
+}
+
+:where(thead th) {
+  border-bottom: 1px solid var(--color-moss);
+  color: var(--color-lichen);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+:where(tbody tr, tfoot tr) {
+  border-bottom: 1px solid var(--color-moss);
+}
+
+:where(tbody th) {
+  font-weight: 600;
+}
+
+:where(td) {
+  color: var(--color-lichen);
+}
+
+// Fields.
+:where(#{$field}) {
+  min-height: 2.5rem;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-moss);
+  border-radius: var(--radius-md);
+  background-color: var(--color-canopy);
+  color: var(--color-bark);
+  transition: border-color 120ms ease-out;
+
+  &:where(:hover:not(:disabled, :focus-visible)) {
+    border-color: var(--color-lichen);
+  }
+
+  &:where(:user-invalid, [aria-invalid='true']) {
+    border-color: var(--color-leaf-bright);
+  }
+
+  &:where(:disabled) {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+}
+
+:where(#{$field})::placeholder {
+  color: var(--color-lichen);
+}
+
+// Chosen options in a list box, instead of the system's grey.
+:where(select[multiple], select[size]) option:checked {
+  background: var(--color-moss);
+  color: var(--color-bark);
+}
+
+:where(textarea) {
+  min-height: 6rem;
+  line-height: var(--line-body);
+  resize: vertical;
+}
+
+// The native arrow sits wherever the browser puts it, hard against the edge
+// in Chrome. Drawn instead as two strokes, one diagonal per square, the
+// chevron keeps the same inset on the right as the text has on the left.
+:where(select:not([multiple], [size])) {
+  --chevron: 0.375rem;
+  --stroke: 0.75px;
+
+  appearance: none;
+  padding-right: calc(var(--space-2) + 2 * var(--chevron) + var(--space-1));
+  background-image:
+    linear-gradient(
+      45deg,
+      transparent calc(50% - var(--stroke)),
+      var(--color-lichen) calc(50% - var(--stroke)),
+      var(--color-lichen) calc(50% + var(--stroke)),
+      transparent calc(50% + var(--stroke))
+    ),
+    linear-gradient(
+      135deg,
+      transparent calc(50% - var(--stroke)),
+      var(--color-lichen) calc(50% - var(--stroke)),
+      var(--color-lichen) calc(50% + var(--stroke)),
+      transparent calc(50% + var(--stroke))
+    );
+  background-position:
+    right calc(var(--space-2) + var(--chevron)) center,
+    right var(--space-2) center;
+  background-size: var(--chevron) var(--chevron);
+  background-repeat: no-repeat;
+  cursor: pointer;
+}
+
+// Checkboxes and radios, drawn: a lichen ring that fills with bark when on.
+:where(input[type='checkbox'], input[type='radio']) {
+  display: inline-grid;
+  place-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  margin: 0;
+  border: 1.5px solid var(--color-lichen);
+  background: var(--color-night);
+  vertical-align: middle;
+  cursor: pointer;
+  appearance: none;
+  transition:
+    background-color 120ms ease-out,
+    border-color 120ms ease-out;
+
+  &::before {
+    content: '';
+    width: 0.65rem;
+    height: 0.65rem;
+    transform: scale(0);
+    transition: transform 120ms ease-out;
+  }
+
+  &:where(:checked, :indeterminate) {
+    border-color: var(--color-bark);
+  }
+
+  &:where(:checked, :indeterminate)::before {
+    transform: scale(1);
+  }
+
+  &:where(:focus-visible) {
+    outline: var(--focus-ring);
+    outline-offset: 2px;
+  }
+
+  &:where(:disabled) {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+}
+
+:where(input[type='checkbox']) {
+  border-radius: var(--radius-sm);
+
+  &::before {
+    background: var(--color-night);
+    clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0, 43% 62%);
+  }
+
+  &:where(:checked, :indeterminate) {
+    background: var(--color-bark);
+  }
+
+  &:where(:indeterminate)::before {
+    clip-path: inset(40% 0);
+  }
+}
+
+:where(input[type='radio']) {
+  border-radius: 50%;
+
+  &::before {
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 50%;
+    background: var(--color-bark);
+  }
+}
+
+// The slider keeps the browser's own drawing, in bark.
+:where(input[type='range']) {
+  accent-color: var(--color-bark);
+  cursor: pointer;
+}
+
+// Gauges are drawn: a bark bar on a moss track. Chrome ignores accent-color
+// on a meter and paints it green.
+:where(progress, meter) {
+  width: 10rem;
+  height: 0.375rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--color-moss);
+  overflow: hidden;
+  appearance: none;
+}
+
+:where(progress)::-webkit-progress-bar,
+:where(meter)::-webkit-meter-bar {
+  border: 0;
+  border-radius: 999px;
+  background: var(--color-moss);
+}
+
+:where(progress)::-webkit-progress-value,
+:where(meter)::-webkit-meter-optimum-value,
+:where(meter)::-webkit-meter-suboptimum-value,
+:where(meter)::-webkit-meter-even-less-good-value {
+  border-radius: 999px;
+  background: var(--color-bark);
+}
+
+:where(progress)::-moz-progress-bar,
+:where(meter)::-moz-meter-bar {
+  border-radius: 999px;
+  background: var(--color-bark);
+}
+
+:where(input[type='color']) {
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: var(--space-0);
+  border: 1px solid var(--color-moss);
+  border-radius: var(--radius-md);
+  background: var(--color-canopy);
+  cursor: pointer;
+}
+
+:where(input[type='file']) {
+  max-width: 100%;
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+}
+
+// The one margin here: the button is a pseudo-element beside a line of
+// text, which no gap can reach.
+:where(input[type='file'])::file-selector-button,
+:where(input[type='button'], input[type='submit'], input[type='reset']) {
+  min-height: 2.5rem;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-moss);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-bark);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+:where(input[type='file'])::file-selector-button {
+  margin-right: var(--space-2);
+}
+
+:where(fieldset) {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+  margin: 0;
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  border: 1px solid var(--color-moss);
+  border-radius: var(--radius-md);
+}
+
+:where(legend) {
+  padding: 0 var(--space-1);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+// Disclosure.
+:where(details) {
+  border-bottom: 1px solid var(--color-moss);
+}
+
+:where(summary) {
+  padding: var(--space-1) 0;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+:where(summary)::marker {
+  color: var(--color-lichen);
+}
+
+:where(details[open]) {
+  padding-bottom: var(--space-2);
+}
+
+// Dialogs.
+:where(dialog) {
+  max-width: min(var(--measure), calc(100vw - 2 * var(--space-3)));
+  padding: var(--space-4);
+  border: 1px solid var(--color-moss);
+  border-radius: var(--radius-md);
+  background: var(--color-canopy);
+  color: var(--color-bark);
+}
+
+:where(dialog)::backdrop {
+  background: var(--color-scrim);
+}

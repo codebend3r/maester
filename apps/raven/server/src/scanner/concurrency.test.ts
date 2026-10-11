@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createTaskQueue, mapWithConcurrency } from '@/scanner/concurrency.js'
+import { createGate, createTaskQueue, mapWithConcurrency } from '@/scanner/concurrency'
 
 const tick = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -25,6 +25,29 @@ describe('mapWithConcurrency', () => {
     await expect(mapWithConcurrency({ items: [], limit: 4, fn: async () => 1 })).resolves.toEqual(
       [],
     )
+  })
+})
+
+describe('createGate', () => {
+  it('lets no more than its limit through at once, however many callers there are', async () => {
+    const gate = createGate({ limit: 2 })
+    const state = { active: 0, peak: 0 }
+    const task = (value: number) => async () => {
+      state.active += 1
+      state.peak = Math.max(state.peak, state.active)
+      await tick(5)
+      state.active -= 1
+      return value
+    }
+    const results = await Promise.all([1, 2, 3, 4, 5].map((value) => gate.run(task(value))))
+    expect(results).toEqual([1, 2, 3, 4, 5])
+    expect(state.peak).toBe(2)
+  })
+
+  it('frees the slot of a task that fails', async () => {
+    const gate = createGate({ limit: 1 })
+    await expect(gate.run(async () => Promise.reject(new Error('EIO')))).rejects.toThrow('EIO')
+    await expect(gate.run(async () => 'next')).resolves.toBe('next')
   })
 })
 

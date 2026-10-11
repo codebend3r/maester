@@ -17,15 +17,36 @@ export const createQueryClient = (): QueryClient =>
 export const queryKeys = {
   libraries: ['libraries'],
   library: (id: number) => ['libraries', id],
-  media: ({ libraryId, search, sort }: { libraryId: number; search: string; sort: string }) => [
-    'libraries',
+  media: ({
     libraryId,
-    'media',
-    { search, sort },
-  ],
+    search,
+    sort,
+    seed,
+  }: {
+    libraryId: number
+    search: string
+    sort: string
+    seed: number
+  }) => ['libraries', libraryId, 'media', { search, sort, seed }],
   /** The prefix every media list of a library shares, whatever its search and sort. */
   mediaLists: (libraryId: number) => ['libraries', libraryId, 'media'],
   mediaItem: (id: number) => ['media', id],
+  mediaTracks: (id: number) => ['media', id, 'tracks'],
+  subtitles: ({ id, trackId, window }: { id: number; trackId: string; window: number }) => [
+    'media',
+    id,
+    'subtitles',
+    trackId,
+    window,
+  ],
   favourites: ['favourites'],
+  history: ({ libraryId, show, limit }: { libraryId: number; show: string; limit: number }) => [
+    'libraries',
+    libraryId,
+    'history',
+    { show, limit },
+  ],
+  /** The prefix every page of a library's history shares. */
+  histories: (libraryId: number) => ['libraries', libraryId, 'history'],
   browse: (path: string | null) => ['browse', path],
 }

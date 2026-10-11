@@ -6,8 +6,9 @@ import { Button } from '@/components/Button/Button'
 import { LibraryDialog } from '@/components/LibraryDialog/LibraryDialog'
 import { ScanStatus } from '@/components/ScanStatus/ScanStatus'
 import { api } from '@/lib/api'
+import { KIND_LABELS } from '@/lib/libraryKinds'
 import { queryKeys } from '@/lib/queryClient'
-import styles from './LibrariesPage.module.scss'
+import styles from '@/pages/LibrariesPage/LibrariesPage.module.scss'
 
 const count = new Intl.NumberFormat()
 
@@ -17,6 +18,15 @@ const LibraryRow = ({ library }: { library: Library }) => {
     mutationFn: () => api.scanLibrary(library.id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.libraries }),
   })
+  // Only the pin is sent as a setting; the server keeps the others as they are.
+  const pin = useMutation({
+    mutationFn: (pinned: boolean) =>
+      api.updateLibrary({
+        id: library.id,
+        input: { name: library.name, paths: library.paths, settings: { pinned } },
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.libraries }),
+  })
 
   return (
     <li className={styles.row}>
@@ -24,7 +34,8 @@ const LibraryRow = ({ library }: { library: Library }) => {
         {library.name}
       </Link>
       <span className={styles.count}>
-        {count.format(library.itemCount)} {library.itemCount === 1 ? 'video' : 'videos'}
+        {KIND_LABELS[library.settings.kind]} · {count.format(library.itemCount)}{' '}
+        {library.itemCount === 1 ? 'video' : 'videos'}
       </span>
       <ul className={styles.paths} aria-label="Folders">
         {library.paths.map((path) => (
@@ -34,14 +45,24 @@ const LibraryRow = ({ library }: { library: Library }) => {
       <div className={styles.status}>
         <ScanStatus scan={library.scan} />
       </div>
-      <Button
-        icon="rescan"
-        className={styles.rescan}
-        disabled={library.scan.state === 'scanning' || rescan.isPending}
-        onClick={() => rescan.mutate()}
-      >
-        Rescan
-      </Button>
+      <div className={styles.actions}>
+        <Button
+          icon="pin"
+          className={styles.pin}
+          aria-pressed={library.settings.pinned}
+          disabled={pin.isPending}
+          onClick={() => pin.mutate(!library.settings.pinned)}
+        >
+          Pin<span className="visually-hidden"> {library.name}</span>
+        </Button>
+        <Button
+          icon="rescan"
+          disabled={library.scan.state === 'scanning' || rescan.isPending}
+          onClick={() => rescan.mutate()}
+        >
+          Rescan
+        </Button>
+      </div>
     </li>
   )
 }

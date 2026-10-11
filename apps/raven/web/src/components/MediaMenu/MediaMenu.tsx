@@ -4,7 +4,7 @@ import { type KeyboardEvent, useEffect, useId, useRef, useState } from 'react'
 import { Button } from '@/components/Button/Button'
 import { Icon } from '@/components/Icon/Icon'
 import { useMediaMutations } from '@/lib/useMediaMutations'
-import styles from './MediaMenu.module.scss'
+import styles from '@/components/MediaMenu/MediaMenu.module.scss'
 
 /** Deleting is the one action here that cannot be undone, so it asks first. */
 const ConfirmDelete = ({
@@ -60,10 +60,13 @@ export const MediaMenu = ({
   media,
   open,
   onOpenChange,
+  inline = false,
 }: {
   media: MediaItem
   open: boolean
   onOpenChange: (open: boolean) => void
+  /** In a row of its own (list, tiles) instead of over a card's thumbnail. */
+  inline?: boolean
 }) => {
   const id = useId()
   const root = useRef<HTMLDivElement>(null)
@@ -116,7 +119,7 @@ export const MediaMenu = ({
   }
 
   return (
-    <div ref={root} className={styles.root}>
+    <div ref={root} className={inline ? `${styles.root} ${styles.inline}` : styles.root}>
       <button
         ref={trigger}
         type="button"

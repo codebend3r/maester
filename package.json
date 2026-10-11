@@ -19,8 +19,11 @@
     "format": "nx run-many -t format",
     "format:check": "nx run-many -t format:check",
     "spellcheck": "nx run maester:spellcheck",
-    "verify": "nx run-many -t spellcheck lint:py lint:ts lint:css format:check typecheck test build",
-    "affected": "nx run maester:spellcheck && nx affected -t lint:py lint:ts lint:css format:check typecheck test build",
+    "typescript-only": "nx run maester:typescript-only",
+    "one-command-per-script": "nx run maester:one-command-per-script",
+    "verify": "nx run-many -t spellcheck typescript-only one-command-per-script lint:py lint:ts lint:css format:check typecheck test build",
+    "affected": "bun run --sequential spellcheck typescript-only one-command-per-script affected:tasks",
+    "affected:tasks": "nx affected -t lint:py lint:ts lint:css format:check typecheck test build",
     "graph": "nx graph"
   },
   "devDependencies": {
@@ -41,6 +44,14 @@
       },
       "spellcheck": {
         "command": "uvx typos@1.51.1",
+        "cache": false
+      },
+      "typescript-only": {
+        "command": "bash scripts/check_typescript_only.sh",
+        "cache": false
+      },
+      "one-command-per-script": {
+        "command": "bash scripts/check_one_command_per_script.sh",
         "cache": false
       }
     }

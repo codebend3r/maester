@@ -2,7 +2,8 @@ import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { walkVideos } from '@/scanner/walk.js'
+import { type Gate, createGate } from '@/scanner/concurrency'
+import { walkVideos } from '@/scanner/walk'
 
 describe('walkVideos', () => {
   const state = { root: '' }
@@ -46,6 +47,33 @@ describe('walkVideos', () => {
     const result = await walkVideos({ roots: [at('Nope'), at('TV')] })
     expect(result.unreadableRoots).toEqual([at('Nope')])
     expect(result.files).toHaveLength(1)
+  })
+
+  it('sends every readdir and stat through the gate, so walks at once share its limit', async () => {
+    const inner = createGate({ limit: 2 })
+    const counts = { calls: 0, active: 0, peak: 0 }
+    const gate: Gate = {
+      run: (task) =>
+        inner.run(async () => {
+          counts.calls += 1
+          counts.active += 1
+          counts.peak = Math.max(counts.peak, counts.active)
+          try {
+            return await task()
+          } finally {
+            counts.active -= 1
+          }
+        }),
+    }
+    const [movies, tv] = await Promise.all([
+      walkVideos({ roots: [at('Movies')], gate }),
+      walkVideos({ roots: [at('TV')], gate }),
+    ])
+    expect(movies.files).toHaveLength(2)
+    expect(tv.files).toHaveLength(1)
+    // Readdir: Movies, Heat, TV, Show, Season 1. Stat: the symlink, then the three videos.
+    expect(counts.calls).toBe(9)
+    expect(counts.peak).toBe(2)
   })
 
   it('reports a file under overlapping paths once', async () => {

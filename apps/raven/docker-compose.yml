@@ -19,6 +19,13 @@ services:
     environment:
       # Rescan every library on a timer (minutes); 0 means only on boot and on demand.
       - RESCAN_INTERVAL_MINUTES=0
+    # Transcode on an Intel GPU: pass its render node in and join the group
+    # that owns it on the host (`stat -c %g /dev/dri/renderD128`). /api/health
+    # then reports "encoder": "vaapi"; without these it stays on the CPU.
+    # devices:
+    #   - /dev/dri/renderD128:/dev/dri/renderD128
+    # group_add:
+    #   - '937'
     # The image runs as the unprivileged `node` user (1000:1000). On a
     # Synology or any host where ./data belongs to someone else, run as the
     # owner instead, e.g. user: '1026:100'.

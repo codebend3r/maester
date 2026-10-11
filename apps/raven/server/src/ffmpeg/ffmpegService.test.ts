@@ -2,8 +2,9 @@ import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { readServerConfig } from '@/config.js'
-import { FfmpegService, FfmpegTimeoutError } from '@/ffmpeg/ffmpegService.js'
+import { readServerConfig } from '@/config'
+import type { HwAccel } from '@/ffmpeg/encoder'
+import { FfmpegService, FfmpegTimeoutError } from '@/ffmpeg/ffmpegService'
 
 describe('FfmpegService', () => {
   const state = { dir: '' }
@@ -16,6 +17,9 @@ describe('FfmpegService', () => {
       join(state.dir, 'broken'),
       '#!/bin/sh\necho "Invalid data found when processing input" >&2\nexit 1\n',
     )
+    await writeFile(join(state.dir, 'works'), '#!/bin/sh\nexit 0\n')
+    await writeFile(join(state.dir, 'renderD128'), '')
+    await chmod(join(state.dir, 'works'), 0o755)
     await chmod(join(state.dir, 'slow'), 0o755)
     await chmod(join(state.dir, 'broken'), 0o755)
   })
@@ -41,5 +45,34 @@ describe('FfmpegService', () => {
     const failure = service('broken').probe('/media/a.mkv')
     await expect(failure).rejects.toThrow('Invalid data found when processing input')
     await expect(failure).rejects.not.toBeInstanceOf(FfmpegTimeoutError)
+  })
+
+  describe('choosing how transcodes encode', () => {
+    const encoderWith = ({ tool, hwAccel }: { tool: string; hwAccel: HwAccel }) =>
+      new FfmpegService({
+        ...readServerConfig({}),
+        ffmpegPath: join(state.dir, tool),
+        hwAccel,
+        vaapiDevice: join(state.dir, 'renderD128'),
+      }).videoEncoder()
+
+    it('uses the GPU when its test encode works', async () => {
+      await expect(encoderWith({ tool: 'works', hwAccel: 'vaapi' })).resolves.toEqual({
+        kind: 'vaapi',
+        device: join(state.dir, 'renderD128'),
+      })
+    })
+
+    it('falls back to the CPU when the GPU is there but its test encode fails', async () => {
+      await expect(encoderWith({ tool: 'broken', hwAccel: 'vaapi' })).resolves.toEqual({
+        kind: 'software',
+      })
+    })
+
+    it('stays on the CPU when hardware acceleration is off', async () => {
+      await expect(encoderWith({ tool: 'works', hwAccel: 'none' })).resolves.toEqual({
+        kind: 'software',
+      })
+    })
   })
 })

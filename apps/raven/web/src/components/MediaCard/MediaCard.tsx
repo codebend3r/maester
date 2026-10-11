@@ -1,17 +1,12 @@
-import { type MediaItem, checkDirectPlay, formatRuntime, resolutionLabel } from '@raven/core'
+import { type MediaItem, formatRuntime, resolutionLabel } from '@raven/core'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Icon } from '@/components/Icon/Icon'
 import { MediaMenu } from '@/components/MediaMenu/MediaMenu'
+import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
 import { api } from '@/lib/api'
-import { browserCanPlay } from '@/lib/canPlay'
-import styles from './MediaCard.module.scss'
-
-/** How far through the video playback stopped, as a fraction for the resume line. */
-const progressOf = (media: MediaItem): number =>
-  media.duration != null && media.duration > 0 && media.position > 0
-    ? Math.min(1, media.position / media.duration)
-    : 0
+import { progressOf } from '@/lib/mediaProgress'
+import styles from '@/components/MediaCard/MediaCard.module.scss'
 
 /**
  * One video in the grid. The whole card is the link, and it hands the item
@@ -23,7 +18,6 @@ export const MediaCard = ({ media }: { media: MediaItem }) => {
   const [menuOpen, setMenuOpen] = useState(false)
   const thumbnail = api.thumbnailUrl(media)
   const progress = progressOf(media)
-  const check = checkDirectPlay({ media, canPlay: browserCanPlay })
   const facts = [
     formatRuntime(media.duration),
     resolutionLabel(media),
@@ -75,12 +69,7 @@ export const MediaCard = ({ media }: { media: MediaItem }) => {
         ))}
         {progress > 0 && <span className="visually-hidden">Partly watched</span>}
       </span>
-      {!check.playable && (
-        <span className={styles.unplayable} title={check.problems.join(' ')}>
-          <Icon name="alert" size={16} />
-          Won't play in this browser
-        </span>
-      )}
+      <PlaybackNote media={media} />
       <MediaMenu media={media} open={menuOpen} onOpenChange={setMenuOpen} />
     </li>
   )

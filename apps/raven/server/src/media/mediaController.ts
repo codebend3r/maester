@@ -13,6 +13,7 @@ import {
   NotFoundException,
   Param,
   ParseIntPipe,
+  Post,
   Put,
   Query,
   Req,
@@ -20,13 +21,23 @@ import {
 } from '@nestjs/common'
 import { type MediaItem, containerMimeType, isNumber, isRecord, isString } from '@raven/core'
 import type { FastifyReply, FastifyRequest } from 'fastify'
-import { type MediaRecord, MediaRepository, toMediaItem } from '@/media/mediaRepository.js'
-import { parseRange } from '@/media/range.js'
-import { ScannerService } from '@/scanner/scannerService.js'
-import { ThumbnailService } from '@/thumbnails/thumbnailService.js'
+import { type MediaRecord, MediaRepository, toMediaItem } from '@/media/mediaRepository'
+import { parseRange } from '@/media/range'
+import { SubtitlesService } from '@/playback/subtitlesService'
+import { ScannerService } from '@/scanner/scannerService'
+import { ThumbnailService } from '@/thumbnails/thumbnailService'
 
 const errorCode = (error: unknown): string =>
   isRecord(error) && isString(error.code) ? error.code : ''
+
+/**
+ * Video bytes come off the share in 1 MiB reads rather than Node's default
+ * 64 KiB: over SMB every read is a round trip, so bigger reads mean fewer.
+ */
+const READ_CHUNK = 1024 * 1024
+
+const readFile = ({ path, start, end }: { path: string; start?: number; end?: number }) =>
+  createReadStream(path, { start, end, highWaterMark: READ_CHUNK })
 
 /** What a client is told when the file stays put. Never the path: that stays server-side. */
 const deleteFailure = (error: unknown): string => {
@@ -46,6 +57,7 @@ export class MediaController {
     @Inject(MediaRepository) private readonly media: MediaRepository,
     @Inject(ThumbnailService) private readonly thumbnails: ThumbnailService,
     @Inject(ScannerService) private readonly scanner: ScannerService,
+    @Inject(SubtitlesService) private readonly subtitles: SubtitlesService,
   ) {}
 
   private find(id: number): MediaRecord {
@@ -66,7 +78,16 @@ export class MediaController {
     if (!isRecord(body) || !isNumber(body.position) || body.position < 0) {
       throw new BadRequestException('position must be a number of seconds')
     }
+    this.media.notePlayedTo({ id, position: body.position })
     this.media.saveProgress({ id, position: body.position })
+  }
+
+  /** The player says a video started, for its library's history. */
+  @Post(':id/plays')
+  @HttpCode(204)
+  recordPlay(@Param('id', ParseIntPipe) id: number): void {
+    this.find(id)
+    this.media.recordPlay({ id })
   }
 
   @Put(':id/favourite')
@@ -102,6 +123,7 @@ export class MediaController {
       }
     }
     await this.thumbnails.discard([id])
+    await this.subtitles.discard([id])
     this.media.removeMany([id])
   }
 
@@ -129,9 +151,8 @@ export class MediaController {
   /**
    * Direct play: the file itself, with byte ranges. The browser asks for the
    * first bytes, finds the index, and starts playing; seeking is just another
-   * range request, so the server does nothing but read. There is no
-   * transcoding: a file the client cannot decode is reported as such by
-   * `checkDirectPlay` rather than converted.
+   * range request, so the server does nothing but read. Files the client
+   * cannot decode as they are go through `PlaybackController`'s stream.
    */
   @Get(':id/file')
   async file(
@@ -155,13 +176,13 @@ export class MediaController {
       return
     }
     if (range == null) {
-      await reply.header('content-length', size).send(createReadStream(record.path))
+      await reply.header('content-length', size).send(readFile({ path: record.path }))
       return
     }
     await reply
       .code(206)
       .header('content-range', `bytes ${range.start}-${range.end}/${size}`)
       .header('content-length', range.end - range.start + 1)
-      .send(createReadStream(record.path, { start: range.start, end: range.end }))
+      .send(readFile({ path: record.path, start: range.start, end: range.end }))
   }
 }

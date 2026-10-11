@@ -1,5 +1,5 @@
 import { ButtonLink } from '@/components/Button/Button'
-import styles from './NotFoundPage.module.scss'
+import styles from '@/pages/NotFoundPage/NotFoundPage.module.scss'
 
 export const NotFoundPage = () => (
   <section className={styles.page}>

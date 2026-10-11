@@ -1,15 +1,28 @@
 import {
   isDirectoryListing,
+  isHistory,
   isLibrary,
   isLibraryList,
   isMediaItem,
   isMediaList,
+  isMediaTracks,
   isRecord,
   isString,
   isStringArray,
-} from './guards.js'
-import { toQueryString } from './query.js'
-import type { DirectoryListing, Library, LibraryInput, MediaItem, MediaSort } from './types.js'
+} from '@/guards'
+import { toQueryString } from '@/query'
+import { parseWebVtt } from '@/subtitles'
+import type {
+  DirectoryListing,
+  HistoryEntry,
+  Library,
+  LibraryInput,
+  MediaItem,
+  MediaSort,
+  MediaTracks,
+  StreamMode,
+  SubtitleCue,
+} from '@/types'
 
 /**
  * The slice of `fetch` the client uses, spelled out structurally so this
@@ -27,6 +40,7 @@ export type FetchResponse = {
   status: number
   statusText: string
   json: () => Promise<unknown>
+  text: () => Promise<string>
 }
 
 export type FetchLike = (url: string, init?: FetchInit) => Promise<FetchResponse>
@@ -104,6 +118,21 @@ export const createApiClient = ({
     return parsed
   }
 
+  /** A plain-text body, such as WebVTT, failing like `send` does. */
+  const sendForText = async (path: string): Promise<string> => {
+    const response = await fetch(url(path), { method: 'GET', headers: { accept: 'text/vtt' } })
+    if (!response.ok) {
+      throw new ApiError({
+        status: response.status,
+        message: errorMessage({
+          body: await readJson(response),
+          fallback: response.statusText || 'Request failed',
+        }),
+      })
+    }
+    return response.text()
+  }
+
   const expect = async <T>({
     request,
     guard,
@@ -150,16 +179,23 @@ export const createApiClient = ({
         guard: isLibrary,
       }),
 
+    /** `seed` only counts with a random sort: the same seed deals the same order. */
     listMedia: ({
       libraryId,
       search = '',
       sort = 'title',
+      seed,
     }: {
       libraryId: number
       search?: string
       sort?: MediaSort
+      seed?: number
     }): Promise<MediaItem[]> => {
-      const query = toQueryString({ sort, ...(search.trim() ? { q: search.trim() } : {}) })
+      const query = toQueryString({
+        sort,
+        ...(sort === 'random' && seed !== undefined ? { seed: String(seed) } : {}),
+        ...(search.trim() ? { q: search.trim() } : {}),
+      })
       return expect({
         request: send({ path: `/api/libraries/${libraryId}/media?${query}` }),
         guard: isMediaList,
@@ -183,6 +219,34 @@ export const createApiClient = ({
     listFavourites: (): Promise<MediaItem[]> =>
       expect({ request: send({ path: '/api/favourites' }), guard: isMediaList }),
 
+    /** Notes that a video started playing, for its library's history. */
+    recordPlay: async (id: number): Promise<void> => {
+      await send({ path: `/api/media/${id}/plays`, method: 'POST' })
+    },
+
+    /**
+     * A library's played videos by when they last played, most recent first,
+     * at most `limit` of them; `watchedOnly` keeps those that count as watched.
+     */
+    listHistory: ({
+      libraryId,
+      limit,
+      watchedOnly = false,
+    }: {
+      libraryId: number
+      limit: number
+      watchedOnly?: boolean
+    }): Promise<HistoryEntry[]> => {
+      const query = toQueryString({
+        limit: String(limit),
+        ...(watchedOnly ? { watched: 'true' } : {}),
+      })
+      return expect({
+        request: send({ path: `/api/libraries/${libraryId}/history?${query}` }),
+        guard: isHistory,
+      })
+    },
+
     /** Removes the file from disk and the video from its library. */
     deleteMedia: async (id: number): Promise<void> => {
       await send({ path: `/api/media/${id}`, method: 'DELETE' })
@@ -204,5 +268,52 @@ export const createApiClient = ({
 
     /** The original file, served with byte ranges: what a player loads for direct play. */
     fileUrl: (mediaId: number): string => url(`/api/media/${mediaId}/file`),
+
+    /** The audio and subtitle tracks a player can choose between. */
+    getTracks: (id: number): Promise<MediaTracks> =>
+      expect({ request: send({ path: `/api/media/${id}/tracks` }), guard: isMediaTracks }),
+
+    /**
+     * One subtitle track's cues. Embedded tracks come a window at a time
+     * (see `subtitleWindows`); sidecar files come whole and ignore `window`.
+     */
+    getSubtitles: async ({
+      id,
+      trackId,
+      window = 0,
+    }: {
+      id: number
+      trackId: string
+      window?: number
+    }): Promise<SubtitleCue[]> =>
+      parseWebVtt(
+        await sendForText(
+          `/api/media/${id}/subtitles/${encodeURIComponent(trackId)}?${toQueryString({ window: String(window) })}`,
+        ),
+      ),
+
+    /**
+     * A converted stream as fragmented MP4, starting at `start` seconds into
+     * the file and stamped with file time plus `STREAM_TIME_SHIFT`. `audio`
+     * picks the track by its `0:a:N` index; left out, the default plays.
+     */
+    streamUrl: ({
+      id,
+      mode,
+      start,
+      audio,
+    }: {
+      id: number
+      mode: StreamMode
+      start: number
+      audio: number | null
+    }): string =>
+      url(
+        `/api/media/${id}/stream?${toQueryString({
+          mode,
+          start: String(Math.max(0, Math.round(start * 1000) / 1000)),
+          ...(audio == null ? {} : { audio: String(audio) }),
+        })}`,
+      ),
   }
 }

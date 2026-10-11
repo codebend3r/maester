@@ -5,7 +5,7 @@ import { ButtonLink } from '@/components/Button/Button'
 import { Player } from '@/components/Player/Player'
 import { api } from '@/lib/api'
 import { queryKeys } from '@/lib/queryClient'
-import styles from './WatchPage.module.scss'
+import styles from '@/pages/WatchPage/WatchPage.module.scss'
 
 /**
  * The card that was clicked hands its item over in router state, so the

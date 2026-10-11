@@ -4,7 +4,7 @@ import { Button } from '@/components/Button/Button'
 import { Icon } from '@/components/Icon/Icon'
 import { api } from '@/lib/api'
 import { queryKeys } from '@/lib/queryClient'
-import styles from './FolderBrowser.module.scss'
+import styles from '@/components/FolderBrowser/FolderBrowser.module.scss'
 
 /**
  * Walks the server's folders (as the server sees them: container paths under

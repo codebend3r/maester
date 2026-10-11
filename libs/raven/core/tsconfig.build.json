@@ -8,5 +8,10 @@
     "outDir": "./dist"
   },
   "include": ["src"],
+  // Sources import through `@/` with no extension; tsc-alias rewrites the
+  // emitted JavaScript and declarations to relative `.js` paths Node resolves.
+  "tsc-alias": {
+    "resolveFullPaths": true
+  },
   "exclude": ["src/**/*.test.ts", "src/test/**"]
 }

@@ -1,0 +1,132 @@
+.controls {
+  grid-area: stage;
+  align-self: end;
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: repeat(4, auto) minmax(0, 1fr) repeat(3, auto);
+  grid-template-areas:
+    'timeline timeline timeline timeline timeline timeline timeline timeline'
+    'play back forward volume clock captions settings fullscreen';
+  gap: var(--space-0) var(--space-0);
+  align-items: center;
+  padding: var(--space-6) clamp(var(--space-2), 3vw, var(--space-5)) var(--space-2);
+  background: linear-gradient(to top, rgb(0 0 0 / 75%), rgb(0 0 0 / 0%));
+  transition: opacity 250ms ease-out;
+}
+
+.hidden {
+  opacity: 0;
+  pointer-events: none;
+
+  // Tabbing into the bar brings it back.
+  &:focus-within {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+.timeline {
+  grid-area: timeline;
+}
+
+.button {
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-bark);
+  cursor: pointer;
+  transition: background-color 120ms ease-out;
+
+  &:hover {
+    background: rgb(28 43 40 / 85%);
+  }
+}
+
+.play {
+  grid-area: play;
+}
+
+.back {
+  grid-area: back;
+}
+
+.forward {
+  grid-area: forward;
+}
+
+.volume {
+  grid-area: volume;
+  display: grid;
+  grid-auto-flow: column;
+  gap: var(--space-0);
+  align-items: center;
+}
+
+.volumeSlider {
+  width: 5.5rem;
+}
+
+.clock {
+  grid-area: clock;
+  padding-left: var(--space-1);
+  color: var(--color-bark);
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.total {
+  color: var(--color-lichen);
+}
+
+.captions {
+  grid-area: captions;
+  position: relative;
+}
+
+// A red leaf-line under CC while subtitles are on.
+.on::after {
+  content: '';
+  position: absolute;
+  bottom: 0.45rem;
+  width: 1.1rem;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--color-leaf-bright);
+}
+
+.settings {
+  grid-area: settings;
+}
+
+.fullscreen {
+  grid-area: fullscreen;
+}
+
+// On a phone the skips and the volume slider go; mute, the clock and the
+// right-hand buttons stay.
+@media (max-width: 30rem) {
+  .controls {
+    grid-template-columns: repeat(2, auto) minmax(0, 1fr) repeat(3, auto);
+    grid-template-areas:
+      'timeline timeline timeline timeline timeline timeline'
+      'play volume clock captions settings fullscreen';
+  }
+
+  .back,
+  .forward,
+  .volumeSlider {
+    display: none;
+  }
+
+  .button {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+}

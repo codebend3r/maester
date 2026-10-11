@@ -2,8 +2,8 @@ import type { Dirent } from 'node:fs'
 import { readdir, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { extensionOf, isVideoFile } from '@raven/core'
-import type { FoundFile } from '@/media/mediaRepository.js'
-import { mapWithConcurrency } from '@/scanner/concurrency.js'
+import type { FoundFile } from '@/media/mediaRepository'
+import { type Gate, createGate, mapWithConcurrency } from '@/scanner/concurrency'
 
 /**
  * Folders that are never media: NAS housekeeping (Synology's @eaDir holds
@@ -18,6 +18,16 @@ const SKIPPED_FOLDERS: ReadonlySet<string> = new Set([
   'System Volume Information',
   'lost+found',
 ])
+
+/**
+ * Every scan's readdir and stat calls, across every library, pass through
+ * this one gate. Node runs file calls on a small pool of worker threads (16,
+ * see `threadpool.ts`), and the player's file reads use the same pool; over
+ * SMB a stat takes about 90ms, so a scan left unchecked fills the pool and
+ * video stalls behind it. Four for scans leaves the rest for playback
+ * whatever is being scanned.
+ */
+export const SCAN_FILESYSTEM: Gate = createGate({ limit: 4 })
 
 const isSkippedName = (name: string): boolean => name.startsWith('.') || SKIPPED_FOLDERS.has(name)
 
@@ -48,24 +58,26 @@ const reason = (error: unknown): string =>
 const classify = async ({
   dir,
   entry,
+  gate,
 }: {
   dir: string
   entry: Dirent
+  gate: Gate
 }): Promise<'dir' | 'file' | null> => {
   if (entry.isDirectory()) return 'dir'
   if (entry.isFile()) return 'file'
   if (!entry.isSymbolicLink()) return null
-  const target = await stat(join(dir, entry.name)).catch(() => null)
+  const target = await gate.run(() => stat(join(dir, entry.name))).catch(() => null)
   return target?.isFile() ? 'file' : null
 }
 
-const list = async (dir: string): Promise<Listing> => {
+const list = async ({ dir, gate }: { dir: string; gate: Gate }): Promise<Listing> => {
   try {
-    const entries = await readdir(dir, { withFileTypes: true })
+    const entries = await gate.run(() => readdir(dir, { withFileTypes: true }))
     const kinds = await Promise.all(
       entries
         .filter((entry) => !isSkippedName(entry.name))
-        .map(async (entry) => ({ entry, kind: await classify({ dir, entry }) })),
+        .map(async (entry) => ({ entry, kind: await classify({ dir, entry, gate }) })),
     )
     return {
       dirs: kinds.filter(({ kind }) => kind === 'dir').map(({ entry }) => join(dir, entry.name)),
@@ -85,9 +97,11 @@ const list = async (dir: string): Promise<Listing> => {
 const walkRoot = async ({
   root,
   limit,
+  gate,
 }: {
   root: string
   limit: number
+  gate: Gate
 }): Promise<{ files: string[]; errors: string[]; readable: boolean }> => {
   const level = async ({
     dirs,
@@ -99,7 +113,11 @@ const walkRoot = async ({
     errors: string[]
   }): Promise<{ files: string[]; errors: string[] }> => {
     if (dirs.length === 0) return { files, errors }
-    const listings = await mapWithConcurrency({ items: dirs, limit, fn: list })
+    const listings = await mapWithConcurrency({
+      items: dirs,
+      limit,
+      fn: (dir) => list({ dir, gate }),
+    })
     return level({
       dirs: listings.flatMap((listing) => listing.dirs),
       files: [...files, ...listings.flatMap((listing) => listing.files)],
@@ -107,7 +125,7 @@ const walkRoot = async ({
     })
   }
 
-  const top = await list(root)
+  const top = await list({ dir: root, gate })
   if (top.error) return { files: [], errors: [top.error], readable: false }
   const rest = await level({ dirs: top.dirs, files: top.files, errors: [] })
   return { ...rest, readable: true }
@@ -116,17 +134,21 @@ const walkRoot = async ({
 /**
  * Every video file under the given library paths, with the size and mtime
  * the scanner diffs against the index. A file reachable from two overlapping
- * paths is reported once, under the first.
+ * paths is reported once, under the first. `limit` caps the folders and
+ * files this walk has open; `gate` caps filesystem calls across every walk
+ * that shares it.
  */
 export const walkVideos = async ({
   roots,
   limit = 16,
+  gate = SCAN_FILESYSTEM,
 }: {
   roots: readonly string[]
   limit?: number
+  gate?: Gate
 }): Promise<WalkResult> => {
   const walked = await Promise.all(
-    roots.map(async (root) => ({ root, ...(await walkRoot({ root, limit })) })),
+    roots.map(async (root) => ({ root, ...(await walkRoot({ root, limit, gate })) })),
   )
   const seen = new Set<string>()
   const candidates = walked.flatMap(({ root, files }) =>
@@ -142,7 +164,7 @@ export const walkVideos = async ({
     items: candidates,
     limit,
     fn: async ({ root, path }) => {
-      const info = await stat(path).catch(() => null)
+      const info = await gate.run(() => stat(path)).catch(() => null)
       return info ? [{ path, root, size: info.size, mtimeMs: Math.round(info.mtimeMs) }] : []
     },
   })

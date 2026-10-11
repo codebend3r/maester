@@ -93,13 +93,3 @@
   align-items: center;
   color: var(--color-bark);
 }
-
-.unplayable {
-  display: grid;
-  grid-auto-flow: column;
-  justify-content: start;
-  align-items: center;
-  gap: var(--space-0);
-  color: var(--color-lichen);
-  font-size: var(--font-size-xs);
-}

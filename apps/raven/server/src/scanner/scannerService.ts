@@ -6,13 +6,15 @@ import {
   type OnModuleDestroy,
 } from '@nestjs/common'
 import type { ScanStatus } from '@raven/core'
-import { SERVER_CONFIG, type ServerConfig } from '@/config.js'
-import { FfmpegService, FfmpegTimeoutError } from '@/ffmpeg/ffmpegService.js'
-import { LibrariesRepository } from '@/libraries/librariesRepository.js'
-import { type FoundFile, MediaRepository } from '@/media/mediaRepository.js'
-import { mapWithConcurrency } from '@/scanner/concurrency.js'
-import { walkVideos } from '@/scanner/walk.js'
-import { ThumbnailService } from '@/thumbnails/thumbnailService.js'
+import { SERVER_CONFIG, type ServerConfig } from '@/config'
+import { FfmpegService, FfmpegTimeoutError } from '@/ffmpeg/ffmpegService'
+import { LibrariesRepository } from '@/libraries/librariesRepository'
+import { type FoundFile, MediaRepository } from '@/media/mediaRepository'
+import { SubtitlesService } from '@/playback/subtitlesService'
+import { TracksService } from '@/playback/tracksService'
+import { mapWithConcurrency } from '@/scanner/concurrency'
+import { walkVideos } from '@/scanner/walk'
+import { ThumbnailService } from '@/thumbnails/thumbnailService'
 
 const IDLE: ScanStatus = {
   state: 'idle',
@@ -48,6 +50,8 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
     @Inject(MediaRepository) private readonly media: MediaRepository,
     @Inject(FfmpegService) private readonly ffmpeg: FfmpegService,
     @Inject(ThumbnailService) private readonly thumbnails: ThumbnailService,
+    @Inject(SubtitlesService) private readonly subtitles: SubtitlesService,
+    @Inject(TracksService) private readonly tracks: TracksService,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -113,6 +117,7 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
         .filter(([path]) => !found.has(path) && !isUnder({ path, roots: walk.unreadableRoots }))
         .map(([, file]) => file.id)
       await this.thumbnails.discard(gone)
+      await this.subtitles.discard(gone)
       this.media.removeMany(gone)
 
       const toProbe = walk.files.flatMap((file: FoundFile) => {
@@ -135,7 +140,8 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
         limit: this.config.probeConcurrency,
         fn: async ({ id, path }) => {
           try {
-            this.media.saveProbe({ id, probe: await this.ffmpeg.probe(path) })
+            const { probe, tracks } = await this.ffmpeg.probeFile(path)
+            this.media.saveProbe({ id, probe, tracks })
             this.thumbnails.enqueue(id)
           } catch (error) {
             // A timeout leaves the file unprobed, so the next scan tries it again.
@@ -148,8 +154,10 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
         },
       })
 
-      // Thumbnails that timed out on an earlier pass get another go.
+      // Thumbnails that timed out on an earlier pass get another go, and
+      // videos indexed before tracks were stored get theirs.
       this.media.pendingThumbnailIds().forEach((id) => this.thumbnails.enqueue(id))
+      this.tracks.backfill(this.media.idsMissingTracks(libraryId))
 
       const unreadable = walk.unreadableRoots.map((root) => `Could not read ${root}.`)
       this.update(libraryId, {

@@ -3,7 +3,8 @@ name: 🚀 Main smoke test
 # Runs on merges into main and nowhere else: builds each product's production
 # image and checks that it starts and serves its health route (smoke-test.yml).
 # The same smoke test, with lint, tests and the rest, runs on the PR before
-# the merge (pull-request-checks.yml).
+# the merge (pull-request-checks.yml). raven's image is then published to
+# GHCR, where Vhagar picks it up.
 on:
   push:
     branches: [main]
@@ -20,3 +21,65 @@ jobs:
   smoke:
     name: 🐳 Smoke test
     uses: ./.github/workflows/smoke-test.yml
+    with:
+      # Hands the health checked raven image to the publish job, so GHCR gets
+      # the exact image that passed rather than a rebuild.
+      save-raven-image: true
+
+  publish:
+    name: 📦 Publish raven
+    needs: smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    # Publishing writes raven's package; nothing else in this run does.
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE: raven:ci
+      PUBLISHED: ghcr.io/${{ github.repository_owner }}/raven
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v7
+
+      # Only what goes into the image counts: the paths
+      # apps/raven/Dockerfile.dockerignore lets through, and the Dockerfile.
+      # A docs or luwin merge then leaves Vhagar's raven running as it is.
+      - name: 🔎 Check whether raven's image changed
+        id: changed
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if git fetch --no-tags --depth=1 origin "$BEFORE" 2>/dev/null &&
+            git diff --quiet "$BEFORE" HEAD -- package.json bun.lock '*/package.json' \
+              libs/raven apps/raven/server apps/raven/web \
+              apps/raven/Dockerfile apps/raven/Dockerfile.dockerignore; then
+            echo "Nothing that goes into raven's image changed; not publishing."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 📥 Download raven's image
+        if: steps.changed.outputs.publish == 'true'
+        uses: actions/download-artifact@v8
+        with:
+          name: raven-image
+
+      - name: 🐳 Load image
+        if: steps.changed.outputs.publish == 'true'
+        run: docker load -i raven-image.tar.gz
+
+      # Vhagar pulls :latest every few minutes and restarts raven on a new one
+      # (apps/raven/vhagar-update.sh). The commit tag keeps every build to go
+      # back to.
+      - name: 📦 Publish to GHCR
+        if: steps.changed.outputs.publish == 'true'
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          echo "$TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker tag "$IMAGE" "$PUBLISHED:$GITHUB_SHA"
+          docker tag "$IMAGE" "$PUBLISHED:latest"
+          docker push "$PUBLISHED:$GITHUB_SHA"
+          docker push "$PUBLISHED:latest"

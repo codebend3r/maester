@@ -1,4 +1,5 @@
 import { resolve } from 'node:path'
+import { type HwAccel, isHwAccel } from '@/ffmpeg/encoder'
 
 /** Everything the server reads from its environment, resolved once at start. */
 export type ServerConfig = {
@@ -26,6 +27,10 @@ export type ServerConfig = {
   scanOnStart: boolean
   /** Rescan every library this often; 0 turns the timer off. */
   rescanIntervalMinutes: number
+  /** How transcodes encode: `auto` tries the GPU this machine has, `none` keeps to the CPU. */
+  hwAccel: HwAccel
+  /** The VAAPI render node, passed into the container on a NAS with a GPU. */
+  vaapiDevice: string
 }
 
 /** The DI token the config is provided under. */
@@ -51,6 +56,12 @@ const flag = ({ value, fallback }: { value: string | undefined; fallback: boolea
   return fallback
 }
 
+/** An unknown or missing HW_ACCEL means `auto`. */
+const hwAccelFrom = (value: string | undefined): HwAccel => {
+  const trimmed = value?.trim() ?? ''
+  return isHwAccel(trimmed) ? trimmed : 'auto'
+}
+
 export const readServerConfig = (env: NodeJS.ProcessEnv = process.env): ServerConfig => ({
   port: wholeNumber({ value: env.PORT, fallback: 8484 }),
   host: env.HOST?.trim() || '0.0.0.0',
@@ -68,4 +79,6 @@ export const readServerConfig = (env: NodeJS.ProcessEnv = process.env): ServerCo
   thumbnailWidth: Math.max(160, wholeNumber({ value: env.THUMBNAIL_WIDTH, fallback: 480 })),
   scanOnStart: flag({ value: env.SCAN_ON_START, fallback: true }),
   rescanIntervalMinutes: wholeNumber({ value: env.RESCAN_INTERVAL_MINUTES, fallback: 0 }),
+  hwAccel: hwAccelFrom(env.HW_ACCEL),
+  vaapiDevice: env.VAAPI_DEVICE?.trim() || '/dev/dri/renderD128',
 })

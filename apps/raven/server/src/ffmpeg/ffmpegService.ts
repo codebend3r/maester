@@ -1,8 +1,19 @@
-import { execFile } from 'node:child_process'
+import { type ChildProcessByStdio, execFile, spawn } from 'node:child_process'
+import { existsSync } from 'node:fs'
+import type { Readable } from 'node:stream'
 import { promisify } from 'node:util'
-import { Inject, Injectable } from '@nestjs/common'
-import { SERVER_CONFIG, type ServerConfig } from '@/config.js'
-import { type ProbeResult, parseProbe } from '@/ffmpeg/probe.js'
+import {
+  Inject,
+  Injectable,
+  Logger,
+  type OnApplicationBootstrap,
+  type OnModuleDestroy,
+} from '@nestjs/common'
+import { SERVER_CONFIG, type ServerConfig } from '@/config'
+import { encoderTestArgs } from '@/ffmpeg/args'
+import { SOFTWARE, type VideoEncoder, encoderCandidates } from '@/ffmpeg/encoder'
+import { type ProbeResult, parseProbe } from '@/ffmpeg/probe'
+import { type FileTracks, parseTracks } from '@/ffmpeg/tracks'
 
 const run = promisify(execFile)
 
@@ -41,28 +52,116 @@ const failureText = (error: unknown): string => {
   return error instanceof Error ? error.message : String(error)
 }
 
+/** A running ffmpeg whose output is read as it is written. */
+export type FfmpegStream = ChildProcessByStdio<null, Readable, Readable>
+
 /** Everything that shells out to ffmpeg or ffprobe goes through here. */
 @Injectable()
-export class FfmpegService {
+export class FfmpegService implements OnApplicationBootstrap, OnModuleDestroy {
+  private readonly logger = new Logger(FfmpegService.name)
   private filters: Promise<ReadonlySet<string>> | null = null
+  private encoder: Promise<VideoEncoder> | null = null
+  private readonly streams = new Set<FfmpegStream>()
 
   constructor(@Inject(SERVER_CONFIG) private readonly config: ServerConfig) {}
 
-  async probe(path: string): Promise<ProbeResult> {
+  /** ffprobe's full `-show_format -show_streams` report, parsed but unchecked. */
+  async probeJson(path: string): Promise<unknown> {
     try {
       const { stdout } = await run(
         this.config.ffprobePath,
         ['-v', 'error', '-show_format', '-show_streams', '-of', 'json', path],
         { maxBuffer: 16 * 1024 * 1024, timeout: this.config.ffmpegTimeoutSeconds * 1000 },
       )
-      const result = parseProbe(JSON.parse(stdout))
-      if (!result) throw new Error('No audio or video streams')
-      return result
+      const parsed: unknown = JSON.parse(stdout)
+      return parsed
     } catch (error) {
       if (wasKilled(error)) {
         throw new FfmpegTimeoutError({ tool: 'ffprobe', seconds: this.config.ffmpegTimeoutSeconds })
       }
       throw new Error(failureText(error), { cause: error })
+    }
+  }
+
+  async probe(path: string): Promise<ProbeResult> {
+    return (await this.probeFile(path)).probe
+  }
+
+  /** One ffprobe run, read twice: what the index keeps, and the file's tracks. */
+  async probeFile(path: string): Promise<{ probe: ProbeResult; tracks: FileTracks }> {
+    const output = await this.probeJson(path)
+    const probe = parseProbe(output)
+    if (!probe) throw new Error('No audio or video streams')
+    return { probe, tracks: parseTracks(output) }
+  }
+
+  /**
+   * Starts ffmpeg writing to stdout, with no time limit: a stream lasts as
+   * long as someone watches. The caller kills it when its reader goes
+   * away; anything still running when the server stops is killed then.
+   * A failure is logged with ffmpeg's own last line.
+   */
+  stream(args: string[]): FfmpegStream {
+    const child = spawn(this.config.ffmpegPath, args, { stdio: ['ignore', 'pipe', 'pipe'] })
+    const stderr = { tail: '' }
+    child.stderr.on('data', (chunk: Buffer) => {
+      stderr.tail = (stderr.tail + chunk.toString()).slice(-4096)
+    })
+    child.on('error', (error) => this.logger.warn(`ffmpeg did not start: ${error.message}`))
+    this.streams.add(child)
+    child.on('close', (code, signal) => {
+      this.streams.delete(child)
+      if (code !== 0 && signal == null) {
+        this.logger.warn(`ffmpeg stream failed (${code}): ${lastLine(stderr.tail)}`)
+      }
+    })
+    return child
+  }
+
+  /** Settles the encoder at start, so the log says which one transcodes will use. */
+  onApplicationBootstrap(): void {
+    void this.videoEncoder()
+  }
+
+  onModuleDestroy(): void {
+    this.streams.forEach((child) => child.kill('SIGKILL'))
+  }
+
+  /**
+   * How transcodes encode: the first GPU encoder whose test encode works,
+   * else libx264. Decided once per run, since the hardware does not change.
+   */
+  videoEncoder(): Promise<VideoEncoder> {
+    this.encoder ??= this.chooseEncoder()
+    return this.encoder
+  }
+
+  private async chooseEncoder(): Promise<VideoEncoder> {
+    const candidates = encoderCandidates({
+      hwAccel: this.config.hwAccel,
+      platform: process.platform,
+      vaapiDevice: this.config.vaapiDevice,
+      deviceExists: existsSync(this.config.vaapiDevice),
+    })
+    const working = await candidates.reduce<Promise<VideoEncoder | null>>(
+      async (found, candidate) =>
+        (await found) ?? ((await this.encodes(candidate)) ? candidate : null),
+      Promise.resolve(null),
+    )
+    const chosen = working ?? SOFTWARE
+    this.logger.log(
+      `Transcodes encode with ${chosen.kind === 'software' ? 'libx264 on the CPU' : chosen.kind}`,
+    )
+    return chosen
+  }
+
+  private async encodes(encoder: VideoEncoder): Promise<boolean> {
+    try {
+      await run(this.config.ffmpegPath, encoderTestArgs(encoder), { timeout: 30_000 })
+      return true
+    } catch (error) {
+      this.logger.warn(`${encoder.kind} cannot encode here: ${failureText(error)}`)
+      return false
     }
   }
 

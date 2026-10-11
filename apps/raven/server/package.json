@@ -4,8 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "nest build",
-    "dev": "nest start --watch",
+    "build": "bun run --sequential build:clean build:compile build:aliases",
+    "build:clean": "rm -rf dist",
+    "build:compile": "tsc -p tsconfig.build.json",
+    "build:aliases": "tsc-alias -p tsconfig.build.json",
+    "dev": "SCAN_ON_START=false tsx watch src/main.ts",
     "start": "node dist/main.js",
     "typecheck": "tsgo --noEmit",
     "lint:ts": "oxlint",
@@ -27,12 +30,13 @@
     "rxjs": "7.8.2"
   },
   "devDependencies": {
-    "@nestjs/cli": "12.0.7",
     "@types/better-sqlite3": "9.6.0",
     "@types/node": "24.19.0",
     "@typescript/native-preview": "7.0.0-dev.20260707.2",
     "oxfmt": "0.68.0",
     "oxlint": "1.83.0",
+    "tsc-alias": "1.9.7",
+    "tsx": "4.23.15",
     "typescript": "6.0.3",
     "vitest": "5.0.2"
   },
