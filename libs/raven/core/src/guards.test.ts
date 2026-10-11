@@ -9,8 +9,9 @@ import {
   isMediaItem,
   isMetadataHealth,
   isRating,
+  isShowListing,
 } from '@/guards'
-import { itemDetails, itemSummary, library, mediaItem } from '@/test/fixtures'
+import { itemDetails, itemSummary, library, mediaItem, showEntry } from '@/test/fixtures'
 
 describe('isMediaItem', () => {
   it('accepts an item that carries its favourite flag', () => {
@@ -139,6 +140,14 @@ describe('the metadata guards', () => {
       isCredit({ personId: 1, name: 'X', job: 'gaffer', role: null, photoVersion: null }),
     ).toBe(false)
     expect(isRating({ source: 'imdb', kind: 'audience', value: 7.5, votes: null })).toBe(true)
+  })
+
+  it('accepts a show listing and refuses one whose next episode is malformed', () => {
+    expect(isShowListing({ shows: [showEntry()], unmatched: [mediaItem()] })).toBe(true)
+    expect(isShowListing({ shows: [showEntry({ next: null })], unmatched: [] })).toBe(true)
+    expect(isShowListing({ shows: [{ ...showEntry(), next: { id: 1 } }], unmatched: [] })).toBe(
+      false,
+    )
   })
 
   it('accepts match candidates and the metadata health', () => {

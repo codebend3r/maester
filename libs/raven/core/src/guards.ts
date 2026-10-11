@@ -23,6 +23,8 @@ import type {
   Rating,
   RatingSource,
   ScanStatus,
+  ShowEntry,
+  ShowListing,
   SubtitleTrack,
   ThumbnailState,
 } from '@/types'
@@ -238,6 +240,17 @@ export const isMediaItem = (value: unknown): value is MediaItem =>
   isNumber(value.versions)
 
 export const isMediaList = arrayOf(isMediaItem)
+
+export const isShowEntry = (value: unknown): value is ShowEntry =>
+  isRecord(value) &&
+  isItemSummary(value.show) &&
+  isNumber(value.episodes) &&
+  isNullableNumber(value.endedYear) &&
+  isString(value.addedAt) &&
+  (value.next === null || isMediaItem(value.next))
+
+export const isShowListing = (value: unknown): value is ShowListing =>
+  isRecord(value) && arrayOf(isShowEntry)(value.shows) && isMediaList(value.unmatched)
 
 export const isItemDetails = (value: unknown): value is ItemDetails =>
   isRecord(value) &&

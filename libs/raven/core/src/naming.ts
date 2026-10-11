@@ -177,3 +177,95 @@ export const foldTitle = (title: string): string =>
 
 /** A title as it sorts: without a leading "The", "A" or "An". */
 export const sortTitle = (title: string): string => title.trim().replace(LEADING_ARTICLE, '')
+
+export type ParsedEpisodeName = {
+  show: string
+  /** The show's year, from its folder or the name: "Severance (2022)". */
+  year: number | null
+  season: number | null
+  /** One number, or two for a file holding two episodes; none when the name has no code. */
+  episodes: number[]
+  /** The episode's own title when the name carries one: "Half Loop". */
+  title: string | null
+  ids: NameIds
+  /** An anime absolute number, `(0123)`, read but not matched on yet. */
+  absolute: number | null
+  /** An air date in the name, `2026.10.09`, read but not matched on yet. */
+  airDate: string | null
+}
+
+/** The number a season folder names: `Season 1`, `Season 01`, or 0 for `Specials`; null for any other folder. */
+export const seasonFolderNumber = (name: string): number | null => {
+  const trimmed = name.trim()
+  if (/^specials$/i.test(trimmed)) return 0
+  const match = /^(?:season|series|staffel|saison)\s*(\d{1,3})$/i.exec(trimmed)
+  return match ? Number(match[1]) : null
+}
+
+/** `S01E02`, `S1E2`, `S01E123`, `S01E01-E02`, `S01E01E02`, and `1x02`. */
+const EPISODE_CODE =
+  /(?<![A-Za-z0-9])(?:S(\d{1,2})[ ._-]?E(\d{1,3})(?:(?:[ ._-]?E|-E?|E)(\d{1,3}))?|(?<!\d)(\d{1,2})x(\d{2,3}))(?![A-Za-z0-9])/i
+
+const ABSOLUTE = /\((\d{3,4})\)/
+const AIR_DATE = /(?<!\d)((?:19|20)\d{2})[.-](\d{2})[.-](\d{2})(?!\d)/
+
+/** One episode number, or the run from `first` to `second` when they read as a range. */
+const episodeRun = ({ first, second }: { first: number; second: number | null }): number[] => {
+  if (second == null) return [first]
+  if (second > first && second - first < 50) {
+    return Array.from({ length: second - first + 1 }, (_, index) => first + index)
+  }
+  return second === first ? [first] : [first, second]
+}
+
+/**
+ * What an episode's name says: the show (its folder first, then the file
+ * name, then `fallbackShow`, the library folder's own name), the season
+ * and episode numbers, and the episode's title when there is one.
+ */
+export const parseEpisodeName = ({
+  fileName,
+  folder,
+  fallbackShow = '',
+}: {
+  fileName: string
+  folder: string
+  fallbackShow?: string
+}): ParsedEpisodeName => {
+  const stem = stripTags(stemOf(fileName))
+  const ids = mergeIds(readIds(fileName), readIds(folder))
+  const segments = folder.split(/[\\/]/).filter((segment) => segment !== '')
+  const showFolder = segments[0] ?? ''
+  const seasonFolder = segments.map(seasonFolderNumber).findLast((number) => number != null) ?? null
+
+  const code = EPISODE_CODE.exec(stem)
+  const before = code ? stem.slice(0, code.index) : stem
+  const after = code ? stem.slice(code.index + code[0].length) : ''
+  const absolute = ABSOLUTE.exec(before)
+  const airDate = AIR_DATE.exec(stem)
+
+  const fromFile = readName(before.replace(ABSOLUTE, ' ').replace(AIR_DATE, ' '))
+  const fromFolder =
+    showFolder !== '' && seasonFolderNumber(showFolder) == null ? readName(showFolder) : null
+  const show = fromFolder?.title || fromFile.title || fallbackShow
+
+  const season = code ? Number(code[1] ?? code[4]) : seasonFolder
+  const episodes = code
+    ? episodeRun({
+        first: Number(code[2] ?? code[5]),
+        second: code[3] == null ? null : Number(code[3]),
+      })
+    : []
+  const title = code ? tidy(after.slice(0, firstTagAt(after))) || null : null
+
+  return {
+    show,
+    year: fromFolder?.year ?? fromFile.year,
+    season,
+    episodes,
+    title,
+    ids,
+    absolute: absolute ? Number(absolute[1]) : null,
+    airDate: airDate ? `${airDate[1]}-${airDate[2]}-${airDate[3]}` : null,
+  }
+}
