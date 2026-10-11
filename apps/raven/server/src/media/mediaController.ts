@@ -1,7 +1,6 @@
 import { createReadStream } from 'node:fs'
 import { stat, unlink } from 'node:fs/promises'
 import {
-  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -23,16 +22,20 @@ import {
   type MediaItem,
   type MediaLocation,
   containerMimeType,
-  isNumber,
+  isFavouriteChange,
+  isProgressChange,
   isRecord,
   isString,
 } from '@raven/core'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { errorMessage } from '@/errorMessage'
 import { PrivateBy } from '@/lock/lockGuard'
-import { type MediaRecord, MediaRepository, toMediaItem } from '@/media/mediaRepository'
+import { MediaArtifacts } from '@/media/mediaArtifacts'
+import { type MediaFile, MediaIndex } from '@/media/mediaIndex'
+import { MediaRepository } from '@/media/mediaRepository'
 import { parseRange } from '@/media/range'
-import { SubtitlesService } from '@/playback/subtitlesService'
+import { ViewingRepository } from '@/media/viewingRepository'
+import { parseBody } from '@/parseBody'
 import { ScannerService } from '@/scanner/scannerService'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
 
@@ -59,104 +62,109 @@ const deleteFailure = (error: unknown): string => {
 }
 
 @Controller('api/media')
+@PrivateBy('media')
 export class MediaController {
   private readonly logger = new Logger(MediaController.name)
 
   constructor(
     @Inject(MediaRepository) private readonly media: MediaRepository,
+    @Inject(ViewingRepository) private readonly viewing: ViewingRepository,
+    @Inject(MediaIndex) private readonly index: MediaIndex,
+    @Inject(MediaArtifacts) private readonly artifacts: MediaArtifacts,
     @Inject(ThumbnailService) private readonly thumbnails: ThumbnailService,
     @Inject(ScannerService) private readonly scanner: ScannerService,
-    @Inject(SubtitlesService) private readonly subtitles: SubtitlesService,
   ) {}
 
-  private find(id: number): MediaRecord {
-    const record = this.media.get(id)
-    if (!record) throw new NotFoundException(`No media ${id}`)
-    return record
+  private find(id: number): MediaItem {
+    const item = this.media.get(id)
+    if (!item) throw new NotFoundException(`No media ${id}`)
+    return item
   }
 
-  @PrivateBy('media')
+  private fileOf(id: number): MediaFile {
+    const file = this.index.fileOf(id)
+    if (!file) throw new NotFoundException(`No media ${id}`)
+    return file
+  }
+
   @Get(':id')
   get(@Param('id', ParseIntPipe) id: number): MediaItem {
-    return toMediaItem(this.find(id))
+    return this.find(id)
   }
 
   /** Where the file lives, for the card's menu: the one call that hands a client a path. */
-  @PrivateBy('media')
   @Get(':id/location')
   location(@Param('id', ParseIntPipe) id: number): MediaLocation {
-    return { path: this.find(id).path }
+    return { path: this.fileOf(id).path }
   }
 
-  @PrivateBy('media')
   @Put(':id/progress')
   @HttpCode(204)
   saveProgress(@Param('id', ParseIntPipe) id: number, @Body() body: unknown): void {
-    this.find(id)
-    if (!isRecord(body) || !isNumber(body.position) || body.position < 0) {
-      throw new BadRequestException('position must be a number of seconds')
+    const { position } = parseBody({
+      guard: isProgressChange,
+      body,
+      message: 'position must be a number of seconds',
+    })
+    if (!this.viewing.report({ id, position })) {
+      throw new NotFoundException(`No media ${id}`)
     }
-    this.media.notePlayedTo({ id, position: body.position })
-    this.media.saveProgress({ id, position: body.position })
   }
 
   /** The player says a video started, for its library's history. */
-  @PrivateBy('media')
   @Post(':id/plays')
   @HttpCode(204)
   recordPlay(@Param('id', ParseIntPipe) id: number): void {
-    this.find(id)
-    this.media.recordPlay({ id })
+    if (!this.viewing.recordPlay({ id })) throw new NotFoundException(`No media ${id}`)
   }
 
-  @PrivateBy('media')
   @Put(':id/favourite')
   setFavourite(@Param('id', ParseIntPipe) id: number, @Body() body: unknown): MediaItem {
-    this.find(id)
-    if (!isRecord(body) || typeof body.favourite !== 'boolean') {
-      throw new BadRequestException('favourite must be true or false')
+    const { favourite } = parseBody({
+      guard: isFavouriteChange,
+      body,
+      message: 'favourite must be true or false',
+    })
+    if (!this.viewing.setFavourite({ id, favourite })) {
+      throw new NotFoundException(`No media ${id}`)
     }
-    this.media.setFavourite({ id, favourite: body.favourite })
-    return toMediaItem(this.find(id))
+    return this.find(id)
   }
 
   /**
    * Deletes the file itself, then the index row (progress and favourite go
-   * with it) and the cached thumbnail. Waits for a running scan first so the
-   * two never race over the same row. A file that is already gone still
-   * loses its row; any other failure, such as a read-only mount, keeps the
-   * row and says why.
+   * with it), then what was kept of it: thumbnail, subtitles, tracks. Waits
+   * for a running scan first so the two never race over the same row. A
+   * file that is already gone still loses its row; any other failure, such
+   * as a read-only mount, keeps the row and says why.
    */
-  @PrivateBy('media')
   @Delete(':id')
   @HttpCode(204)
   async remove(@Param('id', ParseIntPipe) id: number): Promise<void> {
-    const record = this.find(id)
-    await this.scanner.whenIdle(record.libraryId)
+    const file = this.fileOf(id)
+    await this.scanner.whenIdle(file.libraryId)
     try {
-      await unlink(record.path)
+      await unlink(file.path)
     } catch (error) {
       if (errorCode(error) !== 'ENOENT') {
-        this.logger.warn(`Could not delete ${record.path}: ${errorMessage(error)}`)
+        this.logger.warn(`Could not delete ${file.path}: ${errorMessage(error)}`)
         throw new InternalServerErrorException(deleteFailure(error))
       }
     }
-    await this.thumbnails.discard([id])
-    await this.subtitles.discard([id])
-    this.media.removeMany([id])
+    this.index.remove([id])
+    await this.artifacts.discard([id])
   }
 
   /** Versioned URLs (`?v=`) change whenever the file does, so they can be cached for good. */
-  @PrivateBy('media')
   @Get(':id/thumbnail')
   async thumbnail(
     @Param('id', ParseIntPipe) id: number,
     @Query('v') version: string | undefined,
     @Res() reply: FastifyReply,
   ): Promise<void> {
-    const record = this.find(id)
+    const file = this.fileOf(id)
     const path = this.thumbnails.pathFor(id)
-    const info = record.thumbnail === 'ready' ? await stat(path).catch(() => null) : null
+    const info = file.thumbnail === 'ready' ? await stat(path).catch(() => null) : null
     if (!info) throw new NotFoundException('No thumbnail yet')
     await reply
       .header('content-type', 'image/jpeg')
@@ -174,22 +182,21 @@ export class MediaController {
    * range request, so the server does nothing but read. Files the client
    * cannot decode as they are go through `PlaybackController`'s stream.
    */
-  @PrivateBy('media')
   @Get(':id/file')
   async file(
     @Param('id', ParseIntPipe) id: number,
     @Req() request: FastifyRequest,
     @Res() reply: FastifyReply,
   ): Promise<void> {
-    const record = this.find(id)
-    const info = await stat(record.path).catch(() => null)
+    const file = this.fileOf(id)
+    const info = await stat(file.path).catch(() => null)
     if (!info?.isFile()) throw new NotFoundException('The file is no longer on disk')
 
     const size = info.size
     const range = parseRange({ header: request.headers.range, size })
     reply
       .header('accept-ranges', 'bytes')
-      .header('content-type', containerMimeType(record.container) ?? 'application/octet-stream')
+      .header('content-type', containerMimeType(file.container) ?? 'application/octet-stream')
       .header('cache-control', 'private, max-age=0, must-revalidate')
 
     if (range === 'unsatisfiable') {
@@ -197,13 +204,13 @@ export class MediaController {
       return
     }
     if (range == null) {
-      await reply.header('content-length', size).send(readFile({ path: record.path }))
+      await reply.header('content-length', size).send(readFile({ path: file.path }))
       return
     }
     await reply
       .code(206)
       .header('content-range', `bytes ${range.start}-${range.end}/${size}`)
       .header('content-length', range.end - range.start + 1)
-      .send(readFile({ path: record.path, start: range.start, end: range.end }))
+      .send(readFile({ path: file.path, start: range.start, end: range.end }))
   }
 }

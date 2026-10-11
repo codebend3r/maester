@@ -1,14 +1,12 @@
-import { mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import type { MediaSort } from '@raven/core'
+import type { ItemType, MediaSort } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { readServerConfig } from '@/config'
-import { DatabaseService } from '@/db/database'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { MediaIndex } from '@/media/mediaIndex'
 import { MediaRepository } from '@/media/mediaRepository'
+import { ViewingRepository } from '@/media/viewingRepository'
 import { MetadataRepository } from '@/metadata/metadataRepository'
+import type { FetchedItem } from '@/metadata/tmdbClient'
+import { testDatabase } from '@/test/database'
 
 type Seed = {
   name: string
@@ -39,60 +37,48 @@ const VIDEOS: readonly Seed[] = [
   },
 ]
 
+const PROBE = {
+  duration: 60,
+  width: 1920,
+  height: 1080,
+  videoCodec: 'h264',
+  videoBitDepth: 8,
+  hdr: false,
+  audioCodec: 'aac',
+  audioChannels: 2,
+  bitrate: 5_000_000,
+}
+
+const TRACKS = { audio: [], subtitles: [], defaultAudio: null, frameRate: 24 }
+
 describe('listing a library', () => {
-  const state = {
-    dir: '',
-    libraryId: 0,
-    database: null as DatabaseService | null,
-    media: null as MediaRepository | null,
-  }
-  const media = (): MediaRepository => {
-    if (!state.media) throw new Error('not set up')
-    return state.media
-  }
-  const index = (): MediaIndex => {
-    if (!state.database) throw new Error('not set up')
-    return new MediaIndex(state.database)
-  }
+  const database = testDatabase('raven-sort-')
+  const state = { libraryId: 0 }
+  const media = () => new MediaRepository(database.get(), new MetadataRepository(database.get()))
   const titles = ({ sort, seed }: { sort: MediaSort; seed?: number }): string[] =>
     media()
       .list({ libraryId: state.libraryId, sort, seed })
       .map((item) => item.title)
 
   beforeAll(async () => {
-    state.dir = await mkdtemp(join(tmpdir(), 'raven-sort-'))
-    const database = new DatabaseService({ ...readServerConfig({}), dataDir: state.dir })
-    state.database = database
-    state.media = new MediaRepository(database, new MetadataRepository(database))
-    state.libraryId = new LibrariesRepository(database).create({ name: 'Test', paths: ['/m'] }).id
+    await database.open()
+    const index = new MediaIndex(database.get())
+    state.libraryId = new LibrariesRepository(database.get()).create({
+      name: 'Test',
+      paths: ['/m'],
+    }).id
     VIDEOS.forEach((video) => {
-      const id = index().insert({
+      const id = index.insert({
         libraryId: state.libraryId,
         kind: 'other',
         file: { path: `/m/${video.name}.mp4`, root: '/m', size: video.size, mtimeMs: 1 },
       })
-      database.db.prepare('UPDATE media SET added_at = ? WHERE id = ?').run(video.addedAt, id)
-      if (video.probe) {
-        media().saveProbe({
-          id,
-          probe: {
-            ...video.probe,
-            duration: 60,
-            videoCodec: 'h264',
-            videoBitDepth: 8,
-            hdr: false,
-            audioCodec: 'aac',
-            audioChannels: 2,
-          },
-        })
-      }
+      database.get().db.prepare('UPDATE media SET added_at = ? WHERE id = ?').run(video.addedAt, id)
+      if (video.probe) index.saveProbe({ id, probe: { ...PROBE, ...video.probe }, tracks: TRACKS })
     })
   })
 
-  afterAll(async () => {
-    state.database?.onModuleDestroy()
-    await rm(state.dir, { recursive: true, force: true })
-  })
+  afterAll(database.close)
 
   it.each<[MediaSort, string[]]>([
     ['title', ['Alpha', 'Bravo', 'Charlie', 'Delta']],
@@ -118,235 +104,153 @@ describe('listing a library', () => {
     const orders = [1, 2, 3, 4, 5, 6].map((seed) => titles({ sort: 'random', seed }).join())
     expect(new Set(orders).size).toBeGreaterThan(1)
   })
-})
 
-describe('stored tracks', () => {
-  const state = {
-    dir: '',
-    libraryId: 0,
-    database: null as DatabaseService | null,
-    media: null as MediaRepository | null,
-  }
-  const media = (): MediaRepository => {
-    if (!state.media) throw new Error('not set up')
-    return state.media
-  }
-  const index = (): MediaIndex => {
-    if (!state.database) throw new Error('not set up')
-    return new MediaIndex(state.database)
-  }
-  const TRACKS = {
-    audio: [{ index: 0, codec: 'aac', language: 'eng', title: null, channels: 2, default: true }],
-    subtitles: [],
-    defaultAudio: 0,
-    frameRate: 24,
-  }
-  const PROBE = {
-    duration: 60,
-    width: 1920,
-    height: 1080,
-    videoCodec: 'h264',
-    videoBitDepth: 8,
-    hdr: false,
-    audioCodec: 'aac',
-    audioChannels: 2,
-    bitrate: 5_000_000,
-  }
-  const add = (name: string): number =>
-    index().insert({
-      libraryId: state.libraryId,
-      kind: 'other',
-      file: { path: `/m/${name}.mp4`, root: '/m', size: 100, mtimeMs: 1 },
-    })
-
-  beforeAll(async () => {
-    state.dir = await mkdtemp(join(tmpdir(), 'raven-tracks-'))
-    const database = new DatabaseService({ ...readServerConfig({}), dataDir: state.dir })
-    state.database = database
-    state.media = new MediaRepository(database, new MetadataRepository(database))
-    state.libraryId = new LibrariesRepository(database).create({ name: 'Test', paths: ['/m'] }).id
+  it('reads several videos at once, in the order asked, leaving out ones that are gone', () => {
+    const [alpha, bravo] = media().list({ libraryId: state.libraryId, sort: 'title' })
+    const ids = [bravo?.id ?? -1, 999_999, alpha?.id ?? -1]
+    expect(
+      media()
+        .getMany(ids)
+        .map((item) => item.title),
+    ).toEqual(['Bravo', 'Alpha'])
+    expect(media().get(999_999)).toBeNull()
   })
 
-  afterAll(async () => {
-    state.database?.onModuleDestroy()
-    await rm(state.dir, { recursive: true, force: true })
-  })
-
-  it('keeps the tracks a probe found, and forgets them when the file changes', () => {
-    const id = add('kept')
-    media().saveProbe({ id, probe: PROBE, tracks: TRACKS })
-    expect(media().storedTracks(id)).toEqual(TRACKS)
-    index().markChanged({ id, size: 200, mtimeMs: 2 })
-    expect(media().storedTracks(id)).toBeNull()
-  })
-
-  it('lists probed videos that have no tracks yet, and only those', () => {
-    const withTracks = add('with')
-    media().saveProbe({ id: withTracks, probe: PROBE, tracks: TRACKS })
-    const without = add('without')
-    media().saveProbe({ id: without, probe: PROBE })
-    add('unprobed')
-    const failed = add('failed')
-    media().saveProbeError({ id: failed, error: 'No audio or video streams' })
-    expect(media().idsMissingTracks(state.libraryId)).toEqual([without])
+  it('never hands back a path', () => {
+    expect(
+      media()
+        .list({ libraryId: state.libraryId })
+        .every((item) => !('path' in item)),
+    ).toBe(true)
   })
 })
 
-describe('play history', () => {
-  const state = {
-    dir: '',
-    database: null as DatabaseService | null,
-    media: null as MediaRepository | null,
-  }
-  const media = (): MediaRepository => {
-    if (!state.media) throw new Error('not set up')
-    return state.media
-  }
-  const index = (): MediaIndex => {
-    if (!state.database) throw new Error('not set up')
-    return new MediaIndex(state.database)
-  }
-  const libraries = (): LibrariesRepository => {
-    if (!state.database) throw new Error('not set up')
-    return new LibrariesRepository(state.database)
-  }
-  const createLibrary = (name: string): number =>
-    libraries().create({ name, paths: [`/${name}`] }).id
-  /** A one-minute video, so seconds read straight across as sixtieths. */
-  const addMinute = ({ libraryId, name }: { libraryId: number; name: string }): number => {
-    const id = add({ libraryId, name })
-    media().saveProbe({
-      id,
-      probe: {
-        duration: 60,
-        width: 1920,
-        height: 1080,
-        videoCodec: 'h264',
-        videoBitDepth: 8,
-        hdr: false,
-        audioCodec: 'aac',
-        audioChannels: 2,
-        bitrate: 5_000_000,
-      },
+const fetched = ({
+  type,
+  tmdbId,
+  title,
+  number = null,
+}: {
+  type: ItemType
+  tmdbId: string
+  title: string
+  number?: number | null
+}): FetchedItem => ({
+  type,
+  tmdbId,
+  number,
+  title,
+  originalTitle: null,
+  year: null,
+  released: null,
+  ended: null,
+  summary: null,
+  tagline: null,
+  contentRating: null,
+  runtime: null,
+  studio: null,
+  genres: [],
+  imdbId: null,
+  tvdbId: null,
+  images: { poster: null, backdrop: null, still: null },
+  credits: [],
+  rating: null,
+  reviews: [],
+})
+
+describe("listing a TV library's shows", () => {
+  const database = testDatabase('raven-shows-')
+  const state = { libraryId: 0, aired: 0, special: 0, ids: new Map<string, number>() }
+  const media = () => new MediaRepository(database.get(), new MetadataRepository(database.get()))
+  const fileName = (id: number | undefined): string =>
+    id == null ? 'none' : (media().get(id)?.fileName ?? 'gone')
+
+  /** A show with an episode file for each `[season, episode]`. */
+  const addShow = ({
+    title,
+    episodes,
+  }: {
+    title: string
+    episodes: ReadonlyArray<[number, number]>
+  }): number => {
+    const metadata = new MetadataRepository(database.get())
+    const index = new MediaIndex(database.get())
+    const showId = metadata.save({ item: fetched({ type: 'show', tmdbId: title, title }) })
+    episodes.forEach(([season, episode]) => {
+      const seasonId = metadata.save({
+        item: fetched({ type: 'season', tmdbId: `${title}-${season}`, title, number: season }),
+        parentId: showId,
+      })
+      const episodeId = metadata.save({
+        item: fetched({
+          type: 'episode',
+          tmdbId: `${title}-${season}-${episode}`,
+          title: `Episode ${episode}`,
+          number: episode,
+        }),
+        parentId: seasonId,
+      })
+      const name = `${title} - S0${season}E0${episode}.mkv`
+      const id = index.insert({
+        libraryId: state.libraryId,
+        kind: 'shows',
+        file: { path: `/tv/${name}`, root: '/tv', size: 100, mtimeMs: 1 },
+      })
+      index.saveProbe({ id, probe: PROBE, tracks: TRACKS })
+      metadata.link({ mediaIds: [id], itemIds: [episodeId] })
+      state.ids.set(name, id)
     })
-    return id
+    return showId
   }
-  const watchedIds = (libraryId: number): number[] =>
-    media()
-      .history({ libraryId, limit: 100, watchedOnly: true })
-      .map((entry) => entry.record.id)
-  const add = ({ libraryId, name }: { libraryId: number; name: string }): number =>
-    index().insert({
-      libraryId,
-      kind: 'other',
-      file: { path: `/${libraryId}/${name}.mp4`, root: `/${libraryId}`, size: 100, mtimeMs: 1 },
-    })
-  /** A time on 10 October 2026, this many minutes after 7pm UTC. */
-  const at = (minutes: number): Date => new Date(Date.UTC(2026, 9, 10, 19, minutes))
-  const history = ({ libraryId, limit = 100 }: { libraryId: number; limit?: number }) =>
-    media()
-      .history({ libraryId, limit })
-      .map((entry) => ({
-        id: entry.record.id,
-        lastPlayedAt: entry.lastPlayedAt,
-        plays: entry.plays,
-      }))
 
   beforeAll(async () => {
-    state.dir = await mkdtemp(join(tmpdir(), 'raven-history-'))
-    const database = new DatabaseService({ ...readServerConfig({}), dataDir: state.dir })
-    state.database = database
-    state.media = new MediaRepository(database, new MetadataRepository(database))
+    await database.open()
+    state.libraryId = new LibrariesRepository(database.get()).create({
+      name: 'TV',
+      paths: ['/tv'],
+      settings: { kind: 'shows' },
+    }).id
+    state.aired = addShow({
+      title: 'Aired',
+      episodes: [
+        [1, 1],
+        [1, 2],
+      ],
+    })
+    state.special = addShow({
+      title: 'Special',
+      episodes: [
+        [0, 1],
+        [1, 1],
+      ],
+    })
+    const viewing = new ViewingRepository(database.get(), media())
+    viewing.report({ id: state.ids.get('Aired - S01E01.mkv') ?? -1, position: 60 })
   })
 
-  afterAll(async () => {
-    state.database?.onModuleDestroy()
-    await rm(state.dir, { recursive: true, force: true })
-  })
+  afterAll(database.close)
 
-  it('counts a video started again within half an hour as the same play', () => {
-    const libraryId = createLibrary('sitting')
-    const id = add({ libraryId, name: 'film' })
-    media().recordPlay({ id, at: at(0) })
-    media().recordPlay({ id, at: at(25) })
-    expect(history({ libraryId })).toEqual([{ id, lastPlayedAt: at(25).toISOString(), plays: 1 }])
-    media().recordPlay({ id, at: at(56) })
-    expect(history({ libraryId })).toEqual([{ id, lastPlayedAt: at(56).toISOString(), plays: 2 }])
-  })
-
-  it('lists each played video once, by when it last played', () => {
-    const libraryId = createLibrary('order')
-    const first = add({ libraryId, name: 'first' })
-    const second = add({ libraryId, name: 'second' })
-    add({ libraryId, name: 'never' })
-    media().recordPlay({ id: first, at: at(0) })
-    media().recordPlay({ id: second, at: at(10) })
-    media().recordPlay({ id: first, at: at(100) })
-    expect(history({ libraryId })).toEqual([
-      { id: first, lastPlayedAt: at(100).toISOString(), plays: 2 },
-      { id: second, lastPlayedAt: at(10).toISOString(), plays: 1 },
+  it('gives each show its own first episode not yet watched, specials last, in one go', () => {
+    const shows = media().listShows({ libraryId: state.libraryId })
+    expect(shows.map((entry) => [entry.show.title, entry.episodes, entry.next?.fileName])).toEqual([
+      ['Aired', 2, 'Aired - S01E02.mkv'],
+      ['Special', 2, 'Special - S01E01.mkv'],
     ])
   })
 
-  it('keeps to its own library and to the limit', () => {
-    const libraryId = createLibrary('mine')
-    const otherId = createLibrary('theirs')
-    const older = add({ libraryId, name: 'older' })
-    const newer = add({ libraryId, name: 'newer' })
-    media().recordPlay({ id: older, at: at(0) })
-    media().recordPlay({ id: newer, at: at(5) })
-    media().recordPlay({ id: add({ libraryId: otherId, name: 'elsewhere' }), at: at(9) })
-    expect(history({ libraryId }).map((entry) => entry.id)).toEqual([newer, older])
-    expect(history({ libraryId, limit: 1 }).map((entry) => entry.id)).toEqual([newer])
+  it("answers a show's next episode on its own too", () => {
+    expect(fileName(media().nextEpisode(state.aired)?.id)).toBe('Aired - S01E02.mkv')
+    expect(fileName(media().nextEpisode(state.special)?.id)).toBe('Special - S01E01.mkv')
   })
 
-  it("counts a video as watched once a play gets past its library's percentage", () => {
-    const libraryId = createLibrary('threshold')
-    const id = addMinute({ libraryId, name: 'minute' })
-    const entry = () => media().history({ libraryId, limit: 100 })[0]
-    media().recordPlay({ id, at: at(0) })
-    media().notePlayedTo({ id, position: 50, at: at(1) })
-    expect(entry()).toMatchObject({ furthest: 50, watched: false })
-    media().notePlayedTo({ id, position: 20, at: at(2) })
-    expect(entry()).toMatchObject({ furthest: 50, watched: false })
-    media().notePlayedTo({ id, position: 55, at: at(3) })
-    expect(entry()).toMatchObject({ furthest: 55, watched: true, plays: 1 })
-  })
-
-  it('moves the bar when the library changes its percentage', () => {
-    const libraryId = createLibrary('lenient')
-    const id = addMinute({ libraryId, name: 'minute' })
-    media().notePlayedTo({ id, position: 30, at: at(0) })
-    expect(watchedIds(libraryId)).toEqual([])
-    libraries().update({
-      id: libraryId,
-      input: { name: 'lenient', paths: ['/lenient'], settings: { watchedPercent: 50 } },
-    })
-    expect(watchedIds(libraryId)).toEqual([id])
-  })
-
-  it('lists only the watched videos when asked', () => {
-    const libraryId = createLibrary('filtered')
-    const finished = addMinute({ libraryId, name: 'finished' })
-    const started = addMinute({ libraryId, name: 'started' })
-    media().notePlayedTo({ id: finished, position: 60, at: at(0) })
-    media().notePlayedTo({ id: started, position: 10, at: at(5) })
-    expect(history({ libraryId }).map((entry) => entry.id)).toEqual([started, finished])
-    expect(watchedIds(libraryId)).toEqual([finished])
-  })
-
-  it('never counts a video it cannot measure as watched', () => {
-    const libraryId = createLibrary('unprobed')
-    const id = add({ libraryId, name: 'unknown length' })
-    media().notePlayedTo({ id, position: 5000, at: at(0) })
-    expect(media().history({ libraryId, limit: 100 })[0]).toMatchObject({ watched: false })
-  })
-
-  it('forgets the plays of a video that leaves the library', () => {
-    const libraryId = createLibrary('gone')
-    const id = add({ libraryId, name: 'deleted' })
-    media().recordPlay({ id, at: at(0) })
-    media().removeMany([id])
-    expect(history({ libraryId })).toEqual([])
+  it('has none once every episode is watched', () => {
+    const viewing = new ViewingRepository(database.get(), media())
+    viewing.report({ id: state.ids.get('Aired - S01E02.mkv') ?? -1, position: 60 })
+    expect(media().nextEpisode(state.aired)).toBeNull()
+    expect(
+      media()
+        .listShows({ libraryId: state.libraryId })
+        .find((entry) => entry.show.id === state.aired)?.next,
+    ).toBeNull()
   })
 })
