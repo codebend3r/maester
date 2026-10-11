@@ -7,15 +7,16 @@ import {
   type OnModuleDestroy,
 } from '@nestjs/common'
 import {
+  foldTitle,
+  isExtra,
   type LibraryKind,
   type MatchState,
   type MetadataHealth,
   type NameIds,
-  foldTitle,
-  isExtra,
   parseEpisodeName,
   parseMovieName,
   seasonFolderNumber,
+  sortTitle,
 } from '@raven/core'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { MediaRepository, type PendingFile } from '@/media/mediaRepository'
@@ -31,7 +32,7 @@ import { pickMatch } from '@/metadata/matcher'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 import { readNfoIds } from '@/metadata/nfo'
 import { OmdbClient } from '@/metadata/omdbClient'
-import { type FetchedItem, TmdbClient, TmdbError } from '@/metadata/tmdbClient'
+import { type FetchedItem, type SearchResult, TmdbClient, TmdbError } from '@/metadata/tmdbClient'
 import { createTaskQueue, mapWithConcurrency } from '@/scanner/concurrency'
 
 /** The library types whose files get matched. */
@@ -202,6 +203,7 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
    * library gets a pass for what is pending, and the sweep starts.
    */
   onApplicationBootstrap(): void {
+    this.metadata.resortTitles()
     this.libraries
       .list()
       .filter((library) => MATCHED_KINDS.includes(library.settings.kind))
@@ -222,6 +224,22 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
   /** Queues a pass over the library: its pending files, then the clear-up. */
   enqueue(libraryId: number): void {
     this.queue.push(`library:${libraryId}`, () => this.pass(libraryId))
+  }
+
+  /**
+   * Searches TMDB again for a library's files no movie or show was found
+   * for, say after a rename or once TMDB lists a new show; Fix match choices
+   * stay. How many files are queued.
+   */
+  retryUnmatched(libraryId: number): number {
+    const kind = this.libraries.get(libraryId)?.settings.kind
+    const count = this.media.retryUnmatched(libraryId)
+    if (count === 0 || kind == null) return count
+    // Names are read again first, so a parser that now reads the name right gets its say.
+    this.media.retitle({ libraryId, kind })
+    // A pass already running has tried these files, so another follows it.
+    this.queue.again(`library:${libraryId}`, () => this.pass(libraryId))
+    return count
   }
 
   /**
@@ -399,22 +417,29 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
     type,
     title,
     year,
+    country = null,
     context,
   }: {
     type: 'movie' | 'show'
     title: string
     year: number | null
+    country?: string | null
     context: PassContext
   }): Promise<string | null> {
     return remember({
       cache: context.searches,
-      key: `${type}|${foldTitle(title)}|${year ?? ''}`,
+      key: `${type}|${foldTitle(title)}|${year ?? ''}|${country ?? ''}`,
       make: async () => {
-        const results =
+        const ask = (query: string): Promise<SearchResult[]> =>
           type === 'movie'
-            ? await this.tmdb.searchMovies({ query: title, year })
-            : await this.tmdb.searchShows({ query: title, year })
-        return pickMatch({ title, year, results })?.tmdbId ?? null
+            ? this.tmdb.searchMovies({ query, year })
+            : this.tmdb.searchShows({ query, year })
+        const results = await ask(title)
+        // TMDB finds nothing for "The Few Good Men"; without the article it
+        // offers "A Few Good Men", which folds to the same title.
+        const bare = sortTitle(title)
+        const retried = results.length === 0 && bare !== title ? await ask(bare) : results
+        return pickMatch({ type, title, year, country, results: retried })?.tmdbId ?? null
       },
     })
   }
@@ -542,10 +567,26 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
       const nfoIds = await this.nfoIds({ path: join(showDir, assets.nfo), context })
       return nfoIds ? this.idFromIds({ ids: nfoIds, type: 'show' }) : null
     }
-    const tmdbId =
-      override ??
-      (await fromNames()) ??
-      (await this.search({ type: 'show', title: parsed.show, year: parsed.year, context }))
+    // The folder names the show first; when that finds nothing, the file's
+    // own name is tried, as a folder is misspelt more often than every file.
+    const bySearch = async (): Promise<string | null> =>
+      (await this.search({
+        type: 'show',
+        title: parsed.show,
+        year: parsed.year,
+        country: parsed.country,
+        context,
+      })) ??
+      (parsed.showFromFile == null
+        ? null
+        : await this.search({
+            type: 'show',
+            title: parsed.showFromFile,
+            year: parsed.year,
+            country: parsed.country,
+            context,
+          }))
+    const tmdbId = override ?? (await fromNames()) ?? (await bySearch())
     const showId = tmdbId == null ? null : await this.ensure({ type: 'show', tmdbId, context })
     if (tmdbId == null || showId == null) {
       this.settle({ mediaIds, itemIds: [], match: 'unmatched' })

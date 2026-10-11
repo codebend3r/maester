@@ -158,6 +158,18 @@ export const LibraryPage = () => {
     },
   })
 
+  // Match again sends the files no movie or show was found for back to TMDB;
+  // the listing then polls while any of them is pending.
+  const rematch = useMutation({
+    mutationFn: () => api.matchLibrary(libraryId),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(queryKeys.library(libraryId), updated)
+      return queryClient.invalidateQueries({
+        queryKey: tv ? queryKeys.showLists(libraryId) : queryKeys.mediaLists(libraryId),
+      })
+    },
+  })
+
   // Sort, view and grouping switch at once and save behind; a failed save
   // puts the library back as it was and says so.
   const saveSettings = useMutation({
@@ -196,6 +208,7 @@ export const LibraryPage = () => {
   const shows = showsQuery.data?.shows ?? []
   const items = tv ? (showsQuery.data?.unmatched ?? []) : (media.data ?? [])
   const loaded = tv ? showsQuery.isSuccess : media.isSuccess
+  const unmatched = library.data.unmatchedCount
   const emptyState = ((): string | null => {
     if (!loaded || items.length > 0 || shows.length > 0) return null
     if (query) return `Nothing here matches "${query}".`
@@ -234,6 +247,7 @@ export const LibraryPage = () => {
         <p className={styles.count}>
           {KIND_LABELS[settings.kind]} · {count.format(library.data.itemCount)}{' '}
           {library.data.itemCount === 1 ? 'video' : 'videos'}
+          {unmatched > 0 && ` · ${count.format(unmatched)} not matched`}
         </p>
         <div className={styles.status}>
           <ScanStatus scan={library.data.scan} />
@@ -249,6 +263,16 @@ export const LibraryPage = () => {
           >
             Rescan
           </Button>
+          {settings.kind !== 'other' && (
+            <Button
+              icon="search"
+              disabled={!matching || unmatched === 0 || rematch.isPending}
+              title={`Search TMDB again for the files no ${tv ? 'show' : 'movie'} was found for`}
+              onClick={() => rematch.mutate()}
+            >
+              Match again
+            </Button>
+          )}
           <Button icon="edit" onClick={() => setEditing(true)}>
             Edit
           </Button>
@@ -271,6 +295,11 @@ export const LibraryPage = () => {
       {saveSettings.isError && (
         <p className={styles.message} role="alert">
           Could not save how this library is shown: {saveSettings.error.message}
+        </p>
+      )}
+      {rematch.isError && (
+        <p className={styles.message} role="alert">
+          Could not match again: {rematch.error.message}
         </p>
       )}
 

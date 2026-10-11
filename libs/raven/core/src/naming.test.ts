@@ -30,6 +30,18 @@ describe('parseMovieName', () => {
     expect(movie(path)).toMatchObject({ title, year })
   })
 
+  it('puts an article sorted to the end back in front', () => {
+    expect(movie('Whale, The (2022)/Whale, The (2022) WEBDL-2160p.mkv')).toMatchObject({
+      title: 'The Whale',
+      year: 2022,
+    })
+    expect(movie('Knights Tale, A (2001).mkv')).toMatchObject({ title: 'A Knights Tale' })
+    expect(movie('Dances with Wolves, The Directors Cut (1990).mkv')).toMatchObject({
+      title: 'The Dances with Wolves',
+      edition: 'Directors Cut',
+    })
+  })
+
   it('reads a name with no year up to its release tags', () => {
     expect(movie('Some.Home.Movie.1080p.WEB-DL.mkv')).toMatchObject({
       title: 'Some Home Movie',
@@ -66,6 +78,50 @@ describe('parseMovieName', () => {
     })
   })
 
+  it.each([
+    ['Avatar Theatrical Cut (2009) 2160p HEVC.mkv', 'Avatar', 'Theatrical Cut'],
+    [
+      'Dances with Wolves (Directors Cut) (1990) WEBDL-2160p.mkv',
+      'Dances with Wolves',
+      'Directors Cut',
+    ],
+    ['Spy (Extended) (2015) WEBDL-2160p.mkv', 'Spy', 'Extended'],
+    ['Martian, The (Extended Cut) (2015).mkv', 'The Martian', 'Extended Cut'],
+    [
+      'Hobbit an Unexpected Journey, The (Extended) (2012).mkv',
+      'The Hobbit an Unexpected Journey',
+      'Extended',
+    ],
+    ['Invitation (Unrated Edition) (2022).mkv', 'Invitation', 'Unrated Edition'],
+    ['Aliens 20th Anniversary Edition (1986).mkv', 'Aliens', '20th Anniversary Edition'],
+    ['Blade Runner [Final Cut] (1982).mkv', 'Blade Runner', 'Final Cut'],
+  ])('reads the edition named bare in %s', (path, title, edition) => {
+    expect(movie(path)).toMatchObject({ title, edition })
+  })
+
+  it('ends a title at its own year, and drops a region code', () => {
+    expect(movie('Alexander 2004 Revisited the Final Cut (2004) WEBDL-2160p.mkv')).toMatchObject({
+      title: 'Alexander',
+      year: 2004,
+      edition: 'Final Cut',
+    })
+    expect(movie('Blade Runner 2049 (2017).mkv')).toMatchObject({ title: 'Blade Runner 2049' })
+    expect(movie('2012 (2012).mkv')).toMatchObject({ title: '2012', year: 2012 })
+    expect(movie('Alien Resurrection R2 Special Edition (1997).mkv')).toMatchObject({
+      title: 'Alien Resurrection',
+      edition: 'Special Edition',
+    })
+  })
+
+  it('leaves a title that only ends in Cut or Edition alone', () => {
+    expect(movie('The Final Cut (2004).mkv')).toMatchObject({
+      title: 'The Final Cut',
+      edition: null,
+    })
+    expect(movie('Special (2006).mkv')).toMatchObject({ title: 'Special', edition: null })
+    expect(movie('Director (2021).mkv')).toMatchObject({ title: 'Director', edition: null })
+  })
+
   it('takes the edition out of the title', () => {
     expect(movie('Aliens (1986) {edition-Special Edition}.mkv')).toMatchObject({
       title: 'Aliens',
@@ -96,6 +152,17 @@ describe('isExtra', () => {
 })
 
 describe('foldTitle', () => {
+  it('reads a number spelt out as its digits', () => {
+    expect(foldTitle('The Fantastic Four: First Steps')).toBe(foldTitle('Fantastic 4 First Steps'))
+    expect(foldTitle("Ocean's Eleven")).toBe('oceans 11')
+    expect(foldTitle('Se7en')).toBe('se7en')
+  })
+
+  it('drops an apostrophe rather than splitting the word at it', () => {
+    expect(foldTitle("The King's Man")).toBe(foldTitle('The Kings Man'))
+    expect(foldTitle('The World’s End')).toBe('worlds end')
+  })
+
   it('folds case, accents, punctuation, ampersands and a leading article', () => {
     expect(foldTitle('The Lord of the Rings: The Return of the King')).toBe(
       'lord of the rings the return of the king',
@@ -112,6 +179,14 @@ describe('sortTitle', () => {
     expect(sortTitle('The Matrix')).toBe('Matrix')
     expect(sortTitle('An American Werewolf in London')).toBe('American Werewolf in London')
     expect(sortTitle('Annie Hall')).toBe('Annie Hall')
+  })
+
+  it('ignores the quotes and punctuation a title opens with', () => {
+    expect(sortTitle('“Wuthering Heights”')).toBe('Wuthering Heights”')
+    expect(sortTitle('"The Matrix"')).toBe('Matrix"')
+    expect(sortTitle('(500) Days of Summer')).toBe('500) Days of Summer')
+    expect(sortTitle('...And Justice for All')).toBe('And Justice for All')
+    expect(sortTitle('¡Three Amigos!')).toBe('Three Amigos!')
   })
 })
 
@@ -152,14 +227,7 @@ describe('parseEpisodeName', () => {
       [12],
       'A Real Hero',
     ],
-    [
-      'The Office (US)/Specials/The Office (US) - S00E03.mkv',
-      'The Office (US)',
-      null,
-      0,
-      [3],
-      null,
-    ],
+    ['The Office (US)/Specials/The Office (US) - S00E03.mkv', 'The Office', null, 0, [3], null],
     ['Fargo/Fargo.S02E09E10.1080p.mkv', 'Fargo', 2, 2, [9, 10], null],
     [
       'Fargo/Season 2/Fargo - S02E01-E02 - Waiting for Dutch.mkv',
@@ -183,6 +251,37 @@ describe('parseEpisodeName', () => {
     expect(episode('Severance - S01E02 - Half Loop.mkv').show).toBe('Severance')
     expect(episode('Season 1/Severance - S01E02.mkv').show).toBe('Severance')
     expect(episode('Season 1/S01E02.mkv', 'Severance').show).toBe('Severance')
+  })
+
+  it('keeps the show as the file names it, for when the folder is misspelt', () => {
+    const parsed = episode('Muderbot/Season 1/Murderbot - S01E01 - FreeCommerce WEBDL-2160p.mkv')
+    expect(parsed).toMatchObject({ show: 'Muderbot', showFromFile: 'Murderbot' })
+    expect(episode('Severance (2022)/Season 01/Severance - S01E02.mkv').showFromFile).toBeNull()
+    expect(episode('Fargo/Fargo.S02E09E10.1080p.mkv').showFromFile).toBeNull()
+  })
+
+  it('drops a country suffix from a show name, as TMDB does not search on it, and keeps the country', () => {
+    expect(episode('Euphoria (US)/Season 1/Euphoria (US) - S01E01 - Pilot.mkv')).toMatchObject({
+      show: 'Euphoria',
+      country: 'US',
+    })
+    expect(episode('The Office (UK)/Season 1/The Office (UK) - S01E01.mkv')).toMatchObject({
+      show: 'The Office',
+      country: 'GB',
+    })
+    expect(episode('Season 1/Shameless (us) - S01E01.mkv')).toMatchObject({
+      show: 'Shameless',
+      country: 'US',
+    })
+    expect(episode('Us/Season 1/Us - S01E01.mkv')).toMatchObject({ show: 'Us', country: null })
+  })
+
+  it('puts a show article sorted to the end back in front', () => {
+    expect(episode('Office, The/Season 1/Office, The - S01E01 - Pilot.mkv')).toMatchObject({
+      show: 'The Office',
+      season: 1,
+      episodes: [1],
+    })
   })
 
   it('takes the season from the folder when the name has no code', () => {

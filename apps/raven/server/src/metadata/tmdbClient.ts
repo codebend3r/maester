@@ -23,6 +23,13 @@ const TIMEOUT_MS = 10_000
 /** How often a 429 is waited out before the call gives up. */
 const RETRIES = 3
 
+/**
+ * A title with its accents as single characters. A Mac's SMB mount names a
+ * folder with each accent as a combining mark, and TMDB finds nothing for
+ * "Shōgun" in that form while it finds the show in this one.
+ */
+const composed = (title: string): string => title.normalize('NFC')
+
 /** TMDB's older API key: 32 hex characters, sent as `api_key` rather than as a bearer token. */
 const API_KEY = /^[a-f0-9]{32}$/i
 
@@ -96,6 +103,10 @@ export type SearchResult = {
   year: number | null
   overview: string | null
   poster: string | null
+  /** TMDB's popularity score, which settles a title two results share. */
+  popularity: number | null
+  /** A show's countries of origin, `['GB']`; none for a movie, as TMDB's search gives none. */
+  countries: string[]
 }
 
 export type TmdbState = {
@@ -475,6 +486,8 @@ const toSearchResult = (entry: Record<string, unknown>): SearchResult | null => 
     year: yearOf(text(entry.release_date) ?? text(entry.first_air_date)),
     overview: text(entry.overview),
     poster: imagePath(entry.poster_path),
+    popularity: number(entry.popularity),
+    countries: list(entry.origin_country).filter(isString),
   }
 }
 
@@ -597,7 +610,7 @@ export class TmdbClient {
     year: number | null
   }): Promise<SearchResult[]> {
     const body = await this.get('/search/movie', {
-      query,
+      query: composed(query),
       include_adult: 'false',
       ...(year == null ? {} : { year: String(year) }),
     })
@@ -612,7 +625,7 @@ export class TmdbClient {
     year: number | null
   }): Promise<SearchResult[]> {
     const body = await this.get('/search/tv', {
-      query,
+      query: composed(query),
       include_adult: 'false',
       ...(year == null ? {} : { first_air_date_year: String(year) }),
     })

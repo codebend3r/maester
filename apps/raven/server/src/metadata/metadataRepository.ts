@@ -281,6 +281,21 @@ export class MetadataRepository {
     })()
   }
 
+  /** Sort titles again with the current rule, for items stored under an older one. */
+  resortTitles(): void {
+    const rows = this.db
+      .prepare<[], { id: number; title: string; sort_title: string }>(
+        'SELECT id, title, sort_title FROM items',
+      )
+      .all()
+    const update = this.db.prepare('UPDATE items SET sort_title = ? WHERE id = ?')
+    this.db.transaction(() =>
+      rows
+        .filter((row) => sortTitle(row.title) !== row.sort_title)
+        .forEach((row) => update.run(sortTitle(row.title), row.id)),
+    )()
+  }
+
   /** Replaces an item's pictures from beside the media; a kind left out has none. */
   setLocalImages({
     itemId,

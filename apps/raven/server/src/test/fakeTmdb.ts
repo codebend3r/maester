@@ -96,6 +96,8 @@ export type FakeShow = {
   /** Set once the show has ended. */
   last?: string
   tvdbId?: string
+  /** TMDB's `origin_country`: `['GB']`. */
+  countries?: string[]
   seasons: Record<number, FakeEpisode[]>
 }
 
@@ -197,7 +199,8 @@ const yearOf = (released: string): number => Number(released.slice(0, 4))
  * TMDB in miniature: searches by exact title (year optional), `/find` by
  * IMDb id, and movies by id. `down` makes every call fail as if TMDB were
  * unreachable; `omdbSpent` makes OMDb answer as it does once a key's day is
- * used up; `calls` records each URL asked for.
+ * used up; `calls` records each URL asked for. `hold` keeps the searches
+ * for a title waiting until it is let go, so a pass stays busy.
  */
 /** OMDb's answer for an IMDb id, as its `Ratings` strings. */
 export type FakeOmdb = Record<
@@ -222,6 +225,21 @@ export const fakeTmdb = ({
     shows,
     omdb,
     omdbCalls: 0,
+  }
+  // Searches kept waiting, by lower-cased title, and what lets each go.
+  const held = new Map<string, Promise<void>>()
+  const hold = (title: string): (() => void) => {
+    const gate = { open: () => {} }
+    held.set(
+      title.toLowerCase(),
+      new Promise((resolve) => {
+        gate.open = resolve
+      }),
+    )
+    return () => {
+      held.delete(title.toLowerCase())
+      gate.open()
+    }
   }
 
   const fetch: MetadataFetch = async (url) => {
@@ -255,6 +273,7 @@ export const fakeTmdb = ({
 
     if (path === '/search/movie') {
       const title = query.get('query') ?? ''
+      await held.get(title.toLowerCase())
       const year = query.get('year')
       const results = state.movies.filter(
         (movie) =>
@@ -287,6 +306,7 @@ export const fakeTmdb = ({
           name: show.title,
           original_name: show.title,
           first_air_date: show.first,
+          origin_country: show.countries ?? ['US'],
           overview: `${show.title} is a show.`,
           poster_path: `/showposter${show.id}.jpg`,
         })),
@@ -331,5 +351,5 @@ export const fakeTmdb = ({
     return json({ status_code: 34 }, 404)
   }
 
-  return { fetch, state }
+  return { fetch, state, hold }
 }

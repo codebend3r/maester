@@ -73,6 +73,25 @@ describe('createTaskQueue', () => {
     expect(queue.size()).toBe(0)
   })
 
+  it('runs a key asked for again while it runs once more after it, and only once', async () => {
+    const queue = createTaskQueue({ concurrency: 1 })
+    const ran: string[] = []
+    const task = (label: string) => async () => {
+      await tick(5)
+      ran.push(label)
+    }
+    queue.push('a', task('first'))
+    queue.again('a', task('second'))
+    queue.again('a', task('third'))
+    queue.push('a', task('ignored'))
+    // Queued and not yet running, it is an ordinary push.
+    queue.again('b', task('b'))
+    queue.again('b', task('b ignored'))
+    expect(queue.size()).toBe(3)
+    await queue.idle()
+    expect(ran).toEqual(['first', 'b', 'third'])
+  })
+
   it('survives a failing task', async () => {
     const queue = createTaskQueue({ concurrency: 1 })
     const ran: string[] = []

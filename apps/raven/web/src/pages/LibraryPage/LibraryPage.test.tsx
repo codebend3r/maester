@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { Library, LibraryInput, LibrarySettings, MediaItem, MediaSort } from '@raven/core'
 import { Route, Routes, useParams } from 'react-router-dom'
@@ -148,16 +148,35 @@ describe('LibraryPage for TV shows', () => {
     get: spyOn(api, 'getLibrary'),
     shows: spyOn(api, 'listShows'),
     list: spyOn(api, 'listMedia'),
+    health: spyOn(api, 'getMetadataHealth'),
+    match: spyOn(api, 'matchLibrary'),
   }
 
   afterEach(() => {
     spies.get.mockReset()
     spies.shows.mockReset()
     spies.list.mockReset()
+    spies.health.mockReset()
+    spies.match.mockReset()
   })
 
-  const serve = () => {
+  const serve = (settings: Partial<LibrarySettings> = {}) => {
     spies.get.mockImplementation(async () =>
+      library({
+        id: 2,
+        name: 'TV',
+        unmatchedCount: 1,
+        settings: { ...library().settings, kind: 'shows', ...settings },
+      }),
+    )
+    spies.health.mockImplementation(async () => ({
+      tmdb: 'ok',
+      omdb: 'off',
+      pending: 0,
+      error: null,
+      lastOk: null,
+    }))
+    spies.match.mockImplementation(async () =>
       library({ id: 2, name: 'TV', settings: { ...library().settings, kind: 'shows' } }),
     )
     spies.shows.mockImplementation(async () => ({
@@ -185,6 +204,15 @@ describe('LibraryPage for TV shows', () => {
       '/watch/30',
     )
     expect(spies.list).not.toHaveBeenCalled()
+  })
+
+  it('asks the server to match the files no show was found for again', async () => {
+    serve()
+    await screen.findByText('Not matched')
+    const button = screen.getByRole('button', { name: 'Match again' })
+    await waitFor(() => expect(button).toBeEnabled())
+    await userEvent.click(button)
+    expect(spies.match).toHaveBeenCalledWith(2)
   })
 
   it('offers no file sorts and no grouped view, and plays the next episode', async () => {

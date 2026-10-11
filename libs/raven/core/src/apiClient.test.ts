@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ApiError, type FetchInit, type FetchResponse, createApiClient } from '@/apiClient'
-import { itemDetails, mediaItem, showEntry } from '@/test/fixtures'
+import { itemDetails, library, mediaItem, showEntry } from '@/test/fixtures'
 
 type Call = { url: string; init?: FetchInit }
 
@@ -36,6 +36,15 @@ describe('createApiClient', () => {
     const { client, calls } = clientReturning(respond({ body: [] }))
     await client.listMedia({ libraryId: 3, sort: 'random', seed: 42 })
     expect(calls[0]?.url).toBe('http://nas:8484/api/libraries/3/media?sort=random&seed=42')
+  })
+
+  it('asks the server to match a library again', async () => {
+    const { client, calls } = clientReturning(respond({ body: library() }))
+    await expect(client.matchLibrary(3)).resolves.toEqual(library())
+    expect(calls[0]).toMatchObject({
+      url: 'http://nas:8484/api/libraries/3/match',
+      init: { method: 'POST' },
+    })
   })
 
   it('sends JSON bodies', async () => {

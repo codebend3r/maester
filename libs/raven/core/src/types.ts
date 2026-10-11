@@ -24,6 +24,8 @@ export type Library = {
   /** Absolute folder paths as the server sees them (container paths under Docker). */
   paths: string[]
   itemCount: number
+  /** Files no movie or show was found for; 0 in a library that is not matched. */
+  unmatchedCount: number
   createdAt: string
   scan: ScanStatus
   settings: LibrarySettings
