@@ -17,15 +17,16 @@ COPY --parents apps/*/*/package.json libs/*/*/package.json scripts/package.json 
 
 FROM bun AS build
 RUN bun install --frozen-lockfile --ignore-scripts
+COPY nx.json ./
 # The shared compiler options and lint presets every project extends.
 COPY tsconfig.base.json ./
 COPY tooling/ tooling/
 COPY libs/raven/core/ libs/raven/core/
 COPY apps/raven/server/ apps/raven/server/
 COPY apps/raven/web/ apps/raven/web/
-RUN cd libs/raven/core && bun run build \
- && cd ../../../apps/raven/server && bun run build \
- && cd ../web && bun run build
+# Nx builds what the server and the web app depend on first (`^build` in
+# nx.json), so the build order lives in the project graph, not here.
+RUN NX_DAEMON=false NX_NO_CLOUD=true bunx nx run-many -t build -p @raven/server @raven/web
 
 FROM bun AS deps
 RUN bun install --frozen-lockfile --ignore-scripts --production --filter @raven/server
