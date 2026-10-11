@@ -51,6 +51,19 @@
   scroll-snap-align: start;
 }
 
+.personLink {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  border-radius: var(--radius-md);
+  text-decoration: none;
+
+  &:hover .name {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+}
+
 .photo {
   display: grid;
   place-items: center;

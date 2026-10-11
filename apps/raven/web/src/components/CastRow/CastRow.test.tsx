@@ -23,6 +23,7 @@ describe('CastRow', () => {
     expect(screen.getByRole('heading', { name: 'Cast & Crew' })).toBeInTheDocument()
     expect(screen.getByText('Rudy / Director')).toBeInTheDocument()
     expect(container.querySelector('img')).toHaveAttribute('src', '/api/people/1/photo?v=k1')
+    expect(screen.getByRole('link', { name: /Mark Kimball/ })).toHaveAttribute('href', '/people/1')
     expect(screen.getByText('AO')).toBeInTheDocument()
   })
 

@@ -1,0 +1,172 @@
+.section {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.heading {
+  font-family: var(--font-display);
+  font-size: var(--font-size-lg);
+  font-weight: 400;
+}
+
+.list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(20rem, 100%), 1fr));
+  gap: var(--space-3);
+}
+
+// Avatar, author and time on the first row, the stars beneath, then the text and Read.
+.card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'avatar author when'
+    'avatar stars stars'
+    'text text text'
+    'read read read';
+  align-items: center;
+  gap: var(--space-0) var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-moss);
+  border-radius: var(--radius-md);
+  background: var(--color-canopy);
+}
+
+.avatar {
+  grid-area: avatar;
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--color-moss);
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+.author {
+  grid-area: author;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.when {
+  grid-area: when;
+  color: var(--color-lichen);
+  font-size: var(--font-size-xs);
+}
+
+.stars {
+  grid-area: stars;
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  font-size: var(--font-size-sm);
+  letter-spacing: 0.05em;
+}
+
+.starFull {
+  color: var(--color-bark);
+}
+
+.starHalf {
+  background: linear-gradient(90deg, var(--color-bark) 50%, var(--color-moss) 50%);
+  background-clip: text;
+  color: transparent;
+}
+
+.starEmpty {
+  color: var(--color-moss);
+}
+
+.text {
+  grid-area: text;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  padding-top: var(--space-1);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-body);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.read {
+  grid-area: read;
+  justify-self: start;
+  min-height: 2rem;
+  padding: 0 var(--space-2);
+}
+
+.dialog {
+  width: min(var(--measure), calc(100vw - 2 * var(--space-3)));
+  max-height: calc(100dvh - 2 * var(--space-3));
+  padding: 0;
+  border: 1px solid var(--color-moss);
+  border-radius: var(--radius-md);
+  background: var(--color-canopy);
+  color: var(--color-bark);
+
+  &::backdrop {
+    background: var(--color-scrim);
+  }
+}
+
+.dialogBody {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.dialogHeader {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'avatar title when'
+    'avatar stars stars';
+  align-items: center;
+  gap: var(--space-0) var(--space-2);
+
+  .avatar {
+    grid-area: avatar;
+  }
+
+  .stars {
+    grid-area: stars;
+  }
+}
+
+.dialogTitle {
+  grid-area: title;
+  font-family: var(--font-display);
+  font-size: var(--font-size-lg);
+  font-weight: 400;
+  overflow-wrap: anywhere;
+}
+
+.whole {
+  line-height: var(--line-body);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.dialogActions {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.link {
+  font-weight: 600;
+}

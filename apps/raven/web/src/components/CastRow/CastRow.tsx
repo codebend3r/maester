@@ -1,5 +1,6 @@
 import type { Credit, CreditJob } from '@raven/core'
 import { useId, useRef } from 'react'
+import { Link } from 'react-router-dom'
 import { Button } from '@/components/Button/Button'
 import { api } from '@/lib/api'
 import styles from '@/components/CastRow/CastRow.module.scss'
@@ -90,15 +91,17 @@ export const CastRow = ({
           const photo = api.photoUrl(member)
           return (
             <li key={member.personId} className={styles.person}>
-              <span className={styles.photo}>
-                {photo ? (
-                  <img src={photo} alt="" loading="lazy" decoding="async" />
-                ) : (
-                  <span aria-hidden="true">{initials(member.name)}</span>
-                )}
-              </span>
-              <span className={styles.name}>{member.name}</span>
-              <span className={styles.role}>{member.roles.join(' / ')}</span>
+              <Link to={`/people/${member.personId}`} className={styles.personLink}>
+                <span className={styles.photo}>
+                  {photo ? (
+                    <img src={photo} alt="" loading="lazy" decoding="async" />
+                  ) : (
+                    <span aria-hidden="true">{initials(member.name)}</span>
+                  )}
+                </span>
+                <span className={styles.name}>{member.name}</span>
+                <span className={styles.role}>{member.roles.join(' / ')}</span>
+              </Link>
             </li>
           )
         })}

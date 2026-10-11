@@ -65,7 +65,7 @@ const EpisodeView = ({ details, primary }: { details: ItemDetails; primary: Medi
           formatRuntime(primary.duration) ??
             (details.runtime == null ? null : formatRuntime(details.runtime * 60)),
         ].filter((fact): fact is string => fact != null)}
-        ratings={details.ratings.filter((rating) => rating.source === 'tmdb')}
+        ratings={details.ratings}
         backdrop={api.itemImageUrl({
           id: details.id,
           kind: 'still',

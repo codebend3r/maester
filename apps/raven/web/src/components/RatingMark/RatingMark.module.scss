@@ -1,0 +1,64 @@
+// The sources' own colours, kept to these marks; the rest of the page stays on the tokens.
+.tomato {
+  fill: #fa320a;
+}
+
+.leaf {
+  fill: #0ac855;
+}
+
+.stem {
+  stroke: #0ac855;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.splat {
+  fill: #0ac855;
+}
+
+.imdb {
+  display: inline-grid;
+  place-items: center;
+  padding: 0 0.35em;
+  border-radius: 3px;
+  background: #f5c518;
+  color: #000000;
+  font-weight: 800;
+  line-height: 1.6;
+  letter-spacing: -0.02em;
+}
+
+.metacritic {
+  display: inline-grid;
+  place-items: center;
+  border-radius: 3px;
+  color: #ffffff;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.green {
+  background: #66cc33;
+}
+
+.yellow {
+  background: #ffcc33;
+  color: #000000;
+}
+
+.red {
+  background: #ff0000;
+}
+
+.tmdb {
+  display: inline-grid;
+  place-items: center;
+  padding: 0 0.35em;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #90cea1, #01b4e4);
+  color: #0d253f;
+  font-weight: 800;
+  line-height: 1.6;
+  letter-spacing: 0.02em;
+}

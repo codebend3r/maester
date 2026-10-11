@@ -26,11 +26,18 @@ const SORTS: Record<MediaSort, string> = {
   'resolution-low': 'Lowest resolution',
   'year-new': 'Newest release',
   'year-old': 'Oldest release',
+  'rating-high': 'Highest rated',
+  'rating-low': 'Lowest rated',
   random: 'Random',
 }
 
-/** Release years come from names, which only Movies and TV shows libraries read. */
-const YEAR_SORTS: ReadonlySet<MediaSort> = new Set(['year-new', 'year-old'])
+/** Release years come from names, and scores from TMDB, which only Movies and TV shows libraries read. */
+const YEAR_SORTS: ReadonlySet<MediaSort> = new Set([
+  'year-new',
+  'year-old',
+  'rating-high',
+  'rating-low',
+])
 
 /** Sorts that only mean something per file, which a TV library's show cards cannot use. */
 const FILE_SORTS: ReadonlySet<MediaSort> = new Set([

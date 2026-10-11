@@ -1,4 +1,12 @@
-import type { Credit, ItemSummary, MediaItem, Rating, ScanStatus, ShowEntry } from '@raven/core'
+import type {
+  Credit,
+  ItemSummary,
+  MediaItem,
+  Rating,
+  Review,
+  ScanStatus,
+  ShowEntry,
+} from '@raven/core'
 
 /**
  * Made-up videos for the design page. Negative ids never match a real
@@ -135,6 +143,7 @@ const sampleMovie = (
   season: null,
   episode: null,
   posterVersion: null,
+  ratings: [],
   ...overrides,
 })
 
@@ -189,8 +198,41 @@ export const SAMPLE_SHOWS: ShowEntry[] = [
   },
 ]
 
+/** Every source at once: a fresh tomato, IMDb, a green Metacritic square and TMDB. */
 export const SAMPLE_RATINGS: Rating[] = [
+  { source: 'rottenTomatoes', kind: 'critic', value: 9.1, votes: null },
+  { source: 'imdb', kind: 'audience', value: 8.1, votes: null },
+  { source: 'metacritic', kind: 'critic', value: 7.4, votes: null },
   { source: 'tmdb', kind: 'audience', value: 7.8, votes: 1840 },
+]
+
+/** The other faces of the marks: a splat, and Metacritic's yellow and red. */
+export const SAMPLE_RATINGS_LOW: Rating[] = [
+  { source: 'rottenTomatoes', kind: 'critic', value: 3.8, votes: null },
+  { source: 'metacritic', kind: 'critic', value: 5.2, votes: null },
+  { source: 'metacritic', kind: 'critic', value: 2.9, votes: null },
+]
+
+export const SAMPLE_REVIEWS: Review[] = [
+  {
+    id: -1,
+    author: 'A Patient Viewer',
+    avatarVersion: null,
+    rating: 8,
+    content:
+      'Slow to start, and all the better for it. By the time the night sets in you know every path through the wood, and the last act uses every one of them.',
+    url: 'https://www.themoviedb.org/',
+    writtenAt: new Date(Date.now() - 6 * 3600 * 1000).toISOString(),
+  },
+  {
+    id: -2,
+    author: 'Rook',
+    avatarVersion: null,
+    rating: 5,
+    content: 'Handsome, and hollow. A tagline looking for a film.',
+    url: 'https://www.themoviedb.org/',
+    writtenAt: new Date(Date.now() - 40 * 24 * 3600 * 1000).toISOString(),
+  },
 ]
 
 export const SAMPLE_CREDITS: Credit[] = [

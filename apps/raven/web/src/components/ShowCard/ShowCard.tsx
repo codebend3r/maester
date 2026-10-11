@@ -1,7 +1,8 @@
-import { type ShowEntry, episodeCode } from '@raven/core'
+import { type ShowEntry, type ShownRatings, episodeCode, pickScore } from '@raven/core'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Icon } from '@/components/Icon/Icon'
+import { ScoreChip } from '@/components/RatingChips/RatingChips'
 import { api } from '@/lib/api'
 import { showYears } from '@/lib/itemLinks'
 import styles from '@/components/ShowCard/ShowCard.module.scss'
@@ -11,8 +12,15 @@ import styles from '@/components/ShowCard/ShowCard.module.scss'
  * opens the show's page; its play button starts the first episode not yet
  * watched, carrying the file along so the player starts at once.
  */
-export const ShowCard = ({ entry }: { entry: ShowEntry }) => {
+export const ShowCard = ({
+  entry,
+  ratingsSource = 'tmdb',
+}: {
+  entry: ShowEntry
+  ratingsSource?: ShownRatings
+}) => {
   const { show, next } = entry
+  const score = pickScore({ ratings: show.ratings, source: ratingsSource })
   const poster = api.itemImageUrl({ id: show.id, kind: 'poster', version: show.posterVersion })
   const [failed, setFailed] = useState(false)
   const years = showYears({ year: show.year, endedYear: entry.endedYear })
@@ -59,16 +67,25 @@ export const ShowCard = ({ entry }: { entry: ShowEntry }) => {
         {facts.map((fact) => (
           <span key={fact}>{fact}</span>
         ))}
+        {score && <ScoreChip rating={score} />}
       </span>
     </li>
   )
 }
 
 /** The poster grid a TV library lays its shows out in. */
-export const ShowGrid = ({ shows, busy = false }: { shows: ShowEntry[]; busy?: boolean }) => (
+export const ShowGrid = ({
+  shows,
+  busy = false,
+  ratingsSource = 'tmdb',
+}: {
+  shows: ShowEntry[]
+  busy?: boolean
+  ratingsSource?: ShownRatings
+}) => (
   <ul className={styles.grid} aria-busy={busy}>
     {shows.map((entry) => (
-      <ShowCard key={entry.show.id} entry={entry} />
+      <ShowCard key={entry.show.id} entry={entry} ratingsSource={ratingsSource} />
     ))}
   </ul>
 )

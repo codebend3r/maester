@@ -6,6 +6,7 @@ import { Button, ButtonLink } from '@/components/Button/Button'
 import { CastRow } from '@/components/CastRow/CastRow'
 import { ItemHeader } from '@/components/ItemHeader/ItemHeader'
 import { MediaMenu } from '@/components/MediaMenu/MediaMenu'
+import { ReviewCards } from '@/components/ReviewCards/ReviewCards'
 import { Summary } from '@/components/Summary/Summary'
 import { TmdbCredit } from '@/components/TmdbCredit/TmdbCredit'
 import { Versions } from '@/components/Versions/Versions'
@@ -31,7 +32,6 @@ const MovieView = ({ details, primary }: { details: ItemDetails; primary: MediaI
   })
   const library = libraries.data?.find((entry) => entry.id === primary.libraryId)
   const facts = fileFacts({ media: primary, tracks: tracks.data })
-  const tmdb = details.ratings.filter((rating) => rating.source === 'tmdb')
 
   return (
     <article className={styles.page} aria-labelledby={ids.title}>
@@ -45,7 +45,7 @@ const MovieView = ({ details, primary }: { details: ItemDetails; primary: MediaI
         byline={directedBy(details)}
         contentRating={details.contentRating}
         facts={movieFacts({ details, primary })}
-        ratings={tmdb}
+        ratings={details.ratings}
         poster={api.itemImageUrl({
           id: details.id,
           kind: 'poster',
@@ -111,6 +111,7 @@ const MovieView = ({ details, primary }: { details: ItemDetails; primary: MediaI
 
       <Versions versions={details.versions} libraries={libraries.data ?? []} />
       <CastRow credits={details.credits} />
+      <ReviewCards reviews={details.reviews} />
       <TmdbCredit />
     </article>
   )

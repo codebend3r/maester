@@ -1,9 +1,10 @@
-import { type MediaItem, cardTitle, formatRuntime } from '@raven/core'
+import { type MediaItem, type ShownRatings, cardTitle, formatRuntime, pickScore } from '@raven/core'
 import { type MouseEvent, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Icon } from '@/components/Icon/Icon'
 import { MediaMenu } from '@/components/MediaMenu/MediaMenu'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
+import { ScoreChip } from '@/components/RatingChips/RatingChips'
 import { api } from '@/lib/api'
 import { openPath } from '@/lib/itemLinks'
 import { progressOf } from '@/lib/mediaProgress'
@@ -56,13 +57,23 @@ export const PosterFrame = ({ media }: { media: MediaItem }) => {
  * movie's page and its play button plays at once; anything else opens the
  * player, as a frame-grab card does. A right click opens the card's menu.
  */
-export const PosterCard = ({ media }: { media: MediaItem }) => {
+export const PosterCard = ({
+  media,
+  ratingsSource = 'tmdb',
+}: {
+  media: MediaItem
+  /** Whose score the card shows, from the library's settings. */
+  ratingsSource?: ShownRatings
+}) => {
   const [menuOpen, setMenuOpen] = useState(false)
   const openMenu = (event: MouseEvent) => {
     event.preventDefault()
     setMenuOpen(true)
   }
   const { title, year } = cardTitle(media)
+  const score = media.item
+    ? pickScore({ ratings: media.item.ratings, source: ratingsSource })
+    : null
   const to = openPath(media)
   const hasPage = to !== `/watch/${media.id}`
   const progress = progressOf(media)
@@ -114,6 +125,7 @@ export const PosterCard = ({ media }: { media: MediaItem }) => {
         {facts.map((fact) => (
           <span key={fact}>{fact}</span>
         ))}
+        {score && <ScoreChip rating={score} />}
         {media.match === 'unmatched' && <span>Not matched</span>}
         {progress > 0 && <span className="visually-hidden">Partly watched</span>}
       </span>

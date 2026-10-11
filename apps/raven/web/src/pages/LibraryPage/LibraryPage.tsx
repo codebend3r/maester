@@ -77,9 +77,18 @@ const MediaView = ({
         busy={busy}
         posters={movies}
         matchType={matchType}
+        ratingsSource={settings.ratingsSource}
       />
     )
-  return <MediaGrid items={items} busy={busy} posters={movies} matchType={matchType} />
+  return (
+    <MediaGrid
+      items={items}
+      busy={busy}
+      posters={movies}
+      matchType={matchType}
+      ratingsSource={settings.ratingsSource}
+    />
+  )
 }
 
 export const LibraryPage = () => {
@@ -268,7 +277,11 @@ export const LibraryPage = () => {
       {emptyState && <p className={styles.message}>{emptyState}</p>}
       {!emptyState && tv && (
         <>
-          <ShowGrid shows={shows} busy={showsQuery.isFetching && !showsQuery.data} />
+          <ShowGrid
+            shows={shows}
+            busy={showsQuery.isFetching && !showsQuery.data}
+            ratingsSource={settings.ratingsSource}
+          />
           {items.length > 0 && (
             <section className={styles.unmatched} aria-labelledby={ids.unmatched}>
               <h2 id={ids.unmatched} className={styles.subheading}>
