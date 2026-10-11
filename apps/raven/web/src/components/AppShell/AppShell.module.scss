@@ -115,7 +115,7 @@
   align-items: center;
   gap: var(--space-2);
   width: max-content;
-  max-width: min(24rem, calc(100vw - 2 * var(--header-inline)));
+  max-width: min(30rem, calc(100vw - 2 * var(--header-inline)));
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--color-moss);
   border-radius: var(--radius-md);

@@ -1,0 +1,39 @@
+import { describe, expect, it } from 'bun:test'
+import { isShortcut } from '@/lib/keyboard'
+
+const press = ({
+  key,
+  target = document.body,
+  ...held
+}: {
+  key: string
+  target?: Element
+} & Partial<Pick<KeyboardEventInit, 'metaKey' | 'ctrlKey' | 'altKey' | 'repeat'>>) => {
+  const event = new KeyboardEvent('keydown', { key, bubbles: true, ...held })
+  Object.defineProperty(event, 'target', { value: target })
+  return isShortcut({ event, key: 'b' })
+}
+
+describe('isShortcut', () => {
+  it('takes the key whatever its case', () => {
+    expect(press({ key: 'b' })).toBe(true)
+    expect(press({ key: 'B' })).toBe(true)
+    expect(press({ key: 'n' })).toBe(false)
+  })
+
+  it('leaves a press with a modifier, or held down, alone', () => {
+    expect(press({ key: 'b', metaKey: true })).toBe(false)
+    expect(press({ key: 'b', ctrlKey: true })).toBe(false)
+    expect(press({ key: 'b', altKey: true })).toBe(false)
+    expect(press({ key: 'b', repeat: true })).toBe(false)
+  })
+
+  it('leaves form controls and dialogs their keys', () => {
+    const input = document.createElement('input')
+    const dialog = document.createElement('dialog')
+    const button = document.createElement('button')
+    dialog.append(button)
+    expect(press({ key: 'b', target: input })).toBe(false)
+    expect(press({ key: 'b', target: button })).toBe(false)
+  })
+})

@@ -18,7 +18,7 @@ import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/Button/Button'
 import { FolderBrowser } from '@/components/FolderBrowser/FolderBrowser'
 import { api } from '@/lib/api'
-import { KIND_LABELS } from '@/lib/libraryKinds'
+import { KINDS } from '@/lib/libraryKinds'
 import { queryKeys } from '@/lib/queryClient'
 import styles from '@/components/LibraryDialog/LibraryDialog.module.scss'
 
@@ -149,7 +149,7 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
                   checked={settings.kind === kind}
                   onChange={() => pickKind(kind)}
                 />
-                <label htmlFor={`${ids.kind}-${kind}`}>{KIND_LABELS[kind]}</label>
+                <label htmlFor={`${ids.kind}-${kind}`}>{KINDS[kind].label}</label>
               </div>
             ))}
           </div>

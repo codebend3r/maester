@@ -1,17 +1,14 @@
 import { useQuery } from '@tanstack/react-query'
-import { useEffect, useId } from 'react'
+import { useId } from 'react'
 import { Link, Outlet, matchPath, useLocation } from 'react-router-dom'
 import { Button } from '@/components/Button/Button'
 import { Icon, type IconName } from '@/components/Icon/Icon'
 import { api } from '@/lib/api'
-import { isTypingTarget } from '@/lib/keyboard'
-import { KIND_ICONS } from '@/lib/libraryKinds'
+import { useKeyShortcut } from '@/lib/keyboard'
+import { KINDS } from '@/lib/libraryKinds'
 import { queryKeys } from '@/lib/queryClient'
 import { useSideMenu } from '@/stores/sideMenu'
 import styles from '@/components/AppShell/AppShell.module.scss'
-
-/** The key that collapses and expands the side menu. */
-const TOGGLE_KEY = 'b'
 
 /**
  * A link in the side menu, marked as current when the location matches any
@@ -23,14 +20,15 @@ const NavItem = ({
   patterns,
   icon,
   label,
+  collapsed,
 }: {
   to: string
   patterns: readonly string[]
   icon: IconName
   label: string
+  collapsed: boolean
 }) => {
   const { pathname } = useLocation()
-  const collapsed = useSideMenu((state) => state.collapsed)
   const current = patterns.some((pattern) => matchPath(pattern, pathname) != null)
   return (
     <Link
@@ -50,16 +48,6 @@ const libraryPages = (id: number | string): string[] => [
   `/libraries/${id}`,
   `/libraries/${id}/history`,
 ]
-
-/** B pressed anywhere but in a form control or a dialog, which keep their keys. */
-const isToggleKey = (event: KeyboardEvent): boolean =>
-  event.key.toLowerCase() === TOGGLE_KEY &&
-  !event.metaKey &&
-  !event.ctrlKey &&
-  !event.altKey &&
-  !event.repeat &&
-  !isTypingTarget(event.target) &&
-  !(event.target instanceof Element && event.target.closest('dialog'))
 
 /** Hangs under the toggle until it is first used or put away. */
 const ShortcutTip = ({ onDismiss }: { onDismiss: () => void }) => (
@@ -89,15 +77,7 @@ export const AppShell = () => {
     libraryPages(library.id).some((pattern) => matchPath(pattern, pathname) != null),
   )
 
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (!isToggleKey(event)) return
-      event.preventDefault()
-      toggle()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [toggle])
+  useKeyShortcut({ key: 'b', onPress: toggle })
 
   return (
     <div className={collapsed ? `${styles.shell} ${styles.collapsed}` : styles.shell}>
@@ -123,9 +103,22 @@ export const AppShell = () => {
           patterns={pinnedOpen ? ['/'] : ['/', ...libraryPages(':id')]}
           icon="libraries"
           label="Libraries"
+          collapsed={collapsed}
         />
-        <NavItem to="/favourites" patterns={['/favourites']} icon="heart" label="Favourites" />
-        <NavItem to="/settings" patterns={['/settings']} icon="settings" label="Settings" />
+        <NavItem
+          to="/favourites"
+          patterns={['/favourites']}
+          icon="heart"
+          label="Favourites"
+          collapsed={collapsed}
+        />
+        <NavItem
+          to="/settings"
+          patterns={['/settings']}
+          icon="settings"
+          label="Settings"
+          collapsed={collapsed}
+        />
         {pinned.length > 0 && (
           <ul className={styles.pinned} aria-label="Pinned">
             {pinned.map((library) => (
@@ -133,8 +126,9 @@ export const AppShell = () => {
                 <NavItem
                   to={`/libraries/${library.id}`}
                   patterns={libraryPages(library.id)}
-                  icon={KIND_ICONS[library.settings.kind]}
+                  icon={KINDS[library.settings.kind].icon}
                   label={library.name}
+                  collapsed={collapsed}
                 />
               </li>
             ))}
