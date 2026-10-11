@@ -6,6 +6,8 @@ import {
   type Library,
   type MediaItem,
   isItemDetails,
+  isItemImageOptions,
+  isItemMetadataState,
   isLibrary,
   isMatchCandidateList,
   isMediaItem,
@@ -13,9 +15,10 @@ import {
   isMetadataHealth,
   isRecord,
 } from '@raven/core'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createApp } from '@/app'
 import { readServerConfig } from '@/config'
+import { MediaRepository } from '@/media/mediaRepository'
 import { MetadataService } from '@/metadata/metadataService'
 import { ScannerService } from '@/scanner/scannerService'
 import { encodeClip, encodeImage } from '@/test/clips'
@@ -49,6 +52,7 @@ describe('movie metadata', () => {
       { id: 680, title: 'Pulp Fiction', released: '1994-09-10' },
       { id: 11, title: 'Unknown Thing One', released: '2020-01-01' },
       { id: 12, title: 'Unknown Thing Two', released: '2020-06-01' },
+      { id: 881, title: 'A Few Good Men', released: '1992-12-11' },
     ],
     omdb: { tt0133093: { imdb: '8.7/10', rottenTomatoes: '83%', metacritic: '73/100' } },
   })
@@ -119,6 +123,10 @@ describe('movie metadata', () => {
         seconds: 1,
       }),
       encodeClip({
+        path: join(state.media, 'The Few Good Men (1992)', 'The Few Good Men (1992).mp4'),
+        seconds: 1,
+      }),
+      encodeClip({
         path: join(state.media, 'Unknown Thing (2020)', 'Unknown Thing (2020).mp4'),
         seconds: 1,
       }),
@@ -162,6 +170,7 @@ describe('movie metadata', () => {
     expect(
       items.map((item) => [item.item?.title ?? item.title, item.match, item.versions]),
     ).toEqual([
+      ['A Few Good Men', 'matched', 1],
       ['Heat', 'matched', 1],
       ['Making Of', 'off', 1],
       ['The Matrix', 'matched', 2],
@@ -175,6 +184,22 @@ describe('movie metadata', () => {
       width: 640,
     })
     expect(items.find((item) => item.title === 'Unknown Thing')?.year).toBe(2020)
+  })
+
+  it('starts a Movies library grouped into matched and not', async () => {
+    const library = shape({
+      response: await app().inject({ method: 'GET', url: `/api/libraries/${state.library}` }),
+      guard: isLibrary,
+    })
+    expect(library.settings).toMatchObject({ kind: 'movies', view: 'grouped', groupBy: 'match' })
+  })
+
+  it('asked again without the article when "The Few Good Men" found nothing', () => {
+    const asked = tmdb.state.calls
+      .filter((url) => url.includes('/search/movie'))
+      .map((url) => new URL(url).searchParams.get('query'))
+    expect(asked).toContain('The Few Good Men')
+    expect(asked).toContain('Few Good Men')
   })
 
   it('matched Heat by the id in its folder name, without a search', () => {
@@ -308,6 +333,154 @@ describe('movie metadata', () => {
     expect(still.statusCode).toBe(404)
   })
 
+  it('offers every picture a movie could show, and keeps the chosen one through a refresh', async () => {
+    const matrix = (await list()).find((item) => item.item?.title === 'The Matrix')
+    const id = matrix?.item?.id
+    const options = shape({
+      response: await app().inject({ method: 'GET', url: `/api/items/${id}/images` }),
+      guard: isItemImageOptions,
+    })
+    // The poster beside the files comes first and is the current one; TMDB's own poster is listed too.
+    expect(options.poster.map((option) => [option.source, option.ref, option.current])).toEqual([
+      ['local', join(state.media, 'The Matrix (1999)', 'poster.jpg'), true],
+      ['tmdb', '/poster603.jpg', false],
+      ['tmdb', '/alt603.jpg', false],
+    ])
+    expect(options.poster[1]).toMatchObject({ width: 2000, height: 3000, language: 'en' })
+    expect(options.backdrop.map((option) => [option.ref, option.current])).toEqual([
+      ['/backdrop603.jpg', true],
+      ['/scene603.jpg', false],
+    ])
+    expect(options.backdrop[1]).toMatchObject({ width: 2000, height: 3000, language: 'en' })
+
+    const chosen = shape({
+      response: await app().inject({
+        method: 'PUT',
+        url: `/api/items/${id}/images/poster`,
+        payload: { source: 'tmdb', ref: '/alt603.jpg' },
+      }),
+      guard: isItemDetails,
+    })
+    expect(chosen.posterVersion).not.toBe(matrix?.item?.posterVersion)
+    const poster = await app().inject({
+      method: 'GET',
+      url: `/api/items/${id}/images/poster?v=${chosen.posterVersion}`,
+    })
+    expect(poster.rawPayload.equals(FAKE_JPEG)).toBe(true)
+    expect(tmdb.state.calls.some((url) => url.includes('/alt603.jpg'))).toBe(true)
+    const local = await app().inject({ method: 'GET', url: `/api/items/${id}/images/poster/local` })
+    expect(local.statusCode).toBe(200)
+    expect(local.rawPayload.equals(FAKE_JPEG)).toBe(false)
+
+    await app().inject({ method: 'POST', url: `/api/items/${id}/refresh` })
+    const after = shape({
+      response: await app().inject({ method: 'GET', url: `/api/items/${id}/images` }),
+      guard: isItemImageOptions,
+    })
+    expect(after.poster.find((option) => option.current)?.ref).toBe('/alt603.jpg')
+
+    const back = shape({
+      response: await app().inject({
+        method: 'PUT',
+        url: `/api/items/${id}/images/poster`,
+        payload: { source: 'local' },
+      }),
+      guard: isItemDetails,
+    })
+    expect(back.posterVersion).toBe(matrix?.item?.posterVersion)
+
+    const refused = await app().inject({
+      method: 'PUT',
+      url: `/api/items/${id}/images/poster`,
+      payload: { source: 'tmdb', ref: 'https://evil.example/x.jpg' },
+    })
+    expect(refused.statusCode).toBe(400)
+  })
+
+  it('writes metadata over TMDB’s, keeps it through a refresh, and gives it back on null', async () => {
+    const heat = await byFile('Heat.mp4')
+    const id = heat.item?.id
+    const before = shape({
+      response: await app().inject({ method: 'GET', url: `/api/items/${id}/metadata` }),
+      guard: isItemMetadataState,
+    })
+    expect(before).toMatchObject({
+      shown: { title: 'Heat' },
+      original: { title: 'Heat' },
+      overridden: [],
+    })
+
+    const edited = shape({
+      response: await app().inject({
+        method: 'PUT',
+        url: `/api/items/${id}/metadata`,
+        payload: { title: 'Heat (Director’s Cut)', tagline: 'A Los Angeles crime saga' },
+      }),
+      guard: isItemDetails,
+    })
+    expect(edited).toMatchObject({
+      title: 'Heat (Director’s Cut)',
+      tagline: 'A Los Angeles crime saga',
+    })
+    expect((await byFile('Heat.mp4')).item?.title).toBe('Heat (Director’s Cut)')
+    const written = shape({
+      response: await app().inject({ method: 'GET', url: `/api/items/${id}/metadata` }),
+      guard: isItemMetadataState,
+    })
+    expect(written.original.title).toBe('Heat')
+    expect(written.overridden).toEqual(['title', 'tagline'])
+
+    await app().inject({ method: 'POST', url: `/api/items/${id}/refresh` })
+    expect((await byFile('Heat.mp4')).item?.title).toBe('Heat (Director’s Cut)')
+
+    const refused = await app().inject({
+      method: 'PUT',
+      url: `/api/items/${id}/metadata`,
+      payload: { title: '   ' },
+    })
+    expect(refused.statusCode).toBe(400)
+
+    const back = shape({
+      response: await app().inject({
+        method: 'PUT',
+        url: `/api/items/${id}/metadata`,
+        payload: { title: null, tagline: null },
+      }),
+      guard: isItemDetails,
+    })
+    expect(back.title).toBe('Heat')
+    expect((await byFile('Heat.mp4')).item?.title).toBe('Heat')
+
+    // An emptied field shows nothing, where null would bring TMDB's back.
+    const emptied = shape({
+      response: await app().inject({
+        method: 'PUT',
+        url: `/api/items/${id}/metadata`,
+        payload: { tagline: '', year: 0 },
+      }),
+      guard: isItemDetails,
+    })
+    expect(emptied).toMatchObject({ tagline: null, year: null })
+    const empty = shape({
+      response: await app().inject({ method: 'GET', url: `/api/items/${id}/metadata` }),
+      guard: isItemMetadataState,
+    })
+    expect(empty).toMatchObject({
+      shown: { tagline: null, year: null },
+      original: { tagline: 'A tagline.', year: 1995 },
+    })
+    expect(empty.overridden.toSorted()).toEqual(['tagline', 'year'])
+    const restored = shape({
+      response: await app().inject({
+        method: 'PUT',
+        url: `/api/items/${id}/metadata`,
+        payload: { tagline: null, year: null },
+      }),
+      guard: isItemDetails,
+    })
+    expect(restored).toMatchObject({ tagline: 'A tagline.', year: 1995 })
+  })
+
   it('serves a cast photo', async () => {
     const matrix = (await list()).find((item) => item.item?.title === 'The Matrix')
     const details = shape({
@@ -333,6 +506,7 @@ describe('movie metadata', () => {
       1999,
       1995,
       1994,
+      1992,
       null,
     ])
   })
@@ -466,6 +640,41 @@ describe('movie metadata', () => {
     expect(await byFile('The Matrix (1999).mp4')).toMatchObject({
       match: 'matched',
       item: { title: 'The Matrix' },
+    })
+  })
+
+  it('matches again a file the running pass has already given up on', async () => {
+    const lost = join(state.media, 'Lost Signal (2019)', 'Lost Signal (2019).mp4')
+    await encodeClip({ path: lost, seconds: 1 })
+    await rescan()
+    expect(await byFile('Lost Signal (2019).mp4')).toMatchObject({ match: 'unmatched' })
+
+    // A pass busy with another file gives up on Lost Signal again while it runs.
+    const letGo = tmdb.hold('Slow Burn')
+    await encodeClip({ path: join(state.media, 'Slow Burn (2018).mp4'), seconds: 1 })
+    app().get(MediaRepository).retryUnmatched(state.library)
+    await app().inject({ method: 'POST', url: `/api/libraries/${state.library}/scan` })
+    await vi.waitFor(
+      async () =>
+        expect(await byFile('Lost Signal (2019).mp4')).toMatchObject({ match: 'unmatched' }),
+      { timeout: 5000 },
+    )
+
+    // TMDB lists it now, and Match again comes in before that pass ends.
+    tmdb.state.movies.push({ id: 404, title: 'Lost Signal', released: '2019-04-04' })
+    const library = shape({
+      response: await app().inject({
+        method: 'POST',
+        url: `/api/libraries/${state.library}/match`,
+      }),
+      guard: isLibrary,
+    })
+    expect(library.unmatchedCount).toBe(0)
+    letGo()
+    await settle()
+    expect(await byFile('Lost Signal (2019).mp4')).toMatchObject({
+      match: 'matched',
+      item: { title: 'Lost Signal' },
     })
   })
 

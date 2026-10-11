@@ -24,6 +24,8 @@ export type Library = {
   /** Absolute folder paths as the server sees them (container paths under Docker). */
   paths: string[]
   itemCount: number
+  /** Files no movie or show was found for; 0 in a library that is not matched. */
+  unmatchedCount: number
   createdAt: string
   scan: ScanStatus
   settings: LibrarySettings
@@ -50,13 +52,14 @@ export type LibrarySettings = {
 }
 
 /** The scores a library can show on its cards: Metacritic has no card of its own. */
-export type ShownRatings = 'tmdb' | 'imdb' | 'rottenTomatoes'
+export type ShownRatings = 'tmdb' | 'imdb' | 'rottenTomatoes' | 'metacritic'
 
 export type LibraryKind = 'movies' | 'shows' | 'other'
 
 export type LibraryView = 'grid' | 'list' | 'tiles' | 'grouped'
 
-export type MediaGroupBy = 'resolution' | 'codec' | 'month'
+/** `match` buckets a Movies or TV shows library by how far matching got. */
+export type MediaGroupBy = 'match' | 'resolution' | 'codec' | 'month'
 
 /**
  * What a client sends to create a library or replace its name and paths.
@@ -230,6 +233,94 @@ export type PersonDetails = {
 
 /** The pictures an item can have. */
 export type ItemImageKind = 'poster' | 'backdrop' | 'still'
+
+/** One picture a movie or show could show: a file beside the media, or one of TMDB's. */
+export type ImageOption = {
+  source: 'local' | 'tmdb'
+  /** The file's path for `local`; TMDB's path for `tmdb`, served through `imageOptionUrl`. */
+  ref: string
+  width: number | null
+  height: number | null
+  /** ISO 639-1, or null for a picture with no text. */
+  language: string | null
+  /** Whether the item shows this one now. */
+  current: boolean
+}
+
+/** Everything a movie or show could show as its poster and backdrop. */
+export type ItemImageOptions = {
+  poster: ImageOption[]
+  backdrop: ImageOption[]
+}
+
+/**
+ * How the server plays video, set once for every viewer in Settings.
+ *
+ * - `directPlay`: `auto` plays the original file when the browser takes it
+ *   and converts otherwise; `force` always sends the original file, for a
+ *   browser the check underrates.
+ * - `transcoding`: `on` remuxes and transcodes as needed; `remuxOnly` never
+ *   re-encodes video; `off` converts nothing, so only files the browser
+ *   plays as they are play.
+ * - `maxHeight`: the frame a transcode is scaled down to.
+ * - `quality`: how hard a transcode is squeezed: `low` for a slow network,
+ *   `high` for a big screen.
+ * - `hwAccel`: what encodes a transcode: `auto` takes the GPU the machine
+ *   has, `none` keeps to the CPU.
+ * - `tonemap`: whether HDR is tone mapped to SDR on a transcode when the
+ *   build can.
+ */
+export type PlaybackSettings = {
+  directPlay: 'auto' | 'force'
+  transcoding: 'on' | 'remuxOnly' | 'off'
+  maxHeight: 2160 | 1080 | 720
+  quality: 'low' | 'medium' | 'high'
+  hwAccel: 'auto' | 'none' | 'vaapi' | 'videotoolbox'
+  tonemap: boolean
+}
+
+/** The settings as kept, with what they come to on this machine. */
+export type PlaybackSettingsState = {
+  settings: PlaybackSettings
+  effective: {
+    /** What transcodes encode with, after the test encode. */
+    encoder: 'software' | 'vaapi' | 'videotoolbox'
+    /** Whether this ffmpeg can tone map at all. */
+    tonemapAvailable: boolean
+  }
+}
+
+/** The fields Edit metadata can write over: what a page shows for a movie or show. */
+export type ItemMetadata = {
+  title: string
+  year: number | null
+  tagline: string | null
+  summary: string | null
+  contentRating: string | null
+}
+
+/** Edit metadata: what the page shows, what TMDB says, and which fields were written over. */
+export type ItemMetadataState = {
+  shown: ItemMetadata
+  original: ItemMetadata
+  overridden: (keyof ItemMetadata)[]
+}
+
+/**
+ * What Edit metadata sends: each field given is written over, or cleared
+ * back to TMDB's with null. An empty field over TMDB's words is '', or 0 for
+ * the year, and shows as nothing; a title cannot be empty.
+ */
+export type ItemMetadataChange = {
+  title?: string | null
+  year?: number | null
+  tagline?: string | null
+  summary?: string | null
+  contentRating?: string | null
+}
+
+/** What Edit images picks: one of TMDB's pictures, or the one beside the media. */
+export type ImageChoice = { source: 'tmdb'; ref: string } | { source: 'local' }
 
 /** One of TMDB's search results, offered by Fix match. */
 export type MatchCandidate = {

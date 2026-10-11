@@ -9,6 +9,8 @@ const result = (overrides: Partial<SearchResult>): SearchResult => ({
   year: 1999,
   overview: null,
   poster: null,
+  popularity: null,
+  countries: [],
   ...overrides,
 })
 
@@ -17,6 +19,7 @@ describe('pickMatch', () => {
     const matrix = result({ tmdbId: '603' })
     expect(
       pickMatch({
+        type: 'movie',
         title: 'Matrix',
         year: 1999,
         results: [result({ tmdbId: '2', title: 'The Matrix Reloaded', year: 2003 }), matrix],
@@ -26,9 +29,32 @@ describe('pickMatch', () => {
 
   it('accepts a year either side, preferring the exact one', () => {
     const near = result({ tmdbId: 'near', year: 2000 })
-    expect(pickMatch({ title: 'The Matrix', year: 1999, results: [near] })).toBe(near)
+    expect(pickMatch({ type: 'movie', title: 'The Matrix', year: 1999, results: [near] })).toBe(
+      near,
+    )
     const exact = result({ tmdbId: 'exact', year: 1999 })
-    expect(pickMatch({ title: 'The Matrix', year: 1999, results: [near, exact] })).toBe(exact)
+    expect(
+      pickMatch({ type: 'movie', title: 'The Matrix', year: 1999, results: [near, exact] }),
+    ).toBe(exact)
+  })
+
+  it('accepts the nearest year within three, as a festival and a release can differ', () => {
+    const release = result({ tmdbId: 'release', title: 'The Evil Dead', year: 1983 })
+    expect(
+      pickMatch({ type: 'movie', title: 'The Evil Dead', year: 1981, results: [release] }),
+    ).toBe(release)
+    const remake = result({ tmdbId: 'remake', title: 'Evil Dead', year: 2013 })
+    expect(
+      pickMatch({ type: 'movie', title: 'The Evil Dead', year: 1981, results: [remake, release] }),
+    ).toBe(release)
+    expect(
+      pickMatch({
+        type: 'movie',
+        title: 'The Evil Dead',
+        year: 1981,
+        results: [result({ title: 'The Evil Dead', year: 1985 })],
+      }),
+    ).toBeNull()
   })
 
   it('accepts an original title', () => {
@@ -38,21 +64,32 @@ describe('pickMatch', () => {
       year: 2001,
     })
     expect(
-      pickMatch({ title: "Le Fabuleux Destin d'Amelie Poulain", year: 2001, results: [amelie] }),
+      pickMatch({
+        type: 'movie',
+        title: "Le Fabuleux Destin d'Amelie Poulain",
+        year: 2001,
+        results: [amelie],
+      }),
     ).toBe(amelie)
   })
 
   it('accepts a lone result in the right year whatever its title', () => {
     const only = result({ title: 'Se7en', year: 1995 })
-    expect(pickMatch({ title: 'Seven', year: 1995, results: [only] })).toBe(only)
+    expect(pickMatch({ type: 'movie', title: 'Seven', year: 1995, results: [only] })).toBe(only)
   })
 
   it('refuses anything unsure', () => {
     expect(
-      pickMatch({ title: 'Seven', year: 1995, results: [result({ title: 'Se7en', year: 1996 })] }),
+      pickMatch({
+        type: 'movie',
+        title: 'Seven',
+        year: 1995,
+        results: [result({ title: 'Se7en', year: 1996 })],
+      }),
     ).toBeNull()
     expect(
       pickMatch({
+        type: 'movie',
         title: 'Seven',
         year: 1995,
         results: [
@@ -61,14 +98,112 @@ describe('pickMatch', () => {
         ],
       }),
     ).toBeNull()
-    expect(pickMatch({ title: 'The Matrix', year: 1999, results: [] })).toBeNull()
-    expect(pickMatch({ title: 'The Matrix', year: 1990, results: [result({})] })).toBeNull()
+    expect(pickMatch({ type: 'movie', title: 'The Matrix', year: 1999, results: [] })).toBeNull()
+    expect(
+      pickMatch({ type: 'movie', title: 'The Matrix', year: 1990, results: [result({})] }),
+    ).toBeNull()
   })
 
-  it('takes a name without a year only when one result has its title', () => {
-    expect(pickMatch({ title: 'The Matrix', year: null, results: [result({})] })).not.toBeNull()
+  it('takes a name without a year to the result with its title', () => {
     expect(
-      pickMatch({ title: 'The Matrix', year: null, results: [result({}), result({ year: 2021 })] }),
+      pickMatch({ type: 'movie', title: 'The Matrix', year: null, results: [result({})] }),
+    ).not.toBeNull()
+    expect(
+      pickMatch({
+        type: 'movie',
+        title: 'The Matrix',
+        year: null,
+        results: [result({ title: 'Matrix Reloaded' })],
+      }),
+    ).toBeNull()
+  })
+
+  it('settles two results with the same title by popularity, in or out of a year', () => {
+    const popular = result({ tmdbId: 'popular', title: 'Snowfall', year: 2017, popularity: 80 })
+    const obscure = result({ tmdbId: 'obscure', title: 'Snowfall', year: 2016, popularity: 2 })
+    expect(
+      pickMatch({ type: 'show', title: 'Snowfall', year: null, results: [obscure, popular] }),
+    ).toBe(popular)
+    expect(
+      pickMatch({ type: 'show', title: 'Snowfall', year: 2017, results: [obscure, popular] }),
+    ).toBe(popular)
+    const remake = result({ tmdbId: 'remake', title: 'Snowfall', year: 2017, popularity: 1 })
+    expect(
+      pickMatch({ type: 'movie', title: 'Snowfall', year: 2017, results: [remake, popular] }),
+    ).toBe(popular)
+    // Without scores, TMDB's own order (most popular first) decides.
+    const first = result({ tmdbId: 'first', title: 'Silo' })
+    expect(
+      pickMatch({
+        type: 'show',
+        title: 'Silo',
+        year: null,
+        results: [first, result({ tmdbId: 'second', title: 'Silo' })],
+      }),
+    ).toBe(first)
+  })
+
+  it('leaves a movie without a year unmatched when an original and its remake share the title', () => {
+    const original = result({ tmdbId: 'original', title: 'The Thing', year: 1982, popularity: 30 })
+    const remake = result({ tmdbId: 'remake', title: 'The Thing', year: 2011, popularity: 40 })
+    expect(
+      pickMatch({ type: 'movie', title: 'The Thing', year: null, results: [original, remake] }),
+    ).toBeNull()
+    expect(
+      pickMatch({
+        type: 'movie',
+        title: 'The Thing',
+        year: null,
+        results: [original, result({ tmdbId: '2', title: 'The Thing Below', year: 2021 })],
+      }),
+    ).toBe(original)
+  })
+
+  it('takes a show named with a country only from there', () => {
+    const us = result({
+      tmdbId: 'us',
+      title: 'The Office',
+      year: 2005,
+      popularity: 90,
+      countries: ['US'],
+    })
+    const uk = result({
+      tmdbId: 'uk',
+      title: 'The Office',
+      year: 2001,
+      popularity: 20,
+      countries: ['GB'],
+    })
+    const results = [us, uk]
+    expect(pickMatch({ type: 'show', title: 'The Office', year: null, results })).toBe(us)
+    expect(
+      pickMatch({ type: 'show', title: 'The Office', year: null, country: 'GB', results }),
+    ).toBe(uk)
+    expect(
+      pickMatch({ type: 'show', title: 'The Office', year: null, country: 'AU', results }),
+    ).toBeNull()
+    expect(
+      pickMatch({ type: 'show', title: 'The Office', year: 2001, country: 'US', results: [uk] }),
+    ).toBeNull()
+  })
+
+  it('takes the one result with the title among others without it, as show folders rarely carry a year', () => {
+    const andor = result({ tmdbId: '83867', title: 'Andor', year: 2022 })
+    expect(
+      pickMatch({
+        type: 'show',
+        title: 'Andor',
+        year: null,
+        results: [andor, result({ tmdbId: '2', title: 'Andorra Between Two Evils', year: 2000 })],
+      }),
+    ).toBe(andor)
+    expect(
+      pickMatch({
+        type: 'show',
+        title: 'Andor',
+        year: null,
+        results: [result({ tmdbId: '2', title: 'Andorra Between Two Evils', year: 2000 })],
+      }),
     ).toBeNull()
   })
 })

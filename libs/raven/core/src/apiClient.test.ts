@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ApiError, type FetchInit, type FetchResponse, createApiClient } from '@/apiClient'
-import { itemDetails, mediaItem, showEntry } from '@/test/fixtures'
+import { itemDetails, library, mediaItem, showEntry } from '@/test/fixtures'
 
 type Call = { url: string; init?: FetchInit }
 
@@ -36,6 +36,73 @@ describe('createApiClient', () => {
     const { client, calls } = clientReturning(respond({ body: [] }))
     await client.listMedia({ libraryId: 3, sort: 'random', seed: 42 })
     expect(calls[0]?.url).toBe('http://nas:8484/api/libraries/3/media?sort=random&seed=42')
+  })
+
+  it('asks the server to match a library again', async () => {
+    const { client, calls } = clientReturning(respond({ body: library() }))
+    await expect(client.matchLibrary(3)).resolves.toEqual(library())
+    expect(calls[0]).toMatchObject({
+      url: 'http://nas:8484/api/libraries/3/match',
+      init: { method: 'POST' },
+    })
+  })
+
+  it('reads and writes an item’s metadata over TMDB’s', async () => {
+    const state = {
+      shown: {
+        title: 'Heat (Director’s Cut)',
+        year: 1995,
+        tagline: null,
+        summary: null,
+        contentRating: 'R',
+      },
+      original: { title: 'Heat', year: 1995, tagline: null, summary: null, contentRating: 'R' },
+      overridden: ['title'],
+    }
+    const { client, calls } = clientReturning(respond({ body: state }))
+    await expect(client.getItemMetadata(9)).resolves.toEqual(state)
+    expect(calls[0]?.url).toBe('http://nas:8484/api/items/9/metadata')
+    const edited = clientReturning(respond({ body: itemDetails() }))
+    await edited.client.setItemMetadata({ id: 9, change: { title: null, tagline: 'Hot.' } })
+    expect(edited.calls[0]).toMatchObject({
+      url: 'http://nas:8484/api/items/9/metadata',
+      init: { method: 'PUT', body: '{"title":null,"tagline":"Hot."}' },
+    })
+  })
+
+  it('lists the pictures an item could show, and chooses one', async () => {
+    const options = {
+      poster: [
+        {
+          source: 'tmdb',
+          ref: '/p1.jpg',
+          width: 2000,
+          height: 3000,
+          language: 'en',
+          current: true,
+        },
+      ],
+      backdrop: [],
+    }
+    const { client, calls } = clientReturning(respond({ body: options }))
+    await expect(client.getItemImages(9)).resolves.toEqual(options)
+    expect(calls[0]?.url).toBe('http://nas:8484/api/items/9/images')
+
+    const chosen = clientReturning(respond({ body: itemDetails() }))
+    await chosen.client.chooseItemImage({ id: 9, kind: 'backdrop', choice: { source: 'local' } })
+    expect(chosen.calls[0]).toMatchObject({
+      url: 'http://nas:8484/api/items/9/images/backdrop',
+      init: { method: 'PUT', body: '{"source":"local"}' },
+    })
+
+    const option = options.poster[0]
+    if (!option) throw new Error('no option')
+    expect(
+      client.imageOptionUrl({ id: 9, kind: 'poster', option: { ...option, source: 'tmdb' } }),
+    ).toBe('http://nas:8484/api/images/poster/p1.jpg')
+    expect(
+      client.imageOptionUrl({ id: 9, kind: 'poster', option: { ...option, source: 'local' } }),
+    ).toBe('http://nas:8484/api/items/9/images/poster/local')
   })
 
   it('sends JSON bodies', async () => {

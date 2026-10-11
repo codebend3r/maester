@@ -74,6 +74,11 @@ export const createGate = ({ limit }: { limit: number }): Gate => {
 export type TaskQueue = {
   /** Queues `task` under `key`; a key already queued or running is ignored. */
   push: (key: string, task: () => Promise<void>) => void
+  /**
+   * Like `push`, but a key that is running is queued once more, to run
+   * after it: for work that changed what the running task has already read.
+   */
+  again: (key: string, task: () => Promise<void>) => void
   /** Drops a queued task that has not started yet. */
   cancel: (key: string) => void
   /** Resolves once nothing is queued or running. */
@@ -89,6 +94,8 @@ export type TaskQueue = {
 export const createTaskQueue = ({ concurrency }: { concurrency: number }): TaskQueue => {
   const queued = new Map<string, () => Promise<void>>()
   const running = new Set<string>()
+  // Tasks asked for again while their key ran; each is queued once it ends.
+  const after = new Map<string, () => Promise<void>>()
   const waiters = new Set<() => void>()
 
   const settle = (): void => {
@@ -108,6 +115,9 @@ export const createTaskQueue = ({ concurrency }: { concurrency: number }): TaskQ
       .catch(() => undefined)
       .finally(() => {
         running.delete(key)
+        const rerun = after.get(key)
+        after.delete(key)
+        if (rerun) queued.set(key, rerun)
         pump()
       })
     pump()
@@ -119,8 +129,15 @@ export const createTaskQueue = ({ concurrency }: { concurrency: number }): TaskQ
       queued.set(key, task)
       pump()
     },
+    again: (key, task) => {
+      if (queued.has(key)) return
+      if (running.has(key)) after.set(key, task)
+      else queued.set(key, task)
+      pump()
+    },
     cancel: (key) => {
       queued.delete(key)
+      after.delete(key)
       settle()
     },
     idle: () =>
@@ -129,7 +146,7 @@ export const createTaskQueue = ({ concurrency }: { concurrency: number }): TaskQ
         : new Promise((resolve) => {
             waiters.add(resolve)
           }),
-    size: () => queued.size + running.size,
+    size: () => queued.size + running.size + after.size,
   }
 }
 

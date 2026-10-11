@@ -6,6 +6,7 @@ import { library } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 
 const created: unknown[] = []
+const updated: unknown[] = []
 const offline = createApiClient({
   fetch: async () => {
     throw new Error('No network in tests')
@@ -28,6 +29,10 @@ mock.module('@/lib/api', () => ({
     createLibrary: async (input: unknown) => {
       created.push(input)
       return { id: 1 }
+    },
+    updateLibrary: async ({ id, input }: { id: number; input: unknown }) => {
+      updated.push(input)
+      return { id }
     },
     getMetadataHealth: async () => ({
       tmdb: 'off',
@@ -55,7 +60,7 @@ describe('LibraryDialog', () => {
       within(select)
         .getAllByRole('option')
         .map((option) => option.textContent),
-    ).toEqual(['TMDB', 'IMDb', 'Rotten Tomatoes'])
+    ).toEqual(['TMDB', 'IMDb', 'Rotten Tomatoes', 'Metacritic'])
     await userEvent.click(screen.getByRole('radio', { name: 'Other' }))
     expect(screen.queryByRole('combobox', { name: 'Ratings shown' })).toBeNull()
   })
@@ -133,7 +138,37 @@ describe('LibraryDialog', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Add' }))
     await userEvent.click(screen.getByRole('radio', { name: 'TV shows' }))
     await userEvent.click(screen.getByRole('button', { name: 'Add library' }))
-    expect(created.at(-1)).toMatchObject({ settings: { kind: 'shows' } })
+    expect(created.at(-1)).toMatchObject({
+      settings: { kind: 'shows', view: 'grid', groupBy: 'resolution' },
+    })
+  })
+
+  it('starts a Movies library grouped into matched and not', async () => {
+    renderWithProviders(<LibraryDialog onClose={() => undefined} />)
+    await userEvent.type(screen.getByLabelText('Name'), 'Films')
+    await userEvent.type(screen.getByLabelText('Folder path'), '/media/Films')
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }))
+    await userEvent.click(screen.getByRole('radio', { name: 'Movies' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Add library' }))
+    expect(created.at(-1)).toMatchObject({
+      settings: { kind: 'movies', view: 'grouped', groupBy: 'match' },
+    })
+  })
+
+  it('swaps a grouping the new type cannot show when an edited library changes type', async () => {
+    renderWithProviders(
+      <LibraryDialog
+        library={library({
+          settings: { ...library().settings, kind: 'movies', view: 'grouped', groupBy: 'match' },
+        })}
+        onClose={() => undefined}
+      />,
+    )
+    await userEvent.click(screen.getByRole('radio', { name: 'Other' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+    expect(updated.at(-1)).toMatchObject({
+      settings: { kind: 'other', view: 'grouped', groupBy: 'resolution' },
+    })
   })
 
   it("shows the library's own type when editing it", () => {

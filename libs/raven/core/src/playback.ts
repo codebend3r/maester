@@ -1,4 +1,4 @@
-import type { MediaItem, PlaybackMode, StreamMode } from '@/types'
+import type { MediaItem, PlaybackMode, PlaybackSettings, StreamMode } from '@/types'
 
 /**
  * Asks the client whether it can decode a MIME type such as
@@ -189,6 +189,9 @@ export type PlaybackPlan = {
   problems: string[]
 }
 
+/** The server's playback settings a plan follows: whether to force the original file, and what it will convert. */
+export type PlaybackPolicy = Pick<PlaybackSettings, 'directPlay' | 'transcoding'>
+
 /**
  * How to play a file here. Direct play when the browser takes the file as
  * it is and the default audio track is wanted; otherwise a remux when the
@@ -196,25 +199,42 @@ export type PlaybackPlan = {
  * the last resort. `canStream` answers for Media Source Extensions
  * (`MediaSource.isTypeSupported`), and says no to everything where they
  * are missing.
+ *
+ * The policy is the server's, and has no default: a plan made without it
+ * would offer what the server refuses, or convert what it is told to send
+ * as it is.
  */
 export const planPlayback = ({
   media,
   canPlay,
   canStream,
   defaultAudio,
+  policy,
 }: {
   media: MediaItem
   canPlay: CanPlay
   canStream: CanPlay
   /** Whether the chosen audio track is the one the file plays by default. */
   defaultAudio: boolean
+  policy: PlaybackPolicy
 }): PlaybackPlan => {
   const check = checkDirectPlay({ media, canPlay })
   const direct = check.playable && defaultAudio
   const remux =
+    policy.transcoding !== 'off' &&
     (media.videoCodec == null || COPYABLE_VIDEO.has(media.videoCodec)) &&
     canStream(streamMimeType({ media, mode: 'remux' }))
-  const transcode = canStream(streamMimeType({ media, mode: 'transcode' }))
+  const transcode =
+    policy.transcoding === 'on' && canStream(streamMimeType({ media, mode: 'transcode' }))
+  // Forced, the original file is sent whatever the check says. Only another
+  // audio track, which the file cannot switch to, goes through a remux
+  // first: the video stays as it is either way.
+  if (policy.directPlay === 'force') {
+    return {
+      modes: !defaultAudio && remux ? ['remux', 'direct'] : ['direct'],
+      problems: check.problems,
+    }
+  }
   const available: Record<PlaybackMode, boolean> = { direct, remux, transcode }
   const modes = PLAYBACK_ORDER.filter((mode) => available[mode])
   // Without any way to convert, a file that would play as it is still

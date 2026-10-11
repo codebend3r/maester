@@ -207,6 +207,24 @@ describe('playback', () => {
     expect(bad.statusCode).toBe(400)
   })
 
+  it('refuses a converted stream while Settings have conversion off, and again after', async () => {
+    const turn = (transcoding: 'on' | 'remuxOnly' | 'off') =>
+      app().inject({ method: 'PUT', url: '/api/settings/playback', payload: { transcoding } })
+    await turn('off')
+    const off = await app().inject({
+      method: 'GET',
+      url: `/api/media/${movieId()}/stream?mode=remux&start=0`,
+    })
+    expect(off.statusCode).toBe(403)
+    await turn('remuxOnly')
+    const noTranscode = await app().inject({
+      method: 'GET',
+      url: `/api/media/${movieId()}/stream?mode=transcode&start=0`,
+    })
+    expect(noTranscode.statusCode).toBe(403)
+    await turn('on')
+  })
+
   describe('converted streams', () => {
     const fetchStream = async (query: string): Promise<string> => {
       const response = await app().inject({

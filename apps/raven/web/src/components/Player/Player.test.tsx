@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
-import type { MediaTracks, SubtitleTrack } from '@raven/core'
+import type { MediaTracks, PlaybackSettingsState, SubtitleTrack } from '@raven/core'
 import { act, fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Player } from '@/components/Player/Player'
 import { api } from '@/lib/api'
 import { setBrowserSupport, setStreamSupport } from '@/test/canPlay'
 import { mediaItem } from '@/test/fixtures'
-import { renderWithProviders } from '@/test/render'
+import { DEFAULT_PLAYBACK_STATE, renderWithProviders } from '@/test/render'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
 
 const subtitleTrack = (overrides: Partial<SubtitleTrack>): SubtitleTrack => ({
@@ -72,6 +72,51 @@ describe('Player', () => {
     expect(container.querySelector('video')).toBeNull()
     expect(screen.getByText("This video can't play in this browser.")).toBeInTheDocument()
     expect(screen.getByText("The MKV container isn't supported here.")).toBeInTheDocument()
+  })
+
+  it('waits for the server’s playback settings before it picks a source', async () => {
+    setStreamSupport(() => true)
+    const off: PlaybackSettingsState = {
+      ...DEFAULT_PLAYBACK_STATE,
+      settings: { ...DEFAULT_PLAYBACK_STATE.settings, transcoding: 'off' },
+    }
+    spies.push(spyOn(api, 'getPlaybackSettings').mockImplementation(async () => off))
+    const { container } = renderWithProviders(
+      <Player media={mediaItem()} backTo="/libraries/2" />,
+      { playback: null },
+    )
+    expect(screen.getByLabelText('Loading')).toBeInTheDocument()
+    expect(container.querySelector('video')).toBeNull()
+    // Nothing is converted, so the Matroska file has no way to play here.
+    expect(await screen.findByText("This video can't play in this browser.")).toBeInTheDocument()
+  })
+
+  it('sends the original file under Always, and marks its own audio track as the one playing', async () => {
+    const forced: PlaybackSettingsState = {
+      ...DEFAULT_PLAYBACK_STATE,
+      settings: { ...DEFAULT_PLAYBACK_STATE.settings, directPlay: 'force' },
+    }
+    const { container } = renderWithProviders(
+      <Player media={mediaItem()} backTo="/libraries/2" />,
+      { playback: forced },
+    )
+    expect(container.querySelector('video')).toHaveAttribute('src', '/api/media/7/file')
+    await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    const menu = await screen.findByRole('dialog', { name: 'Settings' })
+    await userEvent.click(
+      await within(within(menu).getByRole('group', { name: 'Audio' })).findByRole('radio', {
+        name: /Japanese/,
+      }),
+    )
+    // Without a stream to remux into, the file plays on, with its default track.
+    expect(container.querySelector('video')).toHaveAttribute('src', '/api/media/7/file')
+    const audio = within(
+      within(await screen.findByRole('dialog', { name: 'Settings' })).getByRole('group', {
+        name: 'Audio',
+      }),
+    )
+    expect(audio.getByRole('radio', { name: /English/ })).toBeChecked()
+    expect(audio.getByRole('radio', { name: /Japanese/ })).not.toBeChecked()
   })
 
   it('lets the viewer try anyway', async () => {

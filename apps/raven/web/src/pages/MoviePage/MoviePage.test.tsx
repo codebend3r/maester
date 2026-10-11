@@ -101,6 +101,41 @@ describe('MoviePage', () => {
     expect(screen.getByText('Watching 7')).toBeInTheDocument()
   })
 
+  it('opens Edit images from the header, and closes it with Done', async () => {
+    const images = spyOn(api, 'getItemImages').mockImplementation(async () => ({
+      poster: [],
+      backdrop: [],
+    }))
+    open(itemDetails())
+    const button = await screen.findByRole('button', { name: 'Edit images' })
+    expect(screen.queryByRole('heading', { name: 'Edit images' })).toBeNull()
+    await userEvent.click(button)
+    expect(await screen.findByRole('heading', { name: 'Edit images' })).toBeInTheDocument()
+    expect(images).toHaveBeenCalledWith(40)
+    await userEvent.click(screen.getByRole('button', { name: 'Done' }))
+    expect(screen.queryByRole('heading', { name: 'Edit images' })).toBeNull()
+    images.mockRestore()
+  })
+
+  it('opens Edit metadata from the header', async () => {
+    const state = spyOn(api, 'getItemMetadata').mockImplementation(async () => ({
+      shown: { title: 'The Matrix', year: 1999, tagline: null, summary: null, contentRating: null },
+      original: {
+        title: 'The Matrix',
+        year: 1999,
+        tagline: null,
+        summary: null,
+        contentRating: null,
+      },
+      overridden: [],
+    }))
+    open(itemDetails())
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit metadata' }))
+    expect(await screen.findByRole('heading', { name: 'Edit metadata' })).toBeInTheDocument()
+    expect(state).toHaveBeenCalledWith(40)
+    state.mockRestore()
+  })
+
   it('lists the versions only when there is more than one', async () => {
     open(itemDetails())
     await screen.findByRole('heading', { level: 1, name: 'Busboys' })

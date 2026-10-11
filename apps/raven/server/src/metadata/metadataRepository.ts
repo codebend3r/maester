@@ -2,18 +2,21 @@ import { createHash } from 'node:crypto'
 import { Inject, Injectable } from '@nestjs/common'
 import {
   type Credit,
+  isCreditJob,
+  isItemType,
+  isRatingSource,
+  isStringArray,
   type ItemDetails,
   type ItemImageKind,
+  type ItemMetadata,
+  type ItemMetadataChange,
+  type ItemMetadataState,
   type ItemSummary,
   type ItemType,
   type PersonDetails,
   type Rating,
   type RatingSource,
   type Review,
-  isCreditJob,
-  isItemType,
-  isRatingSource,
-  isStringArray,
   sortTitle,
 } from '@raven/core'
 import type Sqlite from 'better-sqlite3'
@@ -25,7 +28,8 @@ import type { FetchedItem } from '@/metadata/tmdbClient'
 export const versionOf = (ref: string): string =>
   createHash('sha1').update(ref).digest('base64url').slice(0, 11)
 
-export type ImageSource = 'tmdb' | 'local'
+/** `chosen` is what Edit images picked, a TMDB path; it beats a local picture, which beats TMDB's own. */
+export type ImageSource = 'tmdb' | 'local' | 'chosen'
 
 /** Where an item's picture comes from: a file beside the media wins over TMDB's. */
 export type ImageRef = { source: ImageSource; ref: string }
@@ -59,6 +63,16 @@ type ItemRow = {
   fetched_at: string
 }
 
+type OverrideRow = {
+  item_id: number
+  title: string | null
+  sort_title: string | null
+  year: number | null
+  tagline: string | null
+  summary: string | null
+  content_rating: string | null
+}
+
 type SummaryRow = {
   id: number
   type: string
@@ -70,11 +84,14 @@ type SummaryRow = {
   show_title: string | null
 }
 
-/** The picture each item shows for `kind`: local first, then TMDB's. */
+/** The picture each item shows for `kind`: the chosen one first, then local, then TMDB's. */
 const IMAGE_REFS = `
   SELECT item_id, source, ref FROM item_images
    WHERE kind = ? AND item_id IN (SELECT value FROM json_each(?))
-   ORDER BY item_id, CASE source WHEN 'local' THEN 0 ELSE 1 END`
+   ORDER BY item_id, CASE source WHEN 'chosen' THEN 0 WHEN 'local' THEN 1 ELSE 2 END`
+
+const toImageSource = (source: string): ImageSource =>
+  source === 'local' ? 'local' : source === 'chosen' ? 'chosen' : 'tmdb'
 
 const genresOf = (json: string): string[] => {
   try {
@@ -281,6 +298,90 @@ export class MetadataRepository {
     })()
   }
 
+  /** Edit metadata: TMDB's own words for an item beside what was written over them, and which fields were. */
+  metadata(itemId: number): ItemMetadataState | null {
+    const original = this.db
+      .prepare<[number], ItemRow>('SELECT * FROM items WHERE id = ?')
+      .get(itemId)
+    if (!original) return null
+    const shown = this.db
+      .prepare<[number], ItemRow>('SELECT * FROM shown_items WHERE id = ?')
+      .get(itemId)
+    const override = this.db
+      .prepare<[number], OverrideRow>('SELECT * FROM item_overrides WHERE item_id = ?')
+      .get(itemId)
+    const fields = (row: ItemRow | undefined): ItemMetadata => ({
+      title: row?.title ?? original.title,
+      year: row?.year ?? null,
+      tagline: row?.tagline ?? null,
+      summary: row?.summary ?? null,
+      contentRating: row?.content_rating ?? null,
+    })
+    const overridden: (keyof ItemMetadata)[] = [
+      ...(override?.title != null ? ['title' as const] : []),
+      ...(override?.year != null ? ['year' as const] : []),
+      ...(override?.tagline != null ? ['tagline' as const] : []),
+      ...(override?.summary != null ? ['summary' as const] : []),
+      ...(override?.content_rating != null ? ['contentRating' as const] : []),
+    ]
+    return { shown: fields(shown), original: fields(original), overridden }
+  }
+
+  /**
+   * Writes a field over TMDB's, or clears one back to TMDB's with null; ''
+   * (0 for the year) is written over TMDB's too, and shows as nothing. A
+   * field left out stays as it is; an item with nothing written over keeps
+   * no row.
+   */
+  setMetadata({ itemId, change }: { itemId: number; change: ItemMetadataChange }): void {
+    this.db.transaction(() => {
+      const current = this.db
+        .prepare<[number], OverrideRow>('SELECT * FROM item_overrides WHERE item_id = ?')
+        .get(itemId)
+      const next = {
+        title: 'title' in change ? (change.title ?? null) : (current?.title ?? null),
+        year: 'year' in change ? (change.year ?? null) : (current?.year ?? null),
+        tagline: 'tagline' in change ? (change.tagline ?? null) : (current?.tagline ?? null),
+        summary: 'summary' in change ? (change.summary ?? null) : (current?.summary ?? null),
+        content_rating:
+          'contentRating' in change
+            ? (change.contentRating ?? null)
+            : (current?.content_rating ?? null),
+      }
+      this.db.prepare('DELETE FROM item_overrides WHERE item_id = ?').run(itemId)
+      if (Object.values(next).every((value) => value == null)) return
+      this.db
+        .prepare(
+          `INSERT INTO item_overrides (item_id, title, sort_title, year, tagline, summary, content_rating)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          itemId,
+          next.title,
+          next.title == null ? null : sortTitle(next.title),
+          next.year,
+          next.tagline,
+          next.summary,
+          next.content_rating,
+        )
+    })()
+  }
+
+  /** Sort titles again with the current rule, for items stored under an older one. */
+  resortTitles(): void {
+    const rows = this.db
+      .prepare<[], { id: number; title: string; sort_title: string }>(
+        'SELECT id, title, sort_title FROM items',
+      )
+      .all()
+    const update = this.db.prepare('UPDATE items SET sort_title = ? WHERE id = ?')
+    this.db.transaction(() =>
+      rows
+        .filter((row) => sortTitle(row.title) !== row.sort_title)
+        .forEach((row) => update.run(sortTitle(row.title), row.id)),
+    )()
+  }
+
   /** Replaces an item's pictures from beside the media; a kind left out has none. */
   setLocalImages({
     itemId,
@@ -304,7 +405,50 @@ export class MetadataRepository {
       .prepare<[string, string], { item_id: number; source: string; ref: string }>(IMAGE_REFS)
       .get(kind, JSON.stringify([itemId]))
     if (!row) return null
-    return { source: row.source === 'local' ? 'local' : 'tmdb', ref: row.ref }
+    return { source: toImageSource(row.source), ref: row.ref }
+  }
+
+  /** The picture of `source` an item holds for `kind`, whatever it shows. */
+  imageFrom({
+    itemId,
+    kind,
+    source,
+  }: {
+    itemId: number
+    kind: ItemImageKind
+    source: ImageSource
+  }): string | null {
+    return (
+      this.db
+        .prepare<[number, string, string], { ref: string }>(
+          `SELECT ref FROM item_images WHERE item_id = ? AND kind = ? AND source = ?`,
+        )
+        .get(itemId, kind, source)?.ref ?? null
+    )
+  }
+
+  /** Edit images: the item shows TMDB's picture at `ref` for `kind` from now on, or, for null, whatever it would by itself. */
+  chooseImage({
+    itemId,
+    kind,
+    ref,
+  }: {
+    itemId: number
+    kind: ItemImageKind
+    ref: string | null
+  }): void {
+    this.db.transaction(() => {
+      this.db
+        .prepare(`DELETE FROM item_images WHERE item_id = ? AND kind = ? AND source = 'chosen'`)
+        .run(itemId, kind)
+      if (ref != null) {
+        this.db
+          .prepare(
+            `INSERT INTO item_images (item_id, kind, source, ref) VALUES (?, ?, 'chosen', ?)`,
+          )
+          .run(itemId, kind, ref)
+      }
+    })()
   }
 
   /** An item's TMDB picture for `kind`, whatever is beside the media. */
@@ -370,9 +514,9 @@ export class MetadataRepository {
                 p.number AS parent_number,
                 CASE i.type WHEN 'season' THEN p.id WHEN 'episode' THEN g.id END AS show_id,
                 CASE i.type WHEN 'season' THEN p.title WHEN 'episode' THEN g.title END AS show_title
-           FROM items i
-           LEFT JOIN items p ON p.id = i.parent_id
-           LEFT JOIN items g ON g.id = p.parent_id
+           FROM shown_items i
+           LEFT JOIN shown_items p ON p.id = i.parent_id
+           LEFT JOIN shown_items g ON g.id = p.parent_id
           WHERE i.id IN (SELECT value FROM json_each(?))`,
       )
       .all(JSON.stringify(unique))
@@ -410,7 +554,7 @@ export class MetadataRepository {
 
   /** An item's page, apart from its files and children, which the caller adds. */
   details(id: number): Omit<ItemDetails, 'versions' | 'children'> | null {
-    const row = this.db.prepare<[number], ItemRow>('SELECT * FROM items WHERE id = ?').get(id)
+    const row = this.db.prepare<[number], ItemRow>('SELECT * FROM shown_items WHERE id = ?').get(id)
     const summary = this.summaries([id]).get(id)
     if (!row || !summary) return null
     return {
@@ -687,7 +831,7 @@ export class MetadataRepository {
     const tmdbPaths = new Set(
       this.db
         .prepare<[], { ref: string }>(
-          `SELECT ref FROM item_images WHERE source = 'tmdb'
+          `SELECT ref FROM item_images WHERE source IN ('tmdb', 'chosen')
            UNION SELECT photo AS ref FROM people WHERE photo IS NOT NULL`,
         )
         .all()

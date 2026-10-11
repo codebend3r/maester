@@ -23,6 +23,13 @@ const TIMEOUT_MS = 10_000
 /** How often a 429 is waited out before the call gives up. */
 const RETRIES = 3
 
+/**
+ * A title with its accents as single characters. A Mac's SMB mount names a
+ * folder with each accent as a combining mark, and TMDB finds nothing for
+ * "Shōgun" in that form while it finds the show in this one.
+ */
+const composed = (title: string): string => title.normalize('NFC')
+
 /** TMDB's older API key: 32 hex characters, sent as `api_key` rather than as a bearer token. */
 const API_KEY = /^[a-f0-9]{32}$/i
 
@@ -89,6 +96,17 @@ export type FetchedItem = {
   reviews: FetchedReview[]
 }
 
+/** One of TMDB's pictures for a movie or show. */
+export type TmdbImage = {
+  path: string
+  width: number | null
+  height: number | null
+  /** ISO 639-1, or null for a picture with no text. */
+  language: string | null
+}
+
+export type TmdbImages = { posters: TmdbImage[]; backdrops: TmdbImage[] }
+
 export type SearchResult = {
   tmdbId: string
   title: string
@@ -96,6 +114,10 @@ export type SearchResult = {
   year: number | null
   overview: string | null
   poster: string | null
+  /** TMDB's popularity score, which settles a title two results share. */
+  popularity: number | null
+  /** A show's countries of origin, `['GB']`; none for a movie, as TMDB's search gives none. */
+  countries: string[]
 }
 
 export type TmdbState = {
@@ -475,6 +497,8 @@ const toSearchResult = (entry: Record<string, unknown>): SearchResult | null => 
     year: yearOf(text(entry.release_date) ?? text(entry.first_air_date)),
     overview: text(entry.overview),
     poster: imagePath(entry.poster_path),
+    popularity: number(entry.popularity),
+    countries: list(entry.origin_country).filter(isString),
   }
 }
 
@@ -597,7 +621,7 @@ export class TmdbClient {
     year: number | null
   }): Promise<SearchResult[]> {
     const body = await this.get('/search/movie', {
-      query,
+      query: composed(query),
       include_adult: 'false',
       ...(year == null ? {} : { year: String(year) }),
     })
@@ -612,7 +636,7 @@ export class TmdbClient {
     year: number | null
   }): Promise<SearchResult[]> {
     const body = await this.get('/search/tv', {
-      query,
+      query: composed(query),
       include_adult: 'false',
       ...(year == null ? {} : { first_air_date_year: String(year) }),
     })
@@ -668,6 +692,34 @@ export class TmdbClient {
     const ids = (results: unknown): string[] =>
       records(results).flatMap((entry) => idOf(entry.id) ?? [])
     return { movies: ids(body.movie_results), shows: ids(body.tv_results) }
+  }
+
+  /**
+   * Every poster and backdrop TMDB holds for a movie or show, in the
+   * language details come in and without text, most voted first.
+   */
+  async images({ type, tmdbId }: { type: 'movie' | 'show'; tmdbId: string }): Promise<TmdbImages> {
+    const language = this.config.metadataLanguage.slice(0, 2)
+    const body = record(
+      await this.get(`/${type === 'movie' ? 'movie' : 'tv'}/${encodeURIComponent(tmdbId)}/images`, {
+        include_image_language: `${language},null`,
+      }),
+    )
+    const toImages = (entries: unknown): TmdbImage[] =>
+      records(entries).flatMap((entry) => {
+        const path = imagePath(entry.file_path)
+        return path == null
+          ? []
+          : [
+              {
+                path,
+                width: number(entry.width),
+                height: number(entry.height),
+                language: text(entry.iso_639_1),
+              },
+            ]
+      })
+    return { posters: toImages(body.posters), backdrops: toImages(body.backdrops) }
   }
 
   async movie(tmdbId: string): Promise<FetchedItem> {

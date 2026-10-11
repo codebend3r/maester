@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { readServerConfig } from '@/config'
 import type { HwAccel } from '@/ffmpeg/encoder'
+import { DEFAULT_PLAYBACK_SETTINGS } from '@raven/core'
 import { FfmpegService, FfmpegTimeoutError } from '@/ffmpeg/ffmpegService'
 
 describe('FfmpegService', () => {
@@ -29,12 +30,15 @@ describe('FfmpegService', () => {
   })
 
   const service = (tool: string) =>
-    new FfmpegService({
-      ...readServerConfig({}),
-      ffprobePath: join(state.dir, tool),
-      ffmpegPath: join(state.dir, tool),
-      ffmpegTimeoutSeconds: 1,
-    })
+    new FfmpegService(
+      {
+        ...readServerConfig({}),
+        ffprobePath: join(state.dir, tool),
+        ffmpegPath: join(state.dir, tool),
+        ffmpegTimeoutSeconds: 1,
+      },
+      { playback: () => DEFAULT_PLAYBACK_SETTINGS },
+    )
 
   it('reports a timeout as a timeout, so the scan can retry later', async () => {
     await expect(service('slow').probe('/media/a.mkv')).rejects.toBeInstanceOf(FfmpegTimeoutError)
@@ -49,12 +53,15 @@ describe('FfmpegService', () => {
 
   describe('choosing how transcodes encode', () => {
     const encoderWith = ({ tool, hwAccel }: { tool: string; hwAccel: HwAccel }) =>
-      new FfmpegService({
-        ...readServerConfig({}),
-        ffmpegPath: join(state.dir, tool),
-        hwAccel,
-        vaapiDevice: join(state.dir, 'renderD128'),
-      }).videoEncoder()
+      new FfmpegService(
+        {
+          ...readServerConfig({}),
+          ffmpegPath: join(state.dir, tool),
+          hwAccel,
+          vaapiDevice: join(state.dir, 'renderD128'),
+        },
+        { playback: () => DEFAULT_PLAYBACK_SETTINGS },
+      ).videoEncoder()
 
     it('uses the GPU when its test encode works', async () => {
       await expect(encoderWith({ tool: 'works', hwAccel: 'vaapi' })).resolves.toEqual({

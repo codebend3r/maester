@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common'
 import {
   DEFAULT_LIBRARY_SETTINGS,
+  defaultLibrarySettings,
   type LibraryInput,
   type LibrarySettings,
   isLibraryKind,
@@ -9,6 +10,7 @@ import {
   isMediaSort,
   isShownRatings,
   isWatchedPercent,
+  withLibraryKind,
 } from '@raven/core'
 import { DatabaseService } from '@/db/database'
 
@@ -18,6 +20,7 @@ export type LibraryRecord = {
   name: string
   paths: string[]
   itemCount: number
+  unmatchedCount: number
   createdAt: string
   settings: LibrarySettings
 }
@@ -27,6 +30,7 @@ type LibraryRow = {
   name: string
   created_at: string
   item_count: number
+  unmatched_count: number
   save_progress: number
   pinned: number
   sort: string
@@ -86,7 +90,9 @@ export class LibrariesRepository {
       .prepare<[number | null, number | null], LibraryRow>(
         `SELECT l.id, l.name, l.created_at, l.save_progress, l.pinned, l.sort, l.view_mode, l.group_by,
                 l.watched_percent, l.kind, l.ratings_source,
-                (SELECT COUNT(*) FROM media m WHERE m.library_id = l.id) AS item_count
+                (SELECT COUNT(*) FROM media m WHERE m.library_id = l.id) AS item_count,
+                (SELECT COUNT(*) FROM media m WHERE m.library_id = l.id AND m.match = 'unmatched')
+                  AS unmatched_count
            FROM libraries l
           WHERE ? IS NULL OR l.id = ?
           ORDER BY l.name COLLATE NOCASE`,
@@ -104,6 +110,7 @@ export class LibrariesRepository {
       name: row.name,
       createdAt: row.created_at,
       itemCount: row.item_count,
+      unmatchedCount: row.unmatched_count,
       settings: toSettings(row),
       paths: paths.filter((path) => path.library_id === row.id).map((path) => path.path),
     }))
@@ -126,7 +133,10 @@ export class LibrariesRepository {
   }
 
   create(input: LibraryInput): LibraryRecord {
-    const settings = { ...DEFAULT_LIBRARY_SETTINGS, ...input.settings }
+    const settings = {
+      ...defaultLibrarySettings(input.settings?.kind ?? DEFAULT_LIBRARY_SETTINGS.kind),
+      ...input.settings,
+    }
     const id = this.db.transaction(() => {
       const result = this.db
         .prepare(
@@ -152,7 +162,12 @@ export class LibrariesRepository {
   update({ id, input }: { id: number; input: LibraryInput }): LibraryRecord | null {
     const current = this.get(id)
     if (!current) return null
-    const settings = { ...current.settings, ...input.settings }
+    const laid = { ...current.settings, ...input.settings }
+    // A new type keeps the view and grouping it can show, and swaps the others for its own.
+    const settings =
+      laid.kind === current.settings.kind
+        ? laid
+        : withLibraryKind({ settings: laid, kind: laid.kind })
     this.db.transaction(() => {
       this.db
         .prepare(

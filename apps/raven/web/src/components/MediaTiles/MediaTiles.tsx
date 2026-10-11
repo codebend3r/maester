@@ -14,6 +14,7 @@ import { Icon } from '@/components/Icon/Icon'
 import { MediaMenu } from '@/components/MediaMenu/MediaMenu'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
 import { PosterFrame } from '@/components/PosterCard/PosterCard'
+import { RatingChips } from '@/components/RatingChips/RatingChips'
 import { api } from '@/lib/api'
 import { openPath } from '@/lib/itemLinks'
 import { progressOf } from '@/lib/mediaProgress'
@@ -101,6 +102,7 @@ const MediaTile = ({
           ))}
           {progress > 0 && <span className="visually-hidden">Partly watched</span>}
         </span>
+        {posters && media.item && <RatingChips ratings={media.item.ratings} />}
         {media.folder !== '' && <span className={styles.folder}>{media.folder}</span>}
         {posters && media.match === 'unmatched' && <span className={styles.note}>Not matched</span>}
         {note !== null && <span className={styles.note}>{note}</span>}

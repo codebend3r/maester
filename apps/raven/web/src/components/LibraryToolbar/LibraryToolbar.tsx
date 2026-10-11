@@ -61,9 +61,17 @@ const sortsFor = ({ kind, sort }: LibrarySettings): MediaSort[] =>
           : true),
   )
 
-/** A TV library lays its shows out as posters, so it has no grouped view. */
-const viewsFor = ({ kind, view }: LibrarySettings): LibraryView[] =>
-  LIBRARY_VIEWS.filter((option) => option === view || kind !== 'shows' || option !== 'grouped')
+/** Only a Movies or TV shows library is matched, so only those bucket by match. */
+const groupingsFor = ({ kind, groupBy }: LibrarySettings): MediaGroupBy[] =>
+  MEDIA_GROUPINGS.filter((option) => option === groupBy || kind !== 'other' || option !== 'match')
+
+/**
+ * A TV library lays its shows out as posters, already split into matched and
+ * not, so it has no grouped view, even when its settings say so (one made
+ * before a change of type swapped it).
+ */
+const viewsFor = ({ kind }: LibrarySettings): LibraryView[] =>
+  LIBRARY_VIEWS.filter((option) => kind !== 'shows' || option !== 'grouped')
 
 const VIEWS: Record<LibraryView, { label: string; icon: IconName }> = {
   grid: { label: 'Grid', icon: 'grid' },
@@ -73,6 +81,7 @@ const VIEWS: Record<LibraryView, { label: string; icon: IconName }> = {
 }
 
 const GROUPINGS: Record<MediaGroupBy, string> = {
+  match: 'Matched or not',
   resolution: 'Resolution',
   codec: 'Video codec',
   month: 'Month added',
@@ -140,7 +149,7 @@ export const LibraryToolbar = ({
             ))}
           </select>
         </div>
-        {settings.view === 'grouped' && (
+        {settings.view === 'grouped' && settings.kind !== 'shows' && (
           <div className={styles.field}>
             <label htmlFor={ids.group} className={styles.label}>
               Group by
@@ -153,7 +162,7 @@ export const LibraryToolbar = ({
                 isMediaGroupBy(event.target.value) && onChange({ groupBy: event.target.value })
               }
             >
-              {MEDIA_GROUPINGS.map((grouping) => (
+              {groupingsFor(settings).map((grouping) => (
                 <option key={grouping} value={grouping}>
                   {GROUPINGS[grouping]}
                 </option>

@@ -4,8 +4,10 @@ import { useId, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button, ButtonLink } from '@/components/Button/Button'
 import { CastRow } from '@/components/CastRow/CastRow'
+import { ImageEditor } from '@/components/ImageEditor/ImageEditor'
 import { ItemHeader } from '@/components/ItemHeader/ItemHeader'
 import { MediaMenu } from '@/components/MediaMenu/MediaMenu'
+import { MetadataEditor } from '@/components/MetadataEditor/MetadataEditor'
 import { ReviewCards } from '@/components/ReviewCards/ReviewCards'
 import { Summary } from '@/components/Summary/Summary'
 import { TmdbCredit } from '@/components/TmdbCredit/TmdbCredit'
@@ -24,6 +26,8 @@ const MovieView = ({ details, primary }: { details: ItemDetails; primary: MediaI
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [editingImages, setEditingImages] = useState(false)
+  const [editingMetadata, setEditingMetadata] = useState(false)
   const { favourite } = useMediaMutations({ media: primary })
   const libraries = useQuery({ queryKey: queryKeys.libraries, queryFn: api.listLibraries })
   const tracks = useQuery({
@@ -73,6 +77,20 @@ const MovieView = ({ details, primary }: { details: ItemDetails; primary: MediaI
           disabled={favourite.isPending}
           onClick={() => favourite.mutate(!primary.favourite)}
         />
+        <Button
+          icon="edit"
+          aria-pressed={editingImages}
+          onClick={() => setEditingImages((editing) => !editing)}
+        >
+          Edit images
+        </Button>
+        <Button
+          icon="edit"
+          aria-pressed={editingMetadata}
+          onClick={() => setEditingMetadata((editing) => !editing)}
+        >
+          Edit metadata
+        </Button>
         <MediaMenu
           media={primary}
           open={menuOpen}
@@ -90,6 +108,21 @@ const MovieView = ({ details, primary }: { details: ItemDetails; primary: MediaI
           }}
         />
       </ItemHeader>
+
+      {editingImages && (
+        <ImageEditor
+          details={details}
+          libraries={libraries.data ?? []}
+          onDone={() => setEditingImages(false)}
+        />
+      )}
+      {editingMetadata && (
+        <MetadataEditor
+          details={details}
+          itemKind="movie"
+          onDone={() => setEditingMetadata(false)}
+        />
+      )}
 
       <Summary tagline={details.tagline} summary={details.summary} />
 

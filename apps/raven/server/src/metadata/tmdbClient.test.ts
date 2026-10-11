@@ -69,6 +69,18 @@ describe('TmdbClient', () => {
     expect(seen[0]?.url).toContain('year=1999')
   })
 
+  it('sends a decomposed title composed, as TMDB finds nothing for the other form', async () => {
+    const seen: string[] = []
+    const client = new TmdbClient(config(), async (url) => {
+      seen.push(url)
+      return json({ results: [] })
+    })
+    await client.searchShows({ query: 'Sho\u0304gun', year: 2024 })
+    await client.searchMovies({ query: 'Ame\u0301lie', year: null })
+    expect(seen[0]).toContain('query=Sh%C5%8Dgun')
+    expect(seen[1]).toContain('query=Am%C3%A9lie')
+  })
+
   it('sends a 32-character API key as api_key instead', async () => {
     const seen: Array<{ url: string; authorization: string | undefined }> = []
     const client = new TmdbClient(config('0123456789abcdef0123456789abcdef'), async (url, init) => {

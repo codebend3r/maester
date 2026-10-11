@@ -2,13 +2,16 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   DEFAULT_LIBRARY_SETTINGS,
   LIBRARY_KINDS,
+  type LibraryKind,
   SHOWN_RATINGS,
   type ShownRatings,
   type Library,
   type LibraryInput,
   type LibrarySettings,
+  defaultLibrarySettings,
   isShownRatings,
   validateLibraryInput,
+  withLibraryKind,
 } from '@raven/core'
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -23,6 +26,7 @@ const RATINGS_LABELS: Record<ShownRatings, string> = {
   tmdb: 'TMDB',
   imdb: 'IMDb',
   rottenTomatoes: 'Rotten Tomatoes',
+  metacritic: 'Metacritic',
 }
 
 /**
@@ -83,6 +87,15 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
     onError: (error) => setErrors([error.message]),
   })
 
+  // A new library takes the view and grouping its type starts with; one
+  // being edited keeps its own where the new type can show them.
+  const pickKind = (kind: LibraryKind) =>
+    setSettings((current) => {
+      if (library) return withLibraryKind({ settings: current, kind })
+      const { view, groupBy } = defaultLibrarySettings(kind)
+      return { ...current, kind, view, groupBy }
+    })
+
   const addPath = (path: string) => {
     setPaths((current) => (current.includes(path) ? current : [...current, path]))
     setErrors([])
@@ -134,7 +147,7 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
                   name={ids.kind}
                   value={kind}
                   checked={settings.kind === kind}
-                  onChange={() => setSettings((current) => ({ ...current, kind }))}
+                  onChange={() => pickKind(kind)}
                 />
                 <label htmlFor={`${ids.kind}-${kind}`}>{KIND_LABELS[kind]}</label>
               </div>
@@ -283,7 +296,8 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
               </select>
               <p id={`${ids.settings}-ratings-hint`} className={styles.settingHint}>
                 The score on cards, and the one the rating sorts use. Where that source has none,
-                TMDB's stands in. IMDb and Rotten Tomatoes need <code>OMDB_API_KEY</code>.
+                TMDB's stands in. IMDb, Rotten Tomatoes and Metacritic need{' '}
+                <code>OMDB_API_KEY</code>.
               </p>
             </div>
           )}

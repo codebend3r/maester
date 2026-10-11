@@ -1,10 +1,12 @@
-import { beforeEach, describe, expect, it } from 'bun:test'
+import { beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import { fireEvent, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import type { PlaybackSettingsState } from '@raven/core'
 import { MediaCard } from '@/components/MediaCard/MediaCard'
+import { api } from '@/lib/api'
 import { setBrowserSupport, setStreamSupport } from '@/test/canPlay'
 import { mediaItem } from '@/test/fixtures'
-import { renderWithProviders } from '@/test/render'
+import { DEFAULT_PLAYBACK_STATE, renderWithProviders } from '@/test/render'
 
 describe('MediaCard', () => {
   // Chrome's answers: Matroska and HEVC yes, Dolby audio no.
@@ -34,6 +36,31 @@ describe('MediaCard', () => {
       'title',
       "Dolby Digital Plus audio isn't supported here.",
     )
+  })
+
+  it('says what the server’s playback settings make of it', () => {
+    setStreamSupport(() => true)
+    const off: PlaybackSettingsState = {
+      ...DEFAULT_PLAYBACK_STATE,
+      settings: { ...DEFAULT_PLAYBACK_STATE.settings, transcoding: 'off' },
+    }
+    renderWithProviders(<MediaCard media={mediaItem({ audioCodec: 'eac3' })} />, {
+      playback: off,
+    })
+    expect(screen.getByText("Won't play in this browser")).toBeInTheDocument()
+    expect(screen.queryByText('Converted on the server')).toBeNull()
+  })
+
+  it('says nothing about playing until the server’s playback settings are known', () => {
+    const settings = spyOn(api, 'getPlaybackSettings').mockImplementation(
+      () => new Promise(() => {}),
+    )
+    renderWithProviders(<MediaCard media={mediaItem({ audioCodec: 'eac3' })} />, {
+      playback: null,
+    })
+    expect(screen.queryByText("Won't play in this browser")).toBeNull()
+    expect(settings).toHaveBeenCalledTimes(1)
+    settings.mockRestore()
   })
 
   it('offers Favourite and Delete from its menu', async () => {

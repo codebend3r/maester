@@ -1,0 +1,42 @@
+.button {
+  display: grid;
+  grid-auto-flow: column;
+  align-items: center;
+  justify-content: start;
+  gap: var(--space-0);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--color-bark);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-bark);
+    outline-offset: 2px;
+  }
+}
+
+.hint {
+  display: grid;
+  opacity: 0;
+}
+
+.button:hover .hint {
+  opacity: 0.5;
+}
+
+.mark {
+  display: grid;
+  color: var(--color-bark);
+}
+
+.flipped {
+  transform: rotate(180deg);
+}

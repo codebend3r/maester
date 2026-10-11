@@ -57,4 +57,17 @@ describe('LibrariesPage', () => {
     renderWithProviders(<LibrariesPage />)
     expect(await screen.findByText('TV shows · 1,268 videos')).toBeInTheDocument()
   })
+
+  it('says how many files are not matched, when any are', async () => {
+    spies.list.mockImplementation(async () => [
+      library({
+        name: 'Films',
+        itemCount: 1217,
+        unmatchedCount: 22,
+        settings: { ...library().settings, kind: 'movies' },
+      }),
+    ])
+    renderWithProviders(<LibrariesPage />)
+    expect(await screen.findByText('Movies · 1,217 videos · 22 not matched')).toBeInTheDocument()
+  })
 })

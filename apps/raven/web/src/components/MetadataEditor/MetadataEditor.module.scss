@@ -1,0 +1,105 @@
+.editor {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-moss);
+  border-radius: var(--radius-md);
+  background: var(--color-canopy);
+}
+
+.header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.heading {
+  font-family: var(--font-display);
+  font-size: var(--font-size-xl);
+  font-weight: 400;
+  line-height: var(--line-tight);
+}
+
+.hint {
+  max-width: var(--measure);
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+}
+
+.error {
+  color: var(--color-leaf-bright);
+}
+
+.form {
+  display: grid;
+  gap: var(--space-3);
+  max-width: var(--measure);
+}
+
+.field {
+  display: grid;
+  gap: var(--space-0);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+
+  input,
+  textarea {
+    width: 100%;
+    min-height: 2.5rem;
+    padding: var(--space-1) var(--space-2);
+    border: 1px solid var(--color-moss);
+    border-radius: var(--radius-md);
+    background: var(--color-night);
+    color: var(--color-bark);
+    font: inherit;
+    font-weight: 400;
+  }
+
+  textarea {
+    resize: vertical;
+  }
+}
+
+.control {
+  display: grid;
+}
+
+.withWand {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-1);
+  align-items: center;
+}
+
+.original {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: var(--space-2);
+  color: var(--color-lichen);
+  font-size: var(--font-size-xs);
+  font-weight: 400;
+  overflow-wrap: anywhere;
+}
+
+.reset {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-bark);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid var(--color-bark);
+    outline-offset: 2px;
+  }
+}
+
+.actions {
+  display: grid;
+  justify-content: start;
+}
