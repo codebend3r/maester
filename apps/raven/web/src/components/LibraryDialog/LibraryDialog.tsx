@@ -23,6 +23,7 @@ const RATINGS_LABELS: Record<ShownRatings, string> = {
   tmdb: 'TMDB',
   imdb: 'IMDb',
   rottenTomatoes: 'Rotten Tomatoes',
+  metacritic: 'Metacritic',
 }
 
 /**
@@ -283,7 +284,8 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
               </select>
               <p id={`${ids.settings}-ratings-hint`} className={styles.settingHint}>
                 The score on cards, and the one the rating sorts use. Where that source has none,
-                TMDB's stands in. IMDb and Rotten Tomatoes need <code>OMDB_API_KEY</code>.
+                TMDB's stands in. IMDb, Rotten Tomatoes and Metacritic need{' '}
+                <code>OMDB_API_KEY</code>.
               </p>
             </div>
           )}
