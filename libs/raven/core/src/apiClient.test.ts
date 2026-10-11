@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ApiError, type FetchInit, type FetchResponse, createApiClient } from '@/apiClient'
-import { itemDetails, mediaItem } from '@/test/fixtures'
+import { itemDetails, mediaItem, showEntry } from '@/test/fixtures'
 
 type Call = { url: string; init?: FetchInit }
 
@@ -204,6 +204,30 @@ describe('the metadata calls', () => {
     expect(calls[0]).toMatchObject({
       url: 'http://nas:8484/api/media/7/match',
       init: { method: 'PUT', body: '{"tmdbId":null}' },
+    })
+  })
+
+  it('lists a TV library as shows, with the search and sort', async () => {
+    const listing = { shows: [showEntry()], unmatched: [] }
+    const { client, calls } = clientReturning(respond({ body: listing }))
+    await expect(client.listShows({ libraryId: 3, search: 'sev', sort: 'added' })).resolves.toEqual(
+      listing,
+    )
+    expect(calls[0]?.url).toBe('http://nas:8484/api/libraries/3/shows?sort=added&q=sev')
+  })
+
+  it('asks for the next episode of a show, which may be none', async () => {
+    const { client, calls } = clientReturning(respond({ body: null }))
+    await expect(client.nextEpisode(4)).resolves.toBeNull()
+    expect(calls[0]?.url).toBe('http://nas:8484/api/items/4/next')
+  })
+
+  it("re-points a show's files", async () => {
+    const { client, calls } = clientReturning(respond({ body: itemDetails() }))
+    await client.setItemMatch({ itemId: 4, tmdbId: '95396' })
+    expect(calls[0]).toMatchObject({
+      url: 'http://nas:8484/api/items/4/match',
+      init: { method: 'PUT', body: '{"tmdbId":"95396"}' },
     })
   })
 

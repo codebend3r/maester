@@ -46,6 +46,19 @@
   gap: var(--space-1);
 }
 
+.unmatched {
+  display: grid;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-moss);
+}
+
+.subheading {
+  font-family: var(--font-display);
+  font-size: var(--font-size-lg);
+  font-weight: 400;
+}
+
 .message {
   max-width: var(--measure);
   color: var(--color-lichen);

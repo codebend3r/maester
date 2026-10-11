@@ -107,6 +107,64 @@ export class MetadataRepository {
     return row ? { id: row.id, fetchedAt: row.fetched_at } : null
   }
 
+  /** A show's seasons, or a season's episodes, in order, as cards need them. */
+  children(parentId: number): ItemSummary[] {
+    const ids = this.db
+      .prepare<[number], { id: number }>(
+        'SELECT id FROM items WHERE parent_id = ? ORDER BY number IS NULL, number, id',
+      )
+      .all(parentId)
+      .map((row) => row.id)
+    const summaries = this.summaries(ids)
+    return ids.flatMap((id) => summaries.get(id) ?? [])
+  }
+
+  /** The children with a file somewhere beneath them: a show's seasons on disk, a season's episodes on disk. */
+  childrenOnDisk(parentId: number): ItemSummary[] {
+    const ids = this.db
+      .prepare<[number], { id: number }>(
+        `SELECT c.id FROM items c
+          WHERE c.parent_id = ?
+            AND (EXISTS (SELECT 1 FROM media_items mi WHERE mi.item_id = c.id)
+                 OR EXISTS (SELECT 1 FROM items g JOIN media_items mi ON mi.item_id = g.id
+                             WHERE g.parent_id = c.id))
+          ORDER BY c.number IS NULL, c.number, c.id`,
+      )
+      .all(parentId)
+      .map((row) => row.id)
+    const summaries = this.summaries(ids)
+    return ids.flatMap((id) => summaries.get(id) ?? [])
+  }
+
+  /** The child of `parentId` with `number`: a show's season, or a season's episode. */
+  child({
+    parentId,
+    number,
+  }: {
+    parentId: number
+    number: number
+  }): { id: number; tmdbId: string; fetchedAt: string } | null {
+    const row = this.db
+      .prepare<[number, number], { id: number; tmdb_id: string; fetched_at: string }>(
+        'SELECT id, tmdb_id, fetched_at FROM items WHERE parent_id = ? AND number = ? ORDER BY id LIMIT 1',
+      )
+      .get(parentId, number)
+    return row ? { id: row.id, tmdbId: row.tmdb_id, fetchedAt: row.fetched_at } : null
+  }
+
+  /** Every file linked to the show, one of its seasons, or one of its episodes. */
+  mediaUnderShow(showId: number): number[] {
+    return this.db
+      .prepare<[number, number, number], { media_id: number }>(
+        `SELECT DISTINCT mi.media_id FROM media_items mi
+           JOIN items i ON i.id = mi.item_id
+           LEFT JOIN items p ON p.id = i.parent_id
+          WHERE i.id = ? OR i.parent_id = ? OR p.parent_id = ?`,
+      )
+      .all(showId, showId, showId)
+      .map((row) => row.media_id)
+  }
+
   get(id: number): { id: number; type: ItemType; tmdbId: string; parentId: number | null } | null {
     const row = this.db
       .prepare<[number], { id: number; type: string; tmdb_id: string; parent_id: number | null }>(
@@ -338,7 +396,10 @@ export class MetadataRepository {
       runtime: row.runtime,
       studio: row.studio,
       genres: genresOf(row.genres),
-      backdropVersion: this.versions({ ids: [id], kind: 'backdrop' }).get(id) ?? null,
+      // An episode has a still where the others have a backdrop.
+      backdropVersion:
+        this.versions({ ids: [id], kind: row.type === 'episode' ? 'still' : 'backdrop' }).get(id) ??
+        null,
       ratings,
       credits: this.credits(id),
     }
@@ -436,7 +497,10 @@ export class MetadataRepository {
       .run(libraryId, place, tmdbId)
   }
 
-  /** Items of `type` fetched before `before`, or before `recentBefore` when released after `releasedAfter`. */
+  /**
+   * Items of `type` fetched before `before`, or before `recentBefore` when
+   * released after `releasedAfter` or, for a show, while it still airs.
+   */
   stale({
     type,
     before,
@@ -451,7 +515,8 @@ export class MetadataRepository {
     return this.db
       .prepare<[string, string, string, string], { id: number; tmdb_id: string }>(
         `SELECT id, tmdb_id FROM items
-          WHERE type = ? AND (fetched_at < ? OR (fetched_at < ? AND released >= ?))
+          WHERE type = ? AND (fetched_at < ?
+                              OR (fetched_at < ? AND (released >= ? OR (type = 'show' AND ended IS NULL))))
           ORDER BY fetched_at`,
       )
       .all(type, before, recentBefore, releasedAfter)

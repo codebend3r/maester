@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { foldTitle, isExtra, parseMovieName, sortTitle } from '@/naming'
+import {
+  foldTitle,
+  isExtra,
+  parseEpisodeName,
+  parseMovieName,
+  seasonFolderNumber,
+  sortTitle,
+} from '@/naming'
 
 /** Splits `Folder/Sub/file.mkv` the way the scanner stores it: a relative folder and a name. */
 const movie = (path: string) => {
@@ -105,5 +112,106 @@ describe('sortTitle', () => {
     expect(sortTitle('The Matrix')).toBe('Matrix')
     expect(sortTitle('An American Werewolf in London')).toBe('American Werewolf in London')
     expect(sortTitle('Annie Hall')).toBe('Annie Hall')
+  })
+})
+
+describe('seasonFolderNumber', () => {
+  it('reads season folders and Specials, and nothing else', () => {
+    expect(seasonFolderNumber('Season 1')).toBe(1)
+    expect(seasonFolderNumber('Season 01')).toBe(1)
+    expect(seasonFolderNumber('Specials')).toBe(0)
+    expect(seasonFolderNumber('Severance (2022)')).toBeNull()
+    expect(seasonFolderNumber('Season One')).toBeNull()
+  })
+})
+
+describe('parseEpisodeName', () => {
+  const episode = (path: string, fallbackShow = '') => {
+    const parts = path.split('/')
+    return parseEpisodeName({
+      fileName: parts.at(-1) ?? '',
+      folder: parts.slice(0, -1).join('/'),
+      fallbackShow,
+    })
+  }
+
+  it.each([
+    [
+      'Severance (2022)/Season 01/Severance - S01E02 - Half Loop WEBDL-2160p.mkv',
+      'Severance',
+      2022,
+      1,
+      [2],
+      'Half Loop',
+    ],
+    [
+      'Frieren/Season 01/Frieren - (0012) S01E012 - A Real Hero Bluray-1080p.mkv',
+      'Frieren',
+      null,
+      1,
+      [12],
+      'A Real Hero',
+    ],
+    [
+      'The Office (US)/Specials/The Office (US) - S00E03.mkv',
+      'The Office (US)',
+      null,
+      0,
+      [3],
+      null,
+    ],
+    ['Fargo/Fargo.S02E09E10.1080p.mkv', 'Fargo', 2, 2, [9, 10], null],
+    [
+      'Fargo/Season 2/Fargo - S02E01-E02 - Waiting for Dutch.mkv',
+      'Fargo',
+      null,
+      2,
+      [1, 2],
+      'Waiting for Dutch',
+    ],
+    ['Lost/Season 1/lost.1x02.pilot.part.2.hdtv.mkv', 'Lost', null, 1, [2], 'pilot part 2'],
+  ])('reads %s', (path, show, year, season, episodes, title) => {
+    const parsed = episode(path)
+    expect(parsed.show).toBe(show)
+    expect(parsed.year).toBe(typeof year === 'number' && year > 100 ? year : null)
+    expect(parsed.season).toBe(season)
+    expect(parsed.episodes).toEqual(episodes)
+    expect(parsed.title).toBe(title)
+  })
+
+  it('reads the show from the file at a library root or in a season folder, then the library', () => {
+    expect(episode('Severance - S01E02 - Half Loop.mkv').show).toBe('Severance')
+    expect(episode('Season 1/Severance - S01E02.mkv').show).toBe('Severance')
+    expect(episode('Season 1/S01E02.mkv', 'Severance').show).toBe('Severance')
+  })
+
+  it('takes the season from the folder when the name has no code', () => {
+    expect(episode('Show/Season 3/Episode Four.mkv')).toMatchObject({
+      season: 3,
+      episodes: [],
+      title: null,
+    })
+  })
+
+  it('reads an absolute number and an air date without taking either for a year', () => {
+    expect(episode('Frieren/Season 01/Frieren - (2001) S01E01.mkv')).toMatchObject({
+      year: null,
+      absolute: 2001,
+      episodes: [1],
+    })
+    expect(episode('The Daily/The Daily - 2026.10.09 - Friday.mkv')).toMatchObject({
+      airDate: '2026-10-09',
+      episodes: [],
+    })
+  })
+
+  it('never reads a resolution as a 1x02 code', () => {
+    expect(episode('Show/Show.1920x1080.S01E03.mkv').episodes).toEqual([3])
+  })
+
+  it('takes ids from the show folder', () => {
+    expect(
+      episode('Severance (2022) {tvdb-371980}/Season 01/Severance - S01E01.mkv').ids.tvdb,
+    ).toBe('371980')
   })
 })

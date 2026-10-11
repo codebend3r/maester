@@ -151,3 +151,10 @@
   justify-content: space-between;
   gap: var(--space-1);
 }
+
+.actionsEnd {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: end;
+  gap: var(--space-1);
+}

@@ -1,4 +1,6 @@
 import {
+  BadRequestException,
+  Body,
   Controller,
   Get,
   HttpCode,
@@ -7,11 +9,18 @@ import {
   Param,
   ParseIntPipe,
   Post,
+  Put,
   Query,
   Res,
   ServiceUnavailableException,
 } from '@nestjs/common'
-import type { ItemDetails, ItemImageKind } from '@raven/core'
+import {
+  type ItemDetails,
+  type ItemImageKind,
+  type MediaItem,
+  isRecord,
+  isString,
+} from '@raven/core'
 import type { FastifyReply } from 'fastify'
 import { sendImage } from '@/items/sendImage'
 import { MediaRepository, toMediaItem } from '@/media/mediaRepository'
@@ -42,13 +51,50 @@ export class ItemsController {
     return {
       ...details,
       versions: this.media.forItem(id).map(toMediaItem),
-      children: [],
+      children: this.metadata.childrenOnDisk(id),
     }
+  }
+
+  /**
+   * Fix match for a show: every file under it moves to the show with
+   * `tmdbId`, keeping its season and episode numbers, and the choice is
+   * kept by folder. Answers with the show the files moved to.
+   */
+  @Put(':id/match')
+  async setMatch(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: unknown,
+  ): Promise<ItemDetails> {
+    const item = this.metadata.get(id)
+    if (!item) throw new NotFoundException(`No item ${id}`)
+    if (item.type !== 'show') throw new BadRequestException('Only a show can be re-pointed here.')
+    if (!isRecord(body) || !isString(body.tmdbId) || !/^\d+$/.test(body.tmdbId)) {
+      throw new BadRequestException('tmdbId must be a TMDB id')
+    }
+    if (!this.tmdb.enabled)
+      throw new ServiceUnavailableException('Set TMDB_API_TOKEN to search TMDB.')
+    const moved = await this.service
+      .fixShowMatch({ showId: id, tmdbId: body.tmdbId })
+      .catch((error: unknown) => {
+        if (error instanceof TmdbError) throw new ServiceUnavailableException(error.message)
+        throw error
+      })
+    if (moved == null) throw new NotFoundException('TMDB has no show with that id.')
+    return this.details(moved)
   }
 
   @Get(':id')
   get(@Param('id', ParseIntPipe) id: number): ItemDetails {
     return this.details(id)
+  }
+
+  /** A show's first episode not yet watched, for its Play button; null once every one is. */
+  @Get(':id/next')
+  next(@Param('id', ParseIntPipe) id: number): MediaItem | null {
+    const item = this.metadata.get(id)
+    if (!item) throw new NotFoundException(`No item ${id}`)
+    const record = this.media.nextEpisode(id)
+    return record ? toMediaItem(record) : null
   }
 
   /** Fetches the item from TMDB again now. One TMDB no longer has is gone after, so 404. */

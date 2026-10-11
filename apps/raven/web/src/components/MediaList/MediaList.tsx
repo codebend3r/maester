@@ -8,6 +8,7 @@ import {
 } from '@raven/core'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import type { MatchType } from '@/components/FixMatchDialog/FixMatchDialog'
 import { Icon } from '@/components/Icon/Icon'
 import { MediaMenu } from '@/components/MediaMenu/MediaMenu'
 import { openPath } from '@/lib/itemLinks'
@@ -25,7 +26,15 @@ const added = new Intl.DateTimeFormat(undefined, {
  * menu. In a Movies library the title opens the movie's page and a Year
  * column follows it.
  */
-const MediaRow = ({ media, movies }: { media: MediaItem; movies: boolean }) => {
+const MediaRow = ({
+  media,
+  movies,
+  matchType,
+}: {
+  media: MediaItem
+  movies: boolean
+  matchType: MatchType | null
+}) => {
   const [menuOpen, setMenuOpen] = useState(false)
   const progress = progressOf(media)
   const to = movies ? openPath(media) : `/watch/${media.id}`
@@ -71,7 +80,7 @@ const MediaRow = ({ media, movies }: { media: MediaItem; movies: boolean }) => {
           open={menuOpen}
           onOpenChange={setMenuOpen}
           inline
-          matchType={movies ? 'movie' : null}
+          matchType={matchType}
         />
       </td>
     </tr>
@@ -86,11 +95,14 @@ export const MediaList = ({
   items,
   busy = false,
   movies = false,
+  matchType = null,
 }: {
   items: MediaItem[]
   busy?: boolean
   /** A Movies library: titles open the movie's page, and the year gets a column. */
   movies?: boolean
+  /** What the library matches its files to, for the menu's Fix match. */
+  matchType?: MatchType | null
 }) => (
   <table className={styles.table} aria-label="Videos" aria-busy={busy}>
     <thead>
@@ -123,7 +135,7 @@ export const MediaList = ({
     </thead>
     <tbody>
       {items.map((item) => (
-        <MediaRow key={item.id} media={item} movies={movies} />
+        <MediaRow key={item.id} media={item} movies={movies} matchType={matchType} />
       ))}
     </tbody>
   </table>

@@ -167,6 +167,7 @@ export type ItemDetails = ItemSummary & {
   runtime: number | null
   studio: string | null
   genres: string[]
+  /** The backdrop's version; for an episode, its still's. */
   backdropVersion: string | null
   ratings: Rating[]
   credits: Credit[]
@@ -174,6 +175,25 @@ export type ItemDetails = ItemSummary & {
   versions: MediaItem[]
   /** A show's seasons, or a season's episodes, in order. */
   children: ItemSummary[]
+}
+
+/** A show in a TV shows library's listing. */
+export type ShowEntry = {
+  show: ItemSummary
+  /** Distinct episodes on disk. */
+  episodes: number
+  /** The year the show ended, or null while it still airs. */
+  endedYear: number | null
+  /** When its newest file arrived. */
+  addedAt: string
+  /** The first episode not yet watched by the library's measure, or null when every one is. */
+  next: MediaItem | null
+}
+
+/** A TV shows library: its shows, and the files no show was found for. */
+export type ShowListing = {
+  shows: ShowEntry[]
+  unmatched: MediaItem[]
 }
 
 /** The pictures an item can have. */

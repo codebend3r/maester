@@ -4,6 +4,7 @@ import { type KeyboardEvent, useEffect, useId, useRef, useState } from 'react'
 import { Button } from '@/components/Button/Button'
 import { FixMatchDialog, type MatchType } from '@/components/FixMatchDialog/FixMatchDialog'
 import { Icon, type IconName } from '@/components/Icon/Icon'
+import { api } from '@/lib/api'
 import { useMediaMutations } from '@/lib/useMediaMutations'
 import styles from '@/components/MediaMenu/MediaMenu.module.scss'
 
@@ -245,8 +246,11 @@ export const MediaMenu = ({
 
       {fixing && matchType != null && (
         <FixMatchDialog
-          media={media}
           type={matchType}
+          title={media.title}
+          year={media.year}
+          fileName={media.fileName}
+          match={(tmdbId) => api.setMatch({ mediaId: media.id, tmdbId })}
           onMatched={onMatched}
           onClose={() => {
             setFixing(false)

@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { readServerConfig } from '@/config'
-import { type MetadataFetch, TmdbClient, TmdbError, mergeCredits } from '@/metadata/tmdbClient'
-import { fakeTmdb, movieBody } from '@/test/fakeTmdb'
+import {
+  type MetadataFetch,
+  TmdbClient,
+  TmdbError,
+  mergeCredits,
+  toSeason,
+  toShow,
+} from '@/metadata/tmdbClient'
+import { fakeTmdb, movieBody, seasonBody, showBody } from '@/test/fakeTmdb'
 
 const config = (token: string | null = 'secret-token') => ({
   ...readServerConfig({}),
@@ -157,6 +164,56 @@ describe('TmdbClient', () => {
       movies: ['603'],
       shows: [],
     })
+  })
+})
+
+describe('toShow and toSeason', () => {
+  const show = {
+    id: 95396,
+    title: 'Severance',
+    first: '2022-02-18',
+    last: '2025-03-21',
+    seasons: { 1: [{ number: 1, title: 'Good News About Hell', aired: '2022-02-18' }] },
+  }
+
+  it('reads a show with its creator, aggregate credits, rating and network', () => {
+    const parsed = toShow({ body: showBody(show), country: 'GB' })
+    expect(parsed).toMatchObject({
+      type: 'show',
+      tmdbId: '95396',
+      title: 'Severance',
+      year: 2022,
+      ended: '2025-03-21',
+      contentRating: 'TV-MA',
+      studio: 'Network One',
+      runtime: 45,
+      imdbId: 'tt95396',
+    })
+    expect(parsed?.credits.map((credit) => `${credit.name}:${credit.job}:${credit.role}`)).toEqual([
+      'Adam Scott:cast:Mark Scout',
+      'Britt Lower:cast:Helly R.',
+      'Dan Erickson:creator:Creator',
+      'Ben Stiller:director:Director',
+      'Ben Stiller:producer:Producer',
+    ])
+  })
+
+  it('leaves a show that still airs without an end', () => {
+    expect(
+      toShow({ body: showBody({ ...show, last: undefined }), country: 'US' })?.ended,
+    ).toBeNull()
+  })
+
+  it('reads a season with its episodes, their stills and guest stars', () => {
+    const parsed = toSeason(seasonBody({ show, number: 1 }))
+    expect(parsed?.season).toMatchObject({ type: 'season', number: 1, title: 'Season 1' })
+    expect(parsed?.episodes[0]).toMatchObject({
+      type: 'episode',
+      number: 1,
+      title: 'Good News About Hell',
+      images: { still: '/still95396-1-1.jpg' },
+    })
+    expect(parsed?.episodes[0]?.credits.map((credit) => credit.job)).toEqual(['guest', 'director'])
   })
 })
 

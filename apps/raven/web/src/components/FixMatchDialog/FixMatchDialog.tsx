@@ -1,15 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { MatchCandidate, MediaItem } from '@raven/core'
+import type { MatchCandidate } from '@raven/core'
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react'
 import { Button } from '@/components/Button/Button'
 import { api } from '@/lib/api'
 import { queryKeys } from '@/lib/queryClient'
 import styles from '@/components/FixMatchDialog/FixMatchDialog.module.scss'
 
-/** What the dialog searches for: a movie now, a show once TV shows are matched. */
-export type MatchType = 'movie'
+/** What the dialog searches for: a movie, or a show. */
+export type MatchType = 'movie' | 'show'
 
-const NOT_A: Record<MatchType, string> = { movie: 'Not a movie' }
+const NOT_A: Record<MatchType, string> = { movie: 'Not a movie', show: 'Not a show' }
 
 const yearFrom = (text: string): number | null => {
   const year = Number.parseInt(text.trim(), 10)
@@ -56,27 +56,40 @@ const Candidate = ({
 }
 
 /**
- * Fix match: searches TMDB with the title and year the file's name gave, and
- * points the file at the result the viewer chooses, or at nothing. Whatever
- * is chosen is kept by folder, so renames and re-downloads keep it.
+ * Fix match: searches TMDB with the title and year a name gave, and points
+ * a file (or a whole show) at the result the viewer chooses, or at nothing.
+ * `match` does the pointing; whatever is chosen is kept by folder, so
+ * renames and re-downloads keep it.
  */
-export const FixMatchDialog = ({
-  media,
+export const FixMatchDialog = <T,>({
   type,
+  title,
+  year,
+  fileName,
+  match,
+  allowNone = true,
   onClose,
   onMatched,
 }: {
-  media: MediaItem
   type: MatchType
+  /** What the search box starts with: the parsed title. */
+  title: string
+  year: number | null
+  /** Named under the heading, so the viewer knows which file this is for. */
+  fileName?: string
+  /** Points the file or show at `tmdbId`, or at nothing for null. */
+  match: (tmdbId: string | null) => Promise<T>
+  /** Whether "Not a movie" (or show) is offered. */
+  allowNone?: boolean
   onClose: () => void
-  onMatched?: (updated: MediaItem) => void
+  onMatched?: (result: T) => void
 }) => {
   const dialog = useRef<HTMLDialogElement>(null)
   const ids = { title: useId(), query: useId(), year: useId(), results: useId() }
   const queryClient = useQueryClient()
-  const [query, setQuery] = useState(media.title)
-  const [year, setYear] = useState(media.year == null ? '' : String(media.year))
-  const [asked, setAsked] = useState({ query: media.title.trim(), year: media.year })
+  const [query, setQuery] = useState(title)
+  const [yearText, setYearText] = useState(year == null ? '' : String(year))
+  const [asked, setAsked] = useState({ query: title.trim(), year })
 
   useEffect(() => {
     dialog.current?.showModal()
@@ -90,22 +103,22 @@ export const FixMatchDialog = ({
   })
 
   const choose = useMutation({
-    mutationFn: (tmdbId: string | null) => api.setMatch({ mediaId: media.id, tmdbId }),
-    onSuccess: async (updated) => {
-      queryClient.setQueryData(queryKeys.mediaItem(updated.id), updated)
+    mutationFn: match,
+    onSuccess: async (result) => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.libraries }),
         queryClient.invalidateQueries({ queryKey: queryKeys.items }),
         queryClient.invalidateQueries({ queryKey: queryKeys.favourites }),
+        queryClient.invalidateQueries({ queryKey: ['media'] }),
       ])
-      onMatched?.(updated)
+      onMatched?.(result)
       onClose()
     },
   })
 
   const search = (event: FormEvent) => {
     event.preventDefault()
-    setAsked({ query: query.trim(), year: yearFrom(year) })
+    setAsked({ query: query.trim(), year: yearFrom(yearText) })
   }
 
   return (
@@ -115,7 +128,7 @@ export const FixMatchDialog = ({
           <h2 id={ids.title} className={styles.title}>
             Fix match
           </h2>
-          <p className={styles.file}>{media.fileName}</p>
+          {fileName && <p className={styles.file}>{fileName}</p>}
         </header>
 
         <search>
@@ -136,8 +149,8 @@ export const FixMatchDialog = ({
                 id={ids.year}
                 className={styles.yearInput}
                 inputMode="numeric"
-                value={year}
-                onChange={(event) => setYear(event.target.value)}
+                value={yearText}
+                onChange={(event) => setYearText(event.target.value)}
                 autoComplete="off"
               />
             </div>
@@ -181,10 +194,12 @@ export const FixMatchDialog = ({
           )}
         </section>
 
-        <footer className={styles.actions}>
-          <Button disabled={choose.isPending} onClick={() => choose.mutate(null)}>
-            {NOT_A[type]}
-          </Button>
+        <footer className={allowNone ? styles.actions : styles.actionsEnd}>
+          {allowNone && (
+            <Button disabled={choose.isPending} onClick={() => choose.mutate(null)}>
+              {NOT_A[type]}
+            </Button>
+          )}
           <Button onClick={onClose}>Cancel</Button>
         </footer>
       </div>

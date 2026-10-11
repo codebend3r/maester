@@ -9,6 +9,7 @@ import {
 } from '@raven/core'
 import { type MouseEvent, useState } from 'react'
 import { Link } from 'react-router-dom'
+import type { MatchType } from '@/components/FixMatchDialog/FixMatchDialog'
 import { Icon } from '@/components/Icon/Icon'
 import { MediaMenu } from '@/components/MediaMenu/MediaMenu'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
@@ -28,10 +29,12 @@ const MediaTile = ({
   media,
   note,
   posters,
+  matchType,
 }: {
   media: MediaItem
   note: string | null
   posters: boolean
+  matchType: MatchType | null
 }) => {
   const [menuOpen, setMenuOpen] = useState(false)
   const openMenu = (event: MouseEvent) => {
@@ -108,7 +111,7 @@ const MediaTile = ({
         open={menuOpen}
         onOpenChange={setMenuOpen}
         inline
-        matchType={posters ? 'movie' : null}
+        matchType={matchType}
       />
     </li>
   )
@@ -123,16 +126,25 @@ export const MediaTiles = ({
   busy = false,
   note,
   posters = false,
+  matchType = null,
 }: {
   items: MediaItem[]
   busy?: boolean
   note?: (media: MediaItem) => string | null
   /** A Movies library's tiles: small posters, opening the movie's page. */
   posters?: boolean
+  /** What the library matches its files to, for the menu's Fix match. */
+  matchType?: MatchType | null
 }) => (
   <ul className={styles.tiles} aria-busy={busy}>
     {items.map((item) => (
-      <MediaTile key={item.id} media={item} note={note ? note(item) : null} posters={posters} />
+      <MediaTile
+        key={item.id}
+        media={item}
+        note={note ? note(item) : null}
+        posters={posters}
+        matchType={matchType}
+      />
     ))}
   </ul>
 )

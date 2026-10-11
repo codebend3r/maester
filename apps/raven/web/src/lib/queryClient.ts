@@ -30,6 +30,19 @@ export const queryKeys = {
   }) => ['libraries', libraryId, 'media', { search, sort, seed }],
   /** The prefix every media list of a library shares, whatever its search and sort. */
   mediaLists: (libraryId: number) => ['libraries', libraryId, 'media'],
+  shows: ({
+    libraryId,
+    search,
+    sort,
+    seed,
+  }: {
+    libraryId: number
+    search: string
+    sort: string
+    seed: number
+  }) => ['libraries', libraryId, 'shows', { search, sort, seed }],
+  /** The prefix a library's show listings share. */
+  showLists: (libraryId: number) => ['libraries', libraryId, 'shows'],
   mediaItem: (id: number) => ['media', id],
   mediaTracks: (id: number) => ['media', id, 'tracks'],
   subtitles: ({ id, trackId, window }: { id: number; trackId: string; window: number }) => [
@@ -52,6 +65,7 @@ export const queryKeys = {
   /** Every item page shares this prefix, so a match or refresh refetches them all. */
   items: ['items'],
   item: (id: number) => ['items', id],
+  nextEpisode: (showId: number) => ['items', showId, 'next'],
   matchSearch: ({ type, query, year }: { type: string; query: string; year: number | null }) => [
     'match',
     type,

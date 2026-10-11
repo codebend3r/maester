@@ -10,6 +10,7 @@ import {
   isMatchCandidateList,
   isMetadataHealth,
   isRecord,
+  isShowListing,
   isString,
   isStringArray,
 } from '@/guards'
@@ -27,6 +28,7 @@ import type {
   MediaSort,
   MediaTracks,
   MetadataHealth,
+  ShowListing,
   StreamMode,
   SubtitleCue,
 } from '@/types'
@@ -272,6 +274,46 @@ export const createApiClient = ({
       media.thumbnail === 'ready'
         ? url(`/api/media/${media.id}/thumbnail?v=${media.thumbnailVersion}`)
         : null,
+
+    /**
+     * A TV shows library as shows: one entry each, with the files no show
+     * was found for after. `seed` counts as it does for `listMedia`.
+     */
+    listShows: ({
+      libraryId,
+      search = '',
+      sort = 'title',
+      seed,
+    }: {
+      libraryId: number
+      search?: string
+      sort?: MediaSort
+      seed?: number
+    }): Promise<ShowListing> => {
+      const query = toQueryString({
+        sort,
+        ...(sort === 'random' && seed !== undefined ? { seed: String(seed) } : {}),
+        ...(search.trim() ? { q: search.trim() } : {}),
+      })
+      return expect({
+        request: send({ path: `/api/libraries/${libraryId}/shows?${query}` }),
+        guard: isShowListing,
+      })
+    },
+
+    /** The first episode of a show not yet watched, in whichever library holds it, or null when every one is. */
+    nextEpisode: (showId: number): Promise<MediaItem | null> =>
+      expect({
+        request: send({ path: `/api/items/${showId}/next` }),
+        guard: (value): value is MediaItem | null => value === null || isMediaItem(value),
+      }),
+
+    /** Points every file under a show at another show, keeping their numbers; returns the show they moved to. */
+    setItemMatch: ({ itemId, tmdbId }: { itemId: number; tmdbId: string }): Promise<ItemDetails> =>
+      expect({
+        request: send({ path: `/api/items/${itemId}/match`, method: 'PUT', body: { tmdbId } }),
+        guard: isItemDetails,
+      }),
 
     /** A movie, show, season or episode with everything its page shows. */
     getItem: (id: number): Promise<ItemDetails> =>
