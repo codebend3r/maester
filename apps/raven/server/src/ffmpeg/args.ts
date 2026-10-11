@@ -38,19 +38,15 @@ export const thumbnailArgs = ({
   seek,
   width,
   tonemap,
-  decode = [],
 }: {
   input: string
   output: string
   seek: number
   width: number
   tonemap: boolean
-  /** `hardwareDecodeArgs` for the file, so a 4K HEVC frame is decoded by the GPU. */
-  decode?: string[]
 }): string[] => [
   ...QUIET,
   '-y',
-  ...decode,
   ...(seek > 0 ? ['-ss', String(seek)] : []),
   '-i',
   input,
@@ -72,27 +68,6 @@ const SCALE_TO_1080 = "w=-2:h='min(1080,ih)'"
 
 /** Codecs every Intel GPU recent enough for VAAPI decodes; anything else decodes on the CPU. */
 const GPU_DECODES: ReadonlySet<string> = new Set(['h264', 'hevc'])
-
-/**
- * The flags before `-i` that have the GPU decode a file whose frames then
- * come back to memory for CPU filters, as a thumbnail's do: VideoToolbox
- * takes anything a Mac plays; VAAPI takes H.264 and HEVC. Empty when the
- * CPU should decode. ffmpeg falls back to the CPU itself when the device
- * refuses a file.
- */
-export const hardwareDecodeArgs = ({
-  encoder,
-  videoCodec,
-}: {
-  encoder: VideoEncoder
-  videoCodec: string | null
-}): string[] => {
-  if (encoder.kind === 'videotoolbox') return ['-hwaccel', 'videotoolbox']
-  if (encoder.kind === 'vaapi' && videoCodec != null && GPU_DECODES.has(videoCodec)) {
-    return ['-hwaccel', 'vaapi', '-hwaccel_device', encoder.device]
-  }
-  return []
-}
 
 /**
  * The flags before `-i` and the video encoding after it, for a transcode.

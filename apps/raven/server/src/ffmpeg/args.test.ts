@@ -5,7 +5,6 @@ import {
   streamArgs,
   subtitleFileArgs,
   subtitleWindowArgs,
-  hardwareDecodeArgs,
   thumbnailArgs,
   thumbnailSeek,
 } from '@/ffmpeg/args'
@@ -18,33 +17,6 @@ describe('thumbnailSeek', () => {
   it('uses the first frame for short or unknown clips', () => {
     expect(thumbnailSeek(3)).toBe(0)
     expect(thumbnailSeek(null)).toBe(0)
-  })
-})
-
-describe('hardwareDecodeArgs', () => {
-  it('has the GPU decode what it can, before the input', () => {
-    expect(hardwareDecodeArgs({ encoder: { kind: 'videotoolbox' }, videoCodec: 'av1' })).toEqual([
-      '-hwaccel',
-      'videotoolbox',
-    ])
-    const vaapi = { kind: 'vaapi' as const, device: '/dev/dri/renderD128' }
-    expect(hardwareDecodeArgs({ encoder: vaapi, videoCodec: 'hevc' })).toEqual([
-      '-hwaccel',
-      'vaapi',
-      '-hwaccel_device',
-      '/dev/dri/renderD128',
-    ])
-    expect(hardwareDecodeArgs({ encoder: vaapi, videoCodec: 'av1' })).toEqual([])
-    expect(hardwareDecodeArgs({ encoder: { kind: 'software' }, videoCodec: 'h264' })).toEqual([])
-    const args = thumbnailArgs({
-      input: '/m/a.mkv',
-      output: '/t/1.jpg',
-      seek: 60,
-      width: 480,
-      tonemap: false,
-      decode: ['-hwaccel', 'videotoolbox'],
-    })
-    expect(args.indexOf('-hwaccel')).toBeLessThan(args.indexOf('-ss'))
   })
 })
 
