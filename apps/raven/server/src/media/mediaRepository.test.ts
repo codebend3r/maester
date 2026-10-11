@@ -7,6 +7,7 @@ import { readServerConfig } from '@/config'
 import { DatabaseService } from '@/db/database'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { MediaRepository } from '@/media/mediaRepository'
+import { MetadataRepository } from '@/metadata/metadataRepository'
 
 type Seed = {
   name: string
@@ -57,11 +58,12 @@ describe('listing a library', () => {
     state.dir = await mkdtemp(join(tmpdir(), 'raven-sort-'))
     const database = new DatabaseService({ ...readServerConfig({}), dataDir: state.dir })
     state.database = database
-    state.media = new MediaRepository(database)
+    state.media = new MediaRepository(database, new MetadataRepository(database))
     state.libraryId = new LibrariesRepository(database).create({ name: 'Test', paths: ['/m'] }).id
     VIDEOS.forEach((video) => {
       const id = media().insert({
         libraryId: state.libraryId,
+        kind: 'other',
         file: { path: `/m/${video.name}.mp4`, root: '/m', size: video.size, mtimeMs: 1 },
       })
       database.db.prepare('UPDATE media SET added_at = ? WHERE id = ?').run(video.addedAt, id)
@@ -144,6 +146,7 @@ describe('stored tracks', () => {
   const add = (name: string): number =>
     media().insert({
       libraryId: state.libraryId,
+      kind: 'other',
       file: { path: `/m/${name}.mp4`, root: '/m', size: 100, mtimeMs: 1 },
     })
 
@@ -151,7 +154,7 @@ describe('stored tracks', () => {
     state.dir = await mkdtemp(join(tmpdir(), 'raven-tracks-'))
     const database = new DatabaseService({ ...readServerConfig({}), dataDir: state.dir })
     state.database = database
-    state.media = new MediaRepository(database)
+    state.media = new MediaRepository(database, new MetadataRepository(database))
     state.libraryId = new LibrariesRepository(database).create({ name: 'Test', paths: ['/m'] }).id
   })
 
@@ -222,6 +225,7 @@ describe('play history', () => {
   const add = ({ libraryId, name }: { libraryId: number; name: string }): number =>
     media().insert({
       libraryId,
+      kind: 'other',
       file: { path: `/${libraryId}/${name}.mp4`, root: `/${libraryId}`, size: 100, mtimeMs: 1 },
     })
   /** A time on 10 October 2026, this many minutes after 7pm UTC. */
@@ -239,7 +243,7 @@ describe('play history', () => {
     state.dir = await mkdtemp(join(tmpdir(), 'raven-history-'))
     const database = new DatabaseService({ ...readServerConfig({}), dataDir: state.dir })
     state.database = database
-    state.media = new MediaRepository(database)
+    state.media = new MediaRepository(database, new MetadataRepository(database))
   })
 
   afterAll(async () => {

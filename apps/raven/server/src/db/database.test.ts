@@ -102,4 +102,28 @@ describe('migrations', () => {
     })
     database.onModuleDestroy()
   })
+
+  it('turns matching on for Movies and TV libraries and off for the rest', () => {
+    const before = new Sqlite(join(state.dir, 'raven.db'))
+    MIGRATIONS.slice(0, 7).forEach((sql) => before.exec(sql))
+    before.pragma('user_version = 7')
+    const library = before.prepare(
+      "INSERT INTO libraries (name, created_at, kind) VALUES (?, '2026-01-01T00:00:00.000Z', ?)",
+    )
+    const media = before.prepare(
+      `INSERT INTO media (library_id, path, file_name, folder, title, container, size, mtime_ms, added_at)
+       VALUES (?, ?, 'x.mkv', '', 'x', 'mkv', 1, 1, '2026-01-01T00:00:00.000Z')`,
+    )
+    media.run(library.run('Films', 'movies').lastInsertRowid, '/films/x.mkv')
+    media.run(library.run('Clips', 'other').lastInsertRowid, '/clips/x.mkv')
+    before.close()
+
+    const database = new DatabaseService({ ...readServerConfig({}), dataDir: state.dir })
+    expect(database.db.prepare('SELECT path, match, year FROM media ORDER BY path').all()).toEqual([
+      { path: '/clips/x.mkv', match: 'off', year: null },
+      { path: '/films/x.mkv', match: 'pending', year: null },
+    ])
+    expect(database.db.prepare('SELECT COUNT(*) AS items FROM items').get()).toEqual({ items: 0 })
+    database.onModuleDestroy()
+  })
 })

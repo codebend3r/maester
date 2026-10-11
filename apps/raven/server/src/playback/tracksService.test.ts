@@ -7,6 +7,7 @@ import { DatabaseService } from '@/db/database'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { type MediaRecord, MediaRepository } from '@/media/mediaRepository'
+import { MetadataRepository } from '@/metadata/metadataRepository'
 import { TracksService } from '@/playback/tracksService'
 import { encodeClip } from '@/test/clips'
 
@@ -54,7 +55,7 @@ describe('TracksService', () => {
     await encodeClip({ path: state.other, seconds: 2 })
     const database = new DatabaseService({ ...readServerConfig({}), dataDir: state.dir })
     state.database = database
-    state.media = new MediaRepository(database)
+    state.media = new MediaRepository(database, new MetadataRepository(database))
     state.libraryId = new LibrariesRepository(database).create({
       name: 'Test',
       paths: [join(state.dir, 'media')],
@@ -69,6 +70,7 @@ describe('TracksService', () => {
   it('serves the tracks the scan stored without running ffprobe', async () => {
     const id = media().insert({
       libraryId: state.libraryId,
+      kind: 'other',
       file: { path: state.clip, root: join(state.dir, 'media'), size: 1, mtimeMs: 1 },
     })
     const stored = {
@@ -87,6 +89,7 @@ describe('TracksService', () => {
   it('probes a video that has no stored tracks once, and keeps what it found', async () => {
     const id = media().insert({
       libraryId: state.libraryId,
+      kind: 'other',
       file: { path: state.other, root: join(state.dir, 'media'), size: 2, mtimeMs: 2 },
     })
     media().saveProbe({ id, probe: PROBE })

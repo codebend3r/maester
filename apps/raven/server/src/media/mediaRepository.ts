@@ -1,18 +1,24 @@
 import { basename, dirname, relative } from 'node:path'
 import { Inject, Injectable } from '@nestjs/common'
 import {
+  type LibraryKind,
+  type MatchState,
   type MediaItem,
   type MediaSort,
   type MediaTracks,
   type ThumbnailState,
   containerOf,
+  isExtra,
+  isMatchState,
   isMediaTracks,
   isThumbnailState,
+  parseMovieName,
   titleFromFileName,
 } from '@raven/core'
 import { DatabaseService } from '@/db/database'
 import type { ProbeResult } from '@/ffmpeg/probe'
 import { shuffle } from '@/media/shuffle'
+import { MetadataRepository } from '@/metadata/metadataRepository'
 
 /** A media row with the server-only fields a client never sees. */
 export type MediaRecord = MediaItem & {
@@ -20,6 +26,7 @@ export type MediaRecord = MediaItem & {
   probed: boolean
   probeError: string | null
   mtimeMs: number
+  itemId: number | null
 }
 
 /** A played video in a library's history, with the server-only record. */
@@ -70,18 +77,55 @@ type MediaRow = {
   bitrate: number | null
   thumbnail: string
   added_at: string
+  year: number | null
+  edition: string | null
+  match: string
   position: number | null
   favourited_at: string | null
+  item_id: number | null
+  versions: number
 }
 
-/** A saved spot counts only while its library saves progress; turned off, it is kept but not shown. */
-const SELECT_MEDIA = `
+/** A file waiting to be matched, with what matching needs: its name and where it sits. */
+export type PendingFile = {
+  id: number
+  libraryId: number
+  path: string
+  fileName: string
+  folder: string
+  title: string
+  year: number | null
+}
+
+/**
+ * A saved spot counts only while its library saves progress; turned off, it
+ * is kept but not shown. A file holding two episodes takes the first as its
+ * item. `versions` counts the files in the library that are the same movie.
+ */
+const SELECT_COLUMNS = `
   SELECT m.*, CASE WHEN l.save_progress = 1 THEN p.position END AS position,
-         f.added_at AS favourited_at
+         f.added_at AS favourited_at,
+         i.id AS item_id, i.type AS item_type, i.title AS item_title,
+         i.original_title AS item_original_title, i.sort_title AS item_sort_title,
+         i.year AS item_year,
+         CASE WHEN i.type = 'movie'
+              THEN (SELECT COUNT(*) FROM media_items x JOIN media y ON y.id = x.media_id
+                     WHERE x.item_id = i.id AND y.library_id = m.library_id)
+              ELSE 1 END AS versions`
+
+const FROM_MEDIA = `
     FROM media m
     JOIN libraries l ON l.id = m.library_id
     LEFT JOIN playback_progress p ON p.media_id = m.id
-    LEFT JOIN favourites f ON f.media_id = m.id`
+    LEFT JOIN favourites f ON f.media_id = m.id
+    LEFT JOIN (SELECT media_id, MIN(item_id) AS item_id FROM media_items GROUP BY media_id) mi
+      ON mi.media_id = m.id
+    LEFT JOIN items i ON i.id = mi.item_id`
+
+const SELECT_MEDIA = `${SELECT_COLUMNS}${FROM_MEDIA}`
+
+/** The best of a movie's files first: the most pixels, then the biggest file. */
+const BEST_FIRST = 'COALESCE(m.width * m.height, 0) DESC, m.size DESC, m.id'
 
 const toRecord = (row: MediaRow): MediaRecord => ({
   id: row.id,
@@ -109,7 +153,33 @@ const toRecord = (row: MediaRow): MediaRecord => ({
   probed: row.probed === 1,
   probeError: row.probe_error,
   addedAt: row.added_at,
+  match: isMatchState(row.match) ? row.match : 'pending',
+  year: row.year,
+  edition: row.edition,
+  item: null,
+  versions: row.versions,
+  itemId: row.item_id,
 })
+
+/** What a name says a file is, by its library's type. Extras and other libraries keep the tidied name. */
+export const namedAs = ({
+  kind,
+  fileName,
+  folder,
+}: {
+  kind: LibraryKind
+  fileName: string
+  folder: string
+}): { title: string; year: number | null; edition: string | null; match: MatchState } => {
+  if (kind === 'other' || isExtra({ fileName, folder })) {
+    return { title: titleFromFileName(fileName), year: null, edition: null, match: 'off' }
+  }
+  if (kind === 'movies') {
+    const parsed = parseMovieName({ fileName, folder })
+    return { title: parsed.title, year: parsed.year, edition: parsed.edition, match: 'pending' }
+  }
+  return { title: titleFromFileName(fileName), year: null, edition: null, match: 'pending' }
+}
 
 /** The client-facing view of a record: no absolute paths or internal bookkeeping. */
 export const toMediaItem = ({
@@ -117,6 +187,7 @@ export const toMediaItem = ({
   probed: _probed,
   probeError: _probeError,
   mtimeMs: _mtimeMs,
+  itemId: _itemId,
   ...item
 }: MediaRecord): MediaItem => item
 
@@ -131,23 +202,27 @@ type HistoryRow = {
   watched: number
 }
 
-const BY_TITLE = 'm.title COLLATE NOCASE, m.id'
+const BY_TITLE = 'COALESCE(item_sort_title, title) COLLATE NOCASE, id'
+
+const YEAR = 'COALESCE(item_year, year)'
 
 /**
- * ORDER BY for each sort. Ties fall back to title. Bitrate and resolution are
- * unknown until a file is probed, and those files go last either way.
- * Random lists by title here and is shuffled after.
+ * ORDER BY for each sort, over the listing's columns. Ties fall back to
+ * title. Bitrate, resolution and year are unknown for some files, and those
+ * go last either way. Random lists by title here and is shuffled after.
  */
 const ORDER_BY: Record<MediaSort, string> = {
   title: BY_TITLE,
-  added: 'm.added_at DESC, m.id DESC',
-  oldest: 'm.added_at, m.id',
-  largest: `m.size DESC, ${BY_TITLE}`,
-  smallest: `m.size, ${BY_TITLE}`,
-  'bitrate-high': `m.bitrate IS NULL, m.bitrate DESC, ${BY_TITLE}`,
-  'bitrate-low': `m.bitrate IS NULL, m.bitrate, ${BY_TITLE}`,
-  'resolution-high': `m.width * m.height IS NULL, m.width * m.height DESC, ${BY_TITLE}`,
-  'resolution-low': `m.width * m.height IS NULL, m.width * m.height, ${BY_TITLE}`,
+  added: 'added_at DESC, id DESC',
+  oldest: 'added_at, id',
+  largest: `size DESC, ${BY_TITLE}`,
+  smallest: `size, ${BY_TITLE}`,
+  'bitrate-high': `bitrate IS NULL, bitrate DESC, ${BY_TITLE}`,
+  'bitrate-low': `bitrate IS NULL, bitrate, ${BY_TITLE}`,
+  'resolution-high': `width * height IS NULL, width * height DESC, ${BY_TITLE}`,
+  'resolution-low': `width * height IS NULL, width * height, ${BY_TITLE}`,
+  'year-new': `${YEAR} IS NULL, ${YEAR} DESC, ${BY_TITLE}`,
+  'year-old': `${YEAR} IS NULL, ${YEAR}, ${BY_TITLE}`,
   random: BY_TITLE,
 }
 
@@ -157,13 +232,31 @@ const likePattern = (search: string): string =>
 
 @Injectable()
 export class MediaRepository {
-  constructor(@Inject(DatabaseService) private readonly database: DatabaseService) {}
+  constructor(
+    @Inject(DatabaseService) private readonly database: DatabaseService,
+    @Inject(MetadataRepository) private readonly metadata: MetadataRepository,
+  ) {}
 
   private get db() {
     return this.database.db
   }
 
-  /** A library's videos in `sort` order; `seed` decides a random one. */
+  /** Records for rows, each with its item's summary attached. */
+  private records(rows: readonly MediaRow[]): MediaRecord[] {
+    const summaries = this.metadata.summaries(
+      rows.flatMap((row) => (row.item_id == null ? [] : [row.item_id])),
+    )
+    return rows.map((row) => ({
+      ...toRecord(row),
+      item: row.item_id == null ? null : (summaries.get(row.item_id) ?? null),
+    }))
+  }
+
+  /**
+   * A library's videos in `sort` order; `seed` decides a random one. A movie
+   * kept as several files is one entry, its best file, with `versions` saying
+   * how many there are. Search matches the file's title and its movie's.
+   */
   list({
     libraryId,
     search = '',
@@ -175,30 +268,53 @@ export class MediaRepository {
     sort?: MediaSort
     seed?: number
   }): MediaRecord[] {
-    const records = this.db
-      .prepare<[number, string], MediaRow>(
-        `${SELECT_MEDIA}
-          WHERE m.library_id = ? AND m.title LIKE ? ESCAPE '\\'
+    const pattern = likePattern(search.trim())
+    const rows = this.db
+      .prepare<[number, string, string, string], MediaRow>(
+        `WITH listed AS (
+           ${SELECT_COLUMNS},
+                  ROW_NUMBER() OVER (
+                    PARTITION BY CASE WHEN i.type = 'movie' THEN i.id ELSE -m.id END
+                    ORDER BY ${BEST_FIRST}) AS version_rank
+           ${FROM_MEDIA}
+            WHERE m.library_id = ?)
+         SELECT * FROM listed
+          WHERE version_rank = 1
+            AND (title LIKE ? ESCAPE '\\' OR item_title LIKE ? ESCAPE '\\'
+                 OR item_original_title LIKE ? ESCAPE '\\')
           ORDER BY ${ORDER_BY[sort]}`,
       )
-      .all(libraryId, likePattern(search.trim()))
-      .map(toRecord)
+      .all(libraryId, pattern, pattern, pattern)
+    const records = this.records(rows)
     return sort === 'random' ? shuffle({ items: records, seed }) : records
   }
 
   get(id: number): MediaRecord | null {
     const row = this.db.prepare<[number], MediaRow>(`${SELECT_MEDIA} WHERE m.id = ?`).get(id)
-    return row ? toRecord(row) : null
+    return row ? (this.records([row])[0] ?? null) : null
+  }
+
+  /** Every file that is an item, in any library, best first. */
+  forItem(itemId: number): MediaRecord[] {
+    return this.records(
+      this.db
+        .prepare<[number], MediaRow>(
+          `${SELECT_MEDIA}
+            WHERE m.id IN (SELECT media_id FROM media_items WHERE item_id = ?)
+            ORDER BY ${BEST_FIRST}`,
+        )
+        .all(itemId),
+    )
   }
 
   /** Every favourite across every library, most recently marked first. */
   listFavourites(): MediaRecord[] {
-    return this.db
+    const rows = this.db
       .prepare<[], MediaRow>(
         `${SELECT_MEDIA} WHERE f.media_id IS NOT NULL ORDER BY f.added_at DESC, m.id DESC`,
       )
       .all()
-      .map(toRecord)
+    return this.records(rows)
   }
 
   /** Marking a favourite again keeps its original time, so the list does not reshuffle. */
@@ -292,12 +408,13 @@ export class MediaRepository {
       )
       .all(libraryId, limit)
     const records = new Map(
-      this.db
-        .prepare<[string], MediaRow>(
-          `${SELECT_MEDIA} WHERE m.id IN (SELECT value FROM json_each(?))`,
-        )
-        .all(JSON.stringify(rows.map((row) => row.id)))
-        .map((row) => [row.id, toRecord(row)]),
+      this.records(
+        this.db
+          .prepare<[string], MediaRow>(
+            `${SELECT_MEDIA} WHERE m.id IN (SELECT value FROM json_each(?))`,
+          )
+          .all(JSON.stringify(rows.map((row) => row.id))),
+      ).map((record) => [record.id, record]),
     )
     return rows.flatMap((row) => {
       const record = records.get(row.id)
@@ -338,26 +455,162 @@ export class MediaRepository {
     )
   }
 
-  insert({ libraryId, file }: { libraryId: number; file: FoundFile }): number {
+  insert({
+    libraryId,
+    kind,
+    file,
+  }: {
+    libraryId: number
+    kind: LibraryKind
+    file: FoundFile
+  }): number {
     const fileName = basename(file.path)
     const folder = relative(file.root, dirname(file.path))
+    const named = namedAs({ kind, fileName, folder })
     const result = this.db
       .prepare(
-        `INSERT INTO media (library_id, path, file_name, folder, title, container, size, mtime_ms, added_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO media (library_id, path, file_name, folder, title, year, edition, match, container,
+                            size, mtime_ms, added_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         libraryId,
         file.path,
         fileName,
         folder,
-        titleFromFileName(fileName),
+        named.title,
+        named.year,
+        named.edition,
+        named.match,
         containerOf(fileName),
         file.size,
         Math.round(file.mtimeMs),
         new Date().toISOString(),
       )
     return Number(result.lastInsertRowid)
+  }
+
+  /**
+   * Reads every file's name again for the library's type, and starts its
+   * matching over: links go, and files are pending, or off in a library that
+   * is not Movies or TV shows. Run when a library's type changes.
+   */
+  rename({ libraryId, kind }: { libraryId: number; kind: LibraryKind }): void {
+    const rows = this.db
+      .prepare<[number], { id: number; file_name: string; folder: string }>(
+        'SELECT id, file_name, folder FROM media WHERE library_id = ?',
+      )
+      .all(libraryId)
+    const update = this.db.prepare(
+      'UPDATE media SET title = ?, year = ?, edition = ?, match = ? WHERE id = ?',
+    )
+    this.db.transaction(() => {
+      this.metadata.unlink(rows.map((row) => row.id))
+      rows.forEach((row) => {
+        const named = namedAs({ kind, fileName: row.file_name, folder: row.folder })
+        update.run(named.title, named.year, named.edition, named.match, row.id)
+      })
+    })()
+  }
+
+  /**
+   * Reads names again without touching matches, for files indexed before
+   * names were parsed. Only titles and years the parser now reads change.
+   */
+  retitle({ libraryId, kind }: { libraryId: number; kind: LibraryKind }): void {
+    const rows = this.db
+      .prepare<[number], { id: number; file_name: string; folder: string; title: string }>(
+        `SELECT id, file_name, folder, title FROM media WHERE library_id = ? AND match = 'pending'`,
+      )
+      .all(libraryId)
+    const update = this.db.prepare(
+      'UPDATE media SET title = ?, year = ?, edition = ?, match = ? WHERE id = ?',
+    )
+    this.db.transaction(() =>
+      rows.forEach((row) => {
+        const named = namedAs({ kind, fileName: row.file_name, folder: row.folder })
+        update.run(named.title, named.year, named.edition, named.match, row.id)
+      }),
+    )()
+  }
+
+  /** A library's files waiting to be matched, by place so a folder's files come together. */
+  pending(libraryId: number): PendingFile[] {
+    return this.db
+      .prepare<
+        [number],
+        {
+          id: number
+          library_id: number
+          path: string
+          file_name: string
+          folder: string
+          title: string
+          year: number | null
+        }
+      >(
+        `SELECT id, library_id, path, file_name, folder, title, year FROM media
+          WHERE library_id = ? AND match = 'pending'
+          ORDER BY folder, file_name`,
+      )
+      .all(libraryId)
+      .map((row) => ({
+        id: row.id,
+        libraryId: row.library_id,
+        path: row.path,
+        fileName: row.file_name,
+        folder: row.folder,
+        title: row.title,
+        year: row.year,
+      }))
+  }
+
+  /** How many files wait to be matched in libraries of `kinds`. */
+  countPending(kinds: readonly LibraryKind[]): number {
+    return (
+      this.db
+        .prepare<[string], { count: number }>(
+          `SELECT COUNT(*) AS count FROM media m JOIN libraries l ON l.id = m.library_id
+            WHERE m.match = 'pending' AND l.kind IN (SELECT value FROM json_each(?))`,
+        )
+        .get(JSON.stringify(kinds))?.count ?? 0
+    )
+  }
+
+  /** A library's files in `folder`, with their names, for the files sharing a place. */
+  inFolder({ libraryId, folder }: { libraryId: number; folder: string }): PendingFile[] {
+    return this.db
+      .prepare<
+        [number, string],
+        {
+          id: number
+          library_id: number
+          path: string
+          file_name: string
+          folder: string
+          title: string
+          year: number | null
+        }
+      >(
+        `SELECT id, library_id, path, file_name, folder, title, year FROM media
+          WHERE library_id = ? AND folder = ? ORDER BY file_name`,
+      )
+      .all(libraryId, folder)
+      .map((row) => ({
+        id: row.id,
+        libraryId: row.library_id,
+        path: row.path,
+        fileName: row.file_name,
+        folder: row.folder,
+        title: row.title,
+        year: row.year,
+      }))
+  }
+
+  setMatch({ ids, match }: { ids: readonly number[]; match: MatchState }): void {
+    this.db
+      .prepare('UPDATE media SET match = ? WHERE id IN (SELECT value FROM json_each(?))')
+      .run(match, JSON.stringify(ids))
   }
 
   /** The file was replaced on disk: forget what the old one held so it gets probed again. */

@@ -132,3 +132,53 @@ export const createTaskQueue = ({ concurrency }: { concurrency: number }): TaskQ
     size: () => queued.size + running.size,
   }
 }
+
+export type RateLimit = {
+  /** Runs `task` in its turn: at most `inFlight` at once, started no faster than the rate. */
+  run: <T>(task: () => Promise<T>) => Promise<T>
+  /** Halves the rate, after a server asked us to slow down. */
+  slowDown: () => void
+  /** Back to the starting rate. */
+  reset: () => void
+}
+
+/**
+ * A gate that also spaces out starts, for an API with a ceiling on requests
+ * a second. Starts are booked a slot apart, so a burst queues rather than
+ * tripping the ceiling.
+ */
+export const createRateLimit = ({
+  perSecond,
+  inFlight,
+  now = Date.now,
+  sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
+}: {
+  perSecond: number
+  inFlight: number
+  now?: () => number
+  sleep?: (ms: number) => Promise<void>
+}): RateLimit => {
+  const gate = createGate({ limit: inFlight })
+  const state = { rate: perSecond, next: 0 }
+
+  const turn = async (): Promise<void> => {
+    const at = Math.max(now(), state.next)
+    state.next = at + 1000 / state.rate
+    const wait = at - now()
+    if (wait > 0) await sleep(wait)
+  }
+
+  return {
+    run: (task) =>
+      gate.run(async () => {
+        await turn()
+        return task()
+      }),
+    slowDown: () => {
+      state.rate = Math.max(1, state.rate / 2)
+    },
+    reset: () => {
+      state.rate = perSecond
+    },
+  }
+}

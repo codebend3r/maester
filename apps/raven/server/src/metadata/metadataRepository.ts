@@ -1,0 +1,501 @@
+import { createHash } from 'node:crypto'
+import { Inject, Injectable } from '@nestjs/common'
+import {
+  type Credit,
+  type ItemDetails,
+  type ItemImageKind,
+  type ItemSummary,
+  type ItemType,
+  type Rating,
+  type RatingSource,
+  isCreditJob,
+  isItemType,
+  isRatingSource,
+  isStringArray,
+  sortTitle,
+} from '@raven/core'
+import type Sqlite from 'better-sqlite3'
+import { DatabaseService } from '@/db/database'
+import type { FetchedItem } from '@/metadata/tmdbClient'
+
+/** A short stable tag for a picture's source, so its URL changes exactly when the picture does. */
+export const versionOf = (ref: string): string =>
+  createHash('sha1').update(ref).digest('base64url').slice(0, 11)
+
+export type ImageSource = 'tmdb' | 'local'
+
+/** Where an item's picture comes from: a file beside the media wins over TMDB's. */
+export type ImageRef = { source: ImageSource; ref: string }
+
+/** Rotten Tomatoes and Metacritic are critics; TMDB and IMDb are audiences. */
+const RATING_KINDS: Record<RatingSource, Rating['kind']> = {
+  tmdb: 'audience',
+  imdb: 'audience',
+  rottenTomatoes: 'critic',
+  metacritic: 'critic',
+}
+
+type ItemRow = {
+  id: number
+  type: string
+  tmdb_id: string
+  parent_id: number | null
+  number: number | null
+  title: string
+  original_title: string | null
+  year: number | null
+  released: string | null
+  ended: string | null
+  summary: string | null
+  tagline: string | null
+  content_rating: string | null
+  runtime: number | null
+  studio: string | null
+  genres: string
+  imdb_id: string | null
+  fetched_at: string
+}
+
+type SummaryRow = {
+  id: number
+  type: string
+  title: string
+  year: number | null
+  number: number | null
+  parent_number: number | null
+  show_id: number | null
+  show_title: string | null
+}
+
+/** The picture each item shows for `kind`: local first, then TMDB's. */
+const IMAGE_REFS = `
+  SELECT item_id, source, ref FROM item_images
+   WHERE kind = ? AND item_id IN (SELECT value FROM json_each(?))
+   ORDER BY item_id, CASE source WHEN 'local' THEN 0 ELSE 1 END`
+
+const genresOf = (json: string): string[] => {
+  try {
+    const parsed: unknown = JSON.parse(json)
+    return isStringArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+/** Movies, shows, seasons and episodes as TMDB describes them, with their people, scores and pictures. */
+@Injectable()
+export class MetadataRepository {
+  constructor(@Inject(DatabaseService) private readonly database: DatabaseService) {}
+
+  private get db(): Sqlite.Database {
+    return this.database.db
+  }
+
+  /** The stored item for a TMDB id, and when it was fetched. */
+  find({
+    type,
+    tmdbId,
+  }: {
+    type: ItemType
+    tmdbId: string
+  }): { id: number; fetchedAt: string } | null {
+    const row = this.db
+      .prepare<[string, string], { id: number; fetched_at: string }>(
+        'SELECT id, fetched_at FROM items WHERE type = ? AND tmdb_id = ?',
+      )
+      .get(type, tmdbId)
+    return row ? { id: row.id, fetchedAt: row.fetched_at } : null
+  }
+
+  get(id: number): { id: number; type: ItemType; tmdbId: string; parentId: number | null } | null {
+    const row = this.db
+      .prepare<[number], { id: number; type: string; tmdb_id: string; parent_id: number | null }>(
+        'SELECT id, type, tmdb_id, parent_id FROM items WHERE id = ?',
+      )
+      .get(id)
+    return row && isItemType(row.type)
+      ? { id: row.id, type: row.type, tmdbId: row.tmdb_id, parentId: row.parent_id }
+      : null
+  }
+
+  /**
+   * Stores what TMDB said about an item, replacing what was there: its
+   * fields, its TMDB pictures, its TMDB score, and its credits, with the
+   * people they name. Pictures from beside the media stay.
+   */
+  save({ item, parentId = null }: { item: FetchedItem; parentId?: number | null }): number {
+    return this.db.transaction(() => {
+      const row = this.db
+        .prepare<unknown[], { id: number }>(
+          `INSERT INTO items (type, tmdb_id, parent_id, number, title, original_title, sort_title, year,
+                              released, ended, summary, tagline, content_rating, runtime, studio, genres,
+                              imdb_id, tvdb_id, fetched_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT (type, tmdb_id) DO UPDATE SET
+             parent_id = excluded.parent_id, number = excluded.number, title = excluded.title,
+             original_title = excluded.original_title, sort_title = excluded.sort_title,
+             year = excluded.year, released = excluded.released, ended = excluded.ended,
+             summary = excluded.summary, tagline = excluded.tagline,
+             content_rating = excluded.content_rating, runtime = excluded.runtime,
+             studio = excluded.studio, genres = excluded.genres, imdb_id = excluded.imdb_id,
+             tvdb_id = excluded.tvdb_id, fetched_at = excluded.fetched_at
+           RETURNING id`,
+        )
+        .get(
+          item.type,
+          item.tmdbId,
+          parentId,
+          item.number,
+          item.title,
+          item.originalTitle,
+          sortTitle(item.title),
+          item.year,
+          item.released,
+          item.ended,
+          item.summary,
+          item.tagline,
+          item.contentRating,
+          item.runtime,
+          item.studio,
+          JSON.stringify(item.genres),
+          item.imdbId,
+          item.tvdbId,
+          new Date().toISOString(),
+        )
+      if (!row) throw new Error(`Could not store ${item.type} ${item.tmdbId}`)
+      const id = row.id
+
+      this.db.prepare(`DELETE FROM item_images WHERE item_id = ? AND source = 'tmdb'`).run(id)
+      const image = this.db.prepare(
+        `INSERT INTO item_images (item_id, kind, source, ref) VALUES (?, ?, 'tmdb', ?)`,
+      )
+      Object.entries(item.images).forEach(([kind, ref]) => {
+        if (ref != null) image.run(id, kind, ref)
+      })
+
+      this.db.prepare(`DELETE FROM ratings WHERE item_id = ? AND source = 'tmdb'`).run(id)
+      if (item.rating) {
+        this.db
+          .prepare(`INSERT INTO ratings (item_id, source, value, votes) VALUES (?, 'tmdb', ?, ?)`)
+          .run(id, item.rating.value, item.rating.votes)
+      }
+
+      this.db.prepare('DELETE FROM credits WHERE item_id = ?').run(id)
+      const person = this.db.prepare<[string, string, string | null], { id: number }>(
+        `INSERT INTO people (tmdb_id, name, photo) VALUES (?, ?, ?)
+         ON CONFLICT (tmdb_id) DO UPDATE SET name = excluded.name, photo = excluded.photo
+         RETURNING id`,
+      )
+      const credit = this.db.prepare(
+        `INSERT INTO credits (item_id, person_id, job, role, position) VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT (item_id, person_id, job) DO NOTHING`,
+      )
+      item.credits.forEach((entry, position) => {
+        const stored = person.get(entry.tmdbId, entry.name, entry.photo)
+        if (stored) credit.run(id, stored.id, entry.job, entry.role, position)
+      })
+      return id
+    })()
+  }
+
+  /** Replaces an item's pictures from beside the media; a kind left out has none. */
+  setLocalImages({
+    itemId,
+    images,
+  }: {
+    itemId: number
+    images: Partial<Record<ItemImageKind, string>>
+  }): void {
+    this.db.transaction(() => {
+      this.db.prepare(`DELETE FROM item_images WHERE item_id = ? AND source = 'local'`).run(itemId)
+      const insert = this.db.prepare(
+        `INSERT INTO item_images (item_id, kind, source, ref) VALUES (?, ?, 'local', ?)`,
+      )
+      Object.entries(images).forEach(([kind, ref]) => insert.run(itemId, kind, ref))
+    })()
+  }
+
+  /** The picture an item shows for `kind`, or null when it has none. */
+  image({ itemId, kind }: { itemId: number; kind: ItemImageKind }): ImageRef | null {
+    const row = this.db
+      .prepare<[string, string], { item_id: number; source: string; ref: string }>(IMAGE_REFS)
+      .get(kind, JSON.stringify([itemId]))
+    if (!row) return null
+    return { source: row.source === 'local' ? 'local' : 'tmdb', ref: row.ref }
+  }
+
+  /** An item's TMDB picture for `kind`, whatever is beside the media. */
+  tmdbImage({ itemId, kind }: { itemId: number; kind: ItemImageKind }): string | null {
+    return (
+      this.db
+        .prepare<[number, string], { ref: string }>(
+          `SELECT ref FROM item_images WHERE item_id = ? AND kind = ? AND source = 'tmdb'`,
+        )
+        .get(itemId, kind)?.ref ?? null
+    )
+  }
+
+  private versions({
+    ids,
+    kind,
+  }: {
+    ids: readonly number[]
+    kind: ItemImageKind
+  }): Map<number, string> {
+    const rows = this.db
+      .prepare<[string, string], { item_id: number; source: string; ref: string }>(IMAGE_REFS)
+      .all(kind, JSON.stringify(ids))
+    return rows.reduce(
+      (versions, row) =>
+        versions.has(row.item_id)
+          ? versions
+          : versions.set(row.item_id, versionOf(`${row.source}:${row.ref}`)),
+      new Map<number, string>(),
+    )
+  }
+
+  /** What a card needs for each item, keyed by id. */
+  summaries(ids: readonly number[]): Map<number, ItemSummary> {
+    if (ids.length === 0) return new Map()
+    const unique = [...new Set(ids)]
+    const rows = this.db
+      .prepare<[string], SummaryRow>(
+        `SELECT i.id, i.type, i.title, i.year, i.number,
+                p.number AS parent_number,
+                CASE i.type WHEN 'season' THEN p.id WHEN 'episode' THEN g.id END AS show_id,
+                CASE i.type WHEN 'season' THEN p.title WHEN 'episode' THEN g.title END AS show_title
+           FROM items i
+           LEFT JOIN items p ON p.id = i.parent_id
+           LEFT JOIN items g ON g.id = p.parent_id
+          WHERE i.id IN (SELECT value FROM json_each(?))`,
+      )
+      .all(JSON.stringify(unique))
+    const posters = this.versions({ ids: unique, kind: 'poster' })
+    return new Map(
+      rows.flatMap((row): Array<[number, ItemSummary]> => {
+        if (!isItemType(row.type)) return []
+        return [
+          [
+            row.id,
+            {
+              id: row.id,
+              type: row.type,
+              title: row.title,
+              year: row.year,
+              show:
+                row.show_id != null && row.show_title != null
+                  ? { id: row.show_id, title: row.show_title }
+                  : null,
+              season:
+                row.type === 'season'
+                  ? row.number
+                  : row.type === 'episode'
+                    ? row.parent_number
+                    : null,
+              episode: row.type === 'episode' ? row.number : null,
+              posterVersion: posters.get(row.id) ?? null,
+            },
+          ],
+        ]
+      }),
+    )
+  }
+
+  /** An item's page, apart from its files and children, which the caller adds. */
+  details(id: number): Omit<ItemDetails, 'versions' | 'children'> | null {
+    const row = this.db.prepare<[number], ItemRow>('SELECT * FROM items WHERE id = ?').get(id)
+    const summary = this.summaries([id]).get(id)
+    if (!row || !summary) return null
+    const ratings = this.db
+      .prepare<[number], { source: string; value: number; votes: number | null }>(
+        `SELECT source, value, votes FROM ratings WHERE item_id = ?
+          ORDER BY CASE source WHEN 'rottenTomatoes' THEN 0 WHEN 'imdb' THEN 1
+                               WHEN 'metacritic' THEN 2 ELSE 3 END`,
+      )
+      .all(id)
+      .flatMap((rating): Rating[] =>
+        isRatingSource(rating.source)
+          ? [
+              {
+                source: rating.source,
+                kind: RATING_KINDS[rating.source],
+                value: rating.value,
+                votes: rating.votes,
+              },
+            ]
+          : [],
+      )
+    return {
+      ...summary,
+      tmdbId: row.tmdb_id,
+      imdbId: row.imdb_id,
+      originalTitle: row.original_title,
+      tagline: row.tagline,
+      summary: row.summary,
+      contentRating: row.content_rating,
+      released: row.released,
+      ended: row.ended,
+      runtime: row.runtime,
+      studio: row.studio,
+      genres: genresOf(row.genres),
+      backdropVersion: this.versions({ ids: [id], kind: 'backdrop' }).get(id) ?? null,
+      ratings,
+      credits: this.credits(id),
+    }
+  }
+
+  /** An item's credits in page order. */
+  credits(itemId: number): Credit[] {
+    return this.db
+      .prepare<
+        [number],
+        { person_id: number; name: string; job: string; role: string | null; photo: string | null }
+      >(
+        `SELECT c.person_id, p.name, c.job, c.role, p.photo
+           FROM credits c JOIN people p ON p.id = c.person_id
+          WHERE c.item_id = ?
+          ORDER BY c.position`,
+      )
+      .all(itemId)
+      .flatMap((row): Credit[] =>
+        isCreditJob(row.job)
+          ? [
+              {
+                personId: row.person_id,
+                name: row.name,
+                job: row.job,
+                role: row.role,
+                photoVersion: row.photo == null ? null : versionOf(`tmdb:${row.photo}`),
+              },
+            ]
+          : [],
+      )
+  }
+
+  /** A person's photo path on TMDB, or null. */
+  photo(personId: number): string | null {
+    return (
+      this.db
+        .prepare<[number], { photo: string | null }>('SELECT photo FROM people WHERE id = ?')
+        .get(personId)?.photo ?? null
+    )
+  }
+
+  /** Points each file at its items, replacing whatever it pointed at. */
+  link({ mediaIds, itemIds }: { mediaIds: readonly number[]; itemIds: readonly number[] }): void {
+    this.db.transaction(() => {
+      const clear = this.db.prepare('DELETE FROM media_items WHERE media_id = ?')
+      const insert = this.db.prepare(
+        'INSERT OR IGNORE INTO media_items (media_id, item_id) VALUES (?, ?)',
+      )
+      mediaIds.forEach((mediaId) => {
+        clear.run(mediaId)
+        itemIds.forEach((itemId) => insert.run(mediaId, itemId))
+      })
+    })()
+  }
+
+  unlink(mediaIds: readonly number[]): void {
+    this.db
+      .prepare('DELETE FROM media_items WHERE media_id IN (SELECT value FROM json_each(?))')
+      .run(JSON.stringify(mediaIds))
+  }
+
+  /** The files linked to an item. */
+  mediaFor(itemId: number): number[] {
+    return this.db
+      .prepare<[number], { media_id: number }>('SELECT media_id FROM media_items WHERE item_id = ?')
+      .all(itemId)
+      .map((row) => row.media_id)
+  }
+
+  /** The Fix match saved for a place: undefined when there is none, null for "not a movie". */
+  override({ libraryId, place }: { libraryId: number; place: string }): string | null | undefined {
+    const row = this.db
+      .prepare<[number, string], { tmdb_id: string | null }>(
+        'SELECT tmdb_id FROM match_overrides WHERE library_id = ? AND place = ?',
+      )
+      .get(libraryId, place)
+    return row ? row.tmdb_id : undefined
+  }
+
+  saveOverride({
+    libraryId,
+    place,
+    tmdbId,
+  }: {
+    libraryId: number
+    place: string
+    tmdbId: string | null
+  }): void {
+    this.db
+      .prepare(
+        `INSERT INTO match_overrides (library_id, place, tmdb_id) VALUES (?, ?, ?)
+         ON CONFLICT (library_id, place) DO UPDATE SET tmdb_id = excluded.tmdb_id`,
+      )
+      .run(libraryId, place, tmdbId)
+  }
+
+  /** Items of `type` fetched before `before`, or before `recentBefore` when released after `releasedAfter`. */
+  stale({
+    type,
+    before,
+    recentBefore,
+    releasedAfter,
+  }: {
+    type: ItemType
+    before: string
+    recentBefore: string
+    releasedAfter: string
+  }): Array<{ id: number; tmdbId: string }> {
+    return this.db
+      .prepare<[string, string, string, string], { id: number; tmdb_id: string }>(
+        `SELECT id, tmdb_id FROM items
+          WHERE type = ? AND (fetched_at < ? OR (fetched_at < ? AND released >= ?))
+          ORDER BY fetched_at`,
+      )
+      .all(type, before, recentBefore, releasedAfter)
+      .map((row) => ({ id: row.id, tmdbId: row.tmdb_id }))
+  }
+
+  remove(id: number): void {
+    this.db.prepare('DELETE FROM items WHERE id = ?').run(id)
+  }
+
+  /**
+   * Removes movies with no file, shows and seasons with nothing under them,
+   * and people left with no credits. Returns what is still stored, for the
+   * image cache's sweep.
+   */
+  clearUp(): { tmdbPaths: Set<string>; itemIds: Set<number> } {
+    this.db.transaction(() => {
+      this.db.exec(`
+        DELETE FROM items WHERE type IN ('movie', 'episode')
+          AND id NOT IN (SELECT item_id FROM media_items);
+        DELETE FROM items WHERE type = 'season'
+          AND id NOT IN (SELECT parent_id FROM items WHERE parent_id IS NOT NULL)
+          AND id NOT IN (SELECT item_id FROM media_items);
+        DELETE FROM items WHERE type = 'show'
+          AND id NOT IN (SELECT parent_id FROM items WHERE parent_id IS NOT NULL)
+          AND id NOT IN (SELECT item_id FROM media_items);
+        DELETE FROM people WHERE id NOT IN (SELECT person_id FROM credits);
+      `)
+    })()
+    const tmdbPaths = new Set(
+      this.db
+        .prepare<[], { ref: string }>(
+          `SELECT ref FROM item_images WHERE source = 'tmdb'
+           UNION SELECT photo AS ref FROM people WHERE photo IS NOT NULL`,
+        )
+        .all()
+        .map((row) => row.ref),
+    )
+    const itemIds = new Set(
+      this.db
+        .prepare<[], { id: number }>('SELECT id FROM items')
+        .all()
+        .map((row) => row.id),
+    )
+    return { tmdbPaths, itemIds }
+  }
+}
