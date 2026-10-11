@@ -18,7 +18,7 @@ import {
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createApp } from '@/app'
 import { readServerConfig } from '@/config'
-import { MediaRepository } from '@/media/mediaRepository'
+import { MatchFiles } from '@/metadata/matchFiles'
 import { MetadataService } from '@/metadata/metadataService'
 import { ScannerService } from '@/scanner/scannerService'
 import { encodeClip, encodeImage } from '@/test/clips'
@@ -56,13 +56,13 @@ describe('movie metadata', () => {
     ],
     omdb: { tt0133093: { imdb: '8.7/10', rottenTomatoes: '83%', metacritic: '73/100' } },
   })
-  const state = {
-    root: '',
-    media: '',
-    data: '',
-    app: null as NestFastifyApplication | null,
-    library: 0,
-  }
+  const state: {
+    root: string
+    media: string
+    data: string
+    app: NestFastifyApplication | null
+    library: number
+  } = { root: '', media: '', data: '', app: null, library: 0 }
   const app = (): NestFastifyApplication => {
     if (!state.app) throw new Error('app not started')
     return state.app
@@ -652,7 +652,7 @@ describe('movie metadata', () => {
     // A pass busy with another file gives up on Lost Signal again while it runs.
     const letGo = tmdb.hold('Slow Burn')
     await encodeClip({ path: join(state.media, 'Slow Burn (2018).mp4'), seconds: 1 })
-    app().get(MediaRepository).retryUnmatched(state.library)
+    app().get(MatchFiles).retryUnmatched(state.library)
     await app().inject({ method: 'POST', url: `/api/libraries/${state.library}/scan` })
     await vi.waitFor(
       async () =>

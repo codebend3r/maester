@@ -95,13 +95,13 @@ describe('TV show metadata', () => {
       },
     ],
   })
-  const state = {
-    root: '',
-    media: '',
-    data: '',
-    app: null as NestFastifyApplication | null,
-    library: 0,
-  }
+  const state: {
+    root: string
+    media: string
+    data: string
+    app: NestFastifyApplication | null
+    library: number
+  } = { root: '', media: '', data: '', app: null, library: 0 }
   const app = (): NestFastifyApplication => {
     if (!state.app) throw new Error('app not started')
     return state.app
@@ -334,6 +334,41 @@ describe('TV show metadata', () => {
       'Ben Stiller:director',
       'Ben Stiller:producer',
     ])
+  })
+
+  it("gives a show's seasons their episode counts, and a season's episodes what their rows show", async () => {
+    const show = await item((await showNamed('Severance')).show.id)
+    const seasons = show.children.flatMap((child) => (child.type === 'season' ? [child] : []))
+    expect(seasons.map((season) => [season.season, season.episodeCount])).toEqual([
+      [1, 2],
+      [2, 1],
+    ])
+    const season = await item(seasons[0]?.id)
+    const episodes = season.children.flatMap((child) => (child.type === 'episode' ? [child] : []))
+    const first = await byFile('Severance - S01E01 - Good News About Hell.mp4')
+    const halfLoop = await byFile('Severance - S01E02 - Half Loop.mp4')
+    expect(episodes.map((episode) => [episode.episode, episode.primary?.id ?? null])).toEqual([
+      [1, first.id],
+      [2, halfLoop.id],
+    ])
+    // The row says what the episode's own page would, without asking for it.
+    const pages = await Promise.all(episodes.map((episode) => item(episode.id)))
+    expect(
+      episodes.map(({ summary, released, runtime, stillVersion }) => ({
+        summary,
+        released,
+        runtime,
+        stillVersion,
+      })),
+    ).toEqual(
+      pages.map((page) => ({
+        summary: page.summary,
+        released: page.released,
+        runtime: page.runtime,
+        stillVersion: page.backdropVersion,
+      })),
+    )
+    expect(episodes.every((episode) => episode.stillVersion != null)).toBe(true)
   })
 
   it("serves an episode's page with its guest stars and still", async () => {
