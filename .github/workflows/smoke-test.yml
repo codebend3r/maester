@@ -5,6 +5,12 @@ name: 🩺 Smoke test
 # main-smoke-test.yml after each merge into main; it has no trigger of its own.
 on:
   workflow_call:
+    inputs:
+      # Uploads raven's health checked image as the `raven-image` artifact,
+      # for main-smoke-test.yml to publish.
+      save-raven-image:
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -77,8 +83,12 @@ jobs:
 
       # Built from the repo root, as compose does; the Dockerfile's own
       # ignore file keeps the context to what it copies.
+      # The source label links the published package to this repo.
       - name: 🐳 Build image
-        run: docker build -f apps/raven/Dockerfile -t "$IMAGE" .
+        run: |
+          docker build -f apps/raven/Dockerfile -t "$IMAGE" \
+            --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" .
 
       - name: ▶️ Start server
         run: docker run -d --name raven -p "$PORT:$PORT" "$IMAGE"
@@ -97,6 +107,20 @@ jobs:
           done
           echo "::error::/api/health did not respond within 30s"
           exit 1
+
+      - name: 💾 Save image
+        if: inputs.save-raven-image
+        run: docker save "$IMAGE" | gzip -1 > raven-image.tar.gz
+
+      - name: 📤 Upload image
+        if: inputs.save-raven-image
+        uses: actions/upload-artifact@v7
+        with:
+          name: raven-image
+          path: raven-image.tar.gz
+          retention-days: 1
+          # Already gzipped.
+          compression-level: 0
 
       - name: 📜 Container logs
         if: always()

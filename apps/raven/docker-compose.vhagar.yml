@@ -1,10 +1,10 @@
 # raven on Vhagar, the NAS with the Intel GPU, where it lives as
-# /volume1/docker/raven/docker-compose.yml. Vhagar's docker has no buildx,
-# so the image is built on a Mac and loaded there: see "Running on Vhagar"
-# in README.md.
+# /volume1/docker/raven/docker-compose.yml beside vhagar-update.sh (as
+# update.sh). The main smoke test publishes the image on every merge that
+# changes it, and update.sh pulls it: see "Running on Vhagar" in README.md.
 services:
   raven:
-    image: raven:latest
+    image: ghcr.io/codebend3r/raven:latest
     container_name: raven
     restart: unless-stopped
     # crivas:users, who owns ./data; 937 is the videodriver group that owns

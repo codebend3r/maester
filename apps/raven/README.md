@@ -18,14 +18,25 @@ The index and thumbnails live in `./data` (mounted at `/config`). The image runs
 
 raven runs on Vhagar, the NAS with an Intel GPU, from `docker-compose.vhagar.yml`, which lives there as `/volume1/docker/raven/docker-compose.yml`. Every NAS's share is mounted read-write under `/media/<nas>`: Vhagar's own share directly, the other four through the cifs mounts Vhagar already has of them in `/volume1/Vhagar/`. Each share also holds folders for the others, so pick a library's folders inside one share rather than a whole share.
 
-Vhagar's docker has no buildx, which the Dockerfile needs, so the image is built on a Mac and loaded there. From the repo root:
+Merges to `main` deploy themselves:
+
+1. The main smoke test builds the image, checks `/api/health`, and, when the merge changed anything that goes into the image, pushes it to `ghcr.io/codebend3r/raven` as `latest` and as the commit.
+2. On Vhagar, DSM's Task Scheduler runs `vhagar-update.sh` (there as `update.sh`) as root every five minutes. It pulls `latest`, and when that is not the image raven runs, stops raven, copies `data/raven.db*` to `backups/<time>/` (the last five are kept), and starts the new image. It writes what it did to `update.log`.
+
+Nothing on Vhagar takes instructions from GitHub, and GitHub holds no NAS credentials: Vhagar only pulls a public image.
+
+To set the task up, in DSM: **Control Panel → Task Scheduler → Create → Scheduled Task → User-defined script**. Name it `raven update` and run it as `root`; on **Schedule**, run daily, every 5 minutes, from 00:00 to 23:55; on **Task Settings**, the script is `bash /volume1/docker/raven/update.sh`. DSM asks for your password, as it does for every task that runs as root.
+
+To go back to an earlier build, set `image:` to `ghcr.io/codebend3r/raven:<commit>` and run `update.sh`; put `latest` back to follow `main` again. A backup's files go back into `data/` with raven stopped.
+
+Without GitHub, the image can still be built on a Mac and loaded on Vhagar. Vhagar's docker has no buildx, which the Dockerfile needs. From the repo root:
 
 ```bash
-docker buildx build --builder desktop-linux --platform linux/amd64 -f apps/raven/Dockerfile -t raven:latest --load .
-docker save raven:latest | gzip -1 | ssh vhagar 'cat > /volume1/docker/raven/raven-image.tar.gz'
+docker buildx build --builder desktop-linux --platform linux/amd64 -f apps/raven/Dockerfile -t ghcr.io/codebend3r/raven:latest --load .
+docker save ghcr.io/codebend3r/raven:latest | gzip -1 | ssh vhagar 'cat > /volume1/docker/raven/raven-image.tar.gz'
 ```
 
-Then, on Vhagar, `sudo docker load -i /volume1/docker/raven/raven-image.tar.gz` and `sudo docker compose up -d` in `/volume1/docker/raven/`.
+Then, on Vhagar, `sudo docker load -i /volume1/docker/raven/raven-image.tar.gz` and `sudo docker compose up -d` in `/volume1/docker/raven/`. Pause the task first, or its next run puts `latest` from GHCR back.
 
 ### Coming from weirwood
 
@@ -157,7 +168,7 @@ apps/raven/
                  range-request file serving, tracks, subtitles and converted streams
   web/           @raven/web: React 19 + Vite: libraries, the grid, list, tiles and groups, history,
                  the player and its stream source, the /design page
-  Dockerfile, docker-compose.yml, docker-compose.vhagar.yml
+  Dockerfile, docker-compose.yml, docker-compose.vhagar.yml, vhagar-update.sh
 libs/raven/
   core/          @raven/core: API types and guards, the typed API client, the direct-play check,
                  formatting. No DOM or Node APIs, so a React Native app can use it unchanged.
