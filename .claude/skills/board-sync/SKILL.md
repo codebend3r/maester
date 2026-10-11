@@ -9,11 +9,11 @@ The issues and their PRs are the source of truth, and the board and the checkbox
 
 ## Pick the tool
 
-| What drifted | Run |
-| --- | --- |
-| Status, Epic/Phase/Size/Priority, an issue missing from the board, a finished epic still open, a roadmap checkbox | `scripts/sync_board.py` |
-| An epic or story added, renamed, resized or reprioritized | Edit `scripts/catalog.py`, run `scripts/sync_tracker.py`, then `scripts/sync_board.py` |
-| Board deleted or being rebuilt | `scripts/setup_project.sh` |
+| What drifted                                                                                                      | Run                                                                                    |
+| ----------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Status, Epic/Phase/Size/Priority, an issue missing from the board, a finished epic still open, a roadmap checkbox | `scripts/sync_board.py`                                                                |
+| An epic or story added, renamed, resized or reprioritized                                                         | Edit `scripts/catalog.py`, run `scripts/sync_tracker.py`, then `scripts/sync_board.py` |
+| Board deleted or being rebuilt                                                                                    | `scripts/setup_project.sh`                                                             |
 
 `sync_tracker.py` rewrites every issue body from the catalog, which unticks every epic checklist. Always follow it with `sync_board.py`, which ticks them back. The roadmap it writes is ticked from the live issues already.
 
@@ -28,15 +28,15 @@ The issues and their PRs are the source of truth, and the board and the checkbox
 
 ## What the audit checks
 
-| Issue state | Board becomes |
-| --- | --- |
-| Closed as completed | Done |
-| Open with an open PR that closes it | In Progress |
-| Epic with any story closed or In Progress | In Progress |
-| Epic with every story closed | Checklist ticked, issue closed, Done |
-| Open with no status | Todo |
-| Title `[E3.1]`, milestone `M2 …`, labels `size:M`, `P0` | Epic E3, Phase M2, Size M, Priority P0 |
-| Issue in the repo but not on the board | Added |
+| Issue state                                                      | Board becomes                           |
+| ---------------------------------------------------------------- | --------------------------------------- |
+| Closed as completed                                              | Done                                    |
+| Open with an open PR that closes it                              | In Progress                             |
+| Epic with any story closed or In Progress                        | In Progress                             |
+| Epic with every story closed                                     | Checklist ticked, issue closed, Done    |
+| Open with no status                                              | Todo                                    |
+| Title `[E3.1]`, milestone `M2 …`, labels `size:M`, `P0`          | Epic E3, Phase M2, Size M, Priority P0  |
+| Issue in the repo but not on the board                           | Added                                   |
 | Epic or story closed as completed, unticked in `docs/roadmap.md` | Roadmap re-rendered with its box ticked |
 
 Only issue items are audited. PR and draft items on the board are left alone.

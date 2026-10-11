@@ -155,7 +155,7 @@ def test_a_copy_names_its_version_and_episode():
         Copy("movie", 438631, False, 1, 1)
 
 
-async def test_locate_finds_a_copys_file_through_its_owning_arr(library):
+async def test_locate_finds_the_file_of_a_copy_through_its_owning_arr(library):
     dune = await locate(library.services, Copy("movie", 438631, True))
     assert (dune.owner.host, dune.file.id, dune.label) == (
         "vermithor", 55, "the 4K copy of Dune (2021)",

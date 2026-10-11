@@ -1,7 +1,9 @@
 name: 🧪 Pull request checks
 
-# Pull requests only, into any base branch. Merges to main are covered by
-# main-smoke-test.yml.
+# Every pull request, into any base branch: runs when it opens or reopens and
+# on each push to its branch. Every check in the repo runs against every
+# project, not just the affected ones, then the production images are built
+# and health checked. Merges to main are covered by main-smoke-test.yml.
 on:
   pull_request:
 
@@ -14,18 +16,41 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # One job per check, each running the root script you would run locally, so
+  # the PR lists them separately and `bun run verify` stays the same set.
   checks:
-    name: 🚦 Lint, test and build
+    name: ${{ matrix.check.name }}
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      # A failing check doesn't cancel the rest, so one run reports them all.
+      fail-fast: false
+      matrix:
+        check:
+          # typos over the whole repo, dotfiles included.
+          - name: 🔤 Spellcheck
+            run: bun run spellcheck
+          # ruff, oxlint and stylelint.
+          - name: 🧹 Lint
+            run: bun run lint
+          # ruff format, and oxfmt for each project and the root files.
+          - name: 🎨 Format check
+            run: bun run format:check
+          - name: 🔎 Typecheck
+            run: bun run typecheck
+          # pytest, vitest and bun test. raven's server and core tests encode
+          # real clips with ffmpeg.
+          - name: 🧪 Unit tests
+            run: bun run test
+            ffmpeg: true
+          - name: 🏗️ Build
+            run: bun run build
     env:
       # uv runs against the committed lockfiles, never re-resolving them.
       UV_FROZEN: '1'
     steps:
-      # Full history so Nx can diff against the base branch.
       - name: 📥 Checkout
         uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
 
       # Bun's version comes from `packageManager` in package.json.
       - name: 🍞 Set up Bun
@@ -40,16 +65,16 @@ jobs:
           enable-cache: true
           cache-dependency-glob: '**/uv.lock'
 
-      # raven's server and core tests encode real clips with ffmpeg.
       - name: 🎞️ Install ffmpeg
+        if: matrix.check.ffmpeg
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
 
       - name: 📦 Install
         run: bun install --frozen-lockfile
 
-      - name: 🧭 Base and head for affected
-        uses: nrwl/nx-set-shas@v5
+      - name: ${{ matrix.check.name }}
+        run: ${{ matrix.check.run }}
 
-      # Lint, format, typecheck, test and build every project the PR touches.
-      - name: 🚦 Affected targets
-        run: bun run affected
+  smoke:
+    name: 🐳 Smoke test
+    uses: ./.github/workflows/smoke-test.yml

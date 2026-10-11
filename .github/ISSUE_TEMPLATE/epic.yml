@@ -1,6 +1,6 @@
 name: Epic
 description: A parent issue that groups stories as sub-issues
-labels: ["epic"]
+labels: ['epic']
 body:
   - type: textarea
     id: summary

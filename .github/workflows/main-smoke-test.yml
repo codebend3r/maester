@@ -1,8 +1,9 @@
 name: 🚀 Main smoke test
 
 # Runs on merges into main and nowhere else: builds each product's production
-# image and checks that it starts and serves its health route. Lint and tests
-# run on the PR before the merge (pull-request-checks.yml).
+# image and checks that it starts and serves its health route (smoke-test.yml).
+# The same smoke test, with lint, tests and the rest, runs on the PR before
+# the merge (pull-request-checks.yml).
 on:
   push:
     branches: [main]
@@ -17,97 +18,5 @@ concurrency:
 
 jobs:
   smoke:
-    name: 🩺 luwin build and health check
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    env:
-      IMAGE: luwin:ci
-      PORT: 8020
-      VERSION_FILE: apps/luwin/VERSION
-    steps:
-      - name: 📥 Checkout
-        uses: actions/checkout@v7
-
-      # Built from the repo root, as compose does; the Dockerfile's own
-      # ignore file keeps the context to what it copies.
-      - name: 🐳 Build image
-        run: docker build -f apps/luwin/Dockerfile -t "$IMAGE" .
-
-      - name: 🏷️ Entrypoint reports the release version
-        run: |
-          expected="luwin $(cat "$VERSION_FILE")"
-          actual="$(docker run --rm "$IMAGE" luwin --version)"
-          echo "expected: $expected"
-          echo "actual:   $actual"
-          test "$actual" = "$expected"
-
-      # The default CMD does not serve HTTP yet, so start the web app
-      # explicitly. /health is ungated, so no .env is needed.
-      - name: ▶️ Start web app
-        run: |
-          docker run -d --name luwin -p "$PORT:$PORT" "$IMAGE" \
-            uvicorn luwin.web:create_app --factory --host 0.0.0.0 --port "$PORT"
-
-      - name: 🩺 Wait for /health
-        run: |
-          for _ in $(seq 1 30); do
-            if body="$(curl -fsS "http://127.0.0.1:$PORT/health")"; then
-              echo "$body"
-              echo "$body" | jq -e --arg v "$(cat "$VERSION_FILE")" \
-                '.status == "ok" and .version == $v'
-              exit 0
-            fi
-            sleep 1
-          done
-          echo "::error::/health did not respond within 30s"
-          exit 1
-
-      - name: 📜 Container logs
-        if: always()
-        run: docker logs luwin || true
-
-      - name: 🧹 Stop container
-        if: always()
-        run: docker rm -f luwin || true
-
-  raven:
-    name: 🩺 raven build and health check
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    env:
-      IMAGE: raven:ci
-      PORT: 8484
-    steps:
-      - name: 📥 Checkout
-        uses: actions/checkout@v7
-
-      # Built from the repo root, as compose does; the Dockerfile's own
-      # ignore file keeps the context to what it copies.
-      - name: 🐳 Build image
-        run: docker build -f apps/raven/Dockerfile -t "$IMAGE" .
-
-      - name: ▶️ Start server
-        run: docker run -d --name raven -p "$PORT:$PORT" "$IMAGE"
-
-      # The image's Debian ffmpeg has zscale, so HDR thumbnails are tone mapped.
-      - name: 🩺 Wait for /api/health
-        run: |
-          for _ in $(seq 1 30); do
-            if body="$(curl -fsS "http://127.0.0.1:$PORT/api/health")"; then
-              echo "$body"
-              echo "$body" | jq -e '.status == "ok" and .ffmpeg != null and .tonemap == true'
-              curl -fsS -o /dev/null "http://127.0.0.1:$PORT/"
-              exit 0
-            fi
-            sleep 1
-          done
-          echo "::error::/api/health did not respond within 30s"
-          exit 1
-
-      - name: 📜 Container logs
-        if: always()
-        run: docker logs raven || true
-
-      - name: 🧹 Stop container
-        if: always()
-        run: docker rm -f raven || true
+    name: 🐳 Smoke test
+    uses: ./.github/workflows/smoke-test.yml
