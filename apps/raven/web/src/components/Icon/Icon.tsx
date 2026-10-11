@@ -33,6 +33,11 @@ export type IconName =
   | 'history'
   | 'next'
   | 'wand'
+  | 'film'
+  | 'tv'
+  | 'video'
+  | 'libraries'
+  | 'sidebar'
 
 const PATHS: Record<IconName, string> = {
   back: 'M15 18l-6-6 6-6',
@@ -70,6 +75,11 @@ const PATHS: Record<IconName, string> = {
   shuffle: 'M4 7h3l10 10h3M4 17h3l3-3M14 10l3-3h3M18 4l3 3-3 3M18 14l3 3-3 3',
   history: 'M4 11a8 8 0 1 1 2.3 5.7M4 5v6h6M12 8v4l3 2',
   next: 'M9 6l6 6-6 6',
+  film: 'M4 3h16v18H4zM8 3v18M16 3v18M4 7.5h4M4 12h4M4 16.5h4M16 7.5h4M16 12h4M16 16.5h4',
+  tv: 'M3 8h18v12H3zM8 3.5l4 4.5 4-4.5',
+  video: 'M3 7h12v10H3zM15 10.5l6-3.5v10l-6-3.5',
+  libraries: 'M3 4h4v16H3zM9 4h4v16H9zM14.6 5l3.6-1 3.4 15-3.6 1z',
+  sidebar: 'M4 5h16v14H4zM9.5 5v14',
 }
 
 const isIconName = (name: string): name is IconName => name in PATHS
@@ -90,6 +100,7 @@ export const Icon = ({ name, size = 20 }: { name: IconName; size?: number }) => 
     strokeLinejoin="round"
     aria-hidden="true"
     focusable="false"
+    data-icon={name}
   >
     <path d={PATHS[name]} />
   </svg>

@@ -20,6 +20,7 @@ import { ShortcutsDialog } from '@/components/Player/ShortcutsDialog'
 import { SubtitleOverlay } from '@/components/Player/SubtitleOverlay'
 import { useSubtitleCues } from '@/components/Player/useSubtitleCues'
 import { api } from '@/lib/api'
+import { isTypingTarget } from '@/lib/keyboard'
 import { type PlayerAction, shortcutFor, stepCaptionScale, stepSpeed } from '@/lib/shortcuts'
 import { createStreamSession } from '@/lib/streamSource'
 import { languageName } from '@/lib/trackLabels'
@@ -40,9 +41,6 @@ export const failureMessage = (error: MediaError | null): string => {
   }
   return 'Playback stopped unexpectedly.'
 }
-
-const isTypingTarget = (target: EventTarget | null): boolean =>
-  target instanceof HTMLElement && !!target.closest('input, select, textarea')
 
 const isControlTarget = (target: EventTarget | null): boolean =>
   target instanceof HTMLElement && !!target.closest('button, a')

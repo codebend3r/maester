@@ -9,14 +9,25 @@
 }
 
 .header {
+  --header-inline: clamp(var(--space-3), 4vw, var(--space-6));
+
+  position: relative;
   grid-area: header;
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  padding: var(--space-3) clamp(var(--space-3), 4vw, var(--space-6));
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas: 'toggle wordmark';
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--header-inline);
   border-bottom: 1px solid var(--color-moss);
 }
 
+.toggle {
+  grid-area: toggle;
+}
+
 .wordmark {
+  grid-area: wordmark;
   justify-self: start;
   font-family: var(--font-display);
   font-size: var(--font-size-lg);
@@ -36,12 +47,15 @@
 }
 
 .navLink {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-1);
   padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-md);
   color: var(--color-lichen);
   font-weight: 600;
   text-decoration: none;
-  transition: background-color 120ms ease-out;
 
   &:hover {
     color: var(--color-bark);
@@ -51,6 +65,12 @@
   &[aria-current='page'] {
     color: var(--color-bark);
     background: var(--color-canopy);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .navLink {
+    transition: background-color 120ms ease-out;
   }
 }
 
@@ -68,6 +88,66 @@
 
   .navLink {
     overflow-wrap: anywhere;
+  }
+}
+
+// Down to its icons: each link keeps its name for screen readers and as a tooltip.
+.collapsed {
+  .nav {
+    min-width: 0;
+    padding-inline: var(--space-1);
+  }
+
+  .navLink {
+    grid-template-columns: auto;
+    justify-content: center;
+  }
+}
+
+// The first visit's tip about the B key, pointing up at the toggle.
+.tip {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  left: var(--header-inline);
+  z-index: 2;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+  width: max-content;
+  max-width: min(24rem, calc(100vw - 2 * var(--header-inline)));
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-moss);
+  border-radius: var(--radius-md);
+  background: var(--color-canopy);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 40%);
+  font-size: var(--font-size-sm);
+
+  // Centred under the toggle, which is 2.5rem wide.
+  &::before {
+    content: '';
+    position: absolute;
+    top: calc(-1 * var(--space-0) - 1px);
+    left: calc(1.25rem - var(--space-0));
+    width: var(--space-1);
+    height: var(--space-1);
+    border-top: 1px solid var(--color-moss);
+    border-left: 1px solid var(--color-moss);
+    background: var(--color-canopy);
+    rotate: 45deg;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .tip {
+    animation: tip-in 160ms ease-out;
+  }
+}
+
+@keyframes tip-in {
+  from {
+    opacity: 0;
+    translate: 0 calc(-1 * var(--space-0));
   }
 }
 
@@ -121,5 +201,12 @@
     .navLink {
       overflow-wrap: normal;
     }
+  }
+}
+
+// A phone or tablet has no B key to tell of.
+@media (max-width: 48rem), (hover: none) {
+  .tip {
+    display: none;
   }
 }
