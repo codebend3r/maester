@@ -1,13 +1,13 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { ApiError, type HistoryEntry } from '@raven/core'
+import { useQuery } from '@tanstack/react-query'
+import type { HistoryEntry } from '@raven/core'
 import { useId, useState } from 'react'
-import { useParams, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { Button, ButtonLink } from '@/components/Button/Button'
 import { MediaTiles } from '@/components/MediaTiles/MediaTiles'
-import { api } from '@/lib/api'
+import { RouteState } from '@/components/RouteState/RouteState'
 import { historyDays, historyNote } from '@/lib/history'
-import { queryKeys } from '@/lib/queryClient'
-import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
+import { historyQuery, libraryQuery } from '@/lib/queries'
+import { routeState, useRouteId } from '@/lib/routeQuery'
 import styles from '@/pages/HistoryPage/HistoryPage.module.scss'
 
 /** How many entries a page of history adds. */
@@ -50,42 +50,27 @@ const HistoryDaySection = ({
  * in the URL, so coming back from the player lands on the same list.
  */
 export const HistoryPage = () => {
-  const params = useParams()
-  const libraryId = Number(params.id)
+  const libraryId = useRouteId()
   const ids = { title: useId() }
   const [searchParams, setSearchParams] = useSearchParams()
   const show: Show = searchParams.get('show') === 'all' ? 'all' : 'watched'
   const [limit, setLimit] = useState(PAGE)
 
-  const library = useQuery({
-    queryKey: queryKeys.library(libraryId),
-    queryFn: () => api.getLibrary(libraryId),
-    enabled: Number.isInteger(libraryId),
-  })
+  const libraryResult = useQuery(libraryQuery(libraryId))
   const history = useQuery({
-    queryKey: queryKeys.history({ libraryId, show, limit }),
-    queryFn: () => api.listHistory({ libraryId, limit, watchedOnly: show === 'watched' }),
-    enabled: library.isSuccess,
-    placeholderData: keepPreviousData,
+    ...historyQuery({ libraryId, show, limit }),
+    enabled: libraryResult.isSuccess,
   })
 
-  const missing = library.error instanceof ApiError && library.error.status === 404
-  if (!Number.isInteger(libraryId) || missing) return <NotFoundPage />
-  if (library.isError) {
-    return (
-      <p className={styles.message} role="alert">
-        {library.error.message}
-      </p>
-    )
-  }
-  if (!library.data) return <p className={styles.message}>Opening the history</p>
+  const library = routeState({ id: libraryId, query: libraryResult })
+  if (library.state !== 'ready') return <RouteState state={library} noun="history" />
 
-  const { name, settings } = library.data
+  const { id, name, settings } = library.data
   const entries = history.data ?? []
 
   return (
     <section className={styles.page} aria-labelledby={ids.title}>
-      <ButtonLink to={`/libraries/${libraryId}`} icon="back" className={styles.back}>
+      <ButtonLink to={`/libraries/${id}`} icon="back" className={styles.back}>
         {name}
       </ButtonLink>
 

@@ -7,7 +7,21 @@ import {
   formatRuntime,
   resolutionLabel,
 } from '@raven/core'
+import { showYears } from '@/lib/itemLinks'
 import { languageName } from '@/lib/trackLabels'
+
+const present = (facts: ReadonlyArray<string | null>): string[] =>
+  facts.filter((fact): fact is string => fact != null)
+
+/** How long it runs: the file's own length when probed, else TMDB's runtime in minutes. */
+export const runtimeFact = ({
+  file,
+  runtime,
+}: {
+  file: MediaItem | undefined
+  runtime: number | null
+}): string | null =>
+  formatRuntime(file?.duration ?? null) ?? (runtime == null ? null : formatRuntime(runtime * 60))
 
 /** "A", "A and B", "A, B and C". */
 export const joinNames = (names: readonly string[]): string =>
@@ -34,7 +48,7 @@ export const createdBy = (details: ItemDetails): string | null => {
   return creators.length > 0 ? `Created by ${joinNames(creators)}` : null
 }
 
-/** Year, runtime (the file's own length when probed, else TMDB's) and up to three genres. */
+/** Year, runtime and up to three genres. */
 export const movieFacts = ({
   details,
   primary,
@@ -42,12 +56,43 @@ export const movieFacts = ({
   details: ItemDetails
   primary: MediaItem | undefined
 }): string[] =>
-  [
+  present([
     details.year == null ? null : String(details.year),
-    formatRuntime(primary?.duration ?? null) ??
-      (details.runtime == null ? null : formatRuntime(details.runtime * 60)),
+    runtimeFact({ file: primary, runtime: details.runtime }),
     ...details.genres.slice(0, 3),
-  ].filter((fact): fact is string => fact != null)
+  ])
+
+/** Air date and runtime. */
+export const episodeFacts = ({
+  details,
+  primary,
+}: {
+  details: ItemDetails
+  primary: MediaItem | undefined
+}): string[] =>
+  present([
+    formatAirDate(details.released),
+    runtimeFact({ file: primary, runtime: details.runtime }),
+  ])
+
+/** "Severance · Season 1 · Episode 2". */
+export const episodeByline = (details: ItemDetails): string =>
+  present([
+    details.show?.title ?? null,
+    details.season == null ? null : `Season ${details.season}`,
+    details.episode == null ? null : `Episode ${details.episode}`,
+  ]).join(' · ')
+
+/** "2022 to now", the network, and up to three genres. */
+export const showFacts = (details: ItemDetails): string[] =>
+  present([
+    showYears({
+      year: details.year,
+      endedYear: details.ended == null ? null : Number(details.ended.slice(0, 4)) || null,
+    }),
+    details.studio,
+    ...details.genres.slice(0, 3),
+  ])
 
 const airDate = new Intl.DateTimeFormat(undefined, {
   day: 'numeric',

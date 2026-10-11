@@ -1,12 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
-import { ApiError, type CreditJob, type ItemSummary, type PersonDetails } from '@raven/core'
+import type { CreditJob, ItemSummary, PersonDetails } from '@raven/core'
 import { useId } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link } from 'react-router-dom'
+import { RouteState } from '@/components/RouteState/RouteState'
 import { TmdbCredit } from '@/components/TmdbCredit/TmdbCredit'
 import { api } from '@/lib/api'
 import { itemPath } from '@/lib/itemLinks'
-import { queryKeys } from '@/lib/queryClient'
-import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
+import { personQuery } from '@/lib/queries'
+import { routeState, useRouteId } from '@/lib/routeQuery'
 import styles from '@/pages/PersonPage/PersonPage.module.scss'
 
 /** The groups a person's credits fall into, in page order. */
@@ -95,22 +96,8 @@ const PersonView = ({ person }: { person: PersonDetails }) => {
 
 /** `/people/:id`: a person's photo and name, and everything in raven they are credited on. */
 export const PersonPage = () => {
-  const params = useParams()
-  const id = Number(params.id)
-  const person = useQuery({
-    queryKey: queryKeys.person(id),
-    queryFn: () => api.getPerson(id),
-    enabled: Number.isInteger(id),
-  })
-  const missing = person.error instanceof ApiError && person.error.status === 404
-  if (!Number.isInteger(id) || missing) return <NotFoundPage />
-  if (person.isError) {
-    return (
-      <p className={styles.message} role="alert">
-        {person.error.message}
-      </p>
-    )
-  }
-  if (!person.data) return <p className={styles.message}>Opening the page</p>
-  return <PersonView person={person.data} />
+  const id = useRouteId()
+  const page = routeState({ id, query: useQuery(personQuery(id)) })
+  if (page.state !== 'ready') return <RouteState state={page} noun="page" />
+  return <PersonView person={page.data} />
 }

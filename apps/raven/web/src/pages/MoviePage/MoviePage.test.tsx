@@ -95,6 +95,14 @@ describe('MoviePage', () => {
     expect(await screen.findByText('Dolby Digital Mono')).toBeInTheDocument()
   })
 
+  it('is not found at the address of an item that is not a movie', async () => {
+    open(itemDetails({ type: 'episode', title: 'Half Loop' }))
+    expect(
+      await screen.findByRole('heading', { name: 'Nothing lives at this address' }),
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Half Loop' })).toBeNull()
+  })
+
   it('plays, or resumes from the saved spot', async () => {
     open(itemDetails({ versions: [matchedMovie({ position: 2530 })] }))
     await userEvent.click(await screen.findByRole('link', { name: 'Resume from 42:10' }))

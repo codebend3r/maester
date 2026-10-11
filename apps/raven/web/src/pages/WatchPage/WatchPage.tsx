@@ -1,10 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
-import { ApiError, isMediaItem, isRecord } from '@raven/core'
-import { useLocation, useParams } from 'react-router-dom'
+import { isMediaItem, isRecord } from '@raven/core'
+import { useLocation } from 'react-router-dom'
 import { ButtonLink } from '@/components/Button/Button'
 import { Player } from '@/components/Player/Player'
-import { api } from '@/lib/api'
-import { queryKeys } from '@/lib/queryClient'
+import { mediaQuery } from '@/lib/queries'
+import { routeState, useRouteId } from '@/lib/routeQuery'
 import styles from '@/pages/WatchPage/WatchPage.module.scss'
 
 /**
@@ -13,44 +13,30 @@ import styles from '@/pages/WatchPage/WatchPage.module.scss'
  * without a round trip. A direct link or a refresh fetches it instead.
  */
 export const WatchPage = () => {
-  const params = useParams()
-  const id = Number(params.id)
+  const id = useRouteId()
   const { state } = useLocation()
   const handed =
     isRecord(state) && isMediaItem(state.media) && state.media.id === id ? state.media : undefined
+  const page = routeState({ id, query: useQuery({ ...mediaQuery(id), initialData: handed }) })
 
-  const media = useQuery({
-    queryKey: queryKeys.mediaItem(id),
-    queryFn: () => api.getMedia(id),
-    enabled: Number.isInteger(id),
-    initialData: handed,
-  })
-
-  if (media.data) {
+  if (page.state === 'ready') {
     return (
-      <Player
-        key={media.data.id}
-        media={media.data}
-        backTo={`/libraries/${media.data.libraryId}`}
-      />
+      <Player key={page.data.id} media={page.data} backTo={`/libraries/${page.data.libraryId}`} />
     )
   }
-
-  const missing =
-    !Number.isInteger(id) || (media.error instanceof ApiError && media.error.status === 404)
   return (
     <main className={styles.page}>
-      {media.isError || missing ? (
+      {page.state === 'loading' ? (
+        <p aria-live="polite">Loading</p>
+      ) : (
         <>
           <p role="alert">
-            {missing ? 'This video is no longer in any library.' : media.error?.message}
+            {page.state === 'missing' ? 'This video is no longer in any library.' : page.message}
           </p>
           <ButtonLink to="/" icon="back">
             Back to libraries
           </ButtonLink>
         </>
-      ) : (
-        <p aria-live="polite">Loading</p>
       )}
     </main>
   )
