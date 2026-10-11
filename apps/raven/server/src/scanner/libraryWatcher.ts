@@ -5,10 +5,11 @@ import {
   type OnApplicationBootstrap,
   type OnModuleDestroy,
 } from '@nestjs/common'
+import { errorMessage } from '@/errorMessage'
 import { type LibraryRecord, LibrariesRepository, samePaths } from '@/libraries/librariesRepository'
 import type { WatchFolder, Watching } from '@/scanner/folderWatch'
 import { ScannerService } from '@/scanner/scannerService'
-import { isSkippedPlace, isUnder } from '@/scanner/walk'
+import { isSkippedPlace } from '@/scanner/walk'
 
 /** How the watcher watches and waits; a test makes the waits short. */
 export type WatchOptions = {
@@ -22,27 +23,24 @@ export type WatchOptions = {
 /** The DI token the watch options are provided under. */
 export const WATCH_OPTIONS = Symbol('WATCH_OPTIONS')
 
-type Watch = {
-  /** The library paths watched, to tell when they change. */
-  paths: readonly string[]
-  watchers: Watching[]
-  /** Places that changed since the last refresh. */
-  changed: Set<string>
-  quiet: NodeJS.Timeout | null
-  refreshing: boolean
-  /** Scans the library on a timer once its folders could not be watched. */
-  fallback: NodeJS.Timeout | null
-}
-
-const reason = (error: unknown): string => (error instanceof Error ? error.message : String(error))
+/** A library's folders watched, with the places changed since they were last looked at; or, failing that, a timer. */
+type Watch =
+  | {
+      mode: 'watching'
+      paths: readonly string[]
+      watchers: Watching[]
+      changed: Set<string>
+      quiet: NodeJS.Timeout | null
+    }
+  | { mode: 'polling'; paths: readonly string[]; timer: NodeJS.Timeout }
 
 /**
  * Refreshes each library that refreshes automatically as its folders
- * change. Changes gather until the folders have been still for a moment
- * (a copy in progress keeps them busy), then just the places that changed
- * are looked at again. A library whose folders cannot be watched (a share
- * that went away, or a system out of watches) is scanned on a timer
- * instead, until it is next saved.
+ * change. Changes gather until the folders have been still for a moment (a
+ * copy in progress keeps them busy), then just the places that changed are
+ * looked at again. A library whose folders cannot be watched (a share that
+ * went away, or a system out of watches) is scanned on a timer instead, and
+ * watched again once any library is saved.
  */
 @Injectable()
 export class LibraryWatcher implements OnApplicationBootstrap, OnModuleDestroy {
@@ -72,7 +70,11 @@ export class LibraryWatcher implements OnApplicationBootstrap, OnModuleDestroy {
         .map((library) => [library.id, library]),
     )
     Array.from(this.watches.entries())
-      .filter(([id, watch]) => !samePaths(watch.paths, wanted.get(id)?.paths ?? []))
+      .filter(
+        ([id, watch]) =>
+          watch.mode === 'polling' ||
+          !samePaths({ before: watch.paths, after: wanted.get(id)?.paths ?? [] }),
+      )
       .forEach(([id]) => this.stop(id))
     Array.from(wanted.values())
       .filter((library) => !this.watches.has(library.id))
@@ -81,66 +83,71 @@ export class LibraryWatcher implements OnApplicationBootstrap, OnModuleDestroy {
 
   private start(library: LibraryRecord): void {
     const watch: Watch = {
+      mode: 'watching',
       paths: library.paths,
       watchers: [],
       changed: new Set(),
       quiet: null,
-      refreshing: false,
-      fallback: null,
     }
     this.watches.set(library.id, watch)
-    watch.watchers = library.paths.map((root) =>
-      this.options.watchFolder({
+    library.paths.forEach((root) => {
+      const watcher = this.options.watchFolder({
         root,
         onChange: (path) => this.noteChange({ libraryId: library.id, root, path }),
         onError: (error) => this.fallBack({ library, error }),
-      }),
-    )
+      })
+      // A watch that failed as it was set up has already fallen back to the timer.
+      if (this.watches.get(library.id) === watch) watch.watchers.push(watcher)
+      else watcher.close()
+    })
   }
 
   private stop(libraryId: number): void {
     const watch = this.watches.get(libraryId)
     if (!watch) return
-    watch.watchers.forEach((watcher) => watcher.close())
-    if (watch.quiet) clearTimeout(watch.quiet)
-    if (watch.fallback) clearInterval(watch.fallback)
+    switch (watch.mode) {
+      case 'watching':
+        watch.watchers.forEach((watcher) => watcher.close())
+        if (watch.quiet) clearTimeout(watch.quiet)
+        break
+      case 'polling':
+        clearInterval(watch.timer)
+        break
+      default: {
+        const unknown: never = watch
+        return unknown
+      }
+    }
     this.watches.delete(libraryId)
   }
 
   /** Hidden and NAS folders churn on their own; nothing in them is indexed. */
   private noteChange({ libraryId, root, path }: { libraryId: number; root: string; path: string }) {
     const watch = this.watches.get(libraryId)
-    if (!watch || !isUnder({ path, root }) || isSkippedPlace({ root, path })) return
+    if (watch?.mode !== 'watching' || isSkippedPlace({ root, path })) return
     watch.changed.add(path)
     if (watch.quiet) clearTimeout(watch.quiet)
-    watch.quiet = setTimeout(() => void this.refresh(libraryId), this.options.quietMs)
+    watch.quiet = setTimeout(() => this.settle(libraryId), this.options.quietMs)
   }
 
-  /** One refresh at a time per library; what changes meanwhile waits for the next. */
-  private async refresh(libraryId: number): Promise<void> {
+  /** The folders have been still long enough: the places that changed are looked at again. */
+  private settle(libraryId: number): void {
     const watch = this.watches.get(libraryId)
-    if (!watch || watch.refreshing || watch.changed.size === 0) return
-    const places = [...watch.changed]
+    if (watch?.mode !== 'watching') return
+    watch.quiet = null
+    this.scanner.refresh({ libraryId, places: [...watch.changed] })
     watch.changed.clear()
-    watch.refreshing = true
-    try {
-      await this.scanner.refresh({ libraryId, places })
-    } finally {
-      watch.refreshing = false
-    }
-    await this.refresh(libraryId)
   }
 
   private fallBack({ library, error }: { library: LibraryRecord; error: unknown }): void {
-    const watch = this.watches.get(library.id)
-    if (!watch || watch.fallback) return
+    if (this.watches.get(library.id)?.mode !== 'watching') return
     const minutes = Math.round(this.options.fallbackScanMs / 60_000)
     this.logger.warn(
-      `Could not watch the folders of "${library.name}" (${reason(error)}); scanning it every ${minutes} min instead`,
+      `Could not watch the folders of "${library.name}" (${errorMessage(error)}); scanning it every ${minutes} min instead`,
     )
-    watch.watchers.forEach((watcher) => watcher.close())
-    watch.watchers = []
-    watch.fallback = setInterval(() => this.scanner.scan(library.id), this.options.fallbackScanMs)
-    watch.fallback.unref()
+    this.stop(library.id)
+    const timer = setInterval(() => this.scanner.scan(library.id), this.options.fallbackScanMs)
+    timer.unref()
+    this.watches.set(library.id, { mode: 'polling', paths: library.paths, timer })
   }
 }

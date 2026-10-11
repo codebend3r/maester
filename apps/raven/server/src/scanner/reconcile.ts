@@ -1,5 +1,13 @@
 import { groupBy } from '@/groupBy'
-import type { FoundFile, IndexedFile } from '@/media/mediaIndex'
+import type { FoundFile } from '@/scanner/walk'
+
+/** What the scanner compares against the disk to find new, changed, moved and gone files. */
+export type IndexedFile = {
+  id: number
+  size: number
+  mtimeMs: number
+  probed: boolean
+}
 
 /** What a look at the disk changes in the index. */
 export type Reconciled = {
@@ -42,8 +50,8 @@ export const reconcile = ({
     .map(([, file]) => file)
   const fresh = found.filter((file) => !known.has(file.path))
 
-  const missingByIdentity = groupBy(missing, identity)
-  const moved = [...groupBy(fresh, identity).entries()].flatMap(([key, files]) => {
+  const missingByIdentity = groupBy({ items: missing, key: identity })
+  const moved = [...groupBy({ items: fresh, key: identity }).entries()].flatMap(([key, files]) => {
     const was = missingByIdentity.get(key) ?? []
     const [file] = files
     const [before] = was

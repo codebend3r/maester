@@ -3,23 +3,8 @@ import { Inject, Injectable } from '@nestjs/common'
 import { type LibraryKind, containerOf } from '@raven/core'
 import { DatabaseService } from '@/db/database'
 import { namedAs } from '@/media/mediaRepository'
-import type { Reconciled } from '@/scanner/reconcile'
-
-/** What the scanner compares against the disk to find new, changed, moved and gone files. */
-export type IndexedFile = {
-  id: number
-  size: number
-  mtimeMs: number
-  probed: boolean
-}
-
-export type FoundFile = {
-  path: string
-  /** The library path the walk found it under. */
-  root: string
-  size: number
-  mtimeMs: number
-}
+import type { IndexedFile, Reconciled } from '@/scanner/reconcile'
+import type { FoundFile } from '@/scanner/walk'
 
 /** A file waiting on ffprobe. */
 export type ProbeTarget = { id: number; path: string }

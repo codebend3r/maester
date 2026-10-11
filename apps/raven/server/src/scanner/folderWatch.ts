@@ -1,5 +1,6 @@
 import { type FSWatcher, watch } from 'node:fs'
 import { join } from 'node:path'
+import { isRecord } from '@raven/core'
 import { foldersUnder, isUnder } from '@/scanner/walk'
 
 /** A watch that has stopped once closed. */
@@ -16,6 +17,10 @@ export type WatchFolder = (args: {
   onChange: (path: string) => void
   onError: (error: unknown) => void
 }) => Watching
+
+/** The system has no watches left to give, which no later folder will fix. */
+const isOutOfWatches = (error: unknown): boolean =>
+  isRecord(error) && (error.code === 'ENOSPC' || error.code === 'EMFILE')
 
 /** macOS and Windows watch a whole tree with one native watch. */
 export const watchTree: WatchFolder = ({ root, onChange, onError }) => {
@@ -66,7 +71,10 @@ export const watchEachFolder: WatchFolder = ({ root, onChange, onError }) => {
       })
       watchers.set(folder, watcher)
     } catch (error) {
-      onError(error)
+      // A subfolder that went before it could be watched is its parent's
+      // news, which the parent's watch reports; only the root, or running
+      // out of watches, stops the watch.
+      if (folder === root || isOutOfWatches(error)) onError(error)
     }
   }
 

@@ -153,7 +153,7 @@ describe('AppShell', () => {
     expect(screen.queryByRole('complementary', { name: 'Tip' })).toBeNull()
   })
 
-  it('reads the libraries again when the server says one changed, and hangs up on leaving', async () => {
+  it('reads the libraries again when the server says one changed or comes back, and hangs up on leaving', async () => {
     spies.list.mockImplementation(async () => [library({ id: 3, name: 'Movies' })])
     const shell = renderShell('/')
     await within(nav()).findByRole('link', { name: 'Movies' })
@@ -164,6 +164,10 @@ describe('AppShell', () => {
     spies.list.mockImplementation(async () => [library({ id: 3, name: 'Films' })])
     stream?.send({ type: 'library', libraryId: 3 })
     await within(nav()).findByRole('link', { name: 'Films' })
+
+    spies.list.mockImplementation(async () => [library({ id: 3, name: 'Features' })])
+    stream?.reconnect()
+    await within(nav()).findByRole('link', { name: 'Features' })
 
     shell.unmount()
     expect(stream?.closed).toBe(true)

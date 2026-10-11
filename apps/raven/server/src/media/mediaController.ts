@@ -28,6 +28,7 @@ import {
   isString,
 } from '@raven/core'
 import type { FastifyReply, FastifyRequest } from 'fastify'
+import { errorMessage } from '@/errorMessage'
 import { type MediaRecord, MediaRepository, toMediaItem } from '@/media/mediaRepository'
 import { parseRange } from '@/media/range'
 import { SubtitlesService } from '@/playback/subtitlesService'
@@ -129,9 +130,7 @@ export class MediaController {
       await unlink(record.path)
     } catch (error) {
       if (errorCode(error) !== 'ENOENT') {
-        this.logger.warn(
-          `Could not delete ${record.path}: ${error instanceof Error ? error.message : String(error)}`,
-        )
+        this.logger.warn(`Could not delete ${record.path}: ${errorMessage(error)}`)
         throw new InternalServerErrorException(deleteFailure(error))
       }
     }

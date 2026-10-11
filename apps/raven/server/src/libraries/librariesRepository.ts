@@ -74,9 +74,15 @@ const settingValues = (
   Number(settings.autoRefresh),
 ]
 
-/** Whether two lists of library paths are the same, in the same order. */
-export const samePaths = (a: readonly string[], b: readonly string[]): boolean =>
-  a.length === b.length && a.every((path, index) => path === b[index])
+/** Whether a library's paths are the same, in the same order, as they were. */
+export const samePaths = ({
+  before,
+  after,
+}: {
+  before: readonly string[]
+  after: readonly string[]
+}): boolean =>
+  before.length === after.length && before.every((path, index) => path === after[index])
 
 type PathRow = {
   library_id: number

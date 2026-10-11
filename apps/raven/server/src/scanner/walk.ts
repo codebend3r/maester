@@ -2,7 +2,6 @@ import type { Dirent } from 'node:fs'
 import { lstat, readdir, stat } from 'node:fs/promises'
 import { basename, join, relative, sep } from 'node:path'
 import { extensionOf, isVideoFile } from '@raven/core'
-import type { FoundFile } from '@/media/mediaIndex'
 import { type Gate, createGate, mapWithConcurrency } from '@/scanner/concurrency'
 
 /**
@@ -39,9 +38,26 @@ const isSample = (fileName: string): boolean => {
 
 const isIndexed = (fileName: string): boolean => isVideoFile(fileName) && !isSample(fileName)
 
+/** A video file a walk found, with what the scanner diffs against the index. */
+export type FoundFile = {
+  path: string
+  /** The library path the walk found it under. */
+  root: string
+  size: number
+  mtimeMs: number
+}
+
 /** Whether `path` is `root` or lies under it. */
 export const isUnder = ({ path, root }: { path: string; root: string }): boolean =>
   path === root || path.startsWith(root.endsWith('/') ? root : `${root}/`)
+
+/** The places not already under another: a folder copied in arrives with each of its files. */
+export const outermost = (places: readonly string[]): string[] => {
+  const distinct = [...new Set(places)]
+  return distinct.filter(
+    (place) => !distinct.some((other) => other !== place && isUnder({ path: place, root: other })),
+  )
+}
 
 /** Whether a walk from `root` would skip `path`: it sits in, or is, a hidden or NAS folder. */
 export const isSkippedPlace = ({ root, path }: { root: string; path: string }): boolean =>

@@ -9,7 +9,6 @@ import {
   stat,
   writeFile,
 } from 'node:fs/promises'
-import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
@@ -793,9 +792,8 @@ describe('refreshing a library as its folders change', () => {
   })
 
   it('tells a listening client which library changed', async () => {
-    const { port } = app().getHttpServer().address() as AddressInfo
     const abort = new AbortController()
-    const response = await fetch(`http://127.0.0.1:${port}/api/events`, { signal: abort.signal })
+    const response = await fetch(`${await app().getUrl()}/api/events`, { signal: abort.signal })
     expect(response.headers.get('content-type')).toContain('text/event-stream')
     const reader = response.body?.getReader()
     await copyFile(at('Heat (1995) 1080p.mp4'), at('Heat (1995) copy.mp4'))
@@ -823,6 +821,87 @@ describe('refreshing a library as its folders change', () => {
     await copyFile(at('Heat (1995) 1080p.mp4'), at('Unwatched.mp4'))
     await new Promise((resolve) => setTimeout(resolve, 600))
     expect(fileNames(await listMedia())).toEqual(before)
+  })
+})
+
+describe('a library whose folders cannot be watched', () => {
+  const state = {
+    root: '',
+    libraryId: 0,
+    app: null as NestFastifyApplication | null,
+    /** Every watch asked for, and whether it should fail. */
+    watches: [] as string[],
+    failing: true,
+  }
+  const app = (): NestFastifyApplication => {
+    if (!state.app) throw new Error('app not started')
+    return state.app
+  }
+  const media = () => join(state.root, 'media')
+  const listMedia = async (): Promise<MediaItem[]> =>
+    expectShape({
+      response: await app().inject({
+        method: 'GET',
+        url: `/api/libraries/${state.libraryId}/media`,
+      }),
+      guard: isMediaList,
+    })
+
+  beforeAll(async () => {
+    state.root = await mkdtemp(join(tmpdir(), 'raven-unwatched-'))
+    await encodeClip({ path: join(media(), 'Heat (1995).mp4'), seconds: 2 })
+    state.app = await createApp({
+      config: testConfig({ dataDir: join(state.root, 'data'), mediaDir: state.root }),
+      quiet: true,
+      watch: {
+        fallbackScanMs: 100,
+        watchFolder: ({ root, onError }) => {
+          state.watches.push(root)
+          if (state.failing)
+            onError(new Error('ENOSPC: System limit for number of file watchers reached'))
+          return { close: () => undefined }
+        },
+      },
+    })
+    await state.app.init()
+    const created = expectShape({
+      response: await app().inject({
+        method: 'POST',
+        url: '/api/libraries',
+        payload: { name: 'Unwatched', paths: [media()] },
+      }),
+      guard: isLibrary,
+    })
+    state.libraryId = created.id
+    await app().get(ScannerService).whenIdle(created.id)
+  })
+
+  afterAll(async () => {
+    await state.app?.close()
+    await rm(state.root, { recursive: true, force: true })
+  })
+
+  it('is scanned on a timer instead, so new videos still turn up', async () => {
+    await copyFile(join(media(), 'Heat (1995).mp4'), join(media(), 'Ronin (1998).mp4'))
+    const items = await eventually({
+      read: listMedia,
+      check: (current) => current.length === 2,
+    })
+    expect(items.map((item) => item.fileName).toSorted()).toEqual([
+      'Heat (1995).mp4',
+      'Ronin (1998).mp4',
+    ])
+  })
+
+  it('is watched again once a library is saved', async () => {
+    const before = state.watches.length
+    state.failing = false
+    await app().inject({
+      method: 'PUT',
+      url: `/api/libraries/${state.libraryId}`,
+      payload: { name: 'Unwatched again', paths: [media()] },
+    })
+    expect(state.watches.length).toBe(before + 1)
   })
 })
 

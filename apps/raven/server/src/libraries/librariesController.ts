@@ -102,7 +102,7 @@ export class LibrariesController {
     if (before.settings.kind !== record.settings.kind) {
       this.metadata.changeKind({ libraryId: id, kind: record.settings.kind })
     }
-    if (!samePaths(before.paths, record.paths)) this.scanner.scan(id)
+    if (!samePaths({ before: before.paths, after: record.paths })) this.scanner.scan(id)
     this.watcher.sync()
     return this.withStatus(record)
   }

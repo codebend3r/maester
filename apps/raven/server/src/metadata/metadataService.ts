@@ -18,6 +18,7 @@ import {
   seasonFolderNumber,
   sortTitle,
 } from '@raven/core'
+import { errorMessage } from '@/errorMessage'
 import { groupBy } from '@/groupBy'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { MediaRepository, type PendingFile } from '@/media/mediaRepository'
@@ -68,8 +69,6 @@ const showFolderOf = (file: { folder: string }): string | null => {
 
 /** Where a show's files are kept together: the show's folder, or the file itself at a root. */
 const showPlace = (file: PendingFile): string => showFolderOf(file) ?? filePlace(file)
-
-const message = (error: unknown): string => (error instanceof Error ? error.message : String(error))
 
 /** Whether a TMDB failure means the rest of a pass should wait for the next one. */
 const stopsThePass = (error: unknown): boolean =>
@@ -288,7 +287,7 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
       files.forEach((file) => attempted.add(file.id))
       if (kind === 'shows') {
         await mapWithConcurrency({
-          items: [...groupBy(files, showPlace).values()],
+          items: [...groupBy({ items: files, key: showPlace }).values()],
           limit: PASS_CONCURRENCY,
           fn: (group) =>
             this.guarded({ context, run: () => this.matchShowGroup({ files: group, context }) }),
@@ -304,7 +303,7 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
     }
     await round()
     if (context.stopped.error != null) {
-      this.logger.warn(`Matching stopped for now: ${message(context.stopped.error)}`)
+      this.logger.warn(`Matching stopped for now: ${errorMessage(context.stopped.error)}`)
     }
   }
 
@@ -324,7 +323,7 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
         context.stopped.error = error
         return
       }
-      this.logger.warn(`Could not match: ${message(error)}`)
+      this.logger.warn(`Could not match: ${errorMessage(error)}`)
     }
   }
 
@@ -880,7 +879,9 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
     tmdbId: string
   }): Promise<number | null> {
     const files = this.metadata.mediaUnderShow(showId).flatMap((id) => this.media.get(id) ?? [])
-    const groups = [...groupBy(files, (file) => `${file.libraryId}|${showPlace(file)}`).values()]
+    const groups = [
+      ...groupBy({ items: files, key: (file) => `${file.libraryId}|${showPlace(file)}` }).values(),
+    ]
     await groups.reduce(
       (previous, group) => previous.then(() => this.rePoint({ group, tmdbId })),
       Promise.resolve(),
@@ -1054,7 +1055,7 @@ export class MetadataService implements OnApplicationBootstrap, OnModuleDestroy 
     try {
       this.metadata.saveScores({ itemId, scores: await this.omdb.ratings(imdbId) })
     } catch (error) {
-      this.logger.warn(`No OMDb scores for ${imdbId}: ${message(error)}`)
+      this.logger.warn(`No OMDb scores for ${imdbId}: ${errorMessage(error)}`)
     }
   }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { FoundFile, IndexedFile } from '@/media/mediaIndex'
-import { changesAnything, reconcile } from '@/scanner/reconcile'
+import { type IndexedFile, changesAnything, reconcile } from '@/scanner/reconcile'
+import type { FoundFile } from '@/scanner/walk'
 
 const found = (path: string, size = 100, mtimeMs = 1): FoundFile => ({
   path,

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { type Gate, createGate } from '@/scanner/concurrency'
-import { walkVideos } from '@/scanner/walk'
+import { outermost, walkVideos } from '@/scanner/walk'
 
 describe('walkVideos', () => {
   const state = { root: '' }
@@ -122,5 +122,19 @@ describe('walkVideos', () => {
       })
       expect(result.unreadable).toEqual([at('Unmounted')])
     })
+  })
+})
+
+describe('outermost', () => {
+  it('keeps the places not under another, once each', () => {
+    expect(
+      outermost([
+        '/m/Ronin (1998)/Ronin (1998).mkv',
+        '/m/Ronin (1998)',
+        '/m/Heat (1995)/heat.mkv',
+        '/m/Ronin (1998)',
+        '/m/Ronin (1998) Extras',
+      ]),
+    ).toEqual(['/m/Ronin (1998)', '/m/Heat (1995)/heat.mkv', '/m/Ronin (1998) Extras'])
   })
 })

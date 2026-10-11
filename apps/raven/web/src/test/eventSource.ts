@@ -21,6 +21,12 @@ export class FakeEventSource extends EventTarget {
   send(data: unknown): void {
     this.dispatchEvent(new MessageEvent('message', { data: JSON.stringify(data) }))
   }
+
+  /** The stream dropping, then the browser reconnecting. */
+  reconnect(): void {
+    this.dispatchEvent(new Event('error'))
+    this.dispatchEvent(new Event('open'))
+  }
 }
 
 Object.defineProperty(globalThis, 'EventSource', { value: FakeEventSource, configurable: true })
