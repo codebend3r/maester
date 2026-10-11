@@ -1,10 +1,4 @@
-import {
-  type RatingSource,
-  type ShowEntry,
-  type ShownRatings,
-  episodeCode,
-  sortTitle,
-} from '@raven/core'
+import { type RatingSource, type ShowEntry, episodeCode, sortTitle } from '@raven/core'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Icon } from '@/components/Icon/Icon'
@@ -81,17 +75,7 @@ const COLUMNS: Record<Column, SortColumn<ShowEntry>> = {
 }
 
 /** Every show as a row of facts: title, years, episodes on disk and each of its scores, every column sortable. */
-export const ShowList = ({
-  shows,
-  busy = false,
-  labelledBy,
-}: {
-  shows: ShowEntry[]
-  busy?: boolean
-  /** Kept for the callers that pass it; every rating shows here. */
-  ratingsSource?: ShownRatings
-  labelledBy?: string
-}) => {
+export const ShowList = ({ shows, busy = false }: { shows: ShowEntry[]; busy?: boolean }) => {
   const { sorted, toggle, ariaSort } = useTableSort({ rows: shows, columns: COLUMNS })
   const header = (key: Column, label: string, className?: string) => (
     <SortHeader sort={ariaSort(key)} onToggle={() => toggle(key)} className={className}>
@@ -99,12 +83,7 @@ export const ShowList = ({
     </SortHeader>
   )
   return (
-    <table
-      className={styles.table}
-      aria-label={labelledBy ? undefined : 'Shows'}
-      aria-labelledby={labelledBy}
-      aria-busy={busy}
-    >
+    <table className={styles.table} aria-label="Shows" aria-busy={busy}>
       <thead>
         <tr>
           {header('title', 'Title')}
@@ -149,23 +128,8 @@ export const ShowList = ({
 }
 
 /** Every show as a row with a small poster, its title and facts beside it. */
-export const ShowTiles = ({
-  shows,
-  busy = false,
-  labelledBy,
-}: {
-  shows: ShowEntry[]
-  busy?: boolean
-  /** Kept for the callers that pass it; every rating shows here. */
-  ratingsSource?: ShownRatings
-  labelledBy?: string
-}) => (
-  <ul
-    className={styles.tiles}
-    aria-label={labelledBy ? undefined : 'Shows'}
-    aria-labelledby={labelledBy}
-    aria-busy={busy}
-  >
+export const ShowTiles = ({ shows, busy = false }: { shows: ShowEntry[]; busy?: boolean }) => (
+  <ul className={styles.tiles} aria-label="Shows" aria-busy={busy}>
     {shows.map((entry) => {
       const facts = [
         showYears({ year: entry.show.year, endedYear: entry.endedYear }),
