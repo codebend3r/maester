@@ -24,6 +24,7 @@ import {
 } from '@raven/core'
 import { type LibraryRecord, LibrariesRepository } from '@/libraries/librariesRepository'
 import { MediaRepository, toMediaItem } from '@/media/mediaRepository'
+import { MetadataService } from '@/metadata/metadataService'
 import { SubtitlesService } from '@/playback/subtitlesService'
 import { ScannerService } from '@/scanner/scannerService'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
@@ -55,6 +56,7 @@ export class LibrariesController {
     @Inject(ScannerService) private readonly scanner: ScannerService,
     @Inject(ThumbnailService) private readonly thumbnails: ThumbnailService,
     @Inject(SubtitlesService) private readonly subtitles: SubtitlesService,
+    @Inject(MetadataService) private readonly metadata: MetadataService,
   ) {}
 
   private withStatus(record: LibraryRecord): Library {
@@ -85,13 +87,19 @@ export class LibrariesController {
     return this.withStatus(record)
   }
 
-  /** Only a change of folders rescans; a rename or a settings change leaves the index as it is. */
+  /**
+   * Only a change of folders rescans, and only a change of type matches the
+   * files again; a rename or another setting leaves the index as it is.
+   */
   @Put(':id')
   update(@Param('id', ParseIntPipe) id: number, @Body() body: unknown): Library {
     const input = parseInput(body)
     const before = this.find(id)
     const record = this.libraries.update({ id, input })
     if (!record) throw new NotFoundException(`No library ${id}`)
+    if (before.settings.kind !== record.settings.kind) {
+      this.metadata.changeKind({ libraryId: id, kind: record.settings.kind })
+    }
     if (!samePaths(before.paths, record.paths)) this.scanner.scan(id)
     return this.withStatus(record)
   }
@@ -106,6 +114,8 @@ export class LibrariesController {
     await this.subtitles.discard(ids)
     this.libraries.remove(id)
     this.scanner.forget(id)
+    // The pass finds no library, and clears up the items it left.
+    this.metadata.enqueue(id)
   }
 
   @Post(':id/scan')

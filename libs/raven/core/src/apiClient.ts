@@ -1,11 +1,14 @@
 import {
   isDirectoryListing,
   isHistory,
+  isItemDetails,
   isLibrary,
   isLibraryList,
   isMediaItem,
   isMediaList,
   isMediaTracks,
+  isMatchCandidateList,
+  isMetadataHealth,
   isRecord,
   isString,
   isStringArray,
@@ -15,11 +18,15 @@ import { parseWebVtt } from '@/subtitles'
 import type {
   DirectoryListing,
   HistoryEntry,
+  ItemDetails,
+  ItemImageKind,
   Library,
   LibraryInput,
+  MatchCandidate,
   MediaItem,
   MediaSort,
   MediaTracks,
+  MetadataHealth,
   StreamMode,
   SubtitleCue,
 } from '@/types'
@@ -265,6 +272,97 @@ export const createApiClient = ({
       media.thumbnail === 'ready'
         ? url(`/api/media/${media.id}/thumbnail?v=${media.thumbnailVersion}`)
         : null,
+
+    /** A movie, show, season or episode with everything its page shows. */
+    getItem: (id: number): Promise<ItemDetails> =>
+      expect({ request: send({ path: `/api/items/${id}` }), guard: isItemDetails }),
+
+    /** Fetches an item from TMDB again now, and returns it as it stands after. */
+    refreshItem: (id: number): Promise<ItemDetails> =>
+      expect({
+        request: send({ path: `/api/items/${id}/refresh`, method: 'POST' }),
+        guard: isItemDetails,
+      }),
+
+    /** TMDB's results for Fix match. */
+    searchMatches: ({
+      type,
+      query,
+      year,
+    }: {
+      type: 'movie' | 'show'
+      query: string
+      year?: number | null
+    }): Promise<MatchCandidate[]> =>
+      expect({
+        request: send({
+          path: `/api/match/search?${toQueryString({
+            type,
+            query: query.trim(),
+            ...(year == null ? {} : { year: String(year) }),
+          })}`,
+        }),
+        guard: isMatchCandidateList,
+      }),
+
+    /**
+     * Points a file, and every file in its folder, at a TMDB id, and keeps
+     * that through renames; `null` says it is not a movie at all.
+     */
+    setMatch: ({
+      mediaId,
+      tmdbId,
+    }: {
+      mediaId: number
+      tmdbId: string | null
+    }): Promise<MediaItem> =>
+      expect({
+        request: send({ path: `/api/media/${mediaId}/match`, method: 'PUT', body: { tmdbId } }),
+        guard: isMediaItem,
+      }),
+
+    /** How matching is doing, and whether TMDB is configured at all. */
+    getMetadataHealth: async (): Promise<MetadataHealth> => {
+      const health = await send({ path: '/api/health' })
+      const metadata = isRecord(health) ? health.metadata : null
+      if (!isMetadataHealth(metadata)) {
+        throw new ApiError({
+          status: 502,
+          message: 'The server sent a response this client does not understand.',
+        })
+      }
+      return metadata
+    },
+
+    /** An item's poster, backdrop or still; null when it has none. Versioned, so cached for good. */
+    itemImageUrl: ({
+      id,
+      kind,
+      version,
+    }: {
+      id: number
+      kind: ItemImageKind
+      version: string | null
+    }): string | null =>
+      version == null
+        ? null
+        : url(`/api/items/${id}/images/${kind}?${toQueryString({ v: version })}`),
+
+    /** A person's photo; null when TMDB has none. */
+    photoUrl: ({
+      personId,
+      photoVersion,
+    }: {
+      personId: number
+      photoVersion: string | null
+    }): string | null =>
+      photoVersion == null
+        ? null
+        : url(`/api/people/${personId}/photo?${toQueryString({ v: photoVersion })}`),
+
+    /** A Fix match result's poster, through the server's image cache. */
+    candidatePosterUrl: (poster: string | null): string | null =>
+      poster == null ? null : url(`/api/images/poster${poster}`),
 
     /** The original file, served with byte ranges: what a player loads for direct play. */
     fileUrl: (mediaId: number): string => url(`/api/media/${mediaId}/file`),

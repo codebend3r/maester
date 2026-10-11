@@ -31,6 +31,12 @@ export type ServerConfig = {
   hwAccel: HwAccel
   /** The VAAPI render node, passed into the container on a NAS with a GPU. */
   vaapiDevice: string
+  /** TMDB's API Read Access Token, or its 32-character API key; null turns metadata off. Never logged or sent to a client. */
+  tmdbApiToken: string | null
+  /** The language titles and summaries come in, as TMDB spells it: `en-US`. */
+  metadataLanguage: string
+  /** Whose content rating and release date to show: `US`, `GB`. */
+  metadataCountry: string
 }
 
 /** The DI token the config is provided under. */
@@ -81,4 +87,7 @@ export const readServerConfig = (env: NodeJS.ProcessEnv = process.env): ServerCo
   rescanIntervalMinutes: wholeNumber({ value: env.RESCAN_INTERVAL_MINUTES, fallback: 0 }),
   hwAccel: hwAccelFrom(env.HW_ACCEL),
   vaapiDevice: env.VAAPI_DEVICE?.trim() || '/dev/dri/renderD128',
+  tmdbApiToken: env.TMDB_API_TOKEN?.trim() || null,
+  metadataLanguage: env.METADATA_LANGUAGE?.trim() || 'en-US',
+  metadataCountry: (env.METADATA_COUNTRY?.trim() || 'US').toUpperCase(),
 })

@@ -29,12 +29,28 @@ mock.module('@/lib/api', () => ({
       created.push(input)
       return { id: 1 }
     },
+    getMetadataHealth: async () => ({
+      tmdb: 'off',
+      omdb: 'off',
+      pending: 0,
+      error: null,
+      lastOk: null,
+    }),
   },
 }))
 
 const { LibraryDialog } = await import('@/components/LibraryDialog/LibraryDialog')
 
 describe('LibraryDialog', () => {
+  it('says how to turn on posters and details while TMDB is off', async () => {
+    renderWithProviders(<LibraryDialog onClose={() => undefined} />)
+    const type = screen.getByRole('group', { name: 'Type' })
+    expect(await screen.findByText('TMDB_API_TOKEN')).toBeInTheDocument()
+    expect(type).toHaveAccessibleDescription(
+      "Set TMDB_API_TOKEN in raven's .env for posters and details.",
+    )
+  })
+
   it('shows every problem before sending anything', async () => {
     renderWithProviders(<LibraryDialog onClose={() => undefined} />)
     await userEvent.click(screen.getByRole('button', { name: 'Add library' }))

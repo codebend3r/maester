@@ -14,10 +14,13 @@ export const encodeClip = async ({
   path,
   seconds = 6,
   audio = 'aac',
+  size = '320x240',
 }: {
   path: string
   seconds?: number
   audio?: 'aac' | 'ac3'
+  /** The frame size, `WIDTHxHEIGHT`. */
+  size?: string
 }): Promise<void> => {
   await mkdir(dirname(path), { recursive: true })
   await run('ffmpeg', [
@@ -28,7 +31,7 @@ export const encodeClip = async ({
     '-f',
     'lavfi',
     '-i',
-    `testsrc2=size=320x240:rate=24:duration=${seconds}`,
+    `testsrc2=size=${size}:rate=24:duration=${seconds}`,
     '-f',
     'lavfi',
     '-i',
@@ -115,4 +118,28 @@ export const encodeRichClip = async ({
     path,
   ])
   await rm(srt)
+}
+
+/** A still picture, such as a poster beside a movie, of one flat colour. */
+export const encodeImage = async ({
+  path,
+  size = '200x300',
+}: {
+  path: string
+  size?: string
+}): Promise<void> => {
+  await mkdir(dirname(path), { recursive: true })
+  await run('ffmpeg', [
+    '-hide_banner',
+    '-loglevel',
+    'error',
+    '-y',
+    '-f',
+    'lavfi',
+    '-i',
+    `color=c=teal:s=${size}`,
+    '-frames:v',
+    '1',
+    path,
+  ])
 }

@@ -124,3 +124,18 @@
   justify-content: end;
   gap: var(--space-1);
 }
+
+// A refresh that failed says so beside the button, since the menu has closed.
+.failure {
+  position: absolute;
+  top: calc(100% + var(--space-0));
+  right: 0;
+  z-index: 1;
+  width: max-content;
+  max-width: 16rem;
+  padding: var(--space-1) var(--space-2);
+  border-left: 2px solid var(--color-leaf-bright);
+  border-radius: var(--radius-sm);
+  background: var(--color-canopy);
+  font-size: var(--font-size-xs);
+}

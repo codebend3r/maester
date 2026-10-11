@@ -43,7 +43,7 @@ const firstShown = ({
         .at(0)
     : items.at(0)
 
-/** The library's videos laid out the way its view setting says. */
+/** The library's videos laid out the way its view setting says; a Movies library's as posters. */
 const MediaView = ({
   settings,
   items,
@@ -53,11 +53,12 @@ const MediaView = ({
   items: MediaItem[]
   busy: boolean
 }) => {
-  if (settings.view === 'list') return <MediaList items={items} busy={busy} />
-  if (settings.view === 'tiles') return <MediaTiles items={items} busy={busy} />
+  const movies = settings.kind === 'movies'
+  if (settings.view === 'list') return <MediaList items={items} busy={busy} movies={movies} />
+  if (settings.view === 'tiles') return <MediaTiles items={items} busy={busy} posters={movies} />
   if (settings.view === 'grouped')
-    return <MediaGroups items={items} by={settings.groupBy} busy={busy} />
-  return <MediaGrid items={items} busy={busy} />
+    return <MediaGroups items={items} by={settings.groupBy} busy={busy} posters={movies} />
+  return <MediaGrid items={items} busy={busy} posters={movies} />
 }
 
 export const LibraryPage = () => {
@@ -81,15 +82,28 @@ export const LibraryPage = () => {
   const settings = library.data?.settings ?? DEFAULT_LIBRARY_SETTINGS
   const sort = settings.sort
   const dealt = sort === 'random' ? seed : 0
+  // Files only leave pending while TMDB answers; without it they wait for good.
+  const metadata = useQuery({
+    queryKey: queryKeys.metadataHealth,
+    queryFn: api.getMetadataHealth,
+    enabled: settings.kind !== 'other',
+    staleTime: 60_000,
+  })
+  const matching = metadata.data?.tmdb === 'ok'
 
   const media = useQuery({
     queryKey: queryKeys.media({ libraryId, search: query, sort, seed: dealt }),
     queryFn: () => api.listMedia({ libraryId, search: query, sort, seed: dealt }),
     enabled: library.isSuccess,
     placeholderData: keepPreviousData,
-    // While a scan runs or thumbnails are still being made, keep the grid filling in.
+    // While a scan runs, or thumbnails are still being made or files matched, keep the grid filling in.
     refetchInterval: (current) =>
-      scanning || current.state.data?.some((item) => item.thumbnail === 'pending') ? 3000 : false,
+      scanning ||
+      current.state.data?.some(
+        (item) => item.thumbnail === 'pending' || (matching && item.match === 'pending'),
+      )
+        ? 3000
+        : false,
   })
 
   const rescan = useMutation({

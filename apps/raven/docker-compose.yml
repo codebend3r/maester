@@ -16,6 +16,11 @@ services:
       # Libraries use the container path on the right, e.g. /media/movies.
       - /path/to/Movies:/media/movies:ro
       - /path/to/TV:/media/tv:ro
+    # TMDB_API_TOKEN and the other optional keys in .env.example; raven runs
+    # without the file, so it is not required (Compose 2.24 or later).
+    env_file:
+      - path: .env
+        required: false
     environment:
       # Rescan every library on a timer (minutes); 0 means only on boot and on demand.
       - RESCAN_INTERVAL_MINUTES=0

@@ -1,5 +1,6 @@
 import {
   type MediaItem,
+  cardTitle,
   formatBitrate,
   formatBytes,
   formatRuntime,
@@ -9,6 +10,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Icon } from '@/components/Icon/Icon'
 import { MediaMenu } from '@/components/MediaMenu/MediaMenu'
+import { openPath } from '@/lib/itemLinks'
 import { progressOf } from '@/lib/mediaProgress'
 import styles from '@/components/MediaList/MediaList.module.scss'
 
@@ -18,24 +20,30 @@ const added = new Intl.DateTimeFormat(undefined, {
   year: 'numeric',
 })
 
-/** One video as a table row; a right click on its title opens the row's menu. */
-const MediaRow = ({ media }: { media: MediaItem }) => {
+/**
+ * One video as a table row; a right click on its title opens the row's
+ * menu. In a Movies library the title opens the movie's page and a Year
+ * column follows it.
+ */
+const MediaRow = ({ media, movies }: { media: MediaItem; movies: boolean }) => {
   const [menuOpen, setMenuOpen] = useState(false)
   const progress = progressOf(media)
+  const to = movies ? openPath(media) : `/watch/${media.id}`
+  const { title, year } = cardTitle(media)
   return (
     <tr className={styles.row}>
       <th scope="row">
         <div className={styles.titleCell}>
           <Link
-            to={`/watch/${media.id}`}
-            state={{ media }}
+            to={to}
+            state={to === `/watch/${media.id}` ? { media } : undefined}
             className={styles.title}
             onContextMenu={(event) => {
               event.preventDefault()
               setMenuOpen(true)
             }}
           >
-            {media.title}
+            {title}
           </Link>
           {media.favourite && (
             <span className={styles.favourite}>
@@ -51,13 +59,20 @@ const MediaRow = ({ media }: { media: MediaItem }) => {
           {progress > 0 && <span className="visually-hidden">Partly watched</span>}
         </div>
       </th>
+      {movies && <td className={styles.number}>{year ?? ''}</td>}
       <td className={styles.number}>{formatRuntime(media.duration)}</td>
       <td className={styles.roomy}>{resolutionLabel(media)}</td>
       <td className={`${styles.number} ${styles.extra}`}>{formatBytes(media.size)}</td>
       <td className={`${styles.number} ${styles.extra}`}>{formatBitrate(media.bitrate)}</td>
       <td className={styles.extra}>{added.format(new Date(media.addedAt))}</td>
       <td className={styles.menuCell}>
-        <MediaMenu media={media} open={menuOpen} onOpenChange={setMenuOpen} inline />
+        <MediaMenu
+          media={media}
+          open={menuOpen}
+          onOpenChange={setMenuOpen}
+          inline
+          matchType={movies ? 'movie' : null}
+        />
       </td>
     </tr>
   )
@@ -67,11 +82,25 @@ const MediaRow = ({ media }: { media: MediaItem }) => {
  * Every video as a row of facts. A narrow screen keeps title, length and
  * resolution; a phone drops resolution too, so titles have room to read.
  */
-export const MediaList = ({ items, busy = false }: { items: MediaItem[]; busy?: boolean }) => (
+export const MediaList = ({
+  items,
+  busy = false,
+  movies = false,
+}: {
+  items: MediaItem[]
+  busy?: boolean
+  /** A Movies library: titles open the movie's page, and the year gets a column. */
+  movies?: boolean
+}) => (
   <table className={styles.table} aria-label="Videos" aria-busy={busy}>
     <thead>
       <tr>
         <th scope="col">Title</th>
+        {movies && (
+          <th scope="col" className={styles.number}>
+            Year
+          </th>
+        )}
         <th scope="col" className={styles.number}>
           Length
         </th>
@@ -94,7 +123,7 @@ export const MediaList = ({ items, busy = false }: { items: MediaItem[]; busy?: 
     </thead>
     <tbody>
       {items.map((item) => (
-        <MediaRow key={item.id} media={item} />
+        <MediaRow key={item.id} media={item} movies={movies} />
       ))}
     </tbody>
   </table>

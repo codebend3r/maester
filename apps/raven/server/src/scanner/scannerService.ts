@@ -10,6 +10,7 @@ import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { FfmpegService, FfmpegTimeoutError } from '@/ffmpeg/ffmpegService'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { type FoundFile, MediaRepository } from '@/media/mediaRepository'
+import { MetadataService } from '@/metadata/metadataService'
 import { SubtitlesService } from '@/playback/subtitlesService'
 import { TracksService } from '@/playback/tracksService'
 import { mapWithConcurrency } from '@/scanner/concurrency'
@@ -33,8 +34,8 @@ const isUnder = ({ path, roots }: { path: string; roots: readonly string[] }): b
 
 /**
  * Indexes a library: walks its paths, adds new files, re-probes changed
- * ones, drops deleted ones, and hands every freshly probed file to the
- * thumbnail queue. Scans are incremental (an unchanged size and mtime skips
+ * ones, drops deleted ones, hands every freshly probed file to the
+ * thumbnail queue, and the library to metadata for matching. Scans are incremental (an unchanged size and mtime skips
  * ffprobe), so a rescan of a settled library is mostly directory listing.
  */
 @Injectable()
@@ -52,6 +53,7 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
     @Inject(ThumbnailService) private readonly thumbnails: ThumbnailService,
     @Inject(SubtitlesService) private readonly subtitles: SubtitlesService,
     @Inject(TracksService) private readonly tracks: TracksService,
+    @Inject(MetadataService) private readonly metadata: MetadataService,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -122,7 +124,10 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
 
       const toProbe = walk.files.flatMap((file: FoundFile) => {
         const existing = known.get(file.path)
-        if (!existing) return [{ id: this.media.insert({ libraryId, file }), path: file.path }]
+        if (!existing) {
+          const id = this.media.insert({ libraryId, kind: library.settings.kind, file })
+          return [{ id, path: file.path }]
+        }
         if (existing.size !== file.size || existing.mtimeMs !== file.mtimeMs) {
           this.media.markChanged({ id: existing.id, size: file.size, mtimeMs: file.mtimeMs })
           return [{ id: existing.id, path: file.path }]
@@ -134,6 +139,9 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
         discovered: walk.files.length,
         processed: walk.files.length - toProbe.length,
       })
+      // Matching needs only names, so new files are matched while they are
+      // probed, and the files that went are cleared up after.
+      this.metadata.enqueue(libraryId)
 
       await mapWithConcurrency({
         items: toProbe,

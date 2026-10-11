@@ -24,8 +24,17 @@ const SORTS: Record<MediaSort, string> = {
   'bitrate-low': 'Lowest bitrate',
   'resolution-high': 'Highest resolution',
   'resolution-low': 'Lowest resolution',
+  'year-new': 'Newest release',
+  'year-old': 'Oldest release',
   random: 'Random',
 }
+
+/** Release years come from names, which only Movies and TV shows libraries read. */
+const YEAR_SORTS: ReadonlySet<MediaSort> = new Set(['year-new', 'year-old'])
+
+/** The sorts a library offers; the one it has stays on offer whatever its type. */
+const sortsFor = ({ kind, sort }: LibrarySettings): MediaSort[] =>
+  MEDIA_SORTS.filter((option) => kind !== 'other' || !YEAR_SORTS.has(option) || option === sort)
 
 const VIEWS: Record<LibraryView, { label: string; icon: IconName }> = {
   grid: { label: 'Grid', icon: 'grid' },
@@ -95,7 +104,7 @@ export const LibraryToolbar = ({
               isMediaSort(event.target.value) && onChange({ sort: event.target.value })
             }
           >
-            {MEDIA_SORTS.map((sort) => (
+            {sortsFor(settings).map((sort) => (
               <option key={sort} value={sort}>
                 {SORTS[sort]}
               </option>

@@ -1,6 +1,8 @@
 import { Controller, Get, Inject } from '@nestjs/common'
+import type { MetadataHealth } from '@raven/core'
 import type { VideoEncoder } from '@/ffmpeg/encoder'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
+import { MetadataService } from '@/metadata/metadataService'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
 
 export type Health = {
@@ -12,6 +14,8 @@ export type Health = {
   /** What transcodes encode with: the CPU, or a GPU through VAAPI or VideoToolbox. */
   encoder: VideoEncoder['kind']
   thumbnailsPending: number
+  /** Whether TMDB is configured and answering, and how many files wait to be matched. */
+  metadata: MetadataHealth
 }
 
 @Controller('api/health')
@@ -19,6 +23,7 @@ export class HealthController {
   constructor(
     @Inject(FfmpegService) private readonly ffmpeg: FfmpegService,
     @Inject(ThumbnailService) private readonly thumbnails: ThumbnailService,
+    @Inject(MetadataService) private readonly metadata: MetadataService,
   ) {}
 
   @Get()
@@ -34,6 +39,7 @@ export class HealthController {
       tonemap,
       encoder: encoder.kind,
       thumbnailsPending: this.thumbnails.pending(),
+      metadata: this.metadata.health(),
     }
   }
 }

@@ -1,16 +1,27 @@
 import type {
   AudioTrack,
+  Credit,
+  CreditJob,
   DirectoryEntry,
   DirectoryListing,
   HistoryEntry,
+  ItemDetails,
+  ItemSummary,
+  ItemType,
   Library,
   LibraryKind,
   LibrarySettings,
   LibraryView,
+  MatchCandidate,
+  MatchState,
   MediaGroupBy,
   MediaItem,
   MediaSort,
   MediaTracks,
+  MetadataHealth,
+  MetadataServiceState,
+  Rating,
+  RatingSource,
   ScanStatus,
   SubtitleTrack,
   ThumbnailState,
@@ -66,6 +77,8 @@ export const MEDIA_SORTS: readonly MediaSort[] = [
   'bitrate-low',
   'resolution-high',
   'resolution-low',
+  'year-new',
+  'year-old',
   'random',
 ]
 
@@ -118,6 +131,83 @@ const THUMBNAIL_STATES: readonly ThumbnailState[] = ['pending', 'ready', 'failed
 export const isThumbnailState = (value: unknown): value is ThumbnailState =>
   THUMBNAIL_STATES.some((state) => state === value)
 
+const MATCH_STATES: readonly MatchState[] = ['pending', 'matched', 'manual', 'unmatched', 'off']
+
+export const isMatchState = (value: unknown): value is MatchState =>
+  MATCH_STATES.some((state) => state === value)
+
+const ITEM_TYPES: readonly ItemType[] = ['movie', 'show', 'season', 'episode']
+
+export const isItemType = (value: unknown): value is ItemType =>
+  ITEM_TYPES.some((type) => type === value)
+
+export const isItemSummary = (value: unknown): value is ItemSummary =>
+  isRecord(value) &&
+  isNumber(value.id) &&
+  isItemType(value.type) &&
+  isString(value.title) &&
+  isNullableNumber(value.year) &&
+  (value.show === null ||
+    (isRecord(value.show) && isNumber(value.show.id) && isString(value.show.title))) &&
+  isNullableNumber(value.season) &&
+  isNullableNumber(value.episode) &&
+  isNullableString(value.posterVersion)
+
+export const isItemSummaryList = arrayOf(isItemSummary)
+
+const RATING_SOURCES: readonly RatingSource[] = ['tmdb', 'imdb', 'rottenTomatoes', 'metacritic']
+
+export const isRatingSource = (value: unknown): value is RatingSource =>
+  RATING_SOURCES.some((source) => source === value)
+
+export const isRating = (value: unknown): value is Rating =>
+  isRecord(value) &&
+  isRatingSource(value.source) &&
+  (value.kind === 'critic' || value.kind === 'audience') &&
+  isNumber(value.value) &&
+  isNullableNumber(value.votes)
+
+const CREDIT_JOBS: readonly CreditJob[] = [
+  'cast',
+  'guest',
+  'director',
+  'writer',
+  'creator',
+  'producer',
+]
+
+export const isCreditJob = (value: unknown): value is CreditJob =>
+  CREDIT_JOBS.some((job) => job === value)
+
+export const isCredit = (value: unknown): value is Credit =>
+  isRecord(value) &&
+  isNumber(value.personId) &&
+  isString(value.name) &&
+  isCreditJob(value.job) &&
+  isNullableString(value.role) &&
+  isNullableString(value.photoVersion)
+
+export const isMatchCandidate = (value: unknown): value is MatchCandidate =>
+  isRecord(value) &&
+  isString(value.tmdbId) &&
+  isString(value.title) &&
+  isNullableNumber(value.year) &&
+  isNullableString(value.overview) &&
+  isNullableString(value.poster)
+
+export const isMatchCandidateList = arrayOf(isMatchCandidate)
+
+const isServiceState = (value: unknown): value is MetadataServiceState =>
+  value === 'off' || value === 'ok' || value === 'failing'
+
+export const isMetadataHealth = (value: unknown): value is MetadataHealth =>
+  isRecord(value) &&
+  isServiceState(value.tmdb) &&
+  isServiceState(value.omdb) &&
+  isNumber(value.pending) &&
+  isNullableString(value.error) &&
+  isNullableString(value.lastOk)
+
 export const isMediaItem = (value: unknown): value is MediaItem =>
   isRecord(value) &&
   isNumber(value.id) &&
@@ -140,9 +230,34 @@ export const isMediaItem = (value: unknown): value is MediaItem =>
   isNumber(value.thumbnailVersion) &&
   isNumber(value.position) &&
   typeof value.favourite === 'boolean' &&
-  isString(value.addedAt)
+  isString(value.addedAt) &&
+  isMatchState(value.match) &&
+  isNullableNumber(value.year) &&
+  isNullableString(value.edition) &&
+  (value.item === null || isItemSummary(value.item)) &&
+  isNumber(value.versions)
 
 export const isMediaList = arrayOf(isMediaItem)
+
+export const isItemDetails = (value: unknown): value is ItemDetails =>
+  isRecord(value) &&
+  isString(value.tmdbId) &&
+  isNullableString(value.imdbId) &&
+  isNullableString(value.originalTitle) &&
+  isNullableString(value.tagline) &&
+  isNullableString(value.summary) &&
+  isNullableString(value.contentRating) &&
+  isNullableString(value.released) &&
+  isNullableString(value.ended) &&
+  isNullableNumber(value.runtime) &&
+  isNullableString(value.studio) &&
+  isStringArray(value.genres) &&
+  isNullableString(value.backdropVersion) &&
+  arrayOf(isRating)(value.ratings) &&
+  arrayOf(isCredit)(value.credits) &&
+  isMediaList(value.versions) &&
+  isItemSummaryList(value.children) &&
+  isItemSummary(value)
 
 export const isHistoryEntry = (value: unknown): value is HistoryEntry =>
   isRecord(value) &&

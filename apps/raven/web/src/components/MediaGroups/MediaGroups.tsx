@@ -10,10 +10,12 @@ export const MediaGroups = ({
   items,
   by,
   busy = false,
+  posters = false,
 }: {
   items: MediaItem[]
   by: MediaGroupBy
   busy?: boolean
+  posters?: boolean
 }) => {
   const id = useId()
   return (
@@ -27,7 +29,7 @@ export const MediaGroups = ({
               {count.format(group.items.length)} {group.items.length === 1 ? 'video' : 'videos'}
             </span>
           </h2>
-          <MediaGrid items={group.items} />
+          <MediaGrid items={group.items} posters={posters} />
         </section>
       ))}
     </div>

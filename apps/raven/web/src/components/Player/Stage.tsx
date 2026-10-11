@@ -6,6 +6,7 @@ import {
   STREAM_TIME_SHIFT,
   type SubtitleTrack,
   formatDuration,
+  mediaLabel,
   streamMimeType,
 } from '@raven/core'
 import { type SyntheticEvent, useCallback, useEffect, useRef, useState } from 'react'
@@ -99,6 +100,8 @@ export const Stage = ({
 }: StageProps) => {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  // "The Matrix (1999)", or "Severance · S01E02 · Half Loop", once matched.
+  const label = mediaLabel(media)
   const stage = useRef<HTMLDivElement>(null)
   const video = useRef<HTMLVideoElement>(null)
   const menu = useRef<HTMLDialogElement>(null)
@@ -182,7 +185,7 @@ export const Stage = ({
     video.current?.focus()
     scheduleIdle()
     const title = document.title
-    document.title = media.title
+    document.title = label
     const element = video.current
     const resumedTimer = window.setTimeout(() => setResumedAt(null), 6000)
     return () => {
@@ -194,7 +197,7 @@ export const Stage = ({
       void queryClient.invalidateQueries({ queryKey: ['libraries', media.libraryId, 'media'] })
       void queryClient.invalidateQueries({ queryKey: ['libraries', media.libraryId, 'history'] })
     }
-  }, [media.title, media.libraryId, queryClient, save, scheduleIdle])
+  }, [label, media.libraryId, queryClient, save, scheduleIdle])
 
   // The source: the file itself, or a converted stream through Media Source
   // Extensions. A change of mode or audio track rebuilds it where playback was.
@@ -484,7 +487,7 @@ export const Stage = ({
         playsInline
         preload="auto"
         tabIndex={-1}
-        aria-label={media.title}
+        aria-label={label}
         onClick={togglePlay}
         onDoubleClick={toggleFullscreen}
         onLoadedMetadata={onLoadedMetadata}
@@ -544,7 +547,7 @@ export const Stage = ({
           .join(' ')}
       >
         <ButtonLink to={backTo} icon="back" aria-label="Back to library" className={styles.back} />
-        <h1 className={styles.title}>{media.title}</h1>
+        <h1 className={styles.title}>{label}</h1>
         {resumedAt != null && (
           <p className={styles.resumed} aria-live="polite">
             <span>Resumed at {formatDuration(resumedAt)}</span>

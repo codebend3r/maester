@@ -31,6 +31,7 @@ export type IconName =
   | 'grouped'
   | 'shuffle'
   | 'history'
+  | 'next'
 
 const PATHS: Record<IconName, string> = {
   back: 'M15 18l-6-6 6-6',
@@ -66,6 +67,7 @@ const PATHS: Record<IconName, string> = {
   grouped: 'M4 4h7M4 7h7v5H4zM13 7h7v5h-7zM4 15h7M4 18h7v2H4zM13 18h7v2h-7z',
   shuffle: 'M4 7h3l10 10h3M4 17h3l3-3M14 10l3-3h3M18 4l3 3-3 3M18 14l3 3-3 3',
   history: 'M4 11a8 8 0 1 1 2.3 5.7M4 5v6h6M12 8v4l3 2',
+  next: 'M9 6l6 6-6 6',
 }
 
 const isIconName = (name: string): name is IconName => name in PATHS

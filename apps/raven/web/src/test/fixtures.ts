@@ -1,4 +1,4 @@
-import type { Library, MediaItem } from '@raven/core'
+import type { ItemDetails, ItemSummary, Library, MediaItem } from '@raven/core'
 
 export const library = (overrides: Partial<Library> = {}): Library => ({
   id: 2,
@@ -48,5 +48,52 @@ export const mediaItem = (overrides: Partial<MediaItem> = {}): MediaItem => ({
   position: 0,
   favourite: false,
   addedAt: '2026-09-27T00:00:00.000Z',
+  match: 'off',
+  year: null,
+  edition: null,
+  item: null,
+  versions: 1,
+  ...overrides,
+})
+
+export const itemSummary = (overrides: Partial<ItemSummary> = {}): ItemSummary => ({
+  id: 40,
+  type: 'movie',
+  title: 'Busboys',
+  year: 2026,
+  show: null,
+  season: null,
+  episode: null,
+  posterVersion: 'p1',
+  ...overrides,
+})
+
+/** A matched movie in a Movies library: the file's parsed name, and the movie it is. */
+export const matchedMovie = (overrides: Partial<MediaItem> = {}): MediaItem =>
+  mediaItem({ title: 'Busboys', year: 2026, match: 'matched', item: itemSummary(), ...overrides })
+
+export const itemDetails = (overrides: Partial<ItemDetails> = {}): ItemDetails => ({
+  ...itemSummary(),
+  tmdbId: '1001',
+  imdbId: 'tt1001',
+  originalTitle: 'Busboys',
+  tagline: 'Every table has a story.',
+  summary: 'Two busboys at a downtown steakhouse plan one last perfect shift.',
+  contentRating: 'R',
+  released: '2026-03-14',
+  ended: null,
+  runtime: 97,
+  studio: 'Night Shift Pictures',
+  genres: ['Comedy', 'Drama', 'Crime', 'Romance'],
+  backdropVersion: 'b1',
+  ratings: [{ source: 'tmdb', kind: 'audience', value: 8.2, votes: 1200 }],
+  credits: [
+    { personId: 1, name: 'Mark Kimball', job: 'cast', role: 'Rudy', photoVersion: 'k1' },
+    { personId: 2, name: 'Ana Ortiz', job: 'cast', role: 'Lena', photoVersion: null },
+    { personId: 1, name: 'Mark Kimball', job: 'director', role: 'Director', photoVersion: 'k1' },
+    { personId: 3, name: 'Jo Park', job: 'writer', role: 'Screenplay', photoVersion: null },
+  ],
+  versions: [matchedMovie()],
+  children: [],
   ...overrides,
 })

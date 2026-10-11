@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   DEFAULT_LIBRARY_SETTINGS,
   LIBRARY_KINDS,
@@ -34,6 +34,11 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
   const [typedPath, setTypedPath] = useState('')
   const [errors, setErrors] = useState<string[]>([])
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const metadata = useQuery({
+    queryKey: queryKeys.metadataHealth,
+    queryFn: api.getMetadataHealth,
+    staleTime: 60_000,
+  })
 
   useEffect(() => {
     dialog.current?.showModal()
@@ -109,7 +114,7 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
           />
         </div>
 
-        <fieldset className={styles.field}>
+        <fieldset className={styles.field} aria-describedby={`${ids.kind}-hint`}>
           <legend>Type</legend>
           <div className={styles.kinds}>
             {LIBRARY_KINDS.map((kind) => (
@@ -126,6 +131,16 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
               </div>
             ))}
           </div>
+          <p id={`${ids.kind}-hint`} className={styles.hint}>
+            {metadata.data?.tmdb === 'off' ? (
+              <>
+                Set <code>TMDB_API_TOKEN</code> in raven's <code>.env</code> for posters and
+                details.
+              </>
+            ) : (
+              'Movies and TV shows get posters and details from TMDB.'
+            )}
+          </p>
         </fieldset>
 
         <fieldset className={styles.field} aria-describedby={ids.folders}>

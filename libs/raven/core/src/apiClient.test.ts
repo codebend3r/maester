@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ApiError, type FetchInit, type FetchResponse, createApiClient } from '@/apiClient'
-import { mediaItem } from '@/test/fixtures'
+import { itemDetails, mediaItem } from '@/test/fixtures'
 
 type Call = { url: string; init?: FetchInit }
 
@@ -179,5 +179,58 @@ describe('playback calls', () => {
     expect(client.streamUrl({ id: 7, mode: 'transcode', start: -3, audio: null })).toBe(
       'http://nas:8484/api/media/7/stream?mode=transcode&start=0',
     )
+  })
+})
+
+describe('the metadata calls', () => {
+  it('fetches an item and checks it against the contract', async () => {
+    const details = itemDetails()
+    const { client, calls } = clientReturning(respond({ body: details }))
+    await expect(client.getItem(1)).resolves.toEqual(details)
+    expect(calls[0]?.url).toBe('http://nas:8484/api/items/1')
+  })
+
+  it('searches TMDB through the server with the year when there is one', async () => {
+    const { client, calls } = clientReturning(respond({ body: [] }))
+    await client.searchMatches({ type: 'movie', query: ' The Matrix ', year: 1999 })
+    expect(calls[0]?.url).toBe(
+      'http://nas:8484/api/match/search?type=movie&query=The%20Matrix&year=1999',
+    )
+  })
+
+  it('saves a match, or the lack of one', async () => {
+    const { client, calls } = clientReturning(respond({ body: mediaItem() }))
+    await client.setMatch({ mediaId: 7, tmdbId: null })
+    expect(calls[0]).toMatchObject({
+      url: 'http://nas:8484/api/media/7/match',
+      init: { method: 'PUT', body: '{"tmdbId":null}' },
+    })
+  })
+
+  it('posts a refresh', async () => {
+    const { client, calls } = clientReturning(respond({ body: itemDetails() }))
+    await client.refreshItem(4)
+    expect(calls[0]).toMatchObject({
+      url: 'http://nas:8484/api/items/4/refresh',
+      init: { method: 'POST' },
+    })
+  })
+
+  it('reads the metadata part of the health check', async () => {
+    const metadata = { tmdb: 'ok', omdb: 'off', pending: 3, error: null, lastOk: null }
+    const { client } = clientReturning(respond({ body: { status: 'ok', metadata } }))
+    await expect(client.getMetadataHealth()).resolves.toEqual(metadata)
+  })
+
+  it('builds versioned image URLs, and none without a version', () => {
+    const { client } = clientReturning(respond({}))
+    expect(client.itemImageUrl({ id: 2, kind: 'poster', version: 'abc' })).toBe(
+      'http://nas:8484/api/items/2/images/poster?v=abc',
+    )
+    expect(client.itemImageUrl({ id: 2, kind: 'backdrop', version: null })).toBeNull()
+    expect(client.photoUrl({ personId: 5, photoVersion: 'x' })).toBe(
+      'http://nas:8484/api/people/5/photo?v=x',
+    )
+    expect(client.candidatePosterUrl('/abc.jpg')).toBe('http://nas:8484/api/images/poster/abc.jpg')
   })
 })

@@ -1,0 +1,183 @@
+import { describe, expect, it } from 'vitest'
+import { readServerConfig } from '@/config'
+import { type MetadataFetch, TmdbClient, TmdbError, mergeCredits } from '@/metadata/tmdbClient'
+import { fakeTmdb, movieBody } from '@/test/fakeTmdb'
+
+const config = (token: string | null = 'secret-token') => ({
+  ...readServerConfig({}),
+  tmdbApiToken: token,
+})
+
+const respond =
+  (answers: Array<() => Response | Promise<Response>>): MetadataFetch =>
+  async () => {
+    const next = answers.shift()
+    if (!next) throw new Error('no more answers')
+    return next()
+  }
+
+const json = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
+  new Response(JSON.stringify(body), { status, headers })
+
+describe('TmdbClient', () => {
+  it('reads a movie with its credits, rating, content rating and pictures', async () => {
+    const tmdb = fakeTmdb({
+      movies: [{ id: 603, title: 'The Matrix', released: '1999-03-31', imdbId: 'tt0133093' }],
+    })
+    const client = new TmdbClient(config(), tmdb.fetch)
+    const movie = await client.movie('603')
+    expect(movie).toMatchObject({
+      type: 'movie',
+      tmdbId: '603',
+      title: 'The Matrix',
+      year: 1999,
+      released: '1999-03-31',
+      contentRating: 'R',
+      runtime: 120,
+      studio: 'Studio One',
+      genres: ['Action', 'Science Fiction'],
+      imdbId: 'tt0133093',
+      images: { poster: '/poster603.jpg', backdrop: '/backdrop603.jpg', still: null },
+      rating: { value: 8.2, votes: 1000 },
+    })
+    expect(movie.credits.map((credit) => [credit.name, credit.job, credit.role])).toEqual([
+      ['Keanu Reeves', 'cast', 'Neo'],
+      ['Laurence Fishburne', 'cast', 'Morpheus'],
+      ['Lilly Wachowski', 'director', 'Director'],
+      ['Lana Wachowski', 'director', 'Director'],
+      ['Lilly Wachowski', 'writer', 'Screenplay'],
+    ])
+  })
+
+  it('sends the token as a bearer token and the language on every call', async () => {
+    const seen: Array<{ url: string; authorization: string | undefined }> = []
+    const client = new TmdbClient(config(), async (url, init) => {
+      seen.push({ url, authorization: init.headers.authorization })
+      return json({ results: [] })
+    })
+    await client.searchMovies({ query: 'The Matrix', year: 1999 })
+    expect(seen[0]?.authorization).toBe('Bearer secret-token')
+    expect(seen[0]?.url).toContain('language=en-US')
+    expect(seen[0]?.url).toContain('query=The+Matrix')
+    expect(seen[0]?.url).toContain('year=1999')
+  })
+
+  it('sends a 32-character API key as api_key instead', async () => {
+    const seen: Array<{ url: string; authorization: string | undefined }> = []
+    const client = new TmdbClient(config('0123456789abcdef0123456789abcdef'), async (url, init) => {
+      seen.push({ url, authorization: init.headers.authorization })
+      return json({ results: [] })
+    })
+    await client.searchMovies({ query: 'Heat', year: null })
+    expect(seen[0]?.authorization).toBeUndefined()
+    expect(seen[0]?.url).toContain('api_key=0123456789abcdef0123456789abcdef')
+  })
+
+  it('drops image paths that are not plain TMDB files', async () => {
+    const client = new TmdbClient(
+      config(),
+      respond([
+        () =>
+          json({
+            ...movieBody({ id: 1, title: 'X', released: '2000-01-01' }),
+            poster_path: '/../../etc/passwd',
+          }),
+      ]),
+    )
+    expect((await client.movie('1')).images.poster).toBeNull()
+  })
+
+  it('says a 404 is not found, and stays healthy', async () => {
+    const client = new TmdbClient(config(), respond([() => json({}, 404)]))
+    await expect(client.movie('9')).rejects.toMatchObject({ kind: 'not-found' })
+    expect(client.state().state).toBe('ok')
+  })
+
+  it('stops calling after a 401 until a restart', async () => {
+    const calls = { count: 0 }
+    const client = new TmdbClient(config(), async () => {
+      calls.count += 1
+      return json({}, 401)
+    })
+    await expect(client.movie('1')).rejects.toMatchObject({ kind: 'unauthorized' })
+    await expect(client.movie('2')).rejects.toBeInstanceOf(TmdbError)
+    expect(calls.count).toBe(1)
+    expect(client.enabled).toBe(false)
+    expect(client.state()).toMatchObject({ state: 'failing' })
+    expect(client.state().error).not.toContain('secret-token')
+  })
+
+  it('waits out a 429 and tries again', async () => {
+    const client = new TmdbClient(
+      config(),
+      respond([() => json({}, 429, { 'retry-after': '0' }), () => json({ results: [] })]),
+    )
+    await expect(client.searchMovies({ query: 'x', year: null })).resolves.toEqual([])
+  })
+
+  it('reports a server error and an unreachable TMDB as failing', async () => {
+    const down = new TmdbClient(
+      config(),
+      respond([
+        () => {
+          throw new TypeError('fetch failed')
+        },
+      ]),
+    )
+    await expect(down.movie('1')).rejects.toMatchObject({ kind: 'unavailable' })
+    expect(down.state()).toMatchObject({ state: 'failing', error: 'TMDB could not be reached.' })
+
+    const slow = new TmdbClient(
+      config(),
+      respond([
+        () => {
+          throw new DOMException('The operation timed out.', 'TimeoutError')
+        },
+      ]),
+    )
+    await expect(slow.movie('1')).rejects.toMatchObject({ kind: 'unavailable' })
+    expect(slow.state().error).toBe('TMDB did not answer within 10 seconds.')
+
+    const broken = new TmdbClient(config(), respond([() => json({}, 503)]))
+    await expect(broken.movie('1')).rejects.toMatchObject({ kind: 'unavailable' })
+  })
+
+  it('is off without a token', () => {
+    const client = new TmdbClient(config(null), respond([]))
+    expect(client.enabled).toBe(false)
+    expect(client.state()).toEqual({ state: 'off', error: null, lastOk: null })
+  })
+
+  it('finds a movie by its IMDb id', async () => {
+    const tmdb = fakeTmdb({
+      movies: [{ id: 603, title: 'The Matrix', released: '1999-03-31', imdbId: 'tt0133093' }],
+    })
+    const client = new TmdbClient(config(), tmdb.fetch)
+    await expect(client.find({ id: 'tt0133093', source: 'imdb_id' })).resolves.toEqual({
+      movies: ['603'],
+      shows: [],
+    })
+  })
+})
+
+describe('mergeCredits', () => {
+  it('keeps ten producers', () => {
+    const producers = Array.from({ length: 12 }, (_, index) => ({
+      tmdbId: String(index),
+      name: `Producer ${index}`,
+      photo: null,
+      job: 'producer' as const,
+      role: 'Producer',
+    }))
+    expect(mergeCredits(producers)).toHaveLength(10)
+  })
+
+  it('joins two roles of one kind', () => {
+    expect(
+      mergeCredits([
+        { tmdbId: '1', name: 'A', photo: null, job: 'writer', role: 'Screenplay' },
+        { tmdbId: '1', name: 'A', photo: null, job: 'writer', role: 'Story' },
+      ]),
+    ).toEqual([{ tmdbId: '1', name: 'A', photo: null, job: 'writer', role: 'Screenplay / Story' }])
+  })
+})

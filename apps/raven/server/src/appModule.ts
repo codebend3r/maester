@@ -4,21 +4,37 @@ import { DatabaseService } from '@/db/database'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import { BrowseController } from '@/fs/browseController'
 import { HealthController } from '@/health/healthController'
+import { ItemsController } from '@/items/itemsController'
+import { MatchController } from '@/items/matchController'
+import { PeopleController } from '@/items/peopleController'
 import { LibrariesController } from '@/libraries/librariesController'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { FavouritesController } from '@/media/favouritesController'
 import { MediaController } from '@/media/mediaController'
 import { MediaRepository } from '@/media/mediaRepository'
+import { ImageCache } from '@/metadata/imageCache'
+import { MetadataRepository } from '@/metadata/metadataRepository'
+import { MetadataService } from '@/metadata/metadataService'
+import { METADATA_FETCH, type MetadataFetch, TmdbClient } from '@/metadata/tmdbClient'
 import { PlaybackController } from '@/playback/playbackController'
 import { SubtitlesService } from '@/playback/subtitlesService'
 import { TracksService } from '@/playback/tracksService'
 import { ScannerService } from '@/scanner/scannerService'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
 
-/** Takes its config as an argument so a test can point it at a temporary data dir. */
+/**
+ * Takes its config as an argument so a test can point it at a temporary data
+ * dir, and the fetch metadata uses so a test can answer for TMDB.
+ */
 @Module({})
 export class AppModule {
-  static register(config: ServerConfig): DynamicModule {
+  static register({
+    config,
+    metadataFetch = (url, init) => fetch(url, init),
+  }: {
+    config: ServerConfig
+    metadataFetch?: MetadataFetch
+  }): DynamicModule {
     return {
       module: AppModule,
       controllers: [
@@ -28,12 +44,20 @@ export class AppModule {
         FavouritesController,
         BrowseController,
         HealthController,
+        ItemsController,
+        MatchController,
+        PeopleController,
       ],
       providers: [
         { provide: SERVER_CONFIG, useValue: config },
+        { provide: METADATA_FETCH, useValue: metadataFetch },
         DatabaseService,
         LibrariesRepository,
+        MetadataRepository,
         MediaRepository,
+        TmdbClient,
+        ImageCache,
+        MetadataService,
         FfmpegService,
         ThumbnailService,
         TracksService,

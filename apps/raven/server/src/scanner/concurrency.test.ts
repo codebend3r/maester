@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { createGate, createTaskQueue, mapWithConcurrency } from '@/scanner/concurrency'
+import {
+  createGate,
+  createRateLimit,
+  createTaskQueue,
+  mapWithConcurrency,
+} from '@/scanner/concurrency'
 
 const tick = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -94,5 +99,47 @@ describe('createTaskQueue', () => {
     queue.cancel('second')
     await queue.idle()
     expect(ran).toEqual(['first'])
+  })
+})
+
+describe('createRateLimit', () => {
+  /** A clock that only moves when the limit sleeps, so the test reads its schedule. */
+  const fakeClock = () => {
+    const clock = { now: 0, slept: [] as number[] }
+    return {
+      clock,
+      now: () => clock.now,
+      sleep: async (ms: number) => {
+        clock.slept.push(ms)
+        clock.now += ms
+      },
+    }
+  }
+
+  it('spaces starts a slot apart', async () => {
+    const { clock, now, sleep } = fakeClock()
+    const limit = createRateLimit({ perSecond: 4, inFlight: 1, now, sleep })
+    const started: number[] = []
+    await Promise.all(
+      [1, 2, 3].map(() =>
+        limit.run(async () => {
+          started.push(clock.now)
+        }),
+      ),
+    )
+    expect(started).toEqual([0, 250, 500])
+  })
+
+  it('halves the rate when told to slow down, until reset', async () => {
+    const { clock, now, sleep } = fakeClock()
+    const limit = createRateLimit({ perSecond: 10, inFlight: 1, now, sleep })
+    limit.slowDown()
+    await limit.run(async () => undefined)
+    await limit.run(async () => undefined)
+    expect(clock.slept).toEqual([200])
+    limit.reset()
+    await limit.run(async () => undefined)
+    await limit.run(async () => undefined)
+    expect(clock.slept).toEqual([200, 200, 100])
   })
 })

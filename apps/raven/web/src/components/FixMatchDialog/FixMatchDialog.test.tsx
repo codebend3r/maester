@@ -1,0 +1,123 @@
+import { afterEach, describe, expect, it, spyOn } from 'bun:test'
+import { screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import type { MediaItem } from '@raven/core'
+import { useState } from 'react'
+import { MediaMenu } from '@/components/MediaMenu/MediaMenu'
+import { api } from '@/lib/api'
+import { itemSummary, matchedMovie, mediaItem } from '@/test/fixtures'
+import { renderWithProviders } from '@/test/render'
+
+const Harness = ({
+  media,
+  onMatched,
+}: {
+  media: MediaItem
+  onMatched: (media: MediaItem) => void
+}) => {
+  const [open, setOpen] = useState(false)
+  return (
+    <MediaMenu
+      media={media}
+      open={open}
+      onOpenChange={setOpen}
+      matchType="movie"
+      onMatched={onMatched}
+    />
+  )
+}
+
+describe('Fix match', () => {
+  const spies = {
+    search: spyOn(api, 'searchMatches'),
+    setMatch: spyOn(api, 'setMatch'),
+  }
+
+  afterEach(() => {
+    spies.search.mockReset()
+    spies.setMatch.mockReset()
+  })
+
+  const unmatched = mediaItem({ title: 'Busboys', year: 2026, match: 'unmatched' })
+
+  it('searches with the parsed title and year, and points the file at the choice', async () => {
+    const searched: Array<{ query: string; year?: number | null }> = []
+    spies.search.mockImplementation(async (request) => {
+      searched.push({ query: request.query, year: request.year })
+      return [
+        {
+          tmdbId: '1001',
+          title: 'Busboys',
+          year: 2026,
+          overview: 'Two busboys.',
+          poster: '/b.jpg',
+        },
+        { tmdbId: '1002', title: 'Busboys', year: 1998, overview: null, poster: null },
+      ]
+    })
+    const chosen: Array<string | null> = []
+    spies.setMatch.mockImplementation(async ({ tmdbId }) => {
+      chosen.push(tmdbId)
+      return matchedMovie({ match: 'manual' })
+    })
+    const matched: MediaItem[] = []
+    renderWithProviders(<Harness media={unmatched} onMatched={(media) => matched.push(media)} />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Options for Busboys (2026)' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Fix match' }))
+    expect(screen.getByRole('searchbox', { name: 'Title' })).toHaveValue('Busboys')
+    expect(screen.getByRole('textbox', { name: 'Year' })).toHaveValue('2026')
+    await userEvent.click(await screen.findByRole('button', { name: 'Choose Busboys (1998)' }))
+
+    expect(searched).toEqual([{ query: 'Busboys', year: 2026 }])
+    expect(chosen).toEqual(['1002'])
+    expect(matched.map((media) => media.match)).toEqual(['manual'])
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('searches again with what the viewer types', async () => {
+    const searched: string[] = []
+    spies.search.mockImplementation(async (request) => {
+      searched.push(`${request.query}|${request.year ?? ''}`)
+      return []
+    })
+    renderWithProviders(<Harness media={unmatched} onMatched={() => undefined} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Options for Busboys (2026)' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Fix match' }))
+    await screen.findByText(/TMDB has nothing by that name/)
+    await userEvent.clear(screen.getByRole('searchbox', { name: 'Title' }))
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Title' }), 'Bus Boys')
+    await userEvent.clear(screen.getByRole('textbox', { name: 'Year' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Search' }))
+    await screen.findByText(/TMDB has nothing by that name/)
+    expect(searched).toEqual(['Busboys|2026', 'Bus Boys|'])
+  })
+
+  it('says a file is not a movie at all', async () => {
+    spies.search.mockImplementation(async () => [])
+    const chosen: Array<string | null> = []
+    spies.setMatch.mockImplementation(async ({ tmdbId }) => {
+      chosen.push(tmdbId)
+      return { ...unmatched, match: 'unmatched' }
+    })
+    renderWithProviders(<Harness media={unmatched} onMatched={() => undefined} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Options for Busboys (2026)' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Fix match' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Not a movie' }))
+    expect(chosen).toEqual([null])
+  })
+
+  it('offers Refresh details only once a file is matched', async () => {
+    renderWithProviders(
+      <Harness media={matchedMovie({ item: itemSummary() })} onMatched={() => undefined} />,
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Options for Busboys (2026)' }))
+    expect(screen.getByRole('menuitem', { name: 'Refresh details' })).toBeInTheDocument()
+  })
+
+  it('offers neither in a library that does not match its files', async () => {
+    renderWithProviders(<MediaMenu media={mediaItem()} open onOpenChange={() => undefined} />)
+    expect(screen.queryByRole('menuitem', { name: 'Fix match' })).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: 'Refresh details' })).toBeNull()
+  })
+})

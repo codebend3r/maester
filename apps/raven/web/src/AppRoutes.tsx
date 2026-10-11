@@ -5,6 +5,7 @@ import { FavouritesPage } from '@/pages/FavouritesPage/FavouritesPage'
 import { HistoryPage } from '@/pages/HistoryPage/HistoryPage'
 import { LibrariesPage } from '@/pages/LibrariesPage/LibrariesPage'
 import { LibraryPage } from '@/pages/LibraryPage/LibraryPage'
+import { MoviePage } from '@/pages/MoviePage/MoviePage'
 import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
 import { WatchPage } from '@/pages/WatchPage/WatchPage'
 
@@ -14,6 +15,7 @@ export const AppRoutes = () => (
       <Route index element={<LibrariesPage />} />
       <Route path="libraries/:id" element={<LibraryPage />} />
       <Route path="libraries/:id/history" element={<HistoryPage />} />
+      <Route path="movies/:id" element={<MoviePage />} />
       <Route path="favourites" element={<FavouritesPage />} />
       <Route path="design" element={<DesignPage />} />
       <Route path="*" element={<NotFoundPage />} />

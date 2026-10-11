@@ -1,5 +1,5 @@
 import type { CanPlay } from '@/playback'
-import type { Library, MediaItem } from '@/types'
+import type { ItemDetails, ItemSummary, Library, MediaItem } from '@/types'
 
 export const library = (overrides: Partial<Library> = {}): Library => ({
   id: 1,
@@ -49,6 +49,47 @@ export const mediaItem = (overrides: Partial<MediaItem> = {}): MediaItem => ({
   position: 0,
   favourite: false,
   addedAt: '2026-09-27T00:00:00.000Z',
+  match: 'off',
+  year: null,
+  edition: null,
+  item: null,
+  versions: 1,
+  ...overrides,
+})
+
+export const itemSummary = (overrides: Partial<ItemSummary> = {}): ItemSummary => ({
+  id: 1,
+  type: 'movie',
+  title: 'The Matrix',
+  year: 1999,
+  show: null,
+  season: null,
+  episode: null,
+  posterVersion: 'f89JxwBCi9N',
+  ...overrides,
+})
+
+export const itemDetails = (overrides: Partial<ItemDetails> = {}): ItemDetails => ({
+  ...itemSummary(),
+  tmdbId: '603',
+  imdbId: 'tt0133093',
+  originalTitle: 'The Matrix',
+  tagline: 'Welcome to the Real World.',
+  summary: 'Set in the 22nd century, The Matrix tells the story of a computer hacker.',
+  contentRating: 'R',
+  released: '1999-03-31',
+  ended: null,
+  runtime: 136,
+  studio: 'Warner Bros. Pictures',
+  genres: ['Action', 'Science Fiction'],
+  backdropVersion: 'tlm8UkiQsit',
+  ratings: [{ source: 'tmdb', kind: 'audience', value: 8.2, votes: 26_000 }],
+  credits: [
+    { personId: 1, name: 'Keanu Reeves', job: 'cast', role: 'Neo', photoVersion: 'abc' },
+    { personId: 2, name: 'Lana Wachowski', job: 'director', role: 'Director', photoVersion: null },
+  ],
+  versions: [mediaItem({ match: 'matched', year: 1999, item: itemSummary() })],
+  children: [],
   ...overrides,
 })
 

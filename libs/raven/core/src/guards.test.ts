@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { isHistoryEntry, isLibrary, isMediaItem } from '@/guards'
-import { library, mediaItem } from '@/test/fixtures'
+import {
+  isCredit,
+  isHistoryEntry,
+  isItemDetails,
+  isItemSummary,
+  isLibrary,
+  isMatchCandidate,
+  isMediaItem,
+  isMetadataHealth,
+  isRating,
+} from '@/guards'
+import { itemDetails, itemSummary, library, mediaItem } from '@/test/fixtures'
 
 describe('isMediaItem', () => {
   it('accepts an item that carries its favourite flag', () => {
@@ -83,6 +93,69 @@ describe('isHistoryEntry', () => {
         plays: 2,
         furthest: 5000,
       }),
+    ).toBe(false)
+  })
+})
+
+describe('the metadata guards', () => {
+  it('accepts a matched file with its item', () => {
+    expect(
+      isMediaItem(mediaItem({ match: 'matched', year: 1999, item: itemSummary(), versions: 2 })),
+    ).toBe(true)
+  })
+
+  it('rejects a file whose match state is unknown', () => {
+    expect(isMediaItem({ ...mediaItem(), match: 'guessed' })).toBe(false)
+  })
+
+  it('rejects a file without its versions count', () => {
+    const { versions: _versions, ...without } = mediaItem()
+    expect(isMediaItem(without)).toBe(false)
+  })
+
+  it('accepts an episode summary with its show', () => {
+    expect(
+      isItemSummary(
+        itemSummary({
+          type: 'episode',
+          title: 'Half Loop',
+          show: { id: 4, title: 'Severance' },
+          season: 1,
+          episode: 2,
+        }),
+      ),
+    ).toBe(true)
+  })
+
+  it('accepts item details and refuses a bad rating or credit', () => {
+    expect(isItemDetails(itemDetails())).toBe(true)
+    expect(
+      isItemDetails({
+        ...itemDetails(),
+        ratings: [{ source: 'letterboxd', kind: 'audience', value: 4, votes: 1 }],
+      }),
+    ).toBe(false)
+    expect(
+      isCredit({ personId: 1, name: 'X', job: 'gaffer', role: null, photoVersion: null }),
+    ).toBe(false)
+    expect(isRating({ source: 'imdb', kind: 'audience', value: 7.5, votes: null })).toBe(true)
+  })
+
+  it('accepts match candidates and the metadata health', () => {
+    expect(
+      isMatchCandidate({
+        tmdbId: '603',
+        title: 'The Matrix',
+        year: 1999,
+        overview: null,
+        poster: null,
+      }),
+    ).toBe(true)
+    expect(
+      isMetadataHealth({ tmdb: 'off', omdb: 'off', pending: 0, error: null, lastOk: null }),
+    ).toBe(true)
+    expect(
+      isMetadataHealth({ tmdb: 'broken', omdb: 'off', pending: 0, error: null, lastOk: null }),
     ).toBe(false)
   })
 })

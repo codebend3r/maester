@@ -1,4 +1,4 @@
-import type { MediaItem } from '@raven/core'
+import { type MediaItem, mediaLabel } from '@raven/core'
 import { useState } from 'react'
 import { Button, ButtonLink } from '@/components/Button/Button'
 import styles from '@/components/Player/Player.module.scss'
@@ -40,7 +40,7 @@ export const Unplayable = ({
           Library
         </ButtonLink>
         <h1 id="unplayable-title" className={styles.panelTitle}>
-          {media.title}
+          {mediaLabel(media)}
         </h1>
         <p>This video can't play in this browser.</p>
         <ul className={styles.problems}>

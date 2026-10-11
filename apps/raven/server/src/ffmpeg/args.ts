@@ -299,3 +299,29 @@ export const subtitleFileArgs = ({
   'webvtt',
   output,
 ]
+
+/**
+ * A poster or backdrop beside the media, scaled down to `width` (never up)
+ * and saved as a JPEG for the image cache. The original is only read.
+ */
+export const imageScaleArgs = ({
+  input,
+  output,
+  width,
+}: {
+  input: string
+  output: string
+  width: number
+}): string[] => [
+  ...QUIET,
+  '-y',
+  '-i',
+  input,
+  '-frames:v',
+  '1',
+  '-vf',
+  `scale=w='min(${width},iw)':h=-2`,
+  '-q:v',
+  '3',
+  output,
+]
