@@ -12,12 +12,19 @@ import {
   Res,
   ServiceUnavailableException,
 } from '@nestjs/common'
-import { type MatchCandidate, type MediaItem, isRecord, isString } from '@raven/core'
+import {
+  type ChoosableImageKind,
+  isMatchChoice,
+  isMatchItemType,
+  isMatchedKind,
+  type MatchCandidate,
+  type MediaItem,
+} from '@raven/core'
 import type { FastifyReply } from 'fastify'
 import { sendImage } from '@/items/sendImage'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
-import { PrivateBy } from '@/lock/lockGuard'
-import { MediaRepository, toMediaItem } from '@/media/mediaRepository'
+import { PrivateBy, Public } from '@/lock/lockGuard'
+import { MediaRepository } from '@/media/mediaRepository'
 import { ImageCache } from '@/metadata/imageCache'
 import { MetadataService } from '@/metadata/metadataService'
 import { TMDB_IMAGE_PATH, TmdbClient, TmdbError } from '@/metadata/tmdbClient'
@@ -50,8 +57,7 @@ export class MatchController {
     @Query('query') query: string | undefined,
     @Query('year') year: string | undefined,
   ): Promise<MatchCandidate[]> {
-    if (type !== 'movie' && type !== 'show')
-      throw new BadRequestException('type must be movie or show')
+    if (!isMatchItemType(type)) throw new BadRequestException('type must be movie or show')
     if (!query?.trim()) throw new BadRequestException('Search for a title.')
     this.requireTmdb()
     const parsedYear = Number.parseInt(year ?? '', 10)
@@ -69,12 +75,14 @@ export class MatchController {
   }
 
   /** A search result's poster, through the cache, so the browser never talks to TMDB. */
+  @Public()
   @Get('images/poster/:file')
   async candidatePoster(@Param('file') file: string, @Res() reply: FastifyReply): Promise<void> {
     await this.candidate({ file, use: 'poster', reply })
   }
 
   /** A backdrop Edit images offers, through the cache. */
+  @Public()
   @Get('images/backdrop/:file')
   async candidateBackdrop(@Param('file') file: string, @Res() reply: FastifyReply): Promise<void> {
     await this.candidate({ file, use: 'backdrop', reply })
@@ -86,7 +94,7 @@ export class MatchController {
     reply,
   }: {
     file: string
-    use: 'poster' | 'backdrop'
+    use: ChoosableImageKind
     reply: FastifyReply
   }): Promise<void> {
     const path = `/${file}`
@@ -104,14 +112,9 @@ export class MatchController {
   async setMatch(@Param('id', ParseIntPipe) id: number, @Body() body: unknown): Promise<MediaItem> {
     const record = this.media.get(id)
     if (!record) throw new NotFoundException(`No media ${id}`)
-    if (
-      !isRecord(body) ||
-      !(body.tmdbId === null || (isString(body.tmdbId) && /^\d+$/.test(body.tmdbId)))
-    ) {
-      throw new BadRequestException('tmdbId must be a TMDB id or null')
-    }
-    const kind = this.libraries.get(record.libraryId)?.settings.kind ?? 'other'
-    if (kind === 'other') {
+    if (!isMatchChoice(body)) throw new BadRequestException('tmdbId must be a TMDB id or null')
+    const kind = this.libraries.get(record.libraryId)?.settings.kind
+    if (kind == null || !isMatchedKind(kind)) {
       throw new BadRequestException('Only files in a Movies or TV shows library can be matched.')
     }
     const tmdbId = body.tmdbId
@@ -119,6 +122,6 @@ export class MatchController {
     await this.service.fixMatch({ mediaId: id, tmdbId }).catch(tmdbFailure)
     const updated = this.media.get(id)
     if (!updated) throw new NotFoundException(`No media ${id}`)
-    return toMediaItem(updated)
+    return updated
   }
 }
