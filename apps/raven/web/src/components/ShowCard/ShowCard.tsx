@@ -1,4 +1,4 @@
-import { type ShowEntry, type ShownRatings, episodeCode, pickScore } from '@raven/core'
+import { type ShowEntry, type RatingSource, episodeCode, pickScore } from '@raven/core'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Icon } from '@/components/Icon/Icon'
@@ -17,7 +17,7 @@ export const ShowCard = ({
   ratingsSource = 'tmdb',
 }: {
   entry: ShowEntry
-  ratingsSource?: ShownRatings
+  ratingsSource?: RatingSource
 }) => {
   const { show, next } = entry
   const score = pickScore({ ratings: show.ratings, source: ratingsSource })
@@ -78,15 +78,12 @@ export const ShowGrid = ({
   shows,
   busy = false,
   ratingsSource = 'tmdb',
-  labelledBy,
 }: {
   shows: ShowEntry[]
   busy?: boolean
-  ratingsSource?: ShownRatings
-  /** The heading naming this grid, when it is one bucket of two. */
-  labelledBy?: string
+  ratingsSource?: RatingSource
 }) => (
-  <ul className={styles.grid} aria-busy={busy} aria-labelledby={labelledBy}>
+  <ul className={styles.grid} aria-busy={busy}>
     {shows.map((entry) => (
       <ShowCard key={entry.show.id} entry={entry} ratingsSource={ratingsSource} />
     ))}

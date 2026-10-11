@@ -6,7 +6,7 @@ import { api } from '@/lib/api'
 import { ShowPage } from '@/pages/ShowPage/ShowPage'
 import { itemDetails } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
-import { EPISODE_TWO, SEASON_ONE, SEVERANCE } from '@/test/tv'
+import { EPISODE_TWO, SEVERANCE } from '@/test/tv'
 
 const Watching = () => <p>Watching {useParams().id}</p>
 const Elsewhere = () => <p>Show {useParams().id}</p>
@@ -20,7 +20,7 @@ describe('ShowPage', () => {
   }
 
   const open = () => {
-    spies.item.mockImplementation(async (id) => (id === 5 ? SEASON_ONE : SEVERANCE))
+    spies.item.mockImplementation(async () => SEVERANCE)
     spies.next.mockImplementation(async () => EPISODE_TWO)
     renderWithProviders(
       <Routes>
@@ -71,6 +71,7 @@ describe('ShowPage', () => {
     const season = await screen.findByRole('link', { name: /Season 1/ })
     expect(season).toHaveAttribute('href', '/shows/4/seasons/1')
     expect(await screen.findByText('2 episodes')).toBeInTheDocument()
+    expect(spies.item.mock.calls.map(([id]) => id)).toEqual([4])
   })
 
   it('re-points the whole show from Fix match', async () => {

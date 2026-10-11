@@ -10,11 +10,6 @@
   padding-left: 0;
 }
 
-.message {
-  max-width: var(--measure);
-  color: var(--color-lichen);
-}
-
 .episodes {
   display: grid;
 }
@@ -66,15 +61,7 @@
 // Where playback stopped: the one red mark on the row.
 .resume {
   align-self: end;
-  display: grid;
   height: 3px;
-  background: rgb(0 0 0 / 45%);
-}
-
-.resumeFill {
-  display: block;
-  height: 100%;
-  background: var(--color-leaf-bright);
 }
 
 .body {

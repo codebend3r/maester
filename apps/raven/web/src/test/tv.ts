@@ -1,5 +1,22 @@
-import type { ItemDetails } from '@raven/core'
+import type { EpisodeSummary, ItemDetails, MediaItem, SeasonSummary } from '@raven/core'
 import { itemDetails, itemSummary, mediaItem } from '@/test/fixtures'
+
+const SEASON_ONE_CARD = itemSummary({
+  id: 5,
+  type: 'season',
+  title: 'Season 1',
+  year: 2022,
+  show: { id: 4, title: 'Severance' },
+  season: 1,
+  posterVersion: 'p5',
+})
+
+/** Season 1 as its show's page lists it. */
+export const SEASON_ONE_SUMMARY: SeasonSummary = {
+  ...SEASON_ONE_CARD,
+  type: 'season',
+  episodeCount: 2,
+}
 
 /** A show, its first season and two episodes, as the item routes would answer. */
 export const SEVERANCE: ItemDetails = itemDetails({
@@ -18,17 +35,7 @@ export const SEVERANCE: ItemDetails = itemDetails({
     { personId: 11, name: 'Dan Erickson', job: 'creator', role: 'Creator', photoVersion: null },
   ],
   versions: [],
-  children: [
-    itemSummary({
-      id: 5,
-      type: 'season',
-      title: 'Season 1',
-      year: 2022,
-      show: { id: 4, title: 'Severance' },
-      season: 1,
-      posterVersion: 'p5',
-    }),
-  ],
+  children: [SEASON_ONE_SUMMARY],
 })
 
 export const EPISODE_ONE = mediaItem({
@@ -68,8 +75,19 @@ export const EPISODE_TWO = mediaItem({
   }),
 })
 
+/** An episode as its season's page lists it: its row, and the file Play starts. */
+export const episodeRow = (media: MediaItem): EpisodeSummary => ({
+  ...(media.item ?? itemSummary()),
+  type: 'episode',
+  summary: `${media.item?.title ?? ''} is an episode.`,
+  released: '2022-02-18',
+  runtime: 55,
+  stillVersion: 'still1',
+  primary: media,
+})
+
 export const SEASON_ONE: ItemDetails = itemDetails({
-  ...SEVERANCE.children[0],
+  ...SEASON_ONE_CARD,
   tmdbId: '134430',
   tagline: null,
   summary: 'The first season.',
@@ -82,7 +100,7 @@ export const SEASON_ONE: ItemDetails = itemDetails({
   ratings: [],
   credits: [],
   versions: [],
-  children: [EPISODE_ONE.item, EPISODE_TWO.item].flatMap((item) => item ?? []),
+  children: [EPISODE_ONE, EPISODE_TWO].map(episodeRow),
 })
 
 export const episodeDetails = (media: typeof EPISODE_ONE): ItemDetails =>

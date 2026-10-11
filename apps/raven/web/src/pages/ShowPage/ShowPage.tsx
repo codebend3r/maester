@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
-import { ApiError, type ItemDetails, type ItemSummary, episodeCode } from '@raven/core'
+import { type ItemDetails, type SeasonSummary, episodeCode } from '@raven/core'
 import { useId, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Button, ButtonLink } from '@/components/Button/Button'
 import { CastRow } from '@/components/CastRow/CastRow'
 import { FixMatchDialog } from '@/components/FixMatchDialog/FixMatchDialog'
@@ -9,35 +9,21 @@ import { ImageEditor } from '@/components/ImageEditor/ImageEditor'
 import { ItemHeader } from '@/components/ItemHeader/ItemHeader'
 import { MetadataEditor } from '@/components/MetadataEditor/MetadataEditor'
 import { ReviewCards } from '@/components/ReviewCards/ReviewCards'
+import { RouteState } from '@/components/RouteState/RouteState'
 import { Summary } from '@/components/Summary/Summary'
 import { TmdbCredit } from '@/components/TmdbCredit/TmdbCredit'
 import { api } from '@/lib/api'
-import { createdBy } from '@/lib/itemFacts'
-import { itemPath, showYears } from '@/lib/itemLinks'
-import { queryKeys } from '@/lib/queryClient'
-import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
+import { createdBy, showFacts } from '@/lib/itemFacts'
+import { itemPath, watchLink } from '@/lib/itemLinks'
+import { nextEpisodeQuery } from '@/lib/queries'
+import { useRouteItem } from '@/lib/routeQuery'
 import styles from '@/pages/ShowPage/ShowPage.module.scss'
 
-/** "2022 to now", the network, and up to three genres. */
-export const showFacts = (details: ItemDetails): string[] =>
-  [
-    showYears({
-      year: details.year,
-      endedYear: details.ended == null ? null : Number(details.ended.slice(0, 4)) || null,
-    }),
-    details.studio,
-    ...details.genres.slice(0, 3),
-  ].filter((fact): fact is string => fact != null)
-
 /** One season in the row: its poster, name and how many episodes are on disk. */
-const SeasonCard = ({ season, show }: { season: ItemSummary; show: ItemDetails }) => {
-  const details = useQuery({
-    queryKey: queryKeys.item(season.id),
-    queryFn: () => api.getItem(season.id),
-  })
+const SeasonCard = ({ season, show }: { season: SeasonSummary; show: ItemDetails }) => {
   const poster = api.itemImageUrl({ id: season.id, kind: 'poster', version: season.posterVersion })
   const to = itemPath(season) ?? `/shows/${show.id}`
-  const count = details.data?.children.length
+  const count = season.episodeCount
   return (
     <li className={styles.season}>
       <Link to={to} className={styles.seasonLink}>
@@ -49,11 +35,9 @@ const SeasonCard = ({ season, show }: { season: ItemSummary; show: ItemDetails }
           )}
         </span>
         <span className={styles.seasonTitle}>{season.title}</span>
-        {count != null && (
-          <span className={styles.seasonCount}>
-            {count} {count === 1 ? 'episode' : 'episodes'}
-          </span>
-        )}
+        <span className={styles.seasonCount}>
+          {count} {count === 1 ? 'episode' : 'episodes'}
+        </span>
       </Link>
     </li>
   )
@@ -65,12 +49,10 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
   const [fixing, setFixing] = useState(false)
   const [editingImages, setEditingImages] = useState(false)
   const [editingMetadata, setEditingMetadata] = useState(false)
-  const next = useQuery({
-    queryKey: queryKeys.nextEpisode(details.id),
-    queryFn: () => api.nextEpisode(details.id),
-  })
+  const next = useQuery(nextEpisodeQuery(details.id))
   const libraryId = next.data?.libraryId ?? details.versions[0]?.libraryId
   const code = next.data?.item ? episodeCode(next.data.item) : null
+  const seasons = details.children.flatMap((child) => (child.type === 'season' ? [child] : []))
 
   return (
     <article className={styles.page} aria-labelledby={ids.title}>
@@ -101,12 +83,7 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
         })}
       >
         {next.data && (
-          <ButtonLink
-            tone="primary"
-            icon="play"
-            to={`/watch/${next.data.id}`}
-            state={{ media: next.data }}
-          >
+          <ButtonLink tone="primary" icon="play" {...watchLink(next.data)}>
             {code ? `Play ${code}` : 'Play'}
           </ButtonLink>
         )}
@@ -147,13 +124,13 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
 
       <Summary tagline={details.tagline} summary={details.summary} />
 
-      {details.children.length > 0 && (
+      {seasons.length > 0 && (
         <section className={styles.seasons} aria-labelledby={ids.seasons}>
           <h2 id={ids.seasons} className={styles.heading}>
             Seasons
           </h2>
           <ul className={styles.seasonRow}>
-            {details.children.map((season) => (
+            {seasons.map((season) => (
               <SeasonCard key={season.id} season={season} show={details} />
             ))}
           </ul>
@@ -185,24 +162,7 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
 
 /** `/shows/:id`: a show's backdrop, poster, creator, years, network, seasons and people. */
 export const ShowPage = () => {
-  const params = useParams()
-  const id = Number(params.id)
-  const item = useQuery({
-    queryKey: queryKeys.item(id),
-    queryFn: () => api.getItem(id),
-    enabled: Number.isInteger(id),
-  })
-
-  const missing = item.error instanceof ApiError && item.error.status === 404
-  if (!Number.isInteger(id) || missing) return <NotFoundPage />
-  if (item.isError) {
-    return (
-      <p className={styles.message} role="alert">
-        {item.error.message}
-      </p>
-    )
-  }
-  if (!item.data) return <p className={styles.message}>Opening the show</p>
-  if (item.data.type !== 'show') return <NotFoundPage />
-  return <ShowView details={item.data} />
+  const page = useRouteItem('show')
+  if (page.state !== 'ready') return <RouteState state={page} noun="show" />
+  return <ShowView details={page.data} />
 }

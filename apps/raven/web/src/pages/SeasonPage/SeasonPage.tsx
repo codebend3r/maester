@@ -1,34 +1,35 @@
 import { useQuery } from '@tanstack/react-query'
-import { ApiError, type ItemDetails, type ItemSummary, formatRuntime } from '@raven/core'
+import type { EpisodeSummary, ItemDetails } from '@raven/core'
 import { useId } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { ButtonLink } from '@/components/Button/Button'
 import { Icon } from '@/components/Icon/Icon'
 import { ItemHeader } from '@/components/ItemHeader/ItemHeader'
+import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
+import { RouteState } from '@/components/RouteState/RouteState'
 import { Summary } from '@/components/Summary/Summary'
 import { TmdbCredit } from '@/components/TmdbCredit/TmdbCredit'
 import { api } from '@/lib/api'
-import { formatAirDate } from '@/lib/itemFacts'
-import { progressOf } from '@/lib/mediaProgress'
-import { queryKeys } from '@/lib/queryClient'
+import { formatAirDate, runtimeFact } from '@/lib/itemFacts'
+import { watchLink } from '@/lib/itemLinks'
+import { itemQuery } from '@/lib/queries'
+import { routeState, useRouteId } from '@/lib/routeQuery'
 import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
 import styles from '@/pages/SeasonPage/SeasonPage.module.scss'
 
 /** One episode on disk: its still, number and title, air date and length, two lines of summary, and Play. */
-const EpisodeRow = ({ episode }: { episode: ItemSummary }) => {
-  const details = useQuery({
-    queryKey: queryKeys.item(episode.id),
-    queryFn: () => api.getItem(episode.id),
-  })
-  const file =
-    details.data?.versions.find((version) => version.position > 0) ?? details.data?.versions[0]
+const EpisodeRow = ({ episode }: { episode: EpisodeSummary }) => {
+  const file = episode.primary ?? undefined
+  // The still, from TMDB or beside the file; else a frame of the file itself.
   const picture =
-    stillUrl({ episode, details: details.data }) ?? (file ? api.thumbnailUrl(file) : null)
-  const progress = file ? progressOf(file) : 0
+    episode.stillVersion == null
+      ? file
+        ? api.thumbnailUrl(file)
+        : null
+      : api.itemImageUrl({ id: episode.id, kind: 'still', version: episode.stillVersion })
   const facts = [
-    formatAirDate(details.data?.released ?? null),
-    formatRuntime(file?.duration ?? null) ??
-      (details.data?.runtime == null ? null : formatRuntime(details.data.runtime * 60)),
+    formatAirDate(episode.released),
+    runtimeFact({ file, runtime: episode.runtime }),
   ].filter((fact): fact is string => fact != null)
   const number = episode.episode == null ? '' : `${episode.episode}. `
 
@@ -45,11 +46,7 @@ const EpisodeRow = ({ episode }: { episode: ItemSummary }) => {
         ) : (
           <span className={styles.stillPlaceholder}>{episode.episode ?? ''}</span>
         )}
-        {progress > 0 && (
-          <span className={styles.resume}>
-            <span className={styles.resumeFill} style={{ width: `${progress * 100}%` }} />
-          </span>
-        )}
+        {file && <ResumeBar media={file} className={styles.resume} />}
       </Link>
       <div className={styles.body}>
         <Link to={`/episodes/${episode.id}`} className={styles.title}>
@@ -63,16 +60,11 @@ const EpisodeRow = ({ episode }: { episode: ItemSummary }) => {
             ))}
           </span>
         )}
-        {details.data?.summary && <p className={styles.overview}>{details.data.summary}</p>}
-        {progress > 0 && <span className="visually-hidden">Partly watched</span>}
+        {episode.summary && <p className={styles.overview}>{episode.summary}</p>}
+        {file && <PartlyWatched media={file} />}
       </div>
       {file && (
-        <Link
-          to={`/watch/${file.id}`}
-          state={{ media: file }}
-          className={styles.play}
-          aria-label={`Play ${episode.title}`}
-        >
+        <Link {...watchLink(file)} className={styles.play} aria-label={`Play ${episode.title}`}>
           <Icon name="play" size={16} />
         </Link>
       )}
@@ -80,21 +72,10 @@ const EpisodeRow = ({ episode }: { episode: ItemSummary }) => {
   )
 }
 
-/** The episode's still from TMDB or beside the file; null until its page has loaded. */
-const stillUrl = ({
-  episode,
-  details,
-}: {
-  episode: ItemSummary
-  details: ItemDetails | undefined
-}): string | null =>
-  details?.backdropVersion == null
-    ? null
-    : api.itemImageUrl({ id: episode.id, kind: 'still', version: details.backdropVersion })
-
 const SeasonView = ({ show, season }: { show: ItemDetails; season: ItemDetails }) => {
   const ids = { title: useId(), episodes: useId() }
-  const count = season.children.length
+  const episodes = season.children.flatMap((child) => (child.type === 'episode' ? [child] : []))
+  const count = episodes.length
   return (
     <article className={styles.page} aria-labelledby={ids.title}>
       <ButtonLink to={`/shows/${show.id}`} icon="back" className={styles.back}>
@@ -126,7 +107,7 @@ const SeasonView = ({ show, season }: { show: ItemDetails; season: ItemDetails }
           Episodes
         </h2>
         <ol className={styles.list}>
-          {season.children.map((episode) => (
+          {episodes.map((episode) => (
             <EpisodeRow key={episode.id} episode={episode} />
           ))}
         </ol>
@@ -139,33 +120,16 @@ const SeasonView = ({ show, season }: { show: ItemDetails; season: ItemDetails }
 
 /** `/shows/:id/seasons/:number`: a season's poster and summary, then its episodes on disk in order. */
 export const SeasonPage = () => {
-  const params = useParams()
-  const showId = Number(params.id)
-  const number = Number(params.number)
-  const show = useQuery({
-    queryKey: queryKeys.item(showId),
-    queryFn: () => api.getItem(showId),
-    enabled: Number.isInteger(showId),
-  })
-  const seasonSummary = show.data?.children.find((child) => child.season === number)
-  const season = useQuery({
-    queryKey: queryKeys.item(seasonSummary?.id ?? 0),
-    queryFn: () => api.getItem(seasonSummary?.id ?? 0),
-    enabled: seasonSummary != null,
-  })
+  const showId = useRouteId()
+  const number = useRouteId('number')
+  const showQuery = useQuery(itemQuery(showId))
+  const summary = showQuery.data?.children.find((child) => child.season === number)
+  const seasonQuery = useQuery(itemQuery(summary?.id ?? null))
 
-  const missing =
-    (show.error instanceof ApiError && show.error.status === 404) ||
-    (show.isSuccess && seasonSummary == null)
-  if (!Number.isInteger(showId) || !Number.isInteger(number) || missing) return <NotFoundPage />
-  const error = show.error ?? season.error
-  if (error) {
-    return (
-      <p className={styles.message} role="alert">
-        {error.message}
-      </p>
-    )
-  }
-  if (!show.data || !season.data) return <p className={styles.message}>Opening the season</p>
+  const show = routeState({ id: number == null ? null : showId, query: showQuery })
+  if (show.state !== 'ready') return <RouteState state={show} noun="season" />
+  if (!summary) return <NotFoundPage />
+  const season = routeState({ id: summary.id, query: seasonQuery })
+  if (season.state !== 'ready') return <RouteState state={season} noun="season" />
   return <SeasonView show={show.data} season={season.data} />
 }
