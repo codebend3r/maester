@@ -96,6 +96,112 @@ export type MediaItem = {
   position: number
   favourite: boolean
   addedAt: string
+  /** How far matching got: see `MatchState`. */
+  match: MatchState
+  /** The year the name gives, in a Movies or TV shows library; null elsewhere. */
+  year: number | null
+  /** Plex's `{edition-...}` from the name. */
+  edition: string | null
+  /** The movie or episode this file is, once matched. */
+  item: ItemSummary | null
+  /** How many files in its library are the same movie, this one included; 1 for anything else. */
+  versions: number
+}
+
+/**
+ * `pending` waits for matching, `matched` found its item by itself,
+ * `manual` was chosen with Fix match, `unmatched` found nothing sure, and
+ * `off` is a library that is not Movies or TV shows, or an extra.
+ */
+export type MatchState = 'pending' | 'matched' | 'manual' | 'unmatched' | 'off'
+
+export type ItemType = 'movie' | 'show' | 'season' | 'episode'
+
+/** What a card needs to show a movie, show, season or episode. */
+export type ItemSummary = {
+  id: number
+  type: ItemType
+  title: string
+  year: number | null
+  /** For seasons and episodes: the show they belong to. */
+  show: { id: number; title: string } | null
+  season: number | null
+  episode: number | null
+  /** Changes whenever the poster does; null when there is none. */
+  posterVersion: string | null
+}
+
+export type RatingSource = 'tmdb' | 'imdb' | 'rottenTomatoes' | 'metacritic'
+
+export type Rating = {
+  source: RatingSource
+  /** Rotten Tomatoes and Metacritic are critics; TMDB and IMDb are audiences. */
+  kind: 'critic' | 'audience'
+  /** Out of 10. */
+  value: number
+  votes: number | null
+}
+
+export type CreditJob = 'cast' | 'guest' | 'director' | 'writer' | 'creator' | 'producer'
+
+export type Credit = {
+  personId: number
+  name: string
+  job: CreditJob
+  /** The character, or the job in full: "Screenplay", "Novel". */
+  role: string | null
+  photoVersion: string | null
+}
+
+/** Everything a movie, show, season or episode page shows. */
+export type ItemDetails = ItemSummary & {
+  tmdbId: string
+  imdbId: string | null
+  originalTitle: string | null
+  tagline: string | null
+  summary: string | null
+  contentRating: string | null
+  released: string | null
+  ended: string | null
+  /** Minutes, from TMDB; pages prefer the file's own length. */
+  runtime: number | null
+  studio: string | null
+  genres: string[]
+  backdropVersion: string | null
+  ratings: Rating[]
+  credits: Credit[]
+  /** Every file that is this item, in any library, best first. */
+  versions: MediaItem[]
+  /** A show's seasons, or a season's episodes, in order. */
+  children: ItemSummary[]
+}
+
+/** The pictures an item can have. */
+export type ItemImageKind = 'poster' | 'backdrop' | 'still'
+
+/** One of TMDB's search results, offered by Fix match. */
+export type MatchCandidate = {
+  tmdbId: string
+  title: string
+  year: number | null
+  overview: string | null
+  /** TMDB's path for the poster, served through `candidatePosterUrl`. */
+  poster: string | null
+}
+
+/** `off` when not configured, `failing` when the last call went wrong. */
+export type MetadataServiceState = 'off' | 'ok' | 'failing'
+
+/** How metadata is doing, from `/api/health`. */
+export type MetadataHealth = {
+  tmdb: MetadataServiceState
+  omdb: MetadataServiceState
+  /** Files waiting to be matched. */
+  pending: number
+  /** Why TMDB is failing, never the token itself. */
+  error: string | null
+  /** When TMDB last answered. */
+  lastOk: string | null
 }
 
 /** A video in a library's history: when it last played, how often, and how far it got. */
@@ -124,6 +230,8 @@ export type MediaSort =
   | 'bitrate-low'
   | 'resolution-high'
   | 'resolution-low'
+  | 'year-new'
+  | 'year-old'
   | 'random'
 
 export type DirectoryEntry = {

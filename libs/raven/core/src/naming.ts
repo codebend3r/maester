@@ -1,0 +1,179 @@
+/**
+ * What a file's name says it is, read the way Radarr, Sonarr, Plex and scene
+ * releases write names. Pure string work, so the server's matcher and any
+ * client agree on what a name means.
+ */
+
+/** Ids a name carries: Plex's `{tmdb-603}` or Jellyfin's and Radarr's `[tmdbid-603]`. */
+export type NameIds = {
+  tmdb: string | null
+  imdb: string | null
+  tvdb: string | null
+}
+
+export type ParsedMovieName = {
+  title: string
+  year: number | null
+  /** Plex's `{edition-Director's Cut}`. */
+  edition: string | null
+  ids: NameIds
+}
+
+const NO_IDS: NameIds = { tmdb: null, imdb: null, tvdb: null }
+
+const ID_PATTERN = /\{(tmdb|imdb|tvdb)-([^}\s]+)\}|\[(tmdb|imdb|tvdb)id[-=]([^\]\s]+)\]/gi
+
+const EDITION_PATTERN = /\{edition-([^}]+)\}/i
+
+/**
+ * Words that start the release details in a name: resolutions, sources,
+ * codecs and fixes. Matched against each word of a scene name, and against
+ * each half of Radarr's `Bluray-1080p`.
+ */
+const RELEASE_TAG =
+  /^(2160p|1080p|720p|480p|576p|blu-?ray|remux|web-?dl|webrip|web|hdtv|dvdrip|bdrip|brrip|x26[45]|h26[45]|hevc|av1|hdr|hdr10|dv|uhd|proper|repack)$/i
+
+const isReleaseTag = (word: string): boolean =>
+  word.startsWith('[') || word.split('-').some((part) => RELEASE_TAG.test(part))
+
+const plausibleYear = (year: number): boolean => year >= 1880 && year <= 2100
+
+/** The ids in `name`, the earlier of two of a kind winning. */
+const readIds = (name: string): NameIds => {
+  const found = [...name.matchAll(ID_PATTERN)].map((match) => ({
+    kind: (match[1] ?? match[3] ?? '').toLowerCase(),
+    value: match[2] ?? match[4] ?? '',
+  }))
+  const first = (kind: string): string | null => found.find((id) => id.kind === kind)?.value ?? null
+  return { tmdb: first('tmdb'), imdb: first('imdb'), tvdb: first('tvdb') }
+}
+
+const mergeIds = (first: NameIds, second: NameIds): NameIds => ({
+  tmdb: first.tmdb ?? second.tmdb,
+  imdb: first.imdb ?? second.imdb,
+  tvdb: first.tvdb ?? second.tvdb,
+})
+
+const stripTags = (name: string): string =>
+  name.replace(ID_PATTERN, ' ').replace(new RegExp(EDITION_PATTERN.source, 'gi'), ' ')
+
+const stemOf = (fileName: string): string => {
+  const dot = fileName.lastIndexOf('.')
+  return dot > 0 && fileName.length - dot <= 5 ? fileName.slice(0, dot) : fileName
+}
+
+/** Scene names separate words with dots or underscores; a name with spaces keeps its own. */
+const spaced = (text: string): string =>
+  (text.includes(' ') ? text : text.replace(/[._]+/g, ' ')).replace(/\s+/g, ' ')
+
+/** Separators and openers left dangling where the name was cut. */
+const tidy = (text: string): string =>
+  spaced(text)
+    .replace(/^[\s\-_.([]+/, '')
+    .replace(/[\s\-_.([]+$/, '')
+    .trim()
+
+/** Where the year sits: the last `(YYYY)`, else the last bare year that release tags follow. */
+const findYear = (name: string): { year: number; at: number } | null => {
+  const bracketed = [...name.matchAll(/\((\d{4})\)/g)].findLast((match) =>
+    plausibleYear(Number(match[1])),
+  )
+  if (bracketed?.index != null) return { year: Number(bracketed[1]), at: bracketed.index }
+
+  const bare = [...name.matchAll(/(?<=^|[\s._\-[(])((?:19|20)\d{2})(?=$|[\s._\-\])])/g)].findLast(
+    (match) => {
+      const at = match.index ?? 0
+      if (at === 0) return false
+      const rest = name.slice(at + 4).replace(/^[\s._\-\])]+/, '')
+      const next = rest.split(/[\s._]+/)[0] ?? ''
+      return rest === '' || isReleaseTag(next)
+    },
+  )
+  return bare?.index != null ? { year: Number(bare[1]), at: bare.index } : null
+}
+
+/** Where the release details start in a name without a year, or its length. */
+const firstTagAt = (name: string): number => {
+  const found = [...name.matchAll(/[^\s._]+/g)].find((word) => isReleaseTag(word[0]))
+  return found?.index ?? name.length
+}
+
+/** Reads one name, a folder's or a file's stem: title, year, edition and ids. */
+const readName = (name: string): ParsedMovieName => {
+  const ids = readIds(name)
+  const edition = EDITION_PATTERN.exec(name)?.[1]?.trim() ?? null
+  const bare = stripTags(name)
+  const year = findYear(bare)
+  const title = tidy(bare.slice(0, year ? year.at : firstTagAt(bare)))
+  return { title, year: year?.year ?? null, edition, ids }
+}
+
+/** The last segment of a relative folder, or '' at a library's root. */
+const lastSegment = (folder: string): string =>
+  folder.split(/[\\/]/).findLast((segment) => segment !== '') ?? ''
+
+/**
+ * A movie's title, year, edition and ids. Its own folder is read first when
+ * that folder's name has a year, the way Radarr names folders; otherwise the
+ * file's name is. Ids and editions are taken from either.
+ */
+export const parseMovieName = ({
+  fileName,
+  folder,
+}: {
+  fileName: string
+  folder: string
+}): ParsedMovieName => {
+  const fromFile = readName(stemOf(fileName))
+  const folderName = lastSegment(folder)
+  const fromFolder = folderName ? readName(folderName) : null
+  const useFolder = fromFolder?.year != null && fromFolder.title !== ''
+  const chosen = useFolder && fromFolder ? fromFolder : fromFile
+  return {
+    title: chosen.title || tidy(stemOf(fileName)) || fileName,
+    year: chosen.year,
+    edition: fromFile.edition ?? fromFolder?.edition ?? null,
+    ids: mergeIds(fromFile.ids, fromFolder?.ids ?? NO_IDS),
+  }
+}
+
+/** Plex's folders for extras, which belong to a movie or show but are not it. */
+const EXTRAS_FOLDERS: ReadonlySet<string> = new Set([
+  'behind the scenes',
+  'deleted scenes',
+  'featurettes',
+  'interviews',
+  'scenes',
+  'shorts',
+  'trailers',
+  'extras',
+  'other',
+])
+
+const EXTRAS_SUFFIX = /-(trailer|featurette|behindthescenes|deleted|interview|scene|short|other)$/i
+
+/** A trailer, featurette or other extra, by Plex's folder names and suffixes: never matched. */
+export const isExtra = ({ fileName, folder }: { fileName: string; folder: string }): boolean =>
+  folder.split(/[\\/]/).some((segment) => EXTRAS_FOLDERS.has(segment.trim().toLowerCase())) ||
+  EXTRAS_SUFFIX.test(stemOf(fileName))
+
+const LEADING_ARTICLE = /^(the|a|an)\s+/i
+
+/**
+ * A title folded for comparison: no case, accents or punctuation, `&` as
+ * "and", and no leading "The", "A" or "An", so "The Lord of the Rings: The
+ * Return of the King" and "lord of the rings the return of the king" agree.
+ */
+export const foldTitle = (title: string): string =>
+  title
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(LEADING_ARTICLE, '')
+    .trim()
+
+/** A title as it sorts: without a leading "The", "A" or "An". */
+export const sortTitle = (title: string): string => title.trim().replace(LEADING_ARTICLE, '')
