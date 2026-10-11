@@ -69,6 +69,8 @@ export const queryKeys = {
   itemImages: (id: number) => ['items', id, 'images'],
   /** Edit metadata: what the page shows against what TMDB says. */
   itemMetadata: (id: number) => ['items', id, 'metadata'],
+  /** How the server plays video, for every viewer. */
+  playbackSettings: ['settings', 'playback'],
   nextEpisode: (showId: number) => ['items', showId, 'next'],
   person: (id: number) => ['people', id],
   matchSearch: ({ type, query, year }: { type: string; query: string; year: number | null }) => [

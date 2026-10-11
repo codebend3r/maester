@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { checkDirectPlay, planPlayback, streamMimeType, videoCodecString } from '@/playback'
+import {
+  type PlaybackPolicy,
+  checkDirectPlay,
+  planPlayback,
+  streamMimeType,
+  videoCodecString,
+} from '@/playback'
 import { chromeLike, mediaItem, safariLike } from '@/test/fixtures'
 
 describe('checkDirectPlay', () => {
@@ -94,6 +100,24 @@ describe('videoCodecString', () => {
 })
 
 describe('planPlayback', () => {
+  const standard: PlaybackPolicy = { directPlay: 'auto', transcoding: 'on' }
+
+  it('follows the server policy: forced direct, remux only, or nothing converted', () => {
+    const media = mediaItem({ container: 'mkv', videoCodec: 'hevc', audioCodec: 'eac3' })
+    // Safari takes no Matroska, so the file cannot play as it is; Chrome can stream both ways.
+    const base = { media, canPlay: safariLike, canStream: chromeLike, defaultAudio: true }
+    expect(planPlayback({ ...base, policy: standard }).modes).toEqual(['remux', 'transcode'])
+    expect(
+      planPlayback({ ...base, policy: { directPlay: 'force', transcoding: 'on' } }).modes,
+    ).toEqual(['direct'])
+    expect(
+      planPlayback({ ...base, policy: { directPlay: 'auto', transcoding: 'remuxOnly' } }).modes,
+    ).toEqual(['remux'])
+    expect(
+      planPlayback({ ...base, policy: { directPlay: 'auto', transcoding: 'off' } }).modes,
+    ).toEqual([])
+  })
+
   const everything = (): boolean => true
   const nothing = (): boolean => false
 
@@ -104,6 +128,7 @@ describe('planPlayback', () => {
         canPlay: chromeLike,
         canStream: everything,
         defaultAudio: true,
+        policy: standard,
       }),
     ).toEqual({ modes: ['direct', 'remux', 'transcode'], problems: [] })
   })
@@ -111,7 +136,13 @@ describe('planPlayback', () => {
   it('remuxes when only the audio stands in the way', () => {
     const media = mediaItem({ container: 'mkv', videoCodec: 'hevc', audioCodec: 'truehd' })
     expect(
-      planPlayback({ media, canPlay: chromeLike, canStream: everything, defaultAudio: true }),
+      planPlayback({
+        media,
+        canPlay: chromeLike,
+        canStream: everything,
+        defaultAudio: true,
+        policy: standard,
+      }),
     ).toEqual({
       modes: ['remux', 'transcode'],
       problems: ["Dolby TrueHD audio isn't supported here."],
@@ -124,21 +155,51 @@ describe('planPlayback', () => {
       canPlay: chromeLike,
       canStream: everything,
       defaultAudio: false,
+      policy: standard,
     })
     expect(plan.modes).toEqual(['remux', 'transcode'])
+  })
+
+  it('sends the original file when forced, remuxing it only for another audio track', () => {
+    const media = mediaItem({ container: 'mkv', videoCodec: 'hevc', audioCodec: 'eac3' })
+    const forced = { media, canPlay: safariLike, canStream: chromeLike }
+    const policy: PlaybackPolicy = { directPlay: 'force', transcoding: 'on' }
+    expect(planPlayback({ ...forced, defaultAudio: true, policy }).modes).toEqual(['direct'])
+    expect(planPlayback({ ...forced, defaultAudio: false, policy }).modes).toEqual([
+      'remux',
+      'direct',
+    ])
+    // With nothing converted, the original file plays its own track.
+    expect(
+      planPlayback({
+        ...forced,
+        defaultAudio: false,
+        policy: { directPlay: 'force', transcoding: 'off' },
+      }).modes,
+    ).toEqual(['direct'])
   })
 
   it('transcodes video the server cannot copy or the browser cannot decode', () => {
     const vc1 = mediaItem({ container: 'mkv', videoCodec: 'vc1' })
     expect(
-      planPlayback({ media: vc1, canPlay: chromeLike, canStream: everything, defaultAudio: true })
-        .modes,
+      planPlayback({
+        media: vc1,
+        canPlay: chromeLike,
+        canStream: everything,
+        defaultAudio: true,
+        policy: standard,
+      }).modes,
     ).toEqual(['transcode'])
     const hevc = mediaItem({ container: 'mkv', videoCodec: 'hevc', audioCodec: 'dts' })
     const h264Only = (mime: string): boolean => !mime.includes('hvc1')
     expect(
-      planPlayback({ media: hevc, canPlay: chromeLike, canStream: h264Only, defaultAudio: true })
-        .modes,
+      planPlayback({
+        media: hevc,
+        canPlay: chromeLike,
+        canStream: h264Only,
+        defaultAudio: true,
+        policy: standard,
+      }).modes,
     ).toEqual(['transcode'])
   })
 
@@ -149,12 +210,18 @@ describe('planPlayback', () => {
         canPlay: chromeLike,
         canStream: nothing,
         defaultAudio: false,
+        policy: standard,
       }).modes,
     ).toEqual(['direct'])
     const dts = mediaItem({ audioCodec: 'dts' })
     expect(
-      planPlayback({ media: dts, canPlay: chromeLike, canStream: nothing, defaultAudio: true })
-        .modes,
+      planPlayback({
+        media: dts,
+        canPlay: chromeLike,
+        canStream: nothing,
+        defaultAudio: true,
+        policy: standard,
+      }).modes,
     ).toEqual([])
   })
 })
