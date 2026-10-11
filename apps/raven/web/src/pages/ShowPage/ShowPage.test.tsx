@@ -53,6 +53,19 @@ describe('ShowPage', () => {
     )
   })
 
+  it('opens Edit images for the show', async () => {
+    const images = spyOn(api, 'getItemImages').mockImplementation(async () => ({
+      poster: [],
+      backdrop: [],
+    }))
+    open()
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit images' }))
+    expect(await screen.findByRole('heading', { name: 'Edit images' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Linked files' })).toBeNull()
+    expect(images).toHaveBeenCalled()
+    images.mockRestore()
+  })
+
   it('lists the seasons on disk with their episode counts', async () => {
     open()
     const season = await screen.findByRole('link', { name: /Season 1/ })

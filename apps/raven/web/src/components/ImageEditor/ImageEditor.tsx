@@ -95,10 +95,13 @@ const Options = ({
 export const ImageEditor = ({
   details,
   libraries,
+  itemKind = 'movie',
   onDone,
 }: {
   details: ItemDetails
   libraries: readonly Library[]
+  /** A show's pictures are its own; there are no linked files to list. */
+  itemKind?: 'movie' | 'show'
   onDone: () => void
 }) => {
   const ids = { heading: useId(), versions: useId(), tabs: useId() }
@@ -133,38 +136,40 @@ export const ImageEditor = ({
         </Button>
       </header>
 
-      <section className={styles.group} aria-labelledby={ids.versions}>
-        <h3 id={ids.versions} className={styles.groupHeading}>
-          {details.versions.length === 1 ? 'This file' : 'Linked files'}
-        </h3>
-        <p className={styles.hint}>
-          {details.versions.length === 1
-            ? 'The pictures below are the movie’s, so a second version of it would share them.'
-            : 'These files are the same movie and share the pictures below; each plays on its own.'}
-        </p>
-        <ul className={styles.versions}>
-          {details.versions.map((version) => {
-            const facts = [
-              version.edition ?? 'Standard',
-              resolutionLabel(version),
-              version.hdr ? 'HDR' : null,
-              version.videoCodec ? codecLabel(version.videoCodec) : null,
-              formatBytes(version.size),
-              libraryName(version.libraryId),
-            ].filter((fact): fact is string => fact != null && fact !== '')
-            return (
-              <li key={version.id} className={styles.version}>
-                <span className={styles.facts}>
-                  {facts.map((fact) => (
-                    <span key={fact}>{fact}</span>
-                  ))}
-                </span>
-                <span className={styles.file}>{version.fileName}</span>
-              </li>
-            )
-          })}
-        </ul>
-      </section>
+      {itemKind === 'movie' && (
+        <section className={styles.group} aria-labelledby={ids.versions}>
+          <h3 id={ids.versions} className={styles.groupHeading}>
+            {details.versions.length === 1 ? 'This file' : 'Linked files'}
+          </h3>
+          <p className={styles.hint}>
+            {details.versions.length === 1
+              ? 'The pictures below are the movie’s, so a second version of it would share them.'
+              : 'These files are the same movie and share the pictures below; each plays on its own.'}
+          </p>
+          <ul className={styles.versions}>
+            {details.versions.map((version) => {
+              const facts = [
+                version.edition ?? 'Standard',
+                resolutionLabel(version),
+                version.hdr ? 'HDR' : null,
+                version.videoCodec ? codecLabel(version.videoCodec) : null,
+                formatBytes(version.size),
+                libraryName(version.libraryId),
+              ].filter((fact): fact is string => fact != null && fact !== '')
+              return (
+                <li key={version.id} className={styles.version}>
+                  <span className={styles.facts}>
+                    {facts.map((fact) => (
+                      <span key={fact}>{fact}</span>
+                    ))}
+                  </span>
+                  <span className={styles.file}>{version.fileName}</span>
+                </li>
+              )
+            })}
+          </ul>
+        </section>
+      )}
 
       {options.isError && (
         <p className={styles.error} role="alert">
