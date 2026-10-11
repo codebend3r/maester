@@ -78,12 +78,15 @@ export const ShowGrid = ({
   shows,
   busy = false,
   ratingsSource = 'tmdb',
+  labelledBy,
 }: {
   shows: ShowEntry[]
   busy?: boolean
   ratingsSource?: ShownRatings
+  /** The heading naming this grid, when it is one bucket of two. */
+  labelledBy?: string
 }) => (
-  <ul className={styles.grid} aria-busy={busy}>
+  <ul className={styles.grid} aria-busy={busy} aria-labelledby={labelledBy}>
     {shows.map((entry) => (
       <ShowCard key={entry.show.id} entry={entry} ratingsSource={ratingsSource} />
     ))}

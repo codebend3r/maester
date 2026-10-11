@@ -2,14 +2,19 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import {
   ApiError,
   DEFAULT_LIBRARY_SETTINGS,
+  groupMedia,
+  isLibraryView,
+  isMediaGroupBy,
+  isMediaSort,
   type Library,
   type LibraryKind,
   type LibrarySettings,
   type MediaItem,
-  groupMedia,
+  type ShowEntry,
 } from '@raven/core'
-import { useId, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useEffect, useId, useRef, useState } from 'react'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Bucket } from '@/components/Bucket/Bucket'
 import { Button, ButtonLink } from '@/components/Button/Button'
 import type { MatchType } from '@/components/FixMatchDialog/FixMatchDialog'
 import { LibraryDialog } from '@/components/LibraryDialog/LibraryDialog'
@@ -20,6 +25,7 @@ import { MediaList } from '@/components/MediaList/MediaList'
 import { MediaTiles } from '@/components/MediaTiles/MediaTiles'
 import { ScanStatus } from '@/components/ScanStatus/ScanStatus'
 import { ShowGrid } from '@/components/ShowCard/ShowCard'
+import { ShowList, ShowTiles } from '@/components/ShowCard/ShowViews'
 import { api } from '@/lib/api'
 import { KIND_LABELS } from '@/lib/libraryKinds'
 import { queryKeys } from '@/lib/queryClient'
@@ -41,14 +47,69 @@ const firstShown = ({
   items: MediaItem[]
 }): MediaItem | undefined =>
   settings.view === 'grouped'
-    ? groupMedia({ items, by: settings.groupBy })
+    ? groupMedia({
+        items,
+        by:
+          settings.groupBy === 'match' && settings.kind === 'other'
+            ? 'resolution'
+            : settings.groupBy,
+      })
         .flatMap((group) => group.items)
         .at(0)
     : items.at(0)
 
+/**
+ * The view the address carries, `?q=&sort=&view=&group=`, so a refresh or a
+ * shared link lands on the same search, order and layout; what the address
+ * leaves out comes from the library's own settings.
+ */
+const viewFromUrl = (params: URLSearchParams): Partial<LibrarySettings> => {
+  const sort = params.get('sort')
+  const view = params.get('view')
+  const group = params.get('group')
+  return {
+    ...(isMediaSort(sort) ? { sort } : {}),
+    ...(isLibraryView(view) ? { view } : {}),
+    ...(isMediaGroupBy(group) ? { groupBy: group } : {}),
+  }
+}
+
+/** The address with `change` written into it. */
+const writeView = ({
+  params,
+  change,
+}: {
+  params: URLSearchParams
+  change: Partial<LibrarySettings>
+}): URLSearchParams => {
+  const next = new URLSearchParams(params)
+  if (change.sort != null) next.set('sort', change.sort)
+  if (change.view != null) next.set('view', change.view)
+  if (change.groupBy != null) next.set('group', change.groupBy)
+  return next
+}
+
 /** What a library's files are matched to, for the cards' Fix match. */
 const matchTypeOf = (kind: LibraryKind): MatchType | null =>
   kind === 'movies' ? 'movie' : kind === 'shows' ? 'show' : null
+
+/** A TV library's shows laid out the way its view setting says; the grouped view is the grid, as the page itself splits matched from not. */
+const ShowsView = ({
+  settings,
+  shows,
+  busy,
+  labelledBy,
+}: {
+  settings: LibrarySettings
+  shows: ShowEntry[]
+  busy: boolean
+  labelledBy: string | undefined
+}) => {
+  const props = { shows, busy, ratingsSource: settings.ratingsSource, labelledBy }
+  if (settings.view === 'list') return <ShowList {...props} />
+  if (settings.view === 'tiles') return <ShowTiles {...props} />
+  return <ShowGrid {...props} />
+}
 
 /**
  * The library's videos laid out the way its view setting says: a Movies
@@ -73,7 +134,11 @@ const MediaView = ({
     return (
       <MediaGroups
         items={items}
-        by={settings.groupBy}
+        by={
+          settings.groupBy === 'match' && settings.kind === 'other'
+            ? 'resolution'
+            : settings.groupBy
+        }
         busy={busy}
         posters={movies}
         matchType={matchType}
@@ -94,10 +159,11 @@ const MediaView = ({
 export const LibraryPage = () => {
   const params = useParams()
   const libraryId = Number(params.id)
-  const ids = { title: useId(), unmatched: useId() }
+  const ids = { title: useId() }
   const queryClient = useQueryClient()
   const navigate = useNavigate()
-  const [search, setSearch] = useState('')
+  const [address, setAddress] = useSearchParams()
+  const [search, setSearch] = useState(address.get('q') ?? '')
   const [seed] = useState(dealSeed)
   const [editing, setEditing] = useState(false)
   const query = useDebouncedValue({ value: search.trim(), delayMs: 200 })
@@ -109,7 +175,22 @@ export const LibraryPage = () => {
     refetchInterval: (current) => (current.state.data?.scan.state === 'scanning' ? 1500 : false),
   })
   const scanning = library.data?.scan.state === 'scanning'
-  const settings = library.data?.settings ?? DEFAULT_LIBRARY_SETTINGS
+  const saved = library.data?.settings ?? DEFAULT_LIBRARY_SETTINGS
+  const settings = { ...saved, ...viewFromUrl(address) }
+
+  // The search rides in the address once it settles, replacing rather than
+  // stacking history entries as the viewer types.
+  useEffect(() => {
+    setAddress(
+      (current) => {
+        const next = new URLSearchParams(current)
+        if (query) next.set('q', query)
+        else next.delete('q')
+        return next
+      },
+      { replace: true },
+    )
+  }, [query, setAddress])
   const sort = settings.sort
   const dealt = sort === 'random' ? seed : 0
   // Files only leave pending while TMDB answers; without it they wait for good.
@@ -149,6 +230,20 @@ export const LibraryPage = () => {
         ? 3000
         : false,
   })
+
+  // Nothing else reads the library again after a matching pass, so its count
+  // of files not matched is refetched once the listing has none pending.
+  const isMatchingFiles = tv
+    ? !!showsQuery.data?.unmatched.some((item) => item.match === 'pending')
+    : !!media.data?.some((item) => item.match === 'pending')
+  const wasMatchingFiles = useRef(false)
+  useEffect(() => {
+    if (wasMatchingFiles.current && !isMatchingFiles) {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.library(libraryId), exact: true })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.libraries, exact: true })
+    }
+    wasMatchingFiles.current = isMatchingFiles
+  }, [isMatchingFiles, libraryId, queryClient])
 
   const rescan = useMutation({
     mutationFn: () => api.scanLibrary(libraryId),
@@ -285,6 +380,7 @@ export const LibraryPage = () => {
         onSearch={setSearch}
         settings={settings}
         onChange={(change) => {
+          setAddress(writeView({ params: address, change }), { replace: true })
           if (library.data) saveSettings.mutate({ current: library.data, change })
         }}
         playable={playable}
@@ -304,22 +400,36 @@ export const LibraryPage = () => {
       )}
 
       {emptyState && <p className={styles.message}>{emptyState}</p>}
-      {!emptyState && tv && (
-        <>
-          <ShowGrid
-            shows={shows}
-            busy={showsQuery.isFetching && !showsQuery.data}
-            ratingsSource={settings.ratingsSource}
-          />
-          {items.length > 0 && (
-            <section className={styles.unmatched} aria-labelledby={ids.unmatched}>
-              <h2 id={ids.unmatched} className={styles.subheading}>
-                Not matched
-              </h2>
-              <MediaView settings={settings} items={items} busy={false} />
-            </section>
+      {!emptyState && tv && items.length === 0 && (
+        <ShowsView
+          settings={settings}
+          shows={shows}
+          busy={showsQuery.isFetching && !showsQuery.data}
+          labelledBy={undefined}
+        />
+      )}
+      {!emptyState && tv && items.length > 0 && (
+        <div className={styles.buckets}>
+          {shows.length > 0 && (
+            <Bucket
+              label="Matched"
+              count={`${count.format(shows.length)} ${shows.length === 1 ? 'show' : 'shows'}`}
+            >
+              <ShowsView
+                settings={settings}
+                shows={shows}
+                busy={showsQuery.isFetching && !showsQuery.data}
+                labelledBy={undefined}
+              />
+            </Bucket>
           )}
-        </>
+          <Bucket
+            label="Not matched"
+            count={`${count.format(items.length)} ${items.length === 1 ? 'video' : 'videos'}`}
+          >
+            <MediaView settings={settings} items={items} busy={false} />
+          </Bucket>
+        </div>
       )}
       {!emptyState && !tv && (
         <MediaView settings={settings} items={items} busy={media.isFetching && !media.data} />

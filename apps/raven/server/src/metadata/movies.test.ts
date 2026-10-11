@@ -184,6 +184,14 @@ describe('movie metadata', () => {
     expect(items.find((item) => item.title === 'Unknown Thing')?.year).toBe(2020)
   })
 
+  it('starts a Movies library grouped into matched and not', async () => {
+    const library = shape({
+      response: await app().inject({ method: 'GET', url: `/api/libraries/${state.library}` }),
+      guard: isLibrary,
+    })
+    expect(library.settings).toMatchObject({ kind: 'movies', view: 'grouped', groupBy: 'match' })
+  })
+
   it('asked again without the article when "The Few Good Men" found nothing', () => {
     const asked = tmdb.state.calls
       .filter((url) => url.includes('/search/movie'))

@@ -6,6 +6,22 @@ const summary = (groups: ReturnType<typeof groupMedia>) =>
   groups.map((group) => [group.label, group.items.map((item) => item.id)])
 
 describe('groupMedia', () => {
+  it('buckets by match: found, still looking, not found, then extras', () => {
+    const items = [
+      mediaItem({ id: 1, match: 'unmatched' }),
+      mediaItem({ id: 2, match: 'off' }),
+      mediaItem({ id: 3, match: 'matched' }),
+      mediaItem({ id: 4, match: 'pending' }),
+      mediaItem({ id: 5, match: 'manual' }),
+    ]
+    expect(summary(groupMedia({ items, by: 'match' }))).toEqual([
+      ['Matched', [3, 5]],
+      ['Matching', [4]],
+      ['Not matched', [1]],
+      ['Extras and other files', [2]],
+    ])
+  })
+
   it('buckets by resolution from 4K down, with unprobed videos last', () => {
     const items = [
       mediaItem({ id: 1, width: 1280, height: 720 }),

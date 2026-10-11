@@ -301,14 +301,25 @@ describe('the media server', () => {
         })
       })
 
-      it('changes what type of library it is after it was made', async () => {
-        expect((await putLibrary({ kind: 'shows' })).settings.kind).toBe('shows')
+      it('changes what type of library it is after it was made, keeping a view and grouping the type can show', async () => {
+        expect(
+          (await putLibrary({ kind: 'movies', view: 'grouped', groupBy: 'match' })).settings,
+        ).toMatchObject({ kind: 'movies', view: 'grouped', groupBy: 'match' })
+        expect((await putLibrary({ kind: 'shows' })).settings).toMatchObject({
+          kind: 'shows',
+          view: 'grid',
+          groupBy: 'match',
+        })
         const current = expectShape({
           response: await app().inject({ method: 'GET', url: `/api/libraries/${library.id}` }),
           guard: isLibrary,
         })
         expect(current.settings.kind).toBe('shows')
-        expect((await putLibrary({ kind: 'other' })).settings.kind).toBe('other')
+        expect((await putLibrary({ kind: 'other' })).settings).toMatchObject({
+          kind: 'other',
+          view: 'grid',
+          groupBy: 'resolution',
+        })
       })
 
       it('remembers how the library is sorted and shown', async () => {

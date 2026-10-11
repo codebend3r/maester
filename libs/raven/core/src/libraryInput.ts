@@ -9,7 +9,7 @@ import {
   isString,
   isWatchedPercent,
 } from '@/guards'
-import type { LibraryInput, LibrarySettings } from '@/types'
+import type { LibraryInput, LibraryKind, LibrarySettings } from '@/types'
 
 export const LIBRARY_NAME_MAX = 80
 
@@ -32,6 +32,37 @@ export const DEFAULT_LIBRARY_SETTINGS: LibrarySettings = {
   watchedPercent: 90,
   kind: 'other',
   ratingsSource: 'tmdb',
+}
+
+/**
+ * What a new library of `kind` starts with: a Movies library grouped into
+ * matched and not, the others in a grid, as an Other library is never
+ * matched and a TV library has no grouped view.
+ */
+export const defaultLibrarySettings = (kind: LibraryKind): LibrarySettings => ({
+  ...DEFAULT_LIBRARY_SETTINGS,
+  kind,
+  ...(kind === 'movies' ? { view: 'grouped', groupBy: 'match' } : {}),
+})
+
+/**
+ * Settings with the library's type changed, and the view or grouping the
+ * new type cannot show swapped for its own.
+ */
+export const withLibraryKind = ({
+  settings,
+  kind,
+}: {
+  settings: LibrarySettings
+  kind: LibraryKind
+}): LibrarySettings => {
+  const own = defaultLibrarySettings(kind)
+  return {
+    ...settings,
+    kind,
+    view: kind === 'shows' && settings.view === 'grouped' ? own.view : settings.view,
+    groupBy: kind === 'other' && settings.groupBy === 'match' ? own.groupBy : settings.groupBy,
+  }
 }
 
 /** Each setting's check, and what to say when a value fails it. */
