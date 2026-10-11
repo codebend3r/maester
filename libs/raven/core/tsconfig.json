@@ -1,16 +1,9 @@
 {
+  "extends": "../../../tsconfig.base.json",
+  // No DOM and no Node types: the library may only lean on what every
+  // JavaScript runtime has, so a slip fails the typecheck.
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2023"],
-    "module": "esnext",
-    "moduleResolution": "bundler",
-    "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true,
-    "isolatedModules": true,
-    "skipLibCheck": true,
-    "noEmit": true,
     "paths": {
       "@/*": ["./src/*"]
     },
