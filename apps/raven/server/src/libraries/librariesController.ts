@@ -25,7 +25,7 @@ import {
   validateLibraryInput,
 } from '@raven/core'
 import { type LibraryRecord, LibrariesRepository, samePaths } from '@/libraries/librariesRepository'
-import { PrivateBy } from '@/lock/lockGuard'
+import { PrivateBy, Public } from '@/lock/lockGuard'
 import { LockService } from '@/lock/lockService'
 import { MediaRepository, toMediaItem } from '@/media/mediaRepository'
 import { MATCHED_KINDS, MetadataService } from '@/metadata/metadataService'
@@ -51,6 +51,7 @@ const historyLimit = (asked: string | undefined): number => {
 }
 
 @Controller('api/libraries')
+@PrivateBy('library')
 export class LibrariesController {
   constructor(
     @Inject(LibrariesRepository) private readonly libraries: LibrariesRepository,
@@ -82,17 +83,21 @@ export class LibrariesController {
     return record
   }
 
+  @Public()
   @Get()
   list(): Library[] {
     return this.libraries.list().map((record) => this.withStatus(record))
   }
 
+  /** Every library shows in the side menu, locked or not, so its own settings do too. */
+  @Public()
   @Get(':id')
   get(@Param('id', ParseIntPipe) id: number): Library {
     return this.withStatus(this.find(id))
   }
 
   /** Creating a library starts its first scan; the response already reports it as scanning. */
+  @Public()
   @Post()
   create(@Body() body: unknown): Library {
     const record = this.libraries.create(this.parseLockable(body))
@@ -105,7 +110,6 @@ export class LibrariesController {
    * Only a change of folders rescans, and only a change of type matches the
    * files again; a rename or another setting leaves the index as it is.
    */
-  @PrivateBy('library')
   @Put(':id')
   update(@Param('id', ParseIntPipe) id: number, @Body() body: unknown): Library {
     const input = this.parseLockable(body)
@@ -120,7 +124,6 @@ export class LibrariesController {
     return this.withStatus(record)
   }
 
-  @PrivateBy('library')
   @Delete(':id')
   @HttpCode(204)
   async remove(@Param('id', ParseIntPipe) id: number): Promise<void> {
@@ -136,7 +139,6 @@ export class LibrariesController {
     this.metadata.enqueue(id)
   }
 
-  @PrivateBy('library')
   @Post(':id/scan')
   @HttpCode(200)
   scan(@Param('id', ParseIntPipe) id: number): Library {
@@ -149,7 +151,6 @@ export class LibrariesController {
    * Match again: the files no movie or show was found for go back in the
    * queue, and TMDB is searched for them once more. Fix match choices stay.
    */
-  @PrivateBy('library')
   @Post(':id/match')
   @HttpCode(200)
   rematch(@Param('id', ParseIntPipe) id: number): Library {
@@ -166,7 +167,6 @@ export class LibrariesController {
   }
 
   /** The library's played videos, last played first; `watched=true` keeps the ones watched. */
-  @PrivateBy('library')
   @Get(':id/history')
   history(
     @Param('id', ParseIntPipe) id: number,
@@ -186,7 +186,6 @@ export class LibrariesController {
   }
 
   /** A TV shows library as its shows, with the files no show was found for after. */
-  @PrivateBy('library')
   @Get(':id/shows')
   listShows(
     @Param('id', ParseIntPipe) id: number,
@@ -211,7 +210,6 @@ export class LibrariesController {
     }
   }
 
-  @PrivateBy('library')
   @Get(':id/media')
   listMedia(
     @Param('id', ParseIntPipe) id: number,

@@ -44,6 +44,7 @@ const isImageKind = (value: string): value is ItemImageKind =>
 
 /** Movies, shows, seasons and episodes: their pages, their pictures, and fetching them again. */
 @Controller('api/items')
+@PrivateBy('item')
 export class ItemsController {
   constructor(
     @Inject(MetadataRepository) private readonly metadata: MetadataRepository,
@@ -78,7 +79,6 @@ export class ItemsController {
    * `tmdbId`, keeping its season and episode numbers, and the choice is
    * kept by folder. Answers with the show the files moved to.
    */
-  @PrivateBy('item')
   @Put(':id/match')
   async setMatch(
     @Param('id', ParseIntPipe) id: number,
@@ -103,7 +103,6 @@ export class ItemsController {
     return this.details({ id: moved, cookie })
   }
 
-  @PrivateBy('item')
   @Get(':id')
   get(
     @Param('id', ParseIntPipe) id: number,
@@ -113,7 +112,6 @@ export class ItemsController {
   }
 
   /** A show's first episode not yet watched, for its Play button; null once every one is. */
-  @PrivateBy('item')
   @Get(':id/next')
   next(
     @Param('id', ParseIntPipe) id: number,
@@ -127,7 +125,6 @@ export class ItemsController {
   }
 
   /** Fetches the item from TMDB again now. One TMDB no longer has is gone after, so 404. */
-  @PrivateBy('item')
   @Post(':id/refresh')
   @HttpCode(200)
   async refresh(
@@ -149,7 +146,6 @@ export class ItemsController {
   }
 
   /** Edit metadata: what the page shows, what TMDB says, and which fields were written over. */
-  @PrivateBy('item')
   @Get(':id/metadata')
   getMetadata(@Param('id', ParseIntPipe) id: number): ItemMetadataState {
     const state = this.metadata.metadata(id)
@@ -161,7 +157,6 @@ export class ItemsController {
    * Edit metadata: each field given is written over TMDB's, or cleared back
    * to TMDB's with null. '' (0 for the year) shows nothing where TMDB has words.
    */
-  @PrivateBy('item')
   @Put(':id/metadata')
   setMetadata(
     @Param('id', ParseIntPipe) id: number,
@@ -188,7 +183,6 @@ export class ItemsController {
    * Edit images: every poster and backdrop a movie or show could show, the
    * one beside the media first, then TMDB's, with the current one marked.
    */
-  @PrivateBy('item')
   @Get(':id/images')
   async imageOptions(@Param('id', ParseIntPipe) id: number): Promise<ItemImageOptions> {
     const item = this.metadata.get(id)
@@ -242,7 +236,6 @@ export class ItemsController {
   }
 
   /** Edit images: `{ source: 'tmdb', ref }` shows that picture of TMDB's; `{ source: 'local' }` goes back to the one beside the media, or TMDB's own. */
-  @PrivateBy('item')
   @Put(':id/images/:kind')
   async chooseImage(
     @Param('id', ParseIntPipe) id: number,
@@ -266,7 +259,6 @@ export class ItemsController {
   }
 
   /** The picture beside the media, scaled, whatever the item shows: Edit images previews it. */
-  @PrivateBy('item')
   @Get(':id/images/:kind/local')
   async localImage(
     @Param('id', ParseIntPipe) id: number,
@@ -281,7 +273,6 @@ export class ItemsController {
   }
 
   /** A poster, backdrop or still: the chosen picture first, then one beside the media, then TMDB's. */
-  @PrivateBy('item')
   @Get(':id/images/:kind')
   async image(
     @Param('id', ParseIntPipe) id: number,

@@ -28,9 +28,13 @@ import {
 } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '@/app'
+import { CONTROLLERS } from '@/appModule'
 import { type ServerConfig, readServerConfig } from '@/config'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
+import { routeMarks } from '@/lock/lockGuard'
+import type { Privacy } from '@/lock/lockService'
 import { MediaRepository } from '@/media/mediaRepository'
+import { MetadataRepository } from '@/metadata/metadataRepository'
 import { TracksService } from '@/playback/tracksService'
 import { ScannerService } from '@/scanner/scannerService'
 import { encodeClip } from '@/test/clips'
@@ -54,6 +58,11 @@ const expectShape = <T>({
   if (!guard(body)) throw new Error(`Unexpected body: ${response.rawPayload.toString()}`)
   return body
 }
+
+const ROUTE_METHODS = ['GET', 'POST', 'PUT', 'DELETE'] as const
+
+const isRouteMethod = (value: string): value is (typeof ROUTE_METHODS)[number] =>
+  ROUTE_METHODS.some((method) => method === value)
 
 /** A watcher that never fires, for tests that scan by hand. */
 const NOT_WATCHING = { watchFolder: () => ({ close: () => undefined }) }
@@ -866,6 +875,7 @@ describe('a library locked behind the PIN', () => {
     open: 0,
     private: 0,
     privateVideo: 0,
+    privateItem: 0,
     app: null as NestFastifyApplication | null,
   }
   const app = (): NestFastifyApplication => {
@@ -914,6 +924,33 @@ describe('a library locked behind the PIN', () => {
     })
     const [video] = app().get(MediaRepository).list({ libraryId: state.private })
     state.privateVideo = video?.id ?? 0
+    // A movie only the locked library holds, as if it had been matched.
+    const metadata = app().get(MetadataRepository)
+    state.privateItem = metadata.save({
+      item: {
+        type: 'movie',
+        tmdbId: '7001',
+        number: null,
+        title: 'Lesson One',
+        originalTitle: null,
+        year: null,
+        released: null,
+        ended: null,
+        summary: null,
+        tagline: null,
+        contentRating: null,
+        runtime: null,
+        studio: null,
+        genres: [],
+        imdbId: null,
+        tvdbId: null,
+        images: { poster: null, backdrop: null, still: null },
+        credits: [],
+        rating: null,
+        reviews: [],
+      },
+    })
+    metadata.link({ mediaIds: [state.privateVideo], itemIds: [state.privateItem] })
   })
 
   afterAll(async () => {
@@ -948,6 +985,33 @@ describe('a library locked behind the PIN', () => {
     const statuses = await Promise.all(urls.map(async (url) => (await get(url)).statusCode))
     expect(statuses).toEqual(urls.map(() => 423))
     expect((await get(`/api/libraries/${state.open}/media`)).statusCode).toBe(200)
+  })
+
+  it('holds back every route that takes an id from it, whatever the method', async () => {
+    const ids: Record<Privacy, number> = {
+      library: state.private,
+      media: state.privateVideo,
+      item: state.privateItem,
+    }
+    const held = routeMarks(CONTROLLERS).flatMap((route) =>
+      route.mark == null || route.mark === 'public' || !isRouteMethod(route.method)
+        ? []
+        : [
+            {
+              method: route.method,
+              url: route.path.replace(':id', String(ids[route.mark])).replace(/:\w+/g, 'poster'),
+            },
+          ],
+    )
+    expect(routeMarks(CONTROLLERS).every((route) => isRouteMethod(route.method))).toBe(true)
+    expect(held.length).toBeGreaterThan(25)
+    const answers = await Promise.all(
+      held.map(async ({ method, url }) => {
+        const response = await app().inject({ method, url })
+        return `${method} ${url} ${response.statusCode}`
+      }),
+    )
+    expect(answers).toEqual(held.map(({ method, url }) => `${method} ${url} 423`))
   })
 
   it('opens with the PIN, and shuts again when locked', async () => {

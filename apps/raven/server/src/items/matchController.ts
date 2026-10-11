@@ -16,7 +16,7 @@ import { type MatchCandidate, type MediaItem, isRecord, isString } from '@raven/
 import type { FastifyReply } from 'fastify'
 import { sendImage } from '@/items/sendImage'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
-import { PrivateBy } from '@/lock/lockGuard'
+import { PrivateBy, Public } from '@/lock/lockGuard'
 import { MediaRepository, toMediaItem } from '@/media/mediaRepository'
 import { ImageCache } from '@/metadata/imageCache'
 import { MetadataService } from '@/metadata/metadataService'
@@ -69,12 +69,14 @@ export class MatchController {
   }
 
   /** A search result's poster, through the cache, so the browser never talks to TMDB. */
+  @Public()
   @Get('images/poster/:file')
   async candidatePoster(@Param('file') file: string, @Res() reply: FastifyReply): Promise<void> {
     await this.candidate({ file, use: 'poster', reply })
   }
 
   /** A backdrop Edit images offers, through the cache. */
+  @Public()
   @Get('images/backdrop/:file')
   async candidateBackdrop(@Param('file') file: string, @Res() reply: FastifyReply): Promise<void> {
     await this.candidate({ file, use: 'backdrop', reply })

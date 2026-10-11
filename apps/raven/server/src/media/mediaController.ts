@@ -59,6 +59,7 @@ const deleteFailure = (error: unknown): string => {
 }
 
 @Controller('api/media')
+@PrivateBy('media')
 export class MediaController {
   private readonly logger = new Logger(MediaController.name)
 
@@ -75,20 +76,17 @@ export class MediaController {
     return record
   }
 
-  @PrivateBy('media')
   @Get(':id')
   get(@Param('id', ParseIntPipe) id: number): MediaItem {
     return toMediaItem(this.find(id))
   }
 
   /** Where the file lives, for the card's menu: the one call that hands a client a path. */
-  @PrivateBy('media')
   @Get(':id/location')
   location(@Param('id', ParseIntPipe) id: number): MediaLocation {
     return { path: this.find(id).path }
   }
 
-  @PrivateBy('media')
   @Put(':id/progress')
   @HttpCode(204)
   saveProgress(@Param('id', ParseIntPipe) id: number, @Body() body: unknown): void {
@@ -101,7 +99,6 @@ export class MediaController {
   }
 
   /** The player says a video started, for its library's history. */
-  @PrivateBy('media')
   @Post(':id/plays')
   @HttpCode(204)
   recordPlay(@Param('id', ParseIntPipe) id: number): void {
@@ -109,7 +106,6 @@ export class MediaController {
     this.media.recordPlay({ id })
   }
 
-  @PrivateBy('media')
   @Put(':id/favourite')
   setFavourite(@Param('id', ParseIntPipe) id: number, @Body() body: unknown): MediaItem {
     this.find(id)
@@ -127,7 +123,6 @@ export class MediaController {
    * loses its row; any other failure, such as a read-only mount, keeps the
    * row and says why.
    */
-  @PrivateBy('media')
   @Delete(':id')
   @HttpCode(204)
   async remove(@Param('id', ParseIntPipe) id: number): Promise<void> {
@@ -147,7 +142,6 @@ export class MediaController {
   }
 
   /** Versioned URLs (`?v=`) change whenever the file does, so they can be cached for good. */
-  @PrivateBy('media')
   @Get(':id/thumbnail')
   async thumbnail(
     @Param('id', ParseIntPipe) id: number,
@@ -174,7 +168,6 @@ export class MediaController {
    * range request, so the server does nothing but read. Files the client
    * cannot decode as they are go through `PlaybackController`'s stream.
    */
-  @PrivateBy('media')
   @Get(':id/file')
   async file(
     @Param('id', ParseIntPipe) id: number,

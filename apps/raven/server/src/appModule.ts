@@ -14,7 +14,7 @@ import { ReviewsController } from '@/items/reviewsController'
 import { LibrariesController } from '@/libraries/librariesController'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { LockController } from '@/lock/lockController'
-import { LockGuard } from '@/lock/lockGuard'
+import { LockGuard, assertLockMarked } from '@/lock/lockGuard'
 import { LockService } from '@/lock/lockService'
 import { FavouritesController } from '@/media/favouritesController'
 import { MediaController } from '@/media/mediaController'
@@ -34,6 +34,22 @@ import { ScannerService } from '@/scanner/scannerService'
 import { SettingsController } from '@/settings/settingsController'
 import { SettingsRepository } from '@/settings/settingsRepository'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
+
+export const CONTROLLERS = [
+  LibrariesController,
+  MediaController,
+  PlaybackController,
+  FavouritesController,
+  BrowseController,
+  HealthController,
+  ItemsController,
+  MatchController,
+  PeopleController,
+  ReviewsController,
+  SettingsController,
+  EventsController,
+  LockController,
+] as const
 
 /** Folders stay still for 2 s before a refresh; a library that cannot be watched is scanned every 10 min. */
 const DEFAULT_WATCH: WatchOptions = {
@@ -58,23 +74,10 @@ export class AppModule {
     metadataFetch?: MetadataFetch
     watch?: Partial<WatchOptions>
   }): DynamicModule {
+    assertLockMarked(CONTROLLERS)
     return {
       module: AppModule,
-      controllers: [
-        LibrariesController,
-        MediaController,
-        PlaybackController,
-        FavouritesController,
-        BrowseController,
-        HealthController,
-        ItemsController,
-        MatchController,
-        PeopleController,
-        ReviewsController,
-        SettingsController,
-        EventsController,
-        LockController,
-      ],
+      controllers: [...CONTROLLERS],
       providers: [
         { provide: SERVER_CONFIG, useValue: config },
         { provide: METADATA_FETCH, useValue: metadataFetch },
@@ -97,7 +100,7 @@ export class AppModule {
         ScannerService,
         LibraryWatcher,
         LockService,
-        // Every route passes the lock first; only those marked PrivateBy are held.
+        // Every route passes the lock first; those marked PrivateBy, or on a controller that is, are held.
         { provide: APP_GUARD, useClass: LockGuard },
       ],
     }

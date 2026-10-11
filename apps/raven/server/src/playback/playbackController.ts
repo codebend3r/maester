@@ -39,6 +39,7 @@ const wholeNumber = (value: string | undefined): number | null => {
  * browser cannot play directly.
  */
 @Controller('api/media')
+@PrivateBy('media')
 export class PlaybackController {
   constructor(
     @Inject(SettingsRepository) private readonly settings: SettingsRepository,
@@ -54,14 +55,12 @@ export class PlaybackController {
     return record
   }
 
-  @PrivateBy('media')
   @Get(':id/tracks')
   async listTracks(@Param('id', ParseIntPipe) id: number): Promise<MediaTracks> {
     return (await this.tracks.tracksFor(this.find(id))).tracks
   }
 
   /** WebVTT for one track; `window` picks the stretch of an embedded one. */
-  @PrivateBy('media')
   @Get(':id/subtitles/:trackId')
   async subtitle(
     @Param('id', ParseIntPipe) id: number,
@@ -84,7 +83,6 @@ export class PlaybackController {
    * response is open and is killed the moment the client lets go, which
    * happens on every seek outside what is buffered.
    */
-  @PrivateBy('media')
   @Get(':id/stream')
   async stream(
     @Param('id', ParseIntPipe) id: number,
