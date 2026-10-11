@@ -117,7 +117,7 @@ Each library keeps its own settings on the server, so every browser opens it the
 - **Pin to the side menu**, on by default: the library gets its own link under Favourites. Pin or unpin from the Libraries page, or in **Edit**.
 - **Watched at**, 90% by default: how far into a video playback must get for it to count as watched in the library's history, as a whole percentage from 1 to 100.
 - **Sort**: title, recently or oldest added, largest or smallest file, highest or lowest bitrate, highest or lowest resolution (by pixel count), newest or oldest release (Movies and TV shows), or random. Videos not yet probed, and files with no year, go last. Titles sort without a leading "The", "A" or "An". Random holds its order while the page is open, and each visit starts a fresh deal.
-- **View**: a grid of cards, a list, tiles (rows with a small thumbnail), or grouped by resolution, video codec or month added.
+- **View**: a grid of cards, a list, tiles (rows with a small thumbnail), or grouped: by matched or not (a Movies or TV shows library starts here, Matched above Not matched, so what needs a Fix match is in one place), resolution, video codec or month added. Each bucket is a folded row with its count; click it to open the cards. A TV library's page splits the same way, its shows under a Matched row and the leftover files under Not matched, both folded to start.
 
 Sort, view and grouping are picked on the library page and saved as they change; the others are in **Edit**. Changing a setting or the name never rescans; only a change of folders does.
 

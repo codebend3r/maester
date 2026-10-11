@@ -58,7 +58,8 @@ export type LibraryKind = 'movies' | 'shows' | 'other'
 
 export type LibraryView = 'grid' | 'list' | 'tiles' | 'grouped'
 
-export type MediaGroupBy = 'resolution' | 'codec' | 'month'
+/** `match` buckets a Movies or TV shows library by how far matching got. */
+export type MediaGroupBy = 'match' | 'resolution' | 'codec' | 'month'
 
 /**
  * What a client sends to create a library or replace its name and paths.

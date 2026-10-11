@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common'
 import {
   DEFAULT_LIBRARY_SETTINGS,
+  defaultLibrarySettings,
   type LibraryInput,
   type LibrarySettings,
   isLibraryKind,
@@ -9,6 +10,7 @@ import {
   isMediaSort,
   isShownRatings,
   isWatchedPercent,
+  withLibraryKind,
 } from '@raven/core'
 import { DatabaseService } from '@/db/database'
 
@@ -131,7 +133,10 @@ export class LibrariesRepository {
   }
 
   create(input: LibraryInput): LibraryRecord {
-    const settings = { ...DEFAULT_LIBRARY_SETTINGS, ...input.settings }
+    const settings = {
+      ...defaultLibrarySettings(input.settings?.kind ?? DEFAULT_LIBRARY_SETTINGS.kind),
+      ...input.settings,
+    }
     const id = this.db.transaction(() => {
       const result = this.db
         .prepare(
@@ -157,7 +162,12 @@ export class LibrariesRepository {
   update({ id, input }: { id: number; input: LibraryInput }): LibraryRecord | null {
     const current = this.get(id)
     if (!current) return null
-    const settings = { ...current.settings, ...input.settings }
+    const laid = { ...current.settings, ...input.settings }
+    // A new type keeps the view and grouping it can show, and swaps the others for its own.
+    const settings =
+      laid.kind === current.settings.kind
+        ? laid
+        : withLibraryKind({ settings: laid, kind: laid.kind })
     this.db.transaction(() => {
       this.db
         .prepare(

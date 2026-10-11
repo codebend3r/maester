@@ -2,13 +2,16 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   DEFAULT_LIBRARY_SETTINGS,
   LIBRARY_KINDS,
+  type LibraryKind,
   SHOWN_RATINGS,
   type ShownRatings,
   type Library,
   type LibraryInput,
   type LibrarySettings,
+  defaultLibrarySettings,
   isShownRatings,
   validateLibraryInput,
+  withLibraryKind,
 } from '@raven/core'
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -84,6 +87,15 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
     onError: (error) => setErrors([error.message]),
   })
 
+  // A new library takes the view and grouping its type starts with; one
+  // being edited keeps its own where the new type can show them.
+  const pickKind = (kind: LibraryKind) =>
+    setSettings((current) => {
+      if (library) return withLibraryKind({ settings: current, kind })
+      const { view, groupBy } = defaultLibrarySettings(kind)
+      return { ...current, kind, view, groupBy }
+    })
+
   const addPath = (path: string) => {
     setPaths((current) => (current.includes(path) ? current : [...current, path]))
     setErrors([])
@@ -135,7 +147,7 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
                   name={ids.kind}
                   value={kind}
                   checked={settings.kind === kind}
-                  onChange={() => setSettings((current) => ({ ...current, kind }))}
+                  onChange={() => pickKind(kind)}
                 />
                 <label htmlFor={`${ids.kind}-${kind}`}>{KIND_LABELS[kind]}</label>
               </div>

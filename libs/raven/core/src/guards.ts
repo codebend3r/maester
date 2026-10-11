@@ -102,7 +102,7 @@ export const LIBRARY_KINDS: readonly LibraryKind[] = ['movies', 'shows', 'other'
 export const isLibraryKind = (value: unknown): value is LibraryKind =>
   LIBRARY_KINDS.some((kind) => kind === value)
 
-export const MEDIA_GROUPINGS: readonly MediaGroupBy[] = ['resolution', 'codec', 'month']
+export const MEDIA_GROUPINGS: readonly MediaGroupBy[] = ['match', 'resolution', 'codec', 'month']
 
 export const isMediaGroupBy = (value: unknown): value is MediaGroupBy =>
   MEDIA_GROUPINGS.some((grouping) => grouping === value)

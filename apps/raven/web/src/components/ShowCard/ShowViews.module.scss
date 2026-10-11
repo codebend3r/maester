@@ -1,0 +1,144 @@
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+
+  th,
+  td {
+    padding: var(--space-1) var(--space-2);
+    text-align: left;
+    vertical-align: middle;
+  }
+
+  thead th {
+    color: var(--color-lichen);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--color-moss);
+  }
+
+  tbody tr {
+    border-bottom: 1px solid var(--color-moss);
+
+    &:hover {
+      background: var(--color-canopy);
+    }
+  }
+
+  tbody th {
+    font-weight: 400;
+  }
+
+  td {
+    color: var(--color-lichen);
+    white-space: nowrap;
+  }
+}
+
+.number {
+  font-variant-numeric: tabular-nums;
+
+  &:is(th, td) {
+    text-align: right;
+  }
+}
+
+.playCell {
+  width: 3rem;
+}
+
+.title {
+  font-weight: 600;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+
+  &:hover {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+}
+
+.play {
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 1px solid var(--color-moss);
+  border-radius: 50%;
+  color: var(--color-bark);
+
+  &:hover {
+    background: var(--color-leaf);
+  }
+}
+
+.tiles {
+  display: grid;
+}
+
+.tile {
+  display: grid;
+  grid-template-columns: clamp(4rem, 14vw, 6rem) minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-moss);
+}
+
+.frame {
+  display: grid;
+  grid-template-areas: 'frame';
+  aspect-ratio: 2 / 3;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--color-canopy);
+
+  &:hover .image {
+    filter: brightness(1.12);
+  }
+}
+
+.image,
+.placeholder {
+  grid-area: frame;
+}
+
+.image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: filter 150ms ease-out;
+}
+
+.placeholder {
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-size: var(--font-size-lg);
+  color: var(--color-lichen);
+}
+
+.body {
+  display: grid;
+  gap: var(--space-0);
+  min-width: 0;
+}
+
+.facts {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-lichen);
+  font-size: var(--font-size-xs);
+}
+
+@media (max-width: 40rem) {
+  .roomy {
+    display: none;
+  }
+}
