@@ -1,15 +1,11 @@
 import {
-  isBoolean,
-  isLibraryKind,
-  isLibraryView,
-  isMediaGroupBy,
-  isMediaSort,
-  isRecord,
-  isShownRatings,
-  isString,
-  isWatchedPercent,
-} from '@/guards'
-import type { LibraryInput, LibraryKind, LibrarySettings } from '@/types'
+  type LibraryInput,
+  type LibraryKind,
+  type LibrarySettings,
+  isLibrarySettings,
+  isLibrarySettingsChange,
+} from '@/contract'
+import { isRecord, isString } from '@/schema'
 
 export const LIBRARY_NAME_MAX = 80
 
@@ -67,25 +63,19 @@ export const withLibraryKind = ({
   }
 }
 
-/** Each setting's check, and what to say when a value fails it. */
-const SETTING_CHECKS: Record<
-  keyof LibrarySettings,
-  { valid: (value: unknown) => boolean; problem: string }
-> = {
-  saveProgress: { valid: isBoolean, problem: 'Save progress must be on or off.' },
-  pinned: { valid: isBoolean, problem: 'Pinned must be on or off.' },
-  sort: { valid: isMediaSort, problem: 'Sort is not one of the choices.' },
-  view: { valid: isLibraryView, problem: 'View is not one of the choices.' },
-  groupBy: { valid: isMediaGroupBy, problem: 'Group by is not one of the choices.' },
-  watchedPercent: {
-    valid: isWatchedPercent,
-    problem: 'Watched at must be a whole percentage from 1 to 100.',
-  },
-  kind: { valid: isLibraryKind, problem: 'Type is not one of the choices.' },
-  ratingsSource: { valid: isShownRatings, problem: 'Ratings shown is not one of the choices.' },
-  autoRefresh: { valid: isBoolean, problem: 'Refresh automatically must be on or off.' },
-  locked: { valid: isBoolean, problem: 'Lock with the PIN must be on or off.' },
-}
+/** What to say about each setting sent with a value it does not take. */
+const SETTING_PROBLEMS = {
+  saveProgress: 'Save progress must be on or off.',
+  pinned: 'Pinned must be on or off.',
+  sort: 'Sort is not one of the choices.',
+  view: 'View is not one of the choices.',
+  groupBy: 'Group by is not one of the choices.',
+  watchedPercent: 'Watched at must be a whole percentage from 1 to 100.',
+  kind: 'Type is not one of the choices.',
+  ratingsSource: 'Ratings shown is not one of the choices.',
+  autoRefresh: 'Refresh automatically must be on or off.',
+  locked: 'Lock with the PIN must be on or off.',
+} as const satisfies Record<keyof LibrarySettings, string>
 
 type SettingsResult = { settings: Partial<LibrarySettings>; errors: string[] }
 
@@ -93,22 +83,18 @@ type SettingsResult = { settings: Partial<LibrarySettings>; errors: string[] }
 const readSettings = (input: unknown): SettingsResult => {
   if (input === undefined) return { settings: {}, errors: [] }
   if (!isRecord(input)) return { settings: {}, errors: ['Settings must be an object.'] }
+  const valid = Object.fromEntries(
+    Object.entries(isLibrarySettings.shape)
+      .filter(([key, guard]) => guard(input[key]))
+      .map(([key]) => [key, input[key]]),
+  )
   return {
-    settings: {
-      ...(isBoolean(input.saveProgress) ? { saveProgress: input.saveProgress } : {}),
-      ...(isBoolean(input.pinned) ? { pinned: input.pinned } : {}),
-      ...(isMediaSort(input.sort) ? { sort: input.sort } : {}),
-      ...(isLibraryView(input.view) ? { view: input.view } : {}),
-      ...(isMediaGroupBy(input.groupBy) ? { groupBy: input.groupBy } : {}),
-      ...(isWatchedPercent(input.watchedPercent) ? { watchedPercent: input.watchedPercent } : {}),
-      ...(isLibraryKind(input.kind) ? { kind: input.kind } : {}),
-      ...(isShownRatings(input.ratingsSource) ? { ratingsSource: input.ratingsSource } : {}),
-      ...(isBoolean(input.autoRefresh) ? { autoRefresh: input.autoRefresh } : {}),
-      ...(isBoolean(input.locked) ? { locked: input.locked } : {}),
-    },
-    errors: Object.entries(SETTING_CHECKS)
-      .filter(([key, check]) => input[key] !== undefined && !check.valid(input[key]))
-      .map(([, check]) => check.problem),
+    settings: isLibrarySettingsChange(valid) ? valid : {},
+    errors: Object.entries(SETTING_PROBLEMS)
+      .filter(
+        ([key]) => input[key] !== undefined && !isLibrarySettingsChange({ [key]: input[key] }),
+      )
+      .map(([, problem]) => problem),
   }
 }
 

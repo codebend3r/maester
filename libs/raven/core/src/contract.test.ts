@@ -1,6 +1,24 @@
 import { describe, expect, it } from 'vitest'
 import {
+  ITEM_IMAGE_KINDS,
+  MEDIA_SORTS,
+  STREAM_MODES,
   isCredit,
+  isFavouriteChange,
+  isHwAccel,
+  isImageChoice,
+  isItemImageKind,
+  isItemMetadataChange,
+  isItemMetadataState,
+  isMatchChoice,
+  isMediaSort,
+  isPlaybackSettingsChange,
+  isProgressChange,
+  isServerHealth,
+  isShowMatchChoice,
+  isStreamMode,
+  isTmdbId,
+  isUnlockRequest,
   isHistoryEntry,
   isItemDetails,
   isItemSummary,
@@ -14,7 +32,7 @@ import {
   isReview,
   isServerEvent,
   isShowListing,
-} from '@/guards'
+} from '@/contract'
 import { itemDetails, itemSummary, library, mediaItem, review, showEntry } from '@/test/fixtures'
 
 describe('isMediaItem', () => {
@@ -204,5 +222,98 @@ describe('isMediaLocation', () => {
   it('takes a path', () => {
     expect(isMediaLocation({ path: '/media/Movies/Busboys (2026).mkv' })).toBe(true)
     expect(isMediaLocation({})).toBe(false)
+  })
+})
+
+describe('the choice lists', () => {
+  it('derive each union from its own list', () => {
+    expect(MEDIA_SORTS).toHaveLength(15)
+    expect(isMediaSort('rating-high')).toBe(true)
+    expect(isMediaSort('loudest')).toBe(false)
+    expect(STREAM_MODES).toEqual(['remux', 'transcode'])
+    expect(isStreamMode('direct')).toBe(false)
+    expect(ITEM_IMAGE_KINDS).toEqual(['poster', 'backdrop', 'still'])
+    expect(isItemImageKind('banner')).toBe(false)
+    expect(isHwAccel('vaapi')).toBe(true)
+    expect(isHwAccel('cuda')).toBe(false)
+  })
+})
+
+describe('the change guards', () => {
+  it('takes part of the playback settings, each a value it takes', () => {
+    expect(isPlaybackSettingsChange({ quality: 'high' })).toBe(true)
+    expect(isPlaybackSettingsChange({ maxHeight: 2160, tonemap: false })).toBe(true)
+    expect(isPlaybackSettingsChange({ maxHeight: 480 })).toBe(false)
+    expect(isPlaybackSettingsChange({ quality: 'high', colour: 'red' })).toBe(false)
+  })
+
+  it('takes metadata fields written over or cleared, and nothing else', () => {
+    expect(isItemMetadataChange({ title: 'Heat', year: null })).toBe(true)
+    expect(isItemMetadataChange({ year: '1995' })).toBe(false)
+    expect(isItemMetadataChange({ studio: 'Warner' })).toBe(false)
+  })
+
+  it('names only the fields Edit metadata knows as written over', () => {
+    const metadata = {
+      title: 'Heat',
+      year: 1995,
+      tagline: null,
+      summary: null,
+      contentRating: null,
+    }
+    expect(
+      isItemMetadataState({ shown: metadata, original: metadata, overridden: ['title'] }),
+    ).toBe(true)
+    expect(
+      isItemMetadataState({ shown: metadata, original: metadata, overridden: ['studio'] }),
+    ).toBe(false)
+  })
+})
+
+describe('the request bodies', () => {
+  it('takes a position at or past the start', () => {
+    expect(isProgressChange({ position: 0 })).toBe(true)
+    expect(isProgressChange({ position: 61.5 })).toBe(true)
+    expect(isProgressChange({ position: -1 })).toBe(false)
+    expect(isProgressChange({ position: '61' })).toBe(false)
+  })
+
+  it('takes a favourite flag and a PIN', () => {
+    expect(isFavouriteChange({ favourite: false })).toBe(true)
+    expect(isFavouriteChange({ favourite: 'yes' })).toBe(false)
+    expect(isUnlockRequest({ pin: '1234' })).toBe(true)
+    expect(isUnlockRequest({})).toBe(false)
+  })
+
+  it('takes a TMDB id for Fix match, or null for a file that is not one', () => {
+    expect(isTmdbId('603')).toBe(true)
+    expect(isTmdbId('tt0133093')).toBe(false)
+    expect(isMatchChoice({ tmdbId: '603' })).toBe(true)
+    expect(isMatchChoice({ tmdbId: null })).toBe(true)
+    expect(isMatchChoice({ tmdbId: 603 })).toBe(false)
+    expect(isShowMatchChoice({ tmdbId: '95396' })).toBe(true)
+    expect(isShowMatchChoice({ tmdbId: null })).toBe(false)
+  })
+
+  it("takes one of TMDB's pictures with its path, or the one beside the media", () => {
+    expect(isImageChoice({ source: 'tmdb', ref: '/poster.jpg' })).toBe(true)
+    expect(isImageChoice({ source: 'local' })).toBe(true)
+    expect(isImageChoice({ source: 'tmdb' })).toBe(false)
+    expect(isImageChoice({ source: 'web', ref: '/poster.jpg' })).toBe(false)
+  })
+})
+
+describe('isServerHealth', () => {
+  it('takes the whole health check, its metadata included', () => {
+    const health = {
+      status: 'ok',
+      ffmpeg: null,
+      tonemap: false,
+      encoder: 'vaapi',
+      thumbnailsPending: 2,
+      metadata: { tmdb: 'off', omdb: 'off', pending: 0, error: null, lastOk: null },
+    }
+    expect(isServerHealth(health)).toBe(true)
+    expect(isServerHealth({ ...health, encoder: 'nvenc' })).toBe(false)
   })
 })

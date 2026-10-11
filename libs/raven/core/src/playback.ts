@@ -1,4 +1,4 @@
-import type { MediaItem, PlaybackMode, PlaybackSettings, StreamMode } from '@/types'
+import type { MediaItem, PlaybackMode, PlaybackSettings, StreamMode } from '@/contract'
 
 /**
  * Asks the client whether it can decode a MIME type such as

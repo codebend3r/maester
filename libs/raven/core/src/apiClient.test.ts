@@ -372,8 +372,22 @@ describe('the metadata calls', () => {
 
   it('reads the metadata part of the health check', async () => {
     const metadata = { tmdb: 'ok', omdb: 'off', pending: 3, error: null, lastOk: null }
-    const { client } = clientReturning(respond({ body: { status: 'ok', metadata } }))
+    const health = {
+      status: 'ok',
+      ffmpeg: '7.1',
+      tonemap: true,
+      encoder: 'software',
+      thumbnailsPending: 0,
+      metadata,
+    }
+    const { client } = clientReturning(respond({ body: health }))
     await expect(client.getMetadataHealth()).resolves.toEqual(metadata)
+  })
+
+  it('refuses a health check it does not understand', async () => {
+    const metadata = { tmdb: 'ok', omdb: 'off', pending: 3, error: null, lastOk: null }
+    const { client } = clientReturning(respond({ body: { status: 'ok', metadata } }))
+    await expect(client.getMetadataHealth()).rejects.toMatchObject({ status: 502 })
   })
 
   it('builds versioned image URLs, and none without a version', () => {

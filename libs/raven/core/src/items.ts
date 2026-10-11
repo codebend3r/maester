@@ -1,4 +1,4 @@
-import type { ItemSummary, MediaItem, Rating, ShownRatings } from '@/types'
+import type { ItemSummary, MediaItem, Rating, RatingSource } from '@/contract'
 
 const pad = (value: number): string => String(value).padStart(2, '0')
 
@@ -50,7 +50,7 @@ export const pickScore = ({
   source,
 }: {
   ratings: readonly Rating[]
-  source: ShownRatings
+  source: RatingSource
 }): Rating | null =>
   ratings.find((rating) => rating.source === source) ??
   ratings.find((rating) => rating.source === 'tmdb') ??

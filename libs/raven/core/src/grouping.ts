@@ -1,6 +1,6 @@
 import { resolutionLabel } from '@/media'
 import { codecLabel } from '@/playback'
-import type { MatchState, MediaGroupBy, MediaItem } from '@/types'
+import type { MatchState, MediaGroupBy, MediaItem } from '@/contract'
 
 /** One bucket of the grouped view, its videos in the order they came in. */
 export type MediaGroup = {

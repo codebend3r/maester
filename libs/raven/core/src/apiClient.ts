@@ -1,4 +1,35 @@
 import {
+  type ChoosableImageKind,
+  type DirectoryListing,
+  type FavouriteChange,
+  type HistoryEntry,
+  type ImageChoice,
+  type ImageOption,
+  type ItemDetails,
+  type ItemImageKind,
+  type ItemImageOptions,
+  type ItemMetadataChange,
+  type ItemMetadataState,
+  type Library,
+  type LibraryInput,
+  type LockState,
+  type MatchCandidate,
+  type MatchChoice,
+  type MatchItemType,
+  type MediaItem,
+  type MediaLocation,
+  type MediaTracks,
+  type MetadataHealth,
+  type PersonDetails,
+  type PlaybackSettings,
+  type PlaybackSettingsState,
+  type ProgressChange,
+  type ServerEvent,
+  type ShowListing,
+  type ShowMatchChoice,
+  type StreamMode,
+  type SubtitleCue,
+  type UnlockRequest,
   isDirectoryListing,
   isHistory,
   isItemDetails,
@@ -12,44 +43,16 @@ import {
   isMediaList,
   isMediaLocation,
   isMediaTracks,
-  isMetadataHealth,
   isPersonDetails,
   isPlaybackSettingsState,
-  isRecord,
   isServerEvent,
+  isServerHealth,
   isShowListing,
-  isString,
-  isStringArray,
-} from '@/guards'
+} from '@/contract'
+import { type MediaListOptions, mediaListQuery } from '@/mediaListQuery'
 import { toQueryString } from '@/query'
+import { type Guard, isRecord, isString, isStringArray, nullable } from '@/schema'
 import { parseWebVtt } from '@/subtitles'
-import type {
-  DirectoryListing,
-  HistoryEntry,
-  ImageChoice,
-  ImageOption,
-  ItemDetails,
-  ItemImageKind,
-  ItemImageOptions,
-  ItemMetadataChange,
-  ItemMetadataState,
-  Library,
-  LibraryInput,
-  LockState,
-  MatchCandidate,
-  MediaItem,
-  MediaLocation,
-  MediaSort,
-  MediaTracks,
-  MetadataHealth,
-  PersonDetails,
-  PlaybackSettings,
-  PlaybackSettingsState,
-  ServerEvent,
-  ShowListing,
-  StreamMode,
-  SubtitleCue,
-} from '@/types'
 
 /**
  * The slice of `fetch` the client uses, spelled out structurally so this
@@ -86,7 +89,7 @@ export class ApiError extends Error {
 export const LOCKED_STATUS = 423
 
 /** A call refused because what it asked for sits in a locked library. */
-export const isLockedError = (error: unknown): boolean =>
+export const isLockedError = (error: unknown): error is ApiError =>
   error instanceof ApiError && error.status === LOCKED_STATUS
 
 /** Nest's error body carries `message` as a string or, for validation, a list. */
@@ -132,39 +135,23 @@ export const createApiClient = ({
   const root = baseUrl.replace(/\/+$/, '')
   const url = (path: string): string => `${root}${path}`
 
-  const send = async ({
+  /** Calls the server, failing with its own message when it says no. */
+  const call = async ({
     path,
     method = 'GET',
+    accept = 'application/json',
     body,
   }: {
     path: string
     method?: string
+    accept?: string
     body?: unknown
-  }): Promise<unknown> => {
+  }): Promise<FetchResponse> => {
     const response = await fetch(url(path), {
       method,
-      headers:
-        body === undefined
-          ? { accept: 'application/json' }
-          : {
-              accept: 'application/json',
-              'content-type': 'application/json',
-            },
+      headers: body === undefined ? { accept } : { accept, 'content-type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),
     })
-    const parsed = response.status === 204 ? null : await readJson(response)
-    if (!response.ok) {
-      throw new ApiError({
-        status: response.status,
-        message: errorMessage({ body: parsed, fallback: response.statusText || 'Request failed' }),
-      })
-    }
-    return parsed
-  }
-
-  /** A plain-text body, such as WebVTT, failing like `send` does. */
-  const sendForText = async (path: string): Promise<string> => {
-    const response = await fetch(url(path), { method: 'GET', headers: { accept: 'text/vtt' } })
     if (!response.ok) {
       throw new ApiError({
         status: response.status,
@@ -174,15 +161,28 @@ export const createApiClient = ({
         }),
       })
     }
-    return response.text()
+    return response
   }
+
+  const send = async (request: {
+    path: string
+    method?: string
+    body?: unknown
+  }): Promise<unknown> => {
+    const response = await call(request)
+    return response.status === 204 ? null : readJson(response)
+  }
+
+  /** A plain-text body, such as WebVTT. */
+  const sendForText = async (path: string): Promise<string> =>
+    (await call({ path, accept: 'text/vtt' })).text()
 
   const expect = async <T>({
     request,
     guard,
   }: {
     request: Promise<unknown>
-    guard: (value: unknown) => value is T
+    guard: Guard<T>
   }): Promise<T> => {
     const value = await request
     if (!guard(value)) {
@@ -223,7 +223,11 @@ export const createApiClient = ({
     /** Opens every locked library for this browser; a wrong PIN fails with the server's reason. */
     unlock: (pin: string): Promise<LockState> =>
       expect({
-        request: send({ path: '/api/lock/unlock', method: 'POST', body: { pin } }),
+        request: send({
+          path: '/api/lock/unlock',
+          method: 'POST',
+          body: { pin } satisfies UnlockRequest,
+        }),
         guard: isLockState,
       }),
 
@@ -247,25 +251,14 @@ export const createApiClient = ({
     /** `seed` only counts with a random sort: the same seed deals the same order. */
     listMedia: ({
       libraryId,
-      search = '',
-      sort = 'title',
-      seed,
-    }: {
-      libraryId: number
-      search?: string
-      sort?: MediaSort
-      seed?: number
-    }): Promise<MediaItem[]> => {
-      const query = toQueryString({
-        sort,
-        ...(sort === 'random' && seed !== undefined ? { seed: String(seed) } : {}),
-        ...(search.trim() ? { q: search.trim() } : {}),
-      })
-      return expect({
-        request: send({ path: `/api/libraries/${libraryId}/media?${query}` }),
+      ...options
+    }: { libraryId: number } & MediaListOptions): Promise<MediaItem[]> =>
+      expect({
+        request: send({
+          path: `/api/libraries/${libraryId}/media?${mediaListQuery.encode(options)}`,
+        }),
         guard: isMediaList,
-      })
-    },
+      }),
 
     getMedia: (id: number): Promise<MediaItem> =>
       expect({ request: send({ path: `/api/media/${id}` }), guard: isMediaItem }),
@@ -275,12 +268,20 @@ export const createApiClient = ({
       expect({ request: send({ path: `/api/media/${id}/location` }), guard: isMediaLocation }),
 
     saveProgress: async ({ id, position }: { id: number; position: number }): Promise<void> => {
-      await send({ path: `/api/media/${id}/progress`, method: 'PUT', body: { position } })
+      await send({
+        path: `/api/media/${id}/progress`,
+        method: 'PUT',
+        body: { position } satisfies ProgressChange,
+      })
     },
 
     setFavourite: ({ id, favourite }: { id: number; favourite: boolean }): Promise<MediaItem> =>
       expect({
-        request: send({ path: `/api/media/${id}/favourite`, method: 'PUT', body: { favourite } }),
+        request: send({
+          path: `/api/media/${id}/favourite`,
+          method: 'PUT',
+          body: { favourite } satisfies FavouriteChange,
+        }),
         guard: isMediaItem,
       }),
 
@@ -341,37 +342,30 @@ export const createApiClient = ({
      */
     listShows: ({
       libraryId,
-      search = '',
-      sort = 'title',
-      seed,
-    }: {
-      libraryId: number
-      search?: string
-      sort?: MediaSort
-      seed?: number
-    }): Promise<ShowListing> => {
-      const query = toQueryString({
-        sort,
-        ...(sort === 'random' && seed !== undefined ? { seed: String(seed) } : {}),
-        ...(search.trim() ? { q: search.trim() } : {}),
-      })
-      return expect({
-        request: send({ path: `/api/libraries/${libraryId}/shows?${query}` }),
+      ...options
+    }: { libraryId: number } & MediaListOptions): Promise<ShowListing> =>
+      expect({
+        request: send({
+          path: `/api/libraries/${libraryId}/shows?${mediaListQuery.encode(options)}`,
+        }),
         guard: isShowListing,
-      })
-    },
+      }),
 
     /** The first episode of a show not yet watched, in whichever library holds it, or null when every one is. */
     nextEpisode: (showId: number): Promise<MediaItem | null> =>
       expect({
         request: send({ path: `/api/items/${showId}/next` }),
-        guard: (value): value is MediaItem | null => value === null || isMediaItem(value),
+        guard: nullable(isMediaItem),
       }),
 
     /** Points every file under a show at another show, keeping their numbers; returns the show they moved to. */
     setItemMatch: ({ itemId, tmdbId }: { itemId: number; tmdbId: string }): Promise<ItemDetails> =>
       expect({
-        request: send({ path: `/api/items/${itemId}/match`, method: 'PUT', body: { tmdbId } }),
+        request: send({
+          path: `/api/items/${itemId}/match`,
+          method: 'PUT',
+          body: { tmdbId } satisfies ShowMatchChoice,
+        }),
         guard: isItemDetails,
       }),
 
@@ -392,7 +386,7 @@ export const createApiClient = ({
       query,
       year,
     }: {
-      type: 'movie' | 'show'
+      type: MatchItemType
       query: string
       year?: number | null
     }): Promise<MatchCandidate[]> =>
@@ -419,22 +413,17 @@ export const createApiClient = ({
       tmdbId: string | null
     }): Promise<MediaItem> =>
       expect({
-        request: send({ path: `/api/media/${mediaId}/match`, method: 'PUT', body: { tmdbId } }),
+        request: send({
+          path: `/api/media/${mediaId}/match`,
+          method: 'PUT',
+          body: { tmdbId } satisfies MatchChoice,
+        }),
         guard: isMediaItem,
       }),
 
     /** How matching is doing, and whether TMDB is configured at all. */
-    getMetadataHealth: async (): Promise<MetadataHealth> => {
-      const health = await send({ path: '/api/health' })
-      const metadata = isRecord(health) ? health.metadata : null
-      if (!isMetadataHealth(metadata)) {
-        throw new ApiError({
-          status: 502,
-          message: 'The server sent a response this client does not understand.',
-        })
-      }
-      return metadata
-    },
+    getMetadataHealth: async (): Promise<MetadataHealth> =>
+      (await expect({ request: send({ path: '/api/health' }), guard: isServerHealth })).metadata,
 
     /** An item's poster, backdrop or still; null when it has none. Versioned, so cached for good. */
     itemImageUrl: ({
@@ -527,7 +516,7 @@ export const createApiClient = ({
       choice,
     }: {
       id: number
-      kind: 'poster' | 'backdrop'
+      kind: ChoosableImageKind
       choice: ImageChoice
     }): Promise<ItemDetails> =>
       expect({
@@ -542,7 +531,7 @@ export const createApiClient = ({
       option,
     }: {
       id: number
-      kind: 'poster' | 'backdrop'
+      kind: ChoosableImageKind
       option: ImageOption
     }): string =>
       option.source === 'local'

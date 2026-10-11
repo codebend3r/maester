@@ -1,4 +1,4 @@
-import type { SubtitleCue } from '@/types'
+import type { SubtitleCue } from '@/contract'
 
 /**
  * Embedded subtitles are extracted a window at a time. They are interleaved

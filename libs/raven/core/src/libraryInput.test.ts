@@ -5,7 +5,7 @@ import {
   validateLibraryInput,
   withLibraryKind,
 } from '@/libraryInput'
-import type { LibrarySettings } from '@/types'
+import type { LibrarySettings } from '@/contract'
 
 describe('validateLibraryInput', () => {
   it('trims the name and tidies the paths', () => {

@@ -1,0 +1,737 @@
+import {
+  type Guard,
+  type Infer,
+  isBoolean,
+  isNumber,
+  isString,
+  isStringArray,
+  listOf,
+  keyOf,
+  nullable,
+  object,
+  oneOf,
+  union,
+  exactPartial,
+} from '@/schema'
+
+/**
+ * The API contract between the media server and every client. Anything a
+ * client renders, or the server returns, is one of these shapes, so the web
+ * app and a future native app agree on the wire format by construction.
+ *
+ * Each shape is written once, as the guard that checks it, and its type is
+ * read off the guard. `response.json()` and a request body are both
+ * `unknown` until one of these says otherwise, which is what lets every
+ * client and the server skip casts entirely.
+ */
+
+export const isScanState = oneOf(['idle', 'scanning'])
+
+export type ScanState = Infer<typeof isScanState>
+
+export const isScanStatus = object({
+  state: isScanState,
+  /** Video files the walk found under the library's paths. */
+  discovered: isNumber,
+  /** Files already indexed: unchanged ones count straight away, new and changed ones once probed. */
+  processed: isNumber,
+  startedAt: nullable(isString),
+  finishedAt: nullable(isString),
+  /** The last scan's failure, cleared when the next scan starts. */
+  error: nullable(isString),
+})
+
+export type ScanStatus = Infer<typeof isScanStatus>
+
+export const isMediaSort = oneOf([
+  'title',
+  'added',
+  'oldest',
+  'changed',
+  'largest',
+  'smallest',
+  'bitrate-high',
+  'bitrate-low',
+  'resolution-high',
+  'resolution-low',
+  'year-new',
+  'year-old',
+  'rating-high',
+  'rating-low',
+  'random',
+])
+
+/**
+ * `added` is newest first and `oldest` the reverse; `changed` puts the files
+ * last found, renamed, moved or replaced first. Resolution ranks by
+ * pixel count. `random` shuffles by a seed the client sends, so the order
+ * holds across refetches until the client deals a new one.
+ */
+export type MediaSort = Infer<typeof isMediaSort>
+
+export const MEDIA_SORTS = isMediaSort.values
+
+export const isLibraryView = oneOf(['grid', 'list', 'tiles', 'grouped'])
+
+export type LibraryView = Infer<typeof isLibraryView>
+
+export const LIBRARY_VIEWS = isLibraryView.values
+
+export const isLibraryKind = oneOf(['movies', 'shows', 'other'])
+
+export type LibraryKind = Infer<typeof isLibraryKind>
+
+export const LIBRARY_KINDS = isLibraryKind.values
+
+export const isMediaGroupBy = oneOf(['match', 'resolution', 'codec', 'month'])
+
+/** `match` buckets a Movies or TV shows library by how far matching got. */
+export type MediaGroupBy = Infer<typeof isMediaGroupBy>
+
+export const MEDIA_GROUPINGS = isMediaGroupBy.values
+
+export const isRatingSource = oneOf(['tmdb', 'imdb', 'rottenTomatoes', 'metacritic'])
+
+export type RatingSource = Infer<typeof isRatingSource>
+
+export const RATING_SOURCES = isRatingSource.values
+
+/** @deprecated The same as `RatingSource`; use that. */
+export type ShownRatings = RatingSource
+
+/** @deprecated The same as `isRatingSource`; use that. */
+export const isShownRatings = isRatingSource
+
+/** @deprecated The same as `RATING_SOURCES`; use that. */
+export const SHOWN_RATINGS = RATING_SOURCES
+
+/** A whole percentage from 1 to 100. */
+export const isWatchedPercent = (value: unknown): value is number =>
+  isNumber(value) && Number.isInteger(value) && value >= 1 && value <= 100
+
+/** How a library behaves, each one set per library. */
+export const isLibrarySettings = object({
+  /** Remember where each video stopped and resume there. Off keeps saved spots without using them. */
+  saveProgress: isBoolean,
+  /** Give the library its own link in the side menu. */
+  pinned: isBoolean,
+  /** The order its videos are listed in. */
+  sort: isMediaSort,
+  /** How its videos are laid out: cards, a table, tiles, or cards in groups. */
+  view: isLibraryView,
+  /** What the grouped view buckets videos by. */
+  groupBy: isMediaGroupBy,
+  /** How far into a video, as a whole percentage, a play must get for it to count as watched. */
+  watchedPercent: isWatchedPercent,
+  /** What the library holds: movies, TV shows, or anything else. */
+  kind: isLibraryKind,
+  /** Whose score its cards show and its rating sorts use; TMDB's stands in where that source has none. */
+  ratingsSource: isRatingSource,
+  /** Watch the folders and take in videos added, removed, renamed or replaced there as it happens. */
+  autoRefresh: isBoolean,
+  /** Private: its videos stay hidden until the server's PIN is entered. */
+  locked: isBoolean,
+})
+
+export type LibrarySettings = Infer<typeof isLibrarySettings>
+
+/** Some of a library's settings, each a value it takes, and nothing else. */
+export const isLibrarySettingsChange = exactPartial(isLibrarySettings.shape)
+
+export const isLibrary = object({
+  id: isNumber,
+  name: isString,
+  /** Absolute folder paths as the server sees them (container paths under Docker). */
+  paths: isStringArray,
+  itemCount: isNumber,
+  /** Files no movie or show was found for; 0 in a library that is not matched. */
+  unmatchedCount: isNumber,
+  createdAt: isString,
+  scan: isScanStatus,
+  settings: isLibrarySettings,
+})
+
+export type Library = Infer<typeof isLibrary>
+
+export const isLibraryList = listOf(isLibrary)
+
+/**
+ * What a client sends to create a library or replace its name and paths.
+ * Settings left out keep their defaults on create and their current values
+ * on update, so a client can change one without knowing the rest.
+ * `validateLibraryInput` checks it, with a reason for each problem.
+ */
+export type LibraryInput = {
+  name: string
+  paths: string[]
+  settings?: Partial<LibrarySettings>
+}
+
+export const isThumbnailState = oneOf(['pending', 'ready', 'failed'])
+
+export type ThumbnailState = Infer<typeof isThumbnailState>
+
+export const isMatchState = oneOf(['pending', 'matched', 'manual', 'unmatched', 'off'])
+
+/**
+ * `pending` waits for matching, `matched` found its item by itself,
+ * `manual` was chosen with Fix match, `unmatched` found nothing sure, and
+ * `off` is a library that is not Movies or TV shows, or an extra.
+ */
+export type MatchState = Infer<typeof isMatchState>
+
+export const isItemType = oneOf(['movie', 'show', 'season', 'episode'])
+
+export type ItemType = Infer<typeof isItemType>
+
+/** What Fix match and matching look files up as on TMDB. */
+export type MatchItemType = Extract<ItemType, 'movie' | 'show'>
+
+export const isRating = object({
+  source: isRatingSource,
+  /** Rotten Tomatoes and Metacritic are critics; TMDB and IMDb are audiences. */
+  kind: oneOf(['critic', 'audience']),
+  /** Out of 10. */
+  value: isNumber,
+  votes: nullable(isNumber),
+})
+
+export type Rating = Infer<typeof isRating>
+
+/** What a card needs to show a movie, show, season or episode. */
+export const isItemSummary = object({
+  id: isNumber,
+  type: isItemType,
+  title: isString,
+  year: nullable(isNumber),
+  /** For seasons and episodes: the show they belong to. */
+  show: nullable(object({ id: isNumber, title: isString })),
+  season: nullable(isNumber),
+  episode: nullable(isNumber),
+  /** Changes whenever the poster does; null when there is none. */
+  posterVersion: nullable(isString),
+  /** Every score it has, one per source. */
+  ratings: listOf(isRating),
+})
+
+export type ItemSummary = Infer<typeof isItemSummary>
+
+export const isItemSummaryList = listOf(isItemSummary)
+
+export const isMediaItem = object({
+  id: isNumber,
+  libraryId: isNumber,
+  title: isString,
+  fileName: isString,
+  /** The folder the file sits in, relative to the library path that found it; '' at the root. */
+  folder: isString,
+  size: isNumber,
+  /** Normalised from the file extension: 'mp4', 'mkv', 'webm', 'mov', ... */
+  container: isString,
+  /** Seconds, or null until the file has been probed. */
+  duration: nullable(isNumber),
+  width: nullable(isNumber),
+  height: nullable(isNumber),
+  /** ffprobe codec names: 'h264', 'hevc', 'vp9', 'av1', ... */
+  videoCodec: nullable(isString),
+  videoBitDepth: nullable(isNumber),
+  hdr: isBoolean,
+  /** ffprobe codec names: 'aac', 'ac3', 'eac3', 'opus', 'truehd', ... */
+  audioCodec: nullable(isString),
+  audioChannels: nullable(isNumber),
+  /** Bits per second across the whole file. */
+  bitrate: nullable(isNumber),
+  thumbnail: isThumbnailState,
+  /** Changes whenever the file does, so a thumbnail URL can be cached forever. */
+  thumbnailVersion: isNumber,
+  /** Where playback last stopped, in seconds; 0 when never started or finished. */
+  position: isNumber,
+  favourite: isBoolean,
+  addedAt: isString,
+  /** When the file last changed on disk: found, renamed, moved or replaced. */
+  changedAt: isString,
+  /** How far matching got: see `MatchState`. */
+  match: isMatchState,
+  /** The year the name gives, in a Movies or TV shows library; null elsewhere. */
+  year: nullable(isNumber),
+  /** Plex's `{edition-...}` from the name. */
+  edition: nullable(isString),
+  /** The movie or episode this file is, once matched. */
+  item: nullable(isItemSummary),
+  /** How many files in its library are the same movie, this one included; 1 for anything else. */
+  versions: isNumber,
+})
+
+export type MediaItem = Infer<typeof isMediaItem>
+
+export const isMediaList = listOf(isMediaItem)
+
+export const isCreditJob = oneOf(['cast', 'guest', 'director', 'writer', 'creator', 'producer'])
+
+export type CreditJob = Infer<typeof isCreditJob>
+
+export const isCredit = object({
+  personId: isNumber,
+  name: isString,
+  job: isCreditJob,
+  /** The character, or the job in full: "Screenplay", "Novel". */
+  role: nullable(isString),
+  photoVersion: nullable(isString),
+})
+
+export type Credit = Infer<typeof isCredit>
+
+/** A review by a TMDB member, as TMDB hands it on. */
+export const isReview = object({
+  id: isNumber,
+  author: isString,
+  /** Changes with the avatar; null when TMDB hosts none. */
+  avatarVersion: nullable(isString),
+  /** Out of 10, when the author gave one. */
+  rating: nullable(isNumber),
+  /** Plain text; never rendered as HTML. */
+  content: isString,
+  /** The review on TMDB. */
+  url: isString,
+  writtenAt: isString,
+})
+
+export type Review = Infer<typeof isReview>
+
+/** Everything a movie, show, season or episode page shows. */
+export const isItemDetails = object({
+  ...isItemSummary.shape,
+  tmdbId: isString,
+  imdbId: nullable(isString),
+  originalTitle: nullable(isString),
+  tagline: nullable(isString),
+  summary: nullable(isString),
+  contentRating: nullable(isString),
+  released: nullable(isString),
+  ended: nullable(isString),
+  /** Minutes, from TMDB; pages prefer the file's own length. */
+  runtime: nullable(isNumber),
+  studio: nullable(isString),
+  genres: isStringArray,
+  /** The backdrop's version; for an episode, its still's. */
+  backdropVersion: nullable(isString),
+  credits: listOf(isCredit),
+  /** Reviews by TMDB members, newest first; at most ten. */
+  reviews: listOf(isReview),
+  /** Every file that is this item, in any library, best first. */
+  versions: isMediaList,
+  /** A show's seasons, or a season's episodes, in order. */
+  children: isItemSummaryList,
+})
+
+export type ItemDetails = Infer<typeof isItemDetails>
+
+/** A show in a TV shows library's listing. */
+export const isShowEntry = object({
+  show: isItemSummary,
+  /** Distinct episodes on disk. */
+  episodes: isNumber,
+  /** The year the show ended, or null while it still airs. */
+  endedYear: nullable(isNumber),
+  /** When its newest file arrived. */
+  addedAt: isString,
+  /** The first episode not yet watched by the library's measure, or null when every one is. */
+  next: nullable(isMediaItem),
+})
+
+export type ShowEntry = Infer<typeof isShowEntry>
+
+/** A TV shows library: its shows, and the files no show was found for. */
+export const isShowListing = object({
+  shows: listOf(isShowEntry),
+  unmatched: isMediaList,
+})
+
+export type ShowListing = Infer<typeof isShowListing>
+
+/** A person's page: who they are, and everything in raven they are credited on. */
+export const isPersonDetails = object({
+  id: isNumber,
+  name: isString,
+  photoVersion: nullable(isString),
+  /** Movies and shows on disk, newest first. */
+  credits: listOf(object({ item: isItemSummary, job: isCreditJob, role: nullable(isString) })),
+})
+
+export type PersonDetails = Infer<typeof isPersonDetails>
+
+export const isItemImageKind = oneOf(['poster', 'backdrop', 'still'])
+
+/** The pictures an item can have. */
+export type ItemImageKind = Infer<typeof isItemImageKind>
+
+export const ITEM_IMAGE_KINDS = isItemImageKind.values
+
+/** One picture a movie or show could show: a file beside the media, or one of TMDB's. */
+export const isImageOption = object({
+  source: oneOf(['local', 'tmdb']),
+  /** The file's path for `local`; TMDB's path for `tmdb`, served through `imageOptionUrl`. */
+  ref: isString,
+  width: nullable(isNumber),
+  height: nullable(isNumber),
+  /** ISO 639-1, or null for a picture with no text. */
+  language: nullable(isString),
+  /** Whether the item shows this one now. */
+  current: isBoolean,
+})
+
+export type ImageOption = Infer<typeof isImageOption>
+
+/** Everything a movie or show could show as its poster and backdrop. */
+export const isItemImageOptions = object({
+  poster: listOf(isImageOption),
+  backdrop: listOf(isImageOption),
+})
+
+export type ItemImageOptions = Infer<typeof isItemImageOptions>
+
+/** The pictures Edit images can choose: the ones `ItemImageOptions` offers. */
+export type ChoosableImageKind = keyof ItemImageOptions
+
+/** What Edit images picks: one of TMDB's pictures, or the one beside the media. */
+export const isImageChoice = union(
+  object({ source: oneOf(['tmdb']), ref: isString }),
+  object({ source: oneOf(['local']) }),
+)
+
+export type ImageChoice = Infer<typeof isImageChoice>
+
+/** The values each playback setting takes. */
+export const PLAYBACK_CHOICES = {
+  directPlay: ['auto', 'force'],
+  transcoding: ['on', 'remuxOnly', 'off'],
+  maxHeight: [2160, 1080, 720],
+  quality: ['low', 'medium', 'high'],
+  hwAccel: ['auto', 'none', 'vaapi', 'videotoolbox'],
+} as const
+
+export const isHwAccel = oneOf(PLAYBACK_CHOICES.hwAccel)
+
+/** What encodes a transcode: `auto` takes the GPU the machine has, `none` keeps to the CPU. */
+export type HwAccel = Infer<typeof isHwAccel>
+
+/** How the server plays video, set once for every viewer in Settings. */
+export const isPlaybackSettings = object({
+  /**
+   * `auto` plays the original file when the browser takes it and converts
+   * otherwise; `force` always sends the original file, for a browser the
+   * check underrates.
+   */
+  directPlay: oneOf(PLAYBACK_CHOICES.directPlay),
+  /**
+   * `on` remuxes and transcodes as needed; `remuxOnly` never re-encodes
+   * video; `off` converts nothing, so only files the browser plays as they
+   * are play.
+   */
+  transcoding: oneOf(PLAYBACK_CHOICES.transcoding),
+  /** The frame a transcode is scaled down to. */
+  maxHeight: oneOf(PLAYBACK_CHOICES.maxHeight),
+  /** How hard a transcode is squeezed: `low` for a slow network, `high` for a big screen. */
+  quality: oneOf(PLAYBACK_CHOICES.quality),
+  /** What encodes a transcode: `auto` takes the GPU the machine has, `none` keeps to the CPU. */
+  hwAccel: isHwAccel,
+  /** Whether HDR is tone mapped to SDR on a transcode when the build can. */
+  tonemap: isBoolean,
+})
+
+export type PlaybackSettings = Infer<typeof isPlaybackSettings>
+
+export const DEFAULT_PLAYBACK_SETTINGS: PlaybackSettings = {
+  directPlay: 'auto',
+  transcoding: 'on',
+  maxHeight: 1080,
+  quality: 'medium',
+  hwAccel: 'auto',
+  tonemap: true,
+}
+
+/** A change sends any of the fields; each given must be a value the setting takes. */
+export const isPlaybackSettingsChange = exactPartial(isPlaybackSettings.shape)
+
+export const isEncoderKind = oneOf(['software', 'vaapi', 'videotoolbox'])
+
+/** What transcodes encode with: the CPU, or a GPU through VAAPI or VideoToolbox. */
+export type EncoderKind = Infer<typeof isEncoderKind>
+
+/** The settings as kept, with what they come to on this machine. */
+export const isPlaybackSettingsState = object({
+  settings: isPlaybackSettings,
+  effective: object({
+    /** What transcodes encode with, after the test encode. */
+    encoder: isEncoderKind,
+    /** Whether this ffmpeg can tone map at all. */
+    tonemapAvailable: isBoolean,
+  }),
+})
+
+export type PlaybackSettingsState = Infer<typeof isPlaybackSettingsState>
+
+/** The fields Edit metadata can write over: what a page shows for a movie or show. */
+export const isItemMetadata = object({
+  title: isString,
+  year: nullable(isNumber),
+  tagline: nullable(isString),
+  summary: nullable(isString),
+  contentRating: nullable(isString),
+})
+
+export type ItemMetadata = Infer<typeof isItemMetadata>
+
+/** Edit metadata: what the page shows, what TMDB says, and which fields were written over. */
+export const isItemMetadataState = object({
+  shown: isItemMetadata,
+  original: isItemMetadata,
+  overridden: listOf(keyOf(isItemMetadata.shape)),
+})
+
+export type ItemMetadataState = Infer<typeof isItemMetadataState>
+
+/** Only known fields, each text, a number for the year, or null; nothing else. */
+export const isItemMetadataChange = exactPartial({
+  title: nullable(isString),
+  year: nullable(isNumber),
+  tagline: nullable(isString),
+  summary: nullable(isString),
+  contentRating: nullable(isString),
+} satisfies { [K in keyof ItemMetadata]: Guard<ItemMetadata[K] | null> })
+
+/**
+ * What Edit metadata sends: each field given is written over, or cleared
+ * back to TMDB's with null. An empty field over TMDB's words is '', or 0 for
+ * the year, and shows as nothing; a title cannot be empty.
+ */
+export type ItemMetadataChange = Infer<typeof isItemMetadataChange>
+
+/** TMDB's ids are digits, which raven keeps as text. */
+export const isTmdbId = (value: unknown): value is string => isString(value) && /^\d+$/.test(value)
+
+/** One of TMDB's search results, offered by Fix match. */
+export const isMatchCandidate = object({
+  tmdbId: isString,
+  title: isString,
+  year: nullable(isNumber),
+  overview: nullable(isString),
+  /** TMDB's path for the poster, served through `candidatePosterUrl`. */
+  poster: nullable(isString),
+})
+
+export type MatchCandidate = Infer<typeof isMatchCandidate>
+
+export const isMatchCandidateList = listOf(isMatchCandidate)
+
+export const isMetadataServiceState = oneOf(['off', 'ok', 'failing'])
+
+/** `off` when not configured, `failing` when the last call went wrong. */
+export type MetadataServiceState = Infer<typeof isMetadataServiceState>
+
+/** How metadata is doing, from `/api/health`. */
+export const isMetadataHealth = object({
+  tmdb: isMetadataServiceState,
+  omdb: isMetadataServiceState,
+  /** Files waiting to be matched. */
+  pending: isNumber,
+  /** Why TMDB is failing, never the token itself. */
+  error: nullable(isString),
+  /** When TMDB last answered. */
+  lastOk: nullable(isString),
+})
+
+export type MetadataHealth = Infer<typeof isMetadataHealth>
+
+/** What `/api/health` answers: the server is up, and how its parts are doing. */
+export const isServerHealth = object({
+  status: oneOf(['ok']),
+  /** null when ffmpeg is missing, in which case nothing but direct play works. */
+  ffmpeg: nullable(isString),
+  /** Whether HDR thumbnails and transcodes get tone mapped to SDR. */
+  tonemap: isBoolean,
+  /** What transcodes encode with: the CPU, or a GPU through VAAPI or VideoToolbox. */
+  encoder: isEncoderKind,
+  thumbnailsPending: isNumber,
+  /** Whether TMDB is configured and answering, and how many files wait to be matched. */
+  metadata: isMetadataHealth,
+})
+
+export type ServerHealth = Infer<typeof isServerHealth>
+
+/** A video in a library's history: when it last played, how often, and how far it got. */
+export const isHistoryEntry = object({
+  media: isMediaItem,
+  lastPlayedAt: isString,
+  plays: isNumber,
+  /** The furthest any play got, in seconds. */
+  furthest: isNumber,
+  /** Whether a play got past the library's watched percentage. */
+  watched: isBoolean,
+})
+
+export type HistoryEntry = Infer<typeof isHistoryEntry>
+
+export const isHistory = listOf(isHistoryEntry)
+
+/**
+ * Whether locked libraries can be opened here: `available` once the server
+ * has a PIN, `unlocked` once this browser has entered it.
+ */
+export const isLockState = object({
+  available: isBoolean,
+  unlocked: isBoolean,
+})
+
+export type LockState = Infer<typeof isLockState>
+
+/** Where a video's file lives, as the server sees it (a container path under Docker). */
+export const isMediaLocation = object({
+  path: isString,
+})
+
+export type MediaLocation = Infer<typeof isMediaLocation>
+
+/**
+ * What the server tells a client as it happens: a library's videos changed,
+ * so whatever shows them should be read again.
+ */
+export const isServerEvent = object({
+  type: oneOf(['library']),
+  libraryId: isNumber,
+})
+
+export type ServerEvent = Infer<typeof isServerEvent>
+
+export const isDirectoryEntry = object({
+  name: isString,
+  path: isString,
+})
+
+export type DirectoryEntry = Infer<typeof isDirectoryEntry>
+
+export const isDirectoryListing = object({
+  path: isString,
+  /** null at the browse root, where the server will not go any higher. */
+  parent: nullable(isString),
+  directories: listOf(isDirectoryEntry),
+})
+
+export type DirectoryListing = Infer<typeof isDirectoryListing>
+
+export const isAudioTrack = object({
+  /** Position among the file's audio tracks, as ffmpeg's `0:a:N` counts them. */
+  index: isNumber,
+  /** ffprobe codec name: 'aac', 'eac3', 'truehd', ... */
+  codec: nullable(isString),
+  channels: nullable(isNumber),
+  /** Normalised by `languageTag`: 'en' for 'eng', 'English' or 'en-US'; null when untagged. */
+  language: nullable(isString),
+  title: nullable(isString),
+  default: isBoolean,
+})
+
+export type AudioTrack = Infer<typeof isAudioTrack>
+
+export const isSubtitleSource = oneOf(['embedded', 'external'])
+
+/** Embedded in the video file, or a file of its own beside it. */
+export type SubtitleSource = Infer<typeof isSubtitleSource>
+
+export const isSubtitleTrack = object({
+  /** Stable for the file: `embedded-N` for the Nth subtitle stream, `external-N` for the Nth sidecar. */
+  id: isString,
+  source: isSubtitleSource,
+  /** ffprobe codec name ('subrip', 'ass', 'hdmv_pgs_subtitle', ...), or the sidecar's extension. */
+  codec: nullable(isString),
+  /** Normalised by `languageTag`, like an audio track's. */
+  language: nullable(isString),
+  title: nullable(isString),
+  default: isBoolean,
+  forced: isBoolean,
+  hearingImpaired: isBoolean,
+  /** Text tracks convert to WebVTT; image tracks (PGS, VobSub, DVB) cannot be shown. */
+  supported: isBoolean,
+})
+
+export type SubtitleTrack = Infer<typeof isSubtitleTrack>
+
+/** What a player can choose between, read from the file when it is opened. */
+export const isMediaTracks = object({
+  audio: listOf(isAudioTrack),
+  subtitles: listOf(isSubtitleTrack),
+  /** The audio track direct play gets: the one flagged default, else the first. */
+  defaultAudio: nullable(isNumber),
+  /** Frames per second, for stepping a frame at a time. */
+  frameRate: nullable(isNumber),
+})
+
+export type MediaTracks = Infer<typeof isMediaTracks>
+
+/**
+ * One subtitle, timed against the file. `text` may hold `<i>`, `<b>` and `<u>`.
+ * Read from WebVTT by `parseWebVtt`, never from JSON, so it has no guard.
+ */
+export type SubtitleCue = {
+  start: number
+  end: number
+  text: string
+}
+
+export const isPlaybackMode = oneOf(['direct', 'remux', 'transcode'])
+
+/**
+ * How a file reaches the player: the original bytes, a remux with the video
+ * copied and the audio converted, or a full conversion of both.
+ */
+export type PlaybackMode = Infer<typeof isPlaybackMode>
+
+export const isStreamMode = oneOf(['remux', 'transcode']) satisfies Guard<PlaybackMode>
+
+/** The two ways the server can convert a file on the fly. */
+export type StreamMode = Infer<typeof isStreamMode>
+
+export const STREAM_MODES = isStreamMode.values
+
+/*
+ * Request bodies: what a client sends, checked by the server with the same
+ * guard the client's call is typed by.
+ */
+
+/** A spot in a file, in seconds from its start. */
+const isSeconds = (value: unknown): value is number => isNumber(value) && value >= 0
+
+/** `PUT /api/media/:id/progress`: where playback got to. */
+export const isProgressChange = object({
+  position: isSeconds,
+})
+
+export type ProgressChange = Infer<typeof isProgressChange>
+
+/** `PUT /api/media/:id/favourite`. */
+export const isFavouriteChange = object({
+  favourite: isBoolean,
+})
+
+export type FavouriteChange = Infer<typeof isFavouriteChange>
+
+/** `POST /api/lock/unlock`: the PIN that opens every locked library. */
+export const isUnlockRequest = object({
+  pin: isString,
+})
+
+export type UnlockRequest = Infer<typeof isUnlockRequest>
+
+/** `PUT /api/media/:id/match`: a TMDB id for Fix match, or null for a file that is not one at all. */
+export const isMatchChoice = object({
+  tmdbId: nullable(isTmdbId),
+})
+
+export type MatchChoice = Infer<typeof isMatchChoice>
+
+/** `PUT /api/items/:id/match`: the TMDB show to point a show's files at. */
+export const isShowMatchChoice = object({
+  tmdbId: isTmdbId,
+})
+
+export type ShowMatchChoice = Infer<typeof isShowMatchChoice>

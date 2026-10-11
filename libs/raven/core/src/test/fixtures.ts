@@ -1,5 +1,5 @@
 import type { CanPlay } from '@/playback'
-import type { ItemDetails, ItemSummary, Library, MediaItem, Review, ShowEntry } from '@/types'
+import type { ItemDetails, ItemSummary, Library, MediaItem, Review, ShowEntry } from '@/contract'
 
 export const library = (overrides: Partial<Library> = {}): Library => ({
   id: 1,
