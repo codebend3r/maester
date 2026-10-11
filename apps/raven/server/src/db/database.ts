@@ -235,6 +235,14 @@ export const MIGRATIONS: readonly string[] = [
       FROM items i
       LEFT JOIN item_overrides o ON o.item_id = i.id;
   `,
+  // Server-wide settings, one JSON value per key: 'playback' holds how
+  // video is played for every viewer.
+  `
+  CREATE TABLE settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
+  `,
 ]
 
 const migrate = (db: Sqlite.Database): void => {

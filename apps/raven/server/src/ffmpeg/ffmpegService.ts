@@ -10,6 +10,7 @@ import {
   type OnModuleDestroy,
 } from '@nestjs/common'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
+import { SettingsRepository } from '@/settings/settingsRepository'
 import { encoderTestArgs } from '@/ffmpeg/args'
 import { SOFTWARE, type VideoEncoder, encoderCandidates } from '@/ffmpeg/encoder'
 import { type ProbeResult, parseProbe } from '@/ffmpeg/probe'
@@ -63,7 +64,10 @@ export class FfmpegService implements OnApplicationBootstrap, OnModuleDestroy {
   private encoder: Promise<VideoEncoder> | null = null
   private readonly streams = new Set<FfmpegStream>()
 
-  constructor(@Inject(SERVER_CONFIG) private readonly config: ServerConfig) {}
+  constructor(
+    @Inject(SERVER_CONFIG) private readonly config: ServerConfig,
+    @Inject(SettingsRepository) private readonly settings: Pick<SettingsRepository, 'playback'>,
+  ) {}
 
   /** ffprobe's full `-show_format -show_streams` report, parsed but unchecked. */
   async probeJson(path: string): Promise<unknown> {
@@ -136,9 +140,16 @@ export class FfmpegService implements OnApplicationBootstrap, OnModuleDestroy {
     return this.encoder
   }
 
+  /** Forgets the chosen encoder, so the next transcode chooses again under new settings. */
+  resetEncoder(): void {
+    this.encoder = null
+  }
+
   private async chooseEncoder(): Promise<VideoEncoder> {
+    // The setting wins over HW_ACCEL, unless it leaves the choice to the machine.
+    const preferred = this.settings.playback().hwAccel
     const candidates = encoderCandidates({
-      hwAccel: this.config.hwAccel,
+      hwAccel: preferred === 'auto' ? this.config.hwAccel : preferred,
       platform: process.platform,
       vaapiDevice: this.config.vaapiDevice,
       deviceExists: existsSync(this.config.vaapiDevice),
