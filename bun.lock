@@ -19,11 +19,11 @@
       "name": "@raven/server",
       "version": "0.4.3",
       "dependencies": {
-        "@fastify/static": "10.1.5",
         "@nestjs/common": "12.1.0",
         "@nestjs/core": "12.1.0",
         "@nestjs/platform-fastify": "12.1.0",
         "@raven/core": "workspace:*",
+        "@shared/server": "workspace:*",
         "better-sqlite3": "13.0.3",
         "fastify": "5.12.5",
         "reflect-metadata": "0.2.2",
@@ -78,10 +78,10 @@
       "name": "@rookery/server",
       "version": "0.4.3",
       "dependencies": {
-        "@fastify/static": "10.1.5",
         "@nestjs/common": "12.1.0",
         "@nestjs/core": "12.1.0",
         "@nestjs/platform-fastify": "12.1.0",
+        "@shared/server": "workspace:*",
         "better-sqlite3": "13.0.3",
         "fastify": "5.12.5",
         "reflect-metadata": "0.2.2",
@@ -133,6 +133,30 @@
       "name": "@raven/core",
       "version": "0.4.3",
       "devDependencies": {
+        "@typescript/native-preview": "7.0.0-dev.20260707.2",
+        "oxfmt": "0.68.0",
+        "oxlint": "1.83.0",
+        "tsc-alias": "1.9.7",
+        "typescript": "6.0.3",
+        "vitest": "5.0.2",
+      },
+    },
+    "libs/shared/server": {
+      "name": "@shared/server",
+      "version": "0.4.3",
+      "dependencies": {
+        "@fastify/static": "10.1.5",
+        "@nestjs/common": "12.1.0",
+        "@nestjs/core": "12.1.0",
+        "@nestjs/platform-fastify": "12.1.0",
+        "better-sqlite3": "13.0.3",
+        "fastify": "5.12.5",
+        "reflect-metadata": "0.2.2",
+        "rxjs": "7.8.2",
+      },
+      "devDependencies": {
+        "@types/better-sqlite3": "9.6.0",
+        "@types/node": "24.19.0",
         "@typescript/native-preview": "7.0.0-dev.20260707.2",
         "oxfmt": "0.68.0",
         "oxlint": "1.83.0",
@@ -470,6 +494,8 @@
     "@rookery/server": ["@rookery/server@workspace:apps/rookery/server"],
 
     "@rookery/web": ["@rookery/web@workspace:apps/rookery/web"],
+
+    "@shared/server": ["@shared/server@workspace:libs/shared/server"],
 
     "@sindresorhus/merge-streams": ["@sindresorhus/merge-streams@4.0.0", "", {}, "sha512-tlqY9xq5ukxTUZBmoOp+m61cqwQD5pHJtFY3Mn8CA8ps6yghLH/Hw8UPdqg4OLmFW3IFlcXnQNmo/dh8HzXYIQ=="],
 

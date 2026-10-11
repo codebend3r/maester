@@ -1,13 +1,14 @@
-import { existsSync, mkdirSync, renameSync, statSync } from 'node:fs'
+import { existsSync, renameSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { Inject, Injectable, type OnModuleDestroy } from '@nestjs/common'
-import Sqlite from 'better-sqlite3'
+import { openSqlite } from '@shared/server'
+import type Sqlite from 'better-sqlite3'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 
 /**
- * Each entry moves the schema one version forward and runs exactly once,
- * tracked by SQLite's `user_version`. Append new migrations; never edit a
- * shipped one, since existing databases have already run it.
+ * raven's schema, one version per entry; `openSqlite` runs the ones a
+ * database has not run yet. Append new migrations; never edit a shipped one,
+ * since existing databases have already run it.
  */
 export const MIGRATIONS: readonly string[] = [
   `
@@ -276,16 +277,6 @@ export const MIGRATIONS: readonly string[] = [
   `,
 ]
 
-const migrate = (db: Sqlite.Database): void => {
-  const current = Number(db.pragma('user_version', { simple: true }))
-  MIGRATIONS.slice(current).forEach((sql, offset) => {
-    db.transaction(() => {
-      db.exec(sql)
-      db.pragma(`user_version = ${current + offset + 1}`)
-    })()
-  })
-}
-
 /** The index's file in the data folder. Before raven was renamed it was `weirwood.db`. */
 export const DATABASE_FILE = 'raven.db'
 const LEGACY_FILE = 'weirwood.db'
@@ -321,13 +312,9 @@ export class DatabaseService implements OnModuleDestroy {
   readonly db: Sqlite.Database
 
   constructor(@Inject(SERVER_CONFIG) config: ServerConfig) {
-    mkdirSync(config.dataDir, { recursive: true })
     adoptLegacyDatabase({ dataDir: config.dataDir })
-    this.db = new Sqlite(join(config.dataDir, DATABASE_FILE))
     // WAL lets the API read while a scan writes, which is most of the time.
-    this.db.pragma('journal_mode = WAL')
-    this.db.pragma('foreign_keys = ON')
-    migrate(this.db)
+    this.db = openSqlite({ dataDir: config.dataDir, file: DATABASE_FILE, migrations: MIGRATIONS })
   }
 
   onModuleDestroy(): void {

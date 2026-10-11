@@ -10,6 +10,7 @@ import {
   ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common'
+import { readCookie } from '@shared/server'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import {
@@ -18,7 +19,6 @@ import {
   clearedPinCookie,
   clearedSessionCookie,
   pinCookie,
-  readCookie,
   sessionCookie,
 } from '@/auth/cookies'
 import { CALLBACK_PATH, SignInService } from '@/auth/signInService'

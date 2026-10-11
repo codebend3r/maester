@@ -1,12 +1,10 @@
-import { join } from 'node:path'
-import fastifyStatic from '@fastify/static'
 import { NestFactory } from '@nestjs/core'
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify'
+import { serveWebApp } from '@shared/server'
 import { AppModule } from '@/appModule'
 import { type Clock, systemClock } from '@/clock'
 import type { ServerConfig } from '@/config'
 import { HttpPlexTv, type PlexTv } from '@/plex/plexTv'
-import { SpaFallbackFilter } from '@/spa/spaFallbackFilter'
 
 const READS = new Set(['GET', 'HEAD', 'OPTIONS'])
 // Where the server's own routes live: never cached, and a miss under one is a
@@ -51,29 +49,8 @@ export const createApp = async ({
   })
 
   // In Docker the server hands out the built web app too, so there is one
-  // port. In development Vite serves it and proxies the API here.
-  if (config.webDir) {
-    // Registered straight on Fastify and awaited: Nest's own useStaticAssets
-    // imports the plugin lazily and drops the promise, so the plugin lands
-    // after Fastify has started booting and `ready()` never resolves.
-    await app.register(fastifyStatic, {
-      root: config.webDir,
-      prefix: '/',
-      // Vite fingerprints everything under /assets, so it never goes stale.
-      setHeaders: (reply, path) => {
-        reply.header(
-          'cache-control',
-          path.includes('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache',
-        )
-      },
-    })
-  }
-  app.useGlobalFilters(
-    new SpaFallbackFilter({
-      indexPath: config.webDir ? join(config.webDir, 'index.html') : null,
-      serverPrefixes: SERVER_PREFIXES,
-    }),
-  )
+  // port. In development Vite serves it and proxies the server's routes here.
+  await serveWebApp({ app, webDir: config.webDir, serverPrefixes: SERVER_PREFIXES })
   app.enableShutdownHooks()
   return app
 }

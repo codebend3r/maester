@@ -1,14 +1,9 @@
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { type ListenConfig, readListenConfig } from '@shared/server'
 
 /** Everything the server reads from its environment, resolved once at start. */
-export type ServerConfig = {
-  port: number
-  host: string
-  /** Holds the SQLite database; mount it as a volume under Docker. */
-  dataDir: string
-  /** The built web client to serve, or null when the Vite dev server serves it instead. */
-  webDir: string | null
+export type ServerConfig = ListenConfig & {
   /** rookery's own public origin, with no trailing slash. Plex sends the browser back here. */
   publicUrl: string
   /** The bearer token apps present to `/internal/session`. */
@@ -31,19 +26,6 @@ export const SERVER_CONFIG = Symbol('SERVER_CONFIG')
 export class ConfigError extends Error {}
 
 const REQUIRED = ['PUBLIC_URL', 'SERVICE_TOKEN'] as const
-
-const wholeNumber = ({
-  value,
-  fallback,
-}: {
-  value: string | undefined
-  fallback: number
-}): number => {
-  const parsed = Number(value)
-  return value != null && value.trim() !== '' && Number.isInteger(parsed) && parsed >= 0
-    ? parsed
-    : fallback
-}
 
 const originOf = (value: string): string | null => {
   try {
@@ -77,10 +59,7 @@ export const readServerConfig = (env: NodeJS.ProcessEnv = process.env): ServerCo
     throw new ConfigError(`not an http(s) URL: ${invalid.join(', ')}`)
   }
   return {
-    port: wholeNumber({ value: env.PORT, fallback: 8030 }),
-    host: env.HOST?.trim() || '0.0.0.0',
-    dataDir: resolve(env.DATA_DIR?.trim() || './data'),
-    webDir: env.WEB_DIR?.trim() ? resolve(env.WEB_DIR.trim()) : null,
+    ...readListenConfig({ env, defaultPort: 8030 }),
     publicUrl,
     serviceToken: (env.SERVICE_TOKEN ?? '').trim(),
     appOrigins: appOrigins.flatMap((origin) => originOf(origin) ?? []),

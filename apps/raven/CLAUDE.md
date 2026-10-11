@@ -10,7 +10,7 @@ A self-hosted video library and web player: direct play, with an on-the-fly remu
 
 ## Structure
 
-raven's projects live in the workspace described by the root `CLAUDE.md`, which covers Nx, the project table and how to run tasks: `@raven/server` in `apps/raven/server`, `@raven/web` in `apps/raven/web`, and `@raven/core` in `libs/raven/core`.
+raven's projects live in the workspace described by the root `CLAUDE.md`, which covers Nx, the project table and how to run tasks: `@raven/server` in `apps/raven/server`, `@raven/web` in `apps/raven/web`, and `@raven/core` in `libs/raven/core`. The server also depends on `@shared/server` (`libs/shared/server`), which it shares with rookery: it serves the built web app, opens SQLite and runs `MIGRATIONS`, reads the listen config, and compares the PIN and the unlock cookie in constant time.
 
 `libs/raven/core` must stay platform-agnostic: no DOM, no Node APIs, not even `URLSearchParams` (use `toQueryString`). Its tsconfig has `lib: ["ES2023"]` and no `types` so a slip fails the typecheck.
 

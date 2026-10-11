@@ -82,8 +82,11 @@ Shared tool config lives at the root, so every project lints and compiles by the
 | `@raven/core`     | `libs/raven/core`     | raven's shared core: API types and guards, API client, direct-play check      |
 | `@rookery/server` | `apps/rookery/server` | The suite's sign-in: NestJS 12 on Fastify, SQLite (better-sqlite3), vitest    |
 | `@rookery/web`    | `apps/rookery/web`    | rookery's login and logout pages: React 19, Vite 8, bun test + happy-dom      |
+| `@shared/server`  | `libs/shared/server`  | The servers' shared scaffolding: web app serving, SQLite migrations, env      |
 | `scripts`         | `scripts`             | Repo tooling; its Python is linted with luwin's pinned ruff and config        |
 
 Python projects declare `package.json` scripts that call uv (`uv run pytest -q`, `uv run ruff check .`); Nx runs them in the project's folder. There is no Python Nx plugin and no uv workspace.
+
+`@shared/server` holds what raven's and rookery's servers both need: `serveWebApp` (the built web app and its SPA fallback), `openSqlite` (the `user_version` migration runner), `readListenConfig`, `wholeNumber` and `flag` for the environment, `readCookie` and `sameSecret`. A helper a second server would copy goes there; one only a single product uses stays in that product.
 
 The TypeScript, code style and CSS rules above are shared by every product. Each product folder has its own `CLAUDE.md` with only what is specific to that product. Design specs for every product live in `docs/superpowers/specs/`.

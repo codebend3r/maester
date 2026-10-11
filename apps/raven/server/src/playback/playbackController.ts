@@ -12,6 +12,7 @@ import {
   Res,
 } from '@nestjs/common'
 import { type MediaTracks, STREAM_TIME_SHIFT, isStreamMode } from '@raven/core'
+import { wholeNumber } from '@shared/server'
 import type { FastifyReply } from 'fastify'
 import { streamArgs } from '@/ffmpeg/args'
 import { SOFTWARE } from '@/ffmpeg/encoder'
@@ -21,7 +22,6 @@ import { SettingsRepository } from '@/settings/settingsRepository'
 import { type MediaFile, MediaIndex } from '@/media/mediaIndex'
 import { SubtitlesService } from '@/playback/subtitlesService'
 import { TracksService } from '@/playback/tracksService'
-import { wholeNumber } from '@/wholeNumber'
 
 /**
  * What a player needs beyond the file itself: the tracks to choose from,

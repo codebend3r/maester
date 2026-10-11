@@ -1,4 +1,3 @@
-import { createHash, timingSafeEqual } from 'node:crypto'
 import {
   BadRequestException,
   Body,
@@ -10,6 +9,7 @@ import {
   Req,
   UnauthorizedException,
 } from '@nestjs/common'
+import { sameSecret } from '@shared/server'
 import type { FastifyRequest } from 'fastify'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import type { PublicUser } from '@/auth/authController'
@@ -21,13 +21,6 @@ export type SessionInfo = {
   plex: { id: string; username: string | null; email: string | null } | null
   expires_at: string
 }
-
-/** Hashing both sides first gives equal lengths, which `timingSafeEqual` needs. */
-const sameSecret = ({ given, expected }: { given: string; expected: string }): boolean =>
-  timingSafeEqual(
-    createHash('sha256').update(given).digest(),
-    createHash('sha256').update(expected).digest(),
-  )
 
 /**
  * For the suite's other apps, never for browsers: luwin posts the cookie's
