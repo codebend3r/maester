@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { safeReturnTo } from '@/auth/returnTo.js'
+import { safeReturnTo } from '@/auth/returnTo'
 
 const appOrigins = ['https://luwin.maester.example.com']
 const check = (value: unknown) => safeReturnTo({ value, appOrigins, fallback: '/' })

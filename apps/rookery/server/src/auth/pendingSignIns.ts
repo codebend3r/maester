@@ -1,8 +1,8 @@
 import { randomBytes } from 'node:crypto'
 import { Inject, Injectable } from '@nestjs/common'
-import { addMs } from '@/clock.js'
-import { DatabaseService } from '@/db/database.js'
-import type { PlexPin } from '@/plex/plexTv.js'
+import { addMs } from '@/clock'
+import { DatabaseService } from '@/db/database'
+import type { PlexPin } from '@/plex/plexTv'
 
 /** How long a sign-in may take between pressing the button and Plex sending the browser back. */
 export const PENDING_MS = 15 * 60 * 1000

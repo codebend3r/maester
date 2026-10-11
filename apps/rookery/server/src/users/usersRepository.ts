@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { Inject, Injectable } from '@nestjs/common'
-import { DatabaseService } from '@/db/database.js'
-import type { PlexAccount } from '@/plex/plexTv.js'
+import { DatabaseService } from '@/db/database'
+import type { PlexAccount } from '@/plex/plexTv'
 
 export type User = {
   id: string

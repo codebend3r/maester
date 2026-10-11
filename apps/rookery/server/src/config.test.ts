@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ConfigError, readServerConfig } from '@/config.js'
+import { ConfigError, readServerConfig } from '@/config'
 
 const required = { PUBLIC_URL: 'https://rookery.maester.example.com/', SERVICE_TOKEN: 's3cret' }
 

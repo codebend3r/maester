@@ -1,18 +1,18 @@
 import { setTimeout as sleep } from 'node:timers/promises'
 import { Inject, Injectable } from '@nestjs/common'
-import { CLOCK, type Clock } from '@/clock.js'
-import { SERVER_CONFIG, type ServerConfig } from '@/config.js'
-import { PendingSignIns } from '@/auth/pendingSignIns.js'
-import { safeReturnTo } from '@/auth/returnTo.js'
+import { CLOCK, type Clock } from '@/clock'
+import { SERVER_CONFIG, type ServerConfig } from '@/config'
+import { PendingSignIns } from '@/auth/pendingSignIns'
+import { safeReturnTo } from '@/auth/returnTo'
 import {
   PLEX_TV_CLIENT,
   type PlexPin,
   type PlexTv,
   PlexUnavailable,
   plexAuthUrl,
-} from '@/plex/plexTv.js'
-import { SessionsRepository } from '@/sessions/sessionsRepository.js'
-import { UsersRepository } from '@/users/usersRepository.js'
+} from '@/plex/plexTv'
+import { SessionsRepository } from '@/sessions/sessionsRepository'
+import { UsersRepository } from '@/users/usersRepository'
 
 /** Why a sign-in came back without a session; `/login` shows a message for each. */
 export type SignInError = 'not_approved' | 'expired' | 'plex_unavailable'
