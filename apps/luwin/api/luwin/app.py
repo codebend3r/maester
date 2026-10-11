@@ -46,7 +46,7 @@ from luwin.clients.media import MediaPaths
 from luwin.config import REQUIRED, Settings, load_env_file, refuse_renamed, require, settings
 from luwin.jobs import Scheduler, scheduled
 from luwin.notify import LogNotifier
-from luwin.registry import Registry
+from luwin.registry import Instance, api_keys_needed, instances_from_env
 from luwin.seerr_events import seerr_routes
 from luwin.store import Store
 from luwin.web import create_app
@@ -60,9 +60,9 @@ import luwin.tools  # noqa: F401  isort: skip
 log = logging.getLogger("luwin")
 
 
-def build_services(cfg: Settings, instances: Registry) -> Services:
+def build_services(cfg: Settings, instances: list[Instance]) -> Services:
     def per_host(service: str, cls: type) -> dict[str, Any]:
-        return {i.host: cls(i.host, i.url, i.api_key) for i in instances.instances(service)}
+        return {i.host: cls(i.host, i.url, i.api_key) for i in instances if i.service == service}
 
     return Services(
         seerr=SeerrClient(cfg.seerr_url, cfg.seerr_api_key),
@@ -109,7 +109,7 @@ def build(
 ) -> App:
     cfg = cfg or settings()
     store = store or Store(cfg.db_path)
-    services = services or build_services(cfg, Registry.from_env(os.environ))
+    services = services or build_services(cfg, instances_from_env(os.environ))
     kill = KillSwitch(store)
     runner = ToolRunner(tools or app_registry, kill_switch=kill)
     agent = Agent(
@@ -168,7 +168,7 @@ def run() -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
     load_env_file()
     refuse_renamed(os.environ)
-    require(os.environ, *REQUIRED)
+    require(os.environ, *REQUIRED, *api_keys_needed(os.environ))
     app = build()
     log.info("starting luwin (model %s) on port %s", app.settings.model, app.settings.web_port)
     try:

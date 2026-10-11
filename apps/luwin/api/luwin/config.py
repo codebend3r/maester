@@ -13,11 +13,12 @@ from __future__ import annotations
 
 import os
 import re
-from collections.abc import Mapping
-from dataclasses import dataclass, field
+from collections.abc import Callable, Iterator, Mapping
+from dataclasses import dataclass, field, fields, is_dataclass
 from datetime import time, timedelta
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from dotenv import load_dotenv
@@ -72,17 +73,45 @@ def refuse_renamed(env: Mapping[str, str]) -> None:
         raise RenamedConfig(leftover)
 
 
+# A setting's reader: the variable's value, or `default` when it's unset or blank. A value
+# that can't be what the setting needs fails on boot, naming the variable.
+Reader = Callable[[Mapping[str, str], str, Any], Any]
+
+
+def _raw(env: Mapping[str, str], name: str, default: str) -> str:
+    """As set, spaces and all (a key)."""
+    return env.get(name, default)
+
+
+def _text(env: Mapping[str, str], name: str, default: str) -> str:
+    return env.get(name, "").strip() or default
+
+
+def _lower(env: Mapping[str, str], name: str, default: str) -> str:
+    return env.get(name, "").strip().lower() or default
+
+
+def _url(env: Mapping[str, str], name: str, default: str) -> str:
+    return env.get(name, "").strip().rstrip("/") or default
+
+
 def _int(env: Mapping[str, str], name: str, default: int) -> int:
     raw = env.get(name, "")
     return int(raw) if raw.strip() else default
 
 
-def _url(env: Mapping[str, str], name: str) -> str:
-    return env.get(name, "").strip().rstrip("/")
+def _minutes(env: Mapping[str, str], name: str, default: timedelta) -> timedelta:
+    raw = env.get(name, "")
+    return timedelta(minutes=int(raw)) if raw.strip() else default
 
 
-def _list(env: Mapping[str, str], name: str) -> tuple[str, ...]:
-    return tuple(item.strip() for item in env.get(name, "").split(",") if item.strip())
+def _hours(env: Mapping[str, str], name: str, default: timedelta) -> timedelta:
+    raw = env.get(name, "")
+    return timedelta(hours=int(raw)) if raw.strip() else default
+
+
+def _list(env: Mapping[str, str], name: str, default: tuple[str, ...] = ()) -> tuple[str, ...]:
+    return tuple(item.strip() for item in env.get(name, "").split(",") if item.strip()) or default
 
 
 def media_root_problem(root: str) -> str | None:
@@ -94,30 +123,34 @@ def media_root_problem(root: str) -> str | None:
     return None
 
 
-def _media_roots(env: Mapping[str, str]) -> tuple[str, ...]:
-    roots = _list(env, "MEDIA_ROOTS")
+def _media_roots(env: Mapping[str, str], name: str, default: tuple[str, ...]) -> tuple[str, ...]:
+    roots = _list(env, name, default)
     if problems := [p for p in map(media_root_problem, roots) if p]:
-        raise ValueError(f"MEDIA_ROOTS: {'; '.join(problems)}")
+        raise ValueError(f"{name}: {'; '.join(problems)}")
     return roots
 
 
-def _pairs(env: Mapping[str, str], name: str) -> tuple[tuple[str, str], ...]:
+def _pairs(
+    env: Mapping[str, str], name: str, default: tuple[tuple[str, str], ...]
+) -> tuple[tuple[str, str], ...]:
     """`from=to,from=to`; an entry without both sides is skipped."""
     pairs = (item.split("=", 1) for item in _list(env, name) if "=" in item)
-    return tuple((a.strip(), b.strip()) for a, b in pairs if a.strip() and b.strip())
+    return tuple((a.strip(), b.strip()) for a, b in pairs if a.strip() and b.strip()) or default
 
 
 WEEKDAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 
 
-def _zone(env: Mapping[str, str]) -> str:
-    """The server's time zone (`TZ`, an IANA name), checked so a typo fails on boot."""
-    name = env.get("TZ", "").strip() or "UTC"
+def _zone(env: Mapping[str, str], name: str, default: str) -> str:
+    """The server's time zone (an IANA name), checked so a typo fails on boot."""
+    zone = env.get(name, "").strip() or default
     try:
-        ZoneInfo(name)
+        ZoneInfo(zone)
     except (ZoneInfoNotFoundError, ValueError):
-        raise ValueError(f"TZ: {name!r} isn't a known time zone (try 'America/Toronto')") from None
-    return name
+        raise ValueError(
+            f"{name}: {zone!r} isn't a known time zone (try 'America/Toronto')"
+        ) from None
+    return zone
 
 
 def _clock(env: Mapping[str, str], name: str, default: time) -> time:
@@ -141,27 +174,6 @@ def _weekday(env: Mapping[str, str], name: str, default: int) -> int:
     return WEEKDAYS.index(raw)
 
 
-@dataclass(frozen=True)
-class Jobs:
-    """When the admin console's scheduled jobs run, in the server's time zone."""
-
-    timezone: str = "UTC"
-    # The daily digest, and the weekly NAS health report on `nas_report_day` at the same time.
-    digest_at: time = time(8, 0)
-    nas_report_day: int = 0  # Monday
-    # How often the stalled-download sweeper looks, and how long a download may be
-    # stuck before it's blocklisted and searched again.
-    sweep_every: timedelta = timedelta(minutes=15)
-    stalled_after: timedelta = timedelta(hours=6)
-
-    @property
-    def zone(self) -> ZoneInfo:
-        return ZoneInfo(self.timezone)
-
-
-EXPIRY_REMINDER = "Heads up: your Plex access ends {when} ({date}). {renew}"
-
-
 def _pattern(env: Mapping[str, str], name: str, default: str) -> str:
     raw = env.get(name, "").strip() or default
     try:
@@ -181,41 +193,16 @@ def _days(env: Mapping[str, str], name: str, default: tuple[int, ...]) -> tuple[
     return tuple(sorted({int(d) for d in raw}, reverse=True))
 
 
-def _reminder(env: Mapping[str, str]) -> str:
+def _reminder(env: Mapping[str, str], name: str, default: str) -> str:
     """The expiry reminder's text, checked so a typo in a placeholder fails on boot."""
-    text = env.get("EXPIRY_REMINDER", "").strip() or EXPIRY_REMINDER
+    text = env.get(name, "").strip() or default
     try:
         text.format(when="in 7 days", date="Sat Oct 04", renew="")
     except (KeyError, IndexError, ValueError) as exc:
         raise ValueError(
-            f"EXPIRY_REMINDER: only {{when}}, {{date}} and {{renew}} can be filled in ({exc!r})"
+            f"{name}: only {{when}}, {{date}} and {{renew}} can be filled in ({exc!r})"
         ) from None
     return text
-
-
-@dataclass(frozen=True)
-class Access:
-    """How invites and access changes are scoped, and how friends hear their access is ending."""
-
-    invite_expires_days: int = 7  # how long an invite link works
-    # Where friends open an invite link (`<this>/j/<code>`): Wizarr's public address.
-    public_url: str = ""
-    # Wizarr server names an invite shares from; empty for every server.
-    servers: tuple[str, ...] = ()
-    access_days: int = 35  # how long access lasts once joined; 0 for no end
-    # Library names an invite shares; empty for every library that isn't 4K or private.
-    libraries: tuple[str, ...] = ()
-    # Library names never shared, whatever is asked (wizteros' "9X." libraries).
-    private_pattern: str = r"^9\d\."
-    # Where a friend keeps their access going, named in the expiry reminder.
-    contribution_url: str = ""
-    # The reminder DM: {when} ("in 7 days", "tomorrow", "today"), {date}, and {renew}.
-    reminder: str = EXPIRY_REMINDER
-    # How many days before access ends a reminder goes out, each once.
-    remind_days: tuple[int, ...] = (7, 1)
-
-    def is_private(self, library: str) -> bool:
-        return re.search(self.private_pattern, library) is not None
 
 
 @dataclass(frozen=True)
@@ -226,129 +213,147 @@ class FleetMonitorAccess:
     token: str
 
 
-def _fleet_monitor(env: Mapping[str, str]) -> FleetMonitorAccess | None:
-    """The fleet monitor, when FLEET_MONITOR_URL is set; its token must be set with it."""
-    url = _url(env, "FLEET_MONITOR_URL")
+def _fleet_monitor(
+    env: Mapping[str, str], name: str, default: FleetMonitorAccess | None
+) -> FleetMonitorAccess | None:
+    """The fleet monitor, when its URL is set; FLEET_MONITOR_TOKEN must be set with it."""
+    url = _url(env, name, "")
     if not url:
-        return None
+        return default
     require(env, "FLEET_MONITOR_TOKEN")
     return FleetMonitorAccess(url, env["FLEET_MONITOR_TOKEN"].strip())
 
 
+def setting(default: Any, env: str, read: Reader = _text, *, required: bool = False) -> Any:
+    """A field read from the variable `env` by `read`; `required` ones must be set to boot."""
+    return field(default=default, metadata={"env": env, "read": read, "required": required})
+
+
+@dataclass(frozen=True)
+class Jobs:
+    """When the admin console's scheduled jobs run, in the server's time zone."""
+
+    timezone: str = setting("UTC", "TZ", _zone)
+    # The daily digest, and the weekly NAS health report on `nas_report_day` at the same time.
+    digest_at: time = setting(time(8, 0), "DIGEST_TIME", _clock)
+    nas_report_day: int = setting(0, "NAS_REPORT_DAY", _weekday)  # Monday
+    # How often the stalled-download sweeper looks, and how long a download may be
+    # stuck before it's blocklisted and searched again.
+    sweep_every: timedelta = setting(timedelta(minutes=15), "SWEEP_MINUTES", _minutes)
+    stalled_after: timedelta = setting(timedelta(hours=6), "STALLED_HOURS", _hours)
+
+    @property
+    def zone(self) -> ZoneInfo:
+        return ZoneInfo(self.timezone)
+
+
+EXPIRY_REMINDER = "Heads up: your Plex access ends {when} ({date}). {renew}"
+
+
+@dataclass(frozen=True)
+class Access:
+    """How invites and access changes are scoped, and how friends hear their access is ending."""
+
+    # How long an invite link works.
+    invite_expires_days: int = setting(7, "INVITE_EXPIRES_DAYS", _int)
+    # Where friends open an invite link (`<this>/j/<code>`): Wizarr's public address.
+    public_url: str = setting("", "WIZARR_PUBLIC_URL", _url)
+    # Wizarr server names an invite shares from; empty for every server.
+    servers: tuple[str, ...] = setting((), "INVITE_SERVERS", _list)
+    # How long access lasts once joined; 0 for no end.
+    access_days: int = setting(35, "INVITE_ACCESS_DAYS", _int)
+    # Library names an invite shares; empty for every library that isn't 4K or private.
+    libraries: tuple[str, ...] = setting((), "INVITE_LIBRARIES", _list)
+    # Library names never shared, whatever is asked (wizteros' "9X." libraries).
+    private_pattern: str = setting(r"^9\d\.", "PRIVATE_LIBRARIES", _pattern)
+    # Where a friend keeps their access going, named in the expiry reminder.
+    contribution_url: str = setting("", "CONTRIBUTION_URL", _url)
+    # The reminder DM: {when} ("in 7 days", "tomorrow", "today"), {date}, and {renew}.
+    reminder: str = setting(EXPIRY_REMINDER, "EXPIRY_REMINDER", _reminder)
+    # How many days before access ends a reminder goes out, each once.
+    remind_days: tuple[int, ...] = setting((7, 1), "EXPIRY_REMIND_DAYS", _days)
+
+    def is_private(self, library: str) -> bool:
+        return re.search(self.private_pattern, library) is not None
+
+
 @dataclass(frozen=True)
 class Guardrails:
-    replace_daily_cap: int = 3
-    storage_pause_4k_percent: int = 90
-    user_messages_per_hour: int = 30
-    user_tokens_per_day: int = 200_000
+    replace_daily_cap: int = setting(3, "REPLACE_DAILY_CAP", _int)
+    storage_pause_4k_percent: int = setting(90, "STORAGE_PAUSE_4K_PERCENT", _int)
+    user_messages_per_hour: int = setting(30, "USER_MESSAGES_PER_HOUR", _int)
+    user_tokens_per_day: int = setting(200_000, "USER_TOKENS_PER_DAY", _int)
 
 
 @dataclass(frozen=True)
 class Settings:
-    anthropic_api_key: str = ""
-    model: str = "claude-opus-5-5"
-    effort: str = "medium"  # low | medium | high | xhigh | max
+    anthropic_api_key: str = setting("", "ANTHROPIC_API_KEY", _raw, required=True)
+    model: str = setting("claude-opus-5-5", "LUWIN_MODEL")
+    effort: str = setting("medium", "LUWIN_EFFORT")  # low | medium | high | xhigh | max
 
-    seerr_url: str = ""
-    seerr_api_key: str = ""
-    seerr_webhook_secret: str = ""
-    plex_url: str = ""
-    plex_token: str = ""
-    wizarr_url: str = ""
-    wizarr_api_key: str = ""
+    seerr_url: str = setting("", "SEERR_URL", _url, required=True)
+    seerr_api_key: str = setting("", "SEERR_API_KEY", _raw, required=True)
+    seerr_webhook_secret: str = setting("", "SEERR_WEBHOOK_SECRET", _raw)
+    plex_url: str = setting("", "PLEX_URL", _url)
+    plex_token: str = setting("", "PLEX_TOKEN", _raw)
+    wizarr_url: str = setting("", "WIZARR_URL", _url)
+    wizarr_api_key: str = setting("", "WIZARR_API_KEY", _raw)
     # plex.tv, where friends' library shares live; the account is `PLEX_TOKEN`'s.
-    plex_tv_url: str = "https://plex.tv"
+    plex_tv_url: str = setting("https://plex.tv", "PLEX_TV_URL", _url)
     # rookery, which owns sign-in: its LAN address, which luwin asks who a session
     # belongs to with the service token; and the public address browsers sign in at.
-    rookery_url: str = ""
-    rookery_public_url: str = ""
-    rookery_service_token: str = ""
+    rookery_url: str = setting("", "ROOKERY_URL", _url, required=True)
+    rookery_public_url: str = setting("", "ROOKERY_PUBLIC_URL", _url, required=True)
+    rookery_service_token: str = setting("", "ROOKERY_SERVICE_TOKEN", required=True)
     access: Access = field(default_factory=Access)
     # A friend who wants an English dub gets this Sonarr/Radarr tag on the
     # request, and the quality profile named here when it exists.
-    dub_tag: str = "dub"
-    dub_profile: str = ""
+    dub_tag: str = setting("dub", "DUB_TAG")
+    dub_profile: str = setting("", "DUB_PROFILE")
     # The file health check reads media only under these read-only mounts. An
     # arr path that starts with a mapped prefix is read under its mount instead.
-    media_roots: tuple[str, ...] = ()
-    media_path_map: tuple[tuple[str, str], ...] = ()
-    probe_timeout_seconds: int = 120
+    media_roots: tuple[str, ...] = setting((), "MEDIA_ROOTS", _media_roots)
+    media_path_map: tuple[tuple[str, str], ...] = setting((), "MEDIA_PATH_MAP", _pairs)
+    probe_timeout_seconds: int = setting(120, "PROBE_TIMEOUT_SECONDS", _int)
     # CPU and memory per NAS, for server load; None when no monitor is set up.
-    fleet_monitor: FleetMonitorAccess | None = None
+    fleet_monitor: FleetMonitorAccess | None = setting(None, "FLEET_MONITOR_URL", _fleet_monitor)
     # The host luwin's container runs on, where the speed test runs; empty for none.
-    speedtest_host: str = ""
+    speedtest_host: str = setting("", "SPEEDTEST_HOST", _lower)
     # Files reported from one release group in 30 days before the digest suggests blocking it.
-    bad_release_reports: int = 3
+    bad_release_reports: int = setting(3, "BAD_RELEASE_REPORTS", _int)
     jobs: Jobs = field(default_factory=Jobs)
 
     guardrails: Guardrails = field(default_factory=Guardrails)
-    db_path: str = "/data/luwin.db"
-    web_port: int = 8020
+    db_path: str = setting("/data/luwin.db", "LUWIN_DB_PATH")
+    web_port: int = setting(8020, "WEB_PORT", _int)
 
 
-# What luwin cannot start without. Per-host arr instances are discovered by
-# the registry and validated there, so they are not listed here.
-REQUIRED = (
-    "ANTHROPIC_API_KEY",
-    "SEERR_URL",
-    "SEERR_API_KEY",
-    "ROOKERY_URL",
-    "ROOKERY_PUBLIC_URL",
-    "ROOKERY_SERVICE_TOKEN",
-)
+def _read[T](cls: type[T], env: Mapping[str, str]) -> T:
+    """`cls` from `env`: each setting by its reader, each section (a dataclass) in turn."""
+    values: dict[str, Any] = {}
+    for f in fields(cls):
+        if name := f.metadata.get("env"):
+            values[f.name] = f.metadata["read"](env, name, f.default)
+        elif is_dataclass(f.default_factory):
+            values[f.name] = _read(f.default_factory, env)
+    return cls(**values)
+
+
+def _required(cls: type) -> Iterator[str]:
+    for f in fields(cls):
+        if f.metadata.get("required"):
+            yield f.metadata["env"]
+        elif is_dataclass(f.default_factory):
+            yield from _required(f.default_factory)
+
+
+# What luwin cannot start without, besides the API key of each per-host arr instance
+# configured (`luwin/registry.py`).
+REQUIRED = tuple(_required(Settings))
 
 
 def load_settings(env: Mapping[str, str]) -> Settings:
-    return Settings(
-        anthropic_api_key=env.get("ANTHROPIC_API_KEY", ""),
-        model=env.get("LUWIN_MODEL", "").strip() or "claude-opus-5-5",
-        effort=env.get("LUWIN_EFFORT", "").strip() or "medium",
-        seerr_url=_url(env, "SEERR_URL"),
-        seerr_api_key=env.get("SEERR_API_KEY", ""),
-        seerr_webhook_secret=env.get("SEERR_WEBHOOK_SECRET", ""),
-        plex_url=_url(env, "PLEX_URL"),
-        plex_token=env.get("PLEX_TOKEN", ""),
-        wizarr_url=_url(env, "WIZARR_URL"),
-        wizarr_api_key=env.get("WIZARR_API_KEY", ""),
-        plex_tv_url=_url(env, "PLEX_TV_URL") or "https://plex.tv",
-        rookery_url=_url(env, "ROOKERY_URL"),
-        rookery_public_url=_url(env, "ROOKERY_PUBLIC_URL"),
-        rookery_service_token=env.get("ROOKERY_SERVICE_TOKEN", "").strip(),
-        access=Access(
-            invite_expires_days=_int(env, "INVITE_EXPIRES_DAYS", 7),
-            public_url=_url(env, "WIZARR_PUBLIC_URL"),
-            servers=_list(env, "INVITE_SERVERS"),
-            access_days=_int(env, "INVITE_ACCESS_DAYS", 35),
-            libraries=_list(env, "INVITE_LIBRARIES"),
-            private_pattern=_pattern(env, "PRIVATE_LIBRARIES", r"^9\d\."),
-            contribution_url=_url(env, "CONTRIBUTION_URL"),
-            reminder=_reminder(env),
-            remind_days=_days(env, "EXPIRY_REMIND_DAYS", (7, 1)),
-        ),
-        dub_tag=env.get("DUB_TAG", "").strip() or "dub",
-        dub_profile=env.get("DUB_PROFILE", "").strip(),
-        media_roots=_media_roots(env),
-        media_path_map=_pairs(env, "MEDIA_PATH_MAP"),
-        probe_timeout_seconds=_int(env, "PROBE_TIMEOUT_SECONDS", 120),
-        fleet_monitor=_fleet_monitor(env),
-        speedtest_host=env.get("SPEEDTEST_HOST", "").strip().lower(),
-        bad_release_reports=_int(env, "BAD_RELEASE_REPORTS", 3),
-        jobs=Jobs(
-            timezone=_zone(env),
-            digest_at=_clock(env, "DIGEST_TIME", time(8, 0)),
-            nas_report_day=_weekday(env, "NAS_REPORT_DAY", 0),
-            sweep_every=timedelta(minutes=_int(env, "SWEEP_MINUTES", 15)),
-            stalled_after=timedelta(hours=_int(env, "STALLED_HOURS", 6)),
-        ),
-        guardrails=Guardrails(
-            replace_daily_cap=_int(env, "REPLACE_DAILY_CAP", 3),
-            storage_pause_4k_percent=_int(env, "STORAGE_PAUSE_4K_PERCENT", 90),
-            user_messages_per_hour=_int(env, "USER_MESSAGES_PER_HOUR", 30),
-            user_tokens_per_day=_int(env, "USER_TOKENS_PER_DAY", 200_000),
-        ),
-        db_path=env.get("LUWIN_DB_PATH", "").strip() or "/data/luwin.db",
-        web_port=_int(env, "WEB_PORT", 8020),
-    )
+    return _read(Settings, env)
 
 
 @lru_cache(maxsize=1)

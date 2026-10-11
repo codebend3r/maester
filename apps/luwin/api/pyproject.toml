@@ -41,6 +41,10 @@ line-length = 100
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F", "I", "RUF", "UP", "B"]
 
+[tool.ruff.lint.flake8-bugbear]
+# `setting()` returns a `dataclasses.field()`, like `field()` itself (RUF009).
+extend-immutable-calls = ["luwin.config.setting"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"

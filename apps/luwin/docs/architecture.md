@@ -24,7 +24,7 @@ One process, one container, one SQLite file on `/data`. The FastAPI app and the 
 
 Two NAS hosts each run their own Sonarr, Radarr, SABnzbd and Tautulli (see `wizteros/docs/arr-stack.md`). Seerr, Plex and Wizarr are single. luwin never talks to "Sonarr"; it talks to `sonarr[meleys]` or `sonarr[vermithor]`.
 
-- Instances are declared in env as `SONARR_MELEYS_URL`, `SONARR_MELEYS_API_KEY`, and so on.
+- Instances are declared in env as `SONARR_MELEYS_URL`, `SONARR_MELEYS_API_KEY`, and so on (`luwin/registry.py`). An instance with a URL but no API key fails boot, named with the other missing variables.
 - Every tool that touches an arr instance takes `host` and logs it in the audit row.
 - A title's owning host is resolved per copy (standard or 4K) through Seerr, the one ownership rule described under Tools. When it can't be settled, the tool refuses rather than guessing.
 
