@@ -19,9 +19,11 @@ briefly fills the upload for everyone.
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import Annotated, Any
 
-from luwin.agent.tools import Result, Tier, ToolContext, tool
+from pydantic import Field
+
+from luwin.agent.tools import Ok, Refused, Result, Tier, ToolContext, tool
 from luwin.perf import reencode, uplink
 from luwin.perf.lag import diagnose, live_streams
 from luwin.perf.load import read_loads
@@ -45,22 +47,17 @@ IN_BRIEF = (
     "it (at most 2 Mbps), the app and player, and `advice`: the cause and what to do. Reply "
     "with the advice, not the stats; with details=true it adds every finding and the numbers "
     "behind them, for when they ask.",
-    {
-        "type": "object",
-        "properties": {
-            "details": {
-                "type": "boolean",
-                "description": "Every finding and the stats behind them, when they ask.",
-            }
-        },
-        "additionalProperties": False,
-    },
     tier=Tier.FRIEND,
 )
-async def session_report(ctx: ToolContext, details: bool = False) -> dict[str, Any] | Result:
+async def session_report(
+    ctx: ToolContext,
+    details: Annotated[
+        bool, Field(description="Every finding and the stats behind them, when they ask.")
+    ] = False,
+) -> dict[str, Any] | Result:
     link = ctx.linked_user()
     if link.tautulli_user_id is None:
-        return Result.refusal(
+        return Refused(
             "Their Plex account isn't matched to a Tautulli user, so their stream can't be found."
         )
     services = ctx.services
@@ -88,7 +85,7 @@ async def session_report(ctx: ToolContext, details: bool = False) -> dict[str, A
     # The version a stream plays may be a remux worth re-encoding.
     flagged = await asyncio.gather(*(reencode.flag(services, ctx.store, s) for s in streams))
     notices = tuple(notice for notice in flagged if notice is not None)
-    return Result(reply, notices) if notices else reply
+    return Ok(reply, notices) if notices else reply
 
 
 @tool(
@@ -98,12 +95,11 @@ async def session_report(ctx: ToolContext, details: bool = False) -> dict[str, A
     "and memory where the fleet monitor is set up. `verdict` says whether load could be why "
     "things are slow. Use when someone asks if the server is up or busy, or why everything "
     "is slow.",
-    {"type": "object", "properties": {}, "additionalProperties": False},
     tier=Tier.FRIEND,
 )
 async def server_status(ctx: ToolContext) -> dict[str, Any] | Result:
     if not ctx.services.tautulli:
-        return Result.refusal("No Tautulli instance is configured, so there's nothing to read.")
+        return Refused("No Tautulli instance is configured, so there's nothing to read.")
     return (await read_loads(ctx.services)).as_dict()
 
 
@@ -115,27 +111,23 @@ async def server_status(ctx: ToolContext) -> dict[str, Any] | Result:
     "takes about 30 seconds and briefly fills the upload, so it's rationed: a result is "
     "reused for 10 minutes and a new test runs at most every 20 (`next_test`). host is the "
     "NAS to test from; only the one luwin runs on can.",
-    {
-        "type": "object",
-        "properties": {"host": {"type": "string", "description": "The NAS to test from."}},
-        "required": ["host"],
-        "additionalProperties": False,
-    },
     tier=Tier.FRIEND,
     host_param="host",
 )
-async def speed_test(ctx: ToolContext, host: str) -> dict[str, Any] | Result:
+async def speed_test(
+    ctx: ToolContext, host: Annotated[str, Field(description="The NAS to test from.")]
+) -> dict[str, Any] | Result:
     tester = ctx.services.speedtest
     if tester is None:
-        return Result.refusal("No speed test is set up on this server (SPEEDTEST_HOST).")
+        return Refused("No speed test is set up on this server (SPEEDTEST_HOST).")
     if host.lower() != tester.host:
-        return Result.refusal(
+        return Refused(
             f"Speed tests run on {tester.host}, where luwin runs; the servers share one "
             f"internet connection, so test from {tester.host}."
         )
     found = await uplink.reading(ctx.memo, ctx.services, tester)
     match found.found:
         case uplink.NotMeasured(why=why):
-            return Result.refusal(f"The speed test on {tester.host} failed: {why}. {found.wait()}")
+            return Refused(f"The speed test on {tester.host} failed: {why}. {found.wait()}")
         case uplink.Uplink():
             return found.as_dict()

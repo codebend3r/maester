@@ -1,6 +1,6 @@
 import time
 
-from luwin.agent.tools import Tier, registry
+from luwin.agent.tools import Refused, Tier, registry
 from luwin.clients import ClientError
 from luwin.clients.plex import PlexItem, Version
 from luwin.clients.speedtest import SpeedResult
@@ -45,7 +45,7 @@ async def test_server_status_reports_each_host_and_survives_a_dead_one(ctx):
 async def test_server_status_without_tautulli(ctx):
     ctx.services.tautulli = {}
     out = await server_status(ctx)
-    assert out.is_error and "No Tautulli instance is configured" in out.content
+    assert isinstance(out, Refused) and "No Tautulli instance is configured" in out.content
 
 
 def test_tool_is_registered_for_friends():
@@ -59,22 +59,22 @@ async def test_speed_test_runs_on_the_host_luwin_runs_on(ctx):
     assert (out["host"], out["upload_mbps"], out["remote_streams_mbps"]) == ("meleys", 3.2, 18.5)
     assert out["headroom"].startswith("The upload is nearly full")
     elsewhere = await speed_test(ctx, "vermithor")
-    assert elsewhere.is_error and "Speed tests run on meleys" in elsewhere.content
+    assert isinstance(elsewhere, Refused) and "Speed tests run on meleys" in elsewhere.content
     assert ctx.services.speedtest.runs == 1
 
 
 async def test_speed_test_refuses_when_it_fails_or_isnt_set_up(ctx):
     failed = await speed_test(ctx, "meleys")
-    assert failed.is_error and "no test server answered" in failed.content
+    assert isinstance(failed, Refused) and "no test server answered" in failed.content
     assert "the next can run in about 20 min" in failed.content
     ctx.services.speedtest = None
     missing = await speed_test(ctx, "meleys")
-    assert missing.is_error and "SPEEDTEST_HOST" in missing.content
+    assert isinstance(missing, Refused) and "SPEEDTEST_HOST" in missing.content
 
 
 async def test_session_report_needs_their_tautulli_account(ctx):
     out = await session_report(ctx)
-    assert out.is_error and "isn't matched to a Tautulli user" in out.content
+    assert isinstance(out, Refused) and "isn't matched to a Tautulli user" in out.content
 
 
 async def test_session_report_with_nothing_playing(ctx):

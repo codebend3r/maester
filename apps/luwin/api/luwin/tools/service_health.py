@@ -83,7 +83,6 @@ HEALTH: Key[tuple[Check, ...]] = Key("service_health")
     "and why. Use it for 'is Plex down?' or when another tool says a service didn't answer. "
     "Checked at most once a minute; `checked` says how long ago. `maintenance` says when the "
     "admin has the server down on purpose, and why.",
-    {"type": "object", "properties": {}, "additionalProperties": False},
     tier=Tier.FRIEND,
 )
 async def service_health(ctx: ToolContext) -> dict[str, Any]:

@@ -12,9 +12,11 @@ assumed, and the reply says so. It only reads.
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import Annotated, Any
 
-from luwin.agent.tools import Result, Tier, ToolContext, tool
+from pydantic import Field
+
+from luwin.agent.tools import Refused, Result, Tier, ToolContext, tool
 from luwin.clients.seerr import MediaDetails
 from luwin.formatting import mbps
 from luwin.perf.uplink import recent
@@ -35,25 +37,17 @@ GUESSED = (
     "connection is the tightest of what's known: the speed they give (connection_mbps, from "
     "fast.com say), their last play away from home, and the servers' free upload at the last "
     "speed test. Movies only.",
-    {
-        "type": "object",
-        "properties": {
-            "tmdb_id": {"type": "integer", "description": "The movie's TMDB id."},
-            "connection_mbps": {
-                "type": "number",
-                "description": "Their download speed in Mbps, when they give one.",
-            },
-        },
-        "required": ["tmdb_id"],
-        "additionalProperties": False,
-    },
     tier=Tier.FRIEND,
 )
 async def pick_version(
-    ctx: ToolContext, tmdb_id: int, connection_mbps: float | None = None
+    ctx: ToolContext,
+    tmdb_id: Annotated[int, Field(description="The movie's TMDB id.")],
+    connection_mbps: Annotated[
+        float | None, Field(description="Their download speed in Mbps, when they give one.")
+    ] = None,
 ) -> dict[str, Any] | Result:
     if connection_mbps is not None and connection_mbps <= 0:
-        return Result.refusal("connection_mbps must be a speed above 0.")
+        return Refused("connection_mbps must be a speed above 0.")
     services, link = ctx.services, ctx.linked_user()
     (details, versions), away = await asyncio.gather(
         _title(ctx, tmdb_id), last_away(services, link.tautulli_user_id)

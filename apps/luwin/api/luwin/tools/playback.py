@@ -18,13 +18,15 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import Any
+from typing import Annotated, Any
 
-from luwin.agent.tools import Choice, Choices, Result, Tier, ToolContext, tool
+from pydantic import Field
+
+from luwin.agent.tools import Choice, Choices, Ok, Refused, Result, Tier, ToolContext, tool
 from luwin.clients.seerr import MediaDetails
 from luwin.formatting import humanized
 from luwin.library import NotLocated
-from luwin.media import Copy, copy_ref, episode_code, titled, version_label
+from luwin.media import Copy, MediaType, Version, copy_ref, episode_code, titled, version_label
 from luwin.playback.diagnosis import FileChecked, TrackList, read_tracks
 from luwin.playback.health import parse_clock
 from luwin.playback.items import locate
@@ -32,23 +34,12 @@ from luwin.playback.plays import Play, identify, recent_plays
 from luwin.playback.reports import ReportKind, file_report
 
 # The copy (and episode) a playback tool is about.
-ITEM_PROPERTIES: dict[str, Any] = {
-    "tmdb_id": {
-        "type": "integer",
-        "description": "The TMDB id, from recent_sessions or search_media.",
-    },
-    "media_type": {"type": "string", "enum": ["movie", "tv"]},
-    "version": {"type": "string", "enum": ["1080p", "4K"], "description": "Which copy."},
-    "season": {"type": "integer", "description": "Shows only: the season."},
-    "episode": {"type": "integer", "description": "Shows only: the episode."},
-}
-ITEM_REQUIRED = ["tmdb_id", "media_type", "version"]
-ITEM_SCHEMA: dict[str, Any] = {
-    "type": "object",
-    "properties": ITEM_PROPERTIES,
-    "required": ITEM_REQUIRED,
-    "additionalProperties": False,
-}
+PlayedTmdbId = Annotated[
+    int, Field(description="The TMDB id, from recent_sessions or search_media.")
+]
+WhichCopy = Annotated[Version, Field(description="Which copy.")]
+Season = Annotated[int | None, Field(description="Shows only: the season.")]
+EpisodeNumber = Annotated[int | None, Field(description="Shows only: the episode.")]
 
 NOTHING_RECENT = (
     "Nothing watched recently shows up. Ask which title (and for a show, which episode) "
@@ -79,13 +70,12 @@ def play_choice(play: Play, details: MediaDetails, is_4k: bool | None, now: floa
     "title and copy before reporting it. A pick reads media_type:tmdb_id:version[:SxxEyy], "
     "with version ? when the copy is unclear. What couldn't be looked up is in notes. When "
     "it finds nothing, ask which title and use search_media.",
-    {"type": "object", "properties": {}, "additionalProperties": False},
     tier=Tier.FRIEND,
 )
 async def recent_sessions(ctx: ToolContext) -> dict[str, Any] | Choices | Result:
     link = ctx.linked_user()
     if link.tautulli_user_id is None:
-        return Result.refusal(
+        return Refused(
             "Their Plex account isn't matched to a Tautulli user, so what they watched can't "
             f"be looked up. {NOTHING_RECENT}"
         )
@@ -121,30 +111,29 @@ async def recent_sessions(ctx: ToolContext) -> dict[str, Any] | Choices | Result
     "subtitle files next to it: language, codec, title, forced, and for audio whether it is "
     "English. Answers 'does this have Spanish subs?' or 'is this one dubbed?'. For a show, "
     "name the episode.",
-    ITEM_SCHEMA,
     tier=Tier.FRIEND,
 )
 async def list_tracks(
     ctx: ToolContext,
-    tmdb_id: int,
-    media_type: str,
-    version: str,
-    season: int | None = None,
-    episode: int | None = None,
+    tmdb_id: PlayedTmdbId,
+    media_type: MediaType,
+    version: WhichCopy,
+    season: Season = None,
+    episode: EpisodeNumber = None,
 ) -> dict[str, Any] | Result:
     try:
         copy = Copy.of(media_type, tmdb_id, version, season, episode)
     except ValueError as bad:  # arguments that name no copy
-        return Result.refusal(str(bad))
+        return Refused(str(bad))
     try:
         located = await locate(ctx.services, copy)
     except NotLocated as exc:
-        return Result.refusal(str(exc))
+        return Refused(str(exc))
     match await read_tracks(ctx.services.probe, located):
         case TrackList() as found:
             return {"title": located.title, "version": copy.version, **found.as_dict()["tracks"]}
         case FileChecked(health=health):
-            return Result.refusal(f"The file couldn't be read: {health.summary}")
+            return Refused(f"The file couldn't be read: {health.summary}")
 
 
 @tool(
@@ -156,44 +145,30 @@ async def list_tracks(
     "(out of sync, missing dub), other. Records the report, opens a Seerr issue as the user, "
     "and returns what was found and decided: a player fix to relay, a new copy to offer with "
     "replace_media, or that it's recorded. Follow its `next`.",
-    {
-        "type": "object",
-        "properties": {
-            **ITEM_PROPERTIES,
-            "kind": {"type": "string", "enum": [k.value for k in ReportKind]},
-            "description": {"type": "string", "description": "The problem in the user's words."},
-            "at": {
-                "type": "string",
-                "description": "When it breaks, as H:MM:SS ('freezes at 1:12:30').",
-            },
-        },
-        "required": [*ITEM_REQUIRED, "kind", "description"],
-        "additionalProperties": False,
-    },
     tier=Tier.FRIEND,
 )
 async def report_problem(
     ctx: ToolContext,
-    tmdb_id: int,
-    media_type: str,
-    version: str,
-    kind: str,
-    description: str,
-    season: int | None = None,
-    episode: int | None = None,
-    at: str | None = None,
+    tmdb_id: PlayedTmdbId,
+    media_type: MediaType,
+    version: WhichCopy,
+    kind: ReportKind,
+    description: Annotated[str, Field(description="The problem in the user's words.")],
+    season: Season = None,
+    episode: EpisodeNumber = None,
+    at: Annotated[
+        str | None, Field(description="When it breaks, as H:MM:SS ('freezes at 1:12:30').")
+    ] = None,
 ) -> Result:
     try:
         copy = Copy.of(media_type, tmdb_id, version, season, episode)
         moment = parse_clock(at) if at else None
     except ValueError as bad:  # arguments that name no copy, or no time
-        return Result.refusal(str(bad))
+        return Refused(str(bad))
     link = ctx.linked_user()
     try:
         located = await locate(ctx.services, copy)
     except NotLocated as exc:
-        return Result.refusal(str(exc))
-    filed = await file_report(
-        ctx.services, ctx.store, link, located, ReportKind(kind), description, moment
-    )
-    return Result(filed.as_dict(), filed.notices)
+        return Refused(str(exc))
+    filed = await file_report(ctx.services, ctx.store, link, located, kind, description, moment)
+    return Ok(filed.as_dict(), filed.notices)

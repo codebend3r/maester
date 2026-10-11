@@ -109,7 +109,7 @@ async def test_anime_reports_english_audio_per_season(ctx):
     sonarr.series_list = [
         Series(40, "Frieren", 424536, 2023, "/Syrax/Anime/Frieren", True, "anime", (1, 2))
     ]
-    sonarr.files = [
+    sonarr.file_list = [
         MediaFile(1, "/a.mkv", 1, "Bluray-1080p", None, 40, 1, ("jpn", "eng")),
         MediaFile(2, "/b.mkv", 1, "WEBDL-1080p", None, 40, 2, ("jpn",)),
     ]

@@ -1,7 +1,7 @@
 import time
 from datetime import timedelta
 
-from luwin.agent.tools import Tier, registry
+from luwin.agent.tools import Refused, Tier, registry
 from luwin.clients.plex import PlexItem, Version
 from luwin.tools.versions import GUESSED, pick_version
 from tests.factories import history_row, session
@@ -63,7 +63,7 @@ async def test_nothing_on_plex_and_a_bad_speed(ctx):
     ctx.services.seerr.details[("movie", 438631)] = DUNE
     assert (await pick_version(ctx, 438631))["note"] == "No version of it is on Plex."
     refused = await pick_version(ctx, 438631, connection_mbps=0)
-    assert refused.is_error and "above 0" in refused.content
+    assert isinstance(refused, Refused) and "above 0" in refused.content
 
 
 async def test_asking_about_a_title_only_reads(ctx):

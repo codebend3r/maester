@@ -15,9 +15,11 @@ from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any
+from typing import Annotated, Any
 
-from luwin.agent.tools import Result, Tier, ToolContext, tool
+from pydantic import Field
+
+from luwin.agent.tools import Ok, Refused, Result, Tier, ToolContext, tool
 from luwin.clients.sonarr import Episode
 from luwin.library import NotLocated, show_owner_on
 from luwin.media import episode_code
@@ -74,28 +76,21 @@ def note(found: Gaps) -> str:
     "Sonarr expects with the files on the host that owns the show, searches the missing "
     "ones and lists them. A season missing entirely goes to the admin instead. host is the "
     "owning Sonarr host that check_availability reports; season narrows it to one season.",
-    {
-        "type": "object",
-        "properties": {
-            "tmdb_id": {"type": "integer", "description": "The show's TMDB id."},
-            "host": {"type": "string", "description": "The Sonarr host that owns the show."},
-            "season": {"type": "integer", "description": "Only this season."},
-        },
-        "required": ["tmdb_id", "host"],
-        "additionalProperties": False,
-    },
     tier=Tier.FRIEND,
     host_param="host",
     held_in_maintenance=True,
 )
 async def find_gaps(
-    ctx: ToolContext, tmdb_id: int, host: str, season: int | None = None
+    ctx: ToolContext,
+    tmdb_id: Annotated[int, Field(description="The show's TMDB id.")],
+    host: Annotated[str, Field(description="The Sonarr host that owns the show.")],
+    season: Annotated[int | None, Field(description="Only this season.")] = None,
 ) -> dict[str, Any] | Result:
     details = await ctx.services.seerr.media_details("tv", tmdb_id)
     try:
         owner = await show_owner_on(ctx.services, details, host)
     except NotLocated as exc:
-        return Result.refusal(str(exc))
+        return Refused(str(exc))
     episodes = await owner.episodes()
     found = gaps_in(episodes, datetime.now(UTC), season)
     if found.scattered:
@@ -119,4 +114,4 @@ async def find_gaps(
         f"None of {seasons} is there, so it wasn't searched: likely a request that never went "
         "through, or a season Sonarr can't find."
     )
-    return Result(reply, (notice,))
+    return Ok(reply, (notice,))

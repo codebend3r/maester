@@ -18,7 +18,9 @@ from luwin.clients.plex import Plex
 from luwin.clients.seerr import MediaDetails
 from luwin.dub import dub_coverage, is_anime
 from luwin.library import Library, OwnerUnknown
+from luwin.media import MediaType
 from luwin.plex_versions import describe_version, items_of
+from luwin.tools.args import TmdbId
 
 
 async def plex_copies(plex: Plex, details: MediaDetails) -> list[dict[str, Any]]:
@@ -82,18 +84,11 @@ async def show_details(services: Services, details: MediaDetails) -> dict[str, A
     "plex_link per copy that opens it in Plex; include the link in your reply. For shows it "
     "also gives sonarr_host, the host follow_show needs, and for anime how many files of "
     "each season have English audio.",
-    {
-        "type": "object",
-        "properties": {
-            "tmdb_id": {"type": "integer", "description": "The TMDB id from search_media."},
-            "media_type": {"type": "string", "enum": ["movie", "tv"]},
-        },
-        "required": ["tmdb_id", "media_type"],
-        "additionalProperties": False,
-    },
     tier=Tier.FRIEND,
 )
-async def check_availability(ctx: ToolContext, tmdb_id: int, media_type: str) -> dict[str, Any]:
+async def check_availability(
+    ctx: ToolContext, tmdb_id: TmdbId, media_type: MediaType
+) -> dict[str, Any]:
     services = ctx.services
     details = await services.seerr.media_details(media_type, tmdb_id)
     reply: dict[str, Any] = {

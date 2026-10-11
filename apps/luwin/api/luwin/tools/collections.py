@@ -12,9 +12,11 @@ refused), the tool refuses (`Result.refusal`) and says why.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Annotated, Any
 
-from luwin.agent.tools import Choice, Choices, Result, Tier, ToolContext, tool
+from pydantic import Field
+
+from luwin.agent.tools import Choice, Choices, Refused, Result, Tier, ToolContext, tool
 from luwin.clients.seerr import Collection, RequestRefused, RequestStatus, SearchResult
 from luwin.tools.requests import explain
 from luwin.tools.search import as_choice, availability
@@ -30,17 +32,12 @@ def missing(collection: Collection) -> list[SearchResult]:
     "The user is shown a picker of the entries with their availability, led by an option "
     "to request every missing one; wait for their pick. Picking that option means calling "
     "request_collection.",
-    {
-        "type": "object",
-        "properties": {
-            "tmdb_id": {"type": "integer", "description": "TMDB id of any movie in it."},
-        },
-        "required": ["tmdb_id"],
-        "additionalProperties": False,
-    },
     tier=Tier.FRIEND,
 )
-async def find_collection(ctx: ToolContext, tmdb_id: int) -> dict[str, Any] | Choices:
+async def find_collection(
+    ctx: ToolContext,
+    tmdb_id: Annotated[int, Field(description="TMDB id of any movie in it.")],
+) -> dict[str, Any] | Choices:
     seerr = ctx.services.seerr
     movie = await seerr.media_details("movie", tmdb_id)
     if movie.collection_id is None:
@@ -72,21 +69,16 @@ async def find_collection(ctx: ToolContext, tmdb_id: int) -> dict[str, Any] | Ch
     "Request every entry of a collection that isn't on the server or requested yet, one "
     "Seerr request each, as the user. Checks the user's movie quota first and requests "
     "nothing when the collection needs more than is left.",
-    {
-        "type": "object",
-        "properties": {
-            "collection_id": {
-                "type": "integer",
-                "description": "The collection id, from find_collection's collection:<id> option.",
-            },
-        },
-        "required": ["collection_id"],
-        "additionalProperties": False,
-    },
     tier=Tier.FRIEND,
     held_in_maintenance=True,
 )
-async def request_collection(ctx: ToolContext, collection_id: int) -> dict[str, Any] | Result:
+async def request_collection(
+    ctx: ToolContext,
+    collection_id: Annotated[
+        int,
+        Field(description="The collection id, from find_collection's collection:<id> option."),
+    ],
+) -> dict[str, Any] | Result:
     user = ctx.linked_user()
     seerr = ctx.services.seerr
     collection = await seerr.collection(collection_id)
@@ -100,13 +92,13 @@ async def request_collection(ctx: ToolContext, collection_id: int) -> dict[str, 
         ],
     }
     if not gaps:
-        return Result.refusal(
+        return Refused(
             f"Nothing was requested: every entry of {collection.name} is already on the server "
             "or requested."
         )
     quota = (await seerr.quota(user.seerr_user_id)).movie
     if quota.remaining is not None and len(gaps) > quota.remaining:
-        return Result.refusal(
+        return Refused(
             f"Nothing was requested: {collection.name} needs {len(gaps)} movie requests "
             f"({', '.join(p.title for p in gaps)}), but this account has {quota.remaining} of "
             f"{quota.limit} left for the next {quota.days} days. Ask which ones they want most."
@@ -130,5 +122,5 @@ async def request_collection(ctx: ToolContext, collection_id: int) -> dict[str, 
         )
     if not requested:
         why = "; ".join(f"{r['title']}: {r['reason']}" for r in refused)
-        return Result.refusal(f"Seerr took none of {collection.name}'s requests. {why}")
+        return Refused(f"Seerr took none of {collection.name}'s requests. {why}")
     return {**reply, "requested": requested, **({"refused": refused} if refused else {})}

@@ -10,10 +10,13 @@ is already on the server or already requested.
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import Annotated, Any
+
+from pydantic import Field
 
 from luwin.agent.tools import Choice, Choices, Tier, ToolContext, tool
 from luwin.clients.seerr import MediaStatus, SearchResult
+from luwin.media import MediaType
 
 # The disambiguation picker shows at most this many options.
 SEARCH_PICKS = 5
@@ -70,24 +73,15 @@ def as_choice(result: SearchResult) -> Choice:
     "When several titles plausibly match, the user is shown a picker; wait for their pick "
     "instead of choosing. For a vague description, search for the title you think is meant "
     "and confirm it with the user before requesting.",
-    {
-        "type": "object",
-        "properties": {
-            "query": {"type": "string", "description": "The title to look for."},
-            "media_type": {
-                "type": "string",
-                "enum": ["movie", "tv"],
-                "description": "Only movies or only shows, when the user said which.",
-            },
-            "year": {"type": "integer", "description": "Release year, when the user gave one."},
-        },
-        "required": ["query"],
-        "additionalProperties": False,
-    },
     tier=Tier.FRIEND,
 )
 async def search_media(
-    ctx: ToolContext, query: str, media_type: str | None = None, year: int | None = None
+    ctx: ToolContext,
+    query: Annotated[str, Field(description="The title to look for.")],
+    media_type: Annotated[
+        MediaType | None, Field(description="Only movies or only shows, when the user said which.")
+    ] = None,
+    year: Annotated[int | None, Field(description="Release year, when the user gave one.")] = None,
 ) -> dict[str, Any] | Choices:
     results = [
         r

@@ -1,6 +1,6 @@
 import pytest
 
-from luwin.agent.tools import Choices, Result
+from luwin.agent.tools import Choices, Refused
 from luwin.clients.seerr import (
     Collection,
     MediaDetails,
@@ -85,7 +85,7 @@ async def test_one_request_per_missing_entry_summed_up(ctx, seerr):
 async def test_a_collection_over_the_quota_is_explained_not_half_requested(ctx, seerr):
     seerr.quotas[4] = Quotas(Quota(5, 7, 3, 2, False), UNLIMITED_TV)
     out = await request_collection(ctx, 87359)
-    assert out.is_error and seerr.requests == []
+    assert isinstance(out, Refused) and seerr.requests == []
     assert out.content == (
         "Nothing was requested: Mission: Impossible Collection needs 3 movie requests "
         "(Mission: Impossible II, Ghost Protocol, Rogue Nation), but this account has 2 of 5 "
@@ -98,14 +98,14 @@ async def test_a_collection_over_the_quota_is_explained_not_half_requested(ctx, 
 
 async def test_nothing_requested_is_a_refusal(ctx, seerr):
     seerr.collections[87359] = Collection(87359, "MI", MI.parts[:1])  # nothing missing
-    assert (await request_collection(ctx, 87359)) == Result.refusal(
+    assert (await request_collection(ctx, 87359)) == Refused(
         "Nothing was requested: every entry of MI is already on the server or requested."
     )
     seerr.collections[87359] = MI
     for tmdb_id in (955, 56292, 177677):
         seerr.refusals[tmdb_id] = RequestRefused(Refusal.BLOCKLISTED, "blocklisted")
     out = await request_collection(ctx, 87359)
-    assert out.is_error and out.content.startswith(
+    assert isinstance(out, Refused) and out.content.startswith(
         "Seerr took none of Mission: Impossible Collection's requests. Mission: Impossible II: "
         "That title is blocklisted on this server."
     )

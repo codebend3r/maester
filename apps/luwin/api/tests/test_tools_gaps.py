@@ -2,7 +2,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from luwin.agent.tools import Result, registry
+from luwin.agent.tools import Refused, Result, registry
 from luwin.clients.sonarr import Episode
 from luwin.tools.gaps import find_gaps, gaps_in
 from tests.playback_world import stock
@@ -72,5 +72,5 @@ async def test_find_gaps_for_one_season_or_a_complete_show(bear):
 
 async def test_find_gaps_only_on_the_owning_host(bear):
     out = await find_gaps(bear, 136315, "vermithor")
-    assert out == Result.refusal("The Bear (2022) is on the Sonarr on meleys, not vermithor.")
+    assert out == Refused("The Bear (2022) is on the Sonarr on meleys, not vermithor.")
     assert registry.get("find_gaps").host_param == "host"

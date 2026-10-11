@@ -7,11 +7,14 @@ One guide per device, each ending with what every device shares
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
 GUIDES_DIR = Path(__file__).resolve().parent
 
 # The devices there's a guide for, by the name tools and commands use.
-DEVICES = {
+Device = Literal["android_tv", "apple_tv", "fire_tv", "mobile", "roku", "web"]
+# Each device's guide file.
+DEVICES: dict[Device, str] = {
     "apple_tv": "apple-tv",
     "roku": "roku",
     "fire_tv": "fire-tv",
@@ -21,7 +24,7 @@ DEVICES = {
 }
 
 
-def guide(device: str) -> str:
+def guide(device: Device) -> str:
     """A device's guide, then the settings every device shares."""
     own = (GUIDES_DIR / f"{DEVICES[device]}.md").read_text()
     return f"{own.strip()}\n\n{(GUIDES_DIR / 'streaming.md').read_text().strip()}"
