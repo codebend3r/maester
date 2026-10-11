@@ -3,14 +3,17 @@ import {
   ApiError,
   DEFAULT_LIBRARY_SETTINGS,
   groupMedia,
+  isLibraryView,
+  isMediaGroupBy,
+  isMediaSort,
   type Library,
   type LibraryKind,
   type LibrarySettings,
   type MediaItem,
   type ShowEntry,
 } from '@raven/core'
-import { useId, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useEffect, useId, useState } from 'react'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Button, ButtonLink } from '@/components/Button/Button'
 import type { MatchType } from '@/components/FixMatchDialog/FixMatchDialog'
 import { LibraryDialog } from '@/components/LibraryDialog/LibraryDialog'
@@ -53,6 +56,37 @@ const firstShown = ({
         .flatMap((group) => group.items)
         .at(0)
     : items.at(0)
+
+/**
+ * The view the address carries, `?q=&sort=&view=&group=`, so a refresh or a
+ * shared link lands on the same search, order and layout; what the address
+ * leaves out comes from the library's own settings.
+ */
+const viewFromUrl = (params: URLSearchParams): Partial<LibrarySettings> => {
+  const sort = params.get('sort')
+  const view = params.get('view')
+  const group = params.get('group')
+  return {
+    ...(isMediaSort(sort) ? { sort } : {}),
+    ...(isLibraryView(view) ? { view } : {}),
+    ...(isMediaGroupBy(group) ? { groupBy: group } : {}),
+  }
+}
+
+/** The address with `change` written into it. */
+const writeView = ({
+  params,
+  change,
+}: {
+  params: URLSearchParams
+  change: Partial<LibrarySettings>
+}): URLSearchParams => {
+  const next = new URLSearchParams(params)
+  if (change.sort != null) next.set('sort', change.sort)
+  if (change.view != null) next.set('view', change.view)
+  if (change.groupBy != null) next.set('group', change.groupBy)
+  return next
+}
 
 /** What a library's files are matched to, for the cards' Fix match. */
 const matchTypeOf = (kind: LibraryKind): MatchType | null =>
@@ -127,7 +161,8 @@ export const LibraryPage = () => {
   const ids = { title: useId(), matched: useId(), unmatched: useId() }
   const queryClient = useQueryClient()
   const navigate = useNavigate()
-  const [search, setSearch] = useState('')
+  const [address, setAddress] = useSearchParams()
+  const [search, setSearch] = useState(address.get('q') ?? '')
   const [seed] = useState(dealSeed)
   const [editing, setEditing] = useState(false)
   const query = useDebouncedValue({ value: search.trim(), delayMs: 200 })
@@ -139,7 +174,22 @@ export const LibraryPage = () => {
     refetchInterval: (current) => (current.state.data?.scan.state === 'scanning' ? 1500 : false),
   })
   const scanning = library.data?.scan.state === 'scanning'
-  const settings = library.data?.settings ?? DEFAULT_LIBRARY_SETTINGS
+  const saved = library.data?.settings ?? DEFAULT_LIBRARY_SETTINGS
+  const settings = { ...saved, ...viewFromUrl(address) }
+
+  // The search rides in the address once it settles, replacing rather than
+  // stacking history entries as the viewer types.
+  useEffect(() => {
+    setAddress(
+      (current) => {
+        const next = new URLSearchParams(current)
+        if (query) next.set('q', query)
+        else next.delete('q')
+        return next
+      },
+      { replace: true },
+    )
+  }, [query, setAddress])
   const sort = settings.sort
   const dealt = sort === 'random' ? seed : 0
   // Files only leave pending while TMDB answers; without it they wait for good.
@@ -315,6 +365,7 @@ export const LibraryPage = () => {
         onSearch={setSearch}
         settings={settings}
         onChange={(change) => {
+          setAddress(writeView({ params: address, change }), { replace: true })
           if (library.data) saveSettings.mutate({ current: library.data, change })
         }}
         playable={playable}

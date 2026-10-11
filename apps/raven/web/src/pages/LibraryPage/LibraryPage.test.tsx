@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { Library, LibraryInput, LibrarySettings, MediaItem, MediaSort } from '@raven/core'
-import { Route, Routes, useParams } from 'react-router-dom'
+import { Route, Routes, useLocation, useParams } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { LibraryPage } from '@/pages/LibraryPage/LibraryPage'
 import { library, mediaItem, showEntry } from '@/test/fixtures'
@@ -14,6 +14,9 @@ const ITEMS = [WIDE, FULL, mediaItem({ id: 3, title: 'Also full', width: 1920, h
 
 /** Stands in for the player: says which video the page went to. */
 const Watching = () => <p>Watching {useParams().id}</p>
+
+/** Prints the address's query string, so a test can read what the page wrote there. */
+const Address = () => <p data-testid="address">{useLocation().search}</p>
 
 describe('LibraryPage', () => {
   const spies = {
@@ -27,7 +30,11 @@ describe('LibraryPage', () => {
   }
 
   /** Serves one library whose settings change as the page saves them. */
-  const serve = (settings: Partial<LibrarySettings> = {}, items: MediaItem[] = ITEMS) => {
+  const serve = (
+    settings: Partial<LibrarySettings> = {},
+    items: MediaItem[] = ITEMS,
+    route = '/libraries/2',
+  ) => {
     const current: { library: Library } = {
       library: library({ id: 2, settings: { ...library().settings, ...settings } }),
     }
@@ -45,11 +52,14 @@ describe('LibraryPage', () => {
       return current.library
     })
     renderWithProviders(
-      <Routes>
-        <Route path="libraries/:id" element={<LibraryPage />} />
-        <Route path="watch/:id" element={<Watching />} />
-      </Routes>,
-      { route: '/libraries/2' },
+      <>
+        <Routes>
+          <Route path="libraries/:id" element={<LibraryPage />} />
+          <Route path="watch/:id" element={<Watching />} />
+        </Routes>
+        <Address />
+      </>,
+      { route },
     )
   }
 
@@ -67,6 +77,33 @@ describe('LibraryPage', () => {
     expect(screen.getByLabelText('Sort')).toHaveValue('largest')
     expect(screen.getByRole('button', { name: 'List' })).toHaveAttribute('aria-pressed', 'true')
     expect(state.listed.at(-1)?.sort).toBe('largest')
+  })
+
+  it('opens on the search, sort, view and grouping the address carries', async () => {
+    serve(
+      { view: 'grid', sort: 'title' },
+      ITEMS,
+      '/libraries/2?q=wide&sort=largest&view=list&group=codec',
+    )
+    expect(await screen.findByRole('table', { name: 'Videos' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Search Movies')).toHaveValue('wide')
+    expect(screen.getByLabelText('Sort')).toHaveValue('largest')
+    expect(state.listed.at(-1)?.sort).toBe('largest')
+    expect(spies.list.mock.calls.at(-1)?.[0]?.search).toBe('wide')
+  })
+
+  it('writes each change of view and the search into the address', async () => {
+    serve()
+    await screen.findByRole('link', { name: 'Wide' })
+    await userEvent.click(screen.getByRole('button', { name: 'List' }))
+    await userEvent.selectOptions(screen.getByLabelText('Sort'), 'Largest file')
+    expect(screen.getByTestId('address').textContent).toBe('?view=list&sort=largest')
+    await userEvent.type(screen.getByLabelText('Search Movies'), 'wide')
+    await waitFor(() =>
+      expect(screen.getByTestId('address').textContent).toBe('?view=list&sort=largest&q=wide'),
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Grid' }))
+    expect(screen.getByTestId('address').textContent).toBe('?view=grid&sort=largest&q=wide')
   })
 
   it('saves a new sort to the library and lists in that order', async () => {
