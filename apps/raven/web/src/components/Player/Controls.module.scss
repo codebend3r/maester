@@ -11,8 +11,11 @@
   gap: var(--space-0) var(--space-0);
   align-items: center;
   padding: var(--space-6) clamp(var(--space-2), 3vw, var(--space-5)) var(--space-2);
-  background: linear-gradient(to top, rgb(0 0 0 / 75%), rgb(0 0 0 / 0%));
-  transition: opacity 250ms ease-out;
+  background: var(--fade-from-bottom);
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition: opacity 250ms ease-out;
+  }
 }
 
 .hidden {
@@ -41,10 +44,13 @@
   background: transparent;
   color: var(--color-bark);
   cursor: pointer;
-  transition: background-color 120ms ease-out;
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition: background-color 120ms ease-out;
+  }
 
   &:hover {
-    background: rgb(28 43 40 / 85%);
+    background: var(--color-canopy-haze);
   }
 }
 

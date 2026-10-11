@@ -138,7 +138,7 @@
   border: 1px solid var(--color-moss);
   border-radius: var(--radius-md);
   background: var(--color-canopy);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 40%);
+  box-shadow: var(--shadow-menu);
   font-size: var(--font-size-sm);
 
   // Centred over the toggle, which is 2.5rem wide.

@@ -13,9 +13,12 @@
   text-decoration: none;
   white-space: nowrap;
   cursor: pointer;
-  transition:
-    background-color 120ms ease-out,
-    border-color 120ms ease-out;
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition:
+      background-color 120ms ease-out,
+      border-color 120ms ease-out;
+  }
 
   &:disabled {
     cursor: not-allowed;

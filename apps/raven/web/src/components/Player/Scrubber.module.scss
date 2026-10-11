@@ -20,8 +20,11 @@
   height: 4px;
   overflow: hidden;
   border-radius: 2px;
-  background: rgb(230 225 214 / 22%);
-  transition: height 120ms ease-out;
+  background: var(--color-bark-faint);
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition: height 120ms ease-out;
+  }
 }
 
 .scrubber:hover .rail,
@@ -38,7 +41,7 @@
 }
 
 .buffered {
-  background: rgb(157 176 168 / 45%);
+  background: var(--color-lichen-faint);
 }
 
 .played {
@@ -55,9 +58,13 @@
   height: 0.9rem;
   border-radius: 0 70%;
   background: var(--color-leaf-bright);
-  box-shadow: 0 0 0 2px rgb(0 0 0 / 35%);
+  box-shadow: var(--shadow-outline);
   transform: translate(-50%, -50%) rotate(45deg) scale(0.8);
-  transition: transform 120ms ease-out;
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition: transform 120ms ease-out;
+  }
+
   pointer-events: none;
 }
 

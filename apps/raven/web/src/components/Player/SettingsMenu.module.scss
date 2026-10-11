@@ -27,8 +27,8 @@
   padding: var(--space-3);
   border: 1px solid var(--color-moss);
   border-radius: var(--radius-md);
-  background: rgb(28 43 40 / 96%);
-  box-shadow: 0 12px 32px rgb(0 0 0 / 45%);
+  background: var(--color-canopy-glass);
+  box-shadow: var(--shadow-panel);
 }
 
 .header {

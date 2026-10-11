@@ -235,7 +235,10 @@ $field: "input:not([type='checkbox'], [type='radio'], [type='range'], [type='col
   border-radius: var(--radius-md);
   background-color: var(--color-canopy);
   color: var(--color-bark);
-  transition: border-color 120ms ease-out;
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition: border-color 120ms ease-out;
+  }
 
   &:where(:hover:not(:disabled, :focus-visible)) {
     border-color: var(--color-lichen);
@@ -311,16 +314,22 @@ $field: "input:not([type='checkbox'], [type='radio'], [type='range'], [type='col
   vertical-align: middle;
   cursor: pointer;
   appearance: none;
-  transition:
-    background-color 120ms ease-out,
-    border-color 120ms ease-out;
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition:
+      background-color 120ms ease-out,
+      border-color 120ms ease-out;
+  }
 
   &::before {
     content: '';
     width: 0.65rem;
     height: 0.65rem;
     transform: scale(0);
-    transition: transform 120ms ease-out;
+
+    @media (prefers-reduced-motion: no-preference) {
+      transition: transform 120ms ease-out;
+    }
   }
 
   &:where(:checked, :indeterminate) {
