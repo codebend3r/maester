@@ -82,9 +82,13 @@ export const fileFacts = ({
     formatChannels(audioTrack?.channels ?? media.audioChannels),
   ].filter((part): part is string => part != null)
   const language = languageName(audioTrack?.language ?? null)
-  const audio = [language, audioDetails.length > 0 ? `(${audioDetails.join(' ')})` : null]
-    .filter((part): part is string => part != null)
-    .join(' ')
+  // "English (EAC3 5.1)", or just the details when the track names no language.
+  const audio =
+    language == null
+      ? audioDetails.join(' ')
+      : [language, audioDetails.length > 0 ? `(${audioDetails.join(' ')})` : null]
+          .filter((part): part is string => part != null)
+          .join(' ')
   const subtitles = unique(
     (tracks?.subtitles ?? []).flatMap((track) => languageName(track.language) ?? []),
   ).join(', ')

@@ -84,6 +84,17 @@ describe('MoviePage', () => {
     expect(screen.getByText('English, Spanish')).toBeInTheDocument()
   })
 
+  it('describes untagged audio without a language', async () => {
+    open(itemDetails())
+    spies.tracks.mockImplementation(async () => ({
+      audio: [{ index: 0, codec: 'ac3', channels: 1, language: null, title: null, default: true }],
+      subtitles: [],
+      defaultAudio: 0,
+      frameRate: 24,
+    }))
+    expect(await screen.findByText('Dolby Digital Mono')).toBeInTheDocument()
+  })
+
   it('plays, or resumes from the saved spot', async () => {
     open(itemDetails({ versions: [matchedMovie({ position: 2530 })] }))
     await userEvent.click(await screen.findByRole('link', { name: 'Resume from 42:10' }))
