@@ -1,12 +1,17 @@
-import { type MediaItem, formatRuntime, mediaLabel, resolutionLabel } from '@raven/core'
-import { useState } from 'react'
+import {
+  type MatchItemType,
+  type MediaItem,
+  formatRuntime,
+  mediaLabel,
+  resolutionLabel,
+} from '@raven/core'
 import { Link } from 'react-router-dom'
-import type { MatchType } from '@/components/FixMatchDialog/FixMatchDialog'
-import { Icon } from '@/components/Icon/Icon'
-import { MENU_HOST, MediaMenu } from '@/components/MediaMenu/MediaMenu'
+import { FavouriteMark } from '@/components/FavouriteMark/FavouriteMark'
+import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
+import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { api } from '@/lib/api'
-import { progressOf } from '@/lib/mediaProgress'
+import { watchLink } from '@/lib/itemLinks'
 import styles from '@/components/MediaCard/MediaCard.module.scss'
 
 /**
@@ -21,11 +26,10 @@ export const MediaCard = ({
 }: {
   media: MediaItem
   /** What the library matches its files to, for the menu's Fix match. */
-  matchType?: MatchType | null
+  matchType?: MatchItemType | null
 }) => {
-  const [menuOpen, setMenuOpen] = useState(false)
+  const menu = useCardMenu({ media, matchType })
   const thumbnail = api.thumbnailUrl(media)
-  const progress = progressOf(media)
   const facts = [
     formatRuntime(media.duration),
     resolutionLabel(media),
@@ -33,16 +37,8 @@ export const MediaCard = ({
   ].filter((fact): fact is string => fact != null)
 
   return (
-    <li className={`${styles.card} ${MENU_HOST}`}>
-      <Link
-        to={`/watch/${media.id}`}
-        state={{ media }}
-        className={styles.link}
-        onContextMenu={(event) => {
-          event.preventDefault()
-          setMenuOpen(true)
-        }}
-      >
+    <li className={`${styles.card} ${menu.hostClass}`}>
+      <Link {...watchLink(media)} className={styles.link} onContextMenu={menu.onContextMenu}>
         <span className={styles.frame}>
           {thumbnail ? (
             <img
@@ -57,28 +53,19 @@ export const MediaCard = ({
               {mediaLabel(media).slice(0, 1)}
             </span>
           )}
-          {progress > 0 && (
-            <span className={styles.resume} aria-hidden="true">
-              <span className={styles.resumeFill} style={{ width: `${progress * 100}%` }} />
-            </span>
-          )}
+          <ResumeBar media={media} className={styles.resume} />
         </span>
         <span className={styles.title}>{mediaLabel(media)}</span>
       </Link>
       <span className={styles.facts}>
-        {media.favourite && (
-          <span className={styles.favourite}>
-            <Icon name="heart" size={14} />
-            <span className="visually-hidden">Favourite</span>
-          </span>
-        )}
+        <FavouriteMark media={media} />
         {facts.map((fact) => (
           <span key={fact}>{fact}</span>
         ))}
-        {progress > 0 && <span className="visually-hidden">Partly watched</span>}
+        <PartlyWatched media={media} />
       </span>
       <PlaybackNote media={media} />
-      <MediaMenu media={media} open={menuOpen} onOpenChange={setMenuOpen} matchType={matchType} />
+      {menu.menu}
     </li>
   )
 }

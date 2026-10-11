@@ -1,4 +1,5 @@
 import {
+  type MatchItemType,
   type MediaItem,
   cardTitle,
   codecLabel,
@@ -7,17 +8,15 @@ import {
   mediaLabel,
   resolutionLabel,
 } from '@raven/core'
-import { type MouseEvent, useState } from 'react'
 import { Link } from 'react-router-dom'
-import type { MatchType } from '@/components/FixMatchDialog/FixMatchDialog'
-import { Icon } from '@/components/Icon/Icon'
-import { MENU_HOST, MediaMenu } from '@/components/MediaMenu/MediaMenu'
+import { FavouriteMark } from '@/components/FavouriteMark/FavouriteMark'
+import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
 import { PosterFrame } from '@/components/PosterCard/PosterCard'
 import { RatingChips } from '@/components/RatingChips/RatingChips'
+import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { api } from '@/lib/api'
-import { openPath } from '@/lib/itemLinks'
-import { progressOf } from '@/lib/mediaProgress'
+import { cardLink } from '@/lib/itemLinks'
 import styles from '@/components/MediaTiles/MediaTiles.module.scss'
 
 /**
@@ -35,17 +34,11 @@ const MediaTile = ({
   media: MediaItem
   note: string | null
   posters: boolean
-  matchType: MatchType | null
+  matchType: MatchItemType | null
 }) => {
-  const [menuOpen, setMenuOpen] = useState(false)
-  const openMenu = (event: MouseEvent) => {
-    event.preventDefault()
-    setMenuOpen(true)
-  }
+  const menu = useCardMenu({ media, matchType, inline: true })
   const thumbnail = api.thumbnailUrl(media)
-  const progress = progressOf(media)
-  const to = posters ? openPath(media) : `/watch/${media.id}`
-  const state = to === `/watch/${media.id}` ? { media } : undefined
+  const link = cardLink({ media, pages: posters })
   const { year } = cardTitle(media)
   const facts = [
     posters && year != null ? String(year) : null,
@@ -59,17 +52,16 @@ const MediaTile = ({
 
   return (
     <li
-      className={[styles.tile, posters ? styles.posterTile : '', MENU_HOST]
+      className={[styles.tile, posters ? styles.posterTile : '', menu.hostClass]
         .filter(Boolean)
         .join(' ')}
     >
       <Link
-        to={to}
-        state={state}
+        {...link}
         className={posters ? styles.posterFrame : styles.frame}
         tabIndex={-1}
         aria-hidden="true"
-        onContextMenu={openMenu}
+        onContextMenu={menu.onContextMenu}
       >
         {posters ? (
           <PosterFrame media={media} />
@@ -84,27 +76,18 @@ const MediaTile = ({
         ) : (
           <span className={styles.placeholder}>{media.title.slice(0, 1)}</span>
         )}
-        {!posters && progress > 0 && (
-          <span className={styles.resume}>
-            <span className={styles.resumeFill} style={{ width: `${progress * 100}%` }} />
-          </span>
-        )}
+        {!posters && <ResumeBar media={media} className={styles.resume} />}
       </Link>
       <div className={styles.body}>
-        <Link to={to} state={state} className={styles.title} onContextMenu={openMenu}>
+        <Link {...link} className={styles.title} onContextMenu={menu.onContextMenu}>
           {posters ? cardTitle(media).title : mediaLabel(media)}
         </Link>
         <span className={styles.facts}>
-          {media.favourite && (
-            <span className={styles.favourite}>
-              <Icon name="heart" size={14} />
-              <span className="visually-hidden">Favourite</span>
-            </span>
-          )}
+          <FavouriteMark media={media} />
           {facts.map((fact) => (
             <span key={fact}>{fact}</span>
           ))}
-          {progress > 0 && <span className="visually-hidden">Partly watched</span>}
+          <PartlyWatched media={media} />
         </span>
         {posters && media.item && <RatingChips ratings={media.item.ratings} />}
         {media.folder !== '' && <span className={styles.folder}>{media.folder}</span>}
@@ -112,13 +95,7 @@ const MediaTile = ({
         {note !== null && <span className={styles.note}>{note}</span>}
         <PlaybackNote media={media} />
       </div>
-      <MediaMenu
-        media={media}
-        open={menuOpen}
-        onOpenChange={setMenuOpen}
-        inline
-        matchType={matchType}
-      />
+      {menu.menu}
     </li>
   )
 }
@@ -140,7 +117,7 @@ export const MediaTiles = ({
   /** A Movies library's tiles: small posters, opening the movie's page. */
   posters?: boolean
   /** What the library matches its files to, for the menu's Fix match. */
-  matchType?: MatchType | null
+  matchType?: MatchItemType | null
 }) => (
   <ul className={styles.tiles} aria-busy={busy}>
     {items.map((item) => (

@@ -1,4 +1,5 @@
 import {
+  type MatchItemType,
   type MediaItem,
   type RatingSource,
   cardTitle,
@@ -8,15 +9,13 @@ import {
   resolutionLabel,
   sortTitle,
 } from '@raven/core'
-import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import type { MatchType } from '@/components/FixMatchDialog/FixMatchDialog'
-import { Icon } from '@/components/Icon/Icon'
-import { MENU_HOST, MediaMenu } from '@/components/MediaMenu/MediaMenu'
+import { FavouriteMark } from '@/components/FavouriteMark/FavouriteMark'
+import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
 import { ScoreChip } from '@/components/RatingChips/RatingChips'
+import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { SortHeader } from '@/components/SortHeader/SortHeader'
-import { openPath } from '@/lib/itemLinks'
-import { progressOf } from '@/lib/mediaProgress'
+import { cardLink } from '@/lib/itemLinks'
 import { type SortColumn, useTableSort } from '@/lib/tableSort'
 import styles from '@/components/MediaList/MediaList.module.scss'
 
@@ -38,39 +37,26 @@ const MediaRow = ({
 }: {
   media: MediaItem
   movies: boolean
-  matchType: MatchType | null
+  matchType: MatchItemType | null
 }) => {
-  const [menuOpen, setMenuOpen] = useState(false)
-  const progress = progressOf(media)
-  const to = movies ? openPath(media) : `/watch/${media.id}`
+  const menu = useCardMenu({ media, matchType, inline: true })
   const { title, year } = cardTitle(media)
   return (
-    <tr className={`${styles.row} ${MENU_HOST}`}>
+    <tr className={`${styles.row} ${menu.hostClass}`}>
       <th scope="row">
         <div className={styles.titleCell}>
           <Link
-            to={to}
-            state={to === `/watch/${media.id}` ? { media } : undefined}
+            {...cardLink({ media, pages: movies })}
             className={styles.title}
-            onContextMenu={(event) => {
-              event.preventDefault()
-              setMenuOpen(true)
-            }}
+            onContextMenu={menu.onContextMenu}
           >
             {title}
           </Link>
-          {media.favourite && (
-            <span className={styles.favourite}>
-              <Icon name="heart" size={14} />
-              <span className="visually-hidden">Favourite</span>
-            </span>
-          )}
-          {progress > 0 && (
-            <span className={styles.resume} aria-hidden="true">
-              <span className={styles.resumeFill} style={{ width: `${progress * 100}%` }} />
-            </span>
-          )}
-          {progress > 0 && <span className="visually-hidden">Partly watched</span>}
+          <span className={styles.mark}>
+            <FavouriteMark media={media} />
+          </span>
+          <ResumeBar media={media} tone="inline" className={styles.resume} />
+          <PartlyWatched media={media} />
         </div>
       </th>
       {movies && <td className={styles.number}>{year ?? ''}</td>}
@@ -89,15 +75,7 @@ const MediaRow = ({
       <td className={`${styles.number} ${styles.extra}`}>{formatBitrate(media.bitrate)}</td>
       <td className={styles.extra}>{day.format(new Date(media.addedAt))}</td>
       <td className={styles.extra}>{day.format(new Date(media.changedAt))}</td>
-      <td className={styles.menuCell}>
-        <MediaMenu
-          media={media}
-          open={menuOpen}
-          onOpenChange={setMenuOpen}
-          inline
-          matchType={matchType}
-        />
-      </td>
+      <td className={styles.menuCell}>{menu.menu}</td>
     </tr>
   )
 }
@@ -162,7 +140,7 @@ export const MediaList = ({
   /** A Movies library: titles open the movie's page, and the year and ratings get columns. */
   movies?: boolean
   /** What the library matches its files to, for the menu's Fix match. */
-  matchType?: MatchType | null
+  matchType?: MatchItemType | null
 }) => {
   const { sorted, toggle, ariaSort } = useTableSort({ rows: items, columns: COLUMNS })
   const header = (key: Column, label: string, className?: string) => (

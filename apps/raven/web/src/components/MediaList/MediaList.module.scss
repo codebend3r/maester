@@ -47,12 +47,16 @@
 .titleCell {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'title mark'
+    'resume resume';
   gap: var(--space-0) var(--space-1);
   align-items: center;
   font-weight: 400;
 }
 
 .title {
+  grid-area: title;
   font-weight: 600;
   text-decoration: none;
   overflow-wrap: anywhere;
@@ -63,24 +67,15 @@
   }
 }
 
-.favourite {
-  display: grid;
-  color: var(--color-bark);
+// Where playback stopped, as a thin line under the title.
+.mark {
+  grid-area: mark;
 }
 
-// Where playback stopped, as a thin line under the title.
 .resume {
-  grid-column: 1 / -1;
-  display: grid;
+  grid-area: resume;
   height: 3px;
   max-width: 12rem;
-  background: var(--color-moss);
-}
-
-.resumeFill {
-  display: block;
-  height: 100%;
-  background: var(--color-leaf-bright);
 }
 
 .menuCell {

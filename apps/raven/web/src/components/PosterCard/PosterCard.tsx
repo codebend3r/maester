@@ -1,13 +1,21 @@
-import { type MediaItem, type ShownRatings, cardTitle, formatRuntime, pickScore } from '@raven/core'
-import { type MouseEvent, useState } from 'react'
+import {
+  type MatchItemType,
+  type MediaItem,
+  type RatingSource,
+  cardTitle,
+  formatRuntime,
+  pickScore,
+} from '@raven/core'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { FavouriteMark } from '@/components/FavouriteMark/FavouriteMark'
 import { Icon } from '@/components/Icon/Icon'
-import { MENU_HOST, MediaMenu } from '@/components/MediaMenu/MediaMenu'
+import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
 import { ScoreChip } from '@/components/RatingChips/RatingChips'
+import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { api } from '@/lib/api'
-import { openPath } from '@/lib/itemLinks'
-import { progressOf } from '@/lib/mediaProgress'
+import { cardLink, watchLink } from '@/lib/itemLinks'
 import styles from '@/components/PosterCard/PosterCard.module.scss'
 
 /**
@@ -24,8 +32,6 @@ export const PosterFrame = ({ media }: { media: MediaItem }) => {
   const source = [poster, thumbnail].find(
     (url): url is string => url != null && !failed.includes(url),
   )
-  const progress = progressOf(media)
-
   return (
     <span className={styles.frame}>
       {source ? (
@@ -43,11 +49,7 @@ export const PosterFrame = ({ media }: { media: MediaItem }) => {
           {cardTitle(media).title.slice(0, 1)}
         </span>
       )}
-      {progress > 0 && (
-        <span className={styles.resume} aria-hidden="true">
-          <span className={styles.resumeFill} style={{ width: `${progress * 100}%` }} />
-        </span>
-      )}
+      <ResumeBar media={media} className={styles.resume} />
     </span>
   )
 }
@@ -59,24 +61,22 @@ export const PosterFrame = ({ media }: { media: MediaItem }) => {
  */
 export const PosterCard = ({
   media,
+  matchType = null,
   ratingsSource = 'tmdb',
 }: {
   media: MediaItem
+  /** What the library matches its files to, for the menu's Fix match. */
+  matchType?: MatchItemType | null
   /** Whose score the card shows, from the library's settings. */
-  ratingsSource?: ShownRatings
+  ratingsSource?: RatingSource
 }) => {
-  const [menuOpen, setMenuOpen] = useState(false)
-  const openMenu = (event: MouseEvent) => {
-    event.preventDefault()
-    setMenuOpen(true)
-  }
+  const menu = useCardMenu({ media, matchType })
   const { title, year } = cardTitle(media)
   const score = media.item
     ? pickScore({ ratings: media.item.ratings, source: ratingsSource })
     : null
-  const to = openPath(media)
-  const hasPage = to !== `/watch/${media.id}`
-  const progress = progressOf(media)
+  const link = cardLink({ media, pages: true })
+  const hasPage = link.state == null
   const facts = [
     year == null ? null : String(year),
     media.versions > 1 ? `${media.versions} versions` : null,
@@ -84,53 +84,37 @@ export const PosterCard = ({
   ].filter((fact): fact is string => fact != null)
 
   return (
-    <li className={`${styles.card} ${MENU_HOST}`}>
+    <li className={`${styles.card} ${menu.hostClass}`}>
       <Link
-        to={to}
-        state={hasPage ? undefined : { media }}
+        {...link}
         className={styles.picture}
         tabIndex={-1}
         aria-hidden="true"
-        onContextMenu={openMenu}
+        onContextMenu={menu.onContextMenu}
       >
         <PosterFrame media={media} />
       </Link>
       {hasPage && (
         <span className={styles.overlay}>
-          <Link
-            to={`/watch/${media.id}`}
-            state={{ media }}
-            className={styles.play}
-            aria-label={`Play ${title}`}
-          >
+          <Link {...watchLink(media)} className={styles.play} aria-label={`Play ${title}`}>
             <Icon name="play" size={18} />
           </Link>
         </span>
       )}
-      <Link
-        to={to}
-        state={hasPage ? undefined : { media }}
-        className={styles.title}
-        onContextMenu={openMenu}
-      >
+      <Link {...link} className={styles.title} onContextMenu={menu.onContextMenu}>
         {title}
       </Link>
       <span className={styles.facts}>
-        {media.favourite && (
-          <span className={styles.favourite}>
-            <Icon name="heart" size={14} />
-            <span className="visually-hidden">Favourite</span>
-          </span>
-        )}
+        <FavouriteMark media={media} />
         {facts.map((fact) => (
           <span key={fact}>{fact}</span>
         ))}
         {score && <ScoreChip rating={score} />}
         {media.match === 'unmatched' && <span>Not matched</span>}
-        {progress > 0 && <span className="visually-hidden">Partly watched</span>}
+        <PartlyWatched media={media} />
       </span>
       <PlaybackNote media={media} />
-      <MediaMenu media={media} open={menuOpen} onOpenChange={setMenuOpen} matchType="movie" />
+      {menu.menu}
     </li>
   )
 }
