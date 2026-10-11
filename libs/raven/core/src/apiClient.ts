@@ -3,6 +3,7 @@ import {
   isHistory,
   isItemDetails,
   isItemImageOptions,
+  isItemMetadataState,
   isLibrary,
   isLibraryList,
   isMatchCandidateList,
@@ -26,6 +27,8 @@ import type {
   ItemDetails,
   ItemImageKind,
   ItemImageOptions,
+  ItemMetadataChange,
+  ItemMetadataState,
   Library,
   LibraryInput,
   MatchCandidate,
@@ -434,6 +437,26 @@ export const createApiClient = ({
     /** A Fix match result's poster, through the server's image cache. */
     candidatePosterUrl: (poster: string | null): string | null =>
       poster == null ? null : url(`/api/images/poster${poster}`),
+
+    /** Edit metadata: what the page shows, what TMDB says, and which fields were written over. */
+    getItemMetadata: (id: number): Promise<ItemMetadataState> =>
+      expect({
+        request: send({ path: `/api/items/${id}/metadata` }),
+        guard: isItemMetadataState,
+      }),
+
+    /** Edit metadata: writes the fields given over TMDB's, or clears each sent as null. */
+    setItemMetadata: ({
+      id,
+      change,
+    }: {
+      id: number
+      change: ItemMetadataChange
+    }): Promise<ItemDetails> =>
+      expect({
+        request: send({ path: `/api/items/${id}/metadata`, method: 'PUT', body: change }),
+        guard: isItemDetails,
+      }),
 
     /** Every poster and backdrop a movie or show could show, the current one marked. */
     getItemImages: (id: number): Promise<ItemImageOptions> =>

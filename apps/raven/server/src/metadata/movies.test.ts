@@ -7,6 +7,7 @@ import {
   type MediaItem,
   isItemDetails,
   isItemImageOptions,
+  isItemMetadataState,
   isLibrary,
   isMatchCandidateList,
   isMediaItem,
@@ -385,6 +386,61 @@ describe('movie metadata', () => {
       payload: { source: 'tmdb', ref: 'https://evil.example/x.jpg' },
     })
     expect(refused.statusCode).toBe(400)
+  })
+
+  it('writes metadata over TMDB’s, keeps it through a refresh, and gives it back on null', async () => {
+    const heat = await byFile('Heat.mp4')
+    const id = heat.item?.id
+    const before = shape({
+      response: await app().inject({ method: 'GET', url: `/api/items/${id}/metadata` }),
+      guard: isItemMetadataState,
+    })
+    expect(before).toMatchObject({
+      shown: { title: 'Heat' },
+      original: { title: 'Heat' },
+      overridden: [],
+    })
+
+    const edited = shape({
+      response: await app().inject({
+        method: 'PUT',
+        url: `/api/items/${id}/metadata`,
+        payload: { title: 'Heat (Director’s Cut)', tagline: 'A Los Angeles crime saga' },
+      }),
+      guard: isItemDetails,
+    })
+    expect(edited).toMatchObject({
+      title: 'Heat (Director’s Cut)',
+      tagline: 'A Los Angeles crime saga',
+    })
+    expect((await byFile('Heat.mp4')).item?.title).toBe('Heat (Director’s Cut)')
+    const written = shape({
+      response: await app().inject({ method: 'GET', url: `/api/items/${id}/metadata` }),
+      guard: isItemMetadataState,
+    })
+    expect(written.original.title).toBe('Heat')
+    expect(written.overridden).toEqual(['title', 'tagline'])
+
+    await app().inject({ method: 'POST', url: `/api/items/${id}/refresh` })
+    expect((await byFile('Heat.mp4')).item?.title).toBe('Heat (Director’s Cut)')
+
+    const refused = await app().inject({
+      method: 'PUT',
+      url: `/api/items/${id}/metadata`,
+      payload: { title: '   ' },
+    })
+    expect(refused.statusCode).toBe(400)
+
+    const back = shape({
+      response: await app().inject({
+        method: 'PUT',
+        url: `/api/items/${id}/metadata`,
+        payload: { title: null, tagline: null },
+      }),
+      guard: isItemDetails,
+    })
+    expect(back.title).toBe('Heat')
+    expect((await byFile('Heat.mp4')).item?.title).toBe('Heat')
   })
 
   it('serves a cast photo', async () => {

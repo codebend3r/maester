@@ -47,6 +47,29 @@ describe('createApiClient', () => {
     })
   })
 
+  it('reads and writes an item’s metadata over TMDB’s', async () => {
+    const state = {
+      shown: {
+        title: 'Heat (Director’s Cut)',
+        year: 1995,
+        tagline: null,
+        summary: null,
+        contentRating: 'R',
+      },
+      original: { title: 'Heat', year: 1995, tagline: null, summary: null, contentRating: 'R' },
+      overridden: ['title'],
+    }
+    const { client, calls } = clientReturning(respond({ body: state }))
+    await expect(client.getItemMetadata(9)).resolves.toEqual(state)
+    expect(calls[0]?.url).toBe('http://nas:8484/api/items/9/metadata')
+    const edited = clientReturning(respond({ body: itemDetails() }))
+    await edited.client.setItemMetadata({ id: 9, change: { title: null, tagline: 'Hot.' } })
+    expect(edited.calls[0]).toMatchObject({
+      url: 'http://nas:8484/api/items/9/metadata',
+      init: { method: 'PUT', body: '{"title":null,"tagline":"Hot."}' },
+    })
+  })
+
   it('lists the pictures an item could show, and chooses one', async () => {
     const options = {
       poster: [

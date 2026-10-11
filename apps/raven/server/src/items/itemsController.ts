@@ -16,11 +16,13 @@ import {
 } from '@nestjs/common'
 import {
   type ImageOption,
+  isItemMetadataChange,
   isRecord,
   isString,
   type ItemDetails,
   type ItemImageKind,
   type ItemImageOptions,
+  type ItemMetadataState,
   type MediaItem,
 } from '@raven/core'
 import type { FastifyReply } from 'fastify'
@@ -115,6 +117,33 @@ export class ItemsController {
       if (error instanceof TmdbError) throw new ServiceUnavailableException(error.message)
       throw error
     }
+    return this.details(id)
+  }
+
+  /** Edit metadata: what the page shows, what TMDB says, and which fields were written over. */
+  @Get(':id/metadata')
+  getMetadata(@Param('id', ParseIntPipe) id: number): ItemMetadataState {
+    const state = this.metadata.metadata(id)
+    if (!state) throw new NotFoundException(`No item ${id}`)
+    return state
+  }
+
+  /** Edit metadata: each field given is written over TMDB's, or cleared back to TMDB's with null. */
+  @Put(':id/metadata')
+  setMetadata(@Param('id', ParseIntPipe) id: number, @Body() body: unknown): ItemDetails {
+    this.details(id)
+    if (!isItemMetadataChange(body)) {
+      throw new BadRequestException(
+        'title must be text, year a number, tagline, summary and contentRating text; null clears one',
+      )
+    }
+    if (body.title != null && body.title.trim() === '') {
+      throw new BadRequestException('A title cannot be blank; send null to go back to TMDB’s.')
+    }
+    this.metadata.setMetadata({
+      itemId: id,
+      change: { ...body, ...(body.title == null ? {} : { title: body.title.trim() }) },
+    })
     return this.details(id)
   }
 

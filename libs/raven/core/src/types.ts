@@ -253,6 +253,31 @@ export type ItemImageOptions = {
   backdrop: ImageOption[]
 }
 
+/** The fields Edit metadata can write over: what a page shows for a movie or show. */
+export type ItemMetadata = {
+  title: string
+  year: number | null
+  tagline: string | null
+  summary: string | null
+  contentRating: string | null
+}
+
+/** Edit metadata: what the page shows, what TMDB says, and which fields were written over. */
+export type ItemMetadataState = {
+  shown: ItemMetadata
+  original: ItemMetadata
+  overridden: (keyof ItemMetadata)[]
+}
+
+/** What Edit metadata sends: each field given is written over, or cleared back to TMDB's with null. */
+export type ItemMetadataChange = {
+  title?: string | null
+  year?: number | null
+  tagline?: string | null
+  summary?: string | null
+  contentRating?: string | null
+}
+
 /** What Edit images picks: one of TMDB's pictures, or the one beside the media. */
 export type ImageChoice = { source: 'tmdb'; ref: string } | { source: 'local' }
 

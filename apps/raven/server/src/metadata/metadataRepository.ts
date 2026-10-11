@@ -2,18 +2,21 @@ import { createHash } from 'node:crypto'
 import { Inject, Injectable } from '@nestjs/common'
 import {
   type Credit,
+  isCreditJob,
+  isItemType,
+  isRatingSource,
+  isStringArray,
   type ItemDetails,
   type ItemImageKind,
+  type ItemMetadata,
+  type ItemMetadataChange,
+  type ItemMetadataState,
   type ItemSummary,
   type ItemType,
   type PersonDetails,
   type Rating,
   type RatingSource,
   type Review,
-  isCreditJob,
-  isItemType,
-  isRatingSource,
-  isStringArray,
   sortTitle,
 } from '@raven/core'
 import type Sqlite from 'better-sqlite3'
@@ -58,6 +61,16 @@ type ItemRow = {
   genres: string
   imdb_id: string | null
   fetched_at: string
+}
+
+type OverrideRow = {
+  item_id: number
+  title: string | null
+  sort_title: string | null
+  year: number | null
+  tagline: string | null
+  summary: string | null
+  content_rating: string | null
 }
 
 type SummaryRow = {
@@ -285,6 +298,74 @@ export class MetadataRepository {
     })()
   }
 
+  /** Edit metadata: TMDB's own words for an item beside what was written over them, and which fields were. */
+  metadata(itemId: number): ItemMetadataState | null {
+    const original = this.db
+      .prepare<[number], ItemRow>('SELECT * FROM items WHERE id = ?')
+      .get(itemId)
+    if (!original) return null
+    const shown = this.db
+      .prepare<[number], ItemRow>('SELECT * FROM shown_items WHERE id = ?')
+      .get(itemId)
+    const override = this.db
+      .prepare<[number], OverrideRow>('SELECT * FROM item_overrides WHERE item_id = ?')
+      .get(itemId)
+    const fields = (row: ItemRow | undefined): ItemMetadata => ({
+      title: row?.title ?? original.title,
+      year: row?.year ?? null,
+      tagline: row?.tagline ?? null,
+      summary: row?.summary ?? null,
+      contentRating: row?.content_rating ?? null,
+    })
+    const overridden: (keyof ItemMetadata)[] = [
+      ...(override?.title != null ? ['title' as const] : []),
+      ...(override?.year != null ? ['year' as const] : []),
+      ...(override?.tagline != null ? ['tagline' as const] : []),
+      ...(override?.summary != null ? ['summary' as const] : []),
+      ...(override?.content_rating != null ? ['contentRating' as const] : []),
+    ]
+    return { shown: fields(shown), original: fields(original), overridden }
+  }
+
+  /**
+   * Writes a field over TMDB's, or clears one back to TMDB's with null. A
+   * field left out stays as it is; an item with nothing written over keeps
+   * no row.
+   */
+  setMetadata({ itemId, change }: { itemId: number; change: ItemMetadataChange }): void {
+    this.db.transaction(() => {
+      const current = this.db
+        .prepare<[number], OverrideRow>('SELECT * FROM item_overrides WHERE item_id = ?')
+        .get(itemId)
+      const next = {
+        title: 'title' in change ? (change.title ?? null) : (current?.title ?? null),
+        year: 'year' in change ? (change.year ?? null) : (current?.year ?? null),
+        tagline: 'tagline' in change ? (change.tagline ?? null) : (current?.tagline ?? null),
+        summary: 'summary' in change ? (change.summary ?? null) : (current?.summary ?? null),
+        content_rating:
+          'contentRating' in change
+            ? (change.contentRating ?? null)
+            : (current?.content_rating ?? null),
+      }
+      this.db.prepare('DELETE FROM item_overrides WHERE item_id = ?').run(itemId)
+      if (Object.values(next).every((value) => value == null)) return
+      this.db
+        .prepare(
+          `INSERT INTO item_overrides (item_id, title, sort_title, year, tagline, summary, content_rating)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          itemId,
+          next.title,
+          next.title == null ? null : sortTitle(next.title),
+          next.year,
+          next.tagline,
+          next.summary,
+          next.content_rating,
+        )
+    })()
+  }
+
   /** Sort titles again with the current rule, for items stored under an older one. */
   resortTitles(): void {
     const rows = this.db
@@ -432,9 +513,9 @@ export class MetadataRepository {
                 p.number AS parent_number,
                 CASE i.type WHEN 'season' THEN p.id WHEN 'episode' THEN g.id END AS show_id,
                 CASE i.type WHEN 'season' THEN p.title WHEN 'episode' THEN g.title END AS show_title
-           FROM items i
-           LEFT JOIN items p ON p.id = i.parent_id
-           LEFT JOIN items g ON g.id = p.parent_id
+           FROM shown_items i
+           LEFT JOIN shown_items p ON p.id = i.parent_id
+           LEFT JOIN shown_items g ON g.id = p.parent_id
           WHERE i.id IN (SELECT value FROM json_each(?))`,
       )
       .all(JSON.stringify(unique))
@@ -472,7 +553,7 @@ export class MetadataRepository {
 
   /** An item's page, apart from its files and children, which the caller adds. */
   details(id: number): Omit<ItemDetails, 'versions' | 'children'> | null {
-    const row = this.db.prepare<[number], ItemRow>('SELECT * FROM items WHERE id = ?').get(id)
+    const row = this.db.prepare<[number], ItemRow>('SELECT * FROM shown_items WHERE id = ?').get(id)
     const summary = this.summaries([id]).get(id)
     if (!row || !summary) return null
     return {

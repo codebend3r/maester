@@ -8,6 +8,9 @@ import type {
   ImageOption,
   ItemDetails,
   ItemImageOptions,
+  ItemMetadata,
+  ItemMetadataChange,
+  ItemMetadataState,
   ItemSummary,
   ItemType,
   Library,
@@ -228,6 +231,39 @@ export const isMatchCandidate = (value: unknown): value is MatchCandidate =>
   isNullableString(value.poster)
 
 export const isMatchCandidateList = arrayOf(isMatchCandidate)
+
+const METADATA_FIELDS: readonly (keyof ItemMetadata)[] = [
+  'title',
+  'year',
+  'tagline',
+  'summary',
+  'contentRating',
+]
+
+export const isItemMetadata = (value: unknown): value is ItemMetadata =>
+  isRecord(value) &&
+  isString(value.title) &&
+  isNullableNumber(value.year) &&
+  isNullableString(value.tagline) &&
+  isNullableString(value.summary) &&
+  isNullableString(value.contentRating)
+
+export const isItemMetadataState = (value: unknown): value is ItemMetadataState =>
+  isRecord(value) &&
+  isItemMetadata(value.shown) &&
+  isItemMetadata(value.original) &&
+  Array.isArray(value.overridden) &&
+  value.overridden.every((field) => METADATA_FIELDS.some((known) => known === field))
+
+/** Only known fields, each text, a number for the year, or null; nothing else. */
+export const isItemMetadataChange = (value: unknown): value is ItemMetadataChange =>
+  isRecord(value) &&
+  Object.keys(value).every((key) => METADATA_FIELDS.some((known) => known === key)) &&
+  (value.title === undefined || isNullableString(value.title)) &&
+  (value.year === undefined || isNullableNumber(value.year)) &&
+  (value.tagline === undefined || isNullableString(value.tagline)) &&
+  (value.summary === undefined || isNullableString(value.summary)) &&
+  (value.contentRating === undefined || isNullableString(value.contentRating))
 
 export const isImageOption = (value: unknown): value is ImageOption =>
   isRecord(value) &&
