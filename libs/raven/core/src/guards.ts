@@ -20,11 +20,14 @@ import type {
   MediaTracks,
   MetadataHealth,
   MetadataServiceState,
+  PersonDetails,
   Rating,
   RatingSource,
+  Review,
   ScanStatus,
   ShowEntry,
   ShowListing,
+  ShownRatings,
   SubtitleTrack,
   ThumbnailState,
 } from '@/types'
@@ -81,6 +84,8 @@ export const MEDIA_SORTS: readonly MediaSort[] = [
   'resolution-low',
   'year-new',
   'year-old',
+  'rating-high',
+  'rating-low',
   'random',
 ]
 
@@ -102,6 +107,11 @@ export const MEDIA_GROUPINGS: readonly MediaGroupBy[] = ['resolution', 'codec', 
 export const isMediaGroupBy = (value: unknown): value is MediaGroupBy =>
   MEDIA_GROUPINGS.some((grouping) => grouping === value)
 
+export const SHOWN_RATINGS: readonly ShownRatings[] = ['tmdb', 'imdb', 'rottenTomatoes']
+
+export const isShownRatings = (value: unknown): value is ShownRatings =>
+  SHOWN_RATINGS.some((source) => source === value)
+
 /** A whole percentage from 1 to 100. */
 export const isWatchedPercent = (value: unknown): value is number =>
   isNumber(value) && Number.isInteger(value) && value >= 1 && value <= 100
@@ -114,7 +124,8 @@ export const isLibrarySettings = (value: unknown): value is LibrarySettings =>
   isLibraryView(value.view) &&
   isMediaGroupBy(value.groupBy) &&
   isWatchedPercent(value.watchedPercent) &&
-  isLibraryKind(value.kind)
+  isLibraryKind(value.kind) &&
+  isShownRatings(value.ratingsSource)
 
 export const isLibrary = (value: unknown): value is Library =>
   isRecord(value) &&
@@ -143,20 +154,6 @@ const ITEM_TYPES: readonly ItemType[] = ['movie', 'show', 'season', 'episode']
 export const isItemType = (value: unknown): value is ItemType =>
   ITEM_TYPES.some((type) => type === value)
 
-export const isItemSummary = (value: unknown): value is ItemSummary =>
-  isRecord(value) &&
-  isNumber(value.id) &&
-  isItemType(value.type) &&
-  isString(value.title) &&
-  isNullableNumber(value.year) &&
-  (value.show === null ||
-    (isRecord(value.show) && isNumber(value.show.id) && isString(value.show.title))) &&
-  isNullableNumber(value.season) &&
-  isNullableNumber(value.episode) &&
-  isNullableString(value.posterVersion)
-
-export const isItemSummaryList = arrayOf(isItemSummary)
-
 const RATING_SOURCES: readonly RatingSource[] = ['tmdb', 'imdb', 'rottenTomatoes', 'metacritic']
 
 export const isRatingSource = (value: unknown): value is RatingSource =>
@@ -168,6 +165,31 @@ export const isRating = (value: unknown): value is Rating =>
   (value.kind === 'critic' || value.kind === 'audience') &&
   isNumber(value.value) &&
   isNullableNumber(value.votes)
+
+export const isItemSummary = (value: unknown): value is ItemSummary =>
+  isRecord(value) &&
+  isNumber(value.id) &&
+  isItemType(value.type) &&
+  isString(value.title) &&
+  isNullableNumber(value.year) &&
+  (value.show === null ||
+    (isRecord(value.show) && isNumber(value.show.id) && isString(value.show.title))) &&
+  isNullableNumber(value.season) &&
+  isNullableNumber(value.episode) &&
+  isNullableString(value.posterVersion) &&
+  arrayOf(isRating)(value.ratings)
+
+export const isItemSummaryList = arrayOf(isItemSummary)
+
+export const isReview = (value: unknown): value is Review =>
+  isRecord(value) &&
+  isNumber(value.id) &&
+  isString(value.author) &&
+  isNullableString(value.avatarVersion) &&
+  isNullableNumber(value.rating) &&
+  isString(value.content) &&
+  isString(value.url) &&
+  isString(value.writtenAt)
 
 const CREDIT_JOBS: readonly CreditJob[] = [
   'cast',
@@ -241,6 +263,19 @@ export const isMediaItem = (value: unknown): value is MediaItem =>
 
 export const isMediaList = arrayOf(isMediaItem)
 
+export const isPersonDetails = (value: unknown): value is PersonDetails =>
+  isRecord(value) &&
+  isNumber(value.id) &&
+  isString(value.name) &&
+  isNullableString(value.photoVersion) &&
+  arrayOf(
+    (credit): credit is PersonDetails['credits'][number] =>
+      isRecord(credit) &&
+      isItemSummary(credit.item) &&
+      isCreditJob(credit.job) &&
+      isNullableString(credit.role),
+  )(value.credits)
+
 export const isShowEntry = (value: unknown): value is ShowEntry =>
   isRecord(value) &&
   isItemSummary(value.show) &&
@@ -266,8 +301,8 @@ export const isItemDetails = (value: unknown): value is ItemDetails =>
   isNullableString(value.studio) &&
   isStringArray(value.genres) &&
   isNullableString(value.backdropVersion) &&
-  arrayOf(isRating)(value.ratings) &&
   arrayOf(isCredit)(value.credits) &&
+  arrayOf(isReview)(value.reviews) &&
   isMediaList(value.versions) &&
   isItemSummaryList(value.children) &&
   isItemSummary(value)

@@ -45,7 +45,12 @@ export type LibrarySettings = {
   watchedPercent: number
   /** What the library holds: movies, TV shows, or anything else. */
   kind: LibraryKind
+  /** Whose score its cards show and its rating sorts use; TMDB's stands in where that source has none. */
+  ratingsSource: ShownRatings
 }
+
+/** The scores a library can show on its cards: Metacritic has no card of its own. */
+export type ShownRatings = 'tmdb' | 'imdb' | 'rottenTomatoes'
 
 export type LibraryKind = 'movies' | 'shows' | 'other'
 
@@ -129,6 +134,8 @@ export type ItemSummary = {
   episode: number | null
   /** Changes whenever the poster does; null when there is none. */
   posterVersion: string | null
+  /** Every score it has, one per source. */
+  ratings: Rating[]
 }
 
 export type RatingSource = 'tmdb' | 'imdb' | 'rottenTomatoes' | 'metacritic'
@@ -169,8 +176,9 @@ export type ItemDetails = ItemSummary & {
   genres: string[]
   /** The backdrop's version; for an episode, its still's. */
   backdropVersion: string | null
-  ratings: Rating[]
   credits: Credit[]
+  /** Reviews by TMDB members, newest first; at most ten. */
+  reviews: Review[]
   /** Every file that is this item, in any library, best first. */
   versions: MediaItem[]
   /** A show's seasons, or a season's episodes, in order. */
@@ -194,6 +202,30 @@ export type ShowEntry = {
 export type ShowListing = {
   shows: ShowEntry[]
   unmatched: MediaItem[]
+}
+
+/** A review by a TMDB member, as TMDB hands it on. */
+export type Review = {
+  id: number
+  author: string
+  /** Changes with the avatar; null when TMDB hosts none. */
+  avatarVersion: string | null
+  /** Out of 10, when the author gave one. */
+  rating: number | null
+  /** Plain text; never rendered as HTML. */
+  content: string
+  /** The review on TMDB. */
+  url: string
+  writtenAt: string
+}
+
+/** A person's page: who they are, and everything in raven they are credited on. */
+export type PersonDetails = {
+  id: number
+  name: string
+  photoVersion: string | null
+  /** Movies and shows on disk, newest first. */
+  credits: Array<{ item: ItemSummary; job: CreditJob; role: string | null }>
 }
 
 /** The pictures an item can have. */
@@ -252,6 +284,8 @@ export type MediaSort =
   | 'resolution-low'
   | 'year-new'
   | 'year-old'
+  | 'rating-high'
+  | 'rating-low'
   | 'random'
 
 export type DirectoryEntry = {

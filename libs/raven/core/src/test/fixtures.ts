@@ -1,5 +1,5 @@
 import type { CanPlay } from '@/playback'
-import type { ItemDetails, ItemSummary, Library, MediaItem, ShowEntry } from '@/types'
+import type { ItemDetails, ItemSummary, Library, MediaItem, Review, ShowEntry } from '@/types'
 
 export const library = (overrides: Partial<Library> = {}): Library => ({
   id: 1,
@@ -23,6 +23,7 @@ export const library = (overrides: Partial<Library> = {}): Library => ({
     groupBy: 'resolution',
     watchedPercent: 90,
     kind: 'other',
+    ratingsSource: 'tmdb',
   },
   ...overrides,
 })
@@ -66,6 +67,7 @@ export const itemSummary = (overrides: Partial<ItemSummary> = {}): ItemSummary =
   season: null,
   episode: null,
   posterVersion: 'f89JxwBCi9N',
+  ratings: [{ source: 'tmdb', kind: 'audience', value: 8.2, votes: 26_000 }],
   ...overrides,
 })
 
@@ -105,7 +107,7 @@ export const itemDetails = (overrides: Partial<ItemDetails> = {}): ItemDetails =
   studio: 'Warner Bros. Pictures',
   genres: ['Action', 'Science Fiction'],
   backdropVersion: 'tlm8UkiQsit',
-  ratings: [{ source: 'tmdb', kind: 'audience', value: 8.2, votes: 26_000 }],
+  reviews: [],
   credits: [
     { personId: 1, name: 'Keanu Reeves', job: 'cast', role: 'Neo', photoVersion: 'abc' },
     { personId: 2, name: 'Lana Wachowski', job: 'director', role: 'Director', photoVersion: null },
@@ -160,3 +162,14 @@ export const safariLike = canPlayFrom([
   'ac-3',
   'ec-3',
 ])
+
+export const review = (overrides: Partial<Review> = {}): Review => ({
+  id: 1,
+  author: 'A TMDB member',
+  avatarVersion: null,
+  rating: 8,
+  content: 'A fine film, if a little long.',
+  url: 'https://www.themoviedb.org/review/abc',
+  writtenAt: '2026-10-01T12:00:00.000Z',
+  ...overrides,
+})

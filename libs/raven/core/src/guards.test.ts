@@ -8,10 +8,12 @@ import {
   isMatchCandidate,
   isMediaItem,
   isMetadataHealth,
+  isPersonDetails,
   isRating,
+  isReview,
   isShowListing,
 } from '@/guards'
-import { itemDetails, itemSummary, library, mediaItem, showEntry } from '@/test/fixtures'
+import { itemDetails, itemSummary, library, mediaItem, review, showEntry } from '@/test/fixtures'
 
 describe('isMediaItem', () => {
   it('accepts an item that carries its favourite flag', () => {
@@ -37,6 +39,7 @@ describe('isLibrary', () => {
             groupBy: 'month',
             watchedPercent: 80,
             kind: 'shows',
+            ratingsSource: 'imdb',
           },
         }),
       ),
@@ -148,6 +151,22 @@ describe('the metadata guards', () => {
     expect(isShowListing({ shows: [{ ...showEntry(), next: { id: 1 } }], unmatched: [] })).toBe(
       false,
     )
+  })
+
+  it('accepts reviews and a person, and refuses a settings record without a ratings source', () => {
+    expect(isReview(review())).toBe(true)
+    expect(isReview({ ...review(), content: 7 })).toBe(false)
+    expect(isItemDetails({ ...itemDetails(), reviews: [review({ rating: null })] })).toBe(true)
+    expect(
+      isPersonDetails({
+        id: 1,
+        name: 'Keanu Reeves',
+        photoVersion: null,
+        credits: [{ item: itemSummary(), job: 'cast', role: 'Neo' }],
+      }),
+    ).toBe(true)
+    const { ratingsSource: _source, ...settings } = library().settings
+    expect(isLibrary({ ...library(), settings })).toBe(false)
   })
 
   it('accepts match candidates and the metadata health', () => {
