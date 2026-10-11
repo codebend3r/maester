@@ -1,0 +1,87 @@
+.page {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: var(--font-size-2xl);
+  font-weight: 400;
+  line-height: var(--line-tight);
+}
+
+.section {
+  display: grid;
+  gap: var(--space-3);
+  max-width: var(--measure);
+}
+
+.heading {
+  font-family: var(--font-display);
+  font-size: var(--font-size-xl);
+  font-weight: 400;
+}
+
+.hint {
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+}
+
+.error {
+  color: var(--color-leaf-bright);
+}
+
+.setting {
+  display: grid;
+  gap: var(--space-1);
+  padding: 0;
+  border: 0;
+}
+
+.legend {
+  padding: 0;
+  font-weight: 600;
+}
+
+.choices {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.choice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    'input label'
+    '. hint';
+  align-items: baseline;
+  gap: 0 var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-moss);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+
+  input {
+    grid-area: input;
+  }
+
+  &:has(input:checked) {
+    border-color: var(--color-lichen);
+  }
+
+  &:has(input:focus-visible) {
+    outline: 2px solid var(--color-bark);
+    outline-offset: 2px;
+  }
+}
+
+.choiceLabel {
+  grid-area: label;
+  font-weight: 600;
+}
+
+.choiceHint {
+  grid-area: hint;
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+}

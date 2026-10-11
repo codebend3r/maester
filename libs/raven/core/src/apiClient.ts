@@ -12,6 +12,7 @@ import {
   isMediaTracks,
   isMetadataHealth,
   isPersonDetails,
+  isPlaybackSettingsState,
   isRecord,
   isShowListing,
   isString,
@@ -37,6 +38,8 @@ import type {
   MediaTracks,
   MetadataHealth,
   PersonDetails,
+  PlaybackSettings,
+  PlaybackSettingsState,
   ShowListing,
   StreamMode,
   SubtitleCue,
@@ -437,6 +440,20 @@ export const createApiClient = ({
     /** A Fix match result's poster, through the server's image cache. */
     candidatePosterUrl: (poster: string | null): string | null =>
       poster == null ? null : url(`/api/images/poster${poster}`),
+
+    /** How the server plays video, and what that comes to on this machine. */
+    getPlaybackSettings: (): Promise<PlaybackSettingsState> =>
+      expect({
+        request: send({ path: '/api/settings/playback' }),
+        guard: isPlaybackSettingsState,
+      }),
+
+    /** Changes one or more playback settings; the rest stay as they are. */
+    setPlaybackSettings: (change: Partial<PlaybackSettings>): Promise<PlaybackSettingsState> =>
+      expect({
+        request: send({ path: '/api/settings/playback', method: 'PUT', body: change }),
+        guard: isPlaybackSettingsState,
+      }),
 
     /** Edit metadata: what the page shows, what TMDB says, and which fields were written over. */
     getItemMetadata: (id: number): Promise<ItemMetadataState> =>

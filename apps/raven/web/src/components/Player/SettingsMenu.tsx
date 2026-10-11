@@ -78,7 +78,9 @@ export const SettingsMenu = ({
   const id = useId()
   const heading = `${id}-heading`
   const first = useRef<HTMLFieldSetElement>(null)
-  const playingAudio = audio ?? tracks?.defaultAudio ?? null
+  // The original file plays its own default track, whichever was picked.
+  const playingAudio =
+    mode === 'direct' ? (tracks?.defaultAudio ?? null) : (audio ?? tracks?.defaultAudio ?? null)
 
   // Opening the menu puts the keyboard on the chosen option of the first group.
   useEffect(() => {

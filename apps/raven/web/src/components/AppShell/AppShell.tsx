@@ -58,6 +58,9 @@ export const AppShell = () => {
         <NavItem to="/favourites" patterns={['/favourites']}>
           Favourites
         </NavItem>
+        <NavItem to="/settings" patterns={['/settings']}>
+          Settings
+        </NavItem>
         {pinned.length > 0 && (
           <ul className={styles.pinned} aria-label="Pinned">
             {pinned.map((library) => (

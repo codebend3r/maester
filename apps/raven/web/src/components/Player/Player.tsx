@@ -8,7 +8,15 @@ import { Unplayable } from '@/components/Player/Unplayable'
 import { api } from '@/lib/api'
 import { browserCanPlay, browserCanStream } from '@/lib/canPlay'
 import { queryKeys } from '@/lib/queryClient'
+import { usePlaybackPolicy } from '@/lib/usePlaybackPolicy'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
+
+/** The stage's spinner, while what picks the first source is still on its way. */
+const Waiting = () => (
+  <div className={styles.stage} aria-busy="true">
+    <output className={styles.spinner} aria-label="Loading" />
+  </div>
+)
 
 /**
  * Picks how to play a file and which tracks to play, then hands over to
@@ -38,13 +46,22 @@ export const Player = ({ media, backTo }: { media: MediaItem; backTo: string }) 
   const subtitle = tracks?.subtitles.find((track) => track.id === subtitleId) ?? null
 
   const defaultAudio = audio == null || audio === tracks?.defaultAudio
+  const policy = usePlaybackPolicy()
   const plan = useMemo(
     () =>
-      planPlayback({ media, canPlay: browserCanPlay, canStream: browserCanStream, defaultAudio }),
-    [media, defaultAudio],
+      policy &&
+      planPlayback({
+        media,
+        canPlay: browserCanPlay,
+        canStream: browserCanStream,
+        defaultAudio,
+        policy,
+      }),
+    [media, defaultAudio, policy],
   )
   const [forced, setForced] = useState(false)
-  const modes: PlaybackMode[] = plan.modes.length === 0 && forced ? ['direct'] : plan.modes
+  const planned = plan?.modes ?? []
+  const modes: PlaybackMode[] = planned.length === 0 && forced ? ['direct'] : planned
   // A step down the ladder belongs to one plan; a new audio track starts at the top.
   const ladder = `${modes.join(',')}|${audio ?? 'default'}`
   const [fallback, setFallback] = useState({ ladder: '', step: 0 })
@@ -92,6 +109,10 @@ export const Player = ({ media, backTo }: { media: MediaItem; backTo: string }) 
     return tracks?.subtitles.find((track) => track.id === id) ?? null
   }, [subtitle, tracks, prefs.subtitles.language, pickSubtitle])
 
+  // The server's settings say whether to force the original file and what it
+  // converts; a plan made without them starts a stream it may refuse.
+  if (!plan) return <Waiting />
+
   if (failure != null || mode == null) {
     return (
       <Unplayable
@@ -106,11 +127,7 @@ export const Player = ({ media, backTo }: { media: MediaItem; backTo: string }) 
   // A remembered audio language may mean a converted stream; wait for the
   // track list rather than start one source only to swap it.
   if (prefs.audioLanguage != null && tracksQuery.isPending && audioPick == null) {
-    return (
-      <div className={styles.stage} aria-busy="true">
-        <output className={styles.spinner} aria-label="Loading" />
-      </div>
-    )
+    return <Waiting />
   }
 
   return (
