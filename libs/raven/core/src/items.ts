@@ -1,4 +1,4 @@
-import type { ItemSummary, MediaItem, Rating, ShownRatings } from '@/types'
+import type { ItemSummary, MediaItem, Rating, RatingSource } from '@/contract'
 
 const pad = (value: number): string => String(value).padStart(2, '0')
 
@@ -38,6 +38,10 @@ export const mediaLabel = (media: MediaItem): string => {
   return media.year == null ? media.title : `${media.title} (${media.year})`
 }
 
+/** The version Play starts: a saved spot wins, so Play resumes where the viewer stopped, in whichever version. */
+export const primaryVersion = (versions: readonly MediaItem[]): MediaItem | undefined =>
+  versions.find((version) => version.position > 0) ?? versions[0]
+
 /** The title a card shows, and the year beneath it. */
 export const cardTitle = (media: MediaItem): { title: string; year: number | null } =>
   media.item
@@ -50,7 +54,7 @@ export const pickScore = ({
   source,
 }: {
   ratings: readonly Rating[]
-  source: ShownRatings
+  source: RatingSource
 }): Rating | null =>
   ratings.find((rating) => rating.source === source) ??
   ratings.find((rating) => rating.source === 'tmdb') ??
