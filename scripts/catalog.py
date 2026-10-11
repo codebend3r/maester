@@ -22,7 +22,9 @@ MILESTONES = [
 ]
 
 # Each epic: key, title, milestone, area label, summary, stories.
-# Each story: title, size (S/M/L), priority (P0/P1/P2), user story, acceptance criteria.
+# Each story: key, title, size, priority, user story, acceptance criteria.
+# A story's key is its issue's `[E0.1]` title prefix, so it never changes once the
+# issue exists: a story added mid-epic takes the next free number, not its position.
 EPICS = [
     {
         "key": "E0",
@@ -32,6 +34,7 @@ EPICS = [
         "summary": "Project skeleton, configuration, service clients, storage, container and CI. Everything later epics build on.",
         "stories": [
             {
+                "key": "E0.1",
                 "title": "Project scaffold",
                 "size": "S",
                 "priority": "P0",
@@ -44,6 +47,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E0.2",
                 "title": "Config and secrets loading",
                 "size": "S",
                 "priority": "P0",
@@ -56,6 +60,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E0.3",
                 "title": "Service instance registry",
                 "size": "M",
                 "priority": "P0",
@@ -68,6 +73,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E0.4",
                 "title": "API clients with fakes",
                 "size": "L",
                 "priority": "P0",
@@ -80,6 +86,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E0.5",
                 "title": "SQLite store and audit log",
                 "size": "M",
                 "priority": "P0",
@@ -92,6 +99,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E0.6",
                 "title": "Container, compose and NAS deploy",
                 "size": "M",
                 "priority": "P0",
@@ -104,6 +112,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E0.7",
                 "title": "CI on pull requests",
                 "size": "S",
                 "priority": "P1",
@@ -124,6 +133,7 @@ EPICS = [
         "summary": "The Claude tool-use loop, the tool registry with permission tiers, memory, guardrails and an eval harness.",
         "stories": [
             {
+                "key": "E1.1",
                 "title": "Tool-use loop on the Messages API",
                 "size": "M",
                 "priority": "P0",
@@ -137,6 +147,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E1.2",
                 "title": "Tool registry with permission tiers",
                 "size": "M",
                 "priority": "P0",
@@ -149,6 +160,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E1.3",
                 "title": "Per-user conversation memory",
                 "size": "S",
                 "priority": "P1",
@@ -160,6 +172,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E1.4",
                 "title": "Guardrails for destructive tools",
                 "size": "M",
                 "priority": "P0",
@@ -172,6 +185,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E1.5",
                 "title": "Eval harness",
                 "size": "M",
                 "priority": "P1",
@@ -192,6 +206,7 @@ EPICS = [
         "summary": "luwin's first chat surface, account linking to Plex/Seerr users, tiers, and interactive buttons. The surface has since been removed so luwin can become its own app.",
         "stories": [
             {
+                "key": "E2.1",
                 "title": "First chat surface with DMs and a requests channel",
                 "size": "M",
                 "priority": "P0",
@@ -204,6 +219,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E2.2",
                 "title": "Account linking",
                 "size": "M",
                 "priority": "P0",
@@ -216,6 +232,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E2.3",
                 "title": "Tiers for friends, trusted friends and the admin",
                 "size": "S",
                 "priority": "P1",
@@ -227,6 +244,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E2.4",
                 "title": "Confirmation and choice buttons",
                 "size": "M",
                 "priority": "P0",
@@ -238,6 +256,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E2.5",
                 "title": "Unlinked-user flow",
                 "size": "S",
                 "priority": "P1",
@@ -258,6 +277,7 @@ EPICS = [
         "summary": "Searching, disambiguating and requesting movies and shows in 1080p and 4K through Seerr, with status and ready notifications.",
         "stories": [
             {
+                "key": "E3.1",
                 "title": "Search and disambiguate titles",
                 "size": "M",
                 "priority": "P0",
@@ -270,6 +290,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E3.2",
                 "title": "Request a movie in 1080p",
                 "size": "M",
                 "priority": "P0",
@@ -282,6 +303,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E3.3",
                 "title": "Request in 4K with admin approval",
                 "size": "M",
                 "priority": "P0",
@@ -293,6 +315,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E3.4",
                 "title": "TV requests by season",
                 "size": "M",
                 "priority": "P0",
@@ -304,6 +327,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E3.5",
                 "title": "Availability lookup with a Plex deep link",
                 "size": "S",
                 "priority": "P0",
@@ -315,6 +339,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E3.6",
                 "title": "Request status with an ETA",
                 "size": "M",
                 "priority": "P1",
@@ -326,6 +351,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E3.7",
                 "title": "Ready notifications",
                 "size": "M",
                 "priority": "P1",
@@ -338,6 +364,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E3.8",
                 "title": "Collection requests",
                 "size": "S",
                 "priority": "P2",
@@ -349,6 +376,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E3.9",
                 "title": "Dub-aware anime requests",
                 "size": "M",
                 "priority": "P1",
@@ -369,6 +397,7 @@ EPICS = [
         "summary": 'Diagnose "it won\'t play" reports before touching anything, then replace the file through a guarded flow when it is really broken.',
         "stories": [
             {
+                "key": "E4.1",
                 "title": "Identify the item being reported",
                 "size": "S",
                 "priority": "P0",
@@ -380,6 +409,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E4.2",
                 "title": "Diagnose the client side first",
                 "size": "L",
                 "priority": "P0",
@@ -392,6 +422,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E4.3",
                 "title": "File health check",
                 "size": "M",
                 "priority": "P0",
@@ -404,6 +435,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E4.4",
                 "title": "Open a Seerr issue for every report",
                 "size": "S",
                 "priority": "P1",
@@ -415,6 +447,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E4.5",
                 "title": "Guarded replace flow",
                 "size": "L",
                 "priority": "P0",
@@ -427,6 +460,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E4.6",
                 "title": "Replacement guardrails",
                 "size": "S",
                 "priority": "P0",
@@ -438,6 +472,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E4.7",
                 "title": "Wrong-file reports",
                 "size": "M",
                 "priority": "P1",
@@ -449,6 +484,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E4.8",
                 "title": "Subtitle and audio issue reports",
                 "size": "M",
                 "priority": "P2",
@@ -460,6 +496,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E4.9",
                 "title": "Missing-episode reports",
                 "size": "S",
                 "priority": "P1",
@@ -480,6 +517,7 @@ EPICS = [
         "summary": "Explain lag and choppy playback with live session, server and network data, and give a concrete fix.",
         "stories": [
             {
+                "key": "E5.1",
                 "title": "Live session report with relay detection",
                 "size": "M",
                 "priority": "P0",
@@ -491,6 +529,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E5.2",
                 "title": "Server load per host",
                 "size": "M",
                 "priority": "P0",
@@ -502,6 +541,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E5.3",
                 "title": "On-demand speed test",
                 "size": "S",
                 "priority": "P1",
@@ -513,6 +553,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E5.4",
                 "title": "Advice generation",
                 "size": "M",
                 "priority": "P0",
@@ -524,6 +565,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E5.5",
                 "title": "Service health checks",
                 "size": "S",
                 "priority": "P1",
@@ -535,6 +577,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E5.6",
                 "title": "Version picking for slow connections",
                 "size": "S",
                 "priority": "P2",
@@ -554,6 +597,7 @@ EPICS = [
         "summary": "Everything the admin does from chat: approvals, digests, limits, stalled downloads, log reading and NAS health.",
         "stories": [
             {
+                "key": "E6.1",
                 "title": "Approval queue with buttons",
                 "size": "M",
                 "priority": "P0",
@@ -565,6 +609,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E6.2",
                 "title": "Daily digest",
                 "size": "M",
                 "priority": "P1",
@@ -576,6 +621,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E6.3",
                 "title": "Admin commands",
                 "size": "S",
                 "priority": "P0",
@@ -586,6 +632,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E6.4",
                 "title": "Storage-aware limits",
                 "size": "S",
                 "priority": "P1",
@@ -596,6 +643,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E6.5",
                 "title": "Stalled download sweeper",
                 "size": "M",
                 "priority": "P1",
@@ -607,6 +655,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E6.6",
                 "title": "Disk usage forecast",
                 "size": "S",
                 "priority": "P2",
@@ -618,6 +667,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E6.7",
                 "title": "Bad-release detection",
                 "size": "S",
                 "priority": "P2",
@@ -628,6 +678,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E6.8",
                 "title": "Download log reading",
                 "size": "M",
                 "priority": "P1",
@@ -639,6 +690,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E6.9",
                 "title": "Maintenance windows",
                 "size": "S",
                 "priority": "P2",
@@ -649,6 +701,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E6.10",
                 "title": "Weekly NAS health report",
                 "size": "M",
                 "priority": "P2",
@@ -668,6 +721,7 @@ EPICS = [
         "summary": "Wizarr invites, device setup help, access changes and expiry reminders.",
         "stories": [
             {
+                "key": "E7.1",
                 "title": "Invite requests through Wizarr",
                 "size": "M",
                 "priority": "P0",
@@ -679,6 +733,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E7.2",
                 "title": "Device setup help",
                 "size": "S",
                 "priority": "P1",
@@ -689,6 +744,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E7.3",
                 "title": "Library and 4K access requests",
                 "size": "S",
                 "priority": "P1",
@@ -698,6 +754,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E7.4",
                 "title": "Access expiry reminders",
                 "size": "S",
                 "priority": "P2",
@@ -717,6 +774,7 @@ EPICS = [
         "summary": "Recommendations, digests, stats and social features that give friends reasons to come back.",
         "stories": [
             {
+                "key": "E8.1",
                 "title": "Personal recommendations",
                 "size": "M",
                 "priority": "P1",
@@ -727,6 +785,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E8.2",
                 "title": "Weekly newly-added post",
                 "size": "S",
                 "priority": "P1",
@@ -737,6 +796,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E8.3",
                 "title": "Plex Wrapped",
                 "size": "M",
                 "priority": "P2",
@@ -747,6 +807,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E8.4",
                 "title": "Auto-request from the Plex watchlist",
                 "size": "M",
                 "priority": "P2",
@@ -757,6 +818,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E8.5",
                 "title": "Cleanup suggestions",
                 "size": "S",
                 "priority": "P2",
@@ -767,6 +829,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E8.6",
                 "title": "What's new for me",
                 "size": "S",
                 "priority": "P2",
@@ -777,6 +840,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E8.7",
                 "title": "Resume nudges",
                 "size": "S",
                 "priority": "P2",
@@ -787,6 +851,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E8.8",
                 "title": "Group picks",
                 "size": "M",
                 "priority": "P2",
@@ -797,6 +862,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E8.9",
                 "title": "Quiet hours and notification preferences",
                 "size": "S",
                 "priority": "P1",
@@ -807,6 +873,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E8.10",
                 "title": "Server Oscars",
                 "size": "S",
                 "priority": "P2",
@@ -817,6 +884,7 @@ EPICS = [
                 ],
             },
             {
+                "key": "E8.11",
                 "title": "Shared watchlists",
                 "size": "M",
                 "priority": "P2",
@@ -829,6 +897,18 @@ EPICS = [
         ],
     },
 ]
+
+SIZES = {
+    "S": "Under half a day",
+    "M": "A day or two",
+    "L": "Several days, consider splitting",
+}
+
+PRIORITIES = {
+    "P0": "Must have for the milestone",
+    "P1": "Should have",
+    "P2": "Nice to have",
+}
 
 AREA_LABELS = {
     "agent": "The Claude tool-use loop, registry and guardrails",

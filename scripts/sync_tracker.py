@@ -2,48 +2,59 @@
 """Push the catalog to GitHub Issues and render docs/roadmap.md from it.
 
 Idempotent: labels and milestones are created or updated in place, and issues
-are matched by their `[E0.1]`-style title prefix so re-running never creates a
-duplicate. Stories are attached to their epic as native sub-issues. The roadmap
-ticks every epic and story whose issue is closed as completed.
+are matched by the `[E0.1]`-style key in their title, so re-running never creates
+a duplicate and leaves an unchanged issue alone. Stories are attached to their epic
+as native sub-issues. Epic checklists are rendered ticked from the stories' issues,
+and the roadmap ticks every epic and story whose issue is closed as completed.
 
     uv run python scripts/sync_tracker.py            # sync issues + write roadmap
-    uv run python scripts/sync_tracker.py --doc-only  # write roadmap from the live issue map
+    uv run python scripts/sync_tracker.py --doc-only  # only write the roadmap
 
 Needs `gh` authenticated with the `repo` scope.
 """
 
 import json
-import subprocess
 import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent))
-from catalog import AREA_LABELS, EPICS, MILESTONES
+from catalog import AREA_LABELS, EPICS, MILESTONES, PRIORITIES, SIZES
+from tracker import (
+    REPO,
+    ROADMAP_PATH,
+    ROOT,
+    by_key,
+    epic_body,
+    gh,
+    is_closed,
+    list_issues,
+    render_roadmap,
+)
 
-REPO = "codebend3r/maester"
-ROOT = Path(__file__).resolve().parent.parent
-MAP_PATH = ROOT / "docs" / "issue-map.json"
-ROADMAP_PATH = ROOT / "docs" / "roadmap.md"
+PRIORITY_COLORS = {"P0": "B60205", "P1": "D93F0B", "P2": "FBCA04"}
+SIZE_COLORS = {"S": "C5DEF5", "M": "7FB3E8", "L": "2E6BB8"}
 
 LABELS = {
     "epic": ("5319E7", "A parent issue grouping stories"),
     "story": ("0E8A16", "A user story with acceptance criteria"),
     "bug": ("D73A4A", "Something is broken"),
-    "P0": ("B60205", "Must have for the milestone"),
-    "P1": ("D93F0B", "Should have"),
-    "P2": ("FBCA04", "Nice to have"),
-    "size:S": ("C5DEF5", "Under half a day"),
-    "size:M": ("7FB3E8", "A day or two"),
-    "size:L": ("2E6BB8", "Several days, consider splitting"),
+    **{name: (PRIORITY_COLORS[name], desc) for name, desc in PRIORITIES.items()},
+    **{f"size:{name}": (SIZE_COLORS[name], desc) for name, desc in SIZES.items()},
     **{f"area:{k}": ("BFDADC", v) for k, v in AREA_LABELS.items()},
 }
 
 
-def gh(*args: str, input: str | None = None) -> str:
-    r = subprocess.run(["gh", *args], capture_output=True, text=True, input=input)
-    if r.returncode != 0:
-        raise RuntimeError(f"gh {' '.join(args)}\n{r.stderr}")
-    return r.stdout.strip()
+def is_managed(label: str) -> bool:
+    """A label the catalog sets, so a stale one comes off when the catalog changes."""
+    return label in PRIORITIES or label.startswith(("size:", "area:"))
+
+
+def label_changes(current: set[str], wanted: list[str]) -> tuple[list[str], list[str]]:
+    """Labels to add, and managed labels to remove, so the issue carries exactly `wanted`.
+
+    Labels the catalog doesn't manage (`bug`, or one set by hand) are left alone.
+    """
+    add = [label for label in wanted if label not in current]
+    remove = sorted(label for label in current if is_managed(label) and label not in wanted)
+    return add, remove
 
 
 def api(path: str, method: str = "GET", **fields) -> object:
@@ -81,26 +92,6 @@ def sync_milestones() -> dict[str, str]:
     return numbers
 
 
-def existing_issues() -> dict[str, dict]:
-    """Issues keyed by their `[E0.1]` / `[E0]` title prefix."""
-    out = gh(
-        "issue", "list", "-R", REPO, "--state", "all", "--limit", "500", "--json", "number,title,id"
-    )
-    found = {}
-    for issue in json.loads(out):
-        title = issue["title"]
-        if title.startswith("[") and "]" in title:
-            found[title[1 : title.index("]")]] = issue
-    return found
-
-
-def epic_body(epic: dict) -> str:
-    lines = [epic["summary"], "", f"**Milestone:** {epic['milestone']}", "", "## Stories", ""]
-    lines += [f"- [ ] {s['title']}" for s in epic["stories"]]
-    lines += ["", "_Stories are attached as sub-issues; the checklist above is a summary._"]
-    return "\n".join(lines)
-
-
 def story_body(epic: dict, story: dict) -> str:
     lines = [
         f"**Epic:** {epic['key']} {epic['title']}",
@@ -116,28 +107,31 @@ def story_body(epic: dict, story: dict) -> str:
     return "\n".join(lines)
 
 
+def edit_args(issue: dict, title: str, body: str, labels: list[str], milestone: str) -> list[str]:
+    """The `gh issue edit` arguments that bring an issue in line, or none when it already is."""
+    add, remove = label_changes({label["name"] for label in issue["labels"]}, labels)
+    current_milestone = (issue["milestone"] or {}).get("title")
+    if (issue["title"], issue["body"], current_milestone) == (title, body, milestone) and not (
+        add or remove
+    ):
+        return []
+    args = ["issue", "edit", str(issue["number"]), "-R", REPO, "--title", title, "--body", body]
+    args += ["--milestone", milestone]
+    if add:
+        args += ["--add-label", ",".join(add)]
+    if remove:
+        args += ["--remove-label", ",".join(remove)]
+    return args
+
+
 def upsert_issue(
     key: str, title: str, body: str, labels: list[str], milestone: str, found: dict
 ) -> dict:
     full_title = f"[{key}] {title}"
-    if key in found:
-        n = found[key]["number"]
-        gh(
-            "issue",
-            "edit",
-            str(n),
-            "-R",
-            REPO,
-            "--title",
-            full_title,
-            "--body",
-            body,
-            "--milestone",
-            milestone,
-            "--add-label",
-            ",".join(labels),
-        )
-        return found[key]
+    if issue := found.get(key):
+        if args := edit_args(issue, full_title, body, labels, milestone):
+            gh(*args)
+        return issue
     out = gh(
         "issue",
         "create",
@@ -176,104 +170,34 @@ def link_sub_issue(parent_id: str, child_id: str) -> None:
     )
 
 
-def sync_issues(milestones: dict[str, str]) -> dict:
-    found = existing_issues()
-    issue_map = {}
+def sync_issues(milestones: dict[str, str]) -> None:
+    found = by_key(list_issues())
+    closed = {key for key, issue in found.items() if is_closed(issue)}
     for epic in EPICS:
         ms = milestones[epic["milestone"]]
-        parent = upsert_issue(
-            epic["key"], epic["title"], epic_body(epic), ["epic", f"area:{epic['area']}"], ms, found
-        )
-        issue_map[epic["key"]] = parent["number"]
-        for i, story in enumerate(epic["stories"], 1):
-            key = f"{epic['key']}.{i}"
-            labels = ["story", f"area:{epic['area']}", story["priority"], f"size:{story['size']}"]
-            child = upsert_issue(key, story["title"], story_body(epic, story), labels, ms, found)
-            issue_map[key] = child["number"]
+        area = f"area:{epic['area']}"
+        body = epic_body(epic, closed)
+        parent = upsert_issue(epic["key"], epic["title"], body, ["epic", area], ms, found)
+        for story in epic["stories"]:
+            labels = ["story", area, story["priority"], f"size:{story['size']}"]
+            body = story_body(epic, story)
+            child = upsert_issue(story["key"], story["title"], body, labels, ms, found)
             link_sub_issue(parent["id"], child["id"])
         print(
             f"{epic['key']} {epic['title']}: #{parent['number']} + {len(epic['stories'])} stories"
         )
-    MAP_PATH.write_text(json.dumps(issue_map, indent=2) + "\n")
-    return issue_map
 
 
-def load_issue_map() -> dict:
-    return json.loads(MAP_PATH.read_text()) if MAP_PATH.exists() else {}
-
-
-def is_done(issue: dict) -> bool:
-    """Closed as completed. An issue closed as not planned is not done."""
-    return issue["state"] == "CLOSED" and issue.get("stateReason") in (None, "", "COMPLETED")
-
-
-def completed_issues() -> set[int]:
-    out = gh(
-        "issue", "list", "-R", REPO, "--state", "closed", "--limit", "500",
-        "--json", "number,state,stateReason",
-    )  # fmt: skip
-    return {issue["number"] for issue in json.loads(out) if is_done(issue)}
-
-
-def render_roadmap(issue_map: dict, done: set[int]) -> str:
-    """The roadmap doc, with a box ticked for each issue number in `done`."""
-
-    def link(key: str) -> str:
-        n = issue_map.get(key)
-        return f"[#{n}](https://github.com/{REPO}/issues/{n})" if n else "(not synced)"
-
-    def box(key: str) -> str:
-        return "[x]" if issue_map.get(key) in done else "[ ]"
-
-    out = [
-        "# Roadmap",
-        "",
-        "Generated from `scripts/catalog.py` by `scripts/sync_tracker.py`. Edit the catalog, not this file.",
-        "A box is ticked once its issue is closed as completed; `scripts/sync_board.py` keeps them current.",
-        "",
-        f'Board: https://github.com/users/{REPO.split("/")[0]}/projects ("maester roadmap")',
-        "",
-        "## Milestones",
-        "",
-    ]
-    for key, title, desc in MILESTONES:
-        out += [f"### {key} {title}", "", desc, ""]
-        out += [
-            f"- {box(e['key'])} {e['key']} {e['title']} {link(e['key'])}"
-            for e in EPICS
-            if e["milestone"] == key
-        ]
-        out.append("")
-    out += ["## Epics", ""]
-    for epic in EPICS:
-        out += [
-            f"### {epic['key']} {epic['title']} ({epic['milestone']}) {link(epic['key'])}",
-            "",
-            epic["summary"],
-            "",
-        ]
-        for i, s in enumerate(epic["stories"], 1):
-            key = f"{epic['key']}.{i}"
-            out.append(
-                f"- {box(key)} {key} {s['title']} · {s['size']} · {s['priority']} · {link(key)}"
-            )
-        out.append("")
-    return "\n".join(out)
-
-
-def write_roadmap(issue_map: dict) -> None:
-    ROADMAP_PATH.write_text(render_roadmap(issue_map, completed_issues()))
+def write_roadmap() -> None:
+    ROADMAP_PATH.write_text(render_roadmap(list_issues()))
     print(f"wrote {ROADMAP_PATH.relative_to(ROOT)}")
 
 
 def main() -> None:
-    if "--doc-only" in sys.argv:
-        write_roadmap(load_issue_map())
-        return
-    sync_labels()
-    milestones = sync_milestones()
-    issue_map = sync_issues(milestones)
-    write_roadmap(issue_map)
+    if "--doc-only" not in sys.argv:
+        sync_labels()
+        sync_issues(sync_milestones())
+    write_roadmap()
 
 
 if __name__ == "__main__":
