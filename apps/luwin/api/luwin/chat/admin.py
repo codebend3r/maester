@@ -17,7 +17,6 @@ them in a DM how it went.
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 from dataclasses import dataclass
@@ -25,12 +24,13 @@ from datetime import UTC, datetime
 from typing import Any
 
 from luwin.agent.limits import KillSwitch
-from luwin.agent.runner import ToolOutcome
+from luwin.agent.runner import AwaitingApproval, Errored, ToolOutcome
 from luwin.agent.tools import Tier
 from luwin.approvals import ask_about_request
 from luwin.chat.identity import IdentityService
 from luwin.chat.service import ChatResponse, ChatService, ChatUser
 from luwin.clients import ClientError, Services
+from luwin.clients.base import gather_each
 from luwin.config import Settings
 from luwin.formatting import ago, humanized, local_time
 from luwin.notify import Announcement, Notice
@@ -179,20 +179,15 @@ class AdminConsole:
                 f"\nCouldn't read Seerr's pending requests, so any made there may be missing: {exc}"
             )
             requests = []
-        asked = await asyncio.gather(
-            *(ask_about_request(self.services, self.store, r) for r in requests),
-            return_exceptions=True,
+        by_id = {r.id: r for r in requests}
+        asked = await gather_each(
+            by_id, lambda rid: ask_about_request(self.services, self.store, by_id[rid])
         )
-        if bug := next((a for a in asked if isinstance(a, BaseException)
-                        and not isinstance(a, ClientError)), None):  # fmt: skip
-            raise bug
-        failed = [
-            (r, a) for r, a in zip(requests, asked, strict=True) if isinstance(a, ClientError)
-        ]
-        raised = [post for a in asked if not isinstance(a, BaseException) and (post := a[1])]
-        if failed:
-            listed = ", ".join(f"#{r.id}" for r, _ in failed)
-            note += f"\nCouldn't raise an approval for Seerr request {listed}: {failed[0][1]}"
+        raised = [post for _, post in asked.answered.values() if post]
+        if asked.unreachable:
+            listed = ", ".join(f"#{rid}" for rid in asked.unreachable)
+            why = next(iter(asked.unreachable.values()))
+            note += f"\nCouldn't raise an approval for Seerr request {listed}: {why}"
         waiting = self.store.open_pending("approve")
         if waiting:
             lines = [f"{len(waiting)} waiting on you:"]
@@ -270,7 +265,7 @@ class AdminConsole:
             user = callers.get(call.user_id) or ChatUser(call.user_id, self._name(call.user_id))
             callers[call.user_id] = user
             outcome = await self.chat.agent.run_held(call, self.chat.tier_for(user))
-            if outcome.is_error and outcome.retryable:
+            if outcome.status == Errored(retryable=True):
                 self.store.keep_held(call.id)
                 kept.append((call, outcome))
             else:
@@ -301,8 +296,10 @@ class AdminConsole:
 
     @staticmethod
     def _how(outcome: ToolOutcome) -> str:
-        if outcome.approval_id is not None:
-            return "now waiting on your approval"
-        if outcome.is_error:
-            return f"didn't go through ({outcome.text[:200]})"
-        return "done"
+        match outcome.status:
+            case AwaitingApproval():
+                return "now waiting on your approval"
+            case Errored():
+                return f"didn't go through ({outcome.text[:200]})"
+            case _:
+                return "done"

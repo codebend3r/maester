@@ -33,10 +33,8 @@ def test_world_seeds_fake_seerr():
 async def test_run_case_checks_tools_and_reply(tmp_path: Path):
     reg = ToolRegistry()
 
-    @reg.tool(
-        "search_media", "search", {"type": "object", "properties": {"query": {"type": "string"}}}
-    )
-    async def search(ctx, query=""):
+    @reg.tool("search_media", "search")
+    async def search(ctx, query: str = ""):
         return [{"title": "Dune"}]
 
     case = Case.load(CASES_DIR / "ambiguous_title.yaml")

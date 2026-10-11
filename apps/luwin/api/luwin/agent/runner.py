@@ -22,7 +22,8 @@ then, with the same checks.
 
 A result that offers choices or carries a `Result` (notices, an approval
 to ask for) is turned into what the chat layer renders. An approval is
-checked against its decide tool's schema before it is stored.
+checked against its decide tool's signature before it is stored
+(`open_approval`, which Seerr's webhook raises its approvals through too).
 """
 
 from __future__ import annotations
@@ -41,15 +42,17 @@ from luwin.agent.tools import (
     Approval,
     Choice,
     Choices,
-    Result,
+    Failed,
+    NeedsApproval,
+    Ok,
+    Refused,
     ToolContext,
     ToolRegistry,
     ToolSpec,
     ValidationError,
-    validate_input,
 )
 from luwin.notify import AdminPost, ApprovalPost, Notice
-from luwin.store import MAINTENANCE, Flag, HeldCall, NotLinked, PendingAction
+from luwin.store import MAINTENANCE, Flag, HeldCall, NotLinked, PendingAction, Store
 
 log = logging.getLogger("luwin.agent")
 
@@ -58,19 +61,58 @@ APPROVAL_TTL = timedelta(days=7)
 
 
 @dataclass(frozen=True)
+class Done:
+    """The call ran and answered."""
+
+
+@dataclass(frozen=True)
+class Errored:
+    """The call was refused, or failed. Trying again may succeed only when `retryable` (a
+    service that didn't answer, a tool that raised): only then is a press reopened."""
+
+    retryable: bool = False
+
+
+@dataclass(frozen=True)
+class AwaitingConfirmation:
+    """A destructive call the caller must confirm, with this pending action's button."""
+
+    pending_id: int
+
+
+@dataclass(frozen=True)
+class AwaitingApproval:
+    """The call asked the admin; it is audited as waiting on this pending action."""
+
+    pending_id: int
+
+
+@dataclass(frozen=True)
+class HeldForMaintenance:
+    """Saved for when the maintenance window ends, instead of run."""
+
+    held_id: int
+
+
+@dataclass(frozen=True)
+class Cancelled:
+    """The caller pressed Cancel: nothing ran."""
+
+
+# What became of a call: exactly one of these.
+Status = Done | Errored | AwaitingConfirmation | AwaitingApproval | HeldForMaintenance | Cancelled
+
+
+@dataclass(frozen=True)
 class ToolOutcome:
     content: Any
-    is_error: bool = False
-    # A confirmation the caller must press before the call runs.
-    pending_id: int | None = None
-    # An approval the admin must press; the call is audited as waiting on it.
-    approval_id: int | None = None
+    status: Status = Done()
     choices: tuple[Choice, ...] = ()
     notices: tuple[Notice, ...] = ()
-    # The tool itself failed (not a refusal), so trying again may succeed.
-    retryable: bool = False
-    # Saved for when a maintenance window ends, instead of run.
-    held_id: int | None = None
+
+    @property
+    def is_error(self) -> bool:
+        return isinstance(self.status, Errored)
 
     @property
     def text(self) -> str:
@@ -89,7 +131,26 @@ class ToolOutcome:
         return block
 
 
-CANCELLED = ToolOutcome("Cancelled by the user; nothing was done.")
+def open_approval(store: Store, approval: Approval, requester: str) -> tuple[PendingAction, bool]:
+    """The pending action asking the admin about `approval`, and whether it's new.
+
+    Its arguments must fit its decide tool (`LookupError` when that isn't a
+    button-only admin tool, `ValidationError` when they don't fit). With a
+    subject, an approval already open about it is reused.
+    """
+    decide = approval.decide_spec()
+    decide.validate({**approval.args, "approved": True})
+    fields: dict[str, Any] = dict(
+        kind="approve",
+        action=decide.name,
+        requester=requester,
+        payload=approval.args,
+        summary=approval.summary,
+        ttl=APPROVAL_TTL,
+    )
+    if approval.subject is None:
+        return store.create_pending(**fields), True
+    return store.create_pending_once(subject=approval.subject, **fields)
 
 
 class ToolRunner:
@@ -117,11 +178,11 @@ class ToolRunner:
         if spec is None or spec.button_only or spec.tier > ctx.tier:
             return self._refuse(ctx, name, raw_input, f"tool {name!r} is not available to you")
         try:
-            args = validate_input(spec.input_schema, raw_input)
+            args = spec.validate(raw_input)
         except ValidationError as exc:
             return ToolOutcome(
                 json.dumps({"INVALID_JSON": json.dumps(raw_input, default=str), "error": str(exc)}),
-                is_error=True,
+                Errored(),
             )
         if spec.destructive:
             if self.kill_switch.enabled:
@@ -136,7 +197,7 @@ class ToolRunner:
     ) -> ToolOutcome:
         """What a button press decided, run as the presser (`ctx`)."""
         if pending.kind == "confirm" and not approved:
-            return CANCELLED
+            return ToolOutcome("Cancelled by the user; nothing was done.", Cancelled())
         spec = self.registry.get(pending.action)
         if spec is None:
             return self._refuse(
@@ -146,7 +207,7 @@ class ToolRunner:
             return self._refuse(ctx, spec.name, pending.payload, "that action was not decided")
         args = {**pending.payload, "approved": approved} if spec.button_only else pending.payload
         try:
-            args = validate_input(spec.input_schema, args)
+            args = spec.validate(args)
         except ValidationError as exc:
             return self._refuse(ctx, spec.name, args, f"stored arguments no longer fit: {exc}")
         async with self._one_at_a_time(spec):
@@ -175,7 +236,7 @@ class ToolRunner:
         if spec is None or spec.button_only or spec.tier > ctx.tier:
             return self._refuse(ctx, held.tool, held.args, "that action is no longer available")
         try:
-            args = validate_input(spec.input_schema, held.args)
+            args = spec.validate(held.args)
         except ValidationError as exc:
             return self._refuse(ctx, spec.name, held.args, f"its arguments no longer fit: {exc}")
         async with self._one_at_a_time(spec):
@@ -200,7 +261,7 @@ class ToolRunner:
                 "saved and runs when maintenance ends, and the user gets a DM saying how it "
                 "went. Tell them that, and don't call this tool again for it.",
             },
-            held_id=held.id,
+            HeldForMaintenance(held.id),
         )
         host = args.get(spec.host_param) if spec.host_param else None
         ctx.store.audit(
@@ -227,30 +288,35 @@ class ToolRunner:
     async def _execute(self, ctx: ToolContext, spec: ToolSpec, args: dict[str, Any]) -> ToolOutcome:
         started = time.monotonic()
         try:
-            outcome = self._outcome(ctx, spec, await spec.handler(ctx, **args))
+            outcome = self._outcome(ctx, spec, await spec.call(ctx, args))
         except NotLinked as exc:  # no Seerr account to act as: the same refusal as any tool's
-            outcome = self._outcome(ctx, spec, Result.refusal(str(exc)))
+            outcome = self._outcome(ctx, spec, Refused(str(exc)))
         except Exception as exc:  # a tool failing must not take the turn down
             log.exception("tool %s failed", spec.name)
-            outcome = ToolOutcome(f"{type(exc).__name__}: {exc}", is_error=True, retryable=True)
+            outcome = ToolOutcome(f"{type(exc).__name__}: {exc}", Errored(retryable=True))
         host = args.get(spec.host_param) if spec.host_param else None
         self._audit(ctx, spec.name, args, outcome, host, self._ms(started))
         return outcome
 
     def _outcome(self, ctx: ToolContext, spec: ToolSpec, result: Any) -> ToolOutcome:
-        if isinstance(result, Choices):
-            return ToolOutcome(result.as_content(), choices=tuple(result.shown))
-        if not isinstance(result, Result):
-            return ToolOutcome(result)
-        if result.approval is None:
-            return ToolOutcome(
-                result.content,
-                is_error=result.is_error,
-                notices=result.notices,
-                retryable=result.retryable,
-            )
+        match result:
+            case Choices():
+                return ToolOutcome(result.as_content(), choices=tuple(result.shown))
+            case Ok(content, notices):
+                return ToolOutcome(content, notices=notices)
+            case Refused(content, notices):
+                return ToolOutcome(content, Errored(), notices=notices)
+            case Failed(content, notices, retryable):
+                return ToolOutcome(content, Errored(retryable), notices=notices)
+            case NeedsApproval():
+                return self._ask_admin(ctx, spec, result)
+            case _:
+                return ToolOutcome(result)
+
+    def _ask_admin(self, ctx: ToolContext, spec: ToolSpec, result: NeedsApproval) -> ToolOutcome:
+        """Raise the result's approval, or tell the admin by hand when it can't be."""
         try:
-            pending, new = self._ask_admin(ctx, result.approval)
+            pending, new = open_approval(ctx.store, result.approval, ctx.user_id)
         except (LookupError, ValidationError) as exc:
             # The tool has acted but its approval can't be raised: say so to
             # the admin rather than leave the action stranded unseen.
@@ -261,7 +327,7 @@ class ToolRunner:
             )
             return ToolOutcome(
                 f"the admin could not be asked for approval: {exc}",
-                is_error=True,
+                Errored(),
                 notices=(*result.notices, stranded),
             )
         content = {
@@ -273,25 +339,7 @@ class ToolRunner:
         }
         # An approval already open about the same subject has its post; don't post it twice.
         post = (ApprovalPost(result.approval.notice, pending.id),) if new else ()
-        return ToolOutcome(content, approval_id=pending.id, notices=(*result.notices, *post))
-
-    def _ask_admin(self, ctx: ToolContext, approval: Approval) -> tuple[PendingAction, bool]:
-        """The pending action for `approval`, and whether it's new."""
-        decide = self.registry.get(approval.decide)
-        if decide is None or not decide.button_only:
-            raise LookupError(f"{approval.decide!r} is not a registered admin decision tool")
-        validate_input(decide.input_schema, {**approval.args, "approved": True})
-        fields: dict[str, Any] = dict(
-            kind="approve",
-            action=decide.name,
-            requester=ctx.user_id,
-            payload=approval.args,
-            summary=approval.summary,
-            ttl=APPROVAL_TTL,
-        )
-        if approval.subject is None:
-            return ctx.store.create_pending(**fields), True
-        return ctx.store.create_pending_once(subject=approval.subject, **fields)
+        return ToolOutcome(content, AwaitingApproval(pending.id), notices=(*result.notices, *post))
 
     def _request_confirmation(
         self, ctx: ToolContext, spec: ToolSpec, args: dict[str, Any]
@@ -313,13 +361,13 @@ class ToolRunner:
                 "note": "The user has been shown Confirm/Cancel buttons. Do not call this tool again; "
                 "tell the user what will happen once they confirm.",
             },
-            pending_id=pending.id,
+            AwaitingConfirmation(pending.id),
         )
 
     def _refuse(
         self, ctx: ToolContext, name: str, args: Any, why: str, *, retryable: bool = False
     ) -> ToolOutcome:
-        outcome = ToolOutcome(why, is_error=True, retryable=retryable)
+        outcome = ToolOutcome(why, Errored(retryable))
         self._audit(ctx, name, args if isinstance(args, dict) else {}, outcome, None, 0)
         return outcome
 
@@ -348,5 +396,7 @@ class ToolRunner:
             ok=not outcome.is_error,
             host=host,
             duration_ms=ms,
-            pending_id=outcome.approval_id,
+            pending_id=(
+                outcome.status.pending_id if isinstance(outcome.status, AwaitingApproval) else None
+            ),
         )

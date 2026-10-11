@@ -10,23 +10,17 @@ from luwin.config import Settings
 from luwin.store import Store
 from tests.fake_model import FakeModel, text_message, tool_message
 
-SEARCH_SCHEMA = {
-    "type": "object",
-    "properties": {"query": {"type": "string"}},
-    "required": ["query"],
-}
-
 
 @pytest.fixture
 def world():
     reg = ToolRegistry()
 
-    @reg.tool("search_media", "search", SEARCH_SCHEMA)
-    async def search(ctx, query):
+    @reg.tool("search_media", "search")
+    async def search(ctx, query: str):
         return [{"title": "Dune", "year": 2021}, {"title": "Dune", "year": 1984}]
 
-    @reg.tool("replace_media", "replace", SEARCH_SCHEMA, tier=Tier.TRUSTED, destructive=True)
-    async def replace(ctx, query):
+    @reg.tool("replace_media", "replace", tier=Tier.TRUSTED, destructive=True)
+    async def replace(ctx, query: str):
         return "replaced " * 200
 
     store = Store(":memory:")

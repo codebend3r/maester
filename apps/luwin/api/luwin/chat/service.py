@@ -20,7 +20,14 @@ import secrets
 from dataclasses import dataclass, field, replace
 
 from luwin.agent.loop import Agent, TurnFailed
-from luwin.agent.runner import CANCELLED
+from luwin.agent.runner import (
+    AwaitingApproval,
+    AwaitingConfirmation,
+    Cancelled,
+    Done,
+    Errored,
+    HeldForMaintenance,
+)
 from luwin.agent.tools import Choice, Tier
 from luwin.chat.identity import IdentityService
 from luwin.chat.split import split_reply
@@ -163,27 +170,29 @@ class ChatService:
         outcome = await self.agent.run_decision(
             decided, presser.id, self.tier_for(presser), approve
         )
-        if outcome is CANCELLED:
-            return Decision("Cancelled.", notices=outcome.notices)
-        if outcome.approval_id is not None:  # the confirmed action went to the admin instead
-            return Decision(ESCALATED, notices=outcome.notices)
-        if outcome.held_id is not None:
-            return Decision(HELD)
-        if outcome.is_error and outcome.retryable:
-            if self.store.reopen_pending(decided.id):
+        match outcome.status:
+            case Cancelled():
+                return Decision("Cancelled.", notices=outcome.notices)
+            case AwaitingApproval():  # the confirmed action went to the admin instead
+                return Decision(ESCALATED, notices=outcome.notices)
+            case HeldForMaintenance():
+                return Decision(HELD)
+            case Errored(retryable=True):
+                if self.store.reopen_pending(decided.id):
+                    return Decision(
+                        f"Couldn't do it: {outcome.text[:1500]}\nIt's still open, so you can "
+                        "press again.",
+                        settled=False,
+                    )
                 return Decision(
-                    f"Couldn't do it: {outcome.text[:1500]}\nIt's still open, so you can press "
-                    "again.",
-                    settled=False,
+                    f"Couldn't do it: {outcome.text[:1500]}\nA newer approval for the same thing "
+                    "is open; use that one.",
+                    notices=outcome.notices,
                 )
-            return Decision(
-                f"Couldn't do it: {outcome.text[:1500]}\nA newer approval for the same thing is "
-                "open; use that one.",
-                notices=outcome.notices,
-            )
-        if outcome.is_error:
-            return Decision(f"Couldn't do it: {outcome.text[:1500]}", notices=outcome.notices)
-        return Decision(kind.done + outcome.text[:1500], notices=outcome.notices)
+            case Errored():
+                return Decision(f"Couldn't do it: {outcome.text[:1500]}", notices=outcome.notices)
+            case Done() | AwaitingConfirmation():
+                return Decision(kind.done + outcome.text[:1500], notices=outcome.notices)
 
     def _may_decide(self, pending: PendingAction, presser: ChatUser) -> bool:
         if pending.kind == "confirm":
