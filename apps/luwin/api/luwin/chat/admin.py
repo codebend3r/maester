@@ -17,7 +17,6 @@ them in a DM how it went.
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 from dataclasses import dataclass
@@ -31,6 +30,7 @@ from luwin.approvals import ask_about_request
 from luwin.chat.identity import IdentityService
 from luwin.chat.service import ChatResponse, ChatService, ChatUser
 from luwin.clients import ClientError, Services
+from luwin.clients.base import gather_each
 from luwin.config import Settings
 from luwin.formatting import ago, humanized, local_time
 from luwin.notify import Announcement, Notice
@@ -179,20 +179,15 @@ class AdminConsole:
                 f"\nCouldn't read Seerr's pending requests, so any made there may be missing: {exc}"
             )
             requests = []
-        asked = await asyncio.gather(
-            *(ask_about_request(self.services, self.store, r) for r in requests),
-            return_exceptions=True,
+        by_id = {r.id: r for r in requests}
+        asked = await gather_each(
+            by_id, lambda rid: ask_about_request(self.services, self.store, by_id[rid])
         )
-        if bug := next((a for a in asked if isinstance(a, BaseException)
-                        and not isinstance(a, ClientError)), None):  # fmt: skip
-            raise bug
-        failed = [
-            (r, a) for r, a in zip(requests, asked, strict=True) if isinstance(a, ClientError)
-        ]
-        raised = [post for a in asked if not isinstance(a, BaseException) and (post := a[1])]
-        if failed:
-            listed = ", ".join(f"#{r.id}" for r, _ in failed)
-            note += f"\nCouldn't raise an approval for Seerr request {listed}: {failed[0][1]}"
+        raised = [post for _, post in asked.answered.values() if post]
+        if asked.unreachable:
+            listed = ", ".join(f"#{rid}" for rid in asked.unreachable)
+            why = next(iter(asked.unreachable.values()))
+            note += f"\nCouldn't raise an approval for Seerr request {listed}: {why}"
         waiting = self.store.open_pending("approve")
         if waiting:
             lines = [f"{len(waiting)} waiting on you:"]

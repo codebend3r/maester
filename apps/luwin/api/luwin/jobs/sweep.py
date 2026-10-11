@@ -33,9 +33,10 @@ from datetime import UTC, datetime, timedelta
 from luwin.agent.limits import KillSwitch
 from luwin.clients import ClientError, Services
 from luwin.clients.arr import Arr, QueueItem
+from luwin.clients.base import Answers, gather_each
 from luwin.config import Settings
 from luwin.formatting import humanized
-from luwin.kinds import KINDS
+from luwin.kinds import KINDS, Kind
 from luwin.media import MediaType
 from luwin.notify import AdminPost, Notice
 from luwin.store import MAINTENANCE, StallAction, Store, Watched
@@ -118,6 +119,19 @@ def downloads(host: str, kind: MediaType, queue: Sequence[QueueItem]) -> list[Do
     return [Download(host, kind, d, tuple(rs)) for d, rs in by_id.items()]
 
 
+Queues = Answers[tuple[Kind, str], list[QueueItem]]
+
+
+async def read_queues(services: Services) -> Queues:
+    """Every host's Radarr and Sonarr queue, asked at once, by kind and host."""
+    arrs = {
+        (kind, host): arr
+        for kind in KINDS.values()
+        for host, arr in sorted(kind.arrs(services).items())
+    }
+    return await gather_each(arrs, lambda key: arrs[key].queue())
+
+
 def stuck_since(download: Download, before: Watched | None, now: str) -> str | None:
     """Since when a download has been stuck, carried over from the last sweep; None if not."""
     if download.waiting:
@@ -145,15 +159,13 @@ class Sweeper:
         """One sweep of every host's queues; the notices are titles surfaced to the admin."""
         if self.store.flag(MAINTENANCE):
             return []
+        queues = await read_queues(self.services)
+        for (kind, host), why in queues.unreachable.items():
+            log.warning("sweep: %s on %s didn't answer: %s", kind.arr_name, host, why)
         notices: list[Notice] = []
-        for kind in KINDS.values():
-            for host, arr in sorted(kind.arrs(self.services).items()):
-                try:
-                    queue = await arr.queue()
-                except ClientError as exc:
-                    log.warning("sweep: %s on %s didn't answer: %s", kind.arr_name, host, exc)
-                    continue
-                notices += await self.sweep(host, kind.media_type, arr, queue)
+        for (kind, host), queue in queues.answered.items():
+            arr = kind.arrs(self.services)[host]
+            notices += await self.sweep(host, kind.media_type, arr, queue)
         return notices
 
     async def sweep(

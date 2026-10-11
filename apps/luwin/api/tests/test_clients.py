@@ -22,6 +22,7 @@ from luwin.clients import (
     TautulliClient,
     WizarrClient,
 )
+from luwin.clients.base import gather_each
 from luwin.clients.seerr import (
     ArrRef,
     MediaDetails,
@@ -679,3 +680,18 @@ async def test_sonarr_searches_episodes_and_finds_a_series_only_by_its_tvdb_id()
         136315, "tv", "The Bear", 2022, "", MediaStatus.UNKNOWN, MediaStatus.UNKNOWN
     )
     assert await sonarr.find_id(no_tvdb) is None  # nothing to ask by, so nothing asked
+
+
+async def test_gather_each_names_who_couldnt_answer_and_raises_a_bug():
+    async def ask(key):
+        if key == "down":
+            raise ClientError("sonarr", "GET", "/api/v3/queue", None, "timeout")
+        if key == "bug":
+            raise KeyError(key)
+        return key.upper()
+
+    found = await gather_each(["a", "down", "a"], ask)
+    assert found.answered == {"a": "A"}
+    assert found.unreachable == {"down": "sonarr GET /api/v3/queue failed (None): timeout"}
+    with pytest.raises(KeyError):
+        await gather_each(["a", "bug"], ask)

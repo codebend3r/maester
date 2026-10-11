@@ -24,6 +24,7 @@ from datetime import UTC, datetime, timedelta
 
 from luwin.agent.tools import Tier
 from luwin.clients import Account, ClientError, PlexAccount, Services
+from luwin.clients.base import every_host
 from luwin.store import Store, UserRow
 from luwin.store.base import stamp
 
@@ -137,16 +138,19 @@ class IdentityService:
         )
 
     async def _tautulli_id(self, email: str, username: str) -> int | None:
-        for client in self.services.tautulli.values():
-            try:
-                for u in await client.users():
-                    if (email and u.email.lower() == email) or (
-                        username and u.username.lower() == username
-                    ):
-                        return u.user_id
-            except Exception:  # a missing Tautulli must not block the match
-                continue
-        return None
+        """Their Tautulli user id, from the first host that knows them; every host is asked at
+        once, and one that can't answer doesn't block the match."""
+        found = await every_host(self.services.tautulli, lambda t: t.users())
+        return next(
+            (
+                u.user_id
+                for users in found.answered.values()
+                for u in users
+                if (email and u.email.lower() == email)
+                or (username and u.username.lower() == username)
+            ),
+            None,
+        )
 
     def set_tier_override(self, user_id: str, tier: str | None) -> str:
         normalized = Tier.parse(tier).name.lower() if tier else None

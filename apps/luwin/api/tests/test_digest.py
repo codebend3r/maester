@@ -160,3 +160,27 @@ async def test_a_replacement_the_admin_declined_isnt_listed_as_replaced(digest, 
     args = {"report_id": report.id, "host": "vermithor", "requester": "d1", "approved": False}
     store.audit(user_id="a1", tool="decide_replacement", args=args, result="", ok=True)
     assert "Replaced" not in sections(await digest.compose(NOW))
+
+
+async def test_a_title_both_requested_and_raised_as_an_issue_is_asked_of_seerr_once(
+    digest, services
+):
+    services.seerr.requests = [
+        MediaRequest(1, RequestStatus.PENDING, "tv", 136315, False, 4,
+                     created_at=(NOW - timedelta(hours=2)).isoformat()),
+    ]  # fmt: skip
+    services.seerr.open_issue_list = [
+        Issue(12, "video", "tv", 136315, "dany", (NOW - timedelta(days=3)).isoformat(), 2, 7)
+    ]
+    asked = []
+    look_up = services.seerr.media_details
+
+    async def counted(media_type, tmdb_id):
+        asked.append((media_type, tmdb_id))
+        return await look_up(media_type, tmdb_id)
+
+    services.seerr.media_details = counted
+    found = sections(await digest.compose(NOW))
+    assert found["New requests"][0].startswith("The Bear (2022) in 1080p for dany")
+    assert found["Open issues"][0].startswith("#12 The Bear (2022) S02E07")
+    assert asked == [("tv", 136315)]

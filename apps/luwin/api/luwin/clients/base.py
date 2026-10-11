@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any, ClassVar
 
@@ -113,27 +113,32 @@ class Downable:
 
 
 @dataclass(frozen=True)
-class HostAnswers[T]:
-    """What each host's instance answered, and why the others couldn't."""
+class Answers[K, T]:
+    """What each one asked answered, and why the others couldn't."""
 
-    answered: dict[str, T]
-    unreachable: dict[str, str]  # host -> why
+    answered: dict[K, T]
+    unreachable: dict[K, str]  # key -> why
+
+
+async def gather_each[K, T](keys: Iterable[K], call: Callable[[K], Awaitable[T]]) -> Answers[K, T]:
+    """Ask for every key at once, each once. One that can't answer (`ClientError`) is named
+    instead of hiding the others; anything else is a bug, and raises."""
+    asked = list(dict.fromkeys(keys))
+    found = await asyncio.gather(*map(call, asked), return_exceptions=True)
+    answered: dict[K, T] = {}
+    unreachable: dict[K, str] = {}
+    for key, result in zip(asked, found, strict=True):
+        if isinstance(result, ClientError):
+            unreachable[key] = str(result)
+        elif isinstance(result, BaseException):
+            raise result
+        else:
+            answered[key] = result
+    return Answers(answered, unreachable)
 
 
 async def every_host[C, T](
     clients: Mapping[str, C], call: Callable[[C], Awaitable[T]]
-) -> HostAnswers[T]:
-    """Ask every host's instance at once. One that can't answer (`ClientError`) is named
-    instead of hiding the others; anything else is a bug, and raises."""
-    hosts = sorted(clients)
-    found = await asyncio.gather(*(call(clients[h]) for h in hosts), return_exceptions=True)
-    answered: dict[str, T] = {}
-    unreachable: dict[str, str] = {}
-    for host, result in zip(hosts, found, strict=True):
-        if isinstance(result, ClientError):
-            unreachable[host] = str(result)
-        elif isinstance(result, BaseException):
-            raise result
-        else:
-            answered[host] = result
-    return HostAnswers(answered, unreachable)
+) -> Answers[str, T]:
+    """`gather_each` over a service's instances, by host."""
+    return await gather_each(sorted(clients), lambda host: call(clients[host]))

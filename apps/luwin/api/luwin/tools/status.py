@@ -20,12 +20,13 @@ from __future__ import annotations
 
 import asyncio
 import re
-from collections.abc import Awaitable, Callable, Hashable, Iterable
+from collections.abc import Awaitable
 from dataclasses import dataclass
 from typing import Any
 
 from luwin.agent.tools import Tier, ToolContext, tool
 from luwin.clients.arr import HistoryEvent, QueueItem
+from luwin.clients.base import Answers, gather_each
 from luwin.clients.sabnzbd import Download
 from luwin.clients.seerr import MediaDetails, MediaRequest, RequestStatus
 from luwin.formatting import humanized
@@ -87,27 +88,21 @@ async def locate(library: Library, request: MediaRequest) -> Located:
         return Located(request, details, None, str(exc))
 
 
-async def fetch_each[K: Hashable](
-    keys: Iterable[K], fetch: Callable[[K], Awaitable[Any]]
-) -> dict[K, Any]:
-    """Fetch every key once, concurrently; a failure is kept as that key's value."""
-    unique = list(dict.fromkeys(keys))
-    results = await asyncio.gather(*map(fetch, unique), return_exceptions=True)
-    return dict(zip(unique, results, strict=True))
-
-
-def last_failure(events: list[HistoryEvent], sab_history: Any) -> dict[str, Any]:
+def last_failure(
+    events: list[HistoryEvent], sab_history: dict[str, Download] | None
+) -> dict[str, Any]:
     """Nothing is queued: say whether the last download failed, and why."""
     if not events or events[0].event_type != "downloadFailed":
         return {"download": "nothing downloading right now; waiting for a release to grab"}
     reason = events[0].message
-    if not reason and isinstance(sab_history, dict):
+    if not reason and sab_history is not None:
         failed = sab_history.get(events[0].download_id or "")
         reason = failed.fail_message if failed and failed.fail_message else ""
     return {"failed": f"the last download failed: {reason or 'no reason recorded'}"}
 
 
-def request_row(located: Located | BaseException, request: MediaRequest) -> dict[str, Any]:
+def request_row(located: Located | str, request: MediaRequest) -> dict[str, Any]:
+    """The request's own facts; `located` is why it couldn't be looked up, when it couldn't."""
     row: dict[str, Any] = {
         "request_id": request.id,
         "version": version_label(request.is_4k),
@@ -116,7 +111,7 @@ def request_row(located: Located | BaseException, request: MediaRequest) -> dict
     }
     if request.seasons:
         row["seasons"] = list(request.seasons)
-    if isinstance(located, BaseException):
+    if isinstance(located, str):
         return {
             **row,
             "title": f"TMDB {request.tmdb_id}",
@@ -134,29 +129,40 @@ async def _by_nzo(rows: Awaitable[list[Download]]) -> dict[str, Download]:
     return {d.nzo_id: d for d in await rows}
 
 
-def _mine(queue: list[QueueItem] | BaseException, owner: Owner) -> list[QueueItem] | BaseException:
-    if isinstance(queue, BaseException):
-        return queue
-    return [q for q in queue if q.media_id == owner.media_id]
+Queues = Answers[tuple[str, str], list[QueueItem]]  # by (kind, host)
 
 
-def download(
-    owner: Owner,
-    items: list[QueueItem] | BaseException,
-    sab_queue: Any,
-    history: Any,
-    sab_history: Any,
-) -> dict[str, Any]:
+def queued(queues: Queues, owner: Owner) -> list[QueueItem] | None:
+    """The owner's queue entries for the title; None when its queue couldn't be read."""
+    queue = queues.answered.get((owner.kind.media_type, owner.host))
+    return None if queue is None else [q for q in queue if q.media_id == owner.media_id]
+
+
+@dataclass(frozen=True)
+class Fetched:
+    """Phases two and three: each involved queue, and the history of requests with nothing
+    queued, as each host answered."""
+
+    queues: Queues
+    sab_queues: Answers[str, dict[str, Download]]
+    histories: Answers[int, list[HistoryEvent]]  # by request id
+    sab_histories: Answers[str, dict[str, Download]]
+
+
+def download(owner: Owner, request_id: int, fetched: Fetched) -> dict[str, Any]:
     """An approved request's download, from what the phases fetched (failures included)."""
     arr = f"{owner.kind.arr_name} on {owner.host}"
-    if isinstance(items, BaseException):
-        return {"host": owner.host, "error": f"couldn't reach {arr}: {items}"}
+    items = queued(fetched.queues, owner)
+    if items is None:
+        why = fetched.queues.unreachable[(owner.kind.media_type, owner.host)]
+        return {"host": owner.host, "error": f"couldn't reach {arr}: {why}"}
     if items:
-        slots = sab_queue if isinstance(sab_queue, dict) else {}
+        slots = fetched.sab_queues.answered.get(owner.host, {})
         return {"host": owner.host, **merged_progress(items, slots)}
-    if isinstance(history, BaseException):
-        return {"host": owner.host, "error": f"couldn't read {arr} history: {history}"}
-    return {"host": owner.host, **last_failure(history, sab_history)}
+    if (why := fetched.histories.unreachable.get(request_id)) is not None:
+        return {"host": owner.host, "error": f"couldn't read {arr} history: {why}"}
+    sab_history = fetched.sab_histories.answered.get(owner.host)
+    return {"host": owner.host, **last_failure(fetched.histories.answered[request_id], sab_history)}
 
 
 @tool(
@@ -180,36 +186,37 @@ async def request_status(ctx: ToolContext) -> dict[str, Any]:
     if not requests:
         return {"requests": [], "note": "No open requests."}
     library = await Library.load(services)
+    by_id = {r.id: r for r in requests}
 
     # 1. Each request's title and the arr holding its copy.
-    located = dict(
-        zip(
-            (r.id for r in requests),
-            await asyncio.gather(*(locate(library, r) for r in requests), return_exceptions=True),
-            strict=True,
-        )
-    )
+    located = await gather_each(by_id, lambda rid: locate(library, by_id[rid]))
     owners = {
         rid: loc.owner
-        for rid, loc in located.items()
-        if isinstance(loc, Located) and loc.owner and loc.request.status == RequestStatus.APPROVED
+        for rid, loc in located.answered.items()
+        if loc.owner and loc.request.status == RequestStatus.APPROVED
     }
     # 2. Each involved arr queue and SABnzbd queue, once.
-    arrs = {(o.kind, o.host): o.arr for o in owners.values()}
-    queues = await fetch_each(arrs, lambda key: arrs[key].queue())
+    arrs = {(o.kind.media_type, o.host): o.arr for o in owners.values()}
     sabs = {o.host: services.sabnzbd[o.host] for o in owners.values() if o.host in services.sabnzbd}
-    sab_queues = await fetch_each(sabs, lambda h: _by_nzo(sabs[h].queue()))
-    items = {rid: _mine(queues[(o.kind, o.host)], o) for rid, o in owners.items()}
+    queues, sab_queues = await asyncio.gather(
+        gather_each(arrs, lambda key: arrs[key].queue()),
+        gather_each(sabs, lambda h: _by_nzo(sabs[h].queue())),
+    )
     # 3. History for requests with nothing queued, and their hosts' SABnzbd history.
-    idle = {rid: o for rid, o in owners.items() if items[rid] == []}
-    histories = await fetch_each(idle, lambda rid: idle[rid].arr.history(idle[rid].media_id))
-    idle_sabs = [o.host for o in idle.values() if o.host in sabs]
-    sab_histories = await fetch_each(idle_sabs, lambda h: _by_nzo(sabs[h].history()))
+    idle = {rid: o for rid, o in owners.items() if queued(queues, o) == []}
+    histories, sab_histories = await asyncio.gather(
+        gather_each(idle, lambda rid: idle[rid].arr.history(idle[rid].media_id)),
+        gather_each(
+            [o.host for o in idle.values() if o.host in sabs],
+            lambda h: _by_nzo(sabs[h].history()),
+        ),
+    )
+    fetched = Fetched(queues, sab_queues, histories, sab_histories)
 
     # 4. The rows.
     rows = []
     for request in requests:
-        loc = located[request.id]
+        loc = located.answered.get(request.id) or located.unreachable[request.id]
         row = request_row(loc, request)
         if isinstance(loc, Located) and request.status == RequestStatus.APPROVED:
             if loc.unknown is not None:
@@ -217,15 +224,6 @@ async def request_status(ctx: ToolContext) -> dict[str, Any]:
             elif loc.owner is None:
                 row["download"] = "not sent to Radarr or Sonarr yet"
             else:
-                host = loc.owner.host
-                row.update(
-                    download(
-                        loc.owner,
-                        items[request.id],
-                        sab_queues.get(host),
-                        histories.get(request.id),
-                        sab_histories.get(host),
-                    )
-                )
+                row.update(download(loc.owner, request.id, fetched))
         rows.append(row)
     return {"requests": rows}

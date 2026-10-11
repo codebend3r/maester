@@ -2,6 +2,7 @@ from dataclasses import replace
 
 import pytest
 
+from luwin.clients import ClientError
 from luwin.clients.arr import HistoryEvent, QueueItem
 from luwin.clients.radarr import Movie
 from luwin.clients.sabnzbd import Download
@@ -202,10 +203,13 @@ async def test_one_unreachable_host_only_spoils_its_own_rows(dune_on_meleys):
     await request(ctx, "movie", 999)  # Seerr no longer knows this one
 
     async def down():
-        raise ConnectionError("meleys radarr is down")
+        raise ClientError("radarr", "GET", "/api/v3/queue", None, "meleys radarr is down")
 
     ctx.services.radarr["meleys"].queue = down
     missing, bear, dune = (await request_status(ctx))["requests"]
     assert missing["title"] == "TMDB 999" and "couldn't look it up" in missing["error"]
     assert bear["percent"] == 75.0
-    assert dune["error"] == "couldn't reach Radarr on meleys: meleys radarr is down"
+    assert dune["error"] == (
+        "couldn't reach Radarr on meleys: radarr GET /api/v3/queue failed (None): "
+        "meleys radarr is down"
+    )
