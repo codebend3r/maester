@@ -1,4 +1,8 @@
 .shell {
+  // The side menu's padding and its links', which the logo lines up with.
+  --side-inline: var(--space-3);
+  --link-inline: var(--space-2);
+
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   grid-template-rows: auto 1fr;
@@ -8,10 +12,12 @@
   min-height: 100dvh;
 }
 
+// The mark starts where the side menu's icons do, so the page has one left
+// edge from the logo down.
 .header {
   grid-area: header;
   display: grid;
-  padding: var(--space-3) clamp(var(--space-3), 4vw, var(--space-6));
+  padding: var(--space-3) calc(var(--side-inline) + var(--link-inline));
   border-bottom: 1px solid var(--color-moss);
 }
 
@@ -30,7 +36,7 @@
     'dock';
   gap: var(--space-3);
   min-width: 11rem;
-  padding: var(--space-5) var(--space-3) var(--space-3);
+  padding: var(--space-5) var(--side-inline) var(--space-3);
   border-right: 1px solid var(--color-moss);
 }
 
@@ -59,7 +65,7 @@
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: var(--space-1);
-  padding: var(--space-1) var(--space-2);
+  padding: var(--space-1) var(--link-inline);
   border-radius: var(--radius-md);
   color: var(--color-lichen);
   font-weight: 600;
@@ -101,9 +107,10 @@
 
 // Down to its icons: each link keeps its name for screen readers and as a tooltip.
 .collapsed {
+  --side-inline: var(--space-1);
+
   .side {
     min-width: 0;
-    padding-inline: var(--space-1);
   }
 
   .navLink {
@@ -179,6 +186,11 @@
       'header'
       'side'
       'main';
+  }
+
+  // In line with the toggle that leads the menu row.
+  .header {
+    padding-inline: clamp(var(--space-3), 4vw, var(--space-6));
   }
 
   // One row across the top, the toggle first.
