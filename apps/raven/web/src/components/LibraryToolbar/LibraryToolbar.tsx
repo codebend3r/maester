@@ -43,8 +43,8 @@ const GROUPINGS: Record<MediaGroupBy, string> = {
 /**
  * Search, then how the library is ordered and laid out. Sort, view and
  * grouping are the library's own settings: `onChange` gets just the one that
- * changed. Group by shows only in the grouped view, Shuffle only with a
- * random sort.
+ * changed. Group by shows only in the grouped view. Play and Shuffle are
+ * always there, and wait until there is something to play.
  */
 export const LibraryToolbar = ({
   name,
@@ -52,6 +52,8 @@ export const LibraryToolbar = ({
   onSearch,
   settings,
   onChange,
+  playable,
+  onPlay,
   onShuffle,
 }: {
   name: string
@@ -59,6 +61,8 @@ export const LibraryToolbar = ({
   onSearch: (search: string) => void
   settings: LibrarySettings
   onChange: (change: Partial<LibrarySettings>) => void
+  playable: boolean
+  onPlay: () => void
   onShuffle: () => void
 }) => {
   const ids = { search: useId(), sort: useId(), group: useId() }
@@ -119,11 +123,14 @@ export const LibraryToolbar = ({
             </select>
           </div>
         )}
-        {settings.sort === 'random' && (
-          <Button icon="shuffle" onClick={onShuffle}>
+        <div className={styles.play}>
+          <Button tone="primary" icon="play" disabled={!playable} onClick={onPlay}>
+            Play
+          </Button>
+          <Button icon="shuffle" disabled={!playable} onClick={onShuffle}>
             Shuffle
           </Button>
-        )}
+        </div>
       </div>
 
       <fieldset className={styles.views}>

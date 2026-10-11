@@ -1,18 +1,19 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { Library, LibraryInput, LibrarySettings, MediaSort } from '@raven/core'
-import { Route, Routes } from 'react-router-dom'
+import type { Library, LibraryInput, LibrarySettings, MediaItem, MediaSort } from '@raven/core'
+import { Route, Routes, useParams } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { LibraryPage } from '@/pages/LibraryPage/LibraryPage'
 import { library, mediaItem } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 
-const ITEMS = [
-  mediaItem({ id: 1, title: 'Wide', width: 3840, height: 2160 }),
-  mediaItem({ id: 2, title: 'Full', width: 1920, height: 1080 }),
-  mediaItem({ id: 3, title: 'Also full', width: 1920, height: 800 }),
-]
+const WIDE = mediaItem({ id: 1, title: 'Wide', width: 3840, height: 2160 })
+const FULL = mediaItem({ id: 2, title: 'Full', width: 1920, height: 1080 })
+const ITEMS = [WIDE, FULL, mediaItem({ id: 3, title: 'Also full', width: 1920, height: 800 })]
+
+/** Stands in for the player: says which video the page went to. */
+const Watching = () => <p>Watching {useParams().id}</p>
 
 describe('LibraryPage', () => {
   const spies = {
@@ -26,14 +27,14 @@ describe('LibraryPage', () => {
   }
 
   /** Serves one library whose settings change as the page saves them. */
-  const serve = (settings: Partial<LibrarySettings> = {}) => {
+  const serve = (settings: Partial<LibrarySettings> = {}, items: MediaItem[] = ITEMS) => {
     const current: { library: Library } = {
       library: library({ id: 2, settings: { ...library().settings, ...settings } }),
     }
     spies.get.mockImplementation(async () => current.library)
     spies.list.mockImplementation(async (request) => {
       state.listed.push({ sort: request.sort, seed: request.seed })
-      return ITEMS
+      return items
     })
     spies.update.mockImplementation(async ({ input }) => {
       state.sent.push(input)
@@ -46,6 +47,7 @@ describe('LibraryPage', () => {
     renderWithProviders(
       <Routes>
         <Route path="libraries/:id" element={<LibraryPage />} />
+        <Route path="watch/:id" element={<Watching />} />
       </Routes>,
       { route: '/libraries/2' },
     )
@@ -97,12 +99,33 @@ describe('LibraryPage', () => {
     expect(state.sent.at(-1)?.settings).toEqual({ groupBy: 'codec' })
   })
 
-  it('deals a new random order when asked to shuffle again', async () => {
-    serve({ sort: 'random' })
+  it('plays the first video in the order shown', async () => {
+    serve({ sort: 'largest' })
     await screen.findByRole('link', { name: 'Wide' })
-    const first = state.listed.at(-1)?.seed
-    expect(first).toBeNumber()
+    await userEvent.click(screen.getByRole('button', { name: 'Play' }))
+    expect(await screen.findByText('Watching 1')).toBeInTheDocument()
+  })
+
+  it('plays the first video of the first bucket in the grouped view', async () => {
+    serve({ view: 'grouped' }, [FULL, WIDE])
+    await screen.findByRole('link', { name: 'Wide' })
+    await userEvent.click(screen.getByRole('button', { name: 'Play' }))
+    expect(await screen.findByText('Watching 1')).toBeInTheDocument()
+  })
+
+  it('shuffles to a random video whatever the sort', async () => {
+    serve({ sort: 'title' })
+    await screen.findByRole('link', { name: 'Wide' })
+    const random = spyOn(Math, 'random').mockReturnValue(0.9)
     await userEvent.click(screen.getByRole('button', { name: 'Shuffle' }))
-    expect(state.listed.at(-1)?.seed).not.toBe(first)
+    random.mockRestore()
+    expect(await screen.findByText('Watching 3')).toBeInTheDocument()
+  })
+
+  it('has nothing to play or shuffle in an empty library', async () => {
+    serve({}, [])
+    await screen.findByText(/No videos in these folders yet/)
+    expect(screen.getByRole('button', { name: 'Play' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Shuffle' })).toBeDisabled()
   })
 })

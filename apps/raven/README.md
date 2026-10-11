@@ -102,10 +102,12 @@ Each library keeps its own settings on the server, so every browser opens it the
 
 - **Save where each video stopped**, on by default: leave a video and come back to pick up where it stopped. Turned off, nothing new is saved and nothing resumes, but saved spots are kept for when it is turned back on.
 - **Pin to the side menu**, on by default: the library gets its own link under Favourites. Pin or unpin from the Libraries page, or in **Edit**.
-- **Sort**: title, recently or oldest added, largest or smallest file, highest or lowest bitrate, highest or lowest resolution (by pixel count), or random. Videos not yet probed go last. Random holds its order until **Shuffle** deals again, and each visit starts a fresh deal.
+- **Sort**: title, recently or oldest added, largest or smallest file, highest or lowest bitrate, highest or lowest resolution (by pixel count), or random. Videos not yet probed go last. Random holds its order while the page is open, and each visit starts a fresh deal.
 - **View**: a grid of cards, a list, tiles (rows with a small thumbnail), or grouped by resolution, video codec or month added.
 
 Sort, view and grouping are picked on the library page and saved as they change; the first two are in **Edit**. Changing a setting or the name never rescans; only a change of folders does.
+
+Beside the sort, **Play** starts the first video as the page shows it (the top of the first group in the grouped view) and **Shuffle** starts a random one, whatever the sort. Both keep to the search.
 
 ## Favourites and deleting
 

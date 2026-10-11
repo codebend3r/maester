@@ -31,6 +31,8 @@ const ToolbarDemo = () => {
       onSearch={setSearch}
       settings={settings}
       onChange={(change) => setSettings((current) => ({ ...current, ...change }))}
+      playable
+      onPlay={noop}
       onShuffle={noop}
     />
   )

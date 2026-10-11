@@ -5,9 +5,10 @@ import {
   type Library,
   type LibrarySettings,
   type MediaItem,
+  groupMedia,
 } from '@raven/core'
 import { useId, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { Button, ButtonLink } from '@/components/Button/Button'
 import { LibraryDialog } from '@/components/LibraryDialog/LibraryDialog'
 import { LibraryToolbar } from '@/components/LibraryToolbar/LibraryToolbar'
@@ -24,8 +25,22 @@ import styles from '@/pages/LibraryPage/LibraryPage.module.scss'
 
 const count = new Intl.NumberFormat()
 
-/** A fresh deal for a random sort; the order holds until the next one. */
+/** A fresh deal for a random sort; the order holds while the page is open. */
 const dealSeed = (): number => Math.floor(Math.random() * 2 ** 31)
+
+/** The video the page shows first: in the grouped view, the top of the first bucket. */
+const firstShown = ({
+  settings,
+  items,
+}: {
+  settings: LibrarySettings
+  items: MediaItem[]
+}): MediaItem | undefined =>
+  settings.view === 'grouped'
+    ? groupMedia({ items, by: settings.groupBy })
+        .flatMap((group) => group.items)
+        .at(0)
+    : items.at(0)
 
 /** The library's videos laid out the way its view setting says. */
 const MediaView = ({
@@ -49,8 +64,9 @@ export const LibraryPage = () => {
   const libraryId = Number(params.id)
   const ids = { title: useId() }
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const [search, setSearch] = useState('')
-  const [seed, setSeed] = useState(dealSeed)
+  const [seed] = useState(dealSeed)
   const [editing, setEditing] = useState(false)
   const query = useDebouncedValue({ value: search.trim(), delayMs: 200 })
 
@@ -126,6 +142,12 @@ export const LibraryPage = () => {
     return 'No videos in these folders yet. Check the paths, or add a folder that holds videos.'
   })()
 
+  // The item rides along in router state, as a card click hands it over, so
+  // the player starts without fetching it again.
+  const watch = (item: MediaItem | undefined) => {
+    if (item) navigate(`/watch/${item.id}`, { state: { media: item } })
+  }
+
   return (
     <section className={styles.page} aria-labelledby={ids.title}>
       <ButtonLink to="/" icon="back" className={styles.back}>
@@ -164,7 +186,9 @@ export const LibraryPage = () => {
         onChange={(change) => {
           if (library.data) saveSettings.mutate({ current: library.data, change })
         }}
-        onShuffle={() => setSeed((current) => (current + 1 + dealSeed()) % 2 ** 31)}
+        playable={items.length > 0}
+        onPlay={() => watch(firstShown({ settings, items }))}
+        onShuffle={() => watch(items.at(Math.floor(Math.random() * items.length)))}
       />
 
       {saveSettings.isError && (

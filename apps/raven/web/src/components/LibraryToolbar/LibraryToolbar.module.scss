@@ -30,6 +30,13 @@
   align-items: center;
 }
 
+.play {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  gap: var(--space-1);
+}
+
 .label {
   color: var(--color-lichen);
   font-size: var(--font-size-sm);
