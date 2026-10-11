@@ -35,7 +35,11 @@ const rangesFrom = (ranges: Array<[number, number]>) => ({
  */
 const fakeBuffer = () => {
   const events = listeners()
-  const state = { ranges: [] as Array<[number, number]>, updating: false, appended: 0 }
+  const state: { ranges: Array<[number, number]>; updating: boolean; appended: number } = {
+    ranges: [],
+    updating: false,
+    appended: 0,
+  }
   const finish = () =>
     queueMicrotask(() => {
       state.updating = false

@@ -1,8 +1,9 @@
-import { type MediaTracks, type PlaybackMode, describeMode } from '@raven/core'
+import { type PlaybackMode, describeMode } from '@raven/core'
 import { type RefObject, useEffect, useId, useRef } from 'react'
 import { Icon } from '@/components/Icon/Icon'
 import styles from '@/components/Player/SettingsMenu.module.scss'
 import type { SubtitleStatus } from '@/components/Player/useSubtitleCues'
+import type { TrackSelection } from '@/components/Player/useTrackSelection'
 import { SPEEDS } from '@/lib/shortcuts'
 import { audioLabel, subtitleLabel } from '@/lib/trackLabels'
 
@@ -49,32 +50,22 @@ const Option = ({
  */
 export const SettingsMenu = ({
   menuRef,
-  tracks,
-  tracksFailed,
-  audio,
-  subtitleId,
+  selection: { tracks, tracksFailed, audio, subtitle, pickAudio, pickSubtitle },
   subtitleStatus,
   rate,
   mode,
-  onPickAudio,
-  onPickSubtitle,
   onPickRate,
   onClose,
 }: {
   menuRef: RefObject<HTMLDialogElement | null>
-  tracks: MediaTracks | null
-  tracksFailed: boolean
-  /** The playing track's `0:a:N` index, or null for the default. */
-  audio: number | null
-  subtitleId: string | null
+  selection: TrackSelection
   subtitleStatus: SubtitleStatus
   rate: number
   mode: PlaybackMode
-  onPickAudio: (index: number) => void
-  onPickSubtitle: (id: string | null) => void
   onPickRate: (rate: number) => void
   onClose: () => void
 }) => {
+  const subtitleId = subtitle?.id ?? null
   const id = useId()
   const heading = `${id}-heading`
   const first = useRef<HTMLFieldSetElement>(null)
@@ -119,7 +110,7 @@ export const SettingsMenu = ({
                     checked={track.index === playingAudio}
                     label={label.name}
                     details={label.details}
-                    onSelect={() => onPickAudio(track.index)}
+                    onSelect={() => pickAudio(track.index)}
                   />
                 )
               })
@@ -133,7 +124,7 @@ export const SettingsMenu = ({
               name={`${id}-subtitles`}
               checked={subtitleId == null}
               label="Off"
-              onSelect={() => onPickSubtitle(null)}
+              onSelect={() => pickSubtitle(null)}
             />
             {(tracks?.subtitles ?? []).map((track) => {
               const label = subtitleLabel(track)
@@ -145,7 +136,7 @@ export const SettingsMenu = ({
                   disabled={!track.supported}
                   label={label.name}
                   details={label.details}
-                  onSelect={() => onPickSubtitle(track.id)}
+                  onSelect={() => pickSubtitle(track.id)}
                 />
               )
             })}

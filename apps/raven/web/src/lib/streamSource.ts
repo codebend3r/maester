@@ -55,14 +55,30 @@ export type StreamResponse = {
   body: ReadableStream<Uint8Array<ArrayBuffer>> | null
 }
 
-export type StreamEnvironment = {
-  createMediaSource: () => MediaSourceLike | null
+/**
+ * Where the media source comes from and how the video is pointed at it. The
+ * environment is made for one video, so `attach` needs only the source, of
+ * the very type `createMediaSource` made.
+ */
+export type StreamEnvironment<S extends MediaSourceLike = MediaSourceLike> = {
+  createMediaSource: () => S | null
   /** Points the video at the source; the returned function lets go of it again. */
-  attach: ({ video, source }: { video: VideoLike; source: MediaSourceLike }) => () => void
+  attach: (source: S) => () => void
   fetch: (url: string, init: { signal: AbortSignal }) => Promise<StreamResponse>
 }
 
 export type StreamSession = { destroy: () => void }
+
+type SessionState = {
+  /** Bumped by every new stream and by destroy, so stale work can tell it is stale. */
+  generation: number
+  destroyed: boolean
+  controller: AbortController | null
+  buffer: SourceBufferLike | null
+  /** File time the running stream started at, while one runs. */
+  streamingFrom: number | null
+  detach: () => void
+}
 
 /** Stop reading while this much is buffered ahead of the playhead. */
 const MAX_AHEAD_SECONDS = 60
@@ -118,14 +134,13 @@ const isQuotaError = (error: unknown): boolean =>
 
 const isAbort = (error: unknown): boolean => error instanceof Error && error.name === 'AbortError'
 
-/** The browser's own Media Source Extensions, managed (iOS Safari) or classic. */
-const browserEnvironment = (): StreamEnvironment => ({
+/** The browser's own Media Source Extensions, managed (iOS Safari) or classic, for `video`. */
+export const browserEnvironment = (video: HTMLVideoElement): StreamEnvironment<MediaSource> => ({
   createMediaSource: () => {
     const Source = window.ManagedMediaSource ?? window.MediaSource
     return Source ? new Source() : null
   },
-  attach: ({ video, source }) => {
-    if (!(video instanceof HTMLVideoElement) || !(source instanceof MediaSource)) return () => {}
+  attach: (source) => {
     // ManagedMediaSource only opens when AirPlay is off or has its own source.
     video.disableRemotePlayback = true
     const url = URL.createObjectURL(source)
@@ -143,14 +158,14 @@ const browserEnvironment = (): StreamEnvironment => ({
   fetch: (url, init) => window.fetch(url, init),
 })
 
-export const createStreamSession = ({
+export const createStreamSession = <S extends MediaSourceLike>({
   video,
   mime,
   duration,
   start,
   url,
   onError,
-  environment = browserEnvironment(),
+  environment,
 }: {
   video: VideoLike
   mime: string
@@ -160,15 +175,14 @@ export const createStreamSession = ({
   start: number
   url: (start: number) => string
   onError: (message: string) => void
-  environment?: StreamEnvironment
+  environment: StreamEnvironment<S>
 }): StreamSession => {
-  const state = {
+  const state: SessionState = {
     generation: 0,
     destroyed: false,
-    controller: null as AbortController | null,
-    buffer: null as SourceBufferLike | null,
-    /** File time the running stream started at, while one runs. */
-    streamingFrom: null as number | null,
+    controller: null,
+    buffer: null,
+    streamingFrom: null,
     detach: () => {},
   }
   const source = environment.createMediaSource()
@@ -333,7 +347,7 @@ export const createStreamSession = ({
     queueMicrotask(() => fail("This browser can't play converted video."))
   } else {
     source.addEventListener('sourceopen', onOpen)
-    state.detach = environment.attach({ video, source })
+    state.detach = environment.attach(source)
   }
 
   return {
