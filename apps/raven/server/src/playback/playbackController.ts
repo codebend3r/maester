@@ -11,7 +11,7 @@ import {
   Query,
   Res,
 } from '@nestjs/common'
-import { type MediaTracks, STREAM_TIME_SHIFT, type StreamMode } from '@raven/core'
+import { type MediaTracks, STREAM_TIME_SHIFT, isStreamMode } from '@raven/core'
 import type { FastifyReply } from 'fastify'
 import { streamArgs } from '@/ffmpeg/args'
 import { SOFTWARE } from '@/ffmpeg/encoder'
@@ -21,17 +21,7 @@ import { SettingsRepository } from '@/settings/settingsRepository'
 import { type MediaFile, MediaIndex } from '@/media/mediaIndex'
 import { SubtitlesService } from '@/playback/subtitlesService'
 import { TracksService } from '@/playback/tracksService'
-
-const STREAM_MODES: readonly StreamMode[] = ['remux', 'transcode']
-
-const isStreamMode = (value: unknown): value is StreamMode =>
-  STREAM_MODES.some((mode) => mode === value)
-
-/** A query value as a whole number at or above zero, or null when it is not one. */
-const wholeNumber = (value: string | undefined): number | null => {
-  const parsed = Number(value)
-  return value != null && value !== '' && Number.isInteger(parsed) && parsed >= 0 ? parsed : null
-}
+import { wholeNumber } from '@/wholeNumber'
 
 /**
  * What a player needs beyond the file itself: the tracks to choose from,

@@ -2,6 +2,7 @@ import {
   type LibraryKind,
   type MatchState,
   isExtra,
+  isMatchedKind,
   parseEpisodeName,
   parseMovieName,
   titleFromFileName,
@@ -17,7 +18,7 @@ export const namedAs = ({
   fileName: string
   folder: string
 }): { title: string; year: number | null; edition: string | null; match: MatchState } => {
-  if (kind === 'other' || isExtra({ fileName, folder })) {
+  if (!isMatchedKind(kind) || isExtra({ fileName, folder })) {
     return { title: titleFromFileName(fileName), year: null, edition: null, match: 'off' }
   }
   if (kind === 'movies') {

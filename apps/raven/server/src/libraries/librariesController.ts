@@ -19,9 +19,11 @@ import {
   type Library,
   type LibraryInput,
   type MediaItem,
-  type MediaSort,
+  type MediaListParams,
   type ShowListing,
-  isMediaSort,
+  isMatchedKind,
+  isRecord,
+  mediaListQuery,
   validateLibraryInput,
 } from '@raven/core'
 import { type LibraryRecord, LibrariesRepository, samePaths } from '@/libraries/librariesRepository'
@@ -31,7 +33,7 @@ import { MediaArtifacts } from '@/media/mediaArtifacts'
 import { MediaIndex } from '@/media/mediaIndex'
 import { MediaRepository } from '@/media/mediaRepository'
 import { ViewingRepository } from '@/media/viewingRepository'
-import { MATCHED_KINDS, MetadataService } from '@/metadata/metadataService'
+import { MetadataService } from '@/metadata/metadataService'
 import { LibraryWatcher } from '@/scanner/libraryWatcher'
 import { ScannerService } from '@/scanner/scannerService'
 
@@ -40,6 +42,10 @@ const parseInput = (body: unknown): LibraryInput => {
   if (!result.ok) throw new BadRequestException(result.errors)
   return result.value
 }
+
+/** A listing's search, sort and seed, read as the client's `mediaListQuery.encode` wrote them. */
+const listParams = (query: unknown): MediaListParams =>
+  mediaListQuery.decode(isRecord(query) ? query : {})
 
 /** How many history entries a request gets unless it asks, and the most it may ask for. */
 const HISTORY_LIMIT = { fallback: 100, most: 500 }
@@ -157,7 +163,7 @@ export class LibrariesController {
   @HttpCode(200)
   rematch(@Param('id', ParseIntPipe) id: number): Library {
     const record = this.find(id)
-    if (!MATCHED_KINDS.includes(record.settings.kind)) {
+    if (!isMatchedKind(record.settings.kind)) {
       throw new BadRequestException('Only a Movies or TV shows library is matched.')
     }
     if (this.metadata.health().tmdb === 'off') {
@@ -185,41 +191,18 @@ export class LibrariesController {
 
   /** A TV shows library as its shows, with the files no show was found for after. */
   @Get(':id/shows')
-  listShows(
-    @Param('id', ParseIntPipe) id: number,
-    @Query('q') search?: string,
-    @Query('sort') sort?: string,
-    @Query('seed') seed?: string,
-  ): ShowListing {
+  listShows(@Param('id', ParseIntPipe) id: number, @Query() query: unknown): ShowListing {
     this.find(id)
-    const order: MediaSort = isMediaSort(sort) ? sort : 'title'
-    const dealt = Number.parseInt(seed ?? '', 10)
+    const params = listParams(query)
     return {
-      shows: this.media.listShows({
-        libraryId: id,
-        search: search ?? '',
-        sort: order,
-        seed: Number.isInteger(dealt) ? dealt : 0,
-      }),
-      unmatched: this.media.listUnmatched({ libraryId: id, search: search ?? '' }),
+      shows: this.media.listShows({ libraryId: id, ...params }),
+      unmatched: this.media.listUnmatched({ libraryId: id, search: params.search }),
     }
   }
 
   @Get(':id/media')
-  listMedia(
-    @Param('id', ParseIntPipe) id: number,
-    @Query('q') search?: string,
-    @Query('sort') sort?: string,
-    @Query('seed') seed?: string,
-  ): MediaItem[] {
+  listMedia(@Param('id', ParseIntPipe) id: number, @Query() query: unknown): MediaItem[] {
     this.find(id)
-    const order: MediaSort = isMediaSort(sort) ? sort : 'title'
-    const dealt = Number.parseInt(seed ?? '', 10)
-    return this.media.list({
-      libraryId: id,
-      search: search ?? '',
-      sort: order,
-      seed: Number.isInteger(dealt) ? dealt : 0,
-    })
+    return this.media.list({ libraryId: id, ...listParams(query) })
   }
 }

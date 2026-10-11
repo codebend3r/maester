@@ -1,7 +1,6 @@
 import { createReadStream } from 'node:fs'
 import { stat, unlink } from 'node:fs/promises'
 import {
-  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -23,7 +22,8 @@ import {
   type MediaItem,
   type MediaLocation,
   containerMimeType,
-  isNumber,
+  isFavouriteChange,
+  isProgressChange,
   isRecord,
   isString,
 } from '@raven/core'
@@ -35,6 +35,7 @@ import { type MediaFile, MediaIndex } from '@/media/mediaIndex'
 import { MediaRepository } from '@/media/mediaRepository'
 import { parseRange } from '@/media/range'
 import { ViewingRepository } from '@/media/viewingRepository'
+import { parseBody } from '@/parseBody'
 import { ScannerService } from '@/scanner/scannerService'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
 
@@ -100,10 +101,12 @@ export class MediaController {
   @Put(':id/progress')
   @HttpCode(204)
   saveProgress(@Param('id', ParseIntPipe) id: number, @Body() body: unknown): void {
-    if (!isRecord(body) || !isNumber(body.position) || body.position < 0) {
-      throw new BadRequestException('position must be a number of seconds')
-    }
-    if (!this.viewing.report({ id, position: body.position })) {
+    const { position } = parseBody({
+      guard: isProgressChange,
+      body,
+      message: 'position must be a number of seconds',
+    })
+    if (!this.viewing.report({ id, position })) {
       throw new NotFoundException(`No media ${id}`)
     }
   }
@@ -117,10 +120,12 @@ export class MediaController {
 
   @Put(':id/favourite')
   setFavourite(@Param('id', ParseIntPipe) id: number, @Body() body: unknown): MediaItem {
-    if (!isRecord(body) || typeof body.favourite !== 'boolean') {
-      throw new BadRequestException('favourite must be true or false')
-    }
-    if (!this.viewing.setFavourite({ id, favourite: body.favourite })) {
+    const { favourite } = parseBody({
+      guard: isFavouriteChange,
+      body,
+      message: 'favourite must be true or false',
+    })
+    if (!this.viewing.setFavourite({ id, favourite })) {
       throw new NotFoundException(`No media ${id}`)
     }
     return this.find(id)

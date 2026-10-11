@@ -1,3 +1,5 @@
+import type { HwAccel } from '@raven/core'
+
 /**
  * How transcodes encode video: on the CPU with libx264, or on a GPU. VAAPI
  * drives an Intel or AMD GPU on Linux through its render node; VideoToolbox
@@ -7,14 +9,6 @@ export type VideoEncoder =
   | { kind: 'software' }
   | { kind: 'videotoolbox' }
   | { kind: 'vaapi'; device: string }
-
-/** The HW_ACCEL setting: `auto` tries what this machine has; `none` keeps to the CPU. */
-export type HwAccel = 'auto' | 'none' | 'vaapi' | 'videotoolbox'
-
-const HW_ACCELS: readonly HwAccel[] = ['auto', 'none', 'vaapi', 'videotoolbox']
-
-export const isHwAccel = (value: unknown): value is HwAccel =>
-  HW_ACCELS.some((accel) => accel === value)
 
 export const SOFTWARE: VideoEncoder = { kind: 'software' }
 

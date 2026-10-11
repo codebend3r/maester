@@ -1,6 +1,7 @@
-import { BadRequestException, Body, Controller, Get, Inject, Put } from '@nestjs/common'
+import { Body, Controller, Get, Inject, Put } from '@nestjs/common'
 import { type PlaybackSettingsState, isPlaybackSettingsChange } from '@raven/core'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
+import { parseBody } from '@/parseBody'
 import { SettingsRepository } from '@/settings/settingsRepository'
 
 /** Settings that hold for every viewer: how video is played. */
@@ -30,11 +31,13 @@ export class SettingsController {
   /** Changes the fields sent; a new choice of hardware takes effect on the next transcode. */
   @Put('playback')
   async setPlayback(@Body() body: unknown): Promise<PlaybackSettingsState> {
-    if (!isPlaybackSettingsChange(body)) {
-      throw new BadRequestException('Each setting must be one of the values it takes.')
-    }
+    const change = parseBody({
+      guard: isPlaybackSettingsChange,
+      body,
+      message: 'Each setting must be one of the values it takes.',
+    })
     const before = this.settings.playback()
-    const after = this.settings.setPlayback(body)
+    const after = this.settings.setPlayback(change)
     if (after.hwAccel !== before.hwAccel) this.ffmpeg.resetEncoder()
     return this.state()
   }

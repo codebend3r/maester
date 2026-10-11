@@ -3,8 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { readServerConfig } from '@/config'
-import type { HwAccel } from '@/ffmpeg/encoder'
-import { DEFAULT_PLAYBACK_SETTINGS } from '@raven/core'
+import { DEFAULT_PLAYBACK_SETTINGS, type HwAccel } from '@raven/core'
 import { FfmpegService, FfmpegTimeoutError } from '@/ffmpeg/ffmpegService'
 
 describe('FfmpegService', () => {
