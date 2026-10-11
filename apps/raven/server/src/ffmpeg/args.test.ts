@@ -151,13 +151,20 @@ describe('subtitle args', () => {
     expect(args.slice(args.indexOf('-ss'), args.indexOf('-i'))).toEqual([
       '-ss',
       '590',
-      '-t',
-      '310',
       '-copyts',
       '-start_at_zero',
     ])
-    expect(args).toContain('0:s:1')
-    expect(args.slice(-3)).toEqual(['-f', 'webvtt', '/s/x.vtt'])
+    expect(args).not.toContain('-t')
+    // The end is an absolute position on the output side, so the read stops there.
+    expect(args.slice(args.indexOf('-map'))).toEqual([
+      '-map',
+      '0:s:1',
+      '-to',
+      '900',
+      '-f',
+      'webvtt',
+      '/s/x.vtt',
+    ])
   })
 
   it('converts a sidecar, optionally from another character set', () => {
