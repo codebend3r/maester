@@ -9,11 +9,13 @@ import {
   isMatchCandidateList,
   isMediaItem,
   isMediaList,
+  isMediaLocation,
   isMediaTracks,
   isMetadataHealth,
   isPersonDetails,
   isPlaybackSettingsState,
   isRecord,
+  isServerEvent,
   isShowListing,
   isString,
   isStringArray,
@@ -34,12 +36,14 @@ import type {
   LibraryInput,
   MatchCandidate,
   MediaItem,
+  MediaLocation,
   MediaSort,
   MediaTracks,
   MetadataHealth,
   PersonDetails,
   PlaybackSettings,
   PlaybackSettingsState,
+  ServerEvent,
   ShowListing,
   StreamMode,
   SubtitleCue,
@@ -87,6 +91,16 @@ const errorMessage = ({ body, fallback }: { body: unknown; fallback: string }): 
 const readJson = async (response: FetchResponse): Promise<unknown> => {
   try {
     return await response.json()
+  } catch {
+    return null
+  }
+}
+
+/** One message off the server's event stream, or null for anything this client does not know. */
+export const parseServerEvent = (data: string): ServerEvent | null => {
+  try {
+    const parsed: unknown = JSON.parse(data)
+    return isServerEvent(parsed) ? parsed : null
   } catch {
     return null
   }
@@ -232,6 +246,10 @@ export const createApiClient = ({
 
     getMedia: (id: number): Promise<MediaItem> =>
       expect({ request: send({ path: `/api/media/${id}` }), guard: isMediaItem }),
+
+    /** Where the video's file lives; listings leave the path out. */
+    getMediaLocation: (id: number): Promise<MediaLocation> =>
+      expect({ request: send({ path: `/api/media/${id}/location` }), guard: isMediaLocation }),
 
     saveProgress: async ({ id, position }: { id: number; position: number }): Promise<void> => {
       await send({ path: `/api/media/${id}/progress`, method: 'PUT', body: { position } })
@@ -510,6 +528,9 @@ export const createApiClient = ({
 
     /** The original file, served with byte ranges: what a player loads for direct play. */
     fileUrl: (mediaId: number): string => url(`/api/media/${mediaId}/file`),
+
+    /** The server's event stream: `ServerEvent`s, read with `parseServerEvent`. */
+    eventsUrl: (): string => url('/api/events'),
 
     /** The audio and subtitle tracks a player can choose between. */
     getTracks: (id: number): Promise<MediaTracks> =>

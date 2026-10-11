@@ -4,6 +4,7 @@ import '@testing-library/jest-dom'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
 import { useSideMenu } from '@/stores/sideMenu'
 import { resetBrowserSupport } from '@/test/canPlay'
+import { FakeEventSource } from '@/test/eventSource'
 
 const initialPrefs = usePlayerPrefs.getInitialState()
 const initialSideMenu = useSideMenu.getInitialState()
@@ -14,4 +15,5 @@ afterEach(() => {
   usePlayerPrefs.setState(initialPrefs, true)
   useSideMenu.setState(initialSideMenu, true)
   resetBrowserSupport()
+  FakeEventSource.opened = []
 })

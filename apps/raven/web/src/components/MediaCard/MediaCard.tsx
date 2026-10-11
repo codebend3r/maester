@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { MatchType } from '@/components/FixMatchDialog/FixMatchDialog'
 import { Icon } from '@/components/Icon/Icon'
-import { MediaMenu } from '@/components/MediaMenu/MediaMenu'
+import { MENU_HOST, MediaMenu } from '@/components/MediaMenu/MediaMenu'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
 import { api } from '@/lib/api'
 import { progressOf } from '@/lib/mediaProgress'
@@ -33,7 +33,7 @@ export const MediaCard = ({
   ].filter((fact): fact is string => fact != null)
 
   return (
-    <li className={styles.card}>
+    <li className={`${styles.card} ${MENU_HOST}`}>
       <Link
         to={`/watch/${media.id}`}
         state={{ media }}

@@ -1,12 +1,21 @@
-import type { UseMutationResult } from '@tanstack/react-query'
+import { type UseMutationResult, useQuery } from '@tanstack/react-query'
 import { type MediaItem, mediaLabel } from '@raven/core'
-import { type KeyboardEvent, useEffect, useId, useRef, useState } from 'react'
+import { Fragment, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react'
 import { Button } from '@/components/Button/Button'
 import { FixMatchDialog, type MatchType } from '@/components/FixMatchDialog/FixMatchDialog'
 import { Icon, type IconName } from '@/components/Icon/Icon'
 import { api } from '@/lib/api'
+import { copyText } from '@/lib/clipboard'
+import { queryKeys } from '@/lib/queryClient'
 import { useMediaMutations } from '@/lib/useMediaMutations'
 import styles from '@/components/MediaMenu/MediaMenu.module.scss'
+
+/**
+ * The class for a card, row or tile holding a menu: there the menu's button
+ * stays out of sight until the pointer or focus comes in. Elsewhere, as on a
+ * movie's page, it is always there.
+ */
+export const MENU_HOST = styles.host
 
 /** Deleting is the one action here that cannot be undone, so it asks first. */
 const ConfirmDelete = ({
@@ -80,10 +89,53 @@ const MenuItem = ({
   </li>
 )
 
+/** A path that wraps after a slash rather than in the middle of a name. */
+const WrappingPath = ({ path }: { path: string }) =>
+  path.split('/').map((part, index, parts) => (
+    <Fragment key={parts.slice(0, index + 1).join('/')}>
+      {index > 0 && (
+        <>
+          /<wbr />
+        </>
+      )}
+      {part}
+    </Fragment>
+  ))
+
+/**
+ * Where the file lives, read each time the menu opens, since a rename moves
+ * it; choosing it copies the path.
+ */
+const LocationItem = ({ media }: { media: MediaItem }) => {
+  const [copied, setCopied] = useState(false)
+  const location = useQuery({
+    queryKey: queryKeys.mediaLocation(media.id),
+    queryFn: () => api.getMediaLocation(media.id),
+    staleTime: 0,
+  })
+  const path = location.data?.path ?? null
+  const waiting = location.isError ? location.error.message : 'Finding the file'
+  return (
+    <li role="none" className={styles.location}>
+      <button
+        type="button"
+        role="menuitem"
+        className={`${styles.item} ${styles.locationItem}`}
+        aria-disabled={path == null}
+        onClick={async () => setCopied(path != null && (await copyText(path)))}
+      >
+        <Icon name="copy" size={16} />
+        <span className={styles.locationLabel}>{copied ? 'Copied' : 'Copy file path'}</span>
+        <span className={styles.path}>{path ? <WrappingPath path={path} /> : waiting}</span>
+      </button>
+    </li>
+  )
+}
+
 /**
  * A card's context menu: mark or unmark a favourite, fix the match or fetch
- * the details again where the library matches its files, or delete the
- * video. The card owns `open`, so a right click anywhere on it opens this
+ * the details again where the library matches its files, delete the video,
+ * or see and copy where its file lives. The card owns `open`, so a right click anywhere on it opens this
  * same menu; the button here is the discoverable way in for touch and
  * keyboard.
  */
@@ -223,6 +275,7 @@ export const MediaMenu = ({
               setConfirming(true)
             }}
           />
+          <LocationItem media={media} />
         </ul>
       )}
 

@@ -29,11 +29,48 @@
   background: var(--color-scrim);
   color: var(--color-bark);
   cursor: pointer;
-  transition: background-color 120ms ease-out;
 
   &:hover,
   &[aria-expanded='true'] {
     background: var(--color-moss);
+  }
+}
+
+// In a card, row or tile the button waits out of sight for the pointer or
+// focus. A touch screen has no hover to bring it, so there it stays.
+@media (hover: hover) {
+  .host .trigger {
+    opacity: 0;
+    scale: 0.85;
+  }
+
+  .host:hover .trigger,
+  .host:focus-within .trigger,
+  .trigger[aria-expanded='true'] {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .trigger {
+    transition:
+      opacity 120ms ease-out,
+      scale 120ms ease-out,
+      background-color 120ms ease-out;
+  }
+
+  .list {
+    transform-origin: top right;
+    animation: menu-in 120ms ease-out;
+  }
+}
+
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    scale: 0.96;
+    translate: 0 calc(-1 * var(--space-0));
   }
 }
 
@@ -44,7 +81,10 @@
   z-index: 1;
   display: grid;
   gap: 2px;
+  // As wide as its longest line, so a file's path reads in a few lines.
+  width: max-content;
   min-width: 12rem;
+  max-width: min(24rem, calc(100vw - 2 * var(--space-3)));
   padding: var(--space-0);
   border: 1px solid var(--color-moss);
   border-radius: var(--radius-md);
@@ -77,6 +117,44 @@
   &:focus-visible {
     outline-offset: -2px;
   }
+}
+
+// The file's path closes the menu, set off by a rule, under its own label.
+.location {
+  display: grid;
+  padding-top: var(--space-0);
+  border-top: 1px solid var(--color-moss);
+}
+
+.locationItem {
+  grid-auto-flow: row;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    'icon label'
+    'path path';
+  row-gap: var(--space-0);
+  white-space: normal;
+
+  &[aria-disabled='true'] {
+    cursor: default;
+  }
+
+  > svg {
+    grid-area: icon;
+  }
+}
+
+.locationLabel {
+  grid-area: label;
+}
+
+.path {
+  grid-area: path;
+  color: var(--color-lichen);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  font-weight: 400;
+  overflow-wrap: anywhere;
 }
 
 .dialog {

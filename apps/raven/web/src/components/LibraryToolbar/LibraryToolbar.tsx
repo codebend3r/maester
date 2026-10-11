@@ -18,6 +18,7 @@ const SORTS: Record<MediaSort, string> = {
   title: 'Title',
   added: 'Recently added',
   oldest: 'Oldest added',
+  changed: 'Recently changed',
   largest: 'Largest file',
   smallest: 'Smallest file',
   'bitrate-high': 'Highest bitrate',

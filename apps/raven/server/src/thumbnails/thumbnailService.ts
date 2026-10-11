@@ -3,6 +3,7 @@ import { rename, rm, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Inject, Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
+import { errorMessage } from '@/errorMessage'
 import { thumbnailArgs, thumbnailSeek } from '@/ffmpeg/args'
 import { FfmpegService, FfmpegTimeoutError } from '@/ffmpeg/ffmpegService'
 import { MediaRepository } from '@/media/mediaRepository'
@@ -108,9 +109,7 @@ export class ThumbnailService implements OnApplicationBootstrap {
     } catch (error) {
       // A slow share is not a broken file: leave it pending for the next scan.
       const retryLater = error instanceof FfmpegTimeoutError
-      this.logger.warn(
-        `No thumbnail for ${record.fileName}: ${error instanceof Error ? error.message : String(error)}`,
-      )
+      this.logger.warn(`No thumbnail for ${record.fileName}: ${errorMessage(error)}`)
       this.media.setThumbnail({ id, state: retryLater ? 'pending' : 'failed' })
     }
   }

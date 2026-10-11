@@ -24,10 +24,11 @@ import {
   isMediaSort,
   validateLibraryInput,
 } from '@raven/core'
-import { type LibraryRecord, LibrariesRepository } from '@/libraries/librariesRepository'
+import { type LibraryRecord, LibrariesRepository, samePaths } from '@/libraries/librariesRepository'
 import { MediaRepository, toMediaItem } from '@/media/mediaRepository'
 import { MATCHED_KINDS, MetadataService } from '@/metadata/metadataService'
 import { SubtitlesService } from '@/playback/subtitlesService'
+import { LibraryWatcher } from '@/scanner/libraryWatcher'
 import { ScannerService } from '@/scanner/scannerService'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
 
@@ -47,9 +48,6 @@ const historyLimit = (asked: string | undefined): number => {
     : HISTORY_LIMIT.fallback
 }
 
-const samePaths = (a: readonly string[], b: readonly string[]): boolean =>
-  a.length === b.length && a.every((path, index) => path === b[index])
-
 @Controller('api/libraries')
 export class LibrariesController {
   constructor(
@@ -59,6 +57,7 @@ export class LibrariesController {
     @Inject(ThumbnailService) private readonly thumbnails: ThumbnailService,
     @Inject(SubtitlesService) private readonly subtitles: SubtitlesService,
     @Inject(MetadataService) private readonly metadata: MetadataService,
+    @Inject(LibraryWatcher) private readonly watcher: LibraryWatcher,
   ) {}
 
   private withStatus(record: LibraryRecord): Library {
@@ -86,6 +85,7 @@ export class LibrariesController {
   create(@Body() body: unknown): Library {
     const record = this.libraries.create(parseInput(body))
     this.scanner.scan(record.id)
+    this.watcher.sync()
     return this.withStatus(record)
   }
 
@@ -102,7 +102,8 @@ export class LibrariesController {
     if (before.settings.kind !== record.settings.kind) {
       this.metadata.changeKind({ libraryId: id, kind: record.settings.kind })
     }
-    if (!samePaths(before.paths, record.paths)) this.scanner.scan(id)
+    if (!samePaths({ before: before.paths, after: record.paths })) this.scanner.scan(id)
+    this.watcher.sync()
     return this.withStatus(record)
   }
 
@@ -115,6 +116,7 @@ export class LibrariesController {
     await this.thumbnails.discard(ids)
     await this.subtitles.discard(ids)
     this.libraries.remove(id)
+    this.watcher.sync()
     this.scanner.forget(id)
     // The pass finds no library, and clears up the items it left.
     this.metadata.enqueue(id)

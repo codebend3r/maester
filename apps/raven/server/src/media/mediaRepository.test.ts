@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { readServerConfig } from '@/config'
 import { DatabaseService } from '@/db/database'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
+import { MediaIndex } from '@/media/mediaIndex'
 import { MediaRepository } from '@/media/mediaRepository'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 
@@ -49,6 +50,10 @@ describe('listing a library', () => {
     if (!state.media) throw new Error('not set up')
     return state.media
   }
+  const index = (): MediaIndex => {
+    if (!state.database) throw new Error('not set up')
+    return new MediaIndex(state.database)
+  }
   const titles = ({ sort, seed }: { sort: MediaSort; seed?: number }): string[] =>
     media()
       .list({ libraryId: state.libraryId, sort, seed })
@@ -61,7 +66,7 @@ describe('listing a library', () => {
     state.media = new MediaRepository(database, new MetadataRepository(database))
     state.libraryId = new LibrariesRepository(database).create({ name: 'Test', paths: ['/m'] }).id
     VIDEOS.forEach((video) => {
-      const id = media().insert({
+      const id = index().insert({
         libraryId: state.libraryId,
         kind: 'other',
         file: { path: `/m/${video.name}.mp4`, root: '/m', size: video.size, mtimeMs: 1 },
@@ -126,6 +131,10 @@ describe('stored tracks', () => {
     if (!state.media) throw new Error('not set up')
     return state.media
   }
+  const index = (): MediaIndex => {
+    if (!state.database) throw new Error('not set up')
+    return new MediaIndex(state.database)
+  }
   const TRACKS = {
     audio: [{ index: 0, codec: 'aac', language: 'eng', title: null, channels: 2, default: true }],
     subtitles: [],
@@ -144,7 +153,7 @@ describe('stored tracks', () => {
     bitrate: 5_000_000,
   }
   const add = (name: string): number =>
-    media().insert({
+    index().insert({
       libraryId: state.libraryId,
       kind: 'other',
       file: { path: `/m/${name}.mp4`, root: '/m', size: 100, mtimeMs: 1 },
@@ -167,7 +176,7 @@ describe('stored tracks', () => {
     const id = add('kept')
     media().saveProbe({ id, probe: PROBE, tracks: TRACKS })
     expect(media().storedTracks(id)).toEqual(TRACKS)
-    media().markChanged({ id, size: 200, mtimeMs: 2 })
+    index().markChanged({ id, size: 200, mtimeMs: 2 })
     expect(media().storedTracks(id)).toBeNull()
   })
 
@@ -192,6 +201,10 @@ describe('play history', () => {
   const media = (): MediaRepository => {
     if (!state.media) throw new Error('not set up')
     return state.media
+  }
+  const index = (): MediaIndex => {
+    if (!state.database) throw new Error('not set up')
+    return new MediaIndex(state.database)
   }
   const libraries = (): LibrariesRepository => {
     if (!state.database) throw new Error('not set up')
@@ -223,7 +236,7 @@ describe('play history', () => {
       .history({ libraryId, limit: 100, watchedOnly: true })
       .map((entry) => entry.record.id)
   const add = ({ libraryId, name }: { libraryId: number; name: string }): number =>
-    media().insert({
+    index().insert({
       libraryId,
       kind: 'other',
       file: { path: `/${libraryId}/${name}.mp4`, root: `/${libraryId}`, size: 100, mtimeMs: 1 },

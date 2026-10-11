@@ -7,10 +7,12 @@ import {
   isLibrary,
   isMatchCandidate,
   isMediaItem,
+  isMediaLocation,
   isMetadataHealth,
   isPersonDetails,
   isRating,
   isReview,
+  isServerEvent,
   isShowListing,
 } from '@/guards'
 import { itemDetails, itemSummary, library, mediaItem, review, showEntry } from '@/test/fixtures'
@@ -40,6 +42,7 @@ describe('isLibrary', () => {
             watchedPercent: 80,
             kind: 'shows',
             ratingsSource: 'imdb',
+            autoRefresh: false,
           },
         }),
       ),
@@ -185,5 +188,20 @@ describe('the metadata guards', () => {
     expect(
       isMetadataHealth({ tmdb: 'broken', omdb: 'off', pending: 0, error: null, lastOk: null }),
     ).toBe(false)
+  })
+})
+
+describe('isServerEvent', () => {
+  it("accepts a library's change and nothing else", () => {
+    expect(isServerEvent({ type: 'library', libraryId: 3 })).toBe(true)
+    expect(isServerEvent({ type: 'library', libraryId: '3' })).toBe(false)
+    expect(isServerEvent({ type: 'scan', libraryId: 3 })).toBe(false)
+  })
+})
+
+describe('isMediaLocation', () => {
+  it('takes a path', () => {
+    expect(isMediaLocation({ path: '/media/Movies/Busboys (2026).mkv' })).toBe(true)
+    expect(isMediaLocation({})).toBe(false)
   })
 })

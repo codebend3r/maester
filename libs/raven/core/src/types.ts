@@ -49,6 +49,8 @@ export type LibrarySettings = {
   kind: LibraryKind
   /** Whose score its cards show and its rating sorts use; TMDB's stands in where that source has none. */
   ratingsSource: ShownRatings
+  /** Watch the folders and take in videos added, removed, renamed or replaced there as it happens. */
+  autoRefresh: boolean
 }
 
 /** The scores a library can show on its cards: Metacritic has no card of its own. */
@@ -104,6 +106,8 @@ export type MediaItem = {
   position: number
   favourite: boolean
   addedAt: string
+  /** When the file last changed on disk: found, renamed, moved or replaced. */
+  changedAt: string
   /** How far matching got: see `MatchState`. */
   match: MatchState
   /** The year the name gives, in a Movies or TV shows library; null elsewhere. */
@@ -358,8 +362,20 @@ export type HistoryEntry = {
   watched: boolean
 }
 
+/** Where a video's file lives, as the server sees it (a container path under Docker). */
+export type MediaLocation = {
+  path: string
+}
+
 /**
- * `added` is newest first and `oldest` the reverse. Resolution ranks by
+ * What the server tells a client as it happens: a library's videos changed,
+ * so whatever shows them should be read again.
+ */
+export type ServerEvent = { type: 'library'; libraryId: number }
+
+/**
+ * `added` is newest first and `oldest` the reverse; `changed` puts the files
+ * last found, renamed, moved or replaced first. Resolution ranks by
  * pixel count. `random` shuffles by a seed the client sends, so the order
  * holds across refetches until the client deals a new one.
  */
@@ -367,6 +383,7 @@ export type MediaSort =
   | 'title'
   | 'added'
   | 'oldest'
+  | 'changed'
   | 'largest'
   | 'smallest'
   | 'bitrate-high'

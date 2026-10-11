@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { ApiError, type FetchInit, type FetchResponse, createApiClient } from '@/apiClient'
+import {
+  ApiError,
+  type FetchInit,
+  type FetchResponse,
+  createApiClient,
+  parseServerEvent,
+} from '@/apiClient'
 import { itemDetails, library, mediaItem, showEntry } from '@/test/fixtures'
 
 type Call = { url: string; init?: FetchInit }
@@ -179,6 +185,26 @@ describe('createApiClient', () => {
     expect(calls[0]?.url).toBe('http://nas:8484/api/libraries/3/history?limit=50')
     await client.listHistory({ libraryId: 3, limit: 50, watchedOnly: true })
     expect(calls[1]?.url).toBe('http://nas:8484/api/libraries/3/history?limit=50&watched=true')
+  })
+
+  it("asks where a video's file lives", async () => {
+    const { client, calls } = clientReturning(respond({ body: { path: '/media/Movies/a.mkv' } }))
+    await expect(client.getMediaLocation(7)).resolves.toEqual({ path: '/media/Movies/a.mkv' })
+    expect(calls[0]?.url).toBe('http://nas:8484/api/media/7/location')
+  })
+
+  it('points an event source at the server', () => {
+    const { client } = clientReturning(respond({}))
+    expect(client.eventsUrl()).toBe('http://nas:8484/api/events')
+  })
+
+  it('reads the events it knows and drops the rest', () => {
+    expect(parseServerEvent('{"type":"library","libraryId":2}')).toEqual({
+      type: 'library',
+      libraryId: 2,
+    })
+    expect(parseServerEvent('{"type":"party"}')).toBeNull()
+    expect(parseServerEvent('not json')).toBeNull()
   })
 
   it('deletes a video', async () => {

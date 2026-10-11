@@ -19,8 +19,16 @@ import {
   Req,
   Res,
 } from '@nestjs/common'
-import { type MediaItem, containerMimeType, isNumber, isRecord, isString } from '@raven/core'
+import {
+  type MediaItem,
+  type MediaLocation,
+  containerMimeType,
+  isNumber,
+  isRecord,
+  isString,
+} from '@raven/core'
 import type { FastifyReply, FastifyRequest } from 'fastify'
+import { errorMessage } from '@/errorMessage'
 import { type MediaRecord, MediaRepository, toMediaItem } from '@/media/mediaRepository'
 import { parseRange } from '@/media/range'
 import { SubtitlesService } from '@/playback/subtitlesService'
@@ -71,6 +79,12 @@ export class MediaController {
     return toMediaItem(this.find(id))
   }
 
+  /** Where the file lives, for the card's menu: the one call that hands a client a path. */
+  @Get(':id/location')
+  location(@Param('id', ParseIntPipe) id: number): MediaLocation {
+    return { path: this.find(id).path }
+  }
+
   @Put(':id/progress')
   @HttpCode(204)
   saveProgress(@Param('id', ParseIntPipe) id: number, @Body() body: unknown): void {
@@ -116,9 +130,7 @@ export class MediaController {
       await unlink(record.path)
     } catch (error) {
       if (errorCode(error) !== 'ENOENT') {
-        this.logger.warn(
-          `Could not delete ${record.path}: ${error instanceof Error ? error.message : String(error)}`,
-        )
+        this.logger.warn(`Could not delete ${record.path}: ${errorMessage(error)}`)
         throw new InternalServerErrorException(deleteFailure(error))
       }
     }

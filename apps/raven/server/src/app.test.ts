@@ -1,4 +1,14 @@
-import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import {
+  chmod,
+  copyFile,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rename,
+  rm,
+  stat,
+  writeFile,
+} from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
@@ -12,6 +22,8 @@ import {
   isLibraryList,
   isMediaItem,
   isMediaList,
+  isMediaLocation,
+  parseServerEvent,
 } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '@/app'
@@ -39,6 +51,30 @@ const expectShape = <T>({
   const body: unknown = response.json()
   if (!guard(body)) throw new Error(`Unexpected body: ${response.rawPayload.toString()}`)
   return body
+}
+
+/** A watcher that never fires, for tests that scan by hand. */
+const NOT_WATCHING = { watchFolder: () => ({ close: () => undefined }) }
+
+/** Resolves with `read()` once `check` holds for it, polling, or fails after `ms`. */
+const eventually = async <T>({
+  read,
+  check,
+  ms = 10_000,
+}: {
+  read: () => Promise<T>
+  check: (value: T) => boolean
+  ms?: number
+}): Promise<T> => {
+  const until = Date.now() + ms
+  const poll = async (): Promise<T> => {
+    const value = await read()
+    if (check(value)) return value
+    if (Date.now() > until) throw new Error(`timed out waiting: ${JSON.stringify(value)}`)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    return poll()
+  }
+  return poll()
 }
 
 const testConfig = ({
@@ -95,6 +131,7 @@ describe('the media server', () => {
     state.app = await createApp({
       config: testConfig({ dataDir: state.data, mediaDir: state.media }),
       quiet: true,
+      watch: NOT_WATCHING,
     })
     await state.app.init()
     await state.app.getHttpAdapter().getInstance().ready()
@@ -164,6 +201,18 @@ describe('the media server', () => {
         url: `/api/libraries/${library.id}/media`,
       })
       expect(response.body).not.toContain(state.media)
+    })
+
+    it("tells a client where a video's file lives when it asks", async () => {
+      const [movie] = await listMedia(library.id)
+      const location = expectShape({
+        response: await app().inject({ method: 'GET', url: `/api/media/${movie?.id}/location` }),
+        guard: isMediaLocation,
+      })
+      expect(location.path).toBe(join(state.media, 'Movies', 'Big.Buck.Test.2008.mp4'))
+      expect(
+        (await app().inject({ method: 'GET', url: '/api/media/999999/location' })).statusCode,
+      ).toBe(404)
     })
 
     it('reports the scan and item count on the library', async () => {
@@ -298,6 +347,7 @@ describe('the media server', () => {
           watchedPercent: 90,
           kind: 'other',
           ratingsSource: 'tmdb',
+          autoRefresh: true,
         })
       })
 
@@ -353,6 +403,7 @@ describe('the media server', () => {
           watchedPercent: 90,
           kind: 'other',
           ratingsSource: 'tmdb',
+          autoRefresh: true,
         })
         expect(updated.scan.state).toBe('idle')
         expect((await putLibrary({ pinned: true })).settings.pinned).toBe(true)
@@ -649,6 +700,208 @@ describe('the media server', () => {
     expect(
       (await app().inject({ method: 'GET', url: `/api/libraries/${created?.id}` })).statusCode,
     ).toBe(404)
+  })
+})
+
+describe('refreshing a library as its folders change', () => {
+  const state = {
+    root: '',
+    media: '',
+    libraryId: 0,
+    app: null as NestFastifyApplication | null,
+  }
+  const app = (): NestFastifyApplication => {
+    if (!state.app) throw new Error('app not started')
+    return state.app
+  }
+  const at = (...parts: string[]) => join(state.media, ...parts)
+  const listMedia = async (): Promise<MediaItem[]> =>
+    expectShape({
+      response: await app().inject({
+        method: 'GET',
+        url: `/api/libraries/${state.libraryId}/media?sort=changed`,
+      }),
+      guard: isMediaList,
+    })
+  const fileNames = (items: MediaItem[]): string[] => items.map((item) => item.fileName).toSorted()
+
+  beforeAll(async () => {
+    state.root = await mkdtemp(join(tmpdir(), 'raven-refresh-'))
+    state.media = join(state.root, 'media')
+    await encodeClip({ path: at('Heat (1995).mp4'), seconds: 2 })
+    state.app = await createApp({
+      config: testConfig({ dataDir: join(state.root, 'data'), mediaDir: state.root }),
+      quiet: true,
+      watch: { quietMs: 100 },
+    })
+    await state.app.listen(0, '127.0.0.1')
+    const created = expectShape({
+      response: await app().inject({
+        method: 'POST',
+        url: '/api/libraries',
+        payload: { name: 'Watched', paths: [state.media] },
+      }),
+      guard: isLibrary,
+    })
+    state.libraryId = created.id
+    await app().get(ScannerService).whenIdle(created.id)
+    // The watch is set up a moment after the library is saved.
+    await new Promise((resolve) => setTimeout(resolve, 300))
+  })
+
+  afterAll(async () => {
+    await state.app?.close()
+    await rm(state.root, { recursive: true, force: true })
+  })
+
+  it('takes in a video added to a folder under it', async () => {
+    await mkdir(at('Ronin (1998)'))
+    await copyFile(at('Heat (1995).mp4'), at('Ronin (1998)', 'Ronin (1998).mp4'))
+    const items = await eventually({
+      read: listMedia,
+      check: (current) => current.some((item) => item.fileName === 'Ronin (1998).mp4'),
+    })
+    expect(items.find((item) => item.fileName === 'Ronin (1998).mp4')?.folder).toBe('Ronin (1998)')
+  })
+
+  it('follows a renamed video: the same video, moved up Recently changed', async () => {
+    const before = (await listMedia()).find((item) => item.fileName === 'Heat (1995).mp4')
+    await app().inject({
+      method: 'PUT',
+      url: `/api/media/${before?.id}/favourite`,
+      payload: { favourite: true },
+    })
+    await rename(at('Heat (1995).mp4'), at('Heat (1995) 1080p.mp4'))
+    const items = await eventually({
+      read: listMedia,
+      check: (current) => current.some((item) => item.fileName === 'Heat (1995) 1080p.mp4'),
+    })
+    expect(fileNames(items)).toEqual(['Heat (1995) 1080p.mp4', 'Ronin (1998).mp4'])
+    expect(items[0]).toMatchObject({ id: before?.id, favourite: true, title: 'Heat (1995) 1080p' })
+    expect((items[0]?.changedAt ?? '') > (before?.changedAt ?? '')).toBe(true)
+    expect(items[0]?.addedAt).toBe(before?.addedAt)
+  })
+
+  it('drops a video deleted from its folder', async () => {
+    await rm(at('Ronin (1998)'), { recursive: true })
+    const items = await eventually({
+      read: listMedia,
+      check: (current) => current.length === 1,
+    })
+    expect(fileNames(items)).toEqual(['Heat (1995) 1080p.mp4'])
+  })
+
+  it('tells a listening client which library changed', async () => {
+    const abort = new AbortController()
+    const response = await fetch(`${await app().getUrl()}/api/events`, { signal: abort.signal })
+    expect(response.headers.get('content-type')).toContain('text/event-stream')
+    const reader = response.body?.getReader()
+    await copyFile(at('Heat (1995) 1080p.mp4'), at('Heat (1995) copy.mp4'))
+    const read = async (text: string): Promise<string> => {
+      const chunk = await reader?.read()
+      const next = text + new TextDecoder().decode(chunk?.value)
+      return next.includes('data:') || chunk?.done ? next : read(next)
+    }
+    const message = await read('')
+    abort.abort()
+    const data = message.split('\n').find((line) => line.startsWith('data:')) ?? ''
+    expect(parseServerEvent(data.slice('data:'.length).trim())).toEqual({
+      type: 'library',
+      libraryId: state.libraryId,
+    })
+  })
+
+  it('leaves the library alone once it no longer refreshes automatically', async () => {
+    await app().inject({
+      method: 'PUT',
+      url: `/api/libraries/${state.libraryId}`,
+      payload: { name: 'Watched', paths: [state.media], settings: { autoRefresh: false } },
+    })
+    const before = fileNames(await listMedia())
+    await copyFile(at('Heat (1995) 1080p.mp4'), at('Unwatched.mp4'))
+    await new Promise((resolve) => setTimeout(resolve, 600))
+    expect(fileNames(await listMedia())).toEqual(before)
+  })
+})
+
+describe('a library whose folders cannot be watched', () => {
+  const state = {
+    root: '',
+    libraryId: 0,
+    app: null as NestFastifyApplication | null,
+    /** Every watch asked for, and whether it should fail. */
+    watches: [] as string[],
+    failing: true,
+  }
+  const app = (): NestFastifyApplication => {
+    if (!state.app) throw new Error('app not started')
+    return state.app
+  }
+  const media = () => join(state.root, 'media')
+  const listMedia = async (): Promise<MediaItem[]> =>
+    expectShape({
+      response: await app().inject({
+        method: 'GET',
+        url: `/api/libraries/${state.libraryId}/media`,
+      }),
+      guard: isMediaList,
+    })
+
+  beforeAll(async () => {
+    state.root = await mkdtemp(join(tmpdir(), 'raven-unwatched-'))
+    await encodeClip({ path: join(media(), 'Heat (1995).mp4'), seconds: 2 })
+    state.app = await createApp({
+      config: testConfig({ dataDir: join(state.root, 'data'), mediaDir: state.root }),
+      quiet: true,
+      watch: {
+        fallbackScanMs: 100,
+        watchFolder: ({ root, onError }) => {
+          state.watches.push(root)
+          if (state.failing)
+            onError(new Error('ENOSPC: System limit for number of file watchers reached'))
+          return { close: () => undefined }
+        },
+      },
+    })
+    await state.app.init()
+    const created = expectShape({
+      response: await app().inject({
+        method: 'POST',
+        url: '/api/libraries',
+        payload: { name: 'Unwatched', paths: [media()] },
+      }),
+      guard: isLibrary,
+    })
+    state.libraryId = created.id
+    await app().get(ScannerService).whenIdle(created.id)
+  })
+
+  afterAll(async () => {
+    await state.app?.close()
+    await rm(state.root, { recursive: true, force: true })
+  })
+
+  it('is scanned on a timer instead, so new videos still turn up', async () => {
+    await copyFile(join(media(), 'Heat (1995).mp4'), join(media(), 'Ronin (1998).mp4'))
+    const items = await eventually({
+      read: listMedia,
+      check: (current) => current.length === 2,
+    })
+    expect(items.map((item) => item.fileName).toSorted()).toEqual([
+      'Heat (1995).mp4',
+      'Ronin (1998).mp4',
+    ])
+  })
+
+  it('is watched again once a library is saved', async () => {
+    const before = state.watches.length
+    state.failing = false
+    await app().inject({
+      method: 'PUT',
+      url: `/api/libraries/${state.libraryId}`,
+      payload: { name: 'Unwatched again', paths: [media()] },
+    })
+    expect(state.watches.length).toBe(before + 1)
   })
 })
 
