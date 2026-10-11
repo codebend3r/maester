@@ -99,6 +99,21 @@ describe('LibraryPage', () => {
     expect(state.sent.at(-1)?.settings).toEqual({ groupBy: 'codec' })
   })
 
+  it('folds every bucket to start, and opens one on a click', async () => {
+    serve({ view: 'grouped', groupBy: 'resolution' })
+    await screen.findByRole('link', { name: 'Wide' })
+    const heading = screen
+      .getAllByRole('heading', { level: 2 })
+      .find((candidate) => candidate.textContent === '4K, 1 video')
+    if (!heading) throw new Error('no 4K bucket')
+    const bucket = heading.closest('details')
+    expect(bucket).not.toBeNull()
+    expect(bucket).not.toHaveAttribute('open')
+    await userEvent.click(heading)
+    expect(bucket).toHaveAttribute('open')
+    expect(screen.getByRole('link', { name: 'Wide' })).toBeInTheDocument()
+  })
+
   it('buckets a Movies library by matched and not matched, which is where a new one opens', async () => {
     serve({ view: 'grouped', groupBy: 'match', kind: 'movies' }, [
       mediaItem({ id: 1, title: 'Found', match: 'matched' }),
