@@ -71,6 +71,18 @@ describe('TV show metadata', () => {
         },
       },
       {
+        id: 247718,
+        title: 'Murderbot',
+        first: '2025-05-16',
+        seasons: { 1: [{ number: 1, title: 'FreeCommerce', aired: '2025-05-16' }] },
+      },
+      {
+        id: 126308,
+        title: 'Shōgun',
+        first: '2024-02-27',
+        seasons: { 1: [{ number: 1, title: 'Anjin', aired: '2024-02-27' }] },
+      },
+      {
         id: 209867,
         title: 'Frieren',
         first: '2023-09-29',
@@ -170,6 +182,20 @@ describe('TV show metadata', () => {
         seconds: 1,
       }),
       encodeClip({
+        path: join(state.media, 'Muderbot', 'Season 1', 'Murderbot - S01E01 - FreeCommerce.mp4'),
+        seconds: 1,
+      }),
+      encodeClip({
+        // Named as a Mac's SMB mount gives it: the macron as a combining mark.
+        path: join(
+          state.media,
+          'Sho\u0304gun (2024)',
+          'Season 1',
+          'Sho\u0304gun - S01E01 - Anjin.mp4',
+        ),
+        seconds: 1,
+      }),
+      encodeClip({
         path: join(state.media, 'Unknown Show', 'Season 1', 'Unknown Show - S01E01.mp4'),
         seconds: 1,
       }),
@@ -219,10 +245,31 @@ describe('TV show metadata', () => {
     ).toEqual([
       ['Fargo', 2, 2014, 2024],
       ['Frieren', 1, 2023, null],
+      ['Murderbot', 1, 2025, null],
       ['Severance', 3, 2022, null],
+      ['Shōgun', 1, 2024, null],
     ])
     expect(listing.unmatched.map((entry) => entry.fileName)).toEqual(['Unknown Show - S01E01.mp4'])
     expect(listing.shows.every((entry) => entry.show.posterVersion != null)).toBe(true)
+  })
+
+  it('matches a misspelt folder by the name its files carry', async () => {
+    const episode = await byFile('Murderbot - S01E01 - FreeCommerce.mp4')
+    expect(episode.match).toBe('matched')
+    expect(episode.item).toMatchObject({ show: { title: 'Murderbot' }, season: 1, episode: 1 })
+    const asked = tmdb.state.calls
+      .filter((url) => url.includes('/search/tv'))
+      .map((url) => new URL(url).searchParams.get('query'))
+    expect(asked).toContain('Muderbot')
+    expect(asked).toContain('Murderbot')
+  })
+
+  it('matches a show whose folder spells its accent as a combining mark', async () => {
+    const anjin = await byFile('Sho\u0304gun - S01E01 - Anjin.mp4')
+    expect(anjin).toMatchObject({
+      match: 'matched',
+      item: { type: 'episode', title: 'Anjin', show: { title: 'Shōgun' } },
+    })
   })
 
   it('searches once per show folder, and fetches each season once', () => {
@@ -349,7 +396,7 @@ describe('TV show metadata', () => {
   it('searches shows and sorts them by year', async () => {
     expect((await shows('?q=sev')).shows.map((entry) => entry.show.title)).toEqual(['Severance'])
     expect((await shows('?sort=year-new')).shows.map((entry) => entry.show.year)).toEqual([
-      2023, 2022, 2014,
+      2025, 2024, 2023, 2022, 2014,
     ])
   })
 
@@ -395,12 +442,94 @@ describe('TV show metadata', () => {
     expect(halfLoop.match).toBe('manual')
     const gone = await app().inject({ method: 'GET', url: `/api/items/${severance.show.id}` })
     expect(gone.statusCode).toBe(404)
-    expect((await shows()).shows.map((entry) => entry.show.title)).toEqual(['Fargo', 'Frieren'])
+    expect((await shows()).shows.map((entry) => entry.show.title)).toEqual([
+      'Fargo',
+      'Frieren',
+      'Murderbot',
+      'Shōgun',
+    ])
   })
 
   it('keeps the re-pointing through a rescan', async () => {
     await rescan()
     const halfLoop = await byFile('Severance - S01E02 - Half Loop.mp4')
     expect(halfLoop.item).toMatchObject({ show: { title: 'Fargo' } })
+  })
+  it('searches TMDB again for the files no show was found for, and only those', async () => {
+    await encodeClip({
+      path: join(state.media, 'Late Show', 'Season 1', 'Late Show - S01E01.mp4'),
+      seconds: 1,
+    })
+    await rescan()
+    expect((await byFile('Late Show - S01E01.mp4')).match).toBe('unmatched')
+    const before = tmdb.state.calls.length
+
+    const response = await app().inject({
+      method: 'POST',
+      url: `/api/libraries/${state.library}/match`,
+    })
+    expect(response.statusCode).toBe(200)
+    // The count is read after the retry, which sends the file back to pending.
+    const library = shape({ response, guard: isLibrary })
+    expect(library.unmatchedCount).toBe(0)
+    await settle()
+    const searched = tmdb.state.calls
+      .slice(before)
+      .filter((url) => url.includes('/search/tv'))
+      .map((url) => new URL(url).searchParams.get('query'))
+    expect(searched).toEqual(['Late Show'])
+    expect((await byFile('Late Show - S01E01.mp4')).match).toBe('unmatched')
+    expect((await byFile('Unknown Show - S01E01.mp4')).match).toBe('manual')
+
+    tmdb.state.shows.push({ id: 4242, title: 'Late Show', first: '2024-03-01', seasons: { 1: [] } })
+    await app().inject({ method: 'POST', url: `/api/libraries/${state.library}/match` })
+    await settle()
+    expect((await byFile('Late Show - S01E01.mp4')).match).toBe('matched')
+    expect((await shows()).shows.map((entry) => entry.show.title)).toContain('Late Show')
+    const after = shape({
+      response: await app().inject({ method: 'GET', url: `/api/libraries/${state.library}` }),
+      guard: isLibrary,
+    })
+    expect(after.unmatchedCount).toBe(0)
+  })
+
+  it('tells two shows of one name apart by the country in the folder', async () => {
+    tmdb.state.shows.push(
+      {
+        id: 2316,
+        title: 'The Office',
+        first: '2005-03-24',
+        seasons: { 1: [{ number: 1, title: 'Pilot', aired: '2005-03-24' }] },
+      },
+      {
+        id: 2996,
+        title: 'The Office',
+        first: '2001-07-09',
+        countries: ['GB'],
+        seasons: { 1: [{ number: 1, title: 'Downsize', aired: '2001-07-09' }] },
+      },
+    )
+    await Promise.all(
+      ['UK', 'US'].map((country) =>
+        encodeClip({
+          path: join(
+            state.media,
+            `The Office (${country})`,
+            'Season 1',
+            `The Office (${country}) - S01E01.mp4`,
+          ),
+          seconds: 1,
+        }),
+      ),
+    )
+    await rescan()
+    expect(await byFile('The Office (UK) - S01E01.mp4')).toMatchObject({
+      match: 'matched',
+      item: { title: 'Downsize' },
+    })
+    expect(await byFile('The Office (US) - S01E01.mp4')).toMatchObject({
+      match: 'matched',
+      item: { title: 'Pilot' },
+    })
   })
 })

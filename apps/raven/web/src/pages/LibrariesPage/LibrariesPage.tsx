@@ -36,6 +36,7 @@ const LibraryRow = ({ library }: { library: Library }) => {
       <span className={styles.count}>
         {KIND_LABELS[library.settings.kind]} · {count.format(library.itemCount)}{' '}
         {library.itemCount === 1 ? 'video' : 'videos'}
+        {library.unmatchedCount > 0 && ` · ${count.format(library.unmatchedCount)} not matched`}
       </span>
       <ul className={styles.paths} aria-label="Folders">
         {library.paths.map((path) => (

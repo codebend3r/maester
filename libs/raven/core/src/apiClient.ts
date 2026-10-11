@@ -190,6 +190,13 @@ export const createApiClient = ({
         guard: isLibrary,
       }),
 
+    /** Match again: TMDB is searched once more for the library's files no movie or show was found for. */
+    matchLibrary: (id: number): Promise<Library> =>
+      expect({
+        request: send({ path: `/api/libraries/${id}/match`, method: 'POST' }),
+        guard: isLibrary,
+      }),
+
     /** `seed` only counts with a random sort: the same seed deals the same order. */
     listMedia: ({
       libraryId,

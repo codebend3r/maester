@@ -6,6 +6,7 @@ export const library = (overrides: Partial<Library> = {}): Library => ({
   name: 'Movies',
   paths: ['/media/movies'],
   itemCount: 0,
+  unmatchedCount: 0,
   createdAt: '2026-09-27T00:00:00.000Z',
   scan: {
     state: 'idle',

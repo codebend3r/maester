@@ -133,6 +133,7 @@ export const isLibrary = (value: unknown): value is Library =>
   isString(value.name) &&
   isStringArray(value.paths) &&
   isNumber(value.itemCount) &&
+  isNumber(value.unmatchedCount) &&
   isString(value.createdAt) &&
   isScanStatus(value.scan) &&
   isLibrarySettings(value.settings)

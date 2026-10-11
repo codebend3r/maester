@@ -798,6 +798,20 @@ export class MediaRepository {
       .run(match, JSON.stringify(ids))
   }
 
+  /**
+   * Puts a library's unmatched files back in the queue, for another search;
+   * Fix match choices and extras stay. How many went back.
+   */
+  retryUnmatched(libraryId: number): number {
+    return Number(
+      this.db
+        .prepare<[number]>(
+          `UPDATE media SET match = 'pending' WHERE library_id = ? AND match = 'unmatched'`,
+        )
+        .run(libraryId).changes,
+    )
+  }
+
   /** The file was replaced on disk: forget what the old one held so it gets probed again. */
   markChanged({ id, size, mtimeMs }: { id: number; size: number; mtimeMs: number }): void {
     this.db
