@@ -139,7 +139,7 @@ Every card has a menu, from the button in its corner or a right click. In a Movi
 
 A Movies library knows what each of its files is: posters, titles and years on its cards, and a page for every movie with its backdrop, director, content rating, runtime, genres, TMDB's score, summary, the file's video, audio and subtitles, its other versions, and a cast and crew row with photos. Other libraries stay as they were. TV shows are next.
 
-- **Turning it on.** Put TMDB's API Read Access Token in `apps/raven/.env` as `TMDB_API_TOKEN` (copy `.env.example`; on Vhagar the file sits beside the compose file, and `update.sh` makes an empty one if there is none). Without a token, or without the internet, raven works as before, with names tidied into titles and years.
+- **Turning it on.** Put TMDB's API Read Access Token, or its 32-character API key, in `apps/raven/.env` as `TMDB_API_TOKEN` (copy `.env.example`; on Vhagar the file sits beside the compose file, and `update.sh` makes an empty one if there is none). Without a token, or without the internet, raven works as before, with names tidied into titles and years.
 - **Names.** Radarr's `Movie (Year)/Movie (Year) Quality.mkv`, scene names like `The.Matrix.1999.1080p.BluRay.x264-GROUP.mkv`, Plex's `{edition-...}`, and id tags (`{tmdb-603}`, `{imdb-tt0133093}`, `[tmdbid-603]`) are all read. A movie's own folder is read first when it has a year. Plex's extras folders (`Featurettes`, `Trailers`, ...) and suffixes (`-trailer`, ...) are never matched.
 - **Matching.** A Fix match wins, then an id in a name or in a Radarr NFO (`movie.nfo` or `<file>.nfo`, ids only), then a search by title and year that takes only a sure answer: the same title (ignoring case, accents, punctuation and a leading article) in the same year or one either side, or the only result in the right year. Anything else is **Not matched**; raven never guesses. Matching needs only the name, so new files match while they are still being probed.
 - **One card per movie.** A movie kept in two qualities is one card, its best version (most pixels, then biggest file), saying how many there are; the page lists them all, each playable.
@@ -213,7 +213,7 @@ A native iOS or Android app would be another `apps/raven/` entry that imports `@
 | `THUMBNAIL_WIDTH`             | `480`                          |                                              |
 | `FFMPEG_TIMEOUT_SECONDS`      | `90`                           | Per ffprobe or thumbnail run                 |
 | `FFMPEG_PATH`, `FFPROBE_PATH` | `ffmpeg`, `ffprobe`            |                                              |
-| `TMDB_API_TOKEN`              | unset                          | TMDB's API Read Access Token; unset turns metadata off |
+| `TMDB_API_TOKEN`              | unset                          | TMDB's API Read Access Token or API key; unset turns metadata off |
 | `METADATA_LANGUAGE`           | `en-US`                        | Language for titles and summaries            |
 | `METADATA_COUNTRY`            | `US`                           | Whose content rating and release date to show |
 

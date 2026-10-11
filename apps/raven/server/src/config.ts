@@ -31,7 +31,7 @@ export type ServerConfig = {
   hwAccel: HwAccel
   /** The VAAPI render node, passed into the container on a NAS with a GPU. */
   vaapiDevice: string
-  /** TMDB's API Read Access Token; null turns metadata off. Never logged or sent to a client. */
+  /** TMDB's API Read Access Token, or its 32-character API key; null turns metadata off. Never logged or sent to a client. */
   tmdbApiToken: string | null
   /** The language titles and summaries come in, as TMDB spells it: `en-US`. */
   metadataLanguage: string

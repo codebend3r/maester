@@ -62,6 +62,17 @@ describe('TmdbClient', () => {
     expect(seen[0]?.url).toContain('year=1999')
   })
 
+  it('sends a 32-character API key as api_key instead', async () => {
+    const seen: Array<{ url: string; authorization: string | undefined }> = []
+    const client = new TmdbClient(config('0123456789abcdef0123456789abcdef'), async (url, init) => {
+      seen.push({ url, authorization: init.headers.authorization })
+      return json({ results: [] })
+    })
+    await client.searchMovies({ query: 'Heat', year: null })
+    expect(seen[0]?.authorization).toBeUndefined()
+    expect(seen[0]?.url).toContain('api_key=0123456789abcdef0123456789abcdef')
+  })
+
   it('drops image paths that are not plain TMDB files', async () => {
     const client = new TmdbClient(
       config(),

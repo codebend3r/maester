@@ -23,6 +23,9 @@ const TIMEOUT_MS = 10_000
 /** How often a 429 is waited out before the call gives up. */
 const RETRIES = 3
 
+/** TMDB's older API key: 32 hex characters, sent as `api_key` rather than as a bearer token. */
+const API_KEY = /^[a-f0-9]{32}$/i
+
 /** The only image paths raven ever fetches: `/abc123.jpg`, nothing that could leave TMDB's CDN. */
 export const TMDB_IMAGE_PATH = /^\/[A-Za-z0-9_-]+\.(jpg|png)$/
 
@@ -340,14 +343,23 @@ export class TmdbClient {
     if (token == null || this.status.refused) {
       throw new TmdbError({ kind: 'unauthorized', message: 'TMDB is not configured.' })
     }
-    const query = new URLSearchParams({ language: this.config.metadataLanguage, ...params })
+    // TMDB's settings page shows two credentials; either works here.
+    const asKey = API_KEY.test(token)
+    const query = new URLSearchParams({
+      language: this.config.metadataLanguage,
+      ...params,
+      ...(asKey ? { api_key: token } : {}),
+    })
     const url = `${API}${path}?${query.toString()}`
+    const headers: Record<string, string> = asKey
+      ? { accept: 'application/json' }
+      : { accept: 'application/json', authorization: `Bearer ${token}` }
 
     const attempt = async (retriesLeft: number): Promise<unknown> => {
       const response = await this.limit
         .run(() =>
           this.fetch(url, {
-            headers: { accept: 'application/json', authorization: `Bearer ${token}` },
+            headers,
             signal: AbortSignal.timeout(TIMEOUT_MS),
           }),
         )
