@@ -1,7 +1,27 @@
 import { describe, expect, it } from 'vitest'
 import {
+  ITEM_IMAGE_KINDS,
+  MEDIA_SORTS,
+  STREAM_MODES,
   isCredit,
+  isFavouriteChange,
+  isHwAccel,
+  isImageChoice,
+  isItemImageKind,
+  isItemMetadataChange,
+  isItemMetadataState,
+  isMatchChoice,
+  isMediaSort,
+  isPlaybackSettingsChange,
+  isProgressChange,
+  isServerHealth,
+  isShowMatchChoice,
+  isStreamMode,
+  isTmdbId,
+  isUnlockRequest,
   isHistoryEntry,
+  isEpisodeSummary,
+  isItemChild,
   isItemDetails,
   isItemSummary,
   isLibrary,
@@ -12,10 +32,20 @@ import {
   isPersonDetails,
   isRating,
   isReview,
+  isSeasonSummary,
   isServerEvent,
   isShowListing,
-} from '@/guards'
-import { itemDetails, itemSummary, library, mediaItem, review, showEntry } from '@/test/fixtures'
+} from '@/contract'
+import {
+  episodeSummary,
+  itemDetails,
+  itemSummary,
+  library,
+  mediaItem,
+  review,
+  seasonSummary,
+  showEntry,
+} from '@/test/fixtures'
 
 describe('isMediaItem', () => {
   it('accepts an item that carries its favourite flag', () => {
@@ -149,6 +179,23 @@ describe('the metadata guards', () => {
     expect(isRating({ source: 'imdb', kind: 'audience', value: 7.5, votes: null })).toBe(true)
   })
 
+  it("accepts a page's children: seasons with their episode count, episodes with their row", () => {
+    expect(isSeasonSummary(seasonSummary())).toBe(true)
+    expect(isEpisodeSummary(episodeSummary())).toBe(true)
+    expect(isEpisodeSummary(episodeSummary({ primary: null, stillVersion: null }))).toBe(true)
+    expect(isItemDetails(itemDetails({ children: [seasonSummary(), episodeSummary()] }))).toBe(true)
+  })
+
+  it('refuses a child that is not a season or an episode, or lacks what its row needs', () => {
+    expect(isItemChild({ ...seasonSummary(), type: 'movie' })).toBe(false)
+    const { episodeCount: _count, ...countless } = seasonSummary()
+    expect(isItemChild(countless)).toBe(false)
+    const { primary: _primary, ...unplayable } = episodeSummary()
+    expect(isItemChild(unplayable)).toBe(false)
+    expect(isItemDetails(itemDetails({ children: [] }))).toBe(true)
+    expect(isItemDetails({ ...itemDetails(), children: [itemSummary()] })).toBe(false)
+  })
+
   it('accepts a show listing and refuses one whose next episode is malformed', () => {
     expect(isShowListing({ shows: [showEntry()], unmatched: [mediaItem()] })).toBe(true)
     expect(isShowListing({ shows: [showEntry({ next: null })], unmatched: [] })).toBe(true)
@@ -204,5 +251,98 @@ describe('isMediaLocation', () => {
   it('takes a path', () => {
     expect(isMediaLocation({ path: '/media/Movies/Busboys (2026).mkv' })).toBe(true)
     expect(isMediaLocation({})).toBe(false)
+  })
+})
+
+describe('the choice lists', () => {
+  it('derive each union from its own list', () => {
+    expect(MEDIA_SORTS).toHaveLength(15)
+    expect(isMediaSort('rating-high')).toBe(true)
+    expect(isMediaSort('loudest')).toBe(false)
+    expect(STREAM_MODES).toEqual(['remux', 'transcode'])
+    expect(isStreamMode('direct')).toBe(false)
+    expect(ITEM_IMAGE_KINDS).toEqual(['poster', 'backdrop', 'still'])
+    expect(isItemImageKind('banner')).toBe(false)
+    expect(isHwAccel('vaapi')).toBe(true)
+    expect(isHwAccel('cuda')).toBe(false)
+  })
+})
+
+describe('the change guards', () => {
+  it('takes part of the playback settings, each a value it takes', () => {
+    expect(isPlaybackSettingsChange({ quality: 'high' })).toBe(true)
+    expect(isPlaybackSettingsChange({ maxHeight: 2160, tonemap: false })).toBe(true)
+    expect(isPlaybackSettingsChange({ maxHeight: 480 })).toBe(false)
+    expect(isPlaybackSettingsChange({ quality: 'high', colour: 'red' })).toBe(false)
+  })
+
+  it('takes metadata fields written over or cleared, and nothing else', () => {
+    expect(isItemMetadataChange({ title: 'Heat', year: null })).toBe(true)
+    expect(isItemMetadataChange({ year: '1995' })).toBe(false)
+    expect(isItemMetadataChange({ studio: 'Warner' })).toBe(false)
+  })
+
+  it('names only the fields Edit metadata knows as written over', () => {
+    const metadata = {
+      title: 'Heat',
+      year: 1995,
+      tagline: null,
+      summary: null,
+      contentRating: null,
+    }
+    expect(
+      isItemMetadataState({ shown: metadata, original: metadata, overridden: ['title'] }),
+    ).toBe(true)
+    expect(
+      isItemMetadataState({ shown: metadata, original: metadata, overridden: ['studio'] }),
+    ).toBe(false)
+  })
+})
+
+describe('the request bodies', () => {
+  it('takes a position at or past the start', () => {
+    expect(isProgressChange({ position: 0 })).toBe(true)
+    expect(isProgressChange({ position: 61.5 })).toBe(true)
+    expect(isProgressChange({ position: -1 })).toBe(false)
+    expect(isProgressChange({ position: '61' })).toBe(false)
+  })
+
+  it('takes a favourite flag and a PIN', () => {
+    expect(isFavouriteChange({ favourite: false })).toBe(true)
+    expect(isFavouriteChange({ favourite: 'yes' })).toBe(false)
+    expect(isUnlockRequest({ pin: '1234' })).toBe(true)
+    expect(isUnlockRequest({})).toBe(false)
+  })
+
+  it('takes a TMDB id for Fix match, or null for a file that is not one', () => {
+    expect(isTmdbId('603')).toBe(true)
+    expect(isTmdbId('tt0133093')).toBe(false)
+    expect(isMatchChoice({ tmdbId: '603' })).toBe(true)
+    expect(isMatchChoice({ tmdbId: null })).toBe(true)
+    expect(isMatchChoice({ tmdbId: 603 })).toBe(false)
+    expect(isShowMatchChoice({ tmdbId: '95396' })).toBe(true)
+    expect(isShowMatchChoice({ tmdbId: null })).toBe(false)
+  })
+
+  it("takes one of TMDB's pictures with its path, or the one beside the media", () => {
+    expect(isImageChoice({ source: 'tmdb', ref: '/poster.jpg' })).toBe(true)
+    expect(isImageChoice({ source: 'local' })).toBe(true)
+    expect(isImageChoice({ source: 'tmdb' })).toBe(false)
+    expect(isImageChoice({ source: 'web', ref: '/poster.jpg' })).toBe(false)
+  })
+})
+
+describe('isServerHealth', () => {
+  it('takes the whole health check, its metadata included', () => {
+    const health = {
+      status: 'ok',
+      ffmpeg: null,
+      tonemap: false,
+      encoder: 'vaapi',
+      thumbnailsPending: 2,
+      metadata: { tmdb: 'off', omdb: 'off', pending: 0, error: null, lastOk: null },
+    }
+    expect(isServerHealth(health)).toBe(true)
+    expect(isServerHealth({ ...health, encoder: 'nvenc' })).toBe(false)
   })
 })

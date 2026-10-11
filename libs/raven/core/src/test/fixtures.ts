@@ -1,5 +1,14 @@
 import type { CanPlay } from '@/playback'
-import type { ItemDetails, ItemSummary, Library, MediaItem, Review, ShowEntry } from '@/types'
+import type {
+  EpisodeSummary,
+  ItemDetails,
+  ItemSummary,
+  Library,
+  MediaItem,
+  Review,
+  SeasonSummary,
+  ShowEntry,
+} from '@/contract'
 
 export const library = (overrides: Partial<Library> = {}): Library => ({
   id: 1,
@@ -72,6 +81,39 @@ export const itemSummary = (overrides: Partial<ItemSummary> = {}): ItemSummary =
   episode: null,
   posterVersion: 'f89JxwBCi9N',
   ratings: [{ source: 'tmdb', kind: 'audience', value: 8.2, votes: 26_000 }],
+  ...overrides,
+})
+
+export const seasonSummary = (overrides: Partial<SeasonSummary> = {}): SeasonSummary => ({
+  ...itemSummary({
+    id: 5,
+    title: 'Season 1',
+    year: 2022,
+    show: { id: 4, title: 'Severance' },
+    season: 1,
+    ratings: [],
+  }),
+  type: 'season',
+  episodeCount: 9,
+  ...overrides,
+})
+
+export const episodeSummary = (overrides: Partial<EpisodeSummary> = {}): EpisodeSummary => ({
+  ...itemSummary({
+    id: 6,
+    title: 'Half Loop',
+    year: 2022,
+    show: { id: 4, title: 'Severance' },
+    season: 1,
+    episode: 2,
+    ratings: [],
+  }),
+  type: 'episode',
+  summary: 'Mark and the team go to the break room.',
+  released: '2022-02-18',
+  runtime: 54,
+  stillVersion: 'st1llVers10n',
+  primary: mediaItem({ id: 12, title: 'Severance - S01E02 - Half Loop', match: 'matched' }),
   ...overrides,
 })
 
