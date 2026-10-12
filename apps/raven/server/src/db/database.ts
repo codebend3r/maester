@@ -275,6 +275,20 @@ export const MIGRATIONS: readonly string[] = [
   `
   ALTER TABLE libraries ADD COLUMN locked INTEGER NOT NULL DEFAULT 0;
   `,
+  // A movie's saga: the TMDB collection it belongs to, for a library's Sagas.
+  // Movies stored before this learn theirs from TMDB once, in the daily
+  // sweep; saga_checked marks the ones that have, every item stored after.
+  `
+  ALTER TABLE items ADD COLUMN saga_tmdb_id TEXT;
+  ALTER TABLE items ADD COLUMN saga_name TEXT;
+  ALTER TABLE items ADD COLUMN saga_checked INTEGER NOT NULL DEFAULT 0;
+  `,
+  // A movie's logo, its title as art, sits in item_images as kind 'logo'.
+  // Movies stored before this learn theirs from TMDB once, in the daily
+  // sweep; logo_checked marks the ones that have, every item stored after.
+  `
+  ALTER TABLE items ADD COLUMN logo_checked INTEGER NOT NULL DEFAULT 0;
+  `,
 ]
 
 /** The index's file in the data folder. Before raven was renamed it was `weirwood.db`. */

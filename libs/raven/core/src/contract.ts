@@ -196,6 +196,18 @@ export type LibrarySettings = Infer<typeof isLibrarySettings>
 /** Some of a library's settings, each a value it takes, and nothing else. */
 export const isLibrarySettingsChange = exactPartial(isLibrarySettings.shape)
 
+/**
+ * The picture that stands for a library's newest video: the backdrop of its
+ * movie or show (an episode's comes from its show), else the video's own
+ * thumbnail. `item` names the movie or show, `thumbnail` the video.
+ */
+export const isLibraryBackdrop = union(
+  object({ type: oneOf(['item']), id: isNumber, version: isString }),
+  object({ type: oneOf(['thumbnail']), id: isNumber, version: isNumber }),
+)
+
+export type LibraryBackdrop = Infer<typeof isLibraryBackdrop>
+
 export const isLibrary = object({
   id: isNumber,
   name: isString,
@@ -270,6 +282,11 @@ export const isItemSummary = object({
   episode: nullable(isNumber),
   /** Changes whenever the poster does; null when there is none. */
   posterVersion: nullable(isString),
+  /**
+   * Changes whenever the backdrop does; null when there is none. A season or
+   * an episode has none of its own here.
+   */
+  backdropVersion: nullable(isString),
   /** Every score it has, one per source. */
   ratings: listOf(isRating),
 })
@@ -404,6 +421,8 @@ export const isItemDetails = object({
   genres: isStringArray,
   /** The backdrop's version; for an episode, its still's. */
   backdropVersion: nullable(isString),
+  /** The title as TMDB's art, on a clear ground; null when it has none, and for anything but a movie. */
+  logoVersion: nullable(isString),
   credits: listOf(isCredit),
   /** Reviews by TMDB members, newest first; at most ten. */
   reviews: listOf(isReview),
@@ -486,7 +505,8 @@ export const isPersonDetails = object({
 
 export type PersonDetails = Infer<typeof isPersonDetails>
 
-export const isItemImageKind = oneOf(['poster', 'backdrop', 'still'])
+/** A logo is the title drawn as art, on a clear ground, for a movie's page. */
+export const isItemImageKind = oneOf(['poster', 'backdrop', 'still', 'logo'])
 
 /** The pictures an item can have. */
 export type ItemImageKind = Infer<typeof isItemImageKind>
@@ -508,10 +528,12 @@ export const isImageOption = object({
 
 export type ImageOption = Infer<typeof isImageOption>
 
-/** Everything a movie or show could show as its poster and backdrop. */
+/** Everything a movie or show could show as its poster and backdrop, and a movie as its logo. */
 export const isItemImageOptions = object({
   poster: listOf(isImageOption),
   backdrop: listOf(isImageOption),
+  /** TMDB's PNG logos; none for a show, whose page shows no logo. */
+  logo: listOf(isImageOption),
 })
 
 export type ItemImageOptions = Infer<typeof isItemImageOptions>
@@ -596,6 +618,26 @@ export const isPlaybackSettingsState = object({
 })
 
 export type PlaybackSettingsState = Infer<typeof isPlaybackSettingsState>
+
+/** The values each display setting takes. */
+export const DISPLAY_CHOICES = {
+  titles: ['logo', 'text'],
+} as const
+
+/** How pages look, set once for every viewer in Settings. */
+export const isDisplaySettings = object({
+  /** `logo` shows a movie's title as its logo where TMDB has one; `text` always spells it out. */
+  titles: oneOf(DISPLAY_CHOICES.titles),
+})
+
+export type DisplaySettings = Infer<typeof isDisplaySettings>
+
+export const DEFAULT_DISPLAY_SETTINGS: DisplaySettings = { titles: 'logo' }
+
+/** A change sends any of the fields; each given must be a value the setting takes. */
+export const isDisplaySettingsChange = exactPartial(isDisplaySettings.shape)
+
+export type DisplaySettingsChange = Infer<typeof isDisplaySettingsChange>
 
 /** The fields Edit metadata can write over: what a page shows for a movie or show. */
 export const isItemMetadata = object({

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'bun:test'
-import { episodeByline, episodeFacts, formatAirDate, runtimeFact } from '@/lib/itemFacts'
+import {
+  episodeByline,
+  episodeFacts,
+  formatAirDate,
+  runtimeFact,
+  versionFacts,
+} from '@/lib/itemFacts'
 import { itemDetails, mediaItem } from '@/test/fixtures'
 
 describe('runtimeFact', () => {
@@ -25,5 +31,24 @@ describe('episode facts', () => {
       formatAirDate('2022-02-18')!,
       '55m',
     ])
+  })
+})
+
+describe('versionFacts', () => {
+  it("names a file's resolution, HDR, codec and size, leaving out what it does not have", () => {
+    expect(
+      versionFacts(
+        mediaItem({
+          width: 3840,
+          height: 2160,
+          hdr: true,
+          videoCodec: 'hevc',
+          size: 61_000_000_000,
+        }),
+      ),
+    ).toEqual(['4K', 'HDR', 'HEVC', '61.0 GB'])
+    expect(
+      versionFacts(mediaItem({ width: null, height: null, videoCodec: null, size: 1_500_000_000 })),
+    ).toEqual(['1.5 GB'])
   })
 })

@@ -7,6 +7,29 @@
   background: var(--color-canopy);
 }
 
+// From a card's menu the editor is the dialog's own panel, so the dialog
+// itself has no frame.
+.dialog {
+  width: min(60rem, calc(100vw - 2 * var(--space-3)));
+  max-height: calc(100dvh - 2 * var(--space-3));
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-bark);
+
+  &::backdrop {
+    background: var(--color-scrim);
+  }
+}
+
+.waiting {
+  padding: var(--space-4);
+  border: 1px solid var(--color-moss);
+  border-radius: var(--radius-md);
+  background: var(--color-canopy);
+  color: var(--color-lichen);
+}
+
 .header {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -116,7 +139,8 @@
 }
 
 .posters,
-.backdrops {
+.backdrops,
+.logos {
   display: grid;
   gap: var(--space-2);
 }
@@ -125,7 +149,8 @@
   grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr));
 }
 
-.backdrops {
+.backdrops,
+.logos {
   grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
 }
 
@@ -174,6 +199,13 @@
 
 .backdrops .option img {
   aspect-ratio: 16 / 9;
+}
+
+// A logo keeps its own shape, held in a short band, on the night it is shown on.
+.logos .option img {
+  aspect-ratio: 3 / 1;
+  padding: var(--space-2);
+  object-fit: contain;
 }
 
 .caption {

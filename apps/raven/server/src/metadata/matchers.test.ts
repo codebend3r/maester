@@ -12,7 +12,6 @@ import { ItemPictures } from '@/metadata/itemPictures'
 import { MatchFiles } from '@/metadata/matchFiles'
 import { createMatchers } from '@/metadata/matchers'
 import { MatchPass } from '@/metadata/matchPass'
-import { MetadataRepository } from '@/metadata/metadataRepository'
 import { OmdbClient } from '@/metadata/omdbClient'
 import { OmdbScores } from '@/metadata/omdbScores'
 import { TmdbClient } from '@/metadata/tmdbClient'
@@ -20,6 +19,7 @@ import { SettingsRepository } from '@/settings/settingsRepository'
 import { encodeImage } from '@/test/clips'
 import { testDatabase } from '@/test/database'
 import { fakeTmdb } from '@/test/fakeTmdb'
+import { repositories } from '@/test/repositories'
 
 describe('matching by library type', () => {
   const database = testDatabase('raven-matchers-')
@@ -48,10 +48,15 @@ describe('matching by library type', () => {
       tmdbApiToken: 'test-token',
       hwAccel: 'none' as const,
     }
-    const metadata = new MetadataRepository(database.get())
+    const { images, metadata } = repositories(database.get())
     const files = new MatchFiles(database.get(), metadata)
     const ffmpeg = new FfmpegService(config, new SettingsRepository(database.get()))
-    const pictures = new ItemPictures(metadata, files, new ImageCache(config, tmdb.fetch, ffmpeg))
+    const pictures = new ItemPictures(
+      metadata,
+      files,
+      new ImageCache(config, tmdb.fetch, ffmpeg),
+      images,
+    )
     const pass = () =>
       new MatchPass({
         tmdb: new TmdbClient(config, tmdb.fetch),
@@ -60,7 +65,13 @@ describe('matching by library type', () => {
         scores: new OmdbScores(metadata, new OmdbClient(config, tmdb.fetch)),
         logger: new Logger('MatchersTest'),
       })
-    return { metadata, files, pass, matchers: createMatchers({ files, metadata, pictures }) }
+    return {
+      images,
+      metadata,
+      files,
+      pass,
+      matchers: createMatchers({ files, metadata, pictures }),
+    }
   }
 
   /** The file indexed at `path` under a library's root. */
@@ -162,23 +173,23 @@ describe('matching by library type', () => {
   })
 
   it('keeps the poster beside one copy of a movie when another library has a copy without one', async () => {
-    const { metadata, matchers, pass } = services()
+    const { images, metadata, matchers, pass } = services()
     const heat = under('Films', 'Heat (1995)/Heat (1995).mkv')
     const uhd = under('Films 4K', 'Heat (1995)/Heat (1995) 2160p.mkv')
     const poster = join(database.dir(), 'Films', 'Heat (1995)', 'poster.jpg')
 
     await matchers.movie.match({ files: [heat], pass: pass() })
     const itemId = metadata.find({ type: 'movie', tmdbId: '949' })?.id ?? -1
-    expect(metadata.image({ itemId, kind: 'poster' })).toEqual({ source: 'local', ref: poster })
+    expect(images.image({ itemId, kind: 'poster' })).toEqual({ source: 'local', ref: poster })
 
     // The copy in the other library, matched in a later pass, has no poster of its own.
     await matchers.movie.match({ files: [uhd], pass: pass() })
     expect(metadata.mediaUnder(itemId).toSorted()).toEqual([heat.id, uhd.id].toSorted())
-    expect(metadata.image({ itemId, kind: 'poster' })).toEqual({ source: 'local', ref: poster })
+    expect(images.image({ itemId, kind: 'poster' })).toEqual({ source: 'local', ref: poster })
   })
 
   it('places a show folder: extras off, and the still kept whichever version comes last', async () => {
-    const { metadata, files, matchers, pass } = services()
+    const { images, metadata, files, matchers, pass } = services()
     const thumbed = under('Shows', 'Severance/Season 01/Severance - S01E01.mkv')
     const plain = under('Shows', 'Severance/Season 01/Severance - S01E01 2160p.mkv')
     const second = under('Shows', 'Severance/Season 01/Severance - S01E02.mkv')
@@ -199,7 +210,7 @@ describe('matching by library type', () => {
     const seasonId = metadata.child({ parentId: showId, number: 1 })?.id ?? -1
     const episodeId = metadata.child({ parentId: seasonId, number: 1 })?.id ?? -1
     expect(metadata.mediaUnder(episodeId).toSorted()).toEqual([thumbed.id, plain.id].toSorted())
-    expect(metadata.image({ itemId: episodeId, kind: 'still' })).toEqual({
+    expect(images.image({ itemId: episodeId, kind: 'still' })).toEqual({
       source: 'local',
       ref: still,
     })
@@ -207,7 +218,7 @@ describe('matching by library type', () => {
     // Matching the version without a still again keeps the other's.
     files.reset([plain.id])
     await matchers.show.match({ files: [plain], pass: pass() })
-    expect(metadata.image({ itemId: episodeId, kind: 'still' })).toEqual({
+    expect(images.image({ itemId: episodeId, kind: 'still' })).toEqual({
       source: 'local',
       ref: still,
     })

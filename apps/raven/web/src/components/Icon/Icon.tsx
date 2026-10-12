@@ -37,6 +37,7 @@ export type IconName =
   | 'filmSpark'
   | 'tv'
   | 'tvSpark'
+  | 'image'
   | 'ascending'
   | 'descending'
   | 'trophy'
@@ -98,6 +99,7 @@ const PATHS: Record<IconName, string> = {
   tv: 'M3 8h18v12H3zM8 3.5l4 4.5 4-4.5',
   tvSpark:
     'M3 8h18v12H3zM8 3.5l4 4.5 4-4.5M12 10.5L13 13 15.5 14 13 15 12 17.5 11 15 8.5 14 11 13z',
+  image: 'M3 5h18v14H3zM3 16l5-5 4 4 3-3 6 6M14 9a1.5 1.5 0 1 0 3 0 1.5 1.5 0 1 0-3 0',
   ascending: 'M7 20V4M3 8l4-4 4 4M13 7h3M13 12h5M13 17h7',
   descending: 'M7 4v16M3 16l4 4 4-4M13 7h7M13 12h5M13 17h3',
   trophy: 'M7 4h10v5a5 5 0 0 1-10 0zM7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3M12 14v6M8 20h8',

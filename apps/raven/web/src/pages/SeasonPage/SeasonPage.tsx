@@ -2,7 +2,6 @@ import { useQuery } from '@tanstack/react-query'
 import type { EpisodeSummary, ItemDetails } from '@raven/core'
 import { useId } from 'react'
 import { Link } from 'react-router-dom'
-import { ButtonLink } from '@/components/Button/Button'
 import { Icon } from '@/components/Icon/Icon'
 import { ItemHeader } from '@/components/ItemHeader/ItemHeader'
 import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
@@ -78,11 +77,8 @@ const SeasonView = ({ show, season }: { show: ItemDetails; season: ItemDetails }
   const count = episodes.length
   return (
     <article className={styles.page} aria-labelledby={ids.title}>
-      <ButtonLink to={`/shows/${show.id}`} icon="back" className={styles.back}>
-        {show.title}
-      </ButtonLink>
-
       <ItemHeader
+        back={{ to: `/shows/${show.id}`, label: show.title }}
         titleId={ids.title}
         title={season.title}
         byline={show.title}

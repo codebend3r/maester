@@ -18,6 +18,8 @@ import {
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createApp } from '@/app'
 import { readServerConfig } from '@/config'
+import { DatabaseService } from '@/db/database'
+import { ItemRefresher } from '@/metadata/itemRefresher'
 import { MatchFiles } from '@/metadata/matchFiles'
 import { MetadataService } from '@/metadata/metadataService'
 import { ScannerService } from '@/scanner/scannerService'
@@ -201,12 +203,43 @@ describe('movie metadata', () => {
     expect(items.find((item) => item.title === 'Unknown Thing')?.year).toBe(2020)
   })
 
+  it("gives a matched card its movie's backdrop version, and none to a file matched to nothing", async () => {
+    const items = await list()
+    const heat = items.find((item) => item.item?.title === 'Heat')
+    expect(heat?.item?.backdropVersion).toEqual(expect.any(String))
+    expect(items.find((item) => item.title === 'Unknown Thing')?.item).toBeNull()
+  })
+
   it('starts a Movies library grouped into matched and not', async () => {
     const library = shape({
       response: await app().inject({ method: 'GET', url: `/api/libraries/${state.library}` }),
       guard: isLibrary,
     })
     expect(library.settings).toMatchObject({ kind: 'movies', view: 'grouped', groupBy: 'match' })
+  })
+
+  it("serves a movie's logo for its page, and learns an older movie's in the sweep", async () => {
+    const heat = await byFile('Heat.mp4')
+    const logoOf = async () =>
+      shape({
+        response: await app().inject({ method: 'GET', url: `/api/items/${heat.item?.id}` }),
+        guard: isItemDetails,
+      }).logoVersion
+    const version = await logoOf()
+    expect(version).toEqual(expect.any(String))
+    const logo = await app().inject({
+      method: 'GET',
+      url: `/api/items/${heat.item?.id}/images/logo?v=${version}`,
+    })
+    expect(logo.statusCode).toBe(200)
+    expect(logo.headers['content-type']).toBe('image/png')
+
+    const db = app().get(DatabaseService).db
+    db.prepare("DELETE FROM item_images WHERE kind = 'logo'").run()
+    db.prepare("UPDATE items SET logo_checked = 0 WHERE type = 'movie'").run()
+    expect(await logoOf()).toBeNull()
+    await app().get(ItemRefresher).sweep()
+    expect(await logoOf()).toBe(version)
   })
 
   it('asked again without the article when "The Few Good Men" found nothing', () => {
@@ -561,8 +594,12 @@ describe('movie metadata', () => {
       url: `/api/images/poster${results[0]?.poster}`,
     })
     expect(poster.statusCode).toBe(200)
-    const sneaky = await app().inject({ method: 'GET', url: '/api/images/poster/..%2Fsecret.jpg' })
-    expect(sneaky.statusCode).toBe(404)
+    const statusOf = async (url: string) => (await app().inject({ method: 'GET', url })).statusCode
+    expect(await statusOf('/api/images/backdrop/backdrop11.jpg')).toBe(200)
+    expect(await statusOf('/api/images/logo/logo11.png')).toBe(200)
+    // A still is never offered, so it is no picture to serve, and nor is a path off TMDB's CDN.
+    expect(await statusOf('/api/images/still/still11.jpg')).toBe(404)
+    expect(await statusOf('/api/images/poster/..%2Fsecret.jpg')).toBe(404)
   })
 
   it('keeps a Fix match through a rename', async () => {

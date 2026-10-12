@@ -5,6 +5,7 @@ import {
   TmdbClient,
   TmdbError,
   mergeCredits,
+  pickLogo,
   toSeason,
   toShow,
 } from '@/metadata/tmdbClient'
@@ -54,6 +55,68 @@ describe('TmdbClient', () => {
       ['Lana Wachowski', 'director', 'Director'],
       ['Lilly Wachowski', 'writer', 'Screenplay'],
     ])
+  })
+
+  it('reads the collection a movie belongs to as its saga, and none for one in no collection', async () => {
+    const tmdb = fakeTmdb({
+      movies: [
+        {
+          id: 120,
+          title: 'The Fellowship of the Ring',
+          released: '2001-12-18',
+          saga: { id: 119, name: 'The Lord of the Rings Collection' },
+        },
+        { id: 949, title: 'Heat', released: '1995-12-15' },
+      ],
+    })
+    const client = new TmdbClient(config(), tmdb.fetch)
+    const saga = { tmdbId: '119', name: 'The Lord of the Rings Collection' }
+    expect((await client.movie('120')).saga).toEqual(saga)
+    expect((await client.movie('949')).saga).toBeNull()
+    expect(await client.movieExtras('120')).toEqual({ saga, logo: '/logo120.png' })
+    expect((await client.movieExtras('949')).saga).toBeNull()
+    // The saga and logo alone ask for the movie with its pictures, and nothing else appended.
+    const asked = new URL(tmdb.state.calls.at(-1) ?? '')
+    expect(asked.pathname).toBe('/3/movie/949')
+    expect(asked.searchParams.get('append_to_response')).toBe('images')
+  })
+
+  it("reads a movie's logo: a PNG in the language asked for, before one with none", async () => {
+    const tmdb = fakeTmdb({ movies: [{ id: 603, title: 'The Matrix', released: '1999-03-31' }] })
+    const client = new TmdbClient(config(), tmdb.fetch)
+    expect((await client.movie('603')).images.logo).toBe('/logo603.png')
+    expect((await client.movieExtras('603')).logo).toBe('/logo603.png')
+    expect(tmdb.state.calls.at(-1)).toContain('include_image_language=en%2Cnull')
+  })
+
+  it('lists every PNG logo for Edit images, passing over an SVG, and none for a show', async () => {
+    const tmdb = fakeTmdb({
+      movies: [{ id: 603, title: 'The Matrix', released: '1999-03-31' }],
+      shows: [{ id: 1399, title: 'Game of Thrones', first: '2011-04-17', seasons: {} }],
+    })
+    const client = new TmdbClient(config(), tmdb.fetch)
+    const movie = await client.images({ type: 'movie', tmdbId: '603' })
+    expect(movie.logo.map((logo) => [logo.path, logo.language])).toEqual([
+      ['/logo603-fr.png', 'fr'],
+      ['/logo603.png', 'en'],
+      ['/logo603-plain.png', null],
+    ])
+    expect((await client.images({ type: 'show', tmdbId: '1399' })).logo).toEqual([])
+  })
+
+  it('takes a logo with no language when none is in the language, and never an SVG', () => {
+    const logo = (path: string, language: string | null) => ({
+      file_path: path,
+      iso_639_1: language,
+    })
+    expect(
+      pickLogo({
+        logos: [logo('/a.svg', 'en'), logo('/b.png', 'fr'), logo('/c.png', null)],
+        language: 'en',
+      }),
+    ).toBe('/c.png')
+    expect(pickLogo({ logos: [logo('/a.svg', 'en')], language: 'en' })).toBeNull()
+    expect(pickLogo({ logos: undefined, language: 'en' })).toBeNull()
   })
 
   it('sends the token as a bearer token and the language on every call', async () => {

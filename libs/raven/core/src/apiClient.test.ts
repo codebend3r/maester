@@ -90,6 +90,7 @@ describe('createApiClient', () => {
         },
       ],
       backdrop: [],
+      logo: [],
     }
     const { client, calls } = clientReturning(respond({ body: options }))
     await expect(client.getItemImages(9)).resolves.toEqual(options)
@@ -162,6 +163,16 @@ describe('createApiClient', () => {
     const { client, calls } = clientReturning(respond({ body: [entry] }))
     await expect(client.listFavourites()).resolves.toEqual([entry])
     expect(calls[0]?.url).toBe('http://nas:8484/api/favourites')
+  })
+
+  it('reads and changes the display settings', async () => {
+    const { client, calls } = clientReturning(respond({ body: { titles: 'text' } }))
+    await expect(client.getDisplaySettings()).resolves.toEqual({ titles: 'text' })
+    await expect(client.setDisplaySettings({ titles: 'text' })).resolves.toEqual({ titles: 'text' })
+    expect(calls.map((call) => [call.url, call.init?.method])).toEqual([
+      ['http://nas:8484/api/settings/display', 'GET'],
+      ['http://nas:8484/api/settings/display', 'PUT'],
+    ])
   })
 
   it('records that a video started playing', async () => {

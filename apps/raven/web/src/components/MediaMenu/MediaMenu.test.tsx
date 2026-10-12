@@ -5,7 +5,7 @@ import { ApiError, type MediaItem } from '@raven/core'
 import { useState } from 'react'
 import { MediaMenu } from '@/components/MediaMenu/MediaMenu'
 import { api } from '@/lib/api'
-import { mediaItem } from '@/test/fixtures'
+import { itemDetails, itemSummary, matchedMovie, mediaItem } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 
 /** The card owns the open state so a right click can open the menu too. */
@@ -73,6 +73,61 @@ describe('MediaMenu', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(reason)
     expect(screen.getByRole('dialog')).toBeInTheDocument()
     spy.mockRestore()
+  })
+
+  describe('Edit images', () => {
+    const spies = {
+      item: spyOn(api, 'getItem'),
+      images: spyOn(api, 'getItemImages'),
+      libraries: spyOn(api, 'listLibraries'),
+    }
+    const asked: number[] = []
+
+    const serve = () => {
+      asked.length = 0
+      spies.item.mockImplementation(async (id) => {
+        asked.push(id)
+        return itemDetails({ id })
+      })
+      spies.images.mockImplementation(async () => ({ poster: [], backdrop: [], logo: [] }))
+      spies.libraries.mockImplementation(async () => [])
+    }
+
+    const openAny = () => userEvent.click(screen.getByRole('button', { name: /^Options for / }))
+
+    it("opens a movie's pictures in a dialog over the page, and closes on Done", async () => {
+      serve()
+      renderWithProviders(<Harness media={matchedMovie()} />)
+      await openAny()
+      await userEvent.click(screen.getByRole('menuitem', { name: 'Edit images' }))
+      const dialog = await screen.findByRole('dialog', { name: 'Edit images' })
+      expect(
+        await within(dialog).findByRole('heading', { name: 'Edit images' }),
+      ).toBeInTheDocument()
+      expect(asked).toEqual([40])
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }))
+      expect(screen.queryByRole('dialog', { name: 'Edit images' })).toBeNull()
+    })
+
+    it("edits an episode's show's pictures", async () => {
+      serve()
+      const episode = mediaItem({
+        title: 'Severance - S01E01',
+        match: 'matched',
+        item: itemSummary({ id: 91, type: 'episode', show: { id: 90, title: 'Severance' } }),
+      })
+      renderWithProviders(<Harness media={episode} />)
+      await openAny()
+      await userEvent.click(screen.getByRole('menuitem', { name: 'Edit images' }))
+      await screen.findByRole('dialog', { name: 'Edit images' })
+      expect(asked).toEqual([90])
+    })
+
+    it('is not offered for a file matched to nothing', async () => {
+      renderWithProviders(<Harness media={mediaItem()} />)
+      await openAny()
+      expect(screen.queryByRole('menuitem', { name: 'Edit images' })).toBeNull()
+    })
   })
 
   it('closes with Escape and hands focus back to its button', async () => {

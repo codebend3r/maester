@@ -6,18 +6,21 @@ import {
   type ItemDetails,
   type Library,
   type MatchItemType,
-  codecLabel,
-  formatBytes,
-  resolutionLabel,
 } from '@raven/core'
 import { useId, useState } from 'react'
 import { Button } from '@/components/Button/Button'
+import { LogoImage } from '@/components/LogoImage/LogoImage'
 import { api } from '@/lib/api'
 import { afterItemEdited } from '@/lib/invalidate'
+import { versionFacts } from '@/lib/itemFacts'
 import { itemImagesQuery } from '@/lib/queries'
 import styles from '@/components/ImageEditor/ImageEditor.module.scss'
 
-const KIND_LABELS: Record<ChoosableImageKind, string> = { poster: 'Poster', backdrop: 'Backdrop' }
+const KIND_LABELS: Record<ChoosableImageKind, string> = {
+  poster: 'Poster',
+  backdrop: 'Backdrop',
+  logo: 'Logo',
+}
 
 const LANGUAGE_NAMES = new Intl.DisplayNames(['en'], { type: 'language' })
 
@@ -43,7 +46,17 @@ const describe = (option: ImageOption): string =>
 const choiceOf = (option: ImageOption): ImageChoice =>
   option.source === 'local' ? { source: 'local' } : { source: 'tmdb', ref: option.ref }
 
-const KINDS: readonly ChoosableImageKind[] = ['poster', 'backdrop']
+/** A movie's pictures include its logo; a show's page shows none, so it has no logo to choose. */
+const KINDS_OF: Record<MatchItemType, readonly ChoosableImageKind[]> = {
+  movie: ['poster', 'backdrop', 'logo'],
+  show: ['poster', 'backdrop'],
+}
+
+const GRIDS: Record<ChoosableImageKind, string | undefined> = {
+  poster: styles.posters,
+  backdrop: styles.backdrops,
+  logo: styles.logos,
+}
 
 /** One tab's pictures to pick from. */
 const Options = ({
@@ -63,7 +76,7 @@ const Options = ({
     {options.length === 0 ? (
       <p className={styles.hint}>No {kind}s to choose from.</p>
     ) : (
-      <ul className={kind === 'poster' ? styles.posters : styles.backdrops}>
+      <ul className={GRIDS[kind]}>
         {options.map((option) => (
           <li key={`${option.source}:${option.ref}`}>
             <button
@@ -74,12 +87,20 @@ const Options = ({
               disabled={busy || option.current}
               onClick={() => onChoose(option)}
             >
-              <img
-                src={api.imageOptionUrl({ id: itemId, kind, option })}
-                alt=""
-                loading="lazy"
-                decoding="async"
-              />
+              {kind === 'logo' ? (
+                <LogoImage
+                  src={api.imageOptionUrl({ id: itemId, kind, option })}
+                  alt=""
+                  loading="lazy"
+                />
+              ) : (
+                <img
+                  src={api.imageOptionUrl({ id: itemId, kind, option })}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                />
+              )}
               <span className={styles.caption}>{describe(option)}</span>
             </button>
           </li>
@@ -90,8 +111,9 @@ const Options = ({
 )
 
 /**
- * Edit images: every poster and backdrop a movie could show, the current
- * one marked, and the files that are this movie, since they share them.
+ * Edit images: every poster, backdrop and logo a movie could show (a show
+ * has no logo), the current one marked, and the files that are this movie,
+ * since they share them.
  */
 export const ImageEditor = ({
   details,
@@ -107,6 +129,7 @@ export const ImageEditor = ({
 }) => {
   const ids = { heading: useId(), versions: useId(), tabs: useId() }
   const [tab, setTab] = useState<ChoosableImageKind>('poster')
+  const kinds = KINDS_OF[itemKind]
   const queryClient = useQueryClient()
   const options = useQuery(itemImagesQuery(details.id))
   const choose = useMutation({
@@ -142,12 +165,9 @@ export const ImageEditor = ({
             {details.versions.map((version) => {
               const facts = [
                 version.edition ?? 'Standard',
-                resolutionLabel(version),
-                version.hdr ? 'HDR' : null,
-                version.videoCodec ? codecLabel(version.videoCodec) : null,
-                formatBytes(version.size),
+                ...versionFacts(version),
                 libraryName(version.libraryId),
-              ].filter((fact): fact is string => fact != null && fact !== '')
+              ].filter((fact) => fact !== '')
               return (
                 <li key={version.id} className={styles.version}>
                   <span className={styles.facts}>
@@ -179,7 +199,7 @@ export const ImageEditor = ({
       {options.data && (
         <section className={styles.group}>
           <div role="tablist" aria-label="Pictures" className={styles.tabs}>
-            {KINDS.map((kind) => (
+            {kinds.map((kind) => (
               <button
                 key={kind}
                 type="button"
@@ -193,7 +213,8 @@ export const ImageEditor = ({
                 onKeyDown={(event) => {
                   if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
                   event.preventDefault()
-                  const next = KINDS[(KINDS.indexOf(kind) + 1) % KINDS.length] ?? kind
+                  const step = event.key === 'ArrowRight' ? 1 : kinds.length - 1
+                  const next = kinds[(kinds.indexOf(kind) + step) % kinds.length] ?? kind
                   setTab(next)
                   document.getElementById(`${ids.tabs}-${next}`)?.focus()
                 }}

@@ -94,7 +94,7 @@ export const MediaCard = ({
         ))}
         <PartlyWatched media={media} />
       </span>
-      <PlaybackNote media={media} place="card" />
+      <PlaybackNote media={media} />
       {menu.menu}
     </li>
   )

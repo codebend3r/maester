@@ -20,32 +20,29 @@ import {
   type ImageOption,
   isImageChoice,
   isItemImageKind,
-  isItemImageOptions,
   isItemMetadataChange,
   isMatchItemType,
   isShowMatchChoice,
   type ItemDetails,
   type ItemImageOptions,
   type ItemMetadataState,
-  keyOf,
   type MediaItem,
 } from '@raven/core'
 import type { FastifyReply } from 'fastify'
+import { isChoosableImageKind } from '@/items/imageKinds'
 import { itemChildren } from '@/items/itemChildren'
 import { sendImage } from '@/items/sendImage'
 import { PrivateBy } from '@/lock/lockGuard'
 import { LockService } from '@/lock/lockService'
 import { MediaRepository } from '@/media/mediaRepository'
 import { ImageCache } from '@/metadata/imageCache'
+import { ItemImagesRepository } from '@/metadata/itemImagesRepository'
 import { ItemOverrides } from '@/metadata/itemOverrides'
 import { ItemRefresher } from '@/metadata/itemRefresher'
 import { isLocal } from '@/metadata/localItems'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 import { MetadataService } from '@/metadata/metadataService'
 import { TMDB_IMAGE_PATH, TmdbClient, TmdbError } from '@/metadata/tmdbClient'
-
-/** The pictures Edit images chooses between: a poster and a backdrop. */
-const isChoosableImageKind = keyOf(isItemImageOptions.shape)
 
 /** Movies, shows, seasons and episodes: their pages, their pictures, and fetching them again. */
 @Controller('api/items')
@@ -58,6 +55,7 @@ export class ItemsController {
     @Inject(ItemRefresher) private readonly refresher: ItemRefresher,
     @Inject(ItemOverrides) private readonly overrides: ItemOverrides,
     @Inject(ImageCache) private readonly images: ImageCache,
+    @Inject(ItemImagesRepository) private readonly stored: ItemImagesRepository,
     @Inject(TmdbClient) private readonly tmdb: TmdbClient,
     @Inject(LockService) private readonly lock: LockService,
   ) {}
@@ -180,8 +178,9 @@ export class ItemsController {
   }
 
   /**
-   * Edit images: every poster and backdrop a movie or show could show, the
-   * one beside the media first, then TMDB's, with the current one marked.
+   * Edit images: every poster and backdrop a movie or show could show, and
+   * every logo a movie could, the one beside the media first, then TMDB's,
+   * with the current one marked.
    */
   @Get(':id/images')
   async imageOptions(@Param('id', ParseIntPipe) id: number): Promise<ItemImageOptions> {
@@ -197,12 +196,12 @@ export class ItemsController {
             if (error instanceof TmdbError) throw new ServiceUnavailableException(error.message)
             throw error
           })
-        : { posters: [], backdrops: [] }
+        : { poster: [], backdrop: [], logo: [] }
     const options = (kind: ChoosableImageKind): ImageOption[] => {
-      const current = this.metadata.image({ itemId: id, kind })
-      const local = this.metadata.imageFrom({ itemId: id, kind, source: 'local' })
-      const own = this.metadata.imageFrom({ itemId: id, kind, source: 'tmdb' })
-      const tmdb = kind === 'poster' ? fetched.posters : fetched.backdrops
+      const current = this.stored.image({ itemId: id, kind })
+      const local = this.stored.imageFrom({ itemId: id, kind, source: 'local' })
+      const own = this.stored.imageFrom({ itemId: id, kind, source: 'tmdb' })
+      const tmdb = fetched[kind]
       // TMDB's own choice is offered even when the images call left it out.
       const listed =
         own != null && !tmdb.some((image) => image.path === own)
@@ -231,7 +230,12 @@ export class ItemsController {
         })),
       ]
     }
-    return { poster: options('poster'), backdrop: options('backdrop') }
+    return {
+      poster: options('poster'),
+      backdrop: options('backdrop'),
+      // A show's page shows no logo, so it has none to choose.
+      logo: type === 'movie' ? options('logo') : [],
+    }
   }
 
   /** Edit images: `{ source: 'tmdb', ref }` shows that picture of TMDB's; `{ source: 'local' }` goes back to the one beside the media, or TMDB's own. */
@@ -250,7 +254,7 @@ export class ItemsController {
     if (body.source === 'tmdb' && !TMDB_IMAGE_PATH.test(body.ref)) {
       throw new BadRequestException('ref must be a TMDB image path')
     }
-    this.metadata.chooseImage({
+    this.stored.chooseImage({
       itemId: id,
       kind,
       ref: body.source === 'tmdb' ? body.ref : null,
@@ -266,7 +270,7 @@ export class ItemsController {
     @Res() reply: FastifyReply,
   ): Promise<void> {
     if (!isItemImageKind(kind)) throw new NotFoundException(`No ${kind} pictures`)
-    const local = this.metadata.imageFrom({ itemId: id, kind, source: 'local' })
+    const local = this.stored.imageFrom({ itemId: id, kind, source: 'local' })
     const path =
       local == null ? null : await this.images.local({ itemId: id, kind, source: local, use: kind })
     await sendImage({ reply, path, version: undefined })
@@ -281,20 +285,22 @@ export class ItemsController {
     @Res() reply: FastifyReply,
   ): Promise<void> {
     if (!isItemImageKind(kind)) throw new NotFoundException(`No ${kind} pictures`)
-    const image = this.metadata.image({ itemId: id, kind })
+    const image = this.stored.image({ itemId: id, kind })
     const chosen =
       image?.source === 'chosen' ? await this.images.tmdb({ path: image.ref, use: kind }) : null
     const localRef =
       image?.source === 'local'
         ? image.ref
-        : this.metadata.imageFrom({ itemId: id, kind, source: 'local' })
+        : this.stored.imageFrom({ itemId: id, kind, source: 'local' })
     const local =
       chosen == null && localRef != null
         ? await this.images.local({ itemId: id, kind, source: localRef, use: kind })
         : null
     // A picture beside the media that will not decode falls back to TMDB's.
     const tmdbPath =
-      chosen == null && local == null ? this.metadata.tmdbImage({ itemId: id, kind }) : null
+      chosen == null && local == null
+        ? this.stored.imageFrom({ itemId: id, kind, source: 'tmdb' })
+        : null
     const path =
       chosen ??
       local ??

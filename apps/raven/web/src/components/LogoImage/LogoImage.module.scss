@@ -1,0 +1,4 @@
+// A dark logo drawn in white, so it reads on the night.
+.whitened {
+  filter: brightness(0) invert(1);
+}

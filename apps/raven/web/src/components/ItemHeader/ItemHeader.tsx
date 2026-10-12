@@ -1,7 +1,9 @@
 import type { Rating } from '@raven/core'
-import type { ReactNode } from 'react'
+import { type ReactNode, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { ButtonLink } from '@/components/Button/Button'
 import { Icon } from '@/components/Icon/Icon'
+import { LogoImage } from '@/components/LogoImage/LogoImage'
 import { RatingChips } from '@/components/RatingChips/RatingChips'
 import type { watchLink } from '@/lib/itemLinks'
 import styles from '@/components/ItemHeader/ItemHeader.module.scss'
@@ -41,8 +43,28 @@ const Picture = ({ picture, title }: { picture: HeaderPicture; title: string }) 
 }
 
 /**
- * The top of a movie, show or episode page: the backdrop fading into the
- * page behind it, the picture (a poster, or an episode's still), the title
+ * The title as its logo, else in display type. A logo that fails to load
+ * falls back to the words. The shadow falls from a wrapper, so it follows
+ * the logo as drawn, whitened or not.
+ */
+const TitleArt = ({ title, logo }: { title: string; logo: string | null }) => {
+  const [hasFailed, setFailed] = useState(false)
+  if (!logo || hasFailed) return title
+  return (
+    <span className={styles.logo}>
+      <LogoImage
+        className={styles.logoImage}
+        src={logo}
+        alt={title}
+        onError={() => setFailed(true)}
+      />
+    </span>
+  )
+}
+
+/**
+ * The top of a movie, show or episode page: the way back over the corner of
+ * the backdrop, the backdrop fading into the page behind it, the picture (a poster, or an episode's still), the title
  * in display type with who made it beneath, the facts, the scores, and the
  * page's actions. A picture that plays its video shows a play mark on hover
  * and focus. On a narrow screen the picture sits above the rest.
@@ -56,6 +78,8 @@ export const ItemHeader = ({
   ratings,
   picture,
   backdrop,
+  logo = null,
+  back,
   children,
 }: {
   titleId: string
@@ -68,16 +92,25 @@ export const ItemHeader = ({
   /** Left out for a page with no picture beside its title. */
   picture?: HeaderPicture
   backdrop: string | null
+  /** The title as art, shown in its place: a movie's logo. */
+  logo?: string | null
+  /** Where the page goes back to, laid over the backdrop's top corner. */
+  back: { to: string; label: string }
   /** The page's actions: Play, favourite, the menu. */
   children?: ReactNode
 }) => (
   <header className={styles.hero}>
     {backdrop && <img className={styles.backdrop} src={backdrop} alt="" decoding="async" />}
+    <div className={styles.top}>
+      <ButtonLink to={back.to} icon="back" className={styles.back}>
+        {back.label}
+      </ButtonLink>
+    </div>
     <div className={LAYOUTS[picture?.shape ?? 'none']}>
       {picture && <Picture picture={picture} title={title} />}
       <div className={styles.details}>
         <h1 id={titleId} className={styles.title}>
-          {title}
+          <TitleArt key={logo ?? 'none'} title={title} logo={logo} />
         </h1>
         {byline && <p className={styles.byline}>{byline}</p>}
         {(contentRating != null || facts.length > 0) && (

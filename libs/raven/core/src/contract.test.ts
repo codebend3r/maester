@@ -262,7 +262,7 @@ describe('the choice lists', () => {
     expect(isMediaSort('loudest')).toBe(false)
     expect(STREAM_MODES).toEqual(['remux', 'transcode'])
     expect(isStreamMode('direct')).toBe(false)
-    expect(ITEM_IMAGE_KINDS).toEqual(['poster', 'backdrop', 'still'])
+    expect(ITEM_IMAGE_KINDS).toEqual(['poster', 'backdrop', 'still', 'logo'])
     expect(isItemImageKind('banner')).toBe(false)
     expect(isHwAccel('vaapi')).toBe(true)
     expect(isHwAccel('cuda')).toBe(false)

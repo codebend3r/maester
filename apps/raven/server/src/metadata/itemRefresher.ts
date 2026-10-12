@@ -22,7 +22,8 @@ const DAY_MS = 24 * 60 * 60 * 1000
 /**
  * Fetches items from TMDB again: one at a time when asked, and every day the
  * ones that have gone stale. An item TMDB no longer has is forgotten, and
- * its files go back to be matched again.
+ * its files go back to be matched again. Movies stored before raven kept
+ * sagas and logos learn theirs in the same sweep.
  */
 @Injectable()
 export class ItemRefresher implements OnApplicationBootstrap, OnModuleDestroy {
@@ -155,7 +156,35 @@ export class ItemRefresher implements OnApplicationBootstrap, OnModuleDestroy {
       fn: ({ id }) => guard.run(() => this.refresh(id)),
     })
     guard.reportStop()
+    await this.fillMovieExtras()
     await this.scores.fillDue()
     await this.pictures.clearUp()
+  }
+
+  /**
+   * Asks TMDB for the saga and logo of each movie stored before raven kept
+   * them: the movie with its pictures, one call each, so no credits or
+   * scores are fetched again. One TMDB no longer has is noted as in no saga
+   * and with no logo; the sweep that refreshes it forgets it.
+   */
+  private async fillMovieExtras(): Promise<void> {
+    const guard = new PassGuard({
+      logger: this.logger,
+      failed: "Could not read a movie's saga and logo",
+      stopped: 'Reading sagas and logos stopped for now',
+    })
+    await mapWithConcurrency({
+      items: this.metadata.extrasUnchecked(),
+      limit: PASS_CONCURRENCY,
+      fn: ({ id, tmdbId }) =>
+        guard.run(async () => {
+          const extras = await this.tmdb.movieExtras(tmdbId).catch((error: unknown) => {
+            if (notFound(error)) return { saga: null, logo: null }
+            throw error
+          })
+          this.metadata.saveMovieExtras({ itemId: id, ...extras })
+        }),
+    })
+    guard.reportStop()
   }
 }

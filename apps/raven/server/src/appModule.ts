@@ -24,6 +24,7 @@ import { MediaIndex } from '@/media/mediaIndex'
 import { MediaRepository } from '@/media/mediaRepository'
 import { ViewingRepository } from '@/media/viewingRepository'
 import { ImageCache } from '@/metadata/imageCache'
+import { ItemImagesRepository } from '@/metadata/itemImagesRepository'
 import { ItemOverrides } from '@/metadata/itemOverrides'
 import { ItemPictures } from '@/metadata/itemPictures'
 import { ItemRefresher } from '@/metadata/itemRefresher'
@@ -95,6 +96,7 @@ export class AppModule {
         ServerEvents,
         LibrariesRepository,
         SettingsRepository,
+        ItemImagesRepository,
         MetadataRepository,
         ItemOverrides,
         MediaRepository,

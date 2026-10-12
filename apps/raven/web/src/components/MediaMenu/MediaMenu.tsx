@@ -1,5 +1,5 @@
 import { type UseMutationResult, useQuery } from '@tanstack/react-query'
-import { type MatchItemType, type MediaItem, mediaLabel } from '@raven/core'
+import { type ItemSummary, type MatchItemType, type MediaItem, mediaLabel } from '@raven/core'
 import {
   Fragment,
   type KeyboardEvent,
@@ -12,6 +12,7 @@ import {
 import { Button } from '@/components/Button/Button'
 import { FixMatchDialog } from '@/components/FixMatchDialog/FixMatchDialog'
 import { Icon, type IconName } from '@/components/Icon/Icon'
+import { ImageEditorDialog } from '@/components/ImageEditor/ImageEditorDialog'
 import { api } from '@/lib/api'
 import { copyText } from '@/lib/clipboard'
 import { mediaLocationQuery } from '@/lib/queries'
@@ -77,6 +78,16 @@ const ConfirmDelete = ({
       </div>
     </dialog>
   )
+}
+
+/**
+ * Whose pictures Edit images changes: a movie's own, or an episode's show's;
+ * none for a file matched to nothing.
+ */
+const artworkOf = (item: ItemSummary | null): { id: number; kind: MatchItemType } | null => {
+  if (item?.type === 'movie') return { id: item.id, kind: 'movie' }
+  if (item?.type === 'episode' && item.show) return { id: item.show.id, kind: 'show' }
+  return null
 }
 
 /** One entry in the menu. */
@@ -176,9 +187,11 @@ const MenuBody = ({
   const list = useRef<HTMLUListElement>(null)
   const [confirming, setConfirming] = useState(false)
   const [fixing, setFixing] = useState(false)
+  const [editingImages, setEditingImages] = useState(false)
   const { favourite, remove, refresh } = useMediaMutations({ media })
   const matchable = matchType != null && media.match !== 'off'
   const item = media.item
+  const artwork = artworkOf(item)
 
   const items = (): HTMLButtonElement[] =>
     Array.from(list.current?.querySelectorAll('button') ?? [])
@@ -262,6 +275,16 @@ const MenuBody = ({
               }}
             />
           )}
+          {artwork && (
+            <MenuItem
+              icon="image"
+              label="Edit images"
+              onClick={() => {
+                close({ refocus: false })
+                setEditingImages(true)
+              }}
+            />
+          )}
           <MenuItem
             icon="trash"
             label="Delete"
@@ -292,6 +315,17 @@ const MenuBody = ({
         />
       )}
 
+      {editingImages && artwork && (
+        <ImageEditorDialog
+          itemId={artwork.id}
+          itemKind={artwork.kind}
+          onClose={() => {
+            setEditingImages(false)
+            trigger.current?.focus()
+          }}
+        />
+      )}
+
       {fixing && matchType != null && (
         <FixMatchDialog
           type={matchType}
@@ -312,8 +346,9 @@ const MenuBody = ({
 
 /**
  * A card's context menu: mark or unmark a favourite, fix the match or fetch
- * the details again where the library matches its files, delete the video,
- * or see and copy where its file lives. The card owns `open`, so a right
+ * the details again where the library matches its files, change the
+ * pictures of its movie or show, delete the video, or see and copy where its
+ * file lives. The card owns `open`, so a right
  * click anywhere on it opens this same menu; the button here is the
  * discoverable way in for touch and keyboard. Until it first opens it is
  * only that button.

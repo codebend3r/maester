@@ -1,10 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { MediaIndex } from '@/media/mediaIndex'
-import { MediaRepository } from '@/media/mediaRepository'
 import { ViewingRepository } from '@/media/viewingRepository'
-import { MetadataRepository } from '@/metadata/metadataRepository'
 import { testDatabase } from '@/test/database'
+import { repositories } from '@/test/repositories'
 
 const MINUTE = {
   duration: 60,
@@ -20,7 +19,7 @@ const MINUTE = {
 
 describe('play history', () => {
   const database = testDatabase('raven-history-')
-  const media = () => new MediaRepository(database.get(), new MetadataRepository(database.get()))
+  const media = () => repositories(database.get()).media
   const viewing = () => new ViewingRepository(database.get(), media())
   const index = () => new MediaIndex(database.get())
   const libraries = () => new LibrariesRepository(database.get())

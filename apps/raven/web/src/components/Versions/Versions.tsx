@@ -1,7 +1,8 @@
-import { type Library, type MediaItem, codecLabel, formatBytes, resolutionLabel } from '@raven/core'
+import type { Library, MediaItem } from '@raven/core'
 import { useId } from 'react'
 import { Link } from 'react-router-dom'
 import { Icon } from '@/components/Icon/Icon'
+import { versionFacts } from '@/lib/itemFacts'
 import styles from '@/components/Versions/Versions.module.scss'
 
 /** Every file that is this movie, best first, each playable on its own. Shown only when there is more than one. */
@@ -24,10 +25,7 @@ export const Versions = ({
       <ul className={styles.list}>
         {versions.map((version) => {
           const facts = [
-            resolutionLabel(version),
-            version.hdr ? 'HDR' : null,
-            version.videoCodec ? codecLabel(version.videoCodec) : null,
-            formatBytes(version.size),
+            ...versionFacts(version),
             version.edition,
             libraryName(version.libraryId),
           ].filter((fact): fact is string => fact != null && fact !== '')

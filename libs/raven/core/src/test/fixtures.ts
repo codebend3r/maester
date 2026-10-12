@@ -80,6 +80,7 @@ export const itemSummary = (overrides: Partial<ItemSummary> = {}): ItemSummary =
   season: null,
   episode: null,
   posterVersion: 'f89JxwBCi9N',
+  backdropVersion: null,
   ratings: [{ source: 'tmdb', kind: 'audience', value: 8.2, votes: 26_000 }],
   ...overrides,
 })
@@ -154,6 +155,7 @@ export const itemDetails = (overrides: Partial<ItemDetails> = {}): ItemDetails =
   studio: 'Warner Bros. Pictures',
   genres: ['Action', 'Science Fiction'],
   backdropVersion: 'tlm8UkiQsit',
+  logoVersion: null,
   reviews: [],
   credits: [
     { personId: 1, name: 'Keanu Reeves', job: 'cast', role: 'Neo', photoVersion: 'abc' },

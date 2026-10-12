@@ -3,6 +3,7 @@ import {
   type MediaItem,
   type MediaTracks,
   codecLabel,
+  formatBytes,
   formatChannels,
   formatRuntime,
   resolutionLabel,
@@ -143,3 +144,12 @@ export const fileFacts = ({
     { label: 'Subtitles', value: subtitles },
   ].filter((fact) => fact.value !== '')
 }
+
+/** What sets one file of a movie apart from its other files: its resolution, HDR, codec and size. */
+export const versionFacts = (media: MediaItem): string[] =>
+  [
+    resolutionLabel(media),
+    media.hdr ? 'HDR' : null,
+    media.videoCodec ? codecLabel(media.videoCodec) : null,
+    formatBytes(media.size),
+  ].filter((fact): fact is string => fact != null && fact !== '')

@@ -6,8 +6,23 @@
 }
 
 .backdrop,
+.top,
 .content {
   grid-area: hero;
+}
+
+// The way back sits in the backdrop's top corner, over the content, on a
+// glass of the night so it reads over any picture.
+.top {
+  z-index: 2;
+  align-self: start;
+  justify-self: start;
+  padding: var(--space-3) var(--space-4);
+}
+
+.back {
+  border-color: transparent;
+  background: var(--color-night-glass);
 }
 
 // Decorative, and still: it fades into the night behind the page. Its
@@ -140,6 +155,24 @@
   font-weight: 400;
   line-height: var(--line-tight);
   overflow-wrap: anywhere;
+}
+
+// The logo stands where the title would, held to a title's size, with the
+// same shadow the words have against a bright backdrop. The shadow is the
+// wrapper's, so it adds to the logo's own whitening filter.
+.logo {
+  display: block;
+  filter: drop-shadow(var(--shadow-text));
+}
+
+.logoImage {
+  display: block;
+  width: auto;
+  max-width: min(30rem, 100%);
+  height: auto;
+  max-height: 8rem;
+  object-fit: contain;
+  object-position: left bottom;
 }
 
 .byline {

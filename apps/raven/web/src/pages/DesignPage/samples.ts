@@ -144,6 +144,7 @@ const sampleMovie = (
   season: null,
   episode: null,
   posterVersion: null,
+  backdropVersion: null,
   ratings: [],
   ...overrides,
 })

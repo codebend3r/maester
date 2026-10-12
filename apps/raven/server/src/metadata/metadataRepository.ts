@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto'
 import { Inject, Injectable } from '@nestjs/common'
 import {
   type Credit,
@@ -7,7 +6,6 @@ import {
   isRatingSource,
   isStringArray,
   type ItemDetails,
-  type ItemImageKind,
   type ItemSummary,
   type ItemType,
   type PersonDetails,
@@ -18,18 +16,10 @@ import {
 } from '@raven/core'
 import type Sqlite from 'better-sqlite3'
 import { DatabaseService } from '@/db/database'
+import { ItemImagesRepository, lineOf, versionOf } from '@/metadata/itemImagesRepository'
+import { LOCAL } from '@/metadata/localItems'
 import type { OmdbScore } from '@/metadata/omdbClient'
-import type { FetchedItem } from '@/metadata/tmdbClient'
-
-/** A short stable tag for a picture's source, so its URL changes exactly when the picture does. */
-export const versionOf = (ref: string): string =>
-  createHash('sha1').update(ref).digest('base64url').slice(0, 11)
-
-/** `chosen` is what Edit images picked, a TMDB path; it beats a local picture, which beats TMDB's own. */
-export type ImageSource = 'tmdb' | 'local' | 'chosen'
-
-/** Where an item's picture comes from: a file beside the media wins over TMDB's. */
-export type ImageRef = { source: ImageSource; ref: string }
+import type { FetchedItem, FetchedSaga, MovieExtras } from '@/metadata/tmdbClient'
 
 /** Rotten Tomatoes and Metacritic are critics; TMDB and IMDb are audiences. */
 const RATING_KINDS: Record<RatingSource, Rating['kind']> = {
@@ -71,19 +61,6 @@ type SummaryRow = {
   show_title: string | null
 }
 
-/** The picture each item shows for `kind`: the chosen one first, then local, then TMDB's. */
-const IMAGE_REFS = `
-  SELECT item_id, source, ref FROM item_images
-   WHERE kind = ? AND item_id IN (SELECT value FROM json_each(?))
-   ORDER BY item_id, CASE source WHEN 'chosen' THEN 0 WHEN 'local' THEN 1 ELSE 2 END`
-
-/** An item and the two above it, where it has them: an episode's season and show. */
-type PosterLine = { id: number; parent: number | null; grandparent: number | null }
-
-/** The items a poster may come from, nearest first. */
-const lineOf = (line: PosterLine): number[] =>
-  [line.id, line.parent, line.grandparent].filter((id): id is number => id != null)
-
 /**
  * `under(root, id)`: each item `roots` selects (as `root, id` pairs of
  * itself), and every item beneath it. "A file somewhere under it" is then
@@ -104,9 +81,6 @@ export type StoredItem = {
   number: number | null
 }
 
-const toImageSource = (source: string): ImageSource =>
-  source === 'local' ? 'local' : source === 'chosen' ? 'chosen' : 'tmdb'
-
 const genresOf = (json: string): string[] => {
   try {
     const parsed: unknown = JSON.parse(json)
@@ -119,7 +93,10 @@ const genresOf = (json: string): string[] => {
 /** Movies, shows, seasons and episodes as TMDB describes them, with their people, scores and pictures. */
 @Injectable()
 export class MetadataRepository {
-  constructor(@Inject(DatabaseService) private readonly database: DatabaseService) {}
+  constructor(
+    @Inject(DatabaseService) private readonly database: DatabaseService,
+    @Inject(ItemImagesRepository) private readonly images: ItemImagesRepository,
+  ) {}
 
   private get db(): Sqlite.Database {
     return this.database.db
@@ -210,7 +187,7 @@ export class MetadataRepository {
     }
   > {
     if (ids.length === 0) return new Map()
-    const stills = this.versions({ ids, kind: 'still' })
+    const stills = this.images.versions({ ids, kind: 'still' })
     return new Map(
       this.db
         .prepare<
@@ -305,8 +282,9 @@ export class MetadataRepository {
         .prepare<unknown[], { id: number }>(
           `INSERT INTO items (type, tmdb_id, parent_id, number, title, original_title, sort_title, year,
                               released, ended, summary, tagline, content_rating, runtime, studio, genres,
-                              imdb_id, tvdb_id, fetched_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                              imdb_id, tvdb_id, fetched_at, saga_tmdb_id, saga_name, saga_checked,
+                              logo_checked)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1)
            ON CONFLICT (type, tmdb_id) DO UPDATE SET
              parent_id = excluded.parent_id, number = excluded.number, title = excluded.title,
              original_title = excluded.original_title, sort_title = excluded.sort_title,
@@ -314,7 +292,9 @@ export class MetadataRepository {
              summary = excluded.summary, tagline = excluded.tagline,
              content_rating = excluded.content_rating, runtime = excluded.runtime,
              studio = excluded.studio, genres = excluded.genres, imdb_id = excluded.imdb_id,
-             tvdb_id = excluded.tvdb_id, fetched_at = excluded.fetched_at
+             tvdb_id = excluded.tvdb_id, fetched_at = excluded.fetched_at,
+             saga_tmdb_id = excluded.saga_tmdb_id, saga_name = excluded.saga_name, saga_checked = 1,
+             logo_checked = 1
            RETURNING id`,
         )
         .get(
@@ -337,6 +317,8 @@ export class MetadataRepository {
           item.imdbId,
           item.tvdbId,
           new Date().toISOString(),
+          item.saga?.tmdbId ?? null,
+          item.saga?.name ?? null,
         )
       if (!row) throw new Error(`Could not store ${item.type} ${item.tmdbId}`)
       const id = row.id
@@ -434,105 +416,6 @@ export class MetadataRepository {
     )()
   }
 
-  /** Replaces an item's pictures from beside the media; a kind left out has none. */
-  setLocalImages({
-    itemId,
-    images,
-  }: {
-    itemId: number
-    images: Partial<Record<ItemImageKind, string>>
-  }): void {
-    this.db.transaction(() => {
-      this.db.prepare(`DELETE FROM item_images WHERE item_id = ? AND source = 'local'`).run(itemId)
-      const insert = this.db.prepare(
-        `INSERT INTO item_images (item_id, kind, source, ref) VALUES (?, ?, 'local', ?)`,
-      )
-      Object.entries(images).forEach(([kind, ref]) => insert.run(itemId, kind, ref))
-    })()
-  }
-
-  /** The picture an item shows for `kind`, or null when it has none. */
-  image({ itemId, kind }: { itemId: number; kind: ItemImageKind }): ImageRef | null {
-    const row = this.db
-      .prepare<[string, string], { item_id: number; source: string; ref: string }>(IMAGE_REFS)
-      .get(kind, JSON.stringify([itemId]))
-    if (!row) return null
-    return { source: toImageSource(row.source), ref: row.ref }
-  }
-
-  /** The picture of `source` an item holds for `kind`, whatever it shows. */
-  imageFrom({
-    itemId,
-    kind,
-    source,
-  }: {
-    itemId: number
-    kind: ItemImageKind
-    source: ImageSource
-  }): string | null {
-    return (
-      this.db
-        .prepare<[number, string, string], { ref: string }>(
-          `SELECT ref FROM item_images WHERE item_id = ? AND kind = ? AND source = ?`,
-        )
-        .get(itemId, kind, source)?.ref ?? null
-    )
-  }
-
-  /** Edit images: the item shows TMDB's picture at `ref` for `kind` from now on, or, for null, whatever it would by itself. */
-  chooseImage({
-    itemId,
-    kind,
-    ref,
-  }: {
-    itemId: number
-    kind: ItemImageKind
-    ref: string | null
-  }): void {
-    this.db.transaction(() => {
-      this.db
-        .prepare(`DELETE FROM item_images WHERE item_id = ? AND kind = ? AND source = 'chosen'`)
-        .run(itemId, kind)
-      if (ref != null) {
-        this.db
-          .prepare(
-            `INSERT INTO item_images (item_id, kind, source, ref) VALUES (?, ?, 'chosen', ?)`,
-          )
-          .run(itemId, kind, ref)
-      }
-    })()
-  }
-
-  /** An item's TMDB picture for `kind`, whatever is beside the media. */
-  tmdbImage({ itemId, kind }: { itemId: number; kind: ItemImageKind }): string | null {
-    return (
-      this.db
-        .prepare<[number, string], { ref: string }>(
-          `SELECT ref FROM item_images WHERE item_id = ? AND kind = ? AND source = 'tmdb'`,
-        )
-        .get(itemId, kind)?.ref ?? null
-    )
-  }
-
-  private versions({
-    ids,
-    kind,
-  }: {
-    ids: readonly number[]
-    kind: ItemImageKind
-  }): Map<number, string> {
-    const rows = this.db
-      .prepare<[string, string], { item_id: number; source: string; ref: string }>(IMAGE_REFS)
-      .all(kind, JSON.stringify(ids))
-    return rows.reduce(
-      (versions, row) =>
-        versions.has(row.item_id)
-          ? versions
-          : versions.set(row.item_id, versionOf(`${row.source}:${row.ref}`)),
-      new Map<number, string>(),
-    )
-  }
-
   /** Every score each item has, keyed by item, sources in the order the page shows them. */
   private ratingsFor(ids: readonly number[]): Map<number, Rating[]> {
     return this.db
@@ -572,7 +455,8 @@ export class MetadataRepository {
           WHERE i.id IN (SELECT value FROM json_each(?))`,
       )
       .all(JSON.stringify(unique))
-    const posters = this.versions({ ids: unique, kind: 'poster' })
+    const posters = this.images.versions({ ids: unique, kind: 'poster' })
+    const backdrops = this.images.versions({ ids: unique, kind: 'backdrop' })
     return new Map(
       rows.flatMap((row): Array<[number, ItemSummary]> => {
         if (!isItemType(row.type)) return []
@@ -596,6 +480,7 @@ export class MetadataRepository {
                     : null,
               episode: row.type === 'episode' ? row.number : null,
               posterVersion: posters.get(row.id) ?? null,
+              backdropVersion: backdrops.get(row.id) ?? null,
               ratings: ratings.get(row.id) ?? [],
             },
           ],
@@ -604,7 +489,6 @@ export class MetadataRepository {
     )
   }
 
-  /** An item's page, apart from its files and children, which the caller adds. */
   /**
    * The item whose poster stands for each item: its own, else its parent's,
    * else its grandparent's, so an episode shows its season's poster and a
@@ -612,15 +496,7 @@ export class MetadataRepository {
    */
   posterItems(ids: readonly number[]): Map<number, ItemSummary> {
     if (ids.length === 0) return new Map()
-    const lines = this.db
-      .prepare<[string], PosterLine>(
-        `SELECT i.id, p.id AS parent, g.id AS grandparent
-           FROM shown_items i
-           LEFT JOIN shown_items p ON p.id = i.parent_id
-           LEFT JOIN shown_items g ON g.id = p.parent_id
-          WHERE i.id IN (SELECT value FROM json_each(?))`,
-      )
-      .all(JSON.stringify([...new Set(ids)]))
+    const lines = this.images.lines(ids)
     const summaries = this.summaries(lines.flatMap(lineOf))
     return new Map(
       lines.flatMap((line): Array<[number, ItemSummary]> => {
@@ -632,6 +508,50 @@ export class MetadataRepository {
     )
   }
 
+  /** The saga each of these items belongs to; one in none is left out. */
+  sagasOf(ids: readonly number[]): Map<number, FetchedSaga> {
+    if (ids.length === 0) return new Map()
+    return new Map(
+      this.db
+        .prepare<[string], { id: number; saga_tmdb_id: string; saga_name: string }>(
+          `SELECT id, saga_tmdb_id, saga_name FROM items
+            WHERE saga_tmdb_id IS NOT NULL AND saga_name IS NOT NULL
+              AND id IN (SELECT value FROM json_each(?))`,
+        )
+        .all(JSON.stringify([...new Set(ids)]))
+        .map((row) => [row.id, { tmdbId: row.saga_tmdb_id, name: row.saga_name }]),
+    )
+  }
+
+  /**
+   * Movies stored before raven kept sagas or logos, which have yet to learn
+   * them. Items raven made up are never fetched, so none of them is listed.
+   */
+  extrasUnchecked(): Array<{ id: number; tmdbId: string }> {
+    return this.db
+      .prepare<[string], { id: number; tmdb_id: string }>(
+        `SELECT id, tmdb_id FROM items
+          WHERE type = 'movie' AND (saga_checked = 0 OR logo_checked = 0) AND tmdb_id NOT GLOB ?
+          ORDER BY id`,
+      )
+      .all(`${LOCAL}*`)
+      .map((row) => ({ id: row.id, tmdbId: row.tmdb_id }))
+  }
+
+  /** Notes the saga a movie belongs to and TMDB's logo for it, or that it has neither. */
+  saveMovieExtras({ itemId, saga, logo }: { itemId: number } & MovieExtras): void {
+    this.db.transaction(() => {
+      this.db
+        .prepare(
+          `UPDATE items SET saga_tmdb_id = ?, saga_name = ?, saga_checked = 1, logo_checked = 1
+            WHERE id = ?`,
+        )
+        .run(saga?.tmdbId ?? null, saga?.name ?? null, itemId)
+      this.images.setTmdbLogo({ itemId, logo })
+    })()
+  }
+
+  /** An item's page, apart from its files and children, which the caller adds. */
   details(id: number): Omit<ItemDetails, 'versions' | 'children'> | null {
     const row = this.db.prepare<[number], ItemRow>('SELECT * FROM shown_items WHERE id = ?').get(id)
     const summary = this.summaries([id]).get(id)
@@ -651,8 +571,10 @@ export class MetadataRepository {
       genres: genresOf(row.genres),
       // An episode has a still where the others have a backdrop.
       backdropVersion:
-        this.versions({ ids: [id], kind: row.type === 'episode' ? 'still' : 'backdrop' }).get(id) ??
-        null,
+        this.images
+          .versions({ ids: [id], kind: row.type === 'episode' ? 'still' : 'backdrop' })
+          .get(id) ?? null,
+      logoVersion: this.images.versions({ ids: [id], kind: 'logo' }).get(id) ?? null,
       credits: this.credits(id),
       reviews: this.reviews(id),
     }

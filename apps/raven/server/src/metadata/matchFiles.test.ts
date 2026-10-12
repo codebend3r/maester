@@ -2,13 +2,13 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { MediaIndex } from '@/media/mediaIndex'
 import { MatchFiles } from '@/metadata/matchFiles'
-import { MetadataRepository } from '@/metadata/metadataRepository'
 import { testDatabase } from '@/test/database'
+import { repositories } from '@/test/repositories'
 
 describe('the match queue', () => {
   const database = testDatabase('raven-match-files-')
   const state = { libraryId: 0, ids: new Map<string, number>() }
-  const files = () => new MatchFiles(database.get(), new MetadataRepository(database.get()))
+  const files = () => new MatchFiles(database.get(), repositories(database.get()).metadata)
   const names = (found: ReadonlyArray<{ fileName: string }>): string[] =>
     found.map((file) => file.fileName)
 
