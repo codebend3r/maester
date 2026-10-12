@@ -82,6 +82,7 @@ describe('listing a library', () => {
 
   it.each<[MediaSort, string[]]>([
     ['title', ['Alpha', 'Bravo', 'Charlie', 'Delta']],
+    ['title-desc', ['Delta', 'Charlie', 'Bravo', 'Alpha']],
     ['added', ['Delta', 'Alpha', 'Charlie', 'Bravo']],
     ['oldest', ['Bravo', 'Charlie', 'Alpha', 'Delta']],
     ['largest', ['Delta', 'Alpha', 'Charlie', 'Bravo']],
@@ -261,6 +262,32 @@ describe("listing a TV library's shows", () => {
         .listShows({ libraryId: state.libraryId, limit: 1 })
         .map((entry) => entry.show.title),
     ).toEqual(['Aired'])
+  })
+
+  it("sorts shows by their files' mean bitrate, a show with none probed last either way", () => {
+    const bitrates = database
+      .get()
+      .db.prepare('UPDATE media SET bitrate = ? WHERE file_name LIKE ?')
+    bitrates.run(9_000_000, 'Special%')
+    const listed = (sort: 'bitrate-high' | 'bitrate-low') =>
+      media()
+        .listShows({ libraryId: state.libraryId, sort })
+        .map((entry) => [entry.show.title, entry.bitrate])
+    expect(listed('bitrate-high')).toEqual([
+      ['Special', 9_000_000],
+      ['Aired', 5_000_000],
+    ])
+    expect(listed('bitrate-low')).toEqual([
+      ['Aired', 5_000_000],
+      ['Special', 9_000_000],
+    ])
+    bitrates.run(null, 'Aired%')
+    expect(listed('bitrate-low')).toEqual([
+      ['Special', 9_000_000],
+      ['Aired', null],
+    ])
+    bitrates.run(5_000_000, 'Aired%')
+    bitrates.run(5_000_000, 'Special%')
   })
 
   it("answers a show's next episode on its own too", () => {

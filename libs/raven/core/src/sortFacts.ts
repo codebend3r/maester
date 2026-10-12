@@ -1,11 +1,14 @@
-import type { MediaItem, MediaSort, ShowEntry } from '@/contract'
+import type { MediaItem, MediaSort, ShowEntry, SortFieldName } from '@/contract'
 import { formatBitrate, formatBytes, timeAgo } from '@/format'
 import { resolutionLabel } from '@/media'
+import { sortParts } from '@/sortFields'
 
 type Fact = (args: { media: MediaItem; now: Date }) => string | null
 
 const added: Fact = ({ media, now }) =>
   `Added ${timeAgo({ at: media.addedAt, now, style: 'long' })}`
+const changed: Fact = ({ media, now }) =>
+  `Changed ${timeAgo({ at: media.changedAt, now, style: 'long' })}`
 const size: Fact = ({ media }) => formatBytes(media.size)
 const bitrate: Fact = ({ media }) => formatBitrate(media.bitrate)
 const resolution: Fact = ({ media }) => resolutionLabel(media)
@@ -13,24 +16,18 @@ const none: Fact = () => null
 
 /**
  * What a card says of the value its listing is sorted by, one entry per
- * sort. The title, year and score are on the cards already, and a random
- * order has no value to show.
+ * field, whichever way it runs. The title, year and score are on the cards
+ * already, and a random order has no value to show.
  */
-const MEDIA_SORT_FACTS: Record<MediaSort, Fact> = {
+const FIELD_FACTS: Record<SortFieldName, Fact> = {
   title: none,
   added,
-  oldest: added,
-  changed: ({ media, now }) => `Changed ${timeAgo({ at: media.changedAt, now, style: 'long' })}`,
-  largest: size,
-  smallest: size,
-  'bitrate-high': bitrate,
-  'bitrate-low': bitrate,
-  'resolution-high': resolution,
-  'resolution-low': resolution,
-  'year-new': none,
-  'year-old': none,
-  'rating-high': none,
-  'rating-low': none,
+  changed,
+  size,
+  bitrate,
+  resolution,
+  release: none,
+  rating: none,
   random: none,
 }
 
@@ -47,9 +44,9 @@ export const sortFact = ({
   media: MediaItem
   sort: MediaSort
   now?: Date
-}): string | null => MEDIA_SORT_FACTS[sort]({ media, now })
+}): string | null => FIELD_FACTS[sortParts(sort).field]({ media, now })
 
-/** The same for a show: when its newest episode came, for the sorts by when shows were added. */
+/** The same for a show: when its newest episode came, or its files' mean bitrate, for the sorts by those. */
 export const showSortFact = ({
   entry,
   sort,
@@ -58,7 +55,24 @@ export const showSortFact = ({
   entry: ShowEntry
   sort: MediaSort
   now?: Date
-}): string | null =>
-  sort === 'added' || sort === 'oldest'
-    ? `Added ${timeAgo({ at: entry.addedAt, now, style: 'long' })}`
-    : null
+}): string | null => {
+  const { field } = sortParts(sort)
+  switch (field) {
+    case 'added':
+      return `Added ${timeAgo({ at: entry.addedAt, now, style: 'long' })}`
+    case 'bitrate':
+      return formatBitrate(entry.bitrate)
+    case 'title':
+    case 'changed':
+    case 'size':
+    case 'resolution':
+    case 'release':
+    case 'rating':
+    case 'random':
+      return null
+    default: {
+      const unknown: never = field
+      return unknown
+    }
+  }
+}

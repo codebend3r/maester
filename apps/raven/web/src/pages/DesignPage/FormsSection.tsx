@@ -87,8 +87,8 @@ export const FormsSection = () => {
             <Field id={`${id}-select`} label="Sort">
               <select id={`${id}-select`} defaultValue="added">
                 <option value="title">Title</option>
-                <option value="added">Recently added</option>
-                <option value="largest">Largest file</option>
+                <option value="added">Date added</option>
+                <option value="largest">File size</option>
               </select>
             </Field>
             <Field id={`${id}-multiple`} label="Several at once">

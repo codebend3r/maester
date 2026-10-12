@@ -108,20 +108,26 @@ type ShowRow = {
   ended: string | null
   episodes: number
   added_at: string
+  bitrate: number | null
 }
 
 const SHOW_BY_TITLE = 'sh.sort_title COLLATE NOCASE, sh.id'
 
-/** A show's listing order: sorts that only mean something per file fall back to title. */
+/**
+ * A show's listing order: by its files' mean bitrate for the bitrate sorts,
+ * and by title for the others that only mean something per file.
+ */
 const SHOW_ORDER_BY: Record<MediaSort, string> = {
   title: SHOW_BY_TITLE,
+  'title-desc': 'sh.sort_title COLLATE NOCASE DESC, sh.id DESC',
   added: 'added_at DESC, sh.id DESC',
   oldest: 'added_at, sh.id',
   changed: 'changed_at DESC, sh.id DESC',
+  'changed-old': 'changed_at, sh.id',
   largest: SHOW_BY_TITLE,
   smallest: SHOW_BY_TITLE,
-  'bitrate-high': SHOW_BY_TITLE,
-  'bitrate-low': SHOW_BY_TITLE,
+  'bitrate-high': `bitrate IS NULL, bitrate DESC, ${SHOW_BY_TITLE}`,
+  'bitrate-low': `bitrate IS NULL, bitrate, ${SHOW_BY_TITLE}`,
   'resolution-high': SHOW_BY_TITLE,
   'resolution-low': SHOW_BY_TITLE,
   'year-new': `sh.year IS NULL, sh.year DESC, ${SHOW_BY_TITLE}`,
@@ -133,7 +139,7 @@ const SHOW_ORDER_BY: Record<MediaSort, string> = {
 
 /** The files of a library that are episodes, with their show and numbers. */
 const EPISODE_FILES = `
-  SELECT m.id AS media_id, m.library_id, m.added_at, m.changed_at, e.id AS episode_id,
+  SELECT m.id AS media_id, m.library_id, m.added_at, m.changed_at, m.bitrate, e.id AS episode_id,
          s.parent_id AS show_id
     FROM media m
     JOIN media_items mi ON mi.media_id = m.id
@@ -165,9 +171,11 @@ const YEAR = 'COALESCE(item_year, year)'
  */
 const ORDER_BY: Record<MediaSort, string> = {
   title: BY_TITLE,
+  'title-desc': 'COALESCE(item_sort_title, title) COLLATE NOCASE DESC, id DESC',
   added: 'added_at DESC, id DESC',
   oldest: 'added_at, id',
   changed: 'changed_at DESC, id DESC',
+  'changed-old': 'changed_at, id',
   largest: `size DESC, ${BY_TITLE}`,
   smallest: `size, ${BY_TITLE}`,
   'bitrate-high': `bitrate IS NULL, bitrate DESC, ${BY_TITLE}`,
@@ -307,9 +315,9 @@ export class MediaRepository {
 
   /**
    * A TV library as its shows: how many episodes each has on disk, when
-   * its newest file came, and the first episode not yet watched by the
-   * library's measure (specials last). Search matches show titles, and
-   * `limit` keeps the first that many.
+   * its newest file came, its files' mean bitrate, and the first episode
+   * not yet watched by the library's measure (specials last). Search
+   * matches show titles, and `limit` keeps the first that many.
    */
   listShows({
     libraryId,
@@ -329,7 +337,7 @@ export class MediaRepository {
       .prepare<[number, string, string, number], ShowRow>(
         `WITH files AS (${EPISODE_FILES})
          SELECT sh.id, sh.ended, COUNT(DISTINCT f.episode_id) AS episodes, MAX(f.added_at) AS added_at,
-                MAX(f.changed_at) AS changed_at,
+                MAX(f.changed_at) AS changed_at, AVG(f.bitrate) AS bitrate,
                 ${score({ item: 'sh.id', source: 'l.ratings_source' })} AS score
            FROM files f
            JOIN shown_items sh ON sh.id = f.show_id
@@ -354,6 +362,7 @@ export class MediaRepository {
           episodes: row.episodes,
           endedYear: row.ended == null ? null : Number(row.ended.slice(0, 4)) || null,
           addedAt: row.added_at,
+          bitrate: row.bitrate == null ? null : Math.round(row.bitrate),
           next: (nextId == null ? null : episodes.get(nextId)) ?? null,
         },
       ]

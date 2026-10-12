@@ -1,12 +1,18 @@
 import {
+  type DirectedSortFieldName,
   type LibrarySettings,
   type LibraryView,
   type MediaGroupBy,
-  type MediaSort,
+  type SortDirection,
+  type SortFieldName,
   groupingsFor,
   isMediaGroupBy,
-  isMediaSort,
-  sortsFor,
+  isSortFieldName,
+  reversedDirection,
+  reversedSort,
+  sortFieldsFor,
+  sortParts,
+  startingSort,
   viewsFor,
 } from '@raven/core'
 import { useId } from 'react'
@@ -14,22 +20,54 @@ import { Button } from '@/components/Button/Button'
 import type { IconName } from '@/components/Icon/Icon'
 import styles from '@/components/LibraryToolbar/LibraryToolbar.module.scss'
 
-const SORTS: Record<MediaSort, string> = {
+const FIELDS: Record<SortFieldName, string> = {
   title: 'Title',
-  added: 'Recently added',
-  oldest: 'Oldest added',
-  changed: 'Recently changed',
-  largest: 'Largest file',
-  smallest: 'Smallest file',
-  'bitrate-high': 'Highest bitrate',
-  'bitrate-low': 'Lowest bitrate',
-  'resolution-high': 'Highest resolution',
-  'resolution-low': 'Lowest resolution',
-  'year-new': 'Newest release',
-  'year-old': 'Oldest release',
-  'rating-high': 'Highest rated',
-  'rating-low': 'Lowest rated',
+  added: 'Date added',
+  changed: 'Date changed',
+  size: 'File size',
+  bitrate: 'Bitrate',
+  resolution: 'Resolution',
+  release: 'Release date',
+  rating: 'Rating',
   random: 'Random',
+}
+
+/** How each way a field runs reads: A to Z, newest first. */
+const DIRECTIONS: Record<DirectedSortFieldName, Record<SortDirection, string>> = {
+  title: { ascending: 'A to Z', descending: 'Z to A' },
+  added: { ascending: 'Oldest first', descending: 'Newest first' },
+  changed: { ascending: 'Oldest first', descending: 'Newest first' },
+  size: { ascending: 'Smallest first', descending: 'Largest first' },
+  bitrate: { ascending: 'Lowest first', descending: 'Highest first' },
+  resolution: { ascending: 'Lowest first', descending: 'Highest first' },
+  release: { ascending: 'Oldest first', descending: 'Newest first' },
+  rating: { ascending: 'Lowest first', descending: 'Highest first' },
+}
+
+/**
+ * The button beside the sort that turns the order around, saying which way
+ * it runs now; a field with no direction, as Random, has none.
+ */
+const DirectionButton = ({
+  settings,
+  onChange,
+}: {
+  settings: LibrarySettings
+  onChange: (change: Partial<LibrarySettings>) => void
+}) => {
+  const { field, direction } = sortParts(settings.sort)
+  if (direction === null) return null
+  const labels = DIRECTIONS[field]
+  return (
+    <Button
+      icon={direction}
+      title={`Sort ${labels[reversedDirection(direction)].toLowerCase()} instead`}
+      onClick={() => onChange({ sort: reversedSort(settings.sort) })}
+    >
+      <span className="visually-hidden">Order: </span>
+      {labels[direction]}
+    </Button>
+  )
 }
 
 const VIEWS: Record<LibraryView, { label: string; icon: IconName }> = {
@@ -47,7 +85,8 @@ const GROUPINGS: Record<MediaGroupBy, string> = {
 }
 
 /**
- * Search, then how the library is ordered and laid out. Sort, view and
+ * Search, then how the library is ordered and laid out: what it is sorted
+ * on, and beside it which way, where that means something. Sort, view and
  * grouping are the library's own settings, already coherent with its type,
  * so the options are its type's: `onChange` gets just the one that changed.
  * Group by shows only in the grouped view. Play and Shuffle are
@@ -97,17 +136,19 @@ export const LibraryToolbar = ({
           <select
             id={ids.sort}
             className={styles.select}
-            value={settings.sort}
+            value={sortParts(settings.sort).field}
             onChange={(event) =>
-              isMediaSort(event.target.value) && onChange({ sort: event.target.value })
+              isSortFieldName(event.target.value) &&
+              onChange({ sort: startingSort(event.target.value) })
             }
           >
-            {sortsFor(settings.kind).map((sort) => (
-              <option key={sort} value={sort}>
-                {SORTS[sort]}
+            {sortFieldsFor(settings.kind).map((field) => (
+              <option key={field} value={field}>
+                {FIELDS[field]}
               </option>
             ))}
           </select>
+          <DirectionButton settings={settings} onChange={onChange} />
         </div>
         {settings.view === 'grouped' && (
           <div className={styles.field}>

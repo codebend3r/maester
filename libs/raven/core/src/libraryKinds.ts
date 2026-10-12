@@ -5,18 +5,21 @@ import {
   type LibrarySettings,
   type LibraryView,
   MEDIA_GROUPINGS,
-  MEDIA_SORTS,
   type MediaGroupBy,
   type MatchItemType,
   type MediaSort,
+  type SortFieldName,
+  fieldSorts,
+  isSortFieldName,
 } from '@/contract'
+import { sortParts } from '@/sortFields'
 
 /** What a type of library can do: the one place each rule about each type lives. */
 export type KindRules = {
   /** What its files are matched to on TMDB; null for a library that is never matched. */
   matches: MatchItemType | null
-  /** The orders it can list its videos in. */
-  sorts: readonly MediaSort[]
+  /** The fields it can sort its videos on, in the order a menu offers them. */
+  fields: readonly SortFieldName[]
   /** The layouts it can show. */
   views: readonly LibraryView[]
   /** What its grouped view can bucket by. */
@@ -28,17 +31,13 @@ export type KindRules = {
 }
 
 /** Release years come from names, and scores from TMDB, which only matched libraries read. */
-const MATCHED_SORTS: readonly MediaSort[] = ['year-new', 'year-old', 'rating-high', 'rating-low']
+const MATCHED_FIELDS: readonly SortFieldName[] = ['release', 'rating']
 
-/** Sorts that only mean something per file, which a TV library's show cards cannot use. */
-const FILE_SORTS: readonly MediaSort[] = [
-  'largest',
-  'smallest',
-  'bitrate-high',
-  'bitrate-low',
-  'resolution-high',
-  'resolution-low',
-]
+/**
+ * Fields only a file has, which a TV library's show cards cannot sort on. A
+ * show's bitrate is the mean of its files', so shows sort on that.
+ */
+const FILE_FIELDS: readonly SortFieldName[] = ['size', 'resolution']
 
 const without = <T>({ all, left }: { all: readonly T[]; left: readonly T[] }): T[] =>
   all.filter((item) => !left.includes(item))
@@ -46,7 +45,7 @@ const without = <T>({ all, left }: { all: readonly T[]; left: readonly T[] }): T
 /** A library of movies starts grouped into matched and not. */
 const MOVIE_RULES = {
   matches: 'movie',
-  sorts: MEDIA_SORTS,
+  fields: isSortFieldName.values,
   views: LIBRARY_VIEWS,
   groupings: MEDIA_GROUPINGS,
   view: 'grouped',
@@ -56,11 +55,11 @@ const MOVIE_RULES = {
 /**
  * A library of shows lays its shows out as posters, already split into
  * matched and not, so it has no grouped view, and its cards are shows, so
- * no per-file sort.
+ * no sort on a field only a file has.
  */
 const SHOW_RULES = {
   matches: 'show',
-  sorts: without({ all: MEDIA_SORTS, left: FILE_SORTS }),
+  fields: without({ all: isSortFieldName.values, left: FILE_FIELDS }),
   views: without({ all: LIBRARY_VIEWS, left: ['grouped'] }),
   groupings: MEDIA_GROUPINGS,
   view: 'grid',
@@ -70,7 +69,7 @@ const SHOW_RULES = {
 /** A library that is never matched has no years, scores or match to sort or group by. */
 const UNMATCHED_RULES = {
   matches: null,
-  sorts: without({ all: MEDIA_SORTS, left: MATCHED_SORTS }),
+  fields: without({ all: isSortFieldName.values, left: MATCHED_FIELDS }),
   views: LIBRARY_VIEWS,
   groupings: without({ all: MEDIA_GROUPINGS, left: ['match'] }),
   view: 'grid',
@@ -107,7 +106,12 @@ export const MATCHED_KINDS: readonly LibraryKind[] = LIBRARY_KINDS.filter(
 /** Whether the library's cards are its shows, with its files no show was found for listed apart. */
 export const listsShows = (kind: LibraryKind): boolean => matchTypeFor(kind) === 'show'
 
-export const sortsFor = (kind: LibraryKind): readonly MediaSort[] => KIND_RULES[kind].sorts
+/** The fields a library of `kind` can sort on, in the order a menu offers them. */
+export const sortFieldsFor = (kind: LibraryKind): readonly SortFieldName[] =>
+  KIND_RULES[kind].fields
+
+/** Every sort a library of `kind` can list its videos in: each of its fields, each way. */
+export const sortsFor = (kind: LibraryKind): MediaSort[] => sortFieldsFor(kind).flatMap(fieldSorts)
 
 export const viewsFor = (kind: LibraryKind): readonly LibraryView[] => KIND_RULES[kind].views
 
@@ -137,7 +141,9 @@ export const coherentSettings = (settings: LibrarySettings): LibrarySettings => 
   const rules: KindRules = KIND_RULES[settings.kind]
   return {
     ...settings,
-    sort: rules.sorts.includes(settings.sort) ? settings.sort : DEFAULT_LIBRARY_SETTINGS.sort,
+    sort: rules.fields.includes(sortParts(settings.sort).field)
+      ? settings.sort
+      : DEFAULT_LIBRARY_SETTINGS.sort,
     view: rules.views.includes(settings.view) ? settings.view : rules.view,
     groupBy: rules.groupings.includes(settings.groupBy) ? settings.groupBy : rules.groupBy,
   }

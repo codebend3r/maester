@@ -51,6 +51,11 @@ export const titleFromFileName = (fileName: string): string => {
   return spaced.trim() || fileName
 }
 
+/** The resolutions `resolutionLabel` names, from the least to the most. */
+export const RESOLUTIONS = ['SD', '480p', '720p', '1080p', '4K'] as const
+
+export type Resolution = (typeof RESOLUTIONS)[number]
+
 /** "4K", "1080p", "720p", "480p" or "SD", from the frame size. */
 export const resolutionLabel = ({
   width,
@@ -58,7 +63,7 @@ export const resolutionLabel = ({
 }: {
   width: number | null
   height: number | null
-}): string | null => {
+}): Resolution | null => {
   if (width == null || height == null) return null
   // Scope and letterboxed encodes shave height, so width decides as well:
   // 1920x800 is a 1080p file, not a 800p one.

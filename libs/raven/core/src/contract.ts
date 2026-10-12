@@ -43,30 +43,89 @@ export const isScanStatus = object({
 
 export type ScanStatus = Infer<typeof isScanStatus>
 
-export const isMediaSort = oneOf([
+/** Whether a scan is under way, walking or indexing. */
+export const isScanning = (scan: ScanStatus): boolean => scan.state !== 'idle'
+
+export const SORT_DIRECTIONS = ['ascending', 'descending'] as const
+
+export type SortDirection = (typeof SORT_DIRECTIONS)[number]
+
+/** Every field a library can be sorted on, in the order a menu offers them. */
+export const isSortFieldName = oneOf([
   'title',
   'added',
-  'oldest',
   'changed',
-  'largest',
-  'smallest',
-  'bitrate-high',
-  'bitrate-low',
-  'resolution-high',
-  'resolution-low',
-  'year-new',
-  'year-old',
-  'rating-high',
-  'rating-low',
+  'size',
+  'bitrate',
+  'resolution',
+  'release',
+  'rating',
   'random',
 ])
 
+export type SortFieldName = Infer<typeof isSortFieldName>
+
 /**
- * `added` is newest first and `oldest` the reverse; `changed` puts the files
- * last found, renamed, moved or replaced first. Resolution ranks by
- * pixel count. `random` shuffles by a seed the client sends, so the order
- * holds across refetches until the client deals a new one.
+ * What a listing is sorted on, each field with its sorts: one for each way a
+ * field runs and the way it starts, or the one sort of a field with no way
+ * to it. Ascending runs A to Z, oldest, smallest or lowest first; a field
+ * starts the way it is most often wanted, newest or biggest first but for
+ * titles. `changed` puts the files last found, renamed, moved or replaced
+ * first. Resolution ranks by pixel count. `random` shuffles by a seed the
+ * client sends, so the order holds across refetches until it deals a new one.
  */
+export const SORT_FIELDS = {
+  title: { type: 'directed', ascending: 'title', descending: 'title-desc', start: 'ascending' },
+  added: { type: 'directed', ascending: 'oldest', descending: 'added', start: 'descending' },
+  changed: {
+    type: 'directed',
+    ascending: 'changed-old',
+    descending: 'changed',
+    start: 'descending',
+  },
+  size: { type: 'directed', ascending: 'smallest', descending: 'largest', start: 'descending' },
+  bitrate: {
+    type: 'directed',
+    ascending: 'bitrate-low',
+    descending: 'bitrate-high',
+    start: 'descending',
+  },
+  resolution: {
+    type: 'directed',
+    ascending: 'resolution-low',
+    descending: 'resolution-high',
+    start: 'descending',
+  },
+  release: { type: 'directed', ascending: 'year-old', descending: 'year-new', start: 'descending' },
+  rating: {
+    type: 'directed',
+    ascending: 'rating-low',
+    descending: 'rating-high',
+    start: 'descending',
+  },
+  random: { type: 'undirected', sort: 'random' },
+} as const satisfies Record<
+  SortFieldName,
+  | { type: 'directed'; ascending: string; descending: string; start: SortDirection }
+  | { type: 'undirected'; sort: string }
+>
+
+type SortFieldRule = (typeof SORT_FIELDS)[SortFieldName]
+
+/** Every sort the table names, read off it; `MediaSort` is the same union, read off its guard. */
+type FieldSort =
+  | Extract<SortFieldRule, { type: 'directed' }>[SortDirection]
+  | Extract<SortFieldRule, { type: 'undirected' }>['sort']
+
+/** A field's sorts: one for each way it runs, or the one of a field with no way to it. */
+export const fieldSorts = (name: SortFieldName): FieldSort[] => {
+  const field: SortFieldRule = SORT_FIELDS[name]
+  return field.type === 'directed' ? [field.ascending, field.descending] : [field.sort]
+}
+
+/** Every sort of every field in `SORT_FIELDS`, which is the one place a sort is named. */
+export const isMediaSort = oneOf(isSortFieldName.values.flatMap(fieldSorts))
+
 export type MediaSort = Infer<typeof isMediaSort>
 
 export const MEDIA_SORTS = isMediaSort.values
@@ -365,6 +424,11 @@ export const isShowEntry = object({
   endedYear: nullable(isNumber),
   /** When its newest file arrived. */
   addedAt: isString,
+  /**
+   * The mean bitrate of its files in the library, in bits per second, which
+   * the bitrate sorts go by; null until one of them is probed.
+   */
+  bitrate: nullable(isNumber),
   /** The first episode not yet watched by the library's measure, or null when every one is. */
   next: nullable(isMediaItem),
 })
