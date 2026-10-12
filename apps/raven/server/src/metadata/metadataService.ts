@@ -1,11 +1,10 @@
 import { Inject, Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common'
 import {
-  isMatchedKind,
   type LibraryKind,
   MATCHED_KINDS,
   type MatchItemType,
   type MetadataHealth,
-  matchedItemType,
+  matchTypeFor,
 } from '@raven/core'
 import { groupBy } from '@/groupBy'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
@@ -54,7 +53,7 @@ export class MetadataService implements OnApplicationBootstrap {
     this.metadata.resortTitles()
     this.libraries.list().forEach((library) => {
       const { kind } = library.settings
-      if (!isMatchedKind(kind)) return
+      if (matchTypeFor(kind) == null) return
       this.files.retitle({ libraryId: library.id, kind })
       this.enqueue(library.id)
     })
@@ -124,9 +123,10 @@ export class MetadataService implements OnApplicationBootstrap {
 
   private async pass(libraryId: number): Promise<void> {
     const kind = this.libraries.get(libraryId)?.settings.kind
-    if (kind != null && isMatchedKind(kind) && this.tmdb.enabled) {
+    const type = kind == null ? null : matchTypeFor(kind)
+    if (type != null && this.tmdb.enabled) {
       this.tmdb.newPass()
-      await this.matchPending({ libraryId, type: matchedItemType(kind) })
+      await this.matchPending({ libraryId, type })
     }
     await this.pictures.clearUp()
   }
@@ -189,8 +189,8 @@ export class MetadataService implements OnApplicationBootstrap {
   async fixMatch({ mediaId, tmdbId }: { mediaId: number; tmdbId: string | null }): Promise<void> {
     const file = this.files.byId(mediaId)
     const kind = file == null ? null : this.libraries.get(file.libraryId)?.settings.kind
-    if (file == null || kind == null || !isMatchedKind(kind)) return
-    const type = matchedItemType(kind)
+    const type = kind == null ? null : matchTypeFor(kind)
+    if (file == null || type == null) return
     const group = this.matchers[type].fixGroup(file)
     await this.pointPlace({
       libraryId: file.libraryId,

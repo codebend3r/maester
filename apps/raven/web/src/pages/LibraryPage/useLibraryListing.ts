@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { type LibrarySettings, type MediaItem, isMatchedKind, listsShows } from '@raven/core'
+import { type LibrarySettings, type MediaItem, listsShows, matchTypeFor } from '@raven/core'
 import { useEffect, useRef } from 'react'
 import { afterMatchingPass } from '@/lib/invalidate'
 import { mediaListQuery, metadataHealthQuery, showListQuery } from '@/lib/queries'
@@ -30,29 +30,30 @@ export const useLibraryListing = ({
   enabled: boolean
   scanning: boolean
 }): Listing & {
-  /** Whether the shows are listed apart from the files: a TV or Anime shows library's are. */
-  listsShows: boolean
   loaded: boolean
   busy: boolean
   /** Whether TMDB answers, so pending files will leave pending. */
   canMatch: boolean
 } => {
   const queryClient = useQueryClient()
-  const showsApart = listsShows(settings.kind)
+  const isShowList = listsShows(settings.kind)
   // Files only leave pending while TMDB answers; without it they wait for good.
-  const metadata = useQuery({ ...metadataHealthQuery, enabled: isMatchedKind(settings.kind) })
+  const metadata = useQuery({
+    ...metadataHealthQuery,
+    enabled: matchTypeFor(settings.kind) != null,
+  })
   const canMatch = metadata.data?.tmdb === 'ok'
   const listing = { libraryId, search, sort: settings.sort, seed }
 
   const shows = useQuery({
     ...showListQuery(listing),
-    enabled: enabled && showsApart,
+    enabled: enabled && isShowList,
     refetchInterval: (current) =>
       scanning || (canMatch && anyPending(current.state.data?.unmatched ?? [])) ? POLL_MS : false,
   })
   const files = useQuery({
     ...mediaListQuery(listing),
-    enabled: enabled && !showsApart,
+    enabled: enabled && !isShowList,
     refetchInterval: (current) =>
       scanning ||
       (current.state.data ?? []).some(
@@ -62,7 +63,7 @@ export const useLibraryListing = ({
         : false,
   })
 
-  const shown = showsApart
+  const shown = isShowList
     ? { shows: shows.data?.shows ?? [], files: shows.data?.unmatched ?? [], query: shows }
     : { shows: [], files: files.data ?? [], query: files }
 
@@ -78,7 +79,6 @@ export const useLibraryListing = ({
   return {
     shows: shown.shows,
     files: shown.files,
-    listsShows: showsApart,
     loaded: shown.query.isSuccess,
     busy: shown.query.isFetching && !shown.query.data,
     canMatch,

@@ -120,7 +120,6 @@ const LibraryView = ({ library }: { library: Library }) => {
               settings={settings}
               shows={listing.shows}
               files={listing.files}
-              listsShows={listing.listsShows}
               busy={listing.busy}
             />
           )}

@@ -7,11 +7,8 @@ import {
   coherentSettings,
   defaultLibrarySettings,
   groupingsFor,
-  isMatchItemType,
-  isMatchedKind,
   listsShows,
-  matchedItemType,
-  matchesAlike,
+  matchTypeFor,
   sortsFor,
   viewsFor,
   withLibraryKind,
@@ -85,14 +82,15 @@ describe('withLibraryKind', () => {
 describe('the rules for each type of library', () => {
   it('matches movies and shows libraries, anime included, to movies and shows', () => {
     expect(MATCHED_KINDS).toEqual(['movies', 'shows', 'animeMovies', 'animeShows'])
-    expect(isMatchedKind('other')).toBe(false)
-    expect(isMatchedKind('sports')).toBe(false)
-    expect(isMatchedKind('youtube')).toBe(false)
-    expect(matchedItemType('movies')).toBe('movie')
-    expect(matchedItemType('shows')).toBe('show')
-    expect(matchedItemType('animeMovies')).toBe('movie')
-    expect(matchedItemType('animeShows')).toBe('show')
-    expect(KIND_RULES.other.matches).toBeNull()
+    expect(LIBRARY_KINDS.map((kind) => [kind, matchTypeFor(kind)])).toEqual([
+      ['movies', 'movie'],
+      ['shows', 'show'],
+      ['animeMovies', 'movie'],
+      ['animeShows', 'show'],
+      ['sports', null],
+      ['youtube', null],
+      ['other', null],
+    ])
   })
 
   it('reads anime like the movies or shows it is, and sporting events and YouTube videos like Other', () => {
@@ -104,14 +102,6 @@ describe('the rules for each type of library', () => {
 
   it('lists the shows of a TV or Anime shows library, and the files of the rest', () => {
     expect(LIBRARY_KINDS.filter(listsShows)).toEqual(['shows', 'animeShows'])
-  })
-
-  it('reads files alike only between types matched to the same thing, or to nothing', () => {
-    expect(matchesAlike({ from: 'movies', to: 'animeMovies' })).toBe(true)
-    expect(matchesAlike({ from: 'animeShows', to: 'shows' })).toBe(true)
-    expect(matchesAlike({ from: 'sports', to: 'youtube' })).toBe(true)
-    expect(matchesAlike({ from: 'movies', to: 'animeShows' })).toBe(false)
-    expect(matchesAlike({ from: 'other', to: 'animeMovies' })).toBe(false)
   })
 
   it('offers every sort to a Movies library', () => {
@@ -158,19 +148,5 @@ describe('coherentSettings', () => {
       groupBy: 'codec',
     }
     expect(coherentSettings(movies)).toEqual(movies)
-  })
-})
-
-describe('isMatchItemType', () => {
-  it('takes what matched libraries are matched to, movies and shows, and nothing else', () => {
-    expect(isMatchItemType.values).toEqual(['movie', 'show'])
-    expect(['movie', 'show', 'season', 'episode', 'other', 7].map(isMatchItemType)).toEqual([
-      true,
-      true,
-      false,
-      false,
-      false,
-      false,
-    ])
   })
 })

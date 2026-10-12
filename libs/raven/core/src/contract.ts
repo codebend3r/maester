@@ -183,8 +183,10 @@ export const isItemType = oneOf(['movie', 'show', 'season', 'episode'])
 
 export type ItemType = Infer<typeof isItemType>
 
-/** What Fix match and matching look files up as on TMDB. */
-export type MatchItemType = Extract<ItemType, 'movie' | 'show'>
+/** What Fix match and matching look files up as on TMDB, and what Edit images chooses pictures for. */
+export const isMatchItemType = oneOf(['movie', 'show'] satisfies ItemType[])
+
+export type MatchItemType = Infer<typeof isMatchItemType>
 
 export const isRating = object({
   source: isRatingSource,

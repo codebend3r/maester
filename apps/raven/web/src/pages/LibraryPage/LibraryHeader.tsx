@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { KIND_RULES, type Library, type LibrarySettings } from '@raven/core'
+import { type Library, type LibrarySettings, matchTypeFor } from '@raven/core'
 import { Button, ButtonLink } from '@/components/Button/Button'
 import { ScanStatus } from '@/components/ScanStatus/ScanStatus'
 import { api } from '@/lib/api'
@@ -64,7 +64,7 @@ export const LibraryHeader = ({
   onEdit: () => void
 }) => {
   const scanning = library.scan.state === 'scanning'
-  const matchType = KIND_RULES[settings.kind].matches
+  const matchType = matchTypeFor(settings.kind)
   const unmatched = library.unmatchedCount
 
   return (

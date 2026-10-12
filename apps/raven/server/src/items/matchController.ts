@@ -16,9 +16,9 @@ import {
   type ChoosableImageKind,
   isMatchChoice,
   isMatchItemType,
-  isMatchedKind,
   type MatchCandidate,
   type MediaItem,
+  matchTypeFor,
 } from '@raven/core'
 import type { FastifyReply } from 'fastify'
 import { sendImage } from '@/items/sendImage'
@@ -114,7 +114,7 @@ export class MatchController {
     if (!record) throw new NotFoundException(`No media ${id}`)
     if (!isMatchChoice(body)) throw new BadRequestException('tmdbId must be a TMDB id or null')
     const kind = this.libraries.get(record.libraryId)?.settings.kind
-    if (kind == null || !isMatchedKind(kind)) {
+    if (kind == null || matchTypeFor(kind) == null) {
       throw new BadRequestException('Only files in a library of movies or shows can be matched.')
     }
     const tmdbId = body.tmdbId

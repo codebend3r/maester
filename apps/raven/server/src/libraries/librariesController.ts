@@ -21,9 +21,8 @@ import {
   type MediaItem,
   type MediaListParams,
   type ShowListing,
-  isMatchedKind,
   isRecord,
-  matchesAlike,
+  matchTypeFor,
   mediaListQuery,
   validateLibraryInput,
 } from '@raven/core'
@@ -127,7 +126,7 @@ export class LibrariesController {
     const before = this.find(id)
     const record = this.libraries.update({ id, input })
     if (!record) throw new NotFoundException(`No library ${id}`)
-    if (!matchesAlike({ from: before.settings.kind, to: record.settings.kind })) {
+    if (matchTypeFor(before.settings.kind) !== matchTypeFor(record.settings.kind)) {
       this.metadata.changeKind({ libraryId: id, kind: record.settings.kind })
     }
     if (!samePaths({ before: before.paths, after: record.paths })) this.scanner.scan(id)
@@ -166,7 +165,7 @@ export class LibrariesController {
   @HttpCode(200)
   rematch(@Param('id', ParseIntPipe) id: number): Library {
     const record = this.find(id)
-    if (!isMatchedKind(record.settings.kind)) {
+    if (matchTypeFor(record.settings.kind) == null) {
       throw new BadRequestException('Only a library of movies or shows is matched.')
     }
     if (this.metadata.health().tmdb === 'off') {

@@ -60,7 +60,7 @@
   display: grid;
 }
 
-// `--link-ground` is the colour behind the link, for the lock badge to sit on.
+// `--link-ground` is the link's background, which its badge sits on too.
 .navLink {
   --link-ground: var(--color-night);
 
@@ -73,23 +73,17 @@
   color: var(--color-lichen);
   font-weight: 600;
   text-decoration: none;
+  background: var(--link-ground);
 
-  &:hover {
-    --link-ground: var(--color-canopy);
-
-    color: var(--color-bark);
-    background: var(--color-canopy);
-  }
-
+  &:hover,
   &[aria-current='page'] {
     --link-ground: var(--color-canopy);
 
     color: var(--color-bark);
-    background: var(--color-canopy);
   }
 }
 
-// The type's icon, with a locked library's lock laid over its corner.
+// The link's icon, with its badge laid over its corner.
 .navIcon {
   display: grid;
   grid-template-areas: 'icon';
@@ -99,10 +93,10 @@
   }
 }
 
-// On the link's own ground, so the type icon's lines stop short of the lock
+// On the link's own ground, so the icon's lines stop short of the badge
 // instead of running through it. It hangs a little past the icon's corner,
 // into the link's padding and gap.
-.lockBadge {
+.badge {
   grid-area: icon;
   align-self: end;
   justify-self: end;
@@ -115,7 +109,7 @@
 
 @media (prefers-reduced-motion: no-preference) {
   .navLink,
-  .lockBadge {
+  .badge {
     transition: background-color 120ms ease-out;
   }
 }

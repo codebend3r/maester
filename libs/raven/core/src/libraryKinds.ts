@@ -10,7 +10,6 @@ import {
   type MatchItemType,
   type MediaSort,
 } from '@/contract'
-import { oneOf } from '@/schema'
 
 /** What a type of library can do: the one place each rule about each type lives. */
 export type KindRules = {
@@ -92,36 +91,21 @@ export const KIND_RULES = {
   other: UNMATCHED_RULES,
 } as const satisfies Record<LibraryKind, KindRules>
 
+/**
+ * What a library's files are matched to on TMDB: movies for a Movies or
+ * Anime movies library, shows for a TV or Anime shows one, and null for a
+ * type that is never matched. Two types with the same answer read their
+ * files the same way.
+ */
+export const matchTypeFor = (kind: LibraryKind): MatchItemType | null => KIND_RULES[kind].matches
+
 /** The types of library that are matched against TMDB. */
-export type MatchedKind = {
-  [K in LibraryKind]: (typeof KIND_RULES)[K]['matches'] extends null ? never : K
-}[LibraryKind]
-
-export const isMatchedKind = (kind: LibraryKind): kind is MatchedKind =>
-  KIND_RULES[kind].matches !== null
-
-export const MATCHED_KINDS: readonly MatchedKind[] = LIBRARY_KINDS.filter(isMatchedKind)
-
-/** What a matched library's files are matched to: a Movies or Anime movies library's to movies, a TV or Anime shows library's to shows. */
-export const matchedItemType = <K extends MatchedKind>(
-  kind: K,
-): (typeof KIND_RULES)[K]['matches'] => KIND_RULES[kind].matches
-
-/** What Fix match searches and Edit images chooses pictures for: the types matched libraries' files are matched to. */
-export const isMatchItemType = oneOf([
-  ...new Set(MATCHED_KINDS.map((kind) => matchedItemType(kind))),
-])
+export const MATCHED_KINDS: readonly LibraryKind[] = LIBRARY_KINDS.filter(
+  (kind) => matchTypeFor(kind) != null,
+)
 
 /** Whether the library's cards are its shows, with its files no show was found for listed apart. */
-export const listsShows = (kind: LibraryKind): boolean => KIND_RULES[kind].matches === 'show'
-
-/**
- * Whether a library going from one type to the other reads its files the
- * same way: Movies to Anime movies, say, or Sporting events to Other. Its
- * names and matches then stay as they are.
- */
-export const matchesAlike = ({ from, to }: { from: LibraryKind; to: LibraryKind }): boolean =>
-  KIND_RULES[from].matches === KIND_RULES[to].matches
+export const listsShows = (kind: LibraryKind): boolean => matchTypeFor(kind) === 'show'
 
 export const sortsFor = (kind: LibraryKind): readonly MediaSort[] => KIND_RULES[kind].sorts
 

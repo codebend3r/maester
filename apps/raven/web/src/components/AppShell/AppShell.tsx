@@ -11,11 +11,17 @@ import { useServerEvents } from '@/lib/useServerEvents'
 import { useSideMenu } from '@/stores/sideMenu'
 import styles from '@/components/AppShell/AppShell.module.scss'
 
+/** A small icon laid over a link's own, and the word it adds to the link's name. */
+type NavBadge = { icon: IconName; label: string }
+
+/** A locked library keeps its type's icon, with a lock over it. */
+const LOCKED: NavBadge = { icon: 'lock', label: 'locked' }
+
 /**
  * A link in the side menu, marked as current when the location matches any
  * of its patterns. Collapsed to its icon, it keeps its name for screen
- * readers and as a tooltip. A locked library's icon wears a small lock, so
- * its type still shows, and its name says it is locked.
+ * readers and as a tooltip. A badge lays its icon over the link's and adds
+ * its word to the name both ways: `Tutorials (locked)`.
  */
 const NavItem = ({
   to,
@@ -23,36 +29,36 @@ const NavItem = ({
   icon,
   label,
   collapsed,
-  isLocked = false,
+  badge,
 }: {
   to: string
   patterns: readonly string[]
   icon: IconName
   label: string
   collapsed: boolean
-  isLocked?: boolean
+  badge?: NavBadge
 }) => {
   const { pathname } = useLocation()
   const current = patterns.some((pattern) => matchPath(pattern, pathname) != null)
-  const name = isLocked ? `${label} (locked)` : label
+  const suffix = badge ? ` (${badge.label})` : ''
   return (
     <Link
       to={to}
       className={styles.navLink}
       aria-current={current ? 'page' : undefined}
-      title={collapsed ? name : undefined}
+      title={collapsed ? `${label}${suffix}` : undefined}
     >
       <span className={styles.navIcon}>
         <Icon name={icon} />
-        {isLocked && (
-          <span className={styles.lockBadge}>
-            <Icon name="lock" size={12} />
+        {badge && (
+          <span className={styles.badge}>
+            <Icon name={badge.icon} size={12} />
           </span>
         )}
       </span>
       <span className={collapsed ? 'visually-hidden' : undefined}>
         {label}
-        {isLocked && <span className="visually-hidden">{' (locked)'}</span>}
+        {badge && <span className="visually-hidden">{suffix}</span>}
       </span>
     </Link>
   )
@@ -139,7 +145,7 @@ export const AppShell = () => {
                     icon={KINDS[library.settings.kind].icon}
                     label={library.name}
                     collapsed={collapsed}
-                    isLocked={library.settings.locked}
+                    badge={library.settings.locked ? LOCKED : undefined}
                   />
                 </li>
               ))}
