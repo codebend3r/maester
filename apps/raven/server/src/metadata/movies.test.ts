@@ -14,6 +14,8 @@ import {
   isMediaList,
   isMetadataHealth,
   isRecord,
+  isSagaList,
+  sagaBackdrop,
 } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createApp } from '@/app'
@@ -46,12 +48,21 @@ const shape = <T>({
   return body
 }
 
+/** Two of the films in one collection, as TMDB has none that fits them both. */
+const CRIME_SAGA = { id: 9001, name: 'Crime Classics Collection' }
+
 describe('movie metadata', () => {
   const tmdb = fakeTmdb({
     movies: [
-      { id: 603, title: 'The Matrix', released: '1999-03-31', imdbId: 'tt0133093' },
-      { id: 949, title: 'Heat', released: '1995-12-15' },
-      { id: 680, title: 'Pulp Fiction', released: '1994-09-10' },
+      {
+        id: 603,
+        title: 'The Matrix',
+        released: '1999-03-31',
+        imdbId: 'tt0133093',
+        saga: { id: 2344, name: 'The Matrix Collection' },
+      },
+      { id: 949, title: 'Heat', released: '1995-12-15', saga: CRIME_SAGA },
+      { id: 680, title: 'Pulp Fiction', released: '1994-09-10', saga: CRIME_SAGA },
       { id: 11, title: 'Unknown Thing One', released: '2020-01-01' },
       { id: 12, title: 'Unknown Thing Two', released: '2020-06-01' },
       { id: 881, title: 'A Few Good Men', released: '1992-12-11' },
@@ -101,6 +112,17 @@ describe('movie metadata', () => {
     if (!found) throw new Error(`No ${fileName}`)
     return found
   }
+  const sagaTitles = async () =>
+    shape({
+      response: await app().inject({
+        method: 'GET',
+        url: `/api/libraries/${state.library}/sagas`,
+      }),
+      guard: isSagaList,
+    }).map((saga) => ({
+      name: saga.name,
+      titles: saga.media.map((media) => media.item?.title ?? media.title),
+    }))
   const rescan = async () => {
     await app().inject({ method: 'POST', url: `/api/libraries/${state.library}/scan` })
     await settle()
@@ -218,6 +240,23 @@ describe('movie metadata', () => {
     expect(library.settings).toMatchObject({ kind: 'movies', view: 'grouped', groupBy: 'match' })
   })
 
+  it('gathers the movies of one TMDB collection into a saga, oldest first, and no lone one', async () => {
+    expect(await sagaTitles()).toEqual([
+      { name: 'Crime Classics Collection', titles: ['Pulp Fiction', 'Heat'] },
+    ])
+  })
+
+  it("gives a saga its first movie's backdrop, for its page", async () => {
+    const response = await app().inject({
+      method: 'GET',
+      url: `/api/libraries/${state.library}/sagas`,
+    })
+    const [saga] = shape({ response, guard: isSagaList })
+    const first = saga?.media[0]?.item
+    expect(first?.backdropVersion).toEqual(expect.any(String))
+    expect(saga && sagaBackdrop(saga)).toEqual({ id: first?.id, version: first?.backdropVersion })
+  })
+
   it("serves a movie's logo for its page, and learns an older movie's in the sweep", async () => {
     const heat = await byFile('Heat.mp4')
     const logoOf = async () =>
@@ -250,6 +289,33 @@ describe('movie metadata', () => {
     expect(shape({ response, guard: isMediaList }).map((item) => item.title)).toEqual([
       'Unknown Thing',
     ])
+  })
+
+  it('learns the saga and logo of a movie stored before they were kept, in one call, once', async () => {
+    const db = app().get(DatabaseService).db
+    db.prepare(
+      `UPDATE items SET saga_tmdb_id = NULL, saga_name = NULL, saga_checked = 0, logo_checked = 0
+        WHERE type = 'movie'`,
+    ).run()
+    expect(await sagaTitles()).toEqual([])
+    const movies = db
+      .prepare<[], { tmdb_id: string }>("SELECT tmdb_id FROM items WHERE type = 'movie'")
+      .all()
+      .map((row) => `/3/movie/${row.tmdb_id}`)
+    const askedFrom = (start: number) =>
+      tmdb.state.calls
+        .slice(start)
+        .filter((url) => url.includes('/movie/'))
+        .map((url) => new URL(url).pathname)
+    const before = tmdb.state.calls.length
+    await app().get(ItemRefresher).sweep()
+    expect(await sagaTitles()).toEqual([
+      { name: 'Crime Classics Collection', titles: ['Pulp Fiction', 'Heat'] },
+    ])
+    expect(askedFrom(before).toSorted()).toEqual(movies.toSorted())
+    const after = tmdb.state.calls.length
+    await app().get(ItemRefresher).sweep()
+    expect(askedFrom(after)).toEqual([])
   })
 
   it('asked again without the article when "The Few Good Men" found nothing', () => {

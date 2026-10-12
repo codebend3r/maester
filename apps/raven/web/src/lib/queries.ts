@@ -66,6 +66,12 @@ export const libraryFavouritesQuery = (libraryId: number) =>
     queryFn: () => api.listLibraryFavourites(libraryId),
   })
 
+export const sagasQuery = (libraryId: number | null) =>
+  queryOptions({
+    queryKey: queryKeys.sagas(libraryId),
+    queryFn: libraryId == null ? skipToken : () => api.listSagas(libraryId),
+  })
+
 export const unmatchedQuery = (libraryId: number) =>
   queryOptions({
     queryKey: queryKeys.unmatched(libraryId),

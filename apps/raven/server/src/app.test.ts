@@ -236,6 +236,7 @@ describe('the media server', () => {
       }
       expect(await api().listInProgress(library.id)).toEqual([])
       expect(await api().listLibraryFavourites(library.id)).toEqual([])
+      expect(await api().listSagas(library.id)).toEqual([])
       expect(await api().listUnmatched(library.id)).toEqual([])
     })
 

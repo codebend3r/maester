@@ -13,6 +13,7 @@ import { JumpPicker } from '@/components/JumpPicker/JumpPicker'
 import { LibraryToolbar } from '@/components/LibraryToolbar/LibraryToolbar'
 import { MediaGrid } from '@/components/MediaGrid/MediaGrid'
 import { MediaTiles } from '@/components/MediaTiles/MediaTiles'
+import { SagaDecks } from '@/components/SagaDeck/SagaDeck'
 import { finishedNote } from '@/lib/history'
 import { watchLink } from '@/lib/itemLinks'
 import { jumpScale } from '@/lib/jumpScale'
@@ -21,6 +22,7 @@ import {
   inProgressQuery,
   libraryFavouritesQuery,
   metadataHealthQuery,
+  sagasQuery,
   unmatchedQuery,
 } from '@/lib/queries'
 import { LibraryListing } from '@/pages/LibraryPage/LibraryViews'
@@ -212,6 +214,24 @@ const FavouritesSection = ({ library }: { library: Library }) => {
 }
 
 /**
+ * The library's movies gathered by the TMDB collection they belong to, by
+ * name, each saga a deck of its posters that opens its own page.
+ */
+const SagasSection = ({ library }: { library: Library }) => {
+  const query = useQuery(sagasQuery(library.id))
+  return (
+    <SectionBody
+      query={query}
+      empty={whenEmpty(
+        `No sagas in ${library.name} yet. One shows here once two movies or more from the same TMDB collection are in the library.`,
+      )}
+    >
+      {(sagas) => <SagaDecks libraryId={library.id} sagas={sagas} />}
+    </SectionBody>
+  )
+}
+
+/**
  * The files no movie or show was found for, each with Fix match in its menu.
  * While TMDB answers, the tab keeps reading again until none is pending,
  * then reads the library again for its count of files not matched.
@@ -287,6 +307,7 @@ const SECTION_VIEWS = {
   all: AllSection,
   'in-progress': InProgressSection,
   favourites: FavouritesSection,
+  sagas: SagasSection,
   'not-matched': NotMatchedSection,
   finished: FinishedSection,
 } as const satisfies Record<LibrarySection, (props: { library: Library }) => ReactNode>

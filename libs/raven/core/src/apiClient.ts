@@ -29,6 +29,7 @@ import {
   type PlaybackSettingsState,
   type PosterEntry,
   type ProgressChange,
+  type Saga,
   type ServerEvent,
   type ShowListing,
   type ShowMatchChoice,
@@ -53,6 +54,7 @@ import {
   isPersonDetails,
   isPlaybackSettingsState,
   isPosterEntries,
+  isSagaList,
   isServerEvent,
   isServerHealth,
   isShowListing,
@@ -331,6 +333,10 @@ export const createApiClient = ({
     /** A library's favourites, most recently marked first, each with its poster. */
     listLibraryFavourites: (libraryId: number): Promise<PosterEntry[]> =>
       libraryGet({ libraryId, path: 'favourites', guard: isPosterEntries }),
+
+    /** A movie library's sagas of two movies or more, by name, each oldest first. */
+    listSagas: (libraryId: number): Promise<Saga[]> =>
+      libraryGet({ libraryId, path: 'sagas', guard: isSagaList }),
 
     /** A matched library's files no movie or show was found for, or waiting to be matched, by title. */
     listUnmatched: (libraryId: number): Promise<MediaItem[]> =>
