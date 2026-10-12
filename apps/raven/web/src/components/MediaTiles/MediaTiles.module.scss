@@ -50,6 +50,9 @@
 
 // Where playback stopped: the one red mark on the row.
 .resume {
+  // Above the picture, whose hover filter paints it as a layer of its own.
+  position: relative;
+  z-index: 1;
   align-self: end;
   height: 3px;
 }
@@ -108,4 +111,12 @@
 .posterFrame {
   display: grid;
   border-radius: var(--radius-sm);
+}
+
+// The value the listing is sorted by: a line of its own above the facts, so
+// a long one ("Added 3 days ago") never squeezes them, and a shade brighter.
+.sorted {
+  color: var(--color-bark);
+  font-size: var(--font-size-xs);
+  font-stretch: 90%;
 }

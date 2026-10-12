@@ -84,6 +84,11 @@ describe('LibraryPage', () => {
     expect(state.listed.at(-1)?.sort).toBe('largest')
   })
 
+  it('shows on each card the value the library is sorted by', async () => {
+    serve({ view: 'grid', sort: 'largest' })
+    expect(await screen.findAllByText('1.6 GB')).toHaveLength(ITEMS.length)
+  })
+
   it('opens on the search, sort, view and grouping the address carries', async () => {
     serve(
       { view: 'grid', sort: 'title' },

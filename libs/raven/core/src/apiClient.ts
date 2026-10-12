@@ -3,6 +3,7 @@ import {
   type DirectoryListing,
   type FavouriteChange,
   type HistoryEntry,
+  type Home,
   type ImageChoice,
   type ImageOption,
   type ItemDetails,
@@ -23,6 +24,7 @@ import {
   type PersonDetails,
   type PlaybackSettings,
   type PlaybackSettingsState,
+  type PosterEntry,
   type ProgressChange,
   type ServerEvent,
   type ShowListing,
@@ -32,6 +34,7 @@ import {
   type UnlockRequest,
   isDirectoryListing,
   isHistory,
+  isHome,
   isItemDetails,
   isItemImageOptions,
   isItemMetadataState,
@@ -45,6 +48,7 @@ import {
   isMediaTracks,
   isPersonDetails,
   isPlaybackSettingsState,
+  isPosterEntries,
   isServerEvent,
   isServerHealth,
   isShowListing,
@@ -285,9 +289,12 @@ export const createApiClient = ({
         guard: isMediaItem,
       }),
 
-    /** Every favourite across every library, most recently favourited first. */
-    listFavourites: (): Promise<MediaItem[]> =>
-      expect({ request: send({ path: '/api/favourites' }), guard: isMediaList }),
+    /** Every favourite across every library with the poster its card shows, most recently favourited first. */
+    listFavourites: (): Promise<PosterEntry[]> =>
+      expect({ request: send({ path: '/api/favourites' }), guard: isPosterEntries }),
+
+    /** Every video in progress, then each pinned library's newest arrivals; libraries still locked stay out. */
+    getHome: (): Promise<Home> => expect({ request: send({ path: '/api/home' }), guard: isHome }),
 
     /** Notes that a video started playing, for its library's history. */
     recordPlay: async (id: number): Promise<void> => {

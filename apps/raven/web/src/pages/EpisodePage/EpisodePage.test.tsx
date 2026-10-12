@@ -20,7 +20,7 @@ describe('EpisodePage', () => {
     spies.tracks.mockReset()
   })
 
-  it('shows the show and number, the title, air date, summary, guests and Resume', async () => {
+  const open = () => {
     spies.item.mockImplementation(async () => episodeDetails(EPISODE_TWO))
     spies.libraries.mockImplementation(async () => [library({ id: 2, name: 'TV' })])
     spies.tracks.mockImplementation(async () => ({
@@ -35,6 +35,10 @@ describe('EpisodePage', () => {
       </Routes>,
       { route: '/episodes/7' },
     )
+  }
+
+  it('shows the show and number, the title, air date, summary, guests and Resume', async () => {
+    open()
     expect(await screen.findByRole('heading', { level: 1, name: 'Half Loop' })).toBeInTheDocument()
     expect(screen.getByText('Severance · Season 1 · Episode 2')).toBeInTheDocument()
     expect(screen.getByText(/18 Feb 2022|Feb 18, 2022/)).toBeInTheDocument()
@@ -49,5 +53,12 @@ describe('EpisodePage', () => {
       'href',
       '/shows/4/seasons/1',
     )
+  })
+
+  it('plays from its still', async () => {
+    open()
+    const still = await screen.findByRole('link', { name: 'Play Half Loop' })
+    expect(still).toHaveAttribute('href', '/watch/13')
+    expect(still.querySelector('img')).not.toBeNull()
   })
 })

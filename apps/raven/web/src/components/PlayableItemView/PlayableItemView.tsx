@@ -14,6 +14,7 @@ import { ImageEditor } from '@/components/ImageEditor/ImageEditor'
 import { ItemHeader } from '@/components/ItemHeader/ItemHeader'
 import { MediaMenu } from '@/components/MediaMenu/MediaMenu'
 import { MetadataEditor } from '@/components/MetadataEditor/MetadataEditor'
+import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
 import { ReviewCards } from '@/components/ReviewCards/ReviewCards'
 import { Summary } from '@/components/Summary/Summary'
 import { TmdbCredit } from '@/components/TmdbCredit/TmdbCredit'
@@ -34,7 +35,7 @@ type PlayableConfig = {
   back: (facts: Facts & { libraries: readonly Library[] }) => { to: string; label: string }
   byline: (details: ItemDetails) => string | null
   facts: (facts: Facts) => string[]
-  /** An episode has a still and no poster. */
+  /** A movie has a poster and a backdrop; an episode has its still, else the file's frame grab, for both. */
   pictures: 'poster and backdrop' | 'still'
   /** Whether the page offers Edit images and Edit metadata. */
   editable: boolean
@@ -79,8 +80,9 @@ const PLAYABLE = {
 
 /**
  * A movie's or an episode's page once the item and the version Play starts
- * are known: the header with Play, favourite and the file's menu, then the
- * summary, the file, its versions and the people.
+ * are known: the header with Play, favourite and the file's menu (its
+ * picture plays too), whether this browser needs that version converted or
+ * cannot play it, then the summary, the file, its versions and the people.
  */
 export const PlayableItemView = ({
   kind,
@@ -105,6 +107,10 @@ export const PlayableItemView = ({
   const back = config.back({ details, primary, libraries: known })
   const facts = fileFacts({ media: primary, tracks: tracks.data })
   const play = watchLink(primary)
+  const playPicture = { ...play, label: `Play ${details.title}` }
+  const still =
+    api.itemImageUrl({ id: details.id, kind: 'still', version: details.backdropVersion }) ??
+    api.thumbnailUrl(primary)
 
   return (
     <article className={styles.page} aria-labelledby={ids.title}>
@@ -121,24 +127,22 @@ export const PlayableItemView = ({
         ratings={details.ratings}
         {...(config.pictures === 'poster and backdrop'
           ? {
-              poster: api.itemImageUrl({
-                id: details.id,
-                kind: 'poster',
-                version: details.posterVersion,
-              }),
+              picture: {
+                shape: 'poster',
+                url: api.itemImageUrl({
+                  id: details.id,
+                  kind: 'poster',
+                  version: details.posterVersion,
+                }),
+                play: playPicture,
+              },
               backdrop: api.itemImageUrl({
                 id: details.id,
                 kind: 'backdrop',
                 version: details.backdropVersion,
               }),
             }
-          : {
-              backdrop: api.itemImageUrl({
-                id: details.id,
-                kind: 'still',
-                version: details.backdropVersion,
-              }),
-            })}
+          : { picture: { shape: 'still', url: still, play: playPicture }, backdrop: still })}
       >
         <ButtonLink tone="primary" icon="play" to={play.to} state={play.state}>
           {primary.position > 0 ? `Resume from ${formatDuration(primary.position)}` : 'Play'}
@@ -186,6 +190,8 @@ export const PlayableItemView = ({
           }}
         />
       </ItemHeader>
+
+      <PlaybackNote media={primary} place="page" />
 
       {editingImages && (
         <ImageEditor details={details} libraries={known} onDone={() => setEditingImages(false)} />

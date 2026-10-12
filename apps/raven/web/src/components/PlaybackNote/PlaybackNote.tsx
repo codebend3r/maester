@@ -7,9 +7,11 @@ import styles from '@/components/PlaybackNote/PlaybackNote.module.scss'
 /**
  * Says when this browser cannot play a video as it is: converted on the
  * server, or not at all, as the server's playback settings have it. Nothing
- * when it plays directly, or before those settings are known.
+ * when it plays directly, or before those settings are known. A card only
+ * warns of a video that will not play: most 4K files are converted, so on a
+ * card that says nothing worth choosing by, and the video's page says it.
  */
-export const PlaybackNote = ({ media }: { media: MediaItem }) => {
+export const PlaybackNote = ({ media, place }: { media: MediaItem; place: 'card' | 'page' }) => {
   const policy = usePlaybackPolicy()
   if (!policy) return null
   const plan = planPlayback({
@@ -19,7 +21,7 @@ export const PlaybackNote = ({ media }: { media: MediaItem }) => {
     defaultAudio: true,
     policy,
   })
-  const converted = plan.modes.length > 0 && plan.modes[0] !== 'direct'
+  const converted = place === 'page' && plan.modes.length > 0 && plan.modes[0] !== 'direct'
   return (
     <>
       {plan.modes.length === 0 && (

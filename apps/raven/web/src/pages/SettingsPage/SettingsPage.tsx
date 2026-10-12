@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { PLAYBACK_CHOICES, type PlaybackSettings } from '@raven/core'
-import { useId } from 'react'
+import { DEFAULT_PLAYBACK_SETTINGS, PLAYBACK_CHOICES, type PlaybackSettings } from '@raven/core'
+import { useId, useState } from 'react'
+import { Button } from '@/components/Button/Button'
+import { Icon, type IconName } from '@/components/Icon/Icon'
 import { api } from '@/lib/api'
 import { playbackSettingsQuery } from '@/lib/queries'
 import { queryKeys } from '@/lib/queryClient'
@@ -58,16 +60,34 @@ const HW_ACCEL: Choices<'hwAccel'> = {
   videotoolbox: { label: 'VideoToolbox', hint: 'The media engine in a Mac.' },
 }
 
+const isSettingKey = (key: string): key is keyof PlaybackSettings =>
+  key in DEFAULT_PLAYBACK_SETTINGS
+
+/** Whether every playback setting is where a fresh install has it. */
+const atDefaults = (settings: PlaybackSettings): boolean =>
+  Object.keys(DEFAULT_PLAYBACK_SETTINGS)
+    .filter(isSettingKey)
+    .every((key) => settings[key] === DEFAULT_PLAYBACK_SETTINGS[key])
+
 const ENCODER_NAMES = {
   software: 'libx264 on the CPU',
   vaapi: 'VAAPI',
   videotoolbox: 'VideoToolbox',
 }
 
+/** A setting's or a section's title with its icon before it. */
+const Titled = ({ icon, children }: { icon: IconName; children: string }) => (
+  <>
+    <Icon name={icon} />
+    {children}
+  </>
+)
+
 /** One setting as a group of radio buttons, each with a line saying what it means. */
 const Setting = <K extends ChoiceKey>({
   name,
   label,
+  icon,
   choices,
   value,
   disabled,
@@ -75,6 +95,7 @@ const Setting = <K extends ChoiceKey>({
 }: {
   name: K
   label: string
+  icon: IconName
   choices: Choices<K>
   value: ChoiceValue<K>
   disabled: boolean
@@ -84,7 +105,9 @@ const Setting = <K extends ChoiceKey>({
   const id = useId()
   return (
     <fieldset className={styles.setting} disabled={disabled}>
-      <legend className={styles.legend}>{label}</legend>
+      <legend className={styles.legend}>
+        <Titled icon={icon}>{label}</Titled>
+      </legend>
       <div className={styles.choices}>
         {values.map((choice) => (
           <label key={String(choice)} className={styles.choice}>
@@ -103,16 +126,29 @@ const Setting = <K extends ChoiceKey>({
   )
 }
 
-/** `/settings`: how the server plays video, for every viewer. Each change saves on its own. */
+/**
+ * `/settings`: how the server plays video, for every viewer. Each change
+ * saves on its own; Reset to defaults puts them all back at once, after a
+ * second click to be sure.
+ */
 export const SettingsPage = () => {
   const ids = { title: useId(), playback: useId() }
   const queryClient = useQueryClient()
+  const [confirming, setConfirming] = useState(false)
   const state = useQuery(playbackSettingsQuery)
   const save = useMutation({
     mutationFn: (change: Partial<PlaybackSettings>) => api.setPlaybackSettings(change),
     onSuccess: (updated) => queryClient.setQueryData(queryKeys.playbackSettings, updated),
   })
+  const reset = useMutation({
+    mutationFn: () => api.setPlaybackSettings(DEFAULT_PLAYBACK_SETTINGS),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(queryKeys.playbackSettings, updated)
+      setConfirming(false)
+    },
+  })
   const settings = state.data?.settings
+  const busy = save.isPending || reset.isPending
   const change =
     <K extends ChoiceKey>(key: K) =>
     (value: ChoiceValue<K>) =>
@@ -120,12 +156,40 @@ export const SettingsPage = () => {
 
   return (
     <section className={styles.page} aria-labelledby={ids.title}>
-      <h1 id={ids.title} className={styles.title}>
-        Settings
-      </h1>
+      <header className={styles.header}>
+        <h1 id={ids.title} className={styles.title}>
+          Settings
+        </h1>
+        {settings && (
+          <div className={styles.reset}>
+            {confirming ? (
+              <>
+                <p className={styles.hint}>Every setting goes back to its default.</p>
+                <Button tone="danger" icon="reset" disabled={busy} onClick={() => reset.mutate()}>
+                  Reset all
+                </Button>
+                <Button onClick={() => setConfirming(false)}>Cancel</Button>
+              </>
+            ) : (
+              <Button
+                icon="reset"
+                disabled={busy || atDefaults(settings)}
+                onClick={() => setConfirming(true)}
+              >
+                Reset to defaults
+              </Button>
+            )}
+          </div>
+        )}
+      </header>
+      <output className={styles.status}>
+        {reset.isSuccess && !!settings && atDefaults(settings)
+          ? 'Every setting is back to its default.'
+          : ''}
+      </output>
       <section className={styles.section} aria-labelledby={ids.playback}>
         <h2 id={ids.playback} className={styles.heading}>
-          Playback
+          <Titled icon="playback">Playback</Titled>
         </h2>
         <p className={styles.hint}>
           How the server plays video, for every viewer. A change takes effect on the next play.
@@ -140,53 +204,65 @@ export const SettingsPage = () => {
             Could not save: {save.error.message}
           </p>
         )}
+        {reset.isError && (
+          <p className={styles.error} role="alert">
+            Could not reset: {reset.error.message}
+          </p>
+        )}
         {settings && state.data && (
           <>
             <Setting
               name="directPlay"
+              icon="file-play"
               label="Play the original file"
               choices={DIRECT_PLAY}
               value={settings.directPlay}
-              disabled={save.isPending}
+              disabled={busy}
               onChange={change('directPlay')}
             />
             <Setting
               name="transcoding"
+              icon="convert"
               label="Server conversion"
               choices={TRANSCODING}
               value={settings.transcoding}
-              disabled={save.isPending}
+              disabled={busy}
               onChange={change('transcoding')}
             />
             <Setting
               name="maxHeight"
+              icon="resize"
               label="Transcode size"
               choices={MAX_HEIGHT}
               value={settings.maxHeight}
-              disabled={save.isPending}
+              disabled={busy}
               onChange={change('maxHeight')}
             />
             <Setting
               name="quality"
+              icon="gauge"
               label="Transcode quality"
               choices={QUALITY}
               value={settings.quality}
-              disabled={save.isPending}
+              disabled={busy}
               onChange={change('quality')}
             />
             <Setting
               name="hwAccel"
+              icon="chip"
               label="Hardware acceleration"
               choices={HW_ACCEL}
               value={settings.hwAccel}
-              disabled={save.isPending}
+              disabled={busy}
               onChange={change('hwAccel')}
             />
             <p className={styles.hint}>
               Transcodes encode with {ENCODER_NAMES[state.data.effective.encoder]} right now.
             </p>
-            <fieldset className={styles.setting} disabled={save.isPending}>
-              <legend className={styles.legend}>HDR</legend>
+            <fieldset className={styles.setting} disabled={busy}>
+              <legend className={styles.legend}>
+                <Titled icon="sun">HDR</Titled>
+              </legend>
               <label className={styles.choice}>
                 <input
                   type="checkbox"

@@ -139,7 +139,7 @@ export const ComponentsSection = () => (
         {SAMPLE_MEDIA.slice(0, 4).map((media) => (
           <div key={media.id} className={styles.noteRow}>
             <span>{media.title}</span>
-            <PlaybackNote media={media} />
+            <PlaybackNote media={media} place="page" />
           </div>
         ))}
       </div>
@@ -173,7 +173,7 @@ export const ComponentsSection = () => (
         contentRating="PG-13"
         facts={['2026', '1h 42m', 'Drama', 'Mystery']}
         ratings={SAMPLE_RATINGS}
-        poster={null}
+        picture={{ shape: 'poster', url: null }}
         backdrop={null}
       >
         <Button tone="primary" icon="play">

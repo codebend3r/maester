@@ -1,12 +1,15 @@
 import { useQuery } from '@tanstack/react-query'
 import { useId } from 'react'
-import { MediaGrid } from '@/components/MediaGrid/MediaGrid'
+import { PosterCard } from '@/components/PosterCard/PosterCard'
 import { favouritesQuery } from '@/lib/queries'
 import styles from '@/pages/FavouritesPage/FavouritesPage.module.scss'
 
 const count = new Intl.NumberFormat()
 
-/** Every favourite across every library, most recently marked first. */
+/**
+ * Every favourite across every library, most recently marked first, as
+ * posters: a movie's own, an episode's season's.
+ */
 export const FavouritesPage = () => {
   const id = useId()
   const favourites = useQuery(favouritesQuery)
@@ -37,7 +40,13 @@ export const FavouritesPage = () => {
           and choose Favourite.
         </p>
       )}
-      {items.length > 0 && <MediaGrid items={items} />}
+      {items.length > 0 && (
+        <ul className={styles.grid}>
+          {items.map(({ media, poster }) => (
+            <PosterCard key={media.id} media={media} poster={poster} />
+          ))}
+        </ul>
+      )}
     </section>
   )
 }

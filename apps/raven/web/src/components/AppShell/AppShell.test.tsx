@@ -14,6 +14,7 @@ const renderShell = (route: string) =>
     <Routes>
       <Route element={<AppShell />}>
         <Route index element={<p>home</p>} />
+        <Route path="libraries" element={<p>libraries</p>} />
         <Route path="favourites" element={<p>favourites</p>} />
         <Route path="libraries/:id" element={<p>library</p>} />
         <Route
@@ -48,10 +49,36 @@ describe('AppShell', () => {
     expect(home.querySelector('img')).toHaveAttribute('src', '/brand/raven-mark-on-dark.svg')
   })
 
+  it('leads with Home, a house, marked on the page it opens on', () => {
+    spies.list.mockImplementation(async () => [])
+    renderShell('/')
+    const [first] = within(nav()).getAllByRole('link')
+    expect(first).toHaveAccessibleName('Home')
+    expect(first).toHaveAttribute('href', '/')
+    expect(first).toHaveAttribute('aria-current', 'page')
+    expect(first && iconOf(first)).toBe('home')
+    expect(within(nav()).getByRole('link', { name: 'Libraries' })).not.toHaveAttribute(
+      'aria-current',
+    )
+  })
+
+  it('marks Libraries, not Home, on the list of libraries', () => {
+    spies.list.mockImplementation(async () => [])
+    renderShell('/libraries')
+    expect(within(nav()).getByRole('link', { name: 'Libraries' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+    expect(within(nav()).getByRole('link', { name: 'Home' })).not.toHaveAttribute('aria-current')
+  })
+
   it('links to the libraries and the favourites, marking the current page', () => {
     spies.list.mockImplementation(async () => [])
     renderShell('/favourites')
-    expect(within(nav()).getByRole('link', { name: 'Libraries' })).toHaveAttribute('href', '/')
+    expect(within(nav()).getByRole('link', { name: 'Libraries' })).toHaveAttribute(
+      'href',
+      '/libraries',
+    )
     const favourites = within(nav()).getByRole('link', { name: 'Favourites' })
     expect(favourites).toHaveAttribute('href', '/favourites')
     expect(favourites).toHaveAttribute('aria-current', 'page')

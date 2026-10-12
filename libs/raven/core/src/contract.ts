@@ -369,6 +369,38 @@ export const isShowListing = object({
 
 export type ShowListing = Infer<typeof isShowListing>
 
+/**
+ * A pinned library's row on the home page: its newest arrivals, newest
+ * first. A TV shows library gives its shows, by when each one's newest
+ * episode came; any other library gives its videos.
+ */
+export const isHomeShelf = union(
+  object({ libraryId: isNumber, type: oneOf(['shows']), shows: listOf(isShowEntry) }),
+  object({ libraryId: isNumber, type: oneOf(['media']), media: isMediaList }),
+)
+
+export type HomeShelf = Infer<typeof isHomeShelf>
+
+/**
+ * A video, and the item whose poster its card shows: the movie, or an
+ * episode's season (else its show); null for a file matched to none.
+ */
+export const isPosterEntry = object({ media: isMediaItem, poster: nullable(isItemSummary) })
+
+export type PosterEntry = Infer<typeof isPosterEntry>
+
+/** `GET /api/favourites`: every favourite with its poster, most recently marked first. */
+export const isPosterEntries = listOf(isPosterEntry)
+
+/** `GET /api/home`: every video in progress, then each pinned library's shelf, as the side menu orders them. */
+export const isHome = object({
+  /** Videos with a saved spot, the most recently watched first. */
+  inProgress: isPosterEntries,
+  shelves: listOf(isHomeShelf),
+})
+
+export type Home = Infer<typeof isHome>
+
 /** A person's page: who they are, and everything in raven they are credited on. */
 export const isPersonDetails = object({
   id: isNumber,

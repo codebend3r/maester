@@ -2,6 +2,7 @@ import {
   type MatchItemType,
   type MediaGroupBy,
   type MediaItem,
+  type MediaSort,
   type RatingSource,
   groupMedia,
 } from '@raven/core'
@@ -19,6 +20,7 @@ export const MediaGroups = ({
   posters = false,
   matchType = null,
   ratingsSource = 'tmdb',
+  sort,
 }: {
   items: MediaItem[]
   by: MediaGroupBy
@@ -26,6 +28,7 @@ export const MediaGroups = ({
   posters?: boolean
   matchType?: MatchItemType | null
   ratingsSource?: RatingSource
+  sort?: MediaSort
 }) => (
   <div className={styles.groups} aria-busy={busy}>
     {groupMedia({ items, by }).map((group) => (
@@ -39,6 +42,7 @@ export const MediaGroups = ({
           posters={posters}
           matchType={matchType}
           ratingsSource={ratingsSource}
+          sort={sort}
         />
       </Bucket>
     ))}

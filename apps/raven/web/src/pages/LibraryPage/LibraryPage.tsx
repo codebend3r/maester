@@ -73,7 +73,7 @@ const LibraryView = ({ library }: { library: Library }) => {
 
   return (
     <section className={styles.page} aria-labelledby={ids.title}>
-      <ButtonLink to="/" icon="back" className={styles.back}>
+      <ButtonLink to="/libraries" icon="back" className={styles.back}>
         Libraries
       </ButtonLink>
 

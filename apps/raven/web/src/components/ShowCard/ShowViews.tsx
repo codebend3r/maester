@@ -1,4 +1,11 @@
-import { type RatingSource, type ShowEntry, episodeCode, sortTitle } from '@raven/core'
+import {
+  type MediaSort,
+  type RatingSource,
+  type ShowEntry,
+  episodeCode,
+  showSortFact,
+  sortTitle,
+} from '@raven/core'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Icon } from '@/components/Icon/Icon'
@@ -128,9 +135,19 @@ export const ShowList = ({ shows, busy = false }: { shows: ShowEntry[]; busy?: b
 }
 
 /** Every show as a row with a small poster, its title and facts beside it. */
-export const ShowTiles = ({ shows, busy = false }: { shows: ShowEntry[]; busy?: boolean }) => (
+export const ShowTiles = ({
+  shows,
+  busy = false,
+  sort,
+}: {
+  shows: ShowEntry[]
+  busy?: boolean
+  /** The order the listing is in, whose value each tile shows. */
+  sort?: MediaSort
+}) => (
   <ul className={styles.tiles} aria-label="Shows" aria-busy={busy}>
     {shows.map((entry) => {
+      const sorted = sort ? showSortFact({ entry, sort }) : null
       const facts = [
         showYears({ year: entry.show.year, endedYear: entry.endedYear }),
         episodesLabel(entry),
@@ -142,6 +159,7 @@ export const ShowTiles = ({ shows, busy = false }: { shows: ShowEntry[]; busy?: 
             <Link to={`/shows/${entry.show.id}`} className={styles.title}>
               {entry.show.title}
             </Link>
+            {sorted && <span className={styles.sorted}>{sorted}</span>}
             <span className={styles.facts}>
               {facts.map((fact) => (
                 <span key={fact}>{fact}</span>

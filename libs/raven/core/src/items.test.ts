@@ -77,6 +77,20 @@ describe('mediaLabel and cardTitle', () => {
     expect(cardTitle(parsed)).toEqual({ title: 'Heat', year: 1995 })
     expect(mediaLabel(mediaItem({ title: 'Clip' }))).toBe('Clip')
   })
+  it('name an episode by its show and number as well, with no year', () => {
+    const episode = mediaItem({
+      item: itemSummary({
+        type: 'episode',
+        title: 'Lost / Found',
+        year: 2024,
+        show: { id: 3, title: 'The Acolyte' },
+        season: 1,
+        episode: 1,
+      }),
+    })
+    expect(cardTitle(episode)).toEqual({ title: mediaLabel(episode), year: null })
+    expect(cardTitle(episode).title).toContain('The Acolyte')
+  })
 })
 
 describe('primaryVersion', () => {

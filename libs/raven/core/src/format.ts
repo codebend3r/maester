@@ -44,3 +44,34 @@ export const formatChannels = (channels: number | null): string | null => {
   const named: Record<number, string> = { 1: 'Mono', 2: 'Stereo', 6: '5.1', 8: '7.1' }
   return named[channels] ?? `${channels} ch`
 }
+
+const AGO_UNITS: ReadonlyArray<{ unit: Intl.RelativeTimeFormatUnit; seconds: number }> = [
+  { unit: 'year', seconds: 365 * 24 * 3600 },
+  { unit: 'month', seconds: 30 * 24 * 3600 },
+  { unit: 'day', seconds: 24 * 3600 },
+  { unit: 'hour', seconds: 3600 },
+  { unit: 'minute', seconds: 60 },
+]
+
+/** Narrow for a byline, "3d ago"; long for a card's words, "3 days ago", "yesterday". */
+const AGO_FORMATS = {
+  narrow: new Intl.RelativeTimeFormat(undefined, { numeric: 'always', style: 'narrow' }),
+  long: new Intl.RelativeTimeFormat(undefined, { numeric: 'auto', style: 'long' }),
+}
+
+/** How long ago `at` was, in the largest whole unit; "just now" under a minute. */
+export const timeAgo = ({
+  at,
+  now = new Date(),
+  style = 'narrow',
+}: {
+  at: string
+  now?: Date
+  style?: keyof typeof AGO_FORMATS
+}): string => {
+  const seconds = Math.max(0, (now.getTime() - new Date(at).getTime()) / 1000)
+  const found = AGO_UNITS.find((candidate) => seconds >= candidate.seconds)
+  return found
+    ? AGO_FORMATS[style].format(-Math.floor(seconds / found.seconds), found.unit)
+    : 'just now'
+}

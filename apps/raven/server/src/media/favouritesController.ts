@@ -1,5 +1,5 @@
 import { Controller, Get, Headers, Inject } from '@nestjs/common'
-import type { MediaItem } from '@raven/core'
+import type { PosterEntry } from '@raven/core'
 import { LockService } from '@/lock/lockService'
 import { MediaRepository } from '@/media/mediaRepository'
 
@@ -11,10 +11,12 @@ export class FavouritesController {
     @Inject(LockService) private readonly lock: LockService,
   ) {}
 
-  /** Every favourite but those in a library still locked. */
+  /** Every favourite but those in a library still locked, each with the poster its card shows. */
   @Get()
-  list(@Headers('cookie') cookie: string | undefined): MediaItem[] {
+  list(@Headers('cookie') cookie: string | undefined): PosterEntry[] {
     const viewer = this.lock.viewer({ cookie })
-    return this.media.listFavourites().filter((item) => viewer.seesLibrary(item.libraryId))
+    return this.media.withPosters(
+      this.media.listFavourites().filter((item) => viewer.seesLibrary(item.libraryId)),
+    )
   }
 }

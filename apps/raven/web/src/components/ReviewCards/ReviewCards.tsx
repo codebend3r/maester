@@ -1,4 +1,4 @@
-import type { Review } from '@raven/core'
+import { type Review, timeAgo } from '@raven/core'
 import { useEffect, useId, useRef, useState } from 'react'
 import { Button } from '@/components/Button/Button'
 import { api } from '@/lib/api'
@@ -15,23 +15,6 @@ const initials = (name: string): string =>
     .slice(0, 2)
     .join('')
     .toUpperCase()
-
-const UNITS: ReadonlyArray<{ unit: Intl.RelativeTimeFormatUnit; seconds: number }> = [
-  { unit: 'year', seconds: 365 * 24 * 3600 },
-  { unit: 'month', seconds: 30 * 24 * 3600 },
-  { unit: 'day', seconds: 24 * 3600 },
-  { unit: 'hour', seconds: 3600 },
-  { unit: 'minute', seconds: 60 },
-]
-
-const relative = new Intl.RelativeTimeFormat(undefined, { numeric: 'always', style: 'narrow' })
-
-/** "6 h ago", "3 mo ago", "2 y ago"; "just now" under a minute. */
-export const timeAgo = ({ at, now = new Date() }: { at: string; now?: Date }): string => {
-  const seconds = Math.max(0, (now.getTime() - new Date(at).getTime()) / 1000)
-  const found = UNITS.find((candidate) => seconds >= candidate.seconds)
-  return found ? relative.format(-Math.floor(seconds / found.seconds), found.unit) : 'just now'
-}
 
 /** A score out of 10 as stars out of five, halves allowed: 7 becomes 3.5. */
 export const starsOf = (rating: number): number => Math.round(rating) / 2

@@ -57,7 +57,7 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
   return (
     <article className={styles.page} aria-labelledby={ids.title}>
       <ButtonLink
-        to={libraryId == null ? '/' : `/libraries/${libraryId}`}
+        to={libraryId == null ? '/libraries' : `/libraries/${libraryId}`}
         icon="back"
         className={styles.back}
       >
@@ -71,11 +71,14 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
         contentRating={details.contentRating}
         facts={showFacts(details)}
         ratings={details.ratings}
-        poster={api.itemImageUrl({
-          id: details.id,
-          kind: 'poster',
-          version: details.posterVersion,
-        })}
+        picture={{
+          shape: 'poster',
+          url: api.itemImageUrl({
+            id: details.id,
+            kind: 'poster',
+            version: details.posterVersion,
+          }),
+        }}
         backdrop={api.itemImageUrl({
           id: details.id,
           kind: 'backdrop',

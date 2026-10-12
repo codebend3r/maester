@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common'
 import {
   type MediaItem,
   type MediaSort,
+  type PosterEntry,
   type ShowEntry,
   isMatchState,
   isThumbnailState,
@@ -145,6 +146,16 @@ type EpisodeScope = { kind: 'library'; libraryId: number } | { kind: 'everywhere
 
 const BY_TITLE = 'COALESCE(item_sort_title, title) COLLATE NOCASE, id'
 
+/** SQLite reads a negative LIMIT as none. */
+const NO_LIMIT = -1
+
+/**
+ * The LIMIT a listing reads with. A random sort deals from every row, so it
+ * reads them all and is cut after the shuffle.
+ */
+const sqlLimit = ({ sort, limit }: { sort: MediaSort; limit: number | undefined }): number =>
+  sort === 'random' ? NO_LIMIT : (limit ?? NO_LIMIT)
+
 const YEAR = 'COALESCE(item_year, year)'
 
 /**
@@ -218,24 +229,27 @@ export class MediaRepository {
   }
 
   /**
-   * A library's videos in `sort` order; `seed` decides a random one. A movie
-   * kept as several files is one entry, its best file, with `versions` saying
-   * how many there are. Search matches the file's title and its movie's.
+   * A library's videos in `sort` order; `seed` decides a random one, and
+   * `limit` keeps the first that many. A movie kept as several files is one
+   * entry, its best file, with `versions` saying how many there are. Search
+   * matches the file's title and its movie's.
    */
   list({
     libraryId,
     search = '',
     sort = 'title',
     seed = 0,
+    limit,
   }: {
     libraryId: number
     search?: string
     sort?: MediaSort
     seed?: number
+    limit?: number
   }): MediaItem[] {
     const pattern = likePattern(search.trim())
     const rows = this.db
-      .prepare<[number, string, string, string], MediaRow>(
+      .prepare<[number, string, string, string, number], MediaRow>(
         `WITH listed AS (
            ${SELECT_COLUMNS},
                   ROW_NUMBER() OVER (
@@ -247,11 +261,12 @@ export class MediaRepository {
           WHERE version_rank = 1
             AND (title LIKE ? ESCAPE '\\' OR item_title LIKE ? ESCAPE '\\'
                  OR item_original_title LIKE ? ESCAPE '\\')
-          ORDER BY ${ORDER_BY[sort]}`,
+          ORDER BY ${ORDER_BY[sort]}
+          LIMIT ?`,
       )
-      .all(libraryId, pattern, pattern, pattern)
+      .all(libraryId, pattern, pattern, pattern, sqlLimit({ sort, limit }))
     const items = this.items(rows)
-    return sort === 'random' ? shuffle({ items, seed }) : items
+    return sort === 'random' ? shuffle({ items, seed }).slice(0, limit) : items
   }
 
   /**
@@ -293,22 +308,25 @@ export class MediaRepository {
   /**
    * A TV library as its shows: how many episodes each has on disk, when
    * its newest file came, and the first episode not yet watched by the
-   * library's measure (specials last). Search matches show titles.
+   * library's measure (specials last). Search matches show titles, and
+   * `limit` keeps the first that many.
    */
   listShows({
     libraryId,
     search = '',
     sort = 'title',
     seed = 0,
+    limit,
   }: {
     libraryId: number
     search?: string
     sort?: MediaSort
     seed?: number
+    limit?: number
   }): ShowEntry[] {
     const pattern = likePattern(search.trim())
     const rows = this.db
-      .prepare<[number, string, string], ShowRow>(
+      .prepare<[number, string, string, number], ShowRow>(
         `WITH files AS (${EPISODE_FILES})
          SELECT sh.id, sh.ended, COUNT(DISTINCT f.episode_id) AS episodes, MAX(f.added_at) AS added_at,
                 MAX(f.changed_at) AS changed_at,
@@ -318,9 +336,10 @@ export class MediaRepository {
            JOIN libraries l ON l.id = f.library_id
           WHERE sh.title LIKE ? ESCAPE '\\' OR sh.original_title LIKE ? ESCAPE '\\'
           GROUP BY sh.id
-          ORDER BY ${SHOW_ORDER_BY[sort]}`,
+          ORDER BY ${SHOW_ORDER_BY[sort]}
+          LIMIT ?`,
       )
-      .all(libraryId, pattern, pattern)
+      .all(libraryId, pattern, pattern, sqlLimit({ sort, limit }))
     const showIds = rows.map((row) => row.id)
     const summaries = this.metadata.summaries(showIds)
     const next = this.nextUnwatched({ showIds, scope: { kind: 'library', libraryId } })
@@ -339,7 +358,7 @@ export class MediaRepository {
         },
       ]
     })
-    return sort === 'random' ? shuffle({ items: entries, seed }) : entries
+    return sort === 'random' ? shuffle({ items: entries, seed }).slice(0, limit) : entries
   }
 
   /**
@@ -389,6 +408,33 @@ export class MediaRepository {
       if (!item) return byItem
       return byItem.set(row.linked_item, [...(byItem.get(row.linked_item) ?? []), item])
     }, new Map<number, MediaItem[]>())
+  }
+
+  /**
+   * Every video with a saved spot, across every library that saves progress,
+   * the most recently watched first. A finished or barely started video has
+   * no spot, so it is not in progress.
+   */
+  listInProgress(): MediaItem[] {
+    return this.items(
+      this.db
+        .prepare<[], MediaRow>(
+          `${SELECT_MEDIA} WHERE p.media_id IS NOT NULL AND l.save_progress = 1
+            ORDER BY p.updated_at DESC, m.id DESC`,
+        )
+        .all(),
+    )
+  }
+
+  /** Each video with the item whose poster its card shows, by `MetadataRepository.posterItems`. */
+  withPosters(videos: readonly MediaItem[]): PosterEntry[] {
+    const posters = this.metadata.posterItems(
+      videos.flatMap((media) => (media.item ? [media.item.id] : [])),
+    )
+    return videos.map((media) => ({
+      media,
+      poster: media.item ? (posters.get(media.item.id) ?? null) : null,
+    }))
   }
 
   /** Every favourite across every library, most recently marked first. */

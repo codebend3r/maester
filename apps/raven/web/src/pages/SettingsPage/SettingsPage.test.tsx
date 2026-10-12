@@ -11,6 +11,19 @@ const STATE: PlaybackSettingsState = {
   effective: { encoder: 'videotoolbox', tonemapAvailable: true },
 }
 
+/** Three settings moved off their defaults. */
+const CHANGED: PlaybackSettingsState = {
+  ...STATE,
+  settings: {
+    ...DEFAULT_PLAYBACK_SETTINGS,
+    transcoding: 'remuxOnly',
+    quality: 'high',
+    tonemap: false,
+  },
+}
+
+const iconOf = (element: HTMLElement) => element.querySelector('svg')?.dataset.icon
+
 describe('SettingsPage', () => {
   const spies = {
     get: spyOn(api, 'getPlaybackSettings'),
@@ -30,6 +43,47 @@ describe('SettingsPage', () => {
     expect(screen.getByRole('radio', { name: /^Auto/ })).toBeChecked()
     expect(screen.getByRole('checkbox', { name: /Tone map HDR/ })).toBeChecked()
     expect(screen.getByText('Transcodes encode with VideoToolbox right now.')).toBeInTheDocument()
+  })
+
+  it('marks the section and each setting with an icon of its own', async () => {
+    spies.get.mockImplementation(async () => STATE)
+    renderWithProviders(<SettingsPage />, { playback: null })
+    expect(iconOf(await screen.findByRole('heading', { name: 'Playback' }))).toBe('playback')
+    const icons = screen.getAllByRole('group').map(iconOf)
+    expect(icons).toEqual(['file-play', 'convert', 'resize', 'gauge', 'chip', 'sun'])
+  })
+
+  it('puts every setting back to its default on a second click', async () => {
+    spies.get.mockImplementation(async () => CHANGED)
+    spies.set.mockImplementation(async (change) => ({
+      ...CHANGED,
+      settings: { ...CHANGED.settings, ...change },
+    }))
+    renderWithProviders(<SettingsPage />, { playback: null })
+    await userEvent.click(await screen.findByRole('button', { name: 'Reset to defaults' }))
+    expect(spies.set).not.toHaveBeenCalled()
+    await userEvent.click(screen.getByRole('button', { name: 'Reset all' }))
+    await waitFor(() => expect(spies.set).toHaveBeenCalledWith(DEFAULT_PLAYBACK_SETTINGS))
+    expect(await screen.findByRole('radio', { name: /Remux and transcode/ })).toBeChecked()
+    expect(screen.getByRole('checkbox', { name: /Tone map HDR/ })).toBeChecked()
+    expect(screen.getByRole('button', { name: 'Reset to defaults' })).toBeDisabled()
+    expect(screen.getByRole('status')).toHaveTextContent('Every setting is back to its default.')
+  })
+
+  it('keeps the settings when the reset is cancelled', async () => {
+    spies.get.mockImplementation(async () => CHANGED)
+    renderWithProviders(<SettingsPage />, { playback: null })
+    await userEvent.click(await screen.findByRole('button', { name: 'Reset to defaults' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(spies.set).not.toHaveBeenCalled()
+    expect(screen.getByRole('radio', { name: /Remux only/ })).toBeChecked()
+    expect(screen.queryByRole('button', { name: 'Reset all' })).toBeNull()
+  })
+
+  it('has nothing to reset while every setting is at its default', async () => {
+    spies.get.mockImplementation(async () => STATE)
+    renderWithProviders(<SettingsPage />, { playback: null })
+    expect(await screen.findByRole('button', { name: 'Reset to defaults' })).toBeDisabled()
   })
 
   it('saves a choice as soon as it is picked', async () => {

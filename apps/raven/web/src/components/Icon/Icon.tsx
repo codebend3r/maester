@@ -37,6 +37,15 @@ export type IconName =
   | 'tv'
   | 'video'
   | 'libraries'
+  | 'home'
+  | 'playback'
+  | 'file-play'
+  | 'convert'
+  | 'resize'
+  | 'gauge'
+  | 'chip'
+  | 'sun'
+  | 'reset'
   | 'sidebar'
   | 'lock'
   | 'unlock'
@@ -81,6 +90,15 @@ const PATHS: Record<IconName, string> = {
   tv: 'M3 8h18v12H3zM8 3.5l4 4.5 4-4.5',
   video: 'M3 7h12v10H3zM15 10.5l6-3.5v10l-6-3.5',
   libraries: 'M3 4h4v16H3zM9 4h4v16H9zM14.6 5l3.6-1 3.4 15-3.6 1z',
+  home: 'M3 11.5L12 4l9 7.5M5.5 9.5V20h5v-5.5h3V20h5V9.5',
+  playback: 'M3 5h18v14H3zM10 9v6l5-3z',
+  'file-play': 'M6 3h8l4 4v14H6zM14 3v4h4M10.5 11v6l4.5-3z',
+  convert: 'M4 8h13M14 5l3 3-3 3M20 16H7M10 13l-3 3 3 3',
+  resize: 'M4 9V4h5M4 4l6 6M20 15v5h-5M20 20l-6-6',
+  gauge: 'M4 17a8 8 0 1 1 16 0M12 17l4-5M7.5 12.5l1 .6',
+  chip: 'M7 7h10v10H7zM10 10h4v4h-4zM9.5 3v4M14.5 3v4M9.5 17v4M14.5 17v4M3 9.5h4M3 14.5h4M17 9.5h4M17 14.5h4',
+  sun: 'M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2.5v2M12 19.5v2M4.6 4.6L6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4L6 18M18 6l1.4-1.4',
+  reset: 'M4 11a8 8 0 1 1 2.3 5.7M4 5v6h6',
   sidebar: 'M4 5h16v14H4zM9.5 5v14',
   lock: 'M5 11h14v10H5zM8 11V7.5a4 4 0 0 1 8 0V11M12 15v2',
   unlock: 'M5 11h14v10H5zM8 11V7.5a4 4 0 0 1 7.7-1.5M12 15v2',

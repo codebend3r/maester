@@ -42,11 +42,15 @@ export const mediaLabel = (media: MediaItem): string => {
 export const primaryVersion = (versions: readonly MediaItem[]): MediaItem | undefined =>
   versions.find((version) => version.position > 0) ?? versions[0]
 
-/** The title a card shows, and the year beneath it. */
-export const cardTitle = (media: MediaItem): { title: string; year: number | null } =>
-  media.item
-    ? { title: media.item.title, year: media.item.year }
-    : { title: media.title, year: media.year }
+/**
+ * The title a card shows, and the year beneath it. An episode's title alone
+ * says little on a poster, so it comes with its show and number, and no year.
+ */
+export const cardTitle = (media: MediaItem): { title: string; year: number | null } => {
+  if (!media.item) return { title: media.title, year: media.year }
+  if (media.item.type === 'episode') return { title: itemLabel(media.item), year: null }
+  return { title: media.item.title, year: media.item.year }
+}
 
 /** The score a card shows: the library's chosen source, else TMDB's, else none. */
 export const pickScore = ({

@@ -92,7 +92,10 @@ const SeasonView = ({ show, season }: { show: ItemDetails; season: ItemDetails }
           `${count} ${count === 1 ? 'episode' : 'episodes'}`,
         ].filter((fact): fact is string => fact != null)}
         ratings={[]}
-        poster={api.itemImageUrl({ id: season.id, kind: 'poster', version: season.posterVersion })}
+        picture={{
+          shape: 'poster',
+          url: api.itemImageUrl({ id: season.id, kind: 'poster', version: season.posterVersion }),
+        }}
         backdrop={api.itemImageUrl({
           id: show.id,
           kind: 'backdrop',

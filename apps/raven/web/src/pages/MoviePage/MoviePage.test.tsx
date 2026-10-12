@@ -6,6 +6,7 @@ import { Route, Routes, useParams } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { MoviePage } from '@/pages/MoviePage/MoviePage'
 import { itemDetails, library, matchedMovie } from '@/test/fixtures'
+import { setBrowserSupport, setStreamSupport } from '@/test/canPlay'
 import { renderWithProviders } from '@/test/render'
 
 const Watching = () => <p>Watching {useParams().id}</p>
@@ -75,6 +76,30 @@ describe('MoviePage', () => {
     expect(screen.getByRole('listitem', { name: 'TMDB audience score, 82%' })).toBeInTheDocument()
     expect(screen.getByText('Every table has a story.')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Films' })).toHaveAttribute('href', '/libraries/2')
+  })
+
+  it('says the server converts the version Play starts when this browser cannot play it', async () => {
+    setBrowserSupport((mime) => !mime.includes('ec-3'))
+    setStreamSupport(() => true)
+    open(itemDetails({ versions: [matchedMovie({ audioCodec: 'eac3' })] }))
+    expect(await screen.findByText('Converted on the server')).toHaveAttribute(
+      'title',
+      "Dolby Digital Plus audio isn't supported here.",
+    )
+  })
+
+  it('warns when this browser cannot play the version Play starts at all', async () => {
+    setBrowserSupport((mime) => !mime.includes('ec-3'))
+    open(itemDetails({ versions: [matchedMovie({ audioCodec: 'eac3' })] }))
+    expect(await screen.findByText("Won't play in this browser")).toBeInTheDocument()
+  })
+
+  it('plays from its poster', async () => {
+    open(itemDetails())
+    const poster = await screen.findByRole('link', { name: 'Play Busboys' })
+    expect(poster.querySelector('img')).not.toBeNull()
+    await userEvent.click(poster)
+    expect(await screen.findByText('Watching 7')).toBeInTheDocument()
   })
 
   it("describes the file's video, audio and subtitles", async () => {

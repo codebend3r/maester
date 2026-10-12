@@ -4,6 +4,7 @@ import { UnlockDialog } from '@/components/UnlockDialog/UnlockDialog'
 import { DesignPage } from '@/pages/DesignPage/DesignPage'
 import { FavouritesPage } from '@/pages/FavouritesPage/FavouritesPage'
 import { HistoryPage } from '@/pages/HistoryPage/HistoryPage'
+import { HomePage } from '@/pages/HomePage/HomePage'
 import { LibrariesPage } from '@/pages/LibrariesPage/LibrariesPage'
 import { LibraryPage } from '@/pages/LibraryPage/LibraryPage'
 import { EpisodePage } from '@/pages/EpisodePage/EpisodePage'
@@ -19,7 +20,8 @@ export const AppRoutes = () => (
   <>
     <Routes>
       <Route element={<AppShell />}>
-        <Route index element={<LibrariesPage />} />
+        <Route index element={<HomePage />} />
+        <Route path="libraries" element={<LibrariesPage />} />
         <Route path="libraries/:id" element={<LibraryPage />} />
         <Route path="libraries/:id/history" element={<HistoryPage />} />
         <Route path="movies/:id" element={<MoviePage />} />

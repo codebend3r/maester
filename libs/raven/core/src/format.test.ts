@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { formatBitrate, formatBytes, formatChannels, formatDuration, formatRuntime } from '@/format'
+import {
+  formatBitrate,
+  formatBytes,
+  formatChannels,
+  formatDuration,
+  formatRuntime,
+  timeAgo,
+} from '@/format'
 
 describe('formatDuration', () => {
   it.each([
@@ -50,5 +57,21 @@ describe('formatChannels', () => {
     expect(formatChannels(6)).toBe('5.1')
     expect(formatChannels(3)).toBe('3 ch')
     expect(formatChannels(null)).toBeNull()
+  })
+})
+
+describe('timeAgo', () => {
+  const now = new Date('2026-10-11T12:00:00.000Z')
+
+  it('says how long ago in the largest whole unit, narrow by default', () => {
+    expect(timeAgo({ at: '2026-10-11T06:00:00.000Z', now })).toMatch(/6\s?h/)
+    expect(timeAgo({ at: '2026-10-08T12:00:00.000Z', now })).toMatch(/3\s?d/)
+    expect(timeAgo({ at: '2024-10-11T12:00:00.000Z', now })).toMatch(/2\s?y/)
+    expect(timeAgo({ at: '2026-10-11T11:59:50.000Z', now })).toBe('just now')
+  })
+
+  it('spells it out in the long style, naming yesterday', () => {
+    expect(timeAgo({ at: '2026-10-08T12:00:00.000Z', now, style: 'long' })).toBe('3 days ago')
+    expect(timeAgo({ at: '2026-10-10T12:00:00.000Z', now, style: 'long' })).toBe('yesterday')
   })
 })

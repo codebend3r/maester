@@ -17,6 +17,7 @@ import { LockController } from '@/lock/lockController'
 import { LockGuard, assertLockMarked } from '@/lock/lockGuard'
 import { LockService } from '@/lock/lockService'
 import { FavouritesController } from '@/media/favouritesController'
+import { HomeController } from '@/media/homeController'
 import { MediaArtifacts } from '@/media/mediaArtifacts'
 import { MediaController } from '@/media/mediaController'
 import { MediaIndex } from '@/media/mediaIndex'
@@ -47,6 +48,7 @@ export const CONTROLLERS = [
   MediaController,
   PlaybackController,
   FavouritesController,
+  HomeController,
   BrowseController,
   HealthController,
   ItemsController,

@@ -1,4 +1,11 @@
-import { type ShowEntry, type RatingSource, episodeCode, pickScore } from '@raven/core'
+import {
+  type MediaSort,
+  type RatingSource,
+  type ShowEntry,
+  episodeCode,
+  pickScore,
+  showSortFact,
+} from '@raven/core'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Icon } from '@/components/Icon/Icon'
@@ -10,14 +17,18 @@ import styles from '@/components/ShowCard/ShowCard.module.scss'
 /**
  * A show as a poster, its title, years and episode count beneath. The card
  * opens the show's page; its play button starts the first episode not yet
- * watched, carrying the file along so the player starts at once.
+ * watched, carrying the file along so the player starts at once. Sorted by
+ * when shows were added, it says when the newest episode came.
  */
 export const ShowCard = ({
   entry,
   ratingsSource = 'tmdb',
+  sort,
 }: {
   entry: ShowEntry
   ratingsSource?: RatingSource
+  /** The order the listing is in, whose value the card shows. */
+  sort?: MediaSort
 }) => {
   const { show, next } = entry
   const score = pickScore({ ratings: show.ratings, source: ratingsSource })
@@ -25,6 +36,7 @@ export const ShowCard = ({
   const [failed, setFailed] = useState(false)
   const years = showYears({ year: show.year, endedYear: entry.endedYear })
   const code = next?.item ? episodeCode(next.item) : null
+  const sorted = sort ? showSortFact({ entry, sort }) : null
   const facts = [
     years,
     `${entry.episodes} ${entry.episodes === 1 ? 'episode' : 'episodes'}`,
@@ -63,6 +75,7 @@ export const ShowCard = ({
       <Link to={`/shows/${show.id}`} className={styles.title}>
         {show.title}
       </Link>
+      {sorted && <span className={styles.sorted}>{sorted}</span>}
       <span className={styles.facts}>
         {facts.map((fact) => (
           <span key={fact}>{fact}</span>
@@ -78,14 +91,16 @@ export const ShowGrid = ({
   shows,
   busy = false,
   ratingsSource = 'tmdb',
+  sort,
 }: {
   shows: ShowEntry[]
   busy?: boolean
   ratingsSource?: RatingSource
+  sort?: MediaSort
 }) => (
   <ul className={styles.grid} aria-busy={busy}>
     {shows.map((entry) => (
-      <ShowCard key={entry.show.id} entry={entry} ratingsSource={ratingsSource} />
+      <ShowCard key={entry.show.id} entry={entry} ratingsSource={ratingsSource} sort={sort} />
     ))}
   </ul>
 )
