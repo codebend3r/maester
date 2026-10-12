@@ -115,7 +115,7 @@ export class MatchController {
     if (!isMatchChoice(body)) throw new BadRequestException('tmdbId must be a TMDB id or null')
     const kind = this.libraries.get(record.libraryId)?.settings.kind
     if (kind == null || !isMatchedKind(kind)) {
-      throw new BadRequestException('Only files in a Movies or TV shows library can be matched.')
+      throw new BadRequestException('Only files in a library of movies or shows can be matched.')
     }
     const tmdbId = body.tmdbId
     if (tmdbId != null) this.requireTmdb()

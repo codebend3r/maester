@@ -327,6 +327,16 @@ describe('LibraryPage for TV shows', () => {
     expect(spies.list).not.toHaveBeenCalled()
   })
 
+  it('lists an Anime shows library as its shows, the same way', async () => {
+    serve({ kind: 'animeShows' })
+    expect(await screen.findByRole('link', { name: 'Severance' })).toHaveAttribute(
+      'href',
+      '/shows/4',
+    )
+    expect(screen.getByText('Anime shows · 12 videos · 1 not matched')).toBeInTheDocument()
+    expect(spies.list).not.toHaveBeenCalled()
+  })
+
   it('asks the server to match the files no show was found for again', async () => {
     serve()
     await screen.findByText('Not matched')

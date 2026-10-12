@@ -143,18 +143,18 @@ describe('matching by library type', () => {
     const { matchers } = services()
     const heat = under('Films', 'Heat (1995)/Heat (1995).mkv')
     const extra = under('Films', 'Heat (1995)/Featurettes/Making Of.mkv')
-    expect(matchers.movies.groups([heat, extra])).toEqual([[heat], [extra]])
+    expect(matchers.movie.groups([heat, extra])).toEqual([[heat], [extra]])
     const first = under('Shows', 'Severance/Season 01/Severance - S01E01.mkv')
     const second = under('Shows', 'Severance/Season 01/Severance - S01E02.mkv')
-    expect(matchers.shows.groups([first, second])).toEqual([[first, second]])
+    expect(matchers.show.groups([first, second])).toEqual([[first, second]])
   })
 
   it('keeps a Fix match for a folder of one movie, or for a whole show folder', () => {
     const { matchers } = services()
-    const heat = matchers.movies.fixGroup(under('Films', 'Heat (1995)/Heat (1995).mkv'))
+    const heat = matchers.movie.fixGroup(under('Films', 'Heat (1995)/Heat (1995).mkv'))
     expect(heat.place).toBe('Heat (1995)')
     expect(heat.files.map((file) => file.fileName)).toEqual(['Heat (1995).mkv'])
-    const show = matchers.shows.fixGroup(
+    const show = matchers.show.fixGroup(
       under('Shows', 'Severance/Season 01/Severance - S01E01.mkv'),
     )
     expect(show.place).toBe('Severance')
@@ -167,12 +167,12 @@ describe('matching by library type', () => {
     const uhd = under('Films 4K', 'Heat (1995)/Heat (1995) 2160p.mkv')
     const poster = join(database.dir(), 'Films', 'Heat (1995)', 'poster.jpg')
 
-    await matchers.movies.match({ files: [heat], pass: pass() })
+    await matchers.movie.match({ files: [heat], pass: pass() })
     const itemId = metadata.find({ type: 'movie', tmdbId: '949' })?.id ?? -1
     expect(metadata.image({ itemId, kind: 'poster' })).toEqual({ source: 'local', ref: poster })
 
     // The copy in the other library, matched in a later pass, has no poster of its own.
-    await matchers.movies.match({ files: [uhd], pass: pass() })
+    await matchers.movie.match({ files: [uhd], pass: pass() })
     expect(metadata.mediaUnder(itemId).toSorted()).toEqual([heat.id, uhd.id].toSorted())
     expect(metadata.image({ itemId, kind: 'poster' })).toEqual({ source: 'local', ref: poster })
   })
@@ -191,7 +191,7 @@ describe('matching by library type', () => {
       'Severance - S01E01-thumb.jpg',
     )
 
-    await matchers.shows.match({ files: [thumbed, plain, second, extra], pass: pass() })
+    await matchers.show.match({ files: [thumbed, plain, second, extra], pass: pass() })
     expect(
       files.byIds([thumbed.id, plain.id, second.id, extra.id]).map((file) => file.match),
     ).toEqual(['matched', 'matched', 'matched', 'off'])
@@ -206,7 +206,7 @@ describe('matching by library type', () => {
 
     // Matching the version without a still again keeps the other's.
     files.reset([plain.id])
-    await matchers.shows.match({ files: [plain], pass: pass() })
+    await matchers.show.match({ files: [plain], pass: pass() })
     expect(metadata.image({ itemId: episodeId, kind: 'still' })).toEqual({
       source: 'local',
       ref: still,

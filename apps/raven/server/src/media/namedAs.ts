@@ -3,12 +3,13 @@ import {
   type MatchState,
   isExtra,
   isMatchedKind,
+  matchedItemType,
   parseEpisodeName,
   parseMovieName,
   titleFromFileName,
 } from '@raven/core'
 
-/** What a name says a file is, by its library's type. Extras and other libraries keep the tidied name. */
+/** What a name says a file is, by its library's type. Extras and libraries that are not matched keep the tidied name. */
 export const namedAs = ({
   kind,
   fileName,
@@ -21,7 +22,7 @@ export const namedAs = ({
   if (!isMatchedKind(kind) || isExtra({ fileName, folder })) {
     return { title: titleFromFileName(fileName), year: null, edition: null, match: 'off' }
   }
-  if (kind === 'movies') {
+  if (matchedItemType(kind) === 'movie') {
     const parsed = parseMovieName({ fileName, folder })
     return { title: parsed.title, year: parsed.year, edition: parsed.edition, match: 'pending' }
   }

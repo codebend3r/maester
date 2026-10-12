@@ -246,7 +246,7 @@ export class MatchFiles {
   /**
    * Reads every file's name again for the library's type, and starts its
    * matching over: links go, and files are pending, or off in a library that
-   * is not Movies or TV shows. Run when a library's type changes.
+   * is not matched. Run when a library's type changes how its files are read.
    */
   rename({ libraryId, kind }: { libraryId: number; kind: LibraryKind }): void {
     const rows = this.files({ where: 'm.library_id = ?', params: [libraryId] })

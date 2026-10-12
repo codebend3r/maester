@@ -180,6 +180,42 @@ describe('LibraryDialog', () => {
     })
   })
 
+  it('offers every type, each matched like its counterpart', async () => {
+    renderWithProviders(<LibraryDialog onClose={() => undefined} />)
+    expect(
+      within(screen.getByRole('group', { name: 'Type' }))
+        .getAllByRole('radio')
+        .map((radio) => radio.getAttribute('value')),
+    ).toEqual(['movies', 'shows', 'animeMovies', 'animeShows', 'sports', 'youtube', 'other'])
+    await userEvent.type(screen.getByLabelText('Name'), 'Anime')
+    await userEvent.type(screen.getByLabelText('Folder path'), '/media/Anime')
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }))
+    await userEvent.click(screen.getByRole('radio', { name: 'Anime movies' }))
+    expect(screen.getByRole('combobox', { name: 'Ratings shown' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('radio', { name: 'Sporting events' }))
+    expect(screen.queryByRole('combobox', { name: 'Ratings shown' })).toBeNull()
+    await userEvent.click(screen.getByRole('radio', { name: 'Anime shows' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Add library' }))
+    expect(created.at(-1)).toMatchObject({
+      settings: { kind: 'animeShows', view: 'grid', groupBy: 'resolution' },
+    })
+  })
+
+  it('locks a library of any type, and keeps the lock through a change of type', async () => {
+    renderWithProviders(
+      <LibraryDialog
+        library={library({ settings: { ...library().settings, kind: 'movies' } })}
+        onClose={() => undefined}
+      />,
+    )
+    await userEvent.click(await screen.findByRole('checkbox', { name: 'Lock with the PIN' }))
+    await userEvent.click(screen.getByRole('radio', { name: 'YouTube videos' }))
+    expect(screen.getByRole('checkbox', { name: 'Lock with the PIN' })).toBeChecked()
+    await userEvent.click(screen.getByRole('radio', { name: 'Anime shows' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+    expect(updated.at(-1)).toMatchObject({ settings: { kind: 'animeShows', locked: true } })
+  })
+
   it("shows the library's own type when editing it", () => {
     renderWithProviders(
       <LibraryDialog

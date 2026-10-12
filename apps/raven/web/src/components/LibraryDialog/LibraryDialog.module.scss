@@ -42,11 +42,17 @@
   }
 }
 
-// The three types side by side, wrapping on a narrow screen.
+// The types two to a row, so each sits beside its counterpart: Movies with
+// TV shows, then the anime pair, then Sporting events with YouTube videos.
+// One to a row on a narrow screen.
 .kinds {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(7rem, 100%), max-content));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-1) var(--space-4);
+
+  @media (max-width: 30rem) {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .kind {
