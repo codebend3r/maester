@@ -80,8 +80,12 @@ export const queryKeys = {
     show: string
     limit: number
   }) => ['libraries', libraryId, 'history', { show, limit }],
-  /** The prefix every page of a library's history shares. */
-  histories: (libraryId: number) => ['libraries', libraryId, 'history'],
+  /** A library's tabs beside its listing: in progress, favourites, sagas, files not matched. */
+  inProgress: (libraryId: number) => ['libraries', libraryId, 'in-progress'],
+  libraryFavourites: (libraryId: number) => ['libraries', libraryId, 'favourites'],
+  sagas: (libraryId: number | null) => ['libraries', libraryId, 'sagas'],
+  unmatched: (libraryId: number) => ['libraries', libraryId, 'unmatched'],
+  duplicates: (libraryId: number) => ['libraries', libraryId, 'duplicates'],
   browse: (path: string | null) => ['browse', path],
   /** Every item page shares this prefix, so a match or refresh refetches them all. */
   items: ['items'],

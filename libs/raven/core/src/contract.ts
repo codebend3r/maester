@@ -25,14 +25,21 @@ import {
  * client and the server skip casts entirely.
  */
 
-export const isScanState = oneOf(['idle', 'scanning'])
+/**
+ * A scan first walks the library's paths for videos, then indexes what it
+ * found; `idle` between scans.
+ */
+export const isScanState = oneOf(['idle', 'walking', 'indexing'])
 
 export type ScanState = Infer<typeof isScanState>
 
 export const isScanStatus = object({
   state: isScanState,
-  /** Video files the walk found under the library's paths. */
-  discovered: isNumber,
+  /**
+   * Video files found under the library's paths: climbing while the walk
+   * looks, as a big share takes minutes, then all of them.
+   */
+  found: isNumber,
   /** Files already indexed: unchanged ones count straight away, new and changed ones once probed. */
   processed: isNumber,
   startedAt: nullable(isString),
@@ -491,8 +498,28 @@ export const isPosterEntry = object({ media: isMediaItem, poster: nullable(isIte
 
 export type PosterEntry = Infer<typeof isPosterEntry>
 
-/** `GET /api/favourites`: every favourite with its poster, most recently marked first. */
+/**
+ * `GET /api/favourites`: every favourite with its poster, most recently
+ * marked first. A library's own favourites and videos in progress come the
+ * same way.
+ */
 export const isPosterEntries = listOf(isPosterEntry)
+
+/**
+ * A saga: a TMDB collection (The Lord of the Rings Collection, say) and the
+ * movies of it a library holds, oldest first, one entry each, its best file.
+ * Its backdrop is read off them by `sagaBackdrop`.
+ */
+export const isSaga = object({
+  tmdbId: isString,
+  name: isString,
+  media: isMediaList,
+})
+
+export type Saga = Infer<typeof isSaga>
+
+/** `GET /api/libraries/:id/sagas`: a library's sagas of two movies or more, by name. */
+export const isSagaList = listOf(isSaga)
 
 /** `GET /api/home`: every video in progress, then each pinned library's shelf, as the side menu orders them. */
 export const isHome = object({

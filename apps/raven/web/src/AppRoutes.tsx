@@ -24,6 +24,7 @@ export const AppRoutes = () => (
         <Route path="libraries" element={<LibrariesPage />} />
         <Route path="libraries/:id" element={<LibraryPage />} />
         <Route path="libraries/:id/history" element={<HistoryPage />} />
+        <Route path="libraries/:id/:section" element={<LibraryPage />} />
         <Route path="movies/:id" element={<MoviePage />} />
         <Route path="shows/:id" element={<ShowPage />} />
         <Route path="shows/:id/seasons/:number" element={<SeasonPage />} />

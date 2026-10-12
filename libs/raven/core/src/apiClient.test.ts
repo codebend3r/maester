@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  type ApiClient,
   ApiError,
   type FetchInit,
   type FetchResponse,
@@ -163,6 +164,30 @@ describe('createApiClient', () => {
     const { client, calls } = clientReturning(respond({ body: [entry] }))
     await expect(client.listFavourites()).resolves.toEqual([entry])
     expect(calls[0]?.url).toBe('http://nas:8484/api/favourites')
+  })
+
+  it("asks for a library's videos in progress, favourites, sagas and files not matched", async () => {
+    const entry = { media: mediaItem({ favourite: true }), poster: null }
+    const asked = async <T>({
+      body,
+      call,
+    }: {
+      body: T
+      call: (client: ApiClient) => Promise<T>
+    }) => {
+      const { client, calls } = clientReturning(respond({ body }))
+      await expect(call(client)).resolves.toEqual(body)
+      return calls[0]?.url
+    }
+    expect([
+      await asked({ body: [entry], call: (client) => client.listInProgress(3) }),
+      await asked({ body: [entry], call: (client) => client.listLibraryFavourites(3) }),
+      await asked({ body: [mediaItem()], call: (client) => client.listUnmatched(3) }),
+    ]).toEqual([
+      'http://nas:8484/api/libraries/3/in-progress',
+      'http://nas:8484/api/libraries/3/favourites',
+      'http://nas:8484/api/libraries/3/unmatched',
+    ])
   })
 
   it('reads and changes the display settings', async () => {

@@ -1,9 +1,10 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { type Library, type LibrarySettings, matchTypeFor } from '@raven/core'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { type Library, isScanning, matchTypeFor } from '@raven/core'
 import { Button, ButtonLink } from '@/components/Button/Button'
 import { ScanStatus } from '@/components/ScanStatus/ScanStatus'
 import { api } from '@/lib/api'
 import { KINDS } from '@/lib/libraryKinds'
+import { metadataHealthQuery } from '@/lib/queries'
 import { queryKeys } from '@/lib/queryClient'
 import styles from '@/pages/LibraryPage/LibraryPage.module.scss'
 
@@ -35,6 +36,7 @@ export const useLibraryActions = (library: Library) => {
       return Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.showLists(library.id) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.mediaLists(library.id) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.unmatched(library.id) }),
       ])
     },
   })
@@ -49,22 +51,22 @@ export const useLibraryActions = (library: Library) => {
 export const LibraryHeader = ({
   titleId,
   library,
-  settings,
   actions: { relock, rescan, rematch },
-  canMatch,
-  shut,
+  isShut,
   onEdit,
 }: {
   titleId: string
   library: Library
-  settings: LibrarySettings
   actions: ReturnType<typeof useLibraryActions>
-  canMatch: boolean
-  shut: boolean
+  isShut: boolean
   onEdit: () => void
 }) => {
-  const scanning = library.scan.state === 'scanning'
+  const { settings } = library
+  const scanning = isScanning(library.scan)
   const matchType = matchTypeFor(settings.kind)
+  // Files only leave pending while TMDB answers, so Match again waits on it.
+  const metadata = useQuery({ ...metadataHealthQuery, enabled: matchType != null })
+  const canMatch = metadata.data?.tmdb === 'ok'
   const unmatched = library.unmatchedCount
 
   return (
@@ -104,7 +106,7 @@ export const LibraryHeader = ({
         <Button icon="edit" onClick={onEdit}>
           Edit
         </Button>
-        {settings.locked && !shut && (
+        {settings.locked && !isShut && (
           <Button icon="lock" disabled={relock.isPending} onClick={() => relock.mutate()}>
             Lock
           </Button>

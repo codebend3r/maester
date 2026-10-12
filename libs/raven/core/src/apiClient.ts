@@ -202,6 +202,18 @@ export const createApiClient = ({
     return value
   }
 
+  /** One of a library's lists, read at `path` under it. */
+  const libraryGet = <T>({
+    libraryId,
+    path,
+    guard,
+  }: {
+    libraryId: number
+    path: string
+    guard: Guard<T>
+  }): Promise<T> =>
+    expect({ request: send({ path: `/api/libraries/${libraryId}/${path}` }), guard })
+
   /** A video's thumbnail at `version`, which it changes with, so it can be cached for good. */
   const thumbnailAt = ({ id, version }: { id: number; version: number }): string =>
     url(`/api/media/${id}/thumbnail?v=${version}`)
@@ -311,6 +323,18 @@ export const createApiClient = ({
     /** Every favourite across every library with the poster its card shows, most recently favourited first. */
     listFavourites: (): Promise<PosterEntry[]> =>
       expect({ request: send({ path: '/api/favourites' }), guard: isPosterEntries }),
+
+    /** A library's videos with a saved spot, the most recently watched first, each with its poster. */
+    listInProgress: (libraryId: number): Promise<PosterEntry[]> =>
+      libraryGet({ libraryId, path: 'in-progress', guard: isPosterEntries }),
+
+    /** A library's favourites, most recently marked first, each with its poster. */
+    listLibraryFavourites: (libraryId: number): Promise<PosterEntry[]> =>
+      libraryGet({ libraryId, path: 'favourites', guard: isPosterEntries }),
+
+    /** A matched library's files no movie or show was found for, or waiting to be matched, by title. */
+    listUnmatched: (libraryId: number): Promise<MediaItem[]> =>
+      libraryGet({ libraryId, path: 'unmatched', guard: isMediaList }),
 
     /** Every video in progress, then each pinned library's newest arrivals; libraries still locked stay out. */
     getHome: (): Promise<Home> => expect({ request: send({ path: '/api/home' }), guard: isHome }),

@@ -9,7 +9,7 @@ export const library = (overrides: Partial<Library> = {}): Library => ({
   createdAt: '2026-09-27T00:00:00.000Z',
   scan: {
     state: 'idle',
-    discovered: 12,
+    found: 12,
     processed: 12,
     startedAt: null,
     finishedAt: null,

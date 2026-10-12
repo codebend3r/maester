@@ -60,6 +60,19 @@ const howFar = (entry: HistoryEntry): string => {
   return `${Math.min(100, Math.floor((entry.furthest / duration) * 100))}% watched`
 }
 
+/** The line under a finished video, with no day above it: the day it last played, and how often it has. */
+export const finishedNote = ({
+  entry,
+  now = new Date(),
+}: {
+  entry: HistoryEntry
+  now?: Date
+}): string =>
+  [
+    dayLabel({ date: new Date(entry.lastPlayedAt), now }),
+    ...(entry.plays > 1 ? [`${entry.plays} plays`] : []),
+  ].join(' · ')
+
 /** The line under a video in its history: how far it got, when it last played, and how often. */
 export const historyNote = (entry: HistoryEntry): string =>
   [

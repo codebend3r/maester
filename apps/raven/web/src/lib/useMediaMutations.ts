@@ -5,14 +5,16 @@ import { queryKeys } from '@/lib/queryClient'
 
 /**
  * Marking a favourite, deleting a video and fetching its details again,
- * with every cached list patched
- * in place so the grid answers at once. The favourites list, home and the
- * library counts refetch behind that.
+ * with every cached list patched in place so the grid answers at once.
+ * Behind that, everything its library shows refetches: the listings and
+ * every tab, In progress, Not matched, its sagas and its history among
+ * them, so no menu there is left stale. So do the favourites, the item
+ * pages and home.
  */
 export const useMediaMutations = ({ media }: { media: MediaItem }) => {
   const queryClient = useQueryClient()
   const lists = { queryKey: queryKeys.mediaLists(media.libraryId) }
-  const showLists = { queryKey: queryKeys.showLists(media.libraryId) }
+  const library = { queryKey: queryKeys.library(media.libraryId) }
   const without = (items: MediaItem[] | undefined): MediaItem[] | undefined =>
     items?.filter((item) => item.id !== media.id)
   const withoutFavourite = (entries: PosterEntry[] | undefined): PosterEntry[] | undefined =>
@@ -27,11 +29,15 @@ export const useMediaMutations = ({ media }: { media: MediaItem }) => {
       )
       if (!updated.favourite) {
         queryClient.setQueryData<PosterEntry[]>(queryKeys.favourites, withoutFavourite)
+        queryClient.setQueryData<PosterEntry[]>(
+          queryKeys.libraryFavourites(media.libraryId),
+          withoutFavourite,
+        )
       }
       return Promise.all([
+        queryClient.invalidateQueries(library),
         queryClient.invalidateQueries({ queryKey: queryKeys.favourites }),
         queryClient.invalidateQueries({ queryKey: queryKeys.items }),
-        queryClient.invalidateQueries(showLists),
         queryClient.invalidateQueries({ queryKey: queryKeys.home }),
       ])
     },
@@ -43,23 +49,22 @@ export const useMediaMutations = ({ media }: { media: MediaItem }) => {
       queryClient.removeQueries({ queryKey: queryKeys.mediaItem(media.id) })
       queryClient.setQueriesData<MediaItem[]>(lists, without)
       queryClient.setQueryData<PosterEntry[]>(queryKeys.favourites, withoutFavourite)
+      // Every library, the counts on the libraries list with them.
       return Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.libraries }),
         queryClient.invalidateQueries({ queryKey: queryKeys.items }),
-        queryClient.invalidateQueries(showLists),
         queryClient.invalidateQueries({ queryKey: queryKeys.home }),
       ])
     },
   })
 
-  // A refresh can change titles, posters and credits anywhere the item shows.
+  // A refresh can change titles, posters, credits and sagas anywhere the item shows.
   const refresh = useMutation({
     mutationFn: (itemId: number) => api.refreshItem(itemId),
     onSuccess: (details) => {
       queryClient.setQueryData(queryKeys.item(details.id), details)
       return Promise.all([
-        queryClient.invalidateQueries({ queryKey: lists.queryKey }),
-        queryClient.invalidateQueries(showLists),
+        queryClient.invalidateQueries(library),
         queryClient.invalidateQueries({ queryKey: queryKeys.items }),
         queryClient.invalidateQueries({ queryKey: queryKeys.home }),
       ])

@@ -1,0 +1,63 @@
+// Fixed to the right edge, half way down, so it holds still as the page
+// scrolls. Each step is a 27th of the screen's height, the alphabet's
+// share, so the longest strip always fits and a shorter one sits tighter.
+// As wide as its widest step, a number or a decade where it is not letters.
+.picker {
+  position: fixed;
+  top: 50%;
+  right: var(--space-1);
+  z-index: 1;
+  display: grid;
+  border: 1px solid var(--color-moss);
+  border-radius: var(--radius-md);
+  background: var(--color-night-glass);
+  translate: 0 -50%;
+}
+
+// The unit the numbers below count in.
+.unit {
+  padding: var(--space-1) var(--space-0) 0;
+  color: var(--color-lichen);
+  font-size: var(--font-size-xs);
+  text-align: center;
+}
+
+.marks {
+  display: grid;
+  padding: var(--space-1) 0;
+}
+
+.item {
+  display: grid;
+}
+
+.mark {
+  display: grid;
+  place-items: center;
+  min-width: var(--space-4);
+  height: calc(min(100dvh - 8rem, 40rem) / 27);
+  padding: 0 var(--space-0);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--color-lichen);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: var(--line-tight);
+  white-space: nowrap;
+
+  &:hover:not(:disabled) {
+    color: var(--color-bark);
+    background: var(--color-canopy);
+  }
+
+  &:disabled {
+    color: var(--color-lichen-faint);
+    cursor: default;
+  }
+
+  &:focus-visible {
+    outline-offset: -2px;
+  }
+}

@@ -128,10 +128,13 @@ const walkTree = async ({
   root,
   limit,
   gate,
+  onFound,
 }: {
   root: string
   limit: number
   gate: Gate
+  /** Told how many videos each folder held, as each is read. */
+  onFound?: (count: number) => void
 }): Promise<Tree> => {
   const level = async ({
     dirs,
@@ -143,7 +146,11 @@ const walkTree = async ({
     const listings = await mapWithConcurrency({
       items: dirs,
       limit,
-      fn: (dir) => list({ dir, gate }),
+      fn: async (dir) => {
+        const listing = await list({ dir, gate })
+        if (listing.files.length > 0) onFound?.(listing.files.length)
+        return listing
+      },
     })
     return level({
       dirs: listings.flatMap((listing) => listing.dirs),
@@ -155,6 +162,7 @@ const walkTree = async ({
 
   const top = await list({ dir: root, gate })
   if (top.error) return { files: [], folders: [], errors: [top.error], readable: false }
+  if (top.files.length > 0) onFound?.(top.files.length)
   const rest = await level({ dirs: top.dirs, files: top.files, folders: [root], errors: [] })
   return { ...rest, readable: true }
 }
@@ -205,15 +213,17 @@ const lookAt = async ({
   root,
   limit,
   gate,
+  onFound,
 }: {
   place: string
   root: string
   limit: number
   gate: Gate
+  onFound?: (count: number) => void
 }): Promise<Look> => {
   const kind = await kindOf({ place, root, gate })
   if (kind === 'dir') {
-    const tree = await walkTree({ root: place, limit, gate })
+    const tree = await walkTree({ root: place, limit, gate, onFound })
     return { files: tree.files, errors: tree.errors, unreadable: tree.readable ? null : place }
   }
   if (kind === 'file') {
@@ -237,11 +247,14 @@ export const walkVideos = async ({
   places = roots,
   limit = 16,
   gate = SCAN_FILESYSTEM,
+  onFound,
 }: {
   roots: readonly string[]
   places?: readonly string[]
   limit?: number
   gate?: Gate
+  /** Told how many videos each folder held as the walk reads it, for a count that climbs. */
+  onFound?: (count: number) => void
 }): Promise<WalkResult> => {
   const looked = await Promise.all(
     places
@@ -251,7 +264,7 @@ export const walkVideos = async ({
       })
       .map(async ({ place, root }) => ({
         root,
-        ...(await lookAt({ place, root, limit, gate })),
+        ...(await lookAt({ place, root, limit, gate, onFound })),
       })),
   )
   const seen = new Set<string>()

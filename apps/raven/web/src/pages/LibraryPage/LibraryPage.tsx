@@ -1,144 +1,100 @@
 import { useQuery } from '@tanstack/react-query'
-import type { Library, MediaItem } from '@raven/core'
+import { type Library, isScanning } from '@raven/core'
 import { useId, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Navigate, useParams } from 'react-router-dom'
 import { ButtonLink } from '@/components/Button/Button'
 import { LibraryDialog } from '@/components/LibraryDialog/LibraryDialog'
-import { LibraryToolbar } from '@/components/LibraryToolbar/LibraryToolbar'
 import { LockedLibrary } from '@/components/LockedLibrary/LockedLibrary'
 import { RouteState } from '@/components/RouteState/RouteState'
-import { watchLink } from '@/lib/itemLinks'
-import { libraryQuery, lockQuery } from '@/lib/queries'
+import { useLibraryLock } from '@/lib/libraryLock'
+import { libraryQuery } from '@/lib/queries'
 import { routeState, useRouteId } from '@/lib/routeQuery'
 import { LibraryHeader, useLibraryActions } from '@/pages/LibraryPage/LibraryHeader'
-import { LibraryListing } from '@/pages/LibraryPage/LibraryViews'
-import { playQueue } from '@/pages/LibraryPage/libraryShape'
-import { useLibraryListing } from '@/pages/LibraryPage/useLibraryListing'
-import { useLibraryView } from '@/pages/LibraryPage/useLibraryView'
+import { LibraryTabs } from '@/pages/LibraryPage/LibraryTabs'
+import { SectionView } from '@/pages/LibraryPage/SectionViews'
+import {
+  type LibrarySection,
+  SECTIONS,
+  hasSection,
+  sectionFrom,
+  sectionPath,
+} from '@/pages/LibraryPage/librarySections'
+import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
+import { useUnlockPrompt } from '@/stores/unlockPrompt'
 import styles from '@/pages/LibraryPage/LibraryPage.module.scss'
 
-/** What the page says in place of a listing with nothing in it, or null while there is something. */
-const emptyMessage = ({
-  loaded,
-  empty,
-  query,
-  scanning,
-}: {
-  loaded: boolean
-  empty: boolean
-  query: string
-  scanning: boolean
-}): string | null => {
-  if (!loaded || !empty) return null
-  if (query) return `Nothing here matches "${query}".`
-  if (scanning) return 'Looking through the folders. Videos appear here as they are found.'
-  return 'No videos in these folders yet. Check the paths, or add a folder that holds videos.'
-}
-
-/** The page once its library is known. */
-const LibraryView = ({ library }: { library: Library }) => {
-  const ids = { title: useId() }
-  const navigate = useNavigate()
-  const [editing, setEditing] = useState(false)
-  const view = useLibraryView({ library })
-  const { settings } = view
-  const scanning = library.scan.state === 'scanning'
+/** The page once its library is known, open at one of its tabs. */
+const LibraryView = ({ library, section }: { library: Library; section: LibrarySection }) => {
+  const titleId = useId()
+  const [isEditing, setEditing] = useState(false)
   // A locked library's videos are not asked for until this browser has the PIN.
-  const lock = useQuery({ ...lockQuery, enabled: settings.locked })
-  const shut = settings.locked && !lock.data?.unlocked
+  const lock = useLibraryLock(library)
+  const isShut = lock.state !== 'open'
   const actions = useLibraryActions(library)
-  const listing = useLibraryListing({
-    libraryId: library.id,
-    settings,
-    search: view.query,
-    seed: view.seed,
-    enabled: !shut,
-    scanning,
-  })
-  const queue = playQueue({ settings, listing })
-  const empty = emptyMessage({
-    loaded: listing.loaded,
-    empty: listing.shows.length === 0 && listing.files.length === 0,
-    query: view.query,
-    scanning,
-  })
 
-  // The item rides along in router state, as a card click hands it over, so
-  // the player starts without fetching it again.
-  const watch = (item: MediaItem | undefined) => {
-    if (!item) return
-    const link = watchLink(item)
-    navigate(link.to, { state: link.state })
+  // A locked library's folders stay on the server until the PIN is entered,
+  // so Edit asks for it rather than open with none.
+  const edit = () => {
+    if (isShut) return useUnlockPrompt.getState().ask()
+    setEditing(true)
   }
 
   return (
-    <section className={styles.page} aria-labelledby={ids.title}>
+    <section className={styles.page} aria-labelledby={titleId}>
       <ButtonLink to="/libraries" icon="back" className={styles.back}>
         Libraries
       </ButtonLink>
 
       <LibraryHeader
-        titleId={ids.title}
+        titleId={titleId}
         library={library}
-        settings={settings}
         actions={actions}
-        canMatch={listing.canMatch}
-        shut={shut}
-        onEdit={() => setEditing(true)}
+        isShut={isShut}
+        onEdit={edit}
       />
 
-      {shut && lock.data && <LockedLibrary name={library.name} available={lock.data.available} />}
+      {lock.state === 'shut' && <LockedLibrary name={library.name} available={lock.available} />}
 
-      {!shut && (
+      {!isShut && (
         <>
-          <LibraryToolbar
-            name={library.name}
-            search={view.search}
-            onSearch={view.setSearch}
-            settings={settings}
-            onChange={view.change}
-            playable={queue.playable}
-            onPlay={() => watch(queue.first())}
-            onShuffle={() => watch(queue.random())}
-          />
+          <LibraryTabs library={library} current={section} />
 
-          {view.saveError && (
-            <p className={styles.message} role="alert">
-              Could not save how this library is shown: {view.saveError.message}
-            </p>
-          )}
           {actions.rematch.isError && (
             <p className={styles.message} role="alert">
               Could not match again: {actions.rematch.error.message}
             </p>
           )}
 
-          {empty ? (
-            <p className={styles.message}>{empty}</p>
-          ) : (
-            <LibraryListing
-              settings={settings}
-              shows={listing.shows}
-              files={listing.files}
-              busy={listing.busy}
-            />
-          )}
+          {/* Keyed by its tab, so moving to another starts its body afresh. */}
+          <section key={section} className={styles.section} aria-label={SECTIONS[section].label}>
+            <SectionView library={library} section={section} />
+          </section>
         </>
       )}
 
-      {editing && <LibraryDialog library={library} onClose={() => setEditing(false)} />}
+      {isEditing && <LibraryDialog library={library} onClose={() => setEditing(false)} />}
     </section>
   )
 }
 
-/** `/libraries/:id`: a library's videos or shows, searched, sorted and laid out as it was left. */
+/**
+ * `/libraries/:id`: a library's videos or shows, searched, sorted and laid
+ * out as it was left, with its other tabs at `/libraries/:id/:section`. A
+ * tab the library's type does not have, as after a change of type, opens All.
+ */
 export const LibraryPage = () => {
   const libraryId = useRouteId()
+  const section = sectionFrom(useParams().section)
   const library = useQuery({
     ...libraryQuery(libraryId),
-    refetchInterval: (current) => (current.state.data?.scan.state === 'scanning' ? 1500 : false),
+    refetchInterval: (current) =>
+      current.state.data && isScanning(current.state.data.scan) ? 1500 : false,
   })
   const page = routeState({ id: libraryId, query: library })
+  if (section == null) return <NotFoundPage />
   if (page.state !== 'ready') return <RouteState state={page} noun="library" />
-  return <LibraryView library={page.data} />
+  if (!hasSection({ kind: page.data.settings.kind, section })) {
+    return <Navigate to={sectionPath({ libraryId: page.data.id, section: 'all' })} replace />
+  }
+  return <LibraryView library={page.data} section={section} />
 }

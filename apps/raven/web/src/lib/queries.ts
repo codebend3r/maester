@@ -54,6 +54,24 @@ export const historyQuery = ({
     placeholderData: keepPreviousData,
   })
 
+export const inProgressQuery = (libraryId: number) =>
+  queryOptions({
+    queryKey: queryKeys.inProgress(libraryId),
+    queryFn: () => api.listInProgress(libraryId),
+  })
+
+export const libraryFavouritesQuery = (libraryId: number) =>
+  queryOptions({
+    queryKey: queryKeys.libraryFavourites(libraryId),
+    queryFn: () => api.listLibraryFavourites(libraryId),
+  })
+
+export const unmatchedQuery = (libraryId: number) =>
+  queryOptions({
+    queryKey: queryKeys.unmatched(libraryId),
+    queryFn: () => api.listUnmatched(libraryId),
+  })
+
 export const favouritesQuery = queryOptions({
   queryKey: queryKeys.favourites,
   queryFn: () => api.listFavourites(),

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import type { HistoryEntry } from '@raven/core'
-import { historyDays, historyNote } from '@/lib/history'
+import { finishedNote, historyDays, historyNote } from '@/lib/history'
 import { mediaItem } from '@/test/fixtures'
 
 const entry = ({
@@ -75,5 +75,16 @@ describe('historyNote', () => {
       media: mediaItem({ duration: null }),
     }
     expect(historyNote(unmeasured)).toBe(`Played · ${time(at)}`)
+  })
+})
+
+describe('finishedNote', () => {
+  it('names the day a finished video last played, and how often it has past once', () => {
+    const now = new Date(2026, 9, 11, 20, 0)
+    const finished = (playedAt: Date, plays = 1) =>
+      finishedNote({ entry: entry({ playedAt, plays, watched: true }), now })
+    expect(finished(new Date(2026, 9, 11, 9, 0))).toBe('Today')
+    expect(finished(new Date(2026, 9, 10, 9, 0), 3)).toBe('Yesterday · 3 plays')
+    expect(finished(new Date(2026, 9, 2, 9, 0))).toBe(dayName({ date: new Date(2026, 9, 2) }))
   })
 })

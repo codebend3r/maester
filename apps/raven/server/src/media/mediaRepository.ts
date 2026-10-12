@@ -4,12 +4,20 @@ import {
   type MediaItem,
   type MediaSort,
   type PosterEntry,
+  type Saga,
   type ShowEntry,
   isMatchState,
   isThumbnailState,
 } from '@raven/core'
 import { DatabaseService } from '@/db/database'
-import { BEST_FIRST, FURTHEST_JOIN, isWatched, likePattern, score } from '@/media/mediaSql'
+import {
+  BEST_FIRST,
+  FIRST_ITEM,
+  FURTHEST_JOIN,
+  isWatched,
+  likePattern,
+  score,
+} from '@/media/mediaSql'
 import { shuffle } from '@/media/shuffle'
 import { ItemImagesRepository } from '@/metadata/itemImagesRepository'
 import { MetadataRepository } from '@/metadata/metadataRepository'
@@ -67,9 +75,9 @@ const FROM_MEDIA = `
     JOIN libraries l ON l.id = m.library_id
     LEFT JOIN playback_progress p ON p.media_id = m.id
     LEFT JOIN favourites f ON f.media_id = m.id
-    LEFT JOIN (SELECT media_id, MIN(item_id) AS item_id FROM media_items GROUP BY media_id) mi
-      ON mi.media_id = m.id
-    LEFT JOIN shown_items i ON i.id = mi.item_id`
+    LEFT JOIN ${FIRST_ITEM}
+    LEFT JOIN shown_items i ON i.id = mi.item_id
+    LEFT JOIN items t ON t.id = mi.item_id`
 
 const SELECT_MEDIA = `${SELECT_COLUMNS}${FROM_MEDIA}`
 
@@ -423,18 +431,19 @@ export class MediaRepository {
   }
 
   /**
-   * Every video with a saved spot, across every library that saves progress,
-   * the most recently watched first. A finished or barely started video has
-   * no spot, so it is not in progress.
+   * Every video with a saved spot, across every library that saves progress
+   * or in `libraryId` alone, the most recently watched first. A finished or
+   * barely started video has no spot, so it is not in progress.
    */
-  listInProgress(): MediaItem[] {
+  listInProgress({ libraryId = null }: { libraryId?: number | null } = {}): MediaItem[] {
     return this.items(
       this.db
-        .prepare<[], MediaRow>(
+        .prepare<{ libraryId: number | null }, MediaRow>(
           `${SELECT_MEDIA} WHERE p.media_id IS NOT NULL AND l.save_progress = 1
+              AND (@libraryId IS NULL OR m.library_id = @libraryId)
             ORDER BY p.updated_at DESC, m.id DESC`,
         )
-        .all(),
+        .all({ libraryId }),
     )
   }
 
@@ -477,14 +486,48 @@ export class MediaRepository {
     }))
   }
 
-  /** Every favourite across every library, most recently marked first. */
-  listFavourites(): MediaItem[] {
+  /** Every favourite across every library, or in `libraryId` alone, most recently marked first. */
+  listFavourites({ libraryId = null }: { libraryId?: number | null } = {}): MediaItem[] {
     return this.items(
       this.db
-        .prepare<[], MediaRow>(
-          `${SELECT_MEDIA} WHERE f.media_id IS NOT NULL ORDER BY f.added_at DESC, m.id DESC`,
+        .prepare<{ libraryId: number | null }, MediaRow>(
+          `${SELECT_MEDIA} WHERE f.media_id IS NOT NULL
+              AND (@libraryId IS NULL OR m.library_id = @libraryId)
+            ORDER BY f.added_at DESC, m.id DESC`,
         )
-        .all(),
+        .all({ libraryId }),
     )
+  }
+
+  /**
+   * A library's sagas: each TMDB collection two or more of its movies belong
+   * to, by name, with those movies oldest first, one entry each, its best
+   * file. A movie split onto
+   * several cards is still one movie, so a single movie of a collection is
+   * no saga yet, however many cards it has.
+   */
+  listSagas(libraryId: number): Saga[] {
+    const movies = this.items(
+      this.db
+        .prepare<[number], MediaRow>(
+          `WITH ranked AS (
+             ${SELECT_COLUMNS},
+                    ROW_NUMBER() OVER (PARTITION BY i.id ORDER BY ${BEST_FIRST}) AS version_rank
+             ${FROM_MEDIA}
+              WHERE m.library_id = ? AND i.type = 'movie' AND t.saga_tmdb_id IS NOT NULL)
+           SELECT * FROM ranked WHERE version_rank = 1 ORDER BY ${ORDER_BY['year-old']}`,
+        )
+        .all(libraryId),
+    )
+    const sagas = this.metadata.sagasOf(movies.flatMap((media) => media.item?.id ?? []))
+    const grouped = movies.reduce((groups, media) => {
+      const saga = media.item ? sagas.get(media.item.id) : undefined
+      if (!saga) return groups
+      const held = groups.get(saga.tmdbId)?.media ?? []
+      return groups.set(saga.tmdbId, { ...saga, media: [...held, media] })
+    }, new Map<string, Saga>())
+    return [...grouped.values()]
+      .filter((saga) => saga.media.length > 1)
+      .toSorted((a, b) => a.name.localeCompare(b.name))
   }
 }

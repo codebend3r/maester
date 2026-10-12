@@ -19,6 +19,7 @@ import {
   type LibrarySettings,
   type MediaItem,
   isRecord,
+  isScanning,
   parseServerEvent,
 } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -149,7 +150,7 @@ describe('the media server', () => {
 
     beforeAll(async () => {
       const created = await api().createLibrary({ name: 'Everything', paths: paths() })
-      expect(created.scan.state).toBe('scanning')
+      expect(isScanning(created.scan)).toBe(true)
       library.id = created.id
       await settle(created.id)
     })
@@ -217,6 +218,27 @@ describe('the media server', () => {
       expect(listed.find((entry) => entry.id === library.id)?.backdrop).toEqual(backdrop)
     })
 
+    it("lists a library's own videos in progress and favourites, and no sagas or misses in Other", async () => {
+      const [movie] = await listMedia(library.id)
+      const id = movie?.id ?? -1
+      await api().saveProgress({ id, position: 3 })
+      await api().setFavourite({ id, favourite: true })
+      try {
+        const inProgress = await api().listInProgress(library.id)
+        expect(inProgress.map(({ media, poster }) => [media.id, media.position, poster])).toEqual([
+          [id, 3, null],
+        ])
+        const favourites = await api().listLibraryFavourites(library.id)
+        expect(favourites.map(({ media }) => media.id)).toEqual([id])
+      } finally {
+        await api().saveProgress({ id, position: 0 })
+        await api().setFavourite({ id, favourite: false })
+      }
+      expect(await api().listInProgress(library.id)).toEqual([])
+      expect(await api().listLibraryFavourites(library.id)).toEqual([])
+      expect(await api().listUnmatched(library.id)).toEqual([])
+    })
+
     it('will not lock a library while the server has no PIN', async () => {
       await expect(
         api().createLibrary({ name: 'Private', paths: [state.media], settings: { locked: true } }),
@@ -254,7 +276,7 @@ describe('the media server', () => {
       expect(libraries).toHaveLength(1)
       expect(libraries[0]).toMatchObject({
         itemCount: 2,
-        scan: { state: 'idle', discovered: 2, processed: 2, error: null },
+        scan: { state: 'idle', found: 2, processed: 2, error: null },
       })
     })
 

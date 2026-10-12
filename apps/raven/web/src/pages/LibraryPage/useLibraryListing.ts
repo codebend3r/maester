@@ -1,14 +1,8 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { type LibrarySettings, type MediaItem, listsShows, matchTypeFor } from '@raven/core'
-import { useEffect, useRef } from 'react'
-import { afterMatchingPass } from '@/lib/invalidate'
+import { useQuery } from '@tanstack/react-query'
+import { type LibrarySettings, listsShows, matchTypeFor } from '@raven/core'
 import { mediaListQuery, metadataHealthQuery, showListQuery } from '@/lib/queries'
 import type { Listing } from '@/pages/LibraryPage/libraryShape'
-
-const POLL_MS = 3000
-
-const anyPending = (items: readonly MediaItem[]): boolean =>
-  items.some((item) => item.match === 'pending')
+import { POLL_MS, anyPending, useMatchingPassDone } from '@/pages/LibraryPage/useMatchingPassDone'
 
 /**
  * What a library lists, one shape whatever its type: a TV library's shows
@@ -20,22 +14,14 @@ export const useLibraryListing = ({
   settings,
   search,
   seed,
-  enabled,
   scanning,
 }: {
   libraryId: number
   settings: LibrarySettings
   search: string
   seed: number
-  enabled: boolean
   scanning: boolean
-}): Listing & {
-  loaded: boolean
-  busy: boolean
-  /** Whether TMDB answers, so pending files will leave pending. */
-  canMatch: boolean
-} => {
-  const queryClient = useQueryClient()
+}): Listing & { loaded: boolean; busy: boolean } => {
   const isShowList = listsShows(settings.kind)
   // Files only leave pending while TMDB answers; without it they wait for good.
   const metadata = useQuery({
@@ -47,13 +33,13 @@ export const useLibraryListing = ({
 
   const shows = useQuery({
     ...showListQuery(listing),
-    enabled: enabled && isShowList,
+    enabled: isShowList,
     refetchInterval: (current) =>
       scanning || (canMatch && anyPending(current.state.data?.unmatched ?? [])) ? POLL_MS : false,
   })
   const files = useQuery({
     ...mediaListQuery(listing),
-    enabled: enabled && !isShowList,
+    enabled: !isShowList,
     refetchInterval: (current) =>
       scanning ||
       (current.state.data ?? []).some(
@@ -67,20 +53,12 @@ export const useLibraryListing = ({
     ? { shows: shows.data?.shows ?? [], files: shows.data?.unmatched ?? [], query: shows }
     : { shows: [], files: files.data ?? [], query: files }
 
-  // Nothing else reads the library again after a matching pass, so its count
-  // of files not matched is refetched once the listing has none pending.
-  const isMatching = anyPending(shown.files)
-  const wasMatching = useRef(false)
-  useEffect(() => {
-    if (wasMatching.current && !isMatching) void afterMatchingPass({ queryClient, libraryId })
-    wasMatching.current = isMatching
-  }, [isMatching, libraryId, queryClient])
+  useMatchingPassDone({ libraryId, files: shown.files })
 
   return {
     shows: shown.shows,
     files: shown.files,
     loaded: shown.query.isSuccess,
     busy: shown.query.isFetching && !shown.query.data,
-    canMatch,
   }
 }

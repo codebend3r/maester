@@ -43,6 +43,16 @@ describe('walkVideos', () => {
     expect(result.unreadable).toEqual([])
   })
 
+  it('tells how many videos each folder held as it reads it, adding up to what it found', async () => {
+    const counts: number[] = []
+    const result = await walkVideos({
+      roots: [at('Movies'), at('TV')],
+      onFound: (count) => counts.push(count),
+    })
+    expect(counts.length).toBeGreaterThan(1)
+    expect(counts.reduce((sum, count) => sum + count, 0)).toBe(result.files.length)
+  })
+
   it('reports a path that does not exist instead of throwing', async () => {
     const result = await walkVideos({ roots: [at('Nope'), at('TV')] })
     expect(result.unreadable).toEqual([at('Nope')])

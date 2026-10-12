@@ -12,9 +12,8 @@ import { MediaList } from '@/components/MediaList/MediaList'
 import { MediaTiles } from '@/components/MediaTiles/MediaTiles'
 import { ShowGrid } from '@/components/ShowCard/ShowCard'
 import { ShowList, ShowTiles } from '@/components/ShowCard/ShowViews'
+import { plural } from '@/lib/plural'
 import styles from '@/pages/LibraryPage/LibraryPage.module.scss'
-
-const count = new Intl.NumberFormat()
 
 /** A TV library's shows laid out the way its view setting says; the grouped view is the grid, as the page itself splits matched from not. */
 const ShowsView = ({
@@ -90,9 +89,6 @@ const MediaView = ({
     />
   )
 }
-
-const plural = ({ n, one, many }: { n: number; one: string; many: string }): string =>
-  `${count.format(n)} ${n === 1 ? one : many}`
 
 /**
  * A library's listing laid out: its files, or a TV library's shows, with the
