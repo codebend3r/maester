@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { containerOf, isVideoFile, resolutionLabel, titleFromFileName } from '@/media'
 
 describe('isVideoFile', () => {
@@ -40,7 +40,7 @@ describe('resolutionLabel', () => {
     [{ width: 854, height: 480 }, '480p'],
     [{ width: 640, height: 360 }, 'SD'],
     [{ width: null, height: null }, null],
-  ])('labels %j as %s', (size, label) => {
+  ] as const)('labels %j as %s', (size, label) => {
     expect(resolutionLabel(size)).toBe(label)
   })
 })

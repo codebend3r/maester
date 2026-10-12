@@ -3,7 +3,7 @@ import type { EpisodeSummary, ItemDetails } from '@raven/core'
 import { useId } from 'react'
 import { Link } from 'react-router-dom'
 import { Icon } from '@/components/Icon/Icon'
-import { ItemHeader } from '@/components/ItemHeader/ItemHeader'
+import { ItemHeader, ItemHeaderSkeleton } from '@/components/ItemHeader/ItemHeader'
 import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { RouteState } from '@/components/RouteState/RouteState'
 import { Summary } from '@/components/Summary/Summary'
@@ -126,9 +126,13 @@ export const SeasonPage = () => {
   const seasonQuery = useQuery(itemQuery(summary?.id ?? null))
 
   const show = routeState({ id: number == null ? null : showId, query: showQuery })
-  if (show.state !== 'ready') return <RouteState state={show} noun="season" />
+  if (show.state !== 'ready')
+    return <RouteState state={show} noun="season" shape={<ItemHeaderSkeleton picture="poster" />} />
   if (!summary) return <NotFoundPage />
   const season = routeState({ id: summary.id, query: seasonQuery })
-  if (season.state !== 'ready') return <RouteState state={season} noun="season" />
+  if (season.state !== 'ready')
+    return (
+      <RouteState state={season} noun="season" shape={<ItemHeaderSkeleton picture="poster" />} />
+    )
   return <SeasonView show={show.data} season={season.data} />
 }

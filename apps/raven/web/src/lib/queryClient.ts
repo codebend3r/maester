@@ -114,3 +114,19 @@ export const queryKeys = {
   }) => ['match', type, query, year],
   metadataHealth: ['health', 'metadata'],
 }
+
+/**
+ * Keys for the changes shown before the server answers. Changes under one
+ * key go to the server one at a time and are read again together, so it
+ * covers every change that reads again the same caches.
+ */
+export const mutationKeys = {
+  /** Any video's favourite: they all show in the same listings. */
+  favourite: ['favourite'],
+  /** Any library's pin: they all show in the libraries list and on home. */
+  pin: ['pin'],
+  /** One library's sort, view or grouping, which only its page changes. */
+  libraryView: (libraryId: number) => ['library-view', libraryId],
+  playbackSettings: ['settings', 'playback'],
+  displaySettings: ['settings', 'display'],
+}

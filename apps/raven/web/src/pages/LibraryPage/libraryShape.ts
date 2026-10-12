@@ -3,6 +3,15 @@ import { type LibrarySettings, type MediaItem, type ShowEntry, groupMedia } from
 /** A library's listing: its shows (none outside a TV library), then the files listed as files. */
 export type Listing = { shows: ShowEntry[]; files: MediaItem[] }
 
+/** Where a listing stands: on its way, failed with nothing to show, or read. */
+export type ListingState =
+  | { state: 'pending' }
+  | { state: 'failed'; error: Error }
+  | ({ state: 'listed' } & Listing)
+
+/** What Play, Shuffle and the jump strip see while nothing is listed yet. */
+export const NOTHING_LISTED: Listing = { shows: [], files: [] }
+
 /**
  * What Play and Shuffle start: a show's next episode first, then the files
  * in the order the page shows them. The settings are coherent with the

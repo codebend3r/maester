@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   type Library,
   type LibrarySettings,
@@ -10,7 +10,10 @@ import {
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api } from '@/lib/api'
-import { queryKeys } from '@/lib/queryClient'
+import { librarySettingsEdits } from '@/lib/edits'
+import { afterLibraryView } from '@/lib/invalidate'
+import { useOptimisticMutation } from '@/lib/optimistic'
+import { mutationKeys } from '@/lib/queryClient'
 import { useDebouncedValue } from '@/lib/useDebouncedValue'
 
 /** A fresh deal for a random sort; the order holds while the page is open. */
@@ -61,7 +64,6 @@ export const useLibraryView = ({ library }: { library: Library }) => {
   const query = useDebouncedValue({ value: search.trim(), delayMs: 200 })
   // The address may ask for what the library's type cannot show; that is settled here, once.
   const settings = coherentSettings({ ...library.settings, ...viewFromUrl(address) })
-  const key = queryKeys.library(library.id)
 
   // The search rides in the address once it settles, replacing rather than
   // stacking history entries as the viewer types.
@@ -77,24 +79,15 @@ export const useLibraryView = ({ library }: { library: Library }) => {
     )
   }, [query, setAddress])
 
-  const save = useMutation({
+  const save = useOptimisticMutation({
+    mutationKey: mutationKeys.libraryView(library.id),
     mutationFn: ({ current, change }: { current: Library; change: Partial<LibrarySettings> }) =>
       api.updateLibrary({
         id: current.id,
         input: { name: current.name, paths: current.paths, settings: change },
       }),
-    onMutate: async ({ current, change }) => {
-      await queryClient.cancelQueries({ queryKey: key, exact: true })
-      queryClient.setQueryData<Library>(key, {
-        ...current,
-        settings: { ...current.settings, ...change },
-      })
-      return { previous: current }
-    },
-    onError: (_error, _variables, context) => {
-      if (context) queryClient.setQueryData(key, context.previous)
-    },
-    onSuccess: (updated) => queryClient.setQueryData(key, updated),
+    edits: ({ current, change }) => librarySettingsEdits({ libraryId: current.id, change }),
+    settle: () => afterLibraryView({ queryClient, libraryId: library.id }),
   })
 
   return {
@@ -109,6 +102,6 @@ export const useLibraryView = ({ library }: { library: Library }) => {
       setAddress(writeView({ params: address, change }), { replace: true })
       save.mutate({ current: library, change })
     },
-    saveError: save.error,
+    saveError: save.failure,
   }
 }

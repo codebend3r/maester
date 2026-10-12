@@ -1,54 +1,43 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { MediaItem, PosterEntry } from '@raven/core'
 import { api } from '@/lib/api'
-import { queryKeys } from '@/lib/queryClient'
+import { favouriteEdits, withoutEntry } from '@/lib/edits'
+import { afterFavourites } from '@/lib/invalidate'
+import { useOptimisticMutation } from '@/lib/optimistic'
+import { mutationKeys, queryKeys } from '@/lib/queryClient'
 
 /**
  * Marking a favourite, deleting a video and fetching its details again,
- * with every cached list patched in place so the grid answers at once.
- * Behind that, everything its library shows refetches: the listings and
- * every tab, In progress, Not matched, its sagas and its history among
- * them, so no menu there is left stale. So do the favourites, the item
- * pages and home.
+ * with every cached list patched in place so the grid answers at once. A
+ * favourite shows before the server even answers. Behind each, everything
+ * its library shows refetches: the listings and every tab, In progress, Not
+ * matched, its sagas and its history among them, so no menu there is left
+ * stale. So do the favourites, the item pages and home; favourites marked
+ * in a run settle together, so every library refetches after them.
  */
 export const useMediaMutations = ({ media }: { media: MediaItem }) => {
   const queryClient = useQueryClient()
   const lists = { queryKey: queryKeys.mediaLists(media.libraryId) }
   const library = { queryKey: queryKeys.library(media.libraryId) }
-  const without = (items: MediaItem[] | undefined): MediaItem[] | undefined =>
-    items?.filter((item) => item.id !== media.id)
-  const withoutFavourite = (entries: PosterEntry[] | undefined): PosterEntry[] | undefined =>
-    entries?.filter((entry) => entry.media.id !== media.id)
 
-  const favourite = useMutation({
+  const favourite = useOptimisticMutation({
+    mutationKey: mutationKeys.favourite,
     mutationFn: (marked: boolean) => api.setFavourite({ id: media.id, favourite: marked }),
-    onSuccess: (updated) => {
-      queryClient.setQueryData(queryKeys.mediaItem(updated.id), updated)
-      queryClient.setQueriesData<MediaItem[]>(lists, (items) =>
-        items?.map((item) => (item.id === updated.id ? updated : item)),
-      )
-      if (!updated.favourite) {
-        queryClient.setQueryData<PosterEntry[]>(queryKeys.favourites, withoutFavourite)
-        queryClient.setQueryData<PosterEntry[]>(
-          queryKeys.libraryFavourites(media.libraryId),
-          withoutFavourite,
-        )
-      }
-      return Promise.all([
-        queryClient.invalidateQueries(library),
-        queryClient.invalidateQueries({ queryKey: queryKeys.favourites }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.items }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.home }),
-      ])
-    },
+    edits: (marked) => favouriteEdits({ media, favourite: marked }),
+    settle: () => afterFavourites(queryClient),
   })
 
   const remove = useMutation({
     mutationFn: () => api.deleteMedia(media.id),
     onSuccess: () => {
       queryClient.removeQueries({ queryKey: queryKeys.mediaItem(media.id) })
-      queryClient.setQueriesData<MediaItem[]>(lists, without)
-      queryClient.setQueryData<PosterEntry[]>(queryKeys.favourites, withoutFavourite)
+      queryClient.setQueriesData<MediaItem[]>(lists, (items) =>
+        items?.filter((item) => item.id !== media.id),
+      )
+      queryClient.setQueryData<PosterEntry[]>(
+        queryKeys.favourites,
+        (entries) => entries && withoutEntry({ entries, id: media.id }),
+      )
       // Every library, the counts on the libraries list with them.
       return Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.libraries }),

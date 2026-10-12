@@ -94,16 +94,14 @@ export const ShowCard = ({
 /** The poster grid a TV library lays its shows out in. */
 export const ShowGrid = ({
   shows,
-  busy = false,
   ratingsSource = 'tmdb',
   sort,
 }: {
   shows: ShowEntry[]
-  busy?: boolean
   ratingsSource?: RatingSource
   sort?: MediaSort
 }) => (
-  <ul className={styles.grid} aria-busy={busy}>
+  <ul className={styles.grid}>
     {shows.map((entry) => (
       <ShowCard key={entry.show.id} entry={entry} ratingsSource={ratingsSource} sort={sort} />
     ))}

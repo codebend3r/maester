@@ -16,7 +16,6 @@ const count = new Intl.NumberFormat()
 export const MediaGroups = ({
   items,
   by,
-  busy = false,
   posters = false,
   matchType = null,
   ratingsSource = 'tmdb',
@@ -24,13 +23,12 @@ export const MediaGroups = ({
 }: {
   items: MediaItem[]
   by: MediaGroupBy
-  busy?: boolean
   posters?: boolean
   matchType?: MatchItemType | null
   ratingsSource?: RatingSource
   sort?: MediaSort
 }) => (
-  <div className={styles.groups} aria-busy={busy}>
+  <div className={styles.groups}>
     {groupMedia({ items, by }).map((group) => (
       <Bucket
         key={group.key}

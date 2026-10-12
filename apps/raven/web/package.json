@@ -17,7 +17,7 @@
     "lint:css:fix": "stylelint --fix \"src/**/*.scss\"",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
-    "test": "bun test --dots",
+    "test": "bun test --dots --parallel",
     "test:watch": "bun test --dots --watch"
   },
   "dependencies": {

@@ -17,6 +17,7 @@ import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
 import { PosterFrame } from '@/components/PosterCard/PosterCard'
 import { RatingChips } from '@/components/RatingChips/RatingChips'
 import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
+import { Bone } from '@/components/Skeleton/Skeleton'
 import { api } from '@/lib/api'
 import { cardLink } from '@/lib/itemLinks'
 import { mediaEntryKey } from '@/lib/entryKeys'
@@ -114,14 +115,12 @@ const MediaTile = ({
  */
 export const MediaTiles = ({
   items,
-  busy = false,
   note,
   posters = false,
   matchType = null,
   sort,
 }: {
   items: MediaItem[]
-  busy?: boolean
   note?: (media: MediaItem) => string | null
   /** A Movies library's tiles: small posters, opening the movie's page. */
   posters?: boolean
@@ -130,7 +129,7 @@ export const MediaTiles = ({
   /** The order the listing is in, whose value each tile shows first. */
   sort?: MediaSort
 }) => (
-  <ul className={styles.tiles} aria-busy={busy}>
+  <ul className={styles.tiles}>
     {items.map((item) => (
       <MediaTile
         key={item.id}
@@ -140,6 +139,28 @@ export const MediaTiles = ({
         matchType={matchType}
         sort={sort}
       />
+    ))}
+  </ul>
+)
+
+/** A tile on its way, laid out as a tile: its frame grab's place, a line for its title and one for its facts. */
+const TileSkeleton = () => (
+  <li className={styles.tile}>
+    <span className={styles.frame}>
+      <Bone shape="fill" />
+    </span>
+    <div className={styles.body}>
+      <Bone shape="text" width="half" />
+      <Bone shape="small" width="short" />
+    </div>
+  </li>
+)
+
+/** The tiles while they are on their way, as rows of stand-ins; a list stands in the same. */
+export const MediaTilesSkeleton = ({ count = 6 }: { count?: number }) => (
+  <ul className={styles.tiles}>
+    {Array.from({ length: count }, (_, index) => (
+      <TileSkeleton key={index} />
     ))}
   </ul>
 )

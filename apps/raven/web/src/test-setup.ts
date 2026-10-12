@@ -6,6 +6,9 @@ import { useSideMenu } from '@/stores/sideMenu'
 import { useUnlockPrompt } from '@/stores/unlockPrompt'
 import { resetBrowserSupport } from '@/test/canPlay'
 import { FakeEventSource } from '@/test/eventSource'
+import { pacePolls, resetPolls } from '@/test/polls'
+
+pacePolls()
 
 const initialPrefs = usePlayerPrefs.getInitialState()
 const initialSideMenu = useSideMenu.getInitialState()
@@ -19,4 +22,5 @@ afterEach(() => {
   useUnlockPrompt.setState(initialUnlockPrompt, true)
   resetBrowserSupport()
   FakeEventSource.opened = []
+  resetPolls()
 })

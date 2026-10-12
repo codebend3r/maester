@@ -1,6 +1,7 @@
 import type { ItemSummary, MatchItemType, MediaItem, MediaSort, RatingSource } from '@raven/core'
 import { MediaCard } from '@/components/MediaCard/MediaCard'
 import { PosterCard } from '@/components/PosterCard/PosterCard'
+import { SkeletonCards } from '@/components/Skeleton/Skeleton'
 import styles from '@/components/MediaGrid/MediaGrid.module.scss'
 
 /**
@@ -10,7 +11,6 @@ import styles from '@/components/MediaGrid/MediaGrid.module.scss'
  */
 export const MediaGrid = ({
   items,
-  busy = false,
   posters = false,
   matchType = null,
   ratingsSource = 'tmdb',
@@ -18,7 +18,6 @@ export const MediaGrid = ({
   posterOf,
 }: {
   items: MediaItem[]
-  busy?: boolean
   posters?: boolean
   matchType?: MatchItemType | null
   ratingsSource?: RatingSource
@@ -26,7 +25,7 @@ export const MediaGrid = ({
   /** The item whose poster a card shows, when not the video's own: an episode's season. */
   posterOf?: (media: MediaItem) => ItemSummary | null
 }) => (
-  <ul className={posters ? `${styles.grid} ${styles.posters}` : styles.grid} aria-busy={busy}>
+  <ul className={posters ? `${styles.grid} ${styles.posters}` : styles.grid}>
     {items.map((item) =>
       posters ? (
         <PosterCard
@@ -41,5 +40,18 @@ export const MediaGrid = ({
         <MediaCard key={item.id} media={item} matchType={matchType} sort={sort} />
       ),
     )}
+  </ul>
+)
+
+/** The grid while its cards are on their way: stand-ins shaped as its cards, posters or frame grabs. */
+export const MediaGridSkeleton = ({
+  posters = false,
+  count,
+}: {
+  posters?: boolean
+  count?: number
+}) => (
+  <ul className={posters ? `${styles.grid} ${styles.posters}` : styles.grid}>
+    <SkeletonCards picture={posters ? 'poster' : 'frame'} count={count} />
   </ul>
 )

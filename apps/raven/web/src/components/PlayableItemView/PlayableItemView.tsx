@@ -156,7 +156,6 @@ export const PlayableItemView = ({
           aria-label="Favourite"
           aria-pressed={primary.favourite}
           className={primary.favourite ? styles.favourited : undefined}
-          disabled={favourite.isPending}
           onClick={() => favourite.mutate(!primary.favourite)}
         />
         {config.editable && (

@@ -1,6 +1,7 @@
 import { type UseQueryResult, useQuery } from '@tanstack/react-query'
 import {
   type Library,
+  type LibrarySettings,
   type MediaItem,
   type PosterEntry,
   isScanning,
@@ -12,9 +13,10 @@ import { ButtonLink } from '@/components/Button/Button'
 import { Duplicates } from '@/components/Duplicates/Duplicates'
 import { JumpPicker } from '@/components/JumpPicker/JumpPicker'
 import { LibraryToolbar } from '@/components/LibraryToolbar/LibraryToolbar'
-import { MediaGrid } from '@/components/MediaGrid/MediaGrid'
-import { MediaTiles } from '@/components/MediaTiles/MediaTiles'
+import { MediaGrid, MediaGridSkeleton } from '@/components/MediaGrid/MediaGrid'
+import { MediaTiles, MediaTilesSkeleton } from '@/components/MediaTiles/MediaTiles'
 import { SagaDecks } from '@/components/SagaDeck/SagaDeck'
+import { Loading } from '@/components/Skeleton/Skeleton'
 import { finishedNote } from '@/lib/history'
 import { watchLink } from '@/lib/itemLinks'
 import { jumpScale } from '@/lib/jumpScale'
@@ -27,8 +29,8 @@ import {
   sagasQuery,
   unmatchedQuery,
 } from '@/lib/queries'
-import { LibraryListing } from '@/pages/LibraryPage/LibraryViews'
-import { playQueue } from '@/pages/LibraryPage/libraryShape'
+import { LibraryListing, LibraryListingSkeleton } from '@/pages/LibraryPage/LibraryViews'
+import { type ListingState, NOTHING_LISTED, playQueue } from '@/pages/LibraryPage/libraryShape'
 import type { LibrarySection } from '@/pages/LibraryPage/librarySections'
 import { useLibraryListing } from '@/pages/LibraryPage/useLibraryListing'
 import { useLibraryView } from '@/pages/LibraryPage/useLibraryView'
@@ -40,17 +42,15 @@ const FINISHED_LIMIT = 48
 
 /** What the page says in place of a listing with nothing in it, or null while there is something. */
 const emptyMessage = ({
-  loaded,
   empty,
   query,
   scanning,
 }: {
-  loaded: boolean
   empty: boolean
   query: string
   scanning: boolean
 }): string | null => {
-  if (!loaded || !empty) return null
+  if (!empty) return null
   if (query) return `Nothing here matches "${query}".`
   if (scanning) return 'Looking through the folders. Videos appear here as they are found.'
   return 'No videos in these folders yet. Check the paths, or add a folder that holds videos.'
@@ -63,15 +63,17 @@ const whenEmpty =
     list.length === 0 ? message : null
 
 /**
- * A tab's body: its failure, a line while it loads, the line `empty` gives
+ * A tab's body: its failure, `shape` while it loads, the line `empty` gives
  * for what came back, if any, else its content.
  */
 const SectionBody = <T,>({
   query,
+  shape,
   empty,
   children,
 }: {
   query: UseQueryResult<T>
+  shape: ReactNode
   empty: (data: T) => string | null
   children: (data: T) => ReactNode
 }) => {
@@ -82,7 +84,7 @@ const SectionBody = <T,>({
       </p>
     )
   }
-  if (query.isPending) return <p className={styles.message}>Loading</p>
+  if (query.isPending) return <Loading label="Loading">{shape}</Loading>
   const message = empty(query.data)
   if (message != null) return <p className={styles.message}>{message}</p>
   return children(query.data)
@@ -106,6 +108,38 @@ const EntryGrid = ({ library, entries }: { library: Library; entries: PosterEntr
   )
 }
 
+/** The listing as it stands: its shape on its way, why it could not be read, why it is empty, or itself. */
+const ListingBody = ({
+  listing,
+  settings,
+  empty,
+}: {
+  listing: ListingState
+  settings: LibrarySettings
+  empty: string | null
+}) => {
+  switch (listing.state) {
+    case 'pending':
+      return <LibraryListingSkeleton settings={settings} />
+    case 'failed':
+      return (
+        <p className={styles.message} role="alert">
+          {listing.error.message}
+        </p>
+      )
+    case 'listed':
+      return empty ? (
+        <p className={styles.message}>{empty}</p>
+      ) : (
+        <LibraryListing settings={settings} shows={listing.shows} files={listing.files} />
+      )
+    default: {
+      const unknown: never = listing
+      return unknown
+    }
+  }
+}
+
 /**
  * Every video or show in the library, searched, sorted and laid out as it
  * was left, with Play and Shuffle, and a strip down the side that jumps
@@ -124,21 +158,24 @@ const AllSection = ({ library }: { library: Library }) => {
     seed: view.seed,
     scanning,
   })
-  const queue = playQueue({ settings, listing })
+  const listed = listing.state === 'listed' ? listing : NOTHING_LISTED
+  const queue = playQueue({ settings, listing: listed })
   // The strip down the side follows the order: letters for titles, steps of
   // the value sorted by for the rest, none for a random order.
   const scale = jumpScale({
     sort: settings.sort,
-    files: listing.files,
-    shows: listing.shows,
+    files: listed.files,
+    shows: listed.shows,
     source: settings.ratingsSource,
   })
-  const empty = emptyMessage({
-    loaded: listing.loaded,
-    empty: listing.shows.length === 0 && listing.files.length === 0,
-    query: view.query,
-    scanning,
-  })
+  const empty =
+    listing.state === 'listed'
+      ? emptyMessage({
+          empty: listed.shows.length === 0 && listed.files.length === 0,
+          query: view.query,
+          scanning,
+        })
+      : null
 
   // The item rides along in router state, as a card click hands it over, so
   // the player starts without fetching it again.
@@ -169,16 +206,7 @@ const AllSection = ({ library }: { library: Library }) => {
 
       {scale && !empty && <JumpPicker scale={scale} scope={cards} />}
 
-      {empty ? (
-        <p className={styles.message}>{empty}</p>
-      ) : (
-        <LibraryListing
-          settings={settings}
-          shows={listing.shows}
-          files={listing.files}
-          busy={listing.busy}
-        />
-      )}
+      <ListingBody listing={listing} settings={settings} empty={empty} />
     </div>
   )
 }
@@ -189,6 +217,7 @@ const InProgressSection = ({ library }: { library: Library }) => {
   return (
     <SectionBody
       query={query}
+      shape={<MediaGridSkeleton posters={matchTypeFor(library.settings.kind) != null} />}
       empty={whenEmpty(
         library.settings.saveProgress
           ? `Nothing in progress in ${library.name}. A video left partway through waits here.`
@@ -206,6 +235,7 @@ const FavouritesSection = ({ library }: { library: Library }) => {
   return (
     <SectionBody
       query={query}
+      shape={<MediaGridSkeleton posters={matchTypeFor(library.settings.kind) != null} />}
       empty={whenEmpty(
         `No favourites in ${library.name} yet. Open a video's menu, from the button in its corner or a right click, and choose Favourite.`,
       )}
@@ -224,6 +254,7 @@ const SagasSection = ({ library }: { library: Library }) => {
   return (
     <SectionBody
       query={query}
+      shape={<MediaGridSkeleton posters />}
       empty={whenEmpty(
         `No sagas in ${library.name} yet. One shows here once two movies or more from the same TMDB collection are in the library.`,
       )}
@@ -249,7 +280,11 @@ const NotMatchedSection = ({ library }: { library: Library }) => {
   })
   useMatchingPassDone({ libraryId: library.id, files: query.data ?? [] })
   return (
-    <SectionBody query={query} empty={whenEmpty(`Every file in ${library.name} is matched.`)}>
+    <SectionBody
+      query={query}
+      shape={<MediaGridSkeleton />}
+      empty={whenEmpty(`Every file in ${library.name} is matched.`)}
+    >
       {(files) => (
         <>
           <p className={styles.message}>
@@ -275,6 +310,7 @@ const DuplicatesSection = ({ library }: { library: Library }) => {
   return (
     <SectionBody
       query={query}
+      shape={<MediaGridSkeleton posters />}
       empty={whenEmpty(`No movie in ${library.name} has more than one file.`)}
     >
       {(listing) => <Duplicates library={library} listing={listing} />}
@@ -291,6 +327,7 @@ const FinishedSection = ({ library }: { library: Library }) => {
   return (
     <SectionBody
       query={query}
+      shape={<MediaTilesSkeleton />}
       empty={whenEmpty(
         `Nothing finished in ${library.name} yet. A video counts once playback gets ${library.settings.watchedPercent}% of the way through.`,
       )}

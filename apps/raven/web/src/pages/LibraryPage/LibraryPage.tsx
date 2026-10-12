@@ -1,13 +1,15 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { type Library, isScanning } from '@raven/core'
 import { useId, useState } from 'react'
 import { Navigate, useParams } from 'react-router-dom'
 import { ButtonLink } from '@/components/Button/Button'
 import { LibraryDialog } from '@/components/LibraryDialog/LibraryDialog'
 import { LockedLibrary } from '@/components/LockedLibrary/LockedLibrary'
+import { MediaGridSkeleton } from '@/components/MediaGrid/MediaGrid'
 import { RouteState } from '@/components/RouteState/RouteState'
+import { Bone } from '@/components/Skeleton/Skeleton'
 import { useLibraryLock } from '@/lib/libraryLock'
-import { libraryQuery } from '@/lib/queries'
+import { librariesQuery, libraryQuery } from '@/lib/queries'
 import { routeState, useRouteId } from '@/lib/routeQuery'
 import { LibraryHeader, useLibraryActions } from '@/pages/LibraryPage/LibraryHeader'
 import { LibraryTabs } from '@/pages/LibraryPage/LibraryTabs'
@@ -77,22 +79,40 @@ const LibraryView = ({ library, section }: { library: Library; section: LibraryS
   )
 }
 
+/** The page before anything of its library is known: the way back, its title and counts, its tabs, and a grid of cards. */
+const LibrarySkeleton = () => (
+  <>
+    <Bone shape="button" />
+    <Bone shape="hero" width="half" />
+    <Bone shape="text" width="short" />
+    <Bone shape="text" width="most" />
+    <MediaGridSkeleton />
+  </>
+)
+
 /**
  * `/libraries/:id`: a library's videos or shows, searched, sorted and laid
  * out as it was left, with its other tabs at `/libraries/:id/:section`. A
  * tab the library's type does not have, as after a change of type, opens All.
+ * The libraries list the side menu reads already holds this one, so the
+ * page opens on that while the library itself is read.
  */
 export const LibraryPage = () => {
+  const queryClient = useQueryClient()
   const libraryId = useRouteId()
   const section = sectionFrom(useParams().section)
   const library = useQuery({
     ...libraryQuery(libraryId),
+    placeholderData: () =>
+      queryClient.getQueryData(librariesQuery.queryKey)?.find((entry) => entry.id === libraryId),
     refetchInterval: (current) =>
       current.state.data && isScanning(current.state.data.scan) ? 1500 : false,
   })
   const page = routeState({ id: libraryId, query: library })
   if (section == null) return <NotFoundPage />
-  if (page.state !== 'ready') return <RouteState state={page} noun="library" />
+  if (page.state !== 'ready') {
+    return <RouteState state={page} noun="library" shape={<LibrarySkeleton />} />
+  }
   if (!hasSection({ kind: page.data.settings.kind, section })) {
     return <Navigate to={sectionPath({ libraryId: page.data.id, section: 'all' })} replace />
   }

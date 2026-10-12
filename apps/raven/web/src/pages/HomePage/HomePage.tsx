@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom'
 import { MediaCard } from '@/components/MediaCard/MediaCard'
 import { PosterCard } from '@/components/PosterCard/PosterCard'
 import { ShowCard } from '@/components/ShowCard/ShowCard'
+import { Bone, Loading, SkeletonCards } from '@/components/Skeleton/Skeleton'
 import { homeQuery, librariesQuery } from '@/lib/queries'
 import styles from '@/pages/HomePage/HomePage.module.scss'
 
@@ -105,7 +106,18 @@ export const HomePage = () => {
           {home.error.message}
         </p>
       )}
-      {home.isPending && <p className={styles.message}>Gathering your libraries</p>}
+      {home.isPending && (
+        <Loading label="Gathering your libraries">
+          {['continue', 'newest'].map((shelf) => (
+            <section key={shelf} className={styles.shelf}>
+              <Bone shape="heading" width="short" />
+              <ul className={styles.row}>
+                <SkeletonCards picture="poster" count={8} />
+              </ul>
+            </section>
+          ))}
+        </Loading>
+      )}
       {isBare && (
         <p className={styles.message}>
           Nothing to show yet. Pin a library in its settings and its newest videos show here, and

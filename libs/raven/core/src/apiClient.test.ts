@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import {
   type ApiClient,
   ApiError,
@@ -8,7 +8,14 @@ import {
   isLockedError,
   parseServerEvent,
 } from '@/apiClient'
-import { itemDetails, library, mediaItem, showEntry } from '@/test/fixtures'
+import type {
+  ItemImageOptions,
+  ItemMetadataState,
+  MediaTracks,
+  MetadataHealth,
+  PersonDetails,
+} from '@/contract'
+import { itemDetails, itemSummary, library, mediaItem, showEntry } from '@/test/fixtures'
 
 type Call = { url: string; init?: FetchInit }
 
@@ -56,7 +63,7 @@ describe('createApiClient', () => {
   })
 
   it('reads and writes an item’s metadata over TMDB’s', async () => {
-    const state = {
+    const state: ItemMetadataState = {
       shown: {
         title: 'Heat (Director’s Cut)',
         year: 1995,
@@ -79,7 +86,7 @@ describe('createApiClient', () => {
   })
 
   it('lists the pictures an item could show, and chooses one', async () => {
-    const options = {
+    const options: ItemImageOptions = {
       poster: [
         {
           source: 'tmdb',
@@ -177,11 +184,11 @@ describe('createApiClient', () => {
       body,
       call,
     }: {
-      body: T
+      body: Awaited<T>
       call: (client: ApiClient) => Promise<T>
     }) => {
       const { client, calls } = clientReturning(respond({ body }))
-      await expect(call(client)).resolves.toEqual(body)
+      expect(await call(client)).toEqual(body)
       return calls[0]?.url
     }
     expect([
@@ -310,7 +317,7 @@ describe('createApiClient', () => {
 
 describe('playback calls', () => {
   it('checks the track list against the contract', async () => {
-    const tracks = {
+    const tracks: MediaTracks = {
       audio: [
         { index: 0, codec: 'truehd', channels: 8, language: 'eng', title: null, default: true },
       ],
@@ -401,11 +408,11 @@ describe('the metadata calls', () => {
   })
 
   it('fetches a person and builds avatar URLs', async () => {
-    const person = {
+    const person: PersonDetails = {
       id: 5,
       name: 'Keanu Reeves',
       photoVersion: 'k',
-      credits: [{ item: itemDetails().versions[0]?.item, job: 'cast', role: 'Neo' }],
+      credits: [{ item: itemSummary(), job: 'cast', role: 'Neo' }],
     }
     const { client, calls } = clientReturning(respond({ body: person }))
     await expect(client.getPerson(5)).resolves.toEqual(person)
@@ -441,7 +448,13 @@ describe('the metadata calls', () => {
   })
 
   it('reads the metadata part of the health check', async () => {
-    const metadata = { tmdb: 'ok', omdb: 'off', pending: 3, error: null, lastOk: null }
+    const metadata: MetadataHealth = {
+      tmdb: 'ok',
+      omdb: 'off',
+      pending: 3,
+      error: null,
+      lastOk: null,
+    }
     const health = {
       status: 'ok',
       ffmpeg: '7.1',

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import type { Saga } from '@/contract'
 import { sagaBackdrop } from '@/sagas'
 import { itemSummary, mediaItem } from '@/test/fixtures'

@@ -6,7 +6,7 @@ import { Button, ButtonLink } from '@/components/Button/Button'
 import { CastRow } from '@/components/CastRow/CastRow'
 import { FixMatchDialog } from '@/components/FixMatchDialog/FixMatchDialog'
 import { ImageEditor } from '@/components/ImageEditor/ImageEditor'
-import { ItemHeader } from '@/components/ItemHeader/ItemHeader'
+import { ItemHeader, ItemHeaderSkeleton } from '@/components/ItemHeader/ItemHeader'
 import { MetadataEditor } from '@/components/MetadataEditor/MetadataEditor'
 import { ReviewCards } from '@/components/ReviewCards/ReviewCards'
 import { RouteState } from '@/components/RouteState/RouteState'
@@ -162,6 +162,7 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
 /** `/shows/:id`: a show's backdrop, poster, creator, years, network, seasons and people. */
 export const ShowPage = () => {
   const page = useRouteItem('show')
-  if (page.state !== 'ready') return <RouteState state={page} noun="show" />
+  if (page.state !== 'ready')
+    return <RouteState state={page} noun="show" shape={<ItemHeaderSkeleton picture="poster" />} />
   return <ShowView details={page.data} />
 }

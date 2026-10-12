@@ -229,7 +229,7 @@ $field: "input:not([type='checkbox'], [type='radio'], [type='range'], [type='col
 
 // Fields.
 :where(#{$field}) {
-  min-height: 2.5rem;
+  min-height: var(--control-size);
   padding: var(--space-1) var(--space-2);
   border: 1px solid var(--color-moss);
   border-radius: var(--radius-md);
@@ -438,7 +438,7 @@ $field: "input:not([type='checkbox'], [type='radio'], [type='range'], [type='col
 // text, which no gap can reach.
 :where(input[type='file'])::file-selector-button,
 :where(input[type='button'], input[type='submit'], input[type='reset']) {
-  min-height: 2.5rem;
+  min-height: var(--control-size);
   padding: var(--space-1) var(--space-3);
   border: 1px solid var(--color-moss);
   border-radius: var(--radius-md);

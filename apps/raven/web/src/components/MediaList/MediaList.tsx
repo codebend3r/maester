@@ -132,12 +132,10 @@ const COLUMNS: Record<Column, SortColumn<MediaItem>> = {
  */
 export const MediaList = ({
   items,
-  busy = false,
   movies = false,
   matchType = null,
 }: {
   items: MediaItem[]
-  busy?: boolean
   /** A Movies library: titles open the movie's page, and the year and ratings get columns. */
   movies?: boolean
   /** What the library matches its files to, for the menu's Fix match. */
@@ -150,7 +148,7 @@ export const MediaList = ({
     </SortHeader>
   )
   return (
-    <table className={styles.table} aria-label="Videos" aria-busy={busy}>
+    <table className={styles.table} aria-label="Videos">
       <thead>
         <tr>
           {header('title', 'Title')}

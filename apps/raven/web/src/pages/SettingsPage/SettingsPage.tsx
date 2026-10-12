@@ -11,10 +11,12 @@ import {
 import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react'
 import { Button } from '@/components/Button/Button'
 import { Icon, type IconName } from '@/components/Icon/Icon'
+import { Bone, Loading } from '@/components/Skeleton/Skeleton'
 import { api } from '@/lib/api'
+import { edit, useOptimisticMutation } from '@/lib/optimistic'
 import { plural } from '@/lib/plural'
 import { adminLockQuery, displaySettingsQuery, playbackSettingsQuery } from '@/lib/queries'
-import { queryKeys } from '@/lib/queryClient'
+import { mutationKeys, queryKeys } from '@/lib/queryClient'
 import styles from '@/pages/SettingsPage/SettingsPage.module.scss'
 
 /** Every value a setting takes, with its words; a value added in `@raven/core` cannot go unlabelled. */
@@ -138,15 +140,26 @@ const Setting = <V extends string | number>({
   )
 }
 
+/** `count` settings on their way: each a title over a choice or two. */
+const SettingsSkeleton = ({ count }: { count: number }) =>
+  Array.from({ length: count }, (_, index) => (
+    <span key={index} className={styles.choices}>
+      <Bone shape="text" width="short" />
+      <Bone shape="small" width="most" />
+      <Bone shape="small" width="half" />
+    </span>
+  ))
+
 /**
  * One source of settings: its heading and what it covers, why it could not
- * be read or saved, a line while it is read, and its settings once known.
+ * be read or saved, `shape` while it is read, and its settings once known.
  */
 const SettingsSection = <T,>({
   icon,
   title,
   hint,
   query,
+  shape,
   saveError,
   children,
 }: {
@@ -154,6 +167,7 @@ const SettingsSection = <T,>({
   title: string
   hint: string
   query: UseQueryResult<T>
+  shape: ReactNode
   saveError: Error | null
   children: (data: T) => ReactNode
 }) => {
@@ -175,7 +189,7 @@ const SettingsSection = <T,>({
         </p>
       )}
       {query.data !== undefined && children(query.data)}
-      {query.isPending && <p className={styles.hint}>Reading the settings</p>}
+      {query.isPending && <Loading label="Reading the settings">{shape}</Loading>}
     </section>
   )
 }
@@ -301,7 +315,11 @@ const AdminLockSection = () => {
           {failure.message}
         </p>
       )}
-      {lock.isPending && <p className={styles.hint}>Reading the admin lock</p>}
+      {lock.isPending && (
+        <Loading label="Reading the admin lock">
+          <SettingsSkeleton count={1} />
+        </Loading>
+      )}
       {current && (
         <label className={styles.choice}>
           <input
@@ -354,8 +372,9 @@ const AdminLockSection = () => {
 /**
  * `/settings`: how the server plays video, and how pages look, for every
  * viewer, then the admin lock at the foot, for this browser. Each change
- * saves on its own; Reset to defaults puts the server's settings back at
- * once, after a second click to be sure.
+ * shows at once and saves on its own behind it, put back if the save
+ * fails; Reset to defaults puts the server's settings back at once, after a
+ * second click to be sure.
  */
 export const SettingsPage = () => {
   const titleId = useId()
@@ -363,13 +382,29 @@ export const SettingsPage = () => {
   const [isConfirming, setConfirming] = useState(false)
   const playback = useQuery(playbackSettingsQuery)
   const display = useQuery(displaySettingsQuery)
-  const save = useMutation({
+  const save = useOptimisticMutation({
+    mutationKey: mutationKeys.playbackSettings,
     mutationFn: (change: Partial<PlaybackSettings>) => api.setPlaybackSettings(change),
-    onSuccess: (updated) => queryClient.setQueryData(queryKeys.playbackSettings, updated),
+    edits: (change) => [
+      edit({
+        queryKey: playbackSettingsQuery.queryKey,
+        update: (state) => ({ ...state, settings: { ...state.settings, ...change } }),
+      }),
+    ],
+    settle: () =>
+      queryClient.invalidateQueries({ queryKey: queryKeys.playbackSettings, exact: true }),
   })
-  const saveDisplay = useMutation({
+  const saveDisplay = useOptimisticMutation({
+    mutationKey: mutationKeys.displaySettings,
     mutationFn: (change: Partial<DisplaySettings>) => api.setDisplaySettings(change),
-    onSuccess: (updated) => queryClient.setQueryData(queryKeys.displaySettings, updated),
+    edits: (change) => [
+      edit({
+        queryKey: displaySettingsQuery.queryKey,
+        update: (shown) => ({ ...shown, ...change }),
+      }),
+    ],
+    settle: () =>
+      queryClient.invalidateQueries({ queryKey: queryKeys.displaySettings, exact: true }),
   })
   const reset = useMutation({
     mutationFn: () =>
@@ -441,7 +476,8 @@ export const SettingsPage = () => {
         title="Playback"
         hint="How the server plays video, for every viewer. A change takes effect on the next play."
         query={playback}
-        saveError={save.error}
+        shape={<SettingsSkeleton count={Object.keys(DEFAULT_PLAYBACK_SETTINGS).length} />}
+        saveError={save.failure}
       >
         {({ settings: current, effective }) => (
           <>
@@ -451,7 +487,7 @@ export const SettingsPage = () => {
               label="Play the original file"
               choices={DIRECT_PLAY}
               value={current.directPlay}
-              disabled={busy}
+              disabled={reset.isPending}
               onChange={(directPlay) => save.mutate({ directPlay })}
             />
             <Setting
@@ -460,7 +496,7 @@ export const SettingsPage = () => {
               label="Server conversion"
               choices={TRANSCODING}
               value={current.transcoding}
-              disabled={busy}
+              disabled={reset.isPending}
               onChange={(transcoding) => save.mutate({ transcoding })}
             />
             <Setting
@@ -469,7 +505,7 @@ export const SettingsPage = () => {
               label="Transcode size"
               choices={MAX_HEIGHT}
               value={current.maxHeight}
-              disabled={busy}
+              disabled={reset.isPending}
               onChange={(maxHeight) => save.mutate({ maxHeight })}
             />
             <Setting
@@ -478,7 +514,7 @@ export const SettingsPage = () => {
               label="Transcode quality"
               choices={QUALITY}
               value={current.quality}
-              disabled={busy}
+              disabled={reset.isPending}
               onChange={(quality) => save.mutate({ quality })}
             />
             <Setting
@@ -487,13 +523,13 @@ export const SettingsPage = () => {
               label="Hardware acceleration"
               choices={HW_ACCEL}
               value={current.hwAccel}
-              disabled={busy}
+              disabled={reset.isPending}
               onChange={(hwAccel) => save.mutate({ hwAccel })}
             />
             <p className={styles.hint}>
               Transcodes encode with {ENCODER_NAMES[effective.encoder]} right now.
             </p>
-            <fieldset className={styles.setting} disabled={busy}>
+            <fieldset className={styles.setting} disabled={reset.isPending}>
               <legend className={styles.legend}>
                 <Titled icon="sun">HDR</Titled>
               </legend>
@@ -519,7 +555,8 @@ export const SettingsPage = () => {
         title="Display"
         hint="How pages look, for every viewer."
         query={display}
-        saveError={saveDisplay.error}
+        shape={<SettingsSkeleton count={Object.keys(DEFAULT_DISPLAY_SETTINGS).length} />}
+        saveError={saveDisplay.failure}
       >
         {(shown) => (
           <Setting
@@ -528,7 +565,7 @@ export const SettingsPage = () => {
             values={DISPLAY_CHOICES.titles}
             choices={TITLES}
             value={shown.titles}
-            disabled={busy}
+            disabled={reset.isPending}
             onChange={(titles) => saveDisplay.mutate({ titles })}
           />
         )}

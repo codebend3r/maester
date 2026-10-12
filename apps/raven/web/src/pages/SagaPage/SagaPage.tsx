@@ -2,9 +2,9 @@ import { useQuery } from '@tanstack/react-query'
 import { type Library, sagaBackdrop } from '@raven/core'
 import { useId } from 'react'
 import { useParams } from 'react-router-dom'
-import { ItemHeader } from '@/components/ItemHeader/ItemHeader'
+import { ItemHeader, ItemHeaderSkeleton } from '@/components/ItemHeader/ItemHeader'
 import { LockedLibrary } from '@/components/LockedLibrary/LockedLibrary'
-import { MediaGrid } from '@/components/MediaGrid/MediaGrid'
+import { MediaGrid, MediaGridSkeleton } from '@/components/MediaGrid/MediaGrid'
 import { RouteState } from '@/components/RouteState/RouteState'
 import { api } from '@/lib/api'
 import { useLibraryLock } from '@/lib/libraryLock'
@@ -12,7 +12,16 @@ import { libraryQuery, sagasQuery } from '@/lib/queries'
 import { routeState, useRouteId } from '@/lib/routeQuery'
 import { sagaFacts, sagaRuntime } from '@/lib/sagas'
 import { sectionPath } from '@/pages/LibraryPage/librarySections'
+import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
 import styles from '@/pages/SagaPage/SagaPage.module.scss'
+
+/** A saga on its way: its title and facts over a grid of posters. */
+const SagaSkeleton = () => (
+  <>
+    <ItemHeaderSkeleton picture="none" />
+    <MediaGridSkeleton posters count={6} />
+  </>
+)
 
 /** The saga once its library is known and open to this browser. */
 const SagaView = ({ library, sagaId }: { library: Library; sagaId: string }) => {
@@ -25,8 +34,9 @@ const SagaView = ({ library, sagaId }: { library: Library; sagaId: string }) => 
       error: sagas.error,
     },
   })
-  if (page.state !== 'ready') return <RouteState state={page} noun="saga" />
-  if (page.data == null) return <RouteState state={{ state: 'missing' }} noun="saga" />
+  if (page.state !== 'ready')
+    return <RouteState state={page} noun="saga" shape={<SagaSkeleton />} />
+  if (page.data == null) return <NotFoundPage />
   const saga = page.data
   const runtime = sagaRuntime(saga)
   const backdrop = sagaBackdrop(saga)
@@ -67,7 +77,8 @@ export const SagaPage = () => {
   const library = useQuery(libraryQuery(libraryId))
   const lock = useLibraryLock(library.data)
   const page = routeState({ id: libraryId, query: library })
-  if (page.state !== 'ready') return <RouteState state={page} noun="saga" />
+  if (page.state !== 'ready')
+    return <RouteState state={page} noun="saga" shape={<SagaSkeleton />} />
   switch (lock.state) {
     case 'checking':
       return null

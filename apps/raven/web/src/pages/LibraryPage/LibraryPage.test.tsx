@@ -5,7 +5,9 @@ import type { Library, LibraryInput, LibrarySettings, MediaItem, MediaSort } fro
 import { api } from '@/lib/api'
 import { useUnlockPrompt } from '@/stores/unlockPrompt'
 import { library, mediaItem, showEntry } from '@/test/fixtures'
+import { held } from '@/test/held'
 import { renderLibraryPage } from '@/test/libraryPage'
+import { pollFast } from '@/test/polls'
 
 const WIDE = mediaItem({ id: 1, title: 'Wide', width: 3840, height: 2160 })
 const FULL = mediaItem({ id: 2, title: 'Full', width: 1920, height: 1080 })
@@ -61,6 +63,29 @@ describe('LibraryPage', () => {
     spies.lock.mockReset()
     state.sent = []
     state.listed = []
+  })
+
+  it('opens on what the libraries list knows while the library itself is read', async () => {
+    spies.get.mockImplementation(() => held<Library>().promise)
+    spies.list.mockImplementation(() => held<MediaItem[]>().promise)
+    renderLibraryPage({ libraries: [library({ id: 2, name: 'Films' })] })
+    expect(await screen.findByRole('heading', { level: 1, name: 'Films' })).toBeInTheDocument()
+    expect(screen.getByText('Gathering the videos')).toBeInTheDocument()
+  })
+
+  it('stands in for the library while it is read, with nothing of it known yet', async () => {
+    spies.get.mockImplementation(() => held<Library>().promise)
+    renderLibraryPage()
+    expect(await screen.findByText('Opening the library')).toBeInTheDocument()
+  })
+
+  it('says why its videos could not be read', async () => {
+    spies.get.mockImplementation(async () => library({ id: 2 }))
+    spies.list.mockImplementation(async () => {
+      throw new Error('The server is away.')
+    })
+    renderLibraryPage()
+    expect(await screen.findByRole('alert')).toHaveTextContent('The server is away.')
   })
 
   it('opens in the view and sort the library was left in', async () => {
@@ -388,6 +413,7 @@ describe('LibraryPage for TV shows', () => {
   })
 
   it('reads the count of files not matched again once the matching pass settles', async () => {
+    pollFast()
     serve()
     await screen.findByText('TV shows · 12 videos · 1 not matched')
     // Match again sends the file back to pending, and the pass leaves it unmatched again.
@@ -408,10 +434,8 @@ describe('LibraryPage for TV shows', () => {
     await userEvent.click(button)
     expect(await screen.findByText('TV shows · 12 videos')).toBeInTheDocument()
     // The listing polls while a file is pending; once none is, the library is read again.
-    expect(
-      await screen.findByText('TV shows · 12 videos · 1 not matched', {}, { timeout: 5000 }),
-    ).toBeInTheDocument()
-  }, 10_000)
+    expect(await screen.findByText('TV shows · 12 videos · 1 not matched')).toBeInTheDocument()
+  })
 
   it('lays the shows out as a list when asked, each row playable', async () => {
     serve({ view: 'list' })

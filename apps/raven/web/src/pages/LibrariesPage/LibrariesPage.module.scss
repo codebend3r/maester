@@ -30,6 +30,14 @@
   border-bottom: 1px solid var(--color-moss);
 }
 
+// A library on its way: a line for its name over one for its counts.
+.rowSkeleton {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-4) 0;
+  border-bottom: 1px solid var(--color-moss);
+}
+
 .backdrop,
 .details {
   grid-area: row;

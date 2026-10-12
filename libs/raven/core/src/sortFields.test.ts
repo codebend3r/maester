@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { MEDIA_SORTS, isSortFieldName } from '@/contract'
+import { describe, expect, it } from 'bun:test'
+import { MEDIA_SORTS, type MediaSort, isSortFieldName } from '@/contract'
 import { sortFieldsFor } from '@/libraryKinds'
 import { reversedDirection, reversedSort, sortOf, sortParts, startingSort } from '@/sortFields'
 
@@ -13,27 +13,26 @@ describe('sort fields', () => {
 
   it('names every sort once, as one way a field runs', () => {
     expect(MEDIA_SORTS).toHaveLength(new Set(MEDIA_SORTS).size)
-    expect(MEDIA_SORTS.toSorted()).toEqual(
-      [
-        'title',
-        'title-desc',
-        'added',
-        'oldest',
-        'changed',
-        'changed-old',
-        'largest',
-        'smallest',
-        'bitrate-high',
-        'bitrate-low',
-        'resolution-high',
-        'resolution-low',
-        'year-new',
-        'year-old',
-        'rating-high',
-        'rating-low',
-        'random',
-      ].toSorted(),
-    )
+    const named: MediaSort[] = [
+      'title',
+      'title-desc',
+      'added',
+      'oldest',
+      'changed',
+      'changed-old',
+      'largest',
+      'smallest',
+      'bitrate-high',
+      'bitrate-low',
+      'resolution-high',
+      'resolution-low',
+      'year-new',
+      'year-old',
+      'rating-high',
+      'rating-low',
+      'random',
+    ]
+    expect(MEDIA_SORTS.toSorted()).toEqual(named.toSorted())
   })
 
   it('runs titles A to Z first, and the rest newest, biggest or best first', () => {
