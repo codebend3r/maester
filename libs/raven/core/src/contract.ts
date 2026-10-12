@@ -854,6 +854,22 @@ export const isLockState = object({
 
 export type LockState = Infer<typeof isLockState>
 
+/**
+ * The admin lock, as it stands for this browser. It is on until the admin
+ * password is entered here, and while it is, locked libraries are left out
+ * altogether, no video can be deleted, and no file's path is handed out.
+ * `available` once the server has a strong `ADMIN_PASSWORD`, so it can be
+ * turned off. Turned back on, it waits `remainingMs` (counted from this
+ * answer) before it holds, and until then it goes off again with no password.
+ */
+export const isAdminLock = union(
+  object({ state: oneOf(['on']), available: isBoolean }),
+  object({ state: oneOf(['turningOn']), remainingMs: isNumber }),
+  object({ state: oneOf(['off']) }),
+)
+
+export type AdminLock = Infer<typeof isAdminLock>
+
 /** Where a video's file lives, as the server sees it (a container path under Docker). */
 export const isMediaLocation = object({
   path: isString,
@@ -990,6 +1006,13 @@ export const isUnlockRequest = object({
 })
 
 export type UnlockRequest = Infer<typeof isUnlockRequest>
+
+/** `POST /api/admin/unlock`: the admin password, which turns the admin lock off in this browser. */
+export const isAdminUnlockRequest = object({
+  password: isString,
+})
+
+export type AdminUnlockRequest = Infer<typeof isAdminUnlockRequest>
 
 /** `PUT /api/media/:id/match`: a TMDB id for Fix match, or null for a file that is not one at all. */
 export const isMatchChoice = object({

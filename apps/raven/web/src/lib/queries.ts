@@ -189,6 +189,20 @@ export const browseQuery = (path: string | null) =>
 
 export const lockQuery = queryOptions({ queryKey: queryKeys.lock, queryFn: () => api.getLock() })
 
+/** A moment past when a lock on its way is due, so the server holds it by the time it is asked. */
+const PAST_DUE_MS = 250
+
+/** Read again once a lock on its way holds, so every page can follow it. */
+export const adminLockQuery = queryOptions({
+  queryKey: queryKeys.adminLock,
+  queryFn: () => api.getAdminLock(),
+  staleTime: 60_000,
+  refetchInterval: (query) => {
+    const lock = query.state.data
+    return lock?.state === 'turningOn' ? lock.remainingMs + PAST_DUE_MS : false
+  },
+})
+
 export const metadataHealthQuery = queryOptions({
   queryKey: queryKeys.metadataHealth,
   queryFn: () => api.getMetadataHealth(),

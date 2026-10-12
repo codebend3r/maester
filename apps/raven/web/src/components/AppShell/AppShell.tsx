@@ -7,6 +7,7 @@ import { Icon } from '@/components/Icon/Icon'
 import { LibraryIcon } from '@/components/LibraryIcon/LibraryIcon'
 import { Logo } from '@/components/Logo/Logo'
 import { PageBackdrop } from '@/components/PageBackdrop/PageBackdrop'
+import { useFollowAdminLock } from '@/lib/adminLock'
 import { useKeyShortcut } from '@/lib/keyboard'
 import { librariesQuery } from '@/lib/queries'
 import { useScrollReset } from '@/lib/useScrollReset'
@@ -83,7 +84,7 @@ const ShortcutTip = ({ onDismiss }: { onDismiss: () => void }) => (
  * stays that way across visits; expanded on a wide screen, it shows raven's
  * version beside the toggle. While a card's picture is behind the page, the
  * menu frosts over it. While the frame is open, what the pages show follows
- * the server's changes. The player leaves the frame behind for the
+ * the server's changes, and the admin lock coming on or going off. The player leaves the frame behind for the
  * whole screen.
  */
 export const AppShell = () => {
@@ -99,6 +100,7 @@ export const AppShell = () => {
 
   useKeyShortcut({ key: 'b', onPress: toggle })
   useServerEvents()
+  useFollowAdminLock()
   useScrollReset()
 
   return (

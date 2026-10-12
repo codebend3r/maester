@@ -1,5 +1,6 @@
 import { type UseQueryResult, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  type AdminLock,
   DEFAULT_DISPLAY_SETTINGS,
   DEFAULT_PLAYBACK_SETTINGS,
   DISPLAY_CHOICES,
@@ -7,11 +8,12 @@ import {
   PLAYBACK_CHOICES,
   type PlaybackSettings,
 } from '@raven/core'
-import { type ReactNode, useId, useState } from 'react'
+import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react'
 import { Button } from '@/components/Button/Button'
 import { Icon, type IconName } from '@/components/Icon/Icon'
 import { api } from '@/lib/api'
-import { displaySettingsQuery, playbackSettingsQuery } from '@/lib/queries'
+import { plural } from '@/lib/plural'
+import { adminLockQuery, displaySettingsQuery, playbackSettingsQuery } from '@/lib/queries'
 import { queryKeys } from '@/lib/queryClient'
 import styles from '@/pages/SettingsPage/SettingsPage.module.scss'
 
@@ -178,10 +180,182 @@ const SettingsSection = <T,>({
   )
 }
 
+/** Whole seconds until `deadline`, counted down as they pass. */
+const Countdown = ({ deadline }: { deadline: number }) => {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1_000)
+    return () => window.clearInterval(timer)
+  }, [])
+  const seconds = Math.max(0, Math.ceil((deadline - now) / 1_000))
+  return plural({ n: seconds, one: 'second', many: 'seconds' })
+}
+
+/** What the admin lock's toggle says under it; `readAt` is when the lock was read, its countdown's start. */
+const AdminLockHint = ({ lock, readAt }: { lock: AdminLock; readAt: number }) => {
+  switch (lock.state) {
+    case 'on':
+      return lock.available ? (
+        'Turning it off asks for the admin password.'
+      ) : (
+        <>
+          Set <code>ADMIN_PASSWORD</code> in raven's <code>.env</code> to turn it off.
+        </>
+      )
+    case 'turningOn':
+      return (
+        <>
+          Turns on in <Countdown deadline={readAt + lock.remainingMs} />. Until then, turning it off
+          needs no password.
+        </>
+      )
+    case 'off':
+      return 'Off in this browser, until it is turned on, 12 hours pass or the server restarts. Turned on, it waits a moment first, so a slip costs no password.'
+    default: {
+      const unknown: never = lock
+      return unknown
+    }
+  }
+}
+
+/**
+ * The admin lock, at the foot of the page. It holds in every browser until
+ * the admin password is entered there. Turned back on, it waits a moment
+ * before it holds, and unticked again in that moment it needs no password,
+ * so a slip of the finger costs nothing.
+ */
+const AdminLockSection = () => {
+  const headingId = useId()
+  const passwordId = useId()
+  const queryClient = useQueryClient()
+  const lock = useQuery(adminLockQuery)
+  const current = lock.data
+  const [isAsking, setAsking] = useState(false)
+  const [password, setPassword] = useState('')
+  const passwordInput = useRef<HTMLInputElement>(null)
+  const settle = (next: AdminLock) => queryClient.setQueryData(queryKeys.adminLock, next)
+  const unlock = useMutation({
+    mutationFn: (entered: string) => api.unlockAdmin(entered),
+    onSuccess: (next) => {
+      settle(next)
+      setAsking(false)
+    },
+    onSettled: () => setPassword(''),
+  })
+  const turnOn = useMutation({ mutationFn: () => api.lockAdmin(), onSuccess: settle })
+  const keepOff = useMutation({
+    mutationFn: () => api.keepAdminUnlocked(),
+    onSuccess: settle,
+    // Too late, it holds already: read again, it asks for the password.
+    onError: () => queryClient.invalidateQueries({ queryKey: queryKeys.adminLock }),
+  })
+  const busy = unlock.isPending || turnOn.isPending || keepOff.isPending
+  const failure = turnOn.error ?? keepOff.error
+  const isAskingNow = isAsking && current?.state === 'on'
+
+  useEffect(() => {
+    if (isAskingNow) passwordInput.current?.focus()
+  }, [isAskingNow])
+
+  const toggle = ({ from, checked }: { from: AdminLock; checked: boolean }): void => {
+    switch (from.state) {
+      case 'on':
+        unlock.reset()
+        setAsking(!checked)
+        return
+      case 'turningOn':
+        if (!checked) keepOff.mutate()
+        return
+      case 'off':
+        if (checked) turnOn.mutate()
+        return
+      default: {
+        const unknown: never = from
+        return unknown
+      }
+    }
+  }
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault()
+    unlock.mutate(password)
+  }
+
+  return (
+    <section className={styles.section} aria-labelledby={headingId}>
+      <h2 id={headingId} className={styles.heading}>
+        <Titled icon="lock">Admin</Titled>
+      </h2>
+      <p className={styles.hint}>
+        On in every browser until the admin password is entered there. While it is on, locked
+        libraries are hidden altogether, so nothing asks for their PIN, and no video can be deleted
+        or have its file's path shown.
+      </p>
+      {lock.isError && (
+        <p className={styles.error} role="alert">
+          {lock.error.message}
+        </p>
+      )}
+      {failure && (
+        <p className={styles.error} role="alert">
+          {failure.message}
+        </p>
+      )}
+      {lock.isPending && <p className={styles.hint}>Reading the admin lock</p>}
+      {current && (
+        <label className={styles.choice}>
+          <input
+            type="checkbox"
+            checked={current.state !== 'off' && !isAskingNow}
+            disabled={busy || (current.state === 'on' && !current.available)}
+            onChange={(event) => toggle({ from: current, checked: event.target.checked })}
+          />
+          <span className={styles.choiceLabel}>Admin lock</span>
+          <span className={styles.choiceHint}>
+            <AdminLockHint lock={current} readAt={lock.dataUpdatedAt} />
+          </span>
+        </label>
+      )}
+      {isAskingNow && (
+        <form className={styles.password} onSubmit={submit}>
+          <label htmlFor={passwordId} className={styles.passwordLabel}>
+            Admin password
+          </label>
+          <input
+            ref={passwordInput}
+            id={passwordId}
+            type="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+          />
+          {unlock.isError && (
+            <p role="alert" className={styles.error}>
+              {unlock.error.message}
+            </p>
+          )}
+          <div className={styles.actions}>
+            <Button onClick={() => setAsking(false)}>Cancel</Button>
+            <Button
+              type="submit"
+              tone="primary"
+              icon="unlock"
+              disabled={password === '' || unlock.isPending}
+            >
+              Turn off
+            </Button>
+          </div>
+        </form>
+      )}
+    </section>
+  )
+}
+
 /**
  * `/settings`: how the server plays video, and how pages look, for every
- * viewer. Each change saves on its own; Reset to defaults puts them all
- * back at once, after a second click to be sure.
+ * viewer, then the admin lock at the foot, for this browser. Each change
+ * saves on its own; Reset to defaults puts the server's settings back at
+ * once, after a second click to be sure.
  */
 export const SettingsPage = () => {
   const titleId = useId()
@@ -359,6 +533,7 @@ export const SettingsPage = () => {
           />
         )}
       </SettingsSection>
+      <AdminLockSection />
     </section>
   )
 }

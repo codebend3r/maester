@@ -1,5 +1,8 @@
 import { type DynamicModule, Module } from '@nestjs/common'
 import { APP_GUARD } from '@nestjs/core'
+import { AdminController } from '@/admin/adminController'
+import { AdminGuard } from '@/admin/adminGuard'
+import { AdminService } from '@/admin/adminService'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { DatabaseService } from '@/db/database'
 import { EventsController } from '@/events/eventsController'
@@ -60,6 +63,7 @@ export const CONTROLLERS = [
   SettingsController,
   EventsController,
   LockController,
+  AdminController,
 ] as const
 
 /** Folders stay still for 2 s before a refresh; a library that cannot be watched is scanned every 10 min. */
@@ -119,9 +123,12 @@ export class AppModule {
         MediaArtifacts,
         ScannerService,
         LibraryWatcher,
+        AdminService,
         LockService,
         // Every route passes the lock first; those marked PrivateBy, or on a controller that is, are held.
         { provide: APP_GUARD, useClass: LockGuard },
+        // Then the admin lock, which holds back the routes marked AdminOnly.
+        { provide: APP_GUARD, useClass: AdminGuard },
       ],
     }
   }

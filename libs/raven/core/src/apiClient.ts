@@ -1,4 +1,6 @@
 import {
+  type AdminLock,
+  type AdminUnlockRequest,
   type ChoosableImageKind,
   type DirectoryListing,
   type DisplaySettings,
@@ -39,6 +41,7 @@ import {
   type StreamMode,
   type SubtitleCue,
   type UnlockRequest,
+  isAdminLock,
   isDirectoryListing,
   isDisplaySettings,
   isDuplicates,
@@ -275,6 +278,31 @@ export const createApiClient = ({
     /** Closes the locked libraries again. */
     lock: (): Promise<LockState> =>
       expect({ request: send({ path: '/api/lock/lock', method: 'POST' }), guard: isLockState }),
+
+    getAdminLock: (): Promise<AdminLock> =>
+      expect({ request: send({ path: '/api/admin' }), guard: isAdminLock }),
+
+    /** Turns the admin lock off in this browser; a wrong password fails with the server's reason. */
+    unlockAdmin: (password: string): Promise<AdminLock> =>
+      expect({
+        request: send({
+          path: '/api/admin/unlock',
+          method: 'POST',
+          body: { password } satisfies AdminUnlockRequest,
+        }),
+        guard: isAdminLock,
+      }),
+
+    /** Turns the admin lock back on, after a short wait in which `keepAdminUnlocked` undoes it. */
+    lockAdmin: (): Promise<AdminLock> =>
+      expect({ request: send({ path: '/api/admin/lock', method: 'POST' }), guard: isAdminLock }),
+
+    /** Takes back a `lockAdmin` that has yet to hold, with no password; fails once it holds. */
+    keepAdminUnlocked: (): Promise<AdminLock> =>
+      expect({
+        request: send({ path: '/api/admin/keep-unlocked', method: 'POST' }),
+        guard: isAdminLock,
+      }),
 
     scanLibrary: (id: number): Promise<Library> =>
       expect({

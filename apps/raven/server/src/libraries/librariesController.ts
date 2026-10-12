@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Headers,
   HttpCode,
@@ -32,6 +33,7 @@ import {
   mediaListQuery,
   validateLibraryInput,
 } from '@raven/core'
+import { AdminService } from '@/admin/adminService'
 import { type LibraryRecord, LibrariesRepository, samePaths } from '@/libraries/librariesRepository'
 import { PrivateBy, Public } from '@/lock/lockGuard'
 import { LockService } from '@/lock/lockService'
@@ -82,13 +84,28 @@ export class LibrariesController {
     @Inject(MetadataService) private readonly metadata: MetadataService,
     @Inject(LibraryWatcher) private readonly watcher: LibraryWatcher,
     @Inject(LockService) private readonly lock: LockService,
+    @Inject(AdminService) private readonly admin: AdminService,
   ) {}
 
-  /** A library can only be locked behind a PIN that can open it again. */
-  private parseLockable(body: unknown): LibraryInput {
+  /**
+   * A library can only be locked behind a PIN that can open it again, and
+   * only locked with the admin lock off, as it then drops out of sight.
+   */
+  private parseLockable({
+    body,
+    cookie,
+    wasLocked,
+  }: {
+    body: unknown
+    cookie: string | undefined
+    wasLocked: boolean
+  }): LibraryInput {
     const input = parseInput(body)
     if (input.settings?.locked && !this.lock.available) {
       throw new BadRequestException("Set LIBRARY_PIN in raven's .env to lock a library.")
+    }
+    if (input.settings?.locked && !wasLocked && this.admin.isLocked({ cookie })) {
+      throw new ForbiddenException('Turn the admin lock off in Settings to lock a library.')
     }
     return input
   }
@@ -119,33 +136,38 @@ export class LibrariesController {
     return record
   }
 
+  /** Every library, but a locked one while the admin lock holds. */
   @Public()
   @Get()
   list(@Headers('cookie') cookie: string | undefined): Library[] {
     const viewer = this.lock.viewer({ cookie })
     return this.libraries
       .list()
+      .filter((record) => viewer.listsLibrary(record.id))
       .map((record) => this.withStatus({ record, canSee: viewer.seesLibrary(record.id) }))
   }
 
-  /** Every library shows in the side menu, locked or not, so its own settings do too. */
+  /**
+   * Every library shows in the side menu, locked or not, so its own settings
+   * do too; while the admin lock holds, a locked one is not there at all.
+   */
   @Public()
   @Get(':id')
   get(
     @Param('id', ParseIntPipe) id: number,
     @Headers('cookie') cookie: string | undefined,
   ): Library {
-    return this.withStatus({
-      record: this.find(id),
-      canSee: this.lock.viewer({ cookie }).seesLibrary(id),
-    })
+    const record = this.find(id)
+    const viewer = this.lock.viewer({ cookie })
+    if (!viewer.listsLibrary(id)) throw new NotFoundException(`No library ${id}`)
+    return this.withStatus({ record, canSee: viewer.seesLibrary(id) })
   }
 
   /** Creating a library starts its first scan; the response already reports it as scanning. */
   @Public()
   @Post()
-  create(@Body() body: unknown): Library {
-    const record = this.libraries.create(this.parseLockable(body))
+  create(@Body() body: unknown, @Headers('cookie') cookie: string | undefined): Library {
+    const record = this.libraries.create(this.parseLockable({ body, cookie, wasLocked: false }))
     this.scanner.scan(record.id)
     this.watcher.sync()
     return this.withStatus({ record, canSee: true })
@@ -158,9 +180,13 @@ export class LibrariesController {
    * as it is.
    */
   @Put(':id')
-  update(@Param('id', ParseIntPipe) id: number, @Body() body: unknown): Library {
-    const input = this.parseLockable(body)
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: unknown,
+    @Headers('cookie') cookie: string | undefined,
+  ): Library {
     const before = this.find(id)
+    const input = this.parseLockable({ body, cookie, wasLocked: before.settings.locked })
     const record = this.libraries.update({ id, input })
     if (!record) throw new NotFoundException(`No library ${id}`)
     if (matchTypeFor(before.settings.kind) !== matchTypeFor(record.settings.kind)) {

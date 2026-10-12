@@ -96,6 +96,8 @@ export const queryKeys = {
   itemMetadata: (id: number) => ['items', id, 'metadata'],
   /** Whether locked libraries can be opened, and are, in this browser. */
   lock: ['lock'],
+  /** Whether the admin lock holds in this browser. */
+  adminLock: ['admin'],
   /** How the server plays video, for every viewer. */
   playbackSettings: ['settings', 'playback'],
   displaySettings: ['settings', 'display'],

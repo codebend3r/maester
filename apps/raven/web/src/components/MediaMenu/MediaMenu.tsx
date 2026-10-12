@@ -13,6 +13,7 @@ import { Button } from '@/components/Button/Button'
 import { FixMatchDialog } from '@/components/FixMatchDialog/FixMatchDialog'
 import { Icon, type IconName } from '@/components/Icon/Icon'
 import { ImageEditorDialog } from '@/components/ImageEditor/ImageEditorDialog'
+import { useAdminLocked } from '@/lib/adminLock'
 import { api } from '@/lib/api'
 import { copyText } from '@/lib/clipboard'
 import { mediaLocationQuery } from '@/lib/queries'
@@ -189,6 +190,7 @@ const MenuBody = ({
   const [fixing, setFixing] = useState(false)
   const [editingImages, setEditingImages] = useState(false)
   const { favourite, remove, refresh } = useMediaMutations({ media })
+  const isAdminLocked = useAdminLocked()
   const matchable = matchType != null && media.match !== 'off'
   const item = media.item
   const artwork = artworkOf(item)
@@ -285,15 +287,17 @@ const MenuBody = ({
               }}
             />
           )}
-          <MenuItem
-            icon="trash"
-            label="Delete"
-            onClick={() => {
-              close({ refocus: false })
-              setConfirming(true)
-            }}
-          />
-          <LocationItem media={media} />
+          {!isAdminLocked && (
+            <MenuItem
+              icon="trash"
+              label="Delete"
+              onClick={() => {
+                close({ refocus: false })
+                setConfirming(true)
+              }}
+            />
+          )}
+          {!isAdminLocked && <LocationItem media={media} />}
         </ul>
       )}
 
@@ -347,8 +351,8 @@ const MenuBody = ({
 /**
  * A card's context menu: mark or unmark a favourite, fix the match or fetch
  * the details again where the library matches its files, change the
- * pictures of its movie or show, delete the video, or see and copy where its
- * file lives. The card owns `open`, so a right
+ * pictures of its movie or show, and, with the admin lock off, delete the
+ * video or see and copy where its file lives. The card owns `open`, so a right
  * click anywhere on it opens this same menu; the button here is the
  * discoverable way in for touch and keyboard. Until it first opens it is
  * only that button.
