@@ -45,11 +45,14 @@ export const primaryVersion = (versions: readonly MediaItem[]): MediaItem | unde
 /**
  * The title a card shows, and the year beneath it. An episode's title alone
  * says little on a poster, so it comes with its show and number, and no year.
+ * A movie split onto several cards names each card's cut or release after
+ * the title: `Alexander (Revisited the Final Cut)`.
  */
 export const cardTitle = (media: MediaItem): { title: string; year: number | null } => {
   if (!media.item) return { title: media.title, year: media.year }
   if (media.item.type === 'episode') return { title: itemLabel(media.item), year: null }
-  return { title: media.item.title, year: media.item.year }
+  const title = media.variant == null ? media.item.title : `${media.item.title} (${media.variant})`
+  return { title, year: media.item.year }
 }
 
 /** The score a card shows: the library's chosen source, else TMDB's, else none. */

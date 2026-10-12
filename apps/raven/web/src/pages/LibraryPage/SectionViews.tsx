@@ -9,6 +9,7 @@ import {
 import { type ReactNode, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ButtonLink } from '@/components/Button/Button'
+import { Duplicates } from '@/components/Duplicates/Duplicates'
 import { JumpPicker } from '@/components/JumpPicker/JumpPicker'
 import { LibraryToolbar } from '@/components/LibraryToolbar/LibraryToolbar'
 import { MediaGrid } from '@/components/MediaGrid/MediaGrid'
@@ -18,6 +19,7 @@ import { finishedNote } from '@/lib/history'
 import { watchLink } from '@/lib/itemLinks'
 import { jumpScale } from '@/lib/jumpScale'
 import {
+  duplicatesQuery,
   historyQuery,
   inProgressQuery,
   libraryFavouritesQuery,
@@ -264,6 +266,21 @@ const NotMatchedSection = ({ library }: { library: Library }) => {
   )
 }
 
+/**
+ * The movies holding more than one file on their card, each to split
+ * apart, and the movies already split, each to put back together.
+ */
+const DuplicatesSection = ({ library }: { library: Library }) => {
+  const query = useQuery(duplicatesQuery(library.id))
+  return (
+    <SectionBody
+      query={query}
+      empty={whenEmpty(`No movie in ${library.name} has more than one file.`)}
+    >
+      {(listing) => <Duplicates library={library} listing={listing} />}
+    </SectionBody>
+  )
+}
 
 /** What was watched to the end most recently, with a way to the whole history. */
 const FinishedSection = ({ library }: { library: Library }) => {
@@ -309,6 +326,7 @@ const SECTION_VIEWS = {
   favourites: FavouritesSection,
   sagas: SagasSection,
   'not-matched': NotMatchedSection,
+  duplicates: DuplicatesSection,
   finished: FinishedSection,
 } as const satisfies Record<LibrarySection, (props: { library: Library }) => ReactNode>
 

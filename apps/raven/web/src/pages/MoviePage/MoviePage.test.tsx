@@ -141,6 +141,32 @@ describe('MoviePage', () => {
     expect(screen.getByText('Watching 7')).toBeInTheDocument()
   })
 
+  it('plays the file a split card names', async () => {
+    const details = itemDetails({
+      versions: [
+        matchedMovie({ id: 8, width: 3840, height: 2160, fileName: 'Busboys 2160p.mkv' }),
+        matchedMovie({ id: 7 }),
+      ],
+    })
+    open({ details, route: '/movies/40?file=7' })
+    await userEvent.click(await screen.findByRole('link', { name: 'Play Busboys' }))
+    expect(await screen.findByText('Watching 7')).toBeInTheDocument()
+  })
+
+  it('plays the best file when the address names a file that is not the movie’s', async () => {
+    open({
+      details: itemDetails({
+        versions: [
+          matchedMovie({ id: 8, width: 3840, height: 2160, fileName: 'Busboys 2160p.mkv' }),
+          matchedMovie({ id: 7 }),
+        ],
+      }),
+      route: '/movies/40?file=99',
+    })
+    await userEvent.click(await screen.findByRole('link', { name: 'Play Busboys' }))
+    expect(await screen.findByText('Watching 8')).toBeInTheDocument()
+  })
+
   it("shows the title as the movie's logo", async () => {
     open({ details: itemDetails({ logoVersion: 'abc' }) })
     const heading = await screen.findByRole('heading', { level: 1, name: 'Busboys' })

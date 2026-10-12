@@ -22,6 +22,7 @@ import { MediaArtifacts } from '@/media/mediaArtifacts'
 import { MediaController } from '@/media/mediaController'
 import { MediaIndex } from '@/media/mediaIndex'
 import { MediaRepository } from '@/media/mediaRepository'
+import { MovieSplits } from '@/media/movieSplits'
 import { ViewingRepository } from '@/media/viewingRepository'
 import { ImageCache } from '@/metadata/imageCache'
 import { ItemImagesRepository } from '@/metadata/itemImagesRepository'
@@ -100,6 +101,7 @@ export class AppModule {
         MetadataRepository,
         ItemOverrides,
         MediaRepository,
+        MovieSplits,
         ViewingRepository,
         MediaIndex,
         MatchFiles,

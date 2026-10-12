@@ -38,6 +38,7 @@ const sample = (overrides: Partial<MediaItem> & Pick<MediaItem, 'id' | 'title'>)
   edition: null,
   item: null,
   versions: 1,
+  variant: null,
   ...overrides,
 })
 

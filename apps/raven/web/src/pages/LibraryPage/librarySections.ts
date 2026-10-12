@@ -11,6 +11,7 @@ export const LIBRARY_SECTIONS = [
   'favourites',
   'sagas',
   'not-matched',
+  'duplicates',
   'finished',
 ] as const
 
@@ -34,6 +35,7 @@ export const SECTIONS = {
   favourites: { label: 'Favourites', isFor: always },
   sagas: { label: 'Sagas', isFor: matchedToMovies },
   'not-matched': { label: 'Not matched', isFor: matched },
+  duplicates: { label: 'Duplicates', isFor: matchedToMovies },
   finished: { label: 'Recently finished', isFor: always },
 } as const satisfies Record<
   LibrarySection,

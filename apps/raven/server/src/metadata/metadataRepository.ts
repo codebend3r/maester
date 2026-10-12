@@ -724,14 +724,27 @@ export class MetadataRepository {
     )
   }
 
-  /** Points each file at its items, replacing whatever it pointed at. */
+  /**
+   * Points each file at its items, replacing whatever it pointed at. A file
+   * matched to another movie leaves its split behind, as that split was of
+   * the old movie's cards; one matched to the same item again keeps it.
+   */
   link({ mediaIds, itemIds }: { mediaIds: readonly number[]; itemIds: readonly number[] }): void {
     this.db.transaction(() => {
+      const unsplit = this.db.prepare<{ mediaId: number; itemIds: string }>(
+        `UPDATE media SET split = NULL
+          WHERE id = @mediaId AND split IS NOT NULL
+            AND NOT EXISTS (SELECT 1 FROM media_items
+                             WHERE media_id = @mediaId
+                               AND item_id IN (SELECT value FROM json_each(@itemIds)))`,
+      )
       const clear = this.db.prepare('DELETE FROM media_items WHERE media_id = ?')
       const insert = this.db.prepare(
         'INSERT OR IGNORE INTO media_items (media_id, item_id) VALUES (?, ?)',
       )
+      const linked = JSON.stringify(itemIds)
       mediaIds.forEach((mediaId) => {
+        unsplit.run({ mediaId, itemIds: linked })
         clear.run(mediaId)
         itemIds.forEach((itemId) => insert.run(mediaId, itemId))
       })
