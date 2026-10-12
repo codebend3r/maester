@@ -21,6 +21,13 @@
   color: var(--color-lichen);
 }
 
+// The poster grid a Movies library has.
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(10rem, 100%), 1fr));
+  gap: var(--space-4) var(--space-3);
+}
+
 .message {
   max-width: var(--measure);
   color: var(--color-lichen);

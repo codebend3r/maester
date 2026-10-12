@@ -185,6 +185,7 @@ describe('the media server', () => {
           { method: 'GET', url: `/api/media/${id}` },
           { method: 'PUT', url: `/api/media/${id}/favourite`, payload: { favourite: true } },
           { method: 'GET', url: '/api/favourites' },
+          { method: 'GET', url: '/api/home' },
         ].map(async ({ method, url, payload }) => {
           const response = await app().inject({
             method: isRouteMethod(method) ? method : 'GET',
@@ -503,7 +504,7 @@ describe('the media server', () => {
 
     describe('favourites', () => {
       const favouriteIds = async (): Promise<number[]> =>
-        (await api().listFavourites()).map((item) => item.id)
+        (await api().listFavourites()).map((entry) => entry.media.id)
 
       it('marks a video as a favourite and lists it', async () => {
         const [movie] = await listMedia(library.id)
@@ -516,7 +517,7 @@ describe('the media server', () => {
       it('lists the most recently marked first, and forgets one that is unmarked', async () => {
         const [movie, episode] = await listMedia(library.id)
         await api().setFavourite({ id: episode?.id ?? -1, favourite: true })
-        expect((await api().listFavourites()).map((item) => item.title)).toEqual([
+        expect((await api().listFavourites()).map((entry) => entry.media.title)).toEqual([
           'Show - S01E01',
           'Big Buck Test 2008',
         ])
@@ -537,6 +538,49 @@ describe('the media server', () => {
         await expect(api().setFavourite({ id: 999_999, favourite: true })).rejects.toMatchObject({
           status: 404,
         })
+      })
+    })
+
+    describe('home', () => {
+      const shelfOf = async (libraryId: number) =>
+        (await api().getHome()).shelves.find((shelf) => shelf.libraryId === libraryId)
+
+      it("shows what is in progress, then a pinned library's newest arrivals", async () => {
+        const [movie] = await listMedia(library.id)
+        const id = movie?.id ?? -1
+        await api().saveProgress({ id, position: 3 })
+        try {
+          const home = await api().getHome()
+          // A file matched to nothing has no poster to stand for it.
+          expect(
+            home.inProgress.map(({ media, poster }) => [media.id, media.position, poster]),
+          ).toEqual([[id, 3, null]])
+          expect(await shelfOf(library.id)).toEqual({
+            libraryId: library.id,
+            type: 'media',
+            media: await api().listMedia({ libraryId: library.id, sort: 'added' }),
+          })
+        } finally {
+          // Barely started again: the spot is cleared.
+          await api().saveProgress({ id, position: 0 })
+        }
+        expect((await api().getHome()).inProgress).toEqual([])
+      })
+
+      it('leaves out a library that is not pinned', async () => {
+        const input = { name: 'Everything', paths: paths() }
+        await api().updateLibrary({
+          id: library.id,
+          input: { ...input, settings: { pinned: false } },
+        })
+        try {
+          expect(await shelfOf(library.id)).toBeUndefined()
+        } finally {
+          await api().updateLibrary({
+            id: library.id,
+            input: { ...input, settings: { pinned: true } },
+          })
+        }
       })
     })
 
@@ -594,7 +638,9 @@ describe('the media server', () => {
         await expect(stat(thumbnail)).rejects.toThrow()
         await expect(api().getMedia(doomed.id)).rejects.toMatchObject({ status: 404 })
         await expect(api().deleteMedia(doomed.id)).rejects.toMatchObject({ status: 404 })
-        expect((await api().listFavourites()).map((item) => item.id)).not.toContain(doomed.id)
+        expect((await api().listFavourites()).map((entry) => entry.media.id)).not.toContain(
+          doomed.id,
+        )
         expect((await api().getLibrary(library.id)).itemCount).toBe(2)
       })
 
@@ -927,7 +973,7 @@ describe('a library locked behind the PIN', () => {
 
     await api(cookie).setFavourite({ id: state.privateVideo, favourite: true })
     const favourites = async (holding?: string) =>
-      (await api(holding).listFavourites()).map((item) => item.id)
+      (await api(holding).listFavourites()).map((entry) => entry.media.id)
     expect(await favourites(cookie)).toEqual([state.privateVideo])
     expect(await favourites()).toEqual([])
 
@@ -937,6 +983,23 @@ describe('a library locked behind the PIN', () => {
     await expect(
       api('raven_unlock=1.forged').listMedia({ libraryId: state.private }),
     ).rejects.toMatchObject({ status: 423 })
+  })
+
+  it('keeps a locked library off the home page until it is unlocked', async () => {
+    const { cookie } = await unlock('3001')
+    await api(cookie).saveProgress({ id: state.privateVideo, position: 1 })
+    const home = async (holding?: string) => {
+      const answer = await api(holding).getHome()
+      return {
+        inProgress: answer.inProgress.map((entry) => entry.media.id),
+        shelves: answer.shelves.map((shelf) => shelf.libraryId),
+      }
+    }
+    expect(await home(cookie)).toEqual({
+      inProgress: [state.privateVideo],
+      shelves: [state.open, state.private],
+    })
+    expect(await home()).toEqual({ inProgress: [], shelves: [state.open] })
   })
 
   it('refuses an unlock that sends no PIN, saying why', async () => {

@@ -77,6 +77,13 @@ const IMAGE_REFS = `
    WHERE kind = ? AND item_id IN (SELECT value FROM json_each(?))
    ORDER BY item_id, CASE source WHEN 'chosen' THEN 0 WHEN 'local' THEN 1 ELSE 2 END`
 
+/** An item and the two above it, where it has them: an episode's season and show. */
+type PosterLine = { id: number; parent: number | null; grandparent: number | null }
+
+/** The items a poster may come from, nearest first. */
+const lineOf = (line: PosterLine): number[] =>
+  [line.id, line.parent, line.grandparent].filter((id): id is number => id != null)
+
 /**
  * `under(root, id)`: each item `roots` selects (as `root, id` pairs of
  * itself), and every item beneath it. "A file somewhere under it" is then
@@ -598,6 +605,33 @@ export class MetadataRepository {
   }
 
   /** An item's page, apart from its files and children, which the caller adds. */
+  /**
+   * The item whose poster stands for each item: its own, else its parent's,
+   * else its grandparent's, so an episode shows its season's poster and a
+   * season without one its show's. An item with none up the line is left out.
+   */
+  posterItems(ids: readonly number[]): Map<number, ItemSummary> {
+    if (ids.length === 0) return new Map()
+    const lines = this.db
+      .prepare<[string], PosterLine>(
+        `SELECT i.id, p.id AS parent, g.id AS grandparent
+           FROM shown_items i
+           LEFT JOIN shown_items p ON p.id = i.parent_id
+           LEFT JOIN shown_items g ON g.id = p.parent_id
+          WHERE i.id IN (SELECT value FROM json_each(?))`,
+      )
+      .all(JSON.stringify([...new Set(ids)]))
+    const summaries = this.summaries(lines.flatMap(lineOf))
+    return new Map(
+      lines.flatMap((line): Array<[number, ItemSummary]> => {
+        const poster = lineOf(line)
+          .map((id) => summaries.get(id))
+          .find((summary) => summary?.posterVersion != null)
+        return poster ? [[line.id, poster]] : []
+      }),
+    )
+  }
+
   details(id: number): Omit<ItemDetails, 'versions' | 'children'> | null {
     const row = this.db.prepare<[number], ItemRow>('SELECT * FROM shown_items WHERE id = ?').get(id)
     const summary = this.summaries([id]).get(id)

@@ -1,12 +1,14 @@
 import {
   type MatchItemType,
   type MediaItem,
+  type MediaSort,
   cardTitle,
   codecLabel,
   formatBytes,
   formatRuntime,
   mediaLabel,
   resolutionLabel,
+  sortFact,
 } from '@raven/core'
 import { Link } from 'react-router-dom'
 import { FavouriteMark } from '@/components/FavouriteMark/FavouriteMark'
@@ -30,16 +32,19 @@ const MediaTile = ({
   note,
   posters,
   matchType,
+  sort,
 }: {
   media: MediaItem
   note: string | null
   posters: boolean
   matchType: MatchItemType | null
+  sort: MediaSort | undefined
 }) => {
   const menu = useCardMenu({ media, matchType, inline: true })
   const thumbnail = api.thumbnailUrl(media)
   const link = cardLink({ media, pages: posters })
   const { year } = cardTitle(media)
+  const sorted = sort ? sortFact({ media, sort }) : null
   const facts = [
     posters && year != null ? String(year) : null,
     posters && media.versions > 1 ? `${media.versions} versions` : null,
@@ -48,7 +53,7 @@ const MediaTile = ({
     media.hdr ? 'HDR' : null,
     media.videoCodec ? codecLabel(media.videoCodec) : null,
     formatBytes(media.size),
-  ].filter((fact): fact is string => fact != null)
+  ].filter((fact): fact is string => fact != null && fact !== sorted)
 
   return (
     <li
@@ -82,6 +87,7 @@ const MediaTile = ({
         <Link {...link} className={styles.title} onContextMenu={menu.onContextMenu}>
           {posters ? cardTitle(media).title : mediaLabel(media)}
         </Link>
+        {sorted && <span className={styles.sorted}>{sorted}</span>}
         <span className={styles.facts}>
           <FavouriteMark media={media} />
           {facts.map((fact) => (
@@ -93,7 +99,7 @@ const MediaTile = ({
         {media.folder !== '' && <span className={styles.folder}>{media.folder}</span>}
         {posters && media.match === 'unmatched' && <span className={styles.note}>Not matched</span>}
         {note !== null && <span className={styles.note}>{note}</span>}
-        <PlaybackNote media={media} />
+        <PlaybackNote media={media} place="card" />
       </div>
       {menu.menu}
     </li>
@@ -110,6 +116,7 @@ export const MediaTiles = ({
   note,
   posters = false,
   matchType = null,
+  sort,
 }: {
   items: MediaItem[]
   busy?: boolean
@@ -118,6 +125,8 @@ export const MediaTiles = ({
   posters?: boolean
   /** What the library matches its files to, for the menu's Fix match. */
   matchType?: MatchItemType | null
+  /** The order the listing is in, whose value each tile shows first. */
+  sort?: MediaSort
 }) => (
   <ul className={styles.tiles} aria-busy={busy}>
     {items.map((item) => (
@@ -127,6 +136,7 @@ export const MediaTiles = ({
         note={note ? note(item) : null}
         posters={posters}
         matchType={matchType}
+        sort={sort}
       />
     ))}
   </ul>

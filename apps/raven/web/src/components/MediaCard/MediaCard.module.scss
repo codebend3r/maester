@@ -24,6 +24,32 @@
   }
 }
 
+// A video with a page of its own splits the card: the picture plays it, and
+// the title opens the page.
+.split {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.picture {
+  border-radius: var(--radius-md);
+
+  &:hover .thumbnail,
+  &:focus-visible .thumbnail {
+    filter: brightness(1.12);
+  }
+}
+
+.titleLink {
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+}
+
 .frame {
   display: grid;
   grid-template-areas: 'frame';
@@ -59,6 +85,9 @@
 
 // Where playback stopped: the one red mark in the grid.
 .resume {
+  // Above the picture, whose hover filter paints it as a layer of its own.
+  position: relative;
+  z-index: 1;
   align-self: end;
   height: 4px;
 }
@@ -79,6 +108,14 @@
   justify-content: start;
   gap: var(--space-2);
   color: var(--color-lichen);
+  font-size: var(--font-size-xs);
+  font-stretch: 90%;
+}
+
+// The value the listing is sorted by: a line of its own above the facts, so
+// a long one ("Added 3 days ago") never squeezes them, and a shade brighter.
+.sorted {
+  color: var(--color-bark);
   font-size: var(--font-size-xs);
   font-stretch: 90%;
 }

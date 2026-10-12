@@ -7,6 +7,11 @@ import { renderWithProviders } from '@/test/render'
 const picture = (container: HTMLElement): HTMLImageElement | null => container.querySelector('img')
 
 describe('PosterCard', () => {
+  it('shows the value its listing is sorted by', () => {
+    renderWithProviders(<PosterCard media={matchedMovie()} sort="bitrate-high" />)
+    expect(screen.getByText('2.2 Mb/s')).toBeInTheDocument()
+  })
+
   it("opens a matched movie's page, plays from its button, and shows the year", () => {
     renderWithProviders(<PosterCard media={matchedMovie()} />)
     expect(screen.getByRole('link', { name: 'Busboys' })).toHaveAttribute('href', '/movies/40')

@@ -1,7 +1,8 @@
 import type { EpisodeSummary, ItemDetails, MediaItem, SeasonSummary } from '@raven/core'
 import { itemDetails, itemSummary, mediaItem } from '@/test/fixtures'
 
-const SEASON_ONE_CARD = itemSummary({
+/** Season 1 as a card: its poster stands for its episodes. */
+export const SEASON_ONE_CARD = itemSummary({
   id: 5,
   type: 'season',
   title: 'Season 1',

@@ -105,6 +105,23 @@ describe('listing a library', () => {
     expect(new Set(orders).size).toBeGreaterThan(1)
   })
 
+  it('stops at the limit, in sort order', () => {
+    expect(
+      media()
+        .list({ libraryId: state.libraryId, sort: 'added', limit: 2 })
+        .map((item) => item.title),
+    ).toEqual(['Delta', 'Alpha'])
+  })
+
+  it('deals a random order before it stops at the limit', () => {
+    const dealt = titles({ sort: 'random', seed: 7 })
+    expect(
+      media()
+        .list({ libraryId: state.libraryId, sort: 'random', seed: 7, limit: 2 })
+        .map((item) => item.title),
+    ).toEqual(dealt.slice(0, 2))
+  })
+
   it('reads several videos at once, in the order asked, leaving out ones that are gone', () => {
     const [alpha, bravo] = media().list({ libraryId: state.libraryId, sort: 'title' })
     const ids = [bravo?.id ?? -1, 999_999, alpha?.id ?? -1]
@@ -238,6 +255,14 @@ describe("listing a TV library's shows", () => {
     ])
   })
 
+  it('stops at the limit', () => {
+    expect(
+      media()
+        .listShows({ libraryId: state.libraryId, limit: 1 })
+        .map((entry) => entry.show.title),
+    ).toEqual(['Aired'])
+  })
+
   it("answers a show's next episode on its own too", () => {
     expect(fileName(media().nextEpisode(state.aired)?.id)).toBe('Aired - S01E02.mkv')
     expect(fileName(media().nextEpisode(state.special)?.id)).toBe('Special - S01E01.mkv')
@@ -252,5 +277,61 @@ describe("listing a TV library's shows", () => {
         .listShows({ libraryId: state.libraryId })
         .find((entry) => entry.show.id === state.aired)?.next,
     ).toBeNull()
+  })
+})
+
+describe('listing what is in progress', () => {
+  const database = testDatabase('raven-progress-')
+  const state = { libraryId: 0, ids: new Map<string, number>() }
+  const media = () => new MediaRepository(database.get(), new MetadataRepository(database.get()))
+  const titles = (): string[] =>
+    media()
+      .listInProgress()
+      .map((item) => item.title)
+
+  beforeAll(async () => {
+    await database.open()
+    const index = new MediaIndex(database.get())
+    state.libraryId = new LibrariesRepository(database.get()).create({
+      name: 'Test',
+      paths: ['/m'],
+    }).id
+    ;['Alpha', 'Bravo', 'Charlie', 'Delta'].forEach((name) => {
+      const id = index.insert({
+        libraryId: state.libraryId,
+        kind: 'other',
+        file: { path: `/m/${name}.mp4`, root: '/m', size: 100, mtimeMs: 1 },
+      })
+      index.saveProbe({ id, probe: PROBE, tracks: TRACKS })
+      state.ids.set(name, id)
+    })
+    const viewing = new ViewingRepository(database.get(), media())
+    const watch = ({ name, position, at }: { name: string; position: number; at: string }) =>
+      viewing.report({ id: state.ids.get(name) ?? -1, position, at: new Date(at) })
+    watch({ name: 'Alpha', position: 30, at: '2026-01-01T00:00:00.000Z' })
+    watch({ name: 'Bravo', position: 20, at: '2026-01-02T00:00:00.000Z' })
+    // Finished, and barely started: neither keeps a spot.
+    watch({ name: 'Charlie', position: 59, at: '2026-01-03T00:00:00.000Z' })
+    watch({ name: 'Delta', position: 1, at: '2026-01-04T00:00:00.000Z' })
+  })
+
+  afterAll(database.close)
+
+  it('lists every video with a saved spot, the most recently watched first', () => {
+    expect(titles()).toEqual(['Bravo', 'Alpha'])
+    expect(
+      media()
+        .listInProgress()
+        .map((item) => item.position),
+    ).toEqual([20, 30])
+  })
+
+  it('lists none from a library that saves no progress', () => {
+    const libraries = new LibrariesRepository(database.get())
+    libraries.update({
+      id: state.libraryId,
+      input: { name: 'Test', paths: ['/m'], settings: { saveProgress: false } },
+    })
+    expect(titles()).toEqual([])
   })
 })

@@ -24,6 +24,7 @@ export const afterMatch = (queryClient: QueryClient): Promise<unknown> =>
       { queryKey: queryKeys.items },
       { queryKey: queryKeys.favourites },
       { queryKey: queryKeys.allMedia },
+      { queryKey: queryKeys.home },
     ],
   })
 
@@ -38,10 +39,11 @@ export const afterLibrarySaved = (queryClient: QueryClient): Promise<unknown> =>
       { queryKey: queryKeys.libraries },
       { queryKey: queryKeys.allMedia },
       { queryKey: queryKeys.favourites },
+      { queryKey: queryKeys.home },
     ],
   })
 
-/** The player closed: resume lines on the grid, and the history, show where it stopped. */
+/** The player closed: resume lines on the grid and home, and the history, show where it stopped. */
 export const afterWatching = ({
   queryClient,
   libraryId,
@@ -54,6 +56,7 @@ export const afterWatching = ({
     filters: [
       { queryKey: queryKeys.mediaLists(libraryId) },
       { queryKey: queryKeys.histories(libraryId) },
+      { queryKey: queryKeys.home },
     ],
   })
 
@@ -76,6 +79,7 @@ export const afterItemEdited = ({
           part === 'images' ? queryKeys.itemImages(updated.id) : queryKeys.itemMetadata(updated.id),
       },
       { queryKey: queryKeys.libraries },
+      { queryKey: queryKeys.home },
     ],
   })
 }
@@ -95,6 +99,7 @@ export const afterLibraryEvent = ({
       { queryKey: queryKeys.libraries, exact: true },
       { queryKey: queryKeys.favourites },
       { queryKey: queryKeys.items },
+      { queryKey: queryKeys.home },
     ],
   })
 
@@ -106,10 +111,11 @@ export const afterReconnect = (queryClient: QueryClient): Promise<unknown> =>
       { queryKey: queryKeys.libraries },
       { queryKey: queryKeys.favourites },
       { queryKey: queryKeys.items },
+      { queryKey: queryKeys.home },
     ],
   })
 
-/** A matching pass finished: the library's count of files not matched changed. */
+/** A matching pass finished: the library's count of files not matched changed, and home's shows with it. */
 export const afterMatchingPass = ({
   queryClient,
   libraryId,
@@ -122,5 +128,6 @@ export const afterMatchingPass = ({
     filters: [
       { queryKey: queryKeys.library(libraryId), exact: true },
       { queryKey: queryKeys.libraries, exact: true },
+      { queryKey: queryKeys.home },
     ],
   })

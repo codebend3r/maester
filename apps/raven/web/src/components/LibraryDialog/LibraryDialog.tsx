@@ -75,7 +75,7 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
     onSuccess: async () => {
       await refresh()
       onClose()
-      navigate('/')
+      navigate('/libraries')
     },
     onError: (error) => setErrors([error.message]),
   })

@@ -157,10 +157,10 @@ describe('createApiClient', () => {
     expect(calls[0]?.init).toMatchObject({ method: 'PUT', body: '{"favourite":true}' })
   })
 
-  it('lists favourites across every library', async () => {
-    const item = mediaItem({ favourite: true })
-    const { client, calls } = clientReturning(respond({ body: [item] }))
-    await expect(client.listFavourites()).resolves.toEqual([item])
+  it('lists favourites across every library, each with the poster its card shows', async () => {
+    const entry = { media: mediaItem({ favourite: true }), poster: null }
+    const { client, calls } = clientReturning(respond({ body: [entry] }))
+    await expect(client.listFavourites()).resolves.toEqual([entry])
     expect(calls[0]?.url).toBe('http://nas:8484/api/favourites')
   })
 

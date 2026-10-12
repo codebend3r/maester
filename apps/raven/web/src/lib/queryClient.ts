@@ -69,6 +69,8 @@ export const queryKeys = {
     window,
   ],
   favourites: ['favourites'],
+  /** What is in progress and each pinned library's newest arrivals. */
+  home: ['home'],
   history: ({
     libraryId,
     show,

@@ -111,3 +111,64 @@ describe('the metadata store', () => {
     expect(metadata().mediaUnder(state.showId)).toEqual([])
   })
 })
+
+describe('the poster that stands for an item', () => {
+  const database = testDatabase('raven-poster-items-')
+  const metadata = () => new MetadataRepository(database.get())
+  const ids = { show: 0, postered: 0, bare: 0, inPostered: 0, inBare: 0, movie: 0, plain: 0 }
+
+  const item = ({
+    type,
+    tmdbId,
+    number = null,
+    poster = null,
+  }: {
+    type: FetchedItem['type']
+    tmdbId: string
+    number?: number | null
+    poster?: string | null
+  }): FetchedItem => ({
+    ...show,
+    type,
+    tmdbId,
+    number,
+    title: tmdbId,
+    credits: [],
+    images: { poster, backdrop: null, still: null },
+  })
+
+  beforeAll(async () => {
+    await database.open()
+    const stored = metadata()
+    ids.show = stored.save({ item: item({ type: 'show', tmdbId: '700', poster: '/show.jpg' }) })
+    ids.postered = stored.save({
+      item: item({ type: 'season', tmdbId: '700-1', number: 1, poster: '/one.jpg' }),
+      parentId: ids.show,
+    })
+    ids.bare = stored.save({
+      item: item({ type: 'season', tmdbId: '700-2', number: 2 }),
+      parentId: ids.show,
+    })
+    ids.inPostered = stored.save({
+      item: item({ type: 'episode', tmdbId: '700-1-1', number: 1 }),
+      parentId: ids.postered,
+    })
+    ids.inBare = stored.save({
+      item: item({ type: 'episode', tmdbId: '700-2-1', number: 1 }),
+      parentId: ids.bare,
+    })
+    ids.movie = stored.save({ item: item({ type: 'movie', tmdbId: '800', poster: '/movie.jpg' }) })
+    ids.plain = stored.save({ item: item({ type: 'movie', tmdbId: '801' }) })
+  })
+
+  afterAll(database.close)
+
+  it("is a movie's own, an episode's season's, else its show's, and none where no poster is", () => {
+    const posters = metadata().posterItems([ids.inPostered, ids.inBare, ids.movie, ids.plain])
+    expect(posters.get(ids.inPostered)?.id).toBe(ids.postered)
+    expect(posters.get(ids.inBare)?.id).toBe(ids.show)
+    expect(posters.get(ids.movie)?.id).toBe(ids.movie)
+    expect(posters.get(ids.plain)).toBeUndefined()
+    expect(posters.get(ids.inPostered)?.posterVersion).not.toBeNull()
+  })
+})

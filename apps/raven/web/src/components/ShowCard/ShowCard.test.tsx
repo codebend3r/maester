@@ -5,6 +5,16 @@ import { showEntry } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 
 describe('ShowCard', () => {
+  it('says when its newest episode came when shows are sorted by when they were added', () => {
+    const addedAt = new Date(Date.now() - 3 * 24 * 3600 * 1000).toISOString()
+    renderWithProviders(
+      <ul>
+        <ShowCard entry={showEntry({ addedAt })} sort="added" />
+      </ul>,
+    )
+    expect(screen.getByText('Added 3 days ago')).toBeInTheDocument()
+  })
+
   it("opens the show's page, plays the next episode, and says the years and count", () => {
     const { container } = renderWithProviders(
       <ul>

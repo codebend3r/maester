@@ -62,9 +62,9 @@ const ShortcutTip = ({ onDismiss }: { onDismiss: () => void }) => (
 
 /**
  * The frame around every browsing page: the logo, then the side menu
- * beside the page (below it on a narrow screen). Pinned libraries get their
- * own links there, each with its type's icon (a lock for a locked one), and an open one is marked
- * instead of Libraries. The menu collapses to its icons with B or the toggle
+ * beside the page (below it on a narrow screen), Home first. Pinned
+ * libraries get their own links there, each with its type's icon (a lock for
+ * a locked one), and an open one is marked instead of Libraries. The menu collapses to its icons with B or the toggle
  * at its foot, which keeps to the bottom left of the screen however far the
  * page scrolls, and stays that way across visits. While it is open, what the
  * pages show follows the server's changes. The player leaves the frame behind
@@ -92,9 +92,10 @@ export const AppShell = () => {
       </header>
       <div className={styles.side}>
         <nav id={navId} className={styles.nav} aria-label="Main">
+          <NavItem to="/" patterns={['/']} icon="home" label="Home" collapsed={collapsed} />
           <NavItem
-            to="/"
-            patterns={pinnedOpen ? ['/'] : ['/', ...libraryPages(':id')]}
+            to="/libraries"
+            patterns={pinnedOpen ? ['/libraries'] : ['/libraries', ...libraryPages(':id')]}
             icon="libraries"
             label="Libraries"
             collapsed={collapsed}

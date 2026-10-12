@@ -1,13 +1,13 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import type { MediaItem } from '@raven/core'
+import type { MediaItem, PosterEntry } from '@raven/core'
 import { api } from '@/lib/api'
 import { queryKeys } from '@/lib/queryClient'
 
 /**
  * Marking a favourite, deleting a video and fetching its details again,
  * with every cached list patched
- * in place so the grid answers at once. The favourites list and the library
- * counts refetch behind that.
+ * in place so the grid answers at once. The favourites list, home and the
+ * library counts refetch behind that.
  */
 export const useMediaMutations = ({ media }: { media: MediaItem }) => {
   const queryClient = useQueryClient()
@@ -15,6 +15,8 @@ export const useMediaMutations = ({ media }: { media: MediaItem }) => {
   const showLists = { queryKey: queryKeys.showLists(media.libraryId) }
   const without = (items: MediaItem[] | undefined): MediaItem[] | undefined =>
     items?.filter((item) => item.id !== media.id)
+  const withoutFavourite = (entries: PosterEntry[] | undefined): PosterEntry[] | undefined =>
+    entries?.filter((entry) => entry.media.id !== media.id)
 
   const favourite = useMutation({
     mutationFn: (marked: boolean) => api.setFavourite({ id: media.id, favourite: marked }),
@@ -23,11 +25,14 @@ export const useMediaMutations = ({ media }: { media: MediaItem }) => {
       queryClient.setQueriesData<MediaItem[]>(lists, (items) =>
         items?.map((item) => (item.id === updated.id ? updated : item)),
       )
-      if (!updated.favourite) queryClient.setQueryData<MediaItem[]>(queryKeys.favourites, without)
+      if (!updated.favourite) {
+        queryClient.setQueryData<PosterEntry[]>(queryKeys.favourites, withoutFavourite)
+      }
       return Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.favourites }),
         queryClient.invalidateQueries({ queryKey: queryKeys.items }),
         queryClient.invalidateQueries(showLists),
+        queryClient.invalidateQueries({ queryKey: queryKeys.home }),
       ])
     },
   })
@@ -37,11 +42,12 @@ export const useMediaMutations = ({ media }: { media: MediaItem }) => {
     onSuccess: () => {
       queryClient.removeQueries({ queryKey: queryKeys.mediaItem(media.id) })
       queryClient.setQueriesData<MediaItem[]>(lists, without)
-      queryClient.setQueryData<MediaItem[]>(queryKeys.favourites, without)
+      queryClient.setQueryData<PosterEntry[]>(queryKeys.favourites, withoutFavourite)
       return Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.libraries }),
         queryClient.invalidateQueries({ queryKey: queryKeys.items }),
         queryClient.invalidateQueries(showLists),
+        queryClient.invalidateQueries({ queryKey: queryKeys.home }),
       ])
     },
   })
@@ -55,6 +61,7 @@ export const useMediaMutations = ({ media }: { media: MediaItem }) => {
         queryClient.invalidateQueries({ queryKey: lists.queryKey }),
         queryClient.invalidateQueries(showLists),
         queryClient.invalidateQueries({ queryKey: queryKeys.items }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.home }),
       ])
     },
   })

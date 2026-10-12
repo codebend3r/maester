@@ -3,17 +3,54 @@
   gap: var(--space-5);
 }
 
+.header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'title reset';
+  align-items: end;
+  gap: var(--space-3);
+}
+
 .title {
+  grid-area: title;
   font-family: var(--font-display);
-  font-size: var(--font-size-2xl);
+  font-size: var(--font-size-hero);
   font-weight: 400;
   line-height: var(--line-tight);
+}
+
+// Reset to defaults, or the question it asks first, in a row of its own.
+.reset {
+  grid-area: reset;
+  display: grid;
+  grid-auto-flow: column;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+// Says the reset is done; empty, it takes no room.
+.status {
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+
+  &:empty {
+    display: none;
+  }
 }
 
 .section {
   display: grid;
   gap: var(--space-3);
   max-width: var(--measure);
+}
+
+.heading,
+.legend {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  align-items: center;
+  gap: var(--space-1);
 }
 
 .heading {
@@ -84,4 +121,20 @@
   grid-area: hint;
   color: var(--color-lichen);
   font-size: var(--font-size-sm);
+}
+
+@media (max-width: 40rem) {
+  .header {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'title'
+      'reset';
+    justify-items: start;
+  }
+
+  // The question and its buttons wrap rather than run off a phone.
+  .reset {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(auto-fit, minmax(min-content, max-content));
+  }
 }

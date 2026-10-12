@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import { fireEvent, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { PlaybackSettingsState } from '@raven/core'
+import { type PlaybackSettingsState, mediaLabel } from '@raven/core'
 import { MediaCard } from '@/components/MediaCard/MediaCard'
 import { api } from '@/lib/api'
 import { setBrowserSupport, setStreamSupport } from '@/test/canPlay'
 import { mediaItem } from '@/test/fixtures'
 import { DEFAULT_PLAYBACK_STATE, renderWithProviders } from '@/test/render'
+import { EPISODE_TWO } from '@/test/tv'
 
 describe('MediaCard', () => {
   // Chrome's answers: Matroska and HEVC yes, Dolby audio no.
@@ -20,6 +21,34 @@ describe('MediaCard', () => {
     expect(screen.queryByText("Won't play in this browser")).toBeNull()
   })
 
+  it('is one link, to the player, for a video with no page of its own', () => {
+    renderWithProviders(<MediaCard media={mediaItem()} />)
+    expect(screen.getAllByRole('link')).toHaveLength(1)
+  })
+
+  it('plays from its picture, and opens the page of the episode it is from its title', () => {
+    renderWithProviders(<MediaCard media={EPISODE_TWO} />)
+    const label = mediaLabel(EPISODE_TWO)
+    expect(screen.getByRole('link', { name: label })).toHaveAttribute('href', '/episodes/7')
+    expect(screen.getByRole('link', { name: `Play ${label}` })).toHaveAttribute('href', '/watch/13')
+  })
+
+  it('shows the value its listing is sorted by, first', () => {
+    renderWithProviders(<MediaCard media={mediaItem()} sort="largest" />)
+    expect(screen.getByText('1.6 GB')).toBeInTheDocument()
+  })
+
+  it('says how long ago it was added when sorted by when videos were added', () => {
+    const addedAt = new Date(Date.now() - 3 * 24 * 3600 * 1000).toISOString()
+    renderWithProviders(<MediaCard media={mediaItem({ addedAt })} sort="added" />)
+    expect(screen.getByText('Added 3 days ago')).toBeInTheDocument()
+  })
+
+  it('names the resolution once when sorted by it', () => {
+    renderWithProviders(<MediaCard media={mediaItem()} sort="resolution-high" />)
+    expect(screen.getAllByText('1080p')).toHaveLength(1)
+  })
+
   it('warns before a click when the browser cannot decode the audio', () => {
     renderWithProviders(<MediaCard media={mediaItem({ audioCodec: 'eac3' })} />)
     expect(screen.getByText("Won't play in this browser")).toHaveAttribute(
@@ -28,14 +57,11 @@ describe('MediaCard', () => {
     )
   })
 
-  it('says the server converts what the browser cannot decode but can stream', () => {
+  it('leaves converting on the server to the video’s page, saying nothing of it', () => {
     setStreamSupport(() => true)
     renderWithProviders(<MediaCard media={mediaItem({ audioCodec: 'eac3' })} />)
     expect(screen.queryByText("Won't play in this browser")).toBeNull()
-    expect(screen.getByText('Converted on the server')).toHaveAttribute(
-      'title',
-      "Dolby Digital Plus audio isn't supported here.",
-    )
+    expect(screen.queryByText('Converted on the server')).toBeNull()
   })
 
   it('says what the server’s playback settings make of it', () => {

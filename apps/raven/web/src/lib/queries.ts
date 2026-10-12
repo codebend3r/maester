@@ -59,6 +59,11 @@ export const favouritesQuery = queryOptions({
   queryFn: () => api.listFavourites(),
 })
 
+export const homeQuery = queryOptions({
+  queryKey: queryKeys.home,
+  queryFn: () => api.getHome(),
+})
+
 export const mediaQuery = (id: number | null) =>
   queryOptions({
     queryKey: queryKeys.mediaItem(id),

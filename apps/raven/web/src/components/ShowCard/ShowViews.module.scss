@@ -145,3 +145,11 @@
     display: none;
   }
 }
+
+// The value the listing is sorted by: a line of its own above the facts, so
+// a long one ("Added 3 days ago") never squeezes them, and a shade brighter.
+.sorted {
+  color: var(--color-bark);
+  font-size: var(--font-size-xs);
+  font-stretch: 90%;
+}

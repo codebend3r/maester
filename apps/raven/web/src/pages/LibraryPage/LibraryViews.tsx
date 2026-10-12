@@ -22,14 +22,22 @@ const ShowsView = ({
   busy: boolean
 }) => {
   if (settings.view === 'list') return <ShowList shows={shows} busy={busy} />
-  if (settings.view === 'tiles') return <ShowTiles shows={shows} busy={busy} />
-  return <ShowGrid shows={shows} busy={busy} ratingsSource={settings.ratingsSource} />
+  if (settings.view === 'tiles') return <ShowTiles shows={shows} busy={busy} sort={settings.sort} />
+  return (
+    <ShowGrid
+      shows={shows}
+      busy={busy}
+      ratingsSource={settings.ratingsSource}
+      sort={settings.sort}
+    />
+  )
 }
 
 /**
  * The library's videos laid out the way its view setting says, a Movies
- * library's as posters. The settings are coherent with the library's type,
- * so a TV library's leftover files are never grouped.
+ * library's as posters, each card or tile showing the value the listing is
+ * sorted by. The settings are coherent with the library's type, so a TV
+ * library's leftover files are never grouped.
  */
 const MediaView = ({
   settings,
@@ -45,7 +53,15 @@ const MediaView = ({
   if (settings.view === 'list')
     return <MediaList items={items} busy={busy} movies={movies} matchType={matchType} />
   if (settings.view === 'tiles')
-    return <MediaTiles items={items} busy={busy} posters={movies} matchType={matchType} />
+    return (
+      <MediaTiles
+        items={items}
+        busy={busy}
+        posters={movies}
+        matchType={matchType}
+        sort={settings.sort}
+      />
+    )
   if (settings.view === 'grouped')
     return (
       <MediaGroups
@@ -55,6 +71,7 @@ const MediaView = ({
         posters={movies}
         matchType={matchType}
         ratingsSource={settings.ratingsSource}
+        sort={settings.sort}
       />
     )
   return (
@@ -64,6 +81,7 @@ const MediaView = ({
       posters={movies}
       matchType={matchType}
       ratingsSource={settings.ratingsSource}
+      sort={settings.sort}
     />
   )
 }

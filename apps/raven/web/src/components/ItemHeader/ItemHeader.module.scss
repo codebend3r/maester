@@ -35,15 +35,21 @@
   padding: var(--space-8) var(--space-4) 0;
 }
 
-// An episode's page has a still for a backdrop and no poster.
-.noPoster {
+// An episode's still is wider than a poster, so its column is too.
+.withStill {
+  grid-template-columns: clamp(12rem, 30vw, 24rem) minmax(0, 1fr);
+}
+
+.noPicture {
   grid-template-columns: minmax(0, 1fr);
   grid-template-areas: 'details';
 }
 
-.poster {
+// The picture, its stand-in letter and the play mark share one cell.
+.picture {
   grid-area: poster;
   display: grid;
+  grid-template-areas: 'picture';
   place-items: center;
   aspect-ratio: 2 / 3;
   overflow: hidden;
@@ -53,11 +59,70 @@
   color: var(--color-lichen);
   font-family: var(--font-display);
   font-size: var(--font-size-hero);
+  text-decoration: none;
+
+  > * {
+    grid-area: picture;
+  }
 
   img {
     width: 100%;
     height: 100%;
     object-fit: cover;
+  }
+}
+
+.still {
+  aspect-ratio: 16 / 9;
+}
+
+// Above the picture, whose hover filter paints it as a layer of its own.
+.playMark {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 50%;
+  background: var(--color-scrim);
+  color: var(--color-bark);
+  opacity: 0;
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition:
+      opacity 120ms ease-out,
+      background-color 120ms ease-out;
+  }
+}
+
+.playable {
+  img {
+    @media (prefers-reduced-motion: no-preference) {
+      transition: filter 150ms ease-out;
+    }
+  }
+
+  &:hover,
+  &:focus-visible {
+    img {
+      filter: brightness(1.12);
+    }
+
+    .playMark {
+      opacity: 1;
+    }
+  }
+
+  &:hover .playMark {
+    background: var(--color-leaf);
+  }
+}
+
+// Touch screens have no hover to reveal it.
+@media (hover: none) {
+  .playMark {
+    opacity: 1;
   }
 }
 
@@ -118,8 +183,12 @@
     padding: var(--space-6) 0 0;
   }
 
-  .poster {
+  .picture {
     width: min(12rem, 60vw);
+  }
+
+  .still {
+    width: min(24rem, 100%);
   }
 
   // Facts wrap on a phone rather than run off the edge.
