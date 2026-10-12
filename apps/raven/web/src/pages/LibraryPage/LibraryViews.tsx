@@ -29,9 +29,13 @@ const ShowsView = ({ settings, shows }: { settings: LibrarySettings; shows: Show
  * sorted by. The settings are coherent with the library's type, so a TV
  * library's leftover files are never grouped.
  */
+/** A Movies library lays its videos out as posters; any other, as frame grabs. */
+const isMovieLibrary = (settings: LibrarySettings): boolean =>
+  matchTypeFor(settings.kind) === 'movie'
+
 const MediaView = ({ settings, items }: { settings: LibrarySettings; items: MediaItem[] }) => {
   const matchType = matchTypeFor(settings.kind)
-  const movies = matchType === 'movie'
+  const movies = isMovieLibrary(settings)
   if (settings.view === 'list')
     return <MediaList items={items} movies={movies} matchType={matchType} />
   if (settings.view === 'tiles')
@@ -91,16 +95,15 @@ export const LibraryListing = ({
 
 /**
  * The listing while it is on its way, laid out as its view lays it out:
- * rows for a list or tiles, else cards, posters where the listing has them.
+ * rows for a list or tiles, else cards, posters for a TV library's shows
+ * and a Movies library's films.
  */
 export const LibraryListingSkeleton = ({ settings }: { settings: LibrarySettings }) => (
   <Loading label={`Gathering the ${listsShows(settings.kind) ? 'shows' : 'videos'}`}>
     {settings.view === 'list' || settings.view === 'tiles' ? (
       <MediaTilesSkeleton />
     ) : (
-      <MediaGridSkeleton
-        posters={listsShows(settings.kind) || matchTypeFor(settings.kind) === 'movie'}
-      />
+      <MediaGridSkeleton posters={listsShows(settings.kind) || isMovieLibrary(settings)} />
     )}
   </Loading>
 )

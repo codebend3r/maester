@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { type Library, isLibrary, isScanning } from '@raven/core'
+import { type Library, isScanning } from '@raven/core'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/Button/Button'
@@ -8,9 +8,11 @@ import { LibraryIcon } from '@/components/LibraryIcon/LibraryIcon'
 import { ScanStatus } from '@/components/ScanStatus/ScanStatus'
 import { Bone, Loading } from '@/components/Skeleton/Skeleton'
 import { api } from '@/lib/api'
+import { librarySettingsEdits } from '@/lib/edits'
+import { afterLibrarySettings } from '@/lib/invalidate'
 import { KINDS } from '@/lib/libraryKinds'
 import { lockState } from '@/lib/libraryLock'
-import { optimisticChange, patchEvery, patchQueries } from '@/lib/optimistic'
+import { useOptimisticMutation } from '@/lib/optimistic'
 import { librariesQuery, lockQuery } from '@/lib/queries'
 import { mutationKeys, queryKeys } from '@/lib/queryClient'
 import styles from '@/pages/LibrariesPage/LibrariesPage.module.scss'
@@ -32,34 +34,15 @@ const LibraryRow = ({ library, isShut }: { library: Library; isShut: boolean }) 
   })
   // Only the pin is sent as a setting; the server keeps the others as they are.
   // It shows at once, here and in the side menu; home's shelves follow it.
-  const pin = useMutation({
+  const pin = useOptimisticMutation({
+    mutationKey: mutationKeys.librarySettings,
     mutationFn: (pinned: boolean) =>
       api.updateLibrary({
         id: library.id,
         input: { name: library.name, paths: library.paths, settings: { pinned } },
       }),
-    ...optimisticChange<boolean>({
-      queryClient,
-      mutationKey: mutationKeys.pin(library.id),
-      apply: (pinned) =>
-        patchQueries({
-          queryClient,
-          filters: [
-            { queryKey: queryKeys.libraries, exact: true },
-            { queryKey: queryKeys.library(library.id), exact: true },
-          ],
-          patch: patchEvery({
-            guard: isLibrary,
-            id: library.id,
-            patch: (current) => ({ ...current, settings: { ...current.settings, pinned } }),
-          }),
-        }),
-      settle: () =>
-        Promise.all([
-          queryClient.invalidateQueries({ queryKey: queryKeys.libraries }),
-          queryClient.invalidateQueries({ queryKey: queryKeys.home }),
-        ]),
-    }),
+    edits: (pinned) => librarySettingsEdits({ libraryId: library.id, change: { pinned } }),
+    settle: () => afterLibrarySettings({ queryClient, libraryId: library.id }),
   })
 
   const backdrop = !isShut && library.backdrop && api.libraryBackdropUrl(library.backdrop)

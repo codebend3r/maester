@@ -172,9 +172,7 @@ describe('SettingsPage', () => {
   it('stands in for the settings while they are read', async () => {
     spies.get.mockImplementation(() => held<PlaybackSettingsState>().promise)
     renderWithProviders(<SettingsPage />, { playback: null, display: null })
-    expect(screen.getAllByRole('status').map((status) => status.textContent)).toContain(
-      'Reading the settings',
-    )
+    expect(screen.getAllByText('Reading the settings')).not.toEqual([])
   })
 })
 

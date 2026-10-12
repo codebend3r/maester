@@ -1,5 +1,5 @@
 import type { InvalidateQueryFilters, QueryClient } from '@tanstack/react-query'
-import type { ItemDetails } from '@raven/core'
+import type { ItemDetails, MediaItem } from '@raven/core'
 import { queryKeys } from '@/lib/queryClient'
 
 /**
@@ -39,6 +39,49 @@ export const afterLibrarySaved = (queryClient: QueryClient): Promise<unknown> =>
       { queryKey: queryKeys.libraries },
       { queryKey: queryKeys.allMedia },
       { queryKey: queryKeys.favourites },
+      { queryKey: queryKeys.home },
+    ],
+  })
+
+/**
+ * A favourite was marked or unmarked: everything its library shows, every
+ * tab's menu among them, the favourites, the item pages, home, and the
+ * video itself.
+ */
+export const afterFavourite = ({
+  queryClient,
+  media,
+}: {
+  queryClient: QueryClient
+  media: MediaItem
+}): Promise<unknown> =>
+  refetch({
+    queryClient,
+    filters: [
+      { queryKey: queryKeys.library(media.libraryId) },
+      { queryKey: queryKeys.favourites },
+      { queryKey: queryKeys.items },
+      { queryKey: queryKeys.home },
+      { queryKey: queryKeys.mediaItem(media.id), exact: true },
+    ],
+  })
+
+/**
+ * A library's view or pin was saved: the library, the list the side menu
+ * reads, and home, whose shelves follow the pins.
+ */
+export const afterLibrarySettings = ({
+  queryClient,
+  libraryId,
+}: {
+  queryClient: QueryClient
+  libraryId: number
+}): Promise<unknown> =>
+  refetch({
+    queryClient,
+    filters: [
+      { queryKey: queryKeys.library(libraryId), exact: true },
+      { queryKey: queryKeys.libraries, exact: true },
       { queryKey: queryKeys.home },
     ],
   })

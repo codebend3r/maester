@@ -1,106 +1,111 @@
-import type { MutationKey, QueryClient, QueryFilters, QueryKey } from '@tanstack/react-query'
-import { isRecord } from '@raven/core'
+import {
+  type MutationKey,
+  type QueryClient,
+  type QueryFilters,
+  type QueryKey,
+  hashKey,
+  useMutation,
+  useQueryClient,
+} from '@tanstack/react-query'
+import { useState } from 'react'
 
-/** What an optimistic change replaced in the cache, to put back if the server refuses it. */
-export type Snapshot = ReadonlyArray<readonly [QueryKey, unknown]>
+/** One change to the cache, ready to write into each query its filters find. */
+export type Edit = {
+  filters: QueryFilters
+  write: (args: { queryClient: QueryClient; queryKey: QueryKey }) => void
+}
 
-/** A change to some cached data; it hands back the very same data where it changes nothing. */
-export type Patch = (data: unknown) => unknown
+/** What the edits of a change replaced, to put back if the server refuses it. */
+type Snapshot = ReadonlyArray<readonly [QueryKey, unknown]>
+
+/** An edit to every query `filters` find, each holding a `T`, put through `update`. */
+export const edit = <T>({
+  filters,
+  update,
+}: {
+  filters: QueryFilters
+  update: (data: T) => T
+}): Edit => ({
+  filters,
+  write: ({ queryClient, queryKey }) =>
+    queryClient.setQueryData<T>(queryKey, (data) => (data === undefined ? data : update(data))),
+})
 
 /**
- * Shows a change before the server answers: every cached query `filters`
- * find whose data `patch` changes takes the patched data at once, with any
- * fetch of it in flight called off so an older answer cannot land over it.
- * Queries `patch` leaves alone are not touched, not even marked fresh.
+ * Shows a change before the server answers: every query the edits touch
+ * has any fetch in flight called off, so an older answer cannot land over
+ * the change, then takes its edits. What each held before comes back.
  */
-export const patchQueries = async ({
+const applyEdits = async ({
   queryClient,
-  filters,
-  patch,
+  edits,
 }: {
   queryClient: QueryClient
-  filters: readonly QueryFilters[]
-  patch: Patch
+  edits: readonly Edit[]
 }): Promise<Snapshot> => {
-  const found = new Map(
-    filters
-      .flatMap((filter) => queryClient.getQueryCache().findAll(filter))
-      .map((query) => [query.queryHash, query]),
-  )
-  const changing = [...found.values()].filter(
-    (query) => patch(query.state.data) !== query.state.data,
-  )
+  const touched = edits.map((change) => ({
+    change,
+    queries: queryClient.getQueryCache().findAll(change.filters),
+  }))
+  const queries = [
+    ...new Map(
+      touched.flatMap((entry) => entry.queries).map((query) => [query.queryHash, query]),
+    ).values(),
+  ]
   await Promise.all(
-    changing.map((query) => queryClient.cancelQueries({ queryKey: query.queryKey, exact: true })),
+    queries.map((query) => queryClient.cancelQueries({ queryKey: query.queryKey, exact: true })),
   )
-  return changing.map((query) => {
-    const before = query.state.data
-    queryClient.setQueryData(query.queryKey, patch(before))
-    return [query.queryKey, before] as const
-  })
+  const snapshot = queries.map((query) => [query.queryKey, query.state.data] as const)
+  touched.forEach(({ change, queries: found }) =>
+    found.forEach((query) => change.write({ queryClient, queryKey: query.queryKey })),
+  )
+  return snapshot
 }
 
 /**
- * `patch` for every record `guard` accepts with the id `id`, however deep
- * in some cached data it sits: a listing, a poster entry, a history day,
- * an item's versions. Data holding none comes back as it was.
+ * A change shown before the server answers: `edits` patch the cache at
+ * once, and a refusal puts it back. Changes with the same key go to the
+ * server one at a time, in the order they were made, so their answers
+ * cannot cross; once the last of them settles, `settle` reads again what
+ * they touched. `failure` is why the server refused one, until the next
+ * change is made.
  */
-export const patchEvery = <T extends { id: number }>({
-  guard,
-  id,
-  patch,
-}: {
-  guard: (value: unknown) => value is T
-  id: number
-  patch: (value: T) => T
-}): Patch => {
-  const walk: Patch = (data) => {
-    if (Array.isArray(data)) {
-      const list: readonly unknown[] = data
-      const next = list.map(walk)
-      return next.every((value, index) => value === list[index]) ? data : next
-    }
-    if (!isRecord(data)) return data
-    if (data.id === id && guard(data)) return patch(data)
-    const entries = Object.entries(data)
-    const next = entries.map(([key, value]) => [key, walk(value)] as const)
-    return next.every(([, value], index) => value === entries[index]?.[1])
-      ? data
-      : Object.fromEntries(next)
-  }
-  return walk
-}
-
-/**
- * The options every optimistic change shares, spread into `useMutation`:
- * `apply` shows the change at once and a refusal puts the cache back. Only
- * once the last of several changes to the same thing has settled is the
- * server asked again, through `settle`, for what they all came to; an
- * answer to any one of them, which may come back out of order, is never
- * written over the cache.
- */
-export const optimisticChange = <TVariables>({
-  queryClient,
+export const useOptimisticMutation = <TVariables>({
   mutationKey,
-  apply,
+  mutationFn,
+  edits,
   settle,
 }: {
-  queryClient: QueryClient
   mutationKey: MutationKey
-  apply: (variables: TVariables) => Promise<Snapshot>
-  /** Reads again what the change touched. */
+  mutationFn: (variables: TVariables) => Promise<unknown>
+  edits: (variables: TVariables) => readonly Edit[]
   settle: () => Promise<unknown>
 }) => {
-  // The mutation asking is still counted while its own callbacks run.
+  const queryClient = useQueryClient()
+  const [failure, setFailure] = useState<Error | null>(null)
+  // The change asking is still counted while its own callbacks run, and a
+  // change waiting its turn counts too.
   const isLast = (): boolean => queryClient.isMutating({ mutationKey }) <= 1
-  return {
+  const mutation = useMutation({
     mutationKey,
-    onMutate: apply,
-    // Latest first, so a query two patches touched ends as it began.
-    onError: (_error: Error, _variables: TVariables, snapshot: Snapshot | undefined) => {
+    scope: { id: hashKey(mutationKey) },
+    mutationFn,
+    onMutate: (variables: TVariables) => applyEdits({ queryClient, edits: edits(variables) }),
+    // A change still waiting its turn was made over this one, so only the
+    // last puts the cache back; the reading again after it settles the rest.
+    onError: (error, _variables, snapshot) => {
+      setFailure(error)
       if (!snapshot || !isLast()) return
-      snapshot.toReversed().forEach(([queryKey, data]) => queryClient.setQueryData(queryKey, data))
+      snapshot.forEach(([queryKey, data]) => queryClient.setQueryData(queryKey, data))
     },
     onSettled: () => (isLast() ? settle() : undefined),
+  })
+  return {
+    mutate: (variables: TVariables) => {
+      setFailure(null)
+      mutation.mutate(variables)
+    },
+    isPending: mutation.isPending,
+    failure,
   }
 }

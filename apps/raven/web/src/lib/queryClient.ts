@@ -116,13 +116,15 @@ export const queryKeys = {
 }
 
 /**
- * Keys for the changes shown before the server answers, so the last of
- * several in flight on the same thing knows it is the last.
+ * Keys for the changes shown before the server answers. Changes under one
+ * key go to the server one at a time and are read again together, so it
+ * covers every change that reads again the same caches.
  */
 export const mutationKeys = {
-  favourite: (mediaId: number) => ['favourite', mediaId],
-  pin: (libraryId: number) => ['pin', libraryId],
-  libraryView: (libraryId: number) => ['library-view', libraryId],
+  /** Any video's favourite: they all show in the same listings. */
+  favourite: ['favourite'],
+  /** Any library's pin, sort or view: they all show in the libraries list. */
+  librarySettings: ['library-settings'],
   playbackSettings: ['settings', 'playback'],
   displaySettings: ['settings', 'display'],
 }

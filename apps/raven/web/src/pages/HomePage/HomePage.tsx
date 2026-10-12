@@ -109,12 +109,12 @@ export const HomePage = () => {
       {home.isPending && (
         <Loading label="Gathering your libraries">
           {['continue', 'newest'].map((shelf) => (
-            <div key={shelf} className={styles.shelf}>
+            <section key={shelf} className={styles.shelf}>
               <Bone shape="heading" width="short" />
               <ul className={styles.row}>
                 <SkeletonCards picture="poster" count={8} />
               </ul>
-            </div>
+            </section>
           ))}
         </Loading>
       )}

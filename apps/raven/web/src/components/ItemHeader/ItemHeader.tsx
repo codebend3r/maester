@@ -24,8 +24,14 @@ const LAYOUTS = {
   none: `${styles.content} ${styles.noPicture}`,
 } as const satisfies Record<HeaderPicture['shape'] | 'none', string | undefined>
 
+/** Each picture's frame: a poster's, or the wider one of a still. */
+const PICTURES = {
+  poster: styles.picture,
+  still: `${styles.picture} ${styles.still}`,
+} as const satisfies Record<HeaderPicture['shape'], string | undefined>
+
 const Picture = ({ picture, title }: { picture: HeaderPicture; title: string }) => {
-  const className = picture.shape === 'still' ? `${styles.picture} ${styles.still}` : styles.picture
+  const className = PICTURES[picture.shape]
   const content = picture.url ? (
     <img src={picture.url} alt="" decoding="async" />
   ) : (
@@ -146,9 +152,7 @@ export const ItemHeaderSkeleton = ({ picture }: { picture: HeaderPicture['shape'
     </div>
     <div className={LAYOUTS[picture]}>
       {picture !== 'none' && (
-        <span
-          className={picture === 'still' ? `${styles.picture} ${styles.still}` : styles.picture}
-        >
+        <span className={PICTURES[picture]}>
           <Bone shape="fill" />
         </span>
       )}

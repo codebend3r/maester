@@ -60,7 +60,7 @@
 // As tall as a button, and as wide as a short label on one.
 .button {
   width: 7rem;
-  min-height: 2.5rem;
+  min-height: var(--control-size);
   border-radius: var(--radius-md);
 }
 
@@ -82,21 +82,6 @@
   align-content: start;
   gap: var(--space-1);
   min-width: 0;
-}
-
-// A row of a list or of tiles: a frame grab beside its two lines.
-.row {
-  display: grid;
-  grid-template-columns: clamp(6rem, 22vw, 10rem) minmax(0, 1fr);
-  gap: var(--space-3);
-  align-items: center;
-  padding: var(--space-2) 0;
-  border-bottom: 1px solid var(--color-moss);
-}
-
-.lines {
-  display: grid;
-  gap: var(--space-1);
 }
 
 @keyframes arrive {

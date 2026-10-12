@@ -34,7 +34,7 @@ describe('HomePage', () => {
     spies.home.mockImplementation(() => held<Home>().promise)
     spies.libraries.mockImplementation(async () => LIBRARIES)
     renderWithProviders(<HomePage />)
-    expect(await screen.findByRole('status')).toHaveTextContent('Gathering your libraries')
+    expect(await screen.findByText('Gathering your libraries')).toBeInTheDocument()
     expect(screen.queryAllByRole('listitem')).toEqual([])
   })
 

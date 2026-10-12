@@ -17,7 +17,7 @@ import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
 import { PosterFrame } from '@/components/PosterCard/PosterCard'
 import { RatingChips } from '@/components/RatingChips/RatingChips'
 import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
-import { SkeletonRows } from '@/components/Skeleton/Skeleton'
+import { Bone } from '@/components/Skeleton/Skeleton'
 import { api } from '@/lib/api'
 import { cardLink } from '@/lib/itemLinks'
 import { mediaEntryKey } from '@/lib/entryKeys'
@@ -143,9 +143,24 @@ export const MediaTiles = ({
   </ul>
 )
 
-/** The tiles while they are on their way, as rows of stand-ins; a list lays out the same. */
-export const MediaTilesSkeleton = () => (
+/** A tile on its way, laid out as a tile: its frame grab's place, a line for its title and one for its facts. */
+const TileSkeleton = () => (
+  <li className={styles.tile}>
+    <span className={styles.frame}>
+      <Bone shape="fill" />
+    </span>
+    <div className={styles.body}>
+      <Bone shape="text" width="half" />
+      <Bone shape="small" width="short" />
+    </div>
+  </li>
+)
+
+/** The tiles while they are on their way, as rows of stand-ins; a list stands in the same. */
+export const MediaTilesSkeleton = ({ count = 6 }: { count?: number }) => (
   <ul className={styles.tiles}>
-    <SkeletonRows />
+    {Array.from({ length: count }, (_, index) => (
+      <TileSkeleton key={index} />
+    ))}
   </ul>
 )

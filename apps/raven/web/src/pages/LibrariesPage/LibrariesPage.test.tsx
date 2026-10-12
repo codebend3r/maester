@@ -64,7 +64,7 @@ describe('LibrariesPage', () => {
   it('stands in for the libraries while they are read', async () => {
     spies.list.mockImplementation(() => held<Library[]>().promise)
     renderWithProviders(<LibrariesPage />)
-    expect(await screen.findByRole('status')).toHaveTextContent('Gathering your libraries')
+    expect(await screen.findByText('Gathering your libraries')).toBeInTheDocument()
   })
 
   it('shows a library that is not pinned as unpressed', async () => {

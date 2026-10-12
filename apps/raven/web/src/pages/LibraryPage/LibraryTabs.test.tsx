@@ -5,6 +5,7 @@ import type { LibraryKind, LibrarySettings } from '@raven/core'
 import { api } from '@/lib/api'
 import { itemSummary, library, matchedMovie, mediaItem } from '@/test/fixtures'
 import { renderLibraryPage } from '@/test/libraryPage'
+import { pollFast } from '@/test/polls'
 
 const movie = ({ id, title, year }: { id: number; title: string; year: number }) =>
   matchedMovie({ id, title, item: itemSummary({ id: id * 10, title, year }) })
@@ -168,6 +169,7 @@ describe('LibraryPage tabs', () => {
   })
 
   it('reads the count of files not matched again once Match again settles on its tab', async () => {
+    pollFast()
     const films = (unmatchedCount: number) =>
       library({
         id: 2,

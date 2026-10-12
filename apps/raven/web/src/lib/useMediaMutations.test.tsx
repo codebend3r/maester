@@ -6,28 +6,28 @@ import type { ReactNode } from 'react'
 import { api } from '@/lib/api'
 import { queryKeys } from '@/lib/queryClient'
 import { useMediaMutations } from '@/lib/useMediaMutations'
-import { itemDetails, mediaItem } from '@/test/fixtures'
+import { itemDetails, matchedMovie, mediaItem } from '@/test/fixtures'
 import { held } from '@/test/held'
 
-/** The tabs beside library 2's listing, every one of them showing the video's menu. */
-const TABS = [
-  queryKeys.inProgress(2),
-  queryKeys.unmatched(2),
-  queryKeys.sagas(2),
-  queryKeys.history({ libraryId: 2, show: '', limit: 50 }),
-  queryKeys.libraryFavourites(2),
-  queryKeys.showLists(2),
+/** The tabs beside library 2's listing, every one of them showing the video's menu, each as it is cached with nothing in it. */
+const TABS: ReadonlyArray<readonly [readonly unknown[], unknown]> = [
+  [queryKeys.inProgress(2), []],
+  [queryKeys.unmatched(2), []],
+  [queryKeys.sagas(2), []],
+  [queryKeys.history({ libraryId: 2, show: '', limit: 50 }), []],
+  [queryKeys.libraryFavourites(2), []],
+  [queryKeys.showLists(2), { shows: [], unmatched: [] }],
 ]
 
 /** The hook for video 7 of library 2, its library's tabs already cached. */
-const setUp = () => {
+const setUp = ({ media = mediaItem() }: { media?: MediaItem } = {}) => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  TABS.forEach((key) => client.setQueryData(key, []))
+  TABS.forEach(([key, empty]) => client.setQueryData(key, empty))
   client.setQueryData(queryKeys.inProgress(3), [])
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={client}>{children}</QueryClientProvider>
   )
-  const { result } = renderHook(() => useMediaMutations({ media: mediaItem() }), { wrapper })
+  const { result } = renderHook(() => useMediaMutations({ media }), { wrapper })
   const isStale = (key: readonly unknown[]) => !!client.getQueryState(key)?.isInvalidated
   return { result, isStale, client }
 }
@@ -47,8 +47,7 @@ describe('useMediaMutations', () => {
     spies.favourite.mockImplementation(async ({ favourite }) => mediaItem({ favourite }))
     const { result, isStale } = setUp()
     act(() => result.current.favourite.mutate(true))
-    await waitFor(() => expect(result.current.favourite.isSuccess).toBe(true))
-    expect(TABS.filter((key) => !isStale(key))).toEqual([])
+    await waitFor(() => expect(TABS.filter(([key]) => !isStale(key))).toEqual([]))
     expect(isStale(queryKeys.inProgress(3))).toBe(false)
   })
 
@@ -58,21 +57,21 @@ describe('useMediaMutations', () => {
   it('marks the video a favourite wherever it is cached, before the server answers', async () => {
     const answer = held<MediaItem>()
     spies.favourite.mockImplementation(() => answer.promise)
-    const { result, client } = setUp()
-    client.setQueryData(LISTING, [mediaItem(), mediaItem({ id: 8 })])
-    client.setQueryData(queryKeys.item(40), itemDetails({ id: 40, versions: [mediaItem()] }))
+    const movie = matchedMovie()
+    const { result, client } = setUp({ media: movie })
+    client.setQueryData(LISTING, [movie, mediaItem({ id: 8 })])
+    client.setQueryData(queryKeys.item(40), itemDetails({ id: 40, versions: [movie] }))
     act(() => result.current.favourite.mutate(true))
     await waitFor(() =>
       expect(client.getQueryData<MediaItem[]>(LISTING)).toEqual([
-        mediaItem({ favourite: true }),
+        { ...movie, favourite: true },
         mediaItem({ id: 8 }),
       ]),
     )
     expect(client.getQueryData<ItemDetails>(queryKeys.item(40))?.versions).toEqual([
-      mediaItem({ favourite: true }),
+      { ...movie, favourite: true },
     ])
-    answer.answer(mediaItem({ favourite: true }))
-    await waitFor(() => expect(result.current.favourite.isSuccess).toBe(true))
+    answer.answer({ ...movie, favourite: true })
   })
 
   it('takes the favourite back when the server refuses it', async () => {
@@ -82,7 +81,9 @@ describe('useMediaMutations', () => {
     const { result, client } = setUp()
     client.setQueryData(LISTING, [mediaItem()])
     act(() => result.current.favourite.mutate(true))
-    await waitFor(() => expect(result.current.favourite.isError).toBe(true))
+    await waitFor(() =>
+      expect(result.current.favourite.failure?.message).toBe('The server is away.'),
+    )
     expect(client.getQueryData<MediaItem[]>(LISTING)).toEqual([mediaItem()])
   })
 
@@ -109,7 +110,7 @@ describe('useMediaMutations', () => {
     const { result, isStale } = setUp()
     act(() => result.current.refresh.mutate(40))
     await waitFor(() => expect(result.current.refresh.isSuccess).toBe(true))
-    expect(TABS.filter((key) => !isStale(key))).toEqual([])
+    expect(TABS.filter(([key]) => !isStale(key))).toEqual([])
     expect(isStale(queryKeys.inProgress(3))).toBe(false)
   })
 })

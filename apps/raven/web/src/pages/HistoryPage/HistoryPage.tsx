@@ -45,9 +45,10 @@ const HistoryDaySection = ({
   )
 }
 
-/** The history on its way, before its library is known: its title and intro over rows of tiles. */
+/** The history on its way, before its library is known: the way back, its title and intro over rows of tiles. */
 const HistorySkeleton = () => (
   <>
+    <Bone shape="button" />
     <Bone shape="hero" width="half" />
     <Bone shape="text" width="most" />
     <MediaTilesSkeleton />

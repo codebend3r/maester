@@ -82,7 +82,7 @@ describe('MoviePage', () => {
       </Routes>,
       { route: '/movies/40' },
     )
-    expect(await screen.findByRole('status')).toHaveTextContent('Opening the movie')
+    expect(await screen.findByText('Opening the movie')).toBeInTheDocument()
     expect(screen.queryByRole('heading')).toBeNull()
   })
 

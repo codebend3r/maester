@@ -1,6 +1,7 @@
 import { type UseQueryResult, useQuery } from '@tanstack/react-query'
 import {
   type Library,
+  type LibrarySettings,
   type MediaItem,
   type PosterEntry,
   isScanning,
@@ -29,7 +30,7 @@ import {
   unmatchedQuery,
 } from '@/lib/queries'
 import { LibraryListing, LibraryListingSkeleton } from '@/pages/LibraryPage/LibraryViews'
-import { playQueue } from '@/pages/LibraryPage/libraryShape'
+import { type ListingState, NOTHING_LISTED, playQueue } from '@/pages/LibraryPage/libraryShape'
 import type { LibrarySection } from '@/pages/LibraryPage/librarySections'
 import { useLibraryListing } from '@/pages/LibraryPage/useLibraryListing'
 import { useLibraryView } from '@/pages/LibraryPage/useLibraryView'
@@ -41,17 +42,15 @@ const FINISHED_LIMIT = 48
 
 /** What the page says in place of a listing with nothing in it, or null while there is something. */
 const emptyMessage = ({
-  loaded,
   empty,
   query,
   scanning,
 }: {
-  loaded: boolean
   empty: boolean
   query: string
   scanning: boolean
 }): string | null => {
-  if (!loaded || !empty) return null
+  if (!empty) return null
   if (query) return `Nothing here matches "${query}".`
   if (scanning) return 'Looking through the folders. Videos appear here as they are found.'
   return 'No videos in these folders yet. Check the paths, or add a folder that holds videos.'
@@ -109,10 +108,37 @@ const EntryGrid = ({ library, entries }: { library: Library; entries: PosterEntr
   )
 }
 
-/** `EntryGrid` while its entries are on their way. */
-const EntryGridSkeleton = ({ library }: { library: Library }) => (
-  <MediaGridSkeleton posters={matchTypeFor(library.settings.kind) != null} />
-)
+/** The listing as it stands: its shape on its way, why it could not be read, why it is empty, or itself. */
+const ListingBody = ({
+  listing,
+  settings,
+  empty,
+}: {
+  listing: ListingState
+  settings: LibrarySettings
+  empty: string | null
+}) => {
+  switch (listing.state) {
+    case 'pending':
+      return <LibraryListingSkeleton settings={settings} />
+    case 'failed':
+      return (
+        <p className={styles.message} role="alert">
+          {listing.error.message}
+        </p>
+      )
+    case 'listed':
+      return empty ? (
+        <p className={styles.message}>{empty}</p>
+      ) : (
+        <LibraryListing settings={settings} shows={listing.shows} files={listing.files} />
+      )
+    default: {
+      const unknown: never = listing
+      return unknown
+    }
+  }
+}
 
 /**
  * Every video or show in the library, searched, sorted and laid out as it
@@ -132,22 +158,24 @@ const AllSection = ({ library }: { library: Library }) => {
     seed: view.seed,
     scanning,
   })
-  const queue = playQueue({ settings, listing })
+  const listed = listing.state === 'listed' ? listing : NOTHING_LISTED
+  const queue = playQueue({ settings, listing: listed })
   // The strip down the side follows the order: letters for titles, steps of
   // the value sorted by for the rest, none for a random order.
   const scale = jumpScale({
     sort: settings.sort,
-    files: listing.files,
-    shows: listing.shows,
+    files: listed.files,
+    shows: listed.shows,
     source: settings.ratingsSource,
   })
-  const isListed = !listing.pending && listing.error == null
-  const empty = emptyMessage({
-    loaded: isListed,
-    empty: listing.shows.length === 0 && listing.files.length === 0,
-    query: view.query,
-    scanning,
-  })
+  const empty =
+    listing.state === 'listed'
+      ? emptyMessage({
+          empty: listed.shows.length === 0 && listed.files.length === 0,
+          query: view.query,
+          scanning,
+        })
+      : null
 
   // The item rides along in router state, as a card click hands it over, so
   // the player starts without fetching it again.
@@ -178,16 +206,7 @@ const AllSection = ({ library }: { library: Library }) => {
 
       {scale && !empty && <JumpPicker scale={scale} scope={cards} />}
 
-      {listing.pending && <LibraryListingSkeleton settings={settings} />}
-      {listing.error && (
-        <p className={styles.message} role="alert">
-          {listing.error.message}
-        </p>
-      )}
-      {empty && <p className={styles.message}>{empty}</p>}
-      {isListed && !empty && (
-        <LibraryListing settings={settings} shows={listing.shows} files={listing.files} />
-      )}
+      <ListingBody listing={listing} settings={settings} empty={empty} />
     </div>
   )
 }
@@ -198,7 +217,7 @@ const InProgressSection = ({ library }: { library: Library }) => {
   return (
     <SectionBody
       query={query}
-      shape={<EntryGridSkeleton library={library} />}
+      shape={<MediaGridSkeleton posters={matchTypeFor(library.settings.kind) != null} />}
       empty={whenEmpty(
         library.settings.saveProgress
           ? `Nothing in progress in ${library.name}. A video left partway through waits here.`
@@ -216,7 +235,7 @@ const FavouritesSection = ({ library }: { library: Library }) => {
   return (
     <SectionBody
       query={query}
-      shape={<EntryGridSkeleton library={library} />}
+      shape={<MediaGridSkeleton posters={matchTypeFor(library.settings.kind) != null} />}
       empty={whenEmpty(
         `No favourites in ${library.name} yet. Open a video's menu, from the button in its corner or a right click, and choose Favourite.`,
       )}
