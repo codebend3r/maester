@@ -8,6 +8,8 @@ import {
   type ShowEntry,
   isMatchState,
   isThumbnailState,
+  readCut,
+  readRelease,
 } from '@raven/core'
 import { DatabaseService } from '@/db/database'
 import {
@@ -50,23 +52,32 @@ type MediaRow = {
   position: number | null
   favourited_at: string | null
   item_id: number | null
+  item_type: string | null
+  item_tmdb_title: string | null
+  item_tmdb_original_title: string | null
+  split: string | null
   versions: number
 }
 
 /**
  * A saved spot counts only while its library saves progress; turned off, it
  * is kept but not shown. A file holding two episodes takes the first as its
- * item. `versions` counts the files in the library that are the same movie.
+ * item. `versions` counts the files in the library on the same movie's card,
+ * which its `split` names; `IS` holds two NULLs equal, so the files on the
+ * movie's own card count each other. TMDB's own titles come along for
+ * telling a split file's cut.
  */
 const SELECT_COLUMNS = `
   SELECT m.*, CASE WHEN l.save_progress = 1 THEN p.position END AS position,
          f.added_at AS favourited_at,
          i.id AS item_id, i.type AS item_type, i.title AS item_title,
          i.original_title AS item_original_title, i.sort_title AS item_sort_title,
-         i.year AS item_year,
+         i.year AS item_year, t.title AS item_tmdb_title,
+         t.original_title AS item_tmdb_original_title,
          CASE WHEN i.type = 'movie'
               THEN (SELECT COUNT(*) FROM media_items x JOIN media y ON y.id = x.media_id
-                     WHERE x.item_id = i.id AND y.library_id = m.library_id)
+                     WHERE x.item_id = i.id AND y.library_id = m.library_id
+                       AND y.split IS m.split)
               ELSE 1 END AS versions,
          ${score({ item: 'i.id', source: 'l.ratings_source' })} AS score`
 
@@ -80,6 +91,18 @@ const FROM_MEDIA = `
     LEFT JOIN items t ON t.id = mi.item_id`
 
 const SELECT_MEDIA = `${SELECT_COLUMNS}${FROM_MEDIA}`
+
+/**
+ * What sets a split movie file's card apart: the cut Smart split apart
+ * gave it, else the cut or release its name reads as. Null for a file on
+ * its movie's own card, and for anything but a movie.
+ */
+const variantOf = (row: MediaRow): string | null => {
+  if (row.item_type !== 'movie' || row.split == null) return null
+  if (row.split.startsWith('cut:')) return row.split.slice('cut:'.length)
+  const titles = [row.item_tmdb_title, row.item_tmdb_original_title]
+  return readCut({ fileName: row.file_name, titles })?.label ?? readRelease(row.file_name)
+}
 
 /** The client's view of a row, before its item's summary is attached: no path, no bookkeeping. */
 const toItem = (row: MediaRow): MediaItem => ({
@@ -110,6 +133,7 @@ const toItem = (row: MediaRow): MediaItem => ({
   edition: row.edition,
   item: null,
   versions: row.versions,
+  variant: variantOf(row),
 })
 
 /** A show in a TV library's listing, before its next episode is looked up. */
@@ -250,7 +274,8 @@ export class MediaRepository {
   /**
    * A library's videos in `sort` order; `seed` decides a random one, and
    * `limit` keeps the first that many. A movie kept as several files is one
-   * entry, its best file, with `versions` saying how many there are. Search
+   * entry, its best file, with `versions` saying how many there are, unless
+   * its files were split apart into a card each or one for each cut. Search
    * matches the file's title and its movie's.
    */
   list({
@@ -272,7 +297,8 @@ export class MediaRepository {
         `WITH listed AS (
            ${SELECT_COLUMNS},
                   ROW_NUMBER() OVER (
-                    PARTITION BY CASE WHEN i.type = 'movie' THEN i.id ELSE -m.id END
+                    PARTITION BY CASE WHEN i.type = 'movie' THEN i.id || '|' || COALESCE(m.split, '')
+                                      ELSE -m.id END
                     ORDER BY ${BEST_FIRST}) AS version_rank
            ${FROM_MEDIA}
             WHERE m.library_id = ?)

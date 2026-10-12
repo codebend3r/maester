@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
+  canSplitByCut,
   foldTitle,
   isExtra,
   parseEpisodeName,
   parseMovieName,
+  readCut,
+  readRelease,
   seasonFolderNumber,
   sortTitle,
 } from '@/naming'
@@ -163,6 +166,126 @@ describe('parseMovieName', () => {
       year: 1986,
       edition: 'Special Edition',
     })
+  })
+})
+
+describe('readCut', () => {
+  it.each([
+    ['Alexander 2004 Revisited the Final Cut (2004).mkv', ['Alexander'], 'Revisited the Final Cut'],
+    ['Aliens (Special Edition) (1986).mkv', ['Aliens'], 'Special Edition'],
+    ['Avatar Extended (2009) 2160p HEVC.mkv', ['Avatar'], 'Extended'],
+    ['Avatar Theatrical Cut (2009) 2160p HEVC.mkv', ['Avatar'], 'Theatrical Cut'],
+    ['Deadpool 2 Super Duper Cut (2018).mkv', ['Deadpool 2'], 'Super Duper Cut'],
+    [
+      'Kingdom of Heaven Directors Cut Roadshow Version (2005).mkv',
+      ['Kingdom of Heaven'],
+      'Directors Cut Roadshow Version',
+    ],
+    ['Blade Runner (1982) {edition-Final Cut} Remux-2160p.mkv', ['Blade Runner'], 'Final Cut'],
+    [
+      'Kingdom of Heaven (2005) Directors Cut WEBDL-2160p.mkv',
+      ['Kingdom of Heaven'],
+      'Directors Cut',
+    ],
+    ['The.Matrix.1999.Directors.Cut.1080p.BluRay.x264.mkv', ['The Matrix'], 'Directors Cut'],
+    ['The Matrix 1999 Extended.mkv', ['The Matrix'], 'Extended'],
+  ])('reads %s as the cut %s', (fileName, titles, label) => {
+    expect(readCut({ fileName, titles })?.label).toBe(label)
+  })
+
+  it.each([
+    ['300 (2007) 2160p HEVC.mkv', ['300']],
+    ['300 (2007) WEBDL-2160p.mkv', ['300']],
+    ['Alexander (2004).mkv', ['Alexander']],
+    ['Bobs Burgers Movie, The (2022) 2160p HEVC.mkv', ["The Bob's Burgers Movie"]],
+    ['Spider-Man Far From Home (2019) WEBDL-2160p.mkv', ['Spider-Man: Far From Home']],
+    ['Fast and Furious (2009).mkv', ['Fast & Furious']],
+    ['The.Matrix.1999.1080p.BluRay.x264-GROUP.mkv', ['The Matrix']],
+    ['Blade Runner 2049 (2017) Remux-2160p.mkv', ['Blade Runner 2049']],
+    ['The Matrix (1999) 4K.mkv', ['The Matrix']],
+    ['The Matrix 1999 4K.mkv', ['The Matrix']],
+  ])('finds no cut in %s beyond the title, year and release', (fileName, titles) => {
+    expect(readCut({ fileName, titles })).toBeNull()
+  })
+
+  it('counts the original title as the title too', () => {
+    expect(
+      readCut({
+        fileName: 'Amelie (2001).mkv',
+        titles: ['Amélie', 'Le Fabuleux Destin d’Amélie Poulain'],
+      }),
+    ).toBeNull()
+    expect(readCut({ fileName: 'Amelie (2001).mkv', titles: ['Amélie', null] })).toBeNull()
+  })
+
+  it('reads a scene name’s cut past its year as a spaced name’s', () => {
+    const titles = ['The Matrix']
+    expect(
+      readCut({ fileName: 'The.Matrix.1999.Directors.Cut.1080p.BluRay.x264.mkv', titles }),
+    ).toEqual({ label: 'Directors Cut', key: 'directors' })
+    expect(readCut({ fileName: 'The Matrix (1999) Directors Cut 1080p.mkv', titles })).toEqual({
+      label: 'Directors Cut',
+      key: 'directors',
+    })
+  })
+
+  it('reads the cut from Plex’s edition tag alone when the name has one', () => {
+    expect(
+      readCut({
+        fileName: 'The Matrix (1999) Extended Cut {edition-Extended Cut}.mkv',
+        titles: ['The Matrix'],
+      }),
+    ).toEqual({ label: 'Extended Cut', key: 'extended' })
+  })
+
+  it('folds two namings of one cut to the same key', () => {
+    const titles = ['Watchmen']
+    expect(readCut({ fileName: "Watchmen Director's Cut (2009).mkv", titles })?.key).toBe(
+      readCut({ fileName: 'Watchmen (Directors Edition) (2009).mkv', titles })?.key,
+    )
+  })
+
+  it('tells a cut from a second copy of the same one', () => {
+    const titles = ['Watchmen']
+    const webdl = readCut({ fileName: 'Watchmen The Ultimate Cut (2009) WEBDL-2160p.mkv', titles })
+    const hevc = readCut({ fileName: 'Watchmen The Ultimate Cut (2009) 2160p HEVC.mkv', titles })
+    expect(webdl).toEqual({ label: 'The Ultimate Cut', key: 'ultimate' })
+    expect(hevc).toEqual(webdl)
+  })
+})
+
+describe('canSplitByCut', () => {
+  const cut = (label: string, key: string) => ({ cut: { label, key } })
+
+  it('tells files apart by their cuts’ keys, the plain cut counting as one', () => {
+    expect(canSplitByCut([{ cut: null }, cut('Final Cut', 'final')])).toBe(true)
+    expect(canSplitByCut([cut('Extended', 'extended'), cut('Theatrical Cut', 'theatrical')])).toBe(
+      true,
+    )
+  })
+
+  it('finds nothing to tell apart in one cut named two ways, or in plain copies', () => {
+    expect(
+      canSplitByCut([cut("Director's Cut", 'directors'), cut('Directors Edition', 'directors')]),
+    ).toBe(false)
+    expect(canSplitByCut([{ cut: null }, { cut: null }])).toBe(false)
+  })
+})
+
+describe('readRelease', () => {
+  it.each([
+    ['300 (2007) 2160p HEVC.mkv', '2160p HEVC'],
+    ['300 (2007) WEBDL-2160p.mkv', 'WEBDL-2160p'],
+    ['The.Matrix.1999.1080p.BluRay.x264-GROUP.mkv', '1080p BluRay x264-GROUP'],
+    ['Alexander (2004) [Remux-2160p].mkv', 'Remux-2160p'],
+    ['The Matrix (1999) 4K.mkv', '4K'],
+    ['The.Matrix.1999.Directors.Cut.1080p.BluRay.x264.mkv', '1080p BluRay x264'],
+  ])('reads the release details of %s as %s', (fileName, release) => {
+    expect(readRelease(fileName)).toBe(release)
+  })
+
+  it('is null for a name with none', () => {
+    expect(readRelease('Aliens (1986).mkv')).toBeNull()
   })
 })
 

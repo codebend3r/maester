@@ -71,6 +71,14 @@ describe('mediaLabel and cardTitle', () => {
     expect(cardTitle(matched)).toEqual({ title: 'The Matrix', year: 1999 })
   })
 
+  it("name a split movie's card by its cut after the title", () => {
+    const split = mediaItem({
+      variant: 'Final Cut',
+      item: itemSummary({ title: 'Alexander', year: 2004 }),
+    })
+    expect(cardTitle(split)).toEqual({ title: 'Alexander (Final Cut)', year: 2004 })
+  })
+
   it('fall back to the parsed title and year', () => {
     const parsed = mediaItem({ title: 'Heat', year: 1995 })
     expect(mediaLabel(parsed)).toBe('Heat (1995)')

@@ -52,7 +52,8 @@ export const showYears = ({
 
 /**
  * Where a card goes: a matched item's page where the library has pages, or
- * straight to the player, with the video handed over, for anything else.
+ * straight to the player, with the video handed over, for anything else. A
+ * card a movie was split onto names its file, so the page plays that one.
  */
 export const cardLink = ({
   media,
@@ -62,5 +63,6 @@ export const cardLink = ({
   pages: boolean
 }): { to: string; state?: { media: MediaItem } } => {
   const page = pages && media.item ? itemPath(media.item) : null
-  return page == null ? watchLink(media) : { to: page }
+  if (page == null) return watchLink(media)
+  return media.variant == null ? { to: page } : { to: `${page}?file=${media.id}` }
 }

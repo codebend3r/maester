@@ -17,6 +17,7 @@ describe('LibraryPage tabs', () => {
     favourites: spyOn(api, 'listLibraryFavourites'),
     sagas: spyOn(api, 'listSagas'),
     unmatched: spyOn(api, 'listUnmatched'),
+    duplicates: spyOn(api, 'listDuplicates'),
     history: spyOn(api, 'listHistory'),
     lockState: spyOn(api, 'getLock'),
     health: spyOn(api, 'getMetadataHealth'),
@@ -29,6 +30,7 @@ describe('LibraryPage tabs', () => {
     spies.favourites.mockImplementation(async () => [])
     spies.sagas.mockImplementation(async () => [])
     spies.unmatched.mockImplementation(async () => [])
+    spies.duplicates.mockImplementation(async () => [])
     spies.history.mockImplementation(async () => [])
   })
 
@@ -60,6 +62,7 @@ describe('LibraryPage tabs', () => {
       'Favourites',
       'Sagas',
       'Not matched',
+      'Duplicates',
       'Recently finished',
     ])
     expect(links.map((link) => link.getAttribute('href'))).toEqual([
@@ -68,9 +71,35 @@ describe('LibraryPage tabs', () => {
       '/libraries/2/favourites',
       '/libraries/2/sagas',
       '/libraries/2/not-matched',
+      '/libraries/2/duplicates',
       '/libraries/2/finished',
     ])
     expect(screen.getByRole('link', { name: 'All' })).toHaveAttribute('aria-current', 'page')
+  })
+
+  it('opens Duplicates on the movies holding more than one file', async () => {
+    const alexander = movie({ id: 4, title: 'Alexander', year: 2004 })
+    spies.duplicates.mockImplementation(async () => [
+      {
+        itemId: 40,
+        cards: [
+          {
+            entry: { media: { ...alexander, versions: 2 }, poster: null },
+            files: [
+              { media: alexander, cut: null },
+              {
+                media: { ...alexander, id: 5, fileName: 'Alexander Final Cut.mkv' },
+                cut: { label: 'Final Cut', key: 'final' },
+              },
+            ],
+          },
+        ],
+      },
+    ])
+    open({ route: '/libraries/2/duplicates' })
+    expect(await screen.findByRole('heading', { name: 'Alexander' })).toBeInTheDocument()
+    expect(spies.duplicates).toHaveBeenCalledWith(2)
+    expect(spies.list).not.toHaveBeenCalled()
   })
 
   it('lays each saga out as a deck of its posters, opening its own page', async () => {

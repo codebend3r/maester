@@ -78,6 +78,12 @@ export const unmatchedQuery = (libraryId: number) =>
     queryFn: () => api.listUnmatched(libraryId),
   })
 
+export const duplicatesQuery = (libraryId: number) =>
+  queryOptions({
+    queryKey: queryKeys.duplicates(libraryId),
+    queryFn: () => api.listDuplicates(libraryId),
+  })
+
 export const favouritesQuery = queryOptions({
   queryKey: queryKeys.favourites,
   queryFn: () => api.listFavourites(),

@@ -349,8 +349,18 @@ export const isMediaItem = object({
   edition: nullable(isString),
   /** The movie or episode this file is, once matched. */
   item: nullable(isItemSummary),
-  /** How many files in its library are the same movie, this one included; 1 for anything else. */
+  /**
+   * How many files in its library share its card, this one included: the
+   * movie's files, or those of its cut once split apart; 1 for anything else.
+   */
   versions: isNumber,
+  /**
+   * What sets its card apart from the movie's others once its files were
+   * split apart: its cut, `Final Cut`, else what its name says past the
+   * title, `WEBDL-2160p`. Null while it shares the movie's own card, and
+   * for anything but a movie.
+   */
+  variant: nullable(isString),
 })
 
 export type MediaItem = Infer<typeof isMediaItem>
@@ -520,6 +530,61 @@ export type Saga = Infer<typeof isSaga>
 
 /** `GET /api/libraries/:id/sagas`: a library's sagas of two movies or more, by name. */
 export const isSagaList = listOf(isSaga)
+
+/** Which cut of a movie a file is, as its name reads. */
+export const isFileCut = object({
+  /** The cut in the name's own words: `Revisited the Final Cut`. */
+  label: isString,
+  /** The cut folded, so two namings of one cut agree: `revisited final`. */
+  key: isString,
+})
+
+export type FileCut = Infer<typeof isFileCut>
+
+/** One file on a card that holds several, and the cut its name reads as; null for the cut most files are. */
+export const isDuplicateFile = object({ media: isMediaItem, cut: nullable(isFileCut) })
+
+export type DuplicateFile = Infer<typeof isDuplicateFile>
+
+/** One of a movie's cards: the card as listed, and the files on it, best first. */
+export const isDuplicateCard = object({ entry: isPosterEntry, files: listOf(isDuplicateFile) })
+
+export type DuplicateCard = Infer<typeof isDuplicateCard>
+
+/**
+ * A movie with more than one file in a library, and the cards they make:
+ * one while they share it, more once split apart, the movie's own first.
+ */
+export const isDuplicate = object({ itemId: isNumber, cards: listOf(isDuplicateCard) })
+
+export type Duplicate = Infer<typeof isDuplicate>
+
+/**
+ * `GET /api/libraries/:id/duplicates`: a movie library's movies with more
+ * than one file, split apart or not, by title. A split movie stays, so its
+ * cards can be put back together.
+ */
+export const isDuplicates = listOf(isDuplicate)
+
+export type Duplicates = Infer<typeof isDuplicates>
+
+/**
+ * How a card's files are split: `apart` gives each its own card; `smart`
+ * gives each cut its own, keeping the files of one cut together.
+ */
+export const isSplitHow = oneOf(['apart', 'smart'])
+
+export type SplitHow = Infer<typeof isSplitHow>
+
+/** `POST /api/libraries/:id/duplicates/split`: the card, named by any file on it, and how. */
+export const isSplitRequest = object({ mediaId: isNumber, how: isSplitHow })
+
+export type SplitRequest = Infer<typeof isSplitRequest>
+
+/** `POST /api/libraries/:id/duplicates/join`: the movie whose files share one card again. */
+export const isJoinRequest = object({ itemId: isNumber })
+
+export type JoinRequest = Infer<typeof isJoinRequest>
 
 /** `GET /api/home`: every video in progress, then each pinned library's shelf, as the side menu orders them. */
 export const isHome = object({

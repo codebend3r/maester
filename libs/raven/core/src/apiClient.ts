@@ -3,6 +3,7 @@ import {
   type DirectoryListing,
   type DisplaySettings,
   type DisplaySettingsChange,
+  type Duplicates,
   type FavouriteChange,
   type HistoryEntry,
   type Home,
@@ -13,6 +14,7 @@ import {
   type ItemImageOptions,
   type ItemMetadataChange,
   type ItemMetadataState,
+  type JoinRequest,
   type Library,
   type LibraryBackdrop,
   type LibraryInput,
@@ -33,11 +35,13 @@ import {
   type ServerEvent,
   type ShowListing,
   type ShowMatchChoice,
+  type SplitRequest,
   type StreamMode,
   type SubtitleCue,
   type UnlockRequest,
   isDirectoryListing,
   isDisplaySettings,
+  isDuplicates,
   isHistory,
   isHome,
   isItemDetails,
@@ -341,6 +345,36 @@ export const createApiClient = ({
     /** A matched library's files no movie or show was found for, or waiting to be matched, by title. */
     listUnmatched: (libraryId: number): Promise<MediaItem[]> =>
       libraryGet({ libraryId, path: 'unmatched', guard: isMediaList }),
+
+    /** A movie library's movies with more than one file, each with its cards, split apart or not. */
+    listDuplicates: (libraryId: number): Promise<Duplicates> =>
+      libraryGet({ libraryId, path: 'duplicates', guard: isDuplicates }),
+
+    /** Splits the card `mediaId` is on, every file apart or by cut; answers with the duplicates as they stand after. */
+    splitDuplicate: ({
+      libraryId,
+      mediaId,
+      how,
+    }: { libraryId: number } & SplitRequest): Promise<Duplicates> =>
+      expect({
+        request: send({
+          path: `/api/libraries/${libraryId}/duplicates/split`,
+          method: 'POST',
+          body: { mediaId, how } satisfies SplitRequest,
+        }),
+        guard: isDuplicates,
+      }),
+
+    /** Puts a movie's files back on one card; answers with the duplicates as they stand after. */
+    joinSplit: ({ libraryId, itemId }: { libraryId: number } & JoinRequest): Promise<Duplicates> =>
+      expect({
+        request: send({
+          path: `/api/libraries/${libraryId}/duplicates/join`,
+          method: 'POST',
+          body: { itemId } satisfies JoinRequest,
+        }),
+        guard: isDuplicates,
+      }),
 
     /** Every video in progress, then each pinned library's newest arrivals; libraries still locked stay out. */
     getHome: (): Promise<Home> => expect({ request: send({ path: '/api/home' }), guard: isHome }),

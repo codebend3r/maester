@@ -197,6 +197,33 @@ describe('createApiClient', () => {
     ])
   })
 
+  it("lists a library's duplicates, splits a card and puts a movie back together", async () => {
+    const entry = { media: mediaItem({ versions: 2 }), poster: null }
+    const listing = [
+      {
+        itemId: 1,
+        cards: [
+          { entry, files: [{ media: mediaItem(), cut: { label: 'Final Cut', key: 'final' } }] },
+        ],
+      },
+    ]
+    const { client, calls } = clientReturning(respond({ body: listing }))
+    await expect(client.listDuplicates(3)).resolves.toEqual(listing)
+    await expect(
+      client.splitDuplicate({ libraryId: 3, mediaId: 7, how: 'smart' }),
+    ).resolves.toEqual(listing)
+    await expect(client.joinSplit({ libraryId: 3, itemId: 1 })).resolves.toEqual(listing)
+    expect(calls.map((call) => [call.url, call.init?.method, call.init?.body])).toEqual([
+      ['http://nas:8484/api/libraries/3/duplicates', 'GET', undefined],
+      [
+        'http://nas:8484/api/libraries/3/duplicates/split',
+        'POST',
+        JSON.stringify({ mediaId: 7, how: 'smart' }),
+      ],
+      ['http://nas:8484/api/libraries/3/duplicates/join', 'POST', JSON.stringify({ itemId: 1 })],
+    ])
+  })
+
   it('reads and changes the display settings', async () => {
     const { client, calls } = clientReturning(respond({ body: { titles: 'text' } }))
     await expect(client.getDisplaySettings()).resolves.toEqual({ titles: 'text' })

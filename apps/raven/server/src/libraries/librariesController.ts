@@ -16,6 +16,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common'
 import {
+  type Duplicates,
   type HistoryEntry,
   type Library,
   type LibraryInput,
@@ -24,7 +25,9 @@ import {
   type PosterEntry,
   type Saga,
   type ShowListing,
+  isJoinRequest,
   isRecord,
+  isSplitRequest,
   matchTypeFor,
   mediaListQuery,
   validateLibraryInput,
@@ -35,8 +38,10 @@ import { LockService } from '@/lock/lockService'
 import { MediaArtifacts } from '@/media/mediaArtifacts'
 import { MediaIndex } from '@/media/mediaIndex'
 import { MediaRepository } from '@/media/mediaRepository'
+import { MovieSplits } from '@/media/movieSplits'
 import { ViewingRepository } from '@/media/viewingRepository'
 import { MetadataService } from '@/metadata/metadataService'
+import { parseBody } from '@/parseBody'
 import { LibraryWatcher } from '@/scanner/libraryWatcher'
 import { ScannerService } from '@/scanner/scannerService'
 
@@ -69,6 +74,7 @@ export class LibrariesController {
   constructor(
     @Inject(LibrariesRepository) private readonly libraries: LibrariesRepository,
     @Inject(MediaRepository) private readonly media: MediaRepository,
+    @Inject(MovieSplits) private readonly splits: MovieSplits,
     @Inject(ViewingRepository) private readonly viewing: ViewingRepository,
     @Inject(MediaIndex) private readonly index: MediaIndex,
     @Inject(MediaArtifacts) private readonly artifacts: MediaArtifacts,
@@ -267,5 +273,43 @@ export class LibrariesController {
     return matchTypeFor(record.settings.kind) == null
       ? []
       : this.media.listUnmatched({ libraryId: id })
+  }
+
+  /** A library matched to movies; the others keep each file on its own card, with nothing to split. */
+  private findMovies(id: number): LibraryRecord {
+    const record = this.find(id)
+    if (matchTypeFor(record.settings.kind) !== 'movie') {
+      throw new BadRequestException('Only a library of movies has duplicates to split.')
+    }
+    return record
+  }
+
+  /** Its movies with more than one file, split apart or not; none in a library not matched to movies. */
+  @Get(':id/duplicates')
+  listDuplicates(@Param('id', ParseIntPipe) id: number): Duplicates {
+    const record = this.find(id)
+    return matchTypeFor(record.settings.kind) === 'movie' ? this.splits.list(id) : []
+  }
+
+  /** Splits a card, named by any file on it: every file apart, or by cut. */
+  @Post(':id/duplicates/split')
+  @HttpCode(200)
+  split(@Param('id', ParseIntPipe) id: number, @Body() body: unknown): Duplicates {
+    this.findMovies(id)
+    const request = parseBody({
+      guard: isSplitRequest,
+      body,
+      message: 'Send { mediaId, how }, how being "apart" or "smart".',
+    })
+    return this.splits.split({ libraryId: id, ...request })
+  }
+
+  /** Puts a split movie's files back on one card. */
+  @Post(':id/duplicates/join')
+  @HttpCode(200)
+  join(@Param('id', ParseIntPipe) id: number, @Body() body: unknown): Duplicates {
+    this.findMovies(id)
+    const { itemId } = parseBody({ guard: isJoinRequest, body, message: 'Send { itemId }.' })
+    return this.splits.join({ libraryId: id, itemId })
   }
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { episodeBackPath, itemPath, watchLink } from '@/lib/itemLinks'
+import { cardLink, episodeBackPath, itemPath, watchLink } from '@/lib/itemLinks'
 import { itemSummary, mediaItem } from '@/test/fixtures'
 
 describe('itemPath', () => {
@@ -30,5 +30,22 @@ describe('watchLink', () => {
   it('hands the video over in router state', () => {
     const media = mediaItem({ id: 9 })
     expect(watchLink(media)).toEqual({ to: '/watch/9', state: { media } })
+  })
+})
+
+describe('cardLink', () => {
+  it("opens a matched movie's page, naming the file when the movie was split onto several cards", () => {
+    const item = itemSummary({ id: 4, type: 'movie' })
+    expect(cardLink({ media: mediaItem({ id: 9, item }), pages: true })).toEqual({
+      to: '/movies/4',
+    })
+    expect(
+      cardLink({ media: mediaItem({ id: 9, item, variant: 'Final Cut' }), pages: true }),
+    ).toEqual({ to: '/movies/4?file=9' })
+  })
+
+  it('plays a file straight away where the library has no pages', () => {
+    const media = mediaItem({ id: 9, item: itemSummary({ id: 4, type: 'movie' }) })
+    expect(cardLink({ media, pages: false })).toEqual(watchLink(media))
   })
 })

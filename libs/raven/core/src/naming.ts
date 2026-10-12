@@ -4,6 +4,8 @@
  * client agree on what a name means.
  */
 
+import type { DuplicateFile, FileCut } from '@/contract'
+
 /** Ids a name carries: Plex's `{tmdb-603}` or Jellyfin's and Radarr's `[tmdbid-603]`. */
 export type NameIds = {
   tmdb: string | null
@@ -77,7 +79,7 @@ const readBareEdition = (title: string): { title: string; edition: string | null
  * each half of Radarr's `Bluray-1080p`.
  */
 const RELEASE_TAG =
-  /^(2160p|1080p|720p|480p|576p|blu-?ray|remux|web-?dl|webrip|web|hdtv|dvdrip|bdrip|brrip|x26[45]|h26[45]|hevc|av1|hdr|hdr10|dv|uhd|proper|repack)$/i
+  /^(2160p|1080p|720p|480p|576p|4k|blu-?ray|remux|web-?dl|webrip|web|hdtv|dvdrip|bdrip|brrip|x26[45]|h26[45]|hevc|av1|hdr|hdr10|dv|uhd|proper|repack)$/i
 
 const isReleaseTag = (word: string): boolean =>
   word.startsWith('[') || word.split('-').some((part) => RELEASE_TAG.test(part))
@@ -241,6 +243,99 @@ export const parseMovieName = ({
     ids: mergeIds(fromFile.ids, fromFolder?.ids ?? NO_IDS),
     alternatives,
   }
+}
+
+/** Words that say nothing of which cut a file is: articles, and what a cut is called. */
+const CUT_FILLER: ReadonlySet<string> = new Set([
+  'the',
+  'a',
+  'an',
+  'and',
+  'cut',
+  'edition',
+  'version',
+])
+
+const WORD = /[\p{L}\p{N}]+(?:['’]\p{L}+)*/gu
+
+const wordsOf = (text: string): string[] => text.match(WORD) ?? []
+
+/** A word as two namings of it agree: `Director’s` and `directors` alike. */
+const foldWord = (word: string): string =>
+  word
+    .normalize('NFKD')
+    .replace(/\p{M}/gu, '')
+    .replace(/['’]/g, '')
+    .toLowerCase()
+
+/**
+ * A name without its tags, in two: what names the movie, its title and any
+ * cut with the year taken out, and the release details after.
+ * `Kingdom of Heaven (2005) Directors Cut WEBDL-2160p` names `Kingdom of
+ * Heaven Directors Cut` and is released as `WEBDL-2160p`.
+ */
+const regionsOf = (bare: string): { named: string; release: string } => {
+  const found = findYear(bare)
+  const before = found ? bare.slice(0, found.at) : ''
+  const rest = found ? bare.slice(found.at).replace(/^\(?\d{4}\)?/, '') : bare
+  const at = firstTagAt(rest)
+  return { named: `${before} ${rest.slice(0, at)}`, release: rest.slice(at) }
+}
+
+/**
+ * A year left among a name's words, as a scene name puts it before its cut,
+ * `The.Matrix.1999.Directors.Cut`, where `findYear` takes no year.
+ */
+const isYearWord = (word: string): boolean => /^\d{4}$/.test(word) && plausibleYear(Number(word))
+
+/** A cut in these words, or null when they say no more than `Cut` or `Edition`. */
+const cutIn = (words: readonly string[]): FileCut | null => {
+  const key = words
+    .map(foldWord)
+    .filter((word) => !CUT_FILLER.has(word))
+    .join(' ')
+  return key === '' ? null : { label: words.join(' '), key }
+}
+
+/**
+ * Which cut of a movie a file is: Plex's `{edition-...}` when the name has
+ * one, else what the name says beyond the movie's `titles`, its year and
+ * its release details, so `Alexander 2004 Revisited the Final Cut (2004)`
+ * is `Revisited the Final Cut`. Null for a name that says nothing more,
+ * which is the cut most files are. Pass TMDB's own titles, not an edited
+ * one; a missing original title is null.
+ */
+export const readCut = ({
+  fileName,
+  titles,
+}: {
+  fileName: string
+  titles: readonly (string | null)[]
+}): FileCut | null => {
+  const stem = stemOf(fileName)
+  const tagged = EDITION_PATTERN.exec(stem)?.[1]
+  if (tagged != null) return cutIn(wordsOf(tagged))
+  const known = new Set(titles.flatMap((title) => wordsOf(title ?? '').map(foldWord)))
+  return cutIn(
+    wordsOf(regionsOf(stripTags(stem)).named).filter(
+      (word) => !known.has(foldWord(word)) && !isYearWord(word) && !isReleaseTag(word),
+    ),
+  )
+}
+
+/**
+ * Whether Smart split apart can tell these files apart: whether they read as
+ * more than one cut, the cut most files are counting as one. Cuts compare by
+ * key, as `Director's Cut` and `Directors Edition` are one cut.
+ */
+export const canSplitByCut = (files: readonly Pick<DuplicateFile, 'cut'>[]): boolean =>
+  new Set(files.map((file) => file.cut?.key ?? '')).size > 1
+
+/** A name's release details, `WEBDL-2160p` or `2160p HEVC`, or null when it gives none. */
+export const readRelease = (fileName: string): string | null => {
+  const { release } = regionsOf(stripTags(stemOf(fileName)))
+  const details = tidy(release.replace(/[[\]]/g, ' '))
+  return details === '' ? null : details
 }
 
 /** Plex's folders for extras, which belong to a movie or show but are not it. */
