@@ -12,6 +12,8 @@ import { Icon } from '@/components/Icon/Icon'
 import { ScoreChip } from '@/components/RatingChips/RatingChips'
 import { api } from '@/lib/api'
 import { showYears } from '@/lib/itemLinks'
+import { showEntryKey } from '@/lib/entryKeys'
+import { useHoverBackdrop } from '@/lib/useHoverBackdrop'
 import styles from '@/components/ShowCard/ShowCard.module.scss'
 
 /**
@@ -33,6 +35,9 @@ export const ShowCard = ({
   const { show, next } = entry
   const score = pickScore({ ratings: show.ratings, source: ratingsSource })
   const poster = api.itemImageUrl({ id: show.id, kind: 'poster', version: show.posterVersion })
+  const hover = useHoverBackdrop(
+    api.itemImageUrl({ id: show.id, kind: 'backdrop', version: show.backdropVersion }),
+  )
   const [failed, setFailed] = useState(false)
   const years = showYears({ year: show.year, endedYear: entry.endedYear })
   const code = next?.item ? episodeCode(next.item) : null
@@ -43,7 +48,7 @@ export const ShowCard = ({
   ].filter((fact): fact is string => fact != null)
 
   return (
-    <li className={styles.card}>
+    <li className={styles.card} data-entry={showEntryKey(show)} {...hover}>
       <Link to={`/shows/${show.id}`} className={styles.picture} tabIndex={-1} aria-hidden="true">
         <span className={styles.frame}>
           {poster && !failed ? (

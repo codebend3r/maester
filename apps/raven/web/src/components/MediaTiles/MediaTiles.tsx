@@ -19,6 +19,7 @@ import { RatingChips } from '@/components/RatingChips/RatingChips'
 import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { api } from '@/lib/api'
 import { cardLink } from '@/lib/itemLinks'
+import { mediaEntryKey } from '@/lib/entryKeys'
 import styles from '@/components/MediaTiles/MediaTiles.module.scss'
 
 /**
@@ -60,6 +61,7 @@ const MediaTile = ({
       className={[styles.tile, posters ? styles.posterTile : '', menu.hostClass]
         .filter(Boolean)
         .join(' ')}
+      data-entry={mediaEntryKey(media)}
     >
       <Link
         {...link}

@@ -186,7 +186,18 @@ describe('LibraryDialog', () => {
       within(screen.getByRole('group', { name: 'Type' }))
         .getAllByRole('radio')
         .map((radio) => radio.getAttribute('value')),
-    ).toEqual(['movies', 'shows', 'animeMovies', 'animeShows', 'sports', 'youtube', 'other'])
+    ).toEqual([
+      'movies',
+      'shows',
+      'animeMovies',
+      'animeShows',
+      'familyMovies',
+      'familyShows',
+      'documentaries',
+      'sports',
+      'youtube',
+      'other',
+    ])
     await userEvent.type(screen.getByLabelText('Name'), 'Anime')
     await userEvent.type(screen.getByLabelText('Folder path'), '/media/Anime')
     await userEvent.click(screen.getByRole('button', { name: 'Add' }))

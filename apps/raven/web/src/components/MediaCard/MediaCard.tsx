@@ -14,6 +14,7 @@ import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
 import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { api } from '@/lib/api'
 import { cardLink, watchLink } from '@/lib/itemLinks'
+import { mediaEntryKey } from '@/lib/entryKeys'
 import styles from '@/components/MediaCard/MediaCard.module.scss'
 
 /**
@@ -61,7 +62,7 @@ export const MediaCard = ({
   )
 
   return (
-    <li className={`${styles.card} ${menu.hostClass}`}>
+    <li className={`${styles.card} ${menu.hostClass}`} data-entry={mediaEntryKey(media)}>
       {page.state == null ? (
         <span className={styles.split}>
           <Link

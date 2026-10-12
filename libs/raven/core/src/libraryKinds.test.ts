@@ -80,13 +80,24 @@ describe('withLibraryKind', () => {
 })
 
 describe('the rules for each type of library', () => {
-  it('matches movies and shows libraries, anime included, to movies and shows', () => {
-    expect(MATCHED_KINDS).toEqual(['movies', 'shows', 'animeMovies', 'animeShows'])
+  it('matches movies and shows libraries, anime, family and documentaries included, to movies and shows', () => {
+    expect(MATCHED_KINDS).toEqual([
+      'movies',
+      'shows',
+      'animeMovies',
+      'animeShows',
+      'familyMovies',
+      'familyShows',
+      'documentaries',
+    ])
     expect(LIBRARY_KINDS.map((kind) => [kind, matchTypeFor(kind)])).toEqual([
       ['movies', 'movie'],
       ['shows', 'show'],
       ['animeMovies', 'movie'],
       ['animeShows', 'show'],
+      ['familyMovies', 'movie'],
+      ['familyShows', 'show'],
+      ['documentaries', 'movie'],
       ['sports', null],
       ['youtube', null],
       ['other', null],
@@ -96,12 +107,15 @@ describe('the rules for each type of library', () => {
   it('reads anime like the movies or shows it is, and sporting events and YouTube videos like Other', () => {
     expect(KIND_RULES.animeMovies).toEqual(KIND_RULES.movies)
     expect(KIND_RULES.animeShows).toEqual(KIND_RULES.shows)
+    expect(KIND_RULES.familyMovies).toEqual(KIND_RULES.movies)
+    expect(KIND_RULES.familyShows).toEqual(KIND_RULES.shows)
+    expect(KIND_RULES.documentaries).toEqual(KIND_RULES.movies)
     expect(KIND_RULES.sports).toEqual(KIND_RULES.other)
     expect(KIND_RULES.youtube).toEqual(KIND_RULES.other)
   })
 
-  it('lists the shows of a TV or Anime shows library, and the files of the rest', () => {
-    expect(LIBRARY_KINDS.filter(listsShows)).toEqual(['shows', 'animeShows'])
+  it('lists the shows of a TV, Anime or Family TV shows library, and the files of the rest', () => {
+    expect(LIBRARY_KINDS.filter(listsShows)).toEqual(['shows', 'animeShows', 'familyShows'])
   })
 
   it('offers every sort to a Movies library', () => {

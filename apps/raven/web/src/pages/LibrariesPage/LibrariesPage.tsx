@@ -1,19 +1,28 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { Library } from '@raven/core'
+import { type Library, isScanning } from '@raven/core'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/Button/Button'
 import { LibraryDialog } from '@/components/LibraryDialog/LibraryDialog'
+import { LibraryIcon } from '@/components/LibraryIcon/LibraryIcon'
 import { ScanStatus } from '@/components/ScanStatus/ScanStatus'
 import { api } from '@/lib/api'
 import { KINDS } from '@/lib/libraryKinds'
-import { librariesQuery } from '@/lib/queries'
+import { lockState } from '@/lib/libraryLock'
+import { librariesQuery, lockQuery } from '@/lib/queries'
 import { queryKeys } from '@/lib/queryClient'
 import styles from '@/pages/LibrariesPage/LibrariesPage.module.scss'
 
 const count = new Intl.NumberFormat()
 
-const LibraryRow = ({ library }: { library: Library }) => {
+/**
+ * A library's row: its type icon beside its name, its counts and folders,
+ * and its actions. Hovered or focused, the picture of its newest video
+ * fades in behind it. While it is locked to this browser it shows only its
+ * name, type and counts; the server sends no more, and a list cached from
+ * before is held to the same.
+ */
+const LibraryRow = ({ library, isShut }: { library: Library; isShut: boolean }) => {
   const queryClient = useQueryClient()
   const rescan = useMutation({
     mutationFn: () => api.scanLibrary(library.id),
@@ -29,42 +38,58 @@ const LibraryRow = ({ library }: { library: Library }) => {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.libraries }),
   })
 
+  const backdrop = !isShut && library.backdrop && api.libraryBackdropUrl(library.backdrop)
+  const lockNote = isShut ? ' · Locked' : ' · Unlocked'
+
   return (
     <li className={styles.row}>
-      <Link to={`/libraries/${library.id}`} className={styles.name}>
-        {library.name}
-      </Link>
-      <span className={styles.count}>
-        {KINDS[library.settings.kind].label}
-        {library.settings.locked && ' · Locked'} · {count.format(library.itemCount)}{' '}
-        {library.itemCount === 1 ? 'video' : 'videos'}
-        {library.unmatchedCount > 0 && ` · ${count.format(library.unmatchedCount)} not matched`}
-      </span>
-      <ul className={styles.paths} aria-label="Folders">
-        {library.paths.map((path) => (
-          <li key={path}>{path}</li>
-        ))}
-      </ul>
-      <div className={styles.status}>
-        <ScanStatus scan={library.scan} />
-      </div>
-      <div className={styles.actions}>
-        <Button
-          icon="pin"
-          className={styles.pin}
-          aria-pressed={library.settings.pinned}
-          disabled={pin.isPending}
-          onClick={() => pin.mutate(!library.settings.pinned)}
-        >
-          Pin<span className="visually-hidden"> {library.name}</span>
-        </Button>
-        <Button
-          icon="rescan"
-          disabled={library.scan.state === 'scanning' || rescan.isPending}
-          onClick={() => rescan.mutate()}
-        >
-          Rescan
-        </Button>
+      {backdrop && (
+        <span className={styles.backdrop} style={{ backgroundImage: `url("${backdrop}")` }} />
+      )}
+      <div className={styles.details}>
+        <LibraryIcon
+          kind={library.settings.kind}
+          isLocked={library.settings.locked}
+          size={28}
+          className={styles.icon}
+        />
+        <Link to={`/libraries/${library.id}`} className={styles.name}>
+          {library.name}
+        </Link>
+        <span className={styles.count}>
+          {KINDS[library.settings.kind].label}
+          {library.settings.locked && lockNote} · {count.format(library.itemCount)}{' '}
+          {library.itemCount === 1 ? 'video' : 'videos'}
+          {library.unmatchedCount > 0 && ` · ${count.format(library.unmatchedCount)} not matched`}
+        </span>
+        {!isShut && (
+          <ul className={styles.paths} aria-label="Folders">
+            {library.paths.map((path) => (
+              <li key={path}>{path}</li>
+            ))}
+          </ul>
+        )}
+        <div className={styles.status}>
+          <ScanStatus scan={library.scan} />
+        </div>
+        <div className={styles.actions}>
+          <Button
+            icon="pin"
+            className={styles.pin}
+            aria-pressed={library.settings.pinned}
+            disabled={pin.isPending}
+            onClick={() => pin.mutate(!library.settings.pinned)}
+          >
+            Pin<span className="visually-hidden"> {library.name}</span>
+          </Button>
+          <Button
+            icon="rescan"
+            disabled={isScanning(library.scan) || rescan.isPending}
+            onClick={() => rescan.mutate()}
+          >
+            Rescan
+          </Button>
+        </div>
       </div>
     </li>
   )
@@ -76,7 +101,13 @@ export const LibrariesPage = () => {
     ...librariesQuery,
     // Poll only while something is scanning, so the counts climb live.
     refetchInterval: (query) =>
-      query.state.data?.some((library) => library.scan.state === 'scanning') ? 1500 : false,
+      query.state.data?.some((library) => isScanning(library.scan)) ? 1500 : false,
+  })
+
+  // Whether this browser holds the PIN, asked only when some library is locked.
+  const lock = useQuery({
+    ...lockQuery,
+    enabled: (libraries.data ?? []).some((library) => library.settings.locked),
   })
 
   const dialog = adding && <LibraryDialog onClose={() => setAdding(false)} />
@@ -117,7 +148,13 @@ export const LibrariesPage = () => {
       </header>
       <ul className={styles.list} aria-busy={libraries.isPending}>
         {(libraries.data ?? []).map((library) => (
-          <LibraryRow key={library.id} library={library} />
+          <LibraryRow
+            key={library.id}
+            library={library}
+            isShut={
+              lockState({ locked: library.settings.locked, lock: lock.data }).state !== 'open'
+            }
+          />
         ))}
       </ul>
       {dialog}

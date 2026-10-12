@@ -1,12 +1,50 @@
-import { describe, expect, it } from 'bun:test'
-import { fireEvent, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it } from 'bun:test'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { PosterCard } from '@/components/PosterCard/PosterCard'
 import { itemSummary, matchedMovie, mediaItem } from '@/test/fixtures'
+import { usePageBackdrop } from '@/stores/pageBackdrop'
 import { renderWithProviders } from '@/test/render'
 
 const picture = (container: HTMLElement): HTMLImageElement | null => container.querySelector('img')
 
 describe('PosterCard', () => {
+  afterEach(() => usePageBackdrop.setState({ current: null, shown: null, recent: [], loaded: [] }))
+
+  const shownBehind = () => usePageBackdrop.getState().current
+
+  it("lays its movie's backdrop behind the page while pointed at, and puts it away after", async () => {
+    const { container } = renderWithProviders(
+      <PosterCard media={matchedMovie({ item: itemSummary({ backdropVersion: 'b9' }) })} />,
+    )
+    const card = container.querySelector('li') ?? document.body
+    fireEvent.pointerEnter(card, { pointerType: 'mouse' })
+    await waitFor(() => expect(shownBehind()).toBe('/api/items/40/images/backdrop?v=b9'))
+    fireEvent.pointerLeave(card, { pointerType: 'mouse' })
+    expect(shownBehind()).not.toBeNull()
+    await waitFor(() => expect(shownBehind()).toBeNull())
+  })
+
+  it('shows the backdrop as soon as the card is focused', () => {
+    renderWithProviders(
+      <PosterCard media={matchedMovie({ item: itemSummary({ backdropVersion: 'b9' }) })} />,
+    )
+    fireEvent.focus(screen.getByRole('link', { name: 'Busboys' }))
+    expect(shownBehind()).toBe('/api/items/40/images/backdrop?v=b9')
+  })
+
+  it('leaves the page alone for a touch, and for a movie with no backdrop', async () => {
+    const { container } = renderWithProviders(
+      <PosterCard media={matchedMovie({ item: itemSummary({ backdropVersion: 'b9' }) })} />,
+    )
+    fireEvent.pointerEnter(container.querySelector('li') ?? document.body, {
+      pointerType: 'touch',
+    })
+    renderWithProviders(<PosterCard media={matchedMovie({ id: 8 })} />)
+    fireEvent.focus(screen.getAllByRole('link', { name: 'Busboys' })[1] ?? document.body)
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    expect(shownBehind()).toBeNull()
+  })
+
   it('shows the value its listing is sorted by', () => {
     renderWithProviders(<PosterCard media={matchedMovie()} sort="bitrate-high" />)
     expect(screen.getByText('2.2 Mb/s')).toBeInTheDocument()

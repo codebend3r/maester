@@ -141,6 +141,9 @@ export const isLibraryKind = oneOf([
   'shows',
   'animeMovies',
   'animeShows',
+  'familyMovies',
+  'familyShows',
+  'documentaries',
   'sports',
   'youtube',
   'other',
@@ -211,14 +214,20 @@ export type LibraryBackdrop = Infer<typeof isLibraryBackdrop>
 export const isLibrary = object({
   id: isNumber,
   name: isString,
-  /** Absolute folder paths as the server sees them (container paths under Docker). */
+  /**
+   * Absolute folder paths as the server sees them (container paths under
+   * Docker). None while the library is locked to this browser.
+   */
   paths: isStringArray,
   itemCount: isNumber,
   /** Files no movie or show was found for; 0 in a library that is not matched. */
   unmatchedCount: isNumber,
   createdAt: isString,
+  /** While the library is locked to this browser, a failure says only that there was one. */
   scan: isScanStatus,
   settings: isLibrarySettings,
+  /** null when no video has a picture yet, or while the library is locked to this browser. */
+  backdrop: nullable(isLibraryBackdrop),
 })
 
 export type Library = Infer<typeof isLibrary>

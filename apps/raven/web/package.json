@@ -3,6 +3,9 @@
   "version": "0.4.6",
   "private": true,
   "type": "module",
+  "imports": {
+    "#package": "./package.json"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",

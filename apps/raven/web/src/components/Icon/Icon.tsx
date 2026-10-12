@@ -37,6 +37,9 @@ export type IconName =
   | 'filmSpark'
   | 'tv'
   | 'tvSpark'
+  | 'filmHeart'
+  | 'tvHeart'
+  | 'globe'
   | 'image'
   | 'ascending'
   | 'descending'
@@ -99,6 +102,12 @@ const PATHS: Record<IconName, string> = {
   tv: 'M3 8h18v12H3zM8 3.5l4 4.5 4-4.5',
   tvSpark:
     'M3 8h18v12H3zM8 3.5l4 4.5 4-4.5M12 10.5L13 13 15.5 14 13 15 12 17.5 11 15 8.5 14 11 13z',
+  filmHeart:
+    'M4 3h16v18H4zM8 3v18M16 3v18M4 7.5h4M4 12h4M4 16.5h4M16 7.5h4M16 12h4M16 16.5h4M12 14.6s-2.6-1.7-2.6-3.6a1.5 1.5 0 0 1 2.6-.9 1.5 1.5 0 0 1 2.6.9c0 1.9-2.6 3.6-2.6 3.6z',
+  tvHeart:
+    'M3 8h18v12H3zM8 3.5l4 4.5 4-4.5M12 16.6s-2.6-1.7-2.6-3.6a1.5 1.5 0 0 1 2.6-.9 1.5 1.5 0 0 1 2.6.9c0 1.9-2.6 3.6-2.6 3.6z',
+  globe:
+    'M12 3a9 9 0 1 0 0 18 9 9 0 1 0 0-18zM3 12h18M12 3c2.5 2.5 3.8 5.5 3.8 9s-1.3 6.5-3.8 9M12 3c-2.5 2.5-3.8 5.5-3.8 9s1.3 6.5 3.8 9',
   image: 'M3 5h18v14H3zM3 16l5-5 4 4 3-3 6 6M14 9a1.5 1.5 0 1 0 3 0 1.5 1.5 0 1 0-3 0',
   ascending: 'M7 20V4M3 8l4-4 4 4M13 7h3M13 12h5M13 17h7',
   descending: 'M7 4v16M3 16l4 4 4-4M13 7h7M13 12h5M13 17h3',

@@ -23,16 +23,51 @@
   border-top: 1px solid var(--color-moss);
 }
 
+// The backdrop and the details share one cell, the backdrop beneath.
 .row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas:
-    'name count'
-    'paths actions'
-    'status actions';
-  gap: var(--space-1) var(--space-4);
-  padding: var(--space-4) 0;
+  grid-template-areas: 'row';
   border-bottom: 1px solid var(--color-moss);
+}
+
+.backdrop,
+.details {
+  grid-area: row;
+}
+
+// Decorative: the library's newest video, faded in from the left so the name
+// stays clear. Its opacity would paint it over the details, and its clicks
+// with it, so it takes none and the details sit above.
+.backdrop {
+  background-position: center 25%;
+  background-size: cover;
+  opacity: 0;
+  mask-image: linear-gradient(to right, transparent, var(--color-stage) 60%);
+  pointer-events: none;
+}
+
+.row:hover .backdrop,
+.row:focus-within .backdrop {
+  opacity: 0.22;
+}
+
+// The icon hangs beside the name, and the lines below line up with the name.
+.details {
+  z-index: 1;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'icon name count'
+    '. paths actions'
+    '. status actions';
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-4) 0;
+}
+
+.icon {
+  grid-area: icon;
+  align-self: center;
+  color: var(--color-lichen);
 }
 
 .name {
@@ -80,6 +115,12 @@
   justify-content: end;
 }
 
+@media (prefers-reduced-motion: no-preference) {
+  .backdrop {
+    transition: opacity 300ms ease-out;
+  }
+}
+
 // Pinned reads as switched on: the same lit ground as the current page in the side menu.
 .pin[aria-pressed='true'] {
   color: var(--color-bark);
@@ -110,14 +151,14 @@
     justify-items: start;
   }
 
-  .row {
-    grid-template-columns: minmax(0, 1fr);
+  .details {
+    grid-template-columns: auto minmax(0, 1fr);
     grid-template-areas:
-      'name'
-      'count'
-      'paths'
-      'status'
-      'actions';
+      'icon name'
+      '. count'
+      '. paths'
+      '. status'
+      '. actions';
   }
 
   .count,

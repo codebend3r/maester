@@ -98,6 +98,17 @@ describe('isLibrary', () => {
     expect(isLibrary(withoutSettings)).toBe(false)
   })
 
+  it("accepts a library whose backdrop is its newest video's movie or its thumbnail", () => {
+    expect(isLibrary(library({ backdrop: { type: 'item', id: 3, version: 'abc' } }))).toBe(true)
+    expect(isLibrary(library({ backdrop: { type: 'thumbnail', id: 8, version: 41 } }))).toBe(true)
+  })
+
+  it('rejects a backdrop whose version does not fit its type', () => {
+    expect(
+      isLibrary({ ...library(), backdrop: { type: 'thumbnail', id: 8, version: 'abc' } }),
+    ).toBe(false)
+  })
+
   it('rejects a library with a setting that is not a boolean', () => {
     expect(isLibrary({ ...library(), settings: { ...library().settings, pinned: 'yes' } })).toBe(
       false,

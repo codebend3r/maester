@@ -14,6 +14,7 @@ import { SortHeader } from '@/components/SortHeader/SortHeader'
 import { api } from '@/lib/api'
 import { showYears } from '@/lib/itemLinks'
 import { type SortColumn, useTableSort } from '@/lib/tableSort'
+import { showEntryKey } from '@/lib/entryKeys'
 import styles from '@/components/ShowCard/ShowViews.module.scss'
 
 const episodesLabel = (entry: ShowEntry): string =>
@@ -106,7 +107,7 @@ export const ShowList = ({ shows, busy = false }: { shows: ShowEntry[]; busy?: b
       </thead>
       <tbody>
         {sorted.map((entry) => (
-          <tr key={entry.show.id} className={styles.row}>
+          <tr key={entry.show.id} className={styles.row} data-entry={showEntryKey(entry.show)}>
             <th scope="row">
               <Link to={`/shows/${entry.show.id}`} className={styles.title}>
                 {entry.show.title}
@@ -153,7 +154,7 @@ export const ShowTiles = ({
         episodesLabel(entry),
       ].filter((fact): fact is string => fact != null)
       return (
-        <li key={entry.show.id} className={styles.tile}>
+        <li key={entry.show.id} className={styles.tile} data-entry={showEntryKey(entry.show)}>
           <SmallPoster entry={entry} />
           <div className={styles.body}>
             <Link to={`/shows/${entry.show.id}`} className={styles.title}>

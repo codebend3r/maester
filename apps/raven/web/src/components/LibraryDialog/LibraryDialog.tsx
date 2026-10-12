@@ -153,7 +153,7 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
                 details.
               </>
             ) : (
-              'Movies, TV shows and anime get posters and details from TMDB.'
+              'Movies, TV shows, anime, family and documentaries get posters and details from TMDB.'
             )}
           </p>
         </fieldset>

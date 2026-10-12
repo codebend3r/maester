@@ -1,27 +1,25 @@
 import { useQuery } from '@tanstack/react-query'
-import { useId } from 'react'
+import { type ReactNode, useId } from 'react'
 import { Link, Outlet, matchPath, useLocation } from 'react-router-dom'
+import { version } from '#package'
 import { Button } from '@/components/Button/Button'
-import { Icon, type IconName } from '@/components/Icon/Icon'
+import { Icon } from '@/components/Icon/Icon'
+import { LibraryIcon } from '@/components/LibraryIcon/LibraryIcon'
 import { Logo } from '@/components/Logo/Logo'
+import { PageBackdrop } from '@/components/PageBackdrop/PageBackdrop'
 import { useKeyShortcut } from '@/lib/keyboard'
-import { KINDS } from '@/lib/libraryKinds'
 import { librariesQuery } from '@/lib/queries'
+import { useScrollReset } from '@/lib/useScrollReset'
 import { useServerEvents } from '@/lib/useServerEvents'
+import { usePageBackdrop } from '@/stores/pageBackdrop'
 import { useSideMenu } from '@/stores/sideMenu'
 import styles from '@/components/AppShell/AppShell.module.scss'
-
-/** A small icon laid over a link's own, and the word it adds to the link's name. */
-type NavBadge = { icon: IconName; label: string }
-
-/** A locked library keeps its type's icon, with a lock over it. */
-const LOCKED: NavBadge = { icon: 'lock', label: 'locked' }
 
 /**
  * A link in the side menu, marked as current when the location matches any
  * of its patterns. Collapsed to its icon, it keeps its name for screen
- * readers and as a tooltip. A badge lays its icon over the link's and adds
- * its word to the name both ways: `Tutorials (locked)`.
+ * readers and as a tooltip. A note adds its word to the name both ways:
+ * `Tutorials (locked)`.
  */
 const NavItem = ({
   to,
@@ -29,18 +27,18 @@ const NavItem = ({
   icon,
   label,
   collapsed,
-  badge,
+  note,
 }: {
   to: string
   patterns: readonly string[]
-  icon: IconName
+  icon: ReactNode
   label: string
   collapsed: boolean
-  badge?: NavBadge
+  note?: string
 }) => {
   const { pathname } = useLocation()
   const current = patterns.some((pattern) => matchPath(pattern, pathname) != null)
-  const suffix = badge ? ` (${badge.label})` : ''
+  const suffix = note ? ` (${note})` : ''
   return (
     <Link
       to={to}
@@ -48,17 +46,10 @@ const NavItem = ({
       aria-current={current ? 'page' : undefined}
       title={collapsed ? `${label}${suffix}` : undefined}
     >
-      <span className={styles.navIcon}>
-        <Icon name={icon} />
-        {badge && (
-          <span className={styles.badge}>
-            <Icon name={badge.icon} size={12} />
-          </span>
-        )}
-      </span>
+      {icon}
       <span className={collapsed ? 'visually-hidden' : undefined}>
         {label}
-        {badge && <span className="visually-hidden">{suffix}</span>}
+        {note && <span className="visually-hidden">{suffix}</span>}
       </span>
     </Link>
   )
@@ -82,19 +73,23 @@ const ShortcutTip = ({ onDismiss }: { onDismiss: () => void }) => (
 
 /**
  * The frame around every browsing page: the logo, then the side menu
- * beside the page (below it on a narrow screen), Home first. Pinned
- * libraries get their own links there, each with its type's icon (with a
- * lock on it for a locked one, whatever its type), and an open one is marked
- * instead of Libraries. The menu collapses to its icons with B or the toggle
- * at its foot, which keeps to the bottom left of the screen however far the
- * page scrolls, and stays that way across visits. While it is open, what the
- * pages show follows the server's changes. The player leaves the frame behind
- * for the whole screen.
+ * beside the page (below it on a narrow screen): Home and Favourites, then
+ * the pinned libraries, each with its type's icon (with a lock on it for a
+ * locked one, whatever its type), an open one marked instead of Libraries.
+ * Libraries and Settings sit at its foot, above the toggle, and keep to the
+ * bottom of the screen however far the page scrolls; on a narrow screen they
+ * end the row. The menu collapses to its icons with B or the toggle, and
+ * stays that way across visits; expanded on a wide screen, it shows raven's
+ * version beside the toggle. While a card's picture is behind the page, the
+ * menu frosts over it. While the frame is open, what the pages show follows
+ * the server's changes. The player leaves the frame behind for the
+ * whole screen.
  */
 export const AppShell = () => {
   const navId = useId()
   const { pathname } = useLocation()
   const { collapsed, tipSeen, toggle, dismissTip } = useSideMenu()
+  const isFrosted = usePageBackdrop((state) => state.shown != null)
   const libraries = useQuery(librariesQuery)
   const pinned = (libraries.data ?? []).filter((library) => library.settings.pinned)
   const pinnedOpen = pinned.some((library) =>
@@ -103,36 +98,34 @@ export const AppShell = () => {
 
   useKeyShortcut({ key: 'b', onPress: toggle })
   useServerEvents()
+  useScrollReset()
 
   return (
     <div className={collapsed ? `${styles.shell} ${styles.collapsed}` : styles.shell}>
+      <PageBackdrop />
       <header className={styles.header}>
         <Link to="/" className={styles.home}>
           <Logo />
         </Link>
       </header>
-      <div className={styles.side}>
-        <nav id={navId} className={styles.nav} aria-label="Main">
-          <NavItem to="/" patterns={['/']} icon="home" label="Home" collapsed={collapsed} />
+      <nav
+        id={navId}
+        className={isFrosted ? `${styles.side} ${styles.frosted}` : styles.side}
+        aria-label="Main"
+      >
+        <div className={styles.links}>
           <NavItem
-            to="/libraries"
-            patterns={pinnedOpen ? ['/libraries'] : ['/libraries', ...libraryPages(':id')]}
-            icon="libraries"
-            label="Libraries"
+            to="/"
+            patterns={['/']}
+            icon={<Icon name="home" />}
+            label="Home"
             collapsed={collapsed}
           />
           <NavItem
             to="/favourites"
             patterns={['/favourites']}
-            icon="heart"
+            icon={<Icon name="heart" />}
             label="Favourites"
-            collapsed={collapsed}
-          />
-          <NavItem
-            to="/settings"
-            patterns={['/settings']}
-            icon="settings"
-            label="Settings"
             collapsed={collapsed}
           />
           {pinned.length > 0 && (
@@ -142,29 +135,55 @@ export const AppShell = () => {
                   <NavItem
                     to={`/libraries/${library.id}`}
                     patterns={libraryPages(library.id)}
-                    icon={KINDS[library.settings.kind].icon}
+                    icon={
+                      <LibraryIcon
+                        kind={library.settings.kind}
+                        isLocked={library.settings.locked}
+                      />
+                    }
                     label={library.name}
                     collapsed={collapsed}
-                    badge={library.settings.locked ? LOCKED : undefined}
+                    note={library.settings.locked ? 'locked' : undefined}
                   />
                 </li>
               ))}
             </ul>
           )}
-        </nav>
-        <div className={styles.dock}>
-          <Button
-            icon="sidebar"
-            aria-label="Side menu"
-            aria-expanded={!collapsed}
-            aria-controls={navId}
-            aria-keyshortcuts="B"
-            title={`${collapsed ? 'Expand' : 'Collapse'} the side menu (B)`}
-            onClick={toggle}
-          />
-          {!tipSeen && <ShortcutTip onDismiss={dismissTip} />}
         </div>
-      </div>
+        <div className={styles.dock}>
+          <div className={styles.manage}>
+            <NavItem
+              to="/libraries"
+              patterns={pinnedOpen ? ['/libraries'] : ['/libraries', ...libraryPages(':id')]}
+              icon={<Icon name="libraries" />}
+              label="Libraries"
+              collapsed={collapsed}
+            />
+            <NavItem
+              to="/settings"
+              patterns={['/settings']}
+              icon={<Icon name="settings" />}
+              label="Settings"
+              collapsed={collapsed}
+            />
+          </div>
+          <div className={styles.foot}>
+            <div className={styles.toggle}>
+              <Button
+                icon="sidebar"
+                aria-label="Side menu"
+                aria-expanded={!collapsed}
+                aria-controls={navId}
+                aria-keyshortcuts="B"
+                title={`${collapsed ? 'Expand' : 'Collapse'} the side menu (B)`}
+                onClick={toggle}
+              />
+              {!tipSeen && <ShortcutTip onDismiss={dismissTip} />}
+            </div>
+            {!collapsed && <p className={styles.version}>v{version}</p>}
+          </div>
+        </div>
+      </nav>
       <main className={styles.main}>
         <Outlet />
       </main>

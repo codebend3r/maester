@@ -26,6 +26,7 @@ import { createApp } from '@/app'
 import { CONTROLLERS } from '@/appModule'
 import { type ServerConfig, readServerConfig } from '@/config'
 import { DatabaseService } from '@/db/database'
+import { LOCKED_SCAN_ERROR } from '@/libraries/librariesController'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { routeMarks } from '@/lock/lockGuard'
 import type { Privacy } from '@/lock/lockService'
@@ -206,6 +207,14 @@ describe('the media server', () => {
       expect(
         answers.filter(({ keys }) => !keys.includes('fileName')).map(({ url }) => url),
       ).toEqual([`/api/libraries/${library.id}/shows`])
+    })
+
+    it('pictures a library by its newest video, here by its thumbnail as it matched nothing', async () => {
+      const [newest] = await api().listMedia({ libraryId: library.id, sort: 'added' })
+      const backdrop = { type: 'thumbnail', id: newest?.id, version: newest?.thumbnailVersion }
+      expect((await api().getLibrary(library.id)).backdrop).toEqual(backdrop)
+      const listed = await api().listLibraries()
+      expect(listed.find((entry) => entry.id === library.id)?.backdrop).toEqual(backdrop)
     })
 
     it('will not lock a library while the server has no PIN', async () => {
@@ -889,6 +898,47 @@ describe('a library locked behind the PIN', () => {
     expect(await api().getLock()).toEqual({ available: true, unlocked: false })
   })
 
+  it("keeps a locked library's folders and picture to itself until it is unlocked", async () => {
+    await app().get(ThumbnailService).whenIdle()
+    const shown = async (holding?: string) =>
+      (await api(holding).listLibraries()).map((library) => ({
+        paths: library.paths,
+        backdrop: library.backdrop?.type ?? null,
+      }))
+    expect(await shown()).toEqual([
+      { paths: [at('Open')], backdrop: 'thumbnail' },
+      { paths: [], backdrop: null },
+    ])
+    expect(await api().getLibrary(state.private)).toMatchObject({ paths: [], backdrop: null })
+    const { cookie } = await unlock('3001')
+    expect(await shown(cookie)).toEqual([
+      { paths: [at('Open')], backdrop: 'thumbnail' },
+      { paths: [at('Private')], backdrop: 'thumbnail' },
+    ])
+    expect((await api(cookie).getLibrary(state.private)).backdrop).toEqual({
+      type: 'thumbnail',
+      id: state.privateVideo,
+      version: expect.any(Number),
+    })
+  })
+
+  it("says a locked library's scan failed without naming its folders", async () => {
+    const id = await createLibrary({
+      name: 'Gone',
+      paths: [at('Missing')],
+      settings: { locked: true },
+    })
+    const { cookie } = await unlock('3001')
+    try {
+      expect((await api().getLibrary(id)).scan.error).toBe(LOCKED_SCAN_ERROR)
+      const listed = await api().listLibraries()
+      expect(listed.find((library) => library.id === id)?.scan.error).toBe(LOCKED_SCAN_ERROR)
+      expect((await api(cookie).getLibrary(id)).scan.error).toContain(at('Missing'))
+    } finally {
+      await api(cookie).deleteLibrary(id)
+    }
+  })
+
   it('holds back its videos, their files, pictures and paths, and its history', async () => {
     const id = state.privateVideo
     const refused = await Promise.all(
@@ -1023,6 +1073,54 @@ describe('a library locked behind the PIN', () => {
     )
     expect(statuses).toEqual([401, 401, 401, 401, 401, 429])
     await expect(api().unlock('3001')).rejects.toMatchObject({ status: 429 })
+  })
+})
+
+describe('the order of libraries', () => {
+  const state: { root: string; app: NestFastifyApplication | null } = { root: '', app: null }
+  const app = (): NestFastifyApplication => {
+    if (!state.app) throw new Error('app not started')
+    return state.app
+  }
+  const at = (...parts: string[]) => join(state.root, 'media', ...parts)
+  // Scope 4K: short of 2160 lines, but 4K by its width.
+  const SCOPE_4K = '3200x1340'
+
+  beforeAll(async () => {
+    state.root = await mkdtemp(join(tmpdir(), 'raven-order-'))
+    await Promise.all([
+      encodeClip({ path: at('Clips', 'Small.mp4'), seconds: 1 }),
+      encodeClip({ path: at('UHD', 'Wide.mp4'), seconds: 1, size: SCOPE_4K }),
+      encodeClip({ path: at('Mixed', 'Wide.mp4'), seconds: 1, size: SCOPE_4K }),
+      encodeClip({ path: at('Mixed', 'Small.mp4'), seconds: 1 }),
+    ])
+    state.app = await createApp({
+      config: testConfig({ dataDir: join(state.root, 'data'), mediaDir: state.root }),
+      quiet: true,
+      watch: NOT_WATCHING,
+    })
+    await state.app.init()
+  })
+
+  afterAll(async () => {
+    await state.app?.close()
+    await rm(state.root, { recursive: true, force: true })
+  })
+
+  it('leads with the libraries whose videos are mostly 4K, then goes by name', async () => {
+    const api = apiFor({ app: app() })
+    const create = async (input: LibraryInput) => {
+      const created = await api.createLibrary(input)
+      await app().get(ScannerService).whenIdle(created.id)
+    }
+    await create({ name: 'Anime', paths: [at('Clips')] })
+    await create({ name: 'Mixed', paths: [at('Mixed')] })
+    await create({ name: 'Zulu', paths: [at('UHD')] })
+    expect((await api.listLibraries()).map((library) => library.name)).toEqual([
+      'Zulu',
+      'Anime',
+      'Mixed',
+    ])
   })
 })
 

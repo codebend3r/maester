@@ -14,6 +14,7 @@ import {
   type ItemMetadataChange,
   type ItemMetadataState,
   type Library,
+  type LibraryBackdrop,
   type LibraryInput,
   type LockState,
   type MatchCandidate,
@@ -201,6 +202,21 @@ export const createApiClient = ({
     return value
   }
 
+  /** A video's thumbnail at `version`, which it changes with, so it can be cached for good. */
+  const thumbnailAt = ({ id, version }: { id: number; version: number }): string =>
+    url(`/api/media/${id}/thumbnail?v=${version}`)
+
+  /** An item's picture of `kind` at `version`, which it changes with, so it can be cached for good. */
+  const itemImageAt = ({
+    id,
+    kind,
+    version,
+  }: {
+    id: number
+    kind: ItemImageKind
+    version: string
+  }): string => url(`/api/items/${id}/images/${kind}?${toQueryString({ v: version })}`)
+
   return {
     listLibraries: (): Promise<Library[]> =>
       expect({ request: send({ path: '/api/libraries' }), guard: isLibraryList }),
@@ -343,7 +359,7 @@ export const createApiClient = ({
     /** null until the server has generated one; versioned so it can be cached forever. */
     thumbnailUrl: (media: MediaItem): string | null =>
       media.thumbnail === 'ready'
-        ? url(`/api/media/${media.id}/thumbnail?v=${media.thumbnailVersion}`)
+        ? thumbnailAt({ id: media.id, version: media.thumbnailVersion })
         : null,
 
     /**
@@ -444,10 +460,21 @@ export const createApiClient = ({
       id: number
       kind: ItemImageKind
       version: string | null
-    }): string | null =>
-      version == null
-        ? null
-        : url(`/api/items/${id}/images/${kind}?${toQueryString({ v: version })}`),
+    }): string | null => (version == null ? null : itemImageAt({ id, kind, version })),
+
+    /** The picture behind a library's row on the Libraries page; versioned, so cached for good. */
+    libraryBackdropUrl: (backdrop: LibraryBackdrop): string => {
+      switch (backdrop.type) {
+        case 'item':
+          return itemImageAt({ id: backdrop.id, kind: 'backdrop', version: backdrop.version })
+        case 'thumbnail':
+          return thumbnailAt({ id: backdrop.id, version: backdrop.version })
+        default: {
+          const unknown: never = backdrop
+          return unknown
+        }
+      }
+    },
 
     /** A person, and everything in raven they are credited on. */
     getPerson: (id: number): Promise<PersonDetails> =>

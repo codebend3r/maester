@@ -41,6 +41,9 @@ type LibraryRow = {
 
 const isSettingName = keyOf(isLibrarySettings.shape)
 
+/** A 4K frame, as `resolutionLabel` in `@raven/core` reads one: scope encodes shave height, so width counts too. */
+const IS_4K = '(m.width >= 3200 OR m.height >= 1800)'
+
 /**
  * A row's settings. Each column is read as its setting, and checked with
  * that setting's guard from the contract: a value this version does not
@@ -119,17 +122,25 @@ export class LibrariesRepository {
     return this.database.db
   }
 
-  /** Every library, or just one when `id` is given. */
+  /**
+   * Every library, or just one when `id` is given. The 4K libraries come
+   * first, those whose probed videos are mostly 4K, then the rest, each by
+   * name, so the side menu, the Libraries page and Home all lead with them.
+   */
   private rows(id: number | null): LibraryRecord[] {
     const libraries = this.db
       .prepare<[number | null, number | null], LibraryRow>(
         `SELECT l.id, l.name, l.created_at, ${SETTING_COLUMNS.map((column) => `l.${column}`).join(', ')},
                 (SELECT COUNT(*) FROM media m WHERE m.library_id = l.id) AS item_count,
                 (SELECT COUNT(*) FROM media m WHERE m.library_id = l.id AND m.match = 'unmatched')
-                  AS unmatched_count
+                  AS unmatched_count,
+                (SELECT COUNT(*) FROM media m WHERE m.library_id = l.id AND m.width IS NOT NULL)
+                  AS probed_count,
+                (SELECT COUNT(*) FROM media m WHERE m.library_id = l.id AND ${IS_4K})
+                  AS uhd_count
            FROM libraries l
           WHERE ? IS NULL OR l.id = ?
-          ORDER BY l.name COLLATE NOCASE`,
+          ORDER BY 2 * uhd_count > probed_count DESC, l.name COLLATE NOCASE`,
       )
       .all(id, id)
     const paths = this.db

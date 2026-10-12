@@ -77,24 +77,28 @@ const UNMATCHED_RULES = {
 } as const satisfies KindRules
 
 /**
- * Anime is matched on TMDB like any movie or show. Sporting events and
- * YouTube videos are not there to match, so they are read like Other.
+ * Anime and family films and shows are matched on TMDB like any movie or
+ * show, and documentaries as movies, as Radarr files them. Sporting events
+ * and YouTube videos are not there to match, so they are read like Other.
  */
 export const KIND_RULES = {
   movies: MOVIE_RULES,
   shows: SHOW_RULES,
   animeMovies: MOVIE_RULES,
   animeShows: SHOW_RULES,
+  familyMovies: MOVIE_RULES,
+  familyShows: SHOW_RULES,
+  documentaries: MOVIE_RULES,
   sports: UNMATCHED_RULES,
   youtube: UNMATCHED_RULES,
   other: UNMATCHED_RULES,
 } as const satisfies Record<LibraryKind, KindRules>
 
 /**
- * What a library's files are matched to on TMDB: movies for a Movies or
- * Anime movies library, shows for a TV or Anime shows one, and null for a
- * type that is never matched. Two types with the same answer read their
- * files the same way.
+ * What a library's files are matched to on TMDB: movies for a Movies, Anime
+ * movies, Family movies or Documentaries library, shows for a TV, Anime or
+ * Family TV shows one, and null for a type that is never matched. Two types
+ * with the same answer read their files the same way.
  */
 export const matchTypeFor = (kind: LibraryKind): MatchItemType | null => KIND_RULES[kind].matches
 
