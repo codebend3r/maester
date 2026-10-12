@@ -17,6 +17,7 @@ import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { SortHeader } from '@/components/SortHeader/SortHeader'
 import { cardLink } from '@/lib/itemLinks'
 import { type SortColumn, useTableSort } from '@/lib/tableSort'
+import { mediaEntryKey } from '@/lib/entryKeys'
 import styles from '@/components/MediaList/MediaList.module.scss'
 
 const day = new Intl.DateTimeFormat(undefined, {
@@ -42,7 +43,7 @@ const MediaRow = ({
   const menu = useCardMenu({ media, matchType, inline: true })
   const { title, year } = cardTitle(media)
   return (
-    <tr className={`${styles.row} ${menu.hostClass}`}>
+    <tr className={`${styles.row} ${menu.hostClass}`} data-entry={mediaEntryKey(media)}>
       <th scope="row">
         <div className={styles.titleCell}>
           <Link

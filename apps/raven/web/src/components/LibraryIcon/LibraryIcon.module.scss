@@ -1,0 +1,27 @@
+// The type icon, with the lock laid over its corner.
+.icon {
+  display: grid;
+  grid-template-areas: 'icon';
+
+  > svg {
+    grid-area: icon;
+  }
+}
+
+// A locked library's type icon is cut away round the lock, so its lines stop
+// short of the lock instead of running through it, over whatever is behind:
+// the night, a link's ground or a picture. The cut sits where the lock's
+// centre falls and is as wide as the lock with its 1px of room.
+.icon:has(.lock) > svg {
+  mask-image: radial-gradient(35% 35% at 86% 86%, transparent 99%, var(--color-stage) 100%);
+}
+
+// It hangs a little past the icon's corner, into the container's padding or gap.
+.lock {
+  grid-area: icon;
+  align-self: end;
+  justify-self: end;
+  display: grid;
+  padding: 1px;
+  translate: 30% 30%;
+}

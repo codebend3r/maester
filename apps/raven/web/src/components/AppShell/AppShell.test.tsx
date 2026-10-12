@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { LIBRARY_KINDS } from '@raven/core'
-import { screen, within } from '@testing-library/react'
+import { act, fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router-dom'
+import { version } from '#package'
 import { AppShell } from '@/components/AppShell/AppShell'
 import { api } from '@/lib/api'
 import { KINDS } from '@/lib/libraryKinds'
+import { usePageBackdrop } from '@/stores/pageBackdrop'
 import { useSideMenu } from '@/stores/sideMenu'
 import { FakeEventSource } from '@/test/eventSource'
 import { library } from '@/test/fixtures'
@@ -43,6 +45,7 @@ describe('AppShell', () => {
 
   afterEach(() => {
     spies.list.mockReset()
+    usePageBackdrop.setState({ current: null, shown: null, recent: [], loaded: [] })
   })
 
   it('links home from the logo, named by its word alone', () => {
@@ -89,6 +92,27 @@ describe('AppShell', () => {
     expect(within(nav()).getByRole('link', { name: 'Libraries' })).not.toHaveAttribute(
       'aria-current',
     )
+  })
+
+  it('leads with Home and Favourites, then the pinned libraries, with Libraries and Settings last', async () => {
+    spies.list.mockImplementation(async () => [library({ id: 3, name: 'Movies' })])
+    renderShell('/')
+    await within(nav()).findByRole('link', { name: 'Movies' })
+    expect(
+      within(nav())
+        .getAllByRole('link')
+        .map((link) => link.textContent),
+    ).toEqual(['Home', 'Favourites', 'Movies', 'Libraries', 'Settings'])
+  })
+
+  it('opens a page a link leads to at its top', async () => {
+    spies.list.mockImplementation(async () => [])
+    const scroll = spyOn(window, 'scrollTo').mockImplementation(() => undefined)
+    renderShell('/')
+    expect(scroll).not.toHaveBeenCalled()
+    await userEvent.click(within(nav()).getByRole('link', { name: 'Favourites' }))
+    expect(scroll).toHaveBeenCalledWith({ top: 0 })
+    scroll.mockRestore()
   })
 
   it('lists the pinned libraries and leaves the rest out', async () => {
@@ -142,6 +166,9 @@ describe('AppShell', () => {
       'tv',
       'filmSpark',
       'tvSpark',
+      'filmHeart',
+      'tvHeart',
+      'globe',
       'trophy',
       'youtube',
       'video',
@@ -202,6 +229,31 @@ describe('AppShell', () => {
     await userEvent.click(toggle())
     expect(toggle()).toHaveAttribute('aria-expanded', 'true')
     expect(within(nav()).getByRole('link', { name: 'Favourites' })).not.toHaveAttribute('title')
+  })
+
+  it("shows raven's version beside the toggle while the menu is open", async () => {
+    spies.list.mockImplementation(async () => [])
+    renderShell('/')
+    expect(within(nav()).getByText(`v${version}`)).toBeInTheDocument()
+
+    await userEvent.click(toggle())
+    expect(within(nav()).queryByText(`v${version}`)).toBeNull()
+  })
+
+  it("frosts over once a card's picture is behind the page, and clears after", () => {
+    spies.list.mockImplementation(async () => [])
+    const { container } = renderShell('/')
+    expect(nav()).not.toHaveClass('frosted')
+
+    // Asked for but still loading, nothing is behind the page yet.
+    act(() => usePageBackdrop.getState().show('/api/items/1/backdrop'))
+    expect(nav()).not.toHaveClass('frosted')
+
+    fireEvent.load(container.querySelector('img[src="/api/items/1/backdrop"]') ?? document.body)
+    expect(nav()).toHaveClass('frosted')
+
+    act(() => usePageBackdrop.getState().hide('/api/items/1/backdrop'))
+    expect(nav()).not.toHaveClass('frosted')
   })
 
   it('collapses and expands with B, but not while typing or with a modifier held', async () => {

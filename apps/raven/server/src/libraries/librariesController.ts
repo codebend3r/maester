@@ -4,6 +4,7 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   HttpCode,
   Inject,
   NotFoundException,
@@ -47,6 +48,9 @@ const parseInput = (body: unknown): LibraryInput => {
 const listParams = (query: unknown): MediaListParams =>
   mediaListQuery.decode(isRecord(query) ? query : {})
 
+/** A locked library's scan failure, in place of the message, which names its folders. */
+export const LOCKED_SCAN_ERROR = 'The last scan ran into trouble. Enter the PIN to see what.'
+
 /** How many history entries a request gets unless it asks, and the most it may ask for. */
 const HISTORY_LIMIT = { fallback: 100, most: 500 }
 
@@ -81,8 +85,24 @@ export class LibrariesController {
     return input
   }
 
-  private withStatus(record: LibraryRecord): Library {
-    return { ...record, scan: this.scanner.status(record.id) }
+  /**
+   * A library as a client sees it: its scan's live status, and its newest
+   * video's picture. Without `canSee` a library still locked to the browser
+   * keeps its folders, its picture and what its last scan said about them
+   * (which names the folders) to itself, and shows only its name, type and
+   * counts. Every route says which, so none reveals a locked library by
+   * leaving it out: the public ones ask the lock, while the guarded ones,
+   * and creating a library, pass true, as whoever reaches them sees it all.
+   */
+  private withStatus({ record, canSee }: { record: LibraryRecord; canSee: boolean }): Library {
+    const scan = this.scanner.status(record.id)
+    if (canSee) return { ...record, scan, backdrop: this.media.backdropOf(record.id) }
+    return {
+      ...record,
+      paths: [],
+      scan: { ...scan, error: scan.error == null ? null : LOCKED_SCAN_ERROR },
+      backdrop: null,
+    }
   }
 
   private find(id: number): LibraryRecord {
@@ -93,15 +113,24 @@ export class LibrariesController {
 
   @Public()
   @Get()
-  list(): Library[] {
-    return this.libraries.list().map((record) => this.withStatus(record))
+  list(@Headers('cookie') cookie: string | undefined): Library[] {
+    const viewer = this.lock.viewer({ cookie })
+    return this.libraries
+      .list()
+      .map((record) => this.withStatus({ record, canSee: viewer.seesLibrary(record.id) }))
   }
 
   /** Every library shows in the side menu, locked or not, so its own settings do too. */
   @Public()
   @Get(':id')
-  get(@Param('id', ParseIntPipe) id: number): Library {
-    return this.withStatus(this.find(id))
+  get(
+    @Param('id', ParseIntPipe) id: number,
+    @Headers('cookie') cookie: string | undefined,
+  ): Library {
+    return this.withStatus({
+      record: this.find(id),
+      canSee: this.lock.viewer({ cookie }).seesLibrary(id),
+    })
   }
 
   /** Creating a library starts its first scan; the response already reports it as scanning. */
@@ -111,7 +140,7 @@ export class LibrariesController {
     const record = this.libraries.create(this.parseLockable(body))
     this.scanner.scan(record.id)
     this.watcher.sync()
-    return this.withStatus(record)
+    return this.withStatus({ record, canSee: true })
   }
 
   /**
@@ -131,7 +160,7 @@ export class LibrariesController {
     }
     if (!samePaths({ before: before.paths, after: record.paths })) this.scanner.scan(id)
     this.watcher.sync()
-    return this.withStatus(record)
+    return this.withStatus({ record, canSee: true })
   }
 
   @Delete(':id')
@@ -154,7 +183,7 @@ export class LibrariesController {
   scan(@Param('id', ParseIntPipe) id: number): Library {
     const record = this.find(id)
     this.scanner.scan(id)
-    return this.withStatus(record)
+    return this.withStatus({ record, canSee: true })
   }
 
   /**
@@ -173,7 +202,7 @@ export class LibrariesController {
     }
     this.metadata.retryUnmatched(id)
     // Read again, so the count of files not matched is the one after the retry.
-    return this.withStatus(this.find(id))
+    return this.withStatus({ record: this.find(id), canSee: true })
   }
 
   /** The library's played videos, last played first; `watched=true` keeps the ones watched. */

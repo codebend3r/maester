@@ -1,0 +1,15 @@
+// Fills the frame it is given, cropped to the frame's shape.
+.image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+// The title's first letter, in the middle of the frame.
+.placeholder {
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-size: var(--font-size-xl);
+  color: var(--color-lichen);
+}

@@ -9,60 +9,36 @@ import {
   pickScore,
   sortFact,
 } from '@raven/core'
-import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { FavouriteMark } from '@/components/FavouriteMark/FavouriteMark'
 import { Icon } from '@/components/Icon/Icon'
 import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
+import { PosterImage } from '@/components/PosterImage/PosterImage'
 import { ScoreChip } from '@/components/RatingChips/RatingChips'
 import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { api } from '@/lib/api'
 import { cardLink, watchLink } from '@/lib/itemLinks'
+import { mediaEntryKey } from '@/lib/entryKeys'
+import { useHoverBackdrop } from '@/lib/useHoverBackdrop'
 import styles from '@/components/PosterCard/PosterCard.module.scss'
 
-/**
- * The picture a poster card shows: the poster, else the frame grab cropped
- * to 2:3, else the title's first letter. A poster that fails to load falls
- * back the same way. The poster is the video's own item's unless `poster`
- * names another, as an episode shows its season's.
- */
+/** The picture a poster card shows, with where playback stopped along its foot. */
 export const PosterFrame = ({
   media,
-  poster: stand = media.item,
+  poster,
 }: {
   media: MediaItem
   poster?: ItemSummary | null
-}) => {
-  const poster = stand
-    ? api.itemImageUrl({ id: stand.id, kind: 'poster', version: stand.posterVersion })
-    : null
-  const thumbnail = api.thumbnailUrl(media)
-  const [failed, setFailed] = useState<ReadonlyArray<string>>([])
-  const source = [poster, thumbnail].find(
-    (url): url is string => url != null && !failed.includes(url),
-  )
-  return (
-    <span className={styles.frame}>
-      {source ? (
-        <img
-          key={source}
-          className={styles.image}
-          src={source}
-          alt=""
-          loading="lazy"
-          decoding="async"
-          onError={() => setFailed((current) => [...current, source])}
-        />
-      ) : (
-        <span className={styles.placeholder} aria-hidden="true">
-          {cardTitle(media).title.slice(0, 1)}
-        </span>
-      )}
-      <ResumeBar media={media} className={styles.resume} />
-    </span>
-  )
-}
+}) => (
+  <span className={styles.frame}>
+    <PosterImage media={media} poster={poster} />
+    <ResumeBar media={media} className={styles.resume} />
+  </span>
+)
+
+const backdropOf = (item: ItemSummary | null | undefined): string | null =>
+  item ? api.itemImageUrl({ id: item.id, kind: 'backdrop', version: item.backdropVersion }) : null
 
 /**
  * A movie as a poster, its title and year beneath. A matched card opens the
@@ -88,6 +64,8 @@ export const PosterCard = ({
   sort?: MediaSort
 }) => {
   const menu = useCardMenu({ media, matchType })
+  // The card's poster item's backdrop, else the video's own.
+  const hover = useHoverBackdrop(backdropOf(poster) ?? backdropOf(media.item))
   const { title, year } = cardTitle(media)
   const score = media.item
     ? pickScore({ ratings: media.item.ratings, source: ratingsSource })
@@ -102,7 +80,7 @@ export const PosterCard = ({
   ].filter((fact): fact is string => fact != null && fact !== sorted)
 
   return (
-    <li className={`${styles.card} ${menu.hostClass}`}>
+    <li className={`${styles.card} ${menu.hostClass}`} data-entry={mediaEntryKey(media)} {...hover}>
       <Link
         {...link}
         className={styles.picture}

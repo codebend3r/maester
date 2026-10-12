@@ -26,13 +26,19 @@
   text-decoration: none;
 }
 
-// The menu's column: its links, then the toggle at its foot.
+// The menu's column: its links, then Libraries, Settings and the toggle at
+// its foot. The frost's blur would make the menu a stacking context only
+// while a card is pointed at, moving the tip under the page and back, so the
+// menu is always one: over the page (for the tip), still under a card's open
+// menu, which comes later.
 .side {
+  position: relative;
+  z-index: 1;
   grid-area: side;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   grid-template-areas:
-    'nav'
+    'links'
     'dock';
   gap: var(--space-3);
   min-width: 11rem;
@@ -40,30 +46,75 @@
   border-right: 1px solid var(--color-moss);
 }
 
-.nav {
-  grid-area: nav;
+// While a card's picture is behind the page, the menu frosts over it.
+.frosted {
+  background: var(--color-frost-glass);
+  backdrop-filter: blur(24px);
+}
+
+// In step with the picture's own fade.
+@media (prefers-reduced-motion: no-preference) {
+  .side {
+    transition:
+      background-color 450ms ease-out,
+      backdrop-filter 450ms ease-out;
+  }
+}
+
+.links {
+  grid-area: links;
   display: grid;
   align-content: start;
   gap: var(--space-0);
 }
 
 // Its row runs down to the foot of the page, which gives it room to stick to
-// the bottom of the screen on a long page instead of waiting at the end. Over
-// the page (for the tip), but under a card's open menu.
+// the bottom of the screen on a long page instead of waiting at the end.
+// Clear like the links above, so a picture behind the page shows through.
+// Over any pinned links that pass under it.
 .dock {
   position: sticky;
   bottom: var(--space-3);
   z-index: 1;
   grid-area: dock;
   align-self: end;
-  justify-self: start;
+  display: grid;
+  gap: var(--space-3);
+}
+
+// Libraries and Settings, set off from the links above by a rule.
+.manage {
+  display: grid;
+  gap: var(--space-0);
+  padding-top: var(--space-1);
+  border-top: 1px solid var(--color-moss);
+}
+
+// The toggle, with raven's version beside it while the menu is open.
+.foot {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas: 'toggle version';
+  align-items: center;
+  gap: var(--space-2);
+}
+
+// The toggle holds the tip, so the tip points at it rather than the links.
+.toggle {
+  position: relative;
+  grid-area: toggle;
   display: grid;
 }
 
-// `--link-ground` is the link's background, which its badge sits on too.
-.navLink {
-  --link-ground: var(--color-night);
+.version {
+  grid-area: version;
+  color: var(--color-lichen);
+  font-size: var(--font-size-xs);
+  font-variant-numeric: tabular-nums;
+}
 
+// Clear until pointed at or open, so a picture behind the page shows through.
+.navLink {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
@@ -73,43 +124,16 @@
   color: var(--color-lichen);
   font-weight: 600;
   text-decoration: none;
-  background: var(--link-ground);
 
   &:hover,
   &[aria-current='page'] {
-    --link-ground: var(--color-canopy);
-
+    background: var(--color-canopy);
     color: var(--color-bark);
   }
 }
 
-// The link's icon, with its badge laid over its corner.
-.navIcon {
-  display: grid;
-  grid-template-areas: 'icon';
-
-  > svg {
-    grid-area: icon;
-  }
-}
-
-// On the link's own ground, so the icon's lines stop short of the badge
-// instead of running through it. It hangs a little past the icon's corner,
-// into the link's padding and gap.
-.badge {
-  grid-area: icon;
-  align-self: end;
-  justify-self: end;
-  display: grid;
-  padding: 1px;
-  border-radius: 50%;
-  background: var(--link-ground);
-  translate: 30% 30%;
-}
-
 @media (prefers-reduced-motion: no-preference) {
-  .navLink,
-  .badge {
+  .navLink {
     transition: background-color 120ms ease-out;
   }
 }
@@ -144,8 +168,10 @@
     justify-content: center;
   }
 
-  .dock {
-    justify-self: center;
+  .foot {
+    grid-template-columns: auto;
+    grid-template-areas: 'toggle';
+    justify-content: center;
   }
 }
 
@@ -219,38 +245,50 @@
     padding-inline: clamp(var(--space-3), 4vw, var(--space-6));
   }
 
-  // One row across the top, the toggle first.
+  // One row across the top: the toggle, the links, then Libraries and
+  // Settings. With many pinned libraries the row scrolls sideways by itself,
+  // so the page never does. Each column is as wide as its link, so the links
+  // sit side by side instead of shrinking over each other.
   .side {
-    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-columns: repeat(3, max-content);
     grid-template-rows: auto;
-    grid-template-areas: 'dock nav';
+    grid-template-areas: 'toggle links manage';
     align-items: center;
-    gap: 0;
+    gap: var(--space-1);
     min-width: 0;
     border-right: 0;
     border-bottom: 1px solid var(--color-moss);
+    overflow-x: auto;
   }
 
   // Collapsing narrows the column on a wide screen; the row keeps its edge.
   .side,
   .collapsed .side {
-    padding: 0 0 0 clamp(var(--space-3), 4vw, var(--space-6));
+    padding: var(--space-1) clamp(var(--space-3), 4vw, var(--space-6));
   }
 
-  // With many pinned libraries the links scroll sideways by themselves, so
-  // the page never does. Each column is as wide as its link, so the links sit
-  // side by side instead of shrinking over each other.
-  .nav {
+  .links,
+  .manage {
     grid-auto-flow: column;
     grid-auto-columns: max-content;
-    justify-content: start;
-    padding: var(--space-1) clamp(var(--space-3), 4vw, var(--space-6)) var(--space-1) var(--space-1);
-    overflow-x: auto;
   }
 
-  .dock {
-    position: static;
-    align-self: center;
+  // Its parts take their places in the row, all but the version, which the
+  // row has no room for.
+  .dock,
+  .foot {
+    display: contents;
+  }
+
+  .version {
+    display: none;
+  }
+
+  .manage {
+    grid-area: manage;
+    padding: 0 0 0 var(--space-1);
+    border-top: 0;
+    border-left: 1px solid var(--color-moss);
   }
 
   .navLink {

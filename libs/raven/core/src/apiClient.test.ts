@@ -407,6 +407,12 @@ describe('the metadata calls', () => {
       'http://nas:8484/api/items/2/images/poster?v=abc',
     )
     expect(client.itemImageUrl({ id: 2, kind: 'backdrop', version: null })).toBeNull()
+    expect(client.libraryBackdropUrl({ type: 'item', id: 3, version: 'def' })).toBe(
+      'http://nas:8484/api/items/3/images/backdrop?v=def',
+    )
+    expect(client.libraryBackdropUrl({ type: 'thumbnail', id: 8, version: 41 })).toBe(
+      'http://nas:8484/api/media/8/thumbnail?v=41',
+    )
     expect(client.photoUrl({ personId: 5, photoVersion: 'x' })).toBe(
       'http://nas:8484/api/people/5/photo?v=x',
     )

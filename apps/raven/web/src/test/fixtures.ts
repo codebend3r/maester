@@ -27,6 +27,7 @@ export const library = (overrides: Partial<Library> = {}): Library => ({
     autoRefresh: true,
     locked: false,
   },
+  backdrop: null,
   ...overrides,
 })
 

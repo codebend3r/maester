@@ -43,8 +43,9 @@
 }
 
 // The types two to a row, so each sits beside its counterpart: Movies with
-// TV shows, then the anime pair, then Sporting events with YouTube videos.
-// One to a row on a narrow screen.
+// TV shows, then the anime pair and the family pair, then Documentaries with
+// Sporting events and YouTube videos with Other. One to a row on a narrow
+// screen.
 .kinds {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

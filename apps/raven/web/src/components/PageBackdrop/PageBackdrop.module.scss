@@ -1,0 +1,32 @@
+// Fixed behind everything, the page's own ground under it: under the content
+// in the page's stacking, over the night the body paints. Every picture
+// shares the one cell, the newest on top.
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  display: grid;
+  grid-template: 'layer' minmax(0, 1fr) / minmax(0, 1fr);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+// Faint, and fading towards the foot, so text over it keeps its contrast.
+.layer {
+  grid-area: layer;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  mask-image: linear-gradient(to bottom, var(--color-stage) 45%, transparent 100%);
+}
+
+.shown {
+  opacity: 0.32;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .layer {
+    transition: opacity 450ms ease-out;
+  }
+}
