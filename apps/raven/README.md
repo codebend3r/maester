@@ -138,6 +138,7 @@ A library's page opens on **All**, its listing with the search, sort and view ab
 
 - **In progress**: the videos left partway through, the most recently watched first. Empty in a library that does not save where videos stop.
 - **Favourites**: the library's own favourites, most recently marked first.
+- **Sagas**, in a library matched to movies: the movies gathered by the TMDB collection they belong to (The Lord of the Rings Collection, say), by name, each a deck of its posters, the first movie on top, with how many there are and the years they span. Pointed at or focused, a deck fans out like a hand of cards; it opens the saga's own page (`/libraries/4/sagas/119`), under the backdrop of its first movie, with its movies oldest first to pick one to watch. A collection shows once two of its movies are in the library. Movies matched before sagas were kept learn theirs in the sweep on start, one light call each, with no scores fetched again.
 - **Not matched**, in a matched library: the files no movie or show was found for, or still waiting, each with **Fix match** in its menu.
 - **Recently finished**: the last 48 videos watched by the library's **Watched at** setting, each with the day it last played, and a link to the full [History](#history).
 

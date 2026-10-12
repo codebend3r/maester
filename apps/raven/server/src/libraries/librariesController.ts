@@ -22,6 +22,7 @@ import {
   type MediaItem,
   type MediaListParams,
   type PosterEntry,
+  type Saga,
   type ShowListing,
   isRecord,
   matchTypeFor,
@@ -252,6 +253,12 @@ export class LibrariesController {
     return this.media.withPosters(this.media.listFavourites({ libraryId: id }))
   }
 
+  /** Its sagas of two movies or more; none in a library that is not matched to movies. */
+  @Get(':id/sagas')
+  listSagas(@Param('id', ParseIntPipe) id: number): Saga[] {
+    const record = this.find(id)
+    return matchTypeFor(record.settings.kind) === 'movie' ? this.media.listSagas(id) : []
+  }
 
   /** Its files no movie or show was found for, or still waiting for matching, by title. */
   @Get(':id/unmatched')

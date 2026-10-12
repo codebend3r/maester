@@ -12,6 +12,7 @@ describe('the tabs of a library', () => {
       'all',
       'in-progress',
       'favourites',
+      'sagas',
       'not-matched',
       'finished',
     ]
@@ -30,6 +31,7 @@ describe('the tabs of a library', () => {
 
   it('reads All from no param, a tab from its name, and nothing from anything else', () => {
     expect(sectionFrom(undefined)).toBe('all')
+    expect(sectionFrom('sagas')).toBe('sagas')
     expect(sectionFrom('all')).toBeNull()
     expect(sectionFrom('history')).toBeNull()
   })

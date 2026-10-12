@@ -35,6 +35,7 @@ import {
   isReview,
   isSeasonSummary,
   isServerEvent,
+  isSaga,
   isShowListing,
 } from '@/contract'
 import {
@@ -56,6 +57,22 @@ describe('isMediaItem', () => {
   it('rejects an item whose favourite flag is missing', () => {
     const { favourite: _favourite, ...withoutFlag } = mediaItem()
     expect(isMediaItem(withoutFlag)).toBe(false)
+  })
+})
+
+describe('isSaga', () => {
+  it('accepts a collection with its movies', () => {
+    expect(
+      isSaga({
+        tmdbId: '119',
+        name: 'The Lord of the Rings Collection',
+        media: [mediaItem()],
+      }),
+    ).toBe(true)
+  })
+
+  it('rejects a saga with no name', () => {
+    expect(isSaga({ tmdbId: '119', name: null, media: [] })).toBe(false)
   })
 })
 

@@ -1,0 +1,100 @@
+// The sagas side by side, each card wide enough for its deck to fan out in.
+.decks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(15rem, 100%), 1fr));
+  gap: var(--space-6) var(--space-4);
+  padding-top: var(--space-3);
+}
+
+.item {
+  display: grid;
+}
+
+// The deck over the saga's name and facts. Raised while open, so a fanned
+// deck lies over its neighbours rather than under them.
+.card {
+  display: grid;
+  grid-template-rows: auto auto auto;
+  justify-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  color: var(--color-bark);
+  text-align: center;
+  text-decoration: none;
+
+  &:hover,
+  &:focus-visible {
+    z-index: 1;
+  }
+}
+
+// Every poster in one cell, the first on top. `--offset` is a poster's place
+// from the middle of the deck: -1, 0 and 1 for a deck of three. Stacked, each
+// one under the top peeks out a little further to the right; fanned, they
+// spread about the middle and turn about a point below the deck, the edges
+// dipping, as a hand of cards does. The spread narrows as the deck grows, so
+// a long saga still fans within reach of its card. The deck keeps its
+// posters' stacking to itself, so they never rise over a menu.
+.deck {
+  display: grid;
+  grid-template-areas: 'deck';
+  isolation: isolate;
+  width: 55%;
+  padding-block: var(--space-2) var(--space-3);
+}
+
+.poster {
+  --offset: calc(var(--index) - (var(--count) - 1) / 2);
+  --step: min(36%, 110% / var(--count));
+  --turn: min(9deg, 44deg / var(--count));
+  --dip: min(3%, 40% / (var(--count) * var(--count)));
+
+  grid-area: deck;
+  display: grid;
+  z-index: calc(var(--count) - var(--index));
+  aspect-ratio: 2 / 3;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-menu);
+  overflow: hidden;
+  transform-origin: 50% 120%;
+  translate: min(var(--index) * 4%, 12%) 0;
+  rotate: min(var(--index) * 2deg, 6deg);
+  background: var(--color-moss);
+}
+
+.card:hover .poster,
+.card:focus-visible .poster {
+  translate: calc(var(--offset) * var(--step)) calc(var(--offset) * var(--offset) * var(--dip) - 4%);
+  rotate: calc(var(--offset) * var(--turn));
+  box-shadow: var(--shadow-panel);
+}
+
+.name {
+  font-family: var(--font-display);
+  font-size: var(--font-size-lg);
+  line-height: var(--line-tight);
+  overflow-wrap: anywhere;
+}
+
+.card:hover .name {
+  text-decoration: underline;
+  text-decoration-color: var(--color-leaf-bright);
+  text-underline-offset: 0.18em;
+}
+
+.facts {
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+}
+
+// A springy fan, each poster a beat behind the one above it, and back again.
+@media (prefers-reduced-motion: no-preference) {
+  .poster {
+    transition:
+      translate 420ms cubic-bezier(0.34, 1.56, 0.64, 1),
+      rotate 420ms cubic-bezier(0.34, 1.56, 0.64, 1),
+      box-shadow 420ms ease-out;
+    transition-delay: calc(var(--index) * 30ms);
+  }
+}

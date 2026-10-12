@@ -168,6 +168,11 @@ describe('createApiClient', () => {
 
   it("asks for a library's videos in progress, favourites, sagas and files not matched", async () => {
     const entry = { media: mediaItem({ favourite: true }), poster: null }
+    const saga = {
+      tmdbId: '119',
+      name: 'The Lord of the Rings Collection',
+      media: [mediaItem()],
+    }
     const asked = async <T>({
       body,
       call,
@@ -182,10 +187,12 @@ describe('createApiClient', () => {
     expect([
       await asked({ body: [entry], call: (client) => client.listInProgress(3) }),
       await asked({ body: [entry], call: (client) => client.listLibraryFavourites(3) }),
+      await asked({ body: [saga], call: (client) => client.listSagas(3) }),
       await asked({ body: [mediaItem()], call: (client) => client.listUnmatched(3) }),
     ]).toEqual([
       'http://nas:8484/api/libraries/3/in-progress',
       'http://nas:8484/api/libraries/3/favourites',
+      'http://nas:8484/api/libraries/3/sagas',
       'http://nas:8484/api/libraries/3/unmatched',
     ])
   })

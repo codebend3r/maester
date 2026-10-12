@@ -10,6 +10,7 @@ import { LibraryPage } from '@/pages/LibraryPage/LibraryPage'
 import { EpisodePage } from '@/pages/EpisodePage/EpisodePage'
 import { MoviePage } from '@/pages/MoviePage/MoviePage'
 import { SeasonPage } from '@/pages/SeasonPage/SeasonPage'
+import { SagaPage } from '@/pages/SagaPage/SagaPage'
 import { SettingsPage } from '@/pages/SettingsPage/SettingsPage'
 import { ShowPage } from '@/pages/ShowPage/ShowPage'
 import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
@@ -25,6 +26,7 @@ export const AppRoutes = () => (
         <Route path="libraries/:id" element={<LibraryPage />} />
         <Route path="libraries/:id/history" element={<HistoryPage />} />
         <Route path="libraries/:id/:section" element={<LibraryPage />} />
+        <Route path="libraries/:id/sagas/:sagaId" element={<SagaPage />} />
         <Route path="movies/:id" element={<MoviePage />} />
         <Route path="shows/:id" element={<ShowPage />} />
         <Route path="shows/:id/seasons/:number" element={<SeasonPage />} />

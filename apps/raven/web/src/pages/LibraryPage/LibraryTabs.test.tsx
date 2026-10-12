@@ -15,6 +15,7 @@ describe('LibraryPage tabs', () => {
     list: spyOn(api, 'listMedia'),
     inProgress: spyOn(api, 'listInProgress'),
     favourites: spyOn(api, 'listLibraryFavourites'),
+    sagas: spyOn(api, 'listSagas'),
     unmatched: spyOn(api, 'listUnmatched'),
     history: spyOn(api, 'listHistory'),
     lockState: spyOn(api, 'getLock'),
@@ -26,6 +27,7 @@ describe('LibraryPage tabs', () => {
     spies.list.mockImplementation(async () => [mediaItem({ id: 1, title: 'Wide' })])
     spies.inProgress.mockImplementation(async () => [])
     spies.favourites.mockImplementation(async () => [])
+    spies.sagas.mockImplementation(async () => [])
     spies.unmatched.mockImplementation(async () => [])
     spies.history.mockImplementation(async () => [])
   })
@@ -56,6 +58,7 @@ describe('LibraryPage tabs', () => {
       'All',
       'In progress',
       'Favourites',
+      'Sagas',
       'Not matched',
       'Recently finished',
     ])
@@ -63,10 +66,32 @@ describe('LibraryPage tabs', () => {
       '/libraries/2',
       '/libraries/2/in-progress',
       '/libraries/2/favourites',
+      '/libraries/2/sagas',
       '/libraries/2/not-matched',
       '/libraries/2/finished',
     ])
     expect(screen.getByRole('link', { name: 'All' })).toHaveAttribute('aria-current', 'page')
+  })
+
+  it('lays each saga out as a deck of its posters, opening its own page', async () => {
+    spies.sagas.mockImplementation(async () => [
+      {
+        tmdbId: '119',
+        name: 'The Lord of the Rings Collection',
+        media: [
+          movie({ id: 7, title: 'The Fellowship of the Ring', year: 2001 }),
+          movie({ id: 8, title: 'The Two Towers', year: 2002 }),
+        ],
+      },
+    ])
+    open()
+    await userEvent.click(await screen.findByRole('link', { name: 'Sagas' }))
+    const deck = await screen.findByRole('link', { name: /The Lord of the Rings Collection/ })
+    expect(deck).toHaveAttribute('href', '/libraries/2/sagas/119')
+    expect(deck).toHaveTextContent('2 movies · 2001 to 2002')
+    expect(deck.querySelectorAll('img')).toHaveLength(2)
+    expect(screen.getByRole('link', { name: 'Sagas' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByTestId('address')).toHaveTextContent('/libraries/2/sagas')
   })
 
   it('asks for nothing but its own tab', async () => {
@@ -167,6 +192,11 @@ describe('LibraryPage tabs', () => {
     )
   })
 
+  it("opens All in place of a tab the library's type does not have", async () => {
+    open({ kind: 'other', route: '/libraries/2/sagas' })
+    expect(await screen.findByRole('link', { name: /Wide/ })).toBeInTheDocument()
+    expect(screen.getByTestId('address')).toHaveTextContent(/^\/libraries\/2$/)
+  })
 
   it('finds nothing at an address that names no tab', async () => {
     open({ route: '/libraries/2/all' })

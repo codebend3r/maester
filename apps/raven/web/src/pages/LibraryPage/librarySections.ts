@@ -9,6 +9,7 @@ export const LIBRARY_SECTIONS = [
   'all',
   'in-progress',
   'favourites',
+  'sagas',
   'not-matched',
   'finished',
 ] as const
@@ -17,6 +18,8 @@ export type LibrarySection = (typeof LIBRARY_SECTIONS)[number]
 
 const always = (): boolean => true
 
+/** TMDB keeps collections of movies alone, and only a movie gathers several files on one card. */
+const matchedToMovies = (kind: LibraryKind): boolean => matchTypeFor(kind) === 'movie'
 
 const matched = (kind: LibraryKind): boolean => matchTypeFor(kind) != null
 
@@ -29,6 +32,7 @@ export const SECTIONS = {
   all: { label: 'All', isFor: always },
   'in-progress': { label: 'In progress', isFor: always },
   favourites: { label: 'Favourites', isFor: always },
+  sagas: { label: 'Sagas', isFor: matchedToMovies },
   'not-matched': { label: 'Not matched', isFor: matched },
   finished: { label: 'Recently finished', isFor: always },
 } as const satisfies Record<
