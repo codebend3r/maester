@@ -11,12 +11,28 @@ export type NameIds = {
   tvdb: string | null
 }
 
+/** A title and year a movie's name reads as. */
+export type MovieReading = { title: string; year: number | null }
+
 export type ParsedMovieName = {
   title: string
   year: number | null
   /** Plex's `{edition-Director's Cut}`, or an edition named bare in the title: `Avatar Theatrical Cut`, `Spy (Extended)`. */
   edition: string | null
   ids: NameIds
+  /**
+   * Other readings to search when the title finds nothing, best first: the
+   * title with the edition it seemed to end in, `Redux Redux`, then the
+   * file's own name where its folder named the movie differently,
+   * `Dont Make Me (2022)/Don't Make Me Go (2022).mkv`.
+   */
+  alternatives: MovieReading[]
+}
+
+/** One name read: a movie's, or the part of an episode's before its code. */
+type NameReading = Omit<ParsedMovieName, 'alternatives'> & {
+  /** The title with the edition it seemed to end in kept, when it had one. */
+  withEdition: string | null
 }
 
 const NO_IDS: NameIds = { tmdb: null, imdb: null, tvdb: null }
@@ -140,30 +156,32 @@ const REGION_TAG = /\s+R[1-6]$/i
 /**
  * A title that repeats its own year ends there: `Alexander 2004 Revisited
  * the Final Cut (2004)` is `Alexander`. A year that is the title, `2012`,
- * or a different number, `Blade Runner 2049`, stays.
+ * one that ends it, `Death to 2020`, or a different number, `Blade Runner
+ * 2049`, stays.
  */
 const beforeOwnYear = ({ title, year }: { title: string; year: number | null }): string => {
   if (year == null) return title
-  const at = title.search(new RegExp(`(?<=\\s)${year}(?=\\s|$)`))
+  const at = title.search(new RegExp(`(?<=\\s)${year}(?=\\s)`))
   return at > 0 ? tidy(title.slice(0, at)) : title
 }
 
 /** Reads one name, a folder's or a file's stem: title, year, edition and ids. */
-const readName = (name: string): ParsedMovieName => {
+const readName = (name: string): NameReading => {
   const ids = readIds(name)
   const edition = EDITION_PATTERN.exec(name)?.[1]?.trim() ?? null
   const bare = stripTags(name)
-  const year = findYear(bare)
-  const named = readBareEdition(tidy(bare.slice(0, year ? year.at : firstTagAt(bare))))
-  const title = beforeOwnYear({ title: named.title, year: year?.year ?? null }).replace(
-    REGION_TAG,
-    '',
-  )
+  const found = findYear(bare)
+  const year = found?.year ?? null
+  const whole = tidy(bare.slice(0, found ? found.at : firstTagAt(bare)))
+  const named = readBareEdition(whole)
+  const titled = (text: string): string =>
+    unsortTitle(beforeOwnYear({ title: text, year }).replace(REGION_TAG, ''))
   return {
-    title: unsortTitle(title),
-    year: year?.year ?? null,
+    title: titled(named.title),
+    year,
     edition: edition ?? named.edition,
     ids,
+    withEdition: named.edition == null ? null : titled(whole),
   }
 }
 
@@ -171,10 +189,18 @@ const readName = (name: string): ParsedMovieName => {
 const lastSegment = (folder: string): string =>
   folder.split(/[\\/]/).findLast((segment) => segment !== '') ?? ''
 
+/** The title with its edition kept, when the name had one, in `year` when it has none of its own. */
+const editionKept = ({ name, year }: { name: NameReading; year: number | null }): MovieReading[] =>
+  name.withEdition == null ? [] : [{ title: name.withEdition, year: name.year ?? year }]
+
+const readingKey = (reading: MovieReading): string =>
+  `${foldTitle(reading.title)}|${reading.year ?? ''}`
+
 /**
  * A movie's title, year, edition and ids. Its own folder is read first when
  * that folder's name has a year, the way Radarr names folders; otherwise the
- * file's name is. Ids and editions are taken from either.
+ * file's name is. Ids and editions are taken from either, and the readings
+ * not taken are kept as alternatives.
  */
 export const parseMovieName = ({
   fileName,
@@ -188,11 +214,32 @@ export const parseMovieName = ({
   const fromFolder = folderName ? readName(folderName) : null
   const useFolder = fromFolder?.year != null && fromFolder.title !== ''
   const chosen = useFolder && fromFolder ? fromFolder : fromFile
+  const title = chosen.title || tidy(stemOf(fileName)) || fileName
+  const year = chosen.year
+  // A file with no year of its own is taken to be in its folder's.
+  const others = [
+    ...editionKept({ name: chosen, year }),
+    ...(useFolder
+      ? [
+          { title: fromFile.title, year: fromFile.year ?? year },
+          ...editionKept({ name: fromFile, year }),
+        ]
+      : []),
+  ]
+  const alternatives = others.filter((reading, index) => {
+    const key = readingKey(reading)
+    return (
+      foldTitle(reading.title) !== '' &&
+      key !== readingKey({ title, year }) &&
+      others.findIndex((other) => readingKey(other) === key) === index
+    )
+  })
   return {
-    title: chosen.title || tidy(stemOf(fileName)) || fileName,
-    year: chosen.year,
+    title,
+    year,
     edition: fromFile.edition ?? fromFolder?.edition ?? null,
     ids: mergeIds(fromFile.ids, fromFolder?.ids ?? NO_IDS),
+    alternatives,
   }
 }
 

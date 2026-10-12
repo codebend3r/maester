@@ -11,6 +11,10 @@ export type FakeMovie = {
   released: string
   imdbId?: string
   poster?: string | null
+  /** The other titles TMDB knows it by, which its search reads too. */
+  alternativeTitles?: string[]
+  /** Left out of a search without adult titles, as TMDB leaves out Paprika (1991). */
+  isHiddenFromSearch?: boolean
 }
 
 /** A movie as TMDB's `/movie/{id}` answers with credits, release dates and external ids appended. */
@@ -196,8 +200,8 @@ const json = (body: unknown, status = 200): Response =>
 const yearOf = (released: string): number => Number(released.slice(0, 4))
 
 /**
- * TMDB in miniature: searches by exact title (year optional), `/find` by
- * IMDb id, and movies by id. `down` makes every call fail as if TMDB were
+ * TMDB in miniature: searches by a title or alternative title holding the
+ * query (year optional), `/find` by IMDb id, and movies by id. `down` makes every call fail as if TMDB were
  * unreachable; `omdbSpent` makes OMDb answer as it does once a key's day is
  * used up; `calls` records each URL asked for. `hold` keeps the searches
  * for a title waiting until it is let go, so a pass stays busy.
@@ -276,10 +280,14 @@ export const fakeTmdb = ({
       const title = query.get('query') ?? ''
       await held.get(title.toLowerCase())
       const year = query.get('year')
+      const isAdultIncluded = query.get('include_adult') === 'true'
       const results = state.movies.filter(
         (movie) =>
-          movie.title.toLowerCase().includes(title.toLowerCase()) &&
-          (year == null || Math.abs(yearOf(movie.released) - Number(year)) <= 1),
+          [movie.title, ...(movie.alternativeTitles ?? [])].some((each) =>
+            each.toLowerCase().includes(title.toLowerCase()),
+          ) &&
+          (year == null || Math.abs(yearOf(movie.released) - Number(year)) <= 1) &&
+          (isAdultIncluded || !movie.isHiddenFromSearch),
       )
       return json({
         results: results.map((movie) => ({
@@ -364,6 +372,27 @@ export const fakeTmdb = ({
         posters: [picture('poster', 'en'), picture('alt', null)],
         backdrops: [picture('backdrop', null), picture('scene', 'en')],
       })
+    }
+
+    const alternatives = /^\/(movie|tv)\/(\d+)\/alternative_titles$/.exec(path)
+    if (alternatives) {
+      const id = Number(alternatives[2])
+      if (alternatives[1] === 'tv') {
+        return state.shows.some((entry) => entry.id === id)
+          ? json({ id, results: [] })
+          : json({ status_code: 34 }, 404)
+      }
+      const found = state.movies.find((entry) => entry.id === id)
+      return found
+        ? json({
+            id,
+            titles: (found.alternativeTitles ?? []).map((title) => ({
+              iso_3166_1: 'US',
+              title,
+              type: '',
+            })),
+          })
+        : json({ status_code: 34 }, 404)
     }
 
     const movie = /^\/movie\/(\d+)$/.exec(path)

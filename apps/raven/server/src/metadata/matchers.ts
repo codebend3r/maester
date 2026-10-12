@@ -67,12 +67,15 @@ const movieMatcher = (deps: MatcherDeps): KindMatcher => {
       stem: stemOf(file.fileName),
       ownFolder: own,
     })
+    const parsed = parseMovieName(file)
     const resolved = await pass.resolve({
       type: 'movie',
       fix: fixFor({ file, own }),
-      ids: parseMovieName(file).ids,
+      ids: parsed.ids,
       nfoPath: assets.nfo == null ? null : join(dir, assets.nfo),
-      titles: [{ title: file.title, year: file.year }],
+      // When the name finds nothing, its other readings are tried: the file's
+      // own name where its folder is misnamed, as with a show.
+      titles: [{ title: file.title, year: file.year }, ...parsed.alternatives],
     })
     if (resolved.kind === 'unmatched') {
       deps.files.settle({ ids: [file.id], itemIds: [], match: 'unmatched' })
