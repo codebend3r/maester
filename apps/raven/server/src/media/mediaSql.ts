@@ -9,6 +9,13 @@ export const likePattern = (search: string): string => `%${escapeLike(search)}%`
 /** The best of a movie's files first: the most pixels, then the biggest file. */
 export const BEST_FIRST = 'COALESCE(m.width * m.height, 0) DESC, m.size DESC, m.id'
 
+/**
+ * After a JOIN, gives `mi.item_id`: the file's first item, so a file holding
+ * two episodes takes the first.
+ */
+export const FIRST_ITEM = `(SELECT media_id, MIN(item_id) AS item_id FROM media_items GROUP BY media_id) mi
+      ON mi.media_id = m.id`
+
 /** Joins `p.furthest`: the furthest any play of the file got. */
 export const FURTHEST_JOIN = `
   LEFT JOIN (SELECT media_id, MAX(furthest) AS furthest FROM plays GROUP BY media_id) p

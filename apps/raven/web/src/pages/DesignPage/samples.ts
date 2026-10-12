@@ -102,8 +102,8 @@ export const SAMPLE_SCANS: Array<{ label: string; scan: ScanStatus }> = [
   {
     label: 'Scanning',
     scan: {
-      state: 'scanning',
-      discovered: 1240,
+      state: 'indexing',
+      found: 1240,
       processed: 812,
       startedAt: '2026-10-09T12:00:00.000Z',
       finishedAt: null,
@@ -114,7 +114,7 @@ export const SAMPLE_SCANS: Array<{ label: string; scan: ScanStatus }> = [
     label: 'Done',
     scan: {
       state: 'idle',
-      discovered: 1240,
+      found: 1240,
       processed: 1240,
       startedAt: '2026-10-09T12:00:00.000Z',
       finishedAt: new Date().toISOString(),
@@ -125,7 +125,7 @@ export const SAMPLE_SCANS: Array<{ label: string; scan: ScanStatus }> = [
     label: 'Failed',
     scan: {
       state: 'idle',
-      discovered: 0,
+      found: 0,
       processed: 0,
       startedAt: '2026-10-09T12:00:00.000Z',
       finishedAt: '2026-10-09T12:00:01.000Z',

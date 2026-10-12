@@ -230,6 +230,33 @@ describe('LibraryPage', () => {
     expect(await screen.findByText('Watching 3')).toBeInTheDocument()
   })
 
+  it('offers the letters of its titles down the side', async () => {
+    serve({ settings: { sort: 'title', view: 'grid' } })
+    const picker = await screen.findByRole('navigation', { name: 'Jump to a letter' })
+    const enabled = within(picker)
+      .getAllByRole('button')
+      .filter((button) => !button.hasAttribute('disabled'))
+      .map((button) => button.textContent)
+    expect(enabled).toEqual(['A', 'F', 'W'])
+  })
+
+  it('steps through what the listing is sorted by, a movie library grouped included', async () => {
+    serve({ settings: { kind: 'movies', sort: 'resolution-high', view: 'grouped' } })
+    const picker = await screen.findByRole('navigation', { name: 'Jump to a resolution' })
+    const enabled = within(picker)
+      .getAllByRole('button')
+      .filter((button) => !button.hasAttribute('disabled'))
+      .map((button) => button.textContent)
+    expect(enabled).toEqual(['4K', '1080'])
+    expect(screen.queryByRole('navigation', { name: 'Jump to a letter' })).toBeNull()
+  })
+
+  it('has no strip down the side in a random order, which has nothing to jump by', async () => {
+    serve({ settings: { sort: 'random', view: 'grid' } })
+    await screen.findByRole('link', { name: 'Wide' })
+    expect(screen.queryByRole('navigation', { name: /^Jump to/ })).toBeNull()
+  })
+
   it('says what type of library it is', async () => {
     serve({ settings: { kind: 'movies' } })
     expect(await screen.findByText('Movies · 12 videos')).toBeInTheDocument()
@@ -259,6 +286,16 @@ describe('LibraryPage', () => {
     expect(state.listed).toEqual([])
     await userEvent.click(within(locked).getByRole('button', { name: 'Unlock' }))
     expect(useUnlockPrompt.getState().open).toBe(true)
+  })
+
+  it('asks for the PIN on Edit while the library is locked, as its folders are held back', async () => {
+    spies.lockState.mockImplementation(async () => ({ available: true, unlocked: false }))
+    serve({ settings: { locked: true } })
+    await screen.findByRole('region', { name: 'Locked' })
+    await userEvent.click(screen.getByRole('button', { name: 'Edit' }))
+    expect(useUnlockPrompt.getState().open).toBe(true)
+    expect(screen.queryByRole('dialog')).toBeNull()
+    useUnlockPrompt.setState({ open: false })
   })
 
   it('shows an unlocked library, with a way to lock it again', async () => {

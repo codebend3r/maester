@@ -21,7 +21,7 @@ import { ThumbnailService } from '@/thumbnails/thumbnailService'
 
 const IDLE: ScanStatus = {
   state: 'idle',
-  discovered: 0,
+  found: 0,
   processed: 0,
   startedAt: null,
   finishedAt: null,
@@ -190,17 +190,23 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
   /** A full scan: everything under the library's paths, its progress and outcome in the status. */
   private async scanLibrary(library: LibraryRecord): Promise<void> {
     this.update(library.id, {
-      state: 'scanning',
-      discovered: 0,
+      state: 'walking',
+      found: 0,
       processed: 0,
       startedAt: new Date().toISOString(),
       finishedAt: null,
       error: null,
     })
     try {
-      const { walk, changes, toProbe } = await this.reindex({ library, scope: { kind: 'library' } })
+      const { walk, changes, toProbe } = await this.reindex({
+        library,
+        scope: { kind: 'library' },
+        onFound: (count) =>
+          this.update(library.id, { found: this.status(library.id).found + count }),
+      })
       this.update(library.id, {
-        discovered: walk.files.length,
+        state: 'indexing',
+        found: walk.files.length,
         processed: walk.files.length - toProbe.length,
       })
       // Matching needs only names, so new files are matched while they are
@@ -266,13 +272,17 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
   private async reindex({
     library,
     scope,
+    onFound,
   }: {
     library: LibraryRecord
     scope: Scope
+    /** A full scan's count of videos found while it walks; a refresh keeps the status as it is. */
+    onFound?: (count: number) => void
   }): Promise<{ walk: WalkResult; changes: Reconciled; toProbe: ProbeTarget[] }> {
     const walk = await walkVideos({
       roots: library.paths,
       places: scope.kind === 'library' ? library.paths : scope.places,
+      onFound,
     })
     const known = new Map(
       Array.from(this.index.forLibrary(library.id)).filter(([path]) =>

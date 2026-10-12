@@ -1,4 +1,5 @@
-import type { ScanStatus as Status } from '@raven/core'
+import { type ScanStatus as Status, isScanning } from '@raven/core'
+import { plural } from '@/lib/plural'
 import styles from '@/components/ScanStatus/ScanStatus.module.scss'
 
 const count = new Intl.NumberFormat()
@@ -12,20 +13,26 @@ const since = (iso: string): string => {
   return new Date(iso).toLocaleDateString()
 }
 
+/** While the walk looks: how many videos it has found so far, once it has found any. */
+const lookingNote = (found: number): string =>
+  found === 0
+    ? 'Looking through the folders'
+    : `Looking through the folders, ${plural({ n: found, one: 'video', many: 'videos' })} found so far`
+
 /** Live scan progress, or when the library was last brought up to date. */
 export const ScanStatus = ({ scan }: { scan: Status }) => (
   <div className={styles.status} aria-live="polite">
-    {scan.state === 'scanning' ? (
+    {isScanning(scan) ? (
       <>
         <span>
-          {scan.discovered === 0
-            ? 'Looking through the folders'
-            : `Indexing ${count.format(scan.processed)} of ${count.format(scan.discovered)}`}
+          {scan.state === 'walking'
+            ? lookingNote(scan.found)
+            : `Indexing ${count.format(scan.processed)} of ${count.format(scan.found)}`}
         </span>
         <progress
           className={styles.bar}
-          max={Math.max(scan.discovered, 1)}
-          value={scan.discovered === 0 ? undefined : scan.processed}
+          max={Math.max(scan.found, 1)}
+          value={scan.state === 'walking' ? undefined : scan.processed}
           aria-label="Scan progress"
         />
       </>

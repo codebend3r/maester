@@ -55,10 +55,11 @@ const NavItem = ({
   )
 }
 
-/** A library's own pages: its videos and its history. */
+/** A library's own pages: its videos, its other tabs, its history and its sagas. */
 const libraryPages = (id: number | string): string[] => [
   `/libraries/${id}`,
-  `/libraries/${id}/history`,
+  `/libraries/${id}/:page`,
+  `/libraries/${id}/sagas/:saga`,
 ]
 
 /** Rises above the toggle until it is first used or put away. */

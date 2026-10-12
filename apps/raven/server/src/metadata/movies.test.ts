@@ -242,6 +242,16 @@ describe('movie metadata', () => {
     expect(await logoOf()).toBe(version)
   })
 
+  it('lists the files no movie was found for', async () => {
+    const response = await app().inject({
+      method: 'GET',
+      url: `/api/libraries/${state.library}/unmatched`,
+    })
+    expect(shape({ response, guard: isMediaList }).map((item) => item.title)).toEqual([
+      'Unknown Thing',
+    ])
+  })
+
   it('asked again without the article when "The Few Good Men" found nothing', () => {
     const asked = tmdb.state.calls
       .filter((url) => url.includes('/search/movie'))

@@ -43,7 +43,10 @@ export const afterLibrarySaved = (queryClient: QueryClient): Promise<unknown> =>
     ],
   })
 
-/** The player closed: resume lines on the grid and home, and the history, show where it stopped. */
+/**
+ * The player closed: resume lines on the library's listings, In progress
+ * and the history, all under the library, and home's show where it stopped.
+ */
 export const afterWatching = ({
   queryClient,
   libraryId,
@@ -53,11 +56,7 @@ export const afterWatching = ({
 }): Promise<unknown> =>
   refetch({
     queryClient,
-    filters: [
-      { queryKey: queryKeys.mediaLists(libraryId) },
-      { queryKey: queryKeys.histories(libraryId) },
-      { queryKey: queryKeys.home },
-    ],
+    filters: [{ queryKey: queryKeys.library(libraryId) }, { queryKey: queryKeys.home }],
   })
 
 /** An item's pictures or metadata were edited: its page takes the answer, its editor and the listings read again. */

@@ -21,6 +21,7 @@ import {
   type LibraryInput,
   type MediaItem,
   type MediaListParams,
+  type PosterEntry,
   type ShowListing,
   isRecord,
   matchTypeFor,
@@ -235,5 +236,29 @@ export class LibrariesController {
   listMedia(@Param('id', ParseIntPipe) id: number, @Query() query: unknown): MediaItem[] {
     this.find(id)
     return this.media.list({ libraryId: id, ...listParams(query) })
+  }
+
+  /** Its videos with a saved spot, the most recently watched first, each with its card's poster. */
+  @Get(':id/in-progress')
+  listInProgress(@Param('id', ParseIntPipe) id: number): PosterEntry[] {
+    this.find(id)
+    return this.media.withPosters(this.media.listInProgress({ libraryId: id }))
+  }
+
+  /** Its favourites, most recently marked first, each with its card's poster. */
+  @Get(':id/favourites')
+  listFavourites(@Param('id', ParseIntPipe) id: number): PosterEntry[] {
+    this.find(id)
+    return this.media.withPosters(this.media.listFavourites({ libraryId: id }))
+  }
+
+
+  /** Its files no movie or show was found for, or still waiting for matching, by title. */
+  @Get(':id/unmatched')
+  listUnmatched(@Param('id', ParseIntPipe) id: number): MediaItem[] {
+    const record = this.find(id)
+    return matchTypeFor(record.settings.kind) == null
+      ? []
+      : this.media.listUnmatched({ libraryId: id })
   }
 }

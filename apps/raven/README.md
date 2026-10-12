@@ -128,7 +128,20 @@ Each library keeps its own settings on the server, so every browser opens it the
 
 Sort, view and grouping are picked on the library page and saved as they change; the others are in **Edit**. Changing a setting or the name never rescans; only a change of folders does.
 
+In every library and view, a strip runs down the right edge of the screen and stays there as the page scrolls, stepping through whatever the listing is sorted by, in its order: the alphabet for titles (a title files under its letter without a leading "The", "A" or "An", and # holds the ones that start with no letter), round steps of bitrate under Mb/s or of size under GB, resolutions, years (decades over a wide span), whole scores in the library's source, and months (years over a wide span) for when videos came or changed. Values not known yet sit under ? at the end. A step jumps to the first card under it in the order shown, opening a folded bucket on the way; a step no card falls under is there but cannot be pressed. A TV library steps its bitrate every 5 Mb/s, each show by its files' mean bitrate, and spells out titles for size and resolution, which its shows sort by title for. A random order has no strip, and neither has a TV library sorted by when videos changed.
+
 Beside the sort, **Play** starts the first video as the page shows it (the top of the first group in the grouped view) and **Shuffle** starts a random one, whatever the sort. Both keep to the search.
+
+## Library tabs
+
+A library's page opens on **All**, its listing with the search, sort and view above. Tabs beside it each have an address of their own under the library's (`/libraries/4/sagas`), so they can be linked to and the back button steps between them, and each reads only what it shows:
+
+- **In progress**: the videos left partway through, the most recently watched first. Empty in a library that does not save where videos stop.
+- **Favourites**: the library's own favourites, most recently marked first.
+- **Not matched**, in a matched library: the files no movie or show was found for, or still waiting, each with **Fix match** in its menu.
+- **Recently finished**: the last 48 videos watched by the library's **Watched at** setting, each with the day it last played, and a link to the full [History](#history).
+
+A tab the library's type has no use for, as after a change of type, opens All instead. A locked library shows no tabs until the PIN is entered.
 
 ## History
 

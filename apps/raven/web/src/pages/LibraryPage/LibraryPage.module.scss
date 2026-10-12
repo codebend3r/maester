@@ -4,6 +4,15 @@
   gap: var(--space-4);
 }
 
+// Room down the right edge for All's jump strip, as wide as a decade's step,
+// where the page's own padding is narrower than the strip. The whole page
+// makes room, so the header's buttons stay clear of the strip too.
+.page:has(.withJump) {
+  @media (max-width: 64rem) {
+    padding-right: var(--space-6);
+  }
+}
+
 .back {
   justify-self: start;
   border-color: transparent;
@@ -49,6 +58,61 @@
 .buckets {
   display: grid;
   gap: var(--space-3);
+}
+
+// The tabs as one row over a rule, the open one underlined. A narrow screen
+// scrolls the row, so each tab draws its focus ring inside itself, where the
+// scrolling cannot clip it.
+.tabs {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: max-content;
+  border-bottom: 1px solid var(--color-moss);
+  overflow-x: auto;
+}
+
+.tabItem {
+  display: grid;
+}
+
+.tab {
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 2px solid transparent;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  color: var(--color-lichen);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+
+  &:hover {
+    color: var(--color-bark);
+  }
+
+  &[aria-current='page'] {
+    color: var(--color-bark);
+    border-bottom-color: var(--color-leaf-bright);
+  }
+
+  &:focus-visible {
+    outline-offset: -2px;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .tab {
+    transition:
+      color 120ms ease-out,
+      border-color 120ms ease-out;
+  }
+}
+
+.section {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.more {
+  justify-self: start;
 }
 
 .message {
