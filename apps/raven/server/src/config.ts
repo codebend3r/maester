@@ -41,6 +41,8 @@ export type ServerConfig = ListenConfig & {
   omdbDailyLimit: number
   /** The PIN that opens locked libraries; null leaves them shut and none can be locked. Never logged or sent to a client. */
   libraryPin: string | null
+  /** The password that turns the admin lock off; null, or too weak, keeps it on. Never logged or sent to a client. */
+  adminPassword: string | null
 }
 
 /** The DI token the config is provided under. */
@@ -71,4 +73,5 @@ export const readServerConfig = (env: NodeJS.ProcessEnv = process.env): ServerCo
   omdbApiKey: env.OMDB_API_KEY?.trim() || null,
   omdbDailyLimit: Math.max(1, wholeNumber(env.OMDB_DAILY_LIMIT) ?? 1000),
   libraryPin: env.LIBRARY_PIN?.trim() || null,
+  adminPassword: env.ADMIN_PASSWORD?.trim() || null,
 })

@@ -31,7 +31,7 @@ const viewerHiding = ({
     const holding = metadata.librariesHolding(itemId)
     return holding.length === 0 || holding.some(seesLibrary)
   }
-  return { seesLibrary, seesItem, sees: () => true }
+  return { listsLibrary: () => true, seesLibrary, seesItem, sees: () => true }
 }
 
 describe("a page's children", () => {

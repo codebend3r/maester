@@ -28,6 +28,7 @@ import {
   isString,
 } from '@raven/core'
 import type { FastifyReply, FastifyRequest } from 'fastify'
+import { AdminOnly } from '@/admin/adminGuard'
 import { errorMessage } from '@/errorMessage'
 import { PrivateBy } from '@/lock/lockGuard'
 import { MediaArtifacts } from '@/media/mediaArtifacts'
@@ -93,6 +94,7 @@ export class MediaController {
   }
 
   /** Where the file lives, for the card's menu: the one call that hands a client a path. */
+  @AdminOnly()
   @Get(':id/location')
   location(@Param('id', ParseIntPipe) id: number): MediaLocation {
     return { path: this.fileOf(id).path }
@@ -138,6 +140,7 @@ export class MediaController {
    * file that is already gone still loses its row; any other failure, such
    * as a read-only mount, keeps the row and says why.
    */
+  @AdminOnly()
   @Delete(':id')
   @HttpCode(204)
   async remove(@Param('id', ParseIntPipe) id: number): Promise<void> {

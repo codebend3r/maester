@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import {
+  ApiError,
   DEFAULT_DISPLAY_SETTINGS,
   DEFAULT_PLAYBACK_SETTINGS,
   type PlaybackSettingsState,
@@ -147,5 +148,78 @@ describe('SettingsPage', () => {
     expect(screen.getByRole('radio', { name: /Remux only/ })).toBeChecked()
     await userEvent.click(screen.getByRole('checkbox', { name: /Tone map HDR/ }))
     await waitFor(() => expect(spies.set).toHaveBeenCalledWith({ tonemap: false }))
+  })
+})
+
+describe('the admin lock on SettingsPage', () => {
+  const spies = {
+    get: spyOn(api, 'getAdminLock'),
+    unlock: spyOn(api, 'unlockAdmin'),
+    lock: spyOn(api, 'lockAdmin'),
+    keep: spyOn(api, 'keepAdminUnlocked'),
+  }
+
+  afterEach(() => Object.values(spies).forEach((spy) => spy.mockReset()))
+
+  const toggle = () => screen.getByRole('checkbox', { name: /^Admin lock/ })
+
+  it('ends the page, and turns off only with the password', async () => {
+    spies.unlock.mockImplementation(async (password) => {
+      if (password !== 'Soft-Wing-27') {
+        throw new ApiError({ status: 401, message: 'That password is not right.' })
+      }
+      return { state: 'off' }
+    })
+    renderWithProviders(<SettingsPage />, { adminLock: { state: 'on', available: true } })
+    expect(screen.getAllByRole('region').at(-1)).toHaveAccessibleName('Admin')
+    expect(toggle()).toBeChecked()
+
+    await userEvent.click(toggle())
+    const password = screen.getByLabelText('Admin password')
+    expect(password).toHaveFocus()
+    await userEvent.type(password, 'soft-wing-27')
+    await userEvent.click(screen.getByRole('button', { name: 'Turn off' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('That password is not right.')
+    expect(toggle()).not.toBeChecked()
+
+    await userEvent.type(screen.getByLabelText('Admin password'), 'Soft-Wing-27')
+    await userEvent.click(screen.getByRole('button', { name: 'Turn off' }))
+    await waitFor(() => expect(screen.queryByLabelText('Admin password')).toBeNull())
+    expect(toggle()).not.toBeChecked()
+    expect(spies.unlock.mock.calls).toEqual([['soft-wing-27'], ['Soft-Wing-27']])
+  })
+
+  it('stays on when the password is not given after all', async () => {
+    renderWithProviders(<SettingsPage />, { adminLock: { state: 'on', available: true } })
+    await userEvent.click(toggle())
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByLabelText('Admin password')).toBeNull()
+    expect(toggle()).toBeChecked()
+    expect(spies.unlock).not.toHaveBeenCalled()
+  })
+
+  it('turns on after a wait, in which it goes off again with no password', async () => {
+    spies.lock.mockImplementation(async () => ({ state: 'turningOn', remainingMs: 15_000 }))
+    spies.keep.mockImplementation(async () => ({ state: 'off' }))
+    renderWithProviders(<SettingsPage />, { adminLock: { state: 'off' } })
+    expect(toggle()).not.toBeChecked()
+
+    await userEvent.click(toggle())
+    expect(await screen.findByText(/Turns on in 15 seconds/)).toBeInTheDocument()
+    expect(toggle()).toBeChecked()
+
+    await userEvent.click(toggle())
+    await waitFor(() => expect(toggle()).not.toBeChecked())
+    expect(spies.keep).toHaveBeenCalledTimes(1)
+    expect(screen.queryByLabelText('Admin password')).toBeNull()
+  })
+
+  it('cannot be turned off until the server has a password', async () => {
+    renderWithProviders(<SettingsPage />, { adminLock: { state: 'on', available: false } })
+    expect(toggle()).toBeChecked()
+    expect(toggle()).toBeDisabled()
+    expect(screen.getByText(/to turn it off/)).toHaveTextContent(
+      "Set ADMIN_PASSWORD in raven's .env to turn it off.",
+    )
   })
 })

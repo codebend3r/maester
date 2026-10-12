@@ -61,6 +61,19 @@ describe('MediaMenu', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
+  it('leaves Delete and the file path out while the admin lock is on', async () => {
+    const location = spyOn(api, 'getMediaLocation')
+    renderWithProviders(<Harness media={mediaItem()} />, {
+      adminLock: { state: 'on', available: true },
+    })
+    await openMenu()
+    expect(screen.getByRole('menuitem', { name: 'Favourite' })).toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: 'Delete' })).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: /Copy file path/ })).toBeNull()
+    expect(location).not.toHaveBeenCalled()
+    location.mockRestore()
+  })
+
   it("shows the server's reason when the file cannot be deleted", async () => {
     const reason = 'Could not delete the file: its folder is mounted read-only.'
     const spy = spyOn(api, 'deleteMedia').mockImplementation(async () => {

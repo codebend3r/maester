@@ -4,6 +4,7 @@ import {
   HttpException,
   Inject,
   Injectable,
+  NotFoundException,
   RequestMethod,
   SetMetadata,
   type Type,
@@ -11,9 +12,18 @@ import {
 import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants'
 import { Reflector } from '@nestjs/core'
 import { LOCKED_STATUS, isNumber, isRecord, isString } from '@raven/core'
+import { AdminService } from '@/admin/adminService'
 import { LockService, PRIVACIES, type Privacy } from '@/lock/lockService'
+import { requestParts } from '@/requestParts'
 
 const PRIVACY = Symbol('PRIVACY')
+
+/** What the routes answer for an id that names nothing, so one held out of sight reads the same. */
+const NOT_FOUND: Record<Privacy, string> = {
+  library: 'No library',
+  media: 'No media',
+  item: 'No item',
+}
 
 /** What a route says about the lock: what its `:id` names, or that it holds nothing back. */
 export type LockMark = Privacy | 'public'
@@ -104,14 +114,17 @@ export const assertLockMarked = (controllers: readonly Type[]): void => {
 /**
  * Answers 423 Locked for a route marked `PrivateBy`, on itself or its
  * controller, whose id sits in a locked library this browser has not
- * unlocked. `assertLockMarked` keeps every route with a parameter marked, so
- * the routes that pass unchecked take no id.
+ * unlocked. While the admin lock holds it answers 404 instead, as if there
+ * were no such library, so nothing asks for the PIN. `assertLockMarked`
+ * keeps every route with a parameter marked, so the routes that pass
+ * unchecked take no id.
  */
 @Injectable()
 export class LockGuard implements CanActivate {
   constructor(
     @Inject(Reflector) private readonly reflector: Reflector,
     @Inject(LockService) private readonly lock: LockService,
+    @Inject(AdminService) private readonly admin: AdminService,
   ) {}
 
   canActivate(context: ExecutionContext): boolean {
@@ -120,11 +133,10 @@ export class LockGuard implements CanActivate {
       context.getClass(),
     ])
     if (!isPrivacy(mark)) return true
-    const request: unknown = context.switchToHttp().getRequest()
-    const headers = isRecord(request) && isRecord(request.headers) ? request.headers : {}
-    const params = isRecord(request) && isRecord(request.params) ? request.params : {}
-    const cookie = isString(headers.cookie) ? headers.cookie : undefined
-    if (this.lock.viewer({ cookie }).sees({ privacy: mark, id: Number(params.id) })) return true
+    const { params, cookie } = requestParts(context)
+    const id = Number(params.id)
+    if (this.lock.viewer({ cookie }).sees({ privacy: mark, id })) return true
+    if (this.admin.isLocked({ cookie })) throw new NotFoundException(`${NOT_FOUND[mark]} ${id}`)
     throw new HttpException('This library is locked.', LOCKED_STATUS)
   }
 }
