@@ -22,6 +22,12 @@ export type SeasonData = {
   episodes: Map<number, number>
 }
 
+/** How many of a search's results have their alternative titles looked up. */
+const ALIAS_LOOKUPS = 5
+
+/** How far from the name's year a result can be to have them looked up: as far as `pickMatch` reaches. */
+const ALIAS_YEARS_APART = 3
+
 /** A title to search TMDB for, with what narrows it. */
 export type SearchTitle = { title: string; year: number | null; country?: string | null }
 
@@ -157,16 +163,75 @@ export class MatchPass {
     return this.searches.get({
       key: `${type}|${foldTitle(title)}|${year ?? ''}|${country ?? ''}`,
       make: async () => {
-        const ask = (query: string): Promise<SearchResult[]> =>
-          type === 'movie' ? tmdb.searchMovies({ query, year }) : tmdb.searchShows({ query, year })
-        const results = await ask(title)
+        const ask = ({
+          query,
+          includeAdult = false,
+        }: {
+          query: string
+          includeAdult?: boolean
+        }): Promise<SearchResult[]> =>
+          type === 'movie'
+            ? tmdb.searchMovies({ query, year, includeAdult })
+            : tmdb.searchShows({ query, year })
+        const pick = (
+          extra: Omit<Parameters<typeof pickMatch>[0], 'type' | 'title' | 'year' | 'country'>,
+        ): string | null => pickMatch({ type, title, year, country, ...extra })?.tmdbId ?? null
+
+        const results = await ask({ query: title })
         // TMDB finds nothing for "The Few Good Men"; without the article it
         // offers "A Few Good Men", which folds to the same title.
         const bare = sortTitle(title)
-        const retried = results.length === 0 && bare !== title ? await ask(bare) : results
-        return pickMatch({ type, title, year, country, results: retried })?.tmdbId ?? null
+        const retried =
+          results.length === 0 && bare !== title ? await ask({ query: bare }) : results
+        const sure = pick({ results: retried })
+        if (sure != null) return sure
+        // TMDB's search reads alternative titles too, so "Expired" finds
+        // Loveland (2022), the name it was released under abroad.
+        const aliased = pick({
+          results: retried,
+          aliases: await this.aliasesOf({ type, year, results: retried }),
+        })
+        if (aliased != null || type !== 'movie') return aliased
+        // TMDB leaves some films out of a search without adult titles though
+        // it does not mark them adult, as with "Paprika" (1991). Only the
+        // same title counts there, never a lone result of another.
+        return pick({
+          results: await ask({ query: title, includeAdult: true }),
+          canTakeLoneResult: false,
+        })
       },
     })
+  }
+
+  /** The other titles TMDB knows the results near `year` by, the first few of them. */
+  private async aliasesOf({
+    type,
+    year,
+    results,
+  }: {
+    type: MatchItemType
+    year: number | null
+    results: readonly SearchResult[]
+  }): Promise<Map<string, string[]>> {
+    const near = results
+      .filter(
+        (result) =>
+          year == null ||
+          (result.year != null && Math.abs(result.year - year) <= ALIAS_YEARS_APART),
+      )
+      .slice(0, ALIAS_LOOKUPS)
+    const found = await Promise.all(
+      near.map(async (result) => {
+        const titles = await this.deps.tmdb
+          .alternativeTitles({ type, tmdbId: result.tmdbId })
+          .catch((error: unknown) => {
+            if (notFound(error)) return []
+            throw error
+          })
+        return [result.tmdbId, titles] as const
+      }),
+    )
+    return new Map(found)
   }
 
   /** The stored movie or show for a TMDB id, fetched first when raven does not have it; null when TMDB has no such one. */

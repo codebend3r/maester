@@ -12,12 +12,14 @@ const mostPopular = (results: readonly SearchResult[]): SearchResult | null =>
 /**
  * The search result a parsed name is, or null when raven cannot be sure.
  *
- * - A result whose title or original title folds to the same as the name's,
+ * - A result whose title, original title or one of its `aliases` folds to
+ *   the same as the name's,
  *   released in the name's year or one either side (release dates differ by
  *   country), or failing that within three years, the nearest first (a
  *   festival premiere and a release can sit two years apart). The exact
  *   year wins over a neighbour.
- * - Otherwise, the only result there is, when its year is the name's.
+ * - Otherwise, the only result there is, when its year is the name's,
+ *   unless `canTakeLoneResult` is false.
  * - Without a year (Sonarr's show folders carry none), a show with the same
  *   title. A movie needs to be the one result with its title, as an
  *   original and its remake share it and only the year tells them apart.
@@ -33,6 +35,8 @@ export const pickMatch = ({
   year,
   country = null,
   results,
+  aliases = new Map(),
+  canTakeLoneResult = true,
 }: {
   type: MatchItemType
   title: string
@@ -40,15 +44,21 @@ export const pickMatch = ({
   /** The country the name gives, as TMDB writes it: `GB` for "(UK)". */
   country?: string | null
   results: readonly SearchResult[]
+  /** The other titles TMDB knows a result by, by its id: Loveland (2022) is also `Expired`. */
+  aliases?: ReadonlyMap<string, readonly string[]>
+  /** Whether a lone result in the name's year counts whatever its title. */
+  canTakeLoneResult?: boolean
 }): SearchResult | null => {
   const wanted = foldTitle(title)
   const fromThere = (result: SearchResult): boolean =>
     country == null || result.countries.includes(country)
+  const titlesOf = (result: SearchResult): string[] => [
+    result.title,
+    ...(result.originalTitle == null ? [] : [result.originalTitle]),
+    ...(aliases.get(result.tmdbId) ?? []),
+  ]
   const sameTitle = results.filter(
-    (result) =>
-      fromThere(result) &&
-      (foldTitle(result.title) === wanted ||
-        (result.originalTitle != null && foldTitle(result.originalTitle) === wanted)),
+    (result) => fromThere(result) && titlesOf(result).some((each) => foldTitle(each) === wanted),
   )
 
   if (year == null) {
@@ -72,5 +82,11 @@ export const pickMatch = ({
   }
 
   const [only] = results
-  return results.length === 1 && only != null && only.year === year && fromThere(only) ? only : null
+  return canTakeLoneResult &&
+    results.length === 1 &&
+    only != null &&
+    only.year === year &&
+    fromThere(only)
+    ? only
+    : null
 }

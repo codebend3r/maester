@@ -53,6 +53,7 @@ describe('movie metadata', () => {
       { id: 11, title: 'Unknown Thing One', released: '2020-01-01' },
       { id: 12, title: 'Unknown Thing Two', released: '2020-06-01' },
       { id: 881, title: 'A Few Good Men', released: '1992-12-11' },
+      { id: 861072, title: "Don't Make Me Go", released: '2022-06-13' },
     ],
     omdb: { tt0133093: { imdb: '8.7/10', rottenTomatoes: '83%', metacritic: '73/100' } },
   })
@@ -130,6 +131,10 @@ describe('movie metadata', () => {
         path: join(state.media, 'Unknown Thing (2020)', 'Unknown Thing (2020).mp4'),
         seconds: 1,
       }),
+      encodeClip({
+        path: join(state.media, 'Dont Make Me (2022)', "Don't Make Me Go (2022).mp4"),
+        seconds: 1,
+      }),
     ])
     state.app = await createApp({
       config: {
@@ -170,6 +175,7 @@ describe('movie metadata', () => {
     expect(
       items.map((item) => [item.item?.title ?? item.title, item.match, item.versions]),
     ).toEqual([
+      ["Don't Make Me Go", 'matched', 1],
       ['A Few Good Men', 'matched', 1],
       ['Heat', 'matched', 1],
       ['Making Of', 'off', 1],
@@ -200,6 +206,14 @@ describe('movie metadata', () => {
       .map((url) => new URL(url).searchParams.get('query'))
     expect(asked).toContain('The Few Good Men')
     expect(asked).toContain('Few Good Men')
+  })
+
+  it("matched a misnamed folder by its file's own name once the folder's found nothing", () => {
+    const asked = tmdb.state.calls
+      .filter((url) => url.includes('/search/movie'))
+      .map((url) => new URL(url).searchParams.get('query'))
+    expect(asked).toContain('Dont Make Me')
+    expect(asked).toContain("Don't Make Me Go")
   })
 
   it('matched Heat by the id in its folder name, without a search', () => {
@@ -502,6 +516,7 @@ describe('movie metadata', () => {
     expect(found.map((item) => item.item?.title)).toEqual(['The Matrix'])
     const newest = await list('?sort=year-new')
     expect(newest.map((item) => item.item?.year ?? item.year)).toEqual([
+      2022,
       2020,
       1999,
       1995,

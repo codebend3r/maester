@@ -78,6 +78,54 @@ describe('pickMatch', () => {
     expect(pickMatch({ type: 'movie', title: 'Seven', year: 1995, results: [only] })).toBe(only)
   })
 
+  it('accepts a title TMDB knows a result by, as with a film released abroad under another name', () => {
+    const loveland = result({ tmdbId: '659924', title: 'Loveland', year: 2022 })
+    const jam = result({ tmdbId: '1109028', title: 'Maria Elena e o Pote de Geleia', year: 2023 })
+    const results = [loveland, jam]
+    expect(pickMatch({ type: 'movie', title: 'Expired', year: 2022, results })).toBeNull()
+    expect(
+      pickMatch({
+        type: 'movie',
+        title: 'Expired',
+        year: 2022,
+        results,
+        aliases: new Map([['659924', ['Expired', 'Просроченный']]]),
+      }),
+    ).toBe(loveland)
+    const vidaLoca = result({ tmdbId: '32325', title: 'Mi Vida Loca', year: 1994 })
+    expect(
+      pickMatch({
+        type: 'movie',
+        title: 'My Crazy Life',
+        year: 1993,
+        results: [vidaLoca],
+        aliases: new Map([['32325', ['My Crazy Life']]]),
+      }),
+    ).toBe(vidaLoca)
+  })
+
+  it('takes a lone result of another title only when told it can', () => {
+    const only = result({ title: 'Se7en', year: 1995 })
+    expect(
+      pickMatch({
+        type: 'movie',
+        title: 'Seven',
+        year: 1995,
+        results: [only],
+        canTakeLoneResult: false,
+      }),
+    ).toBeNull()
+    expect(
+      pickMatch({
+        type: 'movie',
+        title: 'Se7en',
+        year: 1995,
+        results: [only],
+        canTakeLoneResult: false,
+      }),
+    ).toBe(only)
+  })
+
   it('refuses anything unsure', () => {
     expect(
       pickMatch({

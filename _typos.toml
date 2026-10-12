@@ -14,3 +14,5 @@ mis = "mis"
 tha = "tha"
 # The media element's `seeked` event, as React's `onSeeked`.
 seeked = "seeked"
+# Mi Vida Loca (1993), a film raven matches by its English title.
+loca = "loca"

@@ -69,6 +69,7 @@ describe('parseMovieName', () => {
         year: 2017,
         edition: null,
         ids: { tmdb: null, imdb: 'tt1856101', tvdb: null },
+        alternatives: [],
       },
     )
     expect(movie('The Matrix (1999) [tmdbid-603]/The Matrix (1999) {tvdb-169}.mkv').ids).toEqual({
@@ -107,6 +108,10 @@ describe('parseMovieName', () => {
     })
     expect(movie('Blade Runner 2049 (2017).mkv')).toMatchObject({ title: 'Blade Runner 2049' })
     expect(movie('2012 (2012).mkv')).toMatchObject({ title: '2012', year: 2012 })
+    expect(movie('Death to 2020 (2020)/Death to 2020 (2020) 1080p WEBDL.mkv')).toMatchObject({
+      title: 'Death to 2020',
+      year: 2020,
+    })
     expect(movie('Alien Resurrection R2 Special Edition (1997).mkv')).toMatchObject({
       title: 'Alien Resurrection',
       edition: 'Special Edition',
@@ -120,6 +125,36 @@ describe('parseMovieName', () => {
     })
     expect(movie('Special (2006).mkv')).toMatchObject({ title: 'Special', edition: null })
     expect(movie('Director (2021).mkv')).toMatchObject({ title: 'Director', edition: null })
+  })
+
+  it("keeps the file's own name to try where its folder names the movie differently", () => {
+    expect(movie("Dont Make Me (2022)/Don't Make Me Go (2022) 1080p WEBDL.mkv")).toMatchObject({
+      title: 'Dont Make Me',
+      year: 2022,
+      alternatives: [{ title: "Don't Make Me Go", year: 2022 }],
+    })
+    expect(movie('Karate Kid, The (2019)/Karate Kid, The (1984) 1080p WEBDL.mkv')).toMatchObject({
+      title: 'The Karate Kid',
+      year: 2019,
+      alternatives: [{ title: 'The Karate Kid', year: 1984 }],
+    })
+    expect(movie('Swordsmen, The (2020)/Swordsman, The.mkv').alternatives).toEqual([
+      { title: 'The Swordsman', year: 2020 },
+    ])
+  })
+
+  it("keeps the title with its edition to try, as a title can end in an edition's word", () => {
+    expect(movie('Redux Redux (2026)/Redux Redux (2026) 1080p WEBDL.mkv')).toMatchObject({
+      title: 'Redux',
+      edition: 'Redux',
+      alternatives: [{ title: 'Redux Redux', year: 2026 }],
+    })
+  })
+
+  it('has no alternatives when the folder and file agree', () => {
+    expect(movie('The Matrix (1999)/The Matrix (1999) Bluray-1080p.mkv').alternatives).toEqual([])
+    expect(movie('The.Matrix.1999.1080p.BluRay.x264-GROUP.mkv').alternatives).toEqual([])
+    expect(movie('Classics/The Third Man (1949) Bluray-1080p.mkv').alternatives).toEqual([])
   })
 
   it('takes the edition out of the title', () => {

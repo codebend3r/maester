@@ -20,6 +20,16 @@ describe('a matching pass', () => {
     movies: [
       { id: 949, title: 'Heat', released: '1995-12-15', imdbId: 'tt0113277' },
       { id: 881, title: 'A Few Good Men', released: '1992-12-11' },
+      { id: 659924, title: 'Loveland', released: '2022-03-17', alternativeTitles: ['Expired'] },
+      {
+        id: 1109028,
+        title: 'Maria Elena e o Pote de Geleia Vencido',
+        released: '2023-04-11',
+        alternativeTitles: ['The Expired Jam Jar'],
+      },
+      { id: 848247, title: 'Expiration', released: '2022-04-07' },
+      { id: 50270, title: 'Paprika', released: '1991-02-13', isHiddenFromSearch: true },
+      { id: 4040, title: 'Unheard Of Delights', released: '2001-05-01', isHiddenFromSearch: true },
     ],
     shows: [{ id: 95396, title: 'Severance', first: '2022-02-18', tvdbId: '371980', seasons: {} }],
   })
@@ -104,6 +114,40 @@ describe('a matching pass', () => {
     const asked = searches().length
     await expect(ask()).resolves.toMatchObject({ kind: 'matched', tmdbId: '95396' })
     expect(searches()).toHaveLength(asked)
+  })
+
+  it('takes a film by a title TMDB knows it by abroad before trying the next title', async () => {
+    const resolved = await pass().resolve({
+      type: 'movie',
+      fix: { kind: 'none' },
+      ids: NO_IDS,
+      nfoPath: null,
+      titles: [
+        { title: 'Expired', year: 2022 },
+        { title: 'Expiration', year: 2022 },
+      ],
+    })
+    expect(resolved).toMatchObject({ kind: 'matched', tmdbId: '659924' })
+    expect(tmdb.state.calls.some((url) => url.includes('/movie/659924/alternative_titles'))).toBe(
+      true,
+    )
+    expect(searches().some((url) => url.includes('query=Expiration'))).toBe(false)
+  })
+
+  it('searches with adult titles for a film TMDB leaves out, taking only its own title', async () => {
+    const ask = (title: string, year: number) =>
+      pass().resolve({
+        type: 'movie',
+        fix: { kind: 'none' },
+        ids: NO_IDS,
+        nfoPath: null,
+        titles: [{ title, year }],
+      })
+    await expect(ask('Paprika', 1991)).resolves.toMatchObject({ kind: 'matched', tmdbId: '50270' })
+    expect(
+      searches().some((url) => url.includes('query=Paprika') && url.includes('include_adult=true')),
+    ).toBe(true)
+    await expect(ask('Unheard Of', 2001)).resolves.toEqual({ kind: 'unmatched' })
   })
 
   it('leaves files unmatched when nothing is found, or TMDB has no such id', async () => {

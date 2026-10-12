@@ -623,13 +623,16 @@ export class TmdbClient {
   async searchMovies({
     query,
     year,
+    includeAdult = false,
   }: {
     query: string
     year: number | null
+    /** Takes in titles TMDB keeps out of an ordinary search. */
+    includeAdult?: boolean
   }): Promise<SearchResult[]> {
     const body = await this.get('/search/movie', {
       query: composed(query),
-      include_adult: 'false',
+      include_adult: String(includeAdult),
       ...(year == null ? {} : { year: String(year) }),
     })
     return records(record(body).results).flatMap((entry) => toSearchResult(entry) ?? [])
@@ -699,6 +702,23 @@ export class TmdbClient {
     const ids = (results: unknown): string[] =>
       records(results).flatMap((entry) => idOf(entry.id) ?? [])
     return { movies: ids(body.movie_results), shows: ids(body.tv_results) }
+  }
+
+  /** The other titles TMDB knows a movie or show by: a country's own, a working title, a translation. */
+  async alternativeTitles({
+    type,
+    tmdbId,
+  }: {
+    type: MatchItemType
+    tmdbId: string
+  }): Promise<string[]> {
+    const body = record(
+      await this.get(
+        `/${type === 'movie' ? 'movie' : 'tv'}/${encodeURIComponent(tmdbId)}/alternative_titles`,
+      ),
+    )
+    // A movie's come as `titles`, a show's as `results`.
+    return records(body.titles ?? body.results).flatMap((entry) => text(entry.title) ?? [])
   }
 
   /**
