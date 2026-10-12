@@ -197,10 +197,8 @@ describe('LibraryPage tabs', () => {
     await userEvent.click(button)
     expect(await screen.findByText('Movies · 12 videos')).toBeInTheDocument()
     // The tab polls while a file is pending; once none is, the library is read again.
-    expect(
-      await screen.findByText('Movies · 12 videos · 1 not matched', {}, { timeout: 5000 }),
-    ).toBeInTheDocument()
-  }, 10_000)
+    expect(await screen.findByText('Movies · 12 videos · 1 not matched')).toBeInTheDocument()
+  })
 
   it('shows the most recently finished, with a way to the whole history', async () => {
     spies.history.mockImplementation(async () => [

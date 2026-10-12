@@ -408,10 +408,8 @@ describe('LibraryPage for TV shows', () => {
     await userEvent.click(button)
     expect(await screen.findByText('TV shows · 12 videos')).toBeInTheDocument()
     // The listing polls while a file is pending; once none is, the library is read again.
-    expect(
-      await screen.findByText('TV shows · 12 videos · 1 not matched', {}, { timeout: 5000 }),
-    ).toBeInTheDocument()
-  }, 10_000)
+    expect(await screen.findByText('TV shows · 12 videos · 1 not matched')).toBeInTheDocument()
+  })
 
   it('lays the shows out as a list when asked, each row playable', async () => {
     serve({ view: 'list' })
