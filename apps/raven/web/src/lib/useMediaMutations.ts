@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { MediaItem, PosterEntry } from '@raven/core'
 import { api } from '@/lib/api'
 import { favouriteEdits, withoutEntry } from '@/lib/edits'
-import { afterFavourite } from '@/lib/invalidate'
+import { afterFavourites } from '@/lib/invalidate'
 import { useOptimisticMutation } from '@/lib/optimistic'
 import { mutationKeys, queryKeys } from '@/lib/queryClient'
 
@@ -12,7 +12,8 @@ import { mutationKeys, queryKeys } from '@/lib/queryClient'
  * favourite shows before the server even answers. Behind each, everything
  * its library shows refetches: the listings and every tab, In progress, Not
  * matched, its sagas and its history among them, so no menu there is left
- * stale. So do the favourites, the item pages and home.
+ * stale. So do the favourites, the item pages and home; favourites marked
+ * in a run settle together, so every library refetches after them.
  */
 export const useMediaMutations = ({ media }: { media: MediaItem }) => {
   const queryClient = useQueryClient()
@@ -23,7 +24,7 @@ export const useMediaMutations = ({ media }: { media: MediaItem }) => {
     mutationKey: mutationKeys.favourite,
     mutationFn: (marked: boolean) => api.setFavourite({ id: media.id, favourite: marked }),
     edits: (marked) => favouriteEdits({ media, favourite: marked }),
-    settle: () => afterFavourite({ queryClient, media }),
+    settle: () => afterFavourites(queryClient),
   })
 
   const remove = useMutation({

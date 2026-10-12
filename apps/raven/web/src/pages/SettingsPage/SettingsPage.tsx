@@ -7,7 +7,6 @@ import {
   type DisplaySettings,
   PLAYBACK_CHOICES,
   type PlaybackSettings,
-  type PlaybackSettingsState,
 } from '@raven/core'
 import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react'
 import { Button } from '@/components/Button/Button'
@@ -387,8 +386,8 @@ export const SettingsPage = () => {
     mutationKey: mutationKeys.playbackSettings,
     mutationFn: (change: Partial<PlaybackSettings>) => api.setPlaybackSettings(change),
     edits: (change) => [
-      edit<PlaybackSettingsState>({
-        filters: { queryKey: queryKeys.playbackSettings, exact: true },
+      edit({
+        queryKey: playbackSettingsQuery.queryKey,
         update: (state) => ({ ...state, settings: { ...state.settings, ...change } }),
       }),
     ],
@@ -399,8 +398,8 @@ export const SettingsPage = () => {
     mutationKey: mutationKeys.displaySettings,
     mutationFn: (change: Partial<DisplaySettings>) => api.setDisplaySettings(change),
     edits: (change) => [
-      edit<DisplaySettings>({
-        filters: { queryKey: queryKeys.displaySettings, exact: true },
+      edit({
+        queryKey: displaySettingsQuery.queryKey,
         update: (shown) => ({ ...shown, ...change }),
       }),
     ],

@@ -123,8 +123,10 @@ export const queryKeys = {
 export const mutationKeys = {
   /** Any video's favourite: they all show in the same listings. */
   favourite: ['favourite'],
-  /** Any library's pin, sort or view: they all show in the libraries list. */
-  librarySettings: ['library-settings'],
+  /** Any library's pin: they all show in the libraries list and on home. */
+  pin: ['pin'],
+  /** One library's sort, view or grouping, which only its page changes. */
+  libraryView: (libraryId: number) => ['library-view', libraryId],
   playbackSettings: ['settings', 'playback'],
   displaySettings: ['settings', 'display'],
 }

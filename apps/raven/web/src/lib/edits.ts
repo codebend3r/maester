@@ -1,19 +1,36 @@
-import type {
-  Home,
-  ItemDetails,
-  Library,
-  LibrarySettings,
-  MediaItem,
-  PosterEntry,
-  ShowListing,
-} from '@raven/core'
-import { type Edit, edit } from '@/lib/optimistic'
+import type { LibrarySettings, MediaItem, PosterEntry, ShowListing } from '@raven/core'
+import { type Edit, edit, editAll } from '@/lib/optimistic'
+import {
+  favouritesQuery,
+  homeQuery,
+  inProgressQuery,
+  itemQuery,
+  librariesQuery,
+  libraryFavouritesQuery,
+  libraryQuery,
+  mediaQuery,
+  unmatchedQuery,
+} from '@/lib/queries'
 import { queryKeys } from '@/lib/queryClient'
 
 /**
  * What each change looks like in the cache before the server answers, named
- * for the change, as `invalidate.ts` names what is read again after it.
+ * for the change, as `invalidate.ts` names what is read again after it. Each
+ * update hands back the very same data where it changes nothing, so a query
+ * that does not hold what changed is left alone.
  */
+
+/** `items` with `change` made to each one `matches`, or the very same list where none does. */
+const mapWhere = <T>({
+  items,
+  matches,
+  change,
+}: {
+  items: T[]
+  matches: (item: T) => boolean
+  change: (item: T) => T
+}): T[] =>
+  items.some(matches) ? items.map((item) => (matches(item) ? change(item) : item)) : items
 
 /** Poster entries without video `id`'s. */
 export const withoutEntry = ({
@@ -37,55 +54,62 @@ export const favouriteEdits = ({
   media: MediaItem
   favourite: boolean
 }): Edit[] => {
-  const mark = (item: MediaItem): MediaItem =>
-    item.id === media.id ? { ...item, favourite } : item
-  const markEntry = (entry: PosterEntry): PosterEntry =>
-    entry.media.id === media.id ? { ...entry, media: mark(entry.media) } : entry
-  const favourites = (entries: PosterEntry[]): PosterEntry[] =>
-    favourite ? entries.map(markEntry) : withoutEntry({ entries, id: media.id })
-  const markAll = (items: MediaItem[]): MediaItem[] => items.map(mark)
+  const isVideo = (item: MediaItem): boolean => item.id === media.id
+  const mark = (item: MediaItem): MediaItem => ({ ...item, favourite })
+  const markAll = (items: MediaItem[]): MediaItem[] =>
+    mapWhere({ items, matches: isVideo, change: mark })
+  const markEntries = (entries: PosterEntry[]): PosterEntry[] =>
+    mapWhere({
+      items: entries,
+      matches: (entry) => isVideo(entry.media),
+      change: (entry) => ({ ...entry, media: mark(entry.media) }),
+    })
+  const favourites = (entries: PosterEntry[]): PosterEntry[] => {
+    if (favourite) return markEntries(entries)
+    const kept = withoutEntry({ entries, id: media.id })
+    return kept.length === entries.length ? entries : kept
+  }
   const { libraryId } = media
   return [
-    edit<MediaItem>({
-      filters: { queryKey: queryKeys.mediaItem(media.id), exact: true },
-      update: mark,
-    }),
-    edit<MediaItem[]>({ filters: { queryKey: queryKeys.mediaLists(libraryId) }, update: markAll }),
-    edit<MediaItem[]>({
-      filters: { queryKey: queryKeys.unmatched(libraryId), exact: true },
+    edit({ queryKey: mediaQuery(media.id).queryKey, update: mark }),
+    editAll<MediaItem[]>({
+      filters: { queryKey: queryKeys.mediaLists(libraryId) },
       update: markAll,
     }),
-    edit<ShowListing>({
+    editAll<ShowListing>({
       filters: { queryKey: queryKeys.showLists(libraryId) },
-      update: (listing) => ({ ...listing, unmatched: markAll(listing.unmatched) }),
+      update: (listing) => {
+        const unmatched = markAll(listing.unmatched)
+        return unmatched === listing.unmatched ? listing : { ...listing, unmatched }
+      },
     }),
-    edit<PosterEntry[]>({
-      filters: { queryKey: queryKeys.inProgress(libraryId), exact: true },
-      update: (entries) => entries.map(markEntry),
-    }),
-    edit<PosterEntry[]>({
-      filters: { queryKey: queryKeys.favourites, exact: true },
-      update: favourites,
-    }),
-    edit<PosterEntry[]>({
-      filters: { queryKey: queryKeys.libraryFavourites(libraryId), exact: true },
-      update: favourites,
-    }),
-    edit<Home>({
-      filters: { queryKey: queryKeys.home, exact: true },
-      update: (home) => ({
-        ...home,
-        inProgress: home.inProgress.map(markEntry),
-        shelves: home.shelves.map((shelf) =>
-          shelf.type === 'media' ? { ...shelf, media: markAll(shelf.media) } : shelf,
-        ),
-      }),
+    edit({ queryKey: unmatchedQuery(libraryId).queryKey, update: markAll }),
+    edit({ queryKey: inProgressQuery(libraryId).queryKey, update: markEntries }),
+    edit({ queryKey: favouritesQuery.queryKey, update: favourites }),
+    edit({ queryKey: libraryFavouritesQuery(libraryId).queryKey, update: favourites }),
+    edit({
+      queryKey: homeQuery.queryKey,
+      update: (home) => {
+        const inProgress = markEntries(home.inProgress)
+        const shelves = mapWhere({
+          items: home.shelves,
+          matches: (shelf) => shelf.type === 'media' && shelf.media.some(isVideo),
+          change: (shelf) =>
+            shelf.type === 'media' ? { ...shelf, media: markAll(shelf.media) } : shelf,
+        })
+        return inProgress === home.inProgress && shelves === home.shelves
+          ? home
+          : { ...home, inProgress, shelves }
+      },
     }),
     ...(media.item
       ? [
-          edit<ItemDetails>({
-            filters: { queryKey: queryKeys.item(media.item.id), exact: true },
-            update: (details) => ({ ...details, versions: markAll(details.versions) }),
+          edit({
+            queryKey: itemQuery(media.item.id).queryKey,
+            update: (details) => {
+              const versions = markAll(details.versions)
+              return versions === details.versions ? details : { ...details, versions }
+            },
           }),
         ]
       : []),
@@ -99,19 +123,18 @@ export const librarySettingsEdits = ({
 }: {
   libraryId: number
   change: Partial<LibrarySettings>
-}): Edit[] => {
-  const changed = (library: Library): Library =>
-    library.id === libraryId
-      ? { ...library, settings: { ...library.settings, ...change } }
-      : library
-  return [
-    edit<Library>({
-      filters: { queryKey: queryKeys.library(libraryId), exact: true },
-      update: changed,
-    }),
-    edit<Library[]>({
-      filters: { queryKey: queryKeys.libraries, exact: true },
-      update: (libraries) => libraries.map(changed),
-    }),
-  ]
-}
+}): Edit[] => [
+  edit({
+    queryKey: libraryQuery(libraryId).queryKey,
+    update: (library) => ({ ...library, settings: { ...library.settings, ...change } }),
+  }),
+  edit({
+    queryKey: librariesQuery.queryKey,
+    update: (libraries) =>
+      mapWhere({
+        items: libraries,
+        matches: (library) => library.id === libraryId,
+        change: (library) => ({ ...library, settings: { ...library.settings, ...change } }),
+      }),
+  }),
+]

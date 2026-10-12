@@ -1,5 +1,5 @@
 import type { InvalidateQueryFilters, QueryClient } from '@tanstack/react-query'
-import type { ItemDetails, MediaItem } from '@raven/core'
+import type { ItemDetails } from '@raven/core'
 import { queryKeys } from '@/lib/queryClient'
 
 /**
@@ -44,33 +44,31 @@ export const afterLibrarySaved = (queryClient: QueryClient): Promise<unknown> =>
   })
 
 /**
- * A favourite was marked or unmarked: everything its library shows, every
- * tab's menu among them, the favourites, the item pages, home, and the
- * video itself.
+ * Favourites were marked or unmarked, perhaps across libraries: everything
+ * every library shows, each tab's menu among them, the favourites, the item
+ * pages, home, and the videos themselves.
  */
-export const afterFavourite = ({
-  queryClient,
-  media,
-}: {
-  queryClient: QueryClient
-  media: MediaItem
-}): Promise<unknown> =>
+export const afterFavourites = (queryClient: QueryClient): Promise<unknown> =>
   refetch({
     queryClient,
     filters: [
-      { queryKey: queryKeys.library(media.libraryId) },
+      { queryKey: queryKeys.libraries },
       { queryKey: queryKeys.favourites },
       { queryKey: queryKeys.items },
       { queryKey: queryKeys.home },
-      { queryKey: queryKeys.mediaItem(media.id), exact: true },
+      { queryKey: queryKeys.allMedia },
     ],
   })
 
-/**
- * A library's view or pin was saved: the library, the list the side menu
- * reads, and home, whose shelves follow the pins.
- */
-export const afterLibrarySettings = ({
+/** Libraries were pinned or unpinned: every library, and home, whose shelves follow the pins. */
+export const afterPins = (queryClient: QueryClient): Promise<unknown> =>
+  refetch({
+    queryClient,
+    filters: [{ queryKey: queryKeys.libraries }, { queryKey: queryKeys.home }],
+  })
+
+/** A library's sort, view or grouping was saved: the library, and the list the side menu reads. */
+export const afterLibraryView = ({
   queryClient,
   libraryId,
 }: {
@@ -82,7 +80,6 @@ export const afterLibrarySettings = ({
     filters: [
       { queryKey: queryKeys.library(libraryId), exact: true },
       { queryKey: queryKeys.libraries, exact: true },
-      { queryKey: queryKeys.home },
     ],
   })
 

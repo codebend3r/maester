@@ -1,4 +1,5 @@
 import {
+  type DataTag,
   type MutationKey,
   type QueryClient,
   type QueryFilters,
@@ -9,32 +10,57 @@ import {
 } from '@tanstack/react-query'
 import { useState } from 'react'
 
-/** One change to the cache, ready to write into each query its filters find. */
-export type Edit = {
-  filters: QueryFilters
-  write: (args: { queryClient: QueryClient; queryKey: QueryKey }) => void
-}
+/** A write an edit would make: to the query `queryKey` names, whose data it changes. */
+type Write = { queryKey: QueryKey; write: () => void }
+
+/**
+ * One change to the cache. It plans a write only for each query whose data
+ * it would change, so a query it leaves as it was is not touched: no fetch
+ * called off, nothing marked fresh.
+ */
+export type Edit = { plan: (queryClient: QueryClient) => Write[] }
 
 /** What the edits of a change replaced, to put back if the server refuses it. */
 type Snapshot = ReadonlyArray<readonly [QueryKey, unknown]>
 
-/** An edit to every query `filters` find, each holding a `T`, put through `update`. */
-export const edit = <T>({
+/**
+ * An edit to every query `filters` find, each holding a `T`, as every
+ * listing of a library does. `update` hands back the very same data where
+ * it changes nothing.
+ */
+export const editAll = <T>({
   filters,
   update,
 }: {
   filters: QueryFilters
   update: (data: T) => T
 }): Edit => ({
-  filters,
-  write: ({ queryClient, queryKey }) =>
-    queryClient.setQueryData<T>(queryKey, (data) => (data === undefined ? data : update(data))),
+  plan: (queryClient) =>
+    queryClient
+      .getQueriesData<T>(filters)
+      .filter(([, data]) => data !== undefined && update(data) !== data)
+      .map(([queryKey]) => ({
+        queryKey,
+        write: () =>
+          queryClient.setQueryData<T>(queryKey, (data) =>
+            data === undefined ? data : update(data),
+          ),
+      })),
 })
 
+/** An edit to the one query `queryKey` names, its data typed as that query's. */
+export const edit = <T>({
+  queryKey,
+  update,
+}: {
+  queryKey: DataTag<QueryKey, T, Error>
+  update: (data: T) => T
+}): Edit => editAll<T>({ filters: { queryKey, exact: true }, update })
+
 /**
- * Shows a change before the server answers: every query the edits touch
- * has any fetch in flight called off, so an older answer cannot land over
- * the change, then takes its edits. What each held before comes back.
+ * Shows a change before the server answers: every query it changes has any
+ * fetch in flight called off, so an older answer cannot land over it, then
+ * takes the change. What each held before comes back.
  */
 const applyEdits = async ({
   queryClient,
@@ -43,22 +69,16 @@ const applyEdits = async ({
   queryClient: QueryClient
   edits: readonly Edit[]
 }): Promise<Snapshot> => {
-  const touched = edits.map((change) => ({
-    change,
-    queries: queryClient.getQueryCache().findAll(change.filters),
-  }))
-  const queries = [
-    ...new Map(
-      touched.flatMap((entry) => entry.queries).map((query) => [query.queryHash, query]),
-    ).values(),
+  const planned = () => edits.flatMap((change) => change.plan(queryClient))
+  const touched = [
+    ...new Map(planned().map(({ queryKey }) => [hashKey(queryKey), queryKey])).values(),
   ]
-  await Promise.all(
-    queries.map((query) => queryClient.cancelQueries({ queryKey: query.queryKey, exact: true })),
+  await Promise.all(touched.map((queryKey) => queryClient.cancelQueries({ queryKey, exact: true })))
+  const snapshot = touched.map(
+    (queryKey) => [queryKey, queryClient.getQueryData(queryKey)] as const,
   )
-  const snapshot = queries.map((query) => [query.queryKey, query.state.data] as const)
-  touched.forEach(({ change, queries: found }) =>
-    found.forEach((query) => change.write({ queryClient, queryKey: query.queryKey })),
-  )
+  // Planned again: a fetch called off has put back what it held before.
+  planned().forEach(({ write }) => write())
   return snapshot
 }
 

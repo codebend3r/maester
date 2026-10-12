@@ -66,7 +66,7 @@ export const SkeletonCards = ({
  * leave unread when it arrives already filled.
  */
 export const Loading = ({ label, children }: { label: string; children: ReactNode }) => (
-  <div className={styles.loading} aria-busy="true">
+  <div className={styles.loading}>
     <p className="visually-hidden">{label}</p>
     <div className={styles.shapes} aria-hidden="true">
       {children}

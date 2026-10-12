@@ -11,7 +11,7 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { librarySettingsEdits } from '@/lib/edits'
-import { afterLibrarySettings } from '@/lib/invalidate'
+import { afterLibraryView } from '@/lib/invalidate'
 import { useOptimisticMutation } from '@/lib/optimistic'
 import { mutationKeys } from '@/lib/queryClient'
 import { useDebouncedValue } from '@/lib/useDebouncedValue'
@@ -80,14 +80,14 @@ export const useLibraryView = ({ library }: { library: Library }) => {
   }, [query, setAddress])
 
   const save = useOptimisticMutation({
-    mutationKey: mutationKeys.librarySettings,
+    mutationKey: mutationKeys.libraryView(library.id),
     mutationFn: ({ current, change }: { current: Library; change: Partial<LibrarySettings> }) =>
       api.updateLibrary({
         id: current.id,
         input: { name: current.name, paths: current.paths, settings: change },
       }),
     edits: ({ current, change }) => librarySettingsEdits({ libraryId: current.id, change }),
-    settle: () => afterLibrarySettings({ queryClient, libraryId: library.id }),
+    settle: () => afterLibraryView({ queryClient, libraryId: library.id }),
   })
 
   return {

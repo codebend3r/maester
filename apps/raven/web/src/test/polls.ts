@@ -5,8 +5,9 @@ const pace = { speedUp: 1 }
 
 /**
  * Hands TanStack Query timers that run as the platform's do, but for a
- * query's poll, which comes round at the pace the test sets. Called before
- * any query client exists, as TanStack asks.
+ * query's poll, which comes round at the pace the test sets. TanStack keeps
+ * its own timers to itself, so they are written out again here. Called
+ * before any query client exists, as TanStack asks.
  */
 export const pacePolls = (): void =>
   timeoutManager.setTimeoutProvider({

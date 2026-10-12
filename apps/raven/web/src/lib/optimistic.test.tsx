@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
-import { edit, useOptimisticMutation } from '@/lib/optimistic'
+import { editAll, useOptimisticMutation } from '@/lib/optimistic'
 import { held } from '@/test/held'
 
 /** A stored count of 1, and a hook that changes it, sending each change through `save`. */
@@ -18,7 +18,9 @@ const setUp = (save: (n: number) => Promise<number>) => {
       useOptimisticMutation({
         mutationKey: ['count'],
         mutationFn: save,
-        edits: (n: number) => [edit<number>({ filters: { queryKey: ['count'] }, update: () => n })],
+        edits: (n: number) => [
+          editAll<number>({ filters: { queryKey: ['count'] }, update: () => n }),
+        ],
         settle: async () => {
           settled.push('read again')
         },

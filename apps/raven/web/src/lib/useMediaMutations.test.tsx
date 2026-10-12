@@ -48,7 +48,6 @@ describe('useMediaMutations', () => {
     const { result, isStale } = setUp()
     act(() => result.current.favourite.mutate(true))
     await waitFor(() => expect(TABS.filter(([key]) => !isStale(key))).toEqual([]))
-    expect(isStale(queryKeys.inProgress(3))).toBe(false)
   })
 
   /** Library 2's listing, sorted by title. */
@@ -85,6 +84,42 @@ describe('useMediaMutations', () => {
       expect(result.current.favourite.failure?.message).toBe('The server is away.'),
     )
     expect(client.getQueryData<MediaItem[]>(LISTING)).toEqual([mediaItem()])
+  })
+
+  it('reads again every library a run of favourites touched, the refused one too', async () => {
+    const later = held<MediaItem>()
+    spies.favourite.mockImplementation(async ({ id }) => {
+      if (id === 7) throw new Error('The server is away.')
+      return later.promise
+    })
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const elsewhere = queryKeys.media({ libraryId: 3, search: '', sort: 'title', seed: 0 })
+    client.setQueryData(LISTING, [mediaItem()])
+    client.setQueryData(elsewhere, [mediaItem({ id: 9, libraryId: 3 })])
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    )
+    const { result } = renderHook(
+      () => ({
+        seven: useMediaMutations({ media: mediaItem() }),
+        nine: useMediaMutations({ media: mediaItem({ id: 9, libraryId: 3 }) }),
+      }),
+      { wrapper },
+    )
+    act(() => {
+      result.current.seven.favourite.mutate(true)
+      result.current.nine.favourite.mutate(true)
+    })
+    await waitFor(() =>
+      expect(result.current.seven.favourite.failure?.message).toBe('The server is away.'),
+    )
+    later.answer(mediaItem({ id: 9, libraryId: 3, favourite: true }))
+    await waitFor(() =>
+      expect([LISTING, elsewhere].map((key) => client.getQueryState(key)?.isInvalidated)).toEqual([
+        true,
+        true,
+      ]),
+    )
   })
 
   it('takes an unmarked favourite off the favourites at once', async () => {
