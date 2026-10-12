@@ -134,11 +134,11 @@
       "version": "0.4.7",
       "devDependencies": {
         "@typescript/native-preview": "7.0.0-dev.20260707.2",
+        "bun-types": "1.4.2",
         "oxfmt": "0.68.0",
         "oxlint": "1.83.0",
         "tsc-alias": "1.9.7",
         "typescript": "6.0.3",
-        "vitest": "5.0.2",
       },
     },
     "libs/shared/server": {

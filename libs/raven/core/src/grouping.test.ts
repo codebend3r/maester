@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { groupMedia } from '@/grouping'
 import { mediaItem } from '@/test/fixtures'
 

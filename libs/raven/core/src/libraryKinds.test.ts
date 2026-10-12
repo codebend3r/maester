@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { LIBRARY_KINDS, type LibrarySettings } from '@/contract'
 import {
   DEFAULT_LIBRARY_SETTINGS,

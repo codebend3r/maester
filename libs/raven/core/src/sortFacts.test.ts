@@ -1,5 +1,5 @@
 import type { MediaSort } from '@/contract'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { showSortFact, sortFact } from '@/sortFacts'
 import { mediaItem, showEntry } from '@/test/fixtures'
 

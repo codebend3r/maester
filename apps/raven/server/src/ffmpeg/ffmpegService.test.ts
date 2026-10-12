@@ -39,11 +39,12 @@ describe('FfmpegService', () => {
       { playback: () => DEFAULT_PLAYBACK_SETTINGS },
     )
 
+  // Both wait out the same second, side by side.
   it('reports a timeout as a timeout, so the scan can retry later', async () => {
-    await expect(service('slow').probeFile('/media/a.mkv')).rejects.toBeInstanceOf(
-      FfmpegTimeoutError,
-    )
-    await expect(service('slow').exec(['-version'])).rejects.toThrow('ffmpeg gave up after 1s')
+    await Promise.all([
+      expect(service('slow').probeFile('/media/a.mkv')).rejects.toBeInstanceOf(FfmpegTimeoutError),
+      expect(service('slow').exec(['-version'])).rejects.toThrow('ffmpeg gave up after 1s'),
+    ])
   })
 
   it("passes on ffprobe's own reason for a broken file", async () => {
