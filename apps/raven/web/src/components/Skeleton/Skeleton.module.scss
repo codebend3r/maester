@@ -1,0 +1,133 @@
+// Stand-ins for what is on its way: the canopy's own colour, with a band of
+// moss sweeping across where motion is welcome. A whole stand-in comes in
+// after a beat, so an answer that is quick never flashes one up.
+
+.loading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.shapes {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+.bone {
+  display: block;
+  border-radius: var(--radius-sm);
+  background-color: var(--color-canopy);
+}
+
+// A picture keeps the shape of the one it stands in for; `fill` takes
+// whatever its container gives it, as a header's picture does.
+.poster,
+.frame,
+.fill {
+  border-radius: var(--radius-md);
+}
+
+.poster {
+  aspect-ratio: 2 / 3;
+}
+
+.frame {
+  aspect-ratio: 16 / 9;
+}
+
+.fill {
+  width: 100%;
+  height: 100%;
+}
+
+// A line as tall as the type it stands in for.
+.hero {
+  height: var(--font-size-hero);
+}
+
+.heading {
+  height: var(--font-size-xl);
+}
+
+.text {
+  height: var(--font-size-md);
+}
+
+.small {
+  height: var(--font-size-xs);
+}
+
+// As tall as a button, and as wide as a short label on one.
+.button {
+  width: 7rem;
+  min-height: 2.5rem;
+  border-radius: var(--radius-md);
+}
+
+.most {
+  width: 75%;
+}
+
+.half {
+  width: 50%;
+}
+
+.short {
+  width: 25%;
+}
+
+// A card: its picture, then a line for its title and one for its facts.
+.card {
+  display: grid;
+  align-content: start;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+// A row of a list or of tiles: a frame grab beside its two lines.
+.row {
+  display: grid;
+  grid-template-columns: clamp(6rem, 22vw, 10rem) minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-moss);
+}
+
+.lines {
+  display: grid;
+  gap: var(--space-1);
+}
+
+@keyframes arrive {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 150% 0;
+  }
+
+  to {
+    background-position: -50% 0;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .loading {
+    animation: arrive 200ms ease-out 150ms both;
+  }
+
+  .bone {
+    background-image: linear-gradient(
+      90deg,
+      transparent 30%,
+      var(--color-moss) 50%,
+      transparent 70%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.6s ease-in-out infinite;
+  }
+}

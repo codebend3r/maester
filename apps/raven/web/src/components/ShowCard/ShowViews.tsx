@@ -83,7 +83,7 @@ const COLUMNS: Record<Column, SortColumn<ShowEntry>> = {
 }
 
 /** Every show as a row of facts: title, years, episodes on disk and each of its scores, every column sortable. */
-export const ShowList = ({ shows, busy = false }: { shows: ShowEntry[]; busy?: boolean }) => {
+export const ShowList = ({ shows }: { shows: ShowEntry[] }) => {
   const { sorted, toggle, ariaSort } = useTableSort({ rows: shows, columns: COLUMNS })
   const header = (key: Column, label: string, className?: string) => (
     <SortHeader sort={ariaSort(key)} onToggle={() => toggle(key)} className={className}>
@@ -91,7 +91,7 @@ export const ShowList = ({ shows, busy = false }: { shows: ShowEntry[]; busy?: b
     </SortHeader>
   )
   return (
-    <table className={styles.table} aria-label="Shows" aria-busy={busy}>
+    <table className={styles.table} aria-label="Shows">
       <thead>
         <tr>
           {header('title', 'Title')}
@@ -138,15 +138,13 @@ export const ShowList = ({ shows, busy = false }: { shows: ShowEntry[]; busy?: b
 /** Every show as a row with a small poster, its title and facts beside it. */
 export const ShowTiles = ({
   shows,
-  busy = false,
   sort,
 }: {
   shows: ShowEntry[]
-  busy?: boolean
   /** The order the listing is in, whose value each tile shows. */
   sort?: MediaSort
 }) => (
-  <ul className={styles.tiles} aria-label="Shows" aria-busy={busy}>
+  <ul className={styles.tiles} aria-label="Shows">
     {shows.map((entry) => {
       const sorted = sort ? showSortFact({ entry, sort }) : null
       const facts = [

@@ -1,5 +1,6 @@
 import { primaryVersion } from '@raven/core'
 import { useSearchParams } from 'react-router-dom'
+import { ItemHeaderSkeleton } from '@/components/ItemHeader/ItemHeader'
 import { PlayableItemView } from '@/components/PlayableItemView/PlayableItemView'
 import { RouteState } from '@/components/RouteState/RouteState'
 import { useRouteItem } from '@/lib/routeQuery'
@@ -13,7 +14,8 @@ import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
 export const MoviePage = () => {
   const page = useRouteItem('movie')
   const [params] = useSearchParams()
-  if (page.state !== 'ready') return <RouteState state={page} noun="movie" />
+  if (page.state !== 'ready')
+    return <RouteState state={page} noun="movie" shape={<ItemHeaderSkeleton picture="poster" />} />
   const file = Number(params.get('file'))
   const primary =
     page.data.versions.find((version) => version.id === file) ?? primaryVersion(page.data.versions)

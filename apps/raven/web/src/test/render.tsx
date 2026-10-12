@@ -4,6 +4,7 @@ import {
   DEFAULT_DISPLAY_SETTINGS,
   DEFAULT_PLAYBACK_SETTINGS,
   type DisplaySettings,
+  type Library,
   type PlaybackSettingsState,
 } from '@raven/core'
 import { render } from '@testing-library/react'
@@ -22,6 +23,7 @@ export const DEFAULT_PLAYBACK_STATE: PlaybackSettingsState = {
  * `route`. The server's playback and display settings are already known, as
  * they are once a page has read them, and so is the admin lock, off as in an
  * admin's browser so every action shows; `null` leaves any to be fetched.
+ * `libraries` is the list the side menu reads, for a test that has it read.
  */
 export const renderWithProviders = (
   ui: ReactNode,
@@ -30,17 +32,20 @@ export const renderWithProviders = (
     playback = DEFAULT_PLAYBACK_STATE,
     display = DEFAULT_DISPLAY_SETTINGS,
     adminLock = { state: 'off' },
+    libraries = null,
   }: {
     route?: string
     playback?: PlaybackSettingsState | null
     display?: DisplaySettings | null
     adminLock?: AdminLock | null
+    libraries?: Library[] | null
   } = {},
 ) => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   if (playback) client.setQueryData(queryKeys.playbackSettings, playback)
   if (display) client.setQueryData(queryKeys.displaySettings, display)
   if (adminLock) client.setQueryData(queryKeys.adminLock, adminLock)
+  if (libraries) client.setQueryData(queryKeys.libraries, libraries)
   return render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[route]}>{ui}</MemoryRouter>

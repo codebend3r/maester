@@ -3,6 +3,7 @@ import {
   type Library,
   type LibrarySettings,
   coherentSettings,
+  isLibrary,
   isLibraryView,
   isMediaGroupBy,
   isMediaSort,
@@ -10,7 +11,8 @@ import {
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api } from '@/lib/api'
-import { queryKeys } from '@/lib/queryClient'
+import { optimisticChange, patchEvery, patchQueries } from '@/lib/optimistic'
+import { mutationKeys, queryKeys } from '@/lib/queryClient'
 import { useDebouncedValue } from '@/lib/useDebouncedValue'
 
 /** A fresh deal for a random sort; the order holds while the page is open. */
@@ -83,18 +85,21 @@ export const useLibraryView = ({ library }: { library: Library }) => {
         id: current.id,
         input: { name: current.name, paths: current.paths, settings: change },
       }),
-    onMutate: async ({ current, change }) => {
-      await queryClient.cancelQueries({ queryKey: key, exact: true })
-      queryClient.setQueryData<Library>(key, {
-        ...current,
-        settings: { ...current.settings, ...change },
-      })
-      return { previous: current }
-    },
-    onError: (_error, _variables, context) => {
-      if (context) queryClient.setQueryData(key, context.previous)
-    },
-    onSuccess: (updated) => queryClient.setQueryData(key, updated),
+    ...optimisticChange<{ current: Library; change: Partial<LibrarySettings> }>({
+      queryClient,
+      mutationKey: mutationKeys.libraryView(library.id),
+      apply: ({ change }) =>
+        patchQueries({
+          queryClient,
+          filters: [{ queryKey: key, exact: true }],
+          patch: patchEvery({
+            guard: isLibrary,
+            id: library.id,
+            patch: (current) => ({ ...current, settings: { ...current.settings, ...change } }),
+          }),
+        }),
+      settle: () => queryClient.invalidateQueries({ queryKey: key, exact: true }),
+    }),
   })
 
   return {

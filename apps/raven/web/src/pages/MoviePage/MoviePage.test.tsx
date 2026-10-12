@@ -7,6 +7,7 @@ import { api } from '@/lib/api'
 import { MoviePage } from '@/pages/MoviePage/MoviePage'
 import { itemDetails, library, matchedMovie } from '@/test/fixtures'
 import { setBrowserSupport, setStreamSupport } from '@/test/canPlay'
+import { held } from '@/test/held'
 import { renderWithProviders } from '@/test/render'
 
 const Watching = () => <p>Watching {useParams().id}</p>
@@ -71,6 +72,18 @@ describe('MoviePage', () => {
     spies.item.mockReset()
     spies.libraries.mockReset()
     spies.tracks.mockReset()
+  })
+
+  it('stands in for the movie while it is read, saying so to a screen reader', async () => {
+    spies.item.mockImplementation(() => held<ItemDetails>().promise)
+    renderWithProviders(
+      <Routes>
+        <Route path="movies/:id" element={<MoviePage />} />
+      </Routes>,
+      { route: '/movies/40' },
+    )
+    expect(await screen.findByRole('status')).toHaveTextContent('Opening the movie')
+    expect(screen.queryByRole('heading')).toBeNull()
   })
 
   it('shows the header: title, director, content rating, facts and the TMDB score', async () => {

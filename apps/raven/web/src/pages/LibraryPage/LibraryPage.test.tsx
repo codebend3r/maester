@@ -5,6 +5,7 @@ import type { Library, LibraryInput, LibrarySettings, MediaItem, MediaSort } fro
 import { api } from '@/lib/api'
 import { useUnlockPrompt } from '@/stores/unlockPrompt'
 import { library, mediaItem, showEntry } from '@/test/fixtures'
+import { held } from '@/test/held'
 import { renderLibraryPage } from '@/test/libraryPage'
 
 const WIDE = mediaItem({ id: 1, title: 'Wide', width: 3840, height: 2160 })
@@ -61,6 +62,29 @@ describe('LibraryPage', () => {
     spies.lock.mockReset()
     state.sent = []
     state.listed = []
+  })
+
+  it('opens on what the libraries list knows while the library itself is read', async () => {
+    spies.get.mockImplementation(() => held<Library>().promise)
+    spies.list.mockImplementation(() => held<MediaItem[]>().promise)
+    renderLibraryPage({ libraries: [library({ id: 2, name: 'Films' })] })
+    expect(await screen.findByRole('heading', { level: 1, name: 'Films' })).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('Gathering the videos')
+  })
+
+  it('stands in for the library while it is read, with nothing of it known yet', async () => {
+    spies.get.mockImplementation(() => held<Library>().promise)
+    renderLibraryPage()
+    expect(await screen.findByRole('status')).toHaveTextContent('Opening the library')
+  })
+
+  it('says why its videos could not be read', async () => {
+    spies.get.mockImplementation(async () => library({ id: 2 }))
+    spies.list.mockImplementation(async () => {
+      throw new Error('The server is away.')
+    })
+    renderLibraryPage()
+    expect(await screen.findByRole('alert')).toHaveTextContent('The server is away.')
   })
 
   it('opens in the view and sort the library was left in', async () => {

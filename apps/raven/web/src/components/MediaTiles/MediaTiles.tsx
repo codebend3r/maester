@@ -17,6 +17,7 @@ import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
 import { PosterFrame } from '@/components/PosterCard/PosterCard'
 import { RatingChips } from '@/components/RatingChips/RatingChips'
 import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
+import { SkeletonRows } from '@/components/Skeleton/Skeleton'
 import { api } from '@/lib/api'
 import { cardLink } from '@/lib/itemLinks'
 import { mediaEntryKey } from '@/lib/entryKeys'
@@ -114,14 +115,12 @@ const MediaTile = ({
  */
 export const MediaTiles = ({
   items,
-  busy = false,
   note,
   posters = false,
   matchType = null,
   sort,
 }: {
   items: MediaItem[]
-  busy?: boolean
   note?: (media: MediaItem) => string | null
   /** A Movies library's tiles: small posters, opening the movie's page. */
   posters?: boolean
@@ -130,7 +129,7 @@ export const MediaTiles = ({
   /** The order the listing is in, whose value each tile shows first. */
   sort?: MediaSort
 }) => (
-  <ul className={styles.tiles} aria-busy={busy}>
+  <ul className={styles.tiles}>
     {items.map((item) => (
       <MediaTile
         key={item.id}
@@ -141,5 +140,12 @@ export const MediaTiles = ({
         sort={sort}
       />
     ))}
+  </ul>
+)
+
+/** The tiles while they are on their way, as rows of stand-ins; a list lays out the same. */
+export const MediaTilesSkeleton = () => (
+  <ul className={styles.tiles}>
+    <SkeletonRows />
   </ul>
 )

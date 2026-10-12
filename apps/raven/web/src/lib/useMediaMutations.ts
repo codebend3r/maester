@@ -1,11 +1,24 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import type { MediaItem, PosterEntry } from '@raven/core'
+import { type MediaItem, type PosterEntry, isMediaItem, isPosterEntry } from '@raven/core'
 import { api } from '@/lib/api'
-import { queryKeys } from '@/lib/queryClient'
+import { type Patch, optimisticChange, patchEvery, patchQueries } from '@/lib/optimistic'
+import { mutationKeys, queryKeys } from '@/lib/queryClient'
+
+/** A list of poster entries without the one for video `id`; anything else as it was. */
+const withoutEntry =
+  (id: number): Patch =>
+  (data) => {
+    if (!Array.isArray(data)) return data
+    const entries: readonly unknown[] = data
+    const kept = entries.filter((entry) => !(isPosterEntry(entry) && entry.media.id === id))
+    return kept.length === entries.length ? data : kept
+  }
 
 /**
  * Marking a favourite, deleting a video and fetching its details again,
- * with every cached list patched in place so the grid answers at once.
+ * with every cached list patched in place so the grid answers at once. A
+ * favourite shows before the server answers, on every card, row and page
+ * holding the video, and leaves the favourites at once when unmarked.
  * Behind that, everything its library shows refetches: the listings and
  * every tab, In progress, Not matched, its sagas and its history among
  * them, so no menu there is left stale. So do the favourites, the item
@@ -22,25 +35,47 @@ export const useMediaMutations = ({ media }: { media: MediaItem }) => {
 
   const favourite = useMutation({
     mutationFn: (marked: boolean) => api.setFavourite({ id: media.id, favourite: marked }),
-    onSuccess: (updated) => {
-      queryClient.setQueryData(queryKeys.mediaItem(updated.id), updated)
-      queryClient.setQueriesData<MediaItem[]>(lists, (items) =>
-        items?.map((item) => (item.id === updated.id ? updated : item)),
-      )
-      if (!updated.favourite) {
-        queryClient.setQueryData<PosterEntry[]>(queryKeys.favourites, withoutFavourite)
-        queryClient.setQueryData<PosterEntry[]>(
-          queryKeys.libraryFavourites(media.libraryId),
-          withoutFavourite,
-        )
-      }
-      return Promise.all([
-        queryClient.invalidateQueries(library),
-        queryClient.invalidateQueries({ queryKey: queryKeys.favourites }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.items }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.home }),
-      ])
-    },
+    ...optimisticChange<boolean>({
+      queryClient,
+      mutationKey: mutationKeys.favourite(media.id),
+      // Everywhere the video shows: its library's listings and tabs, the
+      // favourites, home, the item pages and its own.
+      apply: async (marked) => [
+        ...(await patchQueries({
+          queryClient,
+          filters: [
+            library,
+            { queryKey: queryKeys.favourites },
+            { queryKey: queryKeys.home },
+            { queryKey: queryKeys.items },
+            { queryKey: queryKeys.mediaItem(media.id), exact: true },
+          ],
+          patch: patchEvery({
+            guard: isMediaItem,
+            id: media.id,
+            patch: (item) => ({ ...item, favourite: marked }),
+          }),
+        })),
+        ...(marked
+          ? []
+          : await patchQueries({
+              queryClient,
+              filters: [
+                { queryKey: queryKeys.favourites, exact: true },
+                { queryKey: queryKeys.libraryFavourites(media.libraryId), exact: true },
+              ],
+              patch: withoutEntry(media.id),
+            })),
+      ],
+      settle: () =>
+        Promise.all([
+          queryClient.invalidateQueries({ queryKey: queryKeys.mediaItem(media.id), exact: true }),
+          queryClient.invalidateQueries(library),
+          queryClient.invalidateQueries({ queryKey: queryKeys.favourites }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.items }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.home }),
+        ]),
+    }),
   })
 
   const remove = useMutation({

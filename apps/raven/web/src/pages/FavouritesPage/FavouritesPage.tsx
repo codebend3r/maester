@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useId } from 'react'
 import { PosterCard } from '@/components/PosterCard/PosterCard'
+import { Loading, SkeletonCards } from '@/components/Skeleton/Skeleton'
 import { favouritesQuery } from '@/lib/queries'
 import styles from '@/pages/FavouritesPage/FavouritesPage.module.scss'
 
@@ -33,7 +34,13 @@ export const FavouritesPage = () => {
           {favourites.error.message}
         </p>
       )}
-      {favourites.isPending && <p className={styles.message}>Gathering your favourites</p>}
+      {favourites.isPending && (
+        <Loading label="Gathering your favourites">
+          <ul className={styles.grid}>
+            <SkeletonCards picture="poster" />
+          </ul>
+        </Loading>
+      )}
       {favourites.isSuccess && items.length === 0 && (
         <p className={styles.message}>
           No favourites yet. Open a video's menu, from the button in its corner or a right click,

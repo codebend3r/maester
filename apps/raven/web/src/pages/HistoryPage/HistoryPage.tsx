@@ -3,8 +3,9 @@ import type { HistoryEntry } from '@raven/core'
 import { useId, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Button, ButtonLink } from '@/components/Button/Button'
-import { MediaTiles } from '@/components/MediaTiles/MediaTiles'
+import { MediaTiles, MediaTilesSkeleton } from '@/components/MediaTiles/MediaTiles'
 import { RouteState } from '@/components/RouteState/RouteState'
+import { Bone, Loading } from '@/components/Skeleton/Skeleton'
 import { historyDays, historyNote } from '@/lib/history'
 import { historyQuery, libraryQuery } from '@/lib/queries'
 import { routeState, useRouteId } from '@/lib/routeQuery'
@@ -44,6 +45,15 @@ const HistoryDaySection = ({
   )
 }
 
+/** The history on its way, before its library is known: its title and intro over rows of tiles. */
+const HistorySkeleton = () => (
+  <>
+    <Bone shape="hero" width="half" />
+    <Bone shape="text" width="most" />
+    <MediaTilesSkeleton />
+  </>
+)
+
 /**
  * A library's history: what was watched by its own measure, or everything
  * that played, last played first and split into days. Which of the two is
@@ -63,7 +73,8 @@ export const HistoryPage = () => {
   })
 
   const library = routeState({ id: libraryId, query: libraryResult })
-  if (library.state !== 'ready') return <RouteState state={library} noun="history" />
+  if (library.state !== 'ready')
+    return <RouteState state={library} noun="history" shape={<HistorySkeleton />} />
 
   const { id, name, settings } = library.data
   const entries = history.data ?? []
@@ -105,6 +116,11 @@ export const HistoryPage = () => {
         <p className={styles.message} role="alert">
           {history.error.message}
         </p>
+      )}
+      {history.isPending && (
+        <Loading label="Reading the history">
+          <MediaTilesSkeleton />
+        </Loading>
       )}
       {history.isSuccess && entries.length === 0 && (
         <p className={styles.message}>

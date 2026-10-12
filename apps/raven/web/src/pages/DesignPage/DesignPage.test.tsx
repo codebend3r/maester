@@ -77,7 +77,14 @@ describe('DesignPage', () => {
       .getAllByRole('heading', { level: 3 })
       .map((heading) => heading.textContent)
     expect(names).toEqual(
-      expect.arrayContaining(['Button', 'Icon', 'MediaCard', 'MediaList', 'MediaTiles']),
+      expect.arrayContaining([
+        'Button',
+        'Icon',
+        'MediaCard',
+        'MediaList',
+        'MediaTiles',
+        'Skeleton',
+      ]),
     )
   })
 })

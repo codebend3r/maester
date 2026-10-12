@@ -6,16 +6,17 @@ import { ICON_NAMES, Icon } from '@/components/Icon/Icon'
 import { ItemHeader } from '@/components/ItemHeader/ItemHeader'
 import { LibraryToolbar } from '@/components/LibraryToolbar/LibraryToolbar'
 import { MediaCard } from '@/components/MediaCard/MediaCard'
-import { MediaGrid } from '@/components/MediaGrid/MediaGrid'
+import { MediaGrid, MediaGridSkeleton } from '@/components/MediaGrid/MediaGrid'
 import { MediaGroups } from '@/components/MediaGroups/MediaGroups'
 import { MediaList } from '@/components/MediaList/MediaList'
-import { MediaTiles } from '@/components/MediaTiles/MediaTiles'
+import { MediaTiles, MediaTilesSkeleton } from '@/components/MediaTiles/MediaTiles'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
 import { Controls } from '@/components/Player/Controls'
 import { RatingChips } from '@/components/RatingChips/RatingChips'
 import { ReviewCards } from '@/components/ReviewCards/ReviewCards'
 import { ScanStatus } from '@/components/ScanStatus/ScanStatus'
 import { ShowGrid } from '@/components/ShowCard/ShowCard'
+import { Loading } from '@/components/Skeleton/Skeleton'
 import { DesignSection, Specimen } from '@/pages/DesignPage/DesignSection'
 import {
   FEATURED_SAMPLE,
@@ -219,6 +220,16 @@ export const ComponentsSection = () => (
 
     <Specimen name="MediaGroups" note="Grouped by resolution.">
       <MediaGroups items={SAMPLE_MEDIA} by="resolution" />
+    </Specimen>
+
+    <Specimen
+      name="Skeleton"
+      note="What a page shows while it waits: the shape of what is coming, which a screen reader hears as one line."
+    >
+      <Loading label="Gathering the videos">
+        <MediaGridSkeleton posters count={4} />
+        <MediaTilesSkeleton />
+      </Loading>
     </Specimen>
 
     <Specimen name="LibraryToolbar">

@@ -9,6 +9,7 @@ import {
 } from '@raven/core'
 import { api } from '@/lib/api'
 import { SettingsPage } from '@/pages/SettingsPage/SettingsPage'
+import { held } from '@/test/held'
 import { renderWithProviders } from '@/test/render'
 
 const STATE: PlaybackSettingsState = {
@@ -37,12 +38,14 @@ describe('SettingsPage', () => {
     setDisplay: spyOn(api, 'setDisplaySettings'),
   }
 
+  // Display settings start at their defaults and keep what the page saves.
   beforeEach(() => {
-    spies.getDisplay.mockImplementation(async () => DEFAULT_DISPLAY_SETTINGS)
-    spies.setDisplay.mockImplementation(async (change) => ({
-      ...DEFAULT_DISPLAY_SETTINGS,
-      ...change,
-    }))
+    const server = { display: DEFAULT_DISPLAY_SETTINGS }
+    spies.getDisplay.mockImplementation(async () => server.display)
+    spies.setDisplay.mockImplementation(async (change) => {
+      server.display = { ...server.display, ...change }
+      return server.display
+    })
   })
 
   afterEach(() => Object.values(spies).forEach((spy) => spy.mockReset()))
@@ -137,17 +140,41 @@ describe('SettingsPage', () => {
   })
 
   it('saves a choice as soon as it is picked', async () => {
-    spies.get.mockImplementation(async () => STATE)
-    spies.set.mockImplementation(async (change) => ({
-      ...STATE,
-      settings: { ...STATE.settings, ...change },
-    }))
+    servePlayback(STATE)
     renderWithProviders(<SettingsPage />, { playback: null, display: null })
     await userEvent.click(await screen.findByRole('radio', { name: /Remux only/ }))
     await waitFor(() => expect(spies.set).toHaveBeenCalledWith({ transcoding: 'remuxOnly' }))
     expect(screen.getByRole('radio', { name: /Remux only/ })).toBeChecked()
     await userEvent.click(screen.getByRole('checkbox', { name: /Tone map HDR/ }))
     await waitFor(() => expect(spies.set).toHaveBeenCalledWith({ tonemap: false }))
+  })
+
+  it('shows a choice at once, every setting still open while it saves', async () => {
+    spies.get.mockImplementation(async () => STATE)
+    spies.set.mockImplementation(() => held<PlaybackSettingsState>().promise)
+    renderWithProviders(<SettingsPage />, { playback: null, display: null })
+    await userEvent.click(await screen.findByRole('radio', { name: /Remux only/ }))
+    await waitFor(() => expect(screen.getByRole('radio', { name: /Remux only/ })).toBeChecked())
+    expect(screen.getByRole('radio', { name: /^High/ })).toBeEnabled()
+  })
+
+  it('puts a choice back when it cannot be saved, and says why', async () => {
+    spies.get.mockImplementation(async () => STATE)
+    spies.set.mockImplementation(async () => {
+      throw new Error('The server is away.')
+    })
+    renderWithProviders(<SettingsPage />, { playback: null, display: null })
+    await userEvent.click(await screen.findByRole('radio', { name: /Remux only/ }))
+    expect(await screen.findByText('Could not save: The server is away.')).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: /Remux and transcode/ })).toBeChecked()
+  })
+
+  it('stands in for the settings while they are read', async () => {
+    spies.get.mockImplementation(() => held<PlaybackSettingsState>().promise)
+    renderWithProviders(<SettingsPage />, { playback: null, display: null })
+    expect(screen.getAllByRole('status').map((status) => status.textContent)).toContain(
+      'Reading the settings',
+    )
   })
 })
 

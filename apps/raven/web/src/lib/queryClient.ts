@@ -114,3 +114,15 @@ export const queryKeys = {
   }) => ['match', type, query, year],
   metadataHealth: ['health', 'metadata'],
 }
+
+/**
+ * Keys for the changes shown before the server answers, so the last of
+ * several in flight on the same thing knows it is the last.
+ */
+export const mutationKeys = {
+  favourite: (mediaId: number) => ['favourite', mediaId],
+  pin: (libraryId: number) => ['pin', libraryId],
+  libraryView: (libraryId: number) => ['library-view', libraryId],
+  playbackSettings: ['settings', 'playback'],
+  displaySettings: ['settings', 'display'],
+}

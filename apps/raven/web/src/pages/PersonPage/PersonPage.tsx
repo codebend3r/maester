@@ -3,6 +3,7 @@ import type { CreditJob, ItemSummary, PersonDetails } from '@raven/core'
 import { useId } from 'react'
 import { Link } from 'react-router-dom'
 import { RouteState } from '@/components/RouteState/RouteState'
+import { Bone, SkeletonCards } from '@/components/Skeleton/Skeleton'
 import { TmdbCredit } from '@/components/TmdbCredit/TmdbCredit'
 import { api } from '@/lib/api'
 import { itemPath } from '@/lib/itemLinks'
@@ -53,6 +54,21 @@ const Card = ({ item, role }: { item: ItemSummary; role: string | null }) => {
   )
 }
 
+/** A person on their way: their photo's place and a line for their name, over a grid of posters. */
+const PersonSkeleton = () => (
+  <>
+    <div className={styles.header}>
+      <span className={styles.photo}>
+        <Bone shape="fill" />
+      </span>
+      <Bone shape="hero" width="half" />
+    </div>
+    <ul className={styles.grid}>
+      <SkeletonCards picture="poster" count={6} />
+    </ul>
+  </>
+)
+
 const PersonView = ({ person }: { person: PersonDetails }) => {
   const id = useId()
   const photo = api.photoUrl({ personId: person.id, photoVersion: person.photoVersion })
@@ -98,6 +114,7 @@ const PersonView = ({ person }: { person: PersonDetails }) => {
 export const PersonPage = () => {
   const id = useRouteId()
   const page = routeState({ id, query: useQuery(personQuery(id)) })
-  if (page.state !== 'ready') return <RouteState state={page} noun="page" />
+  if (page.state !== 'ready')
+    return <RouteState state={page} noun="page" shape={<PersonSkeleton />} />
   return <PersonView person={page.data} />
 }

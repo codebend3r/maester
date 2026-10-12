@@ -4,6 +4,7 @@ import { type Home, mediaLabel } from '@raven/core'
 import { api } from '@/lib/api'
 import { HomePage } from '@/pages/HomePage/HomePage'
 import { library, matchedMovie, mediaItem, showEntry } from '@/test/fixtures'
+import { held } from '@/test/held'
 import { renderWithProviders } from '@/test/render'
 import { EPISODE_TWO, SEASON_ONE_CARD } from '@/test/tv'
 
@@ -27,6 +28,14 @@ describe('HomePage', () => {
   afterEach(() => {
     spies.home.mockReset()
     spies.libraries.mockReset()
+  })
+
+  it('stands in for its shelves while home is read, hiding the stand-ins from a screen reader', async () => {
+    spies.home.mockImplementation(() => held<Home>().promise)
+    spies.libraries.mockImplementation(async () => LIBRARIES)
+    renderWithProviders(<HomePage />)
+    expect(await screen.findByRole('status')).toHaveTextContent('Gathering your libraries')
+    expect(screen.queryAllByRole('listitem')).toEqual([])
   })
 
   it('puts what is in progress first, then a row for each pinned library', async () => {

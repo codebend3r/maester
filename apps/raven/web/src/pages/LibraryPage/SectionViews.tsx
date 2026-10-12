@@ -12,9 +12,10 @@ import { ButtonLink } from '@/components/Button/Button'
 import { Duplicates } from '@/components/Duplicates/Duplicates'
 import { JumpPicker } from '@/components/JumpPicker/JumpPicker'
 import { LibraryToolbar } from '@/components/LibraryToolbar/LibraryToolbar'
-import { MediaGrid } from '@/components/MediaGrid/MediaGrid'
-import { MediaTiles } from '@/components/MediaTiles/MediaTiles'
+import { MediaGrid, MediaGridSkeleton } from '@/components/MediaGrid/MediaGrid'
+import { MediaTiles, MediaTilesSkeleton } from '@/components/MediaTiles/MediaTiles'
 import { SagaDecks } from '@/components/SagaDeck/SagaDeck'
+import { Loading } from '@/components/Skeleton/Skeleton'
 import { finishedNote } from '@/lib/history'
 import { watchLink } from '@/lib/itemLinks'
 import { jumpScale } from '@/lib/jumpScale'
@@ -27,7 +28,7 @@ import {
   sagasQuery,
   unmatchedQuery,
 } from '@/lib/queries'
-import { LibraryListing } from '@/pages/LibraryPage/LibraryViews'
+import { LibraryListing, LibraryListingSkeleton } from '@/pages/LibraryPage/LibraryViews'
 import { playQueue } from '@/pages/LibraryPage/libraryShape'
 import type { LibrarySection } from '@/pages/LibraryPage/librarySections'
 import { useLibraryListing } from '@/pages/LibraryPage/useLibraryListing'
@@ -63,15 +64,17 @@ const whenEmpty =
     list.length === 0 ? message : null
 
 /**
- * A tab's body: its failure, a line while it loads, the line `empty` gives
+ * A tab's body: its failure, `shape` while it loads, the line `empty` gives
  * for what came back, if any, else its content.
  */
 const SectionBody = <T,>({
   query,
+  shape,
   empty,
   children,
 }: {
   query: UseQueryResult<T>
+  shape: ReactNode
   empty: (data: T) => string | null
   children: (data: T) => ReactNode
 }) => {
@@ -82,7 +85,7 @@ const SectionBody = <T,>({
       </p>
     )
   }
-  if (query.isPending) return <p className={styles.message}>Loading</p>
+  if (query.isPending) return <Loading label="Loading">{shape}</Loading>
   const message = empty(query.data)
   if (message != null) return <p className={styles.message}>{message}</p>
   return children(query.data)
@@ -105,6 +108,11 @@ const EntryGrid = ({ library, entries }: { library: Library; entries: PosterEntr
     />
   )
 }
+
+/** `EntryGrid` while its entries are on their way. */
+const EntryGridSkeleton = ({ library }: { library: Library }) => (
+  <MediaGridSkeleton posters={matchTypeFor(library.settings.kind) != null} />
+)
 
 /**
  * Every video or show in the library, searched, sorted and laid out as it
@@ -133,8 +141,9 @@ const AllSection = ({ library }: { library: Library }) => {
     shows: listing.shows,
     source: settings.ratingsSource,
   })
+  const isListed = !listing.pending && listing.error == null
   const empty = emptyMessage({
-    loaded: listing.loaded,
+    loaded: isListed,
     empty: listing.shows.length === 0 && listing.files.length === 0,
     query: view.query,
     scanning,
@@ -169,15 +178,15 @@ const AllSection = ({ library }: { library: Library }) => {
 
       {scale && !empty && <JumpPicker scale={scale} scope={cards} />}
 
-      {empty ? (
-        <p className={styles.message}>{empty}</p>
-      ) : (
-        <LibraryListing
-          settings={settings}
-          shows={listing.shows}
-          files={listing.files}
-          busy={listing.busy}
-        />
+      {listing.pending && <LibraryListingSkeleton settings={settings} />}
+      {listing.error && (
+        <p className={styles.message} role="alert">
+          {listing.error.message}
+        </p>
+      )}
+      {empty && <p className={styles.message}>{empty}</p>}
+      {isListed && !empty && (
+        <LibraryListing settings={settings} shows={listing.shows} files={listing.files} />
       )}
     </div>
   )
@@ -189,6 +198,7 @@ const InProgressSection = ({ library }: { library: Library }) => {
   return (
     <SectionBody
       query={query}
+      shape={<EntryGridSkeleton library={library} />}
       empty={whenEmpty(
         library.settings.saveProgress
           ? `Nothing in progress in ${library.name}. A video left partway through waits here.`
@@ -206,6 +216,7 @@ const FavouritesSection = ({ library }: { library: Library }) => {
   return (
     <SectionBody
       query={query}
+      shape={<EntryGridSkeleton library={library} />}
       empty={whenEmpty(
         `No favourites in ${library.name} yet. Open a video's menu, from the button in its corner or a right click, and choose Favourite.`,
       )}
@@ -224,6 +235,7 @@ const SagasSection = ({ library }: { library: Library }) => {
   return (
     <SectionBody
       query={query}
+      shape={<MediaGridSkeleton posters />}
       empty={whenEmpty(
         `No sagas in ${library.name} yet. One shows here once two movies or more from the same TMDB collection are in the library.`,
       )}
@@ -249,7 +261,11 @@ const NotMatchedSection = ({ library }: { library: Library }) => {
   })
   useMatchingPassDone({ libraryId: library.id, files: query.data ?? [] })
   return (
-    <SectionBody query={query} empty={whenEmpty(`Every file in ${library.name} is matched.`)}>
+    <SectionBody
+      query={query}
+      shape={<MediaGridSkeleton />}
+      empty={whenEmpty(`Every file in ${library.name} is matched.`)}
+    >
       {(files) => (
         <>
           <p className={styles.message}>
@@ -275,6 +291,7 @@ const DuplicatesSection = ({ library }: { library: Library }) => {
   return (
     <SectionBody
       query={query}
+      shape={<MediaGridSkeleton posters />}
       empty={whenEmpty(`No movie in ${library.name} has more than one file.`)}
     >
       {(listing) => <Duplicates library={library} listing={listing} />}
@@ -291,6 +308,7 @@ const FinishedSection = ({ library }: { library: Library }) => {
   return (
     <SectionBody
       query={query}
+      shape={<MediaTilesSkeleton />}
       empty={whenEmpty(
         `Nothing finished in ${library.name} yet. A video counts once playback gets ${library.settings.watchedPercent}% of the way through.`,
       )}

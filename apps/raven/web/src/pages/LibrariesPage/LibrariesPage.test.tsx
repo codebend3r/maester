@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
-import { screen } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { LibraryInput } from '@raven/core'
+import type { Library, LibraryInput } from '@raven/core'
 import { api } from '@/lib/api'
 import { LibrariesPage } from '@/pages/LibrariesPage/LibrariesPage'
 import { library } from '@/test/fixtures'
+import { held } from '@/test/held'
 import { renderWithProviders } from '@/test/render'
 
 describe('LibrariesPage', () => {
@@ -35,6 +36,35 @@ describe('LibrariesPage', () => {
     expect(sent).toEqual([
       { id: 2, input: { name: 'Movies', paths: ['/media/Movies'], settings: { pinned: false } } },
     ])
+  })
+
+  it('pins at once, before the server answers', async () => {
+    const clips = library({ name: 'Clips', settings: { ...library().settings, pinned: false } })
+    spies.list.mockImplementation(async () => [clips])
+    spies.update.mockImplementation(() => held<Library>().promise)
+    renderWithProviders(<LibrariesPage />)
+    const pin = await screen.findByRole('button', { name: 'Pin Clips' })
+    await userEvent.click(pin)
+    await waitFor(() => expect(pin).toHaveAttribute('aria-pressed', 'true'))
+    expect(pin).toBeEnabled()
+  })
+
+  it('takes the pin back when the server refuses it', async () => {
+    const clips = library({ name: 'Clips', settings: { ...library().settings, pinned: false } })
+    spies.list.mockImplementation(async () => [clips])
+    spies.update.mockImplementation(async () => {
+      throw new Error('The server is away.')
+    })
+    renderWithProviders(<LibrariesPage />)
+    const pin = await screen.findByRole('button', { name: 'Pin Clips' })
+    await userEvent.click(pin)
+    await waitFor(() => expect(pin).toHaveAttribute('aria-pressed', 'false'))
+  })
+
+  it('stands in for the libraries while they are read', async () => {
+    spies.list.mockImplementation(() => held<Library[]>().promise)
+    renderWithProviders(<LibrariesPage />)
+    expect(await screen.findByRole('status')).toHaveTextContent('Gathering your libraries')
   })
 
   it('shows a library that is not pinned as unpressed', async () => {

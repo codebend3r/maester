@@ -1,16 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { type Library, isScanning } from '@raven/core'
+import { type Library, isLibrary, isScanning } from '@raven/core'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/Button/Button'
 import { LibraryDialog } from '@/components/LibraryDialog/LibraryDialog'
 import { LibraryIcon } from '@/components/LibraryIcon/LibraryIcon'
 import { ScanStatus } from '@/components/ScanStatus/ScanStatus'
+import { Bone, Loading } from '@/components/Skeleton/Skeleton'
 import { api } from '@/lib/api'
 import { KINDS } from '@/lib/libraryKinds'
 import { lockState } from '@/lib/libraryLock'
+import { optimisticChange, patchEvery, patchQueries } from '@/lib/optimistic'
 import { librariesQuery, lockQuery } from '@/lib/queries'
-import { queryKeys } from '@/lib/queryClient'
+import { mutationKeys, queryKeys } from '@/lib/queryClient'
 import styles from '@/pages/LibrariesPage/LibrariesPage.module.scss'
 
 const count = new Intl.NumberFormat()
@@ -29,13 +31,35 @@ const LibraryRow = ({ library, isShut }: { library: Library; isShut: boolean }) 
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.libraries }),
   })
   // Only the pin is sent as a setting; the server keeps the others as they are.
+  // It shows at once, here and in the side menu; home's shelves follow it.
   const pin = useMutation({
     mutationFn: (pinned: boolean) =>
       api.updateLibrary({
         id: library.id,
         input: { name: library.name, paths: library.paths, settings: { pinned } },
       }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.libraries }),
+    ...optimisticChange<boolean>({
+      queryClient,
+      mutationKey: mutationKeys.pin(library.id),
+      apply: (pinned) =>
+        patchQueries({
+          queryClient,
+          filters: [
+            { queryKey: queryKeys.libraries, exact: true },
+            { queryKey: queryKeys.library(library.id), exact: true },
+          ],
+          patch: patchEvery({
+            guard: isLibrary,
+            id: library.id,
+            patch: (current) => ({ ...current, settings: { ...current.settings, pinned } }),
+          }),
+        }),
+      settle: () =>
+        Promise.all([
+          queryClient.invalidateQueries({ queryKey: queryKeys.libraries }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.home }),
+        ]),
+    }),
   })
 
   const backdrop = !isShut && library.backdrop && api.libraryBackdropUrl(library.backdrop)
@@ -77,7 +101,6 @@ const LibraryRow = ({ library, isShut }: { library: Library; isShut: boolean }) 
             icon="pin"
             className={styles.pin}
             aria-pressed={library.settings.pinned}
-            disabled={pin.isPending}
             onClick={() => pin.mutate(!library.settings.pinned)}
           >
             Pin<span className="visually-hidden"> {library.name}</span>
@@ -146,17 +169,30 @@ export const LibrariesPage = () => {
           Add library
         </Button>
       </header>
-      <ul className={styles.list} aria-busy={libraries.isPending}>
-        {(libraries.data ?? []).map((library) => (
-          <LibraryRow
-            key={library.id}
-            library={library}
-            isShut={
-              lockState({ locked: library.settings.locked, lock: lock.data }).state !== 'open'
-            }
-          />
-        ))}
-      </ul>
+      {libraries.isPending ? (
+        <Loading label="Gathering your libraries">
+          <ul className={styles.list}>
+            {['first', 'second', 'third'].map((row) => (
+              <li key={row} className={styles.rowSkeleton}>
+                <Bone shape="heading" width="half" />
+                <Bone shape="small" width="short" />
+              </li>
+            ))}
+          </ul>
+        </Loading>
+      ) : (
+        <ul className={styles.list}>
+          {(libraries.data ?? []).map((library) => (
+            <LibraryRow
+              key={library.id}
+              library={library}
+              isShut={
+                lockState({ locked: library.settings.locked, lock: lock.data }).state !== 'open'
+              }
+            />
+          ))}
+        </ul>
+      )}
       {dialog}
     </section>
   )

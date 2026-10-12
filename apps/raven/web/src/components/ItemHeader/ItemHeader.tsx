@@ -5,6 +5,7 @@ import { ButtonLink } from '@/components/Button/Button'
 import { Icon } from '@/components/Icon/Icon'
 import { LogoImage } from '@/components/LogoImage/LogoImage'
 import { RatingChips } from '@/components/RatingChips/RatingChips'
+import { Bone } from '@/components/Skeleton/Skeleton'
 import type { watchLink } from '@/lib/itemLinks'
 import styles from '@/components/ItemHeader/ItemHeader.module.scss'
 
@@ -131,4 +132,35 @@ export const ItemHeader = ({
       </div>
     </div>
   </header>
+)
+
+/**
+ * The header while its item is on its way, laid out as the header itself:
+ * the way back, its picture's place, then lines for the title, the byline
+ * and facts, and the buttons.
+ */
+export const ItemHeaderSkeleton = ({ picture }: { picture: HeaderPicture['shape'] | 'none' }) => (
+  <div className={styles.hero}>
+    <div className={styles.top}>
+      <Bone shape="button" />
+    </div>
+    <div className={LAYOUTS[picture]}>
+      {picture !== 'none' && (
+        <span
+          className={picture === 'still' ? `${styles.picture} ${styles.still}` : styles.picture}
+        >
+          <Bone shape="fill" />
+        </span>
+      )}
+      <div className={styles.details}>
+        <Bone shape="hero" width="most" />
+        <Bone shape="text" width="half" />
+        <Bone shape="small" width="short" />
+        <span className={styles.actions}>
+          <Bone shape="button" />
+          <Bone shape="button" />
+        </span>
+      </div>
+    </div>
+  </div>
 )
