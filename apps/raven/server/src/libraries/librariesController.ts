@@ -21,8 +21,8 @@ import {
   type MediaItem,
   type MediaListParams,
   type ShowListing,
-  isMatchedKind,
   isRecord,
+  matchTypeFor,
   mediaListQuery,
   validateLibraryInput,
 } from '@raven/core'
@@ -115,8 +115,10 @@ export class LibrariesController {
   }
 
   /**
-   * Only a change of folders rescans, and only a change of type matches the
-   * files again; a rename or another setting leaves the index as it is.
+   * Only a change of folders rescans, and only a change of type that reads
+   * files another way matches them again: Movies to Anime movies keeps every
+   * match. A rename or another setting, the lock included, leaves the index
+   * as it is.
    */
   @Put(':id')
   update(@Param('id', ParseIntPipe) id: number, @Body() body: unknown): Library {
@@ -124,7 +126,7 @@ export class LibrariesController {
     const before = this.find(id)
     const record = this.libraries.update({ id, input })
     if (!record) throw new NotFoundException(`No library ${id}`)
-    if (before.settings.kind !== record.settings.kind) {
+    if (matchTypeFor(before.settings.kind) !== matchTypeFor(record.settings.kind)) {
       this.metadata.changeKind({ libraryId: id, kind: record.settings.kind })
     }
     if (!samePaths({ before: before.paths, after: record.paths })) this.scanner.scan(id)
@@ -163,8 +165,8 @@ export class LibrariesController {
   @HttpCode(200)
   rematch(@Param('id', ParseIntPipe) id: number): Library {
     const record = this.find(id)
-    if (!isMatchedKind(record.settings.kind)) {
-      throw new BadRequestException('Only a Movies or TV shows library is matched.')
+    if (matchTypeFor(record.settings.kind) == null) {
+      throw new BadRequestException('Only a library of movies or shows is matched.')
     }
     if (this.metadata.health().tmdb === 'off') {
       throw new ServiceUnavailableException('Set TMDB_API_TOKEN to match files.')

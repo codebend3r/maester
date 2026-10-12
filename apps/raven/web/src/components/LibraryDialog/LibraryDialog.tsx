@@ -9,8 +9,8 @@ import {
   RATING_SOURCES,
   type RatingSource,
   defaultLibrarySettings,
-  isMatchedKind,
   isRatingSource,
+  matchTypeFor,
   validateLibraryInput,
   withLibraryKind,
 } from '@raven/core'
@@ -153,7 +153,7 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
                 details.
               </>
             ) : (
-              'Movies and TV shows get posters and details from TMDB.'
+              'Movies, TV shows and anime get posters and details from TMDB.'
             )}
           </p>
         </fieldset>
@@ -306,7 +306,7 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
               it.
             </p>
           </div>
-          {isMatchedKind(settings.kind) && (
+          {matchTypeFor(settings.kind) != null && (
             <div className={styles.watched}>
               <label htmlFor={`${ids.settings}-ratings`}>Ratings shown</label>
               <select

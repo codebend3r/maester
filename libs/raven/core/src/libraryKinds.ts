@@ -10,9 +10,8 @@ import {
   type MatchItemType,
   type MediaSort,
 } from '@/contract'
-import { oneOf } from '@/schema'
 
-/** What a type of library can do: the one place each rule about Movies, TV shows and Other lives. */
+/** What a type of library can do: the one place each rule about each type lives. */
 export type KindRules = {
   /** What its files are matched to on TMDB; null for a library that is never matched. */
   matches: MatchItemType | null
@@ -44,57 +43,69 @@ const FILE_SORTS: readonly MediaSort[] = [
 const without = <T>({ all, left }: { all: readonly T[]; left: readonly T[] }): T[] =>
   all.filter((item) => !left.includes(item))
 
+/** A library of movies starts grouped into matched and not. */
+const MOVIE_RULES = {
+  matches: 'movie',
+  sorts: MEDIA_SORTS,
+  views: LIBRARY_VIEWS,
+  groupings: MEDIA_GROUPINGS,
+  view: 'grouped',
+  groupBy: 'match',
+} as const satisfies KindRules
+
+/**
+ * A library of shows lays its shows out as posters, already split into
+ * matched and not, so it has no grouped view, and its cards are shows, so
+ * no per-file sort.
+ */
+const SHOW_RULES = {
+  matches: 'show',
+  sorts: without({ all: MEDIA_SORTS, left: FILE_SORTS }),
+  views: without({ all: LIBRARY_VIEWS, left: ['grouped'] }),
+  groupings: MEDIA_GROUPINGS,
+  view: 'grid',
+  groupBy: 'resolution',
+} as const satisfies KindRules
+
+/** A library that is never matched has no years, scores or match to sort or group by. */
+const UNMATCHED_RULES = {
+  matches: null,
+  sorts: without({ all: MEDIA_SORTS, left: MATCHED_SORTS }),
+  views: LIBRARY_VIEWS,
+  groupings: without({ all: MEDIA_GROUPINGS, left: ['match'] }),
+  view: 'grid',
+  groupBy: 'resolution',
+} as const satisfies KindRules
+
+/**
+ * Anime is matched on TMDB like any movie or show. Sporting events and
+ * YouTube videos are not there to match, so they are read like Other.
+ */
 export const KIND_RULES = {
-  /** A Movies library starts grouped into matched and not. */
-  movies: {
-    matches: 'movie',
-    sorts: MEDIA_SORTS,
-    views: LIBRARY_VIEWS,
-    groupings: MEDIA_GROUPINGS,
-    view: 'grouped',
-    groupBy: 'match',
-  },
-  /**
-   * A TV library lays its shows out as posters, already split into matched
-   * and not, so it has no grouped view, and its cards are shows, so no
-   * per-file sort.
-   */
-  shows: {
-    matches: 'show',
-    sorts: without({ all: MEDIA_SORTS, left: FILE_SORTS }),
-    views: without({ all: LIBRARY_VIEWS, left: ['grouped'] }),
-    groupings: MEDIA_GROUPINGS,
-    view: 'grid',
-    groupBy: 'resolution',
-  },
-  /** An Other library is never matched, so it has no years, scores or match to sort or group by. */
-  other: {
-    matches: null,
-    sorts: without({ all: MEDIA_SORTS, left: MATCHED_SORTS }),
-    views: LIBRARY_VIEWS,
-    groupings: without({ all: MEDIA_GROUPINGS, left: ['match'] }),
-    view: 'grid',
-    groupBy: 'resolution',
-  },
+  movies: MOVIE_RULES,
+  shows: SHOW_RULES,
+  animeMovies: MOVIE_RULES,
+  animeShows: SHOW_RULES,
+  sports: UNMATCHED_RULES,
+  youtube: UNMATCHED_RULES,
+  other: UNMATCHED_RULES,
 } as const satisfies Record<LibraryKind, KindRules>
 
+/**
+ * What a library's files are matched to on TMDB: movies for a Movies or
+ * Anime movies library, shows for a TV or Anime shows one, and null for a
+ * type that is never matched. Two types with the same answer read their
+ * files the same way.
+ */
+export const matchTypeFor = (kind: LibraryKind): MatchItemType | null => KIND_RULES[kind].matches
+
 /** The types of library that are matched against TMDB. */
-export type MatchedKind = {
-  [K in LibraryKind]: (typeof KIND_RULES)[K]['matches'] extends null ? never : K
-}[LibraryKind]
+export const MATCHED_KINDS: readonly LibraryKind[] = LIBRARY_KINDS.filter(
+  (kind) => matchTypeFor(kind) != null,
+)
 
-export const isMatchedKind = (kind: LibraryKind): kind is MatchedKind =>
-  KIND_RULES[kind].matches !== null
-
-export const MATCHED_KINDS: readonly MatchedKind[] = LIBRARY_KINDS.filter(isMatchedKind)
-
-/** What a matched library's files are matched to: a Movies library's to movies, a TV library's to shows. */
-export const matchedItemType = <K extends MatchedKind>(
-  kind: K,
-): (typeof KIND_RULES)[K]['matches'] => KIND_RULES[kind].matches
-
-/** What Fix match searches and Edit images chooses pictures for: the types matched libraries' files are matched to. */
-export const isMatchItemType = oneOf(MATCHED_KINDS.map((kind) => matchedItemType(kind)))
+/** Whether the library's cards are its shows, with its files no show was found for listed apart. */
+export const listsShows = (kind: LibraryKind): boolean => matchTypeFor(kind) === 'show'
 
 export const sortsFor = (kind: LibraryKind): readonly MediaSort[] => KIND_RULES[kind].sorts
 

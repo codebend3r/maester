@@ -11,6 +11,7 @@ import {
   isItemMetadataChange,
   isItemMetadataState,
   isMatchChoice,
+  isMatchItemType,
   isMediaSort,
   isPlaybackSettingsChange,
   isProgressChange,
@@ -265,6 +266,18 @@ describe('the choice lists', () => {
     expect(isItemImageKind('banner')).toBe(false)
     expect(isHwAccel('vaapi')).toBe(true)
     expect(isHwAccel('cuda')).toBe(false)
+  })
+
+  it('matches files to movies and shows, and nothing else', () => {
+    expect(isMatchItemType.values).toEqual(['movie', 'show'])
+    expect(['movie', 'show', 'season', 'episode', 'other', 7].map(isMatchItemType)).toEqual([
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+    ])
   })
 })
 

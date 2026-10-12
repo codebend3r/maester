@@ -14,6 +14,7 @@ import { join } from 'node:path'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import {
   type ApiClient,
+  LIBRARY_KINDS,
   type LibraryInput,
   type LibrarySettings,
   type MediaItem,
@@ -30,6 +31,7 @@ import { routeMarks } from '@/lock/lockGuard'
 import type { Privacy } from '@/lock/lockService'
 import { MediaIndex } from '@/media/mediaIndex'
 import { MetadataRepository } from '@/metadata/metadataRepository'
+import { MetadataService } from '@/metadata/metadataService'
 import { ScannerService } from '@/scanner/scannerService'
 import { encodeClip } from '@/test/clips'
 import { apiFor } from '@/test/server'
@@ -1000,6 +1002,27 @@ describe('a library locked behind the PIN', () => {
       shelves: [state.open, state.private],
     })
     expect(await home()).toEqual({ inProgress: [], shelves: [state.open] })
+  })
+
+  it('stays locked whatever its type', async () => {
+    const { cookie } = await unlock('3001')
+    const { name, paths } = await api(cookie).getLibrary(state.private)
+    const answers = await LIBRARY_KINDS.reduce<Promise<string[]>>(async (done, kind) => {
+      const before = await done
+      const saved = await api(cookie).updateLibrary({
+        id: state.private,
+        input: { name, paths, settings: { kind } },
+      })
+      const status = await api()
+        .listMedia({ libraryId: state.private })
+        .then(
+          () => 200,
+          (error: unknown) => (isRecord(error) ? error.status : error),
+        )
+      return [...before, `${saved.settings.kind} locked=${saved.settings.locked} ${status}`]
+    }, Promise.resolve([]))
+    expect(answers).toEqual(LIBRARY_KINDS.map((kind) => `${kind} locked=true 423`))
+    await app().get(MetadataService).whenIdle()
   })
 
   it('refuses an unlock that sends no PIN, saying why', async () => {

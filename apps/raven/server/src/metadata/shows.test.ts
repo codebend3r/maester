@@ -6,6 +6,7 @@ import {
   type ItemDetails,
   type MediaItem,
   type ShowListing,
+  isHome,
   isItemDetails,
   isLibrary,
   isMediaItem,
@@ -251,6 +252,29 @@ describe('TV show metadata', () => {
     ])
     expect(listing.unmatched.map((entry) => entry.fileName)).toEqual(['Unknown Show - S01E01.mp4'])
     expect(listing.shows.every((entry) => entry.show.posterVersion != null)).toBe(true)
+  })
+
+  it('keeps every match as an Anime shows library, listed and shelved as its shows', async () => {
+    const setKind = async (kind: string) => {
+      await app().inject({
+        method: 'PUT',
+        url: `/api/libraries/${state.library}`,
+        payload: { name: 'TV', paths: [state.media], settings: { kind } },
+      })
+      await settle()
+    }
+    const before = await shows()
+    const asked = tmdb.state.calls.length
+    await setKind('animeShows')
+    expect(await shows()).toEqual(before)
+    expect(tmdb.state.calls).toHaveLength(asked)
+    const home = shape({
+      response: await app().inject({ method: 'GET', url: '/api/home' }),
+      guard: isHome,
+    })
+    expect(home.shelves.find((shelf) => shelf.libraryId === state.library)?.type).toBe('shows')
+    await setKind('shows')
+    expect(tmdb.state.calls).toHaveLength(asked)
   })
 
   it('matches a misspelt folder by the name its files carry', async () => {

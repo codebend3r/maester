@@ -103,6 +103,15 @@ describe('movie metadata', () => {
     await app().inject({ method: 'POST', url: `/api/libraries/${state.library}/scan` })
     await settle()
   }
+  const setKind = async (kind: string): Promise<Library> =>
+    shape({
+      response: await app().inject({
+        method: 'PUT',
+        url: `/api/libraries/${state.library}`,
+        payload: { name: 'Films', paths: [state.media], settings: { kind } },
+      }),
+      guard: isLibrary,
+    })
 
   beforeAll(async () => {
     state.root = await mkdtemp(join(tmpdir(), 'raven-metadata-'))
@@ -619,23 +628,26 @@ describe('movie metadata', () => {
     expect(shape({ response, guard: isItemDetails }).title).toBe('Heat')
   })
 
+  it('keeps every match when the type changes to Anime movies, which is matched the same way', async () => {
+    const before = await list()
+    const asked = tmdb.state.calls.length
+    expect((await setKind('animeMovies')).settings).toMatchObject({ kind: 'animeMovies' })
+    await settle()
+    expect(await list()).toEqual(before)
+    expect(tmdb.state.calls).toHaveLength(asked)
+    await setKind('movies')
+    await settle()
+    expect(tmdb.state.calls).toHaveLength(asked)
+  })
+
   it('matches again when the type changes, and goes back to file names for Other', async () => {
-    const put = async (kind: string): Promise<Library> =>
-      shape({
-        response: await app().inject({
-          method: 'PUT',
-          url: `/api/libraries/${state.library}`,
-          payload: { name: 'Films', paths: [state.media], settings: { kind } },
-        }),
-        guard: isLibrary,
-      })
-    await put('other')
+    await setKind('other')
     await settle()
     const other = await list()
     expect(other.every((item) => item.match === 'off' && item.item === null)).toBe(true)
     expect(other.map((item) => item.title)).toContain('Pulp Fiction 1994 1080p BluRay x264')
 
-    await put('movies')
+    await setKind('movies')
     await settle()
     const movies = await list()
     expect(movies.find((item) => item.title === 'Heat')).toMatchObject({ match: 'matched' })

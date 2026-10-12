@@ -11,10 +11,17 @@ import { useServerEvents } from '@/lib/useServerEvents'
 import { useSideMenu } from '@/stores/sideMenu'
 import styles from '@/components/AppShell/AppShell.module.scss'
 
+/** A small icon laid over a link's own, and the word it adds to the link's name. */
+type NavBadge = { icon: IconName; label: string }
+
+/** A locked library keeps its type's icon, with a lock over it. */
+const LOCKED: NavBadge = { icon: 'lock', label: 'locked' }
+
 /**
  * A link in the side menu, marked as current when the location matches any
  * of its patterns. Collapsed to its icon, it keeps its name for screen
- * readers and as a tooltip.
+ * readers and as a tooltip. A badge lays its icon over the link's and adds
+ * its word to the name both ways: `Tutorials (locked)`.
  */
 const NavItem = ({
   to,
@@ -22,24 +29,37 @@ const NavItem = ({
   icon,
   label,
   collapsed,
+  badge,
 }: {
   to: string
   patterns: readonly string[]
   icon: IconName
   label: string
   collapsed: boolean
+  badge?: NavBadge
 }) => {
   const { pathname } = useLocation()
   const current = patterns.some((pattern) => matchPath(pattern, pathname) != null)
+  const suffix = badge ? ` (${badge.label})` : ''
   return (
     <Link
       to={to}
       className={styles.navLink}
       aria-current={current ? 'page' : undefined}
-      title={collapsed ? label : undefined}
+      title={collapsed ? `${label}${suffix}` : undefined}
     >
-      <Icon name={icon} />
-      <span className={collapsed ? 'visually-hidden' : undefined}>{label}</span>
+      <span className={styles.navIcon}>
+        <Icon name={icon} />
+        {badge && (
+          <span className={styles.badge}>
+            <Icon name={badge.icon} size={12} />
+          </span>
+        )}
+      </span>
+      <span className={collapsed ? 'visually-hidden' : undefined}>
+        {label}
+        {badge && <span className="visually-hidden">{suffix}</span>}
+      </span>
     </Link>
   )
 }
@@ -63,8 +83,9 @@ const ShortcutTip = ({ onDismiss }: { onDismiss: () => void }) => (
 /**
  * The frame around every browsing page: the logo, then the side menu
  * beside the page (below it on a narrow screen), Home first. Pinned
- * libraries get their own links there, each with its type's icon (a lock for
- * a locked one), and an open one is marked instead of Libraries. The menu collapses to its icons with B or the toggle
+ * libraries get their own links there, each with its type's icon (with a
+ * lock on it for a locked one, whatever its type), and an open one is marked
+ * instead of Libraries. The menu collapses to its icons with B or the toggle
  * at its foot, which keeps to the bottom left of the screen however far the
  * page scrolls, and stays that way across visits. While it is open, what the
  * pages show follows the server's changes. The player leaves the frame behind
@@ -121,9 +142,10 @@ export const AppShell = () => {
                   <NavItem
                     to={`/libraries/${library.id}`}
                     patterns={libraryPages(library.id)}
-                    icon={library.settings.locked ? 'lock' : KINDS[library.settings.kind].icon}
+                    icon={KINDS[library.settings.kind].icon}
                     label={library.name}
                     collapsed={collapsed}
+                    badge={library.settings.locked ? LOCKED : undefined}
                   />
                 </li>
               ))}

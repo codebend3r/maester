@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
+import { LIBRARY_KINDS } from '@raven/core'
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router-dom'
 import { AppShell } from '@/components/AppShell/AppShell'
 import { api } from '@/lib/api'
+import { KINDS } from '@/lib/libraryKinds'
 import { useSideMenu } from '@/stores/sideMenu'
 import { FakeEventSource } from '@/test/eventSource'
 import { library } from '@/test/fixtures'
@@ -33,6 +35,8 @@ const renderShell = (route: string) =>
 const nav = () => screen.getByRole('navigation', { name: 'Main' })
 const toggle = () => screen.getByRole('button', { name: 'Side menu' })
 const iconOf = (element: HTMLElement) => element.querySelector('svg')?.dataset.icon
+const iconsOf = (element: HTMLElement) =>
+  [...element.querySelectorAll('svg')].map((svg) => svg.dataset.icon)
 
 describe('AppShell', () => {
   const spies = { list: spyOn(api, 'listLibraries') }
@@ -126,23 +130,60 @@ describe('AppShell', () => {
   })
 
   it("gives each pinned library its type's icon", async () => {
-    spies.list.mockImplementation(async () => [
-      library({ id: 1, name: 'Films', settings: { ...library().settings, kind: 'movies' } }),
-      library({ id: 2, name: 'Series', settings: { ...library().settings, kind: 'shows' } }),
-      library({ id: 3, name: 'Clips', settings: { ...library().settings, kind: 'other' } }),
-    ])
+    spies.list.mockImplementation(async () =>
+      LIBRARY_KINDS.map((kind, index) =>
+        library({ id: index + 1, name: kind, settings: { ...library().settings, kind } }),
+      ),
+    )
     renderShell('/')
     const pinned = await within(nav()).findByRole('list', { name: 'Pinned' })
-    expect(within(pinned).getAllByRole('link').map(iconOf)).toEqual(['film', 'tv', 'video'])
+    expect(within(pinned).getAllByRole('link').map(iconOf)).toEqual([
+      'film',
+      'tv',
+      'filmSpark',
+      'tvSpark',
+      'trophy',
+      'youtube',
+      'video',
+    ])
   })
 
-  it('wears a lock for a locked library, whatever its type', async () => {
+  it("keeps a locked library's type icon, with a lock on it, whatever its type", async () => {
+    spies.list.mockImplementation(async () =>
+      LIBRARY_KINDS.map((kind, index) =>
+        library({
+          id: index + 1,
+          name: kind,
+          settings: { ...library().settings, kind, locked: true },
+        }),
+      ),
+    )
+    renderShell('/')
+    const pinned = await within(nav()).findByRole('list', { name: 'Pinned' })
+    expect(within(pinned).getAllByRole('link').map(iconsOf)).toEqual(
+      LIBRARY_KINDS.map((kind) => [KINDS[kind].icon, 'lock']),
+    )
+    expect(
+      within(pinned)
+        .getAllByRole('link')
+        .map((link) => link.textContent),
+    ).toEqual(LIBRARY_KINDS.map((kind) => `${kind} (locked)`))
+  })
+
+  it('says a locked library is locked in its tooltip once the menu collapses', async () => {
     spies.list.mockImplementation(async () => [
       library({ id: 1, name: 'Tutorials', settings: { ...library().settings, locked: true } }),
+      library({ id: 2, name: 'Clips' }),
     ])
     renderShell('/')
-    const link = await within(nav()).findByRole('link', { name: 'Tutorials' })
-    expect(iconOf(link)).toBe('lock')
+    await within(nav()).findByRole('link', { name: 'Tutorials (locked)' })
+    await userEvent.click(toggle())
+    expect(within(nav()).getByRole('link', { name: 'Tutorials (locked)' })).toHaveAttribute(
+      'title',
+      'Tutorials (locked)',
+    )
+    expect(iconsOf(within(nav()).getByRole('link', { name: 'Clips' }))).toEqual(['video'])
+    await userEvent.click(toggle())
   })
 
   it('collapses to its icons with the toggle, keeping every link named', async () => {

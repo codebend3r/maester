@@ -60,7 +60,10 @@
   display: grid;
 }
 
+// `--link-ground` is the link's background, which its badge sits on too.
 .navLink {
+  --link-ground: var(--color-night);
+
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
@@ -70,20 +73,43 @@
   color: var(--color-lichen);
   font-weight: 600;
   text-decoration: none;
+  background: var(--link-ground);
 
-  &:hover {
-    color: var(--color-bark);
-    background: var(--color-canopy);
-  }
-
+  &:hover,
   &[aria-current='page'] {
+    --link-ground: var(--color-canopy);
+
     color: var(--color-bark);
-    background: var(--color-canopy);
   }
 }
 
+// The link's icon, with its badge laid over its corner.
+.navIcon {
+  display: grid;
+  grid-template-areas: 'icon';
+
+  > svg {
+    grid-area: icon;
+  }
+}
+
+// On the link's own ground, so the icon's lines stop short of the badge
+// instead of running through it. It hangs a little past the icon's corner,
+// into the link's padding and gap.
+.badge {
+  grid-area: icon;
+  align-self: end;
+  justify-self: end;
+  display: grid;
+  padding: 1px;
+  border-radius: 50%;
+  background: var(--link-ground);
+  translate: 30% 30%;
+}
+
 @media (prefers-reduced-motion: no-preference) {
-  .navLink {
+  .navLink,
+  .badge {
     transition: background-color 120ms ease-out;
   }
 }

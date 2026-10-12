@@ -1,11 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
-import { type HomeShelf, type Library, KIND_RULES } from '@raven/core'
+import { type HomeShelf, type Library, matchTypeFor } from '@raven/core'
 import { type ReactNode, useId } from 'react'
 import { Link } from 'react-router-dom'
 import { MediaCard } from '@/components/MediaCard/MediaCard'
 import { PosterCard } from '@/components/PosterCard/PosterCard'
 import { ShowCard } from '@/components/ShowCard/ShowCard'
-import { KINDS } from '@/lib/libraryKinds'
 import { homeQuery, librariesQuery } from '@/lib/queries'
 import styles from '@/pages/HomePage/HomePage.module.scss'
 
@@ -38,6 +37,7 @@ const Shelf = ({
 /** A pinned library's newest arrivals, laid out as the library lays them out: posters, shows or frame grabs. */
 const LibraryShelf = ({ shelf, library }: { shelf: HomeShelf; library: Library }) => {
   const { kind, ratingsSource } = library.settings
+  const matchType = matchTypeFor(kind)
   const title = (
     <Link to={`/libraries/${library.id}`} className={styles.headingLink}>
       {library.name}
@@ -56,15 +56,15 @@ const LibraryShelf = ({ shelf, library }: { shelf: HomeShelf; library: Library }
       return (
         <Shelf title={title} isEmpty={shelf.media.length === 0}>
           {shelf.media.map((media) =>
-            KINDS[kind].posters ? (
+            matchType === 'movie' ? (
               <PosterCard
                 key={media.id}
                 media={media}
-                matchType={KIND_RULES[kind].matches}
+                matchType={matchType}
                 ratingsSource={ratingsSource}
               />
             ) : (
-              <MediaCard key={media.id} media={media} matchType={KIND_RULES[kind].matches} />
+              <MediaCard key={media.id} media={media} matchType={matchType} />
             ),
           )}
         </Shelf>

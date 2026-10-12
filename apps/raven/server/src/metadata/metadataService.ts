@@ -1,10 +1,10 @@
 import { Inject, Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common'
 import {
-  isMatchedKind,
   type LibraryKind,
   MATCHED_KINDS,
-  type MatchedKind,
+  type MatchItemType,
   type MetadataHealth,
+  matchTypeFor,
 } from '@raven/core'
 import { groupBy } from '@/groupBy'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
@@ -21,7 +21,7 @@ import { TmdbClient } from '@/metadata/tmdbClient'
 import { createTaskQueue, mapWithConcurrency } from '@/scanner/concurrency'
 
 /**
- * Matches the files in Movies and TV shows libraries to TMDB, one library
+ * Matches the files in libraries of movies and shows to TMDB, one library
  * pass at a time, in the background. A Fix match wins, then an id in a name
  * or NFO, then a search by title and year that only takes a sure answer.
  * Items are shared, so a second file of the same movie costs a search and
@@ -34,7 +34,7 @@ import { createTaskQueue, mapWithConcurrency } from '@/scanner/concurrency'
 export class MetadataService implements OnApplicationBootstrap {
   private readonly logger = new Logger(MetadataService.name)
   private readonly queue = createTaskQueue({ concurrency: 1 })
-  private readonly matchers: Record<MatchedKind, KindMatcher>
+  private readonly matchers: Record<MatchItemType, KindMatcher>
 
   constructor(
     @Inject(LibrariesRepository) private readonly libraries: LibrariesRepository,
@@ -53,7 +53,7 @@ export class MetadataService implements OnApplicationBootstrap {
     this.metadata.resortTitles()
     this.libraries.list().forEach((library) => {
       const { kind } = library.settings
-      if (!isMatchedKind(kind)) return
+      if (matchTypeFor(kind) == null) return
       this.files.retitle({ libraryId: library.id, kind })
       this.enqueue(library.id)
     })
@@ -87,7 +87,7 @@ export class MetadataService implements OnApplicationBootstrap {
 
   /**
    * A library's type changed: every file's name is read again for the new
-   * type and matched from scratch, or left off for Other.
+   * type and matched from scratch, or left off for a type that is not matched.
    */
   changeKind({ libraryId, kind }: { libraryId: number; kind: LibraryKind }): void {
     this.queue.push(`kind:${libraryId}:${kind}`, async () => {
@@ -123,9 +123,10 @@ export class MetadataService implements OnApplicationBootstrap {
 
   private async pass(libraryId: number): Promise<void> {
     const kind = this.libraries.get(libraryId)?.settings.kind
-    if (kind != null && isMatchedKind(kind) && this.tmdb.enabled) {
+    const type = kind == null ? null : matchTypeFor(kind)
+    if (type != null && this.tmdb.enabled) {
       this.tmdb.newPass()
-      await this.matchPending({ libraryId, kind })
+      await this.matchPending({ libraryId, type })
     }
     await this.pictures.clearUp()
   }
@@ -133,13 +134,13 @@ export class MetadataService implements OnApplicationBootstrap {
   /** Matches the library's pending files, and any that turn up while it runs. */
   private async matchPending({
     libraryId,
-    kind,
+    type,
   }: {
     libraryId: number
-    kind: MatchedKind
+    type: MatchItemType
   }): Promise<void> {
     const pass = this.newPass()
-    const matcher = this.matchers[kind]
+    const matcher = this.matchers[type]
     const attempted = new Set<number>()
     const round = async (): Promise<void> => {
       const files = this.files.pending(libraryId).filter((file) => !attempted.has(file.id))
@@ -162,13 +163,13 @@ export class MetadataService implements OnApplicationBootstrap {
    */
   private async pointPlace({
     libraryId,
-    kind,
+    type,
     place,
     fix,
     files,
   }: {
     libraryId: number
-    kind: MatchedKind
+    type: MatchItemType
     place: string
     fix: FixMatchChoice
     files: readonly MatchFile[]
@@ -176,23 +177,24 @@ export class MetadataService implements OnApplicationBootstrap {
     this.files.saveFixMatch({ libraryId, place, fix })
     if (files.length === 0) return
     this.files.reset(files.map((file) => file.id))
-    await this.matchers[kind].match({ files, pass: this.newPass() })
+    await this.matchers[type].match({ files, pass: this.newPass() })
   }
 
   /**
    * Fix match: points a file, and the files kept with it (a movie's folder,
    * or a show's whole folder), at a TMDB movie or show, or at nothing for
    * `null`, and keeps that by place so renames and re-downloads keep it. A
-   * file outside a Movies or TV shows library is left as it is.
+   * file in a library that is not matched is left as it is.
    */
   async fixMatch({ mediaId, tmdbId }: { mediaId: number; tmdbId: string | null }): Promise<void> {
     const file = this.files.byId(mediaId)
     const kind = file == null ? null : this.libraries.get(file.libraryId)?.settings.kind
-    if (file == null || kind == null || !isMatchedKind(kind)) return
-    const group = this.matchers[kind].fixGroup(file)
+    const type = kind == null ? null : matchTypeFor(kind)
+    if (file == null || type == null) return
+    const group = this.matchers[type].fixGroup(file)
     await this.pointPlace({
       libraryId: file.libraryId,
-      kind,
+      type,
       place: group.place,
       fix: tmdbId == null ? { kind: 'not-a-match' } : { kind: 'tmdb', tmdbId },
       files: group.files,
@@ -226,7 +228,7 @@ export class MetadataService implements OnApplicationBootstrap {
         previous.then(() =>
           this.pointPlace({
             libraryId: first.libraryId,
-            kind: 'shows',
+            type: 'show',
             place: showPlace(first),
             fix: { kind: 'tmdb', tmdbId },
             files,

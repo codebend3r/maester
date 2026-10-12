@@ -77,7 +77,15 @@ export type LibraryView = Infer<typeof isLibraryView>
 
 export const LIBRARY_VIEWS = isLibraryView.values
 
-export const isLibraryKind = oneOf(['movies', 'shows', 'other'])
+export const isLibraryKind = oneOf([
+  'movies',
+  'shows',
+  'animeMovies',
+  'animeShows',
+  'sports',
+  'youtube',
+  'other',
+])
 
 export type LibraryKind = Infer<typeof isLibraryKind>
 
@@ -85,7 +93,7 @@ export const LIBRARY_KINDS = isLibraryKind.values
 
 export const isMediaGroupBy = oneOf(['match', 'resolution', 'codec', 'month'])
 
-/** `match` buckets a Movies or TV shows library by how far matching got. */
+/** `match` buckets a matched library, of movies or shows, by how far matching got. */
 export type MediaGroupBy = Infer<typeof isMediaGroupBy>
 
 export const MEDIA_GROUPINGS = isMediaGroupBy.values
@@ -114,13 +122,13 @@ export const isLibrarySettings = object({
   groupBy: isMediaGroupBy,
   /** How far into a video, as a whole percentage, a play must get for it to count as watched. */
   watchedPercent: isWatchedPercent,
-  /** What the library holds: movies, TV shows, or anything else. */
+  /** What the library holds: movies, TV shows, anime movies or shows, sporting events, YouTube videos, or anything else. */
   kind: isLibraryKind,
   /** Whose score its cards show and its rating sorts use; TMDB's stands in where that source has none. */
   ratingsSource: isRatingSource,
   /** Watch the folders and take in videos added, removed, renamed or replaced there as it happens. */
   autoRefresh: isBoolean,
-  /** Private: its videos stay hidden until the server's PIN is entered. */
+  /** Private, whatever its type: its videos stay hidden until the server's PIN is entered. */
   locked: isBoolean,
 })
 
@@ -167,7 +175,7 @@ export const isMatchState = oneOf(['pending', 'matched', 'manual', 'unmatched', 
 /**
  * `pending` waits for matching, `matched` found its item by itself,
  * `manual` was chosen with Fix match, `unmatched` found nothing sure, and
- * `off` is a library that is not Movies or TV shows, or an extra.
+ * `off` is a library that is not matched, or an extra.
  */
 export type MatchState = Infer<typeof isMatchState>
 
@@ -175,8 +183,10 @@ export const isItemType = oneOf(['movie', 'show', 'season', 'episode'])
 
 export type ItemType = Infer<typeof isItemType>
 
-/** What Fix match and matching look files up as on TMDB. */
-export type MatchItemType = Extract<ItemType, 'movie' | 'show'>
+/** What Fix match and matching look files up as on TMDB, and what Edit images chooses pictures for. */
+export const isMatchItemType = oneOf(['movie', 'show'] satisfies ItemType[])
+
+export type MatchItemType = Infer<typeof isMatchItemType>
 
 export const isRating = object({
   source: isRatingSource,
@@ -241,7 +251,7 @@ export const isMediaItem = object({
   changedAt: isString,
   /** How far matching got: see `MatchState`. */
   match: isMatchState,
-  /** The year the name gives, in a Movies or TV shows library; null elsewhere. */
+  /** The year the name gives, in a matched library; null elsewhere. */
   year: nullable(isNumber),
   /** Plex's `{edition-...}` from the name. */
   edition: nullable(isString),

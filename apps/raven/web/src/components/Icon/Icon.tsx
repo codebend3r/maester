@@ -34,7 +34,11 @@ export type IconName =
   | 'next'
   | 'wand'
   | 'film'
+  | 'filmSpark'
   | 'tv'
+  | 'tvSpark'
+  | 'trophy'
+  | 'youtube'
   | 'video'
   | 'libraries'
   | 'home'
@@ -87,7 +91,14 @@ const PATHS: Record<IconName, string> = {
   history: 'M4 11a8 8 0 1 1 2.3 5.7M4 5v6h6M12 8v4l3 2',
   next: 'M9 6l6 6-6 6',
   film: 'M4 3h16v18H4zM8 3v18M16 3v18M4 7.5h4M4 12h4M4 16.5h4M16 7.5h4M16 12h4M16 16.5h4',
+  filmSpark:
+    'M4 3h16v18H4zM8 3v18M16 3v18M4 7.5h4M4 12h4M4 16.5h4M16 7.5h4M16 12h4M16 16.5h4M12 8.6L12.8 11.2 14.4 12 12.8 12.8 12 15.4 11.2 12.8 9.6 12 11.2 11.2z',
   tv: 'M3 8h18v12H3zM8 3.5l4 4.5 4-4.5',
+  tvSpark:
+    'M3 8h18v12H3zM8 3.5l4 4.5 4-4.5M12 10.5L13 13 15.5 14 13 15 12 17.5 11 15 8.5 14 11 13z',
+  trophy: 'M7 4h10v5a5 5 0 0 1-10 0zM7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3M12 14v6M8 20h8',
+  youtube:
+    'M6 5.5h12a3.5 3.5 0 0 1 3.5 3.5v6a3.5 3.5 0 0 1-3.5 3.5H6A3.5 3.5 0 0 1 2.5 15V9A3.5 3.5 0 0 1 6 5.5zM10 9.5v5l4.5-2.5z',
   video: 'M3 7h12v10H3zM15 10.5l6-3.5v10l-6-3.5',
   libraries: 'M3 4h4v16H3zM9 4h4v16H9zM14.6 5l3.6-1 3.4 15-3.6 1z',
   home: 'M3 11.5L12 4l9 7.5M5.5 9.5V20h5v-5.5h3V20h5V9.5',

@@ -1,5 +1,5 @@
 import { Controller, Get, Headers, Inject } from '@nestjs/common'
-import type { Home, HomeShelf } from '@raven/core'
+import { type Home, type HomeShelf, listsShows } from '@raven/core'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { LockService } from '@/lock/lockService'
 import { MediaRepository } from '@/media/mediaRepository'
@@ -28,7 +28,7 @@ export class HomeController {
       .filter((library) => library.settings.pinned && viewer.seesLibrary(library.id))
       .map(({ id, settings }): HomeShelf => {
         const newest = { libraryId: id, sort: 'added', limit: SHELF_SIZE } as const
-        return settings.kind === 'shows'
+        return listsShows(settings.kind)
           ? { libraryId: id, type: 'shows', shows: this.media.listShows(newest) }
           : { libraryId: id, type: 'media', media: this.media.list(newest) }
       })

@@ -1,4 +1,10 @@
-import { KIND_RULES, type LibrarySettings, type MediaItem, type ShowEntry } from '@raven/core'
+import {
+  type LibrarySettings,
+  type MediaItem,
+  type ShowEntry,
+  listsShows,
+  matchTypeFor,
+} from '@raven/core'
 import { Bucket } from '@/components/Bucket/Bucket'
 import { MediaGrid } from '@/components/MediaGrid/MediaGrid'
 import { MediaGroups } from '@/components/MediaGroups/MediaGroups'
@@ -6,7 +12,6 @@ import { MediaList } from '@/components/MediaList/MediaList'
 import { MediaTiles } from '@/components/MediaTiles/MediaTiles'
 import { ShowGrid } from '@/components/ShowCard/ShowCard'
 import { ShowList, ShowTiles } from '@/components/ShowCard/ShowViews'
-import { KINDS } from '@/lib/libraryKinds'
 import styles from '@/pages/LibraryPage/LibraryPage.module.scss'
 
 const count = new Intl.NumberFormat()
@@ -48,8 +53,8 @@ const MediaView = ({
   items: MediaItem[]
   busy: boolean
 }) => {
-  const movies = KINDS[settings.kind].posters
-  const matchType = KIND_RULES[settings.kind].matches
+  const matchType = matchTypeFor(settings.kind)
+  const movies = matchType === 'movie'
   if (settings.view === 'list')
     return <MediaList items={items} busy={busy} movies={movies} matchType={matchType} />
   if (settings.view === 'tiles')
@@ -97,17 +102,15 @@ export const LibraryListing = ({
   settings,
   shows,
   files,
-  listsShows,
   busy,
 }: {
   settings: LibrarySettings
   shows: ShowEntry[]
   files: MediaItem[]
-  listsShows: boolean
   busy: boolean
 }) => {
   const filesView = <MediaView settings={settings} items={files} busy={busy} />
-  if (!listsShows) return filesView
+  if (!listsShows(settings.kind)) return filesView
   const showsView = <ShowsView settings={settings} shows={shows} busy={busy} />
   if (files.length === 0) return showsView
   return (

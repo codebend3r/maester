@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { LibrarySettings } from '@/contract'
+import { LIBRARY_KINDS, type LibrarySettings } from '@/contract'
 import {
   DEFAULT_LIBRARY_SETTINGS,
   KIND_RULES,
@@ -7,9 +7,8 @@ import {
   coherentSettings,
   defaultLibrarySettings,
   groupingsFor,
-  isMatchItemType,
-  isMatchedKind,
-  matchedItemType,
+  listsShows,
+  matchTypeFor,
   sortsFor,
   viewsFor,
   withLibraryKind,
@@ -27,11 +26,15 @@ describe('defaultLibrarySettings', () => {
       view: 'grid',
       groupBy: 'resolution',
     })
+    expect(defaultLibrarySettings('animeMovies')).toMatchObject({
+      view: 'grouped',
+      groupBy: 'match',
+    })
     expect(defaultLibrarySettings('other')).toEqual(DEFAULT_LIBRARY_SETTINGS)
   })
 
   it('starts every type with settings it can show', () => {
-    ;(['movies', 'shows', 'other'] as const).forEach((kind) => {
+    LIBRARY_KINDS.forEach((kind) => {
       const settings = defaultLibrarySettings(kind)
       expect(coherentSettings(settings)).toEqual(settings)
     })
@@ -66,15 +69,39 @@ describe('withLibraryKind', () => {
     const clips: LibrarySettings = { ...DEFAULT_LIBRARY_SETTINGS, sort: 'largest' }
     expect(withLibraryKind({ settings: clips, kind: 'shows' }).sort).toBe('title')
   })
+
+  it('keeps the lock, whatever the type', () => {
+    const locked: LibrarySettings = { ...DEFAULT_LIBRARY_SETTINGS, locked: true }
+    LIBRARY_KINDS.forEach((kind) => {
+      expect(withLibraryKind({ settings: locked, kind }).locked).toBe(true)
+      expect(coherentSettings({ ...defaultLibrarySettings(kind), locked: true }).locked).toBe(true)
+    })
+  })
 })
 
 describe('the rules for each type of library', () => {
-  it('matches Movies and TV shows libraries, to movies and shows', () => {
-    expect(MATCHED_KINDS).toEqual(['movies', 'shows'])
-    expect(isMatchedKind('other')).toBe(false)
-    expect(matchedItemType('movies')).toBe('movie')
-    expect(matchedItemType('shows')).toBe('show')
-    expect(KIND_RULES.other.matches).toBeNull()
+  it('matches movies and shows libraries, anime included, to movies and shows', () => {
+    expect(MATCHED_KINDS).toEqual(['movies', 'shows', 'animeMovies', 'animeShows'])
+    expect(LIBRARY_KINDS.map((kind) => [kind, matchTypeFor(kind)])).toEqual([
+      ['movies', 'movie'],
+      ['shows', 'show'],
+      ['animeMovies', 'movie'],
+      ['animeShows', 'show'],
+      ['sports', null],
+      ['youtube', null],
+      ['other', null],
+    ])
+  })
+
+  it('reads anime like the movies or shows it is, and sporting events and YouTube videos like Other', () => {
+    expect(KIND_RULES.animeMovies).toEqual(KIND_RULES.movies)
+    expect(KIND_RULES.animeShows).toEqual(KIND_RULES.shows)
+    expect(KIND_RULES.sports).toEqual(KIND_RULES.other)
+    expect(KIND_RULES.youtube).toEqual(KIND_RULES.other)
+  })
+
+  it('lists the shows of a TV or Anime shows library, and the files of the rest', () => {
+    expect(LIBRARY_KINDS.filter(listsShows)).toEqual(['shows', 'animeShows'])
   })
 
   it('offers every sort to a Movies library', () => {
@@ -121,19 +148,5 @@ describe('coherentSettings', () => {
       groupBy: 'codec',
     }
     expect(coherentSettings(movies)).toEqual(movies)
-  })
-})
-
-describe('isMatchItemType', () => {
-  it('takes what matched libraries are matched to, movies and shows, and nothing else', () => {
-    expect(isMatchItemType.values).toEqual(['movie', 'show'])
-    expect(['movie', 'show', 'season', 'episode', 'other', 7].map(isMatchItemType)).toEqual([
-      true,
-      true,
-      false,
-      false,
-      false,
-      false,
-    ])
   })
 })

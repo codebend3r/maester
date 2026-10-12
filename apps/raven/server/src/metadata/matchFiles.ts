@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { type LibraryKind, type MatchedKind, type MatchState, isMatchState } from '@raven/core'
+import { type LibraryKind, type MatchState, isMatchState } from '@raven/core'
 import { DatabaseService } from '@/db/database'
 import { BEST_FIRST, escapeLike } from '@/media/mediaSql'
 import { namedAs } from '@/media/namedAs'
@@ -184,7 +184,7 @@ export class MatchFiles {
   }
 
   /** How many files wait to be matched in libraries of `kinds`. */
-  countPending(kinds: readonly MatchedKind[]): number {
+  countPending(kinds: readonly LibraryKind[]): number {
     return (
       this.db
         .prepare<[string], { count: number }>(
@@ -246,7 +246,7 @@ export class MatchFiles {
   /**
    * Reads every file's name again for the library's type, and starts its
    * matching over: links go, and files are pending, or off in a library that
-   * is not Movies or TV shows. Run when a library's type changes.
+   * is not matched. Run when a library's type changes how its files are read.
    */
   rename({ libraryId, kind }: { libraryId: number; kind: LibraryKind }): void {
     const rows = this.files({ where: 'm.library_id = ?', params: [libraryId] })

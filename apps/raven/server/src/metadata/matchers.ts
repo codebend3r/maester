@@ -1,7 +1,7 @@
 import { basename, dirname, join } from 'node:path'
 import {
   isExtra,
-  type MatchedKind,
+  type MatchItemType,
   type MatchState,
   parseEpisodeName,
   parseMovieName,
@@ -22,7 +22,7 @@ import {
   stemOf,
 } from '@/metadata/places'
 
-/** How one type of library is matched: which files go together, and what a Fix match covers. */
+/** How files are matched to one type of TMDB item: which go together, and what a Fix match covers. */
 export type KindMatcher = {
   /** Pending files in the units matched together: one movie file, or one show folder's files. */
   groups: (files: readonly MatchFile[]) => MatchFile[][]
@@ -225,8 +225,8 @@ const showMatcher = (deps: MatcherDeps): KindMatcher => {
   }
 }
 
-/** How each type of matched library is matched. */
-export const createMatchers = (deps: MatcherDeps): Record<MatchedKind, KindMatcher> => ({
-  movies: movieMatcher(deps),
-  shows: showMatcher(deps),
+/** How files are matched to movies and to shows; a library's type says which its files are. */
+export const createMatchers = (deps: MatcherDeps): Record<MatchItemType, KindMatcher> => ({
+  movie: movieMatcher(deps),
+  show: showMatcher(deps),
 })
