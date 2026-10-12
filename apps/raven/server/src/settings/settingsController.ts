@@ -1,10 +1,15 @@
 import { Body, Controller, Get, Inject, Put } from '@nestjs/common'
-import { type PlaybackSettingsState, isPlaybackSettingsChange } from '@raven/core'
+import {
+  type DisplaySettings,
+  type PlaybackSettingsState,
+  isDisplaySettingsChange,
+  isPlaybackSettingsChange,
+} from '@raven/core'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import { parseBody } from '@/parseBody'
 import { SettingsRepository } from '@/settings/settingsRepository'
 
-/** Settings that hold for every viewer: how video is played. */
+/** Settings that hold for every viewer: how video is played, and how pages look. */
 @Controller('api/settings')
 export class SettingsController {
   constructor(
@@ -40,5 +45,21 @@ export class SettingsController {
     const after = this.settings.setPlayback(change)
     if (after.hwAccel !== before.hwAccel) this.ffmpeg.resetEncoder()
     return this.state()
+  }
+
+  @Get('display')
+  display(): DisplaySettings {
+    return this.settings.display()
+  }
+
+  /** Changes the fields sent. */
+  @Put('display')
+  setDisplay(@Body() body: unknown): DisplaySettings {
+    const change = parseBody({
+      guard: isDisplaySettingsChange,
+      body,
+      message: 'Each setting must be one of the values it takes.',
+    })
+    return this.settings.setDisplay(change)
   }
 }

@@ -2,11 +2,10 @@ import type { ItemType, MediaSort } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { MediaIndex } from '@/media/mediaIndex'
-import { MediaRepository } from '@/media/mediaRepository'
 import { ViewingRepository } from '@/media/viewingRepository'
-import { MetadataRepository } from '@/metadata/metadataRepository'
-import type { FetchedItem } from '@/metadata/tmdbClient'
+import { BLANK_ITEM, type FetchedItem } from '@/metadata/tmdbClient'
 import { testDatabase } from '@/test/database'
+import { repositories } from '@/test/repositories'
 
 type Seed = {
   name: string
@@ -54,7 +53,7 @@ const TRACKS = { audio: [], subtitles: [], defaultAudio: null, frameRate: 24 }
 describe('listing a library', () => {
   const database = testDatabase('raven-sort-')
   const state = { libraryId: 0 }
-  const media = () => new MediaRepository(database.get(), new MetadataRepository(database.get()))
+  const media = () => repositories(database.get()).media
   const titles = ({ sort, seed }: { sort: MediaSort; seed?: number }): string[] =>
     media()
       .list({ libraryId: state.libraryId, sort, seed })
@@ -153,33 +152,12 @@ const fetched = ({
   tmdbId: string
   title: string
   number?: number | null
-}): FetchedItem => ({
-  type,
-  tmdbId,
-  number,
-  title,
-  originalTitle: null,
-  year: null,
-  released: null,
-  ended: null,
-  summary: null,
-  tagline: null,
-  contentRating: null,
-  runtime: null,
-  studio: null,
-  genres: [],
-  imdbId: null,
-  tvdbId: null,
-  images: { poster: null, backdrop: null, still: null },
-  credits: [],
-  rating: null,
-  reviews: [],
-})
+}): FetchedItem => ({ ...BLANK_ITEM, type, tmdbId, number, title })
 
 describe("listing a TV library's shows", () => {
   const database = testDatabase('raven-shows-')
   const state = { libraryId: 0, aired: 0, special: 0, ids: new Map<string, number>() }
-  const media = () => new MediaRepository(database.get(), new MetadataRepository(database.get()))
+  const media = () => repositories(database.get()).media
   const fileName = (id: number | undefined): string =>
     id == null ? 'none' : (media().get(id)?.fileName ?? 'gone')
 
@@ -191,7 +169,7 @@ describe("listing a TV library's shows", () => {
     title: string
     episodes: ReadonlyArray<[number, number]>
   }): number => {
-    const metadata = new MetadataRepository(database.get())
+    const { metadata } = repositories(database.get())
     const index = new MediaIndex(database.get())
     const showId = metadata.save({ item: fetched({ type: 'show', tmdbId: title, title }) })
     episodes.forEach(([season, episode]) => {
@@ -310,7 +288,7 @@ describe("listing a TV library's shows", () => {
 describe('listing what is in progress', () => {
   const database = testDatabase('raven-progress-')
   const state = { libraryId: 0, ids: new Map<string, number>() }
-  const media = () => new MediaRepository(database.get(), new MetadataRepository(database.get()))
+  const media = () => repositories(database.get()).media
   const titles = (): string[] =>
     media()
       .listInProgress()

@@ -70,6 +70,7 @@ export const itemSummary = (overrides: Partial<ItemSummary> = {}): ItemSummary =
   season: null,
   episode: null,
   posterVersion: 'p1',
+  backdropVersion: null,
   ratings: [{ source: 'tmdb', kind: 'audience', value: 8.2, votes: 1200 }],
   ...overrides,
 })
@@ -92,6 +93,7 @@ export const itemDetails = (overrides: Partial<ItemDetails> = {}): ItemDetails =
   studio: 'Night Shift Pictures',
   genres: ['Comedy', 'Drama', 'Crime', 'Romance'],
   backdropVersion: 'b1',
+  logoVersion: null,
   reviews: [],
   credits: [
     { personId: 1, name: 'Mark Kimball', job: 'cast', role: 'Rudy', photoVersion: 'k1' },

@@ -2,14 +2,15 @@ import { mkdirSync } from 'node:fs'
 import { readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Inject, Injectable, Logger } from '@nestjs/common'
+import type { ItemImageKind } from '@raven/core'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { imageScaleArgs } from '@/ffmpeg/args'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import { METADATA_FETCH, type MetadataFetch, TMDB_IMAGE_PATH } from '@/metadata/tmdbClient'
 import { type Gate, createGate } from '@/scanner/concurrency'
 
-/** What a picture is for, which decides the one size it is kept at. */
-export type ImageUse = 'poster' | 'backdrop' | 'photo' | 'still'
+/** What a picture is for, which decides the one size it is kept at: an item's, or a person's photo. */
+export type ImageUse = ItemImageKind | 'photo'
 
 /** TMDB's size names, and the widths local images are scaled to so both look alike. */
 const TMDB_SIZES: Record<ImageUse, string> = {
@@ -17,9 +18,16 @@ const TMDB_SIZES: Record<ImageUse, string> = {
   backdrop: 'w1280',
   photo: 'w185',
   still: 'w300',
+  logo: 'w500',
 }
 
-const WIDTHS: Record<ImageUse, number> = { poster: 500, backdrop: 1280, photo: 185, still: 300 }
+const WIDTHS: Record<ImageUse, number> = {
+  poster: 500,
+  backdrop: 1280,
+  photo: 185,
+  still: 300,
+  logo: 500,
+}
 
 const TIMEOUT_MS = 10_000
 

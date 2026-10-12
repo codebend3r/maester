@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common'
 import {
+  type ChoosableImageKind,
   type CreditJob,
   type ItemType,
   isNumber,
@@ -96,11 +97,46 @@ export type FetchedItem = {
   genres: string[]
   imdbId: string | null
   tvdbId: string | null
-  images: { poster: string | null; backdrop: string | null; still: string | null }
+  /** The TMDB collection a movie belongs to; null for one in none, and for anything but a movie. */
+  saga: FetchedSaga | null
+  images: {
+    poster: string | null
+    backdrop: string | null
+    still: string | null
+    /** A movie's title as art: a PNG on a clear ground. */
+    logo: string | null
+  }
   credits: FetchedCredit[]
   /** TMDB's own score out of 10, when anyone has voted. */
   rating: { value: number; votes: number | null } | null
   reviews: FetchedReview[]
+}
+
+/** A TMDB collection: The Lord of the Rings Collection, say. */
+export type FetchedSaga = { tmdbId: string; name: string }
+
+/** What a movie stored before raven kept sagas and logos has yet to learn. */
+export type MovieExtras = Pick<FetchedItem, 'saga'> & { logo: FetchedItem['images']['logo'] }
+
+/** An item with nothing known of it but what names it, which each use spreads its own over. */
+export const BLANK_ITEM: Omit<FetchedItem, 'type' | 'tmdbId' | 'number' | 'title'> = {
+  originalTitle: null,
+  year: null,
+  released: null,
+  ended: null,
+  summary: null,
+  tagline: null,
+  contentRating: null,
+  runtime: null,
+  studio: null,
+  genres: [],
+  imdbId: null,
+  tvdbId: null,
+  saga: null,
+  images: { poster: null, backdrop: null, still: null, logo: null },
+  credits: [],
+  rating: null,
+  reviews: [],
 }
 
 /** One of TMDB's pictures for a movie or show. */
@@ -112,7 +148,8 @@ export type TmdbImage = {
   language: string | null
 }
 
-export type TmdbImages = { posters: TmdbImage[]; backdrops: TmdbImage[] }
+/** A movie's or show's pictures of each kind Edit images chooses; logos only as PNG files, whose ground is clear. */
+export type TmdbImages = Record<ChoosableImageKind, TmdbImage[]>
 
 export type SearchResult = {
   tmdbId: string
@@ -156,6 +193,66 @@ export const yearOf = (date: string | null): number | null => {
   const year = Number(date?.slice(0, 4) ?? '')
   return date != null && /^\d{4}/.test(date) && year > 0 ? year : null
 }
+
+/** TMDB's pictures that are plain TMDB files, in the order TMDB lists them. */
+const toImages = (entries: unknown): TmdbImage[] =>
+  records(entries).flatMap((entry) => {
+    const path = imagePath(entry.file_path)
+    return path == null
+      ? []
+      : [
+          {
+            path,
+            width: number(entry.width),
+            height: number(entry.height),
+            language: text(entry.iso_639_1),
+          },
+        ]
+  })
+
+/** A logo raven shows is a PNG, whose ground is clear; an SVG is passed over. */
+const isClearLogo = (logo: TmdbImage): boolean => logo.path.endsWith('.png')
+
+/**
+ * The logo a page shows for its title: a clear one, in `language` before
+ * one with no language, TMDB's most voted first. Anything not a plain TMDB
+ * file is passed over.
+ */
+export const pickLogo = ({
+  logos,
+  language,
+}: {
+  logos: unknown
+  language: string
+}): string | null => {
+  const clear = toImages(logos).filter(isClearLogo)
+  return (
+    (
+      clear.find((logo) => logo.language === language) ??
+      clear.find((logo) => logo.language == null)
+    )?.path ?? null
+  )
+}
+
+/** A movie's `belongs_to_collection`, or null when it belongs to none. */
+const toSaga = (value: unknown): FetchedSaga | null => {
+  const collection = record(value)
+  const tmdbId = idOf(collection.id)
+  const name = text(collection.name)
+  return tmdbId == null || name == null ? null : { tmdbId, name }
+}
+
+/** A movie's saga and logo, from `/movie/{id}` with its images appended. */
+const toMovieExtras = ({
+  movie,
+  language,
+}: {
+  movie: Record<string, unknown>
+  language: string
+}): MovieExtras => ({
+  saga: toSaga(movie.belongs_to_collection),
+  logo: pickLogo({ logos: record(movie.images).logos, language }),
+})
 
 /** Reviews appended to a movie or show, newest first. */
 export const toReviews = (reviews: unknown): FetchedReview[] =>
@@ -367,10 +464,12 @@ export const toShow = ({
     genres: records(show.genres).flatMap((genre) => text(genre.name) ?? []),
     imdbId: text(external.imdb_id),
     tvdbId: idOf(external.tvdb_id),
+    saga: null,
     images: {
       poster: imagePath(show.poster_path),
       backdrop: imagePath(show.backdrop_path),
       still: null,
+      logo: null,
     },
     credits: mergeCredits([...creators, ...aggregateCredits(record(show.aggregate_credits))]),
     rating: tmdbRating(show),
@@ -385,29 +484,21 @@ const toEpisode = (entry: Record<string, unknown>): FetchedItem | null => {
   if (tmdbId == null || episode == null) return null
   const aired = text(entry.air_date)
   return {
+    ...BLANK_ITEM,
     type: 'episode',
     tmdbId,
     number: episode,
     title: text(entry.name) ?? `Episode ${episode}`,
-    originalTitle: null,
     year: yearOf(aired),
     released: aired,
-    ended: null,
     summary: text(entry.overview),
-    tagline: null,
-    contentRating: null,
     runtime: number(entry.runtime) || null,
-    studio: null,
-    genres: [],
-    imdbId: null,
-    tvdbId: null,
-    images: { poster: null, backdrop: null, still: imagePath(entry.still_path) },
+    images: { ...BLANK_ITEM.images, still: imagePath(entry.still_path) },
     credits: mergeCredits([
       ...castCredits({ cast: entry.guest_stars, job: 'guest' }),
       ...crewCredits(entry.crew),
     ]),
     rating: tmdbRating(entry),
-    reviews: [],
   }
 }
 
@@ -422,26 +513,15 @@ export const toSeason = (
   const aired = text(season.air_date)
   return {
     season: {
+      ...BLANK_ITEM,
       type: 'season',
       tmdbId,
       number: seasonNumber,
       title: text(season.name) ?? (seasonNumber === 0 ? 'Specials' : `Season ${seasonNumber}`),
-      originalTitle: null,
       year: yearOf(aired),
       released: aired,
-      ended: null,
       summary: text(season.overview),
-      tagline: null,
-      contentRating: null,
-      runtime: null,
-      studio: null,
-      genres: [],
-      imdbId: null,
-      tvdbId: null,
-      images: { poster: imagePath(season.poster_path), backdrop: null, still: null },
-      credits: [],
-      rating: null,
-      reviews: [],
+      images: { ...BLANK_ITEM.images, poster: imagePath(season.poster_path) },
     },
     episodes: records(season.episodes).flatMap((entry) => toEpisode(entry) ?? []),
   }
@@ -451,9 +531,12 @@ export const toSeason = (
 export const toMovie = ({
   body,
   country,
+  language,
 }: {
   body: unknown
   country: string
+  /** ISO 639-1, for the logo: `en`. */
+  language: string
 }): FetchedItem | null => {
   const movie = record(body)
   const tmdbId = idOf(movie.id)
@@ -462,6 +545,7 @@ export const toMovie = ({
   const primary = text(movie.release_date)
   const certification = movieCertification({ releaseDates: movie.release_dates, country })
   const credits = record(movie.credits)
+  const extras = toMovieExtras({ movie, language })
   return {
     type: 'movie',
     tmdbId,
@@ -479,10 +563,12 @@ export const toMovie = ({
     genres: records(movie.genres).flatMap((genre) => text(genre.name) ?? []),
     imdbId: text(record(movie.external_ids).imdb_id) ?? text(movie.imdb_id),
     tvdbId: null,
+    saga: extras.saga,
     images: {
       poster: imagePath(movie.poster_path),
       backdrop: imagePath(movie.backdrop_path),
       still: null,
+      logo: extras.logo,
     },
     credits: mergeCredits([
       ...castCredits({ cast: credits.cast, job: 'cast' }),
@@ -554,6 +640,11 @@ export class TmdbClient {
   /** Back to the full rate, at the start of a pass. */
   newPass(): void {
     this.limit.reset()
+  }
+
+  /** ISO 639-1, which TMDB tags pictures with: `en` of `en-US`. */
+  private get language(): string {
+    return this.config.metadataLanguage.slice(0, 2)
   }
 
   private async get(path: string, params: Record<string, string> = {}): Promise<unknown> {
@@ -722,38 +813,41 @@ export class TmdbClient {
   }
 
   /**
-   * Every poster and backdrop TMDB holds for a movie or show, in the
-   * language details come in and without text, most voted first.
+   * Every poster, backdrop and PNG logo TMDB holds for a movie or show, in
+   * the language details come in and without text, most voted first.
    */
   async images({ type, tmdbId }: { type: MatchItemType; tmdbId: string }): Promise<TmdbImages> {
-    const language = this.config.metadataLanguage.slice(0, 2)
     const body = record(
       await this.get(`/${type === 'movie' ? 'movie' : 'tv'}/${encodeURIComponent(tmdbId)}/images`, {
-        include_image_language: `${language},null`,
+        include_image_language: `${this.language},null`,
       }),
     )
-    const toImages = (entries: unknown): TmdbImage[] =>
-      records(entries).flatMap((entry) => {
-        const path = imagePath(entry.file_path)
-        return path == null
-          ? []
-          : [
-              {
-                path,
-                width: number(entry.width),
-                height: number(entry.height),
-                language: text(entry.iso_639_1),
-              },
-            ]
-      })
-    return { posters: toImages(body.posters), backdrops: toImages(body.backdrops) }
+    return {
+      poster: toImages(body.posters),
+      backdrop: toImages(body.backdrops),
+      logo: toImages(body.logos).filter(isClearLogo),
+    }
+  }
+
+  /**
+   * Only a movie's saga and logo, for a movie stored before raven kept them:
+   * the movie with its pictures, in one call, and no credits, dates or
+   * reviews.
+   */
+  async movieExtras(tmdbId: string): Promise<MovieExtras> {
+    const body = await this.get(`/movie/${encodeURIComponent(tmdbId)}`, {
+      append_to_response: 'images',
+      include_image_language: `${this.language},null`,
+    })
+    return toMovieExtras({ movie: record(body), language: this.language })
   }
 
   async movie(tmdbId: string): Promise<FetchedItem> {
     const body = await this.get(`/movie/${encodeURIComponent(tmdbId)}`, {
-      append_to_response: 'credits,release_dates,external_ids,reviews',
+      append_to_response: 'credits,release_dates,external_ids,reviews,images',
+      include_image_language: `${this.language},null`,
     })
-    const movie = toMovie({ body, country: this.config.metadataCountry })
+    const movie = toMovie({ body, country: this.config.metadataCountry, language: this.language })
     if (!movie) {
       throw new TmdbError({
         kind: 'unavailable',

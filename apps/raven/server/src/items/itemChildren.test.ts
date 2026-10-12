@@ -3,12 +3,12 @@ import { itemChildren } from '@/items/itemChildren'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import type { Viewer } from '@/lock/lockService'
 import { MediaIndex } from '@/media/mediaIndex'
-import { MediaRepository } from '@/media/mediaRepository'
 import { ViewingRepository } from '@/media/viewingRepository'
 import { localEpisode, localSeason } from '@/metadata/localItems'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 import type { FetchedItem } from '@/metadata/tmdbClient'
 import { testDatabase } from '@/test/database'
+import { repositories } from '@/test/repositories'
 
 const show: FetchedItem = {
   ...localSeason({ showTmdbId: '1', number: 1 }),
@@ -37,10 +37,7 @@ const viewerHiding = ({
 describe("a page's children", () => {
   const database = testDatabase('raven-item-children-')
   const state = { open: 0, locked: 0, showId: 0, seasons: [0, 0], files: new Map<string, number>() }
-  const repositories = () => {
-    const metadata = new MetadataRepository(database.get())
-    return { metadata, media: new MediaRepository(database.get(), metadata) }
-  }
+  const stores = () => repositories(database.get())
 
   beforeAll(async () => {
     await database.open()
@@ -51,7 +48,7 @@ describe("a page's children", () => {
       paths: ['/private'],
       settings: { kind: 'shows', locked: true },
     }).id
-    const { metadata } = repositories()
+    const { metadata } = stores()
     const index = new MediaIndex(database.get())
     const file = ({ libraryId, path }: { libraryId: number; path: string }) => {
       const root = libraryId === state.open ? '/tv' : '/private'
@@ -108,7 +105,7 @@ describe("a page's children", () => {
       mediaIds: [file({ libraryId: state.locked, path: 'Andor/S02E01.mkv' })],
       itemIds: [episode(seasonTwo, 1)],
     })
-    new ViewingRepository(database.get(), new MediaRepository(database.get(), metadata)).report({
+    new ViewingRepository(database.get(), stores().media).report({
       id: state.files.get('Andor/S01E01.mkv') ?? -1,
       position: 300,
       at: new Date(),
@@ -118,7 +115,7 @@ describe("a page's children", () => {
   afterAll(database.close)
 
   it('counts only the episodes on disk this browser may see, and leaves out a season it may not', () => {
-    const { metadata, media } = repositories()
+    const { metadata, media } = stores()
     const everything = itemChildren({
       parentId: state.showId,
       viewer: viewerHiding({ hidden: -1, metadata }),
@@ -141,7 +138,7 @@ describe("a page's children", () => {
   })
 
   it('gives each episode its row and the file Play starts, from what this browser may see', () => {
-    const { metadata, media } = repositories()
+    const { metadata, media } = stores()
     const [seasonOne = -1] = state.seasons
     const rows = itemChildren({
       parentId: seasonOne,

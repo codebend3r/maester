@@ -3,6 +3,7 @@ import { Inject, Injectable } from '@nestjs/common'
 import { ITEM_IMAGE_KINDS, type ItemImageKind, parseEpisodeName } from '@raven/core'
 import type { FolderReader } from '@/metadata/folderReader'
 import { ImageCache } from '@/metadata/imageCache'
+import { ItemImagesRepository } from '@/metadata/itemImagesRepository'
 import { episodeStill, movieAssets, seasonPoster, showAssets } from '@/metadata/localAssets'
 import { type MatchFile, MatchFiles } from '@/metadata/matchFiles'
 import { MetadataRepository, type StoredItem } from '@/metadata/metadataRepository'
@@ -37,6 +38,7 @@ export class ItemPictures {
     @Inject(MetadataRepository) private readonly metadata: MetadataRepository,
     @Inject(MatchFiles) private readonly files: MatchFiles,
     @Inject(ImageCache) private readonly images: ImageCache,
+    @Inject(ItemImagesRepository) private readonly stored: ItemImagesRepository,
   ) {}
 
   /**
@@ -68,7 +70,7 @@ export class ItemPictures {
     if (!item) return
     const files = this.files.under(itemId)
     const pictures = await Promise.all(files.map((file) => this.beside({ item, file, folders })))
-    this.metadata.setLocalImages({ itemId, images: firstOfEach(pictures) })
+    this.stored.setLocalImages({ itemId, images: firstOfEach(pictures) })
   }
 
   /** The pictures one file has beside it for `item`. */
@@ -136,7 +138,7 @@ export class ItemPictures {
 
   /** Fetches an item's poster into the cache as soon as it is matched, so a library's first visit is quick. */
   warmPoster(itemId: number): void {
-    const image = this.metadata.image({ itemId, kind: 'poster' })
+    const image = this.stored.image({ itemId, kind: 'poster' })
     if (!image) return
     const made =
       image.source === 'local'

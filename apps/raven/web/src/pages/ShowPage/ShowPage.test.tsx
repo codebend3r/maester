@@ -57,6 +57,7 @@ describe('ShowPage', () => {
     const images = spyOn(api, 'getItemImages').mockImplementation(async () => ({
       poster: [],
       backdrop: [],
+      logo: [],
     }))
     open()
     await userEvent.click(await screen.findByRole('button', { name: 'Edit images' }))

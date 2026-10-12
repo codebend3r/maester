@@ -1,5 +1,13 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { DEFAULT_PLAYBACK_SETTINGS, type PlaybackSettings, isPlaybackSettings } from '@raven/core'
+import {
+  DEFAULT_DISPLAY_SETTINGS,
+  DEFAULT_PLAYBACK_SETTINGS,
+  type DisplaySettings,
+  type PlaybackSettings,
+  isDisplaySettings,
+  type Guard,
+  isPlaybackSettings,
+} from '@raven/core'
 import { DatabaseService } from '@/db/database'
 
 /** Server-wide settings, one JSON value per key, each read with its defaults filled in. */
@@ -24,25 +32,51 @@ export class SettingsRepository {
     }
   }
 
-  /** How video is played, every field present; a stored value that no longer reads falls back to the default. */
+  private write({ key, value }: { key: string; value: unknown }): void {
+    this.db
+      .prepare(
+        `INSERT INTO settings (key, value) VALUES (?, ?)
+         ON CONFLICT (key) DO UPDATE SET value = excluded.value`,
+      )
+      .run(key, JSON.stringify(value))
+  }
+
+  /** The stored value over the defaults, every field present; one that no longer reads falls back to the defaults. */
+  private merged<T>({ key, defaults, guard }: { key: string; defaults: T; guard: Guard<T> }): T {
+    const stored = this.read(key)
+    const merged = { ...defaults, ...(stored != null && typeof stored === 'object' ? stored : {}) }
+    return guard(merged) ? merged : defaults
+  }
+
+  /** How video is played. */
   playback(): PlaybackSettings {
-    const stored = this.read('playback')
-    const merged = {
-      ...DEFAULT_PLAYBACK_SETTINGS,
-      ...(stored != null && typeof stored === 'object' ? stored : {}),
-    }
-    return isPlaybackSettings(merged) ? merged : DEFAULT_PLAYBACK_SETTINGS
+    return this.merged({
+      key: 'playback',
+      defaults: DEFAULT_PLAYBACK_SETTINGS,
+      guard: isPlaybackSettings,
+    })
   }
 
   /** Changes the fields given and keeps the rest. */
   setPlayback(change: Partial<PlaybackSettings>): PlaybackSettings {
     const next: PlaybackSettings = { ...this.playback(), ...change }
-    this.db
-      .prepare(
-        `INSERT INTO settings (key, value) VALUES ('playback', ?)
-         ON CONFLICT (key) DO UPDATE SET value = excluded.value`,
-      )
-      .run(JSON.stringify(next))
+    this.write({ key: 'playback', value: next })
+    return next
+  }
+
+  /** How pages look: whether a movie's title shows as its logo. */
+  display(): DisplaySettings {
+    return this.merged({
+      key: 'display',
+      defaults: DEFAULT_DISPLAY_SETTINGS,
+      guard: isDisplaySettings,
+    })
+  }
+
+  /** Changes the fields given and keeps the rest. */
+  setDisplay(change: Partial<DisplaySettings>): DisplaySettings {
+    const next: DisplaySettings = { ...this.display(), ...change }
+    this.write({ key: 'display', value: next })
     return next
   }
 }

@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common'
 import {
+  type LibraryBackdrop,
   type MediaItem,
   type MediaSort,
   type PosterEntry,
@@ -10,6 +11,7 @@ import {
 import { DatabaseService } from '@/db/database'
 import { BEST_FIRST, FURTHEST_JOIN, isWatched, likePattern, score } from '@/media/mediaSql'
 import { shuffle } from '@/media/shuffle'
+import { ItemImagesRepository } from '@/metadata/itemImagesRepository'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 
 /** A media row as the listings read it; the path is selected with the rest but never leaves here. */
@@ -200,6 +202,7 @@ export class MediaRepository {
   constructor(
     @Inject(DatabaseService) private readonly database: DatabaseService,
     @Inject(MetadataRepository) private readonly metadata: MetadataRepository,
+    @Inject(ItemImagesRepository) private readonly images: ItemImagesRepository,
   ) {}
 
   private get db() {
@@ -433,6 +436,34 @@ export class MediaRepository {
         )
         .all(),
     )
+  }
+
+  /**
+   * What stands for a library on the Libraries page: the backdrop of its
+   * newest video's movie or show, by `ItemImagesRepository.backdropFor`, else
+   * that video's thumbnail once it is made. Asked for every library each
+   * time the page polls, so it reads that one file and nothing of a listing.
+   */
+  backdropOf(libraryId: number): LibraryBackdrop | null {
+    const newest = this.db
+      .prepare<
+        [number],
+        { id: number; thumbnail: string; mtime_ms: number; item_id: number | null }
+      >(
+        `SELECT m.id, m.thumbnail, m.mtime_ms,
+                (SELECT MIN(mi.item_id) FROM media_items mi WHERE mi.media_id = m.id) AS item_id
+           FROM media m
+          WHERE m.library_id = ?
+          ORDER BY m.added_at DESC, m.id DESC
+          LIMIT 1`,
+      )
+      .get(libraryId)
+    if (!newest) return null
+    const backdrop = newest.item_id == null ? null : this.images.backdropFor(newest.item_id)
+    if (backdrop) return { type: 'item', ...backdrop }
+    return newest.thumbnail === 'ready'
+      ? { type: 'thumbnail', id: newest.id, version: newest.mtime_ms }
+      : null
   }
 
   /** Each video with the item whose poster its card shows, by `MetadataRepository.posterItems`. */

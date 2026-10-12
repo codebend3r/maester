@@ -99,7 +99,7 @@ const MediaTile = ({
         {media.folder !== '' && <span className={styles.folder}>{media.folder}</span>}
         {posters && media.match === 'unmatched' && <span className={styles.note}>Not matched</span>}
         {note !== null && <span className={styles.note}>{note}</span>}
-        <PlaybackNote media={media} place="card" />
+        <PlaybackNote media={media} />
       </div>
       {menu.menu}
     </li>

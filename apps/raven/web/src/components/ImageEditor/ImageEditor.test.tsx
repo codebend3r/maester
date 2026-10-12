@@ -22,6 +22,10 @@ const OPTIONS: ItemImageOptions = {
   backdrop: [
     { source: 'tmdb', ref: '/b1.jpg', width: 3840, height: 2160, language: null, current: true },
   ],
+  logo: [
+    { source: 'tmdb', ref: '/l1.png', width: 1000, height: 400, language: 'en', current: true },
+    { source: 'tmdb', ref: '/l2.png', width: 1200, height: 300, language: 'en', current: false },
+  ],
 }
 
 describe('ImageEditor', () => {
@@ -31,13 +35,17 @@ describe('ImageEditor', () => {
   }
   const state = { done: 0 }
 
-  const open = (overrides: Parameters<typeof itemDetails>[0] = {}) => {
+  const open = (
+    overrides: Parameters<typeof itemDetails>[0] = {},
+    itemKind: 'movie' | 'show' = 'movie',
+  ) => {
     spies.options.mockImplementation(async () => OPTIONS)
     spies.choose.mockImplementation(async () => itemDetails({ posterVersion: 'new' }))
     renderWithProviders(
       <ImageEditor
         details={itemDetails(overrides)}
         libraries={[library({ id: 2, name: 'Films' })]}
+        itemKind={itemKind}
         onDone={() => {
           state.done += 1
         }}
@@ -110,6 +118,48 @@ describe('ImageEditor', () => {
       kind: 'poster',
       choice: { source: 'local' },
     })
+  })
+
+  it("offers a movie's logos on a tab of their own, and chooses one", async () => {
+    open()
+    const tabs = await screen.findByRole('tablist', { name: 'Pictures' })
+    await userEvent.click(within(tabs).getByRole('tab', { name: 'Logo 2' }))
+    expect(
+      screen.getByRole('button', { name: 'Logo: TMDB, 1000 by 400, English' }),
+    ).toHaveAttribute('aria-pressed', 'true')
+    await userEvent.click(screen.getByRole('button', { name: 'Logo: TMDB, 1200 by 300, English' }))
+    await waitFor(() => expect(spies.choose).toHaveBeenCalledTimes(1))
+    expect(spies.choose.mock.calls[0]?.[0]).toEqual({
+      id: 40,
+      kind: 'logo',
+      choice: { source: 'tmdb', ref: '/l2.png' },
+    })
+  })
+
+  it('steps between the tabs with the arrow keys, both ways', async () => {
+    open()
+    const tabs = await screen.findByRole('tablist', { name: 'Pictures' })
+    within(tabs).getByRole('tab', { name: 'Poster 2' }).focus()
+    await userEvent.keyboard('{ArrowLeft}')
+    expect(within(tabs).getByRole('tab', { name: 'Logo 2' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
+    await userEvent.keyboard('{ArrowRight}')
+    expect(within(tabs).getByRole('tab', { name: 'Poster 2' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
+  })
+
+  it('has no logo tab for a show, whose page shows none', async () => {
+    open({}, 'show')
+    const tabs = await screen.findByRole('tablist', { name: 'Pictures' })
+    expect(
+      within(tabs)
+        .getAllByRole('tab')
+        .map((tab) => tab.textContent),
+    ).toEqual(['Poster2', 'Backdrop1'])
   })
 
   it('lists the linked files that share the pictures, and closes with Done', async () => {

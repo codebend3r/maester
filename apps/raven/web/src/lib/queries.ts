@@ -170,3 +170,9 @@ export const playbackSettingsQuery = queryOptions({
   queryFn: () => api.getPlaybackSettings(),
   staleTime: 60_000,
 })
+
+export const displaySettingsQuery = queryOptions({
+  queryKey: queryKeys.displaySettings,
+  queryFn: () => api.getDisplaySettings(),
+  staleTime: 60_000,
+})

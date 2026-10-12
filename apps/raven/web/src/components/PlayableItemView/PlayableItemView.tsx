@@ -22,7 +22,7 @@ import { Versions } from '@/components/Versions/Versions'
 import { api } from '@/lib/api'
 import { directedBy, episodeByline, episodeFacts, fileFacts, movieFacts } from '@/lib/itemFacts'
 import { episodeBackPath, itemPath, watchLink } from '@/lib/itemLinks'
-import { librariesQuery, tracksQuery } from '@/lib/queries'
+import { displaySettingsQuery, librariesQuery, tracksQuery } from '@/lib/queries'
 import { queryKeys } from '@/lib/queryClient'
 import { useMediaMutations } from '@/lib/useMediaMutations'
 import styles from '@/components/PlayableItemView/PlayableItemView.module.scss'
@@ -103,6 +103,8 @@ export const PlayableItemView = ({
   const { favourite } = useMediaMutations({ media: primary })
   const libraries = useQuery(librariesQuery)
   const tracks = useQuery(tracksQuery(primary.id))
+  // A logo until Settings says to spell titles out, as a fresh install does.
+  const showsLogo = useQuery(displaySettingsQuery).data?.titles !== 'text'
   const known = libraries.data ?? []
   const back = config.back({ details, primary, libraries: known })
   const facts = fileFacts({ media: primary, tracks: tracks.data })
@@ -114,17 +116,19 @@ export const PlayableItemView = ({
 
   return (
     <article className={styles.page} aria-labelledby={ids.title}>
-      <ButtonLink to={back.to} icon="back" className={styles.back}>
-        {back.label}
-      </ButtonLink>
-
       <ItemHeader
+        back={back}
         titleId={ids.title}
         title={details.title}
         byline={config.byline(details)}
         contentRating={config.showsContentRating ? details.contentRating : null}
         facts={config.facts({ details, primary })}
         ratings={details.ratings}
+        logo={
+          showsLogo
+            ? api.itemImageUrl({ id: details.id, kind: 'logo', version: details.logoVersion })
+            : null
+        }
         {...(config.pictures === 'poster and backdrop'
           ? {
               picture: {
@@ -191,7 +195,7 @@ export const PlayableItemView = ({
         />
       </ItemHeader>
 
-      <PlaybackNote media={primary} place="page" />
+      <PlaybackNote media={primary} />
 
       {editingImages && (
         <ImageEditor details={details} libraries={known} onDone={() => setEditingImages(false)} />

@@ -56,15 +56,11 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
 
   return (
     <article className={styles.page} aria-labelledby={ids.title}>
-      <ButtonLink
-        to={libraryId == null ? '/libraries' : `/libraries/${libraryId}`}
-        icon="back"
-        className={styles.back}
-      >
-        Library
-      </ButtonLink>
-
       <ItemHeader
+        back={{
+          to: libraryId == null ? '/libraries' : `/libraries/${libraryId}`,
+          label: 'Library',
+        }}
         titleId={ids.title}
         title={details.title}
         byline={createdBy(details)}

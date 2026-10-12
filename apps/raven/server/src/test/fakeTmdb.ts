@@ -15,9 +15,22 @@ export type FakeMovie = {
   alternativeTitles?: string[]
   /** Left out of a search without adult titles, as TMDB leaves out Paprika (1991). */
   isHiddenFromSearch?: boolean
+  /** The collection it belongs to, as `belongs_to_collection`. */
+  saga?: { id: number; name: string }
 }
 
-/** A movie as TMDB's `/movie/{id}` answers with credits, release dates and external ids appended. */
+/**
+ * A movie's logos as TMDB lists them: an SVG first, which raven passes over,
+ * then PNG files in French, in English and with no language.
+ */
+const logosOf = (id: number) => [
+  { file_path: `/logo${id}.svg`, iso_639_1: 'en', width: 500, height: 200 },
+  { file_path: `/logo${id}-fr.png`, iso_639_1: 'fr', width: 500, height: 200 },
+  { file_path: `/logo${id}.png`, iso_639_1: 'en', width: 500, height: 200 },
+  { file_path: `/logo${id}-plain.png`, iso_639_1: null, width: 500, height: 200 },
+]
+
+/** A movie as TMDB's `/movie/{id}` answers with credits, release dates, external ids and images appended. */
 export const movieBody = (movie: FakeMovie): Record<string, unknown> => ({
   id: movie.id,
   title: movie.title,
@@ -33,6 +46,10 @@ export const movieBody = (movie: FakeMovie): Record<string, unknown> => ({
   production_companies: [{ id: 1, name: 'Studio One' }],
   poster_path: movie.poster === undefined ? `/poster${movie.id}.jpg` : movie.poster,
   backdrop_path: `/backdrop${movie.id}.jpg`,
+  images: { logos: logosOf(movie.id) },
+  belongs_to_collection: movie.saga
+    ? { id: movie.saga.id, name: movie.saga.name, poster_path: null, backdrop_path: null }
+    : null,
   vote_average: 8.2,
   vote_count: 1000,
   external_ids: { imdb_id: movie.imdbId ?? null },
@@ -371,6 +388,7 @@ export const fakeTmdb = ({
         id,
         posters: [picture('poster', 'en'), picture('alt', null)],
         backdrops: [picture('backdrop', null), picture('scene', 'en')],
+        logos: images[1] === 'movie' ? logosOf(id) : [],
       })
     }
 

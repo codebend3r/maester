@@ -1,6 +1,8 @@
 import {
   type ChoosableImageKind,
   type DirectoryListing,
+  type DisplaySettings,
+  type DisplaySettingsChange,
   type FavouriteChange,
   type HistoryEntry,
   type Home,
@@ -33,6 +35,7 @@ import {
   type SubtitleCue,
   type UnlockRequest,
   isDirectoryListing,
+  isDisplaySettings,
   isHistory,
   isHome,
   isItemDetails,
@@ -490,6 +493,17 @@ export const createApiClient = ({
       expect({
         request: send({ path: '/api/settings/playback', method: 'PUT', body: change }),
         guard: isPlaybackSettingsState,
+      }),
+
+    /** How pages look for every viewer: whether a movie's title shows as its logo. */
+    getDisplaySettings: (): Promise<DisplaySettings> =>
+      expect({ request: send({ path: '/api/settings/display' }), guard: isDisplaySettings }),
+
+    /** Changes one or more display settings; the rest stay as they are. */
+    setDisplaySettings: (change: DisplaySettingsChange): Promise<DisplaySettings> =>
+      expect({
+        request: send({ path: '/api/settings/display', method: 'PUT', body: change }),
+        guard: isDisplaySettings,
       }),
 
     /** Edit metadata: what the page shows, what TMDB says, and which fields were written over. */

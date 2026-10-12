@@ -1,11 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { MediaIndex } from '@/media/mediaIndex'
-import { localEpisode, localSeason } from '@/metadata/localItems'
+import { LOCAL, localEpisode, localSeason } from '@/metadata/localItems'
 import { MatchFiles } from '@/metadata/matchFiles'
-import { MetadataRepository } from '@/metadata/metadataRepository'
 import type { FetchedItem } from '@/metadata/tmdbClient'
 import { testDatabase } from '@/test/database'
+import { repositories } from '@/test/repositories'
 
 const show: FetchedItem = {
   ...localSeason({ showTmdbId: '1', number: 1 }),
@@ -25,7 +25,7 @@ const episode = (number: number): FetchedItem => ({
 
 describe('the metadata store', () => {
   const database = testDatabase('raven-metadata-repository-')
-  const metadata = () => new MetadataRepository(database.get())
+  const metadata = () => repositories(database.get()).metadata
   const state = { libraryId: 0, mediaId: 0, showId: 0, seasonId: 0 }
 
   beforeAll(async () => {
@@ -112,9 +112,9 @@ describe('the metadata store', () => {
   })
 })
 
-describe('the poster that stands for an item', () => {
+describe('the pictures that stand for an item', () => {
   const database = testDatabase('raven-poster-items-')
-  const metadata = () => new MetadataRepository(database.get())
+  const metadata = () => repositories(database.get()).metadata
   const ids = { show: 0, postered: 0, bare: 0, inPostered: 0, inBare: 0, movie: 0, plain: 0 }
 
   const item = ({
@@ -122,11 +122,13 @@ describe('the poster that stands for an item', () => {
     tmdbId,
     number = null,
     poster = null,
+    backdrop = null,
   }: {
     type: FetchedItem['type']
     tmdbId: string
     number?: number | null
     poster?: string | null
+    backdrop?: string | null
   }): FetchedItem => ({
     ...show,
     type,
@@ -134,13 +136,15 @@ describe('the poster that stands for an item', () => {
     number,
     title: tmdbId,
     credits: [],
-    images: { poster, backdrop: null, still: null },
+    images: { poster, backdrop, still: null, logo: null },
   })
 
   beforeAll(async () => {
     await database.open()
     const stored = metadata()
-    ids.show = stored.save({ item: item({ type: 'show', tmdbId: '700', poster: '/show.jpg' }) })
+    ids.show = stored.save({
+      item: item({ type: 'show', tmdbId: '700', poster: '/show.jpg', backdrop: '/wide.jpg' }),
+    })
     ids.postered = stored.save({
       item: item({ type: 'season', tmdbId: '700-1', number: 1, poster: '/one.jpg' }),
       parentId: ids.show,
@@ -157,7 +161,9 @@ describe('the poster that stands for an item', () => {
       item: item({ type: 'episode', tmdbId: '700-2-1', number: 1 }),
       parentId: ids.bare,
     })
-    ids.movie = stored.save({ item: item({ type: 'movie', tmdbId: '800', poster: '/movie.jpg' }) })
+    ids.movie = stored.save({
+      item: item({ type: 'movie', tmdbId: '800', poster: '/movie.jpg', backdrop: '/set.jpg' }),
+    })
     ids.plain = stored.save({ item: item({ type: 'movie', tmdbId: '801' }) })
   })
 
@@ -170,5 +176,35 @@ describe('the poster that stands for an item', () => {
     expect(posters.get(ids.movie)?.id).toBe(ids.movie)
     expect(posters.get(ids.plain)).toBeUndefined()
     expect(posters.get(ids.inPostered)?.posterVersion).not.toBeNull()
+  })
+
+  it('keeps the saga and logo of a movie, and which movies have yet to learn either', () => {
+    const { images, metadata: stored } = repositories(database.get())
+    const saga = { tmdbId: '119', name: 'The Lord of the Rings Collection' }
+    const sagaMovie = stored.save({ item: { ...item({ type: 'movie', tmdbId: '120' }), saga } })
+    stored.save({ item: item({ type: 'movie', tmdbId: `${LOCAL}121` }) })
+    expect(stored.sagasOf([sagaMovie, ids.plain])).toEqual(new Map([[sagaMovie, saga]]))
+    expect(stored.extrasUnchecked()).toEqual([])
+
+    const db = database.get().db
+    db.prepare("UPDATE items SET saga_checked = 0 WHERE tmdb_id IN ('800', '120')").run()
+    db.prepare("UPDATE items SET logo_checked = 0 WHERE type = 'movie' AND tmdb_id <> '800'").run()
+    // A movie raven made up is never asked about, whatever it has yet to learn.
+    expect(stored.extrasUnchecked().map((movie) => movie.tmdbId)).toEqual(['800', '801', '120'])
+    stored.saveMovieExtras({ itemId: ids.plain, saga: null, logo: null })
+    stored.saveMovieExtras({ itemId: sagaMovie, saga, logo: '/rings.png' })
+    expect(stored.extrasUnchecked().map((movie) => movie.tmdbId)).toEqual(['800'])
+    expect(stored.sagasOf([sagaMovie]).get(sagaMovie)).toEqual(saga)
+    expect(images.imageFrom({ itemId: sagaMovie, kind: 'logo', source: 'tmdb' })).toBe('/rings.png')
+    expect(images.image({ itemId: ids.plain, kind: 'logo' })).toBeNull()
+  })
+
+  it("is a movie's own backdrop, an episode's show's, and none where no backdrop is", () => {
+    const { images } = repositories(database.get())
+    const backdropOf = (id: number) => images.backdropFor(id)?.id
+    expect(backdropOf(ids.inPostered)).toBe(ids.show)
+    expect(backdropOf(ids.bare)).toBe(ids.show)
+    expect(backdropOf(ids.movie)).toBe(ids.movie)
+    expect(images.backdropFor(ids.plain)).toBeNull()
   })
 })

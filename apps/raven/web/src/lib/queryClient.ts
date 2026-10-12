@@ -94,6 +94,7 @@ export const queryKeys = {
   lock: ['lock'],
   /** How the server plays video, for every viewer. */
   playbackSettings: ['settings', 'playback'],
+  displaySettings: ['settings', 'display'],
   nextEpisode: (showId: number) => ['items', showId, 'next'],
   person: (id: number | null) => ['people', id],
   matchSearch: ({

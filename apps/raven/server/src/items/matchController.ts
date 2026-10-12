@@ -13,7 +13,6 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common'
 import {
-  type ChoosableImageKind,
   isMatchChoice,
   isMatchItemType,
   type MatchCandidate,
@@ -21,6 +20,7 @@ import {
   matchTypeFor,
 } from '@raven/core'
 import type { FastifyReply } from 'fastify'
+import { isChoosableImageKind } from '@/items/imageKinds'
 import { sendImage } from '@/items/sendImage'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { PrivateBy, Public } from '@/lock/lockGuard'
@@ -74,31 +74,21 @@ export class MatchController {
     }))
   }
 
-  /** A search result's poster, through the cache, so the browser never talks to TMDB. */
+  /**
+   * A search result's poster, or a poster, backdrop or logo Edit images
+   * offers, through the cache, so the browser never talks to TMDB.
+   */
   @Public()
-  @Get('images/poster/:file')
-  async candidatePoster(@Param('file') file: string, @Res() reply: FastifyReply): Promise<void> {
-    await this.candidate({ file, use: 'poster', reply })
-  }
-
-  /** A backdrop Edit images offers, through the cache. */
-  @Public()
-  @Get('images/backdrop/:file')
-  async candidateBackdrop(@Param('file') file: string, @Res() reply: FastifyReply): Promise<void> {
-    await this.candidate({ file, use: 'backdrop', reply })
-  }
-
-  private async candidate({
-    file,
-    use,
-    reply,
-  }: {
-    file: string
-    use: ChoosableImageKind
-    reply: FastifyReply
-  }): Promise<void> {
+  @Get('images/:use/:file')
+  async candidate(
+    @Param('use') use: string,
+    @Param('file') file: string,
+    @Res() reply: FastifyReply,
+  ): Promise<void> {
     const path = `/${file}`
-    if (!TMDB_IMAGE_PATH.test(path)) throw new NotFoundException('No such picture')
+    if (!isChoosableImageKind(use) || !TMDB_IMAGE_PATH.test(path)) {
+      throw new NotFoundException('No such picture')
+    }
     await sendImage({ reply, path: await this.images.tmdb({ path, use }), version: file })
   }
 

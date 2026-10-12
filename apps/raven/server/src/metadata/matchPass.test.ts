@@ -5,12 +5,12 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { readServerConfig } from '@/config'
 import { MatchFiles } from '@/metadata/matchFiles'
 import { MatchPass } from '@/metadata/matchPass'
-import { MetadataRepository } from '@/metadata/metadataRepository'
 import { OmdbClient } from '@/metadata/omdbClient'
 import { OmdbScores } from '@/metadata/omdbScores'
 import { TmdbClient } from '@/metadata/tmdbClient'
 import { testDatabase } from '@/test/database'
 import { fakeTmdb } from '@/test/fakeTmdb'
+import { repositories } from '@/test/repositories'
 
 const NO_IDS = { tmdb: null, imdb: null, tvdb: null }
 
@@ -35,7 +35,7 @@ describe('a matching pass', () => {
   })
   const pass = (): MatchPass => {
     const config = { ...readServerConfig({}), tmdbApiToken: 'test-token' }
-    const metadata = new MetadataRepository(database.get())
+    const { metadata } = repositories(database.get())
     return new MatchPass({
       tmdb: new TmdbClient(config, tmdb.fetch),
       metadata,

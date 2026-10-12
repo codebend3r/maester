@@ -80,4 +80,17 @@ describe('playback settings', () => {
     expect(unknown.statusCode).toBe(400)
     expect((await read()).settings.maxHeight).toBe(1080)
   })
+
+  it('shows movie titles as logos until told to spell them out, and refuses another value', async () => {
+    expect(await api().getDisplaySettings()).toEqual({ titles: 'logo' })
+    expect(await api().setDisplaySettings({ titles: 'text' })).toEqual({ titles: 'text' })
+    expect(await api().getDisplaySettings()).toEqual({ titles: 'text' })
+    const refused = await app().inject({
+      method: 'PUT',
+      url: '/api/settings/display',
+      payload: { titles: 'art' },
+    })
+    expect(refused.statusCode).toBe(400)
+    expect(await api().getDisplaySettings()).toEqual({ titles: 'text' })
+  })
 })

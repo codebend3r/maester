@@ -32,6 +32,7 @@ import type { Privacy } from '@/lock/lockService'
 import { MediaIndex } from '@/media/mediaIndex'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 import { MetadataService } from '@/metadata/metadataService'
+import { BLANK_ITEM } from '@/metadata/tmdbClient'
 import { ScannerService } from '@/scanner/scannerService'
 import { encodeClip } from '@/test/clips'
 import { apiFor } from '@/test/server'
@@ -869,28 +870,7 @@ describe('a library locked behind the PIN', () => {
     // A movie only the locked library holds, as if it had been matched.
     const metadata = app().get(MetadataRepository)
     state.privateItem = metadata.save({
-      item: {
-        type: 'movie',
-        tmdbId: '7001',
-        number: null,
-        title: 'Lesson One',
-        originalTitle: null,
-        year: null,
-        released: null,
-        ended: null,
-        summary: null,
-        tagline: null,
-        contentRating: null,
-        runtime: null,
-        studio: null,
-        genres: [],
-        imdbId: null,
-        tvdbId: null,
-        images: { poster: null, backdrop: null, still: null },
-        credits: [],
-        rating: null,
-        reviews: [],
-      },
+      item: { ...BLANK_ITEM, type: 'movie', tmdbId: '7001', number: null, title: 'Lesson One' },
     })
     metadata.link({ mediaIds: [state.privateVideo], itemIds: [state.privateItem] })
   })

@@ -132,7 +132,7 @@ export const PosterCard = ({
         {media.match === 'unmatched' && <span>Not matched</span>}
         <PartlyWatched media={media} />
       </span>
-      <PlaybackNote media={media} place="card" />
+      <PlaybackNote media={media} />
       {menu.menu}
     </li>
   )

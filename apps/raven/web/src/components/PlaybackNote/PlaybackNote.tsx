@@ -5,13 +5,11 @@ import { usePlaybackPolicy } from '@/lib/usePlaybackPolicy'
 import styles from '@/components/PlaybackNote/PlaybackNote.module.scss'
 
 /**
- * Says when this browser cannot play a video as it is: converted on the
- * server, or not at all, as the server's playback settings have it. Nothing
- * when it plays directly, or before those settings are known. A card only
- * warns of a video that will not play: most 4K files are converted, so on a
- * card that says nothing worth choosing by, and the video's page says it.
+ * Warns when this browser cannot play a video at all, as the server's
+ * playback settings have it. Nothing when it plays, directly or converted
+ * on the server, as most 4K files are, or before those settings are known.
  */
-export const PlaybackNote = ({ media, place }: { media: MediaItem; place: 'card' | 'page' }) => {
+export const PlaybackNote = ({ media }: { media: MediaItem }) => {
   const policy = usePlaybackPolicy()
   if (!policy) return null
   const plan = planPlayback({
@@ -21,21 +19,11 @@ export const PlaybackNote = ({ media, place }: { media: MediaItem; place: 'card'
     defaultAudio: true,
     policy,
   })
-  const converted = place === 'page' && plan.modes.length > 0 && plan.modes[0] !== 'direct'
+  if (plan.modes.length > 0) return null
   return (
-    <>
-      {plan.modes.length === 0 && (
-        <span className={styles.note} title={plan.problems.join(' ')}>
-          <Icon name="alert" size={16} />
-          Won't play in this browser
-        </span>
-      )}
-      {converted && (
-        <span className={styles.note} title={plan.problems.join(' ')}>
-          <Icon name="rescan" size={16} />
-          Converted on the server
-        </span>
-      )}
-    </>
+    <span className={styles.note} title={plan.problems.join(' ')}>
+      <Icon name="alert" size={16} />
+      Won't play in this browser
+    </span>
   )
 }

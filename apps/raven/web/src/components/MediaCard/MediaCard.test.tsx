@@ -57,7 +57,7 @@ describe('MediaCard', () => {
     )
   })
 
-  it('leaves converting on the server to the video’s page, saying nothing of it', () => {
+  it('says nothing of a video the server converts for this browser', () => {
     setStreamSupport(() => true)
     renderWithProviders(<MediaCard media={mediaItem({ audioCodec: 'eac3' })} />)
     expect(screen.queryByText("Won't play in this browser")).toBeNull()

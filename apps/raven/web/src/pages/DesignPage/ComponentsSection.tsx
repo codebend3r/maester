@@ -134,12 +134,12 @@ export const ComponentsSection = () => (
       </div>
     </Specimen>
 
-    <Specimen name="PlaybackNote" note="What it says depends on this browser.">
+    <Specimen name="PlaybackNote" note="Only for a video this browser cannot play.">
       <div className={styles.stack}>
         {SAMPLE_MEDIA.slice(0, 4).map((media) => (
           <div key={media.id} className={styles.noteRow}>
             <span>{media.title}</span>
-            <PlaybackNote media={media} place="page" />
+            <PlaybackNote media={media} />
           </div>
         ))}
       </div>
@@ -165,8 +165,12 @@ export const ComponentsSection = () => (
       <ShowGrid shows={SAMPLE_SHOWS} />
     </Specimen>
 
-    <Specimen name="ItemHeader" note="The top of a movie's page, without its backdrop here.">
+    <Specimen
+      name="ItemHeader"
+      note="The top of a movie's page, with the way back to its library, without its backdrop here."
+    >
       <ItemHeader
+        back={{ to: '/', label: 'Movies' }}
         titleId="design-item-header"
         title="Weirwood at Night"
         byline="Directed by Mark Kimball"
