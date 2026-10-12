@@ -105,13 +105,15 @@ describe('the rules for each type of library', () => {
   })
 
   it('offers every sort to a Movies library', () => {
-    expect(sortsFor('movies')).toHaveLength(15)
+    expect(sortsFor('movies')).toHaveLength(17)
   })
 
   it('leaves the per-file sorts out of a TV library, and the release and score sorts out of an Other one', () => {
     expect(sortsFor('shows')).not.toContain('largest')
     expect(sortsFor('shows')).not.toContain('resolution-low')
     expect(sortsFor('shows')).toContain('year-new')
+    expect(sortsFor('shows')).toContain('bitrate-high')
+    expect(sortsFor('shows')).toContain('bitrate-low')
     expect(sortsFor('other')).not.toContain('year-new')
     expect(sortsFor('other')).not.toContain('rating-high')
     expect(sortsFor('other')).toContain('largest')
@@ -138,6 +140,13 @@ describe('coherentSettings', () => {
   it('shows a TV library in a grid where its settings say grouped', () => {
     const shows: LibrarySettings = { ...defaultLibrarySettings('shows'), view: 'grouped' }
     expect(coherentSettings(shows).view).toBe('grid')
+  })
+
+  it("keeps a TV library's sort by its shows' bitrate, either way", () => {
+    const highest: LibrarySettings = { ...defaultLibrarySettings('shows'), sort: 'bitrate-high' }
+    expect(coherentSettings(highest).sort).toBe('bitrate-high')
+    const lowest: LibrarySettings = { ...defaultLibrarySettings('animeShows'), sort: 'bitrate-low' }
+    expect(coherentSettings(lowest).sort).toBe('bitrate-low')
   })
 
   it('leaves settings the type can show alone', () => {

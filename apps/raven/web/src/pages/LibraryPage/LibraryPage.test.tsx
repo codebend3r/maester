@@ -2,22 +2,14 @@ import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { Library, LibraryInput, LibrarySettings, MediaItem, MediaSort } from '@raven/core'
-import { Route, Routes, useLocation, useParams } from 'react-router-dom'
 import { api } from '@/lib/api'
-import { LibraryPage } from '@/pages/LibraryPage/LibraryPage'
 import { useUnlockPrompt } from '@/stores/unlockPrompt'
 import { library, mediaItem, showEntry } from '@/test/fixtures'
-import { renderWithProviders } from '@/test/render'
+import { renderLibraryPage } from '@/test/libraryPage'
 
 const WIDE = mediaItem({ id: 1, title: 'Wide', width: 3840, height: 2160 })
 const FULL = mediaItem({ id: 2, title: 'Full', width: 1920, height: 1080 })
 const ITEMS = [WIDE, FULL, mediaItem({ id: 3, title: 'Also full', width: 1920, height: 800 })]
-
-/** Stands in for the player: says which video the page went to. */
-const Watching = () => <p>Watching {useParams().id}</p>
-
-/** Prints the address's query string, so a test can read what the page wrote there. */
-const Address = () => <p data-testid="address">{useLocation().search}</p>
 
 describe('LibraryPage', () => {
   const spies = {
@@ -33,11 +25,15 @@ describe('LibraryPage', () => {
   }
 
   /** Serves one library whose settings change as the page saves them. */
-  const serve = (
-    settings: Partial<LibrarySettings> = {},
-    items: MediaItem[] = ITEMS,
+  const serve = ({
+    settings = {},
+    items = ITEMS,
     route = '/libraries/2',
-  ) => {
+  }: {
+    settings?: Partial<LibrarySettings>
+    items?: MediaItem[]
+    route?: string
+  } = {}) => {
     const current: { library: Library } = {
       library: library({ id: 2, settings: { ...library().settings, ...settings } }),
     }
@@ -54,16 +50,7 @@ describe('LibraryPage', () => {
       }
       return current.library
     })
-    renderWithProviders(
-      <>
-        <Routes>
-          <Route path="libraries/:id" element={<LibraryPage />} />
-          <Route path="watch/:id" element={<Watching />} />
-        </Routes>
-        <Address />
-      </>,
-      { route },
-    )
+    renderLibraryPage({ route })
   }
 
   afterEach(() => {
@@ -77,27 +64,27 @@ describe('LibraryPage', () => {
   })
 
   it('opens in the view and sort the library was left in', async () => {
-    serve({ view: 'list', sort: 'largest' })
+    serve({ settings: { view: 'list', sort: 'largest' } })
     expect(await screen.findByRole('table', { name: 'Videos' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Sort')).toHaveValue('largest')
+    expect(screen.getByLabelText('Sort')).toHaveValue('size')
+    expect(screen.getByRole('button', { name: 'Order: Largest first' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'List' })).toHaveAttribute('aria-pressed', 'true')
     expect(state.listed.at(-1)?.sort).toBe('largest')
   })
 
   it('shows on each card the value the library is sorted by', async () => {
-    serve({ view: 'grid', sort: 'largest' })
+    serve({ settings: { view: 'grid', sort: 'largest' } })
     expect(await screen.findAllByText('1.6 GB')).toHaveLength(ITEMS.length)
   })
 
   it('opens on the search, sort, view and grouping the address carries', async () => {
-    serve(
-      { view: 'grid', sort: 'title' },
-      ITEMS,
-      '/libraries/2?q=wide&sort=largest&view=list&group=codec',
-    )
+    serve({
+      settings: { view: 'grid', sort: 'title' },
+      route: '/libraries/2?q=wide&sort=largest&view=list&group=codec',
+    })
     expect(await screen.findByRole('table', { name: 'Videos' })).toBeInTheDocument()
     expect(screen.getByLabelText('Search Movies')).toHaveValue('wide')
-    expect(screen.getByLabelText('Sort')).toHaveValue('largest')
+    expect(screen.getByLabelText('Sort')).toHaveValue('size')
     expect(state.listed.at(-1)?.sort).toBe('largest')
     expect(spies.list.mock.calls.at(-1)?.[0]?.search).toBe('wide')
   })
@@ -106,24 +93,44 @@ describe('LibraryPage', () => {
     serve()
     await screen.findByRole('link', { name: 'Wide' })
     await userEvent.click(screen.getByRole('button', { name: 'List' }))
-    await userEvent.selectOptions(screen.getByLabelText('Sort'), 'Largest file')
-    expect(screen.getByTestId('address').textContent).toBe('?view=list&sort=largest')
+    await userEvent.selectOptions(screen.getByLabelText('Sort'), 'File size')
+    expect(screen.getByTestId('address').textContent).toBe('/libraries/2?view=list&sort=largest')
     await userEvent.type(screen.getByLabelText('Search Movies'), 'wide')
     await waitFor(() =>
-      expect(screen.getByTestId('address').textContent).toBe('?view=list&sort=largest&q=wide'),
+      expect(screen.getByTestId('address').textContent).toBe(
+        '/libraries/2?view=list&sort=largest&q=wide',
+      ),
     )
     await userEvent.click(screen.getByRole('button', { name: 'Grid' }))
-    expect(screen.getByTestId('address').textContent).toBe('?view=grid&sort=largest&q=wide')
+    expect(screen.getByTestId('address').textContent).toBe(
+      '/libraries/2?view=grid&sort=largest&q=wide',
+    )
   })
 
-  it('saves a new sort to the library and lists in that order', async () => {
+  it('saves a new sort to the library, highest first to start, and lists in that order', async () => {
     serve()
     await screen.findByRole('link', { name: 'Wide' })
-    await userEvent.selectOptions(screen.getByLabelText('Sort'), 'Highest bitrate')
+    await userEvent.selectOptions(screen.getByLabelText('Sort'), 'Bitrate')
     expect(state.sent).toEqual([
       { name: 'Movies', paths: ['/media/Movies'], settings: { sort: 'bitrate-high' } },
     ])
     expect(state.listed.at(-1)?.sort).toBe('bitrate-high')
+  })
+
+  it('turns the order around with the button beside the sort', async () => {
+    serve({ settings: { sort: 'title' } })
+    await screen.findByRole('link', { name: 'Wide' })
+    await userEvent.click(screen.getByRole('button', { name: 'Order: A to Z' }))
+    expect(state.sent.at(-1)?.settings).toEqual({ sort: 'title-desc' })
+    expect(await screen.findByRole('button', { name: 'Order: Z to A' })).toBeInTheDocument()
+    expect(state.listed.at(-1)?.sort).toBe('title-desc')
+  })
+
+  it('has no order to turn around while random', async () => {
+    serve({ settings: { sort: 'random' } })
+    await screen.findByRole('link', { name: 'Wide' })
+    expect(screen.getByLabelText('Sort')).toHaveValue('random')
+    expect(screen.queryByRole('button', { name: /^Order:/ })).toBeNull()
   })
 
   it('switches the view straight away and saves it', async () => {
@@ -147,7 +154,7 @@ describe('LibraryPage', () => {
   })
 
   it('folds every bucket to start, and opens one on a click', async () => {
-    serve({ view: 'grouped', groupBy: 'resolution' })
+    serve({ settings: { view: 'grouped', groupBy: 'resolution' } })
     await screen.findByRole('link', { name: 'Wide' })
     const heading = screen
       .getAllByRole('heading', { level: 2 })
@@ -162,11 +169,14 @@ describe('LibraryPage', () => {
   })
 
   it('buckets a Movies library by matched and not matched, which is where a new one opens', async () => {
-    serve({ view: 'grouped', groupBy: 'match', kind: 'movies' }, [
-      mediaItem({ id: 1, title: 'Found', match: 'matched' }),
-      mediaItem({ id: 2, title: 'Lost', match: 'unmatched' }),
-      mediaItem({ id: 3, title: 'Also found', match: 'manual' }),
-    ])
+    serve({
+      settings: { view: 'grouped', groupBy: 'match', kind: 'movies' },
+      items: [
+        mediaItem({ id: 1, title: 'Found', match: 'matched' }),
+        mediaItem({ id: 2, title: 'Lost', match: 'unmatched' }),
+        mediaItem({ id: 3, title: 'Also found', match: 'manual' }),
+      ],
+    })
     await screen.findByRole('link', { name: 'Found' })
     expect(
       screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent),
@@ -178,7 +188,7 @@ describe('LibraryPage', () => {
   })
 
   it('does not offer match buckets to a library of no particular type', async () => {
-    serve({ view: 'grouped', groupBy: 'resolution', kind: 'other' })
+    serve({ settings: { view: 'grouped', groupBy: 'resolution', kind: 'other' } })
     await screen.findByRole('link', { name: 'Wide' })
     const groupings = within(screen.getByLabelText('Group by'))
       .getAllByRole('option')
@@ -187,7 +197,7 @@ describe('LibraryPage', () => {
   })
 
   it('shows the grouping an Other library really uses when the address asks for match', async () => {
-    serve({ kind: 'other' }, ITEMS, '/libraries/2?view=grouped&group=match')
+    serve({ settings: { kind: 'other' }, route: '/libraries/2?view=grouped&group=match' })
     await screen.findByRole('link', { name: 'Wide' })
     const select = screen.getByLabelText('Group by')
     expect(select).toHaveValue('resolution')
@@ -198,21 +208,21 @@ describe('LibraryPage', () => {
   })
 
   it('plays the first video in the order shown', async () => {
-    serve({ sort: 'largest' })
+    serve({ settings: { sort: 'largest' } })
     await screen.findByRole('link', { name: 'Wide' })
     await userEvent.click(screen.getByRole('button', { name: 'Play' }))
     expect(await screen.findByText('Watching 1')).toBeInTheDocument()
   })
 
   it('plays the first video of the first bucket in the grouped view', async () => {
-    serve({ view: 'grouped' }, [FULL, WIDE])
+    serve({ settings: { view: 'grouped' }, items: [FULL, WIDE] })
     await screen.findByRole('link', { name: 'Wide' })
     await userEvent.click(screen.getByRole('button', { name: 'Play' }))
     expect(await screen.findByText('Watching 1')).toBeInTheDocument()
   })
 
   it('shuffles to a random video whatever the sort', async () => {
-    serve({ sort: 'title' })
+    serve({ settings: { sort: 'title' } })
     await screen.findByRole('link', { name: 'Wide' })
     const random = spyOn(Math, 'random').mockReturnValue(0.9)
     await userEvent.click(screen.getByRole('button', { name: 'Shuffle' }))
@@ -221,7 +231,7 @@ describe('LibraryPage', () => {
   })
 
   it('says what type of library it is', async () => {
-    serve({ kind: 'movies' })
+    serve({ settings: { kind: 'movies' } })
     expect(await screen.findByText('Movies · 12 videos')).toBeInTheDocument()
   })
 
@@ -234,7 +244,7 @@ describe('LibraryPage', () => {
   })
 
   it('has nothing to play or shuffle in an empty library', async () => {
-    serve({}, [])
+    serve({ items: [] })
     await screen.findByText(/No videos in these folders yet/)
     expect(screen.getByRole('button', { name: 'Play' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Shuffle' })).toBeDisabled()
@@ -242,7 +252,7 @@ describe('LibraryPage', () => {
 
   it('keeps a locked library shut, asking for nothing, until the PIN is entered', async () => {
     spies.lockState.mockImplementation(async () => ({ available: true, unlocked: false }))
-    serve({ locked: true })
+    serve({ settings: { locked: true } })
     const locked = await screen.findByRole('region', { name: 'Locked' })
     expect(locked).toHaveTextContent('Movies is locked.')
     expect(screen.queryByRole('search')).toBeNull()
@@ -254,7 +264,7 @@ describe('LibraryPage', () => {
   it('shows an unlocked library, with a way to lock it again', async () => {
     spies.lockState.mockImplementation(async () => ({ available: true, unlocked: true }))
     spies.lock.mockImplementation(async () => ({ available: true, unlocked: false }))
-    serve({ locked: true })
+    serve({ settings: { locked: true } })
     expect(await screen.findByRole('link', { name: /Wide/ })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Lock' }))
     expect(spies.lock).toHaveBeenCalledTimes(1)
@@ -301,13 +311,7 @@ describe('LibraryPage for TV shows', () => {
       shows: [showEntry()],
       unmatched: [mediaItem({ id: 30, title: 'Unknown Show - S01E01', match: 'unmatched' })],
     }))
-    renderWithProviders(
-      <Routes>
-        <Route path="libraries/:id" element={<LibraryPage />} />
-        <Route path="watch/:id" element={<Watching />} />
-      </Routes>,
-      { route: '/libraries/2' },
-    )
+    renderLibraryPage()
   }
 
   it('lists shows as posters, with the files no show was found for after', async () => {
@@ -403,8 +407,8 @@ describe('LibraryPage for TV shows', () => {
     const sorts = within(screen.getByLabelText('Sort'))
       .getAllByRole('option')
       .map((o) => o.textContent)
-    expect(sorts).toContain('Newest release')
-    expect(sorts).not.toContain('Largest file')
+    expect(sorts).toContain('Release date')
+    expect(sorts).not.toContain('File size')
     expect(screen.queryByRole('button', { name: 'Grouped' })).toBeNull()
     await userEvent.click(screen.getByRole('button', { name: 'Play' }))
     expect(screen.getByText('Watching 12')).toBeInTheDocument()

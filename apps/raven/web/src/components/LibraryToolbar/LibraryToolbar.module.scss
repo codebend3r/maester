@@ -25,6 +25,7 @@
 
 .field {
   display: grid;
+  grid-auto-flow: column;
   grid-template-columns: auto minmax(0, 1fr);
   gap: var(--space-1);
   align-items: center;

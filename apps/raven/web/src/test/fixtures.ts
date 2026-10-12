@@ -109,6 +109,7 @@ export const showEntry = (overrides: Partial<ShowEntry> = {}): ShowEntry => ({
   episodes: 9,
   endedYear: null,
   addedAt: '2026-09-27T00:00:00.000Z',
+  bitrate: 6_000_000,
   next: mediaItem({
     id: 12,
     title: 'Severance - S01E02 - Half Loop',

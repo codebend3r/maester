@@ -257,7 +257,7 @@ describe('isMediaLocation', () => {
 
 describe('the choice lists', () => {
   it('derive each union from its own list', () => {
-    expect(MEDIA_SORTS).toHaveLength(15)
+    expect(MEDIA_SORTS).toHaveLength(17)
     expect(isMediaSort('rating-high')).toBe(true)
     expect(isMediaSort('loudest')).toBe(false)
     expect(STREAM_MODES).toEqual(['remux', 'transcode'])

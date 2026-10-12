@@ -1,4 +1,4 @@
-import { resolutionLabel } from '@/media'
+import { RESOLUTIONS, resolutionLabel } from '@/media'
 import { codecLabel } from '@/playback'
 import type { MatchState, MediaGroupBy, MediaItem } from '@/contract'
 
@@ -10,7 +10,7 @@ export type MediaGroup = {
 }
 
 /** Resolution buckets from the largest frame down, as the cards label them. */
-const RESOLUTIONS: readonly string[] = ['4K', '1080p', '720p', '480p', 'SD']
+const LARGEST_FIRST: readonly string[] = RESOLUTIONS.toReversed()
 
 const UNPROBED = { key: 'unprobed', label: 'Not probed yet' }
 
@@ -58,7 +58,7 @@ const unprobedLast = (a: MediaGroup, b: MediaGroup): number =>
 const ORDER: Record<MediaGroupBy, (a: MediaGroup, b: MediaGroup) => number> = {
   match: (a, b) => matchOrder(a.key) - matchOrder(b.key),
   resolution: (a, b) =>
-    unprobedLast(a, b) || RESOLUTIONS.indexOf(a.key) - RESOLUTIONS.indexOf(b.key),
+    unprobedLast(a, b) || LARGEST_FIRST.indexOf(a.key) - LARGEST_FIRST.indexOf(b.key),
   codec: (a, b) =>
     unprobedLast(a, b) || b.items.length - a.items.length || a.label.localeCompare(b.label),
   month: (a, b) => unprobedLast(a, b) || b.key.localeCompare(a.key),

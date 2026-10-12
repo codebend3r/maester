@@ -51,4 +51,13 @@ describe('showSortFact', () => {
     expect(showSortFact({ entry, sort: 'oldest', now: NOW })).toBe('Added last month')
     expect(showSortFact({ entry, sort: 'title', now: NOW })).toBeNull()
   })
+
+  it("says its files' mean bitrate for a sort by bitrate, and nothing before one is probed", () => {
+    const entry = showEntry({ bitrate: 8_400_000 })
+    expect(showSortFact({ entry, sort: 'bitrate-high', now: NOW })).toBe('8.4 Mb/s')
+    expect(showSortFact({ entry, sort: 'bitrate-low', now: NOW })).toBe('8.4 Mb/s')
+    expect(
+      showSortFact({ entry: showEntry({ bitrate: null }), sort: 'bitrate-high', now: NOW }),
+    ).toBeNull()
+  })
 })

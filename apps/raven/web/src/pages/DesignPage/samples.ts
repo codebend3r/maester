@@ -177,6 +177,7 @@ export const SAMPLE_SHOWS: ShowEntry[] = [
     episodes: 18,
     endedYear: null,
     addedAt: '2026-10-02T12:00:00.000Z',
+    bitrate: 9_800_000,
     next: sample({
       id: -22,
       title: 'The Long Winter - S02E03 - Thaw',
@@ -195,6 +196,7 @@ export const SAMPLE_SHOWS: ShowEntry[] = [
     episodes: 10,
     endedYear: 2016,
     addedAt: '2026-09-14T09:00:00.000Z',
+    bitrate: 4_200_000,
     next: null,
   },
 ]
