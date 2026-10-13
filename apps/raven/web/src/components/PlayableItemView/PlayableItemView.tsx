@@ -9,6 +9,7 @@ import {
 import { useId, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, ButtonLink } from '@/components/Button/Button'
+import { AiMatchNote } from '@/components/AiMatchNote/AiMatchNote'
 import { CastRow } from '@/components/CastRow/CastRow'
 import { ImageEditor } from '@/components/ImageEditor/ImageEditor'
 import { ItemHeader } from '@/components/ItemHeader/ItemHeader'
@@ -182,6 +183,7 @@ export const PlayableItemView = ({
           onOpenChange={setMenuOpen}
           inline
           matchType={config.matchType}
+          aiMatch={details.aiMatch}
           withFavourite={false}
           onMatched={(updated) => {
             const page = updated.item ? itemPath(updated.item) : null
@@ -195,6 +197,8 @@ export const PlayableItemView = ({
       </ItemHeader>
 
       <PlaybackNote media={primary} />
+
+      {details.aiMatch && <AiMatchNote aiMatch={details.aiMatch} />}
 
       {editingImages && (
         <ImageEditor details={details} libraries={known} onDone={() => setEditingImages(false)} />

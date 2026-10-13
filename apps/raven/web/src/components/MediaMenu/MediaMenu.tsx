@@ -1,5 +1,11 @@
 import { type UseMutationResult, useQuery } from '@tanstack/react-query'
-import { type ItemSummary, type MatchItemType, type MediaItem, mediaLabel } from '@raven/core'
+import {
+  type AiMatch,
+  type ItemSummary,
+  type MatchItemType,
+  type MediaItem,
+  mediaLabel,
+} from '@raven/core'
 import {
   Fragment,
   type KeyboardEvent,
@@ -16,7 +22,7 @@ import { ImageEditorDialog } from '@/components/ImageEditor/ImageEditorDialog'
 import { useAdminLocked } from '@/lib/adminLock'
 import { api } from '@/lib/api'
 import { copyText } from '@/lib/clipboard'
-import { mediaLocationQuery } from '@/lib/queries'
+import { itemQuery, mediaLocationQuery } from '@/lib/queries'
 import { useMediaMutations } from '@/lib/useMediaMutations'
 import styles from '@/components/MediaMenu/MediaMenu.module.scss'
 
@@ -156,6 +162,8 @@ type MenuProps = {
   inline?: boolean
   /** What the library matches its files to; null leaves Fix match and Refresh details out. */
   matchType?: MatchItemType | null
+  /** Why the AI lookup matched the file's movie, shown in Fix match; null or left out when it did not. */
+  aiMatch?: AiMatch | null
   /** Off where the page has its own favourite button. */
   withFavourite?: boolean
   onMatched?: (updated: MediaItem) => void
@@ -172,6 +180,7 @@ const MenuBody = ({
   open,
   onOpenChange,
   matchType = null,
+  aiMatch = null,
   withFavourite = true,
   onMatched,
   onDeleted,
@@ -193,6 +202,7 @@ const MenuBody = ({
   const isAdminLocked = useAdminLocked()
   const matchable = matchType != null && media.match !== 'off'
   const item = media.item
+  const itemDetails = useQuery(itemQuery(fixing ? (item?.id ?? null) : null))
   const artwork = artworkOf(item)
 
   const items = (): HTMLButtonElement[] =>
@@ -336,6 +346,7 @@ const MenuBody = ({
           title={media.title}
           year={media.year}
           fileName={media.fileName}
+          aiMatch={aiMatch ?? itemDetails.data?.aiMatch ?? null}
           libraryId={media.libraryId}
           match={(tmdbId) => api.setMatch({ mediaId: media.id, tmdbId })}
           onMatched={onMatched}

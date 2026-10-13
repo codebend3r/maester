@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import type { ItemDetails } from '@raven/core'
 import { Route, Routes, useParams } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { ShowPage } from '@/pages/ShowPage/ShowPage'
@@ -19,8 +20,8 @@ describe('ShowPage', () => {
     setItemMatch: spyOn(api, 'setItemMatch'),
   }
 
-  const open = () => {
-    spies.item.mockImplementation(async () => SEVERANCE)
+  const open = ({ details = SEVERANCE }: { details?: ItemDetails } = {}) => {
+    spies.item.mockImplementation(async () => details)
     spies.next.mockImplementation(async () => EPISODE_TWO)
     renderWithProviders(
       <Routes>
@@ -97,5 +98,15 @@ describe('ShowPage', () => {
       query: 'Severance',
       libraryId: EPISODE_TWO.libraryId,
     })
+  })
+
+  it('says the show was matched by AI, and says so in Fix match too', async () => {
+    const reason = "Season 1's episode titles match TMDB's."
+    open({ details: { ...SEVERANCE, aiMatch: { reason } } })
+    const note = await screen.findByText('Matched by AI.')
+    expect(note.closest('p')).toHaveTextContent(`Matched by AI. ${reason}`)
+    spies.search.mockImplementation(async () => [])
+    await userEvent.click(screen.getByRole('button', { name: 'Fix match' }))
+    expect(screen.getByRole('dialog')).toHaveTextContent(`Matched by AI. ${reason}`)
   })
 })

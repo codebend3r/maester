@@ -1,19 +1,21 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
-import { screen } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { MediaItem } from '@raven/core'
+import type { AiMatch, MediaItem } from '@raven/core'
 import { useState } from 'react'
 import { MediaMenu } from '@/components/MediaMenu/MediaMenu'
 import { api } from '@/lib/api'
-import { itemSummary, matchedMovie, mediaItem } from '@/test/fixtures'
+import { itemDetails, itemSummary, matchedMovie, mediaItem } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 
 const Harness = ({
   media,
   onMatched,
+  aiMatch = null,
 }: {
   media: MediaItem
   onMatched: (media: MediaItem) => void
+  aiMatch?: AiMatch | null
 }) => {
   const [open, setOpen] = useState(false)
   return (
@@ -23,17 +25,20 @@ const Harness = ({
       onOpenChange={setOpen}
       matchType="movie"
       onMatched={onMatched}
+      aiMatch={aiMatch}
     />
   )
 }
 
 describe('Fix match', () => {
   const spies = {
+    item: spyOn(api, 'getItem'),
     search: spyOn(api, 'searchMatches'),
     setMatch: spyOn(api, 'setMatch'),
   }
 
   afterEach(() => {
+    spies.item.mockReset()
     spies.search.mockReset()
     spies.setMatch.mockReset()
   })
@@ -119,5 +124,39 @@ describe('Fix match', () => {
     renderWithProviders(<MediaMenu media={mediaItem()} open onOpenChange={() => undefined} />)
     expect(screen.queryByRole('menuitem', { name: 'Fix match' })).toBeNull()
     expect(screen.queryByRole('menuitem', { name: 'Refresh details' })).toBeNull()
+  })
+
+  it('says the file was matched by AI, and why, above the search', async () => {
+    spies.search.mockImplementation(async () => [])
+    renderWithProviders(
+      <Harness
+        media={unmatched}
+        onMatched={() => undefined}
+        aiMatch={{ reason: 'The title and year fit.' }}
+      />,
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Options for Busboys (2026)' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Fix match' }))
+    expect(screen.getByRole('dialog')).toHaveTextContent('Matched by AI. The title and year fit.')
+  })
+
+  it('reads the movie behind a card for its AI note, and shows none for a file with no item', async () => {
+    spies.search.mockImplementation(async () => [])
+    spies.item.mockImplementation(async () =>
+      itemDetails({ aiMatch: { reason: 'Only one result fits.' } }),
+    )
+    const first = renderWithProviders(
+      <Harness media={matchedMovie()} onMatched={() => undefined} />,
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Options for Busboys (2026)' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Fix match' }))
+    await waitFor(() =>
+      expect(screen.getByRole('dialog')).toHaveTextContent('Matched by AI. Only one result fits.'),
+    )
+    first.unmount()
+    renderWithProviders(<Harness media={unmatched} onMatched={() => undefined} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Options for Busboys (2026)' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Fix match' }))
+    expect(screen.getByRole('dialog')).not.toHaveTextContent('Matched by AI.')
   })
 })

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { MatchCandidate, MatchItemType } from '@raven/core'
+import type { AiMatch, MatchCandidate, MatchItemType } from '@raven/core'
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react'
+import { AiMatchNote } from '@/components/AiMatchNote/AiMatchNote'
 import { Button } from '@/components/Button/Button'
 import { api } from '@/lib/api'
 import { afterMatch } from '@/lib/invalidate'
@@ -64,6 +65,7 @@ export const FixMatchDialog = <T,>({
   title,
   year,
   fileName,
+  aiMatch = null,
   libraryId,
   match,
   allowNone = true,
@@ -77,6 +79,8 @@ export const FixMatchDialog = <T,>({
   year: number | null
   /** Named under the heading, so the viewer knows which file this is for. */
   fileName?: string
+  /** Why the AI lookup matched what is being fixed, being sure; null or left out when it did not. */
+  aiMatch?: AiMatch | null
   /** The library the file is in: the results its type prefers are listed first. */
   libraryId?: number
   /** Points the file or show at `tmdbId`, or at nothing for null. */
@@ -123,6 +127,7 @@ export const FixMatchDialog = <T,>({
             Fix match
           </h2>
           {fileName && <p className={styles.file}>{fileName}</p>}
+          {aiMatch && <AiMatchNote aiMatch={aiMatch} />}
         </header>
 
         <search>
