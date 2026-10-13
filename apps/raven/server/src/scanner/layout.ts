@@ -101,10 +101,13 @@ export type RelayoutPlan = {
   overrides: Array<{ from: string; to: string | null }>
 }
 
+/** Where a Fix match can be kept for a file: its title's place, and its own. */
+type FixPlaces = { title: string; own: string }
+
 /**
- * The places a Fix match can be kept under for a file: a show's folder or a
- * movie's, and its own. A movie at a library's root has no folder of its own,
- * as `fixGroup` reads it, so its file's place stands for both.
+ * The places a Fix match can be kept under for a file: its title's (a show's
+ * folder, or a movie's) and its own. A file at a title root has no folder of
+ * its own, as `fixGroup` reads it, so its own place is its title's too.
  */
 const fixPlacesOf = ({
   kind,
@@ -112,19 +115,67 @@ const fixPlacesOf = ({
 }: {
   kind: LibraryKind
   file: { folder: string; fileName: string }
-}): string[] =>
-  matchTypeFor(kind) === 'show'
-    ? [showPlace(file), filePlace(file)]
-    : [file.folder === '' ? filePlace(file) : file.folder, filePlace(file)]
+}): FixPlaces => {
+  const own = filePlace(file)
+  if (matchTypeFor(kind) === 'show') return { title: showPlace(file), own }
+  return { title: file.folder === '' ? own : file.folder, own }
+}
+
+/**
+ * Where a moving file takes the places a Fix match can be kept under. A file
+ * whose title's place is its own takes it as its own alone, so the folder it
+ * comes to share with other titles never claims it.
+ */
+const fixMovesOf = ({
+  kind,
+  file,
+  folder,
+}: {
+  kind: LibraryKind
+  file: LayoutRow
+  folder: string
+}): Array<{ id: number; from: string; to: string }> => {
+  const before = fixPlacesOf({ kind, file })
+  const after = fixPlacesOf({ kind, file: { folder, fileName: file.fileName } })
+  return before.title === before.own
+    ? [{ id: file.id, from: before.own, to: after.own }]
+    : [
+        { id: file.id, from: before.title, to: after.title },
+        { id: file.id, from: before.own, to: after.own },
+      ]
+}
+
+/** What becomes of one Fix match: it stays where it is, goes, or moves to one new place. */
+type FixFate = { from: string } & (
+  | { fate: 'stays' }
+  | { fate: 'goes' }
+  | { fate: 'moves'; to: string }
+)
+
+/** Holds every move into a place a Fix match stays at, again until none is left, as each hold leaves one more staying. */
+const holdTaken = (fates: readonly FixFate[]): readonly FixFate[] => {
+  const staying = new Set(
+    fates.filter((fixed) => fixed.fate === 'stays').map((fixed) => fixed.from),
+  )
+  const held = fates.map((fixed): FixFate =>
+    fixed.fate === 'moves' && staying.has(fixed.to) ? { from: fixed.from, fate: 'stays' } : fixed,
+  )
+  return held.some((fixed, index) => fixed !== fates[index]) ? holdTaken(held) : fates
+}
 
 /**
  * Reads every file's place again for the library's type and folder layout.
- * Only files whose folder changes move. A Fix match stays where it is while
- * a file that does not move still has its place. Otherwise it moves with its
- * files when its old place now names one place; one that named several, such
- * as a whole letter folder kept as one show, is dropped, as it was made for
- * files that were never one title. Files under none of the roots are left
- * out.
+ * Only files whose folder changes move. A Fix match:
+ *
+ * - stays where it is while a file that does not move still has its place;
+ * - goes when its files now sit in several places, as a whole letter folder
+ *   kept as one show was made for files that were never one title;
+ * - moves when its files now sit in one place no other file reaches, no
+ *   other Fix match moves to, and no Fix match staying holds;
+ * - otherwise stays, as when setting flat merges titles into one place: it
+ *   applies to nothing there, and again once the layout is set back.
+ *
+ * Files under none of the roots are left out.
  */
 export const planRelayout = ({
   rows,
@@ -152,21 +203,56 @@ export const planRelayout = ({
   const kept = new Set(
     placed
       .filter(({ file, folder }) => folder === file.folder)
-      .flatMap(({ file }) => fixPlacesOf({ kind, file })),
+      .flatMap(({ file }) => Object.values(fixPlacesOf({ kind, file }))),
   )
-  const pairs = moved.flatMap(({ file, folder }) => {
-    const after = fixPlacesOf({ kind, file: { folder, fileName: file.fileName } })
-    return fixPlacesOf({ kind, file }).map((from, index) => ({ from, to: after[index] ?? '' }))
+  const reached = groupBy({
+    items: placed.flatMap(({ file, folder }) =>
+      Object.values(fixPlacesOf({ kind, file: { folder, fileName: file.fileName } })).map(
+        (place) => ({ place, id: file.id }),
+      ),
+    ),
+    key: (entry) => entry.place,
   })
-  const targets = groupBy({ items: pairs, key: (pair) => pair.from })
+  const sources = groupBy({
+    items: moved.flatMap(({ file, folder }) => fixMovesOf({ kind, file, folder })),
+    key: (pair) => pair.from,
+  })
+  const fateOf = (from: string): FixFate => {
+    if (kept.has(from)) return { from, fate: 'stays' }
+    const pairs = sources.get(from) ?? []
+    const targets = [...new Set(pairs.map((pair) => pair.to))]
+    const [to] = targets
+    if (to == null || to === from) return { from, fate: 'stays' }
+    if (targets.length > 1) return { from, fate: 'goes' }
+    const covered = new Set(pairs.map((pair) => pair.id))
+    const isShared = (reached.get(to) ?? []).some((entry) => !covered.has(entry.id))
+    return isShared ? { from, fate: 'stays' } : { from, fate: 'moves', to }
+  }
+  const fates = overrides.map(fateOf)
+  const claims = groupBy({
+    items: fates.flatMap((fixed) => (fixed.fate === 'moves' ? [fixed.to] : [])),
+    key: (to) => to,
+  })
+  const unshared = fates.map((fixed): FixFate =>
+    fixed.fate === 'moves' && (claims.get(fixed.to)?.length ?? 0) > 1
+      ? { from: fixed.from, fate: 'stays' }
+      : fixed,
+  )
   return {
     moves: moved.map(({ file, folder }) => ({ id: file.id, folder })),
-    overrides: overrides.flatMap((from) => {
-      if (kept.has(from)) return []
-      const to = [...new Set((targets.get(from) ?? []).map((pair) => pair.to))]
-      if (to.length === 0) return []
-      const [only] = to
-      return [{ from, to: to.length === 1 && only != null && only !== '' ? only : null }]
+    overrides: holdTaken(unshared).flatMap((fixed): RelayoutPlan['overrides'] => {
+      switch (fixed.fate) {
+        case 'stays':
+          return []
+        case 'goes':
+          return [{ from: fixed.from, to: null }]
+        case 'moves':
+          return [{ from: fixed.from, to: fixed.to }]
+        default: {
+          const unknown: never = fixed
+          return unknown
+        }
+      }
     }),
   }
 }

@@ -134,4 +134,97 @@ describe('relayout', () => {
     ])
     expect(metadata.mediaUnder(movie)).toEqual(ids)
   })
+
+  it('moves Fix matches along a chain without one overwriting the next', () => {
+    const { library, files } = setUp({
+      kind: 'shows',
+      root: '/m/Series',
+      paths: [
+        '/m/Series/Anime/K/Season 1/K - S01E01.mkv',
+        '/m/Series/K/Kingdom/Season 1/Kingdom - S01E01.mkv',
+      ],
+    })
+    files.saveFixMatch({
+      libraryId: library.id,
+      place: 'Anime',
+      fix: { kind: 'tmdb', tmdbId: '46298' },
+    })
+    files.saveFixMatch({
+      libraryId: library.id,
+      place: 'K',
+      fix: { kind: 'tmdb', tmdbId: '70523' },
+    })
+
+    const plan = planRelayout({
+      rows: files.layoutRows(library.id),
+      roots: library.paths,
+      kind: 'shows',
+      layout: 'auto',
+      overrides: files.overridePlaces(library.id),
+    })
+    files.applyRelayout({ libraryId: library.id, kind: 'shows', plan })
+
+    expect(files.fixMatchAt({ libraryId: library.id, place: 'K' })).toEqual({
+      kind: 'tmdb',
+      tmdbId: '46298',
+    })
+    expect(files.fixMatchAt({ libraryId: library.id, place: 'Kingdom' })).toEqual({
+      kind: 'tmdb',
+      tmdbId: '70523',
+    })
+    expect(files.fixMatchAt({ libraryId: library.id, place: 'Anime' })).toEqual({ kind: 'none' })
+  })
+
+  it('finds nothing more to do when read again straight after', () => {
+    const { library, files } = setUp({
+      kind: 'shows',
+      root: '/m/Telly',
+      paths: [
+        '/m/Telly/A/Andor/Season 1/Andor - S01E01.mkv',
+        '/m/Telly/K/K/Season 1/K - S01E01.mkv',
+        '/m/Telly/A/Archer - S01E01.mkv',
+        '/m/Telly/Pilot.mkv',
+      ],
+    })
+    files.saveFixMatch({ libraryId: library.id, place: 'A', fix: { kind: 'not-a-match' } })
+    files.saveFixMatch({
+      libraryId: library.id,
+      place: 'K',
+      fix: { kind: 'tmdb', tmdbId: '46298' },
+    })
+    const plan = () =>
+      planRelayout({
+        rows: files.layoutRows(library.id),
+        roots: library.paths,
+        kind: 'shows',
+        layout: 'auto',
+        overrides: files.overridePlaces(library.id),
+      })
+
+    files.applyRelayout({ libraryId: library.id, kind: 'shows', plan: plan() })
+
+    expect(plan()).toEqual({ moves: [], overrides: [] })
+  })
+
+  it('matches a movie again when its new folder reads it as another title', () => {
+    const { library, files, ids } = setUp({
+      kind: 'movies',
+      root: '/m/Animation',
+      paths: ['/m/Animation/Other/Paperman (2012)/Paperman (2012).mkv'],
+    })
+    expect(files.byIds(ids).map((file) => file.match)).toEqual(['off'])
+
+    const plan = planRelayout({
+      rows: files.layoutRows(library.id),
+      roots: library.paths,
+      kind: 'movies',
+      layout: 'auto',
+      overrides: files.overridePlaces(library.id),
+    })
+    files.applyRelayout({ libraryId: library.id, kind: 'movies', plan })
+
+    expect(
+      files.byIds(ids).map((file) => [file.folder, file.title, file.year, file.match]),
+    ).toEqual([['Paperman (2012)', 'Paperman', 2012, 'pending']])
+  })
 })

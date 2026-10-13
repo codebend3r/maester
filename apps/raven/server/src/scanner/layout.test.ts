@@ -218,4 +218,102 @@ describe('planRelayout', () => {
     expect(plan.moves).toEqual([{ id: 1, folder: 'A/Andor/Season 1' }])
     expect(plan.overrides).toEqual([{ from: 'Andor', to: 'A' }])
   })
+
+  it('leaves Fix matches where they are when setting flat merges their shows into one', () => {
+    const plan = planRelayout({
+      rows: [
+        row(1, '/m/TV/A/Andor/Season 1/Andor - S01E01.mkv', 'Andor/Season 1'),
+        row(2, '/m/TV/A/Ahsoka/Season 1/Ahsoka - S01E01.mkv', 'Ahsoka/Season 1'),
+      ],
+      roots: ['/m/TV'],
+      kind: 'shows',
+      layout: 'flat',
+      overrides: ['Andor', 'Ahsoka'],
+    })
+    expect(plan).toEqual({
+      moves: [
+        { id: 1, folder: 'A/Andor/Season 1' },
+        { id: 2, folder: 'A/Ahsoka/Season 1' },
+      ],
+      overrides: [],
+    })
+  })
+
+  it('leaves a Fix match where it is when another that stays already holds its new place', () => {
+    const plan = planRelayout({
+      rows: [row(1, '/m/TV/A/Andor/Season 1/Andor - S01E01.mkv', 'Andor/Season 1')],
+      roots: ['/m/TV'],
+      kind: 'shows',
+      layout: 'flat',
+      overrides: ['Andor', 'A'],
+    })
+    expect(plan.overrides).toEqual([])
+  })
+
+  it('moves Fix matches along a chain, and holds the chain when its end is taken', () => {
+    const rows = [
+      row(1, '/m/TV/Requests/K/Season 1/K - S01E01.mkv', 'Requests/K/Season 1'),
+      row(2, '/m/TV/K/Kingdom/Season 1/Kingdom - S01E01.mkv', 'K/Kingdom/Season 1'),
+    ]
+    const chain = planRelayout({
+      rows,
+      roots: ['/m/TV'],
+      kind: 'shows',
+      layout: 'auto',
+      overrides: ['Requests', 'K'],
+    })
+    expect(chain.overrides).toEqual([
+      { from: 'Requests', to: 'K' },
+      { from: 'K', to: 'Kingdom' },
+    ])
+    const held = planRelayout({
+      rows,
+      roots: ['/m/TV'],
+      kind: 'shows',
+      layout: 'auto',
+      overrides: ['Requests', 'K', 'Kingdom'],
+    })
+    expect(held.overrides).toEqual([])
+  })
+
+  it("moves a loose movie's Fix match with it when the library is set to flat", () => {
+    const plan = planRelayout({
+      rows: [
+        row(6, '/m/Movies/H/Heat (1995).mp4', ''),
+        row(7, '/m/Movies/H/Hereditary (2018).mp4', ''),
+      ],
+      roots: ['/m/Movies'],
+      kind: 'movies',
+      layout: 'flat',
+      overrides: ['Heat (1995).mp4'],
+    })
+    expect(plan.overrides).toEqual([{ from: 'Heat (1995).mp4', to: 'H/Heat (1995).mp4' }])
+  })
+
+  it("moves a loose episode's Fix match with it when the library is set to flat", () => {
+    const plan = planRelayout({
+      rows: [row(8, '/m/TV/A/Archer - S01E01.mkv', ''), row(9, '/m/TV/A/Atlanta - S01E01.mkv', '')],
+      roots: ['/m/TV'],
+      kind: 'shows',
+      layout: 'flat',
+      overrides: ['Archer - S01E01.mkv'],
+    })
+    expect(plan.overrides).toEqual([{ from: 'Archer - S01E01.mkv', to: 'A/Archer - S01E01.mkv' }])
+  })
+
+  it('changes nothing in a library whose files were already read again', () => {
+    const plan = planRelayout({
+      rows: [
+        row(1, '/m/TV/A/Andor/Season 1/Andor - S01E01.mkv', 'Andor/Season 1'),
+        row(2, '/m/TV/K/Season 1/K - S01E01.mkv', 'K/Season 1'),
+        row(3, '/m/TV/A/Archer - S01E01.mkv', ''),
+        row(4, '/m/TV/Pilot.mkv', ''),
+      ],
+      roots: ['/m/TV/'],
+      kind: 'shows',
+      layout: 'auto',
+      overrides: ['Andor', 'K', 'Archer - S01E01.mkv', 'Pilot.mkv'],
+    })
+    expect(plan).toEqual({ moves: [], overrides: [] })
+  })
 })

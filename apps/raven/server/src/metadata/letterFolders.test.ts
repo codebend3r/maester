@@ -13,6 +13,7 @@ import {
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '@/app'
 import { readServerConfig } from '@/config'
+import { DatabaseService } from '@/db/database'
 import { MetadataService } from '@/metadata/metadataService'
 import { ScannerService } from '@/scanner/scannerService'
 import { encodeClip } from '@/test/clips'
@@ -108,6 +109,21 @@ describe('letter and group folders', () => {
       response: await app().inject({ method: 'GET', url: `/api/libraries/${id}` }),
       guard: isLibrary,
     })
+  const putLayout = async (folderLayout: 'auto' | 'flat') => {
+    await app().inject({
+      method: 'PUT',
+      url: `/api/libraries/${state.shows}`,
+      payload: { name: 'TV', paths: [state.tv], settings: { kind: 'shows', folderLayout } },
+    })
+  }
+  const setLayout = async (folderLayout: 'auto' | 'flat') => {
+    await putLayout(folderLayout)
+    await settle()
+  }
+  const kassa = async (): Promise<MediaItem | undefined> =>
+    (await mediaOf(state.shows)).find((item) => item.fileName === 'Andor - S01E01 - Kassa.mp4')
+  const showTitles = async (): Promise<string[]> =>
+    (await showsOf(state.shows)).shows.map((entry) => entry.show.title)
   const createLibrary = async ({
     name,
     path,
@@ -241,32 +257,51 @@ describe('letter and group folders', () => {
   })
 
   it('reads every top folder as a title when set to flat, and letter folders again when set back', async () => {
-    const setLayout = async (folderLayout: 'auto' | 'flat') => {
-      await app().inject({
-        method: 'PUT',
-        url: `/api/libraries/${state.shows}`,
-        payload: { name: 'TV', paths: [state.tv], settings: { kind: 'shows', folderLayout } },
-      })
-      await settle()
-    }
     await setLayout('flat')
-    const andor = (await mediaOf(state.shows)).find(
-      (item) => item.fileName === 'Andor - S01E01 - Kassa.mp4',
-    )
-    expect(andor?.folder).toBe('A/Andor/Season 1')
+    expect((await kassa())?.folder).toBe('A/Andor/Season 1')
     expect((await libraryOf(state.shows)).layouts).toEqual([
       { path: state.tv, layout: 'flat', groups: 0 },
     ])
     await setLayout('auto')
-    expect((await showsOf(state.shows)).shows.map((entry) => entry.show.title)).toEqual([
-      'Ahsoka',
-      'Andor',
-      'Cupertino',
-      'K',
-    ])
+    expect(await showTitles()).toEqual(['Ahsoka', 'Andor', 'Cupertino', 'K'])
     expect((await libraryOf(state.shows)).layouts).toEqual([
       { path: state.tv, layout: 'lettered', groups: 3 },
     ])
+  })
+
+  it('reads files again for a layout change made while a relayout still runs', async () => {
+    await app().get(MetadataService).whenIdle()
+    const gate = { isRunning: false, open: (): void => undefined }
+    // Stands in for a relayout of this library still running when the change comes.
+    app()
+      .get(MetadataService)
+      .schedule({
+        key: `layout:${state.shows}`,
+        task: () =>
+          new Promise<void>((resolve) => {
+            gate.isRunning = true
+            gate.open = resolve
+          }),
+      })
+    expect(gate.isRunning).toBe(true)
+    await putLayout('flat')
+    gate.open()
+    await settle()
+    expect((await kassa())?.folder).toBe('A/Andor/Season 1')
+    await setLayout('auto')
+    expect(await showTitles()).toEqual(['Ahsoka', 'Andor', 'Cupertino', 'K'])
+  })
+
+  it('reads a file still filed under its letter again on boot', async () => {
+    app()
+      .get(DatabaseService)
+      .db.prepare('UPDATE media SET folder = ? WHERE library_id = ? AND file_name = ?')
+      .run('A/Andor/Season 1', state.shows, 'Andor - S01E01 - Kassa.mp4')
+    expect((await kassa())?.folder).toBe('A/Andor/Season 1')
+    app().get(MetadataService).onApplicationBootstrap()
+    await settle()
+    expect((await kassa())?.folder).toBe('Andor/Season 1')
+    expect(await showTitles()).toEqual(['Ahsoka', 'Andor', 'Cupertino', 'K'])
   })
 
   // Last: it changes what Andor is.

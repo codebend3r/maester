@@ -316,11 +316,17 @@ export class MatchFiles {
     plan: RelayoutPlan
   }): void {
     const setFolder = this.db.prepare('UPDATE media SET folder = ? WHERE id = ?')
-    const moveFix = this.db.prepare(
-      'UPDATE OR REPLACE match_overrides SET place = ? WHERE library_id = ? AND place = ?',
+    const readFix = this.db.prepare<[number, string], { tmdb_id: string | null }>(
+      'SELECT tmdb_id FROM match_overrides WHERE library_id = ? AND place = ?',
     )
     const dropFix = this.db.prepare(
       'DELETE FROM match_overrides WHERE library_id = ? AND place = ?',
+    )
+    // The plan never lands two Fix matches on one place; were it to, the one
+    // already there would win rather than the relayout, and so the boot, fail.
+    const addFix = this.db.prepare(
+      `INSERT INTO match_overrides (library_id, place, tmdb_id) VALUES (?, ?, ?)
+       ON CONFLICT (library_id, place) DO NOTHING`,
     )
     this.db.transaction(() => {
       const folders = new Map(plan.moves.map((move) => [move.id, move.folder]))
@@ -339,17 +345,24 @@ export class MatchFiles {
           : moved.filter((file) => {
               const before = namedAs({ kind, fileName: file.fileName, folder: file.was })
               const after = namedAs({ kind, fileName: file.fileName, folder: file.folder })
-              return before.title !== after.title || before.year !== after.year
+              return (
+                before.title !== after.title ||
+                before.year !== after.year ||
+                before.edition !== after.edition ||
+                before.match !== after.match
+              )
             })
       this.metadata.unlink(regrouped.map((file) => file.id))
       this.rewriteNames({ rows: regrouped, kind })
-      plan.overrides.forEach(({ from, to }) => {
-        if (to == null) {
-          dropFix.run(libraryId, from)
-          return
-        }
-        moveFix.run(to, libraryId, from)
+      // Every Fix match that leaves its place is read, then all are cleared
+      // before any lands, so one moving into a place another leaves never
+      // meets it, whatever order they come in.
+      const landing = plan.overrides.flatMap(({ from, to }) => {
+        const fix = to == null ? undefined : readFix.get(libraryId, from)
+        return to == null || fix == null ? [] : [{ to, tmdbId: fix.tmdb_id }]
       })
+      plan.overrides.forEach(({ from }) => dropFix.run(libraryId, from))
+      landing.forEach(({ to, tmdbId }) => addFix.run(libraryId, to, tmdbId))
     })()
   }
 }

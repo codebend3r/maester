@@ -107,11 +107,11 @@ export class MetadataService implements OnApplicationBootstrap {
   /**
    * Reads where each of a library's files sits again, for its type and
    * folder layout: what each of its paths is, and the folders of the files
-   * that changed. Whether any file moved.
+   * that changed.
    */
-  private relayoutNow(libraryId: number): boolean {
+  private relayoutNow(libraryId: number): void {
     const library = this.libraries.get(libraryId)
-    if (!library) return false
+    if (!library) return
     const rows = this.files.layoutRows(libraryId)
     this.refreshLayouts({ library, rows })
     const plan = planRelayout({
@@ -121,12 +121,11 @@ export class MetadataService implements OnApplicationBootstrap {
       layout: library.settings.folderLayout,
       overrides: this.files.overridePlaces(libraryId),
     })
-    if (plan.moves.length === 0) return false
+    if (plan.moves.length === 0) return
     this.files.applyRelayout({ libraryId, kind: library.settings.kind, plan })
     this.logger.log(
       `Read ${plan.moves.length} files of "${library.name}" under their letter or group folders again`,
     )
-    return true
   }
 
   /**
@@ -159,9 +158,13 @@ export class MetadataService implements OnApplicationBootstrap {
     this.libraries.saveLayouts({ id: library.id, layouts })
   }
 
-  /** A library's folder layout changed: its files are read again and matched where they regrouped. */
+  /**
+   * A library's folder layout changed: its files are read again and matched
+   * where they regrouped. A change made while one is read runs again after
+   * it, which reads the settings as they are then.
+   */
   changeLayout({ libraryId }: { libraryId: number }): void {
-    this.queue.push(`layout:${libraryId}`, async () => {
+    this.queue.again(`layout:${libraryId}`, async () => {
       this.relayoutNow(libraryId)
       await this.pass(libraryId)
     })
