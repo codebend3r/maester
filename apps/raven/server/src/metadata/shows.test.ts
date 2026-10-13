@@ -254,6 +254,7 @@ describe('TV show metadata', () => {
     expect(listing.shows.every((entry) => entry.show.posterVersion != null)).toBe(true)
   })
 
+  // Before the Anime shows case: it counts TMDB's calls across the file, and that case searches again.
   it('searches once per show folder, and fetches each season once', () => {
     const searches = tmdb.state.calls.filter((url) => url.includes('/search/tv'))
     expect(searches.filter((url) => url.includes('Severance'))).toHaveLength(1)

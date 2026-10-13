@@ -360,4 +360,17 @@ describe('pickByTiers', () => {
     expect(pickByTiers({ ...asked, prefer: TIER_SETS.any })).toBe(lone)
     expect(pickByTiers({ ...asked, prefer: TIER_SETS.any, canTakeLoneResult: false })).toBeNull()
   })
+
+  it('takes a lone live-action result in an Anime library through its last tier, as a Movies one would', () => {
+    const lone = result({
+      tmdbId: '8',
+      title: 'Something Else',
+      year: 1999,
+      genreIds: [28],
+      originalLanguage: 'en',
+    })
+    const asked = { type: 'movie', title: 'The Matrix', year: 1999, results: [lone] } as const
+    expect(pickByTiers({ ...asked, prefer: TIER_SETS.anime })).toBe(pickMatch(asked))
+    expect(pickByTiers({ ...asked, prefer: TIER_SETS.anime })).toBe(lone)
+  })
 })

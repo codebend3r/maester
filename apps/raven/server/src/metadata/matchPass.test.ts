@@ -218,6 +218,7 @@ describe('a matching pass', () => {
     expect(failed.ran).toBe(0)
   })
 
+  // Kept after the tests that expect the shared fake to have seen no search, as this one searches.
   it("prefers the results its library's type does, from the same search", async () => {
     const asked = searches().length
     const ask = (prefer: readonly CandidateTier[]) =>

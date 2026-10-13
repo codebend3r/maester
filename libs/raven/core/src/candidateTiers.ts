@@ -1,4 +1,4 @@
-/** The genre ids of TMDB's the tiers read, the same for movies and shows. */
+/** The TMDB genre ids the tiers read, the same for movies and shows. */
 export const TMDB_GENRES = { animation: 16, family: 10751, documentary: 99 } as const
 
 /**
