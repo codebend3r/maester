@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { Library, LibraryInput } from '@raven/core'
 import { api } from '@/lib/api'
 import { LibrariesPage } from '@/pages/LibrariesPage/LibrariesPage'
+import { useUnlockPrompt } from '@/stores/unlockPrompt'
 import { library } from '@/test/fixtures'
 import { held } from '@/test/held'
 import { renderWithProviders } from '@/test/render'
@@ -16,12 +17,78 @@ describe('LibrariesPage', () => {
     list: spyOn(api, 'listLibraries'),
     update: spyOn(api, 'updateLibrary'),
     lock: spyOn(api, 'getLock'),
+    health: spyOn(api, 'getMetadataHealth'),
+    match: spyOn(api, 'matchLibrary'),
   }
 
   afterEach(() => {
     spies.list.mockReset()
     spies.update.mockReset()
     spies.lock.mockReset()
+    spies.health.mockReset()
+    spies.match.mockReset()
+  })
+
+  it("offers each library's history, a rescan and Edit, each named for its library", async () => {
+    spies.list.mockImplementation(async () => [library({ id: 2, name: 'Clips' })])
+    renderWithProviders(<LibrariesPage />)
+    expect(await screen.findByRole('link', { name: 'History Clips' })).toHaveAttribute(
+      'href',
+      '/libraries/2/history',
+    )
+    expect(screen.getByRole('button', { name: 'Rescan Clips' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Edit Clips' })).toBeEnabled()
+    // An Other library is never matched.
+    expect(screen.queryByRole('button', { name: /^Match again/ })).toBeNull()
+  })
+
+  it('matches the files no movie was found for again, and reads the count again', async () => {
+    const films = library({
+      id: 4,
+      name: 'Films',
+      unmatchedCount: 3,
+      settings: { ...library().settings, kind: 'movies' },
+    })
+    const matched = { ...films, unmatchedCount: 0 }
+    spies.list.mockImplementation(async () => [films])
+    spies.health.mockImplementation(async () => ({
+      tmdb: 'ok',
+      omdb: 'off',
+      pending: 0,
+      error: null,
+      lastOk: null,
+      ai: 'off',
+      aiRemaining: 0,
+      aiPending: 0,
+    }))
+    spies.match.mockImplementation(async () => matched)
+    renderWithProviders(<LibrariesPage />)
+    const button = await screen.findByRole('button', { name: 'Match again Films' })
+    await waitFor(() => expect(button).toBeEnabled())
+    spies.list.mockImplementation(async () => [matched])
+    await userEvent.click(button)
+    expect(spies.match).toHaveBeenCalledWith(4)
+    expect(await screen.findByText('Movies · 12 videos')).toBeInTheDocument()
+  })
+
+  it('opens Edit on the library, with its name filled in', async () => {
+    spies.list.mockImplementation(async () => [library({ id: 2, name: 'Clips' })])
+    renderWithProviders(<LibrariesPage />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit Clips' }))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByLabelText('Name')).toHaveValue('Clips')
+  })
+
+  it('asks for the PIN on Edit while the library is locked, as its folders are held back', async () => {
+    spies.list.mockImplementation(async () => [
+      library({ id: 3, name: 'Tutorials', settings: { ...library().settings, locked: true } }),
+    ])
+    spies.lock.mockImplementation(async () => ({ available: true, unlocked: false }))
+    renderWithProviders(<LibrariesPage />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit Tutorials' }))
+    expect(useUnlockPrompt.getState().open).toBe(true)
+    expect(screen.queryByRole('dialog')).toBeNull()
+    useUnlockPrompt.setState({ open: false })
   })
 
   it('unpins a pinned library, changing nothing else', async () => {
