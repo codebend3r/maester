@@ -138,7 +138,10 @@ export class MatchFiles {
     return this.files({ where: `m.library_id = ? AND m.match = 'pending'`, params: [libraryId] })
   }
 
-  /** A library's files a search matched, not a Fix match, by place as `pending` gives them. */
+  /**
+   * A library's files matched by a search or by an id in a name or NFO, not
+   * by a Fix match, by place as `pending` gives them.
+   */
   matched(libraryId: number): MatchFile[] {
     return this.files({ where: `m.library_id = ? AND m.match = 'matched'`, params: [libraryId] })
   }

@@ -415,6 +415,17 @@ describe('the admin lock', () => {
     ).resolves.toHaveLength(1)
   })
 
+  it('hides an item no library holds while a library is locked', async () => {
+    // As a pass TMDB stopped after a type change leaves an item, which may be a locked library's.
+    const orphan = app()
+      .get(MetadataRepository)
+      .save({
+        item: { ...BLANK_ITEM, type: 'movie', tmdbId: '7003', number: null, title: 'Left Over' },
+      })
+    expect(await status(api().getItem(orphan))).toBe(404)
+    expect(await status(api(state.admin, state.pin).getItem(orphan))).toBe(200)
+  })
+
   it('will not delete a video or say where its file is', async () => {
     const id = state.openVideo
     expect(await status(api().getMediaLocation(id))).toBe(403)

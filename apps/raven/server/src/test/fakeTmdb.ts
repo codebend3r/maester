@@ -229,9 +229,10 @@ const yearOf = (released: string): number => Number(released.slice(0, 4))
 /**
  * TMDB in miniature: searches by a title or alternative title holding the
  * query (year optional), `/find` by IMDb id, and movies by id. `down` makes every call fail as if TMDB were
- * unreachable; `omdbSpent` makes OMDb answer as it does once a key's day is
- * used up; `calls` records each URL asked for. `hold` keeps the searches
- * for a title waiting until it is let go, so a pass stays busy.
+ * unreachable, and `failing` lists the paths (after `/3`) whose calls fail
+ * the same way, by prefix; `omdbSpent` makes OMDb answer as it does once a
+ * key's day is used up; `calls` records each URL asked for. `hold` keeps the
+ * searches for a title waiting until it is let go, so a pass stays busy.
  */
 /** OMDb's answer for an IMDb id, as its `Ratings` strings. */
 export type FakeOmdb = Record<
@@ -249,8 +250,10 @@ export const fakeTmdb = ({
   omdb?: FakeOmdb
 }) => {
   const calls: string[] = []
+  const failing: string[] = []
   const state = {
     down: false,
+    failing,
     omdbSpent: false,
     calls,
     movies,
@@ -301,6 +304,7 @@ export const fakeTmdb = ({
       return new Response(FAKE_JPEG, { headers: { 'content-type': 'image/jpeg' } })
     }
     const path = parsed.pathname.replace(/^\/3/, '')
+    if (state.failing.some((prefix) => path.startsWith(prefix))) throw new TypeError('fetch failed')
     const query = parsed.searchParams
 
     if (path === '/search/movie') {

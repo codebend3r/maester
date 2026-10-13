@@ -106,7 +106,7 @@ export class MetadataService implements OnApplicationBootstrap {
    * left off for a type that is not matched. Fix match choices stay.
    */
   changeKind({ libraryId, kind }: { libraryId: number; kind: LibraryKind }): void {
-    this.queue.push(
+    this.queue.again(
       `kind:${libraryId}:${kind}`,
       this.logged(`type change of library ${libraryId}`, async () => {
         this.relayoutNow(libraryId)
@@ -124,12 +124,13 @@ export class MetadataService implements OnApplicationBootstrap {
    * for are searched again, and Fix match choices stay.
    */
   changePreference({ libraryId, kind }: { libraryId: number; kind: LibraryKind }): void {
-    this.queue.push(
+    this.queue.again(
       `prefer:${libraryId}:${kind}`,
       this.logged(`type change of library ${libraryId}`, async () => {
+        // The layout saved with this change is read even when the type moved on since.
+        this.relayoutNow(libraryId)
         // A type changed again since then is matched by the change queued after this one.
         if (this.libraries.get(libraryId)?.settings.kind !== kind) return
-        this.relayoutNow(libraryId)
         this.files.retryUnmatched(libraryId)
         await this.repick({ libraryId, kind })
         await this.pass(libraryId)
@@ -251,8 +252,9 @@ export class MetadataService implements OnApplicationBootstrap {
       this.tmdb.newPass()
       const isStopped = await this.matchPending({ libraryId, kind, type })
       // The items of files still waiting for TMDB stay, with their edits and
-      // pictures, until a pass that gets through matches the files to them again.
-      if (isStopped) return
+      // pictures, until a pass that gets through matches the files to them
+      // again. A library removed meanwhile is cleared up all the same.
+      if (isStopped && this.libraries.get(libraryId) != null) return
     }
     await this.pictures.clearUp()
   }

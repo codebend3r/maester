@@ -101,7 +101,9 @@ export class LockService {
     const seesLibrary = (libraryId: number): boolean => !locked.has(libraryId)
     const seesItem = (itemId: number): boolean => {
       const holding = this.metadata.librariesHolding(itemId)
-      return holding.length === 0 || holding.some(seesLibrary)
+      // An item no library holds is one a type change or rescan left waiting;
+      // it may be a locked library's.
+      return holding.some(seesLibrary)
     }
     const sees = ({ privacy, id }: { privacy: Privacy; id: number }): boolean => {
       switch (privacy) {

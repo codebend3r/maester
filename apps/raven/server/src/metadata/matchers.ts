@@ -21,7 +21,9 @@ export type KindMatcher = {
   groups: (files: readonly MatchFile[]) => MatchFile[][]
   /**
    * Matches one unit with the pass's caches. A file already linked keeps its
-   * links until `settle` replaces them, so one that fails midway stays as it was.
+   * links until `settle` replaces them, so one that fails midway keeps its
+   * card; a show folder that fails part way through waits, pending, to be
+   * matched whole.
    */
   match: (args: { files: readonly MatchFile[]; pass: MatchPass }) => Promise<void>
   /** The place a Fix match on `file` is kept under, and every file it covers. */
@@ -200,11 +202,18 @@ const showMatcher = (deps: MatcherDeps): KindMatcher => {
       fallbackShow,
       match: resolved.match,
     }
-    const touched = await episodes.reduce<Promise<number[]>>(
-      (previous, file) =>
-        previous.then(async (items) => [...items, ...(await placeEpisode({ file, show, pass }))]),
-      Promise.resolve([]),
-    )
+    const touched = await episodes
+      .reduce<Promise<number[]>>(
+        (previous, file) =>
+          previous.then(async (items) => [...items, ...(await placeEpisode({ file, show, pass }))]),
+        Promise.resolve([]),
+      )
+      .catch((error: unknown) => {
+        // A folder placed in part, say when TMDB went away fetching a season,
+        // would sit under two shows; it waits to be matched whole instead.
+        deps.files.setMatch({ ids, match: 'pending' })
+        throw error
+      })
     await deps.pictures.syncLocal({ itemIds: [show.showId, ...touched], folders: pass.folders })
     deps.pictures.warmPoster(show.showId)
   }
