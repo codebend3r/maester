@@ -91,7 +91,9 @@ describe("the AI lookup's decisions", () => {
       libraryId: state.library,
       places: ['Archie', 'Destination Wild Arctic', 'Cesar 911', 'Archie'],
     })
-    expect([...suggestions]).toEqual([['Archie', { ...ARCHIE, reason: 'Generic episode titles.' }]])
+    expect([...suggestions]).toEqual([
+      ['Archie', { ...ARCHIE, reason: 'Generic episode titles.', place: 'Archie' }],
+    ])
     expect(decisions().suggestionsAt({ libraryId: state.library, places: [] }).size).toBe(0)
   })
 

@@ -6,29 +6,37 @@ import { api } from '@/lib/api'
 import { useReturnFocus } from '@/lib/useReturnFocus'
 import styles from '@/components/SuggestedMovies/SuggestedMovies.module.scss'
 
-/** One card: a file with a suggestion, standing for every file of its folder suggested the same. */
-export type SuggestedMovie = { key: string; file: MediaItem; suggestion: AiSuggestion }
+/**
+ * One card: the first file of a group the AI lookup suggested a movie for,
+ * labelled by the group's place: the folder's name for a folder holding one
+ * movie, else the file's own name.
+ */
+export type SuggestedMovie = { file: MediaItem; label: string; suggestion: AiSuggestion }
+
+/** What a card is labelled by: its folder's name when its place is the file's folder, else the file. */
+const labelOf = ({ file, place }: { file: MediaItem; place: string }): string =>
+  place === file.folder ? (place.split('/').at(-1) ?? place) : file.fileName
 
 /**
- * The files the AI lookup suggested a movie for, one per folder and
- * suggestion, as a movie kept in two qualities is one; a file at the root of
- * the library is its own. A folder holding several movies keeps them apart by
- * title and year, as the lookup groups them.
+ * The files the AI lookup suggested a movie for, one per place it was asked
+ * about, as the server keys them: a folder holding one movie is one, so a
+ * movie kept in two qualities is one card; a folder of several movies, or a
+ * file at the root of the library, gives each file its own.
  */
 export const suggestedMoviesOf = (files: readonly UnmatchedFile[]): SuggestedMovie[] =>
   files.reduce<SuggestedMovie[]>((found, file) => {
     const { aiSuggestion } = file
     if (aiSuggestion == null) return found
-    const key =
-      file.folder === ''
-        ? `file:${file.id}`
-        : `folder:${file.folder}|${file.title}|${file.year}|${aiSuggestion.tmdbId}`
-    return found.some((entry) => entry.key === key)
+    return found.some((entry) => entry.suggestion.place === aiSuggestion.place)
       ? found
-      : found.concat({ key, file, suggestion: aiSuggestion })
+      : found.concat({
+          file,
+          label: labelOf({ file, place: aiSuggestion.place }),
+          suggestion: aiSuggestion,
+        })
   }, [])
 
-/** One suggestion: its card, labelled by the folder or the loose file it is for, and Fix match on that file. */
+/** One suggestion: its card, labelled by the folder or the file it is for, and Fix match on that file. */
 const SuggestedMovieEntry = ({
   entry,
   libraryId,
@@ -39,15 +47,14 @@ const SuggestedMovieEntry = ({
   const fixButton = useRef<HTMLButtonElement>(null)
   const [isFixing, setIsFixing] = useState(false)
   useReturnFocus({ isOpen: isFixing, target: fixButton })
-  const { file } = entry
-  const subject = file.folder === '' ? file.fileName : file.folder
+  const { file, label } = entry
   const pointAt = (tmdbId: string | null) => api.setMatch({ mediaId: file.id, tmdbId })
   return (
     <li className={styles.entry}>
-      <p className={styles.file}>{subject}</p>
+      <p className={styles.file}>{label}</p>
       <AiSuggestionCard
         suggestion={entry.suggestion}
-        subject={subject}
+        subject={label}
         accept={pointAt}
         onFix={() => setIsFixing(true)}
         fixRef={fixButton}
@@ -88,7 +95,7 @@ export const SuggestedMovies = ({
       </h2>
       <ul className={styles.list}>
         {suggested.map((entry) => (
-          <SuggestedMovieEntry key={entry.key} entry={entry} libraryId={libraryId} />
+          <SuggestedMovieEntry key={entry.suggestion.place} entry={entry} libraryId={libraryId} />
         ))}
       </ul>
     </section>

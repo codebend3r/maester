@@ -8,7 +8,7 @@ export const isAiConfidence = oneOf(['high', 'low'])
 export type AiConfidence = Infer<typeof isAiConfidence>
 
 /** The movie or show the AI lookup chose, as the search that offered it described it. */
-export type AiPick = Omit<AiSuggestion, 'reason'>
+export type AiPick = Omit<AiSuggestion, 'reason' | 'place'>
 
 /** How one lookup came out. */
 export type AiOutcome =
@@ -130,7 +130,11 @@ export class AiDecisions {
     )
   }
 
-  /** The unsure picks for these places, by place; none where a Fix match has answered. */
+  /**
+   * The unsure picks for these places, by place, each naming its own; none
+   * where a Fix match has answered. The places are groups' places inside the
+   * library, as `groupPlaceOf` gives them, never a path on disk.
+   */
   suggestionsAt({
     libraryId,
     places,
@@ -172,6 +176,7 @@ export class AiDecisions {
                   year: row.year,
                   poster: row.poster,
                   reason: row.reason,
+                  place: row.place,
                 },
               ] as const,
             ],

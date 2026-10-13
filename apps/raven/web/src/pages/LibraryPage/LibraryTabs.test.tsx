@@ -241,7 +241,7 @@ describe('LibraryPage tabs', () => {
         year: 2023,
         folder: 'Archie (2023)',
         fileName: 'Archie (2023).mkv',
-        aiSuggestion: aiSuggestion(),
+        aiSuggestion: aiSuggestion({ place: 'Archie (2023)' }),
       }),
     ])
     spies.setMatch.mockImplementation(async () => mediaItem({ id: 9, match: 'manual' }))
@@ -313,7 +313,7 @@ describe('LibraryPage tabs', () => {
         year: 2023,
         folder: 'Archie (2023)',
         fileName: 'Archie (2023).mkv',
-        aiSuggestion: lookups.pending > 0 ? null : aiSuggestion(),
+        aiSuggestion: lookups.pending > 0 ? null : aiSuggestion({ place: 'Archie (2023)' }),
       }),
     ])
     open({ route: '/libraries/2/not-matched' })

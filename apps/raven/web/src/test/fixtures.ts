@@ -106,6 +106,7 @@ export const aiSuggestion = (overrides: Partial<AiSuggestion> = {}): AiSuggestio
   year: 2023,
   poster: '/archie.jpg',
   reason: 'The only Archie series from 2023; its episode titles are generic.',
+  place: 'Archie',
   ...overrides,
 })
 
