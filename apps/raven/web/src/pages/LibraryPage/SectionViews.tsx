@@ -17,6 +17,7 @@ import { MediaGrid, MediaGridSkeleton } from '@/components/MediaGrid/MediaGrid'
 import { MediaTiles, MediaTilesSkeleton } from '@/components/MediaTiles/MediaTiles'
 import { SagaDecks } from '@/components/SagaDeck/SagaDeck'
 import { Loading } from '@/components/Skeleton/Skeleton'
+import { UnmatchedShows } from '@/components/UnmatchedShows/UnmatchedShows'
 import { finishedNote } from '@/lib/history'
 import { watchLink } from '@/lib/itemLinks'
 import { jumpScale } from '@/lib/jumpScale'
@@ -288,13 +289,28 @@ const NotMatchedSection = ({ library }: { library: Library }) => {
       {(files) => (
         <>
           <p className={styles.message}>
-            Open a file's menu and choose Fix match to point it at the right {matchType ?? 'title'}.
+            {matchType === 'show'
+              ? 'Choose Fix match beside a show to point its folder at the right show.'
+              : `Open a file's menu and choose Fix match to point it at the right ${matchType ?? 'title'}.`}
           </p>
-          <MediaGrid
-            items={files}
-            matchType={matchType}
-            ratingsSource={library.settings.ratingsSource}
-          />
+          {matchType === 'show' ? (
+            <UnmatchedShows
+              files={files}
+              renderFiles={(group) => (
+                <MediaGrid
+                  items={group}
+                  matchType={matchType}
+                  ratingsSource={library.settings.ratingsSource}
+                />
+              )}
+            />
+          ) : (
+            <MediaGrid
+              items={files}
+              matchType={matchType}
+              ratingsSource={library.settings.ratingsSource}
+            />
+          )}
         </>
       )}
     </SectionBody>

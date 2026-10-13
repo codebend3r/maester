@@ -168,6 +168,31 @@ describe('LibraryPage tabs', () => {
     expect(screen.getByRole('link', { name: /Unknown Thing/ })).toBeInTheDocument()
   })
 
+  it('groups the files not matched of a TV library by show folder', async () => {
+    spies.unmatched.mockImplementation(async () =>
+      [1, 2].map((id) =>
+        mediaItem({
+          id,
+          title: `Archie - S01E0${id}`,
+          folder: 'Archie/Season 1',
+          fileName: `Archie - S01E0${id}.mkv`,
+          match: 'unmatched',
+        }),
+      ),
+    )
+    open({ kind: 'shows', route: '/libraries/2/not-matched' })
+    expect(
+      await screen.findByText(
+        'Choose Fix match beside a show to point its folder at the right show.',
+      ),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Archie/ })).toHaveTextContent('2 episodes')
+    expect(screen.getByRole('button', { name: 'Fix match for Archie' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /Archie - S01E01/ })).toBeNull()
+    await userEvent.click(screen.getByRole('button', { name: /^Archie/ }))
+    expect(screen.getByRole('link', { name: /Archie - S01E01/ })).toBeInTheDocument()
+  })
+
   it('reads the count of files not matched again once Match again settles on its tab', async () => {
     pollFast()
     const films = (unmatchedCount: number) =>
