@@ -76,7 +76,8 @@ describe('Fix match confidence', () => {
     tv: number
     films: number
     vault: number
-  } = { root: '', app: null, tv: 0, films: 0, vault: 0 }
+    cellar: number
+  } = { root: '', app: null, tv: 0, films: 0, vault: 0, cellar: 0 }
   const app = (): NestFastifyApplication => {
     if (!state.app) throw new Error('app not started')
     return state.app
@@ -145,11 +146,18 @@ describe('Fix match confidence', () => {
     const tv = join(state.root, 'TV')
     const films = join(state.root, 'Films')
     const vault = join(state.root, 'Vault')
+    const cellar = join(state.root, 'Cellar')
     await Promise.all([
       encodeClip({ path: join(tv, 'Monster', 'Season 1', 'Monster - S01E01.mp4'), seconds: 1 }),
       encodeClip({ path: join(tv, 'Monster', 'Season 1', 'Monster - S01E35.mp4'), seconds: 1 }),
       encodeClip({ path: join(films, 'Short Film (2020)', 'Short Film (2020).mp4'), seconds: 1 }),
       encodeClip({ path: join(vault, 'Monster', 'Season 1', 'Monster - S01E35.mp4'), seconds: 1 }),
+      // Larger than the Films copy, so it is the movie's best file.
+      encodeClip({
+        path: join(cellar, 'Short Film (2020)', 'Short Film (2020).mp4'),
+        seconds: 1,
+        size: '640x480',
+      }),
     ])
     state.app = await createApp({
       config: {
@@ -187,8 +195,15 @@ describe('Fix match confidence', () => {
       paths: [vault],
       settings: { kind: 'shows', locked: true },
     })
+    state.cellar = await create({
+      name: 'Cellar',
+      paths: [cellar],
+      settings: { kind: 'movies', locked: true },
+    })
     await Promise.all(
-      [state.tv, state.films, state.vault].map((id) => app().get(ScannerService).whenIdle(id)),
+      [state.tv, state.films, state.vault, state.cellar].map((id) =>
+        app().get(ScannerService).whenIdle(id),
+      ),
     )
     await app().get(MetadataService).whenIdle()
     await app().get(ThumbnailService).whenIdle()
@@ -256,6 +271,28 @@ describe('Fix match confidence', () => {
     const query = `type=show&query=Monster&mediaId=${hidden.id}`
     expect(scores(await search({ query }))).toEqual(NO_SUBJECT)
     expect(scores(await search({ query, cookie: unlocked }))).toEqual(ON_DISK)
+  })
+
+  it('scores a movie by the best of its files this browser may see', async () => {
+    const admin = await adminCookie(app())
+    const pin = cookieSet(
+      await app().inject({ method: 'POST', url: '/api/lock/unlock', payload: { pin: '3001' } }),
+    )
+    const film = await fileNamed({ library: state.films, name: 'Short Film (2020).mp4' })
+    const hidden = await fileNamed({
+      library: state.cellar,
+      name: 'Short Film (2020).mp4',
+      cookie: cookies(admin, pin),
+    })
+    const itemId = film.item?.id
+    expect(itemId).toBeDefined()
+    expect(hidden.item?.id).toBe(itemId)
+    expect(
+      scores(await search({ query: `type=movie&query=Short%20Film&year=2020&itemId=${itemId}` })),
+    ).toEqual([
+      ['501', 100],
+      ['502', 40],
+    ])
   })
 
   it('answers when a details call fails, scoring that result without it', async () => {

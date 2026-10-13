@@ -39,7 +39,7 @@ import { MediaRepository } from '@/media/mediaRepository'
 import { ImageCache } from '@/metadata/imageCache'
 import { type OnDisk, scoreCandidates } from '@/metadata/matchConfidence'
 import { MatchFactsCache } from '@/metadata/matchFactsCache'
-import { MatchFiles } from '@/metadata/matchFiles'
+import { type MatchFile, MatchFiles } from '@/metadata/matchFiles'
 import { MetadataService } from '@/metadata/metadataService'
 import { type SearchResult, TMDB_IMAGE_PATH, TmdbClient, TmdbError } from '@/metadata/tmdbClient'
 
@@ -47,6 +47,9 @@ const tmdbFailure = (error: unknown): never => {
   if (error instanceof TmdbError) throw new ServiceUnavailableException(error.message)
   throw error
 }
+
+/** A file a search's subject stands for, as its score reads it. */
+type SubjectFile = Pick<MediaItem, 'libraryId' | 'fileName' | 'folder' | 'duration'>
 
 /** How many of the first-scored results Fix match reads the details of. */
 const DETAILS_FOR = 5
@@ -58,6 +61,14 @@ const NOTHING_ON_DISK = { onDisk: null, country: null } as const satisfies {
   onDisk: OnDisk | null
   country: string | null
 }
+
+/** A show's file as its score reads it: a show's files never need a duration. */
+const asShowFile = ({ libraryId, fileName, folder }: MatchFile): SubjectFile => ({
+  libraryId,
+  fileName,
+  folder,
+  duration: null,
+})
 
 /** The file or show a search names, or null for none; a malformed id, or both, is a 400. */
 const subjectFrom = ({
@@ -227,7 +238,7 @@ export class MatchController {
 
   /**
    * The files a subject stands for: a show file's whole show folder, a movie
-   * file alone, a matched show's every file, or a movie item's best file.
+   * file alone, a matched show's every file, or a movie item's files, best first.
    */
   private subjectFiles({
     type,
@@ -235,7 +246,7 @@ export class MatchController {
   }: {
     type: MatchItemType
     subject: MatchSubject
-  }): Array<{ libraryId: number; fileName: string; folder: string; duration: number | null }> {
+  }): SubjectFile[] {
     switch (subject.kind) {
       case 'media': {
         const file = this.media.get(subject.id)
@@ -244,12 +255,12 @@ export class MatchController {
         if (showFolder == null) return [file]
         return this.files
           .underFolder({ libraryId: file.libraryId, folder: showFolder })
-          .map((each) => ({ ...each, duration: null }))
+          .map(asShowFile)
       }
       case 'item':
         return type === 'show'
-          ? this.files.under(subject.id).map((each) => ({ ...each, duration: null }))
-          : this.media.forItem(subject.id).slice(0, 1)
+          ? this.files.under(subject.id).map(asShowFile)
+          : this.media.forItem(subject.id)
       default: {
         const unreachable: never = subject
         return unreachable
