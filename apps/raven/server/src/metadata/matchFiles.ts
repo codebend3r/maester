@@ -1,9 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { type LibraryKind, type MatchState, isMatchState } from '@raven/core'
+import { type LibraryKind, type MatchState, isMatchState, matchTypeFor } from '@raven/core'
 import { DatabaseService } from '@/db/database'
 import { BEST_FIRST, escapeLike } from '@/media/mediaSql'
 import { namedAs } from '@/media/namedAs'
 import { MetadataRepository } from '@/metadata/metadataRepository'
+import type { LayoutRow, RelayoutPlan } from '@/scanner/layout'
 
 /** A Fix match kept for a place: none, "this is not a movie or show", or a TMDB id. */
 export type FixMatch = { kind: 'none' } | { kind: 'not-a-match' } | { kind: 'tmdb'; tmdbId: string }
@@ -277,5 +278,91 @@ export class MatchFiles {
         )
         .run(libraryId).changes,
     )
+  }
+
+  /** Every file of a library with where it sits, for reading its place again. */
+  layoutRows(libraryId: number): LayoutRow[] {
+    return this.db
+      .prepare<[number], { id: number; path: string; folder: string; file_name: string }>(
+        'SELECT id, path, folder, file_name FROM media WHERE library_id = ? ORDER BY id',
+      )
+      .all(libraryId)
+      .map((row) => ({ id: row.id, path: row.path, folder: row.folder, fileName: row.file_name }))
+  }
+
+  /** The places a library keeps Fix matches under. */
+  overridePlaces(libraryId: number): string[] {
+    return this.db
+      .prepare<[number], { place: string }>(
+        'SELECT place FROM match_overrides WHERE library_id = ?',
+      )
+      .all(libraryId)
+      .map((row) => row.place)
+  }
+
+  /**
+   * Writes a relayout in one go. A TV library's moved files are regrouped,
+   * so they lose their links and wait to be matched again; a movie keeps
+   * its match unless its new folder reads its name as another title than its
+   * old folder did. Fix matches move with their place, or go.
+   */
+  applyRelayout({
+    libraryId,
+    kind,
+    plan,
+  }: {
+    libraryId: number
+    kind: LibraryKind
+    plan: RelayoutPlan
+  }): void {
+    const setFolder = this.db.prepare('UPDATE media SET folder = ? WHERE id = ?')
+    const readFix = this.db.prepare<[number, string], { tmdb_id: string | null }>(
+      'SELECT tmdb_id FROM match_overrides WHERE library_id = ? AND place = ?',
+    )
+    const dropFix = this.db.prepare(
+      'DELETE FROM match_overrides WHERE library_id = ? AND place = ?',
+    )
+    // The plan never lands two Fix matches on one place; were it to, the one
+    // already there would win rather than the relayout, and so the boot, fail.
+    const addFix = this.db.prepare(
+      `INSERT INTO match_overrides (library_id, place, tmdb_id) VALUES (?, ?, ?)
+       ON CONFLICT (library_id, place) DO NOTHING`,
+    )
+    this.db.transaction(() => {
+      const folders = new Map(plan.moves.map((move) => [move.id, move.folder]))
+      const moved = this.byIds(plan.moves.map((move) => move.id)).flatMap((file) => {
+        const folder = folders.get(file.id)
+        return folder == null
+          ? []
+          : [{ id: file.id, fileName: file.fileName, was: file.folder, folder }]
+      })
+      plan.moves.forEach((move) => setFolder.run(move.folder, move.id))
+      // Compared with the name as the old folder reads it, not the stored
+      // title, which may predate the parser and would rematch for no reason.
+      const regrouped =
+        matchTypeFor(kind) === 'show'
+          ? moved
+          : moved.filter((file) => {
+              const before = namedAs({ kind, fileName: file.fileName, folder: file.was })
+              const after = namedAs({ kind, fileName: file.fileName, folder: file.folder })
+              return (
+                before.title !== after.title ||
+                before.year !== after.year ||
+                before.edition !== after.edition ||
+                before.match !== after.match
+              )
+            })
+      this.metadata.unlink(regrouped.map((file) => file.id))
+      this.rewriteNames({ rows: regrouped, kind })
+      // Every Fix match that leaves its place is read, then all are cleared
+      // before any lands, so one moving into a place another leaves never
+      // meets it, whatever order they come in.
+      const landing = plan.overrides.flatMap(({ from, to }) => {
+        const fix = to == null ? undefined : readFix.get(libraryId, from)
+        return to == null || fix == null ? [] : [{ to, tmdbId: fix.tmdb_id }]
+      })
+      plan.overrides.forEach(({ from }) => dropFix.run(libraryId, from))
+      landing.forEach(({ to, tmdbId }) => addFix.run(libraryId, to, tmdbId))
+    })()
   }
 }

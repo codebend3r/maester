@@ -107,6 +107,7 @@ describe('LibraryDialog', () => {
           ratingsSource: 'tmdb',
           autoRefresh: true,
           locked: false,
+          folderLayout: 'auto',
         },
       },
     ])
@@ -135,6 +136,7 @@ describe('LibraryDialog', () => {
         ratingsSource: 'tmdb',
         autoRefresh: false,
         locked: true,
+        folderLayout: 'auto',
       },
     })
   })
@@ -305,5 +307,42 @@ describe('LibraryDialog', () => {
       'Turn the admin lock off in Settings to lock a library.',
     )
     expect(screen.getByRole('checkbox', { name: 'Lock with the PIN' })).toBeDisabled()
+  })
+
+  it('reads letter and group folders unless told not to', async () => {
+    renderWithProviders(
+      <LibraryDialog
+        library={library({ settings: { ...library().settings, kind: 'animeShows' } })}
+        onClose={() => undefined}
+      />,
+    )
+    const box = screen.getByRole('checkbox', { name: 'Read letter and group folders' })
+    expect(box).toBeChecked()
+    await userEvent.click(box)
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+    expect(updated.at(-1)).toMatchObject({ settings: { folderLayout: 'flat' } })
+  })
+
+  it('says what each path was read as', () => {
+    renderWithProviders(
+      <LibraryDialog
+        library={library({
+          paths: ['/media/Anime', '/media/Classics'],
+          layouts: [
+            { path: '/media/Anime', layout: 'lettered', groups: 23 },
+            { path: '/media/Classics', layout: 'flat', groups: 0 },
+          ],
+          settings: { ...library().settings, kind: 'animeShows' },
+        })}
+        onClose={() => undefined}
+      />,
+    )
+    expect(screen.getByText('/media/Anime: letter folders (23)')).toBeTruthy()
+    expect(screen.getByText('/media/Classics: one folder per title')).toBeTruthy()
+  })
+
+  it('offers no folder layout for a library that is never matched', () => {
+    renderWithProviders(<LibraryDialog onClose={() => undefined} />)
+    expect(screen.queryByRole('checkbox', { name: 'Read letter and group folders' })).toBeNull()
   })
 })

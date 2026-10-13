@@ -231,7 +231,7 @@ describe('TV show metadata', () => {
 
   afterAll(async () => {
     await state.app?.close()
-    await rm(state.root, { recursive: true, force: true })
+    await rm(state.root, { recursive: true, force: true, maxRetries: 5 })
   })
 
   it('lists the library as shows, with episode counts, years and the unmatched after', async () => {

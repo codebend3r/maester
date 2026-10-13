@@ -125,6 +125,7 @@ export class LibrariesController {
     return {
       ...record,
       paths: [],
+      layouts: [],
       scan: { ...scan, error: scan.error == null ? null : LOCKED_SCAN_ERROR },
       backdrop: null,
     }
@@ -174,10 +175,10 @@ export class LibrariesController {
   }
 
   /**
-   * Only a change of folders rescans, and only a change of type that reads
-   * files another way matches them again: Movies to Anime movies keeps every
-   * match. A rename or another setting, the lock included, leaves the index
-   * as it is.
+   * Only a change of folders rescans. A change of type that reads files
+   * another way, or of folder layout, reads them again and matches what
+   * regrouped. A rename or another setting, the lock included, leaves the
+   * index as it is.
    */
   @Put(':id')
   update(
@@ -191,6 +192,8 @@ export class LibrariesController {
     if (!record) throw new NotFoundException(`No library ${id}`)
     if (matchTypeFor(before.settings.kind) !== matchTypeFor(record.settings.kind)) {
       this.metadata.changeKind({ libraryId: id, kind: record.settings.kind })
+    } else if (before.settings.folderLayout !== record.settings.folderLayout) {
+      this.metadata.changeLayout({ libraryId: id })
     }
     if (!samePaths({ before: before.paths, after: record.paths })) this.scanner.scan(id)
     this.watcher.sync()

@@ -2,10 +2,13 @@ import { Inject, Injectable } from '@nestjs/common'
 import {
   DEFAULT_LIBRARY_SETTINGS,
   type LibraryInput,
+  type LibraryPathLayout,
   type LibrarySettings,
+  type PathLayout,
   coherentSettings,
   defaultLibrarySettings,
   isLibrarySettings,
+  isPathLayout,
   keyOf,
 } from '@raven/core'
 import { DatabaseService } from '@/db/database'
@@ -15,6 +18,7 @@ export type LibraryRecord = {
   id: number
   name: string
   paths: string[]
+  layouts: LibraryPathLayout[]
   itemCount: number
   unmatchedCount: number
   createdAt: string
@@ -37,6 +41,7 @@ type LibraryRow = {
   ratings_source: string
   auto_refresh: number
   locked: number
+  folder_layout: string
 }
 
 const isSettingName = keyOf(isLibrarySettings.shape)
@@ -62,6 +67,7 @@ const toSettings = (row: LibraryRow): LibrarySettings => {
     ratingsSource: row.ratings_source,
     autoRefresh: row.auto_refresh === 1,
     locked: row.locked === 1,
+    folderLayout: row.folder_layout,
   } satisfies Record<keyof LibrarySettings, unknown>
   const known = Object.fromEntries(
     Object.entries(stored).filter(
@@ -88,6 +94,7 @@ const settingParams = (settings: LibrarySettings) => ({
   ratings_source: settings.ratingsSource,
   auto_refresh: Number(settings.autoRefresh),
   locked: Number(settings.locked),
+  folder_layout: settings.folderLayout,
 })
 
 const SETTING_COLUMNS = Object.keys(settingParams(DEFAULT_LIBRARY_SETTINGS))
@@ -112,6 +119,8 @@ export const samePaths = ({
 type PathRow = {
   library_id: number
   path: string
+  layout: string | null
+  group_folders: number
 }
 
 @Injectable()
@@ -145,7 +154,7 @@ export class LibrariesRepository {
       .all(id, id)
     const paths = this.db
       .prepare<[number | null, number | null], PathRow>(
-        `SELECT library_id, path FROM library_paths
+        `SELECT library_id, path, layout, group_folders FROM library_paths
           WHERE ? IS NULL OR library_id = ?
           ORDER BY position`,
       )
@@ -158,6 +167,13 @@ export class LibrariesRepository {
       unmatchedCount: row.unmatched_count,
       settings: toSettings(row),
       paths: paths.filter((path) => path.library_id === row.id).map((path) => path.path),
+      layouts: paths
+        .filter((path) => path.library_id === row.id)
+        .map((path) => ({
+          path: path.path,
+          layout: isPathLayout(path.layout) ? path.layout : null,
+          groups: path.group_folders,
+        })),
     }))
   }
 
@@ -169,12 +185,46 @@ export class LibrariesRepository {
     return this.rows(id)[0] ?? null
   }
 
+  /** What a full scan found each readable path to be; paths it could not read keep what they had. */
+  saveLayouts({
+    id,
+    layouts,
+  }: {
+    id: number
+    layouts: ReadonlyArray<{ path: string; layout: PathLayout; groups: number }>
+  }): void {
+    const update = this.db.prepare(
+      'UPDATE library_paths SET layout = ?, group_folders = ? WHERE library_id = ? AND path = ?',
+    )
+    this.db.transaction(() => {
+      layouts.forEach(({ path, layout, groups }) => update.run(layout, groups, id, path))
+    })()
+  }
+
+  /** Each path a library keeps holds on to what a scan found it to be; a new one starts unread. */
   private replacePaths({ id, paths }: { id: number; paths: string[] }): void {
+    const found = new Map(
+      this.db
+        .prepare<[number], Pick<PathRow, 'path' | 'layout' | 'group_folders'>>(
+          'SELECT path, layout, group_folders FROM library_paths WHERE library_id = ?',
+        )
+        .all(id)
+        .map((row) => [row.path, row]),
+    )
     this.db.prepare('DELETE FROM library_paths WHERE library_id = ?').run(id)
     const insert = this.db.prepare(
-      'INSERT INTO library_paths (library_id, path, position) VALUES (?, ?, ?)',
+      `INSERT INTO library_paths (library_id, path, position, layout, group_folders)
+       VALUES (?, ?, ?, ?, ?)`,
     )
-    paths.forEach((path, position) => insert.run(id, path, position))
+    paths.forEach((path, position) =>
+      insert.run(
+        id,
+        path,
+        position,
+        found.get(path)?.layout ?? null,
+        found.get(path)?.group_folders ?? 0,
+      ),
+    )
   }
 
   /** A new library starts with its type's defaults, under whatever settings were sent. */

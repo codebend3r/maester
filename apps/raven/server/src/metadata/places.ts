@@ -10,11 +10,11 @@ export const stemOf = (fileName: string): string => {
   return dot > 0 ? fileName.slice(0, dot) : fileName
 }
 
-/** A file's own place: its path inside the library, the key a Fix match is kept under when its folder holds more. */
+/** A file's own place: its path inside the folder its titles sit in, the key a Fix match is kept under when its folder holds more. */
 export const filePlace = (file: { folder: string; fileName: string }): string =>
   file.folder === '' ? file.fileName : join(file.folder, file.fileName)
 
-/** The library path a file was found under, which its path starts with. */
+/** The folder a file's titles sit in (a library path, or a letter or group folder), which its path starts with. */
 export const rootOf = (file: Placed): string =>
   file.path.slice(0, file.path.length - filePlace(file).length - 1)
 
@@ -31,7 +31,7 @@ export const showDirOf = (file: Placed): string => {
 /**
  * Whether a folder's files are one movie, perhaps in several qualities: its
  * own pictures, NFO and Fix match then belong to that movie. Extras do not
- * count, and a library's root never holds one movie.
+ * count, and the folder titles sit in (a library path, a letter or group folder) never holds one movie.
  */
 export const holdsOneMovie = ({
   folder,

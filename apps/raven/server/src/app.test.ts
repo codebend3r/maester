@@ -69,7 +69,7 @@ describe('the media server', () => {
 
   afterAll(async () => {
     await state.app?.close()
-    await rm(state.root, { recursive: true, force: true })
+    await rm(state.root, { recursive: true, force: true, maxRetries: 5 })
   })
 
   it('rejects a library without a name or folder', async () => {
@@ -313,6 +313,7 @@ describe('the media server', () => {
           ratingsSource: 'tmdb',
           autoRefresh: true,
           locked: false,
+          folderLayout: 'auto',
         })
       })
 
@@ -391,6 +392,7 @@ describe('the media server', () => {
           ratingsSource: 'tmdb',
           autoRefresh: true,
           locked: false,
+          folderLayout: 'auto',
         })
         expect(updated.scan.state).toBe('idle')
         expect((await putLibrary({ pinned: true })).settings.pinned).toBe(true)
@@ -644,7 +646,7 @@ describe('the media server', () => {
           }
           // Writable again, the same request goes through.
           await api().deleteMedia(kept.id)
-          await rm(locked, { recursive: true, force: true })
+          await rm(locked, { recursive: true, force: true, maxRetries: 5 })
         },
       )
     })
@@ -699,7 +701,7 @@ describe('the order of libraries', () => {
 
   afterAll(async () => {
     await state.app?.close()
-    await rm(state.root, { recursive: true, force: true })
+    await rm(state.root, { recursive: true, force: true, maxRetries: 5 })
   })
 
   it('leads with the libraries whose videos are mostly 4K, then goes by name', async () => {
@@ -742,7 +744,7 @@ describe('serving the web app', () => {
 
   afterAll(async () => {
     await state.app?.close()
-    await rm(state.root, { recursive: true, force: true })
+    await rm(state.root, { recursive: true, force: true, maxRetries: 5 })
   })
 
   it('answers client-side routes with index.html', async () => {

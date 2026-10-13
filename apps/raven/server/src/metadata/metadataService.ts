@@ -6,8 +6,9 @@ import {
   type MetadataHealth,
   matchTypeFor,
 } from '@raven/core'
+import { errorMessage } from '@/errorMessage'
 import { groupBy } from '@/groupBy'
-import { LibrariesRepository } from '@/libraries/librariesRepository'
+import { type LibraryRecord, LibrariesRepository } from '@/libraries/librariesRepository'
 import { ItemPictures } from '@/metadata/itemPictures'
 import { type FixMatchChoice, type MatchFile, MatchFiles } from '@/metadata/matchFiles'
 import { createMatchers, type KindMatcher } from '@/metadata/matchers'
@@ -19,6 +20,7 @@ import { PASS_CONCURRENCY } from '@/metadata/passGuard'
 import { showPlace } from '@/metadata/places'
 import { TmdbClient } from '@/metadata/tmdbClient'
 import { createTaskQueue, mapWithConcurrency } from '@/scanner/concurrency'
+import { type LayoutRow, indexedLayoutsOf, planRelayout } from '@/scanner/layout'
 
 /**
  * Matches the files in libraries of movies and shows to TMDB, one library
@@ -48,10 +50,22 @@ export class MetadataService implements OnApplicationBootstrap {
     this.matchers = createMatchers({ files, metadata, pictures })
   }
 
-  /** Names indexed before they were parsed are read again, and every matched library gets a pass for what is pending. */
+  /**
+   * Files filed under another folder layout, or indexed before letter
+   * folders were read, are placed again; names indexed before they were
+   * parsed are read again; and every matched library gets a pass for what is
+   * pending.
+   */
   onApplicationBootstrap(): void {
     this.metadata.resortTitles()
     this.libraries.list().forEach((library) => {
+      try {
+        this.relayoutNow(library.id)
+      } catch (error) {
+        this.logger.error(
+          `Could not place the files of "${library.name}" again: ${errorMessage(error)}`,
+        )
+      }
       const { kind } = library.settings
       if (matchTypeFor(kind) == null) return
       this.files.retitle({ libraryId: library.id, kind })
@@ -90,10 +104,94 @@ export class MetadataService implements OnApplicationBootstrap {
    * type and matched from scratch, or left off for a type that is not matched.
    */
   changeKind({ libraryId, kind }: { libraryId: number; kind: LibraryKind }): void {
-    this.queue.push(`kind:${libraryId}:${kind}`, async () => {
-      this.files.rename({ libraryId, kind })
-      await this.pass(libraryId)
+    this.queue.push(
+      `kind:${libraryId}:${kind}`,
+      this.logged(`type change of library ${libraryId}`, async () => {
+        this.relayoutNow(libraryId)
+        this.files.rename({ libraryId, kind })
+        await this.pass(libraryId)
+      }),
+    )
+  }
+
+  /**
+   * Reads where each of a library's files sits again, for its type and
+   * folder layout: what each of its paths is, and the folders of the files
+   * that changed.
+   */
+  private relayoutNow(libraryId: number): void {
+    const library = this.libraries.get(libraryId)
+    if (!library) return
+    const rows = this.files.layoutRows(libraryId)
+    this.refreshLayouts({ library, rows })
+    const plan = planRelayout({
+      rows,
+      roots: library.paths,
+      kind: library.settings.kind,
+      layout: library.settings.folderLayout,
+      overrides: this.files.overridePlaces(libraryId),
     })
+    if (plan.moves.length === 0) return
+    this.files.applyRelayout({ libraryId, kind: library.settings.kind, plan })
+    this.logger.log(
+      `Placed ${plan.moves.length} files of "${library.name}" again for its folder layout`,
+    )
+  }
+
+  /**
+   * What each of a library's paths is, read again from the files the index
+   * holds under it, as a layout change runs no scan. Nothing is written when
+   * nothing changed, so a steady boot writes nothing.
+   */
+  private refreshLayouts({
+    library,
+    rows,
+  }: {
+    library: LibraryRecord
+    rows: readonly LayoutRow[]
+  }): void {
+    const layouts = indexedLayoutsOf({
+      rows,
+      roots: library.paths,
+      kind: library.settings.kind,
+      layout: library.settings.folderLayout,
+    })
+    const isSaved = layouts.every((fresh) =>
+      library.layouts.some(
+        (saved) =>
+          saved.path === fresh.path &&
+          saved.layout === fresh.layout &&
+          saved.groups === fresh.groups,
+      ),
+    )
+    if (isSaved) return
+    this.libraries.saveLayouts({ id: library.id, layouts })
+  }
+
+  /**
+   * A library's folder layout changed: its files are read again and matched
+   * where they regrouped. A change made while one is read runs again after
+   * it, which reads the settings as they are then.
+   */
+  changeLayout({ libraryId }: { libraryId: number }): void {
+    this.queue.again(
+      `layout:${libraryId}`,
+      this.logged(`layout change of library ${libraryId}`, async () => {
+        this.relayoutNow(libraryId)
+        await this.pass(libraryId)
+      }),
+    )
+  }
+
+  /** The queue drops a task that throws without a word, so a failure is logged here. */
+  private logged(what: string, task: () => Promise<void>): () => Promise<void> {
+    return async () => {
+      try {
+        await task()
+      } catch (error) {
+        this.logger.error(`The ${what} failed: ${errorMessage(error)}`)
+      }
+    }
   }
 
   whenIdle(): Promise<void> {

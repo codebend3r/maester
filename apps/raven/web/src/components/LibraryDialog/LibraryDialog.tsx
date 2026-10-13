@@ -6,6 +6,7 @@ import {
   type LibraryInput,
   type LibraryKind,
   type LibrarySettings,
+  type PathLayout,
   RATING_SOURCES,
   type RatingSource,
   defaultLibrarySettings,
@@ -30,6 +31,19 @@ const RATINGS_LABELS: Record<RatingSource, string> = {
   imdb: 'IMDb',
   rottenTomatoes: 'Rotten Tomatoes',
   metacritic: 'Metacritic',
+}
+
+/** What Edit library calls each way a path was read. */
+const pathLayoutLabel = ({
+  layout,
+  groups,
+}: {
+  layout: PathLayout | null
+  groups: number
+}): string => {
+  if (layout == null) return 'not scanned yet'
+  if (layout === 'flat') return 'one folder per title'
+  return layout === 'lettered' ? `letter folders (${groups})` : `group folders (${groups})`
 }
 
 /**
@@ -312,6 +326,38 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
               it.
             </p>
           </div>
+          {matchTypeFor(settings.kind) != null && (
+            <div className={styles.setting}>
+              <input
+                id={`${ids.settings}-layout`}
+                type="checkbox"
+                className={styles.checkbox}
+                checked={settings.folderLayout === 'auto'}
+                onChange={(event) =>
+                  setSettings((current) => ({
+                    ...current,
+                    folderLayout: event.target.checked ? 'auto' : 'flat',
+                  }))
+                }
+                aria-describedby={`${ids.settings}-layout-hint`}
+              />
+              <label htmlFor={`${ids.settings}-layout`}>Read letter and group folders</label>
+              <div className={styles.layoutHint}>
+                <p id={`${ids.settings}-layout-hint`}>
+                  Shows and movies inside letter folders (A, B, #) and group folders such as
+                  Requests are read as titles of their own. Turn this off when those folder names
+                  are the titles.
+                </p>
+                {!!library && library.layouts.length > 0 && (
+                  <ul className={styles.layouts}>
+                    {library.layouts.map((entry) => (
+                      <li key={entry.path}>{`${entry.path}: ${pathLayoutLabel(entry)}`}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          )}
           {matchTypeFor(settings.kind) != null && (
             <div className={styles.watched}>
               <label htmlFor={`${ids.settings}-ratings`}>Ratings shown</label>

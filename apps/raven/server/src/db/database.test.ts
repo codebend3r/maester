@@ -144,4 +144,27 @@ describe('migrations', () => {
     expect(database.db.prepare('SELECT COUNT(*) AS items FROM items').get()).toEqual({ items: 0 })
     database.onModuleDestroy()
   })
+
+  it('gives a library made before folder layouts the auto layout, and its paths none yet', () => {
+    const before = new Sqlite(join(state.dir, 'raven.db'))
+    MIGRATIONS.slice(0, 18).forEach((sql) => before.exec(sql))
+    before.pragma('user_version = 18')
+    before.exec(
+      "INSERT INTO libraries (name, created_at) VALUES ('Anime', '2026-01-01T00:00:00.000Z')",
+    )
+    before.exec(
+      "INSERT INTO library_paths (library_id, path, position) VALUES (1, '/media/Anime', 0)",
+    )
+    before.close()
+
+    const database = new DatabaseService({ ...readServerConfig({}), dataDir: state.dir })
+    expect(database.db.prepare('SELECT folder_layout FROM libraries').get()).toEqual({
+      folder_layout: 'auto',
+    })
+    expect(database.db.prepare('SELECT layout, group_folders FROM library_paths').get()).toEqual({
+      layout: null,
+      group_folders: 0,
+    })
+    database.onModuleDestroy()
+  })
 })

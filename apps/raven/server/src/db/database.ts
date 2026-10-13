@@ -297,6 +297,15 @@ export const MIGRATIONS: readonly string[] = [
   `
   ALTER TABLE media ADD COLUMN split TEXT;
   `,
+  // How a library's folders are read: 'auto' reads letter folders (A/, #/)
+  // and group folders (Requests/) as holding the titles, 'flat' reads every
+  // top folder as a title. Each path keeps what its last full scan found:
+  // 'flat', 'lettered' or 'grouped', and how many group folders.
+  `
+  ALTER TABLE libraries ADD COLUMN folder_layout TEXT NOT NULL DEFAULT 'auto';
+  ALTER TABLE library_paths ADD COLUMN layout TEXT;
+  ALTER TABLE library_paths ADD COLUMN group_folders INTEGER NOT NULL DEFAULT 0;
+  `,
 ]
 
 /** The index's file in the data folder. Before raven was renamed it was `weirwood.db`. */

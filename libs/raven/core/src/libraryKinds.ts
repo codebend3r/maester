@@ -134,6 +134,7 @@ export const DEFAULT_LIBRARY_SETTINGS: LibrarySettings = {
   ratingsSource: 'tmdb',
   autoRefresh: true,
   locked: false,
+  folderLayout: 'auto',
 }
 
 /**
