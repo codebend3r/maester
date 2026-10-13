@@ -101,8 +101,10 @@ export class MetadataService implements OnApplicationBootstrap {
   }
 
   /**
-   * A library's type changed: every file's name is read again for the new
-   * type and matched from scratch, or left off for a type that is not matched.
+   * A library's type changed to one that reads or picks its files another
+   * way: every file's name is read again for the new type and matched from
+   * scratch, preferring the new type's results, or left off for a type that
+   * is not matched. Fix match choices stay.
    */
   changeKind({ libraryId, kind }: { libraryId: number; kind: LibraryKind }): void {
     this.queue.push(

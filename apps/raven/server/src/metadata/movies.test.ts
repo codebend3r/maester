@@ -741,16 +741,25 @@ describe('movie metadata', () => {
     expect(shape({ response, guard: isItemDetails }).title).toBe('Heat')
   })
 
-  it('keeps every match when the type changes to Anime movies, which is matched the same way', async () => {
-    const before = await list()
+  it('matches again when the type changes to Anime movies, keeping what it found and every Fix match', async () => {
+    const matches = async () =>
+      (await list()).map((item) => [item.fileName, item.match, item.item?.title ?? null])
+    const before = await matches()
     const asked = tmdb.state.calls.length
     expect((await setKind('animeMovies')).settings).toMatchObject({ kind: 'animeMovies' })
     await settle()
-    expect(await list()).toEqual(before)
-    expect(tmdb.state.calls).toHaveLength(asked)
+    // Nothing here is animation, so every search falls through to the same pick.
+    expect(await matches()).toEqual(before)
+    expect((await list()).find((item) => item.title === 'Unknown Thing')).toMatchObject({
+      match: 'manual',
+      item: { title: 'Unknown Thing Two' },
+    })
+    const searched = tmdb.state.calls.length
+    expect(searched).toBeGreaterThan(asked)
     await setKind('movies')
     await settle()
-    expect(tmdb.state.calls).toHaveLength(asked)
+    expect(await matches()).toEqual(before)
+    expect(tmdb.state.calls.length).toBeGreaterThan(searched)
   })
 
   it('matches again when the type changes, and goes back to file names for Other', async () => {

@@ -254,7 +254,13 @@ describe('TV show metadata', () => {
     expect(listing.shows.every((entry) => entry.show.posterVersion != null)).toBe(true)
   })
 
-  it('keeps every match as an Anime shows library, listed and shelved as its shows', async () => {
+  it('searches once per show folder, and fetches each season once', () => {
+    const searches = tmdb.state.calls.filter((url) => url.includes('/search/tv'))
+    expect(searches.filter((url) => url.includes('Severance'))).toHaveLength(1)
+    expect(tmdb.state.calls.filter((url) => url.includes('/tv/95396/season/1'))).toHaveLength(1)
+  })
+
+  it('matches again as an Anime shows library, listed and shelved as its shows', async () => {
     const setKind = async (kind: string) => {
       await app().inject({
         method: 'PUT',
@@ -266,15 +272,18 @@ describe('TV show metadata', () => {
     const before = await shows()
     const asked = tmdb.state.calls.length
     await setKind('animeShows')
+    // None of these shows is animation, so each search falls through to the same pick.
     expect(await shows()).toEqual(before)
-    expect(tmdb.state.calls).toHaveLength(asked)
+    const searched = tmdb.state.calls.length
+    expect(searched).toBeGreaterThan(asked)
     const home = shape({
       response: await app().inject({ method: 'GET', url: '/api/home' }),
       guard: isHome,
     })
     expect(home.shelves.find((shelf) => shelf.libraryId === state.library)?.type).toBe('shows')
     await setKind('shows')
-    expect(tmdb.state.calls).toHaveLength(asked)
+    expect(await shows()).toEqual(before)
+    expect(tmdb.state.calls.length).toBeGreaterThan(searched)
   })
 
   it('matches a misspelt folder by the name its files carry', async () => {
@@ -294,12 +303,6 @@ describe('TV show metadata', () => {
       match: 'matched',
       item: { type: 'episode', title: 'Anjin', show: { title: 'Shōgun' } },
     })
-  })
-
-  it('searches once per show folder, and fetches each season once', () => {
-    const searches = tmdb.state.calls.filter((url) => url.includes('/search/tv'))
-    expect(searches.filter((url) => url.includes('Severance'))).toHaveLength(1)
-    expect(tmdb.state.calls.filter((url) => url.includes('/tv/95396/season/1'))).toHaveLength(1)
   })
 
   it('links each file to its episode, and a two-episode file to both', async () => {
