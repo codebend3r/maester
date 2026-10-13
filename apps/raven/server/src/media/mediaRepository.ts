@@ -66,8 +66,10 @@ type MediaRow = {
  * is kept but not shown. A file holding two episodes takes the first as its
  * item. `versions` counts the files in the library on the same movie's card,
  * which its `split` names; `IS` holds two NULLs equal, so the files on the
- * movie's own card count each other. TMDB's own titles come along for
- * telling a split file's cut.
+ * movie's own card count each other. The CROSS JOIN makes that count start
+ * from the movie's files: left to choose, SQLite walked every file in the
+ * library for each card, seconds for a few thousand movies. TMDB's own
+ * titles come along for telling a split file's cut.
  */
 const SELECT_COLUMNS = `
   SELECT m.*, CASE WHEN l.save_progress = 1 THEN p.position END AS position,
@@ -77,7 +79,7 @@ const SELECT_COLUMNS = `
          i.year AS item_year, t.title AS item_tmdb_title,
          t.original_title AS item_tmdb_original_title,
          CASE WHEN i.type = 'movie'
-              THEN (SELECT COUNT(*) FROM media_items x JOIN media y ON y.id = x.media_id
+              THEN (SELECT COUNT(*) FROM media_items x CROSS JOIN media y ON y.id = x.media_id
                      WHERE x.item_id = i.id AND y.library_id = m.library_id
                        AND y.split IS m.split)
               ELSE 1 END AS versions,
