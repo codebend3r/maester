@@ -21,6 +21,10 @@ export type FakeMovie = {
   genreIds?: number[]
   /** TMDB's `original_language`: `en` when not given. */
   language?: string
+  /** TMDB's `runtime` in minutes: 120 when not given. */
+  runtime?: number
+  /** TMDB's `popularity` in a search; left out when not given. */
+  popularity?: number
 }
 
 /**
@@ -42,7 +46,7 @@ export const movieBody = (movie: FakeMovie): Record<string, unknown> => ({
   release_date: movie.released,
   overview: `${movie.title} is a film.`,
   tagline: 'A tagline.',
-  runtime: 120,
+  runtime: movie.runtime ?? 120,
   genres: [
     { id: 28, name: 'Action' },
     { id: 878, name: 'Science Fiction' },
@@ -129,6 +133,8 @@ export type FakeShow = {
   genreIds?: number[]
   /** TMDB's `original_language`: `en` when not given. */
   language?: string
+  /** TMDB's `popularity` in a search; left out when not given. */
+  popularity?: number
   seasons: Record<number, FakeEpisode[]>
 }
 
@@ -143,6 +149,13 @@ export const showBody = (show: FakeShow): Record<string, unknown> => ({
   overview: `${show.title} is a show.`,
   tagline: 'A tagline.',
   episode_run_time: [45],
+  number_of_episodes: Object.entries(show.seasons)
+    .filter(([number]) => number !== '0')
+    .reduce((sum, [, episodes]) => sum + episodes.length, 0),
+  seasons: Object.entries(show.seasons).map(([number, episodes]) => ({
+    season_number: Number(number),
+    episode_count: episodes.length,
+  })),
   genres: [{ id: 18, name: 'Drama' }],
   networks: [{ id: 1, name: 'Network One' }],
   poster_path: `/showposter${show.id}.jpg`,
@@ -306,6 +319,7 @@ export const fakeTmdb = ({
     const path = parsed.pathname.replace(/^\/3/, '')
     if (state.failing.some((prefix) => path.startsWith(prefix))) throw new TypeError('fetch failed')
     const query = parsed.searchParams
+    const appended = (query.get('append_to_response') ?? '').split(',')
 
     if (path === '/search/movie') {
       const title = query.get('query') ?? ''
@@ -328,6 +342,7 @@ export const fakeTmdb = ({
           release_date: movie.released,
           genre_ids: movie.genreIds ?? [28, 878],
           original_language: movie.language ?? 'en',
+          ...(movie.popularity == null ? {} : { popularity: movie.popularity }),
           overview: `${movie.title} is a film.`,
           poster_path: movie.poster === undefined ? `/poster${movie.id}.jpg` : movie.poster,
         })),
@@ -353,6 +368,7 @@ export const fakeTmdb = ({
           origin_country: show.countries ?? ['US'],
           genre_ids: show.genreIds ?? [18],
           original_language: show.language ?? 'en',
+          ...(show.popularity == null ? {} : { popularity: show.popularity }),
           overview: `${show.title} is a show.`,
           poster_path: `/showposter${show.id}.jpg`,
         })),
@@ -386,7 +402,22 @@ export const fakeTmdb = ({
     const show = /^\/tv\/(\d+)$/.exec(path)
     if (show) {
       const found = state.shows.find((entry) => String(entry.id) === show[1])
-      return found ? json(showBody(found)) : json({ status_code: 34 }, 404)
+      return found
+        ? json({
+            ...showBody(found),
+            ...(appended.includes('alternative_titles')
+              ? {
+                  alternative_titles: {
+                    results: (found.alternativeTitles ?? []).map((title) => ({
+                      iso_3166_1: 'GB',
+                      title,
+                      type: '',
+                    })),
+                  },
+                }
+              : {}),
+          })
+        : json({ status_code: 34 }, 404)
     }
 
     const images = /^\/(movie|tv)\/(\d+)\/images$/.exec(path)
@@ -444,7 +475,22 @@ export const fakeTmdb = ({
     const movie = /^\/movie\/(\d+)$/.exec(path)
     if (movie) {
       const found = state.movies.find((entry) => String(entry.id) === movie[1])
-      return found ? json(movieBody(found)) : json({ status_code: 34 }, 404)
+      return found
+        ? json({
+            ...movieBody(found),
+            ...(appended.includes('alternative_titles')
+              ? {
+                  alternative_titles: {
+                    titles: (found.alternativeTitles ?? []).map((title) => ({
+                      iso_3166_1: 'US',
+                      title,
+                      type: '',
+                    })),
+                  },
+                }
+              : {}),
+          })
+        : json({ status_code: 34 }, 404)
     }
     return json({ status_code: 34 }, 404)
   }

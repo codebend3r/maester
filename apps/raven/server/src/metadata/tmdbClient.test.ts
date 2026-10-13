@@ -268,6 +268,61 @@ describe('TmdbClient', () => {
       countries: ['JP'],
     })
   })
+
+  it("reads a show's seasons, episode total and aliases for Fix match, in one call", async () => {
+    const tmdb = fakeTmdb({
+      movies: [],
+      shows: [
+        {
+          id: 30981,
+          title: 'Monster',
+          first: '2004-04-07',
+          alternativeTitles: ['MONSTER'],
+          seasons: {
+            0: [{ number: 1, title: 'Special', aired: '2004-01-01' }],
+            1: [
+              { number: 1, title: 'Herr Dr. Tenma', aired: '2004-04-07' },
+              { number: 2, title: 'Downfall', aired: '2004-04-14' },
+            ],
+          },
+        },
+      ],
+    })
+    const client = new TmdbClient(config(), tmdb.fetch)
+    expect(await client.matchFacts({ type: 'show', tmdbId: '30981' })).toEqual({
+      type: 'show',
+      aliases: ['MONSTER'],
+      seasons: [
+        { number: 0, episodeCount: 1 },
+        { number: 1, episodeCount: 2 },
+      ],
+      episodeCount: 2,
+    })
+    expect(tmdb.state.calls).toHaveLength(1)
+    expect(new URL(tmdb.state.calls[0] ?? '').searchParams.get('append_to_response')).toBe(
+      'alternative_titles',
+    )
+  })
+
+  it("reads a movie's runtime and aliases for Fix match", async () => {
+    const tmdb = fakeTmdb({
+      movies: [
+        {
+          id: 949,
+          title: 'Heat',
+          released: '1995-12-15',
+          runtime: 170,
+          alternativeTitles: ['Fuego contra fuego'],
+        },
+      ],
+    })
+    const client = new TmdbClient(config(), tmdb.fetch)
+    expect(await client.matchFacts({ type: 'movie', tmdbId: '949' })).toEqual({
+      type: 'movie',
+      aliases: ['Fuego contra fuego'],
+      runtime: 170,
+    })
+  })
 })
 
 describe('toShow and toSeason', () => {

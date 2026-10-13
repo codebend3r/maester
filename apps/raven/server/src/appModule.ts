@@ -40,6 +40,7 @@ import { MetadataRepository } from '@/metadata/metadataRepository'
 import { MetadataService } from '@/metadata/metadataService'
 import { OmdbClient } from '@/metadata/omdbClient'
 import { OmdbScores } from '@/metadata/omdbScores'
+import { MatchFactsCache } from '@/metadata/matchFactsCache'
 import { METADATA_FETCH, type MetadataFetch, TmdbClient } from '@/metadata/tmdbClient'
 import { PlaybackController } from '@/playback/playbackController'
 import { SubtitlesService } from '@/playback/subtitlesService'
@@ -118,6 +119,7 @@ export class AppModule {
         MatchFiles,
         AiDecisions,
         TmdbClient,
+        MatchFactsCache,
         OmdbClient,
         AiClient,
         AiMatcher,

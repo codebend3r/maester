@@ -833,6 +833,37 @@ export class TmdbClient {
   }
 
   /**
+   * What Fix match's confidence reads of a result beyond its search: a
+   * show's seasons and episode total, or a movie's runtime, and its other
+   * titles, in one call.
+   */
+  async matchFacts({ type, tmdbId }: { type: MatchItemType; tmdbId: string }): Promise<MatchFacts> {
+    const body = record(
+      await this.get(`/${type === 'movie' ? 'movie' : 'tv'}/${encodeURIComponent(tmdbId)}`, {
+        append_to_response: 'alternative_titles',
+      }),
+    )
+    const titled = record(body.alternative_titles)
+    // A movie's come as `titles`, a show's as `results`.
+    const aliases = records(titled.titles ?? titled.results).flatMap(
+      (entry) => text(entry.title) ?? [],
+    )
+    if (type === 'movie') return { type, aliases, runtime: number(body.runtime) || null }
+    return {
+      type,
+      aliases,
+      seasons: records(body.seasons).flatMap((season) => {
+        const seasonNumber = number(season.season_number)
+        const episodeCount = number(season.episode_count)
+        return seasonNumber == null || episodeCount == null
+          ? []
+          : [{ number: seasonNumber, episodeCount }]
+      }),
+      episodeCount: number(body.number_of_episodes),
+    }
+  }
+
+  /**
    * Every poster, backdrop and PNG logo TMDB holds for a movie or show, in
    * the language details come in and without text, most voted first.
    */
