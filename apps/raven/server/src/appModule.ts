@@ -28,6 +28,7 @@ import { MediaRepository } from '@/media/mediaRepository'
 import { MovieSplits } from '@/media/movieSplits'
 import { ViewingRepository } from '@/media/viewingRepository'
 import { AI_FETCH, AiClient, type AiFetch } from '@/metadata/aiClient'
+import { AiDecisions } from '@/metadata/aiDecisions'
 import { ImageCache } from '@/metadata/imageCache'
 import { ItemImagesRepository } from '@/metadata/itemImagesRepository'
 import { ItemOverrides } from '@/metadata/itemOverrides'
@@ -113,6 +114,7 @@ export class AppModule {
         ViewingRepository,
         MediaIndex,
         MatchFiles,
+        AiDecisions,
         TmdbClient,
         OmdbClient,
         AiClient,

@@ -167,4 +167,28 @@ describe('migrations', () => {
     })
     database.onModuleDestroy()
   })
+
+  it("adds the AI lookup's decisions, none yet, gone with their library", () => {
+    const before = new Sqlite(join(state.dir, 'raven.db'))
+    MIGRATIONS.slice(0, 19).forEach((sql) => before.exec(sql))
+    before.pragma('user_version = 19')
+    before.exec(
+      "INSERT INTO libraries (name, created_at) VALUES ('TV', '2026-01-01T00:00:00.000Z')",
+    )
+    before.close()
+
+    const database = new DatabaseService({ ...readServerConfig({}), dataDir: state.dir })
+    const count = () => database.db.prepare('SELECT COUNT(*) AS decisions FROM ai_decisions').get()
+    expect(count()).toEqual({ decisions: 0 })
+    database.db
+      .prepare(
+        `INSERT INTO ai_decisions (library_id, place, tmdb_id, title, year, poster, confidence, reason, model, decided_at)
+         VALUES (1, 'Archie', NULL, NULL, NULL, NULL, 'low', 'Nothing fits.', 'claude-haiku-5-5', '2026-10-13T00:00:00.000Z')`,
+      )
+      .run()
+    expect(count()).toEqual({ decisions: 1 })
+    database.db.prepare('DELETE FROM libraries WHERE id = 1').run()
+    expect(count()).toEqual({ decisions: 0 })
+    database.onModuleDestroy()
+  })
 })
