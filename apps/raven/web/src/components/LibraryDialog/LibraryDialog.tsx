@@ -342,8 +342,8 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
                 aria-describedby={`${ids.settings}-layout-hint`}
               />
               <label htmlFor={`${ids.settings}-layout`}>Read letter and group folders</label>
-              <div id={`${ids.settings}-layout-hint`} className={styles.layoutHint}>
-                <p>
+              <div className={styles.layoutHint}>
+                <p id={`${ids.settings}-layout-hint`}>
                   Shows and movies inside letter folders (A, B, #) and group folders such as
                   Requests are read as titles of their own. Turn this off when those folder names
                   are the titles.
