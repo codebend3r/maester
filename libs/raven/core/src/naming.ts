@@ -411,6 +411,8 @@ export const sortTitle = (title: string): string =>
 
 export type ParsedEpisodeName = {
   show: string
+  /** The show with the edition words cut off, "Dragon Ball Z" for "Dragon Ball Z (Uncut)", when `show` has some: a fallback to search on. */
+  showWithoutEdition: string | null
   /** The show as the file itself names it, when that differs from the folder: a misspelt folder, `Muderbot/Murderbot - S01E01.mkv`. */
   showFromFile: string | null
   /**
@@ -495,10 +497,14 @@ export const parseEpisodeName = ({
   const fromFile = readName(before.replace(ABSOLUTE, ' ').replace(AIR_DATE, ' '))
   const fromFolder =
     showFolder !== '' && seasonFolderNumber(showFolder) == null ? readName(showFolder) : null
-  const named = fromFolder?.title || fromFile.title || fallbackShow
+  // Shows have no editions, so a name ending in a word an edition would,
+  // "Australia Remastered", is read whole.
+  const fileNamed = fromFile.withEdition ?? fromFile.title
+  const named = (fromFolder?.withEdition ?? fromFolder?.title) || fileNamed || fallbackShow
   // The suffix is not searched on, but kept to choose between two shows of the name.
   const show = named.replace(COUNTRY_SUFFIX, '')
-  const fileShow = fromFile.title.replace(COUNTRY_SUFFIX, '')
+  const plain = (fromFolder?.title || fromFile.title || fallbackShow).replace(COUNTRY_SUFFIX, '')
+  const fileShow = fileNamed.replace(COUNTRY_SUFFIX, '')
   const showFromFile = fileShow !== '' && fileShow !== show ? fileShow : null
 
   const season = code ? Number(code[1] ?? code[4]) : seasonFolder
@@ -512,8 +518,9 @@ export const parseEpisodeName = ({
 
   return {
     show,
+    showWithoutEdition: plain !== '' && plain !== show ? plain : null,
     showFromFile,
-    country: countryOf(named) ?? countryOf(fromFile.title),
+    country: countryOf(named) ?? countryOf(fileNamed),
     year: fromFolder?.year ?? fromFile.year,
     season,
     episodes,

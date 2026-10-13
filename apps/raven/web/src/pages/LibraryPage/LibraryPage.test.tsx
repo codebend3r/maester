@@ -334,6 +334,15 @@ describe('LibraryPage', () => {
 })
 
 describe('LibraryPage for TV shows', () => {
+  const unknownEpisode = (match: 'unmatched' | 'pending') =>
+    mediaItem({
+      id: 30,
+      title: 'Unknown Show - S01E01',
+      folder: 'Unknown Show/Season 1',
+      fileName: 'Unknown Show - S01E01.mkv',
+      match,
+    })
+
   const spies = {
     get: spyOn(api, 'getLibrary'),
     shows: spyOn(api, 'listShows'),
@@ -371,7 +380,7 @@ describe('LibraryPage for TV shows', () => {
     )
     spies.shows.mockImplementation(async () => ({
       shows: [showEntry()],
-      unmatched: [mediaItem({ id: 30, title: 'Unknown Show - S01E01', match: 'unmatched' })],
+      unmatched: [unknownEpisode('unmatched')],
     }))
     renderLibraryPage()
   }
@@ -383,9 +392,12 @@ describe('LibraryPage for TV shows', () => {
       '/shows/4',
     )
     const headings = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
-    expect(headings).toEqual(['Matched, 1 show', 'Not matched, 1 video'])
+    expect(headings).toEqual(['Matched, 1 show', 'Not matched, 1 show'])
     expect(screen.getByText('Matched').closest('details')).not.toHaveAttribute('open')
     expect(screen.getByText('TV shows · 12 videos · 1 not matched')).toBeInTheDocument()
+    await userEvent.click(screen.getByText('Not matched', { selector: 'h2' }))
+    expect(screen.getByRole('button', { name: 'Fix match for Unknown Show' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /^Unknown Show/ }))
     expect(screen.getByRole('link', { name: 'Unknown Show - S01E01' })).toHaveAttribute(
       'href',
       '/watch/30',
@@ -427,7 +439,7 @@ describe('LibraryPage for TV shows', () => {
     )
     spies.shows.mockImplementationOnce(async () => ({
       shows: [showEntry()],
-      unmatched: [mediaItem({ id: 30, title: 'Unknown Show - S01E01', match: 'pending' })],
+      unmatched: [unknownEpisode('pending')],
     }))
     const button = screen.getByRole('button', { name: 'Match again' })
     await waitFor(() => expect(button).toBeEnabled())

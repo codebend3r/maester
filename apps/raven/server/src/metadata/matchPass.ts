@@ -28,6 +28,21 @@ const ALIAS_LOOKUPS = 5
 /** How far from the name's year a result can be to have them looked up: as far as `pickMatch` reaches. */
 const ALIAS_YEARS_APART = 3
 
+/**
+ * How soon a result's other titles are looked up: 0 when a title starts with
+ * the name's words (Archie (2023) is "Archie: The Man Who Became Cary Grant"
+ * in its own country), 1 when none contains the name, so TMDB found it by an
+ * alternative title ("Expired" finds Loveland), 2 when one holds it mid-title.
+ */
+const aliasTier = ({ result, name }: { result: SearchResult; name: string }): 0 | 1 | 2 => {
+  const titles = [result.title, result.originalTitle].flatMap((title) =>
+    title == null ? [] : [`${foldTitle(title)} `],
+  )
+  if (titles.some((title) => title.startsWith(`${name} `))) return 0
+  if (titles.some((title) => ` ${title}`.includes(` ${name} `))) return 2
+  return 1
+}
+
 /** A title to search TMDB for, with what narrows it. */
 export type SearchTitle = { title: string; year: number | null; country?: string | null }
 
@@ -189,7 +204,7 @@ export class MatchPass {
         // Loveland (2022), the name it was released under abroad.
         const aliased = pick({
           results: retried,
-          aliases: await this.aliasesOf({ type, year, results: retried }),
+          aliases: await this.aliasesOf({ type, title, year, results: retried }),
         })
         if (aliased != null || type !== 'movie') return aliased
         // TMDB leaves some films out of a search without adult titles though
@@ -203,22 +218,31 @@ export class MatchPass {
     })
   }
 
-  /** The other titles TMDB knows the results near `year` by, the first few of them. */
+  /**
+   * The other titles TMDB knows the results near `year` by, the first few of
+   * them: those whose titles start with the name first, then those that do
+   * not contain it, then the rest, each in TMDB's order, so a short name with
+   * many near matches still reaches the one it is short for.
+   */
   private async aliasesOf({
     type,
+    title,
     year,
     results,
   }: {
     type: MatchItemType
+    title: string
     year: number | null
     results: readonly SearchResult[]
   }): Promise<Map<string, string[]>> {
+    const name = foldTitle(title)
     const near = results
       .filter(
         (result) =>
           year == null ||
           (result.year != null && Math.abs(result.year - year) <= ALIAS_YEARS_APART),
       )
+      .toSorted((a, b) => aliasTier({ result: a, name }) - aliasTier({ result: b, name }))
       .slice(0, ALIAS_LOOKUPS)
     const found = await Promise.all(
       near.map(async (result) => {
