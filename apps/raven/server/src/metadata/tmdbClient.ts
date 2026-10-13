@@ -168,6 +168,20 @@ export type SearchResult = {
   originalLanguage: string | null
 }
 
+/**
+ * What Fix match's confidence reads of a result that TMDB's search does not
+ * give: a show's seasons and episode counts, or a movie's runtime in
+ * minutes, and the other titles TMDB knows it by.
+ */
+export type MatchFacts =
+  | {
+      type: 'show'
+      aliases: string[]
+      seasons: Array<{ number: number; episodeCount: number }>
+      episodeCount: number | null
+    }
+  | { type: 'movie'; aliases: string[]; runtime: number | null }
+
 export type TmdbState = {
   state: 'off' | 'ok' | 'failing'
   error: string | null
