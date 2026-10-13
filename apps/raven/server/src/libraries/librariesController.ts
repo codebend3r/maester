@@ -125,6 +125,7 @@ export class LibrariesController {
     return {
       ...record,
       paths: [],
+      layouts: [],
       scan: { ...scan, error: scan.error == null ? null : LOCKED_SCAN_ERROR },
       backdrop: null,
     }

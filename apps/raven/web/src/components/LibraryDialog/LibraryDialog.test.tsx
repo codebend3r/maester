@@ -107,6 +107,7 @@ describe('LibraryDialog', () => {
           ratingsSource: 'tmdb',
           autoRefresh: true,
           locked: false,
+          folderLayout: 'auto',
         },
       },
     ])
@@ -135,6 +136,7 @@ describe('LibraryDialog', () => {
         ratingsSource: 'tmdb',
         autoRefresh: false,
         locked: true,
+        folderLayout: 'auto',
       },
     })
   })

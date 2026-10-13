@@ -225,6 +225,8 @@ export const isLibrarySettings = object({
   autoRefresh: isBoolean,
   /** Private, whatever its type: its videos stay hidden until the server's PIN is entered. */
   locked: isBoolean,
+  /** Read letter and group folders as holding the titles (`auto`), or every top folder as one title (`flat`). */
+  folderLayout: isFolderLayout,
 })
 
 export type LibrarySettings = Infer<typeof isLibrarySettings>
@@ -252,6 +254,8 @@ export const isLibrary = object({
    * Docker). None while the library is locked to this browser.
    */
   paths: isStringArray,
+  /** How each path was read on its last full scan, in path order. None while the library is locked to this browser. */
+  layouts: listOf(isLibraryPathLayout),
   itemCount: isNumber,
   /** Files no movie or show was found for; 0 in a library that is not matched. */
   unmatchedCount: isNumber,

@@ -92,6 +92,7 @@ describe('isLibrary', () => {
             ratingsSource: 'imdb',
             autoRefresh: false,
             locked: true,
+            folderLayout: 'flat',
           },
         }),
       ),

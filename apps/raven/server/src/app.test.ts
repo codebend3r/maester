@@ -313,6 +313,7 @@ describe('the media server', () => {
           ratingsSource: 'tmdb',
           autoRefresh: true,
           locked: false,
+          folderLayout: 'auto',
         })
       })
 
@@ -391,6 +392,7 @@ describe('the media server', () => {
           ratingsSource: 'tmdb',
           autoRefresh: true,
           locked: false,
+          folderLayout: 'auto',
         })
         expect(updated.scan.state).toBe('idle')
         expect((await putLibrary({ pinned: true })).settings.pinned).toBe(true)
