@@ -325,7 +325,9 @@ export const fakeTmdb = ({
       const year = query.get('first_air_date_year')
       const results = state.shows.filter(
         (show) =>
-          show.title.toLowerCase().includes(title.toLowerCase()) &&
+          [show.title, ...(show.alternativeTitles ?? [])].some((each) =>
+            each.toLowerCase().includes(title.toLowerCase()),
+          ) &&
           (year == null || Math.abs(yearOf(show.first) - Number(year)) <= 1),
       )
       return json({

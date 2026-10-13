@@ -29,14 +29,19 @@ const ALIAS_LOOKUPS = 5
 const ALIAS_YEARS_APART = 3
 
 /**
- * Whether a result's title starts with the name's words, as titles a show
- * is better known by abroad tend to: Archie (2023) is "Archie: The Man Who
- * Became Cary Grant" in its own country.
+ * How soon a result's other titles are looked up: 0 when a title starts with
+ * the name's words (Archie (2023) is "Archie: The Man Who Became Cary Grant"
+ * in its own country), 1 when none contains the name, so TMDB found it by an
+ * alternative title ("Expired" finds Loveland), 2 when one holds it mid-title.
  */
-const startsWithName = ({ result, name }: { result: SearchResult; name: string }): boolean =>
-  [result.title, result.originalTitle].some(
-    (title) => title != null && `${foldTitle(title)} `.startsWith(`${name} `),
+const aliasTier = ({ result, name }: { result: SearchResult; name: string }): 0 | 1 | 2 => {
+  const titles = [result.title, result.originalTitle].flatMap((title) =>
+    title == null ? [] : [`${foldTitle(title)} `],
   )
+  if (titles.some((title) => title.startsWith(`${name} `))) return 0
+  if (titles.some((title) => ` ${title}`.includes(` ${name} `))) return 2
+  return 1
+}
 
 /** A title to search TMDB for, with what narrows it. */
 export type SearchTitle = { title: string; year: number | null; country?: string | null }
@@ -215,9 +220,9 @@ export class MatchPass {
 
   /**
    * The other titles TMDB knows the results near `year` by, the first few of
-   * them: those whose titles start with the name first, then the rest in
-   * TMDB's order, so a short name with many look-alikes still reaches the
-   * one it is short for.
+   * them: those whose titles start with the name first, then those that do
+   * not contain it, then the rest, each in TMDB's order, so a short name with
+   * many look-alikes still reaches the one it is short for.
    */
   private async aliasesOf({
     type,
@@ -237,10 +242,7 @@ export class MatchPass {
           year == null ||
           (result.year != null && Math.abs(result.year - year) <= ALIAS_YEARS_APART),
       )
-      .toSorted(
-        (a, b) =>
-          Number(startsWithName({ result: b, name })) - Number(startsWithName({ result: a, name })),
-      )
+      .toSorted((a, b) => aliasTier({ result: a, name }) - aliasTier({ result: b, name }))
       .slice(0, ALIAS_LOOKUPS)
     const found = await Promise.all(
       near.map(async (result) => {
