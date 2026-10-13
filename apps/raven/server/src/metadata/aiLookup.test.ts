@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import { isLibrary, isShowListing, type LibraryKind } from '@raven/core'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createApp } from '@/app'
 import { readServerConfig } from '@/config'
 import { MetadataService } from '@/metadata/metadataService'
@@ -252,5 +252,33 @@ describe("the AI lookup's daily limit, and Anthropic away", () => {
     const asked = server.claude.state.requests.length
     await server.matchAgain()
     expect(server.askedSince(asked)).toEqual(['Archie'])
+  })
+})
+
+describe('a library given up on during the lookups', () => {
+  const server = startServer({
+    prefix: 'raven-ai-gone-',
+    files: [ARCHIE, CESAR, WILD[0] ?? ''],
+    aiDailyLimit: 200,
+  })
+  afterAll(server.stop)
+
+  it('is not looked up any more once it is no longer a matched type', async () => {
+    const places = ['Archie', 'Cesar 911', 'Destination Wild Arctic']
+    const releases = places.map((place) => server.claude.hold(place))
+    const started = server.start()
+    const { requests } = server.claude.state
+    await vi.waitFor(() => expect(requests).toHaveLength(2))
+    const response = await server.app().inject({
+      method: 'PUT',
+      url: `/api/libraries/${server.state.library}`,
+      payload: { name: 'TV', paths: [join(server.state.root, 'TV')], settings: { kind: 'other' } },
+    })
+    expect(response.statusCode).toBe(200)
+    releases.forEach((release) => release())
+    await started
+    // The two lookups under way finish their turns; the third is never started.
+    expect(requests).toHaveLength(4)
+    expect(requests.filter((request) => request.place === 'Destination Wild Arctic')).toEqual([])
   })
 })

@@ -138,7 +138,8 @@ const answerFor = ({
  * place, gets its replies in turn, then words and no choice. A `status`
  * other than 200 answers every request with that error, marked not to be
  * retried, so a test never waits out the SDK's backoff. `requests` records
- * what raven sent.
+ * what raven sent. `hold` keeps a group's requests waiting, recorded but not
+ * answered, until the function it returns is called.
  */
 export const fakeClaude = ({
   lookups,
@@ -146,6 +147,20 @@ export const fakeClaude = ({
   lookups: Readonly<Partial<Record<string, readonly FakeReply[]>>>
 }) => {
   const state: { status: number; requests: SeenRequest[] } = { status: 200, requests: [] }
+  const held = new Map<string, Promise<void>>()
+  const hold = (place: string): (() => void) => {
+    const gate = { open: () => {} }
+    held.set(
+      place,
+      new Promise((resolve) => {
+        gate.open = resolve
+      }),
+    )
+    return () => {
+      held.delete(place)
+      gate.open()
+    }
+  }
   const fetch: AiFetch = async (input, init) => {
     const raw = typeof init?.body === 'string' ? init.body : ''
     const parsed: unknown = raw === '' ? null : JSON.parse(raw)
@@ -160,6 +175,7 @@ export const fakeClaude = ({
       place,
       turn,
     })
+    await held.get(place ?? '')
     if (state.status !== 200) {
       return json({
         body: { type: 'error', error: { type: 'api_error', message: 'Away.' } },
@@ -190,5 +206,5 @@ export const fakeClaude = ({
       },
     })
   }
-  return { fetch, state }
+  return { fetch, state, hold }
 }

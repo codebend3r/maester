@@ -387,7 +387,12 @@ export class MetadataService implements OnApplicationBootstrap {
     pass: MatchPass
     lookups: { isHalted: boolean }
   }): Promise<void> {
-    if (lookups.isHalted || !this.ai.take()) return
+    if (lookups.isHalted) return
+    // The groups were listed before the lookups began, and the library may
+    // have been removed or changed to a type that is not looked up since.
+    const current = this.libraries.get(library.id)
+    if (current == null || matchTypeFor(current.settings.kind) !== type) return
+    if (!this.ai.take()) return
     const outcome = await this.aiMatcher
       .decide(aiGroupOf({ library, type, place, files }))
       .catch((error: unknown) => {
