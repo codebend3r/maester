@@ -1,8 +1,10 @@
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { Library } from '@raven/core'
 import { Button } from '@/components/Button/Button'
 import { LibraryActions, type useLibraryActions } from '@/components/LibraryActions/LibraryActions'
 import { LibraryIcon } from '@/components/LibraryIcon/LibraryIcon'
 import { ScanStatus } from '@/components/ScanStatus/ScanStatus'
+import { api } from '@/lib/api'
 import { KINDS } from '@/lib/libraryKinds'
 import styles from '@/pages/LibraryPage/LibraryPage.module.scss'
 
@@ -17,14 +19,17 @@ export const LibraryHeader = ({
   library,
   actions,
   isShut,
-  onEdit,
 }: {
   titleId: string
   library: Library
   actions: ReturnType<typeof useLibraryActions>
   isShut: boolean
-  onEdit: () => void
 }) => {
+  const queryClient = useQueryClient()
+  const relock = useMutation({
+    mutationFn: api.lock,
+    onSuccess: () => queryClient.invalidateQueries(),
+  })
   const { settings } = library
   const unmatched = library.unmatchedCount
 
@@ -43,13 +48,9 @@ export const LibraryHeader = ({
         <ScanStatus scan={library.scan} />
       </div>
       <div className={styles.actions}>
-        <LibraryActions library={library} actions={actions} onEdit={onEdit} />
+        <LibraryActions library={library} isShut={isShut} actions={actions} />
         {settings.locked && !isShut && (
-          <Button
-            icon="lock"
-            disabled={actions.relock.isPending}
-            onClick={() => actions.relock.mutate()}
-          >
+          <Button icon="lock" disabled={relock.isPending} onClick={() => relock.mutate()}>
             Lock
           </Button>
         )}

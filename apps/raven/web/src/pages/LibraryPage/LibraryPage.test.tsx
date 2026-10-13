@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import type { Library, LibraryInput, LibrarySettings, MediaItem, MediaSort } from '@raven/core'
 import { api } from '@/lib/api'
 import { useUnlockPrompt } from '@/stores/unlockPrompt'
-import { library, mediaItem, showEntry } from '@/test/fixtures'
+import { library, mediaItem, metadataHealth, showEntry } from '@/test/fixtures'
 import { held } from '@/test/held'
 import { renderLibraryPage } from '@/test/libraryPage'
 import { pollFast } from '@/test/polls'
@@ -305,7 +305,7 @@ describe('LibraryPage', () => {
 
   it("links to the library's history", async () => {
     serve()
-    expect(await screen.findByRole('link', { name: 'History' })).toHaveAttribute(
+    expect(await screen.findByRole('link', { name: 'History Movies' })).toHaveAttribute(
       'href',
       '/libraries/2/history',
     )
@@ -333,7 +333,7 @@ describe('LibraryPage', () => {
     spies.lockState.mockImplementation(async () => ({ available: true, unlocked: false }))
     serve({ settings: { locked: true } })
     await screen.findByRole('region', { name: 'Locked' })
-    await userEvent.click(screen.getByRole('button', { name: 'Edit' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Movies' }))
     expect(useUnlockPrompt.getState().open).toBe(true)
     expect(screen.queryByRole('dialog')).toBeNull()
     useUnlockPrompt.setState({ open: false })
@@ -384,16 +384,7 @@ describe('LibraryPage for TV shows', () => {
         settings: { ...library().settings, kind: 'shows', ...settings },
       }),
     )
-    spies.health.mockImplementation(async () => ({
-      tmdb: 'ok',
-      omdb: 'off',
-      pending: 0,
-      error: null,
-      lastOk: null,
-      ai: 'off',
-      aiRemaining: 0,
-      aiPending: 0,
-    }))
+    spies.health.mockImplementation(async () => metadataHealth())
     spies.match.mockImplementation(async () =>
       library({ id: 2, name: 'TV', settings: { ...library().settings, kind: 'shows' } }),
     )
@@ -437,7 +428,7 @@ describe('LibraryPage for TV shows', () => {
   it('asks the server to match the files no show was found for again', async () => {
     serve()
     await screen.findByText('Not matched')
-    const button = screen.getByRole('button', { name: 'Match again' })
+    const button = screen.getByRole('button', { name: 'Match again TV' })
     await waitFor(() => expect(button).toBeEnabled())
     await userEvent.click(button)
     expect(spies.match).toHaveBeenCalledWith(2)
@@ -460,7 +451,7 @@ describe('LibraryPage for TV shows', () => {
       shows: [showEntry()],
       unmatched: [unknownEpisode('pending')],
     }))
-    const button = screen.getByRole('button', { name: 'Match again' })
+    const button = screen.getByRole('button', { name: 'Match again TV' })
     await waitFor(() => expect(button).toBeEnabled())
     await userEvent.click(button)
     expect(await screen.findByText('TV shows · 12 videos')).toBeInTheDocument()

@@ -5,7 +5,7 @@ import type { Library, LibraryInput } from '@raven/core'
 import { api } from '@/lib/api'
 import { LibrariesPage } from '@/pages/LibrariesPage/LibrariesPage'
 import { useUnlockPrompt } from '@/stores/unlockPrompt'
-import { library } from '@/test/fixtures'
+import { library, metadataHealth } from '@/test/fixtures'
 import { held } from '@/test/held'
 import { renderWithProviders } from '@/test/render'
 
@@ -51,16 +51,7 @@ describe('LibrariesPage', () => {
     })
     const matched = { ...films, unmatchedCount: 0 }
     spies.list.mockImplementation(async () => [films])
-    spies.health.mockImplementation(async () => ({
-      tmdb: 'ok',
-      omdb: 'off',
-      pending: 0,
-      error: null,
-      lastOk: null,
-      ai: 'off',
-      aiRemaining: 0,
-      aiPending: 0,
-    }))
+    spies.health.mockImplementation(async () => metadataHealth())
     spies.match.mockImplementation(async () => matched)
     renderWithProviders(<LibrariesPage />)
     const button = await screen.findByRole('button', { name: 'Match again Films' })

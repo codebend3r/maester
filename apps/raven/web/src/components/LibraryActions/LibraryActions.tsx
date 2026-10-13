@@ -1,67 +1,68 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { type Library, isScanning, matchTypeFor } from '@raven/core'
+import { useState } from 'react'
 import { Button, ButtonLink } from '@/components/Button/Button'
+import { LibraryDialog } from '@/components/LibraryDialog/LibraryDialog'
 import { api } from '@/lib/api'
+import { afterRematch, afterRescan } from '@/lib/invalidate'
 import { metadataHealthQuery } from '@/lib/queries'
 import { queryKeys } from '@/lib/queryClient'
+import { useUnlockPrompt } from '@/stores/unlockPrompt'
 
-/** What can be done to a library from its page or its row: lock it again, rescan it, match its files again. */
+/**
+ * Rescan and Match again for a library. The caller holds them, as Match
+ * again's error shows on its page below the tabs and in its row below the
+ * scan's status.
+ */
 export const useLibraryActions = (library: Library) => {
   const queryClient = useQueryClient()
-
-  const relock = useMutation({
-    mutationFn: api.lock,
-    onSuccess: () => queryClient.invalidateQueries(),
-  })
 
   const rescan = useMutation({
     mutationFn: () => api.scanLibrary(library.id),
     onSuccess: (updated) => {
       queryClient.setQueryData(queryKeys.library(library.id), updated)
-      return queryClient.invalidateQueries({ queryKey: queryKeys.libraries })
+      return afterRescan(queryClient)
     },
   })
 
-  // Match again sends the files no movie or show was found for back to TMDB;
-  // the listing then polls while any of them is pending. The Libraries page
-  // reads its list again for the count of files not matched.
   const rematch = useMutation({
     mutationFn: () => api.matchLibrary(library.id),
     onSuccess: (updated) => {
       queryClient.setQueryData(queryKeys.library(library.id), updated)
-      return Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.libraries, exact: true }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.showLists(library.id) }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.mediaLists(library.id) }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.unmatched(library.id) }),
-      ])
+      return afterRematch({ queryClient, libraryId: library.id })
     },
   })
 
-  return { relock, rescan, rematch }
+  return { rescan, rematch }
 }
 
 /**
  * A library's history, Rescan, Match again and Edit, in its page's header and
- * in its row on the Libraries page. In the list, where every row has the same
- * buttons, each says whose it is.
+ * in its row on the Libraries page. Each names its library to a screen
+ * reader, as the list has the same buttons on every row.
  */
 export const LibraryActions = ({
   library,
+  isShut,
   actions: { rescan, rematch },
-  isInList = false,
-  onEdit,
 }: {
   library: Library
+  isShut: boolean
   actions: ReturnType<typeof useLibraryActions>
-  isInList?: boolean
-  onEdit: () => void
 }) => {
+  const [isEditing, setEditing] = useState(false)
   const matchType = matchTypeFor(library.settings.kind)
   // Files only leave pending while TMDB answers, so Match again waits on it.
   const metadata = useQuery({ ...metadataHealthQuery, enabled: matchType != null })
   const canMatch = metadata.data?.tmdb === 'ok'
-  const whose = isInList && <span className="visually-hidden"> {library.name}</span>
+  const whose = <span className="visually-hidden"> {library.name}</span>
+
+  // A locked library's folders stay on the server until the PIN is entered,
+  // so Edit asks for it rather than open with none.
+  const edit = () => {
+    if (isShut) return useUnlockPrompt.getState().ask()
+    setEditing(true)
+  }
 
   return (
     <>
@@ -85,9 +86,10 @@ export const LibraryActions = ({
           Match again{whose}
         </Button>
       )}
-      <Button icon="edit" onClick={onEdit}>
+      <Button icon="edit" onClick={edit}>
         Edit{whose}
       </Button>
+      {isEditing && <LibraryDialog library={library} onClose={() => setEditing(false)} />}
     </>
   )
 }

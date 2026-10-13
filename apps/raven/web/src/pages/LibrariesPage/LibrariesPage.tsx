@@ -17,7 +17,6 @@ import { useOptimisticMutation } from '@/lib/optimistic'
 import { librariesQuery, lockQuery } from '@/lib/queries'
 import { mutationKeys } from '@/lib/queryClient'
 import styles from '@/pages/LibrariesPage/LibrariesPage.module.scss'
-import { useUnlockPrompt } from '@/stores/unlockPrompt'
 
 const count = new Intl.NumberFormat()
 
@@ -30,7 +29,6 @@ const count = new Intl.NumberFormat()
  */
 const LibraryRow = ({ library, isShut }: { library: Library; isShut: boolean }) => {
   const queryClient = useQueryClient()
-  const [isEditing, setEditing] = useState(false)
   const actions = useLibraryActions(library)
   // Only the pin is sent as a setting; the server keeps the others as they are.
   // It shows at once, here and in the side menu; home's shelves follow it.
@@ -44,13 +42,6 @@ const LibraryRow = ({ library, isShut }: { library: Library; isShut: boolean }) 
     edits: (pinned) => librarySettingsEdits({ libraryId: library.id, change: { pinned } }),
     settle: () => afterPins(queryClient),
   })
-
-  // A locked library's folders stay on the server until the PIN is entered,
-  // so Edit asks for it rather than open with none.
-  const edit = () => {
-    if (isShut) return useUnlockPrompt.getState().ask()
-    setEditing(true)
-  }
 
   const backdrop = !isShut && library.backdrop && api.libraryBackdropUrl(library.backdrop)
   const lockNote = isShut ? ' · Locked' : ' · Unlocked'
@@ -95,10 +86,9 @@ const LibraryRow = ({ library, isShut }: { library: Library; isShut: boolean }) 
           >
             Pin<span className="visually-hidden"> {library.name}</span>
           </Button>
-          <LibraryActions library={library} actions={actions} isInList onEdit={edit} />
+          <LibraryActions library={library} isShut={isShut} actions={actions} />
         </div>
       </div>
-      {isEditing && <LibraryDialog library={library} onClose={() => setEditing(false)} />}
     </li>
   )
 }
