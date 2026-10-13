@@ -177,9 +177,10 @@ export class LibrariesController {
 
   /**
    * Only a change of folders rescans. A change of type that reads files
-   * another way or prefers other results, or of folder layout, reads them
-   * again and matches what regrouped. A rename or another setting, the lock
-   * included, leaves the index as it is.
+   * another way, or of folder layout, reads them again and matches what
+   * regrouped; one that only prefers other results picks each file again
+   * where it stands. A rename or another setting, the lock included, leaves
+   * the index as it is.
    */
   @Put(':id')
   update(
@@ -191,8 +192,11 @@ export class LibrariesController {
     const input = this.parseLockable({ body, cookie, wasLocked: before.settings.locked })
     const record = this.libraries.update({ id, input })
     if (!record) throw new NotFoundException(`No library ${id}`)
-    if (!matchesAlike({ before: before.settings.kind, after: record.settings.kind })) {
-      this.metadata.changeKind({ libraryId: id, kind: record.settings.kind })
+    const { kind } = record.settings
+    if (matchTypeFor(before.settings.kind) !== matchTypeFor(kind)) {
+      this.metadata.changeKind({ libraryId: id, kind })
+    } else if (!matchesAlike({ before: before.settings.kind, after: kind })) {
+      this.metadata.changePreference({ libraryId: id, kind })
     } else if (before.settings.folderLayout !== record.settings.folderLayout) {
       this.metadata.changeLayout({ libraryId: id })
     }

@@ -138,6 +138,11 @@ export class MatchFiles {
     return this.files({ where: `m.library_id = ? AND m.match = 'pending'`, params: [libraryId] })
   }
 
+  /** A library's files a search matched, not a Fix match, by place as `pending` gives them. */
+  matched(libraryId: number): MatchFile[] {
+    return this.files({ where: `m.library_id = ? AND m.match = 'matched'`, params: [libraryId] })
+  }
+
   /** A library's files in `folder`, with their names, for the files sharing a place. */
   inFolder({ libraryId, folder }: { libraryId: number; folder: string }): MatchFile[] {
     return this.files({

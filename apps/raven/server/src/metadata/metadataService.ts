@@ -29,9 +29,9 @@ import { type LayoutRow, indexedLayoutsOf, planRelayout } from '@/scanner/layout
  * or NFO, then a search by title and year that only takes a sure answer.
  * Items are shared, so a second file of the same movie costs a search and
  * no fetch; a show is matched once per show folder, and each season fetched
- * once. Every pass ends by removing items, people and pictures nothing uses
- * any more. Its queue runs one piece of metadata work at a time, the sweep
- * `ItemRefresher` schedules included.
+ * once. Every pass TMDB does not stop ends by removing items, people and
+ * pictures nothing uses any more. Its queue runs one piece of metadata work
+ * at a time, the sweep `ItemRefresher` schedules included.
  */
 @Injectable()
 export class MetadataService implements OnApplicationBootstrap {
@@ -101,10 +101,9 @@ export class MetadataService implements OnApplicationBootstrap {
   }
 
   /**
-   * A library's type changed to one that reads or picks its files another
-   * way: every file's name is read again for the new type and matched from
-   * scratch, preferring the new type's results, or left off for a type that
-   * is not matched. Fix match choices stay.
+   * A library's type changed to one that reads its files another way: every
+   * file's name is read again for the new type and matched from scratch, or
+   * left off for a type that is not matched. Fix match choices stay.
    */
   changeKind({ libraryId, kind }: { libraryId: number; kind: LibraryKind }): void {
     this.queue.push(
@@ -112,6 +111,27 @@ export class MetadataService implements OnApplicationBootstrap {
       this.logged(`type change of library ${libraryId}`, async () => {
         this.relayoutNow(libraryId)
         this.files.rename({ libraryId, kind })
+        await this.pass(libraryId)
+      }),
+    )
+  }
+
+  /**
+   * A library's type changed to one that reads its files the same way but
+   * prefers other results: each matched file is picked again where it
+   * stands, so one that keeps its movie or show keeps its link and split,
+   * and its card stays up meanwhile. The files no movie or show was found
+   * for are searched again, and Fix match choices stay.
+   */
+  changePreference({ libraryId, kind }: { libraryId: number; kind: LibraryKind }): void {
+    this.queue.push(
+      `prefer:${libraryId}:${kind}`,
+      this.logged(`type change of library ${libraryId}`, async () => {
+        // A type changed again since then is matched by the change queued after this one.
+        if (this.libraries.get(libraryId)?.settings.kind !== kind) return
+        this.relayoutNow(libraryId)
+        this.files.retryUnmatched(libraryId)
+        await this.repick({ libraryId, kind })
         await this.pass(libraryId)
       }),
     )
@@ -229,12 +249,36 @@ export class MetadataService implements OnApplicationBootstrap {
     const type = kind == null ? null : matchTypeFor(kind)
     if (kind != null && type != null && this.tmdb.enabled) {
       this.tmdb.newPass()
-      await this.matchPending({ libraryId, kind, type })
+      const isStopped = await this.matchPending({ libraryId, kind, type })
+      // The items of files still waiting for TMDB stay, with their edits and
+      // pictures, until a pass that gets through matches the files to them again.
+      if (isStopped) return
     }
     await this.pictures.clearUp()
   }
 
-  /** Matches the library's pending files, and any that turn up while it runs. */
+  /** Matches `files` in the units the matcher keeps together, a few at once, until TMDB stops the pass. */
+  private async matchGroups({
+    files,
+    type,
+    pass,
+  }: {
+    files: readonly MatchFile[]
+    type: MatchItemType
+    pass: MatchPass
+  }): Promise<void> {
+    const matcher = this.matchers[type]
+    await mapWithConcurrency({
+      items: matcher.groups(files),
+      limit: PASS_CONCURRENCY,
+      fn: (group) => pass.guard.run(() => matcher.match({ files: group, pass })),
+    })
+  }
+
+  /**
+   * Matches the library's pending files, and any that turn up while it
+   * runs. Whether TMDB went away and stopped it.
+   */
   private async matchPending({
     libraryId,
     kind,
@@ -243,22 +287,38 @@ export class MetadataService implements OnApplicationBootstrap {
     libraryId: number
     kind: LibraryKind
     type: MatchItemType
-  }): Promise<void> {
+  }): Promise<boolean> {
     const pass = this.newPass(kind)
-    const matcher = this.matchers[type]
     const attempted = new Set<number>()
     const round = async (): Promise<void> => {
       const files = this.files.pending(libraryId).filter((file) => !attempted.has(file.id))
       if (files.length === 0 || pass.guard.isStopped) return
       files.forEach((file) => attempted.add(file.id))
-      await mapWithConcurrency({
-        items: matcher.groups(files),
-        limit: PASS_CONCURRENCY,
-        fn: (group) => pass.guard.run(() => matcher.match({ files: group, pass })),
-      })
+      await this.matchGroups({ files, type, pass })
       return round()
     }
     await round()
+    pass.guard.reportStop()
+    return pass.guard.isStopped
+  }
+
+  /**
+   * Matches the library's matched files again with a fresh pass for `kind`,
+   * in place: no file loses its link before its new pick replaces it, and a
+   * Fix match is never picked again.
+   */
+  private async repick({
+    libraryId,
+    kind,
+  }: {
+    libraryId: number
+    kind: LibraryKind
+  }): Promise<void> {
+    const type = matchTypeFor(kind)
+    if (type == null || !this.tmdb.enabled) return
+    this.tmdb.newPass()
+    const pass = this.newPass(kind)
+    await this.matchGroups({ files: this.files.matched(libraryId), type, pass })
     pass.guard.reportStop()
   }
 

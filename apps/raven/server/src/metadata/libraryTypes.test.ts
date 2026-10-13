@@ -2,7 +2,14 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
-import { isLibrary, isMatchCandidateList, isShowListing } from '@raven/core'
+import {
+  type MediaItem,
+  isItemDetails,
+  isLibrary,
+  isMatchCandidateList,
+  isMediaList,
+  isShowListing,
+} from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '@/app'
 import { readServerConfig } from '@/config'
@@ -33,7 +40,7 @@ const shape = <T>({
 describe('matching by library type', () => {
   // The live-action series is listed first, as TMDB lists the more popular one.
   const tmdb = fakeTmdb({
-    movies: [],
+    movies: [{ id: 603, title: 'The Matrix', released: '1999-03-31' }],
     shows: [
       {
         id: 90660,
@@ -58,27 +65,54 @@ describe('matching by library type', () => {
   const state: {
     root: string
     tv: string
+    films: string
     data: string
     app: NestFastifyApplication | null
     library: number
-  } = { root: '', tv: '', data: '', app: null, library: 0 }
+    filmLibrary: number
+  } = { root: '', tv: '', films: '', data: '', app: null, library: 0, filmLibrary: 0 }
   const app = (): NestFastifyApplication => {
     if (!state.app) throw new Error('app not started')
     return state.app
   }
   const settle = async () => {
     await app().get(ScannerService).whenIdle(state.library)
+    await app().get(ScannerService).whenIdle(state.filmLibrary)
     await app().get(MetadataService).whenIdle()
     await app().get(ThumbnailService).whenIdle()
   }
-  const setKind = async (kind: string): Promise<void> => {
-    await app().inject({
+  /** Saves a library's type as Edit does, and waits for the matching it sets off. */
+  const saveKind = async ({
+    id,
+    name,
+    path,
+    kind,
+  }: {
+    id: number
+    name: string
+    path: string
+    kind: string
+  }): Promise<void> => {
+    const response = await app().inject({
       method: 'PUT',
-      url: `/api/libraries/${state.library}`,
-      payload: { name: 'TV', paths: [state.tv], settings: { kind } },
+      url: `/api/libraries/${id}`,
+      payload: { name, paths: [path], settings: { kind } },
     })
+    expect(response.statusCode).toBe(200)
     await settle()
   }
+  const setKind = (kind: string) =>
+    saveKind({ id: state.library, name: 'TV', path: state.tv, kind })
+  const setFilmKind = (kind: string) =>
+    saveKind({ id: state.filmLibrary, name: 'Films', path: state.films, kind })
+  const films = async (): Promise<MediaItem[]> =>
+    shape({
+      response: await app().inject({
+        method: 'GET',
+        url: `/api/libraries/${state.filmLibrary}/media`,
+      }),
+      guard: isMediaList,
+    })
   const showYears = async (): Promise<Array<number | null>> =>
     shape({
       response: await app().inject({
@@ -91,16 +125,26 @@ describe('matching by library type', () => {
   beforeAll(async () => {
     state.root = await mkdtemp(join(tmpdir(), 'raven-types-'))
     state.tv = join(state.root, 'TV')
+    state.films = join(state.root, 'Films')
     state.data = join(state.root, 'data')
-    await encodeClip({
-      path: join(
-        state.tv,
-        'Cowboy Bebop',
-        'Season 1',
-        'Cowboy Bebop - S01E01 - Asteroid Blues.mp4',
-      ),
-      seconds: 1,
-    })
+    const matrix = join(state.films, 'The Matrix (1999)')
+    await Promise.all([
+      encodeClip({
+        path: join(
+          state.tv,
+          'Cowboy Bebop',
+          'Season 1',
+          'Cowboy Bebop - S01E01 - Asteroid Blues.mp4',
+        ),
+        seconds: 1,
+      }),
+      encodeClip({ path: join(matrix, 'The Matrix (1999) Bluray-1080p.mp4'), seconds: 1 }),
+      encodeClip({
+        path: join(matrix, 'The Matrix (1999) Remux-2160p.mp4'),
+        seconds: 1,
+        size: '640x360',
+      }),
+    ])
     state.app = await createApp({
       config: {
         ...readServerConfig({}),
@@ -122,6 +166,14 @@ describe('matching by library type', () => {
         method: 'POST',
         url: '/api/libraries',
         payload: { name: 'TV', paths: [state.tv], settings: { kind: 'shows' } },
+      }),
+      guard: isLibrary,
+    }).id
+    state.filmLibrary = shape({
+      response: await app().inject({
+        method: 'POST',
+        url: '/api/libraries',
+        payload: { name: 'Films', paths: [state.films], settings: { kind: 'movies' } },
       }),
       guard: isLibrary,
     }).id
@@ -168,5 +220,84 @@ describe('matching by library type', () => {
       url: '/api/match/search?type=show&query=Cowboy%20Bebop&libraryId=abc',
     })
     expect(response.statusCode).toBe(400)
+  })
+
+  it('keeps a split movie split when Movies becomes Anime movies, searching TMDB again', async () => {
+    const cards = async () =>
+      (await films()).map((card) => [card.fileName, card.variant, card.item?.title ?? null])
+    const [card] = await films()
+    const split = await app().inject({
+      method: 'POST',
+      url: `/api/libraries/${state.filmLibrary}/duplicates/split`,
+      payload: { mediaId: card?.id, how: 'apart' },
+    })
+    expect(split.statusCode).toBe(200)
+    const apart = await cards()
+    expect(apart).toHaveLength(2)
+    expect(apart.every(([, variant]) => variant != null)).toBe(true)
+    const asked = tmdb.state.calls.length
+    await setFilmKind('animeMovies')
+    expect(await cards()).toEqual(apart)
+    expect(tmdb.state.calls.length).toBeGreaterThan(asked)
+    await setFilmKind('movies')
+    expect(await cards()).toEqual(apart)
+  })
+
+  it('keeps the movie, its edits and its matches when Movies becomes Anime movies while TMDB is away', async () => {
+    await setFilmKind('movies')
+    const [card] = await films()
+    const itemId = card?.item?.id
+    const movie = async () =>
+      shape({
+        response: await app().inject({ method: 'GET', url: `/api/items/${itemId}` }),
+        guard: isItemDetails,
+      })
+    const edited = await app().inject({
+      method: 'PUT',
+      url: `/api/items/${itemId}/metadata`,
+      payload: { title: 'The Matrix (Edited)' },
+    })
+    expect(edited.statusCode).toBe(200)
+    tmdb.state.down = true
+    await setFilmKind('animeMovies')
+    tmdb.state.down = false
+    const kept = await movie()
+    expect(kept.title).toBe('The Matrix (Edited)')
+    expect(kept.versions.map((version) => [version.match, version.item?.id])).toEqual([
+      ['matched', itemId],
+      ['matched', itemId],
+    ])
+    await setFilmKind('movies')
+    expect((await movie()).title).toBe('The Matrix (Edited)')
+  })
+
+  it('keeps a show while TMDB is away during a change to Movies, and finds it again once it is back', async () => {
+    const listing = async () =>
+      shape({
+        response: await app().inject({
+          method: 'GET',
+          url: `/api/libraries/${state.library}/shows`,
+        }),
+        guard: isShowListing,
+      }).shows.map((entry) => ({ id: entry.show.id, title: entry.show.title }))
+    const [show] = await listing()
+    const showId = show?.id
+    await app().inject({
+      method: 'PUT',
+      url: `/api/items/${showId}/metadata`,
+      payload: { title: 'Cowboy Bebop (Edited)' },
+    })
+    tmdb.state.down = true
+    await setKind('movies')
+    tmdb.state.down = false
+    const kept = await app().inject({ method: 'GET', url: `/api/items/${showId}` })
+    expect(shape({ response: kept, guard: isItemDetails }).title).toBe('Cowboy Bebop (Edited)')
+    await setKind('shows')
+    expect(await listing()).toEqual([{ id: showId, title: 'Cowboy Bebop (Edited)' }])
+    await app().inject({
+      method: 'PUT',
+      url: `/api/items/${showId}/metadata`,
+      payload: { title: null },
+    })
   })
 })
