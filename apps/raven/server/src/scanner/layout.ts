@@ -121,61 +121,31 @@ const fixPlacesOf = ({
   return { title: file.folder === '' ? own : file.folder, own }
 }
 
-/**
- * Where a moving file takes the places a Fix match can be kept under. A file
- * whose title's place is its own takes it as its own alone, so the folder it
- * comes to share with other titles never claims it.
- */
-const fixMovesOf = ({
-  kind,
-  file,
-  folder,
-}: {
-  kind: LibraryKind
-  file: LayoutRow
-  folder: string
-}): Array<{ id: number; from: string; to: string }> => {
-  const before = fixPlacesOf({ kind, file })
-  const after = fixPlacesOf({ kind, file: { folder, fileName: file.fileName } })
-  return before.title === before.own
-    ? [{ id: file.id, from: before.own, to: after.own }]
-    : [
-        { id: file.id, from: before.title, to: after.title },
-        { id: file.id, from: before.own, to: after.own },
-      ]
-}
+/** The places that hold a file: one at a title root, its title's and its own elsewhere. */
+const placesIn = (places: FixPlaces): string[] =>
+  places.title === places.own ? [places.own] : [places.title, places.own]
 
 /** What becomes of one Fix match: it stays where it is, goes, or moves to one new place. */
 type FixFate = { from: string } & (
   | { fate: 'stays' }
   | { fate: 'goes' }
-  | { fate: 'moves'; to: string }
+  | { fate: 'moves'; to: string; isOwn: boolean }
 )
-
-/** Holds every move into a place a Fix match stays at, again until none is left, as each hold leaves one more staying. */
-const holdTaken = (fates: readonly FixFate[]): readonly FixFate[] => {
-  const staying = new Set(
-    fates.filter((fixed) => fixed.fate === 'stays').map((fixed) => fixed.from),
-  )
-  const held = fates.map((fixed): FixFate =>
-    fixed.fate === 'moves' && staying.has(fixed.to) ? { from: fixed.from, fate: 'stays' } : fixed,
-  )
-  return held.some((fixed, index) => fixed !== fates[index]) ? holdTaken(held) : fates
-}
 
 /**
  * Reads every file's place again for the library's type and folder layout.
- * Only files whose folder changes move. A Fix match:
+ * Only files whose folder changes move. A Fix match never ends up at a place
+ * whose files include one it did not cover before:
  *
- * - stays where it is while a file that does not move still has its place;
- * - goes when its files now sit in several places, as a whole letter folder
- *   kept as one show was made for files that were never one title;
- * - moves when its files now sit in one place no other file reaches, no
- *   other Fix match moves to, and no Fix match staying holds;
- * - otherwise stays, as when setting flat merges titles into one place: it
- *   applies to nothing there, and again once the layout is set back.
+ * - when its files now sit under several places, it goes, as a whole letter
+ *   folder kept as one show was made for files that were never one title;
+ * - when they sit under one new place that holds none of anyone else's, it
+ *   moves there, or stays when that is where it was;
+ * - otherwise it stays where it was if nothing else came there, applying to
+ *   nothing until the layout is set back, and goes if something did.
  *
- * Files under none of the roots are left out.
+ * When a file's own Fix match and its folder's would land on one place, its
+ * own moves and the other goes. Files under none of the roots are left out.
  */
 export const planRelayout = ({
   rows,
@@ -197,57 +167,61 @@ export const planRelayout = ({
       titleRootOf({ root, path: file.path, kind, layout }),
       dirname(file.path),
     )
-    return [{ file, folder }]
+    return [
+      {
+        id: file.id,
+        folder,
+        isMoved: folder !== file.folder,
+        before: fixPlacesOf({ kind, file }),
+        after: fixPlacesOf({ kind, file: { folder, fileName: file.fileName } }),
+      },
+    ]
   })
-  const moved = placed.filter(({ file, folder }) => folder !== file.folder)
-  const kept = new Set(
-    placed
-      .filter(({ file, folder }) => folder === file.folder)
-      .flatMap(({ file }) => Object.values(fixPlacesOf({ kind, file }))),
-  )
-  const reached = groupBy({
-    items: placed.flatMap(({ file, folder }) =>
-      Object.values(fixPlacesOf({ kind, file: { folder, fileName: file.fileName } })).map(
-        (place) => ({ place, id: file.id }),
-      ),
-    ),
-    key: (entry) => entry.place,
-  })
-  const sources = groupBy({
-    items: moved.flatMap(({ file, folder }) => fixMovesOf({ kind, file, folder })),
-    key: (pair) => pair.from,
-  })
+  const under = (side: 'before' | 'after') =>
+    groupBy({
+      items: placed.flatMap((file) => placesIn(file[side]).map((place) => ({ place, file }))),
+      key: (entry) => entry.place,
+    })
+  const before = under('before')
+  const after = under('after')
   const fateOf = (from: string): FixFate => {
-    if (kept.has(from)) return { from, fate: 'stays' }
-    const pairs = sources.get(from) ?? []
-    const targets = [...new Set(pairs.map((pair) => pair.to))]
+    const covered = (before.get(from) ?? []).map((entry) => entry.file)
+    const ids = new Set(covered.map((file) => file.id))
+    const gainsNothing = (place: string) =>
+      (after.get(place) ?? []).every((entry) => ids.has(entry.file.id))
+    const where: FixFate = gainsNothing(from) ? { from, fate: 'stays' } : { from, fate: 'goes' }
+    // A file takes a Fix match kept at its own place to its own, and one kept at its title's to its title's.
+    const targets = [
+      ...new Set(
+        covered.map((file) => (from === file.before.own ? file.after.own : file.after.title)),
+      ),
+    ]
     const [to] = targets
-    if (to == null || to === from) return { from, fate: 'stays' }
+    if (to == null) return where
     if (targets.length > 1) return { from, fate: 'goes' }
-    const covered = new Set(pairs.map((pair) => pair.id))
-    const isShared = (reached.get(to) ?? []).some((entry) => !covered.has(entry.id))
-    return isShared ? { from, fate: 'stays' } : { from, fate: 'moves', to }
+    if (to === from || !gainsNothing(to)) return where
+    return { from, fate: 'moves', to, isOwn: covered.every((file) => file.before.own === from) }
   }
   const fates = overrides.map(fateOf)
-  const claims = groupBy({
-    items: fates.flatMap((fixed) => (fixed.fate === 'moves' ? [fixed.to] : [])),
-    key: (to) => to,
+  const rivals = groupBy({
+    items: fates.flatMap((fixed) => (fixed.fate === 'moves' ? [fixed] : [])),
+    key: (fixed) => fixed.to,
   })
-  const unshared = fates.map((fixed): FixFate =>
-    fixed.fate === 'moves' && (claims.get(fixed.to)?.length ?? 0) > 1
-      ? { from: fixed.from, fate: 'stays' }
-      : fixed,
-  )
   return {
-    moves: moved.map(({ file, folder }) => ({ id: file.id, folder })),
-    overrides: holdTaken(unshared).flatMap((fixed): RelayoutPlan['overrides'] => {
+    moves: placed.flatMap((file) => (file.isMoved ? [{ id: file.id, folder: file.folder }] : [])),
+    overrides: fates.flatMap((fixed): RelayoutPlan['overrides'] => {
       switch (fixed.fate) {
         case 'stays':
           return []
         case 'goes':
           return [{ from: fixed.from, to: null }]
-        case 'moves':
-          return [{ from: fixed.from, to: fixed.to }]
+        case 'moves': {
+          const claims = rivals.get(fixed.to) ?? []
+          const isWinner =
+            claims.length === 1 ||
+            (fixed.isOwn && claims.filter((claim) => claim.isOwn).length === 1)
+          return [{ from: fixed.from, to: isWinner ? fixed.to : null }]
+        }
         default: {
           const unknown: never = fixed
           return unknown

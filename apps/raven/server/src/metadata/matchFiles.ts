@@ -284,7 +284,7 @@ export class MatchFiles {
   layoutRows(libraryId: number): LayoutRow[] {
     return this.db
       .prepare<[number], { id: number; path: string; folder: string; file_name: string }>(
-        'SELECT id, path, folder, file_name FROM media WHERE library_id = ?',
+        'SELECT id, path, folder, file_name FROM media WHERE library_id = ? ORDER BY id',
       )
       .all(libraryId)
       .map((row) => ({ id: row.id, path: row.path, folder: row.folder, fileName: row.file_name }))

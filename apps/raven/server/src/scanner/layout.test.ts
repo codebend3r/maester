@@ -150,7 +150,7 @@ describe('planRelayout', () => {
     ])
   })
 
-  it('leaves a Fix match where it is while a file that does not move still uses its place', () => {
+  it("drops a group folder's Fix match once its files sit under several places, though some did not move", () => {
     const plan = planRelayout({
       rows: [
         row(
@@ -165,7 +165,10 @@ describe('planRelayout', () => {
       layout: 'auto',
       overrides: ['Requests'],
     })
-    expect(plan).toEqual({ moves: [{ id: 1, folder: 'Cupertino/Season 1' }], overrides: [] })
+    expect(plan).toEqual({
+      moves: [{ id: 1, folder: 'Cupertino/Season 1' }],
+      overrides: [{ from: 'Requests', to: null }],
+    })
   })
 
   it("moves a Fix match kept for a letter folder holding one loose movie to the movie's file", () => {
@@ -239,7 +242,7 @@ describe('planRelayout', () => {
     })
   })
 
-  it('leaves a Fix match where it is when another that stays already holds its new place', () => {
+  it("drops a Fix match kept for a place with no files once a title lands there, and moves the title's own there", () => {
     const plan = planRelayout({
       rows: [row(1, '/m/TV/A/Andor/Season 1/Andor - S01E01.mkv', 'Andor/Season 1')],
       roots: ['/m/TV'],
@@ -247,10 +250,63 @@ describe('planRelayout', () => {
       layout: 'flat',
       overrides: ['Andor', 'A'],
     })
-    expect(plan.overrides).toEqual([])
+    expect(plan.overrides).toEqual([
+      { from: 'Andor', to: 'A' },
+      { from: 'A', to: null },
+    ])
   })
 
-  it('moves Fix matches along a chain, and holds the chain when its end is taken', () => {
+  it("drops a whole letter's Fix match whichever order its files come in", () => {
+    const rows = [
+      row(1, '/m/TV/K/K/Season 1/K - S01E01.mkv', 'K/K/Season 1'),
+      row(2, '/m/TV/K/Kingdom/Season 1/Kingdom - S01E01.mkv', 'K/Kingdom/Season 1'),
+    ]
+    const planFor = (ordered: typeof rows) =>
+      planRelayout({
+        rows: ordered,
+        roots: ['/m/TV'],
+        kind: 'shows',
+        layout: 'auto',
+        overrides: ['K'],
+      })
+    expect(planFor(rows).overrides).toEqual([{ from: 'K', to: null }])
+    expect(planFor(rows.toReversed()).overrides).toEqual([{ from: 'K', to: null }])
+  })
+
+  it("drops a show's Fix match when setting flat would have it cover its letter's other shows", () => {
+    const plan = planRelayout({
+      rows: [
+        row(1, '/m/TV/K/K/Season 1/K - S01E01.mkv', 'K/Season 1'),
+        row(2, '/m/TV/K/Kingdom/Season 1/Kingdom - S01E01.mkv', 'Kingdom/Season 1'),
+      ],
+      roots: ['/m/TV'],
+      kind: 'shows',
+      layout: 'flat',
+      overrides: ['K'],
+    })
+    expect(plan.overrides).toEqual([{ from: 'K', to: null }])
+  })
+
+  it("moves a loose movie's own Fix match, and drops its letter folder's, when both would land on it", () => {
+    const planFor = (overrides: string[]) =>
+      planRelayout({
+        rows: [row(6, '/m/Movies/H/Heat (1995).mp4', 'H')],
+        roots: ['/m/Movies'],
+        kind: 'movies',
+        layout: 'auto',
+        overrides,
+      })
+    const expected = [
+      { from: 'H', to: null },
+      { from: 'H/Heat (1995).mp4', to: 'Heat (1995).mp4' },
+    ]
+    const byPlace = (entries: ReturnType<typeof planFor>['overrides']) =>
+      entries.toSorted((a, b) => a.from.localeCompare(b.from))
+    expect(byPlace(planFor(['H', 'H/Heat (1995).mp4']).overrides)).toEqual(expected)
+    expect(byPlace(planFor(['H/Heat (1995).mp4', 'H']).overrides)).toEqual(expected)
+  })
+
+  it('moves Fix matches along a chain, and drops one left at its end with no files', () => {
     const rows = [
       row(1, '/m/TV/Requests/K/Season 1/K - S01E01.mkv', 'Requests/K/Season 1'),
       row(2, '/m/TV/K/Kingdom/Season 1/Kingdom - S01E01.mkv', 'K/Kingdom/Season 1'),
@@ -266,14 +322,18 @@ describe('planRelayout', () => {
       { from: 'Requests', to: 'K' },
       { from: 'K', to: 'Kingdom' },
     ])
-    const held = planRelayout({
+    const ended = planRelayout({
       rows,
       roots: ['/m/TV'],
       kind: 'shows',
       layout: 'auto',
       overrides: ['Requests', 'K', 'Kingdom'],
     })
-    expect(held.overrides).toEqual([])
+    expect(ended.overrides).toEqual([
+      { from: 'Requests', to: 'K' },
+      { from: 'K', to: 'Kingdom' },
+      { from: 'Kingdom', to: null },
+    ])
   })
 
   it("moves a loose movie's Fix match with it when the library is set to flat", () => {
