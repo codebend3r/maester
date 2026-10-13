@@ -1,9 +1,9 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { type Library, isScanning } from '@raven/core'
-import { useId, useState } from 'react'
+import { useId } from 'react'
 import { Navigate, useParams } from 'react-router-dom'
 import { ButtonLink } from '@/components/Button/Button'
-import { LibraryDialog } from '@/components/LibraryDialog/LibraryDialog'
+import { useLibraryActions } from '@/components/LibraryActions/LibraryActions'
 import { LockedLibrary } from '@/components/LockedLibrary/LockedLibrary'
 import { MediaGridSkeleton } from '@/components/MediaGrid/MediaGrid'
 import { RouteState } from '@/components/RouteState/RouteState'
@@ -11,7 +11,7 @@ import { Bone } from '@/components/Skeleton/Skeleton'
 import { useLibraryLock } from '@/lib/libraryLock'
 import { librariesQuery, libraryQuery } from '@/lib/queries'
 import { routeState, useRouteId } from '@/lib/routeQuery'
-import { LibraryHeader, useLibraryActions } from '@/pages/LibraryPage/LibraryHeader'
+import { LibraryHeader } from '@/pages/LibraryPage/LibraryHeader'
 import { LibraryTabs } from '@/pages/LibraryPage/LibraryTabs'
 import { SectionView } from '@/pages/LibraryPage/SectionViews'
 import {
@@ -22,24 +22,15 @@ import {
   sectionPath,
 } from '@/pages/LibraryPage/librarySections'
 import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
-import { useUnlockPrompt } from '@/stores/unlockPrompt'
 import styles from '@/pages/LibraryPage/LibraryPage.module.scss'
 
 /** The page once its library is known, open at one of its tabs. */
 const LibraryView = ({ library, section }: { library: Library; section: LibrarySection }) => {
   const titleId = useId()
-  const [isEditing, setEditing] = useState(false)
   // A locked library's videos are not asked for until this browser has the PIN.
   const lock = useLibraryLock(library)
   const isShut = lock.state !== 'open'
   const actions = useLibraryActions(library)
-
-  // A locked library's folders stay on the server until the PIN is entered,
-  // so Edit asks for it rather than open with none.
-  const edit = () => {
-    if (isShut) return useUnlockPrompt.getState().ask()
-    setEditing(true)
-  }
 
   return (
     <section className={styles.page} aria-labelledby={titleId}>
@@ -47,13 +38,7 @@ const LibraryView = ({ library, section }: { library: Library; section: LibraryS
         Libraries
       </ButtonLink>
 
-      <LibraryHeader
-        titleId={titleId}
-        library={library}
-        actions={actions}
-        isShut={isShut}
-        onEdit={edit}
-      />
+      <LibraryHeader titleId={titleId} library={library} actions={actions} isShut={isShut} />
 
       {lock.state === 'shut' && <LockedLibrary name={library.name} available={lock.available} />}
 
@@ -73,8 +58,6 @@ const LibraryView = ({ library, section }: { library: Library; section: LibraryS
           </section>
         </>
       )}
-
-      {isEditing && <LibraryDialog library={library} onClose={() => setEditing(false)} />}
     </section>
   )
 }

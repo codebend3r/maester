@@ -9,6 +9,7 @@ import {
   library,
   matchedMovie,
   mediaItem,
+  metadataHealth,
   unmatchedFile,
 } from '@/test/fixtures'
 import { renderLibraryPage } from '@/test/libraryPage'
@@ -268,16 +269,7 @@ describe('LibraryPage tabs', () => {
     const lost = (match: 'pending' | 'unmatched') => [
       unmatchedFile({ id: 9, title: 'Unknown Thing', match }),
     ]
-    spies.health.mockImplementation(async () => ({
-      tmdb: 'ok',
-      omdb: 'off',
-      pending: 0,
-      error: null,
-      lastOk: null,
-      ai: 'off',
-      aiRemaining: 0,
-      aiPending: 0,
-    }))
+    spies.health.mockImplementation(async () => metadataHealth())
     spies.get.mockImplementation(async () => films(1))
     spies.unmatched.mockImplementation(async () => lost('unmatched'))
     renderLibraryPage({ route: '/libraries/2/not-matched' })
@@ -285,7 +277,7 @@ describe('LibraryPage tabs', () => {
     // Match again sends the file back to pending, and the pass leaves it unmatched again.
     spies.match.mockImplementation(async () => films(0))
     spies.unmatched.mockImplementationOnce(async () => lost('pending'))
-    const button = screen.getByRole('button', { name: 'Match again' })
+    const button = screen.getByRole('button', { name: 'Match again Films' })
     await waitFor(() => expect(button).toBeEnabled())
     await userEvent.click(button)
     expect(await screen.findByText('Movies · 12 videos')).toBeInTheDocument()
@@ -296,16 +288,9 @@ describe('LibraryPage tabs', () => {
   it('reads the files not matched again once the AI lookups end, showing what they suggest', async () => {
     pollFast()
     const lookups = { pending: 1 }
-    spies.health.mockImplementation(async () => ({
-      tmdb: 'ok',
-      omdb: 'off',
-      pending: 0,
-      error: null,
-      lastOk: null,
-      ai: 'ok',
-      aiRemaining: 199,
-      aiPending: lookups.pending,
-    }))
+    spies.health.mockImplementation(async () =>
+      metadataHealth({ ai: 'ok', aiRemaining: 199, aiPending: lookups.pending }),
+    )
     spies.unmatched.mockImplementation(async () => [
       unmatchedFile({
         id: 9,
@@ -329,16 +314,7 @@ describe('LibraryPage tabs', () => {
 
   it('reads health no more while the AI lookup is off', async () => {
     pollFast()
-    spies.health.mockImplementation(async () => ({
-      tmdb: 'ok',
-      omdb: 'off',
-      pending: 1,
-      error: null,
-      lastOk: null,
-      ai: 'off',
-      aiRemaining: 0,
-      aiPending: 0,
-    }))
+    spies.health.mockImplementation(async () => metadataHealth({ pending: 1 }))
     spies.unmatched.mockImplementation(async () => [
       unmatchedFile({ id: 9, title: 'Unknown Thing', match: 'pending' }),
     ])

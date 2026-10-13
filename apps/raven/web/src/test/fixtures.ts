@@ -4,6 +4,7 @@ import type {
   ItemSummary,
   Library,
   MediaItem,
+  MetadataHealth,
   Review,
   ShowEntry,
   UnmatchedFile,
@@ -40,6 +41,19 @@ export const library = (overrides: Partial<Library> = {}): Library => ({
     icon: null,
   },
   backdrop: null,
+  ...overrides,
+})
+
+/** How metadata stands: TMDB answering, OMDb and the AI lookup off, nothing pending. */
+export const metadataHealth = (overrides: Partial<MetadataHealth> = {}): MetadataHealth => ({
+  tmdb: 'ok',
+  omdb: 'off',
+  pending: 0,
+  error: null,
+  lastOk: null,
+  ai: 'off',
+  aiRemaining: 0,
+  aiPending: 0,
   ...overrides,
 })
 

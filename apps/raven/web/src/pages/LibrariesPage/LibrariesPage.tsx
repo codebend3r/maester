@@ -1,8 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { type Library, isScanning } from '@raven/core'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/Button/Button'
+import { LibraryActions, useLibraryActions } from '@/components/LibraryActions/LibraryActions'
 import { LibraryDialog } from '@/components/LibraryDialog/LibraryDialog'
 import { LibraryIcon } from '@/components/LibraryIcon/LibraryIcon'
 import { ScanStatus } from '@/components/ScanStatus/ScanStatus'
@@ -14,24 +15,21 @@ import { KINDS } from '@/lib/libraryKinds'
 import { lockState } from '@/lib/libraryLock'
 import { useOptimisticMutation } from '@/lib/optimistic'
 import { librariesQuery, lockQuery } from '@/lib/queries'
-import { mutationKeys, queryKeys } from '@/lib/queryClient'
+import { mutationKeys } from '@/lib/queryClient'
 import styles from '@/pages/LibrariesPage/LibrariesPage.module.scss'
 
 const count = new Intl.NumberFormat()
 
 /**
  * A library's row: its type icon beside its name, its counts and folders,
- * and its actions. Hovered or focused, the picture of its newest video
- * fades in behind it. While it is locked to this browser it shows only its
- * name, type and counts; the server sends no more, and a list cached from
- * before is held to the same.
+ * and its actions, the library page's own with Pin before them. Hovered or
+ * focused, the picture of its newest video fades in behind it. While it is
+ * locked to this browser it shows only its name, type and counts; the server
+ * sends no more, and a list cached from before is held to the same.
  */
 const LibraryRow = ({ library, isShut }: { library: Library; isShut: boolean }) => {
   const queryClient = useQueryClient()
-  const rescan = useMutation({
-    mutationFn: () => api.scanLibrary(library.id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.libraries }),
-  })
+  const actions = useLibraryActions(library)
   // Only the pin is sent as a setting; the server keeps the others as they are.
   // It shows at once, here and in the side menu; home's shelves follow it.
   const pin = useOptimisticMutation({
@@ -73,6 +71,11 @@ const LibraryRow = ({ library, isShut }: { library: Library; isShut: boolean }) 
         )}
         <div className={styles.status}>
           <ScanStatus scan={library.scan} />
+          {actions.rematch.isError && (
+            <p className={styles.error} role="alert">
+              Could not match again: {actions.rematch.error.message}
+            </p>
+          )}
         </div>
         <div className={styles.actions}>
           <Button
@@ -83,13 +86,7 @@ const LibraryRow = ({ library, isShut }: { library: Library; isShut: boolean }) 
           >
             Pin<span className="visually-hidden"> {library.name}</span>
           </Button>
-          <Button
-            icon="rescan"
-            disabled={isScanning(library.scan) || rescan.isPending}
-            onClick={() => rescan.mutate()}
-          >
-            Rescan
-          </Button>
+          <LibraryActions library={library} isShut={isShut} actions={actions} />
         </div>
       </div>
     </li>

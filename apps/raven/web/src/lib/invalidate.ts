@@ -67,6 +67,31 @@ export const afterPins = (queryClient: QueryClient): Promise<unknown> =>
     filters: [{ queryKey: queryKeys.libraries }, { queryKey: queryKeys.home }],
   })
 
+/** A library was rescanned: every library and everything listed under them. */
+export const afterRescan = (queryClient: QueryClient): Promise<unknown> =>
+  refetch({ queryClient, filters: [{ queryKey: queryKeys.libraries }] })
+
+/**
+ * A library's files not matched went back to TMDB: the libraries list for its
+ * count, and its listings, which then poll while any file is pending.
+ */
+export const afterRematch = ({
+  queryClient,
+  libraryId,
+}: {
+  queryClient: QueryClient
+  libraryId: number
+}): Promise<unknown> =>
+  refetch({
+    queryClient,
+    filters: [
+      { queryKey: queryKeys.libraries, exact: true },
+      { queryKey: queryKeys.showLists(libraryId) },
+      { queryKey: queryKeys.mediaLists(libraryId) },
+      { queryKey: queryKeys.unmatched(libraryId) },
+    ],
+  })
+
 /** A library's sort, view or grouping was saved: the library, and the list the side menu reads. */
 export const afterLibraryView = ({
   queryClient,
