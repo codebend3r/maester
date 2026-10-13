@@ -8,7 +8,7 @@ export const isAiConfidence = oneOf(['high', 'low'])
 export type AiConfidence = Infer<typeof isAiConfidence>
 
 /** The movie or show the AI lookup chose, as the search that offered it described it. */
-export type AiPick = { tmdbId: string; title: string; year: number | null; poster: string | null }
+export type AiPick = Omit<AiSuggestion, 'reason'>
 
 /** How one lookup came out. */
 export type AiOutcome =
