@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { AiMatch, MediaItem } from '@raven/core'
+import type { AiMatch, MatchItemType, MediaItem } from '@raven/core'
 import { useState } from 'react'
 import { MediaMenu } from '@/components/MediaMenu/MediaMenu'
 import { api } from '@/lib/api'
@@ -12,10 +12,12 @@ const Harness = ({
   media,
   onMatched,
   aiMatch = null,
+  matchType = 'movie',
 }: {
   media: MediaItem
   onMatched: (media: MediaItem) => void
   aiMatch?: AiMatch | null
+  matchType?: MatchItemType
 }) => {
   const [open, setOpen] = useState(false)
   return (
@@ -23,7 +25,7 @@ const Harness = ({
       media={media}
       open={open}
       onOpenChange={setOpen}
-      matchType="movie"
+      matchType={matchType}
       onMatched={onMatched}
       aiMatch={aiMatch}
     />
@@ -140,6 +142,27 @@ describe('Fix match', () => {
     expect(screen.getByRole('dialog')).toHaveTextContent('Matched by AI. The title and year fit.')
   })
 
+  it('has the note describe the dialog, so a screen reader hears it on opening', async () => {
+    spies.search.mockImplementation(async () => [])
+    const first = renderWithProviders(
+      <Harness
+        media={unmatched}
+        onMatched={() => undefined}
+        aiMatch={{ reason: 'The title and year fit.' }}
+      />,
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Options for Busboys (2026)' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Fix match' }))
+    expect(screen.getByRole('dialog')).toHaveAccessibleDescription(
+      'Matched by AI. The title and year fit.',
+    )
+    first.unmount()
+    renderWithProviders(<Harness media={unmatched} onMatched={() => undefined} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Options for Busboys (2026)' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Fix match' }))
+    expect(screen.getByRole('dialog')).not.toHaveAttribute('aria-describedby')
+  })
+
   it('reads the movie behind a card for its AI note, and shows none for a file with no item', async () => {
     spies.search.mockImplementation(async () => [])
     spies.item.mockImplementation(async () =>
@@ -158,5 +181,26 @@ describe('Fix match', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Options for Busboys (2026)' }))
     await userEvent.click(screen.getByRole('menuitem', { name: 'Fix match' }))
     expect(screen.getByRole('dialog')).not.toHaveTextContent('Matched by AI.')
+  })
+
+  it("reads no details for an episode's card, as an episode carries no AI note", async () => {
+    spies.search.mockImplementation(async () => [])
+    spies.item.mockImplementation(async () => itemDetails())
+    const episode = mediaItem({
+      match: 'matched',
+      item: itemSummary({
+        id: 41,
+        type: 'episode',
+        title: 'Good News About Hell',
+        show: { id: 4, title: 'Severance' },
+        season: 1,
+        episode: 1,
+      }),
+    })
+    renderWithProviders(<Harness media={episode} matchType="show" onMatched={() => undefined} />)
+    await userEvent.click(screen.getByRole('button', { name: /^Options for/ }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Fix match' }))
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(spies.item).not.toHaveBeenCalled()
   })
 })

@@ -202,7 +202,10 @@ const MenuBody = ({
   const isAdminLocked = useAdminLocked()
   const matchable = matchType != null && media.match !== 'off'
   const item = media.item
-  const itemDetails = useQuery(itemQuery(fixing ? (item?.id ?? null) : null))
+  // Only a movie's details carry an AI note: an episode's never do.
+  const itemDetails = useQuery(
+    itemQuery(fixing && matchType === 'movie' ? (item?.id ?? null) : null),
+  )
   const artwork = artworkOf(item)
 
   const items = (): HTMLButtonElement[] =>

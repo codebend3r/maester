@@ -33,7 +33,13 @@ const UnmatchedShowEntry = ({
   const [isOpen, setIsOpen] = useState(false)
   const [isFixing, setIsFixing] = useState(false)
   const first = group.files[0]
-  const suggestion = first == null ? null : suggestionOf(first)
+  // A file still pending has no suggestion yet, so the card follows the first that has one.
+  const suggested = group.files
+    .flatMap((file) => {
+      const suggestion = suggestionOf(file)
+      return suggestion == null ? [] : [{ file, suggestion }]
+    })
+    .at(0)
   useReturnFocus({ isOpen: isFixing, target: fixButton })
 
   return (
@@ -53,7 +59,7 @@ const UnmatchedShowEntry = ({
           {plural({ n: group.files.length, one: 'episode', many: 'episodes' })}
         </span>
       </button>
-      {!suggestion && (
+      {!suggested && (
         <Button
           ref={fixButton}
           className={styles.fix}
@@ -64,12 +70,12 @@ const UnmatchedShowEntry = ({
           Fix match
         </Button>
       )}
-      {suggestion && first && (
+      {suggested && (
         <div className={styles.suggestion}>
           <AiSuggestionCard
-            suggestion={suggestion}
+            suggestion={suggested.suggestion}
             subject={group.title}
-            accept={(tmdbId) => api.setMatch({ mediaId: first.id, tmdbId })}
+            accept={(tmdbId) => api.setMatch({ mediaId: suggested.file.id, tmdbId })}
             onFix={() => setIsFixing(true)}
             fixRef={fixButton}
           />

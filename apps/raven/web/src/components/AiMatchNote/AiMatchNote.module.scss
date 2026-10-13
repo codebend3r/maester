@@ -13,3 +13,8 @@
     font-weight: 600;
   }
 }
+
+// A reason may hold a long name with no break in it.
+.text {
+  overflow-wrap: anywhere;
+}

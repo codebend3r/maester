@@ -125,6 +125,22 @@ describe('UnmatchedShows', () => {
     expect(matched.at(-1)).toEqual({ mediaId: 1, tmdbId: '201000' })
   })
 
+  it('keeps the card of a show whose first file is still pending, accepting it for a file it is for', async () => {
+    renderWithProviders(
+      <UnmatchedShows
+        files={[{ ...files[0]!, match: 'pending' }, files[1]!]}
+        renderFiles={() => null}
+        suggestionOf={(file) => (file.id === 2 ? aiSuggestion() : null)}
+      />,
+    )
+    await userEvent.click(
+      screen.getByRole('button', {
+        name: 'Accept Archie: The Man Who Became Cary Grant (2023) for Archie',
+      }),
+    )
+    expect(matched.at(-1)).toEqual({ mediaId: 2, tmdbId: '201000' })
+  })
+
   it("hands focus back to the suggestion's Fix match once its dialog is cancelled", async () => {
     renderWithProviders(
       <UnmatchedShows files={files} renderFiles={() => null} suggestionOf={() => aiSuggestion()} />,

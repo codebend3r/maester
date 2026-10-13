@@ -91,7 +91,7 @@ export const FixMatchDialog = <T,>({
   onMatched?: (result: T) => void
 }) => {
   const dialog = useRef<HTMLDialogElement>(null)
-  const ids = { title: useId(), query: useId(), year: useId(), results: useId() }
+  const ids = { title: useId(), note: useId(), query: useId(), year: useId(), results: useId() }
   const queryClient = useQueryClient()
   const [query, setQuery] = useState(title)
   const [yearText, setYearText] = useState(year == null ? '' : String(year))
@@ -120,14 +120,20 @@ export const FixMatchDialog = <T,>({
   }
 
   return (
-    <dialog ref={dialog} className={styles.dialog} aria-labelledby={ids.title} onClose={onClose}>
+    <dialog
+      ref={dialog}
+      className={styles.dialog}
+      aria-labelledby={ids.title}
+      aria-describedby={aiMatch ? ids.note : undefined}
+      onClose={onClose}
+    >
       <div className={styles.body}>
         <header className={styles.header}>
           <h2 id={ids.title} className={styles.title}>
             Fix match
           </h2>
           {fileName && <p className={styles.file}>{fileName}</p>}
-          {aiMatch && <AiMatchNote aiMatch={aiMatch} />}
+          {aiMatch && <AiMatchNote aiMatch={aiMatch} id={ids.note} />}
         </header>
 
         <search>
