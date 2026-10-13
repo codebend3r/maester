@@ -1,0 +1,30 @@
+.section {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.heading {
+  font-family: var(--font-display);
+  font-size: var(--font-size-lg);
+  font-weight: 400;
+  line-height: var(--line-tight);
+}
+
+// The cards are a collection, so they are placed by the grid, not by name.
+.list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
+  gap: var(--space-2);
+}
+
+.entry {
+  display: grid;
+  align-content: start;
+  gap: var(--space-1);
+}
+
+.file {
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+  overflow-wrap: anywhere;
+}

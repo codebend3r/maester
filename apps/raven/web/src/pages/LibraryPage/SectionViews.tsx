@@ -1,9 +1,11 @@
 import { type UseQueryResult, useQuery } from '@tanstack/react-query'
 import {
+  type AiSuggestion,
   type Library,
   type LibrarySettings,
   type MediaItem,
   type PosterEntry,
+  type UnmatchedFile,
   isScanning,
   matchTypeFor,
 } from '@raven/core'
@@ -17,6 +19,7 @@ import { MediaGrid, MediaGridSkeleton } from '@/components/MediaGrid/MediaGrid'
 import { MediaTiles, MediaTilesSkeleton } from '@/components/MediaTiles/MediaTiles'
 import { SagaDecks } from '@/components/SagaDeck/SagaDeck'
 import { Loading } from '@/components/Skeleton/Skeleton'
+import { SuggestedMovies } from '@/components/SuggestedMovies/SuggestedMovies'
 import { UnmatchedShows } from '@/components/UnmatchedShows/UnmatchedShows'
 import { finishedNote } from '@/lib/history'
 import { watchLink } from '@/lib/itemLinks'
@@ -265,10 +268,17 @@ const SagasSection = ({ library }: { library: Library }) => {
   )
 }
 
+/** What the AI lookup suggests for a file, read off the Not matched listing. */
+const suggestionsIn =
+  (files: readonly UnmatchedFile[]) =>
+  (file: MediaItem): AiSuggestion | null =>
+    files.find((each) => each.id === file.id)?.aiSuggestion ?? null
+
 /**
- * The files no movie or show was found for, each with Fix match in its menu.
- * While TMDB answers, the tab keeps reading again until none is pending,
- * then reads the library again for its count of files not matched.
+ * The files no movie or show was found for, each with Fix match in its menu,
+ * and what the AI lookup suggests where it was not sure. While TMDB answers,
+ * the tab keeps reading again until none is pending, then reads the library
+ * again for its count of files not matched.
  */
 const NotMatchedSection = ({ library }: { library: Library }) => {
   const matchType = matchTypeFor(library.settings.kind)
@@ -296,6 +306,7 @@ const NotMatchedSection = ({ library }: { library: Library }) => {
           {matchType === 'show' ? (
             <UnmatchedShows
               files={files}
+              suggestionOf={suggestionsIn(files)}
               renderFiles={(group) => (
                 <MediaGrid
                   items={group}
@@ -305,11 +316,14 @@ const NotMatchedSection = ({ library }: { library: Library }) => {
               )}
             />
           ) : (
-            <MediaGrid
-              items={files}
-              matchType={matchType}
-              ratingsSource={library.settings.ratingsSource}
-            />
+            <>
+              <SuggestedMovies files={files} libraryId={library.id} />
+              <MediaGrid
+                items={files}
+                matchType={matchType}
+                ratingsSource={library.settings.ratingsSource}
+              />
+            </>
           )}
         </>
       )}

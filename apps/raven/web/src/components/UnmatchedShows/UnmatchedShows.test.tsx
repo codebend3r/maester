@@ -2,7 +2,7 @@ import { describe, expect, it, mock } from 'bun:test'
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createApiClient } from '@raven/core'
-import { mediaItem } from '@/test/fixtures'
+import { aiSuggestion, mediaItem } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 
 const offline = createApiClient({
@@ -99,5 +99,41 @@ describe('UnmatchedShows', () => {
       />,
     )
     expect(screen.getByRole('button', { name: 'Fix match for S01E02' })).toBeInTheDocument()
+  })
+
+  it("shows what the AI lookup suggests in the show's entry, with Accept and its one Fix match", async () => {
+    renderWithProviders(
+      <UnmatchedShows
+        files={files}
+        renderFiles={() => null}
+        suggestionOf={(file) => (file.id === 1 ? aiSuggestion() : null)}
+      />,
+    )
+    const [archie] = screen.getAllByRole('listitem')
+    expect(
+      within(archie!).getByRole('article', {
+        name: 'Suggested: Archie: The Man Who Became Cary Grant (2023)',
+      }),
+    ).toBeInTheDocument()
+    expect(within(archie!).getAllByRole('button', { name: 'Fix match for Archie' })).toHaveLength(1)
+    expect(screen.getByRole('button', { name: 'Fix match for Veronica' })).toBeInTheDocument()
+    await userEvent.click(
+      within(archie!).getByRole('button', {
+        name: 'Accept Archie: The Man Who Became Cary Grant (2023) for Archie',
+      }),
+    )
+    expect(matched.at(-1)).toEqual({ mediaId: 1, tmdbId: '201000' })
+  })
+
+  it("hands focus back to the suggestion's Fix match once its dialog is cancelled", async () => {
+    renderWithProviders(
+      <UnmatchedShows files={files} renderFiles={() => null} suggestionOf={() => aiSuggestion()} />,
+    )
+    const fix = screen.getByRole('button', { name: 'Fix match for Archie' })
+    expect(fix.closest('article')).not.toBeNull()
+    await userEvent.click(fix)
+    await userEvent.click(await screen.findByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(fix).toHaveFocus()
   })
 })

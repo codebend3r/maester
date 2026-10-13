@@ -1,4 +1,5 @@
 import type {
+  AiSuggestion,
   ItemDetails,
   ItemSummary,
   Library,
@@ -95,6 +96,16 @@ export const matchedMovie = (overrides: Partial<MediaItem> = {}): MediaItem =>
 export const unmatchedFile = (overrides: Partial<UnmatchedFile> = {}): UnmatchedFile => ({
   ...mediaItem({ match: 'unmatched' }),
   aiSuggestion: null,
+  ...overrides,
+})
+
+/** What the AI lookup suggests for a group it was not sure of. */
+export const aiSuggestion = (overrides: Partial<AiSuggestion> = {}): AiSuggestion => ({
+  tmdbId: '201000',
+  title: 'Archie: The Man Who Became Cary Grant',
+  year: 2023,
+  poster: '/archie.jpg',
+  reason: 'The only Archie series from 2023; its episode titles are generic.',
   ...overrides,
 })
 

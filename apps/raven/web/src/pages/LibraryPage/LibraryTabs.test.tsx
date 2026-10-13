@@ -3,7 +3,14 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { LibraryKind, LibrarySettings } from '@raven/core'
 import { api } from '@/lib/api'
-import { itemSummary, library, matchedMovie, mediaItem, unmatchedFile } from '@/test/fixtures'
+import {
+  aiSuggestion,
+  itemSummary,
+  library,
+  matchedMovie,
+  mediaItem,
+  unmatchedFile,
+} from '@/test/fixtures'
 import { renderLibraryPage } from '@/test/libraryPage'
 import { pollFast } from '@/test/polls'
 
@@ -23,6 +30,7 @@ describe('LibraryPage tabs', () => {
     lockState: spyOn(api, 'getLock'),
     health: spyOn(api, 'getMetadataHealth'),
     match: spyOn(api, 'matchLibrary'),
+    setMatch: spyOn(api, 'setMatch'),
   }
 
   beforeEach(() => {
@@ -191,6 +199,61 @@ describe('LibraryPage tabs', () => {
     expect(screen.queryByRole('link', { name: /Archie - S01E01/ })).toBeNull()
     await userEvent.click(screen.getByRole('button', { name: /^Archie/ }))
     expect(screen.getByRole('link', { name: /Archie - S01E01/ })).toBeInTheDocument()
+  })
+
+  it("offers the AI lookup's suggestion for a show folder, and accepts it as Fix match would", async () => {
+    spies.unmatched.mockImplementation(async () =>
+      [1, 2].map((id) =>
+        unmatchedFile({
+          id,
+          title: `Archie - S01E0${id}`,
+          folder: 'Archie/Season 1',
+          fileName: `Archie - S01E0${id}.mkv`,
+          aiSuggestion: aiSuggestion(),
+        }),
+      ),
+    )
+    spies.setMatch.mockImplementation(async () => mediaItem({ id: 1, match: 'manual' }))
+    open({ kind: 'shows', route: '/libraries/2/not-matched' })
+    expect(
+      await screen.findByText('Suggested: Archie: The Man Who Became Cary Grant (2023)'),
+    ).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Fix match for Archie' })).toHaveLength(1)
+    spies.unmatched.mockImplementation(async () => [])
+    await userEvent.click(
+      screen.getByRole('button', {
+        name: 'Accept Archie: The Man Who Became Cary Grant (2023) for Archie',
+      }),
+    )
+    expect(spies.setMatch).toHaveBeenCalledWith({ mediaId: 1, tmdbId: '201000' })
+    await waitFor(() =>
+      expect(
+        screen.queryByText('Suggested: Archie: The Man Who Became Cary Grant (2023)'),
+      ).toBeNull(),
+    )
+  })
+
+  it("offers the AI lookup's suggestion for a movie above the files", async () => {
+    spies.unmatched.mockImplementation(async () => [
+      unmatchedFile({
+        id: 9,
+        title: 'Archie',
+        year: 2023,
+        folder: 'Archie (2023)',
+        fileName: 'Archie (2023).mkv',
+        aiSuggestion: aiSuggestion(),
+      }),
+    ])
+    spies.setMatch.mockImplementation(async () => mediaItem({ id: 9, match: 'manual' }))
+    open({ route: '/libraries/2/not-matched' })
+    const suggested = await screen.findByRole('region', { name: 'Suggested by AI' })
+    await userEvent.click(
+      within(suggested).getByRole('button', {
+        name: 'Accept Archie: The Man Who Became Cary Grant (2023) for Archie (2023)',
+      }),
+    )
+    expect(spies.setMatch).toHaveBeenCalledWith({ mediaId: 9, tmdbId: '201000' })
+    expect(screen.getByRole('link', { name: /Archie/ })).toBeInTheDocument()
   })
 
   it('reads the count of files not matched again once Match again settles on its tab', async () => {
