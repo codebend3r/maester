@@ -56,6 +56,10 @@ export type IconName =
   | 'lock'
   | 'unlock'
 
+// The frames the film and TV icons share; each variant draws its mark inside one.
+const FILM = 'M4 3h16v18H4zM8 3v18M16 3v18M4 7.5h4M4 12h4M4 16.5h4M16 7.5h4M16 12h4M16 16.5h4'
+const TV = 'M3 8h18v12H3zM8 3.5l4 4.5 4-4.5'
+
 const PATHS: Record<IconName, string> = {
   back: 'M15 18l-6-6 6-6',
   plus: 'M12 5v14M5 12h14',
@@ -92,16 +96,12 @@ const PATHS: Record<IconName, string> = {
   shuffle: 'M4 7h3l10 10h3M4 17h3l3-3M14 10l3-3h3M18 4l3 3-3 3M18 14l3 3-3 3',
   history: 'M4 11a8 8 0 1 1 2.3 5.7M4 5v6h6M12 8v4l3 2',
   next: 'M9 6l6 6-6 6',
-  film: 'M4 3h16v18H4zM8 3v18M16 3v18M4 7.5h4M4 12h4M4 16.5h4M16 7.5h4M16 12h4M16 16.5h4',
-  filmSpark:
-    'M4 3h16v18H4zM8 3v18M16 3v18M4 7.5h4M4 12h4M4 16.5h4M16 7.5h4M16 12h4M16 16.5h4M12 8.6L12.8 11.2 14.4 12 12.8 12.8 12 15.4 11.2 12.8 9.6 12 11.2 11.2z',
-  tv: 'M3 8h18v12H3zM8 3.5l4 4.5 4-4.5',
-  tvSpark:
-    'M3 8h18v12H3zM8 3.5l4 4.5 4-4.5M12 10.5L13 13 15.5 14 13 15 12 17.5 11 15 8.5 14 11 13z',
-  filmHeart:
-    'M4 3h16v18H4zM8 3v18M16 3v18M4 7.5h4M4 12h4M4 16.5h4M16 7.5h4M16 12h4M16 16.5h4M12 14.6s-2.6-1.7-2.6-3.6a1.5 1.5 0 0 1 2.6-.9 1.5 1.5 0 0 1 2.6.9c0 1.9-2.6 3.6-2.6 3.6z',
-  tvHeart:
-    'M3 8h18v12H3zM8 3.5l4 4.5 4-4.5M12 16.6s-2.6-1.7-2.6-3.6a1.5 1.5 0 0 1 2.6-.9 1.5 1.5 0 0 1 2.6.9c0 1.9-2.6 3.6-2.6 3.6z',
+  film: FILM,
+  filmSpark: `${FILM}M12 8.6L12.8 11.2 14.4 12 12.8 12.8 12 15.4 11.2 12.8 9.6 12 11.2 11.2z`,
+  tv: TV,
+  tvSpark: `${TV}M12 10.5L13 13 15.5 14 13 15 12 17.5 11 15 8.5 14 11 13z`,
+  filmHeart: `${FILM}M12 14.6s-2.6-1.7-2.6-3.6a1.5 1.5 0 0 1 2.6-.9 1.5 1.5 0 0 1 2.6.9c0 1.9-2.6 3.6-2.6 3.6z`,
+  tvHeart: `${TV}M12 16.6s-2.6-1.7-2.6-3.6a1.5 1.5 0 0 1 2.6-.9 1.5 1.5 0 0 1 2.6.9c0 1.9-2.6 3.6-2.6 3.6z`,
   globe:
     'M12 3a9 9 0 1 0 0 18 9 9 0 1 0 0-18zM3 12h18M12 3c2.5 2.5 3.8 5.5 3.8 9s-1.3 6.5-3.8 9M12 3c-2.5 2.5-3.8 5.5-3.8 9s1.3 6.5 3.8 9',
   image: 'M3 5h18v14H3zM3 16l5-5 4 4 3-3 6 6M14 9a1.5 1.5 0 1 0 3 0 1.5 1.5 0 1 0-3 0',
@@ -111,11 +111,9 @@ const PATHS: Record<IconName, string> = {
   youtube:
     'M6 5.5h12a3.5 3.5 0 0 1 3.5 3.5v6a3.5 3.5 0 0 1-3.5 3.5H6A3.5 3.5 0 0 1 2.5 15V9A3.5 3.5 0 0 1 6 5.5zM10 9.5v5l4.5-2.5z',
   video: 'M3 7h12v10H3zM15 10.5l6-3.5v10l-6-3.5',
-  tvGlobe:
-    'M3 8h18v12H3zM8 3.5l4 4.5 4-4.5M12 10a4 4 0 1 0 0 8 4 4 0 1 0 0-8zM8 14h8M12 10c-1.1 1.1-1.6 2.5-1.6 4s.5 2.9 1.6 4M12 10c1.1 1.1 1.6 2.5 1.6 4s-.5 2.9-1.6 4',
+  tvGlobe: `${TV}M12 10a4 4 0 1 0 0 8 4 4 0 1 0 0-8zM8 14h8M12 10c-1.1 1.1-1.6 2.5-1.6 4s.5 2.9 1.6 4M12 10c1.1 1.1 1.6 2.5 1.6 4s-.5 2.9-1.6 4`,
   fourK: 'M3 6h18v12H3zM9.5 15V9l-3 4.5h4.5M13.5 9v6M17.5 9l-4 3.5M15 11.2l2.5 3.8',
-  musicVideo:
-    'M3 8h18v12H3zM8 3.5l4 4.5 4-4.5M13 16.2v-5.4l2.4 1M13 16.2a1.6 1.6 0 1 1-3.2 0 1.6 1.6 0 0 1 3.2 0z',
+  musicVideo: `${TV}M13 16.2v-5.4l2.4 1M13 16.2a1.6 1.6 0 1 1-3.2 0 1.6 1.6 0 0 1 3.2 0z`,
   standUp: 'M12 2.5a3 3 0 0 0-3 3v3a3 3 0 0 0 6 0v-3a3 3 0 0 0-3-3zM9 7h6M12 11.5V21M8 21h8',
   gamepad:
     'M7.5 7.5h9a4.5 4.5 0 0 1 4.5 4.5v1.5a3.5 3.5 0 0 1-6.3 2.1L14 14.5h-4l-.7 1.1A3.5 3.5 0 0 1 3 13.5V12a4.5 4.5 0 0 1 4.5-4.5zM7.5 10.5v3M6 12h3M15.5 11.5h.01M17.5 13h.01',
@@ -157,8 +155,11 @@ const isIconName = (name: string): name is IconName => name in PATHS
 /** Every icon there is, for the design page. */
 export const ICON_NAMES: readonly IconName[] = Object.keys(PATHS).filter(isIconName)
 
+/** How wide an icon is: pixels, or ems of the text it sits in, to grow and shrink with it. */
+export type IconSize = number | `${number}em`
+
 /** Line icons. Decorative by default: pair them with text or an aria-label on the control. */
-export const Icon = ({ name, size = 20 }: { name: IconName; size?: number }) => (
+export const Icon = ({ name, size = 20 }: { name: IconName; size?: IconSize }) => (
   <svg
     width={size}
     height={size}

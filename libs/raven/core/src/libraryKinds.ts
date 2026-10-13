@@ -103,10 +103,9 @@ export const KIND_RULES = {
 } as const satisfies Record<LibraryKind, KindRules>
 
 /**
- * What a library's files are matched to on TMDB: movies for a Movies, Anime
- * movies, Family movies, Documentaries or Sporting events library, shows for a TV, Anime or
- * Family TV shows one, and null for a type that is never matched. Two types
- * with the same answer read their files the same way.
+ * What a library's files are matched to on TMDB, by its type's rules; null
+ * for a type that is never matched. Two types with the same answer read
+ * their files the same way.
  */
 export const matchTypeFor = (kind: LibraryKind): MatchItemType | null => KIND_RULES[kind].matches
 

@@ -8,6 +8,9 @@ import { library } from '@/test/fixtures'
 import { held } from '@/test/held'
 import { renderWithProviders } from '@/test/render'
 
+/** The picture laid behind a row; the icons carry a style too, for their size. */
+const BACKDROP = '[style*="background-image"]'
+
 describe('LibrariesPage', () => {
   const spies = {
     list: spyOn(api, 'listLibraries'),
@@ -117,7 +120,7 @@ describe('LibrariesPage', () => {
     renderWithProviders(<LibrariesPage />)
     const pictureBehind = async (name: string) => {
       const row = (await screen.findByRole('link', { name })).closest('li')
-      const picture = row?.querySelector('[style]')
+      const picture = row?.querySelector(BACKDROP)
       return picture instanceof HTMLElement ? picture.style.backgroundImage : null
     }
     expect(await pictureBehind('Films')).toContain('/api/items/7/images/backdrop?v=abc')
@@ -139,7 +142,7 @@ describe('LibrariesPage', () => {
     renderWithProviders(<LibrariesPage />)
     const row = (await screen.findByRole('link', { name: 'Tutorials' })).closest('li')
     expect(row).toHaveTextContent('Other · Locked · 12 videos')
-    expect(row?.querySelector('[style]')).toBeNull()
+    expect(row?.querySelector(BACKDROP)).toBeNull()
     expect(screen.queryByRole('list', { name: 'Folders' })).toBeNull()
     expect(screen.queryByText('/media/Tutorials')).toBeNull()
   })
@@ -159,7 +162,7 @@ describe('LibrariesPage', () => {
     expect(await screen.findByText('/media/Tutorials')).toBeInTheDocument()
     const row = screen.getByRole('link', { name: 'Tutorials' }).closest('li')
     expect(row).toHaveTextContent('Other · Unlocked · 12 videos')
-    expect(row?.querySelector('[style]')).not.toBeNull()
+    expect(row?.querySelector(BACKDROP)).not.toBeNull()
   })
 
   it('says how many files are not matched, when any are', async () => {

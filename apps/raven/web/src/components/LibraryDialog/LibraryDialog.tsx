@@ -1,10 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   DEFAULT_LIBRARY_SETTINGS,
-  LIBRARY_ICON_NAMES,
   LIBRARY_KINDS,
   type Library,
-  type LibraryIconName,
   type LibraryInput,
   type LibraryKind,
   type LibrarySettings,
@@ -21,10 +19,10 @@ import { type FormEvent, useEffect, useId, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/Button/Button'
 import { FolderBrowser } from '@/components/FolderBrowser/FolderBrowser'
-import { Icon } from '@/components/Icon/Icon'
+import { IconPicker } from '@/components/LibraryDialog/IconPicker'
 import { useAdminLocked } from '@/lib/adminLock'
 import { api } from '@/lib/api'
-import { KINDS, LIBRARY_ICON_LABELS, libraryIconOf } from '@/lib/libraryKinds'
+import { KINDS } from '@/lib/libraryKinds'
 import { afterLibrarySaved } from '@/lib/invalidate'
 import { lockQuery, metadataHealthQuery } from '@/lib/queries'
 import styles from '@/components/LibraryDialog/LibraryDialog.module.scss'
@@ -118,13 +116,6 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
       return { ...current, kind, view, groupBy }
     })
 
-  // The type's own icon is kept as none picked, so it goes on changing with the type.
-  const pickIcon = (icon: LibraryIconName) =>
-    setSettings((current) => ({
-      ...current,
-      icon: icon === KINDS[current.kind].icon ? null : icon,
-    }))
-
   const addPath = (path: string) => {
     setPaths((current) => (current.includes(path) ? current : [...current, path]))
     setErrors([])
@@ -205,25 +196,11 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
 
         <fieldset className={styles.field} aria-describedby={`${ids.icon}-hint`}>
           <legend>Icon</legend>
-          <div className={styles.icons}>
-            {LIBRARY_ICON_NAMES.map((icon) => (
-              <div key={icon} className={styles.iconChoice}>
-                <input
-                  id={`${ids.icon}-${icon}`}
-                  type="radio"
-                  name={ids.icon}
-                  value={icon}
-                  className="visually-hidden"
-                  checked={libraryIconOf(settings) === icon}
-                  onChange={() => pickIcon(icon)}
-                />
-                <label htmlFor={`${ids.icon}-${icon}`} title={LIBRARY_ICON_LABELS[icon]}>
-                  <Icon name={icon} size={24} />
-                  <span className="visually-hidden">{`${LIBRARY_ICON_LABELS[icon]} icon`}</span>
-                </label>
-              </div>
-            ))}
-          </div>
+          <IconPicker
+            kind={settings.kind}
+            icon={settings.icon}
+            onChange={(icon) => setSettings((current) => ({ ...current, icon }))}
+          />
           <p id={`${ids.icon}-hint`} className={styles.hint}>
             Shown in the side menu, on the library's page and on Libraries. The type's own icon
             changes with the type.

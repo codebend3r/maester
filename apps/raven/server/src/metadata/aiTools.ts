@@ -178,7 +178,7 @@ export const AI_TOOLS: Anthropic.Tool[] = [
   },
 ]
 
-/** What each type of library is, as Claude is told. YouTube videos and Other are never asked about. */
+/** What each type of library is, as Claude is told. Only types that are matched are ever asked about. */
 const LIBRARY_WORDS = {
   movies: 'Movies',
   shows: 'TV shows',

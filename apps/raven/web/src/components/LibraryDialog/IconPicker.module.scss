@@ -1,0 +1,52 @@
+// Rows of eight tiles, six on a narrow screen, in the order of
+// `LIBRARY_ICON_NAMES`, which keeps each kind of media together.
+.icons {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 3rem));
+  gap: var(--space-1);
+
+  @media (max-width: 30rem) {
+    grid-template-columns: repeat(6, minmax(0, 3rem));
+  }
+}
+
+// Positioned, so the radio kept out of sight stays by its tile.
+.choice {
+  position: relative;
+  display: grid;
+
+  label {
+    display: grid;
+    place-items: center;
+    aspect-ratio: 1;
+    border: 1px solid var(--color-moss);
+    border-radius: var(--radius-md);
+    background: var(--color-night);
+    color: var(--color-lichen);
+    cursor: pointer;
+  }
+
+  label:hover {
+    color: var(--color-bark);
+  }
+
+  input:checked + label {
+    border-color: var(--color-leaf-bright);
+    background: var(--color-moss);
+    color: var(--color-bark);
+  }
+
+  input:focus-visible + label {
+    outline: var(--focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .choice label {
+    transition:
+      color 120ms ease-out,
+      border-color 120ms ease-out,
+      background-color 120ms ease-out;
+  }
+}

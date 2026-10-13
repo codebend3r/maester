@@ -73,7 +73,7 @@ export const LibraryHeader = ({
   return (
     <header className={styles.header}>
       <h1 id={titleId} className={styles.title}>
-        <LibraryIcon settings={settings} size={48} />
+        <LibraryIcon settings={settings} size="0.7em" />
         <span className={styles.name}>{library.name}</span>
       </h1>
       <p className={styles.count}>

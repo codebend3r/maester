@@ -1,13 +1,13 @@
 import type { LibrarySettings } from '@raven/core'
-import { Icon } from '@/components/Icon/Icon'
+import { Icon, type IconSize } from '@/components/Icon/Icon'
 import { libraryIconOf } from '@/lib/libraryKinds'
 import styles from '@/components/LibraryIcon/LibraryIcon.module.scss'
 
 /**
  * A library's icon, the one it picked or its type's, with a lock laid over
- * its corner when the library is locked. The lock keeps the proportion of
- * the side menu's 12px lock on its 20px icons. A caller's className adds
- * placement.
+ * its corner when the library is locked. Both are drawn in ems of `size`, so
+ * the lock keeps the proportion of the side menu's 12px lock on its 20px
+ * icons at any size. A caller's className adds placement.
  */
 export const LibraryIcon = ({
   settings,
@@ -15,14 +15,17 @@ export const LibraryIcon = ({
   className,
 }: {
   settings: Pick<LibrarySettings, 'icon' | 'kind' | 'locked'>
-  size?: number
+  size?: IconSize
   className?: string
 }) => (
-  <span className={className ? `${styles.icon} ${className}` : styles.icon}>
-    <Icon name={libraryIconOf(settings)} size={size} />
+  <span
+    className={className ? `${styles.icon} ${className}` : styles.icon}
+    style={{ fontSize: size }}
+  >
+    <Icon name={libraryIconOf(settings)} size="1em" />
     {settings.locked && (
       <span className={styles.lock}>
-        <Icon name="lock" size={Math.round(size * 0.6)} />
+        <Icon name="lock" size="0.6em" />
       </span>
     )}
   </span>
