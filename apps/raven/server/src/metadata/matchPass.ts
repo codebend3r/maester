@@ -222,7 +222,7 @@ export class MatchPass {
    * The other titles TMDB knows the results near `year` by, the first few of
    * them: those whose titles start with the name first, then those that do
    * not contain it, then the rest, each in TMDB's order, so a short name with
-   * many look-alikes still reaches the one it is short for.
+   * many near matches still reaches the one it is short for.
    */
   private async aliasesOf({
     type,
