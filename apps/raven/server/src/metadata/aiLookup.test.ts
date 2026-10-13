@@ -19,7 +19,7 @@ import { MatchFiles } from '@/metadata/matchFiles'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 import { MetadataService } from '@/metadata/metadataService'
 import { ScannerService } from '@/scanner/scannerService'
-import { NOT_WATCHING } from '@/test/app'
+import { ADMIN_PASSWORD, adminCookie, cookies, cookieSet, NOT_WATCHING } from '@/test/app'
 import { encodeClip } from '@/test/clips'
 import { type FakeReply, fakeClaude } from '@/test/fakeClaude'
 import { type FakeMovie, type FakeShow, fakeTmdb } from '@/test/fakeTmdb'
@@ -256,11 +256,14 @@ const startServer = ({
   }
 }
 
+const PIN = '3001'
+
 describe('the AI lookup', () => {
   const server = startServer({
     prefix: 'raven-ai-',
     files: [...WILD, ARCHIE, CESAR],
     aiDailyLimit: 200,
+    config: { libraryPin: PIN, adminPassword: ADMIN_PASSWORD },
   })
   const shows = () =>
     server.get({ url: `/api/libraries/${server.state.library}/shows`, guard: isShowListing })
@@ -368,6 +371,30 @@ describe('the AI lookup', () => {
     })
     expect(details.aiMatch).toBeNull()
   })
+
+  it('keeps its note from a browser that may not open the library it matched in', async () => {
+    const wild = (await shows()).shows.find((entry) => entry.show.title === 'Wild Arctic')
+    // Another library holds the show too, matched by a search, so the page still opens.
+    const open = join(server.state.root, 'Open')
+    await encodeClip({ path: join(open, WILD_ARCTIC), seconds: 1 })
+    const openId = await server.create({ name: 'Open', path: open, kind: 'shows' })
+    await server.app().get(ScannerService).whenIdle(openId)
+    await server.settle()
+    const admin = await adminCookie(server.app())
+    const locked = await server.update({ settings: { locked: true }, cookie: admin })
+    expect(locked.statusCode).toBe(200)
+    const unlocked = await server.app().inject({
+      method: 'POST',
+      url: '/api/lock/unlock',
+      payload: { pin: PIN },
+    })
+    const noteFor = async (cookie?: string) =>
+      (await server.get({ url: `/api/items/${wild?.show.id ?? -1}`, guard: isItemDetails, cookie }))
+        .aiMatch
+    expect(await noteFor()).toBeNull()
+    expect(await noteFor(admin)).toBeNull()
+    expect(await noteFor(cookies(admin, cookieSet(unlocked)))).toEqual({ reason: WILD_REASON })
+  })
 })
 
 describe("the AI lookup's daily limit, and Anthropic away", () => {
@@ -417,7 +444,8 @@ describe('a library given up on during the lookups', () => {
     const releases = places.map((place) => server.claude.hold(place))
     const started = server.start()
     const { requests } = server.claude.state
-    await vi.waitFor(() => expect(requests).toHaveLength(2))
+    // Starting encodes the clips first, which a busy machine takes a while over.
+    await vi.waitFor(() => expect(requests).toHaveLength(2), { timeout: 10_000 })
     const response = await server.update({ settings: { kind: 'other' } })
     expect(response.statusCode).toBe(200)
     releases.forEach((release) => release())
@@ -435,6 +463,7 @@ describe('files that land while the lookups run', () => {
   it('are matched by a pass that follows the one under way', async () => {
     const release = server.claude.hold('Archie')
     const started = server.start()
+    // Starting encodes the clips first, which a busy machine takes a while over.
     await vi.waitFor(() => expect(server.claude.state.requests).toHaveLength(1), {
       timeout: 10_000,
     })

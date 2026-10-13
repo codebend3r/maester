@@ -15,6 +15,8 @@ export type FakeReply =
 export type SeenRequest = {
   url: string
   apiKey: string | null
+  /** The bearer token header, which raven never sends. */
+  authorization: string | null
   /** The body as sent. */
   raw: string
   body: Record<string, unknown>
@@ -172,9 +174,11 @@ export const fakeClaude = ({
     const body = isRecord(parsed) ? parsed : {}
     const place = placeOf(body)
     const turn = turnOf(body)
+    const headers = new Headers(init?.headers)
     state.requests.push({
       url: String(input),
-      apiKey: new Headers(init?.headers).get('x-api-key'),
+      apiKey: headers.get('x-api-key'),
+      authorization: headers.get('authorization'),
       raw,
       body,
       place,

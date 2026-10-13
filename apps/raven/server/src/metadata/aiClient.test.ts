@@ -19,6 +19,7 @@ const config = (overrides: Partial<ServerConfig> = {}): ServerConfig => ({
 describe('AiClient', () => {
   afterEach(() => {
     vi.useRealTimers()
+    vi.unstubAllEnvs()
   })
 
   it('is off without a key, and never calls out', async () => {
@@ -41,6 +42,17 @@ describe('AiClient', () => {
       ['https://api.anthropic.com/v1/messages', 'test-key'],
     ])
     expect(ai.state()).toEqual({ state: 'ok', error: null })
+  })
+
+  it("asks Anthropic with raven's own key, whatever key, token or base URL the environment holds", async () => {
+    vi.stubEnv('ANTHROPIC_API_KEY', 'environment-key')
+    vi.stubEnv('ANTHROPIC_AUTH_TOKEN', 'environment-token')
+    vi.stubEnv('ANTHROPIC_BASE_URL', 'https://proxy.example')
+    const claude = fakeClaude({ lookups: {} })
+    await new AiClient(config(), claude.fetch).send(ASK)
+    expect(
+      claude.state.requests.map((request) => [request.url, request.apiKey, request.authorization]),
+    ).toEqual([['https://api.anthropic.com/v1/messages', 'test-key', null]])
   })
 
   it('counts lookups against the daily limit, and counts again from midnight UTC', () => {

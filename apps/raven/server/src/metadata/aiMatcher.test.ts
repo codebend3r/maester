@@ -361,6 +361,22 @@ describe('AiMatcher', () => {
     }
   })
 
+  it('throws when TMDB is away listing a season, rather than saying there is no such season', async () => {
+    tmdb.state.failing.push('/tv/80001/season')
+    try {
+      const looking = lookUp({
+        replies: [
+          SEARCH_WILD,
+          { kind: 'episodes', tmdbId: '80001', season: 1 },
+          { kind: 'choose', tmdbId: '80001', confidence: 'high', reason: 'Titles match.' },
+        ],
+      })
+      await expect(looking).rejects.toBeInstanceOf(TmdbError)
+    } finally {
+      tmdb.state.failing.splice(0)
+    }
+  })
+
   it('throws when Anthropic is away', async () => {
     await expect(lookUp({ replies: [SEARCH_WILD], status: 529 })).rejects.toBeInstanceOf(AiError)
   })
