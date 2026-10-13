@@ -21,6 +21,38 @@ describe('libraries', () => {
     ])
   })
 
+  it("keeps the icon a library picked, wears its type's until it picks one, and goes back to it", () => {
+    const libraries = new LibrariesRepository(database.get())
+    const { id, settings } = libraries.create({
+      name: 'UFC',
+      paths: ['/media/UFC'],
+      settings: { kind: 'sports' },
+    })
+    expect(settings.icon).toBeNull()
+    libraries.update({
+      id,
+      input: { name: 'UFC', paths: ['/media/UFC'], settings: { icon: 'octagon' } },
+    })
+    expect(libraries.get(id)?.settings.icon).toBe('octagon')
+    libraries.update({
+      id,
+      input: { name: 'UFC', paths: ['/media/UFC'], settings: { kind: 'movies' } },
+    })
+    expect(libraries.get(id)?.settings.icon).toBe('octagon')
+    libraries.update({
+      id,
+      input: { name: 'UFC', paths: ['/media/UFC'], settings: { icon: null } },
+    })
+    expect(libraries.get(id)?.settings.icon).toBeNull()
+  })
+
+  it('reads an icon this version does not know as the type wearing its own', () => {
+    const libraries = new LibrariesRepository(database.get())
+    const { id } = libraries.create({ name: 'Racing', paths: ['/media/Racing'] })
+    database.get().db.prepare("UPDATE libraries SET icon = 'rocket' WHERE id = ?").run(id)
+    expect(libraries.get(id)?.settings.icon).toBeNull()
+  })
+
   it('keeps what a full scan found each path to be, until the paths change', () => {
     const libraries = new LibrariesRepository(database.get())
     const { id } = libraries.create({

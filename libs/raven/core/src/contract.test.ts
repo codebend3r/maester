@@ -96,10 +96,21 @@ describe('isLibrary', () => {
             autoRefresh: false,
             locked: true,
             folderLayout: 'flat',
+            icon: 'octagon',
           },
         }),
       ),
     ).toBe(true)
+  })
+
+  it("accepts a library that wears its type's icon", () => {
+    expect(isLibrary(library({ settings: { ...library().settings, icon: null } }))).toBe(true)
+  })
+
+  it('rejects a library whose icon is not one of the choices', () => {
+    expect(isLibrary({ ...library(), settings: { ...library().settings, icon: 'rocket' } })).toBe(
+      false,
+    )
   })
 
   it('rejects a library whose type is not one of the three', () => {

@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   DEFAULT_LIBRARY_SETTINGS,
+  LIBRARY_ICON_NAMES,
   LIBRARY_KINDS,
   type Library,
+  type LibraryIconName,
   type LibraryInput,
   type LibraryKind,
   type LibrarySettings,
@@ -19,9 +21,10 @@ import { type FormEvent, useEffect, useId, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/Button/Button'
 import { FolderBrowser } from '@/components/FolderBrowser/FolderBrowser'
+import { Icon } from '@/components/Icon/Icon'
 import { useAdminLocked } from '@/lib/adminLock'
 import { api } from '@/lib/api'
-import { KINDS } from '@/lib/libraryKinds'
+import { KINDS, LIBRARY_ICON_LABELS, libraryIconOf } from '@/lib/libraryKinds'
 import { afterLibrarySaved } from '@/lib/invalidate'
 import { lockQuery, metadataHealthQuery } from '@/lib/queries'
 import styles from '@/components/LibraryDialog/LibraryDialog.module.scss'
@@ -53,7 +56,14 @@ const pathLayoutLabel = ({
  */
 export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose: () => void }) => {
   const dialog = useRef<HTMLDialogElement>(null)
-  const ids = { name: useId(), errors: useId(), folders: useId(), settings: useId(), kind: useId() }
+  const ids = {
+    name: useId(),
+    errors: useId(),
+    folders: useId(),
+    settings: useId(),
+    kind: useId(),
+    icon: useId(),
+  }
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [name, setName] = useState(library?.name ?? '')
@@ -107,6 +117,13 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
       const { view, groupBy } = defaultLibrarySettings(kind)
       return { ...current, kind, view, groupBy }
     })
+
+  // The type's own icon is kept as none picked, so it goes on changing with the type.
+  const pickIcon = (icon: LibraryIconName) =>
+    setSettings((current) => ({
+      ...current,
+      icon: icon === KINDS[current.kind].icon ? null : icon,
+    }))
 
   const addPath = (path: string) => {
     setPaths((current) => (current.includes(path) ? current : [...current, path]))
@@ -175,7 +192,7 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
                 details.
               </>
             ) : (
-              'Movies, TV shows, anime, family and documentaries get posters and details from TMDB.'
+              'Movies, TV shows, anime, family, documentaries and sporting events get posters and details from TMDB.'
             )}
           </p>
           {isAiOff && (
@@ -184,6 +201,33 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
               matcher misses.
             </p>
           )}
+        </fieldset>
+
+        <fieldset className={styles.field} aria-describedby={`${ids.icon}-hint`}>
+          <legend>Icon</legend>
+          <div className={styles.icons}>
+            {LIBRARY_ICON_NAMES.map((icon) => (
+              <div key={icon} className={styles.iconChoice}>
+                <input
+                  id={`${ids.icon}-${icon}`}
+                  type="radio"
+                  name={ids.icon}
+                  value={icon}
+                  className="visually-hidden"
+                  checked={libraryIconOf(settings) === icon}
+                  onChange={() => pickIcon(icon)}
+                />
+                <label htmlFor={`${ids.icon}-${icon}`} title={LIBRARY_ICON_LABELS[icon]}>
+                  <Icon name={icon} size={24} />
+                  <span className="visually-hidden">{`${LIBRARY_ICON_LABELS[icon]} icon`}</span>
+                </label>
+              </div>
+            ))}
+          </div>
+          <p id={`${ids.icon}-hint`} className={styles.hint}>
+            Shown in the side menu, on the library's page and on Libraries. The type's own icon
+            changes with the type.
+          </p>
         </fieldset>
 
         <fieldset className={styles.field} aria-describedby={ids.folders}>

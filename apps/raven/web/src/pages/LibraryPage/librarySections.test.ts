@@ -20,6 +20,7 @@ describe('the tabs of a library', () => {
     expect(sectionsFor('movies')).toEqual(everything)
     expect(sectionsFor('familyMovies')).toEqual(everything)
     expect(sectionsFor('documentaries')).toEqual(everything)
+    expect(sectionsFor('sports')).toEqual(everything)
     expect(sectionsFor('shows')).toEqual([
       'all',
       'in-progress',
@@ -27,7 +28,7 @@ describe('the tabs of a library', () => {
       'not-matched',
       'finished',
     ])
-    expect(sectionsFor('sports')).toEqual(['all', 'in-progress', 'favourites', 'finished'])
+    expect(sectionsFor('youtube')).toEqual(['all', 'in-progress', 'favourites', 'finished'])
   })
 
   it('reads All from no param, a tab from its name, and nothing from anything else', () => {

@@ -42,6 +42,7 @@ type LibraryRow = {
   auto_refresh: number
   locked: number
   folder_layout: string
+  icon: string | null
 }
 
 const isSettingName = keyOf(isLibrarySettings.shape)
@@ -68,6 +69,7 @@ const toSettings = (row: LibraryRow): LibrarySettings => {
     autoRefresh: row.auto_refresh === 1,
     locked: row.locked === 1,
     folderLayout: row.folder_layout,
+    icon: row.icon,
   } satisfies Record<keyof LibrarySettings, unknown>
   const known = Object.fromEntries(
     Object.entries(stored).filter(
@@ -95,6 +97,7 @@ const settingParams = (settings: LibrarySettings) => ({
   auto_refresh: Number(settings.autoRefresh),
   locked: Number(settings.locked),
   folder_layout: settings.folderLayout,
+  icon: settings.icon,
 })
 
 const SETTING_COLUMNS = Object.keys(settingParams(DEFAULT_LIBRARY_SETTINGS))

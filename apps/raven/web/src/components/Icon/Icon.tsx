@@ -1,4 +1,8 @@
+import type { LibraryIconName } from '@raven/core'
+
+/** Every icon a library can wear, and the app's own. */
 export type IconName =
+  | LibraryIconName
   | 'back'
   | 'plus'
   | 'rescan'
@@ -33,19 +37,9 @@ export type IconName =
   | 'history'
   | 'next'
   | 'wand'
-  | 'film'
-  | 'filmSpark'
-  | 'tv'
-  | 'tvSpark'
-  | 'filmHeart'
-  | 'tvHeart'
-  | 'globe'
   | 'image'
   | 'ascending'
   | 'descending'
-  | 'trophy'
-  | 'youtube'
-  | 'video'
   | 'libraries'
   | 'home'
   | 'playback'
@@ -117,6 +111,30 @@ const PATHS: Record<IconName, string> = {
   youtube:
     'M6 5.5h12a3.5 3.5 0 0 1 3.5 3.5v6a3.5 3.5 0 0 1-3.5 3.5H6A3.5 3.5 0 0 1 2.5 15V9A3.5 3.5 0 0 1 6 5.5zM10 9.5v5l4.5-2.5z',
   video: 'M3 7h12v10H3zM15 10.5l6-3.5v10l-6-3.5',
+  tvGlobe:
+    'M3 8h18v12H3zM8 3.5l4 4.5 4-4.5M12 10a4 4 0 1 0 0 8 4 4 0 1 0 0-8zM8 14h8M12 10c-1.1 1.1-1.6 2.5-1.6 4s.5 2.9 1.6 4M12 10c1.1 1.1 1.6 2.5 1.6 4s-.5 2.9-1.6 4',
+  fourK: 'M3 6h18v12H3zM9.5 15V9l-3 4.5h4.5M13.5 9v6M17.5 9l-4 3.5M15 11.2l2.5 3.8',
+  musicVideo:
+    'M3 8h18v12H3zM8 3.5l4 4.5 4-4.5M13 16.2v-5.4l2.4 1M13 16.2a1.6 1.6 0 1 1-3.2 0 1.6 1.6 0 0 1 3.2 0z',
+  standUp: 'M12 2.5a3 3 0 0 0-3 3v3a3 3 0 0 0 6 0v-3a3 3 0 0 0-3-3zM9 7h6M12 11.5V21M8 21h8',
+  gamepad:
+    'M7.5 7.5h9a4.5 4.5 0 0 1 4.5 4.5v1.5a3.5 3.5 0 0 1-6.3 2.1L14 14.5h-4l-.7 1.1A3.5 3.5 0 0 1 3 13.5V12a4.5 4.5 0 0 1 4.5-4.5zM7.5 10.5v3M6 12h3M15.5 11.5h.01M17.5 13h.01',
+  octagon:
+    'M8.4 3.2h7.2l5.2 5.2v7.2l-5.2 5.2H8.4l-5.2-5.2V8.4zM10 7.2h4l2.8 2.8v4L14 16.8h-4L7.2 14v-4z',
+  basketball:
+    'M12 3a9 9 0 1 0 0 18 9 9 0 1 0 0-18zM3 12h18M12 3v18M5.6 5.7C7.6 7.4 8.6 9.6 8.6 12s-1 4.6-3 6.3M18.4 5.7c-2 1.7-3 3.9-3 6.3s1 4.6 3 6.3',
+  soccer:
+    'M12 3a9 9 0 1 0 0 18 9 9 0 1 0 0-18zM12 7.5l4.3 3.1-1.6 5h-5.4l-1.6-5zM12 7.5V3M16.3 10.6l4.3-1.4M14.7 15.6l2.6 3.7M9.3 15.6l-2.6 3.7M7.7 10.6L3.4 9.2',
+  americanFootball:
+    'M5 19C3.5 14 5 8.5 9 5.5S16.5 3 19 5c1.5 5 0 10.5-4 13.5S7.5 20.5 5 19zM9.5 14.5l5-5M11 11.5l1.5 1.5M12.5 10l1.5 1.5M9.5 13l1.5 1.5',
+  headphones: 'M4 14a8 8 0 0 1 16 0M4 14h3.5v6.5H4zM16.5 14H20v6.5h-3.5z',
+  music:
+    'M9 18V5.5l11-2V16M9 9.5l11-2M9 18a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0zM20 16a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0z',
+  disc: 'M12 3a9 9 0 1 0 0 18 9 9 0 1 0 0-18zM12 10a2 2 0 1 0 0 4 2 2 0 1 0 0-4zM12 6.5a5.5 5.5 0 0 1 5.5 5.5',
+  podcast:
+    'M12 7.5a2 2 0 1 0 0 4 2 2 0 1 0 0-4zM8.5 13a5 5 0 1 1 7 0M6 15.5a8.5 8.5 0 1 1 12 0M12 14.5v6',
+  audiobook:
+    'M12 6.5C10 5 7 4.5 3.5 5v13c3.5-.5 6.5 0 8.5 1.5 2-1.5 5-2 8.5-1.5V5c-3.5-.5-6.5 0-8.5 1.5zM12 6.5v13',
   libraries: 'M3 4h4v16H3zM9 4h4v16H9zM14.6 5l3.6-1 3.4 15-3.6 1z',
   home: 'M3 11.5L12 4l9 7.5M5.5 9.5V20h5v-5.5h3V20h5V9.5',
   playback: 'M3 5h18v14H3zM10 9v6l5-3z',

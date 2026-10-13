@@ -73,6 +73,22 @@ describe('LibraryPage', () => {
     expect(screen.getByText('Gathering the videos')).toBeInTheDocument()
   })
 
+  it('puts the icon the side menu shows beside the name', async () => {
+    spies.get.mockImplementation(() => held<Library>().promise)
+    spies.list.mockImplementation(() => held<MediaItem[]>().promise)
+    renderLibraryPage({
+      libraries: [
+        library({
+          id: 2,
+          name: 'UFC',
+          settings: { ...library().settings, kind: 'sports', icon: 'octagon' },
+        }),
+      ],
+    })
+    const title = await screen.findByRole('heading', { level: 1, name: 'UFC' })
+    expect(title.querySelector('svg')?.dataset.icon).toBe('octagon')
+  })
+
   it('stands in for the library while it is read, with nothing of it known yet', async () => {
     spies.get.mockImplementation(() => held<Library>().promise)
     renderLibraryPage()

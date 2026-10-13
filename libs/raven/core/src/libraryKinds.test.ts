@@ -84,7 +84,7 @@ describe('withLibraryKind', () => {
 })
 
 describe('the rules for each type of library', () => {
-  it('matches movies and shows libraries, anime, family and documentaries included, to movies and shows', () => {
+  it('matches movies and shows libraries, anime, family, documentaries and sporting events included, to movies and shows', () => {
     expect(MATCHED_KINDS).toEqual([
       'movies',
       'shows',
@@ -93,6 +93,7 @@ describe('the rules for each type of library', () => {
       'familyMovies',
       'familyShows',
       'documentaries',
+      'sports',
     ])
     expect(LIBRARY_KINDS.map((kind) => [kind, matchTypeFor(kind)])).toEqual([
       ['movies', 'movie'],
@@ -102,7 +103,7 @@ describe('the rules for each type of library', () => {
       ['familyMovies', 'movie'],
       ['familyShows', 'show'],
       ['documentaries', 'movie'],
-      ['sports', null],
+      ['sports', 'movie'],
       ['youtube', null],
       ['other', null],
     ])
@@ -114,8 +115,11 @@ describe('the rules for each type of library', () => {
     expect({ ...KIND_RULES.familyMovies, prefer: 'any' }).toEqual(KIND_RULES.movies)
     expect({ ...KIND_RULES.familyShows, prefer: 'any' }).toEqual(KIND_RULES.shows)
     expect({ ...KIND_RULES.documentaries, prefer: 'any' }).toEqual(KIND_RULES.movies)
-    expect(KIND_RULES.sports).toEqual(KIND_RULES.other)
     expect(KIND_RULES.youtube).toEqual(KIND_RULES.other)
+  })
+
+  it('reads sporting events as movies, as TMDB lists events like UFC cards', () => {
+    expect(KIND_RULES.sports).toEqual(KIND_RULES.movies)
   })
 
   it('prefers Japanese animation in Anime libraries, family and animation in Family ones, and documentaries in Documentaries', () => {
@@ -212,7 +216,8 @@ describe('matchesAlike', () => {
     expect(alike('animeMovies', 'animeShows')).toBe(false)
     expect(alike('shows', 'animeShows')).toBe(false)
     expect(alike('movies', 'other')).toBe(false)
-    expect(alike('sports', 'other')).toBe(true)
-    expect(alike('youtube', 'sports')).toBe(true)
+    expect(alike('movies', 'sports')).toBe(true)
+    expect(alike('sports', 'other')).toBe(false)
+    expect(alike('youtube', 'other')).toBe(true)
   })
 })

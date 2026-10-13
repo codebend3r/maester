@@ -301,7 +301,7 @@ describe('the media server', () => {
         })
       const positionOf = async (id: number): Promise<number> => (await api().getMedia(id)).position
 
-      it('starts a library with progress saved, pinned, watched at 90%, and of no particular type', async () => {
+      it("starts a library with progress saved, pinned, watched at 90%, of no particular type and wearing its type's icon", async () => {
         expect((await api().getLibrary(library.id)).settings).toEqual({
           saveProgress: true,
           pinned: true,
@@ -314,6 +314,7 @@ describe('the media server', () => {
           autoRefresh: true,
           locked: false,
           folderLayout: 'auto',
+          icon: null,
         })
       })
 
@@ -393,6 +394,7 @@ describe('the media server', () => {
           autoRefresh: true,
           locked: false,
           folderLayout: 'auto',
+          icon: null,
         })
         expect(updated.scan.state).toBe('idle')
         expect((await putLibrary({ pinned: true })).settings.pinned).toBe(true)

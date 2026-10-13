@@ -175,6 +175,20 @@ describe('AppShell', () => {
     ])
   })
 
+  it('gives a pinned library the icon it picked, whatever its type', async () => {
+    spies.list.mockImplementation(async () => [
+      library({
+        id: 1,
+        name: 'UFC',
+        settings: { ...library().settings, kind: 'sports', icon: 'octagon' },
+      }),
+      library({ id: 2, name: 'Music', settings: { ...library().settings, icon: 'disc' } }),
+    ])
+    renderShell('/')
+    const pinned = await within(nav()).findByRole('list', { name: 'Pinned' })
+    expect(within(pinned).getAllByRole('link').map(iconOf)).toEqual(['octagon', 'disc'])
+  })
+
   it("keeps a locked library's type icon, with a lock on it, whatever its type", async () => {
     spies.list.mockImplementation(async () =>
       LIBRARY_KINDS.map((kind, index) =>
