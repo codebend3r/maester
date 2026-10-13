@@ -6,6 +6,7 @@ import {
   type MetadataHealth,
   matchTypeFor,
 } from '@raven/core'
+import { errorMessage } from '@/errorMessage'
 import { groupBy } from '@/groupBy'
 import { type LibraryRecord, LibrariesRepository } from '@/libraries/librariesRepository'
 import { ItemPictures } from '@/metadata/itemPictures'
@@ -58,7 +59,13 @@ export class MetadataService implements OnApplicationBootstrap {
   onApplicationBootstrap(): void {
     this.metadata.resortTitles()
     this.libraries.list().forEach((library) => {
-      this.relayoutNow(library.id)
+      try {
+        this.relayoutNow(library.id)
+      } catch (error) {
+        this.logger.error(
+          `Could not place the files of "${library.name}" again: ${errorMessage(error)}`,
+        )
+      }
       const { kind } = library.settings
       if (matchTypeFor(kind) == null) return
       this.files.retitle({ libraryId: library.id, kind })
@@ -97,11 +104,14 @@ export class MetadataService implements OnApplicationBootstrap {
    * type and matched from scratch, or left off for a type that is not matched.
    */
   changeKind({ libraryId, kind }: { libraryId: number; kind: LibraryKind }): void {
-    this.queue.push(`kind:${libraryId}:${kind}`, async () => {
-      this.relayoutNow(libraryId)
-      this.files.rename({ libraryId, kind })
-      await this.pass(libraryId)
-    })
+    this.queue.push(
+      `kind:${libraryId}:${kind}`,
+      this.logged(`type change of library ${libraryId}`, async () => {
+        this.relayoutNow(libraryId)
+        this.files.rename({ libraryId, kind })
+        await this.pass(libraryId)
+      }),
+    )
   }
 
   /**
@@ -124,7 +134,7 @@ export class MetadataService implements OnApplicationBootstrap {
     if (plan.moves.length === 0) return
     this.files.applyRelayout({ libraryId, kind: library.settings.kind, plan })
     this.logger.log(
-      `Read ${plan.moves.length} files of "${library.name}" under their letter or group folders again`,
+      `Placed ${plan.moves.length} files of "${library.name}" again for its folder layout`,
     )
   }
 
@@ -164,10 +174,24 @@ export class MetadataService implements OnApplicationBootstrap {
    * it, which reads the settings as they are then.
    */
   changeLayout({ libraryId }: { libraryId: number }): void {
-    this.queue.again(`layout:${libraryId}`, async () => {
-      this.relayoutNow(libraryId)
-      await this.pass(libraryId)
-    })
+    this.queue.again(
+      `layout:${libraryId}`,
+      this.logged(`layout change of library ${libraryId}`, async () => {
+        this.relayoutNow(libraryId)
+        await this.pass(libraryId)
+      }),
+    )
+  }
+
+  /** The queue drops a task that throws without a word, so a failure is logged here. */
+  private logged(what: string, task: () => Promise<void>): () => Promise<void> {
+    return async () => {
+      try {
+        await task()
+      } catch (error) {
+        this.logger.error(`The ${what} failed: ${errorMessage(error)}`)
+      }
+    }
   }
 
   whenIdle(): Promise<void> {

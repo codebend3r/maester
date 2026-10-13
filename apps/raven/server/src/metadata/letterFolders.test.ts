@@ -10,10 +10,12 @@ import {
   isMediaList,
   isShowListing,
 } from '@raven/core'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createApp } from '@/app'
 import { readServerConfig } from '@/config'
 import { DatabaseService } from '@/db/database'
+import { LibrariesRepository } from '@/libraries/librariesRepository'
+import { MediaIndex } from '@/media/mediaIndex'
 import { MetadataService } from '@/metadata/metadataService'
 import { ScannerService } from '@/scanner/scannerService'
 import { encodeClip } from '@/test/clips'
@@ -62,6 +64,12 @@ describe('letter and group folders', () => {
         seasons: { 1: [{ number: 1, title: 'Master and Apprentice', aired: '2023-08-22' }] },
       },
       {
+        id: 10283,
+        title: 'Archer',
+        first: '2009-09-17',
+        seasons: { 1: [{ number: 1, title: 'Mole Hunt', aired: '2009-09-17' }] },
+      },
+      {
         id: 46298,
         title: 'K',
         first: '2012-10-05',
@@ -78,12 +86,24 @@ describe('letter and group folders', () => {
   const state: {
     root: string
     tv: string
+    other: string
     movies: string
     data: string
     app: NestFastifyApplication | null
     shows: number
     moviesLibrary: number
-  } = { root: '', tv: '', movies: '', data: '', app: null, shows: 0, moviesLibrary: 0 }
+    otherLibrary: number
+  } = {
+    root: '',
+    tv: '',
+    other: '',
+    movies: '',
+    data: '',
+    app: null,
+    shows: 0,
+    moviesLibrary: 0,
+    otherLibrary: 0,
+  }
   const app = (): NestFastifyApplication => {
     if (!state.app) throw new Error('app not started')
     return state.app
@@ -91,6 +111,7 @@ describe('letter and group folders', () => {
   const settle = async () => {
     await app().get(ScannerService).whenIdle(state.shows)
     await app().get(ScannerService).whenIdle(state.moviesLibrary)
+    await app().get(ScannerService).whenIdle(state.otherLibrary)
     await app().get(MetadataService).whenIdle()
     await app().get(ThumbnailService).whenIdle()
   }
@@ -131,7 +152,7 @@ describe('letter and group folders', () => {
   }: {
     name: string
     path: string
-    kind: 'shows' | 'movies'
+    kind: 'shows' | 'movies' | 'other'
   }): Promise<number> =>
     shape({
       response: await app().inject({
@@ -145,6 +166,7 @@ describe('letter and group folders', () => {
   beforeAll(async () => {
     state.root = await mkdtemp(join(tmpdir(), 'raven-letters-'))
     state.tv = join(state.root, 'TV')
+    state.other = join(state.root, 'Other')
     state.movies = join(state.root, 'Movies')
     state.data = join(state.root, 'data')
     await Promise.all([
@@ -160,6 +182,14 @@ describe('letter and group folders', () => {
           'Season 1',
           'Ahsoka - S01E01 - Master and Apprentice.mp4',
         ),
+        seconds: 1,
+      }),
+      encodeClip({
+        path: join(state.tv, 'A', 'Archer - S01E01 - Mole Hunt.mp4'),
+        seconds: 1,
+      }),
+      encodeClip({
+        path: join(state.other, 'A', 'Andor', 'Season 1', 'Andor - S01E01 - Kassa.mp4'),
         seconds: 1,
       }),
       encodeClip({
@@ -198,12 +228,13 @@ describe('letter and group folders', () => {
       path: state.movies,
       kind: 'movies',
     })
+    state.otherLibrary = await createLibrary({ name: 'Other', path: state.other, kind: 'other' })
     await settle()
   })
 
   afterAll(async () => {
     await state.app?.close()
-    await rm(state.root, { recursive: true, force: true })
+    await rm(state.root, { recursive: true, force: true, maxRetries: 5 })
   })
 
   it('matches each show under a letter or group folder as its own show', async () => {
@@ -211,6 +242,7 @@ describe('letter and group folders', () => {
     expect(listing.shows.map((entry) => entry.show.title)).toEqual([
       'Ahsoka',
       'Andor',
+      'Archer',
       'Cupertino',
       'K',
     ])
@@ -251,6 +283,7 @@ describe('letter and group folders', () => {
     expect((await showsOf(state.shows)).shows.map((entry) => entry.show.title)).toEqual([
       'Ahsoka',
       'Andor',
+      'Archer',
       'Cupertino',
       'K',
     ])
@@ -263,7 +296,7 @@ describe('letter and group folders', () => {
       { path: state.tv, layout: 'flat', groups: 0 },
     ])
     await setLayout('auto')
-    expect(await showTitles()).toEqual(['Ahsoka', 'Andor', 'Cupertino', 'K'])
+    expect(await showTitles()).toEqual(['Ahsoka', 'Andor', 'Archer', 'Cupertino', 'K'])
     expect((await libraryOf(state.shows)).layouts).toEqual([
       { path: state.tv, layout: 'lettered', groups: 3 },
     ])
@@ -289,7 +322,7 @@ describe('letter and group folders', () => {
     await settle()
     expect((await kassa())?.folder).toBe('A/Andor/Season 1')
     await setLayout('auto')
-    expect(await showTitles()).toEqual(['Ahsoka', 'Andor', 'Cupertino', 'K'])
+    expect(await showTitles()).toEqual(['Ahsoka', 'Andor', 'Archer', 'Cupertino', 'K'])
   })
 
   it('reads a file still filed under its letter again on boot', async () => {
@@ -301,7 +334,58 @@ describe('letter and group folders', () => {
     app().get(MetadataService).onApplicationBootstrap()
     await settle()
     expect((await kassa())?.folder).toBe('Andor/Season 1')
-    expect(await showTitles()).toEqual(['Ahsoka', 'Andor', 'Cupertino', 'K'])
+    expect(await showTitles()).toEqual(['Ahsoka', 'Andor', 'Archer', 'Cupertino', 'K'])
+  })
+
+  it('matches a loose episode in a letter folder by its own name, never as a show called A', async () => {
+    const listing = await showsOf(state.shows)
+    expect(listing.shows.map((entry) => entry.show.title)).not.toContain('A')
+    const archer = (await mediaOf(state.shows)).find(
+      (item) => item.fileName === 'Archer - S01E01 - Mole Hunt.mp4',
+    )
+    expect(archer?.match).toBe('matched')
+    expect(listing.shows.find((entry) => entry.show.title === 'Archer')?.show.id).toBeDefined()
+  })
+
+  it('reads the letter folders of an Other library once it is changed to shows', async () => {
+    const before = (await mediaOf(state.otherLibrary)).map((item) => item.folder)
+    expect(before).toEqual(['A/Andor/Season 1'])
+    await app().inject({
+      method: 'PUT',
+      url: `/api/libraries/${state.otherLibrary}`,
+      payload: { name: 'Other', paths: [state.other], settings: { kind: 'shows' } },
+    })
+    await settle()
+    expect((await mediaOf(state.otherLibrary)).map((item) => item.folder)).toEqual([
+      'Andor/Season 1',
+    ])
+    expect((await showsOf(state.otherLibrary)).shows.map((entry) => entry.show.title)).toEqual([
+      'Andor',
+    ])
+  })
+
+  it('files a scan under the layout in force when its walk ends, not when it began', async () => {
+    const racing = join(state.root, 'Racing')
+    await encodeClip({
+      path: join(racing, 'A', 'Zed', 'Season 1', 'Zed - S01E01 - Pilot.mp4'),
+      seconds: 1,
+    })
+    const libraries = app().get(LibrariesRepository)
+    const index = app().get(MediaIndex)
+    const original = index.forLibrary.bind(index)
+    // The first read of the index after a walk: the layout changes just before it.
+    const spy = vi.spyOn(index, 'forLibrary').mockImplementationOnce((libraryId) => {
+      libraries.update({
+        id: libraryId,
+        input: { name: 'Racing', paths: [racing], settings: { folderLayout: 'flat' } },
+      })
+      return original(libraryId)
+    })
+    const id = await createLibrary({ name: 'Racing', path: racing, kind: 'shows' })
+    await app().get(ScannerService).whenIdle(id)
+    spy.mockRestore()
+    const [zed] = await mediaOf(id)
+    expect(zed?.folder).toBe('A/Zed/Season 1')
   })
 
   // Last: it changes what Andor is.
@@ -321,6 +405,7 @@ describe('letter and group folders', () => {
       ['Ahsoka - S01E01 - Master and Apprentice.mp4', 'matched'],
       ['Andor - S01E01 - Kassa.mp4', 'manual'],
       ['Andor - S02E01 - One Year Later.mp4', 'manual'],
+      ['Archer - S01E01 - Mole Hunt.mp4', 'matched'],
       ['Cupertino - S01E01 - Pilot.mp4', 'matched'],
       ['K - S01E01 - Kitten.mp4', 'matched'],
     ])

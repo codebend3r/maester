@@ -290,7 +290,9 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
         inScope({ path, scope, unreadable: walk.unreadable }),
       ),
     )
-    const { kind, folderLayout } = library.settings
+    // A layout or type change can land during the walk; what follows is
+    // synchronous, so the settings read here are the ones the files are filed under.
+    const { kind, folderLayout } = this.libraries.get(library.id)?.settings ?? library.settings
     // Each file is filed under the folder its titles sit in, a letter folder
     // or a group folder when its path has one, before anything reads it.
     const changes = reconcile({
@@ -310,7 +312,7 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
     }
     const toProbe = this.index.apply({
       libraryId: library.id,
-      kind: library.settings.kind,
+      kind,
       changes,
     })
     await this.artifacts.discard(changes.gone)
