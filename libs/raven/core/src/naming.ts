@@ -187,6 +187,9 @@ const readName = (name: string): NameReading => {
   }
 }
 
+/** The year a folder or file name gives, as the title parser reads it, or null. */
+export const yearOf = (name: string): number | null => readName(name).year
+
 /** The last segment of a relative folder, or '' at a library's root. */
 const lastSegment = (folder: string): string =>
   folder.split(/[\\/]/).findLast((segment) => segment !== '') ?? ''

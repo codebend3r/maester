@@ -173,6 +173,32 @@ export type RatingSource = Infer<typeof isRatingSource>
 
 export const RATING_SOURCES = isRatingSource.values
 
+/**
+ * How a library's folders are read: `auto` reads letter folders (`A/`, `#/`)
+ * and group folders (`Requests/`) as holding the titles; `flat` reads every
+ * top folder as one title.
+ */
+export const isFolderLayout = oneOf(['auto', 'flat'])
+
+export type FolderLayout = Infer<typeof isFolderLayout>
+
+export const FOLDER_LAYOUTS = isFolderLayout.values
+
+/** What a library path turned out to be on its last full scan. */
+export const isPathLayout = oneOf(['flat', 'lettered', 'grouped'])
+
+export type PathLayout = Infer<typeof isPathLayout>
+
+/** One library path, how it was read, and how many group folders it holds. */
+export const isLibraryPathLayout = object({
+  path: isString,
+  /** null until a full scan has read the path. */
+  layout: nullable(isPathLayout),
+  groups: isNumber,
+})
+
+export type LibraryPathLayout = Infer<typeof isLibraryPathLayout>
+
 /** A whole percentage from 1 to 100. */
 export const isWatchedPercent = (value: unknown): value is number =>
   isNumber(value) && Number.isInteger(value) && value >= 1 && value <= 100
