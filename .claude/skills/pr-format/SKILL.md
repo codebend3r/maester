@@ -33,9 +33,9 @@ Follows `.github/pull_request_template.md`. **What** and **Why** are always requ
 - `path/or/symbol`: <what changed>
 - <what now happens that didn't before>
 
-| <Screen>                                                                                        | <Screen>      |
-| ----------------------------------------------------------------------------------------------- | ------------- |
-| ![<alt>](https://raw.githubusercontent.com/codebend3r/maester/pr-screenshots/pr-<n>/<name>.png) | ![<alt>](url) |
+| <Screen>                                                                                  | <Screen>      |
+| ----------------------------------------------------------------------------------------- | ------------- |
+| ![<alt>](https://raw.githubusercontent.com/codebend3r/maester/<commit>/pr-<n>/<name>.png) | ![<alt>](url) |
 
 Screenshots come from a demo library of generated clips, in Chrome at 1440x900.
 
@@ -100,7 +100,7 @@ The title and body describe the **current whole branch**, not the first commit. 
 
 1. Re-read `origin/main...HEAD`
 2. Add, change, or remove bullets in the right project's section
-3. Re-take the screenshots of any screen that changed, replacing the files under `pr-<n>/`
+3. Re-take the screenshots of any screen that changed, commit them on top of `refs/screenshots/pr-<n>`, and point that PR's links at the new SHA
 4. Update the title if the scope changed
 5. `gh pr edit <n> --title "MAE: <title>" --body-file <file>`
 

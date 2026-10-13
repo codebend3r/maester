@@ -60,37 +60,50 @@ Open every image before uploading. Retake any that shows a scratchpad path, a ho
 
 Video frames compress badly as PNG; convert them: `sips -s format jpeg -s formatOptions 82 player.png --out player.jpg`. Keep UI-only shots as PNG.
 
-## 4. Host on `pr-screenshots`
+## 4. Host under `refs/screenshots/pr-<n>`
 
-Images live on the orphan `pr-screenshots` branch, one folder per PR, never on the PR branch. It shares no history with `main`: never merge or rebase it.
+Each PR's images live in a commit of their own, holding only `pr-<n>/<name>.png`, pushed to `refs/screenshots/pr-<n>` on origin. Never a branch, never the PR branch: nothing under `refs/heads` means GitHub's branch list, `git fetch` and the branch sync skills never see it, and the ref keeps the commit from being garbage collected. The body links to the images by that commit's SHA.
 
-A detached worktree leaves no local `pr-screenshots` branch behind for the branch sync and rebase skills to pick up:
+Build the commit with a throwaway index, no checkout. A retake builds on the PR's current commit, so unchanged shots carry over and the old SHA stays reachable for older revisions of the body:
 
 ```sh
-git fetch origin pr-screenshots
-git worktree add --detach <scratch>/pr-screenshots origin/pr-screenshots
-mkdir -p <scratch>/pr-screenshots/pr-<n>
-cp <scratch>/shots/* <scratch>/pr-screenshots/pr-<n>/
-git -C <scratch>/pr-screenshots add -A
-git -C <scratch>/pr-screenshots commit -m "MAE: screenshots for PR #<n>"
-git -C <scratch>/pr-screenshots push origin HEAD:pr-screenshots
-git worktree remove <scratch>/pr-screenshots
+n=<n>
+export GIT_INDEX_FILE=<scratch>/screenshots.index
+rm -f "$GIT_INDEX_FILE"
+parent=$(git fetch -q origin "refs/screenshots/pr-$n" 2>/dev/null && git rev-parse FETCH_HEAD)
+if [ -n "$parent" ]; then git read-tree "$parent"; fi
+for f in <scratch>/shots/*; do
+  git update-index --add --cacheinfo "100644,$(git hash-object -w "$f"),pr-$n/$(basename "$f")"
+done
+tree=$(git write-tree)
+unset GIT_INDEX_FILE
+if [ -n "$parent" ]; then
+  commit=$(git commit-tree "$tree" -p "$parent" -m "MAE: screenshots for PR #$n")
+else
+  commit=$(git commit-tree "$tree" -m "MAE: screenshots for PR #$n")
+fi
+git push origin "${commit}:refs/screenshots/pr-$n"
+echo "$commit"
 ```
 
-Lefthook prints "No config files … have been found" on that commit; the branch has no `lefthook.yml`, so that is expected.
+- Keep `${commit}` in braces: zsh reads `$commit:r` as a filename modifier and mangles the refspec
+- To drop a shot on a retake, `git update-index --force-remove "pr-$n/<name>.png"` before `git write-tree`
+- A retake is a new commit: point every link in that PR at the new SHA
 
-Check each link serves an image: `curl -sI https://raw.githubusercontent.com/codebend3r/maester/pr-screenshots/pr-<n>/<name>.png` gives `200` and `content-type: image/png`.
+The links are `https://raw.githubusercontent.com/codebend3r/maester/<commit>/pr-<n>/<name>.png`, with the full 40-character SHA.
+
+Raw can take a minute to serve a new commit, and it caches a `404` for a few minutes. Check each link with a fresh throwaway query string first, so an early `404` never lands on the real link: `curl -sI "<link>?v=$RANDOM"` gives `200` and `content-type: image/png`. Only then check the bare link and put it in the body.
 
 ## 5. Embed
 
 A two-column table in the project's section, a bold caption row above each row of images, alt text on each, and one line saying where they came from:
 
 ```markdown
-| Player                                                                                                         | Player settings                                                                                                        |
-| -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| ![Player with subtitles](https://raw.githubusercontent.com/codebend3r/maester/pr-screenshots/pr-96/player.jpg) | ![Player settings menu](https://raw.githubusercontent.com/codebend3r/maester/pr-screenshots/pr-96/player-settings.jpg) |
-| **History**                                                                                                    | **`/design`**                                                                                                          |
-| ![History page](https://raw.githubusercontent.com/codebend3r/maester/pr-screenshots/pr-96/history.png)         | ![Design page](https://raw.githubusercontent.com/codebend3r/maester/pr-screenshots/pr-96/design.png)                   |
+| Player                                                                                                                                   | Player settings                                                                                                                                  |
+| ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| ![Player with subtitles](https://raw.githubusercontent.com/codebend3r/maester/06890e2978f8c93fbd7109c8b06396dbb1a6a6ad/pr-96/player.jpg) | ![Player settings menu](https://raw.githubusercontent.com/codebend3r/maester/06890e2978f8c93fbd7109c8b06396dbb1a6a6ad/pr-96/player-settings.jpg) |
+| **History**                                                                                                                              | **`/design`**                                                                                                                                    |
+| ![History page](https://raw.githubusercontent.com/codebend3r/maester/06890e2978f8c93fbd7109c8b06396dbb1a6a6ad/pr-96/history.png)         | ![Design page](https://raw.githubusercontent.com/codebend3r/maester/06890e2978f8c93fbd7109c8b06396dbb1a6a6ad/pr-96/design.png)                   |
 
 Screenshots come from a demo library of generated clips, in Chrome at 1440x900.
 ```
