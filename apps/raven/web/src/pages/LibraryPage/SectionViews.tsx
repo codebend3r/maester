@@ -283,7 +283,7 @@ const NotMatchedSection = ({ library }: { library: Library }) => {
   return (
     <SectionBody
       query={query}
-      shape={<MediaGridSkeleton />}
+      shape={matchType === 'show' ? <MediaTilesSkeleton /> : <MediaGridSkeleton />}
       empty={whenEmpty(`Every file in ${library.name} is matched.`)}
     >
       {(files) => (

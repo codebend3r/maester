@@ -1,13 +1,6 @@
+import { showFolderOf } from '@raven/core'
 import { describe, expect, it } from 'vitest'
-import {
-  filePlace,
-  holdsOneMovie,
-  rootOf,
-  showDirOf,
-  showFolderOf,
-  showPlace,
-  stemOf,
-} from '@/metadata/places'
+import { filePlace, holdsOneMovie, rootOf, showDirOf, showPlace, stemOf } from '@/metadata/places'
 
 const file = (path: string, root = '/tv') => {
   const inside = path.slice(root.length + 1)

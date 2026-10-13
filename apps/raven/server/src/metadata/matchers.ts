@@ -5,6 +5,7 @@ import {
   type MatchState,
   parseEpisodeName,
   parseMovieName,
+  showFolderOf,
 } from '@raven/core'
 import { groupBy } from '@/groupBy'
 import type { ItemPictures } from '@/metadata/itemPictures'
@@ -12,15 +13,7 @@ import { movieAssets, showAssets } from '@/metadata/localAssets'
 import type { FixMatch, MatchFile, MatchFiles } from '@/metadata/matchFiles'
 import type { MatchPass } from '@/metadata/matchPass'
 import type { MetadataRepository } from '@/metadata/metadataRepository'
-import {
-  filePlace,
-  holdsOneMovie,
-  rootOf,
-  showDirOf,
-  showFolderOf,
-  showPlace,
-  stemOf,
-} from '@/metadata/places'
+import { filePlace, holdsOneMovie, rootOf, showDirOf, showPlace, stemOf } from '@/metadata/places'
 
 /** How files are matched to one type of TMDB item: which go together, and what a Fix match covers. */
 export type KindMatcher = {

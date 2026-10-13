@@ -81,4 +81,23 @@ describe('UnmatchedShows', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Not a show' }))
     expect(matched).toEqual([{ mediaId: 1, tmdbId: null }])
   })
+
+  it('returns focus to Fix match once its dialog is cancelled', async () => {
+    renderShows()
+    const fix = screen.getByRole('button', { name: 'Fix match for Archie' })
+    await userEvent.click(fix)
+    await userEvent.click(await screen.findByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(fix).toHaveFocus()
+  })
+
+  it('names a show read from no name by its first file', () => {
+    renderWithProviders(
+      <UnmatchedShows
+        files={[mediaItem({ id: 9, title: 'S01E02', folder: 'Season 1', fileName: 'S01E02.mkv' })]}
+        renderFiles={() => null}
+      />,
+    )
+    expect(screen.getByRole('button', { name: 'Fix match for S01E02' })).toBeInTheDocument()
+  })
 })

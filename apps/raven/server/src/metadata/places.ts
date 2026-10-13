@@ -1,5 +1,5 @@
 import { dirname, join } from 'node:path'
-import { foldTitle, isExtra, parseMovieName, seasonFolderNumber } from '@raven/core'
+import { foldTitle, isExtra, parseMovieName, showFolderOf } from '@raven/core'
 
 /** Where a file sits: its path, and its name and folder inside its library. */
 export type Placed = { path: string; folder: string; fileName: string }
@@ -17,12 +17,6 @@ export const filePlace = (file: { folder: string; fileName: string }): string =>
 /** The library path a file was found under, which its path starts with. */
 export const rootOf = (file: Placed): string =>
   file.path.slice(0, file.path.length - filePlace(file).length - 1)
-
-/** The first segment of a file's folder when it names a show, so a Fix match covers every season under it. */
-export const showFolderOf = (file: { folder: string }): string | null => {
-  const first = file.folder.split(/[\\/]/).find((segment) => segment !== '') ?? ''
-  return first !== '' && seasonFolderNumber(first) == null ? first : null
-}
 
 /** Where a show's files are kept together: the show's folder, or the file itself at a root. */
 export const showPlace = (file: { folder: string; fileName: string }): string =>

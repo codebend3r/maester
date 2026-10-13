@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { mediaItem } from '@/test/fixtures'
-import { unmatchedShowsOf } from '@/unmatchedShows'
+import { showFolderOf, unmatchedShowsOf } from '@/unmatchedShows'
 
 const episode = ({ id, folder, fileName }: { id: number; folder: string; fileName: string }) =>
   mediaItem({ id, folder, fileName, match: 'unmatched' })
@@ -53,5 +53,21 @@ describe('unmatchedShowsOf', () => {
 
   it('gives nothing for nothing', () => {
     expect(unmatchedShowsOf([])).toEqual([])
+  })
+
+  it('titles a file named only by its episode code by its tidied file name', () => {
+    const groups = unmatchedShowsOf([
+      mediaItem({ id: 1, folder: 'Season 1', fileName: 'S01E02.mkv', title: 'S01E02' }),
+    ])
+    expect(groups[0]?.title).toBe('S01E02')
+  })
+})
+
+describe('showFolderOf', () => {
+  it('is the first folder unless it is a season folder', () => {
+    expect(showFolderOf({ folder: 'Archie/Season 1' })).toBe('Archie')
+    expect(showFolderOf({ folder: 'Archie' })).toBe('Archie')
+    expect(showFolderOf({ folder: 'Season 1/Archie' })).toBeNull()
+    expect(showFolderOf({ folder: '' })).toBeNull()
   })
 })

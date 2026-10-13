@@ -1,5 +1,5 @@
 import { type MediaItem, type UnmatchedShow, unmatchedShowsOf } from '@raven/core'
-import { type ReactNode, useId, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useId, useRef, useState } from 'react'
 import { Button } from '@/components/Button/Button'
 import { FixMatchDialog } from '@/components/FixMatchDialog/FixMatchDialog'
 import { Icon } from '@/components/Icon/Icon'
@@ -20,6 +20,14 @@ const UnmatchedShowEntry = ({
   const [isOpen, setIsOpen] = useState(false)
   const [isFixing, setIsFixing] = useState(false)
   const first = group.files[0]
+  const wasFixing = useRef(false)
+
+  // The open dialog is modal, so everything behind it is inert until it is
+  // gone: focus can only come back once it has unmounted.
+  useEffect(() => {
+    if (wasFixing.current && !isFixing) fixButton.current?.focus()
+    wasFixing.current = isFixing
+  }, [isFixing])
 
   return (
     <li className={styles.show}>
@@ -31,7 +39,7 @@ const UnmatchedShowEntry = ({
         onClick={() => setIsOpen(!isOpen)}
       >
         <span className={styles.chevron} aria-hidden="true">
-          <Icon name="up" size={18} />
+          <Icon name="next" size={18} />
         </span>
         <span className={styles.title}>{group.title}</span>
         <span className={styles.count}>
@@ -56,10 +64,7 @@ const UnmatchedShowEntry = ({
           title={group.title}
           year={null}
           match={(tmdbId) => api.setMatch({ mediaId: first.id, tmdbId })}
-          onClose={() => {
-            setIsFixing(false)
-            fixButton.current?.focus()
-          }}
+          onClose={() => setIsFixing(false)}
         />
       )}
     </li>

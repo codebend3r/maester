@@ -10,7 +10,8 @@
     'toggle fix'
     'files files';
   align-items: center;
-  gap: var(--space-1) var(--space-2);
+  // The files region has its own top padding, so a collapsed one adds no row gap.
+  gap: 0 var(--space-2);
   border-bottom: 1px solid var(--color-moss);
   padding-bottom: var(--space-1);
 }
@@ -42,19 +43,17 @@
 .chevron {
   display: grid;
   color: var(--color-lichen);
-  transform: rotate(180deg);
 }
 
 .toggle[aria-expanded='true'] .chevron {
-  transform: none;
+  transform: rotate(90deg);
 }
 
 .title {
-  overflow: hidden;
   font-family: var(--font-display);
   font-size: var(--font-size-lg);
   line-height: var(--line-tight);
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .count {
@@ -78,12 +77,24 @@
 }
 
 @media (max-width: 30rem) {
+  .show {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'toggle'
+      'fix'
+      'files';
+  }
+
   .toggle {
     grid-template-columns: auto minmax(0, 1fr);
   }
 
   .count {
     grid-column: 2;
+  }
+
+  .fix {
+    justify-self: start;
   }
 }
 

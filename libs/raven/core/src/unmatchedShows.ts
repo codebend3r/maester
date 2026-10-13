@@ -11,11 +11,20 @@ export type UnmatchedShow = {
   files: MediaItem[]
 }
 
+/** The first segment of a file's folder when it names a show, so a Fix match covers every season under it. */
+export const showFolderOf = (file: { folder: string }): string | null => {
+  const first = file.folder.split(/[\\/]/).find((segment) => segment !== '') ?? ''
+  return first !== '' && seasonFolderNumber(first) == null ? first : null
+}
+
 /** The show folder a file sits in, else the file's own place, as the server keeps a show's files together. */
-const keyOf = ({ folder, fileName }: Pick<MediaItem, 'folder' | 'fileName'>): string => {
-  const first = folder.split(/[\\/]/).find((segment) => segment !== '') ?? ''
-  if (first !== '' && seasonFolderNumber(first) == null) return first
-  return folder === '' ? fileName : `${folder}/${fileName}`
+const keyOf = (file: Pick<MediaItem, 'folder' | 'fileName'>): string =>
+  showFolderOf(file) ?? (file.folder === '' ? file.fileName : `${file.folder}/${file.fileName}`)
+
+/** The show as the first file's name reads it; a name that is only an episode code reads no show, so the file's own title stands in. */
+const titleOf = (file: MediaItem): string => {
+  const show = parseEpisodeName({ fileName: file.fileName, folder: file.folder }).show
+  return show === '' ? file.title || file.fileName : show
 }
 
 /** A TV library's unmatched files gathered by show folder, groups in the order their first file came. */
@@ -27,6 +36,5 @@ export const unmatchedShowsOf = (files: readonly MediaItem[]): UnmatchedShow[] =
         group.key === key ? { ...group, files: group.files.concat(file) } : group,
       )
     }
-    const title = parseEpisodeName({ fileName: file.fileName, folder: file.folder }).show
-    return groups.concat({ key, title, files: [file] })
+    return groups.concat({ key, title: titleOf(file), files: [file] })
   }, [])
