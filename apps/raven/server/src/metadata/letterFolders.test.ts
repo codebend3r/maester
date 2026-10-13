@@ -254,12 +254,18 @@ describe('letter and group folders', () => {
       (item) => item.fileName === 'Andor - S01E01 - Kassa.mp4',
     )
     expect(andor?.folder).toBe('A/Andor/Season 1')
+    expect((await libraryOf(state.shows)).layouts).toEqual([
+      { path: state.tv, layout: 'flat', groups: 0 },
+    ])
     await setLayout('auto')
     expect((await showsOf(state.shows)).shows.map((entry) => entry.show.title)).toEqual([
       'Ahsoka',
       'Andor',
       'Cupertino',
       'K',
+    ])
+    expect((await libraryOf(state.shows)).layouts).toEqual([
+      { path: state.tv, layout: 'lettered', groups: 3 },
     ])
   })
 

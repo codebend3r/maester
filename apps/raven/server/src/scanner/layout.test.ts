@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { showDirOf } from '@/metadata/places'
-import { layoutsOf, planRelayout, titleRootOf, withTitleRoots } from '@/scanner/layout'
+import {
+  indexedLayoutsOf,
+  layoutsOf,
+  planRelayout,
+  titleRootOf,
+  withTitleRoots,
+} from '@/scanner/layout'
 import type { FoundFile } from '@/scanner/walk'
 
 const found = (path: string, root: string): FoundFile => ({ path, root, size: 1, mtimeMs: 1 })
@@ -53,6 +59,21 @@ describe('title roots', () => {
         fileName: 'Andor - S01E01.mkv',
       }),
     ).toBe('/m/TV/A/Andor')
+  })
+
+  it('describes each library path by the files the index holds under it, and leaves out one holding none', () => {
+    expect(
+      indexedLayoutsOf({
+        rows: [
+          { path: '/m/TV/A/Andor/Season 1/a.mkv' },
+          { path: '/m/TV/B/Bluey/Season 1/b.mkv' },
+          { path: '/m/Old/C/Cupertino/Season 1/c.mkv' },
+        ],
+        roots: ['/m/TV', '/m/Empty'],
+        kind: 'shows',
+        layout: 'auto',
+      }),
+    ).toEqual([{ path: '/m/TV', layout: 'lettered', groups: 2 }])
   })
 
   it('describes each library path by the group folders its files sit in', () => {
@@ -127,6 +148,52 @@ describe('planRelayout', () => {
       { from: 'A/Alien (1979)', to: 'Alien (1979)' },
       { from: 'A/Alien (1979)/Alien (1979).mkv', to: 'Alien (1979)/Alien (1979).mkv' },
     ])
+  })
+
+  it('leaves a Fix match where it is while a file that does not move still uses its place', () => {
+    const plan = planRelayout({
+      rows: [
+        row(
+          1,
+          '/m/TV/Requests/Cupertino/Season 1/Cupertino - S01E01.mkv',
+          'Requests/Cupertino/Season 1',
+        ),
+        row(2, '/m/TV/Requests/Chernobyl/Chernobyl - S01E01.mkv', 'Requests/Chernobyl'),
+      ],
+      roots: ['/m/TV'],
+      kind: 'shows',
+      layout: 'auto',
+      overrides: ['Requests'],
+    })
+    expect(plan).toEqual({ moves: [{ id: 1, folder: 'Cupertino/Season 1' }], overrides: [] })
+  })
+
+  it("moves a Fix match kept for a letter folder holding one loose movie to the movie's file", () => {
+    const plan = planRelayout({
+      rows: [row(6, '/m/Movies/H/Heat (1995).mp4', 'H')],
+      roots: ['/m/Movies'],
+      kind: 'movies',
+      layout: 'auto',
+      overrides: ['H'],
+    })
+    expect(plan).toEqual({
+      moves: [{ id: 6, folder: '' }],
+      overrides: [{ from: 'H', to: 'Heat (1995).mp4' }],
+    })
+  })
+
+  it('drops a Fix match kept for a letter folder holding several loose movies', () => {
+    const plan = planRelayout({
+      rows: [
+        row(6, '/m/Movies/H/Heat (1995).mp4', 'H'),
+        row(7, '/m/Movies/H/Hereditary (2018).mp4', 'H'),
+      ],
+      roots: ['/m/Movies'],
+      kind: 'movies',
+      layout: 'auto',
+      overrides: ['H'],
+    })
+    expect(plan.overrides).toEqual([{ from: 'H', to: null }])
   })
 
   it('moves nothing in a library that is never matched, though it has letter folders', () => {

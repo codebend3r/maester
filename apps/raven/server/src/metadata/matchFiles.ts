@@ -303,8 +303,8 @@ export class MatchFiles {
   /**
    * Writes a relayout in one go. A TV library's moved files are regrouped,
    * so they lose their links and wait to be matched again; a movie keeps
-   * its match unless its name now reads as another title. Fix matches move
-   * with their place, or go.
+   * its match unless its new folder reads its name as another title than its
+   * old folder did. Fix matches move with their place, or go.
    */
   applyRelayout({
     libraryId,
@@ -323,14 +323,23 @@ export class MatchFiles {
       'DELETE FROM match_overrides WHERE library_id = ? AND place = ?',
     )
     this.db.transaction(() => {
+      const folders = new Map(plan.moves.map((move) => [move.id, move.folder]))
+      const moved = this.byIds(plan.moves.map((move) => move.id)).flatMap((file) => {
+        const folder = folders.get(file.id)
+        return folder == null
+          ? []
+          : [{ id: file.id, fileName: file.fileName, was: file.folder, folder }]
+      })
       plan.moves.forEach((move) => setFolder.run(move.folder, move.id))
-      const moved = this.byIds(plan.moves.map((move) => move.id))
+      // Compared with the name as the old folder reads it, not the stored
+      // title, which may predate the parser and would rematch for no reason.
       const regrouped =
         matchTypeFor(kind) === 'show'
           ? moved
           : moved.filter((file) => {
-              const named = namedAs({ kind, fileName: file.fileName, folder: file.folder })
-              return named.title !== file.title || named.year !== file.year
+              const before = namedAs({ kind, fileName: file.fileName, folder: file.was })
+              const after = namedAs({ kind, fileName: file.fileName, folder: file.folder })
+              return before.title !== after.title || before.year !== after.year
             })
       this.metadata.unlink(regrouped.map((file) => file.id))
       this.rewriteNames({ rows: regrouped, kind })

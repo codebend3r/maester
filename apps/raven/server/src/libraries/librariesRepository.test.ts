@@ -36,4 +36,41 @@ describe('libraries', () => {
     libraries.update({ id, input: { name: 'TV', paths: ['/media/Shows'] } })
     expect(libraries.get(id)?.layouts).toEqual([{ path: '/media/Shows', layout: null, groups: 0 }])
   })
+
+  it('keeps what each path was found to be through a save that keeps it, and starts a new one unread', () => {
+    const libraries = new LibrariesRepository(database.get())
+    const { id } = libraries.create({
+      name: 'Films',
+      paths: ['/media/Films', '/media/Classics'],
+      settings: { kind: 'movies' },
+    })
+    libraries.saveLayouts({
+      id,
+      layouts: [
+        { path: '/media/Films', layout: 'lettered', groups: 26 },
+        { path: '/media/Classics', layout: 'flat', groups: 0 },
+      ],
+    })
+    libraries.update({
+      id,
+      input: {
+        name: 'Films',
+        paths: ['/media/Films', '/media/Classics'],
+        settings: { pinned: true },
+      },
+    })
+    expect(libraries.get(id)?.layouts).toEqual([
+      { path: '/media/Films', layout: 'lettered', groups: 26 },
+      { path: '/media/Classics', layout: 'flat', groups: 0 },
+    ])
+    libraries.update({
+      id,
+      input: { name: 'Films', paths: ['/media/Classics', '/media/Films', '/media/New'] },
+    })
+    expect(libraries.get(id)?.layouts).toEqual([
+      { path: '/media/Classics', layout: 'flat', groups: 0 },
+      { path: '/media/Films', layout: 'lettered', groups: 26 },
+      { path: '/media/New', layout: null, groups: 0 },
+    ])
+  })
 })

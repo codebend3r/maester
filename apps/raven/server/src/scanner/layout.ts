@@ -47,7 +47,7 @@ export const withTitleRoots = ({
     root: titleRootOf({ root: file.root, path: file.path, kind, layout }),
   }))
 
-/** What each library path is, from the walk's files rooted at their library paths. */
+/** What each library path is, from files rooted at their library paths: the walk's, or the index's. */
 export const layoutsOf = ({
   roots,
   files,
@@ -55,7 +55,7 @@ export const layoutsOf = ({
   layout,
 }: {
   roots: readonly string[]
-  files: readonly FoundFile[]
+  files: ReadonlyArray<{ path: string; root: string }>
   kind: LibraryKind
   layout: FolderLayout
 }): Array<{ path: string; layout: PathLayout; groups: number }> =>
@@ -68,6 +68,30 @@ export const layoutsOf = ({
     return { path: root, layout: describeLayout(groups), groups: new Set(groups).size }
   })
 
+/**
+ * What each library path is, from the files the index holds under it, for a
+ * layout change no scan follows. A path holding none is left out, so it keeps
+ * what it had, as one a scan cannot read does; files under none are skipped.
+ */
+export const indexedLayoutsOf = ({
+  rows,
+  roots,
+  kind,
+  layout,
+}: {
+  rows: ReadonlyArray<{ path: string }>
+  roots: readonly string[]
+  kind: LibraryKind
+  layout: FolderLayout
+}): Array<{ path: string; layout: PathLayout; groups: number }> => {
+  const files = rows.flatMap((row) => {
+    const root = roots.find((candidate) => isUnder({ path: row.path, root: candidate }))
+    return root == null ? [] : [{ path: row.path, root }]
+  })
+  const held = new Set(files.map((file) => file.root))
+  return layoutsOf({ roots: roots.filter((root) => held.has(root)), files, kind, layout })
+}
+
 /** A file as the index has it, for reading its place again. */
 export type LayoutRow = { id: number; path: string; folder: string; fileName: string }
 
@@ -77,7 +101,11 @@ export type RelayoutPlan = {
   overrides: Array<{ from: string; to: string | null }>
 }
 
-/** The places a Fix match can be kept under for a file: a show's folder or a movie's, and its own. */
+/**
+ * The places a Fix match can be kept under for a file: a show's folder or a
+ * movie's, and its own. A movie at a library's root has no folder of its own,
+ * as `fixGroup` reads it, so its file's place stands for both.
+ */
 const fixPlacesOf = ({
   kind,
   file,
@@ -87,14 +115,16 @@ const fixPlacesOf = ({
 }): string[] =>
   matchTypeFor(kind) === 'show'
     ? [showPlace(file), filePlace(file)]
-    : [file.folder, filePlace(file)]
+    : [file.folder === '' ? filePlace(file) : file.folder, filePlace(file)]
 
 /**
  * Reads every file's place again for the library's type and folder layout.
- * Only files whose folder changes move. A Fix match moves with its files
- * when its old place now names one place; one that named several, such as a
- * whole letter folder kept as one show, is dropped, as it was made for files
- * that were never one title.
+ * Only files whose folder changes move. A Fix match stays where it is while
+ * a file that does not move still has its place. Otherwise it moves with its
+ * files when its old place now names one place; one that named several, such
+ * as a whole letter folder kept as one show, is dropped, as it was made for
+ * files that were never one title. Files under none of the roots are left
+ * out.
  */
 export const planRelayout = ({
   rows,
@@ -109,25 +139,30 @@ export const planRelayout = ({
   layout: FolderLayout
   overrides: readonly string[]
 }): RelayoutPlan => {
-  const moved = rows.flatMap((file) => {
+  const placed = rows.flatMap((file) => {
     const root = roots.find((candidate) => isUnder({ path: file.path, root: candidate }))
     if (root == null) return []
     const folder = relative(
       titleRootOf({ root, path: file.path, kind, layout }),
       dirname(file.path),
     )
-    return folder === file.folder ? [] : [{ file, folder }]
+    return [{ file, folder }]
   })
+  const moved = placed.filter(({ file, folder }) => folder !== file.folder)
+  const kept = new Set(
+    placed
+      .filter(({ file, folder }) => folder === file.folder)
+      .flatMap(({ file }) => fixPlacesOf({ kind, file })),
+  )
   const pairs = moved.flatMap(({ file, folder }) => {
     const after = fixPlacesOf({ kind, file: { folder, fileName: file.fileName } })
-    return fixPlacesOf({ kind, file })
-      .map((from, index) => ({ from, to: after[index] ?? '' }))
-      .filter((pair) => pair.from !== '')
+    return fixPlacesOf({ kind, file }).map((from, index) => ({ from, to: after[index] ?? '' }))
   })
   const targets = groupBy({ items: pairs, key: (pair) => pair.from })
   return {
     moves: moved.map(({ file, folder }) => ({ id: file.id, folder })),
     overrides: overrides.flatMap((from) => {
+      if (kept.has(from)) return []
       const to = [...new Set((targets.get(from) ?? []).map((pair) => pair.to))]
       if (to.length === 0) return []
       const [only] = to

@@ -108,4 +108,30 @@ describe('relayout', () => {
       kind: 'none',
     })
   })
+
+  it("keeps a movie's match when only its stored title is stale, and its new folder reads it the same", () => {
+    const { library, files, metadata, ids } = setUp({
+      kind: 'movies',
+      root: '/m/Films',
+      paths: ['/m/Films/B/Blade Runner (1982)/Blade Runner (1982).mkv'],
+    })
+    const movie = metadata.save({ item: fetched({ type: 'movie', tmdbId: '78' }) })
+    files.settle({ ids, itemIds: [movie], match: 'matched' })
+    const [id] = ids
+    database.get().db.prepare("UPDATE media SET title = 'Old Title' WHERE id = ?").run(id)
+
+    const plan = planRelayout({
+      rows: files.layoutRows(library.id),
+      roots: library.paths,
+      kind: 'movies',
+      layout: 'auto',
+      overrides: files.overridePlaces(library.id),
+    })
+    files.applyRelayout({ libraryId: library.id, kind: 'movies', plan })
+
+    expect(files.byIds(ids).map((file) => [file.folder, file.title, file.match])).toEqual([
+      ['Blade Runner (1982)', 'Old Title', 'matched'],
+    ])
+    expect(metadata.mediaUnder(movie)).toEqual(ids)
+  })
 })

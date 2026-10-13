@@ -7,7 +7,7 @@ import {
   matchTypeFor,
 } from '@raven/core'
 import { groupBy } from '@/groupBy'
-import { LibrariesRepository } from '@/libraries/librariesRepository'
+import { type LibraryRecord, LibrariesRepository } from '@/libraries/librariesRepository'
 import { ItemPictures } from '@/metadata/itemPictures'
 import { type FixMatchChoice, type MatchFile, MatchFiles } from '@/metadata/matchFiles'
 import { createMatchers, type KindMatcher } from '@/metadata/matchers'
@@ -19,7 +19,7 @@ import { PASS_CONCURRENCY } from '@/metadata/passGuard'
 import { showPlace } from '@/metadata/places'
 import { TmdbClient } from '@/metadata/tmdbClient'
 import { createTaskQueue, mapWithConcurrency } from '@/scanner/concurrency'
-import { planRelayout } from '@/scanner/layout'
+import { type LayoutRow, indexedLayoutsOf, planRelayout } from '@/scanner/layout'
 
 /**
  * Matches the files in libraries of movies and shows to TMDB, one library
@@ -106,13 +106,16 @@ export class MetadataService implements OnApplicationBootstrap {
 
   /**
    * Reads where each of a library's files sits again, for its type and
-   * folder layout, and moves those that changed. Whether any did.
+   * folder layout: what each of its paths is, and the folders of the files
+   * that changed. Whether any file moved.
    */
   private relayoutNow(libraryId: number): boolean {
     const library = this.libraries.get(libraryId)
     if (!library) return false
+    const rows = this.files.layoutRows(libraryId)
+    this.refreshLayouts({ library, rows })
     const plan = planRelayout({
-      rows: this.files.layoutRows(libraryId),
+      rows,
       roots: library.paths,
       kind: library.settings.kind,
       layout: library.settings.folderLayout,
@@ -124,6 +127,36 @@ export class MetadataService implements OnApplicationBootstrap {
       `Read ${plan.moves.length} files of "${library.name}" under their letter or group folders again`,
     )
     return true
+  }
+
+  /**
+   * What each of a library's paths is, read again from the files the index
+   * holds under it, as a layout change runs no scan. Nothing is written when
+   * nothing changed, so a steady boot writes nothing.
+   */
+  private refreshLayouts({
+    library,
+    rows,
+  }: {
+    library: LibraryRecord
+    rows: readonly LayoutRow[]
+  }): void {
+    const layouts = indexedLayoutsOf({
+      rows,
+      roots: library.paths,
+      kind: library.settings.kind,
+      layout: library.settings.folderLayout,
+    })
+    const isSaved = layouts.every((fresh) =>
+      library.layouts.some(
+        (saved) =>
+          saved.path === fresh.path &&
+          saved.layout === fresh.layout &&
+          saved.groups === fresh.groups,
+      ),
+    )
+    if (isSaved) return
+    this.libraries.saveLayouts({ id: library.id, layouts })
   }
 
   /** A library's folder layout changed: its files are read again and matched where they regrouped. */

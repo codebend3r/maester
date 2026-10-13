@@ -201,12 +201,30 @@ export class LibrariesRepository {
     })()
   }
 
+  /** Each path a library keeps holds on to what a scan found it to be; a new one starts unread. */
   private replacePaths({ id, paths }: { id: number; paths: string[] }): void {
+    const found = new Map(
+      this.db
+        .prepare<[number], Pick<PathRow, 'path' | 'layout' | 'group_folders'>>(
+          'SELECT path, layout, group_folders FROM library_paths WHERE library_id = ?',
+        )
+        .all(id)
+        .map((row) => [row.path, row]),
+    )
     this.db.prepare('DELETE FROM library_paths WHERE library_id = ?').run(id)
     const insert = this.db.prepare(
-      'INSERT INTO library_paths (library_id, path, position) VALUES (?, ?, ?)',
+      `INSERT INTO library_paths (library_id, path, position, layout, group_folders)
+       VALUES (?, ?, ?, ?, ?)`,
     )
-    paths.forEach((path, position) => insert.run(id, path, position))
+    paths.forEach((path, position) =>
+      insert.run(
+        id,
+        path,
+        position,
+        found.get(path)?.layout ?? null,
+        found.get(path)?.group_folders ?? 0,
+      ),
+    )
   }
 
   /** A new library starts with its type's defaults, under whatever settings were sent. */
