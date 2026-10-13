@@ -100,7 +100,7 @@ describe('a library locked behind the PIN', () => {
 
   afterAll(async () => {
     await state.app?.close()
-    await rm(state.root, { recursive: true, force: true })
+    await rm(state.root, { recursive: true, force: true, maxRetries: 5 })
   })
 
   it('lists the library, saying it is locked', async () => {
@@ -117,17 +117,22 @@ describe('a library locked behind the PIN', () => {
     const shown = async (holding?: string) =>
       (await api(holding).listLibraries()).map((library) => ({
         paths: library.paths,
+        layouts: library.layouts,
         backdrop: library.backdrop?.type ?? null,
       }))
     expect(await shown()).toEqual([
-      { paths: [at('Open')], backdrop: 'thumbnail' },
-      { paths: [], backdrop: null },
+      { paths: [at('Open')], layouts: expect.any(Array), backdrop: 'thumbnail' },
+      { paths: [], layouts: [], backdrop: null },
     ])
-    expect(await api().getLibrary(state.private)).toMatchObject({ paths: [], backdrop: null })
+    expect(await api().getLibrary(state.private)).toMatchObject({
+      paths: [],
+      layouts: [],
+      backdrop: null,
+    })
     const { cookie } = await unlock('3001')
     expect(await shown(cookie)).toEqual([
-      { paths: [at('Open')], backdrop: 'thumbnail' },
-      { paths: [at('Private')], backdrop: 'thumbnail' },
+      { paths: [at('Open')], layouts: expect.any(Array), backdrop: 'thumbnail' },
+      { paths: [at('Private')], layouts: expect.any(Array), backdrop: 'thumbnail' },
     ])
     expect((await api(cookie).getLibrary(state.private)).backdrop).toEqual({
       type: 'thumbnail',
@@ -376,7 +381,7 @@ describe('the admin lock', () => {
   afterAll(async () => {
     vi.useRealTimers()
     await state.app?.close()
-    await rm(state.root, { recursive: true, force: true })
+    await rm(state.root, { recursive: true, force: true, maxRetries: 5 })
   })
 
   it('is on for a browser until the password is entered there', async () => {
