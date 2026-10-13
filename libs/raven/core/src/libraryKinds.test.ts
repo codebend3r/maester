@@ -1,15 +1,19 @@
 import { describe, expect, it } from 'bun:test'
-import { LIBRARY_KINDS, type LibrarySettings } from '@/contract'
+import { TIER_SETS } from '@/candidateTiers'
+import { LIBRARY_KINDS, type LibraryKind, type LibrarySettings } from '@/contract'
 import {
   DEFAULT_LIBRARY_SETTINGS,
   KIND_RULES,
   MATCHED_KINDS,
   coherentSettings,
   defaultLibrarySettings,
+  firstTierFor,
   groupingsFor,
   listsShows,
   matchTypeFor,
+  matchesAlike,
   sortsFor,
+  tiersFor,
   viewsFor,
   withLibraryKind,
 } from '@/libraryKinds'
@@ -104,14 +108,37 @@ describe('the rules for each type of library', () => {
     ])
   })
 
-  it('reads anime like the movies or shows it is, and sporting events and YouTube videos like Other', () => {
-    expect(KIND_RULES.animeMovies).toEqual(KIND_RULES.movies)
-    expect(KIND_RULES.animeShows).toEqual(KIND_RULES.shows)
-    expect(KIND_RULES.familyMovies).toEqual(KIND_RULES.movies)
-    expect(KIND_RULES.familyShows).toEqual(KIND_RULES.shows)
-    expect(KIND_RULES.documentaries).toEqual(KIND_RULES.movies)
+  it('reads anime, family and documentaries like the movies or shows they are, preferring their own results', () => {
+    expect({ ...KIND_RULES.animeMovies, prefer: 'any' }).toEqual(KIND_RULES.movies)
+    expect({ ...KIND_RULES.animeShows, prefer: 'any' }).toEqual(KIND_RULES.shows)
+    expect({ ...KIND_RULES.familyMovies, prefer: 'any' }).toEqual(KIND_RULES.movies)
+    expect({ ...KIND_RULES.familyShows, prefer: 'any' }).toEqual(KIND_RULES.shows)
+    expect({ ...KIND_RULES.documentaries, prefer: 'any' }).toEqual(KIND_RULES.movies)
     expect(KIND_RULES.sports).toEqual(KIND_RULES.other)
     expect(KIND_RULES.youtube).toEqual(KIND_RULES.other)
+  })
+
+  it('prefers Japanese animation in Anime libraries, family and animation in Family ones, and documentaries in Documentaries', () => {
+    expect(LIBRARY_KINDS.map((kind) => [kind, KIND_RULES[kind].prefer])).toEqual([
+      ['movies', 'any'],
+      ['shows', 'any'],
+      ['animeMovies', 'anime'],
+      ['animeShows', 'anime'],
+      ['familyMovies', 'family'],
+      ['familyShows', 'family'],
+      ['documentaries', 'documentary'],
+      ['sports', 'any'],
+      ['youtube', 'any'],
+      ['other', 'any'],
+    ])
+    expect(tiersFor('animeShows')).toBe(TIER_SETS.anime)
+    expect(tiersFor('movies')).toBe(TIER_SETS.any)
+    expect(firstTierFor('animeMovies')).toEqual({
+      genres: [16],
+      languages: ['ja'],
+      countries: ['JP'],
+    })
+    expect(firstTierFor('shows')).toEqual({})
   })
 
   it('lists the shows of a TV, Anime or Family TV shows library, and the files of the rest', () => {
@@ -171,5 +198,21 @@ describe('coherentSettings', () => {
       groupBy: 'codec',
     }
     expect(coherentSettings(movies)).toEqual(movies)
+  })
+})
+
+describe('matchesAlike', () => {
+  it('says only types matched to the same thing, preferring the same results, match alike', () => {
+    const alike = (before: LibraryKind, after: LibraryKind): boolean =>
+      matchesAlike({ before, after })
+    expect(alike('movies', 'movies')).toBe(true)
+    expect(alike('movies', 'animeMovies')).toBe(false)
+    expect(alike('movies', 'documentaries')).toBe(false)
+    expect(alike('animeMovies', 'familyMovies')).toBe(false)
+    expect(alike('animeMovies', 'animeShows')).toBe(false)
+    expect(alike('shows', 'animeShows')).toBe(false)
+    expect(alike('movies', 'other')).toBe(false)
+    expect(alike('sports', 'other')).toBe(true)
+    expect(alike('youtube', 'sports')).toBe(true)
   })
 })

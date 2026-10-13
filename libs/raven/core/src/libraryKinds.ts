@@ -1,3 +1,4 @@
+import { type CandidateTier, TIER_SETS, type TierSet } from '@/candidateTiers'
 import {
   LIBRARY_KINDS,
   LIBRARY_VIEWS,
@@ -18,6 +19,8 @@ import { sortParts } from '@/sortFields'
 export type KindRules = {
   /** What its files are matched to on TMDB; null for a library that is never matched. */
   matches: MatchItemType | null
+  /** The search results it prefers, tier by tier: a key of `TIER_SETS`. */
+  prefer: TierSet
   /** The fields it can sort its videos on, in the order a menu offers them. */
   fields: readonly SortFieldName[]
   /** The layouts it can show. */
@@ -45,6 +48,7 @@ const without = <T>({ all, left }: { all: readonly T[]; left: readonly T[] }): T
 /** A library of movies starts grouped into matched and not. */
 const MOVIE_RULES = {
   matches: 'movie',
+  prefer: 'any',
   fields: isSortFieldName.values,
   views: LIBRARY_VIEWS,
   groupings: MEDIA_GROUPINGS,
@@ -59,6 +63,7 @@ const MOVIE_RULES = {
  */
 const SHOW_RULES = {
   matches: 'show',
+  prefer: 'any',
   fields: without({ all: isSortFieldName.values, left: FILE_FIELDS }),
   views: without({ all: LIBRARY_VIEWS, left: ['grouped'] }),
   groupings: MEDIA_GROUPINGS,
@@ -69,6 +74,7 @@ const SHOW_RULES = {
 /** A library that is never matched has no years, scores or match to sort or group by. */
 const UNMATCHED_RULES = {
   matches: null,
+  prefer: 'any',
   fields: without({ all: isSortFieldName.values, left: MATCHED_FIELDS }),
   views: LIBRARY_VIEWS,
   groupings: without({ all: MEDIA_GROUPINGS, left: ['match'] }),
@@ -78,17 +84,18 @@ const UNMATCHED_RULES = {
 
 /**
  * Anime and family films and shows are matched on TMDB like any movie or
- * show, and documentaries as movies, as Radarr files them. Sporting events
- * and YouTube videos are not there to match, so they are read like Other.
+ * show, and documentaries as movies, as Radarr files them, each preferring
+ * the results of its own kind. Sporting events and YouTube videos are not
+ * there to match, so they are read like Other.
  */
 export const KIND_RULES = {
   movies: MOVIE_RULES,
   shows: SHOW_RULES,
-  animeMovies: MOVIE_RULES,
-  animeShows: SHOW_RULES,
-  familyMovies: MOVIE_RULES,
-  familyShows: SHOW_RULES,
-  documentaries: MOVIE_RULES,
+  animeMovies: { ...MOVIE_RULES, prefer: 'anime' },
+  animeShows: { ...SHOW_RULES, prefer: 'anime' },
+  familyMovies: { ...MOVIE_RULES, prefer: 'family' },
+  familyShows: { ...SHOW_RULES, prefer: 'family' },
+  documentaries: { ...MOVIE_RULES, prefer: 'documentary' },
   sports: UNMATCHED_RULES,
   youtube: UNMATCHED_RULES,
   other: UNMATCHED_RULES,
@@ -101,6 +108,29 @@ export const KIND_RULES = {
  * with the same answer read their files the same way.
  */
 export const matchTypeFor = (kind: LibraryKind): MatchItemType | null => KIND_RULES[kind].matches
+
+/** The tiers a library of `kind` searches TMDB's results in, in order. */
+export const tiersFor = (kind: LibraryKind): readonly CandidateTier[] =>
+  TIER_SETS[KIND_RULES[kind].prefer]
+
+/** The results a library of `kind` prefers most, which Fix match lists first. */
+export const firstTierFor = (kind: LibraryKind): CandidateTier =>
+  TIER_SETS[KIND_RULES[kind].prefer][0]
+
+/**
+ * Whether two types of library match their files alike: to the same type of
+ * TMDB item, preferring the same results. A change between two that do not
+ * matches every file again.
+ */
+export const matchesAlike = ({
+  before,
+  after,
+}: {
+  before: LibraryKind
+  after: LibraryKind
+}): boolean =>
+  matchTypeFor(before) === matchTypeFor(after) &&
+  KIND_RULES[before].prefer === KIND_RULES[after].prefer
 
 /** The types of library that are matched against TMDB. */
 export const MATCHED_KINDS: readonly LibraryKind[] = LIBRARY_KINDS.filter(
