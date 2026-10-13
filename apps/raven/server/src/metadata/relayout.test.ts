@@ -1,0 +1,111 @@
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { LibrariesRepository } from '@/libraries/librariesRepository'
+import { MediaIndex } from '@/media/mediaIndex'
+import { localSeason } from '@/metadata/localItems'
+import { MatchFiles } from '@/metadata/matchFiles'
+import type { FetchedItem } from '@/metadata/tmdbClient'
+import { planRelayout } from '@/scanner/layout'
+import { testDatabase } from '@/test/database'
+import { repositories } from '@/test/repositories'
+
+/** The least TMDB item `MetadataRepository.save` takes, as `metadataRepository.test.ts` builds one. */
+const fetched = ({ type, tmdbId }: { type: FetchedItem['type']; tmdbId: string }): FetchedItem => ({
+  ...localSeason({ showTmdbId: '1', number: 1 }),
+  type,
+  tmdbId,
+  number: null,
+  title: tmdbId,
+  credits: [],
+})
+
+describe('relayout', () => {
+  const database = testDatabase('raven-relayout-')
+  beforeAll(database.open)
+  afterAll(database.close)
+
+  const setUp = ({
+    kind,
+    root,
+    paths,
+  }: {
+    kind: 'shows' | 'movies'
+    root: string
+    paths: string[]
+  }) => {
+    const libraries = new LibrariesRepository(database.get())
+    const { metadata } = repositories(database.get())
+    const files = new MatchFiles(database.get(), metadata)
+    const index = new MediaIndex(database.get())
+    const library = libraries.create({ name: kind, paths: [root], settings: { kind } })
+    const ids = paths.map((path) =>
+      index.insert({ libraryId: library.id, kind, file: { path, root, size: 1, mtimeMs: 1 } }),
+    )
+    return { library, files, metadata, ids }
+  }
+
+  it("sends regrouped show files back to matching, and drops a whole letter's Fix match", () => {
+    const { library, files, metadata, ids } = setUp({
+      kind: 'shows',
+      root: '/m/TV',
+      paths: [
+        '/m/TV/A/Andor/Season 1/Andor - S01E01.mkv',
+        '/m/TV/A/Ahsoka/Season 1/Ahsoka - S01E01.mkv',
+      ],
+    })
+    const show = metadata.save({ item: fetched({ type: 'show', tmdbId: '1' }) })
+    files.settle({ ids, itemIds: [show], match: 'matched' })
+    files.saveFixMatch({ libraryId: library.id, place: 'A', fix: { kind: 'tmdb', tmdbId: '1' } })
+
+    const plan = planRelayout({
+      rows: files.layoutRows(library.id),
+      roots: library.paths,
+      kind: 'shows',
+      layout: 'auto',
+      overrides: files.overridePlaces(library.id),
+    })
+    files.applyRelayout({ libraryId: library.id, kind: 'shows', plan })
+
+    expect(files.byIds(ids).map((file) => [file.folder, file.match])).toEqual([
+      ['Andor/Season 1', 'pending'],
+      ['Ahsoka/Season 1', 'pending'],
+    ])
+    expect(metadata.mediaUnder(show)).toEqual([])
+    expect(files.fixMatchAt({ libraryId: library.id, place: 'A' })).toEqual({ kind: 'none' })
+  })
+
+  it("keeps a movie's match and moves its Fix match with its folder", () => {
+    const { library, files, metadata, ids } = setUp({
+      kind: 'movies',
+      root: '/m/Movies',
+      paths: ['/m/Movies/A/Alien (1979)/Alien (1979).mkv'],
+    })
+    const movie = metadata.save({ item: fetched({ type: 'movie', tmdbId: '348' }) })
+    files.settle({ ids, itemIds: [movie], match: 'manual' })
+    files.saveFixMatch({
+      libraryId: library.id,
+      place: 'A/Alien (1979)',
+      fix: { kind: 'tmdb', tmdbId: '348' },
+    })
+
+    const plan = planRelayout({
+      rows: files.layoutRows(library.id),
+      roots: library.paths,
+      kind: 'movies',
+      layout: 'auto',
+      overrides: files.overridePlaces(library.id),
+    })
+    files.applyRelayout({ libraryId: library.id, kind: 'movies', plan })
+
+    expect(files.byIds(ids).map((file) => [file.folder, file.match])).toEqual([
+      ['Alien (1979)', 'manual'],
+    ])
+    expect(metadata.mediaUnder(movie)).toEqual(ids)
+    expect(files.fixMatchAt({ libraryId: library.id, place: 'Alien (1979)' })).toEqual({
+      kind: 'tmdb',
+      tmdbId: '348',
+    })
+    expect(files.fixMatchAt({ libraryId: library.id, place: 'A/Alien (1979)' })).toEqual({
+      kind: 'none',
+    })
+  })
+})

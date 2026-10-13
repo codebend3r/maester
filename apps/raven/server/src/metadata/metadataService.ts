@@ -19,6 +19,7 @@ import { PASS_CONCURRENCY } from '@/metadata/passGuard'
 import { showPlace } from '@/metadata/places'
 import { TmdbClient } from '@/metadata/tmdbClient'
 import { createTaskQueue, mapWithConcurrency } from '@/scanner/concurrency'
+import { planRelayout } from '@/scanner/layout'
 
 /**
  * Matches the files in libraries of movies and shows to TMDB, one library
@@ -48,10 +49,16 @@ export class MetadataService implements OnApplicationBootstrap {
     this.matchers = createMatchers({ files, metadata, pictures })
   }
 
-  /** Names indexed before they were parsed are read again, and every matched library gets a pass for what is pending. */
+  /**
+   * Files filed under another folder layout, or indexed before letter
+   * folders were read, are placed again; names indexed before they were
+   * parsed are read again; and every matched library gets a pass for what is
+   * pending.
+   */
   onApplicationBootstrap(): void {
     this.metadata.resortTitles()
     this.libraries.list().forEach((library) => {
+      this.relayoutNow(library.id)
       const { kind } = library.settings
       if (matchTypeFor(kind) == null) return
       this.files.retitle({ libraryId: library.id, kind })
@@ -91,7 +98,38 @@ export class MetadataService implements OnApplicationBootstrap {
    */
   changeKind({ libraryId, kind }: { libraryId: number; kind: LibraryKind }): void {
     this.queue.push(`kind:${libraryId}:${kind}`, async () => {
+      this.relayoutNow(libraryId)
       this.files.rename({ libraryId, kind })
+      await this.pass(libraryId)
+    })
+  }
+
+  /**
+   * Reads where each of a library's files sits again, for its type and
+   * folder layout, and moves those that changed. Whether any did.
+   */
+  private relayoutNow(libraryId: number): boolean {
+    const library = this.libraries.get(libraryId)
+    if (!library) return false
+    const plan = planRelayout({
+      rows: this.files.layoutRows(libraryId),
+      roots: library.paths,
+      kind: library.settings.kind,
+      layout: library.settings.folderLayout,
+      overrides: this.files.overridePlaces(libraryId),
+    })
+    if (plan.moves.length === 0) return false
+    this.files.applyRelayout({ libraryId, kind: library.settings.kind, plan })
+    this.logger.log(
+      `Read ${plan.moves.length} files of "${library.name}" under their letter or group folders again`,
+    )
+    return true
+  }
+
+  /** A library's folder layout changed: its files are read again and matched where they regrouped. */
+  changeLayout({ libraryId }: { libraryId: number }): void {
+    this.queue.push(`layout:${libraryId}`, async () => {
+      this.relayoutNow(libraryId)
       await this.pass(libraryId)
     })
   }

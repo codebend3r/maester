@@ -240,6 +240,29 @@ describe('letter and group folders', () => {
     ])
   })
 
+  it('reads every top folder as a title when set to flat, and letter folders again when set back', async () => {
+    const setLayout = async (folderLayout: 'auto' | 'flat') => {
+      await app().inject({
+        method: 'PUT',
+        url: `/api/libraries/${state.shows}`,
+        payload: { name: 'TV', paths: [state.tv], settings: { kind: 'shows', folderLayout } },
+      })
+      await settle()
+    }
+    await setLayout('flat')
+    const andor = (await mediaOf(state.shows)).find(
+      (item) => item.fileName === 'Andor - S01E01 - Kassa.mp4',
+    )
+    expect(andor?.folder).toBe('A/Andor/Season 1')
+    await setLayout('auto')
+    expect((await showsOf(state.shows)).shows.map((entry) => entry.show.title)).toEqual([
+      'Ahsoka',
+      'Andor',
+      'Cupertino',
+      'K',
+    ])
+  })
+
   // Last: it changes what Andor is.
   it('fixes the match of one show under a letter folder without touching its neighbours', async () => {
     const before = await showsOf(state.shows)

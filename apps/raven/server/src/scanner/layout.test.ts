@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { showDirOf } from '@/metadata/places'
-import { layoutsOf, titleRootOf, withTitleRoots } from '@/scanner/layout'
+import { layoutsOf, planRelayout, titleRootOf, withTitleRoots } from '@/scanner/layout'
 import type { FoundFile } from '@/scanner/walk'
 
 const found = (path: string, root: string): FoundFile => ({ path, root, size: 1, mtimeMs: 1 })
@@ -72,5 +72,83 @@ describe('title roots', () => {
       { path: '/m/TV', layout: 'lettered', groups: 3 },
       { path: '/m/Reality', layout: 'flat', groups: 0 },
     ])
+  })
+})
+
+const row = (id: number, path: string, folder: string) => ({
+  id,
+  path,
+  folder,
+  fileName: path.slice(path.lastIndexOf('/') + 1),
+})
+
+describe('planRelayout', () => {
+  const lettered = [
+    row(1, '/m/TV/A/Andor/Season 1/Andor - S01E01.mkv', 'A/Andor/Season 1'),
+    row(2, '/m/TV/A/Ahsoka/Season 1/Ahsoka - S01E01.mkv', 'A/Ahsoka/Season 1'),
+    row(3, '/m/Reality/Alone/Season 1/Alone - S01E01.mkv', 'Alone/Season 1'),
+  ]
+
+  it('moves files indexed under their letter, and leaves a flat path alone', () => {
+    const plan = planRelayout({
+      rows: lettered,
+      roots: ['/m/TV', '/m/Reality'],
+      kind: 'shows',
+      layout: 'auto',
+      overrides: [],
+    })
+    expect(plan.moves).toEqual([
+      { id: 1, folder: 'Andor/Season 1' },
+      { id: 2, folder: 'Ahsoka/Season 1' },
+    ])
+  })
+
+  it('drops a Fix match kept for a whole letter, and keeps one for a flat show', () => {
+    const plan = planRelayout({
+      rows: lettered,
+      roots: ['/m/TV', '/m/Reality'],
+      kind: 'shows',
+      layout: 'auto',
+      overrides: ['A', 'Alone'],
+    })
+    expect(plan.overrides).toEqual([{ from: 'A', to: null }])
+  })
+
+  it('moves a Fix match kept for a movie folder under a letter', () => {
+    const plan = planRelayout({
+      rows: [row(4, '/m/Movies/A/Alien (1979)/Alien (1979).mkv', 'A/Alien (1979)')],
+      roots: ['/m/Movies'],
+      kind: 'movies',
+      layout: 'auto',
+      overrides: ['A/Alien (1979)', 'A/Alien (1979)/Alien (1979).mkv'],
+    })
+    expect(plan.moves).toEqual([{ id: 4, folder: 'Alien (1979)' }])
+    expect(plan.overrides).toEqual([
+      { from: 'A/Alien (1979)', to: 'Alien (1979)' },
+      { from: 'A/Alien (1979)/Alien (1979).mkv', to: 'Alien (1979)/Alien (1979).mkv' },
+    ])
+  })
+
+  it('moves nothing in a library that is never matched, though it has letter folders', () => {
+    const plan = planRelayout({
+      rows: [row(5, '/m/Home/A/Beach/clip.mp4', 'A/Beach')],
+      roots: ['/m/Home'],
+      kind: 'other',
+      layout: 'auto',
+      overrides: [],
+    })
+    expect(plan).toEqual({ moves: [], overrides: [] })
+  })
+
+  it('moves files back under their letter when the library is set to flat', () => {
+    const plan = planRelayout({
+      rows: [row(1, '/m/TV/A/Andor/Season 1/Andor - S01E01.mkv', 'Andor/Season 1')],
+      roots: ['/m/TV'],
+      kind: 'shows',
+      layout: 'flat',
+      overrides: ['Andor'],
+    })
+    expect(plan.moves).toEqual([{ id: 1, folder: 'A/Andor/Season 1' }])
+    expect(plan.overrides).toEqual([{ from: 'Andor', to: 'A' }])
   })
 })

@@ -1,9 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { type LibraryKind, type MatchState, isMatchState } from '@raven/core'
+import { type LibraryKind, type MatchState, isMatchState, matchTypeFor } from '@raven/core'
 import { DatabaseService } from '@/db/database'
 import { BEST_FIRST, escapeLike } from '@/media/mediaSql'
 import { namedAs } from '@/media/namedAs'
 import { MetadataRepository } from '@/metadata/metadataRepository'
+import type { LayoutRow, RelayoutPlan } from '@/scanner/layout'
 
 /** A Fix match kept for a place: none, "this is not a movie or show", or a TMDB id. */
 export type FixMatch = { kind: 'none' } | { kind: 'not-a-match' } | { kind: 'tmdb'; tmdbId: string }
@@ -277,5 +278,69 @@ export class MatchFiles {
         )
         .run(libraryId).changes,
     )
+  }
+
+  /** Every file of a library with where it sits, for reading its place again. */
+  layoutRows(libraryId: number): LayoutRow[] {
+    return this.db
+      .prepare<[number], { id: number; path: string; folder: string; file_name: string }>(
+        'SELECT id, path, folder, file_name FROM media WHERE library_id = ?',
+      )
+      .all(libraryId)
+      .map((row) => ({ id: row.id, path: row.path, folder: row.folder, fileName: row.file_name }))
+  }
+
+  /** The places a library keeps Fix matches under. */
+  overridePlaces(libraryId: number): string[] {
+    return this.db
+      .prepare<[number], { place: string }>(
+        'SELECT place FROM match_overrides WHERE library_id = ?',
+      )
+      .all(libraryId)
+      .map((row) => row.place)
+  }
+
+  /**
+   * Writes a relayout in one go. A TV library's moved files are regrouped,
+   * so they lose their links and wait to be matched again; a movie keeps
+   * its match unless its name now reads as another title. Fix matches move
+   * with their place, or go.
+   */
+  applyRelayout({
+    libraryId,
+    kind,
+    plan,
+  }: {
+    libraryId: number
+    kind: LibraryKind
+    plan: RelayoutPlan
+  }): void {
+    const setFolder = this.db.prepare('UPDATE media SET folder = ? WHERE id = ?')
+    const moveFix = this.db.prepare(
+      'UPDATE OR REPLACE match_overrides SET place = ? WHERE library_id = ? AND place = ?',
+    )
+    const dropFix = this.db.prepare(
+      'DELETE FROM match_overrides WHERE library_id = ? AND place = ?',
+    )
+    this.db.transaction(() => {
+      plan.moves.forEach((move) => setFolder.run(move.folder, move.id))
+      const moved = this.byIds(plan.moves.map((move) => move.id))
+      const regrouped =
+        matchTypeFor(kind) === 'show'
+          ? moved
+          : moved.filter((file) => {
+              const named = namedAs({ kind, fileName: file.fileName, folder: file.folder })
+              return named.title !== file.title || named.year !== file.year
+            })
+      this.metadata.unlink(regrouped.map((file) => file.id))
+      this.rewriteNames({ rows: regrouped, kind })
+      plan.overrides.forEach(({ from, to }) => {
+        if (to == null) {
+          dropFix.run(libraryId, from)
+          return
+        }
+        moveFix.run(to, libraryId, from)
+      })
+    })()
   }
 }
