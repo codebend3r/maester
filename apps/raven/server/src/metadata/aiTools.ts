@@ -45,20 +45,38 @@ export const AI_SEARCH_RESULTS = 10
 /** How much of a result's overview Claude reads, in characters. */
 const OVERVIEW_LENGTH = 200
 
-/** A whole number: a year, a season. */
-const isWhole = (value: unknown): value is number => isNumber(value) && Number.isInteger(value)
+/** The years a search may keep to, the seasons a show may list, and the longest title searched. */
+export const AI_INPUT_BOUNDS = {
+  years: { min: 1870, max: 2100 },
+  seasons: { min: 0, max: 999 },
+  queryLength: 200,
+} as const
+
+/** A whole number from `min` to `max`: a year, a season. */
+const wholeWithin =
+  ({ min, max }: { min: number; max: number }) =>
+  (value: unknown): value is number =>
+    isNumber(value) && Number.isInteger(value) && value >= min && value <= max
 
 /** Words, not only spaces. */
 const isText = (value: unknown): value is string => isString(value) && value.trim() !== ''
 
-/** What `search_tmdb` takes; strict tool use guarantees the shape, and this checks it anyway. */
+/**
+ * What `search_tmdb` takes; strict tool use guarantees the shape, and this
+ * checks it anyway, with bounds the schema cannot hold, so an odd call is
+ * answered as an error rather than sent to TMDB.
+ */
 export const isSearchInput = object({
   type: isMatchItemType,
-  query: isText,
-  year: nullable(isWhole),
+  query: (value: unknown): value is string =>
+    isText(value) && value.length <= AI_INPUT_BOUNDS.queryLength,
+  year: nullable(wholeWithin(AI_INPUT_BOUNDS.years)),
 })
 
-export const isEpisodesInput = object({ tmdbId: isTmdbId, season: isWhole })
+export const isEpisodesInput = object({
+  tmdbId: isTmdbId,
+  season: wholeWithin(AI_INPUT_BOUNDS.seasons),
+})
 
 export const isChooseInput = object({
   tmdbId: nullable(isTmdbId),

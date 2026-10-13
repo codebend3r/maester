@@ -136,17 +136,22 @@ const answerFor = ({
 /**
  * Claude in miniature for the AI lookup: each lookup, named by its group's
  * place, gets its replies in turn, then words and no choice. A `status`
- * other than 200 answers every request with that error, marked not to be
- * retried, so a test never waits out the SDK's backoff. `requests` records
- * what raven sent. `hold` keeps a group's requests waiting, recorded but not
- * answered, until the function it returns is called.
+ * other than 200 answers every request with that error and `message`,
+ * marked not to be retried, so a test never waits out the SDK's backoff.
+ * `requests` records what raven sent. `hold` keeps a group's requests
+ * waiting, recorded but not answered, until the function it returns is
+ * called.
  */
 export const fakeClaude = ({
   lookups,
 }: {
   lookups: Readonly<Partial<Record<string, readonly FakeReply[]>>>
 }) => {
-  const state: { status: number; requests: SeenRequest[] } = { status: 200, requests: [] }
+  const state: { status: number; message: string; requests: SeenRequest[] } = {
+    status: 200,
+    message: 'Away',
+    requests: [],
+  }
   const held = new Map<string, Promise<void>>()
   const hold = (place: string): (() => void) => {
     const gate = { open: () => {} }
@@ -178,7 +183,7 @@ export const fakeClaude = ({
     await held.get(place ?? '')
     if (state.status !== 200) {
       return json({
-        body: { type: 'error', error: { type: 'api_error', message: 'Away.' } },
+        body: { type: 'error', error: { type: 'api_error', message: state.message } },
         status: state.status,
         headers: { 'x-should-retry': 'false' },
       })

@@ -2,11 +2,13 @@ import {
   Anthropic,
   APIError,
   AuthenticationError,
+  BadRequestError,
   type ClientOptions,
+  NotFoundError,
   PermissionDeniedError,
 } from '@anthropic-ai/sdk'
 import { Inject, Injectable } from '@nestjs/common'
-import type { MetadataServiceState } from '@raven/core'
+import { isRecord, isString, type MetadataServiceState } from '@raven/core'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 
 /**
@@ -36,12 +38,19 @@ export type AiState = { state: MetadataServiceState; error: string | null }
 /** Today in UTC, when the day's count starts again, as OMDb's does. */
 const today = (): string => new Date().toISOString().slice(0, 10)
 
+/** A failed answer's status, and Anthropic's own words for it when its error body has some. */
+const said = ({ status, body }: { status: number; body: unknown }): string => {
+  const words = isRecord(body) && isRecord(body.error) ? body.error.message : null
+  return isString(words) && words.trim() !== '' ? `${status}: ${words}` : String(status)
+}
+
 /**
  * Claude, through Anthropic's SDK, with raven's own key: the key, the
  * token, the profile and the base URL come from raven's config, never the
- * environment (the SDK still adds `ANTHROPIC_CUSTOM_HEADERS` if set). Counts the
- * day's lookups against `AI_DAILY_LIMIT`, starting again at midnight UTC,
- * and stops for good, until a restart, once the key is refused.
+ * environment (the SDK still adds `ANTHROPIC_CUSTOM_HEADERS` if set).
+ * Counts the day's lookups against `AI_DAILY_LIMIT`, starting again at
+ * midnight UTC, and stops for good, until a restart, once Anthropic refuses
+ * the key or turns a request down in a way no retry would change.
  */
 @Injectable()
 export class AiClient {
@@ -119,15 +128,24 @@ export class AiClient {
     }
   }
 
-  /** Why a request failed, in words that never hold the key; a refused key stops lookups for good. */
+  /**
+   * Why a request failed, with what Anthropic said, which never holds the
+   * key. A refused key, or a request turned down whatever is asked (a model
+   * id or an effort Anthropic does not take), stops lookups for good.
+   */
   private failure(error: unknown): string {
+    if (!(error instanceof APIError) || error.status == null) {
+      return 'Anthropic could not be reached.'
+    }
+    const answer = said({ status: error.status, body: error.error })
     if (error instanceof AuthenticationError || error instanceof PermissionDeniedError) {
       this.status.isRefused = true
-      return `Anthropic refused the key (${error.status}). Check ANTHROPIC_API_KEY and restart.`
+      return `Anthropic refused the key (${answer}). Check ANTHROPIC_API_KEY and restart.`
     }
-    if (error instanceof APIError && error.status != null) {
-      return `Anthropic answered ${error.status}.`
+    if (error instanceof BadRequestError || error instanceof NotFoundError) {
+      this.status.isRefused = true
+      return `Anthropic turned the request down (${answer}). Check AI_MATCH_MODEL and AI_MATCH_EFFORT, and restart.`
     }
-    return 'Anthropic could not be reached.'
+    return `Anthropic answered ${answer}.`
   }
 }

@@ -155,6 +155,26 @@ describe('AiMatcher', () => {
     expect(requests).toHaveLength(6)
   })
 
+  it('tells Claude, after the tool results, when its next reply is its last', async () => {
+    const { requests } = await lookUp({ replies: Array.from({ length: 7 }, () => SEARCH_WILD) })
+    const notice = 'This is your last reply: call choose_match now.'
+    expect(requests.map((request) => request.raw.includes(notice))).toEqual([
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+    ])
+    expect(resultsIn(requests[5]!.body)).toEqual({
+      role: 'user',
+      content: [
+        expect.objectContaining({ type: 'tool_result', tool_use_id: 'toolu_4' }),
+        { type: 'text', text: notice },
+      ],
+    })
+  })
+
   it('describes each result by id, titles, year, genres, language, countries and the start of its overview', async () => {
     const { requests } = await lookUp({
       replies: [SEARCH_WILD, { kind: 'choose', tmdbId: null, confidence: 'low', reason: 'x' }],
@@ -234,6 +254,48 @@ describe('AiMatcher', () => {
     expect(resultsIn(requests[2]!.body)).toMatchObject({
       content: [{ content: 'There is no tool called delete_files.', is_error: true }],
     })
+  })
+
+  it('refuses a year, a season or a title out of bounds, and never asks TMDB with it', async () => {
+    const { requests } = await lookUp({
+      replies: [
+        {
+          kind: 'call',
+          name: AI_TOOL_NAMES.search,
+          input: { type: 'show', query: 'Wild Arctic', year: 1869 },
+        },
+        {
+          kind: 'call',
+          name: AI_TOOL_NAMES.search,
+          input: { type: 'show', query: 'W'.repeat(201), year: null },
+        },
+        SEARCH_WILD,
+        { kind: 'call', name: AI_TOOL_NAMES.episodes, input: { tmdbId: '80001', season: 1000 } },
+        { kind: 'choose', tmdbId: null, confidence: 'low', reason: 'x' },
+      ],
+    })
+    const searchError =
+      'search_tmdb takes a type, a title of at most 200 characters, and a year from 1870 to 2100 or null.'
+    expect([1, 2, 4].map((index) => resultsIn(requests[index]!.body))).toEqual([
+      {
+        role: 'user',
+        content: [expect.objectContaining({ content: searchError, is_error: true })],
+      },
+      {
+        role: 'user',
+        content: [expect.objectContaining({ content: searchError, is_error: true })],
+      },
+      {
+        role: 'user',
+        content: [
+          expect.objectContaining({
+            content: 'list_episodes takes a show id and a season number from 0 to 999.',
+            is_error: true,
+          }),
+        ],
+      },
+    ])
+    expect(tmdb.state.calls.filter((url) => /1869|WWWW|season\/1000/.test(url))).toEqual([])
   })
 
   it('asks as the spec sets: the model, low effort, adaptive thinking, strict tools, the prompt cached', async () => {

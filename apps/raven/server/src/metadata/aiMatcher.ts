@@ -7,6 +7,7 @@ import type { LibraryRecord } from '@/libraries/librariesRepository'
 import { AiClient } from '@/metadata/aiClient'
 import type { AiOutcome, AiPick } from '@/metadata/aiDecisions'
 import {
+  AI_INPUT_BOUNDS,
   AI_SEARCH_RESULTS,
   AI_SYSTEM_PROMPT,
   AI_TOOL_NAMES,
@@ -38,6 +39,14 @@ const MAX_TOKENS = 4000
 
 /** The longest reason kept, in characters. */
 const REASON_LENGTH = 500
+
+/** Sent with the tool results before Claude's last reply, so it chooses rather than runs out. */
+const LAST_REPLY: Anthropic.TextBlockParam = {
+  type: 'text',
+  text: 'This is your last reply: call choose_match now.',
+}
+
+const { years, seasons, queryLength } = AI_INPUT_BOUNDS
 
 /** `count` of `items`, evenly spaced from the first, so a long show is sampled over every season. */
 const spread = <T>({ items, count }: { items: readonly T[]; count: number }): T[] =>
@@ -210,12 +219,14 @@ export class AiMatcher {
     if (choice != null) return this.choose({ lookup, input: choice.input })
     if (turn >= AI_MAX_TURNS) return undecided(`No choice in ${AI_MAX_TURNS} turns.`)
     const results = await Promise.all(uses.map((use) => this.run({ lookup, use })))
+    // The notice follows the tool results, which must come first, so the history stays append-only.
+    const isLast = turn + 1 === AI_MAX_TURNS
     return this.turn({
       lookup,
       messages: [
         ...messages,
         { role: 'assistant', content: response.content },
-        { role: 'user', content: results },
+        { role: 'user', content: isLast ? [...results, LAST_REPLY] : results },
       ],
       turn: turn + 1,
     })
@@ -247,7 +258,7 @@ export class AiMatcher {
     if (!isSearchInput(input)) {
       return answer({
         use,
-        content: 'search_tmdb takes a type, a title to search for, and a year or null.',
+        content: `search_tmdb takes a type, a title of at most ${queryLength} characters, and a year from ${years.min} to ${years.max} or null.`,
         isError: true,
       })
     }
@@ -274,7 +285,7 @@ export class AiMatcher {
     if (!isEpisodesInput(input)) {
       return answer({
         use,
-        content: 'list_episodes takes a show id and a season number.',
+        content: `list_episodes takes a show id and a season number from ${seasons.min} to ${seasons.max}.`,
         isError: true,
       })
     }

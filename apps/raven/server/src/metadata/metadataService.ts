@@ -58,8 +58,9 @@ const decisionPlacesOf = ({
  * no fetch; a show is matched once per show folder, and each season fetched
  * once. Every pass TMDB does not stop ends by removing items, people and
  * pictures nothing uses any more. Before that, with an AI key, each group a
- * pass left unmatched and never asked about goes to the AI lookup. Its queue runs one piece of metadata work
- * at a time, the sweep `ItemRefresher` schedules included.
+ * pass left unmatched and never asked about goes to the AI lookup. One
+ * queue runs the metadata work a piece at a time, the sweep `ItemRefresher`
+ * schedules included.
  */
 @Injectable()
 export class MetadataService implements OnApplicationBootstrap {
@@ -425,7 +426,9 @@ export class MetadataService implements OnApplicationBootstrap {
   /**
    * Asks the AI lookup about every group the pass left unmatched that has
    * no Fix match and was never asked, two at a time, while today's lookups
-   * last. Libraries that are never matched never get here.
+   * last. A movie file whose own place has a Fix match is left out, as its
+   * matcher reads that before its folder's. Libraries that are never
+   * matched never get here.
    */
   private async lookUpUnmatched({
     library,
@@ -438,9 +441,16 @@ export class MetadataService implements OnApplicationBootstrap {
   }): Promise<void> {
     if (!this.ai.enabled || pass.guard.isStopped) return
     const libraryId = library.id
+    const unfixed = this.files
+      .unmatched(libraryId)
+      .filter(
+        (file) =>
+          type === 'show' ||
+          this.files.fixMatchAt({ libraryId, place: filePlace(file) }).kind === 'none',
+      )
     const groups = [
       ...groupBy({
-        items: this.files.unmatched(libraryId),
+        items: unfixed,
         key: (file) =>
           groupPlaceOf({
             type,
@@ -492,7 +502,7 @@ export class MetadataService implements OnApplicationBootstrap {
     if (current == null || matchTypeFor(current.settings.kind) !== type) return
     if (!this.ai.take()) return
     const outcome = await this.aiMatcher
-      .decide(aiGroupOf({ library, type, place, files }))
+      .decide(aiGroupOf({ library: current, type, place, files }))
       .catch((error: unknown) => {
         if (!(error instanceof AiError)) throw error
         lookups.isHalted = true
@@ -503,6 +513,8 @@ export class MetadataService implements OnApplicationBootstrap {
     if (outcome == null || this.libraries.get(library.id) == null) return
     this.decisions.record({ libraryId: library.id, place, outcome, model: this.aiMatcher.model })
     if (outcome.kind !== 'chosen' || outcome.confidence !== 'high') return
+    // A Fix match made during the lookup has matched the group already, and wins.
+    if (this.files.fixMatchAt({ libraryId: library.id, place }).kind !== 'none') return
     this.files.reset(files.map((file) => file.id))
     await this.matchers[type].match({ files, pass })
   }

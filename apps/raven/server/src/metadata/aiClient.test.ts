@@ -55,14 +55,16 @@ describe('AiClient', () => {
     expect(ai.take()).toBe(true)
   })
 
-  it('stops until a restart once the key is refused, never naming the key', async () => {
+  it('stops until a restart once the key is refused, saying why but never naming the key', async () => {
     const claude = fakeClaude({ lookups: {} })
     claude.state.status = 401
+    claude.state.message = 'invalid x-api-key'
     const ai = new AiClient(config(), claude.fetch)
     await expect(ai.send(ASK)).rejects.toThrow(
-      'Anthropic refused the key (401). Check ANTHROPIC_API_KEY and restart.',
+      'Anthropic refused the key (401: invalid x-api-key). Check ANTHROPIC_API_KEY and restart.',
     )
     expect(ai.enabled).toBe(false)
+    expect(ai.remaining()).toBe(0)
     expect(ai.state()).toMatchObject({ state: 'failing' })
     expect(JSON.stringify(ai.state())).not.toContain('test-key')
     claude.state.status = 200
@@ -70,12 +72,32 @@ describe('AiClient', () => {
     expect(claude.state.requests).toHaveLength(1)
   })
 
-  it('is failing while Anthropic answers an error, and ok again after', async () => {
+  it.each([400, 404])(
+    'stops until a restart once Anthropic turns the request down with %i, as for a model it does not know',
+    async (status) => {
+      const claude = fakeClaude({ lookups: {} })
+      claude.state.status = status
+      claude.state.message = 'model: claude-haiku-9'
+      const ai = new AiClient(config(), claude.fetch)
+      const reason = `Anthropic turned the request down (${status}: model: claude-haiku-9). Check AI_MATCH_MODEL and AI_MATCH_EFFORT, and restart.`
+      await expect(ai.send(ASK)).rejects.toThrow(reason)
+      expect(ai.state()).toEqual({ state: 'failing', error: reason })
+      expect([ai.enabled, ai.remaining(), ai.take()]).toEqual([false, 0, false])
+      expect(JSON.stringify(ai.state())).not.toContain('test-key')
+      claude.state.status = 200
+      await expect(ai.send(ASK)).rejects.toBeInstanceOf(AiError)
+      expect(claude.state.requests).toHaveLength(1)
+    },
+  )
+
+  it('is failing while Anthropic answers an error, saying what it said, and ok again after', async () => {
     const claude = fakeClaude({ lookups: {} })
     claude.state.status = 529
+    claude.state.message = 'Overloaded'
     const ai = new AiClient(config(), claude.fetch)
-    await expect(ai.send(ASK)).rejects.toThrow('Anthropic answered 529.')
-    expect(ai.state()).toEqual({ state: 'failing', error: 'Anthropic answered 529.' })
+    await expect(ai.send(ASK)).rejects.toThrow('Anthropic answered 529: Overloaded.')
+    expect(ai.state()).toEqual({ state: 'failing', error: 'Anthropic answered 529: Overloaded.' })
+    expect(JSON.stringify(ai.state())).not.toContain('test-key')
     expect(ai.enabled).toBe(true)
     claude.state.status = 200
     await ai.send(ASK)

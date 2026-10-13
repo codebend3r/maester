@@ -103,6 +103,7 @@ const CESAR = 'Cesar 911/Season 1/Cesar 911 - S01E01 - Lilly.mp4'
 /** Named as TMDB has it, so a search matches it with no lookup. */
 const WILD_ARCTIC = 'Wild Arctic/Season 1/Wild Arctic - S01E01 - Polar Night.mp4'
 const HETE = 'Hete (1995)/Hete (1995).mp4'
+const HOME_VIDEO = 'Home Video (2001)/Home Video (2001).mp4'
 
 /**
  * A server over a temp tree, answering for TMDB and Claude: `files` in a
@@ -481,7 +482,7 @@ describe('a suggestion where Fix match has answered', () => {
 describe('the AI lookup in a library of movies', () => {
   const server = startServer({
     prefix: 'raven-ai-movies-',
-    files: [HETE],
+    files: [HETE, HOME_VIDEO],
     aiDailyLimit: 200,
     library: { name: 'Movies', kind: 'movies' },
   })
@@ -492,9 +493,25 @@ describe('the AI lookup in a library of movies', () => {
   afterAll(server.stop)
 
   it('matches a movie it was sure of, and says so on its page', async () => {
-    expect(server.askedSince(0)).toEqual(['Hete (1995)'])
+    expect(server.askedSince(0).toSorted()).toEqual(['Hete (1995)', 'Home Video (2001)'])
     expect(server.filesIn('Hete (1995)').map((file) => file.match)).toEqual(['matched'])
     expect((await details()).aiMatch).toEqual({ reason: HEAT_REASON })
+  })
+
+  it("never sends a movie a Fix match at the file's own place says is not one", async () => {
+    // Kept at the file, as when its folder held another movie: the folder has none.
+    server
+      .app()
+      .get(MatchFiles)
+      .saveFixMatch({
+        libraryId: server.state.library,
+        place: HOME_VIDEO,
+        fix: { kind: 'not-a-match' },
+      })
+    const asked = server.claude.state.requests.length
+    await server.matchAgain()
+    expect(server.askedSince(asked)).toEqual([])
+    expect(server.filesIn('Home Video (2001)').map((file) => file.match)).toEqual(['unmatched'])
   })
 
   it('keeps the movie and its edit through a change to Anime movies while Anthropic is away', async () => {
