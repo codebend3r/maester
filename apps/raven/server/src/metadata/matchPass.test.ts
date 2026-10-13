@@ -196,3 +196,50 @@ describe('a matching pass', () => {
     expect(failed.ran).toBe(0)
   })
 })
+
+describe('looking up the other titles of a show', () => {
+  const database = testDatabase('raven-match-pass-aliases-')
+  const show = (id: number, title: string, alternativeTitles: string[] = []) => ({
+    id,
+    title,
+    first: '1970-01-01',
+    alternativeTitles,
+    seasons: {},
+  })
+  // TMDB lists the show Archie is known by in Britain sixth, after five
+  // shows with Archie somewhere in their names.
+  const tmdb = fakeTmdb({
+    movies: [],
+    shows: [
+      show(23560, 'Educating Archie'),
+      show(329191, 'Afterlife with Archie'),
+      show(3747, "Archie's Weird Mysteries"),
+      show(22010, 'The Archie Comedy Hour'),
+      show(4277, "Archie Bunker's Place"),
+      show(207759, 'Archie: The Man Who Became Cary Grant', ['Archie']),
+    ],
+  })
+
+  beforeAll(database.open)
+  afterAll(database.close)
+
+  it('looks first at the results whose titles start with the name, so a sixth result is not missed', async () => {
+    const config = { ...readServerConfig({}), tmdbApiToken: 'test-token' }
+    const { metadata } = repositories(database.get())
+    const pass = new MatchPass({
+      tmdb: new TmdbClient(config, tmdb.fetch),
+      metadata,
+      files: new MatchFiles(database.get(), metadata),
+      scores: new OmdbScores(metadata, new OmdbClient(config, tmdb.fetch)),
+      logger: new Logger('MatchPassTest'),
+    })
+    const resolved = await pass.resolve({
+      type: 'show',
+      fix: { kind: 'none' },
+      ids: NO_IDS,
+      nfoPath: null,
+      titles: [{ title: 'Archie', year: null }],
+    })
+    expect(resolved).toMatchObject({ kind: 'matched', tmdbId: '207759', match: 'matched' })
+  })
+})

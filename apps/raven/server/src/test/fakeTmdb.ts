@@ -119,6 +119,8 @@ export type FakeShow = {
   tvdbId?: string
   /** TMDB's `origin_country`: `['GB']`. */
   countries?: string[]
+  /** The other titles TMDB knows the show by, as `/tv/{id}/alternative_titles` gives them. */
+  alternativeTitles?: string[]
   seasons: Record<number, FakeEpisode[]>
 }
 
@@ -396,8 +398,16 @@ export const fakeTmdb = ({
     if (alternatives) {
       const id = Number(alternatives[2])
       if (alternatives[1] === 'tv') {
-        return state.shows.some((entry) => entry.id === id)
-          ? json({ id, results: [] })
+        const titled = state.shows.find((entry) => entry.id === id)
+        return titled
+          ? json({
+              id,
+              results: (titled.alternativeTitles ?? []).map((title) => ({
+                iso_3166_1: 'GB',
+                title,
+                type: '',
+              })),
+            })
           : json({ status_code: 34 }, 404)
       }
       const found = state.movies.find((entry) => entry.id === id)

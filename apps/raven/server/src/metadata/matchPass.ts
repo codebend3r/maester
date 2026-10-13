@@ -28,6 +28,16 @@ const ALIAS_LOOKUPS = 5
 /** How far from the name's year a result can be to have them looked up: as far as `pickMatch` reaches. */
 const ALIAS_YEARS_APART = 3
 
+/**
+ * Whether a result's title starts with the name's words, as titles a show
+ * is better known by abroad tend to: Archie (2023) is "Archie: The Man Who
+ * Became Cary Grant" in its own country.
+ */
+const startsWithName = ({ result, name }: { result: SearchResult; name: string }): boolean =>
+  [result.title, result.originalTitle].some(
+    (title) => title != null && `${foldTitle(title)} `.startsWith(`${name} `),
+  )
+
 /** A title to search TMDB for, with what narrows it. */
 export type SearchTitle = { title: string; year: number | null; country?: string | null }
 
@@ -189,7 +199,7 @@ export class MatchPass {
         // Loveland (2022), the name it was released under abroad.
         const aliased = pick({
           results: retried,
-          aliases: await this.aliasesOf({ type, year, results: retried }),
+          aliases: await this.aliasesOf({ type, title, year, results: retried }),
         })
         if (aliased != null || type !== 'movie') return aliased
         // TMDB leaves some films out of a search without adult titles though
@@ -203,21 +213,33 @@ export class MatchPass {
     })
   }
 
-  /** The other titles TMDB knows the results near `year` by, the first few of them. */
+  /**
+   * The other titles TMDB knows the results near `year` by, the first few of
+   * them: those whose titles start with the name first, then the rest in
+   * TMDB's order, so a short name with many look-alikes still reaches the
+   * one it is short for.
+   */
   private async aliasesOf({
     type,
+    title,
     year,
     results,
   }: {
     type: MatchItemType
+    title: string
     year: number | null
     results: readonly SearchResult[]
   }): Promise<Map<string, string[]>> {
+    const name = foldTitle(title)
     const near = results
       .filter(
         (result) =>
           year == null ||
           (result.year != null && Math.abs(result.year - year) <= ALIAS_YEARS_APART),
+      )
+      .toSorted(
+        (a, b) =>
+          Number(startsWithName({ result: b, name })) - Number(startsWithName({ result: a, name })),
       )
       .slice(0, ALIAS_LOOKUPS)
     const found = await Promise.all(
