@@ -15,6 +15,7 @@ import { MediaArtifacts } from '@/media/mediaArtifacts'
 import { MediaIndex, type ProbeTarget } from '@/media/mediaIndex'
 import { MetadataService } from '@/metadata/metadataService'
 import { mapWithConcurrency } from '@/scanner/concurrency'
+import { layoutsOf, withTitleRoots } from '@/scanner/layout'
 import { type Reconciled, changesAnything, reconcile } from '@/scanner/reconcile'
 import { type WalkResult, isUnder, outermost, walkVideos } from '@/scanner/walk'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
@@ -289,7 +290,24 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
         inScope({ path, scope, unreadable: walk.unreadable }),
       ),
     )
-    const changes = reconcile({ known, found: walk.files })
+    const { kind, folderLayout } = library.settings
+    // Each file is filed under the folder its titles sit in, a letter folder
+    // or a group folder when its path has one, before anything reads it.
+    const changes = reconcile({
+      known,
+      found: withTitleRoots({ files: walk.files, kind, layout: folderLayout }),
+    })
+    if (scope.kind === 'library') {
+      this.libraries.saveLayouts({
+        id: library.id,
+        layouts: layoutsOf({
+          roots: library.paths.filter((path) => !walk.unreadable.includes(path)),
+          files: walk.files,
+          kind,
+          layout: folderLayout,
+        }),
+      })
+    }
     const toProbe = this.index.apply({
       libraryId: library.id,
       kind: library.settings.kind,

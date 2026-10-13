@@ -344,7 +344,7 @@ export const isMediaItem = object({
   libraryId: isNumber,
   title: isString,
   fileName: isString,
-  /** The folder the file sits in, relative to the library path that found it; '' at the root. */
+  /** The folder the file sits in, under the folder its titles sit in (its library path, or a letter or group folder there); '' there. */
   folder: isString,
   size: isNumber,
   /** Normalised from the file extension: 'mp4', 'mkv', 'webm', 'mov', ... */
