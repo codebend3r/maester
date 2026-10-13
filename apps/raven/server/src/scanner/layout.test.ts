@@ -273,7 +273,7 @@ describe('planRelayout', () => {
     expect(planFor(rows.toReversed()).overrides).toEqual([{ from: 'K', to: null }])
   })
 
-  it("drops a show's Fix match when setting flat would have it cover its letter's other shows", () => {
+  it("keeps a show's Fix match at its place when setting flat brings its letter's other shows there", () => {
     const plan = planRelayout({
       rows: [
         row(1, '/m/TV/K/K/Season 1/K - S01E01.mkv', 'K/Season 1'),
@@ -284,7 +284,64 @@ describe('planRelayout', () => {
       layout: 'flat',
       overrides: ['K'],
     })
-    expect(plan.overrides).toEqual([{ from: 'K', to: null }])
+    expect(plan.overrides).toEqual([])
+  })
+
+  it('keeps a Fix match through setting flat and back, though its letter holds other shows', () => {
+    const rows = [
+      row(1, '/m/TV/A/Andor/Season 1/Andor - S01E01.mkv', 'Andor/Season 1'),
+      row(2, '/m/TV/A/Ahsoka/Season 1/Ahsoka - S01E01.mkv', 'Ahsoka/Season 1'),
+    ]
+    const planFor = ({ layout, files }: { layout: 'auto' | 'flat'; files: typeof rows }) =>
+      planRelayout({ rows: files, roots: ['/m/TV'], kind: 'shows', layout, overrides: ['Andor'] })
+    const flat = planFor({ layout: 'flat', files: rows })
+    expect(flat.overrides).toEqual([])
+    const folders = new Map(flat.moves.map((move) => [move.id, move.folder]))
+    const relaid = rows.map((file) => ({ ...file, folder: folders.get(file.id) ?? file.folder }))
+    expect(relaid.map((file) => file.folder)).toEqual(['A/Andor/Season 1', 'A/Ahsoka/Season 1'])
+    const auto = planFor({ layout: 'auto', files: relaid })
+    expect(auto.overrides).toEqual([])
+    const places = ['Andor'].flatMap((place) => {
+      const entry = [...flat.overrides, ...auto.overrides].find((fixed) => fixed.from === place)
+      return entry == null ? [place] : (entry.to ?? [])
+    })
+    expect(places).toContain('Andor')
+  })
+
+  it('keeps a Fix match when another library path brings more of its show from under a letter', () => {
+    const plan = planRelayout({
+      rows: [
+        row(1, '/m/TV1/Andor/Season 1/Andor - S01E01.mkv', 'Andor/Season 1'),
+        row(2, '/m/TV2/A/Andor/Season 2/Andor - S02E01.mkv', 'A/Andor/Season 2'),
+      ],
+      roots: ['/m/TV1', '/m/TV2'],
+      kind: 'shows',
+      layout: 'auto',
+      overrides: ['Andor'],
+    })
+    expect(plan).toEqual({ moves: [{ id: 2, folder: 'Andor/Season 2' }], overrides: [] })
+  })
+
+  it("drops a letter's Fix match left behind by its show when another show takes its place", () => {
+    const plan = planRelayout({
+      rows: [
+        row(1, '/m/TV/K/Kingdom/Season 1/Kingdom - S01E01.mkv', 'K/Kingdom/Season 1'),
+        row(2, '/m/TV/Requests/Kingdom/Season 2/Kingdom - S02E01.mkv', 'Requests/Kingdom/Season 2'),
+        row(3, '/m/TV/Requests/K/Season 1/K - S01E01.mkv', 'Requests/K/Season 1'),
+      ],
+      roots: ['/m/TV'],
+      kind: 'shows',
+      layout: 'auto',
+      overrides: ['K'],
+    })
+    expect(plan).toEqual({
+      moves: [
+        { id: 1, folder: 'Kingdom/Season 1' },
+        { id: 2, folder: 'Kingdom/Season 2' },
+        { id: 3, folder: 'K/Season 1' },
+      ],
+      overrides: [{ from: 'K', to: null }],
+    })
   })
 
   it("moves a loose movie's own Fix match, and drops its letter folder's, when both would land on it", () => {

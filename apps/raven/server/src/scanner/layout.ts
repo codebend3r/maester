@@ -134,15 +134,17 @@ type FixFate = { from: string } & (
 
 /**
  * Reads every file's place again for the library's type and folder layout.
- * Only files whose folder changes move. A Fix match never ends up at a place
- * whose files include one it did not cover before:
+ * Only files whose folder changes move. A place names its title, so a Fix
+ * match follows its files, and only a split or a merge stops it:
  *
  * - when its files now sit under several places, it goes, as a whole letter
  *   folder kept as one show was made for files that were never one title;
- * - when they sit under one new place that holds none of anyone else's, it
- *   moves there, or stays when that is where it was;
- * - otherwise it stays where it was if nothing else came there, applying to
- *   nothing until the layout is set back, and goes if something did.
+ * - when they all sit under one other place, it moves there if that place
+ *   holds no other files; otherwise it stays where it was, applying to
+ *   nothing until its files come back, and goes instead if any file now sits
+ *   at its place, as a letter's would on a show named like the letter;
+ * - when they all stay at its place, or no file sat there, it stays, whatever
+ *   arrives, except that one no file sat at goes when another moves there.
  *
  * When a file's own Fix match and its folder's would land on one place, its
  * own moves and the other goes. Files under none of the roots are left out.
@@ -186,21 +188,22 @@ export const planRelayout = ({
   const after = under('after')
   const fateOf = (from: string): FixFate => {
     const covered = (before.get(from) ?? []).map((entry) => entry.file)
-    const ids = new Set(covered.map((file) => file.id))
-    const gainsNothing = (place: string) =>
-      (after.get(place) ?? []).every((entry) => ids.has(entry.file.id))
-    const where: FixFate = gainsNothing(from) ? { from, fate: 'stays' } : { from, fate: 'goes' }
     // A file takes a Fix match kept at its own place to its own, and one kept at its title's to its title's.
     const targets = [
       ...new Set(
         covered.map((file) => (from === file.before.own ? file.after.own : file.after.title)),
       ),
     ]
-    const [to] = targets
-    if (to == null) return where
     if (targets.length > 1) return { from, fate: 'goes' }
-    if (to === from || !gainsNothing(to)) return where
-    return { from, fate: 'moves', to, isOwn: covered.every((file) => file.before.own === from) }
+    const [to] = targets
+    if (to == null || to === from) return { from, fate: 'stays' }
+    const ids = new Set(covered.map((file) => file.id))
+    const holdsOnlyTheirs = (place: string) =>
+      (after.get(place) ?? []).every((entry) => ids.has(entry.file.id))
+    if (holdsOnlyTheirs(to)) {
+      return { from, fate: 'moves', to, isOwn: covered.every((file) => file.before.own === from) }
+    }
+    return holdsOnlyTheirs(from) ? { from, fate: 'stays' } : { from, fate: 'goes' }
   }
   const fates = overrides.map(fateOf)
   const rivals = groupBy({
@@ -211,8 +214,9 @@ export const planRelayout = ({
     moves: placed.flatMap((file) => (file.isMoved ? [{ id: file.id, folder: file.folder }] : [])),
     overrides: fates.flatMap((fixed): RelayoutPlan['overrides'] => {
       switch (fixed.fate) {
+        // Only one kept for a place with no files can stay where another lands.
         case 'stays':
-          return []
+          return rivals.has(fixed.from) ? [{ from: fixed.from, to: null }] : []
         case 'goes':
           return [{ from: fixed.from, to: null }]
         case 'moves': {
