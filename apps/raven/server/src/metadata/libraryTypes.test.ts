@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
@@ -15,6 +15,7 @@ import { createApp } from '@/app'
 import { readServerConfig } from '@/config'
 import { MetadataService } from '@/metadata/metadataService'
 import { ScannerService } from '@/scanner/scannerService'
+import { ADMIN_PASSWORD, adminCookie, cookieSet, cookies } from '@/test/app'
 import { encodeClip } from '@/test/clips'
 import { fakeTmdb } from '@/test/fakeTmdb'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
@@ -144,6 +145,7 @@ describe('matching by library type', () => {
         seconds: 1,
         size: '640x360',
       }),
+      mkdir(join(state.root, 'Anime')),
     ])
     state.app = await createApp({
       config: {
@@ -155,6 +157,8 @@ describe('matching by library type', () => {
         scanOnStart: false,
         rescanIntervalMinutes: 0,
         tmdbApiToken: 'test-token',
+        libraryPin: '3001',
+        adminPassword: ADMIN_PASSWORD,
       },
       quiet: true,
       metadataFetch: tmdb.fetch,
@@ -299,5 +303,38 @@ describe('matching by library type', () => {
       url: `/api/items/${showId}/metadata`,
       payload: { title: null },
     })
+  })
+
+  it("lists TMDB's order for a library the lock keeps out of sight", async () => {
+    const admin = await adminCookie(app())
+    const hidden = shape({
+      response: await app().inject({
+        method: 'POST',
+        url: '/api/libraries',
+        headers: { cookie: admin },
+        payload: {
+          name: 'Anime',
+          paths: [join(state.root, 'Anime')],
+          settings: { kind: 'animeShows', locked: true },
+        },
+      }),
+      guard: isLibrary,
+    }).id
+    await app().get(ScannerService).whenIdle(hidden)
+    const order = async (cookie: string): Promise<string[]> =>
+      shape({
+        response: await app().inject({
+          method: 'GET',
+          url: `/api/match/search?type=show&query=Cowboy%20Bebop&libraryId=${hidden}`,
+          headers: { cookie },
+        }),
+        guard: isMatchCandidateList,
+      }).map((each) => each.tmdbId)
+    const pin = cookieSet(
+      await app().inject({ method: 'POST', url: '/api/lock/unlock', payload: { pin: '3001' } }),
+    )
+    expect(await order('')).toEqual(['90660', '30991'])
+    expect(await order(admin)).toEqual(['90660', '30991'])
+    expect(await order(cookies(admin, pin))).toEqual(['30991', '90660'])
   })
 })

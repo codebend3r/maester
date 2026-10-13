@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   Inject,
   NotFoundException,
   Param,
@@ -27,6 +28,7 @@ import { isChoosableImageKind } from '@/items/imageKinds'
 import { sendImage } from '@/items/sendImage'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { PrivateBy, Public } from '@/lock/lockGuard'
+import { LockService } from '@/lock/lockService'
 import { MediaRepository } from '@/media/mediaRepository'
 import { ImageCache } from '@/metadata/imageCache'
 import { MetadataService } from '@/metadata/metadataService'
@@ -46,6 +48,7 @@ export class MatchController {
     @Inject(LibrariesRepository) private readonly libraries: LibrariesRepository,
     @Inject(MetadataService) private readonly service: MetadataService,
     @Inject(ImageCache) private readonly images: ImageCache,
+    @Inject(LockService) private readonly lock: LockService,
   ) {}
 
   private requireTmdb(): void {
@@ -65,10 +68,11 @@ export class MatchController {
     @Query('query') query: string | undefined,
     @Query('year') year: string | undefined,
     @Query('libraryId') libraryId: string | undefined,
+    @Headers('cookie') cookie: string | undefined,
   ): Promise<MatchCandidate[]> {
     if (!isMatchItemType(type)) throw new BadRequestException('type must be movie or show')
     if (!query?.trim()) throw new BadRequestException('Search for a title.')
-    const preferred = this.preferredBy(libraryId)
+    const preferred = this.preferredBy({ libraryId, cookie })
     this.requireTmdb()
     const parsedYear = Number.parseInt(year ?? '', 10)
     const asked = { query: query.trim(), year: Number.isInteger(parsedYear) ? parsedYear : null }
@@ -87,11 +91,23 @@ export class MatchController {
       }))
   }
 
-  /** The tier a library's type prefers first; every result for no library, or one raven no longer has. */
-  private preferredBy(libraryId: string | undefined): CandidateTier {
+  /**
+   * The tier a library's type prefers first; every result for no library,
+   * one raven no longer has, or one the lock keeps from this browser, so the
+   * order never tells a hidden library's type, or that it is there.
+   */
+  private preferredBy({
+    libraryId,
+    cookie,
+  }: {
+    libraryId: string | undefined
+    cookie: string | undefined
+  }): CandidateTier {
     if (libraryId == null) return {}
     if (!/^\d+$/.test(libraryId)) throw new BadRequestException('libraryId must be a library id')
-    const kind = this.libraries.get(Number(libraryId))?.settings.kind
+    const id = Number(libraryId)
+    if (!this.lock.viewer({ cookie }).seesLibrary(id)) return {}
+    const kind = this.libraries.get(id)?.settings.kind
     return kind == null ? {} : firstTierFor(kind)
   }
 

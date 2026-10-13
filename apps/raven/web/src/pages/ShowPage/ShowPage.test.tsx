@@ -85,11 +85,17 @@ describe('ShowPage', () => {
       return itemDetails({ ...SEVERANCE, id: 9, title: 'Fargo' })
     })
     open()
+    // Once the next episode is in, the page knows the show's library.
+    await screen.findByRole('link', { name: 'Play S01E02' })
     await userEvent.click(await screen.findByRole('button', { name: 'Fix match' }))
     expect(screen.getByRole('searchbox', { name: 'Title' })).toHaveValue('Severance')
     expect(screen.queryByRole('button', { name: 'Not a show' })).toBeNull()
     await userEvent.click(await screen.findByRole('button', { name: 'Choose Fargo (2014)' }))
     expect(moved).toEqual([{ itemId: 4, tmdbId: '60622' }])
-    expect(spies.search.mock.calls[0]?.[0]).toMatchObject({ type: 'show', query: 'Severance' })
+    expect(spies.search.mock.calls[0]?.[0]).toMatchObject({
+      type: 'show',
+      query: 'Severance',
+      libraryId: EPISODE_TWO.libraryId,
+    })
   })
 })
