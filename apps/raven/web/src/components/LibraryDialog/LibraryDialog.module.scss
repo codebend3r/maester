@@ -150,6 +150,28 @@
   font-size: var(--font-size-sm);
 }
 
+// A div, not a p like the other hints: it holds a paragraph and a list, kept apart by gap.
+.layoutHint {
+  grid-area: hint;
+  display: grid;
+  gap: var(--space-0);
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+
+  p {
+    margin: 0;
+  }
+}
+
+.layouts {
+  display: grid;
+  gap: var(--space-0);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-wrap: anywhere;
+}
+
 .typed {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
