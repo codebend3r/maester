@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { Logger } from '@nestjs/common'
-import { type LibraryKind } from '@raven/core'
+import { type LibraryKind, TIER_SETS } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { readServerConfig } from '@/config'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
@@ -64,6 +64,7 @@ describe('matching by library type', () => {
         files,
         scores: new OmdbScores(metadata, new OmdbClient(config, tmdb.fetch)),
         logger: new Logger('MatchersTest'),
+        prefer: TIER_SETS.any,
       })
     return {
       images,

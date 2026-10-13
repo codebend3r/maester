@@ -1,6 +1,7 @@
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Logger } from '@nestjs/common'
+import { type CandidateTier, TIER_SETS } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { readServerConfig } from '@/config'
 import { MatchFiles } from '@/metadata/matchFiles'
@@ -31,9 +32,29 @@ describe('a matching pass', () => {
       { id: 50270, title: 'Paprika', released: '1991-02-13', isHiddenFromSearch: true },
       { id: 4040, title: 'Unheard Of Delights', released: '2001-05-01', isHiddenFromSearch: true },
     ],
-    shows: [{ id: 95396, title: 'Severance', first: '2022-02-18', tvdbId: '371980', seasons: {} }],
+    shows: [
+      { id: 95396, title: 'Severance', first: '2022-02-18', tvdbId: '371980', seasons: {} },
+      {
+        id: 90660,
+        title: 'Cowboy Bebop',
+        first: '2021-11-19',
+        genreIds: [10759, 18],
+        language: 'en',
+        countries: ['US'],
+        seasons: {},
+      },
+      {
+        id: 30991,
+        title: 'Cowboy Bebop',
+        first: '1998-04-03',
+        genreIds: [16, 10759],
+        language: 'ja',
+        countries: ['JP'],
+        seasons: {},
+      },
+    ],
   })
-  const pass = (): MatchPass => {
+  const pass = (prefer: readonly CandidateTier[] = TIER_SETS.any): MatchPass => {
     const config = { ...readServerConfig({}), tmdbApiToken: 'test-token' }
     const { metadata } = repositories(database.get())
     return new MatchPass({
@@ -42,6 +63,7 @@ describe('a matching pass', () => {
       files: new MatchFiles(database.get(), metadata),
       scores: new OmdbScores(metadata, new OmdbClient(config, tmdb.fetch)),
       logger: new Logger('MatchPassTest'),
+      prefer,
     })
   }
   const searches = (): string[] => tmdb.state.calls.filter((url) => url.includes('/search/'))
@@ -195,6 +217,24 @@ describe('a matching pass', () => {
     })
     expect(failed.ran).toBe(0)
   })
+
+  it("prefers the results its library's type does, from the same search", async () => {
+    const asked = searches().length
+    const ask = (prefer: readonly CandidateTier[]) =>
+      pass(prefer).resolve({
+        type: 'show',
+        fix: { kind: 'none' },
+        ids: NO_IDS,
+        nfoPath: null,
+        titles: [{ title: 'Cowboy Bebop', year: null }],
+      })
+    await expect(ask(TIER_SETS.anime)).resolves.toMatchObject({
+      kind: 'matched',
+      tmdbId: '30991',
+    })
+    await expect(ask(TIER_SETS.any)).resolves.toMatchObject({ kind: 'matched', tmdbId: '90660' })
+    expect(searches()).toHaveLength(asked + 2)
+  })
 })
 
 describe('looking up the other titles of a show', () => {
@@ -244,6 +284,7 @@ describe('looking up the other titles of a show', () => {
       files: new MatchFiles(database.get(), metadata),
       scores: new OmdbScores(metadata, new OmdbClient(config, tmdb.fetch)),
       logger: new Logger('MatchPassTest'),
+      prefer: TIER_SETS.any,
     })
     const resolved = await pass.resolve({
       type: 'show',
@@ -299,6 +340,7 @@ describe('looking up the other titles of a show known only by an alternative', (
       files: new MatchFiles(database.get(), metadata),
       scores: new OmdbScores(metadata, new OmdbClient(config, tmdb.fetch)),
       logger: new Logger('MatchPassTest'),
+      prefer: TIER_SETS.any,
     })
     const resolved = await pass.resolve({
       type: 'show',

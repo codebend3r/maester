@@ -5,6 +5,7 @@ import {
   type MatchItemType,
   type MetadataHealth,
   matchTypeFor,
+  tiersFor,
 } from '@raven/core'
 import { errorMessage } from '@/errorMessage'
 import { groupBy } from '@/groupBy'
@@ -209,22 +210,24 @@ export class MetadataService implements OnApplicationBootstrap {
     }
   }
 
-  private newPass(): MatchPass {
+  /** A pass for a library of `kind`, whose searches prefer that type's results. */
+  private newPass(kind: LibraryKind): MatchPass {
     return new MatchPass({
       tmdb: this.tmdb,
       metadata: this.metadata,
       files: this.files,
       scores: this.scores,
       logger: this.logger,
+      prefer: tiersFor(kind),
     })
   }
 
   private async pass(libraryId: number): Promise<void> {
     const kind = this.libraries.get(libraryId)?.settings.kind
     const type = kind == null ? null : matchTypeFor(kind)
-    if (type != null && this.tmdb.enabled) {
+    if (kind != null && type != null && this.tmdb.enabled) {
       this.tmdb.newPass()
-      await this.matchPending({ libraryId, type })
+      await this.matchPending({ libraryId, kind, type })
     }
     await this.pictures.clearUp()
   }
@@ -232,12 +235,14 @@ export class MetadataService implements OnApplicationBootstrap {
   /** Matches the library's pending files, and any that turn up while it runs. */
   private async matchPending({
     libraryId,
+    kind,
     type,
   }: {
     libraryId: number
+    kind: LibraryKind
     type: MatchItemType
   }): Promise<void> {
-    const pass = this.newPass()
+    const pass = this.newPass(kind)
     const matcher = this.matchers[type]
     const attempted = new Set<number>()
     const round = async (): Promise<void> => {
@@ -261,12 +266,14 @@ export class MetadataService implements OnApplicationBootstrap {
    */
   private async pointPlace({
     libraryId,
+    kind,
     type,
     place,
     fix,
     files,
   }: {
     libraryId: number
+    kind: LibraryKind
     type: MatchItemType
     place: string
     fix: FixMatchChoice
@@ -275,7 +282,7 @@ export class MetadataService implements OnApplicationBootstrap {
     this.files.saveFixMatch({ libraryId, place, fix })
     if (files.length === 0) return
     this.files.reset(files.map((file) => file.id))
-    await this.matchers[type].match({ files, pass: this.newPass() })
+    await this.matchers[type].match({ files, pass: this.newPass(kind) })
   }
 
   /**
@@ -288,10 +295,11 @@ export class MetadataService implements OnApplicationBootstrap {
     const file = this.files.byId(mediaId)
     const kind = file == null ? null : this.libraries.get(file.libraryId)?.settings.kind
     const type = kind == null ? null : matchTypeFor(kind)
-    if (file == null || type == null) return
+    if (file == null || kind == null || type == null) return
     const group = this.matchers[type].fixGroup(file)
     await this.pointPlace({
       libraryId: file.libraryId,
+      kind,
       type,
       place: group.place,
       fix: tmdbId == null ? { kind: 'not-a-match' } : { kind: 'tmdb', tmdbId },
@@ -319,13 +327,18 @@ export class MetadataService implements OnApplicationBootstrap {
       }).values(),
     ].flatMap((files) => {
       const [first] = files
-      return first ? [{ first, files }] : []
+      const kind = first == null ? null : this.libraries.get(first.libraryId)?.settings.kind
+      // A library whose type changed away from shows has its files unlinked by that change.
+      return first != null && kind != null && matchTypeFor(kind) === 'show'
+        ? [{ first, kind, files }]
+        : []
     })
     await groups.reduce<Promise<void>>(
-      (previous, { first, files }) =>
+      (previous, { first, kind, files }) =>
         previous.then(() =>
           this.pointPlace({
             libraryId: first.libraryId,
+            kind,
             type: 'show',
             place: showPlace(first),
             fix: { kind: 'tmdb', tmdbId },
