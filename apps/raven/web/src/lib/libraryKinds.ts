@@ -46,18 +46,6 @@ export const LIBRARY_ICON_LABELS: Record<LibraryIconName, string> = {
   audiobook: 'Audiobooks',
 }
 
-/** The icon a library wears: the one it picked, else its type's. */
+/** The icon a library wears: the one it picked, else its type's, which changes with the type. */
 export const libraryIconOf = (settings: Pick<LibrarySettings, 'icon' | 'kind'>): LibraryIconName =>
   settings.icon ?? KINDS[settings.kind].icon
-
-/**
- * What picking `icon` stores, the inverse of `libraryIconOf`: the type's own
- * is kept as none picked, so it goes on changing with the type.
- */
-export const pickedIcon = ({
-  kind,
-  icon,
-}: {
-  kind: LibraryKind
-  icon: LibraryIconName
-}): LibrarySettings['icon'] => (icon === KINDS[kind].icon ? null : icon)

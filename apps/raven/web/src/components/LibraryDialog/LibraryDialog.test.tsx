@@ -278,7 +278,7 @@ describe('LibraryDialog', () => {
     expect(screen.getByRole('radio', { name: 'Movies' })).toBeChecked()
   })
 
-  it("offers every icon, the type's own picked until another is", async () => {
+  it("offers every icon, the type's own checked until another is picked", async () => {
     renderWithProviders(<LibraryDialog onClose={() => undefined} />)
     const icons = within(screen.getByRole('group', { name: 'Icon' })).getAllByRole('radio')
     expect(icons.map((radio) => radio.getAttribute('value'))).toEqual([...LIBRARY_ICON_NAMES])
@@ -297,7 +297,7 @@ describe('LibraryDialog', () => {
     expect(created.at(-1)).toMatchObject({ settings: { kind: 'movies', icon: 'octagon' } })
   })
 
-  it("keeps the type's own icon as none picked, so it goes on changing with the type", async () => {
+  it("keeps the icon picked, the type's own included, through a change of type", async () => {
     renderWithProviders(
       <LibraryDialog
         library={library({ settings: { ...library().settings, kind: 'sports', icon: 'octagon' } })}
@@ -306,6 +306,20 @@ describe('LibraryDialog', () => {
     )
     expect(screen.getByRole('radio', { name: 'UFC icon' })).toBeChecked()
     await userEvent.click(screen.getByRole('radio', { name: 'Sporting events icon' }))
+    await userEvent.click(screen.getByRole('radio', { name: 'Movies' }))
+    expect(screen.getByRole('radio', { name: 'Sporting events icon' })).toBeChecked()
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+    expect(updated.at(-1)).toMatchObject({ settings: { kind: 'movies', icon: 'trophy' } })
+  })
+
+  it("wears the type's icon, changing with the type, until one is picked", async () => {
+    renderWithProviders(
+      <LibraryDialog
+        library={library({ settings: { ...library().settings, kind: 'sports' } })}
+        onClose={() => undefined}
+      />,
+    )
+    expect(screen.getByRole('radio', { name: 'Sporting events icon' })).toBeChecked()
     await userEvent.click(screen.getByRole('radio', { name: 'Movies' }))
     expect(screen.getByRole('radio', { name: 'Movies icon' })).toBeChecked()
     await userEvent.click(screen.getByRole('button', { name: 'Save changes' }))

@@ -34,8 +34,10 @@
   padding: 0;
   border: 0;
 
-  label,
-  legend {
+  // Only the field's own label or legend: labels inside a control, like the
+  // icon picker's tiles, keep their own look.
+  > label,
+  > legend {
     padding: 0;
     font-weight: 600;
     font-size: var(--font-size-sm);

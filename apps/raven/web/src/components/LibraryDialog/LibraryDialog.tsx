@@ -22,7 +22,7 @@ import { FolderBrowser } from '@/components/FolderBrowser/FolderBrowser'
 import { IconPicker } from '@/components/LibraryDialog/IconPicker'
 import { useAdminLocked } from '@/lib/adminLock'
 import { api } from '@/lib/api'
-import { KINDS } from '@/lib/libraryKinds'
+import { KINDS, libraryIconOf } from '@/lib/libraryKinds'
 import { afterLibrarySaved } from '@/lib/invalidate'
 import { lockQuery, metadataHealthQuery } from '@/lib/queries'
 import styles from '@/components/LibraryDialog/LibraryDialog.module.scss'
@@ -197,13 +197,12 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
         <fieldset className={styles.field} aria-describedby={`${ids.icon}-hint`}>
           <legend>Icon</legend>
           <IconPicker
-            kind={settings.kind}
-            icon={settings.icon}
+            value={libraryIconOf(settings)}
             onChange={(icon) => setSettings((current) => ({ ...current, icon }))}
           />
           <p id={`${ids.icon}-hint`} className={styles.hint}>
-            Shown in the side menu, on the library's page and on Libraries. The type's own icon
-            changes with the type.
+            Shown in the side menu, on the library's page and on Libraries. Until one is picked, the
+            library wears its type's.
           </p>
         </fieldset>
 
