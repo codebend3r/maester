@@ -2,7 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
-import { isLibrary, isShowListing } from '@raven/core'
+import { isLibrary, isMatchCandidateList, isShowListing } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '@/app'
 import { readServerConfig } from '@/config'
@@ -142,5 +142,31 @@ describe('matching by library type', () => {
     expect(await showYears()).toEqual([1998])
     await setKind('shows')
     expect(await showYears()).toEqual([2021])
+  })
+
+  it("lists the results a library's type prefers first in Fix match", async () => {
+    const order = async (query: string): Promise<string[]> =>
+      shape({
+        response: await app().inject({
+          method: 'GET',
+          url: `/api/match/search?type=show&query=Cowboy%20Bebop${query}`,
+        }),
+        guard: isMatchCandidateList,
+      }).map((each) => each.tmdbId)
+    await setKind('animeShows')
+    expect(await order(`&libraryId=${state.library}`)).toEqual(['30991', '90660'])
+    expect(await order('')).toEqual(['90660', '30991'])
+    // A library removed while the dialog was open lists TMDB's order.
+    expect(await order('&libraryId=9999')).toEqual(['90660', '30991'])
+    await setKind('shows')
+    expect(await order(`&libraryId=${state.library}`)).toEqual(['90660', '30991'])
+  })
+
+  it('refuses a library id that is not one', async () => {
+    const response = await app().inject({
+      method: 'GET',
+      url: '/api/match/search?type=show&query=Cowboy%20Bebop&libraryId=abc',
+    })
+    expect(response.statusCode).toBe(400)
   })
 })

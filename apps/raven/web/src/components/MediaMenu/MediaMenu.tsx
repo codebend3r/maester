@@ -336,6 +336,7 @@ const MenuBody = ({
           title={media.title}
           year={media.year}
           fileName={media.fileName}
+          libraryId={media.libraryId}
           match={(tmdbId) => api.setMatch({ mediaId: media.id, tmdbId })}
           onMatched={onMatched}
           onClose={() => {

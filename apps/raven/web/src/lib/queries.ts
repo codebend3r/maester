@@ -165,19 +165,21 @@ export const personQuery = (id: number | null) =>
     queryFn: id == null ? skipToken : () => api.getPerson(id),
   })
 
-/** A search for Fix match; an empty title asks for nothing. */
+/** A search for Fix match, the library's preferred results first; an empty title asks for nothing. */
 export const matchSearchQuery = ({
   type,
   query,
   year,
+  libraryId,
 }: {
   type: MatchItemType
   query: string
   year: number | null
+  libraryId: number | null
 }) =>
   queryOptions({
-    queryKey: queryKeys.matchSearch({ type, query, year }),
-    queryFn: query === '' ? skipToken : () => api.searchMatches({ type, query, year }),
+    queryKey: queryKeys.matchSearch({ type, query, year, libraryId }),
+    queryFn: query === '' ? skipToken : () => api.searchMatches({ type, query, year, libraryId }),
     staleTime: 5 * 60_000,
   })
 

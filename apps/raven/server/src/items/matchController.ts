@@ -13,6 +13,9 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common'
 import {
+  type CandidateTier,
+  firstTierFor,
+  fitsTier,
   isMatchChoice,
   isMatchItemType,
   type MatchCandidate,
@@ -27,7 +30,7 @@ import { PrivateBy, Public } from '@/lock/lockGuard'
 import { MediaRepository } from '@/media/mediaRepository'
 import { ImageCache } from '@/metadata/imageCache'
 import { MetadataService } from '@/metadata/metadataService'
-import { TMDB_IMAGE_PATH, TmdbClient, TmdbError } from '@/metadata/tmdbClient'
+import { type SearchResult, TMDB_IMAGE_PATH, TmdbClient, TmdbError } from '@/metadata/tmdbClient'
 
 const tmdbFailure = (error: unknown): never => {
   if (error instanceof TmdbError) throw new ServiceUnavailableException(error.message)
@@ -51,27 +54,45 @@ export class MatchController {
     }
   }
 
+  /**
+   * TMDB's results for Fix match. With `libraryId`, those that fit the
+   * library type's first tier (Japanese animation in an Anime library) come
+   * first, each part in TMDB's order.
+   */
   @Get('match/search')
   async search(
     @Query('type') type: string | undefined,
     @Query('query') query: string | undefined,
     @Query('year') year: string | undefined,
+    @Query('libraryId') libraryId: string | undefined,
   ): Promise<MatchCandidate[]> {
     if (!isMatchItemType(type)) throw new BadRequestException('type must be movie or show')
     if (!query?.trim()) throw new BadRequestException('Search for a title.')
+    const preferred = this.preferredBy(libraryId)
     this.requireTmdb()
     const parsedYear = Number.parseInt(year ?? '', 10)
     const asked = { query: query.trim(), year: Number.isInteger(parsedYear) ? parsedYear : null }
     const results = await (
       type === 'movie' ? this.tmdb.searchMovies(asked) : this.tmdb.searchShows(asked)
     ).catch(tmdbFailure)
-    return results.map(({ tmdbId, title, year: released, overview, poster }) => ({
-      tmdbId,
-      title,
-      year: released,
-      overview,
-      poster,
-    }))
+    const rank = (result: SearchResult): number => (fitsTier({ tier: preferred, result }) ? 0 : 1)
+    return results
+      .toSorted((a, b) => rank(a) - rank(b))
+      .map(({ tmdbId, title, year: released, overview, poster }) => ({
+        tmdbId,
+        title,
+        year: released,
+        overview,
+        poster,
+      }))
+  }
+
+  /** The tier a library's type prefers first; every result for no library, or one raven no longer has. */
+  private preferredBy(libraryId: string | undefined): CandidateTier {
+    if (libraryId == null) return {}
+    if (!/^\d+$/.test(libraryId)) throw new BadRequestException('libraryId must be a library id')
+    const kind = this.libraries.get(Number(libraryId))?.settings.kind
+    return kind == null ? {} : firstTierFor(kind)
   }
 
   /**

@@ -389,6 +389,14 @@ describe('the metadata calls', () => {
     )
   })
 
+  it("names the library a search is for, so its type's results come first", async () => {
+    const { client, calls } = clientReturning(respond({ body: [] }))
+    await client.searchMatches({ type: 'show', query: 'Cowboy Bebop', year: null, libraryId: 3 })
+    expect(calls[0]?.url).toBe(
+      'http://nas:8484/api/match/search?type=show&query=Cowboy%20Bebop&libraryId=3',
+    )
+  })
+
   it('saves a match, or the lack of one', async () => {
     const { client, calls } = clientReturning(respond({ body: mediaItem() }))
     await client.setMatch({ mediaId: 7, tmdbId: null })

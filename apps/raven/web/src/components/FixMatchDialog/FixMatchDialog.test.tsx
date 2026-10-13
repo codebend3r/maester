@@ -41,9 +41,9 @@ describe('Fix match', () => {
   const unmatched = mediaItem({ title: 'Busboys', year: 2026, match: 'unmatched' })
 
   it('searches with the parsed title and year, and points the file at the choice', async () => {
-    const searched: Array<{ query: string; year?: number | null }> = []
+    const searched: Array<{ query: string; year?: number | null; libraryId?: number | null }> = []
     spies.search.mockImplementation(async (request) => {
-      searched.push({ query: request.query, year: request.year })
+      searched.push({ query: request.query, year: request.year, libraryId: request.libraryId })
       return [
         {
           tmdbId: '1001',
@@ -69,7 +69,7 @@ describe('Fix match', () => {
     expect(screen.getByRole('textbox', { name: 'Year' })).toHaveValue('2026')
     await userEvent.click(await screen.findByRole('button', { name: 'Choose Busboys (1998)' }))
 
-    expect(searched).toEqual([{ query: 'Busboys', year: 2026 }])
+    expect(searched).toEqual([{ query: 'Busboys', year: 2026, libraryId: unmatched.libraryId }])
     expect(chosen).toEqual(['1002'])
     expect(matched.map((media) => media.match)).toEqual(['manual'])
     expect(screen.queryByRole('dialog')).toBeNull()

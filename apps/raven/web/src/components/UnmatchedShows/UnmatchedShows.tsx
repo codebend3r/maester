@@ -63,6 +63,7 @@ const UnmatchedShowEntry = ({
           type="show"
           title={group.title}
           year={null}
+          libraryId={first.libraryId}
           match={(tmdbId) => api.setMatch({ mediaId: first.id, tmdbId })}
           onClose={() => setIsFixing(false)}
         />
