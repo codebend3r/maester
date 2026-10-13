@@ -261,6 +261,10 @@ A native iOS or Android app would be another `apps/raven/` entry that imports `@
 | `METADATA_COUNTRY`            | `US`                           | Whose content rating and release date to show |
 | `OMDB_API_KEY`                | unset                          | OMDb's key, for IMDb, Rotten Tomatoes and Metacritic scores |
 | `OMDB_DAILY_LIMIT`            | `1000`                         | OMDb calls a day                             |
+| `ANTHROPIC_API_KEY`           | unset                          | raven's own Anthropic key, for the [AI lookup](#metadata) of what matching leaves; unset turns it off |
+| `AI_MATCH_MODEL`              | `claude-haiku-5-5`             | The model the AI lookup asks                 |
+| `AI_MATCH_EFFORT`             | `low`                          | How hard it thinks: `low`, `medium`, `high`, `xhigh` or `max` |
+| `AI_DAILY_LIMIT`              | `200`                          | AI lookups a day                             |
 | `LIBRARY_PIN`                 | unset                          | The PIN that opens locked libraries          |
 | `ADMIN_PASSWORD`              | unset                          | Turns the [admin lock](#admin-lock) off; 10 characters or more, mixing cases, a digit and a symbol. Unset or weaker, the lock stays on |
 
