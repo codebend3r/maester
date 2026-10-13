@@ -272,6 +272,7 @@ describe('the metadata guards', () => {
         lastOk: null,
         ai: 'off',
         aiRemaining: 0,
+        aiPending: 0,
       }),
     ).toBe(true)
     expect(
@@ -283,10 +284,22 @@ describe('the metadata guards', () => {
         lastOk: null,
         ai: 'off',
         aiRemaining: 0,
+        aiPending: 0,
       }),
     ).toBe(false)
     expect(
       isMetadataHealth({ tmdb: 'ok', omdb: 'off', pending: 0, error: null, lastOk: null }),
+    ).toBe(false)
+    expect(
+      isMetadataHealth({
+        tmdb: 'ok',
+        omdb: 'off',
+        pending: 0,
+        error: null,
+        lastOk: null,
+        ai: 'ok',
+        aiRemaining: 200,
+      }),
     ).toBe(false)
   })
 })
@@ -412,6 +425,7 @@ describe('isServerHealth', () => {
         lastOk: null,
         ai: 'ok',
         aiRemaining: 200,
+        aiPending: 2,
       },
     }
     expect(isServerHealth(health)).toBe(true)
@@ -426,6 +440,7 @@ describe('the AI lookup', () => {
     year: 2023,
     poster: null,
     reason: 'Generic episode titles.',
+    place: 'Archie',
   }
 
   it('takes a suggestion with a TMDB id, and a file Not matched lists with one or none', () => {
@@ -435,6 +450,14 @@ describe('the AI lookup', () => {
     expect(isUnmatchedFile({ ...mediaItem(), aiSuggestion: suggestion })).toBe(true)
     expect(isUnmatchedList([{ ...mediaItem(), aiSuggestion: null }])).toBe(true)
     expect(isUnmatchedFile(mediaItem())).toBe(false)
+  })
+
+  it("keeps a suggestion's place inside its library", () => {
+    expect(isAiSuggestion({ ...suggestion, place: 'Odds/Heat (1995).mkv' })).toBe(true)
+    expect(isAiSuggestion({ ...suggestion, place: '/media/TV/Archie' })).toBe(false)
+    expect(isAiSuggestion({ ...suggestion, place: '' })).toBe(false)
+    const { place: _place, ...placeless } = suggestion
+    expect(isAiSuggestion(placeless)).toBe(false)
   })
 
   it('says why an item was matched by AI, or nothing', () => {

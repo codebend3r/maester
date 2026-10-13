@@ -65,6 +65,8 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
   const [errors, setErrors] = useState<string[]>([])
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const metadata = useQuery(metadataHealthQuery)
+  // `off` is exactly "no key": a key that fails is the health check's to report.
+  const isAiOff = metadata.data?.ai === 'off'
   const lock = useQuery(lockQuery)
   const lockable = !!lock.data?.available
   const isAdminLocked = useAdminLocked()
@@ -146,7 +148,10 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
           />
         </div>
 
-        <fieldset className={styles.field} aria-describedby={`${ids.kind}-hint`}>
+        <fieldset
+          className={styles.field}
+          aria-describedby={isAiOff ? `${ids.kind}-hint ${ids.kind}-ai-hint` : `${ids.kind}-hint`}
+        >
           <legend>Type</legend>
           <div className={styles.kinds}>
             {LIBRARY_KINDS.map((kind) => (
@@ -173,6 +178,12 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
               'Movies, TV shows, anime, family and documentaries get posters and details from TMDB.'
             )}
           </p>
+          {isAiOff && (
+            <p id={`${ids.kind}-ai-hint`} className={styles.hint}>
+              Set <code>ANTHROPIC_API_KEY</code> in raven's <code>.env</code> to look up titles the
+              matcher misses.
+            </p>
+          )}
         </fieldset>
 
         <fieldset className={styles.field} aria-describedby={ids.folders}>

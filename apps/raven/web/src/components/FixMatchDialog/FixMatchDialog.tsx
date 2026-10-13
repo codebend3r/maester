@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { MatchCandidate, MatchItemType } from '@raven/core'
+import type { AiMatch, MatchCandidate, MatchItemType } from '@raven/core'
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react'
+import { AiMatchNote } from '@/components/AiMatchNote/AiMatchNote'
 import { Button } from '@/components/Button/Button'
 import { api } from '@/lib/api'
 import { afterMatch } from '@/lib/invalidate'
@@ -64,6 +65,7 @@ export const FixMatchDialog = <T,>({
   title,
   year,
   fileName,
+  aiMatch = null,
   libraryId,
   match,
   allowNone = true,
@@ -77,6 +79,8 @@ export const FixMatchDialog = <T,>({
   year: number | null
   /** Named under the heading, so the viewer knows which file this is for. */
   fileName?: string
+  /** Why the AI lookup matched what is being fixed, being sure; null or left out when it did not. */
+  aiMatch?: AiMatch | null
   /** The library the file is in: the results its type prefers are listed first. */
   libraryId?: number
   /** Points the file or show at `tmdbId`, or at nothing for null. */
@@ -87,7 +91,7 @@ export const FixMatchDialog = <T,>({
   onMatched?: (result: T) => void
 }) => {
   const dialog = useRef<HTMLDialogElement>(null)
-  const ids = { title: useId(), query: useId(), year: useId(), results: useId() }
+  const ids = { title: useId(), note: useId(), query: useId(), year: useId(), results: useId() }
   const queryClient = useQueryClient()
   const [query, setQuery] = useState(title)
   const [yearText, setYearText] = useState(year == null ? '' : String(year))
@@ -116,13 +120,20 @@ export const FixMatchDialog = <T,>({
   }
 
   return (
-    <dialog ref={dialog} className={styles.dialog} aria-labelledby={ids.title} onClose={onClose}>
+    <dialog
+      ref={dialog}
+      className={styles.dialog}
+      aria-labelledby={ids.title}
+      aria-describedby={aiMatch ? ids.note : undefined}
+      onClose={onClose}
+    >
       <div className={styles.body}>
         <header className={styles.header}>
           <h2 id={ids.title} className={styles.title}>
             Fix match
           </h2>
           {fileName && <p className={styles.file}>{fileName}</p>}
+          {aiMatch && <AiMatchNote aiMatch={aiMatch} id={ids.note} />}
         </header>
 
         <search>

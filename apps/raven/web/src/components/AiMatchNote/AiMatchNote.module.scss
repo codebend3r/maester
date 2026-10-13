@@ -1,0 +1,20 @@
+.note {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-1);
+  max-width: var(--measure);
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-body);
+
+  strong {
+    color: var(--color-bark);
+    font-weight: 600;
+  }
+}
+
+// A reason may hold a long name with no break in it.
+.text {
+  overflow-wrap: anywhere;
+}

@@ -1,9 +1,11 @@
 import { type UseQueryResult, useQuery } from '@tanstack/react-query'
 import {
+  type AiSuggestion,
   type Library,
   type LibrarySettings,
   type MediaItem,
   type PosterEntry,
+  type UnmatchedFile,
   isScanning,
   matchTypeFor,
 } from '@raven/core'
@@ -17,6 +19,7 @@ import { MediaGrid, MediaGridSkeleton } from '@/components/MediaGrid/MediaGrid'
 import { MediaTiles, MediaTilesSkeleton } from '@/components/MediaTiles/MediaTiles'
 import { SagaDecks } from '@/components/SagaDeck/SagaDeck'
 import { Loading } from '@/components/Skeleton/Skeleton'
+import { SuggestedMovies } from '@/components/SuggestedMovies/SuggestedMovies'
 import { UnmatchedShows } from '@/components/UnmatchedShows/UnmatchedShows'
 import { finishedNote } from '@/lib/history'
 import { watchLink } from '@/lib/itemLinks'
@@ -33,6 +36,7 @@ import {
 import { LibraryListing, LibraryListingSkeleton } from '@/pages/LibraryPage/LibraryViews'
 import { type ListingState, NOTHING_LISTED, playQueue } from '@/pages/LibraryPage/libraryShape'
 import type { LibrarySection } from '@/pages/LibraryPage/librarySections'
+import { useAiLookupsDone } from '@/pages/LibraryPage/useAiLookupsDone'
 import { useLibraryListing } from '@/pages/LibraryPage/useLibraryListing'
 import { useLibraryView } from '@/pages/LibraryPage/useLibraryView'
 import { POLL_MS, anyPending, useMatchingPassDone } from '@/pages/LibraryPage/useMatchingPassDone'
@@ -265,10 +269,18 @@ const SagasSection = ({ library }: { library: Library }) => {
   )
 }
 
+/** What the AI lookup suggests for a file, read off the Not matched listing. */
+const suggestionsIn =
+  (files: readonly UnmatchedFile[]) =>
+  (file: MediaItem): AiSuggestion | null =>
+    files.find((each) => each.id === file.id)?.aiSuggestion ?? null
+
 /**
- * The files no movie or show was found for, each with Fix match in its menu.
- * While TMDB answers, the tab keeps reading again until none is pending,
- * then reads the library again for its count of files not matched.
+ * The files no movie or show was found for, each with Fix match in its menu,
+ * and what the AI lookup suggests where it was not sure. While TMDB answers,
+ * the tab keeps reading again until none is pending, then reads the library
+ * again for its count of files not matched. The lookups run after that, so
+ * once they end, the tab reads both again.
  */
 const NotMatchedSection = ({ library }: { library: Library }) => {
   const matchType = matchTypeFor(library.settings.kind)
@@ -280,6 +292,7 @@ const NotMatchedSection = ({ library }: { library: Library }) => {
       canMatch && anyPending(current.state.data ?? []) ? POLL_MS : false,
   })
   useMatchingPassDone({ libraryId: library.id, files: query.data ?? [] })
+  useAiLookupsDone({ libraryId: library.id, files: query.data ?? [] })
   return (
     <SectionBody
       query={query}
@@ -296,6 +309,7 @@ const NotMatchedSection = ({ library }: { library: Library }) => {
           {matchType === 'show' ? (
             <UnmatchedShows
               files={files}
+              suggestionOf={suggestionsIn(files)}
               renderFiles={(group) => (
                 <MediaGrid
                   items={group}
@@ -305,11 +319,14 @@ const NotMatchedSection = ({ library }: { library: Library }) => {
               )}
             />
           ) : (
-            <MediaGrid
-              items={files}
-              matchType={matchType}
-              ratingsSource={library.settings.ratingsSource}
-            />
+            <>
+              <SuggestedMovies files={files} libraryId={library.id} />
+              <MediaGrid
+                items={files}
+                matchType={matchType}
+                ratingsSource={library.settings.ratingsSource}
+              />
+            </>
           )}
         </>
       )}

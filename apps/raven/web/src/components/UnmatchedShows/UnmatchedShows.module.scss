@@ -8,9 +8,11 @@
   grid-template-columns: minmax(0, 1fr) auto;
   grid-template-areas:
     'toggle fix'
+    'suggestion suggestion'
     'files files';
   align-items: center;
-  // The files region has its own top padding, so a collapsed one adds no row gap.
+  // The suggestion and the files region bring their own top padding, so an
+  // entry without them adds no row gap.
   gap: 0 var(--space-2);
   border-bottom: 1px solid var(--color-moss);
   padding-bottom: var(--space-1);
@@ -71,6 +73,12 @@
   }
 }
 
+.suggestion {
+  grid-area: suggestion;
+  max-width: var(--measure);
+  padding: var(--space-1) 0 0;
+}
+
 .files {
   grid-area: files;
   padding: var(--space-1) 0 var(--space-2);
@@ -82,6 +90,7 @@
     grid-template-areas:
       'toggle'
       'fix'
+      'suggestion'
       'files';
   }
 

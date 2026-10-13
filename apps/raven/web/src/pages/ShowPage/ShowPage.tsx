@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { type ItemDetails, type SeasonSummary, episodeCode } from '@raven/core'
 import { useId, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { AiMatchNote } from '@/components/AiMatchNote/AiMatchNote'
 import { Button, ButtonLink } from '@/components/Button/Button'
 import { CastRow } from '@/components/CastRow/CastRow'
 import { FixMatchDialog } from '@/components/FixMatchDialog/FixMatchDialog'
@@ -105,6 +106,8 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
         </Button>
       </ItemHeader>
 
+      {details.aiMatch && <AiMatchNote aiMatch={details.aiMatch} />}
+
       {editingImages && (
         <ImageEditor
           details={details}
@@ -146,6 +149,7 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
           title={details.title}
           year={details.year}
           libraryId={libraryId}
+          aiMatch={details.aiMatch}
           allowNone={false}
           match={(tmdbId) =>
             tmdbId == null

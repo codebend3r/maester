@@ -833,6 +833,10 @@ export type MatchCandidate = Infer<typeof isMatchCandidate>
 
 export const isMatchCandidateList = listOf(isMatchCandidate)
 
+/** A place inside a library, as the server keeps a group's Fix match: a relative path, never an absolute one. */
+export const isLibraryPlace = (value: unknown): value is string =>
+  isString(value) && value !== '' && !value.startsWith('/')
+
 /**
  * A movie or show the AI lookup offers for files it was not sure of.
  * Accepting it is a Fix match to `tmdbId`.
@@ -845,6 +849,11 @@ export const isAiSuggestion = object({
   poster: nullable(isString),
   /** Why Claude thinks so, in a sentence or two. */
   reason: isString,
+  /**
+   * The group the lookup was asked about: a show's folder, a movie's folder
+   * when it holds that one movie, else the movie file's own place.
+   */
+  place: isLibraryPlace,
 })
 
 export type AiSuggestion = Infer<typeof isAiSuggestion>
@@ -879,6 +888,8 @@ export const isMetadataHealth = object({
   ai: isMetadataServiceState,
   /** AI lookups left today; 0 while it is off. */
   aiRemaining: isNumber,
+  /** Groups waiting for or in an AI lookup, across libraries; 0 between passes. */
+  aiPending: isNumber,
 })
 
 export type MetadataHealth = Infer<typeof isMetadataHealth>

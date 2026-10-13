@@ -467,6 +467,7 @@ describe('the metadata calls', () => {
       lastOk: null,
       ai: 'ok',
       aiRemaining: 200,
+      aiPending: 1,
     }
     const health = {
       status: 'ok',

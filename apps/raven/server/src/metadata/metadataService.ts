@@ -67,6 +67,8 @@ export class MetadataService implements OnApplicationBootstrap {
   private readonly logger = new Logger(MetadataService.name)
   private readonly queue = createTaskQueue({ concurrency: 1 })
   private readonly matchers: Record<MatchItemType, KindMatcher>
+  /** Each run of AI lookups under way, with how many of its groups wait for or are in one. */
+  private readonly lookupRuns = new Set<{ left: number }>()
 
   constructor(
     @Inject(LibrariesRepository) private readonly libraries: LibrariesRepository,
@@ -279,6 +281,7 @@ export class MetadataService implements OnApplicationBootstrap {
       lastOk: tmdb.lastOk,
       ai: this.ai.state().state,
       aiRemaining: this.ai.remaining(),
+      aiPending: [...this.lookupRuns].reduce((sum, run) => sum + run.left, 0),
     }
   }
 
@@ -465,12 +468,23 @@ export class MetadataService implements OnApplicationBootstrap {
         : [],
     )
     const lookups = { isHalted: false }
-    await mapWithConcurrency({
-      items: groups,
-      limit: AI_CONCURRENCY,
-      fn: ({ place, files }) =>
-        pass.guard.run(() => this.lookUp({ library, type, place, files, pass, lookups })),
-    })
+    // Counted in the health check, so a page showing what the lookups find
+    // knows when to read it again. A group skipped once the lookups halt or
+    // TMDB stops the pass counts as done at once.
+    const run = { left: groups.length }
+    this.lookupRuns.add(run)
+    try {
+      await mapWithConcurrency({
+        items: groups,
+        limit: AI_CONCURRENCY,
+        fn: async ({ place, files }) => {
+          await pass.guard.run(() => this.lookUp({ library, type, place, files, pass, lookups }))
+          run.left -= 1
+        },
+      })
+    } finally {
+      this.lookupRuns.delete(run)
+    }
     pass.guard.reportStop()
   }
 

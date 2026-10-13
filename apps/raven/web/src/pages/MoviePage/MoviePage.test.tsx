@@ -289,4 +289,22 @@ describe('MoviePage', () => {
       ),
     ).toBeInTheDocument()
   })
+
+  it('says the movie was matched by AI, and why', async () => {
+    open({
+      details: itemDetails({
+        aiMatch: { reason: 'The title and year fit, and no other result does.' },
+      }),
+    })
+    const note = await screen.findByText('Matched by AI.')
+    expect(note.closest('p')).toHaveTextContent(
+      'Matched by AI. The title and year fit, and no other result does.',
+    )
+  })
+
+  it('says nothing of AI for a movie a search or Fix match matched', async () => {
+    open({ details: itemDetails() })
+    expect(await screen.findByRole('heading', { level: 1, name: 'Busboys' })).toBeInTheDocument()
+    expect(screen.queryByText('Matched by AI.')).toBeNull()
+  })
 })

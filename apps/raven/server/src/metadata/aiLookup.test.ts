@@ -67,6 +67,7 @@ const MOVIES: FakeMovie[] = [{ id: 949, title: 'Heat', released: '1995-12-15' }]
 const WILD_REASON = "Season 1's episode titles match TMDB's (Polar Night, The Thaw)."
 const ARCHIE_REASON = 'The only Archie series from 2023; its episode titles are generic.'
 const HEAT_REASON = 'Heat (1995) is the only 1995 film the misspelt title fits.'
+const HEAT_GUESS = 'Heat (1995) may be it, though the title is spelt far from it.'
 
 /** What Claude does for each group, as the spike saw it: sure, unsure, and nothing. */
 const LOOKUPS: Record<string, readonly FakeReply[]> = {
@@ -92,6 +93,15 @@ const LOOKUPS: Record<string, readonly FakeReply[]> = {
     { kind: 'search', type: 'movie', query: 'Heat', year: 1995 },
     { kind: 'choose', tmdbId: '949', confidence: 'high', reason: HEAT_REASON },
   ],
+  ...Object.fromEntries(
+    ['Heet (1995)', 'Odds/Hete (1995).mp4', 'Odds/Haet (1995).mp4'].map((place) => [
+      place,
+      [
+        { kind: 'search', type: 'movie', query: 'Heat', year: 1995 },
+        { kind: 'choose', tmdbId: '949', confidence: 'low', reason: HEAT_GUESS },
+      ],
+    ]),
+  ),
 }
 
 const WILD = [
@@ -103,6 +113,10 @@ const CESAR = 'Cesar 911/Season 1/Cesar 911 - S01E01 - Lilly.mp4'
 /** Named as TMDB has it, so a search matches it with no lookup. */
 const WILD_ARCTIC = 'Wild Arctic/Season 1/Wild Arctic - S01E01 - Polar Night.mp4'
 const HETE = 'Hete (1995)/Hete (1995).mp4'
+/** One movie in two qualities, in a folder of its own. */
+const HEET = ['Heet (1995)/Heet (1995) 1080p.mp4', 'Heet (1995)/Heet (1995) 2160p.mp4']
+/** Two movies in one folder, each asked about on its own. */
+const ODDS = ['Odds/Hete (1995).mp4', 'Odds/Haet (1995).mp4']
 const HOME_VIDEO = 'Home Video (2001)/Home Video (2001).mp4'
 
 /**
@@ -324,6 +338,7 @@ describe('the AI lookup', () => {
           year: 2023,
           poster: '/showposter201000.jpg',
           reason: ARCHIE_REASON,
+          place: 'Archie',
         },
       ],
       ['Cesar 911 - S01E01 - Lilly.mp4', null],
@@ -347,7 +362,11 @@ describe('the AI lookup', () => {
 
   it('reports the lookup in the health check, never its key', async () => {
     const { metadata, body } = await server.health()
-    expect(metadata).toMatchObject({ ai: 'ok', aiRemaining: 200 - server.lookups() })
+    expect(metadata).toMatchObject({
+      ai: 'ok',
+      aiRemaining: 200 - server.lookups(),
+      aiPending: 0,
+    })
     expect(body).not.toContain('test-key')
   })
 
@@ -487,6 +506,35 @@ describe('files that land while the lookups run', () => {
   })
 })
 
+describe('the lookups a pass runs', () => {
+  const server = startServer({
+    prefix: 'raven-ai-pending-',
+    files: [ARCHIE, CESAR, WILD[0] ?? ''],
+    aiDailyLimit: 200,
+  })
+  afterAll(server.stop)
+
+  it('are counted in the health check while they wait or run, and none once they end', async () => {
+    const [archie, ...rest] = ['Archie', 'Cesar 911', 'Destination Wild Arctic'].map((place) =>
+      server.claude.hold(place),
+    )
+    const started = server.start()
+    // Starting encodes the clips first, which a busy machine takes a while over.
+    await vi.waitFor(() => expect(server.claude.state.requests).toHaveLength(2), {
+      timeout: 10_000,
+    })
+    expect((await server.health()).metadata.aiPending).toBe(3)
+    archie?.()
+    // Archie's lookup ends, and the third begins in its place.
+    await vi.waitFor(async () => expect((await server.health()).metadata.aiPending).toBe(2), {
+      timeout: 10_000,
+    })
+    rest.forEach((release) => release())
+    await started
+    expect((await server.health()).metadata.aiPending).toBe(0)
+  })
+})
+
 describe('a suggestion where Fix match has answered', () => {
   const server = startServer({ prefix: 'raven-ai-fixed-', files: [ARCHIE], aiDailyLimit: 200 })
 
@@ -562,5 +610,36 @@ describe('the AI lookup in a library of movies', () => {
       title: 'Heat (the long cut)',
       aiMatch: { reason: HEAT_REASON },
     })
+  })
+})
+
+describe("the AI lookup's suggestions in a library of movies", () => {
+  const server = startServer({
+    prefix: 'raven-ai-places-',
+    files: [...HEET, ...ODDS],
+    aiDailyLimit: 200,
+    library: { name: 'Movies', kind: 'movies' },
+  })
+
+  beforeAll(server.start)
+  afterAll(server.stop)
+
+  it("names each suggestion's group by its place in the library, as Fix match keeps it", async () => {
+    expect(server.askedSince(0).toSorted()).toEqual([
+      'Heet (1995)',
+      'Odds/Haet (1995).mp4',
+      'Odds/Hete (1995).mp4',
+    ])
+    const files = await server.unmatched()
+    expect(
+      files
+        .toSorted((a, b) => a.fileName.localeCompare(b.fileName))
+        .map((file) => [file.fileName, file.aiSuggestion?.place]),
+    ).toEqual([
+      ['Haet (1995).mp4', 'Odds/Haet (1995).mp4'],
+      ['Heet (1995) 1080p.mp4', 'Heet (1995)'],
+      ['Heet (1995) 2160p.mp4', 'Heet (1995)'],
+      ['Hete (1995).mp4', 'Odds/Hete (1995).mp4'],
+    ])
   })
 })
