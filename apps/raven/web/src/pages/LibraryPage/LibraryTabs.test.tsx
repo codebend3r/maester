@@ -3,7 +3,7 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { LibraryKind, LibrarySettings } from '@raven/core'
 import { api } from '@/lib/api'
-import { itemSummary, library, matchedMovie, mediaItem } from '@/test/fixtures'
+import { itemSummary, library, matchedMovie, mediaItem, unmatchedFile } from '@/test/fixtures'
 import { renderLibraryPage } from '@/test/libraryPage'
 import { pollFast } from '@/test/polls'
 
@@ -159,7 +159,7 @@ describe('LibraryPage tabs', () => {
 
   it('lists the files not matched, with how to fix them', async () => {
     spies.unmatched.mockImplementation(async () => [
-      mediaItem({ id: 9, title: 'Unknown Thing', match: 'unmatched' }),
+      unmatchedFile({ id: 9, title: 'Unknown Thing', match: 'unmatched' }),
     ])
     open({ route: '/libraries/2/not-matched' })
     expect(
@@ -171,7 +171,7 @@ describe('LibraryPage tabs', () => {
   it('groups the files not matched of a TV library by show folder', async () => {
     spies.unmatched.mockImplementation(async () =>
       [1, 2].map((id) =>
-        mediaItem({
+        unmatchedFile({
           id,
           title: `Archie - S01E0${id}`,
           folder: 'Archie/Season 1',
@@ -203,7 +203,7 @@ describe('LibraryPage tabs', () => {
         settings: { ...library().settings, kind: 'movies' },
       })
     const lost = (match: 'pending' | 'unmatched') => [
-      mediaItem({ id: 9, title: 'Unknown Thing', match }),
+      unmatchedFile({ id: 9, title: 'Unknown Thing', match }),
     ]
     spies.health.mockImplementation(async () => ({
       tmdb: 'ok',
@@ -211,6 +211,8 @@ describe('LibraryPage tabs', () => {
       pending: 0,
       error: null,
       lastOk: null,
+      ai: 'off',
+      aiRemaining: 0,
     }))
     spies.get.mockImplementation(async () => films(1))
     spies.unmatched.mockImplementation(async () => lost('unmatched'))

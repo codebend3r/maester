@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { type Infer, oneOf } from '@raven/core'
+import { type AiSuggestion, type Infer, oneOf } from '@raven/core'
 import { DatabaseService } from '@/db/database'
 
 /** How sure the AI lookup was: `high` is matched, `low` is a suggestion. */
@@ -21,9 +21,6 @@ export type AiOutcome =
 
 /** Where a decision is kept: a group's place in a library, as a Fix match is. */
 export type DecisionPlace = { libraryId: number; place: string }
-
-/** An unsure pick, as the Not matched listing offers it. */
-type Suggestion = AiPick & { reason: string }
 
 /** A decision as its columns hold it. */
 type Row = {
@@ -140,7 +137,7 @@ export class AiDecisions {
   }: {
     libraryId: number
     places: readonly string[]
-  }): Map<string, Suggestion> {
+  }): Map<string, AiSuggestion> {
     if (places.length === 0) return new Map()
     const rows = this.db
       .prepare<

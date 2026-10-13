@@ -160,6 +160,7 @@ export const itemDetails = (overrides: Partial<ItemDetails> = {}): ItemDetails =
   genres: ['Action', 'Science Fiction'],
   backdropVersion: 'tlm8UkiQsit',
   logoVersion: null,
+  aiMatch: null,
   reviews: [],
   credits: [
     { personId: 1, name: 'Keanu Reeves', job: 'cast', role: 'Neo', photoVersion: 'abc' },

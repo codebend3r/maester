@@ -2,7 +2,15 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
-import { isLibrary, isShowListing, type LibraryKind } from '@raven/core'
+import {
+  isItemDetails,
+  isLibrary,
+  isMetadataHealth,
+  isRecord,
+  isShowListing,
+  isUnmatchedList,
+  type LibraryKind,
+} from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createApp } from '@/app'
 import { readServerConfig } from '@/config'
@@ -169,7 +177,32 @@ const startServer = ({
   const askedSince = (from: number): string[] => [
     ...new Set(claude.state.requests.slice(from).flatMap((request) => request.place ?? [])),
   ]
-  return { tmdb, claude, state, app, settle, get, start, stop, matchAgain, askedSince }
+  const health = async () => {
+    const response = await app().inject({ method: 'GET', url: '/api/health' })
+    const body: unknown = response.json()
+    const metadata = isRecord(body) ? body.metadata : null
+    if (!isMetadataHealth(metadata)) throw new Error(`Unexpected health: ${response.body}`)
+    return { metadata, body: response.body }
+  }
+  const unmatched = () =>
+    get({ url: `/api/libraries/${state.library}/unmatched`, guard: isUnmatchedList })
+  /** How many lookups were started: a lookup's first request has no reply before it. */
+  const lookups = () => claude.state.requests.filter((request) => request.turn === 0).length
+  return {
+    tmdb,
+    claude,
+    state,
+    app,
+    settle,
+    get,
+    start,
+    stop,
+    matchAgain,
+    askedSince,
+    health,
+    unmatched,
+    lookups,
+  }
 }
 
 describe('the AI lookup', () => {
@@ -225,6 +258,65 @@ describe('the AI lookup', () => {
     await server.matchAgain()
     expect(server.claude.state.requests).toHaveLength(before)
   })
+
+  it('lists the unsure pick beside the files it is for, and nothing for the rest', async () => {
+    const files = await server.unmatched()
+    expect(files.map((file) => [file.fileName, file.aiSuggestion])).toEqual([
+      [
+        'Archie - S01E01 - Episode 1.mp4',
+        {
+          tmdbId: '201000',
+          title: 'Archie: The Man Who Became Cary Grant',
+          year: 2023,
+          poster: '/showposter201000.jpg',
+          reason: ARCHIE_REASON,
+        },
+      ],
+      ['Cesar 911 - S01E01 - Lilly.mp4', null],
+    ])
+  })
+
+  it('says a show it was sure of was matched by AI, and why; never its episodes', async () => {
+    const listing = await shows()
+    const wild = listing.shows[0]
+    const details = await server.get({
+      url: `/api/items/${wild?.show.id ?? -1}`,
+      guard: isItemDetails,
+    })
+    expect(details.aiMatch).toEqual({ reason: WILD_REASON })
+    const episode = await server.get({
+      url: `/api/items/${wild?.next?.item?.id ?? -1}`,
+      guard: isItemDetails,
+    })
+    expect(episode.aiMatch).toBeNull()
+  })
+
+  it('reports the lookup in the health check, never its key', async () => {
+    const { metadata, body } = await server.health()
+    expect(metadata).toMatchObject({ ai: 'ok', aiRemaining: 200 - server.lookups() })
+    expect(body).not.toContain('test-key')
+  })
+
+  it('takes an accepted suggestion as a Fix match, which no AI note claims', async () => {
+    const archie = (await server.unmatched()).find((file) => file.aiSuggestion != null)
+    await server.app().inject({
+      method: 'PUT',
+      url: `/api/media/${archie?.id ?? -1}/match`,
+      payload: { tmdbId: archie?.aiSuggestion?.tmdbId },
+    })
+    await server.settle()
+    expect((await server.unmatched()).map((file) => file.fileName)).toEqual([
+      'Cesar 911 - S01E01 - Lilly.mp4',
+    ])
+    const listing = await shows()
+    const accepted = listing.shows.find((entry) => entry.show.title.startsWith('Archie'))
+    expect(accepted?.next?.match).toBe('manual')
+    const details = await server.get({
+      url: `/api/items/${accepted?.show.id ?? -1}`,
+      guard: isItemDetails,
+    })
+    expect(details.aiMatch).toBeNull()
+  })
 })
 
 describe("the AI lookup's daily limit, and Anthropic away", () => {
@@ -235,6 +327,11 @@ describe("the AI lookup's daily limit, and Anthropic away", () => {
     await server.start()
   })
   afterAll(server.stop)
+
+  it('is failing in the health check while Anthropic is away', async () => {
+    expect((await server.health()).metadata).toMatchObject({ ai: 'failing', aiRemaining: 1 })
+    expect((await server.unmatched()).map((file) => file.aiSuggestion)).toEqual([null, null])
+  })
 
   it('keeps nothing while Anthropic is away, and leaves the files not matched', async () => {
     // A full scan queues one pass, which asked about both groups before either failed.
@@ -252,6 +349,7 @@ describe("the AI lookup's daily limit, and Anthropic away", () => {
     const asked = server.claude.state.requests.length
     await server.matchAgain()
     expect(server.askedSince(asked)).toEqual(['Archie'])
+    expect((await server.health()).metadata).toMatchObject({ ai: 'ok', aiRemaining: 0 })
   })
 })
 

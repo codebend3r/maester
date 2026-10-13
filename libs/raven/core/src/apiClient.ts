@@ -25,6 +25,7 @@ import {
   type MatchChoice,
   type MatchItemType,
   type MediaItem,
+  type UnmatchedFile,
   type MediaLocation,
   type MediaTracks,
   type MetadataHealth,
@@ -54,6 +55,7 @@ import {
   isLibraryList,
   isLockState,
   isMatchCandidateList,
+  isUnmatchedList,
   isMediaItem,
   isMediaList,
   isMediaLocation,
@@ -370,9 +372,9 @@ export const createApiClient = ({
     listSagas: (libraryId: number): Promise<Saga[]> =>
       libraryGet({ libraryId, path: 'sagas', guard: isSagaList }),
 
-    /** A matched library's files no movie or show was found for, or waiting to be matched, by title. */
-    listUnmatched: (libraryId: number): Promise<MediaItem[]> =>
-      libraryGet({ libraryId, path: 'unmatched', guard: isMediaList }),
+    /** A library's files no movie or show was found for, each with the AI lookup's suggestion for its folder. */
+    listUnmatched: (libraryId: number): Promise<UnmatchedFile[]> =>
+      libraryGet({ libraryId, path: 'unmatched', guard: isUnmatchedList }),
 
     /** A movie library's movies with more than one file, each with its cards, split apart or not. */
     listDuplicates: (libraryId: number): Promise<Duplicates> =>

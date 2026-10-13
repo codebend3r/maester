@@ -1,17 +1,22 @@
 import { Inject, Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common'
 import {
+  type AiMatch,
+  isMatchItemType,
+  type ItemType,
   type LibraryKind,
   MATCHED_KINDS,
   type MatchItemType,
+  type MediaItem,
   type MetadataHealth,
   matchTypeFor,
   tiersFor,
+  type UnmatchedFile,
 } from '@raven/core'
 import { errorMessage } from '@/errorMessage'
 import { groupBy } from '@/groupBy'
 import { type LibraryRecord, LibrariesRepository } from '@/libraries/librariesRepository'
 import { AiClient, AiError } from '@/metadata/aiClient'
-import { AiDecisions } from '@/metadata/aiDecisions'
+import { AiDecisions, type DecisionPlace } from '@/metadata/aiDecisions'
 import { AI_CONCURRENCY, aiGroupOf, AiMatcher } from '@/metadata/aiMatcher'
 import { ItemPictures } from '@/metadata/itemPictures'
 import { type FixMatchChoice, type MatchFile, MatchFiles } from '@/metadata/matchFiles'
@@ -21,10 +26,29 @@ import { MetadataRepository } from '@/metadata/metadataRepository'
 import { OmdbClient } from '@/metadata/omdbClient'
 import { OmdbScores } from '@/metadata/omdbScores'
 import { PASS_CONCURRENCY } from '@/metadata/passGuard'
-import { groupPlaceOf, showPlace } from '@/metadata/places'
+import { filePlace, groupPlaceOf, showPlace } from '@/metadata/places'
 import { TmdbClient } from '@/metadata/tmdbClient'
 import { createTaskQueue, mapWithConcurrency } from '@/scanner/concurrency'
 import { type LayoutRow, indexedLayoutsOf, planRelayout } from '@/scanner/layout'
+
+/**
+ * Where a matched file's group may keep its decision: a show's folder; a
+ * movie's file, or its folder when that holds the one movie. The decision's
+ * id must still be the item's, so a folder of several movies never claims one.
+ */
+const decisionPlacesOf = ({
+  type,
+  file,
+}: {
+  type: MatchItemType
+  file: MatchFile
+}): DecisionPlace[] => {
+  if (type === 'show') return [{ libraryId: file.libraryId, place: showPlace(file) }]
+  return [
+    { libraryId: file.libraryId, place: filePlace(file) },
+    ...(file.folder === '' ? [] : [{ libraryId: file.libraryId, place: file.folder }]),
+  ]
+}
 
 /**
  * Matches the files in libraries of movies and shows to TMDB, one library
@@ -246,7 +270,75 @@ export class MetadataService implements OnApplicationBootstrap {
       pending: this.files.countPending(MATCHED_KINDS),
       error: tmdb.error,
       lastOk: tmdb.lastOk,
+      ai: this.ai.state().state,
+      aiRemaining: this.ai.remaining(),
     }
+  }
+
+  /**
+   * A library's files not matched, each with what the AI lookup suggests
+   * for its group when it was not sure: kept at the place a Fix match on the
+   * file would be. A pending file has none yet.
+   */
+  withSuggestions({
+    libraryId,
+    type,
+    files,
+  }: {
+    libraryId: number
+    type: MatchItemType
+    files: readonly MediaItem[]
+  }): UnmatchedFile[] {
+    const placed = files.map((file) => ({
+      file,
+      place:
+        file.match === 'unmatched'
+          ? groupPlaceOf({
+              type,
+              file,
+              folderFiles: () => this.files.inFolder({ libraryId, folder: file.folder }),
+            })
+          : null,
+    }))
+    const suggestions = this.decisions.suggestionsAt({
+      libraryId,
+      places: placed.flatMap(({ place }) => place ?? []),
+    })
+    return placed.map(({ file, place }) => ({
+      ...file,
+      aiSuggestion: place == null ? null : (suggestions.get(place) ?? null),
+    }))
+  }
+
+  /**
+   * Why the AI lookup matched a movie or show, being sure: its reason, when
+   * one of the item's files that `sees` lets through is `matched` (not by
+   * Fix match) and a sure decision for that file's group chose the item.
+   * Null otherwise, and for a season or episode.
+   */
+  aiMatchFor({
+    id,
+    type,
+    tmdbId,
+    sees,
+  }: {
+    id: number
+    type: ItemType
+    tmdbId: string
+    sees: (libraryId: number) => boolean
+  }): AiMatch | null {
+    if (!isMatchItemType(type)) return null
+    const places = [
+      ...new Map(
+        this.files
+          .under(id)
+          .filter((file) => file.match === 'matched' && sees(file.libraryId))
+          .flatMap((file) => decisionPlacesOf({ type, file }))
+          .map((place) => [`${place.libraryId}|${place.place}`, place] as const),
+      ).values(),
+    ]
+    const reason = this.decisions.highReason({ places, tmdbId })
+    return reason == null ? null : { reason }
   }
 
   /** A pass for a library of `kind`, whose searches prefer that type's results. */

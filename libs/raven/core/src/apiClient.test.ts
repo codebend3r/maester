@@ -195,7 +195,10 @@ describe('createApiClient', () => {
       await asked({ body: [entry], call: (client) => client.listInProgress(3) }),
       await asked({ body: [entry], call: (client) => client.listLibraryFavourites(3) }),
       await asked({ body: [saga], call: (client) => client.listSagas(3) }),
-      await asked({ body: [mediaItem()], call: (client) => client.listUnmatched(3) }),
+      await asked({
+        body: [{ ...mediaItem(), aiSuggestion: null }],
+        call: (client) => client.listUnmatched(3),
+      }),
     ]).toEqual([
       'http://nas:8484/api/libraries/3/in-progress',
       'http://nas:8484/api/libraries/3/favourites',
@@ -462,6 +465,8 @@ describe('the metadata calls', () => {
       pending: 3,
       error: null,
       lastOk: null,
+      ai: 'ok',
+      aiRemaining: 200,
     }
     const health = {
       status: 'ok',

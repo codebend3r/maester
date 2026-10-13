@@ -29,7 +29,10 @@ import {
   isMatchCandidate,
   isMediaItem,
   isMediaLocation,
+  isAiSuggestion,
   isMetadataHealth,
+  isUnmatchedFile,
+  isUnmatchedList,
   isPersonDetails,
   isRating,
   isReview,
@@ -261,10 +264,29 @@ describe('the metadata guards', () => {
       }),
     ).toBe(true)
     expect(
-      isMetadataHealth({ tmdb: 'off', omdb: 'off', pending: 0, error: null, lastOk: null }),
+      isMetadataHealth({
+        tmdb: 'off',
+        omdb: 'off',
+        pending: 0,
+        error: null,
+        lastOk: null,
+        ai: 'off',
+        aiRemaining: 0,
+      }),
     ).toBe(true)
     expect(
-      isMetadataHealth({ tmdb: 'broken', omdb: 'off', pending: 0, error: null, lastOk: null }),
+      isMetadataHealth({
+        tmdb: 'broken',
+        omdb: 'off',
+        pending: 0,
+        error: null,
+        lastOk: null,
+        ai: 'off',
+        aiRemaining: 0,
+      }),
+    ).toBe(false)
+    expect(
+      isMetadataHealth({ tmdb: 'ok', omdb: 'off', pending: 0, error: null, lastOk: null }),
     ).toBe(false)
   })
 })
@@ -382,9 +404,44 @@ describe('isServerHealth', () => {
       tonemap: false,
       encoder: 'vaapi',
       thumbnailsPending: 2,
-      metadata: { tmdb: 'off', omdb: 'off', pending: 0, error: null, lastOk: null },
+      metadata: {
+        tmdb: 'off',
+        omdb: 'off',
+        pending: 0,
+        error: null,
+        lastOk: null,
+        ai: 'ok',
+        aiRemaining: 200,
+      },
     }
     expect(isServerHealth(health)).toBe(true)
     expect(isServerHealth({ ...health, encoder: 'nvenc' })).toBe(false)
+  })
+})
+
+describe('the AI lookup', () => {
+  const suggestion = {
+    tmdbId: '201000',
+    title: 'Archie: The Man Who Became Cary Grant',
+    year: 2023,
+    poster: null,
+    reason: 'Generic episode titles.',
+  }
+
+  it('takes a suggestion with a TMDB id, and a file Not matched lists with one or none', () => {
+    expect(isAiSuggestion(suggestion)).toBe(true)
+    expect(isAiSuggestion({ ...suggestion, tmdbId: 'tt123' })).toBe(false)
+    expect(isAiSuggestion({ ...suggestion, reason: null })).toBe(false)
+    expect(isUnmatchedFile({ ...mediaItem(), aiSuggestion: suggestion })).toBe(true)
+    expect(isUnmatchedList([{ ...mediaItem(), aiSuggestion: null }])).toBe(true)
+    expect(isUnmatchedFile(mediaItem())).toBe(false)
+  })
+
+  it('says why an item was matched by AI, or nothing', () => {
+    expect(isItemDetails(itemDetails({ aiMatch: { reason: 'Episode titles match.' } }))).toBe(true)
+    expect(isItemDetails(itemDetails({ aiMatch: null }))).toBe(true)
+    expect(isItemDetails({ ...itemDetails(), aiMatch: { why: 'x' } })).toBe(false)
+    const { aiMatch: _aiMatch, ...without } = itemDetails()
+    expect(isItemDetails(without)).toBe(false)
   })
 })

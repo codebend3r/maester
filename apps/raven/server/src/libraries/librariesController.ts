@@ -32,6 +32,7 @@ import {
   matchesAlike,
   matchTypeFor,
   mediaListQuery,
+  type UnmatchedFile,
   validateLibraryInput,
 } from '@raven/core'
 import { AdminService } from '@/admin/adminService'
@@ -300,13 +301,17 @@ export class LibrariesController {
     return matchTypeFor(record.settings.kind) === 'movie' ? this.media.listSagas(id) : []
   }
 
-  /** Its files no movie or show was found for, or still waiting for matching, by title. */
+  /** Its files no movie or show was found for, or still waiting for matching, by title, each with the AI lookup's suggestion. */
   @Get(':id/unmatched')
-  listUnmatched(@Param('id', ParseIntPipe) id: number): MediaItem[] {
+  listUnmatched(@Param('id', ParseIntPipe) id: number): UnmatchedFile[] {
     const record = this.find(id)
-    return matchTypeFor(record.settings.kind) == null
-      ? []
-      : this.media.listUnmatched({ libraryId: id })
+    const type = matchTypeFor(record.settings.kind)
+    if (type == null) return []
+    return this.metadata.withSuggestions({
+      libraryId: id,
+      type,
+      files: this.media.listUnmatched({ libraryId: id }),
+    })
   }
 
   /** A library matched to movies; the others keep each file on its own card, with nothing to split. */
