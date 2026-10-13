@@ -450,7 +450,7 @@ const COUNTRY_SUFFIX =
   /\s*\((US|UK|AU|CA|NZ|IE|JP|KR|FR|DE|IT|ES|BR|MX|IN|CN|SE|NO|DK|NL|BE|PL|RU|TR|ZA)\)$/i
 
 /** The country a name's suffix gives, as TMDB writes it: Sonarr's UK is GB. */
-const countryOf = (name: string): string | null => {
+export const countryOf = (name: string): string | null => {
   const code = COUNTRY_SUFFIX.exec(name)?.[1]?.toUpperCase() ?? null
   return code === 'UK' ? 'GB' : code
 }

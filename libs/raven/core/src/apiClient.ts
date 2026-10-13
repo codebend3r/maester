@@ -25,6 +25,7 @@ import {
   type MatchCandidate,
   type MatchChoice,
   type MatchItemType,
+  type MatchSubject,
   type MediaItem,
   type UnmatchedFile,
   type MediaLocation,
@@ -135,6 +136,21 @@ export const parseServerEvent = (data: string): ServerEvent | null => {
     return isServerEvent(parsed) ? parsed : null
   } catch {
     return null
+  }
+}
+
+/** The query a search's subject adds: the file, or the show, it is scored against. */
+const subjectQuery = (subject: MatchSubject | null): Record<string, string> => {
+  if (subject == null) return {}
+  switch (subject.kind) {
+    case 'media':
+      return { mediaId: String(subject.id) }
+    case 'item':
+      return { itemId: String(subject.id) }
+    default: {
+      const unreachable: never = subject
+      return unreachable
+    }
   }
 }
 
@@ -514,11 +530,14 @@ export const createApiClient = ({
       query,
       year,
       libraryId,
+      subject = null,
     }: {
       type: MatchItemType
       query: string
       year?: number | null
       libraryId?: number | null
+      /** The file or show the search is for, which its results are scored against. */
+      subject?: MatchSubject | null
     }): Promise<MatchCandidate[]> =>
       expect({
         request: send({
@@ -527,6 +546,7 @@ export const createApiClient = ({
             query: query.trim(),
             ...(year == null ? {} : { year: String(year) }),
             ...(libraryId == null ? {} : { libraryId: String(libraryId) }),
+            ...subjectQuery(subject),
           })}`,
         }),
         guard: isMatchCandidateList,

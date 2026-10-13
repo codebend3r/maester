@@ -12,6 +12,7 @@ import {
   isItemMetadataState,
   isMatchChoice,
   isMatchItemType,
+  isMatchSubject,
   isMediaSort,
   isPlaybackSettingsChange,
   isProgressChange,
@@ -272,8 +273,21 @@ describe('the metadata guards', () => {
         year: 1999,
         overview: null,
         poster: null,
+        confidence: 94,
       }),
     ).toBe(true)
+    expect(
+      isMatchCandidate({
+        tmdbId: '603',
+        title: 'The Matrix',
+        year: 1999,
+        overview: null,
+        poster: null,
+      }),
+    ).toBe(false)
+    expect(isMatchSubject({ kind: 'media', id: 7 })).toBe(true)
+    expect(isMatchSubject({ kind: 'item', id: 7 })).toBe(true)
+    expect(isMatchSubject({ kind: 'folder', id: 7 })).toBe(false)
     expect(
       isMetadataHealth({
         tmdb: 'off',
