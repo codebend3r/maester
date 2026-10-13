@@ -17,6 +17,10 @@ export type FakeMovie = {
   isHiddenFromSearch?: boolean
   /** The collection it belongs to, as `belongs_to_collection`. */
   saga?: { id: number; name: string }
+  /** TMDB's `genre_ids` in a search: Action and Science Fiction when not given. */
+  genreIds?: number[]
+  /** TMDB's `original_language`: `en` when not given. */
+  language?: string
 }
 
 /**
@@ -121,6 +125,10 @@ export type FakeShow = {
   countries?: string[]
   /** The other titles TMDB knows the show by, as `/tv/{id}/alternative_titles` gives them. */
   alternativeTitles?: string[]
+  /** TMDB's `genre_ids` in a search: Drama when not given. */
+  genreIds?: number[]
+  /** TMDB's `original_language`: `en` when not given. */
+  language?: string
   seasons: Record<number, FakeEpisode[]>
 }
 
@@ -314,6 +322,8 @@ export const fakeTmdb = ({
           title: movie.title,
           original_title: movie.originalTitle ?? movie.title,
           release_date: movie.released,
+          genre_ids: movie.genreIds ?? [28, 878],
+          original_language: movie.language ?? 'en',
           overview: `${movie.title} is a film.`,
           poster_path: movie.poster === undefined ? `/poster${movie.id}.jpg` : movie.poster,
         })),
@@ -337,6 +347,8 @@ export const fakeTmdb = ({
           original_name: show.title,
           first_air_date: show.first,
           origin_country: show.countries ?? ['US'],
+          genre_ids: show.genreIds ?? [18],
+          original_language: show.language ?? 'en',
           overview: `${show.title} is a show.`,
           poster_path: `/showposter${show.id}.jpg`,
         })),

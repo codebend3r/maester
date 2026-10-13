@@ -162,6 +162,10 @@ export type SearchResult = {
   popularity: number | null
   /** A show's countries of origin, `['GB']`; none for a movie, as TMDB's search gives none. */
   countries: string[]
+  /** TMDB's genre ids, `[16, 10759]`, which a library's type prefers results by. */
+  genreIds: number[]
+  /** The language it was made in, as TMDB writes it: `ja`. */
+  originalLanguage: string | null
 }
 
 export type TmdbState = {
@@ -592,6 +596,8 @@ const toSearchResult = (entry: Record<string, unknown>): SearchResult | null => 
     poster: imagePath(entry.poster_path),
     popularity: number(entry.popularity),
     countries: list(entry.origin_country).filter(isString),
+    genreIds: list(entry.genre_ids).filter(isNumber),
+    originalLanguage: text(entry.original_language),
   }
 }
 
