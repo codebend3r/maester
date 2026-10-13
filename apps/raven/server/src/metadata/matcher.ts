@@ -1,4 +1,10 @@
-import { foldTitle, type MatchItemType } from '@raven/core'
+import {
+  type CandidateTier,
+  fitsTier,
+  foldTitle,
+  isUnfiltered,
+  type MatchItemType,
+} from '@raven/core'
 import type { SearchResult } from '@/metadata/tmdbClient'
 
 /** The most popular of `results`, TMDB's own order (popularity first) breaking a tie. */
@@ -90,3 +96,29 @@ export const pickMatch = ({
     ? only
     : null
 }
+
+/**
+ * `pickMatch` over each of a library's tiers in turn: the results that fit
+ * the first, then the second, and so on, and the first pick wins. A lone
+ * result in the name's year counts only in a tier that is every result, so
+ * a filter that leaves one result never makes it a guess.
+ */
+export const pickByTiers = ({
+  prefer,
+  results,
+  canTakeLoneResult = true,
+  ...asked
+}: Parameters<typeof pickMatch>[0] & {
+  /** The library's tiers, from `tiersFor`. */
+  prefer: readonly CandidateTier[]
+}): SearchResult | null =>
+  prefer.reduce<SearchResult | null>(
+    (picked, tier) =>
+      picked ??
+      pickMatch({
+        ...asked,
+        results: results.filter((result) => fitsTier({ tier, result })),
+        canTakeLoneResult: canTakeLoneResult && isUnfiltered(tier),
+      }),
+    null,
+  )

@@ -240,6 +240,34 @@ describe('TmdbClient', () => {
       shows: [],
     })
   })
+
+  it('keeps the genres and language a search gives, which a library type prefers by', async () => {
+    const tmdb = fakeTmdb({
+      movies: [
+        { id: 4977, title: 'Paprika', released: '2006-11-25', genreIds: [16, 878], language: 'ja' },
+      ],
+      shows: [
+        {
+          id: 30991,
+          title: 'Cowboy Bebop',
+          first: '1998-04-03',
+          genreIds: [16, 10759],
+          language: 'ja',
+          countries: ['JP'],
+          seasons: {},
+        },
+      ],
+    })
+    const client = new TmdbClient(config(), tmdb.fetch)
+    const [paprika] = await client.searchMovies({ query: 'Paprika', year: 2006 })
+    expect(paprika).toMatchObject({ genreIds: [16, 878], originalLanguage: 'ja', countries: [] })
+    const [bebop] = await client.searchShows({ query: 'Cowboy Bebop', year: null })
+    expect(bebop).toMatchObject({
+      genreIds: [16, 10759],
+      originalLanguage: 'ja',
+      countries: ['JP'],
+    })
+  })
 })
 
 describe('toShow and toSeason', () => {

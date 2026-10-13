@@ -145,6 +145,7 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
           type="show"
           title={details.title}
           year={details.year}
+          libraryId={libraryId}
           allowNone={false}
           match={(tmdbId) =>
             tmdbId == null

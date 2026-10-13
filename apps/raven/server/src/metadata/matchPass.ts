@@ -1,9 +1,15 @@
 import type { Logger } from '@nestjs/common'
-import { foldTitle, type MatchItemType, type NameIds, sortTitle } from '@raven/core'
+import {
+  type CandidateTier,
+  foldTitle,
+  type MatchItemType,
+  type NameIds,
+  sortTitle,
+} from '@raven/core'
 import { FolderReader } from '@/metadata/folderReader'
 import { isLocal, localEpisode, localSeason } from '@/metadata/localItems'
 import type { FixMatch, MatchFiles } from '@/metadata/matchFiles'
-import { pickMatch } from '@/metadata/matcher'
+import { pickByTiers, pickMatch } from '@/metadata/matcher'
 import type { MetadataRepository } from '@/metadata/metadataRepository'
 import { readNfoIds } from '@/metadata/nfo'
 import type { OmdbScores } from '@/metadata/omdbScores'
@@ -52,6 +58,8 @@ export type Resolved =
   | { kind: 'matched'; itemId: number; tmdbId: string; match: 'manual' | 'matched' }
 
 export type MatchPassDeps = {
+  /** The library's tiers, from `tiersFor`: every search in the pass prefers them in order. */
+  prefer: readonly CandidateTier[]
   tmdb: TmdbClient
   metadata: MetadataRepository
   files: MatchFiles
@@ -62,7 +70,8 @@ export type MatchPassDeps = {
 /**
  * One matching pass: what it has read, searched and fetched, so a folder is
  * read, a title searched and a season fetched once however many files ask,
- * and the guard that stops it when TMDB goes away.
+ * and the guard that stops it when TMDB goes away. A pass serves one library,
+ * so its searches, cached by title, are picked with that library's tiers.
  */
 export class MatchPass {
   readonly folders: FolderReader
@@ -190,7 +199,9 @@ export class MatchPass {
             : tmdb.searchShows({ query, year })
         const pick = (
           extra: Omit<Parameters<typeof pickMatch>[0], 'type' | 'title' | 'year' | 'country'>,
-        ): string | null => pickMatch({ type, title, year, country, ...extra })?.tmdbId ?? null
+        ): string | null =>
+          pickByTiers({ type, title, year, country, prefer: this.deps.prefer, ...extra })?.tmdbId ??
+          null
 
         const results = await ask({ query: title })
         // TMDB finds nothing for "The Few Good Men"; without the article it

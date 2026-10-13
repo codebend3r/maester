@@ -17,9 +17,12 @@ import { filePlace, holdsOneMovie, rootOf, showDirOf, showPlace, stemOf } from '
 
 /** How files are matched to one type of TMDB item: which go together, and what a Fix match covers. */
 export type KindMatcher = {
-  /** Pending files in the units matched together: one movie file, or one show folder's files. */
+  /** Files in the units matched together: one movie file, or one show folder's files. */
   groups: (files: readonly MatchFile[]) => MatchFile[][]
-  /** Matches one unit with the pass's caches. */
+  /**
+   * Matches one unit with the pass's caches. A file already linked keeps its
+   * links until `settle` replaces them, so one that fails midway stays as it was.
+   */
   match: (args: { files: readonly MatchFile[]; pass: MatchPass }) => Promise<void>
   /** The place a Fix match on `file` is kept under, and every file it covers. */
   fixGroup: (file: MatchFile) => { place: string; files: MatchFile[] }

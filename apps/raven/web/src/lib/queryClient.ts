@@ -107,11 +107,13 @@ export const queryKeys = {
     type,
     query,
     year,
+    libraryId,
   }: {
     type: MatchItemType
     query: string
     year: number | null
-  }) => ['match', type, query, year],
+    libraryId: number | null
+  }) => ['match', type, query, year, libraryId],
   metadataHealth: ['health', 'metadata'],
 }
 

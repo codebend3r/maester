@@ -64,6 +64,7 @@ export const FixMatchDialog = <T,>({
   title,
   year,
   fileName,
+  libraryId,
   match,
   allowNone = true,
   onClose,
@@ -76,6 +77,8 @@ export const FixMatchDialog = <T,>({
   year: number | null
   /** Named under the heading, so the viewer knows which file this is for. */
   fileName?: string
+  /** The library the file is in: the results its type prefers are listed first. */
+  libraryId?: number
   /** Points the file or show at `tmdbId`, or at nothing for null. */
   match: (tmdbId: string | null) => Promise<T>
   /** Whether "Not a movie" (or show) is offered. */
@@ -94,7 +97,9 @@ export const FixMatchDialog = <T,>({
     dialog.current?.showModal()
   }, [])
 
-  const results = useQuery(matchSearchQuery({ type, query: asked.query, year: asked.year }))
+  const results = useQuery(
+    matchSearchQuery({ type, query: asked.query, year: asked.year, libraryId: libraryId ?? null }),
+  )
 
   const choose = useMutation({
     mutationFn: match,

@@ -498,15 +498,17 @@ export const createApiClient = ({
         guard: isItemDetails,
       }),
 
-    /** TMDB's results for Fix match. */
+    /** TMDB's results for Fix match, those `libraryId`'s type prefers first. */
     searchMatches: ({
       type,
       query,
       year,
+      libraryId,
     }: {
       type: MatchItemType
       query: string
       year?: number | null
+      libraryId?: number | null
     }): Promise<MatchCandidate[]> =>
       expect({
         request: send({
@@ -514,6 +516,7 @@ export const createApiClient = ({
             type,
             query: query.trim(),
             ...(year == null ? {} : { year: String(year) }),
+            ...(libraryId == null ? {} : { libraryId: String(libraryId) }),
           })}`,
         }),
         guard: isMatchCandidateList,

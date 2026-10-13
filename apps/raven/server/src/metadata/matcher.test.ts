@@ -1,5 +1,6 @@
+import { TIER_SETS } from '@raven/core'
 import { describe, expect, it } from 'vitest'
-import { pickMatch } from '@/metadata/matcher'
+import { pickByTiers, pickMatch } from '@/metadata/matcher'
 import type { SearchResult } from '@/metadata/tmdbClient'
 
 const result = (overrides: Partial<SearchResult>): SearchResult => ({
@@ -11,6 +12,8 @@ const result = (overrides: Partial<SearchResult>): SearchResult => ({
   poster: null,
   popularity: null,
   countries: [],
+  genreIds: [],
+  originalLanguage: null,
   ...overrides,
 })
 
@@ -253,5 +256,121 @@ describe('pickMatch', () => {
         results: [result({ tmdbId: '2', title: 'Andorra Between Two Evils', year: 2000 })],
       }),
     ).toBeNull()
+  })
+})
+
+describe('pickByTiers', () => {
+  /** The 2021 live-action series, listed first as the more popular. */
+  const liveAction = result({
+    tmdbId: '90660',
+    title: 'Cowboy Bebop',
+    year: 2021,
+    popularity: 80,
+    genreIds: [10759, 18],
+    originalLanguage: 'en',
+    countries: ['US'],
+  })
+  const anime = result({
+    tmdbId: '30991',
+    title: 'Cowboy Bebop',
+    year: 1998,
+    popularity: 60,
+    genreIds: [16, 10759],
+    originalLanguage: 'ja',
+    countries: ['JP'],
+  })
+
+  it('takes the more popular series in a TV library, and the anime in an Anime one', () => {
+    const asked = { type: 'show', title: 'Cowboy Bebop', year: null } as const
+    const results = [liveAction, anime]
+    expect(pickByTiers({ ...asked, results, prefer: TIER_SETS.any })).toBe(liveAction)
+    expect(pickByTiers({ ...asked, results, prefer: TIER_SETS.anime })).toBe(anime)
+  })
+
+  it('takes Avatar: The Last Airbender as the cartoon in an Anime library, through the animation tier', () => {
+    const asked = { type: 'show', title: 'Avatar The Last Airbender', year: null } as const
+    const netflix = result({
+      tmdbId: '82452',
+      title: 'Avatar: The Last Airbender',
+      year: 2024,
+      popularity: 200,
+      genreIds: [10759, 18],
+      originalLanguage: 'en',
+      countries: ['US'],
+    })
+    const cartoon = result({
+      tmdbId: '246',
+      title: 'Avatar: The Last Airbender',
+      year: 2005,
+      popularity: 100,
+      genreIds: [16, 10759],
+      originalLanguage: 'en',
+      countries: ['US'],
+    })
+    const results = [netflix, cartoon]
+    expect(pickByTiers({ ...asked, results, prefer: TIER_SETS.any })).toBe(netflix)
+    expect(pickByTiers({ ...asked, results, prefer: TIER_SETS.anime })).toBe(cartoon)
+  })
+
+  it('matches a Chinese donghua in an Anime library through the animation tier', () => {
+    const donghua = result({
+      tmdbId: '259140',
+      title: 'TO BE HERO X',
+      year: 2025,
+      genreIds: [16, 10759],
+      originalLanguage: 'zh',
+      countries: ['CN'],
+    })
+    expect(
+      pickByTiers({
+        type: 'show',
+        title: 'To Be Hero X',
+        year: 2025,
+        results: [donghua],
+        prefer: TIER_SETS.anime,
+      }),
+    ).toBe(donghua)
+  })
+
+  it('never takes the lone result a filter leaves when its title is another', () => {
+    const other = result({
+      tmdbId: '1',
+      title: 'Ninja Scroll: The Series',
+      year: 2003,
+      genreIds: [16],
+      originalLanguage: 'ja',
+      countries: ['JP'],
+    })
+    const liveDrama = result({ tmdbId: '2', title: 'Ninja Detective', year: 2003, genreIds: [18] })
+    expect(
+      pickByTiers({
+        type: 'show',
+        title: 'Ninja Scroll',
+        year: 2003,
+        results: [other, liveDrama],
+        prefer: TIER_SETS.anime,
+      }),
+    ).toBeNull()
+  })
+
+  it('picks as pickMatch does in a library that prefers nothing, a lone result included', () => {
+    const lone = result({ tmdbId: '7', title: 'Something Else', year: 1999 })
+    const asked = { type: 'movie', title: 'The Matrix', year: 1999, results: [lone] } as const
+    expect(pickByTiers({ ...asked, prefer: TIER_SETS.any })).toBe(pickMatch(asked))
+    expect(pickByTiers({ ...asked, prefer: TIER_SETS.any })).toBe(lone)
+    expect(pickByTiers({ ...asked, prefer: TIER_SETS.any, canTakeLoneResult: false })).toBeNull()
+  })
+
+  it('takes a lone live-action result in an Anime library through its last tier, as a Movies one would', () => {
+    const lone = result({
+      tmdbId: '8',
+      title: 'Something Else',
+      year: 1999,
+      genreIds: [28],
+      originalLanguage: 'en',
+    })
+    const asked = { type: 'movie', title: 'The Matrix', year: 1999, results: [lone] } as const
+    expect(pickByTiers({ ...asked, prefer: TIER_SETS.anime })).toBe(pickMatch(asked))
+    expect(pickByTiers({ ...asked, prefer: TIER_SETS.anime })).toBe(lone)
   })
 })
