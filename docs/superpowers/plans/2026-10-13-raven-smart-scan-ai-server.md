@@ -44,7 +44,8 @@
   - `bunx nx run @raven/server:test`, `bunx nx run @raven/core:test`, `bunx nx run @raven/web:test`;
   - one file at a time with `-- <path>`, as in `bunx nx run @raven/server:test -- src/metadata/aiMatcher.test.ts`;
   - `bunx nx run <project>:typecheck` and `bunx nx run <project>:lint:ts`;
-  - `bun run verify` before the PR.
+  - `bun run verify` before the PR;
+  - `bunx nx run <project>:format` (oxfmt, 100 columns) before every commit, as some of this plan's lines are longer than the formatter allows.
 - Commits follow the `commit-format` skill: a `MAE:` subject, a short bullet body, written with a heredoc, and no agent attribution. That skill forbids naming the assistant's vendor anywhere in a commit, so subjects and bodies say "the AI lookup", "its key" and "the SDK", never the vendor, the model or the assistant by name.
 - Branch `raven-smart-scan-ai-server` from `raven-smart-scan-types`. The PR is stacked on step 3's PR.
 
@@ -64,6 +65,19 @@
 - **File names are sent as paths inside the group's place**, such as `Season 1/Doctor Who - S01E01 - ....mkv`, so season folders show.
 - **`MatchPass.resolve` takes the pick as `decided`.** The matcher reads it from `AiDecisions`, as it reads the Fix match, so a pass never reads storage itself. `matchPending` now takes its pass, so the lookups reuse the pass's cached searches.
 
+- **A lookup that fails on Anthropic or TMDB still spends one of the day's lookups.** `take()` runs before the lookup, as the request may have been billed; the group is asked again on the next pass.
+- **A group whose Fix match points at a TMDB id that TMDB cannot resolve is never asked.** The spec excludes only "not a match"; a Fix match is the user's answer either way.
+- **A refused key stops lookups until a restart,** and health then reports `ai: 'failing'` with `aiRemaining` 0.
+- **The show name read from a file reaches Claude only among the searches tried,** and only when it differs from the folder's.
+
+## Amendments from the pre-flight scan
+
+Each task reads these before its own steps; where one names a task, it binds that task's code.
+
+- Task 1: `remaining()` answers 0 once the key was refused (`status.refused`), so health never reports lookups left that will not run. Derive `AiState`'s `state` from core's `MetadataServiceState` rather than writing the union again. Name the refused flag as a predicate (`isRefused`). The doc comment that says the client takes "nothing else from the environment" should say the key, token, profile and base URL come from raven's own config (the SDK still adds `ANTHROPIC_CUSTOM_HEADERS` if set). In `fakeClaude`'s message body add `diagnostics: null`, as 0.133.0's `Message` has it.
+- Task 4: name the lookups' stop flag as a predicate: `const lookups = { isHalted: false }`, passed as `lookups`, typed `{ isHalted: boolean }`, read as `lookups.isHalted`.
+- Task 5: `apps/raven/web/src/test/fixtures.ts` already starts `import type { ... } from '@raven/core'`, so add plain `UnmatchedFile` to that list (a `type` modifier inside it does not compile).
+
 ## Review Focus
 
 1. **A pick Claude was never offered is never applied.** That covers an id no search returned, and a movie id offered in a TV library (the two id spaces overlap). Pinned in Task 3 (`throws away an id...` cases).
@@ -78,6 +92,10 @@
 
 | File | Change |
 | --- | --- |
+| `apps/raven/server/src/lock/lockService.ts`, `src/appLock.test.ts` | Task 0: an item no library holds is hidden under a lock |
+| `apps/raven/server/src/test/fakeTmdb.ts` | Task 0: `state.failing` |
+| `apps/raven/server/src/metadata/libraryTypes.test.ts` | Task 0: the carry-over tests |
+| `apps/raven/server/src/metadata/matchFiles.ts` | Task 0: the `matched` comment |
 | `apps/raven/server/package.json`, `bun.lock` | `@anthropic-ai/sdk` 0.133.0 |
 | `apps/raven/server/src/config.ts` | `anthropicApiKey`, `aiMatchModel`, `aiMatchEffort`, `aiDailyLimit` |
 | `apps/raven/server/src/config.test.ts` (new) | the four variables |
@@ -117,7 +135,8 @@ Step 3's last review left five narrow faults in code this step touches next. Fix
 
 **Files:**
 - Modify: `apps/raven/server/src/lock/lockService.ts` (`viewer`, `seesItem`)
-- Modify: `apps/raven/server/src/metadata/metadataService.ts` (`changeKind`, `changePreference`, `pass`, `matchGroups`, `repick`)
+- Modify: `apps/raven/server/src/metadata/metadataService.ts` (`changeKind`, `changePreference`, `pass`)
+- Modify: `apps/raven/server/src/metadata/matchers.ts` (`matchShowGroup`)
 - Modify: `apps/raven/server/src/metadata/matchFiles.ts` (the `matched` comment)
 - Modify: `apps/raven/server/src/test/fakeTmdb.ts` (`state.failing`)
 - Modify: `apps/raven/server/src/appLock.test.ts`
@@ -125,25 +144,25 @@ Step 3's last review left five narrow faults in code this step touches next. Fix
 
 **Interfaces:**
 - Consumes: step 3's `changePreference`, `repick`, `matchGroups`, `pass` (the clear-up skipped when TMDB stopped the pass), `MatchFiles.setMatch`, `MatchFiles.matched`.
-- Produces: `fakeTmdb(...).state.failing: string[]`, URL paths (after `/3`) whose calls fail as if TMDB were down. `matchGroups` gains an optional `whenFailed?: (group: readonly MatchFile[]) => void`. No public signature changes.
+- Produces: `fakeTmdb(...).state.failing: string[]`, URL paths (after `/3`) whose calls fail as if TMDB were down. `matchShowGroup` in `matchers.ts` puts a show folder back to `pending` when placing its episodes fails part way. No public signature changes.
 
 The five faults:
 
 1. **A stopped pass keeps a locked library's items readable.** Since step 3, a pass TMDB stops skips the clear-up, so after a type change of a locked library during an outage its unlinked items stay, and `LockService.viewer`'s `seesItem` lets anyone read an item no library holds (`holding.length === 0`). Fix: while a lock applies to the viewer (the branch after `EVERYTHING` is returned), an item no library holds is hidden: `holding.length > 0 && holding.some(seesLibrary)`.
 2. **A layout saved with a type change can be lost.** `changePreference` returns early when the type changed again before its task ran, and skips `relayoutNow` with it. Fix: call `this.relayoutNow(libraryId)` first, before the type check (it reads the settings as they are then).
-3. **Two saves while a type change runs can be dropped.** `changeKind` and `changePreference` queue with `push`, which drops a task whose key is running, so TV shows to Movies and straight back leaves the files read as movies. Fix: queue both with `this.queue.again(...)`, as `changeLayout` does, so a change saved while one with the same key runs is applied after it.
+3. **A save that repeats a type change still running is dropped.** `changeKind` and `changePreference` queue with `push`, which drops a task whose key is running. While Anime movies to Movies re-picks (`prefer:<id>:movies` running), saving Anime movies and then Movies again drops the last save, so the library ends as Movies with its files picked for Anime movies. Fix: queue both with `this.queue.again(...)`, as `changeLayout` does, so a change saved while one with the same key runs is applied after it.
 4. **A library deleted while its pass runs is not cleared up if the pass stops.** The delete's `enqueue` is dropped while `library:<id>` runs. Fix: in `pass`, skip the clear-up only when TMDB stopped the pass and the library is still there: `if (isStopped && this.libraries.get(libraryId) != null) return`.
-5. **A re-pick TMDB stops halfway through a show can leave its folder under two shows, both still `matched`.** `matchShowGroup` places files one by one after the show is resolved, so a season fetch that fails part way leaves the first files on the new show and the rest on the old. Fix: `repick` hands `matchGroups` a `whenFailed` that puts the group's files back to `pending` (`this.files.setMatch({ ids, match: 'pending' })`), keeping their links so their cards stay, and the error goes on to the guard as before. The pass that follows, or the next one, matches the folder whole.
+5. **A pass TMDB stops halfway through a show can leave its folder under two shows, both still `matched`.** `matchShowGroup` places files one by one after the show is resolved, so a season fetch that fails part way leaves the first files on the new show and the rest on the old, and the pass that follows a re-pick does the same. Fix: in `matchShowGroup` (`apps/raven/server/src/metadata/matchers.ts`), when placing the episodes throws, put every file of the group back to `pending` (`deps.files.setMatch({ ids, match: 'pending' })`), keeping their links so their cards stay, and rethrow so the guard sees the error as before. A later pass matches the folder whole. Movies are untouched: a movie re-pick TMDB stops leaves its files `matched` on their old pick, which `libraryTypes.test.ts`'s "keeps the movie, its edits and its matches when Movies becomes Anime movies while TMDB is away" pins.
 
 Also correct the `matched` comment in `matchFiles.ts`: those files were matched by a search or by an id in a name or NFO, not by a Fix match.
 
 - [ ] **Step 1: Let the fake TMDB fail one path**
 
-In `apps/raven/server/src/test/fakeTmdb.ts`, add `failing: [] as string[]` to `state`, document it in the comment above `fakeTmdb` (`failing` makes calls to those paths fail as `down` does), and right after the `path` is computed (`parsed.pathname.replace(/^\/3/, '')`), throw the same `TypeError('fetch failed')` as `down` when `state.failing.some((prefix) => path.startsWith(prefix))`.
+In `apps/raven/server/src/test/fakeTmdb.ts`, declare `const failing: string[] = []` before `state` and add `failing` to `state` (no cast: the repo forbids `as string[]`), document it in the comment above `fakeTmdb` (`failing` makes calls to those paths fail as `down` does), and right after the `path` is computed (`parsed.pathname.replace(/^\/3/, '')`), throw the same `TypeError('fetch failed')` as `down` when `state.failing.some((prefix) => path.startsWith(prefix))`.
 
 - [ ] **Step 2: Write the failing tests**
 
-In `apps/raven/server/src/appLock.test.ts`, find how it creates a locked library and checks a hidden item (`@PrivateBy('item')` routes such as `GET /api/items/:id`). Add a test: with a locked library and no unlock cookie, an item no library holds answers 404 at `/api/items/:id`; once unlocked, 200. Make the orphan item the way step 3's own tests do: a movie in the locked library, then its file unlinked through a type change to Other while the fake TMDB is `down` (or, if the file has a simpler way in its setup, save an item with `MetadataRepository.save` and link nothing to it). State in the test name why it matters: "hides an item no library holds while a library is locked".
+In `apps/raven/server/src/appLock.test.ts`, find how it creates a locked library and checks a hidden item (`@PrivateBy('item')` routes such as `GET /api/items/:id`). Add the test inside the file's "the admin lock" `describe`, where a hidden item answers 404 (outside it, with the admin lock off, a hidden item answers 423): with a locked library and no cookie, an item no library holds answers 404 at `/api/items/:id`; with both cookies (`cookies(state.admin, state.pin)`, as that describe's other tests send them), 200. Make the orphan item the way step 3's own tests do: a movie in the locked library, then its file unlinked through a type change to Other while the fake TMDB is `down` (or, if the file has a simpler way in its setup, save an item with `MetadataRepository.save` and link nothing to it). State in the test name why it matters: "hides an item no library holds while a library is locked".
 
 In `apps/raven/server/src/metadata/libraryTypes.test.ts`, add:
 
@@ -170,35 +189,21 @@ In `apps/raven/server/src/metadata/libraryTypes.test.ts`, add:
 
 Add the season 2 episode to both fake Cowboy Bebop shows (`2: [{ number: 1, title: 'Second', aired: ... }]`), add a `mediaOf` helper beside `showYears` that lists `/api/libraries/:id/media` with `isMediaList`, and adjust the earlier tests' expectations only if the extra file changes them (it should not: both files sit under one show). If a rescan does not start a pass in this app, use whatever the file's other tests use to get pending files matched (read `ScannerService` and `MetadataService.enqueue`), and say which in your report.
 
-Add a test for faults 2 and 3 together:
+Add a test for faults 2 and 3 together, through a Movies library, as only movie searches can be held (`hold` gates `/search/movie`, never `/search/tv`): read `hold` in `fakeTmdb.ts` first.
 
-```ts
-  it('applies a type change saved while another one runs', async () => {
-    const hold = tmdb.hold('Cowboy Bebop')
-    await app().inject({
-      method: 'PUT',
-      url: `/api/libraries/${state.library}`,
-      payload: { name: 'TV', paths: [state.tv], settings: { kind: 'animeShows' } },
-    })
-    await app().inject({
-      method: 'PUT',
-      url: `/api/libraries/${state.library}`,
-      payload: { name: 'TV', paths: [state.tv], settings: { kind: 'shows' } },
-    })
-    hold()
-    await settle()
-    expect(await showYears()).toEqual([2021])
-  })
-```
+- Create a second library in this file's `beforeAll`, kind `animeMovies`, over a new path holding `A/Alien (1979)/Alien (1979).mp4` (a letter folder, so its folder layout matters), with `Alien` (348, 1979) added to the fake's `movies`. Give it its own `settle` coverage.
+- The test: hold the search for `alien`; save the library as Movies (this queues `prefer:<id>:movies`, whose re-pick blocks on the held search); then save Anime movies with `folderLayout: 'flat'`; then save Movies again (with `push`, this third save repeats the running key and is dropped). Release the hold and settle.
+- Expect: the library's kind is Movies, its layout is `flat` (`GET /api/libraries/:id` settings, and the file's `folder` reads `A/Alien (1979)` again since a flat layout files it under `A`), and its files were picked again after the last save (the fake recorded a `/search/movie` call for `alien` after the release).
+- Before the fix this fails: the last save is dropped, and the Anime movies task returns early without placing the files for the flat layout.
 
-Check `hold`'s signature in `fakeTmdb.ts` (it holds searches for a title until released) and adapt the call to it. If holding the search does not keep the first task running long enough to show the drop on `push`, say so in the report and pin fault 3 with a unit test of `createTaskQueue`'s `again` instead; do not leave it untested.
+If the queue's timing makes any of this unreliable, say so in the report and find another sequence that fails first; do not fall back to a unit test of `createTaskQueue`'s `again`, which already has one and cannot show that these two methods use it.
 
-For fault 4, add to `libraryTypes.test.ts` (or `movies.test.ts` if its setup fits better): a library whose pass is held (`tmdb.hold`) is deleted, then TMDB goes `down` and the hold is released; after `settle`, the library's items are gone (`GET /api/items/:id` answers 404 for an item id read before the delete).
+For fault 4, in the same Movies library or a third one: the library needs one movie already matched (so an item exists; read its id from `/api/items` or the media listing) and a second, pending movie whose search is held. Delete the library through `DELETE /api/libraries/:id` while that pass waits on the hold; set the fake TMDB `down`; release the hold. The held call already passed the `down` check, so it answers; the stop must come from a later call, such as fetching that second movie, which TMDB has not stored. After `settle`, the first movie's item answers 404 at `/api/items/:id`. Before the fix it answers 200, as the stopped pass skipped the clear-up.
 
 - [ ] **Step 3: Run them to verify they fail**
 
 Run: `bunx nx run @raven/server:test -- src/appLock.test.ts src/metadata/libraryTypes.test.ts`
-Expected: the new tests FAIL: the orphan item answers 200, the re-picked files are `matched`, the second type change is dropped, the deleted library's item stays.
+Expected: the new tests FAIL: the orphan item answers 200, one re-picked show file is `matched` under the anime while the other stays on the series, the last save is dropped and the flat layout not applied, the deleted library's item stays.
 
 - [ ] **Step 4: Fix the five faults**
 
@@ -234,46 +239,21 @@ Make the five changes listed above. In `metadataService.ts`:
       if (isStopped && this.libraries.get(libraryId) != null) return
 ```
 
-```ts
-  /** Matches `files` in the units the matcher keeps together, a few at once, until TMDB stops the pass. */
-  private async matchGroups({
-    files,
-    type,
-    pass,
-    whenFailed,
-  }: {
-    files: readonly MatchFile[]
-    type: MatchItemType
-    pass: MatchPass
-    /** Called with a group whose matching threw, before the guard sees the error. */
-    whenFailed?: (group: readonly MatchFile[]) => void
-  }): Promise<void> {
-    const matcher = this.matchers[type]
-    await mapWithConcurrency({
-      items: matcher.groups(files),
-      limit: PASS_CONCURRENCY,
-      fn: (group) =>
-        pass.guard.run(() =>
-          matcher.match({ files: group, pass }).catch((error: unknown) => {
-            whenFailed?.(group)
-            throw error
-          }),
-        ),
-    })
-  }
-```
-
-and in `repick`:
+In `matchers.ts`'s `matchShowGroup`, wrap the episode placement:
 
 ```ts
-    await this.matchGroups({
-      files: this.files.matched(libraryId),
-      type,
-      pass,
-      // A show TMDB stopped halfway may sit under two shows; it waits to be matched whole.
-      whenFailed: (group) =>
-        this.files.setMatch({ ids: group.map((file) => file.id), match: 'pending' }),
-    })
+    const touched = await episodes
+      .reduce<Promise<number[]>>(
+        (previous, file) =>
+          previous.then(async (items) => [...items, ...(await placeEpisode({ file, show, pass }))]),
+        Promise.resolve([]),
+      )
+      .catch((error: unknown) => {
+        // A folder placed in part, say when TMDB went away fetching a season,
+        // would sit under two shows; it waits to be matched whole instead.
+        deps.files.setMatch({ ids, match: 'pending' })
+        throw error
+      })
 ```
 
 In `lockService.ts`'s `viewer`:
@@ -290,20 +270,20 @@ In `lockService.ts`'s `viewer`:
 
 - [ ] **Step 5: Run them to verify they pass**
 
-Run: `bunx nx run @raven/server:test -- src/appLock.test.ts src/metadata/libraryTypes.test.ts src/metadata/shows.test.ts src/metadata/movies.test.ts`, then `bunx nx run @raven/server:test`, `bunx nx run @raven/server:typecheck` and `bunx nx run @raven/server:lint:ts`.
+Run: `bunx nx run @raven/server:test -- src/appLock.test.ts src/metadata/libraryTypes.test.ts src/metadata/shows.test.ts src/metadata/movies.test.ts src/metadata/matchers.test.ts`, then `bunx nx run @raven/server:test`, `bunx nx run @raven/server:typecheck` and `bunx nx run @raven/server:lint:ts`.
 Expected: PASS.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add apps/raven/server/src/lock/lockService.ts apps/raven/server/src/metadata/metadataService.ts apps/raven/server/src/metadata/matchFiles.ts apps/raven/server/src/test/fakeTmdb.ts apps/raven/server/src/appLock.test.ts apps/raven/server/src/metadata/libraryTypes.test.ts
+git add apps/raven/server/src/lock/lockService.ts apps/raven/server/src/metadata/metadataService.ts apps/raven/server/src/metadata/matchers.ts apps/raven/server/src/metadata/matchFiles.ts apps/raven/server/src/test/fakeTmdb.ts apps/raven/server/src/appLock.test.ts apps/raven/server/src/metadata/libraryTypes.test.ts
 git commit -m "$(cat <<'MSG'
 MAE: raven keeps type changes and locked items safe through an outage
 
 - An item no library holds is hidden while a library is locked
 - A type change saved while another runs is applied after it, and its layout with it
 - A library deleted while its pass runs is cleared up even when TMDB stops the pass
-- A show TMDB stops halfway through a re-pick waits to be matched whole
+- A show TMDB stops halfway through placing waits to be matched whole
 MSG
 )"
 ```
@@ -2562,7 +2542,7 @@ EOF
 - Create: `apps/raven/server/src/metadata/aiLookup.test.ts`
 
 **Interfaces:**
-- Consumes: `AiClient.take`, `enabled`, `AiError` (Task 1); `AiDecisions` (Task 2); `AiMatcher.decide`, `model`, `aiGroupOf`, `AI_CONCURRENCY` (Task 3); step 3's `MetadataService.newPass(kind)`, `matchPending` (answers whether TMDB stopped the pass), `matchGroups`, `changePreference` and `repick`, as committed at `14b24e8`.
+- Consumes: `AiClient.take`, `enabled`, `AiError` (Task 1); `AiDecisions` (Task 2); `AiMatcher.decide`, `model`, `aiGroupOf`, `AI_CONCURRENCY` (Task 3); step 3's `MetadataService.newPass(kind)`, `matchPending` (answers whether TMDB stopped the pass), `matchGroups`, `changePreference` and `repick`, as committed at `14b24e8` plus Task 0 (`pass` still clears up a library removed during a stopped pass; `changeKind` and `changePreference` queue with `again`).
 - Produces:
   - `groupPlaceOf({ type, file, folderFiles }: { type: MatchItemType; file: { folder: string; fileName: string }; folderFiles: () => ReadonlyArray<{ fileName: string; folder: string }> }): string`
   - `MatchFiles.unmatched(libraryId: number): MatchFile[]`
@@ -3089,7 +3069,7 @@ In `relayoutNow`, after `this.files.applyRelayout({ ... })`:
     this.decisions.forget(libraryId)
 ```
 
-The next edits are written against step 3 as committed on `raven-smart-scan-types` at `14b24e8`, where `matchPending({ libraryId, kind, type })` makes its own pass and answers whether TMDB stopped it, and `pass` returns early, skipping the clear-up, when it did. Keep that behaviour; if step 3 changed these two methods again before this step starts, make the same two changes to whatever is there: hand the pass in, and ask the AI lookup after a pass TMDB did not stop.
+The next edits are written against step 3 as committed on `raven-smart-scan-types` at `14b24e8` and Task 0's changes, where `matchPending({ libraryId, kind, type })` makes its own pass and answers whether TMDB stopped it, and `pass` returns early, skipping the clear-up, when it did. Keep that behaviour; if step 3 changed these two methods again before this step starts, make the same two changes to whatever is there: hand the pass in, and ask the AI lookup after a pass TMDB did not stop.
 
 Replace `pass` with:
 
@@ -3103,11 +3083,12 @@ Replace `pass` with:
       const pass = this.newPass(kind)
       const isStopped = await this.matchPending({ libraryId, type, pass })
       // The items of files still waiting for TMDB stay, with their edits and
-      // pictures, until a pass that gets through matches the files to them again.
-      if (isStopped) return
+      // pictures, until a pass that gets through matches the files to them
+      // again. A library removed meanwhile is cleared up all the same.
+      if (isStopped && this.libraries.get(libraryId) != null) return
       await this.lookUpUnmatched({ library, type, pass })
       // A lookup that found TMDB away stops the pass the same way.
-      if (pass.guard.isStopped) return
+      if (pass.guard.isStopped && this.libraries.get(libraryId) != null) return
     }
     await this.pictures.clearUp()
   }
@@ -3204,7 +3185,8 @@ After `matchPending`, add:
         this.logger.warn(`AI lookups stopped for now: ${error.message}`)
         return null
       })
-    if (outcome == null) return
+    // A library removed during the lookup keeps no decision.
+    if (outcome == null || this.libraries.get(library.id) == null) return
     this.decisions.record({ libraryId: library.id, place, outcome, model: this.aiMatcher.model })
     if (outcome.kind !== 'chosen' || outcome.confidence !== 'high') return
     this.files.reset(files.map((file) => file.id))
@@ -3417,7 +3399,7 @@ Expected: PASS.
 
 In `apps/raven/web/src/test/fixtures.ts`:
 - add `aiMatch: null,` to `itemDetails` after `logoVersion: null,`;
-- add `type UnmatchedFile` to its `@raven/core` import, and after `matchedMovie`:
+- add `UnmatchedFile` to its `import type { ... } from '@raven/core'` list, and after `matchedMovie`:
 
 ```ts
 /** A file Not matched lists: unmatched, with no AI suggestion unless given one. */
