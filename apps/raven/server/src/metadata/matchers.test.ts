@@ -141,6 +141,7 @@ describe('matching by library type', () => {
         'Severance/Season 01/Severance - S01E01 2160p.mkv',
         'Severance/Season 01/Severance - S01E02.mkv',
         'Severance/Featurettes/Making Of.mkv',
+        'Severance (Uncut)/Season 01/Severance (Uncut) - S01E01.mkv',
       ],
       pictures: ['Severance/Season 01/Severance - S01E01-thumb.jpg'],
     })
@@ -222,5 +223,12 @@ describe('matching by library type', () => {
       source: 'local',
       ref: still,
     })
+  })
+
+  it('searches a show again without its edition words when the whole name finds nothing', async () => {
+    const { files, matchers, pass } = services()
+    const uncut = under('Shows', 'Severance (Uncut)/Season 01/Severance (Uncut) - S01E01.mkv')
+    await matchers.show.match({ files: [uncut], pass: pass() })
+    expect(files.byId(uncut.id)?.match).toBe('matched')
   })
 })

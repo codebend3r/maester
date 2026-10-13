@@ -432,6 +432,18 @@ describe('parseEpisodeName', () => {
     ).toBe('The Ultimate Fighter Final')
   })
 
+  it('keeps the show name without its edition words as a fallback', () => {
+    expect(
+      episode('Dragon Ball Z (Uncut)/Season 1/Dragon Ball Z (Uncut) - S01E01.mkv'),
+    ).toMatchObject({ show: 'Dragon Ball Z (Uncut)', showWithoutEdition: 'Dragon Ball Z' })
+    expect(
+      episode('Australia Remastered/Season 1/Australia Remastered - S01E01.mkv'),
+    ).toMatchObject({ show: 'Australia Remastered', showWithoutEdition: 'Australia' })
+    expect(
+      episode('Severance (2022)/Season 1/Severance - S01E01.mkv').showWithoutEdition,
+    ).toBeNull()
+  })
+
   it('drops a country suffix from a show name, as TMDB does not search on it, and keeps the country', () => {
     expect(episode('Euphoria (US)/Season 1/Euphoria (US) - S01E01 - Pilot.mkv')).toMatchObject({
       show: 'Euphoria',

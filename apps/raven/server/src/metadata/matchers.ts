@@ -188,6 +188,10 @@ const showMatcher = (deps: MatcherDeps): KindMatcher => {
       titles: [
         { title: parsed.show, ...narrowing },
         ...(parsed.showFromFile == null ? [] : [{ title: parsed.showFromFile, ...narrowing }]),
+        // Shows have no editions, but a folder's annotation reads as one: "Dragon Ball Z (Uncut)".
+        ...(parsed.showWithoutEdition == null
+          ? []
+          : [{ title: parsed.showWithoutEdition, ...narrowing }]),
       ],
     })
     if (resolved.kind === 'unmatched') {
