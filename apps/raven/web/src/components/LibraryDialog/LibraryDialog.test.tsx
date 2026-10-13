@@ -1,7 +1,7 @@
 import { describe, expect, it, mock } from 'bun:test'
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { createApiClient } from '@raven/core'
+import { type MetadataHealth, createApiClient } from '@raven/core'
 import { library } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 
@@ -14,6 +14,18 @@ const offline = createApiClient({
     throw new Error('No network in tests')
   },
 })
+
+/** What the next dialog finds of metadata: TMDB off and the AI key set, unless a test says otherwise. */
+const NO_TMDB: MetadataHealth = {
+  tmdb: 'off',
+  omdb: 'off',
+  pending: 0,
+  error: null,
+  lastOk: null,
+  ai: 'ok',
+  aiRemaining: 200,
+}
+const metadataHealth: { now: MetadataHealth } = { now: NO_TMDB }
 
 // Spread over a real client: Bun's module mocks are shared by every test
 // file, and the others still need the URL helpers.
@@ -37,13 +49,7 @@ mock.module('@/lib/api', () => ({
       return { id }
     },
     getLock: async () => ({ available: lockAvailable.now, unlocked: false }),
-    getMetadataHealth: async () => ({
-      tmdb: 'off',
-      omdb: 'off',
-      pending: 0,
-      error: null,
-      lastOk: null,
-    }),
+    getMetadataHealth: async () => metadataHealth.now,
   },
 }))
 
@@ -75,6 +81,34 @@ describe('LibraryDialog', () => {
     expect(type).toHaveAccessibleDescription(
       "Set TMDB_API_TOKEN in raven's .env for posters and details.",
     )
+  })
+
+  it("says how to turn the AI lookup on while its key is unset, after TMDB's hint", async () => {
+    metadataHealth.now = { ...NO_TMDB, ai: 'off', aiRemaining: 0 }
+    try {
+      renderWithProviders(<LibraryDialog onClose={() => undefined} />)
+      const type = screen.getByRole('group', { name: 'Type' })
+      expect(await screen.findByText('ANTHROPIC_API_KEY')).toBeInTheDocument()
+      expect(type).toHaveAccessibleDescription(
+        "Set TMDB_API_TOKEN in raven's .env for posters and details. Set ANTHROPIC_API_KEY in raven's .env to look up titles the matcher misses.",
+      )
+    } finally {
+      metadataHealth.now = NO_TMDB
+    }
+  })
+
+  it('names only the AI key once TMDB is set', async () => {
+    metadataHealth.now = { ...NO_TMDB, tmdb: 'ok', ai: 'off', aiRemaining: 0 }
+    try {
+      renderWithProviders(<LibraryDialog onClose={() => undefined} />)
+      const type = screen.getByRole('group', { name: 'Type' })
+      expect(await screen.findByText('ANTHROPIC_API_KEY')).toBeInTheDocument()
+      expect(type).toHaveAccessibleDescription(
+        "Movies, TV shows, anime, family and documentaries get posters and details from TMDB. Set ANTHROPIC_API_KEY in raven's .env to look up titles the matcher misses.",
+      )
+    } finally {
+      metadataHealth.now = NO_TMDB
+    }
   })
 
   it('shows every problem before sending anything', async () => {
