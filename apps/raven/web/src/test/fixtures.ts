@@ -1,4 +1,12 @@
-import type { ItemDetails, ItemSummary, Library, MediaItem, Review, ShowEntry } from '@raven/core'
+import type {
+  ItemDetails,
+  ItemSummary,
+  Library,
+  MediaItem,
+  Review,
+  ShowEntry,
+  UnmatchedFile,
+} from '@raven/core'
 
 export const library = (overrides: Partial<Library> = {}): Library => ({
   id: 2,
@@ -83,6 +91,13 @@ export const itemSummary = (overrides: Partial<ItemSummary> = {}): ItemSummary =
 export const matchedMovie = (overrides: Partial<MediaItem> = {}): MediaItem =>
   mediaItem({ title: 'Busboys', year: 2026, match: 'matched', item: itemSummary(), ...overrides })
 
+/** A file Not matched lists: unmatched, with no AI suggestion unless given one. */
+export const unmatchedFile = (overrides: Partial<UnmatchedFile> = {}): UnmatchedFile => ({
+  ...mediaItem({ match: 'unmatched' }),
+  aiSuggestion: null,
+  ...overrides,
+})
+
 export const itemDetails = (overrides: Partial<ItemDetails> = {}): ItemDetails => ({
   ...itemSummary(),
   tmdbId: '1001',
@@ -98,6 +113,7 @@ export const itemDetails = (overrides: Partial<ItemDetails> = {}): ItemDetails =
   genres: ['Comedy', 'Drama', 'Crime', 'Romance'],
   backdropVersion: 'b1',
   logoVersion: null,
+  aiMatch: null,
   reviews: [],
   credits: [
     { personId: 1, name: 'Mark Kimball', job: 'cast', role: 'Rudy', photoVersion: 'k1' },

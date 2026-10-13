@@ -3,15 +3,18 @@ import {
   isExtra,
   type MatchItemType,
   type MatchState,
+  type ParsedEpisodeName,
+  type ParsedMovieName,
   parseEpisodeName,
   parseMovieName,
   showFolderOf,
 } from '@raven/core'
 import { groupBy } from '@/groupBy'
+import type { AiDecisions } from '@/metadata/aiDecisions'
 import type { ItemPictures } from '@/metadata/itemPictures'
 import { movieAssets, showAssets } from '@/metadata/localAssets'
 import type { FixMatch, MatchFile, MatchFiles } from '@/metadata/matchFiles'
-import type { MatchPass } from '@/metadata/matchPass'
+import type { MatchPass, SearchTitle } from '@/metadata/matchPass'
 import type { MetadataRepository } from '@/metadata/metadataRepository'
 import { filePlace, holdsOneMovie, rootOf, showDirOf, showPlace, stemOf } from '@/metadata/places'
 
@@ -21,7 +24,9 @@ export type KindMatcher = {
   groups: (files: readonly MatchFile[]) => MatchFile[][]
   /**
    * Matches one unit with the pass's caches. A file already linked keeps its
-   * links until `settle` replaces them, so one that fails midway stays as it was.
+   * links until `settle` replaces them, so one that fails midway keeps its
+   * card; a show folder that fails part way through waits, pending, to be
+   * matched whole.
    */
   match: (args: { files: readonly MatchFile[]; pass: MatchPass }) => Promise<void>
   /** The place a Fix match on `file` is kept under, and every file it covers. */
@@ -32,6 +37,8 @@ export type MatcherDeps = {
   files: MatchFiles
   metadata: MetadataRepository
   pictures: ItemPictures
+  /** The AI lookup's decisions, whose sure pick a group takes when its own search finds nothing. */
+  decisions: AiDecisions
 }
 
 /** Extras are never matched; the rest are what a unit is about. */
@@ -47,6 +54,40 @@ const withoutExtras = ({
   return files.filter((file) => !isExtra(file))
 }
 
+/** A show folder's first file as matching reads it: a file at a root falls back to the folder its titles sit in. */
+export const readShowFile = (first: MatchFile): ParsedEpisodeName =>
+  parseEpisodeName({ ...first, fallbackShow: basename(rootOf(first)) })
+
+/**
+ * The titles a show folder is searched by, in turn: the folder's name; the
+ * file's own, as a folder is misspelt more often than every file; and the
+ * folder's without an annotation that reads as an edition, as shows have
+ * none: "Dragon Ball Z (Uncut)".
+ */
+export const showSearchTitles = (parsed: ParsedEpisodeName): SearchTitle[] => {
+  const narrowing = { year: parsed.year, country: parsed.country }
+  return [
+    { title: parsed.show, ...narrowing },
+    ...(parsed.showFromFile == null ? [] : [{ title: parsed.showFromFile, ...narrowing }]),
+    ...(parsed.showWithoutEdition == null
+      ? []
+      : [{ title: parsed.showWithoutEdition, ...narrowing }]),
+  ]
+}
+
+/**
+ * The titles a movie file is searched by, in turn: its name's title and
+ * year, then the name's other readings, such as the file's own name where
+ * its folder is misnamed.
+ */
+export const movieSearchTitles = ({
+  file,
+  parsed,
+}: {
+  file: Pick<MatchFile, 'title' | 'year'>
+  parsed: ParsedMovieName
+}): SearchTitle[] => [{ title: file.title, year: file.year }, ...parsed.alternatives]
+
 const movieMatcher = (deps: MatcherDeps): KindMatcher => {
   /** The Fix match for a movie file: its own place first, then its folder's when that is one movie. */
   const fixFor = ({ file, own }: { file: MatchFile; own: boolean }): FixMatch => {
@@ -54,6 +95,11 @@ const movieMatcher = (deps: MatcherDeps): KindMatcher => {
     if (forFile.kind !== 'none' || !own) return forFile
     return deps.files.fixMatchAt({ libraryId: file.libraryId, place: file.folder })
   }
+
+  /** A sure AI pick for a movie file: kept at its own place, or at its folder's when that is one movie. */
+  const decidedFor = ({ file, own }: { file: MatchFile; own: boolean }): string | null =>
+    deps.decisions.highPickAt({ libraryId: file.libraryId, place: filePlace(file) }) ??
+    (own ? deps.decisions.highPickAt({ libraryId: file.libraryId, place: file.folder }) : null)
 
   const matchMovie = async ({ file, pass }: { file: MatchFile; pass: MatchPass }) => {
     const dir = dirname(file.path)
@@ -69,9 +115,8 @@ const movieMatcher = (deps: MatcherDeps): KindMatcher => {
       fix: fixFor({ file, own }),
       ids: parsed.ids,
       nfoPath: assets.nfo == null ? null : join(dir, assets.nfo),
-      // When the name finds nothing, its other readings are tried: the file's
-      // own name where its folder is misnamed, as with a show.
-      titles: [{ title: file.title, year: file.year }, ...parsed.alternatives],
+      titles: movieSearchTitles({ file, parsed }),
+      decided: decidedFor({ file, own }),
     })
     if (resolved.kind === 'unmatched') {
       deps.files.settle({ ids: [file.id], itemIds: [], match: 'unmatched' })
@@ -172,23 +217,15 @@ const showMatcher = (deps: MatcherDeps): KindMatcher => {
     const fallbackShow = basename(rootOf(first))
     const showDir = showDirOf(first)
     const assets = showAssets(await pass.folders.names(showDir))
-    const parsed = parseEpisodeName({ ...first, fallbackShow })
-    const narrowing = { year: parsed.year, country: parsed.country }
+    const parsed = readShowFile(first)
+    const place = showPlace(first)
     const resolved = await pass.resolve({
       type: 'show',
-      fix: deps.files.fixMatchAt({ libraryId: first.libraryId, place: showPlace(first) }),
+      fix: deps.files.fixMatchAt({ libraryId: first.libraryId, place }),
       ids: parsed.ids,
       nfoPath: assets.nfo == null ? null : join(showDir, assets.nfo),
-      // The folder names the show first; when that finds nothing, the file's
-      // own name is tried, as a folder is misspelt more often than every file.
-      titles: [
-        { title: parsed.show, ...narrowing },
-        ...(parsed.showFromFile == null ? [] : [{ title: parsed.showFromFile, ...narrowing }]),
-        // Shows have no editions, but a folder's annotation reads as one: "Dragon Ball Z (Uncut)".
-        ...(parsed.showWithoutEdition == null
-          ? []
-          : [{ title: parsed.showWithoutEdition, ...narrowing }]),
-      ],
+      titles: showSearchTitles(parsed),
+      decided: deps.decisions.highPickAt({ libraryId: first.libraryId, place }),
     })
     if (resolved.kind === 'unmatched') {
       deps.files.settle({ ids, itemIds: [], match: 'unmatched' })
@@ -200,11 +237,18 @@ const showMatcher = (deps: MatcherDeps): KindMatcher => {
       fallbackShow,
       match: resolved.match,
     }
-    const touched = await episodes.reduce<Promise<number[]>>(
-      (previous, file) =>
-        previous.then(async (items) => [...items, ...(await placeEpisode({ file, show, pass }))]),
-      Promise.resolve([]),
-    )
+    const touched = await episodes
+      .reduce<Promise<number[]>>(
+        (previous, file) =>
+          previous.then(async (items) => [...items, ...(await placeEpisode({ file, show, pass }))]),
+        Promise.resolve([]),
+      )
+      .catch((error: unknown) => {
+        // A folder placed in part, say when TMDB went away fetching a season,
+        // would sit under two shows; it waits to be matched whole instead.
+        deps.files.setMatch({ ids, match: 'pending' })
+        throw error
+      })
     await deps.pictures.syncLocal({ itemIds: [show.showId, ...touched], folders: pass.folders })
     deps.pictures.warmPoster(show.showId)
   }

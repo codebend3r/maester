@@ -8,6 +8,7 @@ import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { MediaIndex } from '@/media/mediaIndex'
 import { ImageCache } from '@/metadata/imageCache'
+import { AiDecisions } from '@/metadata/aiDecisions'
 import { ItemPictures } from '@/metadata/itemPictures'
 import { MatchFiles } from '@/metadata/matchFiles'
 import { createMatchers } from '@/metadata/matchers'
@@ -71,7 +72,12 @@ describe('matching by library type', () => {
       metadata,
       files,
       pass,
-      matchers: createMatchers({ files, metadata, pictures }),
+      matchers: createMatchers({
+        files,
+        metadata,
+        pictures,
+        decisions: new AiDecisions(database.get()),
+      }),
     }
   }
 

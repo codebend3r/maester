@@ -27,6 +27,9 @@ import { MediaIndex } from '@/media/mediaIndex'
 import { MediaRepository } from '@/media/mediaRepository'
 import { MovieSplits } from '@/media/movieSplits'
 import { ViewingRepository } from '@/media/viewingRepository'
+import { AI_FETCH, AiClient, type AiFetch } from '@/metadata/aiClient'
+import { AiDecisions } from '@/metadata/aiDecisions'
+import { AiMatcher } from '@/metadata/aiMatcher'
 import { ImageCache } from '@/metadata/imageCache'
 import { ItemImagesRepository } from '@/metadata/itemImagesRepository'
 import { ItemOverrides } from '@/metadata/itemOverrides'
@@ -75,7 +78,7 @@ const DEFAULT_WATCH: WatchOptions = {
 
 /**
  * Takes its config as an argument so a test can point it at a temporary data
- * dir, the fetch metadata uses so a test can answer for TMDB, and the
+ * dir, the fetches metadata and the AI lookup use so a test can answer for TMDB and Claude, and the
  * watcher's timing so a test need not wait.
  */
 @Module({})
@@ -83,10 +86,12 @@ export class AppModule {
   static register({
     config,
     metadataFetch = (url, init) => fetch(url, init),
+    aiFetch = (input, init) => fetch(input, init),
     watch = {},
   }: {
     config: ServerConfig
     metadataFetch?: MetadataFetch
+    aiFetch?: AiFetch
     watch?: Partial<WatchOptions>
   }): DynamicModule {
     assertLockMarked(CONTROLLERS)
@@ -96,6 +101,7 @@ export class AppModule {
       providers: [
         { provide: SERVER_CONFIG, useValue: config },
         { provide: METADATA_FETCH, useValue: metadataFetch },
+        { provide: AI_FETCH, useValue: aiFetch },
         { provide: WATCH_OPTIONS, useValue: { ...DEFAULT_WATCH, ...watch } },
         DatabaseService,
         ServerEvents,
@@ -109,8 +115,11 @@ export class AppModule {
         ViewingRepository,
         MediaIndex,
         MatchFiles,
+        AiDecisions,
         TmdbClient,
         OmdbClient,
+        AiClient,
+        AiMatcher,
         ImageCache,
         OmdbScores,
         ItemPictures,

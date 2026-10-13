@@ -64,13 +64,19 @@ export class ItemsController {
     if (!this.metadata.get(id)) throw new NotFoundException(`No item ${id}`)
   }
 
-  /** The item's page, with only the files and children this browser may see. */
+  /** The item's page, with only the files, children and AI note this browser may see. */
   private details({ id, cookie }: { id: number; cookie: string | undefined }): ItemDetails {
     const details = this.metadata.details(id)
     if (!details) throw new NotFoundException(`No item ${id}`)
     const viewer = this.lock.viewer({ cookie })
     return {
       ...details,
+      aiMatch: this.service.aiMatchFor({
+        id,
+        type: details.type,
+        tmdbId: details.tmdbId,
+        sees: (libraryId) => viewer.seesLibrary(libraryId),
+      }),
       versions: this.media.forItem(id).filter((item) => viewer.seesLibrary(item.libraryId)),
       children: itemChildren({ parentId: id, viewer, metadata: this.metadata, media: this.media }),
     }

@@ -460,6 +460,11 @@ export const isItemChild = union(isSeasonSummary, isEpisodeSummary)
 
 export type ItemChild = Infer<typeof isItemChild>
 
+/** Why the AI lookup matched a movie or show it was sure of, in Claude's words. */
+export const isAiMatch = object({ reason: isString })
+
+export type AiMatch = Infer<typeof isAiMatch>
+
 /** Everything a movie, show, season or episode page shows. */
 export const isItemDetails = object({
   ...isItemSummary.shape,
@@ -479,6 +484,11 @@ export const isItemDetails = object({
   backdropVersion: nullable(isString),
   /** The title as TMDB's art, on a clear ground; null when it has none, and for anything but a movie. */
   logoVersion: nullable(isString),
+  /**
+   * Why the AI lookup matched it, when it did, being sure; null when a
+   * search, an id or Fix match did, and for a season or episode.
+   */
+  aiMatch: nullable(isAiMatch),
   credits: listOf(isCredit),
   /** Reviews by TMDB members, newest first; at most ten. */
   reviews: listOf(isReview),
@@ -823,6 +833,33 @@ export type MatchCandidate = Infer<typeof isMatchCandidate>
 
 export const isMatchCandidateList = listOf(isMatchCandidate)
 
+/**
+ * A movie or show the AI lookup offers for files it was not sure of.
+ * Accepting it is a Fix match to `tmdbId`.
+ */
+export const isAiSuggestion = object({
+  tmdbId: isTmdbId,
+  title: isString,
+  year: nullable(isNumber),
+  /** TMDB's path for the poster, served through `candidatePosterUrl`. */
+  poster: nullable(isString),
+  /** Why Claude thinks so, in a sentence or two. */
+  reason: isString,
+})
+
+export type AiSuggestion = Infer<typeof isAiSuggestion>
+
+/** A file no movie or show was found for, as Not matched lists it. */
+export const isUnmatchedFile = object({
+  ...isMediaItem.shape,
+  /** What the AI lookup suggests for its folder; null when it was not asked, chose nothing, or is sure. */
+  aiSuggestion: nullable(isAiSuggestion),
+})
+
+export type UnmatchedFile = Infer<typeof isUnmatchedFile>
+
+export const isUnmatchedList = listOf(isUnmatchedFile)
+
 export const isMetadataServiceState = oneOf(['off', 'ok', 'failing'])
 
 /** `off` when not configured, `failing` when the last call went wrong. */
@@ -838,6 +875,10 @@ export const isMetadataHealth = object({
   error: nullable(isString),
   /** When TMDB last answered. */
   lastOk: nullable(isString),
+  /** The AI lookup: `off` without ANTHROPIC_API_KEY, `failing` when its last call went wrong. */
+  ai: isMetadataServiceState,
+  /** AI lookups left today; 0 while it is off. */
+  aiRemaining: isNumber,
 })
 
 export type MetadataHealth = Infer<typeof isMetadataHealth>

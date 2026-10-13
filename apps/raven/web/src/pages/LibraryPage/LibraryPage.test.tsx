@@ -374,6 +374,8 @@ describe('LibraryPage for TV shows', () => {
       pending: 0,
       error: null,
       lastOk: null,
+      ai: 'off',
+      aiRemaining: 0,
     }))
     spies.match.mockImplementation(async () =>
       library({ id: 2, name: 'TV', settings: { ...library().settings, kind: 'shows' } }),

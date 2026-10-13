@@ -1,6 +1,14 @@
 import { showFolderOf } from '@raven/core'
 import { describe, expect, it } from 'vitest'
-import { filePlace, holdsOneMovie, rootOf, showDirOf, showPlace, stemOf } from '@/metadata/places'
+import {
+  filePlace,
+  groupPlaceOf,
+  holdsOneMovie,
+  rootOf,
+  showDirOf,
+  showPlace,
+  stemOf,
+} from '@/metadata/places'
 
 const file = (path: string, root = '/tv') => {
   const inside = path.slice(root.length + 1)
@@ -71,5 +79,27 @@ describe('where a file sits', () => {
     expect(
       holdsOneMovie({ folder: '', files: [{ folder: '', fileName: 'Heat (1995).mkv' }] }),
     ).toBe(false)
+  })
+
+  it("keeps a group's decision where its Fix match is kept", () => {
+    const none = () => []
+    const episode = file('/tv/Severance/Season 01/Severance - S01E01.mkv')
+    expect(groupPlaceOf({ type: 'show', file: episode, folderFiles: none })).toBe('Severance')
+    const loose = file('/tv/Severance - S01E01.mkv')
+    expect(groupPlaceOf({ type: 'show', file: loose, folderFiles: none })).toBe(
+      'Severance - S01E01.mkv',
+    )
+    const heat = file('/films/Heat (1995)/Heat (1995) 1080p.mkv', '/films')
+    const heatUhd = file('/films/Heat (1995)/Heat (1995) 2160p.mkv', '/films')
+    expect(groupPlaceOf({ type: 'movie', file: heat, folderFiles: () => [heat, heatUhd] })).toBe(
+      'Heat (1995)',
+    )
+    const shared = file('/films/Michael Mann/Heat (1995).mkv', '/films')
+    const thief = file('/films/Michael Mann/Thief (1981).mkv', '/films')
+    expect(groupPlaceOf({ type: 'movie', file: shared, folderFiles: () => [shared, thief] })).toBe(
+      'Michael Mann/Heat (1995).mkv',
+    )
+    const atRoot = file('/films/Heat (1995).mkv', '/films')
+    expect(groupPlaceOf({ type: 'movie', file: atRoot, folderFiles: none })).toBe('Heat (1995).mkv')
   })
 })

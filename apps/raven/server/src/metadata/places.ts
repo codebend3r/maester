@@ -1,5 +1,5 @@
 import { dirname, join } from 'node:path'
-import { foldTitle, isExtra, parseMovieName, showFolderOf } from '@raven/core'
+import { foldTitle, isExtra, type MatchItemType, parseMovieName, showFolderOf } from '@raven/core'
 
 /** Where a file sits: its path, and its name and folder inside its library. */
 export type Placed = { path: string; folder: string; fileName: string }
@@ -50,4 +50,25 @@ export const holdsOneMovie = ({
       }),
   )
   return movies.size === 1
+}
+
+/**
+ * The place a group keeps its Fix match and AI decision under, as
+ * `fixGroup` reads it: a show's folder (or the file, at a root), a movie's
+ * folder when it holds that one movie, else the movie file's own place.
+ */
+export const groupPlaceOf = ({
+  type,
+  file,
+  folderFiles,
+}: {
+  type: MatchItemType
+  file: { folder: string; fileName: string }
+  /** The files in the movie's folder, read only for a movie in a folder. */
+  folderFiles: () => ReadonlyArray<{ fileName: string; folder: string }>
+}): string => {
+  if (type === 'show') return showPlace(file)
+  return holdsOneMovie({ folder: file.folder, files: file.folder === '' ? [] : folderFiles() })
+    ? file.folder
+    : filePlace(file)
 }

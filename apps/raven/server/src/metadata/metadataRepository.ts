@@ -551,8 +551,8 @@ export class MetadataRepository {
     })()
   }
 
-  /** An item's page, apart from its files and children, which the caller adds. */
-  details(id: number): Omit<ItemDetails, 'versions' | 'children'> | null {
+  /** An item's page, apart from its files, its children and the AI note, which the caller adds. */
+  details(id: number): Omit<ItemDetails, 'versions' | 'children' | 'aiMatch'> | null {
     const row = this.db.prepare<[number], ItemRow>('SELECT * FROM shown_items WHERE id = ?').get(id)
     const summary = this.summaries([id]).get(id)
     if (!row || !summary) return null

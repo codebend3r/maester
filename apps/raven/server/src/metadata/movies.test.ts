@@ -652,6 +652,8 @@ describe('movie metadata', () => {
       tmdb: 'ok',
       omdb: 'ok',
       pending: 0,
+      ai: 'off',
+      aiRemaining: 0,
     })
     expect(health.body).not.toContain('test-token')
   })

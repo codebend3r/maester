@@ -1,6 +1,16 @@
 import { resolve } from 'node:path'
-import { type HwAccel, isHwAccel } from '@raven/core'
+import type { Anthropic } from '@anthropic-ai/sdk'
+import { type HwAccel, isHwAccel, oneOf } from '@raven/core'
 import { flag, type ListenConfig, readListenConfig, wholeNumber } from '@shared/server'
+
+/** The effort levels the AI lookup can ask for, as `output_config.effort` takes them. */
+const AI_MATCH_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'] as const satisfies ReadonlyArray<
+  NonNullable<Anthropic.OutputConfig['effort']>
+>
+
+const isAiMatchEffort = oneOf(AI_MATCH_EFFORTS)
+
+export type AiMatchEffort = (typeof AI_MATCH_EFFORTS)[number]
 
 /**
  * Everything the server reads from its environment, resolved once at start.
@@ -39,6 +49,14 @@ export type ServerConfig = ListenConfig & {
   omdbApiKey: string | null
   /** OMDb calls a day; a free key allows 1,000. */
   omdbDailyLimit: number
+  /** raven's own Anthropic key, for the AI lookup of what matching leaves; null turns it off. Never logged or sent to a client. */
+  anthropicApiKey: string | null
+  /** The model the AI lookup asks: `claude-haiku-5-5`. */
+  aiMatchModel: string
+  /** How hard it thinks, as `output_config.effort`; the spike found `low` enough. */
+  aiMatchEffort: AiMatchEffort
+  /** AI lookups a day, counted again from midnight UTC. */
+  aiDailyLimit: number
   /** The PIN that opens locked libraries; null leaves them shut and none can be locked. Never logged or sent to a client. */
   libraryPin: string | null
   /** The password that turns the admin lock off; null, or too weak, keeps it on. Never logged or sent to a client. */
@@ -52,6 +70,12 @@ export const SERVER_CONFIG = Symbol('SERVER_CONFIG')
 const hwAccelFrom = (value: string | undefined): HwAccel => {
   const trimmed = value?.trim() ?? ''
   return isHwAccel(trimmed) ? trimmed : 'auto'
+}
+
+/** An unknown or missing AI_MATCH_EFFORT means `low`. */
+const aiEffortFrom = (value: string | undefined): AiMatchEffort => {
+  const trimmed = value?.trim() ?? ''
+  return isAiMatchEffort(trimmed) ? trimmed : 'low'
 }
 
 export const readServerConfig = (env: NodeJS.ProcessEnv = process.env): ServerConfig => ({
@@ -72,6 +96,10 @@ export const readServerConfig = (env: NodeJS.ProcessEnv = process.env): ServerCo
   metadataCountry: (env.METADATA_COUNTRY?.trim() || 'US').toUpperCase(),
   omdbApiKey: env.OMDB_API_KEY?.trim() || null,
   omdbDailyLimit: Math.max(1, wholeNumber(env.OMDB_DAILY_LIMIT) ?? 1000),
+  anthropicApiKey: env.ANTHROPIC_API_KEY?.trim() || null,
+  aiMatchModel: env.AI_MATCH_MODEL?.trim() || 'claude-haiku-5-5',
+  aiMatchEffort: aiEffortFrom(env.AI_MATCH_EFFORT),
+  aiDailyLimit: Math.max(1, wholeNumber(env.AI_DAILY_LIMIT) ?? 200),
   libraryPin: env.LIBRARY_PIN?.trim() || null,
   adminPassword: env.ADMIN_PASSWORD?.trim() || null,
 })
