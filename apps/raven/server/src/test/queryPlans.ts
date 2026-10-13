@@ -17,10 +17,12 @@ const stepsOf = (rows: readonly PlanRow[]): PlanStep[] => {
 
 /**
  * A second connection to a test database that keeps each statement it runs,
- * its parameters filled in, so a test can ask SQLite how it ran them: hand
- * `database` to the repositories under test, then read `plans`. SQLite only
- * plans a statement with every parameter bound, which is why it is traced
- * rather than read off the source.
+ * so a test can ask SQLite how it ran them: hand `database` to the
+ * repositories under test, then read `steps`. better-sqlite3 runs no
+ * statement with a parameter unbound, so each is traced with its values
+ * written in rather than read off the source. It cuts each string value
+ * longer than 32 bytes, which leaves a `json_each` list malformed to run but
+ * planned the same, as SQLite plans without reading it.
  */
 export const tracedDatabase = (database: DatabaseService) => {
   const statements: string[] = []

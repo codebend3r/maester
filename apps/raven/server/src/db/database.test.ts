@@ -218,4 +218,30 @@ describe('migrations', () => {
     ])
     database.onModuleDestroy()
   })
+
+  it('keeps showing the edits made before shown_items read them by key', () => {
+    const before = new Sqlite(join(state.dir, 'raven.db'))
+    MIGRATIONS.slice(0, 21).forEach((sql) => before.exec(sql))
+    before.pragma('user_version = 21')
+    before.exec(
+      `INSERT INTO items (id, type, tmdb_id, title, sort_title, year, tagline, fetched_at)
+       VALUES (1, 'movie', '19995', 'Avatar', 'avatar', 2009, 'Enter the world.', '2026-01-01T00:00:00.000Z')`,
+    )
+    before.exec(
+      `INSERT INTO item_overrides (item_id, title, sort_title, tagline)
+       VALUES (1, 'Avatar (Theatrical Cut)', 'avatar theatrical cut', '')`,
+    )
+    before.close()
+
+    const database = new DatabaseService({ ...readServerConfig({}), dataDir: state.dir })
+    expect(
+      database.db.prepare('SELECT title, sort_title, year, tagline FROM shown_items').get(),
+    ).toEqual({
+      title: 'Avatar (Theatrical Cut)',
+      sort_title: 'avatar theatrical cut',
+      year: 2009,
+      tagline: null,
+    })
+    database.onModuleDestroy()
+  })
 })

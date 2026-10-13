@@ -35,14 +35,16 @@ describe('how a library listing is read', () => {
   /** Every step SQLite took to list the library's newest cards, as the home page asks. */
   const listingSteps = () => {
     const traced = tracedDatabase(database.get())
-    repositories(traced.database).media.list({
-      libraryId: state.libraryId,
-      sort: 'added',
-      limit: 8,
-    })
-    const steps = traced.steps()
-    traced.database.onModuleDestroy()
-    return steps
+    try {
+      repositories(traced.database).media.list({
+        libraryId: state.libraryId,
+        sort: 'added',
+        limit: 8,
+      })
+      return traced.steps()
+    } finally {
+      traced.database.onModuleDestroy()
+    }
   }
 
   beforeEach(async () => {
@@ -59,20 +61,20 @@ describe('how a library listing is read', () => {
   afterEach(() => database.close())
 
   it('looks up the items on its cards by id, never copying every item first', () => {
-    const copies = listingSteps().filter((step) =>
-      step.detail.startsWith('MATERIALIZE shown_items'),
-    )
+    const details = listingSteps().map((step) => step.detail)
 
-    expect(copies).toEqual([])
+    expect(details).toContain('SEARCH i USING INTEGER PRIMARY KEY (rowid=?) LEFT-JOIN')
+    expect(details.filter((detail) => detail.startsWith('MATERIALIZE shown_items'))).toEqual([])
   })
 
   it('counts each card’s versions from its movie’s files, never walking the whole library', () => {
-    const perCard = listingSteps().filter(
-      (step) =>
-        step.within.some((outer) => outer.startsWith('CORRELATED')) &&
-        step.detail.includes('(library_id=?)'),
-    )
+    const perCard = listingSteps()
+      .filter((step) => step.within.some((outer) => outer.startsWith('CORRELATED')))
+      .map((step) => step.detail)
 
-    expect(perCard).toEqual([])
+    expect(perCard).toContain('SEARCH x USING INDEX media_items_item (item_id=?)')
+    expect(
+      perCard.filter((detail) => detail.startsWith('SCAN') || detail.includes('(library_id=?)')),
+    ).toEqual([])
   })
 })
