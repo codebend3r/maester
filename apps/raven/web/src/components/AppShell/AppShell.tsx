@@ -138,12 +138,7 @@ export const AppShell = () => {
                   <NavItem
                     to={`/libraries/${library.id}`}
                     patterns={libraryPages(library.id)}
-                    icon={
-                      <LibraryIcon
-                        kind={library.settings.kind}
-                        isLocked={library.settings.locked}
-                      />
-                    }
+                    icon={<LibraryIcon settings={library.settings} />}
                     label={library.name}
                     collapsed={collapsed}
                     note={library.settings.locked ? 'locked' : undefined}

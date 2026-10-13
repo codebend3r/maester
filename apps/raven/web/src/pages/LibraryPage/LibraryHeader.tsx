@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { type Library, isScanning, matchTypeFor } from '@raven/core'
 import { Button, ButtonLink } from '@/components/Button/Button'
+import { LibraryIcon } from '@/components/LibraryIcon/LibraryIcon'
 import { ScanStatus } from '@/components/ScanStatus/ScanStatus'
 import { api } from '@/lib/api'
 import { KINDS } from '@/lib/libraryKinds'
@@ -72,7 +73,8 @@ export const LibraryHeader = ({
   return (
     <header className={styles.header}>
       <h1 id={titleId} className={styles.title}>
-        {library.name}
+        <LibraryIcon settings={settings} size="0.7em" />
+        <span className={styles.name}>{library.name}</span>
       </h1>
       <p className={styles.count}>
         {KINDS[settings.kind].label} · {count.format(library.itemCount)}{' '}

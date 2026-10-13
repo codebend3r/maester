@@ -19,9 +19,10 @@ import { type FormEvent, useEffect, useId, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/Button/Button'
 import { FolderBrowser } from '@/components/FolderBrowser/FolderBrowser'
+import { IconPicker } from '@/components/LibraryDialog/IconPicker'
 import { useAdminLocked } from '@/lib/adminLock'
 import { api } from '@/lib/api'
-import { KINDS } from '@/lib/libraryKinds'
+import { KINDS, libraryIconOf } from '@/lib/libraryKinds'
 import { afterLibrarySaved } from '@/lib/invalidate'
 import { lockQuery, metadataHealthQuery } from '@/lib/queries'
 import styles from '@/components/LibraryDialog/LibraryDialog.module.scss'
@@ -53,7 +54,14 @@ const pathLayoutLabel = ({
  */
 export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose: () => void }) => {
   const dialog = useRef<HTMLDialogElement>(null)
-  const ids = { name: useId(), errors: useId(), folders: useId(), settings: useId(), kind: useId() }
+  const ids = {
+    name: useId(),
+    errors: useId(),
+    folders: useId(),
+    settings: useId(),
+    kind: useId(),
+    icon: useId(),
+  }
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [name, setName] = useState(library?.name ?? '')
@@ -175,7 +183,7 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
                 details.
               </>
             ) : (
-              'Movies, TV shows, anime, family and documentaries get posters and details from TMDB.'
+              'Movies, TV shows, anime, family, documentaries and sporting events get posters and details from TMDB.'
             )}
           </p>
           {isAiOff && (
@@ -184,6 +192,18 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
               matcher misses.
             </p>
           )}
+        </fieldset>
+
+        <fieldset className={styles.field} aria-describedby={`${ids.icon}-hint`}>
+          <legend>Icon</legend>
+          <IconPicker
+            value={libraryIconOf(settings)}
+            onChange={(icon) => setSettings((current) => ({ ...current, icon }))}
+          />
+          <p id={`${ids.icon}-hint`} className={styles.hint}>
+            Shown in the side menu, on the library's page and on Libraries. Until one is picked, the
+            library wears its type's.
+          </p>
         </fieldset>
 
         <fieldset className={styles.field} aria-describedby={ids.folders}>

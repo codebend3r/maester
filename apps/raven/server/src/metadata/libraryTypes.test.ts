@@ -47,6 +47,7 @@ describe('matching by library type', () => {
       { id: 348, title: 'Alien', released: '1979-05-25' },
       { id: 949, title: 'Heat', released: '1995-12-15' },
       { id: 8195, title: 'Ronin', released: '1998-09-25' },
+      { id: 21936, title: 'UFC 102 Couture vs Nogueira', released: '2009-08-29' },
     ],
     shows: [
       {
@@ -472,6 +473,25 @@ describe('matching by library type', () => {
     tmdb.state.down = false
     const item = await app().inject({ method: 'GET', url: `/api/items/${heat}` })
     expect(item.statusCode).toBe(404)
+  })
+
+  it('matches a Sporting events library to TMDB movies, as TMDB lists events like UFC cards', async () => {
+    const events = join(state.root, 'UFC')
+    await encodeClip({ path: join(events, 'UFC 102 Couture vs Nogueira (2009).mp4'), seconds: 1 })
+    const ufc = shape({
+      response: await app().inject({
+        method: 'POST',
+        url: '/api/libraries',
+        payload: { name: 'UFC', paths: [events], settings: { kind: 'sports', icon: 'octagon' } },
+      }),
+      guard: isLibrary,
+    })
+    expect(ufc.settings.icon).toBe('octagon')
+    await app().get(ScannerService).whenIdle(ufc.id)
+    await app().get(MetadataService).whenIdle()
+    expect((await mediaOf(ufc.id)).map((file) => [file.match, file.item?.title ?? null])).toEqual([
+      ['matched', 'UFC 102 Couture vs Nogueira'],
+    ])
   })
 
   it("lists TMDB's order for a library the lock keeps out of sight", async () => {

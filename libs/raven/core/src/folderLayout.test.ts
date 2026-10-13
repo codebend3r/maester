@@ -65,8 +65,14 @@ describe('groupFolderOf', () => {
     expect(groupFolderOf({ kind: 'shows', folder: 'A/Andor/Season 1', layout: 'flat' })).toBeNull()
     expect(groupFolderOf({ kind: 'other', folder: 'A/Clip', layout: 'auto' })).toBeNull()
     expect(
-      groupFolderOf({ kind: 'sports', folder: 'Requests/UFC 300 (2024)', layout: 'auto' }),
+      groupFolderOf({ kind: 'youtube', folder: 'Requests/Lofi Girl (2024)', layout: 'auto' }),
     ).toBeNull()
+  })
+
+  it('reads group folders in a Sporting events library, as it is matched like movies', () => {
+    expect(
+      groupFolderOf({ kind: 'sports', folder: 'Requests/UFC 300 (2024)', layout: 'auto' }),
+    ).toBe('Requests')
   })
 })
 

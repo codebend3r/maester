@@ -30,6 +30,7 @@ const SETTING_PROBLEMS = {
   autoRefresh: 'Refresh automatically must be on or off.',
   locked: 'Lock with the PIN must be on or off.',
   folderLayout: 'Folder layout is not one of the choices.',
+  icon: 'Icon is not one of the choices.',
 } as const satisfies Record<keyof LibrarySettings, string>
 
 type SettingsResult = { settings: Partial<LibrarySettings>; errors: string[] }

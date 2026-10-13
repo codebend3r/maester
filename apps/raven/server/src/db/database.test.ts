@@ -191,4 +191,31 @@ describe('migrations', () => {
     expect(count()).toEqual({ decisions: 0 })
     database.onModuleDestroy()
   })
+
+  it("gives every library its type's icon, and sends Sporting events files to be matched", () => {
+    const before = new Sqlite(join(state.dir, 'raven.db'))
+    MIGRATIONS.slice(0, 20).forEach((sql) => before.exec(sql))
+    before.pragma('user_version = 20')
+    const library = before.prepare(
+      "INSERT INTO libraries (name, created_at, kind) VALUES (?, '2026-01-01T00:00:00.000Z', ?)",
+    )
+    const media = before.prepare(
+      `INSERT INTO media (library_id, path, file_name, folder, title, container, size, mtime_ms, added_at, match)
+       VALUES (?, ?, 'x.mkv', '', 'x', 'mkv', 1, 1, '2026-01-01T00:00:00.000Z', 'off')`,
+    )
+    media.run(library.run('UFC', 'sports').lastInsertRowid, '/ufc/x.mkv')
+    media.run(library.run('Clips', 'youtube').lastInsertRowid, '/clips/x.mkv')
+    before.close()
+
+    const database = new DatabaseService({ ...readServerConfig({}), dataDir: state.dir })
+    expect(database.db.prepare('SELECT name, icon FROM libraries ORDER BY id').all()).toEqual([
+      { name: 'UFC', icon: null },
+      { name: 'Clips', icon: null },
+    ])
+    expect(database.db.prepare('SELECT path, match FROM media ORDER BY path').all()).toEqual([
+      { path: '/clips/x.mkv', match: 'off' },
+      { path: '/ufc/x.mkv', match: 'pending' },
+    ])
+    database.onModuleDestroy()
+  })
 })

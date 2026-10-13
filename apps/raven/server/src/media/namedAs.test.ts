@@ -31,9 +31,15 @@ describe('namedAs', () => {
     })
   })
 
-  it('leaves sporting events and YouTube videos unmatched, with the tidied name', () => {
+  it('reads sporting events as movies, to be matched', () => {
+    const file = { fileName: 'UFC 102 Couture vs Nogueira (2009) 720p.mkv', folder: '' }
+    expect(namedAs({ kind: 'sports', ...file })).toEqual(namedAs({ kind: 'movies', ...file }))
+    expect(namedAs({ kind: 'sports', ...file })).toMatchObject({ year: 2009, match: 'pending' })
+  })
+
+  it('leaves YouTube videos unmatched, with the tidied name', () => {
     const file = { fileName: 'UFC.324.Prelims.1080p.mkv', folder: '' }
-    expect(namedAs({ kind: 'sports', ...file })).toEqual(namedAs({ kind: 'other', ...file }))
+    expect(namedAs({ kind: 'youtube', ...file })).toEqual(namedAs({ kind: 'other', ...file }))
     expect(namedAs({ kind: 'youtube', ...file })).toMatchObject({ year: null, match: 'off' })
   })
 })

@@ -30,12 +30,20 @@
   align-items: end;
 }
 
+// The library's icon, the one the side menu shows, before its name.
 .title {
   grid-area: title;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: center;
   font-family: var(--font-display);
   font-size: var(--font-size-hero);
   font-weight: 400;
   line-height: var(--line-tight);
+}
+
+.name {
   overflow-wrap: anywhere;
 }
 

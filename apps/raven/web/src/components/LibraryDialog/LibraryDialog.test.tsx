@@ -1,7 +1,7 @@
 import { describe, expect, it, mock } from 'bun:test'
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { type MetadataHealth, createApiClient } from '@raven/core'
+import { LIBRARY_ICON_NAMES, type MetadataHealth, createApiClient } from '@raven/core'
 import { library } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 
@@ -105,7 +105,7 @@ describe('LibraryDialog', () => {
       const type = screen.getByRole('group', { name: 'Type' })
       expect(await screen.findByText('ANTHROPIC_API_KEY')).toBeInTheDocument()
       expect(type).toHaveAccessibleDescription(
-        "Movies, TV shows, anime, family and documentaries get posters and details from TMDB. Set ANTHROPIC_API_KEY in raven's .env to look up titles the matcher misses.",
+        "Movies, TV shows, anime, family, documentaries and sporting events get posters and details from TMDB. Set ANTHROPIC_API_KEY in raven's .env to look up titles the matcher misses.",
       )
     } finally {
       metadataHealth.now = NO_TMDB
@@ -143,6 +143,7 @@ describe('LibraryDialog', () => {
           autoRefresh: true,
           locked: false,
           folderLayout: 'auto',
+          icon: null,
         },
       },
     ])
@@ -172,6 +173,7 @@ describe('LibraryDialog', () => {
         autoRefresh: false,
         locked: true,
         folderLayout: 'auto',
+        icon: null,
       },
     })
   })
@@ -241,6 +243,8 @@ describe('LibraryDialog', () => {
     await userEvent.click(screen.getByRole('radio', { name: 'Anime movies' }))
     expect(screen.getByRole('combobox', { name: 'Ratings shown' })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('radio', { name: 'Sporting events' }))
+    expect(screen.getByRole('combobox', { name: 'Ratings shown' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('radio', { name: 'YouTube videos' }))
     expect(screen.queryByRole('combobox', { name: 'Ratings shown' })).toBeNull()
     await userEvent.click(screen.getByRole('radio', { name: 'Anime shows' }))
     await userEvent.click(screen.getByRole('button', { name: 'Add library' }))
@@ -272,6 +276,54 @@ describe('LibraryDialog', () => {
       />,
     )
     expect(screen.getByRole('radio', { name: 'Movies' })).toBeChecked()
+  })
+
+  it("offers every icon, the type's own checked until another is picked", async () => {
+    renderWithProviders(<LibraryDialog onClose={() => undefined} />)
+    const icons = within(screen.getByRole('group', { name: 'Icon' })).getAllByRole('radio')
+    expect(icons.map((radio) => radio.getAttribute('value'))).toEqual([...LIBRARY_ICON_NAMES])
+    expect(icons).toHaveLength(24)
+    expect(screen.getByRole('radio', { name: 'Home videos icon' })).toBeChecked()
+    await userEvent.type(screen.getByLabelText('Name'), 'UFC')
+    await userEvent.type(screen.getByLabelText('Folder path'), '/media/UFC')
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }))
+    await userEvent.click(screen.getByRole('radio', { name: 'Sporting events' }))
+    expect(screen.getByRole('radio', { name: 'Sporting events icon' })).toBeChecked()
+    await userEvent.click(screen.getByRole('radio', { name: 'UFC icon' }))
+    expect(screen.getByRole('radio', { name: 'UFC icon' })).toBeChecked()
+    await userEvent.click(screen.getByRole('radio', { name: 'Movies' }))
+    expect(screen.getByRole('radio', { name: 'UFC icon' })).toBeChecked()
+    await userEvent.click(screen.getByRole('button', { name: 'Add library' }))
+    expect(created.at(-1)).toMatchObject({ settings: { kind: 'movies', icon: 'octagon' } })
+  })
+
+  it("keeps the icon picked, the type's own included, through a change of type", async () => {
+    renderWithProviders(
+      <LibraryDialog
+        library={library({ settings: { ...library().settings, kind: 'sports', icon: 'octagon' } })}
+        onClose={() => undefined}
+      />,
+    )
+    expect(screen.getByRole('radio', { name: 'UFC icon' })).toBeChecked()
+    await userEvent.click(screen.getByRole('radio', { name: 'Sporting events icon' }))
+    await userEvent.click(screen.getByRole('radio', { name: 'Movies' }))
+    expect(screen.getByRole('radio', { name: 'Sporting events icon' })).toBeChecked()
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+    expect(updated.at(-1)).toMatchObject({ settings: { kind: 'movies', icon: 'trophy' } })
+  })
+
+  it("wears the type's icon, changing with the type, until one is picked", async () => {
+    renderWithProviders(
+      <LibraryDialog
+        library={library({ settings: { ...library().settings, kind: 'sports' } })}
+        onClose={() => undefined}
+      />,
+    )
+    expect(screen.getByRole('radio', { name: 'Sporting events icon' })).toBeChecked()
+    await userEvent.click(screen.getByRole('radio', { name: 'Movies' }))
+    expect(screen.getByRole('radio', { name: 'Movies icon' })).toBeChecked()
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+    expect(updated.at(-1)).toMatchObject({ settings: { kind: 'movies', icon: null } })
   })
 
   it('sets how far into a video counts as watched', async () => {

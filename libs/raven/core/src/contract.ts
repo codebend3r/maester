@@ -160,6 +160,42 @@ export type LibraryKind = Infer<typeof isLibraryKind>
 
 export const LIBRARY_KINDS = isLibraryKind.values
 
+/**
+ * The icons a library can wear, in the order Edit library offers them:
+ * films and shows, then sport, then audio. Each type wears one of them
+ * until its library picks another; the web app draws them.
+ */
+export const isLibraryIconName = oneOf([
+  'film',
+  'tv',
+  'filmSpark',
+  'tvSpark',
+  'filmHeart',
+  'tvHeart',
+  'globe',
+  'tvGlobe',
+  'fourK',
+  'musicVideo',
+  'youtube',
+  'video',
+  'standUp',
+  'gamepad',
+  'trophy',
+  'octagon',
+  'basketball',
+  'soccer',
+  'americanFootball',
+  'headphones',
+  'music',
+  'disc',
+  'podcast',
+  'audiobook',
+])
+
+export type LibraryIconName = Infer<typeof isLibraryIconName>
+
+export const LIBRARY_ICON_NAMES = isLibraryIconName.values
+
 export const isMediaGroupBy = oneOf(['match', 'resolution', 'codec', 'month'])
 
 /** `match` buckets a matched library, of movies or shows, by how far matching got. */
@@ -227,6 +263,8 @@ export const isLibrarySettings = object({
   locked: isBoolean,
   /** Read letter and group folders as holding the titles (`auto`), or every top folder as one title (`flat`). */
   folderLayout: isFolderLayout,
+  /** The icon it wears in the side menu, on its page and on Libraries; null wears its type's. */
+  icon: nullable(isLibraryIconName),
 })
 
 export type LibrarySettings = Infer<typeof isLibrarySettings>

@@ -326,6 +326,14 @@ export const MIGRATIONS: readonly string[] = [
     PRIMARY KEY (library_id, place)
   );
   `,
+  // The icon a library picked, NULL wearing its type's. Sporting events are
+  // matched as movies now, so their files wait to be matched: the start-up
+  // pass reads their names again, extras going back to off, and matches them.
+  `
+  ALTER TABLE libraries ADD COLUMN icon TEXT;
+  UPDATE media SET match = 'pending'
+    WHERE library_id IN (SELECT id FROM libraries WHERE kind = 'sports');
+  `,
 ]
 
 /** The index's file in the data folder. Before raven was renamed it was `weirwood.db`. */

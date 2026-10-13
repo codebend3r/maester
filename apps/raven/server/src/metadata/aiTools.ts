@@ -178,7 +178,7 @@ export const AI_TOOLS: Anthropic.Tool[] = [
   },
 ]
 
-/** What each type of library is, as Claude is told. Sporting events, YouTube videos and Other are never asked about. */
+/** What each type of library is, as Claude is told. Only types that are matched are ever asked about. */
 const LIBRARY_WORDS = {
   movies: 'Movies',
   shows: 'TV shows',
@@ -187,7 +187,7 @@ const LIBRARY_WORDS = {
   familyMovies: 'Family movies: family films and animation first',
   familyShows: 'Family TV shows: family shows and animation first',
   documentaries: 'Documentaries: documentaries first, matched as movies',
-  sports: 'Sporting events',
+  sports: 'Sporting events: recorded events such as UFC cards, matched as movies',
   youtube: 'YouTube videos',
   other: 'Other',
 } as const satisfies Record<LibraryKind, string>

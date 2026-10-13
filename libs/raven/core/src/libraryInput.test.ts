@@ -110,6 +110,27 @@ describe('validateLibraryInput', () => {
     expect(result).toEqual({ ok: false, errors: ['Type is not one of the choices.'] })
   })
 
+  it("keeps an icon, or null for the type's own", () => {
+    expect(
+      validateLibraryInput({ name: 'UFC', paths: ['/media/ufc'], settings: { icon: 'octagon' } }),
+    ).toEqual({
+      ok: true,
+      value: { name: 'UFC', paths: ['/media/ufc'], settings: { icon: 'octagon' } },
+    })
+    expect(
+      validateLibraryInput({ name: 'UFC', paths: ['/media/ufc'], settings: { icon: null } }),
+    ).toEqual({ ok: true, value: { name: 'UFC', paths: ['/media/ufc'], settings: { icon: null } } })
+  })
+
+  it('rejects an icon that is not one of the choices', () => {
+    const result = validateLibraryInput({
+      name: 'UFC',
+      paths: ['/media/ufc'],
+      settings: { icon: 'rocket' },
+    })
+    expect(result).toEqual({ ok: false, errors: ['Icon is not one of the choices.'] })
+  })
+
   it('keeps a watched percentage that is a whole number from 1 to 100', () => {
     const result = validateLibraryInput({
       name: 'Clips',

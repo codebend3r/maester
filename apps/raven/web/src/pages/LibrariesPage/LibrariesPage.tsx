@@ -54,12 +54,7 @@ const LibraryRow = ({ library, isShut }: { library: Library; isShut: boolean }) 
         <span className={styles.backdrop} style={{ backgroundImage: `url("${backdrop}")` }} />
       )}
       <div className={styles.details}>
-        <LibraryIcon
-          kind={library.settings.kind}
-          isLocked={library.settings.locked}
-          size={28}
-          className={styles.icon}
-        />
+        <LibraryIcon settings={library.settings} size={28} className={styles.icon} />
         <Link to={`/libraries/${library.id}`} className={styles.name}>
           {library.name}
         </Link>
