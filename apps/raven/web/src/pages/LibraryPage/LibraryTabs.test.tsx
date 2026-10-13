@@ -276,6 +276,7 @@ describe('LibraryPage tabs', () => {
       lastOk: null,
       ai: 'off',
       aiRemaining: 0,
+      aiPending: 0,
     }))
     spies.get.mockImplementation(async () => films(1))
     spies.unmatched.mockImplementation(async () => lost('unmatched'))
@@ -290,6 +291,61 @@ describe('LibraryPage tabs', () => {
     expect(await screen.findByText('Movies · 12 videos')).toBeInTheDocument()
     // The tab polls while a file is pending; once none is, the library is read again.
     expect(await screen.findByText('Movies · 12 videos · 1 not matched')).toBeInTheDocument()
+  })
+
+  it('reads the files not matched again once the AI lookups end, showing what they suggest', async () => {
+    pollFast()
+    const lookups = { pending: 1 }
+    spies.health.mockImplementation(async () => ({
+      tmdb: 'ok',
+      omdb: 'off',
+      pending: 0,
+      error: null,
+      lastOk: null,
+      ai: 'ok',
+      aiRemaining: 199,
+      aiPending: lookups.pending,
+    }))
+    spies.unmatched.mockImplementation(async () => [
+      unmatchedFile({
+        id: 9,
+        title: 'Archie',
+        year: 2023,
+        folder: 'Archie (2023)',
+        fileName: 'Archie (2023).mkv',
+        aiSuggestion: lookups.pending > 0 ? null : aiSuggestion(),
+      }),
+    ])
+    open({ route: '/libraries/2/not-matched' })
+    expect(await screen.findByRole('link', { name: /Archie/ })).toBeInTheDocument()
+    await waitFor(() => expect(spies.health).toHaveBeenCalled())
+    expect(screen.queryByRole('region', { name: 'Suggested by AI' })).toBeNull()
+    // The lookup still under way ends, and leaves a suggestion.
+    lookups.pending = 0
+    expect(
+      await screen.findByText('Suggested: Archie: The Man Who Became Cary Grant (2023)'),
+    ).toBeInTheDocument()
+  })
+
+  it('reads health no more while the AI lookup is off', async () => {
+    pollFast()
+    spies.health.mockImplementation(async () => ({
+      tmdb: 'ok',
+      omdb: 'off',
+      pending: 1,
+      error: null,
+      lastOk: null,
+      ai: 'off',
+      aiRemaining: 0,
+      aiPending: 0,
+    }))
+    spies.unmatched.mockImplementation(async () => [
+      unmatchedFile({ id: 9, title: 'Unknown Thing', match: 'pending' }),
+    ])
+    open({ route: '/libraries/2/not-matched' })
+    // The listing polls while its file is pending; health is read once.
+    await waitFor(() => expect(spies.unmatched.mock.calls.length).toBeGreaterThan(3))
+    expect(spies.health).toHaveBeenCalledTimes(1)
   })
 
   it('shows the most recently finished, with a way to the whole history', async () => {

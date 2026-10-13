@@ -347,7 +347,11 @@ describe('the AI lookup', () => {
 
   it('reports the lookup in the health check, never its key', async () => {
     const { metadata, body } = await server.health()
-    expect(metadata).toMatchObject({ ai: 'ok', aiRemaining: 200 - server.lookups() })
+    expect(metadata).toMatchObject({
+      ai: 'ok',
+      aiRemaining: 200 - server.lookups(),
+      aiPending: 0,
+    })
     expect(body).not.toContain('test-key')
   })
 
@@ -484,6 +488,35 @@ describe('files that land while the lookups run', () => {
     expect(listing.unmatched.map((file) => file.fileName)).toEqual([
       'Archie - S01E01 - Episode 1.mp4',
     ])
+  })
+})
+
+describe('the lookups a pass runs', () => {
+  const server = startServer({
+    prefix: 'raven-ai-pending-',
+    files: [ARCHIE, CESAR, WILD[0] ?? ''],
+    aiDailyLimit: 200,
+  })
+  afterAll(server.stop)
+
+  it('are counted in the health check while they wait or run, and none once they end', async () => {
+    const [archie, ...rest] = ['Archie', 'Cesar 911', 'Destination Wild Arctic'].map((place) =>
+      server.claude.hold(place),
+    )
+    const started = server.start()
+    // Starting encodes the clips first, which a busy machine takes a while over.
+    await vi.waitFor(() => expect(server.claude.state.requests).toHaveLength(2), {
+      timeout: 10_000,
+    })
+    expect((await server.health()).metadata.aiPending).toBe(3)
+    archie?.()
+    // Archie's lookup ends, and the third begins in its place.
+    await vi.waitFor(async () => expect((await server.health()).metadata.aiPending).toBe(2), {
+      timeout: 10_000,
+    })
+    rest.forEach((release) => release())
+    await started
+    expect((await server.health()).metadata.aiPending).toBe(0)
   })
 })
 

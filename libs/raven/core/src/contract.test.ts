@@ -272,6 +272,7 @@ describe('the metadata guards', () => {
         lastOk: null,
         ai: 'off',
         aiRemaining: 0,
+        aiPending: 0,
       }),
     ).toBe(true)
     expect(
@@ -283,10 +284,22 @@ describe('the metadata guards', () => {
         lastOk: null,
         ai: 'off',
         aiRemaining: 0,
+        aiPending: 0,
       }),
     ).toBe(false)
     expect(
       isMetadataHealth({ tmdb: 'ok', omdb: 'off', pending: 0, error: null, lastOk: null }),
+    ).toBe(false)
+    expect(
+      isMetadataHealth({
+        tmdb: 'ok',
+        omdb: 'off',
+        pending: 0,
+        error: null,
+        lastOk: null,
+        ai: 'ok',
+        aiRemaining: 200,
+      }),
     ).toBe(false)
   })
 })
@@ -412,6 +425,7 @@ describe('isServerHealth', () => {
         lastOk: null,
         ai: 'ok',
         aiRemaining: 200,
+        aiPending: 2,
       },
     }
     expect(isServerHealth(health)).toBe(true)

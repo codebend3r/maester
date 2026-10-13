@@ -24,6 +24,7 @@ const NO_TMDB: MetadataHealth = {
   lastOk: null,
   ai: 'ok',
   aiRemaining: 200,
+  aiPending: 0,
 }
 const metadataHealth: { now: MetadataHealth } = { now: NO_TMDB }
 

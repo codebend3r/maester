@@ -36,6 +36,7 @@ import {
 import { LibraryListing, LibraryListingSkeleton } from '@/pages/LibraryPage/LibraryViews'
 import { type ListingState, NOTHING_LISTED, playQueue } from '@/pages/LibraryPage/libraryShape'
 import type { LibrarySection } from '@/pages/LibraryPage/librarySections'
+import { useAiLookupsDone } from '@/pages/LibraryPage/useAiLookupsDone'
 import { useLibraryListing } from '@/pages/LibraryPage/useLibraryListing'
 import { useLibraryView } from '@/pages/LibraryPage/useLibraryView'
 import { POLL_MS, anyPending, useMatchingPassDone } from '@/pages/LibraryPage/useMatchingPassDone'
@@ -278,7 +279,8 @@ const suggestionsIn =
  * The files no movie or show was found for, each with Fix match in its menu,
  * and what the AI lookup suggests where it was not sure. While TMDB answers,
  * the tab keeps reading again until none is pending, then reads the library
- * again for its count of files not matched.
+ * again for its count of files not matched. The lookups run after that, so
+ * once they end, the tab reads both again.
  */
 const NotMatchedSection = ({ library }: { library: Library }) => {
   const matchType = matchTypeFor(library.settings.kind)
@@ -290,6 +292,7 @@ const NotMatchedSection = ({ library }: { library: Library }) => {
       canMatch && anyPending(current.state.data ?? []) ? POLL_MS : false,
   })
   useMatchingPassDone({ libraryId: library.id, files: query.data ?? [] })
+  useAiLookupsDone({ libraryId: library.id, files: query.data ?? [] })
   return (
     <SectionBody
       query={query}

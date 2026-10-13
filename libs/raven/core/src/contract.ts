@@ -879,6 +879,8 @@ export const isMetadataHealth = object({
   ai: isMetadataServiceState,
   /** AI lookups left today; 0 while it is off. */
   aiRemaining: isNumber,
+  /** Groups waiting for or in an AI lookup, across libraries; 0 between passes. */
+  aiPending: isNumber,
 })
 
 export type MetadataHealth = Infer<typeof isMetadataHealth>

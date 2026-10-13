@@ -188,3 +188,24 @@ export const afterMatchingPass = ({
       { queryKey: queryKeys.home },
     ],
   })
+
+/**
+ * The AI lookups ended: what the library's Not matched tab lists and
+ * suggests, its other listings and its count, which a sure pick changes, and
+ * home's shows.
+ */
+export const afterAiLookups = ({
+  queryClient,
+  libraryId,
+}: {
+  queryClient: QueryClient
+  libraryId: number
+}): Promise<unknown> =>
+  refetch({
+    queryClient,
+    filters: [
+      { queryKey: queryKeys.library(libraryId) },
+      { queryKey: queryKeys.libraries, exact: true },
+      { queryKey: queryKeys.home },
+    ],
+  })
