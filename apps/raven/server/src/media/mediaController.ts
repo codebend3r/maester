@@ -158,7 +158,12 @@ export class MediaController {
     await this.artifacts.discard([id])
   }
 
-  /** Versioned URLs (`?v=`) change whenever the file does, so they can be cached for good. */
+  /**
+   * Versioned URLs (`?v=`) change whenever the file does, so they can be
+   * cached for good, but only by the browser: a shared cache in front of
+   * raven, such as Netlify's proxy, must not keep a thumbnail the PIN lock
+   * gave one browser.
+   */
   @Get(':id/thumbnail')
   async thumbnail(
     @Param('id', ParseIntPipe) id: number,
@@ -174,7 +179,7 @@ export class MediaController {
       .header('content-length', info.size)
       .header(
         'cache-control',
-        version ? 'public, max-age=31536000, immutable' : 'public, max-age=60',
+        version ? 'private, max-age=31536000, immutable' : 'private, max-age=60',
       )
       .send(createReadStream(path))
   }

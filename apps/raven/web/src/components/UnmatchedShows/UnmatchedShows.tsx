@@ -9,6 +9,7 @@ import { AiSuggestionCard } from '@/components/AiSuggestionCard/AiSuggestionCard
 import { Button } from '@/components/Button/Button'
 import { FixMatchDialog } from '@/components/FixMatchDialog/FixMatchDialog'
 import { Icon } from '@/components/Icon/Icon'
+import { useAdminLocked } from '@/lib/adminLock'
 import { api } from '@/lib/api'
 import { plural } from '@/lib/plural'
 import { useReturnFocus } from '@/lib/useReturnFocus'
@@ -16,8 +17,8 @@ import styles from '@/components/UnmatchedShows/UnmatchedShows.module.scss'
 
 /**
  * One show folder: a toggle to its episodes, and Fix match, which points the
- * whole folder at a show. When the AI lookup suggested a show, its card
- * holds Accept and the folder's Fix match.
+ * whole folder at a show, with the admin lock off. When the AI lookup
+ * suggested a show, its card holds Accept and the folder's Fix match.
  */
 const UnmatchedShowEntry = ({
   group,
@@ -32,6 +33,7 @@ const UnmatchedShowEntry = ({
   const fixButton = useRef<HTMLButtonElement>(null)
   const [isOpen, setIsOpen] = useState(false)
   const [isFixing, setIsFixing] = useState(false)
+  const canManage = !useAdminLocked()
   const first = group.files[0]
   // A file still pending has no suggestion yet, so the card follows the first that has one.
   const suggested = group.files
@@ -59,7 +61,7 @@ const UnmatchedShowEntry = ({
           {plural({ n: group.files.length, one: 'episode', many: 'episodes' })}
         </span>
       </button>
-      {!suggested && (
+      {!suggested && canManage && (
         <Button
           ref={fixButton}
           className={styles.fix}

@@ -6,7 +6,9 @@ import { contentTypeOf } from '@/metadata/imageCache'
 
 /**
  * Sends a cached picture. Versioned URLs (`?v=`) change whenever the picture
- * does, so they are cached for good, as thumbnails are.
+ * does, so they are cached for good, as thumbnails are. Only by the browser,
+ * though: a shared cache in front of raven, such as Netlify's proxy, must not
+ * keep a picture the PIN lock gave one browser and hand it to the next.
  */
 export const sendImage = async ({
   reply,
@@ -22,6 +24,9 @@ export const sendImage = async ({
   await reply
     .header('content-type', contentTypeOf(path))
     .header('content-length', info.size)
-    .header('cache-control', version ? 'public, max-age=31536000, immutable' : 'public, max-age=60')
+    .header(
+      'cache-control',
+      version ? 'private, max-age=31536000, immutable' : 'private, max-age=60',
+    )
     .send(createReadStream(path))
 }

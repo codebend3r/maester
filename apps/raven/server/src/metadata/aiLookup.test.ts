@@ -143,10 +143,12 @@ const startServer = ({
   const claude = fakeClaude({ lookups: LOOKUPS })
   const state: {
     root: string
+    /** The admin session's cookie, for the routes the admin lock holds back. */
+    admin: string
     app: NestFastifyApplication | null
     library: number
     clips: number
-  } = { root: '', app: null, library: 0, clips: 0 }
+  } = { root: '', admin: '', app: null, library: 0, clips: 0 }
   const app = (): NestFastifyApplication => {
     if (!state.app) throw new Error('app not started')
     return state.app
@@ -180,18 +182,19 @@ const startServer = ({
         method: 'POST',
         url: '/api/libraries',
         payload: { name, paths: [path], settings: { kind } },
+        headers: { cookie: state.admin },
       }),
       guard: isLibrary,
     }).id
   /** The folder the library's files are in. */
   const libraryPath = () => join(state.root, library.name)
-  /** Edit library: `settings` over the library's own, as a browser holding `cookie`. */
+  /** Edit library: `settings` over the library's own, as a browser holding `cookie`, the admin session's unless given. */
   const update = ({ settings, cookie }: { settings: LibraryInput['settings']; cookie?: string }) =>
     app().inject({
       method: 'PUT',
       url: `/api/libraries/${state.library}`,
       payload: { name: library.name, paths: [libraryPath()], settings },
-      headers: cookie == null ? {} : { cookie },
+      headers: { cookie: cookie ?? state.admin },
     })
   const start = async () => {
     state.root = await mkdtemp(join(tmpdir(), prefix))
@@ -211,6 +214,7 @@ const startServer = ({
         tmdbApiToken: 'test-token',
         anthropicApiKey: 'test-key',
         aiDailyLimit,
+        adminPassword: ADMIN_PASSWORD,
         ...config,
       },
       quiet: true,
@@ -220,6 +224,7 @@ const startServer = ({
     })
     await state.app.init()
     await state.app.getHttpAdapter().getInstance().ready()
+    state.admin = await adminCookie(state.app)
     state.clips = await create({ name: 'Clips', path: join(state.root, 'Clips'), kind: 'other' })
     state.library = await create({ name: library.name, path: libraryPath(), kind: library.kind })
     await settle()
@@ -229,7 +234,11 @@ const startServer = ({
     await rm(state.root, { recursive: true, force: true, maxRetries: 5 })
   }
   const matchAgain = async () => {
-    await app().inject({ method: 'POST', url: `/api/libraries/${state.library}/match` })
+    await app().inject({
+      method: 'POST',
+      url: `/api/libraries/${state.library}/match`,
+      headers: { cookie: state.admin },
+    })
     await settle()
   }
   /** The places Claude was asked about from request `from` on, each once, in order. */
@@ -277,7 +286,7 @@ describe('the AI lookup', () => {
     prefix: 'raven-ai-',
     files: [...WILD, ARCHIE, CESAR],
     aiDailyLimit: 200,
-    config: { libraryPin: PIN, adminPassword: ADMIN_PASSWORD },
+    config: { libraryPin: PIN },
   })
   const shows = () =>
     server.get({ url: `/api/libraries/${server.state.library}/shows`, guard: isShowListing })
@@ -320,6 +329,7 @@ describe('the AI lookup', () => {
       method: 'PUT',
       url: `/api/media/${cesar?.id ?? -1}/match`,
       payload: { tmdbId: null },
+      headers: { cookie: server.state.admin },
     })
     await server.settle()
     const before = server.claude.state.requests.length
@@ -376,6 +386,7 @@ describe('the AI lookup', () => {
       method: 'PUT',
       url: `/api/media/${archie?.id ?? -1}/match`,
       payload: { tmdbId: archie?.aiSuggestion?.tmdbId },
+      headers: { cookie: server.state.admin },
     })
     await server.settle()
     expect((await server.unmatched()).map((file) => file.fileName)).toEqual([
@@ -487,9 +498,11 @@ describe('files that land while the lookups run', () => {
       timeout: 10_000,
     })
     await encodeClip({ path: join(server.state.root, 'TV', WILD_ARCTIC), seconds: 1 })
-    await server
-      .app()
-      .inject({ method: 'POST', url: `/api/libraries/${server.state.library}/scan` })
+    await server.app().inject({
+      method: 'POST',
+      url: `/api/libraries/${server.state.library}/scan`,
+      headers: { cookie: server.state.admin },
+    })
     await server.app().get(ScannerService).whenIdle(server.state.library)
     release()
     await started
@@ -548,6 +561,7 @@ describe('a suggestion where Fix match has answered', () => {
       method: 'PUT',
       url: `/api/media/${archie?.id ?? -1}/match`,
       payload: { tmdbId: null },
+      headers: { cookie: server.state.admin },
     })
     await server.settle()
     expect((await server.unmatched()).map((file) => [file.fileName, file.aiSuggestion])).toEqual([
@@ -596,6 +610,7 @@ describe('the AI lookup in a library of movies', () => {
       method: 'PUT',
       url: `/api/items/${heat()?.id ?? -1}/metadata`,
       payload: { title: 'Heat (the long cut)' },
+      headers: { cookie: server.state.admin },
     })
     expect(edited.statusCode).toBe(200)
     server.claude.state.status = 529

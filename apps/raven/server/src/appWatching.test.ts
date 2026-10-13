@@ -6,22 +6,24 @@ import { type ApiClient, type MediaItem, parseServerEvent } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '@/app'
 import { ScannerService } from '@/scanner/scannerService'
-import { eventually, testConfig } from '@/test/app'
+import { adminCookie, eventually, testConfig } from '@/test/app'
 import { encodeClip } from '@/test/clips'
 import { apiFor } from '@/test/server'
 
+/** As a browser with the admin lock off, so the library can be added and edited. */
 describe('refreshing a library as its folders change', () => {
   const state: {
     root: string
     media: string
+    admin: string
     libraryId: number
     app: NestFastifyApplication | null
-  } = { root: '', media: '', libraryId: 0, app: null }
+  } = { root: '', media: '', admin: '', libraryId: 0, app: null }
   const app = (): NestFastifyApplication => {
     if (!state.app) throw new Error('app not started')
     return state.app
   }
-  const api = (): ApiClient => apiFor({ app: app() })
+  const api = (): ApiClient => apiFor({ app: app(), cookie: state.admin })
   const at = (...parts: string[]) => join(state.media, ...parts)
   const listMedia = (): Promise<MediaItem[]> =>
     api().listMedia({ libraryId: state.libraryId, sort: 'changed' })
@@ -37,6 +39,7 @@ describe('refreshing a library as its folders change', () => {
       watch: { quietMs: 100 },
     })
     await state.app.listen(0, '127.0.0.1')
+    state.admin = await adminCookie(state.app)
     const created = await api().createLibrary({ name: 'Watched', paths: [state.media] })
     state.libraryId = created.id
     await app().get(ScannerService).whenIdle(created.id)
@@ -117,20 +120,22 @@ describe('refreshing a library as its folders change', () => {
   })
 })
 
+/** As a browser with the admin lock off, so the library can be added and edited. */
 describe('a library whose folders cannot be watched', () => {
   const state: {
     root: string
+    admin: string
     libraryId: number
     app: NestFastifyApplication | null
     /** Every watch asked for, and whether it should fail. */
     watches: string[]
     failing: boolean
-  } = { root: '', libraryId: 0, app: null, watches: [], failing: true }
+  } = { root: '', admin: '', libraryId: 0, app: null, watches: [], failing: true }
   const app = (): NestFastifyApplication => {
     if (!state.app) throw new Error('app not started')
     return state.app
   }
-  const api = (): ApiClient => apiFor({ app: app() })
+  const api = (): ApiClient => apiFor({ app: app(), cookie: state.admin })
   const media = () => join(state.root, 'media')
   const listMedia = (): Promise<MediaItem[]> => api().listMedia({ libraryId: state.libraryId })
 
@@ -151,6 +156,7 @@ describe('a library whose folders cannot be watched', () => {
       },
     })
     await state.app.init()
+    state.admin = await adminCookie(state.app)
     const created = await api().createLibrary({ name: 'Unwatched', paths: [media()] })
     state.libraryId = created.id
     await app().get(ScannerService).whenIdle(created.id)

@@ -25,6 +25,7 @@ import { ItemRefresher } from '@/metadata/itemRefresher'
 import { MatchFiles } from '@/metadata/matchFiles'
 import { MetadataService } from '@/metadata/metadataService'
 import { ScannerService } from '@/scanner/scannerService'
+import { ADMIN_PASSWORD, adminCookie } from '@/test/app'
 import { encodeClip, encodeImage } from '@/test/clips'
 import { FAKE_JPEG, fakeTmdb } from '@/test/fakeTmdb'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
@@ -51,6 +52,7 @@ const shape = <T>({
 /** Two of the films in one collection, as TMDB has none that fits them both. */
 const CRIME_SAGA = { id: 9001, name: 'Crime Classics Collection' }
 
+/** As a browser with the admin lock off, so files can be matched and items edited. */
 describe('movie metadata', () => {
   const tmdb = fakeTmdb({
     movies: [
@@ -74,9 +76,10 @@ describe('movie metadata', () => {
     root: string
     media: string
     data: string
+    admin: string
     app: NestFastifyApplication | null
     library: number
-  } = { root: '', media: '', data: '', app: null, library: 0 }
+  } = { root: '', media: '', data: '', admin: '', app: null, library: 0 }
   const app = (): NestFastifyApplication => {
     if (!state.app) throw new Error('app not started')
     return state.app
@@ -124,7 +127,11 @@ describe('movie metadata', () => {
       titles: saga.media.map((media) => media.item?.title ?? media.title),
     }))
   const rescan = async () => {
-    await app().inject({ method: 'POST', url: `/api/libraries/${state.library}/scan` })
+    await app().inject({
+      method: 'POST',
+      url: `/api/libraries/${state.library}/scan`,
+      headers: { cookie: state.admin },
+    })
     await settle()
   }
   const setKind = async (kind: string): Promise<Library> =>
@@ -133,6 +140,7 @@ describe('movie metadata', () => {
         method: 'PUT',
         url: `/api/libraries/${state.library}`,
         payload: { name: 'Films', paths: [state.media], settings: { kind } },
+        headers: { cookie: state.admin },
       }),
       guard: isLibrary,
     })
@@ -180,17 +188,20 @@ describe('movie metadata', () => {
         rescanIntervalMinutes: 0,
         tmdbApiToken: 'test-token',
         omdbApiKey: 'omdb-key',
+        adminPassword: ADMIN_PASSWORD,
       },
       quiet: true,
       metadataFetch: tmdb.fetch,
     })
     await state.app.init()
     await state.app.getHttpAdapter().getInstance().ready()
+    state.admin = await adminCookie(state.app)
     const created = shape({
       response: await app().inject({
         method: 'POST',
         url: '/api/libraries',
         payload: { name: 'Films', paths: [state.media], settings: { kind: 'movies' } },
+        headers: { cookie: state.admin },
       }),
       guard: isLibrary,
     })
@@ -383,6 +394,7 @@ describe('movie metadata', () => {
         method: 'PUT',
         url: `/api/libraries/${state.library}`,
         payload: { name: 'Films', paths: [state.media], settings: { ratingsSource } },
+        headers: { cookie: state.admin },
       })
     expect((await put('rottenTomatoes')).statusCode).toBe(200)
     const high = await list('?sort=rating-high')
@@ -444,7 +456,7 @@ describe('movie metadata', () => {
     })
     expect(poster.statusCode).toBe(200)
     expect(poster.headers['content-type']).toBe('image/jpeg')
-    expect(poster.headers['cache-control']).toContain('immutable')
+    expect(poster.headers['cache-control']).toBe('private, max-age=31536000, immutable')
     expect([...poster.rawPayload.subarray(0, 2)]).toEqual([0xff, 0xd8])
     expect(poster.rawPayload.equals(FAKE_JPEG)).toBe(false)
 
@@ -469,7 +481,11 @@ describe('movie metadata', () => {
     const matrix = (await list()).find((item) => item.item?.title === 'The Matrix')
     const id = matrix?.item?.id
     const options = shape({
-      response: await app().inject({ method: 'GET', url: `/api/items/${id}/images` }),
+      response: await app().inject({
+        method: 'GET',
+        url: `/api/items/${id}/images`,
+        headers: { cookie: state.admin },
+      }),
       guard: isItemImageOptions,
     })
     // The poster beside the files comes first and is the current one; TMDB's own poster is listed too.
@@ -490,6 +506,7 @@ describe('movie metadata', () => {
         method: 'PUT',
         url: `/api/items/${id}/images/poster`,
         payload: { source: 'tmdb', ref: '/alt603.jpg' },
+        headers: { cookie: state.admin },
       }),
       guard: isItemDetails,
     })
@@ -504,9 +521,17 @@ describe('movie metadata', () => {
     expect(local.statusCode).toBe(200)
     expect(local.rawPayload.equals(FAKE_JPEG)).toBe(false)
 
-    await app().inject({ method: 'POST', url: `/api/items/${id}/refresh` })
+    await app().inject({
+      method: 'POST',
+      url: `/api/items/${id}/refresh`,
+      headers: { cookie: state.admin },
+    })
     const after = shape({
-      response: await app().inject({ method: 'GET', url: `/api/items/${id}/images` }),
+      response: await app().inject({
+        method: 'GET',
+        url: `/api/items/${id}/images`,
+        headers: { cookie: state.admin },
+      }),
       guard: isItemImageOptions,
     })
     expect(after.poster.find((option) => option.current)?.ref).toBe('/alt603.jpg')
@@ -516,6 +541,7 @@ describe('movie metadata', () => {
         method: 'PUT',
         url: `/api/items/${id}/images/poster`,
         payload: { source: 'local' },
+        headers: { cookie: state.admin },
       }),
       guard: isItemDetails,
     })
@@ -525,6 +551,7 @@ describe('movie metadata', () => {
       method: 'PUT',
       url: `/api/items/${id}/images/poster`,
       payload: { source: 'tmdb', ref: 'https://evil.example/x.jpg' },
+      headers: { cookie: state.admin },
     })
     expect(refused.statusCode).toBe(400)
   })
@@ -533,7 +560,11 @@ describe('movie metadata', () => {
     const heat = await byFile('Heat.mp4')
     const id = heat.item?.id
     const before = shape({
-      response: await app().inject({ method: 'GET', url: `/api/items/${id}/metadata` }),
+      response: await app().inject({
+        method: 'GET',
+        url: `/api/items/${id}/metadata`,
+        headers: { cookie: state.admin },
+      }),
       guard: isItemMetadataState,
     })
     expect(before).toMatchObject({
@@ -547,6 +578,7 @@ describe('movie metadata', () => {
         method: 'PUT',
         url: `/api/items/${id}/metadata`,
         payload: { title: 'Heat (Director’s Cut)', tagline: 'A Los Angeles crime saga' },
+        headers: { cookie: state.admin },
       }),
       guard: isItemDetails,
     })
@@ -556,19 +588,28 @@ describe('movie metadata', () => {
     })
     expect((await byFile('Heat.mp4')).item?.title).toBe('Heat (Director’s Cut)')
     const written = shape({
-      response: await app().inject({ method: 'GET', url: `/api/items/${id}/metadata` }),
+      response: await app().inject({
+        method: 'GET',
+        url: `/api/items/${id}/metadata`,
+        headers: { cookie: state.admin },
+      }),
       guard: isItemMetadataState,
     })
     expect(written.original.title).toBe('Heat')
     expect(written.overridden).toEqual(['title', 'tagline'])
 
-    await app().inject({ method: 'POST', url: `/api/items/${id}/refresh` })
+    await app().inject({
+      method: 'POST',
+      url: `/api/items/${id}/refresh`,
+      headers: { cookie: state.admin },
+    })
     expect((await byFile('Heat.mp4')).item?.title).toBe('Heat (Director’s Cut)')
 
     const refused = await app().inject({
       method: 'PUT',
       url: `/api/items/${id}/metadata`,
       payload: { title: '   ' },
+      headers: { cookie: state.admin },
     })
     expect(refused.statusCode).toBe(400)
 
@@ -577,6 +618,7 @@ describe('movie metadata', () => {
         method: 'PUT',
         url: `/api/items/${id}/metadata`,
         payload: { title: null, tagline: null },
+        headers: { cookie: state.admin },
       }),
       guard: isItemDetails,
     })
@@ -589,12 +631,17 @@ describe('movie metadata', () => {
         method: 'PUT',
         url: `/api/items/${id}/metadata`,
         payload: { tagline: '', year: 0 },
+        headers: { cookie: state.admin },
       }),
       guard: isItemDetails,
     })
     expect(emptied).toMatchObject({ tagline: null, year: null })
     const empty = shape({
-      response: await app().inject({ method: 'GET', url: `/api/items/${id}/metadata` }),
+      response: await app().inject({
+        method: 'GET',
+        url: `/api/items/${id}/metadata`,
+        headers: { cookie: state.admin },
+      }),
       guard: isItemMetadataState,
     })
     expect(empty).toMatchObject({
@@ -607,6 +654,7 @@ describe('movie metadata', () => {
         method: 'PUT',
         url: `/api/items/${id}/metadata`,
         payload: { tagline: null, year: null },
+        headers: { cookie: state.admin },
       }),
       guard: isItemDetails,
     })
@@ -664,6 +712,7 @@ describe('movie metadata', () => {
       response: await app().inject({
         method: 'GET',
         url: '/api/match/search?type=movie&query=Unknown%20Thing',
+        headers: { cookie: state.admin },
       }),
       guard: isMatchCandidateList,
     })
@@ -688,6 +737,7 @@ describe('movie metadata', () => {
         method: 'PUT',
         url: `/api/media/${unknown.id}/match`,
         payload: { tmdbId: '12' },
+        headers: { cookie: state.admin },
       }),
       guard: isMediaItem,
     })
@@ -714,6 +764,7 @@ describe('movie metadata', () => {
         method: 'PUT',
         url: `/api/media/${pulp.id}/match`,
         payload: { tmdbId: null },
+        headers: { cookie: state.admin },
       }),
       guard: isMediaItem,
     })
@@ -730,6 +781,7 @@ describe('movie metadata', () => {
       method: 'PUT',
       url: `/api/media/${heat.id}/match`,
       payload: { tmdbId: '../1' },
+      headers: { cookie: state.admin },
     })
     expect(response.statusCode).toBe(400)
   })
@@ -739,6 +791,7 @@ describe('movie metadata', () => {
     const response = await app().inject({
       method: 'POST',
       url: `/api/items/${heat.item?.id}/refresh`,
+      headers: { cookie: state.admin },
     })
     expect(response.statusCode).toBe(200)
     expect(shape({ response, guard: isItemDetails }).title).toBe('Heat')
@@ -805,7 +858,11 @@ describe('movie metadata', () => {
     const letGo = tmdb.hold('Slow Burn')
     await encodeClip({ path: join(state.media, 'Slow Burn (2018).mp4'), seconds: 1 })
     app().get(MatchFiles).retryUnmatched(state.library)
-    await app().inject({ method: 'POST', url: `/api/libraries/${state.library}/scan` })
+    await app().inject({
+      method: 'POST',
+      url: `/api/libraries/${state.library}/scan`,
+      headers: { cookie: state.admin },
+    })
     await vi.waitFor(
       async () =>
         expect(await byFile('Lost Signal (2019).mp4')).toMatchObject({ match: 'unmatched' }),
@@ -818,6 +875,7 @@ describe('movie metadata', () => {
       response: await app().inject({
         method: 'POST',
         url: `/api/libraries/${state.library}/match`,
+        headers: { cookie: state.admin },
       }),
       guard: isLibrary,
     })

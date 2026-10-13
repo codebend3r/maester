@@ -18,6 +18,7 @@ import { createApp } from '@/app'
 import { readServerConfig } from '@/config'
 import { MetadataService } from '@/metadata/metadataService'
 import { ScannerService } from '@/scanner/scannerService'
+import { ADMIN_PASSWORD, adminCookie } from '@/test/app'
 import { encodeClip, encodeImage } from '@/test/clips'
 import { FAKE_JPEG, fakeTmdb } from '@/test/fakeTmdb'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
@@ -41,6 +42,7 @@ const shape = <T>({
   return body
 }
 
+/** As a browser with the admin lock off, so files can be matched. */
 describe('TV show metadata', () => {
   const tmdb = fakeTmdb({
     movies: [],
@@ -100,9 +102,10 @@ describe('TV show metadata', () => {
     root: string
     media: string
     data: string
+    admin: string
     app: NestFastifyApplication | null
     library: number
-  } = { root: '', media: '', data: '', app: null, library: 0 }
+  } = { root: '', media: '', data: '', admin: '', app: null, library: 0 }
   const app = (): NestFastifyApplication => {
     if (!state.app) throw new Error('app not started')
     return state.app
@@ -144,7 +147,11 @@ describe('TV show metadata', () => {
     return found
   }
   const rescan = async () => {
-    await app().inject({ method: 'POST', url: `/api/libraries/${state.library}/scan` })
+    await app().inject({
+      method: 'POST',
+      url: `/api/libraries/${state.library}/scan`,
+      headers: { cookie: state.admin },
+    })
     await settle()
   }
 
@@ -211,17 +218,20 @@ describe('TV show metadata', () => {
         scanOnStart: false,
         rescanIntervalMinutes: 0,
         tmdbApiToken: 'test-token',
+        adminPassword: ADMIN_PASSWORD,
       },
       quiet: true,
       metadataFetch: tmdb.fetch,
     })
     await state.app.init()
     await state.app.getHttpAdapter().getInstance().ready()
+    state.admin = await adminCookie(state.app)
     const created = shape({
       response: await app().inject({
         method: 'POST',
         url: '/api/libraries',
         payload: { name: 'TV', paths: [state.media], settings: { kind: 'shows' } },
+        headers: { cookie: state.admin },
       }),
       guard: isLibrary,
     })
@@ -267,6 +277,7 @@ describe('TV show metadata', () => {
         method: 'PUT',
         url: `/api/libraries/${state.library}`,
         payload: { name: 'TV', paths: [state.media], settings: { kind } },
+        headers: { cookie: state.admin },
       })
       await settle()
     }
@@ -467,6 +478,7 @@ describe('TV show metadata', () => {
     const results = await app().inject({
       method: 'GET',
       url: '/api/match/search?type=show&query=sever',
+      headers: { cookie: state.admin },
     })
     expect(results.statusCode).toBe(200)
     expect(results.json()).toMatchObject([{ tmdbId: '95396', title: 'Severance', year: 2022 }])
@@ -477,6 +489,7 @@ describe('TV show metadata', () => {
         method: 'PUT',
         url: `/api/media/${unknown.id}/match`,
         payload: { tmdbId: '95396' },
+        headers: { cookie: state.admin },
       }),
       guard: isMediaItem,
     })
@@ -495,6 +508,7 @@ describe('TV show metadata', () => {
       method: 'PUT',
       url: `/api/items/${severance.show.id}/match`,
       payload: { tmdbId: '60622' },
+      headers: { cookie: state.admin },
     })
     expect(response.statusCode).toBe(200)
     const fargo = shape({ response, guard: isItemDetails })
@@ -530,6 +544,7 @@ describe('TV show metadata', () => {
     const response = await app().inject({
       method: 'POST',
       url: `/api/libraries/${state.library}/match`,
+      headers: { cookie: state.admin },
     })
     expect(response.statusCode).toBe(200)
     // The count is read after the retry, which sends the file back to pending.
@@ -545,7 +560,11 @@ describe('TV show metadata', () => {
     expect((await byFile('Unknown Show - S01E01.mp4')).match).toBe('manual')
 
     tmdb.state.shows.push({ id: 4242, title: 'Late Show', first: '2024-03-01', seasons: { 1: [] } })
-    await app().inject({ method: 'POST', url: `/api/libraries/${state.library}/match` })
+    await app().inject({
+      method: 'POST',
+      url: `/api/libraries/${state.library}/match`,
+      headers: { cookie: state.admin },
+    })
     await settle()
     expect((await byFile('Late Show - S01E01.mp4')).match).toBe('matched')
     expect((await shows()).shows.map((entry) => entry.show.title)).toContain('Late Show')

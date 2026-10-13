@@ -12,9 +12,9 @@ raven is the `apps/raven/` folder of an Nx workspace; the [root README](../../RE
 ## Run it with Docker
 
 1. Edit the volumes in `apps/raven/docker-compose.yml` so each media folder is mounted read-only under `/media`.
-2. From `apps/raven/`, `docker compose up -d --build`. The image builds from the repo root, where the workspace's `bun.lock` lives.
-3. Open `http://<host>:8484`, choose **Add library**, and pick folders under `/media` with the folder browser.
-4. For posters and details in Movies libraries, copy `.env.example` to `.env` beside the compose file and set `TMDB_API_TOKEN` (see [Metadata](#metadata)). Without it raven works as before.
+2. Copy `.env.example` to `.env` beside the compose file and set `ADMIN_PASSWORD`: adding a library, like anything else that changes raven, needs the [admin lock](#admin-lock) off, and only the password turns it off. For posters and details in Movies libraries, set `TMDB_API_TOKEN` too (see [Metadata](#metadata)); without it raven works as before.
+3. From `apps/raven/`, `docker compose up -d --build`. The image builds from the repo root, where the workspace's `bun.lock` lives.
+4. Open `http://<host>:8484`, turn the admin lock off at the foot of **Settings** with that password, choose **Add library**, and pick folders under `/media` with the folder browser.
 
 Deleting a video from the app removes the file, so leave `:ro` off any mount where that should work. On a read-only mount the app keeps the video and says why. Deleting needs the [admin lock](#admin-lock) off, which needs `ADMIN_PASSWORD` in `.env`.
 
@@ -43,6 +43,34 @@ docker save ghcr.io/codebend3r/raven:latest | gzip -1 | ssh vhagar 'cat > /volum
 ```
 
 Then, on Vhagar, `sudo docker load -i /volume1/docker/raven/raven-image.tar.gz` and `sudo docker compose up -d` in `/volume1/docker/raven/`. Pause the task first, or its next run puts `latest` from GHCR back.
+
+### Public through Tailscale Funnel
+
+The compose file's `tailscale` service puts raven on the internet at `https://raven.<tailnet>.ts.net` with [Tailscale Funnel](https://tailscale.com/kb/1223/funnel). It runs in a container of its own and proxies to raven over the compose network, so a new raven image never restarts it. It sits in the `funnel` profile, and `update.sh` starts it only once `funnel/serve.json` is there, so until then raven stays on the LAN.
+
+Anyone with the address can browse and play every library that is not locked. Set `ADMIN_PASSWORD` first: the [admin lock](#admin-lock) is what keeps them from changing anything, and without the password it also stays on for you. Make `LIBRARY_PIN` long, too: five wrong tries a minute still lets a stranger make 7,200 a day, enough to run through a four-digit PIN in under two days.
+
+1. In the Tailscale admin console, generate a one-off auth key (**Settings → Keys**, not reusable). The tailnet's policy must give the node the `funnel` attribute, as it already does for the tailnet's other Funnels.
+2. Put it in Vhagar's `.env` as `TS_AUTHKEY`, beside `ADMIN_PASSWORD`.
+3. Stage the serve config and the compose file, and run the update:
+   ```bash
+   ssh vhagar 'mkdir -p /volume1/docker/raven/funnel'
+   ssh vhagar 'cat > /volume1/docker/raven/funnel/serve.json' < apps/raven/vhagar-funnel.json
+   ssh vhagar 'cat > /volume1/docker/raven/docker-compose.yml' < apps/raven/docker-compose.vhagar.yml
+   ```
+   Then, as root, `bash /volume1/docker/raven/update.sh`.
+4. Once `raven` shows in the admin console, turn off its key expiry there and take `TS_AUTHKEY` out of `.env`. The sign-in stays in `tailscale/`.
+
+To take raven off the internet, delete `funnel/` and, as root in `/volume1/docker/raven`, run `docker compose --profile funnel rm -sf tailscale`.
+
+### On Netlify
+
+The web app can also be served from Netlify, with `/api` proxied to the Funnel address, so a page there works as it does on Vhagar, the PIN and the admin lock included: the browser only ever talks to Netlify, so their cookies stay first party.
+
+1. Create a site from the GitHub repo. Leave the base directory empty, the repo root, and set the package directory to `apps/raven/web`. Its `netlify.toml` holds the build command, the publish folder, Bun's version and the single-page app's fallback.
+2. In the site's environment variables, set `RAVEN_API_ORIGIN` to the Funnel address, `https://raven.<tailnet>.ts.net`. The build writes it into a `_redirects` file, and fails on Netlify without it.
+
+Every `/api` request goes through Netlify, video included, so playback counts against the site's bandwidth, and Netlify gives a proxied request 26 seconds to start answering. raven marks its pictures `private`, so Netlify's cache never keeps one that the PIN opened for a single browser.
 
 ### Coming from weirwood
 
@@ -127,7 +155,7 @@ Each library keeps its own settings on the server, so every browser opens it the
 - **Sort**: title, recently or oldest added, recently changed (found, renamed, moved or replaced), largest or smallest file, highest or lowest bitrate, highest or lowest resolution (by pixel count), newest or oldest release (libraries matched to TMDB), or random. Videos not yet probed, and files with no year, go last. Titles sort without a leading "The", "A" or "An". Random holds its order while the page is open, and each visit starts a fresh deal.
 - **View**: a grid of cards, a list, tiles (rows with a small thumbnail), or grouped: by matched or not (a library matched to movies starts here, Matched above Not matched, so what needs a Fix match is in one place), resolution, video codec or month added. Each bucket is a folded row with its count; click it to open the cards. The page of a library matched to shows splits the same way, its shows under a Matched row and the leftover files under Not matched, both folded to start.
 
-Sort, view and grouping are picked on the library page and saved as they change; the others are in **Edit**. Changing a setting or the name never rescans; only a change of folders does.
+Sort, view and grouping are picked on the library page and saved as they change; the others are in **Edit**. Changing a setting or the name never rescans; only a change of folders does. Sort, view, grouping and the pin can be changed with the [admin lock](#admin-lock) on, and the change holds for every browser; **Edit** needs it off.
 
 In every library and view, a strip runs down the right edge of the screen and stays there as the page scrolls, stepping through whatever the listing is sorted by, in its order: the alphabet for titles (a title files under its letter without a leading "The", "A" or "An", and # holds the ones that start with no letter), round steps of bitrate under Mb/s or of size under GB, resolutions, years (decades over a wide span), whole scores in the library's source, and months (years over a wide span) for when videos came or changed. Values not known yet sit under ? at the end. A step jumps to the first card under it in the order shown, opening a folded bucket on the way; a step no card falls under is there but cannot be pressed. A TV library steps its bitrate every 5 Mb/s, each show by its files' mean bitrate, and spells out titles for size and resolution, which its shows sort by title for. A random order has no strip, and neither has a TV library sorted by when videos changed.
 
@@ -156,13 +184,15 @@ Each library's **History**, linked from its page and its row on the Libraries pa
 
 ## Favourites and deleting
 
-Every card has a menu, from the button in its corner or a right click; on a screen with a pointer, the button shows when the card is pointed at or focused. With the [admin lock](#admin-lock) off, the menu ends with where the file lives, and choosing it copies the path. In a matched library it also has **Fix match** and **Refresh details** (see [Metadata](#metadata)), and on a matched movie or episode **Edit images**, which opens the movie's (or the episode's show's) pictures in a dialog over the page, the same as **Edit images** on its page. **Favourite** marks the video and lists it under **Favourites** in the side menu, most recently marked first, across every library. **Delete**, with the admin lock off, asks first, then removes the file from disk and the video from the index, along with its thumbnail, progress and favourite. There is no undo.
+Every card has a menu, from the button in its corner or a right click; on a screen with a pointer, the button shows when the card is pointed at or focused. **Favourite** marks the video and lists it under **Favourites** in the side menu, most recently marked first, across every library. The rest of the menu needs the [admin lock](#admin-lock) off. In a matched library it has **Fix match** and **Refresh details** (see [Metadata](#metadata)), and on a matched movie or episode **Edit images**, which opens the movie's (or the episode's show's) pictures in a dialog over the page, the same as **Edit images** on its page. It ends with where the file lives, and choosing it copies the path. **Delete** asks first, then removes the file from disk and the video from the index, along with its thumbnail, progress and favourite. There is no undo.
 
 ## Admin lock
 
 The admin lock keeps what only an admin should do out of every other browser's reach. It is on in every browser until the admin password is entered there, and while it is on:
 
 - Locked libraries are not there at all: not in the side menu, on the Libraries page, on Home, in Favourites or on a cast page, and an address of one answers as if there were no such library, so nothing asks for the PIN. No library can be locked either, as it would drop out of sight.
+- raven can be watched, not managed. No library can be added, edited, deleted, rescanned or matched again, and the server's folders cannot be browsed. No Fix match, AI suggestion, **Refresh details**, **Edit metadata** or **Edit images** can be saved, and no duplicate split apart or put back together. **Playback** and **Display** in **Settings** can be read but not changed. The buttons and menu items for all of this are left out, and the server answers `403` to them.
+- A library's sort, view, grouping and pin still change, as its page and the Libraries page save them for whoever is watching. Sent with anything else, a new name, other folders or another type, the change answers `403`.
 - No video can be deleted, and no file's path is shown: the card menu leaves out **Delete** and where the file lives, and the server answers `403` to both.
 
 The toggle is at the foot of **Settings**. Turning it off asks for `ADMIN_PASSWORD` and holds in that browser only, for 12 hours, until it is turned on again, or until the server restarts. Turning it on waits 15 seconds before it holds, with the seconds counting down beside it; unticked again in that time, it goes off with no password, so a slip of the finger costs nothing. Five wrong passwords in a row make it wait a minute.
@@ -181,7 +211,7 @@ A Movies, Anime movies, Family movies, Documentaries or Sporting events library 
 - **Shows.** A show is matched once per show folder, and each season fetched once; every file links to its episode (both, for a two-episode file). An episode TMDB does not list (another order, or absolute numbering) still sits under its show and season with the name its file gave. A TV library's cards are its shows, with the years, how many episodes are on disk, and Play for the first episode not yet watched; the files no show was found for sit under **Not matched** below. The show page has its seasons and the cast over the whole run; a season page lists only the episodes on disk; an episode page has its still, air date, guest stars and file.
 - **Season and episode pictures.** `Season01.jpg` or `season01-poster.jpg` in the show's or the season's folder (`season-specials-poster` for Specials) beats TMDB's season poster, and `<file>-thumb.jpg` beats an episode's still.
 - **Pictures.** `poster`, `folder` or `cover`, and `fanart`, `backdrop` or `background` (`jpg`, `png`, `webp`) beside a movie win over TMDB's, as do `<file>-poster` and `<file>-fanart`; folder-wide ones count only when the folder holds that one movie. Posters are fetched as soon as a movie matches (about 60 KB each); backdrops and photos the first time they are shown. A movie's page shows its title as TMDB's logo, a PNG in your language or without text, drawn in white when it is dark; it falls back to the words when there is none or it fails. **Edit images** on a movie's or a show's page lists, on a Poster tab and a Backdrop tab (and a Logo tab of TMDB's PNG logos for a movie), every picture the movie could show, the one beside the files and all of TMDB's in your language or without text, with the current one marked, and the files that are this movie (an Extended cut beside the theatrical one), since they share the pictures. A choice is kept through refreshes; picking the one beside the files goes back to raven's own order.
-- **Settings, Playback.** `/settings` holds how the server plays video, for every viewer: whether the original file plays only when the browser can take it or always; whether the server remuxes and transcodes, remuxes only, or converts nothing; the size (4K, 1080p, 720p) and quality (low, medium, high) of a transcode; which hardware encodes (auto, VideoToolbox, VAAPI, CPU only), shown against what it comes to after the test encode; and whether HDR is tone mapped. A change takes effect on the next play, and the hardware choice on the next transcode.
+- **Settings, Playback.** `/settings` holds how the server plays video, for every viewer: whether the original file plays only when the browser can take it or always; whether the server remuxes and transcodes, remuxes only, or converts nothing; the size (4K, 1080p, 720p) and quality (low, medium, high) of a transcode; which hardware encodes (auto, VideoToolbox, VAAPI, CPU only), shown against what it comes to after the test encode; and whether HDR is tone mapped. A change takes effect on the next play, and the hardware choice on the next transcode. Changing them needs the [admin lock](#admin-lock) off.
 - **Settings, Display.** How pages look, for every viewer: **Movie titles** shows each movie's title as its logo where TMDB has one, or spells every title out in type. **Reset to defaults** puts it back with the playback settings.
 - **Edit metadata.** Beside Edit images on a movie's or a show's page: the title, year, content rating, tagline and summary the page shows, each above what TMDB says. What is written shows instead of TMDB's words; TMDB's stay underneath, come back with Use TMDB's, and a refresh never touches an edit. The wand beside the title puts the file name's edition in brackets after it: `Heat (Director's Cut)`. They sit in `<data>/images/`, and the browser only ever talks to raven.
 - **Ratings.** Cards show the library's chosen source (TMDB, IMDb, Rotten Tomatoes or Metacritic); the list and tile views show every score a movie or show has.
@@ -274,7 +304,7 @@ A native iOS or Android app would be another `apps/raven/` entry that imports `@
 
 ## Not there yet
 
-- No accounts or auth: keep it on the LAN or behind Tailscale.
+- No accounts. Everyone who reaches raven, on the LAN or through [Funnel](#public-through-tailscale-funnel), shares one set of progress, history and favourites; the [admin lock](#admin-lock) and the PIN are what keep the rest to you.
 - Picture subtitles (PGS, VobSub) would need burning in or OCR.
 - On VAAPI, HDR is converted to BT.709 on the GPU rather than tone mapped. That suits HLG; HDR10 (PQ) comes out flat.
 - No QSV; Intel GPUs go through VAAPI.

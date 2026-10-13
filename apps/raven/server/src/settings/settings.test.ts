@@ -6,15 +6,24 @@ import type { ApiClient } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '@/app'
 import { readServerConfig } from '@/config'
+import { ADMIN_PASSWORD, adminCookie } from '@/test/app'
 import { apiFor } from '@/test/server'
 
+/** As a browser with the admin lock off, the only one that can change them. */
 describe('playback settings', () => {
-  const state: { root: string; app: NestFastifyApplication | null } = { root: '', app: null }
+  const state: { root: string; admin: string; app: NestFastifyApplication | null } = {
+    root: '',
+    admin: '',
+    app: null,
+  }
   const app = (): NestFastifyApplication => {
     if (!state.app) throw new Error('app not started')
     return state.app
   }
-  const api = (): ApiClient => apiFor({ app: app() })
+  const api = (): ApiClient => apiFor({ app: app(), cookie: state.admin })
+  /** A change by hand, for a value the client's types will not let it send. */
+  const put = ({ url, payload }: { url: string; payload: Record<string, unknown> }) =>
+    app().inject({ method: 'PUT', url, payload, headers: { cookie: state.admin } })
   const read = () => api().getPlaybackSettings()
 
   beforeAll(async () => {
@@ -26,11 +35,13 @@ describe('playback settings', () => {
         dataDir: join(state.root, 'data'),
         browseRoot: state.root,
         scanOnStart: false,
+        adminPassword: ADMIN_PASSWORD,
       },
       quiet: true,
     })
     await state.app.init()
     await state.app.getHttpAdapter().getInstance().ready()
+    state.admin = await adminCookie(state.app)
   })
 
   afterAll(async () => {
@@ -65,18 +76,9 @@ describe('playback settings', () => {
       hwAccel: 'none',
       maxHeight: 1080,
     })
-    // Values the client's types will not let it send, so sent by hand.
-    const refused = await app().inject({
-      method: 'PUT',
-      url: '/api/settings/playback',
-      payload: { maxHeight: 480 },
-    })
+    const refused = await put({ url: '/api/settings/playback', payload: { maxHeight: 480 } })
     expect(refused.statusCode).toBe(400)
-    const unknown = await app().inject({
-      method: 'PUT',
-      url: '/api/settings/playback',
-      payload: { bitrate: '8M' },
-    })
+    const unknown = await put({ url: '/api/settings/playback', payload: { bitrate: '8M' } })
     expect(unknown.statusCode).toBe(400)
     expect((await read()).settings.maxHeight).toBe(1080)
   })
@@ -85,11 +87,7 @@ describe('playback settings', () => {
     expect(await api().getDisplaySettings()).toEqual({ titles: 'logo' })
     expect(await api().setDisplaySettings({ titles: 'text' })).toEqual({ titles: 'text' })
     expect(await api().getDisplaySettings()).toEqual({ titles: 'text' })
-    const refused = await app().inject({
-      method: 'PUT',
-      url: '/api/settings/display',
-      payload: { titles: 'art' },
-    })
+    const refused = await put({ url: '/api/settings/display', payload: { titles: 'art' } })
     expect(refused.statusCode).toBe(400)
     expect(await api().getDisplaySettings()).toEqual({ titles: 'text' })
   })

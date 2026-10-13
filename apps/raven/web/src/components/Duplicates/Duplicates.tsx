@@ -13,6 +13,7 @@ import { useId } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/Button/Button'
 import { PosterImage } from '@/components/PosterImage/PosterImage'
+import { useAdminLocked } from '@/lib/adminLock'
 import { api } from '@/lib/api'
 import { afterSplit } from '@/lib/invalidate'
 import { versionFacts } from '@/lib/itemFacts'
@@ -92,15 +93,18 @@ const Splits = ({
  * While its files share one card, that card's files and the ways to split
  * it; once split, each card under its own title, any that still holds
  * several files splittable again, and Put back together for them all.
+ * Splitting and putting back wait for the admin lock to be off.
  */
 const MovieDuplicate = ({
   movie,
   busy,
+  canManage,
   onSplit,
   onJoin,
 }: {
   movie: Duplicate
   busy: boolean
+  canManage: boolean
   onSplit: (split: { mediaId: number; how: SplitHow }) => void
   onJoin: () => void
 }) => {
@@ -137,7 +141,7 @@ const MovieDuplicate = ({
                   </Link>
                 </h4>
                 <Files card={card} />
-                {card.files.length > 1 && (
+                {canManage && card.files.length > 1 && (
                   <Splits
                     card={card}
                     busy={busy}
@@ -150,14 +154,16 @@ const MovieDuplicate = ({
         ) : (
           <div className={styles.cards}>
             <Files card={own} />
-            <Splits
-              card={own}
-              busy={busy}
-              onSplit={(how) => onSplit({ mediaId: own.entry.media.id, how })}
-            />
+            {canManage && (
+              <Splits
+                card={own}
+                busy={busy}
+                onSplit={(how) => onSplit({ mediaId: own.entry.media.id, how })}
+              />
+            )}
           </div>
         )}
-        {isSplit && (
+        {canManage && isSplit && (
           <footer className={styles.join}>
             <Button icon="merge" disabled={busy} onClick={onJoin}>
               Put back together
@@ -185,6 +191,7 @@ export const Duplicates = ({
   listing: DuplicatesListing
 }) => {
   const queryClient = useQueryClient()
+  const canManage = !useAdminLocked()
   const settle = (updated: DuplicatesListing) => {
     queryClient.setQueryData(queryKeys.duplicates(library.id), updated)
     return afterSplit({ queryClient, libraryId: library.id })
@@ -214,6 +221,7 @@ export const Duplicates = ({
             key={movie.itemId}
             movie={movie}
             busy={busy}
+            canManage={canManage}
             onSplit={(request) => split.mutate(request)}
             onJoin={() => join.mutate(movie.itemId)}
           />

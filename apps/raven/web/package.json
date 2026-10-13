@@ -68,6 +68,20 @@
       "format:check",
       "test",
       "test:watch"
-    ]
+    ],
+    "targets": {
+      "build": {
+        "inputs": [
+          "production",
+          "^production",
+          {
+            "env": "RAVEN_API_ORIGIN"
+          },
+          {
+            "env": "NETLIFY"
+          }
+        ]
+      }
+    }
   }
 }

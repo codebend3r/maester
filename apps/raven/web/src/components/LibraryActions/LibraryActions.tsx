@@ -3,6 +3,7 @@ import { type Library, isScanning, matchTypeFor } from '@raven/core'
 import { useState } from 'react'
 import { Button, ButtonLink } from '@/components/Button/Button'
 import { LibraryDialog } from '@/components/LibraryDialog/LibraryDialog'
+import { useAdminLocked } from '@/lib/adminLock'
 import { api } from '@/lib/api'
 import { afterRematch, afterRescan } from '@/lib/invalidate'
 import { metadataHealthQuery } from '@/lib/queries'
@@ -37,9 +38,10 @@ export const useLibraryActions = (library: Library) => {
 }
 
 /**
- * A library's history, Rescan, Match again and Edit, in its page's header and
- * in its row on the Libraries page. Each names its library to a screen
- * reader, as the list has the same buttons on every row.
+ * A library's history, and Rescan, Match again and Edit with the admin lock
+ * off, in its page's header and in its row on the Libraries page. Each names
+ * its library to a screen reader, as the list has the same buttons on every
+ * row.
  */
 export const LibraryActions = ({
   library,
@@ -51,6 +53,7 @@ export const LibraryActions = ({
   actions: ReturnType<typeof useLibraryActions>
 }) => {
   const [isEditing, setEditing] = useState(false)
+  const canManage = !useAdminLocked()
   const matchType = matchTypeFor(library.settings.kind)
   // Files only leave pending while TMDB answers, so Match again waits on it.
   const metadata = useQuery({ ...metadataHealthQuery, enabled: matchType != null })
@@ -69,27 +72,33 @@ export const LibraryActions = ({
       <ButtonLink to={`/libraries/${library.id}/history`} icon="history">
         History{whose}
       </ButtonLink>
-      <Button
-        icon="rescan"
-        disabled={isScanning(library.scan) || rescan.isPending}
-        onClick={() => rescan.mutate()}
-      >
-        Rescan{whose}
-      </Button>
-      {matchType && (
-        <Button
-          icon="search"
-          disabled={!canMatch || library.unmatchedCount === 0 || rematch.isPending}
-          title={`Search TMDB again for the files no ${matchType} was found for`}
-          onClick={() => rematch.mutate()}
-        >
-          Match again{whose}
-        </Button>
+      {canManage && (
+        <>
+          <Button
+            icon="rescan"
+            disabled={isScanning(library.scan) || rescan.isPending}
+            onClick={() => rescan.mutate()}
+          >
+            Rescan{whose}
+          </Button>
+          {matchType && (
+            <Button
+              icon="search"
+              disabled={!canMatch || library.unmatchedCount === 0 || rematch.isPending}
+              title={`Search TMDB again for the files no ${matchType} was found for`}
+              onClick={() => rematch.mutate()}
+            >
+              Match again{whose}
+            </Button>
+          )}
+          <Button icon="edit" onClick={edit}>
+            Edit{whose}
+          </Button>
+        </>
       )}
-      <Button icon="edit" onClick={edit}>
-        Edit{whose}
-      </Button>
-      {isEditing && <LibraryDialog library={library} onClose={() => setEditing(false)} />}
+      {canManage && isEditing && (
+        <LibraryDialog library={library} onClose={() => setEditing(false)} />
+      )}
     </>
   )
 }

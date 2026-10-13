@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { DEFAULT_DISPLAY_SETTINGS, type DisplaySettings, type ItemDetails } from '@raven/core'
+import {
+  type AdminLock,
+  DEFAULT_DISPLAY_SETTINGS,
+  type DisplaySettings,
+  type ItemDetails,
+} from '@raven/core'
 import { Route, Routes, useParams } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { MoviePage } from '@/pages/MoviePage/MoviePage'
@@ -23,10 +28,12 @@ describe('MoviePage', () => {
     details,
     route = '/movies/40',
     display = DEFAULT_DISPLAY_SETTINGS,
+    adminLock,
   }: {
     details: ItemDetails
     route?: string
     display?: DisplaySettings
+    adminLock?: AdminLock
   }) => {
     spies.item.mockImplementation(async () => details)
     spies.libraries.mockImplementation(async () => [library({ id: 2, name: 'Films' })])
@@ -64,7 +71,7 @@ describe('MoviePage', () => {
         <Route path="movies/:id" element={<MoviePage />} />
         <Route path="watch/:id" element={<Watching />} />
       </Routes>,
-      { route, display },
+      { route, display, adminLock },
     )
   }
 
@@ -210,6 +217,14 @@ describe('MoviePage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Done' }))
     expect(screen.queryByRole('heading', { name: 'Edit images' })).toBeNull()
     images.mockRestore()
+  })
+
+  it("leaves Edit images, Edit metadata and the file's menu out while the admin lock is on", async () => {
+    open({ details: itemDetails(), adminLock: { state: 'on', available: true } })
+    expect(await screen.findByRole('button', { name: 'Favourite' })).toBeInTheDocument()
+    expect(
+      screen.queryAllByRole('button', { name: /^(Edit images|Edit metadata|Options for .+)$/ }),
+    ).toEqual([])
   })
 
   it('opens Edit metadata from the header', async () => {

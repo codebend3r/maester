@@ -12,7 +12,12 @@ import { requestParts } from '@/requestParts'
 
 const ADMIN_ONLY = Symbol('ADMIN_ONLY')
 
-/** Marks a route the admin lock holds back: deleting a video's file, or handing out its path. */
+/**
+ * Marks a route the admin lock holds back: one that manages raven rather
+ * than watches it, such as adding, scanning or matching a library, fixing a
+ * match, editing an item, browsing the server's folders, changing the
+ * settings, deleting a video's file, or handing out its path.
+ */
 export const AdminOnly = () => SetMetadata(ADMIN_ONLY, true)
 
 /** Answers 403 Forbidden for a route marked `AdminOnly` while the admin lock holds for this browser. */

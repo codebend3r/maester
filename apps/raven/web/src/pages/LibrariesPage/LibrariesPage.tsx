@@ -8,6 +8,7 @@ import { LibraryDialog } from '@/components/LibraryDialog/LibraryDialog'
 import { LibraryIcon } from '@/components/LibraryIcon/LibraryIcon'
 import { ScanStatus } from '@/components/ScanStatus/ScanStatus'
 import { Bone, Loading } from '@/components/Skeleton/Skeleton'
+import { useAdminLocked } from '@/lib/adminLock'
 import { api } from '@/lib/api'
 import { librarySettingsEdits } from '@/lib/edits'
 import { afterPins } from '@/lib/invalidate'
@@ -95,6 +96,7 @@ const LibraryRow = ({ library, isShut }: { library: Library; isShut: boolean }) 
 
 export const LibrariesPage = () => {
   const [adding, setAdding] = useState(false)
+  const canManage = !useAdminLocked()
   const libraries = useQuery({
     ...librariesQuery,
     // Poll only while something is scanning, so the counts climb live.
@@ -108,7 +110,7 @@ export const LibrariesPage = () => {
     enabled: (libraries.data ?? []).some((library) => library.settings.locked),
   })
 
-  const dialog = adding && <LibraryDialog onClose={() => setAdding(false)} />
+  const dialog = canManage && adding && <LibraryDialog onClose={() => setAdding(false)} />
 
   if (libraries.isError) {
     return (
@@ -128,9 +130,13 @@ export const LibrariesPage = () => {
           A library is a set of folders. Pick the ones that hold your movies or shows, and every
           video inside is indexed, given a thumbnail, and ready to play.
         </p>
-        <Button tone="primary" icon="plus" onClick={() => setAdding(true)}>
-          Add library
-        </Button>
+        {canManage ? (
+          <Button tone="primary" icon="plus" onClick={() => setAdding(true)}>
+            Add library
+          </Button>
+        ) : (
+          <p>Turn the admin lock off in Settings to add one.</p>
+        )}
         {dialog}
       </section>
     )
@@ -140,9 +146,11 @@ export const LibrariesPage = () => {
     <section className={styles.page}>
       <header className={styles.header}>
         <h1 className={styles.title}>Libraries</h1>
-        <Button tone="primary" icon="plus" onClick={() => setAdding(true)}>
-          Add library
-        </Button>
+        {canManage && (
+          <Button tone="primary" icon="plus" onClick={() => setAdding(true)}>
+            Add library
+          </Button>
+        )}
       </header>
       {libraries.isPending ? (
         <Loading label="Gathering your libraries">

@@ -235,4 +235,21 @@ describe('LibrariesPage', () => {
     renderWithProviders(<LibrariesPage />)
     expect(await screen.findByText('Movies · 1,217 videos · 22 not matched')).toBeInTheDocument()
   })
+
+  it('leaves Add library and Rescan out while the admin lock is on, but keeps the pin', async () => {
+    spies.list.mockImplementation(async () => [library({ name: 'Clips' })])
+    renderWithProviders(<LibrariesPage />, { adminLock: { state: 'on', available: true } })
+    expect(await screen.findByRole('button', { name: 'Pin Clips' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add library' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Rescan' })).toBeNull()
+  })
+
+  it('says how to add the first library while the admin lock is on', async () => {
+    spies.list.mockImplementation(async () => [])
+    renderWithProviders(<LibrariesPage />, { adminLock: { state: 'on', available: true } })
+    expect(
+      await screen.findByText('Turn the admin lock off in Settings to add one.'),
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add library' })).toBeNull()
+  })
 })

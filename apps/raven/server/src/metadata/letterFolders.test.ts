@@ -18,6 +18,7 @@ import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { MediaIndex } from '@/media/mediaIndex'
 import { MetadataService } from '@/metadata/metadataService'
 import { ScannerService } from '@/scanner/scannerService'
+import { ADMIN_PASSWORD, adminCookie } from '@/test/app'
 import { encodeClip } from '@/test/clips'
 import { fakeTmdb } from '@/test/fakeTmdb'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
@@ -89,6 +90,7 @@ describe('letter and group folders', () => {
     other: string
     movies: string
     data: string
+    admin: string
     app: NestFastifyApplication | null
     shows: number
     moviesLibrary: number
@@ -99,6 +101,7 @@ describe('letter and group folders', () => {
     other: '',
     movies: '',
     data: '',
+    admin: '',
     app: null,
     shows: 0,
     moviesLibrary: 0,
@@ -135,6 +138,7 @@ describe('letter and group folders', () => {
       method: 'PUT',
       url: `/api/libraries/${state.shows}`,
       payload: { name: 'TV', paths: [state.tv], settings: { kind: 'shows', folderLayout } },
+      headers: { cookie: state.admin },
     })
   }
   const setLayout = async (folderLayout: 'auto' | 'flat') => {
@@ -159,6 +163,7 @@ describe('letter and group folders', () => {
         method: 'POST',
         url: '/api/libraries',
         payload: { name, paths: [path], settings: { kind } },
+        headers: { cookie: state.admin },
       }),
       guard: isLibrary,
     }).id
@@ -216,12 +221,14 @@ describe('letter and group folders', () => {
         scanOnStart: false,
         rescanIntervalMinutes: 0,
         tmdbApiToken: 'test-token',
+        adminPassword: ADMIN_PASSWORD,
       },
       quiet: true,
       metadataFetch: tmdb.fetch,
     })
     await state.app.init()
     await state.app.getHttpAdapter().getInstance().ready()
+    state.admin = await adminCookie(state.app)
     state.shows = await createLibrary({ name: 'TV', path: state.tv, kind: 'shows' })
     state.moviesLibrary = await createLibrary({
       name: 'Movies',
@@ -354,6 +361,7 @@ describe('letter and group folders', () => {
       method: 'PUT',
       url: `/api/libraries/${state.otherLibrary}`,
       payload: { name: 'Other', paths: [state.other], settings: { kind: 'shows' } },
+      headers: { cookie: state.admin },
     })
     await settle()
     expect((await mediaOf(state.otherLibrary)).map((item) => item.folder)).toEqual([
@@ -396,6 +404,7 @@ describe('letter and group folders', () => {
       method: 'PUT',
       url: `/api/items/${andor?.show.id}/match`,
       payload: { tmdbId: '114461' },
+      headers: { cookie: state.admin },
     })
     await settle()
     const states = (await mediaOf(state.shows))

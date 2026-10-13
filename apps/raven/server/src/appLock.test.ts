@@ -302,6 +302,7 @@ describe('the admin lock', () => {
     pin: string
     open: number
     openVideo: number
+    openItem: number
     private: number
     privateVideo: number
     privateItem: number
@@ -312,6 +313,7 @@ describe('the admin lock', () => {
     pin: '',
     open: 0,
     openVideo: 0,
+    openItem: 0,
     private: 0,
     privateVideo: 0,
     privateItem: 0,
@@ -373,6 +375,10 @@ describe('the admin lock', () => {
       item: { ...BLANK_ITEM, type: 'movie', tmdbId: '7002', number: null, title: 'Lesson One' },
     })
     metadata.link({ mediaIds: [state.privateVideo], itemIds: [state.privateItem] })
+    state.openItem = metadata.save({
+      item: { ...BLANK_ITEM, type: 'movie', tmdbId: '7004', number: null, title: 'Heat' },
+    })
+    metadata.link({ mediaIds: [state.openVideo], itemIds: [state.openItem] })
     state.pin = cookieSet(
       await app().inject({ method: 'POST', url: '/api/lock/unlock', payload: { pin: '3001' } }),
     )
@@ -458,6 +464,88 @@ describe('the admin lock', () => {
       input: { name, paths, settings: { pinned: false } },
     })
     expect(saved.settings).toMatchObject({ pinned: false, locked: false })
+  })
+
+  it('holds back every route that manages raven rather than watches it', async () => {
+    const library = `/api/libraries/${state.open}`
+    const item = `/api/items/${state.openItem}`
+    // Deleting and scanning name no library, so letting them through changes nothing.
+    const absent = '/api/libraries/999999'
+    const managing: {
+      method: (typeof ROUTE_METHODS)[number]
+      url: string
+      payload?: Record<string, unknown>
+    }[] = [
+      { method: 'POST', url: '/api/libraries', payload: {} },
+      { method: 'DELETE', url: absent },
+      { method: 'POST', url: `${absent}/scan` },
+      { method: 'POST', url: `${library}/match` },
+      { method: 'POST', url: `${library}/duplicates/split`, payload: {} },
+      { method: 'POST', url: `${library}/duplicates/join`, payload: {} },
+      { method: 'GET', url: `/api/fs/browse?path=${encodeURIComponent(at('Open'))}` },
+      { method: 'PUT', url: '/api/settings/playback', payload: {} },
+      { method: 'PUT', url: '/api/settings/display', payload: {} },
+      { method: 'GET', url: '/api/match/search?type=movie&query=Heat' },
+      { method: 'PUT', url: `/api/media/${state.openVideo}/match`, payload: {} },
+      { method: 'PUT', url: `${item}/match`, payload: {} },
+      { method: 'POST', url: `${item}/refresh` },
+      { method: 'GET', url: `${item}/metadata` },
+      { method: 'PUT', url: `${item}/metadata`, payload: { title: 7 } },
+      { method: 'GET', url: `${item}/images` },
+      { method: 'PUT', url: `${item}/images/poster`, payload: {} },
+    ]
+    const answers = (...cookie: string[]) =>
+      Promise.all(
+        managing.map(async ({ method, url, payload }) => {
+          const response = await app().inject({
+            method,
+            url,
+            ...(payload ? { payload } : {}),
+            headers: { cookie: cookies(...cookie) },
+          })
+          return `${method} ${url} ${response.statusCode === 403 ? 'refused' : 'answered'}`
+        }),
+      )
+    expect(await answers()).toEqual(managing.map(({ method, url }) => `${method} ${url} refused`))
+    expect(await answers(state.admin)).toEqual(
+      managing.map(({ method, url }) => `${method} ${url} answered`),
+    )
+  })
+
+  it('lets anyone sort, view, group or pin a library, and change nothing else of it', async () => {
+    const { name, paths, settings } = await api().getLibrary(state.open)
+    const { sort, view, groupBy, pinned } = settings
+    const viewed = await api().updateLibrary({
+      id: state.open,
+      input: { name, paths, settings: { sort, view, groupBy, pinned: !pinned } },
+    })
+    expect(viewed.settings.pinned).toBe(!pinned)
+    const changes = [
+      { name: 'Renamed', paths },
+      { name, paths: [...paths, at('Private')] },
+      { name, paths, settings: { sort, kind: 'movies' } },
+    ] satisfies LibraryInput[]
+    const refused = await Promise.all(
+      changes.map((input) =>
+        api()
+          .updateLibrary({ id: state.open, input })
+          .catch((error: unknown) => error),
+      ),
+    )
+    expect(refused).toEqual(
+      changes.map(() =>
+        expect.objectContaining({
+          status: 403,
+          message:
+            'Turn the admin lock off in Settings to change more than how a library is sorted, viewed, grouped or pinned.',
+        }),
+      ),
+    )
+    expect(await api().getLibrary(state.open)).toMatchObject({
+      name,
+      paths,
+      settings: { kind: settings.kind },
+    })
   })
 
   it('turns off only with the password', async () => {

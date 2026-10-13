@@ -1,7 +1,14 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { Library, LibraryInput, LibrarySettings, MediaItem, MediaSort } from '@raven/core'
+import type {
+  AdminLock,
+  Library,
+  LibraryInput,
+  LibrarySettings,
+  MediaItem,
+  MediaSort,
+} from '@raven/core'
 import { api } from '@/lib/api'
 import { useUnlockPrompt } from '@/stores/unlockPrompt'
 import { library, mediaItem, metadataHealth, showEntry } from '@/test/fixtures'
@@ -31,10 +38,12 @@ describe('LibraryPage', () => {
     settings = {},
     items = ITEMS,
     route = '/libraries/2',
+    adminLock,
   }: {
     settings?: Partial<LibrarySettings>
     items?: MediaItem[]
     route?: string
+    adminLock?: AdminLock
   } = {}) => {
     const current: { library: Library } = {
       library: library({ id: 2, settings: { ...library().settings, ...settings } }),
@@ -52,7 +61,7 @@ describe('LibraryPage', () => {
       }
       return current.library
     })
-    renderLibraryPage({ route })
+    renderLibraryPage({ route, adminLock })
   }
 
   afterEach(() => {
@@ -309,6 +318,14 @@ describe('LibraryPage', () => {
       'href',
       '/libraries/2/history',
     )
+  })
+
+  it('leaves Rescan, Match again and Edit out while the admin lock is on', async () => {
+    serve({ settings: { kind: 'movies' }, adminLock: { state: 'on', available: true } })
+    expect(await screen.findByRole('link', { name: /^History/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Rescan/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Match again/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Edit/ })).toBeNull()
   })
 
   it('has nothing to play or shuffle in an empty library', async () => {

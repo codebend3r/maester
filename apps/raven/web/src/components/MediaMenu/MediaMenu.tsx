@@ -270,47 +270,49 @@ const MenuBody = ({
               }}
             />
           )}
-          {matchable && (
-            <MenuItem
-              icon="search"
-              label="Fix match"
-              onClick={() => {
-                close({ refocus: false })
-                setFixing(true)
-              }}
-            />
-          )}
-          {matchable && item != null && (
-            <MenuItem
-              icon="rescan"
-              label="Refresh details"
-              onClick={() => {
-                refresh.mutate(item.id)
-                close({ refocus: true })
-              }}
-            />
-          )}
-          {artwork && (
-            <MenuItem
-              icon="image"
-              label="Edit images"
-              onClick={() => {
-                close({ refocus: false })
-                setEditingImages(true)
-              }}
-            />
-          )}
           {!isAdminLocked && (
-            <MenuItem
-              icon="trash"
-              label="Delete"
-              onClick={() => {
-                close({ refocus: false })
-                setConfirming(true)
-              }}
-            />
+            <>
+              {matchable && (
+                <MenuItem
+                  icon="search"
+                  label="Fix match"
+                  onClick={() => {
+                    close({ refocus: false })
+                    setFixing(true)
+                  }}
+                />
+              )}
+              {matchable && item != null && (
+                <MenuItem
+                  icon="rescan"
+                  label="Refresh details"
+                  onClick={() => {
+                    refresh.mutate(item.id)
+                    close({ refocus: true })
+                  }}
+                />
+              )}
+              {artwork && (
+                <MenuItem
+                  icon="image"
+                  label="Edit images"
+                  onClick={() => {
+                    close({ refocus: false })
+                    setEditingImages(true)
+                  }}
+                />
+              )}
+              <MenuItem
+                icon="trash"
+                label="Delete"
+                onClick={() => {
+                  close({ refocus: false })
+                  setConfirming(true)
+                }}
+              />
+              <LocationItem media={media} />
+            </>
           )}
-          {!isAdminLocked && <LocationItem media={media} />}
         </ul>
       )}
 
@@ -364,10 +366,10 @@ const MenuBody = ({
 }
 
 /**
- * A card's context menu: mark or unmark a favourite, fix the match or fetch
- * the details again where the library matches its files, change the
- * pictures of its movie or show, and, with the admin lock off, delete the
- * video or see and copy where its file lives. The card owns `open`, so a right
+ * A card's context menu: mark or unmark a favourite and, with the admin lock
+ * off, fix the match or fetch the details again where the library matches
+ * its files, change the pictures of its movie or show, delete the video, or
+ * see and copy where its file lives. The card owns `open`, so a right
  * click anywhere on it opens this same menu; the button here is the
  * discoverable way in for touch and keyboard. Until it first opens it is
  * only that button.

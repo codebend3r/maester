@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '@/app'
 import { readServerConfig } from '@/config'
 import { ScannerService } from '@/scanner/scannerService'
+import { ADMIN_PASSWORD, adminCookie } from '@/test/app'
 import { encodeRichClip } from '@/test/clips'
 import { apiFor } from '@/test/server'
 
@@ -51,10 +52,12 @@ const firstPacketTimes = async (path: string): Promise<{ video: number; audio: n
 /** Rounded to the millisecond, as WebVTT is. */
 const ms = (seconds: number): number => Math.round(seconds * 1000) / 1000
 
+/** As a browser with the admin lock off, so the library can be added and the settings changed. */
 describe('playback', () => {
   const state: {
     root: string
     lead: number
+    admin: string
     app: NestFastifyApplication | null
     movie: MediaItem | null
   } = {
@@ -67,6 +70,7 @@ describe('playback', () => {
      * what the player needs, so expectations are measured from here.
      */
     lead: 0,
+    admin: '',
     app: null,
     movie: null,
   }
@@ -74,7 +78,7 @@ describe('playback', () => {
     if (!state.app) throw new Error('app not started')
     return state.app
   }
-  const api = (): ApiClient => apiFor({ app: app() })
+  const api = (): ApiClient => apiFor({ app: app(), cookie: state.admin })
   const movieId = (): number => state.movie?.id ?? -1
   /** A converted stream's address, built as the player builds it. */
   const streamUrl = ({
@@ -102,11 +106,13 @@ describe('playback', () => {
         browseRoot: media,
         scanOnStart: false,
         rescanIntervalMinutes: 0,
+        adminPassword: ADMIN_PASSWORD,
       },
       quiet: true,
     })
     await state.app.init()
     await state.app.getHttpAdapter().getInstance().ready()
+    state.admin = await adminCookie(state.app)
     const library = await api().createLibrary({ name: 'Films', paths: [media] })
     await app().get(ScannerService).whenIdle(library.id)
     const [movie] = await api().listMedia({ libraryId: library.id })

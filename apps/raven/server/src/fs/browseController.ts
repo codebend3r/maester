@@ -10,6 +10,7 @@ import {
   Query,
 } from '@nestjs/common'
 import type { DirectoryEntry, DirectoryListing } from '@raven/core'
+import { AdminOnly } from '@/admin/adminGuard'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 
 const isInside = ({ root, path }: { root: string; path: string }): boolean =>
@@ -27,6 +28,7 @@ const errorCode = (error: unknown): string | null =>
 export class BrowseController {
   constructor(@Inject(SERVER_CONFIG) private readonly config: ServerConfig) {}
 
+  @AdminOnly()
   @Get('browse')
   async browse(@Query('path') requested?: string): Promise<DirectoryListing> {
     const root = await realpath(this.config.browseRoot).catch(() => this.config.browseRoot)

@@ -7,7 +7,11 @@ import { adminLockQuery } from '@/lib/queries'
 export const isAdminLocked = (lock: AdminLock | undefined): boolean =>
   (lock?.state ?? 'on') === 'on'
 
-/** Whether this browser is held back from deleting videos, copying their paths and locking libraries. */
+/**
+ * Whether this browser is held back from managing raven: adding, editing,
+ * scanning and matching libraries, fixing matches, editing items and the
+ * settings, deleting videos, copying their paths and locking libraries.
+ */
 export const useAdminLocked = (): boolean => isAdminLocked(useQuery(adminLockQuery).data)
 
 /**

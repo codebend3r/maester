@@ -21,6 +21,7 @@ import {
   type HistoryEntry,
   type Library,
   type LibraryInput,
+  type LibrarySettings,
   type MediaItem,
   type MediaListParams,
   type PosterEntry,
@@ -35,6 +36,7 @@ import {
   type UnmatchedFile,
   validateLibraryInput,
 } from '@raven/core'
+import { AdminOnly } from '@/admin/adminGuard'
 import { AdminService } from '@/admin/adminService'
 import { type LibraryRecord, LibrariesRepository, samePaths } from '@/libraries/librariesRepository'
 import { PrivateBy, Public } from '@/lock/lockGuard'
@@ -71,6 +73,29 @@ const historyLimit = (asked: string | undefined): number => {
     ? Math.min(Math.max(limit, 1), HISTORY_LIMIT.most)
     : HISTORY_LIMIT.fallback
 }
+
+/** The settings anyone may change with the admin lock on: how a library is laid out, and its pin. */
+const VIEWER_SETTINGS = [
+  'sort',
+  'view',
+  'groupBy',
+  'pinned',
+] as const satisfies readonly (keyof LibrarySettings)[]
+
+const isViewerSetting = (key: string): key is (typeof VIEWER_SETTINGS)[number] =>
+  VIEWER_SETTINGS.some((setting) => setting === key)
+
+/** Whether an update keeps the name and folders, and changes only the settings a viewer may. */
+const isViewerChange = ({
+  before,
+  input,
+}: {
+  before: LibraryRecord
+  input: LibraryInput
+}): boolean =>
+  input.name === before.name &&
+  samePaths({ before: before.paths, after: input.paths }) &&
+  Object.keys(input.settings ?? {}).every(isViewerSetting)
 
 @Controller('api/libraries')
 @PrivateBy('library')
@@ -168,6 +193,7 @@ export class LibrariesController {
 
   /** Creating a library starts its first scan; the response already reports it as scanning. */
   @Public()
+  @AdminOnly()
   @Post()
   create(@Body() body: unknown, @Headers('cookie') cookie: string | undefined): Library {
     const record = this.libraries.create(this.parseLockable({ body, cookie, wasLocked: false }))
@@ -181,7 +207,9 @@ export class LibrariesController {
    * another way, or of folder layout, reads them again and matches what
    * regrouped; one that only prefers other results picks each file again
    * where it stands. A rename or another setting, the lock included, leaves
-   * the index as it is.
+   * the index as it is. With the admin lock on, a library keeps its name and
+   * folders, and only its sort, view, grouping and pin can change, as the
+   * library's page and the pin save them for whoever is watching.
    */
   @Put(':id')
   update(
@@ -191,6 +219,11 @@ export class LibrariesController {
   ): Library {
     const before = this.find(id)
     const input = this.parseLockable({ body, cookie, wasLocked: before.settings.locked })
+    if (!isViewerChange({ before, input }) && this.admin.isLocked({ cookie })) {
+      throw new ForbiddenException(
+        'Turn the admin lock off in Settings to change more than how a library is sorted, viewed, grouped or pinned.',
+      )
+    }
     const record = this.libraries.update({ id, input })
     if (!record) throw new NotFoundException(`No library ${id}`)
     const { kind } = record.settings
@@ -206,6 +239,7 @@ export class LibrariesController {
     return this.withStatus({ record, canSee: true })
   }
 
+  @AdminOnly()
   @Delete(':id')
   @HttpCode(204)
   async remove(@Param('id', ParseIntPipe) id: number): Promise<void> {
@@ -221,6 +255,7 @@ export class LibrariesController {
     this.metadata.enqueue(id)
   }
 
+  @AdminOnly()
   @Post(':id/scan')
   @HttpCode(200)
   scan(@Param('id', ParseIntPipe) id: number): Library {
@@ -233,6 +268,7 @@ export class LibrariesController {
    * Match again: the files no movie or show was found for go back in the
    * queue, and TMDB is searched for them once more. Fix match choices stay.
    */
+  @AdminOnly()
   @Post(':id/match')
   @HttpCode(200)
   rematch(@Param('id', ParseIntPipe) id: number): Library {
@@ -331,6 +367,7 @@ export class LibrariesController {
   }
 
   /** Splits a card, named by any file on it: every file apart, or by cut. */
+  @AdminOnly()
   @Post(':id/duplicates/split')
   @HttpCode(200)
   split(@Param('id', ParseIntPipe) id: number, @Body() body: unknown): Duplicates {
@@ -344,6 +381,7 @@ export class LibrariesController {
   }
 
   /** Puts a split movie's files back on one card. */
+  @AdminOnly()
   @Post(':id/duplicates/join')
   @HttpCode(200)
   join(@Param('id', ParseIntPipe) id: number, @Body() body: unknown): Duplicates {

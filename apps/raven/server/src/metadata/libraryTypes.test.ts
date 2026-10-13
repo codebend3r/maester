@@ -39,6 +39,7 @@ const shape = <T>({
   return body
 }
 
+/** As a browser with the admin lock off, so libraries can be added and edited. */
 describe('matching by library type', () => {
   // The live-action series is listed first, as TMDB lists the more popular one.
   const tmdb = fakeTmdb({
@@ -82,6 +83,7 @@ describe('matching by library type', () => {
     films: string
     animeFilms: string
     data: string
+    admin: string
     app: NestFastifyApplication | null
     library: number
     filmLibrary: number
@@ -92,6 +94,7 @@ describe('matching by library type', () => {
     films: '',
     animeFilms: '',
     data: '',
+    admin: '',
     app: null,
     library: 0,
     filmLibrary: 0,
@@ -124,6 +127,7 @@ describe('matching by library type', () => {
       method: 'PUT',
       url: `/api/libraries/${id}`,
       payload: { name, paths: [path], settings: { kind } },
+      headers: { cookie: state.admin },
     })
     expect(response.statusCode).toBe(200)
     await settle()
@@ -202,11 +206,13 @@ describe('matching by library type', () => {
     })
     await state.app.init()
     await state.app.getHttpAdapter().getInstance().ready()
+    state.admin = await adminCookie(state.app)
     state.library = shape({
       response: await app().inject({
         method: 'POST',
         url: '/api/libraries',
         payload: { name: 'TV', paths: [state.tv], settings: { kind: 'shows' } },
+        headers: { cookie: state.admin },
       }),
       guard: isLibrary,
     }).id
@@ -215,6 +221,7 @@ describe('matching by library type', () => {
         method: 'POST',
         url: '/api/libraries',
         payload: { name: 'Films', paths: [state.films], settings: { kind: 'movies' } },
+        headers: { cookie: state.admin },
       }),
       guard: isLibrary,
     }).id
@@ -227,6 +234,7 @@ describe('matching by library type', () => {
           paths: [state.animeFilms],
           settings: { kind: 'animeMovies' },
         },
+        headers: { cookie: state.admin },
       }),
       guard: isLibrary,
     }).id
@@ -255,6 +263,7 @@ describe('matching by library type', () => {
         response: await app().inject({
           method: 'GET',
           url: `/api/match/search?type=show&query=Cowboy%20Bebop${query}`,
+          headers: { cookie: state.admin },
         }),
         guard: isMatchCandidateList,
       }).map((each) => each.tmdbId)
@@ -271,6 +280,7 @@ describe('matching by library type', () => {
     const response = await app().inject({
       method: 'GET',
       url: '/api/match/search?type=show&query=Cowboy%20Bebop&libraryId=abc',
+      headers: { cookie: state.admin },
     })
     expect(response.statusCode).toBe(400)
   })
@@ -283,6 +293,7 @@ describe('matching by library type', () => {
       method: 'POST',
       url: `/api/libraries/${state.filmLibrary}/duplicates/split`,
       payload: { mediaId: card?.id, how: 'apart' },
+      headers: { cookie: state.admin },
     })
     expect(split.statusCode).toBe(200)
     const apart = await cards()
@@ -309,6 +320,7 @@ describe('matching by library type', () => {
       method: 'PUT',
       url: `/api/items/${itemId}/metadata`,
       payload: { title: 'The Matrix (Edited)' },
+      headers: { cookie: state.admin },
     })
     expect(edited.statusCode).toBe(200)
     tmdb.state.down = true
@@ -339,6 +351,7 @@ describe('matching by library type', () => {
       method: 'PUT',
       url: `/api/items/${showId}/metadata`,
       payload: { title: 'Cowboy Bebop (Edited)' },
+      headers: { cookie: state.admin },
     })
     tmdb.state.down = true
     await setKind('movies')
@@ -351,6 +364,7 @@ describe('matching by library type', () => {
       method: 'PUT',
       url: `/api/items/${showId}/metadata`,
       payload: { title: null },
+      headers: { cookie: state.admin },
     })
   })
 
@@ -360,14 +374,22 @@ describe('matching by library type', () => {
       path: join(state.tv, 'Cowboy Bebop', 'Season 2', 'Cowboy Bebop - S02E01 - Second.mp4'),
       seconds: 1,
     })
-    await app().inject({ method: 'POST', url: `/api/libraries/${state.library}/scan` })
+    await app().inject({
+      method: 'POST',
+      url: `/api/libraries/${state.library}/scan`,
+      headers: { cookie: state.admin },
+    })
     await settle()
     tmdb.state.failing = ['/tv/30991/season/2']
     await setKind('animeShows')
     const states = (await mediaOf()).map((item) => item.match)
     expect(states.every((match) => match === 'pending')).toBe(true)
     tmdb.state.failing = []
-    await app().inject({ method: 'POST', url: `/api/libraries/${state.library}/scan` })
+    await app().inject({
+      method: 'POST',
+      url: `/api/libraries/${state.library}/scan`,
+      headers: { cookie: state.admin },
+    })
     await settle()
     expect(await showYears()).toEqual([1998])
     await setKind('shows')
@@ -379,6 +401,7 @@ describe('matching by library type', () => {
         method: 'PUT',
         url: `/api/libraries/${state.animeFilmLibrary}`,
         payload: { name: 'Anime films', paths: [state.animeFilms], settings },
+        headers: { cookie: state.admin },
       })
       expect(response.statusCode).toBe(200)
     }
@@ -455,6 +478,7 @@ describe('matching by library type', () => {
         method: 'POST',
         url: '/api/libraries',
         payload: { name: 'Vault', paths: [vault], settings: { kind: 'movies' } },
+        headers: { cookie: state.admin },
       }),
       guard: isLibrary,
     }).id
@@ -464,7 +488,11 @@ describe('matching by library type', () => {
         (await mediaOf(id)).flatMap((file) => (file.item == null ? [] : [file.item.id])),
       check: (items) => items.length > 0 && isRoninAsked(),
     })
-    const deleted = await app().inject({ method: 'DELETE', url: `/api/libraries/${id}` })
+    const deleted = await app().inject({
+      method: 'DELETE',
+      url: `/api/libraries/${id}`,
+      headers: { cookie: state.admin },
+    })
     expect(deleted.statusCode).toBe(204)
     // The held search answers, but fetching Ronin, which raven has not stored, stops the pass.
     tmdb.state.down = true
@@ -483,6 +511,7 @@ describe('matching by library type', () => {
         method: 'POST',
         url: '/api/libraries',
         payload: { name: 'UFC', paths: [events], settings: { kind: 'sports', icon: 'octagon' } },
+        headers: { cookie: state.admin },
       }),
       guard: isLibrary,
     })
@@ -522,7 +551,6 @@ describe('matching by library type', () => {
     const pin = cookieSet(
       await app().inject({ method: 'POST', url: '/api/lock/unlock', payload: { pin: '3001' } }),
     )
-    expect(await order('')).toEqual(['90660', '30991'])
     expect(await order(admin)).toEqual(['90660', '30991'])
     expect(await order(cookies(admin, pin))).toEqual(['30991', '90660'])
   })

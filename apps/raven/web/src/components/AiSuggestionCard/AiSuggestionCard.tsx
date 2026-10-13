@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { AiSuggestion } from '@raven/core'
 import { type Ref, useId } from 'react'
 import { Button } from '@/components/Button/Button'
+import { useAdminLocked } from '@/lib/adminLock'
 import { api } from '@/lib/api'
 import { afterMatch } from '@/lib/invalidate'
 import styles from '@/components/AiSuggestionCard/AiSuggestionCard.module.scss'
@@ -14,7 +15,7 @@ export const suggestedName = (suggestion: AiSuggestion): string =>
  * What the AI lookup suggests for files it was not sure of: the poster, the
  * title and year, and the reason it gave. Accept points the files at it with
  * the call Fix match makes, so it is kept as a Fix match; Fix match opens
- * the search to choose another.
+ * the search to choose another. Both wait for the admin lock to be off.
  */
 export const AiSuggestionCard = ({
   suggestion,
@@ -34,6 +35,7 @@ export const AiSuggestionCard = ({
 }) => {
   const titleId = useId()
   const queryClient = useQueryClient()
+  const canManage = !useAdminLocked()
   const accepting = useMutation({
     mutationFn: () => accept(suggestion.tmdbId),
     onSuccess: () => afterMatch(queryClient),
@@ -60,19 +62,26 @@ export const AiSuggestionCard = ({
           </p>
         )}
       </div>
-      <footer className={styles.actions}>
-        <Button
-          tone="primary"
-          disabled={accepting.isPending}
-          aria-label={`Accept ${name} for ${subject}`}
-          onClick={() => accepting.mutate()}
-        >
-          Accept
-        </Button>
-        <Button ref={fixRef} icon="search" aria-label={`Fix match for ${subject}`} onClick={onFix}>
-          Fix match
-        </Button>
-      </footer>
+      {canManage && (
+        <footer className={styles.actions}>
+          <Button
+            tone="primary"
+            disabled={accepting.isPending}
+            aria-label={`Accept ${name} for ${subject}`}
+            onClick={() => accepting.mutate()}
+          >
+            Accept
+          </Button>
+          <Button
+            ref={fixRef}
+            icon="search"
+            aria-label={`Fix match for ${subject}`}
+            onClick={onFix}
+          >
+            Fix match
+          </Button>
+        </footer>
+      )}
     </article>
   )
 }

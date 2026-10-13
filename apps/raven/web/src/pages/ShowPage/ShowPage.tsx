@@ -13,6 +13,7 @@ import { ReviewCards } from '@/components/ReviewCards/ReviewCards'
 import { RouteState } from '@/components/RouteState/RouteState'
 import { Summary } from '@/components/Summary/Summary'
 import { TmdbCredit } from '@/components/TmdbCredit/TmdbCredit'
+import { useAdminLocked } from '@/lib/adminLock'
 import { api } from '@/lib/api'
 import { createdBy, showFacts } from '@/lib/itemFacts'
 import { itemPath, watchLink } from '@/lib/itemLinks'
@@ -50,6 +51,7 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
   const [fixing, setFixing] = useState(false)
   const [editingImages, setEditingImages] = useState(false)
   const [editingMetadata, setEditingMetadata] = useState(false)
+  const canEdit = !useAdminLocked()
   const next = useQuery(nextEpisodeQuery(details.id))
   const libraryId = next.data?.libraryId ?? details.versions[0]?.libraryId
   const code = next.data?.item ? episodeCode(next.data.item) : null
@@ -87,28 +89,32 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
             {code ? `Play ${code}` : 'Play'}
           </ButtonLink>
         )}
-        <Button
-          icon="edit"
-          aria-pressed={editingImages}
-          onClick={() => setEditingImages((editing) => !editing)}
-        >
-          Edit images
-        </Button>
-        <Button
-          icon="edit"
-          aria-pressed={editingMetadata}
-          onClick={() => setEditingMetadata((editing) => !editing)}
-        >
-          Edit metadata
-        </Button>
-        <Button icon="search" onClick={() => setFixing(true)}>
-          Fix match
-        </Button>
+        {canEdit && (
+          <>
+            <Button
+              icon="edit"
+              aria-pressed={editingImages}
+              onClick={() => setEditingImages((editing) => !editing)}
+            >
+              Edit images
+            </Button>
+            <Button
+              icon="edit"
+              aria-pressed={editingMetadata}
+              onClick={() => setEditingMetadata((editing) => !editing)}
+            >
+              Edit metadata
+            </Button>
+            <Button icon="search" onClick={() => setFixing(true)}>
+              Fix match
+            </Button>
+          </>
+        )}
       </ItemHeader>
 
       {details.aiMatch && <AiMatchNote aiMatch={details.aiMatch} />}
 
-      {editingImages && (
+      {canEdit && editingImages && (
         <ImageEditor
           details={details}
           libraries={[]}
@@ -116,7 +122,7 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
           onDone={() => setEditingImages(false)}
         />
       )}
-      {editingMetadata && (
+      {canEdit && editingMetadata && (
         <MetadataEditor
           details={details}
           itemKind="show"
@@ -143,7 +149,7 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
       <ReviewCards reviews={details.reviews} />
       <TmdbCredit />
 
-      {fixing && (
+      {canEdit && fixing && (
         <FixMatchDialog
           type="show"
           title={details.title}

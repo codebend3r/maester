@@ -20,6 +20,7 @@ import { ReviewCards } from '@/components/ReviewCards/ReviewCards'
 import { Summary } from '@/components/Summary/Summary'
 import { TmdbCredit } from '@/components/TmdbCredit/TmdbCredit'
 import { Versions } from '@/components/Versions/Versions'
+import { useAdminLocked } from '@/lib/adminLock'
 import { api } from '@/lib/api'
 import { directedBy, episodeByline, episodeFacts, fileFacts, movieFacts } from '@/lib/itemFacts'
 import { episodeBackPath, itemPath, watchLink } from '@/lib/itemLinks'
@@ -38,7 +39,7 @@ type PlayableConfig = {
   facts: (facts: Facts) => string[]
   /** A movie has a poster and a backdrop; an episode has its still, else the file's frame grab, for both. */
   pictures: 'poster and backdrop' | 'still'
-  /** Whether the page offers Edit images and Edit metadata. */
+  /** Whether the page offers Edit images and Edit metadata, once the admin lock is off. */
   editable: boolean
   showsTagline: boolean
   showsContentRating: boolean
@@ -81,9 +82,10 @@ const PLAYABLE = {
 
 /**
  * A movie's or an episode's page once the item and the version Play starts
- * are known: the header with Play, favourite and the file's menu (its
- * picture plays too), whether this browser needs that version converted or
- * cannot play it, then the summary, the file, its versions and the people.
+ * are known: the header with Play, favourite and, with the admin lock off,
+ * the editors and the file's menu (its picture plays too), whether this
+ * browser needs that version converted or cannot play it, then the summary,
+ * the file, its versions and the people.
  */
 export const PlayableItemView = ({
   kind,
@@ -102,6 +104,8 @@ export const PlayableItemView = ({
   const [editingImages, setEditingImages] = useState(false)
   const [editingMetadata, setEditingMetadata] = useState(false)
   const { favourite } = useMediaMutations({ media: primary })
+  const isAdminLocked = useAdminLocked()
+  const canEdit = config.editable && !isAdminLocked
   const libraries = useQuery(librariesQuery)
   const tracks = useQuery(tracksQuery(primary.id))
   // A logo until Settings says to spell titles out, as a fresh install does.
@@ -159,7 +163,7 @@ export const PlayableItemView = ({
           className={primary.favourite ? styles.favourited : undefined}
           onClick={() => favourite.mutate(!primary.favourite)}
         />
-        {config.editable && (
+        {canEdit && (
           <>
             <Button
               icon="edit"
@@ -177,33 +181,36 @@ export const PlayableItemView = ({
             </Button>
           </>
         )}
-        <MediaMenu
-          media={primary}
-          open={menuOpen}
-          onOpenChange={setMenuOpen}
-          inline
-          matchType={config.matchType}
-          aiMatch={details.aiMatch}
-          withFavourite={false}
-          onMatched={(updated) => {
-            const page = updated.item ? itemPath(updated.item) : null
-            navigate(page ?? `/libraries/${updated.libraryId}`, { replace: true })
-          }}
-          onDeleted={() => {
-            if (details.versions.length <= 1) navigate(back.to)
-            else void queryClient.invalidateQueries({ queryKey: queryKeys.item(details.id) })
-          }}
-        />
+        {/* Without its favourite, which the page has beside it, all the menu holds needs the admin lock off. */}
+        {!isAdminLocked && (
+          <MediaMenu
+            media={primary}
+            open={menuOpen}
+            onOpenChange={setMenuOpen}
+            inline
+            matchType={config.matchType}
+            aiMatch={details.aiMatch}
+            withFavourite={false}
+            onMatched={(updated) => {
+              const page = updated.item ? itemPath(updated.item) : null
+              navigate(page ?? `/libraries/${updated.libraryId}`, { replace: true })
+            }}
+            onDeleted={() => {
+              if (details.versions.length <= 1) navigate(back.to)
+              else void queryClient.invalidateQueries({ queryKey: queryKeys.item(details.id) })
+            }}
+          />
+        )}
       </ItemHeader>
 
       <PlaybackNote media={primary} />
 
       {details.aiMatch && <AiMatchNote aiMatch={details.aiMatch} />}
 
-      {editingImages && (
+      {canEdit && editingImages && (
         <ImageEditor details={details} libraries={known} onDone={() => setEditingImages(false)} />
       )}
-      {editingMetadata && (
+      {canEdit && editingMetadata && (
         <MetadataEditor
           details={details}
           itemKind="movie"
