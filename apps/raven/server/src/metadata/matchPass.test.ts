@@ -236,6 +236,32 @@ describe('a matching pass', () => {
     await expect(ask(TIER_SETS.any)).resolves.toMatchObject({ kind: 'matched', tmdbId: '90660' })
     expect(searches()).toHaveLength(asked + 2)
   })
+
+  it('takes a sure AI pick only when a search finds nothing, and never over a Fix match', async () => {
+    const ask = (overrides: Partial<Parameters<MatchPass['resolve']>[0]>) =>
+      pass().resolve({
+        type: 'show',
+        fix: { kind: 'none' },
+        ids: NO_IDS,
+        nfoPath: null,
+        titles: [{ title: 'Severance', year: null }],
+        decided: '30991',
+        ...overrides,
+      })
+    await expect(ask({})).resolves.toMatchObject({ kind: 'matched', tmdbId: '95396' })
+    await expect(
+      ask({ titles: [{ title: 'Nothing Like It', year: null }] }),
+    ).resolves.toMatchObject({
+      kind: 'matched',
+      tmdbId: '30991',
+      match: 'matched',
+    })
+    await expect(ask({ fix: { kind: 'not-a-match' } })).resolves.toEqual({ kind: 'unmatched' })
+    await expect(ask({ fix: { kind: 'tmdb', tmdbId: '90660' } })).resolves.toMatchObject({
+      tmdbId: '90660',
+      match: 'manual',
+    })
+  })
 })
 
 describe('looking up the other titles of a show', () => {

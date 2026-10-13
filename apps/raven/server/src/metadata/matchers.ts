@@ -10,6 +10,7 @@ import {
   showFolderOf,
 } from '@raven/core'
 import { groupBy } from '@/groupBy'
+import type { AiDecisions } from '@/metadata/aiDecisions'
 import type { ItemPictures } from '@/metadata/itemPictures'
 import { movieAssets, showAssets } from '@/metadata/localAssets'
 import type { FixMatch, MatchFile, MatchFiles } from '@/metadata/matchFiles'
@@ -36,6 +37,8 @@ export type MatcherDeps = {
   files: MatchFiles
   metadata: MetadataRepository
   pictures: ItemPictures
+  /** The AI lookup's decisions, whose sure pick a group takes when its own search finds nothing. */
+  decisions: AiDecisions
 }
 
 /** Extras are never matched; the rest are what a unit is about. */
@@ -93,6 +96,11 @@ const movieMatcher = (deps: MatcherDeps): KindMatcher => {
     return deps.files.fixMatchAt({ libraryId: file.libraryId, place: file.folder })
   }
 
+  /** A sure AI pick for a movie file: kept at its own place, or at its folder's when that is one movie. */
+  const decidedFor = ({ file, own }: { file: MatchFile; own: boolean }): string | null =>
+    deps.decisions.highPickAt({ libraryId: file.libraryId, place: filePlace(file) }) ??
+    (own ? deps.decisions.highPickAt({ libraryId: file.libraryId, place: file.folder }) : null)
+
   const matchMovie = async ({ file, pass }: { file: MatchFile; pass: MatchPass }) => {
     const dir = dirname(file.path)
     const own = pass.folders.ownFolder({ libraryId: file.libraryId, folder: file.folder })
@@ -108,6 +116,7 @@ const movieMatcher = (deps: MatcherDeps): KindMatcher => {
       ids: parsed.ids,
       nfoPath: assets.nfo == null ? null : join(dir, assets.nfo),
       titles: movieSearchTitles({ file, parsed }),
+      decided: decidedFor({ file, own }),
     })
     if (resolved.kind === 'unmatched') {
       deps.files.settle({ ids: [file.id], itemIds: [], match: 'unmatched' })
@@ -209,12 +218,14 @@ const showMatcher = (deps: MatcherDeps): KindMatcher => {
     const showDir = showDirOf(first)
     const assets = showAssets(await pass.folders.names(showDir))
     const parsed = readShowFile(first)
+    const place = showPlace(first)
     const resolved = await pass.resolve({
       type: 'show',
-      fix: deps.files.fixMatchAt({ libraryId: first.libraryId, place: showPlace(first) }),
+      fix: deps.files.fixMatchAt({ libraryId: first.libraryId, place }),
       ids: parsed.ids,
       nfoPath: assets.nfo == null ? null : join(showDir, assets.nfo),
       titles: showSearchTitles(parsed),
+      decided: deps.decisions.highPickAt({ libraryId: first.libraryId, place }),
     })
     if (resolved.kind === 'unmatched') {
       deps.files.settle({ ids, itemIds: [], match: 'unmatched' })

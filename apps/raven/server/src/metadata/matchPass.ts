@@ -95,8 +95,8 @@ export class MatchPass {
   /**
    * The movie or show a set of files is: a Fix match wins, then an id in a
    * name or NFO, then a search for each of `titles` in turn that only takes a
-   * sure answer. Unmatched when the Fix match says it is none, nothing is
-   * found, or TMDB has no such item.
+   * sure answer, then the AI lookup's sure pick. Unmatched when the Fix match
+   * says it is none, nothing is found, or TMDB has no such item.
    */
   async resolve({
     type,
@@ -104,19 +104,23 @@ export class MatchPass {
     ids,
     nfoPath,
     titles,
+    decided = null,
   }: {
     type: MatchItemType
     fix: FixMatch
     ids: NameIds
     nfoPath: string | null
     titles: readonly SearchTitle[]
+    /** The TMDB id the AI lookup chose for the group, being sure; null when it was not asked, unsure, or chose nothing. */
+    decided?: string | null
   }): Promise<Resolved> {
     if (fix.kind === 'not-a-match') return { kind: 'unmatched' }
     const tmdbId =
       fix.kind === 'tmdb'
         ? fix.tmdbId
         : ((await this.fromIds({ type, ids, nfoPath })) ??
-          (await this.searchEach({ type, titles })))
+          (await this.searchEach({ type, titles })) ??
+          decided)
     const itemId = tmdbId == null ? null : await this.ensure({ type, tmdbId })
     if (tmdbId == null || itemId == null) return { kind: 'unmatched' }
     return { kind: 'matched', itemId, tmdbId, match: fix.kind === 'tmdb' ? 'manual' : 'matched' }

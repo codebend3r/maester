@@ -10,6 +10,9 @@ import {
 import { errorMessage } from '@/errorMessage'
 import { groupBy } from '@/groupBy'
 import { type LibraryRecord, LibrariesRepository } from '@/libraries/librariesRepository'
+import { AiClient, AiError } from '@/metadata/aiClient'
+import { AiDecisions } from '@/metadata/aiDecisions'
+import { AI_CONCURRENCY, aiGroupOf, AiMatcher } from '@/metadata/aiMatcher'
 import { ItemPictures } from '@/metadata/itemPictures'
 import { type FixMatchChoice, type MatchFile, MatchFiles } from '@/metadata/matchFiles'
 import { createMatchers, type KindMatcher } from '@/metadata/matchers'
@@ -18,7 +21,7 @@ import { MetadataRepository } from '@/metadata/metadataRepository'
 import { OmdbClient } from '@/metadata/omdbClient'
 import { OmdbScores } from '@/metadata/omdbScores'
 import { PASS_CONCURRENCY } from '@/metadata/passGuard'
-import { showPlace } from '@/metadata/places'
+import { groupPlaceOf, showPlace } from '@/metadata/places'
 import { TmdbClient } from '@/metadata/tmdbClient'
 import { createTaskQueue, mapWithConcurrency } from '@/scanner/concurrency'
 import { type LayoutRow, indexedLayoutsOf, planRelayout } from '@/scanner/layout'
@@ -30,7 +33,8 @@ import { type LayoutRow, indexedLayoutsOf, planRelayout } from '@/scanner/layout
  * Items are shared, so a second file of the same movie costs a search and
  * no fetch; a show is matched once per show folder, and each season fetched
  * once. Every pass TMDB does not stop ends by removing items, people and
- * pictures nothing uses any more. Its queue runs one piece of metadata work
+ * pictures nothing uses any more. Before that, with an AI key, each group a
+ * pass left unmatched and never asked about goes to the AI lookup. Its queue runs one piece of metadata work
  * at a time, the sweep `ItemRefresher` schedules included.
  */
 @Injectable()
@@ -47,8 +51,11 @@ export class MetadataService implements OnApplicationBootstrap {
     @Inject(OmdbClient) private readonly omdb: OmdbClient,
     @Inject(OmdbScores) private readonly scores: OmdbScores,
     @Inject(ItemPictures) private readonly pictures: ItemPictures,
+    @Inject(AiClient) private readonly ai: AiClient,
+    @Inject(AiMatcher) private readonly aiMatcher: AiMatcher,
+    @Inject(AiDecisions) private readonly decisions: AiDecisions,
   ) {
-    this.matchers = createMatchers({ files, metadata, pictures })
+    this.matchers = createMatchers({ files, metadata, pictures, decisions })
   }
 
   /**
@@ -87,9 +94,12 @@ export class MetadataService implements OnApplicationBootstrap {
   /**
    * Searches TMDB again for a library's files no movie or show was found
    * for, say after a rename or once TMDB lists a new show; Fix match choices
-   * stay. How many files are queued.
+   * stay. The AI lookup asks again about the groups it chose no id for. How
+   * many files are queued.
    */
   retryUnmatched(libraryId: number): number {
+    // The lookups that chose no id are asked again with the files.
+    this.decisions.clearUndecided(libraryId)
     const kind = this.libraries.get(libraryId)?.settings.kind
     const count = this.files.retryUnmatched(libraryId)
     if (count === 0 || kind == null) return count
@@ -109,6 +119,8 @@ export class MetadataService implements OnApplicationBootstrap {
     this.queue.again(
       `kind:${libraryId}:${kind}`,
       this.logged(`type change of library ${libraryId}`, async () => {
+        // Claude was told the old type, and the places may mean other groups now.
+        this.decisions.forget(libraryId)
         this.relayoutNow(libraryId)
         this.files.rename({ libraryId, kind })
         await this.pass(libraryId)
@@ -128,6 +140,8 @@ export class MetadataService implements OnApplicationBootstrap {
       `prefer:${libraryId}:${kind}`,
       this.logged(`type change of library ${libraryId}`, async () => {
         // The layout saved with this change is read even when the type moved on since.
+        // Claude was told the old type, and the places may mean other groups now.
+        this.decisions.forget(libraryId)
         this.relayoutNow(libraryId)
         // A type changed again since then is matched by the change queued after this one.
         if (this.libraries.get(libraryId)?.settings.kind !== kind) return
@@ -157,6 +171,8 @@ export class MetadataService implements OnApplicationBootstrap {
     })
     if (plan.moves.length === 0) return
     this.files.applyRelayout({ libraryId, kind: library.settings.kind, plan })
+    // The decisions were kept by the old places.
+    this.decisions.forget(libraryId)
     this.logger.log(
       `Placed ${plan.moves.length} files of "${library.name}" again for its folder layout`,
     )
@@ -246,15 +262,20 @@ export class MetadataService implements OnApplicationBootstrap {
   }
 
   private async pass(libraryId: number): Promise<void> {
-    const kind = this.libraries.get(libraryId)?.settings.kind
+    const library = this.libraries.get(libraryId)
+    const kind = library?.settings.kind
     const type = kind == null ? null : matchTypeFor(kind)
-    if (kind != null && type != null && this.tmdb.enabled) {
+    if (library != null && kind != null && type != null && this.tmdb.enabled) {
       this.tmdb.newPass()
-      const isStopped = await this.matchPending({ libraryId, kind, type })
+      const pass = this.newPass(kind)
+      const isStopped = await this.matchPending({ libraryId, type, pass })
       // The items of files still waiting for TMDB stay, with their edits and
       // pictures, until a pass that gets through matches the files to them
       // again. A library removed meanwhile is cleared up all the same.
       if (isStopped && this.libraries.get(libraryId) != null) return
+      await this.lookUpUnmatched({ library, type, pass })
+      // A lookup that found TMDB away stops the pass the same way.
+      if (pass.guard.isStopped && this.libraries.get(libraryId) != null) return
     }
     await this.pictures.clearUp()
   }
@@ -278,19 +299,18 @@ export class MetadataService implements OnApplicationBootstrap {
   }
 
   /**
-   * Matches the library's pending files, and any that turn up while it
-   * runs. Whether TMDB went away and stopped it.
+   * Matches the library's pending files with `pass`, and any that turn up
+   * while it runs. Whether TMDB went away and stopped it.
    */
   private async matchPending({
     libraryId,
-    kind,
     type,
+    pass,
   }: {
     libraryId: number
-    kind: LibraryKind
     type: MatchItemType
+    pass: MatchPass
   }): Promise<boolean> {
-    const pass = this.newPass(kind)
     const attempted = new Set<number>()
     const round = async (): Promise<void> => {
       const files = this.files.pending(libraryId).filter((file) => !attempted.has(file.id))
@@ -302,6 +322,86 @@ export class MetadataService implements OnApplicationBootstrap {
     await round()
     pass.guard.reportStop()
     return pass.guard.isStopped
+  }
+
+  /**
+   * Asks the AI lookup about every group the pass left unmatched that has
+   * no Fix match and was never asked, two at a time, while today's lookups
+   * last. Libraries that are never matched never get here.
+   */
+  private async lookUpUnmatched({
+    library,
+    type,
+    pass,
+  }: {
+    library: LibraryRecord
+    type: MatchItemType
+    pass: MatchPass
+  }): Promise<void> {
+    if (!this.ai.enabled || pass.guard.isStopped) return
+    const libraryId = library.id
+    const groups = [
+      ...groupBy({
+        items: this.files.unmatched(libraryId),
+        key: (file) =>
+          groupPlaceOf({
+            type,
+            file,
+            folderFiles: () => this.files.inFolder({ libraryId, folder: file.folder }),
+          }),
+      }),
+    ].flatMap(([place, files]) =>
+      this.files.fixMatchAt({ libraryId, place }).kind === 'none' &&
+      !this.decisions.isAsked({ libraryId, place })
+        ? [{ place, files }]
+        : [],
+    )
+    const lookups = { isHalted: false }
+    await mapWithConcurrency({
+      items: groups,
+      limit: AI_CONCURRENCY,
+      fn: ({ place, files }) =>
+        pass.guard.run(() => this.lookUp({ library, type, place, files, pass, lookups })),
+    })
+    pass.guard.reportStop()
+  }
+
+  /**
+   * One lookup: books one of today's, keeps the answer, and matches the
+   * group again at once, with the pass's searches, when the pick is sure.
+   * Anthropic failing halts the pass's other lookups and keeps nothing, so
+   * the group is asked on the next pass; TMDB failing stops the pass.
+   */
+  private async lookUp({
+    library,
+    type,
+    place,
+    files,
+    pass,
+    lookups,
+  }: {
+    library: LibraryRecord
+    type: MatchItemType
+    place: string
+    files: readonly MatchFile[]
+    pass: MatchPass
+    lookups: { isHalted: boolean }
+  }): Promise<void> {
+    if (lookups.isHalted || !this.ai.take()) return
+    const outcome = await this.aiMatcher
+      .decide(aiGroupOf({ library, type, place, files }))
+      .catch((error: unknown) => {
+        if (!(error instanceof AiError)) throw error
+        lookups.isHalted = true
+        this.logger.warn(`AI lookups stopped for now: ${error.message}`)
+        return null
+      })
+    // A library removed during the lookup keeps no decision.
+    if (outcome == null || this.libraries.get(library.id) == null) return
+    this.decisions.record({ libraryId: library.id, place, outcome, model: this.aiMatcher.model })
+    if (outcome.kind !== 'chosen' || outcome.confidence !== 'high') return
+    this.files.reset(files.map((file) => file.id))
+    await this.matchers[type].match({ files, pass })
   }
 
   /**

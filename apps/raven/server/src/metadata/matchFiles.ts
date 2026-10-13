@@ -138,6 +138,11 @@ export class MatchFiles {
     return this.files({ where: `m.library_id = ? AND m.match = 'pending'`, params: [libraryId] })
   }
 
+  /** A library's files no movie or show was found for, by place so a folder's files come together. */
+  unmatched(libraryId: number): MatchFile[] {
+    return this.files({ where: `m.library_id = ? AND m.match = 'unmatched'`, params: [libraryId] })
+  }
+
   /**
    * A library's files matched by a search or by an id in a name or NFO, not
    * by a Fix match, by place as `pending` gives them.

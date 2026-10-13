@@ -63,4 +63,12 @@ describe('the match queue', () => {
     expect(files().retryUnmatched(state.libraryId)).toBe(1)
     expect(files().pending(state.libraryId)).toHaveLength(4)
   })
+
+  it("lists a library's files no movie or show was found for", () => {
+    const id = (path: string) => state.ids.get(path) ?? -1
+    files().setMatch({ ids: [id('Elsewhere/Elsewhere - S01E01.mkv')], match: 'unmatched' })
+    expect(names(files().unmatched(state.libraryId))).toEqual(['Elsewhere - S01E01.mkv'])
+    files().setMatch({ ids: [id('Elsewhere/Elsewhere - S01E01.mkv')], match: 'pending' })
+    expect(files().unmatched(state.libraryId)).toEqual([])
+  })
 })
