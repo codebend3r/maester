@@ -3,6 +3,8 @@ import {
   isExtra,
   type MatchItemType,
   type MatchState,
+  type ParsedEpisodeName,
+  type ParsedMovieName,
   parseEpisodeName,
   parseMovieName,
   showFolderOf,
@@ -11,7 +13,7 @@ import { groupBy } from '@/groupBy'
 import type { ItemPictures } from '@/metadata/itemPictures'
 import { movieAssets, showAssets } from '@/metadata/localAssets'
 import type { FixMatch, MatchFile, MatchFiles } from '@/metadata/matchFiles'
-import type { MatchPass } from '@/metadata/matchPass'
+import type { MatchPass, SearchTitle } from '@/metadata/matchPass'
 import type { MetadataRepository } from '@/metadata/metadataRepository'
 import { filePlace, holdsOneMovie, rootOf, showDirOf, showPlace, stemOf } from '@/metadata/places'
 
@@ -49,6 +51,40 @@ const withoutExtras = ({
   return files.filter((file) => !isExtra(file))
 }
 
+/** A show folder's first file as matching reads it: a file at a root falls back to the folder its titles sit in. */
+export const readShowFile = (first: MatchFile): ParsedEpisodeName =>
+  parseEpisodeName({ ...first, fallbackShow: basename(rootOf(first)) })
+
+/**
+ * The titles a show folder is searched by, in turn: the folder's name; the
+ * file's own, as a folder is misspelt more often than every file; and the
+ * folder's without an annotation that reads as an edition, as shows have
+ * none: "Dragon Ball Z (Uncut)".
+ */
+export const showSearchTitles = (parsed: ParsedEpisodeName): SearchTitle[] => {
+  const narrowing = { year: parsed.year, country: parsed.country }
+  return [
+    { title: parsed.show, ...narrowing },
+    ...(parsed.showFromFile == null ? [] : [{ title: parsed.showFromFile, ...narrowing }]),
+    ...(parsed.showWithoutEdition == null
+      ? []
+      : [{ title: parsed.showWithoutEdition, ...narrowing }]),
+  ]
+}
+
+/**
+ * The titles a movie file is searched by, in turn: its name's title and
+ * year, then the name's other readings, such as the file's own name where
+ * its folder is misnamed.
+ */
+export const movieSearchTitles = ({
+  file,
+  parsed,
+}: {
+  file: Pick<MatchFile, 'title' | 'year'>
+  parsed: ParsedMovieName
+}): SearchTitle[] => [{ title: file.title, year: file.year }, ...parsed.alternatives]
+
 const movieMatcher = (deps: MatcherDeps): KindMatcher => {
   /** The Fix match for a movie file: its own place first, then its folder's when that is one movie. */
   const fixFor = ({ file, own }: { file: MatchFile; own: boolean }): FixMatch => {
@@ -71,9 +107,7 @@ const movieMatcher = (deps: MatcherDeps): KindMatcher => {
       fix: fixFor({ file, own }),
       ids: parsed.ids,
       nfoPath: assets.nfo == null ? null : join(dir, assets.nfo),
-      // When the name finds nothing, its other readings are tried: the file's
-      // own name where its folder is misnamed, as with a show.
-      titles: [{ title: file.title, year: file.year }, ...parsed.alternatives],
+      titles: movieSearchTitles({ file, parsed }),
     })
     if (resolved.kind === 'unmatched') {
       deps.files.settle({ ids: [file.id], itemIds: [], match: 'unmatched' })
@@ -174,23 +208,13 @@ const showMatcher = (deps: MatcherDeps): KindMatcher => {
     const fallbackShow = basename(rootOf(first))
     const showDir = showDirOf(first)
     const assets = showAssets(await pass.folders.names(showDir))
-    const parsed = parseEpisodeName({ ...first, fallbackShow })
-    const narrowing = { year: parsed.year, country: parsed.country }
+    const parsed = readShowFile(first)
     const resolved = await pass.resolve({
       type: 'show',
       fix: deps.files.fixMatchAt({ libraryId: first.libraryId, place: showPlace(first) }),
       ids: parsed.ids,
       nfoPath: assets.nfo == null ? null : join(showDir, assets.nfo),
-      // The folder names the show first; when that finds nothing, the file's
-      // own name is tried, as a folder is misspelt more often than every file.
-      titles: [
-        { title: parsed.show, ...narrowing },
-        ...(parsed.showFromFile == null ? [] : [{ title: parsed.showFromFile, ...narrowing }]),
-        // Shows have no editions, but a folder's annotation reads as one: "Dragon Ball Z (Uncut)".
-        ...(parsed.showWithoutEdition == null
-          ? []
-          : [{ title: parsed.showWithoutEdition, ...narrowing }]),
-      ],
+      titles: showSearchTitles(parsed),
     })
     if (resolved.kind === 'unmatched') {
       deps.files.settle({ ids, itemIds: [], match: 'unmatched' })
