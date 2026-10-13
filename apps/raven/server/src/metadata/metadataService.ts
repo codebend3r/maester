@@ -105,9 +105,13 @@ export class MetadataService implements OnApplicationBootstrap {
     })
   }
 
-  /** Queues a pass over the library: its pending files, then the clear-up. */
+  /**
+   * Queues a pass over the library: its pending files, then the clear-up. A
+   * pass under way may be past reading them (its AI lookups can take
+   * minutes), so another follows it.
+   */
   enqueue(libraryId: number): void {
-    this.queue.push(`library:${libraryId}`, () => this.pass(libraryId))
+    this.queue.again(`library:${libraryId}`, () => this.pass(libraryId))
   }
 
   /** Queues other metadata work, so it never runs beside a pass. */
@@ -157,15 +161,17 @@ export class MetadataService implements OnApplicationBootstrap {
    * prefers other results: each matched file is picked again where it
    * stands, so one that keeps its movie or show keeps its link and split,
    * and its card stays up meanwhile. The files no movie or show was found
-   * for are searched again, and Fix match choices stay.
+   * for are searched again, and Fix match choices stay. The AI lookup's sure
+   * picks stay too; where it was unsure or chose nothing, it is asked again.
    */
   changePreference({ libraryId, kind }: { libraryId: number; kind: LibraryKind }): void {
     this.queue.again(
       `prefer:${libraryId}:${kind}`,
       this.logged(`type change of library ${libraryId}`, async () => {
+        // Forgetting a sure pick would unlink its group, and the clear-up could
+        // delete the item, edits and all, before a new lookup was sure.
+        this.decisions.forgetUnsure(libraryId)
         // The layout saved with this change is read even when the type moved on since.
-        // Claude was told the old type, and the places may mean other groups now.
-        this.decisions.forget(libraryId)
         this.relayoutNow(libraryId)
         // A type changed again since then is matched by the change queued after this one.
         if (this.libraries.get(libraryId)?.settings.kind !== kind) return

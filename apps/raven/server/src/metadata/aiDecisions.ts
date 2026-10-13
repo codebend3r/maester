@@ -130,7 +130,7 @@ export class AiDecisions {
     )
   }
 
-  /** The unsure picks for these places, by place. */
+  /** The unsure picks for these places, by place; none where a Fix match has answered. */
   suggestionsAt({
     libraryId,
     places,
@@ -151,9 +151,12 @@ export class AiDecisions {
           reason: string
         }
       >(
-        `SELECT place, tmdb_id, title, year, poster, reason FROM ai_decisions
-          WHERE library_id = ? AND confidence = 'low' AND tmdb_id IS NOT NULL
-            AND place IN (SELECT value FROM json_each(?))`,
+        `SELECT d.place, d.tmdb_id, d.title, d.year, d.poster, d.reason FROM ai_decisions d
+          WHERE d.library_id = ? AND d.confidence = 'low' AND d.tmdb_id IS NOT NULL
+            AND d.place IN (SELECT value FROM json_each(?))
+            AND NOT EXISTS (
+              SELECT 1 FROM match_overrides o WHERE o.library_id = d.library_id AND o.place = d.place
+            )`,
       )
       .all(libraryId, JSON.stringify([...new Set(places)]))
     return new Map(
@@ -212,5 +215,18 @@ export class AiDecisions {
   /** Every decision of a library, for a change that makes them stale: its type, or where its files sit. */
   forget(libraryId: number): void {
     this.db.prepare('DELETE FROM ai_decisions WHERE library_id = ?').run(libraryId)
+  }
+
+  /**
+   * A library's decisions that chose no id or were unsure, for a type that
+   * prefers other results: those groups are asked again with it, while a
+   * sure pick keeps its group matched.
+   */
+  forgetUnsure(libraryId: number): void {
+    this.db
+      .prepare(
+        `DELETE FROM ai_decisions WHERE library_id = ? AND (tmdb_id IS NULL OR confidence = 'low')`,
+      )
+      .run(libraryId)
   }
 }

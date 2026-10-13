@@ -95,6 +95,28 @@ describe("the AI lookup's decisions", () => {
     expect(decisions().suggestionsAt({ libraryId: state.library, places: [] }).size).toBe(0)
   })
 
+  it('offers none where a Fix match has answered, either way', () => {
+    const { db } = database.get()
+    db.prepare('INSERT INTO match_overrides (library_id, place, tmdb_id) VALUES (?, ?, NULL)').run(
+      state.library,
+      'Archie',
+    )
+    try {
+      expect(decisions().suggestionsAt({ libraryId: state.library, places: ['Archie'] }).size).toBe(
+        0,
+      )
+      db.prepare("UPDATE match_overrides SET tmdb_id = '4321' WHERE library_id = ?").run(
+        state.library,
+      )
+      expect(decisions().suggestionsAt({ libraryId: state.library, places: ['Archie'] }).size).toBe(
+        0,
+      )
+    } finally {
+      db.prepare('DELETE FROM match_overrides WHERE library_id = ?').run(state.library)
+    }
+    expect(decisions().suggestionsAt({ libraryId: state.library, places: ['Archie'] }).size).toBe(1)
+  })
+
   it("says why a sure pick matched, for an item's places and id", () => {
     const reason = ({ places, tmdbId }: { places: string[]; tmdbId: string }) =>
       decisions().highReason({
@@ -123,5 +145,42 @@ describe("the AI lookup's decisions", () => {
     expect(decisions().isAsked({ libraryId: state.other, place: 'Bebop' })).toBe(true)
     new LibrariesRepository(database.get()).remove(state.other)
     expect(decisions().isAsked({ libraryId: state.other, place: 'Bebop' })).toBe(false)
+  })
+
+  it('forgets only what was not sure, for a type that prefers other results', () => {
+    const anime = new LibrariesRepository(database.get()).create({
+      name: 'Anime',
+      paths: ['/anime'],
+      settings: { kind: 'animeShows' },
+    }).id
+    record({
+      libraryId: anime,
+      place: 'Bebop',
+      outcome: { kind: 'undecided', reason: 'Declined.' },
+    })
+    record({
+      place: 'Destination Wild Arctic',
+      outcome: {
+        kind: 'chosen',
+        pick: { tmdbId: '80001', title: 'Wild Arctic', year: 2018, poster: null },
+        confidence: 'high',
+        reason: 'Episode titles match.',
+      },
+    })
+    record({
+      place: 'Archie',
+      outcome: { kind: 'chosen', pick: ARCHIE, confidence: 'low', reason: 'Generic.' },
+    })
+    record({
+      place: 'Cesar 911',
+      outcome: { kind: 'none', confidence: 'high', reason: 'Episodes of another show.' },
+    })
+    record({ place: 'Doctor Who', outcome: { kind: 'undecided', reason: 'No choice in 6 turns.' } })
+    decisions().forgetUnsure(state.library)
+    const asked = ['Destination Wild Arctic', 'Archie', 'Cesar 911', 'Doctor Who'].map((place) =>
+      decisions().isAsked({ libraryId: state.library, place }),
+    )
+    expect(asked).toEqual([true, false, false, false])
+    expect(decisions().isAsked({ libraryId: anime, place: 'Bebop' })).toBe(true)
   })
 })
