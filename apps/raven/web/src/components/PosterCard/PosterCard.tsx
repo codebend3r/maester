@@ -9,7 +9,7 @@ import {
   pickScore,
   sortFact,
 } from '@raven/core'
-import { Link } from 'react-router-dom'
+import { CardLink } from '@/components/CardLink/CardLink'
 import { FavouriteMark } from '@/components/FavouriteMark/FavouriteMark'
 import { Icon } from '@/components/Icon/Icon'
 import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
@@ -87,7 +87,7 @@ export const PosterCard = ({
 
   return (
     <li className={`${styles.card} ${menu.hostClass}`} data-entry={mediaEntryKey(media)} {...hover}>
-      <Link
+      <CardLink
         {...link}
         className={styles.picture}
         tabIndex={-1}
@@ -95,17 +95,17 @@ export const PosterCard = ({
         onContextMenu={menu.onContextMenu}
       >
         <PosterFrame media={media} poster={poster} sizes={sizes} />
-      </Link>
+      </CardLink>
       {hasPage && (
         <span className={styles.overlay}>
-          <Link {...watchLink({ media })} className={styles.play} aria-label={`Play ${title}`}>
+          <CardLink {...watchLink({ media })} className={styles.play} aria-label={`Play ${title}`}>
             <Icon name="play" size={18} />
-          </Link>
+          </CardLink>
         </span>
       )}
-      <Link {...link} className={styles.title} onContextMenu={menu.onContextMenu}>
+      <CardLink {...link} className={styles.title} onContextMenu={menu.onContextMenu}>
         {title}
-      </Link>
+      </CardLink>
       {sorted && <span className={styles.sorted}>{sorted}</span>}
       <span className={styles.facts}>
         <FavouriteMark media={media} />

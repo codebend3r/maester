@@ -7,7 +7,7 @@ import {
   sortTitle,
 } from '@raven/core'
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { CardLink } from '@/components/CardLink/CardLink'
 import { Icon } from '@/components/Icon/Icon'
 import { RatingChips, ScoreChip } from '@/components/RatingChips/RatingChips'
 import { SortHeader } from '@/components/SortHeader/SortHeader'
@@ -26,14 +26,14 @@ const NextPlay = ({ entry }: { entry: ShowEntry }) => {
   if (!next) return null
   const code = next.item ? episodeCode(next.item) : null
   return (
-    <Link
+    <CardLink
       to={`/watch/${next.id}`}
       state={{ media: next }}
       className={styles.play}
       aria-label={code ? `Play ${show.title} ${code}` : `Play ${show.title}`}
     >
       <Icon name="play" size={16} />
-    </Link>
+    </CardLink>
   )
 }
 
@@ -43,7 +43,7 @@ const SmallPoster = ({ entry }: { entry: ShowEntry }) => {
   const poster = posterSources({ item: show, sizes: POSTER_SIZES.showTile })
   const [failed, setFailed] = useState(false)
   return (
-    <Link to={`/shows/${show.id}`} className={styles.frame} tabIndex={-1} aria-hidden="true">
+    <CardLink to={`/shows/${show.id}`} className={styles.frame} tabIndex={-1} aria-hidden="true">
       {poster && !failed ? (
         <img
           className={styles.image}
@@ -56,7 +56,7 @@ const SmallPoster = ({ entry }: { entry: ShowEntry }) => {
       ) : (
         <span className={styles.placeholder}>{show.title.slice(0, 1)}</span>
       )}
-    </Link>
+    </CardLink>
   )
 }
 
@@ -109,9 +109,9 @@ export const ShowList = ({ shows }: { shows: ShowEntry[] }) => {
         {sorted.map((entry) => (
           <tr key={entry.show.id} className={styles.row} data-entry={showEntryKey(entry.show)}>
             <th scope="row">
-              <Link to={`/shows/${entry.show.id}`} className={styles.title}>
+              <CardLink to={`/shows/${entry.show.id}`} className={styles.title}>
                 {entry.show.title}
-              </Link>
+              </CardLink>
             </th>
             <td className={styles.number}>
               {showYears({ year: entry.show.year, endedYear: entry.endedYear }) ?? ''}
@@ -155,9 +155,9 @@ export const ShowTiles = ({
         <li key={entry.show.id} className={styles.tile} data-entry={showEntryKey(entry.show)}>
           <SmallPoster entry={entry} />
           <div className={styles.body}>
-            <Link to={`/shows/${entry.show.id}`} className={styles.title}>
+            <CardLink to={`/shows/${entry.show.id}`} className={styles.title}>
               {entry.show.title}
-            </Link>
+            </CardLink>
             {sorted && <span className={styles.sorted}>{sorted}</span>}
             <span className={styles.facts}>
               {facts.map((fact) => (

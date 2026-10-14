@@ -7,12 +7,15 @@ import {
   object,
 } from '@raven/core'
 
+/** An address in the app, from its root. */
+export type AppPath = `/${string}`
+
 /** A season's page, by its show and number. */
-export const seasonPath = ({ showId, season }: { showId: number; season: number }): string =>
+export const seasonPath = ({ showId, season }: { showId: number; season: number }): AppPath =>
   `/shows/${showId}/seasons/${season}`
 
 /** Where an item's page lives, or null for one that has no page of its own. */
-export const itemPath = (item: ItemSummary): string | null => {
+export const itemPath = (item: ItemSummary): AppPath | null => {
   if (item.type === 'movie') return `/movies/${item.id}`
   if (item.type === 'show') return `/shows/${item.id}`
   if (item.type === 'episode') return `/episodes/${item.id}`
@@ -51,7 +54,7 @@ export const watchLink = ({
 }: {
   media: MediaItem
   upNext?: WatchState['upNext']
-}): { to: string; state: WatchState } => ({ to: `/watch/${media.id}`, state: { media, upNext } })
+}): { to: AppPath; state: WatchState } => ({ to: `/watch/${media.id}`, state: { media, upNext } })
 
 /**
  * What `watchLink` handed over for video `id`; null for a direct visit, a
@@ -90,7 +93,7 @@ export const cardLink = ({
 }: {
   media: MediaItem
   pages: boolean
-}): { to: string; state?: WatchState } => {
+}): { to: AppPath; state?: WatchState } => {
   const page = pages && media.item ? itemPath(media.item) : null
   if (page == null) return watchLink({ media })
   return media.variant == null ? { to: page } : { to: `${page}?file=${media.id}` }

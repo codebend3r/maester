@@ -5,6 +5,7 @@ import { BrowserRouter } from 'react-router-dom'
 import '@fontsource/young-serif'
 import '@fontsource-variable/instrument-sans/wdth.css'
 import { AppRoutes } from '@/AppRoutes'
+import { CardLinks } from '@/components/CardLink/CardLink'
 import { createQueryClient } from '@/lib/queryClient'
 import { SharedPlaybackPolicy } from '@/lib/sharedPlaybackPolicy'
 import '@/styles/globals.scss'
@@ -19,7 +20,9 @@ if (rootElement) {
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
           <SharedPlaybackPolicy>
-            <AppRoutes />
+            <CardLinks>
+              <AppRoutes />
+            </CardLinks>
           </SharedPlaybackPolicy>
         </BrowserRouter>
       </QueryClientProvider>

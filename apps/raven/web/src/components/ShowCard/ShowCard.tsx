@@ -7,7 +7,7 @@ import {
   showSortFact,
 } from '@raven/core'
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { CardLink } from '@/components/CardLink/CardLink'
 import { Icon } from '@/components/Icon/Icon'
 import { ScoreChip } from '@/components/RatingChips/RatingChips'
 import { api } from '@/lib/api'
@@ -53,7 +53,12 @@ export const ShowCard = ({
 
   return (
     <li className={styles.card} data-entry={showEntryKey(show)} {...hover}>
-      <Link to={`/shows/${show.id}`} className={styles.picture} tabIndex={-1} aria-hidden="true">
+      <CardLink
+        to={`/shows/${show.id}`}
+        className={styles.picture}
+        tabIndex={-1}
+        aria-hidden="true"
+      >
         <span className={styles.frame}>
           {poster && !failed ? (
             <img
@@ -68,22 +73,22 @@ export const ShowCard = ({
             <span className={styles.placeholder}>{show.title.slice(0, 1)}</span>
           )}
         </span>
-      </Link>
+      </CardLink>
       {next && (
         <span className={styles.overlay}>
-          <Link
+          <CardLink
             to={`/watch/${next.id}`}
             state={{ media: next }}
             className={styles.play}
             aria-label={code ? `Play ${show.title} ${code}` : `Play ${show.title}`}
           >
             <Icon name="play" size={18} />
-          </Link>
+          </CardLink>
         </span>
       )}
-      <Link to={`/shows/${show.id}`} className={styles.title}>
+      <CardLink to={`/shows/${show.id}`} className={styles.title}>
         {show.title}
-      </Link>
+      </CardLink>
       {sorted && <span className={styles.sorted}>{sorted}</span>}
       <span className={styles.facts}>
         {facts.map((fact) => (

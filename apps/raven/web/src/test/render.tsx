@@ -10,6 +10,7 @@ import {
 import { render } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { MemoryRouter } from 'react-router-dom'
+import { CardLinks } from '@/components/CardLink/CardLink'
 import { queryKeys } from '@/lib/queryClient'
 import { SharedPlaybackPolicy } from '@/lib/sharedPlaybackPolicy'
 
@@ -21,10 +22,11 @@ export const DEFAULT_PLAYBACK_STATE: PlaybackSettingsState = {
 
 /**
  * Renders inside a fresh query client and an in-memory router, starting at
- * `route`, wrapped as `main.tsx` wraps the app: the shared playback policy.
- * The server's playback and display settings are already known, as they
- * are once a page has read them, and so is the admin lock, off as in an
- * admin's browser so every action shows; `null` leaves any to be fetched.
+ * `route`, wrapped as `main.tsx` wraps the app: the shared playback policy,
+ * and what card links follow. The server's playback and display settings
+ * are already known, as they are once a page has read them, and so is the
+ * admin lock, off as in an admin's browser so every action shows; `null`
+ * leaves any to be fetched.
  * `libraries` is the list the side menu reads, for a test that has it read.
  * Returns what Testing Library's `render` does, and the query client.
  */
@@ -52,7 +54,9 @@ export const renderWithProviders = (
   const rendered = render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[route]}>
-        <SharedPlaybackPolicy>{ui}</SharedPlaybackPolicy>
+        <SharedPlaybackPolicy>
+          <CardLinks>{ui}</CardLinks>
+        </SharedPlaybackPolicy>
       </MemoryRouter>
     </QueryClientProvider>,
   )
