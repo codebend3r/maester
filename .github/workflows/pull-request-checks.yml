@@ -47,7 +47,7 @@ jobs:
           # pytest, vitest and bun test. raven's server and core tests encode
           # real clips with ffmpeg.
           - name: 🧪 Unit tests
-            run: bun run test
+            run: bun run test:ci
             ffmpeg: true
           - name: 🏗️ Build
             run: bun run build
