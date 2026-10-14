@@ -24,7 +24,7 @@ import { ItemRefresher } from '@/metadata/itemRefresher'
 import { MatchFiles } from '@/metadata/matchFiles'
 import { MetadataService } from '@/metadata/metadataService'
 import { ScannerService } from '@/scanner/scannerService'
-import { type InjectOptions, adminCookie, injectAs, testConfig } from '@/test/app'
+import { type InjectOptions, adminCookie, eventually, injectAs, testConfig } from '@/test/app'
 import { encodeClip, encodeImage, jpegSize } from '@/test/clips'
 import { FAKE_JPEG, fakeTmdb } from '@/test/fakeTmdb'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
@@ -498,6 +498,19 @@ describe('movie metadata', () => {
   })
 
   it("serves TMDB's poster at each width a card asks for, warmed when the movie was matched", async () => {
+    const fetched = () =>
+      tmdb.state.calls.filter((url) => url.endsWith('/poster949.jpg')).toSorted()
+    // Nothing has asked for Heat's poster yet, so these are the matching's own.
+    const warmed = await eventually({
+      read: async () => fetched(),
+      check: (urls) => urls.length === 3,
+      ms: 4000,
+    })
+    expect(warmed).toEqual([
+      'https://image.tmdb.org/t/p/w185/poster949.jpg',
+      'https://image.tmdb.org/t/p/w342/poster949.jpg',
+      'https://image.tmdb.org/t/p/w500/poster949.jpg',
+    ])
     const heat = (await list()).find((item) => item.item?.title === 'Heat')?.item
     const at = (query: string) =>
       app().inject({
@@ -508,11 +521,7 @@ describe('movie metadata', () => {
     expect(responses.map((response) => response.statusCode)).toEqual([200, 200, 200, 200, 200])
     expect(responses.every((response) => response.rawPayload.equals(FAKE_JPEG))).toBe(true)
     expect(responses[0]?.headers['cache-control']).toBe('private, max-age=31536000, immutable')
-    expect(tmdb.state.calls.filter((url) => url.endsWith('/poster949.jpg')).toSorted()).toEqual([
-      'https://image.tmdb.org/t/p/w185/poster949.jpg',
-      'https://image.tmdb.org/t/p/w342/poster949.jpg',
-      'https://image.tmdb.org/t/p/w500/poster949.jpg',
-    ])
+    expect(fetched()).toEqual(warmed)
   })
 
   it('refuses a width that is not one a poster comes in', async () => {
