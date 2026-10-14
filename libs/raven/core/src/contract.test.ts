@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import {
+  DEFAULT_SAGA_BACKDROP,
   ITEM_IMAGE_KINDS,
   MEDIA_SORTS,
   STREAM_MODES,
@@ -40,6 +41,8 @@ import {
   isSeasonSummary,
   isServerEvent,
   isSaga,
+  isSagaBackdrop,
+  isSlideshowMotion,
   isShowListing,
 } from '@/contract'
 import {
@@ -70,13 +73,33 @@ describe('isSaga', () => {
       isSaga({
         tmdbId: '119',
         name: 'The Lord of the Rings Collection',
+        backdrop: DEFAULT_SAGA_BACKDROP,
         media: [mediaItem()],
       }),
     ).toBe(true)
   })
 
-  it('rejects a saga with no name', () => {
-    expect(isSaga({ tmdbId: '119', name: null, media: [] })).toBe(false)
+  it('rejects a saga with no name, or none of its backdrop', () => {
+    expect(isSaga({ tmdbId: '119', name: null, backdrop: DEFAULT_SAGA_BACKDROP, media: [] })).toBe(
+      false,
+    )
+    expect(isSaga({ tmdbId: '119', name: 'Rings', media: [] })).toBe(false)
+  })
+})
+
+describe('isSagaBackdrop', () => {
+  it('accepts a slideshow by any motion, and a picture held still', () => {
+    expect(
+      isSlideshowMotion.values.every((motion) => isSagaBackdrop({ type: 'slideshow', motion })),
+    ).toBe(true)
+    expect(isSagaBackdrop({ type: 'still', itemId: 20 })).toBe(true)
+  })
+
+  it('rejects a slideshow with no motion, or a still with no picture', () => {
+    expect(isSagaBackdrop({ type: 'slideshow', motion: 'spin' })).toBe(false)
+    expect(isSagaBackdrop({ type: 'slideshow', itemId: 20 })).toBe(false)
+    expect(isSagaBackdrop({ type: 'still', itemId: null })).toBe(false)
+    expect(isSagaBackdrop({ type: 'off' })).toBe(false)
   })
 })
 

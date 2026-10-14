@@ -25,6 +25,7 @@ import { MediaArtifacts } from '@/media/mediaArtifacts'
 import { MediaController } from '@/media/mediaController'
 import { MediaIndex } from '@/media/mediaIndex'
 import { MediaRepository } from '@/media/mediaRepository'
+import { SagaBackdrops } from '@/media/sagaBackdrops'
 import { MovieSplits } from '@/media/movieSplits'
 import { ViewingRepository } from '@/media/viewingRepository'
 import { AI_FETCH, AiClient, type AiFetch } from '@/metadata/aiClient'
@@ -112,6 +113,7 @@ export class AppModule {
         ItemImagesRepository,
         MetadataRepository,
         ItemOverrides,
+        SagaBackdrops,
         MediaRepository,
         MovieSplits,
         ViewingRepository,

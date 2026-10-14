@@ -37,6 +37,21 @@ export const watchLink = (media: MediaItem): { to: string; state: { media: Media
   state: { media },
 })
 
+/**
+ * The link to play videos one after another: the first as `watchLink`
+ * hands it over, with the ones to play after it riding along in turn.
+ */
+export const queueLink = ({
+  media,
+  upNext,
+}: {
+  media: MediaItem
+  upNext: readonly MediaItem[]
+}): { to: string; state: { media: MediaItem; upNext: readonly MediaItem[] } } => {
+  const link = watchLink(media)
+  return { ...link, state: { ...link.state, upNext } }
+}
+
 /** "2011 to 2019", "2022 to now", or just the year for a show that began and ended in one. */
 export const showYears = ({
   year,

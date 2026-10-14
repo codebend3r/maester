@@ -91,8 +91,14 @@ export const ComponentsSection = () => (
     title="Components"
     intro="Every shared component, with made-up videos. Nothing here saves; the library dialog and folder browser are left out because they change real libraries."
   >
-    <Specimen name="Button" note="Quiet by default; primary for the one action a screen is for.">
+    <Specimen
+      name="Button"
+      note="Quiet by default; primary for the one action a screen is for, and large where that action is the page's whole point."
+    >
       <div className={styles.row}>
+        <Button tone="primary" size="large" icon="play">
+          Play all
+        </Button>
         <Button tone="primary" icon="plus">
           Add library
         </Button>

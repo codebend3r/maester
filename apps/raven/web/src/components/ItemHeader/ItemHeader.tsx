@@ -1,4 +1,4 @@
-import type { Rating } from '@raven/core'
+import type { Rating, SlideshowMotion } from '@raven/core'
 import { type ReactNode, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ButtonLink } from '@/components/Button/Button'
@@ -6,6 +6,7 @@ import { Icon } from '@/components/Icon/Icon'
 import { LogoImage } from '@/components/LogoImage/LogoImage'
 import { RatingChips } from '@/components/RatingChips/RatingChips'
 import { Bone } from '@/components/Skeleton/Skeleton'
+import { Slideshow } from '@/components/Slideshow/Slideshow'
 import type { watchLink } from '@/lib/itemLinks'
 import styles from '@/components/ItemHeader/ItemHeader.module.scss'
 
@@ -15,6 +16,16 @@ export type HeaderPicture = {
   /** null for none yet: the title's first letter stands in. */
   url: string | null
   play?: ReturnType<typeof watchLink> & { label: string }
+}
+
+/** What fades into the page behind the header: a picture's url, or several pictures in turn. */
+export type HeaderBackdrop = string | { slides: readonly string[]; motion: SlideshowMotion }
+
+const Backdrop = ({ backdrop }: { backdrop: HeaderBackdrop }) => {
+  if (typeof backdrop === 'string') {
+    return <img className={styles.backdrop} src={backdrop} alt="" decoding="async" />
+  }
+  return <Slideshow className={styles.backdrop} slides={backdrop.slides} motion={backdrop.motion} />
 }
 
 /** The content's columns for each kind of picture, or for none. */
@@ -98,7 +109,7 @@ export const ItemHeader = ({
   ratings: readonly Rating[]
   /** Left out for a page with no picture beside its title. */
   picture?: HeaderPicture
-  backdrop: string | null
+  backdrop: HeaderBackdrop | null
   /** The title as art, shown in its place: a movie's logo. */
   logo?: string | null
   /** Where the page goes back to, laid over the backdrop's top corner. */
@@ -107,7 +118,7 @@ export const ItemHeader = ({
   children?: ReactNode
 }) => (
   <header className={styles.hero}>
-    {backdrop && <img className={styles.backdrop} src={backdrop} alt="" decoding="async" />}
+    {backdrop && <Backdrop backdrop={backdrop} />}
     <div className={styles.top}>
       <ButtonLink to={back.to} icon="back" className={styles.back}>
         {back.label}

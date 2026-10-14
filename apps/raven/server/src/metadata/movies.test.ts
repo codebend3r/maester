@@ -253,7 +253,40 @@ describe('movie metadata', () => {
     const [saga] = shape({ response, guard: isSagaList })
     const first = saga?.media[0]?.item
     expect(first?.backdropVersion).toEqual(expect.any(String))
-    expect(saga && sagaBackdrop(saga)).toEqual({ id: first?.id, version: first?.backdropVersion })
+    expect(saga && sagaBackdrop(saga)).toEqual({
+      id: first?.id,
+      version: first?.backdropVersion,
+      title: first?.title,
+    })
+  })
+
+  it("keeps the backdrop an admin picks for a saga: a slideshow's motion, or one of its movies held still", async () => {
+    const url = `/api/libraries/${state.library}/sagas`
+    const sagas = async () =>
+      shape({ response: await app().inject({ method: 'GET', url }), guard: isSagaList })
+    const [saga] = await sagas()
+    expect(saga?.backdrop).toEqual({ type: 'slideshow', motion: 'fade' })
+    const heat = saga?.media.find((media) => media.item?.title === 'Heat')?.item
+    const pick = (payload: InjectOptions['payload'], sagaId = saga?.tmdbId ?? '') =>
+      asAdmin({ method: 'PUT', url: `${url}/${sagaId}/backdrop`, payload })
+
+    const still = { type: 'still', itemId: heat?.id }
+    expect((await pick(still)).json()).toEqual(still)
+    expect((await sagas())[0]?.backdrop).toEqual(still)
+    const slideshow = { type: 'slideshow', motion: 'kenBurns' }
+    expect((await pick(slideshow)).json()).toEqual(slideshow)
+    expect((await sagas())[0]?.backdrop).toEqual(slideshow)
+
+    expect((await pick({ type: 'still', itemId: 999_999 })).statusCode).toBe(400)
+    expect((await pick({ type: 'slideshow', motion: 'spin' })).statusCode).toBe(400)
+    expect((await pick(slideshow, '2344')).statusCode).toBe(404)
+    const viewer = await app().inject({
+      method: 'PUT',
+      url: `${url}/${saga?.tmdbId}/backdrop`,
+      payload: still,
+    })
+    expect(viewer.statusCode).toBe(403)
+    expect((await sagas())[0]?.backdrop).toEqual(slideshow)
   })
 
   it("serves a movie's logo for its page, and learns an older movie's in the sweep", async () => {

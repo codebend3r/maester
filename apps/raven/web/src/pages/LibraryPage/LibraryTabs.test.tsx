@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { AdminLock, LibraryKind, LibrarySettings } from '@raven/core'
+import {
+  type AdminLock,
+  DEFAULT_SAGA_BACKDROP,
+  type LibraryKind,
+  type LibrarySettings,
+} from '@raven/core'
 import { api } from '@/lib/api'
 import {
   aiSuggestion,
@@ -119,6 +124,7 @@ describe('LibraryPage tabs', () => {
       {
         tmdbId: '119',
         name: 'The Lord of the Rings Collection',
+        backdrop: DEFAULT_SAGA_BACKDROP,
         media: [
           movie({ id: 7, title: 'The Fellowship of the Ring', year: 2001 }),
           movie({ id: 8, title: 'The Two Towers', year: 2002 }),

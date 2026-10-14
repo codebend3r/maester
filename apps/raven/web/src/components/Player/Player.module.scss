@@ -56,10 +56,10 @@
   position: relative;
   z-index: 2;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   grid-template-areas:
-    'back title'
-    '. resumed';
+    'back title next'
+    '. resumed resumed';
   gap: var(--space-1) var(--space-2);
   align-items: center;
   padding: var(--space-3) clamp(var(--space-3), 3vw, var(--space-5)) var(--space-6);
@@ -83,6 +83,12 @@
 
 .back {
   grid-area: back;
+  border-color: transparent;
+}
+
+// What plays next, when the video came with more to play after it.
+.next {
+  grid-area: next;
   border-color: transparent;
 }
 

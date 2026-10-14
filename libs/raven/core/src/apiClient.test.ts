@@ -8,12 +8,13 @@ import {
   isLockedError,
   parseServerEvent,
 } from '@/apiClient'
-import type {
-  ItemImageOptions,
-  ItemMetadataState,
-  MediaTracks,
-  MetadataHealth,
-  PersonDetails,
+import {
+  DEFAULT_SAGA_BACKDROP,
+  type ItemImageOptions,
+  type ItemMetadataState,
+  type MediaTracks,
+  type MetadataHealth,
+  type PersonDetails,
 } from '@/contract'
 import { itemDetails, itemSummary, library, mediaItem, showEntry } from '@/test/fixtures'
 
@@ -178,6 +179,7 @@ describe('createApiClient', () => {
     const saga = {
       tmdbId: '119',
       name: 'The Lord of the Rings Collection',
+      backdrop: DEFAULT_SAGA_BACKDROP,
       media: [mediaItem()],
     }
     const asked = async <T>({
@@ -231,6 +233,17 @@ describe('createApiClient', () => {
         JSON.stringify({ mediaId: 7, how: 'smart' }),
       ],
       ['http://nas:8484/api/libraries/3/duplicates/join', 'POST', JSON.stringify({ itemId: 1 })],
+    ])
+  })
+
+  it("picks a saga's backdrop, naming the saga in the path", async () => {
+    const backdrop = { type: 'still', itemId: 20 } as const
+    const { client, calls } = clientReturning(respond({ body: backdrop }))
+    await expect(
+      client.setSagaBackdrop({ libraryId: 3, sagaId: '119', backdrop }),
+    ).resolves.toEqual(backdrop)
+    expect(calls.map((call) => [call.url, call.init?.method, call.init?.body])).toEqual([
+      ['http://nas:8484/api/libraries/3/sagas/119/backdrop', 'PUT', JSON.stringify(backdrop)],
     ])
   })
 

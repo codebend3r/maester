@@ -1,0 +1,95 @@
+// Every picture in one cell, the one coming in on top of the one it covers.
+// Shaped as a backdrop is, so it takes the place a single picture would.
+.slideshow {
+  display: grid;
+  grid-template-areas: 'slide';
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+}
+
+.picture {
+  grid-area: slide;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  opacity: 0;
+}
+
+.first,
+.current {
+  z-index: 1;
+  opacity: 1;
+}
+
+// Still up under the one coming in, so a cross fade never shows the page through.
+.previous {
+  opacity: 1;
+}
+
+// Without motion each picture is simply up in its turn, or the first held still.
+@media (prefers-reduced-motion: no-preference) {
+  .fade .current {
+    animation: fade-in 1.2s ease-in-out both;
+  }
+
+  // A slow zoom across the whole of a picture's turn, held at its end while
+  // the next fades in over it.
+  .kenBurns {
+    .picture {
+      transform-origin: 50% 30%;
+    }
+
+    .first {
+      animation: zoom var(--slide-ms) linear both;
+    }
+
+    .current {
+      animation:
+        fade-in 1.2s ease-in-out both,
+        zoom var(--slide-ms) linear both;
+    }
+
+    .previous {
+      transform: scale(1.12);
+    }
+  }
+
+  .slide {
+    .current {
+      animation: slide-in 1s ease-in-out both;
+    }
+
+    .previous {
+      animation: slide-out 1s ease-in-out both;
+    }
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes zoom {
+  from {
+    transform: scale(1);
+  }
+
+  to {
+    transform: scale(1.12);
+  }
+}
+
+@keyframes slide-in {
+  from {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes slide-out {
+  to {
+    transform: translateX(-100%);
+  }
+}

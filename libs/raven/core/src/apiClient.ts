@@ -37,6 +37,7 @@ import {
   type PosterEntry,
   type ProgressChange,
   type Saga,
+  type SagaBackdrop,
   type ServerEvent,
   type ShowListing,
   type ShowMatchChoice,
@@ -65,6 +66,7 @@ import {
   isPersonDetails,
   isPlaybackSettingsState,
   isPosterEntries,
+  isSagaBackdrop,
   isSagaList,
   isServerEvent,
   isServerHealth,
@@ -395,6 +397,25 @@ export const createApiClient = ({
     /** A movie library's sagas of two movies or more, by name, each oldest first. */
     listSagas: (libraryId: number): Promise<Saga[]> =>
       libraryGet({ libraryId, path: 'sagas', guard: isSagaList }),
+
+    /** Picks what a saga's page shows behind its title; answers with what was saved. */
+    setSagaBackdrop: ({
+      libraryId,
+      sagaId,
+      backdrop,
+    }: {
+      libraryId: number
+      sagaId: Saga['tmdbId']
+      backdrop: SagaBackdrop
+    }): Promise<SagaBackdrop> =>
+      expect({
+        request: send({
+          path: `/api/libraries/${libraryId}/sagas/${encodeURIComponent(sagaId)}/backdrop`,
+          method: 'PUT',
+          body: backdrop,
+        }),
+        guard: isSagaBackdrop,
+      }),
 
     /** A library's files no movie or show was found for, each with the AI lookup's suggestion for its folder. */
     listUnmatched: (libraryId: number): Promise<UnmatchedFile[]> =>

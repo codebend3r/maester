@@ -24,14 +24,17 @@ import {
   type MediaListParams,
   type PosterEntry,
   type Saga,
+  type SagaBackdrop,
   type ShowListing,
   isJoinRequest,
   isLibraryViewChange,
   isRecord,
+  isSagaBackdrop,
   isSplitRequest,
   matchesAlike,
   matchTypeFor,
   mediaListQuery,
+  sagaPictures,
   type UnmatchedFile,
   validateLibraryInput,
 } from '@raven/core'
@@ -43,6 +46,7 @@ import { MediaArtifacts } from '@/media/mediaArtifacts'
 import { MediaIndex } from '@/media/mediaIndex'
 import { MediaRepository } from '@/media/mediaRepository'
 import { MovieSplits } from '@/media/movieSplits'
+import { SagaBackdrops } from '@/media/sagaBackdrops'
 import { ViewingRepository } from '@/media/viewingRepository'
 import { MetadataService } from '@/metadata/metadataService'
 import { parseBody } from '@/parseBody'
@@ -79,6 +83,7 @@ export class LibrariesController {
     @Inject(LibrariesRepository) private readonly libraries: LibrariesRepository,
     @Inject(MediaRepository) private readonly media: MediaRepository,
     @Inject(MovieSplits) private readonly splits: MovieSplits,
+    @Inject(SagaBackdrops) private readonly sagaBackdrops: SagaBackdrops,
     @Inject(ViewingRepository) private readonly viewing: ViewingRepository,
     @Inject(MediaIndex) private readonly index: MediaIndex,
     @Inject(MediaArtifacts) private readonly artifacts: MediaArtifacts,
@@ -304,6 +309,32 @@ export class LibrariesController {
   listSagas(@Param('id', ParseIntPipe) id: number): Saga[] {
     const record = this.find(id)
     return matchTypeFor(record.settings.kind) === 'movie' ? this.media.listSagas(id) : []
+  }
+
+  /**
+   * Picks what a saga's page shows behind its title: its movies' backdrops
+   * in turn, or one of them held still, which must be one it has.
+   */
+  @AdminOnly()
+  @Put(':id/sagas/:sagaId/backdrop')
+  setSagaBackdrop(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('sagaId') sagaId: string,
+    @Body() body: unknown,
+  ): SagaBackdrop {
+    const saga = this.listSagas(id).find((each) => each.tmdbId === sagaId)
+    if (!saga) throw new NotFoundException(`No saga ${sagaId} in library ${id}`)
+    const backdrop = parseBody({
+      guard: isSagaBackdrop,
+      body,
+      message: 'Send a slideshow and its motion, or the movie whose backdrop to hold still.',
+    })
+    const isOwnPicture =
+      backdrop.type === 'slideshow' ||
+      sagaPictures(saga).some((picture) => picture.id === backdrop.itemId)
+    if (!isOwnPicture) throw new BadRequestException(`${saga.name} has no such backdrop.`)
+    this.sagaBackdrops.save({ libraryId: id, sagaId, backdrop })
+    return backdrop
   }
 
   /** Its files no movie or show was found for, or still waiting for matching, by title, each with the AI lookup's suggestion. */

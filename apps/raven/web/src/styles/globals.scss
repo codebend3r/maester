@@ -77,6 +77,8 @@
   --max-width: 110rem;
   // How tall a control stands, a button or a field: room for a finger.
   --control-size: 2.5rem;
+  // The one action a page is for, standing out from the rest: Play all.
+  --control-size-large: 3.5rem;
   // A readable measure for prose: empty states, errors, the dialog.
   --measure: 38rem;
   --focus-ring: 2px solid var(--color-bark);

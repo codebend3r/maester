@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { cardLink, episodeBackPath, itemPath, watchLink } from '@/lib/itemLinks'
+import { cardLink, episodeBackPath, itemPath, queueLink, watchLink } from '@/lib/itemLinks'
 import { itemSummary, mediaItem } from '@/test/fixtures'
 
 describe('itemPath', () => {
@@ -30,6 +30,14 @@ describe('watchLink', () => {
   it('hands the video over in router state', () => {
     const media = mediaItem({ id: 9 })
     expect(watchLink(media)).toEqual({ to: '/watch/9', state: { media } })
+  })
+})
+
+describe('queueLink', () => {
+  it('plays the first video, handing over the ones to play after it', () => {
+    const media = mediaItem({ id: 9 })
+    const upNext = [mediaItem({ id: 10 }), mediaItem({ id: 11 })]
+    expect(queueLink({ media, upNext })).toEqual({ to: '/watch/9', state: { media, upNext } })
   })
 })
 

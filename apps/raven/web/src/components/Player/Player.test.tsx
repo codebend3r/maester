@@ -1,7 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
-import type { MediaTracks, PlaybackSettingsState, SubtitleTrack } from '@raven/core'
+import {
+  type MediaTracks,
+  type PlaybackSettingsState,
+  type SubtitleTrack,
+  isMediaList,
+  isRecord,
+} from '@raven/core'
 import { act, fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { Route, Routes, useLocation, useParams } from 'react-router-dom'
 import { Player } from '@/components/Player/Player'
 import { api } from '@/lib/api'
 import { setBrowserSupport, setStreamSupport } from '@/test/canPlay'
@@ -253,6 +260,43 @@ describe('the player controls', () => {
     const video = container.querySelector('video')
     fireEvent.keyDown(screen.getByRole('slider', { name: 'Volume' }), { key: 'l' })
     expect(video?.currentTime).toBe(0)
+  })
+
+  it('plays the next video in line once this one ends, and offers it sooner', async () => {
+    const PlayerProbe = () => {
+      const { id } = useParams()
+      const { state } = useLocation()
+      const upNext = isRecord(state) && isMediaList(state.upNext) ? state.upNext : []
+      return <p>{`Playing ${id ?? ''}, then ${upNext.map((media) => media.id).join(', ')}`}</p>
+    }
+    const upNext = [
+      mediaItem({ id: 8, title: 'Busboys 2 (2027)', container: 'mp4' }),
+      mediaItem({ id: 9, title: 'Busboys 3 (2028)', container: 'mp4' }),
+    ]
+    const { container } = renderWithProviders(
+      <Routes>
+        <Route
+          path="/"
+          element={
+            <Player media={mediaItem({ container: 'mp4' })} upNext={upNext} backTo="/libraries/2" />
+          }
+        />
+        <Route path="watch/:id" element={<PlayerProbe />} />
+      </Routes>,
+    )
+    expect(screen.getByRole('link', { name: /^Next: Busboys 2/ })).toHaveAttribute(
+      'href',
+      '/watch/8',
+    )
+    const video = container.querySelector('video')
+    if (!video) throw new Error('no video')
+    fireEvent(video, new Event('ended'))
+    expect(await screen.findByText('Playing 8, then 9')).toBeInTheDocument()
+  })
+
+  it('offers no next video when none came with it', () => {
+    renderWithProviders(<Player media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />)
+    expect(screen.queryByRole('link', { name: /^Next/ })).toBeNull()
   })
 
   it('steps down through every conversion before giving up', async () => {
