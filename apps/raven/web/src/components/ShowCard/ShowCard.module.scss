@@ -3,6 +3,20 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(10rem, 100%), 1fr));
   gap: var(--space-4) var(--space-3);
+
+  // A library can hold thousands of shows, so the browser lays out and
+  // draws only those near the screen. One it skips stands in at the height
+  // it had when last drawn, else at about a card's height 1440 wide.
+  > li {
+    content-visibility: auto;
+    contain-intrinsic-block-size: auto 21rem;
+  }
+
+  // Skipping also clips what a card draws to its box, which would cut off
+  // a focus ring, so a card holding the focus is drawn whole.
+  > li:focus-within {
+    content-visibility: visible;
+  }
 }
 
 // Areas stack the picture, the play button over it, then the words.

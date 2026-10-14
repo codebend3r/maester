@@ -1,4 +1,5 @@
 import type { RefObject } from 'react'
+import { holdInPlace } from '@/lib/holdInPlace'
 import type { JumpScale } from '@/lib/jumpScale'
 import styles from '@/components/JumpPicker/JumpPicker.module.scss'
 
@@ -22,7 +23,8 @@ const FOCUSABLE_LINK = 'a[href]:not([aria-hidden="true"]):not([tabindex="-1"])'
  * page shows first, as a list re-sorted by its headers shows them in its
  * own order. A folded bucket holding it opens first. The card's first link
  * the keyboard can reach takes the focus, so the keyboard carries on from
- * there; a picture link kept out of the tab order is passed over.
+ * there; a picture link kept out of the tab order is passed over. Once
+ * there, the card is held at the top while the cards around it are drawn.
  */
 const jumpTo = ({
   scope,
@@ -40,6 +42,7 @@ const jumpTo = ({
   const smooth = window.matchMedia('(prefers-reduced-motion: no-preference)').matches
   entry.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'start' })
   entry.querySelector<HTMLElement>(FOCUSABLE_LINK)?.focus({ preventScroll: true })
+  holdInPlace({ card: entry, top: 0, afterScroll: smooth })
 }
 
 /**

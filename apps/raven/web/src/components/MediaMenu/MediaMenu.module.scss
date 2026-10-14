@@ -52,6 +52,14 @@
   }
 }
 
+// A grid skips drawing its offscreen cards (`content-visibility: auto`),
+// which also clips what a card draws to its box, under the cards after it.
+// The open list and a failure note hang out of the card, so while either
+// shows, the card is drawn whole.
+.host:has(.list, .failure) {
+  content-visibility: visible;
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .trigger {
     transition:
