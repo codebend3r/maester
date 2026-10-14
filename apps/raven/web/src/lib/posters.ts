@@ -4,8 +4,11 @@ import { api } from '@/lib/api'
 /**
  * How wide a poster shows in each layout that lists them, as an `img`'s
  * `sizes`, so the browser fetches the narrowest of a poster's widths that
- * stays sharp. Measured in Chrome from 320 to 1920 px wide, with the side
- * menu open and collapsed: each is at least as wide as the poster ever
+ * stays sharp. `auto` comes first: a browser that knows it sizes a lazy
+ * picture by the width it is laid out at, which no media query can know, as
+ * a grid's columns hang on the side menu's width. The rest is for the
+ * browsers that do not, measured in Chrome from 320 to 1920 px wide with the
+ * side menu open and collapsed: each is at least as wide as the poster ever
  * shows at that width, never narrower, so none is fetched too small. A
  * change to one of these layouts wants its line here measured again.
  */
@@ -15,20 +18,20 @@ export const POSTER_SIZES = {
    * a saga's, a person's and the favourites'. One column on a phone, then
    * columns of 160 to 248 px; past 64rem, four or more under 204 px.
    */
-  grid: '(max-width: 30rem) calc(100vw - 2rem), (max-width: 64rem) 15.5rem, 12.75rem',
+  grid: 'auto, (max-width: 30rem) calc(100vw - 2rem), (max-width: 64rem) 15.5rem, 12.75rem',
   /**
    * Home's rows: two, four, then eight across the page, which stops growing
    * at 120rem.
    */
-  row: '(max-width: 40rem) calc(50vw - 1.5rem), (max-width: 64rem) calc(23vw - 0.75rem), (max-width: 120rem) calc(12.5vw - 2rem), 13rem',
+  row: 'auto, (max-width: 40rem) calc(50vw - 1.5rem), (max-width: 64rem) calc(23vw - 0.75rem), (max-width: 120rem) calc(12.5vw - 2rem), 13rem',
   /** A saga's deck: 55% of its card, in a grid of `minmax(min(15rem, 100%), 1fr)`. */
-  deck: '(max-width: 40rem) calc(55vw - 1.75rem), (max-width: 48rem) 12rem, (max-width: 64rem) 16.5rem, 12rem',
+  deck: 'auto, (max-width: 40rem) calc(55vw - 1.75rem), (max-width: 48rem) 12rem, (max-width: 64rem) 16.5rem, 12rem',
   /** A season in its show's row: `9rem`. */
   season: '9rem',
   /** A TV library's tile: `clamp(4rem, 14vw, 6rem)`. */
-  showTile: '6rem',
+  showTile: 'auto, 6rem',
   /** A Movies library's tile: `clamp(3.5rem, 12vw, 5rem)`. */
-  movieTile: '5rem',
+  movieTile: 'auto, 5rem',
   /** A movie on the Duplicates tab. */
   duplicate: '(max-width: 30rem) 3.5rem, 5rem',
 } as const
