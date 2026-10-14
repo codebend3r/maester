@@ -19,9 +19,12 @@ const stepsOf = (rows: readonly PlanRow[]): PlanStep[] => {
 /**
  * `sqlite_stat1` as `ANALYZE` left it on a copy of a real server's database:
  * 61k files and 54k items in 11 libraries. Counts only, by table and index;
- * a table with no index has a row count alone.
+ * a table with no index has a row count alone, and an empty table none.
+ * To take them again, open a copy with the server (or run `ANALYZE` on it),
+ * then `SELECT tbl, idx, stat FROM sqlite_stat1 ORDER BY tbl, idx`.
+ * `queryPlans.test.ts` fails when the schema gains or loses an index.
  */
-const PRODUCTION_STATISTICS = [
+export const PRODUCTION_STATISTICS = [
   ['credits', 'credits_person', '669689 4'],
   ['credits', 'sqlite_autoindex_credits_1', '669689 17 1 1'],
   ['favourites', null, '1'],
@@ -53,7 +56,9 @@ const PRODUCTION_STATISTICS = [
  * Makes a test database plan as that real one does, whatever few rows the
  * test added: its statistics are replaced by the real ones. The STAT4
  * samples `ANALYZE` draws from the test's own rows are dropped, so the real
- * counts alone guide the planner.
+ * counts alone guide the planner. Never refresh the statistics after this:
+ * a refresh sees the test's few rows against the copied counts and
+ * analyzes again, putting the test's own counts back.
  */
 export const planLikeProduction = (database: DatabaseService): void => {
   const { db } = database
