@@ -1,5 +1,6 @@
 import { mkdirSync } from 'node:fs'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
+import { Logger } from '@nestjs/common'
 import Sqlite from 'better-sqlite3'
 
 /**
@@ -25,10 +26,54 @@ export const migrate = ({
   })
 }
 
+const logger = new Logger('SQLite')
+
+/** A refresh slower than this is logged, so its cost on a slow disk shows. */
+const SLOW_REFRESH_MS = 100
+
 /**
- * Opens `file` in `dataDir`, making the folder when it is missing, and
- * migrates it. WAL lets reads go on while something writes, and foreign keys
- * are on, so `ON DELETE CASCADE` holds.
+ * Brings the query planner's statistics in line with the data: SQLite's
+ * `PRAGMA optimize` analyzes each table with rows whose indexes have none
+ * yet, or whose size changed about tenfold since. That size is SQLite's
+ * estimate from the table's b-tree, not a count, so a table can be analyzed
+ * again after growing by less. Mask 0x10002 is what SQLite advises when a
+ * long-lived connection opens, and it serves after a large write too: it
+ * checks every table, not only those read since the connection opened, and
+ * it leaves out bit 0x10, so an analysis counts every row instead of
+ * sampling about 2000 per index. A sample judges a column of few values,
+ * such as a library or an item type, far too selective, and the planner
+ * picks worse plans from it. better-sqlite3 builds SQLite with STAT4, which
+ * keeps sample values too, so a plan can hang on the values bound: a
+ * statement is planned again on its first step after a bound value
+ * changes, which costs about as much as preparing it again, a few
+ * microseconds for a simple one. Nearly free when nothing grew.
+ *
+ * Statistics only steer the planner, so a refresh that fails (the write
+ * lock held too long, a full disk) is logged and passed over: it never
+ * fails an open, or the scan or pass whose writes it follows.
+ */
+export const refreshStatistics = ({ db }: { db: Sqlite.Database }): void => {
+  const start = performance.now()
+  try {
+    db.pragma('optimize = 0x10002')
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error)
+    // A held write lock fails only after better-sqlite3's busy timeout, every request waiting.
+    const ms = Math.round(performance.now() - start)
+    logger.warn(
+      `Could not refresh the query planner's statistics of ${basename(db.name)} after ${ms} ms: ${reason}`,
+    )
+    return
+  }
+  const ms = Math.round(performance.now() - start)
+  if (ms <= SLOW_REFRESH_MS) return
+  logger.log(`Refreshed the query planner's statistics of ${basename(db.name)} in ${ms} ms`)
+}
+
+/**
+ * Opens `file` in `dataDir`, making the folder when it is missing, migrates
+ * it and refreshes the planner's statistics. WAL lets reads go on while
+ * something writes, and foreign keys are on, so `ON DELETE CASCADE` holds.
  */
 export const openSqlite = ({
   dataDir,
@@ -44,5 +89,6 @@ export const openSqlite = ({
   db.pragma('journal_mode = WAL')
   db.pragma('foreign_keys = ON')
   migrate({ db, migrations })
+  refreshStatistics({ db })
   return db
 }
