@@ -20,12 +20,18 @@ const PROBE = {
 
 const TRACKS = { audio: [], subtitles: [], defaultAudio: null, frameRate: 24 }
 
-type Read = (libraries: LibrariesRepository, libraryId: number) => unknown
+type Read = ({
+  libraries,
+  libraryId,
+}: {
+  libraries: LibrariesRepository
+  libraryId: number
+}) => unknown
 
 /** The reads that count each library's files. */
 const READS = {
-  'every library': (libraries) => libraries.list(),
-  'one library': (libraries, libraryId) => libraries.get(libraryId),
+  'every library': ({ libraries }) => libraries.list(),
+  'one library': ({ libraries, libraryId }) => libraries.get(libraryId),
 } as const satisfies Record<string, Read>
 
 /** A step that reads the files, `m`. */
@@ -50,7 +56,7 @@ describe.each([
   const stepsOf = (read: Read): PlanStep[] => {
     const traced = tracedDatabase(database.get())
     try {
-      read(new LibrariesRepository(traced.database), state.libraryId)
+      read({ libraries: new LibrariesRepository(traced.database), libraryId: state.libraryId })
       return traced.steps()
     } finally {
       traced.database.onModuleDestroy()

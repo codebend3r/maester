@@ -268,11 +268,13 @@ describe('migrations', () => {
         .prepare<[string], { name: string }>('SELECT name FROM pragma_index_info(?) ORDER BY seqno')
         .all(index)
         .map((column) => column.name),
-      isPartial: !!database.db
-        .prepare<[string], { partial: number }>(
-          "SELECT partial FROM pragma_index_list('media') WHERE name = ?",
-        )
-        .get(index)?.partial,
+      isPartial: !!(
+        database.db
+          .prepare<[string], { partial: number }>(
+            "SELECT partial FROM pragma_index_list('media') WHERE name = ?",
+          )
+          .get(index)?.partial ?? 0
+      ),
     })
     expect(indexed('media_library_unmatched')).toEqual({ columns: ['library_id'], isPartial: true })
     expect(indexed('media_library_probed')).toEqual({
