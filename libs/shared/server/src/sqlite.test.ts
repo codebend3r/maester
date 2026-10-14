@@ -3,6 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Logger } from '@nestjs/common'
+import Sqlite from 'better-sqlite3'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { openSqlite, refreshStatistics } from '@/sqlite'
 
@@ -155,6 +156,21 @@ describe('refreshStatistics', () => {
     refreshStatistics({ db })
     expect(log).toHaveBeenCalledExactlyOnceWith(
       "Refreshed the query planner's statistics of test.db in 150 ms",
+    )
+    db.close()
+  })
+
+  it('logs a refresh that fails as a warning, and carries on', () => {
+    const before = openSqlite({ dataDir: state.dir, file: 'test.db', migrations: [FIRST, INDEXED] })
+    addNotes({ db: before, bodies: twoBodies(4) })
+    before.close()
+    // The notes are not analyzed yet, and analyzing them writes, which this connection cannot.
+    const db = new Sqlite(join(state.dir, 'test.db'), { readonly: true })
+    const warn = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined)
+
+    expect(() => refreshStatistics({ db })).not.toThrow()
+    expect(warn).toHaveBeenCalledExactlyOnceWith(
+      "Could not refresh the query planner's statistics of test.db: attempt to write a readonly database",
     )
     db.close()
   })

@@ -45,11 +45,24 @@ const SLOW_REFRESH_MS = 100
  * picks worse plans from it. better-sqlite3 builds SQLite with STAT4, which
  * keeps sample values too, so a plan can hang on the values bound: a
  * statement is planned again on its first step after a bound value
- * changes, 2 to 7 microseconds each time. Nearly free when nothing grew.
+ * changes, which costs about as much as preparing it again, a few
+ * microseconds for a simple one. Nearly free when nothing grew.
+ *
+ * Statistics only steer the planner, so a refresh that fails (the write
+ * lock held too long, a full disk) is logged and passed over: it never
+ * fails an open, or the scan or pass whose writes it follows.
  */
 export const refreshStatistics = ({ db }: { db: Sqlite.Database }): void => {
   const start = performance.now()
-  db.pragma('optimize = 0x10002')
+  try {
+    db.pragma('optimize = 0x10002')
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error)
+    logger.warn(
+      `Could not refresh the query planner's statistics of ${basename(db.name)}: ${reason}`,
+    )
+    return
+  }
   const ms = Math.round(performance.now() - start)
   if (ms <= SLOW_REFRESH_MS) return
   logger.log(`Refreshed the query planner's statistics of ${basename(db.name)} in ${ms} ms`)
