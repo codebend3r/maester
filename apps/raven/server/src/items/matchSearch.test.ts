@@ -48,6 +48,7 @@ describe('Fix match confidence', () => {
       { id: 501, title: 'Short Film', released: '2020-03-01', runtime: 1 },
       { id: 502, title: 'Short Film', released: '2021-05-01', runtime: 120 },
       { id: 503, title: 'Hidden Film', released: '2019-06-01', runtime: 1 },
+      { id: 504, title: 'Night Train', released: '2019-02-01', runtime: 120 },
     ],
     shows: [
       { id: 30981, title: 'Monster', first: '2004-04-07', popularity: 50, seasons: { 1: run(74) } },
@@ -71,6 +72,22 @@ describe('Fix match confidence', () => {
       { id: 69084, title: 'Monster Strike', first: '2015-10-10', seasons: { 1: run(12) } },
       { id: 15130, title: 'Monster Rancher', first: '1999-04-05', seasons: { 1: run(48) } },
       { id: 7101, title: 'Patriot', first: '2015-11-05', seasons: { 1: run(10) } },
+      {
+        id: 2316,
+        title: 'The Office',
+        first: '2005-03-24',
+        countries: ['US'],
+        popularity: 90,
+        seasons: { 1: run(6) },
+      },
+      {
+        id: 2996,
+        title: 'The Office',
+        first: '2001-07-09',
+        countries: ['GB'],
+        popularity: 30,
+        seasons: { 1: run(6) },
+      },
     ],
   })
   const state: {
@@ -80,7 +97,8 @@ describe('Fix match confidence', () => {
     films: number
     vault: number
     cellar: number
-  } = { root: '', app: null, tv: 0, films: 0, vault: 0, cellar: 0 }
+    shows: number
+  } = { root: '', app: null, tv: 0, films: 0, vault: 0, cellar: 0, shows: 0 }
   const app = (): NestFastifyApplication => {
     if (!state.app) throw new Error('app not started')
     return state.app
@@ -150,6 +168,7 @@ describe('Fix match confidence', () => {
     const films = join(state.root, 'Films')
     const vault = join(state.root, 'Vault')
     const cellar = join(state.root, 'Cellar')
+    const shows = join(state.root, 'Shows')
     await Promise.all([
       encodeClip({ path: join(tv, 'Monster', 'Season 1', 'Monster - S01E01.mp4'), seconds: 1 }),
       encodeClip({ path: join(tv, 'Monster', 'Season 1', 'Monster - S01E35.mp4'), seconds: 1 }),
@@ -165,6 +184,16 @@ describe('Fix match confidence', () => {
         path: join(cellar, 'Hidden Film (2019)', 'Hidden Film (2019).mp4'),
         seconds: 1,
       }),
+      encodeClip({
+        path: join(films, 'Night Train (2019)', 'Night Train (2019) {edition-Extended}.mp4'),
+        seconds: 1,
+      }),
+      encodeClip({
+        path: join(shows, 'The Office (UK)', 'Season 1', 'The Office (UK) - S01E01.mp4'),
+        seconds: 1,
+      }),
+      encodeClip({ path: join(shows, 'Monster', 'Season 1', 'Monster - S01E01.mp4'), seconds: 1 }),
+      encodeClip({ path: join(shows, 'Monster', 'Trailers', 'Monster - S02E01.mp4'), seconds: 1 }),
     ])
     state.app = await createApp({
       config: {
@@ -207,8 +236,9 @@ describe('Fix match confidence', () => {
       paths: [cellar],
       settings: { kind: 'movies', locked: true },
     })
+    state.shows = await create({ name: 'Shows', paths: [shows], settings: { kind: 'shows' } })
     await Promise.all(
-      [state.tv, state.films, state.vault, state.cellar].map((id) =>
+      [state.tv, state.films, state.vault, state.cellar, state.shows].map((id) =>
         app().get(ScannerService).whenIdle(id),
       ),
     )
@@ -326,13 +356,71 @@ describe('Fix match confidence', () => {
     ])
   })
 
+  it('searches and scores a typed country suffix as the country, not as part of the title', async () => {
+    expect(scores(await search({ query: 'type=show&query=The%20Office' }))).toEqual([
+      ['2316', 100],
+      ['2996', 73],
+    ])
+    const typed = `type=show&query=${encodeURIComponent('The Office (UK)')}`
+    expect(scores(await search({ query: typed }))).toEqual([
+      ['2996', 100],
+      ['2316', 40],
+    ])
+  })
+
+  it("takes the country from a show folder's suffix when none is typed, and a typed one first", async () => {
+    const file = await fileNamed({ library: state.shows, name: 'The Office (UK) - S01E01.mp4' })
+    expect(
+      scores(await search({ query: `type=show&query=The%20Office&mediaId=${file.id}` })),
+    ).toEqual([
+      ['2996', 100],
+      ['2316', 40],
+    ])
+    const typed = `type=show&query=${encodeURIComponent('The Office (US)')}&mediaId=${file.id}`
+    expect(scores(await search({ query: typed }))).toEqual([
+      ['2316', 100],
+      ['2996', 40],
+    ])
+  })
+
+  it("leaves an extra out of a show folder's fit", async () => {
+    const trailer = await fileNamed({ library: state.shows, name: 'Monster - S02E01.mp4' })
+    expect(trailer.match).toBe('off')
+    // No show here has a season 2, so the trailer, were it read, would hold every one at 40.
+    const file = await fileNamed({ library: state.shows, name: 'Monster - S01E01.mp4' })
+    expect(scores(await search({ query: `type=show&query=Monster&mediaId=${file.id}` }))).toEqual([
+      ['30981', 79],
+      ['65806', 79],
+      ['131532', 47],
+      ['69084', 40],
+      ['15130', 37],
+      ['51808', 33],
+      ['64198', 19],
+    ])
+  })
+
+  it('measures no runtime fit for a file that names an edition', async () => {
+    const cut = await fileNamed({
+      library: state.films,
+      name: 'Night Train (2019) {edition-Extended}.mp4',
+    })
+    expect(cut.edition).toBe('Extended')
+    // A 1 second cut against a 120 minute runtime would, measured, be held at 40.
+    const query = `type=movie&query=Night%20Train&year=2019&mediaId=${cut.id}`
+    expect(scores(await search({ query }))).toEqual([['504', 100]])
+  })
+
   it('answers when a details call fails, scoring that result without it', async () => {
+    // Patriot has 10 episodes, so the Monster folder's S01E35 holds it at 40 once its details are read.
+    const file = await fileNamed({ library: state.tv, name: 'Monster - S01E35.mp4' })
+    const query = `type=show&query=Patriot&mediaId=${file.id}`
     tmdb.state.failing.push('/tv/7101')
     try {
-      expect(scores(await search({ query: 'type=show&query=Patriot' }))).toEqual([['7101', 100]])
+      expect(scores(await search({ query }))).toEqual([['7101', 100]])
     } finally {
       tmdb.state.failing.splice(0)
     }
+    expect(scores(await search({ query }))).toEqual([['7101', 40]])
   })
 
   it('treats a file raven no longer has as no subject', async () => {

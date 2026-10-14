@@ -15,7 +15,6 @@ import {
 } from '@nestjs/common'
 import {
   type CandidateTier,
-  countryOf,
   firstTierFor,
   fitsTier,
   isMatchChoice,
@@ -27,6 +26,7 @@ import {
   matchTypeFor,
   parseEpisodeName,
   showFolderOf,
+  splitCountry,
 } from '@raven/core'
 import type { FastifyReply } from 'fastify'
 import { AdminOnly } from '@/admin/adminGuard'
@@ -49,7 +49,10 @@ const tmdbFailure = (error: unknown): never => {
 }
 
 /** A file a search's subject stands for, as its score reads it. */
-type SubjectFile = Pick<MediaItem, 'libraryId' | 'fileName' | 'folder' | 'duration'>
+type SubjectFile = Pick<
+  MediaItem,
+  'libraryId' | 'fileName' | 'folder' | 'match' | 'duration' | 'edition'
+>
 
 /** How many of the first-scored results Fix match reads the details of. */
 const DETAILS_FOR = 5
@@ -62,12 +65,14 @@ const NOTHING_ON_DISK = { onDisk: null, country: null } as const satisfies {
   country: string | null
 }
 
-/** A show's file as its score reads it: a show's files never need a duration. */
-const asShowFile = ({ libraryId, fileName, folder }: MatchFile): SubjectFile => ({
+/** A show's file as its score reads it: a show's files never need a duration or an edition. */
+const asShowFile = ({ libraryId, fileName, folder, match }: MatchFile): SubjectFile => ({
   libraryId,
   fileName,
   folder,
+  match,
   duration: null,
+  edition: null,
 })
 
 /** The file or show a search names, or null for none; a malformed id, or both, is a 400. */
@@ -117,7 +122,8 @@ export class MatchController {
    * first. With `libraryId`, those that fit the library type's first tier
    * come first among equals; with `mediaId` or `itemId`, they are scored
    * against what that file's show folder, that movie file or that show has
-   * on disk.
+   * on disk. A country suffix typed, `The Office (UK)`, is the country
+   * searched for, ahead of the subject's, and never part of the title.
    */
   @AdminOnly()
   @Get('match/search')
@@ -131,12 +137,13 @@ export class MatchController {
     @Headers('cookie') cookie: string | undefined,
   ): Promise<MatchCandidate[]> {
     if (!isMatchItemType(type)) throw new BadRequestException('type must be movie or show')
-    if (!query?.trim()) throw new BadRequestException('Search for a title.')
+    const typed = splitCountry(query?.trim() ?? '')
+    if (!typed.title) throw new BadRequestException('Search for a title.')
     const preferred = this.preferredBy({ libraryId, cookie })
     const subject = subjectFrom({ mediaId, itemId })
     this.requireTmdb()
     const parsedYear = Number.parseInt(year ?? '', 10)
-    const asked = { query: query.trim(), year: Number.isInteger(parsedYear) ? parsedYear : null }
+    const asked = { query: typed.title, year: Number.isInteger(parsedYear) ? parsedYear : null }
     const results = await (
       type === 'movie' ? this.tmdb.searchMovies(asked) : this.tmdb.searchShows(asked)
     ).catch(tmdbFailure)
@@ -146,7 +153,7 @@ export class MatchController {
     const scoring = {
       title: asked.query,
       year: asked.year,
-      country: country ?? countryOf(asked.query),
+      country: typed.country ?? country,
       results: ordered,
       tier: preferred,
       onDisk,
@@ -211,14 +218,19 @@ export class MatchController {
   }): { onDisk: OnDisk | null; country: string | null } {
     if (subject == null) return NOTHING_ON_DISK
     const viewer = this.lock.viewer({ cookie })
-    const files = this.subjectFiles({ type, subject }).filter((file) =>
-      viewer.seesLibrary(file.libraryId),
+    // An extra is never matched (`off`), so a trailer's numbers say nothing of the show.
+    const files = this.subjectFiles({ type, subject }).filter(
+      (file) => file.match !== 'off' && viewer.seesLibrary(file.libraryId),
     )
     const [first] = files
     if (first == null) return NOTHING_ON_DISK
     switch (type) {
       case 'movie':
-        return { onDisk: { type: 'movie', duration: first.duration }, country: null }
+        // A cut, extended or director's, runs its own length rather than TMDB's runtime.
+        return {
+          onDisk: { type: 'movie', duration: first.edition == null ? first.duration : null },
+          country: null,
+        }
       case 'show': {
         const named = files.map((file) =>
           parseEpisodeName({ fileName: file.fileName, folder: file.folder }),

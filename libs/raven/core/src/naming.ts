@@ -449,10 +449,14 @@ export const seasonFolderNumber = (name: string): number | null => {
 const COUNTRY_SUFFIX =
   /\s*\((US|UK|AU|CA|NZ|IE|JP|KR|FR|DE|IT|ES|BR|MX|IN|CN|SE|NO|DK|NL|BE|PL|RU|TR|ZA)\)$/i
 
-/** The country a name's suffix gives, as TMDB writes it: Sonarr's UK is GB. */
-export const countryOf = (name: string): string | null => {
+/**
+ * A name without Sonarr's country suffix, and the country it gives as TMDB
+ * writes it: `The Office (UK)` is `The Office` from GB. A name without one
+ * gives no country.
+ */
+export const splitCountry = (name: string): { title: string; country: string | null } => {
   const code = COUNTRY_SUFFIX.exec(name)?.[1]?.toUpperCase() ?? null
-  return code === 'UK' ? 'GB' : code
+  return { title: name.replace(COUNTRY_SUFFIX, ''), country: code === 'UK' ? 'GB' : code }
 }
 
 /** `S01E02`, `S1E2`, `S01E123`, `S01E01-E02`, `S01E01E02`, and `1x02`. */
@@ -505,9 +509,11 @@ export const parseEpisodeName = ({
   const fileNamed = fromFile.withEdition ?? fromFile.title
   const named = (fromFolder?.withEdition ?? fromFolder?.title) || fileNamed || fallbackShow
   // The suffix is not searched on, but kept to choose between two shows of the name.
-  const show = named.replace(COUNTRY_SUFFIX, '')
-  const plain = (fromFolder?.title || fromFile.title || fallbackShow).replace(COUNTRY_SUFFIX, '')
-  const fileShow = fileNamed.replace(COUNTRY_SUFFIX, '')
+  const showSplit = splitCountry(named)
+  const fileSplit = splitCountry(fileNamed)
+  const show = showSplit.title
+  const plain = splitCountry(fromFolder?.title || fromFile.title || fallbackShow).title
+  const fileShow = fileSplit.title
   const showFromFile = fileShow !== '' && fileShow !== show ? fileShow : null
 
   const season = code ? Number(code[1] ?? code[4]) : seasonFolder
@@ -523,7 +529,7 @@ export const parseEpisodeName = ({
     show,
     showWithoutEdition: plain !== '' && plain !== show ? plain : null,
     showFromFile,
-    country: countryOf(named) ?? countryOf(fileNamed),
+    country: showSplit.country ?? fileSplit.country,
     year: fromFolder?.year ?? fromFile.year,
     season,
     episodes,

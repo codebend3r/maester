@@ -16,7 +16,7 @@ export type OnDisk =
   | { type: 'show'; files: readonly EpisodeNumbers[] }
   | {
       type: 'movie'
-      /** Seconds, or null until the file has been probed. */
+      /** Seconds; null until the file has been probed, or for an edition, which runs its own length. */
       duration: number | null
     }
 
