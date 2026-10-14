@@ -368,14 +368,11 @@ export class MetadataService implements OnApplicationBootstrap {
   /**
    * A pass, after which the planner's statistics follow what it stored and
    * cleared up: a library's first can add thousands of items, credits and
-   * people. A pass TMDB stopped kept what it stored before then.
+   * people. A pass TMDB stopped ends here too, with what it stored by then.
    */
   private async pass(libraryId: number): Promise<void> {
-    try {
-      await this.matchAndClearUp(libraryId)
-    } finally {
-      this.database.refreshStatistics()
-    }
+    await this.matchAndClearUp(libraryId)
+    this.database.refreshStatistics()
   }
 
   private async matchAndClearUp(libraryId: number): Promise<void> {

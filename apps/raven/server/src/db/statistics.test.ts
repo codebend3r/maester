@@ -3,9 +3,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import { isLibrary } from '@raven/core'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createApp } from '@/app'
 import { DatabaseService } from '@/db/database'
+import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import { MetadataService } from '@/metadata/metadataService'
 import { ScannerService } from '@/scanner/scannerService'
 import { NOT_WATCHING, adminCookie, testConfig } from '@/test/app'
@@ -14,9 +15,9 @@ import { fakeTmdb } from '@/test/fakeTmdb'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
 
 /**
- * A Movies library whose search for Heat waits until let go, so its matching
- * pass is still busy when the scan ends: what the scan leaves can be told
- * apart from what the pass leaves.
+ * A Movies library whose probes wait until let go, and its search for Heat
+ * after them, so what the scan's index leaves, while probing can still take
+ * hours, can be told apart from what its matching pass leaves.
  */
 describe("the query planner's statistics", () => {
   const tmdb = fakeTmdb({ movies: [{ id: 949, title: 'Heat', released: '1995-12-15' }] })
@@ -24,8 +25,15 @@ describe("the query planner's statistics", () => {
     root: string
     app: NestFastifyApplication | null
     library: number
-    letGo: () => void
-  } = { root: '', app: null, library: 0, letGo: () => undefined }
+    letGoSearch: () => void
+    letGoProbes: () => void
+  } = {
+    root: '',
+    app: null,
+    library: 0,
+    letGoSearch: () => undefined,
+    letGoProbes: () => undefined,
+  }
   const app = (): NestFastifyApplication => {
     if (!state.app) throw new Error('app not started')
     return state.app
@@ -64,7 +72,16 @@ describe("the query planner's statistics", () => {
     await state.app.init()
     await state.app.getHttpAdapter().getInstance().ready()
     const admin = await adminCookie(state.app)
-    state.letGo = tmdb.hold('heat')
+    state.letGoSearch = tmdb.hold('heat')
+    const ffmpeg = app().get(FfmpegService)
+    const probeFile = ffmpeg.probeFile.bind(ffmpeg)
+    const probes = new Promise<void>((resolve) => {
+      state.letGoProbes = resolve
+    })
+    const probing = vi.spyOn(ffmpeg, 'probeFile').mockImplementation(async (path) => {
+      await probes
+      return probeFile(path)
+    })
     const created = await app().inject({
       method: 'POST',
       url: '/api/libraries',
@@ -74,24 +91,30 @@ describe("the query planner's statistics", () => {
     const library: unknown = created.json()
     if (!isLibrary(library)) throw new Error(`Unexpected body: ${created.body}`)
     state.library = library.id
-    await app().get(ScannerService).whenIdle(state.library)
+    await vi.waitFor(() => expect(probing).toHaveBeenCalled())
   })
 
   afterAll(async () => {
-    state.letGo()
+    state.letGoProbes()
+    state.letGoSearch()
+    await state.app?.get(ScannerService).whenIdle(state.library)
     await state.app?.get(MetadataService).whenIdle()
     await state.app?.get(ThumbnailService).whenIdle()
     await state.app?.close()
+    vi.restoreAllMocks()
     await rm(state.root, { recursive: true, force: true, maxRetries: 5 })
   })
 
-  it('cover the videos a scan indexed once it ends, while matching still runs', () => {
+  it('cover the videos a scan indexed while it still probes them', () => {
     expect(statisticsOf('media')).toMatchObject({ media_library_title: '2 2 1' })
     expect(statisticsOf('items')).toEqual({})
   })
 
   it('cover the movies a matching pass stored once it ends', async () => {
-    state.letGo()
+    state.letGoProbes()
+    await app().get(ScannerService).whenIdle(state.library)
+    expect(statisticsOf('items')).toEqual({})
+    state.letGoSearch()
     await app().get(MetadataService).whenIdle()
     expect(statisticsOf('items')).toEqual({
       items_parent: '1 1 1',
