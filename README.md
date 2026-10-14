@@ -66,4 +66,4 @@ Work is tracked in [GitHub Issues](https://github.com/codebend3r/maester/issues)
 
 ## Releases
 
-Every app, lib and API shares one semver version. `scripts/bump_version.sh <patch|minor|major>` sets it in every project's `package.json`, `VERSION` and `pyproject.toml` (and their lockfiles), commits `Release vX.Y.Z` and tags `vX.Y.Z`.
+Every app, lib and API shares one semver version. `scripts/bump_version.sh <patch|minor|major>` sets it in every project's `package.json`, `VERSION` and `pyproject.toml` (and their lockfiles), commits `Release vX.Y.Z` and tags `vX.Y.Z`. After every merge into main, CI tags the merge `vX.Y.Z.N`, the Nth build of `X.Y.Z`, releases it on GitHub, and bakes it into raven's image, whose side menu shows it; the files stay at `X.Y.Z`, and the next bump drops the build number.

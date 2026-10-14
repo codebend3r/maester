@@ -1,10 +1,15 @@
-name: 🚀 Main smoke test
+name: 🚀 Main smoke test and release
 
-# Runs on merges into main and nowhere else: builds each product's production
-# image and checks that it starts and serves its health route (smoke-test.yml).
-# The same smoke test, with lint, tests and the rest, runs on the PR before
-# the merge (pull-request-checks.yml). raven's image is then published to
-# GHCR, where Vhagar picks it up.
+# Runs on merges into main and nowhere else. Each merge is the next build of
+# the current version, X.Y.Z.N (scripts/bump_version.sh build): each
+# product's production image is built with that version and checked to start
+# and serve its health route (smoke-test.yml), then the merge is tagged
+# vX.Y.Z.N and released on GitHub. The same smoke test, with lint, tests and
+# the rest, runs on the PR before the merge (pull-request-checks.yml).
+# raven's image is then published to GHCR, where Vhagar picks it up.
+#
+# Your own "Release vX.Y.Z" commit (the version-bump skill) arrives with its
+# tag; it gets no build number, and its release is that tag.
 on:
   push:
     branches: [main]
@@ -18,17 +23,108 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Worked out before anything is built, since the images carry it; tagged
+  # only once they pass.
+  version:
+    name: 🔢 Version
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      kind: ${{ steps.version.outputs.kind }}
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v7
+        with:
+          # Every tag, to count the current version's builds.
+          fetch-depth: 0
+
+      # manual: your Release commit, released as its own tag. existing: a
+      # re-run, keeping the tag this commit already has. build: the next one.
+      - name: 🔢 Pick the version
+        id: version
+        run: |
+          subject=$(git log -1 --format=%s)
+          tagged=$(git tag --points-at HEAD --list 'v[0-9]*' | head -n 1)
+          if [[ $subject =~ ^Release\ v(.+)$ ]]; then
+            version=${BASH_REMATCH[1]} kind=manual
+          elif [ -n "$tagged" ]; then
+            version=${tagged#v} kind=existing
+          else
+            version=$(scripts/bump_version.sh --print build) kind=build
+          fi
+          echo "$kind: $version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "kind=$kind" >> "$GITHUB_OUTPUT"
+
   smoke:
     name: 🐳 Smoke test
+    needs: version
     uses: ./.github/workflows/smoke-test.yml
     with:
       # Hands the health checked raven image to the publish job, so GHCR gets
       # the exact image that passed rather than a rebuild.
       save-raven-image: true
+      version: ${{ needs.version.outputs.version }}
+
+  release:
+    name: 🏷️ Release
+    needs: [version, smoke]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    # Pushing the tag and creating the release write to the repo.
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      KIND: ${{ needs.version.outputs.kind }}
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # The images already carry the version, so the tag has to match it.
+      - name: 🏷️ Tag the build
+        run: |
+          if [ "$KIND" = build ]; then
+            next=$(scripts/bump_version.sh --print build)
+            if [ "$next" != "$VERSION" ]; then
+              echo "::error::The next build is $next, but the images were built as $VERSION."
+              exit 1
+            fi
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898283+github-actions[bot]@users.noreply.github.com'
+            scripts/bump_version.sh --push build
+          fi
+          if [ -z "$(git tag --points-at HEAD --list "v$VERSION")" ]; then
+            echo "::error::v$VERSION is not on this commit. Push a Release commit with its tag: scripts/bump_version.sh --push."
+            exit 1
+          fi
+
+      # The notes list the PRs since the version before: the last build, or
+      # for your own release the last X.Y.Z, so they cover every build of it.
+      - name: 🚀 Publish the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="v$VERSION"
+          if gh release view "$tag" > /dev/null 2>&1; then
+            echo "$tag is already released."
+            exit 0
+          fi
+          previous=(--match 'v[0-9]*')
+          if [ "$KIND" = manual ]; then previous+=(--exclude 'v*.*.*.*'); fi
+          notes=(--generate-notes)
+          if since=$(git describe --tags --abbrev=0 "${previous[@]}" HEAD^ 2> /dev/null); then
+            notes+=(--notes-start-tag "$since")
+          fi
+          gh release create "$tag" --verify-tag --latest \
+            --title "$tag ($(git rev-parse --short HEAD))" "${notes[@]}"
 
   publish:
     name: 📦 Publish raven
-    needs: smoke
+    needs: [version, release]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     # Publishing writes raven's package; nothing else in this run does.
@@ -38,6 +134,7 @@ jobs:
     env:
       IMAGE: raven:ci
       PUBLISHED: ghcr.io/${{ github.repository_owner }}/raven
+      VERSION: ${{ needs.version.outputs.version }}
     steps:
       - name: 📥 Checkout
         uses: actions/checkout@v7
@@ -73,15 +170,17 @@ jobs:
         run: docker load -i raven-image.tar.gz
 
       # Vhagar pulls :latest every few minutes and restarts raven on a new one
-      # (apps/raven/vhagar-update.sh). The commit tag keeps every build to go
-      # back to.
+      # (apps/raven/vhagar-update.sh). The version and commit tags keep every
+      # build to go back to.
       - name: 📦 Publish to GHCR
         if: steps.changed.outputs.publish == 'true'
         env:
           TOKEN: ${{ github.token }}
         run: |
           echo "$TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker tag "$IMAGE" "$PUBLISHED:$VERSION"
           docker tag "$IMAGE" "$PUBLISHED:$GITHUB_SHA"
           docker tag "$IMAGE" "$PUBLISHED:latest"
+          docker push "$PUBLISHED:$VERSION"
           docker push "$PUBLISHED:$GITHUB_SHA"
           docker push "$PUBLISHED:latest"

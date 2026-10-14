@@ -1,6 +1,6 @@
 ---
 name: version-bump
-description: Use when cutting a release or bumping the version in this workspace, "npm version minor", "npm version patch", "npm version major", "bump the version", "cut a release", "tag a new version", "release a patch/minor/major", "tag v1.2.0". Every app, lib and API shares one semver version; bumps all of them, makes a "Release vX.Y.Z" commit and puts an annotated vX.Y.Z tag on that commit.
+description: Use when cutting a release or bumping the version in this workspace, "npm version minor", "npm version patch", "npm version major", "bump the version", "cut a release", "tag a new version", "release a patch/minor/major", "tag v1.2.0". Every app, lib and API shares one semver version; bumps all of them, makes a "Release vX.Y.Z" commit and puts an annotated vX.Y.Z tag on that commit. CI tags each merge between releases as a vX.Y.Z.N build.
 ---
 
 # Version bump
@@ -10,6 +10,12 @@ The workspace follows [semver 2.0.0](https://semver.org) with one version for ev
 `scripts/bump_version.sh` does the whole thing. `npm version` does not work here (the root `package.json` has no version and does not know about the Python projects), so when asked for `npm version <bump>`, run this script instead. Never edit versions or create release tags by hand.
 
 Older `maester-vX.Y.Z` tags stay as they are; the line continues from the latest `vX.Y.Z` tag.
+
+## Builds between releases
+
+Every merge into `main` is a build. `main-smoke-test.yml` works out the next one with `scripts/bump_version.sh --print build`, bakes it into the images (raven's side menu shows it), and once they pass the smoke test tags the merge `vX.Y.Z.N`, the Nth build of `X.Y.Z`. It then publishes a GitHub Release titled `vX.Y.Z.N (<short sha>)` and pushes raven's image as `:X.Y.Z.N`. Builds write no files and make no commit: four numbers are not semver, so every `package.json`, `VERSION` and `pyproject.toml` stays at `X.Y.Z`.
+
+`build` and `--print` are CI's. Never run `scripts/bump_version.sh build` by hand. Patch, minor and major stay the user's, through the steps below. A build tag counts as its `X.Y.Z`, so the next bump drops the build number: after `v0.5.3.4`, `patch` gives `v0.5.4`, and the merge after that is `v0.5.4.1`. CI recognises the pushed `Release vX.Y.Z` commit, gives it no build number, and publishes its tag as the GitHub Release.
 
 ## Pick the bump
 
@@ -26,17 +32,18 @@ While the version is `0.y.z`, breaking changes may go in a `minor`. A literal re
 
 1. Be on `main`, up to date, with a clean tree and the tags fetched: `git switch main && git pull --rebase --tags`.
 2. Preview: `scripts/bump_version.sh --dry-run <major|minor|patch|X.Y.Z>`.
-3. Release: `scripts/bump_version.sh <bump>`. Add `--push` only when asked to push; it pushes the branch and the tag in the same step.
+3. Release: `scripts/bump_version.sh <bump>`. Add `--push` only when asked to push; it pushes the branch and the tag in one atomic push, so CI never sees the Release commit without its tag.
 4. Verify: `git show --stat HEAD` shows every `package.json` under `apps/` and `libs/`, `bun.lock`, each `apps/<product>/VERSION`, each `pyproject.toml` and its `uv.lock`, and nothing else; `git describe --exact-match HEAD` prints `vX.Y.Z`.
 
 ## What the script guarantees
 
-- The current version is the latest `vX.Y.Z` tag reachable from HEAD; it refuses to run when there is none.
+- The current version is the latest `vX.Y.Z` tag reachable from HEAD, less any build number (`v0.5.3.4` is `0.5.3`); it refuses to run when there is none.
 - Every tracked `apps/*/*/package.json` and `libs/*/*/package.json` gets the new top-level `version`, and its workspace entry in `bun.lock` follows, so `bun install --frozen-lockfile` still passes. A project whose version had drifted (rookery was `0.1.0` before `v0.4.0`) is pulled onto the shared version.
 - Every `apps/<product>/VERSION` gets the new version (the luwin smoke test reads it).
 - Every `pyproject.toml` under `apps/` and `libs/` gets its first `version = "..."` line (the `[project]` table) updated, and the project's own entry in the `uv.lock` beside it. The luwin image reads its version from that metadata, so `--version` and `/health` follow.
 - `patch` on a prerelease (`1.2.0-rc.1`) releases it (`1.2.0`) rather than skipping to `1.2.1`.
 - It refuses a dirty tree, an invalid version, a version that does not move forward by semver precedence, and a tag that already exists. Nothing is written when it refuses.
+- `build` refuses a commit that already has a version tag, and a prerelease, which gets no builds.
 - It warns when the branch is not the remote's default branch.
 
 ## Undo before pushing

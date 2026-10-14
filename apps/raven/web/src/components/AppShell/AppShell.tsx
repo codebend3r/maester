@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { type ReactNode, useId } from 'react'
 import { Link, Outlet, matchPath, useLocation } from 'react-router-dom'
-import { version } from '#package'
 import { Button } from '@/components/Button/Button'
 import { Icon } from '@/components/Icon/Icon'
 import { LibraryIcon } from '@/components/LibraryIcon/LibraryIcon'
@@ -12,6 +11,7 @@ import { useKeyShortcut } from '@/lib/keyboard'
 import { librariesQuery } from '@/lib/queries'
 import { TopCardNote, useScrollReset } from '@/lib/useScrollReset'
 import { useServerEvents } from '@/lib/useServerEvents'
+import { ravenVersion } from '@/lib/version'
 import { usePageBackdrop } from '@/stores/pageBackdrop'
 import { useSideMenu } from '@/stores/sideMenu'
 import styles from '@/components/AppShell/AppShell.module.scss'
@@ -178,7 +178,7 @@ export const AppShell = () => {
               />
               {!tipSeen && <ShortcutTip onDismiss={dismissTip} />}
             </div>
-            {!collapsed && <p className={styles.version}>v{version}</p>}
+            {!collapsed && <p className={styles.version}>v{ravenVersion}</p>}
           </div>
         </div>
       </nav>

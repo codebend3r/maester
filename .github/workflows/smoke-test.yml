@@ -11,6 +11,12 @@ on:
       save-raven-image:
         type: boolean
         default: false
+      # The build main-smoke-test.yml is releasing (X.Y.Z.N), baked into the
+      # images that show it. Pull requests pass none, so theirs show the
+      # package.json version.
+      version:
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -39,6 +45,8 @@ jobs:
             health: /api/health
             expect: .status == "ok" and .ffmpeg != null and .tonemap == true
             page: /
+            # The web app shows it in the side menu.
+            version-arg: VITE_RAVEN_VERSION
           # rookery refuses to boot without its required settings, so the check
           # passes placeholders; nothing here signs anyone in.
           - product: rookery
@@ -55,6 +63,8 @@ jobs:
       EXPECT: ${{ matrix.expect }}
       PAGE: ${{ matrix.page }}
       VERSION_FILE: ${{ matrix.version-file }}
+      VERSION_ARG: ${{ matrix.version-arg }}
+      RELEASE_VERSION: ${{ inputs.version }}
     steps:
       - name: 📥 Checkout
         uses: actions/checkout@v7
@@ -64,9 +74,14 @@ jobs:
       # The source label links a published package to this repo.
       - name: 🐳 Build image
         run: |
+          release=()
+          if [ -n "$RELEASE_VERSION" ]; then
+            release+=(--label "org.opencontainers.image.version=$RELEASE_VERSION")
+            if [ -n "$VERSION_ARG" ]; then release+=(--build-arg "$VERSION_ARG=$RELEASE_VERSION"); fi
+          fi
           docker build -f "apps/$PRODUCT/Dockerfile" -t "$IMAGE" \
             --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
-            --label "org.opencontainers.image.revision=$GITHUB_SHA" .
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" "${release[@]}" .
 
       - name: 🏷️ Entrypoint reports the release version
         if: matrix.product == 'luwin'
@@ -76,6 +91,11 @@ jobs:
           echo "expected: $expected"
           echo "actual:   $actual"
           test "$actual" = "$expected"
+
+      # Vite inlines the version into the bundle, so it is there as text.
+      - name: 🏷️ Web app carries the release version
+        if: matrix.version-arg && inputs.version
+        run: docker run --rm "$IMAGE" grep -rqF "$RELEASE_VERSION" /app/web/assets
 
       # The matrix's own constants, split into words on purpose.
       - name: ▶️ Start server
