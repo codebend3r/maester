@@ -47,10 +47,20 @@ describe('Fix match confidence', () => {
     movies: [
       { id: 501, title: 'Short Film', released: '2020-03-01', runtime: 1 },
       { id: 502, title: 'Short Film', released: '2021-05-01', runtime: 120 },
+      { id: 503, title: 'Hidden Film', released: '2019-06-01', runtime: 1 },
     ],
     shows: [
       { id: 30981, title: 'Monster', first: '2004-04-07', popularity: 50, seasons: { 1: run(74) } },
       { id: 65806, title: 'Monster', first: '2016-03-12', popularity: 10, seasons: { 1: run(50) } },
+      // Ahead of better titles in TMDB's order, so the details read are the
+      // five that score best, not TMDB's first five.
+      { id: 51808, title: 'Robot and Monster', first: '2012-08-04', seasons: { 1: run(26) } },
+      {
+        id: 64198,
+        title: 'Blaze and the Monster Machines',
+        first: '2014-10-13',
+        seasons: { 1: run(20) },
+      },
       {
         id: 131532,
         title: 'Monster High',
@@ -60,13 +70,6 @@ describe('Fix match confidence', () => {
       },
       { id: 69084, title: 'Monster Strike', first: '2015-10-10', seasons: { 1: run(12) } },
       { id: 15130, title: 'Monster Rancher', first: '1999-04-05', seasons: { 1: run(48) } },
-      { id: 51808, title: 'Robot and Monster', first: '2012-08-04', seasons: { 1: run(26) } },
-      {
-        id: 64198,
-        title: 'Blaze and the Monster Machines',
-        first: '2014-10-13',
-        seasons: { 1: run(20) },
-      },
       { id: 7101, title: 'Patriot', first: '2015-11-05', seasons: { 1: run(10) } },
     ],
   })
@@ -157,6 +160,10 @@ describe('Fix match confidence', () => {
         path: join(cellar, 'Short Film (2020)', 'Short Film (2020).mp4'),
         seconds: 1,
         size: '640x480',
+      }),
+      encodeClip({
+        path: join(cellar, 'Hidden Film (2019)', 'Hidden Film (2019).mp4'),
+        seconds: 1,
       }),
     ])
     state.app = await createApp({
@@ -295,10 +302,37 @@ describe('Fix match confidence', () => {
     ])
   })
 
+  it('scores a movie whose every file is hidden from this browser as if there were none', async () => {
+    const admin = await adminCookie(app())
+    const pin = cookieSet(
+      await app().inject({ method: 'POST', url: '/api/lock/unlock', payload: { pin: '3001' } }),
+    )
+    const unlocked = cookies(admin, pin)
+    const hidden = await fileNamed({
+      library: state.cellar,
+      name: 'Hidden Film (2019).mp4',
+      cookie: unlocked,
+    })
+    expect(hidden.item).not.toBeNull()
+    // Its 1-second file fits 501 and rules out 502, so the scores show whether it was read.
+    const query = `type=movie&query=Short%20Film&year=2020&itemId=${hidden.item?.id}`
+    expect(scores(await search({ query }))).toEqual([
+      ['501', 79],
+      ['502', 79],
+    ])
+    expect(scores(await search({ query, cookie: unlocked }))).toEqual([
+      ['501', 100],
+      ['502', 40],
+    ])
+  })
+
   it('answers when a details call fails, scoring that result without it', async () => {
     tmdb.state.failing.push('/tv/7101')
-    expect(scores(await search({ query: 'type=show&query=Patriot' }))).toEqual([['7101', 100]])
-    tmdb.state.failing.splice(0)
+    try {
+      expect(scores(await search({ query: 'type=show&query=Patriot' }))).toEqual([['7101', 100]])
+    } finally {
+      tmdb.state.failing.splice(0)
+    }
   })
 
   it('treats a file raven no longer has as no subject', async () => {

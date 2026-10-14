@@ -186,7 +186,9 @@ export class MatchController {
     cookie: string | undefined
   }): CandidateTier {
     if (libraryId == null) return {}
-    if (!/^\d+$/.test(libraryId)) throw new BadRequestException('libraryId must be a library id')
+    if (!WHOLE_NUMBER.test(libraryId)) {
+      throw new BadRequestException('libraryId must be a library id')
+    }
     const id = Number(libraryId)
     if (!this.lock.viewer({ cookie }).seesLibrary(id)) return {}
     const kind = this.libraries.get(id)?.settings.kind

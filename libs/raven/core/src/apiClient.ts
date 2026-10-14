@@ -524,7 +524,10 @@ export const createApiClient = ({
         guard: isItemDetails,
       }),
 
-    /** TMDB's results for Fix match, those `libraryId`'s type prefers first. */
+    /**
+     * TMDB's results for Fix match, best first by confidence, scored against
+     * what `subject` has on disk; `libraryId`'s type comes first among equals.
+     */
     searchMatches: ({
       type,
       query,
