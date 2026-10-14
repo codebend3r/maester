@@ -1,5 +1,5 @@
 import { keepPreviousData, queryOptions, skipToken } from '@tanstack/react-query'
-import type { MatchItemType, MediaSort } from '@raven/core'
+import type { MatchItemType, MatchSubject, MediaSort } from '@raven/core'
 import { api } from '@/lib/api'
 import { queryKeys } from '@/lib/queryClient'
 
@@ -165,21 +165,24 @@ export const personQuery = (id: number | null) =>
     queryFn: id == null ? skipToken : () => api.getPerson(id),
   })
 
-/** A search for Fix match, the library's preferred results first; an empty title asks for nothing. */
+/** A search for Fix match, scored against `subject` and best first; an empty title asks for nothing. */
 export const matchSearchQuery = ({
   type,
   query,
   year,
   libraryId,
+  subject,
 }: {
   type: MatchItemType
   query: string
   year: number | null
   libraryId: number | null
+  subject: MatchSubject | null
 }) =>
   queryOptions({
-    queryKey: queryKeys.matchSearch({ type, query, year, libraryId }),
-    queryFn: query === '' ? skipToken : () => api.searchMatches({ type, query, year, libraryId }),
+    queryKey: queryKeys.matchSearch({ type, query, year, libraryId, subject }),
+    queryFn:
+      query === '' ? skipToken : () => api.searchMatches({ type, query, year, libraryId, subject }),
     staleTime: 5 * 60_000,
   })
 

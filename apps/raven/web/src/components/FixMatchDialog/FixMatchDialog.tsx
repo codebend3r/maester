@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { AiMatch, MatchCandidate, MatchItemType } from '@raven/core'
+import type { AiMatch, MatchCandidate, MatchItemType, MatchSubject } from '@raven/core'
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react'
 import { AiMatchNote } from '@/components/AiMatchNote/AiMatchNote'
 import { Button } from '@/components/Button/Button'
@@ -67,6 +67,7 @@ export const FixMatchDialog = <T,>({
   fileName,
   aiMatch = null,
   libraryId,
+  subject,
   match,
   allowNone = true,
   onClose,
@@ -83,6 +84,8 @@ export const FixMatchDialog = <T,>({
   aiMatch?: AiMatch | null
   /** The library the file is in: the results its type prefers are listed first. */
   libraryId?: number
+  /** The file (and its show folder) or the show being fixed: the results are scored against what it has on disk. */
+  subject: MatchSubject
   /** Points the file or show at `tmdbId`, or at nothing for null. */
   match: (tmdbId: string | null) => Promise<T>
   /** Whether "Not a movie" (or show) is offered. */
@@ -102,7 +105,13 @@ export const FixMatchDialog = <T,>({
   }, [])
 
   const results = useQuery(
-    matchSearchQuery({ type, query: asked.query, year: asked.year, libraryId: libraryId ?? null }),
+    matchSearchQuery({
+      type,
+      query: asked.query,
+      year: asked.year,
+      libraryId: libraryId ?? null,
+      subject,
+    }),
   )
 
   const choose = useMutation({

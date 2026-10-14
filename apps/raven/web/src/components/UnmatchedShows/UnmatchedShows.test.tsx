@@ -1,5 +1,5 @@
 import { describe, expect, it, mock } from 'bun:test'
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createApiClient } from '@raven/core'
 import { aiSuggestion, mediaItem } from '@/test/fixtures'
@@ -10,6 +10,7 @@ const offline = createApiClient({
     throw new Error('No network in tests')
   },
 })
+const searched: Array<{ subject?: unknown }> = []
 const matched: Array<{ mediaId: number; tmdbId: string | null }> = []
 
 // Spread over a real client: Bun's module mocks are shared by every test
@@ -17,7 +18,10 @@ const matched: Array<{ mediaId: number; tmdbId: string | null }> = []
 mock.module('@/lib/api', () => ({
   api: {
     ...offline,
-    searchMatches: async () => [],
+    searchMatches: async (request: { subject?: unknown }) => {
+      searched.push(request)
+      return []
+    },
     setMatch: async (request: { mediaId: number; tmdbId: string | null }) => {
       matched.push(request)
       return mediaItem()
@@ -78,6 +82,9 @@ describe('UnmatchedShows', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Fix match for Archie' }))
     expect(await screen.findByRole('heading', { name: 'Fix match' })).toBeInTheDocument()
     expect(screen.getByRole('searchbox', { name: 'Title' })).toHaveValue('Archie')
+    await waitFor(() =>
+      expect(searched.at(-1)).toMatchObject({ subject: { kind: 'media', id: 1 } }),
+    )
     await userEvent.click(screen.getByRole('button', { name: 'Not a show' }))
     expect(matched).toEqual([{ mediaId: 1, tmdbId: null }])
   })

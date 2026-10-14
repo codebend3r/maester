@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { AiMatch, MatchItemType, MediaItem } from '@raven/core'
+import type { AiMatch, MatchItemType, MatchSubject, MediaItem } from '@raven/core'
 import { useState } from 'react'
 import { MediaMenu } from '@/components/MediaMenu/MediaMenu'
 import { api } from '@/lib/api'
@@ -48,9 +48,19 @@ describe('Fix match', () => {
   const unmatched = mediaItem({ title: 'Busboys', year: 2026, match: 'unmatched' })
 
   it('searches with the parsed title and year, and points the file at the choice', async () => {
-    const searched: Array<{ query: string; year?: number | null; libraryId?: number | null }> = []
+    const searched: Array<{
+      query: string
+      year?: number | null
+      libraryId?: number | null
+      subject?: MatchSubject | null
+    }> = []
     spies.search.mockImplementation(async (request) => {
-      searched.push({ query: request.query, year: request.year, libraryId: request.libraryId })
+      searched.push({
+        query: request.query,
+        year: request.year,
+        libraryId: request.libraryId,
+        subject: request.subject,
+      })
       return [
         {
           tmdbId: '1001',
@@ -84,7 +94,14 @@ describe('Fix match', () => {
     expect(screen.getByRole('textbox', { name: 'Year' })).toHaveValue('2026')
     await userEvent.click(await screen.findByRole('button', { name: 'Choose Busboys (1998)' }))
 
-    expect(searched).toEqual([{ query: 'Busboys', year: 2026, libraryId: unmatched.libraryId }])
+    expect(searched).toEqual([
+      {
+        query: 'Busboys',
+        year: 2026,
+        libraryId: unmatched.libraryId,
+        subject: { kind: 'media', id: unmatched.id },
+      },
+    ])
     expect(chosen).toEqual(['1002'])
     expect(matched.map((media) => media.match)).toEqual(['manual'])
     expect(screen.queryByRole('dialog')).toBeNull()
@@ -92,8 +109,10 @@ describe('Fix match', () => {
 
   it('searches again with what the viewer types', async () => {
     const searched: string[] = []
+    const subjects: Array<MatchSubject | null | undefined> = []
     spies.search.mockImplementation(async (request) => {
       searched.push(`${request.query}|${request.year ?? ''}`)
+      subjects.push(request.subject)
       return []
     })
     renderWithProviders(<Harness media={unmatched} onMatched={() => undefined} />)
@@ -106,6 +125,7 @@ describe('Fix match', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Search' }))
     await screen.findByText(/TMDB has nothing by that name/)
     expect(searched).toEqual(['Busboys|2026', 'Bus Boys|'])
+    expect(subjects.every((each) => each?.kind === 'media' && each.id === unmatched.id)).toBe(true)
   })
 
   it('says a file is not a movie at all', async () => {
