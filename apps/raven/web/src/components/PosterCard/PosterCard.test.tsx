@@ -4,12 +4,16 @@ import { PosterCard } from '@/components/PosterCard/PosterCard'
 import { POSTER_SIZES } from '@/lib/posters'
 import { itemSummary, matchedMovie, mediaItem } from '@/test/fixtures'
 import { usePageBackdrop } from '@/stores/pageBackdrop'
+import { atPixelRatio, restorePixelRatio } from '@/test/pixelRatio'
 import { renderWithProviders } from '@/test/render'
 
 const picture = (container: HTMLElement): HTMLImageElement | null => container.querySelector('img')
 
 describe('PosterCard', () => {
-  afterEach(() => usePageBackdrop.setState({ current: null, shown: null, recent: [], loaded: [] }))
+  afterEach(() => {
+    usePageBackdrop.setState({ current: null, shown: null, recent: [], loaded: [] })
+    restorePixelRatio()
+  })
 
   const shownBehind = () => usePageBackdrop.getState().current
 
@@ -84,20 +88,23 @@ describe('PosterCard', () => {
     expect(picture(container)).toHaveAttribute('sizes', POSTER_SIZES.grid)
   })
 
+  // A grid poster is at least 160 px wide, so 342 px covers it up to 342 / 160 = 2.1375x.
   it('leaves the widths out on a screen dense enough to need the widest anyway', () => {
     const at = (ratio: number) => {
-      Object.defineProperty(window, 'devicePixelRatio', { value: ratio, configurable: true })
+      atPixelRatio(ratio)
       return picture(
         renderWithProviders(<PosterCard sizes={POSTER_SIZES.grid} media={matchedMovie()} />)
           .container,
       )
     }
-    const phone = at(3)
-    expect(phone).toHaveAttribute('src', '/api/items/40/images/poster?v=p1')
-    expect(phone).not.toHaveAttribute('srcset')
-    expect(phone).not.toHaveAttribute('sizes')
-    expect(at(2)).toHaveAttribute('sizes', POSTER_SIZES.grid)
-    Object.defineProperty(window, 'devicePixelRatio', { value: 1, configurable: true })
+    expect(at(2.1)).toHaveAttribute('sizes', POSTER_SIZES.grid)
+    const dense = [at(2.25), at(3)]
+    expect(dense.map((poster) => poster?.getAttribute('src'))).toEqual([
+      '/api/items/40/images/poster?v=p1',
+      '/api/items/40/images/poster?v=p1',
+    ])
+    expect(dense.map((poster) => poster?.hasAttribute('srcset') ?? true)).toEqual([false, false])
+    expect(dense.map((poster) => poster?.hasAttribute('sizes') ?? true)).toEqual([false, false])
   })
 
   it('falls back from the poster to the frame grab, then to a letter', () => {

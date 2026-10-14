@@ -1,11 +1,14 @@
-import { describe, expect, it } from 'bun:test'
+import { afterEach, describe, expect, it } from 'bun:test'
 import { screen, within } from '@testing-library/react'
 import { MediaTiles } from '@/components/MediaTiles/MediaTiles'
 import { POSTER_SIZES } from '@/lib/posters'
 import { matchedMovie, mediaItem } from '@/test/fixtures'
+import { atPixelRatio, restorePixelRatio } from '@/test/pixelRatio'
 import { renderWithProviders } from '@/test/render'
 
 describe('MediaTiles', () => {
+  afterEach(restorePixelRatio)
+
   it('shows each video with its facts and the folder it sits in', () => {
     renderWithProviders(<MediaTiles items={[mediaItem({ folder: 'Comedy/2026' })]} />)
     const tile = screen.getByRole('listitem')
@@ -29,9 +32,8 @@ describe('MediaTiles', () => {
   })
 
   it('keeps the widths at 3x, where a tile poster 56 px wide needs no more than 185', () => {
-    Object.defineProperty(window, 'devicePixelRatio', { value: 3, configurable: true })
+    atPixelRatio(3)
     const { container } = renderWithProviders(<MediaTiles items={[matchedMovie()]} posters />)
     expect(container.querySelector('img')).toHaveAttribute('sizes', POSTER_SIZES.movieTile)
-    Object.defineProperty(window, 'devicePixelRatio', { value: 1, configurable: true })
   })
 })

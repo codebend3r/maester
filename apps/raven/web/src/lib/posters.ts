@@ -56,7 +56,9 @@ const NARROWEST: Record<PosterSizes, number> = {
  * Whether a screen this dense needs a poster's own width even where the
  * layout shows it narrowest, as a phone at 3x does in a grid. There a
  * `srcset` could only ever pick that width, and a grid of thousands of
- * posters would build and parse one for each for nothing.
+ * posters would build and parse one for each for nothing. Chrome takes the
+ * narrowest file at least as wide as the slot times the ratio, with no
+ * rounding down between two (checked in Chrome 155), so that is the test.
  */
 const needsOwnWidth = (sizes: PosterSizes): boolean =>
   POSTER_WIDTHS.every(
