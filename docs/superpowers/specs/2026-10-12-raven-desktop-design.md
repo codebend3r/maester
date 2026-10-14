@@ -345,6 +345,8 @@ The other pure UI helpers stay in `@raven/ui`, now that both apps share it. They
 
 ## Order of work (one PR each)
 
+Reordered by `2026-10-14-raven-player-desktop-design.md`: raven player ships first as its steps P0 to P7, which cover step 4, steps 7 and 8 for macOS arm64, and the player's share of step 3. The order in its "What the full desktop raven inherits" section replaces the one below.
+
 Steps 3 to 10 build macOS only. Windows and Linux come in step 11.
 
 1. **Server spike, thrown away. Done 2026-10-12: passed** (see "Spike outcomes"). It ran `startServer` from a bun-bundled file in an Electron `utilityProcess`, loaded better-sqlite3, and played a direct, a remux and a transcode stream through the web engine, locally and through the remote proxy.
