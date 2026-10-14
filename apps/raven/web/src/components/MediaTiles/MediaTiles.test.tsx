@@ -27,4 +27,11 @@ describe('MediaTiles', () => {
     expect(poster?.getAttribute('srcset')).toContain('/api/items/40/images/poster?v=p1&w=185 185w')
     expect(poster).toHaveAttribute('sizes', POSTER_SIZES.movieTile)
   })
+
+  it('keeps the widths at 3x, where a tile poster 56 px wide needs no more than 185', () => {
+    Object.defineProperty(window, 'devicePixelRatio', { value: 3, configurable: true })
+    const { container } = renderWithProviders(<MediaTiles items={[matchedMovie()]} posters />)
+    expect(container.querySelector('img')).toHaveAttribute('sizes', POSTER_SIZES.movieTile)
+    Object.defineProperty(window, 'devicePixelRatio', { value: 1, configurable: true })
+  })
 })

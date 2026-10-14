@@ -1,4 +1,4 @@
-import type { ItemSummary } from '@raven/core'
+import { type ItemSummary, POSTER_OWN_WIDTH, POSTER_WIDTHS } from '@raven/core'
 import { api } from '@/lib/api'
 
 /**
@@ -39,8 +39,34 @@ export const POSTER_SIZES = {
 export type PosterSizes = (typeof POSTER_SIZES)[keyof typeof POSTER_SIZES]
 
 /**
+ * The narrowest each layout shows a poster, in CSS pixels, by the same
+ * measure as its `sizes`, or below it where the layout allows narrower.
+ */
+const NARROWEST: Record<PosterSizes, number> = {
+  [POSTER_SIZES.grid]: 160,
+  [POSTER_SIZES.row]: 70,
+  [POSTER_SIZES.deck]: 118,
+  [POSTER_SIZES.season]: 144,
+  [POSTER_SIZES.showTile]: 64,
+  [POSTER_SIZES.movieTile]: 56,
+  [POSTER_SIZES.duplicate]: 56,
+}
+
+/**
+ * Whether a screen this dense needs a poster's own width even where the
+ * layout shows it narrowest, as a phone at 3x does in a grid. There a
+ * `srcset` could only ever pick that width, and a grid of thousands of
+ * posters would build and parse one for each for nothing.
+ */
+const needsOwnWidth = (sizes: PosterSizes): boolean =>
+  POSTER_WIDTHS.every(
+    (width) => width === POSTER_OWN_WIDTH || width < NARROWEST[sizes] * window.devicePixelRatio,
+  )
+
+/**
  * An item's poster as an `img`'s `src`, `srcSet` and `sizes`, so the browser
- * picks the width `sizes` needs; null when it has none.
+ * picks the width `sizes` needs; just its `src` where it would pick that
+ * anyway; null when it has none.
  */
 export const posterSources = ({
   item,
@@ -48,8 +74,10 @@ export const posterSources = ({
 }: {
   item: Pick<ItemSummary, 'id' | 'posterVersion'>
   sizes: PosterSizes
-}): { src: string; srcSet: string; sizes: PosterSizes } | null => {
+}): { src: string; srcSet?: string; sizes?: PosterSizes } | null => {
   const src = api.itemImageUrl({ id: item.id, kind: 'poster', version: item.posterVersion })
+  if (!src) return null
+  if (needsOwnWidth(sizes)) return { src }
   const srcSet = api.posterSrcSet({ id: item.id, version: item.posterVersion })
-  return src && srcSet ? { src, srcSet, sizes } : null
+  return srcSet ? { src, srcSet, sizes } : { src }
 }

@@ -84,6 +84,22 @@ describe('PosterCard', () => {
     expect(picture(container)).toHaveAttribute('sizes', POSTER_SIZES.grid)
   })
 
+  it('leaves the widths out on a screen dense enough to need the widest anyway', () => {
+    const at = (ratio: number) => {
+      Object.defineProperty(window, 'devicePixelRatio', { value: ratio, configurable: true })
+      return picture(
+        renderWithProviders(<PosterCard sizes={POSTER_SIZES.grid} media={matchedMovie()} />)
+          .container,
+      )
+    }
+    const phone = at(3)
+    expect(phone).toHaveAttribute('src', '/api/items/40/images/poster?v=p1')
+    expect(phone).not.toHaveAttribute('srcset')
+    expect(phone).not.toHaveAttribute('sizes')
+    expect(at(2)).toHaveAttribute('sizes', POSTER_SIZES.grid)
+    Object.defineProperty(window, 'devicePixelRatio', { value: 1, configurable: true })
+  })
+
   it('falls back from the poster to the frame grab, then to a letter', () => {
     const { container } = renderWithProviders(
       <PosterCard sizes={POSTER_SIZES.grid} media={matchedMovie()} />,
