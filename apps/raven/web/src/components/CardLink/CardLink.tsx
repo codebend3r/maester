@@ -45,7 +45,9 @@ const isPlainClick = (event: MouseEvent): boolean =>
  * A link on a card, row or tile, opening `to` in the app with `state`
  * handed over, as react-router's `Link` does, for a fraction of its cost. A
  * click with a key held, or with another button, is the browser's, so the
- * address opens in a new tab or window. It must sit inside `CardLinks`.
+ * address opens in a new tab or window. It takes no `target` or `download`,
+ * which its click would ignore, opening the address in this tab all the
+ * same. It must sit inside `CardLinks`.
  */
 export const CardLink = ({
   to,
@@ -53,7 +55,10 @@ export const CardLink = ({
   onClick,
   children,
   ...rest
-}: Omit<ComponentProps<'a'>, 'href'> & { to: AppPath; state?: unknown }) => {
+}: Omit<ComponentProps<'a'>, 'href' | 'target' | 'download'> & {
+  to: AppPath
+  state?: unknown
+}) => {
   const follow = useContext(Following)
   if (!follow) throw new Error('CardLink needs CardLinks around it')
   return (
