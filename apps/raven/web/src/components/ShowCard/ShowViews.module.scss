@@ -80,10 +80,11 @@
 
   // A library can hold thousands of shows, so the browser lays out and
   // draws only those near the screen. One it skips stands in at the height
-  // it had when last drawn, else at about a tile's height 1440 wide.
+  // it had when last drawn, else at about a tile's height 1440 wide. The
+  // stand-in is what sits inside the tile's padding and rule, which add to it.
   > li {
     content-visibility: auto;
-    contain-intrinsic-block-size: auto 10.5rem;
+    contain-intrinsic-block-size: auto 9rem;
   }
 
   // Skipping also clips what a tile draws to its box, which would cut off

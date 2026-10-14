@@ -8,7 +8,7 @@
   // it had when last drawn, else at about a card's height 1440 wide.
   > li {
     content-visibility: auto;
-    contain-intrinsic-block-size: auto 15rem;
+    contain-intrinsic-block-size: auto 14rem;
   }
 
   // Skipping also clips what a card draws to its box, which would cut off
