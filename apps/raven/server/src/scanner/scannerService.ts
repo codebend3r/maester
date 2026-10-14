@@ -220,8 +220,6 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
         onProbed: () =>
           this.update(library.id, { processed: this.status(library.id).processed + 1 }),
       })
-      // Matching ran beside the probes, storing items as it went, and may not have ended.
-      this.database.refreshStatistics()
       // Thumbnails that timed out on an earlier pass get another go.
       this.thumbnails.retryPending()
 
