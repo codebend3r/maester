@@ -18,6 +18,7 @@ import { api } from '@/lib/api'
 import { afterSplit } from '@/lib/invalidate'
 import { versionFacts } from '@/lib/itemFacts'
 import { cardLink } from '@/lib/itemLinks'
+import { POSTER_SIZES } from '@/lib/posters'
 import { plural } from '@/lib/plural'
 import { queryKeys } from '@/lib/queryClient'
 import styles from '@/components/Duplicates/Duplicates.module.scss'
@@ -30,7 +31,7 @@ const Poster = ({ entry }: { entry: PosterEntry }) => (
     tabIndex={-1}
     aria-hidden="true"
   >
-    <PosterImage media={entry.media} poster={entry.poster} />
+    <PosterImage media={entry.media} poster={entry.poster} sizes={POSTER_SIZES.duplicate} />
   </Link>
 )
 

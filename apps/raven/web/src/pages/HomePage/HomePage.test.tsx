@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { screen, within } from '@testing-library/react'
 import { type Home, mediaLabel } from '@raven/core'
 import { api } from '@/lib/api'
+import { POSTER_SIZES } from '@/lib/posters'
 import { HomePage } from '@/pages/HomePage/HomePage'
 import { library, matchedMovie, mediaItem, showEntry } from '@/test/fixtures'
 import { held } from '@/test/held'
@@ -90,6 +91,28 @@ describe('HomePage', () => {
       'href',
       '/watch/8',
     )
+  })
+
+  it('sizes every poster as the rows lay them out, eight, four or two across', async () => {
+    open({
+      inProgress: [{ media: EPISODE_TWO, poster: SEASON_ONE_CARD }],
+      shelves: [
+        { libraryId: 2, type: 'media', media: [matchedMovie()] },
+        { libraryId: 3, type: 'shows', shows: [showEntry()] },
+      ],
+    })
+    await screen.findByRole('heading', { name: 'Films' })
+    const posters = ['Continue watching', 'Films', 'Series'].map((name) =>
+      shelf(name).querySelector('img'),
+    )
+    expect(posters.map((poster) => poster?.getAttribute('sizes'))).toEqual([
+      POSTER_SIZES.row,
+      POSTER_SIZES.row,
+      POSTER_SIZES.row,
+    ])
+    expect(posters.map((poster) => poster?.getAttribute('srcset')?.split(', ').length)).toEqual([
+      3, 3, 3,
+    ])
   })
 
   it('shows every video in progress, past the eight a library row holds', async () => {

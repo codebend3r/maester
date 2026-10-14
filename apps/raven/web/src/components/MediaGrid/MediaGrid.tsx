@@ -2,6 +2,7 @@ import type { ItemSummary, MatchItemType, MediaItem, MediaSort, RatingSource } f
 import { MediaCard } from '@/components/MediaCard/MediaCard'
 import { PosterCard } from '@/components/PosterCard/PosterCard'
 import { SkeletonCards } from '@/components/Skeleton/Skeleton'
+import { POSTER_SIZES } from '@/lib/posters'
 import styles from '@/components/MediaGrid/MediaGrid.module.scss'
 
 /**
@@ -35,6 +36,7 @@ export const MediaGrid = ({
           matchType={matchType}
           ratingsSource={ratingsSource}
           sort={sort}
+          sizes={POSTER_SIZES.grid}
         />
       ) : (
         <MediaCard key={item.id} media={item} matchType={matchType} sort={sort} />

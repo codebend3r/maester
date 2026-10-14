@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { screen, within } from '@testing-library/react'
 import { Route, Routes } from 'react-router-dom'
 import { api } from '@/lib/api'
+import { POSTER_SIZES } from '@/lib/posters'
 import { PersonPage, groupCredits } from '@/pages/PersonPage/PersonPage'
 import { itemSummary } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
@@ -58,5 +59,13 @@ describe('PersonPage', () => {
       'href',
       '/shows/4',
     )
+    const poster = acting.querySelector('img')
+    expect(poster).toHaveAttribute('src', `/api/items/1/images/poster?v=${MATRIX.posterVersion}`)
+    expect(poster?.getAttribute('srcset')?.split(', ')).toEqual([
+      `/api/items/1/images/poster?v=${MATRIX.posterVersion}&w=185 185w`,
+      `/api/items/1/images/poster?v=${MATRIX.posterVersion}&w=342 342w`,
+      `/api/items/1/images/poster?v=${MATRIX.posterVersion} 500w`,
+    ])
+    expect(poster).toHaveAttribute('sizes', POSTER_SIZES.grid)
   })
 })

@@ -11,8 +11,8 @@ import { Link } from 'react-router-dom'
 import { Icon } from '@/components/Icon/Icon'
 import { RatingChips, ScoreChip } from '@/components/RatingChips/RatingChips'
 import { SortHeader } from '@/components/SortHeader/SortHeader'
-import { api } from '@/lib/api'
 import { showYears } from '@/lib/itemLinks'
+import { POSTER_SIZES, posterSources } from '@/lib/posters'
 import { type SortColumn, useTableSort } from '@/lib/tableSort'
 import { showEntryKey } from '@/lib/entryKeys'
 import styles from '@/components/ShowCard/ShowViews.module.scss'
@@ -40,14 +40,14 @@ const NextPlay = ({ entry }: { entry: ShowEntry }) => {
 /** A show's small poster, or its initial; a second way to the page, so out of the tab order. */
 const SmallPoster = ({ entry }: { entry: ShowEntry }) => {
   const { show } = entry
-  const poster = api.itemImageUrl({ id: show.id, kind: 'poster', version: show.posterVersion })
+  const poster = posterSources({ item: show, sizes: POSTER_SIZES.showTile })
   const [failed, setFailed] = useState(false)
   return (
     <Link to={`/shows/${show.id}`} className={styles.frame} tabIndex={-1} aria-hidden="true">
       {poster && !failed ? (
         <img
           className={styles.image}
-          src={poster}
+          {...poster}
           alt=""
           loading="lazy"
           decoding="async"

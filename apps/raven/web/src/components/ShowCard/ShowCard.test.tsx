@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'bun:test'
 import { screen } from '@testing-library/react'
 import { ShowCard, ShowGrid } from '@/components/ShowCard/ShowCard'
+import { ShowTiles } from '@/components/ShowCard/ShowViews'
+import { POSTER_SIZES } from '@/lib/posters'
 import { showEntry } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 
@@ -9,7 +11,7 @@ describe('ShowCard', () => {
     const addedAt = new Date(Date.now() - 3 * 24 * 3600 * 1000).toISOString()
     renderWithProviders(
       <ul>
-        <ShowCard entry={showEntry({ addedAt })} sort="added" />
+        <ShowCard sizes={POSTER_SIZES.row} entry={showEntry({ addedAt })} sort="added" />
       </ul>,
     )
     expect(screen.getByText('Added 3 days ago')).toBeInTheDocument()
@@ -18,7 +20,7 @@ describe('ShowCard', () => {
   it("opens the show's page, plays the next episode, and says the years and count", () => {
     const { container } = renderWithProviders(
       <ul>
-        <ShowCard entry={showEntry()} />
+        <ShowCard sizes={POSTER_SIZES.row} entry={showEntry()} />
       </ul>,
     )
     expect(screen.getByRole('link', { name: 'Severance' })).toHaveAttribute('href', '/shows/4')
@@ -29,6 +31,27 @@ describe('ShowCard', () => {
     expect(screen.getByText('2022 to now')).toBeInTheDocument()
     expect(screen.getByText('9 episodes')).toBeInTheDocument()
     expect(container.querySelector('img')).toHaveAttribute('src', '/api/items/4/images/poster?v=p1')
+  })
+
+  it('offers its poster at each width, sized as the row or grid holding it lays it out', () => {
+    const srcset = [
+      '/api/items/4/images/poster?v=p1&w=185 185w',
+      '/api/items/4/images/poster?v=p1&w=342 342w',
+      '/api/items/4/images/poster?v=p1 500w',
+    ].join(', ')
+    const row = renderWithProviders(
+      <ul>
+        <ShowCard sizes={POSTER_SIZES.row} entry={showEntry()} />
+      </ul>,
+    )
+    expect(row.container.querySelector('img')).toHaveAttribute('srcset', srcset)
+    expect(row.container.querySelector('img')).toHaveAttribute('sizes', POSTER_SIZES.row)
+    const grid = renderWithProviders(<ShowGrid shows={[showEntry()]} />)
+    expect(grid.container.querySelector('img')).toHaveAttribute('srcset', srcset)
+    expect(grid.container.querySelector('img')).toHaveAttribute('sizes', POSTER_SIZES.grid)
+    const tiles = renderWithProviders(<ShowTiles shows={[showEntry()]} />)
+    expect(tiles.container.querySelector('img')).toHaveAttribute('srcset', srcset)
+    expect(tiles.container.querySelector('img')).toHaveAttribute('sizes', POSTER_SIZES.showTile)
   })
 
   it('gives an ended show both years, and no play button once every episode is watched', () => {

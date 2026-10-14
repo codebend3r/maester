@@ -2,6 +2,7 @@ import { type Saga, sagaCover } from '@raven/core'
 import { Link } from 'react-router-dom'
 import { PosterImage } from '@/components/PosterImage/PosterImage'
 import { api } from '@/lib/api'
+import { POSTER_SIZES } from '@/lib/posters'
 import { sagaFacts, sagaPath } from '@/lib/sagas'
 import { useHoverBackdrop } from '@/lib/useHoverBackdrop'
 import styles from '@/components/SagaDeck/SagaDeck.module.scss'
@@ -30,7 +31,7 @@ const SagaDeck = ({ saga, to }: { saga: Saga; to: string }) => {
               className={styles.poster}
               ref={(node) => node?.style.setProperty('--index', String(index))}
             >
-              <PosterImage media={media} />
+              <PosterImage media={media} sizes={POSTER_SIZES.deck} />
             </span>
           ))}
         </span>

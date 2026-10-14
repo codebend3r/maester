@@ -3,6 +3,7 @@ import { ApiError, type Duplicates as DuplicatesListing } from '@raven/core'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { api } from '@/lib/api'
+import { POSTER_SIZES } from '@/lib/posters'
 import { SectionView } from '@/pages/LibraryPage/SectionViews'
 import { itemSummary, library, matchedMovie } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
@@ -134,6 +135,9 @@ describe('the Duplicates tab', () => {
     expect(
       within(movie('Alexander')).queryByRole('button', { name: 'Put back together' }),
     ).toBeNull()
+    const poster = movie('Alexander').querySelector('img')
+    expect(poster?.getAttribute('srcset')).toContain('&w=185 185w')
+    expect(poster).toHaveAttribute('sizes', POSTER_SIZES.duplicate)
   })
 
   it('offers Smart split apart only where the files read as different cuts', async () => {

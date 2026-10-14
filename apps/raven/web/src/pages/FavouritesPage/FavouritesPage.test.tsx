@@ -2,6 +2,7 @@ import { describe, expect, it, spyOn } from 'bun:test'
 import { screen } from '@testing-library/react'
 import { mediaLabel } from '@raven/core'
 import { api } from '@/lib/api'
+import { POSTER_SIZES } from '@/lib/posters'
 import { FavouritesPage } from '@/pages/FavouritesPage/FavouritesPage'
 import { itemSummary, matchedMovie, mediaItem } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
@@ -43,6 +44,10 @@ describe('FavouritesPage', () => {
     )
     expect(container.querySelector('img')?.getAttribute('src')).toContain(
       '/api/items/5/images/poster',
+    )
+    expect(container.querySelector('img')).toHaveAttribute('sizes', POSTER_SIZES.grid)
+    expect(container.querySelector('img')?.getAttribute('srcset')).toContain(
+      '/api/items/5/images/poster?v=p5&w=185 185w',
     )
     spy.mockRestore()
   })

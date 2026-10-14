@@ -7,6 +7,7 @@ import { Bone, SkeletonCards } from '@/components/Skeleton/Skeleton'
 import { TmdbCredit } from '@/components/TmdbCredit/TmdbCredit'
 import { api } from '@/lib/api'
 import { itemPath } from '@/lib/itemLinks'
+import { POSTER_SIZES, posterSources } from '@/lib/posters'
 import { personQuery } from '@/lib/queries'
 import { routeState, useRouteId } from '@/lib/routeQuery'
 import styles from '@/pages/PersonPage/PersonPage.module.scss'
@@ -33,13 +34,13 @@ export const groupCredits = (
   })).filter((group) => group.credits.length > 0)
 
 const Card = ({ item, role }: { item: ItemSummary; role: string | null }) => {
-  const poster = api.itemImageUrl({ id: item.id, kind: 'poster', version: item.posterVersion })
+  const poster = posterSources({ item, sizes: POSTER_SIZES.grid })
   return (
     <li className={styles.card}>
       <Link to={itemPath(item) ?? '/'} className={styles.link}>
         <span className={styles.poster}>
           {poster ? (
-            <img src={poster} alt="" loading="lazy" decoding="async" />
+            <img {...poster} alt="" loading="lazy" decoding="async" />
           ) : (
             <span aria-hidden="true">{item.title.slice(0, 1)}</span>
           )}

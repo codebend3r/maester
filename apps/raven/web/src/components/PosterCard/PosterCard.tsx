@@ -20,6 +20,7 @@ import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { api } from '@/lib/api'
 import { cardLink, watchLink } from '@/lib/itemLinks'
 import { mediaEntryKey } from '@/lib/entryKeys'
+import type { PosterSizes } from '@/lib/posters'
 import { useHoverBackdrop } from '@/lib/useHoverBackdrop'
 import styles from '@/components/PosterCard/PosterCard.module.scss'
 
@@ -27,12 +28,14 @@ import styles from '@/components/PosterCard/PosterCard.module.scss'
 export const PosterFrame = ({
   media,
   poster,
+  sizes,
 }: {
   media: MediaItem
   poster?: ItemSummary | null
+  sizes: PosterSizes
 }) => (
   <span className={styles.frame}>
-    <PosterImage media={media} poster={poster} />
+    <PosterImage media={media} poster={poster} sizes={sizes} />
     <ResumeBar media={media} className={styles.resume} />
   </span>
 )
@@ -52,10 +55,13 @@ export const PosterCard = ({
   ratingsSource = 'tmdb',
   sort,
   poster,
+  sizes,
 }: {
   media: MediaItem
   /** The item whose poster the card shows, when not the video's own: an episode's season. */
   poster?: ItemSummary | null
+  /** How wide the list holding the card shows its poster. */
+  sizes: PosterSizes
   /** What the library matches its files to, for the menu's Fix match. */
   matchType?: MatchItemType | null
   /** Whose score the card shows, from the library's settings. */
@@ -88,7 +94,7 @@ export const PosterCard = ({
         aria-hidden="true"
         onContextMenu={menu.onContextMenu}
       >
-        <PosterFrame media={media} poster={poster} />
+        <PosterFrame media={media} poster={poster} sizes={sizes} />
       </Link>
       {hasPage && (
         <span className={styles.overlay}>

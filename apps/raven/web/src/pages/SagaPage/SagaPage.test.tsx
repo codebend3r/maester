@@ -10,6 +10,7 @@ import {
 } from '@raven/core'
 import { Route, Routes } from 'react-router-dom'
 import { api } from '@/lib/api'
+import { POSTER_SIZES } from '@/lib/posters'
 import { SagaPage } from '@/pages/SagaPage/SagaPage'
 import { usePageBackdrop } from '@/stores/pageBackdrop'
 import { itemSummary, library, matchedMovie } from '@/test/fixtures'
@@ -108,6 +109,17 @@ describe('SagaPage', () => {
       'href',
       '/libraries/2/sagas',
     )
+  })
+
+  it("fetches each movie's poster no wider than the saga's grid shows it", async () => {
+    open()
+    await screen.findByRole('heading', { name: 'The Lord of the Rings Collection' })
+    const posters = [...document.querySelectorAll('img[src*="/images/poster"]')]
+    expect(posters.map((poster) => poster.getAttribute('sizes'))).toEqual([
+      POSTER_SIZES.grid,
+      POSTER_SIZES.grid,
+      POSTER_SIZES.grid,
+    ])
   })
 
   it("lays out each movie's backdrop for the slideshow, from the first", async () => {
