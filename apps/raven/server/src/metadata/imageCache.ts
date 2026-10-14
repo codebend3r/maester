@@ -60,6 +60,9 @@ export class ImageCache {
   private readonly root: string
   private readonly working = new Map<string, Promise<string | null>>()
   private readonly downloads: Gate = createGate({ limit: 4 })
+  // Scaling takes CPU the server shares with transcodes, and matching a
+  // library of pictures beside its media asks for three widths of each.
+  private readonly scales: Gate = createGate({ limit: 2 })
   private readonly warned = new Set<string>()
 
   constructor(
@@ -142,7 +145,9 @@ export class ImageCache {
       if (await exists(target)) return target
       const temp = temporary(dir, 'jpg')
       try {
-        await this.ffmpeg.exec(imageScaleArgs({ input: source, output: temp, width }))
+        await this.scales.run(() =>
+          this.ffmpeg.exec(imageScaleArgs({ input: source, output: temp, width })),
+        )
         if (!(await exists(temp))) throw new Error('ffmpeg wrote nothing')
         await rename(temp, target)
       } catch (error) {

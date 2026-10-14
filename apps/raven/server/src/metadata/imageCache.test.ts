@@ -9,6 +9,22 @@ import { ImageCache } from '@/metadata/imageCache'
 import { encodeImage, jpegSize } from '@/test/clips'
 import { FAKE_JPEG } from '@/test/fakeTmdb'
 
+/** ffmpeg as the cache runs it, counting the most scales that ran at once. */
+class CountingFfmpeg extends FfmpegService {
+  running = 0
+  most = 0
+
+  override async exec(args: string[]): Promise<void> {
+    this.running += 1
+    this.most = Math.max(this.most, this.running)
+    try {
+      await super.exec(args)
+    } finally {
+      this.running -= 1
+    }
+  }
+}
+
 const exists = (path: string): Promise<boolean> =>
   stat(path).then(
     () => true,
@@ -16,10 +32,16 @@ const exists = (path: string): Promise<boolean> =>
   )
 
 describe('the image cache', () => {
-  const state: { root: string; calls: string[]; cache: ImageCache | null } = {
+  const state: {
+    root: string
+    calls: string[]
+    cache: ImageCache | null
+    ffmpeg: CountingFfmpeg | null
+  } = {
     root: '',
     calls: [],
     cache: null,
+    ffmpeg: null,
   }
   const cache = (): ImageCache => {
     if (!state.cache) throw new Error('cache not made')
@@ -31,13 +53,14 @@ describe('the image cache', () => {
   beforeAll(async () => {
     state.root = await mkdtemp(join(tmpdir(), 'raven-images-'))
     const config = { ...readServerConfig({}), dataDir: join(state.root, 'data') }
+    state.ffmpeg = new CountingFfmpeg(config, { playback: () => DEFAULT_PLAYBACK_SETTINGS })
     state.cache = new ImageCache(
       config,
       async (url) => {
         state.calls.push(url)
         return new Response(FAKE_JPEG, { headers: { 'content-type': 'image/jpeg' } })
       },
-      new FfmpegService(config, { playback: () => DEFAULT_PLAYBACK_SETTINGS }),
+      state.ffmpeg,
     )
   })
 
@@ -71,6 +94,26 @@ describe('the image cache', () => {
     expect(await widthOf(middle)).toBe(342)
     expect(await widthOf(own)).toBe(400)
     expect(await at(185)).toBe(narrow)
+  })
+
+  it('scales at most two pictures beside the media at once, however many are asked for', async () => {
+    const sources = await Promise.all(
+      ['Collateral (2004)', 'Miami Vice (2006)', 'Manhunter (1986)'].map(async (folder, index) => {
+        const source = join(state.root, folder, 'poster.jpg')
+        await encodeImage({ path: source, size: '400x600' })
+        return { source, itemId: 20 + index }
+      }),
+    )
+    const ffmpeg = state.ffmpeg
+    if (!ffmpeg) throw new Error('ffmpeg not made')
+    ffmpeg.most = 0
+    const made = await Promise.all(
+      sources.flatMap(({ source, itemId }) =>
+        POSTER_WIDTHS.map((width) => cache().local({ itemId, kind: 'poster', source, width })),
+      ),
+    )
+    expect(made.filter((path) => path != null)).toHaveLength(9)
+    expect(ffmpeg.most).toBe(2)
   })
 
   it('makes every width of a picture beside the media again once it changes', async () => {
