@@ -16,8 +16,9 @@ The design was chosen from four mockups (pill, ring, meter, poster stamp) in the
 
 ### Against what
 
-- The title and year come from the search fields. They start as the folder's name, so a viewer who corrects a typo is scored against the correction.
-- The fit and the country come from what is on disk: the files of the folder or show being fixed (the subject).
+- The title and year come from the search fields. They start as the folder's name, so a viewer who corrects a typo is scored against the correction. A country suffix typed at the end, Sonarr's `The Office (UK)`, is not part of the title: TMDB is searched for `The Office`, the results are scored against it, and the suffix gives the country, as the background matcher reads a folder's.
+- The fit comes from what is on disk: the files of the folder or show being fixed (the subject). Extras, which matching marks `off` (a `Trailers` folder, a `-featurette` suffix), are not part of it.
+- The country comes from a suffix typed in the search, else from the subject's name.
 
 ### Signals
 
@@ -25,30 +26,30 @@ The title says how likely a result is at all; the other signals, the support, sa
 
 `score = round(100 × title × (0.6 + 0.4 × support))`
 
-**Title**, from 0 to 1: 1 when the result's title, original title or one of its TMDB aliases folds (`foldTitle`) to the searched title. `foldTitle` keeps only Latin letters and digits, so a title with none (몬스터, モンスター) is compared lower-cased and trimmed instead; otherwise a search in Korean would be every Korean result's exact title. Otherwise 0.8 × the folded titles' similarity, `1 − Levenshtein distance / the longer length`, so a typo stays close and extra words do not: "Wild Artic" against "Wild Arctic" is 0.73, "Monster High" against "Monster" 0.47, "Monster: The Lizzie Borden Story" 0.18.
+**Title**, from 0 to 1: 1 when the result's title, original title or one of its TMDB aliases folds (`foldTitle`) to the searched title. `foldTitle` keeps only Latin letters and digits, so a title with a letter of another script (몬스터, モンスター, 응답하라 1988), or with nothing `foldTitle` keeps, is compared lower-cased and trimmed instead; otherwise a search in Korean would be every Korean result's exact title, or, with digits, each one's digits ("응답하라 1988" and "괴물 1988" would both be "1988"). Otherwise 0.8 × the folded titles' similarity, `1 − Levenshtein distance / the longer length`, so a typo stays close and extra words do not: "Wild Arctik" against "Wild Arctic" is 0.73, "Monster High" against "Monster" 0.47, "Monster: The Lizzie Borden Story" 0.18.
 
 **Support**, from 0 to 1: the weighted mean of the supporting signals that can be measured. One that cannot (no year asked, no subject, no runtime from TMDB) is left out of the sum and of the weights both. When none can, the support is 1, so an exact title on its own is 100.
 
 | Signal | Weight | Value |
 | --- | --- | --- |
 | Year | 30 | Measured when a year is asked. The same year 1, one either side 0.8, within three 0.4, otherwise 0. A result with no year is 0. |
-| Fit | 20 | Measured when the subject gives one and TMDB's details were read. Shows: 1 when every file on disk fits the show (below), else 0. Movies: 1 when TMDB's runtime is within 10 minutes of the file's duration, 0.5 within 25, else 0. |
+| Fit | 20 | Measured when the subject gives one and TMDB's details were read. Shows: 1 when every file on disk fits the show (below), else 0. Movies: 1 when TMDB's runtime is within 10 minutes of the file's duration, 0.5 within 25, else 0; a file that names an edition (`{edition-Extended}`, `Directors Cut`) measures none, as a cut runs its own length. |
 | Library type | 5 | Measured when the library's first tier filters (`isUnfiltered` is false): 1 when the result fits it (`fitsTier`), else 0. |
 | Popularity | 5 | Measured for a result whose title is 1 and that is not from another country (below), when some such result has a popularity above 0: its popularity over the highest among them. It only tells apart results that share the title, as `pickMatch`'s does. |
 
 **Changed from the brainstorm, on purpose.** The brainstorm summed the title (50) with the rest. Worked through, that gave "Monster High" 57 against a "Monster" folder, Possible, because fit and popularity added points whatever the title. The title now multiplies; the partial title is edit distance rather than shared words, so a typo reaches Possible; the year weighs 30, so an exact title six years off with a fit is Possible rather than Strong; and popularity is compared only among results with the title, so a lone exact title is not marked down by a more popular different show.
 
-A show's file fits when its season (above 0) holds its highest episode in TMDB's season list, when it is in season 1 and its highest episode is within the show's episode total (one season on disk numbered straight through), or when its absolute number is within the total. Files with no numbers, and season 0, are left out. A subject with no file left out of that measures no fit.
+A show's file fits when its season (above 0) holds its highest episode in TMDB's season list, when it is in season 1 and its highest episode is within the show's episode total (one season on disk numbered straight through), or when its absolute number is within the total. Files with no numbers, and season 0, are left out. Episode 0, a pilot, is no number, and nor is an absolute number equal to the year `parseEpisodeName` reads for the name, as `Monster (2004)/Monster (2004) - Making Of.mkv` gives `(2004)` as both. A subject with no file left out of that measures no fit.
 
 ### Caps, applied in order
 
 1. **Does not fit.** A fit of 0 caps the score at 40: a show without an episode on disk, or a movie two hours long against a 22 minute file.
-2. **Another country.** When the subject's name gives a country ("The Office (UK)", read by `parseEpisodeName`), or the searched title ends in one, a show whose countries do not include it is capped at 40. Movies' search results carry no countries, so it never applies to them.
+2. **Another country.** When the searched title ends in a country ("The Office (UK)"), or else the subject's name gives one (read by `parseEpisodeName`), a show whose countries do not include it is capped at 40. Movies' search results carry no countries, so it never applies to them.
 3. **Close call.** Take the highest score. When it is 80 or more and another result is within 10 points of it, every result within 10 points of it is capped at 79. Two results that both fit, and that nothing tells apart, are both Possible, and no result is named Best match.
 
 ### Details for the top five
 
-TMDB's search results carry no episode counts, runtimes or aliases. The results are scored once without fit or aliases, and the five highest have their details read: one call each, `/tv/{id}` or `/movie/{id}` with `append_to_response=alternative_titles`, which gives the seasons and their episode counts (or the runtime) and the aliases in one answer. They go through `TmdbClient`'s rate limiter, in parallel, and are kept in memory for a day, up to 500, so searching again costs nothing. Then all results are scored again. A details call that fails leaves that result without fit or aliases; the search never fails for it.
+TMDB's search results carry no episode counts, runtimes or aliases. The results are scored once without fit or aliases, and the five highest have their details read: one call each, `/tv/{id}` or `/movie/{id}` with `append_to_response=alternative_titles`, which gives the seasons and their episode counts (or the runtime) and the aliases in one answer. They go through `TmdbClient`'s rate limiter, in parallel, and are kept in memory for a day, up to 500, so searching again costs nothing. The search waits at most 2.5 seconds for them: what has arrived by then is read, and a call still in flight keeps going and fills the cache when it lands, so a slow TMDB, or one answering 429, never holds the search longer. Then all results are scored again. A details call TMDB fails (a `TmdbError`) leaves that result without fit or aliases; the search never fails for it.
 
 ### Worked example: the "Monster" folder
 
@@ -72,8 +73,8 @@ Without a subject (a search typed from scratch), the fit is not measured and pop
 ## Server
 
 - `apps/raven/server/src/metadata/matchConfidence.ts`: `scoreCandidates`, a pure function. It takes the searched title, year and country, the results in today's order, the library's first tier, what the subject has on disk and the details read for some results, and answers each result's confidence. No I/O, so its tests call it directly.
-- `apps/raven/server/src/metadata/matchFactsCache.ts`: `MatchFactsCache`, an injectable service over `TmdbClient.matchFacts` with the in-memory cache. `TmdbClient.matchFacts({ type, tmdbId })` reads the details call above into `MatchFacts`, a discriminated union: `{ type: 'show', aliases, seasons, episodeCount }` or `{ type: 'movie', aliases, runtime }`.
-- `MatchController.search` resolves the subject (a show folder's files through `MatchFiles.underFolder`, a matched show's through `MatchFiles.under`, a movie's duration from `MediaRepository.get`), scores once, reads the top five's details, scores again, and sorts by confidence, stable over today's order.
+- `apps/raven/server/src/metadata/matchFactsCache.ts`: `MatchFactsCache`, an injectable service over `TmdbClient.matchFacts` with the in-memory cache. `read({ type, tmdbIds, deadlineMs })` answers with what arrived within the deadline. `TmdbClient.matchFacts({ type, tmdbId })` reads the details call above into `MatchFacts`, a discriminated union: `{ type: 'show', aliases, seasons, episodeCount }` or `{ type: 'movie', aliases, runtime }`.
+- `MatchController.search` splits a typed country suffix off the query (`splitCountry` in `@raven/core`, which `parseEpisodeName` reads a show's name with too), resolves the subject (a show folder's files through `MatchFiles.underFolder`, a matched show's through `MatchFiles.under`, a movie's duration from `MediaRepository.get`, none for an edition; extras left out), scores once, reads the top five's details within 2.5 seconds, scores again, and sorts by confidence, stable over today's order.
 
 ## Web
 
@@ -92,8 +93,8 @@ Without a subject (a search typed from scratch), the fit is not measured and pop
 ## Testing
 
 - Core: `confidenceTierOf` at 0, 49, 50, 79, 80 and 100; `isMatchCandidate` with and without `confidence`; `isMatchSubject`; `searchMatches` sending the subject.
-- Server, `scoreCandidates`: an exact title alone is 100; an alias or the original title counts as the title; partial titles by edit distance (a typo Possible, extra words Weak); the year steps; support left at 1 when nothing is measured, and averaged over only what is; popularity only among results with the title; fit for shows (season, season 1 straight through, absolute, season 0 and unnumbered files left out); fit for movies (10 and 25 minutes); both caps; the close call, and none below 80; the worked example above, number for number.
-- Server, the endpoint: `confidence` on every result; best first with today's order breaking ties; only five details calls, and none the second time; a failed details call still answers; the subject read through `mediaId` and `itemId`; a hidden library's subject ignored; `mediaId` with `itemId`, or a malformed id, a 400. The existing order tests keep passing or change only where the new order is meant.
+- Server, `scoreCandidates`: an exact title alone is 100; an alias or the original title counts as the title; partial titles by edit distance (a typo Possible, extra words Weak); the year steps; support left at 1 when nothing is measured, and averaged over only what is; popularity only among results with the title; fit for shows (season, season 1 straight through, absolute, season 0 and unnumbered files left out, episode 0 and an absolute number that is the year read as no number); fit for movies (10 and 25 minutes); both caps; the close call at exactly 10 behind and not at 11, and none below 80; a non-Latin title with digits; the worked example above, number for number.
+- Server, the endpoint: `confidence` on every result; best first with today's order breaking ties; only five details calls, and none the second time; a failed details call still answers, scored without them; the subject read through `mediaId` and `itemId`; a typed country suffix searched as the country, ahead of a folder's, and a folder's when none is typed; an extra left out of a show folder; an edition measuring no runtime fit; the details cache answering at its deadline and keeping a late answer; a hidden library's subject ignored; `mediaId` with `itemId`, or a malformed id, a 400. The existing order tests keep passing or change only where the new order is meant.
 - Web: the stamp and tier line per tier; Best match only on a Strong top result; Choose described by its tier line; each caller's subject reaching the search.
 
 ## Order of work

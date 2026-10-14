@@ -92,13 +92,14 @@ describe('Fix match confidence', () => {
   })
   const state: {
     root: string
+    admin: string
     app: NestFastifyApplication | null
     tv: number
     films: number
     vault: number
     cellar: number
     shows: number
-  } = { root: '', app: null, tv: 0, films: 0, vault: 0, cellar: 0, shows: 0 }
+  } = { root: '', admin: '', app: null, tv: 0, films: 0, vault: 0, cellar: 0, shows: 0 }
   const app = (): NestFastifyApplication => {
     if (!state.app) throw new Error('app not started')
     return state.app
@@ -114,7 +115,7 @@ describe('Fix match confidence', () => {
       response: await app().inject({
         method: 'GET',
         url: `/api/match/search?${query}`,
-        ...(cookie == null ? {} : { headers: { cookie } }),
+        headers: { cookie: cookie ?? state.admin },
       }),
       guard: isMatchCandidateList,
     })
@@ -213,13 +214,13 @@ describe('Fix match confidence', () => {
     })
     await state.app.init()
     await state.app.getHttpAdapter().getInstance().ready()
-    const admin = await adminCookie(app())
+    state.admin = await adminCookie(app())
     const create = async (payload: Record<string, unknown>) =>
       shape({
         response: await app().inject({
           method: 'POST',
           url: '/api/libraries',
-          headers: { cookie: admin },
+          headers: { cookie: state.admin },
           payload,
         }),
         guard: isLibrary,
@@ -435,6 +436,7 @@ describe('Fix match confidence', () => {
         await app().inject({
           method: 'GET',
           url: `/api/match/search?type=show&query=Monster&${query}`,
+          headers: { cookie: state.admin },
         })
       ).statusCode
     expect(await statusOf('mediaId=1&itemId=2')).toBe(400)

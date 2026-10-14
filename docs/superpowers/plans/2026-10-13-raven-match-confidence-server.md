@@ -235,7 +235,7 @@ describe('scoreCandidates', () => {
   })
 
   it('scores a typo Possible and extra words Weak, by edit distance', () => {
-    expect(score({ title: 'Wild Artic', results: [result({ tmdbId: '1', title: 'Wild Arctic' })] })).toEqual([73])
+    expect(score({ title: 'Wild Arctik', results: [result({ tmdbId: '1', title: 'Wild Arctic' })] })).toEqual([73])
     expect(
       score({
         title: 'Monster',
