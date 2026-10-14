@@ -168,6 +168,20 @@ export type SearchResult = {
   originalLanguage: string | null
 }
 
+/**
+ * What Fix match's confidence reads of a result that TMDB's search does not
+ * give: a show's seasons and episode counts, or a movie's runtime in
+ * minutes, and the other titles TMDB knows it by.
+ */
+export type MatchFacts =
+  | {
+      type: 'show'
+      aliases: string[]
+      seasons: Array<{ number: number; episodeCount: number }>
+      episodeCount: number | null
+    }
+  | { type: 'movie'; aliases: string[]; runtime: number | null }
+
 export type TmdbState = {
   state: 'off' | 'ok' | 'failing'
   error: string | null
@@ -816,6 +830,37 @@ export class TmdbClient {
     )
     // A movie's come as `titles`, a show's as `results`.
     return records(body.titles ?? body.results).flatMap((entry) => text(entry.title) ?? [])
+  }
+
+  /**
+   * What Fix match's confidence reads of a result beyond its search: a
+   * show's seasons and episode total, or a movie's runtime, and its other
+   * titles, in one call.
+   */
+  async matchFacts({ type, tmdbId }: { type: MatchItemType; tmdbId: string }): Promise<MatchFacts> {
+    const body = record(
+      await this.get(`/${type === 'movie' ? 'movie' : 'tv'}/${encodeURIComponent(tmdbId)}`, {
+        append_to_response: 'alternative_titles',
+      }),
+    )
+    const titled = record(body.alternative_titles)
+    // A movie's come as `titles`, a show's as `results`.
+    const aliases = records(titled.titles ?? titled.results).flatMap(
+      (entry) => text(entry.title) ?? [],
+    )
+    if (type === 'movie') return { type, aliases, runtime: number(body.runtime) || null }
+    return {
+      type,
+      aliases,
+      seasons: records(body.seasons).flatMap((season) => {
+        const seasonNumber = number(season.season_number)
+        const episodeCount = number(season.episode_count)
+        return seasonNumber == null || episodeCount == null
+          ? []
+          : [{ number: seasonNumber, episodeCount }]
+      }),
+      episodeCount: number(body.number_of_episodes),
+    }
   }
 
   /**

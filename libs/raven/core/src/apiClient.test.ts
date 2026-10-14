@@ -400,6 +400,24 @@ describe('the metadata calls', () => {
     )
   })
 
+  it('names the file or show a search is for, so it can be scored against what is on disk', async () => {
+    const { client, calls } = clientReturning(respond({ body: [] }))
+    await client.searchMatches({
+      type: 'show',
+      query: 'Monster',
+      subject: { kind: 'media', id: 12 },
+    })
+    await client.searchMatches({
+      type: 'show',
+      query: 'Monster',
+      subject: { kind: 'item', id: 40 },
+    })
+    expect(calls.map((call) => call.url)).toEqual([
+      'http://nas:8484/api/match/search?type=show&query=Monster&mediaId=12',
+      'http://nas:8484/api/match/search?type=show&query=Monster&itemId=40',
+    ])
+  })
+
   it('saves a match, or the lack of one', async () => {
     const { client, calls } = clientReturning(respond({ body: mediaItem() }))
     await client.setMatch({ mediaId: 7, tmdbId: null })

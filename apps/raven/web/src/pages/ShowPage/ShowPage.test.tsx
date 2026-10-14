@@ -92,7 +92,7 @@ describe('ShowPage', () => {
 
   it('re-points the whole show from Fix match', async () => {
     spies.search.mockImplementation(async () => [
-      { tmdbId: '60622', title: 'Fargo', year: 2014, overview: null, poster: null },
+      { tmdbId: '60622', title: 'Fargo', year: 2014, overview: null, poster: null, confidence: 90 },
     ])
     const moved: Array<{ itemId: number; tmdbId: string }> = []
     spies.setItemMatch.mockImplementation(async (request) => {

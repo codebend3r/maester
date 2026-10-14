@@ -58,8 +58,16 @@ describe('Fix match', () => {
           year: 2026,
           overview: 'Two busboys.',
           poster: '/b.jpg',
+          confidence: 90,
         },
-        { tmdbId: '1002', title: 'Busboys', year: 1998, overview: null, poster: null },
+        {
+          tmdbId: '1002',
+          title: 'Busboys',
+          year: 1998,
+          overview: null,
+          poster: null,
+          confidence: 80,
+        },
       ]
     })
     const chosen: Array<string | null> = []

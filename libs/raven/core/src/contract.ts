@@ -879,11 +879,21 @@ export const isMatchCandidate = object({
   overview: nullable(isString),
   /** TMDB's path for the poster, served through `candidatePosterUrl`. */
   poster: nullable(isString),
+  /** How sure Fix match is that this is the folder's or file's movie or show: a whole number from 0 to 100. */
+  confidence: isNumber,
 })
 
 export type MatchCandidate = Infer<typeof isMatchCandidate>
 
 export const isMatchCandidateList = listOf(isMatchCandidate)
+
+/** What a Fix match search is for: a file (and the show folder it is in), or a matched show. */
+export const isMatchSubject = union(
+  object({ kind: oneOf(['media']), id: isNumber }),
+  object({ kind: oneOf(['item']), id: isNumber }),
+)
+
+export type MatchSubject = Infer<typeof isMatchSubject>
 
 /** A place inside a library, as the server keeps a group's Fix match: a relative path, never an absolute one. */
 export const isLibraryPlace = (value: unknown): value is string =>

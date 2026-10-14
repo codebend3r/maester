@@ -35,6 +35,7 @@ import { ItemImagesRepository } from '@/metadata/itemImagesRepository'
 import { ItemOverrides } from '@/metadata/itemOverrides'
 import { ItemPictures } from '@/metadata/itemPictures'
 import { ItemRefresher } from '@/metadata/itemRefresher'
+import { MatchFactsCache } from '@/metadata/matchFactsCache'
 import { MatchFiles } from '@/metadata/matchFiles'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 import { MetadataService } from '@/metadata/metadataService'
@@ -118,6 +119,7 @@ export class AppModule {
         MatchFiles,
         AiDecisions,
         TmdbClient,
+        MatchFactsCache,
         OmdbClient,
         AiClient,
         AiMatcher,

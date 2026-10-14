@@ -9,6 +9,7 @@ import {
   readRelease,
   seasonFolderNumber,
   sortTitle,
+  splitCountry,
 } from '@/naming'
 
 /** Splits `Folder/Sub/file.mkv` the way the scanner stores it: a relative folder and a name. */
@@ -355,6 +356,15 @@ describe('seasonFolderNumber', () => {
     expect(seasonFolderNumber('Specials')).toBe(0)
     expect(seasonFolderNumber('Severance (2022)')).toBeNull()
     expect(seasonFolderNumber('Season One')).toBeNull()
+  })
+})
+
+describe('splitCountry', () => {
+  it("splits Sonarr's country suffix off a name, giving the country as TMDB writes it", () => {
+    expect(splitCountry('The Office (UK)')).toEqual({ title: 'The Office', country: 'GB' })
+    expect(splitCountry('Euphoria (us)')).toEqual({ title: 'Euphoria', country: 'US' })
+    expect(splitCountry('Us')).toEqual({ title: 'Us', country: null })
+    expect(splitCountry('Heat (1995)')).toEqual({ title: 'Heat (1995)', country: null })
   })
 })
 
