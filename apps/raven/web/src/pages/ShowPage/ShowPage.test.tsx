@@ -111,6 +111,7 @@ describe('ShowPage', () => {
       type: 'show',
       query: 'Severance',
       libraryId: EPISODE_TWO.libraryId,
+      subject: { kind: 'item', id: 4 },
     })
   })
 

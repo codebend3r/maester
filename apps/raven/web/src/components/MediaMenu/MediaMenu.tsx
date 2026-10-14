@@ -350,6 +350,7 @@ const MenuBody = ({
           fileName={media.fileName}
           aiMatch={aiMatch ?? itemDetails.data?.aiMatch ?? null}
           libraryId={media.libraryId}
+          subject={{ kind: 'media', id: media.id }}
           match={(tmdbId) => api.setMatch({ mediaId: media.id, tmdbId })}
           onMatched={onMatched}
           onClose={() => {

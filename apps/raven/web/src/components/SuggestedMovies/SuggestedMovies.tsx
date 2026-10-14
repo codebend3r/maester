@@ -66,6 +66,7 @@ const SuggestedMovieEntry = ({
           year={file.year}
           fileName={file.fileName}
           libraryId={libraryId}
+          subject={{ kind: 'media', id: file.id }}
           match={pointAt}
           onClose={() => setIsFixing(false)}
         />

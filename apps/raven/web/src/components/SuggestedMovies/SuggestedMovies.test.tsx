@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
-import { screen } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { SuggestedMovies, suggestedMoviesOf } from '@/components/SuggestedMovies/SuggestedMovies'
 import { api } from '@/lib/api'
@@ -129,6 +129,11 @@ describe('SuggestedMovies', () => {
     const fix = screen.getByRole('button', { name: 'Fix match for Heat.mkv' })
     await userEvent.click(fix)
     expect(screen.getByRole('searchbox', { name: 'Title' })).toHaveValue('Heat')
+    await waitFor(() =>
+      expect(spies.search.mock.calls[0]?.[0]).toMatchObject({
+        subject: { kind: 'media', id: FILES[2]?.id },
+      }),
+    )
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(fix).toHaveFocus()

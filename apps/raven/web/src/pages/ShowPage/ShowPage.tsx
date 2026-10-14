@@ -153,6 +153,7 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
             title={details.title}
             year={details.year}
             libraryId={libraryId}
+            subject={{ kind: 'item', id: details.id }}
             aiMatch={details.aiMatch}
             allowNone={false}
             match={(tmdbId) =>
