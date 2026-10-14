@@ -67,6 +67,17 @@ describe('holdInPlace', () => {
     expect(top()).toBe(300)
   })
 
+  it('stops when told to', () => {
+    const { page, card, top } = setUp()
+    page.scrollTo(5000)
+    const stop = holdInPlace({ card, top: 0 })
+    stop()
+    page.place({ element: card, top: 5300 })
+    page.frame()
+    expect(top()).toBe(300)
+    expect(page.isWaiting()).toBe(false)
+  })
+
   it('stops when the card leaves the page', () => {
     const { page, card } = setUp()
     page.scrollTo(5000)

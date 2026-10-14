@@ -21,7 +21,8 @@ type Hold = {
  * each standing in at an estimate of its height until drawn, so drawing
  * those above a card moves it. Each frame scrolls it back, until it has held
  * still a few frames, or the viewer scrolls. With `afterScroll` it waits
- * out a smooth scroll first, which would carry the card off again.
+ * out a smooth scroll first, which would carry the card off again. What it
+ * returns stops it sooner.
  */
 export const holdInPlace = ({
   card,
@@ -31,7 +32,7 @@ export const holdInPlace = ({
   card: Element
   top: number
   afterScroll?: boolean
-}): void => {
+}): (() => void) => {
   const viewer = new AbortController()
   VIEWER_INPUT.forEach((type) =>
     window.addEventListener(type, () => viewer.abort(), { passive: true, signal: viewer.signal }),
@@ -72,4 +73,5 @@ export const holdInPlace = ({
 
   const start = window.scrollY
   window.requestAnimationFrame(() => step({ frames: 0, still: 0, hasMoved: false, y: start }))
+  return () => viewer.abort()
 }

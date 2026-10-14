@@ -10,7 +10,7 @@ import { PageBackdrop } from '@/components/PageBackdrop/PageBackdrop'
 import { useFollowAdminLock } from '@/lib/adminLock'
 import { useKeyShortcut } from '@/lib/keyboard'
 import { librariesQuery } from '@/lib/queries'
-import { useScrollReset } from '@/lib/useScrollReset'
+import { TopCardNote, useScrollReset } from '@/lib/useScrollReset'
 import { useServerEvents } from '@/lib/useServerEvents'
 import { usePageBackdrop } from '@/stores/pageBackdrop'
 import { useSideMenu } from '@/stores/sideMenu'
@@ -89,7 +89,7 @@ const ShortcutTip = ({ onDismiss }: { onDismiss: () => void }) => (
  */
 export const AppShell = () => {
   const navId = useId()
-  const { pathname } = useLocation()
+  const { pathname, key } = useLocation()
   const { collapsed, tipSeen, toggle, dismissTip } = useSideMenu()
   const isFrosted = usePageBackdrop((state) => state.shown != null)
   const libraries = useQuery(librariesQuery)
@@ -183,7 +183,9 @@ export const AppShell = () => {
         </div>
       </nav>
       <main className={styles.main}>
-        <Outlet />
+        <TopCardNote pageKey={key}>
+          <Outlet />
+        </TopCardNote>
       </main>
     </div>
   )
