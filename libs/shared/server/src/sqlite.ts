@@ -58,8 +58,10 @@ export const refreshStatistics = ({ db }: { db: Sqlite.Database }): void => {
     db.pragma('optimize = 0x10002')
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error)
+    // A held write lock fails only after better-sqlite3's busy timeout, every request waiting.
+    const ms = Math.round(performance.now() - start)
     logger.warn(
-      `Could not refresh the query planner's statistics of ${basename(db.name)}: ${reason}`,
+      `Could not refresh the query planner's statistics of ${basename(db.name)} after ${ms} ms: ${reason}`,
     )
     return
   }

@@ -160,17 +160,18 @@ describe('refreshStatistics', () => {
     db.close()
   })
 
-  it('logs a refresh that fails as a warning, and carries on', () => {
+  it('logs a refresh that fails as a warning, with how long it held things up, and carries on', () => {
     const before = openSqlite({ dataDir: state.dir, file: 'test.db', migrations: [FIRST, INDEXED] })
     addNotes({ db: before, bodies: twoBodies(4) })
     before.close()
     // The notes are not analyzed yet, and analyzing them writes, which this connection cannot.
     const db = new Sqlite(join(state.dir, 'test.db'), { readonly: true })
     const warn = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined)
+    vi.spyOn(performance, 'now').mockReturnValueOnce(1000).mockReturnValueOnce(6000)
 
     expect(() => refreshStatistics({ db })).not.toThrow()
     expect(warn).toHaveBeenCalledExactlyOnceWith(
-      "Could not refresh the query planner's statistics of test.db: attempt to write a readonly database",
+      "Could not refresh the query planner's statistics of test.db after 5000 ms: attempt to write a readonly database",
     )
     db.close()
   })
