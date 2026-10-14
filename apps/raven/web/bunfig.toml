@@ -1,10 +1,12 @@
 [test]
 # happy-dom must register the DOM before test-setup imports Testing Library,
-# eventSource stands in for the EventSource happy-dom lacks, and
-# scss-modules registers its loader ahead of any component import.
+# eventSource and mediaError stand in for the EventSource and MediaError
+# happy-dom lacks, and scss-modules registers its loader ahead of any
+# component import.
 preload = [
   "./src/test/happy-dom.ts",
   "./src/test/eventSource.ts",
+  "./src/test/mediaError.ts",
   "../../../tooling/web/scss-modules.ts",
   "./src/test-setup.ts",
 ]

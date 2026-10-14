@@ -1,5 +1,5 @@
 import { type MediaItem, type PlaybackMode, streamMimeType } from '@raven/core'
-import { type RefObject, useEffect, useEffectEvent } from 'react'
+import { type RefObject, useEffect, useEffectEvent, useRef } from 'react'
 import { useVideoEvents } from '@/components/Player/useVideoEvents'
 import { api } from '@/lib/api'
 import { browserEnvironment, createStreamSession } from '@/lib/streamSource'
@@ -61,15 +61,24 @@ export const useMediaSource = ({
   onRefused: () => void
   onFailure: (message: string) => void
 }): void => {
-  // A running stream outlives renders; its failures reach the latest `onFailure`.
-  const fail = useEffectEvent((message: string) => onFailure(message))
   const mime = mode === 'direct' ? null : streamMimeType({ media, mode })
+  // The source this render wants, and the one attached. They differ from
+  // the commit that picks a new source until the effect swaps it in, and a
+  // failure the browser queued for the old one can land in between; it
+  // must not count against the new one.
+  const wanted = `${media.id}:${mode}:${audio ?? 'default'}`
+  const attached = useRef<string | null>(null)
+  const report = (message: string) => {
+    if (attached.current === wanted) onFailure(message)
+  }
+  // A running stream outlives renders; its failures reach the latest `report`.
+  const fail = useEffectEvent((message: string) => report(message))
 
   useVideoEvents({
     videoRef,
     on: {
       error: (element) => {
-        if (element.getAttribute('src')) onFailure(failureMessage(element.error))
+        if (element.getAttribute('src')) report(failureMessage(element.error))
       },
     },
   })
@@ -119,10 +128,11 @@ export const useMediaSource = ({
   useEffect(() => {
     const element = videoRef.current
     if (!element) return undefined
+    attached.current = wanted
     return attach({
       element,
       source: sourceFor({ id: media.id, mode, audio, mime }),
       duration: media.duration,
     })
-  }, [videoRef, media.id, media.duration, mode, audio, mime])
+  }, [videoRef, media.id, media.duration, mode, audio, mime, wanted])
 }
