@@ -244,4 +244,44 @@ describe('migrations', () => {
     })
     database.onModuleDestroy()
   })
+
+  it("indexes each library's unmatched files, and its probed files by their frame", () => {
+    const before = new Sqlite(join(state.dir, 'raven.db'))
+    MIGRATIONS.slice(0, 23).forEach((sql) => before.exec(sql))
+    before.pragma('user_version = 23')
+    const libraryId = before
+      .prepare(
+        "INSERT INTO libraries (name, created_at, kind) VALUES ('Movies', '2026-01-01T00:00:00.000Z', 'movies')",
+      )
+      .run().lastInsertRowid
+    before
+      .prepare(
+        `INSERT INTO media (library_id, path, file_name, folder, title, container, size, mtime_ms, added_at, width, height)
+         VALUES (?, '/m/x.mkv', 'x.mkv', '', 'x', 'mkv', 1, 1, '2026-01-01T00:00:00.000Z', 3840, 2160)`,
+      )
+      .run(libraryId)
+    before.close()
+
+    const database = new DatabaseService({ ...readServerConfig({}), dataDir: state.dir })
+    const indexed = (index: string) => ({
+      columns: database.db
+        .prepare<[string], { name: string }>('SELECT name FROM pragma_index_info(?) ORDER BY seqno')
+        .all(index)
+        .map((column) => column.name),
+      isPartial: !!database.db
+        .prepare<[string], { partial: number }>(
+          "SELECT partial FROM pragma_index_list('media') WHERE name = ?",
+        )
+        .get(index)?.partial,
+    })
+    expect(indexed('media_library_unmatched')).toEqual({ columns: ['library_id'], isPartial: true })
+    expect(indexed('media_library_probed')).toEqual({
+      columns: ['library_id', 'width', 'height'],
+      isPartial: true,
+    })
+    expect(database.db.prepare('SELECT path, match, width, height FROM media').all()).toEqual([
+      { path: '/m/x.mkv', match: 'pending', width: 3840, height: 2160 },
+    ])
+    database.onModuleDestroy()
+  })
 })

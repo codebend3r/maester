@@ -138,6 +138,11 @@ export class LibrariesRepository {
    * Every library, or just one when `id` is given. The 4K libraries come
    * first, those whose probed videos are mostly 4K, then the rest, each by
    * name, so the side menu, the Libraries page and Home all lead with them.
+   * Each count reads an index, never the files themselves; a probe fills
+   * in the width, so `m.width IS NOT NULL` picks the probed files and lets
+   * the 4K test read `media_library_probed`. The order names the 4K test's
+   * column rather than an expression over the counts, which SQLite would
+   * count again to sort by.
    */
   private rows(id: number | null): LibraryRecord[] {
     const libraries = this.db
@@ -146,13 +151,11 @@ export class LibrariesRepository {
                 (SELECT COUNT(*) FROM media m WHERE m.library_id = l.id) AS item_count,
                 (SELECT COUNT(*) FROM media m WHERE m.library_id = l.id AND m.match = 'unmatched')
                   AS unmatched_count,
-                (SELECT COUNT(*) FROM media m WHERE m.library_id = l.id AND m.width IS NOT NULL)
-                  AS probed_count,
-                (SELECT COUNT(*) FROM media m WHERE m.library_id = l.id AND ${IS_4K})
-                  AS uhd_count
+                (SELECT 2 * COUNT(*) FILTER (WHERE ${IS_4K}) > COUNT(*)
+                   FROM media m WHERE m.library_id = l.id AND m.width IS NOT NULL) AS is_4k
            FROM libraries l
           WHERE ? IS NULL OR l.id = ?
-          ORDER BY 2 * uhd_count > probed_count DESC, l.name COLLATE NOCASE`,
+          ORDER BY is_4k DESC, l.name COLLATE NOCASE`,
       )
       .all(id, id)
     const paths = this.db
