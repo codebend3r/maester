@@ -32,7 +32,7 @@ While the version is `0.y.z`, breaking changes may go in a `minor`. A literal re
 
 1. Be on `main`, up to date, with a clean tree and the tags fetched: `git switch main && git pull --rebase --tags`.
 2. Preview: `scripts/bump_version.sh --dry-run <major|minor|patch|X.Y.Z>`.
-3. Release: `scripts/bump_version.sh <bump>`. Add `--push` only when asked to push; it pushes the branch and the tag in one atomic push, so CI never sees the Release commit without its tag.
+3. Release: `scripts/bump_version.sh <bump>`. Add `--push` only when asked to push; it pushes the branch and the tag in one atomic push, so CI never sees the Release commit without its tag. The pushed tag runs `.github/workflows/release.yml`, which publishes its GitHub release; a tag that never reaches origin never gets one.
 4. Verify: `git show --stat HEAD` shows every `package.json` under `apps/` and `libs/`, `bun.lock`, each `apps/<product>/VERSION`, each `pyproject.toml` and its `uv.lock`, and nothing else; `git describe --exact-match HEAD` prints `vX.Y.Z`.
 
 ## What the script guarantees
