@@ -2,7 +2,8 @@ import { existsSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { Logger } from '@nestjs/common'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { openSqlite, refreshStatistics } from '@/sqlite'
 
 const FIRST = 'CREATE TABLE notes (id INTEGER PRIMARY KEY, body TEXT NOT NULL);'
@@ -36,11 +37,11 @@ const statistics = (db: Database): Record<string, string> => {
 
 describe('openSqlite', () => {
   const state = { dir: '' }
-  /** The migrations' tables, leaving out SQLite's own, such as its statistics. */
+  /** Every table but the statistics opening it gathers. */
   const tables = (db: Database): unknown[] =>
     db
       .prepare(
-        "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT IN ('sqlite_stat1', 'sqlite_stat4') ORDER BY name",
       )
       .all()
       .map((row) => (typeof row === 'object' && row != null && 'name' in row ? row.name : null))
@@ -114,6 +115,7 @@ describe('refreshStatistics', () => {
   })
 
   afterEach(async () => {
+    vi.restoreAllMocks()
     await rm(state.dir, { recursive: true, force: true })
   })
 
@@ -128,6 +130,32 @@ describe('refreshStatistics', () => {
     addNotes({ db, bodies: twoBodies(396) })
     refreshStatistics({ db })
     expect(statistics(db)).toEqual({ notes_body: '400 200' })
+    db.close()
+  })
+
+  it('leaves nothing for SQLite to analyze once it has run', () => {
+    const db = openSqlite({ dataDir: state.dir, file: 'test.db', migrations: [FIRST, INDEXED] })
+    addNotes({ db, bodies: twoBodies(400) })
+    refreshStatistics({ db })
+    // The debug form lists each ANALYZE it would run, and runs none.
+    expect(db.pragma('optimize = 0x10003')).toEqual([])
+    db.close()
+  })
+
+  it('logs a refresh that takes over 100 ms, with how long it took', () => {
+    const db = openSqlite({ dataDir: state.dir, file: 'test.db', migrations: [FIRST, INDEXED] })
+    const log = vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined)
+    const clock = vi.spyOn(performance, 'now')
+
+    clock.mockReturnValueOnce(1000).mockReturnValueOnce(1100)
+    refreshStatistics({ db })
+    expect(log).not.toHaveBeenCalled()
+
+    clock.mockReturnValueOnce(2000).mockReturnValueOnce(2150)
+    refreshStatistics({ db })
+    expect(log).toHaveBeenCalledExactlyOnceWith(
+      "Refreshed the query planner's statistics of test.db in 150 ms",
+    )
     db.close()
   })
 })

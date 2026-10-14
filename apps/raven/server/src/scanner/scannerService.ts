@@ -220,7 +220,7 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
         onProbed: () =>
           this.update(library.id, { processed: this.status(library.id).processed + 1 }),
       })
-      // Matching may still be under way, and refreshes the statistics again when its pass ends.
+      // Matching ran beside the probes, storing items as it went, and may not have ended.
       this.database.refreshStatistics()
       // Thumbnails that timed out on an earlier pass get another go.
       this.thumbnails.retryPending()
@@ -269,10 +269,11 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   /**
-   * Brings the index in line with the disk over `scope` in one write, then
-   * forgets what was kept of the files that went, and tells clients when it
-   * changed. The rows go first, so a failed write leaves no row pointing at
-   * a thumbnail that was already deleted.
+   * Brings the index in line with the disk over `scope` in one write, and
+   * the planner's statistics with it, then forgets what was kept of the
+   * files that went, and tells clients when it changed. The rows go first,
+   * so a failed write leaves no row pointing at a thumbnail that was
+   * already deleted.
    */
   private async reindex({
     library,
@@ -319,6 +320,8 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
       kind,
       changes,
     })
+    // Probing what was added can take hours on a first scan, too long for the planner to wait.
+    if (changesAnything(changes)) this.database.refreshStatistics()
     await this.artifacts.discard(changes.gone)
     if (changesAnything(changes)) this.events.libraryChanged(library.id)
     return { walk, changes, toProbe }
