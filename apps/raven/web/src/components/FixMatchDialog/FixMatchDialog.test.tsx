@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { AiMatch, MatchItemType, MatchSubject, MediaItem } from '@raven/core'
 import { useState } from 'react'
@@ -46,6 +46,69 @@ describe('Fix match', () => {
   })
 
   const unmatched = mediaItem({ title: 'Busboys', year: 2026, match: 'unmatched' })
+
+  const candidate = ({
+    tmdbId,
+    year,
+    confidence,
+    poster = null,
+  }: {
+    tmdbId: string
+    year: number
+    confidence: number
+    poster?: string | null
+  }) => ({ tmdbId, title: 'Busboys', year, overview: null, poster, confidence })
+
+  const openWith = async (candidates: ReturnType<typeof candidate>[]) => {
+    spies.search.mockImplementation(async () => candidates)
+    renderWithProviders(<Harness media={unmatched} onMatched={() => {}} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Options for Busboys (2026)' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Fix match' }))
+    await screen.findByRole('button', { name: `Choose Busboys (${candidates[0]?.year})` })
+    return within(screen.getByRole('region', { name: 'Results' })).getAllByRole('listitem')
+  }
+
+  it('stamps each result with its confidence and names its tier, the Strong top one the best match', async () => {
+    const rows = await openWith([
+      candidate({ tmdbId: '1', year: 2026, confidence: 94, poster: '/b.jpg' }),
+      candidate({ tmdbId: '2', year: 2016, confidence: 82 }),
+      candidate({ tmdbId: '3', year: 1998, confidence: 71 }),
+      candidate({ tmdbId: '4', year: 1990, confidence: 38 }),
+    ])
+    expect(rows.map((row) => row.textContent)).toEqual([
+      expect.stringContaining('Best match'),
+      expect.stringContaining('Strong match'),
+      expect.stringContaining('Possible match'),
+      expect.stringContaining('Weak match'),
+    ])
+    const numbers = ['94', '82', '71', '38']
+    expect(
+      rows.map((row, index) => within(row).getByText(numbers[index] ?? '').textContent),
+    ).toEqual(numbers)
+    expect(screen.getAllByText('Best match')).toHaveLength(1)
+  })
+
+  it('names no best match when the top result is not Strong', async () => {
+    await openWith([
+      candidate({ tmdbId: '1', year: 2026, confidence: 79 }),
+      candidate({ tmdbId: '2', year: 2016, confidence: 79 }),
+    ])
+    expect(screen.queryByText('Best match')).toBeNull()
+    expect(screen.getAllByText('Possible match')).toHaveLength(2)
+  })
+
+  it('describes each Choose by its confidence, so a screen reader hears it with the title', async () => {
+    await openWith([
+      candidate({ tmdbId: '1', year: 2026, confidence: 94 }),
+      candidate({ tmdbId: '2', year: 1998, confidence: 38 }),
+    ])
+    expect(
+      screen.getByRole('button', { name: 'Choose Busboys (2026)' }),
+    ).toHaveAccessibleDescription(/Best match.*confidence 94 out of 100/)
+    expect(
+      screen.getByRole('button', { name: 'Choose Busboys (1998)' }),
+    ).toHaveAccessibleDescription(/Weak match.*confidence 38 out of 100/)
+  })
 
   it('searches with the parsed title and year, and points the file at the choice', async () => {
     const searched: Array<{

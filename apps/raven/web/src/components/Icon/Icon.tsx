@@ -8,6 +8,7 @@ export type IconName =
   | 'rescan'
   | 'edit'
   | 'close'
+  | 'check'
   | 'folder'
   | 'up'
   | 'alert'
@@ -67,6 +68,7 @@ const PATHS: Record<IconName, string> = {
   edit: 'M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4',
   wand: 'M4 20l10-10M14 10l1.5-1.5M17 3v2M17 9v2M14 6h2M20 6h2M19 15v2M19 21v2M16 18h2M22 18h2',
   close: 'M6 6l12 12M18 6L6 18',
+  check: 'M5 12.5l4.5 4.5L19 7.5',
   folder: 'M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z',
   up: 'M12 19V5M5 12l7-7 7 7',
   alert: 'M12 4l9 16H3L12 4zM12 10v4M12 17.5v.5',

@@ -1,8 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { AiMatch, MatchCandidate, MatchItemType, MatchSubject } from '@raven/core'
+import {
+  type AiMatch,
+  type ConfidenceTier,
+  confidenceTierOf,
+  type MatchCandidate,
+  type MatchItemType,
+  type MatchSubject,
+} from '@raven/core'
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react'
 import { AiMatchNote } from '@/components/AiMatchNote/AiMatchNote'
 import { Button } from '@/components/Button/Button'
+import { Icon } from '@/components/Icon/Icon'
 import { api } from '@/lib/api'
 import { afterMatch } from '@/lib/invalidate'
 import { matchSearchQuery } from '@/lib/queries'
@@ -15,29 +23,51 @@ const yearFrom = (text: string): number | null => {
   return Number.isInteger(year) && year > 1800 && year < 2200 ? year : null
 }
 
+const TIER_WORDS: Record<ConfidenceTier, string> = {
+  strong: 'Strong match',
+  possible: 'Possible match',
+  weak: 'Weak match',
+}
+
 const Candidate = ({
   candidate,
+  isBest,
   disabled,
   onChoose,
 }: {
   candidate: MatchCandidate
+  /** The first result, when it is Strong: named the best match. */
+  isBest: boolean
   disabled: boolean
   onChoose: () => void
 }) => {
+  const tierId = useId()
   const poster = api.candidatePosterUrl(candidate.poster)
   const name = candidate.year == null ? candidate.title : `${candidate.title} (${candidate.year})`
+  const tier = confidenceTierOf(candidate.confidence)
   return (
-    <li className={styles.candidate}>
+    <li className={isBest ? `${styles.candidate} ${styles.best}` : styles.candidate}>
       <span className={styles.poster}>
         {poster ? (
           <img src={poster} alt="" loading="lazy" decoding="async" />
         ) : (
-          <span aria-hidden="true">{candidate.title.slice(0, 1)}</span>
+          <span className={styles.initial} aria-hidden="true">
+            {candidate.title.slice(0, 1)}
+          </span>
         )}
+        <span className={`${styles.stamp} ${styles[tier]}`} aria-hidden="true">
+          {tier === 'strong' && <Icon name="check" size={12} />}
+          {candidate.confidence}
+        </span>
       </span>
       <span className={styles.details}>
         <span className={styles.name}>{candidate.title}</span>
         {candidate.year != null && <span className={styles.year}>{candidate.year}</span>}
+        <span id={tierId} className={`${styles.tier} ${styles[tier]}`}>
+          {isBest && <Icon name="check" size={14} />}
+          <span>{isBest ? 'Best match' : TIER_WORDS[tier]}</span>
+          <span className="visually-hidden">, confidence {candidate.confidence} out of 100</span>
+        </span>
         {candidate.overview != null && (
           <span className={styles.overview}>{candidate.overview}</span>
         )}
@@ -47,6 +77,7 @@ const Candidate = ({
         disabled={disabled}
         onClick={onChoose}
         aria-label={`Choose ${name}`}
+        aria-describedby={tierId}
       >
         Choose
       </Button>
@@ -55,8 +86,9 @@ const Candidate = ({
 }
 
 /**
- * Fix match: searches TMDB with the title and year a name gave, and points
- * a file (or a whole show) at the result the viewer chooses, or at nothing.
+ * Fix match: searches TMDB with the title and year a name gave, scored
+ * against what the subject has on disk and listed best first, and points a
+ * file (or a whole show) at the result the viewer chooses, or at nothing.
  * `match` does the pointing; whatever is chosen is kept by folder, so
  * renames and re-downloads keep it.
  */
@@ -196,10 +228,11 @@ export const FixMatchDialog = <T,>({
           {results.isFetching && !results.data && <p className={styles.hint}>Searching TMDB</p>}
           {!!results.data?.length && (
             <ul className={styles.list}>
-              {results.data.map((candidate) => (
+              {results.data.map((candidate, index) => (
                 <Candidate
                   key={candidate.tmdbId}
                   candidate={candidate}
+                  isBest={index === 0 && confidenceTierOf(candidate.confidence) === 'strong'}
                   disabled={choose.isPending}
                   onChoose={() => choose.mutate(candidate.tmdbId)}
                 />

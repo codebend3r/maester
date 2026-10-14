@@ -102,6 +102,7 @@
 .candidate {
   display: grid;
   grid-template-columns: 3.5rem minmax(0, 1fr) auto;
+  grid-template-areas: 'poster details choose';
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-1);
@@ -109,9 +110,14 @@
   background: var(--color-night);
 }
 
+.best {
+  box-shadow: inset 0 0 0 1px var(--color-fern);
+}
+
 .poster {
+  grid-area: poster;
   display: grid;
-  place-items: center;
+  grid-template-areas: 'stack';
   aspect-ratio: 2 / 3;
   overflow: hidden;
   border-radius: var(--radius-sm);
@@ -120,15 +126,80 @@
   font-family: var(--font-display);
 
   img {
+    grid-area: stack;
     width: 100%;
     height: 100%;
     object-fit: cover;
   }
 }
 
+.initial {
+  grid-area: stack;
+  place-self: center;
+}
+
+.stamp {
+  grid-area: stack;
+  align-self: end;
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: center;
+  align-items: center;
+  gap: 2px;
+  padding-block: 1px;
+  color: var(--color-night);
+  font-family: var(--font-body);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: var(--line-body);
+
+  &.strong {
+    background: var(--color-fern);
+  }
+
+  &.possible {
+    background: var(--color-amber);
+  }
+
+  &.weak {
+    border-top: 1px solid var(--color-moss-line);
+    background: var(--color-night);
+    color: var(--color-lichen);
+  }
+}
+
 .details {
+  grid-area: details;
   display: grid;
   gap: 2px;
+}
+
+.tier {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  align-items: center;
+  gap: var(--space-0);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+
+  &.strong {
+    color: var(--color-fern);
+  }
+
+  &.possible {
+    color: var(--color-amber);
+  }
+
+  &.weak {
+    color: var(--color-lichen);
+    font-weight: 400;
+  }
+}
+
+.choose {
+  grid-area: choose;
 }
 
 .name {
@@ -169,4 +240,19 @@
   grid-auto-flow: column;
   justify-content: end;
   gap: var(--space-1);
+}
+
+@media (max-width: 30rem) {
+  .candidate {
+    grid-template-columns: 3.5rem minmax(0, 1fr);
+    grid-template-areas:
+      'poster details'
+      'choose choose';
+  }
+}
+
+@media (forced-colors: active) {
+  .stamp {
+    border: 1px solid canvastext;
+  }
 }

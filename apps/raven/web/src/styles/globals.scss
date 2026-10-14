@@ -15,6 +15,13 @@
   --color-leaf: #a8262f;
   // Thin marks on the dark ground (progress lines): 3.7:1 on --color-night.
   --color-leaf-bright: #d8414a;
+  // How sure Fix match is of a result, and nothing else, so the red leaves
+  // keep their two jobs: fern for a Strong match (9.2:1 on --color-night),
+  // amber for a Possible one (8.7:1). As a fill they carry night text.
+  --color-fern: #8fcf9f;
+  --color-amber: #e3b45f;
+  // A quiet edge that still clears 3:1 on --color-night: a Weak match's stamp.
+  --color-moss-line: #5d736c;
   // Letterboxing around the video is real black, not a tint.
   --color-stage: #000000;
   --color-scrim: rgb(0 0 0 / 55%);
