@@ -10,7 +10,7 @@ import {
   resolutionLabel,
   sortFact,
 } from '@raven/core'
-import { Link } from 'react-router-dom'
+import { CardLink } from '@/components/CardLink/CardLink'
 import { FavouriteMark } from '@/components/FavouriteMark/FavouriteMark'
 import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
@@ -65,7 +65,7 @@ const MediaTile = ({
         .join(' ')}
       data-entry={mediaEntryKey(media)}
     >
-      <Link
+      <CardLink
         {...link}
         className={posters ? styles.posterFrame : styles.frame}
         tabIndex={-1}
@@ -86,11 +86,11 @@ const MediaTile = ({
           <span className={styles.placeholder}>{media.title.slice(0, 1)}</span>
         )}
         {!posters && <ResumeBar media={media} className={styles.resume} />}
-      </Link>
+      </CardLink>
       <div className={styles.body}>
-        <Link {...link} className={styles.title} onContextMenu={menu.onContextMenu}>
+        <CardLink {...link} className={styles.title} onContextMenu={menu.onContextMenu}>
           {posters ? cardTitle(media).title : mediaLabel(media)}
-        </Link>
+        </CardLink>
         {sorted && <span className={styles.sorted}>{sorted}</span>}
         <span className={styles.facts}>
           <FavouriteMark media={media} />

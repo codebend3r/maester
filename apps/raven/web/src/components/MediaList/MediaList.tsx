@@ -9,7 +9,7 @@ import {
   resolutionLabel,
   sortTitle,
 } from '@raven/core'
-import { Link } from 'react-router-dom'
+import { CardLink } from '@/components/CardLink/CardLink'
 import { FavouriteMark } from '@/components/FavouriteMark/FavouriteMark'
 import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
 import { ScoreChip } from '@/components/RatingChips/RatingChips'
@@ -46,13 +46,13 @@ const MediaRow = ({
     <tr className={`${styles.row} ${menu.hostClass}`} data-entry={mediaEntryKey(media)}>
       <th scope="row">
         <div className={styles.titleCell}>
-          <Link
+          <CardLink
             {...cardLink({ media, pages: movies })}
             className={styles.title}
             onContextMenu={menu.onContextMenu}
           >
             {title}
-          </Link>
+          </CardLink>
           <span className={styles.mark}>
             <FavouriteMark media={media} />
           </span>

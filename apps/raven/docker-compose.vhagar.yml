@@ -49,6 +49,8 @@ services:
       # in ./tailscale is enough, and the key can leave .env.
       - TS_AUTHKEY=${TS_AUTHKEY:-}
       - TS_AUTH_ONCE=true
+      # Browser sign-in needs more than containerboot's default minute.
+      - TS_BOOT_TIMEOUT=30m
       - TS_STATE_DIR=/var/lib/tailscale
       - TS_SERVE_CONFIG=/config/serve.json
     volumes:

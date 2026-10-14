@@ -7,7 +7,7 @@ import {
   resolutionLabel,
   sortFact,
 } from '@raven/core'
-import { Link } from 'react-router-dom'
+import { CardLink } from '@/components/CardLink/CardLink'
 import { FavouriteMark } from '@/components/FavouriteMark/FavouriteMark'
 import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
@@ -65,27 +65,27 @@ export const MediaCard = ({
     <li className={`${styles.card} ${menu.hostClass}`} data-entry={mediaEntryKey(media)}>
       {page.state == null ? (
         <span className={styles.split}>
-          <Link
+          <CardLink
             {...play}
             className={styles.picture}
             aria-label={`Play ${label}`}
             onContextMenu={menu.onContextMenu}
           >
             {frame}
-          </Link>
-          <Link
+          </CardLink>
+          <CardLink
             {...page}
             className={`${styles.title} ${styles.titleLink}`}
             onContextMenu={menu.onContextMenu}
           >
             {label}
-          </Link>
+          </CardLink>
         </span>
       ) : (
-        <Link {...play} className={styles.link} onContextMenu={menu.onContextMenu}>
+        <CardLink {...play} className={styles.link} onContextMenu={menu.onContextMenu}>
           {frame}
           <span className={styles.title}>{label}</span>
-        </Link>
+        </CardLink>
       )}
       {sorted && <span className={styles.sorted}>{sorted}</span>}
       <span className={styles.facts}>
