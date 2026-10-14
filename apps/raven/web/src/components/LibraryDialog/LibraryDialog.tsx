@@ -20,7 +20,6 @@ import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/Button/Button'
 import { FolderBrowser } from '@/components/FolderBrowser/FolderBrowser'
 import { IconPicker } from '@/components/LibraryDialog/IconPicker'
-import { useAdminLocked } from '@/lib/adminLock'
 import { api } from '@/lib/api'
 import { KINDS, libraryIconOf } from '@/lib/libraryKinds'
 import { afterLibrarySaved } from '@/lib/invalidate'
@@ -77,8 +76,6 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
   const isAiOff = metadata.data?.ai === 'off'
   const lock = useQuery(lockQuery)
   const lockable = !!lock.data?.available
-  const isAdminLocked = useAdminLocked()
-  const canLock = lockable && !isAdminLocked
 
   useEffect(() => {
     dialog.current?.showModal()
@@ -309,7 +306,7 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
               type="checkbox"
               className={styles.checkbox}
               checked={settings.locked}
-              disabled={!canLock && !settings.locked}
+              disabled={!lockable && !settings.locked}
               onChange={(event) =>
                 setSettings((current) => ({ ...current, locked: event.target.checked }))
               }
@@ -317,11 +314,8 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
             />
             <label htmlFor={`${ids.settings}-locked`}>Lock with the PIN</label>
             <p id={`${ids.settings}-locked-hint`} className={styles.settingHint}>
-              {canLock &&
-                'Keep its videos private: they stay hidden until the PIN is entered in this browser.'}
               {lockable &&
-                isAdminLocked &&
-                'Turn the admin lock off in Settings to lock a library.'}
+                'Keep its videos private: they stay hidden until the PIN is entered in this browser.'}
               {!lockable && (
                 <>
                   Set <code>LIBRARY_PIN</code> in raven's <code>.env</code> to lock a library.

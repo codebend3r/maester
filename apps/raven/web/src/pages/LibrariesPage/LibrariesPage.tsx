@@ -2,12 +2,14 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { type Library, isScanning } from '@raven/core'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { Button } from '@/components/Button/Button'
 import { LibraryActions, useLibraryActions } from '@/components/LibraryActions/LibraryActions'
 import { LibraryDialog } from '@/components/LibraryDialog/LibraryDialog'
 import { LibraryIcon } from '@/components/LibraryIcon/LibraryIcon'
 import { ScanStatus } from '@/components/ScanStatus/ScanStatus'
 import { Bone, Loading } from '@/components/Skeleton/Skeleton'
+import { useCanManage } from '@/lib/adminLock'
 import { api } from '@/lib/api'
 import { librarySettingsEdits } from '@/lib/edits'
 import { afterPins } from '@/lib/invalidate'
@@ -30,15 +32,11 @@ const count = new Intl.NumberFormat()
 const LibraryRow = ({ library, isShut }: { library: Library; isShut: boolean }) => {
   const queryClient = useQueryClient()
   const actions = useLibraryActions(library)
-  // Only the pin is sent as a setting; the server keeps the others as they are.
+  // Only the pin is sent; the server keeps the rest of the library as it is.
   // It shows at once, here and in the side menu; home's shelves follow it.
   const pin = useOptimisticMutation({
     mutationKey: mutationKeys.pin,
-    mutationFn: (pinned: boolean) =>
-      api.updateLibrary({
-        id: library.id,
-        input: { name: library.name, paths: library.paths, settings: { pinned } },
-      }),
+    mutationFn: (pinned: boolean) => api.setLibraryView({ id: library.id, change: { pinned } }),
     edits: (pinned) => librarySettingsEdits({ libraryId: library.id, change: { pinned } }),
     settle: () => afterPins(queryClient),
   })
@@ -95,6 +93,7 @@ const LibraryRow = ({ library, isShut }: { library: Library; isShut: boolean }) 
 
 export const LibrariesPage = () => {
   const [adding, setAdding] = useState(false)
+  const canManage = useCanManage()
   const libraries = useQuery({
     ...librariesQuery,
     // Poll only while something is scanning, so the counts climb live.
@@ -108,7 +107,9 @@ export const LibrariesPage = () => {
     enabled: (libraries.data ?? []).some((library) => library.settings.locked),
   })
 
-  const dialog = adding && <LibraryDialog onClose={() => setAdding(false)} />
+  const dialog = (
+    <AdminOnly>{adding && <LibraryDialog onClose={() => setAdding(false)} />}</AdminOnly>
+  )
 
   if (libraries.isError) {
     return (
@@ -128,9 +129,13 @@ export const LibrariesPage = () => {
           A library is a set of folders. Pick the ones that hold your movies or shows, and every
           video inside is indexed, given a thumbnail, and ready to play.
         </p>
-        <Button tone="primary" icon="plus" onClick={() => setAdding(true)}>
-          Add library
-        </Button>
+        {canManage ? (
+          <Button tone="primary" icon="plus" onClick={() => setAdding(true)}>
+            Add library
+          </Button>
+        ) : (
+          <p>Turn the admin lock off in Settings to add one.</p>
+        )}
         {dialog}
       </section>
     )
@@ -140,9 +145,11 @@ export const LibrariesPage = () => {
     <section className={styles.page}>
       <header className={styles.header}>
         <h1 className={styles.title}>Libraries</h1>
-        <Button tone="primary" icon="plus" onClick={() => setAdding(true)}>
-          Add library
-        </Button>
+        <AdminOnly>
+          <Button tone="primary" icon="plus" onClick={() => setAdding(true)}>
+            Add library
+          </Button>
+        </AdminOnly>
       </header>
       {libraries.isPending ? (
         <Loading label="Gathering your libraries">

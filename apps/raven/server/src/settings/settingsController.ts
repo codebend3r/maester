@@ -5,6 +5,7 @@ import {
   isDisplaySettingsChange,
   isPlaybackSettingsChange,
 } from '@raven/core'
+import { AdminOnly } from '@/admin/adminGuard'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import { parseBody } from '@/parseBody'
 import { SettingsRepository } from '@/settings/settingsRepository'
@@ -34,6 +35,7 @@ export class SettingsController {
   }
 
   /** Changes the fields sent; a new choice of hardware takes effect on the next transcode. */
+  @AdminOnly()
   @Put('playback')
   async setPlayback(@Body() body: unknown): Promise<PlaybackSettingsState> {
     const change = parseBody({
@@ -53,6 +55,7 @@ export class SettingsController {
   }
 
   /** Changes the fields sent. */
+  @AdminOnly()
   @Put('display')
   setDisplay(@Body() body: unknown): DisplaySettings {
     const change = parseBody({

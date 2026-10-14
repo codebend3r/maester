@@ -35,6 +35,15 @@ trap 'log "✗ update failed on line $LINENO"' ERR
 # means none are set.
 [ -f .env ] || touch .env
 
+# The Funnel sidecar is raven's public address. It starts only once its serve
+# config is staged, so without funnel/ raven stays on the LAN; up leaves a
+# running sidecar be unless its part of the compose file changed. A failure
+# is logged and raven's own update goes on.
+if [ -f funnel/serve.json ]; then
+  "$DOCKER" compose --profile funnel up -d tailscale > /dev/null 2>&1 ||
+    log "✗ the Funnel sidecar did not start"
+fi
+
 image="$("$DOCKER" compose config --images "$SERVICE")"
 "$DOCKER" compose pull --quiet "$SERVICE"
 pulled="$("$DOCKER" image inspect --format '{{.Id}}' "$image")"

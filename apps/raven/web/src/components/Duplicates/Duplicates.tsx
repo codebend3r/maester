@@ -11,6 +11,7 @@ import {
 } from '@raven/core'
 import { useId } from 'react'
 import { Link } from 'react-router-dom'
+import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { Button } from '@/components/Button/Button'
 import { PosterImage } from '@/components/PosterImage/PosterImage'
 import { api } from '@/lib/api'
@@ -92,6 +93,7 @@ const Splits = ({
  * While its files share one card, that card's files and the ways to split
  * it; once split, each card under its own title, any that still holds
  * several files splittable again, and Put back together for them all.
+ * Splitting and putting back wait for the admin lock to be off.
  */
 const MovieDuplicate = ({
   movie,
@@ -137,34 +139,40 @@ const MovieDuplicate = ({
                   </Link>
                 </h4>
                 <Files card={card} />
-                {card.files.length > 1 && (
-                  <Splits
-                    card={card}
-                    busy={busy}
-                    onSplit={(how) => onSplit({ mediaId: card.entry.media.id, how })}
-                  />
-                )}
+                <AdminOnly>
+                  {card.files.length > 1 && (
+                    <Splits
+                      card={card}
+                      busy={busy}
+                      onSplit={(how) => onSplit({ mediaId: card.entry.media.id, how })}
+                    />
+                  )}
+                </AdminOnly>
               </li>
             ))}
           </ul>
         ) : (
           <div className={styles.cards}>
             <Files card={own} />
-            <Splits
-              card={own}
-              busy={busy}
-              onSplit={(how) => onSplit({ mediaId: own.entry.media.id, how })}
-            />
+            <AdminOnly>
+              <Splits
+                card={own}
+                busy={busy}
+                onSplit={(how) => onSplit({ mediaId: own.entry.media.id, how })}
+              />
+            </AdminOnly>
           </div>
         )}
-        {isSplit && (
-          <footer className={styles.join}>
-            <Button icon="merge" disabled={busy} onClick={onJoin}>
-              Put back together
-            </Button>
-            <p className={styles.hint}>Its files go back on one card.</p>
-          </footer>
-        )}
+        <AdminOnly>
+          {isSplit && (
+            <footer className={styles.join}>
+              <Button icon="merge" disabled={busy} onClick={onJoin}>
+                Put back together
+              </Button>
+              <p className={styles.hint}>Its files go back on one card.</p>
+            </footer>
+          )}
+        </AdminOnly>
       </article>
     </li>
   )

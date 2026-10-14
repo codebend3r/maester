@@ -1,0 +1,28 @@
+# raven's web app on Netlify, with its API on Vhagar behind Tailscale Funnel.
+# The site's package directory is apps/raven/web and its base directory the
+# repo root, where bun.lock is: Netlify installs and builds there, so the
+# paths below are from the root. RAVEN_API_ORIGIN, set in the site's
+# environment variables, is where the build's _redirects sends /api (see
+# vite.config.ts).
+
+[build]
+command = "bunx nx run @raven/web:build"
+publish = "apps/raven/web/dist"
+
+[build.environment]
+BUN_VERSION = "1.4.2"
+BUN_FLAGS = "--frozen-lockfile"
+NX_DAEMON = "false"
+
+# Vite hashes every file under assets/, as raven's own server assumes.
+[[headers]]
+for = "/assets/*"
+[headers.values]
+Cache-Control = "public, max-age=31536000, immutable"
+
+# The single-page app's fallback. Netlify reads _redirects first, so /api
+# never lands here.
+[[redirects]]
+from = "/*"
+to = "/index.html"
+status = 200

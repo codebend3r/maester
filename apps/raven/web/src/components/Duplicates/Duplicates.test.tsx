@@ -242,6 +242,17 @@ describe('the Duplicates tab', () => {
     )
   })
 
+  it('leaves splitting and putting back together out while the admin lock is on', async () => {
+    spies.list.mockImplementation(async () => AFTER_SPLIT)
+    renderWithProviders(
+      <SectionView library={library({ id: 2, name: 'Films' })} section="duplicates" />,
+      { adminLock: { state: 'on', available: true } },
+    )
+    expect(await screen.findByRole('article', { name: 'Alexander' })).toBeInTheDocument()
+    expect(screen.getByRole('article', { name: 'Heat' })).toBeInTheDocument()
+    expect(screen.queryAllByRole('button', { name: /split apart|put back together/i })).toEqual([])
+  })
+
   it('says when no movie holds more than one file', async () => {
     await show([])
     expect(screen.getByText('No movie in Films has more than one file.')).toBeInTheDocument()

@@ -8,6 +8,7 @@ import {
 } from '@raven/core'
 import { useId, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { Button, ButtonLink } from '@/components/Button/Button'
 import { AiMatchNote } from '@/components/AiMatchNote/AiMatchNote'
 import { CastRow } from '@/components/CastRow/CastRow'
@@ -38,7 +39,7 @@ type PlayableConfig = {
   facts: (facts: Facts) => string[]
   /** A movie has a poster and a backdrop; an episode has its still, else the file's frame grab, for both. */
   pictures: 'poster and backdrop' | 'still'
-  /** Whether the page offers Edit images and Edit metadata. */
+  /** Whether the page offers Edit images and Edit metadata, once the admin lock is off. */
   editable: boolean
   showsTagline: boolean
   showsContentRating: boolean
@@ -81,9 +82,10 @@ const PLAYABLE = {
 
 /**
  * A movie's or an episode's page once the item and the version Play starts
- * are known: the header with Play, favourite and the file's menu (its
- * picture plays too), whether this browser needs that version converted or
- * cannot play it, then the summary, the file, its versions and the people.
+ * are known: the header with Play, favourite and, with the admin lock off,
+ * the editors and the file's menu (its picture plays too), whether this
+ * browser needs that version converted or cannot play it, then the summary,
+ * the file, its versions and the people.
  */
 export const PlayableItemView = ({
   kind,
@@ -159,57 +161,62 @@ export const PlayableItemView = ({
           className={primary.favourite ? styles.favourited : undefined}
           onClick={() => favourite.mutate(!primary.favourite)}
         />
-        {config.editable && (
-          <>
-            <Button
-              icon="edit"
-              aria-pressed={editingImages}
-              onClick={() => setEditingImages((editing) => !editing)}
-            >
-              Edit images
-            </Button>
-            <Button
-              icon="edit"
-              aria-pressed={editingMetadata}
-              onClick={() => setEditingMetadata((editing) => !editing)}
-            >
-              Edit metadata
-            </Button>
-          </>
-        )}
-        <MediaMenu
-          media={primary}
-          open={menuOpen}
-          onOpenChange={setMenuOpen}
-          inline
-          matchType={config.matchType}
-          aiMatch={details.aiMatch}
-          withFavourite={false}
-          onMatched={(updated) => {
-            const page = updated.item ? itemPath(updated.item) : null
-            navigate(page ?? `/libraries/${updated.libraryId}`, { replace: true })
-          }}
-          onDeleted={() => {
-            if (details.versions.length <= 1) navigate(back.to)
-            else void queryClient.invalidateQueries({ queryKey: queryKeys.item(details.id) })
-          }}
-        />
+        <AdminOnly>
+          {config.editable && (
+            <>
+              <Button
+                icon="edit"
+                aria-pressed={editingImages}
+                onClick={() => setEditingImages((editing) => !editing)}
+              >
+                Edit images
+              </Button>
+              <Button
+                icon="edit"
+                aria-pressed={editingMetadata}
+                onClick={() => setEditingMetadata((editing) => !editing)}
+              >
+                Edit metadata
+              </Button>
+            </>
+          )}
+          {/* Without its favourite, which the page has beside it, all the menu holds needs the admin lock off. */}
+          <MediaMenu
+            media={primary}
+            open={menuOpen}
+            onOpenChange={setMenuOpen}
+            inline
+            matchType={config.matchType}
+            aiMatch={details.aiMatch}
+            withFavourite={false}
+            onMatched={(updated) => {
+              const page = updated.item ? itemPath(updated.item) : null
+              navigate(page ?? `/libraries/${updated.libraryId}`, { replace: true })
+            }}
+            onDeleted={() => {
+              if (details.versions.length <= 1) navigate(back.to)
+              else void queryClient.invalidateQueries({ queryKey: queryKeys.item(details.id) })
+            }}
+          />
+        </AdminOnly>
       </ItemHeader>
 
       <PlaybackNote media={primary} />
 
       {details.aiMatch && <AiMatchNote aiMatch={details.aiMatch} />}
 
-      {editingImages && (
-        <ImageEditor details={details} libraries={known} onDone={() => setEditingImages(false)} />
-      )}
-      {editingMetadata && (
-        <MetadataEditor
-          details={details}
-          itemKind="movie"
-          onDone={() => setEditingMetadata(false)}
-        />
-      )}
+      <AdminOnly>
+        {config.editable && editingImages && (
+          <ImageEditor details={details} libraries={known} onDone={() => setEditingImages(false)} />
+        )}
+        {config.editable && editingMetadata && (
+          <MetadataEditor
+            details={details}
+            itemKind="movie"
+            onDone={() => setEditingMetadata(false)}
+          />
+        )}
+      </AdminOnly>
 
       <Summary tagline={config.showsTagline ? details.tagline : null} summary={details.summary} />
 

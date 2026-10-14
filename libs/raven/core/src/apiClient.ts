@@ -20,6 +20,7 @@ import {
   type Library,
   type LibraryBackdrop,
   type LibraryInput,
+  type LibraryViewChange,
   type LockState,
   type MatchCandidate,
   type MatchChoice,
@@ -256,6 +257,13 @@ export const createApiClient = ({
     updateLibrary: ({ id, input }: { id: number; input: LibraryInput }): Promise<Library> =>
       expect({
         request: send({ path: `/api/libraries/${id}`, method: 'PUT', body: input }),
+        guard: isLibrary,
+      }),
+
+    /** How a library is laid out, or its pin: what any viewer may change, the admin lock on or off. */
+    setLibraryView: ({ id, change }: { id: number; change: LibraryViewChange }): Promise<Library> =>
+      expect({
+        request: send({ path: `/api/libraries/${id}/view`, method: 'PUT', body: change }),
         guard: isLibrary,
       }),
 

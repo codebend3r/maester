@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import {
   type Library,
-  type LibrarySettings,
+  type LibraryViewChange,
   coherentSettings,
   isLibraryView,
   isMediaGroupBy,
@@ -24,7 +24,7 @@ const dealSeed = (): number => Math.floor(Math.random() * 2 ** 31)
  * shared link lands on the same search, order and layout; what the address
  * leaves out comes from the library's own settings.
  */
-export const viewFromUrl = (params: URLSearchParams): Partial<LibrarySettings> => {
+export const viewFromUrl = (params: URLSearchParams): LibraryViewChange => {
   const sort = params.get('sort')
   const view = params.get('view')
   const group = params.get('group')
@@ -41,7 +41,7 @@ export const writeView = ({
   change,
 }: {
   params: URLSearchParams
-  change: Partial<LibrarySettings>
+  change: LibraryViewChange
 }): URLSearchParams => {
   const next = new URLSearchParams(params)
   if (change.sort != null) next.set('sort', change.sort)
@@ -81,12 +81,8 @@ export const useLibraryView = ({ library }: { library: Library }) => {
 
   const save = useOptimisticMutation({
     mutationKey: mutationKeys.libraryView(library.id),
-    mutationFn: ({ current, change }: { current: Library; change: Partial<LibrarySettings> }) =>
-      api.updateLibrary({
-        id: current.id,
-        input: { name: current.name, paths: current.paths, settings: change },
-      }),
-    edits: ({ current, change }) => librarySettingsEdits({ libraryId: current.id, change }),
+    mutationFn: api.setLibraryView,
+    edits: ({ id, change }) => librarySettingsEdits({ libraryId: id, change }),
     settle: () => afterLibraryView({ queryClient, libraryId: library.id }),
   })
 
@@ -98,9 +94,9 @@ export const useLibraryView = ({ library }: { library: Library }) => {
     query,
     /** The random sort's deal; 0 for every other sort, so they share a cache entry. */
     seed: settings.sort === 'random' ? seed : 0,
-    change: (change: Partial<LibrarySettings>) => {
+    change: (change: LibraryViewChange) => {
       setAddress(writeView({ params: address, change }), { replace: true })
-      save.mutate({ current: library, change })
+      save.mutate({ id: library.id, change })
     },
     saveError: save.failure,
   }

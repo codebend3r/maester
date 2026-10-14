@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { type ItemDetails, type SeasonSummary, episodeCode } from '@raven/core'
 import { useId, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { AiMatchNote } from '@/components/AiMatchNote/AiMatchNote'
 import { Button, ButtonLink } from '@/components/Button/Button'
 import { CastRow } from '@/components/CastRow/CastRow'
@@ -87,42 +88,46 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
             {code ? `Play ${code}` : 'Play'}
           </ButtonLink>
         )}
-        <Button
-          icon="edit"
-          aria-pressed={editingImages}
-          onClick={() => setEditingImages((editing) => !editing)}
-        >
-          Edit images
-        </Button>
-        <Button
-          icon="edit"
-          aria-pressed={editingMetadata}
-          onClick={() => setEditingMetadata((editing) => !editing)}
-        >
-          Edit metadata
-        </Button>
-        <Button icon="search" onClick={() => setFixing(true)}>
-          Fix match
-        </Button>
+        <AdminOnly>
+          <Button
+            icon="edit"
+            aria-pressed={editingImages}
+            onClick={() => setEditingImages((editing) => !editing)}
+          >
+            Edit images
+          </Button>
+          <Button
+            icon="edit"
+            aria-pressed={editingMetadata}
+            onClick={() => setEditingMetadata((editing) => !editing)}
+          >
+            Edit metadata
+          </Button>
+          <Button icon="search" onClick={() => setFixing(true)}>
+            Fix match
+          </Button>
+        </AdminOnly>
       </ItemHeader>
 
       {details.aiMatch && <AiMatchNote aiMatch={details.aiMatch} />}
 
-      {editingImages && (
-        <ImageEditor
-          details={details}
-          libraries={[]}
-          itemKind="show"
-          onDone={() => setEditingImages(false)}
-        />
-      )}
-      {editingMetadata && (
-        <MetadataEditor
-          details={details}
-          itemKind="show"
-          onDone={() => setEditingMetadata(false)}
-        />
-      )}
+      <AdminOnly>
+        {editingImages && (
+          <ImageEditor
+            details={details}
+            libraries={[]}
+            itemKind="show"
+            onDone={() => setEditingImages(false)}
+          />
+        )}
+        {editingMetadata && (
+          <MetadataEditor
+            details={details}
+            itemKind="show"
+            onDone={() => setEditingMetadata(false)}
+          />
+        )}
+      </AdminOnly>
 
       <Summary tagline={details.tagline} summary={details.summary} />
 
@@ -143,23 +148,25 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
       <ReviewCards reviews={details.reviews} />
       <TmdbCredit />
 
-      {fixing && (
-        <FixMatchDialog
-          type="show"
-          title={details.title}
-          year={details.year}
-          libraryId={libraryId}
-          aiMatch={details.aiMatch}
-          allowNone={false}
-          match={(tmdbId) =>
-            tmdbId == null
-              ? Promise.reject(new Error('Pick a show.'))
-              : api.setItemMatch({ itemId: details.id, tmdbId })
-          }
-          onMatched={(moved) => navigate(`/shows/${moved.id}`, { replace: true })}
-          onClose={() => setFixing(false)}
-        />
-      )}
+      <AdminOnly>
+        {fixing && (
+          <FixMatchDialog
+            type="show"
+            title={details.title}
+            year={details.year}
+            libraryId={libraryId}
+            aiMatch={details.aiMatch}
+            allowNone={false}
+            match={(tmdbId) =>
+              tmdbId == null
+                ? Promise.reject(new Error('Pick a show.'))
+                : api.setItemMatch({ itemId: details.id, tmdbId })
+            }
+            onMatched={(moved) => navigate(`/shows/${moved.id}`, { replace: true })}
+            onClose={() => setFixing(false)}
+          />
+        )}
+      </AdminOnly>
     </article>
   )
 }

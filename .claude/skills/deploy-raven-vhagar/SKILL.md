@@ -1,11 +1,11 @@
 ---
 name: deploy-raven-vhagar
-description: Use when deploying raven to Vhagar, the NAS it runs on: "deploy to vhagar", "deploy raven", "put this build on the NAS", "is vhagar on the latest", "roll vhagar back", or after a merge to main that changed raven. Covers the GHCR path that update.sh follows, the hand-built image when GHCR is not an option, how to run the root steps without a root shell, and how to check what is running.
+description: Use when deploying raven to Vhagar, the NAS it runs on: "deploy to vhagar", "deploy raven", "put this build on the NAS", "is vhagar on the latest", "roll vhagar back", "make raven public", "turn on the funnel", "take raven off the internet", or after a merge to main that changed raven. Covers the GHCR path that update.sh follows, the hand-built image when GHCR is not an option, the Tailscale Funnel sidecar that makes raven public, how to run the root steps without a root shell, and how to check what is running.
 ---
 
 # Deploy raven to Vhagar
 
-raven runs on Vhagar (`192.168.50.6`, the NAS with the Intel GPU) from `/volume1/docker/raven`: `docker-compose.yml` (a copy of `apps/raven/docker-compose.vhagar.yml`), `update.sh` (a copy of `apps/raven/vhagar-update.sh`), `.env` with the TMDB and OMDb keys, `data/` with the index, and `backups/`.
+raven runs on Vhagar (`192.168.50.6`, the NAS with the Intel GPU) from `/volume1/docker/raven`: `docker-compose.yml` (a copy of `apps/raven/docker-compose.vhagar.yml`), `update.sh` (a copy of `apps/raven/vhagar-update.sh`), `.env` with the TMDB and OMDb keys, `data/` with the index, and `backups/`. When raven is public, `funnel/serve.json` (a copy of `apps/raven/vhagar-funnel.json`) and `tailscale/`, the sidecar's sign-in, sit there too.
 
 Every merge to `main` that changes raven's image publishes `ghcr.io/codebend3r/raven:latest` and `:<full commit sha>`. DSM's Task Scheduler runs `update.sh` as root every five minutes; it pulls `latest`, and when that is not the image raven runs, stops raven, copies `data/raven.db*` to `backups/<stamp>/`, and starts the new image. So after a merge, Vhagar follows on its own within about ten minutes.
 
@@ -26,7 +26,7 @@ $nas docker vhagar 'image inspect --format {{.RepoDigests}} ghcr.io/codebend3r/r
 ssh vhagar 'tail -n 20 /volume1/docker/raven/update.log'
 ```
 
-An `update.log` full of `✗ update failed on line 34` means the pull is failing: either the compose points at an image that is not on GHCR (a hand-loaded tag), or the GHCR package is private. Check the manifest without credentials:
+An `update.log` full of `✗ update failed on line <n>`, where line n is the `compose pull` (`grep -n 'compose pull' apps/raven/vhagar-update.sh`), means the pull is failing: either the compose points at an image that is not on GHCR (a hand-loaded tag), or the GHCR package is private. Check the manifest without credentials:
 
 ```bash
 token=$(curl -s 'https://ghcr.io/token?scope=repository:codebend3r/raven:pull&service=ghcr.io' | python3 -c 'import sys,json;print(json.load(sys.stdin)["token"])')
@@ -45,6 +45,10 @@ curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $token" \
    ssh vhagar 'cat > /volume1/docker/raven/docker-compose.yml' < apps/raven/docker-compose.vhagar.yml
    ssh vhagar 'cat > /volume1/docker/raven/update.sh' < apps/raven/vhagar-update.sh
    ssh vhagar 'chmod 755 /volume1/docker/raven/update.sh'
+   ```
+   When raven is public (`ssh vhagar 'test -f /volume1/docker/raven/funnel/serve.json && echo public'`), refresh its serve config too. Never stage it on a box where it is not there: that is what makes raven public (see below).
+   ```bash
+   ssh vhagar 'cat > /volume1/docker/raven/funnel/serve.json' < apps/raven/vhagar-funnel.json
    ```
 3. Run the update now rather than waiting for the task:
    ```bash
@@ -65,6 +69,22 @@ $nas sudo vhagar 'cd /volume1/docker/raven && docker compose stop raven && mkdir
 ```
 
 To go back to following `main`, redo step 2 of the normal path and run `update.sh`. Delete `raven-image.tar.gz` and `docker image rm raven:<branch>` afterwards; neither is cleaned up by the task.
+
+## Public through Tailscale Funnel
+
+The compose file's `tailscale` service (profile `funnel`, container `raven-tailscale`) serves raven at `https://raven.<tailnet>.ts.net`; `tailscale status` on the Mac prints the tailnet's `MagicDNSSuffix`. `update.sh` starts it on every run once `funnel/serve.json` exists, and leaves it alone otherwise. Netlify's copy of the web app (`apps/raven/web/netlify.toml`) proxies `/api` to that address through its `RAVEN_API_ORIGIN`.
+
+Going public is the user's call, every time: it puts every unlocked library on the internet. Before it, `.env` needs `ADMIN_PASSWORD` (check with `ssh vhagar "grep -c '^ADMIN_PASSWORD=.' /volume1/docker/raven/.env"`), or the admin lock holds for the owner too. Then, with a one-off auth key the user made in the Tailscale admin console in `.env` as `TS_AUTHKEY`:
+
+```bash
+ssh vhagar 'mkdir -p /volume1/docker/raven/funnel'
+ssh vhagar 'cat > /volume1/docker/raven/funnel/serve.json' < apps/raven/vhagar-funnel.json
+$nas sudo vhagar 'bash /volume1/docker/raven/update.sh; tail -n 3 /volume1/docker/raven/update.log'
+$nas docker vhagar 'logs --tail 30 raven-tailscale'
+curl -s https://raven.<tailnet>.ts.net/api/health
+```
+
+Afterwards the user turns off the node's key expiry in the admin console, and `TS_AUTHKEY` leaves `.env`; `tailscale/` keeps the sign-in. To take raven off the internet: `ssh vhagar 'rm -rf /volume1/docker/raven/funnel'`, then `$nas sudo vhagar 'cd /volume1/docker/raven && docker compose --profile funnel rm -sf tailscale'`.
 
 ## Roll back
 

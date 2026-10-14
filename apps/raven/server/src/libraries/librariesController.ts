@@ -3,7 +3,6 @@ import {
   Body,
   Controller,
   Delete,
-  ForbiddenException,
   Get,
   Headers,
   HttpCode,
@@ -27,6 +26,7 @@ import {
   type Saga,
   type ShowListing,
   isJoinRequest,
+  isLibraryViewChange,
   isRecord,
   isSplitRequest,
   matchesAlike,
@@ -35,7 +35,7 @@ import {
   type UnmatchedFile,
   validateLibraryInput,
 } from '@raven/core'
-import { AdminService } from '@/admin/adminService'
+import { AdminOnly, ForViewers } from '@/admin/adminGuard'
 import { type LibraryRecord, LibrariesRepository, samePaths } from '@/libraries/librariesRepository'
 import { PrivateBy, Public } from '@/lock/lockGuard'
 import { LockService } from '@/lock/lockService'
@@ -86,28 +86,13 @@ export class LibrariesController {
     @Inject(MetadataService) private readonly metadata: MetadataService,
     @Inject(LibraryWatcher) private readonly watcher: LibraryWatcher,
     @Inject(LockService) private readonly lock: LockService,
-    @Inject(AdminService) private readonly admin: AdminService,
   ) {}
 
-  /**
-   * A library can only be locked behind a PIN that can open it again, and
-   * only locked with the admin lock off, as it then drops out of sight.
-   */
-  private parseLockable({
-    body,
-    cookie,
-    wasLocked,
-  }: {
-    body: unknown
-    cookie: string | undefined
-    wasLocked: boolean
-  }): LibraryInput {
+  /** A library can only be locked behind a PIN that can open it again. */
+  private parseLockable(body: unknown): LibraryInput {
     const input = parseInput(body)
     if (input.settings?.locked && !this.lock.available) {
       throw new BadRequestException("Set LIBRARY_PIN in raven's .env to lock a library.")
-    }
-    if (input.settings?.locked && !wasLocked && this.admin.isLocked({ cookie })) {
-      throw new ForbiddenException('Turn the admin lock off in Settings to lock a library.')
     }
     return input
   }
@@ -168,9 +153,10 @@ export class LibrariesController {
 
   /** Creating a library starts its first scan; the response already reports it as scanning. */
   @Public()
+  @AdminOnly()
   @Post()
-  create(@Body() body: unknown, @Headers('cookie') cookie: string | undefined): Library {
-    const record = this.libraries.create(this.parseLockable({ body, cookie, wasLocked: false }))
+  create(@Body() body: unknown): Library {
+    const record = this.libraries.create(this.parseLockable(body))
     this.scanner.scan(record.id)
     this.watcher.sync()
     return this.withStatus({ record, canSee: true })
@@ -183,14 +169,11 @@ export class LibrariesController {
    * where it stands. A rename or another setting, the lock included, leaves
    * the index as it is.
    */
+  @AdminOnly()
   @Put(':id')
-  update(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() body: unknown,
-    @Headers('cookie') cookie: string | undefined,
-  ): Library {
+  update(@Param('id', ParseIntPipe) id: number, @Body() body: unknown): Library {
     const before = this.find(id)
-    const input = this.parseLockable({ body, cookie, wasLocked: before.settings.locked })
+    const input = this.parseLockable(body)
     const record = this.libraries.update({ id, input })
     if (!record) throw new NotFoundException(`No library ${id}`)
     const { kind } = record.settings
@@ -206,6 +189,26 @@ export class LibrariesController {
     return this.withStatus({ record, canSee: true })
   }
 
+  /**
+   * How a library is sorted, viewed and grouped, and its pin, which anyone
+   * watching may change. None of them is read by a scan, a match or the
+   * watcher, so nothing runs again.
+   */
+  @ForViewers()
+  @Put(':id/view')
+  setView(@Param('id', ParseIntPipe) id: number, @Body() body: unknown): Library {
+    const { name, paths } = this.find(id)
+    const settings = parseBody({
+      guard: isLibraryViewChange,
+      body,
+      message: 'Send only sort, view, groupBy or pinned, each a value it takes.',
+    })
+    const record = this.libraries.update({ id, input: { name, paths, settings } })
+    if (!record) throw new NotFoundException(`No library ${id}`)
+    return this.withStatus({ record, canSee: true })
+  }
+
+  @AdminOnly()
   @Delete(':id')
   @HttpCode(204)
   async remove(@Param('id', ParseIntPipe) id: number): Promise<void> {
@@ -221,6 +224,7 @@ export class LibrariesController {
     this.metadata.enqueue(id)
   }
 
+  @AdminOnly()
   @Post(':id/scan')
   @HttpCode(200)
   scan(@Param('id', ParseIntPipe) id: number): Library {
@@ -233,6 +237,7 @@ export class LibrariesController {
    * Match again: the files no movie or show was found for go back in the
    * queue, and TMDB is searched for them once more. Fix match choices stay.
    */
+  @AdminOnly()
   @Post(':id/match')
   @HttpCode(200)
   rematch(@Param('id', ParseIntPipe) id: number): Library {
@@ -331,6 +336,7 @@ export class LibrariesController {
   }
 
   /** Splits a card, named by any file on it: every file apart, or by cut. */
+  @AdminOnly()
   @Post(':id/duplicates/split')
   @HttpCode(200)
   split(@Param('id', ParseIntPipe) id: number, @Body() body: unknown): Duplicates {
@@ -344,6 +350,7 @@ export class LibrariesController {
   }
 
   /** Puts a split movie's files back on one card. */
+  @AdminOnly()
   @Post(':id/duplicates/join')
   @HttpCode(200)
   join(@Param('id', ParseIntPipe) id: number, @Body() body: unknown): Duplicates {

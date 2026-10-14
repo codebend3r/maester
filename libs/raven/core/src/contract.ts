@@ -273,6 +273,20 @@ export type LibrarySettings = Infer<typeof isLibrarySettings>
 export const isLibrarySettingsChange = exactPartial(isLibrarySettings.shape)
 
 /**
+ * How a library is laid out, and its pin: the settings any viewer may
+ * change, with the admin lock on or off. Everything else of a library, its
+ * name and folders included, is an admin's `LibraryInput`.
+ */
+export const isLibraryViewChange = exactPartial({
+  sort: isLibrarySettings.shape.sort,
+  view: isLibrarySettings.shape.view,
+  groupBy: isLibrarySettings.shape.groupBy,
+  pinned: isLibrarySettings.shape.pinned,
+})
+
+export type LibraryViewChange = Infer<typeof isLibraryViewChange>
+
+/**
  * The picture that stands for a library's newest video: the backdrop of its
  * movie or show (an episode's comes from its show), else the video's own
  * thumbnail. `item` names the movie or show, `thumbnail` the video.

@@ -21,6 +21,7 @@ import { SagaDecks } from '@/components/SagaDeck/SagaDeck'
 import { Loading } from '@/components/Skeleton/Skeleton'
 import { SuggestedMovies } from '@/components/SuggestedMovies/SuggestedMovies'
 import { UnmatchedShows } from '@/components/UnmatchedShows/UnmatchedShows'
+import { useCanManage } from '@/lib/adminLock'
 import { finishedNote } from '@/lib/history'
 import { watchLink } from '@/lib/itemLinks'
 import { jumpScale } from '@/lib/jumpScale'
@@ -275,6 +276,22 @@ const suggestionsIn =
   (file: MediaItem): AiSuggestion | null =>
     files.find((each) => each.id === file.id)?.aiSuggestion ?? null
 
+/** What the Not matched tab says to do about its files: Fix match, once the admin lock is off. */
+const notMatchedHint = ({
+  matchType,
+  canManage,
+}: {
+  matchType: ReturnType<typeof matchTypeFor>
+  canManage: boolean
+}): string => {
+  const title = matchType ?? 'title'
+  if (!canManage) return `Turn the admin lock off in Settings to point these at the right ${title}.`
+  if (matchType === 'show') {
+    return 'Choose Fix match beside a show to point its folder at the right show.'
+  }
+  return `Open a file's menu and choose Fix match to point it at the right ${title}.`
+}
+
 /**
  * The files no movie or show was found for, each with Fix match in its menu,
  * and what the AI lookup suggests where it was not sure. While TMDB answers,
@@ -286,6 +303,7 @@ const NotMatchedSection = ({ library }: { library: Library }) => {
   const matchType = matchTypeFor(library.settings.kind)
   const metadata = useQuery(metadataHealthQuery)
   const canMatch = metadata.data?.tmdb === 'ok'
+  const canManage = useCanManage()
   const query = useQuery({
     ...unmatchedQuery(library.id),
     refetchInterval: (current) =>
@@ -301,11 +319,7 @@ const NotMatchedSection = ({ library }: { library: Library }) => {
     >
       {(files) => (
         <>
-          <p className={styles.message}>
-            {matchType === 'show'
-              ? 'Choose Fix match beside a show to point its folder at the right show.'
-              : `Open a file's menu and choose Fix match to point it at the right ${matchType ?? 'title'}.`}
-          </p>
+          <p className={styles.message}>{notMatchedHint({ matchType, canManage })}</p>
           {matchType === 'show' ? (
             <UnmatchedShows
               files={files}

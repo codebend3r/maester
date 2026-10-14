@@ -15,11 +15,11 @@ import {
   useRef,
   useState,
 } from 'react'
+import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { Button } from '@/components/Button/Button'
 import { FixMatchDialog } from '@/components/FixMatchDialog/FixMatchDialog'
 import { Icon, type IconName } from '@/components/Icon/Icon'
 import { ImageEditorDialog } from '@/components/ImageEditor/ImageEditorDialog'
-import { useAdminLocked } from '@/lib/adminLock'
 import { api } from '@/lib/api'
 import { copyText } from '@/lib/clipboard'
 import { itemQuery, mediaLocationQuery } from '@/lib/queries'
@@ -199,7 +199,6 @@ const MenuBody = ({
   const [fixing, setFixing] = useState(false)
   const [editingImages, setEditingImages] = useState(false)
   const { favourite, remove, refresh } = useMediaMutations({ media })
-  const isAdminLocked = useAdminLocked()
   const matchable = matchType != null && media.match !== 'off'
   const item = media.item
   // Only a movie's details carry an AI note: an episode's never do.
@@ -270,37 +269,37 @@ const MenuBody = ({
               }}
             />
           )}
-          {matchable && (
-            <MenuItem
-              icon="search"
-              label="Fix match"
-              onClick={() => {
-                close({ refocus: false })
-                setFixing(true)
-              }}
-            />
-          )}
-          {matchable && item != null && (
-            <MenuItem
-              icon="rescan"
-              label="Refresh details"
-              onClick={() => {
-                refresh.mutate(item.id)
-                close({ refocus: true })
-              }}
-            />
-          )}
-          {artwork && (
-            <MenuItem
-              icon="image"
-              label="Edit images"
-              onClick={() => {
-                close({ refocus: false })
-                setEditingImages(true)
-              }}
-            />
-          )}
-          {!isAdminLocked && (
+          <AdminOnly>
+            {matchable && (
+              <MenuItem
+                icon="search"
+                label="Fix match"
+                onClick={() => {
+                  close({ refocus: false })
+                  setFixing(true)
+                }}
+              />
+            )}
+            {matchable && item != null && (
+              <MenuItem
+                icon="rescan"
+                label="Refresh details"
+                onClick={() => {
+                  refresh.mutate(item.id)
+                  close({ refocus: true })
+                }}
+              />
+            )}
+            {artwork && (
+              <MenuItem
+                icon="image"
+                label="Edit images"
+                onClick={() => {
+                  close({ refocus: false })
+                  setEditingImages(true)
+                }}
+              />
+            )}
             <MenuItem
               icon="trash"
               label="Delete"
@@ -309,8 +308,8 @@ const MenuBody = ({
                 setConfirming(true)
               }}
             />
-          )}
-          {!isAdminLocked && <LocationItem media={media} />}
+            <LocationItem media={media} />
+          </AdminOnly>
         </ul>
       )}
 
@@ -364,10 +363,10 @@ const MenuBody = ({
 }
 
 /**
- * A card's context menu: mark or unmark a favourite, fix the match or fetch
- * the details again where the library matches its files, change the
- * pictures of its movie or show, and, with the admin lock off, delete the
- * video or see and copy where its file lives. The card owns `open`, so a right
+ * A card's context menu: mark or unmark a favourite and, with the admin lock
+ * off, fix the match or fetch the details again where the library matches
+ * its files, change the pictures of its movie or show, delete the video, or
+ * see and copy where its file lives. The card owns `open`, so a right
  * click anywhere on it opens this same menu; the button here is the
  * discoverable way in for touch and keyboard. Until it first opens it is
  * only that button.

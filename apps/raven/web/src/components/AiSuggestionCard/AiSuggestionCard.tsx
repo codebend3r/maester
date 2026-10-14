@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { AiSuggestion } from '@raven/core'
 import { type Ref, useId } from 'react'
+import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { Button } from '@/components/Button/Button'
 import { api } from '@/lib/api'
 import { afterMatch } from '@/lib/invalidate'
@@ -14,7 +15,7 @@ export const suggestedName = (suggestion: AiSuggestion): string =>
  * What the AI lookup suggests for files it was not sure of: the poster, the
  * title and year, and the reason it gave. Accept points the files at it with
  * the call Fix match makes, so it is kept as a Fix match; Fix match opens
- * the search to choose another.
+ * the search to choose another. Both wait for the admin lock to be off.
  */
 export const AiSuggestionCard = ({
   suggestion,
@@ -60,19 +61,26 @@ export const AiSuggestionCard = ({
           </p>
         )}
       </div>
-      <footer className={styles.actions}>
-        <Button
-          tone="primary"
-          disabled={accepting.isPending}
-          aria-label={`Accept ${name} for ${subject}`}
-          onClick={() => accepting.mutate()}
-        >
-          Accept
-        </Button>
-        <Button ref={fixRef} icon="search" aria-label={`Fix match for ${subject}`} onClick={onFix}>
-          Fix match
-        </Button>
-      </footer>
+      <AdminOnly>
+        <footer className={styles.actions}>
+          <Button
+            tone="primary"
+            disabled={accepting.isPending}
+            aria-label={`Accept ${name} for ${subject}`}
+            onClick={() => accepting.mutate()}
+          >
+            Accept
+          </Button>
+          <Button
+            ref={fixRef}
+            icon="search"
+            aria-label={`Fix match for ${subject}`}
+            onClick={onFix}
+          >
+            Fix match
+          </Button>
+        </footer>
+      </AdminOnly>
     </article>
   )
 }

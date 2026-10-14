@@ -1,7 +1,7 @@
 import { describe, expect, it, spyOn } from 'bun:test'
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { ApiError, type MediaItem } from '@raven/core'
+import { ApiError, type MatchItemType, type MediaItem } from '@raven/core'
 import { useState } from 'react'
 import { MediaMenu } from '@/components/MediaMenu/MediaMenu'
 import { api } from '@/lib/api'
@@ -9,9 +9,15 @@ import { itemDetails, itemSummary, matchedMovie, mediaItem } from '@/test/fixtur
 import { renderWithProviders } from '@/test/render'
 
 /** The card owns the open state so a right click can open the menu too. */
-const Harness = ({ media }: { media: MediaItem }) => {
+const Harness = ({
+  media,
+  matchType = null,
+}: {
+  media: MediaItem
+  matchType?: MatchItemType | null
+}) => {
   const [open, setOpen] = useState(false)
-  return <MediaMenu media={media} open={open} onOpenChange={setOpen} />
+  return <MediaMenu media={media} open={open} onOpenChange={setOpen} matchType={matchType} />
 }
 
 const openMenu = () =>
@@ -61,15 +67,14 @@ describe('MediaMenu', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
-  it('leaves Delete and the file path out while the admin lock is on', async () => {
+  it('offers only Favourite while the admin lock is on', async () => {
     const location = spyOn(api, 'getMediaLocation')
-    renderWithProviders(<Harness media={mediaItem()} />, {
+    renderWithProviders(<Harness media={matchedMovie()} matchType="movie" />, {
       adminLock: { state: 'on', available: true },
     })
-    await openMenu()
+    await userEvent.click(screen.getByRole('button', { name: /^Options for / }))
+    expect(screen.getAllByRole('menuitem')).toHaveLength(1)
     expect(screen.getByRole('menuitem', { name: 'Favourite' })).toBeInTheDocument()
-    expect(screen.queryByRole('menuitem', { name: 'Delete' })).toBeNull()
-    expect(screen.queryByRole('menuitem', { name: /Copy file path/ })).toBeNull()
     expect(location).not.toHaveBeenCalled()
     location.mockRestore()
   })

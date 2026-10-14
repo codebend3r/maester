@@ -225,13 +225,13 @@ describe('the media server', () => {
       expect(found.map((item) => item.title)).toEqual(['Show - S01E01'])
     })
 
-    it('serves a JPEG thumbnail that caches forever when versioned', async () => {
+    it('serves a JPEG thumbnail that the browser alone caches forever when versioned', async () => {
       const [movie] = await listMedia(library.id)
       const url = movie ? api().thumbnailUrl(movie) : null
       const response = await app().inject({ method: 'GET', url: url ?? '' })
       expect(response.statusCode).toBe(200)
       expect(response.headers['content-type']).toBe('image/jpeg')
-      expect(response.headers['cache-control']).toContain('immutable')
+      expect(response.headers['cache-control']).toBe('private, max-age=31536000, immutable')
       expect([...response.rawPayload.subarray(0, 2)]).toEqual([0xff, 0xd8])
     })
 
@@ -707,7 +707,7 @@ describe('the order of libraries', () => {
   })
 
   it('leads with the libraries whose videos are mostly 4K, then goes by name', async () => {
-    const api = apiFor({ app: app() })
+    const api = apiFor({ app: app(), cookie: await adminCookie(app()) })
     const create = async (input: LibraryInput) => {
       const created = await api.createLibrary(input)
       await app().get(ScannerService).whenIdle(created.id)

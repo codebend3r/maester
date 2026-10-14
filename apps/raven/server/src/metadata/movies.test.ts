@@ -19,12 +19,12 @@ import {
 } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createApp } from '@/app'
-import { readServerConfig } from '@/config'
 import { DatabaseService } from '@/db/database'
 import { ItemRefresher } from '@/metadata/itemRefresher'
 import { MatchFiles } from '@/metadata/matchFiles'
 import { MetadataService } from '@/metadata/metadataService'
 import { ScannerService } from '@/scanner/scannerService'
+import { type InjectOptions, adminCookie, injectAs, testConfig } from '@/test/app'
 import { encodeClip, encodeImage } from '@/test/clips'
 import { FAKE_JPEG, fakeTmdb } from '@/test/fakeTmdb'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
@@ -51,6 +51,7 @@ const shape = <T>({
 /** Two of the films in one collection, as TMDB has none that fits them both. */
 const CRIME_SAGA = { id: 9001, name: 'Crime Classics Collection' }
 
+/** As a browser with the admin lock off, so files can be matched and items edited. */
 describe('movie metadata', () => {
   const tmdb = fakeTmdb({
     movies: [
@@ -74,13 +75,16 @@ describe('movie metadata', () => {
     root: string
     media: string
     data: string
+    admin: string
     app: NestFastifyApplication | null
     library: number
-  } = { root: '', media: '', data: '', app: null, library: 0 }
+  } = { root: '', media: '', data: '', admin: '', app: null, library: 0 }
   const app = (): NestFastifyApplication => {
     if (!state.app) throw new Error('app not started')
     return state.app
   }
+  /** A request by hand as the admin, for a route the admin lock holds back. */
+  const asAdmin = (options: InjectOptions) => injectAs({ app: app(), cookie: state.admin })(options)
   const settle = async () => {
     await app().get(ScannerService).whenIdle(state.library)
     await app().get(MetadataService).whenIdle()
@@ -124,12 +128,12 @@ describe('movie metadata', () => {
       titles: saga.media.map((media) => media.item?.title ?? media.title),
     }))
   const rescan = async () => {
-    await app().inject({ method: 'POST', url: `/api/libraries/${state.library}/scan` })
+    await asAdmin({ method: 'POST', url: `/api/libraries/${state.library}/scan` })
     await settle()
   }
   const setKind = async (kind: string): Promise<Library> =>
     shape({
-      response: await app().inject({
+      response: await asAdmin({
         method: 'PUT',
         url: `/api/libraries/${state.library}`,
         payload: { name: 'Films', paths: [state.media], settings: { kind } },
@@ -171,13 +175,7 @@ describe('movie metadata', () => {
     ])
     state.app = await createApp({
       config: {
-        ...readServerConfig({}),
-        hwAccel: 'none',
-        dataDir: state.data,
-        webDir: null,
-        browseRoot: state.root,
-        scanOnStart: false,
-        rescanIntervalMinutes: 0,
+        ...testConfig({ dataDir: state.data, mediaDir: state.root }),
         tmdbApiToken: 'test-token',
         omdbApiKey: 'omdb-key',
       },
@@ -186,8 +184,9 @@ describe('movie metadata', () => {
     })
     await state.app.init()
     await state.app.getHttpAdapter().getInstance().ready()
+    state.admin = await adminCookie(state.app)
     const created = shape({
-      response: await app().inject({
+      response: await asAdmin({
         method: 'POST',
         url: '/api/libraries',
         payload: { name: 'Films', paths: [state.media], settings: { kind: 'movies' } },
@@ -379,7 +378,7 @@ describe('movie metadata', () => {
 
   it("sorts by the library's chosen score, falling back to TMDB's", async () => {
     const put = async (ratingsSource: string) =>
-      app().inject({
+      asAdmin({
         method: 'PUT',
         url: `/api/libraries/${state.library}`,
         payload: { name: 'Films', paths: [state.media], settings: { ratingsSource } },
@@ -444,7 +443,7 @@ describe('movie metadata', () => {
     })
     expect(poster.statusCode).toBe(200)
     expect(poster.headers['content-type']).toBe('image/jpeg')
-    expect(poster.headers['cache-control']).toContain('immutable')
+    expect(poster.headers['cache-control']).toBe('private, max-age=31536000, immutable')
     expect([...poster.rawPayload.subarray(0, 2)]).toEqual([0xff, 0xd8])
     expect(poster.rawPayload.equals(FAKE_JPEG)).toBe(false)
 
@@ -469,7 +468,7 @@ describe('movie metadata', () => {
     const matrix = (await list()).find((item) => item.item?.title === 'The Matrix')
     const id = matrix?.item?.id
     const options = shape({
-      response: await app().inject({ method: 'GET', url: `/api/items/${id}/images` }),
+      response: await asAdmin({ method: 'GET', url: `/api/items/${id}/images` }),
       guard: isItemImageOptions,
     })
     // The poster beside the files comes first and is the current one; TMDB's own poster is listed too.
@@ -486,7 +485,7 @@ describe('movie metadata', () => {
     expect(options.backdrop[1]).toMatchObject({ width: 2000, height: 3000, language: 'en' })
 
     const chosen = shape({
-      response: await app().inject({
+      response: await asAdmin({
         method: 'PUT',
         url: `/api/items/${id}/images/poster`,
         payload: { source: 'tmdb', ref: '/alt603.jpg' },
@@ -504,15 +503,15 @@ describe('movie metadata', () => {
     expect(local.statusCode).toBe(200)
     expect(local.rawPayload.equals(FAKE_JPEG)).toBe(false)
 
-    await app().inject({ method: 'POST', url: `/api/items/${id}/refresh` })
+    await asAdmin({ method: 'POST', url: `/api/items/${id}/refresh` })
     const after = shape({
-      response: await app().inject({ method: 'GET', url: `/api/items/${id}/images` }),
+      response: await asAdmin({ method: 'GET', url: `/api/items/${id}/images` }),
       guard: isItemImageOptions,
     })
     expect(after.poster.find((option) => option.current)?.ref).toBe('/alt603.jpg')
 
     const back = shape({
-      response: await app().inject({
+      response: await asAdmin({
         method: 'PUT',
         url: `/api/items/${id}/images/poster`,
         payload: { source: 'local' },
@@ -521,7 +520,7 @@ describe('movie metadata', () => {
     })
     expect(back.posterVersion).toBe(matrix?.item?.posterVersion)
 
-    const refused = await app().inject({
+    const refused = await asAdmin({
       method: 'PUT',
       url: `/api/items/${id}/images/poster`,
       payload: { source: 'tmdb', ref: 'https://evil.example/x.jpg' },
@@ -533,7 +532,7 @@ describe('movie metadata', () => {
     const heat = await byFile('Heat.mp4')
     const id = heat.item?.id
     const before = shape({
-      response: await app().inject({ method: 'GET', url: `/api/items/${id}/metadata` }),
+      response: await asAdmin({ method: 'GET', url: `/api/items/${id}/metadata` }),
       guard: isItemMetadataState,
     })
     expect(before).toMatchObject({
@@ -543,7 +542,7 @@ describe('movie metadata', () => {
     })
 
     const edited = shape({
-      response: await app().inject({
+      response: await asAdmin({
         method: 'PUT',
         url: `/api/items/${id}/metadata`,
         payload: { title: 'Heat (Director’s Cut)', tagline: 'A Los Angeles crime saga' },
@@ -556,16 +555,16 @@ describe('movie metadata', () => {
     })
     expect((await byFile('Heat.mp4')).item?.title).toBe('Heat (Director’s Cut)')
     const written = shape({
-      response: await app().inject({ method: 'GET', url: `/api/items/${id}/metadata` }),
+      response: await asAdmin({ method: 'GET', url: `/api/items/${id}/metadata` }),
       guard: isItemMetadataState,
     })
     expect(written.original.title).toBe('Heat')
     expect(written.overridden).toEqual(['title', 'tagline'])
 
-    await app().inject({ method: 'POST', url: `/api/items/${id}/refresh` })
+    await asAdmin({ method: 'POST', url: `/api/items/${id}/refresh` })
     expect((await byFile('Heat.mp4')).item?.title).toBe('Heat (Director’s Cut)')
 
-    const refused = await app().inject({
+    const refused = await asAdmin({
       method: 'PUT',
       url: `/api/items/${id}/metadata`,
       payload: { title: '   ' },
@@ -573,7 +572,7 @@ describe('movie metadata', () => {
     expect(refused.statusCode).toBe(400)
 
     const back = shape({
-      response: await app().inject({
+      response: await asAdmin({
         method: 'PUT',
         url: `/api/items/${id}/metadata`,
         payload: { title: null, tagline: null },
@@ -585,7 +584,7 @@ describe('movie metadata', () => {
 
     // An emptied field shows nothing, where null would bring TMDB's back.
     const emptied = shape({
-      response: await app().inject({
+      response: await asAdmin({
         method: 'PUT',
         url: `/api/items/${id}/metadata`,
         payload: { tagline: '', year: 0 },
@@ -594,7 +593,7 @@ describe('movie metadata', () => {
     })
     expect(emptied).toMatchObject({ tagline: null, year: null })
     const empty = shape({
-      response: await app().inject({ method: 'GET', url: `/api/items/${id}/metadata` }),
+      response: await asAdmin({ method: 'GET', url: `/api/items/${id}/metadata` }),
       guard: isItemMetadataState,
     })
     expect(empty).toMatchObject({
@@ -603,7 +602,7 @@ describe('movie metadata', () => {
     })
     expect(empty.overridden.toSorted()).toEqual(['tagline', 'year'])
     const restored = shape({
-      response: await app().inject({
+      response: await asAdmin({
         method: 'PUT',
         url: `/api/items/${id}/metadata`,
         payload: { tagline: null, year: null },
@@ -661,7 +660,7 @@ describe('movie metadata', () => {
 
   it('searches TMDB for Fix match, with candidate posters through the cache', async () => {
     const results = shape({
-      response: await app().inject({
+      response: await asAdmin({
         method: 'GET',
         url: '/api/match/search?type=movie&query=Unknown%20Thing',
       }),
@@ -684,7 +683,7 @@ describe('movie metadata', () => {
   it('keeps a Fix match through a rename', async () => {
     const unknown = await byFile('Unknown Thing (2020).mp4')
     const fixed = shape({
-      response: await app().inject({
+      response: await asAdmin({
         method: 'PUT',
         url: `/api/media/${unknown.id}/match`,
         payload: { tmdbId: '12' },
@@ -710,7 +709,7 @@ describe('movie metadata', () => {
   it('leaves a file unmatched when told it is not a movie', async () => {
     const pulp = await byFile('Pulp.Fiction.1994.1080p.BluRay.x264.mp4')
     const fixed = shape({
-      response: await app().inject({
+      response: await asAdmin({
         method: 'PUT',
         url: `/api/media/${pulp.id}/match`,
         payload: { tmdbId: null },
@@ -726,7 +725,7 @@ describe('movie metadata', () => {
 
   it('refuses a Fix match that is not a TMDB id', async () => {
     const heat = await byFile('Heat.mp4')
-    const response = await app().inject({
+    const response = await asAdmin({
       method: 'PUT',
       url: `/api/media/${heat.id}/match`,
       payload: { tmdbId: '../1' },
@@ -736,10 +735,7 @@ describe('movie metadata', () => {
 
   it('refreshes an item from TMDB', async () => {
     const heat = await byFile('Heat.mp4')
-    const response = await app().inject({
-      method: 'POST',
-      url: `/api/items/${heat.item?.id}/refresh`,
-    })
+    const response = await asAdmin({ method: 'POST', url: `/api/items/${heat.item?.id}/refresh` })
     expect(response.statusCode).toBe(200)
     expect(shape({ response, guard: isItemDetails }).title).toBe('Heat')
   })
@@ -805,7 +801,7 @@ describe('movie metadata', () => {
     const letGo = tmdb.hold('Slow Burn')
     await encodeClip({ path: join(state.media, 'Slow Burn (2018).mp4'), seconds: 1 })
     app().get(MatchFiles).retryUnmatched(state.library)
-    await app().inject({ method: 'POST', url: `/api/libraries/${state.library}/scan` })
+    await asAdmin({ method: 'POST', url: `/api/libraries/${state.library}/scan` })
     await vi.waitFor(
       async () =>
         expect(await byFile('Lost Signal (2019).mp4')).toMatchObject({ match: 'unmatched' }),
@@ -815,10 +811,7 @@ describe('movie metadata', () => {
     // TMDB lists it now, and Match again comes in before that pass ends.
     tmdb.state.movies.push({ id: 404, title: 'Lost Signal', released: '2019-04-04' })
     const library = shape({
-      response: await app().inject({
-        method: 'POST',
-        url: `/api/libraries/${state.library}/match`,
-      }),
+      response: await asAdmin({ method: 'POST', url: `/api/libraries/${state.library}/match` }),
       guard: isLibrary,
     })
     expect(library.unmatchedCount).toBe(0)

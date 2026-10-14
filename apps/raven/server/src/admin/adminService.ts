@@ -37,10 +37,11 @@ const WEAK_PASSWORD = `ADMIN_PASSWORD in raven's .env is too weak to turn the ad
 
 /**
  * The admin lock: on for every browser until the admin password is entered
- * there. While it holds, locked libraries are left out altogether, no video
- * can be deleted, and no file's path is handed out. Entering the password
- * gives the browser a session cookie signed with a key that lives only as
- * long as the process, so a restart turns the lock back on everywhere.
+ * there. While it holds, locked libraries are left out altogether, and the
+ * routes marked `AdminOnly` are held back, as every route that is not a GET
+ * is unless it is marked `ForViewers`. Entering the password gives the
+ * browser a session cookie signed with a key that lives only as long as the
+ * process, so a restart turns the lock back on everywhere.
  * Without a strong password set the lock stays on: forgetting the setting
  * never opens anything.
  */

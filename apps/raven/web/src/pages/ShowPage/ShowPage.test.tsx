@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { ItemDetails } from '@raven/core'
+import type { AdminLock, ItemDetails } from '@raven/core'
 import { Route, Routes, useParams } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { ShowPage } from '@/pages/ShowPage/ShowPage'
@@ -20,7 +20,13 @@ describe('ShowPage', () => {
     setItemMatch: spyOn(api, 'setItemMatch'),
   }
 
-  const open = ({ details = SEVERANCE }: { details?: ItemDetails } = {}) => {
+  const open = ({
+    details = SEVERANCE,
+    adminLock,
+  }: {
+    details?: ItemDetails
+    adminLock?: AdminLock
+  } = {}) => {
     spies.item.mockImplementation(async () => details)
     spies.next.mockImplementation(async () => EPISODE_TWO)
     renderWithProviders(
@@ -29,7 +35,7 @@ describe('ShowPage', () => {
         <Route path="watch/:id" element={<Watching />} />
         <Route path="elsewhere/:id" element={<Elsewhere />} />
       </Routes>,
-      { route: '/shows/4' },
+      { route: '/shows/4', adminLock },
     )
   }
 
@@ -52,6 +58,14 @@ describe('ShowPage', () => {
       'href',
       '/watch/13',
     )
+  })
+
+  it('leaves Edit images, Edit metadata and Fix match out while the admin lock is on', async () => {
+    open({ adminLock: { state: 'on', available: true } })
+    expect(await screen.findByRole('link', { name: 'Play S01E02' })).toBeInTheDocument()
+    expect(
+      screen.queryAllByRole('button', { name: /^(Edit images|Edit metadata|Fix match)$/ }),
+    ).toEqual([])
   })
 
   it('opens Edit images for the show', async () => {

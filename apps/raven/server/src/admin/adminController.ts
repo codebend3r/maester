@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common'
 import { type AdminLock, isAdminUnlockRequest } from '@raven/core'
 import type { FastifyReply } from 'fastify'
+import { ForViewers } from '@/admin/adminGuard'
 import { type AdminChange, AdminService } from '@/admin/adminService'
 import { parseBody } from '@/parseBody'
 
@@ -31,6 +32,7 @@ export class AdminController {
   }
 
   /** `{ password }`: turns the admin lock off for this browser. */
+  @ForViewers()
   @Post('unlock')
   @HttpCode(200)
   unlock(@Body() body: unknown, @Res({ passthrough: true }) reply: FastifyReply): AdminLock {
@@ -46,6 +48,7 @@ export class AdminController {
   }
 
   /** Turns the admin lock back on for this browser, after a wait in which it can be taken back. */
+  @ForViewers()
   @Post('lock')
   @HttpCode(200)
   lock(
@@ -57,6 +60,7 @@ export class AdminController {
   }
 
   /** Takes back a lock still on its way; once it holds, only the password turns it off. */
+  @ForViewers()
   @Post('keep-unlocked')
   @HttpCode(200)
   keepUnlocked(

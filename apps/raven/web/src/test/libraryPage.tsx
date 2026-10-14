@@ -1,4 +1,4 @@
-import type { Library } from '@raven/core'
+import type { AdminLock, Library } from '@raven/core'
 import { Route, Routes, useLocation, useParams } from 'react-router-dom'
 import { LibraryPage } from '@/pages/LibraryPage/LibraryPage'
 import { renderWithProviders } from '@/test/render'
@@ -16,14 +16,17 @@ const Address = () => {
  * Opens a library's page at `route`, routed as the app routes it: All at
  * the library's own address, each other tab beneath it, and the player.
  * The library and its listings come from whatever the test spies serve;
- * `libraries` is the list the side menu has read, if any.
+ * `libraries` is the list the side menu has read, if any, and `adminLock`
+ * the admin lock, off unless given.
  */
 export const renderLibraryPage = ({
   route = '/libraries/2',
   libraries = null,
+  adminLock,
 }: {
   route?: string
   libraries?: Library[] | null
+  adminLock?: AdminLock
 } = {}) =>
   renderWithProviders(
     <>
@@ -34,5 +37,5 @@ export const renderLibraryPage = ({
       </Routes>
       <Address />
     </>,
-    { route, libraries },
+    { route, libraries, adminLock },
   )

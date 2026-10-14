@@ -5,6 +5,7 @@ import {
   unmatchedShowsOf,
 } from '@raven/core'
 import { type ReactNode, useId, useRef, useState } from 'react'
+import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { AiSuggestionCard } from '@/components/AiSuggestionCard/AiSuggestionCard'
 import { Button } from '@/components/Button/Button'
 import { FixMatchDialog } from '@/components/FixMatchDialog/FixMatchDialog'
@@ -16,8 +17,8 @@ import styles from '@/components/UnmatchedShows/UnmatchedShows.module.scss'
 
 /**
  * One show folder: a toggle to its episodes, and Fix match, which points the
- * whole folder at a show. When the AI lookup suggested a show, its card
- * holds Accept and the folder's Fix match.
+ * whole folder at a show, with the admin lock off. When the AI lookup
+ * suggested a show, its card holds Accept and the folder's Fix match.
  */
 const UnmatchedShowEntry = ({
   group,
@@ -59,17 +60,19 @@ const UnmatchedShowEntry = ({
           {plural({ n: group.files.length, one: 'episode', many: 'episodes' })}
         </span>
       </button>
-      {!suggested && (
-        <Button
-          ref={fixButton}
-          className={styles.fix}
-          icon="search"
-          aria-label={`Fix match for ${group.title}`}
-          onClick={() => setIsFixing(true)}
-        >
-          Fix match
-        </Button>
-      )}
+      <AdminOnly>
+        {!suggested && (
+          <Button
+            ref={fixButton}
+            className={styles.fix}
+            icon="search"
+            aria-label={`Fix match for ${group.title}`}
+            onClick={() => setIsFixing(true)}
+          >
+            Fix match
+          </Button>
+        )}
+      </AdminOnly>
       {suggested && (
         <div className={styles.suggestion}>
           <AiSuggestionCard

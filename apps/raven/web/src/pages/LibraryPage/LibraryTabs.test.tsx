@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { LibraryKind, LibrarySettings } from '@raven/core'
+import type { AdminLock, LibraryKind, LibrarySettings } from '@raven/core'
 import { api } from '@/lib/api'
 import {
   aiSuggestion,
@@ -50,15 +50,17 @@ describe('LibraryPage tabs', () => {
     kind = 'movies',
     route = '/libraries/2',
     settings = {},
+    adminLock,
   }: {
     kind?: LibraryKind
     route?: string
     settings?: Partial<LibrarySettings>
+    adminLock?: AdminLock
   } = {}) => {
     spies.get.mockImplementation(async () =>
       library({ id: 2, name: 'Films', settings: { ...library().settings, kind, ...settings } }),
     )
-    renderLibraryPage({ route })
+    renderLibraryPage({ route, adminLock })
   }
 
   it('offers the tabs its type has, with All open first', async () => {
@@ -232,6 +234,41 @@ describe('LibraryPage tabs', () => {
         screen.queryByText('Suggested: Archie: The Man Who Became Cary Grant (2023)'),
       ).toBeNull(),
     )
+  })
+
+  it('shows what was not matched, and the suggestions, with no way to fix them while the admin lock is on', async () => {
+    spies.unmatched.mockImplementation(async () => [
+      ...[1, 2].map((id) =>
+        unmatchedFile({
+          id,
+          title: `Archie - S01E0${id}`,
+          folder: 'Archie/Season 1',
+          fileName: `Archie - S01E0${id}.mkv`,
+          aiSuggestion: aiSuggestion(),
+        }),
+      ),
+      unmatchedFile({
+        id: 3,
+        title: 'Cesar 911 - S01E01',
+        folder: 'Cesar 911/Season 1',
+        fileName: 'Cesar 911 - S01E01.mkv',
+      }),
+    ])
+    open({
+      kind: 'shows',
+      route: '/libraries/2/not-matched',
+      adminLock: { state: 'on', available: true },
+    })
+    expect(
+      await screen.findByText(
+        'Turn the admin lock off in Settings to point these at the right show.',
+      ),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('Suggested: Archie: The Man Who Became Cary Grant (2023)'),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Cesar 911/ })).toBeInTheDocument()
+    expect(screen.queryAllByRole('button', { name: /^(Accept|Fix match) / })).toEqual([])
   })
 
   it("offers the AI lookup's suggestion for a movie above the files", async () => {

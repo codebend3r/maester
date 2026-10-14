@@ -24,6 +24,7 @@ import {
   matchTypeFor,
 } from '@raven/core'
 import type { FastifyReply } from 'fastify'
+import { AdminOnly } from '@/admin/adminGuard'
 import { isChoosableImageKind } from '@/items/imageKinds'
 import { sendImage } from '@/items/sendImage'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
@@ -62,6 +63,7 @@ export class MatchController {
    * library type's first tier (Japanese animation in an Anime library) come
    * first, each part in TMDB's order.
    */
+  @AdminOnly()
   @Get('match/search')
   async search(
     @Query('type') type: string | undefined,
@@ -135,6 +137,7 @@ export class MatchController {
    * says it is not one. Kept through renames, and never replaced by matching.
    */
   @PrivateBy('media')
+  @AdminOnly()
   @Put('media/:id/match')
   async setMatch(@Param('id', ParseIntPipe) id: number, @Body() body: unknown): Promise<MediaItem> {
     const record = this.media.get(id)

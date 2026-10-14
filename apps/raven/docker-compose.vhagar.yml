@@ -32,3 +32,27 @@ services:
       - /volume1/Vhagar/Meleys:/media/meleys
       - /volume1/Vhagar/Syrax:/media/syrax
       - /volume1/Vhagar/Vermithor:/media/vermithor
+
+  # raven's public address, https://raven.<tailnet>.ts.net, through Tailscale
+  # Funnel. Its own container reaches raven over the compose network, so a
+  # new raven image never restarts it. The profile keeps a plain `up` from
+  # starting it; update.sh names it once funnel/serve.json
+  # (vhagar-funnel.json) is in place.
+  tailscale:
+    image: tailscale/tailscale:v1.104.1
+    container_name: raven-tailscale
+    profiles: [funnel]
+    restart: unless-stopped
+    environment:
+      - TS_HOSTNAME=raven
+      # A one-off auth key for the first sign-in. Once signed in, the state
+      # in ./tailscale is enough, and the key can leave .env.
+      - TS_AUTHKEY=${TS_AUTHKEY:-}
+      - TS_AUTH_ONCE=true
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_SERVE_CONFIG=/config/serve.json
+    volumes:
+      - /volume1/docker/raven/tailscale:/var/lib/tailscale
+      # A folder, not the file: Tailscale only sees a change to the serve
+      # config through a mounted directory.
+      - /volume1/docker/raven/funnel:/config:ro

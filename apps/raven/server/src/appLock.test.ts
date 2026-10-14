@@ -2,17 +2,25 @@ import { mkdtemp, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
-import { type ApiClient, LIBRARY_KINDS, type LibraryInput, isRecord } from '@raven/core'
+import {
+  type ApiClient,
+  LIBRARY_KINDS,
+  type LibraryInput,
+  groupingsFor,
+  isRecord,
+  sortsFor,
+  viewsFor,
+} from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createApp } from '@/app'
 import { CONTROLLERS } from '@/appModule'
 import { LOCKED_SCAN_ERROR } from '@/libraries/librariesController'
-import { routeMarks } from '@/lock/lockGuard'
 import type { Privacy } from '@/lock/lockService'
 import { MediaIndex } from '@/media/mediaIndex'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 import { MetadataService } from '@/metadata/metadataService'
 import { BLANK_ITEM } from '@/metadata/tmdbClient'
+import { routeMarks } from '@/routeMarks'
 import { ScannerService } from '@/scanner/scannerService'
 import {
   ADMIN_PASSWORD,
@@ -194,12 +202,12 @@ describe('a library locked behind the PIN', () => {
       item: state.privateItem,
     }
     const held = routeMarks(CONTROLLERS).flatMap((route) =>
-      route.mark == null || route.mark === 'public' || !isRouteMethod(route.method)
+      route.lock == null || route.lock === 'public' || !isRouteMethod(route.method)
         ? []
         : [
             {
               method: route.method,
-              url: route.path.replace(':id', String(ids[route.mark])).replace(/:\w+/g, 'poster'),
+              url: route.path.replace(':id', String(ids[route.lock])).replace(/:\w+/g, 'poster'),
             },
           ],
     )
@@ -302,6 +310,7 @@ describe('the admin lock', () => {
     pin: string
     open: number
     openVideo: number
+    openItem: number
     private: number
     privateVideo: number
     privateItem: number
@@ -312,6 +321,7 @@ describe('the admin lock', () => {
     pin: '',
     open: 0,
     openVideo: 0,
+    openItem: 0,
     private: 0,
     privateVideo: 0,
     privateItem: 0,
@@ -373,6 +383,10 @@ describe('the admin lock', () => {
       item: { ...BLANK_ITEM, type: 'movie', tmdbId: '7002', number: null, title: 'Lesson One' },
     })
     metadata.link({ mediaIds: [state.privateVideo], itemIds: [state.privateItem] })
+    state.openItem = metadata.save({
+      item: { ...BLANK_ITEM, type: 'movie', tmdbId: '7004', number: null, title: 'Heat' },
+    })
+    metadata.link({ mediaIds: [state.openVideo], itemIds: [state.openItem] })
     state.pin = cookieSet(
       await app().inject({ method: 'POST', url: '/api/lock/unlock', payload: { pin: '3001' } }),
     )
@@ -445,19 +459,87 @@ describe('the admin lock', () => {
     })
     await expect(locking).rejects.toMatchObject({
       status: 403,
-      message: 'Turn the admin lock off in Settings to lock a library.',
+      message: 'The admin lock is on. Turn it off in Settings to do this.',
     })
     expect(
       await status(
         api().createLibrary({ name: 'Secret', paths: [at('Open')], settings: { locked: true } }),
       ),
     ).toBe(403)
-    // Saving another setting of an open library is fine.
-    const saved = await api().updateLibrary({
-      id: state.open,
-      input: { name, paths, settings: { pinned: false } },
-    })
+    // Saving how an open library is laid out is fine.
+    const saved = await api().setLibraryView({ id: state.open, change: { pinned: false } })
     expect(saved.settings).toMatchObject({ pinned: false, locked: false })
+  })
+
+  it('holds back every route marked AdminOnly, until the password is entered', async () => {
+    // Ids that name nothing pass the PIN lock, and leave a route nothing to change. An item no
+    // library holds is hidden while a library is locked, so an item's routes take the open
+    // movie: sent no body, and with TMDB off, none of them changes it.
+    const absent = 999999
+    const ids: Record<Privacy, number> = { library: absent, media: absent, item: state.openItem }
+    const managing = routeMarks(CONTROLLERS).flatMap(({ method, path, lock, audience }) =>
+      audience !== 'admin' || !isRouteMethod(method)
+        ? []
+        : [
+            {
+              method,
+              url: path
+                .replace(':id', String(lock == null || lock === 'public' ? absent : ids[lock]))
+                .replace(/:\w+/g, 'poster'),
+            },
+          ],
+    )
+    expect(managing.length).toBeGreaterThanOrEqual(17)
+    const answers = (cookie?: string) =>
+      Promise.all(
+        managing.map(async ({ method, url }) => {
+          const response = await app().inject({ method, url, headers: { cookie: cookies(cookie) } })
+          return { route: `${method} ${url}`, method, code: response.statusCode }
+        }),
+      )
+    expect((await answers()).map(({ route, code }) => `${route} ${code}`)).toEqual(
+      managing.map(({ method, url }) => `${method} ${url} 403`),
+    )
+    const admitted = await answers(state.admin)
+    expect(admitted.filter(({ code }) => code === 403).map(({ route }) => route)).toEqual([])
+    expect(
+      admitted
+        .filter(({ method, code }) => method !== 'GET' && code < 400)
+        .map(({ route }) => route),
+    ).toEqual([])
+  })
+
+  it('lets anyone sort, view, group or pin a library, and change nothing else of it', async () => {
+    const before = await api().getLibrary(state.open)
+    const { kind, sort, view, groupBy, pinned } = before.settings
+    const another = <T>({ values, current }: { values: readonly T[]; current: T }): T =>
+      values.find((value) => value !== current) ?? current
+    const change = {
+      sort: another({ values: sortsFor(kind), current: sort }),
+      view: another({ values: viewsFor(kind), current: view }),
+      groupBy: another({ values: groupingsFor(kind), current: groupBy }),
+      pinned: !pinned,
+    }
+    const viewed = await api().setLibraryView({ id: state.open, change })
+    expect(viewed.settings).toEqual({ ...before.settings, ...change })
+
+    const others = [{ name: 'Renamed' }, { sort, kind: 'movies' }, { locked: true }]
+    const refused = await Promise.all(
+      others.map(async (payload) => {
+        const response = await app().inject({
+          method: 'PUT',
+          url: `/api/libraries/${state.open}/view`,
+          payload,
+        })
+        return response.statusCode
+      }),
+    )
+    expect(refused).toEqual([400, 400, 400])
+    expect(await api(state.admin).getLibrary(state.open)).toMatchObject({
+      name: before.name,
+      paths: before.paths,
+      settings: { ...before.settings, ...change },
+    })
   })
 
   it('turns off only with the password', async () => {

@@ -169,6 +169,27 @@ describe('SettingsPage', () => {
     expect(screen.getByRole('radio', { name: /Remux and transcode/ })).toBeChecked()
   })
 
+  it('shows the settings but keeps them as they are while the admin lock is on', async () => {
+    servePlayback(CHANGED)
+    renderWithProviders(<SettingsPage />, {
+      playback: null,
+      display: null,
+      adminLock: { state: 'on', available: true },
+    })
+    await screen.findByRole('group', { name: 'Movie titles' })
+    const controls = [
+      ...screen.getAllByRole('radio'),
+      screen.getByRole('checkbox', { name: /HDR/ }),
+    ]
+    expect(controls).toHaveLength(18)
+    controls.forEach((control) => expect(control).toBeDisabled())
+    expect(screen.getByRole('radio', { name: /Remux only/ })).toBeChecked()
+    expect(screen.getAllByText('Turn the admin lock off below to change these.')).toHaveLength(2)
+    expect(screen.queryByRole('button', { name: 'Reset to defaults' })).toBeNull()
+    await userEvent.click(screen.getByRole('radio', { name: /Remux and transcode/ }))
+    expect(spies.set).not.toHaveBeenCalled()
+  })
+
   it('stands in for the settings while they are read', async () => {
     spies.get.mockImplementation(() => held<PlaybackSettingsState>().promise)
     renderWithProviders(<SettingsPage />, { playback: null, display: null })
