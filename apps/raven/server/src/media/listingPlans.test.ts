@@ -21,9 +21,18 @@ const READS = {
     new MovieSplits(database, repositories(database).media).list(libraryId),
 } as const satisfies Record<string, Read>
 
-/** A step that reads every file's items, in place or into a copy, rather than a file's own. */
+/** How `FIRST_ITEM` finds a file's first item, `z`: by the file's own key. */
+const FIRST_ITEM_BY_KEY = /^SEARCH z USING (COVERING )?INDEX \w+ \(media_id=\?\)$/
+
+/**
+ * A step that reads every file's items, in place or into a copy, rather than
+ * a file's own: `media_items`, or `mi` for the join `FIRST_ITEM` makes, read
+ * whole, or its first item `z` read any way but by key. Without an index,
+ * SQLite calls a full read of `z` a SEARCH, not a SCAN.
+ */
 const readsEveryFilesItems = (detail: string): boolean =>
-  /^(SCAN|MATERIALIZE|CO-ROUTINE) (media_items|mi)\b/.test(detail)
+  /^(SCAN|MATERIALIZE|CO-ROUTINE) (media_items|mi)\b/.test(detail) ||
+  (/^[A-Z-]+ z\b/.test(detail) && !FIRST_ITEM_BY_KEY.test(detail))
 
 /**
  * How SQLite runs a library's reads, checked on the statements the
@@ -107,6 +116,7 @@ describe.each([
       expect(details).toContainEqual(
         expect.stringMatching(/^SEARCH m USING (COVERING )?INDEX \w+ \(library_id=\?/),
       )
+      expect(details).toContainEqual(expect.stringMatching(FIRST_ITEM_BY_KEY))
       expect(details.filter(readsEveryFilesItems)).toEqual([])
     },
   )
