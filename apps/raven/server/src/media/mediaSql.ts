@@ -11,10 +11,14 @@ export const BEST_FIRST = 'COALESCE(m.width * m.height, 0) DESC, m.size DESC, m.
 
 /**
  * After a JOIN, gives `mi.item_id`: the file's first item, so a file holding
- * two episodes takes the first.
+ * two episodes takes the first. Looked up for each file, by key: a grouped
+ * subquery here was copied whole, every file's items, on each read, and
+ * with statistics SQLite even drove sagas and duplicates from that copy
+ * instead of from the library's files.
  */
-export const FIRST_ITEM = `(SELECT media_id, MIN(item_id) AS item_id FROM media_items GROUP BY media_id) mi
-      ON mi.media_id = m.id`
+export const FIRST_ITEM = `media_items mi
+      ON mi.media_id = m.id
+     AND mi.item_id = (SELECT MIN(z.item_id) FROM media_items z WHERE z.media_id = m.id)`
 
 /** Joins `p.furthest`: the furthest any play of the file got. */
 export const FURTHEST_JOIN = `
