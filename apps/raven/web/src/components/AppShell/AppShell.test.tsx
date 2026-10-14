@@ -3,10 +3,10 @@ import { LIBRARY_KINDS } from '@raven/core'
 import { act, fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router-dom'
-import { version } from '#package'
 import { AppShell } from '@/components/AppShell/AppShell'
 import { api } from '@/lib/api'
 import { KINDS } from '@/lib/libraryKinds'
+import { ravenVersion } from '@/lib/version'
 import { usePageBackdrop } from '@/stores/pageBackdrop'
 import { useSideMenu } from '@/stores/sideMenu'
 import { FakeEventSource } from '@/test/eventSource'
@@ -248,10 +248,10 @@ describe('AppShell', () => {
   it("shows raven's version beside the toggle while the menu is open", async () => {
     spies.list.mockImplementation(async () => [])
     renderShell('/')
-    expect(within(nav()).getByText(`v${version}`)).toBeInTheDocument()
+    expect(within(nav()).getByText(`v${ravenVersion}`)).toBeInTheDocument()
 
     await userEvent.click(toggle())
-    expect(within(nav()).queryByText(`v${version}`)).toBeNull()
+    expect(within(nav()).queryByText(`v${ravenVersion}`)).toBeNull()
   })
 
   it("frosts over once a card's picture is behind the page, and clears after", () => {

@@ -7,7 +7,7 @@ description: Use when deploying raven to Vhagar, the NAS it runs on: "deploy to 
 
 raven runs on Vhagar (`192.168.50.6`, the NAS with the Intel GPU) from `/volume1/docker/raven`: `docker-compose.yml` (a copy of `apps/raven/docker-compose.vhagar.yml`), `update.sh` (a copy of `apps/raven/vhagar-update.sh`), `.env` with the TMDB and OMDb keys, `data/` with the index, and `backups/`. When raven is public, `funnel/serve.json` (a copy of `apps/raven/vhagar-funnel.json`) and `tailscale/`, the sidecar's sign-in, sit there too.
 
-Every merge to `main` that changes raven's image publishes `ghcr.io/codebend3r/raven:latest` and `:<full commit sha>`. DSM's Task Scheduler runs `update.sh` as root every five minutes; it pulls `latest`, and when that is not the image raven runs, stops raven, copies `data/raven.db*` to `backups/<stamp>/`, and starts the new image. So after a merge, Vhagar follows on its own within about ten minutes.
+Every merge to `main` that changes raven's image publishes `ghcr.io/codebend3r/raven:latest`, `:<version>` (the merge's build, `X.Y.Z.N`, which raven's side menu shows) and `:<full commit sha>`. DSM's Task Scheduler runs `update.sh` as root every five minutes; it pulls `latest`, and when that is not the image raven runs, stops raven, copies `data/raven.db*` to `backups/<stamp>/`, and starts the new image. So after a merge, Vhagar follows on its own within about ten minutes.
 
 ## Facts that cost a round trip each
 
@@ -88,7 +88,7 @@ Afterwards the user turns off the node's key expiry in the admin console, and `T
 
 ## Roll back
 
-Set `image:` in `/volume1/docker/raven/docker-compose.yml` to `ghcr.io/codebend3r/raven:<full commit sha>` of the build to go back to, run `update.sh`, and put `latest` back when done. The index from before each update sits in `backups/<stamp>/`; with raven stopped, copy its files back into `data/`.
+Set `image:` in `/volume1/docker/raven/docker-compose.yml` to `ghcr.io/codebend3r/raven:<version>` (`0.5.3.4`, as the side menu and the GitHub Releases name it) or `:<full commit sha>` of the build to go back to, run `update.sh`, and put `latest` back when done. The index from before each update sits in `backups/<stamp>/`; with raven stopped, copy its files back into `data/`.
 
 ## Do not
 

@@ -26,6 +26,10 @@ COPY libs/shared/server/ libs/shared/server/
 COPY libs/raven/core/ libs/raven/core/
 COPY apps/raven/server/ apps/raven/server/
 COPY apps/raven/web/ apps/raven/web/
+# The build CI baked in after a merge into main (X.Y.Z.N), which the web app
+# shows; unset, it shows package.json's version. Docker hands the argument to
+# RUN as an environment variable, and Vite inlines VITE_ ones.
+ARG VITE_RAVEN_VERSION
 # Nx builds what the server and the web app depend on first (`^build` in
 # nx.json), so the build order lives in the project graph, not here.
 RUN NX_DAEMON=false NX_NO_CLOUD=true bunx nx run-many -t build -p @raven/server @raven/web

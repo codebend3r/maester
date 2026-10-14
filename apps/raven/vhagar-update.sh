@@ -3,10 +3,11 @@
 # /volume1/docker/raven as update.sh, and DSM's Task Scheduler runs it as root
 # every five minutes.
 #
-# The main smoke test publishes ghcr.io/codebend3r/raven:latest on every merge
-# that changes raven's image. This pulls it, and when the pulled image is not
-# the one raven runs on, stops raven, copies the index aside, and starts the
-# new image, which may migrate the index. Most runs pull nothing and exit.
+# The main smoke test publishes ghcr.io/codebend3r/raven:latest (and the
+# build's version and commit tags) on every merge that changes raven's image.
+# This pulls it, and when the pulled image is not the one raven runs on, stops
+# raven, copies the index aside, and starts the new image, which may migrate
+# the index. Most runs pull nothing and exit.
 #
 #   bash /volume1/docker/raven/update.sh    # by hand, as root
 #

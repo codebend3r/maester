@@ -79,6 +79,9 @@
           },
           {
             "env": "NETLIFY"
+          },
+          {
+            "env": "VITE_RAVEN_VERSION"
           }
         ]
       }

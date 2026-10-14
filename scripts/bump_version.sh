@@ -5,31 +5,42 @@
 #   scripts/bump_version.sh minor            # 0.3.1 -> 0.4.0
 #   scripts/bump_version.sh major            # 0.3.1 -> 1.0.0
 #   scripts/bump_version.sh 1.0.0-rc.1       # explicit version
+#   scripts/bump_version.sh build            # 0.3.1.4 -> 0.3.1.5, a tag and no commit
 #   scripts/bump_version.sh --dry-run minor  # show the plan, change nothing
-#   scripts/bump_version.sh --push patch     # also push the commit and tag
+#   scripts/bump_version.sh --print build    # print the next version, change nothing
+#   scripts/bump_version.sh --push patch     # also push the commit and tag, in one push
 #
 # Every app, lib and API shares one version. The current one is the latest
 # vX.Y.Z tag reachable from HEAD. The bump writes it to every package.json
 # under apps/ and libs/ (and their bun.lock entries), every apps/<product>/VERSION,
 # and the [project] version of every pyproject.toml (and its uv.lock entry),
 # commits it as "Release vX.Y.Z" and puts an annotated vX.Y.Z tag on it.
+#
+# `build` is CI's, run after every merge into main: it tags HEAD vX.Y.Z.N, the
+# Nth build of X.Y.Z, and writes nothing, since four numbers are not semver and
+# the files stay at X.Y.Z. A build tag counts as its X.Y.Z, so the next bump
+# drops the build number: 0.3.1.5 patch -> 0.3.2.
 set -euo pipefail
 
 SEMVER_RE='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'
+# Exactly four numbers; a prerelease has a `-`, so it never looks like a build.
+BUILD_RE='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.[1-9][0-9]*$'
 
 usage() {
-  sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'
   exit "${1:-0}"
 }
 
 die() { echo "✗ $*" >&2; exit 1; }
 
 dry_run=0
+print=0
 push=0
 target=""
 for arg in "$@"; do
   case "$arg" in
     --dry-run) dry_run=1 ;;
+    --print) print=1 ;;
     --push) push=1 ;;
     -h|--help) usage 0 ;;
     -*) die "unknown flag: $arg" ;;
@@ -95,6 +106,7 @@ compare() {
 last_tag=$(git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null) \
   || die "no vX.Y.Z tag reachable from HEAD; run git fetch --tags or pass an explicit version"
 current=${last_tag#v}
+[[ $current =~ $BUILD_RE ]] && current=${current%.*}
 [[ $current =~ $SEMVER_RE ]] || die "latest tag '$last_tag' is not valid semver"
 major=${BASH_REMATCH[1]} minor=${BASH_REMATCH[2]} patch=${BASH_REMATCH[3]} pre=${BASH_REMATCH[4]}
 
@@ -105,16 +117,31 @@ case "$target" in
     # Releasing a prerelease: 1.2.0-rc.1 patch -> 1.2.0
     if [ -n "$pre" ]; then next="$major.$minor.$patch"; else next="$major.$minor.$((patch + 1))"; fi
     ;;
+  build)
+    [ "$current" = "$major.$minor.$patch" ] || die "$current is a prerelease; only X.Y.Z releases get builds"
+    builds=$(git tag --list "v$current.*" | sed -n "s/^v${current//./\\.}\.\([1-9][0-9]*\)$/\1/p")
+    next="$current.$(($(sort -n <<< "${builds:-0}" | tail -n 1) + 1))"
+    ;;
   *)
     next=${target#v}
-    [[ $next =~ $SEMVER_RE ]] || die "'$target' is not major, minor, patch or a semver version"
+    [[ $next =~ $SEMVER_RE ]] || die "'$target' is not major, minor, patch, build or a semver version"
     ;;
 esac
 
-[ "$(compare "$next" "$current")" = 1 ] || die "$next does not move forward from $current"
+if [ "$target" = build ]; then
+  # One version per commit: a release commit already has its own.
+  on_head=$(git tag --points-at HEAD --list 'v[0-9]*' | tr '\n' ' ')
+  [ -z "$on_head" ] || die "HEAD is already tagged ${on_head% }"
+else
+  [ "$(compare "$next" "$current")" = 1 ] || die "$next does not move forward from $current"
+fi
 tag="v$next"
 title="Release v$next"
 git rev-parse -q --verify "refs/tags/$tag" >/dev/null && die "tag $tag already exists"
+if ((print)); then
+  echo "$next"
+  exit 0
+fi
 [ -z "$(git status --porcelain)" ] || die "working tree is not clean; commit or stash first"
 
 branch=$(git symbolic-ref --short -q HEAD || echo "(detached)")
@@ -124,6 +151,23 @@ if [ -n "$default" ] && [ "$branch" != "$default" ]; then
 fi
 
 echo "→ $current -> $next on $branch"
+if [ "$target" = build ]; then
+  if ((dry_run)); then
+    echo "  would tag $(git rev-parse --short HEAD) $tag, with no commit"
+    ((push)) && echo "  would push $tag"
+    exit 0
+  fi
+  git tag -a "$tag" -m "$title"
+  echo "✓ tagged $(git rev-parse --short HEAD) $tag"
+  if ((push)); then
+    git push -q origin "refs/tags/$tag"
+    echo "✓ pushed $tag"
+  else
+    echo "  push with: git push origin $tag"
+  fi
+  exit 0
+fi
+
 if ((dry_run)); then
   for p in $(package_jsons); do echo "  would write $p ($(jq -r '.version // "no version"' "$p"))"; done
   [ -f bun.lock ] && echo "  would write bun.lock"
@@ -182,9 +226,10 @@ git tag -a "$tag" -m "$title"
 echo "✓ committed $(git rev-parse --short HEAD) and tagged $tag"
 
 if ((push)); then
-  git push -q origin "$branch"
-  git push -q origin "$tag"
+  # Together, so main never has the release commit without its tag: CI reads
+  # a "Release vX.Y.Z" commit as yours and releases that tag.
+  git push -q --atomic origin "$branch" "refs/tags/$tag"
   echo "✓ pushed $branch and $tag"
 else
-  echo "  push with: git push origin $branch && git push origin $tag"
+  echo "  push with: git push --atomic origin $branch $tag"
 fi
