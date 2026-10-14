@@ -1,6 +1,30 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import type { ProbeResult } from '@/ffmpeg/probe'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
+import { MediaIndex } from '@/media/mediaIndex'
+import { MatchFiles } from '@/metadata/matchFiles'
 import { testDatabase } from '@/test/database'
+import { repositories } from '@/test/repositories'
+
+const PROBE = {
+  duration: 60,
+  width: 1920,
+  height: 1080,
+  videoCodec: 'h264',
+  videoBitDepth: 8,
+  hdr: false,
+  audioCodec: 'aac',
+  audioChannels: 2,
+  bitrate: 5_000_000,
+}
+
+const TRACKS = { audio: [], subtitles: [], defaultAudio: null, frameRate: 24 }
+
+/** A video's frame as a probe found it, or null for one not probed yet. */
+type Frame = Pick<ProbeResult, 'width' | 'height'> | null
+
+const HD: Frame = { width: 1920, height: 1080 }
+const UHD: Frame = { width: 3840, height: 2160 }
 
 describe('libraries', () => {
   const database = testDatabase('raven-libraries-')
@@ -104,5 +128,67 @@ describe('libraries', () => {
       { path: '/media/Films', layout: 'lettered', groups: 26 },
       { path: '/media/New', layout: null, groups: 0 },
     ])
+  })
+})
+
+describe('what each library holds, and the order they come in', () => {
+  const database = testDatabase('raven-library-counts-')
+  const libraries = () => new LibrariesRepository(database.get())
+
+  beforeEach(database.open)
+  afterEach(database.close)
+
+  /** A Movies library with a file for each frame, its files' ids in the same order. */
+  const addLibrary = ({ name, frames }: { name: string; frames: readonly Frame[] }) => {
+    const index = new MediaIndex(database.get())
+    const { id } = libraries().create({ name, paths: [`/${name}`], settings: { kind: 'movies' } })
+    const files = frames.map((frame, position) => {
+      const fileId = index.insert({
+        libraryId: id,
+        kind: 'movies',
+        file: { path: `/${name}/${position}.mkv`, root: `/${name}`, size: 1, mtimeMs: 1 },
+      })
+      if (frame) index.saveProbe({ id: fileId, probe: { ...PROBE, ...frame }, tracks: TRACKS })
+      return fileId
+    })
+    return { id, files }
+  }
+
+  it('counts every file a library holds, and those no match was found for', () => {
+    const clips = addLibrary({ name: 'Clips', frames: [HD, HD, null] })
+    addLibrary({ name: 'Empty', frames: [] })
+    // The third stays pending: not matched yet is not "no match was found".
+    new MatchFiles(database.get(), repositories(database.get()).metadata).setMatch({
+      ids: clips.files.slice(0, 2),
+      match: 'unmatched',
+    })
+
+    expect(
+      libraries()
+        .list()
+        .map(({ name, itemCount, unmatchedCount }) => ({ name, itemCount, unmatchedCount })),
+    ).toEqual([
+      { name: 'Clips', itemCount: 3, unmatchedCount: 2 },
+      { name: 'Empty', itemCount: 0, unmatchedCount: 0 },
+    ])
+    expect(libraries().get(clips.id)).toMatchObject({ itemCount: 3, unmatchedCount: 2 })
+  })
+
+  it('leads with the libraries whose probed videos are mostly 4K, then goes by name', () => {
+    addLibrary({ name: 'Zulu', frames: [UHD] })
+    // Scope 4K: short of 2160 lines, but 4K by its width. The unprobed files do not count.
+    addLibrary({ name: 'Scope', frames: [{ width: 3200, height: 1340 }, null, null] })
+    // 4K by its height alone.
+    addLibrary({ name: 'Tall', frames: [{ width: 2880, height: 2160 }] })
+    // Half is not mostly.
+    addLibrary({ name: 'Mixed', frames: [UHD, HD] })
+    addLibrary({ name: 'archive', frames: [] })
+    addLibrary({ name: 'Clips', frames: [HD, null] })
+
+    expect(
+      libraries()
+        .list()
+        .map((library) => library.name),
+    ).toEqual(['Scope', 'Tall', 'Zulu', 'archive', 'Clips', 'Mixed'])
   })
 })
