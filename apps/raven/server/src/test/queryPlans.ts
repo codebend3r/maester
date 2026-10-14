@@ -1,3 +1,4 @@
+import { refreshStatistics } from '@shared/server'
 import Sqlite from 'better-sqlite3'
 import type { DatabaseService } from '@/db/database'
 
@@ -31,7 +32,11 @@ export const tracedDatabase = (database: DatabaseService) => {
       if (typeof sql === 'string') statements.push(sql)
     },
   })
-  const traced: DatabaseService = { db, onModuleDestroy: () => db.close() }
+  const traced: DatabaseService = {
+    db,
+    refreshStatistics: () => refreshStatistics({ db }),
+    onModuleDestroy: () => db.close(),
+  }
   return {
     database: traced,
     /** Every step of every statement run so far, in the order they ran. */

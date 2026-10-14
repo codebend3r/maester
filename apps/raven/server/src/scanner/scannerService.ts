@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common'
 import type { ScanStatus } from '@raven/core'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
+import { DatabaseService } from '@/db/database'
 import { errorMessage } from '@/errorMessage'
 import { ServerEvents } from '@/events/serverEvents'
 import { FfmpegService, FfmpegTimeoutError } from '@/ffmpeg/ffmpegService'
@@ -96,6 +97,7 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
     @Inject(FfmpegService) private readonly ffmpeg: FfmpegService,
     @Inject(ThumbnailService) private readonly thumbnails: ThumbnailService,
     @Inject(MetadataService) private readonly metadata: MetadataService,
+    @Inject(DatabaseService) private readonly database: DatabaseService,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -218,6 +220,8 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
         onProbed: () =>
           this.update(library.id, { processed: this.status(library.id).processed + 1 }),
       })
+      // Matching may still be under way, and refreshes the statistics again when its pass ends.
+      this.database.refreshStatistics()
       // Thumbnails that timed out on an earlier pass get another go.
       this.thumbnails.retryPending()
 
