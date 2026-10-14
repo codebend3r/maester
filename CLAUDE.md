@@ -87,6 +87,6 @@ Shared tool config lives at the root, so every project lints and compiles by the
 
 Python projects declare `package.json` scripts that call uv (`uv run pytest -q`, `uv run ruff check .`); Nx runs them in the project's folder. There is no Python Nx plugin and no uv workspace.
 
-`@shared/server` holds what raven's and rookery's servers both need: `serveWebApp` (the built web app and its SPA fallback), `openSqlite` (the `user_version` migration runner), `readListenConfig`, `wholeNumber` and `flag` for the environment, `readCookie` and `sameSecret`. A helper a second server would copy goes there; one only a single product uses stays in that product.
+`@shared/server` holds what raven's and rookery's servers both need: `serveWebApp` (the built web app and its SPA fallback), `compressResponses` (Brotli or gzip for JSON and text, SVG included; never video, JPEG or PNG pictures, ranges or server-sent events), `openSqlite` (the `user_version` migration runner), `readListenConfig`, `wholeNumber` and `flag` for the environment, `readCookie` and `sameSecret`. A helper a second server would copy goes there; one only a single product uses stays in that product.
 
 The TypeScript, code style and CSS rules above are shared by every product. Each product folder has its own `CLAUDE.md` with only what is specific to that product. Design specs for every product live in `docs/superpowers/specs/`.

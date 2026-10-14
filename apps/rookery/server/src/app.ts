@@ -1,6 +1,6 @@
 import { NestFactory } from '@nestjs/core'
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify'
-import { serveWebApp } from '@shared/server'
+import { compressResponses, serveWebApp } from '@shared/server'
 import { AppModule } from '@/appModule'
 import { type Clock, systemClock } from '@/clock'
 import type { ServerConfig } from '@/config'
@@ -48,6 +48,7 @@ export const createApp = async ({
     return undefined
   })
 
+  await compressResponses({ app })
   // In Docker the server hands out the built web app too, so there is one
   // port. In development Vite serves it and proxies the server's routes here.
   await serveWebApp({ app, webDir: config.webDir, serverPrefixes: SERVER_PREFIXES })

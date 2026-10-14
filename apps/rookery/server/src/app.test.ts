@@ -1,6 +1,7 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { brotliDecompressSync } from 'node:zlib'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createApp } from '@/app'
@@ -450,6 +451,28 @@ describe('serving the web app', () => {
         expect(missing.statusCode).toBe(404)
         expect(missing.headers['content-type']).toContain('application/json')
       })
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('compresses its script for a browser that takes it, and sends it plain to one that does not', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'rookery-web-'))
+    const script = `console.log(${JSON.stringify(Array.from({ length: 200 }, (_, id) => ({ id })))})`
+    await mkdir(join(root, 'assets'), { recursive: true })
+    await writeFile(join(root, 'index.html'), '<!doctype html><title>rookery</title>')
+    await writeFile(join(root, 'assets', 'app.js'), script)
+    const harness = await boot({ webDir: root })
+    try {
+      const get = (headers: Record<string, string>) =>
+        harness.app.inject({ method: 'GET', url: '/assets/app.js', headers })
+      const packed = await get({ 'accept-encoding': 'gzip, deflate, br, zstd' })
+      expect(packed.headers['content-encoding']).toBe('br')
+      expect(packed.headers.vary).toContain('accept-encoding')
+      expect(brotliDecompressSync(packed.rawPayload).toString()).toBe(script)
+      const plain = await get({})
+      expect(plain.headers['content-encoding']).toBeUndefined()
+      expect(plain.body).toBe(script)
     } finally {
       await rm(root, { recursive: true, force: true })
     }
