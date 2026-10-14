@@ -57,6 +57,9 @@ type SubjectFile = Pick<
 /** How many of the first-scored results Fix match reads the details of. */
 const DETAILS_FOR = 5
 
+/** How long a search waits for those details; any that land later are kept for the next. */
+const DETAILS_DEADLINE_MS = 2500
+
 const WHOLE_NUMBER = /^\d+$/
 
 /** What a search scores against when it is for nothing on disk, or for something this browser may not see. */
@@ -166,7 +169,7 @@ export class MatchController {
       .map((each) => each.tmdbId)
     const confidences = scoreCandidates({
       ...scoring,
-      facts: await this.facts.read({ type, tmdbIds: top }),
+      facts: await this.facts.read({ type, tmdbIds: top, deadlineMs: DETAILS_DEADLINE_MS }),
     })
     return ordered
       .map(({ tmdbId, title, year: released, overview, poster }, index) => ({
