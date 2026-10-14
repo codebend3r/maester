@@ -13,7 +13,7 @@ import { Button, ButtonLink } from '@/components/Button/Button'
 import { AiMatchNote } from '@/components/AiMatchNote/AiMatchNote'
 import { CastRow } from '@/components/CastRow/CastRow'
 import { ImageEditor } from '@/components/ImageEditor/ImageEditor'
-import { ItemHeader } from '@/components/ItemHeader/ItemHeader'
+import { ItemHeader, pictureBackdrop } from '@/components/ItemHeader/ItemHeader'
 import { MediaMenu } from '@/components/MediaMenu/MediaMenu'
 import { MetadataEditor } from '@/components/MetadataEditor/MetadataEditor'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
@@ -111,7 +111,7 @@ export const PlayableItemView = ({
   const known = libraries.data ?? []
   const back = config.back({ details, primary, libraries: known })
   const facts = fileFacts({ media: primary, tracks: tracks.data })
-  const play = watchLink(primary)
+  const play = watchLink({ media: primary })
   const playPicture = { ...play, label: `Play ${details.title}` }
   const still =
     api.itemImageUrl({ id: details.id, kind: 'still', version: details.backdropVersion }) ??
@@ -143,13 +143,18 @@ export const PlayableItemView = ({
                 }),
                 play: playPicture,
               },
-              backdrop: api.itemImageUrl({
-                id: details.id,
-                kind: 'backdrop',
-                version: details.backdropVersion,
-              }),
+              backdrop: pictureBackdrop(
+                api.itemImageUrl({
+                  id: details.id,
+                  kind: 'backdrop',
+                  version: details.backdropVersion,
+                }),
+              ),
             }
-          : { picture: { shape: 'still', url: still, play: playPicture }, backdrop: still })}
+          : {
+              picture: { shape: 'still', url: still, play: playPicture },
+              backdrop: pictureBackdrop(still),
+            })}
       >
         <ButtonLink tone="primary" icon="play" to={play.to} state={play.state}>
           {primary.position > 0 ? `Resume from ${formatDuration(primary.position)}` : 'Play'}

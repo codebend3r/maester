@@ -74,6 +74,7 @@ import {
 } from '@/contract'
 import { type MediaListOptions, mediaListQuery } from '@/mediaListQuery'
 import { toQueryString } from '@/query'
+import type { SagaPicture } from '@/sagas'
 import { type Guard, isRecord, isString, isStringArray, nullable } from '@/schema'
 import { parseWebVtt } from '@/subtitles'
 
@@ -610,6 +611,10 @@ export const createApiClient = ({
       kind: ItemImageKind
       version: string | null
     }): string | null => (version == null ? null : itemImageAt({ id, kind, version })),
+
+    /** One of a saga's movies' backdrops; versioned, so cached for good. */
+    sagaPictureUrl: (picture: SagaPicture): string =>
+      itemImageAt({ id: picture.id, kind: 'backdrop', version: picture.version }),
 
     /** The picture behind a library's row on the Libraries page; versioned, so cached for good. */
     libraryBackdropUrl: (backdrop: LibraryBackdrop): string => {

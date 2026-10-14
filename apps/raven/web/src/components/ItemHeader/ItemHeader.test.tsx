@@ -44,7 +44,7 @@ describe('ItemHeader', () => {
           contentRating={null}
           facts={[]}
           ratings={[]}
-          backdrop="/api/items/835/images/backdrop?v=b1"
+          backdrop={{ type: 'picture', url: '/api/items/835/images/backdrop?v=b1' }}
           back={{ to: '/libraries/4', label: '4k Movies' }}
         />
       </MemoryRouter>,

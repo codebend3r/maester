@@ -45,8 +45,8 @@ export const useBezel = (): {
 /**
  * Whether the player fills the screen, and the way in and out. The whole
  * page fills it rather than the stage, so the next video in line, which
- * brings a stage of its own, carries on full screen; the watch page leaves
- * full screen on the way out.
+ * brings a stage of its own, carries on full screen. `useLeaveFullscreen`
+ * takes it back when the player goes.
  */
 export const useFullscreen = (): { fullscreen: boolean; toggle: () => void } => {
   const [fullscreen, setFullscreen] = useState(() => !!document.fullscreenElement)
@@ -63,3 +63,16 @@ export const useFullscreen = (): { fullscreen: boolean; toggle: () => void } => 
     },
   }
 }
+
+/**
+ * Leaves the full screen `useFullscreen` filled, once the page the player
+ * lives on goes. That page outlasts each video, as the next in line takes
+ * the last one's place, so a video ending leaves the screen full.
+ */
+export const useLeaveFullscreen = (): void =>
+  useEffect(
+    () => () => {
+      if (document.fullscreenElement) void document.exitFullscreen()
+    },
+    [],
+  )

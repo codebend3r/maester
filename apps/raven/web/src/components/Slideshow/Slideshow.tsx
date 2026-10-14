@@ -1,5 +1,5 @@
 import type { SlideshowMotion } from '@raven/core'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import styles from '@/components/Slideshow/Slideshow.module.scss'
 
 /** How long each picture holds before the next comes in; the stylesheet reads it as `--slide-ms`. */
@@ -39,32 +39,36 @@ export const slideRoles = <T,>({
   step: number
 }): Array<{ slide: T; role: SlideRole }> => {
   const at = (offset: number) => (step + offset) % slides.length
-  const parts: Array<[number, SlideRole]> =
-    step === 0
-      ? [
-          [0, 'first'],
-          [at(1), 'upcoming'],
-        ]
-      : [
-          [at(0), 'current'],
-          [at(slides.length - 1), 'previous'],
-          [at(1), 'upcoming'],
-        ]
-  // Reversed, so where two parts fall on one picture the first listed wins.
-  const roles = new Map(parts.toReversed())
+  const roleOf = (index: number): SlideRole | null => {
+    if (index === at(0)) return step === 0 ? 'first' : 'current'
+    if (step > 0 && index === at(slides.length - 1)) return 'previous'
+    return index === at(1) ? 'upcoming' : null
+  }
   return slides.flatMap((slide, index) => {
-    const role = roles.get(index)
+    const role = roleOf(index)
     return role ? [{ slide, role }] : []
   })
 }
 
+const LESS_MOTION = '(prefers-reduced-motion: reduce)'
+
+const followLessMotion = (onChange: () => void) => {
+  const query = window.matchMedia(LESS_MOTION)
+  query.addEventListener('change', onChange)
+  return () => query.removeEventListener('change', onChange)
+}
+
 /**
  * Counts the changes of picture, one every `SLIDE_MS` while there is more
- * than one to show. A browser that asks for less motion holds the first.
+ * than one to show. While the browser asks for less motion it holds the
+ * one up, and carries on once it stops asking.
  */
 const useStep = (count: number): number => {
   const [step, setStep] = useState(0)
-  const [isStill] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+  const isStill = useSyncExternalStore(
+    followLessMotion,
+    () => window.matchMedia(LESS_MOTION).matches,
+  )
   useEffect(() => {
     if (isStill || count < 2) return undefined
     const timer = window.setInterval(() => setStep((now) => now + 1), SLIDE_MS)

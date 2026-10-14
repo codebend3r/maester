@@ -9,8 +9,8 @@ export type SagaPicture = {
 
 /**
  * The backdrop of each of a saga's movies that has one, oldest first, as
- * its movies come: what its slideshow shows in turn, and what can be held
- * still in its place.
+ * its movies come: what its slideshow shows in turn, and what its cover
+ * can be.
  */
 export const sagaPictures = (saga: Saga): SagaPicture[] =>
   saga.media.flatMap(({ item }) =>
@@ -20,11 +20,12 @@ export const sagaPictures = (saga: Saga): SagaPicture[] =>
   )
 
 /**
- * The one backdrop that stands for a saga, on its deck and on its page
- * when it holds one still: the movie's picked, while that movie is still
- * in the saga, else its first movie's with one; null when none has.
+ * A saga's cover: the one backdrop that stands for it, behind the page as
+ * its deck is pointed at, and on its page when it holds one still. The
+ * movie's picked, while that movie is still in the saga, else its first
+ * movie's with one; null when none has.
  */
-export const sagaBackdrop = (saga: Saga): SagaPicture | null => {
+export const sagaCover = (saga: Saga): SagaPicture | null => {
   const pictures = sagaPictures(saga)
   const { backdrop } = saga
   const picked =

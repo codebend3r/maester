@@ -1,9 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
-import { isMediaItem, isMediaList, isRecord } from '@raven/core'
-import { useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import { ButtonLink } from '@/components/Button/Button'
 import { Player } from '@/components/Player/Player'
+import { useLeaveFullscreen } from '@/components/Player/useStageChrome'
+import { readWatchState } from '@/lib/itemLinks'
 import { mediaQuery } from '@/lib/queries'
 import { routeState, useRouteId } from '@/lib/routeQuery'
 import styles from '@/pages/WatchPage/WatchPage.module.scss'
@@ -17,25 +17,19 @@ import styles from '@/pages/WatchPage/WatchPage.module.scss'
 export const WatchPage = () => {
   const id = useRouteId()
   const { state } = useLocation()
-  const handed =
-    isRecord(state) && isMediaItem(state.media) && state.media.id === id ? state.media : undefined
-  const upNext = isRecord(state) && isMediaList(state.upNext) ? state.upNext : []
-  const page = routeState({ id, query: useQuery({ ...mediaQuery(id), initialData: handed }) })
-  // The player fills the screen with the whole page, which stays full screen
-  // from one video to the next, so leaving the player leaves full screen.
-  useEffect(
-    () => () => {
-      if (document.fullscreenElement) void document.exitFullscreen()
-    },
-    [],
-  )
+  const handed = readWatchState({ state, id })
+  const page = routeState({
+    id,
+    query: useQuery({ ...mediaQuery(id), initialData: handed?.media }),
+  })
+  useLeaveFullscreen()
 
   if (page.state === 'ready') {
     return (
       <Player
         key={page.data.id}
         media={page.data}
-        upNext={upNext}
+        upNext={handed?.upNext ?? []}
         backTo={`/libraries/${page.data.libraryId}`}
       />
     )

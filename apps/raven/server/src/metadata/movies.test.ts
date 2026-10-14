@@ -15,7 +15,7 @@ import {
   isMetadataHealth,
   isRecord,
   isSagaList,
-  sagaBackdrop,
+  sagaCover,
 } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createApp } from '@/app'
@@ -253,7 +253,7 @@ describe('movie metadata', () => {
     const [saga] = shape({ response, guard: isSagaList })
     const first = saga?.media[0]?.item
     expect(first?.backdropVersion).toEqual(expect.any(String))
-    expect(saga && sagaBackdrop(saga)).toEqual({
+    expect(saga && sagaCover(saga)).toEqual({
       id: first?.id,
       version: first?.backdropVersion,
       title: first?.title,

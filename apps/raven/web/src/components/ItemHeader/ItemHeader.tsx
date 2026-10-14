@@ -18,14 +18,28 @@ export type HeaderPicture = {
   play?: ReturnType<typeof watchLink> & { label: string }
 }
 
-/** What fades into the page behind the header: a picture's url, or several pictures in turn. */
-export type HeaderBackdrop = string | { slides: readonly string[]; motion: SlideshowMotion }
+/** What fades into the page behind the header: one picture, or several in turn, by their urls. */
+export type HeaderBackdrop =
+  | { type: 'picture'; url: string }
+  | { type: 'slideshow'; slides: readonly string[]; motion: SlideshowMotion }
+
+/** A page's one picture behind its header, or none while it has none. */
+export const pictureBackdrop = (url: string | null): HeaderBackdrop | null =>
+  url == null ? null : { type: 'picture', url }
 
 const Backdrop = ({ backdrop }: { backdrop: HeaderBackdrop }) => {
-  if (typeof backdrop === 'string') {
-    return <img className={styles.backdrop} src={backdrop} alt="" decoding="async" />
+  switch (backdrop.type) {
+    case 'picture':
+      return <img className={styles.backdrop} src={backdrop.url} alt="" decoding="async" />
+    case 'slideshow':
+      return (
+        <Slideshow className={styles.backdrop} slides={backdrop.slides} motion={backdrop.motion} />
+      )
+    default: {
+      const unknown: never = backdrop
+      return unknown
+    }
   }
-  return <Slideshow className={styles.backdrop} slides={backdrop.slides} motion={backdrop.motion} />
 }
 
 /** The content's columns for each kind of picture, or for none. */

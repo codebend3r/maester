@@ -1,4 +1,4 @@
-import { type Saga, sagaBackdrop } from '@raven/core'
+import { type Saga, sagaCover } from '@raven/core'
 import { Link } from 'react-router-dom'
 import { PosterImage } from '@/components/PosterImage/PosterImage'
 import { api } from '@/lib/api'
@@ -8,16 +8,14 @@ import styles from '@/components/SagaDeck/SagaDeck.module.scss'
 
 /**
  * A saga as a deck of its posters, the first movie on top. Pointed at or
- * focused, the deck fans out like a hand of cards, and the saga's backdrop
+ * focused, the deck fans out like a hand of cards, and the saga's cover
  * comes in behind the page; it opens the saga's page.
  * Each poster's place in the deck, and the deck's size, ride in custom
  * properties the fan is worked out from.
  */
 const SagaDeck = ({ saga, to }: { saga: Saga; to: string }) => {
-  const backdrop = sagaBackdrop(saga)
-  const hover = useHoverBackdrop(
-    backdrop && api.itemImageUrl({ id: backdrop.id, kind: 'backdrop', version: backdrop.version }),
-  )
+  const cover = sagaCover(saga)
+  const hover = useHoverBackdrop(cover && api.sagaPictureUrl(cover))
   return (
     <li className={styles.item} {...hover}>
       <Link to={to} className={styles.card}>

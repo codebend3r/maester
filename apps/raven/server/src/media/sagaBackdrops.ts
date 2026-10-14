@@ -1,16 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common'
 import { DEFAULT_SAGA_BACKDROP, type SagaBackdrop, isSagaBackdrop } from '@raven/core'
 import { DatabaseService } from '@/db/database'
-
-/** A stored backdrop that no longer reads as one shows the default. */
-const toBackdrop = (json: string): SagaBackdrop => {
-  try {
-    const parsed: unknown = JSON.parse(json)
-    return isSagaBackdrop(parsed) ? parsed : DEFAULT_SAGA_BACKDROP
-  } catch {
-    return DEFAULT_SAGA_BACKDROP
-  }
-}
+import { parseJsonAs } from '@/db/json'
 
 /** What each library's saga pages show behind their titles. */
 @Injectable()
@@ -29,7 +20,11 @@ export class SagaBackdrops {
           'SELECT saga_tmdb_id, backdrop FROM saga_backdrops WHERE library_id = ?',
         )
         .all(libraryId)
-        .map((row) => [row.saga_tmdb_id, toBackdrop(row.backdrop)]),
+        .map((row) => [
+          row.saga_tmdb_id,
+          // One that no longer reads as a backdrop shows the default.
+          parseJsonAs({ json: row.backdrop, guard: isSagaBackdrop }) ?? DEFAULT_SAGA_BACKDROP,
+        ]),
     )
   }
 

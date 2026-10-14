@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { type Library, type Saga, type SagaPicture, sagaBackdrop, sagaPictures } from '@raven/core'
+import { type Library, type Saga, sagaCover, sagaPictures } from '@raven/core'
 import { useId, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
@@ -13,7 +13,7 @@ import { LockedLibrary } from '@/components/LockedLibrary/LockedLibrary'
 import { MediaGrid, MediaGridSkeleton } from '@/components/MediaGrid/MediaGrid'
 import { RouteState } from '@/components/RouteState/RouteState'
 import { api } from '@/lib/api'
-import { queueLink } from '@/lib/itemLinks'
+import { watchLink } from '@/lib/itemLinks'
 import { useLibraryLock } from '@/lib/libraryLock'
 import { libraryQuery, sagasQuery } from '@/lib/queries'
 import { routeState, useRouteId } from '@/lib/routeQuery'
@@ -32,20 +32,26 @@ const SagaSkeleton = () => (
   </>
 )
 
-const backdropUrl = (picture: SagaPicture): string | null =>
-  api.itemImageUrl({ id: picture.id, kind: 'backdrop', version: picture.version })
-
 /**
- * What the saga shows behind its title: its movies' backdrops in turn, as
- * its library picked, or the one it holds still; null when none has one.
+ * What the saga shows behind its title, as its library picked: its movies'
+ * backdrops in turn, or its cover held still; null when none has one.
  */
 const headerBackdrop = (saga: Saga): HeaderBackdrop | null => {
-  if (saga.backdrop.type === 'still') {
-    const still = sagaBackdrop(saga)
-    return still && backdropUrl(still)
+  const { backdrop } = saga
+  switch (backdrop.type) {
+    case 'slideshow': {
+      const slides = sagaPictures(saga).map((picture) => api.sagaPictureUrl(picture))
+      return slides.length === 0 ? null : { type: 'slideshow', slides, motion: backdrop.motion }
+    }
+    case 'still': {
+      const cover = sagaCover(saga)
+      return cover && { type: 'picture', url: api.sagaPictureUrl(cover) }
+    }
+    default: {
+      const unknown: never = backdrop
+      return unknown
+    }
   }
-  const slides = sagaPictures(saga).flatMap((picture) => backdropUrl(picture) ?? [])
-  return slides.length === 0 ? null : { slides, motion: saga.backdrop.motion }
 }
 
 /** The saga once its library is known and open to this browser. */
@@ -87,7 +93,7 @@ const SagaView = ({ library, sagaId }: { library: Library; sagaId: string }) => 
               tone="primary"
               size="large"
               icon="play"
-              {...queueLink({ media: first, upNext: rest })}
+              {...watchLink({ media: first, upNext: rest })}
             >
               Play all
             </ButtonLink>

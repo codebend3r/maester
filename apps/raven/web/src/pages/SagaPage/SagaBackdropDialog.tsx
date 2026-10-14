@@ -4,7 +4,7 @@ import {
   type SagaBackdrop,
   type SlideshowMotion,
   isSlideshowMotion,
-  sagaBackdrop,
+  sagaCover,
   sagaPictures,
 } from '@raven/core'
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react'
@@ -13,17 +13,22 @@ import { api } from '@/lib/api'
 import { afterSagaBackdrop } from '@/lib/invalidate'
 import styles from '@/pages/SagaPage/SagaBackdropDialog.module.scss'
 
-/** Each way the slideshow can move, as the dialog offers it. */
-const MOTIONS = {
+/** A way for the slideshow to go, or `off` for the cover held still. */
+type Choice = SlideshowMotion | 'off'
+
+const CHOICES = [...isSlideshowMotion.values, 'off'] as const satisfies readonly Choice[]
+
+const LABELS = {
   fade: { label: 'Crossfade', hint: 'Each picture fades into the next.' },
   kenBurns: { label: 'Ken Burns', hint: 'A slow zoom across each picture as it fades in.' },
   slide: { label: 'Slide', hint: 'Each picture slides in and pushes the last one out.' },
-} as const satisfies Record<SlideshowMotion, { label: string; hint: string }>
+  off: { label: 'Off', hint: "One movie's backdrop, held still." },
+} as const satisfies Record<Choice, { label: string; hint: string }>
 
 /**
  * Edit backdrop: whether a saga's page shows its movies' backdrops in turn,
- * and how each comes in, or holds one of them still, and which. A native
- * modal <dialog> traps focus and closes on Escape.
+ * and how each comes in, or holds its cover still, and which movie's that
+ * is. A native modal <dialog> traps focus and closes on Escape.
  */
 export const SagaBackdropDialog = ({
   libraryId,
@@ -35,23 +40,27 @@ export const SagaBackdropDialog = ({
   onClose: () => void
 }) => {
   const dialog = useRef<HTMLDialogElement>(null)
-  const ids = { title: useId(), motion: useId(), picture: useId() }
+  const ids = { title: useId(), choice: useId(), cover: useId() }
   const queryClient = useQueryClient()
-  const [backdrop, setBackdrop] = useState<SagaBackdrop>(saga.backdrop)
-  // Turning the slideshow off holds still the picture that stands for the saga now.
-  const standing = sagaBackdrop({ ...saga, backdrop })
+  const [choice, setChoice] = useState<Choice>(
+    saga.backdrop.type === 'slideshow' ? saga.backdrop.motion : 'off',
+  )
+  // The cover the page shows, so a pick whose movie has left the saga starts
+  // on the one standing in for it, and kept while the motions are tried.
+  const [coverId, setCoverId] = useState(sagaCover(saga)?.id ?? null)
 
   useEffect(() => {
     dialog.current?.showModal()
   }, [])
 
-  const holdStill = () => {
-    if (standing) setBackdrop({ type: 'still', itemId: standing.id })
+  const chosen = (): SagaBackdrop | null => {
+    if (choice !== 'off') return { type: 'slideshow', motion: choice }
+    return coverId == null ? null : { type: 'still', itemId: coverId }
   }
 
   const save = useMutation({
-    mutationFn: (picked: SagaBackdrop) =>
-      api.setSagaBackdrop({ libraryId, sagaId: saga.tmdbId, backdrop: picked }),
+    mutationFn: (backdrop: SagaBackdrop) =>
+      api.setSagaBackdrop({ libraryId, sagaId: saga.tmdbId, backdrop }),
     onSuccess: async () => {
       await afterSagaBackdrop({ queryClient, libraryId })
       dialog.current?.close()
@@ -60,7 +69,8 @@ export const SagaBackdropDialog = ({
 
   const submit = (event: FormEvent) => {
     event.preventDefault()
-    save.mutate(backdrop)
+    const backdrop = chosen()
+    if (backdrop) save.mutate(backdrop)
   }
 
   return (
@@ -75,66 +85,41 @@ export const SagaBackdropDialog = ({
           <p className={styles.hint}>
             Behind the title, each movie's backdrop in turn, first to last and round again.
           </p>
-          {isSlideshowMotion.values.map((motion) => (
-            <div key={motion} className={styles.choice}>
+          {CHOICES.map((each) => (
+            <div key={each} className={styles.choice}>
               <input
-                id={`${ids.motion}-${motion}`}
+                id={`${ids.choice}-${each}`}
                 type="radio"
-                name={ids.motion}
-                checked={backdrop.type === 'slideshow' && backdrop.motion === motion}
-                onChange={() => setBackdrop({ type: 'slideshow', motion })}
-                aria-describedby={`${ids.motion}-${motion}-hint`}
+                name={ids.choice}
+                checked={choice === each}
+                disabled={each === 'off' && coverId == null}
+                onChange={() => setChoice(each)}
+                aria-describedby={`${ids.choice}-${each}-hint`}
               />
-              <label htmlFor={`${ids.motion}-${motion}`}>{MOTIONS[motion].label}</label>
-              <p id={`${ids.motion}-${motion}-hint`} className={styles.hint}>
-                {MOTIONS[motion].hint}
+              <label htmlFor={`${ids.choice}-${each}`}>{LABELS[each].label}</label>
+              <p id={`${ids.choice}-${each}-hint`} className={styles.hint}>
+                {LABELS[each].hint}
               </p>
             </div>
           ))}
-          <div className={styles.choice}>
-            <input
-              id={`${ids.motion}-off`}
-              type="radio"
-              name={ids.motion}
-              checked={backdrop.type === 'still'}
-              disabled={!standing}
-              onChange={holdStill}
-              aria-describedby={`${ids.motion}-off-hint`}
-            />
-            <label htmlFor={`${ids.motion}-off`}>Off</label>
-            <p id={`${ids.motion}-off-hint`} className={styles.hint}>
-              One movie's backdrop, held still.
-            </p>
-          </div>
         </fieldset>
 
-        {backdrop.type === 'still' && (
+        {choice === 'off' && (
           <fieldset className={styles.field}>
             <legend>Picture</legend>
             <ul className={styles.pictures}>
               {sagaPictures(saga).map((picture) => (
                 <li key={picture.id} className={styles.picture}>
                   <input
-                    id={`${ids.picture}-${picture.id}`}
+                    id={`${ids.cover}-${picture.id}`}
                     type="radio"
-                    name={ids.picture}
+                    name={ids.cover}
                     className="visually-hidden"
-                    checked={backdrop.itemId === picture.id}
-                    onChange={() => setBackdrop({ type: 'still', itemId: picture.id })}
+                    checked={coverId === picture.id}
+                    onChange={() => setCoverId(picture.id)}
                   />
-                  <label htmlFor={`${ids.picture}-${picture.id}`}>
-                    <img
-                      src={
-                        api.itemImageUrl({
-                          id: picture.id,
-                          kind: 'backdrop',
-                          version: picture.version,
-                        }) ?? undefined
-                      }
-                      alt=""
-                      loading="lazy"
-                      decoding="async"
-                    />
+                  <label htmlFor={`${ids.cover}-${picture.id}`}>
+                    <img src={api.sagaPictureUrl(picture)} alt="" loading="lazy" decoding="async" />
                     <span className={styles.caption}>{picture.title}</span>
                   </label>
                 </li>
@@ -151,7 +136,7 @@ export const SagaBackdropDialog = ({
 
         <div className={styles.actions}>
           <Button onClick={() => dialog.current?.close()}>Cancel</Button>
-          <Button type="submit" tone="primary" disabled={save.isPending}>
+          <Button type="submit" tone="primary" disabled={save.isPending || !chosen()}>
             Save
           </Button>
         </div>

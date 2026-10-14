@@ -92,7 +92,7 @@ export const PosterCard = ({
       </Link>
       {hasPage && (
         <span className={styles.overlay}>
-          <Link {...watchLink(media)} className={styles.play} aria-label={`Play ${title}`}>
+          <Link {...watchLink({ media })} className={styles.play} aria-label={`Play ${title}`}>
             <Icon name="play" size={18} />
           </Link>
         </span>

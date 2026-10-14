@@ -7,15 +7,14 @@ import {
   type LibrarySettings,
   type Saga,
   type SagaBackdrop,
-  isMediaList,
-  isRecord,
 } from '@raven/core'
-import { Route, Routes, useLocation, useParams } from 'react-router-dom'
+import { Route, Routes } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { SagaPage } from '@/pages/SagaPage/SagaPage'
 import { usePageBackdrop } from '@/stores/pageBackdrop'
 import { itemSummary, library, matchedMovie } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
+import { WatchProbe } from '@/test/watchProbe'
 
 const movie = ({
   id,
@@ -44,14 +43,6 @@ const RINGS: Saga = {
     movie({ id: 8, title: 'The Two Towers', year: 2002, backdropVersion: 'b1' }),
     movie({ id: 9, title: 'The Return of the King', year: 2003, backdropVersion: 'b2' }),
   ],
-}
-
-/** Where Play all went: the video it started, and those it handed over to play after. */
-const PlayerProbe = () => {
-  const { id } = useParams()
-  const { state } = useLocation()
-  const upNext = isRecord(state) && isMediaList(state.upNext) ? state.upNext : []
-  return <p>{`Playing ${id ?? ''}, then ${upNext.map((media) => media.id).join(', ')}`}</p>
 }
 
 const backdropOf = (id: number, version: string) =>
@@ -89,7 +80,7 @@ describe('SagaPage', () => {
     renderWithProviders(
       <Routes>
         <Route path="libraries/:id/sagas/:sagaId" element={<SagaPage />} />
-        <Route path="watch/:id" element={<PlayerProbe />} />
+        <Route path="watch/:id" element={<WatchProbe />} />
       </Routes>,
       { route, adminLock },
     )
@@ -181,6 +172,31 @@ describe('SagaPage', () => {
       sagaId: '119',
       backdrop: { type: 'slideshow', motion: 'slide' },
     })
+  })
+
+  it('starts on the cover shown when the movie picked has left the saga, and saves that one', async () => {
+    spies.pick.mockImplementation(async ({ backdrop }) => backdrop)
+    open({ backdrop: { type: 'still', itemId: 990 } })
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit backdrop' }))
+    const dialog = screen.getByRole('dialog', { name: 'Edit backdrop' })
+    const pictures = within(dialog).getByRole('group', { name: 'Picture' })
+    expect(within(pictures).getByRole('radio', { name: 'The Two Towers' })).toBeChecked()
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
+    expect(spies.pick).toHaveBeenCalledWith({
+      libraryId: 2,
+      sagaId: '119',
+      backdrop: { type: 'still', itemId: 80 },
+    })
+  })
+
+  it('keeps the picture picked while the motions are tried', async () => {
+    open({ backdrop: { type: 'still', itemId: 90 } })
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit backdrop' }))
+    const dialog = screen.getByRole('dialog', { name: 'Edit backdrop' })
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Ken Burns' }))
+    expect(within(dialog).queryByRole('group', { name: 'Picture' })).toBeNull()
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Off' }))
+    expect(within(dialog).getByRole('radio', { name: 'The Return of the King' })).toBeChecked()
   })
 
   it('offers Edit backdrop only with the admin lock off', async () => {

@@ -12,21 +12,18 @@ const Waiting = () => (
   </div>
 )
 
-/** Nothing to play after: a video played on its own. */
-const ALONE: readonly MediaItem[] = []
-
 /**
  * Picks how to play a file and which tracks to play, then hands over to
  * the stage, or says why the file cannot play once every way has failed.
  */
 export const Player = ({
   media,
-  upNext = ALONE,
+  upNext,
   backTo,
 }: {
   media: MediaItem
   /** What plays after this video ends, in turn. */
-  upNext?: readonly MediaItem[]
+  upNext: readonly MediaItem[]
   backTo: string
 }) => {
   const selection = useTrackSelection(media.id)

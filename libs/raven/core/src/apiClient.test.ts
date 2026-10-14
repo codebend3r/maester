@@ -530,6 +530,9 @@ describe('the metadata calls', () => {
     expect(client.libraryBackdropUrl({ type: 'thumbnail', id: 8, version: 41 })).toBe(
       'http://nas:8484/api/media/8/thumbnail?v=41',
     )
+    expect(client.sagaPictureUrl({ id: 4, version: 'ghi', title: 'Sintel' })).toBe(
+      'http://nas:8484/api/items/4/images/backdrop?v=ghi',
+    )
     expect(client.photoUrl({ personId: 5, photoVersion: 'x' })).toBe(
       'http://nas:8484/api/people/5/photo?v=x',
     )
