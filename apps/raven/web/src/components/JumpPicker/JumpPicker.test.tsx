@@ -5,6 +5,7 @@ import { useRef } from 'react'
 import { JumpPicker } from '@/components/JumpPicker/JumpPicker'
 import { type JumpScale, jumpScale } from '@/lib/jumpScale'
 import { mediaItem } from '@/test/fixtures'
+import { pageWithoutLayout } from '@/test/scrolling'
 
 const HEAT = mediaItem({ id: 1, title: 'Heat', item: null, bitrate: 72_000_000 })
 const CLIP = mediaItem({ id: 2, title: 'Lost Clip', item: null, bitrate: 8_000_000 })
@@ -47,15 +48,17 @@ const byBitrate = jumpScale({ sort: 'bitrate-high', files: [HEAT, CLIP], source:
 
 describe('JumpPicker', () => {
   const scrolled: string[] = []
-  const scroll = spyOn(HTMLElement.prototype, 'scrollIntoView').mockImplementation(function (
-    this: HTMLElement,
-  ) {
+  const record = function (this: HTMLElement) {
     scrolled.push(this.textContent ?? '')
-  })
+  }
+  const scroll = spyOn(HTMLElement.prototype, 'scrollIntoView').mockImplementation(record)
+  const cleanups: Array<() => void> = []
 
   afterEach(() => {
     scrolled.length = 0
     scroll.mockClear()
+    scroll.mockImplementation(record)
+    cleanups.splice(0).forEach((cleanup) => cleanup())
   })
 
   it('offers every letter for a title order, pressable only where a card starts with it', () => {
@@ -84,6 +87,25 @@ describe('JumpPicker', () => {
     await userEvent.click(screen.getByRole('button', { name: '70 to 75 Mb/s' }))
     expect(scrolled).toEqual(['Heat'])
     expect(screen.getByRole('link', { name: 'Heat' })).toHaveFocus()
+  })
+
+  it('keeps the card at the top while the cards drawn on the way move it', async () => {
+    const page = pageWithoutLayout()
+    cleanups.push(page.restore)
+    // The browser scrolls the card to the top of the screen, wherever it stands then.
+    scroll.mockImplementation(function (this: HTMLElement) {
+      page.scrollTo(window.scrollY + this.getBoundingClientRect().top)
+    })
+    render(<Page scale={byTitle} />)
+    const card = screen.getByRole('link', { name: 'Heat' }).closest('li')
+    if (!card) throw new Error('no card for Heat')
+    page.place({ element: card, top: 4000 })
+    await userEvent.click(screen.getByRole('button', { name: 'H' }))
+    expect(card.getBoundingClientRect().top).toBe(0)
+    // Drawn now, the cards above it are taller than they stood in at.
+    page.place({ element: card, top: 4120 })
+    page.frame(12)
+    expect(card.getBoundingClientRect().top).toBe(0)
   })
 
   it('opens the folded bucket a card sits in first', async () => {
