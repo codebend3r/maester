@@ -6,6 +6,7 @@ import { MediaCard } from '@/components/MediaCard/MediaCard'
 import { PosterCard } from '@/components/PosterCard/PosterCard'
 import { ShowCard } from '@/components/ShowCard/ShowCard'
 import { Bone, Loading, SkeletonCards } from '@/components/Skeleton/Skeleton'
+import { POSTER_SIZES } from '@/lib/posters'
 import { homeQuery, librariesQuery } from '@/lib/queries'
 import styles from '@/pages/HomePage/HomePage.module.scss'
 
@@ -49,7 +50,12 @@ const LibraryShelf = ({ shelf, library }: { shelf: HomeShelf; library: Library }
       return (
         <Shelf title={title} isEmpty={shelf.shows.length === 0}>
           {shelf.shows.map((entry) => (
-            <ShowCard key={entry.show.id} entry={entry} ratingsSource={ratingsSource} />
+            <ShowCard
+              key={entry.show.id}
+              entry={entry}
+              ratingsSource={ratingsSource}
+              sizes={POSTER_SIZES.row}
+            />
           ))}
         </Shelf>
       )
@@ -63,6 +69,7 @@ const LibraryShelf = ({ shelf, library }: { shelf: HomeShelf; library: Library }
                 media={media}
                 matchType={matchType}
                 ratingsSource={ratingsSource}
+                sizes={POSTER_SIZES.row}
               />
             ) : (
               <MediaCard key={media.id} media={media} matchType={matchType} />
@@ -128,7 +135,7 @@ export const HomePage = () => {
       {inProgress.length > 0 && (
         <Shelf title="Continue watching" isEmpty={false}>
           {inProgress.map(({ media, poster }) => (
-            <PosterCard key={media.id} media={media} poster={poster} />
+            <PosterCard key={media.id} media={media} poster={poster} sizes={POSTER_SIZES.row} />
           ))}
         </Shelf>
       )}

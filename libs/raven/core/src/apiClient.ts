@@ -66,6 +66,8 @@ import {
   isPersonDetails,
   isPlaybackSettingsState,
   isPosterEntries,
+  POSTER_OWN_WIDTH,
+  POSTER_WIDTHS,
   isSagaBackdrop,
   isSagaList,
   isServerEvent,
@@ -611,6 +613,20 @@ export const createApiClient = ({
       kind: ItemImageKind
       version: string | null
     }): string | null => (version == null ? null : itemImageAt({ id, kind, version })),
+
+    /**
+     * An item's poster at each width it comes in, for an `img`'s `srcset`;
+     * null when it has none. The widest is `itemImageUrl`'s own URL, so a
+     * card that shows it and the item's page share one download.
+     */
+    posterSrcSet: ({ id, version }: { id: number; version: string | null }): string | null => {
+      if (version == null) return null
+      // Built once and widened by hand: a library lists thousands of posters.
+      const own = itemImageAt({ id, kind: 'poster', version })
+      return POSTER_WIDTHS.map((width) =>
+        width === POSTER_OWN_WIDTH ? `${own} ${width}w` : `${own}&w=${width} ${width}w`,
+      ).join(', ')
+    },
 
     /** One of a saga's movies' backdrops; versioned, so cached for good. */
     sagaPictureUrl: (picture: SagaPicture): string =>

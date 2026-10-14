@@ -143,3 +143,17 @@ export const encodeImage = async ({
     path,
   ])
 }
+
+/** How wide and tall a JPEG says it is, read from its frame header. */
+export const jpegSize = (jpeg: Buffer): { width: number; height: number } => {
+  const read = (at: number): { width: number; height: number } => {
+    if (at + 9 > jpeg.length || jpeg[at] !== 0xff) throw new Error('No JPEG frame header')
+    const marker = jpeg[at + 1] ?? 0
+    // SOF0 to SOF3 hold the frame's size; any other segment is passed over by its length.
+    if (marker >= 0xc0 && marker <= 0xc3) {
+      return { height: jpeg.readUInt16BE(at + 5), width: jpeg.readUInt16BE(at + 7) }
+    }
+    return read(at + 2 + jpeg.readUInt16BE(at + 2))
+  }
+  return read(2)
+}

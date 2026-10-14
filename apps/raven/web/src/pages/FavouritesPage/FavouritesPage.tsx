@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useId } from 'react'
 import { PosterCard } from '@/components/PosterCard/PosterCard'
 import { Loading, SkeletonCards } from '@/components/Skeleton/Skeleton'
+import { POSTER_SIZES } from '@/lib/posters'
 import { favouritesQuery } from '@/lib/queries'
 import styles from '@/pages/FavouritesPage/FavouritesPage.module.scss'
 
@@ -50,7 +51,7 @@ export const FavouritesPage = () => {
       {items.length > 0 && (
         <ul className={styles.grid}>
           {items.map(({ media, poster }) => (
-            <PosterCard key={media.id} media={media} poster={poster} />
+            <PosterCard key={media.id} media={media} poster={poster} sizes={POSTER_SIZES.grid} />
           ))}
         </ul>
       )}

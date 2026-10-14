@@ -17,13 +17,14 @@ import { TmdbCredit } from '@/components/TmdbCredit/TmdbCredit'
 import { api } from '@/lib/api'
 import { createdBy, showFacts } from '@/lib/itemFacts'
 import { itemPath, watchLink } from '@/lib/itemLinks'
+import { POSTER_SIZES, posterSources } from '@/lib/posters'
 import { nextEpisodeQuery } from '@/lib/queries'
 import { useRouteItem } from '@/lib/routeQuery'
 import styles from '@/pages/ShowPage/ShowPage.module.scss'
 
 /** One season in the row: its poster, name and how many episodes are on disk. */
 const SeasonCard = ({ season, show }: { season: SeasonSummary; show: ItemDetails }) => {
-  const poster = api.itemImageUrl({ id: season.id, kind: 'poster', version: season.posterVersion })
+  const poster = posterSources({ item: season, sizes: POSTER_SIZES.season })
   const to = itemPath(season) ?? `/shows/${show.id}`
   const count = season.episodeCount
   return (
@@ -31,7 +32,7 @@ const SeasonCard = ({ season, show }: { season: SeasonSummary; show: ItemDetails
       <Link to={to} className={styles.seasonLink}>
         <span className={styles.seasonPoster}>
           {poster ? (
-            <img src={poster} alt="" loading="lazy" decoding="async" />
+            <img {...poster} alt="" loading="lazy" decoding="async" />
           ) : (
             <span aria-hidden="true">{season.season ?? ''}</span>
           )}

@@ -12,6 +12,7 @@ import { Icon } from '@/components/Icon/Icon'
 import { ScoreChip } from '@/components/RatingChips/RatingChips'
 import { api } from '@/lib/api'
 import { showYears } from '@/lib/itemLinks'
+import { POSTER_SIZES, type PosterSizes, posterSources } from '@/lib/posters'
 import { showEntryKey } from '@/lib/entryKeys'
 import { useHoverBackdrop } from '@/lib/useHoverBackdrop'
 import styles from '@/components/ShowCard/ShowCard.module.scss'
@@ -26,15 +27,18 @@ export const ShowCard = ({
   entry,
   ratingsSource = 'tmdb',
   sort,
+  sizes,
 }: {
   entry: ShowEntry
   ratingsSource?: RatingSource
   /** The order the listing is in, whose value the card shows. */
   sort?: MediaSort
+  /** How wide the list holding the card shows its poster. */
+  sizes: PosterSizes
 }) => {
   const { show, next } = entry
   const score = pickScore({ ratings: show.ratings, source: ratingsSource })
-  const poster = api.itemImageUrl({ id: show.id, kind: 'poster', version: show.posterVersion })
+  const poster = posterSources({ item: show, sizes })
   const hover = useHoverBackdrop(
     api.itemImageUrl({ id: show.id, kind: 'backdrop', version: show.backdropVersion }),
   )
@@ -54,7 +58,7 @@ export const ShowCard = ({
           {poster && !failed ? (
             <img
               className={styles.image}
-              src={poster}
+              {...poster}
               alt=""
               loading="lazy"
               decoding="async"
@@ -103,7 +107,13 @@ export const ShowGrid = ({
 }) => (
   <ul className={styles.grid}>
     {shows.map((entry) => (
-      <ShowCard key={entry.show.id} entry={entry} ratingsSource={ratingsSource} sort={sort} />
+      <ShowCard
+        key={entry.show.id}
+        entry={entry}
+        ratingsSource={ratingsSource}
+        sort={sort}
+        sizes={POSTER_SIZES.grid}
+      />
     ))}
   </ul>
 )

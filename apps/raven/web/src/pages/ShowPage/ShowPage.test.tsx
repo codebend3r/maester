@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import type { AdminLock, ItemDetails } from '@raven/core'
 import { Route, Routes, useParams } from 'react-router-dom'
 import { api } from '@/lib/api'
+import { POSTER_SIZES } from '@/lib/posters'
 import { ShowPage } from '@/pages/ShowPage/ShowPage'
 import { itemDetails } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
@@ -88,6 +89,20 @@ describe('ShowPage', () => {
     expect(season).toHaveAttribute('href', '/shows/4/seasons/1')
     expect(await screen.findByText('2 episodes')).toBeInTheDocument()
     expect(spies.item.mock.calls.map(([id]) => id)).toEqual([4])
+  })
+
+  it("fetches a season's poster no wider than its row shows it, and the show's own big", async () => {
+    open()
+    const season = (await screen.findByRole('link', { name: /Season 1/ })).querySelector('img')
+    expect(season?.getAttribute('srcset')?.split(', ')).toEqual([
+      '/api/items/5/images/poster?v=p5&w=185 185w',
+      '/api/items/5/images/poster?v=p5&w=342 342w',
+      '/api/items/5/images/poster?v=p5 500w',
+    ])
+    expect(season).toHaveAttribute('sizes', POSTER_SIZES.season)
+    const own = document.querySelector('img[src="/api/items/4/images/poster?v=s4"]')
+    expect(own).toBeInTheDocument()
+    expect(own).not.toHaveAttribute('srcset')
   })
 
   it('re-points the whole show from Fix match', async () => {

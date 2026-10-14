@@ -2,32 +2,35 @@ import { mkdirSync } from 'node:fs'
 import { readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Inject, Injectable, Logger } from '@nestjs/common'
-import type { ItemImageKind } from '@raven/core'
+import { type ItemImageKind, POSTER_OWN_WIDTH, POSTER_WIDTHS, type PosterWidth } from '@raven/core'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { imageScaleArgs } from '@/ffmpeg/args'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import { METADATA_FETCH, type MetadataFetch, TMDB_IMAGE_PATH } from '@/metadata/tmdbClient'
 import { type Gate, createGate } from '@/scanner/concurrency'
 
-/** What a picture is for, which decides the one size it is kept at: an item's, or a person's photo. */
+/** What a picture is for: an item's, or a person's photo. */
 export type ImageUse = ItemImageKind | 'photo'
 
-/** TMDB's size names, and the widths local images are scaled to so both look alike. */
-const TMDB_SIZES: Record<ImageUse, string> = {
-  poster: 'w500',
-  backdrop: 'w1280',
-  photo: 'w185',
-  still: 'w300',
-  logo: 'w500',
-}
-
-const WIDTHS: Record<ImageUse, number> = {
-  poster: 500,
+/**
+ * The width each use is served at unless a narrower poster is asked for.
+ * TMDB names its sizes by width (`w500`), and pictures beside the media are
+ * scaled to the same widths, so both look alike.
+ */
+export const IMAGE_WIDTHS = {
+  poster: POSTER_OWN_WIDTH,
   backdrop: 1280,
   photo: 185,
   still: 300,
   logo: 500,
-}
+} as const satisfies Record<ImageUse, number>
+
+/** Every width a picture is kept at: each use's own, and the narrower ones a poster comes in. */
+export type ImageWidth = (typeof IMAGE_WIDTHS)[ImageUse] | PosterWidth
+
+const KEPT_WIDTHS: readonly ImageWidth[] = [
+  ...new Set<ImageWidth>([...Object.values(IMAGE_WIDTHS), ...POSTER_WIDTHS]),
+]
 
 const TIMEOUT_MS = 10_000
 
@@ -44,10 +47,11 @@ export const contentTypeOf = (path: string): string =>
   path.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg'
 
 /**
- * Posters, backdrops, photos and stills on disk beside the thumbnails.
- * TMDB's files sit under `images/tmdb/<size>/`, shared by every item and
- * person that uses them; pictures beside the media are scaled once with
- * ffmpeg into `images/local/<item>-<kind>-<mtime>.jpg`. Either is fetched or
+ * Posters, backdrops, photos and stills on disk beside the thumbnails, each
+ * at the widths it is asked for. TMDB's files sit under
+ * `images/tmdb/w<width>/`, shared by every item and person that uses them;
+ * pictures beside the media are scaled once per width with ffmpeg into
+ * `images/local/<item>-<kind>-<mtime>-<width>.jpg`. Either is fetched or
  * made on first use, and two requests for the same one share the work.
  */
 @Injectable()
@@ -56,6 +60,9 @@ export class ImageCache {
   private readonly root: string
   private readonly working = new Map<string, Promise<string | null>>()
   private readonly downloads: Gate = createGate({ limit: 4 })
+  // Scaling takes CPU the server shares with transcodes, and matching a
+  // library of pictures beside its media asks for three widths of each.
+  private readonly scales: Gate = createGate({ limit: 2 })
   private readonly warned = new Set<string>()
 
   constructor(
@@ -64,8 +71,8 @@ export class ImageCache {
     @Inject(FfmpegService) private readonly ffmpeg: FfmpegService,
   ) {
     this.root = join(config.dataDir, 'images')
-    Object.values(TMDB_SIZES).forEach((size) =>
-      mkdirSync(join(this.root, 'tmdb', size), { recursive: true }),
+    KEPT_WIDTHS.forEach((width) =>
+      mkdirSync(join(this.root, 'tmdb', `w${width}`), { recursive: true }),
     )
     mkdirSync(join(this.root, 'local'), { recursive: true })
   }
@@ -85,10 +92,10 @@ export class ImageCache {
     this.logger.warn(message)
   }
 
-  /** A TMDB picture's cached file, downloaded on first use; null when TMDB cannot serve it. */
-  tmdb({ path, use }: { path: string; use: ImageUse }): Promise<string | null> {
+  /** A TMDB picture's cached file at `width`, downloaded on first use; null when TMDB cannot serve it. */
+  tmdb({ path, width }: { path: string; width: ImageWidth }): Promise<string | null> {
     if (!TMDB_IMAGE_PATH.test(path)) return Promise.resolve(null)
-    const size = TMDB_SIZES[use]
+    const size = `w${width}`
     const dir = join(this.root, 'tmdb', size)
     const target = join(dir, path.slice(1))
     return this.once(target, async () => {
@@ -116,28 +123,31 @@ export class ImageCache {
     })
   }
 
-  /** A picture beside the media, scaled once; null when it is gone or will not decode. */
+  /** A picture beside the media, scaled once to `width`; null when it is gone or will not decode. */
   local({
     itemId,
     kind,
     source,
-    use,
+    width,
   }: {
     itemId: number
     kind: string
     source: string
-    use: ImageUse
+    width: ImageWidth
   }): Promise<string | null> {
-    return this.once(`${itemId}-${kind}`, async () => {
+    return this.once(`${itemId}-${kind}-${width}`, async () => {
       const info = await stat(source).catch(() => null)
       if (!info?.isFile()) return null
       const dir = join(this.root, 'local')
       const prefix = `${itemId}-${kind}-`
-      const target = join(dir, `${prefix}${Math.round(info.mtimeMs)}.jpg`)
+      const current = `${prefix}${Math.round(info.mtimeMs)}-`
+      const target = join(dir, `${current}${width}.jpg`)
       if (await exists(target)) return target
       const temp = temporary(dir, 'jpg')
       try {
-        await this.ffmpeg.exec(imageScaleArgs({ input: source, output: temp, width: WIDTHS[use] }))
+        await this.scales.run(() =>
+          this.ffmpeg.exec(imageScaleArgs({ input: source, output: temp, width })),
+        )
         if (!(await exists(temp))) throw new Error('ffmpeg wrote nothing')
         await rename(temp, target)
       } catch (error) {
@@ -145,11 +155,11 @@ export class ImageCache {
         this.warnOnce(source, `Could not read the image ${source}: ${String(error)}`)
         return null
       }
-      // An older scale of a picture that has since changed.
+      // Scales of the picture before it changed, at any width, and any named before widths were.
       const names = await readdir(dir).catch((): string[] => [])
       await Promise.all(
         names
-          .filter((name) => name.startsWith(prefix) && join(dir, name) !== target)
+          .filter((name) => name.startsWith(prefix) && !name.startsWith(current))
           .map((name) => rm(join(dir, name), { force: true })),
       )
       return target
@@ -168,8 +178,8 @@ export class ImageCache {
     itemIds: ReadonlySet<number>
   }): Promise<void> {
     await Promise.all(
-      Object.values(TMDB_SIZES).map(async (size) => {
-        const dir = join(this.root, 'tmdb', size)
+      KEPT_WIDTHS.map(async (width) => {
+        const dir = join(this.root, 'tmdb', `w${width}`)
         const names = await readdir(dir).catch((): string[] => [])
         await Promise.all(
           names

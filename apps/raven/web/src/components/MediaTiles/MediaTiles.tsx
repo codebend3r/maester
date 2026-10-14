@@ -20,6 +20,7 @@ import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { Bone } from '@/components/Skeleton/Skeleton'
 import { api } from '@/lib/api'
 import { cardLink } from '@/lib/itemLinks'
+import { POSTER_SIZES } from '@/lib/posters'
 import { mediaEntryKey } from '@/lib/entryKeys'
 import styles from '@/components/MediaTiles/MediaTiles.module.scss'
 
@@ -72,7 +73,7 @@ const MediaTile = ({
         onContextMenu={menu.onContextMenu}
       >
         {posters ? (
-          <PosterFrame media={media} />
+          <PosterFrame media={media} sizes={POSTER_SIZES.movieTile} />
         ) : thumbnail ? (
           <img
             className={styles.thumbnail}

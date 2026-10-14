@@ -1,6 +1,6 @@
 import { dirname, join } from 'node:path'
 import { Inject, Injectable } from '@nestjs/common'
-import { ITEM_IMAGE_KINDS, type ItemImageKind, parseEpisodeName } from '@raven/core'
+import { ITEM_IMAGE_KINDS, type ItemImageKind, POSTER_WIDTHS, parseEpisodeName } from '@raven/core'
 import type { FolderReader } from '@/metadata/folderReader'
 import { ImageCache } from '@/metadata/imageCache'
 import { ItemImagesRepository } from '@/metadata/itemImagesRepository'
@@ -136,15 +136,21 @@ export class ItemPictures {
     }
   }
 
-  /** Fetches an item's poster into the cache as soon as it is matched, so a library's first visit is quick. */
+  /**
+   * Fetches an item's poster into the cache as soon as it is matched, at
+   * every width a card may ask for, so a library's first visit is quick
+   * whatever the screen.
+   */
   warmPoster(itemId: number): void {
     const image = this.stored.image({ itemId, kind: 'poster' })
     if (!image) return
-    const made =
-      image.source === 'local'
-        ? this.images.local({ itemId, kind: 'poster', source: image.ref, use: 'poster' })
-        : this.images.tmdb({ path: image.ref, use: 'poster' })
-    void made.catch(() => null)
+    POSTER_WIDTHS.forEach((width) => {
+      const made =
+        image.source === 'local'
+          ? this.images.local({ itemId, kind: 'poster', source: image.ref, width })
+          : this.images.tmdb({ path: image.ref, width })
+      void made.catch(() => null)
+    })
   }
 
   /** Removes items and people nothing uses any more, then the pictures only they showed. */

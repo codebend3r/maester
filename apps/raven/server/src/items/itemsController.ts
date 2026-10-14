@@ -24,6 +24,8 @@ import {
   isMatchItemType,
   isShowMatchChoice,
   type ItemDetails,
+  POSTER_WIDTHS,
+  posterWidthFrom,
   type ItemImageOptions,
   type ItemMetadataState,
   type MediaItem,
@@ -36,7 +38,7 @@ import { sendImage } from '@/items/sendImage'
 import { PrivateBy } from '@/lock/lockGuard'
 import { LockService } from '@/lock/lockService'
 import { MediaRepository } from '@/media/mediaRepository'
-import { ImageCache } from '@/metadata/imageCache'
+import { IMAGE_WIDTHS, ImageCache } from '@/metadata/imageCache'
 import { ItemImagesRepository } from '@/metadata/itemImagesRepository'
 import { ItemOverrides } from '@/metadata/itemOverrides'
 import { ItemRefresher } from '@/metadata/itemRefresher'
@@ -285,29 +287,41 @@ export class ItemsController {
     if (!isItemImageKind(kind)) throw new NotFoundException(`No ${kind} pictures`)
     const local = this.stored.imageFrom({ itemId: id, kind, source: 'local' })
     const path =
-      local == null ? null : await this.images.local({ itemId: id, kind, source: local, use: kind })
+      local == null
+        ? null
+        : await this.images.local({ itemId: id, kind, source: local, width: IMAGE_WIDTHS[kind] })
     await sendImage({ reply, path, version: undefined })
   }
 
-  /** A poster, backdrop or still: the chosen picture first, then one beside the media, then TMDB's. */
+  /**
+   * A poster, backdrop or still: the chosen picture first, then one beside
+   * the media, then TMDB's. A poster comes narrower when `w` asks, so a card
+   * fetches one no wider than it shows.
+   */
   @Get(':id/images/:kind')
   async image(
     @Param('id', ParseIntPipe) id: number,
     @Param('kind') kind: string,
     @Query('v') version: string | undefined,
+    @Query('w') asked: unknown,
     @Res() reply: FastifyReply,
   ): Promise<void> {
     if (!isItemImageKind(kind)) throw new NotFoundException(`No ${kind} pictures`)
+    const posterWidth = asked === undefined ? undefined : posterWidthFrom(asked)
+    if (posterWidth === null || (posterWidth !== undefined && kind !== 'poster')) {
+      throw new BadRequestException(`w must be one of ${POSTER_WIDTHS.join(', ')}, for a poster`)
+    }
+    const width = posterWidth ?? IMAGE_WIDTHS[kind]
     const image = this.stored.image({ itemId: id, kind })
     const chosen =
-      image?.source === 'chosen' ? await this.images.tmdb({ path: image.ref, use: kind }) : null
+      image?.source === 'chosen' ? await this.images.tmdb({ path: image.ref, width }) : null
     const localRef =
       image?.source === 'local'
         ? image.ref
         : this.stored.imageFrom({ itemId: id, kind, source: 'local' })
     const local =
       chosen == null && localRef != null
-        ? await this.images.local({ itemId: id, kind, source: localRef, use: kind })
+        ? await this.images.local({ itemId: id, kind, source: localRef, width })
         : null
     // A picture beside the media that will not decode falls back to TMDB's.
     const tmdbPath =
@@ -317,7 +331,7 @@ export class ItemsController {
     const path =
       chosen ??
       local ??
-      (tmdbPath == null ? null : await this.images.tmdb({ path: tmdbPath, use: kind }))
+      (tmdbPath == null ? null : await this.images.tmdb({ path: tmdbPath, width }))
     await sendImage({ reply, path, version })
   }
 }

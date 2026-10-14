@@ -3,6 +3,8 @@ import {
   DEFAULT_SAGA_BACKDROP,
   ITEM_IMAGE_KINDS,
   MEDIA_SORTS,
+  POSTER_OWN_WIDTH,
+  POSTER_WIDTHS,
   STREAM_MODES,
   isCredit,
   isFavouriteChange,
@@ -16,6 +18,8 @@ import {
   isMatchSubject,
   isMediaSort,
   isPlaybackSettingsChange,
+  isPosterWidth,
+  posterWidthFrom,
   isProgressChange,
   isServerHealth,
   isShowMatchChoice,
@@ -378,6 +382,31 @@ describe('the choice lists', () => {
     expect(isItemImageKind('banner')).toBe(false)
     expect(isHwAccel('vaapi')).toBe(true)
     expect(isHwAccel('cuda')).toBe(false)
+  })
+
+  it('serves posters at a few widths, and no others', () => {
+    expect(POSTER_WIDTHS).toEqual([185, 342, 500])
+    expect([185, 342, 500, 200, 0, '185'].map(isPosterWidth)).toEqual([
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+    ])
+  })
+
+  it("keeps a poster's own width, the one served with no width asked for, as its widest", () => {
+    expect(POSTER_OWN_WIDTH).toBe(500)
+    expect(POSTER_WIDTHS.at(-1)).toBe(POSTER_OWN_WIDTH)
+    expect(Math.max(...POSTER_WIDTHS)).toBe(POSTER_OWN_WIDTH)
+  })
+
+  it("reads a poster's width from a query only as the client writes it", () => {
+    expect(['185', '342', '500'].map(posterWidthFrom)).toEqual([185, 342, 500])
+    expect(
+      ['200', '0185', '185.0', '0xb9', ' 185', '', 185, ['185'], undefined].map(posterWidthFrom),
+    ).toEqual([null, null, null, null, null, null, null, null, null])
   })
 
   it('matches files to movies and shows, and nothing else', () => {
