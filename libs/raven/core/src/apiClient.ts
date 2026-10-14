@@ -35,7 +35,6 @@ import {
   type PlaybackSettings,
   type PlaybackSettingsState,
   type PosterEntry,
-  type PosterWidth,
   type ProgressChange,
   type Saga,
   type SagaBackdrop,
@@ -251,27 +250,16 @@ export const createApiClient = ({
   const thumbnailAt = ({ id, version }: { id: number; version: number }): string =>
     url(`/api/media/${id}/thumbnail?v=${version}`)
 
-  /**
-   * An item's picture of `kind` at `version`, which it changes with, so it
-   * can be cached for good; a poster narrower than its own when `width` says.
-   */
+  /** An item's picture of `kind` at `version`, which it changes with, so it can be cached for good. */
   const itemImageAt = ({
     id,
     kind,
     version,
-    width,
   }: {
     id: number
     kind: ItemImageKind
     version: string
-    width?: PosterWidth
-  }): string =>
-    url(
-      `/api/items/${id}/images/${kind}?${toQueryString({
-        v: version,
-        ...(width === undefined ? {} : { w: String(width) }),
-      })}`,
-    )
+  }): string => url(`/api/items/${id}/images/${kind}?${toQueryString({ v: version })}`)
 
   return {
     listLibraries: (): Promise<Library[]> =>
@@ -632,11 +620,11 @@ export const createApiClient = ({
      */
     posterSrcSet: ({ id, version }: { id: number; version: string | null }): string | null => {
       if (version == null) return null
-      return POSTER_WIDTHS.map((width, index) => {
-        const isWidest = index === POSTER_WIDTHS.length - 1
-        const at = itemImageAt({ id, kind: 'poster', version, ...(isWidest ? {} : { width }) })
-        return `${at} ${width}w`
-      }).join(', ')
+      // Built once and widened by hand: a library lists thousands of posters.
+      const own = itemImageAt({ id, kind: 'poster', version })
+      return POSTER_WIDTHS.map((width, index) =>
+        index === POSTER_WIDTHS.length - 1 ? `${own} ${width}w` : `${own}&w=${width} ${width}w`,
+      ).join(', ')
     },
 
     /** One of a saga's movies' backdrops; versioned, so cached for good. */
