@@ -1,3 +1,4 @@
+export * from '@/compressResponses'
 export * from '@/cookies'
 export * from '@/env'
 export * from '@/secrets'

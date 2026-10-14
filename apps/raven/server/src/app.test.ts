@@ -12,10 +12,19 @@ import {
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createApp } from '@/app'
 import { DatabaseService } from '@/db/database'
+import { ServerEvents } from '@/events/serverEvents'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { MediaIndex } from '@/media/mediaIndex'
 import { ScannerService } from '@/scanner/scannerService'
-import { NOT_WATCHING, adminCookie, isRouteMethod, keysOf, testConfig } from '@/test/app'
+import {
+  BROWSER_ENCODINGS,
+  NOT_WATCHING,
+  adminCookie,
+  decodedBody,
+  isRouteMethod,
+  keysOf,
+  testConfig,
+} from '@/test/app'
 import { encodeClip } from '@/test/clips'
 import { apiFor } from '@/test/server'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
@@ -216,6 +225,25 @@ describe('the media server', () => {
       })
     })
 
+    it('compresses a listing for a browser that takes it, and sends it plain to one that does not', async () => {
+      const url = `/api/libraries/${library.id}/media`
+      const [packed, plain] = await Promise.all([
+        app().inject({
+          method: 'GET',
+          url,
+          headers: { cookie: state.admin, 'accept-encoding': BROWSER_ENCODINGS },
+        }),
+        app().inject({ method: 'GET', url, headers: { cookie: state.admin } }),
+      ])
+      expect(packed.headers['content-encoding']).toBe('br')
+      expect(packed.headers.vary).toContain('accept-encoding')
+      // What the PIN opens for one browser must never sit in Netlify's cache.
+      expect(packed.headers['cache-control'] ?? '').not.toContain('public')
+      expect(packed.rawPayload.length).toBeLessThan(plain.rawPayload.length / 2)
+      expect(plain.headers['content-encoding']).toBeUndefined()
+      expect(decodedBody(packed).equals(plain.rawPayload)).toBe(true)
+    })
+
     it('searches and sorts', async () => {
       const found = await api().listMedia({
         libraryId: library.id,
@@ -228,9 +256,14 @@ describe('the media server', () => {
     it('serves a JPEG thumbnail that the browser alone caches forever when versioned', async () => {
       const [movie] = await listMedia(library.id)
       const url = movie ? api().thumbnailUrl(movie) : null
-      const response = await app().inject({ method: 'GET', url: url ?? '' })
+      const response = await app().inject({
+        method: 'GET',
+        url: url ?? '',
+        headers: { 'accept-encoding': BROWSER_ENCODINGS },
+      })
       expect(response.statusCode).toBe(200)
       expect(response.headers['content-type']).toBe('image/jpeg')
+      expect(response.headers['content-encoding']).toBeUndefined()
       expect(response.headers['cache-control']).toBe('private, max-age=31536000, immutable')
       expect([...response.rawPayload.subarray(0, 2)]).toEqual([0xff, 0xd8])
     })
@@ -241,10 +274,11 @@ describe('the media server', () => {
         const response = await app().inject({
           method: 'GET',
           url: api().fileUrl(movie?.id ?? -1),
-          headers: { range: 'bytes=0-99' },
+          headers: { range: 'bytes=0-99', 'accept-encoding': BROWSER_ENCODINGS },
         })
         expect(response.statusCode).toBe(206)
         expect(response.headers['content-type']).toBe('video/mp4')
+        expect(response.headers['content-encoding']).toBeUndefined()
         expect(response.headers['accept-ranges']).toBe('bytes')
         expect(response.headers['content-range']).toBe(`bytes 0-99/${movie?.size}`)
         expect(response.rawPayload).toHaveLength(100)
@@ -257,9 +291,12 @@ describe('the media server', () => {
         const response = await app().inject({
           method: 'GET',
           url: api().fileUrl(episode?.id ?? -1),
+          headers: { 'accept-encoding': BROWSER_ENCODINGS },
         })
         expect(response.statusCode).toBe(200)
         expect(response.headers['content-type']).toBe('video/x-matroska')
+        expect(response.headers['content-encoding']).toBeUndefined()
+        expect(response.headers['content-length']).toBe(String(episode?.size))
         expect(response.rawPayload).toHaveLength(episode?.size ?? -1)
       })
 
@@ -724,6 +761,8 @@ describe('the order of libraries', () => {
 })
 
 describe('serving the web app', () => {
+  const PAGE = `<!doctype html><title>raven</title>${'<link rel="modulepreload">'.repeat(60)}`
+  const SCRIPT = `console.log(${JSON.stringify(Array.from({ length: 200 }, (_, id) => ({ id })))})`
   const state: { root: string; app: NestFastifyApplication | null } = { root: '', app: null }
   const app = (): NestFastifyApplication => {
     if (!state.app) throw new Error('app not started')
@@ -734,8 +773,8 @@ describe('serving the web app', () => {
     state.root = await mkdtemp(join(tmpdir(), 'raven-web-'))
     const web = join(state.root, 'web')
     await mkdir(join(web, 'assets'), { recursive: true })
-    await writeFile(join(web, 'index.html'), '<!doctype html><title>raven</title>')
-    await writeFile(join(web, 'assets', 'app-1234.js'), 'console.log(1)')
+    await writeFile(join(web, 'index.html'), PAGE)
+    await writeFile(join(web, 'assets', 'app-1234.js'), SCRIPT)
     state.app = await createApp({
       config: testConfig({ dataDir: join(state.root, 'data'), mediaDir: state.root, webDir: web }),
       quiet: true,
@@ -761,9 +800,78 @@ describe('serving the web app', () => {
     expect(response.headers['cache-control']).toContain('immutable')
   })
 
+  it('compresses the page and the script for a browser that takes it, cached as before', async () => {
+    const get = (url: string) =>
+      app().inject({ method: 'GET', url, headers: { 'accept-encoding': BROWSER_ENCODINGS } })
+    const page = await get('/')
+    expect(page.headers['content-encoding']).toBe('br')
+    expect(page.headers['cache-control']).toBe('no-cache')
+    expect(decodedBody(page).toString()).toBe(PAGE)
+    const script = await get('/assets/app-1234.js')
+    expect(script.headers['content-encoding']).toBe('br')
+    expect(script.headers['cache-control']).toBe('public, max-age=31536000, immutable')
+    expect(decodedBody(script).toString()).toBe(SCRIPT)
+  })
+
   it('keeps API 404s as JSON', async () => {
     await expect(apiFor({ app: app() }).getMedia(999)).rejects.toMatchObject({ status: 404 })
     const response = await app().inject({ method: 'GET', url: '/api/media/999' })
     expect(response.json()).toMatchObject({ statusCode: 404 })
+  })
+})
+
+describe('live updates', () => {
+  const state: { root: string; app: NestFastifyApplication | null } = { root: '', app: null }
+  const app = (): NestFastifyApplication => {
+    if (!state.app) throw new Error('app not started')
+    return state.app
+  }
+
+  beforeAll(async () => {
+    state.root = await mkdtemp(join(tmpdir(), 'raven-events-'))
+    state.app = await createApp({
+      config: testConfig({ dataDir: join(state.root, 'data'), mediaDir: state.root }),
+      quiet: true,
+      watch: NOT_WATCHING,
+    })
+    await state.app.listen({ port: 0, host: '127.0.0.1' })
+  })
+
+  afterAll(async () => {
+    await state.app?.close()
+    await rm(state.root, { recursive: true, force: true, maxRetries: 5 })
+  })
+
+  it('streams each event uncompressed the moment it happens, whatever the browser takes', async () => {
+    const aborter = new AbortController()
+    try {
+      const response = await fetch(`${await app().getUrl()}/api/events`, {
+        headers: { 'accept-encoding': BROWSER_ENCODINGS },
+        signal: aborter.signal,
+      })
+      expect(response.headers.get('content-type')).toContain('text/event-stream')
+      expect(response.headers.get('content-encoding')).toBeNull()
+      const reader = response.body?.getReader()
+      if (!reader) throw new Error('no body to read')
+      const decoder = new TextDecoder()
+      const readUntil = async ({ text, read }: { text: string; read: string }): Promise<string> => {
+        if (read.includes(text)) return read
+        const chunk = await reader.read()
+        if (chunk.done) throw new Error(`the stream ended before "${text}": ${read}`)
+        return readUntil({ text, read: read + decoder.decode(chunk.value) })
+      }
+      app().get(ServerEvents).libraryChanged(42)
+      // Compressed, the event would wait in the compressor for more to pack
+      // and never reach the reader.
+      const read = await Promise.race([
+        readUntil({ text: '"libraryId":42', read: '' }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('the event never arrived')), 2000),
+        ),
+      ])
+      expect(read).toContain('data: {"type":"library","libraryId":42}')
+    } finally {
+      aborter.abort()
+    }
   })
 })

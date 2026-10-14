@@ -8,7 +8,7 @@ import { type ApiClient, type MediaItem, STREAM_TIME_SHIFT, type StreamMode } fr
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '@/app'
 import { ScannerService } from '@/scanner/scannerService'
-import { adminCookie, testConfig } from '@/test/app'
+import { BROWSER_ENCODINGS, adminCookie, testConfig } from '@/test/app'
 import { encodeRichClip } from '@/test/clips'
 import { apiFor } from '@/test/server'
 
@@ -204,11 +204,19 @@ describe('playback', () => {
   })
 
   describe('converted streams', () => {
-    /** A stream is binary and endless to a player, so a test reads it by hand. */
+    /**
+     * A stream is binary and endless to a player, so a test reads it by hand,
+     * offering compression as a browser does: video is sent as it is.
+     */
     const fetchStream = async (url: string): Promise<string> => {
-      const response = await app().inject({ method: 'GET', url })
+      const response = await app().inject({
+        method: 'GET',
+        url,
+        headers: { 'accept-encoding': BROWSER_ENCODINGS },
+      })
       expect(response.statusCode).toBe(200)
       expect(response.headers['content-type']).toBe('video/mp4')
+      expect(response.headers['content-encoding']).toBeUndefined()
       expect(response.rawPayload.subarray(4, 8).toString()).toBe('ftyp')
       const path = join(state.root, `stream-${Math.random().toString(36).slice(2)}.mp4`)
       await writeFile(path, response.rawPayload)

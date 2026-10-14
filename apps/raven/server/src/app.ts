@@ -1,6 +1,6 @@
 import { NestFactory } from '@nestjs/core'
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify'
-import { serveWebApp } from '@shared/server'
+import { compressResponses, serveWebApp } from '@shared/server'
 import { AppModule } from '@/appModule'
 import type { ServerConfig } from '@/config'
 import type { AiFetch } from '@/metadata/aiClient'
@@ -33,6 +33,7 @@ export const createApp = async ({
     { logger: quiet ? false : ['log', 'warn', 'error'] },
   )
 
+  await compressResponses({ app })
   // In Docker the server hands out the built web app too, so there is one
   // port and no CORS. In development Vite serves it and proxies /api here.
   await serveWebApp({ app, webDir: config.webDir, serverPrefixes: ['/api/'] })

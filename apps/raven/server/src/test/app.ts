@@ -1,3 +1,4 @@
+import { brotliDecompressSync, gunzipSync } from 'node:zlib'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import { isRecord } from '@raven/core'
 import { type ServerConfig, readServerConfig } from '@/config'
@@ -29,6 +30,21 @@ export const eventually = async <T>({
     return poll()
   }
   return poll()
+}
+
+/** What Chrome offers over https: the browser that reaches raven through Netlify. */
+export const BROWSER_ENCODINGS = 'gzip, deflate, br, zstd'
+
+/** A response's body as a browser's fetch hands it over, unpacked from whatever it was sent in. */
+export const decodedBody = (response: {
+  headers: Record<string, unknown>
+  rawPayload: Buffer
+}): Buffer => {
+  const encoding = response.headers['content-encoding']
+  if (encoding === 'br') return brotliDecompressSync(response.rawPayload)
+  if (encoding === 'gzip') return gunzipSync(response.rawPayload)
+  if (encoding === undefined) return response.rawPayload
+  throw new Error(`Answered in ${String(encoding)}, which no browser asked for`)
 }
 
 /** Every key anywhere in a parsed JSON body. */
