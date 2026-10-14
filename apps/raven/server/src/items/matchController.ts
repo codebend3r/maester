@@ -226,7 +226,12 @@ export class MatchController {
         return {
           onDisk: {
             type: 'show',
-            files: named.map(({ season, episodes, absolute }) => ({ season, episodes, absolute })),
+            files: named.map(({ season, episodes, absolute, year }) => ({
+              season,
+              episodes,
+              absolute,
+              year,
+            })),
           },
           country: named.find((name) => name.country != null)?.country ?? null,
         }

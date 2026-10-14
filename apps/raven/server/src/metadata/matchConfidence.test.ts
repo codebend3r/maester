@@ -33,7 +33,7 @@ const movie = (fields: Partial<Extract<MatchFacts, { type: 'movie' }>>): MatchFa
 })
 
 const episodes = (season: number, ...numbers: number[]): EpisodeNumbers[] =>
-  numbers.map((episode) => ({ season, episodes: [episode], absolute: null }))
+  numbers.map((episode) => ({ season, episodes: [episode], absolute: null, year: null }))
 
 const ANY = TIER_SETS.any[0]
 
@@ -88,7 +88,7 @@ describe('scoreCandidates', () => {
 
   it('scores a typo Possible and extra words Weak, by edit distance', () => {
     expect(
-      score({ title: 'Wild Artic', results: [result({ tmdbId: '1', title: 'Wild Arctic' })] }),
+      score({ title: 'Wild Arctik', results: [result({ tmdbId: '1', title: 'Wild Arctic' })] }),
     ).toEqual([73])
     expect(
       score({
@@ -108,6 +108,19 @@ describe('scoreCandidates', () => {
         results: [result({ tmdbId: '1', title: '몬스터' }), result({ tmdbId: '2', title: '괴물' })],
       }),
     ).toEqual([100, 0])
+  })
+
+  it('compares a title with a letter outside the Latin script as it is written, digits and all', () => {
+    // Folded, each would be "1988", and so the other's exact title.
+    expect(
+      score({
+        title: '응답하라 1988',
+        results: [
+          result({ tmdbId: '1', title: '응답하라 1988' }),
+          result({ tmdbId: '2', title: '괴물 1988' }),
+        ],
+      }),
+    ).toEqual([100, 44])
   })
 
   it('steps the year down one, three and more years off, and marks a result with no year down', () => {
@@ -226,7 +239,7 @@ describe('scoreCandidates', () => {
       const straight: OnDisk = { type: 'show', files: episodes(1, 60) }
       const absolute: OnDisk = {
         type: 'show',
-        files: [{ season: null, episodes: [], absolute: 70 }],
+        files: [{ season: null, episodes: [], absolute: 70, year: null }],
       }
       const later: OnDisk = { type: 'show', files: episodes(2, 60) }
       const run = (disk: OnDisk) =>
@@ -239,11 +252,33 @@ describe('scoreCandidates', () => {
     it('leaves season 0 and unnumbered files out, and measures no fit when none is left', () => {
       const specials: OnDisk = {
         type: 'show',
-        files: [...episodes(0, 99), { season: 1, episodes: [], absolute: null }],
+        files: [...episodes(0, 99), { season: 1, episodes: [], absolute: null, year: null }],
       }
       expect(
         score({ title: 'Monster', results: monster.slice(0, 1), onDisk: specials, facts }),
       ).toEqual([100])
+    })
+
+    describe('beside 74 episodes that fit', () => {
+      const fitting = episodes(1, ...Array.from({ length: 74 }, (_, index) => index + 1))
+      const run = (stray: EpisodeNumbers) =>
+        score({
+          title: 'Monster',
+          results: monster.slice(0, 1),
+          onDisk: { type: 'show', files: [...fitting, stray] },
+          facts,
+        })
+
+      it("reads an absolute number that is the name's year as no number", () => {
+        // `Monster (2004) - Making Of.mkv` in `Monster (2004)/`.
+        expect(run({ season: null, episodes: [], absolute: 2004, year: 2004 })).toEqual([100])
+        expect(run({ season: null, episodes: [], absolute: 2004, year: null })).toEqual([40])
+      })
+
+      it('reads episode 0, a pilot, as no number', () => {
+        expect(run({ season: 1, episodes: [0], absolute: null, year: null })).toEqual([100])
+        expect(run({ season: 1, episodes: [0, 75], absolute: null, year: null })).toEqual([40])
+      })
     })
 
     it('measures no fit for a result whose details were not read', () => {
@@ -299,5 +334,15 @@ describe('scoreCandidates', () => {
         ],
       }),
     ).toEqual([100, 60])
+  })
+
+  it('makes a close call of a runner-up exactly 10 behind a Strong top, and not of one 11 behind', () => {
+    // Popularity alone is the support: 0.75 of the top's is 90, and 0.725 is 89.
+    const heat = (popularity: number) => [
+      result({ tmdbId: '1', title: 'Heat', popularity: 100 }),
+      result({ tmdbId: '2', title: 'Heat', popularity }),
+    ]
+    expect(score({ title: 'Heat', results: heat(75) })).toEqual([79, 79])
+    expect(score({ title: 'Heat', results: heat(72.5) })).toEqual([100, 89])
   })
 })

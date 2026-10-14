@@ -4,15 +4,12 @@ import {
   fitsTier,
   foldTitle,
   isUnfiltered,
+  type ParsedEpisodeName,
 } from '@raven/core'
 import type { MatchFacts, SearchResult } from '@/metadata/tmdbClient'
 
-/** A show file's numbers, as `parseEpisodeName` reads them. */
-export type EpisodeNumbers = {
-  season: number | null
-  episodes: readonly number[]
-  absolute: number | null
-}
+/** A show file's numbers, and the year its name gives, as `parseEpisodeName` reads them. */
+export type EpisodeNumbers = Pick<ParsedEpisodeName, 'season' | 'episodes' | 'absolute' | 'year'>
 
 /** What the folder or file Fix match is for has on disk. */
 export type OnDisk =
@@ -35,13 +32,18 @@ const RULED_OUT = 40
 /** How near the runner-up has to be to make a close call. */
 const CLOSE_CALL = 10
 
+const NON_LATIN_LETTER = /(?!\p{Script=Latin})\p{L}/u
+
 /**
  * A title folded for comparison. `foldTitle` keeps only Latin letters and
- * digits, so a title with none (몬스터) is compared lower-cased instead;
- * otherwise every Korean title would be every other's.
+ * digits, so a title with a letter of another script (몬스터, 응답하라 1988),
+ * or with nothing it keeps, is compared lower-cased instead; otherwise every
+ * Korean title would be every other's, or each one's digits.
  */
-const comparable = (title: string): string =>
-  foldTitle(title) || title.normalize('NFKC').toLowerCase().replace(/\s+/g, ' ').trim()
+const comparable = (title: string): string => {
+  const lowered = title.normalize('NFKC').toLowerCase().replace(/\s+/g, ' ').trim()
+  return NON_LATIN_LETTER.test(title) ? lowered : foldTitle(title) || lowered
+}
 
 /** How many single-character edits turn `a` into `b`. */
 const editDistance = ({ a, b }: { a: readonly string[]; b: readonly string[] }): number => {
@@ -88,6 +90,18 @@ const yearScore = ({ asked, released }: { asked: number; released: number | null
 }
 
 /**
+ * A file's numbers as a fit reads them: episode 0, a pilot, is no number,
+ * and nor is an absolute number that is the name's year, as
+ * `Monster (2004) - Making Of` reads.
+ */
+const fitNumbers = (file: EpisodeNumbers): EpisodeNumbers => ({
+  season: file.season,
+  episodes: file.episodes.filter((episode) => episode > 0),
+  absolute: file.absolute === file.year ? null : file.absolute,
+  year: file.year,
+})
+
+/**
  * 1 when every numbered file fits the show: its season holds its episode,
  * or it is in season 1 within the show's total (numbered straight through),
  * or its absolute number is within the total. Season 0 and unnumbered files
@@ -100,9 +114,9 @@ const showFit = ({
   files: readonly EpisodeNumbers[]
   facts: ShowFacts
 }): number | null => {
-  const numbered = files.filter(
-    (file) => file.season !== 0 && (file.episodes.length > 0 || file.absolute != null),
-  )
+  const numbered = files
+    .map(fitNumbers)
+    .filter((file) => file.season !== 0 && (file.episodes.length > 0 || file.absolute != null))
   if (numbered.length === 0) return null
   const total = facts.episodeCount ?? 0
   const fits = (file: EpisodeNumbers): boolean => {
