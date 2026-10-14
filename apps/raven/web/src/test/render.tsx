@@ -22,8 +22,9 @@ export const DEFAULT_PLAYBACK_STATE: PlaybackSettingsState = {
 
 /**
  * Renders inside a fresh query client and an in-memory router, starting at
- * `route`, wrapped as `main.tsx` wraps the app: the shared playback policy,
- * and what card links follow. The server's playback and display settings
+ * `route` with the pages in `behind` before it in history, wrapped as
+ * `main.tsx` wraps the app: the shared playback policy, and what card
+ * links follow. The server's playback and display settings
  * are already known, as they are once a page has read them, and so is the
  * admin lock, off as in an admin's browser so every action shows; `null`
  * leaves any to be fetched.
@@ -34,12 +35,15 @@ export const renderWithProviders = (
   ui: ReactNode,
   {
     route = '/',
+    behind = [],
     playback = DEFAULT_PLAYBACK_STATE,
     display = DEFAULT_DISPLAY_SETTINGS,
     adminLock = { state: 'off' },
     libraries = null,
   }: {
     route?: string
+    /** Pages already in history before `route`, oldest first, as if the app had been browsed there. */
+    behind?: string[]
     playback?: PlaybackSettingsState | null
     display?: DisplaySettings | null
     adminLock?: AdminLock | null
@@ -53,7 +57,7 @@ export const renderWithProviders = (
   if (libraries) client.setQueryData(queryKeys.libraries, libraries)
   const rendered = render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={[route]}>
+      <MemoryRouter initialEntries={[...behind, route]} initialIndex={behind.length}>
         <SharedPlaybackPolicy>
           <CardLinks>{ui}</CardLinks>
         </SharedPlaybackPolicy>

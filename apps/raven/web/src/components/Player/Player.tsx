@@ -2,6 +2,7 @@ import type { MediaItem } from '@raven/core'
 import styles from '@/components/Player/Player.module.scss'
 import { Stage } from '@/components/Player/Stage'
 import { Unplayable } from '@/components/Player/Unplayable'
+import { useLeave } from '@/components/Player/useLeave'
 import { usePlaybackLadder } from '@/components/Player/usePlaybackLadder'
 import { useTrackSelection } from '@/components/Player/useTrackSelection'
 
@@ -24,8 +25,10 @@ export const Player = ({
   media: MediaItem
   /** What plays after this video ends, in turn. */
   upNext: readonly MediaItem[]
+  /** Where Back goes when no page of the app opened the player; otherwise it goes back to that page. */
   backTo: string
 }) => {
+  const leave = useLeave(backTo)
   const selection = useTrackSelection(media.id)
   const playback = usePlaybackLadder({
     media,
@@ -39,7 +42,7 @@ export const Player = ({
       return (
         <Unplayable
           media={media}
-          backTo={backTo}
+          onBack={leave}
           problems={playback.problems}
           onTryAnyway={playback.tryAnyway}
         />
@@ -50,7 +53,7 @@ export const Player = ({
         <Stage
           media={media}
           upNext={upNext}
-          backTo={backTo}
+          onBack={leave}
           mode={playback.mode}
           selection={selection}
           onFailure={playback.fail}
