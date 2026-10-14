@@ -18,6 +18,7 @@ import { useMediaSource } from '@/components/Player/useMediaSource'
 import { type Overlay, usePlayerActions } from '@/components/Player/usePlayerActions'
 import { useBezel, useFullscreen, useIdle } from '@/components/Player/useStageChrome'
 import { useSubtitleCues } from '@/components/Player/useSubtitleCues'
+import { useUpNext } from '@/components/Player/useUpNext'
 import type { TrackSelection } from '@/components/Player/useTrackSelection'
 import { useVideoEvents } from '@/components/Player/useVideoEvents'
 import { useVideoState } from '@/components/Player/useVideoState'
@@ -35,6 +36,8 @@ const isControlTarget = (target: EventTarget | null): boolean =>
 
 export type StageProps = {
   media: MediaItem
+  /** What plays after this video ends, in turn. */
+  upNext: readonly MediaItem[]
   backTo: string
   mode: PlaybackMode
   selection: TrackSelection
@@ -47,11 +50,10 @@ export type StageProps = {
  * ahead of the file, and `shift` takes that off wherever the element's
  * clock is read or set.
  */
-export const Stage = ({ media, backTo, mode, selection, onFailure }: StageProps) => {
+export const Stage = ({ media, upNext, backTo, mode, selection, onFailure }: StageProps) => {
   const navigate = useNavigate()
   // "The Matrix (1999)", or "Severance · S01E02 · Half Loop", once matched.
   const label = mediaLabel(media)
-  const stage = useRef<HTMLDivElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const menu = useRef<HTMLDialogElement>(null)
   const settingsButton = useRef<HTMLButtonElement>(null)
@@ -92,9 +94,10 @@ export const Stage = ({ media, backTo, mode, selection, onFailure }: StageProps)
     },
   })
 
+  const nextLink = useUpNext({ videoRef, upNext })
   const idle = useIdle(IDLE_MS)
   const { bezel, flash } = useBezel()
-  const fullscreen = useFullscreen(stage)
+  const fullscreen = useFullscreen()
   const [overlay, setOverlay] = useState<Overlay>('none')
   const [resumedAt, setResumedAt] = useState<number | null>(resumable ? media.position : null)
   const { cues, status: subtitleStatus } = useSubtitleCues({
@@ -174,7 +177,6 @@ export const Stage = ({ media, backTo, mode, selection, onFailure }: StageProps)
 
   return (
     <div
-      ref={stage}
       className={[styles.stage, chromeShown ? '' : styles.idle].filter(Boolean).join(' ')}
       onPointerMove={idle.wake}
       onPointerDown={onStagePointerDown}
@@ -213,6 +215,17 @@ export const Stage = ({ media, backTo, mode, selection, onFailure }: StageProps)
       >
         <ButtonLink to={backTo} icon="back" aria-label="Back to library" className={styles.back} />
         <h1 className={styles.title}>{label}</h1>
+        {nextLink && (
+          <ButtonLink
+            {...nextLink}
+            icon="next"
+            className={styles.next}
+            aria-label={`Next: ${mediaLabel(nextLink.state.media)}`}
+            title={mediaLabel(nextLink.state.media)}
+          >
+            Next
+          </ButtonLink>
+        )}
         {resumedAt != null && (
           <p className={styles.resumed} aria-live="polite">
             <span>Resumed at {formatDuration(resumedAt)}</span>

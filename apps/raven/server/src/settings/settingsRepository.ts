@@ -7,8 +7,10 @@ import {
   isDisplaySettings,
   type Guard,
   isPlaybackSettings,
+  isRecord,
 } from '@raven/core'
 import { DatabaseService } from '@/db/database'
+import { parseJsonAs } from '@/db/json'
 
 /** Server-wide settings, one JSON value per key, each read with its defaults filled in. */
 @Injectable()
@@ -19,17 +21,11 @@ export class SettingsRepository {
     return this.database.db
   }
 
-  private read(key: string): unknown {
+  private read(key: string): Record<string, unknown> | null {
     const row = this.db
       .prepare<[string], { value: string }>('SELECT value FROM settings WHERE key = ?')
       .get(key)
-    if (!row) return null
-    try {
-      const parsed: unknown = JSON.parse(row.value)
-      return parsed
-    } catch {
-      return null
-    }
+    return row ? parseJsonAs({ json: row.value, guard: isRecord }) : null
   }
 
   private write({ key, value }: { key: string; value: unknown }): void {
@@ -43,8 +39,7 @@ export class SettingsRepository {
 
   /** The stored value over the defaults, every field present; one that no longer reads falls back to the defaults. */
   private merged<T>({ key, defaults, guard }: { key: string; defaults: T; guard: Guard<T> }): T {
-    const stored = this.read(key)
-    const merged = { ...defaults, ...(stored != null && typeof stored === 'object' ? stored : {}) }
+    const merged = { ...defaults, ...this.read(key) }
     return guard(merged) ? merged : defaults
   }
 

@@ -16,7 +16,16 @@ const Waiting = () => (
  * Picks how to play a file and which tracks to play, then hands over to
  * the stage, or says why the file cannot play once every way has failed.
  */
-export const Player = ({ media, backTo }: { media: MediaItem; backTo: string }) => {
+export const Player = ({
+  media,
+  upNext,
+  backTo,
+}: {
+  media: MediaItem
+  /** What plays after this video ends, in turn. */
+  upNext: readonly MediaItem[]
+  backTo: string
+}) => {
   const selection = useTrackSelection(media.id)
   const playback = usePlaybackLadder({
     media,
@@ -40,6 +49,7 @@ export const Player = ({ media, backTo }: { media: MediaItem; backTo: string }) 
       return (
         <Stage
           media={media}
+          upNext={upNext}
           backTo={backTo}
           mode={playback.mode}
           selection={selection}

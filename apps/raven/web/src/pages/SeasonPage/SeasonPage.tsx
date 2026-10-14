@@ -3,7 +3,7 @@ import type { EpisodeSummary, ItemDetails } from '@raven/core'
 import { useId } from 'react'
 import { Link } from 'react-router-dom'
 import { Icon } from '@/components/Icon/Icon'
-import { ItemHeader, ItemHeaderSkeleton } from '@/components/ItemHeader/ItemHeader'
+import { ItemHeader, ItemHeaderSkeleton, pictureBackdrop } from '@/components/ItemHeader/ItemHeader'
 import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { RouteState } from '@/components/RouteState/RouteState'
 import { Summary } from '@/components/Summary/Summary'
@@ -63,7 +63,11 @@ const EpisodeRow = ({ episode }: { episode: EpisodeSummary }) => {
         {file && <PartlyWatched media={file} />}
       </div>
       {file && (
-        <Link {...watchLink(file)} className={styles.play} aria-label={`Play ${episode.title}`}>
+        <Link
+          {...watchLink({ media: file })}
+          className={styles.play}
+          aria-label={`Play ${episode.title}`}
+        >
           <Icon name="play" size={16} />
         </Link>
       )}
@@ -92,11 +96,9 @@ const SeasonView = ({ show, season }: { show: ItemDetails; season: ItemDetails }
           shape: 'poster',
           url: api.itemImageUrl({ id: season.id, kind: 'poster', version: season.posterVersion }),
         }}
-        backdrop={api.itemImageUrl({
-          id: show.id,
-          kind: 'backdrop',
-          version: show.backdropVersion,
-        })}
+        backdrop={pictureBackdrop(
+          api.itemImageUrl({ id: show.id, kind: 'backdrop', version: show.backdropVersion }),
+        )}
       />
 
       <Summary tagline={null} summary={season.summary} />

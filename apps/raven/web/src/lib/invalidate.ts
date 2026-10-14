@@ -108,6 +108,16 @@ export const afterLibraryView = ({
     ],
   })
 
+/** A saga's backdrop was picked: the library's sagas, which its page and its deck read. */
+export const afterSagaBackdrop = ({
+  queryClient,
+  libraryId,
+}: {
+  queryClient: QueryClient
+  libraryId: number
+}): Promise<unknown> =>
+  refetch({ queryClient, filters: [{ queryKey: queryKeys.sagas(libraryId) }] })
+
 /**
  * The player closed: resume lines on the library's listings, In progress
  * and the history, all under the library, and home's show where it stopped.

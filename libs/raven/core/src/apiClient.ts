@@ -37,6 +37,7 @@ import {
   type PosterEntry,
   type ProgressChange,
   type Saga,
+  type SagaBackdrop,
   type ServerEvent,
   type ShowListing,
   type ShowMatchChoice,
@@ -65,6 +66,7 @@ import {
   isPersonDetails,
   isPlaybackSettingsState,
   isPosterEntries,
+  isSagaBackdrop,
   isSagaList,
   isServerEvent,
   isServerHealth,
@@ -72,6 +74,7 @@ import {
 } from '@/contract'
 import { type MediaListOptions, mediaListQuery } from '@/mediaListQuery'
 import { toQueryString } from '@/query'
+import type { SagaPicture } from '@/sagas'
 import { type Guard, isRecord, isString, isStringArray, nullable } from '@/schema'
 import { parseWebVtt } from '@/subtitles'
 
@@ -396,6 +399,25 @@ export const createApiClient = ({
     listSagas: (libraryId: number): Promise<Saga[]> =>
       libraryGet({ libraryId, path: 'sagas', guard: isSagaList }),
 
+    /** Picks what a saga's page shows behind its title; answers with what was saved. */
+    setSagaBackdrop: ({
+      libraryId,
+      sagaId,
+      backdrop,
+    }: {
+      libraryId: number
+      sagaId: Saga['tmdbId']
+      backdrop: SagaBackdrop
+    }): Promise<SagaBackdrop> =>
+      expect({
+        request: send({
+          path: `/api/libraries/${libraryId}/sagas/${encodeURIComponent(sagaId)}/backdrop`,
+          method: 'PUT',
+          body: backdrop,
+        }),
+        guard: isSagaBackdrop,
+      }),
+
     /** A library's files no movie or show was found for, each with the AI lookup's suggestion for its folder. */
     listUnmatched: (libraryId: number): Promise<UnmatchedFile[]> =>
       libraryGet({ libraryId, path: 'unmatched', guard: isUnmatchedList }),
@@ -589,6 +611,10 @@ export const createApiClient = ({
       kind: ItemImageKind
       version: string | null
     }): string | null => (version == null ? null : itemImageAt({ id, kind, version })),
+
+    /** One of a saga's movies' backdrops; versioned, so cached for good. */
+    sagaPictureUrl: (picture: SagaPicture): string =>
+      itemImageAt({ id: picture.id, kind: 'backdrop', version: picture.version }),
 
     /** The picture behind a library's row on the Libraries page; versioned, so cached for good. */
     libraryBackdropUrl: (backdrop: LibraryBackdrop): string => {

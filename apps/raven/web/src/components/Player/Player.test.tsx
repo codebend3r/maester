@@ -2,11 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import type { MediaTracks, PlaybackSettingsState, SubtitleTrack } from '@raven/core'
 import { act, fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { Route, Routes } from 'react-router-dom'
 import { Player } from '@/components/Player/Player'
 import { api } from '@/lib/api'
 import { setBrowserSupport, setStreamSupport } from '@/test/canPlay'
 import { mediaItem } from '@/test/fixtures'
 import { DEFAULT_PLAYBACK_STATE, renderWithProviders } from '@/test/render'
+import { WatchProbe } from '@/test/watchProbe'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
 
 const subtitleTrack = (overrides: Partial<SubtitleTrack>): SubtitleTrack => ({
@@ -59,7 +61,7 @@ describe('Player', () => {
 
   it('goes straight to the video when the browser can play the file', () => {
     const { container } = renderWithProviders(
-      <Player media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />,
+      <Player media={mediaItem({ container: 'mp4' })} upNext={[]} backTo="/libraries/2" />,
     )
     const video = container.querySelector('video')
     expect(video).toHaveAttribute('src', '/api/media/7/file')
@@ -68,7 +70,9 @@ describe('Player', () => {
   })
 
   it('explains why a file cannot play instead of loading it', () => {
-    const { container } = renderWithProviders(<Player media={mediaItem()} backTo="/libraries/2" />)
+    const { container } = renderWithProviders(
+      <Player media={mediaItem()} upNext={[]} backTo="/libraries/2" />,
+    )
     expect(container.querySelector('video')).toBeNull()
     expect(screen.getByText("This video can't play in this browser.")).toBeInTheDocument()
     expect(screen.getByText("The MKV container isn't supported here.")).toBeInTheDocument()
@@ -82,7 +86,7 @@ describe('Player', () => {
     }
     spies.push(spyOn(api, 'getPlaybackSettings').mockImplementation(async () => off))
     const { container } = renderWithProviders(
-      <Player media={mediaItem()} backTo="/libraries/2" />,
+      <Player media={mediaItem()} upNext={[]} backTo="/libraries/2" />,
       { playback: null },
     )
     expect(screen.getByLabelText('Loading')).toBeInTheDocument()
@@ -97,7 +101,7 @@ describe('Player', () => {
       settings: { ...DEFAULT_PLAYBACK_STATE.settings, directPlay: 'force' },
     }
     const { container } = renderWithProviders(
-      <Player media={mediaItem()} backTo="/libraries/2" />,
+      <Player media={mediaItem()} upNext={[]} backTo="/libraries/2" />,
       { playback: forced },
     )
     expect(container.querySelector('video')).toHaveAttribute('src', '/api/media/7/file')
@@ -120,7 +124,9 @@ describe('Player', () => {
   })
 
   it('lets the viewer try anyway', async () => {
-    const { container } = renderWithProviders(<Player media={mediaItem()} backTo="/libraries/2" />)
+    const { container } = renderWithProviders(
+      <Player media={mediaItem()} upNext={[]} backTo="/libraries/2" />,
+    )
     await userEvent.click(screen.getByRole('button', { name: 'Try playing anyway' }))
     expect(container.querySelector('video')).toHaveAttribute('src', '/api/media/7/file')
   })
@@ -130,7 +136,11 @@ describe('Player progress', () => {
   it('does not overwrite the saved position when the video never started', async () => {
     const saveSpy = spyOn(api, 'saveProgress').mockImplementation(async () => undefined)
     const { container, unmount } = renderWithProviders(
-      <Player media={mediaItem({ container: 'mp4', position: 600 })} backTo="/libraries/2" />,
+      <Player
+        media={mediaItem({ container: 'mp4', position: 600 })}
+        upNext={[]}
+        backTo="/libraries/2"
+      />,
     )
     container.querySelector('video')?.dispatchEvent(new Event('pause'))
     unmount()
@@ -145,7 +155,7 @@ describe('Player history', () => {
     stubTracks()
     const played = spyOn(api, 'recordPlay').mockImplementation(async () => undefined)
     const { container } = renderWithProviders(
-      <Player media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />,
+      <Player media={mediaItem({ container: 'mp4' })} upNext={[]} backTo="/libraries/2" />,
     )
     const video = container.querySelector('video')
     expect(played).not.toHaveBeenCalled()
@@ -162,7 +172,7 @@ describe('the player controls', () => {
 
   it("draws its own controls rather than the browser's", () => {
     const { container } = renderWithProviders(
-      <Player media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />,
+      <Player media={mediaItem({ container: 'mp4' })} upNext={[]} backTo="/libraries/2" />,
     )
     expect(container.querySelector('video')).not.toHaveAttribute('controls')
     expect(screen.getByRole('button', { name: 'Play (k)' })).toBeInTheDocument()
@@ -174,7 +184,9 @@ describe('the player controls', () => {
   })
 
   it('lists audio, subtitles and speed in the settings menu', async () => {
-    renderWithProviders(<Player media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />)
+    renderWithProviders(
+      <Player media={mediaItem({ container: 'mp4' })} upNext={[]} backTo="/libraries/2" />,
+    )
     await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
     const menu = await screen.findByRole('dialog', { name: 'Settings' })
     const audio = within(within(menu).getByRole('group', { name: 'Audio' }))
@@ -188,7 +200,9 @@ describe('the player controls', () => {
   })
 
   it('remembers a subtitle choice for the next video', async () => {
-    renderWithProviders(<Player media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />)
+    renderWithProviders(
+      <Player media={mediaItem({ container: 'mp4' })} upNext={[]} backTo="/libraries/2" />,
+    )
     await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
     const menu = await screen.findByRole('dialog', { name: 'Settings' })
     const subtitles = within(within(menu).getByRole('group', { name: 'Subtitles' }))
@@ -207,14 +221,16 @@ describe('the player controls', () => {
         { start: 0, end: 30, text: 'Hello <i>there</i>' },
       ]),
     )
-    renderWithProviders(<Player media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />)
+    renderWithProviders(
+      <Player media={mediaItem({ container: 'mp4' })} upNext={[]} backTo="/libraries/2" />,
+    )
     expect(await screen.findByText('there')).toHaveClass('italic')
     expect(screen.getByText('Hello')).toBeInTheDocument()
   })
 
   it("answers YouTube's keys", async () => {
     const { container } = renderWithProviders(
-      <Player media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />,
+      <Player media={mediaItem({ container: 'mp4' })} upNext={[]} backTo="/libraries/2" />,
     )
     const video = container.querySelector('video')
     if (!video) throw new Error('no video')
@@ -248,11 +264,44 @@ describe('the player controls', () => {
 
   it('leaves keys alone while the volume slider has them', () => {
     const { container } = renderWithProviders(
-      <Player media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />,
+      <Player media={mediaItem({ container: 'mp4' })} upNext={[]} backTo="/libraries/2" />,
     )
     const video = container.querySelector('video')
     fireEvent.keyDown(screen.getByRole('slider', { name: 'Volume' }), { key: 'l' })
     expect(video?.currentTime).toBe(0)
+  })
+
+  it('plays the next video in line once this one ends, and offers it sooner', async () => {
+    const upNext = [
+      mediaItem({ id: 8, title: 'Busboys 2 (2027)', container: 'mp4' }),
+      mediaItem({ id: 9, title: 'Busboys 3 (2028)', container: 'mp4' }),
+    ]
+    const { container } = renderWithProviders(
+      <Routes>
+        <Route
+          path="/"
+          element={
+            <Player media={mediaItem({ container: 'mp4' })} upNext={upNext} backTo="/libraries/2" />
+          }
+        />
+        <Route path="watch/:id" element={<WatchProbe />} />
+      </Routes>,
+    )
+    expect(screen.getByRole('link', { name: /^Next: Busboys 2/ })).toHaveAttribute(
+      'href',
+      '/watch/8',
+    )
+    const video = container.querySelector('video')
+    if (!video) throw new Error('no video')
+    fireEvent(video, new Event('ended'))
+    expect(await screen.findByText('Playing 8, then 9')).toBeInTheDocument()
+  })
+
+  it('offers no next video when none came with it', () => {
+    renderWithProviders(
+      <Player media={mediaItem({ container: 'mp4' })} upNext={[]} backTo="/libraries/2" />,
+    )
+    expect(screen.queryByRole('link', { name: /^Next/ })).toBeNull()
   })
 
   it('steps down through every conversion before giving up', async () => {
@@ -260,7 +309,7 @@ describe('the player controls', () => {
     setBrowserSupport((mime) => !mime.includes('mlpa'))
     setStreamSupport(() => true)
     renderWithProviders(
-      <Player media={mediaItem({ audioCodec: 'truehd' })} backTo="/libraries/2" />,
+      <Player media={mediaItem({ audioCodec: 'truehd' })} upNext={[]} backTo="/libraries/2" />,
     )
     expect(await screen.findByText("This video can't play in this browser.")).toBeInTheDocument()
     expect(screen.getByText("This browser can't play converted video.")).toBeInTheDocument()

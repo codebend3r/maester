@@ -1,11 +1,20 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
-import { screen } from '@testing-library/react'
-import type { LibrarySettings, Saga } from '@raven/core'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import {
+  type AdminLock,
+  DEFAULT_SAGA_BACKDROP,
+  type LibrarySettings,
+  type Saga,
+  type SagaBackdrop,
+} from '@raven/core'
 import { Route, Routes } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { SagaPage } from '@/pages/SagaPage/SagaPage'
+import { usePageBackdrop } from '@/stores/pageBackdrop'
 import { itemSummary, library, matchedMovie } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
+import { WatchProbe } from '@/test/watchProbe'
 
 const movie = ({
   id,
@@ -28,6 +37,7 @@ const movie = ({
 const RINGS: Saga = {
   tmdbId: '119',
   name: 'The Lord of the Rings Collection',
+  backdrop: DEFAULT_SAGA_BACKDROP,
   media: [
     movie({ id: 7, title: 'The Fellowship of the Ring', year: 2001 }),
     movie({ id: 8, title: 'The Two Towers', year: 2002, backdropVersion: 'b1' }),
@@ -35,11 +45,15 @@ const RINGS: Saga = {
   ],
 }
 
+const backdropOf = (id: number, version: string) =>
+  document.querySelector(`img[src*="/api/items/${id}/images/backdrop?v=${version}"]`)
+
 describe('SagaPage', () => {
   const spies = {
     get: spyOn(api, 'getLibrary'),
     sagas: spyOn(api, 'listSagas'),
     lock: spyOn(api, 'getLock'),
+    pick: spyOn(api, 'setSagaBackdrop'),
   }
 
   afterEach(() => Object.values(spies).forEach((spy) => spy.mockReset()))
@@ -47,7 +61,14 @@ describe('SagaPage', () => {
   const open = ({
     route = '/libraries/2/sagas/119',
     settings = {},
-  }: { route?: string; settings?: Partial<LibrarySettings> } = {}) => {
+    backdrop = DEFAULT_SAGA_BACKDROP,
+    adminLock,
+  }: {
+    route?: string
+    settings?: Partial<LibrarySettings>
+    backdrop?: SagaBackdrop
+    adminLock?: AdminLock
+  } = {}) => {
     spies.get.mockImplementation(async () =>
       library({
         id: 2,
@@ -55,12 +76,13 @@ describe('SagaPage', () => {
         settings: { ...library().settings, kind: 'movies', ...settings },
       }),
     )
-    spies.sagas.mockImplementation(async () => [RINGS])
+    spies.sagas.mockImplementation(async () => [{ ...RINGS, backdrop }])
     renderWithProviders(
       <Routes>
         <Route path="libraries/:id/sagas/:sagaId" element={<SagaPage />} />
+        <Route path="watch/:id" element={<WatchProbe />} />
       </Routes>,
-      { route },
+      { route, adminLock },
     )
   }
 
@@ -74,18 +96,113 @@ describe('SagaPage', () => {
     expect(screen.getByText('8h 54m in all')).toBeInTheDocument()
     expect(
       screen
-        .getAllByRole('link', { name: /^Play / })
+        .getAllByRole('link', { name: /^Play The / })
         .map((link) => link.getAttribute('aria-label')),
     ).toEqual([
       'Play The Fellowship of the Ring',
       'Play The Two Towers',
       'Play The Return of the King',
     ])
-    expect(document.querySelector('img[src*="/api/items/80/images/backdrop?v=b1"]')).not.toBeNull()
+    expect(backdropOf(80, 'b1')).not.toBeNull()
     expect(screen.getByRole('link', { name: 'Sagas' })).toHaveAttribute(
       'href',
       '/libraries/2/sagas',
     )
+  })
+
+  it("lays out each movie's backdrop for the slideshow, from the first", async () => {
+    open({ backdrop: { type: 'slideshow', motion: 'kenBurns' } })
+    await screen.findByRole('heading', { name: 'The Lord of the Rings Collection' })
+    expect(backdropOf(80, 'b1')).not.toBeNull()
+    expect(backdropOf(90, 'b2')).not.toBeNull()
+  })
+
+  it('holds still the backdrop picked for it, and only that one', async () => {
+    open({ backdrop: { type: 'still', itemId: 90 } })
+    await screen.findByRole('heading', { name: 'The Lord of the Rings Collection' })
+    expect(backdropOf(90, 'b2')).not.toBeNull()
+    expect(backdropOf(80, 'b1')).toBeNull()
+  })
+
+  it('plays every movie one after another from Play all', async () => {
+    open()
+    await userEvent.click(await screen.findByRole('link', { name: 'Play all' }))
+    expect(await screen.findByText('Playing 7, then 8, 9')).toBeInTheDocument()
+  })
+
+  it("leaves the saga's backdrop up when a movie is pointed at", async () => {
+    open()
+    const card = await screen.findByRole('link', { name: 'The Two Towers' })
+    fireEvent.focusIn(card)
+    expect(usePageBackdrop.getState().current).toBeNull()
+  })
+
+  it('saves the backdrop picked in Edit backdrop, held still on one movie', async () => {
+    spies.pick.mockImplementation(async ({ backdrop }) => backdrop)
+    open()
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit backdrop' }))
+    const dialog = screen.getByRole('dialog', { name: 'Edit backdrop' })
+    expect(within(dialog).getByRole('radio', { name: 'Crossfade' })).toBeChecked()
+    expect(within(dialog).queryByRole('group', { name: 'Picture' })).toBeNull()
+
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Off' }))
+    const pictures = within(dialog).getByRole('group', { name: 'Picture' })
+    expect(within(pictures).getByRole('radio', { name: 'The Two Towers' })).toBeChecked()
+    await userEvent.click(within(pictures).getByRole('radio', { name: 'The Return of the King' }))
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
+
+    expect(spies.pick).toHaveBeenCalledWith({
+      libraryId: 2,
+      sagaId: '119',
+      backdrop: { type: 'still', itemId: 90 },
+    })
+    await waitFor(() => expect(spies.sagas).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
+
+  it('saves a slideshow by the motion picked', async () => {
+    spies.pick.mockImplementation(async ({ backdrop }) => backdrop)
+    open({ backdrop: { type: 'still', itemId: 90 } })
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit backdrop' }))
+    const dialog = screen.getByRole('dialog', { name: 'Edit backdrop' })
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Slide' }))
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
+    expect(spies.pick).toHaveBeenCalledWith({
+      libraryId: 2,
+      sagaId: '119',
+      backdrop: { type: 'slideshow', motion: 'slide' },
+    })
+  })
+
+  it('starts on the cover shown when the movie picked has left the saga, and saves that one', async () => {
+    spies.pick.mockImplementation(async ({ backdrop }) => backdrop)
+    open({ backdrop: { type: 'still', itemId: 990 } })
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit backdrop' }))
+    const dialog = screen.getByRole('dialog', { name: 'Edit backdrop' })
+    const pictures = within(dialog).getByRole('group', { name: 'Picture' })
+    expect(within(pictures).getByRole('radio', { name: 'The Two Towers' })).toBeChecked()
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
+    expect(spies.pick).toHaveBeenCalledWith({
+      libraryId: 2,
+      sagaId: '119',
+      backdrop: { type: 'still', itemId: 80 },
+    })
+  })
+
+  it('keeps the picture picked while the motions are tried', async () => {
+    open({ backdrop: { type: 'still', itemId: 90 } })
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit backdrop' }))
+    const dialog = screen.getByRole('dialog', { name: 'Edit backdrop' })
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Ken Burns' }))
+    expect(within(dialog).queryByRole('group', { name: 'Picture' })).toBeNull()
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Off' }))
+    expect(within(dialog).getByRole('radio', { name: 'The Return of the King' })).toBeChecked()
+  })
+
+  it('offers Edit backdrop only with the admin lock off', async () => {
+    open({ adminLock: { state: 'on', available: true } })
+    expect(await screen.findByRole('link', { name: 'Play all' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Edit backdrop' })).toBeNull()
   })
 
   it('finds nothing for a saga the library does not have', async () => {

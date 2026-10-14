@@ -8,7 +8,7 @@ import { Button, ButtonLink } from '@/components/Button/Button'
 import { CastRow } from '@/components/CastRow/CastRow'
 import { FixMatchDialog } from '@/components/FixMatchDialog/FixMatchDialog'
 import { ImageEditor } from '@/components/ImageEditor/ImageEditor'
-import { ItemHeader, ItemHeaderSkeleton } from '@/components/ItemHeader/ItemHeader'
+import { ItemHeader, ItemHeaderSkeleton, pictureBackdrop } from '@/components/ItemHeader/ItemHeader'
 import { MetadataEditor } from '@/components/MetadataEditor/MetadataEditor'
 import { ReviewCards } from '@/components/ReviewCards/ReviewCards'
 import { RouteState } from '@/components/RouteState/RouteState'
@@ -77,14 +77,12 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
             version: details.posterVersion,
           }),
         }}
-        backdrop={api.itemImageUrl({
-          id: details.id,
-          kind: 'backdrop',
-          version: details.backdropVersion,
-        })}
+        backdrop={pictureBackdrop(
+          api.itemImageUrl({ id: details.id, kind: 'backdrop', version: details.backdropVersion }),
+        )}
       >
         {next.data && (
-          <ButtonLink tone="primary" icon="play" {...watchLink(next.data)}>
+          <ButtonLink tone="primary" icon="play" {...watchLink({ media: next.data })}>
             {code ? `Play ${code}` : 'Play'}
           </ButtonLink>
         )}

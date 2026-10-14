@@ -1,5 +1,6 @@
 import type { DatabaseService } from '@/db/database'
 import { MediaRepository } from '@/media/mediaRepository'
+import { SagaBackdrops } from '@/media/sagaBackdrops'
 import { ItemImagesRepository } from '@/metadata/itemImagesRepository'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 
@@ -7,5 +8,11 @@ import { MetadataRepository } from '@/metadata/metadataRepository'
 export const repositories = (database: DatabaseService) => {
   const images = new ItemImagesRepository(database)
   const metadata = new MetadataRepository(database, images)
-  return { images, metadata, media: new MediaRepository(database, metadata, images) }
+  const sagaBackdrops = new SagaBackdrops(database)
+  return {
+    images,
+    metadata,
+    sagaBackdrops,
+    media: new MediaRepository(database, metadata, images, sagaBackdrops),
+  }
 }

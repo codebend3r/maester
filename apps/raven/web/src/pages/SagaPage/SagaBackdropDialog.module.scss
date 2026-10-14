@@ -1,0 +1,138 @@
+// elements.scss gives the dialog its frame, padding and scrim; this holds
+// it at a reading width, within the screen's height.
+.dialog {
+  width: min(var(--measure), calc(100vw - 2 * var(--space-3)));
+  max-height: calc(100dvh - 2 * var(--space-3));
+}
+
+.form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: var(--font-size-xl);
+  font-weight: 400;
+  line-height: var(--line-tight);
+}
+
+.field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+  min-width: 0;
+  padding: 0;
+  border: 0;
+
+  > legend {
+    padding: 0 0 var(--space-1);
+  }
+}
+
+.hint {
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+}
+
+// The radio beside its name, its hint under the name.
+.choice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    'radio label'
+    '. hint';
+  gap: 0 var(--space-1);
+  align-items: center;
+
+  > input {
+    grid-area: radio;
+  }
+
+  > label {
+    grid-area: label;
+  }
+
+  > .hint {
+    grid-area: hint;
+  }
+}
+
+// Each movie's backdrop as a tile: a radio kept out of sight, its label the
+// tile. Two to a row, one on a narrow screen.
+.pictures {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+  padding: 0;
+  list-style: none;
+
+  @media (max-width: 30rem) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+// Positioned, so the radio kept out of sight stays by its tile.
+.picture {
+  position: relative;
+  display: grid;
+
+  label {
+    display: grid;
+    grid-template-rows: auto auto;
+    gap: var(--space-0);
+    padding: var(--space-0);
+    border: 2px solid transparent;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+  }
+
+  img {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    border-radius: var(--radius-sm);
+    background: var(--color-night);
+  }
+
+  label:hover {
+    border-color: var(--color-moss);
+  }
+
+  input:checked + label {
+    border-color: var(--color-leaf-bright);
+  }
+
+  input:focus-visible + label {
+    outline: var(--focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+.caption {
+  overflow: hidden;
+  font-size: var(--font-size-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.error {
+  padding: var(--space-2) var(--space-3);
+  border-left: 2px solid var(--color-leaf-bright);
+  background: var(--color-night);
+  font-size: var(--font-size-sm);
+}
+
+.actions {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: end;
+  gap: var(--space-1);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .picture label {
+    transition: border-color 120ms ease-out;
+  }
+}

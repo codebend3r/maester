@@ -607,14 +607,35 @@ export type PosterEntry = Infer<typeof isPosterEntry>
  */
 export const isPosterEntries = listOf(isPosterEntry)
 
+/** How a saga's slideshow moves from one movie's backdrop to the next. */
+export const isSlideshowMotion = oneOf(['fade', 'kenBurns', 'slide'])
+
+export type SlideshowMotion = Infer<typeof isSlideshowMotion>
+
+/**
+ * What a saga's page shows behind its title: its movies' backdrops in turn,
+ * first to last and round again, or the one of them picked, held still.
+ * `PUT /api/libraries/:id/sagas/:sagaId/backdrop` takes it and answers with it.
+ */
+export const isSagaBackdrop = union(
+  object({ type: oneOf(['slideshow']), motion: isSlideshowMotion }),
+  object({ type: oneOf(['still']), itemId: isNumber }),
+)
+
+export type SagaBackdrop = Infer<typeof isSagaBackdrop>
+
+/** A saga's backdrop until its library picks another. */
+export const DEFAULT_SAGA_BACKDROP: SagaBackdrop = { type: 'slideshow', motion: 'fade' }
+
 /**
  * A saga: a TMDB collection (The Lord of the Rings Collection, say) and the
  * movies of it a library holds, oldest first, one entry each, its best file.
- * Its backdrop is read off them by `sagaBackdrop`.
+ * The pictures its backdrop shows are read off them by `sagaPictures`.
  */
 export const isSaga = object({
   tmdbId: isString,
   name: isString,
+  backdrop: isSagaBackdrop,
   media: isMediaList,
 })
 

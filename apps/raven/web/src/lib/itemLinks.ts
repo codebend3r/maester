@@ -1,4 +1,11 @@
-import type { ItemSummary, MediaItem } from '@raven/core'
+import {
+  type Infer,
+  type ItemSummary,
+  type MediaItem,
+  isMediaItem,
+  isMediaList,
+  object,
+} from '@raven/core'
 
 /** A season's page, by its show and number. */
 export const seasonPath = ({ showId, season }: { showId: number; season: number }): string =>
@@ -28,14 +35,36 @@ export const episodeBackPath = ({
     : seasonPath({ showId: item.show.id, season: item.season })
 }
 
+/** What a link to the player hands over in router state: the video, and the ones to play after it. */
+const isWatchState = object({ media: isMediaItem, upNext: isMediaList })
+
+export type WatchState = Infer<typeof isWatchState>
+
 /**
  * The link to play a video, with the video riding along in router state so
- * the player starts without fetching it again.
+ * the player starts without fetching it again, and any to play after it, in
+ * turn, as Play all hands over a saga.
  */
-export const watchLink = (media: MediaItem): { to: string; state: { media: MediaItem } } => ({
-  to: `/watch/${media.id}`,
-  state: { media },
-})
+export const watchLink = ({
+  media,
+  upNext = [],
+}: {
+  media: MediaItem
+  upNext?: WatchState['upNext']
+}): { to: string; state: WatchState } => ({ to: `/watch/${media.id}`, state: { media, upNext } })
+
+/**
+ * What `watchLink` handed over for video `id`; null for a direct visit, a
+ * refresh of a link from before, or another video's state.
+ */
+export const readWatchState = ({
+  state,
+  id,
+}: {
+  state: unknown
+  /** null for an address that names no video. */
+  id: number | null
+}): WatchState | null => (isWatchState(state) && state.media.id === id ? state : null)
 
 /** "2011 to 2019", "2022 to now", or just the year for a show that began and ended in one. */
 export const showYears = ({
@@ -61,8 +90,8 @@ export const cardLink = ({
 }: {
   media: MediaItem
   pages: boolean
-}): { to: string; state?: { media: MediaItem } } => {
+}): { to: string; state?: WatchState } => {
   const page = pages && media.item ? itemPath(media.item) : null
-  if (page == null) return watchLink(media)
+  if (page == null) return watchLink({ media })
   return media.variant == null ? { to: page } : { to: `${page}?file=${media.id}` }
 }

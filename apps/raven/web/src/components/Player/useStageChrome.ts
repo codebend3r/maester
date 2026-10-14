@@ -1,4 +1,4 @@
-import { type RefObject, useEffect, useEffectEvent, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import type { BezelState } from '@/components/Player/Bezel'
 
 /**
@@ -42,11 +42,14 @@ export const useBezel = (): {
   }
 }
 
-/** Whether the stage fills the screen, and the way in and out. */
-export const useFullscreen = (
-  stage: RefObject<HTMLElement | null>,
-): { fullscreen: boolean; toggle: () => void } => {
-  const [fullscreen, setFullscreen] = useState(false)
+/**
+ * Whether the player fills the screen, and the way in and out. The whole
+ * page fills it rather than the stage, so the next video in line, which
+ * brings a stage of its own, carries on full screen. `useLeaveFullscreen`
+ * takes it back when the player goes.
+ */
+export const useFullscreen = (): { fullscreen: boolean; toggle: () => void } => {
+  const [fullscreen, setFullscreen] = useState(() => !!document.fullscreenElement)
   useEffect(() => {
     const onChange = () => setFullscreen(!!document.fullscreenElement)
     document.addEventListener('fullscreenchange', onChange)
@@ -56,7 +59,20 @@ export const useFullscreen = (
     fullscreen,
     toggle: () => {
       if (document.fullscreenElement) void document.exitFullscreen()
-      else void stage.current?.requestFullscreen?.()
+      else void document.documentElement.requestFullscreen?.()
     },
   }
 }
+
+/**
+ * Leaves the full screen `useFullscreen` filled, once the page the player
+ * lives on goes. That page outlasts each video, as the next in line takes
+ * the last one's place, so a video ending leaves the screen full.
+ */
+export const useLeaveFullscreen = (): void =>
+  useEffect(
+    () => () => {
+      if (document.fullscreenElement) void document.exitFullscreen()
+    },
+    [],
+  )

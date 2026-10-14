@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common'
 import {
+  DEFAULT_SAGA_BACKDROP,
   type LibraryBackdrop,
   type MediaItem,
   type MediaSort,
@@ -20,6 +21,7 @@ import {
   likePattern,
   score,
 } from '@/media/mediaSql'
+import { SagaBackdrops } from '@/media/sagaBackdrops'
 import { shuffle } from '@/media/shuffle'
 import { ItemImagesRepository } from '@/metadata/itemImagesRepository'
 import { MetadataRepository } from '@/metadata/metadataRepository'
@@ -235,6 +237,7 @@ export class MediaRepository {
     @Inject(DatabaseService) private readonly database: DatabaseService,
     @Inject(MetadataRepository) private readonly metadata: MetadataRepository,
     @Inject(ItemImagesRepository) private readonly images: ItemImagesRepository,
+    @Inject(SagaBackdrops) private readonly sagaBackdrops: SagaBackdrops,
   ) {}
 
   private get db() {
@@ -527,8 +530,8 @@ export class MediaRepository {
 
   /**
    * A library's sagas: each TMDB collection two or more of its movies belong
-   * to, by name, with those movies oldest first, one entry each, its best
-   * file. A movie split onto
+   * to, by name, with the backdrop the library picked for it and those
+   * movies oldest first, one entry each, its best file. A movie split onto
    * several cards is still one movie, so a single movie of a collection is
    * no saga yet, however many cards it has.
    */
@@ -546,11 +549,13 @@ export class MediaRepository {
         .all(libraryId),
     )
     const sagas = this.metadata.sagasOf(movies.flatMap((media) => media.item?.id ?? []))
+    const backdrops = this.sagaBackdrops.ofLibrary(libraryId)
     const grouped = movies.reduce((groups, media) => {
       const saga = media.item ? sagas.get(media.item.id) : undefined
       if (!saga) return groups
       const held = groups.get(saga.tmdbId)?.media ?? []
-      return groups.set(saga.tmdbId, { ...saga, media: [...held, media] })
+      const backdrop = backdrops.get(saga.tmdbId) ?? DEFAULT_SAGA_BACKDROP
+      return groups.set(saga.tmdbId, { ...saga, backdrop, media: [...held, media] })
     }, new Map<string, Saga>())
     return [...grouped.values()]
       .filter((saga) => saga.media.length > 1)

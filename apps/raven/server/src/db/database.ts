@@ -334,6 +334,16 @@ export const MIGRATIONS: readonly string[] = [
   UPDATE media SET match = 'pending'
     WHERE library_id IN (SELECT id FROM libraries WHERE kind = 'sports');
   `,
+  // What each library's saga pages show behind their titles, a `SagaBackdrop`
+  // as JSON; a saga with no row shows the default slideshow.
+  `
+  CREATE TABLE saga_backdrops (
+    library_id INTEGER NOT NULL REFERENCES libraries (id) ON DELETE CASCADE,
+    saga_tmdb_id TEXT NOT NULL,
+    backdrop TEXT NOT NULL CHECK (json_valid(backdrop)),
+    PRIMARY KEY (library_id, saga_tmdb_id)
+  );
+  `,
 ]
 
 /** The index's file in the data folder. Before raven was renamed it was `weirwood.db`. */

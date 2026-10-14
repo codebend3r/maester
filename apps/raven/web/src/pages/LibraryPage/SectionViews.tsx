@@ -187,7 +187,7 @@ const AllSection = ({ library }: { library: Library }) => {
   // the player starts without fetching it again.
   const watch = (item: MediaItem | undefined) => {
     if (!item) return
-    const link = watchLink(item)
+    const link = watchLink({ media: item })
     navigate(link.to, { state: link.state })
   }
 

@@ -9,6 +9,7 @@ import {
   isThumbnailState,
 } from '@raven/core'
 import { DatabaseService } from '@/db/database'
+import { parseJsonAs } from '@/db/json'
 import type { ProbeResult } from '@/ffmpeg/probe'
 import { namedAs } from '@/media/namedAs'
 import type { IndexedFile, Reconciled } from '@/scanner/reconcile'
@@ -299,12 +300,7 @@ export class MediaIndex {
       .prepare<[number], { tracks: string | null }>('SELECT tracks FROM media WHERE id = ?')
       .get(id)
     if (row?.tracks == null) return null
-    try {
-      const parsed: unknown = JSON.parse(row.tracks)
-      return isMediaTracks(parsed) ? parsed : null
-    } catch {
-      return null
-    }
+    return parseJsonAs({ json: row.tracks, guard: isMediaTracks })
   }
 
   saveTracks({ id, tracks }: { id: number; tracks: MediaTracks }): void {

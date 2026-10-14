@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { cardLink, episodeBackPath, itemPath, watchLink } from '@/lib/itemLinks'
+import { cardLink, episodeBackPath, itemPath, readWatchState, watchLink } from '@/lib/itemLinks'
 import { itemSummary, mediaItem } from '@/test/fixtures'
 
 describe('itemPath', () => {
@@ -27,9 +27,28 @@ describe('episodeBackPath', () => {
 })
 
 describe('watchLink', () => {
-  it('hands the video over in router state', () => {
+  it('hands the video over in router state, with nothing to play after it', () => {
     const media = mediaItem({ id: 9 })
-    expect(watchLink(media)).toEqual({ to: '/watch/9', state: { media } })
+    expect(watchLink({ media })).toEqual({ to: '/watch/9', state: { media, upNext: [] } })
+  })
+
+  it('hands over the videos to play after it, in turn', () => {
+    const media = mediaItem({ id: 9 })
+    const upNext = [mediaItem({ id: 10 }), mediaItem({ id: 11 })]
+    expect(watchLink({ media, upNext })).toEqual({ to: '/watch/9', state: { media, upNext } })
+  })
+})
+
+describe('readWatchState', () => {
+  it("reads what a link handed over for the video it plays, and nothing for another's", () => {
+    const { state } = watchLink({ media: mediaItem({ id: 9 }), upNext: [mediaItem({ id: 10 })] })
+    expect(readWatchState({ state, id: 9 })).toEqual(state)
+    expect(readWatchState({ state, id: 10 })).toBeNull()
+  })
+
+  it('reads nothing from a direct visit, or state from before the queue', () => {
+    expect(readWatchState({ state: null, id: 9 })).toBeNull()
+    expect(readWatchState({ state: { media: mediaItem({ id: 9 }) }, id: 9 })).toBeNull()
   })
 })
 
@@ -46,6 +65,6 @@ describe('cardLink', () => {
 
   it('plays a file straight away where the library has no pages', () => {
     const media = mediaItem({ id: 9, item: itemSummary({ id: 4, type: 'movie' }) })
-    expect(cardLink({ media, pages: false })).toEqual(watchLink(media))
+    expect(cardLink({ media, pages: false })).toEqual(watchLink({ media }))
   })
 })

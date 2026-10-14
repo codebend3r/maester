@@ -25,9 +25,9 @@
   background: var(--color-night-glass);
 }
 
-// Decorative, and still: it fades into the night behind the page. Its
-// opacity would paint it over the content, and its clicks with it, so it
-// takes none and the content sits above.
+// Decorative: a picture, or a saga's slideshow, fading into the night behind
+// the page. Its opacity would paint it over the content, and its clicks with
+// it, so it takes none and the content sits above.
 .backdrop {
   width: 100%;
   height: 100%;

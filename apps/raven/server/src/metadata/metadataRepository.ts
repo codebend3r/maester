@@ -16,6 +16,7 @@ import {
 } from '@raven/core'
 import type Sqlite from 'better-sqlite3'
 import { DatabaseService } from '@/db/database'
+import { parseJsonAs } from '@/db/json'
 import { ItemImagesRepository, lineOf, versionOf } from '@/metadata/itemImagesRepository'
 import { LOCAL } from '@/metadata/localItems'
 import type { OmdbScore } from '@/metadata/omdbClient'
@@ -81,14 +82,7 @@ export type StoredItem = {
   number: number | null
 }
 
-const genresOf = (json: string): string[] => {
-  try {
-    const parsed: unknown = JSON.parse(json)
-    return isStringArray(parsed) ? parsed : []
-  } catch {
-    return []
-  }
-}
+const genresOf = (json: string): string[] => parseJsonAs({ json, guard: isStringArray }) ?? []
 
 /** Movies, shows, seasons and episodes as TMDB describes them, with their people, scores and pictures. */
 @Injectable()

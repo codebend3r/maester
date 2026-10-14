@@ -1,5 +1,12 @@
-import { type PointerEvent, useEffect, useRef } from 'react'
+import { type PointerEvent, createContext, useContext, useEffect, useRef } from 'react'
 import { usePageBackdrop } from '@/stores/pageBackdrop'
+
+/**
+ * Whether the cards inside bring their pictures in behind the page. A page
+ * with a backdrop of its own, as a saga's has, provides false, so pointing
+ * at a card leaves that backdrop alone.
+ */
+export const HoverBackdrops = createContext(true)
 
 /** How long the pointer rests on a card before its picture comes in, so a sweep across the grid loads none. */
 const REST_MS = 120
@@ -14,9 +21,11 @@ const LINGER_MS = 300
 /**
  * Handlers for a card that shows `url` behind the whole page while it is
  * pointed at or focused, and puts it away after. Touch has no pointing, so a
- * tap only opens the card. With no picture the card gets no handlers.
+ * tap only opens the card. With no picture, or inside a page that keeps
+ * `HoverBackdrops` off, the card gets no handlers.
  */
 export const useHoverBackdrop = (url: string | null) => {
+  const isOn = useContext(HoverBackdrops)
   const show = usePageBackdrop((state) => state.show)
   const hide = usePageBackdrop((state) => state.hide)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -38,7 +47,7 @@ export const useHoverBackdrop = (url: string | null) => {
     [url, hide],
   )
 
-  if (!url) return {}
+  if (!url || !isOn) return {}
   // `hide` only puts away the picture still shown, so a card entered since keeps its own.
   const linger = () => after({ ms: LINGER_MS, run: () => hide(url) })
   return {

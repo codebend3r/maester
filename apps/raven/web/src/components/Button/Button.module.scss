@@ -55,6 +55,18 @@
   }
 }
 
+// Bigger in every way, its icon with it, as the icon is sized in ems. A
+// phone has no room for it beside the page's other actions, so there it
+// keeps the regular size.
+.large {
+  @media not (max-width: 30rem) {
+    min-height: var(--control-size-large);
+    padding: var(--space-2) var(--space-5);
+    gap: var(--space-2);
+    font-size: var(--font-size-lg);
+  }
+}
+
 .iconOnly {
   padding: var(--space-1);
   min-width: var(--control-size);

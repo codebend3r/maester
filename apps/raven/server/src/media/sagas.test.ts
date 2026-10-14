@@ -1,3 +1,4 @@
+import { DEFAULT_SAGA_BACKDROP, type SagaBackdrop } from '@raven/core'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { MediaIndex } from '@/media/mediaIndex'
@@ -21,6 +22,10 @@ const PROBE = {
 const TRACKS = { audio: [], subtitles: [], defaultAudio: null, frameRate: 24 }
 
 const RINGS: FetchedSaga = { tmdbId: '119', name: 'The Lord of the Rings Collection' }
+
+const SLIDE: SagaBackdrop = { type: 'slideshow', motion: 'slide' }
+
+const STILL: SagaBackdrop = { type: 'still', itemId: 1 }
 
 describe("a library's sagas", () => {
   const database = testDatabase('raven-sagas-')
@@ -104,5 +109,44 @@ describe("a library's sagas", () => {
     expect(sagas()).toEqual([
       { name: RINGS.name, files: ['Fellowship.mkv', 'Two Towers 2160p.mkv'] },
     ])
+  })
+
+  it('shows the default slideshow until the library picks a backdrop, and only its own pick', () => {
+    addMovie({ title: 'The Fellowship of the Ring', year: 2001, files: ['Fellowship.mkv'] })
+    addMovie({ title: 'The Two Towers', year: 2002, files: ['Two Towers.mkv'] })
+    const backdrops = () =>
+      media()
+        .listSagas(state.libraryId)
+        .map((saga) => saga.backdrop)
+    const { sagaBackdrops } = repositories(database.get())
+    expect(backdrops()).toEqual([DEFAULT_SAGA_BACKDROP])
+
+    sagaBackdrops.save({ libraryId: state.libraryId, sagaId: RINGS.tmdbId, backdrop: SLIDE })
+    const other = new LibrariesRepository(database.get()).create({
+      name: 'Films',
+      paths: ['/f'],
+      settings: { kind: 'movies' },
+    }).id
+    sagaBackdrops.save({ libraryId: other, sagaId: RINGS.tmdbId, backdrop: STILL })
+    expect(backdrops()).toEqual([SLIDE])
+
+    sagaBackdrops.save({ libraryId: state.libraryId, sagaId: RINGS.tmdbId, backdrop: STILL })
+    expect(backdrops()).toEqual([STILL])
+  })
+
+  it('shows the default for a stored backdrop that no longer reads as one', () => {
+    addMovie({ title: 'The Fellowship of the Ring', year: 2001, files: ['Fellowship.mkv'] })
+    addMovie({ title: 'The Two Towers', year: 2002, files: ['Two Towers.mkv'] })
+    database
+      .get()
+      .db.prepare(
+        'INSERT INTO saga_backdrops (library_id, saga_tmdb_id, backdrop) VALUES (?, ?, ?)',
+      )
+      .run(state.libraryId, RINGS.tmdbId, JSON.stringify({ type: 'spin' }))
+    expect(
+      media()
+        .listSagas(state.libraryId)
+        .map((saga) => saga.backdrop),
+    ).toEqual([DEFAULT_SAGA_BACKDROP])
   })
 })
