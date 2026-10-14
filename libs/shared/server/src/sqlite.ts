@@ -26,9 +26,25 @@ export const migrate = ({
 }
 
 /**
- * Opens `file` in `dataDir`, making the folder when it is missing, and
- * migrates it. WAL lets reads go on while something writes, and foreign keys
- * are on, so `ON DELETE CASCADE` holds.
+ * Brings the query planner's statistics in line with the data: SQLite's
+ * `PRAGMA optimize` analyzes each table with rows whose indexes have none
+ * yet, or whose size changed tenfold since. Mask 0x10002 is what SQLite
+ * advises when a long-lived connection opens, and it serves after a large
+ * write too: it checks every table, not only those read since the
+ * connection opened, and it leaves out bit 0x10, so an analysis counts
+ * every row instead of sampling about 2000 per index. A sample judges a
+ * column of few values, such as a library or an item type, far too
+ * selective, and the planner picks worse plans from it. Nearly free when
+ * nothing grew tenfold.
+ */
+export const refreshStatistics = ({ db }: { db: Sqlite.Database }): void => {
+  db.pragma('optimize = 0x10002')
+}
+
+/**
+ * Opens `file` in `dataDir`, making the folder when it is missing, migrates
+ * it and refreshes the planner's statistics. WAL lets reads go on while
+ * something writes, and foreign keys are on, so `ON DELETE CASCADE` holds.
  */
 export const openSqlite = ({
   dataDir,
@@ -44,5 +60,6 @@ export const openSqlite = ({
   db.pragma('journal_mode = WAL')
   db.pragma('foreign_keys = ON')
   migrate({ db, migrations })
+  refreshStatistics({ db })
   return db
 }

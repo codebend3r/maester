@@ -12,6 +12,7 @@ import {
   tiersFor,
   type UnmatchedFile,
 } from '@raven/core'
+import { DatabaseService } from '@/db/database'
 import { errorMessage } from '@/errorMessage'
 import { groupBy } from '@/groupBy'
 import { type LibraryRecord, LibrariesRepository } from '@/libraries/librariesRepository'
@@ -81,6 +82,7 @@ export class MetadataService implements OnApplicationBootstrap {
     @Inject(AiClient) private readonly ai: AiClient,
     @Inject(AiMatcher) private readonly aiMatcher: AiMatcher,
     @Inject(AiDecisions) private readonly decisions: AiDecisions,
+    @Inject(DatabaseService) private readonly database: DatabaseService,
   ) {
     this.matchers = createMatchers({ files, metadata, pictures, decisions })
   }
@@ -363,7 +365,20 @@ export class MetadataService implements OnApplicationBootstrap {
     })
   }
 
+  /**
+   * A pass, after which the planner's statistics follow what it stored and
+   * cleared up: a library's first can add thousands of items, credits and
+   * people. A pass TMDB stopped kept what it stored before then.
+   */
   private async pass(libraryId: number): Promise<void> {
+    try {
+      await this.matchAndClearUp(libraryId)
+    } finally {
+      this.database.refreshStatistics()
+    }
+  }
+
+  private async matchAndClearUp(libraryId: number): Promise<void> {
     const library = this.libraries.get(libraryId)
     const kind = library?.settings.kind
     const type = kind == null ? null : matchTypeFor(kind)

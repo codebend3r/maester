@@ -1,7 +1,7 @@
 import { existsSync, renameSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { Inject, Injectable, type OnModuleDestroy } from '@nestjs/common'
-import { openSqlite } from '@shared/server'
+import { openSqlite, refreshStatistics } from '@shared/server'
 import type Sqlite from 'better-sqlite3'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 
@@ -410,6 +410,14 @@ export class DatabaseService implements OnModuleDestroy {
     adoptLegacyDatabase({ dataDir: config.dataDir })
     // WAL lets the API read while a scan writes, which is most of the time.
     this.db = openSqlite({ dataDir: config.dataDir, file: DATABASE_FILE, migrations: MIGRATIONS })
+  }
+
+  /**
+   * Brings the query planner's statistics in line with the rows, after work
+   * that can add or remove thousands of them: a scan, or a matching pass.
+   */
+  refreshStatistics(): void {
+    refreshStatistics({ db: this.db })
   }
 
   onModuleDestroy(): void {
