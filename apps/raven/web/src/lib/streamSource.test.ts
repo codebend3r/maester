@@ -31,20 +31,37 @@ const rangesFrom = (ranges: Array<[number, number]>) => ({
 
 /**
  * Each chunk is two bytes, the stream times it covers: [4, 6] is the
- * fragment from 4s to 6s on the shifted clock.
+ * fragment from 4s to 6s on the shifted clock. A third byte marks a chunk
+ * that stops partway through its fragment, as network reads do. The
+ * parser then takes whatever comes next as the rest of that fragment, so
+ * a chunk that does not carry on from it is garbled; only `abort` lets go
+ * of the cut-off fragment, and like the real one it throws unless the
+ * source is open.
  */
-const fakeBuffer = () => {
+const fakeBuffer = (source: { readyState: string }) => {
   const events = listeners()
-  const state: { ranges: Array<[number, number]>; updating: boolean; appended: number } = {
+  const state: {
+    ranges: Array<[number, number]>
+    updating: boolean
+    appended: number
+    /** Where the cut-off fragment the parser holds carries on, if it holds one. */
+    cutAt: number | null
+  } = {
     ranges: [],
     updating: false,
     appended: 0,
+    cutAt: null,
   }
-  const finish = () =>
+  const finish = (type: 'updateend' | 'error') =>
     queueMicrotask(() => {
       state.updating = false
-      events.emit('updateend')
+      events.emit(type)
+      if (type === 'error') events.emit('updateend')
     })
+  // Appending to or removing from an ended source opens it again.
+  const reopen = () => {
+    if (source.readyState === 'ended') source.readyState = 'open'
+  }
   const buffer: SourceBufferLike = {
     get updating() {
       return state.updating
@@ -53,17 +70,24 @@ const fakeBuffer = () => {
       return rangesFrom(state.ranges)
     },
     appendBuffer: (data) => {
-      const [from = 0, to = 0] = data
+      const [from = 0, to = 0, cut = 0] = data
+      reopen()
+      state.updating = true
+      if (state.cutAt != null && state.cutAt !== from) {
+        finish('error')
+        return
+      }
       const last = state.ranges.at(-1)
       state.ranges =
         last && Math.abs(last[1] - from) < 0.01
           ? [...state.ranges.slice(0, -1), [last[0], to]]
           : [...state.ranges, [from, to]]
       state.appended += 1
-      state.updating = true
-      finish()
+      state.cutAt = cut ? to : null
+      finish('updateend')
     },
     remove: (start, end) => {
+      reopen()
       state.ranges = state.ranges
         .map(([from, to]): [number, number] => [
           from >= start && from < end ? Math.min(to, end) : from,
@@ -71,10 +95,14 @@ const fakeBuffer = () => {
         ])
         .filter(([from, to]) => !(from >= start && to <= end) && to > from)
       state.updating = true
-      finish()
+      finish('updateend')
     },
     abort: () => {
+      if (source.readyState !== 'open') {
+        throw new DOMException('The source is not open.', 'InvalidStateError')
+      }
       state.updating = false
+      state.cutAt = null
     },
     addEventListener: events.addEventListener,
     removeEventListener: events.removeEventListener,
@@ -103,9 +131,9 @@ const fakeVideo = () => {
 
 /** Responses by start time; each is a list of [from, to] chunks. */
 const setup = (streams: Record<string, Array<[number, number]>>, ok = true) => {
-  const { buffer, state: bufferState } = fakeBuffer()
   const sourceEvents = listeners()
   const sourceState = { readyState: 'closed', ended: 0, duration: NaN, mime: '' }
+  const { buffer, state: bufferState } = fakeBuffer(sourceState)
   const source: MediaSourceLike = {
     get readyState() {
       return sourceState.readyState
@@ -121,6 +149,7 @@ const setup = (streams: Record<string, Array<[number, number]>>, ok = true) => {
       return buffer
     },
     endOfStream: () => {
+      sourceState.readyState = 'ended'
       sourceState.ended += 1
     },
     addEventListener: sourceEvents.addEventListener,
@@ -214,6 +243,44 @@ describe('createStreamSession', () => {
     video.currentTime = 201
     await settle()
     expect(fetched).toEqual(['from-0', 'from-200'])
+    expect(bufferState.ranges).toEqual([[199, 203]])
+  })
+
+  it('starts a seek cleanly when it cuts the running stream off partway through a fragment', async () => {
+    const video = fakeVideo()
+    const { environment, fetched, bufferState } = setup({ 'from-200': [[199, 203]] })
+    // A whole fragment and the first part of the next, then nothing more yet.
+    const stalled: StreamEnvironment = {
+      ...environment,
+      fetch: async (url, init) => {
+        const response = await environment.fetch(url, init)
+        if (url !== 'from-0') return response
+        return {
+          ...response,
+          body: new ReadableStream({
+            start: (controller) => {
+              controller.enqueue(new Uint8Array([1, 3]))
+              controller.enqueue(new Uint8Array([3, 4, 1]))
+            },
+          }),
+        }
+      },
+    }
+    const errors: string[] = []
+    createStreamSession({
+      video,
+      mime: 'video/mp4',
+      duration: 600,
+      start: 0,
+      url: (start) => `from-${start}`,
+      onError: (message) => errors.push(message),
+      environment: stalled,
+    })
+    await settle()
+    video.currentTime = 201
+    await settle()
+    expect(fetched).toEqual(['from-0', 'from-200'])
+    expect(errors).toEqual([])
     expect(bufferState.ranges).toEqual([[199, 203]])
   })
 
