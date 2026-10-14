@@ -1,8 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { AiSuggestion } from '@raven/core'
 import { type Ref, useId } from 'react'
+import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { Button } from '@/components/Button/Button'
-import { useAdminLocked } from '@/lib/adminLock'
 import { api } from '@/lib/api'
 import { afterMatch } from '@/lib/invalidate'
 import styles from '@/components/AiSuggestionCard/AiSuggestionCard.module.scss'
@@ -35,7 +35,6 @@ export const AiSuggestionCard = ({
 }) => {
   const titleId = useId()
   const queryClient = useQueryClient()
-  const canManage = !useAdminLocked()
   const accepting = useMutation({
     mutationFn: () => accept(suggestion.tmdbId),
     onSuccess: () => afterMatch(queryClient),
@@ -62,7 +61,7 @@ export const AiSuggestionCard = ({
           </p>
         )}
       </div>
-      {canManage && (
+      <AdminOnly>
         <footer className={styles.actions}>
           <Button
             tone="primary"
@@ -81,7 +80,7 @@ export const AiSuggestionCard = ({
             Fix match
           </Button>
         </footer>
-      )}
+      </AdminOnly>
     </article>
   )
 }

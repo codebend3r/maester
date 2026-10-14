@@ -17,7 +17,7 @@ import { ReviewsController } from '@/items/reviewsController'
 import { LibrariesController } from '@/libraries/librariesController'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { LockController } from '@/lock/lockController'
-import { LockGuard, assertLockMarked } from '@/lock/lockGuard'
+import { LockGuard } from '@/lock/lockGuard'
 import { LockService } from '@/lock/lockService'
 import { FavouritesController } from '@/media/favouritesController'
 import { HomeController } from '@/media/homeController'
@@ -44,6 +44,7 @@ import { METADATA_FETCH, type MetadataFetch, TmdbClient } from '@/metadata/tmdbC
 import { PlaybackController } from '@/playback/playbackController'
 import { SubtitlesService } from '@/playback/subtitlesService'
 import { TracksService } from '@/playback/tracksService'
+import { assertRoutesMarked } from '@/routeMarks'
 import { watchFolder } from '@/scanner/folderWatch'
 import { LibraryWatcher, WATCH_OPTIONS, type WatchOptions } from '@/scanner/libraryWatcher'
 import { ScannerService } from '@/scanner/scannerService'
@@ -94,7 +95,7 @@ export class AppModule {
     aiFetch?: AiFetch
     watch?: Partial<WatchOptions>
   }): DynamicModule {
-    assertLockMarked(CONTROLLERS)
+    assertRoutesMarked(CONTROLLERS)
     return {
       module: AppModule,
       controllers: [...CONTROLLERS],

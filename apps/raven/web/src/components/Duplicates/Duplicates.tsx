@@ -11,9 +11,9 @@ import {
 } from '@raven/core'
 import { useId } from 'react'
 import { Link } from 'react-router-dom'
+import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { Button } from '@/components/Button/Button'
 import { PosterImage } from '@/components/PosterImage/PosterImage'
-import { useAdminLocked } from '@/lib/adminLock'
 import { api } from '@/lib/api'
 import { afterSplit } from '@/lib/invalidate'
 import { versionFacts } from '@/lib/itemFacts'
@@ -98,13 +98,11 @@ const Splits = ({
 const MovieDuplicate = ({
   movie,
   busy,
-  canManage,
   onSplit,
   onJoin,
 }: {
   movie: Duplicate
   busy: boolean
-  canManage: boolean
   onSplit: (split: { mediaId: number; how: SplitHow }) => void
   onJoin: () => void
 }) => {
@@ -141,36 +139,40 @@ const MovieDuplicate = ({
                   </Link>
                 </h4>
                 <Files card={card} />
-                {canManage && card.files.length > 1 && (
-                  <Splits
-                    card={card}
-                    busy={busy}
-                    onSplit={(how) => onSplit({ mediaId: card.entry.media.id, how })}
-                  />
-                )}
+                <AdminOnly>
+                  {card.files.length > 1 && (
+                    <Splits
+                      card={card}
+                      busy={busy}
+                      onSplit={(how) => onSplit({ mediaId: card.entry.media.id, how })}
+                    />
+                  )}
+                </AdminOnly>
               </li>
             ))}
           </ul>
         ) : (
           <div className={styles.cards}>
             <Files card={own} />
-            {canManage && (
+            <AdminOnly>
               <Splits
                 card={own}
                 busy={busy}
                 onSplit={(how) => onSplit({ mediaId: own.entry.media.id, how })}
               />
-            )}
+            </AdminOnly>
           </div>
         )}
-        {canManage && isSplit && (
-          <footer className={styles.join}>
-            <Button icon="merge" disabled={busy} onClick={onJoin}>
-              Put back together
-            </Button>
-            <p className={styles.hint}>Its files go back on one card.</p>
-          </footer>
-        )}
+        <AdminOnly>
+          {isSplit && (
+            <footer className={styles.join}>
+              <Button icon="merge" disabled={busy} onClick={onJoin}>
+                Put back together
+              </Button>
+              <p className={styles.hint}>Its files go back on one card.</p>
+            </footer>
+          )}
+        </AdminOnly>
       </article>
     </li>
   )
@@ -191,7 +193,6 @@ export const Duplicates = ({
   listing: DuplicatesListing
 }) => {
   const queryClient = useQueryClient()
-  const canManage = !useAdminLocked()
   const settle = (updated: DuplicatesListing) => {
     queryClient.setQueryData(queryKeys.duplicates(library.id), updated)
     return afterSplit({ queryClient, libraryId: library.id })
@@ -221,7 +222,6 @@ export const Duplicates = ({
             key={movie.itemId}
             movie={movie}
             busy={busy}
-            canManage={canManage}
             onSplit={(request) => split.mutate(request)}
             onJoin={() => join.mutate(movie.itemId)}
           />

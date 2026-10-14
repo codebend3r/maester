@@ -3,7 +3,6 @@ import {
   Body,
   Controller,
   Delete,
-  ForbiddenException,
   Get,
   Headers,
   HttpCode,
@@ -21,13 +20,13 @@ import {
   type HistoryEntry,
   type Library,
   type LibraryInput,
-  type LibrarySettings,
   type MediaItem,
   type MediaListParams,
   type PosterEntry,
   type Saga,
   type ShowListing,
   isJoinRequest,
+  isLibraryViewChange,
   isRecord,
   isSplitRequest,
   matchesAlike,
@@ -36,8 +35,7 @@ import {
   type UnmatchedFile,
   validateLibraryInput,
 } from '@raven/core'
-import { AdminOnly } from '@/admin/adminGuard'
-import { AdminService } from '@/admin/adminService'
+import { AdminOnly, ForViewers } from '@/admin/adminGuard'
 import { type LibraryRecord, LibrariesRepository, samePaths } from '@/libraries/librariesRepository'
 import { PrivateBy, Public } from '@/lock/lockGuard'
 import { LockService } from '@/lock/lockService'
@@ -74,29 +72,6 @@ const historyLimit = (asked: string | undefined): number => {
     : HISTORY_LIMIT.fallback
 }
 
-/** The settings anyone may change with the admin lock on: how a library is laid out, and its pin. */
-const VIEWER_SETTINGS = [
-  'sort',
-  'view',
-  'groupBy',
-  'pinned',
-] as const satisfies readonly (keyof LibrarySettings)[]
-
-const isViewerSetting = (key: string): key is (typeof VIEWER_SETTINGS)[number] =>
-  VIEWER_SETTINGS.some((setting) => setting === key)
-
-/** Whether an update keeps the name and folders, and changes only the settings a viewer may. */
-const isViewerChange = ({
-  before,
-  input,
-}: {
-  before: LibraryRecord
-  input: LibraryInput
-}): boolean =>
-  input.name === before.name &&
-  samePaths({ before: before.paths, after: input.paths }) &&
-  Object.keys(input.settings ?? {}).every(isViewerSetting)
-
 @Controller('api/libraries')
 @PrivateBy('library')
 export class LibrariesController {
@@ -111,28 +86,13 @@ export class LibrariesController {
     @Inject(MetadataService) private readonly metadata: MetadataService,
     @Inject(LibraryWatcher) private readonly watcher: LibraryWatcher,
     @Inject(LockService) private readonly lock: LockService,
-    @Inject(AdminService) private readonly admin: AdminService,
   ) {}
 
-  /**
-   * A library can only be locked behind a PIN that can open it again, and
-   * only locked with the admin lock off, as it then drops out of sight.
-   */
-  private parseLockable({
-    body,
-    cookie,
-    wasLocked,
-  }: {
-    body: unknown
-    cookie: string | undefined
-    wasLocked: boolean
-  }): LibraryInput {
+  /** A library can only be locked behind a PIN that can open it again. */
+  private parseLockable(body: unknown): LibraryInput {
     const input = parseInput(body)
     if (input.settings?.locked && !this.lock.available) {
       throw new BadRequestException("Set LIBRARY_PIN in raven's .env to lock a library.")
-    }
-    if (input.settings?.locked && !wasLocked && this.admin.isLocked({ cookie })) {
-      throw new ForbiddenException('Turn the admin lock off in Settings to lock a library.')
     }
     return input
   }
@@ -195,8 +155,8 @@ export class LibrariesController {
   @Public()
   @AdminOnly()
   @Post()
-  create(@Body() body: unknown, @Headers('cookie') cookie: string | undefined): Library {
-    const record = this.libraries.create(this.parseLockable({ body, cookie, wasLocked: false }))
+  create(@Body() body: unknown): Library {
+    const record = this.libraries.create(this.parseLockable(body))
     this.scanner.scan(record.id)
     this.watcher.sync()
     return this.withStatus({ record, canSee: true })
@@ -207,23 +167,13 @@ export class LibrariesController {
    * another way, or of folder layout, reads them again and matches what
    * regrouped; one that only prefers other results picks each file again
    * where it stands. A rename or another setting, the lock included, leaves
-   * the index as it is. With the admin lock on, a library keeps its name and
-   * folders, and only its sort, view, grouping and pin can change, as the
-   * library's page and the pin save them for whoever is watching.
+   * the index as it is.
    */
+  @AdminOnly()
   @Put(':id')
-  update(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() body: unknown,
-    @Headers('cookie') cookie: string | undefined,
-  ): Library {
+  update(@Param('id', ParseIntPipe) id: number, @Body() body: unknown): Library {
     const before = this.find(id)
-    const input = this.parseLockable({ body, cookie, wasLocked: before.settings.locked })
-    if (!isViewerChange({ before, input }) && this.admin.isLocked({ cookie })) {
-      throw new ForbiddenException(
-        'Turn the admin lock off in Settings to change more than how a library is sorted, viewed, grouped or pinned.',
-      )
-    }
+    const input = this.parseLockable(body)
     const record = this.libraries.update({ id, input })
     if (!record) throw new NotFoundException(`No library ${id}`)
     const { kind } = record.settings
@@ -236,6 +186,25 @@ export class LibrariesController {
     }
     if (!samePaths({ before: before.paths, after: record.paths })) this.scanner.scan(id)
     this.watcher.sync()
+    return this.withStatus({ record, canSee: true })
+  }
+
+  /**
+   * How a library is sorted, viewed and grouped, and its pin, which anyone
+   * watching may change. None of them is read by a scan, a match or the
+   * watcher, so nothing runs again.
+   */
+  @ForViewers()
+  @Put(':id/view')
+  setView(@Param('id', ParseIntPipe) id: number, @Body() body: unknown): Library {
+    const { name, paths } = this.find(id)
+    const settings = parseBody({
+      guard: isLibraryViewChange,
+      body,
+      message: 'Send only sort, view, groupBy or pinned, each a value it takes.',
+    })
+    const record = this.libraries.update({ id, input: { name, paths, settings } })
+    if (!record) throw new NotFoundException(`No library ${id}`)
     return this.withStatus({ record, canSee: true })
   }
 

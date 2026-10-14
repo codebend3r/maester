@@ -2,6 +2,7 @@ import {
   type DirectedSortFieldName,
   type LibrarySettings,
   type LibraryView,
+  type LibraryViewChange,
   type MediaGroupBy,
   type SortDirection,
   type SortFieldName,
@@ -53,7 +54,7 @@ const DirectionButton = ({
   onChange,
 }: {
   settings: LibrarySettings
-  onChange: (change: Partial<LibrarySettings>) => void
+  onChange: (change: LibraryViewChange) => void
 }) => {
   const { field, direction } = sortParts(settings.sort)
   if (direction === null) return null
@@ -106,7 +107,7 @@ export const LibraryToolbar = ({
   search: string
   onSearch: (search: string) => void
   settings: LibrarySettings
-  onChange: (change: Partial<LibrarySettings>) => void
+  onChange: (change: LibraryViewChange) => void
   playable: boolean
   onPlay: () => void
   onShuffle: () => void

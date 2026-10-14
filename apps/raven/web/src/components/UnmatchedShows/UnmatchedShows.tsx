@@ -5,11 +5,11 @@ import {
   unmatchedShowsOf,
 } from '@raven/core'
 import { type ReactNode, useId, useRef, useState } from 'react'
+import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { AiSuggestionCard } from '@/components/AiSuggestionCard/AiSuggestionCard'
 import { Button } from '@/components/Button/Button'
 import { FixMatchDialog } from '@/components/FixMatchDialog/FixMatchDialog'
 import { Icon } from '@/components/Icon/Icon'
-import { useAdminLocked } from '@/lib/adminLock'
 import { api } from '@/lib/api'
 import { plural } from '@/lib/plural'
 import { useReturnFocus } from '@/lib/useReturnFocus'
@@ -33,7 +33,6 @@ const UnmatchedShowEntry = ({
   const fixButton = useRef<HTMLButtonElement>(null)
   const [isOpen, setIsOpen] = useState(false)
   const [isFixing, setIsFixing] = useState(false)
-  const canManage = !useAdminLocked()
   const first = group.files[0]
   // A file still pending has no suggestion yet, so the card follows the first that has one.
   const suggested = group.files
@@ -61,17 +60,19 @@ const UnmatchedShowEntry = ({
           {plural({ n: group.files.length, one: 'episode', many: 'episodes' })}
         </span>
       </button>
-      {!suggested && canManage && (
-        <Button
-          ref={fixButton}
-          className={styles.fix}
-          icon="search"
-          aria-label={`Fix match for ${group.title}`}
-          onClick={() => setIsFixing(true)}
-        >
-          Fix match
-        </Button>
-      )}
+      <AdminOnly>
+        {!suggested && (
+          <Button
+            ref={fixButton}
+            className={styles.fix}
+            icon="search"
+            aria-label={`Fix match for ${group.title}`}
+            onClick={() => setIsFixing(true)}
+          >
+            Fix match
+          </Button>
+        )}
+      </AdminOnly>
       {suggested && (
         <div className={styles.suggestion}>
           <AiSuggestionCard

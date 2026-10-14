@@ -28,8 +28,9 @@ import {
   isString,
 } from '@raven/core'
 import type { FastifyReply, FastifyRequest } from 'fastify'
-import { AdminOnly } from '@/admin/adminGuard'
+import { AdminOnly, ForViewers } from '@/admin/adminGuard'
 import { errorMessage } from '@/errorMessage'
+import { sendImage } from '@/items/sendImage'
 import { PrivateBy } from '@/lock/lockGuard'
 import { MediaArtifacts } from '@/media/mediaArtifacts'
 import { type MediaFile, MediaIndex } from '@/media/mediaIndex'
@@ -100,6 +101,7 @@ export class MediaController {
     return { path: this.fileOf(id).path }
   }
 
+  @ForViewers()
   @Put(':id/progress')
   @HttpCode(204)
   saveProgress(@Param('id', ParseIntPipe) id: number, @Body() body: unknown): void {
@@ -114,12 +116,14 @@ export class MediaController {
   }
 
   /** The player says a video started, for its library's history. */
+  @ForViewers()
   @Post(':id/plays')
   @HttpCode(204)
   recordPlay(@Param('id', ParseIntPipe) id: number): void {
     if (!this.viewing.recordPlay({ id })) throw new NotFoundException(`No media ${id}`)
   }
 
+  @ForViewers()
   @Put(':id/favourite')
   setFavourite(@Param('id', ParseIntPipe) id: number, @Body() body: unknown): MediaItem {
     const { favourite } = parseBody({
@@ -158,12 +162,6 @@ export class MediaController {
     await this.artifacts.discard([id])
   }
 
-  /**
-   * Versioned URLs (`?v=`) change whenever the file does, so they can be
-   * cached for good, but only by the browser: a shared cache in front of
-   * raven, such as Netlify's proxy, must not keep a thumbnail the PIN lock
-   * gave one browser.
-   */
   @Get(':id/thumbnail')
   async thumbnail(
     @Param('id', ParseIntPipe) id: number,
@@ -171,17 +169,8 @@ export class MediaController {
     @Res() reply: FastifyReply,
   ): Promise<void> {
     const file = this.fileOf(id)
-    const path = this.thumbnails.pathFor(id)
-    const info = file.thumbnail === 'ready' ? await stat(path).catch(() => null) : null
-    if (!info) throw new NotFoundException('No thumbnail yet')
-    await reply
-      .header('content-type', 'image/jpeg')
-      .header('content-length', info.size)
-      .header(
-        'cache-control',
-        version ? 'private, max-age=31536000, immutable' : 'private, max-age=60',
-      )
-      .send(createReadStream(path))
+    const path = file.thumbnail === 'ready' ? this.thumbnails.pathFor(id) : null
+    await sendImage({ reply, path, version })
   }
 
   /**

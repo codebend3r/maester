@@ -8,6 +8,7 @@ import {
 } from '@raven/core'
 import { useId, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { Button, ButtonLink } from '@/components/Button/Button'
 import { AiMatchNote } from '@/components/AiMatchNote/AiMatchNote'
 import { CastRow } from '@/components/CastRow/CastRow'
@@ -20,7 +21,6 @@ import { ReviewCards } from '@/components/ReviewCards/ReviewCards'
 import { Summary } from '@/components/Summary/Summary'
 import { TmdbCredit } from '@/components/TmdbCredit/TmdbCredit'
 import { Versions } from '@/components/Versions/Versions'
-import { useAdminLocked } from '@/lib/adminLock'
 import { api } from '@/lib/api'
 import { directedBy, episodeByline, episodeFacts, fileFacts, movieFacts } from '@/lib/itemFacts'
 import { episodeBackPath, itemPath, watchLink } from '@/lib/itemLinks'
@@ -104,8 +104,6 @@ export const PlayableItemView = ({
   const [editingImages, setEditingImages] = useState(false)
   const [editingMetadata, setEditingMetadata] = useState(false)
   const { favourite } = useMediaMutations({ media: primary })
-  const isAdminLocked = useAdminLocked()
-  const canEdit = config.editable && !isAdminLocked
   const libraries = useQuery(librariesQuery)
   const tracks = useQuery(tracksQuery(primary.id))
   // A logo until Settings says to spell titles out, as a fresh install does.
@@ -163,26 +161,26 @@ export const PlayableItemView = ({
           className={primary.favourite ? styles.favourited : undefined}
           onClick={() => favourite.mutate(!primary.favourite)}
         />
-        {canEdit && (
-          <>
-            <Button
-              icon="edit"
-              aria-pressed={editingImages}
-              onClick={() => setEditingImages((editing) => !editing)}
-            >
-              Edit images
-            </Button>
-            <Button
-              icon="edit"
-              aria-pressed={editingMetadata}
-              onClick={() => setEditingMetadata((editing) => !editing)}
-            >
-              Edit metadata
-            </Button>
-          </>
-        )}
-        {/* Without its favourite, which the page has beside it, all the menu holds needs the admin lock off. */}
-        {!isAdminLocked && (
+        <AdminOnly>
+          {config.editable && (
+            <>
+              <Button
+                icon="edit"
+                aria-pressed={editingImages}
+                onClick={() => setEditingImages((editing) => !editing)}
+              >
+                Edit images
+              </Button>
+              <Button
+                icon="edit"
+                aria-pressed={editingMetadata}
+                onClick={() => setEditingMetadata((editing) => !editing)}
+              >
+                Edit metadata
+              </Button>
+            </>
+          )}
+          {/* Without its favourite, which the page has beside it, all the menu holds needs the admin lock off. */}
           <MediaMenu
             media={primary}
             open={menuOpen}
@@ -200,23 +198,25 @@ export const PlayableItemView = ({
               else void queryClient.invalidateQueries({ queryKey: queryKeys.item(details.id) })
             }}
           />
-        )}
+        </AdminOnly>
       </ItemHeader>
 
       <PlaybackNote media={primary} />
 
       {details.aiMatch && <AiMatchNote aiMatch={details.aiMatch} />}
 
-      {canEdit && editingImages && (
-        <ImageEditor details={details} libraries={known} onDone={() => setEditingImages(false)} />
-      )}
-      {canEdit && editingMetadata && (
-        <MetadataEditor
-          details={details}
-          itemKind="movie"
-          onDone={() => setEditingMetadata(false)}
-        />
-      )}
+      <AdminOnly>
+        {config.editable && editingImages && (
+          <ImageEditor details={details} libraries={known} onDone={() => setEditingImages(false)} />
+        )}
+        {config.editable && editingMetadata && (
+          <MetadataEditor
+            details={details}
+            itemKind="movie"
+            onDone={() => setEditingMetadata(false)}
+          />
+        )}
+      </AdminOnly>
 
       <Summary tagline={config.showsTagline ? details.tagline : null} summary={details.summary} />
 

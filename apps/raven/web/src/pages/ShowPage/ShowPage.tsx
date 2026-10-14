@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { type ItemDetails, type SeasonSummary, episodeCode } from '@raven/core'
 import { useId, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { AiMatchNote } from '@/components/AiMatchNote/AiMatchNote'
 import { Button, ButtonLink } from '@/components/Button/Button'
 import { CastRow } from '@/components/CastRow/CastRow'
@@ -13,7 +14,6 @@ import { ReviewCards } from '@/components/ReviewCards/ReviewCards'
 import { RouteState } from '@/components/RouteState/RouteState'
 import { Summary } from '@/components/Summary/Summary'
 import { TmdbCredit } from '@/components/TmdbCredit/TmdbCredit'
-import { useAdminLocked } from '@/lib/adminLock'
 import { api } from '@/lib/api'
 import { createdBy, showFacts } from '@/lib/itemFacts'
 import { itemPath, watchLink } from '@/lib/itemLinks'
@@ -51,7 +51,6 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
   const [fixing, setFixing] = useState(false)
   const [editingImages, setEditingImages] = useState(false)
   const [editingMetadata, setEditingMetadata] = useState(false)
-  const canEdit = !useAdminLocked()
   const next = useQuery(nextEpisodeQuery(details.id))
   const libraryId = next.data?.libraryId ?? details.versions[0]?.libraryId
   const code = next.data?.item ? episodeCode(next.data.item) : null
@@ -89,46 +88,46 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
             {code ? `Play ${code}` : 'Play'}
           </ButtonLink>
         )}
-        {canEdit && (
-          <>
-            <Button
-              icon="edit"
-              aria-pressed={editingImages}
-              onClick={() => setEditingImages((editing) => !editing)}
-            >
-              Edit images
-            </Button>
-            <Button
-              icon="edit"
-              aria-pressed={editingMetadata}
-              onClick={() => setEditingMetadata((editing) => !editing)}
-            >
-              Edit metadata
-            </Button>
-            <Button icon="search" onClick={() => setFixing(true)}>
-              Fix match
-            </Button>
-          </>
-        )}
+        <AdminOnly>
+          <Button
+            icon="edit"
+            aria-pressed={editingImages}
+            onClick={() => setEditingImages((editing) => !editing)}
+          >
+            Edit images
+          </Button>
+          <Button
+            icon="edit"
+            aria-pressed={editingMetadata}
+            onClick={() => setEditingMetadata((editing) => !editing)}
+          >
+            Edit metadata
+          </Button>
+          <Button icon="search" onClick={() => setFixing(true)}>
+            Fix match
+          </Button>
+        </AdminOnly>
       </ItemHeader>
 
       {details.aiMatch && <AiMatchNote aiMatch={details.aiMatch} />}
 
-      {canEdit && editingImages && (
-        <ImageEditor
-          details={details}
-          libraries={[]}
-          itemKind="show"
-          onDone={() => setEditingImages(false)}
-        />
-      )}
-      {canEdit && editingMetadata && (
-        <MetadataEditor
-          details={details}
-          itemKind="show"
-          onDone={() => setEditingMetadata(false)}
-        />
-      )}
+      <AdminOnly>
+        {editingImages && (
+          <ImageEditor
+            details={details}
+            libraries={[]}
+            itemKind="show"
+            onDone={() => setEditingImages(false)}
+          />
+        )}
+        {editingMetadata && (
+          <MetadataEditor
+            details={details}
+            itemKind="show"
+            onDone={() => setEditingMetadata(false)}
+          />
+        )}
+      </AdminOnly>
 
       <Summary tagline={details.tagline} summary={details.summary} />
 
@@ -149,23 +148,25 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
       <ReviewCards reviews={details.reviews} />
       <TmdbCredit />
 
-      {canEdit && fixing && (
-        <FixMatchDialog
-          type="show"
-          title={details.title}
-          year={details.year}
-          libraryId={libraryId}
-          aiMatch={details.aiMatch}
-          allowNone={false}
-          match={(tmdbId) =>
-            tmdbId == null
-              ? Promise.reject(new Error('Pick a show.'))
-              : api.setItemMatch({ itemId: details.id, tmdbId })
-          }
-          onMatched={(moved) => navigate(`/shows/${moved.id}`, { replace: true })}
-          onClose={() => setFixing(false)}
-        />
-      )}
+      <AdminOnly>
+        {fixing && (
+          <FixMatchDialog
+            type="show"
+            title={details.title}
+            year={details.year}
+            libraryId={libraryId}
+            aiMatch={details.aiMatch}
+            allowNone={false}
+            match={(tmdbId) =>
+              tmdbId == null
+                ? Promise.reject(new Error('Pick a show.'))
+                : api.setItemMatch({ itemId: details.id, tmdbId })
+            }
+            onMatched={(moved) => navigate(`/shows/${moved.id}`, { replace: true })}
+            onClose={() => setFixing(false)}
+          />
+        )}
+      </AdminOnly>
     </article>
   )
 }

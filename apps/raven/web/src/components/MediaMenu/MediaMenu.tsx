@@ -15,11 +15,11 @@ import {
   useRef,
   useState,
 } from 'react'
+import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { Button } from '@/components/Button/Button'
 import { FixMatchDialog } from '@/components/FixMatchDialog/FixMatchDialog'
 import { Icon, type IconName } from '@/components/Icon/Icon'
 import { ImageEditorDialog } from '@/components/ImageEditor/ImageEditorDialog'
-import { useAdminLocked } from '@/lib/adminLock'
 import { api } from '@/lib/api'
 import { copyText } from '@/lib/clipboard'
 import { itemQuery, mediaLocationQuery } from '@/lib/queries'
@@ -199,7 +199,6 @@ const MenuBody = ({
   const [fixing, setFixing] = useState(false)
   const [editingImages, setEditingImages] = useState(false)
   const { favourite, remove, refresh } = useMediaMutations({ media })
-  const isAdminLocked = useAdminLocked()
   const matchable = matchType != null && media.match !== 'off'
   const item = media.item
   // Only a movie's details carry an AI note: an episode's never do.
@@ -270,49 +269,47 @@ const MenuBody = ({
               }}
             />
           )}
-          {!isAdminLocked && (
-            <>
-              {matchable && (
-                <MenuItem
-                  icon="search"
-                  label="Fix match"
-                  onClick={() => {
-                    close({ refocus: false })
-                    setFixing(true)
-                  }}
-                />
-              )}
-              {matchable && item != null && (
-                <MenuItem
-                  icon="rescan"
-                  label="Refresh details"
-                  onClick={() => {
-                    refresh.mutate(item.id)
-                    close({ refocus: true })
-                  }}
-                />
-              )}
-              {artwork && (
-                <MenuItem
-                  icon="image"
-                  label="Edit images"
-                  onClick={() => {
-                    close({ refocus: false })
-                    setEditingImages(true)
-                  }}
-                />
-              )}
+          <AdminOnly>
+            {matchable && (
               <MenuItem
-                icon="trash"
-                label="Delete"
+                icon="search"
+                label="Fix match"
                 onClick={() => {
                   close({ refocus: false })
-                  setConfirming(true)
+                  setFixing(true)
                 }}
               />
-              <LocationItem media={media} />
-            </>
-          )}
+            )}
+            {matchable && item != null && (
+              <MenuItem
+                icon="rescan"
+                label="Refresh details"
+                onClick={() => {
+                  refresh.mutate(item.id)
+                  close({ refocus: true })
+                }}
+              />
+            )}
+            {artwork && (
+              <MenuItem
+                icon="image"
+                label="Edit images"
+                onClick={() => {
+                  close({ refocus: false })
+                  setEditingImages(true)
+                }}
+              />
+            )}
+            <MenuItem
+              icon="trash"
+              label="Delete"
+              onClick={() => {
+                close({ refocus: false })
+                setConfirming(true)
+              }}
+            />
+            <LocationItem media={media} />
+          </AdminOnly>
         </ul>
       )}
 

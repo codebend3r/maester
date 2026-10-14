@@ -57,6 +57,18 @@ export const adminCookie = async (app: NestFastifyApplication): Promise<string> 
     }),
   )
 
+/** One request by hand, as `app.inject` takes it. */
+export type InjectOptions = Exclude<Parameters<NestFastifyApplication['inject']>[0], string>
+
+/**
+ * `app.inject` as a browser holding `cookie` sends it: the cookie goes with
+ * every request, as it goes with every call of `apiFor`'s client.
+ */
+export const injectAs =
+  ({ app, cookie }: { app: NestFastifyApplication; cookie: string }) =>
+  (options: InjectOptions) =>
+    app.inject({ ...options, headers: { ...options.headers, cookie } })
+
 /** Every cookie given, in one Cookie header. */
 export const cookies = (...given: (string | undefined)[]): string =>
   given.filter((cookie) => !!cookie).join('; ')

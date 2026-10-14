@@ -9,10 +9,11 @@ import {
   type PlaybackSettings,
 } from '@raven/core'
 import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react'
+import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { Button } from '@/components/Button/Button'
 import { Icon, type IconName } from '@/components/Icon/Icon'
 import { Bone, Loading } from '@/components/Skeleton/Skeleton'
-import { useAdminLocked } from '@/lib/adminLock'
+import { useCanManage } from '@/lib/adminLock'
 import { api } from '@/lib/api'
 import { edit, useOptimisticMutation } from '@/lib/optimistic'
 import { plural } from '@/lib/plural'
@@ -106,7 +107,6 @@ const Setting = <V extends string | number>({
   values,
   choices,
   value,
-  disabled,
   onChange,
 }: {
   label: string
@@ -114,12 +114,11 @@ const Setting = <V extends string | number>({
   values: readonly V[]
   choices: Choices<V>
   value: V
-  disabled: boolean
   onChange: (value: V) => void
 }) => {
   const name = useId()
   return (
-    <fieldset className={styles.setting} disabled={disabled}>
+    <fieldset className={styles.setting}>
       <legend className={styles.legend}>
         <Titled icon={icon}>{label}</Titled>
       </legend>
@@ -154,13 +153,14 @@ const SettingsSkeleton = ({ count }: { count: number }) =>
 /**
  * One source of settings: its heading and what it covers, that the admin
  * lock keeps them as they are, why they could not be read or saved, `shape`
- * while they are read, and its settings once known.
+ * while they are read, and its settings once known. One fieldset holds them
+ * all, disabled while the admin lock is on or a reset is saving.
  */
 const SettingsSection = <T,>({
   icon,
   title,
   hint,
-  isAdminLocked,
+  isResetting,
   query,
   shape,
   saveError,
@@ -169,22 +169,21 @@ const SettingsSection = <T,>({
   icon: IconName
   title: string
   hint: string
-  isAdminLocked: boolean
+  isResetting: boolean
   query: UseQueryResult<T>
   shape: ReactNode
   saveError: Error | null
   children: (data: T) => ReactNode
 }) => {
   const headingId = useId()
+  const canManage = useCanManage()
   return (
     <section className={styles.section} aria-labelledby={headingId}>
       <h2 id={headingId} className={styles.heading}>
         <Titled icon={icon}>{title}</Titled>
       </h2>
       <p className={styles.hint}>{hint}</p>
-      {isAdminLocked && (
-        <p className={styles.hint}>Turn the admin lock off below to change these.</p>
-      )}
+      {!canManage && <p className={styles.hint}>Turn the admin lock off below to change these.</p>}
       {query.isError && (
         <p className={styles.error} role="alert">
           {query.error.message}
@@ -195,7 +194,12 @@ const SettingsSection = <T,>({
           Could not save: {saveError.message}
         </p>
       )}
-      {query.data !== undefined && children(query.data)}
+      {/* The section names these already, so the fieldset is no group of its own to a screen reader. */}
+      {query.data !== undefined && (
+        <fieldset role="none" className={styles.settings} disabled={!canManage || isResetting}>
+          {children(query.data)}
+        </fieldset>
+      )}
       {query.isPending && <Loading label="Reading the settings">{shape}</Loading>}
     </section>
   )
@@ -389,7 +393,6 @@ export const SettingsPage = () => {
   const titleId = useId()
   const queryClient = useQueryClient()
   const [isConfirming, setConfirming] = useState(false)
-  const isAdminLocked = useAdminLocked()
   const playback = useQuery(playbackSettingsQuery)
   const display = useQuery(displaySettingsQuery)
   const save = useOptimisticMutation({
@@ -437,7 +440,6 @@ export const SettingsPage = () => {
   })
   const settings = playback.data?.settings
   const busy = save.isPending || saveDisplay.isPending || reset.isPending
-  const canChange = !isAdminLocked && !reset.isPending
   const isAllAtDefaults =
     (settings == null ||
       isAtDefaults({ current: settings, defaults: DEFAULT_PLAYBACK_SETTINGS })) &&
@@ -450,27 +452,29 @@ export const SettingsPage = () => {
         <h1 id={titleId} className={styles.title}>
           Settings
         </h1>
-        {settings && !isAdminLocked && (
-          <div className={styles.reset}>
-            {isConfirming ? (
-              <>
-                <p className={styles.hint}>Every setting goes back to its default.</p>
-                <Button tone="danger" icon="reset" disabled={busy} onClick={() => reset.mutate()}>
-                  Reset all
+        <AdminOnly>
+          {settings && (
+            <div className={styles.reset}>
+              {isConfirming ? (
+                <>
+                  <p className={styles.hint}>Every setting goes back to its default.</p>
+                  <Button tone="danger" icon="reset" disabled={busy} onClick={() => reset.mutate()}>
+                    Reset all
+                  </Button>
+                  <Button onClick={() => setConfirming(false)}>Cancel</Button>
+                </>
+              ) : (
+                <Button
+                  icon="reset"
+                  disabled={busy || isAllAtDefaults}
+                  onClick={() => setConfirming(true)}
+                >
+                  Reset to defaults
                 </Button>
-                <Button onClick={() => setConfirming(false)}>Cancel</Button>
-              </>
-            ) : (
-              <Button
-                icon="reset"
-                disabled={busy || isAllAtDefaults}
-                onClick={() => setConfirming(true)}
-              >
-                Reset to defaults
-              </Button>
-            )}
-          </div>
-        )}
+              )}
+            </div>
+          )}
+        </AdminOnly>
       </header>
       <output className={styles.status}>
         {reset.isSuccess && !!settings && isAllAtDefaults
@@ -486,7 +490,7 @@ export const SettingsPage = () => {
         icon="playback"
         title="Playback"
         hint="How the server plays video, for every viewer. A change takes effect on the next play."
-        isAdminLocked={isAdminLocked}
+        isResetting={reset.isPending}
         query={playback}
         shape={<SettingsSkeleton count={Object.keys(DEFAULT_PLAYBACK_SETTINGS).length} />}
         saveError={save.failure}
@@ -499,7 +503,6 @@ export const SettingsPage = () => {
               label="Play the original file"
               choices={DIRECT_PLAY}
               value={current.directPlay}
-              disabled={!canChange}
               onChange={(directPlay) => save.mutate({ directPlay })}
             />
             <Setting
@@ -508,7 +511,6 @@ export const SettingsPage = () => {
               label="Server conversion"
               choices={TRANSCODING}
               value={current.transcoding}
-              disabled={!canChange}
               onChange={(transcoding) => save.mutate({ transcoding })}
             />
             <Setting
@@ -517,7 +519,6 @@ export const SettingsPage = () => {
               label="Transcode size"
               choices={MAX_HEIGHT}
               value={current.maxHeight}
-              disabled={!canChange}
               onChange={(maxHeight) => save.mutate({ maxHeight })}
             />
             <Setting
@@ -526,7 +527,6 @@ export const SettingsPage = () => {
               label="Transcode quality"
               choices={QUALITY}
               value={current.quality}
-              disabled={!canChange}
               onChange={(quality) => save.mutate({ quality })}
             />
             <Setting
@@ -535,13 +535,12 @@ export const SettingsPage = () => {
               label="Hardware acceleration"
               choices={HW_ACCEL}
               value={current.hwAccel}
-              disabled={!canChange}
               onChange={(hwAccel) => save.mutate({ hwAccel })}
             />
             <p className={styles.hint}>
               Transcodes encode with {ENCODER_NAMES[effective.encoder]} right now.
             </p>
-            <fieldset className={styles.setting} disabled={!canChange}>
+            <fieldset className={styles.setting}>
               <legend className={styles.legend}>
                 <Titled icon="sun">HDR</Titled>
               </legend>
@@ -566,7 +565,7 @@ export const SettingsPage = () => {
         icon="image"
         title="Display"
         hint="How pages look, for every viewer."
-        isAdminLocked={isAdminLocked}
+        isResetting={reset.isPending}
         query={display}
         shape={<SettingsSkeleton count={Object.keys(DEFAULT_DISPLAY_SETTINGS).length} />}
         saveError={saveDisplay.failure}
@@ -578,7 +577,6 @@ export const SettingsPage = () => {
             values={DISPLAY_CHOICES.titles}
             choices={TITLES}
             value={shown.titles}
-            disabled={!canChange}
             onChange={(titles) => saveDisplay.mutate({ titles })}
           />
         )}

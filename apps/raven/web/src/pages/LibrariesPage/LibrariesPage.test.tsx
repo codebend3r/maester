@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { Library, LibraryInput } from '@raven/core'
+import type { Library, LibraryViewChange } from '@raven/core'
 import { api } from '@/lib/api'
 import { LibrariesPage } from '@/pages/LibrariesPage/LibrariesPage'
 import { useUnlockPrompt } from '@/stores/unlockPrompt'
@@ -15,7 +15,7 @@ const BACKDROP = '[style*="background-image"]'
 describe('LibrariesPage', () => {
   const spies = {
     list: spyOn(api, 'listLibraries'),
-    update: spyOn(api, 'updateLibrary'),
+    view: spyOn(api, 'setLibraryView'),
     lock: spyOn(api, 'getLock'),
     health: spyOn(api, 'getMetadataHealth'),
     match: spyOn(api, 'matchLibrary'),
@@ -23,7 +23,7 @@ describe('LibrariesPage', () => {
 
   afterEach(() => {
     spies.list.mockReset()
-    spies.update.mockReset()
+    spies.view.mockReset()
     spies.lock.mockReset()
     spies.health.mockReset()
     spies.match.mockReset()
@@ -84,9 +84,9 @@ describe('LibrariesPage', () => {
 
   it('unpins a pinned library, changing nothing else', async () => {
     const movies = library({ id: 2, name: 'Movies', paths: ['/media/Movies'] })
-    const sent: Array<{ id: number; input: LibraryInput }> = []
+    const sent: Array<{ id: number; change: LibraryViewChange }> = []
     spies.list.mockImplementation(async () => [movies])
-    spies.update.mockImplementation(async (request) => {
+    spies.view.mockImplementation(async (request) => {
       sent.push(request)
       return movies
     })
@@ -94,15 +94,13 @@ describe('LibrariesPage', () => {
     const pin = await screen.findByRole('button', { name: 'Pin Movies' })
     expect(pin).toHaveAttribute('aria-pressed', 'true')
     await userEvent.click(pin)
-    expect(sent).toEqual([
-      { id: 2, input: { name: 'Movies', paths: ['/media/Movies'], settings: { pinned: false } } },
-    ])
+    expect(sent).toEqual([{ id: 2, change: { pinned: false } }])
   })
 
   it('pins at once, before the server answers', async () => {
     const clips = library({ name: 'Clips', settings: { ...library().settings, pinned: false } })
     spies.list.mockImplementation(async () => [clips])
-    spies.update.mockImplementation(() => held<Library>().promise)
+    spies.view.mockImplementation(() => held<Library>().promise)
     renderWithProviders(<LibrariesPage />)
     const pin = await screen.findByRole('button', { name: 'Pin Clips' })
     await userEvent.click(pin)
@@ -113,7 +111,7 @@ describe('LibrariesPage', () => {
   it('takes the pin back when the server refuses it', async () => {
     const clips = library({ name: 'Clips', settings: { ...library().settings, pinned: false } })
     spies.list.mockImplementation(async () => [clips])
-    spies.update.mockImplementation(async () => {
+    spies.view.mockImplementation(async () => {
       throw new Error('The server is away.')
     })
     renderWithProviders(<LibrariesPage />)

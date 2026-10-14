@@ -7,9 +7,8 @@ import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import { type ApiClient, type MediaItem, STREAM_TIME_SHIFT, type StreamMode } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '@/app'
-import { readServerConfig } from '@/config'
 import { ScannerService } from '@/scanner/scannerService'
-import { ADMIN_PASSWORD, adminCookie } from '@/test/app'
+import { adminCookie, testConfig } from '@/test/app'
 import { encodeRichClip } from '@/test/clips'
 import { apiFor } from '@/test/server'
 
@@ -98,16 +97,7 @@ describe('playback', () => {
     // Latin-1 rather than UTF-8, as plenty of old sidecars are.
     await writeFile(join(media, 'Rich (2026).en.forced.srt'), Buffer.from(SIDECAR, 'latin1'))
     state.app = await createApp({
-      config: {
-        ...readServerConfig({}),
-        hwAccel: 'none',
-        dataDir: join(state.root, 'data'),
-        webDir: null,
-        browseRoot: media,
-        scanOnStart: false,
-        rescanIntervalMinutes: 0,
-        adminPassword: ADMIN_PASSWORD,
-      },
+      config: testConfig({ dataDir: join(state.root, 'data'), mediaDir: media }),
       quiet: true,
     })
     await state.app.init()

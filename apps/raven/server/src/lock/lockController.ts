@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common'
 import { type LockState, isUnlockRequest } from '@raven/core'
 import type { FastifyReply } from 'fastify'
+import { ForViewers } from '@/admin/adminGuard'
 import { LockService } from '@/lock/lockService'
 import { parseBody } from '@/parseBody'
 
@@ -24,6 +25,7 @@ export class LockController {
   }
 
   /** `{ pin }`: opens every locked library for this browser. */
+  @ForViewers()
   @Post('unlock')
   @HttpCode(200)
   unlock(@Body() body: unknown, @Res({ passthrough: true }) reply: FastifyReply): LockState {
@@ -35,6 +37,7 @@ export class LockController {
   }
 
   /** Shuts the locked libraries again for this browser. */
+  @ForViewers()
   @Post('lock')
   @HttpCode(200)
   relock(@Res({ passthrough: true }) reply: FastifyReply): LockState {

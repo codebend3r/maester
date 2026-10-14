@@ -21,7 +21,7 @@ import { SagaDecks } from '@/components/SagaDeck/SagaDeck'
 import { Loading } from '@/components/Skeleton/Skeleton'
 import { SuggestedMovies } from '@/components/SuggestedMovies/SuggestedMovies'
 import { UnmatchedShows } from '@/components/UnmatchedShows/UnmatchedShows'
-import { useAdminLocked } from '@/lib/adminLock'
+import { useCanManage } from '@/lib/adminLock'
 import { finishedNote } from '@/lib/history'
 import { watchLink } from '@/lib/itemLinks'
 import { jumpScale } from '@/lib/jumpScale'
@@ -303,7 +303,7 @@ const NotMatchedSection = ({ library }: { library: Library }) => {
   const matchType = matchTypeFor(library.settings.kind)
   const metadata = useQuery(metadataHealthQuery)
   const canMatch = metadata.data?.tmdb === 'ok'
-  const canManage = !useAdminLocked()
+  const canManage = useCanManage()
   const query = useQuery({
     ...unmatchedQuery(library.id),
     refetchInterval: (current) =>

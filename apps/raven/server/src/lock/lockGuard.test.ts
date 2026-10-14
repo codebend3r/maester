@@ -1,7 +1,8 @@
 import { Controller, Delete, Get, Put } from '@nestjs/common'
 import { describe, expect, it } from 'vitest'
 import { CONTROLLERS } from '@/appModule'
-import { PrivateBy, Public, assertLockMarked, lockMarkProblems, routeMarks } from '@/lock/lockGuard'
+import { PrivateBy, Public, lockMarkProblems } from '@/lock/lockGuard'
+import { assertRoutesMarked, routeMarks } from '@/routeMarks'
 
 @Controller('api/things')
 @PrivateBy('media')
@@ -40,8 +41,8 @@ class LooseController {
 describe('the lock marks on routes', () => {
   it('reads each route with its own mark, or else its controller’s', () => {
     expect(routeMarks([ThingsController])).toEqual([
-      { method: 'GET', path: '/api/things/:id', mark: 'media' },
-      { method: 'PUT', path: '/api/things/:id/open', mark: 'public' },
+      { method: 'GET', path: '/api/things/:id', lock: 'media', audience: null },
+      { method: 'PUT', path: '/api/things/:id/open', lock: 'public', audience: null },
     ])
   })
 
@@ -50,7 +51,9 @@ describe('the lock marks on routes', () => {
       'DELETE /api/loose/:id takes a parameter but is marked neither PrivateBy nor Public',
       "GET /api/loose is marked PrivateBy('library') but has no :id",
     ])
-    expect(() => assertLockMarked([LooseController])).toThrow('Unmarked routes')
+    expect(() => assertRoutesMarked([LooseController])).toThrow(
+      "Unmarked routes: DELETE /api/loose/:id takes a parameter but is marked neither PrivateBy nor Public; GET /api/loose is marked PrivateBy('library') but has no :id",
+    )
   })
 
   it('has every route of the server marked', () => {

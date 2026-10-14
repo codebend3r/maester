@@ -14,12 +14,20 @@ import {
 } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createApp } from '@/app'
-import { readServerConfig, type ServerConfig } from '@/config'
+import type { ServerConfig } from '@/config'
 import { MatchFiles } from '@/metadata/matchFiles'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 import { MetadataService } from '@/metadata/metadataService'
 import { ScannerService } from '@/scanner/scannerService'
-import { ADMIN_PASSWORD, adminCookie, cookies, cookieSet, NOT_WATCHING } from '@/test/app'
+import {
+  type InjectOptions,
+  NOT_WATCHING,
+  adminCookie,
+  cookieSet,
+  cookies,
+  injectAs,
+  testConfig,
+} from '@/test/app'
 import { encodeClip } from '@/test/clips'
 import { type FakeReply, fakeClaude } from '@/test/fakeClaude'
 import { type FakeMovie, type FakeShow, fakeTmdb } from '@/test/fakeTmdb'
@@ -153,6 +161,8 @@ const startServer = ({
     if (!state.app) throw new Error('app not started')
     return state.app
   }
+  /** A request by hand as the admin, for a route the admin lock holds back. */
+  const asAdmin = (options: InjectOptions) => injectAs({ app: app(), cookie: state.admin })(options)
   const settle = async () => {
     await app().get(ScannerService).whenIdle(state.library)
     await app().get(ScannerService).whenIdle(state.clips)
@@ -178,23 +188,21 @@ const startServer = ({
     })
   const create = async ({ name, path, kind }: { name: string; path: string; kind: LibraryKind }) =>
     shape({
-      response: await app().inject({
+      response: await asAdmin({
         method: 'POST',
         url: '/api/libraries',
         payload: { name, paths: [path], settings: { kind } },
-        headers: { cookie: state.admin },
       }),
       guard: isLibrary,
     }).id
   /** The folder the library's files are in. */
   const libraryPath = () => join(state.root, library.name)
-  /** Edit library: `settings` over the library's own, as a browser holding `cookie`, the admin session's unless given. */
-  const update = ({ settings, cookie }: { settings: LibraryInput['settings']; cookie?: string }) =>
-    app().inject({
+  /** Edit library: `settings` over the library's own. */
+  const update = ({ settings }: { settings: LibraryInput['settings'] }) =>
+    asAdmin({
       method: 'PUT',
       url: `/api/libraries/${state.library}`,
       payload: { name: library.name, paths: [libraryPath()], settings },
-      headers: { cookie: cookie ?? state.admin },
     })
   const start = async () => {
     state.root = await mkdtemp(join(tmpdir(), prefix))
@@ -204,17 +212,10 @@ const startServer = ({
     await encodeClip({ path: join(state.root, 'Clips', 'Birthday Party.mp4'), seconds: 1 })
     state.app = await createApp({
       config: {
-        ...readServerConfig({}),
-        hwAccel: 'none',
-        dataDir: join(state.root, 'data'),
-        webDir: null,
-        browseRoot: state.root,
-        scanOnStart: false,
-        rescanIntervalMinutes: 0,
+        ...testConfig({ dataDir: join(state.root, 'data'), mediaDir: state.root }),
         tmdbApiToken: 'test-token',
         anthropicApiKey: 'test-key',
         aiDailyLimit,
-        adminPassword: ADMIN_PASSWORD,
         ...config,
       },
       quiet: true,
@@ -234,11 +235,7 @@ const startServer = ({
     await rm(state.root, { recursive: true, force: true, maxRetries: 5 })
   }
   const matchAgain = async () => {
-    await app().inject({
-      method: 'POST',
-      url: `/api/libraries/${state.library}/match`,
-      headers: { cookie: state.admin },
-    })
+    await asAdmin({ method: 'POST', url: `/api/libraries/${state.library}/match` })
     await settle()
   }
   /** The places Claude was asked about from request `from` on, each once, in order. */
@@ -264,6 +261,7 @@ const startServer = ({
     claude,
     state,
     app,
+    asAdmin,
     settle,
     get,
     create,
@@ -325,11 +323,10 @@ describe('the AI lookup', () => {
     expect(server.askedSince(asked)).toEqual(['Cesar 911'])
 
     const cesar = (await shows()).unmatched.find((file) => file.fileName.startsWith('Cesar'))
-    await server.app().inject({
+    await server.asAdmin({
       method: 'PUT',
       url: `/api/media/${cesar?.id ?? -1}/match`,
       payload: { tmdbId: null },
-      headers: { cookie: server.state.admin },
     })
     await server.settle()
     const before = server.claude.state.requests.length
@@ -382,11 +379,10 @@ describe('the AI lookup', () => {
 
   it('takes an accepted suggestion as a Fix match, which no AI note claims', async () => {
     const archie = (await server.unmatched()).find((file) => file.aiSuggestion != null)
-    await server.app().inject({
+    await server.asAdmin({
       method: 'PUT',
       url: `/api/media/${archie?.id ?? -1}/match`,
       payload: { tmdbId: archie?.aiSuggestion?.tmdbId },
-      headers: { cookie: server.state.admin },
     })
     await server.settle()
     expect((await server.unmatched()).map((file) => file.fileName)).toEqual([
@@ -411,7 +407,7 @@ describe('the AI lookup', () => {
     await server.app().get(ScannerService).whenIdle(openId)
     await server.settle()
     const admin = await adminCookie(server.app())
-    const locked = await server.update({ settings: { locked: true }, cookie: admin })
+    const locked = await server.update({ settings: { locked: true } })
     expect(locked.statusCode).toBe(200)
     const unlocked = await server.app().inject({
       method: 'POST',
@@ -498,11 +494,7 @@ describe('files that land while the lookups run', () => {
       timeout: 10_000,
     })
     await encodeClip({ path: join(server.state.root, 'TV', WILD_ARCTIC), seconds: 1 })
-    await server.app().inject({
-      method: 'POST',
-      url: `/api/libraries/${server.state.library}/scan`,
-      headers: { cookie: server.state.admin },
-    })
+    await server.asAdmin({ method: 'POST', url: `/api/libraries/${server.state.library}/scan` })
     await server.app().get(ScannerService).whenIdle(server.state.library)
     release()
     await started
@@ -557,11 +549,10 @@ describe('a suggestion where Fix match has answered', () => {
   it('is not offered once Fix match says the group is not a show', async () => {
     const [archie] = await server.unmatched()
     expect(archie?.aiSuggestion?.tmdbId).toBe('201000')
-    await server.app().inject({
+    await server.asAdmin({
       method: 'PUT',
       url: `/api/media/${archie?.id ?? -1}/match`,
       payload: { tmdbId: null },
-      headers: { cookie: server.state.admin },
     })
     await server.settle()
     expect((await server.unmatched()).map((file) => [file.fileName, file.aiSuggestion])).toEqual([
@@ -606,11 +597,10 @@ describe('the AI lookup in a library of movies', () => {
   })
 
   it('keeps the movie and its edit through a change to Anime movies while Anthropic is away', async () => {
-    const edited = await server.app().inject({
+    const edited = await server.asAdmin({
       method: 'PUT',
       url: `/api/items/${heat()?.id ?? -1}/metadata`,
       payload: { title: 'Heat (the long cut)' },
-      headers: { cookie: server.state.admin },
     })
     expect(edited.statusCode).toBe(200)
     server.claude.state.status = 529

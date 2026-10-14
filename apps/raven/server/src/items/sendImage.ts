@@ -5,8 +5,8 @@ import type { FastifyReply } from 'fastify'
 import { contentTypeOf } from '@/metadata/imageCache'
 
 /**
- * Sends a cached picture. Versioned URLs (`?v=`) change whenever the picture
- * does, so they are cached for good, as thumbnails are. Only by the browser,
+ * Sends a cached picture or thumbnail. Versioned URLs (`?v=`) change whenever
+ * the picture does, so they are cached for good. Only by the browser,
  * though: a shared cache in front of raven, such as Netlify's proxy, must not
  * keep a picture the PIN lock gave one browser and hand it to the next.
  */

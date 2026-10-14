@@ -5,8 +5,7 @@ import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import type { ApiClient } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '@/app'
-import { readServerConfig } from '@/config'
-import { ADMIN_PASSWORD, adminCookie } from '@/test/app'
+import { adminCookie, injectAs, testConfig } from '@/test/app'
 import { apiFor } from '@/test/server'
 
 /** As a browser with the admin lock off, the only one that can change them. */
@@ -23,20 +22,13 @@ describe('playback settings', () => {
   const api = (): ApiClient => apiFor({ app: app(), cookie: state.admin })
   /** A change by hand, for a value the client's types will not let it send. */
   const put = ({ url, payload }: { url: string; payload: Record<string, unknown> }) =>
-    app().inject({ method: 'PUT', url, payload, headers: { cookie: state.admin } })
+    injectAs({ app: app(), cookie: state.admin })({ method: 'PUT', url, payload })
   const read = () => api().getPlaybackSettings()
 
   beforeAll(async () => {
     state.root = await mkdtemp(join(tmpdir(), 'raven-settings-'))
     state.app = await createApp({
-      config: {
-        ...readServerConfig({}),
-        hwAccel: 'none',
-        dataDir: join(state.root, 'data'),
-        browseRoot: state.root,
-        scanOnStart: false,
-        adminPassword: ADMIN_PASSWORD,
-      },
+      config: testConfig({ dataDir: join(state.root, 'data'), mediaDir: state.root }),
       quiet: true,
     })
     await state.app.init()

@@ -4,8 +4,8 @@ import userEvent from '@testing-library/user-event'
 import type {
   AdminLock,
   Library,
-  LibraryInput,
   LibrarySettings,
+  LibraryViewChange,
   MediaItem,
   MediaSort,
 } from '@raven/core'
@@ -24,11 +24,11 @@ describe('LibraryPage', () => {
   const spies = {
     get: spyOn(api, 'getLibrary'),
     list: spyOn(api, 'listMedia'),
-    update: spyOn(api, 'updateLibrary'),
+    view: spyOn(api, 'setLibraryView'),
     lockState: spyOn(api, 'getLock'),
     lock: spyOn(api, 'lock'),
   }
-  const state: { sent: LibraryInput[]; listed: Array<{ sort?: MediaSort; seed?: number }> } = {
+  const state: { sent: LibraryViewChange[]; listed: Array<{ sort?: MediaSort; seed?: number }> } = {
     sent: [],
     listed: [],
   }
@@ -53,11 +53,11 @@ describe('LibraryPage', () => {
       state.listed.push({ sort: request.sort, seed: request.seed })
       return items
     })
-    spies.update.mockImplementation(async ({ input }) => {
-      state.sent.push(input)
+    spies.view.mockImplementation(async ({ change }) => {
+      state.sent.push(change)
       current.library = {
         ...current.library,
-        settings: { ...current.library.settings, ...input.settings },
+        settings: { ...current.library.settings, ...change },
       }
       return current.library
     })
@@ -67,7 +67,7 @@ describe('LibraryPage', () => {
   afterEach(() => {
     spies.get.mockReset()
     spies.list.mockReset()
-    spies.update.mockReset()
+    spies.view.mockReset()
     spies.lockState.mockReset()
     spies.lock.mockReset()
     state.sent = []
@@ -161,9 +161,7 @@ describe('LibraryPage', () => {
     serve()
     await screen.findByRole('link', { name: 'Wide' })
     await userEvent.selectOptions(screen.getByLabelText('Sort'), 'Bitrate')
-    expect(state.sent).toEqual([
-      { name: 'Movies', paths: ['/media/Movies'], settings: { sort: 'bitrate-high' } },
-    ])
+    expect(state.sent).toEqual([{ sort: 'bitrate-high' }])
     expect(state.listed.at(-1)?.sort).toBe('bitrate-high')
   })
 
@@ -171,7 +169,7 @@ describe('LibraryPage', () => {
     serve({ settings: { sort: 'title' } })
     await screen.findByRole('link', { name: 'Wide' })
     await userEvent.click(screen.getByRole('button', { name: 'Order: A to Z' }))
-    expect(state.sent.at(-1)?.settings).toEqual({ sort: 'title-desc' })
+    expect(state.sent.at(-1)).toEqual({ sort: 'title-desc' })
     expect(await screen.findByRole('button', { name: 'Order: Z to A' })).toBeInTheDocument()
     expect(state.listed.at(-1)?.sort).toBe('title-desc')
   })
@@ -188,7 +186,7 @@ describe('LibraryPage', () => {
     await screen.findByRole('link', { name: 'Wide' })
     await userEvent.click(screen.getByRole('button', { name: 'Tiles' }))
     expect(screen.getByRole('button', { name: 'Tiles' })).toHaveAttribute('aria-pressed', 'true')
-    expect(state.sent.at(-1)?.settings).toEqual({ view: 'tiles' })
+    expect(state.sent.at(-1)).toEqual({ view: 'tiles' })
   })
 
   it('groups by resolution, and offers the other groupings only in that view', async () => {
@@ -200,7 +198,7 @@ describe('LibraryPage', () => {
       screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent),
     ).toEqual(['4K, 1 video', '1080p, 2 videos'])
     await userEvent.selectOptions(screen.getByLabelText('Group by'), 'Video codec')
-    expect(state.sent.at(-1)?.settings).toEqual({ groupBy: 'codec' })
+    expect(state.sent.at(-1)).toEqual({ groupBy: 'codec' })
   })
 
   it('folds every bucket to start, and opens one on a click', async () => {
@@ -326,6 +324,13 @@ describe('LibraryPage', () => {
     expect(screen.queryByRole('button', { name: /^Rescan/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /^Match again/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /^Edit/ })).toBeNull()
+  })
+
+  it('still saves how the library is shown while the admin lock is on', async () => {
+    serve({ adminLock: { state: 'on', available: true } })
+    await screen.findByRole('link', { name: 'Wide' })
+    await userEvent.click(screen.getByRole('button', { name: 'Tiles' }))
+    expect(state.sent).toEqual([{ view: 'tiles' }])
   })
 
   it('has nothing to play or shuffle in an empty library', async () => {

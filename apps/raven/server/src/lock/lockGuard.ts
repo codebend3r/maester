@@ -5,16 +5,14 @@ import {
   Inject,
   Injectable,
   NotFoundException,
-  RequestMethod,
   SetMetadata,
-  type Type,
 } from '@nestjs/common'
-import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants'
 import { Reflector } from '@nestjs/core'
-import { LOCKED_STATUS, isNumber, isRecord, isString } from '@raven/core'
+import { LOCKED_STATUS } from '@raven/core'
 import { AdminService } from '@/admin/adminService'
 import { LockService, PRIVACIES, type Privacy } from '@/lock/lockService'
 import { requestParts } from '@/requestParts'
+import type { MarkTargets, RouteMark } from '@/routeMarks'
 
 const PRIVACY = Symbol('PRIVACY')
 
@@ -46,44 +44,13 @@ export const PrivateBy = (privacy: Privacy) => SetMetadata(PRIVACY, privacy)
  */
 export const Public = () => SetMetadata(PRIVACY, 'public')
 
-/** A route as its decorators declare it, with the lock mark it carries. */
-export type RouteMark = { method: string; path: string; mark: LockMark | null }
-
 const decorators = new Reflector()
 
-const joinPath = (parts: readonly unknown[]): string =>
-  `/${parts
-    .filter(isString)
-    .flatMap((part) => part.split('/'))
-    .filter((segment) => segment !== '')
-    .join('/')}`
-
-const methodName = (value: unknown): string =>
-  isNumber(value) ? (RequestMethod[value] ?? 'ALL') : 'ALL'
-
-/** Every route the controllers declare, read from their decorators. */
-export const routeMarks = (controllers: readonly Type[]): RouteMark[] =>
-  controllers.flatMap((controller) => {
-    const prototype: unknown = controller.prototype
-    if (!isRecord(prototype)) return []
-    const base: unknown = decorators.get(PATH_METADATA, controller)
-    const classMark: unknown = decorators.get(PRIVACY, controller)
-    return Object.getOwnPropertyNames(prototype).flatMap((name): RouteMark[] => {
-      const handler = prototype[name]
-      if (name === 'constructor' || typeof handler !== 'function') return []
-      const path: unknown = decorators.get(PATH_METADATA, handler)
-      if (path == null) return []
-      const ownMark: unknown = decorators.get(PRIVACY, handler)
-      const mark = ownMark ?? classMark
-      return [
-        {
-          method: methodName(decorators.get(METHOD_METADATA, handler)),
-          path: joinPath([base, path]),
-          mark: isLockMark(mark) ? mark : null,
-        },
-      ]
-    })
-  })
+/** A route's lock mark, else its controller's, read the same by the guard and the route inventory. */
+export const lockMarkOf = (targets: MarkTargets): LockMark | null => {
+  const mark: unknown = decorators.getAllAndOverride(PRIVACY, targets)
+  return isLockMark(mark) ? mark : null
+}
 
 const takesParameter = (path: string): boolean =>
   path.split('/').some((segment) => segment.startsWith(':'))
@@ -95,43 +62,33 @@ const takesId = (path: string): boolean => path.split('/').includes(':id')
  * say whether the lock holds it, and one the lock holds must name its `:id`.
  */
 export const lockMarkProblems = (routes: readonly RouteMark[]): string[] =>
-  routes.flatMap(({ method, path, mark }) => {
-    if (mark == null && takesParameter(path)) {
+  routes.flatMap(({ method, path, lock }) => {
+    if (lock == null && takesParameter(path)) {
       return [`${method} ${path} takes a parameter but is marked neither PrivateBy nor Public`]
     }
-    if (isPrivacy(mark) && !takesId(path)) {
-      return [`${method} ${path} is marked PrivateBy('${mark}') but has no :id`]
+    if (isPrivacy(lock) && !takesId(path)) {
+      return [`${method} ${path} is marked PrivateBy('${lock}') but has no :id`]
     }
     return []
   })
-
-/** Refuses to start a server with a route that could serve a locked library's ids unchecked. */
-export const assertLockMarked = (controllers: readonly Type[]): void => {
-  const problems = lockMarkProblems(routeMarks(controllers))
-  if (problems.length > 0) throw new Error(`Unmarked routes: ${problems.join('; ')}`)
-}
 
 /**
  * Answers 423 Locked for a route marked `PrivateBy`, on itself or its
  * controller, whose id sits in a locked library this browser has not
  * unlocked. While the admin lock holds it answers 404 instead, as if there
- * were no such library, so nothing asks for the PIN. `assertLockMarked`
+ * were no such library, so nothing asks for the PIN. `assertRoutesMarked`
  * keeps every route with a parameter marked, so the routes that pass
  * unchecked take no id.
  */
 @Injectable()
 export class LockGuard implements CanActivate {
   constructor(
-    @Inject(Reflector) private readonly reflector: Reflector,
     @Inject(LockService) private readonly lock: LockService,
     @Inject(AdminService) private readonly admin: AdminService,
   ) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const mark: unknown = this.reflector.getAllAndOverride(PRIVACY, [
-      context.getHandler(),
-      context.getClass(),
-    ])
+    const mark = lockMarkOf([context.getHandler(), context.getClass()])
     if (!isPrivacy(mark)) return true
     const { params, cookie } = requestParts(context)
     const id = Number(params.id)

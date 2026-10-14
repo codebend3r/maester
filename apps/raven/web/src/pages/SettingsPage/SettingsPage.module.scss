@@ -44,6 +44,16 @@
   max-width: var(--measure);
 }
 
+// A section's settings, held in one fieldset so the admin lock or a reset
+// disables them all at once; spaced as the section around it.
+.settings {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
 .heading,
 .legend {
   display: grid;

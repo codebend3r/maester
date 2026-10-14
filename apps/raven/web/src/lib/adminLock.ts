@@ -8,11 +8,10 @@ export const isAdminLocked = (lock: AdminLock | undefined): boolean =>
   (lock?.state ?? 'on') === 'on'
 
 /**
- * Whether this browser is held back from managing raven: adding, editing,
- * scanning and matching libraries, fixing matches, editing items and the
- * settings, deleting videos, copying their paths and locking libraries.
+ * Whether this browser may manage raven: call the routes the server marks
+ * `AdminOnly`, which it answers only while the admin lock is off here.
  */
-export const useAdminLocked = (): boolean => isAdminLocked(useQuery(adminLockQuery).data)
+export const useCanManage = (): boolean => !isAdminLocked(useQuery(adminLockQuery).data)
 
 /**
  * Reads every page again when the admin lock comes on or goes off in this

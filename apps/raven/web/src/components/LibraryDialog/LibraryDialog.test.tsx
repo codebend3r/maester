@@ -377,16 +377,6 @@ describe('LibraryDialog', () => {
     lockAvailable.now = true
   })
 
-  it('cannot lock a library while the admin lock is on', async () => {
-    renderWithProviders(<LibraryDialog onClose={() => undefined} />, {
-      adminLock: { state: 'on', available: true },
-    })
-    expect(await screen.findByText(/to lock a library/, { selector: 'p' })).toHaveTextContent(
-      'Turn the admin lock off in Settings to lock a library.',
-    )
-    expect(screen.getByRole('checkbox', { name: 'Lock with the PIN' })).toBeDisabled()
-  })
-
   it('reads letter and group folders unless told not to', async () => {
     renderWithProviders(
       <LibraryDialog
