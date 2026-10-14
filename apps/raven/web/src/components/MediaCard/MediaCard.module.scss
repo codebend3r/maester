@@ -53,6 +53,10 @@
 .frame {
   display: grid;
   grid-template-areas: 'frame';
+  // Its shape sets its height either way, but under the default alignment
+  // Chrome lays a shaped box in nested grids out several times over: 4x
+  // the layout of a library of thousands of cards.
+  align-self: start;
   aspect-ratio: 16 / 9;
   border-radius: var(--radius-md);
   overflow: hidden;
