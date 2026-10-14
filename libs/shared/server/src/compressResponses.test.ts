@@ -1,0 +1,252 @@
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { brotliDecompressSync, gunzipSync, gzipSync } from 'node:zlib'
+import { Body, Controller, Get, type MessageEvent, Module, Post, Res, Sse } from '@nestjs/common'
+import { NestFactory } from '@nestjs/core'
+import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify'
+import type { FastifyReply } from 'fastify'
+import { type Observable, Subject, map } from 'rxjs'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { compressResponses } from '@/compressResponses'
+import { serveWebApp } from '@/serveWebApp'
+
+const LIST = Array.from({ length: 200 }, (_, id) => ({ id, title: `Video ${id}`, year: 2026 }))
+const BLOB = Buffer.alloc(64 * 1024, 'raven ')
+const VTT = [
+  'WEBVTT',
+  '',
+  ...LIST.map(({ id }) => `00:00:${id % 60}.000 --> 00:00:${id % 60}.500\nLine ${id}\n`),
+].join('\n')
+const PAGE = `<!doctype html><title>app</title>${'<!-- padding -->'.repeat(100)}`
+const SCRIPT = `console.log(${JSON.stringify(LIST)})`
+const LOGO = `<svg xmlns="http://www.w3.org/2000/svg">${'<rect width="1" height="1"/>'.repeat(100)}</svg>`
+// A PNG's signature and then bytes that would compress well, so leaving them
+// alone is the server's choice rather than zlib finding nothing to gain.
+const POSTER = Buffer.concat([
+  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+  Buffer.alloc(16 * 1024, 0),
+])
+
+const events = new Subject<string>()
+
+@Controller('api')
+class SampleController {
+  @Get('list')
+  list(): typeof LIST {
+    return LIST
+  }
+
+  @Get('blob')
+  async blob(@Res() reply: FastifyReply): Promise<void> {
+    await reply
+      .header('content-type', 'application/octet-stream')
+      .header('content-length', BLOB.length)
+      .send(BLOB)
+  }
+
+  @Get('subtitles')
+  async subtitles(@Res() reply: FastifyReply): Promise<void> {
+    await reply.header('content-type', 'text/vtt; charset=utf-8').send(VTT)
+  }
+
+  @Post('echo')
+  echo(@Body() body: unknown): { body: unknown } {
+    return { body }
+  }
+
+  @Sse('events')
+  events(): Observable<MessageEvent> {
+    return events.pipe(map((data) => ({ data })))
+  }
+}
+
+@Module({ controllers: [SampleController] })
+class SampleModule {}
+
+/** The body as a browser's fetch hands it over, unpacked from whatever it was sent in. */
+const decoded = (response: { headers: Record<string, unknown>; rawPayload: Buffer }): Buffer => {
+  const encoding = response.headers['content-encoding']
+  if (encoding === 'br') return brotliDecompressSync(response.rawPayload)
+  if (encoding === 'gzip') return gunzipSync(response.rawPayload)
+  if (encoding === undefined) return response.rawPayload
+  throw new Error(`Answered in ${String(encoding)}, which nobody asked for`)
+}
+
+/** What Chrome sends over https. */
+const BROWSER = 'gzip, deflate, br, zstd'
+
+describe('compressResponses', () => {
+  const state: { dir: string; app: NestFastifyApplication | null } = { dir: '', app: null }
+  const app = (): NestFastifyApplication => {
+    if (!state.app) throw new Error('The app is not booted')
+    return state.app
+  }
+  const get = ({ url, headers = {} }: { url: string; headers?: Record<string, string> }) =>
+    app().inject({ method: 'GET', url, headers })
+
+  beforeAll(async () => {
+    state.dir = await mkdtemp(join(tmpdir(), 'shared-compress-'))
+    await mkdir(join(state.dir, 'assets'), { recursive: true })
+    await writeFile(join(state.dir, 'index.html'), PAGE)
+    await writeFile(join(state.dir, 'assets', 'app-1a2b.js'), SCRIPT)
+    await writeFile(join(state.dir, 'assets', 'logo-3c4d.svg'), LOGO)
+    await writeFile(join(state.dir, 'assets', 'poster-5e6f.png'), POSTER)
+    const created = await NestFactory.create<NestFastifyApplication>(
+      SampleModule,
+      new FastifyAdapter(),
+      { logger: false },
+    )
+    await compressResponses({ app: created })
+    await serveWebApp({ app: created, webDir: state.dir, serverPrefixes: ['/api/'] })
+    await created.init()
+    await created.getHttpAdapter().getInstance().ready()
+    state.app = created
+  })
+
+  afterAll(async () => {
+    events.complete()
+    await state.app?.close()
+    await rm(state.dir, { recursive: true, force: true })
+  })
+
+  it('compresses JSON with Brotli where the browser takes it, and gzip where it only takes gzip', async () => {
+    const answers = await Promise.all(
+      [BROWSER, 'br, gzip', 'gzip, deflate'].map((accept) =>
+        get({ url: '/api/list', headers: { 'accept-encoding': accept } }),
+      ),
+    )
+    expect(answers.map((answer) => answer.headers['content-encoding'])).toEqual([
+      'br',
+      'br',
+      'gzip',
+    ])
+    answers.forEach((answer) => {
+      expect(answer.headers.vary).toContain('accept-encoding')
+      expect(answer.rawPayload.length).toBeLessThan(JSON.stringify(LIST).length / 4)
+      expect(JSON.parse(decoded(answer).toString())).toEqual(LIST)
+    })
+  })
+
+  it('answers a client that takes no compression as it always has', async () => {
+    const answers = await Promise.all([
+      get({ url: '/api/list' }),
+      get({ url: '/api/list', headers: { 'accept-encoding': 'identity' } }),
+    ])
+    answers.forEach((answer) => {
+      expect(answer.headers['content-encoding']).toBeUndefined()
+      expect(answer.json()).toEqual(LIST)
+    })
+  })
+
+  it("compresses the web app's page, script and SVG, cached as before", async () => {
+    const files = [
+      { url: '/', body: PAGE, cache: 'no-cache' },
+      { url: '/assets/app-1a2b.js', body: SCRIPT, cache: 'public, max-age=31536000, immutable' },
+      { url: '/assets/logo-3c4d.svg', body: LOGO, cache: 'public, max-age=31536000, immutable' },
+    ]
+    const answers = await Promise.all(
+      files.map(({ url }) => get({ url, headers: { 'accept-encoding': BROWSER } })),
+    )
+    answers.forEach((answer, index) => {
+      expect(answer.statusCode).toBe(200)
+      expect(answer.headers['content-encoding']).toBe('br')
+      expect(answer.headers['cache-control']).toBe(files[index]!.cache)
+      expect(decoded(answer).toString()).toBe(files[index]!.body)
+    })
+  })
+
+  it('compresses WebVTT subtitles', async () => {
+    const answer = await get({ url: '/api/subtitles', headers: { 'accept-encoding': BROWSER } })
+    expect(answer.headers['content-encoding']).toBe('br')
+    expect(decoded(answer).toString()).toBe(VTT)
+  })
+
+  it('sends a picture as it is', async () => {
+    const answer = await get({
+      url: '/assets/poster-5e6f.png',
+      headers: { 'accept-encoding': BROWSER },
+    })
+    expect(answer.headers['content-encoding']).toBeUndefined()
+    expect(answer.headers['content-length']).toBe(String(POSTER.length))
+    expect(answer.rawPayload.equals(POSTER)).toBe(true)
+  })
+
+  it('sends binary as it is, its length included', async () => {
+    const answer = await get({ url: '/api/blob', headers: { 'accept-encoding': BROWSER } })
+    expect(answer.headers['content-encoding']).toBeUndefined()
+    expect(answer.headers['content-length']).toBe(String(BLOB.length))
+    expect(answer.rawPayload.equals(BLOB)).toBe(true)
+  })
+
+  it('answers a Range request with the bytes asked for, uncompressed, whatever the route', async () => {
+    const partial = await get({
+      url: '/assets/app-1a2b.js',
+      headers: { 'accept-encoding': BROWSER, range: 'bytes=0-99' },
+    })
+    expect(partial.statusCode).toBe(206)
+    expect(partial.headers['content-encoding']).toBeUndefined()
+    expect(partial.headers['content-range']).toBe(`bytes 0-99/${Buffer.byteLength(SCRIPT)}`)
+    expect(partial.body).toBe(SCRIPT.slice(0, 100))
+
+    // A route that ignores the range still answers it as it always has.
+    const whole = await get({
+      url: '/api/list',
+      headers: { 'accept-encoding': BROWSER, range: 'bytes=0-99' },
+    })
+    expect(whole.statusCode).toBe(200)
+    expect(whole.headers['content-encoding']).toBeUndefined()
+    expect(whole.json()).toEqual(LIST)
+  })
+
+  it('takes a request body as it is sent, never unpacking it', async () => {
+    const answer = await app().inject({
+      method: 'POST',
+      url: '/api/echo',
+      headers: { 'content-type': 'application/json', 'content-encoding': 'gzip' },
+      payload: gzipSync(JSON.stringify({ name: 'Films' })),
+    })
+    expect(answer.statusCode).toBe(400)
+  })
+
+  it('streams server-sent events uncompressed, each as it happens', async () => {
+    const listening = await NestFactory.create<NestFastifyApplication>(
+      SampleModule,
+      new FastifyAdapter(),
+      { logger: false },
+    )
+    await compressResponses({ app: listening })
+    await listening.listen({ port: 0, host: '127.0.0.1' })
+    const aborter = new AbortController()
+    try {
+      const response = await fetch(`${await listening.getUrl()}/api/events`, {
+        headers: { 'accept-encoding': BROWSER },
+        signal: aborter.signal,
+      })
+      expect(response.headers.get('content-type')).toContain('text/event-stream')
+      expect(response.headers.get('content-encoding')).toBeNull()
+      const reader = response.body?.getReader()
+      if (!reader) throw new Error('No body to read')
+      const decoder = new TextDecoder()
+      const readUntil = async ({ text, read }: { text: string; read: string }): Promise<string> => {
+        if (read.includes(text)) return read
+        const chunk = await reader.read()
+        if (chunk.done) throw new Error(`The stream ended before "${text}": ${read}`)
+        return readUntil({ text, read: read + decoder.decode(chunk.value) })
+      }
+      events.next('first')
+      // A compressed stream would hold the event back until it had more to
+      // pack, and this read would never finish.
+      const read = await Promise.race([
+        readUntil({ text: 'data: first', read: '' }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('The event never arrived')), 2000),
+        ),
+      ])
+      expect(read).toContain('data: first')
+    } finally {
+      aborter.abort()
+      await listening.close()
+    }
+  })
+})

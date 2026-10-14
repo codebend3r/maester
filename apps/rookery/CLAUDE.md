@@ -8,7 +8,7 @@ rookery authenticates; it never decides what someone may do in an app. Tiers, ow
 
 ## Structure
 
-rookery's projects live in the workspace described by the root `CLAUDE.md`, which covers Nx, the project table and how to run tasks: `@rookery/server` in `apps/rookery/server` and `@rookery/web` in `apps/rookery/web`. The server depends on `@shared/server` (`libs/shared/server`), which it shares with raven: it serves the built web app (`SERVER_PREFIXES` in `app.ts` names rookery's own routes), opens SQLite and runs `MIGRATIONS`, reads the listen config and cookies, and checks the service token with `sameSecret`.
+rookery's projects live in the workspace described by the root `CLAUDE.md`, which covers Nx, the project table and how to run tasks: `@rookery/server` in `apps/rookery/server` and `@rookery/web` in `apps/rookery/web`. The server depends on `@shared/server` (`libs/shared/server`), which it shares with raven: it serves the built web app (`SERVER_PREFIXES` in `app.ts` names rookery's own routes), compresses responses, opens SQLite and runs `MIGRATIONS`, reads the listen config and cookies, and checks the service token with `sameSecret`.
 
 The image builds from the repo root: `docker build -f apps/rookery/Dockerfile .`. `Dockerfile.dockerignore` allowlists what it copies; a new path the image needs goes there too.
 
