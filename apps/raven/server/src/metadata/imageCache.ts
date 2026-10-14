@@ -2,7 +2,7 @@ import { mkdirSync } from 'node:fs'
 import { readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Inject, Injectable, Logger } from '@nestjs/common'
-import { type ItemImageKind, POSTER_WIDTHS, type PosterWidth } from '@raven/core'
+import { type ItemImageKind, POSTER_OWN_WIDTH, POSTER_WIDTHS, type PosterWidth } from '@raven/core'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { imageScaleArgs } from '@/ffmpeg/args'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
@@ -18,7 +18,7 @@ export type ImageUse = ItemImageKind | 'photo'
  * scaled to the same widths, so both look alike.
  */
 export const IMAGE_WIDTHS = {
-  poster: 500,
+  poster: POSTER_OWN_WIDTH,
   backdrop: 1280,
   photo: 185,
   still: 300,

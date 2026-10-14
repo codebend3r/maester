@@ -66,6 +66,7 @@ import {
   isPersonDetails,
   isPlaybackSettingsState,
   isPosterEntries,
+  POSTER_OWN_WIDTH,
   POSTER_WIDTHS,
   isSagaBackdrop,
   isSagaList,
@@ -622,8 +623,8 @@ export const createApiClient = ({
       if (version == null) return null
       // Built once and widened by hand: a library lists thousands of posters.
       const own = itemImageAt({ id, kind: 'poster', version })
-      return POSTER_WIDTHS.map((width, index) =>
-        index === POSTER_WIDTHS.length - 1 ? `${own} ${width}w` : `${own}&w=${width} ${width}w`,
+      return POSTER_WIDTHS.map((width) =>
+        width === POSTER_OWN_WIDTH ? `${own} ${width}w` : `${own}&w=${width} ${width}w`,
       ).join(', ')
     },
 

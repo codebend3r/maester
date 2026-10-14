@@ -728,12 +728,18 @@ export type ItemImageKind = Infer<typeof isItemImageKind>
 export const ITEM_IMAGE_KINDS = isItemImageKind.values
 
 /**
- * The widths a poster comes in, narrowest first, so a card fetches one no
- * wider than it shows. The widest is the poster's own width, what it is
- * served at when no width is asked for. A fixed few, never any number, so the
- * server's cache holds at most these.
+ * A poster's own width: what it is served at when no width is asked for, and
+ * the widest it comes in. `posterSrcSet` lists it at the URL with no width,
+ * and the server keeps a poster at it by default, so both read it here.
  */
-export const isPosterWidth = oneOf([185, 342, 500])
+export const POSTER_OWN_WIDTH = 500
+
+/**
+ * The widths a poster comes in, narrowest first, so a card fetches one no
+ * wider than it shows. A fixed few, never any number, so the server's cache
+ * holds at most these.
+ */
+export const isPosterWidth = oneOf([185, 342, POSTER_OWN_WIDTH])
 
 export type PosterWidth = Infer<typeof isPosterWidth>
 
