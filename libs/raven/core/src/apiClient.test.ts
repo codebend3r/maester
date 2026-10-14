@@ -538,4 +538,16 @@ describe('the metadata calls', () => {
     )
     expect(client.candidatePosterUrl('/abc.jpg')).toBe('http://nas:8484/api/images/poster/abc.jpg')
   })
+
+  it("lists a poster at each of its widths, the widest at the poster's own URL", () => {
+    const { client } = clientReturning(respond({}))
+    expect(client.posterSrcSet({ id: 2, version: 'abc' })).toBe(
+      [
+        'http://nas:8484/api/items/2/images/poster?v=abc&w=185 185w',
+        'http://nas:8484/api/items/2/images/poster?v=abc&w=342 342w',
+        'http://nas:8484/api/items/2/images/poster?v=abc 500w',
+      ].join(', '),
+    )
+    expect(client.posterSrcSet({ id: 2, version: null })).toBeNull()
+  })
 })

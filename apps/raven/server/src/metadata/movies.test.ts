@@ -25,7 +25,7 @@ import { MatchFiles } from '@/metadata/matchFiles'
 import { MetadataService } from '@/metadata/metadataService'
 import { ScannerService } from '@/scanner/scannerService'
 import { type InjectOptions, adminCookie, injectAs, testConfig } from '@/test/app'
-import { encodeClip, encodeImage } from '@/test/clips'
+import { encodeClip, encodeImage, jpegSize } from '@/test/clips'
 import { FAKE_JPEG, fakeTmdb } from '@/test/fakeTmdb'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
 
@@ -154,7 +154,7 @@ describe('movie metadata', () => {
         size: '640x360',
       }),
       encodeClip({ path: join(matrix, 'Featurettes', 'Making Of.mp4'), seconds: 1 }),
-      encodeImage({ path: join(matrix, 'poster.jpg') }),
+      encodeImage({ path: join(matrix, 'poster.jpg'), size: '600x900' }),
       encodeClip({ path: join(state.media, 'Heat (1995) {tmdb-949}', 'Heat.mp4'), seconds: 1 }),
       encodeClip({
         path: join(state.media, 'Pulp.Fiction.1994.1080p.BluRay.x264.mp4'),
@@ -495,6 +495,59 @@ describe('movie metadata', () => {
       url: `/api/items/${matrix?.item?.id}/images/still`,
     })
     expect(still.statusCode).toBe(404)
+  })
+
+  it("serves TMDB's poster at each width a card asks for, warmed when the movie was matched", async () => {
+    const heat = (await list()).find((item) => item.item?.title === 'Heat')?.item
+    const at = (query: string) =>
+      app().inject({
+        method: 'GET',
+        url: `/api/items/${heat?.id}/images/poster?v=${heat?.posterVersion}${query}`,
+      })
+    const responses = await Promise.all(['&w=185', '&w=342', '&w=500', '', '&w=185'].map(at))
+    expect(responses.map((response) => response.statusCode)).toEqual([200, 200, 200, 200, 200])
+    expect(responses.every((response) => response.rawPayload.equals(FAKE_JPEG))).toBe(true)
+    expect(responses[0]?.headers['cache-control']).toBe('private, max-age=31536000, immutable')
+    expect(tmdb.state.calls.filter((url) => url.endsWith('/poster949.jpg')).toSorted()).toEqual([
+      'https://image.tmdb.org/t/p/w185/poster949.jpg',
+      'https://image.tmdb.org/t/p/w342/poster949.jpg',
+      'https://image.tmdb.org/t/p/w500/poster949.jpg',
+    ])
+  })
+
+  it('refuses a width that is not one a poster comes in', async () => {
+    const heat = (await list()).find((item) => item.item?.title === 'Heat')?.item
+    const statusOf = async (path: string) =>
+      (await app().inject({ method: 'GET', url: `/api/items/${heat?.id}/images/${path}` }))
+        .statusCode
+    const refused = await Promise.all(
+      [
+        'poster?v=1&w=200',
+        'poster?v=1&w=abc',
+        'poster?v=1&w=0185',
+        'poster?v=1&w=',
+        'poster?v=1&w=185&w=342',
+        'backdrop?v=1&w=185',
+      ].map(statusOf),
+    )
+    expect(refused).toEqual([400, 400, 400, 400, 400, 400])
+    expect(tmdb.state.calls.some((url) => url.includes('/w200/'))).toBe(false)
+  })
+
+  it('scales the poster beside the movie to each width a card asks for', async () => {
+    const matrix = (await list()).find((item) => item.item?.title === 'The Matrix')?.item
+    const widthAt = async (query: string) =>
+      jpegSize(
+        (
+          await app().inject({
+            method: 'GET',
+            url: `/api/items/${matrix?.id}/images/poster?v=${matrix?.posterVersion}${query}`,
+          })
+        ).rawPayload,
+      ).width
+    expect(await Promise.all(['', '&w=500', '&w=342', '&w=185'].map(widthAt))).toEqual([
+      500, 500, 342, 185,
+    ])
   })
 
   it('offers every picture a movie could show, and keeps the chosen one through a refresh', async () => {

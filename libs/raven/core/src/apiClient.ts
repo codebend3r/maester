@@ -35,6 +35,7 @@ import {
   type PlaybackSettings,
   type PlaybackSettingsState,
   type PosterEntry,
+  type PosterWidth,
   type ProgressChange,
   type Saga,
   type SagaBackdrop,
@@ -66,6 +67,7 @@ import {
   isPersonDetails,
   isPlaybackSettingsState,
   isPosterEntries,
+  POSTER_WIDTHS,
   isSagaBackdrop,
   isSagaList,
   isServerEvent,
@@ -249,16 +251,27 @@ export const createApiClient = ({
   const thumbnailAt = ({ id, version }: { id: number; version: number }): string =>
     url(`/api/media/${id}/thumbnail?v=${version}`)
 
-  /** An item's picture of `kind` at `version`, which it changes with, so it can be cached for good. */
+  /**
+   * An item's picture of `kind` at `version`, which it changes with, so it
+   * can be cached for good; a poster narrower than its own when `width` says.
+   */
   const itemImageAt = ({
     id,
     kind,
     version,
+    width,
   }: {
     id: number
     kind: ItemImageKind
     version: string
-  }): string => url(`/api/items/${id}/images/${kind}?${toQueryString({ v: version })}`)
+    width?: PosterWidth
+  }): string =>
+    url(
+      `/api/items/${id}/images/${kind}?${toQueryString({
+        v: version,
+        ...(width === undefined ? {} : { w: String(width) }),
+      })}`,
+    )
 
   return {
     listLibraries: (): Promise<Library[]> =>
@@ -611,6 +624,20 @@ export const createApiClient = ({
       kind: ItemImageKind
       version: string | null
     }): string | null => (version == null ? null : itemImageAt({ id, kind, version })),
+
+    /**
+     * An item's poster at each width it comes in, for an `img`'s `srcset`;
+     * null when it has none. The widest is `itemImageUrl`'s own URL, so a
+     * card that shows it and the item's page share one download.
+     */
+    posterSrcSet: ({ id, version }: { id: number; version: string | null }): string | null => {
+      if (version == null) return null
+      return POSTER_WIDTHS.map((width, index) => {
+        const isWidest = index === POSTER_WIDTHS.length - 1
+        const at = itemImageAt({ id, kind: 'poster', version, ...(isWidest ? {} : { width }) })
+        return `${at} ${width}w`
+      }).join(', ')
+    },
 
     /** One of a saga's movies' backdrops; versioned, so cached for good. */
     sagaPictureUrl: (picture: SagaPicture): string =>

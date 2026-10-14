@@ -14,7 +14,7 @@ import type { FastifyReply } from 'fastify'
 import { sendImage } from '@/items/sendImage'
 import { Public } from '@/lock/lockGuard'
 import { LockService } from '@/lock/lockService'
-import { ImageCache } from '@/metadata/imageCache'
+import { IMAGE_WIDTHS, ImageCache } from '@/metadata/imageCache'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 
 /** People are in no library; a person's credits hide the movies and shows this browser may not see. */
@@ -50,7 +50,8 @@ export class PeopleController {
     @Res() reply: FastifyReply,
   ): Promise<void> {
     const photo = this.metadata.photo(id)
-    const path = photo == null ? null : await this.images.tmdb({ path: photo, use: 'photo' })
+    const path =
+      photo == null ? null : await this.images.tmdb({ path: photo, width: IMAGE_WIDTHS.photo })
     await sendImage({ reply, path, version })
   }
 }

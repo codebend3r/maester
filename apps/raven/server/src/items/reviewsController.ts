@@ -2,7 +2,7 @@ import { Controller, Get, Inject, Param, ParseIntPipe, Query, Res } from '@nestj
 import type { FastifyReply } from 'fastify'
 import { sendImage } from '@/items/sendImage'
 import { Public } from '@/lock/lockGuard'
-import { ImageCache } from '@/metadata/imageCache'
+import { IMAGE_WIDTHS, ImageCache } from '@/metadata/imageCache'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 
 /** A review's id names only its author's avatar, which is TMDB's and in no library. */
@@ -22,7 +22,8 @@ export class ReviewsController {
     @Res() reply: FastifyReply,
   ): Promise<void> {
     const avatar = this.metadata.reviewAvatar(id)
-    const path = avatar == null ? null : await this.images.tmdb({ path: avatar, use: 'photo' })
+    const path =
+      avatar == null ? null : await this.images.tmdb({ path: avatar, width: IMAGE_WIDTHS.photo })
     await sendImage({ reply, path, version })
   }
 }

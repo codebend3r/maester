@@ -36,7 +36,7 @@ import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { PrivateBy, Public } from '@/lock/lockGuard'
 import { LockService } from '@/lock/lockService'
 import { MediaRepository } from '@/media/mediaRepository'
-import { ImageCache } from '@/metadata/imageCache'
+import { IMAGE_WIDTHS, ImageCache } from '@/metadata/imageCache'
 import { type OnDisk, scoreCandidates } from '@/metadata/matchConfidence'
 import { MatchFactsCache } from '@/metadata/matchFactsCache'
 import { type MatchFile, MatchFiles } from '@/metadata/matchFiles'
@@ -305,7 +305,11 @@ export class MatchController {
     if (!isChoosableImageKind(use) || !TMDB_IMAGE_PATH.test(path)) {
       throw new NotFoundException('No such picture')
     }
-    await sendImage({ reply, path: await this.images.tmdb({ path, use }), version: file })
+    await sendImage({
+      reply,
+      path: await this.images.tmdb({ path, width: IMAGE_WIDTHS[use] }),
+      version: file,
+    })
   }
 
   /**

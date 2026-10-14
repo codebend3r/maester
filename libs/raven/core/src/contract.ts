@@ -727,6 +727,26 @@ export type ItemImageKind = Infer<typeof isItemImageKind>
 
 export const ITEM_IMAGE_KINDS = isItemImageKind.values
 
+/**
+ * The widths a poster comes in, narrowest first, so a card fetches one no
+ * wider than it shows. The widest is the poster's own width, what it is
+ * served at when no width is asked for. A fixed few, never any number, so the
+ * server's cache holds at most these.
+ */
+export const isPosterWidth = oneOf([185, 342, 500])
+
+export type PosterWidth = Infer<typeof isPosterWidth>
+
+export const POSTER_WIDTHS = isPosterWidth.values
+
+/**
+ * The poster width a query's `w` asks for, written as `posterSrcSet` writes
+ * it, or null for anything else: another number, or the same one spelled
+ * another way.
+ */
+export const posterWidthFrom = (param: unknown): PosterWidth | null =>
+  POSTER_WIDTHS.find((width) => String(width) === param) ?? null
+
 /** One picture a movie or show could show: a file beside the media, or one of TMDB's. */
 export const isImageOption = object({
   source: oneOf(['local', 'tmdb']),
