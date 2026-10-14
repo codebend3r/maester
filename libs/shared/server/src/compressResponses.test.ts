@@ -1,6 +1,7 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { Readable } from 'node:stream'
 import { brotliDecompressSync, gunzipSync, gzipSync } from 'node:zlib'
 import { Body, Controller, Get, type MessageEvent, Module, Post, Res, Sse } from '@nestjs/common'
 import { NestFactory } from '@nestjs/core'
@@ -43,6 +44,12 @@ class SampleController {
       .header('content-type', 'application/octet-stream')
       .header('content-length', BLOB.length)
       .send(BLOB)
+  }
+
+  // As `reply.send(createReadStream(video))` would, with no type named.
+  @Get('untyped')
+  async untyped(@Res() reply: FastifyReply): Promise<void> {
+    await reply.header('content-length', BLOB.length).send(Readable.from([BLOB]))
   }
 
   @Get('subtitles')
@@ -174,6 +181,13 @@ describe('compressResponses', () => {
 
   it('sends binary as it is, its length included', async () => {
     const answer = await get({ url: '/api/blob', headers: { 'accept-encoding': BROWSER } })
+    expect(answer.headers['content-encoding']).toBeUndefined()
+    expect(answer.headers['content-length']).toBe(String(BLOB.length))
+    expect(answer.rawPayload.equals(BLOB)).toBe(true)
+  })
+
+  it('sends a stream that names no type as it is, its length included', async () => {
+    const answer = await get({ url: '/api/untyped', headers: { 'accept-encoding': BROWSER } })
     expect(answer.headers['content-encoding']).toBeUndefined()
     expect(answer.headers['content-length']).toBe(String(BLOB.length))
     expect(answer.rawPayload.equals(BLOB)).toBe(true)

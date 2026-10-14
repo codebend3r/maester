@@ -1,3 +1,4 @@
+import { Stream } from 'node:stream'
 import { constants } from 'node:zlib'
 import fastifyCompress from '@fastify/compress'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
@@ -6,6 +7,9 @@ import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 // Anything else it takes from mime-db, which marks no video and neither JPEG
 // nor PNG compressible.
 const COMPRESSIBLE = /^text\/(?!event-stream)|[+/](?:json|xml)(?:;|$)/u
+
+const isStream = (payload: unknown): payload is Stream | ReadableStream =>
+  payload instanceof Stream || payload instanceof ReadableStream
 
 /**
  * Compresses what compresses well, JSON and the web app's text, with Brotli
@@ -25,16 +29,24 @@ export const compressResponses = async ({
 }: {
   app: NestFastifyApplication
 }): Promise<void> => {
+  const fastify = app.getHttpAdapter().getInstance()
   // A Range asks for bytes of the uncompressed file, so it is answered as it
   // always was. `x-no-compression` is the plugin's way to skip one request.
-  app
-    .getHttpAdapter()
-    .getInstance()
-    .addHook('onRequest', async (request) => {
-      if (request.headers.range !== undefined) {
-        request.headers = { ...request.headers, 'x-no-compression': 'range' }
-      }
-    })
+  fastify.addHook('onRequest', async (request) => {
+    if (request.headers.range !== undefined) {
+      request.headers = { ...request.headers, 'x-no-compression': 'range' }
+    }
+  })
+  // The plugin compresses a reply with no type as JSON, and Fastify names no
+  // type for a stream, so a stream that names none would be packed and lose
+  // its length. Called bytes, it goes out as it is. Fastify runs this hook
+  // before the plugin's, which it adds to each route.
+  fastify.addHook('onSend', async (_request, reply, payload) => {
+    if (reply.getHeader('content-type') === undefined && isStream(payload)) {
+      reply.header('content-type', 'application/octet-stream')
+    }
+    return payload
+  })
   await app.register(fastifyCompress, {
     encodings: ['br', 'gzip'],
     customTypes: COMPRESSIBLE,
