@@ -1,7 +1,7 @@
-import type { RefObject } from 'react'
 import type { BezelState } from '@/components/Player/Bezel'
 import type { TrackSelection } from '@/components/Player/useTrackSelection'
-import type { useVideoState } from '@/components/Player/useVideoState'
+import type { EngineHandle } from '@/components/Player/engine'
+import { preferredSubtitle } from '@/components/Player/selection'
 import { type PlayerAction, stepCaptionScale, stepSpeed } from '@/lib/shortcuts'
 import { languageName } from '@/lib/trackLabels'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
@@ -21,8 +21,7 @@ export type Overlay = 'none' | 'settings' | 'shortcuts'
  * call the rest directly, the play button without the flash.
  */
 export const usePlayerActions = ({
-  videoRef,
-  playback: { seek, fileTime, duration },
+  engine: { actions, state, position, duration },
   selection,
   flash,
   toggleFullscreen,
@@ -31,8 +30,7 @@ export const usePlayerActions = ({
   closeMenu,
   leave,
 }: {
-  videoRef: RefObject<HTMLVideoElement | null>
-  playback: ReturnType<typeof useVideoState>
+  engine: EngineHandle
   selection: TrackSelection
   flash: (next: Omit<BezelState, 'id'>) => void
   toggleFullscreen: () => void
@@ -43,39 +41,30 @@ export const usePlayerActions = ({
   leave: () => void
 }) => {
   const captionScale = usePlayerPrefs((prefs) => prefs.captionScale)
-  const setCaptionScale = usePlayerPrefs((prefs) => prefs.setCaptionScale)
+  const volume = usePlayerPrefs((prefs) => prefs.volume)
+  const muted = usePlayerPrefs((prefs) => prefs.muted)
+  const subtitles = usePlayerPrefs((prefs) => prefs.subtitles)
+  const seek = actions.seek
 
   const togglePlay = () => {
-    const element = videoRef.current
-    if (!element) return
-    if (element.paused) element.play()?.catch(() => undefined)
-    else element.pause()
+    if (state.paused) actions.play()
+    else actions.pause()
   }
 
   const changeVolume = (next: number) => {
-    const element = videoRef.current
-    if (!element) return
-    element.volume = clamp({ value: next, min: 0, max: 1 })
-    element.muted = element.volume === 0
-    flash({
-      icon: element.muted ? 'muted' : 'volume',
-      text: `${Math.round(element.volume * 100)}%`,
-    })
+    const nextVolume = clamp({ value: next, min: 0, max: 1 })
+    const nextMuted = nextVolume === 0
+    actions.setVolume({ volume: nextVolume, muted: nextMuted })
+    flash({ icon: nextMuted ? 'muted' : 'volume', text: `${Math.round(nextVolume * 100)}%` })
   }
 
   const toggleMute = () => {
-    const element = videoRef.current
-    if (!element) return
-    element.muted = !element.muted
-    flash({ icon: element.muted ? 'muted' : 'volume', text: element.muted ? 'Muted' : 'Sound on' })
+    actions.setVolume({ volume, muted: !muted })
+    flash({ icon: !muted ? 'muted' : 'volume', text: !muted ? 'Muted' : 'Sound on' })
   }
 
   const changeRate = (next: number) => {
-    const element = videoRef.current
-    if (!element) return
-    // The default carries the speed across a change of source, which resets it.
-    element.defaultPlaybackRate = next
-    element.playbackRate = next
+    actions.setRate(next)
     flash({ icon: 'forward', text: next === 1 ? 'Normal speed' : `${next}×` })
   }
 
@@ -85,7 +74,16 @@ export const usePlayerActions = ({
       flash({ icon: 'captions', text: 'No subtitles' })
       return
     }
-    const landed = selection.toggleSubtitles()
+    const id =
+      selection.subtitle != null
+        ? null
+        : (preferredSubtitle({
+            tracks: selection.tracks,
+            subtitles: { on: true, language: subtitles.language },
+          }) ??
+          preferredSubtitle({ tracks: selection.tracks, subtitles: { on: true, language: null } }))
+    actions.setSubtitle(id)
+    const landed = selection.tracks?.subtitles.find((track) => track.id === id) ?? null
     flash({
       icon: 'captions',
       text: landed ? `Subtitles: ${languageName(landed.language) ?? 'on'}` : 'Subtitles off',
@@ -93,12 +91,10 @@ export const usePlayerActions = ({
   }
 
   const act = (action: PlayerAction) => {
-    const element = videoRef.current
-    if (!element) return
-    const now = fileTime()
+    const now = position.current
     switch (action.type) {
       case 'togglePlay':
-        flash({ icon: element.paused ? 'play' : 'pause', text: element.paused ? 'Play' : 'Pause' })
+        flash({ icon: state.paused ? 'play' : 'pause', text: state.paused ? 'Play' : 'Pause' })
         togglePlay()
         return
       case 'seekBy':
@@ -117,7 +113,7 @@ export const usePlayerActions = ({
         seek(action.edge === 'start' ? 0 : (duration ?? now))
         return
       case 'volumeBy':
-        changeVolume((element.muted ? 0 : element.volume) + action.delta)
+        changeVolume((muted ? 0 : volume) + action.delta)
         return
       case 'toggleMute':
         toggleMute()
@@ -129,15 +125,15 @@ export const usePlayerActions = ({
         toggleSubtitles()
         return
       case 'stepFrame':
-        if (!element.paused) element.pause()
+        if (!state.paused) actions.pause()
         seek(now + action.direction / (selection.tracks?.frameRate ?? FALLBACK_FRAME_RATE))
         return
       case 'stepSpeed':
-        changeRate(stepSpeed({ current: element.playbackRate, direction: action.direction }))
+        changeRate(stepSpeed({ current: state.rate, direction: action.direction }))
         return
       case 'stepCaptionSize': {
         const next = stepCaptionScale({ current: captionScale, direction: action.direction })
-        setCaptionScale(next)
+        actions.setSubtitleScale(next)
         flash({ icon: 'captions', text: `Subtitles ${Math.round(next * 100)}%` })
         return
       }

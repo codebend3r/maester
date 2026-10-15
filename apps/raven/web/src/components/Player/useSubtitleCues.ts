@@ -1,6 +1,7 @@
 import { useQueries } from '@tanstack/react-query'
 import { type SubtitleCue, type SubtitleTrack, mergeCues, subtitleWindows } from '@raven/core'
-import { subtitlesQuery } from '@/lib/queries'
+import type { HtmlSource } from '@/components/Player/engine'
+import { playerQueriesFor } from '@/lib/playerQueries'
 
 export type SubtitleStatus = 'off' | 'loading' | 'ready' | 'error'
 
@@ -11,23 +12,33 @@ export type SubtitleStatus = 'off' | 'loading' | 'ready' | 'error'
  * cache, so seeking back is instant.
  */
 export const useSubtitleCues = ({
-  mediaId,
+  source,
   track,
   time,
   duration,
 }: {
-  mediaId: number
+  source: HtmlSource
   track: SubtitleTrack | null
   time: number
   duration: number | null
 }): { cues: SubtitleCue[]; status: SubtitleStatus } => {
   const windows =
-    track == null ? [] : track.source === 'external' ? [0] : subtitleWindows({ time, duration })
+    track == null || source.kind === 'file'
+      ? []
+      : track.source === 'external'
+        ? [0]
+        : subtitleWindows({ time, duration })
   return useQueries({
     queries:
-      track == null
+      track == null || source.kind === 'file'
         ? []
-        : windows.map((window) => subtitlesQuery({ id: mediaId, trackId: track.id, window })),
+        : windows.map((window) =>
+            playerQueriesFor(source.api).subtitles({
+              id: source.media.id,
+              trackId: track.id,
+              window,
+            }),
+          ),
     combine: (results) => {
       const [playing] = results
       const status: SubtitleStatus =

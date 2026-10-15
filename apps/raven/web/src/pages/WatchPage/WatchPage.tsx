@@ -1,4 +1,10 @@
-import { useQuery } from '@tanstack/react-query'
+import { type MediaItem, mediaLabel } from '@raven/core'
+import { useState } from 'react'
+import { PlayerServicesProvider } from '@/components/Player/PlayerServices'
+import { api } from '@/lib/api'
+import { afterWatching } from '@/lib/invalidate'
+import { watchLink } from '@/lib/itemLinks'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useLocation } from 'react-router-dom'
 import { ButtonLink } from '@/components/Button/Button'
 import { Player } from '@/components/Player/Player'
@@ -26,7 +32,7 @@ export const WatchPage = () => {
 
   if (page.state === 'ready') {
     return (
-      <Player
+      <WatchPlayer
         key={page.data.id}
         media={page.data}
         upNext={handed?.upNext ?? []}
@@ -49,5 +55,59 @@ export const WatchPage = () => {
         </>
       )}
     </main>
+  )
+}
+
+/** The browser host owns server history, links and clipboard behavior. */
+export const WatchPlayer = ({
+  media,
+  upNext,
+  backTo,
+}: {
+  media: MediaItem
+  upNext: readonly MediaItem[]
+  backTo: string
+}) => {
+  const queryClient = useQueryClient()
+  const [copied, setCopied] = useState<string | null>(null)
+  const [next, ...after] = upNext
+  const resumable = media.position > 0 && media.position < (media.duration ?? Infinity) - 10
+  const copyLink = () => {
+    const link = new URL(api.fileUrl(media.id), window.location.origin).href
+    navigator.clipboard.writeText(link).then(
+      () => setCopied('Link copied. Paste it into VLC or IINA to play it there.'),
+      () => setCopied(`Copy this link: ${link}`),
+    )
+  }
+  return (
+    <PlayerServicesProvider
+      services={{
+        title: {
+          label: mediaLabel(media),
+          duration: media.duration,
+          resumeAt: resumable ? media.position : 0,
+          backTo,
+          next: next
+            ? { ...watchLink({ media: next, upNext: after }), label: mediaLabel(next) }
+            : null,
+        },
+        progress: {
+          started: () => {
+            api.recordPlay(media.id).catch(() => undefined)
+          },
+          save: (position) => {
+            api.saveProgress({ id: media.id, position }).catch(() => undefined)
+          },
+          left: () => {
+            afterWatching({ queryClient, libraryId: media.libraryId }).catch(() => undefined)
+          },
+        },
+        posterUrl: api.thumbnailUrl(media),
+        escape: { label: 'Copy file link', run: copyLink },
+        escapeFeedback: copied,
+      }}
+    >
+      <Player engine={{ kind: 'html', source: { kind: 'server', media, api } }} />
+    </PlayerServicesProvider>
   )
 }

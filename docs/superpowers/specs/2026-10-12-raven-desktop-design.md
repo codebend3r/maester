@@ -195,6 +195,8 @@ export type EngineHandle = {
   actions: EngineActions
   /** The picture: a <video> for html; nothing for native, which draws under the page. */
   surface: ReactNode
+  /** Restores keyboard focus without exposing the picture's DOM to chrome; safe without a surface. */
+  focusSurface: () => void
   /** mpv draws every subtitle format itself, so SubtitleOverlay stays out. */
   drawsSubtitles: boolean
 }
@@ -254,9 +256,12 @@ export type PlayerServices = {
   posterUrl: string | null
   /** Shown on Unplayable: the web's "Copy file link", the desktop's "Open in browser". */
   escape: { label: string; run: () => void } | null
+  /** Optional host-owned action feedback, including clipboard success or failure. */
+  escapeFeedback?: string | null
 }
 ```
 
+- P1 also preserves the browser's Start over focus through `EngineHandle.focusSurface` and its clipboard feedback through optional `PlayerServices.escapeFeedback`. The HTML engine safely ignores focus when its surface is unavailable; the host owns clipboard APIs and feedback text.
 - The web's `WatchPage` builds `PlayerServices` from the singleton for now: `api.saveProgress`, `api.recordPlay`, `afterWatching` on leaving, `watchLink` for the next item. The queries the html engine runs (`tracksQuery`, `subtitlesQuery`, `playbackSettingsQuery`) become factories over the `ApiClient` in the `HtmlSource`, keyed by the same `queryKeys` entries so the web's invalidation still reaches them.
 - When D1 brings `RavenProvider` and `Platform`, `PlayerServices` is built from `useRaven()` instead; nothing in the player changes.
 

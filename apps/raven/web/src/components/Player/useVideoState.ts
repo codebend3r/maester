@@ -9,6 +9,7 @@ export type VideoState = {
   /** The element's own idea of the length, for a file the probe could not time. */
   elementDuration: number | null
   buffered: Ranges
+  ended: boolean
   paused: boolean
   waiting: boolean
   rate: number
@@ -19,6 +20,7 @@ export type VideoEvent =
   | { type: 'sought'; time: number }
   | { type: 'buffered'; buffered: Ranges }
   | { type: 'duration'; duration: number | null }
+  | { type: 'ended' }
   | { type: 'played' }
   | { type: 'paused' }
   | { type: 'waiting' }
@@ -29,6 +31,7 @@ export const initialVideoState = (startAt: number): VideoState => ({
   time: startAt,
   elementDuration: null,
   buffered: [],
+  ended: false,
   paused: true,
   waiting: false,
   rate: 1,
@@ -39,13 +42,15 @@ export const videoReducer = (state: VideoState, event: VideoEvent): VideoState =
     case 'moved':
       return { ...state, time: event.time, buffered: event.buffered }
     case 'sought':
-      return { ...state, time: event.time }
+      return { ...state, time: event.time, ended: false }
     case 'buffered':
       return { ...state, buffered: event.buffered }
     case 'duration':
       return { ...state, elementDuration: event.duration }
+    case 'ended':
+      return { ...state, ended: true }
     case 'played':
-      return { ...state, paused: false }
+      return { ...state, paused: false, ended: false }
     case 'paused':
       return { ...state, paused: true }
     case 'waiting':
@@ -120,15 +125,25 @@ export const useVideoState = ({
         dispatch({ type: 'duration', duration: Number.isFinite(total) && total > 0 ? total : null })
       },
       play: () => {
+        // Play is intent; only playing confirms frames for progress and history.
         playing.current = true
+        dispatch({ type: 'waiting' })
         dispatch({ type: 'played' })
       },
-      playing: () => dispatch({ type: 'flowing' }),
-      canplay: () => dispatch({ type: 'flowing' }),
+      playing: () => {
+        playing.current = true
+        dispatch({ type: 'played' })
+        dispatch({ type: 'flowing' })
+      },
+      ended: () => {
+        position.current = fileTime()
+        dispatch({ type: 'ended' })
+      },
       waiting: () => dispatch({ type: 'waiting' }),
       pause: (element) => {
         // Letting go of a source on the way to another pauses too; that is not the viewer.
         if (element.readyState === HTMLMediaElement.HAVE_NOTHING) return
+        position.current = fileTime()
         playing.current = false
         dispatch({ type: 'paused' })
       },

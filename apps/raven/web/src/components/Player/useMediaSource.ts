@@ -1,7 +1,7 @@
-import { type MediaItem, type PlaybackMode, streamMimeType } from '@raven/core'
+import { type ApiClient, type PlaybackMode, streamMimeType } from '@raven/core'
 import { type RefObject, useEffect, useEffectEvent, useRef } from 'react'
 import { useVideoEvents } from '@/components/Player/useVideoEvents'
-import { api } from '@/lib/api'
+import type { HtmlSource } from '@/components/Player/engine'
 import { browserEnvironment, createStreamSession } from '@/lib/streamSource'
 
 /** What the video plays: the file itself, or a converted stream of a known type. */
@@ -10,11 +10,13 @@ export type VideoSource =
   | { kind: 'stream'; mime: string; url: (start: number) => string }
 
 export const sourceFor = ({
+  api,
   id,
   mode,
   audio,
   mime,
 }: {
+  api: ApiClient
   id: number
   mode: PlaybackMode
   /** The `0:a:N` track to play, or null for the file's default. */
@@ -43,7 +45,7 @@ const failureMessage = (error: MediaError | null): string => {
  */
 export const useMediaSource = ({
   videoRef,
-  media,
+  source: htmlSource,
   mode,
   audio,
   position,
@@ -52,7 +54,7 @@ export const useMediaSource = ({
   onFailure,
 }: {
   videoRef: RefObject<HTMLVideoElement | null>
-  media: MediaItem
+  source: HtmlSource
   mode: PlaybackMode
   audio: number | null
   position: RefObject<number>
@@ -61,12 +63,18 @@ export const useMediaSource = ({
   onRefused: () => void
   onFailure: (message: string) => void
 }): void => {
-  const mime = mode === 'direct' ? null : streamMimeType({ media, mode })
+  const mime =
+    mode === 'direct' || htmlSource.kind === 'file'
+      ? null
+      : streamMimeType({ media: htmlSource.media, mode })
+  const id = htmlSource.kind === 'server' ? htmlSource.media.id : htmlSource.url
+  const api = htmlSource.kind === 'server' ? htmlSource.api : null
+  const knownDuration = htmlSource.kind === 'server' ? htmlSource.media.duration : null
   // The source this render wants, and the one attached. They differ from
   // the commit that picks a new source until the effect swaps it in, and a
   // failure the browser queued for the old one can land in between; it
   // must not count against the new one.
-  const wanted = `${media.id}:${mode}:${audio ?? 'default'}`
+  const wanted = `${id}:${mode}:${audio ?? 'default'}`
   const attached = useRef<string | null>(null)
   const report = (message: string) => {
     if (attached.current === wanted) onFailure(message)
@@ -129,10 +137,10 @@ export const useMediaSource = ({
     const element = videoRef.current
     if (!element) return undefined
     attached.current = wanted
-    return attach({
-      element,
-      source: sourceFor({ id: media.id, mode, audio, mime }),
-      duration: media.duration,
-    })
-  }, [videoRef, media.id, media.duration, mode, audio, mime, wanted])
+    const videoSource: VideoSource =
+      api != null && typeof id === 'number'
+        ? sourceFor({ api, id, mode, audio, mime })
+        : { kind: 'file', url: String(id) }
+    return attach({ element, source: videoSource, duration: knownDuration })
+  }, [videoRef, id, knownDuration, api, mode, audio, mime, wanted])
 }

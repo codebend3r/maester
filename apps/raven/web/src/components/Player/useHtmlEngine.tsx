@@ -1,0 +1,139 @@
+import { type PlaybackMode, STREAM_TIME_SHIFT } from '@raven/core'
+import { useEffect, useRef } from 'react'
+import type { EngineHandle, HtmlSource } from '@/components/Player/engine'
+import styles from '@/components/Player/Player.module.scss'
+import { usePlayerServices } from '@/components/Player/PlayerServices'
+import { SubtitleOverlay } from '@/components/Player/SubtitleOverlay'
+import { useMediaSource } from '@/components/Player/useMediaSource'
+import { useSubtitleCues } from '@/components/Player/useSubtitleCues'
+import type { TrackSelection } from '@/components/Player/useTrackSelection'
+import { useVideoEvents } from '@/components/Player/useVideoEvents'
+import { useVideoState } from '@/components/Player/useVideoState'
+import { usePlayerPrefs } from '@/stores/playerPrefs'
+
+export const useHtmlEngine = ({
+  source,
+  mode,
+  selection,
+  onFailure,
+  toggleFullscreen,
+}: {
+  source: HtmlSource
+  mode: PlaybackMode
+  selection: TrackSelection
+  onFailure: (message: string) => void
+  toggleFullscreen: () => void
+}) => {
+  const { title, posterUrl } = usePlayerServices()
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const volume = usePlayerPrefs((prefs) => prefs.volume)
+  const muted = usePlayerPrefs((prefs) => prefs.muted)
+  const setVolume = usePlayerPrefs((prefs) => prefs.setVolume)
+  const captionScale = usePlayerPrefs((prefs) => prefs.captionScale)
+  const setCaptionScale = usePlayerPrefs((prefs) => prefs.setCaptionScale)
+  const shift = mode === 'direct' ? 0 : STREAM_TIME_SHIFT
+  const playback = useVideoState({
+    videoRef,
+    shift,
+    startAt: title.resumeAt,
+    knownDuration: title.duration,
+  })
+  useMediaSource({
+    videoRef,
+    source,
+    mode,
+    audio: selection.audio,
+    position: playback.position,
+    playing: playback.playing,
+    onRefused: playback.refused,
+    onFailure,
+  })
+  useVideoEvents({
+    videoRef,
+    on: {
+      loadedmetadata: (element) => {
+        element.volume = volume
+        element.muted = muted
+      },
+      volumechange: (element) => setVolume({ volume: element.volume, muted: element.muted }),
+    },
+  })
+  useEffect(() => videoRef.current?.focus(), [])
+  const subtitles = useSubtitleCues({
+    source,
+    track: selection.subtitle,
+    time: playback.state.time,
+    duration: playback.duration,
+  })
+  const savedPosition = playback.position
+  const position = {
+    get current() {
+      const element = videoRef.current
+      return element && element.readyState >= HTMLMediaElement.HAVE_METADATA
+        ? Math.max(0, element.currentTime - shift)
+        : savedPosition.current
+    },
+  }
+  const actions: EngineHandle['actions'] = {
+    play: () => {
+      videoRef.current?.play()?.catch(() => undefined)
+    },
+    pause: () => videoRef.current?.pause(),
+    seek: playback.seek,
+    setVolume: (level) => {
+      const element = videoRef.current
+      if (!element) return
+      element.volume = level.volume
+      element.muted = level.muted
+      setVolume(level)
+    },
+    setRate: (rate) => {
+      const element = videoRef.current
+      if (!element) return
+      // The default survives a converted source being rebuilt.
+      element.defaultPlaybackRate = rate
+      element.playbackRate = rate
+    },
+    setAudio: selection.pickAudio,
+    setSubtitle: selection.pickSubtitle,
+    setSubtitleScale: setCaptionScale,
+  }
+  const engine: EngineHandle = {
+    state: playback.state,
+    duration: playback.duration,
+    position,
+    tracks: selection.tracks,
+    actions,
+    drawsSubtitles: false,
+    focusSurface: () => videoRef.current?.focus(),
+    surface: (
+      // Subtitles use our themed overlay, including for converted streams.
+      // oxlint-disable-next-line jsx-a11y/media-has-caption, jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions
+      <video
+        ref={videoRef}
+        className={styles.video}
+        poster={posterUrl ?? undefined}
+        autoPlay
+        playsInline
+        preload="auto"
+        tabIndex={-1}
+        aria-label={title.label}
+        onClick={() => (playback.state.paused ? actions.play() : actions.pause())}
+        onDoubleClick={toggleFullscreen}
+      />
+    ),
+  }
+  return {
+    engine,
+    subtitleStatus: subtitles.status,
+    renderSubtitles: (lifted: boolean) => (
+      <SubtitleOverlay
+        cues={subtitles.cues}
+        video={videoRef}
+        shift={shift}
+        lifted={lifted}
+        scale={captionScale}
+      />
+    ),
+  }
+}

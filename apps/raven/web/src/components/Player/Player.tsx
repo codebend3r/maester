@@ -1,37 +1,78 @@
-import type { MediaItem } from '@raven/core'
+import { useState } from 'react'
+import type { Engine, HtmlSource } from '@/components/Player/engine'
 import styles from '@/components/Player/Player.module.scss'
+import { usePlayerServices } from '@/components/Player/PlayerServices'
 import { Stage } from '@/components/Player/Stage'
 import { Unplayable } from '@/components/Player/Unplayable'
 import { useLeave } from '@/components/Player/useLeave'
 import { usePlaybackLadder } from '@/components/Player/usePlaybackLadder'
-import { useTrackSelection } from '@/components/Player/useTrackSelection'
+import { type TrackSelection, useTrackSelection } from '@/components/Player/useTrackSelection'
 
-/** The stage's spinner, while what picks the first source is still on its way. */
 const Waiting = () => (
   <div className={styles.stage} aria-busy="true">
     <output className={styles.spinner} aria-label="Loading" />
   </div>
 )
 
-/**
- * Picks how to play a file and which tracks to play, then hands over to
- * the stage, or says why the file cannot play once every way has failed.
- */
-export const Player = ({
-  media,
-  upNext,
-  backTo,
+const fileSelection: TrackSelection = {
+  tracks: null,
+  tracksFailed: false,
+  tracksPending: false,
+  audio: null,
+  isDefaultAudio: true,
+  subtitle: null,
+  isWaitingForTracks: false,
+  pickAudio: () => {},
+  pickSubtitle: () => {},
+}
+
+export const Player = ({ engine }: { engine: Engine }) => {
+  const { title } = usePlayerServices()
+  const leave = useLeave(title.backTo)
+  const source = engine.source
+  switch (source.kind) {
+    case 'server':
+      return <ServerPlayer source={source} onBack={leave} />
+    case 'file':
+      return <FilePlayer source={source} onBack={leave} />
+    default: {
+      const unknown: never = source
+      return unknown
+    }
+  }
+}
+
+const FilePlayer = ({
+  source,
+  onBack,
 }: {
-  media: MediaItem
-  /** What plays after this video ends, in turn. */
-  upNext: readonly MediaItem[]
-  /** Where Back goes when no page of the app opened the player; otherwise it goes back to that page. */
-  backTo: string
+  source: Extract<HtmlSource, { kind: 'file' }>
+  onBack: () => void
 }) => {
-  const leave = useLeave(backTo)
-  const selection = useTrackSelection(media.id)
+  const [failure, setFailure] = useState<string | null>(null)
+  if (failure) return <Unplayable problems={[failure]} onBack={onBack} onTryAnyway={null} />
+  return (
+    <Stage
+      engine={{ kind: 'html', source }}
+      onBack={onBack}
+      mode="direct"
+      selection={fileSelection}
+      onFailure={setFailure}
+    />
+  )
+}
+
+const ServerPlayer = ({
+  source,
+  onBack,
+}: {
+  source: Extract<HtmlSource, { kind: 'server' }>
+  onBack: () => void
+}) => {
+  const selection = useTrackSelection({ mediaId: source.media.id, api: source.api })
   const playback = usePlaybackLadder({
-    media,
+    media: source.media,
+    api: source.api,
     audio: selection.audio,
     isDefaultAudio: selection.isDefaultAudio,
   })
@@ -40,20 +81,14 @@ export const Player = ({
       return <Waiting />
     case 'unplayable':
       return (
-        <Unplayable
-          media={media}
-          onBack={leave}
-          problems={playback.problems}
-          onTryAnyway={playback.tryAnyway}
-        />
+        <Unplayable onBack={onBack} problems={playback.problems} onTryAnyway={playback.tryAnyway} />
       )
     case 'playing':
       if (selection.isWaitingForTracks) return <Waiting />
       return (
         <Stage
-          media={media}
-          upNext={upNext}
-          onBack={leave}
+          engine={{ kind: 'html', source }}
+          onBack={onBack}
           mode={playback.mode}
           selection={selection}
           onFailure={playback.fail}

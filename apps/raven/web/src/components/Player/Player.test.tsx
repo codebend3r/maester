@@ -3,7 +3,7 @@ import type { MediaTracks, PlaybackSettingsState, SubtitleTrack } from '@raven/c
 import { act, fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router-dom'
-import { Player } from '@/components/Player/Player'
+import { WatchPlayer as Player } from '@/pages/WatchPage/WatchPage'
 import { api } from '@/lib/api'
 import { setBrowserSupport, setStreamSupport } from '@/test/canPlay'
 import { mediaItem } from '@/test/fixtures'
@@ -132,6 +132,37 @@ describe('Player', () => {
   })
 })
 
+describe('Player escape feedback', () => {
+  beforeEach(() => setBrowserSupport(() => false))
+
+  it('keeps successful clipboard feedback owned by the browser host', async () => {
+    const clipboard = spyOn(navigator.clipboard, 'writeText').mockImplementation(async () => {})
+    spies.push(clipboard)
+    renderWithProviders(<Player media={mediaItem()} upNext={[]} backTo="/libraries/2" />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Copy file link' }))
+    expect(clipboard).toHaveBeenCalledWith(
+      new URL('/api/media/7/file', window.location.origin).href,
+    )
+    expect(
+      await screen.findByText('Link copied. Paste it into VLC or IINA to play it there.'),
+    ).toBeInTheDocument()
+  })
+
+  it('shows the copyable URL if the browser refuses the clipboard', async () => {
+    const clipboard = spyOn(navigator.clipboard, 'writeText').mockImplementation(async () => {
+      throw new Error('Clipboard denied')
+    })
+    spies.push(clipboard)
+    renderWithProviders(<Player media={mediaItem()} upNext={[]} backTo="/libraries/2" />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Copy file link' }))
+    expect(
+      await screen.findByText(
+        `Copy this link: ${new URL('/api/media/7/file', window.location.origin).href}`,
+      ),
+    ).toBeInTheDocument()
+  })
+})
+
 describe('Player progress', () => {
   it('does not overwrite the saved position when the video never started', async () => {
     const saveSpy = spyOn(api, 'saveProgress').mockImplementation(async () => undefined)
@@ -159,8 +190,10 @@ describe('Player history', () => {
     )
     const video = container.querySelector('video')
     expect(played).not.toHaveBeenCalled()
-    video?.dispatchEvent(new Event('playing'))
-    video?.dispatchEvent(new Event('playing'))
+    act(() => {
+      video?.dispatchEvent(new Event('playing'))
+      video?.dispatchEvent(new Event('playing'))
+    })
     const calls = [...played.mock.calls]
     played.mockRestore()
     expect(calls).toEqual([[7]])

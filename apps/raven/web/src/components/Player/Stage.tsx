@@ -1,28 +1,27 @@
+import { type PlaybackMode, formatDuration } from '@raven/core'
 import {
-  type MediaItem,
-  type PlaybackMode,
-  STREAM_TIME_SHIFT,
-  formatDuration,
-  mediaLabel,
-} from '@raven/core'
-import { type SyntheticEvent, useEffect, useEffectEvent, useRef, useState } from 'react'
+  type ReactNode,
+  type SyntheticEvent,
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useState,
+} from 'react'
+import type { Engine, EngineHandle } from '@/components/Player/engine'
+import { usePlayerServices } from '@/components/Player/PlayerServices'
+import { useHtmlEngine } from '@/components/Player/useHtmlEngine'
+import type { SubtitleStatus } from '@/components/Player/useSubtitleCues'
 import { Button, ButtonLink } from '@/components/Button/Button'
 import { Bezel } from '@/components/Player/Bezel'
 import { Controls } from '@/components/Player/Controls'
 import styles from '@/components/Player/Player.module.scss'
 import { SettingsMenu } from '@/components/Player/SettingsMenu'
 import { ShortcutsDialog } from '@/components/Player/ShortcutsDialog'
-import { SubtitleOverlay } from '@/components/Player/SubtitleOverlay'
-import { useMediaSource } from '@/components/Player/useMediaSource'
 import { type Overlay, usePlayerActions } from '@/components/Player/usePlayerActions'
 import { useBezel, useFullscreen, useIdle } from '@/components/Player/useStageChrome'
-import { useSubtitleCues } from '@/components/Player/useSubtitleCues'
 import { useUpNext } from '@/components/Player/useUpNext'
 import type { TrackSelection } from '@/components/Player/useTrackSelection'
-import { useVideoEvents } from '@/components/Player/useVideoEvents'
-import { useVideoState } from '@/components/Player/useVideoState'
 import { useWatchProgress } from '@/components/Player/useWatchProgress'
-import { api } from '@/lib/api'
 import { isTypingTarget } from '@/lib/keyboard'
 import { shortcutFor } from '@/lib/shortcuts'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
@@ -34,86 +33,77 @@ const isControlTarget = (target: EventTarget | null): boolean =>
   target instanceof HTMLElement && !!target.closest('button, a')
 
 export type StageProps = {
-  media: MediaItem
-  /** What plays after this video ends, in turn. */
-  upNext: readonly MediaItem[]
-  /** Leaves the player, for the page that opened it. */
+  engine: Engine
   onBack: () => void
   mode: PlaybackMode
   selection: TrackSelection
   onFailure: (message: string) => void
 }
 
-/**
- * The video and everything over it, full screen and focused on arrival.
- * Every time here is file time: a converted stream runs `STREAM_TIME_SHIFT`
- * ahead of the file, and `shift` takes that off wherever the element's
- * clock is read or set.
- */
-export const Stage = ({ media, upNext, onBack, mode, selection, onFailure }: StageProps) => {
-  // "The Matrix (1999)", or "Severance · S01E02 · Half Loop", once matched.
-  const label = mediaLabel(media)
-  const videoRef = useRef<HTMLVideoElement>(null)
+export const Stage = (props: StageProps) => {
+  const kind = props.engine.kind
+  switch (kind) {
+    case 'html':
+      return <HtmlStage key={kind} {...props} />
+    default: {
+      const unknown: never = kind
+      return unknown
+    }
+  }
+}
+
+const HtmlStage = ({ engine, ...props }: StageProps) => {
+  const fullscreen = useFullscreen()
+  const html = useHtmlEngine({
+    source: engine.source,
+    ...props,
+    toggleFullscreen: fullscreen.toggle,
+  })
+  return <PlayerChrome {...props} {...html} fullscreen={fullscreen} />
+}
+
+/** Shared controls consume only the engine handle, never the picture's DOM. */
+export const PlayerChrome = ({
+  engine,
+  onBack,
+  mode,
+  selection,
+  subtitleStatus,
+  renderSubtitles,
+  fullscreen,
+}: {
+  engine: EngineHandle
+  onBack: () => void
+  mode: PlaybackMode
+  selection: TrackSelection
+  subtitleStatus: SubtitleStatus
+  renderSubtitles?: (lifted: boolean) => ReactNode
+  fullscreen: ReturnType<typeof useFullscreen>
+}) => {
+  const { title } = usePlayerServices()
+  const label = title.label
+  const { state, duration, actions } = engine
+  const seek = actions.seek
   const menu = useRef<HTMLDialogElement>(null)
   const settingsButton = useRef<HTMLButtonElement>(null)
   const volume = usePlayerPrefs((prefs) => prefs.volume)
   const muted = usePlayerPrefs((prefs) => prefs.muted)
-  const setVolume = usePlayerPrefs((prefs) => prefs.setVolume)
-  const captionScale = usePlayerPrefs((prefs) => prefs.captionScale)
-
-  const shift = mode === 'direct' ? 0 : STREAM_TIME_SHIFT
-  const resumable = media.position > 0 && media.position < (media.duration ?? Infinity) - 10
-  const playback = useVideoState({
-    videoRef,
-    shift,
-    startAt: resumable ? media.position : 0,
-    knownDuration: media.duration,
-  })
-  const { state, duration, seek, fileTime } = playback
-  useWatchProgress({ videoRef, media, position: playback.position, duration, fileTime })
-  useMediaSource({
-    videoRef,
-    media,
-    mode,
-    audio: selection.audio,
-    position: playback.position,
-    playing: playback.playing,
-    onRefused: playback.refused,
-    onFailure,
-  })
-  // Volume carries over from one video to the next.
-  useVideoEvents({
-    videoRef,
-    on: {
-      loadedmetadata: (element) => {
-        element.volume = volume
-        element.muted = muted
-      },
-      volumechange: (element) => setVolume({ volume: element.volume, muted: element.muted }),
-    },
-  })
-
-  const nextLink = useUpNext({ videoRef, upNext })
+  useWatchProgress({ state, position: engine.position, duration })
+  const nextLink = useUpNext({ ended: state.ended })
   const idle = useIdle(IDLE_MS)
   const { bezel, flash } = useBezel()
-  const fullscreen = useFullscreen()
   const [overlay, setOverlay] = useState<Overlay>('none')
-  const [resumedAt, setResumedAt] = useState<number | null>(resumable ? media.position : null)
-  const { cues, status: subtitleStatus } = useSubtitleCues({
-    mediaId: media.id,
-    track: selection.subtitle,
-    time: state.time,
-    duration,
-  })
+  const [resumedAt, setResumedAt] = useState<number | null>(
+    title.resumeAt > 0 ? title.resumeAt : null,
+  )
 
-  // Arriving at the player puts the keyboard on the video straight away, and the title in the tab.
+  // The host title stays in the tab only while this player is open.
   useEffect(() => {
-    videoRef.current?.focus()
-    const title = document.title
+    const previousTitle = document.title
     document.title = label
     const resumedTimer = window.setTimeout(() => setResumedAt(null), 6000)
     return () => {
-      document.title = title
+      document.title = previousTitle
       window.clearTimeout(resumedTimer)
     }
   }, [label])
@@ -124,8 +114,7 @@ export const Stage = ({ media, upNext, onBack, mode, selection, onFailure }: Sta
   }
 
   const controls = usePlayerActions({
-    videoRef,
-    playback,
+    engine,
     selection,
     flash,
     toggleFullscreen: fullscreen.toggle,
@@ -167,9 +156,9 @@ export const Stage = ({ media, upNext, onBack, mode, selection, onFailure }: Sta
 
   const startOver = () => {
     seek(0)
-    videoRef.current?.play()?.catch(() => undefined)
+    actions.play()
     setResumedAt(null)
-    videoRef.current?.focus()
+    engine.focusSurface()
   }
 
   const chromeShown = state.paused || idle.active || overlay !== 'none'
@@ -180,28 +169,8 @@ export const Stage = ({ media, upNext, onBack, mode, selection, onFailure }: Sta
       onPointerMove={idle.wake}
       onPointerDown={onStagePointerDown}
     >
-      {/* Subtitles are drawn by SubtitleOverlay rather than <track>, so they
-          follow the theme and work the same for converted streams. */}
-      {/* oxlint-disable-next-line jsx-a11y/media-has-caption, jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions */}
-      <video
-        ref={videoRef}
-        className={styles.video}
-        poster={api.thumbnailUrl(media) ?? undefined}
-        autoPlay
-        playsInline
-        preload="auto"
-        tabIndex={-1}
-        aria-label={label}
-        onClick={controls.togglePlay}
-        onDoubleClick={fullscreen.toggle}
-      />
-      <SubtitleOverlay
-        cues={cues}
-        video={videoRef}
-        shift={shift}
-        lifted={chromeShown}
-        scale={captionScale}
-      />
+      {engine.surface}
+      {!engine.drawsSubtitles && (renderSubtitles?.(chromeShown) ?? null)}
       {state.waiting && !state.paused && <output className={styles.spinner} aria-label="Loading" />}
       {!!bezel && <Bezel key={bezel.id} bezel={bezel} />}
       <p className="visually-hidden" aria-live="polite">
@@ -216,11 +185,13 @@ export const Stage = ({ media, upNext, onBack, mode, selection, onFailure }: Sta
         <h1 className={styles.title}>{label}</h1>
         {nextLink && (
           <ButtonLink
-            {...nextLink}
+            to={nextLink.to}
+            state={nextLink.state}
+            replace
             icon="next"
             className={styles.next}
-            aria-label={`Next: ${mediaLabel(nextLink.state.media)}`}
-            title={mediaLabel(nextLink.state.media)}
+            aria-label={`Next: ${nextLink.label}`}
+            title={nextLink.label}
           >
             Next
           </ButtonLink>
@@ -256,7 +227,11 @@ export const Stage = ({ media, upNext, onBack, mode, selection, onFailure }: Sta
       {overlay === 'settings' && (
         <SettingsMenu
           menuRef={menu}
-          selection={selection}
+          selection={{
+            ...selection,
+            pickAudio: actions.setAudio,
+            pickSubtitle: actions.setSubtitle,
+          }}
           subtitleStatus={subtitleStatus}
           rate={state.rate}
           mode={mode}

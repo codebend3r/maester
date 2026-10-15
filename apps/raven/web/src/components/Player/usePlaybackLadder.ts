@@ -1,7 +1,14 @@
-import { type MediaItem, type PlaybackMode, planPlayback } from '@raven/core'
+import {
+  type ApiClient,
+  type MediaItem,
+  type PlaybackMode,
+  DEFAULT_PLAYBACK_SETTINGS,
+  planPlayback,
+} from '@raven/core'
 import { useMemo, useState } from 'react'
 import { browserCanPlay, browserCanStream } from '@/lib/canPlay'
-import { usePlaybackPolicy } from '@/lib/usePlaybackPolicy'
+import { useQuery } from '@tanstack/react-query'
+import { playerQueriesFor } from '@/lib/playerQueries'
 
 /** The ways to play, best first, for one audio track; a step down belongs to one ladder. */
 type Ladder = { modes: readonly PlaybackMode[]; audio: number | null }
@@ -27,14 +34,17 @@ export type PlaybackStatus =
  */
 export const usePlaybackLadder = ({
   media,
+  api,
   audio,
   isDefaultAudio,
 }: {
   media: MediaItem
+  api: ApiClient
   audio: number | null
   isDefaultAudio: boolean
 }): PlaybackStatus => {
-  const policy = usePlaybackPolicy()
+  const settings = useQuery(playerQueriesFor(api).playbackSettings)
+  const policy = settings.data?.settings ?? (settings.isError ? DEFAULT_PLAYBACK_SETTINGS : null)
   const plan = useMemo(
     () =>
       policy &&
