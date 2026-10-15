@@ -1,11 +1,19 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AdminService, TURN_ON_DELAY_MS, isStrongPassword } from '@/admin/adminService'
 import { readServerConfig } from '@/config'
+import { SettingsRepository } from '@/settings/settingsRepository'
+import { testDatabase } from '@/test/database'
 
 const PASSWORD = 'Kestrel-Hall-42'
 
+const database = testDatabase('raven-admin-')
+
+/** The service as the server makes it on start, so a second one stands for a restart. */
 const serviceWith = (adminPassword: string | null): AdminService =>
-  new AdminService({ ...readServerConfig({}), adminPassword })
+  new AdminService(
+    { ...readServerConfig({}), adminPassword },
+    new SettingsRepository(database.get()),
+  )
 
 /** The cookie as a browser sends it back: its name and value, no attributes. */
 const sent = (cookie: string): string => cookie.split(';')[0] ?? ''
@@ -30,6 +38,9 @@ describe('isStrongPassword', () => {
 })
 
 describe('AdminService', () => {
+  beforeAll(database.open)
+  afterAll(database.close)
+
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'] })
   })
@@ -79,18 +90,34 @@ describe('AdminService', () => {
     })
   })
 
-  it('comes back on after twelve hours, and on a restart', () => {
+  it('stays off through a restart and with time, until it is turned back on', () => {
+    const cookie = unlocked(serviceWith(PASSWORD))
+    vi.setSystemTime(Date.now() + 90 * 24 * 60 * 60_000)
+    const restarted = serviceWith(PASSWORD)
+    expect(restarted.state({ cookie })).toEqual({ state: 'off' })
+    const waiting = sent(restarted.lock({ cookie })?.cookie ?? '')
+    vi.setSystemTime(Date.now() + TURN_ON_DELAY_MS)
+    expect(serviceWith(PASSWORD).isLocked({ cookie: waiting })).toBe(true)
+  })
+
+  it('keeps its cookie in the browser, renewed each time the lock is read', () => {
     const admin = serviceWith(PASSWORD)
+    const unlocking = admin.unlock(PASSWORD)
+    expect(unlocking.ok && unlocking.cookie).toContain('Max-Age=34560000')
     const cookie = unlocked(admin)
-    expect(serviceWith(PASSWORD).isLocked({ cookie })).toBe(true)
-    vi.setSystemTime(Date.now() + 12 * 60 * 60_000)
-    expect(admin.isLocked({ cookie })).toBe(true)
+    expect(admin.renewed({ cookie })?.cookie).toContain('Max-Age=34560000')
+    expect(admin.renewed({ cookie: undefined })).toBeNull()
+  })
+
+  it('comes back on everywhere when the password changes', () => {
+    const cookie = unlocked(serviceWith(PASSWORD))
+    expect(serviceWith('Kestrel-Hall-43').isLocked({ cookie })).toBe(true)
   })
 
   it('refuses a cookie it did not sign', () => {
     const admin = serviceWith(PASSWORD)
-    const [endsAt = ''] = unlocked(admin).replace('raven_admin=', '').split('.')
-    const forged = `raven_admin=${Number(endsAt) + 1}..${'x'.repeat(43)}`
+    const [since = ''] = unlocked(admin).replace('raven_admin=', '').split('.')
+    const forged = `raven_admin=${Number(since) + 1}..${'x'.repeat(43)}`
     expect(admin.isLocked({ cookie: forged })).toBe(true)
   })
 

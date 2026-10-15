@@ -1,9 +1,10 @@
-import { createHmac, randomBytes } from 'node:crypto'
+import { createHmac } from 'node:crypto'
 import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common'
 import type { AdminLock } from '@raven/core'
 import { readCookie, sameSecret } from '@shared/server'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { WrongTries } from '@/lock/wrongTries'
+import { SettingsRepository } from '@/settings/settingsRepository'
 
 /** How turning the admin lock off went: a cookie to set, or why not with the status to say it with. */
 export type AdminUnlocking =
@@ -14,14 +15,18 @@ export type AdminUnlocking =
 export type AdminChange = { cookie: string; lock: AdminLock }
 
 /**
- * A browser's session with the lock off: when it ends, and, once the lock
- * was turned back on, when it holds again. Null `locksAt` is a lock left off.
+ * A browser's session with the lock off: when the password was entered,
+ * and, once the lock was turned back on, when it holds again. Null
+ * `locksAt` is a lock left off, which it stays until it is turned back on.
  */
-type Session = { endsAt: number; locksAt: number | null }
+type Session = { since: number; locksAt: number | null }
 
 const COOKIE = 'raven_admin'
-/** The lock stays off this long after the password, or until it is turned on or the server restarts. */
-const SESSION_MS = 12 * 60 * 60_000
+/**
+ * How long the browser keeps the cookie: 400 days, the most Chrome allows.
+ * Each read of the lock renews it, so a browser that comes back keeps it.
+ */
+const COOKIE_MAX_AGE_S = 400 * 24 * 60 * 60
 /** Turned on, the lock waits this long, so a slip of the finger is undone without the password. */
 export const TURN_ON_DELAY_MS = 15_000
 
@@ -40,18 +45,27 @@ const WEAK_PASSWORD = `ADMIN_PASSWORD in raven's .env is too weak to turn the ad
  * there. While it holds, locked libraries are left out altogether, and the
  * routes marked `AdminOnly` are held back, as every route that is not a GET
  * is unless it is marked `ForViewers`. Entering the password gives the
- * browser a session cookie signed with a key that lives only as long as the
- * process, so a restart turns the lock back on everywhere.
+ * browser a session cookie that keeps the lock off there until it is turned
+ * back on, through refreshes, restarts and redeploys. The cookie is signed
+ * with a key made from a secret kept in the database and the password
+ * itself, so changing `ADMIN_PASSWORD` turns the lock back on everywhere.
  * Without a strong password set the lock stays on: forgetting the setting
  * never opens anything.
  */
 @Injectable()
 export class AdminService implements OnModuleInit {
   private readonly logger = new Logger(AdminService.name)
-  private readonly key = randomBytes(32)
+  private readonly key: Buffer
   private readonly tries = new WrongTries()
 
-  constructor(@Inject(SERVER_CONFIG) private readonly config: ServerConfig) {}
+  constructor(
+    @Inject(SERVER_CONFIG) private readonly config: ServerConfig,
+    @Inject(SettingsRepository) settings: SettingsRepository,
+  ) {
+    this.key = createHmac('sha256', settings.adminSecret())
+      .update(config.adminPassword ?? '')
+      .digest()
+  }
 
   onModuleInit(): void {
     if (this.config.adminPassword != null && !this.available) this.logger.warn(WEAK_PASSWORD)
@@ -85,7 +99,7 @@ export class AdminService implements OnModuleInit {
       return { ok: false, status: 401, message: 'That password is not right.' }
     }
     this.tries.succeed()
-    return { ok: true, cookie: this.cookieOf({ endsAt: Date.now() + SESSION_MS, locksAt: null }) }
+    return { ok: true, cookie: this.cookieOf({ since: Date.now(), locksAt: null }) }
   }
 
   /**
@@ -98,6 +112,12 @@ export class AdminService implements OnModuleInit {
     return this.change({ ...session, locksAt: Date.now() + TURN_ON_DELAY_MS })
   }
 
+  /** The session's cookie again, for another 400 days in the browser; null when the lock holds. */
+  renewed({ cookie }: { cookie: string | undefined }): AdminChange | null {
+    const session = this.session(cookie)
+    return session == null ? null : this.change(session)
+  }
+
   /** Takes back a lock on its way, with no password. Null once it holds, when only the password opens it. */
   keepUnlocked({ cookie }: { cookie: string | undefined }): AdminChange | null {
     const session = this.session(cookie)
@@ -107,18 +127,17 @@ export class AdminService implements OnModuleInit {
 
   private lockOf(session: Session): AdminLock {
     if (session.locksAt == null) return { state: 'off' }
-    const holdsAt = Math.min(session.locksAt, session.endsAt)
-    return { state: 'turningOn', remainingMs: Math.max(0, holdsAt - Date.now()) }
+    return { state: 'turningOn', remainingMs: Math.max(0, session.locksAt - Date.now()) }
   }
 
   private change(session: Session): AdminChange {
     return { cookie: this.cookieOf(session), lock: this.lockOf(session) }
   }
 
-  /** Scoped to the API, out of reach of scripts, and never sent from another site. */
-  private cookieOf({ endsAt, locksAt }: Session): string {
-    const value = `${endsAt}.${locksAt ?? ''}`
-    return `${COOKIE}=${value}.${this.sign(value)}; Path=/api; HttpOnly; SameSite=Strict`
+  /** Scoped to the API, out of reach of scripts, never sent from another site, and kept when the browser closes. */
+  private cookieOf({ since, locksAt }: Session): string {
+    const value = `${since}.${locksAt ?? ''}`
+    return `${COOKIE}=${value}.${this.sign(value)}; Path=/api; HttpOnly; SameSite=Strict; Max-Age=${COOKIE_MAX_AGE_S}`
   }
 
   private sign(value: string): string {
@@ -127,11 +146,10 @@ export class AdminService implements OnModuleInit {
 
   /** This browser's session while the lock is off for it, else null. */
   private session(cookie: string | undefined): Session | null {
-    const [endsAt = '', locksAt = '', signature = ''] =
+    const [since = '', locksAt = '', signature = ''] =
       readCookie({ header: cookie, name: COOKIE })?.split('.') ?? []
-    if (!sameSecret({ given: signature, expected: this.sign(`${endsAt}.${locksAt}`) })) return null
-    const session = { endsAt: Number(endsAt), locksAt: locksAt === '' ? null : Number(locksAt) }
-    const holdsAt = Math.min(session.endsAt, session.locksAt ?? Number.POSITIVE_INFINITY)
-    return holdsAt > Date.now() ? session : null
+    if (!sameSecret({ given: signature, expected: this.sign(`${since}.${locksAt}`) })) return null
+    const session = { since: Number(since), locksAt: locksAt === '' ? null : Number(locksAt) }
+    return session.locksAt == null || session.locksAt > Date.now() ? session : null
   }
 }

@@ -65,6 +65,7 @@ describe('the image cache', () => {
   })
 
   afterAll(async () => {
+    if (state.cache) await state.cache.onModuleDestroy()
     await rm(state.root, { recursive: true, force: true })
   })
 
@@ -145,6 +146,27 @@ describe('the image cache', () => {
       await widthOf(await cache().local({ itemId: 9, kind: 'poster', source, width: 500 })),
     ).toBe(400)
     expect(await exists(old)).toBe(false)
+  })
+
+  it('waits for running and queued picture work before shutdown', async () => {
+    const source = join(state.root, 'The Insider (1999)', 'poster.jpg')
+    await encodeImage({ path: source, size: '400x600' })
+    const completed: Array<string | null> = []
+    const pending = POSTER_WIDTHS.flatMap((width) => [
+      cache().local({ itemId: 10, kind: 'poster', source, width }),
+      cache().tmdb({ path: '/shutdown-poster.jpg', width }),
+      cache().tmdb({ path: '/shutdown-backdrop.jpg', width }),
+    ]).map(async (work) => {
+      completed.push(await work)
+    })
+
+    try {
+      await cache().onModuleDestroy()
+      expect(completed).toHaveLength(9)
+      expect(completed.every((path) => path != null)).toBe(true)
+    } finally {
+      await Promise.all(pending)
+    }
   })
 
   it('sweeps the TMDB pictures nothing shows any more, at every width', async () => {
