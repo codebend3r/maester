@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
-import { screen, within } from '@testing-library/react'
-import { type Home, mediaLabel } from '@raven/core'
+import { screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { type Home, type HomeSearch, mediaLabel } from '@raven/core'
+import { Link } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { POSTER_SIZES } from '@/lib/posters'
 import { HomePage } from '@/pages/HomePage/HomePage'
@@ -18,7 +20,11 @@ const LIBRARIES = [
 const shelf = (name: string) => screen.getByRole('region', { name })
 
 describe('HomePage', () => {
-  const spies = { home: spyOn(api, 'getHome'), libraries: spyOn(api, 'listLibraries') }
+  const spies = {
+    home: spyOn(api, 'getHome'),
+    libraries: spyOn(api, 'listLibraries'),
+    search: spyOn(api, 'searchHome'),
+  }
 
   const open = (home: Home) => {
     spies.home.mockImplementation(async () => home)
@@ -29,6 +35,7 @@ describe('HomePage', () => {
   afterEach(() => {
     spies.home.mockReset()
     spies.libraries.mockReset()
+    spies.search.mockReset()
   })
 
   it('stands in for its shelves while home is read, hiding the stand-ins from a screen reader', async () => {
@@ -62,7 +69,7 @@ describe('HomePage', () => {
     )
     expect(
       within(shelf('Continue watching')).getByRole('link', { name: mediaLabel(EPISODE_TWO) }),
-    ).toHaveAttribute('href', '/episodes/7')
+    ).toHaveAttribute('href', '/episodes/7?library=2')
     expect(within(shelf('Films')).getByRole('link', { name: 'Films' })).toHaveAttribute(
       'href',
       '/libraries/2',
@@ -81,7 +88,7 @@ describe('HomePage', () => {
     await screen.findByRole('heading', { name: 'Films' })
     expect(within(shelf('Films')).getByRole('link', { name: 'Busboys' })).toHaveAttribute(
       'href',
-      '/movies/40',
+      '/movies/40?library=2',
     )
     expect(within(shelf('Series')).getByRole('link', { name: 'Severance' })).toHaveAttribute(
       'href',
@@ -140,5 +147,83 @@ describe('HomePage', () => {
   it('explains how to fill it when nothing is pinned or in progress', async () => {
     open({ inProgress: [], shelves: [] })
     expect(await screen.findByText(/Pin a library/)).toBeInTheDocument()
+  })
+
+  describe('searching every library', () => {
+    const HOME: Home = {
+      inProgress: [{ media: EPISODE_TWO, poster: SEASON_ONE_CARD }],
+      shelves: [{ libraryId: 5, type: 'media', media: [mediaItem({ id: 8, title: 'Clip' })] }],
+    }
+    const FOUND: HomeSearch = [
+      { libraryId: 2, type: 'media', media: [matchedMovie()] },
+      { libraryId: 3, type: 'shows', shows: [showEntry()] },
+    ]
+
+    const serve = ({ route = '/', found = FOUND }: { route?: string; found?: HomeSearch } = {}) => {
+      spies.home.mockImplementation(async () => HOME)
+      spies.libraries.mockImplementation(async () => LIBRARIES)
+      spies.search.mockImplementation(async () => found)
+      renderWithProviders(
+        <>
+          <Link to="/">Back home</Link>
+          <HomePage />
+        </>,
+        { route },
+      )
+    }
+
+    const searchbox = () => screen.getByRole('searchbox', { name: 'Search every library' })
+
+    it('searches once typing pauses, never on each keystroke, showing what it found in place of the rows', async () => {
+      serve()
+      await screen.findByRole('heading', { name: 'Continue watching' })
+      await userEvent.type(searchbox(), 'bus')
+      await screen.findByRole('heading', { name: 'Films' })
+      expect(spies.search.mock.calls).toEqual([['bus']])
+      expect(
+        screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent),
+      ).toEqual(['Films', 'Series'])
+      expect(within(shelf('Films')).getByRole('link', { name: 'Busboys' })).toHaveAttribute(
+        'href',
+        '/movies/40?library=2',
+      )
+    })
+
+    it('opens a library on the search, so it lists every match there', async () => {
+      serve({ route: '/?q=bus' })
+      await screen.findByRole('heading', { name: 'Films' })
+      expect(within(shelf('Films')).getByRole('link', { name: 'Films' })).toHaveAttribute(
+        'href',
+        '/libraries/2?q=bus',
+      )
+    })
+
+    it('opens on the search the address carries, and writes a new one into it', async () => {
+      serve({ route: '/?q=bus' })
+      expect(searchbox()).toHaveValue('bus')
+      await screen.findByRole('heading', { name: 'Films' })
+      expect(spies.search.mock.calls).toEqual([['bus']])
+      await userEvent.clear(searchbox())
+      await userEvent.type(searchbox(), 'sev')
+      await waitFor(() => expect(spies.search.mock.calls.at(-1)).toEqual(['sev']))
+    })
+
+    it('says when nothing matches', async () => {
+      serve({ route: '/?q=zzz', found: [] })
+      expect(await screen.findByText('Nothing in any library matches "zzz".')).toBeInTheDocument()
+    })
+
+    it('puts the rows back when the search is cleared, or the link home is followed', async () => {
+      serve({ route: '/?q=bus' })
+      await screen.findByRole('heading', { name: 'Films' })
+      await userEvent.clear(searchbox())
+      expect(await screen.findByRole('heading', { name: 'Continue watching' })).toBeInTheDocument()
+
+      await userEvent.type(searchbox(), 'bus')
+      await screen.findByRole('heading', { name: 'Films' })
+      await userEvent.click(screen.getByRole('link', { name: 'Back home' }))
+      expect(searchbox()).toHaveValue('')
+      expect(await screen.findByRole('heading', { name: 'Continue watching' })).toBeInTheDocument()
+    })
   })
 })

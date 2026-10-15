@@ -94,6 +94,14 @@ export const homeQuery = queryOptions({
   queryFn: () => api.getHome(),
 })
 
+/** What a search from home finds in every library; a blank one asks for nothing. */
+export const homeSearchQuery = (query: string) =>
+  queryOptions({
+    queryKey: queryKeys.homeSearch(query),
+    queryFn: query === '' ? skipToken : () => api.searchHome(query),
+    placeholderData: keepPreviousData,
+  })
+
 export const mediaQuery = (id: number | null) =>
   queryOptions({
     queryKey: queryKeys.mediaItem(id),

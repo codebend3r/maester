@@ -17,6 +17,7 @@ import { ReviewCards } from '@/components/ReviewCards/ReviewCards'
 import { ScanStatus } from '@/components/ScanStatus/ScanStatus'
 import { ShowGrid } from '@/components/ShowCard/ShowCard'
 import { Loading } from '@/components/Skeleton/Skeleton'
+import { useSearch } from '@/lib/useSearch'
 import { DesignSection, Specimen } from '@/pages/DesignPage/DesignSection'
 import {
   FEATURED_SAMPLE,
@@ -35,7 +36,7 @@ const noop = () => undefined
 
 /** The toolbar with its own state, since here it saves to nothing. */
 const ToolbarDemo = () => {
-  const [search, setSearch] = useState('')
+  const search = useSearch()
   const [settings, setSettings] = useState<LibrarySettings>({
     ...DEFAULT_LIBRARY_SETTINGS,
     view: 'grouped',
@@ -44,7 +45,6 @@ const ToolbarDemo = () => {
     <LibraryToolbar
       name="Movies"
       search={search}
-      onSearch={setSearch}
       settings={settings}
       onChange={(change) => setSettings((current) => ({ ...current, ...change }))}
       playable
@@ -196,11 +196,12 @@ export const ComponentsSection = () => (
 
     <Specimen
       name="RatingChips"
-      note="One chip per source. Rotten Tomatoes is a tomato from 60% and a splat below; Metacritic's square is green from 61, yellow from 40, red under."
+      note="One chip per source. Rotten Tomatoes is a tomato from 60% and a splat below; Metacritic's square is green from 61, yellow from 40, red under. A movie's page gives every source a chip, a dashed one for a source with no score."
     >
       <div className={styles.stack}>
         <RatingChips ratings={SAMPLE_RATINGS} />
         <RatingChips ratings={SAMPLE_RATINGS_LOW} />
+        <RatingChips ratings={SAMPLE_RATINGS.slice(0, 1)} shouldShowEverySource />
       </div>
     </Specimen>
 

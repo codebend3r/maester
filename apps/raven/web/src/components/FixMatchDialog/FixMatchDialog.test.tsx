@@ -170,7 +170,7 @@ describe('Fix match', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
-  it('searches again with what the viewer types', async () => {
+  it('searches again once the viewer stops typing, never on each keystroke', async () => {
     const searched: string[] = []
     const subjects: Array<MatchSubject | null | undefined> = []
     spies.search.mockImplementation(async (request) => {
@@ -184,11 +184,25 @@ describe('Fix match', () => {
     await screen.findByText(/TMDB has nothing by that name/)
     await userEvent.clear(screen.getByRole('searchbox', { name: 'Title' }))
     await userEvent.type(screen.getByRole('searchbox', { name: 'Title' }), 'Bus Boys')
+    await waitFor(() => expect(searched).toEqual(['Busboys|2026', 'Bus Boys|2026']))
     await userEvent.clear(screen.getByRole('textbox', { name: 'Year' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Search' }))
-    await screen.findByText(/TMDB has nothing by that name/)
-    expect(searched).toEqual(['Busboys|2026', 'Bus Boys|'])
+    await waitFor(() => expect(searched).toEqual(['Busboys|2026', 'Bus Boys|2026', 'Bus Boys|']))
     expect(subjects.every((each) => each?.kind === 'media' && each.id === unmatched.id)).toBe(true)
+  })
+
+  it('searches at once with the Search button, without waiting for typing to pause', async () => {
+    const searched: string[] = []
+    spies.search.mockImplementation(async (request) => {
+      searched.push(`${request.query}|${request.year ?? ''}`)
+      return []
+    })
+    renderWithProviders(<Harness media={unmatched} onMatched={() => undefined} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Options for Busboys (2026)' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Fix match' }))
+    await screen.findByText(/TMDB has nothing by that name/)
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Title' }), ' Two')
+    await userEvent.click(screen.getByRole('button', { name: 'Search' }))
+    await waitFor(() => expect(searched).toEqual(['Busboys|2026', 'Busboys Two|2026']))
   })
 
   it('says a file is not a movie at all', async () => {

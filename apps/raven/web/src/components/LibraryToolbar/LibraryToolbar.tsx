@@ -19,6 +19,8 @@ import {
 import { useId } from 'react'
 import { Button } from '@/components/Button/Button'
 import type { IconName } from '@/components/Icon/Icon'
+import { SearchField } from '@/components/SearchField/SearchField'
+import type { Search } from '@/lib/useSearch'
 import styles from '@/components/LibraryToolbar/LibraryToolbar.module.scss'
 
 const FIELDS: Record<SortFieldName, string> = {
@@ -96,7 +98,6 @@ const GROUPINGS: Record<MediaGroupBy, string> = {
 export const LibraryToolbar = ({
   name,
   search,
-  onSearch,
   settings,
   onChange,
   playable,
@@ -104,8 +105,7 @@ export const LibraryToolbar = ({
   onShuffle,
 }: {
   name: string
-  search: string
-  onSearch: (search: string) => void
+  search: Search
   settings: LibrarySettings
   onChange: (change: LibraryViewChange) => void
   playable: boolean
@@ -119,13 +119,11 @@ export const LibraryToolbar = ({
         <label htmlFor={ids.search} className="visually-hidden">
           Search {name}
         </label>
-        <input
+        <SearchField
           id={ids.search}
-          type="search"
+          search={search}
           className={styles.input}
           placeholder={`Search ${name}`}
-          value={search}
-          onChange={(event) => onSearch(event.target.value)}
         />
       </div>
 

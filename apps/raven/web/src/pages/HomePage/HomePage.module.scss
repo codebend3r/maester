@@ -4,11 +4,43 @@
   gap: var(--space-6);
 }
 
+// The title, and the search beside it; on a narrow screen the search goes under it.
+.header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 36rem);
+  grid-template-areas: 'title search';
+  gap: var(--space-3);
+  align-items: center;
+}
+
 .title {
+  grid-area: title;
   font-family: var(--font-display);
   font-size: var(--font-size-hero);
   font-weight: 400;
   line-height: var(--line-tight);
+}
+
+.search {
+  grid-area: search;
+}
+
+// Home's way into every library, so it is the page's biggest control, in
+// the title's face but a cooler colour, so what is typed reads apart from it.
+.input {
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  color: var(--color-birch);
+  font-family: var(--font-display);
+  font-size: var(--font-size-xl);
+}
+
+// A search's rows stand where the shelves were, spaced as they are.
+.results {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-6);
 }
 
 .message {
@@ -53,6 +85,18 @@
 }
 
 @media (max-width: 40rem) {
+  .input {
+    padding: var(--space-2) var(--space-3);
+    font-size: var(--font-size-lg);
+  }
+
+  .header {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'title'
+      'search';
+  }
+
   .row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

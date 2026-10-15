@@ -7,13 +7,15 @@ import {
   type MatchItemType,
   type MatchSubject,
 } from '@raven/core'
-import { type FormEvent, useEffect, useId, useRef, useState } from 'react'
+import { type FormEvent, useEffect, useId, useRef } from 'react'
 import { AiMatchNote } from '@/components/AiMatchNote/AiMatchNote'
 import { Button } from '@/components/Button/Button'
 import { Icon } from '@/components/Icon/Icon'
+import { SearchField } from '@/components/SearchField/SearchField'
 import { api } from '@/lib/api'
 import { afterMatch } from '@/lib/invalidate'
 import { matchSearchQuery } from '@/lib/queries'
+import { useSearch } from '@/lib/useSearch'
 import styles from '@/components/FixMatchDialog/FixMatchDialog.module.scss'
 
 const NOT_A: Record<MatchItemType, string> = { movie: 'Not a movie', show: 'Not a show' }
@@ -86,8 +88,9 @@ const Candidate = ({
 }
 
 /**
- * Fix match: searches TMDB with the title and year a name gave, scored
- * against what the subject has on disk and listed best first, and points a
+ * Fix match: searches TMDB with the title and year a name gave, and again
+ * as the viewer edits them, scored against what the subject has on disk
+ * and listed best first, and points a
  * file (or a whole show) at the result the viewer chooses, or at nothing.
  * `match` does the pointing; whatever is chosen is kept by folder, so
  * renames and re-downloads keep it.
@@ -128,9 +131,12 @@ export const FixMatchDialog = <T,>({
   const dialog = useRef<HTMLDialogElement>(null)
   const ids = { title: useId(), note: useId(), query: useId(), year: useId(), results: useId() }
   const queryClient = useQueryClient()
-  const [query, setQuery] = useState(title)
-  const [yearText, setYearText] = useState(year == null ? '' : String(year))
-  const [asked, setAsked] = useState({ query: title.trim(), year })
+  // The year is half the search, so it settles as the title does.
+  const typed = {
+    title: useSearch({ initial: title }),
+    year: useSearch({ initial: year == null ? '' : String(year) }),
+  }
+  const asked = { query: typed.title.query, year: yearFrom(typed.year.query) }
 
   useEffect(() => {
     dialog.current?.showModal()
@@ -157,7 +163,8 @@ export const FixMatchDialog = <T,>({
 
   const search = (event: FormEvent) => {
     event.preventDefault()
-    setAsked({ query: query.trim(), year: yearFrom(yearText) })
+    typed.title.searchNow()
+    typed.year.searchNow()
   }
 
   return (
@@ -181,13 +188,7 @@ export const FixMatchDialog = <T,>({
           <form className={styles.form} onSubmit={search}>
             <div className={`${styles.field} ${styles.titleField}`}>
               <label htmlFor={ids.query}>Title</label>
-              <input
-                id={ids.query}
-                type="search"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                autoComplete="off"
-              />
+              <SearchField id={ids.query} search={typed.title} autoComplete="off" />
             </div>
             <div className={`${styles.field} ${styles.yearField}`}>
               <label htmlFor={ids.year}>Year</label>
@@ -195,8 +196,8 @@ export const FixMatchDialog = <T,>({
                 id={ids.year}
                 className={styles.yearInput}
                 inputMode="numeric"
-                value={yearText}
-                onChange={(event) => setYearText(event.target.value)}
+                value={typed.year.text}
+                onChange={(event) => typed.year.setText(event.target.value)}
                 autoComplete="off"
               />
             </div>
