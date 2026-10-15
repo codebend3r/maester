@@ -8,6 +8,29 @@
   color: var(--color-leaf-bright);
 }
 
+// The summary, then the file's video, audio and subtitles; beside each
+// other where both are there and the screen is wide enough.
+.about {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.besideFile {
+  grid-template-columns: minmax(0, 1fr) minmax(16rem, 24rem);
+  grid-template-areas: 'summary file';
+  column-gap: var(--space-6);
+
+  .summary {
+    grid-area: summary;
+  }
+
+  .file {
+    grid-area: file;
+  }
+}
+
 .file {
   display: grid;
 }
@@ -24,5 +47,14 @@
 
   dt {
     color: var(--color-lichen);
+  }
+}
+
+@media (max-width: 64rem) {
+  .besideFile {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'summary'
+      'file';
   }
 }

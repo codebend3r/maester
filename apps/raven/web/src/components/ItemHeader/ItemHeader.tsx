@@ -108,6 +108,7 @@ export const ItemHeader = ({
   contentRating,
   facts,
   ratings,
+  shouldShowEverySource = false,
   picture,
   backdrop,
   logo = null,
@@ -121,6 +122,8 @@ export const ItemHeader = ({
   contentRating: string | null
   facts: readonly string[]
   ratings: readonly Rating[]
+  /** A chip for every source, saying which have no score: a movie's page. */
+  shouldShowEverySource?: boolean
   /** Left out for a page with no picture beside its title. */
   picture?: HeaderPicture
   backdrop: HeaderBackdrop | null
@@ -158,7 +161,7 @@ export const ItemHeader = ({
             ))}
           </p>
         )}
-        <RatingChips ratings={[...ratings]} />
+        <RatingChips ratings={ratings} shouldShowEverySource={shouldShowEverySource} />
         {children && <div className={styles.actions}>{children}</div>}
       </div>
     </div>

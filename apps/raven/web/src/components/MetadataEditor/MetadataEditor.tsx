@@ -1,7 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { ItemDetails, ItemMetadata, ItemMetadataChange, MatchItemType } from '@raven/core'
+import type {
+  ItemDetails,
+  ItemMetadata,
+  ItemMetadataChange,
+  MatchItemType,
+  MediaItem,
+} from '@raven/core'
 import { type FormEvent, useId, useState } from 'react'
 import { Button } from '@/components/Button/Button'
+import { MovieFiles } from '@/components/MovieFiles/MovieFiles'
 import { api } from '@/lib/api'
 import { afterItemEdited } from '@/lib/invalidate'
 import { itemMetadataQuery } from '@/lib/queries'
@@ -42,17 +49,23 @@ export const editionFrom = (versions: readonly ItemDetails['versions'][number][]
   versions.find((version) => version.edition != null)?.edition ?? null
 
 /**
- * Edit metadata: the title, year, rating, tagline and summary a page shows,
- * each beside what TMDB says. A field written over keeps TMDB's words
- * underneath, and "Use TMDB's" puts them back; a refresh never touches an
- * edit. The wand puts the file name's edition in brackets after the title.
+ * Edit metadata: a movie's files, which Split apart gives a card each when
+ * several share one, then the title, year, rating, tagline and summary a
+ * page shows, each beside what TMDB says. A field written over keeps TMDB's
+ * words underneath, and "Use TMDB's" puts them back; a refresh never
+ * touches an edit. The wand puts the file name's edition in brackets after
+ * the title.
  */
 export const MetadataEditor = ({
   details,
+  everyCard = details.versions,
   itemKind,
   onDone,
 }: {
+  /** The item, its `versions` the files on the card the page is for. */
   details: ItemDetails
+  /** A movie's files in the page's library, on every card. */
+  everyCard?: readonly MediaItem[]
   itemKind: MatchItemType
   onDone: () => void
 }) => {
@@ -72,6 +85,7 @@ export const MetadataEditor = ({
   })
 
   const edition = itemKind === 'movie' ? editionFrom(details.versions) : null
+  const [first, ...rest] = details.versions
   const original = state.data?.original
 
   const submit = (event: FormEvent) => {
@@ -99,6 +113,9 @@ export const MetadataEditor = ({
           Cancel
         </Button>
       </header>
+      {itemKind === 'movie' && first && (
+        <MovieFiles files={[first, ...rest]} everyCard={everyCard} itemId={details.id} />
+      )}
       <p className={styles.hint}>
         What is written here shows instead of TMDB’s words, and an emptied box shows nothing; TMDB’s
         stay underneath and come back with Use TMDB’s. A refresh never touches an edit.

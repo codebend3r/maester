@@ -180,8 +180,8 @@ export const afterLibraryEvent = ({
 /**
  * A movie's files were split onto cards of their own or put back on one:
  * everything the library shows, its listings counting and titling its
- * cards, and home's shelves. The duplicates already hold the answer, so
- * theirs reads back the same.
+ * cards, home's shelves, and the item pages, which list a card's files.
+ * The duplicates already hold the answer, so theirs reads back the same.
  */
 export const afterSplit = ({
   queryClient,
@@ -192,7 +192,11 @@ export const afterSplit = ({
 }): Promise<unknown> =>
   refetch({
     queryClient,
-    filters: [{ queryKey: queryKeys.library(libraryId) }, { queryKey: queryKeys.home }],
+    filters: [
+      { queryKey: queryKeys.library(libraryId) },
+      { queryKey: queryKeys.home },
+      { queryKey: queryKeys.items },
+    ],
   })
 
 /** The event stream was down a while: anything may have changed. */

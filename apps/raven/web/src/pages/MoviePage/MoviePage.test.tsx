@@ -6,6 +6,7 @@ import {
   DEFAULT_DISPLAY_SETTINGS,
   type DisplaySettings,
   type ItemDetails,
+  type Library,
 } from '@raven/core'
 import { Route, Routes, useParams } from 'react-router-dom'
 import { api } from '@/lib/api'
@@ -29,14 +30,16 @@ describe('MoviePage', () => {
     route = '/movies/40',
     display = DEFAULT_DISPLAY_SETTINGS,
     adminLock,
+    libraries = [library({ id: 2, name: 'Films' })],
   }: {
     details: ItemDetails
     route?: string
     display?: DisplaySettings
     adminLock?: AdminLock
+    libraries?: Library[]
   }) => {
     spies.item.mockImplementation(async () => details)
-    spies.libraries.mockImplementation(async () => [library({ id: 2, name: 'Films' })])
+    spies.libraries.mockImplementation(async () => libraries)
     spies.tracks.mockImplementation(async () => ({
       audio: [{ index: 0, codec: 'eac3', channels: 6, language: 'en', title: null, default: true }],
       subtitles: [
@@ -104,6 +107,21 @@ describe('MoviePage', () => {
     expect(screen.getByRole('listitem', { name: 'TMDB audience score, 82%' })).toBeInTheDocument()
     expect(screen.getByText('Every table has a story.')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Films' })).toHaveAttribute('href', '/libraries/2')
+  })
+
+  it('shows all four scores, marking the sources that have none for the movie', async () => {
+    open({ details: itemDetails() })
+    const ratings = await screen.findByRole('list', { name: 'Ratings' })
+    expect(
+      within(ratings)
+        .getAllByRole('listitem')
+        .map((chip) => chip.getAttribute('aria-label')),
+    ).toEqual([
+      'Rotten Tomatoes: no score',
+      'IMDb: no score',
+      'Metacritic: no score',
+      'TMDB audience score, 82%',
+    ])
   })
 
   it('says nothing of a version the server converts for this browser', async () => {
@@ -250,6 +268,15 @@ describe('MoviePage', () => {
     open({ details: itemDetails() })
     await screen.findByRole('heading', { level: 1, name: 'Busboys' })
     expect(screen.queryByRole('heading', { name: 'Versions' })).toBeNull()
+    expect(screen.queryByText(/^\d+ files?$/)).toBeNull()
+  })
+
+  it('counts its files among the facts once there are two or more', async () => {
+    open({
+      details: itemDetails({ versions: [matchedMovie({ id: 8 }), matchedMovie({ id: 7 })] }),
+    })
+    await screen.findByRole('heading', { level: 1, name: 'Busboys' })
+    expect(screen.getByText('2 files')).toBeInTheDocument()
   })
 
   it('lists every version, each playable', async () => {
@@ -270,6 +297,49 @@ describe('MoviePage', () => {
     expect(await within(section).findAllByText('Films')).toHaveLength(2)
   })
 
+  describe('in two libraries', () => {
+    const LIBRARIES = [library({ id: 2, name: '4K Films' }), library({ id: 3, name: 'Films' })]
+    // Best first, as the server lists them: the 4K library's two, then the other's two.
+    const AVATAR = itemDetails({
+      versions: [
+        matchedMovie({ id: 8, width: 3840, height: 2160, fileName: 'Busboys Extended 2160p.mkv' }),
+        matchedMovie({ id: 6, width: 3840, height: 2160, fileName: 'Busboys 2160p.mkv' }),
+        matchedMovie({ id: 7, libraryId: 3, fileName: 'Busboys 1080p.mkv' }),
+        matchedMovie({ id: 5, libraryId: 3, fileName: 'Busboys Remux 1080p.mkv' }),
+      ],
+    })
+
+    const played = async () => {
+      const versions = await screen.findByRole('heading', { name: 'Versions' })
+      const section = versions.closest('section') ?? document.body
+      return within(section)
+        .getAllByRole('link', { name: /^Play / })
+        .map((link) => link.getAttribute('href'))
+    }
+
+    it('shows only the files of the library the address names, never mixing in the other', async () => {
+      open({ details: AVATAR, libraries: LIBRARIES, route: '/movies/40?library=3' })
+      expect(await played()).toEqual(['/watch/7', '/watch/5'])
+      expect(screen.getByText('2 files')).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: 'Films' })).toHaveAttribute('href', '/libraries/3')
+      await userEvent.click(screen.getByRole('link', { name: 'Play Busboys' }))
+      expect(await screen.findByText('Watching 7')).toBeInTheDocument()
+    })
+
+    it('keeps to the library of the file a split card names, or of the best file, when the address names none', async () => {
+      open({ details: AVATAR, libraries: LIBRARIES, route: '/movies/40?file=5' })
+      expect(await played()).toEqual(['/watch/7', '/watch/5'])
+      await userEvent.click(screen.getByRole('link', { name: 'Play Busboys' }))
+      expect(await screen.findByText('Watching 5')).toBeInTheDocument()
+    })
+
+    it('keeps to the library of the best file for an address naming no library, or one without the movie', async () => {
+      open({ details: AVATAR, libraries: LIBRARIES, route: '/movies/40?library=9' })
+      expect(await played()).toEqual(['/watch/8', '/watch/6'])
+      expect(screen.getByRole('link', { name: '4K Films' })).toHaveAttribute('href', '/libraries/2')
+    })
+  })
+
   it('leaves out what TMDB did not give', async () => {
     open({
       details: itemDetails({
@@ -283,7 +353,12 @@ describe('MoviePage', () => {
     })
     await screen.findByRole('heading', { level: 1, name: 'Busboys' })
     expect(screen.queryByRole('region', { name: 'Summary' })).toBeNull()
-    expect(screen.queryByRole('list', { name: 'Ratings' })).toBeNull()
+    // Every source still has its chip, each saying it has no score.
+    expect(
+      within(screen.getByRole('list', { name: 'Ratings' })).getAllByRole('listitem', {
+        name: /no score/,
+      }),
+    ).toHaveLength(4)
     expect(screen.queryByRole('heading', { name: 'Cast & Crew' })).toBeNull()
     expect(screen.queryByText(/Directed by/)).toBeNull()
   })

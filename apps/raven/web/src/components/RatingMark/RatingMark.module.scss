@@ -62,3 +62,33 @@
   line-height: 1.6;
   letter-spacing: 0.02em;
 }
+
+// No score to band by: an empty square in the page's own grey.
+.unscored {
+  background: var(--color-moss-line);
+}
+
+// A source with no score: its mark in the page's greys instead of its own
+// colours, so it reads as there but unavailable.
+.greyed {
+  display: inline-grid;
+
+  .tomato,
+  .splat {
+    fill: var(--color-moss-line);
+  }
+
+  .leaf {
+    fill: var(--color-lichen);
+  }
+
+  .stem {
+    stroke: var(--color-lichen);
+  }
+
+  .imdb,
+  .tmdb {
+    background: var(--color-moss-line);
+    color: var(--color-night);
+  }
+}

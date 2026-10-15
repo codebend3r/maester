@@ -5,6 +5,14 @@
   gap: var(--space-1);
 }
 
+// A movie's four chips would run past a phone's width in one row: two rows of two.
+@media (max-width: 30rem) {
+  .chips {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(2, max-content);
+  }
+}
+
 .chip {
   display: grid;
   grid-auto-flow: column;
@@ -22,6 +30,16 @@
   font-size: var(--font-size-xs);
   font-weight: 700;
   letter-spacing: 0.04em;
+}
+
+// A source with no score for the item: there, but quieter than the scores.
+.unscored {
+  border-style: dashed;
+  color: var(--color-lichen);
+}
+
+.unscoredMark {
+  display: grid;
 }
 
 .value {

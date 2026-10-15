@@ -23,7 +23,7 @@ import { TmdbCredit } from '@/components/TmdbCredit/TmdbCredit'
 import { Versions } from '@/components/Versions/Versions'
 import { api } from '@/lib/api'
 import { directedBy, episodeByline, episodeFacts, fileFacts, movieFacts } from '@/lib/itemFacts'
-import { episodeBackPath, itemPath, watchLink } from '@/lib/itemLinks'
+import { episodeBackPath, inLibrary, itemPath, watchLink } from '@/lib/itemLinks'
 import { displaySettingsQuery, librariesQuery, tracksQuery } from '@/lib/queries'
 import { queryKeys } from '@/lib/queryClient'
 import { useMediaMutations } from '@/lib/useMediaMutations'
@@ -43,6 +43,8 @@ type PlayableConfig = {
   editable: boolean
   showsTagline: boolean
   showsContentRating: boolean
+  /** Whether every score's source gets a chip, one with none saying so. */
+  showsEveryScore: boolean
   showsReviews: boolean
   castTitle: string | undefined
 }
@@ -60,6 +62,7 @@ const PLAYABLE = {
     editable: true,
     showsTagline: true,
     showsContentRating: true,
+    showsEveryScore: true,
     showsReviews: true,
     castTitle: undefined,
   },
@@ -75,27 +78,38 @@ const PLAYABLE = {
     editable: false,
     showsTagline: false,
     showsContentRating: false,
+    showsEveryScore: false,
     showsReviews: false,
     castTitle: 'Guest stars & crew',
   },
 } as const satisfies Record<'movie' | 'episode', PlayableConfig>
 
 /**
- * A movie's or an episode's page once the item and the version Play starts
- * are known: the header with Play, favourite and, with the admin lock off,
- * the editors and the file's menu (its picture plays too), whether this
- * browser needs that version converted or cannot play it, then the summary,
- * the file, its versions and the people.
+ * A movie's or an episode's page once the item, the library's files it
+ * shows and the version Play starts are known: the header with Play,
+ * favourite and, with the admin lock off, the editors and the file's menu
+ * (its picture plays too), whether this browser needs that version
+ * converted or cannot play it, then the summary, the file, its versions and
+ * the people. Only Edit images lists every library's files, since the
+ * pictures are the item's wherever its files are.
  */
 export const PlayableItemView = ({
   kind,
-  details,
+  details: item,
+  versions,
+  everyCard,
   primary,
 }: {
   kind: keyof typeof PLAYABLE
+  /** The item with every file this browser may see, in any library. */
   details: ItemDetails
+  /** The files on the one card, in the one library, the page is for. */
+  versions: MediaItem[]
+  /** The item's files in that library, on every card. */
+  everyCard: MediaItem[]
   primary: MediaItem
 }) => {
+  const details = { ...item, versions }
   const config: PlayableConfig = PLAYABLE[kind]
   const ids = { title: useId(), file: useId() }
   const navigate = useNavigate()
@@ -111,6 +125,8 @@ export const PlayableItemView = ({
   const known = libraries.data ?? []
   const back = config.back({ details, primary, libraries: known })
   const facts = fileFacts({ media: primary, tracks: tracks.data })
+  const tagline = config.showsTagline ? details.tagline : null
+  const hasSummary = !!tagline || !!details.summary
   const play = watchLink({ media: primary })
   const playPicture = { ...play, label: `Play ${details.title}` }
   const still =
@@ -127,6 +143,7 @@ export const PlayableItemView = ({
         contentRating={config.showsContentRating ? details.contentRating : null}
         facts={config.facts({ details, primary })}
         ratings={details.ratings}
+        shouldShowEverySource={config.showsEveryScore}
         logo={
           showsLogo
             ? api.itemImageUrl({ id: details.id, kind: 'logo', version: details.logoVersion })
@@ -196,7 +213,12 @@ export const PlayableItemView = ({
             withFavourite={false}
             onMatched={(updated) => {
               const page = updated.item ? itemPath(updated.item) : null
-              navigate(page ?? `/libraries/${updated.libraryId}`, { replace: true })
+              navigate(
+                page == null
+                  ? `/libraries/${updated.libraryId}`
+                  : inLibrary({ page, libraryId: updated.libraryId }),
+                { replace: true },
+              )
             }}
             onDeleted={() => {
               if (details.versions.length <= 1) navigate(back.to)
@@ -212,34 +234,40 @@ export const PlayableItemView = ({
 
       <AdminOnly>
         {config.editable && editingImages && (
-          <ImageEditor details={details} libraries={known} onDone={() => setEditingImages(false)} />
+          <ImageEditor details={item} libraries={known} onDone={() => setEditingImages(false)} />
         )}
         {config.editable && editingMetadata && (
           <MetadataEditor
             details={details}
+            everyCard={everyCard}
             itemKind="movie"
             onDone={() => setEditingMetadata(false)}
           />
         )}
       </AdminOnly>
 
-      <Summary tagline={config.showsTagline ? details.tagline : null} summary={details.summary} />
-
-      {facts.length > 0 && (
-        <section className={styles.file} aria-labelledby={ids.file}>
-          <h2 id={ids.file} className="visually-hidden">
-            File
-          </h2>
-          <dl className={styles.facts}>
-            {facts.map((fact) => (
-              <div key={fact.label} className={styles.fact}>
-                <dt>{fact.label}</dt>
-                <dd>{fact.value}</dd>
-              </div>
-            ))}
-          </dl>
-        </section>
-      )}
+      <div
+        className={
+          hasSummary && facts.length > 0 ? `${styles.about} ${styles.besideFile}` : styles.about
+        }
+      >
+        <Summary tagline={tagline} summary={details.summary} className={styles.summary} />
+        {facts.length > 0 && (
+          <section className={styles.file} aria-labelledby={ids.file}>
+            <h2 id={ids.file} className="visually-hidden">
+              File
+            </h2>
+            <dl className={styles.facts}>
+              {facts.map((fact) => (
+                <div key={fact.label} className={styles.fact}>
+                  <dt>{fact.label}</dt>
+                  <dd>{fact.value}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        )}
+      </div>
 
       <Versions versions={details.versions} libraries={known} />
       <CastRow credits={details.credits} title={config.castTitle} />

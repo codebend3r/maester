@@ -54,6 +54,12 @@ describe('MetadataEditor', () => {
     done.count = 0
   })
 
+  it("lists the movie's files above its fields, with one Split apart for them", async () => {
+    open()
+    expect(await screen.findByRole('heading', { name: '2 files' })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Split apart' })).toHaveLength(1)
+  })
+
   it('shows each field with what TMDB says beneath it', async () => {
     open()
     expect(await screen.findByLabelText('Title')).toHaveValue('Heat')
