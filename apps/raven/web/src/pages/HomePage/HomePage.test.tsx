@@ -222,7 +222,7 @@ describe('HomePage', () => {
       await userEvent.type(searchbox(), 'bus')
       await screen.findByRole('heading', { name: 'Films' })
       await userEvent.click(screen.getByRole('link', { name: 'Back home' }))
-      expect(searchbox()).toHaveValue('')
+      await waitFor(() => expect(searchbox()).toHaveValue(''))
       expect(await screen.findByRole('heading', { name: 'Continue watching' })).toBeInTheDocument()
     })
   })
