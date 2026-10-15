@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { type Home, type HomeSearch, mediaLabel } from '@raven/core'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { POSTER_SIZES } from '@/lib/posters'
 import { HomePage } from '@/pages/HomePage/HomePage'
@@ -18,6 +18,11 @@ const LIBRARIES = [
 ]
 
 const shelf = (name: string) => screen.getByRole('region', { name })
+
+const AddressProbe = () => {
+  const { pathname, search } = useLocation()
+  return <output aria-label="Current address">{`${pathname}${search}`}</output>
+}
 
 describe('HomePage', () => {
   const spies = {
@@ -166,6 +171,7 @@ describe('HomePage', () => {
       renderWithProviders(
         <>
           <Link to="/">Back home</Link>
+          <AddressProbe />
           <HomePage />
         </>,
         { route },
@@ -224,6 +230,9 @@ describe('HomePage', () => {
       await act(async () => {
         await userEvent.click(screen.getByRole('link', { name: 'Back home' }))
       })
+      await waitFor(() =>
+        expect(screen.getByLabelText('Current address')).toHaveTextContent(/^\/$/),
+      )
       await waitFor(() => expect(searchbox()).toHaveValue(''))
       expect(await screen.findByRole('heading', { name: 'Continue watching' })).toBeInTheDocument()
     })
