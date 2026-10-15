@@ -1,6 +1,8 @@
-# raven desktop: a standalone Electron app on a shared `@raven/ui` library, playing through embedded mpv
+# raven desktop: a player-first Electron app on shared React UI and embedded mpv
 
-Status: proposed, not yet reviewed. Revised the same day for native playback; the server side of that work is `2026-10-12-raven-transcoding-design.md`. The server spike and the macOS half of the native video spike ran on 2026-10-12; "Spike outcomes" records what they found, and the sections below carry the fixes. macOS ships first; Windows and Linux follow later, after their half of the video spike.
+Status: proposed, not yet reviewed. This is the canonical desktop spec, consolidating the original 2026-10-12 desktop design and the 2026-10-14 player-first design. The first release is **raven player on macOS arm64**; library modes and other architectures follow in the same app. The companion server work remains in `2026-10-12-raven-transcoding-design.md`.
+
+The server spike and the macOS half of the native video spike ran on 2026-10-12. "Spike outcomes" records their results, including the XDR checks still owed; a spike passing does not mean the production implementation has shipped.
 
 ## Context
 
@@ -8,6 +10,22 @@ The goal is a desktop raven that runs on its own: install it, point it at local 
 
 - the business logic stays in `@raven/core` and `@raven/server`;
 - the React UI moves into a new library, `@raven/ui`, that both `@raven/web` and `@raven/desktop` render.
+
+The player holds most of the value and most of the risk (the native video surface), but is coupled to the least code. It ships before the full UI extraction, the embedded server and library modes.
+
+raven player opens a local video file or a title on a raven server through libmpv under raven's own React controls. It is not a second product: it is `@raven/desktop` with only its player built. The product name becomes "raven" when library modes arrive; its bundle id and data directory do not change.
+
+Today the web player's way out is the Unplayable screen's "Copy file link", which says to paste the link into VLC or IINA (`apps/raven/web/src/components/Player/Unplayable.tsx`). That loses raven's controls, progress and history, and fails for a locked library because the unlock cookie stays in the browser. The player-first release replaces that way out.
+
+### Delivery phases and architectures
+
+| Phase | Scope | Targets |
+| --- | --- | --- |
+| 1: raven player | Local files, server-title handoff, native playback, resume and recents; no embedded server or library browsing | macOS arm64 (Apple Silicon) |
+| 2: full desktop raven | Full shared UI, embedded server, local libraries, remote library browsing and slow-link transcoding | macOS arm64, then macOS x64 (Intel) |
+| 3: additional platforms | Native surfaces, platform validation, CI and packaging | Windows x64 and Linux x64; Linux initially uses X11 |
+
+Windows arm64 and Linux arm64 are not specified. The initial player release ships neither standalone ffmpeg nor an embedded server. The full desktop release adds them; FFmpeg inside libmpv is present from the first release.
 
 ### The playback goal
 
@@ -21,12 +39,41 @@ The desktop app has to be as fast and smooth as the hardware allows, on the newe
 
 The web player cannot meet this goal: Chromium's `<video>` re-encodes TrueHD, DTS and AC3 to stereo AAC, cannot show picture subtitles, has no Dolby Vision, and needs a transcode for anything outside its short codec list. So the desktop app plays video through **embedded libmpv**, drawn natively under raven's own React controls, and keeps the web player as its fallback.
 
-### Decisions
+### First-release goals
+
+- **Play anything well.** Every codec, HDR format, audio format and subtitle format the playback goal above lists plays through libmpv, with raven's chrome, shortcuts and look.
+- **Open files the way a Mac player does.** Open dialog, drag and drop onto the window or the Dock icon, Finder's "Open With", double-click once the user makes raven player the default, Open Recent, and the next video in the folder.
+- **Pick up where you left off.** Local files remember where they stopped and which tracks played. Server titles save progress and history to the server, so the web and the app agree.
+- **Play server titles from raven web.** "Open in raven player" hands a title to the app, which plays the original file directly, with its own unlock for locked libraries.
+- **Never leave the user stuck.** Without libmpv, a local file Chromium can decode plays through the web engine, and a server title opens in the browser.
+- **Lay the ground the full desktop app builds on**: `@raven/ui`, `@raven/mpv`, the bridge, the app shell, the release pipeline.
+
+### First-release non-goals
+
+- Browsing server libraries inside the app. raven web already browses well; desktop browsing arrives in phase 2.
+- An embedded server, scanning, matching or metadata for local files.
+- Converting anything. Server titles play the original file only; slow-link transcoding arrives with phase 2 and the companion spec's mkv container.
+- Intel Macs, Windows and Linux; their builds follow the arm64 player release.
+- Playlists beyond "next in folder" and the web's up-next list, picture in picture, casting, or streaming URLs that are not raven servers.
+- Silent auto-update and any telemetry.
+
+### Who the first release is for
+
+| Story | What it needs |
+| --- | --- |
+| A file the browser cannot play (TrueHD, PGS, Dolby Vision) shows Unplayable on raven web; the viewer clicks "Open in raven player" and it plays with every track | `raven://` handoff, a trusted server, direct play through mpv, the server's PIN |
+| A viewer double-clicks a downloaded MKV in Finder | file associations, `open-file` on a cold launch |
+| A viewer watches half a film, quits, and opens it next week | resume positions and track picks in the local store |
+| A viewer works through a season folder | next video in the folder, natural order |
+| A viewer on a Mac with a receiver wants Atmos to reach it | "This computer" output settings (section 5) |
+| libmpv fails to load on a machine | the web engine for local files, the browser for server titles, a clear message |
+
+## Decisions
 
 | Question | Answer |
 | --- | --- |
 | Video engine | libmpv (`vo=gpu-next`, libplacebo), embedded under the React controls; the web player is the fallback |
-| Platforms | macOS (arm64 and x64) first. Windows x64 and Linux x64 later, once their half of the video spike passes |
+| Platforms | macOS arm64 for the player first; macOS x64 with full desktop. Windows x64 and Linux x64 later, once their half of the video spike passes |
 | Where libmpv runs | Electron's main process, behind a small N-API addon, `@raven/mpv` |
 | macOS surface | One window: an NSView with a `CAMetalLayer` at the bottom of the window's content view, under the page, through libmpv's moltenvk context patch. Proven by the spike |
 | Windows surface (later) | One window with mpv's child window under Chromium's (W1), or an overlay controls window (W3) if the spike rules W1 out |
@@ -34,17 +81,53 @@ The web player cannot meet this goal: Chromium's `<video>` re-encodes TrueHD, DT
 | Where libmpv comes from | macOS: our own CI build with the moltenvk patch and our resize patch. Later, Windows: shinchiro's builds; Linux: the system's libmpv 0.40 or newer |
 | Where ffmpeg comes from | jellyfin-ffmpeg portable builds, for the embedded server |
 
-### What exploration found
+### Player-first application decisions
+
+| Question | Answer |
+| --- | --- |
+| A new app, or the start of desktop raven? | The start of desktop raven: `apps/raven/desktop` (`@raven/desktop`), product name "raven player" until the library modes ship |
+| App identity | Bundle id `io.github.codebend3r.raven`; `userData` pinned to `~/Library/Application Support/raven` from the first build, so the rename to "raven" moves no data |
+| What it plays | Local files the user opened, and titles on raven servers the user added |
+| How server titles arrive | A `raven://play` link from raven web, a pasted raven link, or Open Recent. No library browsing |
+| Fallback | The web engine for local files Chromium decodes; server titles open in the browser |
+| Renderer origin | `app://raven`, a privileged custom scheme served from the asar, with a memory router |
+| How the renderer reaches a server | It does not. The main process makes eight allowlisted API calls in the server's own session, and mpv reads the file directly |
+| Window count | One |
+| Local state | JSON files in `userData`, written atomically and checked with core's guards on read |
+| Updates | Check GitHub Releases and say so; no silent install while builds are ad hoc signed |
+| Crashes | Local minidumps and a rotating log; no third party, no telemetry |
+| Tests | `bun test` for units, Playwright's Electron support for end to end, headless libmpv tests (section 9) |
+
+## What exploration found
+
+These are the design-time findings, before production desktop implementation.
 
 - **`@raven/core` was built for a second client.** `createApiClient({ baseUrl, fetch })` takes an injected fetch and origin (`libs/raven/core/src/apiClient.ts:145`). The direct-play check takes a pluggable `CanPlay` (`playback.ts`). It uses no DOM or Node APIs.
 - **The server is already embeddable.** `createApp({ config })` in `apps/raven/server/src/app.ts` returns an app that is not listening yet, and `main.ts` is three lines. `readListenConfig` accepts `PORT=0` and any `HOST`, `DATA_DIR` and `WEB_DIR` (`libs/shared/server/src/env.ts`).
 - **The server serves the web build on its own origin** (`serveWebApp`). That is why `/api`, the PIN cookie (`SameSite=Strict; Path=/api`), SSE and MSE streaming need no CORS today.
 - **`@raven/web` is almost all reusable UI.** 45 component folders, 15 pages, the Player hooks, and the TanStack Query layer (`lib/queries.ts`, `queryClient.ts`, `invalidate.ts`). It also has 4 zustand stores, the MSE engine (`lib/streamSource.ts`) and the styles. Only `main.tsx` (fonts, `QueryClientProvider`, `BrowserRouter`) and `index.html` are specific to the web app.
 - **The one seam is the API client.** `lib/api.ts` builds a same-origin `api` singleton, and 55 files import it.
-- **The player's state is already engine-agnostic.** `videoReducer` in `components/Player/useVideoState.ts` folds a `VideoEvent` union (`moved`, `sought`, `buffered`, `duration`, `played`, `paused`, `waiting`, `flowing`, `rate`) into the `VideoState` the controls draw. Only `useVideoEvents` ties it to a `<video>` element.
 - **The player is its own full-page route,** `watch/:id`, outside `AppShell` (`AppRoutes.tsx:41`), so a native video surface can fill the window while it shows.
 - **Nothing depends on rookery**, so a standalone build loses nothing by leaving it out.
-- **There is no desktop work yet.** No Electron or Tauri, nothing on the roadmap, and no CI job that publishes binaries.
+- **At the initial exploration there was no production desktop app**, Electron or Tauri integration, or CI publishing desktop binaries. The completed throwaway spikes are recorded below.
+
+### Player-specific findings
+
+- **The player's state is engine agnostic, its effects are not.** `videoReducer` and the `VideoEvent` union in `apps/raven/web/src/components/Player/useVideoState.ts` know nothing of `<video>`, and `Player.tsx` only picks a mode and hands over to `Stage`. Everything else reads or drives the element:
+  - `useWatchProgress.ts` saves on the element's `timeupdate`, `pause`, `playing` and `ended`;
+  - `useUpNext.ts` listens for `ended`;
+  - `usePlayerActions.ts` sets `volume`, `muted`, `playbackRate` and calls `play()` and `pause()` on `videoRef.current`;
+  - `Stage.tsx` restores volume on `loadedmetadata` and draws `SubtitleOverlay` from `useSubtitleCues`.
+
+  The split therefore moves those three hooks onto `VideoState` and an actions object, and `VideoState` needs an `ended` flag it lacks today.
+- **The Player's import closure is small.** Outside `components/Player` it reaches `components/Button`, `components/Icon`, eleven files in `lib/` (`api`, `canPlay`, `invalidate`, `itemLinks`, `keyboard`, `queries`, `queryClient`, `shortcuts`, `streamSource`, `trackLabels`, `usePlaybackPolicy`) and two stores (`playerPrefs`, and `unlockPrompt` through `queryClient.ts`).
+- **Seven files in that closure reach the `api` singleton**, directly or through `lib/queries.ts`: `Stage.tsx` (poster), `useMediaSource.ts` (`fileUrl`, `streamUrl`), `Unplayable.tsx` (poster, file link), `useWatchProgress.ts` (`saveProgress`, `recordPlay`), `useTrackSelection.ts` (`tracksQuery`), `useSubtitleCues.ts` (`subtitlesQuery`) and `lib/usePlaybackPolicy.ts` (`playbackSettingsQuery`). The full UI extraction replaces the singleton across 55 importers; the player alone needs only these seven.
+- **The track shapes already fit mpv.** `isMediaTracks`, `isAudioTrack` and `isSubtitleTrack` in `libs/raven/core/src/contract.ts` carry an audio `index` that counts like ffmpeg's `0:a:N`, subtitle ids `embedded-N` and `external-N`, and a `supported` flag for picture subtitles. mpv's `track-list` maps onto them, so `SettingsMenu` works unchanged.
+- **Player preferences need no change.** `usePlayerPrefs` (`stores/playerPrefs.ts`) persists volume, caption size and the last audio and subtitle languages in `localStorage` under `raven-player`, which an Electron renderer keeps per session.
+- **Core already names video files.** `VIDEO_EXTENSIONS`, `isVideoFile` and `titleFromFileName` in `libs/raven/core/src/media.ts` give the file allowlist and a label for a local file.
+- **The server calls the player needs are few:** `getMedia` (`GET /api/media/:id`), `getTracks` (`GET /api/media/:id/tracks`), `saveProgress` (`PUT /api/media/:id/progress`), `recordPlay` (`POST /api/media/:id/plays`), `getLock` (`GET /api/lock`), `unlock` (`POST /api/lock/unlock`), `getAdminLock` (`GET /api/admin`) and `unlockAdmin` (`POST /api/admin/unlock`). The PIN sets `raven_unlock` (`apps/raven/server/src/lock/lockService.ts`) and the admin password `raven_admin` (`apps/raven/server/src/admin/adminService.ts`).
+- **The guards have one idiom.** Every shape is a guard built from `object`, `oneOf`, `union`, `nullable` and `listOf` in `libs/raven/core/src/schema.ts`, with the type read off it by `Infer`; a discriminated union is a `union` of `object`s whose `type` is a one-value `oneOf` (`isLibraryBackdrop`, `isHomeShelf`). The bridge protocol follows it.
+- **Fullscreen is the page's.** `useFullscreen` in `useStageChrome.ts` calls `document.documentElement.requestFullscreen`, which Electron turns into the window's fullscreen.
 
 ## Target layout
 
@@ -59,13 +142,129 @@ apps/raven/server   @raven/server   unchanged, plus a `startServer` export the d
 
 `@raven/ui` is raven's own library, not a suite-wide one. rookery has different tokens (`--color-parchment` against raven's `--color-bark`) and shares no components.
 
+The first release creates only the player portion of `@raven/ui` and leaves the server unchanged. The remaining UI folders and `startServer` arrive in phase 2.
+
 ## 1. `libs/raven/ui` (`@raven/ui`)
 
-### What moves
+### Player extraction (P2)
 
-Use `git mv` from `apps/raven/web/src` so history follows the files: `components/`, `pages/`, `stores/`, `styles/`, `lib/`, `AppRoutes.tsx`, `managed-media-source.d.ts` and `test/`. Make the move its own PR with no behavior change.
+- **What moves, by `git mv` from `apps/raven/web/src`:**
+  - `components/Player/`, `components/Button/`, `components/Icon/`;
+  - `lib/canPlay.ts`, `lib/keyboard.ts`, `lib/shortcuts.ts`, `lib/streamSource.ts`, `lib/trackLabels.ts` and their tests;
+  - `stores/playerPrefs.ts`;
+  - `styles/` (`globals.scss`, `elements.scss`, `designTokens.ts`), since every module the player brings uses the tokens and the desktop renderer needs them too;
+  - `managed-media-source.d.ts`, which `streamSource.ts` needs.
+- **What stays in web:** `lib/api.ts`, `lib/queries.ts`, `lib/queryClient.ts`, `lib/invalidate.ts`, `lib/itemLinks.ts`, `lib/usePlaybackPolicy.ts` and `stores/unlockPrompt.ts`. They serve the whole library, and the player reaches what it needs of them through `PlayerServices` and its `HtmlSource`.
+- **`languageName`** is written twice today (`lib/trackLabels.ts` and `components/ImageEditor/ImageEditor.tsx`). One copy moves to core at P2 because `trackLabels.ts` moves (section 6).
+- **`UnlockDialog`** moves at step P6, when the desktop needs it.
+- **Build, config and tests** follow "Exports and build" below from the first extraction.
+- **Exports for now:** `Player`, `PlayerServicesProvider`, the engine and services types, `UnlockDialog` (from P6) and `@raven/ui/styles.css`.
+- **Docs:** the root `CLAUDE.md` CSS section and `apps/raven/CLAUDE.md` point raven's `globals.scss` and `elements.scss` at `libs/raven/ui/src/styles/`, and `@raven/ui` joins the project table. The `/design` page's import of `globals.scss` follows the file.
+- The Docker image keeps building `@raven/web`; add `libs/raven/ui` to `apps/raven/Dockerfile.dockerignore`.
 
-### The platform seam
+### Remaining extraction (D1)
+
+After the player release, use `git mv` for the remaining files from `apps/raven/web/src` so history follows the files: `components/`, `pages/`, `stores/`, `styles/`, `lib/`, `AppRoutes.tsx`, `managed-media-source.d.ts` and `test/`. Make the move its own PR with no behavior change.
+
+### Player engines and chrome
+
+```ts
+import type { ApiClient, MediaItem, MediaTracks, PlayerCommand, PlayerEvent, PlayerSource } from '@raven/core'
+import type { ReactNode, RefObject } from 'react'
+import type { VideoState } from '@/components/Player/useVideoState'
+
+/** What the chrome asks of whichever engine plays. The chrome never touches a <video>. */
+export type EngineActions = {
+  play: () => void
+  pause: () => void
+  seek: (time: number) => void
+  setVolume: (level: { volume: number; muted: boolean }) => void
+  setRate: (rate: number) => void
+  setAudio: (index: number | null) => void
+  setSubtitle: (id: string | null) => void
+  setSubtitleScale: (scale: number) => void
+}
+
+/** One engine's side of the stage: what the chrome draws, and what it calls. */
+export type EngineHandle = {
+  state: VideoState
+  duration: number | null
+  /** Where playback is between renders, for the progress saves. */
+  position: RefObject<number>
+  tracks: MediaTracks | null
+  actions: EngineActions
+  /** The picture: a <video> for html; nothing for native, which draws under the page. */
+  surface: ReactNode
+  /** mpv draws every subtitle format itself, so SubtitleOverlay stays out. */
+  drawsSubtitles: boolean
+}
+
+/** The bridge to a native player, as the desktop's preload hands it over. */
+export type NativePlayer = {
+  send: (command: PlayerCommand) => Promise<void>
+  subscribe: (listener: (event: PlayerEvent) => void) => () => void
+}
+
+/** What the html engine plays. A local file has no server behind it: no tracks to pick, nothing to convert. */
+export type HtmlSource =
+  | { kind: 'server'; media: MediaItem; api: ApiClient }
+  | { kind: 'file'; url: string }
+
+export type Engine =
+  | { kind: 'html'; source: HtmlSource }
+  | { kind: 'native'; player: NativePlayer; source: PlayerSource }
+```
+
+- **The native variant arrives at P5;** P1 builds the html engine alone behind these types.
+- **One component per engine.** `HtmlStage` calls `useHtmlEngine` and `NativeStage` calls `useNativeEngine`; both render the shared `PlayerChrome` with the handle. Choosing a hook by `engine.kind` inside one component would break the rules of hooks when the engine changes, so `Stage` switches on the kind and keys the child by it, with the `never` check in `default`.
+- **`useHtmlEngine`** is today's code behind the handle: `useVideoState`, `useVideoEvents`, `useMediaSource` and `streamSource.ts`. For a `file` source it plays the URL directly and reports no tracks.
+- **`useNativeEngine`** sends `PlayerCommand`s and folds `PlayerEvent`s into the same `videoReducer` (section 6 has the mapping).
+- **`VideoState` gains `ended`**, and `VideoEvent` gains `{ type: 'ended' }`. `played` and `sought` clear it. `useUpNext` and `useWatchProgress` read it instead of the element's `ended` event.
+- **`usePlayerActions` calls `EngineActions`**, never `videoRef.current`. Its `act` switch keeps its shape and its `never` check.
+- **`useWatchProgress` reads state transitions:** the first `paused: false` with `waiting: false` is "started", a move of 10 s or more saves, a change to paused saves, `ended` saves the duration, and unmounting saves the last position.
+
+### Services
+
+The player stops importing the `api` singleton. A `PlayerServices` context gives it what it needs, and each host provides its own:
+
+```ts
+/** Where watch progress goes: the server for its titles, the desktop's own store for a local file. */
+export type ProgressSink = {
+  /** Frames really played for the first time: the server's history entry. */
+  started: () => void
+  save: (position: number) => void
+  /** The player is closing, with where it stopped. */
+  left: (position: number) => void
+}
+
+/** What the player shows and links to, apart from the picture. */
+export type PlayerTitle = {
+  label: string
+  duration: number | null
+  /** Where to pick up, or 0 to start at the top. */
+  resumeAt: number
+  backTo: string
+  next: { to: string; state: unknown; label: string } | null
+}
+
+export type PlayerServices = {
+  title: PlayerTitle
+  progress: ProgressSink
+  /** The poster behind the html engine and Unplayable; null when there is none. */
+  posterUrl: string | null
+  /** Shown on Unplayable: the web's "Copy file link", the desktop's "Open in browser". */
+  escape: { label: string; run: () => void } | null
+}
+```
+
+- The web's `WatchPage` builds `PlayerServices` from the singleton for now: `api.saveProgress`, `api.recordPlay`, `afterWatching` on leaving, `watchLink` for the next item. The queries the html engine runs (`tracksQuery`, `subtitlesQuery`, `playbackSettingsQuery`) become factories over the `ApiClient` in the `HtmlSource`, keyed by the same `queryKeys` entries so the web's invalidation still reaches them.
+- When D1 brings `RavenProvider` and `Platform`, `PlayerServices` is built from `useRaven()` instead; nothing in the player changes.
+
+### Why the split happens in place first
+
+The split lands in `@raven/web`, with no visible change, before any file moves. Its diff then reviews as logic, and the move after it reviews as a pure `git mv`, which keeps `git log --follow` working. This is P1, before the player extraction at P2.
+
+### The platform seam (phase 2)
 
 Add `src/platform/platform.ts`:
 
@@ -79,19 +278,14 @@ export type DesktopActions = {
   readOutput: () => Promise<OutputSettings>
   writeOutput: (input: { output: OutputSettings }) => Promise<void>
 }
-
-export type NativePlayer = {
-  send: (command: PlayerCommand) => Promise<void>
-  subscribe: (listener: (event: PlayerEvent) => void) => () => void
-}
 ```
 
 `PlayerCommand`, `PlayerEvent` and `OutputSettings` live in `@raven/core` (section 6), because the desktop's main process checks them too and core is the one place both can import.
 
 - Add `RavenProvider({ platform, children })`. It creates the query client (`createQueryClient`, which moves in from web) and puts `{ platform, queries }` in context.
 - Add `useRaven()`, which returns that context.
-- `player` is `null` when libmpv failed to load or its surface could not be made; the player then uses the web engine, so playback never breaks.
-- Desktop-only affordances read `platform.kind === 'desktop'` and use `&&` in JSX. Two of them ship in v1:
+- `player` is `null` when libmpv failed to load or its surface could not be made. Full library modes use the web engine; the standalone player uses the first-release fallback in section 4.
+- Desktop-only affordances read `platform.kind === 'desktop'` and use `&&` in JSX. The full desktop adds "Switch server" and retains the player's "This computer":
   - **"Switch server"** in the Settings page.
   - **"This computer"** in the Settings page's Playback section: the audio output profile, the output device and the passthrough formats (section 5). They are kept per machine in the desktop config, not in the server's settings.
 - The earlier "Open in system player" action is gone: mpv plays everything a system player would.
@@ -107,30 +301,12 @@ export type NativePlayer = {
 
   This is mechanical churn but has to happen. It is the only way two apps can point the same UI at different origins without a mutable global.
 
-### The player engine
+`NativePlayer` is the engine contract above. `PlayerServices` is built from `useRaven()` without changing the player. `Stage` selects native playback when the platform has a player, otherwise html. In library modes `planPlayback` receives `canPlay: () => true` for native playback: the ladder is direct play, then the remote transcode when direct play fails at runtime. The native page and `--color-stage` are transparent on the watch route; mpv draws subtitles and switches tracks in place without remuxing or restarting.
 
-The Player splits into the chrome and an engine.
-
-- **The chrome** is `Controls`, `Scrubber`, `SettingsMenu`, `ShortcutsDialog`, `Bezel`, the shortcuts and `useWatchProgress`. It reads `VideoState` through the existing `videoReducer` and calls `EngineActions` (`play`, `pause`, `seek`, `setVolume`, `setRate`, `setAudio`, `setSubtitle`, `setSubtitleScale`). `useWatchProgress` reads the state instead of the element.
-- **An engine** produces `VideoEvent`s and implements `EngineActions`:
-
-  ```ts
-  type Engine = { kind: 'html' } | { kind: 'native'; player: NativePlayer }
-  ```
-
-  - **html** is today's code: `<video>`, `useVideoEvents`, `useMediaSource` and `streamSource.ts`, behind the same ladder.
-  - **native** sends `PlayerCommand`s and maps `PlayerEvent`s onto the same `VideoEvent`s: mpv's `time-pos` is `moved`, `pause` is `played` or `paused`, `paused-for-cache` and `seeking` are `waiting` and `flowing`, `demuxer-cache-state` is `buffered`, `speed` is `rate`, `duration` is `duration`.
-- `Stage` picks the engine from `useRaven()`: native when the platform has a player, html otherwise. Under the native engine:
-  - there is no `<video>`; `Stage` renders the chrome over a transparent page, and `--color-stage` in `Player.module.scss`, `html` and `body` turn transparent on the watch route;
-  - audio and subtitle switches happen in place, through mpv's `aid` and `sid`, with no remux and no restart;
-  - mpv draws the subtitles, so `SubtitleOverlay` and `useSubtitleCues` are not used, and the caption size maps to `sub-scale`;
-  - `planPlayback` gets `canPlay: () => true`, so the ladder is direct play, then the remote transcode (section 5) if direct play fails at runtime.
-
-Make the split its own PR with only the html engine, so the web app shows no change before any native code exists.
 
 ### Exports and build
 
-- **Exports:**
+- **Full desktop exports** (the player-only exports above ship first):
   - `RavenProvider`, `ravenRoutes`, the `Platform` types and `isDesktopActions` (a guard)
   - the UI building blocks the desktop renderer uses for its own screens: `AppShell`, the dialog and button primitives, and `UnlockDialog`
   - `@raven/ui/styles.css`
@@ -147,10 +323,20 @@ Make the split its own PR with only the html engine, so the web app shows no cha
   - `tsconfig.json` extends `tooling/tsconfig/react.json` and includes `../../../tooling/web`.
   - `.oxlintrc.json` extends `tooling/oxlint/react.json` and exempts `vite.config.ts` from the named-exports rule.
   - `.stylelintrc` extends `tooling/stylelint/rules.json`. `.oxfmtrc.json` is identical to the others.
-- **Tests move with their files.** They keep running with `bun test` and happy-dom, using the SCSS loader in `tooling/web`. The `test/` render helper wraps in `RavenProvider` with a fake browser platform; the native engine's tests use a fake `NativePlayer`.
+- **Tests move with their files.** They keep running with `bun test` and happy-dom, using the SCSS loader in `tooling/web`. Player-only tests use `PlayerServicesProvider` and a fake engine handle. At D1, the shared `test/` render helper wraps in `RavenProvider` with a fake browser platform; the native engine's tests use a fake `NativePlayer`.
 - **Tokens:** `globals.scss`, `elements.scss` and `designTokens.ts` move to `libs/raven/ui/src/styles/`. The `/design` page moves with them.
 
-## 2. `@raven/web` becomes a thin shell
+## 2. `@raven/web`: shared player first, thin shell later
+
+### First release: "Open in raven player"
+
+- **A per-browser setting,** "Open videos in raven player", in the Playback section of Settings, stored with `usePlayerPrefs`. It is off by default: a page cannot tell whether an app is installed, and an unhandled `raven://` link does nothing in Chrome and shows an error in Safari.
+- **When it is on:**
+  - Unplayable offers "Open in raven player" as its primary action, above "Copy file link".
+  - The player's settings menu offers it too, with the current position as `at`, after pausing.
+- The link carries `location.origin` as the server and the up-next ids the web already has from Play all.
+
+### Phase 2: thin shell
 
 What stays in `apps/raven/web`: `index.html`, `vite.config.ts` (with the `/api` proxy) and `src/main.tsx`. `main.tsx` does the following:
 
@@ -160,7 +346,7 @@ What stays in `apps/raven/web`: `index.html`, `vite.config.ts` (with the `/api` 
 
 The Docker image keeps building `@raven/web`, and Nx's `^build` builds `@raven/ui` first. Add `libs/raven/ui` to the allowlist in `apps/raven/Dockerfile.dockerignore`. The GHCR publish check reads the same allowlist, so library changes republish the image.
 
-## 3. `@raven/server`: one embeddable entry
+## 3. `@raven/server`: one embeddable entry (phase 2)
 
 - Add `src/startServer.ts`, which exports `startServer({ env }): Promise<{ url: string; close: () => Promise<void> }>`. It runs `sizeThreadpool`, `readServerConfig(env)`, `createApp`, then `listen`.
 - `close` drops open connections before it closes the app: `getHttpServer().closeAllConnections()`, or the Fastify adapter created with `forceCloseConnections: true`. Nest's `app.close()` otherwise waits on a stream's connection, which Chromium keeps open after its window is gone; the spike's quit stalled 5 s mid-stream and the host was killed. With it, the host closes in under 15 ms.
@@ -177,7 +363,122 @@ The Docker image keeps building `@raven/web`, and Nx's `^build` builds `@raven/u
 - **Video does not depend on either.** libmpv draws it natively (section 5), so Chromium's codec list no longer limits the desktop. Chromium's `<video>` and MSE remain only as the fallback engine, where `checkDirectPlay` and `planPlayback` still pick direct, remux or transcode on their own.
 - **Config stays TypeScript.** Electron Forge reads `forge.config.ts`, so the TypeScript-only rule holds.
 
-### Layout
+### First-release layout
+
+```
+apps/raven/desktop/
+  package.json            deps: @raven/core, @raven/ui, @raven/mpv (workspace:*), electron 44, @electron-forge/*, @electron-forge/plugin-fuses; dev: @playwright/test
+  forge.config.ts         Info.plist document types from core's VIDEO_EXTENSIONS, the raven:// scheme, fuses, asar.unpack *.node, signing behind env vars
+  vite.config.ts          renderer build, the same shape as web's
+  playwright.config.ts    end-to-end tests against `electron .`
+  index.html
+  tsconfig.json           references tsconfig.main.json (tooling/tsconfig/node.json) and tsconfig.renderer.json (react.json)
+  src/shared/             the desktop's own requests and replies, as guards; the play link parser
+  src/main/main.ts        single-instance lock, open-file and open-url queues, app:// protocol, window, menus, quit
+  src/main/grants.ts      which files the renderer may open, by opaque id
+  src/main/stateStore.ts  player-state.json: recents, resume positions, track picks, window bounds
+  src/main/servers.ts     desktop-config.json servers, a session per server, the allowlisted API calls
+  src/main/player/        the player service: owns @raven/mpv, resolves sources, answers the bridge (section 5)
+  src/main/updates.ts     the release check
+  src/preload/preload.ts  contextBridge.exposeInMainWorld('ravenDesktop', ...): requests, file drops, the player's MessagePort
+  src/renderer/main.tsx   PlayerServicesProvider and a memory router: Home, Play, Settings
+  src/renderer/HomePage/  open, drop, recents
+  src/renderer/PlayPage/  the Player from @raven/ui with the native engine, or html as the fallback
+  src/renderer/SettingsPage/  servers, "This computer", updates, recents
+```
+
+Scripts follow "Build and bundling" below: one command each, all in `nx.includedScripts`. The first release has no hosts to bundle. A sandboxed preload cannot load ESM or workspace packages, so `build:preload` bundles it to one CommonJS file with `bun build --format cjs`, leaving `electron` external. `e2e` runs Playwright and is not part of `verify`, because it needs macOS and libmpv; the macOS CI job runs it (section 7).
+
+### Processes
+
+- **Main:** the window, the menus, the grants, the state store, the servers, and the player service with libmpv. It never blocks: libmpv is async only (section 5), file reads are async, and the state store writes off the hot path.
+- **Renderer:** one sandboxed window loaded from `app://raven`. It holds no paths, no cookies and no network access beyond its own origin.
+- **No utility process** in this slice. The library hosts arrive at D2 and D3.
+
+### Opening files
+
+Every way in ends in the same call in the main process, `grant(path)`. It checks that the path is an existing regular file and that `isVideoFile` accepts its name, then returns a random `fileId` and remembers the path for the session. The renderer only ever holds ids.
+
+- **Open dialog** (`dialog.showOpenDialog`, video types only) and **Open Recent** (the native menu, through `app.addRecentDocument`).
+- **Drag and drop on the window:** the page hands the dropped `File` to the preload, which calls `webUtils.getPathForFile`. A `File` the page made itself has no path there, so a compromised page cannot name one. Multiple files: the first plays and the rest become the up-next list, in the order dropped.
+- **Finder, the Dock icon and file associations:** `open-file` events, listened for in `will-finish-launching` so a cold launch catches them, and queued until the window is ready. Document types come from `VIDEO_EXTENSIONS` by UTI (`public.movie`, `public.mpeg-4`, `com.apple.quicktime-movie`, `public.avi`, `public.mpeg-2-transport-stream`, plus imported declarations for `org.matroska.mkv` and `org.webmproject.webm`), never by bare extension, so `.ts` source files stay with the editor. `LSHandlerRank` is `Alternate`: installing the app takes nothing over until the user picks "Always Open With".
+- **Next in folder:** when a local file ends, the next video in its folder by natural order (`Intl.Collator` with `numeric`) plays, and the Next button shows it as soon as playback starts. Folder siblings with video extensions count as granted, as mpv's and IINA's autoload do.
+- **Opening while playing** saves the current position first, then replaces the video. There is one window.
+
+### Server titles
+
+- **Servers are added on purpose.** Settings lists them; each has an id, an origin and a name read from the server. Adding one from a link shows a native dialog from the main process ("Add the raven server at https://raven.example.ts.net?"), so the page cannot fake the consent, and nothing is fetched before the user agrees.
+- **The play link:** `raven://play?server=<origin>&media=<id>&at=<seconds>&next=<id>,<id>`. A pasted `https://<origin>/watch/<id>` (Open Link, Command L) reads the same way. `readPlayLink` in `src/shared/` parses both into a `PlayRequest` and rejects anything else: an origin that is not http or https or has a path, query or credentials, a media id that is not a positive whole number, a negative `at`, more than 100 `next` ids.
+- **One session per server**, `persist:server:<serverId>`, for the same reason as the per-mode library sessions below: cookies are scoped by host, and one server's unlock must not ride along to another.
+- **The allowlist.** The renderer's `ApiClient` is `createApiClient({ fetch: bridgedFetch })`, so the player calls the same typed methods the web does. `bridgedFetch` sends `{ serverId, method, path, body }` to the main process, which runs it with `ses.fetch` only when the method and path match one of the eight calls listed in "What exploration found". Anything else is refused and logged. Replies are JSON and small, so the main process stays quiet.
+- **mpv reads the file itself:** `/api/media/:id/file` with the session's `raven_unlock` and `raven_admin` cookies as a `Cookie` header (section 5, "Sources"), with the cache forced on. Sidecar subtitles from the server's track list are added with `sub-add` against `/api/media/:id/subtitles/<trackId>`, the same way.
+- **Locked libraries:** a `403` on `getMedia` opens `UnlockDialog` for the PIN. While the server's admin lock hides locked libraries the title answers `404`, so the app asks for the admin password first, then the PIN, as Verification describes for remote mode.
+- **Progress and history** go to the server through the same calls the web makes. Quitting waits up to 1 s for saves in flight.
+- **Fallback:** without libmpv, a server title opens at `<origin>/watch/<id>` in the default browser.
+
+### Screens
+
+- **Home** is a grid of two regions: an "Open a video" panel (button and drop target) and the recent list. Below `48rem` they stack. Each recent is a `li` holding a button with the title, where it came from (the folder, or the server's name), a `progress` element labelled with the share watched, and a remove button labelled "Remove from recents". Dragging files over the window shows a "Drop to play" overlay sharing the region's named grid area. Recents show no thumbnails in this slice.
+- **Play** is the Player with the native engine, or the html engine as the fallback. Back and Escape return Home.
+- **Settings** (Command comma) holds the servers (add, rename, remove, which also clears that server's session), "This computer" (the output profile in section 5, device and passthrough formats), the update check switch and "Clear recents".
+- All of it is SCSS modules on raven's tokens from `@raven/ui`: grids with `gap`, no flex, no margins for spacing, `--focus-ring` on `:focus-visible`, desktop first, working at 320px. Every motion sits in `prefers-reduced-motion: no-preference`.
+
+### Window
+
+- `titleBarStyle: 'hiddenInset'`, so the video fills the window. The traffic lights sit over the player's header; the header pads by a `--titlebar-inset` the desktop renderer sets, and the lights hide and show with the controls (`setWindowButtonVisibility`), as IINA does.
+- Window bounds persist; the window opens on the display it closed on, or the main one if that display is gone.
+- Fullscreen is the page's request, which Electron makes the window's; the native surface follows the bounds (section 5).
+
+### Menus
+
+| Menu | Items |
+| --- | --- |
+| raven player | About, Settings (Command comma), Check for Updates, Hide, Quit |
+| File | Open (Command O), Open Recent with Clear Menu, Open Link (Command L), Close Window (Command W) |
+| Playback | Play or Pause, Skip Back, Skip Forward, Next, Video Info. Shown with no accelerators; each sends its `PlayerAction` to the page, and Video Info sends `stats` |
+| View | Enter Full Screen (Control Command F) |
+| Window, Help | the standard roles; Keyboard Shortcuts, Show Logs, Show Crash Reports, Copy Diagnostics |
+
+Single keys stay with the page, as on the web. A menu accelerator on Space or an arrow would fire before the page sees the key and break the PIN field and the volume slider.
+
+### State that persists
+
+| What | Where | Key | Cap | Written |
+| --- | --- | --- | --- | --- |
+| Servers | `desktop-config.json` | server id | 20 | on change |
+| "This computer" output settings | `desktop-config.json` | none | none | on change |
+| Recents | `player-state.json` | a local path, or a server id and media id | 50, newest first | on open |
+| Resume positions, local files | `player-state.json` | path, with size and modified time to notice a replaced file | 1,000, least recently played dropped | every 10 s of play, on pause and on close, debounced 2 s |
+| Track picks, local files | `player-state.json` | path | 1,000 | on pick |
+| Window bounds | `player-state.json` | none | none | on move or resize, debounced |
+| Server cookies | Electron session `persist:server:<serverId>` | | | by Electron |
+| Volume, caption size, preferred languages | the renderer's `localStorage`, `usePlayerPrefs` unchanged | | | as on the web |
+
+- Server titles keep their resume position on the server only; track picks for them follow the language preferences, as on the web.
+- Each file is read once at launch and checked with guards built from core's combinators. A file that fails the check is kept as `<name>.corrupt-<time>` and the app starts empty, so a bad write never stops it launching.
+- Writes go to a temporary file and are renamed over the old one. The last write happens on `before-quit`.
+- Resume follows the web's rule in `Stage.tsx`: resume when the position is past 0 and more than 10 s from the end; reaching the end clears it.
+
+### Security
+
+- **Window:** `contextIsolation`, `sandbox` (and `app.enableSandbox()`), no `nodeIntegration`, no `webviewTag`. `will-navigate` refuses anything off `app://raven`; `setWindowOpenHandler` denies every window and sends http and https links to `shell.openExternal`.
+- **Content Security Policy,** sent by the `app://` handler: `default-src 'self'; img-src 'self' data:; media-src 'self' raven-file:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'`. The `app://` handler resolves paths inside the renderer's folder and refuses any that leave it.
+- **Permissions:** every permission request and check is denied except `fullscreen`.
+- **IPC:** one `invoke` channel for requests and the player's MessagePort. The main process checks that each message comes from the app's own frame (`senderFrame.url` on `app://raven`) and narrows it with its guard before acting. Replies are narrowed by the renderer at the same boundary, as `createApiClient` narrows API replies.
+- **Files:** only granted ids open. The html fallback reads a granted file through a `raven-file://<fileId>` scheme that serves byte ranges and nothing else.
+- **mpv:** section 5's hardening (no scripts, no ytdl, no default bindings) plus `load` accepting only a `PlayerSource`; mpv never sees a path or URL the renderer wrote.
+- **Fuses**, set in `forge.config.ts`: `RunAsNode` off, `EnableNodeOptionsEnvironmentVariable` off, `EnableNodeCliInspectArguments` off, `EnableEmbeddedAsarIntegrityValidation` on, `OnlyLoadAppFromAsar` on, `EnableCookieEncryption` on.
+- **Test hooks** (mpv with `vo=null` and `ao=null`) are read from the environment only when `app.isPackaged` is false.
+
+### Keyboard and accessibility
+
+- The page keeps every shortcut the web player has (`lib/shortcuts.ts`), and the shortcuts dialog lists them. Home and Settings follow the usual tab order, and arriving on a screen focuses its heading or first control.
+- Every control has a label; the bezel's text stays in its `aria-live` region.
+- The native video view is not an accessibility element, so VoiceOver reads the page's controls, not an empty view over them.
+- `prefers-reduced-motion` follows macOS's Reduce Motion in Chromium; the bezel, the overlay and the chrome's fade respect it.
+- Captions under mpv scale with the same caption size preference (`sub-scale`).
+
+### Phase 2: library hosts and layout
 
 ```
 apps/raven/desktop/
@@ -197,9 +498,9 @@ apps/raven/desktop/
   src/renderer/ConnectionLost/  shown when the remote server cannot be reached
 ```
 
-### How the renderer reaches a server
+### How the library renderer reaches a server
 
-The renderer always loads from `http://127.0.0.1:<port>` with `baseUrl: ''`. Cookies, SSE and the API then stay same-origin, exactly as in the browser.
+The library-mode design loads the renderer from `http://127.0.0.1:<port>` with `baseUrl: ''`. Cookies, SSE and the API then stay same-origin, exactly as in the browser.
 
 - **Local mode:** the host process runs the real raven server with this environment:
   - `HOST=127.0.0.1` and `PORT=0`
@@ -208,14 +509,17 @@ The renderer always loads from `http://127.0.0.1:<port>` with `baseUrl: ''`. Coo
   - `FFMPEG_PATH` and `FFPROBE_PATH` pointing at the bundled binaries
   - the TMDB and OMDb keys from the desktop config
 - **Remote mode:** the host process runs a small Fastify server, about 40 lines. It serves the same renderer and proxies `/api/*` to the remote with `@fastify/http-proxy`, streaming request and response bodies so SSE and byte ranges pass through. The remote's `raven_unlock` cookie has no `Domain` and `Path=/api`, so it lands on the local origin unchanged. Its Fastify is created with `forceCloseConnections: true`, or an open EventSource holds up quitting (3 s in the spike).
-- **One Electron session per mode** (`partition: 'persist:local'` and `persist:remote:<origin>`). Cookies are scoped by host, not port, so every server on 127.0.0.1 would otherwise share one cookie jar: local mode, each remote and any dev server. Separate jars keep one server's unlock from riding along to another.
+- **One Electron session per library mode** (`partition: 'persist:local'` and `persist:remote:<origin>`). Cookies are scoped by host, not port, so every server on 127.0.0.1 would otherwise share one cookie jar: local mode, each remote and any dev server. Separate jars keep one server's unlock from riding along to another.
 - Each host posts `{ url }` to the main process over `process.parentPort`, and the main process loads that URL.
 - Video bytes do not go through the renderer at all; section 5 says where mpv reads them from.
+- Player-only server sessions (`persist:server:<serverId>`) and library-mode sessions remain separate trust boundaries. Cookies are not copied between jars. The same trusted server ids in `desktop-config.json` identify server sources in both modes; local library sources resolve through the embedded server.
 
-### Security, bundling and scripts
+**D3 decision gate:** whether the player-only screens move to the host's origin with the library or keep `app://` remains open. The player depends on `PlayerServices`, not the origin. Before D3 ships, record the chosen origin, routing, frame validation and CSP changes here, preserving the security baseline above. The player-only `connect-src 'self'` policy cannot be copied unchanged if the chosen integration needs additional connections.
 
-- **Window security:** `contextIsolation`, `sandbox` and no `nodeIntegration`. Navigation is limited to the host origin, and external links open in the system browser. The desktop renderer's `index.html` sets a Content-Security-Policy (`default-src 'self'`, plus what fonts and images need); Electron warns without one.
-- **Bundling the hosts:** `bun build --target node --format esm` turns each host into one file of about 3 MB. The local host leaves these external:
+### Build and bundling
+
+- **Library-mode window security:** retain `contextIsolation`, `sandbox`, no `nodeIntegration`, the fuses and IPC guards. For a host-loaded library renderer, restrict navigation and sender-frame checks to that host origin, and set a Content-Security-Policy (`default-src 'self'`, plus what fonts and images need). External http and https links open in the system browser. D3 records the final origin integration before it ships.
+- **Bundling the hosts (phase 2):** `bun build --target node --format esm` turns each host into one file of about 3 MB. The local host leaves these external:
   - `better-sqlite3`;
   - the packages NestJS 12 loads lazily with `import()`, which bun tries to resolve but none of which load at runtime: `@nestjs/microservices`, `@nestjs/websockets`, `@nestjs/platform-express`, `@fastify/multipart`, `@fastify/view`, `class-transformer` and `class-validator`.
 
@@ -227,10 +531,10 @@ The renderer always loads from `http://127.0.0.1:<port>` with `baseUrl: ''`. Coo
 - **Start time:** fork to `{ url }` takes about 190 ms. `module.enableCompileCache()` inside a single-file bundle does nothing, because the file is already compiled when it runs; the main process passes `NODE_COMPILE_CACHE=<userData>/compile-cache` in the fork's env instead, for about 30 ms on later launches.
 - **The fork's env replaces the whole environment.** The main process passes everything the host needs, including `UV_THREADPOOL_SIZE`, rather than relying on `sizeThreadpool()` setting it after the process has started.
 - **No `__dirname` in bundled code.** Bun's bundler bakes it in as the source folder. The main process finds its files through `app.getAppPath()` and `process.resourcesPath`, and passes the hosts every path they need in their env.
-- **ffmpeg:** a `fetch:ffmpeg` script downloads a pinned jellyfin-ffmpeg portable build per platform (macOS arm64 and x64 now; Windows x64 and Linux x64 when those platforms ship). It has zimg, the SIMD tone mapper `tonemapx` and the hardware filters the transcoding spec uses. It is GPL, which matters only if the app is distributed publicly.
+- **ffmpeg (phase 2 only):** a `fetch:ffmpeg` script downloads a pinned jellyfin-ffmpeg portable build per platform (macOS arm64 and x64 in phase 2; Windows x64 and Linux x64 when those platforms ship). It has zimg, the SIMD tone mapper `tonemapx` and the hardware filters the transcoding spec uses. It is GPL, which matters only if the app is distributed publicly.
 - **libmpv:** a `fetch:libmpv` script, in `@raven/mpv`, places the pinned libmpv for the platform beside the addon (section 5).
 - **Scripts** (one command each, chained with `bun run --sequential`, all in `nx.includedScripts`):
-  - `build`: `build:clean`, `build:renderer` (vite), `build:main` (tsc then tsc-alias), `build:hosts` (bun build)
+  - `build`: `build:clean`, `build:renderer` (vite), `build:main` (tsc then tsc-alias), `build:preload` (bun build); add `build:hosts` (bun build) in phase 2
   - `typecheck`: `typecheck:main` and `typecheck:renderer`
   - `dev`: `electron .`
   - `package` and `make`: `electron-forge`
@@ -254,7 +558,7 @@ The renderer always loads from `http://127.0.0.1:<port>` with `baseUrl: ''`. Coo
 
 ### Surfaces
 
-Each surface puts mpv's video under the page, so raven's React controls draw over it. The spike (step 2 of the order of work) settles each one.
+Each surface puts mpv's video under the page, so raven's React controls draw over it. The completed macOS native spike establishes the first surface; D6 settles Windows and Linux before implementation.
 
 - **macOS: one window.**
   - Upstream mpv dropped embedding into an NSView in 0.37, and its Vulkan context always opens its own window. The "moltenvk context" patch, carried by MPVKit and by Plex's fork, takes a `CAMetalLayer*` as `wid`. We build libmpv with it.
@@ -269,7 +573,7 @@ Each surface puts mpv's video under the page, so raven's React controls draw ove
   - **W1, one window.** Chromium draws web content into a child window of its own. The addon creates another child window at the bottom of the z-order and passes it as `wid`, so mpv sits under Chromium's content; stremio-shell-ng does the same with WebView2. The window is created transparent and frameless (Electron sets `transparent` only at creation) and uses `titleBarOverlay` for the window buttons.
   - **W3, an overlay window.** The opaque, framed main window hosts mpv's child window. A transparent, frameless window owned by it (Electron's `parent`) shows only the player controls, and only on the watch route; the main process keeps it on the main window's content bounds. The library UI keeps its native frame, at the cost of a second renderer during playback.
 - **Linux (later): W3 under X11.** Electron 38 and newer default to Wayland, which cannot embed another client's surface, so the app starts with `--ozone-platform=x11`. There is no HDR on Linux in v1; Wayland and its HDR wait for libmpv's gpu-next render API.
-- **Fallback everywhere:** if libmpv is missing, its version is too old, or the surface cannot be made, the platform's `player` is `null` and the web engine plays instead.
+- **Fallback:** if libmpv is missing, its version is too old, or the surface cannot be made, the standalone player uses html for supported local files and opens server titles in the browser. Full library modes set the platform's `player` to `null` and use the web engine.
 
 ### The mpv profile
 
@@ -292,11 +596,12 @@ Each surface puts mpv's video under the page, so raven's React controls draw ove
 
 ### Sources
 
-The renderer only ever names a `mediaId`. The player service in the main process turns it into something mpv opens, so the renderer can never point mpv at a path or URL of its choosing.
+The renderer names a `PlayerSource`: either a granted `fileId`, or a trusted `serverId` and `mediaId`. The main-process player service resolves it, so the renderer can never point mpv at a path or URL of its choosing.
 
-- **Local mode:** the file's path from `getMediaLocation` (`libs/raven/core/src/apiClient.ts:336`). mpv reads the disk directly; no bytes pass through the server.
-- **Remote mode, direct:** the remote server's own `/api/media/:id/file`, not the local proxy, so there is one hop. The cookie is HttpOnly, so the renderer cannot read it; the player service reads `raven_unlock` from Electron's session cookie store and passes it to mpv as a `Cookie` header (`http-header-fields`).
-- **Remote mode, transcode:** for a link too slow for the original, mpv plays the `container=mkv` stream from the transcoding spec, which copies TrueHD, DTS-HD and picture subtitles instead of converting them.
+- **Opened local file (phase 1):** the path behind a granted `fileId`, validated by the main process (section 4). mpv reads the disk directly.
+- **Local library mode (phase 2):** the file's path from `getMediaLocation` (`libs/raven/core/src/apiClient.ts:336`). mpv reads the disk directly; no bytes pass through the server.
+- **Server title, direct (both phases):** the remote server's own `/api/media/:id/file`, not the local proxy, so there is one hop. The cookie is HttpOnly, so the renderer cannot read it; the player service reads `raven_unlock` and `raven_admin` from Electron's session cookie store and passes it to mpv as a `Cookie` header (`http-header-fields`).
+- **Remote library mode, transcode (phase 2):** for a link too slow for the original, mpv plays the `container=mkv` stream from the transcoding spec, which copies TrueHD, DTS-HD and picture subtitles instead of converting them.
   - mpv runs with `rebase-start-time=no`, the engine subtracts `STREAM_TIME_SHIFT` as the web engine does, and the duration comes from the probe.
   - A seek outside the cache reloads the stream with a new `start`.
   - When `paused-for-cache` keeps recurring while `cache-speed` stays below the file's bitrate, the player offers a transcode at a bitrate under the measured speed. It waits for several stalls before offering, so one hiccup does not trigger it.
@@ -304,82 +609,306 @@ The renderer only ever names a `mediaId`. The player service in the main process
 ### The bridge
 
 - **One MessagePort per window,** created by the main process and handed to the renderer through the preload. Commands carry a request id and get a reply; events flow the other way.
-- **Commands are an allowlist,** each a `PlayerCommand` variant: `load` (a `mediaId`, a start time, an audio index, a subtitle id), `play`, `pause`, `seek`, `audio`, `subtitle`, `volume`, `speed`, `subtitleScale`, `stop`. The main process checks each with `isPlayerCommand` and never forwards raw mpv commands; `run`, `load-script` and an arbitrary `loadfile` stay unreachable.
-- **Events are `PlayerEvent` variants:** time, buffered ranges, paused, waiting, duration, rate, tracks, ended, error, and the video's live parameters for the diagnostics. `time-pos` is throttled to about 4 updates a second.
+- **Commands are an allowlist,** each a `PlayerCommand` variant: `load` (a `PlayerSource`, a start time, an audio index, a subtitle id), `play`, `pause`, `seek`, `audio`, `subtitle`, `volume`, `speed`, `subtitleScale`, `stats`, `stop`. The main process checks each with `isPlayerCommand` and never forwards raw mpv commands; `run`, `load-script` and an arbitrary `loadfile` stay unreachable.
+- **Events are `PlayerEvent` variants:** time, buffered ranges, paused, waiting, duration, rate, tracks (`MediaTracks`), ended and error. Diagnostics are drawn by mpv's own stats overlay, not sent as another event. `time-pos` is throttled to about 4 updates a second.
 - **The page stays quiet while a video plays.** Every repaint of the page over the video costs the compositor a frame; in the spike, stopping the page's 10 Hz time updates cut dropped frames from about 10 to 3 in 2 minutes. While the controls are hidden, nothing on the watch route repaints: the chrome keeps the latest time in state but renders the scrubber and time label only while it is shown.
 - **Main process extras:**
   - `powerSaveBlocker.start('prevent-display-sleep')` while a video plays;
   - fullscreen: the HTML fullscreen request becomes the window's, and the surface follows the window's bounds;
   - quitting stops mpv before the host.
 
+### Tracks from mpv
+
+The player service turns mpv's `track-list` into `MediaTracks` with a pure function (`tracksFromMpv`):
+
+- **Audio:** entries of type `audio` in order. `index` is the position among them, so it means what the server's `0:a:N` means and a remembered pick carries between web and desktop. mpv's `aid` is the entry's `id`. `language` goes through core's `languageTag`; `channels` comes from `demux-channel-count`.
+- **Subtitles:** entries of type `sub`. Embedded ones are `embedded-N` by position; external ones are `external-N` in the order they were added. `supported` is always true, since mpv draws PGS, VobSub and DVB.
+- **`defaultAudio`** is the entry flagged default, else the first; **`frameRate`** is `container-fps`.
+
 ### Bundling libmpv
 
 - **macOS:**
   - The spike built mpv v0.41.0 with MPVKit 1.0.0's `0001-player-add-moltenvk-context.patch`, which applies cleanly and registers `gpu-api=vulkan` with `gpu-context=moltenvk`, plus our resize patch. Meson ran with `-Dlibmpv=true -Dcplayer=false -Dvulkan=enabled` against Homebrew's dependencies, with `-I/opt/homebrew/include` because the patch includes a MoltenVK header. MPVKit's other two patches (a static Swift build fix and a tvOS fix) are not needed.
-  - That build links about 30 Homebrew dylibs by absolute path, so it cannot ship. The release uses our own pinned CI build of the same sources (mpv, FFmpeg, libplacebo, MoltenVK, dav1d, libass and their dependencies) for arm64 and x64: self-contained, with MoltenVK bundled, every dylib's install name set to `@rpath`, and every dylib signed.
+  - That build links about 30 Homebrew dylibs by absolute path, so it cannot ship. The release uses our own pinned CI build of the same sources (mpv, FFmpeg, libplacebo, MoltenVK, dav1d, libass and their dependencies) for arm64 first, then x64 in phase 2: self-contained, with MoltenVK bundled, every dylib's install name set to `@rpath`, and every dylib signed.
 - **Windows (later):** shinchiro's `mpv-dev` builds of mpv-winbuild-cmake, a self-contained `libmpv-2.dll`. Releases roll daily, so `fetch:libmpv` pins one and checks its checksum against a mirrored copy.
 - **Linux (later):** the system's libmpv, 0.40 or newer (Debian trixie, Ubuntu 26.04). An older one falls back to the web engine.
 - **Licensing and signing:**
   - GPL libmpv and GPL jellyfin-ffmpeg make a distributed app GPL in effect. That matters only if the app is shared publicly.
   - On Apple Silicon every Mach-O must be signed, so the release signs libmpv and the addon ad hoc. Real signing later needs either every dylib signed or `com.apple.security.cs.disable-library-validation`.
 
-## 6. Logic still worth moving to `@raven/core`
+## 6. Shared logic and player protocol in `@raven/core`
 
-These are pure helpers that are duplicated today or sit away from their siblings. They move during the `@raven/ui` extraction:
+These are pure helpers that are duplicated today or sit away from their siblings. `languageName` moves at P2; the rest move with the remaining UI at D1:
 
 - `score()` and the sortable `COLUMNS` are written twice, in `components/MediaList/MediaList.tsx` and `components/ShowCard/ShowViews.tsx`. Keep one copy in core.
 - `languageName` is written twice, in `lib/trackLabels.ts` and `components/ImageEditor/ImageEditor.tsx`. Keep one copy in core.
 - `pages/LibraryPage/librarySections.ts` (`SECTIONS`, `sectionsFor`) holds the tab rules for each library kind. Move it to `libs/raven/core/src/libraryKinds.ts`, next to `KIND_RULES`.
 
-New in core: `src/player.ts`, the player protocol. `PlayerCommand` and `PlayerEvent` are discriminated unions on `type`, `OutputSettings` is the "This computer" shape, and `isPlayerCommand`, `isPlayerEvent` and `isOutputSettings` are their guards. The renderer, the preload and the main process all import them, so the bridge has one contract.
+Also in core: `OutputSettings`, the "This computer" shape, with `isOutputSettings`. The renderer, preload and main process import it with the player protocol below, so the bridge has one contract.
 
 The other pure UI helpers stay in `@raven/ui`, now that both apps share it. They are `jumpScale`, `letters`, `itemFacts`, `shortcuts`, `selection`, `playQueue` and `history`. They move to core only if a non-React client appears.
 
-## 7. Docs and CI
+### Player protocol
+
+`libs/raven/core/src/player.ts` owns the guards below and derives its types with `Infer`. `load` takes a `PlayerSource` so both opened files and server titles use one protocol; `tracks` carries `MediaTracks` for both engines.
+
+```ts
+import { isMediaTracks } from '@/contract'
+import { type Infer, isBoolean, isNumber, isString, listOf, nullable, object, oneOf, union } from '@/schema'
+
+/**
+ * What the player opens. The renderer names a server title or a file the
+ * main process granted it, never a path or a URL.
+ */
+export const isPlayerSource = union(
+  object({ kind: oneOf(['server']), serverId: isString, mediaId: isNumber }),
+  object({ kind: oneOf(['file']), fileId: isString }),
+)
+
+export type PlayerSource = Infer<typeof isPlayerSource>
+
+export const isPlayerCommand = union(
+  object({
+    type: oneOf(['load']),
+    source: isPlayerSource,
+    start: isNumber,
+    audio: nullable(isNumber),
+    subtitle: nullable(isString),
+  }),
+  object({ type: oneOf(['play']) }),
+  object({ type: oneOf(['pause']) }),
+  object({ type: oneOf(['seek']), time: isNumber }),
+  object({ type: oneOf(['audio']), index: nullable(isNumber) }),
+  object({ type: oneOf(['subtitle']), id: nullable(isString) }),
+  object({ type: oneOf(['volume']), volume: isNumber, muted: isBoolean }),
+  object({ type: oneOf(['speed']), rate: isNumber }),
+  object({ type: oneOf(['subtitleScale']), scale: isNumber }),
+  object({ type: oneOf(['stats']) }),
+  object({ type: oneOf(['stop']) }),
+)
+
+export type PlayerCommand = Infer<typeof isPlayerCommand>
+
+const isTimeRange = object({ start: isNumber, end: isNumber })
+
+export const isPlayerErrorReason = oneOf(['open', 'decode', 'network', 'locked', 'engine'])
+
+export const isPlayerEvent = union(
+  object({ type: oneOf(['time']), time: isNumber }),
+  object({ type: oneOf(['buffered']), ranges: listOf(isTimeRange) }),
+  object({ type: oneOf(['paused']), paused: isBoolean }),
+  object({ type: oneOf(['waiting']), waiting: isBoolean }),
+  object({ type: oneOf(['duration']), duration: nullable(isNumber) }),
+  object({ type: oneOf(['rate']), rate: isNumber }),
+  object({ type: oneOf(['tracks']), tracks: isMediaTracks }),
+  object({ type: oneOf(['ended']) }),
+  object({ type: oneOf(['error']), reason: isPlayerErrorReason, message: isString }),
+)
+
+export type PlayerEvent = Infer<typeof isPlayerEvent>
+
+/** A command on the player's MessagePort, answered by a reply with the same id. */
+export const isPlayerRequest = object({ id: isNumber, command: isPlayerCommand })
+
+export const isPlayerReply = union(
+  object({ id: isNumber, ok: oneOf([true]) }),
+  object({ id: isNumber, ok: oneOf([false]), message: isString }),
+)
+```
+
+- `stats` toggles mpv's own stats overlay (`script-binding stats/display-stats-toggle`). The video's live parameters stay out of the event union: mpv draws the overlay, so nothing needs to cross the bridge for it.
+- Guards check shape, not range. The main process clamps where it applies a value: volume to 0 to 1, speed to 0.25 to 4, subtitle scale to 0.5 to 3, seek to the duration.
+- Tests in `player.test.ts` accept one valid value per variant and reject each malformed field, as `contract.test.ts` does.
+
+### From mpv to the reducer
+
+| mpv | `PlayerEvent` | `VideoEvent` |
+| --- | --- | --- |
+| `time-pos`, at most 4 a second | `time` | `moved`, with the last buffered ranges |
+| `demuxer-cache-state` `seekable-ranges` | `buffered` | `buffered` |
+| `pause` | `paused` | `played` or `paused` |
+| `paused-for-cache`, `seeking` | `waiting` | `waiting` or `flowing` |
+| `duration` | `duration` | `duration` |
+| `speed` | `rate` | `rate` |
+| `track-list` | `tracks` | none: it feeds the settings menu |
+| `end-file` with reason `eof` | `ended` | `ended` |
+| `end-file` with reason `error` | `error` | none: the stage shows Unplayable |
+
+The mapping is a pure function in `@raven/ui` (`fromPlayerEvent`), tested on its own.
+
+## 7. Packaging, signing, updates, diagnostics and CI
+
+### First-release packaging and operations
+
+- **Packaging:** Electron Forge makes a dmg and a zip for arm64. libmpv and the addon sit outside the asar, every Mach-O signed (section 5, "Bundling libmpv"). No ffmpeg ships: there is no server to run it.
+- **Signing:** ad hoc for now. `forge.config.ts` wires Developer ID signing and notarization (`osxSign` and `osxNotarize` with a keychain profile) behind environment variables, off until a certificate exists. The first launch of an ad hoc build needs the "Open Anyway" step in Privacy and Security once; the release notes say how.
+- **Updates:** at launch, at most once a day, and from the menu, the app reads the latest release of `codebend3r/maester` from GitHub and compares versions. A newer one shows a quiet notice with a link to its release page. Squirrel.Mac requires a Developer ID signature, so silent updates wait for one; `updates.ts` is shaped so the notice can become an install then. The check can be switched off.
+- **Version:** the app takes the workspace's shared version, so `version-bump` covers it and About shows it.
+- **Crash reports:** `crashReporter.start({ uploadToServer: false })` keeps minidumps in `crashDumps`. A rotating log (5 files of 1 MB in `logs`) records launches, opens, the bridge's refusals, mpv's warnings and errors, and the budget marks. Help offers Show Logs, Show Crash Reports and Copy Diagnostics (app, Electron, mpv and FFmpeg versions, `hwdec` support, the display's refresh rate and EDR headroom). Nothing leaves the machine unless the user sends it.
+
+### CI and release
+
+- **PR checks:** the Ubuntu matrix picks up `@raven/ui`, `@raven/mpv` and `@raven/desktop` through `run-many`. For that to hold, `@raven/mpv`'s `build` compiles only the TypeScript wrapper; the addon is its own target (`build:native`, cmake-js), and its headless tests are `test:native`. Neither runs on Ubuntu.
+- **A macOS job** (`🖥️ Desktop`) joins `pull-request-checks.yml` on an arm64 runner: restore or build libmpv (cached by its pinned sources), `build:native`, `test:native`, the desktop `build`, `e2e`, then `make`, uploading the unsigned app as a workflow artifact for manual testing. It runs on every PR, like every other check.
+- **Release:** `.github/workflows/desktop-release.yml` on `v*` tags, arm64 only for the first release: build, sign ad hoc, attach the dmg, the zip and `SHA256SUMS` to the GitHub release.
+
+- **Phase 2 matrix:** add macOS x64, fetch the pinned standalone ffmpeg build, and package both dmg and zip for each architecture with checksums. Build libmpv or restore it from the cache keyed by pinned sources; build the addon and run `bunx nx run @raven/desktop:make`. Windows x64 and Linux x64 join with their own CI runners and installer or package formats only after D6's platform spikes pass.
+- **Headless native tests:** run on macOS, with Windows and Linux runners added alongside those platforms. Generic Ubuntu checks continue to build only the TypeScript wrapper, not the addon.
+
+
+### Documentation
 
 - **Root `CLAUDE.md`:** add `@raven/ui`, `@raven/mpv` and `@raven/desktop` to the project table. In the CSS section, point raven's `globals.scss` and `elements.scss` at `libs/raven/ui/src/styles/`, and name `@raven/ui` as a styled project.
 - **`apps/raven/CLAUDE.md`:** note the UI lives in `@raven/ui`, the `Platform` seam, the two player engines, the desktop hosts and the player bridge.
-- **`.github/workflows/desktop-release.yml`:** runs on `v*` tags. A matrix of macOS arm64 and macOS x64 builds libmpv (or restores it from the cache keyed by its pinned sources), fetches ffmpeg, builds the addon, runs `bunx nx run @raven/desktop:make` and attaches the dmg and zip to the GitHub release. Builds are signed ad hoc for now. Windows x64 and Linux x64 join the matrix, with their installer and packages, when those platforms ship.
-- **`@raven/mpv` tests run headless in CI on macOS:** `vo=null` and `ao=null` against a clip that `lavfi` generates, so no media file is checked in. They load, seek, switch tracks, stop, and destroy a hundred times without a hang. Windows and Linux runners are added with their platforms.
-- PR checks pick up the new projects through `run-many` with no changes.
+- **`apps/raven/README.md`:** document installation, ad hoc Gatekeeper approval, file associations, server trust, handoff, output settings, diagnostics and, when shipped, local and remote library modes.
+
+## 8. Performance budgets
+
+| What | Budget | How it is measured |
+| --- | --- | --- |
+| Launch to window shown | 800 ms cold, 400 ms warm, on an M1 | Marks from the first line of `main.ts` to `ready-to-show`, written to the log. e2e asserts the median of 5 launches stays under twice the budget on CI |
+| Finder "Open With" on a cold launch to first frame | 1.5 s for a local file | `open-file` to mpv's `playback-restart`, in the log |
+| First frame, seeks, A/V sync, track switches | The pass criteria in Verification | As specified there |
+| Dropped frames, event loop lag | The pass criteria in Verification: 0 drops in 10 minutes on an XDR display, lag p99 under 20 ms | `frame-drop-count` and `decoder-frame-drop-count`; `monitorEventLoopDelay` in the main process |
+| Renderer JavaScript | 250 KB gzipped | The Vite build report, printed in the macOS CI job |
+| Memory, idle on Home | 300 MB across every process | The sum of `app.getAppMetrics()` working sets after 60 s |
+| Memory, playing M2 | 700 MB plus mpv's demuxer cache, which is capped (section 5) | The same, sampled every 10 s while M2 plays for 10 minutes |
+| CPU while paused | under 2% of one core | `app.getAppMetrics()` CPU usage over 60 s |
+
+The page stays quiet while video plays (section 5, "The bridge"): while the controls are hidden, nothing on the Play screen repaints.
+
+## 9. Testing
+
+- **Units (`bun test`):**
+  - in `@raven/ui`: the reducer with `ended`, `fromPlayerEvent`, the chrome against a fake engine handle, `useWatchProgress` against scripted state, and the existing `Player.test.tsx` and `playerHooks.test.tsx` passing unchanged after the split;
+  - in core: every guard in `player.ts`;
+  - in `@raven/desktop`: `readPlayLink`, `tracksFromMpv`, the allowlist, the grants, the state store against a fake file system (corrupt file, cap, debounce), the natural folder order. Main-process modules take Electron's pieces as arguments, so these run without Electron.
+- **Headless libmpv (`test:native`):** `vo=null` and `ao=null` against a lavfi-generated clip: load, seek, track switch, stop, and a hundred destroys without a hang, plus `track-list` on an MKV that ffmpeg generates with two audio tracks, an embedded subtitle and a sidecar.
+- **End to end (Playwright `_electron`, macOS job):**
+  - launch, open a generated clip through the main process, see the title, play, pause, seek, quit, reopen and see "Resumed at";
+  - recents after a relaunch; removing one;
+  - the security checks: `require` and `process` are undefined in the page; navigating to another origin is refused; `window.open` is denied; a request off the allowlist is refused; a play link to an unknown server shows the prompt and fetches nothing;
+  - the launch budget.
+- **Manual matrix,** on an XDR display, an SDR display and headphones (receiver passthrough when one is at hand):
+  - M1 to M15 from the Verification table, opened from Finder, by drag and drop, and through a server;
+  - a cold "Open With", a double-click once raven player is the default, a drop onto the Dock icon;
+  - quitting mid-film, then reopening: the position comes back locally and on the server;
+  - sleep and wake mid-film; unplugging the external display mid-film;
+  - a locked library, with and without the admin lock;
+  - the server going away mid-film: the error says so, and the position saved last stays.
+
+## Risks
+
+| Risk | Mitigation |
+| --- | --- |
+| An Electron upgrade breaks the native surface (Chromium re-sorting subviews) | Pin Electron's major. Each upgrade is its own PR that runs the surface checklist; the addon logs every re-sort it repairs |
+| 120 Hz pacing and EDR are still unmeasured (the native video spike) | Measured on an XDR display before P5 ships. If they fail, P5 ships with `target-colorspace-hint=no` and the gap written into the spec |
+| Gatekeeper blocks an ad hoc signed download | The release notes cover "Open Anyway". Developer ID signing and notarization are already wired, off until there is a certificate |
+| A web page fires `raven://` links at the app | Only added servers play; an unknown origin needs a native confirmation; links carry ids, not URLs; nothing is fetched before consent |
+| A crafted file exploits FFmpeg inside libmpv | Files open only by the user's action; libmpv runs without scripts or ytdl; the pinned libmpv is rebuilt for FFmpeg security releases |
+| The split regresses the web player | P1 and P2 ship with no visible change, the Player's tests pass unchanged, and M1 and M2 are checked by hand in Chrome and Safari |
+| The main process stalls while playing | Async libmpv only, small JSON on the bridge, lag logged and asserted in e2e |
+| Playwright's Electron support is experimental | e2e drives the page and `electronApp.evaluate` only; a break pins Playwright and never blocks the unit tests |
+| raven web on Netlify hands off its own origin, so video would come through Netlify's proxy | The prompt names the origin; the README says to add the server's own origin; a server advertising its canonical origin is a follow-up |
+| GPL libmpv makes a public build GPL in effect | Distribution is personal; a public release needs the source offer first |
+| The slice grows into the full desktop app | The non-goals above, and exit criteria on every step |
+
+## Rollout
+
+1. P1 and P2 merge behind no flag: the web player must look and behave exactly as before, checked on Vhagar after the deploy.
+2. P3 to P6 produce an unsigned app on every PR (the macOS job's artifact) for testing by hand.
+3. P7 tags the first release with the dmg. The web setting is turned on per browser, by hand, where the app is installed.
+4. After a few weeks of use, D1 to D6 continue in the same app.
+
+Turning the web setting off withdraws the handoff; the app needs nothing from the web to play local files.
+
+## Decision rationale
+
+These choices describe the first release unless a later phase is named.
+
+| Question | Answer | Why |
+| --- | --- | --- |
+| A separate app, or the start of desktop raven? | The start, in `@raven/desktop` | One native stack, one release pipeline, one update channel; data and associations carry over |
+| Browse servers inside the app? | No | Browsing is the full `@raven/ui` move, most of the cost; the web already does it |
+| How does the renderer reach a server? | Through eight allowlisted calls made by the main process; mpv reads files directly | No local port, no proxy, no CORS, no cookies in the renderer, and a compromised page can do only eight things. The proxy host comes with library browsing at D4 |
+| Fallback for server titles | The browser | The web player is already that fallback, with every rung of its ladder |
+| More than one window? | No | One libmpv surface is what the spike proved; nothing asks for two videos at once |
+| Take over double-click on install? | No, `Alternate` rank | Installing a player should not change what Finder does until the user says so |
+| Intel Macs? | Later | Halves the libmpv build; the spike and the test matrix are Apple Silicon |
+| Convert for slow links? | Later, direct play only | Needs the transcoding spec's mkv container; a home network and Tailscale carry a remux |
+| SQLite or JSON? | JSON | A few hundred small records; better-sqlite3 arrives with the embedded server |
+| Auto-update? | Notify only | Squirrel.Mac needs a Developer ID signature |
+| Telemetry? | None | A self-hosted suite; local logs and Copy Diagnostics cover bug reports |
+| Test runner | `bun test`, Playwright for e2e | The same runner as the web; main-process code is written to run without Electron |
+| Name | "raven player", with `userData` pinned to `raven` | Says what it does today, and renaming later moves nothing |
+| Thumbnails in recents | Not yet | Needs a frame grab through mpv; text rows with progress are enough to start |
+
+## What full desktop raven inherits
+
+- `@raven/ui` with its player exports, build and tokens. D1 moves the remaining folders into it and builds `PlayerServices` from `useRaven()`.
+- The player chrome, both engines, `ended` state, protocol, bridge, `MediaTracks` mapping, native surface and "This computer" settings. Do not reimplement them for library modes.
+- The macOS arm64 libmpv build, addon and CI; x64 is added later rather than blocking the player release.
+- The app identity, pinned `userData`, security baseline, fuses, menus, file associations, `raven://`, persisted player state, logs, crash reports, update check and release workflow.
+- D3 decides whether the player screens move to the library host's origin or retain `app://`; the player itself is origin-independent.
 
 ## Order of work (one PR each)
 
-Reordered by `2026-10-14-raven-player-desktop-design.md`: raven player ships first as its steps P0 to P7, which cover step 4, steps 7 and 8 for macOS arm64, and the player's share of step 3. The order in its "What the full desktop raven inherits" section replaces the one below.
+Each implementation step is its own PR, stacked on the one before, with an implementer and a reviewer per task. Spikes come first and are thrown away; their outcomes are written back here. The companion transcoding work runs alongside; D4 requires its mkv container.
 
-Steps 3 to 10 build macOS only. Windows and Linux come in step 11.
+### Completed feasibility spikes
 
-1. **Server spike, thrown away. Done 2026-10-12: passed** (see "Spike outcomes"). It ran `startServer` from a bun-bundled file in an Electron `utilityProcess`, loaded better-sqlite3, and played a direct, a remux and a transcode stream through the web engine, locally and through the remote proxy.
-2. **Native video spike, macOS arm64 half, thrown away. Done 2026-10-12: a conditional pass** (see "Spike outcomes"). Its criteria:
-   - the patched libmpv loads in Electron's main process;
-   - test file M2 (below) plays with `hwdec-current=videotoolbox` and drops no frames in 10 minutes, at 60 and at 120 Hz;
-   - the video stays under the page through navigation, resizing, fullscreen and DevTools;
-   - on an XDR display, EDR highlights are brighter than the UI's white, and M4 has correct colours;
-   - 100 load and stop cycles, then quitting, end with no deadlock;
-   - without libmpv, the app plays through the web engine.
+1. **Server spike, thrown away. Done 2026-10-12: passed.** Ran `startServer` from a bun-bundled file in an Electron `utilityProcess`, loaded better-sqlite3, and played direct, remux and transcode streams through the web engine, locally and through the remote proxy. See "Spike outcomes".
+2. **Native video spike, macOS arm64 half, thrown away. Done 2026-10-12: conditional pass.** Criteria:
+   - patched libmpv loads in Electron's main process;
+   - M2 plays with `hwdec-current=videotoolbox` and no drops over 10 minutes at 60 and 120 Hz;
+   - video stays below the page through navigation, resizing, fullscreen and detached DevTools;
+   - on an XDR display, EDR highlights exceed the UI's white and M4 has correct colours;
+   - 100 load and stop cycles and quitting end without deadlock;
+   - without libmpv, the web engine plays.
 
-   Two of them wait for an XDR display at 120 Hz, which the spike's Mac did not have: zero dropped frames at 120 Hz, and EDR highlights. Both are measured again on one before step 8 ships.
-3. Extract `@raven/ui` with the `Platform` seam, plus the core dedup; web becomes the thin shell. No visible change.
-4. Split the Player into chrome and engine, with only the html engine. No visible change.
-5. Add `startServer`, with `close` dropping open connections, and the `./start` export to the server.
-6. Scaffold `@raven/desktop` with local mode on the web engine, the chooser, a session per mode, the CSP, and the tooling presets.
-7. Add `@raven/mpv`: the addon, the wrapper, the macOS libmpv build with both patches, `fetch:libmpv`, CI builds and the headless tests.
-8. Add the native engine, the macOS surface, the bridge and "This computer".
-9. Add remote mode with direct URLs and the mkv transcode, Connection lost and Switch server.
-10. Bundle ffmpeg and libmpv, add the macOS release workflow, update the docs.
-11. **Windows and Linux.** First their half of the native video spike, thrown away, with these criteria:
-    - **Windows x64:** W1 or W3 draws the controls over the video, with resizing, snapping, maximizing and fullscreen working; HDR10 passes through with Windows HDR on; TrueHD Atmos reaches a receiver.
-    - **Linux x64, X11 on GNOME and KDE:** W3 works, with VAAPI decoding on Intel.
-    - **Both:** without libmpv, the app plays through the web engine.
+   The test Mac could not validate 120 Hz or EDR. Both are measured before P5 ships; the Risks table defines the documented SDR-only fallback if those checks fail. Existing measurements remain a conditional pass, not a claim that every performance target passed.
 
-    Their outcome is written back into this spec. Then, one PR each: the Windows surface and libmpv, then the Linux surface and the system libmpv, each with its CI runner and release matrix entry.
-12. **Follow-ups:** match the display's refresh rate to the video; report the screen's colourspace from the moltenvk context; switch Windows into HDR for an HDR title; Now Playing and media keys (MPNowPlayingInfoCenter, SMTC, MPRIS); Wayland with HDR on Linux.
+### Phase 1: raven player, macOS arm64
 
-The server work in `2026-10-12-raven-transcoding-design.md` runs alongside; step 9 needs its mkv container.
+0. **P0: spike, thrown away.** In a scratch Electron 44 app, packaged and signed ad hoc:
+   - `open-file` from Finder reaches a cold launch, with document types from `extendInfo`;
+   - a `raven://` link from Safari and Chrome reaches `open-url`, cold and warm;
+   - `webUtils.getPathForFile` in a sandboxed preload returns a dropped file's path, and '' for a `File` the page made;
+   - `ses.fetch` in a `persist:server:<id>` session keeps the `raven_unlock` cookie from `/api/lock/unlock` and sends it on the next call (if not, the service keeps the jar through `ses.cookies`);
+   - the page loads from `app://raven` with the CSP header, and the player's MessagePort reaches it through the preload;
+   - the owed XDR checks from the native video spike, if an XDR display is at hand.
+1. **P1: split the Player into chrome and engine, in `@raven/web`.** The html engine only, `ended` in `VideoState`, `EngineActions`, and `PlayerServices` in place of the singleton in the seven files. No visible change.
+2. **P2: create `@raven/ui` with the player.** `git mv` only, plus `languageName` into core, the build, the Dockerfile allowlist and the docs. No visible change.
+3. **P3: `@raven/mpv`.** The addon, the wrapper, the macOS arm64 libmpv build with both patches, `fetch:libmpv`, `build:native`, `test:native` and the macOS CI job (arm64 only).
+4. **P4: the protocol and the app.** `player.ts` in core; the `node.json` tsconfig and oxlint presets (section 4); `@raven/desktop` with the `app://` renderer, the security baseline and fuses, menus, Home, the grants, open dialog, drop, `open-file` and document types, the state store, the html engine for local files, and the e2e suite. M1 plays through the html engine.
+5. **P5: native playback.** `useNativeEngine`, `NativeStage`, the macOS surface, the bridge, `tracksFromMpv`, the title bar behaviour, next in folder, "This computer" and the stats overlay (section 5). M1 to M15 play from local disk.
+6. **P6: server titles.** Servers in Settings, the play link and the trust prompt, a session per server, the allowlist, `UnlockDialog` moved to `@raven/ui`, progress and history to the server, up next from the link, the browser fallback; the web setting and its two "Open in raven player" actions.
+7. **P7: release.** libmpv bundled and signed in the app, `desktop-release.yml` for arm64, the update check, the crash reporter and logs, Copy Diagnostics, and the docs: the root `CLAUDE.md` project table, `apps/raven/CLAUDE.md`, `apps/raven/README.md`, and this spec's outcomes.
+
+### Phase 2: full desktop raven, then macOS x64
+
+1. **D1: finish the shared UI extraction.** Move the remaining components, pages, hooks, stores, query layer, router and tests into `@raven/ui`; add `Platform`, `RavenProvider`, `useRaven()` and the remaining core dedup. Web becomes the thin shell. Build `PlayerServices` from `useRaven()`; no visible web change.
+2. **D2: embed the server.** Add `startServer`, connection-dropping `close` and the `./start` export (section 3).
+3. **D3: local library mode.** Add the library host, chooser, local session, scanning and matching, and the origin/routing/security decision in section 4. Keep the working player, associations and state; when library modes ship, rename "raven player" to "raven" without changing bundle id or `userData`.
+4. **D4: remote library mode.** Add the remote host and proxy, direct mpv URLs, mkv transcodes, Connection lost and Switch server. Preserve player handoff and per-server trust. Depends on the transcoding spec's mkv container.
+5. **D5: full desktop distribution and Intel Macs.** Bundle standalone ffmpeg, extend libmpv and addon builds and the macOS release matrix to x64, and update docs. Preserve the arm64 release pipeline and test the full desktop matrix on each macOS architecture.
+
+### Phase 3: Windows x64 and Linux x64
+
+6. **D6: platform spikes, then implementation.** First run throwaway native video spikes:
+   - **Windows x64:** W1 or W3 draws controls over video through resizing, snapping, maximizing and fullscreen; HDR10 passes with Windows HDR on; TrueHD Atmos reaches a receiver.
+   - **Linux x64, X11 on GNOME and KDE:** W3 works with VAAPI decoding on Intel.
+   - **Both:** without libmpv, full library mode plays through the web engine.
+
+   Write outcomes here. Then, one PR each: the Windows surface and pinned libmpv; the Linux surface and system libmpv. Add each platform's CI runner, release entry and packages with its implementation.
+
+### Follow-ups
+
+Match the display's refresh rate to video; report the screen's colourspace from the moltenvk context; switch Windows into HDR for an HDR title; Now Playing and media keys (MPNowPlayingInfoCenter, SMTC, MPRIS); Wayland with HDR on Linux; advertise the server's canonical origin for web handoff; consider recents thumbnails. Silent updates remain gated on Developer ID signing.
 
 ## Spike outcomes
 
-### Server spike (step 1), macOS arm64, Electron 44.7.0
+### Server feasibility spike, macOS arm64, Electron 44.7.0
 
 Every check passed.
 
@@ -395,11 +924,11 @@ Every check passed.
 | Start time | About 190 ms from fork to `{ url }` |
 | Quit | Clean only once `close` drops open connections (section 3) |
 
-What it changed in this spec: `close` drops connections (section 3); the proxy forces connections closed and each mode gets its own session (section 4); the externals list, better-sqlite3's place beside the bundle, the compile cache through `NODE_COMPILE_CACHE`, the whole env passed to the fork, no `__dirname`, and the CSP (section 4, "Security, bundling and scripts").
+What it changed in this spec: `close` drops connections (section 3); the proxy forces connections closed and each mode gets its own session (section 4); the externals list, better-sqlite3's place beside the bundle, the compile cache through `NODE_COMPILE_CACHE`, the whole env passed to the fork, no `__dirname`, and the CSP (section 4, "Build and bundling").
 
 Two facts about raven itself it surfaced: while the admin lock is on, locked libraries stay hidden until the admin password is entered, so unlocking one in remote mode starts with an admin unlock (see Verification); and the player buffers 60 s ahead, so a seek test needs a file longer than that.
 
-### Native video spike (step 2), macOS arm64 half
+### Native video feasibility spike, macOS arm64 half
 
 Run on an Apple Silicon Mac under macOS 27 with an external LG HDR 5K display, which runs at 60 Hz only (30, 50 and 60 Hz modes) and offers no HDR mode (EDR headroom 1.0). libmpv was built as in "Bundling libmpv"; the addon was 482 lines of Objective-C++.
 
@@ -414,17 +943,26 @@ Run on an Apple Silicon Mac under macOS 27 with an external LG HDR 5K display, w
 | Event-loop lag | Pass: p99 under 20 ms in 179 of 180 ten-second windows (the worst 20.4 ms, including Node's 10 ms sampling period) |
 | Without libmpv | Pass: a missing addon and a missing libmpv are both caught, and the web engine plays |
 
-Verdict: a conditional pass. The embedding works, and most of the dropped frames come from this display and from the page repainting over the video. The XDR checks in step 2 are still owed.
+Verdict: a conditional pass. The embedding works, and most of the dropped frames come from this display and from the page repainting over the video. The XDR checks before P5 are still owed.
 
 What it changed in this spec: the surface sits in the content view and survives Chromium's re-sorts, DevTools open detached, and our resize patch (section 5, "Surfaces"); the colourspace hint per display (section 5, "The mpv profile"); fewer time events and a quiet page (section 5, "The bridge"); async-only calls (section 5, "The addon"); the shippable libmpv build (section 5, "Bundling libmpv").
 
 ## Verification
 
-- **Checks:** `bun run verify` passes for every project, including `typescript-only` and `one-command-per-script`.
-- **After steps 3 and 4:**
-  - `bunx nx run @raven/ui:test` and `bunx nx run @raven/web:test` pass.
-  - `bun run dev:raven` behaves exactly as before.
-  - The Docker smoke test returns a healthy `/api/health` and serves `/`.
+- **Checks:** `bun run verify` passes for every project, and the git hooks pass on every commit.
+- **After P1 and P2:** `bunx nx run @raven/ui:test` and `bunx nx run @raven/web:test` pass; `bun run dev:raven` behaves exactly as before; the Docker smoke test returns a healthy `/api/health` and serves `/`; M1 and M2 play in Chrome and Safari as before.
+- **After P3:** `bunx nx run @raven/mpv:test:native` passes on the macOS runner, with no hang across a hundred destroys.
+- **After P4 to P7:** `bunx nx run @raven/desktop:e2e` passes on the macOS runner; `bunx nx run @raven/desktop:make` builds an app that:
+  - opens M1 to M15 from Finder, by drop and from Open Recent, meeting the pass criteria below on each output;
+  - meets every budget in section 8;
+  - resumes local files after a quit, and leaves the server's position within 10 s of where a server title stopped;
+  - plays a title handed over from raven web on Vhagar, including one in a locked library with the admin lock on;
+  - with libmpv removed, plays M1 through the web engine and opens a server title in the browser;
+  - quits within 1 s while a video plays, leaving no process behind.
+- **Security:** each check in section 9's end to end list passes, and a manual attempt to drop a page-made `File` opens nothing.
+
+### Shared test media, playback criteria and full desktop checks
+
 - **Test media.** One file per row, kept outside the repo. The media volumes hold a file for every row but three pieces. Nothing there has VP9 profile 2 HDR (M9), DVB subtitles (M11), or LPCM 7.1 and WebVTT (M15); the closest HLG runs at 25 fps (M6), and the heaviest 2160p60 file peaks at 56 Mb/s (M14). ffmpeg generates those pieces: libvpx-vp9 at 10-bit with PQ tags, the `dvbsub` encoder, `pcm_s24le` in 7.1, WebVTT, and x265 HLG at 50 fps.
 
   | ID | File | What it proves |
@@ -453,12 +991,13 @@ What it changed in this spec: the surface sits in the content view and survives 
   - A/V sync stays within 20 ms, and an audio or subtitle switch takes at most 0.3 s with no reload;
   - the main process's event-loop lag stays under 20 ms at p99 while playing;
   - on an HDR output `video-target-params/gamma` is `pq`; with passthrough, `audio-out-params/format` starts with `spdif-` and the receiver names the format.
-- **Desktop, local mode:** `bunx nx run @raven/desktop:make` builds an app. Choose "Run on this computer", add a local folder, and let the scan and TMDB matching finish. Then:
+- **After D1:** repeat the shared UI/web tests, unchanged development behavior and Docker smoke checks from P2.
+- **After D3 and D5, desktop local library mode:** `bunx nx run @raven/desktop:make` builds an app. Choose "Run on this computer", add a local folder, and let the scan and TMDB matching finish. Then:
   - Play M1 to M15.
   - Lock a library, restart, and use the PIN dialog.
   - Quit while a video plays, and check that the app is gone within 1 s and that no `node` or `ffmpeg` processes remain.
-- **Desktop, remote mode:** connect to Vhagar's URL, then browse, play M2 directly, seek outside the cache, and switch audio and subtitles. Enter the admin password if Vhagar's admin lock is on, then unlock a locked library with its PIN. Throttle the link below M2's bitrate and check that the transcode is offered and plays. Stop the remote and check that Connection lost appears.
-- **Fallback:** remove libmpv from a build and check that M1 plays through the web engine.
+- **After D4 and D5, desktop remote library mode:** connect to Vhagar's URL, then browse, play M2 directly, seek outside the cache, and switch audio and subtitles. Enter the admin password if Vhagar's admin lock is on, then unlock a locked library with its PIN. Throttle the link below M2's bitrate and check that the transcode is offered and plays. Stop the remote and check that Connection lost appears.
+- **Full library-mode fallback:** remove libmpv from a build and check that M1 plays through the web engine. The player-only server-title fallback remains the browser. Repeat platform-specific criteria after D6.
 
 ## Sources
 
@@ -475,3 +1014,19 @@ What it changed in this spec: the surface sits in the content view and survives 
 - libmpv's built-in defaults: <https://github.com/mpv-player/mpv/blob/master/etc/builtin.conf>
 - libmpv builds: <https://github.com/shinchiro/mpv-winbuild-cmake/releases>, <https://github.com/mpvkit/MPVKit>
 - jellyfin-ffmpeg: <https://github.com/jellyfin/jellyfin-ffmpeg/releases>
+- The transcoding spec: `docs/superpowers/specs/2026-10-12-raven-transcoding-design.md`
+- The web player's design: `docs/superpowers/specs/2026-10-08-raven-player-design.md`
+- Electron security checklist: <https://www.electronjs.org/docs/latest/tutorial/security>
+- Electron `protocol.handle` and privileged schemes: <https://www.electronjs.org/docs/latest/api/protocol>
+- Electron `webUtils.getPathForFile`: <https://www.electronjs.org/docs/latest/api/web-utils>
+- Electron `open-file`, `open-url`, `addRecentDocument` and `setAsDefaultProtocolClient`: <https://www.electronjs.org/docs/latest/api/app>
+- Electron `net.fetch` and `ses.fetch`: <https://www.electronjs.org/docs/latest/api/net>, <https://www.electronjs.org/docs/latest/api/session>
+- Electron MessagePorts: <https://www.electronjs.org/docs/latest/tutorial/message-ports>
+- Electron fuses: <https://www.electronjs.org/docs/latest/tutorial/fuses>
+- Electron crash reporter: <https://www.electronjs.org/docs/latest/api/crash-reporter>
+- Electron auto updates and Squirrel.Mac's signing requirement: <https://www.electronjs.org/docs/latest/api/auto-updater>
+- Electron Forge macOS signing and notarization: <https://www.electronforge.io/guides/code-signing/code-signing-macos>
+- Electron Forge fuses plugin: <https://www.electronforge.io/config/plugins/fuses>
+- Apple document types and imported type declarations: <https://developer.apple.com/documentation/bundleresources/information-property-list/cfbundledocumenttypes>, <https://developer.apple.com/documentation/bundleresources/information-property-list/utimportedtypedeclarations>
+- Playwright's Electron support: <https://playwright.dev/docs/api/class-electron>
+- mpv properties (`track-list`, `demuxer-cache-state`, `end-file`): <https://mpv.io/manual/master/#properties>
