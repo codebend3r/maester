@@ -11,7 +11,7 @@ import {
 } from '@raven/core'
 import { CardLink } from '@/components/CardLink/CardLink'
 import { FavouriteMark } from '@/components/FavouriteMark/FavouriteMark'
-import { Icon } from '@/components/Icon/Icon'
+import { Icon } from '@raven/ui'
 import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
 import { PosterImage } from '@/components/PosterImage/PosterImage'

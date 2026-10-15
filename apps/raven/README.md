@@ -250,13 +250,15 @@ From the repo root:
 
 ```bash
 bun install
-bun run dev:raven   # server on :8484 (watch mode, no scan on start) and Vite on :5173, proxying /api
+bun run dev:raven   # shared player build watcher, server on :8484 (watch mode, no scan on start) and Vite on :5173, proxying /api
 bun run verify         # spellcheck, TypeScript only, one command per script, lint, stylelint, format check, typecheck, tests and build for every project
 ```
 
 The dev server reads `apps/raven/.env`, the file the compose file reads, so `LIBRARY_PIN`, `ADMIN_PASSWORD` and the metadata keys work the same in development. Restart it after changing the file.
 
-`/design` shows the logo in each of its versions, the palette, every token, how each HTML element is drawn and every shared component. It is not in the side menu. Element styles live in `apps/raven/web/src/styles/elements.scss`, written in `:where()` so a component's own class always wins. The logo's files are in `apps/raven/web/public/brand`, and the favicons beside them in `public`.
+`/design` shows the logo in each of its versions, the palette, every token, how each HTML element is drawn and every shared component. It is not in the side menu. Element styles live in `libs/raven/ui/src/styles/elements.scss`, written in `:where()` so a component's own class always wins. The logo's files are in `apps/raven/web/public/brand`, and the favicons beside them in `public`.
+
+The player is built from `libs/raven/ui`, not copied into the web app. Both clients import its built exports and `@raven/ui/styles.css`. Its [library README](../../libs/raven/ui/README.md) documents peers, exports and tests. `dev:raven` also watches the library bundle.
 
 Run a single target through Nx: `bunx nx run @raven/server:test`, `bunx nx run @raven/web:typecheck`, `bunx nx show project @raven/server`.
 
@@ -270,9 +272,10 @@ apps/raven/
                  range-request file serving, tracks, subtitles and converted streams, and
                  metadata: the TMDB client, matching, the image cache and the item routes
   web/           @raven/web: React 19 + Vite: libraries, the grid, list, tiles and groups, history,
-                 movie pages and Fix match, the player and its stream source, the /design page
+                 movie pages and Fix match, the browser player host, the /design page
   Dockerfile, docker-compose.yml, docker-compose.vhagar.yml, vhagar-update.sh, .env.example
 libs/raven/
+  ui/            @raven/ui: shared React player, HTML engine, buttons, icons and styles.
   core/          @raven/core: API types and guards, the typed API client, the direct-play check,
                  reading names, formatting. No DOM or Node APIs, so a React Native app can use
                  it unchanged.

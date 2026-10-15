@@ -10,7 +10,7 @@
   "type": "module",
   "scripts": {
     "dev:luwin": "nx run @luwin/api:dev",
-    "dev:raven": "nx run-many -t dev -p @raven/server @raven/web",
+    "dev:raven": "nx run-many -t dev -p @raven/server @raven/ui @raven/web",
     "dev:rookery": "nx run-many -t dev -p @rookery/server @rookery/web",
     "build": "nx run-many -t build",
     "test": "nx run-many -t test",

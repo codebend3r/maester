@@ -1,6 +1,6 @@
 import { type MediaItem, planPlayback } from '@raven/core'
-import { Icon } from '@/components/Icon/Icon'
-import { browserCanPlay, browserCanStream } from '@/lib/canPlay'
+import { Icon } from '@raven/ui'
+import { browserCanPlay, browserCanStream } from '@raven/ui/canPlay'
 import { useSharedPlaybackPolicy } from '@/lib/sharedPlaybackPolicy'
 import styles from '@/components/PlaybackNote/PlaybackNote.module.scss'
 

@@ -1,6 +1,6 @@
 import { LIBRARY_ICON_NAMES, type LibraryIconName } from '@raven/core'
 import { useId } from 'react'
-import { Icon } from '@/components/Icon/Icon'
+import { Icon } from '@raven/ui'
 import { LIBRARY_ICON_LABELS } from '@/lib/libraryKinds'
 import styles from '@/components/LibraryDialog/IconPicker.module.scss'
 

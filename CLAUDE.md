@@ -48,10 +48,10 @@ These apply to every TypeScript project: everything but `@luwin/api` and the Pyt
 
 ## CSS
 
-These apply to the web apps, `@raven/web` and `@rookery/web`. Each app has its own tokens, so "the app's `globals.scss`" means `apps/<product>/web/src/styles/globals.scss`.
+These apply to the web apps, `@raven/web` and `@rookery/web`. Each app has its own tokens, so "the app's `globals.scss`" means `libs/raven/ui/src/styles/globals.scss` for raven and `apps/rookery/web/src/styles/globals.scss` for rookery.
 
 - Component styles are SCSS modules (`*.module.scss`), imported through the `@/` alias, never a relative path. The `react-ts-css` editor extension flags aliased imports as unresolved; that is a tooling bug to fix in tooling, not a reason to relativize the import.
-- The app's `globals.scss` holds the design tokens, resets and typographic primitives. raven also has `src/styles/elements.scss`, the default look of each element, inside `:where()` so any class beats it. Everything else belongs in a component module.
+- Raven's shared styles live in `libs/raven/ui/src/styles/`; rookery's remain in its web app. The app's `globals.scss` holds the design tokens, resets and typographic primitives. raven also has `libs/raven/ui/src/styles/elements.scss`, the default look of each element, inside `:where()` so any class beats it. Everything else belongs in a component module.
 - Containers drive layout: the container defines the child's available width and height, its padding, and the spacing between children; the children only care about their content. Moving a child to a different container may lay it out differently, because the container specifies the layout.
 - Layout is CSS grid, with `gap` between items and padding on the container. Avoid margins for spacing at all cost. That includes prose: a rendered-markdown container is a grid too, its element margins stay zeroed, and `gap` sets the rhythm between blocks.
 - No flex layouts, toolbars and inline rows included: they are grids too (`grid-auto-flow: column` for a run of items).
@@ -81,6 +81,7 @@ Shared tool config lives at the root, so every project lints and compiles by the
 | `@raven/server`   | `apps/raven/server`   | NestJS 12 on Fastify, SQLite (better-sqlite3), ffprobe/ffmpeg, vitest         |
 | `@raven/web`      | `apps/raven/web`      | React 19, Vite 8, TanStack Query, zustand, SCSS modules, bun test + happy-dom |
 | `@raven/core`     | `libs/raven/core`     | raven's shared core: API types and guards, API client, direct-play check      |
+| `@raven/ui`       | `libs/raven/ui`       | Shared React player, engine/services contracts, primitives and styles         |
 | `@rookery/server` | `apps/rookery/server` | The suite's sign-in: NestJS 12 on Fastify, SQLite (better-sqlite3), vitest    |
 | `@rookery/web`    | `apps/rookery/web`    | rookery's login and logout pages: React 19, Vite 8, bun test + happy-dom      |
 | `@shared/server`  | `libs/shared/server`  | The servers' shared scaffolding: web app serving, SQLite migrations, env      |

@@ -24,7 +24,7 @@ export const resetBrowserSupport = (): void => {
   support.stream = nothing
 }
 
-mock.module('@/lib/canPlay', () => ({
+mock.module('@raven/ui/canPlay', () => ({
   browserCanPlay: (mime: string) => support.current(mime),
   browserCanStream: (mime: string) => support.stream(mime),
 }))

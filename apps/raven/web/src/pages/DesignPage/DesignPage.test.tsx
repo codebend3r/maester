@@ -1,11 +1,11 @@
 import { describe, expect, it, mock } from 'bun:test'
 import { screen, within } from '@testing-library/react'
-import { parseTokens } from '@/lib/tokens'
+import { parseTokens } from '@raven/ui'
 import { renderWithProviders } from '@/test/render'
 
 // Vite hands the page globals.scss as text; Bun cannot, so the tests give it
 // a small stylesheet of their own.
-mock.module('@/styles/designTokens', () => ({
+mock.module('@raven/ui/designTokens', () => ({
   designTokens: parseTokens(`
     :root {
       --color-night: #15201e;

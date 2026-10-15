@@ -1,5 +1,5 @@
 import type { LibrarySettings } from '@raven/core'
-import { Icon, type IconSize } from '@/components/Icon/Icon'
+import { Icon, type IconSize } from '@raven/ui'
 import { libraryIconOf } from '@/lib/libraryKinds'
 import styles from '@/components/LibraryIcon/LibraryIcon.module.scss'
 

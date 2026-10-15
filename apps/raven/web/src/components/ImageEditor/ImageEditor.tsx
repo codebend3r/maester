@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   type ChoosableImageKind,
+  languageName,
   type ImageChoice,
   type ImageOption,
   type ItemDetails,
@@ -8,7 +9,7 @@ import {
   type MatchItemType,
 } from '@raven/core'
 import { useId, useState } from 'react'
-import { Button } from '@/components/Button/Button'
+import { Button } from '@raven/ui'
 import { LogoImage } from '@/components/LogoImage/LogoImage'
 import { api } from '@/lib/api'
 import { afterItemEdited } from '@/lib/invalidate'
@@ -22,23 +23,14 @@ const KIND_LABELS: Record<ChoosableImageKind, string> = {
   logo: 'Logo',
 }
 
-const LANGUAGE_NAMES = new Intl.DisplayNames(['en'], { type: 'language' })
-
-const languageName = (code: string | null): string => {
-  if (code == null) return 'No text'
-  try {
-    return LANGUAGE_NAMES.of(code) ?? code
-  } catch {
-    return code
-  }
-}
-
 /** What a picture is, for its label: where it comes from, its size and its language. */
 const describe = (option: ImageOption): string =>
   [
     option.source === 'local' ? 'Beside the files' : 'TMDB',
     option.width != null && option.height != null ? `${option.width} by ${option.height}` : null,
-    option.source === 'local' ? null : languageName(option.language),
+    option.source === 'local'
+      ? null
+      : (languageName({ tag: option.language, fallback: 'original' }) ?? 'No text'),
   ]
     .filter((part): part is string => part != null)
     .join(', ')

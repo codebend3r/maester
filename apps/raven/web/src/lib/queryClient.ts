@@ -1,3 +1,4 @@
+import { playerQueryKeys } from '@raven/ui'
 import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query'
 import {
   type MatchItemType,
@@ -33,6 +34,7 @@ export const createQueryClient = (): QueryClient =>
  * it (`skipToken`); the key still names what it would hold.
  */
 export const queryKeys = {
+  ...playerQueryKeys,
   libraries: ['libraries'],
   library: (id: number | null) => ['libraries', id],
   media: ({
@@ -64,16 +66,8 @@ export const queryKeys = {
   /** Every video's own queries: the item, its tracks, subtitles and location. */
   allMedia: ['media'],
   mediaItem: (id: number | null) => ['media', id],
-  mediaTracks: (id: number) => ['media', id, 'tracks'],
   /** Where a video's file lives, for its menu. */
   mediaLocation: (id: number) => ['media', id, 'location'],
-  subtitles: ({ id, trackId, window }: { id: number; trackId: string; window: number }) => [
-    'media',
-    id,
-    'subtitles',
-    trackId,
-    window,
-  ],
   favourites: ['favourites'],
   /** What is in progress and each pinned library's newest arrivals. */
   home: ['home'],
@@ -107,8 +101,6 @@ export const queryKeys = {
   lock: ['lock'],
   /** Whether the admin lock holds in this browser. */
   adminLock: ['admin'],
-  /** How the server plays video, for every viewer. */
-  playbackSettings: ['settings', 'playback'],
   displaySettings: ['settings', 'display'],
   nextEpisode: (showId: number) => ['items', showId, 'next'],
   person: (id: number | null) => ['people', id],

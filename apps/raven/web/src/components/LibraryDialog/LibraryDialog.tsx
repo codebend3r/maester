@@ -17,7 +17,7 @@ import {
 } from '@raven/core'
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button } from '@/components/Button/Button'
+import { Button } from '@raven/ui'
 import { FolderBrowser } from '@/components/FolderBrowser/FolderBrowser'
 import { IconPicker } from '@/components/LibraryDialog/IconPicker'
 import { api } from '@/lib/api'

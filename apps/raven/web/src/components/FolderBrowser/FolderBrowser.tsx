@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
-import { Button } from '@/components/Button/Button'
-import { Icon } from '@/components/Icon/Icon'
+import { Button, Icon } from '@raven/ui'
 import { browseQuery } from '@/lib/queries'
 import styles from '@/components/FolderBrowser/FolderBrowser.module.scss'
 

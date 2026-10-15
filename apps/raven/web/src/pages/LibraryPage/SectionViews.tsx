@@ -11,7 +11,7 @@ import {
 } from '@raven/core'
 import { type ReactNode, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ButtonLink } from '@/components/Button/Button'
+import { ButtonLink } from '@raven/ui'
 import { Duplicates } from '@/components/Duplicates/Duplicates'
 import { JumpPicker } from '@/components/JumpPicker/JumpPicker'
 import { LibraryToolbar } from '@/components/LibraryToolbar/LibraryToolbar'

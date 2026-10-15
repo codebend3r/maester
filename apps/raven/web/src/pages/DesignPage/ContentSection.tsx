@@ -1,5 +1,5 @@
 import { useRef } from 'react'
-import { Button } from '@/components/Button/Button'
+import { Button } from '@raven/ui'
 import { DesignSection, Specimen } from '@/pages/DesignPage/DesignSection'
 import styles from '@/pages/DesignPage/DesignPage.module.scss'
 

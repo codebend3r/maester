@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { useId } from 'react'
-import { Icon } from '@/components/Icon/Icon'
+import { Icon } from '@raven/ui'
 import styles from '@/components/Bucket/Bucket.module.scss'
 
 /**

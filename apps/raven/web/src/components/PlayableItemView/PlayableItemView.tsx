@@ -9,7 +9,7 @@ import {
 import { useId, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
-import { Button, ButtonLink } from '@/components/Button/Button'
+import { Button, ButtonLink } from '@raven/ui'
 import { AiMatchNote } from '@/components/AiMatchNote/AiMatchNote'
 import { CastRow } from '@/components/CastRow/CastRow'
 import { ImageEditor } from '@/components/ImageEditor/ImageEditor'

@@ -162,6 +162,14 @@ The first release creates only the player portion of `@raven/ui` and leaves the 
 - **Docs:** the root `CLAUDE.md` CSS section and `apps/raven/CLAUDE.md` point raven's `globals.scss` and `elements.scss` at `libs/raven/ui/src/styles/`, and `@raven/ui` joins the project table. The `/design` page's import of `globals.scss` follows the file.
 - The Docker image keeps building `@raven/web`; add `libs/raven/ui` to `apps/raven/Dockerfile.dockerignore`.
 
+#### P2 extraction adjustments
+
+The P1 closure also includes `lib/playerQueries.ts`. It moves with its tests, while the web query client reuses the three `playerQueryKeys` definitions exported by UI so cache identity and invalidation stay unchanged. `lib/tokens.ts` and its tests move because the shared `designTokens.ts` depends on them. The `/design` page itself stays in web until D1, importing `@raven/ui/designTokens`.
+
+The built package exports the shared Button/Icon primitives, Controls (for the existing design page), player preferences, keyboard helpers, token helpers, `playerQueriesFor` and `playerQueryKeys` where the remaining web UI needs them. Two narrowly scoped built module entries, `@raven/ui/canPlay` and `@raven/ui/designTokens`, retain the host tests' module boundaries. Vite emits one capability implementation, imported by the player and exposed through the public subpath, not a source alias or injected test-only production API.
+
+Player tests are split by ownership. Engine, chrome, track, subtitle, navigation and shortcut scenarios move into UI, with a local PlayerServices fixture and query/router harness. Clipboard, server progress/history and browser host integration stay in web's `WatchPlayer.test.tsx`; it also verifies that mocking the public capability module affects the built player. Both test targets retain the 96% line and 88% function floors and count their own source, not library dist. UI adds source-named timeline, video state, fullscreen and shortcut tests. Core's single `languageName` accepts an optional fallback spelling so track labels and ImageEditor retain their existing invalid-tag behavior.
+
 ### Remaining extraction (D1)
 
 After the player release, use `git mv` for the remaining files from `apps/raven/web/src` so history follows the files: `components/`, `pages/`, `stores/`, `styles/`, `lib/`, `AppRoutes.tsx`, `managed-media-source.d.ts` and `test/`. Make the move its own PR with no behavior change.

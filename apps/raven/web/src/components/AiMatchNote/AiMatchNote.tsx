@@ -1,5 +1,5 @@
 import type { AiMatch } from '@raven/core'
-import { Icon } from '@/components/Icon/Icon'
+import { Icon } from '@raven/ui'
 import styles from '@/components/AiMatchNote/AiMatchNote.module.scss'
 
 /**
