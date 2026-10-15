@@ -50,7 +50,7 @@ const Option = ({
  */
 export const SettingsMenu = ({
   menuRef,
-  selection: { tracks, tracksFailed, audio, subtitle, pickAudio, pickSubtitle },
+  selection: { tracks, tracksFailed, tracksPending, audio, subtitle, pickAudio, pickSubtitle },
   subtitleStatus,
   rate,
   mode,
@@ -78,7 +78,7 @@ export const SettingsMenu = ({
     first.current?.querySelector<HTMLInputElement>('input:checked')?.focus()
   }, [])
 
-  const tracksNote = tracksFailed ? 'Tracks unavailable.' : tracks == null ? 'Reading tracks' : null
+  const tracksNote = tracksFailed ? 'Tracks unavailable.' : tracksPending ? 'Reading tracks' : null
   const subtitleNote = SUBTITLE_STATUS[subtitleStatus]
 
   return (

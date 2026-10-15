@@ -1,8 +1,6 @@
-import { type MediaItem, mediaLabel } from '@raven/core'
-import { useState } from 'react'
 import { Button } from '@/components/Button/Button'
 import styles from '@/components/Player/Player.module.scss'
-import { api } from '@/lib/api'
+import { usePlayerServices } from '@/components/Player/PlayerServices'
 
 /**
  * What stands in for the video when nothing this browser and server can do
@@ -11,27 +9,16 @@ import { api } from '@/lib/api'
  * same URL.
  */
 export const Unplayable = ({
-  media,
   problems,
   onBack,
   onTryAnyway,
 }: {
-  media: MediaItem
   problems: string[]
   /** Leaves the player, for the page that opened it. */
   onBack: () => void
   onTryAnyway: (() => void) | null
 }) => {
-  const [copied, setCopied] = useState<string | null>(null)
-  const thumbnail = api.thumbnailUrl(media)
-
-  const copyLink = () => {
-    const link = new URL(api.fileUrl(media.id), window.location.origin).href
-    navigator.clipboard.writeText(link).then(
-      () => setCopied('Link copied. Paste it into VLC or IINA to play it there.'),
-      () => setCopied(`Copy this link: ${link}`),
-    )
-  }
+  const { title, posterUrl: thumbnail, escape, escapeFeedback } = usePlayerServices()
 
   return (
     <section className={styles.unplayable} aria-labelledby="unplayable-title">
@@ -41,7 +28,7 @@ export const Unplayable = ({
           Back
         </Button>
         <h1 id="unplayable-title" className={styles.panelTitle}>
-          {mediaLabel(media)}
+          {title.label}
         </h1>
         <p>This video can't play in this browser.</p>
         <ul className={styles.problems}>
@@ -49,22 +36,26 @@ export const Unplayable = ({
             <li key={problem}>{problem}</li>
           ))}
         </ul>
-        <p className={styles.hint}>
-          The file is served untouched, so a player that handles every format, like VLC or IINA, can
-          open the same link.
-        </p>
+        {escape && (
+          <p className={styles.hint}>
+            The file is served untouched, so a player that handles every format, like VLC or IINA,
+            can open the same link.
+          </p>
+        )}
         <div className={styles.panelActions}>
           {!!onTryAnyway && (
             <Button tone="primary" onClick={onTryAnyway}>
               Try playing anyway
             </Button>
           )}
-          <Button icon="copy" onClick={copyLink}>
-            Copy file link
-          </Button>
+          {escape && (
+            <Button icon="copy" onClick={escape.run}>
+              {escape.label}
+            </Button>
+          )}
         </div>
         <p className={styles.hint} aria-live="polite">
-          {copied}
+          {escapeFeedback}
         </p>
       </div>
     </section>

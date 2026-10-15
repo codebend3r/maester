@@ -1,6 +1,7 @@
 import { keepPreviousData, queryOptions, skipToken } from '@tanstack/react-query'
 import type { MatchItemType, MatchSubject, MediaSort } from '@raven/core'
 import { api } from '@/lib/api'
+import { playerQueriesFor } from '@/lib/playerQueries'
 import { queryKeys } from '@/lib/queryClient'
 
 /**
@@ -109,13 +110,7 @@ export const mediaQuery = (id: number | null) =>
   })
 
 /** A file's tracks only change when the file does, and the scan stores them. */
-export const tracksQuery = (id: number) =>
-  queryOptions({
-    queryKey: queryKeys.mediaTracks(id),
-    queryFn: () => api.getTracks(id),
-    staleTime: Infinity,
-    retry: false,
-  })
+export const tracksQuery = playerQueriesFor(api).tracks
 
 /** Where a file lives is read fresh each time its menu shows it. */
 export const mediaLocationQuery = (id: number) =>
@@ -126,22 +121,7 @@ export const mediaLocationQuery = (id: number) =>
   })
 
 /** One window of a subtitle track; fetched windows stay for seeking back. */
-export const subtitlesQuery = ({
-  id,
-  trackId,
-  window,
-}: {
-  id: number
-  trackId: string
-  window: number
-}) =>
-  queryOptions({
-    queryKey: queryKeys.subtitles({ id, trackId, window }),
-    queryFn: () => api.getSubtitles({ id, trackId, window }),
-    staleTime: Infinity,
-    gcTime: 30 * 60 * 1000,
-    retry: 1,
-  })
+export const subtitlesQuery = playerQueriesFor(api).subtitles
 
 export const itemQuery = (id: number | null) =>
   queryOptions({
@@ -222,11 +202,7 @@ export const metadataHealthQuery = queryOptions({
   staleTime: 60_000,
 })
 
-export const playbackSettingsQuery = queryOptions({
-  queryKey: queryKeys.playbackSettings,
-  queryFn: () => api.getPlaybackSettings(),
-  staleTime: 60_000,
-})
+export const playbackSettingsQuery = playerQueriesFor(api).playbackSettings
 
 export const displaySettingsQuery = queryOptions({
   queryKey: queryKeys.displaySettings,

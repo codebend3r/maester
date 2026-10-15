@@ -6,6 +6,7 @@ import { type ReactNode, useLayoutEffect, useRef } from 'react'
 import { sourceFor, useMediaSource } from '@/components/Player/useMediaSource'
 import { usePlaybackLadder } from '@/components/Player/usePlaybackLadder'
 import { initialVideoState, videoReducer } from '@/components/Player/useVideoState'
+import { api } from '@/lib/api'
 import { queryKeys } from '@/lib/queryClient'
 import { setBrowserSupport, setStreamSupport } from '@/test/canPlay'
 import { mediaItem } from '@/test/fixtures'
@@ -28,11 +29,11 @@ describe('videoReducer', () => {
 
 describe('sourceFor', () => {
   it('plays the file itself directly, and a stream of its type otherwise', () => {
-    expect(sourceFor({ id: 7, mode: 'direct', audio: null, mime: null })).toEqual({
+    expect(sourceFor({ api, id: 7, mode: 'direct', audio: null, mime: null })).toEqual({
       kind: 'file',
       url: '/api/media/7/file',
     })
-    const stream = sourceFor({ id: 7, mode: 'remux', audio: 1, mime: 'video/mp4' })
+    const stream = sourceFor({ api, id: 7, mode: 'remux', audio: 1, mime: 'video/mp4' })
     expect(stream.kind).toBe('stream')
     if (stream.kind !== 'stream') return
     expect(stream.mime).toBe('video/mp4')
@@ -56,7 +57,7 @@ describe('useMediaSource', () => {
       const playing = useRef(false)
       useMediaSource({
         videoRef,
-        media,
+        source: { kind: 'server', media, api },
         mode,
         audio: null,
         position,
@@ -98,6 +99,7 @@ describe('usePlaybackLadder', () => {
     const { result } = renderHook(
       () =>
         usePlaybackLadder({
+          api,
           media: mediaItem({ audioCodec: 'truehd' }),
           audio: null,
           isDefaultAudio: true,

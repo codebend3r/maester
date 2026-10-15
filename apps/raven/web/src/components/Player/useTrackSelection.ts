@@ -1,14 +1,15 @@
 import { useQuery } from '@tanstack/react-query'
-import type { MediaTracks, SubtitleTrack } from '@raven/core'
+import type { ApiClient, MediaTracks, SubtitleTrack } from '@raven/core'
 import { useState } from 'react'
 import { preferredAudio, preferredSubtitle } from '@/components/Player/selection'
-import { tracksQuery } from '@/lib/queries'
+import { playerQueriesFor } from '@/lib/playerQueries'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
 
 /** The file's tracks, which of them play, and the ways to change that. */
 export type TrackSelection = {
   tracks: MediaTracks | null
   tracksFailed: boolean
+  tracksPending: boolean
   /** The `0:a:N` track to play, or null for the file's default. */
   audio: number | null
   /** Whether the audio playing is the file's own default, which direct play gets without help. */
@@ -19,22 +20,26 @@ export type TrackSelection = {
    * list is on its way, no source should start only to be swapped.
    */
   isWaitingForTracks: boolean
-  pickAudio: (index: number) => void
+  pickAudio: (index: number | null) => void
   pickSubtitle: (id: string | null) => void
-  /** Turns subtitles off, or on in the last language used; says which track it landed on. */
-  toggleSubtitles: () => SubtitleTrack | null
 }
 
 /**
  * Which audio and subtitle tracks play. A pick by hand wins over the
  * remembered preferences, and is remembered for the next video.
  */
-export const useTrackSelection = (mediaId: number): TrackSelection => {
+export const useTrackSelection = ({
+  mediaId,
+  api,
+}: {
+  mediaId: number
+  api: ApiClient
+}): TrackSelection => {
   const audioLanguage = usePlayerPrefs((prefs) => prefs.audioLanguage)
   const subtitlePrefs = usePlayerPrefs((prefs) => prefs.subtitles)
   const setAudioLanguage = usePlayerPrefs((prefs) => prefs.setAudioLanguage)
   const setSubtitles = usePlayerPrefs((prefs) => prefs.setSubtitles)
-  const trackList = useQuery(tracksQuery(mediaId))
+  const trackList = useQuery(playerQueriesFor(api).tracks(mediaId))
   const tracks = trackList.data ?? null
 
   const [audioPick, setAudioPick] = useState<number | null>(null)
@@ -55,6 +60,7 @@ export const useTrackSelection = (mediaId: number): TrackSelection => {
   return {
     tracks,
     tracksFailed: trackList.isError,
+    tracksPending: trackList.isPending,
     audio,
     isDefaultAudio: audio == null || audio === tracks?.defaultAudio,
     subtitle,
@@ -64,16 +70,5 @@ export const useTrackSelection = (mediaId: number): TrackSelection => {
       setAudioLanguage(tracks?.audio.find((track) => track.index === index)?.language ?? null)
     },
     pickSubtitle,
-    toggleSubtitles: () => {
-      if (subtitle != null) {
-        pickSubtitle(null)
-        return null
-      }
-      const id =
-        preferredSubtitle({ tracks, subtitles: { on: true, language: subtitlePrefs.language } }) ??
-        preferredSubtitle({ tracks, subtitles: { on: true, language: null } })
-      pickSubtitle(id)
-      return tracks?.subtitles.find((track) => track.id === id) ?? null
-    },
   }
 }

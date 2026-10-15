@@ -1,76 +1,54 @@
-import { useQueryClient } from '@tanstack/react-query'
-import type { MediaItem } from '@raven/core'
 import { type RefObject, useEffect, useEffectEvent, useRef } from 'react'
-import { useVideoEvents } from '@/components/Player/useVideoEvents'
-import { api } from '@/lib/api'
-import { afterWatching } from '@/lib/invalidate'
+import { usePlayerServices } from '@/components/Player/PlayerServices'
+import type { VideoState } from '@/components/Player/useVideoState'
 
-/** Progress is saved this often while playing, plus on pause and on leaving. */
 const SAVE_EVERY_S = 10
 
-/**
- * Keeps the server told where the viewer is: every few seconds of play, on
- * pause, at the end, when the tab closes and when the player does. The
- * first time frames really play, the video joins its library's history.
- */
+/** Progress follows engine state, not a particular engine's DOM events. */
 export const useWatchProgress = ({
-  videoRef,
-  media,
+  state,
   position,
   duration,
-  fileTime,
 }: {
-  videoRef: RefObject<HTMLVideoElement | null>
-  media: MediaItem
+  state: VideoState
   position: RefObject<number>
   duration: number | null
-  fileTime: () => number
 }): void => {
-  const queryClient = useQueryClient()
-  const lastSaved = useRef(media.position)
-  // Nothing is saved until frames actually play: a video that never got
-  // going still fires `pause` at 0:00 on the way out, and saving that would
-  // wipe the place the viewer really stopped.
+  const { progress, title } = usePlayerServices()
+  const lastSaved = useRef(title.resumeAt)
   const started = useRef(false)
+  const previous = useRef(state)
 
-  const save = (at: number) => {
+  const save = useEffectEvent((at: number) => {
     if (!started.current || !Number.isFinite(at)) return
     lastSaved.current = at
-    api.saveProgress({ id: media.id, position: at }).catch(() => undefined)
-  }
-
-  useVideoEvents({
-    videoRef,
-    on: {
-      playing: () => {
-        if (!started.current) api.recordPlay(media.id).catch(() => undefined)
-        started.current = true
-      },
-      timeupdate: (element) => {
-        if (element.readyState < HTMLMediaElement.HAVE_METADATA) return
-        const now = fileTime()
-        if (Math.abs(now - lastSaved.current) >= SAVE_EVERY_S) save(now)
-      },
-      pause: (element) => {
-        if (element.readyState === HTMLMediaElement.HAVE_NOTHING) return
-        save(fileTime())
-      },
-      ended: () => save(duration ?? fileTime()),
-    },
+    progress.save(at)
   })
 
-  // Closing the tab mid-film still records the position, and so does leaving the player.
-  const leave = useEffectEvent((element: HTMLVideoElement | null) => {
-    if (element && element.readyState > 0) save(position.current)
-    void afterWatching({ queryClient, libraryId: media.libraryId })
+  useEffect(() => {
+    if (!started.current && !state.paused && !state.waiting) {
+      started.current = true
+      progress.started()
+    }
+    if (state.ended && !previous.current.ended) save(duration ?? position.current)
+    else if (
+      (state.paused && !previous.current.paused) ||
+      Math.abs(state.time - lastSaved.current) >= SAVE_EVERY_S
+    )
+      save(position.current)
+    previous.current = state
+  }, [state, duration, position, progress])
+
+  const leave = useEffectEvent(() => {
+    save(position.current)
+    progress.left(position.current)
   })
   const hide = useEffectEvent(() => save(position.current))
   useEffect(() => {
-    const element = videoRef.current
     window.addEventListener('pagehide', hide)
     return () => {
       window.removeEventListener('pagehide', hide)
-      leave(element)
+      leave()
     }
-  }, [videoRef])
+  }, [])
 }
