@@ -10,3 +10,12 @@ preload = [
   "../../../tooling/web/scss-modules.ts",
   "./src/test-setup.ts",
 ]
+# Coverage counts raven web's own source: not the tests, the test harness,
+# the shared loader, or @raven/core's built dist, which core's own tests cover.
+coverageSkipTestFiles = true
+coveragePathIgnorePatterns = [
+  "src/test/**",
+  "src/test-setup.ts",
+  "../../../tooling/**",
+  "../../../libs/**",
+]

@@ -24,6 +24,7 @@
     "typescript-only": "nx run maester:typescript-only",
     "one-command-per-script": "nx run maester:one-command-per-script",
     "verify": "nx run-many -t spellcheck typescript-only one-command-per-script lint:py lint:ts lint:css format:check typecheck test build",
+    "verify:uncached": "bun run verify --skip-nx-cache",
     "affected": "bun run --sequential spellcheck typescript-only one-command-per-script affected:tasks",
     "affected:tasks": "nx affected -t lint:py lint:ts lint:css format:check typecheck test build",
     "graph": "nx graph"

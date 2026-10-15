@@ -13,6 +13,7 @@ data/
 # node
 node_modules/
 dist/
+coverage/
 
 # nx
 .nx/cache

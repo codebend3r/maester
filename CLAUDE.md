@@ -71,7 +71,7 @@ Shared tool config lives at the root, so every project lints and compiles by the
 
 - `tsconfig.base.json` holds the compiler options; `tooling/tsconfig/nest.json` and `tooling/tsconfig/react.json` add a server's or a web app's. A project's `tsconfig.json` extends one and adds its `paths`, its `include` and whatever sets it apart (core's empty `types`).
 - `tooling/oxlint/base.json` holds the lint rules, `nest.json` and `react.json` add a server's or a web app's. A project's `.oxlintrc.json` extends one and adds its ignores, its file overrides and whatever sets it apart.
-- `tooling/stylelint/rules.json` holds the SCSS rules both web apps extend, and `tooling/web` the asset declarations and the bun test SCSS loader they share.
+- `tooling/stylelint/rules.json` holds the SCSS rules both web apps extend, and `tooling/web` the asset declarations and the bun test SCSS loader they share, plus `check-coverage.ts`: raven web's `test` target runs it after the tests and fails when total line or function coverage drops below the floors its `test:coverage` script names.
 - oxfmt has no `extends`, so each project keeps its own `.oxfmtrc.json`; keep their options identical.
 - `nx.json` lists `tsconfig.base.json` and `tooling/` as shared inputs, so a change there reruns every project's tasks.
 
