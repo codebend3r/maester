@@ -5,10 +5,29 @@ import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import { type ApiClient, type MediaItem, parseServerEvent } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '@/app'
+import { MetadataService } from '@/metadata/metadataService'
+import { LibraryWatcher } from '@/scanner/libraryWatcher'
 import { ScannerService } from '@/scanner/scannerService'
 import { adminCookie, eventually, testConfig } from '@/test/app'
 import { encodeClip } from '@/test/clips'
 import { apiFor } from '@/test/server'
+import { ThumbnailService } from '@/thumbnails/thumbnailService'
+
+const closeAfterWork = async ({
+  app,
+  libraryId,
+}: {
+  app: NestFastifyApplication | null
+  libraryId: number
+}): Promise<void> => {
+  if (!app) return
+  // Stop producers before draining work, while the database and media still exist.
+  app.get(LibraryWatcher).onModuleDestroy()
+  await app.get(ScannerService).whenIdle(libraryId)
+  await app.get(MetadataService).whenIdle()
+  await app.get(ThumbnailService).whenIdle()
+  await app.close()
+}
 
 /** As a browser with the admin lock off, so the library can be added and edited. */
 describe('refreshing a library as its folders change', () => {
@@ -48,7 +67,7 @@ describe('refreshing a library as its folders change', () => {
   })
 
   afterAll(async () => {
-    await state.app?.close()
+    await closeAfterWork(state)
     await rm(state.root, { recursive: true, force: true })
   })
 
@@ -163,7 +182,7 @@ describe('a library whose folders cannot be watched', () => {
   })
 
   afterAll(async () => {
-    await state.app?.close()
+    await closeAfterWork(state)
     await rm(state.root, { recursive: true, force: true })
   })
 

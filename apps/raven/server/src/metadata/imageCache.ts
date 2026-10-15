@@ -77,6 +77,11 @@ export class ImageCache {
     mkdirSync(join(this.root, 'local'), { recursive: true })
   }
 
+  /** Poster warming outlives a match, so shutdown must wait for its queued writes too. */
+  async onModuleDestroy(): Promise<void> {
+    await Promise.allSettled(this.working.values())
+  }
+
   /** Runs `make` once per key at a time; later callers wait on the same promise. */
   private once(key: string, make: () => Promise<string | null>): Promise<string | null> {
     const running = this.working.get(key)

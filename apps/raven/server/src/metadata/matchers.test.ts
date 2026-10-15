@@ -42,7 +42,7 @@ describe('matching by library type', () => {
   })
   const state = { paths: new Map<string, number>(), libraries: new Map<string, number>() }
 
-  const services = () => {
+  const createServices = () => {
     const config = {
       ...readServerConfig({}),
       dataDir: database.dir(),
@@ -52,12 +52,8 @@ describe('matching by library type', () => {
     const { images, metadata } = repositories(database.get())
     const files = new MatchFiles(database.get(), metadata)
     const ffmpeg = new FfmpegService(config, new SettingsRepository(database.get()))
-    const pictures = new ItemPictures(
-      metadata,
-      files,
-      new ImageCache(config, tmdb.fetch, ffmpeg),
-      images,
-    )
+    const cache = new ImageCache(config, tmdb.fetch, ffmpeg)
+    const pictures = new ItemPictures(metadata, files, cache, images)
     const pass = () =>
       new MatchPass({
         tmdb: new TmdbClient(config, tmdb.fetch),
@@ -68,6 +64,7 @@ describe('matching by library type', () => {
         prefer: TIER_SETS.any,
       })
     return {
+      cache,
       images,
       metadata,
       files,
@@ -80,6 +77,9 @@ describe('matching by library type', () => {
       }),
     }
   }
+
+  const serviceState: { current: ReturnType<typeof createServices> | null } = { current: null }
+  const services = () => (serviceState.current ??= createServices())
 
   /** The file indexed at `path` under a library's root. */
   const fileAt = (path: string) => {
@@ -154,7 +154,10 @@ describe('matching by library type', () => {
     })
   })
 
-  afterAll(database.close)
+  afterAll(async () => {
+    if (serviceState.current) await serviceState.current.cache.onModuleDestroy()
+    await database.close()
+  })
 
   const under = (name: string, path: string) => fileAt(`${join(database.dir(), name)}/${path}`)
 

@@ -26,9 +26,14 @@ const applied = ({ change, reply }: { change: AdminChange; reply: FastifyReply }
 export class AdminController {
   constructor(@Inject(AdminService) private readonly admin: AdminService) {}
 
+  /** The lock in this browser; a session still open gets its cookie renewed, so it never runs out while in use. */
   @Get()
-  state(@Headers('cookie') cookie: string | undefined): AdminLock {
-    return this.admin.state({ cookie })
+  state(
+    @Headers('cookie') cookie: string | undefined,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ): AdminLock {
+    const renewed = this.admin.renewed({ cookie })
+    return renewed ? applied({ change: renewed, reply }) : this.admin.state({ cookie })
   }
 
   /** `{ password }`: turns the admin lock off for this browser. */

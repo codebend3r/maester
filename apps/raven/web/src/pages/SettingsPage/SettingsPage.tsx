@@ -235,7 +235,7 @@ const AdminLockHint = ({ lock, readAt }: { lock: AdminLock; readAt: number }) =>
         </>
       )
     case 'off':
-      return 'Off in this browser, until it is turned on, 12 hours pass or the server restarts. Turned on, it waits a moment first, so a slip costs no password.'
+      return 'Off in this browser until it is turned back on, through refreshes, restarts and redeploys. Turned on, it waits a moment first, so a slip costs no password.'
     default: {
       const unknown: never = lock
       return unknown
