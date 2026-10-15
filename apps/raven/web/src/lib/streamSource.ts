@@ -285,7 +285,11 @@ export const createStreamSession = <S extends MediaSourceLike>({
     state.controller = controller
     state.streamingFrom = from
     try {
-      if (buffer.updating) buffer.abort()
+      // A network read can stop partway through a fragment, and removing
+      // what is buffered leaves the parser holding that fragment; the new
+      // stream would be read as its rest. Only abort lets go of it, and
+      // it throws once the stream has ended, which leaves nothing held.
+      if (source?.readyState === 'open') buffer.abort()
       if (buffer.buffered.length > 0) {
         buffer.remove(0, Infinity)
         await updateEnd(buffer)
