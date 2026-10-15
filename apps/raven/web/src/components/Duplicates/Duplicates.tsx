@@ -17,7 +17,7 @@ import { PosterImage } from '@/components/PosterImage/PosterImage'
 import { api } from '@/lib/api'
 import { afterSplit } from '@/lib/invalidate'
 import { versionFacts } from '@/lib/itemFacts'
-import { cardLink } from '@/lib/itemLinks'
+import { cardLink, inLibrary } from '@/lib/itemLinks'
 import { POSTER_SIZES } from '@/lib/posters'
 import { plural } from '@/lib/plural'
 import { queryKeys } from '@/lib/queryClient'
@@ -126,7 +126,14 @@ const MovieDuplicate = ({
         <Poster entry={own.entry} />
         <header className={styles.header}>
           <h3 id={headingId} className={styles.title}>
-            <Link to={`/movies/${movie.itemId}`}>{item?.title ?? own.entry.media.title}</Link>
+            <Link
+              to={inLibrary({
+                page: `/movies/${movie.itemId}`,
+                libraryId: own.entry.media.libraryId,
+              })}
+            >
+              {item?.title ?? own.entry.media.title}
+            </Link>
           </h3>
           <p className={styles.meta}>{meta.join(' · ')}</p>
         </header>

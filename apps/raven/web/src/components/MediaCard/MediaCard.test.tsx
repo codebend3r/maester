@@ -29,7 +29,10 @@ describe('MediaCard', () => {
   it('plays from its picture, and opens the page of the episode it is from its title', () => {
     renderWithProviders(<MediaCard media={EPISODE_TWO} />)
     const label = mediaLabel(EPISODE_TWO)
-    expect(screen.getByRole('link', { name: label })).toHaveAttribute('href', '/episodes/7')
+    expect(screen.getByRole('link', { name: label })).toHaveAttribute(
+      'href',
+      '/episodes/7?library=2',
+    )
     expect(screen.getByRole('link', { name: `Play ${label}` })).toHaveAttribute('href', '/watch/13')
   })
 

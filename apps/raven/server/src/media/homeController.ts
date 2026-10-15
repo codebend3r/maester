@@ -1,11 +1,21 @@
-import { Controller, Get, Headers, Inject } from '@nestjs/common'
-import { type Home, type HomeShelf, listsShows } from '@raven/core'
-import { LibrariesRepository } from '@/libraries/librariesRepository'
-import { LockService } from '@/lock/lockService'
+import { Controller, Get, Headers, Inject, Query } from '@nestjs/common'
+import {
+  type Home,
+  type HomeSearch,
+  type HomeShelf,
+  type MediaSort,
+  isString,
+  listsShows,
+} from '@raven/core'
+import { type LibraryRecord, LibrariesRepository } from '@/libraries/librariesRepository'
+import { LockService, type Viewer } from '@/lock/lockService'
 import { MediaRepository } from '@/media/mediaRepository'
 
 /** How many of a pinned library's newest arrivals its shelf on the home page holds. */
 export const SHELF_SIZE = 8
+
+/** How many of a library's matches a search from home shows; the library's own search lists them all. */
+export const SEARCH_SHELF_SIZE = 16
 
 /** The home page cuts across libraries, as favourites do, so it hangs off its own root. */
 @Controller('api/home')
@@ -16,6 +26,29 @@ export class HomeController {
     @Inject(LockService) private readonly lock: LockService,
   ) {}
 
+  /** A library's row: its shows for a TV shows library, its videos for any other. */
+  private shelf({
+    library: { id, settings },
+    search,
+    sort,
+    limit,
+  }: {
+    library: LibraryRecord
+    search: string
+    sort: MediaSort
+    limit: number
+  }): HomeShelf {
+    const listing = { libraryId: id, search, sort, limit }
+    return listsShows(settings.kind)
+      ? { libraryId: id, type: 'shows', shows: this.media.listShows(listing) }
+      : { libraryId: id, type: 'media', media: this.media.list(listing) }
+  }
+
+  /** The libraries `viewer` may see, as the side menu orders them. */
+  private seenBy(viewer: Viewer): LibraryRecord[] {
+    return this.libraries.list().filter((library) => viewer.seesLibrary(library.id))
+  }
+
   /**
    * Every video in progress with the poster its card shows, then each pinned
    * library's newest arrivals; libraries still locked stay out.
@@ -23,20 +56,28 @@ export class HomeController {
   @Get()
   home(@Headers('cookie') cookie: string | undefined): Home {
     const viewer = this.lock.viewer({ cookie })
-    const shelves = this.libraries
-      .list()
-      .filter((library) => library.settings.pinned && viewer.seesLibrary(library.id))
-      .map(({ id, settings }): HomeShelf => {
-        const newest = { libraryId: id, sort: 'added', limit: SHELF_SIZE } as const
-        return listsShows(settings.kind)
-          ? { libraryId: id, type: 'shows', shows: this.media.listShows(newest) }
-          : { libraryId: id, type: 'media', media: this.media.list(newest) }
-      })
+    const shelves = this.seenBy(viewer)
+      .filter((library) => library.settings.pinned)
+      .map((library) => this.shelf({ library, search: '', sort: 'added', limit: SHELF_SIZE }))
     return {
       inProgress: this.media.withPosters(
         this.media.listInProgress().filter((media) => viewer.seesLibrary(media.libraryId)),
       ),
       shelves,
     }
+  }
+
+  /**
+   * What `?q=` finds in every library, pinned or not, by title: a row for
+   * each library holding a match, and nothing for a blank search. Libraries
+   * still locked stay out.
+   */
+  @Get('search')
+  search(@Headers('cookie') cookie: string | undefined, @Query('q') q: unknown): HomeSearch {
+    const search = isString(q) ? q.trim() : ''
+    if (!search) return []
+    return this.seenBy(this.lock.viewer({ cookie }))
+      .map((library) => this.shelf({ library, search, sort: 'title', limit: SEARCH_SHELF_SIZE }))
+      .filter((shelf) => (shelf.type === 'shows' ? shelf.shows : shelf.media).length > 0)
   }
 }
