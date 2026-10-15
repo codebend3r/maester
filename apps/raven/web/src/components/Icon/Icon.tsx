@@ -145,7 +145,7 @@ const PATHS: Record<IconName, string> = {
   chip: 'M7 7h10v10H7zM10 10h4v4h-4zM9.5 3v4M14.5 3v4M9.5 17v4M14.5 17v4M3 9.5h4M3 14.5h4M17 9.5h4M17 14.5h4',
   sun: 'M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2.5v2M12 19.5v2M4.6 4.6L6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4L6 18M18 6l1.4-1.4',
   reset: 'M4 11a8 8 0 1 1 2.3 5.7M4 5v6h6',
-  split: 'M12 21v-7l-6-6M12 14l6-6M6 13V8h5M18 13V8h-5',
+  split: 'M10 12H3M7 8l-4 4 4 4M14 12h7M17 8l4 4-4 4',
   merge: 'M6 3l6 6v12M18 3l-6 6M8 17l4 4 4-4',
   sidebar: 'M4 5h16v14H4zM9.5 5v14',
   lock: 'M5 11h14v10H5zM8 11V7.5a4 4 0 0 1 8 0V11M12 15v2',

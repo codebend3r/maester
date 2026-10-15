@@ -3,6 +3,7 @@ import {
   episodeByline,
   episodeFacts,
   formatAirDate,
+  movieFacts,
   runtimeFact,
   versionFacts,
 } from '@/lib/itemFacts'
@@ -13,6 +14,21 @@ describe('runtimeFact', () => {
     expect(runtimeFact({ file: mediaItem({ duration: 3600 }), runtime: 97 })).toBe('1h 0m')
     expect(runtimeFact({ file: mediaItem({ duration: null }), runtime: 97 })).toBe('1h 37m')
     expect(runtimeFact({ file: undefined, runtime: null })).toBeNull()
+  })
+})
+
+describe('movie facts', () => {
+  it('counts the files only once the movie has two or more', () => {
+    const one = itemDetails({ versions: [mediaItem({ id: 1, duration: null })] })
+    expect(movieFacts({ details: one, primary: undefined })).toEqual([
+      '2026',
+      '1h 37m',
+      'Comedy',
+      'Drama',
+      'Crime',
+    ])
+    const two = { ...one, versions: [mediaItem({ id: 1 }), mediaItem({ id: 2 })] }
+    expect(movieFacts({ details: two, primary: undefined }).at(-1)).toBe('2 files')
   })
 })
 

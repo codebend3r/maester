@@ -9,6 +9,7 @@ import {
   resolutionLabel,
 } from '@raven/core'
 import { showYears } from '@/lib/itemLinks'
+import { plural } from '@/lib/plural'
 import { languageName } from '@/lib/trackLabels'
 
 const present = (facts: ReadonlyArray<string | null>): string[] =>
@@ -49,7 +50,7 @@ export const createdBy = (details: ItemDetails): string | null => {
   return creators.length > 0 ? `Created by ${joinNames(creators)}` : null
 }
 
-/** Year, runtime and up to three genres. */
+/** Year, runtime, up to three genres, and how many files the movie is once there are two or more. */
 export const movieFacts = ({
   details,
   primary,
@@ -61,6 +62,9 @@ export const movieFacts = ({
     details.year == null ? null : String(details.year),
     runtimeFact({ file: primary, runtime: details.runtime }),
     ...details.genres.slice(0, 3),
+    details.versions.length > 1
+      ? plural({ n: details.versions.length, one: 'file', many: 'files' })
+      : null,
   ])
 
 /** Air date and runtime. */

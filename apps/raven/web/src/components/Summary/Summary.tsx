@@ -9,9 +9,12 @@ const LONG_SUMMARY = 240
 export const Summary = ({
   tagline,
   summary,
+  className,
 }: {
   tagline: string | null
   summary: string | null
+  /** Where the page's layout places it. */
+  className?: string
 }) => {
   const id = useId()
   const [expanded, setExpanded] = useState(false)
@@ -19,7 +22,10 @@ export const Summary = ({
   const long = text.length > LONG_SUMMARY
   if (!tagline && !text) return null
   return (
-    <section className={styles.summary} aria-label="Summary">
+    <section
+      className={className ? `${styles.summary} ${className}` : styles.summary}
+      aria-label="Summary"
+    >
       {tagline && <p className={styles.tagline}>{tagline}</p>}
       {text && (
         <p id={id} className={long && !expanded ? `${styles.text} ${styles.clamped}` : styles.text}>

@@ -1,0 +1,65 @@
+.files {
+  display: grid;
+  gap: var(--space-2);
+  max-width: var(--measure);
+}
+
+.others {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.heading {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.list {
+  display: grid;
+}
+
+.file {
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid var(--color-moss);
+  font-size: var(--font-size-sm);
+  overflow-wrap: anywhere;
+}
+
+// A card's link, its files' names, opening the page Fix match is on.
+.card {
+  border-radius: var(--radius-sm);
+
+  &:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+// The button, with what it does beside it; on a narrow screen, under it.
+.split {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.hint {
+  color: var(--color-lichen);
+  font-size: var(--font-size-xs);
+}
+
+.error {
+  color: var(--color-leaf-bright);
+  font-size: var(--font-size-sm);
+}
+
+.note {
+  font-size: var(--font-size-sm);
+}
+
+@media (max-width: 30rem) {
+  .split {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: start;
+  }
+}
