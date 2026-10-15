@@ -17,7 +17,9 @@
     "lint:css:fix": "stylelint --fix \"src/**/*.scss\"",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
-    "test": "bun test --dots --parallel",
+    "test": "bun run --sequential test:run test:coverage",
+    "test:run": "bun test --dots --parallel --coverage --coverage-reporter=lcov",
+    "test:coverage": "bun ../../../tooling/web/check-coverage.ts --lines 96 --functions 88",
     "test:watch": "bun test --dots --watch"
   },
   "dependencies": {
