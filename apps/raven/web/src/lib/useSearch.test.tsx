@@ -67,6 +67,44 @@ describe('useAddressSearch', () => {
     await waitFor(() => expect(result.current.address).toBe('view=grid'))
   })
 
+  it.each(['bus', '   '])('cancels an unsubmitted draft %j when navigating home', (text) => {
+    const { result } = render('/')
+    act(() => {
+      result.current.search.setText(text)
+      result.current.navigate('/')
+    })
+    expect(result.current.search).toMatchObject({ text: '', query: '' })
+    expect(result.current.address).toBe('')
+  })
+
+  it('keeps a newer draft while an earlier query reaches the address', async () => {
+    const { result } = render('/')
+    act(() => result.current.search.setText('bus'))
+    act(() => {
+      result.current.search.searchNow()
+      result.current.search.setText('bust')
+    })
+    await waitFor(() => expect(result.current.address).toBe('q=bus'))
+    expect(result.current.search).toMatchObject({ text: 'bust', query: 'bus' })
+  })
+
+  it('keeps typed whitespace when its own settled query reaches the address', async () => {
+    const { result } = render('/')
+    act(() => result.current.search.setText(' bus '))
+    await waitFor(() => expect(result.current.address).toBe('q=bus'))
+    expect(result.current.search).toMatchObject({ text: ' bus ', query: 'bus' })
+  })
+
+  it('clears a new query when navigation home overtakes its pending address update', () => {
+    const { result } = render('/')
+    act(() => {
+      result.current.search.searchFor('bus')
+      result.current.navigate('/')
+    })
+    expect(result.current.search).toMatchObject({ text: '', query: '' })
+    expect(result.current.address).toBe('')
+  })
+
   it('takes the search from an address it did not write, as a link back to the page', () => {
     const { result } = render('/?q=heat')
     act(() => result.current.navigate('/'))

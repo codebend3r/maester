@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useDeferredValue, useEffect, useState } from 'react'
+import { useLocation, useSearchParams } from 'react-router-dom'
 
 /** How long a search box waits after the last keystroke before it searches. */
 export const SEARCH_DELAY_MS = 200
@@ -40,27 +40,33 @@ export type Search = ReturnType<typeof useSearch>
  */
 export const useAddressSearch = (): Search => {
   const [address, setAddress] = useSearchParams()
+  const { key } = useLocation()
   const asked = address.get('q') ?? ''
   const search = useSearch({ initial: asked })
   const { query, searchFor } = search
+  // Let a queued navigation commit before a local query can replace its address.
+  const deferredQuery = useDeferredValue(query)
 
   useEffect(() => {
+    if (deferredQuery !== query || deferredQuery === asked) return
     setAddress(
       (current) => {
         const next = new URLSearchParams(current)
-        if (query) next.set('q', query)
+        if (deferredQuery) next.set('q', deferredQuery)
         else next.delete('q')
         return next
       },
       { replace: true },
     )
-  }, [query, setAddress])
+  }, [asked, query, deferredQuery, setAddress])
 
-  // Only a change of address is news, and one the box wrote already matches its query.
-  const [heard, setHeard] = useState(asked)
-  if (asked !== heard) {
-    setHeard(asked)
-    if (asked !== query) searchFor(asked)
+  // Navigation can return to the same address before a pending query reaches it.
+  const [heard, setHeard] = useState({ key, asked })
+  const hasQueryChanged = asked !== heard.asked
+  if (key !== heard.key || hasQueryChanged) {
+    setHeard({ key, asked })
+    // A new address carrying the current query acknowledges our write, not a newer draft.
+    if (!hasQueryChanged || asked !== query) searchFor(asked)
   }
 
   return search
