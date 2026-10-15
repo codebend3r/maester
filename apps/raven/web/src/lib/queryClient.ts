@@ -77,6 +77,9 @@ export const queryKeys = {
   favourites: ['favourites'],
   /** What is in progress and each pinned library's newest arrivals. */
   home: ['home'],
+  /** A search from home, under home's key so whatever reads home again reads it again too. */
+  homeSearch: (query: string) => ['home', 'search', query],
+  homeSearches: ['home', 'search'],
   history: ({
     libraryId,
     show,

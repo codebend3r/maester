@@ -1,4 +1,11 @@
-import type { LibrarySettings, MediaItem, PosterEntry, ShowListing } from '@raven/core'
+import type {
+  HomeSearch,
+  HomeShelf,
+  LibrarySettings,
+  MediaItem,
+  PosterEntry,
+  ShowListing,
+} from '@raven/core'
 import { type Edit, edit, editAll } from '@/lib/optimistic'
 import {
   favouritesQuery,
@@ -44,7 +51,7 @@ export const withoutEntry = ({
 /**
  * A video marked or unmarked as a favourite wherever a heart or its menu
  * shows it: its own record, its library's listings, files not matched and
- * In progress, home, its item's page, and the favourites, which an unmarked
+ * In progress, home and its searches, its item's page, and the favourites, which an unmarked
  * one leaves. Its history, sagas and duplicates follow once read again.
  */
 export const favouriteEdits = ({
@@ -63,6 +70,13 @@ export const favouriteEdits = ({
       items: entries,
       matches: (entry) => isVideo(entry.media),
       change: (entry) => ({ ...entry, media: mark(entry.media) }),
+    })
+  const markShelves = (shelves: HomeShelf[]): HomeShelf[] =>
+    mapWhere({
+      items: shelves,
+      matches: (shelf) => shelf.type === 'media' && shelf.media.some(isVideo),
+      change: (shelf) =>
+        shelf.type === 'media' ? { ...shelf, media: markAll(shelf.media) } : shelf,
     })
   const favourites = (entries: PosterEntry[]): PosterEntry[] => {
     if (favourite) return markEntries(entries)
@@ -91,17 +105,13 @@ export const favouriteEdits = ({
       queryKey: homeQuery.queryKey,
       update: (home) => {
         const inProgress = markEntries(home.inProgress)
-        const shelves = mapWhere({
-          items: home.shelves,
-          matches: (shelf) => shelf.type === 'media' && shelf.media.some(isVideo),
-          change: (shelf) =>
-            shelf.type === 'media' ? { ...shelf, media: markAll(shelf.media) } : shelf,
-        })
+        const shelves = markShelves(home.shelves)
         return inProgress === home.inProgress && shelves === home.shelves
           ? home
           : { ...home, inProgress, shelves }
       },
     }),
+    editAll<HomeSearch>({ filters: { queryKey: queryKeys.homeSearches }, update: markShelves }),
     ...(media.item
       ? [
           edit({

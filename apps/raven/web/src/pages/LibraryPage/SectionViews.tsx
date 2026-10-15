@@ -196,7 +196,6 @@ const AllSection = ({ library }: { library: Library }) => {
       <LibraryToolbar
         name={library.name}
         search={view.search}
-        onSearch={view.setSearch}
         settings={settings}
         onChange={view.change}
         playable={queue.playable}

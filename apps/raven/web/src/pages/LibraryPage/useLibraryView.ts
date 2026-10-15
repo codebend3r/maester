@@ -7,14 +7,14 @@ import {
   isMediaGroupBy,
   isMediaSort,
 } from '@raven/core'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { librarySettingsEdits } from '@/lib/edits'
 import { afterLibraryView } from '@/lib/invalidate'
 import { useOptimisticMutation } from '@/lib/optimistic'
 import { mutationKeys } from '@/lib/queryClient'
-import { useDebouncedValue } from '@/lib/useDebouncedValue'
+import { useAddressSearch } from '@/lib/useSearch'
 
 /** A fresh deal for a random sort; the order holds while the page is open. */
 const dealSeed = (): number => Math.floor(Math.random() * 2 ** 31)
@@ -59,25 +59,10 @@ export const writeView = ({
 export const useLibraryView = ({ library }: { library: Library }) => {
   const queryClient = useQueryClient()
   const [address, setAddress] = useSearchParams()
-  const [search, setSearch] = useState(address.get('q') ?? '')
+  const search = useAddressSearch()
   const [seed] = useState(dealSeed)
-  const query = useDebouncedValue({ value: search.trim(), delayMs: 200 })
   // The address may ask for what the library's type cannot show; that is settled here, once.
   const settings = coherentSettings({ ...library.settings, ...viewFromUrl(address) })
-
-  // The search rides in the address once it settles, replacing rather than
-  // stacking history entries as the viewer types.
-  useEffect(() => {
-    setAddress(
-      (current) => {
-        const next = new URLSearchParams(current)
-        if (query) next.set('q', query)
-        else next.delete('q')
-        return next
-      },
-      { replace: true },
-    )
-  }, [query, setAddress])
 
   const save = useOptimisticMutation({
     mutationKey: mutationKeys.libraryView(library.id),
@@ -89,9 +74,8 @@ export const useLibraryView = ({ library }: { library: Library }) => {
   return {
     settings,
     search,
-    setSearch,
     /** The search once typing settles. */
-    query,
+    query: search.query,
     /** The random sort's deal; 0 for every other sort, so they share a cache entry. */
     seed: settings.sort === 'random' ? seed : 0,
     change: (change: LibraryViewChange) => {
