@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { type Home, type HomeSearch, mediaLabel } from '@raven/core'
 import { Link } from 'react-router-dom'
@@ -221,7 +221,9 @@ describe('HomePage', () => {
 
       await userEvent.type(searchbox(), 'bus')
       await screen.findByRole('heading', { name: 'Films' })
-      await userEvent.click(screen.getByRole('link', { name: 'Back home' }))
+      await act(async () => {
+        await userEvent.click(screen.getByRole('link', { name: 'Back home' }))
+      })
       await waitFor(() => expect(searchbox()).toHaveValue(''))
       expect(await screen.findByRole('heading', { name: 'Continue watching' })).toBeInTheDocument()
     })
