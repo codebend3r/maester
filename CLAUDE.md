@@ -6,8 +6,9 @@
 - Run tasks through Nx from the repo root: `bunx nx run @luwin/api:test`, `bunx nx run-many -t test`, `bun run verify`, `bun run affected`.
 - Never put a `.env` at the repo root; Nx loads it into every task. Each product reads its own beside its compose file.
 - Commits and PRs follow the `commit-format` and `pr-format` skills (`MAE:` prefix).
-- TypeScript only: no `.js`, `.jsx`, `.mjs` or `.cjs` files anywhere, config files included. The pre-commit hook and the `typescript-only` target (in `verify`, `affected` and the PR checks) reject them.
-- A `package.json` script runs one command. Steps become scripts of their own, chained with `bun run --sequential build:clean build:compile` (or `--parallel`), never with `&&`, `||` or `;`. The pre-commit hook and the `one-command-per-script` target (in `verify`, `affected` and the PR checks) reject a chained script.
+- lefthook's git hooks (`lefthook.yml`) run on every commit and push: pre-commit runs lint-staged (`lint-staged.config.ts`) to lint and format the staged files, and pre-push runs the checks `verify` runs, one at a time. Never skip them with `--no-verify` or `LEFTHOOK=0`; fix what they report.
+- TypeScript only: no `.js`, `.jsx`, `.mjs` or `.cjs` files anywhere, config files included. The pre-push hook and the `typescript-only` target (in `verify`, `affected` and the PR checks) reject them.
+- A `package.json` script runs one command. Steps become scripts of their own, chained with `bun run --sequential build:clean build:compile` (or `--parallel`), never with `&&`, `||` or `;`. The pre-push hook and the `one-command-per-script` target (in `verify`, `affected` and the PR checks) reject a chained script.
 - Every import of a project's own modules goes through its `@/` alias and names no extension: `@/lib/api`, never `./api`, `../lib/api` or `@/lib/api.js`. oxlint's `no-restricted-imports` fails on anything else. Non-TypeScript assets keep their extension (`@/components/Player/Player.module.scss`). Node needs relative `.js` paths at runtime, so the server and core builds run `tsc-alias` after `tsc` to rewrite the alias in `dist` only.
 - Writing: no em dashes or en dashes anywhere, including comments and UI copy.
 

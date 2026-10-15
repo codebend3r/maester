@@ -30,6 +30,7 @@
   },
   "devDependencies": {
     "lefthook": "2.1.15",
+    "lint-staged": "17.6.0",
     "nx": "23.2.1",
     "oxfmt": "0.68.0",
     "oxlint": "1.83.0"
