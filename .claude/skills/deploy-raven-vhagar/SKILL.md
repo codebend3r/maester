@@ -7,13 +7,14 @@ description: Use when deploying raven to Vhagar, the NAS it runs on: "deploy to 
 
 raven runs on Vhagar (`192.168.50.6`, the NAS with the Intel GPU) from `/volume1/docker/raven`: `docker-compose.yml` (a copy of `apps/raven/docker-compose.vhagar.yml`), `update.sh` (a copy of `apps/raven/vhagar-update.sh`), `.env` with the TMDB and OMDb keys, `data/` with the index, and `backups/`. When raven is public, `funnel/serve.json` (a copy of `apps/raven/vhagar-funnel.json`) and `tailscale/`, the sidecar's sign-in, sit there too.
 
-Every merge to `main` that changes raven's image publishes `ghcr.io/codebend3r/raven:latest`, `:<version>` (the merge's build, `X.Y.Z.N`, which raven's side menu shows) and `:<full commit sha>`. DSM's Task Scheduler runs `update.sh` as root every five minutes; it pulls `latest`, and when that is not the image raven runs, stops raven, copies `data/raven.db*` to `backups/<stamp>/`, and starts the new image. So after a merge, Vhagar follows on its own within about ten minutes.
+Every merge to `main` publishes `ghcr.io/codebend3r/raven:latest`, `:<version>` (the merge's build, `X.Y.Z.N`, which raven's side menu shows) and `:<full commit sha>`. DSM's Task Scheduler runs `update.sh` as root every five minutes; it pulls `latest`, and when that is not the image raven runs, stops raven, copies `data/raven.db*` to `backups/<stamp>/`, and starts the new image. So after a merge, Vhagar follows on its own within about ten minutes.
 
 ## Facts that cost a round trip each
 
 - `ssh vhagar` lands as `crivas`, who cannot talk to the docker socket, and `sudo -n` fails. The `synology-nas-ssh` skill's script runs root steps with the password from the Keychain: `~/.claude/skills/synology-nas-ssh/scripts/nas sudo vhagar '<command>'` and `... docker vhagar <args>`. Plain `ssh vhagar sudo ...` hangs on the prompt.
 - Vhagar's Docker Compose is 2.20.1. It cannot read `env_file: [{ path, required: false }]`, so the Vhagar compose uses plain `env_file: [.env]`, and `update.sh` touches an empty `.env` when none exists. Keep the real `.env` there; never overwrite it.
 - Files under `/volume1/docker/raven` are owned by `crivas`, so staging a file is `ssh vhagar 'cat > /volume1/docker/raven/<name>' < <local file>`. `scp` does not work on these boxes.
+- The DSM task is `Raven update`, id 2. `$nas sudo vhagar '/usr/syno/bin/synoschedtask --get id=2'` must say `Repeat every [5] min (s) until [23]:[55]`. It once said `until [0]:[30]`, so Vhagar updated only just after midnight and every merge looked undeployed. The fix, if it comes back, is `repeat min=5` and `last work hour=23` in `/usr/syno/etc/synoschedule.d/root/2.task`, then `/usr/syno/bin/synoschedtask --sync`, or the same in DSM's Task Scheduler.
 - `nas docker vhagar` takes one docker subcommand per call: `nas docker vhagar 'ps'`, not a chain with `;`.
 
 ## Check what is running
@@ -24,6 +25,7 @@ curl -s http://192.168.50.6:8484/api/health
 $nas docker vhagar 'inspect --format {{.Image}} raven'
 $nas docker vhagar 'image inspect --format {{.RepoDigests}} ghcr.io/codebend3r/raven:latest'
 ssh vhagar 'tail -n 20 /volume1/docker/raven/update.log'
+$nas sudo vhagar '/usr/syno/bin/synoschedtask --get id=2 | head -16'
 ```
 
 An `update.log` full of `✗ update failed on line <n>`, where line n is the `compose pull` (`grep -n 'compose pull' apps/raven/vhagar-update.sh`), means the pull is failing: either the compose points at an image that is not on GHCR (a hand-loaded tag), or the GHCR package is private. Check the manifest without credentials:
