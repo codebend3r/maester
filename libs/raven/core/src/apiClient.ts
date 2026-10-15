@@ -9,6 +9,7 @@ import {
   type FavouriteChange,
   type HistoryEntry,
   type Home,
+  type HomeSearch,
   type ImageChoice,
   type ImageOption,
   type ItemDetails,
@@ -51,6 +52,7 @@ import {
   isDuplicates,
   isHistory,
   isHome,
+  isHomeSearch,
   isItemDetails,
   isItemImageOptions,
   isItemMetadataState,
@@ -456,6 +458,13 @@ export const createApiClient = ({
 
     /** Every video in progress, then each pinned library's newest arrivals; libraries still locked stay out. */
     getHome: (): Promise<Home> => expect({ request: send({ path: '/api/home' }), guard: isHome }),
+
+    /** What `query` finds in every library, a row for each holding a match; libraries still locked stay out. */
+    searchHome: (query: string): Promise<HomeSearch> =>
+      expect({
+        request: send({ path: `/api/home/search?${toQueryString({ q: query.trim() })}` }),
+        guard: isHomeSearch,
+      }),
 
     /** Notes that a video started playing, for its library's history. */
     recordPlay: async (id: number): Promise<void> => {

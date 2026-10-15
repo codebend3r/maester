@@ -443,6 +443,12 @@ export const isMediaItem = object({
    * for anything but a movie.
    */
   variant: nullable(isString),
+  /**
+   * Which of its movie's cards in its library it sits on once split apart,
+   * the same for every file on that card; null on the movie's own card, and
+   * for anything but a movie.
+   */
+  card: nullable(isString),
 })
 
 export type MediaItem = Infer<typeof isMediaItem>
@@ -581,9 +587,9 @@ export const isShowListing = object({
 export type ShowListing = Infer<typeof isShowListing>
 
 /**
- * A pinned library's row on the home page: its newest arrivals, newest
- * first. A TV shows library gives its shows, by when each one's newest
- * episode came; any other library gives its videos.
+ * A library's row on the home page: a pinned library's newest arrivals,
+ * newest first, or what a search found in it, by title. A TV shows library
+ * gives its shows; any other library gives its videos.
  */
 export const isHomeShelf = union(
   object({ libraryId: isNumber, type: oneOf(['shows']), shows: listOf(isShowEntry) }),
@@ -707,6 +713,14 @@ export const isHome = object({
 })
 
 export type Home = Infer<typeof isHome>
+
+/**
+ * `GET /api/home/search?q=`: a row for each library holding a match, as the
+ * side menu orders them, and none for a library with nothing that matches.
+ */
+export const isHomeSearch = listOf(isHomeShelf)
+
+export type HomeSearch = Infer<typeof isHomeSearch>
 
 /** A person's page: who they are, and everything in raven they are credited on. */
 export const isPersonDetails = object({

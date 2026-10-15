@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'bun:test'
-import { cardLink, episodeBackPath, itemPath, readWatchState, watchLink } from '@/lib/itemLinks'
+import {
+  cardLink,
+  episodeBackPath,
+  inLibrary,
+  itemPath,
+  libraryFiles,
+  queryId,
+  readWatchState,
+  watchLink,
+} from '@/lib/itemLinks'
 import { itemSummary, mediaItem } from '@/test/fixtures'
 
 describe('itemPath', () => {
@@ -56,15 +65,101 @@ describe('cardLink', () => {
   it("opens a matched movie's page, naming the file when the movie was split onto several cards", () => {
     const item = itemSummary({ id: 4, type: 'movie' })
     expect(cardLink({ media: mediaItem({ id: 9, item }), pages: true })).toEqual({
-      to: '/movies/4',
+      to: '/movies/4?library=2',
     })
     expect(
       cardLink({ media: mediaItem({ id: 9, item, variant: 'Final Cut' }), pages: true }),
-    ).toEqual({ to: '/movies/4?file=9' })
+    ).toEqual({ to: '/movies/4?library=2&file=9' })
+  })
+
+  it("opens the page as the card's own library shows it", () => {
+    const media = mediaItem({ id: 9, libraryId: 5, item: itemSummary({ id: 4, type: 'movie' }) })
+    expect(cardLink({ media, pages: true })).toEqual({ to: '/movies/4?library=5' })
   })
 
   it('plays a file straight away where the library has no pages', () => {
     const media = mediaItem({ id: 9, item: itemSummary({ id: 4, type: 'movie' }) })
     expect(cardLink({ media, pages: false })).toEqual(watchLink({ media }))
+  })
+})
+
+describe('inLibrary', () => {
+  it('names the library, and the file Play starts where there is one', () => {
+    expect(inLibrary({ page: '/movies/4', libraryId: 3 })).toBe('/movies/4?library=3')
+    expect(inLibrary({ page: '/movies/4', libraryId: 3, file: 9 })).toBe(
+      '/movies/4?library=3&file=9',
+    )
+  })
+})
+
+describe('queryId', () => {
+  it('reads a whole number, and nothing else', () => {
+    expect(queryId('12')).toBe(12)
+    expect(queryId(null)).toBeNull()
+    expect(queryId('')).toBeNull()
+    expect(queryId('1.5')).toBeNull()
+    expect(queryId('four')).toBeNull()
+  })
+})
+
+describe('libraryFiles', () => {
+  const uhd = mediaItem({ id: 8, libraryId: 2 })
+  const uhdToo = mediaItem({ id: 6, libraryId: 2 })
+  const hd = mediaItem({ id: 7, libraryId: 3 })
+  const versions = [uhd, uhdToo, hd]
+
+  it("keeps to the library named, starting the file named where it is that library's", () => {
+    expect(libraryFiles({ versions, library: 3, file: null })).toEqual({
+      versions: [hd],
+      everyCard: [hd],
+      primary: hd,
+    })
+    expect(libraryFiles({ versions, library: 2, file: 6 })).toEqual({
+      versions: [uhd, uhdToo],
+      everyCard: [uhd, uhdToo],
+      primary: uhdToo,
+    })
+    expect(libraryFiles({ versions, library: 2, file: 7 })).toEqual({
+      versions: [uhd, uhdToo],
+      everyCard: [uhd, uhdToo],
+      primary: uhd,
+    })
+  })
+
+  it("takes the named file's library, else the library of the file Play would start", () => {
+    expect(libraryFiles({ versions, library: null, file: 7 })?.versions).toEqual([hd])
+    expect(libraryFiles({ versions, library: 9, file: null })?.versions).toEqual([uhd, uhdToo])
+    const resumed = mediaItem({ id: 7, libraryId: 3, position: 60 })
+    expect(libraryFiles({ versions: [uhd, resumed], library: null, file: null })?.versions).toEqual(
+      [resumed],
+    )
+  })
+
+  it("keeps to one card of a split movie: the named file's, else the movie's own", () => {
+    const own = mediaItem({ id: 1, libraryId: 2 })
+    const ownToo = mediaItem({ id: 2, libraryId: 2 })
+    const cut = mediaItem({ id: 3, libraryId: 2, card: 'cut:Final Cut', variant: 'Final Cut' })
+    const split = [own, ownToo, cut]
+    expect(libraryFiles({ versions: split, library: 2, file: 3 })).toEqual({
+      versions: [cut],
+      everyCard: split,
+      primary: cut,
+    })
+    expect(libraryFiles({ versions: split, library: 2, file: null })?.versions).toEqual([
+      own,
+      ownToo,
+    ])
+  })
+
+  it('takes the card of the file Play would start once every file has a card of its own', () => {
+    const apart = [
+      mediaItem({ id: 1, libraryId: 2, card: 'file:1', size: 1 }),
+      mediaItem({ id: 2, libraryId: 2, card: 'file:2', size: 1, position: 60 }),
+    ]
+    expect(libraryFiles({ versions: apart, library: 2, file: null })?.versions).toEqual([apart[1]])
+  })
+
+  it('has nothing to show without files', () => {
+    expect(libraryFiles({ versions: [], library: 2, file: null })).toBeNull()
   })
 })

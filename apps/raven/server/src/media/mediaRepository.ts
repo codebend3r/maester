@@ -138,6 +138,7 @@ const toItem = (row: MediaRow): MediaItem => ({
   item: null,
   versions: row.versions,
   variant: variantOf(row),
+  card: row.item_type === 'movie' ? row.split : null,
 })
 
 /** A show in a TV library's listing, before its next episode is looked up. */

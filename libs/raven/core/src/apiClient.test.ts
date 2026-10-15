@@ -10,6 +10,7 @@ import {
 } from '@/apiClient'
 import {
   DEFAULT_SAGA_BACKDROP,
+  type HomeShelf,
   type ItemImageOptions,
   type ItemMetadataState,
   type MediaTracks,
@@ -172,6 +173,13 @@ describe('createApiClient', () => {
     const { client, calls } = clientReturning(respond({ body: [entry] }))
     await expect(client.listFavourites()).resolves.toEqual([entry])
     expect(calls[0]?.url).toBe('http://nas:8484/api/favourites')
+  })
+
+  it('searches every library from home, a row for each holding a match', async () => {
+    const shelf: HomeShelf = { libraryId: 3, type: 'media', media: [mediaItem()] }
+    const { client, calls } = clientReturning(respond({ body: [shelf] }))
+    await expect(client.searchHome(' heat ')).resolves.toEqual([shelf])
+    expect(calls[0]?.url).toBe('http://nas:8484/api/home/search?q=heat')
   })
 
   it("asks for a library's videos in progress, favourites, sagas and files not matched", async () => {

@@ -130,7 +130,7 @@ describe('the Duplicates tab', () => {
     expect(within(movie('Alexander')).getByText('2004 · 3 files')).toBeInTheDocument()
     expect(within(movie('Alexander')).getByRole('link', { name: 'Alexander' })).toHaveAttribute(
       'href',
-      '/movies/40',
+      '/movies/40?library=2',
     )
     expect(
       within(movie('Alexander')).queryByRole('button', { name: 'Put back together' }),
@@ -211,7 +211,7 @@ describe('the Duplicates tab', () => {
     ).toEqual(['Alexander', 'Alexander (Revisited the Final Cut)'])
     expect(
       within(cards).getByRole('link', { name: 'Alexander (Revisited the Final Cut)' }),
-    ).toHaveAttribute('href', '/movies/40?file=5')
+    ).toHaveAttribute('href', '/movies/40?library=2&file=5')
     expect(within(movie('Alexander')).getByText('2004 · 3 files · 2 cards')).toBeInTheDocument()
     // The movie's own card still holds two copies, so it can be split again; the Final Cut cannot.
     expect(within(cards).getAllByRole('button', { name: 'Split apart' })).toHaveLength(1)

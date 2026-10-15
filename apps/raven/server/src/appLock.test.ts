@@ -261,6 +261,14 @@ describe('a library locked behind the PIN', () => {
     expect(await home()).toEqual({ inProgress: [], shelves: [state.open] })
   })
 
+  it('keeps a locked library out of a search from home until it is unlocked', async () => {
+    const { cookie } = await unlock('3001')
+    const found = async (holding?: string) =>
+      (await api(holding).searchHome('e')).map((shelf) => shelf.libraryId)
+    expect(await found(cookie)).toEqual([state.open, state.private])
+    expect(await found()).toEqual([state.open])
+  })
+
   it('stays locked whatever its type', async () => {
     const { cookie } = await unlock('3001')
     const { name, paths } = await api(cookie).getLibrary(state.private)

@@ -27,7 +27,7 @@ describe('FavouritesPage', () => {
     renderWithProviders(<FavouritesPage />)
     expect(await screen.findByRole('link', { name: 'Busboys' })).toHaveAttribute(
       'href',
-      '/movies/40',
+      '/movies/40?library=2',
     )
     expect(screen.getByRole('link', { name: 'Play Busboys' })).toHaveAttribute('href', '/watch/7')
     spy.mockRestore()
@@ -40,7 +40,7 @@ describe('FavouritesPage', () => {
     const { container } = renderWithProviders(<FavouritesPage />)
     expect(await screen.findByRole('link', { name: mediaLabel(EPISODE_TWO) })).toHaveAttribute(
       'href',
-      '/episodes/7',
+      '/episodes/7?library=2',
     )
     expect(container.querySelector('img')?.getAttribute('src')).toContain(
       '/api/items/5/images/poster',

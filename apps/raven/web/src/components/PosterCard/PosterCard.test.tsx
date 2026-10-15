@@ -68,7 +68,10 @@ describe('PosterCard', () => {
 
   it("opens a matched movie's page, plays from its button, and shows the year", () => {
     renderWithProviders(<PosterCard sizes={POSTER_SIZES.grid} media={matchedMovie()} />)
-    expect(screen.getByRole('link', { name: 'Busboys' })).toHaveAttribute('href', '/movies/40')
+    expect(screen.getByRole('link', { name: 'Busboys' })).toHaveAttribute(
+      'href',
+      '/movies/40?library=2',
+    )
     expect(screen.getByRole('link', { name: 'Play Busboys' })).toHaveAttribute('href', '/watch/7')
     expect(screen.getByText('2026')).toBeInTheDocument()
   })

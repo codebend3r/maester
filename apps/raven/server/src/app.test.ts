@@ -135,6 +135,7 @@ describe('the media server', () => {
           { method: 'PUT', url: `/api/media/${id}/favourite`, payload: { favourite: true } },
           { method: 'GET', url: '/api/favourites' },
           { method: 'GET', url: '/api/home' },
+          { method: 'GET', url: '/api/home/search?q=buck' },
         ].map(async ({ method, url, payload }) => {
           const response = await app().inject({
             method: isRouteMethod(method) ? method : 'GET',
@@ -576,6 +577,30 @@ describe('the media server', () => {
           await api().saveProgress({ id, position: 0 })
         }
         expect((await api().getHome()).inProgress).toEqual([])
+      })
+
+      it('searches every library, pinned or not, by title, leaving out those with no match', async () => {
+        const input = { name: 'Everything', paths: paths() }
+        await api().updateLibrary({
+          id: library.id,
+          input: { ...input, settings: { pinned: false } },
+        })
+        try {
+          expect(await api().searchHome('buck')).toEqual([
+            {
+              libraryId: library.id,
+              type: 'media',
+              media: await api().listMedia({ libraryId: library.id, search: 'buck' }),
+            },
+          ])
+          expect(await api().searchHome('nothing by this name')).toEqual([])
+          expect(await api().searchHome('  ')).toEqual([])
+        } finally {
+          await api().updateLibrary({
+            id: library.id,
+            input: { ...input, settings: { pinned: true } },
+          })
+        }
       })
 
       it('leaves out a library that is not pinned', async () => {
