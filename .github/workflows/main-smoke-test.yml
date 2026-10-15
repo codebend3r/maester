@@ -135,45 +135,22 @@ jobs:
       IMAGE: raven:ci
       PUBLISHED: ghcr.io/${{ github.repository_owner }}/raven
       VERSION: ${{ needs.version.outputs.version }}
+    # Every build is published, even one whose merge left raven's code alone:
+    # the image carries the build's version, which raven's side menu shows, so
+    # each tag reaches Vhagar.
     steps:
-      - name: 📥 Checkout
-        uses: actions/checkout@v7
-
-      # Only what goes into the image counts: the paths
-      # apps/raven/Dockerfile.dockerignore lets through, read from its `!` lines
-      # so the two never disagree, and the Dockerfile itself. A docs or luwin
-      # merge then leaves Vhagar's raven running as it is.
-      - name: 🔎 Check whether raven's image changed
-        id: changed
-        env:
-          BEFORE: ${{ github.event.before }}
-          IGNORE_FILE: apps/raven/Dockerfile.dockerignore
-        run: |
-          mapfile -t inputs < <(sed -n 's/^!//p' "$IGNORE_FILE")
-          if git fetch --no-tags --depth=1 origin "$BEFORE" 2>/dev/null &&
-            git diff --quiet "$BEFORE" HEAD -- "${inputs[@]}" \
-              apps/raven/Dockerfile "$IGNORE_FILE"; then
-            echo "Nothing that goes into raven's image changed; not publishing."
-            echo "publish=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "publish=true" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: 📥 Download raven's image
-        if: steps.changed.outputs.publish == 'true'
         uses: actions/download-artifact@v8
         with:
           name: raven-image
 
       - name: 🐳 Load image
-        if: steps.changed.outputs.publish == 'true'
         run: docker load -i raven-image.tar.gz
 
       # Vhagar pulls :latest every few minutes and restarts raven on a new one
       # (apps/raven/vhagar-update.sh). The version and commit tags keep every
       # build to go back to.
       - name: 📦 Publish to GHCR
-        if: steps.changed.outputs.publish == 'true'
         env:
           TOKEN: ${{ github.token }}
         run: |

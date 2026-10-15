@@ -26,12 +26,12 @@ raven runs on Vhagar, the NAS with an Intel GPU, from `docker-compose.vhagar.yml
 
 Merges to `main` deploy themselves:
 
-1. The main smoke test builds the image, checks `/api/health`, and, when the merge changed anything that goes into the image, pushes it to `ghcr.io/codebend3r/raven` as `latest` and as the commit.
+1. The main smoke test builds the image with the merge's build version (`X.Y.Z.N`, the tag it gets), checks `/api/health`, and pushes it to `ghcr.io/codebend3r/raven` as `latest`, as the version and as the commit. Every merge publishes, even one that left raven's code alone, since the version it carries is the one raven's side menu shows.
 2. On Vhagar, DSM's Task Scheduler runs `vhagar-update.sh` (there as `update.sh`) as root every five minutes. It pulls `latest`, and when that is not the image raven runs, stops raven, copies `data/raven.db*` to `backups/<time>/` (the last five are kept), and starts the new image. It writes what it did to `update.log`.
 
 Nothing on Vhagar takes instructions from GitHub, and GitHub holds no NAS credentials: Vhagar only pulls a public image.
 
-To set the task up, in DSM: **Control Panel → Task Scheduler → Create → Scheduled Task → User-defined script**. Name it `raven update` and run it as `root`; on **Schedule**, run daily, every 5 minutes, from 00:00 to 23:55; on **Task Settings**, the script is `bash /volume1/docker/raven/update.sh`. DSM asks for your password, as it does for every task that runs as root.
+To set the task up, in DSM: **Control Panel → Task Scheduler → Create → Scheduled Task → User-defined script**. Name it `raven update` and run it as `root`; on **Schedule**, run daily, every 5 minutes, from 00:00 to a last run time of 23:55 (left at 00:00, it runs only just after midnight); on **Task Settings**, the script is `bash /volume1/docker/raven/update.sh`. DSM asks for your password, as it does for every task that runs as root.
 
 To go back to an earlier build, set `image:` to `ghcr.io/codebend3r/raven:<commit>` and run `update.sh`; put `latest` back to follow `main` again. A backup's files go back into `data/` with raven stopped.
 
