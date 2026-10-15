@@ -406,7 +406,7 @@ shows.
 - **Migrations:** the transcoding spec's S1 (`probe_version`) also appends
   one. Whichever lands second goes after the other, and a migration that
   has shipped is never edited or reordered.
-- **`@raven/ui` extraction** (desktop step 3): it moves `LibraryDialog`,
+- **`@raven/ui` extraction** (desktop step D1): it moves `LibraryDialog`,
   `FixMatchDialog` and `SectionViews`. Steps 2, 3 and 5 either land before
   it or rebase onto it.
 - **`librarySections.ts`:** the desktop spec moves it into
