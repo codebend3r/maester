@@ -6,7 +6,6 @@ import {
   mediaLabel,
 } from '@raven/core'
 import { type SyntheticEvent, useEffect, useEffectEvent, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { Button, ButtonLink } from '@/components/Button/Button'
 import { Bezel } from '@/components/Player/Bezel'
 import { Controls } from '@/components/Player/Controls'
@@ -38,7 +37,8 @@ export type StageProps = {
   media: MediaItem
   /** What plays after this video ends, in turn. */
   upNext: readonly MediaItem[]
-  backTo: string
+  /** Leaves the player, for the page that opened it. */
+  onBack: () => void
   mode: PlaybackMode
   selection: TrackSelection
   onFailure: (message: string) => void
@@ -50,8 +50,7 @@ export type StageProps = {
  * ahead of the file, and `shift` takes that off wherever the element's
  * clock is read or set.
  */
-export const Stage = ({ media, upNext, backTo, mode, selection, onFailure }: StageProps) => {
-  const navigate = useNavigate()
+export const Stage = ({ media, upNext, onBack, mode, selection, onFailure }: StageProps) => {
   // "The Matrix (1999)", or "Severance · S01E02 · Half Loop", once matched.
   const label = mediaLabel(media)
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -133,7 +132,7 @@ export const Stage = ({ media, upNext, backTo, mode, selection, onFailure }: Sta
     overlay,
     setOverlay,
     closeMenu,
-    leave: () => navigate(backTo),
+    leave: onBack,
   })
 
   const onKey = useEffectEvent((event: KeyboardEvent) => {
@@ -213,7 +212,7 @@ export const Stage = ({ media, upNext, backTo, mode, selection, onFailure }: Sta
           .filter(Boolean)
           .join(' ')}
       >
-        <ButtonLink to={backTo} icon="back" aria-label="Back to library" className={styles.back} />
+        <Button icon="back" aria-label="Back" className={styles.back} onClick={onBack} />
         <h1 className={styles.title}>{label}</h1>
         {nextLink && (
           <ButtonLink

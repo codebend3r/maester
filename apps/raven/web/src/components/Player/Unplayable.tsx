@@ -1,6 +1,6 @@
 import { type MediaItem, mediaLabel } from '@raven/core'
 import { useState } from 'react'
-import { Button, ButtonLink } from '@/components/Button/Button'
+import { Button } from '@/components/Button/Button'
 import styles from '@/components/Player/Player.module.scss'
 import { api } from '@/lib/api'
 
@@ -13,12 +13,13 @@ import { api } from '@/lib/api'
 export const Unplayable = ({
   media,
   problems,
-  backTo,
+  onBack,
   onTryAnyway,
 }: {
   media: MediaItem
   problems: string[]
-  backTo: string
+  /** Leaves the player, for the page that opened it. */
+  onBack: () => void
   onTryAnyway: (() => void) | null
 }) => {
   const [copied, setCopied] = useState<string | null>(null)
@@ -36,9 +37,9 @@ export const Unplayable = ({
     <section className={styles.unplayable} aria-labelledby="unplayable-title">
       {!!thumbnail && <img className={styles.backdrop} src={thumbnail} alt="" aria-hidden="true" />}
       <div className={styles.panel}>
-        <ButtonLink to={backTo} icon="back" className={styles.panelBack}>
-          Library
-        </ButtonLink>
+        <Button icon="back" className={styles.panelBack} onClick={onBack}>
+          Back
+        </Button>
         <h1 id="unplayable-title" className={styles.panelTitle}>
           {mediaLabel(media)}
         </h1>

@@ -316,3 +316,42 @@ describe('the player controls', () => {
     expect(screen.queryByRole('button', { name: 'Try playing anyway' })).toBeNull()
   })
 })
+
+describe('the player’s Back', () => {
+  beforeEach(() => {
+    setBrowserSupport((mime) => !mime.startsWith('video/x-matroska'))
+    stubTracks()
+  })
+
+  const app = (media = mediaItem({ container: 'mp4' })) => (
+    <Routes>
+      <Route path="movies/3" element={<p>The movie</p>} />
+      <Route path="libraries/2" element={<p>The library</p>} />
+      <Route path="watch/7" element={<Player media={media} upNext={[]} backTo="/libraries/2" />} />
+    </Routes>
+  )
+
+  it('goes back to the page that opened the player', async () => {
+    renderWithProviders(app(), { route: '/watch/7', behind: ['/libraries/2', '/movies/3'] })
+    await userEvent.click(screen.getByRole('button', { name: 'Back' }))
+    expect(await screen.findByText('The movie')).toBeInTheDocument()
+  })
+
+  it('goes back there on Escape too', async () => {
+    renderWithProviders(app(), { route: '/watch/7', behind: ['/movies/3'] })
+    press('Escape')
+    expect(await screen.findByText('The movie')).toBeInTheDocument()
+  })
+
+  it('goes back there from a video that cannot play', async () => {
+    renderWithProviders(app(mediaItem()), { route: '/watch/7', behind: ['/movies/3'] })
+    await userEvent.click(screen.getByRole('button', { name: 'Back' }))
+    expect(await screen.findByText('The movie')).toBeInTheDocument()
+  })
+
+  it('goes to the library when the player was opened straight from its address', async () => {
+    renderWithProviders(app(), { route: '/watch/7' })
+    await userEvent.click(screen.getByRole('button', { name: 'Back' }))
+    expect(await screen.findByText('The library')).toBeInTheDocument()
+  })
+})
