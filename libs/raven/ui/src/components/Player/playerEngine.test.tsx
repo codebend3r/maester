@@ -10,7 +10,7 @@ import type { TrackSelection } from '@/components/Player/useTrackSelection'
 import { useHtmlEngine } from '@/components/Player/useHtmlEngine'
 import { initialVideoState, videoReducer } from '@/components/Player/useVideoState'
 import { useWatchProgress } from '@/components/Player/useWatchProgress'
-import { api } from '@/lib/api'
+import { api } from '@/test/api'
 import { renderWithProviders } from '@/test/render'
 
 const servicesFor = (): PlayerServices => ({

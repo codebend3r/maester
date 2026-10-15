@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { Library } from '@raven/core'
-import { Button } from '@/components/Button/Button'
+import { Button } from '@raven/ui'
 import { LibraryActions, type useLibraryActions } from '@/components/LibraryActions/LibraryActions'
 import { LibraryIcon } from '@/components/LibraryIcon/LibraryIcon'
 import { ScanStatus } from '@/components/ScanStatus/ScanStatus'

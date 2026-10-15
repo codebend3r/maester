@@ -1,6 +1,6 @@
 import { type Review, timeAgo } from '@raven/core'
 import { useEffect, useId, useRef, useState } from 'react'
-import { Button } from '@/components/Button/Button'
+import { Button } from '@raven/ui'
 import { api } from '@/lib/api'
 import styles from '@/components/ReviewCards/ReviewCards.module.scss'
 

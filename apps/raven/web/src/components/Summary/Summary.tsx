@@ -1,5 +1,5 @@
 import { useId, useState } from 'react'
-import { Button } from '@/components/Button/Button'
+import { Button } from '@raven/ui'
 import styles from '@/components/Summary/Summary.module.scss'
 
 /** A summary longer than this gets clamped to three lines with More. */

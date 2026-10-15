@@ -1,6 +1,6 @@
 import { queryOptions } from '@tanstack/react-query'
 import type { ApiClient } from '@raven/core'
-import { queryKeys } from '@/lib/queryClient'
+import { playerQueryKeys as queryKeys } from '@/lib/playerQueryKeys'
 
 export const playerQueriesFor = (api: ApiClient) => ({
   tracks: (id: number) =>

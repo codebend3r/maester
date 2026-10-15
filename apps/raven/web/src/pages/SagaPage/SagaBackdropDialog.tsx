@@ -8,7 +8,7 @@ import {
   sagaPictures,
 } from '@raven/core'
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react'
-import { Button } from '@/components/Button/Button'
+import { Button } from '@raven/ui'
 import { api } from '@/lib/api'
 import { afterSagaBackdrop } from '@/lib/invalidate'
 import styles from '@/pages/SagaPage/SagaBackdropDialog.module.scss'

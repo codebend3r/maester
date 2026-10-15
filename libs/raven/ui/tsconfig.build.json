@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "rootDir": "./src",
+    "outDir": "./dist"
+  },
+  "include": ["src", "../../../tooling/web/assets.d.ts"],
+  "exclude": [
+    "src/styles.ts",
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "src/test/**",
+    "src/test-setup.ts"
+  ],
+  "tsc-alias": { "resolveFullPaths": true }
+}

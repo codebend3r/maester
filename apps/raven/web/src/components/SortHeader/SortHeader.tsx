@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Icon } from '@/components/Icon/Icon'
+import { Icon } from '@raven/ui'
 import styles from '@/components/SortHeader/SortHeader.module.scss'
 
 /** A column header that sorts the table on a click; `aria-sort` says which way it points. */

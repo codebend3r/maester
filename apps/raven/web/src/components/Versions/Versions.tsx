@@ -1,7 +1,7 @@
 import type { Library, MediaItem } from '@raven/core'
 import { useId } from 'react'
 import { Link } from 'react-router-dom'
-import { Icon } from '@/components/Icon/Icon'
+import { Icon } from '@raven/ui'
 import { versionFacts } from '@/lib/itemFacts'
 import styles from '@/components/Versions/Versions.module.scss'
 

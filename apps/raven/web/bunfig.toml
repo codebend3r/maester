@@ -11,7 +11,7 @@ preload = [
   "./src/test-setup.ts",
 ]
 # Coverage counts raven web's own source: not the tests, the test harness,
-# the shared loader, or @raven/core's built dist, which core's own tests cover.
+# the shared loader, or built libraries, which their own tests cover.
 coverageSkipTestFiles = true
 coveragePathIgnorePatterns = [
   "src/test/**",

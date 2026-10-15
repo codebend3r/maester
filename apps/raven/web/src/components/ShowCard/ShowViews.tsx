@@ -8,7 +8,7 @@ import {
 } from '@raven/core'
 import { useState } from 'react'
 import { CardLink } from '@/components/CardLink/CardLink'
-import { Icon } from '@/components/Icon/Icon'
+import { Icon } from '@raven/ui'
 import { RatingChips, ScoreChip } from '@/components/RatingChips/RatingChips'
 import { SortHeader } from '@/components/SortHeader/SortHeader'
 import { showYears } from '@/lib/itemLinks'

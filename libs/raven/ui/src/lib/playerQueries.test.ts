@@ -1,8 +1,8 @@
 import { describe, expect, it, mock } from 'bun:test'
 import { QueryClient } from '@tanstack/react-query'
-import { api } from '@/lib/api'
+import { api } from '@/test/api'
 import { playerQueriesFor } from '@/lib/playerQueries'
-import { queryKeys } from '@/lib/queryClient'
+import { playerQueryKeys as queryKeys } from '@/lib/playerQueryKeys'
 import { DEFAULT_PLAYBACK_STATE } from '@/test/render'
 
 describe('playerQueriesFor', () => {

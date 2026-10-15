@@ -16,9 +16,8 @@ import {
   useState,
 } from 'react'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
-import { Button } from '@/components/Button/Button'
+import { Button, Icon, type IconName } from '@raven/ui'
 import { FixMatchDialog } from '@/components/FixMatchDialog/FixMatchDialog'
-import { Icon, type IconName } from '@/components/Icon/Icon'
 import { ImageEditorDialog } from '@/components/ImageEditor/ImageEditorDialog'
 import { api } from '@/lib/api'
 import { copyText } from '@/lib/clipboard'

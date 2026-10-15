@@ -1,5 +1,4 @@
-import { Button } from '@/components/Button/Button'
-import { Icon } from '@/components/Icon/Icon'
+import { Button, Icon } from '@raven/ui'
 import { useUnlockPrompt } from '@/stores/unlockPrompt'
 import styles from '@/components/LockedLibrary/LockedLibrary.module.scss'
 

@@ -1,0 +1,15 @@
+[test]
+# Register the DOM and missing media globals before components or Testing Library.
+preload = [
+  "./src/test/happy-dom.ts",
+  "./src/test/mediaError.ts",
+  "../../../tooling/web/scss-modules.ts",
+  "./src/test-setup.ts",
+]
+coverageSkipTestFiles = true
+coveragePathIgnorePatterns = [
+  "src/test/**",
+  "src/test-setup.ts",
+  "../../../tooling/**",
+  "../core/**",
+]

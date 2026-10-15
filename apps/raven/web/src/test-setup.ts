@@ -1,7 +1,7 @@
 import { afterEach } from 'bun:test'
 import { cleanup } from '@testing-library/react'
 import '@testing-library/jest-dom'
-import { usePlayerPrefs } from '@/stores/playerPrefs'
+import { usePlayerPrefs } from '@raven/ui'
 import { useSideMenu } from '@/stores/sideMenu'
 import { useUnlockPrompt } from '@/stores/unlockPrompt'
 import { resetBrowserSupport } from '@/test/canPlay'

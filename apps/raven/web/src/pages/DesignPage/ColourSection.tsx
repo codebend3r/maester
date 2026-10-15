@@ -1,15 +1,15 @@
-import { type DesignToken, contrastRatio } from '@/lib/tokens'
+import { type DesignToken, contrastRatio } from '@raven/ui'
 import { DesignSection } from '@/pages/DesignPage/DesignSection'
 import styles from '@/pages/DesignPage/DesignPage.module.scss'
 
 /** The grounds text sits on, which every swatch is measured against. */
-const GROUNDS = ['--color-night', '--color-canopy']
+const GROUNDS = new Set(['--color-night', '--color-canopy'])
 
 const ratio = new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 })
 
 export const ColourSection = ({ tokens }: { tokens: readonly DesignToken[] }) => {
   const colours = tokens.filter((token) => token.group === 'colour')
-  const grounds = colours.filter((token) => GROUNDS.includes(token.name))
+  const grounds = colours.filter((token) => GROUNDS.has(token.name))
   return (
     <DesignSection
       id="colour"

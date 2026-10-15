@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react'
-import type { DesignToken, TokenGroup } from '@/lib/tokens'
+import type { DesignToken, TokenGroup } from '@raven/ui'
 import { DesignSection, Specimen } from '@/pages/DesignPage/DesignSection'
 import styles from '@/pages/DesignPage/DesignPage.module.scss'
 

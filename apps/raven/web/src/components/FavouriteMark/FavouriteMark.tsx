@@ -1,5 +1,5 @@
 import type { MediaItem } from '@raven/core'
-import { Icon } from '@/components/Icon/Icon'
+import { Icon } from '@raven/ui'
 import styles from '@/components/FavouriteMark/FavouriteMark.module.scss'
 
 /** The heart beside a favourite's facts; nothing for any other video. */

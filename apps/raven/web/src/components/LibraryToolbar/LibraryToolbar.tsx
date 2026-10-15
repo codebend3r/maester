@@ -17,8 +17,8 @@ import {
   viewsFor,
 } from '@raven/core'
 import { useId } from 'react'
-import { Button } from '@/components/Button/Button'
-import type { IconName } from '@/components/Icon/Icon'
+import { Button } from '@raven/ui'
+import type { IconName } from '@raven/ui'
 import { SearchField } from '@/components/SearchField/SearchField'
 import type { Search } from '@/lib/useSearch'
 import styles from '@/components/LibraryToolbar/LibraryToolbar.module.scss'

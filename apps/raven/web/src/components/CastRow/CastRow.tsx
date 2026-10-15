@@ -1,7 +1,7 @@
 import type { Credit, CreditJob } from '@raven/core'
 import { useId, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { Button } from '@/components/Button/Button'
+import { Button } from '@raven/ui'
 import { api } from '@/lib/api'
 import styles from '@/components/CastRow/CastRow.module.scss'
 

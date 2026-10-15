@@ -1,4 +1,4 @@
-import { designTokens } from '@/styles/designTokens'
+import { designTokens } from '@raven/ui/designTokens'
 import { ColourSection } from '@/pages/DesignPage/ColourSection'
 import { ComponentsSection } from '@/pages/DesignPage/ComponentsSection'
 import { ContentSection } from '@/pages/DesignPage/ContentSection'

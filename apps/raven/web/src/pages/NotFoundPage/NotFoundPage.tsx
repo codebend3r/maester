@@ -1,4 +1,4 @@
-import { ButtonLink } from '@/components/Button/Button'
+import { ButtonLink } from '@raven/ui'
 import styles from '@/pages/NotFoundPage/NotFoundPage.module.scss'
 
 export const NotFoundPage = () => (

@@ -12,6 +12,7 @@
 !scripts/package.json
 !libs/shared/server
 !libs/raven/core
+!libs/raven/ui
 !apps/raven/server
 !apps/raven/web
 **/node_modules

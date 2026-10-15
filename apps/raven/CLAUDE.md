@@ -10,7 +10,7 @@ A self-hosted video library and web player: direct play, with an on-the-fly remu
 
 ## Structure
 
-raven's projects live in the workspace described by the root `CLAUDE.md`, which covers Nx, the project table and how to run tasks: `@raven/server` in `apps/raven/server`, `@raven/web` in `apps/raven/web`, and `@raven/core` in `libs/raven/core`. The server also depends on `@shared/server` (`libs/shared/server`), which it shares with rookery: it serves the built web app, compresses responses, opens SQLite and runs `MIGRATIONS`, reads the listen config, and compares the PIN and the unlock cookie in constant time.
+raven's projects live in the workspace described by the root `CLAUDE.md`, which covers Nx, the project table and how to run tasks: `@raven/server` in `apps/raven/server`, `@raven/web` in `apps/raven/web`, `@raven/core` in `libs/raven/core`, and the shared player `@raven/ui` in `libs/raven/ui`. The server also depends on `@shared/server` (`libs/shared/server`), which it shares with rookery: it serves the built web app, compresses responses, opens SQLite and runs `MIGRATIONS`, reads the listen config, and compares the PIN and the unlock cookie in constant time.
 
 `libs/raven/core` must stay platform-agnostic: no DOM, no Node APIs, not even `URLSearchParams` (use `toQueryString`). Its tsconfig has `lib: ["ES2023"]` and no `types` so a slip fails the typecheck.
 
@@ -26,6 +26,8 @@ The TypeScript, code style and CSS rules are in the root `CLAUDE.md`. raven adds
 - The web app is also served from Netlify, whose CDN proxies `/api` to raven (README, "On Netlify"). A response that depends on the browser's cookies, the PIN's or the admin lock's, is never `public` in `cache-control`, or Netlify's cache hands it to everyone.
 - raven is reachable from the internet, so every route that is not a GET says who it is for: `@AdminOnly()`, held back by the admin lock, or `@ForViewers()`. A GET that only a managing screen reads is `@AdminOnly()` too. The server refuses to start with a write route marked neither, as it does with a route the PIN lock has not been told about.
 - Server constructors inject with explicit `@Inject(Token)`, so DI never depends on decorator metadata, which neither vitest nor `tsx` emits.
-- All three projects import their own modules via `@/` with no extension; `tsconfig.json` uses `"moduleResolution": "bundler"` so TypeScript allows it. The server's `dev` runs through `tsx`, and its `build` is `tsc` then `tsc-alias`.
+- All four projects import their own modules via `@/` with no extension; `tsconfig.json` uses `"moduleResolution": "bundler"` so TypeScript allows it. The server's `dev` runs through `tsx`, and its `build` is `tsc` then `tsc-alias`.
 - Every search box is a `SearchField` (`components/SearchField`) held by `useSearch`, or `useAddressSearch` when it rides in the address as `?q=` (`lib/useSearch.ts`), so every one is debounced: it searches once typing pauses, or at once on Enter. Never a bare `<input type="search">`, and never a search that runs on each keystroke.
-- The tokens are in `apps/raven/web/src/styles/globals.scss`, and element defaults in `elements.scss` beside it. The `/design` page reads `globals.scss` itself, so a new token shows up there with no extra step.
+- The tokens are in `libs/raven/ui/src/styles/globals.scss`, and element defaults in `elements.scss` beside it. The web `/design` page reads the shared `globals.scss` through `@raven/ui/designTokens`, so a new token shows up there with no extra step.
+
+The shared player has no web app imports. Hosts provide `PlayerServicesProvider` and an `Engine`; the browser keeps its singleton, queries, invalidation and WatchPage services. Import built `@raven/ui` exports and `@raven/ui/styles.css`, never alias UI sources from another project. See `libs/raven/ui/README.md` for peer dependencies and test ownership.

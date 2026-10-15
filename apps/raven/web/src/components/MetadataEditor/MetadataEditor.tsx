@@ -7,7 +7,7 @@ import type {
   MediaItem,
 } from '@raven/core'
 import { type FormEvent, useId, useState } from 'react'
-import { Button } from '@/components/Button/Button'
+import { Button } from '@raven/ui'
 import { MovieFiles } from '@/components/MovieFiles/MovieFiles'
 import { api } from '@/lib/api'
 import { afterItemEdited } from '@/lib/invalidate'

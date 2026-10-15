@@ -1,7 +1,7 @@
 import { keepPreviousData, queryOptions, skipToken } from '@tanstack/react-query'
 import type { MatchItemType, MatchSubject, MediaSort } from '@raven/core'
 import { api } from '@/lib/api'
-import { playerQueriesFor } from '@/lib/playerQueries'
+import { playerQueriesFor } from '@raven/ui'
 import { queryKeys } from '@/lib/queryClient'
 
 /**

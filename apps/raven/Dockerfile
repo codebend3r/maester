@@ -24,6 +24,7 @@ COPY tsconfig.base.json ./
 COPY tooling/ tooling/
 COPY libs/shared/server/ libs/shared/server/
 COPY libs/raven/core/ libs/raven/core/
+COPY libs/raven/ui/ libs/raven/ui/
 COPY apps/raven/server/ apps/raven/server/
 COPY apps/raven/web/ apps/raven/web/
 # The build CI baked in after a merge into main (X.Y.Z.N), which the web app

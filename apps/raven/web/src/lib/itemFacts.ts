@@ -10,7 +10,7 @@ import {
 } from '@raven/core'
 import { showYears } from '@/lib/itemLinks'
 import { plural } from '@/lib/plural'
-import { languageName } from '@/lib/trackLabels'
+import { languageName } from '@raven/core'
 
 const present = (facts: ReadonlyArray<string | null>): string[] =>
   facts.filter((fact): fact is string => fact != null)
@@ -131,7 +131,7 @@ export const fileFacts = ({
     audioCodec == null ? null : codecLabel(audioCodec),
     formatChannels(audioTrack?.channels ?? media.audioChannels),
   ].filter((part): part is string => part != null)
-  const language = languageName(audioTrack?.language ?? null)
+  const language = languageName({ tag: audioTrack?.language ?? null })
   // "English (EAC3 5.1)", or just the details when the track names no language.
   const audio =
     language == null
@@ -140,7 +140,7 @@ export const fileFacts = ({
           .filter((part): part is string => part != null)
           .join(' ')
   const subtitles = unique(
-    (tracks?.subtitles ?? []).flatMap((track) => languageName(track.language) ?? []),
+    (tracks?.subtitles ?? []).flatMap((track) => languageName({ tag: track.language }) ?? []),
   ).join(', ')
   return [
     { label: 'Video', value: video },

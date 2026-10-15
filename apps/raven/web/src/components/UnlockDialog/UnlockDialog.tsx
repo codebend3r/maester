@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react'
-import { Button } from '@/components/Button/Button'
+import { Button } from '@raven/ui'
 import { api } from '@/lib/api'
 import { useUnlockPrompt } from '@/stores/unlockPrompt'
 import styles from '@/components/UnlockDialog/UnlockDialog.module.scss'

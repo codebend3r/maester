@@ -3,7 +3,7 @@ import type { TrackSelection } from '@/components/Player/useTrackSelection'
 import type { EngineHandle } from '@/components/Player/engine'
 import { preferredSubtitle } from '@/components/Player/selection'
 import { type PlayerAction, stepCaptionScale, stepSpeed } from '@/lib/shortcuts'
-import { languageName } from '@/lib/trackLabels'
+import { languageName } from '@raven/core'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
 
 /** Frames per second to step by when the file does not say. */
@@ -86,7 +86,9 @@ export const usePlayerActions = ({
     const landed = selection.tracks?.subtitles.find((track) => track.id === id) ?? null
     flash({
       icon: 'captions',
-      text: landed ? `Subtitles: ${languageName(landed.language) ?? 'on'}` : 'Subtitles off',
+      text: landed
+        ? `Subtitles: ${languageName({ tag: landed.language }) ?? 'on'}`
+        : 'Subtitles off',
     })
   }
 
