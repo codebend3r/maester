@@ -1,3 +1,4 @@
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -6,7 +7,20 @@ from luwin.agent.loop import Agent
 from luwin.agent.runner import ToolRunner
 from luwin.agent.tools import ToolContext, ToolRegistry
 from luwin.config import Settings
-from luwin.evals import CASES_DIR, Case, load_cases, report, run_case
+from luwin.evals import (
+    CASES_DIR,
+    Case,
+    CaseResult,
+    Turn,
+    TurnResult,
+    load_cases,
+    markdown_report,
+    progress_line,
+    publish_report,
+    report,
+    run_case,
+    summary_bar,
+)
 from luwin.evals.world import EVAL_USER, build_services, build_world
 from luwin.memo import Memo
 from luwin.store import Store
@@ -186,3 +200,45 @@ async def test_the_heavy_remux_world_flags_the_remux_to_the_admin():
     (notice,) = outcome.notices
     assert "watched away from home 3 times" in notice.text
     store.close()
+
+
+def _result(name: str, failures: list[str]) -> CaseResult:
+    case = Case(name=name, tier="friend", turns=[Turn(user="hi")])
+    return CaseResult(case, [TurnResult(case.turns[0], "reply", [], failures)])
+
+
+def test_markdown_report_is_sorted_and_stable():
+    results = [_result("b case", ["got | a\npipe"]), _result("a case", [])]
+    markdown = markdown_report(results, model="m-1", day=date(2026, 10, 16))
+    assert "- Passed: **1/2**" in markdown and "- Model: `m-1`" in markdown
+    assert markdown.index("a case") < markdown.index("b case")
+    assert "| ❌ | b case | got \\| a pipe |" in markdown
+    assert markdown == markdown_report(results[::-1], model="m-1", day=date(2026, 10, 16))
+
+
+def test_publish_report_writes_only_full_real_runs(tmp_path: Path, monkeypatch):
+    monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
+    target = tmp_path / "evals.md"
+    results = [_result("a case", [])]
+    publish_report(results, model="m-1", is_full_run=False, report_path=target)
+    publish_report(results, model="fake", is_full_run=True, report_path=target)
+    assert not target.exists()
+    assert publish_report(results, model="m-1", is_full_run=True, report_path=target)
+    assert "a case" in target.read_text()
+
+
+def test_publish_report_appends_to_the_github_step_summary(tmp_path: Path, monkeypatch):
+    summary = tmp_path / "summary.md"
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+    publish_report(
+        [_result("a case", [])], model="fake", is_full_run=False, report_path=tmp_path / "x.md"
+    )
+    assert "a case" in summary.read_text()
+
+
+def test_terminal_output_shows_progress_and_a_pass_bar():
+    results = [_result("a case", []), _result("b case", ["nope"])]
+    assert progress_line(results[1], index=2, total=10, is_color=False) == "[ 2/10] ❌ b case"
+    bar = summary_bar(results, is_color=False)
+    assert bar.endswith("1/2 passed") and bar.count("█") == 15 and bar.count("░") == 15
+    assert "\033[" in summary_bar(results, is_color=True)

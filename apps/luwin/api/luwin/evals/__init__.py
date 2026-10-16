@@ -12,9 +12,11 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import os
 import re
 import sys
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -26,7 +28,10 @@ from luwin.agent.tools import Tier, ToolRegistry
 from luwin.config import Settings
 from luwin.evals.world import EVAL_USER
 
-CASES_DIR = Path(__file__).resolve().parent.parent.parent / "evals" / "cases"
+API_DIR = Path(__file__).resolve().parent.parent.parent
+CASES_DIR = API_DIR / "evals" / "cases"
+REPORT_PATH = API_DIR.parent / "docs" / "evals.md"
+REASON_LIMIT = 120
 
 
 @dataclass
@@ -112,6 +117,34 @@ def load_cases(paths: list[Path] | None = None) -> list[Case]:
     return [Case.load(p) for p in files]
 
 
+BAR_WIDTH = 30
+
+
+def _paint(text: str, code: str, *, is_color: bool) -> str:
+    return f"\033[{code}m{text}\033[0m" if is_color else text
+
+
+def use_color() -> bool:
+    return sys.stdout.isatty() and "NO_COLOR" not in os.environ
+
+
+def progress_line(result: CaseResult, *, index: int, total: int, is_color: bool) -> str:
+    mark = (
+        _paint("✅", "32", is_color=is_color)
+        if result.passed
+        else _paint("❌", "31", is_color=is_color)
+    )
+    return f"[{index:>{len(str(total))}}/{total}] {mark} {result.case.name}"
+
+
+def summary_bar(results: list[CaseResult], *, is_color: bool) -> str:
+    passed = sum(1 for r in results if r.passed)
+    filled = round(BAR_WIDTH * passed / len(results)) if results else 0
+    bar = "█" * filled + "░" * (BAR_WIDTH - filled)
+    code = "32" if passed == len(results) else "31"
+    return f"{_paint(bar, code, is_color=is_color)} {passed}/{len(results)} passed"
+
+
 def report(results: list[CaseResult]) -> str:
     lines = []
     for r in results:
@@ -124,6 +157,58 @@ def report(results: list[CaseResult]) -> str:
     passed = sum(1 for r in results if r.passed)
     lines.append(f"\n{passed}/{len(results)} cases passed")
     return "\n".join(lines)
+
+
+def _cell(text: str) -> str:
+    flat = " ".join(text.split()).replace("|", "\\|")
+    return flat if len(flat) <= REASON_LIMIT else flat[: REASON_LIMIT - 1] + "…"
+
+
+def markdown_report(results: list[CaseResult], *, model: str, day: date) -> str:
+    """A table of every case, stable between runs so a git diff shows only real changes.
+
+    Cases are sorted by name and the only run detail is the day, never a
+    duration or token count, so an unchanged result rewrites an identical file.
+    """
+    ordered = sorted(results, key=lambda r: r.case.name)
+    passed = sum(1 for r in ordered if r.passed)
+    rows = []
+    for r in ordered:
+        failures = [f for t in r.turns for f in t.failures]
+        reason = _cell(failures[0]) if failures else ""
+        rows.append(f"| {'✅' if r.passed else '❌'} | {_cell(r.case.name)} | {reason} |")
+    return "\n".join(
+        [
+            "# Luwin evals",
+            "",
+            "Written by `bunx nx run @luwin/api:eval` after a full run against a real model.",
+            "Filtered and `--model fake` runs leave this file alone.",
+            "",
+            f"- Model: `{model}`",
+            f"- Date: {day.isoformat()}",
+            f"- Passed: **{passed}/{len(ordered)}**",
+            "",
+            "| | Case | First failure |",
+            "| --- | --- | --- |",
+            *rows,
+            "",
+        ]
+    )
+
+
+def publish_report(
+    results: list[CaseResult], *, model: str, is_full_run: bool, report_path: Path = REPORT_PATH
+) -> bool:
+    """Returns whether the tracked report file was written."""
+    markdown = markdown_report(results, model=model, day=date.today())
+    summary = os.environ.get("GITHUB_STEP_SUMMARY")
+    if summary:
+        with open(summary, "a") as handle:
+            handle.write(markdown)
+    if not is_full_run or model == "fake":
+        return False
+    report_path.write_text(markdown)
+    return True
 
 
 def build_agent(model_name: str, registry: ToolRegistry, services: Any, store: Any) -> Agent:
@@ -159,13 +244,23 @@ def main(argv: list[str] | None = None) -> int:
     load_env_file()
     model_name = args.model or settings().model
     cases = load_cases(args.cases or None)
+    is_color = use_color()
     results = []
-    for case in cases:
+    print(f"Running {len(cases)} cases against {model_name}\n")
+    for index, case in enumerate(cases, start=1):
         registry, services, store = build_world(case.services)
         agent = build_agent(model_name, registry, services, store)
         results.append(asyncio.run(run_case(case, agent)))
         store.close()
-    print(report(results))
+        print(
+            progress_line(results[-1], index=index, total=len(cases), is_color=is_color), flush=True
+        )
+    failed = [r for r in results if not r.passed]
+    if failed:
+        print("\nFailures\n" + report(failed).rsplit("\n\n", 1)[0])
+    print(f"\n{summary_bar(results, is_color=is_color)}")
+    if publish_report(results, model=model_name, is_full_run=not args.cases):
+        print(f"Report written to {REPORT_PATH.relative_to(API_DIR.parent.parent.parent)}")
     return 0 if all(r.passed for r in results) else 1
 
 
