@@ -326,7 +326,7 @@ await meson({
     '-Dvulkan=enabled',
     '-Dmoltenvk=enabled',
     '-Dgl=disabled',
-    '-Dswift-build=disabled',
+    '-Dswift-build=enabled',
     '-Dcocoa=enabled',
     '-Dcoreaudio=enabled',
     '-Davfoundation=enabled',
