@@ -1,0 +1,12 @@
+{
+  // The sandboxed preload runs beside the page, so it sees the DOM's File as well as Node's
+  // types. The Playwright tests join it, since their page callbacks run in the window, and
+  // bun's types cover the tests under src/preload and src/shared.
+  "extends": "../../../tooling/tsconfig/node.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM"],
+    "paths": { "@/*": ["./src/*"] },
+    "types": ["node", "bun"]
+  },
+  "include": ["src/preload", "src/shared", "e2e", "playwright.config.ts"]
+}

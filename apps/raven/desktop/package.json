@@ -6,11 +6,14 @@
   "type": "module",
   "main": "dist/main/main.js",
   "scripts": {
-    "build": "bun run --sequential build:clean build:renderer",
+    "build": "bun run --sequential build:clean build:renderer build:main build:preload",
     "build:clean": "rm -rf dist",
     "build:renderer": "vite build",
-    "typecheck": "bun run --parallel typecheck:main typecheck:renderer",
+    "build:main": "bun build src/main/main.ts --target node --format esm --external electron --sourcemap=linked --outdir dist/main",
+    "build:preload": "bun build src/preload/preload.ts --target node --format cjs --external electron --outfile dist/preload/preload.cjs",
+    "typecheck": "bun run --parallel typecheck:main typecheck:preload typecheck:renderer",
     "typecheck:main": "tsgo --noEmit -p tsconfig.main.json",
+    "typecheck:preload": "tsgo --noEmit -p tsconfig.preload.json",
     "typecheck:renderer": "tsgo --noEmit -p tsconfig.renderer.json",
     "lint:ts": "oxlint",
     "lint:ts:fix": "oxlint --fix",
@@ -21,7 +24,8 @@
     "test": "bun run --sequential test:main test:renderer",
     "test:main": "bun test --dots src/main src/shared src/preload src/build",
     "test:renderer": "bun test --dots --preload ./src/renderer/test/happy-dom.ts --preload ../../../tooling/web/scss-modules.ts --preload ./src/renderer/test/setup.ts src/renderer",
-    "test:watch": "bun test --dots --watch src/main src/shared"
+    "test:watch": "bun test --dots --watch src/main src/shared",
+    "dev": "electron ."
   },
   "dependencies": {
     "@fontsource-variable/instrument-sans": "5.3.0",
@@ -71,8 +75,11 @@
       "build",
       "build:clean",
       "build:renderer",
+      "build:main",
+      "build:preload",
       "typecheck",
       "typecheck:main",
+      "typecheck:preload",
       "typecheck:renderer",
       "lint:ts",
       "lint:ts:fix",
@@ -83,8 +90,16 @@
       "test",
       "test:main",
       "test:renderer",
-      "test:watch"
-    ]
+      "test:watch",
+      "dev"
+    ],
+    "targets": {
+      "dev": {
+        "dependsOn": [
+          "build"
+        ]
+      }
+    }
   },
   "productName": "raven player"
 }
