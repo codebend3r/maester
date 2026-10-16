@@ -53,7 +53,7 @@ describe('placeWindow', () => {
     )
   })
 
-  it('keeps a window with exactly 64 by 64 pixels on its display', () => {
+  it('keeps a window with exactly 64 by 64 pixels on its display, moved fully onto it', () => {
     const saved = {
       x: SIDE.x + SIDE.width - 64,
       y: SIDE.y + SIDE.height - 64,
@@ -62,8 +62,28 @@ describe('placeWindow', () => {
       displayId: 2,
     }
     expect(placeWindow({ saved, displays: DISPLAYS, primary: { workArea: PRIMARY } })).toEqual({
-      x: saved.x,
-      y: saved.y,
+      x: SIDE.x + SIDE.width - 800,
+      y: SIDE.y + SIDE.height - 600,
+      width: 800,
+      height: 600,
+    })
+  })
+
+  it('brings a window saved above the top of its work area down, so its title bar can be reached', () => {
+    const saved = { x: 100, y: PRIMARY.y - 500, width: 800, height: 600, displayId: 1 }
+    expect(placeWindow({ saved, displays: DISPLAYS, primary: { workArea: PRIMARY } })).toEqual({
+      x: 100,
+      y: PRIMARY.y,
+      width: 800,
+      height: 600,
+    })
+  })
+
+  it('brings a window saved left of its work area back onto it', () => {
+    const saved = { x: SIDE.x - 700, y: 100, width: 800, height: 600, displayId: 2 }
+    expect(placeWindow({ saved, displays: DISPLAYS, primary: { workArea: PRIMARY } })).toEqual({
+      x: SIDE.x,
+      y: 100,
       width: 800,
       height: 600,
     })

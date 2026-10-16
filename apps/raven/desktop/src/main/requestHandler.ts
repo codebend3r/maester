@@ -7,7 +7,7 @@ const REFUSED = {
 } as const satisfies DesktopReply
 
 const describeError = (error: unknown): string =>
-  error instanceof Error ? error.message : String(error)
+  error instanceof Error ? (error.stack ?? error.message) : String(error)
 
 /**
  * The request channel's door: only the app's own frame is answered, every refusal

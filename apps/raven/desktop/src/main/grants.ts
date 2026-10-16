@@ -11,7 +11,9 @@ export type GrantedFile = {
 
 export type GrantRefusal = 'missing' | 'not-a-file' | 'not-a-video'
 
-export type GrantResult = { ok: true; file: GrantedFile } | { ok: false; reason: GrantRefusal }
+export type GrantResult =
+  | { ok: true; file: Readonly<GrantedFile> }
+  | { ok: false; reason: GrantRefusal }
 
 export type GrantFs = {
   realpath: (path: string) => Promise<string>
@@ -20,8 +22,10 @@ export type GrantFs = {
 
 export type Grants = {
   grant: (path: string) => Promise<GrantResult>
-  fileOf: (fileId: string) => GrantedFile | null
+  fileOf: (fileId: string) => Readonly<GrantedFile> | null
 }
+
+export const ID_DRAWS = 8
 
 const refuse = (reason: GrantRefusal): GrantResult => ({ ok: false, reason })
 
@@ -34,8 +38,15 @@ const attempt = async <T>(run: () => Promise<T>): Promise<T | null> => {
 }
 
 export const createGrants = ({ fs, newId }: { fs: GrantFs; newId: () => string }): Grants => {
-  const byId = new Map<string, GrantedFile>()
+  const byId = new Map<string, Readonly<GrantedFile>>()
   const idByPath = new Map<string, string>()
+
+  // An id already held by another file would re-point that grant, so draw again.
+  const unusedId = (draws: number): string => {
+    if (draws === 0) throw new Error('raven player could not draw a unique file id.')
+    const id = newId()
+    return byId.has(id) ? unusedId(draws - 1) : id
+  }
 
   const grant = async (path: string): Promise<GrantResult> => {
     if (!isAbsolute(path)) return refuse('missing')
@@ -47,14 +58,14 @@ export const createGrants = ({ fs, newId }: { fs: GrantFs; newId: () => string }
     if (stats === null) return refuse('missing')
     if (!stats.isFile()) return refuse('not-a-file')
 
-    const fileId = idByPath.get(real) ?? newId()
-    const file: GrantedFile = {
+    const fileId = idByPath.get(real) ?? unusedId(ID_DRAWS)
+    const file = Object.freeze({
       fileId,
       path: real,
       name: basename(real),
       size: stats.size,
       mtimeMs: stats.mtimeMs,
-    }
+    } satisfies GrantedFile)
     idByPath.set(real, fileId)
     byId.set(fileId, file)
     return { ok: true, file }

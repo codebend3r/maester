@@ -72,4 +72,24 @@ describe('createRequestHandler', () => {
     expect(warnings).toHaveLength(1)
     expect(warnings[0]).toContain('dialog crashed')
   })
+
+  it('keeps the stack of a failing service in the warning', async () => {
+    const failure = new Error('dialog crashed')
+    failure.stack = 'Error: dialog crashed\n    at showOpenDialog (main.ts:180:5)'
+    const { handler, warnings } = setup(async () => {
+      throw failure
+    })
+    await handler({ frameUrl: 'app://raven/', payload: ENVELOPE })
+    expect(warnings[0]).toContain('at showOpenDialog (main.ts:180:5)')
+  })
+
+  it('falls back to the message of an error without a stack', async () => {
+    const failure = new Error('dialog crashed')
+    failure.stack = undefined
+    const { handler, warnings } = setup(async () => {
+      throw failure
+    })
+    await handler({ frameUrl: 'app://raven/', payload: ENVELOPE })
+    expect(warnings[0]).toContain('dialog crashed')
+  })
 })

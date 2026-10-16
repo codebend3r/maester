@@ -75,6 +75,15 @@ export const createStateStore = ({
   let timer: unknown
   let queue = Promise.resolve()
 
+  const report = (error: unknown): void => {
+    try {
+      onError(error)
+    } catch {
+      // A throwing reporter must not reject the queue, or every later write would be skipped.
+    }
+  }
+
+  // Never rejects, so the queue it extends never rejects either.
   const writeIfDirty = async (): Promise<void> => {
     if (savedVersion === version) return
     const writing = { state, version }
@@ -83,7 +92,7 @@ export const createStateStore = ({
       await fs.rename(tmp, file)
       savedVersion = writing.version
     } catch (error) {
-      onError(error)
+      report(error)
     }
   }
 
@@ -107,7 +116,7 @@ export const createStateStore = ({
       cancelTimer()
       timer = timers.set(() => {
         timer = undefined
-        enqueue().catch(onError)
+        void enqueue()
       }, debounceMs)
     },
     flush: () => {

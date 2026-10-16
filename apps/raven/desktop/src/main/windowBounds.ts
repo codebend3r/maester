@@ -12,6 +12,19 @@ const overlap = ({ a, b }: { a: Rect; b: Rect }): { width: number; height: numbe
   height: Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y),
 })
 
+/** Moves a span that fits in the area so it lies wholly inside it. */
+const within = ({
+  start,
+  length,
+  area,
+  areaLength,
+}: {
+  start: number
+  length: number
+  area: number
+  areaLength: number
+}): number => Math.min(Math.max(start, area), area + areaLength - length)
+
 const centred = (workArea: Rect): Rect => {
   const width = Math.min(DEFAULT_SIZE.width, workArea.width)
   const height = Math.min(DEFAULT_SIZE.height, workArea.height)
@@ -48,5 +61,20 @@ export const placeWindow = ({
   if (visible.width < MIN_VISIBLE || visible.height < MIN_VISIBLE) {
     return centred(primary.workArea)
   }
-  return clamped
+  // A window that overlaps by enough may still sit above the top, its title bar out of reach.
+  return {
+    ...clamped,
+    x: within({
+      start: clamped.x,
+      length: clamped.width,
+      area: display.workArea.x,
+      areaLength: display.workArea.width,
+    }),
+    y: within({
+      start: clamped.y,
+      length: clamped.height,
+      area: display.workArea.y,
+      areaLength: display.workArea.height,
+    }),
+  }
 }

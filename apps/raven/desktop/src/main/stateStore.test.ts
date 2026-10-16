@@ -251,6 +251,36 @@ describe('createStateStore', () => {
     expect(JSON.parse(files.get(FILE) ?? 'null')).toEqual(named('/a'))
   })
 
+  it('a throwing onError does not stop later writes', async () => {
+    const fake = createFakeFs()
+    const clock = createFakeTimers()
+    const reported: unknown[] = []
+    const store = createStateStore({
+      fs: fake.fs,
+      file: FILE,
+      initial: EMPTY_STATE,
+      timers: clock.timers,
+      debounceMs: 2000,
+      onError: (error) => {
+        reported.push(error)
+        throw new Error('reporter broke')
+      },
+    })
+    fake.state.failWrites = 1
+    store.update(() => named('/a'))
+    clock.fire()
+    await settle()
+    expect(reported.length).toBe(1)
+    store.update(() => named('/b'))
+    clock.fire()
+    await settle()
+    expect(JSON.parse(fake.files.get(FILE) ?? 'null')).toEqual(named('/b'))
+    store.update(() => named('/c'))
+    await store.flush()
+    expect(JSON.parse(fake.files.get(FILE) ?? 'null')).toEqual(named('/c'))
+    expect(store.isDirty()).toBe(false)
+  })
+
   it('a refused rename leaves the old file intact and the store dirty', async () => {
     const old = JSON.stringify(named('/old'))
     const { store, state, errors, files } = setup({ [FILE]: old })

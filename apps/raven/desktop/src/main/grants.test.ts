@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test'
+import { grantNext } from '@/main/folder'
 import { createGrants, type GrantFs } from '@/main/grants'
 
 type Entry = { real: string; isFile: boolean; size: number; mtimeMs: number }
@@ -6,7 +7,7 @@ type Entry = { real: string; isFile: boolean; size: number; mtimeMs: number }
 const missing = (path: string): Error =>
   Object.assign(new Error(`ENOENT: no such file or directory, '${path}'`), { code: 'ENOENT' })
 
-const setup = (entries: Record<string, Partial<Entry>>) => {
+const setup = (entries: Record<string, Partial<Entry>>, ids: readonly string[] | null = null) => {
   const table = new Map(
     Object.entries(entries).map(([path, entry]) => [
       path,
@@ -30,7 +31,7 @@ const setup = (entries: Record<string, Partial<Entry>>) => {
     fs,
     newId: () => {
       counter.n += 1
-      return `id-${counter.n}`
+      return ids?.[counter.n - 1] ?? `id-${counter.n}`
     },
   })
   return { grants, table }
@@ -113,5 +114,54 @@ describe('grant', () => {
     const { grants } = setup({ '/m/Été 02 (1080p).mkv': {} })
     const result = await grants.grant('/m/Été 02 (1080p).mkv')
     expect(result.ok && result.file.name).toBe('Été 02 (1080p).mkv')
+  })
+})
+
+describe('grant ids', () => {
+  it('draws again when a new id is already taken by another file', async () => {
+    const { grants } = setup({ '/m/A.mkv': {}, '/m/B.mkv': {} }, ['dup', 'dup', 'dup', 'fresh'])
+    const first = await grants.grant('/m/A.mkv')
+    const second = await grants.grant('/m/B.mkv')
+    expect(first.ok && first.file.fileId).toBe('dup')
+    expect(second.ok && second.file.fileId).toBe('fresh')
+    expect(grants.fileOf('dup')!.path).toBe('/m/A.mkv')
+    expect(grants.fileOf('fresh')!.path).toBe('/m/B.mkv')
+  })
+
+  it('gives up after a bounded number of draws instead of re-pointing an id', async () => {
+    const { grants } = setup({ '/m/A.mkv': {}, '/m/B.mkv': {} }, Array(100).fill('dup'))
+    await grants.grant('/m/A.mkv')
+    await expect(grants.grant('/m/B.mkv')).rejects.toThrow(/unique/)
+    expect(grants.fileOf('dup')!.path).toBe('/m/A.mkv')
+  })
+
+  it('hands out a read-only view', async () => {
+    const { grants } = setup({ '/m/A.mkv': { size: 5 } })
+    await grants.grant('/m/A.mkv')
+    const file = grants.fileOf('id-1')!
+    expect(() => {
+      // @ts-expect-error fileOf's view is read-only, so a caller cannot re-point a grant.
+      file.path = '/etc/passwd'
+    }).toThrow()
+    expect(grants.fileOf('id-1')!.path).toBe('/m/A.mkv')
+  })
+})
+
+describe('grantNext with real grants', () => {
+  it('skips a sibling that links to a non-video and grants the next real video', async () => {
+    const { grants } = setup({
+      '/m/Show/E1.mkv': {},
+      '/m/Show/E2.mkv': { real: '/Users/me/.ssh/id_rsa' },
+      '/Users/me/.ssh/id_rsa': {},
+      '/m/Show/E3.mkv': {},
+    })
+    const next = await grantNext({
+      path: '/m/Show/E1.mkv',
+      readdir: async () => ['E1.mkv', 'E2.mkv', 'E3.mkv'],
+      grants,
+    })
+    expect(next!.path).toBe('/m/Show/E3.mkv')
+    expect(grants.fileOf('id-1')!.path).toBe('/m/Show/E3.mkv')
+    expect(grants.fileOf('id-2')).toBeNull()
   })
 })
