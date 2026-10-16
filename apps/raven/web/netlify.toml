@@ -6,7 +6,7 @@
 # vite.config.ts).
 
 [build]
-command = "bunx nx run @raven/web:build"
+command = "bash apps/raven/netlify-build.sh"
 publish = "apps/raven/web/dist"
 
 [build.environment]
