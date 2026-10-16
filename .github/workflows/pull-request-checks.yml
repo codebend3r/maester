@@ -10,6 +10,11 @@ on:
 permissions:
   contents: read
 
+env:
+  # Nx Cloud's remote cache: a task any job or earlier run already did, on the same
+  # inputs, restores instead of running. Unset (a fork's PR), Nx caches locally only.
+  NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
+
 # A newer push to the same branch cancels the in-flight run for that branch.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -115,19 +120,16 @@ jobs:
       - name: 🏗️ Build TypeScript wrapper
         run: bunx nx run @raven/mpv:build
 
-      - name: 💾 Cache own pinned source build
-        id: native-cache
+      # fetch:libmpv is an Nx cached task, so Nx Cloud restores the 7 minute source build
+      # for any run with the same inputs. .nx/cache is the fallback with no token (a
+      # fork's PR) and the first-run seed; it is keyed on the same native sources.
+      - name: 💾 Cache Nx tasks
         uses: actions/cache@v5
         with:
-          path: |
-            libs/raven/mpv/native-build/archives
-            libs/raven/mpv/native-build/prefix
-            libs/raven/mpv/native-build/source-bundle
-            libs/raven/mpv/resources
-          key: raven-mpv-darwin-arm64-xcode26.6-${{ hashFiles('libs/raven/mpv/native/**', 'libs/raven/mpv/src/**', 'libs/raven/mpv/test/**', 'libs/raven/mpv/package.json', 'libs/raven/mpv/README.md', 'libs/raven/mpv/tsconfig*.json', 'libs/raven/core/src/**', 'bun.lock', 'tsconfig.base.json', '.github/workflows/pull-request-checks.yml') }}
+          path: .nx/cache
+          key: nx-desktop-darwin-arm64-xcode26.6-${{ hashFiles('libs/raven/mpv/native/**', 'libs/raven/mpv/src/build/**', 'libs/raven/mpv/package.json', 'bun.lock', 'tsconfig.base.json') }}
 
       - name: 🎞️ Build self-contained libmpv and MoltenVK from source
-        if: steps.native-cache.outputs.cache-hit != 'true'
         run: bunx nx run @raven/mpv:fetch:libmpv
 
       - name: 🔩 Build N-API addon
