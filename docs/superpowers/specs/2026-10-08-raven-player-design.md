@@ -161,8 +161,9 @@ text into italic, bold and underlined runs; every other tag is dropped.
 - CC button: toggles subtitles, on to the last language used.
 - Below 30rem the skip buttons and the volume slider drop out; mute,
   time, CC, settings and fullscreen stay.
-- Everything hides after 2.5s idle while playing, as today; any key or
-  pointer movement brings it back; focus inside the controls keeps it.
+- Everything hides after 10s without a mouse move, key press or click, paused
+  or playing; nothing holds it up, not an open menu or a focused button. Any
+  of the three brings it back.
 
 ### Keyboard (YouTube's)
 
