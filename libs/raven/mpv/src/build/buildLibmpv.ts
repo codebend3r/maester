@@ -272,6 +272,8 @@ await run({
     '--enable-securetransport',
     '--enable-zlib',
     '--enable-iconv',
+    // macOS keeps iconv in libiconv, not libSystem, and ffmpeg's link line omits it
+    '--extra-libs=-liconv',
     '--pkg-config-flags=--static',
     `--extra-cflags=${env.CFLAGS}`,
     `--extra-ldflags=${env.LDFLAGS}`,
