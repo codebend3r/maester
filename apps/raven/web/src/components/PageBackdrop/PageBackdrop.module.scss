@@ -18,6 +18,8 @@
   height: 100%;
   object-fit: cover;
   opacity: 0;
+  filter: blur(var(--space-0));
+  scale: 1.01;
   mask-image: linear-gradient(to bottom, var(--color-stage) 45%, transparent 100%);
 }
 

@@ -1,0 +1,11 @@
+.chip {
+  display: inline-grid;
+  padding: var(--space-0) var(--space-1);
+  border-radius: var(--radius-sm);
+  background: var(--color-night-glass);
+  box-shadow: var(--shadow-outline);
+  color: var(--color-bark);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  line-height: var(--line-tight);
+}

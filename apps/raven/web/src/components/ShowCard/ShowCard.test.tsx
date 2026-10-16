@@ -1,12 +1,35 @@
-import { describe, expect, it } from 'bun:test'
-import { screen } from '@testing-library/react'
+import { afterEach, describe, expect, it } from 'bun:test'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { ShowCard, ShowGrid } from '@/components/ShowCard/ShowCard'
 import { ShowTiles } from '@/components/ShowCard/ShowViews'
 import { POSTER_SIZES } from '@/lib/posters'
 import { showEntry } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
+import { usePageBackdrop } from '@/stores/pageBackdrop'
 
 describe('ShowCard', () => {
+  afterEach(() => {
+    usePageBackdrop.setState({ current: null, shown: null, recent: [], loaded: [] })
+  })
+
+  it("lays its show's backdrop behind the page while pointed at", async () => {
+    const entry = showEntry()
+    const { container } = renderWithProviders(
+      <ul>
+        <ShowCard
+          sizes={POSTER_SIZES.row}
+          entry={{ ...entry, show: { ...entry.show, backdropVersion: 'b9' } }}
+        />
+      </ul>,
+    )
+    fireEvent.pointerEnter(container.querySelector('li') ?? document.body, {
+      pointerType: 'mouse',
+    })
+    await waitFor(() =>
+      expect(usePageBackdrop.getState().current).toBe('/api/items/4/images/backdrop?v=b9'),
+    )
+  })
+
   it('says when its newest episode came when shows are sorted by when they were added', () => {
     const addedAt = new Date(Date.now() - 3 * 24 * 3600 * 1000).toISOString()
     renderWithProviders(
@@ -30,6 +53,7 @@ describe('ShowCard', () => {
     )
     expect(screen.getByText('2022 to now')).toBeInTheDocument()
     expect(screen.getByText('9 episodes')).toBeInTheDocument()
+    expect(screen.getByLabelText('Video resolution: 1080p')).toBeInTheDocument()
     expect(container.querySelector('img')).toHaveAttribute('src', '/api/items/4/images/poster?v=p1')
   })
 
