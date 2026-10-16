@@ -5,6 +5,7 @@ import type { GrantedFile, GrantRefusal, Grants } from '@/main/grants'
 import {
   addRecent,
   clearRecents,
+  type PlayerState,
   removeRecent,
   resumeFor,
   savePosition,
@@ -14,6 +15,7 @@ import type { StateStore } from '@/main/stateStore'
 import {
   type DesktopReply,
   type DesktopRequest,
+  type InvokeEnvelope,
   isInvokeEnvelope,
   MAX_QUEUE,
 } from '@/shared/protocol'
@@ -25,6 +27,7 @@ export const MESSAGES = {
   notOpen: 'That video is no longer open. Open it again from Home.',
   unknownRecent: 'That video is no longer in your recents.',
   unknownRequest: 'raven player does not understand that request.',
+  failed: 'raven player could not do that. Try again.',
 } as const
 
 export type DesktopServiceDeps = {
@@ -34,7 +37,9 @@ export type DesktopServiceDeps = {
   showOpenDialog: () => Promise<string[]>
   addRecentDocument: (path: string) => void
   clearRecentDocuments: () => void
+  stat: (path: string) => Promise<{ size: number; mtimeMs: number }>
   onReady: () => void
+  onError: (error: unknown) => void
   newId: () => string
   now: () => number
 }
@@ -98,10 +103,19 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
     }
   }
 
+  const failed = (error: unknown): DesktopReply => {
+    deps.onError(error)
+    return refused(MESSAGES.failed)
+  }
+
   const openDialog = async (): Promise<DesktopReply> => {
-    const paths = await deps.showOpenDialog()
-    if (paths.length === 0) return DONE
-    return openPaths(paths)
+    try {
+      const paths = await deps.showOpenDialog()
+      if (paths.length === 0) return DONE
+      return await openPaths(paths)
+    } catch (error) {
+      return failed(error)
+    }
   }
 
   const nextAfter = async ({
@@ -161,17 +175,37 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
     return DONE
   }
 
-  const listRecents = (): DesktopReply => {
+  // Home's bar must agree with where playback starts, so a file replaced on disk shows none.
+  const shareOf = async ({ state, path }: { state: PlayerState; path: string }) => {
+    try {
+      const { size, mtimeMs } = await deps.stat(path)
+      return watchedShare(state, { file: { path, size, mtimeMs } })
+    } catch {
+      return null
+    }
+  }
+
+  const listRecents = async (): Promise<DesktopReply> => {
     const state = store.read()
     return {
       type: 'recents',
-      recents: state.recents.map((recent) => ({
-        recentId: recentIdFor(recent.path),
-        label: titleFromFileName(basename(recent.path)),
-        from: basename(dirname(recent.path)),
-        watched: watchedShare(state, { path: recent.path }),
-      })),
+      recents: await Promise.all(
+        state.recents.map(async (recent) => ({
+          recentId: recentIdFor(recent.path),
+          label: titleFromFileName(basename(recent.path)),
+          from: basename(dirname(recent.path)),
+          watched: await shareOf({ state, path: recent.path }),
+        })),
+      ),
     }
+  }
+
+  const forgetRecentIds = (paths: readonly string[]): void => {
+    paths.forEach((path) => {
+      const recentId = idByPath.get(path)
+      idByPath.delete(path)
+      if (recentId !== undefined) pathById.delete(recentId)
+    })
   }
 
   const openRecent = async (recentId: string): Promise<DesktopReply> => {
@@ -184,7 +218,16 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
 
   const dropRecent = (recentId: string): DesktopReply => {
     const path = pathById.get(recentId)
-    if (path !== undefined) store.update((state) => removeRecent(state, { path }))
+    if (path === undefined) return DONE
+    store.update((state) => removeRecent(state, { path }))
+    forgetRecentIds([path])
+    return DONE
+  }
+
+  const dropAllRecents = (): DesktopReply => {
+    store.update(clearRecents)
+    forgetRecentIds([...idByPath.keys()])
+    deps.clearRecentDocuments()
     return DONE
   }
 
@@ -206,9 +249,7 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
       case 'removeRecent':
         return dropRecent(request.recentId)
       case 'clearRecents':
-        store.update(clearRecents)
-        deps.clearRecentDocuments()
-        return DONE
+        return dropAllRecents()
       default: {
         const unreachable: never = request
         return unreachable
@@ -216,8 +257,7 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
     }
   }
 
-  const handle = async (envelope: unknown): Promise<DesktopReply> => {
-    if (!isInvokeEnvelope(envelope)) return refused(MESSAGES.unknownRequest)
+  const route = (envelope: InvokeEnvelope): Promise<DesktopReply> => {
     switch (envelope.kind) {
       case 'page':
         return handleRequest(envelope.request)
@@ -227,6 +267,15 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
         const unreachable: never = envelope
         return unreachable
       }
+    }
+  }
+
+  const handle = async (envelope: unknown): Promise<DesktopReply> => {
+    if (!isInvokeEnvelope(envelope)) return refused(MESSAGES.unknownRequest)
+    try {
+      return await route(envelope)
+    } catch (error) {
+      return failed(error)
     }
   }
 

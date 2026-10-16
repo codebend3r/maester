@@ -96,15 +96,25 @@ const isFinished = ({
   duration: number | null
 }): boolean => position <= 0 || (duration !== null && position >= duration - END_MARGIN_S)
 
+/** The saved entry for this file as it is now: a replaced file (other size or mtime) has none. */
+const savedFor = (state: PlayerState, { file }: { file: FileFacts }): ResumeEntry | null => {
+  const saved = state.resume.find((entry) => entry.path === file.path)
+  if (!saved) return null
+  if (saved.size !== file.size || saved.mtimeMs !== file.mtimeMs) return null
+  return saved
+}
+
 export const savePosition = (
   state: PlayerState,
   {
     file,
     position,
-    duration,
+    duration: reported,
     at,
   }: { file: FileFacts; position: number; duration: number | null; at: number },
 ): PlayerState => {
+  // A player that leaves before it learns the length reports none; the length known before still holds.
+  const duration = reported ?? savedFor(state, { file })?.duration ?? null
   if (isFinished({ position, duration })) {
     return { ...state, resume: state.resume.filter((entry) => entry.path !== file.path) }
   }
@@ -119,14 +129,13 @@ export const savePosition = (
 }
 
 export const resumeFor = (state: PlayerState, { file }: { file: FileFacts }): number => {
-  const saved = state.resume.find((entry) => entry.path === file.path)
+  const saved = savedFor(state, { file })
   if (!saved) return 0
-  if (saved.size !== file.size || saved.mtimeMs !== file.mtimeMs) return 0
   return isFinished(saved) ? 0 : saved.position
 }
 
-export const watchedShare = (state: PlayerState, { path }: { path: string }): number | null => {
-  const saved = state.resume.find((entry) => entry.path === path)
+export const watchedShare = (state: PlayerState, { file }: { file: FileFacts }): number | null => {
+  const saved = savedFor(state, { file })
   if (!saved || saved.duration === null || saved.duration <= 0) return null
   return Math.min(1, Math.max(0, saved.position / saved.duration))
 }

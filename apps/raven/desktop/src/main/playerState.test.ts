@@ -143,6 +143,45 @@ describe('savePosition', () => {
     expect(state.resume.length).toBe(1)
   })
 
+  it('keeps the stored duration when a save arrives without one', () => {
+    const saved = savePosition(EMPTY_STATE, {
+      file: facts('/a'),
+      position: 40,
+      duration: 120,
+      at: 1,
+    })
+    const state = savePosition(saved, { file: facts('/a'), position: 40, duration: null, at: 2 })
+    expect(state.resume[0]!.duration).toBe(120)
+    expect(watchedShare(state, { file: facts('/a') })).toBeCloseTo(0.33, 2)
+  })
+
+  it('treats a duration-less save near the stored end as finished', () => {
+    const saved = savePosition(EMPTY_STATE, {
+      file: facts('/a'),
+      position: 40,
+      duration: 120,
+      at: 1,
+    })
+    const state = savePosition(saved, { file: facts('/a'), position: 115, duration: null, at: 2 })
+    expect(state.resume).toEqual([])
+  })
+
+  it('drops the stored duration of a replaced file', () => {
+    const saved = savePosition(EMPTY_STATE, {
+      file: facts('/a'),
+      position: 40,
+      duration: 120,
+      at: 1,
+    })
+    const state = savePosition(saved, {
+      file: facts('/a', { size: 2000 }),
+      position: 40,
+      duration: null,
+      at: 2,
+    })
+    expect(state.resume[0]!.duration).toBeNull()
+  })
+
   it('replaces the entry for the same path and puts it first', () => {
     const one = savePosition(EMPTY_STATE, { file: facts('/a'), position: 10, duration: 120, at: 1 })
     const two = savePosition(one, { file: facts('/b'), position: 20, duration: 120, at: 2 })
@@ -227,7 +266,7 @@ describe('watchedShare', () => {
       duration: 120,
       at: 1,
     })
-    expect(watchedShare(state, { path: '/a' })).toBe(0.5)
+    expect(watchedShare(state, { file: facts('/a') })).toBe(0.5)
   })
 
   it('is null without a duration', () => {
@@ -237,11 +276,24 @@ describe('watchedShare', () => {
       duration: null,
       at: 1,
     })
-    expect(watchedShare(state, { path: '/a' })).toBeNull()
+    expect(watchedShare(state, { file: facts('/a') })).toBeNull()
+  })
+
+  it('is null when the file was replaced since, as resumeFor starts it at 0', () => {
+    const state = savePosition(EMPTY_STATE, {
+      file: facts('/a'),
+      position: 60,
+      duration: 120,
+      at: 1,
+    })
+    const replaced = facts('/a', { size: 2000 })
+    expect(resumeFor(state, { file: replaced })).toBe(0)
+    expect(watchedShare(state, { file: replaced })).toBeNull()
+    expect(watchedShare(state, { file: facts('/a', { mtimeMs: 9000 }) })).toBeNull()
   })
 
   it('is null for an unknown path', () => {
-    expect(watchedShare(EMPTY_STATE, { path: '/nope' })).toBeNull()
+    expect(watchedShare(EMPTY_STATE, { file: facts('/nope') })).toBeNull()
   })
 
   it('is clamped to 0..1', () => {
@@ -249,7 +301,7 @@ describe('watchedShare', () => {
       ...EMPTY_STATE,
       resume: [{ path: '/a', size: 1, mtimeMs: 1, position: 200, duration: 120, playedAt: 1 }],
     }
-    expect(watchedShare(over, { path: '/a' })).toBe(1)
+    expect(watchedShare(over, { file: facts('/a', { size: 1, mtimeMs: 1 }) })).toBe(1)
   })
 
   it('is null for a zero duration', () => {
@@ -257,7 +309,7 @@ describe('watchedShare', () => {
       ...EMPTY_STATE,
       resume: [{ path: '/a', size: 1, mtimeMs: 1, position: 0, duration: 0, playedAt: 1 }],
     }
-    expect(watchedShare(zero, { path: '/a' })).toBeNull()
+    expect(watchedShare(zero, { file: facts('/a', { size: 1, mtimeMs: 1 }) })).toBeNull()
   })
 })
 

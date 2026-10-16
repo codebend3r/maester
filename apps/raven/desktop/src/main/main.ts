@@ -193,10 +193,14 @@ const startApp = (): void => {
       showOpenDialog,
       addRecentDocument: (path) => app.addRecentDocument(path),
       clearRecentDocuments: () => app.clearRecentDocuments(),
+      stat: (path) => stat(path),
       // The page sends `ready` once per mount; a reload sends it again, which the batches ignore.
       onReady: () => {
         fileBatch.ready()
         linkBatch.ready()
+      },
+      onError: (error) => {
+        console.error('raven player failed to answer a request.', error)
       },
       newId: randomUUID,
       now: Date.now,

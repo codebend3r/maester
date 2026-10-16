@@ -22,9 +22,11 @@ const sequentialId = (): (() => string) => {
 const setup = ({
   files,
   dialog = [],
+  addRecentDocument,
 }: {
   files: Record<string, Partial<Entry>>
-  dialog?: string[]
+  dialog?: string[] | Error
+  addRecentDocument?: (path: string) => void
 }) => {
   const table = new Map(
     Object.entries(files).map(([path, entry]) => [
@@ -78,7 +80,8 @@ const setup = ({
   })
 
   const recentDocuments: string[] = []
-  const spies = { recentDocuments, cleared: 0, ready: 0, dialogCalls: 0 }
+  const errors: unknown[] = []
+  const spies = { recentDocuments, cleared: 0, ready: 0, dialogCalls: 0, errors }
   const clock = { now: 5000 }
   // A second sequence for recents ids, offset so it cannot collide with the grants' ids.
   const recentId = sequentialId()
@@ -94,14 +97,23 @@ const setup = ({
     },
     showOpenDialog: async () => {
       spies.dialogCalls += 1
+      if (dialog instanceof Error) throw dialog
       return dialog
     },
-    addRecentDocument: (path) => spies.recentDocuments.push(path),
+    addRecentDocument: addRecentDocument ?? ((path) => spies.recentDocuments.push(path)),
     clearRecentDocuments: () => {
       spies.cleared += 1
     },
     onReady: () => {
       spies.ready += 1
+    },
+    stat: async (path) => {
+      const entry = table.get(path)
+      if (!entry) throw missing(path)
+      return { size: entry.size, mtimeMs: entry.mtimeMs }
+    },
+    onError: (error) => {
+      spies.errors.push(error)
     },
     newId: () => `10${recentId().slice(2)}`,
     now: () => clock.now,
@@ -395,6 +407,34 @@ describe('savePosition', () => {
   })
 })
 
+describe('a failing dependency', () => {
+  it('answers a rejecting open dialog with a refusal it can show, and reports the error', async () => {
+    const failure = new Error('dialog broke')
+    const { service, spies } = setup({ files: show, dialog: failure })
+    expect(await service.handle({ kind: 'page', request: { type: 'openDialog' } })).toEqual({
+      type: 'refused',
+      message: MESSAGES.failed,
+    })
+    expect(await service.openDialog()).toEqual({ type: 'refused', message: MESSAGES.failed })
+    expect(spies.errors).toEqual([failure, failure])
+  })
+
+  it('answers a throwing addRecentDocument with a refusal, not a rejection', async () => {
+    const failure = new Error('dock broke')
+    const { service, spies } = setup({
+      files: show,
+      addRecentDocument: () => {
+        throw failure
+      },
+    })
+    const { fileId } = idOf(await service.openPaths(['/m/Show/Episode 1.mkv']))
+    expect(
+      await service.handle({ kind: 'page', request: { type: 'describeFile', fileId, queue: [] } }),
+    ).toEqual({ type: 'refused', message: MESSAGES.failed })
+    expect(spies.errors).toEqual([failure])
+  })
+})
+
 describe('recents', () => {
   const recents = async (service: ReturnType<typeof setup>['service']) => {
     const reply = await service.handle({ kind: 'page', request: { type: 'listRecents' } })
@@ -481,6 +521,70 @@ describe('recents', () => {
     })
     expect(await recents(service)).toEqual([])
     expect(spies.cleared).toBe(1)
+  })
+
+  it('no longer opens a removed recent, nor any recent after a clear', async () => {
+    const { service } = setup({ files: show })
+    await open(service, '/m/Show/Episode 1.mkv')
+    await open(service, '/m/Show/Episode 2.mkv')
+    await open(service, '/m/Show/Episode 10.mkv')
+    const [removed, ...kept] = await recents(service)
+    if (!removed) throw new Error('no recent')
+    const openRecent = (recentId: string) =>
+      service.handle({ kind: 'page', request: { type: 'openRecent', recentId } })
+    const unknown = { type: 'refused', message: MESSAGES.unknownRecent } as const
+    await service.handle({
+      kind: 'page',
+      request: { type: 'removeRecent', recentId: removed.recentId },
+    })
+    expect(await openRecent(removed.recentId)).toEqual(unknown)
+    await service.handle({ kind: 'page', request: { type: 'clearRecents' } })
+    expect(kept).toHaveLength(2)
+    expect(await Promise.all(kept.map((recent) => openRecent(recent.recentId)))).toEqual([
+      unknown,
+      unknown,
+    ])
+  })
+
+  it('shows no progress for a file replaced since its position was saved', async () => {
+    const { service, table } = setup({ files: show })
+    const fileId = await open(service, '/m/Show/Episode 1.mkv')
+    await service.handle({
+      kind: 'page',
+      request: { type: 'savePosition', fileId, position: 40, duration: 120 },
+    })
+    expect((await recents(service))[0]!.watched).toBeCloseTo(0.33, 2)
+    table.set('/m/Show/Episode 1.mkv', {
+      real: '/m/Show/Episode 1.mkv',
+      isFile: true,
+      size: 999,
+      mtimeMs: 2000,
+    })
+    expect((await recents(service))[0]!.watched).toBeNull()
+  })
+
+  it('keeps the progress when the player leaves before it learns the length', async () => {
+    const { service } = setup({ files: show })
+    const fileId = await open(service, '/m/Show/Episode 1.mkv')
+    const save = (duration: number | null) =>
+      service.handle({
+        kind: 'page',
+        request: { type: 'savePosition', fileId, position: 40, duration },
+      })
+    await save(120)
+    await save(null)
+    expect((await recents(service))[0]!.watched).toBeCloseTo(0.33, 2)
+  })
+
+  it('shows no progress for a recent whose file has gone', async () => {
+    const { service, table } = setup({ files: show })
+    const fileId = await open(service, '/m/Show/Episode 1.mkv')
+    await service.handle({
+      kind: 'page',
+      request: { type: 'savePosition', fileId, position: 40, duration: 120 },
+    })
+    table.delete('/m/Show/Episode 1.mkv')
+    expect((await recents(service))[0]!.watched).toBeNull()
   })
 
   it('treats removing an unknown recent as done', async () => {
