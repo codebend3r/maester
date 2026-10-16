@@ -27,17 +27,22 @@ const counts = () => {
 }
 const collectUntil = async ({
   matches,
-  remaining = 500,
+  deadline = Date.now() + 15000,
+  rounds = 0,
 }: {
   matches: () => boolean
-  remaining?: number
+  deadline?: number
+  rounds?: number
 }): Promise<void> => {
   if (typeof global.gc !== 'function') throw new Error('Cleanup test requires --expose-gc')
   global.gc()
   await sleep(10)
   if (matches()) return
-  if (remaining === 0) throw new Error(`Native reclamation timed out: ${JSON.stringify(counts())}`)
-  await collectUntil({ matches, remaining: remaining - 1 })
+  if (Date.now() > deadline)
+    throw new Error(
+      `Native reclamation timed out after ${rounds} rounds: ${JSON.stringify(counts())}`,
+    )
+  await collectUntil({ matches, deadline, rounds: rounds + 1 })
 }
 
 if (isMainThread) {
