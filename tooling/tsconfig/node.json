@@ -1,0 +1,7 @@
+{
+  // A Node or Electron main process: Node's types, no decorators.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"]
+  }
+}

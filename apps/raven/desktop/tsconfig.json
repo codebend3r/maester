@@ -1,0 +1,9 @@
+{
+  // Bun reads `paths` from the nearest tsconfig.json, so the alias lives here as
+  // well as in each referenced config.
+  "files": [],
+  "compilerOptions": {
+    "paths": { "@/*": ["./src/*"] }
+  },
+  "references": [{ "path": "./tsconfig.main.json" }]
+}
