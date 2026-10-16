@@ -14,9 +14,9 @@ import type { TrackSelection } from '@/components/Player/useTrackSelection'
 import { useHtmlEngine } from '@/components/Player/useHtmlEngine'
 import { initialVideoState, videoReducer } from '@/components/Player/useVideoState'
 import { useWatchProgress } from '@/components/Player/useWatchProgress'
+import type { PlayerAction } from '@/lib/shortcuts'
 import { api } from '@/test/api'
 import { renderWithProviders } from '@/test/render'
-import type { PlayerAction } from '@/lib/shortcuts'
 
 const servicesFor = (): PlayerServices => ({
   title: { label: 'Local clip', duration: 120, resumeAt: 20, backTo: '/', next: null },
@@ -131,10 +131,11 @@ describe('useWatchProgress duration sink', () => {
       <PlayerServicesProvider services={services}>{children}</PlayerServicesProvider>
     )
     const state = initialVideoState(0)
+    const initialProps: { length: number | null } = { length: null }
     const { rerender } = renderHook(
       ({ length }: { length: number | null }) =>
         useWatchProgress({ state, position, duration: length }),
-      { initialProps: { length: null as number | null }, wrapper },
+      { initialProps, wrapper },
     )
     expect(duration).not.toHaveBeenCalled()
     rerender({ length: 120 })

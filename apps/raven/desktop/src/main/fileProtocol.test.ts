@@ -293,7 +293,7 @@ describe('file handler refusals', () => {
     const { handler, rangeCalls } = setup()
     const response = await handler(get({ url: `raven-file://${ID}/..%2f..%2fetc%2fpasswd` }))
     expect(response.status).toBe(200)
-    expect(rangeCalls[0]?.path).toBe('/movies/Film.mkv')
+    expect(rangeCalls[0]!.path).toBe('/movies/Film.mkv')
   })
 
   it('404s a granted file that stat can no longer find', async () => {

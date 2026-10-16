@@ -60,7 +60,7 @@ describe('servicesFor', () => {
 
   it('saves the position with the length it was told', () => {
     const { services, client } = setup()
-    services.progress.duration?.(30)
+    services.progress.duration!(30)
     services.progress.save(12)
     services.progress.left(20)
     expect(client.request).toHaveBeenNthCalledWith(1, {
@@ -91,12 +91,12 @@ describe('servicesFor', () => {
   it('forwards the menu actions the player understands and drops the rest', () => {
     const { services, menu } = setup()
     const listener = mock<(action: PlayerAction) => void>()
-    const unsubscribe = services.hostActions?.subscribe(listener)
+    const unsubscribe = services.hostActions!.subscribe(listener)
     menu.emit('skipForward')
     menu.emit('next')
     expect(listener).toHaveBeenCalledTimes(1)
     expect(listener).toHaveBeenCalledWith({ type: 'seekBy', seconds: 10 })
-    unsubscribe?.()
+    unsubscribe()
     menu.emit('togglePlay')
     expect(listener).toHaveBeenCalledTimes(1)
   })

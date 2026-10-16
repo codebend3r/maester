@@ -24,7 +24,8 @@ const setup = ({
   flush: () => Promise<void>
   wait?: (ms: number) => Promise<void>
 }) => {
-  const calls = { prevented: 0, quit: 0, exit: 0, flush: 0, waits: [] as number[] }
+  const waits: number[] = []
+  const calls = { prevented: 0, quit: 0, exit: 0, flush: 0, waits }
   const gate = createQuitGate({
     isDirty,
     flush: () => {

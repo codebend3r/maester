@@ -126,7 +126,7 @@ describe('Shell', () => {
     const second = new File(['2'], 'two.mkv')
     const event = dropOnWindow([first, second])
     expect(event.defaultPrevented).toBe(true)
-    expect(dropFiles.mock.calls[0]?.[0]).toEqual([first, second])
+    expect(dropFiles.mock.calls[0]![0]).toEqual([first, second])
     await act(async () => {})
     expect(router.state.location.pathname).toBe(`/play/${ID_A}`)
     expect(router.state.location.state).toEqual({ queue: [ID_B] })

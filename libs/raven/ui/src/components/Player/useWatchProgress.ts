@@ -44,7 +44,8 @@ export const useWatchProgress = ({
     if (duration == null || !Number.isFinite(duration) || duration <= 0) return
     if (reportedDuration.current === duration) return
     reportedDuration.current = duration
-    progress.duration?.(duration)
+    if (!progress.duration) return
+    progress.duration(duration)
   }, [duration, progress])
 
   const leave = useEffectEvent(() => {

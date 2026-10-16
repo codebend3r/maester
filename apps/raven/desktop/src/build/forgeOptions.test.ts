@@ -89,10 +89,9 @@ describe('documentTypes', () => {
   })
 
   it('lists only the UTIs the extensions use', () => {
-    expect(documentTypes(['mkv', 'MP4']).CFBundleDocumentTypes[0]?.LSItemContentTypes).toEqual([
-      'public.mpeg-4',
-      'org.matroska.mkv',
-    ])
+    expect(
+      documentTypes(['mkv', 'MP4']).CFBundleDocumentTypes[0]?.LSItemContentTypes ?? [],
+    ).toEqual(['public.mpeg-4', 'org.matroska.mkv'])
   })
 })
 

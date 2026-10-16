@@ -63,7 +63,7 @@ describe('grantNext', () => {
       readdir: async () => ['Episode 1.mkv', 'Episode 2.mkv', 'Episode 3.mkv'],
       grants,
     })
-    expect(next?.path).toBe('/m/Episode 3.mkv')
+    expect(next!.path).toBe('/m/Episode 3.mkv')
     expect(calls).toEqual(['/m/Episode 2.mkv', '/m/Episode 3.mkv'])
   })
 

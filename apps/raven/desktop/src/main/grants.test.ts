@@ -106,7 +106,7 @@ describe('grant', () => {
     expect(first.ok && second.ok && second.file.fileId).toBe(first.ok ? first.file.fileId : '')
     expect(second.ok && second.file.size).toBe(2)
     expect(second.ok && second.file.mtimeMs).toBe(9)
-    expect(grants.fileOf('id-1')?.size).toBe(2)
+    expect(grants.fileOf('id-1')!.size).toBe(2)
   })
 
   it('grants a unicode name with spaces and parentheses', async () => {

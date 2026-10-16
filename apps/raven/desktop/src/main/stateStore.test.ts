@@ -19,10 +19,11 @@ const missing = (path: string): Error =>
 const createFakeFs = (initial: Record<string, string> = {}) => {
   const files = new Map(Object.entries(initial))
   const calls: Call[] = []
+  const gates: Array<Promise<void>> = []
   const state = {
     failWrites: 0,
     failRenames: 0,
-    gates: [] as Array<Promise<void>>,
+    gates,
   }
 
   const fs: StateFs = {
@@ -209,7 +210,7 @@ describe('createStateStore', () => {
       { op: 'writeFile', path: TMP },
       { op: 'rename', path: TMP },
     ])
-    expect(calls[1]?.args).toEqual([TMP, FILE])
+    expect(calls[1]!.args).toEqual([TMP, FILE])
     expect(JSON.parse(files.get(FILE) ?? 'null')).toEqual(named('/three'))
     expect(files.has(TMP)).toBe(false)
     expect(store.isDirty()).toBe(false)

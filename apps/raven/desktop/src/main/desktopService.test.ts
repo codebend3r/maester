@@ -77,7 +77,8 @@ const setup = ({
     },
   })
 
-  const spies = { recentDocuments: [] as string[], cleared: 0, ready: 0, dialogCalls: 0 }
+  const recentDocuments: string[] = []
+  const spies = { recentDocuments, cleared: 0, ready: 0, dialogCalls: 0 }
   const clock = { now: 5000 }
   // A second sequence for recents ids, offset so it cannot collide with the grants' ids.
   const recentId = sequentialId()
@@ -182,14 +183,14 @@ describe('openPaths', () => {
       files: { '/m/a.mkv': {}, '/m/notes.txt': {}, '/m/b.mkv': {} },
     })
     const target = idOf(await service.openPaths(['/m/a.mkv', '/m/notes.txt', '/m/b.mkv']))
-    expect(grants.fileOf(target.fileId)?.name).toBe('a.mkv')
-    expect(target.queue.map((id) => grants.fileOf(id)?.name)).toEqual(['b.mkv'])
+    expect(grants.fileOf(target.fileId)!.name).toBe('a.mkv')
+    expect(target.queue.map((id) => grants.fileOf(id)!.name)).toEqual(['b.mkv'])
   })
 
   it('plays the first granted when the first path is refused', async () => {
     const { service, grants } = setup({ files: { '/m/a.mkv': {}, '/m/notes.txt': {} } })
     const target = idOf(await service.openPaths(['/m/notes.txt', '/m/a.mkv']))
-    expect(grants.fileOf(target.fileId)?.name).toBe('a.mkv')
+    expect(grants.fileOf(target.fileId)!.name).toBe('a.mkv')
     expect(target.queue).toEqual([])
   })
 
@@ -275,9 +276,9 @@ describe('describeFile', () => {
       folder: 'Show',
       resumeAt: 0,
     })
-    expect(reply.file.next?.label).toBe('Episode 2')
-    expect(isOpaqueId(reply.file.next?.fileId)).toBe(true)
-    expect(reply.file.next?.queue).toEqual([])
+    expect(reply.file.next!.label).toBe('Episode 2')
+    expect(isOpaqueId(reply.file.next!.fileId)).toBe(true)
+    expect(reply.file.next!.queue).toEqual([])
     expect(spies.recentDocuments).toEqual(['/m/Show/Episode 1.mkv'])
     expect(store.read().recents).toEqual([
       { kind: 'file', path: '/m/Show/Episode 1.mkv', openedAt: 5000 },
@@ -302,8 +303,8 @@ describe('describeFile', () => {
     )
     const reply = await describeFile(service, target.fileId, target.queue)
     if (reply.type !== 'file') throw new Error('expected file')
-    expect(reply.file.next?.label).toBe('Film')
-    expect(reply.file.next?.queue).toEqual(target.queue.slice(1))
+    expect(reply.file.next!.label).toBe('Film')
+    expect(reply.file.next!.queue).toEqual(target.queue.slice(1))
   })
 
   it('skips queue entries main no longer knows', async () => {
@@ -314,8 +315,8 @@ describe('describeFile', () => {
     const stranger = '00000000-0000-4000-8000-0000000000ff'
     const reply = await describeFile(service, target.fileId, [stranger, ...target.queue])
     if (reply.type !== 'file') throw new Error('expected file')
-    expect(reply.file.next?.label).toBe('Episode 10')
-    expect(reply.file.next?.queue).toEqual([])
+    expect(reply.file.next!.label).toBe('Episode 10')
+    expect(reply.file.next!.queue).toEqual([])
   })
 
   it('falls back to the folder when no queue entry is known', async () => {
@@ -323,7 +324,7 @@ describe('describeFile', () => {
     const { fileId } = idOf(await service.openPaths(['/m/Show/Episode 1.mkv']))
     const stranger = '00000000-0000-4000-8000-0000000000ff'
     const reply = await describeFile(service, fileId, [stranger])
-    expect(reply.type === 'file' && reply.file.next?.label).toBe('Episode 2')
+    expect(reply.type === 'file' && reply.file.next!.label).toBe('Episode 2')
   })
 
   it('walks the folder of the real file when the opened path is a symlink', async () => {
@@ -334,7 +335,7 @@ describe('describeFile', () => {
     const reply = await describeFile(service, fileId)
     if (reply.type !== 'file') throw new Error('expected file')
     expect(reply.file.folder).toBe('Show')
-    expect(reply.file.next?.label).toBe('Episode 2')
+    expect(reply.file.next!.label).toBe('Episode 2')
   })
 
   it('is refused notOpen for an id that was never granted', async () => {
@@ -418,7 +419,7 @@ describe('recents', () => {
     const list = await recents(service)
     expect(list.map((recent) => recent.label)).toEqual(['Episode 2', 'Episode 1'])
     expect(list.map((recent) => recent.watched)).toEqual([null, expect.any(Number)])
-    expect(list[1]?.watched).toBeCloseTo(0.33, 2)
+    expect(list[1]!.watched).toBeCloseTo(0.33, 2)
     expect(list.every((recent) => recent.from === 'Show')).toBe(true)
     expect(list.every((recent) => isOpaqueId(recent.recentId))).toBe(true)
     expect(JSON.stringify(list)).not.toContain('/')
@@ -429,7 +430,7 @@ describe('recents', () => {
     await open(service, '/m/Show/Episode 1.mkv')
     const [one] = await recents(service)
     const [two] = await recents(service)
-    expect(one?.recentId).toBe(two?.recentId)
+    expect(one!.recentId).toBe(two!.recentId)
   })
 
   it('opens a recent, and keeps it when the file has gone', async () => {

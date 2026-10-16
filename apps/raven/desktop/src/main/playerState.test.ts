@@ -55,7 +55,7 @@ describe('addRecent', () => {
     const second = addRecent(first, { path: '/b.mkv', at: 2 })
     const again = addRecent(second, { path: '/a.mkv', at: 3 })
     expect(again.recents.map((entry) => entry.path)).toEqual(['/a.mkv', '/b.mkv'])
-    expect(again.recents[0]?.openedAt).toBe(3)
+    expect(again.recents[0]!.openedAt).toBe(3)
   })
 
   it('drops the oldest at the 51st distinct path', () => {
@@ -64,7 +64,7 @@ describe('addRecent', () => {
     )
     expect(state.recents.length).toBe(50)
     expect(state.recents.some((entry) => entry.path === '/f0.mkv')).toBe(false)
-    expect(state.recents[0]?.path).toBe('/f50.mkv')
+    expect(state.recents[0]!.path).toBe('/f50.mkv')
   })
 })
 
@@ -139,7 +139,7 @@ describe('savePosition', () => {
       duration: null,
       at: 1,
     })
-    expect(state.resume[0]?.duration).toBeNull()
+    expect(state.resume[0]!.duration).toBeNull()
     expect(state.resume.length).toBe(1)
   })
 
@@ -148,7 +148,7 @@ describe('savePosition', () => {
     const two = savePosition(one, { file: facts('/b'), position: 20, duration: 120, at: 2 })
     const three = savePosition(two, { file: facts('/a'), position: 30, duration: 120, at: 3 })
     expect(three.resume.map((entry) => entry.path)).toEqual(['/a', '/b'])
-    expect(three.resume[0]?.position).toBe(30)
+    expect(three.resume[0]!.position).toBe(30)
   })
 
   it('keeps 1,000 of 1,001 and drops the least recently played', () => {
@@ -162,7 +162,7 @@ describe('savePosition', () => {
     )
     expect(state.resume.length).toBe(1000)
     expect(state.resume.some((entry) => entry.path === '/f0')).toBe(false)
-    expect(state.resume[0]?.path).toBe('/f1000')
+    expect(state.resume[0]!.path).toBe('/f1000')
   })
 })
 
@@ -276,7 +276,7 @@ describe('track picks', () => {
     const two = setTrackPick(one, { path: '/b', audio: 1, subtitle: null, at: 2 })
     const three = setTrackPick(two, { path: '/a', audio: 3, subtitle: null, at: 3 })
     expect(three.tracks.map((pick) => pick.path)).toEqual(['/a', '/b'])
-    expect(trackPickFor(three, { path: '/a' })?.audio).toBe(3)
+    expect(trackPickFor(three, { path: '/a' })!.audio).toBe(3)
   })
 
   it('keeps 1,000 of 1,001', () => {
