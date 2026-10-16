@@ -1,6 +1,7 @@
 import { type Saga, sagaCover } from '@raven/core'
 import { Link } from 'react-router-dom'
 import { PosterImage } from '@/components/PosterImage/PosterImage'
+import { WatchedCount } from '@/components/WatchedCount/WatchedCount'
 import { api } from '@/lib/api'
 import { POSTER_SIZES } from '@/lib/posters'
 import { sagaFacts, sagaPath } from '@/lib/sagas'
@@ -36,7 +37,14 @@ const SagaDeck = ({ saga, to }: { saga: Saga; to: string }) => {
           ))}
         </span>
         <span className={styles.name}>{saga.name}</span>
-        <span className={styles.facts}>{sagaFacts(saga).join(' · ')}</span>
+        <span className={styles.facts}>
+          <span>{sagaFacts(saga).join(' · ')}</span>
+          <WatchedCount
+            watched={saga.media.filter((media) => media.watched).length}
+            total={saga.media.length}
+            unit="movie"
+          />
+        </span>
       </Link>
     </li>
   )

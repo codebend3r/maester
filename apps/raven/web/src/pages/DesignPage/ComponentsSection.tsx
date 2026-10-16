@@ -15,6 +15,9 @@ import { ReviewCards } from '@/components/ReviewCards/ReviewCards'
 import { ScanStatus } from '@/components/ScanStatus/ScanStatus'
 import { ShowGrid } from '@/components/ShowCard/ShowCard'
 import { Loading } from '@/components/Skeleton/Skeleton'
+import { WatchedCount } from '@/components/WatchedCount/WatchedCount'
+import { WatchedMark } from '@/components/WatchedMark/WatchedMark'
+import { WatchedToggle } from '@/components/WatchedToggle/WatchedToggle'
 import { useSearch } from '@/lib/useSearch'
 import { DesignSection, Specimen } from '@/pages/DesignPage/DesignSection'
 import {
@@ -127,6 +130,20 @@ export const ComponentsSection = () => (
           </li>
         ))}
       </ul>
+    </Specimen>
+
+    <Specimen
+      name="Watched"
+      note="A check on a watched video, the number left or a check on a show, season or saga, and the toggle on a page: unpressed, partly and pressed."
+    >
+      <div className={styles.row}>
+        <WatchedMark watched />
+        <WatchedCount watched={3} total={9} />
+        <WatchedCount watched={9} total={9} />
+        <WatchedToggle state="unwatched" onToggle={noop} />
+        <WatchedToggle state="partly" onToggle={noop} />
+        <WatchedToggle state="watched" onToggle={noop} />
+      </div>
     </Specimen>
 
     <Specimen name="ScanStatus">

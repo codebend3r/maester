@@ -1,0 +1,15 @@
+// Over a picture, so on glass of the ground, as a score chip is.
+.mark {
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: var(--color-night-veil);
+  color: var(--color-bark);
+  pointer-events: none;
+
+  @media (forced-colors: active) {
+    border: 1px solid currentcolor;
+  }
+}

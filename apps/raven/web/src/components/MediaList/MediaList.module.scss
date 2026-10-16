@@ -70,6 +70,10 @@
 // Where playback stopped, as a thin line under the title.
 .mark {
   grid-area: mark;
+  display: grid;
+  grid-auto-flow: column;
+  align-items: center;
+  gap: var(--space-1);
 }
 
 .resume {

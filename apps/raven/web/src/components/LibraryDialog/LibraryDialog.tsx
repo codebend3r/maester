@@ -347,8 +347,8 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
               <span aria-hidden="true">%</span>
             </span>
             <p id={`${ids.settings}-watched-hint`} className={styles.settingHint}>
-              A video counts as watched in the library's history once playback gets this far through
-              it.
+              A video counts as watched once playback gets this far through it, and its resume spot
+              clears there too. Set low, a video gives up its spot early.
             </p>
           </div>
           {matchTypeFor(settings.kind) != null && (

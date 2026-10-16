@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'bun:test'
-import { screen, within } from '@testing-library/react'
+import { cleanup, screen, within } from '@testing-library/react'
 import { MediaTiles } from '@/components/MediaTiles/MediaTiles'
 import { POSTER_SIZES } from '@/lib/posters'
 import { matchedMovie, mediaItem } from '@/test/fixtures'
@@ -35,5 +35,31 @@ describe('MediaTiles', () => {
     atPixelRatio(3)
     const { container } = renderWithProviders(<MediaTiles items={[matchedMovie()]} posters />)
     expect(container.querySelector('img')).toHaveAttribute('sizes', POSTER_SIZES.movieTile)
+  })
+
+  it('shows the check for a watched video and not for another', () => {
+    renderWithProviders(<MediaTiles items={[mediaItem({ watched: true })]} />)
+    expect(screen.getByText('Watched')).toBeInTheDocument()
+    cleanup()
+    renderWithProviders(<MediaTiles items={[mediaItem()]} />)
+    expect(screen.queryByText('Watched')).toBeNull()
+  })
+
+  it('shows the check with the resume bar for a rewatch, on a poster tile too', () => {
+    const rewatch = matchedMovie({ watched: true, position: 30, duration: 120 })
+    const { container } = renderWithProviders(<MediaTiles items={[rewatch]} posters />)
+    expect(screen.getByText('Watched')).toBeInTheDocument()
+    expect(container.querySelector('[style]')).toHaveStyle({ width: '25%' })
+  })
+
+  it('leaves the check off the history, whose notes say what was watched', () => {
+    renderWithProviders(
+      <MediaTiles
+        items={[mediaItem({ watched: true })]}
+        note={() => '100% watched'}
+        withWatched={false}
+      />,
+    )
+    expect(screen.queryByText('Watched')).toBeNull()
   })
 })

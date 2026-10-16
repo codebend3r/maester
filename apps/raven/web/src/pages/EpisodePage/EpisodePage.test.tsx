@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { cleanup, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import type { ItemDetails } from '@raven/core'
 import { Route, Routes } from 'react-router-dom'
 import { api } from '@/lib/api'
@@ -78,5 +79,18 @@ describe('EpisodePage', () => {
     })
     expect(await screen.findByRole('link', { name: 'Play' })).toHaveAttribute('href', '/watch/14')
     expect(screen.queryByRole('heading', { name: 'Versions' })).toBeNull()
+  })
+
+  it('sends a media target from its Watched toggle', async () => {
+    const calls: unknown[] = []
+    const set = spyOn(api, 'setWatched').mockImplementation(async (input) => {
+      calls.push(input)
+    })
+    open()
+    const toggle = await screen.findByRole('button', { name: 'Watched' })
+    expect(toggle).toHaveAttribute('aria-pressed', 'false')
+    await userEvent.click(toggle)
+    set.mockRestore()
+    expect(calls).toEqual([{ watched: true, targets: [{ kind: 'media', id: EPISODE_TWO.id }] }])
   })
 })

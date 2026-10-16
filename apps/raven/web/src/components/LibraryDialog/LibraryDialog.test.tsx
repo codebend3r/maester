@@ -324,6 +324,11 @@ describe('LibraryDialog', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Add' }))
     const watched = screen.getByRole('spinbutton', { name: 'Watched at' })
     expect(watched).toHaveValue(95)
+    expect(
+      screen.getByText(
+        /its resume spot clears there too\. Set low, a video gives up its spot early/,
+      ),
+    ).toBeInTheDocument()
     await userEvent.clear(watched)
     await userEvent.type(watched, '75')
     await userEvent.click(screen.getByRole('button', { name: 'Add library' }))

@@ -375,7 +375,7 @@ const FinishedSection = ({ library }: { library: Library }) => {
       query={query}
       shape={<MediaTilesSkeleton />}
       empty={whenEmpty(
-        `Nothing finished in ${library.name} yet. A video counts once playback gets ${library.settings.watchedPercent}% of the way through.`,
+        `Nothing finished in ${library.name} yet. A video counts once playback gets ${library.settings.watchedPercent}% of the way through, or when you mark it watched.`,
       )}
     >
       {(entries) => {

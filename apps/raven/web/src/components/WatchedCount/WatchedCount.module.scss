@@ -1,0 +1,20 @@
+// Over a picture or beside a title: a round badge for a check or a small
+// number, growing into a pill for a longer one.
+.count {
+  display: grid;
+  place-items: center;
+  min-width: 1.5rem;
+  height: 1.5rem;
+  padding: 0 var(--space-1);
+  border-radius: 999px;
+  background: var(--color-night-veil);
+  color: var(--color-bark);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  line-height: 1;
+  pointer-events: none;
+
+  @media (forced-colors: active) {
+    border: 1px solid currentcolor;
+  }
+}

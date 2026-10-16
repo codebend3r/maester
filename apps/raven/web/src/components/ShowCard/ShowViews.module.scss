@@ -50,6 +50,15 @@
   width: 3rem;
 }
 
+// The title and, beside it, how much of the show is watched.
+.titleCell {
+  display: grid;
+  grid-template-columns: auto auto;
+  justify-content: start;
+  align-items: center;
+  gap: var(--space-1);
+}
+
 .title {
   font-weight: 600;
   text-decoration: none;

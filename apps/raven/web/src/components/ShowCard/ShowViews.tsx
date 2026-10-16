@@ -11,6 +11,7 @@ import { CardLink } from '@/components/CardLink/CardLink'
 import { Icon } from '@raven/ui'
 import { RatingChips, ScoreChip } from '@/components/RatingChips/RatingChips'
 import { SortHeader } from '@/components/SortHeader/SortHeader'
+import { WatchedCount } from '@/components/WatchedCount/WatchedCount'
 import { showYears } from '@/lib/itemLinks'
 import { POSTER_SIZES, posterSources } from '@/lib/posters'
 import { type SortColumn, useTableSort } from '@/lib/tableSort'
@@ -109,9 +110,12 @@ export const ShowList = ({ shows }: { shows: ShowEntry[] }) => {
         {sorted.map((entry) => (
           <tr key={entry.show.id} className={styles.row} data-entry={showEntryKey(entry.show)}>
             <th scope="row">
-              <CardLink to={`/shows/${entry.show.id}`} className={styles.title}>
-                {entry.show.title}
-              </CardLink>
+              <div className={styles.titleCell}>
+                <CardLink to={`/shows/${entry.show.id}`} className={styles.title}>
+                  {entry.show.title}
+                </CardLink>
+                <WatchedCount watched={entry.watchedEpisodes} total={entry.episodes} />
+              </div>
             </th>
             <td className={styles.number}>
               {showYears({ year: entry.show.year, endedYear: entry.endedYear }) ?? ''}
@@ -163,6 +167,7 @@ export const ShowTiles = ({
               {facts.map((fact) => (
                 <span key={fact}>{fact}</span>
               ))}
+              <WatchedCount watched={entry.watchedEpisodes} total={entry.episodes} />
             </span>
             <RatingChips ratings={entry.show.ratings} />
           </div>

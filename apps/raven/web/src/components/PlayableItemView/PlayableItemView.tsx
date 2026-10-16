@@ -21,6 +21,7 @@ import { ReviewCards } from '@/components/ReviewCards/ReviewCards'
 import { Summary } from '@/components/Summary/Summary'
 import { TmdbCredit } from '@/components/TmdbCredit/TmdbCredit'
 import { Versions } from '@/components/Versions/Versions'
+import { WatchedToggle } from '@/components/WatchedToggle/WatchedToggle'
 import { api } from '@/lib/api'
 import { directedBy, episodeByline, episodeFacts, fileFacts, movieFacts } from '@/lib/itemFacts'
 import { episodeBackPath, inLibrary, itemPath, watchLink } from '@/lib/itemLinks'
@@ -117,7 +118,7 @@ export const PlayableItemView = ({
   const [menuOpen, setMenuOpen] = useState(false)
   const [editingImages, setEditingImages] = useState(false)
   const [editingMetadata, setEditingMetadata] = useState(false)
-  const { favourite } = useMediaMutations({ media: primary })
+  const { favourite, watched } = useMediaMutations({ media: primary })
   const libraries = useQuery(librariesQuery)
   const tracks = useQuery(tracksQuery(primary.id))
   // A logo until Settings says to spell titles out, as a fresh install does.
@@ -183,6 +184,10 @@ export const PlayableItemView = ({
           className={primary.favourite ? styles.favourited : undefined}
           onClick={() => favourite.mutate(!primary.favourite)}
         />
+        <WatchedToggle
+          state={primary.watched ? 'watched' : 'unwatched'}
+          onToggle={() => watched.mutate(!primary.watched)}
+        />
         <AdminOnly>
           {config.editable && (
             <>
@@ -202,7 +207,7 @@ export const PlayableItemView = ({
               </Button>
             </>
           )}
-          {/* Without its favourite, which the page has beside it, all the menu holds needs the admin lock off. */}
+          {/* Without its favourite and watched, which the page has beside it, all the menu holds needs the admin lock off. */}
           <MediaMenu
             media={primary}
             open={menuOpen}
@@ -211,6 +216,7 @@ export const PlayableItemView = ({
             matchType={config.matchType}
             aiMatch={details.aiMatch}
             withFavourite={false}
+            withWatched={false}
             onMatched={(updated) => {
               const page = updated.item ? itemPath(updated.item) : null
               navigate(

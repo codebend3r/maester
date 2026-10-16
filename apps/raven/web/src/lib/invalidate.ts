@@ -60,6 +60,23 @@ export const afterFavourites = (queryClient: QueryClient): Promise<unknown> =>
     ],
   })
 
+/**
+ * Videos were marked watched or unwatched, in any library: the counts and
+ * cards of everything every library shows, the item pages, home and its
+ * up next, the favourites, and the videos themselves.
+ */
+export const afterWatched = (queryClient: QueryClient): Promise<unknown> =>
+  refetch({
+    queryClient,
+    filters: [
+      { queryKey: queryKeys.libraries },
+      { queryKey: queryKeys.items },
+      { queryKey: queryKeys.home },
+      { queryKey: queryKeys.favourites },
+      { queryKey: queryKeys.allMedia },
+    ],
+  })
+
 /** Libraries were pinned or unpinned: every library, and home, whose shelves follow the pins. */
 export const afterPins = (queryClient: QueryClient): Promise<unknown> =>
   refetch({
@@ -119,8 +136,9 @@ export const afterSagaBackdrop = ({
   refetch({ queryClient, filters: [{ queryKey: queryKeys.sagas(libraryId) }] })
 
 /**
- * The player closed: resume lines on the library's listings, In progress
- * and the history, all under the library, and home's show where it stopped.
+ * The player closed: resume lines and watched marks on the library's
+ * listings, In progress and the history, all under the library, home's show
+ * where it stopped, and the item pages and favourites, which show the same.
  */
 export const afterWatching = ({
   queryClient,
@@ -131,7 +149,12 @@ export const afterWatching = ({
 }): Promise<unknown> =>
   refetch({
     queryClient,
-    filters: [{ queryKey: queryKeys.library(libraryId) }, { queryKey: queryKeys.home }],
+    filters: [
+      { queryKey: queryKeys.library(libraryId) },
+      { queryKey: queryKeys.home },
+      { queryKey: queryKeys.items },
+      { queryKey: queryKeys.favourites },
+    ],
   })
 
 /** An item's pictures or metadata were edited: its page takes the answer, its editor and the listings read again. */

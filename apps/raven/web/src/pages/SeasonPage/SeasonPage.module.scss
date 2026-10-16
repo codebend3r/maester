@@ -14,8 +14,8 @@
 
 .episode {
   display: grid;
-  grid-template-columns: clamp(7rem, 24vw, 14rem) minmax(0, 1fr) auto;
-  grid-template-areas: 'still body play';
+  grid-template-columns: clamp(7rem, 24vw, 14rem) minmax(0, 1fr) auto auto;
+  grid-template-areas: 'still body toggle play';
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-2) 0;
@@ -33,7 +33,8 @@
 
   img,
   .stillPlaceholder,
-  .resume {
+  .resume,
+  .watched {
     grid-area: frame;
   }
 
@@ -56,6 +57,18 @@
 .resume {
   align-self: end;
   height: 3px;
+}
+
+// A check in the still's top corner.
+.watched {
+  align-self: start;
+  justify-self: end;
+  inset: var(--space-0) var(--space-0) auto auto;
+  position: relative;
+}
+
+.toggle {
+  grid-area: toggle;
 }
 
 .body {
@@ -112,9 +125,9 @@
 
 @media (max-width: 30rem) {
   .episode {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto auto;
     grid-template-areas:
-      'still play'
-      'body body';
+      'still toggle play'
+      'body body body';
   }
 }

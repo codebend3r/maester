@@ -61,7 +61,9 @@ describe('HistoryPage', () => {
     expect(await screen.findByRole('link', { name: 'Finished' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 2, name: 'Today' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Started' })).toBeNull()
-    expect(screen.getByText(/95% of the way through/)).toBeInTheDocument()
+    expect(
+      screen.getByText(/played or marked in .*95% of the way through, or when it is marked/),
+    ).toBeInTheDocument()
     expect(asked.at(-1)).toEqual({ limit: 100, watchedOnly: true })
   })
 

@@ -17,6 +17,7 @@ import { PosterOverlay } from '@/components/PosterOverlay/PosterOverlay'
 import { PosterImage } from '@/components/PosterImage/PosterImage'
 import { ScoreChip } from '@/components/RatingChips/RatingChips'
 import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
+import { WatchedMark, WatchedWords } from '@/components/WatchedMark/WatchedMark'
 import { api } from '@/lib/api'
 import { cardLink, watchLink } from '@/lib/itemLinks'
 import { mediaEntryKey } from '@/lib/entryKeys'
@@ -24,19 +25,26 @@ import type { PosterSizes } from '@/lib/posters'
 import { useHoverBackdrop } from '@/lib/useHoverBackdrop'
 import styles from '@/components/PosterCard/PosterCard.module.scss'
 
-/** The picture a poster card shows, with where playback stopped along its foot. */
+/**
+ * The picture a poster card shows, with where playback stopped along its
+ * foot and a check in its corner when it is watched. A rewatch has both.
+ */
 export const PosterFrame = ({
   media,
   poster,
   sizes,
+  withWatched = true,
 }: {
   media: MediaItem
   poster?: ItemSummary | null
   sizes: PosterSizes
+  /** Off where the card's note already says. */
+  withWatched?: boolean
 }) => (
   <span className={styles.frame}>
     <PosterImage media={media} poster={poster} sizes={sizes} />
     <ResumeBar media={media} className={styles.resume} />
+    <WatchedMark decorative watched={withWatched && media.watched} className={styles.watched} />
   </span>
 )
 
@@ -112,6 +120,7 @@ export const PosterCard = ({
         {score && <ScoreChip rating={score} />}
         {media.match === 'unmatched' && <span>Not matched</span>}
         <PartlyWatched media={media} />
+        <WatchedWords watched={media.watched} />
       </span>
       <PlaybackNote media={media} />
       {menu.menu}

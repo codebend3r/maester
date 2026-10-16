@@ -8,7 +8,7 @@ import { POSTER_SIZES } from '@/lib/posters'
 import { ShowPage } from '@/pages/ShowPage/ShowPage'
 import { itemDetails } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
-import { EPISODE_TWO, SEVERANCE } from '@/test/tv'
+import { EPISODE_TWO, SEASON_ONE_SUMMARY, SEVERANCE } from '@/test/tv'
 
 const Watching = () => <p>Watching {useParams().id}</p>
 const Elsewhere = () => <p>Show {useParams().id}</p>
@@ -139,5 +139,67 @@ describe('ShowPage', () => {
     spies.search.mockImplementation(async () => [])
     await userEvent.click(screen.getByRole('button', { name: 'Fix match' }))
     expect(screen.getByRole('dialog')).toHaveTextContent(`Matched by AI. ${reason}`)
+  })
+
+  const withSeasons = (counts: Array<[number, number]>): ItemDetails => ({
+    ...SEVERANCE,
+    children: counts.map(([watchedCount, episodeCount], index) => ({
+      ...SEASON_ONE_SUMMARY,
+      id: 5 + index,
+      season: index + 1,
+      title: `Season ${index + 1}`,
+      watchedCount,
+      episodeCount,
+    })),
+  })
+
+  it('shows how many episodes of a season are left unwatched', async () => {
+    open({ details: withSeasons([[1, 3]]) })
+    expect(await screen.findByText('2 unwatched episodes')).toBeInTheDocument()
+  })
+
+  it('reads as partly pressed when some episodes are watched', async () => {
+    open({
+      details: withSeasons([
+        [3, 3],
+        [0, 2],
+      ]),
+    })
+    expect(await screen.findByRole('button', { name: 'Watched' })).toHaveAttribute(
+      'aria-pressed',
+      'mixed',
+    )
+  })
+
+  it('reads as pressed when all are watched, and unpressed when none is', async () => {
+    open({ details: withSeasons([[3, 3]]) })
+    expect(await screen.findByRole('button', { name: 'Watched' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    cleanup()
+    open({ details: withSeasons([[0, 3]]) })
+    expect(await screen.findByRole('button', { name: 'Watched' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    )
+  })
+
+  it('marks everything watched from a partly watched show, then everything unwatched', async () => {
+    const calls: unknown[] = []
+    const set = spyOn(api, 'setWatched').mockImplementation(async (input) => {
+      calls.push(input)
+    })
+    open({ details: withSeasons([[1, 3]]) })
+    await userEvent.click(await screen.findByRole('button', { name: 'Watched' }))
+    cleanup()
+    open({ details: withSeasons([[3, 3]]) })
+    await userEvent.click(await screen.findByRole('button', { name: 'Watched' }))
+    set.mockRestore()
+    const targets = [{ kind: 'item', id: 4, libraryId: null }]
+    expect(calls).toEqual([
+      { watched: true, targets },
+      { watched: false, targets },
+    ])
   })
 })

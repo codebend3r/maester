@@ -54,6 +54,7 @@ export const historyDays = ({
 }
 
 const howFar = (entry: HistoryEntry): string => {
+  if (entry.marked) return 'Marked watched'
   if (entry.watched) return 'Watched'
   const duration = entry.media.duration
   if (!duration) return 'Played'
@@ -73,7 +74,10 @@ export const finishedNote = ({
     ...(entry.plays > 1 ? [`${entry.plays} plays`] : []),
   ].join(' · ')
 
-/** The line under a video in its history: how far it got, when it last played, and how often. */
+/**
+ * The line under a video in its history: how far it got, or that it was
+ * marked watched, when it last played or was marked, and how many real plays.
+ */
 export const historyNote = (entry: HistoryEntry): string =>
   [
     howFar(entry),

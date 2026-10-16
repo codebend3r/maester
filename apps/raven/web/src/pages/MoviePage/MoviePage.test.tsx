@@ -398,4 +398,25 @@ describe('MoviePage', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Busboys' })).toBeInTheDocument()
     expect(screen.queryByText('Matched by AI.')).toBeNull()
   })
+
+  it('shows Watched pressed for a watched movie and sends a media target when pressed', async () => {
+    const calls: unknown[] = []
+    const set = spyOn(api, 'setWatched').mockImplementation(async (input) => {
+      calls.push(input)
+    })
+    open({ details: itemDetails({ versions: [matchedMovie({ watched: true })] }) })
+    const toggle = await screen.findByRole('button', { name: 'Watched' })
+    expect(toggle).toHaveAttribute('aria-pressed', 'true')
+    await userEvent.click(toggle)
+    set.mockRestore()
+    expect(calls).toEqual([{ watched: false, targets: [{ kind: 'media', id: 7 }] }])
+  })
+
+  it('shows Watched unpressed for a movie not yet watched, and keeps it with the admin lock on', async () => {
+    open({ details: itemDetails(), adminLock: { state: 'on', available: true } })
+    expect(await screen.findByRole('button', { name: 'Watched' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    )
+  })
 })

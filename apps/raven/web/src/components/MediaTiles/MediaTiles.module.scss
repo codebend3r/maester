@@ -45,7 +45,8 @@
 
 .thumbnail,
 .placeholder,
-.resume {
+.resume,
+.watched {
   grid-area: frame;
 }
 
@@ -74,6 +75,15 @@
   z-index: 1;
   align-self: end;
   height: 3px;
+}
+
+// A check in the picture's top corner, over it and its hover filter.
+.watched {
+  position: relative;
+  z-index: 1;
+  align-self: start;
+  justify-self: end;
+  inset: var(--space-0) var(--space-0) auto auto;
 }
 
 .body {

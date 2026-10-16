@@ -60,6 +60,18 @@ describe('historyNote', () => {
     )
   })
 
+  it('says a marked video was marked watched, and when', () => {
+    expect(historyNote(entry({ playedAt: at, watched: true, marked: true }))).toBe(
+      `Marked watched · ${time(at)}`,
+    )
+  })
+
+  it('counts only real plays beside a mark', () => {
+    expect(historyNote(entry({ playedAt: at, watched: true, marked: true, plays: 2 }))).toBe(
+      `Marked watched · ${time(at)} · 2 plays`,
+    )
+  })
+
   it('says how far an unfinished one got', () => {
     expect(historyNote(entry({ playedAt: at, furthest: 42.7 }))).toBe(`42% watched · ${time(at)}`)
   })

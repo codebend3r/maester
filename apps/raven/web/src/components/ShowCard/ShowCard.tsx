@@ -10,6 +10,7 @@ import { useState } from 'react'
 import { CardLink } from '@/components/CardLink/CardLink'
 import { ScoreChip } from '@/components/RatingChips/RatingChips'
 import { PosterOverlay } from '@/components/PosterOverlay/PosterOverlay'
+import { WatchedCount, WatchedCountWords } from '@/components/WatchedCount/WatchedCount'
 import { api } from '@/lib/api'
 import { showYears } from '@/lib/itemLinks'
 import { POSTER_SIZES, type PosterSizes, posterSources } from '@/lib/posters'
@@ -72,6 +73,12 @@ export const ShowCard = ({
           ) : (
             <span className={styles.placeholder}>{show.title.slice(0, 1)}</span>
           )}
+          <WatchedCount
+            decorative
+            watched={entry.watchedEpisodes}
+            total={entry.episodes}
+            className={styles.watched}
+          />
         </span>
       </CardLink>
       {next && (
@@ -93,6 +100,7 @@ export const ShowCard = ({
           <span key={fact}>{fact}</span>
         ))}
         {score && <ScoreChip rating={score} />}
+        <WatchedCountWords watched={entry.watchedEpisodes} total={entry.episodes} />
       </span>
     </li>
   )

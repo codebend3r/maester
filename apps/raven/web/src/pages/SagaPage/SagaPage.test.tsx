@@ -231,4 +231,22 @@ describe('SagaPage', () => {
     expect(await screen.findByRole('region', { name: 'Locked' })).toBeInTheDocument()
     expect(spies.sagas).not.toHaveBeenCalled()
   })
+
+  it('marks every movie of the saga from its Watched toggle, by item in its library', async () => {
+    const calls: unknown[] = []
+    const set = spyOn(api, 'setWatched').mockImplementation(async (input) => {
+      calls.push(input)
+    })
+    open()
+    const toggle = await screen.findByRole('button', { name: 'Watched' })
+    expect(toggle).toHaveAttribute('aria-pressed', 'false')
+    await userEvent.click(toggle)
+    set.mockRestore()
+    expect(calls).toEqual([
+      {
+        watched: true,
+        targets: [70, 80, 90].map((id) => ({ kind: 'item', id, libraryId: 2 })),
+      },
+    ])
+  })
 })

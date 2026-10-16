@@ -165,6 +165,8 @@ type MenuProps = {
   aiMatch?: AiMatch | null
   /** Off where the page has its own favourite button. */
   withFavourite?: boolean
+  /** Off where the page has its own Watched button. */
+  withWatched?: boolean
   onMatched?: (updated: MediaItem) => void
   onDeleted?: () => void
 }
@@ -181,6 +183,7 @@ const MenuBody = ({
   matchType = null,
   aiMatch = null,
   withFavourite = true,
+  withWatched = true,
   onMatched,
   onDeleted,
   id,
@@ -197,7 +200,7 @@ const MenuBody = ({
   const [confirming, setConfirming] = useState(false)
   const [fixing, setFixing] = useState(false)
   const [editingImages, setEditingImages] = useState(false)
-  const { favourite, remove, refresh } = useMediaMutations({ media })
+  const { favourite, watched, remove, refresh } = useMediaMutations({ media })
   const matchable = matchType != null && media.match !== 'off'
   const item = media.item
   // Only a movie's details carry an AI note: an episode's never do.
@@ -264,6 +267,16 @@ const MenuBody = ({
               label={media.favourite ? 'Remove favourite' : 'Favourite'}
               onClick={() => {
                 favourite.mutate(!media.favourite)
+                close({ refocus: true })
+              }}
+            />
+          )}
+          {withWatched && (
+            <MenuItem
+              icon="check"
+              label={media.watched ? 'Mark as unwatched' : 'Mark as watched'}
+              onClick={() => {
+                watched.mutate(!media.watched)
                 close({ refocus: true })
               }}
             />
@@ -363,7 +376,8 @@ const MenuBody = ({
 }
 
 /**
- * A card's context menu: mark or unmark a favourite and, with the admin lock
+ * A card's context menu: mark or unmark a favourite, mark it watched or
+ * unwatched and, with the admin lock
  * off, fix the match or fetch the details again where the library matches
  * its files, change the pictures of its movie or show, delete the video, or
  * see and copy where its file lives. The card owns `open`, so a right

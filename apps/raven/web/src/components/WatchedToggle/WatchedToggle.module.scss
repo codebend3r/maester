@@ -1,0 +1,13 @@
+// Pressed is a solid edge on a filled ground, partly a dashed one, so the
+// state reads without its colour and in forced colours.
+.toggle {
+  &[aria-pressed='true'] {
+    border-color: var(--color-bark);
+    background: var(--color-canopy);
+  }
+
+  &[aria-pressed='mixed'] {
+    border-style: dashed;
+    border-color: var(--color-lichen);
+  }
+}

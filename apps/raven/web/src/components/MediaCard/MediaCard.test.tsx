@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, spyOn } from 'bun:test'
-import { fireEvent, screen } from '@testing-library/react'
+import { cleanup, fireEvent, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { type PlaybackSettingsState, mediaLabel } from '@raven/core'
 import { MediaCard } from '@/components/MediaCard/MediaCard'
@@ -117,5 +117,21 @@ describe('MediaCard', () => {
       <MediaCard media={mediaItem({ thumbnail: 'pending' })} />,
     )
     expect(container.querySelector('img')).toBeNull()
+  })
+
+  it('shows the check for a watched video and not for another', () => {
+    renderWithProviders(<MediaCard media={mediaItem({ watched: true })} />)
+    expect(screen.getByText('Watched')).toBeInTheDocument()
+    cleanup()
+    renderWithProviders(<MediaCard media={mediaItem()} />)
+    expect(screen.queryByText('Watched')).toBeNull()
+  })
+
+  it('shows the check with the resume bar for a rewatch', () => {
+    const { container } = renderWithProviders(
+      <MediaCard media={mediaItem({ watched: true, position: 30, duration: 120 })} />,
+    )
+    expect(screen.getByText('Watched')).toBeInTheDocument()
+    expect(container.querySelector('[style]')).toHaveStyle({ width: '25%' })
   })
 })

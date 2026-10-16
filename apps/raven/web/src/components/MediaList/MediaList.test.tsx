@@ -99,4 +99,13 @@ describe('MediaList', () => {
       .map((cell) => cell.textContent)
     expect(cells.slice(0, 4)).toEqual(['', '', '1.6 GB', ''])
   })
+
+  it('shows the check in the title cell of a watched video, and leaves the header alone', () => {
+    renderWithProviders(<MediaList items={[mediaItem({ watched: true }), mediaItem({ id: 8 })]} />)
+    const [header, watched, unwatched] = screen.getAllByRole('row')
+    if (!header || !watched || !unwatched) throw new Error('rows missing')
+    expect(within(watched).getByRole('rowheader')).toHaveTextContent('Watched')
+    expect(within(unwatched).queryByText('Watched')).toBeNull()
+    expect(within(header).queryByText('Watched')).toBeNull()
+  })
 })
