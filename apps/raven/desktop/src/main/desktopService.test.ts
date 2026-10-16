@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import { dirname, basename } from 'node:path'
 import { isOpaqueId, MAX_QUEUE } from '@/shared/protocol'
 import { createGrants } from '@/main/grants'
-import { createStateStore, type StateFs } from '@/main/stateStore'
+import { createStateStore, type StateFs, type Timers } from '@/main/stateStore'
 import { EMPTY_STATE } from '@/main/playerState'
 import { createDesktopService, MESSAGES } from '@/main/desktopService'
 
@@ -23,10 +23,12 @@ const setup = ({
   files,
   dialog = [],
   addRecentDocument,
+  stat,
 }: {
   files: Record<string, Partial<Entry>>
   dialog?: string[] | Error
   addRecentDocument?: (path: string) => void
+  stat?: (path: string) => Promise<{ size: number; mtimeMs: number }>
 }) => {
   const table = new Map(
     Object.entries(files).map(([path, entry]) => [
@@ -83,6 +85,24 @@ const setup = ({
   const errors: unknown[] = []
   const spies = { recentDocuments, cleared: 0, ready: 0, dialogCalls: 0, errors }
   const clock = { now: 5000 }
+  const statCalls: string[] = []
+  const pendingTimers = new Map<number, () => void>()
+  const timerCount = { next: 0 }
+  const timers: Timers = {
+    set: (run) => {
+      timerCount.next += 1
+      pendingTimers.set(timerCount.next, run)
+      return timerCount.next
+    },
+    clear: (handle) => {
+      if (typeof handle === 'number') pendingTimers.delete(handle)
+    },
+  }
+  const fireTimers = () => {
+    const runs = [...pendingTimers.values()]
+    pendingTimers.clear()
+    runs.forEach((run) => run())
+  }
   // A second sequence for recents ids, offset so it cannot collide with the grants' ids.
   const recentId = sequentialId()
   const service = createDesktopService({
@@ -108,17 +128,31 @@ const setup = ({
       spies.ready += 1
     },
     stat: async (path) => {
+      statCalls.push(path)
+      if (stat) return stat(path)
       const entry = table.get(path)
       if (!entry) throw missing(path)
       return { size: entry.size, mtimeMs: entry.mtimeMs }
     },
+    timers,
     onError: (error) => {
       spies.errors.push(error)
     },
     newId: () => `10${recentId().slice(2)}`,
     now: () => clock.now,
   })
-  return { service, store, table, stats, spies, clock, grants }
+  return {
+    service,
+    store,
+    table,
+    stats,
+    spies,
+    clock,
+    grants,
+    statCalls,
+    fireTimers,
+    pendingTimers,
+  }
 }
 
 const idOf = (reply: Awaited<ReturnType<ReturnType<typeof setup>['service']['openPaths']>>) => {
@@ -574,6 +608,64 @@ describe('recents', () => {
     await save(120)
     await save(null)
     expect((await recents(service))[0]!.watched).toBeCloseTo(0.33, 2)
+  })
+
+  it('answers without a check that never comes back, showing no progress for that file alone', async () => {
+    const stuck = '/m/Show/Episode 2.mkv'
+    const { service, table, fireTimers } = setup({
+      files: show,
+      stat: (path) => {
+        if (path === stuck) return new Promise(() => undefined)
+        const entry = table.get(path)
+        if (!entry) return Promise.reject(missing(path))
+        return Promise.resolve({ size: entry.size, mtimeMs: entry.mtimeMs })
+      },
+    })
+    const save = async (path: string) => {
+      const fileId = await open(service, path)
+      await service.handle({
+        kind: 'page',
+        request: { type: 'savePosition', fileId, position: 30, duration: 120 },
+      })
+    }
+    await save('/m/Show/Episode 1.mkv')
+    await save(stuck)
+    await save('/m/Show/Episode 10.mkv')
+    const listed = recents(service)
+    await Bun.sleep(0)
+    fireTimers()
+    const list = await listed
+    expect(list.map((recent) => [recent.label, recent.watched])).toEqual([
+      ['Episode 10', 0.25],
+      ['Episode 2', null],
+      ['Episode 1', 0.25],
+    ])
+  })
+
+  it('checks a path once however many lists are waiting on it', async () => {
+    const held = Promise.withResolvers<{ size: number; mtimeMs: number }>()
+    const { service, statCalls, fireTimers } = setup({ files: show, stat: () => held.promise })
+    const fileId = await open(service, '/m/Show/Episode 1.mkv')
+    await open(service, '/m/Show/Episode 2.mkv')
+    await service.handle({
+      kind: 'page',
+      request: { type: 'savePosition', fileId, position: 30, duration: 120 },
+    })
+    const first = recents(service)
+    const second = recents(service)
+    await Bun.sleep(0)
+    // Episode 2 has no saved position, so it is not started whatever the disk says.
+    expect(statCalls).toEqual(['/m/Show/Episode 1.mkv'])
+    fireTimers()
+    await Promise.all([first, second])
+    const third = recents(service)
+    await Bun.sleep(0)
+    expect(statCalls).toEqual(['/m/Show/Episode 1.mkv'])
+    held.resolve({ size: 100, mtimeMs: 1000 })
+    const list = await third
+    expect(list.map((recent) => recent.watched)).toEqual([null, 0.25])
+    await recents(service)
+    expect(statCalls).toEqual(['/m/Show/Episode 1.mkv', '/m/Show/Episode 1.mkv'])
   })
 
   it('shows no progress for a recent whose file has gone', async () => {

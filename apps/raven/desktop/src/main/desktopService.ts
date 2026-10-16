@@ -5,13 +5,14 @@ import type { GrantedFile, GrantRefusal, Grants } from '@/main/grants'
 import {
   addRecent,
   clearRecents,
+  type FileFacts,
   type PlayerState,
   removeRecent,
   resumeFor,
   savePosition,
   watchedShare,
 } from '@/main/playerState'
-import type { StateStore } from '@/main/stateStore'
+import type { StateStore, Timers } from '@/main/stateStore'
 import {
   type DesktopReply,
   type DesktopRequest,
@@ -30,6 +31,9 @@ export const MESSAGES = {
   failed: 'raven player could not do that. Try again.',
 } as const
 
+/** How long Home waits on one file's check: a sleeping network share can block for minutes. */
+export const RECENT_CHECK_MS = 500
+
 export type DesktopServiceDeps = {
   grants: Grants
   store: StateStore
@@ -38,6 +42,7 @@ export type DesktopServiceDeps = {
   addRecentDocument: (path: string) => void
   clearRecentDocuments: () => void
   stat: (path: string) => Promise<{ size: number; mtimeMs: number }>
+  timers: Timers
   onReady: () => void
   onError: (error: unknown) => void
   newId: () => string
@@ -175,14 +180,36 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
     return DONE
   }
 
+  // One check per path at a time: a stuck one is reused, not joined by more stuck threads.
+  const checking = new Map<string, Promise<FileFacts | null>>()
+
+  const factsOf = (path: string): Promise<FileFacts | null> => {
+    const pending = checking.get(path)
+    if (pending !== undefined) return pending
+    const check = deps
+      .stat(path)
+      .then(
+        ({ size, mtimeMs }): FileFacts | null => ({ path, size, mtimeMs }),
+        () => null,
+      )
+      .finally(() => checking.delete(path))
+    checking.set(path, check)
+    return check
+  }
+
+  const factsWithin = (path: string): Promise<FileFacts | null> => {
+    const timeout = Promise.withResolvers<null>()
+    const timer = deps.timers.set(() => timeout.resolve(null), RECENT_CHECK_MS)
+    return Promise.race([factsOf(path), timeout.promise]).finally(() => deps.timers.clear(timer))
+  }
+
   // Home's bar must agree with where playback starts, so a file replaced on disk shows none.
+  // Only a file with a saved position needs the check; the rest are not started either way.
   const shareOf = async ({ state, path }: { state: PlayerState; path: string }) => {
-    try {
-      const { size, mtimeMs } = await deps.stat(path)
-      return watchedShare(state, { file: { path, size, mtimeMs } })
-    } catch {
-      return null
-    }
+    if (!state.resume.some((entry) => entry.path === path)) return null
+    const file = await factsWithin(path)
+    if (file === null) return null
+    return watchedShare(state, { file })
   }
 
   const listRecents = async (): Promise<DesktopReply> => {

@@ -194,6 +194,7 @@ const startApp = (): void => {
       addRecentDocument: (path) => app.addRecentDocument(path),
       clearRecentDocuments: () => app.clearRecentDocuments(),
       stat: (path) => stat(path),
+      timers,
       // The page sends `ready` once per mount; a reload sends it again, which the batches ignore.
       onReady: () => {
         fileBatch.ready()
