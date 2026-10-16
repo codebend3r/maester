@@ -1,5 +1,13 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { createContext, useCallback, useContext, useEffect, useEffectEvent, useState } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useState,
+} from 'react'
 import { type NavigateFunction, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useDesktop } from '@/renderer/desktop/DesktopContext'
 import { useFileDrop } from '@/renderer/Shell/useFileDrop'
@@ -95,10 +103,16 @@ export const Shell = () => {
     }
   })
 
+  // A ref survives StrictMode's second run of the effect; main reads every `ready` as a new page.
+  const hasSaidReady = useRef(false)
+
   useEffect(() => {
     const unsubscribe = client.subscribe((event) => onEvent(event))
-    // Main holds what it was asked to open until the page is listening.
-    void client.request({ type: 'ready' })
+    if (!hasSaidReady.current) {
+      hasSaidReady.current = true
+      // Main holds what it was asked to open until the page is listening.
+      void client.request({ type: 'ready' })
+    }
     return unsubscribe
   }, [client])
 
@@ -112,7 +126,8 @@ export const Shell = () => {
     <DraggingContext.Provider value={isDragging}>
       <NoticeContext.Provider value={showNotice}>
         <Outlet />
-        {notice !== null && <output className={styles.notice}>{notice.message}</output>}
+        {/* Always mounted: a live region is announced when its text changes, not when it appears. */}
+        <output className={styles.notice}>{notice?.message ?? ''}</output>
       </NoticeContext.Provider>
     </DraggingContext.Provider>
   )

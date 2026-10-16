@@ -11,4 +11,11 @@
   background: var(--color-canopy-glass);
   box-shadow: var(--shadow-menu);
   font-size: var(--font-size-sm);
+
+  // Nothing to show: keep the live region in the page, but not its box.
+  &:empty {
+    padding: 0;
+    border: 0;
+    box-shadow: none;
+  }
 }

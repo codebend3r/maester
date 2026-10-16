@@ -1,7 +1,7 @@
 import { mock } from 'bun:test'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render } from '@testing-library/react'
-import { act } from 'react'
+import { act, StrictMode } from 'react'
 import { createMemoryRouter, type RouteObject, RouterProvider } from 'react-router-dom'
 import type { DesktopClient } from '@/renderer/desktop/client'
 import { DesktopProvider } from '@/renderer/desktop/DesktopContext'
@@ -24,13 +24,16 @@ export const STUB_ROUTES: RouteObject[] = [
   },
 ]
 
+const DONE = { type: 'done' } as const
+
 type FakeOverrides = Partial<DesktopClient>
 
 /** A client whose calls are recorded; `emit` pushes an event to whoever subscribed. */
 export const fakeClient = (overrides: FakeOverrides = {}) => {
   const listeners = new Set<(event: DesktopEvent) => void>()
   const request = mock<DesktopClient['request']>(
-    overrides.request ?? (async () => ({ type: 'done' })),
+    overrides.request ??
+      (async (asked) => (asked.type === 'listRecents' ? { type: 'recents', recents: [] } : DONE)),
   )
   const dropFiles = mock<DesktopClient['dropFiles']>(
     overrides.dropFiles ?? (async () => ({ type: 'done' })),
@@ -56,20 +59,24 @@ export const renderDesktop = ({
   client,
   route = '/',
   routes = desktopRoutes,
+  isStrict = false,
 }: {
   client: DesktopClient
   route?: string
   routes?: RouteObject[]
+  /** Mounts under StrictMode, which runs every effect twice in development. */
+  isStrict?: boolean
 }) => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const menu = createMenuHub()
   const router = createMemoryRouter(routes, { initialEntries: [route] })
-  render(
+  const app = (
     <QueryClientProvider client={queryClient}>
       <DesktopProvider client={client} menu={menu}>
         <RouterProvider router={router} />
       </DesktopProvider>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   )
+  render(isStrict ? <StrictMode>{app}</StrictMode> : app)
   return { router, menu, queryClient }
 }

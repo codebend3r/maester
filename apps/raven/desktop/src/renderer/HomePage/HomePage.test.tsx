@@ -26,9 +26,20 @@ const answering =
     others[request.type] ??
     (request.type === 'listRecents' ? { type: 'recents', recents } : { type: 'done' })
 
+const settled = () => screen.findByText('Nothing opened yet.')
+
+const dragOverWindow = (type: 'dragenter' | 'dragleave', types: string[]) => {
+  const event = new Event(type)
+  Object.defineProperty(event, 'dataTransfer', { value: { types } })
+  act(() => {
+    window.dispatchEvent(event)
+  })
+}
+
 describe('HomePage', () => {
-  it('focuses its heading on arrival', () => {
+  it('focuses its heading on arrival', async () => {
     renderDesktop({ client: fakeClient(), routes: STUB_ROUTES })
+    await settled()
     expect(screen.getByRole('heading', { name: 'raven player' })).toHaveFocus()
   })
 
@@ -99,31 +110,35 @@ describe('HomePage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('The state file is unreadable.')
   })
 
-  it('shows Drop to play while a drag is over the window', () => {
+  it('shows Drop to play while a drag is over the window', async () => {
     renderDesktop({ client: fakeClient(), routes: STUB_ROUTES })
+    await settled()
     expect(screen.queryByText('Drop to play')).not.toBeInTheDocument()
-    act(() => {
-      window.dispatchEvent(new Event('dragenter'))
-    })
+    dragOverWindow('dragenter', ['Files'])
     expect(screen.getByText('Drop to play')).toBeInTheDocument()
-    act(() => {
-      window.dispatchEvent(new Event('dragleave'))
-    })
+    dragOverWindow('dragleave', ['Files'])
     expect(screen.queryByText('Drop to play')).not.toBeInTheDocument()
   })
 
-  it('keeps Drop to play up while the drag moves between child elements', () => {
+  it('keeps Drop to play up while the drag moves between child elements', async () => {
     renderDesktop({ client: fakeClient(), routes: STUB_ROUTES })
-    act(() => {
-      window.dispatchEvent(new Event('dragenter'))
-      window.dispatchEvent(new Event('dragenter'))
-      window.dispatchEvent(new Event('dragleave'))
-    })
+    await settled()
+    dragOverWindow('dragenter', ['Files'])
+    dragOverWindow('dragenter', ['Files'])
+    dragOverWindow('dragleave', ['Files'])
     expect(screen.getByText('Drop to play')).toBeInTheDocument()
+  })
+
+  it('ignores a drag of selected text', async () => {
+    renderDesktop({ client: fakeClient(), routes: STUB_ROUTES })
+    await settled()
+    dragOverWindow('dragenter', ['text/plain'])
+    expect(screen.queryByText('Drop to play')).not.toBeInTheDocument()
   })
 
   it('goes to Settings', async () => {
     const { router } = renderDesktop({ client: fakeClient(), routes: STUB_ROUTES })
+    await settled()
     await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
     expect(router.state.location.pathname).toBe('/settings')
   })

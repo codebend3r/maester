@@ -18,7 +18,9 @@ export const HomePage = () => {
   const isDragging = useDragging()
   const title = useRef<HTMLHeadingElement>(null)
 
-  useEffect(() => title.current?.focus(), [])
+  useEffect(() => {
+    if (title.current !== null) title.current.focus()
+  }, [])
 
   const recents = useQuery({
     queryKey: RECENTS_KEY,
@@ -57,8 +59,8 @@ export const HomePage = () => {
       <section className={styles.recents} aria-labelledby="recents-title">
         <h2 id="recents-title">Recent</h2>
         {recents.isError && <p role="alert">{recents.error.message}</p>}
-        {recents.data?.length === 0 && <p>Nothing opened yet.</p>}
-        {!!recents.data?.length && (
+        {recents.data !== undefined && recents.data.length === 0 && <p>Nothing opened yet.</p>}
+        {recents.data !== undefined && recents.data.length > 0 && (
           <ul className={styles.list}>
             {recents.data.map((recent) => (
               <li key={recent.recentId} className={styles.recent}>

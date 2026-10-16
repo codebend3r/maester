@@ -74,8 +74,9 @@
   grid-area: open;
   display: grid;
   place-items: center;
-  margin-inline: var(--gutter);
-  border: 2px dashed var(--color-lichen);
+  justify-self: center;
+  width: calc(100% - var(--gutter) * 2);
+  border: var(--border-thick) dashed var(--color-lichen);
   border-radius: var(--radius-md);
   background: var(--color-night-veil);
   font-family: var(--font-display);

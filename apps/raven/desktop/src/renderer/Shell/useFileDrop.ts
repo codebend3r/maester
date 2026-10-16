@@ -20,11 +20,15 @@ export const useFileDrop = ({
   const reply = useEffectEvent(onReply)
 
   useEffect(() => {
-    const enter = () => {
+    // Selected text and links are dragged too; only files are a drop to play.
+    const hasFiles = (event: DragEvent) => event.dataTransfer?.types.includes('Files') ?? false
+    const enter = (event: DragEvent) => {
+      if (!hasFiles(event)) return
       depth.current += 1
       setIsDragging(true)
     }
-    const leave = () => {
+    const leave = (event: DragEvent) => {
+      if (!hasFiles(event)) return
       depth.current = Math.max(0, depth.current - 1)
       if (depth.current === 0) setIsDragging(false)
     }
