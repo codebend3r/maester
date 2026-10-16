@@ -290,11 +290,17 @@ test(
           timeout: 35000,
         },
       )
-      const code = await new Promise<number | null>((resolveExit, reject) => {
-        child.once('error', reject)
-        child.once('close', resolveExit)
-      })
-      assert.equal(code, 0, `${mode} cleanup failed or timed out`)
+      const exit = await new Promise<{ code: number | null; signal: NodeJS.Signals | null }>(
+        (resolveExit, reject) => {
+          child.once('error', reject)
+          child.once('close', (code, signal) => resolveExit({ code, signal }))
+        },
+      )
+      assert.equal(
+        exit.code,
+        0,
+        `${mode} cleanup failed or timed out (code ${exit.code}, signal ${exit.signal})`,
+      )
     }, Promise.resolve())
   },
 )
