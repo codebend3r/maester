@@ -64,6 +64,10 @@ make, patch and the normal Apple command-line tools. They never install tools or
 change `xcode-select`. Supply `DEVELOPER_DIR` explicitly when necessary. CI uses
 Xcode 26.6 on the standard `macos-26` arm64 runner and may install Apple's Metal
 component on that disposable runner only. No local system installation is implied.
+
+`fetch:libmpv` is a cached Nx target (about 7 minutes cold), keyed on `native/`, `src/build/`,
+the lockfile and the Xcode version. CI sets `NX_CLOUD_ACCESS_TOKEN` from a repository secret so
+Nx Cloud serves it to every later run; with no token it caches in `.nx/cache` only.
 Homebrew may provide build tools, never the shipped runtime dependencies.
 Both MoltenVK Xcode stages keep separate derived-data directories under
 `native-build/xcode-derived-data`, outside the upstream packaging cleanup of

@@ -71,9 +71,28 @@
         ]
       },
       "fetch:libmpv": {
-        "cache": false,
+        "cache": true,
         "dependsOn": [
           "^build"
+        ],
+        "inputs": [
+          "{projectRoot}/native/**/*",
+          "{projectRoot}/src/build/**/*",
+          "{projectRoot}/package.json",
+          "{workspaceRoot}/bun.lock",
+          "{workspaceRoot}/tsconfig.base.json",
+          {
+            "runtime": "xcodebuild -version"
+          },
+          {
+            "runtime": "uname -m"
+          }
+        ],
+        "outputs": [
+          "{projectRoot}/native-build/archives",
+          "{projectRoot}/native-build/prefix",
+          "{projectRoot}/native-build/source-bundle",
+          "{projectRoot}/resources"
         ]
       },
       "build:native": {
