@@ -11,12 +11,11 @@ import {
 } from '@raven/core'
 import { CardLink } from '@/components/CardLink/CardLink'
 import { FavouriteMark } from '@/components/FavouriteMark/FavouriteMark'
-import { Icon } from '@raven/ui'
 import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
+import { PosterOverlay } from '@/components/PosterOverlay/PosterOverlay'
 import { PosterImage } from '@/components/PosterImage/PosterImage'
 import { ScoreChip } from '@/components/RatingChips/RatingChips'
-import { ResolutionChip } from '@/components/ResolutionChip/ResolutionChip'
 import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { api } from '@/lib/api'
 import { cardLink, watchLink } from '@/lib/itemLinks'
@@ -97,14 +96,10 @@ export const PosterCard = ({
       >
         <PosterFrame media={media} poster={poster} sizes={sizes} />
       </CardLink>
-      <span className={styles.overlay}>
-        <ResolutionChip media={media} className={styles.quality} />
-        {hasPage && (
-          <CardLink {...watchLink({ media })} className={styles.play} aria-label={`Play ${title}`}>
-            <Icon name="play" size={18} />
-          </CardLink>
-        )}
-      </span>
+      <PosterOverlay
+        media={media}
+        play={hasPage ? { ...watchLink({ media }), label: `Play ${title}` } : null}
+      />
       <CardLink {...link} className={styles.title} onContextMenu={menu.onContextMenu}>
         {title}
       </CardLink>

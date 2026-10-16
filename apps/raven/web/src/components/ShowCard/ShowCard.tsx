@@ -8,9 +8,8 @@ import {
 } from '@raven/core'
 import { useState } from 'react'
 import { CardLink } from '@/components/CardLink/CardLink'
-import { Icon } from '@raven/ui'
 import { ScoreChip } from '@/components/RatingChips/RatingChips'
-import { ResolutionChip } from '@/components/ResolutionChip/ResolutionChip'
+import { PosterOverlay } from '@/components/PosterOverlay/PosterOverlay'
 import { api } from '@/lib/api'
 import { showYears } from '@/lib/itemLinks'
 import { POSTER_SIZES, type PosterSizes, posterSources } from '@/lib/posters'
@@ -76,17 +75,14 @@ export const ShowCard = ({
         </span>
       </CardLink>
       {next && (
-        <span className={styles.overlay}>
-          <ResolutionChip media={next} className={styles.quality} />
-          <CardLink
-            to={`/watch/${next.id}`}
-            state={{ media: next }}
-            className={styles.play}
-            aria-label={code ? `Play ${show.title} ${code}` : `Play ${show.title}`}
-          >
-            <Icon name="play" size={18} />
-          </CardLink>
-        </span>
+        <PosterOverlay
+          media={next}
+          play={{
+            to: `/watch/${next.id}`,
+            state: { media: next },
+            label: code ? `Play ${show.title} ${code}` : `Play ${show.title}`,
+          }}
+        />
       )}
       <CardLink to={`/shows/${show.id}`} className={styles.title}>
         {show.title}
