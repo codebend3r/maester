@@ -10,8 +10,8 @@
     "typecheck": "tsgo --noEmit",
     "lint:ts": "oxlint",
     "lint:ts:fix": "oxlint --fix",
-    "lint:css": "stylelint \"src/**/*.scss\"",
-    "lint:css:fix": "stylelint --fix \"src/**/*.scss\"",
+    "lint:css": "gale \"src/**/*.scss\"",
+    "lint:css:fix": "gale --fix \"src/**/*.scss\"",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
     "test": "bun test --dots",
@@ -25,6 +25,7 @@
     "react-router-dom": "7.18.4"
   },
   "devDependencies": {
+    "@codebend3r/gale": "0.2.5",
     "@happy-dom/global-registrator": "20.14.5",
     "@testing-library/jest-dom": "7.0.1",
     "@testing-library/react": "16.3.3",
@@ -38,8 +39,6 @@
     "oxfmt": "0.68.0",
     "oxlint": "1.83.0",
     "sass": "1.104.1",
-    "stylelint": "17.15.0",
-    "stylelint-config-recommended-scss": "17.0.1",
     "typescript": "7.0.2",
     "vite": "8.3.0"
   },

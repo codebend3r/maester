@@ -40,7 +40,7 @@ jobs:
           # No package.json script chained with `&&`, `||` or `;`.
           - name: 🧩 One command per script
             run: bun run one-command-per-script
-          # ruff, oxlint and stylelint.
+          # ruff, oxlint and gale.
           - name: 🧹 Lint
             run: bun run lint
           # ruff format, and oxfmt for each project and the root files.

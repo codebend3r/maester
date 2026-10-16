@@ -253,7 +253,7 @@ From the repo root:
 ```bash
 bun install
 bun run dev:raven   # shared player build watcher, server on :8484 (watch mode, no scan on start) and Vite on :5173, proxying /api
-bun run verify         # spellcheck, TypeScript only, one command per script, lint, stylelint, format check, typecheck, tests and build for every project
+bun run verify         # spellcheck, TypeScript only, one command per script, lint (gale for the SCSS), format check, typecheck, tests and build for every project
 ```
 
 The dev server reads `apps/raven/.env`, the file the compose file reads, so `LIBRARY_PIN`, `ADMIN_PASSWORD` and the metadata keys work the same in development. Restart it after changing the file.
