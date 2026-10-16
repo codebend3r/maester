@@ -286,4 +286,67 @@ describe('migrations', () => {
     ])
     database.onModuleDestroy()
   })
+
+  it('kinds the plays, moves the old default to 95 and drops the spots a watched play would have cleared', () => {
+    const before = new Sqlite(join(state.dir, 'raven.db'))
+    MIGRATIONS.slice(0, 24).forEach((sql) => before.exec(sql))
+    before.pragma('user_version = 24')
+    const library = before.prepare(
+      `INSERT INTO libraries (name, created_at, watched_percent) VALUES (?, '2026-01-01T00:00:00.000Z', ?)`,
+    )
+    const standard = Number(library.run('Standard', 90).lastInsertRowid)
+    const lenient = Number(library.run('Lenient', 80).lastInsertRowid)
+    const file = before.prepare(
+      `INSERT INTO media (library_id, path, file_name, folder, title, container, size, mtime_ms, added_at, duration)
+       VALUES (?, ?, ?, '', ?, 'mkv', 1, 1, '2026-01-01T00:00:00.000Z', ?)`,
+    )
+    const add = ({
+      libraryId,
+      name,
+      duration,
+    }: {
+      libraryId: number
+      name: string
+      duration: number | null
+    }) => Number(file.run(libraryId, `/${name}.mkv`, `${name}.mkv`, name, duration).lastInsertRowid)
+    const between = add({ libraryId: standard, name: 'between', duration: 100 })
+    const past = add({ libraryId: standard, name: 'past', duration: 100 })
+    const lenientPast = add({ libraryId: lenient, name: 'lenient', duration: 100 })
+    const lenientBefore = add({ libraryId: lenient, name: 'lenient-before', duration: 100 })
+    const unknown = add({ libraryId: standard, name: 'unknown', duration: null })
+    const progress = before.prepare(
+      "INSERT INTO playback_progress (media_id, position, updated_at) VALUES (?, ?, '2026-01-01T00:00:00.000Z')",
+    )
+    progress.run(between, 92)
+    progress.run(past, 95)
+    progress.run(lenientPast, 80)
+    progress.run(lenientBefore, 79)
+    progress.run(unknown, 5000)
+    before
+      .prepare(
+        "INSERT INTO plays (media_id, played_at, furthest) VALUES (?, '2026-01-01T00:00:00.000Z', 91)",
+      )
+      .run(between)
+    before.close()
+
+    const database = new DatabaseService({ ...readServerConfig({}), dataDir: state.dir })
+    expect(database.db.prepare('SELECT kind, furthest FROM plays').all()).toEqual([
+      { kind: 'played', furthest: 91 },
+    ])
+    expect(
+      database.db.prepare('SELECT name, watched_percent FROM libraries ORDER BY id').all(),
+    ).toEqual([
+      { name: 'Standard', watched_percent: 95 },
+      { name: 'Lenient', watched_percent: 80 },
+    ])
+    expect(
+      database.db.prepare('SELECT media_id FROM playback_progress ORDER BY media_id').all(),
+    ).toEqual([{ media_id: between }, { media_id: lenientBefore }, { media_id: unknown }])
+    expect(() =>
+      database.db
+        .prepare("INSERT INTO plays (media_id, played_at, kind) VALUES (?, 'x', 'skipped')")
+        .run(between),
+    ).toThrow()
+    database.onModuleDestroy()
+  })
 })

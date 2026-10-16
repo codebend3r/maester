@@ -17,6 +17,7 @@ export const SEASON_ONE_SUMMARY: SeasonSummary = {
   ...SEASON_ONE_CARD,
   type: 'season',
   episodeCount: 2,
+  watchedCount: 0,
 }
 
 /** A show, its first season and two episodes, as the item routes would answer. */
@@ -84,6 +85,7 @@ export const episodeRow = (media: MediaItem): EpisodeSummary => ({
   released: '2022-02-18',
   runtime: 55,
   stillVersion: 'still1',
+  watched: false,
   primary: media,
 })
 

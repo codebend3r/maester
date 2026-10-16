@@ -22,6 +22,7 @@ const played = ({
   plays: 1,
   furthest: watched ? 95 : 40,
   watched,
+  marked: false,
 })
 
 const FINISHED = played({ id: 1, title: 'Finished', watched: true })
@@ -59,7 +60,7 @@ describe('HistoryPage', () => {
     expect(await screen.findByRole('link', { name: 'Finished' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 2, name: 'Today' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Started' })).toBeNull()
-    expect(screen.getByText(/90% of the way through/)).toBeInTheDocument()
+    expect(screen.getByText(/95% of the way through/)).toBeInTheDocument()
     expect(asked.at(-1)).toEqual({ limit: 100, watchedOnly: true })
   })
 

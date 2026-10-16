@@ -1,9 +1,12 @@
 import type { ItemType, MediaSort } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
+import type { Viewer } from '@/lock/lockService'
 import { MediaIndex } from '@/media/mediaIndex'
 import { ViewingRepository } from '@/media/viewingRepository'
-import { BLANK_ITEM, type FetchedItem } from '@/metadata/tmdbClient'
+import { WatchedCards } from '@/media/watchedCards'
+import { WatchedRepository } from '@/media/watchedRepository'
+import { BLANK_ITEM, type FetchedItem, type FetchedSaga } from '@/metadata/tmdbClient'
 import { testDatabase } from '@/test/database'
 import { repositories } from '@/test/repositories'
 
@@ -269,14 +272,18 @@ describe("listing a TV library's shows", () => {
   })
 
   it("answers a show's next episode on its own too", () => {
-    expect(fileName(media().nextEpisode(state.aired)?.id)).toBe('Aired - S01E02.mkv')
-    expect(fileName(media().nextEpisode(state.special)?.id)).toBe('Special - S01E01.mkv')
+    expect(
+      fileName(media().nextEpisode({ showId: state.aired, libraryIds: [state.libraryId] })?.id),
+    ).toBe('Aired - S01E02.mkv')
+    expect(
+      fileName(media().nextEpisode({ showId: state.special, libraryIds: [state.libraryId] })?.id),
+    ).toBe('Special - S01E01.mkv')
   })
 
   it('has none once every episode is watched', () => {
     const viewing = new ViewingRepository(database.get(), media())
     viewing.report({ id: state.ids.get('Aired - S01E02.mkv') ?? -1, position: 60 })
-    expect(media().nextEpisode(state.aired)).toBeNull()
+    expect(media().nextEpisode({ showId: state.aired, libraryIds: [state.libraryId] })).toBeNull()
     expect(
       media()
         .listShows({ libraryId: state.libraryId })
@@ -338,5 +345,247 @@ describe('listing what is in progress', () => {
       input: { name: 'Test', paths: ['/m'], settings: { saveProgress: false } },
     })
     expect(titles()).toEqual([])
+  })
+})
+
+const EVERYONE: Viewer = {
+  listsLibrary: () => true,
+  seesLibrary: () => true,
+  seesItem: () => true,
+  sees: () => true,
+}
+
+describe('what is watched, card by card', () => {
+  const database = testDatabase('raven-watched-lists-')
+  const state = { libraryId: 0, otherId: 0 }
+  const media = () => repositories(database.get()).media
+  const viewing = () => new ViewingRepository(database.get(), media())
+  const index = () => new MediaIndex(database.get())
+
+  const addFile = ({
+    libraryId,
+    name,
+    height = 1080,
+  }: {
+    libraryId: number
+    name: string
+    height?: number
+  }): number => {
+    const id = index().insert({
+      libraryId,
+      kind: 'other',
+      file: { path: `/${libraryId}/${name}.mkv`, root: `/${libraryId}`, size: 100, mtimeMs: 1 },
+    })
+    index().saveProbe({
+      id,
+      probe: { ...PROBE, width: (height * 16) / 9, height },
+      tracks: TRACKS,
+    })
+    return id
+  }
+  /** A movie with a file for each height, best first once listed. */
+  const addMovie = ({
+    title,
+    heights,
+    libraryId = state.libraryId,
+    saga = null,
+  }: {
+    title: string
+    heights: readonly number[]
+    libraryId?: number
+    saga?: FetchedSaga | null
+  }): { itemId: number; ids: number[] } => {
+    const { metadata } = repositories(database.get())
+    const itemId = metadata.save({
+      item: { ...fetched({ type: 'movie', tmdbId: title, title }), saga },
+    })
+    const ids = heights.map((height) => addFile({ libraryId, name: `${title} ${height}p`, height }))
+    metadata.link({ mediaIds: ids, itemIds: [itemId] })
+    return { itemId, ids }
+  }
+  /** A show whose episodes are numbered 1 to `count`; `shared` is one file holding episodes 1 and 2. */
+  const addShow = ({
+    title,
+    count,
+  }: {
+    title: string
+    count: number
+  }): { showId: number; episodeIds: number[] } => {
+    const { metadata } = repositories(database.get())
+    const showId = metadata.save({ item: fetched({ type: 'show', tmdbId: title, title }) })
+    const seasonId = metadata.save({
+      item: fetched({ type: 'season', tmdbId: `${title}-1`, title, number: 1 }),
+      parentId: showId,
+    })
+    const episodeIds = Array.from({ length: count }, (_, at) =>
+      metadata.save({
+        item: fetched({
+          type: 'episode',
+          tmdbId: `${title}-1-${at + 1}`,
+          title: `Episode ${at + 1}`,
+          number: at + 1,
+        }),
+        parentId: seasonId,
+      }),
+    )
+    return { showId, episodeIds }
+  }
+  const filesOf = ({
+    episodeId,
+    libraryId = state.libraryId,
+    heights,
+  }: {
+    episodeId: number
+    libraryId?: number
+    heights: readonly number[]
+  }): number[] => {
+    const ids = heights.map((height) =>
+      addFile({ libraryId, name: `episode ${episodeId} ${height}p`, height }),
+    )
+    repositories(database.get()).metadata.link({ mediaIds: ids, itemIds: [episodeId] })
+    return ids
+  }
+  const finish = (id: number): void => {
+    viewing().report({ id, position: 60 })
+  }
+  const mark = ({ id, watched }: { id: number; watched: boolean }): void => {
+    new WatchedRepository(database.get()).set({
+      cards: new WatchedCards(database.get(), repositories(database.get()).metadata).resolve({
+        targets: [{ kind: 'media', id }],
+        viewer: EVERYONE,
+      }),
+      watched,
+      at: new Date(),
+    })
+  }
+  const watchedOf = (title: string): boolean | undefined =>
+    media()
+      .list({ libraryId: state.libraryId })
+      .find((item) => item.title.startsWith(title))?.watched
+
+  beforeAll(async () => {
+    await database.open()
+    const libraries = new LibrariesRepository(database.get())
+    state.libraryId = libraries.create({ name: 'Mixed', paths: ['/1'] }).id
+    state.otherId = libraries.create({ name: 'Other', paths: ['/2'] }).id
+  })
+
+  afterAll(database.close)
+
+  it('watches a movie’s whole card when any one of its files is', () => {
+    const { ids } = addMovie({ title: 'Heat', heights: [1080, 720] })
+    addMovie({ title: 'Ronin', heights: [1080] })
+    expect(watchedOf('Heat')).toBe(false)
+    finish(ids[1] ?? -1)
+    expect(watchedOf('Heat')).toBe(true)
+    expect(watchedOf('Ronin')).toBe(false)
+    expect(
+      media()
+        .getMany(ids)
+        .map((item) => item.watched),
+    ).toEqual([true, true])
+  })
+
+  it('keeps a split card apart from the files that share the movie', () => {
+    const { ids } = addMovie({ title: 'Alexander', heights: [1080, 720] })
+    database
+      .get()
+      .db.prepare("UPDATE media SET split = 'cut:Final Cut' WHERE id = ?")
+      .run(ids[1] ?? -1)
+    finish(ids[1] ?? -1)
+    const [theatrical, finalCut] = media().getMany(ids)
+    expect([theatrical?.watched, finalCut?.watched]).toEqual([false, true])
+  })
+
+  it('shows a file watched and started again as both', () => {
+    const { ids } = addMovie({ title: 'Collateral', heights: [1080] })
+    const id = ids[0] ?? -1
+    mark({ id, watched: true })
+    viewing().report({ id, position: 20, at: new Date(Date.now() + 3_600_000) })
+    expect(
+      media()
+        .listInProgress()
+        .find((item) => item.id === id),
+    ).toMatchObject({
+      watched: true,
+      position: 20,
+    })
+  })
+
+  it('carries the flag on a saga’s movies', () => {
+    const saga = { tmdbId: '9001', name: 'The Heist Collection' }
+    const [first, second] = ['Ocean’s 11', 'Ocean’s 12'].map(
+      (title) => addMovie({ title, heights: [1080], saga }).ids[0] ?? -1,
+    )
+    finish(second ?? -1)
+    const movies = media()
+      .listSagas(state.libraryId)
+      .flatMap((each) => each.media)
+    expect(movies.map((item) => [item.id, item.watched])).toEqual(
+      expect.arrayContaining([
+        [first, false],
+        [second, true],
+      ]),
+    )
+  })
+
+  it('counts a show’s watched episodes once, a two-episode file watching both', () => {
+    const { showId, episodeIds } = addShow({ title: 'Doubled', count: 3 })
+    const shared = filesOf({ episodeId: episodeIds[0] ?? -1, heights: [1080] })
+    repositories(database.get()).metadata.link({
+      mediaIds: shared,
+      itemIds: [episodeIds[0] ?? -1, episodeIds[1] ?? -1],
+    })
+    filesOf({ episodeId: episodeIds[2] ?? -1, heights: [1080] })
+    const entry = () =>
+      media()
+        .listShows({ libraryId: state.libraryId })
+        .find((each) => each.show.id === showId)
+    expect(entry()).toMatchObject({ episodes: 3, watchedEpisodes: 0 })
+    finish(shared[0] ?? -1)
+    expect(entry()).toMatchObject({ episodes: 3, watchedEpisodes: 2 })
+    expect(entry()?.next?.item?.id).toBe(episodeIds[2])
+  })
+
+  it('skips an episode watched in any one of its files when picking the next', () => {
+    const { showId, episodeIds } = addShow({ title: 'Versions', count: 2 })
+    const first = filesOf({ episodeId: episodeIds[0] ?? -1, heights: [1080, 720] })
+    const second = filesOf({ episodeId: episodeIds[1] ?? -1, heights: [1080] })
+    const libraryIds = [state.libraryId]
+    const next = () => media().nextEpisode({ showId, libraryIds })?.id
+    expect(next()).toBe(first[0])
+    finish(first[1] ?? -1)
+    expect(next()).toBe(second[0])
+  })
+
+  it('judges the next episode by the libraries it is asked about alone', () => {
+    const { showId, episodeIds } = addShow({ title: 'Everywhere', count: 2 })
+    const here = filesOf({ episodeId: episodeIds[0] ?? -1, heights: [1080] })
+    const there = filesOf({
+      episodeId: episodeIds[0] ?? -1,
+      libraryId: state.otherId,
+      heights: [1080],
+    })
+    filesOf({ episodeId: episodeIds[1] ?? -1, heights: [1080] })
+    finish(there[0] ?? -1)
+    expect(media().nextEpisode({ showId, libraryIds: [state.libraryId] })?.id).toBe(here[0])
+    expect(
+      media().nextEpisode({ showId, libraryIds: [state.libraryId, state.otherId] })?.item?.episode,
+    ).toBe(2)
+  })
+
+  it('answers which episodes are watched, and where', () => {
+    const { episodeIds } = addShow({ title: 'Where', count: 2 })
+    const there = filesOf({
+      episodeId: episodeIds[0] ?? -1,
+      libraryId: state.otherId,
+      heights: [1080],
+    })
+    filesOf({ episodeId: episodeIds[1] ?? -1, heights: [1080] })
+    finish(there[0] ?? -1)
+    expect(media().watchedEpisodes(episodeIds)).toEqual([
+      { episodeId: episodeIds[0], libraryId: state.otherId },
+    ])
+    expect(media().watchedEpisodes([])).toEqual([])
   })
 })

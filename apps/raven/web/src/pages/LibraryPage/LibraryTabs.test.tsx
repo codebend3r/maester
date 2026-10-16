@@ -375,6 +375,7 @@ describe('LibraryPage tabs', () => {
         plays: 2,
         furthest: 100,
         watched: true,
+        marked: false,
       },
     ])
     open({ route: '/libraries/2/finished' })

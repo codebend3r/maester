@@ -4,6 +4,8 @@ import { LibrariesRepository } from '@/libraries/librariesRepository'
 import type { Viewer } from '@/lock/lockService'
 import { MediaIndex } from '@/media/mediaIndex'
 import { ViewingRepository } from '@/media/viewingRepository'
+import { WatchedCards } from '@/media/watchedCards'
+import { WatchedRepository } from '@/media/watchedRepository'
 import { localEpisode, localSeason } from '@/metadata/localItems'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 import type { FetchedItem } from '@/metadata/tmdbClient'
@@ -164,5 +166,36 @@ describe("a page's children", () => {
       state.files.get('Andor/S01E01 2160p.mkv'),
       state.files.get('Andor/S01E02.mkv'),
     ])
+  })
+
+  it('counts what is watched in the libraries this browser may see only', () => {
+    const { metadata, media } = stores()
+    const everyone = viewerHiding({ hidden: -1, metadata })
+    new WatchedRepository(database.get()).set({
+      cards: new WatchedCards(database.get(), metadata).resolve({
+        targets: ['Andor/S01E01 2160p.mkv', 'Andor/S01E02.mkv'].map((path) => ({
+          kind: 'media',
+          id: state.files.get(path) ?? -1,
+        })),
+        viewer: everyone,
+      }),
+      watched: true,
+      at: new Date(),
+    })
+    const [seasonOne = -1] = state.seasons
+    const watchedAmong = (hidden: number) => {
+      const viewer = viewerHiding({ hidden, metadata })
+      return {
+        seasons: itemChildren({ parentId: state.showId, viewer, metadata, media }).flatMap(
+          (child) => (child.type === 'season' ? [child.watchedCount] : []),
+        ),
+        episodes: itemChildren({ parentId: seasonOne, viewer, metadata, media }).flatMap((child) =>
+          child.type === 'episode' ? [child.watched] : [],
+        ),
+      }
+    }
+    expect(watchedAmong(-1)).toEqual({ seasons: [2, 0], episodes: [true, true] })
+    expect(watchedAmong(state.locked)).toEqual({ seasons: [0], episodes: [false] })
+    expect(watchedAmong(state.open)).toEqual({ seasons: [2, 0], episodes: [true, true] })
   })
 })

@@ -32,7 +32,7 @@ export const library = (overrides: Partial<Library> = {}): Library => ({
     sort: 'title',
     view: 'grid',
     groupBy: 'resolution',
-    watchedPercent: 90,
+    watchedPercent: 95,
     kind: 'other',
     ratingsSource: 'tmdb',
     autoRefresh: true,
@@ -65,6 +65,7 @@ export const mediaItem = (overrides: Partial<MediaItem> = {}): MediaItem => ({
   thumbnailVersion: 1,
   position: 0,
   favourite: false,
+  watched: false,
   addedAt: '2026-09-27T00:00:00.000Z',
   changedAt: '2026-09-27T00:00:00.000Z',
   match: 'off',
@@ -102,6 +103,7 @@ export const seasonSummary = (overrides: Partial<SeasonSummary> = {}): SeasonSum
   }),
   type: 'season',
   episodeCount: 9,
+  watchedCount: 0,
   ...overrides,
 })
 
@@ -120,6 +122,7 @@ export const episodeSummary = (overrides: Partial<EpisodeSummary> = {}): Episode
   released: '2022-02-18',
   runtime: 54,
   stillVersion: 'st1llVers10n',
+  watched: false,
   primary: mediaItem({ id: 12, title: 'Severance - S01E02 - Half Loop', match: 'matched' }),
   ...overrides,
 })
@@ -127,6 +130,7 @@ export const episodeSummary = (overrides: Partial<EpisodeSummary> = {}): Episode
 export const showEntry = (overrides: Partial<ShowEntry> = {}): ShowEntry => ({
   show: itemSummary({ id: 4, type: 'show', title: 'Severance', year: 2022 }),
   episodes: 9,
+  watchedEpisodes: 0,
   endedYear: null,
   addedAt: '2026-09-27T00:00:00.000Z',
   bitrate: 6_000_000,

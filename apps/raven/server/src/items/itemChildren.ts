@@ -14,7 +14,8 @@ const ofType = <T extends ItemSummary['type']>({
 /**
  * A show's seasons or a season's episodes on disk, as its page lists them:
  * a season with how many of its episodes this browser may see, an episode
- * with its row's words and the file Play starts. Read a few queries for the
+ * with its row's words and the file Play starts. Both count what is watched
+ * in the libraries this browser may see only. Read a few queries for the
  * whole list, never one per child.
  */
 export const itemChildren = ({
@@ -33,16 +34,24 @@ export const itemChildren = ({
   const onDisk = metadata.episodesOnDisk(ofType({ children, type: 'season' }))
   const rows = metadata.episodeRows(episodeIds)
   const files = media.forItems(episodeIds)
+  const watched = new Set(
+    media
+      .watchedEpisodes([...episodeIds, ...[...onDisk.values()].flat()])
+      .flatMap(({ episodeId, libraryId }) => (viewer.seesLibrary(libraryId) ? [episodeId] : [])),
+  )
   return children.flatMap((child): ItemChild[] => {
     switch (child.type) {
-      case 'season':
+      case 'season': {
+        const shown = (onDisk.get(child.id) ?? []).filter((id) => viewer.seesItem(id))
         return [
           {
             ...child,
             type: 'season',
-            episodeCount: (onDisk.get(child.id) ?? []).filter((id) => viewer.seesItem(id)).length,
+            episodeCount: shown.length,
+            watchedCount: shown.filter((id) => watched.has(id)).length,
           },
         ]
+      }
       case 'episode': {
         const row = rows.get(child.id)
         const visible = (files.get(child.id) ?? []).filter((file) =>
@@ -56,6 +65,7 @@ export const itemChildren = ({
             released: row?.released ?? null,
             runtime: row?.runtime ?? null,
             stillVersion: row?.stillVersion ?? null,
+            watched: watched.has(child.id),
             primary: primaryVersion(visible) ?? null,
           },
         ]

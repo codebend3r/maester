@@ -16,8 +16,8 @@ import { DatabaseService } from '@/db/database'
 import {
   BEST_FIRST,
   FIRST_ITEM,
-  FURTHEST_JOIN,
-  isWatched,
+  cardWatched,
+  fileWatched,
   likePattern,
   score,
 } from '@/media/mediaSql'
@@ -59,6 +59,7 @@ type MediaRow = {
   item_tmdb_original_title: string | null
   split: string | null
   versions: number
+  watched: number
 }
 
 /**
@@ -69,7 +70,8 @@ type MediaRow = {
  * movie's own card count each other. The CROSS JOIN makes that count start
  * from the movie's files: left to choose, SQLite walked every file in the
  * library for each card, seconds for a few thousand movies. TMDB's own
- * titles come along for telling a split file's cut.
+ * titles come along for telling a split file's cut. `watched` is the card's,
+ * not the file's.
  */
 const SELECT_COLUMNS = `
   SELECT m.*, CASE WHEN l.save_progress = 1 THEN p.position END AS position,
@@ -83,6 +85,7 @@ const SELECT_COLUMNS = `
                      WHERE x.item_id = i.id AND y.library_id = m.library_id
                        AND y.split IS m.split)
               ELSE 1 END AS versions,
+         ${cardWatched({ file: 'm', item: 'i' })} AS watched,
          ${score({ item: 'i.id', source: 'l.ratings_source' })} AS score`
 
 const FROM_MEDIA = `
@@ -130,6 +133,7 @@ const toItem = (row: MediaRow): MediaItem => ({
   thumbnailVersion: row.mtime_ms,
   position: row.position ?? 0,
   favourite: row.favourited_at != null,
+  watched: row.watched === 1,
   addedAt: row.added_at,
   changedAt: row.changed_at,
   match: isMatchState(row.match) ? row.match : 'pending',
@@ -146,6 +150,7 @@ type ShowRow = {
   id: number
   ended: string | null
   episodes: number
+  watched_episodes: number
   added_at: string
   bitrate: number | null
 }
@@ -179,15 +184,13 @@ const SHOW_ORDER_BY: Record<MediaSort, string> = {
 /** The files of a library that are episodes, with their show and numbers. */
 const EPISODE_FILES = `
   SELECT m.id AS media_id, m.library_id, m.added_at, m.changed_at, m.bitrate, e.id AS episode_id,
-         s.parent_id AS show_id
+         s.parent_id AS show_id, ${fileWatched('m')} AS watched
     FROM media m
+    JOIN libraries l ON l.id = m.library_id
     JOIN media_items mi ON mi.media_id = m.id
     JOIN shown_items e ON e.id = mi.item_id AND e.type = 'episode'
     JOIN shown_items s ON s.id = e.parent_id
    WHERE m.library_id = ?`
-
-/** Where a show's next episode may come from: one library's files, or any library's. */
-type EpisodeScope = { kind: 'library'; libraryId: number } | { kind: 'everywhere' }
 
 const BY_TITLE = 'COALESCE(item_sort_title, title) COLLATE NOCASE, id'
 
@@ -323,36 +326,44 @@ export class MediaRepository {
   /**
    * Each show's first episode not yet watched, by the measure of the library
    * holding the file (specials last, the best file of an episode first), as
-   * show id to media id. A show with every episode watched has none.
+   * show id to media id. An episode is watched when any of its files in
+   * `libraryIds` is, so a watched 1080p hides its unwatched 720p. A show with
+   * every episode watched has none.
    */
   private nextUnwatched({
     showIds,
-    scope,
+    libraryIds,
   }: {
     showIds: readonly number[]
-    scope: EpisodeScope
+    libraryIds: readonly number[]
   }): Map<number, number> {
-    const libraryId = scope.kind === 'library' ? scope.libraryId : null
     const rows = this.db
-      .prepare<[string, number | null, number | null], { show_id: number; media_id: number }>(
-        `WITH ranked AS (
-           SELECT s.parent_id AS show_id, m.id AS media_id,
-                  ROW_NUMBER() OVER (
-                    PARTITION BY s.parent_id
-                    ORDER BY s.number = 0, s.number, e.number, COALESCE(m.width * m.height, 0) DESC, m.id
-                  ) AS rank
+      .prepare<[string, string], { show_id: number; media_id: number }>(
+        `WITH files AS (
+           SELECT s.parent_id AS show_id, m.id AS media_id, e.id AS episode_id,
+                  s.number AS season_number, e.number AS episode_number,
+                  COALESCE(m.width * m.height, 0) AS pixels,
+                  ${fileWatched('m')} AS watched
              FROM media m
              JOIN libraries l ON l.id = m.library_id
              JOIN media_items mi ON mi.media_id = m.id
              JOIN shown_items e ON e.id = mi.item_id AND e.type = 'episode'
              JOIN shown_items s ON s.id = e.parent_id
-             ${FURTHEST_JOIN}
             WHERE s.parent_id IN (SELECT value FROM json_each(?))
-              AND (? IS NULL OR m.library_id = ?)
-              AND NOT ${isWatched('COALESCE(p.furthest, 0)')})
+              AND m.library_id IN (SELECT value FROM json_each(?))),
+         episodes AS (
+           SELECT *, MAX(watched) OVER (PARTITION BY episode_id) AS episode_watched FROM files),
+         ranked AS (
+           SELECT show_id, media_id,
+                  ROW_NUMBER() OVER (
+                    PARTITION BY show_id
+                    ORDER BY season_number = 0, season_number, episode_number, pixels DESC, media_id
+                  ) AS rank
+             FROM episodes
+            WHERE episode_watched = 0)
          SELECT show_id, media_id FROM ranked WHERE rank = 1`,
       )
-      .all(JSON.stringify(showIds), libraryId, libraryId)
+      .all(JSON.stringify(showIds), JSON.stringify(libraryIds))
     return new Map(rows.map((row) => [row.show_id, row.media_id]))
   }
 
@@ -379,7 +390,9 @@ export class MediaRepository {
     const rows = this.db
       .prepare<[number, string, string, number], ShowRow>(
         `WITH files AS (${EPISODE_FILES})
-         SELECT sh.id, sh.ended, COUNT(DISTINCT f.episode_id) AS episodes, MAX(f.added_at) AS added_at,
+         SELECT sh.id, sh.ended, COUNT(DISTINCT f.episode_id) AS episodes,
+                COUNT(DISTINCT CASE WHEN f.watched = 1 THEN f.episode_id END) AS watched_episodes,
+                MAX(f.added_at) AS added_at,
                 MAX(f.changed_at) AS changed_at, AVG(f.bitrate) AS bitrate,
                 ${score({ item: 'sh.id', source: 'l.ratings_source' })} AS score
            FROM files f
@@ -393,7 +406,7 @@ export class MediaRepository {
       .all(libraryId, pattern, pattern, sqlLimit({ sort, limit }))
     const showIds = rows.map((row) => row.id)
     const summaries = this.metadata.summaries(showIds)
-    const next = this.nextUnwatched({ showIds, scope: { kind: 'library', libraryId } })
+    const next = this.nextUnwatched({ showIds, libraryIds: [libraryId] })
     const episodes = new Map(this.getMany([...next.values()]).map((item) => [item.id, item]))
     const entries = rows.flatMap((row): ShowEntry[] => {
       const show = summaries.get(row.id)
@@ -403,6 +416,7 @@ export class MediaRepository {
         {
           show,
           episodes: row.episodes,
+          watchedEpisodes: row.watched_episodes,
           endedYear: row.ended == null ? null : Number(row.ended.slice(0, 4)) || null,
           addedAt: row.added_at,
           bitrate: row.bitrate == null ? null : Math.round(row.bitrate),
@@ -415,13 +429,35 @@ export class MediaRepository {
 
   /**
    * The first episode of a show not yet watched, by the measure of whichever
-   * library holds the file, specials last; null once every one is watched.
+   * of `libraryIds` holds the file, specials last; null once every one is.
    */
-  nextEpisode(showId: number): MediaItem | null {
-    const next = this.nextUnwatched({ showIds: [showId], scope: { kind: 'everywhere' } }).get(
-      showId,
-    )
+  nextEpisode({
+    showId,
+    libraryIds,
+  }: {
+    showId: number
+    libraryIds: readonly number[]
+  }): MediaItem | null {
+    const next = this.nextUnwatched({ showIds: [showId], libraryIds }).get(showId)
     return next == null ? null : this.get(next)
+  }
+
+  /**
+   * The episodes among `ids` that are watched, each once for every library
+   * where one of its files is: a page counts only the libraries it may show.
+   */
+  watchedEpisodes(ids: readonly number[]): { episodeId: number; libraryId: number }[] {
+    if (ids.length === 0) return []
+    return this.db
+      .prepare<[string], { episode_id: number; library_id: number }>(
+        `SELECT DISTINCT mi.item_id AS episode_id, m.library_id
+           FROM media_items mi
+           JOIN media m ON m.id = mi.media_id
+           JOIN libraries l ON l.id = m.library_id
+          WHERE mi.item_id IN (SELECT value FROM json_each(?)) AND ${fileWatched('m')}`,
+      )
+      .all(JSON.stringify(ids))
+      .map((row) => ({ episodeId: row.episode_id, libraryId: row.library_id }))
   }
 
   /** A library's files no show or movie was found for, pending ones included, by title. */

@@ -28,6 +28,9 @@ import { MediaRepository } from '@/media/mediaRepository'
 import { SagaBackdrops } from '@/media/sagaBackdrops'
 import { MovieSplits } from '@/media/movieSplits'
 import { ViewingRepository } from '@/media/viewingRepository'
+import { WatchedCards } from '@/media/watchedCards'
+import { WatchedController } from '@/media/watchedController'
+import { WatchedRepository } from '@/media/watchedRepository'
 import { AI_FETCH, AiClient, type AiFetch } from '@/metadata/aiClient'
 import { AiDecisions } from '@/metadata/aiDecisions'
 import { AiMatcher } from '@/metadata/aiMatcher'
@@ -59,6 +62,7 @@ export const CONTROLLERS = [
   MediaController,
   PlaybackController,
   FavouritesController,
+  WatchedController,
   HomeController,
   BrowseController,
   HealthController,
@@ -117,6 +121,8 @@ export class AppModule {
         MediaRepository,
         MovieSplits,
         ViewingRepository,
+        WatchedCards,
+        WatchedRepository,
         MediaIndex,
         MatchFiles,
         AiDecisions,

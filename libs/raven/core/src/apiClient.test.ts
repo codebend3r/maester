@@ -168,6 +168,22 @@ describe('createApiClient', () => {
     expect(calls[0]?.init).toMatchObject({ method: 'PUT', body: '{"favourite":true}' })
   })
 
+  it('marks targets watched or unwatched with one request', async () => {
+    const { client, calls } = clientReturning(respond({ status: 204 }))
+    await client.setWatched({
+      watched: true,
+      targets: [
+        { kind: 'media', id: 4 },
+        { kind: 'item', id: 9, libraryId: null },
+      ],
+    })
+    expect(calls[0]?.url).toBe('http://nas:8484/api/watched')
+    expect(calls[0]?.init).toMatchObject({
+      method: 'PUT',
+      body: '{"watched":true,"targets":[{"kind":"media","id":4},{"kind":"item","id":9,"libraryId":null}]}',
+    })
+  })
+
   it('lists favourites across every library, each with the poster its card shows', async () => {
     const entry = { media: mediaItem({ favourite: true }), poster: null }
     const { client, calls } = clientReturning(respond({ body: [entry] }))
@@ -281,6 +297,7 @@ describe('createApiClient', () => {
       plays: 1,
       furthest: 30,
       watched: false,
+      marked: false,
     }
     const { client, calls } = clientReturning(respond({ body: [entry] }))
     await expect(client.listHistory({ libraryId: 3, limit: 50 })).resolves.toEqual([entry])

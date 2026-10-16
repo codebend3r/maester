@@ -14,6 +14,7 @@ import type {
  */
 const sample = (overrides: Partial<MediaItem> & Pick<MediaItem, 'id' | 'title'>): MediaItem => ({
   libraryId: -1,
+  watched: false,
   fileName: `${overrides.title}.mkv`,
   folder: '',
   size: 4_200_000_000,
@@ -178,6 +179,7 @@ export const SAMPLE_SHOWS: ShowEntry[] = [
   {
     show: { ...sampleMovie({ id: -21, title: 'The Long Winter' }), type: 'show', year: 2019 },
     episodes: 18,
+    watchedEpisodes: 0,
     endedYear: null,
     addedAt: '2026-10-02T12:00:00.000Z',
     bitrate: 9_800_000,
@@ -197,6 +199,7 @@ export const SAMPLE_SHOWS: ShowEntry[] = [
   {
     show: { ...sampleMovie({ id: -24, title: 'Ravens of the North' }), type: 'show', year: 2014 },
     episodes: 10,
+    watchedEpisodes: 0,
     endedYear: 2016,
     addedAt: '2026-09-14T09:00:00.000Z',
     bitrate: 4_200_000,

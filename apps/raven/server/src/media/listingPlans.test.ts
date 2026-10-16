@@ -108,6 +108,15 @@ describe.each([
     ).toEqual([])
   })
 
+  it('looks a card’s plays up by their file, never reading every play', () => {
+    const details = stepsOf(READS['its newest cards']).map((step) => step.detail)
+
+    expect(details).toContainEqual(
+      expect.stringMatching(/^SEARCH pl USING (COVERING )?INDEX plays_media \(media_id=\?/),
+    )
+    expect(details.filter((detail) => /^(SCAN|MATERIALIZE) (pl|plays)\b/.test(detail))).toEqual([])
+  })
+
   it.each(Object.entries(READS))(
     'reads %s from the library’s own files, each with its own first item',
     (_name, read) => {
