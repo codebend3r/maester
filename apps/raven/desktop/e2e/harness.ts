@@ -88,7 +88,9 @@ export const closeApp = async ({ app }: { app: ElectronApplication }): Promise<v
 
 export const launchApp = async ({ userData }: { userData: string }): Promise<Launched> => {
   const app = await _electron.launch({
-    args: ['.'],
+    // Chromium's fake audio sink: playback is clocked by the audio output, so a real device
+    // whose clock has stalled (an asleep USB interface) would freeze `currentTime` at 0.
+    args: ['--disable-audio-output', '.'],
     cwd: PROJECT_DIR,
     env: { ...process.env, RAVEN_DESKTOP_USER_DATA: userData },
   })

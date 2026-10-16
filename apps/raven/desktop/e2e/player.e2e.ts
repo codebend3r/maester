@@ -16,6 +16,17 @@ const isPlaying = (facts: VideoFacts | null): boolean =>
 
 const isPaused = (facts: VideoFacts | null): boolean => facts !== null && facts.paused
 
+/**
+ * Waits for the clock to move more than a second past where it is now: a video that
+ * reports playing while its clock is stuck fails here.
+ */
+const expectClockAdvancing = async (page: Page) => {
+  const start = (await videoFacts(page))?.currentTime ?? Number.POSITIVE_INFINITY
+  await expect
+    .poll(async () => ((await videoFacts(page))?.currentTime ?? Number.NEGATIVE_INFINITY) - start)
+    .toBeGreaterThan(1)
+}
+
 /** How far the video is from `seconds`, or Infinity before there is a video. */
 const distanceFrom = async ({ page, seconds }: { page: Page; seconds: number }) => {
   const facts = await videoFacts(page)
@@ -53,6 +64,7 @@ test.describe.serial('playing a local file', () => {
         await openFile({ app, path: clips.first })
         await expect(page.getByRole('heading', { name: 'Clip 01', exact: true })).toBeVisible()
         await expect.poll(async () => isPlaying(await videoFacts(page))).toBe(true)
+        await expectClockAdvancing(page)
 
         // Paused before the seek, so the position main stores is exactly half way and the
         // next test can read 50%: a seek while playing keeps moving until the pause lands.
@@ -78,6 +90,7 @@ test.describe.serial('playing a local file', () => {
         await expect
           .poll(async () => (await videoFacts(page))?.currentTime ?? 0)
           .toBeGreaterThanOrEqual(14)
+        await expectClockAdvancing(page)
 
         // It plays on from 0:15, so park it at half way again for the next test: pause,
         // then 0% (a jump of ten seconds or more saves) and back to 50%, both saved.
