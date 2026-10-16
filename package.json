@@ -1,7 +1,7 @@
 {
   "name": "maester",
   "private": true,
-  "description": "Nx workspace for maester, a self-hosted media suite: raven, a media library and direct-play player, luwin, an AI assistant for a private Plex server, rookery, the suite's sign-in, and the apps and libraries around them",
+  "description": "Nx workspace for maester, a self-hosted media suite: raven, a media library and direct-play player, luwin, an AI assistant for the friends who share the server, rookery, the suite's sign-in, and the apps and libraries around them",
   "workspaces": [
     "apps/*/*",
     "libs/*/*",
