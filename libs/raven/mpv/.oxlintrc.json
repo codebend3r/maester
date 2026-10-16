@@ -1,0 +1,11 @@
+{
+  "extends": ["../../../tooling/oxlint/base.json"],
+  "env": { "node": true },
+  "ignorePatterns": ["dist", "native-build", "resources"],
+  "overrides": [
+    {
+      "files": ["src/**/*.test.ts", "test/**/*.ts"],
+      "rules": { "unicorn/consistent-function-scoping": "off" }
+    }
+  ]
+}

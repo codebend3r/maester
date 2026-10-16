@@ -1,0 +1,209 @@
+[
+  {
+    "name": "mpv",
+    "repository": "https://github.com/mpv-player/mpv",
+    "version": "v0.41.0",
+    "commit": "41f6a645068483470267271e1d09966ca3b9f413",
+    "url": "https://codeload.github.com/mpv-player/mpv/tar.gz/41f6a645068483470267271e1d09966ca3b9f413",
+    "sha256": "068960e89211f2adc80af03f637fa393fb5e407d3dd23592c8fe8c5490bb7ae4",
+    "license": "GPL-2.0-or-later"
+  },
+  {
+    "name": "ffmpeg",
+    "repository": "https://github.com/FFmpeg/FFmpeg",
+    "version": "n8.1.2",
+    "commit": "38b88335f99e76ed89ff3c93f877fdefce736c13",
+    "url": "https://codeload.github.com/FFmpeg/FFmpeg/tar.gz/38b88335f99e76ed89ff3c93f877fdefce736c13",
+    "sha256": "2ae7e42343cfffb811d15cfe98b6d005f082595fcdf034d30a4ff90cfed9f9c6",
+    "license": "LGPL-2.1-or-later"
+  },
+  {
+    "name": "libplacebo",
+    "repository": "https://github.com/haasn/libplacebo",
+    "version": "v7.360.1",
+    "commit": "cee9b076f2c63104ccfd497fa79c39a867293ec4",
+    "url": "https://codeload.github.com/haasn/libplacebo/tar.gz/cee9b076f2c63104ccfd497fa79c39a867293ec4",
+    "sha256": "6f8fa218cbafd8e5f50b8a82d918e1d8bbb92f9f980820bc0b34d92e9b79e484",
+    "license": "LGPL-2.1-or-later"
+  },
+  {
+    "name": "dav1d",
+    "repository": "https://github.com/videolan/dav1d",
+    "version": "1.5.3",
+    "commit": "b546257f770768b2c88258c533da38b91a06f737",
+    "url": "https://codeload.github.com/videolan/dav1d/tar.gz/b546257f770768b2c88258c533da38b91a06f737",
+    "sha256": "c5b7428c3f5b28db0aee0c62f6ffb2b42f4b08e7be5ce49d7ad046aaf0dc151d",
+    "license": "BSD-2-Clause"
+  },
+  {
+    "name": "libass",
+    "repository": "https://github.com/libass/libass",
+    "version": "0.17.5",
+    "commit": "4a05d8127f525943ebf45fdc6497c9e665947f0d",
+    "url": "https://codeload.github.com/libass/libass/tar.gz/4a05d8127f525943ebf45fdc6497c9e665947f0d",
+    "sha256": "3546ecc8748c62e100a9dd18e52ea2d17d7facedf89cfcad97000ad60b1bce2b",
+    "license": "ISC"
+  },
+  {
+    "name": "freetype",
+    "repository": "https://github.com/freetype/freetype",
+    "version": "VER-2-14-1",
+    "commit": "526ec5c47b9ebccc4754c85ac0c0cdf7c85a5e9b",
+    "url": "https://codeload.github.com/freetype/freetype/tar.gz/526ec5c47b9ebccc4754c85ac0c0cdf7c85a5e9b",
+    "sha256": "d24f53b60034dc5c48e90d122d432a8f04a05b9e0a98c8d8e49b4a759207ce2e",
+    "license": "FTL"
+  },
+  {
+    "name": "harfbuzz",
+    "repository": "https://github.com/harfbuzz/harfbuzz",
+    "version": "11.5.1",
+    "commit": "7497c4147469fd4102a7229222586ad5c743c5a1",
+    "url": "https://codeload.github.com/harfbuzz/harfbuzz/tar.gz/7497c4147469fd4102a7229222586ad5c743c5a1",
+    "sha256": "6af13e0f154d52a60328a278de00cab26277a616958173a129d91d8f2e8e0284",
+    "license": "MIT"
+  },
+  {
+    "name": "fribidi",
+    "repository": "https://github.com/fribidi/fribidi",
+    "version": "v1.0.16",
+    "commit": "68162babff4f39c4e2dc164a5e825af93bda9983",
+    "url": "https://codeload.github.com/fribidi/fribidi/tar.gz/68162babff4f39c4e2dc164a5e825af93bda9983",
+    "sha256": "fa34a057a414c85f7e1f3c0fd717bc93d74d370ed474ef2feca90868b4938f72",
+    "license": "LGPL-2.1-or-later"
+  },
+  {
+    "name": "zlib",
+    "repository": "https://github.com/madler/zlib",
+    "version": "v1.3.1",
+    "commit": "51b7f2abdade71cd9bb0e7a373ef2610ec6f9daf",
+    "url": "https://codeload.github.com/madler/zlib/tar.gz/51b7f2abdade71cd9bb0e7a373ef2610ec6f9daf",
+    "sha256": "d9e270d46252734aa49770fbc544125391617956266f220bd63216c834f3a522",
+    "license": "Zlib"
+  },
+  {
+    "name": "luajit",
+    "repository": "https://github.com/LuaJIT/LuaJIT",
+    "version": "v2.1",
+    "commit": "2a8e017ef1ece6a95b983ffca073d30609dce7c4",
+    "url": "https://codeload.github.com/LuaJIT/LuaJIT/tar.gz/2a8e017ef1ece6a95b983ffca073d30609dce7c4",
+    "sha256": "54705d4b1de50a9c668539b9cf0dc3170d94ffdad51fafd1cf4477e498be7144",
+    "license": "MIT"
+  },
+  {
+    "name": "glslang",
+    "repository": "https://github.com/KhronosGroup/glslang",
+    "version": "16.1.0",
+    "commit": "b5782e52ee2f7b3e40bb9c80d15b47016e008bc9",
+    "url": "https://codeload.github.com/KhronosGroup/glslang/tar.gz/b5782e52ee2f7b3e40bb9c80d15b47016e008bc9",
+    "sha256": "6c242598c332050bf3a3619d299594ca2909426935f2c86c69c7356b049347c7",
+    "license": "BSD-3-Clause"
+  },
+  {
+    "name": "moltenvk",
+    "repository": "https://github.com/KhronosGroup/MoltenVK",
+    "version": "v1.4.2",
+    "commit": "db66022459ffb663aa2b50f6b018bc2e124f5edf",
+    "url": "https://codeload.github.com/KhronosGroup/MoltenVK/tar.gz/db66022459ffb663aa2b50f6b018bc2e124f5edf",
+    "sha256": "c6ced1eb31827be7f10e2d8d77087486c75e595ab068e665a712d73b99a8ff06",
+    "license": "Apache-2.0"
+  },
+  {
+    "name": "mpvkit",
+    "repository": "https://github.com/mpvkit/MPVKit",
+    "version": "288527dffbc6d3e63cce147fc7b520c64a791603",
+    "commit": "288527dffbc6d3e63cce147fc7b520c64a791603",
+    "url": "https://codeload.github.com/mpvkit/MPVKit/tar.gz/288527dffbc6d3e63cce147fc7b520c64a791603",
+    "sha256": "671bf1f40a48f284016f69c0c5b35ded83f64fdcbb90f4751493974ae45b854a",
+    "license": "MIT"
+  },
+  {
+    "name": "cereal",
+    "repository": "https://github.com/USCiLab/cereal",
+    "version": "a56bad8bbb770ee266e930c95d37fff2a5be7fea",
+    "commit": "a56bad8bbb770ee266e930c95d37fff2a5be7fea",
+    "url": "https://codeload.github.com/USCiLab/cereal/tar.gz/a56bad8bbb770ee266e930c95d37fff2a5be7fea",
+    "sha256": "12e10fb541270632f6683286ce8c7e8c321fe4addb53fa91ed498b95c1758f93",
+    "license": "BSD-3-Clause"
+  },
+  {
+    "name": "SPIRV-Cross",
+    "repository": "https://github.com/KhronosGroup/SPIRV-Cross",
+    "version": "6c09849fe88c48eaed08413aa022aaa136a3a057",
+    "commit": "6c09849fe88c48eaed08413aa022aaa136a3a057",
+    "url": "https://codeload.github.com/KhronosGroup/SPIRV-Cross/tar.gz/6c09849fe88c48eaed08413aa022aaa136a3a057",
+    "sha256": "b81b9956289950570953738e666a031ca32ff64e4fc925eba89f227c42109518",
+    "license": "Apache-2.0"
+  },
+  {
+    "name": "SPIRV-Headers",
+    "repository": "https://github.com/KhronosGroup/SPIRV-Headers",
+    "version": "29981f65241605e08b0ede4cfeb999fe3b723c6a",
+    "commit": "29981f65241605e08b0ede4cfeb999fe3b723c6a",
+    "url": "https://codeload.github.com/KhronosGroup/SPIRV-Headers/tar.gz/29981f65241605e08b0ede4cfeb999fe3b723c6a",
+    "sha256": "232899f1ad4104fb5bc377b94596c7621575eee62ad9a9e8f929b63a7dd8a7ad",
+    "license": "Apache-2.0"
+  },
+  {
+    "name": "SPIRV-Tools",
+    "repository": "https://github.com/KhronosGroup/SPIRV-Tools",
+    "version": "0d6fd73ca73830ccab5fa1f00ed5ed40124e2c55",
+    "commit": "0d6fd73ca73830ccab5fa1f00ed5ed40124e2c55",
+    "url": "https://codeload.github.com/KhronosGroup/SPIRV-Tools/tar.gz/0d6fd73ca73830ccab5fa1f00ed5ed40124e2c55",
+    "sha256": "20219c0962dffb0d7644bb3116a5923cfcf0526a569baa0b2a17343dd2fa6e5d",
+    "license": "Apache-2.0"
+  },
+  {
+    "name": "Volk",
+    "repository": "https://github.com/zeux/volk",
+    "version": "776893306c5d3b22b6185b5d4a258b81d94572bf",
+    "commit": "776893306c5d3b22b6185b5d4a258b81d94572bf",
+    "url": "https://codeload.github.com/zeux/volk/tar.gz/776893306c5d3b22b6185b5d4a258b81d94572bf",
+    "sha256": "ff5b63e1b7104b34955eb4a993b94882a55f8561e971b92119069e496e3496b5",
+    "license": "MIT"
+  },
+  {
+    "name": "Vulkan-Headers",
+    "repository": "https://github.com/KhronosGroup/Vulkan-Headers",
+    "version": "e3b1eec08173d6b825cd3ac88c885a63b621504a",
+    "commit": "e3b1eec08173d6b825cd3ac88c885a63b621504a",
+    "url": "https://codeload.github.com/KhronosGroup/Vulkan-Headers/tar.gz/e3b1eec08173d6b825cd3ac88c885a63b621504a",
+    "sha256": "f492279345cbc10708b64fcd432b3ff6c8246a5837c4db2b649abba00cf82208",
+    "license": "Apache-2.0"
+  },
+  {
+    "name": "Vulkan-Tools",
+    "repository": "https://github.com/KhronosGroup/Vulkan-Tools",
+    "version": "8c66b352925cb771f793a4d3220b1321ae0febf1",
+    "commit": "8c66b352925cb771f793a4d3220b1321ae0febf1",
+    "url": "https://codeload.github.com/KhronosGroup/Vulkan-Tools/tar.gz/8c66b352925cb771f793a4d3220b1321ae0febf1",
+    "sha256": "170eaa9086812c0a8d5275e0fa320b96af4a00fa4e84eee0437650bdd54ed2a8",
+    "license": "Apache-2.0"
+  },
+  {
+    "name": "fast_float",
+    "repository": "https://github.com/fastfloat/fast_float",
+    "version": "97b54ca9e75f5303507699d27c6b4f4efe4641a1",
+    "commit": "97b54ca9e75f5303507699d27c6b4f4efe4641a1",
+    "url": "https://codeload.github.com/fastfloat/fast_float/tar.gz/97b54ca9e75f5303507699d27c6b4f4efe4641a1",
+    "sha256": "2b132274539286e41f37857cac22aa8441d21bd86d55de825a3342b149f66801",
+    "license": "MIT"
+  },
+  {
+    "name": "jinja",
+    "repository": "https://github.com/pallets/jinja",
+    "version": "15206881c006c79667fe5154fe80c01c65410679",
+    "commit": "15206881c006c79667fe5154fe80c01c65410679",
+    "url": "https://codeload.github.com/pallets/jinja/tar.gz/15206881c006c79667fe5154fe80c01c65410679",
+    "sha256": "b88a20dcc2e34072fcf4159325bc6c34cd4b29a81a8b83d15d2f28ba561da296",
+    "license": "BSD-3-Clause"
+  },
+  {
+    "name": "markupsafe",
+    "repository": "https://github.com/pallets/markupsafe",
+    "version": "297fc8e356e6836a62087949245d09a28e9f1b13",
+    "commit": "297fc8e356e6836a62087949245d09a28e9f1b13",
+    "url": "https://codeload.github.com/pallets/markupsafe/tar.gz/297fc8e356e6836a62087949245d09a28e9f1b13",
+    "sha256": "da7c010c9c81a66ac73036558c1fcb6212b50482f43211cd1254035b94f82414",
+    "license": "BSD-3-Clause"
+  }
+]

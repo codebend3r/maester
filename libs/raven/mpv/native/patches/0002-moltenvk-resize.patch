@@ -1,0 +1,55 @@
+--- a/video/out/vulkan/context_moltenvk.m
++++ b/video/out/vulkan/context_moltenvk.m
+@@ -22,10 +22,12 @@
+ #include "common.h"
+ #include "context.h"
+ #include "utils.h"
++#include "osdep/timer.h"
+ 
+ struct priv {
+     struct mpvk_ctx vk;
+     CAMetalLayer *layer;
++    CGSize drawable_size;
+ };
+ 
+ static void moltenvk_uninit(struct ra_ctx *ctx)
+@@ -77,20 +79,38 @@
+ {
+     struct priv *p = ctx->priv;
+     CGSize s = p->layer.drawableSize;
++    p->drawable_size = s;
+     ra_vk_ctx_resize(ctx, s.width, s.height);
+     return true;
+ }
+ 
+ static int moltenvk_control(struct ra_ctx *ctx, int *events, int request, void *arg)
+ {
+-    return VO_NOTIMPL;
++    if (request != VOCTRL_CHECK_EVENTS)
++        return VO_NOTIMPL;
++    struct priv *p = ctx->priv;
++    CGSize s = p->layer.drawableSize;
++    if (s.width > 0 && s.height > 0 && !CGSizeEqualToSize(s, p->drawable_size)) {
++        moltenvk_reconfig(ctx);
++        *events |= VO_EVENT_RESIZE | VO_EVENT_EXPOSE;
++    }
++    return VO_TRUE;
+ }
+ 
++// The host updates drawableSize, but the embedding context has no window events.
++// Poll even while paused, without replacing vo_wait_default's wakeup mechanism.
++static void moltenvk_wait_events(struct ra_ctx *ctx, int64_t until_time_ns)
++{
++    int64_t deadline = mp_time_ns() + 50000000;
++    vo_wait_default(ctx->vo, MPMIN(until_time_ns, deadline));
++}
++
+ const struct ra_ctx_fns ra_ctx_vulkan_moltenvk = {
+     .type           = "vulkan",
+     .name           = "moltenvk",
+     .reconfig       = moltenvk_reconfig,
+     .control        = moltenvk_control,
++    .wait_events    = moltenvk_wait_events,
+     .init           = moltenvk_init,
+     .uninit         = moltenvk_uninit,
+ };
