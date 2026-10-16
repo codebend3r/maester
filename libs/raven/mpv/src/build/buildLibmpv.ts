@@ -229,6 +229,8 @@ await meson({
     '-Dvulkan=enabled',
     '-Dvk-proc-addr=enabled',
     '-Dglslang=enabled',
+    // libplacebo's meson only searches the compiler's default dirs plus this one for libSPIRV.a
+    `-Dvulkan-sdk=${prefix}`,
     '-Ddovi=enabled',
     '-Ddemos=false',
   ],
