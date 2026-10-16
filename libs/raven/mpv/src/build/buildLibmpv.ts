@@ -318,6 +318,8 @@ await meson({
   name: 'mpv',
   options: [
     '-Ddefault_library=shared',
+    // prefer_static makes meson look only for a static libiconv, which macOS does not ship
+    '-Dprefer_static=false',
     '-Dlibmpv=true',
     '-Dcplayer=false',
     '-Dbuild-date=false',
