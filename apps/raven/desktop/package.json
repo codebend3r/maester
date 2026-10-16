@@ -26,7 +26,10 @@
     "test:renderer": "bun test --dots --preload ./src/renderer/test/happy-dom.ts --preload ../../../tooling/web/scss-modules.ts --preload ./src/renderer/test/setup.ts src/renderer",
     "test:watch": "bun test --dots --watch src/main src/shared",
     "dev": "electron .",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "install:electron": "install-electron",
+    "package": "electron-forge package",
+    "make": "electron-forge make"
   },
   "dependencies": {
     "@fontsource-variable/instrument-sans": "5.3.0",
@@ -93,15 +96,35 @@
       "test:renderer",
       "test:watch",
       "dev",
-      "e2e"
+      "e2e",
+      "install:electron",
+      "package",
+      "make"
     ],
     "targets": {
       "dev": {
         "dependsOn": [
-          "build"
+          "build",
+          "install:electron"
         ]
       },
       "e2e": {
+        "cache": false,
+        "dependsOn": [
+          "build",
+          "install:electron"
+        ]
+      },
+      "install:electron": {
+        "cache": false
+      },
+      "package": {
+        "cache": false,
+        "dependsOn": [
+          "build"
+        ]
+      },
+      "make": {
         "cache": false,
         "dependsOn": [
           "build"

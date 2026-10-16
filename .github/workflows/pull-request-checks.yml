@@ -139,7 +139,6 @@ jobs:
       - name: 🧪 Real headless libmpv tests
         run: bunx nx run @raven/mpv:test:native
 
-      # P4 adds shell/e2e targets, P7 adds app packaging. Do not call absent targets.
       - name: 📤 Native playback resources
         uses: actions/upload-artifact@v7
         with:
@@ -152,6 +151,38 @@ jobs:
         with:
           name: raven-native-sources-${{ github.event.pull_request.head.sha }}
           path: libs/raven/mpv/native-build/source-bundle
+          if-no-files-found: error
+
+      # Vite's log carries the renderer's gzip sizes, for the 250 KB budget.
+      - name: 🏗️ Build desktop app
+        run: bunx nx run @raven/desktop:build
+
+      # Runs `electron .`, never the packaged app, whose fuses turn off the inspector
+      # Playwright needs; the runner's logged-in GUI session shows the window. Electron 44
+      # has no postinstall, so the target's `install:electron` step fetches the binary.
+      - name: 🎬 Desktop end to end
+        run: bunx nx run @raven/desktop:e2e
+        env:
+          # The source-built ffmpeg above has VideoToolbox; `-allow_sw 1` falls back to
+          # Apple's software H.264 encoder on a VM without a hardware one.
+          RAVEN_E2E_FFMPEG: ${{ github.workspace }}/libs/raven/mpv/native-build/prefix/bin/ffmpeg
+
+      - name: 📤 End to end traces
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: raven-desktop-e2e-traces-${{ github.event.pull_request.head.sha }}
+          path: apps/raven/desktop/test-results
+          if-no-files-found: ignore
+
+      - name: 📦 Make the unsigned app
+        run: bunx nx run @raven/desktop:make
+
+      - name: 📤 Unsigned raven player
+        uses: actions/upload-artifact@v7
+        with:
+          name: raven-player-darwin-arm64-${{ github.event.pull_request.head.sha }}
+          path: apps/raven/desktop/out/make
           if-no-files-found: error
 
   smoke:
