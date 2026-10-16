@@ -68,8 +68,6 @@ describe('Shell', () => {
     await settled()
     await client.emit({ type: 'navigate', to: 'settings' })
     expect(router.state.location.pathname).toBe('/settings')
-    await client.emit({ type: 'navigate', to: 'home' })
-    expect(router.state.location.pathname).toBe('/')
   })
 
   it('hands a menu action to the menu hub', async () => {
@@ -102,16 +100,6 @@ describe('Shell', () => {
     } finally {
       jest.useRealTimers()
     }
-  })
-
-  it('refetches the recents when they change', async () => {
-    const client = fakeClient()
-    const { queryClient } = renderDesktop({ client, routes: STUB_ROUTES })
-    await settled()
-    const invalidate = mock(queryClient.invalidateQueries.bind(queryClient))
-    queryClient.invalidateQueries = invalidate
-    await client.emit({ type: 'recentsChanged' })
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['desktop', 'recents'] })
   })
 
   it('sends dropped files in the order dropped and plays the reply', async () => {

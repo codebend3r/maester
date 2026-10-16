@@ -143,16 +143,16 @@ describe('isDesktopEvent', () => {
   it.each([
     [{ type: 'play', target: { fileId: id, queue: [] } }],
     [{ type: 'player', action: 'togglePlay' }],
-    [{ type: 'navigate', to: 'home' }],
     [{ type: 'navigate', to: 'settings' }],
     [{ type: 'notice', message: 'raven links open in a later release' }],
-    [{ type: 'recentsChanged' }],
   ])('accepts %j', (value) => {
     expect(isDesktopEvent(value)).toBe(true)
   })
 
   it.each([
     ['navigating to devtools', { type: 'navigate', to: 'devtools' }],
+    ['navigating home, which nothing in main sends', { type: 'navigate', to: 'home' }],
+    ['recentsChanged, which nothing in main sends', { type: 'recentsChanged' }],
     ['the stats action, which waits for P5', { type: 'player', action: 'stats' }],
     ['a notice without a message', { type: 'notice' }],
   ])('rejects %s', (_name, value) => {

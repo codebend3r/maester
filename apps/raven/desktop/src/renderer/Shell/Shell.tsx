@@ -1,4 +1,3 @@
-import { useQueryClient } from '@tanstack/react-query'
 import {
   createContext,
   useCallback,
@@ -75,7 +74,6 @@ export const useOpenReply = (): ((reply: DesktopReply) => void) => {
 
 export const Shell = () => {
   const { client, menu } = useDesktop()
-  const queryClient = useQueryClient()
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const [notice, setNotice] = useState<{ message: string } | null>(null)
@@ -89,13 +87,11 @@ export const Shell = () => {
       case 'play':
         return void play({ navigate, pathname, target: event.target })
       case 'navigate':
-        return void navigate(event.to === 'home' ? '/' : '/settings')
+        return void navigate('/settings')
       case 'player':
         return menu.emit(event.action)
       case 'notice':
         return showNotice(event.message)
-      case 'recentsChanged':
-        return void queryClient.invalidateQueries({ queryKey: RECENTS_KEY })
       default: {
         const unreachable: never = event
         return unreachable

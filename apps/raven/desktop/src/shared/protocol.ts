@@ -84,9 +84,8 @@ export type DesktopReply = Infer<typeof isDesktopReply>
 export const isDesktopEvent = union(
   object({ type: oneOf(['play']), target: isPlayTarget }),
   object({ type: oneOf(['player']), action: isMenuPlayerAction }),
-  object({ type: oneOf(['navigate']), to: oneOf(['home', 'settings']) }),
+  object({ type: oneOf(['navigate']), to: oneOf(['settings']) }),
   object({ type: oneOf(['notice']), message: isString }),
-  object({ type: oneOf(['recentsChanged']) }),
 )
 
 export type DesktopEvent = Infer<typeof isDesktopEvent>
