@@ -6,13 +6,21 @@
   "type": "module",
   "main": "dist/main/main.js",
   "scripts": {
-    "typecheck": "tsgo --noEmit -p tsconfig.main.json",
+    "build": "bun run --sequential build:clean build:renderer",
+    "build:clean": "rm -rf dist",
+    "build:renderer": "vite build",
+    "typecheck": "bun run --parallel typecheck:main typecheck:renderer",
+    "typecheck:main": "tsgo --noEmit -p tsconfig.main.json",
+    "typecheck:renderer": "tsgo --noEmit -p tsconfig.renderer.json",
     "lint:ts": "oxlint",
     "lint:ts:fix": "oxlint --fix",
+    "lint:css": "stylelint \"src/**/*.scss\"",
+    "lint:css:fix": "stylelint --fix \"src/**/*.scss\"",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
-    "test": "bun run --sequential test:main",
+    "test": "bun run --sequential test:main test:renderer",
     "test:main": "bun test --dots src/main src/shared src/preload src/build",
+    "test:renderer": "bun test --dots --preload ./src/renderer/test/happy-dom.ts --preload ../../../tooling/web/scss-modules.ts --preload ./src/renderer/test/setup.ts src/renderer",
     "test:watch": "bun test --dots --watch src/main src/shared"
   },
   "dependencies": {
@@ -60,13 +68,21 @@
       "lang:ts"
     ],
     "includedScripts": [
+      "build",
+      "build:clean",
+      "build:renderer",
       "typecheck",
+      "typecheck:main",
+      "typecheck:renderer",
       "lint:ts",
       "lint:ts:fix",
+      "lint:css",
+      "lint:css:fix",
       "format",
       "format:check",
       "test",
       "test:main",
+      "test:renderer",
       "test:watch"
     ]
   },

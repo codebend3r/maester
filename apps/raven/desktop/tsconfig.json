@@ -5,5 +5,5 @@
   "compilerOptions": {
     "paths": { "@/*": ["./src/*"] }
   },
-  "references": [{ "path": "./tsconfig.main.json" }]
+  "references": [{ "path": "./tsconfig.main.json" }, { "path": "./tsconfig.renderer.json" }]
 }

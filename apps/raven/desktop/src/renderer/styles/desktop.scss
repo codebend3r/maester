@@ -1,0 +1,5 @@
+// The window is `hiddenInset`: the page runs under the title bar, and this
+// clears the traffic lights.
+:root {
+  --titlebar-inset: 1.75rem;
+}
