@@ -71,8 +71,10 @@ struct Player {
         try {
             player->drain(Napi::Env(env), Napi::Function(env, callback));
         } catch (const Napi::Error &error) {
-            error.ThrowAsJavaScriptException();
-        }
+            // Node calls this from C++ built without exceptions, so nothing may escape. While an
+            // environment terminates, even rethrowing to JavaScript fails by throwing.
+            try { error.ThrowAsJavaScriptException(); } catch (...) {}
+        } catch (...) {}
     }
     static void finalizeCallback(napi_env, void *data, void *) {
         --callbackCount;
