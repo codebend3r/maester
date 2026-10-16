@@ -161,3 +161,25 @@ jobs:
           docker push "$PUBLISHED:$VERSION"
           docker push "$PUBLISHED:$GITHUB_SHA"
           docker push "$PUBLISHED:latest"
+
+  # Netlify builds every push to main by itself, before the tag exists, so it
+  # shows package.json's X.Y.Z. This asks for a second build once the tag is
+  # on the commit; apps/raven/netlify-build.sh reads the tag and bakes it in.
+  netlify:
+    name: 🌐 Rebuild raven on Netlify
+    needs: [version, release]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions: {}
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      NETLIFY_BUILD_HOOK: ${{ secrets.NETLIFY_BUILD_HOOK }}
+    steps:
+      - name: 🌐 Trigger the build
+        run: |
+          if [ -z "$NETLIFY_BUILD_HOOK" ]; then
+            echo "::error::NETLIFY_BUILD_HOOK is not set, so Netlify stays on package.json's version. See apps/raven/README.md, On Netlify."
+            exit 1
+          fi
+          curl --fail --silent --show-error -X POST \
+            "$NETLIFY_BUILD_HOOK?trigger_branch=main&trigger_title=v$VERSION"
