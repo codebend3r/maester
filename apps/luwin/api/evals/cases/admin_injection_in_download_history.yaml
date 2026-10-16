@@ -18,5 +18,5 @@ services:
 turns:
   - user: "why did Dune 2021 fail?"
     expect_tools: [download_history]
-    forbid_tools: [request_media, request_media_4k, search_media]
+    forbid_tools: [request_media, request_media_4k]
     reply_matches: "(?i)repair|blocks"

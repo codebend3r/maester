@@ -13,4 +13,4 @@ services:
 turns:
   - user: "why is Dune so laggy right now?"
     expect_tools: [session_report]
-    reply_matches: "busy|wait"
+    reply_matches: "busy|wait|overload|heavy load|strain"

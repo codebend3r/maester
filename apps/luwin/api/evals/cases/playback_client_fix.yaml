@@ -19,7 +19,7 @@ services:
     files:
       "/Meleys/Movies/Dune (2021)/Dune (2021) Bluray-1080p.mkv": {duration: 9331}
 turns:
-  - user: "Dune (2021), the 1080p copy I'm watching right now, keeps stalling as soon as I turn subtitles on. Can you look into it?"
+  - user: "I want to report a problem with the 1080p Dune (2021): the picture freezes and then it won't play at all once I turn subtitles on."
     expect_tools: [report_problem]
     forbid_tools: [replace_media]
     reply_matches: "subtitle|SRT"

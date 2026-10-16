@@ -51,6 +51,17 @@
       "inputs": ["default"],
       "cache": true
     },
+    "eval": {
+      "inputs": [
+        "{projectRoot}/luwin/**/*.py",
+        "{projectRoot}/evals/**/*",
+        "{projectRoot}/pyproject.toml",
+        "{projectRoot}/uv.lock",
+        { "env": "LUWIN_MODEL" }
+      ],
+      "outputs": ["{workspaceRoot}/apps/luwin/docs/evals.md"],
+      "cache": true
+    },
     "dev": {
       "dependsOn": ["^build"],
       "continuous": true,
