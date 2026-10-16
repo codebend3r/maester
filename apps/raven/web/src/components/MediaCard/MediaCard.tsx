@@ -12,6 +12,7 @@ import { FavouriteMark } from '@/components/FavouriteMark/FavouriteMark'
 import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
 import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
+import { WatchedMark, WatchedWords } from '@/components/WatchedMark/WatchedMark'
 import { api } from '@/lib/api'
 import { cardLink, watchLink } from '@/lib/itemLinks'
 import { mediaEntryKey } from '@/lib/entryKeys'
@@ -58,6 +59,7 @@ export const MediaCard = ({
         </span>
       )}
       <ResumeBar media={media} className={styles.resume} />
+      <WatchedMark decorative watched={media.watched} className={styles.watched} />
     </span>
   )
 
@@ -94,6 +96,7 @@ export const MediaCard = ({
           <span key={fact}>{fact}</span>
         ))}
         <PartlyWatched media={media} />
+        <WatchedWords watched={media.watched} />
       </span>
       <PlaybackNote media={media} />
       {menu.menu}

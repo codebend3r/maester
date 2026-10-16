@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test'
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import { ShowCard, ShowGrid } from '@/components/ShowCard/ShowCard'
-import { ShowTiles } from '@/components/ShowCard/ShowViews'
+import { ShowList, ShowTiles } from '@/components/ShowCard/ShowViews'
 import { POSTER_SIZES } from '@/lib/posters'
 import { showEntry } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
@@ -90,5 +90,55 @@ describe('ShowCard', () => {
     expect(screen.getByText('2014 to 2024')).toBeInTheDocument()
     expect(screen.getByText('1 episode')).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /^Play/ })).toBeNull()
+  })
+
+  it('shows the number unwatched, with its words, when some episodes are', () => {
+    renderWithProviders(
+      <ul>
+        <ShowCard sizes={POSTER_SIZES.row} entry={showEntry({ watchedEpisodes: 3 })} />
+      </ul>,
+    )
+    expect(screen.getByText('6')).toBeInTheDocument()
+    expect(screen.getByText('6 unwatched episodes')).toBeInTheDocument()
+  })
+
+  it('shows the check when every episode is watched', () => {
+    renderWithProviders(
+      <ul>
+        <ShowCard sizes={POSTER_SIZES.row} entry={showEntry({ watchedEpisodes: 9 })} />
+      </ul>,
+    )
+    expect(screen.getByText('Watched')).toBeInTheDocument()
+  })
+
+  it('shows nothing when none is watched', () => {
+    renderWithProviders(
+      <ul>
+        <ShowCard sizes={POSTER_SIZES.row} entry={showEntry()} />
+      </ul>,
+    )
+    expect(screen.queryByText(/unwatched/)).toBeNull()
+    expect(screen.queryByText('Watched')).toBeNull()
+  })
+
+  it('shows the count in a list row and in a tile', () => {
+    renderWithProviders(<ShowList shows={[showEntry({ watchedEpisodes: 3 })]} />)
+    const [, row] = screen.getAllByRole('row')
+    if (!row) throw new Error('no data row')
+    expect(row).toHaveTextContent('6 unwatched episodes')
+    cleanup()
+    renderWithProviders(<ShowTiles shows={[showEntry({ watchedEpisodes: 9 })]} />)
+    expect(screen.getByText('Watched')).toBeInTheDocument()
+  })
+
+  it('shows nothing in a list row or a tile when none is watched', () => {
+    const { container } = renderWithProviders(
+      <>
+        <ShowList shows={[showEntry()]} />
+        <ShowTiles shows={[showEntry()]} />
+      </>,
+    )
+    expect(container).not.toHaveTextContent('unwatched')
+    expect(container).not.toHaveTextContent('Watched')
   })
 })

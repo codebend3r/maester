@@ -392,6 +392,15 @@ describe('LibraryPage tabs', () => {
     )
   })
 
+  it('says a video also counts when it is marked watched, with nothing finished yet', async () => {
+    open({ route: '/libraries/2/finished' })
+    expect(
+      await screen.findByText(
+        'Nothing finished in Films yet. A video counts once playback gets 95% of the way through, or when you mark it watched.',
+      ),
+    ).toBeInTheDocument()
+  })
+
   it("opens All in place of a tab the library's type does not have", async () => {
     open({ kind: 'other', route: '/libraries/2/sagas' })
     expect(await screen.findByRole('link', { name: /Wide/ })).toBeInTheDocument()

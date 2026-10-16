@@ -1,19 +1,20 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { MediaItem, PosterEntry } from '@raven/core'
 import { api } from '@/lib/api'
-import { favouriteEdits, withoutEntry } from '@/lib/edits'
-import { afterFavourites } from '@/lib/invalidate'
+import { favouriteEdits, watchedEdits, withoutEntry } from '@/lib/edits'
+import { afterFavourites, afterWatched } from '@/lib/invalidate'
 import { useOptimisticMutation } from '@/lib/optimistic'
 import { mutationKeys, queryKeys } from '@/lib/queryClient'
 
 /**
- * Marking a favourite, deleting a video and fetching its details again,
- * with every cached list patched in place so the grid answers at once. A
- * favourite shows before the server even answers. Behind each, everything
- * its library shows refetches: the listings and every tab, In progress, Not
- * matched, its sagas and its history among them, so no menu there is left
- * stale. So do the favourites, the item pages and home; favourites marked
- * in a run settle together, so every library refetches after them.
+ * Marking a favourite or a watched mark, deleting a video and fetching its
+ * details again, with every cached list patched in place so the grid
+ * answers at once. A favourite or a mark shows before the server even
+ * answers. Behind each, everything its library shows refetches: the
+ * listings and every tab, In progress, Not matched, its sagas and its
+ * history among them, so no menu there is left stale. So do the favourites,
+ * the item pages and home; marks in a run settle together, so every library
+ * refetches after them.
  */
 export const useMediaMutations = ({ media }: { media: MediaItem }) => {
   const queryClient = useQueryClient()
@@ -25,6 +26,14 @@ export const useMediaMutations = ({ media }: { media: MediaItem }) => {
     mutationFn: (marked: boolean) => api.setFavourite({ id: media.id, favourite: marked }),
     edits: (marked) => favouriteEdits({ media, favourite: marked }),
     settle: () => afterFavourites(queryClient),
+  })
+
+  const watched = useOptimisticMutation({
+    mutationKey: mutationKeys.watched,
+    mutationFn: (isWatched: boolean) =>
+      api.setWatched({ watched: isWatched, targets: [{ kind: 'media', id: media.id }] }),
+    edits: (isWatched) => watchedEdits({ media, watched: isWatched }),
+    settle: () => afterWatched(queryClient),
   })
 
   const remove = useMutation({
@@ -60,5 +69,5 @@ export const useMediaMutations = ({ media }: { media: MediaItem }) => {
     },
   })
 
-  return { favourite, remove, refresh }
+  return { favourite, watched, remove, refresh }
 }

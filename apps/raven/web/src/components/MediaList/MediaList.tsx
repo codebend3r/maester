@@ -15,6 +15,7 @@ import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
 import { ScoreChip } from '@/components/RatingChips/RatingChips'
 import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { SortHeader } from '@/components/SortHeader/SortHeader'
+import { WatchedMark } from '@/components/WatchedMark/WatchedMark'
 import { cardLink } from '@/lib/itemLinks'
 import { type SortColumn, useTableSort } from '@/lib/tableSort'
 import { mediaEntryKey } from '@/lib/entryKeys'
@@ -54,6 +55,7 @@ const MediaRow = ({
             {title}
           </CardLink>
           <span className={styles.mark}>
+            <WatchedMark watched={media.watched} />
             <FavouriteMark media={media} />
           </span>
           <ResumeBar media={media} tone="inline" className={styles.resume} />

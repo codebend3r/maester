@@ -35,12 +35,14 @@ const setUp = ({ media = mediaItem() }: { media?: MediaItem } = {}) => {
 describe('useMediaMutations', () => {
   const spies = {
     favourite: spyOn(api, 'setFavourite'),
+    watched: spyOn(api, 'setWatched'),
     refresh: spyOn(api, 'refreshItem'),
   }
 
   afterEach(() => {
     cleanup()
     spies.favourite.mockReset()
+    spies.watched.mockReset()
     spies.refresh.mockReset()
   })
 
@@ -139,6 +141,47 @@ describe('useMediaMutations', () => {
     expect(client.getQueryData<PosterEntry[]>(queryKeys.libraryFavourites(2))).toEqual(
       entries.slice(1),
     )
+  })
+
+  it('marks the card watched wherever it is cached, before the server answers', async () => {
+    const answer = held<void>()
+    spies.watched.mockImplementation(() => answer.promise)
+    const movie = matchedMovie({ position: 30 })
+    const { result, client } = setUp({ media: movie })
+    client.setQueryData(LISTING, [movie])
+    client.setQueryData(queryKeys.inProgress(2), [{ media: movie, poster: null }])
+    act(() => result.current.watched.mutate(true))
+    await waitFor(() =>
+      expect(client.getQueryData<MediaItem[]>(LISTING)).toEqual([
+        { ...movie, watched: true, position: 0 },
+      ]),
+    )
+    expect(client.getQueryData<PosterEntry[]>(queryKeys.inProgress(2))).toEqual([])
+    expect(spies.watched).toHaveBeenCalledWith({
+      watched: true,
+      targets: [{ kind: 'media', id: 7 }],
+    })
+    answer.answer()
+  })
+
+  it('takes the mark back when the server refuses it', async () => {
+    spies.watched.mockImplementation(async () => {
+      throw new Error('The server is away.')
+    })
+    const { result, client } = setUp()
+    client.setQueryData(LISTING, [mediaItem()])
+    act(() => result.current.watched.mutate(true))
+    await waitFor(() => expect(result.current.watched.failure?.message).toBe('The server is away.'))
+    expect(client.getQueryData<MediaItem[]>(LISTING)).toEqual([mediaItem()])
+  })
+
+  it('reads every tab of the library and the item pages again after marking', async () => {
+    spies.watched.mockImplementation(async () => undefined)
+    const { result, isStale, client } = setUp()
+    client.setQueryData(queryKeys.item(40), itemDetails())
+    act(() => result.current.watched.mutate(true))
+    await waitFor(() => expect(TABS.filter(([key]) => !isStale(key))).toEqual([]))
+    expect(isStale(queryKeys.item(40))).toBe(true)
   })
 
   it('reads every tab of the library again after a refresh', async () => {

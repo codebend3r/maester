@@ -56,8 +56,9 @@
 
 **Interfaces:**
 - Produces:
-  - `WatchedMark({ media, className? })`: renders `<span>` with the `check` icon, `aria-hidden`, plus `<span className="visually-hidden">Watched</span>`, only when `media.watched`; null otherwise.
-  - `WatchedCount({ watched, total, className? })`: uses `watchedStateOf({ watched, total })`. `watched` state: the check and hidden "Watched". `partly`: the number `total - watched` and hidden `${n} unwatched episode(s)` (`plural` from `@/lib/plural`). `unwatched`: null.
+  - `WatchedMark({ watched, decorative?, className? })` (a boolean, not a `media`, so an episode row can pass `episode.watched`): the `check` icon plus `<span className="visually-hidden">Watched</span>` when `watched`; null otherwise. A poster or still sits in a link that is `aria-hidden`, which would hide the words, so there the mark is `decorative` (no words) and the card says them with `WatchedWords({ watched })` beside `PartlyWatched`, as the resume bar does.
+  - `WatchedCount({ watched, total, unit?, decorative?, className? })`: uses `watchedStateOf({ watched, total })`. `watched` state: the check and hidden "Watched". `partly`: the number `total - watched` and hidden `${n} unwatched episode(s)` (`unit: 'movie'` for a saga; `plural` from `@/lib/plural`). `unwatched`: null. `WatchedCountWords` is its words alone, for the same reason.
+  - `WatchedToggle({ state, onToggle, label?, isLabelShown?, className? })` (added): the `Button tone="quiet" icon="check"` every page and episode row uses, with `aria-pressed` (`mixed` for `partly`) and a solid or dashed edge for pressed or partly.
 
 - [ ] **Step 1: Write the failing tests**
   - `WatchedMark.test.tsx`: `shows a check with the words Watched for a watched video`; `shows nothing for an unwatched video`.
@@ -82,7 +83,8 @@ Expected: FAIL, the modules do not exist.
 
 **Interfaces:**
 - Consumes: `WatchedMark`, `WatchedCount`; `media.watched`, `ShowEntry.watchedEpisodes`/`episodes`, `SeasonSummary.watchedCount`/`episodeCount`, and for a saga `saga.media.filter((m) => m.watched).length` of `saga.media.length`.
-- `PosterFrame` renders `WatchedMark` in the same grid area as `ResumeBar`, so a card in progress keeps its bar and a rewatch shows both.
+- `PosterFrame` renders `WatchedMark` (decorative) in the same grid area as `ResumeBar`, so a card in progress keeps its bar and a rewatch shows both. `MediaTiles` takes `withWatched` (default true), which the History page turns off.
+- `ShowCard` puts `WatchedCount` in the poster's corner; `ShowList` beside the title, `ShowTiles` in its facts row, `SeasonCard` in the season's poster and `SagaDeck` beside its facts (counted from `saga.media`, `unit="movie"`).
 
 - [ ] **Step 1: Write the failing tests**
   - Per card: `PosterCard shows the check for a watched video and not for another`; `PosterCard shows the check with the resume bar for a rewatch` (`watched: true`, `position: 30`); the same pair for `MediaCard`, `MediaTiles`, `MediaList` (the check in the title cell, the header unchanged), and the episode row.
@@ -111,7 +113,7 @@ Run: `bunx nx run @raven/web:test -- src/components src/pages/SeasonPage src/pag
 - `afterWatched(queryClient)`: invalidates `libraries`, `items`, `home`, `favourites`, `allMedia`.
 - `afterWatching({ queryClient, libraryId })` adds `items` and `favourites`.
 - `mutationKeys.watched = ['watched']`, so marks serialize.
-- `MediaMenu`: "Mark as watched" when `!media.watched`, else "Mark as unwatched"; for viewers (not behind the admin lock).
+- `MediaMenu`: "Mark as watched" when `!media.watched`, else "Mark as unwatched"; for viewers (not behind the admin lock). A `withWatched` prop (default true) leaves it out where the page has its own toggle, as `withFavourite` does.
 
 - [ ] **Step 1: Write the failing tests**
   - `watchedEdits sets the flag on every file of the card, not on another card of the movie`;
@@ -133,12 +135,13 @@ Run: `bunx nx run @raven/web:test -- src/lib src/components/MediaMenu`
 
 **Files:**
 - Modify: `apps/raven/web/src/components/PlayableItemView/PlayableItemView.tsx` (beside the favourite heart; movie and episode pages), `pages/ShowPage/ShowPage.tsx`, `pages/SeasonPage/SeasonPage.tsx`, `pages/SagaPage/SagaPage.tsx` (each beside Play), and each episode row on the season page
-- Create: `apps/raven/web/src/lib/useWatchedChange.ts` (a `useMutation` for `item` targets and bulk marks: `mutationKey: mutationKeys.watched`, `mutationFn: api.setWatched`, `onSettled: afterWatched`)
+- Create: `apps/raven/web/src/lib/useWatchedChange.ts` (a `useMutation` for `item` targets and bulk marks: `mutationKey: mutationKeys.watched` with the same `scope` as `useOptimisticMutation`'s, so both serialize; `mutationFn: api.setWatched`; `onSettled: afterWatched` once the last of them settles)
 - Test: `PlayableItemView.test.tsx`, `ShowPage.test.tsx`, `SeasonPage.test.tsx`, `SagaPage.test.tsx`, `lib/useWatchedChange.test.tsx`
 
 **Interfaces:**
 - The toggle: `Button tone="quiet" icon="check" aria-pressed={state === 'partly' ? 'mixed' : state === 'watched'}` named "Watched".
 - Movie and episode pages: pressed = `primary.watched`; press sends `{ kind: 'media', id: primary.id }` through `useMediaMutations().watched` (pages are per library and card).
+- Season page: it has no Play button, so the toggle sits in the header's actions alone.
 - Show page: state from `watchedStateOf({ watched: sum of season.watchedCount, total: sum of season.episodeCount })`; press when not `watched` marks everything watched, press when `watched` marks everything unwatched; targets `[{ kind: 'item', id: show.id, libraryId: null }]`.
 - Season page: the same over its episodes (`child.watched`), `[{ kind: 'item', id: season.id, libraryId: null }]`; each episode row has its own toggle sending `{ kind: 'item', id: episode.id, libraryId: null }`.
 - Saga page: state from its movies' `watched`; targets `saga.media.map((m) => ({ kind: 'item', id: m.item.id, libraryId: saga's library }))` (movies without an item send `media`).

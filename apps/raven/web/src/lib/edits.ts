@@ -1,9 +1,13 @@
 import type {
+  Duplicate,
+  Duplicates,
+  HistoryEntry,
   HomeSearch,
   HomeShelf,
   LibrarySettings,
   MediaItem,
   PosterEntry,
+  Saga,
   ShowListing,
 } from '@raven/core'
 import { type Edit, edit, editAll } from '@/lib/optimistic'
@@ -12,10 +16,12 @@ import {
   homeQuery,
   inProgressQuery,
   itemQuery,
+  duplicatesQuery,
   librariesQuery,
   libraryFavouritesQuery,
   libraryQuery,
   mediaQuery,
+  sagasQuery,
   unmatchedQuery,
 } from '@/lib/queries'
 import { queryKeys } from '@/lib/queryClient'
@@ -112,6 +118,142 @@ export const favouriteEdits = ({
       },
     }),
     editAll<HomeSearch>({ filters: { queryKey: queryKeys.homeSearches }, update: markShelves }),
+    ...(media.item
+      ? [
+          edit({
+            queryKey: itemQuery(media.item.id).queryKey,
+            update: (details) => {
+              const versions = markAll(details.versions)
+              return versions === details.versions ? details : { ...details, versions }
+            },
+          }),
+        ]
+      : []),
+  ]
+}
+
+/**
+ * A card marked watched or unwatched, wherever one of its files shows: the
+ * same files as `favouriteEdits` reaches, plus sagas, duplicates, history
+ * and the item's versions. Marking clears every resume spot on the card
+ * either way, so the position goes to 0 and the card leaves In progress.
+ * A card is the files of one movie that share it, else a file by itself.
+ */
+export const watchedEdits = ({
+  media,
+  watched,
+}: {
+  media: MediaItem
+  watched: boolean
+}): Edit[] => {
+  const { libraryId } = media
+  const isOnCard = (item: MediaItem): boolean =>
+    item.libraryId === libraryId &&
+    (media.item == null
+      ? item.id === media.id
+      : item.item?.id === media.item.id && item.card === media.card)
+  const needsMark = (item: MediaItem): boolean =>
+    isOnCard(item) && (item.watched !== watched || item.position !== 0)
+  const mark = (item: MediaItem): MediaItem => ({ ...item, watched, position: 0 })
+  const markAll = (items: MediaItem[]): MediaItem[] =>
+    mapWhere({ items, matches: needsMark, change: mark })
+  const markEntries = (entries: PosterEntry[]): PosterEntry[] =>
+    mapWhere({
+      items: entries,
+      matches: (entry) => needsMark(entry.media),
+      change: (entry) => ({ ...entry, media: mark(entry.media) }),
+    })
+  const dropEntries = (entries: PosterEntry[]): PosterEntry[] => {
+    const kept = entries.filter((entry) => !isOnCard(entry.media))
+    return kept.length === entries.length ? entries : kept
+  }
+  const markShelves = (shelves: HomeShelf[]): HomeShelf[] =>
+    mapWhere({
+      items: shelves,
+      matches: (shelf) => shelf.type === 'media' && shelf.media.some(needsMark),
+      change: (shelf) =>
+        shelf.type === 'media' ? { ...shelf, media: markAll(shelf.media) } : shelf,
+    })
+  const markHistory = (entries: HistoryEntry[]): HistoryEntry[] =>
+    mapWhere({
+      items: entries,
+      matches: (entry) => needsMark(entry.media),
+      change: (entry) => ({ ...entry, media: mark(entry.media) }),
+    })
+  const markSagas = (sagas: Saga[]): Saga[] =>
+    mapWhere({
+      items: sagas,
+      matches: (saga) => saga.media.some(needsMark),
+      change: (saga) => ({ ...saga, media: markAll(saga.media) }),
+    })
+  const markDuplicate = (duplicate: Duplicate): Duplicate => ({
+    ...duplicate,
+    cards: duplicate.cards.map((card) => ({
+      entry: needsMark(card.entry.media)
+        ? { ...card.entry, media: mark(card.entry.media) }
+        : card.entry,
+      files: mapWhere({
+        items: card.files,
+        matches: (file) => needsMark(file.media),
+        change: (file) => ({ ...file, media: mark(file.media) }),
+      }),
+    })),
+  })
+  const markDuplicates = (duplicates: Duplicates): Duplicates =>
+    mapWhere({
+      items: duplicates,
+      matches: (duplicate) =>
+        duplicate.cards.some(
+          (card) => needsMark(card.entry.media) || card.files.some((file) => needsMark(file.media)),
+        ),
+      change: markDuplicate,
+    })
+  return [
+    editAll<MediaItem>({
+      // A video's own record, not its tracks or subtitles, which share the prefix.
+      filters: {
+        queryKey: queryKeys.allMedia,
+        predicate: (query) => query.queryKey.length === 2,
+      },
+      update: (item) => (needsMark(item) ? mark(item) : item),
+    }),
+    editAll<MediaItem[]>({
+      filters: { queryKey: queryKeys.mediaLists(libraryId) },
+      update: markAll,
+    }),
+    editAll<ShowListing>({
+      filters: { queryKey: queryKeys.showLists(libraryId) },
+      update: (listing) => {
+        const unmatched = markAll(listing.unmatched)
+        return unmatched === listing.unmatched ? listing : { ...listing, unmatched }
+      },
+    }),
+    edit({ queryKey: unmatchedQuery(libraryId).queryKey, update: markAll }),
+    edit({ queryKey: inProgressQuery(libraryId).queryKey, update: dropEntries }),
+    edit({ queryKey: favouritesQuery.queryKey, update: markEntries }),
+    edit({ queryKey: libraryFavouritesQuery(libraryId).queryKey, update: markEntries }),
+    edit({
+      queryKey: homeQuery.queryKey,
+      update: (home) => {
+        const inProgress = dropEntries(home.inProgress)
+        const shelves = markShelves(home.shelves)
+        return inProgress === home.inProgress && shelves === home.shelves
+          ? home
+          : { ...home, inProgress, shelves }
+      },
+    }),
+    editAll<HomeSearch>({ filters: { queryKey: queryKeys.homeSearches }, update: markShelves }),
+    edit({ queryKey: sagasQuery(libraryId).queryKey, update: markSagas }),
+    edit({ queryKey: duplicatesQuery(libraryId).queryKey, update: markDuplicates }),
+    // The library's history, and the one across every library.
+    editAll<HistoryEntry[]>({
+      filters: { queryKey: queryKeys.historyLists(libraryId) },
+      update: markHistory,
+    }),
+    editAll<HistoryEntry[]>({
+      filters: { queryKey: queryKeys.historyLists(null) },
+      update: markHistory,
+    }),
     ...(media.item
       ? [
           edit({

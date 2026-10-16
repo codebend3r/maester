@@ -83,6 +83,8 @@ export const queryKeys = {
     show: string
     limit: number
   }) => ['libraries', libraryId, 'history', { show, limit }],
+  /** The prefix every history of a library, or of all of them, shares. */
+  historyLists: (libraryId: number | null) => ['libraries', libraryId, 'history'],
   /** A library's tabs beside its listing: in progress, favourites, sagas, files not matched. */
   inProgress: (libraryId: number) => ['libraries', libraryId, 'in-progress'],
   libraryFavourites: (libraryId: number) => ['libraries', libraryId, 'favourites'],
@@ -128,6 +130,8 @@ export const queryKeys = {
 export const mutationKeys = {
   /** Any video's favourite: they all show in the same listings. */
   favourite: ['favourite'],
+  /** Any mark as watched or unwatched: marks and their answers keep their order. */
+  watched: ['watched'],
   /** Any library's pin: they all show in the libraries list and on home. */
   pin: ['pin'],
   /** One library's sort, view or grouping, which only its page changes. */

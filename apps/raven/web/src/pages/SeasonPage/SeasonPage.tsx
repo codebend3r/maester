@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import type { EpisodeSummary, ItemDetails } from '@raven/core'
+import { type EpisodeSummary, type ItemDetails, watchedStateOf } from '@raven/core'
 import { useId } from 'react'
 import { Link } from 'react-router-dom'
 import { Icon } from '@raven/ui'
@@ -8,16 +8,23 @@ import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { RouteState } from '@/components/RouteState/RouteState'
 import { Summary } from '@/components/Summary/Summary'
 import { TmdbCredit } from '@/components/TmdbCredit/TmdbCredit'
+import { WatchedMark } from '@/components/WatchedMark/WatchedMark'
+import { WatchedToggle } from '@/components/WatchedToggle/WatchedToggle'
 import { api } from '@/lib/api'
 import { formatAirDate, runtimeFact } from '@/lib/itemFacts'
 import { watchLink } from '@/lib/itemLinks'
 import { itemQuery } from '@/lib/queries'
 import { routeState, useRouteId } from '@/lib/routeQuery'
+import { useWatchedToggle } from '@/lib/useWatchedChange'
 import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
 import styles from '@/pages/SeasonPage/SeasonPage.module.scss'
 
-/** One episode on disk: its still, number and title, air date and length, two lines of summary, and Play. */
+/** One episode on disk: its still, number and title, air date and length, two lines of summary, Watched and Play. */
 const EpisodeRow = ({ episode }: { episode: EpisodeSummary }) => {
+  const toggle = useWatchedToggle({
+    state: episode.watched ? 'watched' : 'unwatched',
+    targets: [{ kind: 'item', id: episode.id, libraryId: null }],
+  })
   const file = episode.primary ?? undefined
   // The still, from TMDB or beside the file; else a frame of the file itself.
   const picture =
@@ -46,6 +53,7 @@ const EpisodeRow = ({ episode }: { episode: EpisodeSummary }) => {
           <span className={styles.stillPlaceholder}>{episode.episode ?? ''}</span>
         )}
         {file && <ResumeBar media={file} className={styles.resume} />}
+        <WatchedMark decorative watched={episode.watched} className={styles.watched} />
       </Link>
       <div className={styles.body}>
         <Link to={`/episodes/${episode.id}`} className={styles.title}>
@@ -62,6 +70,12 @@ const EpisodeRow = ({ episode }: { episode: EpisodeSummary }) => {
         {episode.summary && <p className={styles.overview}>{episode.summary}</p>}
         {file && <PartlyWatched media={file} />}
       </div>
+      <WatchedToggle
+        {...toggle}
+        label={`Watched ${episode.title}`}
+        isLabelShown={false}
+        className={styles.toggle}
+      />
       {file && (
         <Link
           {...watchLink({ media: file })}
@@ -79,6 +93,13 @@ const SeasonView = ({ show, season }: { show: ItemDetails; season: ItemDetails }
   const ids = { title: useId(), episodes: useId() }
   const episodes = season.children.flatMap((child) => (child.type === 'episode' ? [child] : []))
   const count = episodes.length
+  const toggle = useWatchedToggle({
+    state: watchedStateOf({
+      watched: episodes.filter((episode) => episode.watched).length,
+      total: count,
+    }),
+    targets: [{ kind: 'item', id: season.id, libraryId: null }],
+  })
   return (
     <article className={styles.page} aria-labelledby={ids.title}>
       <ItemHeader
@@ -99,7 +120,9 @@ const SeasonView = ({ show, season }: { show: ItemDetails; season: ItemDetails }
         backdrop={pictureBackdrop(
           api.itemImageUrl({ id: show.id, kind: 'backdrop', version: show.backdropVersion }),
         )}
-      />
+      >
+        <WatchedToggle {...toggle} />
+      </ItemHeader>
 
       <Summary tagline={null} summary={season.summary} />
 

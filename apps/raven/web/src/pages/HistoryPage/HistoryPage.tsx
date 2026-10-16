@@ -40,6 +40,7 @@ const HistoryDaySection = ({
       <MediaTiles
         items={entries.map((entry) => entry.media)}
         note={(media) => notes.get(media.id) ?? null}
+        withWatched={false}
       />
     </section>
   )
@@ -91,8 +92,9 @@ export const HistoryPage = () => {
           History
         </h1>
         <p className={styles.intro}>
-          Videos played in {name}, last played first. One counts as watched once playback gets{' '}
-          {settings.watchedPercent}% of the way through, which the library's settings can change.
+          Videos played or marked in {name}, last played first. One counts as watched once playback
+          gets {settings.watchedPercent}% of the way through, or when it is marked, which the
+          library's settings can change.
         </p>
       </header>
 

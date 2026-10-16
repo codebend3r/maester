@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'bun:test'
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import { PosterCard } from '@/components/PosterCard/PosterCard'
 import { POSTER_SIZES } from '@/lib/posters'
 import { itemSummary, matchedMovie, mediaItem } from '@/test/fixtures'
@@ -151,5 +151,26 @@ describe('PosterCard', () => {
     expect(screen.getByRole('link', { name: 'Home Movie' })).toHaveAttribute('href', '/watch/7')
     expect(screen.queryByRole('link', { name: /^Play/ })).toBeNull()
     expect(screen.getByText('Not matched')).toBeInTheDocument()
+  })
+
+  it('shows the check for a watched video and not for another', () => {
+    renderWithProviders(
+      <PosterCard sizes={POSTER_SIZES.grid} media={matchedMovie({ watched: true })} />,
+    )
+    expect(screen.getByText('Watched')).toBeInTheDocument()
+    cleanup()
+    renderWithProviders(<PosterCard sizes={POSTER_SIZES.grid} media={matchedMovie()} />)
+    expect(screen.queryByText('Watched')).toBeNull()
+  })
+
+  it('shows the check with the resume bar for a rewatch', () => {
+    const { container } = renderWithProviders(
+      <PosterCard
+        sizes={POSTER_SIZES.grid}
+        media={matchedMovie({ watched: true, position: 30, duration: 120 })}
+      />,
+    )
+    expect(screen.getByText('Watched')).toBeInTheDocument()
+    expect(container.querySelector('[style]')).toHaveStyle({ width: '25%' })
   })
 })

@@ -18,6 +18,7 @@ import { PosterFrame } from '@/components/PosterCard/PosterCard'
 import { RatingChips } from '@/components/RatingChips/RatingChips'
 import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { Bone } from '@/components/Skeleton/Skeleton'
+import { WatchedMark, WatchedWords } from '@/components/WatchedMark/WatchedMark'
 import { api } from '@/lib/api'
 import { cardLink } from '@/lib/itemLinks'
 import { POSTER_SIZES } from '@/lib/posters'
@@ -34,12 +35,14 @@ const MediaTile = ({
   media,
   note,
   posters,
+  withWatched,
   matchType,
   sort,
 }: {
   media: MediaItem
   note: string | null
   posters: boolean
+  withWatched: boolean
   matchType: MatchItemType | null
   sort: MediaSort | undefined
 }) => {
@@ -73,7 +76,7 @@ const MediaTile = ({
         onContextMenu={menu.onContextMenu}
       >
         {posters ? (
-          <PosterFrame media={media} sizes={POSTER_SIZES.movieTile} />
+          <PosterFrame media={media} sizes={POSTER_SIZES.movieTile} withWatched={withWatched} />
         ) : thumbnail ? (
           <img
             className={styles.thumbnail}
@@ -86,6 +89,13 @@ const MediaTile = ({
           <span className={styles.placeholder}>{media.title.slice(0, 1)}</span>
         )}
         {!posters && <ResumeBar media={media} className={styles.resume} />}
+        {!posters && (
+          <WatchedMark
+            decorative
+            watched={withWatched && media.watched}
+            className={styles.watched}
+          />
+        )}
       </CardLink>
       <div className={styles.body}>
         <CardLink {...link} className={styles.title} onContextMenu={menu.onContextMenu}>
@@ -98,6 +108,7 @@ const MediaTile = ({
             <span key={fact}>{fact}</span>
           ))}
           <PartlyWatched media={media} />
+          <WatchedWords watched={withWatched && media.watched} />
         </span>
         {posters && media.item && <RatingChips ratings={media.item.ratings} />}
         {media.folder !== '' && <span className={styles.folder}>{media.folder}</span>}
@@ -118,6 +129,7 @@ export const MediaTiles = ({
   items,
   note,
   posters = false,
+  withWatched = true,
   matchType = null,
   sort,
 }: {
@@ -125,6 +137,8 @@ export const MediaTiles = ({
   note?: (media: MediaItem) => string | null
   /** A Movies library's tiles: small posters, opening the movie's page. */
   posters?: boolean
+  /** Off for the history, whose notes say what was watched. */
+  withWatched?: boolean
   /** What the library matches its files to, for the menu's Fix match. */
   matchType?: MatchItemType | null
   /** The order the listing is in, whose value each tile shows first. */
@@ -137,6 +151,7 @@ export const MediaTiles = ({
         media={item}
         note={note ? note(item) : null}
         posters={posters}
+        withWatched={withWatched}
         matchType={matchType}
         sort={sort}
       />

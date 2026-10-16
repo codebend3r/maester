@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { cleanup, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import type { ItemDetails } from '@raven/core'
 import { Route, Routes } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { SeasonPage } from '@/pages/SeasonPage/SeasonPage'
@@ -63,5 +65,79 @@ describe('SeasonPage', () => {
     expect(
       await screen.findByRole('heading', { name: 'Nothing lives at this address' }),
     ).toBeInTheDocument()
+  })
+
+  const withWatched = (watched: boolean[]): ItemDetails => ({
+    ...SEASON_ONE,
+    children: SEASON_ONE.children.map((child, index) =>
+      child.type === 'episode' ? { ...child, watched: watched[index] ?? false } : child,
+    ),
+  })
+
+  const openWith = (season: ItemDetails) => {
+    spies.item.mockImplementation(async (id) => {
+      if (id === 4) return SEVERANCE
+      if (id === 5) return season
+      throw new Error(`no item ${id}`)
+    })
+    renderWithProviders(
+      <Routes>
+        <Route path="shows/:id/seasons/:number" element={<SeasonPage />} />
+      </Routes>,
+      { route: '/shows/4/seasons/1' },
+    )
+  }
+
+  it('reads as partly pressed when some episodes are watched', async () => {
+    openWith(withWatched([true, false]))
+    expect(await screen.findByRole('button', { name: 'Watched' })).toHaveAttribute(
+      'aria-pressed',
+      'mixed',
+    )
+  })
+
+  it('marks the whole season watched from a partly watched one, then unwatched', async () => {
+    const calls: unknown[] = []
+    const set = spyOn(api, 'setWatched').mockImplementation(async (input) => {
+      calls.push(input)
+    })
+    openWith(withWatched([true, false]))
+    await userEvent.click(await screen.findByRole('button', { name: 'Watched' }))
+    cleanup()
+    openWith(withWatched([true, true]))
+    await userEvent.click(await screen.findByRole('button', { name: 'Watched' }))
+    set.mockRestore()
+    const targets = [{ kind: 'item', id: 5, libraryId: null }]
+    expect(calls).toEqual([
+      { watched: true, targets },
+      { watched: false, targets },
+    ])
+  })
+
+  it('gives each episode row its own toggle, sending that episode', async () => {
+    const calls: unknown[] = []
+    const set = spyOn(api, 'setWatched').mockImplementation(async (input) => {
+      calls.push(input)
+    })
+    openWith(withWatched([true, false]))
+    const first = await screen.findByRole('button', { name: 'Watched Good News About Hell' })
+    const second = screen.getByRole('button', { name: 'Watched Half Loop' })
+    expect(first).toHaveAttribute('aria-pressed', 'true')
+    expect(second).toHaveAttribute('aria-pressed', 'false')
+    await userEvent.click(second)
+    await userEvent.click(first)
+    set.mockRestore()
+    expect(calls).toEqual([
+      { watched: true, targets: [{ kind: 'item', id: 7, libraryId: null }] },
+      { watched: false, targets: [{ kind: 'item', id: 6, libraryId: null }] },
+    ])
+  })
+
+  it('draws the check on a watched episode’s still', async () => {
+    openWith(withWatched([true, false]))
+    const list = await screen.findByRole('list')
+    const [first, second] = within(list).getAllByRole('listitem')
+    expect(first?.querySelector('a[aria-hidden] svg')).not.toBeNull()
+    expect(second?.querySelector('a[aria-hidden] svg')).toBeNull()
   })
 })

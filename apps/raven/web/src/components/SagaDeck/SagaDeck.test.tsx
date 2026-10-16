@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test'
+import { cleanup, screen } from '@testing-library/react'
 import { DEFAULT_SAGA_BACKDROP } from '@raven/core'
 import { SagaDecks } from '@/components/SagaDeck/SagaDeck'
 import { POSTER_SIZES } from '@/lib/posters'
@@ -31,5 +32,32 @@ describe('SagaDecks', () => {
       POSTER_SIZES.deck,
       POSTER_SIZES.deck,
     ])
+  })
+
+  const saga = (watched: boolean[]) => ({
+    tmdbId: '119',
+    name: 'The Lord of the Rings Collection',
+    backdrop: DEFAULT_SAGA_BACKDROP,
+    media: watched.map((isWatched, index) =>
+      matchedMovie({
+        id: index + 1,
+        item: itemSummary({ id: (index + 1) * 10 }),
+        watched: isWatched,
+      }),
+    ),
+  })
+
+  it('shows the number of movies left unwatched, counted from its movies', () => {
+    renderWithProviders(<SagaDecks libraryId={2} sagas={[saga([true, false, false])]} />)
+    expect(screen.getByText('2 unwatched movies')).toBeInTheDocument()
+  })
+
+  it('shows the check when every movie is watched, and nothing when none is', () => {
+    renderWithProviders(<SagaDecks libraryId={2} sagas={[saga([true, true])]} />)
+    expect(screen.getByText('Watched')).toBeInTheDocument()
+    cleanup()
+    renderWithProviders(<SagaDecks libraryId={2} sagas={[saga([false, false])]} />)
+    expect(screen.queryByText('Watched')).toBeNull()
+    expect(screen.queryByText(/unwatched/)).toBeNull()
   })
 })

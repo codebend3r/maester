@@ -67,14 +67,42 @@ describe('MediaMenu', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
-  it('offers only Favourite while the admin lock is on', async () => {
+  it('offers Mark as watched for an unwatched card and sends a media target', async () => {
+    const calls: unknown[] = []
+    const spy = spyOn(api, 'setWatched').mockImplementation(async (input) => {
+      calls.push(input)
+    })
+    renderWithProviders(<Harness media={mediaItem()} />)
+    await openMenu()
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Mark as watched' }))
+    spy.mockRestore()
+    expect(calls).toEqual([{ watched: true, targets: [{ kind: 'media', id: 7 }] }])
+    expect(screen.queryByRole('menu')).toBeNull()
+  })
+
+  it('offers Mark as unwatched for a watched card and sends the other way', async () => {
+    const calls: unknown[] = []
+    const spy = spyOn(api, 'setWatched').mockImplementation(async (input) => {
+      calls.push(input)
+    })
+    renderWithProviders(<Harness media={mediaItem({ watched: true })} />)
+    await openMenu()
+    expect(screen.queryByRole('menuitem', { name: 'Mark as watched' })).toBeNull()
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Mark as unwatched' }))
+    spy.mockRestore()
+    expect(calls).toEqual([{ watched: false, targets: [{ kind: 'media', id: 7 }] }])
+  })
+
+  it('offers Favourite and Mark as watched, and nothing else, while the admin lock is on', async () => {
     const location = spyOn(api, 'getMediaLocation')
     renderWithProviders(<Harness media={matchedMovie()} matchType="movie" />, {
       adminLock: { state: 'on', available: true },
     })
     await userEvent.click(screen.getByRole('button', { name: /^Options for / }))
-    expect(screen.getAllByRole('menuitem')).toHaveLength(1)
-    expect(screen.getByRole('menuitem', { name: 'Favourite' })).toBeInTheDocument()
+    expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual([
+      'Favourite',
+      'Mark as watched',
+    ])
     expect(location).not.toHaveBeenCalled()
     location.mockRestore()
   })

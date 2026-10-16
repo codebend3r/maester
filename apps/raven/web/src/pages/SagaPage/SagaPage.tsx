@@ -1,5 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
-import { type Library, type Saga, sagaCover, sagaPictures } from '@raven/core'
+import {
+  type Library,
+  type Saga,
+  type WatchedChange,
+  sagaCover,
+  sagaPictures,
+  watchedStateOf,
+} from '@raven/core'
 import { useId, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
@@ -12,12 +19,14 @@ import {
 import { LockedLibrary } from '@/components/LockedLibrary/LockedLibrary'
 import { MediaGrid, MediaGridSkeleton } from '@/components/MediaGrid/MediaGrid'
 import { RouteState } from '@/components/RouteState/RouteState'
+import { WatchedToggle } from '@/components/WatchedToggle/WatchedToggle'
 import { api } from '@/lib/api'
 import { watchLink } from '@/lib/itemLinks'
 import { useLibraryLock } from '@/lib/libraryLock'
 import { libraryQuery, sagasQuery } from '@/lib/queries'
 import { routeState, useRouteId } from '@/lib/routeQuery'
 import { sagaFacts, sagaRuntime } from '@/lib/sagas'
+import { useWatchedToggle } from '@/lib/useWatchedChange'
 import { HoverBackdrops } from '@/lib/useHoverBackdrop'
 import { sectionPath } from '@/pages/LibraryPage/librarySections'
 import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
@@ -52,6 +61,30 @@ const headerBackdrop = (saga: Saga): HeaderBackdrop | null => {
       return unknown
     }
   }
+}
+
+/** A saga's movies as targets: each by its item in the saga's library, else its own file. */
+const sagaTargets = ({
+  saga,
+  libraryId,
+}: {
+  saga: Saga
+  libraryId: number
+}): WatchedChange['targets'] =>
+  saga.media.map((media) =>
+    media.item ? { kind: 'item', id: media.item.id, libraryId } : { kind: 'media', id: media.id },
+  )
+
+/** Watched for the whole saga: its movies are marked together. */
+const SagaWatchedToggle = ({ saga, libraryId }: { saga: Saga; libraryId: number }) => {
+  const toggle = useWatchedToggle({
+    state: watchedStateOf({
+      watched: saga.media.filter((media) => media.watched).length,
+      total: saga.media.length,
+    }),
+    targets: sagaTargets({ saga, libraryId }),
+  })
+  return <WatchedToggle {...toggle} />
 }
 
 /** The saga once its library is known and open to this browser. */
@@ -98,6 +131,7 @@ const SagaView = ({ library, sagaId }: { library: Library; sagaId: string }) => 
               Play all
             </ButtonLink>
           )}
+          {first && <SagaWatchedToggle saga={saga} libraryId={library.id} />}
           {backdrop && (
             <AdminOnly>
               <Button icon="edit" onClick={() => setEditing(true)}>

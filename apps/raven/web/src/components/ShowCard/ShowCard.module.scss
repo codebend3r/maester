@@ -59,8 +59,19 @@
 }
 
 .image,
-.placeholder {
+.placeholder,
+.watched {
   grid-area: frame;
+}
+
+// The number left, or a check, in the poster's top corner, over the picture
+// and its hover filter.
+.watched {
+  position: relative;
+  z-index: 1;
+  align-self: start;
+  justify-self: end;
+  inset: var(--space-1) var(--space-1) auto auto;
 }
 
 .image {
