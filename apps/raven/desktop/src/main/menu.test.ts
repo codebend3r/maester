@@ -28,6 +28,11 @@ const topLevel = (template: readonly MenuEntry[], name: string): MenuEntry => {
   return found
 }
 
+const click = (entry: MenuEntry): void => {
+  if (entry.click === undefined) throw new Error(`${entry.label ?? 'item'} has no click`)
+  entry.click()
+}
+
 const itemOf = (menu: MenuEntry, label: string): MenuEntry => {
   const found = (menu.submenu ?? []).find((entry) => entry.label === label)
   if (found === undefined) throw new Error(`no ${label} item`)
@@ -51,7 +56,7 @@ describe('menuTemplate', () => {
     const { template, sent } = setup()
     const settings = itemOf(topLevel(template, 'raven player'), 'Settings…')
     expect(settings.accelerator).toBe('CommandOrControl+,')
-    settings.click?.()
+    click(settings)
     expect(sent).toEqual([{ type: 'navigate', to: 'settings' }])
   })
 
@@ -78,7 +83,7 @@ describe('menuTemplate', () => {
     const { template, dialogs } = setup()
     const open = itemOf(topLevel(template, 'File'), 'Open…')
     expect(open.accelerator).toBe('CommandOrControl+O')
-    open.click?.()
+    click(open)
     expect(dialogs.opened).toBe(1)
   })
 
@@ -91,7 +96,7 @@ describe('menuTemplate', () => {
 
   it('ends the File menu with Close Window', () => {
     const { template } = setup()
-    expect((topLevel(template, 'File').submenu ?? []).at(-1)?.role).toBe('close')
+    expect((topLevel(template, 'File').submenu ?? []).at(-1)?.role ?? null).toBe('close')
   })
 
   it('sends each Playback item as a player action, with no accelerators', () => {
@@ -100,7 +105,7 @@ describe('menuTemplate', () => {
     expect(
       everyItem(playback.submenu ?? []).filter((entry) => entry.accelerator !== undefined),
     ).toEqual([])
-    ;(playback.submenu ?? []).forEach((entry) => entry.click?.())
+    ;(playback.submenu ?? []).forEach(click)
     expect(sent).toEqual([
       { type: 'player', action: 'togglePlay' },
       { type: 'player', action: 'skipBack' },
@@ -111,7 +116,7 @@ describe('menuTemplate', () => {
 
   it('sends skipForward from Skip Forward', () => {
     const { template, sent } = setup()
-    itemOf(topLevel(template, 'Playback'), 'Skip Forward').click?.()
+    click(itemOf(topLevel(template, 'Playback'), 'Skip Forward'))
     expect(sent).toEqual([{ type: 'player', action: 'skipForward' }])
   })
 
@@ -127,7 +132,7 @@ describe('menuTemplate', () => {
     const { template, sent } = setup()
     const help = topLevel(template, 'Help')
     expect(help.role).toBe('help')
-    itemOf(help, 'Keyboard Shortcuts').click?.()
+    click(itemOf(help, 'Keyboard Shortcuts'))
     expect(sent).toEqual([{ type: 'player', action: 'showShortcuts' }])
   })
 

@@ -79,6 +79,13 @@ describe('placeWindow', () => {
     })
   })
 
+  it('falls back when clamping leaves the window off its display', () => {
+    const saved = { x: -5000, y: 25, width: 6000, height: 900, displayId: 1 }
+    expect(placeWindow({ saved, displays: DISPLAYS, primary: { workArea: PRIMARY } })).toEqual(
+      centredDefault(PRIMARY),
+    )
+  })
+
   it('clamps the default to a small main display', () => {
     const small: Rect = { x: 0, y: 0, width: 1024, height: 700 }
     expect(

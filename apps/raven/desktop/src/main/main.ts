@@ -18,13 +18,14 @@ import {
   shell,
 } from 'electron'
 import { createAppHandler } from '@/main/appProtocol'
-import { createDesktopService, type DesktopService, MESSAGES } from '@/main/desktopService'
+import { createDesktopService, type DesktopService } from '@/main/desktopService'
 import { createFileHandler } from '@/main/fileProtocol'
 import { createGrants, type Grants } from '@/main/grants'
 import { menuTemplate } from '@/main/menu'
 import { createOpenBatch, eventForOpen, launchPaths } from '@/main/openBatch'
 import { setWindowBounds } from '@/main/playerState'
 import { createQuitGate } from '@/main/quitGate'
+import { createRequestHandler } from '@/main/requestHandler'
 import { isAppUrl, isPermissionAllowed, isTrustedSender, windowOpenFor } from '@/main/security'
 import { createStateStore, loadState, type StateFs, type StateStore } from '@/main/stateStore'
 import { createNodeTimers } from '@/main/timers'
@@ -83,12 +84,19 @@ const startApp = (): void => {
   ])
 
   const windows: { current: BrowserWindow | null } = { current: null }
+  // Timer callbacks (the open batches) call this too, so a closing window must not throw.
   const send = (event: DesktopEvent): void => {
-    windows.current?.webContents.send(EVENT_CHANNEL, event)
+    const window = windows.current
+    if (window === null || window.isDestroyed() || window.webContents.isDestroyed()) return
+    try {
+      window.webContents.send(EVENT_CHANNEL, event)
+    } catch (error) {
+      console.warn('raven player could not reach its window.', error)
+    }
   }
   const reveal = (): void => {
     const window = windows.current
-    if (window === null) return
+    if (window === null || window.isDestroyed()) return
     if (window.isMinimized()) window.restore()
     window.show()
     window.focus()
@@ -298,24 +306,17 @@ const secureContents = (): void => {
   })
 }
 
-const refuse = (reason: string): DesktopReply => {
-  console.warn(`raven player refused a request: ${reason}`)
-  return { type: 'refused', message: MESSAGES.unknownRequest }
-}
-
 const answerRequests = ({ service }: { service: DesktopService }): void => {
-  ipcMain.handle(REQUEST_CHANNEL, async (event, payload: unknown): Promise<DesktopReply> => {
-    const frameUrl = event.senderFrame?.url ?? null
-    if (!isTrustedSender(frameUrl))
-      return refuse(`sender ${frameUrl ?? 'unknown'} is not ${APP_ORIGIN}`)
-    const reply = await service.handle(payload).catch((error: unknown) => {
-      console.error('raven player failed to answer a request.', error)
-      return null
-    })
-    if (reply === null) return refuse('the request failed')
-    if (reply.type === 'refused') console.warn(`raven player refused a request: ${reply.message}`)
-    return reply
+  const answer = createRequestHandler({
+    isTrustedSender,
+    handle: service.handle,
+    warn: (message) => {
+      console.warn(message)
+    },
   })
+  ipcMain.handle(REQUEST_CHANNEL, (event, payload: unknown) =>
+    answer({ frameUrl: event.senderFrame?.url ?? null, payload }),
+  )
 }
 
 const openWindow = ({ store }: { store: StateStore }): BrowserWindow => {

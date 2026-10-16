@@ -13,7 +13,8 @@ const invoke = (envelope: Envelope): Promise<unknown> =>
 // only a drop carries paths, and those come from `webUtils`, not from the page.
 const bridge = {
   request: (request) => invoke({ kind: 'page', request }),
-  dropFiles: (files) =>
+  // Typed as what it is: whatever the page passed, which `dropPaths` checks itself.
+  dropFiles: (files: unknown) =>
     invoke({
       kind: 'drop',
       paths: dropPaths({ files, pathOf: (file) => webUtils.getPathForFile(file) }),

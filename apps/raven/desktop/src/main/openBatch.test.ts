@@ -93,8 +93,9 @@ describe('createOpenBatch', () => {
     batch.ready()
     expect(delivered).toHaveLength(1)
     expect(delivered[0]).toHaveLength(MAX_QUEUE + 1)
-    expect(delivered[0]?.[0]).toBe('/m/0.mkv')
-    expect(delivered[0]?.at(-1)).toBe(`/m/${MAX_QUEUE}.mkv`)
+    const [held = []] = delivered
+    expect(held[0]).toBe('/m/0.mkv')
+    expect(held.at(-1)).toBe(`/m/${MAX_QUEUE}.mkv`)
   })
 })
 

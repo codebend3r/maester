@@ -36,14 +36,17 @@ export const placeWindow = ({
   if (saved === null) return centred(primary.workArea)
   const display = displays.find(({ id }) => id === saved.displayId)
   if (display === undefined) return centred(primary.workArea)
-  const visible = overlap({ a: saved, b: display.workArea })
-  if (visible.width < MIN_VISIBLE || visible.height < MIN_VISIBLE) {
-    return centred(primary.workArea)
-  }
-  return {
+  // Checked after clamping: a window wider than its display shrinks from the right, so
+  // the clamped rect, not the saved one, is what has to stay on screen.
+  const clamped = {
     x: saved.x,
     y: saved.y,
     width: Math.min(saved.width, display.workArea.width),
     height: Math.min(saved.height, display.workArea.height),
   }
+  const visible = overlap({ a: clamped, b: display.workArea })
+  if (visible.width < MIN_VISIBLE || visible.height < MIN_VISIBLE) {
+    return centred(primary.workArea)
+  }
+  return clamped
 }
