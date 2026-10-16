@@ -1,8 +1,10 @@
 /**
  * Holds a quit until the state store has written, for at most `timeoutMs`: a hung
  * or failed write must never keep the app open. The store does not retry a failed
- * write, so this flush is the last chance to save. Used for `before-quit` and
- * `will-quit` both, since the page's last save can land between them.
+ * write, so this flush is the last chance to save. A save that lands while it writes
+ * leaves the store dirty after a flush that finished, so that case flushes once more
+ * within the same bound. Used for `before-quit` and `will-quit` both, since the page's
+ * last save can land between them.
  */
 export const createQuitGate = ({
   isDirty,
@@ -22,7 +24,16 @@ export const createQuitGate = ({
   let isFlushing = false
 
   const save = async (): Promise<void> => {
-    await Promise.race([flush().catch(() => undefined), wait(timeoutMs)])
+    const deadline = wait(timeoutMs).then(() => 'timedOut' as const)
+    const attempt = () =>
+      Promise.race([
+        flush().then(
+          () => 'flushed' as const,
+          () => 'failed' as const,
+        ),
+        deadline,
+      ])
+    if ((await attempt()) === 'flushed' && isDirty()) await attempt()
     isFlushing = false
     if (isDirty()) {
       exit()

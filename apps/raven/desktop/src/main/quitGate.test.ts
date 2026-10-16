@@ -140,4 +140,56 @@ describe('createQuitGate', () => {
     expect(calls.prevented).toBe(1)
     expect(calls.flush).toBe(1)
   })
+
+  it('flushes once more when a save landed during the flush, then quits', async () => {
+    const state = { pending: 2 }
+    const { gate, event, calls } = setup({
+      isDirty: () => state.pending > 0,
+      flush: async () => {
+        state.pending -= 1
+      },
+    })
+    gate(event)
+    await settle()
+    expect(calls.flush).toBe(2)
+    expect(calls.waits).toEqual([1000])
+    expect(calls.quit).toBe(1)
+    expect(calls.exit).toBe(0)
+  })
+
+  it('exits when the store is still dirty after the second flush', async () => {
+    const { gate, event, calls } = setup({ isDirty: () => true, flush: async () => undefined })
+    gate(event)
+    await settle()
+    expect(calls.flush).toBe(2)
+    expect(calls.quit).toBe(0)
+    expect(calls.exit).toBe(1)
+  })
+
+  it('does not flush again after the bound passes', async () => {
+    const timeout = deferred()
+    const { gate, event, calls } = setup({
+      isDirty: () => true,
+      flush: () => new Promise<void>(() => undefined),
+      wait: () => timeout.promise,
+    })
+    gate(event)
+    timeout.resolve()
+    await settle()
+    expect(calls.flush).toBe(1)
+    expect(calls.exit).toBe(1)
+  })
+
+  it('does not flush again after a failed flush', async () => {
+    const { gate, event, calls } = setup({
+      isDirty: () => true,
+      flush: async () => {
+        throw new Error('disk full')
+      },
+    })
+    gate(event)
+    await settle()
+    expect(calls.flush).toBe(1)
+    expect(calls.exit).toBe(1)
+  })
 })
