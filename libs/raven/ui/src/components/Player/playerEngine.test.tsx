@@ -3,7 +3,11 @@ import { act, fireEvent, renderHook, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { type ReactNode, useEffect } from 'react'
 import { Player } from '@/components/Player/Player'
-import { PlayerServicesProvider, type PlayerServices } from '@/components/Player/PlayerServices'
+import {
+  type HostActions,
+  PlayerServicesProvider,
+  type PlayerServices,
+} from '@/components/Player/PlayerServices'
 import { PlayerChrome } from '@/components/Player/Stage'
 import type { EngineActions, EngineHandle } from '@/components/Player/engine'
 import type { TrackSelection } from '@/components/Player/useTrackSelection'
@@ -12,6 +16,7 @@ import { initialVideoState, videoReducer } from '@/components/Player/useVideoSta
 import { useWatchProgress } from '@/components/Player/useWatchProgress'
 import { api } from '@/test/api'
 import { renderWithProviders } from '@/test/render'
+import type { PlayerAction } from '@/lib/shortcuts'
 
 const servicesFor = (): PlayerServices => ({
   title: { label: 'Local clip', duration: 120, resumeAt: 20, backTo: '/', next: null },
@@ -114,6 +119,50 @@ describe('useWatchProgress state transitions', () => {
   })
 })
 
+describe('useWatchProgress duration sink', () => {
+  it("reports the engine's duration to an optional duration sink once known", () => {
+    const duration = mock((_seconds: number) => {})
+    const services: PlayerServices = {
+      ...servicesFor(),
+      progress: { ...servicesFor().progress, duration },
+    }
+    const position = { current: 0 }
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <PlayerServicesProvider services={services}>{children}</PlayerServicesProvider>
+    )
+    const state = initialVideoState(0)
+    const { rerender } = renderHook(
+      ({ length }: { length: number | null }) =>
+        useWatchProgress({ state, position, duration: length }),
+      { initialProps: { length: null as number | null }, wrapper },
+    )
+    expect(duration).not.toHaveBeenCalled()
+    rerender({ length: 120 })
+    expect(duration).toHaveBeenCalledTimes(1)
+    expect(duration).toHaveBeenCalledWith(120)
+    rerender({ length: 120 })
+    expect(duration).toHaveBeenCalledTimes(1)
+  })
+
+  it('renders without throwing when the sink has no duration', () => {
+    const services = servicesFor()
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <PlayerServicesProvider services={services}>{children}</PlayerServicesProvider>
+    )
+    expect(() =>
+      renderHook(
+        () =>
+          useWatchProgress({
+            state: initialVideoState(0),
+            position: { current: 0 },
+            duration: 120,
+          }),
+        { wrapper },
+      ),
+    ).not.toThrow()
+  })
+})
+
 describe('PlayerChrome with a fake engine handle', () => {
   it('renders a non-video surface and routes buttons, settings and shortcuts to actions', async () => {
     const services = servicesFor()
@@ -158,6 +207,50 @@ describe('PlayerChrome with a fake engine handle', () => {
     expect(actions.seek).toHaveBeenLastCalledWith(0)
     expect(actions.play).toHaveBeenCalledTimes(2)
     expect(engine.focusSurface).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('PlayerChrome host actions', () => {
+  it('acts on actions the host sends', () => {
+    const listeners = new Set<(action: PlayerAction) => void>()
+    const hostActions: HostActions = {
+      subscribe: (listener) => {
+        listeners.add(listener)
+        return () => listeners.delete(listener)
+      },
+    }
+    const emit = (action: PlayerAction) => listeners.forEach((listener) => listener(action))
+    const services: PlayerServices = { ...servicesFor(), hostActions }
+    const actions = actionsFor()
+    const engine: EngineHandle = {
+      state: initialVideoState(20),
+      duration: 120,
+      position: { current: 20 },
+      tracks: null,
+      actions,
+      focusSurface: mock(() => {}),
+      surface: <p>Engine picture</p>,
+      drawsSubtitles: true,
+    }
+    const { unmount } = renderWithProviders(
+      <PlayerServicesProvider services={services}>
+        <PlayerChrome
+          engine={engine}
+          onBack={() => {}}
+          mode="direct"
+          selection={selection}
+          subtitleStatus="off"
+          fullscreen={{ fullscreen: false, toggle: () => {} }}
+        />
+      </PlayerServicesProvider>,
+    )
+    expect(listeners.size).toBe(1)
+    act(() => emit({ type: 'togglePlay' }))
+    expect(actions.play).toHaveBeenCalledTimes(1)
+    act(() => emit({ type: 'seekBy', seconds: 10 }))
+    expect(actions.seek).toHaveBeenLastCalledWith(30)
+    unmount()
+    expect(listeners.size).toBe(0)
   })
 })
 

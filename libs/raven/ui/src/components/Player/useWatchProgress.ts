@@ -18,6 +18,7 @@ export const useWatchProgress = ({
   const lastSaved = useRef(title.resumeAt)
   const started = useRef(false)
   const previous = useRef(state)
+  const reportedDuration = useRef<number | null>(null)
 
   const save = useEffectEvent((at: number) => {
     if (!started.current || !Number.isFinite(at)) return
@@ -38,6 +39,13 @@ export const useWatchProgress = ({
       save(position.current)
     previous.current = state
   }, [state, duration, position, progress])
+
+  useEffect(() => {
+    if (duration == null || !Number.isFinite(duration) || duration <= 0) return
+    if (reportedDuration.current === duration) return
+    reportedDuration.current = duration
+    progress.duration?.(duration)
+  }, [duration, progress])
 
   const leave = useEffectEvent(() => {
     save(position.current)

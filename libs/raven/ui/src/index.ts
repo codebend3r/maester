@@ -3,7 +3,13 @@ export { Button, ButtonLink } from '@/components/Button/Button'
 export type { ButtonTone, ButtonSize } from '@/components/Button/Button'
 export { Player } from '@/components/Player/Player'
 export { PlayerServicesProvider } from '@/components/Player/PlayerServices'
-export type { PlayerServices, PlayerTitle, ProgressSink } from '@/components/Player/PlayerServices'
+export type {
+  HostActions,
+  PlayerServices,
+  PlayerTitle,
+  ProgressSink,
+} from '@/components/Player/PlayerServices'
+export type { PlayerAction } from '@/lib/shortcuts'
 export type { Engine, EngineActions, EngineHandle, HtmlSource } from '@/components/Player/engine'
 export type { VideoState, VideoEvent } from '@/components/Player/useVideoState'
 export { ICON_NAMES, Icon } from '@/components/Icon/Icon'

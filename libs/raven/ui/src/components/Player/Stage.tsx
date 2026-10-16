@@ -23,7 +23,7 @@ import { useUpNext } from '@/components/Player/useUpNext'
 import type { TrackSelection } from '@/components/Player/useTrackSelection'
 import { useWatchProgress } from '@/components/Player/useWatchProgress'
 import { isTypingTarget } from '@/lib/keyboard'
-import { shortcutFor } from '@/lib/shortcuts'
+import { type PlayerAction, shortcutFor } from '@/lib/shortcuts'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
 
 /**
@@ -84,7 +84,7 @@ export const PlayerChrome = ({
   renderSubtitles?: (lifted: boolean) => ReactNode
   fullscreen: ReturnType<typeof useFullscreen>
 }) => {
-  const { title } = usePlayerServices()
+  const { title, hostActions } = usePlayerServices()
   const label = title.label
   const { state, duration, actions } = engine
   const seek = actions.seek
@@ -148,6 +148,12 @@ export const PlayerChrome = ({
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
+
+  const onHostAction = useEffectEvent((action: PlayerAction) => {
+    idle.wake()
+    controls.act(action)
+  })
+  useEffect(() => hostActions?.subscribe(onHostAction) ?? undefined, [hostActions])
 
   // A press outside the open menu closes it, as a popover should.
   const onStagePointerDown = (event: SyntheticEvent) => {
