@@ -71,7 +71,7 @@ Shared tool config lives at the root, so every project lints and compiles by the
 
 - `tsconfig.base.json` holds the compiler options; `tooling/tsconfig/nest.json` and `tooling/tsconfig/react.json` add a server's or a web app's. A project's `tsconfig.json` extends one and adds its `paths`, its `include` and whatever sets it apart (core's empty `types`).
 - `tooling/oxlint/base.json` holds the lint rules, `nest.json` and `react.json` add a server's or a web app's. A project's `.oxlintrc.json` extends one and adds its ignores, its file overrides and whatever sets it apart.
-- `tooling/stylelint/rules.json` holds the SCSS rules both web apps extend, and `tooling/web` the asset declarations and the bun test SCSS loader they share, plus `check-coverage.ts`: raven web's `test` target runs it after the tests and fails when total line or function coverage drops below the floors its `test:coverage` script names.
+- gale lints the SCSS, reading each styled project's `gale.json`. That extends `tooling/gale/recommended-scss.json`, a copy of the rules in `stylelint-config-recommended` 18.0.0 and `stylelint-config-recommended-scss` 17.0.1, because gale 0.2.5 can't load those packages, and then `tooling/gale/rules.json`, the repo's own SCSS rules. `tooling/web` holds the asset declarations and the bun test SCSS loader they share, plus `check-coverage.ts`: raven web's `test` target runs it after the tests and fails when total line or function coverage drops below the floors its `test:coverage` script names.
 - oxfmt has no `extends`, so each project keeps its own `.oxfmtrc.json`; keep their options identical.
 - `nx.json` lists `tsconfig.base.json` and `tooling/` as shared inputs, so a change there reruns every project's tasks.
 
