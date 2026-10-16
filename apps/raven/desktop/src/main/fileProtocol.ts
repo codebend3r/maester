@@ -36,21 +36,23 @@ export const parseRange = ({
   return { kind: 'range', start, end }
 }
 
-const CONTENT_TYPES: Record<string, string> = {
-  mp4: 'video/mp4',
-  m4v: 'video/mp4',
-  webm: 'video/webm',
-  mkv: 'video/x-matroska',
-  mov: 'video/quicktime',
-  ogv: 'video/ogg',
-  ts: 'video/mp2t',
-  m2ts: 'video/mp2t',
-  mts: 'video/mp2t',
-  avi: 'video/x-msvideo',
-}
+const CONTENT_TYPES = new Map(
+  Object.entries({
+    mp4: 'video/mp4',
+    m4v: 'video/mp4',
+    webm: 'video/webm',
+    mkv: 'video/x-matroska',
+    mov: 'video/quicktime',
+    ogv: 'video/ogg',
+    ts: 'video/mp2t',
+    m2ts: 'video/mp2t',
+    mts: 'video/mp2t',
+    avi: 'video/x-msvideo',
+  }),
+)
 
 export const contentTypeFor = (fileName: string): string =>
-  CONTENT_TYPES[extensionOf(fileName)] ?? 'application/octet-stream'
+  CONTENT_TYPES.get(extensionOf(fileName)) ?? 'application/octet-stream'
 
 const answer = ({
   status,
@@ -60,7 +62,8 @@ const answer = ({
   status: number
   body?: ReadableStream<Uint8Array> | null
   headers?: Record<string, string>
-}): Response => new Response(body, { status, headers })
+}): Response =>
+  new Response(body, { status, headers: { ...headers, 'X-Content-Type-Options': 'nosniff' } })
 
 const hostOf = (url: string): string | null => {
   try {
@@ -104,7 +107,10 @@ export const createFileHandler = ({
 
     const range = parseRange({ header: request.headers.get('Range'), size })
     if (range.kind === 'unsatisfiable') {
-      return answer({ status: 416, headers: { ...common, 'Content-Range': `bytes */${size}` } })
+      return answer({
+        status: 416,
+        headers: { ...common, 'Content-Length': '0', 'Content-Range': `bytes */${size}` },
+      })
     }
 
     const { start, end } = range.kind === 'range' ? range : { start: 0, end: size - 1 }
@@ -113,10 +119,12 @@ export const createFileHandler = ({
       'Content-Length': `${end - start + 1}`,
       ...(range.kind === 'range' && { 'Content-Range': `bytes ${start}-${end}/${size}` }),
     }
-    return answer({
-      status: range.kind === 'range' ? 206 : 200,
-      headers,
-      body: isHead ? null : readRange({ path: file.path, start, end }),
-    })
+    const status = range.kind === 'range' ? 206 : 200
+    if (isHead) return answer({ status, headers })
+    try {
+      return answer({ status, headers, body: readRange({ path: file.path, start, end }) })
+    } catch {
+      return answer({ status: 500 })
+    }
   }
 }

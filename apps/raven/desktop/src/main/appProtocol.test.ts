@@ -28,6 +28,8 @@ const FILES = {
   [`${ROOT}/font.woff2`]: 'w2',
   [`${ROOT}/font.woff`]: 'w1',
   [`${ROOT}/data.bin`]: 'bin',
+  [`${ROOT}/a.constructor`]: 'c',
+  [`${ROOT}/a.__proto__`]: 'p',
   [`${ROOT}/UPPER.JS`]: 'x',
   '/opt/raven/package.json': 'secret',
   '/opt/raven/renderer-evil/index.html': 'evil',
@@ -79,6 +81,8 @@ describe('app handler serving', () => {
     ['/font.woff2', 'font/woff2'],
     ['/font.woff', 'font/woff'],
     ['/data.bin', 'application/octet-stream'],
+    ['/a.constructor', 'application/octet-stream'],
+    ['/a.__proto__', 'application/octet-stream'],
     ['/UPPER.JS', 'text/javascript; charset=utf-8'],
   ])('types %s as %s', async (path, type) => {
     const { handler } = setup(FILES)
@@ -112,6 +116,17 @@ describe('app handler refusals', () => {
     expectGuarded(response)
     expect(reads).toEqual([])
   })
+
+  it.each(['app://evil@raven/index.html', 'app://user:pass@raven/index.html'])(
+    '404s a URL with credentials: %s',
+    async (url) => {
+      const { handler, reads } = setup(FILES)
+      const response = await handler(new Request(url))
+      expect(response.status).toBe(404)
+      expectGuarded(response)
+      expect(reads).toEqual([])
+    },
+  )
 
   it('404s a lookalike host', async () => {
     const { handler, reads } = setup(FILES)

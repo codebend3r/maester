@@ -1,24 +1,26 @@
-import { resolve, sep } from 'node:path'
+import { basename, resolve, sep } from 'node:path'
 import { extensionOf } from '@raven/core'
-import { APP_HOST, APP_SCHEME } from '@/shared/protocol'
+import { isAppUrl } from '@/main/security'
 
 export const CONTENT_SECURITY_POLICY =
   "default-src 'self'; img-src 'self' data:; media-src 'self' raven-file:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
 
-const CONTENT_TYPES: Record<string, string> = {
-  html: 'text/html; charset=utf-8',
-  js: 'text/javascript; charset=utf-8',
-  css: 'text/css; charset=utf-8',
-  svg: 'image/svg+xml',
-  json: 'application/json',
-  png: 'image/png',
-  ico: 'image/x-icon',
-  woff2: 'font/woff2',
-  woff: 'font/woff',
-}
+const CONTENT_TYPES = new Map(
+  Object.entries({
+    html: 'text/html; charset=utf-8',
+    js: 'text/javascript; charset=utf-8',
+    css: 'text/css; charset=utf-8',
+    svg: 'image/svg+xml',
+    json: 'application/json',
+    png: 'image/png',
+    ico: 'image/x-icon',
+    woff2: 'font/woff2',
+    woff: 'font/woff',
+  }),
+)
 
 const contentTypeOf = (fileName: string): string =>
-  CONTENT_TYPES[extensionOf(fileName)] ?? 'application/octet-stream'
+  CONTENT_TYPES.get(extensionOf(fileName)) ?? 'application/octet-stream'
 
 const answer = ({
   status,
@@ -69,7 +71,7 @@ export const createAppHandler = ({
   return async (request) => {
     const url = parse(request.url)
     if (url === null) return answer({ status: 400 })
-    if (url.protocol !== `${APP_SCHEME}:` || url.host !== APP_HOST) return answer({ status: 404 })
+    if (!isAppUrl(request.url)) return answer({ status: 404 })
     if (request.method !== 'GET' && request.method !== 'HEAD') {
       return answer({ status: 405, headers: { Allow: 'GET, HEAD' } })
     }
@@ -90,7 +92,7 @@ export const createAppHandler = ({
       status: 200,
       body: request.method === 'HEAD' ? null : bytes,
       headers: {
-        'Content-Type': contentTypeOf(path),
+        'Content-Type': contentTypeOf(basename(path)),
         'Content-Length': `${bytes.byteLength}`,
       },
     })

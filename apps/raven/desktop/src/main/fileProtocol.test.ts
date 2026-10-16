@@ -3,43 +3,44 @@ import { contentTypeFor, createFileHandler, parseRange } from '@/main/fileProtoc
 import type { GrantedFile } from '@/main/grants'
 
 describe('parseRange', () => {
-  const parse = (header: string | null, size = 1000) => parseRange({ header, size })
+  const parse = ({ header, size = 1000 }: { header: string | null; size?: number }) =>
+    parseRange({ header, size })
 
   it('treats no header as all', () => {
-    expect(parse(null)).toEqual({ kind: 'all' })
+    expect(parse({ header: null })).toEqual({ kind: 'all' })
   })
 
   it('reads an open end', () => {
-    expect(parse('bytes=0-')).toEqual({ kind: 'range', start: 0, end: 999 })
-    expect(parse('bytes=500-')).toEqual({ kind: 'range', start: 500, end: 999 })
+    expect(parse({ header: 'bytes=0-' })).toEqual({ kind: 'range', start: 0, end: 999 })
+    expect(parse({ header: 'bytes=500-' })).toEqual({ kind: 'range', start: 500, end: 999 })
   })
 
   it('reads a closed range and clamps its end', () => {
-    expect(parse('bytes=100-199')).toEqual({ kind: 'range', start: 100, end: 199 })
-    expect(parse('bytes=900-5000')).toEqual({ kind: 'range', start: 900, end: 999 })
-    expect(parse('bytes=0-0')).toEqual({ kind: 'range', start: 0, end: 0 })
-    expect(parse('bytes=999-999')).toEqual({ kind: 'range', start: 999, end: 999 })
+    expect(parse({ header: 'bytes=100-199' })).toEqual({ kind: 'range', start: 100, end: 199 })
+    expect(parse({ header: 'bytes=900-5000' })).toEqual({ kind: 'range', start: 900, end: 999 })
+    expect(parse({ header: 'bytes=0-0' })).toEqual({ kind: 'range', start: 0, end: 0 })
+    expect(parse({ header: 'bytes=999-999' })).toEqual({ kind: 'range', start: 999, end: 999 })
   })
 
   it('reads a suffix range', () => {
-    expect(parse('bytes=-500')).toEqual({ kind: 'range', start: 500, end: 999 })
-    expect(parse('bytes=-1')).toEqual({ kind: 'range', start: 999, end: 999 })
-    expect(parse('bytes=-1000')).toEqual({ kind: 'range', start: 0, end: 999 })
-    expect(parse('bytes=-5000')).toEqual({ kind: 'range', start: 0, end: 999 })
+    expect(parse({ header: 'bytes=-500' })).toEqual({ kind: 'range', start: 500, end: 999 })
+    expect(parse({ header: 'bytes=-1' })).toEqual({ kind: 'range', start: 999, end: 999 })
+    expect(parse({ header: 'bytes=-1000' })).toEqual({ kind: 'range', start: 0, end: 999 })
+    expect(parse({ header: 'bytes=-5000' })).toEqual({ kind: 'range', start: 0, end: 999 })
   })
 
   it('is unsatisfiable when the start is past the end', () => {
-    expect(parse('bytes=1000-')).toEqual({ kind: 'unsatisfiable' })
-    expect(parse('bytes=1000-1500')).toEqual({ kind: 'unsatisfiable' })
-    expect(parse('bytes=99999999999999999999-')).toEqual({ kind: 'unsatisfiable' })
-    expect(parse('bytes=-0')).toEqual({ kind: 'unsatisfiable' })
-    expect(parse('bytes=0-', 0)).toEqual({ kind: 'unsatisfiable' })
+    expect(parse({ header: 'bytes=1000-' })).toEqual({ kind: 'unsatisfiable' })
+    expect(parse({ header: 'bytes=1000-1500' })).toEqual({ kind: 'unsatisfiable' })
+    expect(parse({ header: 'bytes=99999999999999999999-' })).toEqual({ kind: 'unsatisfiable' })
+    expect(parse({ header: 'bytes=-0' })).toEqual({ kind: 'unsatisfiable' })
+    expect(parse({ header: 'bytes=0-', size: 0 })).toEqual({ kind: 'unsatisfiable' })
   })
 
   it('falls back to all for multiple ranges', () => {
-    expect(parse('bytes=0-1,5-6')).toEqual({ kind: 'all' })
-    expect(parse('bytes=0-1, 5-6')).toEqual({ kind: 'all' })
-    expect(parse('bytes=0-,-5')).toEqual({ kind: 'all' })
+    expect(parse({ header: 'bytes=0-1,5-6' })).toEqual({ kind: 'all' })
+    expect(parse({ header: 'bytes=0-1, 5-6' })).toEqual({ kind: 'all' })
+    expect(parse({ header: 'bytes=0-,-5' })).toEqual({ kind: 'all' })
   })
 
   it.each([
@@ -61,7 +62,7 @@ describe('parseRange', () => {
     'bytes=0-1;x',
     'BYTES=0-1',
   ])('falls back to all for %p', (header) => {
-    expect(parse(header)).toEqual({ kind: 'all' })
+    expect(parse({ header: header })).toEqual({ kind: 'all' })
   })
 })
 
@@ -79,6 +80,9 @@ describe('contentTypeFor', () => {
     ['Film.avi', 'video/x-msvideo'],
     ['Film.wmv', 'application/octet-stream'],
     ['Film', 'application/octet-stream'],
+    ['a.constructor', 'application/octet-stream'],
+    ['a.__proto__', 'application/octet-stream'],
+    ['a.hasOwnProperty', 'application/octet-stream'],
   ])('%s is %s', (name, type) => {
     expect(contentTypeFor(name)).toBe(type)
   })
@@ -99,7 +103,7 @@ type RangeCall = { path: string; start: number; end: number }
 
 const setup = ({
   file = granted(),
-  size = 1000 as number | null,
+  size = 1000,
 }: { file?: GrantedFile | null; size?: number | null } = {}) => {
   const rangeCalls: RangeCall[] = []
   const statCalls: string[] = []
@@ -149,6 +153,7 @@ describe('file handler ranges', () => {
     expect(response.headers.get('Accept-Ranges')).toBe('bytes')
     expect(response.headers.get('Content-Type')).toBe('video/x-matroska')
     expect(response.headers.get('Cache-Control')).toBe('no-store')
+    expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff')
     expect(response.headers.get('Content-Range')).toBeNull()
     expect((await response.arrayBuffer()).byteLength).toBe(1000)
     expect(rangeCalls).toEqual([{ path: '/movies/Film.mkv', start: 0, end: 999 }])
@@ -195,6 +200,7 @@ describe('file handler ranges', () => {
     const response = await handler(get({ range: 'bytes=1000-' }))
     expect(response.status).toBe(416)
     expect(response.headers.get('Content-Range')).toBe('bytes */1000')
+    expect(response.headers.get('Content-Length')).toBe('0')
     expect(response.headers.get('Accept-Ranges')).toBe('bytes')
     expect(response.headers.get('Cache-Control')).toBe('no-store')
     expect(rangeCalls).toEqual([])
@@ -237,6 +243,21 @@ describe('file handler ranges', () => {
     await handler(get({}))
     await handler(get({ range: 'bytes=0-9' }))
     expect(statCalls).toEqual(['/movies/Film.mkv', '/movies/Film.mkv'])
+  })
+})
+
+describe('file handler failures', () => {
+  it('answers 500 when readRange throws', async () => {
+    const handler = createFileHandler({
+      grants: { fileOf: () => granted() },
+      stat: async () => ({ size: 1000 }),
+      readRange: () => {
+        throw new Error('EMFILE')
+      },
+    })
+    const response = await handler(get({}))
+    expect(response.status).toBe(500)
+    expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff')
   })
 })
 
