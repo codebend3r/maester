@@ -53,7 +53,7 @@
 // The title and, beside it, how much of the show is watched.
 .titleCell {
   display: grid;
-  grid-template-columns: auto auto;
+  grid-template-columns: auto auto auto;
   justify-content: start;
   align-items: center;
   gap: var(--space-1);
@@ -104,12 +104,20 @@
 }
 
 .tile {
+  position: relative;
   display: grid;
   grid-template-columns: clamp(4rem, 14vw, 6rem) minmax(0, 1fr) auto;
   gap: var(--space-3);
   align-items: center;
   padding: var(--space-2) 0;
   border-bottom: 1px solid var(--color-moss);
+}
+
+// Over the poster's top corner, inside the tile's padding.
+.select {
+  position: absolute;
+  inset: calc(var(--space-2) + var(--space-0)) auto auto var(--space-0);
+  z-index: 2;
 }
 
 .frame {

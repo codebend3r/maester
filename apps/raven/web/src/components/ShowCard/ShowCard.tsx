@@ -10,12 +10,14 @@ import { useState } from 'react'
 import { CardLink } from '@/components/CardLink/CardLink'
 import { ScoreChip } from '@/components/RatingChips/RatingChips'
 import { PosterOverlay } from '@/components/PosterOverlay/PosterOverlay'
+import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { WatchedCount, WatchedCountWords } from '@/components/WatchedCount/WatchedCount'
 import { api } from '@/lib/api'
 import { showYears } from '@/lib/itemLinks'
 import { POSTER_SIZES, type PosterSizes, posterSources } from '@/lib/posters'
 import { showEntryKey } from '@/lib/entryKeys'
 import { useHoverBackdrop } from '@/lib/useHoverBackdrop'
+import { useSelectable } from '@/lib/useSelectable'
 import styles from '@/components/ShowCard/ShowCard.module.scss'
 
 /**
@@ -43,6 +45,7 @@ export const ShowCard = ({
   const hover = useHoverBackdrop(
     api.itemImageUrl({ id: show.id, kind: 'backdrop', version: show.backdropVersion }),
   )
+  const select = useSelectable({ key: showEntryKey(show), title: show.title })
   const [failed, setFailed] = useState(false)
   const years = showYears({ year: show.year, endedYear: entry.endedYear })
   const code = next?.item ? episodeCode(next.item) : null
@@ -53,7 +56,7 @@ export const ShowCard = ({
   ].filter((fact): fact is string => fact != null)
 
   return (
-    <li className={styles.card} data-entry={showEntryKey(show)} {...hover}>
+    <li className={styles.card} data-entry={showEntryKey(show)} {...hover} {...select.rootProps}>
       <CardLink
         to={`/shows/${show.id}`}
         className={styles.picture}
@@ -81,17 +84,22 @@ export const ShowCard = ({
           />
         </span>
       </CardLink>
+      <SelectCheckbox select={select} className={styles.select} />
       {next && (
         <PosterOverlay
           media={next}
-          play={{
-            to: `/watch/${next.id}`,
-            state: { media: next },
-            label: code ? `Play ${show.title} ${code}` : `Play ${show.title}`,
-          }}
+          play={
+            select.selecting
+              ? null
+              : {
+                  to: `/watch/${next.id}`,
+                  state: { media: next },
+                  label: code ? `Play ${show.title} ${code}` : `Play ${show.title}`,
+                }
+          }
         />
       )}
-      <CardLink to={`/shows/${show.id}`} className={styles.title}>
+      <CardLink to={`/shows/${show.id}`} className={styles.title} tabIndex={select.linkTabIndex}>
         {show.title}
       </CardLink>
       {sorted && <span className={styles.sorted}>{sorted}</span>}

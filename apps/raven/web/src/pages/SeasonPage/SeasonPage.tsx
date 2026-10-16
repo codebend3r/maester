@@ -6,21 +6,28 @@ import { Icon } from '@raven/ui'
 import { ItemHeader, ItemHeaderSkeleton, pictureBackdrop } from '@/components/ItemHeader/ItemHeader'
 import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { RouteState } from '@/components/RouteState/RouteState'
+import { SelectButton } from '@/components/SelectButton/SelectButton'
+import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
+import { SelectionBar } from '@/components/SelectionBar/SelectionBar'
+import { SelectionScope, sourceOf } from '@/components/SelectionScope/SelectionScope'
 import { Summary } from '@/components/Summary/Summary'
 import { TmdbCredit } from '@/components/TmdbCredit/TmdbCredit'
 import { WatchedMark } from '@/components/WatchedMark/WatchedMark'
 import { WatchedToggle } from '@/components/WatchedToggle/WatchedToggle'
 import { api } from '@/lib/api'
+import { episodeEntryKey } from '@/lib/entryKeys'
 import { formatAirDate, runtimeFact } from '@/lib/itemFacts'
 import { watchLink } from '@/lib/itemLinks'
 import { itemQuery } from '@/lib/queries'
 import { routeState, useRouteId } from '@/lib/routeQuery'
+import { useSelectable } from '@/lib/useSelectable'
 import { useWatchedToggle } from '@/lib/useWatchedChange'
 import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
 import styles from '@/pages/SeasonPage/SeasonPage.module.scss'
 
 /** One episode on disk: its still, number and title, air date and length, two lines of summary, Watched and Play. */
 const EpisodeRow = ({ episode }: { episode: EpisodeSummary }) => {
+  const select = useSelectable({ key: episodeEntryKey(episode), title: episode.title })
   const toggle = useWatchedToggle({
     state: episode.watched ? 'watched' : 'unwatched',
     targets: [{ kind: 'item', id: episode.id, libraryId: null }],
@@ -40,7 +47,8 @@ const EpisodeRow = ({ episode }: { episode: EpisodeSummary }) => {
   const number = episode.episode == null ? '' : `${episode.episode}. `
 
   return (
-    <li className={styles.episode}>
+    <li className={styles.episode} data-entry={episodeEntryKey(episode)} {...select.rootProps}>
+      <SelectCheckbox select={select} className={styles.select} />
       <Link
         to={`/episodes/${episode.id}`}
         className={styles.still}
@@ -56,7 +64,11 @@ const EpisodeRow = ({ episode }: { episode: EpisodeSummary }) => {
         <WatchedMark decorative watched={episode.watched} className={styles.watched} />
       </Link>
       <div className={styles.body}>
-        <Link to={`/episodes/${episode.id}`} className={styles.title}>
+        <Link
+          to={`/episodes/${episode.id}`}
+          className={styles.title}
+          tabIndex={select.linkTabIndex}
+        >
           {number}
           {episode.title}
         </Link>
@@ -70,13 +82,15 @@ const EpisodeRow = ({ episode }: { episode: EpisodeSummary }) => {
         {episode.summary && <p className={styles.overview}>{episode.summary}</p>}
         {file && <PartlyWatched media={file} />}
       </div>
-      <WatchedToggle
-        {...toggle}
-        label={`Watched ${episode.title}`}
-        isLabelShown={false}
-        className={styles.toggle}
-      />
-      {file && (
+      {!select.selecting && (
+        <WatchedToggle
+          {...toggle}
+          label={`Watched ${episode.title}`}
+          isLabelShown={false}
+          className={styles.toggle}
+        />
+      )}
+      {file && !select.selecting && (
         <Link
           {...watchLink({ media: file })}
           className={styles.play}
@@ -101,44 +115,56 @@ const SeasonView = ({ show, season }: { show: ItemDetails; season: ItemDetails }
     targets: [{ kind: 'item', id: season.id, libraryId: null }],
   })
   return (
-    <article className={styles.page} aria-labelledby={ids.title}>
-      <ItemHeader
-        back={{ to: `/shows/${show.id}`, label: show.title }}
-        titleId={ids.title}
-        title={season.title}
-        byline={show.title}
-        contentRating={null}
-        facts={[
-          season.year == null ? null : String(season.year),
-          `${count} ${count === 1 ? 'episode' : 'episodes'}`,
-        ].filter((fact): fact is string => fact != null)}
-        ratings={[]}
-        picture={{
-          shape: 'poster',
-          url: api.itemImageUrl({ id: season.id, kind: 'poster', version: season.posterVersion }),
-        }}
-        backdrop={pictureBackdrop(
-          api.itemImageUrl({ id: show.id, kind: 'backdrop', version: show.backdropVersion }),
-        )}
-      >
-        <WatchedToggle {...toggle} />
-      </ItemHeader>
+    <SelectionScope
+      {...sourceOf(
+        episodes.map((episode) => [
+          episodeEntryKey(episode),
+          [{ kind: 'item', id: episode.id, libraryId: null }],
+        ]),
+      )}
+    >
+      <article className={styles.page} aria-labelledby={ids.title}>
+        <ItemHeader
+          back={{ to: `/shows/${show.id}`, label: show.title }}
+          titleId={ids.title}
+          title={season.title}
+          byline={show.title}
+          contentRating={null}
+          facts={[
+            season.year == null ? null : String(season.year),
+            `${count} ${count === 1 ? 'episode' : 'episodes'}`,
+          ].filter((fact): fact is string => fact != null)}
+          ratings={[]}
+          picture={{
+            shape: 'poster',
+            url: api.itemImageUrl({ id: season.id, kind: 'poster', version: season.posterVersion }),
+          }}
+          backdrop={pictureBackdrop(
+            api.itemImageUrl({ id: show.id, kind: 'backdrop', version: show.backdropVersion }),
+          )}
+        >
+          <WatchedToggle {...toggle} />
+          <SelectButton />
+        </ItemHeader>
 
-      <Summary tagline={null} summary={season.summary} />
+        <Summary tagline={null} summary={season.summary} />
 
-      <section aria-labelledby={ids.episodes} className={styles.episodes}>
-        <h2 id={ids.episodes} className="visually-hidden">
-          Episodes
-        </h2>
-        <ol className={styles.list}>
-          {episodes.map((episode) => (
-            <EpisodeRow key={episode.id} episode={episode} />
-          ))}
-        </ol>
-      </section>
+        <section aria-labelledby={ids.episodes} className={styles.episodes}>
+          <h2 id={ids.episodes} className="visually-hidden">
+            Episodes
+          </h2>
+          <ol className={styles.list}>
+            {episodes.map((episode) => (
+              <EpisodeRow key={episode.id} episode={episode} />
+            ))}
+          </ol>
+        </section>
 
-      <TmdbCredit />
-    </article>
+        <TmdbCredit />
+
+        <SelectionBar />
+      </article>
+    </SelectionScope>
   )
 }
 

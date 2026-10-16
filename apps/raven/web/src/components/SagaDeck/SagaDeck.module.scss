@@ -7,7 +7,15 @@
 }
 
 .item {
+  position: relative;
   display: grid;
+}
+
+// In the card's top corner, over the deck.
+.select {
+  position: absolute;
+  inset: var(--space-1) auto auto var(--space-1);
+  z-index: 2;
 }
 
 // The deck over the saga's name and facts. Raised while open, so a fanned

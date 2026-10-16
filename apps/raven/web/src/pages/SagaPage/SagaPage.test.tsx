@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
-import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import {
   type AdminLock,
@@ -57,10 +57,7 @@ describe('SagaPage', () => {
     pick: spyOn(api, 'setSagaBackdrop'),
   }
 
-  afterEach(() => {
-    cleanup()
-    Object.values(spies).forEach((spy) => spy.mockReset())
-  })
+  afterEach(() => Object.values(spies).forEach((spy) => spy.mockReset()))
 
   const open = ({
     route = '/libraries/2/sagas/119',
@@ -246,6 +243,36 @@ describe('SagaPage', () => {
       {
         watched: true,
         targets: [70, 80, 90].map((id) => ({ kind: 'item', id, libraryId: 2 })),
+      },
+    ])
+  })
+
+  it('selects its movies from a Select button beside Play all, and marks them by file', async () => {
+    const calls: unknown[] = []
+    const set = spyOn(api, 'setWatched').mockImplementation(async (input) => {
+      calls.push(input)
+    })
+    open()
+    const play = await screen.findByRole('link', { name: 'Play all' })
+    const select = screen.getByRole('button', { name: 'Select' })
+    expect(play.parentElement).toBe(select.parentElement)
+    await userEvent.click(select)
+    await userEvent.click(screen.getByRole('link', { name: 'The Two Towers' }))
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select The Return of the King' }))
+    expect(
+      within(screen.getByRole('region', { name: 'Selection' })).getByRole('status'),
+    ).toHaveTextContent('2 selected')
+    expect(screen.queryByText('Watching 8')).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Mark watched' }))
+    await waitFor(() => expect(calls).toHaveLength(1))
+    set.mockRestore()
+    expect(calls).toEqual([
+      {
+        watched: true,
+        targets: [
+          { kind: 'media', id: 8 },
+          { kind: 'media', id: 9 },
+        ],
       },
     ])
   })

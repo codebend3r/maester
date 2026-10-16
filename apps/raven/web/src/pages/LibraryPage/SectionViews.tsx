@@ -6,6 +6,7 @@ import {
   type MediaItem,
   type PosterEntry,
   type UnmatchedFile,
+  type WatchTarget,
   isScanning,
   matchTypeFor,
 } from '@raven/core'
@@ -18,13 +19,17 @@ import { LibraryToolbar } from '@/components/LibraryToolbar/LibraryToolbar'
 import { MediaGrid, MediaGridSkeleton } from '@/components/MediaGrid/MediaGrid'
 import { MediaTiles, MediaTilesSkeleton } from '@/components/MediaTiles/MediaTiles'
 import { SagaDecks } from '@/components/SagaDeck/SagaDeck'
+import { SelectionBar } from '@/components/SelectionBar/SelectionBar'
+import { SelectionScope, sourceOf } from '@/components/SelectionScope/SelectionScope'
 import { Loading } from '@/components/Skeleton/Skeleton'
 import { SuggestedMovies } from '@/components/SuggestedMovies/SuggestedMovies'
 import { UnmatchedShows } from '@/components/UnmatchedShows/UnmatchedShows'
 import { useCanManage } from '@/lib/adminLock'
+import { mediaEntryKey, sagaEntryKey, showEntryKey } from '@/lib/entryKeys'
 import { finishedNote } from '@/lib/history'
 import { watchLink } from '@/lib/itemLinks'
 import { jumpScale } from '@/lib/jumpScale'
+import { sagaTargets } from '@/lib/sagas'
 import {
   duplicatesQuery,
   historyQuery,
@@ -35,6 +40,7 @@ import {
   unmatchedQuery,
 } from '@/lib/queries'
 import { LibraryListing, LibraryListingSkeleton } from '@/pages/LibraryPage/LibraryViews'
+import { SelectableCards } from '@/pages/LibraryPage/SelectableCards'
 import { type ListingState, NOTHING_LISTED, playQueue } from '@/pages/LibraryPage/libraryShape'
 import type { LibrarySection } from '@/pages/LibraryPage/librarySections'
 import { useAiLookupsDone } from '@/pages/LibraryPage/useAiLookupsDone'
@@ -104,13 +110,20 @@ const EntryGrid = ({ library, entries }: { library: Library; entries: PosterEntr
   const matchType = matchTypeFor(library.settings.kind)
   const posters = new Map(entries.map(({ media, poster }) => [media.id, poster]))
   return (
-    <MediaGrid
-      items={entries.map((entry) => entry.media)}
-      posters={matchType != null}
-      posterOf={(media) => posters.get(media.id) ?? null}
-      matchType={matchType}
-      ratingsSource={library.settings.ratingsSource}
-    />
+    <SelectableCards
+      entries={entries.map(({ media }) => [
+        mediaEntryKey(media),
+        [{ kind: 'media', id: media.id }],
+      ])}
+    >
+      <MediaGrid
+        items={entries.map((entry) => entry.media)}
+        posters={matchType != null}
+        posterOf={(media) => posters.get(media.id) ?? null}
+        matchType={matchType}
+        ratingsSource={library.settings.ratingsSource}
+      />
+    </SelectableCards>
   )
 }
 
@@ -191,28 +204,44 @@ const AllSection = ({ library }: { library: Library }) => {
     navigate(link.to, { state: link.state })
   }
 
+  // Every card the listing holds, those in a closed bucket too.
+  const entries = [
+    ...listed.shows.map((entry): [string, WatchTarget[]] => [
+      showEntryKey(entry.show),
+      [{ kind: 'item', id: entry.show.id, libraryId: library.id }],
+    ]),
+    ...listed.files.map((media): [string, WatchTarget[]] => [
+      mediaEntryKey(media),
+      [{ kind: 'media', id: media.id }],
+    ]),
+  ]
+
   return (
-    <div ref={cards} className={scale ? `${styles.section} ${styles.withJump}` : styles.section}>
-      <LibraryToolbar
-        name={library.name}
-        search={view.search}
-        settings={settings}
-        onChange={view.change}
-        playable={queue.playable}
-        onPlay={() => watch(queue.first())}
-        onShuffle={() => watch(queue.random())}
-      />
+    <SelectionScope {...sourceOf(entries)}>
+      <div ref={cards} className={scale ? `${styles.section} ${styles.withJump}` : styles.section}>
+        <LibraryToolbar
+          name={library.name}
+          search={view.search}
+          settings={settings}
+          onChange={view.change}
+          playable={queue.playable}
+          onPlay={() => watch(queue.first())}
+          onShuffle={() => watch(queue.random())}
+        />
 
-      {view.saveError && (
-        <p className={styles.message} role="alert">
-          Could not save how this library is shown: {view.saveError.message}
-        </p>
-      )}
+        {view.saveError && (
+          <p className={styles.message} role="alert">
+            Could not save how this library is shown: {view.saveError.message}
+          </p>
+        )}
 
-      {scale && !empty && <JumpPicker scale={scale} scope={cards} />}
+        {scale && !empty && <JumpPicker scale={scale} scope={cards} />}
 
-      <ListingBody listing={listing} settings={settings} empty={empty} />
-    </div>
+        <ListingBody listing={listing} settings={settings} empty={empty} />
+
+        <SelectionBar />
+      </div>
+    </SelectionScope>
   )
 }
 
@@ -264,7 +293,16 @@ const SagasSection = ({ library }: { library: Library }) => {
         `No sagas in ${library.name} yet. One shows here once two movies or more from the same TMDB collection are in the library.`,
       )}
     >
-      {(sagas) => <SagaDecks libraryId={library.id} sagas={sagas} />}
+      {(sagas) => (
+        <SelectableCards
+          entries={sagas.map((saga) => [
+            sagaEntryKey(saga),
+            sagaTargets({ saga, libraryId: library.id }),
+          ])}
+        >
+          <SagaDecks libraryId={library.id} sagas={sagas} />
+        </SelectableCards>
+      )}
     </SectionBody>
   )
 }
@@ -381,7 +419,12 @@ const FinishedSection = ({ library }: { library: Library }) => {
       {(entries) => {
         const notes = new Map(entries.map((entry) => [entry.media.id, finishedNote({ entry })]))
         return (
-          <>
+          <SelectableCards
+            entries={entries.map(({ media }) => [
+              mediaEntryKey(media),
+              [{ kind: 'media', id: media.id }],
+            ])}
+          >
             <MediaTiles
               items={entries.map((entry) => entry.media)}
               note={(media) => notes.get(media.id) ?? null}
@@ -395,7 +438,7 @@ const FinishedSection = ({ library }: { library: Library }) => {
             >
               Full history
             </ButtonLink>
-          </>
+          </SelectableCards>
         )
       }}
     </SectionBody>

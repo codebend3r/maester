@@ -1,0 +1,88 @@
+// Sticks to the foot of the screen while its section is in view, over the cards.
+.bar {
+  position: sticky;
+  bottom: var(--space-3);
+  z-index: 3;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'status actions';
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-moss-line);
+  border-radius: var(--radius-md);
+  background: var(--color-canopy);
+  box-shadow: var(--shadow-panel);
+
+  @media (prefers-reduced-motion: no-preference) {
+    animation: rise 160ms ease-out;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    translate: 0 var(--space-3);
+  }
+}
+
+.status {
+  grid-area: status;
+  display: grid;
+  gap: var(--space-0);
+}
+
+.count {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  gap: var(--space-2);
+  font-weight: 600;
+}
+
+.outcome {
+  color: var(--color-lichen);
+  font-weight: 400;
+}
+
+.failure {
+  color: var(--color-bark);
+  font-size: var(--font-size-sm);
+}
+
+.actions {
+  grid-area: actions;
+  display: grid;
+  grid-auto-flow: column;
+  gap: var(--space-1);
+}
+
+// Beats the button's own padding, which a phone has no room for.
+.actions .button {
+  min-width: 0;
+}
+
+@media (max-width: 48rem) {
+  .bar {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'status'
+      'actions';
+  }
+
+  .actions {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(auto-fit, minmax(min(8rem, 100%), 1fr));
+  }
+}
+
+@media (max-width: 30rem) {
+  .actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .actions .button {
+    padding-inline: var(--space-1);
+    white-space: normal;
+  }
+}

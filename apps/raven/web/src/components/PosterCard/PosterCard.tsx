@@ -17,12 +17,14 @@ import { PosterOverlay } from '@/components/PosterOverlay/PosterOverlay'
 import { PosterImage } from '@/components/PosterImage/PosterImage'
 import { ScoreChip } from '@/components/RatingChips/RatingChips'
 import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
+import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { WatchedMark, WatchedWords } from '@/components/WatchedMark/WatchedMark'
 import { api } from '@/lib/api'
 import { cardLink, watchLink } from '@/lib/itemLinks'
 import { mediaEntryKey } from '@/lib/entryKeys'
 import type { PosterSizes } from '@/lib/posters'
 import { useHoverBackdrop } from '@/lib/useHoverBackdrop'
+import { useSelectable } from '@/lib/useSelectable'
 import styles from '@/components/PosterCard/PosterCard.module.scss'
 
 /**
@@ -81,6 +83,7 @@ export const PosterCard = ({
   // The card's poster item's backdrop, else the video's own.
   const hover = useHoverBackdrop(backdropOf(poster) ?? backdropOf(media.item))
   const { title, year } = cardTitle(media)
+  const select = useSelectable({ key: mediaEntryKey(media), title })
   const score = media.item
     ? pickScore({ ratings: media.item.ratings, source: ratingsSource })
     : null
@@ -94,7 +97,12 @@ export const PosterCard = ({
   ].filter((fact): fact is string => fact != null && fact !== sorted)
 
   return (
-    <li className={`${styles.card} ${menu.hostClass}`} data-entry={mediaEntryKey(media)} {...hover}>
+    <li
+      className={`${styles.card} ${menu.hostClass}`}
+      data-entry={mediaEntryKey(media)}
+      {...hover}
+      {...select.rootProps}
+    >
       <CardLink
         {...link}
         className={styles.picture}
@@ -104,11 +112,19 @@ export const PosterCard = ({
       >
         <PosterFrame media={media} poster={poster} sizes={sizes} />
       </CardLink>
+      <SelectCheckbox select={select} className={styles.select} />
       <PosterOverlay
         media={media}
-        play={hasPage ? { ...watchLink({ media }), label: `Play ${title}` } : null}
+        play={
+          hasPage && !select.selecting ? { ...watchLink({ media }), label: `Play ${title}` } : null
+        }
       />
-      <CardLink {...link} className={styles.title} onContextMenu={menu.onContextMenu}>
+      <CardLink
+        {...link}
+        className={styles.title}
+        tabIndex={select.linkTabIndex}
+        onContextMenu={menu.onContextMenu}
+      >
         {title}
       </CardLink>
       {sorted && <span className={styles.sorted}>{sorted}</span>}

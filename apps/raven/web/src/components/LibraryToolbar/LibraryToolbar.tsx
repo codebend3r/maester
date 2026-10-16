@@ -20,6 +20,7 @@ import { useId } from 'react'
 import { Button } from '@raven/ui'
 import type { IconName } from '@raven/ui'
 import { SearchField } from '@/components/SearchField/SearchField'
+import { SelectButton } from '@/components/SelectButton/SelectButton'
 import type { Search } from '@/lib/useSearch'
 import styles from '@/components/LibraryToolbar/LibraryToolbar.module.scss'
 
@@ -93,7 +94,8 @@ const GROUPINGS: Record<MediaGroupBy, string> = {
  * grouping are the library's own settings, already coherent with its type,
  * so the options are its type's: `onChange` gets just the one that changed.
  * Group by shows only in the grouped view. Play and Shuffle are
- * always there, and wait until there is something to play.
+ * always there, and wait until there is something to play; Select starts
+ * select mode in the scope the toolbar sits in.
  */
 export const LibraryToolbar = ({
   name,
@@ -177,6 +179,7 @@ export const LibraryToolbar = ({
           <Button icon="shuffle" disabled={!playable} onClick={onShuffle}>
             Shuffle
           </Button>
+          <SelectButton />
         </div>
       </div>
 

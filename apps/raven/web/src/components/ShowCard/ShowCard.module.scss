@@ -92,6 +92,13 @@
   color: var(--color-lichen);
 }
 
+// In the poster's top corner opposite the count, over the picture and its hover filter.
+.select {
+  position: absolute;
+  inset: var(--space-1) auto auto var(--space-1);
+  z-index: 2;
+}
+
 .title {
   grid-area: title;
   display: -webkit-box;

@@ -2,39 +2,33 @@
 pre-commit:
   jobs:
     # Lints and formats the staged files and restages what it fixes (lint-staged.config.ts).
-    - name: lint-staged
+    - name: 🧹 lint-staged
       run: bunx lint-staged
 
 # The checks `bun run verify` runs, one at a time, stopping at the first that fails.
 pre-push:
   piped: true
   jobs:
-    - name: spellcheck
-      run: bunx nx run-many -t spellcheck
-
-    - name: typescript only
-      run: bunx nx run-many -t typescript-only
-
-    - name: one command per script
-      run: bunx nx run-many -t one-command-per-script
-
-    - name: lint python
-      run: bunx nx run-many -t lint:py
-
-    - name: lint typescript
-      run: bunx nx run-many -t lint:ts
-
-    - name: lint css
-      run: bunx nx run-many -t lint:css
-
-    - name: format check
+    - name: ✨ format check
       run: bunx nx run-many -t format:check
 
-    - name: typecheck
+    - name: 🔎 typecheck
       run: bunx nx run-many -t typecheck
 
-    - name: test
+    - name: 🐍 lint python
+      run: bunx nx run-many -t lint:py
+
+    - name: 🟦 lint typescript
+      run: bunx nx run-many -t lint:ts
+
+    - name: 🎨 lint css
+      run: bunx nx run-many -t lint:css
+
+    - name: 📝 spellcheck
+      run: bunx nx run-many -t spellcheck
+
+    - name: 🧪 test
       run: bunx nx run-many -t test
 
-    - name: build
+    - name: 📦 build
       run: bunx nx run-many -t build

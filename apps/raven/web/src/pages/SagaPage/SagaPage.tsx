@@ -1,12 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import {
-  type Library,
-  type Saga,
-  type WatchedChange,
-  sagaCover,
-  sagaPictures,
-  watchedStateOf,
-} from '@raven/core'
+import { type Library, type Saga, sagaCover, sagaPictures, watchedStateOf } from '@raven/core'
 import { useId, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
@@ -19,13 +12,17 @@ import {
 import { LockedLibrary } from '@/components/LockedLibrary/LockedLibrary'
 import { MediaGrid, MediaGridSkeleton } from '@/components/MediaGrid/MediaGrid'
 import { RouteState } from '@/components/RouteState/RouteState'
+import { SelectButton } from '@/components/SelectButton/SelectButton'
+import { SelectionBar } from '@/components/SelectionBar/SelectionBar'
+import { SelectionScope, sourceOf } from '@/components/SelectionScope/SelectionScope'
 import { WatchedToggle } from '@/components/WatchedToggle/WatchedToggle'
 import { api } from '@/lib/api'
+import { mediaEntryKey } from '@/lib/entryKeys'
 import { watchLink } from '@/lib/itemLinks'
 import { useLibraryLock } from '@/lib/libraryLock'
 import { libraryQuery, sagasQuery } from '@/lib/queries'
 import { routeState, useRouteId } from '@/lib/routeQuery'
-import { sagaFacts, sagaRuntime } from '@/lib/sagas'
+import { sagaFacts, sagaRuntime, sagaTargets } from '@/lib/sagas'
 import { useWatchedToggle } from '@/lib/useWatchedChange'
 import { HoverBackdrops } from '@/lib/useHoverBackdrop'
 import { sectionPath } from '@/pages/LibraryPage/librarySections'
@@ -63,18 +60,6 @@ const headerBackdrop = (saga: Saga): HeaderBackdrop | null => {
   }
 }
 
-/** A saga's movies as targets: each by its item in the saga's library, else its own file. */
-const sagaTargets = ({
-  saga,
-  libraryId,
-}: {
-  saga: Saga
-  libraryId: number
-}): WatchedChange['targets'] =>
-  saga.media.map((media) =>
-    media.item ? { kind: 'item', id: media.item.id, libraryId } : { kind: 'media', id: media.id },
-  )
-
 /** Watched for the whole saga: its movies are marked together. */
 const SagaWatchedToggle = ({ saga, libraryId }: { saga: Saga; libraryId: number }) => {
   const toggle = useWatchedToggle({
@@ -110,50 +95,58 @@ const SagaView = ({ library, sagaId }: { library: Library; sagaId: string }) => 
   return (
     // The saga has a backdrop of its own, which pointing at a movie leaves up.
     <HoverBackdrops value={false}>
-      <section className={styles.page} aria-labelledby={titleId}>
-        <ItemHeader
-          back={{ to: sectionPath({ libraryId: library.id, section: 'sagas' }), label: 'Sagas' }}
-          titleId={titleId}
-          title={saga.name}
-          byline={library.name}
-          contentRating={null}
-          facts={[...sagaFacts(saga), ...(runtime ? [runtime] : [])]}
-          ratings={[]}
-          backdrop={backdrop}
-        >
-          {first && (
-            <ButtonLink
-              tone="primary"
-              size="large"
-              icon="play"
-              {...watchLink({ media: first, upNext: rest })}
-            >
-              Play all
-            </ButtonLink>
-          )}
-          {first && <SagaWatchedToggle saga={saga} libraryId={library.id} />}
-          {backdrop && (
-            <AdminOnly>
-              <Button icon="edit" onClick={() => setEditing(true)}>
-                Edit backdrop
-              </Button>
-              {isEditing && (
-                <SagaBackdropDialog
-                  libraryId={library.id}
-                  saga={saga}
-                  onClose={() => setEditing(false)}
-                />
-              )}
-            </AdminOnly>
-          )}
-        </ItemHeader>
-        <MediaGrid
-          items={saga.media}
-          posters
-          matchType="movie"
-          ratingsSource={library.settings.ratingsSource}
-        />
-      </section>
+      <SelectionScope
+        {...sourceOf(
+          saga.media.map((media) => [mediaEntryKey(media), [{ kind: 'media', id: media.id }]]),
+        )}
+      >
+        <section className={styles.page} aria-labelledby={titleId}>
+          <ItemHeader
+            back={{ to: sectionPath({ libraryId: library.id, section: 'sagas' }), label: 'Sagas' }}
+            titleId={titleId}
+            title={saga.name}
+            byline={library.name}
+            contentRating={null}
+            facts={[...sagaFacts(saga), ...(runtime ? [runtime] : [])]}
+            ratings={[]}
+            backdrop={backdrop}
+          >
+            {first && (
+              <ButtonLink
+                tone="primary"
+                size="large"
+                icon="play"
+                {...watchLink({ media: first, upNext: rest })}
+              >
+                Play all
+              </ButtonLink>
+            )}
+            {first && <SagaWatchedToggle saga={saga} libraryId={library.id} />}
+            <SelectButton />
+            {backdrop && (
+              <AdminOnly>
+                <Button icon="edit" onClick={() => setEditing(true)}>
+                  Edit backdrop
+                </Button>
+                {isEditing && (
+                  <SagaBackdropDialog
+                    libraryId={library.id}
+                    saga={saga}
+                    onClose={() => setEditing(false)}
+                  />
+                )}
+              </AdminOnly>
+            )}
+          </ItemHeader>
+          <MediaGrid
+            items={saga.media}
+            posters
+            matchType="movie"
+            ratingsSource={library.settings.ratingsSource}
+          />
+          <SelectionBar />
+        </section>
+      </SelectionScope>
     </HoverBackdrops>
   )
 }

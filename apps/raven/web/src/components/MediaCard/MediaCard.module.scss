@@ -24,6 +24,13 @@
   }
 }
 
+// In the picture's top corner opposite the check, over it and its hover filter.
+.select {
+  position: absolute;
+  inset: var(--space-1) auto auto var(--space-1);
+  z-index: 2;
+}
+
 // A video with a page of its own splits the card: the picture plays it, and
 // the title opens the page.
 .split {

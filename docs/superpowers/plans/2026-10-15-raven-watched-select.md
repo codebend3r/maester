@@ -200,3 +200,18 @@ MAE: raven selects many cards to mark them watched at once
 - Select on every library tab and the saga, show and season pages
 MSG
 ```
+
+---
+
+## As built
+
+The plan was written before the code existed. Where the code differs:
+
+- `SelectionScope` takes the section's cards as `sourceOf(entries)`, a `[key, targets]` list that gives `resolve` and `allKeys`. It reads both through a ref, so a section drawn again does not redraw every card. The Select button's ref has a context of its own (`useSelectButtonRef`), which `SelectionBar` reads to hand focus back.
+- `useSelectable` also returns `linkTabIndex` (-1 while selecting) and `isAvailable` (false outside a scope, where `SelectCheckbox` renders nothing). Cards put `rootProps` on their root and pass `select` to `SelectCheckbox`.
+- A closed bucket's cards are left out of a range twice: by `ENTRY_SELECTOR` (exported from `useScrollReset.ts`) and by a `closest('details:not([open])')` filter, because happy-dom, which the tests run in, cannot match a nested `:not()`.
+- The play button, the card menu and an episode row's Watched and Play are not drawn while selecting (not hidden with CSS), so they leave the tab order in a test as in a browser. `useCardMenu` also leaves a right click to the browser while selecting.
+- `useOptimisticMutation` gained `mutateAsync`, which the bar awaits for its outcome, sending a selection of more than `MAX_WATCH_TARGETS` targets in parts.
+- `isShortcut` skips a press something already handled (`defaultPrevented`, as an open menu's Escape is) and takes `inCheckboxes`, so Escape works from a card's checkbox, the card's only tab stop while selecting.
+- `sagaTargets` moved from `SagaPage.tsx` to `lib/sagas.ts`; the library's tabs other than All share `SelectableCards` (header with Select, the cards, the bar).
+- The checkbox is placed by each card (absolute, in the card's box; in a table row, a column of the title cell). Its visibility rules and the selected card's ring live in `SelectCheckbox.module.scss` and read the `data-selecting` and `data-selected` attributes `rootProps` sets.

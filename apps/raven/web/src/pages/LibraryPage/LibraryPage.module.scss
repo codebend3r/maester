@@ -123,6 +123,12 @@
   justify-self: start;
 }
 
+// Select, at the end of a row of its own above a tab's cards.
+.selectHeader {
+  display: grid;
+  justify-content: end;
+}
+
 .message {
   max-width: var(--measure);
   color: var(--color-lichen);

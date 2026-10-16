@@ -46,13 +46,17 @@
 // and resume line are laid out in here.
 .titleCell {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   grid-template-areas:
-    'title mark'
-    'resume resume';
+    'select title mark'
+    '. resume resume';
   gap: var(--space-0) var(--space-1);
   align-items: center;
   font-weight: 400;
+}
+
+.select {
+  grid-area: select;
 }
 
 .title {

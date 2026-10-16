@@ -125,6 +125,11 @@ export const useOptimisticMutation = <TVariables>({
       setFailure(null)
       mutation.mutate(variables)
     },
+    /** As `mutate`, for a caller that waits on the answer: it rejects with why the server refused. */
+    mutateAsync: (variables: TVariables) => {
+      setFailure(null)
+      return mutation.mutateAsync(variables)
+    },
     isPending: mutation.isPending,
     failure,
   }

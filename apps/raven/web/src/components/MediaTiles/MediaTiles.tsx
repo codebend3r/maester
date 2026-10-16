@@ -17,12 +17,14 @@ import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
 import { PosterFrame } from '@/components/PosterCard/PosterCard'
 import { RatingChips } from '@/components/RatingChips/RatingChips'
 import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
+import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { Bone } from '@/components/Skeleton/Skeleton'
 import { WatchedMark, WatchedWords } from '@/components/WatchedMark/WatchedMark'
 import { api } from '@/lib/api'
 import { cardLink } from '@/lib/itemLinks'
 import { POSTER_SIZES } from '@/lib/posters'
 import { mediaEntryKey } from '@/lib/entryKeys'
+import { useSelectable } from '@/lib/useSelectable'
 import styles from '@/components/MediaTiles/MediaTiles.module.scss'
 
 /**
@@ -50,6 +52,8 @@ const MediaTile = ({
   const thumbnail = api.thumbnailUrl(media)
   const link = cardLink({ media, pages: posters })
   const { year } = cardTitle(media)
+  const label = posters ? cardTitle(media).title : mediaLabel(media)
+  const select = useSelectable({ key: mediaEntryKey(media), title: label })
   const sorted = sort ? sortFact({ media, sort }) : null
   const facts = [
     posters && year != null ? String(year) : null,
@@ -67,7 +71,9 @@ const MediaTile = ({
         .filter(Boolean)
         .join(' ')}
       data-entry={mediaEntryKey(media)}
+      {...select.rootProps}
     >
+      <SelectCheckbox select={select} className={styles.select} />
       <CardLink
         {...link}
         className={posters ? styles.posterFrame : styles.frame}
@@ -98,8 +104,13 @@ const MediaTile = ({
         )}
       </CardLink>
       <div className={styles.body}>
-        <CardLink {...link} className={styles.title} onContextMenu={menu.onContextMenu}>
-          {posters ? cardTitle(media).title : mediaLabel(media)}
+        <CardLink
+          {...link}
+          className={styles.title}
+          tabIndex={select.linkTabIndex}
+          onContextMenu={menu.onContextMenu}
+        >
+          {label}
         </CardLink>
         {sorted && <span className={styles.sorted}>{sorted}</span>}
         <span className={styles.facts}>

@@ -22,12 +22,20 @@
 }
 
 .tile {
+  position: relative;
   display: grid;
   grid-template-columns: clamp(6rem, 22vw, 10rem) minmax(0, 1fr) auto;
   gap: var(--space-3);
   align-items: center;
   padding: var(--space-2) 0;
   border-bottom: 1px solid var(--color-moss);
+}
+
+// Over the picture's top corner, inside the tile's padding.
+.select {
+  position: absolute;
+  inset: calc(var(--space-2) + var(--space-0)) auto auto var(--space-0);
+  z-index: 2;
 }
 
 .frame {
