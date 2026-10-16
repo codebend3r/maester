@@ -62,7 +62,8 @@
     '. resumed resumed';
   gap: var(--space-1) var(--space-2);
   align-items: center;
-  padding: var(--space-3) clamp(var(--space-3), 3vw, var(--space-5)) var(--space-6);
+  padding: calc(var(--space-3) + var(--titlebar-inset)) clamp(var(--space-3), 3vw, var(--space-5))
+    var(--space-6);
   background: var(--fade-from-top);
 
   @media (prefers-reduced-motion: no-preference) {

@@ -13,7 +13,7 @@ bunx nx run @raven/ui:test
 bun run dev:raven
 ```
 
-The build cleans output, bundles ESM and CSS with Vite, emits declarations with TypeScript, then rewrites declaration aliases with tsc-alias. `dev` watches the library bundle; `dev:raven` runs that watcher alongside the server and web dev servers. Generated JavaScript is build output only; source and configuration are TypeScript.
+The build cleans output, bundles ESM and CSS with Vite, emits declarations with TypeScript, then rewrites declaration aliases with tsc-alias. `dev` watches the library bundle; `dev:raven` runs that watcher alongside the server and web dev servers. Generated JavaScript is build output only; source and configuration are TypeScript. Hosts may pass `progress.duration` and `hostActions` in the player services; the web passes neither.
 
 Peer dependencies are React 19.3.0, React DOM 19.3.0, React Router DOM 7.18.4, TanStack React Query 5.103.1 and zustand 5.0.15, supplied by the host. `@raven/core` is a workspace dependency. All stay external to the bundle, including React's JSX runtime, so hosts share one React, router, cache and preference store.
 

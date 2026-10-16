@@ -1,0 +1,159 @@
+.home {
+  --gutter: var(--space-5);
+
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    'bar bar'
+    'open recents';
+  gap: var(--space-5) var(--space-6);
+  align-content: start;
+  min-height: 100vh;
+  padding-block-end: var(--space-5);
+
+  @media (max-width: 48rem) {
+    --gutter: var(--space-3);
+
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    grid-template-areas:
+      'bar'
+      'open'
+      'recents';
+    gap: var(--space-4);
+  }
+}
+
+// The window has no title bar of its own: this strip is what you drag it by.
+.bar {
+  grid-area: bar;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--titlebar-inset) var(--gutter) var(--space-2);
+  -webkit-app-region: drag;
+
+  h1 {
+    font-family: var(--font-display);
+    font-size: var(--font-size-xl);
+    line-height: var(--line-tight);
+  }
+
+  button {
+    -webkit-app-region: no-drag;
+  }
+}
+
+.open,
+.recents {
+  display: grid;
+  gap: var(--space-3);
+  align-content: start;
+  padding-inline: var(--gutter);
+
+  h2 {
+    font-family: var(--font-display);
+    font-size: var(--font-size-lg);
+    font-weight: 400;
+  }
+}
+
+.open {
+  grid-area: open;
+  justify-items: start;
+}
+
+.recents {
+  grid-area: recents;
+}
+
+// Shares the open area with the section, laid over it.
+.drop {
+  grid-area: open;
+  display: grid;
+  place-items: center;
+  justify-self: center;
+  width: calc(100% - var(--gutter) * 2);
+  border: var(--border-thick) dashed var(--color-lichen);
+  border-radius: var(--radius-md);
+  background: var(--color-night-veil);
+  font-family: var(--font-display);
+  font-size: var(--font-size-lg);
+  pointer-events: none;
+
+  @media (prefers-reduced-motion: no-preference) {
+    animation: fade-in 120ms ease-out;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.list {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.recent {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-1);
+  align-items: center;
+}
+
+.play {
+  display: grid;
+  gap: var(--space-0);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: var(--color-canopy);
+  text-align: start;
+  cursor: pointer;
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition: border-color 120ms ease-out;
+  }
+
+  &:hover {
+    border-color: var(--color-moss-line);
+  }
+}
+
+.name {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.from {
+  overflow: hidden;
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.watched {
+  appearance: none;
+  width: 100%;
+  height: var(--space-0);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--color-moss);
+  overflow: hidden;
+
+  &::-webkit-progress-bar {
+    background: var(--color-moss);
+  }
+
+  &::-webkit-progress-value {
+    background: var(--color-leaf-bright);
+  }
+}

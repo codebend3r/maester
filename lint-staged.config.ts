@@ -11,6 +11,7 @@ export default {
   '*.{json,md,yml,yaml,toml,html}': oxfmt,
   // stylelint is a dependency of each web app, not of the root.
   'apps/raven/web/**/*.scss': ['bun --cwd apps/raven/web stylelint --fix', oxfmt],
+  'apps/raven/desktop/**/*.scss': ['bun --cwd apps/raven/desktop stylelint --fix', oxfmt],
   'apps/rookery/web/**/*.scss': ['bun --cwd apps/rookery/web stylelint --fix', oxfmt],
   'apps/luwin/api/**/*.{py,pyi}': [
     'uv run --directory apps/luwin/api ruff check --fix',

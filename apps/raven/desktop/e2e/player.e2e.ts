@@ -1,0 +1,147 @@
+import { expect, type Page, test } from '@playwright/test'
+import { type Clips, makeClips } from '@/e2e/clips'
+import { freshUserData, openFile, removeDir, requestFromPage, withApp } from '@/e2e/harness'
+
+type VideoFacts = { readyState: number; paused: boolean; currentTime: number }
+
+const videoFacts = (page: Page): Promise<VideoFacts | null> =>
+  page.evaluate(() => {
+    const video = document.querySelector('video')
+    if (video === null) return null
+    return { readyState: video.readyState, paused: video.paused, currentTime: video.currentTime }
+  })
+
+const isPlaying = (facts: VideoFacts | null): boolean =>
+  facts !== null && facts.readyState >= 2 && !facts.paused
+
+const isPaused = (facts: VideoFacts | null): boolean => facts !== null && facts.paused
+
+/**
+ * Waits for the clock to move more than a second past where it is now: a video that
+ * reports playing while its clock is stuck fails here.
+ */
+const expectClockAdvancing = async (page: Page) => {
+  const start = (await videoFacts(page))?.currentTime ?? Number.POSITIVE_INFINITY
+  await expect
+    .poll(async () => ((await videoFacts(page))?.currentTime ?? Number.NEGATIVE_INFINITY) - start)
+    .toBeGreaterThan(1)
+}
+
+/** How far the video is from `seconds`, or Infinity before there is a video. */
+const distanceFrom = async ({ page, seconds }: { page: Page; seconds: number }) => {
+  const facts = await videoFacts(page)
+  return facts === null ? Number.POSITIVE_INFINITY : Math.abs(facts.currentTime - seconds)
+}
+
+/** The share of `label` main has stored as watched, in whole percent, as Home labels it. */
+const watchedPercent = async ({ page, label }: { page: Page; label: string }) => {
+  const reply = await requestFromPage({ page, request: { type: 'listRecents' } })
+  if (reply === null || reply.type !== 'recents') return null
+  const recent = reply.recents.find((entry) => entry.label === label)
+  if (recent === undefined || recent.watched === null) return null
+  return Math.round(recent.watched * 100)
+}
+
+const homeHeading = (page: Page) => page.getByRole('heading', { name: 'raven player' })
+
+test.describe.serial('playing a local file', () => {
+  let userData = ''
+  let clips: Clips = { folder: '', first: '', second: '' }
+
+  test.beforeAll(async () => {
+    userData = await freshUserData()
+    clips = await makeClips()
+  })
+
+  test.afterAll(async () => {
+    await Promise.all([removeDir(userData), removeDir(clips.folder)])
+  })
+
+  test('opens a clip from Finder, plays, pauses, seeks and resumes after a relaunch', async () => {
+    await withApp({
+      userData,
+      run: async ({ app, page }) => {
+        await openFile({ app, path: clips.first })
+        await expect(page.getByRole('heading', { name: 'Clip 01', exact: true })).toBeVisible()
+        await expect.poll(async () => isPlaying(await videoFacts(page))).toBe(true)
+        await expectClockAdvancing(page)
+
+        // Paused before the seek, so the position main stores is exactly half way and the
+        // next test can read 50%: a seek while playing keeps moving until the pause lands.
+        await page.keyboard.press('k')
+        await expect.poll(async () => isPaused(await videoFacts(page))).toBe(true)
+        await page.keyboard.press('5')
+        await expect.poll(() => distanceFrom({ page, seconds: 15 })).toBeLessThanOrEqual(1)
+
+        // The AppleDouble sidecar and the text file between them are skipped.
+        await expect(page.getByRole('link', { name: 'Next: Clip 02 Été' })).toBeVisible()
+        // Main has the position before the app quits.
+        await expect.poll(() => watchedPercent({ page, label: 'Clip 01' })).toBe(50)
+      },
+    })
+
+    await withApp({
+      userData,
+      run: async ({ app, page }) => {
+        await openFile({ app, path: clips.first })
+        await expect(page.getByText('Resumed at 0:15')).toBeVisible()
+        // The note shows on mount; the video itself starts from there once it plays.
+        await expect.poll(async () => isPlaying(await videoFacts(page))).toBe(true)
+        await expect
+          .poll(async () => (await videoFacts(page))?.currentTime ?? 0)
+          .toBeGreaterThanOrEqual(14)
+        await expectClockAdvancing(page)
+
+        // It plays on from 0:15, so park it at half way again for the next test: pause,
+        // then 0% (a jump of ten seconds or more saves) and back to 50%, both saved.
+        await page.keyboard.press('k')
+        await expect.poll(async () => isPaused(await videoFacts(page))).toBe(true)
+        await page.keyboard.press('0')
+        await expect.poll(() => distanceFrom({ page, seconds: 0 })).toBeLessThanOrEqual(1)
+        await page.keyboard.press('5')
+        await expect.poll(() => distanceFrom({ page, seconds: 15 })).toBeLessThanOrEqual(1)
+        await expect.poll(() => watchedPercent({ page, label: 'Clip 01' })).toBe(50)
+      },
+    })
+  })
+
+  test('lists recents after a relaunch and removes one', async () => {
+    await withApp({
+      userData,
+      run: async ({ page }) => {
+        const recent = page.getByRole('button', { name: 'Clip 01' })
+        await expect(recent).toBeVisible()
+        await expect(page.getByRole('progressbar', { name: '50% watched' })).toBeVisible()
+
+        await recent.click()
+        await expect(page.getByRole('heading', { name: 'Clip 01', exact: true })).toBeVisible()
+        await page.keyboard.press('Escape')
+        await expect(homeHeading(page)).toBeVisible()
+
+        await page.getByRole('button', { name: 'Remove from recents' }).click()
+        await expect(page.getByText('Nothing opened yet.')).toBeVisible()
+      },
+    })
+  })
+
+  test('refuses a File the page made', async () => {
+    await withApp({
+      userData,
+      run: async ({ page }) => {
+        await expect(homeHeading(page)).toBeVisible()
+        // Named for a real video, so a path taken from the name would play it.
+        await page.evaluate((name) => {
+          const transfer = new DataTransfer()
+          transfer.items.add(new File(['x'], name, { type: 'video/mp4' }))
+          window.dispatchEvent(
+            new DragEvent('drop', { dataTransfer: transfer, bubbles: true, cancelable: true }),
+          )
+        }, clips.first)
+
+        await expect(page.getByRole('status')).toHaveText('Drop a video file to play it.')
+        expect(page.url()).toBe('app://raven/')
+        await expect(homeHeading(page)).toBeVisible()
+      },
+    })
+  })
+})

@@ -1,5 +1,5 @@
 {
-  "extends": "../../../tsconfig.base.json",
+  "extends": "../../../tooling/tsconfig/node.json",
   "compilerOptions": {
     "paths": { "@/*": ["./src/*"] },
     "types": ["bun-types", "node"]

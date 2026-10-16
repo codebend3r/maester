@@ -1,0 +1,136 @@
+{
+  "name": "@raven/desktop",
+  "version": "0.5.4",
+  "private": true,
+  "description": "raven player: local videos under raven's own controls",
+  "type": "module",
+  "main": "dist/main/main.js",
+  "scripts": {
+    "build": "bun run --sequential build:clean build:renderer build:main build:preload",
+    "build:clean": "rm -rf dist",
+    "build:renderer": "vite build",
+    "build:main": "bun build src/main/main.ts --target node --format esm --external electron --sourcemap=linked --outdir dist/main",
+    "build:preload": "bun build src/preload/preload.ts --target node --format cjs --external electron --outfile dist/preload/preload.cjs",
+    "typecheck": "bun run --parallel typecheck:main typecheck:preload typecheck:renderer",
+    "typecheck:main": "tsgo --noEmit -p tsconfig.main.json",
+    "typecheck:preload": "tsgo --noEmit -p tsconfig.preload.json",
+    "typecheck:renderer": "tsgo --noEmit -p tsconfig.renderer.json",
+    "lint:ts": "oxlint",
+    "lint:ts:fix": "oxlint --fix",
+    "lint:css": "stylelint \"src/**/*.scss\"",
+    "lint:css:fix": "stylelint --fix \"src/**/*.scss\"",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check .",
+    "test": "bun run --sequential test:main test:renderer",
+    "test:main": "bun test --dots src/main src/shared src/preload src/build",
+    "test:renderer": "bun test --dots --preload ./src/renderer/test/happy-dom.ts --preload ../../../tooling/web/scss-modules.ts --preload ./src/renderer/test/setup.ts src/renderer",
+    "test:watch": "bun test --dots --watch src/main src/shared",
+    "dev": "electron .",
+    "e2e": "playwright test",
+    "install:electron": "install-electron",
+    "package": "electron-forge package",
+    "make": "electron-forge make"
+  },
+  "dependencies": {
+    "@fontsource-variable/instrument-sans": "5.3.0",
+    "@fontsource/young-serif": "5.3.0",
+    "@raven/core": "workspace:*",
+    "@raven/ui": "workspace:*",
+    "@tanstack/react-query": "5.103.1",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "react-router-dom": "7.18.4",
+    "zustand": "5.0.15"
+  },
+  "devDependencies": {
+    "@electron-forge/cli": "8.0.1",
+    "@electron-forge/maker-zip": "8.0.1",
+    "@electron-forge/plugin-fuses": "8.0.1",
+    "@electron-forge/shared-types": "8.0.1",
+    "@electron/fuses": "2.1.3",
+    "@happy-dom/global-registrator": "20.14.5",
+    "@playwright/test": "1.64.1",
+    "@testing-library/jest-dom": "7.0.1",
+    "@testing-library/react": "16.3.3",
+    "@testing-library/user-event": "14.6.7",
+    "@types/bun": "1.4.2",
+    "@types/node": "24.19.0",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "@vitejs/plugin-react": "6.1.1",
+    "electron": "44.7.0",
+    "happy-dom": "20.14.5",
+    "oxfmt": "0.68.0",
+    "oxlint": "1.83.0",
+    "sass": "1.104.1",
+    "stylelint": "17.15.0",
+    "stylelint-config-recommended-scss": "17.0.1",
+    "typescript": "7.0.2",
+    "vite": "8.3.0"
+  },
+  "nx": {
+    "projectType": "application",
+    "tags": [
+      "scope:desktop",
+      "lang:ts"
+    ],
+    "includedScripts": [
+      "build",
+      "build:clean",
+      "build:renderer",
+      "build:main",
+      "build:preload",
+      "typecheck",
+      "typecheck:main",
+      "typecheck:preload",
+      "typecheck:renderer",
+      "lint:ts",
+      "lint:ts:fix",
+      "lint:css",
+      "lint:css:fix",
+      "format",
+      "format:check",
+      "test",
+      "test:main",
+      "test:renderer",
+      "test:watch",
+      "dev",
+      "e2e",
+      "install:electron",
+      "package",
+      "make"
+    ],
+    "targets": {
+      "dev": {
+        "dependsOn": [
+          "build",
+          "install:electron"
+        ]
+      },
+      "e2e": {
+        "cache": false,
+        "dependsOn": [
+          "build",
+          "install:electron"
+        ]
+      },
+      "install:electron": {
+        "cache": false
+      },
+      "package": {
+        "cache": false,
+        "dependsOn": [
+          "build"
+        ]
+      },
+      "make": {
+        "cache": false,
+        "dependsOn": [
+          "build"
+        ]
+      }
+    }
+  },
+  "productName": "raven player"
+}

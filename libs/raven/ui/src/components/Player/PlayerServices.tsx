@@ -1,9 +1,17 @@
 import { createContext, type ReactNode, useContext } from 'react'
+import type { PlayerAction } from '@/lib/shortcuts'
 
 export type ProgressSink = {
   started: () => void
   save: (position: number) => void
   left: (position: number) => void
+  /** The engine learned how long the video is. */
+  duration?: (seconds: number) => void
+}
+
+/** A host (the desktop menu, say) that sends the player actions of its own. */
+export type HostActions = {
+  subscribe: (listener: (action: PlayerAction) => void) => () => void
 }
 
 export type PlayerTitle = {
@@ -21,6 +29,7 @@ export type PlayerServices = {
   escape: { label: string; run: () => void } | null
   /** The host owns feedback from its escape action, including clipboard failures. */
   escapeFeedback?: string | null
+  hostActions?: HostActions
 }
 
 const Services = createContext<PlayerServices | null>(null)
