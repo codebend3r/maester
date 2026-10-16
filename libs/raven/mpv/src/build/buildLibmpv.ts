@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path'
 import { fetchSources } from '@/build/fetchSources'
 import { refreshSourceBundle } from '@/build/sourceBundle'
 import { auditNative } from '@/build/auditNative'
+import { moltenvkBuildCommands } from '@/build/moltenvk'
 import {
   digest,
   output,
@@ -151,49 +152,10 @@ await run({
     resolve(mvk, 'External/SPIRV-Tools'),
   ],
 })
-await run({
-  args: [
-    'xcodebuild',
-    'build',
-    '-quiet',
-    '-project',
-    'ExternalDependencies.xcodeproj',
-    '-scheme',
-    'ExternalDependencies-macOS',
-    '-configuration',
-    'Release',
-    '-destination',
-    'generic/platform=macOS',
-    '-derivedDataPath',
-    resolve(mvk, 'External/build/Intermediates/macOS'),
-    'ARCHS=arm64',
-    'ONLY_ACTIVE_ARCH=YES',
-    'CODE_SIGNING_ALLOWED=NO',
-    'SKIP_PACKAGING=YES',
-  ],
-  cwd: mvk,
-  env,
-})
-await run({
-  args: [
-    'xcodebuild',
-    'build',
-    '-quiet',
-    '-project',
-    'MoltenVKPackaging.xcodeproj',
-    '-scheme',
-    'MoltenVK Package (macOS only)',
-    '-configuration',
-    'Release',
-    '-destination',
-    'generic/platform=macOS',
-    'ARCHS=arm64',
-    'ONLY_ACTIVE_ARCH=YES',
-    'CODE_SIGNING_ALLOWED=NO',
-  ],
-  cwd: mvk,
-  env,
-})
+await moltenvkBuildCommands({ source: mvk, buildRoot: work }).reduce(async (previous, command) => {
+  await previous
+  await run({ ...command, env })
+}, Promise.resolve())
 await mkdir(resolve(prefix, 'lib/pkgconfig'), { recursive: true })
 await mkdir(resolve(prefix, 'include'), { recursive: true })
 await cp(
