@@ -80,6 +80,80 @@ jobs:
       - name: ${{ matrix.check.name }}
         run: ${{ matrix.check.run }}
 
+  desktop:
+    name: 🖥️ Desktop
+    # Standard macos-26 is arm64; macos-26-intel is explicitly not supported.
+    runs-on: macos-26
+    timeout-minutes: 120
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      HOMEBREW_NO_AUTO_UPDATE: '1'
+    steps:
+      - name: 📥 Checkout exact PR head
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: 🍞 Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      - name: 🛠️ Prepare disposable native toolchain
+        run: |
+          test "$(uname -m)" = arm64
+          xcodebuild -version
+          if ! xcrun metal --version; then
+            xcodebuild -downloadComponent MetalToolchain
+          fi
+          xcrun metal --version
+          brew install cmake ninja meson pkgconf
+
+      - name: 📦 Install
+        run: bun install --frozen-lockfile
+
+      - name: 🏗️ Build TypeScript wrapper
+        run: bunx nx run @raven/mpv:build
+
+      - name: 💾 Cache own pinned source build
+        id: native-cache
+        uses: actions/cache@v5
+        with:
+          path: |
+            libs/raven/mpv/native-build/archives
+            libs/raven/mpv/native-build/prefix
+            libs/raven/mpv/native-build/source-bundle
+            libs/raven/mpv/resources
+          key: raven-mpv-darwin-arm64-xcode26.6-${{ hashFiles('libs/raven/mpv/native/**', 'libs/raven/mpv/src/**', 'libs/raven/mpv/test/**', 'libs/raven/mpv/package.json', 'libs/raven/mpv/README.md', 'libs/raven/mpv/tsconfig*.json', 'libs/raven/core/src/**', 'bun.lock', 'tsconfig.base.json', '.github/workflows/pull-request-checks.yml') }}
+
+      - name: 🎞️ Build self-contained libmpv and MoltenVK from source
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        run: bunx nx run @raven/mpv:fetch:libmpv
+
+      - name: 🔩 Build N-API addon
+        run: bunx nx run @raven/mpv:build:native
+
+      - name: 🔎 Audit native dependencies, sources and signatures
+        run: bunx nx run @raven/mpv:audit:native
+
+      - name: 🧪 Real headless libmpv tests
+        run: bunx nx run @raven/mpv:test:native
+
+      # P4 adds shell/e2e targets, P7 adds app packaging. Do not call absent targets.
+      - name: 📤 Native playback resources
+        uses: actions/upload-artifact@v7
+        with:
+          name: raven-native-darwin-arm64-${{ github.event.pull_request.head.sha }}
+          path: libs/raven/mpv/resources/darwin-arm64
+          if-no-files-found: error
+
+      - name: 📤 Matching native sources
+        uses: actions/upload-artifact@v7
+        with:
+          name: raven-native-sources-${{ github.event.pull_request.head.sha }}
+          path: libs/raven/mpv/native-build/source-bundle
+          if-no-files-found: error
+
   smoke:
     name: 🐳 Smoke test
     uses: ./.github/workflows/smoke-test.yml

@@ -1,0 +1,99 @@
+{
+  "name": "@raven/mpv",
+  "version": "0.5.4",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "bun run --sequential build:clean build:compile build:aliases",
+    "build:clean": "rm -rf dist",
+    "build:compile": "tsc -p tsconfig.build.json",
+    "build:aliases": "tsc-alias -p tsconfig.build.json",
+    "typecheck": "tsgo --noEmit",
+    "lint:ts": "oxlint",
+    "lint:ts:fix": "oxlint --fix",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check .",
+    "test": "bun test --dots src",
+    "test:watch": "bun test --dots --watch src",
+    "fetch:sources": "bun src/build/fetchSources.ts",
+    "fetch:libmpv": "bun src/build/buildLibmpv.ts",
+    "build:native": "bun src/build/buildAddon.ts",
+    "test:native": "node --import tsx --test --test-timeout=120000 test/native.test.ts",
+    "audit:native": "bun src/build/auditNative.ts"
+  },
+  "dependencies": {
+    "@raven/core": "workspace:*",
+    "node-addon-api": "8.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.0",
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "bun-types": "1.4.2",
+    "cmake-js": "7.3.1",
+    "oxfmt": "0.68.0",
+    "oxlint": "1.83.0",
+    "tsc-alias": "1.9.7",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3"
+  },
+  "nx": {
+    "projectType": "library",
+    "tags": [
+      "scope:desktop",
+      "lang:ts"
+    ],
+    "includedScripts": [
+      "build",
+      "typecheck",
+      "lint:ts",
+      "lint:ts:fix",
+      "format",
+      "format:check",
+      "test",
+      "test:watch",
+      "fetch:sources",
+      "fetch:libmpv",
+      "build:native",
+      "test:native",
+      "audit:native"
+    ],
+    "targets": {
+      "fetch:sources": {
+        "cache": false,
+        "dependsOn": [
+          "^build"
+        ]
+      },
+      "fetch:libmpv": {
+        "cache": false,
+        "dependsOn": [
+          "^build"
+        ]
+      },
+      "build:native": {
+        "cache": false,
+        "dependsOn": [
+          "^build"
+        ]
+      },
+      "test:native": {
+        "cache": false,
+        "dependsOn": [
+          "^build"
+        ]
+      },
+      "audit:native": {
+        "cache": false,
+        "dependsOn": [
+          "^build"
+        ]
+      }
+    }
+  }
+}
