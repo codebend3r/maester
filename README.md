@@ -6,7 +6,7 @@ maester is a self-hosted media suite: a library and player, an AI assistant for 
 | ------- | ------------------------------------------------------------------------------------------------------------ |
 | raven   | A self-hosted media library and direct-play player                                                           |
 | luwin   | The AI assistant: requests, playback fixes and lag answers, in its own chat app and inside raven and rookery |
-| rookery | Sign-in: one Plex sign-in shared by luwin and the rest of the suite                                          |
+| rookery | Sign-in: one sign-in shared by luwin and the rest of the suite                                               |
 
 | Project           | Path                  | What                                                                   |
 | ----------------- | --------------------- | ---------------------------------------------------------------------- |
@@ -14,7 +14,7 @@ maester is a self-hosted media suite: a library and player, an AI assistant for 
 | `@raven/server`   | `apps/raven/server`   | raven's media server: NestJS on Fastify, SQLite index, ffmpeg          |
 | `@raven/web`      | `apps/raven/web`      | raven's library and player: React 19 on Vite                           |
 | `@raven/core`     | `libs/raven/core`     | raven's platform-agnostic core: API types, client, direct-play check   |
-| `@rookery/server` | `apps/rookery/server` | rookery's sign-in server: NestJS on Fastify, SQLite, Plex PIN flow     |
+| `@rookery/server` | `apps/rookery/server` | rookery's sign-in server: NestJS on Fastify, SQLite, shared sessions   |
 | `@rookery/web`    | `apps/rookery/web`    | rookery's login and logout pages: React 19 on Vite                     |
 | `@shared/server`  | `libs/shared/server`  | What raven's and rookery's servers share: web app serving, SQLite      |
 | `scripts`         | `scripts`             | Repo tooling: tracker and board sync, NAS deploy, version bump         |
