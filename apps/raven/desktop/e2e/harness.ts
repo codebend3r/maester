@@ -49,6 +49,29 @@ const readLaunchMark = (app: ElectronApplication): Promise<number | null> =>
     stdout.once('close', () => resolve(null))
   })
 
+/**
+ * main's launch mark, failing with a clear error when it has not been seen `ms` after the
+ * window opened (it is printed at ready-to-show, so it is never far behind).
+ */
+export const launchMarkWithin = async ({
+  launched,
+  ms,
+}: {
+  launched: Launched
+  ms: number
+}): Promise<number> => {
+  const deadline = new AbortController()
+  const mark = await Promise.race([
+    launched.launchMs,
+    delay(ms, 'timeout' as const, { signal: deadline.signal }),
+  ])
+  deadline.abort()
+  if (mark === 'timeout')
+    throw new Error(`raven player's launch mark was not seen within ${ms} ms.`)
+  if (mark === null) throw new Error('raven player quit before printing its launch mark.')
+  return mark
+}
+
 /** Quits the app as a person would and waits for its process to end, killing it past the deadline. */
 export const closeApp = async ({ app }: { app: ElectronApplication }): Promise<void> => {
   if (hasExited(app)) return

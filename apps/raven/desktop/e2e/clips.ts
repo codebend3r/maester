@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { mkdtemp, writeFile } from 'node:fs/promises'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -63,6 +63,9 @@ export const makeClips = async (): Promise<Clips> => {
     encode({ binary, output: second }),
     writeFile(join(folder, '._Clip 01b.mp4'), 'Mac OS X'),
     writeFile(join(folder, 'notes.txt'), 'not a video'),
-  ])
+  ]).catch(async (error: unknown) => {
+    await rm(folder, { recursive: true, force: true })
+    throw error
+  })
   return { folder, first, second }
 }

@@ -126,35 +126,51 @@ test.describe('the security baseline', () => {
     await expect(page.getByRole('heading', { name: 'raven player' })).toBeVisible()
   })
 
-  test('sends the content security policy and refuses an encoded way out of the page folder', async () => {
-    const answers = await running().page.evaluate(async () => {
-      const page = await fetch('/index.html')
-      const escapes = await Promise.all(
-        ['/%2e%2e/package.json', '/%2e%2e%2fpackage.json', '/..%2fpackage.json'].map(
-          async (path) => (await fetch(path)).status,
-        ),
-      )
+  test('sends the content security policy', async () => {
+    const answer = await running().page.evaluate(async () => {
+      const response = await fetch('/index.html')
       return {
-        status: page.status,
-        policy: page.headers.get('content-security-policy'),
-        escapes,
+        status: response.status,
+        policy: response.headers.get('content-security-policy'),
       }
     })
-    expect(answers.status).toBe(200)
-    expect(answers.policy).toBe(CONTENT_SECURITY_POLICY)
-    expect(answers.escapes.filter((status) => status === 200)).toEqual([])
+    expect(answer).toEqual({ status: 200, policy: CONTENT_SECURITY_POLICY })
+  })
+
+  test('refuses an encoded way out of the page folder', async () => {
+    // The page folder is `dist/renderer`. The last two land on files that exist (the
+    // project's package.json and `dist/main/main.js`), so only the containment check
+    // stands between them and a 200. `%2e%2e` is normalized away by URL parsing before
+    // the handler sees it, leaving `/package.json`, which the page folder does not hold.
+    const paths = ['/%2e%2e/package.json', '/..%2f..%2fpackage.json', '/..%2fmain%2fmain.js']
+    const statuses = await running().page.evaluate(
+      (sent) => Promise.all(sent.map(async (path) => (await fetch(path)).status)),
+      paths,
+    )
+    expect(statuses).toEqual([404, 403, 403])
   })
 
   test('fails a video whose file id was never granted', async () => {
-    const outcome = await running().page.evaluate(
-      () =>
+    const { app, page } = running()
+    const unknown = 'raven-file://00000000-0000-4000-8000-000000000000'
+    const outcome = await page.evaluate(
+      (src) =>
         new Promise<string>((resolve) => {
           const video = document.createElement('video')
           video.addEventListener('error', () => resolve('error'), { once: true })
           video.addEventListener('loadedmetadata', () => resolve('loaded'), { once: true })
-          video.src = 'raven-file://00000000-0000-4000-8000-000000000000'
+          video.src = src
         }),
+      unknown,
     )
     expect(outcome).toBe('error')
+
+    // The page may not fetch `raven-file:` itself (the CSP's connect-src), so main asks its
+    // own handler: a 404 is the grant check answering, where a broken scheme would throw.
+    const status = await app.evaluate(
+      async ({ net }, url) => (await net.fetch(url)).status,
+      unknown,
+    )
+    expect(status).toBe(404)
   })
 })
