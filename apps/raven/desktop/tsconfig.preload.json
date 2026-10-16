@@ -5,7 +5,7 @@
   "extends": "../../../tooling/tsconfig/node.json",
   "compilerOptions": {
     "lib": ["ES2023", "DOM"],
-    "paths": { "@/*": ["./src/*"] },
+    "paths": { "@/e2e/*": ["./e2e/*"], "@/*": ["./src/*"] },
     "types": ["node", "bun"]
   },
   "include": ["src/preload", "src/shared", "e2e", "playwright.config.ts"]

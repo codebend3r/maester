@@ -25,7 +25,8 @@
     "test:main": "bun test --dots src/main src/shared src/preload src/build",
     "test:renderer": "bun test --dots --preload ./src/renderer/test/happy-dom.ts --preload ../../../tooling/web/scss-modules.ts --preload ./src/renderer/test/setup.ts src/renderer",
     "test:watch": "bun test --dots --watch src/main src/shared",
-    "dev": "electron ."
+    "dev": "electron .",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@fontsource-variable/instrument-sans": "5.3.0",
@@ -91,10 +92,17 @@
       "test:main",
       "test:renderer",
       "test:watch",
-      "dev"
+      "dev",
+      "e2e"
     ],
     "targets": {
       "dev": {
+        "dependsOn": [
+          "build"
+        ]
+      },
+      "e2e": {
+        "cache": false,
         "dependsOn": [
           "build"
         ]

@@ -3,7 +3,7 @@
   // well as in each referenced config.
   "files": [],
   "compilerOptions": {
-    "paths": { "@/*": ["./src/*"] }
+    "paths": { "@/e2e/*": ["./e2e/*"], "@/*": ["./src/*"] }
   },
   "references": [
     { "path": "./tsconfig.main.json" },
