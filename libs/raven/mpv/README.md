@@ -65,6 +65,9 @@ change `xcode-select`. Supply `DEVELOPER_DIR` explicitly when necessary. CI uses
 Xcode 26.6 on the standard `macos-26` arm64 runner and may install Apple's Metal
 component on that disposable runner only. No local system installation is implied.
 Homebrew may provide build tools, never the shipped runtime dependencies.
+Both MoltenVK Xcode stages keep separate derived-data directories under
+`native-build/xcode-derived-data`, outside the upstream packaging cleanup of
+`External/build/Intermediates`. External dependency framework packaging remains enabled.
 
 `native/sources.lock.json` pins every runtime source and build-time source dependency
 to an immutable official upstream Git commit and SHA-256 of that commit's GitHub
