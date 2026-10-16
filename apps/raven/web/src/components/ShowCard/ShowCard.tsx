@@ -10,6 +10,7 @@ import { useState } from 'react'
 import { CardLink } from '@/components/CardLink/CardLink'
 import { Icon } from '@raven/ui'
 import { ScoreChip } from '@/components/RatingChips/RatingChips'
+import { ResolutionChip } from '@/components/ResolutionChip/ResolutionChip'
 import { api } from '@/lib/api'
 import { showYears } from '@/lib/itemLinks'
 import { POSTER_SIZES, type PosterSizes, posterSources } from '@/lib/posters'
@@ -76,6 +77,7 @@ export const ShowCard = ({
       </CardLink>
       {next && (
         <span className={styles.overlay}>
+          <ResolutionChip media={next} className={styles.quality} />
           <CardLink
             to={`/watch/${next.id}`}
             state={{ media: next }}

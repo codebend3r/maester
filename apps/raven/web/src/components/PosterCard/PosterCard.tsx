@@ -16,6 +16,7 @@ import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
 import { PosterImage } from '@/components/PosterImage/PosterImage'
 import { ScoreChip } from '@/components/RatingChips/RatingChips'
+import { ResolutionChip } from '@/components/ResolutionChip/ResolutionChip'
 import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { api } from '@/lib/api'
 import { cardLink, watchLink } from '@/lib/itemLinks'
@@ -96,13 +97,14 @@ export const PosterCard = ({
       >
         <PosterFrame media={media} poster={poster} sizes={sizes} />
       </CardLink>
-      {hasPage && (
-        <span className={styles.overlay}>
+      <span className={styles.overlay}>
+        <ResolutionChip media={media} className={styles.quality} />
+        {hasPage && (
           <CardLink {...watchLink({ media })} className={styles.play} aria-label={`Play ${title}`}>
             <Icon name="play" size={18} />
           </CardLink>
-        </span>
-      )}
+        )}
+      </span>
       <CardLink {...link} className={styles.title} onContextMenu={menu.onContextMenu}>
         {title}
       </CardLink>

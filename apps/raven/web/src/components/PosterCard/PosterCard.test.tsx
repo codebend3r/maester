@@ -73,6 +73,7 @@ describe('PosterCard', () => {
       '/movies/40?library=2',
     )
     expect(screen.getByRole('link', { name: 'Play Busboys' })).toHaveAttribute('href', '/watch/7')
+    expect(screen.getByLabelText('Video resolution: 1080p')).toBeInTheDocument()
     expect(screen.getByText('2026')).toBeInTheDocument()
   })
 
