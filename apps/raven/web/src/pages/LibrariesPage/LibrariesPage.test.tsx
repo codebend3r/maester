@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it, spyOn } from 'bun:test'
-import { screen, waitFor, within } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
+import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { Library, LibraryViewChange } from '@raven/core'
 import { api } from '@/lib/api'
@@ -21,7 +21,13 @@ describe('LibrariesPage', () => {
     match: spyOn(api, 'matchLibrary'),
   }
 
+  beforeEach(() => {
+    spies.lock.mockImplementation(async () => ({ available: false, unlocked: false }))
+    spies.health.mockImplementation(async () => metadataHealth())
+  })
+
   afterEach(() => {
+    cleanup()
     spies.list.mockReset()
     spies.view.mockReset()
     spies.lock.mockReset()

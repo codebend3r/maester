@@ -11,7 +11,6 @@ const picture = (container: HTMLElement): HTMLImageElement | null => container.q
 
 describe('PosterCard', () => {
   afterEach(() => {
-    usePageBackdrop.setState({ current: null, shown: null, recent: [], loaded: [] })
     restorePixelRatio()
   })
 

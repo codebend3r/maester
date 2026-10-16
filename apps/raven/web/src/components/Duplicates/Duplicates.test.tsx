@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { ApiError, type Duplicates as DuplicatesListing } from '@raven/core'
-import { screen, waitFor, within } from '@testing-library/react'
+import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { api } from '@/lib/api'
 import { POSTER_SIZES } from '@/lib/posters'
@@ -95,7 +95,10 @@ describe('the Duplicates tab', () => {
     join: spyOn(api, 'joinSplit'),
   }
 
-  afterEach(() => Object.values(spies).forEach((spy) => spy.mockReset()))
+  afterEach(() => {
+    cleanup()
+    Object.values(spies).forEach((spy) => spy.mockReset())
+  })
 
   /** The tab as the library page opens it, its listing read through the query. */
   const show = async (listing: DuplicatesListing = LISTING) => {

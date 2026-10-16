@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { LIBRARY_KINDS } from '@raven/core'
-import { act, fireEvent, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router-dom'
 import { AppShell } from '@/components/AppShell/AppShell'
@@ -44,8 +44,8 @@ describe('AppShell', () => {
   const spies = { list: spyOn(api, 'listLibraries') }
 
   afterEach(() => {
+    cleanup()
     spies.list.mockReset()
-    usePageBackdrop.setState({ current: null, shown: null, recent: [], loaded: [] })
   })
 
   it('links home from the logo, named by its word alone', () => {

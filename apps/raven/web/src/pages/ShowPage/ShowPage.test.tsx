@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
-import { screen } from '@testing-library/react'
+import { cleanup, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { AdminLock, ItemDetails } from '@raven/core'
 import { Route, Routes, useParams } from 'react-router-dom'
@@ -41,6 +41,7 @@ describe('ShowPage', () => {
   }
 
   afterEach(() => {
+    cleanup()
     spies.item.mockReset()
     spies.next.mockReset()
     spies.search.mockReset()

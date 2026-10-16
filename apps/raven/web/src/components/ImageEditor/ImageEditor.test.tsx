@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
-import { screen, waitFor, within } from '@testing-library/react'
+import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ItemImageOptions } from '@raven/core'
 import { ImageEditor } from '@/components/ImageEditor/ImageEditor'
@@ -54,6 +54,7 @@ describe('ImageEditor', () => {
   }
 
   afterEach(() => {
+    cleanup()
     spies.options.mockReset()
     spies.choose.mockReset()
     state.done = 0

@@ -1,9 +1,7 @@
-import { afterEach, describe, expect, it } from 'bun:test'
+import { describe, expect, it } from 'bun:test'
 import { usePageBackdrop } from '@/stores/pageBackdrop'
 
 describe('the page backdrop', () => {
-  afterEach(() => usePageBackdrop.setState({ current: null, shown: null, recent: [], loaded: [] }))
-
   it('shows the latest picture, keeping the few before it to fade out', () => {
     const { show } = usePageBackdrop.getState()
     ;['/a', '/b', '/c', '/d', '/e', '/c'].forEach((url) => show(url))

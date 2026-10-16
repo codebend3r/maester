@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
-import { screen } from '@testing-library/react'
+import { cleanup, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { HistoryEntry } from '@raven/core'
 import { Route, Routes } from 'react-router-dom'
@@ -50,6 +50,7 @@ describe('HistoryPage', () => {
   }
 
   afterEach(() => {
+    cleanup()
     spies.library.mockReset()
     spies.history.mockReset()
     asked.splice(0)

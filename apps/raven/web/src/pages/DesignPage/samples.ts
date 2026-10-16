@@ -215,10 +215,14 @@ export const SAMPLE_RATINGS: Rating[] = [
   { source: 'tmdb', kind: 'audience', value: 7.8, votes: 1840 },
 ]
 
-/** The other faces of the marks: a splat, and Metacritic's yellow and red. */
+/** The other faces of the marks: a splat, and Metacritic's yellow. */
 export const SAMPLE_RATINGS_LOW: Rating[] = [
   { source: 'rottenTomatoes', kind: 'critic', value: 3.8, votes: null },
   { source: 'metacritic', kind: 'critic', value: 5.2, votes: null },
+]
+
+/** Metacritic's red, in a row of its own: a row has one chip per source. */
+export const SAMPLE_RATINGS_RED: Rating[] = [
   { source: 'metacritic', kind: 'critic', value: 2.9, votes: null },
 ]
 

@@ -24,6 +24,7 @@ import {
   SAMPLE_MOVIES,
   SAMPLE_RATINGS,
   SAMPLE_RATINGS_LOW,
+  SAMPLE_RATINGS_RED,
   SAMPLE_REVIEWS,
   SAMPLE_SCANS,
   SAMPLE_SHOWS,
@@ -199,6 +200,7 @@ export const ComponentsSection = () => (
       <div className={styles.stack}>
         <RatingChips ratings={SAMPLE_RATINGS} />
         <RatingChips ratings={SAMPLE_RATINGS_LOW} />
+        <RatingChips ratings={SAMPLE_RATINGS_RED} />
         <RatingChips ratings={SAMPLE_RATINGS.slice(0, 1)} shouldShowEverySource />
       </div>
     </Specimen>

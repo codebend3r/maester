@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
-import { screen, waitFor } from '@testing-library/react'
+import { cleanup, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ItemMetadataState } from '@raven/core'
 import { MetadataEditor } from '@/components/MetadataEditor/MetadataEditor'
@@ -49,6 +49,7 @@ describe('MetadataEditor', () => {
   }
 
   afterEach(() => {
+    cleanup()
     spies.state.mockReset()
     spies.save.mockReset()
     done.count = 0

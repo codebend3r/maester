@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
-import { screen } from '@testing-library/react'
+import { cleanup, screen } from '@testing-library/react'
 import type { ItemDetails } from '@raven/core'
 import { Route, Routes } from 'react-router-dom'
 import { api } from '@/lib/api'
@@ -16,6 +16,7 @@ describe('EpisodePage', () => {
   }
 
   afterEach(() => {
+    cleanup()
     spies.item.mockReset()
     spies.libraries.mockReset()
     spies.tracks.mockReset()
