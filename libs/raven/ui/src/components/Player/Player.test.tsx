@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, it, jest, spyOn } from 'bun:test'
 import {
   type MediaItem,
   type MediaTracks,
@@ -351,5 +351,71 @@ describe('the player’s Back', () => {
     renderWithProviders(app(), { route: '/watch/7' })
     await userEvent.click(screen.getByRole('button', { name: 'Back' }))
     expect(await screen.findByText('The library')).toBeInTheDocument()
+  })
+})
+
+// Last in the file: with the fake timers ahead of them, the Back tests above time out.
+describe('the controls fading out', () => {
+  const IDLE_MS = 10_000
+  beforeEach(() => {
+    stubTracks()
+    jest.useFakeTimers()
+  })
+  afterEach(() => jest.useRealTimers())
+
+  const renderPlayer = () =>
+    renderWithProviders(
+      <TestPlayer media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />,
+    )
+  const bar = () => screen.getByRole('slider', { name: 'Seek' }).closest('.controls')
+  const idle = (ms: number) => act(() => jest.advanceTimersByTime(ms))
+
+  it('hides the controls and the cursor after ten idle seconds, paused or not', () => {
+    const { container } = renderPlayer()
+    idle(IDLE_MS - 1)
+    expect(bar()).not.toHaveClass('hidden')
+    idle(1)
+    expect(bar()).toHaveClass('hidden')
+    expect(container.querySelector('.chrome')).toHaveClass('chromeHidden')
+    expect(container.querySelector('.stage')).toHaveClass('idle')
+  })
+
+  it.each([
+    ['a mouse move', () => fireEvent.pointerMove(screen.getByRole('slider', { name: 'Seek' }))],
+    ['a key press', () => press('x')],
+    ['a click', () => fireEvent.pointerDown(screen.getByRole('slider', { name: 'Seek' }))],
+  ])('brings them back on %s, and hides them again ten seconds later', (_name, wake) => {
+    renderPlayer()
+    idle(IDLE_MS)
+    expect(bar()).toHaveClass('hidden')
+    act(() => wake())
+    expect(bar()).not.toHaveClass('hidden')
+    idle(IDLE_MS - 1)
+    expect(bar()).not.toHaveClass('hidden')
+    idle(1)
+    expect(bar()).toHaveClass('hidden')
+  })
+
+  it('hides them although a control still has focus', () => {
+    renderPlayer()
+    act(() => screen.getByRole('button', { name: 'Play (k)' }).focus())
+    idle(IDLE_MS)
+    expect(bar()).toHaveClass('hidden')
+  })
+
+  it('hides them while the settings menu is open', () => {
+    renderPlayer()
+    act(() => screen.getByRole('button', { name: 'Settings' }).click())
+    expect(screen.getByRole('dialog', { name: 'Settings' })).toBeInTheDocument()
+    idle(IDLE_MS)
+    expect(bar()).toHaveClass('hidden')
+  })
+
+  it('counts a key pressed on the volume slider as stirring', () => {
+    renderPlayer()
+    idle(IDLE_MS - 1)
+    fireEvent.keyDown(screen.getByRole('slider', { name: 'Volume' }), { key: 'ArrowLeft' })
+    idle(1)
+    expect(bar()).not.toHaveClass('hidden')
   })
 })

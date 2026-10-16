@@ -73,12 +73,6 @@
 .chromeHidden {
   opacity: 0;
   pointer-events: none;
-
-  // Tabbing to the back button brings the bar back with it.
-  &:focus-within {
-    opacity: 1;
-    pointer-events: auto;
-  }
 }
 
 .back {

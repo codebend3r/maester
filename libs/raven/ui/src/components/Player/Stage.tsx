@@ -26,8 +26,12 @@ import { isTypingTarget } from '@/lib/keyboard'
 import { shortcutFor } from '@/lib/shortcuts'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
 
-/** How long the controls and cursor linger after the last mouse move or key press. */
-const IDLE_MS = 2500
+/**
+ * How long the controls and cursor linger after the last mouse move, key
+ * press or click. Nothing holds them past it: not a pause, an open menu or a
+ * focused button.
+ */
+const IDLE_MS = 10_000
 
 const isControlTarget = (target: EventTarget | null): boolean =>
   target instanceof HTMLElement && !!target.closest('button, a')
@@ -125,13 +129,13 @@ export const PlayerChrome = ({
   })
 
   const onKey = useEffectEvent((event: KeyboardEvent) => {
+    idle.wake()
     const action = shortcutFor(event)
     // Form controls keep their own keys (the radios' arrows, the volume
     // slider's); only Escape reaches past them, to close what they sit in.
     if (isTypingTarget(event.target) && action?.type !== 'escape') return
     // A focused button or link answers Space and Enter itself.
     if (isControlTarget(event.target) && (event.key === ' ' || event.key === 'Enter')) return
-    idle.wake()
     if (!action) return
     // With the shortcut list open, the keys only close it.
     if (overlay === 'shortcuts' && action.type !== 'escape' && action.type !== 'showShortcuts') {
@@ -161,7 +165,7 @@ export const PlayerChrome = ({
     engine.focusSurface()
   }
 
-  const chromeShown = state.paused || idle.active || overlay !== 'none'
+  const chromeShown = idle.active
 
   return (
     <div
