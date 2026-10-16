@@ -7,6 +7,7 @@ import {
   documentTypes,
   FUSES,
   isPackagedPath,
+  resealTargets,
   signingFrom,
   utiFor,
 } from '@/build/forgeOptions'
@@ -146,6 +147,36 @@ describe('adHocSealArgs', () => {
       '--deep',
       '/out/raven player.app',
     ])
+  })
+})
+
+describe('resealTargets', () => {
+  const outputPaths = ['/out/raven player-darwin-arm64', '/out/raven player-darwin-x64']
+
+  it('reseals each packaged app ad hoc on macOS without an identity', () => {
+    expect(
+      resealTargets({ platform: 'darwin', signing: {}, outputPaths, appName: 'raven player' }),
+    ).toEqual([
+      adHocSealArgs({ app: '/out/raven player-darwin-arm64/raven player.app' }),
+      adHocSealArgs({ app: '/out/raven player-darwin-x64/raven player.app' }),
+    ])
+  })
+
+  it('reseals nothing when an identity signs the app', () => {
+    expect(
+      resealTargets({
+        platform: 'darwin',
+        signing: { osxSign: { identity: 'Developer ID Application: Someone' } },
+        outputPaths,
+        appName: 'raven player',
+      }),
+    ).toEqual([])
+  })
+
+  it('reseals nothing off macOS', () => {
+    expect(
+      resealTargets({ platform: 'linux', signing: {}, outputPaths, appName: 'raven player' }),
+    ).toEqual([])
   })
 })
 

@@ -26,7 +26,7 @@
 12. **The e2e clip** is made by ffmpeg with `h264_videotoolbox -allow_sw 1` (H.264 in MP4, which Chromium decodes), from `RAVEN_E2E_FFMPEG` or `ffmpeg` on `PATH`. CI points it at `@raven/mpv`'s source-built ffmpeg (`--enable-videotoolbox`, already in the job's cache).
 13. **`OutputSettings` / `isOutputSettings`** (section 6) is "This computer", so it lands in P5 with its settings screen.
 14. **Track picks:** the stored shape and its reducer land in P4 (section 4 table); nothing writes them until P5, since the html engine reports no tracks for a local file.
-15. **`electron` joins the root `trustedDependencies`** so its postinstall downloads the binary under `bun install`; the Ubuntu checks set `ELECTRON_SKIP_BINARY_DOWNLOAD=1`, since nothing there launches Electron. Docker already installs with `--ignore-scripts`.
+15. **The Electron binary comes from `@raven/desktop`'s `install:electron` target**, which `dev` and `e2e` depend on. Electron 44.7.0 has no install script, so `electron` stays out of the root `trustedDependencies` (listing it would do nothing), and `bun install` alone never downloads the binary. Docker already installs with `--ignore-scripts`.
 
 ## Deferred, so nothing is lost
 

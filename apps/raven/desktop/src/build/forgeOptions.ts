@@ -1,3 +1,5 @@
+import { join } from 'node:path'
+
 /**
  * The tested half of forge.config.ts. Forge loads its config with jiti, which does not read
  * tsconfig `paths`, so this file imports nothing from the project.
@@ -15,7 +17,7 @@ export const DOCUMENT_UTIS = [
 
 export type DocumentUti = (typeof DOCUMENT_UTIS)[number]
 
-// Formats macOS has no UTI of its own for conform to `public.movie` where it knows them.
+// Formats without a UTI of their own are claimed as `public.movie`, which they conform to where macOS knows them.
 const UTI_BY_EXTENSION = {
   mp4: 'public.mpeg-4',
   m4v: 'public.mpeg-4',
@@ -155,3 +157,22 @@ export const adHocSealArgs = ({ app }: { app: string }): string[] => [
   '--deep',
   app,
 ]
+
+/**
+ * One codesign argument list per packaged app to reseal: none off macOS, and none when an
+ * identity signs the app through osxSign after the packager is done.
+ */
+export const resealTargets = ({
+  platform,
+  signing,
+  outputPaths,
+  appName,
+}: {
+  platform: string
+  signing: Signing
+  outputPaths: readonly string[]
+  appName: string
+}): string[][] => {
+  if (platform !== 'darwin' || signing.osxSign !== undefined) return []
+  return outputPaths.map((folder) => adHocSealArgs({ app: join(folder, `${appName}.app`) }))
+}

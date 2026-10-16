@@ -62,7 +62,6 @@
   },
   "trustedDependencies": [
     "@parcel/watcher",
-    "electron",
     "lefthook",
     "nx"
   ]

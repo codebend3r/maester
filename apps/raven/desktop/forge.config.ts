@@ -1,5 +1,4 @@
 import { execFile } from 'node:child_process'
-import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { MakerZIP } from '@electron-forge/maker-zip'
 import { FusesPlugin } from '@electron-forge/plugin-fuses'
@@ -7,10 +6,10 @@ import type { ForgeConfig } from '@electron-forge/shared-types'
 import { FuseV1Options, FuseVersion } from '@electron/fuses'
 import { VIDEO_EXTENSIONS } from '@raven/core'
 import {
-  adHocSealArgs,
   documentTypes,
   FUSES,
   isPackagedPath,
+  resealTargets,
   signingFrom,
 } from './src/build/forgeOptions'
 
@@ -51,10 +50,9 @@ const config: ForgeConfig = {
     // An identity signs through osxSign after the packager is done; without one, nothing
     // seals the final bundle, so it is resealed ad hoc here.
     postPackage: async (_forgeConfig, { platform, outputPaths }) => {
-      if (platform !== 'darwin' || signing.osxSign !== undefined) return
       await Promise.all(
-        outputPaths.map((folder) =>
-          run('codesign', adHocSealArgs({ app: join(folder, `${APP_NAME}.app`) })),
+        resealTargets({ platform, signing, outputPaths, appName: APP_NAME }).map((args) =>
+          run('codesign', args),
         ),
       )
     },
