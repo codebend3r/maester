@@ -13,6 +13,7 @@ import {
   union,
   exactPartial,
 } from '@/schema'
+import { MAX_WATCH_TARGETS } from '@/watched'
 
 /**
  * The API contract between the media server and every client. Anything a
@@ -420,6 +421,8 @@ export const isMediaItem = object({
   /** Where playback last stopped, in seconds; 0 when never started or finished. */
   position: isNumber,
   favourite: isBoolean,
+  /** Whether its card is watched: any of the files on it has a mark, or a play that got to the library's watched percentage. */
+  watched: isBoolean,
   addedAt: isString,
   /** When the file last changed on disk: found, renamed, moved or replaced. */
   changedAt: isString,
@@ -493,6 +496,8 @@ export const isSeasonSummary = object({
   type: oneOf(['season']),
   /** Its episodes with a file this browser may see. */
   episodeCount: isNumber,
+  /** Of `episodeCount`, those watched. */
+  watchedCount: isNumber,
 })
 
 export type SeasonSummary = Infer<typeof isSeasonSummary>
@@ -507,6 +512,8 @@ export const isEpisodeSummary = object({
   runtime: nullable(isNumber),
   /** Changes whenever the still does, beside the file or TMDB's; null when there is none. */
   stillVersion: nullable(isString),
+  /** Whether any of its files this browser may see is watched; not read off `primary`, whose card for a two-episode file is the first episode's. */
+  watched: isBoolean,
   /** The version Play starts, by `primaryVersion`; null when none of its files may be seen. */
   primary: nullable(isMediaItem),
 })
@@ -563,6 +570,8 @@ export const isShowEntry = object({
   show: isItemSummary,
   /** Distinct episodes on disk. */
   episodes: isNumber,
+  /** Of `episodes`, those watched. */
+  watchedEpisodes: isNumber,
   /** The year the show ended, or null while it still airs. */
   endedYear: nullable(isNumber),
   /** When its newest file arrived. */
@@ -1033,15 +1042,17 @@ export const isServerHealth = object({
 
 export type ServerHealth = Infer<typeof isServerHealth>
 
-/** A video in a library's history: when it last played, how often, and how far it got. */
+/** A video in a library's history: when it last played or was marked, how often it really played, and how far it got. */
 export const isHistoryEntry = object({
   media: isMediaItem,
   lastPlayedAt: isString,
   plays: isNumber,
   /** The furthest any play got, in seconds. */
   furthest: isNumber,
-  /** Whether a play got past the library's watched percentage. */
+  /** Whether a play got to the library's watched percentage, or a mark holds it watched. */
   watched: isBoolean,
+  /** Whether Mark as watched holds it watched; `plays` and `furthest` count real plays only. */
+  marked: isBoolean,
 })
 
 export type HistoryEntry = Infer<typeof isHistoryEntry>
@@ -1204,6 +1215,29 @@ export const isFavouriteChange = object({
 })
 
 export type FavouriteChange = Infer<typeof isFavouriteChange>
+
+/**
+ * What `PUT /api/watched` marks: the card a file is on, or every card under
+ * an item (a show, season, episode or movie) in one library, or in every
+ * library the viewer may see when `libraryId` is null.
+ */
+export const isWatchTarget = union(
+  object({ kind: oneOf(['media']), id: isNumber }),
+  object({ kind: oneOf(['item']), id: isNumber, libraryId: nullable(isNumber) }),
+)
+
+export type WatchTarget = Infer<typeof isWatchTarget>
+
+const isWatchTargets = (value: unknown): value is WatchTarget[] =>
+  listOf(isWatchTarget)(value) && value.length > 0 && value.length <= MAX_WATCH_TARGETS
+
+/** `PUT /api/watched`: mark every target, from one to `MAX_WATCH_TARGETS`, watched or unwatched. */
+export const isWatchedChange = object({
+  watched: isBoolean,
+  targets: isWatchTargets,
+})
+
+export type WatchedChange = Infer<typeof isWatchedChange>
 
 /** `POST /api/lock/unlock`: the PIN that opens every locked library. */
 export const isUnlockRequest = object({

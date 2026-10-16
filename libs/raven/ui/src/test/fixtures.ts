@@ -30,5 +30,6 @@ export const mediaItem = (overrides: Partial<MediaItem> = {}): MediaItem => ({
   versions: 1,
   variant: null,
   card: null,
+  watched: false,
   ...overrides,
 })

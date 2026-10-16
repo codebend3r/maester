@@ -35,6 +35,7 @@ import { AdminOnly } from '@/admin/adminGuard'
 import { isChoosableImageKind } from '@/items/imageKinds'
 import { itemChildren } from '@/items/itemChildren'
 import { sendImage } from '@/items/sendImage'
+import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { PrivateBy } from '@/lock/lockGuard'
 import { LockService } from '@/lock/lockService'
 import { MediaRepository } from '@/media/mediaRepository'
@@ -61,6 +62,7 @@ export class ItemsController {
     @Inject(ItemImagesRepository) private readonly stored: ItemImagesRepository,
     @Inject(TmdbClient) private readonly tmdb: TmdbClient,
     @Inject(LockService) private readonly lock: LockService,
+    @Inject(LibrariesRepository) private readonly libraries: LibrariesRepository,
   ) {}
 
   private requireItem(id: number): void {
@@ -121,15 +123,19 @@ export class ItemsController {
     return this.details({ id, cookie })
   }
 
-  /** A show's first episode not yet watched, for its Play button; null once every one is. */
+  /**
+   * A show's first episode not yet watched in the libraries this browser may
+   * see, for its Play button; null once every one is.
+   */
   @Get(':id/next')
   next(
     @Param('id', ParseIntPipe) id: number,
     @Headers('cookie') cookie: string | undefined,
   ): MediaItem | null {
     this.requireItem(id)
-    const next = this.media.nextEpisode(id)
-    return next && this.lock.viewer({ cookie }).seesLibrary(next.libraryId) ? next : null
+    const viewer = this.lock.viewer({ cookie })
+    const libraryIds = this.libraries.ids().filter((libraryId) => viewer.seesLibrary(libraryId))
+    return this.media.nextEpisode({ showId: id, libraryIds })
   }
 
   /** Fetches the item from TMDB again now. One TMDB no longer has is gone after, so 404. */

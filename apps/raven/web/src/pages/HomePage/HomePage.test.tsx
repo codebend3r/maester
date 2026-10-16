@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
-import { act, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { type Home, type HomeSearch, mediaLabel } from '@raven/core'
 import { Link, useLocation } from 'react-router-dom'
@@ -38,6 +38,7 @@ describe('HomePage', () => {
   }
 
   afterEach(() => {
+    cleanup()
     spies.home.mockReset()
     spies.libraries.mockReset()
     spies.search.mockReset()
@@ -226,7 +227,12 @@ describe('HomePage', () => {
       expect(await screen.findByRole('heading', { name: 'Continue watching' })).toBeInTheDocument()
 
       await userEvent.type(searchbox(), 'bus')
-      await screen.findByRole('heading', { name: 'Films' })
+      // The cached results show a render before the deferred query writes the
+      // address, so waiting on them alone lets that write land outside act().
+      await waitFor(() =>
+        expect(screen.getByLabelText('Current address')).toHaveTextContent(/^\/\?q=bus$/),
+      )
+      expect(screen.getByRole('heading', { name: 'Films' })).toBeInTheDocument()
       await act(async () => {
         await userEvent.click(screen.getByRole('link', { name: 'Back home' }))
       })

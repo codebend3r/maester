@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
-import { screen } from '@testing-library/react'
+import { cleanup, screen } from '@testing-library/react'
 import type { AdminLock } from '@raven/core'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { api } from '@/lib/api'
@@ -16,6 +16,7 @@ describe('AdminOnly', () => {
   const read = spyOn(api, 'getAdminLock')
 
   afterEach(() => {
+    cleanup()
     read.mockReset()
   })
 

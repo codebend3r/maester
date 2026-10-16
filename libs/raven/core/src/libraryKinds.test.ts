@@ -37,6 +37,10 @@ describe('defaultLibrarySettings', () => {
     expect(defaultLibrarySettings('other')).toEqual(DEFAULT_LIBRARY_SETTINGS)
   })
 
+  it('counts a play as watched at 95% unless a library says otherwise', () => {
+    expect(DEFAULT_LIBRARY_SETTINGS.watchedPercent).toBe(95)
+  })
+
   it('starts every type with settings it can show', () => {
     LIBRARY_KINDS.forEach((kind) => {
       const settings = defaultLibrarySettings(kind)

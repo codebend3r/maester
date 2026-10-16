@@ -8,13 +8,14 @@ const entry = ({
   playedAt,
   ...rest
 }: { id?: number; playedAt: Date } & Partial<
-  Pick<HistoryEntry, 'plays' | 'furthest' | 'watched'>
+  Pick<HistoryEntry, 'plays' | 'furthest' | 'watched' | 'marked'>
 >): HistoryEntry => ({
   media: mediaItem({ id, duration: 100 }),
   lastPlayedAt: playedAt.toISOString(),
   plays: 1,
   furthest: 0,
   watched: false,
+  marked: false,
   ...rest,
 })
 

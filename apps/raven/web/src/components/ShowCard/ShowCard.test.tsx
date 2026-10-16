@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'bun:test'
+import { describe, expect, it } from 'bun:test'
 import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { ShowCard, ShowGrid } from '@/components/ShowCard/ShowCard'
 import { ShowTiles } from '@/components/ShowCard/ShowViews'
@@ -8,10 +8,6 @@ import { renderWithProviders } from '@/test/render'
 import { usePageBackdrop } from '@/stores/pageBackdrop'
 
 describe('ShowCard', () => {
-  afterEach(() => {
-    usePageBackdrop.setState({ current: null, shown: null, recent: [], loaded: [] })
-  })
-
   it("lays its show's backdrop behind the page while pointed at", async () => {
     const entry = showEntry()
     const { container } = renderWithProviders(

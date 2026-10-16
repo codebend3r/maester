@@ -1,12 +1,15 @@
 import { afterAll, afterEach, describe, expect, it, spyOn } from 'bun:test'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { LogoImage } from '@/components/LogoImage/LogoImage'
 import * as logoTone from '@/lib/logoTone'
 
 describe('LogoImage', () => {
   const tone = spyOn(logoTone, 'isDarkLogo')
 
-  afterEach(() => tone.mockReset())
+  afterEach(() => {
+    cleanup()
+    tone.mockReset()
+  })
   afterAll(() => tone.mockRestore())
 
   it("draws a dark logo in white once it has loaded, beside the caller's own class", () => {

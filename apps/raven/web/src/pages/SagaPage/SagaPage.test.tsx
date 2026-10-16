@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
-import { fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import {
   type AdminLock,
@@ -57,7 +57,10 @@ describe('SagaPage', () => {
     pick: spyOn(api, 'setSagaBackdrop'),
   }
 
-  afterEach(() => Object.values(spies).forEach((spy) => spy.mockReset()))
+  afterEach(() => {
+    cleanup()
+    Object.values(spies).forEach((spy) => spy.mockReset())
+  })
 
   const open = ({
     route = '/libraries/2/sagas/119',

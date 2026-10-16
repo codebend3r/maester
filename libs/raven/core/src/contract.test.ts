@@ -26,6 +26,8 @@ import {
   isStreamMode,
   isTmdbId,
   isUnlockRequest,
+  isWatchTarget,
+  isWatchedChange,
   isHistoryEntry,
   isEpisodeSummary,
   isItemChild,
@@ -49,6 +51,7 @@ import {
   isSlideshowMotion,
   isShowListing,
 } from '@/contract'
+import { MAX_WATCH_TARGETS } from '@/watched'
 import {
   episodeSummary,
   itemDetails,
@@ -68,6 +71,12 @@ describe('isMediaItem', () => {
   it('rejects an item whose favourite flag is missing', () => {
     const { favourite: _favourite, ...withoutFlag } = mediaItem()
     expect(isMediaItem(withoutFlag)).toBe(false)
+  })
+
+  it('rejects an item that does not say whether it is watched', () => {
+    const { watched: _watched, ...withoutFlag } = mediaItem()
+    expect(isMediaItem(withoutFlag)).toBe(false)
+    expect(isMediaItem(mediaItem({ watched: true }))).toBe(true)
   })
 })
 
@@ -191,8 +200,21 @@ describe('isHistoryEntry', () => {
         plays: 2,
         furthest: 5000,
         watched: true,
+        marked: false,
       }),
     ).toBe(true)
+  })
+
+  it('rejects an entry that does not say whether a mark holds it watched', () => {
+    expect(
+      isHistoryEntry({
+        media: mediaItem(),
+        lastPlayedAt: '2026-10-10T19:00:00.000Z',
+        plays: 0,
+        furthest: 0,
+        watched: true,
+      }),
+    ).toBe(false)
   })
 
   it('rejects an entry that does not say whether it was watched', () => {
@@ -202,6 +224,7 @@ describe('isHistoryEntry', () => {
         lastPlayedAt: '2026-10-10T19:00:00.000Z',
         plays: 2,
         furthest: 5000,
+        marked: false,
       }),
     ).toBe(false)
   })
@@ -254,6 +277,8 @@ describe('the metadata guards', () => {
   it("accepts a page's children: seasons with their episode count, episodes with their row", () => {
     expect(isSeasonSummary(seasonSummary())).toBe(true)
     expect(isEpisodeSummary(episodeSummary())).toBe(true)
+    expect(isSeasonSummary(seasonSummary({ watchedCount: 3 }))).toBe(true)
+    expect(isEpisodeSummary(episodeSummary({ watched: true }))).toBe(true)
     expect(isEpisodeSummary(episodeSummary({ primary: null, stillVersion: null }))).toBe(true)
     expect(isItemDetails(itemDetails({ children: [seasonSummary(), episodeSummary()] }))).toBe(true)
   })
@@ -270,6 +295,8 @@ describe('the metadata guards', () => {
 
   it('accepts a show listing and refuses one whose next episode is malformed', () => {
     expect(isShowListing({ shows: [showEntry()], unmatched: [mediaItem()] })).toBe(true)
+    const { watchedEpisodes: _watchedEpisodes, ...uncounted } = showEntry()
+    expect(isShowListing({ shows: [uncounted], unmatched: [] })).toBe(false)
     expect(isShowListing({ shows: [showEntry({ next: null })], unmatched: [] })).toBe(true)
     expect(isShowListing({ shows: [{ ...showEntry(), next: { id: 1 } }], unmatched: [] })).toBe(
       false,
@@ -450,6 +477,48 @@ describe('the change guards', () => {
     expect(
       isItemMetadataState({ shown: metadata, original: metadata, overridden: ['studio'] }),
     ).toBe(false)
+  })
+})
+
+describe('isWatchTarget', () => {
+  it('takes a file, and an item in one library or in every library', () => {
+    expect(isWatchTarget({ kind: 'media', id: 7 })).toBe(true)
+    expect(isWatchTarget({ kind: 'item', id: 7, libraryId: 2 })).toBe(true)
+    expect(isWatchTarget({ kind: 'item', id: 7, libraryId: null })).toBe(true)
+  })
+
+  it('refuses an item that does not say which libraries, and any other kind', () => {
+    expect(isWatchTarget({ kind: 'item', id: 7 })).toBe(false)
+    expect(isWatchTarget({ kind: 'saga', id: 7 })).toBe(false)
+    expect(isWatchTarget({ kind: 'media', id: '7' })).toBe(false)
+  })
+})
+
+describe('isWatchedChange', () => {
+  it('takes a direction and a list of targets', () => {
+    expect(
+      isWatchedChange({
+        watched: true,
+        targets: [
+          { kind: 'media', id: 1 },
+          { kind: 'item', id: 4, libraryId: null },
+        ],
+      }),
+    ).toBe(true)
+  })
+
+  it('takes from one to the most targets', () => {
+    const target = { kind: 'media', id: 1 }
+    const targets = (length: number) => Array.from({ length }, () => target)
+    expect(isWatchedChange({ watched: true, targets: targets(0) })).toBe(false)
+    expect(isWatchedChange({ watched: true, targets: targets(1) })).toBe(true)
+    expect(isWatchedChange({ watched: true, targets: targets(MAX_WATCH_TARGETS) })).toBe(true)
+    expect(isWatchedChange({ watched: true, targets: targets(MAX_WATCH_TARGETS + 1) })).toBe(false)
+  })
+
+  it('refuses a missing direction or a bad target', () => {
+    expect(isWatchedChange({ targets: [] })).toBe(false)
+    expect(isWatchedChange({ watched: true, targets: [{ kind: 'media' }] })).toBe(false)
   })
 })
 

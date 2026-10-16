@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
-import { screen, within } from '@testing-library/react'
+import { cleanup, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { MediaItem } from '@raven/core'
 import { MovieFiles } from '@/components/MovieFiles/MovieFiles'
@@ -36,6 +36,7 @@ describe('MovieFiles', () => {
   const spies = { split: spyOn(api, 'splitDuplicate'), join: spyOn(api, 'joinSplit') }
 
   afterEach(() => {
+    cleanup()
     spies.split.mockReset()
     spies.join.mockReset()
   })

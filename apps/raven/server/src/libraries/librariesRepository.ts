@@ -187,6 +187,14 @@ export class LibrariesRepository {
     return this.rows(null)
   }
 
+  /** Every library's id, for a caller that has no use for the rest of its record. */
+  ids(): number[] {
+    return this.db
+      .prepare<[], { id: number }>('SELECT id FROM libraries')
+      .all()
+      .map((row) => row.id)
+  }
+
   get(id: number): LibraryRecord | null {
     return this.rows(id)[0] ?? null
   }

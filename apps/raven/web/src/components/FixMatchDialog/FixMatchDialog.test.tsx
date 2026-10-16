@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
-import { screen, waitFor, within } from '@testing-library/react'
+import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { AiMatch, MatchItemType, MatchSubject, MediaItem } from '@raven/core'
 import { useState } from 'react'
@@ -40,6 +40,7 @@ describe('Fix match', () => {
   }
 
   afterEach(() => {
+    cleanup()
     spies.item.mockReset()
     spies.search.mockReset()
     spies.setMatch.mockReset()

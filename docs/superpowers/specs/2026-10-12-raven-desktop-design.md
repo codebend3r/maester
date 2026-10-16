@@ -470,7 +470,7 @@ Single keys stay with the page, as on the web. A menu accelerator on Space or an
 - Server titles keep their resume position on the server only; track picks for them follow the language preferences, as on the web.
 - Each file is read once at launch and checked with guards built from core's combinators. A file that fails the check is kept as `<name>.corrupt-<time>` and the app starts empty, so a bad write never stops it launching.
 - Writes go to a temporary file and are renamed over the old one. The last write happens on `before-quit`.
-- Resume follows the web's rule in `Stage.tsx`: resume when the position is past 0 and more than 10 s from the end; reaching the end clears it.
+- Resume follows the web's rule in `Stage.tsx`: resume when the position is past 0 and more than 10 s from the end; reaching the end clears it. Server titles clear their spot at the library's **Watched at** (95% by default), the same point at which a play counts as watched.
 
 ### Security
 

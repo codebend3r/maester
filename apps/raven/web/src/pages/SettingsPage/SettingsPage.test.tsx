@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
-import { screen, waitFor, within } from '@testing-library/react'
+import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import {
   ApiError,
@@ -48,7 +48,10 @@ describe('SettingsPage', () => {
     })
   })
 
-  afterEach(() => Object.values(spies).forEach((spy) => spy.mockReset()))
+  afterEach(() => {
+    cleanup()
+    Object.values(spies).forEach((spy) => spy.mockReset())
+  })
 
   /** Serves playback settings that start as `start` and change as the page saves them. */
   const servePlayback = (start: PlaybackSettingsState) => {
@@ -205,7 +208,10 @@ describe('the admin lock on SettingsPage', () => {
     keep: spyOn(api, 'keepAdminUnlocked'),
   }
 
-  afterEach(() => Object.values(spies).forEach((spy) => spy.mockReset()))
+  afterEach(() => {
+    cleanup()
+    Object.values(spies).forEach((spy) => spy.mockReset())
+  })
 
   const toggle = () => screen.getByRole('checkbox', { name: /^Admin lock/ })
 

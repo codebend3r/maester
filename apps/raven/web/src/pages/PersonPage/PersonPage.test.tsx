@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
-import { screen, within } from '@testing-library/react'
+import { cleanup, screen, within } from '@testing-library/react'
 import { Route, Routes } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { POSTER_SIZES } from '@/lib/posters'
@@ -27,7 +27,10 @@ describe('groupCredits', () => {
 
 describe('PersonPage', () => {
   const spy = spyOn(api, 'getPerson')
-  afterEach(() => spy.mockReset())
+  afterEach(() => {
+    cleanup()
+    spy.mockReset()
+  })
 
   it("lists what raven holds of a person's, grouped by job, as poster cards", async () => {
     spy.mockImplementation(async () => ({

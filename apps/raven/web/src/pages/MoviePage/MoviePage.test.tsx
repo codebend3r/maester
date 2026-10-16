@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
-import { screen, within } from '@testing-library/react'
+import { cleanup, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import {
   type AdminLock,
@@ -79,6 +79,7 @@ describe('MoviePage', () => {
   }
 
   afterEach(() => {
+    cleanup()
     spies.item.mockReset()
     spies.libraries.mockReset()
     spies.tracks.mockReset()

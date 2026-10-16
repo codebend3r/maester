@@ -159,7 +159,7 @@ export const DEFAULT_LIBRARY_SETTINGS: LibrarySettings = {
   sort: 'title',
   view: 'grid',
   groupBy: 'resolution',
-  watchedPercent: 90,
+  watchedPercent: 95,
   kind: 'other',
   ratingsSource: 'tmdb',
   autoRefresh: true,

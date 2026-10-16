@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
-import { screen, waitFor, within } from '@testing-library/react'
+import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import {
   type AdminLock,
@@ -47,9 +47,14 @@ describe('LibraryPage tabs', () => {
     spies.unmatched.mockImplementation(async () => [])
     spies.duplicates.mockImplementation(async () => [])
     spies.history.mockImplementation(async () => [])
+    spies.lockState.mockImplementation(async () => ({ available: false, unlocked: false }))
+    spies.health.mockImplementation(async () => metadataHealth())
   })
 
-  afterEach(() => Object.values(spies).forEach((spy) => spy.mockReset()))
+  afterEach(() => {
+    cleanup()
+    Object.values(spies).forEach((spy) => spy.mockReset())
+  })
 
   const open = ({
     kind = 'movies',
@@ -375,6 +380,7 @@ describe('LibraryPage tabs', () => {
         plays: 2,
         furthest: 100,
         watched: true,
+        marked: false,
       },
     ])
     open({ route: '/libraries/2/finished' })

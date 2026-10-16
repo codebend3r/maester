@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
-import { screen, within } from '@testing-library/react'
+import { cleanup, screen, within } from '@testing-library/react'
 import { Route, Routes } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { SeasonPage } from '@/pages/SeasonPage/SeasonPage'
@@ -23,7 +23,10 @@ describe('SeasonPage', () => {
     )
   }
 
-  afterEach(() => spies.item.mockReset())
+  afterEach(() => {
+    cleanup()
+    spies.item.mockReset()
+  })
 
   it('lists the episodes on disk in order, each with its air date, length and Play', async () => {
     open()

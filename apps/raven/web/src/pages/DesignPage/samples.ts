@@ -14,6 +14,7 @@ import type {
  */
 const sample = (overrides: Partial<MediaItem> & Pick<MediaItem, 'id' | 'title'>): MediaItem => ({
   libraryId: -1,
+  watched: false,
   fileName: `${overrides.title}.mkv`,
   folder: '',
   size: 4_200_000_000,
@@ -178,6 +179,7 @@ export const SAMPLE_SHOWS: ShowEntry[] = [
   {
     show: { ...sampleMovie({ id: -21, title: 'The Long Winter' }), type: 'show', year: 2019 },
     episodes: 18,
+    watchedEpisodes: 0,
     endedYear: null,
     addedAt: '2026-10-02T12:00:00.000Z',
     bitrate: 9_800_000,
@@ -197,6 +199,7 @@ export const SAMPLE_SHOWS: ShowEntry[] = [
   {
     show: { ...sampleMovie({ id: -24, title: 'Ravens of the North' }), type: 'show', year: 2014 },
     episodes: 10,
+    watchedEpisodes: 0,
     endedYear: 2016,
     addedAt: '2026-09-14T09:00:00.000Z',
     bitrate: 4_200_000,
@@ -212,10 +215,14 @@ export const SAMPLE_RATINGS: Rating[] = [
   { source: 'tmdb', kind: 'audience', value: 7.8, votes: 1840 },
 ]
 
-/** The other faces of the marks: a splat, and Metacritic's yellow and red. */
+/** The other faces of the marks: a splat, and Metacritic's yellow. */
 export const SAMPLE_RATINGS_LOW: Rating[] = [
   { source: 'rottenTomatoes', kind: 'critic', value: 3.8, votes: null },
   { source: 'metacritic', kind: 'critic', value: 5.2, votes: null },
+]
+
+/** Metacritic's red, in a row of its own: a row has one chip per source. */
+export const SAMPLE_RATINGS_RED: Rating[] = [
   { source: 'metacritic', kind: 'critic', value: 2.9, votes: null },
 ]
 

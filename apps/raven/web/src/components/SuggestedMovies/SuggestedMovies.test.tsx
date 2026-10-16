@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
-import { screen, waitFor } from '@testing-library/react'
+import { cleanup, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { SuggestedMovies, suggestedMoviesOf } from '@/components/SuggestedMovies/SuggestedMovies'
 import { api } from '@/lib/api'
@@ -90,6 +90,7 @@ describe('SuggestedMovies', () => {
   const spies = { search: spyOn(api, 'searchMatches'), setMatch: spyOn(api, 'setMatch') }
 
   afterEach(() => {
+    cleanup()
     spies.search.mockReset()
     spies.setMatch.mockReset()
   })

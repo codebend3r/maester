@@ -105,8 +105,8 @@ describe('play history', () => {
     expect(entry()).toMatchObject({ furthest: 50, watched: false })
     viewing().report({ id, position: 20, at: at(2) })
     expect(entry()).toMatchObject({ furthest: 50, watched: false })
-    viewing().report({ id, position: 55, at: at(3) })
-    expect(entry()).toMatchObject({ furthest: 55, watched: true, plays: 1 })
+    viewing().report({ id, position: 57, at: at(3) })
+    expect(entry()).toMatchObject({ furthest: 57, watched: true, plays: 1 })
   })
 
   it('moves the bar when the library changes its percentage', () => {
@@ -167,6 +167,122 @@ describe('play history', () => {
     viewing().report({ id, position: 30, at: at(0) })
     expect(positionOf(id)).toBe(0)
     expect(viewing().history({ libraryId, limit: 100 })[0]).toMatchObject({ furthest: 30 })
+  })
+
+  it('clears the spot at the library’s watched percentage, and not before', () => {
+    const libraryId = createLibrary('threshold-spot')
+    const id = addMinute({ libraryId, name: 'minute' })
+    viewing().report({ id, position: 56, at: at(0) })
+    expect(positionOf(id)).toBe(56)
+    viewing().report({ id, position: 57, at: at(1) })
+    expect(positionOf(id)).toBe(0)
+    expect(watchedIds(libraryId)).toEqual([id])
+  })
+
+  it('clears the spot where a lower percentage says, and keeps one a higher percentage allows', () => {
+    const halfway = createLibrary('halfway')
+    libraries().update({
+      id: halfway,
+      input: { name: 'halfway', paths: ['/halfway'], settings: { watchedPercent: 50 } },
+    })
+    const early = addMinute({ libraryId: halfway, name: 'early' })
+    viewing().report({ id: early, position: 29, at: at(0) })
+    expect(positionOf(early)).toBe(29)
+    viewing().report({ id: early, position: 30, at: at(1) })
+    expect(positionOf(early)).toBe(0)
+    const strict = createLibrary('strict')
+    libraries().update({
+      id: strict,
+      input: { name: 'strict', paths: ['/strict'], settings: { watchedPercent: 100 } },
+    })
+    const late = addMinute({ libraryId: strict, name: 'late' })
+    viewing().report({ id: late, position: 59, at: at(0) })
+    expect(positionOf(late)).toBe(59)
+  })
+
+  it('keeps the spots of a library that saves no progress, even past the threshold', () => {
+    const libraryId = createLibrary('keeps-spots')
+    const id = addMinute({ libraryId, name: 'film' })
+    viewing().report({ id, position: 30, at: at(0) })
+    libraries().update({
+      id: libraryId,
+      input: { name: 'keeps-spots', paths: ['/keeps-spots'], settings: { saveProgress: false } },
+    })
+    viewing().report({ id, position: 60, at: at(1) })
+    libraries().update({
+      id: libraryId,
+      input: { name: 'keeps-spots', paths: ['/keeps-spots'], settings: { saveProgress: true } },
+    })
+    expect(positionOf(id)).toBe(30)
+  })
+
+  it('never continues a mark or a play set aside, so playing again starts a new play', () => {
+    const libraryId = createLibrary('sittings')
+    const id = addMinute({ libraryId, name: 'film' })
+    const db = database.get().db
+    db.prepare(
+      "INSERT INTO plays (media_id, played_at, furthest, kind) VALUES (?, ?, 60, 'marked')",
+    ).run(id, at(0).toISOString())
+    viewing().recordPlay({ id, at: at(5) })
+    expect(db.prepare("SELECT COUNT(*) AS n FROM plays WHERE kind = 'marked'").get()).toEqual({
+      n: 1,
+    })
+    expect(
+      db.prepare('SELECT kind, furthest FROM plays WHERE media_id = ? ORDER BY id').all(id),
+    ).toEqual([
+      { kind: 'marked', furthest: 60 },
+      { kind: 'played', furthest: 0 },
+    ])
+    db.prepare("UPDATE plays SET kind = 'cleared' WHERE kind = 'played' AND media_id = ?").run(id)
+    viewing().report({ id, position: 10, at: at(10) })
+    expect(
+      db.prepare('SELECT kind, furthest FROM plays WHERE media_id = ? ORDER BY id').all(id),
+    ).toEqual([
+      { kind: 'marked', furthest: 60 },
+      { kind: 'cleared', furthest: 0 },
+      { kind: 'played', furthest: 10 },
+    ])
+  })
+
+  it('counts real plays in the history, takes furthest from the plays that count, and reports a mark', () => {
+    const libraryId = createLibrary('kinds')
+    const id = addMinute({ libraryId, name: 'film' })
+    const insert = database
+      .get()
+      .db.prepare('INSERT INTO plays (media_id, played_at, furthest, kind) VALUES (?, ?, ?, ?)')
+    insert.run(id, at(0).toISOString(), 60, 'cleared')
+    insert.run(id, at(60).toISOString(), 10, 'played')
+    expect(viewing().history({ libraryId, limit: 10 })[0]).toMatchObject({
+      plays: 2,
+      furthest: 10,
+      watched: false,
+      marked: false,
+    })
+    insert.run(id, at(120).toISOString(), 60, 'marked')
+    expect(viewing().history({ libraryId, limit: 10 })[0]).toMatchObject({
+      plays: 2,
+      furthest: 10,
+      lastPlayedAt: at(120).toISOString(),
+      watched: true,
+      marked: true,
+    })
+    expect(watchedIds(libraryId)).toEqual([id])
+  })
+
+  it('lists a video that was only marked, with no plays, and filters by the rule', () => {
+    const libraryId = createLibrary('marks-only')
+    const marked = addMinute({ libraryId, name: 'marked' })
+    const cleared = addMinute({ libraryId, name: 'cleared' })
+    const insert = database
+      .get()
+      .db.prepare('INSERT INTO plays (media_id, played_at, furthest, kind) VALUES (?, ?, ?, ?)')
+    insert.run(marked, at(0).toISOString(), 60, 'marked')
+    insert.run(cleared, at(5).toISOString(), 60, 'cleared')
+    expect(history({ libraryId })).toEqual([
+      { id: cleared, lastPlayedAt: at(5).toISOString(), plays: 1 },
+      { id: marked, lastPlayedAt: at(0).toISOString(), plays: 0 },
+    ])
+    expect(watchedIds(libraryId)).toEqual([marked])
   })
 
   it('says when there is no such video, and writes nothing', () => {

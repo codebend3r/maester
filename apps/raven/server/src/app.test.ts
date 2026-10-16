@@ -339,14 +339,14 @@ describe('the media server', () => {
         })
       const positionOf = async (id: number): Promise<number> => (await api().getMedia(id)).position
 
-      it("starts a library with progress saved, pinned, watched at 90%, of no particular type and wearing its type's icon", async () => {
+      it("starts a library with progress saved, pinned, watched at 95%, of no particular type and wearing its type's icon", async () => {
         expect((await api().getLibrary(library.id)).settings).toEqual({
           saveProgress: true,
           pinned: true,
           sort: 'title',
           view: 'grid',
           groupBy: 'resolution',
-          watchedPercent: 90,
+          watchedPercent: 95,
           kind: 'other',
           ratingsSource: 'tmdb',
           autoRefresh: true,
@@ -426,7 +426,7 @@ describe('the media server', () => {
           sort: 'title',
           view: 'grid',
           groupBy: 'resolution',
-          watchedPercent: 90,
+          watchedPercent: 95,
           kind: 'other',
           ratingsSource: 'tmdb',
           autoRefresh: true,

@@ -16,10 +16,8 @@ describe('MatchFactsCache', () => {
   })
 
   const setUp = ({
-    movies = [],
     held,
   }: {
-    movies?: Parameters<typeof fakeTmdb>[0]['movies']
     /** A path whose calls wait until `until` settles. */
     held?: { path: string; until: Promise<void> }
   } = {}) => {
@@ -27,7 +25,6 @@ describe('MatchFactsCache', () => {
       movies: [
         { id: 949, title: 'Heat', released: '1995-12-15', runtime: 170 },
         { id: 8195, title: 'Ronin', released: '1998-09-25', runtime: 122 },
-        ...movies,
       ],
     })
     const fetch: MetadataFetch = async (url, init) => {
@@ -116,21 +113,20 @@ describe('MatchFactsCache', () => {
   })
 
   it('keeps at most 500, the oldest going first', async () => {
-    const movies = Array.from({ length: 499 }, (_, index) => ({
-      id: 10000 + index,
-      title: `Film ${index}`,
-      released: '2000-01-01',
-    }))
-    const { tmdb, cache } = setUp({ movies })
-    const tmdbIds = ['949', '8195', ...movies.map((movie) => String(movie.id))]
+    const { client, cache } = setUp()
+    // Past TMDB's rate limit, 501 reads would take 25 seconds; the cache is what is under test.
+    const matchFacts = vi
+      .spyOn(client, 'matchFacts')
+      .mockImplementation(async () => ({ type: 'movie', aliases: [], runtime: null }))
+    const tmdbIds = Array.from({ length: 501 }, (_, index) => String(10000 + index))
     await tmdbIds.reduce(async (done, tmdbId) => {
       await done
       await cache.read({ type: 'movie', tmdbIds: [tmdbId], deadlineMs: DEADLINE_MS })
     }, Promise.resolve())
-    expect(detailsCalls(tmdb.state.calls)).toBe(501)
+    expect(matchFacts).toHaveBeenCalledTimes(501)
     await cache.read({ type: 'movie', tmdbIds: [tmdbIds[500] ?? ''], deadlineMs: DEADLINE_MS })
-    expect(detailsCalls(tmdb.state.calls)).toBe(501)
-    await cache.read({ type: 'movie', tmdbIds: ['949'], deadlineMs: DEADLINE_MS })
-    expect(detailsCalls(tmdb.state.calls)).toBe(502)
+    expect(matchFacts).toHaveBeenCalledTimes(501)
+    await cache.read({ type: 'movie', tmdbIds: [tmdbIds[0] ?? ''], deadlineMs: DEADLINE_MS })
+    expect(matchFacts).toHaveBeenCalledTimes(502)
   })
 })

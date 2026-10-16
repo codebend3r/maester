@@ -20,17 +20,32 @@ export const FIRST_ITEM = `media_items mi
       ON mi.media_id = m.id
      AND mi.item_id = (SELECT MIN(z.item_id) FROM media_items z WHERE z.media_id = m.id)`
 
-/** Joins `p.furthest`: the furthest any play of the file got. */
-export const FURTHEST_JOIN = `
-  LEFT JOIN (SELECT media_id, MAX(furthest) AS furthest FROM plays GROUP BY media_id) p
-    ON p.media_id = m.id`
+/**
+ * Whether the file `file` is watched: it has a `marked` play, or a `played`
+ * one that got to its library's watched percentage. A file whose length is
+ * still unknown is watched only by a mark. An `EXISTS` over the file's
+ * plays, by `plays_media`, so it never aggregates the whole table. Assumes
+ * `libraries l` is its library.
+ */
+export const fileWatched = (file: string): string =>
+  `EXISTS (SELECT 1 FROM plays pl
+            WHERE pl.media_id = ${file}.id
+              AND (pl.kind = 'marked'
+                   OR (pl.kind = 'played' AND ${file}.duration > 0
+                       AND pl.furthest >= ${file}.duration * l.watched_percent / 100.0)))`
 
 /**
- * Whether a play that got to `furthest` watched the file, by its library's
- * measure. A file whose length is still unknown is never watched.
+ * Whether the card of the file `file` is watched, `item` being its first
+ * item: any file in its library with the same item and `split`, or the file
+ * alone when nothing is matched to it. The CROSS JOIN starts the walk from
+ * the item's files, as the version count does.
  */
-export const isWatched = (furthest: string): string =>
-  `(m.duration > 0 AND ${furthest} >= m.duration * l.watched_percent / 100.0)`
+export const cardWatched = ({ file, item }: { file: string; item: string }): string =>
+  `CASE WHEN ${item}.id IS NULL THEN ${fileWatched(file)}
+        ELSE EXISTS (SELECT 1 FROM media_items x CROSS JOIN media y ON y.id = x.media_id
+                      WHERE x.item_id = ${item}.id AND y.library_id = ${file}.library_id
+                        AND y.split IS ${file}.split AND ${fileWatched('y')})
+   END`
 
 /** An item's score: from the source its library shows, else TMDB's own. */
 export const score = ({ item, source }: { item: string; source: string }): string =>

@@ -86,7 +86,7 @@ const COLUMNS: Record<Column, SortColumn<ShowEntry>> = {
 export const ShowList = ({ shows }: { shows: ShowEntry[] }) => {
   const { sorted, toggle, ariaSort } = useTableSort({ rows: shows, columns: COLUMNS })
   const header = (key: Column, label: string, className?: string) => (
-    <SortHeader sort={ariaSort(key)} onToggle={() => toggle(key)} className={className}>
+    <SortHeader key={key} sort={ariaSort(key)} onToggle={() => toggle(key)} className={className}>
       {label}
     </SortHeader>
   )

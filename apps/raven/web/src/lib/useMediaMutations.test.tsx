@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { act, renderHook, waitFor } from '@testing-library/react'
+import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
 import type { ItemDetails, MediaItem, PosterEntry } from '@raven/core'
 import type { ReactNode } from 'react'
 import { api } from '@/lib/api'
@@ -39,6 +39,7 @@ describe('useMediaMutations', () => {
   }
 
   afterEach(() => {
+    cleanup()
     spies.favourite.mockReset()
     spies.refresh.mockReset()
   })

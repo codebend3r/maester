@@ -128,7 +128,7 @@ describe('LibraryDialog', () => {
           sort: 'title',
           view: 'grid',
           groupBy: 'resolution',
-          watchedPercent: 90,
+          watchedPercent: 95,
           kind: 'other',
           ratingsSource: 'tmdb',
           autoRefresh: true,
@@ -158,7 +158,7 @@ describe('LibraryDialog', () => {
         sort: 'title',
         view: 'grid',
         groupBy: 'resolution',
-        watchedPercent: 90,
+        watchedPercent: 95,
         kind: 'other',
         ratingsSource: 'tmdb',
         autoRefresh: false,
@@ -323,7 +323,7 @@ describe('LibraryDialog', () => {
     await userEvent.type(screen.getByLabelText('Folder path'), '/media/Clips')
     await userEvent.click(screen.getByRole('button', { name: 'Add' }))
     const watched = screen.getByRole('spinbutton', { name: 'Watched at' })
-    expect(watched).toHaveValue(90)
+    expect(watched).toHaveValue(95)
     await userEvent.clear(watched)
     await userEvent.type(watched, '75')
     await userEvent.click(screen.getByRole('button', { name: 'Add library' }))

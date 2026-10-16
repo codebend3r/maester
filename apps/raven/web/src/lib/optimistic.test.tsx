@@ -43,6 +43,8 @@ describe('useOptimisticMutation', () => {
     await waitFor(() => expect(settled).toEqual(['read again']))
     act(() => result.current.mutate(3))
     expect(result.current.failure).toBeNull()
+    // The server still refuses, and the failure lands a few ticks later.
+    await waitFor(() => expect(result.current.failure?.message).toBe('The server is away.'))
   })
 
   it('sends changes one at a time, in order, and reads again once the last settles', async () => {

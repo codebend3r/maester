@@ -7,6 +7,7 @@ import {
   type DisplaySettingsChange,
   type Duplicates,
   type FavouriteChange,
+  type WatchedChange,
   type HistoryEntry,
   type Home,
   type HomeSearch,
@@ -386,6 +387,15 @@ export const createApiClient = ({
         }),
         guard: isMediaItem,
       }),
+
+    /** Marks every target watched or unwatched; a target in a library this browser may not see is skipped. */
+    setWatched: async ({ watched, targets }: WatchedChange): Promise<void> => {
+      await send({
+        path: '/api/watched',
+        method: 'PUT',
+        body: { watched, targets } satisfies WatchedChange,
+      })
+    },
 
     /** Every favourite across every library with the poster its card shows, most recently favourited first. */
     listFavourites: (): Promise<PosterEntry[]> =>

@@ -90,7 +90,9 @@ describe('Player progress', () => {
         backTo="/libraries/2"
       />,
     )
-    container.querySelector('video')?.dispatchEvent(new Event('pause'))
+    act(() => {
+      container.querySelector('video')?.dispatchEvent(new Event('pause'))
+    })
     unmount()
     const saved = [...saveSpy.mock.calls]
     saveSpy.mockRestore()
