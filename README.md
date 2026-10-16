@@ -25,6 +25,8 @@ Each app has a README of its own: [luwin](apps/luwin/README.md), [raven](apps/ra
 
 You need Bun at the version `package.json` pins in `packageManager`, [uv](https://docs.astral.sh/uv/) for the Python projects, and `ffmpeg` and `ffprobe` on the PATH for raven's server and core tests.
 
+The Python projects need Python 3.12. Run `uv python install 3.12` once, even when another Python is on the PATH: uv accepts only 3.12, and it stops at a broken interpreter it finds first, such as a leftover Intel Homebrew `python3` on Apple silicon. If `bun run verify` fails on a fresh clone, the `get-started` skill (`.claude/skills/get-started`) maps each common error to its fix.
+
 ```bash
 bun install        # Nx, oxlint, oxfmt, and the git hooks
 bun run verify     # spellcheck, lint, format check, typecheck, tests and build for every project
