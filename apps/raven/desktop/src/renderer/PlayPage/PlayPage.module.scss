@@ -5,16 +5,41 @@
 }
 
 .refused {
+  --gutter: var(--space-5);
+
+  display: grid;
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    'bar'
+    'message';
+  min-height: 100vh;
+
+  @media (max-width: 48rem) {
+    --gutter: var(--space-3);
+  }
+}
+
+// The window has no title bar of its own: this strip is what you drag it by.
+.bar {
+  grid-area: bar;
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  padding: var(--titlebar-inset) var(--gutter) var(--space-2);
+  -webkit-app-region: drag;
+
+  button {
+    -webkit-app-region: no-drag;
+  }
+}
+
+.message {
+  grid-area: message;
   display: grid;
   gap: var(--space-3);
   align-content: center;
   justify-items: start;
-  min-height: 100vh;
-  padding: var(--titlebar-inset) var(--space-5) var(--space-5);
-
-  @media (max-width: 48rem) {
-    padding-inline: var(--space-3);
-  }
+  padding: 0 var(--gutter) var(--space-5);
 
   h1 {
     font-family: var(--font-display);

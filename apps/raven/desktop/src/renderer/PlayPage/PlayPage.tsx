@@ -18,14 +18,18 @@ const Refused = ({ message }: { message: string }) => {
   }, [])
 
   return (
-    <main className={styles.refused}>
-      <h1 tabIndex={-1} ref={title}>
-        This video can't be opened
-      </h1>
-      <p>{message}</p>
-      <Button icon="back" onClick={() => void navigate('/')}>
-        Home
-      </Button>
+    <main className={styles.refused} aria-labelledby="refused-title">
+      <header className={styles.bar}>
+        <Button icon="back" onClick={() => void navigate('/')}>
+          Home
+        </Button>
+      </header>
+      <section className={styles.message}>
+        <h1 id="refused-title" tabIndex={-1} ref={title}>
+          This video can't be opened
+        </h1>
+        <p>{message}</p>
+      </section>
     </main>
   )
 }
@@ -68,7 +72,8 @@ const PlayPage = ({ fileId, queue }: { fileId: string; queue: string[] }) => {
     retry: false,
   })
 
-  if (file.isPending) return <main className={styles.waiting} aria-busy="true" />
+  if (file.isPending)
+    return <main className={styles.waiting} aria-busy="true" aria-label="Opening video" />
   if (file.isError) return <Refused message={file.error.message} />
   return <Playing file={file.data} />
 }

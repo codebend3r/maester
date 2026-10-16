@@ -116,6 +116,18 @@ describe('PlayPage', () => {
     expect(described).toBeGreaterThan(saved)
   })
 
+  it('names the page it shows while main describes the file', async () => {
+    const pending = Promise.withResolvers<DesktopReply>()
+    const client = fakeClient({
+      request: async (request) =>
+        request.type === 'describeFile' ? pending.promise : { type: 'done' },
+    })
+    renderDesktop({ client, route: `/play/${A}` })
+    const waiting = await screen.findByRole('main', { name: 'Opening video' })
+    expect(waiting).toHaveAttribute('aria-busy', 'true')
+    await act(async () => pending.resolve({ type: 'file', file: CLIP_A }))
+  })
+
   it('says why a video cannot be opened and goes Home', async () => {
     const client = fakeClient({
       request: describing(() => ({ type: 'refused', message: 'That video is gone.' })),
@@ -127,6 +139,13 @@ describe('PlayPage', () => {
     expect(screen.getByText('That video is gone.')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Home' }))
     await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+  })
+
+  it('asks main with an empty queue when the location state is malformed', async () => {
+    const client = fakeClient({ request: clips })
+    renderDesktop({ client, route: `/play/${A}`, state: { queue: ['../x'] } })
+    await videoElement()
+    expect(client.request).toHaveBeenCalledWith({ type: 'describeFile', fileId: A, queue: [] })
   })
 
   it('refuses an id that is not an opaque id without asking main', async () => {

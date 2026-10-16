@@ -11,17 +11,22 @@ export const SettingsPage = () => {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const title = useRef<HTMLHeadingElement>(null)
-  const [isCleared, setIsCleared] = useState(false)
+  const [status, setStatus] = useState('')
 
   useEffect(() => {
     if (title.current !== null) title.current.focus()
   }, [])
 
   const clear = async () => {
+    // Emptied first: a live region announces a change, so the same text twice needs a gap.
+    setStatus('')
     const reply = await client.request({ type: 'clearRecents' })
-    if (reply.type === 'refused') return
+    if (reply.type === 'refused') {
+      setStatus(reply.message)
+      return
+    }
     await queryClient.invalidateQueries({ queryKey: RECENTS_KEY })
-    setIsCleared(true)
+    setStatus('Recents cleared.')
   }
 
   return (
@@ -40,7 +45,8 @@ export const SettingsPage = () => {
         <Button tone="danger" onClick={() => void clear()}>
           Clear recents
         </Button>
-        {isCleared && <output>Recents cleared.</output>}
+        {/* Always mounted: a live region is announced when its text changes, not when it appears. */}
+        <output>{status}</output>
       </section>
     </main>
   )

@@ -11,7 +11,7 @@ import { desktopRoutes } from '@/renderer/routes'
 import { Shell } from '@/renderer/Shell/Shell'
 import type { DesktopEvent } from '@/shared/protocol'
 
-/** Where the Shell sends the page, before the screens that fill those places exist. */
+/** The real Shell and Home, with stand-ins where they send the page, so Play's and Settings' requests stay out. */
 export const STUB_ROUTES: RouteObject[] = [
   {
     path: '/',
@@ -58,18 +58,23 @@ export const fakeClient = (overrides: FakeOverrides = {}) => {
 export const renderDesktop = ({
   client,
   route = '/',
+  state,
   routes = desktopRoutes,
   isStrict = false,
 }: {
   client: DesktopClient
   route?: string
+  /** The first entry's `location.state`, as a navigation inside the app would leave it. */
+  state?: unknown
   routes?: RouteObject[]
   /** Mounts under StrictMode, which runs every effect twice in development. */
   isStrict?: boolean
 }) => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const menu = createMenuHub()
-  const router = createMemoryRouter(routes, { initialEntries: [route] })
+  const router = createMemoryRouter(routes, {
+    initialEntries: [state === undefined ? route : { pathname: route, state }],
+  })
   const app = (
     <QueryClientProvider client={queryClient}>
       <DesktopProvider client={client} menu={menu}>
