@@ -1,0 +1,135 @@
+// Clear of the sticky header when a link jumps here.
+.downloads {
+  display: grid;
+  gap: var(--space-5);
+  justify-self: center;
+  width: min(100%, 81.25rem);
+  padding: 0 var(--gutter) clamp(var(--space-7), 8vw, var(--space-10));
+  scroll-margin-top: calc(var(--field-size) + 2 * var(--space-2));
+}
+
+.intro {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.title {
+  font-size: var(--font-size-hero);
+  line-height: var(--line-display);
+  letter-spacing: var(--tracking-display);
+}
+
+.lead {
+  color: var(--color-birch);
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16.25rem), 1fr));
+  gap: var(--space-3);
+}
+
+.cardItem {
+  display: grid;
+}
+
+.card {
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-line-faint);
+  border-radius: var(--radius-xl);
+  background: var(--color-canopy);
+}
+
+.yours {
+  border-color: color-mix(in srgb, var(--color-bark) 28%, transparent);
+}
+
+.web {
+  border-color: var(--color-line);
+  background: var(--color-deep);
+}
+
+// The name keeps the whole width, as it cannot wrap; what the system needs
+// wraps beside the badge instead.
+.head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'name name'
+    'needs badge';
+  gap: var(--space-0) var(--space-2);
+  align-items: center;
+}
+
+.name {
+  grid-area: name;
+  font-size: var(--font-size-xl);
+}
+
+.needs {
+  grid-area: needs;
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+}
+
+.badge {
+  grid-area: badge;
+  padding: var(--space-0) var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--color-moss);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.files {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.fileItem {
+  display: grid;
+}
+
+// The icon and who the file is for at the left, what kind of file at the right.
+.file {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  justify-content: stretch;
+  min-height: var(--control-size-tall);
+  padding: 0 var(--space-3);
+  gap: var(--space-2);
+}
+
+.fileLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fileKind {
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  opacity: 0.85;
+}
+
+.server {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.serverLabel {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.serverInput {
+  min-width: 0;
+  min-height: var(--control-size-tall);
+}
+
+.open {
+  min-height: var(--control-size-tall);
+  font-size: var(--font-size-md);
+}
