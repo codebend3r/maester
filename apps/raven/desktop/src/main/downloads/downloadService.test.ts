@@ -1,12 +1,9 @@
 import { describe, expect, it } from 'bun:test'
 import { LOCKED_STATUS, type DownloadTarget, type MediaItem, type Saga } from '@raven/core'
 import { EMPTY_CONFIG, type ConfigStore, type DesktopConfig } from '@/main/desktopConfig'
-import {
-  ASK_TTL_MS,
-  createDownloadService,
-  DOWNLOAD_MESSAGES,
-  DOWNLOADS_EVENT_MS,
-} from '@/main/downloads/downloadService'
+import { ASK_TTL_MS } from '@/main/downloads/asks'
+import { DOWNLOAD_MESSAGES } from '@/main/downloads/downloadMessages'
+import { createDownloadService, DOWNLOADS_EVENT_MS } from '@/main/downloads/downloadService'
 import {
   EMPTY_DOWNLOADS,
   NO_PENDING,
