@@ -16,6 +16,9 @@ import { fakeTimers } from '@/main/test/playerFakes'
 const SERVER_ID = '6f1c1c0e-3b0a-4f4e-8a55-0d2f3c5b7e11'
 const ID = '0f8fad5b-d9cb-469f-a165-70867728950e'
 const OTHER_ID = '00000000-0000-4000-8000-0000000000a1'
+const THIRD_ID = '00000000-0000-4000-8000-0000000000a2'
+const OTHER_SERVER_ID = '7c9e6679-7425-40de-944b-e07fc1f90ae7'
+const UNREACHABLE: ServerCallResult = { ok: false, message: 'unreachable' }
 const NOW = 1_700_000_000_000
 const GIB = 1024 ** 3
 const NO_CONTENT: ServerCallResult = { ok: true, status: 204, body: '' }
@@ -213,13 +216,17 @@ describe('touch', () => {
     world.fireAt(SYNC_DEBOUNCE_MS)
     await ticks(3)
     expect(world.log).toEqual([{ name: 'recordPlay', mediaId: 11 }])
-    held.open({ ok: false, message: 'unreachable' })
+    held.open(UNREACHABLE)
     await ticks(5)
     expect(world.log).toHaveLength(1)
-    // The position saved meanwhile owes a send of its own, after a debounce.
+    // The position saved meanwhile owes a send of its own, which waits for the retry now that
+    // the server could not be reached.
     world.server.answer = async () => NO_CONTENT
     world.fireAt(SYNC_DEBOUNCE_MS)
     await ticks(5)
+    expect(world.log).toHaveLength(1)
+    world.fireAt(SYNC_RETRY_MS)
+    await ticks(8)
     expect(world.log.slice(1)).toEqual([
       { name: 'recordPlay', mediaId: 11 },
       { name: 'saveProgress', mediaId: 11, position: 360 },
@@ -411,6 +418,104 @@ describe('an answer that is no success', () => {
     expect(world.warnings).toHaveLength(1)
     expect(world.warnings[0]).toContain('S01E01 Good News')
     expect(world.pendingOf()).toEqual({ play: false, position: 300, furthest: 300, at: NOW })
+  })
+})
+
+describe('after an unreachable answer', () => {
+  it("holds the server's touches for the retry, until a success lets them send again", async () => {
+    const world = setup()
+    world.server.answer = async () => UNREACHABLE
+    world.note({ play: true, position: 300 })
+    world.fireAt(SYNC_DEBOUNCE_MS)
+    await ticks(5)
+    expect(world.log).toHaveLength(1)
+    world.note({ position: 310 })
+    world.note({ position: 320 })
+    expect([...world.pending.values()].map(({ ms }) => ms)).toEqual([SYNC_RETRY_MS])
+    world.server.answer = async () => NO_CONTENT
+    world.fireAt(SYNC_RETRY_MS)
+    await ticks(8)
+    expect(world.log.slice(1)).toEqual([
+      { name: 'recordPlay', mediaId: 11 },
+      { name: 'saveProgress', mediaId: 11, position: 320 },
+    ])
+    world.note({ position: 330 })
+    expect([...world.pending.values()].map(({ ms }) => ms)).toContain(SYNC_DEBOUNCE_MS)
+  })
+
+  it("holds every download of that server, and none of another server's", async () => {
+    const other = entryFor({ downloadId: OTHER_ID, mediaId: 12 })
+    const elsewhere = entryFor({ downloadId: THIRD_ID, serverId: OTHER_SERVER_ID, mediaId: 13 })
+    const world = setup({ entries: [entryFor(), other, elsewhere] })
+    world.server.answer = async () => UNREACHABLE
+    world.note({ position: 300 })
+    world.fireAt(SYNC_DEBOUNCE_MS)
+    await ticks(5)
+    world.server.answer = async () => NO_CONTENT
+    world.note({ downloadId: OTHER_ID, position: 40 })
+    world.note({ downloadId: THIRD_ID, position: 50 })
+    world.fireAt(SYNC_DEBOUNCE_MS)
+    await ticks(5)
+    expect(world.log.slice(1)).toEqual([{ name: 'saveProgress', mediaId: 13, position: 50 }])
+  })
+})
+
+describe('the launch and retry runs', () => {
+  const pendingAt = ({ at, position }: { at: number; position: number }) => ({
+    play: false,
+    position,
+    furthest: position,
+    at,
+  })
+
+  it('send one download at a time per server, oldest first, with servers side by side', async () => {
+    const newer = entryFor({ pending: pendingAt({ at: NOW + 2, position: 300 }) })
+    const older = entryFor({
+      downloadId: OTHER_ID,
+      mediaId: 12,
+      pending: pendingAt({ at: NOW + 1, position: 40 }),
+    })
+    const elsewhere = entryFor({
+      downloadId: THIRD_ID,
+      serverId: OTHER_SERVER_ID,
+      mediaId: 13,
+      pending: pendingAt({ at: NOW + 3, position: 50 }),
+    })
+    const world = setup({ entries: [newer, older, elsewhere] })
+    const held = gate()
+    world.server.answer = (call) =>
+      call.name === 'saveProgress' && call.mediaId === 12
+        ? held.answer
+        : Promise.resolve(NO_CONTENT)
+    const running = world.sync.runAll()
+    await ticks(5)
+    expect(world.log).toEqual([
+      { name: 'saveProgress', mediaId: 12, position: 40 },
+      { name: 'saveProgress', mediaId: 13, position: 50 },
+    ])
+    held.open(NO_CONTENT)
+    await running
+    expect(world.log.slice(2)).toEqual([{ name: 'saveProgress', mediaId: 11, position: 300 }])
+  })
+
+  it("end a server's round at its first unreachable answer, and the retry sends the rest in order", async () => {
+    const newer = entryFor({ pending: pendingAt({ at: NOW + 2, position: 300 }) })
+    const older = entryFor({
+      downloadId: OTHER_ID,
+      mediaId: 12,
+      pending: pendingAt({ at: NOW + 1, position: 40 }),
+    })
+    const world = setup({ entries: [newer, older] })
+    world.server.answer = async () => UNREACHABLE
+    await world.sync.runAll()
+    expect(world.log).toEqual([{ name: 'saveProgress', mediaId: 12, position: 40 }])
+    world.server.answer = async () => NO_CONTENT
+    world.fireAt(SYNC_RETRY_MS)
+    await ticks(10)
+    expect(world.log.slice(1)).toEqual([
+      { name: 'saveProgress', mediaId: 12, position: 40 },
+      { name: 'saveProgress', mediaId: 11, position: 300 },
+    ])
   })
 })
 
