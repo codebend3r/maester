@@ -1,0 +1,8 @@
+// The label cannot wrap or shrink, so where the header breaks its actions
+// into even cells (see ItemHeader) it takes a whole row rather than spill out
+// of its cell.
+@container (max-width: 27rem) {
+  .download {
+    grid-column: 1 / -1;
+  }
+}

@@ -20,6 +20,14 @@ describe('DownloadButton', () => {
     expect(container).toBeEmptyDOMElement()
   })
 
+  it('takes the class that gives it a whole row where the header breaks its actions into cells', () => {
+    usePlayerPrefs.setState({ opensInRavenPlayer: true })
+    render(<DownloadButton target={{ kind: 'saga', libraryId: 2, tmdbId: '119' }} />)
+    expect(screen.getByRole('button', { name: 'Download to raven player' }).className).toMatch(
+      /download/u,
+    )
+  })
+
   it('opens the saga download link in raven player when pressed', async () => {
     usePlayerPrefs.setState({ opensInRavenPlayer: true })
     render(<DownloadButton target={{ kind: 'saga', libraryId: 2, tmdbId: '119' }} />)
