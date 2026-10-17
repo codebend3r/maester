@@ -4,7 +4,9 @@ import { Button } from '@raven/ui'
 import { api } from '@/lib/api'
 import { watchLink } from '@/lib/itemLinks'
 
-type PickState = 'idle' | 'picking' | 'empty'
+const PICK_STATES = { idle: 'idle', picking: 'picking', empty: 'empty' } as const
+
+type PickState = (typeof PICK_STATES)[keyof typeof PICK_STATES]
 
 const LABELS = {
   idle: null,
@@ -20,20 +22,20 @@ const LABELS = {
  */
 export const ShuffleButton = ({ itemId, children }: { itemId: number; children: string }) => {
   const navigate = useNavigate()
-  const [state, setState] = useState<PickState>('idle')
+  const [state, setState] = useState<PickState>(PICK_STATES.idle)
   const pick = () => {
-    setState('picking')
+    setState(PICK_STATES.picking)
     api
       .randomEpisode(itemId)
       .then((media) => {
         if (!media) {
-          setState('empty')
+          setState(PICK_STATES.empty)
           return
         }
         const link = watchLink({ media })
         navigate(link.to, { state: link.state })
       })
-      .catch(() => setState('idle'))
+      .catch(() => setState(PICK_STATES.idle))
   }
   return (
     <Button

@@ -8,6 +8,7 @@ import {
   useSelectionScope,
 } from '@/components/SelectionScope/SelectionScope'
 import { Peek, peeked } from '@/test/selection'
+import { useSelectionScopes } from '@/stores/selectionScope'
 
 const NOTHING = sourceOf([])
 
@@ -57,6 +58,40 @@ describe('SelectionScope', () => {
     expect(peeked.scope?.resolve('a')).toEqual([{ kind: 'media', id: 2 }])
     expect(peeked.scope?.allKeys()).toEqual(['a'])
     expect(peeked.scope?.resolve('missing')).toEqual([])
+  })
+
+  it('draws its cards once as it opens, with the scope already there', () => {
+    const drawn: boolean[] = []
+    const Card = () => {
+      drawn.push(useSelectionScope() !== null)
+      return null
+    }
+    render(
+      <SelectionScope {...NOTHING}>
+        <Card />
+      </SelectionScope>,
+    )
+    expect(drawn).toEqual([true])
+  })
+
+  it('keeps an earlier scope drawn while a later one overlaps it, and opens it again after', () => {
+    const tree = (isLaterThere: boolean) => (
+      <>
+        <SelectionScope {...sourceOf([['a', []]])}>
+          <p>earlier</p>
+        </SelectionScope>
+        {isLaterThere && (
+          <SelectionScope {...sourceOf([['b', []]])}>
+            <Peek />
+          </SelectionScope>
+        )}
+      </>
+    )
+    const { rerender } = render(tree(true))
+    expect(peeked.scope?.allKeys()).toEqual(['b'])
+    rerender(tree(false))
+    expect(screen.getByText('earlier')).toBeInTheDocument()
+    expect(useSelectionScopes.getState().scopes.map((scope) => scope.allKeys())).toEqual([['a']])
   })
 
   it('redraws a card only for its own key', () => {

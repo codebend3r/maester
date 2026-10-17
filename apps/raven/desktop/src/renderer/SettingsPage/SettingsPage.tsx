@@ -2,12 +2,13 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@raven/ui'
-import { useDesktop } from '@/renderer/desktop/DesktopContext'
 import { Servers } from '@/renderer/SettingsPage/Servers'
 import styles from '@/renderer/SettingsPage/SettingsPage.module.scss'
 import { ThisComputer } from '@/renderer/SettingsPage/ThisComputer'
 import { Updates } from '@/renderer/SettingsPage/Updates'
 import { RECENTS_KEY } from '@/renderer/Shell/openReply'
+import { useDesktop } from '@/renderer/stores/desktop'
+import { DESKTOP_REPLIES } from '@/shared/protocol'
 
 export const SettingsPage = () => {
   const { client } = useDesktop()

@@ -1,10 +1,17 @@
-import { useEffect, useEffectEvent, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useRef } from 'react'
 import type { DesktopClient } from '@/renderer/desktop/client'
+import { useDragging } from '@/renderer/stores/dragging'
 import type { DesktopReply } from '@/shared/protocol'
 
+/** `DataTransfer.types` names a drag of files this way; the DOM types it as a plain string. */
+const DRAG_TYPES = { files: 'Files' } as const
+
+const setIsDragging = (isDragging: boolean) => useDragging.setState({ isDragging })
+
 /**
- * Whether files are being dragged over the window, and the drop itself: the
- * files go to main in the order dropped, and what main answers goes to `onReply`.
+ * Whether files are being dragged over the window, kept in `useDragging`, and the
+ * drop itself: the files go to main in the order dropped, and what main answers
+ * goes to `onReply`.
  */
 export const useFileDrop = ({
   client,
@@ -12,12 +19,14 @@ export const useFileDrop = ({
 }: {
   client: DesktopClient
   onReply: (reply: DesktopReply) => void
-}): boolean => {
-  const [isDragging, setIsDragging] = useState(false)
+}) => {
   // Entering a child element fires dragenter on it before dragleave on the one
   // left, so a count, not a flag, keeps the overlay from flickering.
   const depth = useRef(0)
   const reply = useEffectEvent(onReply)
+
+  // A Shell unmounted mid-drag takes its count with it, so the flag goes too.
+  useEffect(() => () => setIsDragging(false), [])
 
   useEffect(() => {
     // Selected text and links are dragged too; only files are a drop to play.

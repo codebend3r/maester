@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
-import { type PlayerServices, PlayerServicesProvider, Player } from '@raven/ui'
+import { type NativePlayer, type PlayerServices, Player, useHostPlayer } from '@raven/ui'
 import { act, screen } from '@testing-library/react'
 // The one renderer test that imports main's modules: it runs both ends of the real bridge.
 import { connectPort, type PortLike } from '@/main/player/playerPort'
@@ -27,6 +27,15 @@ const SERVICES: PlayerServices = {
   unplayableNote: 'raven player could not play this video.',
 }
 
+const Hosted = ({ player }: { player: NativePlayer }) => {
+  const isHosting = useHostPlayer(SERVICES)
+  return (
+    isHosting && (
+      <Player engine={{ kind: 'native', player, source: { kind: 'file', fileId: FILE_ID } }} />
+    )
+  )
+}
+
 /** The page's player over one real channel, with main's port bridge and a scripted service on the far end. */
 const bridge = ({
   outcome,
@@ -47,13 +56,7 @@ const bridge = ({
     routes: [
       {
         path: '/',
-        element: (
-          <PlayerServicesProvider services={SERVICES}>
-            <Player
-              engine={{ kind: 'native', player, source: { kind: 'file', fileId: FILE_ID } }}
-            />
-          </PlayerServicesProvider>
-        ),
+        element: <Hosted player={player} />,
       },
     ],
   })

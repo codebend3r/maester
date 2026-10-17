@@ -22,9 +22,9 @@ export const DEFAULT_PLAYBACK_STATE: PlaybackSettingsState = {
 }
 
 /**
- * Renders inside a fresh query client and an in-memory router, starting at
+ * Renders `ui` inside a fresh query client and an in-memory router, starting at
  * `route` with the pages in `behind` before it in history, wrapped as
- * `main.tsx` wraps the app: the shared playback policy, the media origin probe, and what card
+ * `main.tsx` wraps the app: the playback settings prefetch, the media origin probe, and what card
  * links follow. The server's playback and display settings
  * are already known, as they are once a page has read them, and so is the
  * admin lock, off as in an admin's browser so every action shows; `null`

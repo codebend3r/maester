@@ -8,7 +8,7 @@ import {
   isRecord,
   type PlayerEvent,
 } from '@raven/core'
-import { PLAYER_PORT_MESSAGE } from '@/shared/protocol'
+import { WINDOW_MESSAGE_TYPES } from '@/shared/protocol'
 
 const TAP_KEY = 'ravenE2ePlayerTap'
 const PORT_KEY = 'ravenE2ePlayerPort'
@@ -72,7 +72,7 @@ export const tapPlayerPort = async ({ page }: { page: Page }): Promise<void> => 
   await page.context().addInitScript(installTap, {
     tapKey: TAP_KEY,
     portKey: PORT_KEY,
-    portMessage: PLAYER_PORT_MESSAGE,
+    portMessage: WINDOW_MESSAGE_TYPES.playerPort,
   })
   await page.reload()
   await expect.poll(async () => (await trafficOf({ page })).ports).toBe(1)

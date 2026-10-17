@@ -2,13 +2,13 @@ import { MAX_WATCH_TARGETS } from '@raven/core'
 import { useRef, useState } from 'react'
 import { Button, useKeyShortcut } from '@raven/ui'
 import {
-  type SelectionScopeValue,
   useSelectButtonRef,
   useSelection,
   useSelectionScope,
 } from '@/components/SelectionScope/SelectionScope'
 import { useReturnFocus } from '@/lib/useReturnFocus'
 import { useWatchedChange } from '@/lib/useWatchedChange'
+import type { SelectionScopeValue } from '@/stores/selectionScope'
 import styles from '@/components/SelectionBar/SelectionBar.module.scss'
 
 /** What marking the selection came to, for the selection it was made on. */

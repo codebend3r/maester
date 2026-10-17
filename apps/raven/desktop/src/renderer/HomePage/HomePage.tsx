@@ -2,11 +2,11 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@raven/ui'
-import { useDesktop } from '@/renderer/desktop/DesktopContext'
 import styles from '@/renderer/HomePage/HomePage.module.scss'
 import { RECENTS_KEY, useOpenReply } from '@/renderer/Shell/openReply'
-import { useDragging } from '@/renderer/Shell/Shell'
-import type { RecentView } from '@/shared/protocol'
+import { useDesktop } from '@/renderer/stores/desktop'
+import { useDragging } from '@/renderer/stores/dragging'
+import { DESKTOP_REPLIES, type RecentView } from '@/shared/protocol'
 
 export const watchedLabel = (watched: number | null): string =>
   watched === null ? 'Not started' : `${Math.round(watched * 100)}% watched`
@@ -16,7 +16,7 @@ export const HomePage = () => {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const openReply = useOpenReply()
-  const isDragging = useDragging()
+  const isDragging = useDragging((state) => state.isDragging)
   const title = useRef<HTMLHeadingElement>(null)
 
   useEffect(() => {

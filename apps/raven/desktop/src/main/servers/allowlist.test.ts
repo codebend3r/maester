@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'bun:test'
+import { SERVER_METHODS } from '@/shared/protocol'
 import {
   MAX_BODY,
   MAX_SECRET,
-  SERVER_METHODS,
   isWrite,
   matchCall,
   requestFor,
@@ -81,7 +81,7 @@ const refuse = ({
 
 describe('the allowlist values', () => {
   it('names three methods and the two limits', () => {
-    expect(SERVER_METHODS).toEqual(['GET', 'PUT', 'POST'])
+    expect(Object.values(SERVER_METHODS)).toEqual(['GET', 'PUT', 'POST'])
     expect(MAX_BODY).toBe(4096)
     expect(MAX_SECRET).toBe(256)
   })

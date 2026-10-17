@@ -2,25 +2,21 @@ import {
   type ComponentProps,
   type MouseEvent,
   type ReactNode,
-  createContext,
   useCallback,
-  useContext,
   useLayoutEffect,
   useRef,
 } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import type { AppPath } from '@/lib/itemLinks'
-
-type Follow = (link: { to: AppPath; state: unknown }) => void
-
-const Following = createContext<Follow | null>(null)
+import { type Follow, useCardLinks } from '@/stores/cardLinks'
 
 /**
  * Follows the card links inside, with one hold on the router for the whole
  * app. Each of react-router's `Link`s takes its own, a handful of hooks and
  * a layout effect apiece, which a grid of thousands of cards with three
  * links each paid for on every load. `follow` keeps one identity for good,
- * so no card draws again when the address changes.
+ * so no card draws again when the address changes. It goes in
+ * `useCardLinks` as this mounts, and the links inside draw once it is there.
  */
 export const CardLinks = ({ children }: { children: ReactNode }) => {
   const navigate = useNavigate()
@@ -34,7 +30,14 @@ export const CardLinks = ({ children }: { children: ReactNode }) => {
     // As `Link` does: the page already open is replaced, not stacked again.
     latest.current.navigate(to, { state, replace: to === `${pathname}${search}${hash}` })
   }, [])
-  return <Following value={follow}>{children}</Following>
+  useLayoutEffect(() => {
+    useCardLinks.setState({ follow })
+    return () => {
+      if (useCardLinks.getState().follow === follow) useCardLinks.setState({ follow: null })
+    }
+  }, [follow])
+  const isFollowing = useCardLinks((state) => state.follow !== null)
+  return isFollowing && children
 }
 
 /** A click the browser would follow in this tab: the main button, no key held to open it elsewhere. */
@@ -59,7 +62,7 @@ export const CardLink = ({
   to: AppPath
   state?: unknown
 }) => {
-  const follow = useContext(Following)
+  const follow = useCardLinks((links) => links.follow)
   if (!follow) throw new Error('CardLink needs CardLinks around it')
   return (
     <a

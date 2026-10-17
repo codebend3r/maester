@@ -1,9 +1,15 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRef, useState } from 'react'
-import { type AudioProfile, isPassthroughFormat, type OutputSettings } from '@raven/core'
-import { useDesktop } from '@/renderer/desktop/DesktopContext'
+import {
+  AUDIO_DEVICES,
+  AUDIO_PROFILES,
+  type AudioProfile,
+  isPassthroughFormat,
+  type OutputSettings,
+} from '@raven/core'
 import { OUTPUT_KEY } from '@/renderer/PlayPage/playerServices'
 import styles from '@/renderer/SettingsPage/ThisComputer.module.scss'
+import { useDesktop } from '@/renderer/stores/desktop'
 import { CARRIED_FORMATS, carriesPassthrough } from '@/shared/carriedOutput'
 import type { AudioDevice } from '@/shared/protocol'
 

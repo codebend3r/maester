@@ -18,22 +18,24 @@ const renderDialog = ({
 } = {}) => {
   const calls: string[] = []
   const entered: string[] = []
-  renderWithProviders(
-    <UnlockDialog
-      secret={secret}
-      hint={hint}
-      unlock={(value) => {
-        entered.push(value)
-        return unlock(value)
-      }}
-      onUnlocked={() => {
-        calls.push('onUnlocked')
-      }}
-      onClose={() => {
-        calls.push('onClose')
-      }}
-    />,
-  )
+  renderWithProviders({
+    ui: (
+      <UnlockDialog
+        secret={secret}
+        hint={hint}
+        unlock={(value) => {
+          entered.push(value)
+          return unlock(value)
+        }}
+        onUnlocked={() => {
+          calls.push('onUnlocked')
+        }}
+        onClose={() => {
+          calls.push('onClose')
+        }}
+      />
+    ),
+  })
   return { calls, entered }
 }
 
@@ -155,17 +157,21 @@ describe('UnlockDialog', () => {
   it('asks for the PIN afresh after the admin password when the host keys it by secret', async () => {
     const calls: string[] = []
     const entered: string[] = []
-    renderWithProviders(
-      <AdminThenPin
-        calls={calls}
-        unlock={async (value) => {
-          entered.push(value)
-          if (value === 'wrong') throw new ApiError({ status: 401, message: 'That is not it.' })
-          return { state: 'off' }
-        }}
-      />,
-    )
-    await userEvent.type(screen.getByLabelText('Admin password'), 'wrong{Enter}')
+    const wrongPassword = 'wrong'
+    renderWithProviders({
+      ui: (
+        <AdminThenPin
+          calls={calls}
+          unlock={async (value) => {
+            entered.push(value)
+            if (value === wrongPassword)
+              throw new ApiError({ status: 401, message: 'That is not it.' })
+            return { state: 'off' }
+          }}
+        />
+      ),
+    })
+    await userEvent.type(screen.getByLabelText('Admin password'), `${wrongPassword}{Enter}`)
     expect(await screen.findByRole('alert')).toHaveTextContent('That is not it.')
     await userEvent.type(screen.getByLabelText('Admin password'), 'hunter2{Enter}')
 

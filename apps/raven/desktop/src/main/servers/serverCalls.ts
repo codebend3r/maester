@@ -7,7 +7,7 @@ import {
   type AllowedCall,
   type ServerMethod,
 } from '@/main/servers/allowlist'
-import { SERVER_GONE } from '@/shared/protocol'
+import { SERVER_GONE, SERVER_METHODS } from '@/shared/protocol'
 
 export const CALL_TIMEOUT_MS = 10_000
 export const MAX_REPLY_CHARS = 1_048_576
@@ -221,7 +221,9 @@ export const createServerCalls = ({
     const server = serverOf(serverId)
     if (server === null) return { ok: false, message: CALL_MESSAGES.unknownServer }
     const slots =
-      requestFor(allowed).method === 'GET' ? MAX_IN_FLIGHT : MAX_IN_FLIGHT + WRITE_RESERVE
+      requestFor(allowed).method === SERVER_METHODS.get
+        ? MAX_IN_FLIGHT
+        : MAX_IN_FLIGHT + WRITE_RESERVE
     if (countOf(serverId) >= slots) {
       return { ok: false, message: CALL_MESSAGES.busy(server.name) }
     }

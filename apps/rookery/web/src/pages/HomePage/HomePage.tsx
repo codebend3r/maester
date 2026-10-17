@@ -4,18 +4,25 @@ import { Frame } from '@/components/Frame/Frame'
 import { type User, fetchMe } from '@/lib/api'
 import styles from '@/pages/HomePage/HomePage.module.scss'
 
-type State = { kind: 'loading' } | { kind: 'signed_in'; user: User } | { kind: 'failed' }
+const HOME_STATE_KINDS = { loading: 'loading', signedIn: 'signed_in', failed: 'failed' } as const
+
+type State =
+  | { kind: typeof HOME_STATE_KINDS.loading }
+  | { kind: typeof HOME_STATE_KINDS.signedIn; user: User }
+  | { kind: typeof HOME_STATE_KINDS.failed }
 
 /** Who is signed in, and a way out. Anyone without a session goes to `/login`. */
 export const HomePage = () => {
   const navigate = useNavigate()
-  const [state, setState] = useState<State>({ kind: 'loading' })
+  const [state, setState] = useState<State>({ kind: HOME_STATE_KINDS.loading })
 
   useEffect(() => {
     fetchMe().then(
       (user) =>
-        user ? setState({ kind: 'signed_in', user }) : navigate('/login', { replace: true }),
-      () => setState({ kind: 'failed' }),
+        user
+          ? setState({ kind: HOME_STATE_KINDS.signedIn, user })
+          : navigate('/login', { replace: true }),
+      () => setState({ kind: HOME_STATE_KINDS.failed }),
     )
   }, [navigate])
 

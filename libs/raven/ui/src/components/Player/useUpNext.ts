@@ -1,13 +1,13 @@
 import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { usePlayerServices } from '@/components/Player/PlayerServices'
+import { useHostServices } from '@/stores/playerServices'
 
 /** Replaces the current watch entry only on a transition to ended. */
 export const useUpNext = ({ ended }: { ended: boolean }) => {
   const navigate = useNavigate()
   const {
     title: { next },
-  } = usePlayerServices()
+  } = useHostServices()
   const wasEnded = useRef(false)
   useEffect(() => {
     if (ended && !wasEnded.current && next) {

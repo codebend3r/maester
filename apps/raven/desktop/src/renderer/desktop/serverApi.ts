@@ -1,8 +1,8 @@
 import { type ApiClient, createApiClient, type FetchLike, type FetchResponse } from '@raven/core'
 import { useQuery, type UseQueryResult } from '@tanstack/react-query'
 import type { DesktopClient } from '@/renderer/desktop/client'
-import { useDesktop } from '@/renderer/desktop/DesktopContext'
-import { isServerMethod, type ServerView } from '@/shared/protocol'
+import { useDesktop } from '@/renderer/stores/desktop'
+import { DESKTOP_REPLIES, isServerMethod, type ServerView } from '@/shared/protocol'
 
 /** A server call that never reached the server: main could not, or would not, make it. */
 export class ServerUnreachable extends Error {

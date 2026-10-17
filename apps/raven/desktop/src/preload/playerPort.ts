@@ -1,6 +1,6 @@
 import {
   isPlayerConnection,
-  PLAYER_PORT_MESSAGE,
+  PLAYER_CONNECTION_STATUSES,
   type PlayerConnectionStatus,
 } from '@/shared/protocol'
 
@@ -39,7 +39,7 @@ export const forwardPlayerPort = ({
   if (!isPlayerConnection(payload)) return
   if (ports.length !== PORTS_FOR[payload.status]) return
   post({
-    message: { type: PLAYER_PORT_MESSAGE, connection: rebuild(payload) },
+    message: { type: WINDOW_MESSAGE_TYPES.playerPort, connection: rebuild(payload) },
     transfer: [...ports],
   })
 }

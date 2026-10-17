@@ -107,19 +107,20 @@ describe('serverById and serverByOrigin', () => {
   const config = configOf({ count: 3 })
 
   it('find a stored server', () => {
-    expect(serverById(config, { serverId: idFor({ n: 1 }) })).toEqual(entryFor({ n: 1 }))
-    expect(serverByOrigin(config, { origin: originFor({ n: 2 }) })).toEqual(entryFor({ n: 2 }))
+    expect(serverById({ config, serverId: idFor({ n: 1 }) })).toEqual(entryFor({ n: 1 }))
+    expect(serverByOrigin({ config, origin: originFor({ n: 2 }) })).toEqual(entryFor({ n: 2 }))
   })
 
   it('are null for an unknown id or origin', () => {
-    expect(serverById(config, { serverId: idFor({ n: 9 }) })).toBeNull()
-    expect(serverByOrigin(config, { origin: originFor({ n: 9 }) })).toBeNull()
+    expect(serverById({ config, serverId: idFor({ n: 9 }) })).toBeNull()
+    expect(serverByOrigin({ config, origin: originFor({ n: 9 }) })).toBeNull()
   })
 })
 
 describe('addServer', () => {
   it('appends a server named after its host', () => {
-    const outcome = addServer(EMPTY_CONFIG, {
+    const outcome = addServer({
+      config: EMPTY_CONFIG,
       id: idFor({ n: 1 }),
       origin: 'http://127.0.0.1:8080',
       at: 1700000000000,
@@ -134,13 +135,15 @@ describe('addServer', () => {
   })
 
   it('twice with the same origin keeps one entry and returns the first id', () => {
-    const first = addServer(EMPTY_CONFIG, {
+    const first = addServer({
+      config: EMPTY_CONFIG,
       id: idFor({ n: 1 }),
       origin: originFor({ n: 1 }),
       at: 1,
     })
     if (!first.ok) throw new Error('expected the first add to succeed')
-    const second = addServer(first.config, {
+    const second = addServer({
+      config: first.config,
       id: idFor({ n: 2 }),
       origin: originFor({ n: 1 }),
       at: 2,
@@ -153,25 +156,31 @@ describe('addServer', () => {
 
   it('a stored origin is found even when the list is full', () => {
     const full = configOf({ count: SERVERS_CAP })
-    const outcome = addServer(full, { id: idFor({ n: 99 }), origin: originFor({ n: 4 }), at: 99 })
+    const outcome = addServer({
+      config: full,
+      id: idFor({ n: 99 }),
+      origin: originFor({ n: 4 }),
+      at: 99,
+    })
     expect(outcome).toEqual({ ok: true, server: entryFor({ n: 4 }), config: full })
   })
 
   it('refuses the twenty-first origin as full', () => {
     const full = configOf({ count: SERVERS_CAP })
-    expect(addServer(full, { id: idFor({ n: 99 }), origin: originFor({ n: 99 }), at: 99 })).toEqual(
-      {
-        ok: false,
-        reason: 'full',
-      },
-    )
+    expect(
+      addServer({ config: full, id: idFor({ n: 99 }), origin: originFor({ n: 99 }), at: 99 }),
+    ).toEqual({
+      ok: false,
+      reason: 'full',
+    })
     expect(SERVERS_CAP).toBe(20)
     expect(SERVERS_CAP).toBe(CONFIG_SERVERS_CAP)
   })
 
   it('accepts the twentieth origin', () => {
     const config = configOf({ count: SERVERS_CAP - 1 })
-    const outcome = addServer(config, {
+    const outcome = addServer({
+      config,
       id: idFor({ n: 99 }),
       origin: originFor({ n: 99 }),
       at: 99,
@@ -182,7 +191,7 @@ describe('addServer', () => {
   it.each(['https://S9.example', 'https://s9.example/', 'https://s9.example.', 'not an origin'])(
     'refuses the origin %p that is not canonical',
     (origin) => {
-      expect(addServer(EMPTY_CONFIG, { id: idFor({ n: 9 }), origin, at: 9 })).toEqual({
+      expect(addServer({ config: EMPTY_CONFIG, id: idFor({ n: 9 }), origin, at: 9 })).toEqual({
         ok: false,
         reason: 'invalid',
       })
@@ -190,7 +199,9 @@ describe('addServer', () => {
   )
 
   it('refuses an id that is not opaque', () => {
-    expect(addServer(EMPTY_CONFIG, { id: '../x', origin: originFor({ n: 9 }), at: 9 })).toEqual({
+    expect(
+      addServer({ config: EMPTY_CONFIG, id: '../x', origin: originFor({ n: 9 }), at: 9 }),
+    ).toEqual({
       ok: false,
       reason: 'invalid',
     })
@@ -198,7 +209,8 @@ describe('addServer', () => {
 
   it('refuses an id another server has, as taken', () => {
     expect(
-      addServer(configOf({ count: 2 }), {
+      addServer({
+        config: configOf({ count: 2 }),
         id: idFor({ n: 1 }),
         origin: originFor({ n: 9 }),
         at: 9,
@@ -209,8 +221,8 @@ describe('addServer', () => {
   it('does not mutate its input', () => {
     const config = configOf({ count: 2 })
     const before = structuredClone(config)
-    addServer(config, { id: idFor({ n: 9 }), origin: originFor({ n: 9 }), at: 9 })
-    addServer(config, { id: idFor({ n: 8 }), origin: originFor({ n: 1 }), at: 8 })
+    addServer({ config, id: idFor({ n: 9 }), origin: originFor({ n: 9 }), at: 9 })
+    addServer({ config, id: idFor({ n: 8 }), origin: originFor({ n: 1 }), at: 8 })
     expect(config).toEqual(before)
   })
 })
@@ -218,7 +230,7 @@ describe('addServer', () => {
 describe('renameServer', () => {
   it('renames one server with the cleaned name and leaves the others', () => {
     const config = configOf({ count: 3 })
-    const next = renameServer(config, { serverId: idFor({ n: 1 }), name: '  Vhagar   NAS ' })
+    const next = renameServer({ config, serverId: idFor({ n: 1 }), name: '  Vhagar   NAS ' })
     expect(next?.servers.map((server) => server.name) ?? []).toEqual([
       'Server 0',
       'Vhagar NAS',
@@ -229,27 +241,27 @@ describe('renameServer', () => {
 
   it('is null for an unknown id', () => {
     expect(
-      renameServer(configOf({ count: 2 }), { serverId: idFor({ n: 9 }), name: 'NAS' }),
+      renameServer({ config: configOf({ count: 2 }), serverId: idFor({ n: 9 }), name: 'NAS' }),
     ).toBeNull()
   })
 
   it('is null for a name that cleanName refuses', () => {
     const config = configOf({ count: 2 })
-    expect(renameServer(config, { serverId: idFor({ n: 1 }), name: '   ' })).toBeNull()
-    expect(renameServer(config, { serverId: idFor({ n: 1 }), name: 'a\u0007b' })).toBeNull()
+    expect(renameServer({ config, serverId: idFor({ n: 1 }), name: '   ' })).toBeNull()
+    expect(renameServer({ config, serverId: idFor({ n: 1 }), name: 'a\u0007b' })).toBeNull()
   })
 
   it('does not mutate its input', () => {
     const config = configOf({ count: 2 })
     const before = structuredClone(config)
-    renameServer(config, { serverId: idFor({ n: 1 }), name: 'NAS' })
+    renameServer({ config, serverId: idFor({ n: 1 }), name: 'NAS' })
     expect(config).toEqual(before)
   })
 })
 
 describe('removeServer', () => {
   it('leaves the others in order', () => {
-    const next = removeServer(configOf({ count: 4 }), { serverId: idFor({ n: 1 }) })
+    const next = removeServer({ config: configOf({ count: 4 }), serverId: idFor({ n: 1 }) })
     expect(next.servers.map((server) => server.id)).toEqual([
       idFor({ n: 0 }),
       idFor({ n: 2 }),
@@ -259,18 +271,18 @@ describe('removeServer', () => {
 
   it('keeps the output setting', () => {
     const config = { ...configOf({ count: 1 }), output: { ...EMPTY_CONFIG.output, spatial: true } }
-    expect(removeServer(config, { serverId: idFor({ n: 0 }) }).output).toEqual(config.output)
+    expect(removeServer({ config, serverId: idFor({ n: 0 }) }).output).toEqual(config.output)
   })
 
   it('an unknown id changes nothing', () => {
     const config = configOf({ count: 2 })
-    expect(removeServer(config, { serverId: idFor({ n: 9 }) })).toBe(config)
+    expect(removeServer({ config, serverId: idFor({ n: 9 }) })).toBe(config)
   })
 
   it('does not mutate its input', () => {
     const config = configOf({ count: 3 })
     const before = structuredClone(config)
-    removeServer(config, { serverId: idFor({ n: 1 }) })
+    removeServer({ config, serverId: idFor({ n: 1 }) })
     expect(config).toEqual(before)
   })
 })

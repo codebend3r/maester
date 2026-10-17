@@ -8,11 +8,7 @@ import {
   useState,
 } from 'react'
 import type { Engine, EngineHandle } from '@/components/Player/engine'
-import {
-  type Handoff,
-  type PlayerFavourite,
-  usePlayerServices,
-} from '@/components/Player/PlayerServices'
+import type { Handoff, PlayerFavourite } from '@/components/Player/PlayerServices'
 import { useHtmlEngine } from '@/components/Player/useHtmlEngine'
 import type { SubtitleStatus } from '@/components/Player/useSubtitleCues'
 import { Button, ButtonLink } from '@/components/Button/Button'
@@ -39,6 +35,7 @@ import { useWatchProgress } from '@/components/Player/useWatchProgress'
 import { isInForeignDialog, isTypingTarget } from '@/lib/keyboard'
 import { type PlayerAction, shortcutFor } from '@/lib/shortcuts'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
+import { useHostServices } from '@/stores/playerServices'
 
 /**
  * How long the controls and cursor linger after the last mouse move, key
@@ -101,7 +98,7 @@ export const PlayerChrome = ({
   /** The library file playing, for the line under the title and Playback info; null for a local file. */
   file?: PlaybackFile | null
 }) => {
-  const { title, hostActions, favourite, chrome, isVolumeFixed, handoff } = usePlayerServices()
+  const { title, hostActions, favourite, chrome, isVolumeFixed, handoff } = useHostServices()
   const media = file?.media ?? null
   const label = title.label
   const { state, duration, actions } = engine

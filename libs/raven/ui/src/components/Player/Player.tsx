@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { type Engine, type HtmlSource, sourceKey } from '@/components/Player/engine'
 import styles from '@/components/Player/Player.module.scss'
-import { usePlayerServices } from '@/components/Player/PlayerServices'
+import { useHostServices } from '@/stores/playerServices'
 import { NativeStage } from '@/components/Player/NativeStage'
 import { Stage } from '@/components/Player/Stage'
 import { Unplayable } from '@/components/Player/Unplayable'
@@ -28,7 +28,7 @@ const fileSelection: TrackSelection = {
 }
 
 export const Player = ({ engine }: { engine: Engine }) => {
-  const { title } = usePlayerServices()
+  const { title } = useHostServices()
   const leave = useLeave(title.backTo)
   switch (engine.kind) {
     case 'html':

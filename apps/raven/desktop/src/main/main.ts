@@ -114,10 +114,8 @@ import {
   APP_SCHEME,
   type DesktopEvent,
   type DesktopReply,
-  EVENT_CHANNEL,
   FILE_SCHEME,
-  PLAYER_PORT_CHANNEL,
-  REQUEST_CHANNEL,
+  IPC_CHANNELS,
 } from '@/shared/protocol'
 
 const launchedAt = performance.now()
@@ -250,7 +248,7 @@ const startApp = (): void => {
     const window = windows.current
     if (window === null || window.isDestroyed() || window.webContents.isDestroyed()) return
     try {
-      window.webContents.send(EVENT_CHANNEL, event)
+      window.webContents.send(IPC_CHANNELS.event, event)
     } catch (error) {
       warn(`raven player could not reach its window. ${errorText(error)}`)
     }
@@ -416,7 +414,7 @@ const startApp = (): void => {
       warn(`raven player could not clear its old server sessions: ${errorText(error)}`)
     })
     const grants = createGrants({ fs: { realpath, stat }, newId: randomUUID })
-    const serverOf = (serverId: string) => serverById(config.read(), { serverId })
+    const serverOf = (serverId: string) => serverById({ config: config.read(), serverId })
     const sessions = createServerSessions({
       fromPartition: (partition) => session.fromPartition(partition),
       timers,
@@ -760,7 +758,7 @@ const answerRequests = ({ service, grants }: { service: DesktopService; grants: 
     },
     warn,
   })
-  ipcMain.handle(REQUEST_CHANNEL, (event, payload: unknown) =>
+  ipcMain.handle(IPC_CHANNELS.request, (event, payload: unknown) =>
     answer({ frameUrl: event.senderFrame?.url ?? null, payload }),
   )
 }
@@ -799,7 +797,7 @@ const openWindow = ({ store }: { store: StateStore }): BrowserWindow => {
     if (window.isFullScreen() || window.isMinimized()) return
     const current = window.getBounds()
     const displayId = screen.getDisplayMatching(current).id
-    store.update((state) => setWindowBounds(state, { bounds: { ...current, displayId } }))
+    store.update((state) => setWindowBounds({ state, bounds: { ...current, displayId } }))
   }
   window.on('moved', remember)
   window.on('resized', remember)
@@ -880,9 +878,15 @@ const attachPlayer = ({
   const servers = {
     resolve: async (source: Parameters<typeof sources.resolve>[0]) => {
       const resolved = await sources.resolve(source)
-      const server = serverById(config.read(), { serverId: source.serverId })
+      const server = serverById({ config: config.read(), serverId: source.serverId })
       if (resolved.ok && server !== null) {
-        log.info(openLine({ kind: 'server', serverName: server.name, mediaId: source.mediaId }))
+        log.info(
+          openLine({
+            kind: PLAYER_SOURCE_KINDS.server,
+            serverName: server.name,
+            mediaId: source.mediaId,
+          }),
+        )
       }
       return resolved
     },
@@ -999,7 +1003,7 @@ const attachPlayer = ({
     },
     post: ({ connection, ports }) => {
       if (!isPageLive(window)) throw new Error('its page is gone.')
-      window.webContents.postMessage(PLAYER_PORT_CHANNEL, connection, ports)
+      window.webContents.postMessage(IPC_CHANNELS.player, connection, ports)
     },
     warn,
     timers,

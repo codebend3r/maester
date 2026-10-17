@@ -1,7 +1,7 @@
 import type { MediaTracks } from '@raven/core'
 import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { type NativePlayer, sendQuietly } from '@/components/Player/engine'
-import { usePlayerServices } from '@/components/Player/PlayerServices'
+import { useHostServices } from '@/stores/playerServices'
 import { preferredAudio, preferredSubtitle } from '@/components/Player/selection'
 import type { TrackSelection } from '@/components/Player/useTrackSelection'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
@@ -18,7 +18,7 @@ export const useNativeTrackSelection = ({
   tracks: MediaTracks | null
   player: NativePlayer
 }): TrackSelection => {
-  const { trackPicks } = usePlayerServices()
+  const { trackPicks } = useHostServices()
   const audioLanguage = usePlayerPrefs((prefs) => prefs.audioLanguage)
   const subtitlePrefs = usePlayerPrefs((prefs) => prefs.subtitles)
   const setAudioLanguage = usePlayerPrefs((prefs) => prefs.setAudioLanguage)

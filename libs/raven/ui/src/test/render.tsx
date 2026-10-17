@@ -3,22 +3,31 @@ import { DEFAULT_PLAYBACK_SETTINGS, type PlaybackSettingsState } from '@raven/co
 import { render } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { MemoryRouter } from 'react-router-dom'
+import type { PlayerServices } from '@/components/Player/PlayerServices'
 import { playerQueryKeys } from '@/lib/playerQueryKeys'
+import { usePlayerServices } from '@/stores/playerServices'
 
 export const DEFAULT_PLAYBACK_STATE: PlaybackSettingsState = {
   settings: DEFAULT_PLAYBACK_SETTINGS,
   effective: { encoder: 'software', tonemapAvailable: true },
 }
 
-/** The player's only host requirements: a query cache and a router. */
-export const renderWithProviders = (
-  ui: ReactNode,
-  {
-    route = '/',
-    behind = [],
-    playback = DEFAULT_PLAYBACK_STATE,
-  }: { route?: string; behind?: string[]; playback?: PlaybackSettingsState | null } = {},
-) => {
+/** The player's host requirements: a query cache, a router and its services in the store. */
+export const renderWithProviders = ({
+  ui,
+  route = '/',
+  behind = [],
+  playback = DEFAULT_PLAYBACK_STATE,
+  services,
+}: {
+  ui: ReactNode
+  route?: string
+  behind?: string[]
+  playback?: PlaybackSettingsState | null
+  /** Set before the first render, as a host sets them; left out for a host the test renders itself. */
+  services?: PlayerServices
+}) => {
+  if (services) usePlayerServices.setState({ services })
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   if (playback) client.setQueryData(playerQueryKeys.playbackSettings, playback)
   return {

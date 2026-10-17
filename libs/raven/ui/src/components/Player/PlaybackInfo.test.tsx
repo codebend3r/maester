@@ -61,17 +61,19 @@ const renderInfo = ({
   onClose?: () => void
   playback?: typeof DEFAULT_PLAYBACK_STATE | null
 }) =>
-  renderWithProviders(
-    <PlaybackInfo
-      readStats={readStats}
-      mode={mode}
-      file={media && { media, api }}
-      tracks={TRACKS}
-      audio={audio}
-      onClose={onClose}
-    />,
-    { playback },
-  )
+  renderWithProviders({
+    ui: (
+      <PlaybackInfo
+        readStats={readStats}
+        mode={mode}
+        file={media && { media, api }}
+        tracks={TRACKS}
+        audio={audio}
+        onClose={onClose}
+      />
+    ),
+    playback,
+  })
 
 const section = (title: string): HTMLElement => {
   const found = screen.getByRole('heading', { name: title }).closest('section')

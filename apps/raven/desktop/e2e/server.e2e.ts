@@ -9,6 +9,8 @@ import {
   routesOf,
   startFixtureServer,
 } from '@/e2e/fixtureServer'
+import type { ServerMethod } from '@/main/servers/allowlist'
+import { SERVER_METHODS } from '@/shared/protocol'
 import {
   browserOpens,
   closeApp,
@@ -85,7 +87,7 @@ const requestsTo = ({
   path,
 }: {
   requests: readonly FixtureRequest[]
-  method: string
+  method: ServerMethod
   path: string
 }) => requests.filter((request) => request.method === method && request.path === path)
 
@@ -108,7 +110,7 @@ const savedPositions = ({
   requests: readonly FixtureRequest[]
   mediaId: number
 }) =>
-  requestsTo({ requests, method: 'PUT', path: `/api/media/${mediaId}/progress` }).map(
+  requestsTo({ requests, method: SERVER_METHODS.put, path: `/api/media/${mediaId}/progress` }).map(
     ({ body }) => {
       const value = parseJson({ text: body })
       if (typeof value !== 'object' || value === null || !('position' in value)) return null
@@ -348,14 +350,18 @@ test.describe.serial('playing a title from a locked raven server', () => {
         await expectPlayingNatively({ page, title: 'Fixture One' })
 
         const played = loggedSince({ fixture, from })
-        const files = requestsTo({ requests: played, method: 'GET', path: '/api/media/1/file' })
+        const files = requestsTo({
+          requests: played,
+          method: SERVER_METHODS.get,
+          path: '/api/media/1/file',
+        })
         expect(files.length).toBeGreaterThan(0)
         expect(files.every(({ hasUnlock, hasOtherCookie }) => hasUnlock && !hasOtherCookie)).toBe(
           true,
         )
         const sidecars = requestsTo({
           requests: played,
-          method: 'GET',
+          method: SERVER_METHODS.get,
           path: '/api/media/1/subtitles/external-0',
         })
         expect(sidecars.length).toBeGreaterThan(0)
@@ -375,7 +381,7 @@ test.describe.serial('playing a title from a locked raven server', () => {
           routesOf(
             requestsTo({
               requests: loggedSince({ fixture, from }),
-              method: 'POST',
+              method: SERVER_METHODS.post,
               path: '/api/media/1/plays',
             }),
           ),
@@ -584,7 +590,7 @@ test.describe('playing a title while the admin lock hides it', () => {
         await expectPlayingNatively({ page, title: 'Fixture One' })
         const files = requestsTo({
           requests: running.requests,
-          method: 'GET',
+          method: SERVER_METHODS.get,
           path: '/api/media/1/file',
         })
         expect(files.length).toBeGreaterThan(0)

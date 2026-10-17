@@ -96,7 +96,7 @@ const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 0))
 
 const writes = (calls: Call[]) => calls.filter((call) => call.op === 'writeFile')
 
-const named = (path: string): PlayerState => addRecent(EMPTY_STATE, { path, at: 1 })
+const named = (path: string): PlayerState => addRecent({ state: EMPTY_STATE, path, at: 1 })
 
 const setup = (initial: Record<string, string> = {}) => {
   const fake = createFakeFs(initial)

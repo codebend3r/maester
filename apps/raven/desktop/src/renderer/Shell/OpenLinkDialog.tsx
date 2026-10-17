@@ -1,9 +1,9 @@
 import { type FormEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react'
-import { Button } from '@raven/ui'
-import { useDesktop } from '@/renderer/desktop/DesktopContext'
+import { Button, KEYS } from '@raven/ui'
 import styles from '@/renderer/Shell/OpenLinkDialog.module.scss'
 import { useOpenReply } from '@/renderer/Shell/openReply'
-import type { DesktopReply } from '@/shared/protocol'
+import { useDesktop } from '@/renderer/stores/desktop'
+import { DESKTOP_REPLIES, type DesktopReply } from '@/shared/protocol'
 
 const UNOPENED = 'raven player could not open that link. Try again.'
 

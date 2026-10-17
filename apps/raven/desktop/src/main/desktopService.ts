@@ -221,7 +221,7 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
   ): Promise<DesktopReply> => {
     const file = grants.fileOf(request.fileId)
     if (file === null) return refused(MESSAGES.notOpen)
-    store.update((state) => addRecent(state, { path: file.path, at: now() }))
+    store.update((state) => addRecent({ state, path: file.path, at: now() }))
     deps.addRecentDocument(file.path)
     return {
       type: 'file',
@@ -229,20 +229,21 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
         fileId: file.fileId,
         label: titleFromFileName(file.name),
         folder: basename(dirname(file.path)),
-        resumeAt: resumeFor(store.read(), { file }),
+        resumeAt: resumeFor({ state: store.read(), file }),
         next: await nextAfter({ file, queue: request.queue }),
-        tracks: trackPickFor(store.read(), { path: file.path }),
+        tracks: trackPickFor({ state: store.read(), path: file.path }),
       },
     }
   }
 
   const recordPosition = (
-    request: Extract<DesktopRequest, { type: 'savePosition' }>,
+    request: Extract<DesktopRequest, { type: typeof DESKTOP_REQUESTS.savePosition }>,
   ): DesktopReply => {
     const file = grants.fileOf(request.fileId)
     if (file === null) return refused(MESSAGES.notOpen)
     store.update((state) =>
-      savePosition(state, {
+      savePosition({
+        state,
         file: { path: file.path, size: file.size, mtimeMs: file.mtimeMs },
         position: request.position,
         duration: request.duration,
@@ -256,7 +257,8 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
     const file = grants.fileOf(request.fileId)
     if (file === null) return refused(MESSAGES.notOpen)
     store.update((state) =>
-      setTrackPick(state, {
+      setTrackPick({
+        state,
         path: file.path,
         audio: request.audio,
         subtitle: request.subtitle,
@@ -295,7 +297,7 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
     if (!state.resume.some((entry) => entry.path === path)) return null
     const file = await factsWithin(path)
     if (file === null) return null
-    return watchedShare(state, { file })
+    return watchedShare({ state, file })
   }
 
   const viewOf = async ({
@@ -313,9 +315,9 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
           from: basename(dirname(entry.path)),
           watched: await shareOf({ state, path: entry.path }),
         }
-      case 'server': {
+      case RECENT_KINDS.server: {
         // A title whose server has gone cannot be played, so Home does not offer it.
-        const server = serverById(config.read(), { serverId: entry.serverId })
+        const server = serverById({ config: config.read(), serverId: entry.serverId })
         if (server === null) return null
         return {
           recentId: recentIdFor({ entry }),
@@ -355,7 +357,7 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
     serverId: string
     mediaId: number
   }): DesktopReply => {
-    if (serverById(config.read(), { serverId }) === null) {
+    if (serverById({ config: config.read(), serverId }) === null) {
       return refused(CALL_MESSAGES.unknownServer)
     }
     // The server keeps where to resume, so a recent starts at 0 and the page asks it.
@@ -371,7 +373,7 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
         if (!result.ok) return refused(messageFor(result.reason))
         return { type: 'play', target: { fileId: result.file.fileId, queue: [] } }
       }
-      case 'server':
+      case RECENT_KINDS.server:
         return playServer({ serverId: entry.serverId, mediaId: entry.mediaId })
       default: {
         const unreachable: never = entry
@@ -384,7 +386,7 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
     const entry = entryById.get(recentId)
     if (entry === undefined) return DONE
     const key = recentKey(entry)
-    store.update((state) => removeRecentByKey(state, { key }))
+    store.update((state) => removeRecentByKey({ state, key }))
     forgetRecentIds({ keys: [key] })
     return DONE
   }
@@ -418,21 +420,21 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
 
   const renameOne = ({ serverId, name }: { serverId: string; name: string }): DesktopReply => {
     if (cleanName(name) === null) return refused(MESSAGES.badName)
-    if (serverById(config.read(), { serverId }) === null) {
+    if (serverById({ config: config.read(), serverId }) === null) {
       return refused(CALL_MESSAGES.unknownServer)
     }
-    config.update((current) => renameServer(current, { serverId, name }) ?? current)
+    config.update((current) => renameServer({ config: current, serverId, name }) ?? current)
     return serversOf(config.read())
   }
 
   const removeOne = async ({ serverId }: { serverId: string }): Promise<DesktopReply> => {
     await deps.trust.remove(serverId)
     // A removal that could not be saved keeps the server, so it keeps its recents too.
-    if (serverById(config.read(), { serverId }) === null) {
-      store.update((state) => removeServerRecents(state, { serverId }))
+    if (serverById({ config: config.read(), serverId }) === null) {
+      store.update((state) => removeServerRecents({ state, serverId }))
       forgetRecentIds({
         keys: [...entryById.values()]
-          .filter((entry) => entry.kind === 'server' && entry.serverId === serverId)
+          .filter((entry) => entry.kind === RECENT_KINDS.server && entry.serverId === serverId)
           .map(recentKey),
       })
     }
@@ -446,7 +448,7 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
     serverId: string
     mediaId: number
   }): Promise<DesktopReply> => {
-    const server = serverById(config.read(), { serverId })
+    const server = serverById({ config: config.read(), serverId })
     if (server === null) return refused(CALL_MESSAGES.unknownServer)
     try {
       await deps.openExternal(watchUrlFor({ origin: server.origin, mediaId }))
@@ -461,11 +463,11 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
     request: Extract<DesktopRequest, { type: 'noteServerTitle' }>,
   ): DesktopReply => {
     const { serverId, mediaId, label, watched } = request
-    if (serverById(config.read(), { serverId }) === null) {
+    if (serverById({ config: config.read(), serverId }) === null) {
       return refused(CALL_MESSAGES.unknownServer)
     }
     store.update((state) =>
-      noteServerRecent(state, { serverId, mediaId, label, watched, at: now() }),
+      noteServerRecent({ state, serverId, mediaId, label, watched, at: now() }),
     )
     return DONE
   }
@@ -487,13 +489,13 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
         return openDialog()
       case 'describeFile':
         return describeFile(request)
-      case 'savePosition':
+      case DESKTOP_REQUESTS.savePosition:
         return recordPosition(request)
       case 'listRecents':
         return listRecents()
       case 'openRecent':
         return openRecent({ recentId: request.recentId })
-      case 'removeRecent':
+      case DESKTOP_REQUESTS.removeRecent:
         return dropRecent({ recentId: request.recentId })
       case 'clearRecents':
         return dropAllRecents()
@@ -511,11 +513,11 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
         return serverCall(request)
       case 'listServers':
         return serversOf(config.read())
-      case 'addServer':
+      case DESKTOP_REQUESTS.addServer:
         return addServer({ origin: request.origin })
-      case 'renameServer':
+      case DESKTOP_REQUESTS.renameServer:
         return renameOne({ serverId: request.serverId, name: request.name })
-      case 'removeServer':
+      case DESKTOP_REQUESTS.removeServer:
         return removeOne({ serverId: request.serverId })
       case 'openLink':
         return deps.links.open({ link: request.link, from: 'app' })

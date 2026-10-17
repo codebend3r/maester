@@ -4,13 +4,13 @@ import { render } from '@testing-library/react'
 import { act, StrictMode } from 'react'
 import { createMemoryRouter, type RouteObject, RouterProvider } from 'react-router-dom'
 import type { DesktopClient } from '@/renderer/desktop/client'
-import { DesktopProvider } from '@/renderer/desktop/DesktopContext'
 import { createMenuHub } from '@/renderer/desktop/menuHub'
 import type { PlayerConnection, PlayerConnections } from '@/renderer/desktop/playerConnection'
 import { HomePage } from '@/renderer/HomePage/HomePage'
 import { desktopRoutes } from '@/renderer/routes'
 import { Shell } from '@/renderer/Shell/Shell'
-import type { DesktopEvent } from '@/shared/protocol'
+import { useDesktopBridge } from '@/renderer/stores/desktop'
+import { DESKTOP_REQUESTS, type DesktopEvent, DESKTOP_REPLIES } from '@/shared/protocol'
 
 /** The real Shell and Home, with stand-ins where they send the page, so Play's and Settings' requests stay out. */
 export const STUB_ROUTES: RouteObject[] = [
@@ -105,11 +105,11 @@ export const renderDesktop = ({
   const router = createMemoryRouter(routes, {
     initialEntries: [state === undefined ? route : { pathname: route, state }],
   })
+  // Before the render, as `main.tsx` does; the setup resets it after each test.
+  useDesktopBridge.setState({ desktop: { client, menu, player } })
   const app = (
     <QueryClientProvider client={queryClient}>
-      <DesktopProvider client={client} menu={menu} player={player}>
-        <RouterProvider router={router} />
-      </DesktopProvider>
+      <RouterProvider router={router} />
     </QueryClientProvider>
   )
   render(isStrict ? <StrictMode>{app}</StrictMode> : app)

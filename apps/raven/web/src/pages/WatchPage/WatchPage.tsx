@@ -1,9 +1,9 @@
 import { type MediaItem, mediaLabel, playLinkFor } from '@raven/core'
 import { useState } from 'react'
 import {
-  PlayerServicesProvider,
   ButtonLink,
   Player,
+  useHostPlayer,
   useLeaveFullscreen,
   useMediaPlane,
   usePlayerPrefs,
@@ -95,53 +95,50 @@ export const WatchPlayer = ({
       () => setCopied(`Copy this link: ${link}`),
     )
   }
+  const isHosting = useHostPlayer({
+    title: {
+      label: mediaLabel(media),
+      duration: media.duration,
+      resumeAt: resumable ? media.position : 0,
+      backTo,
+      next: next ? { ...watchLink({ media: next, upNext: after }), label: mediaLabel(next) } : null,
+    },
+    progress: {
+      started: () => {
+        api.recordPlay(media.id).catch(() => undefined)
+      },
+      save: (position) => {
+        api.saveProgress({ id: media.id, position }).catch(() => undefined)
+      },
+      left: () => {
+        afterWatching({ queryClient, libraryId: media.libraryId }).catch(() => undefined)
+      },
+    },
+    posterUrl: api.thumbnailUrl(media),
+    escape: { label: 'Copy file link', run: copyLink },
+    escapeFeedback: copied,
+    favourite: {
+      isFavourite: media.favourite,
+      toggle: () => favourite.mutate(!media.favourite),
+    },
+    ...(opensInRavenPlayer && {
+      handoff: {
+        label: 'Open in raven player',
+        run: (at) =>
+          ravenPlayer.open(
+            playLinkFor({
+              origin: window.location.origin,
+              mediaId: media.id,
+              at,
+              next: upNext.map(({ id }) => id),
+            }),
+          ),
+      },
+    }),
+  })
   return (
-    <PlayerServicesProvider
-      services={{
-        title: {
-          label: mediaLabel(media),
-          duration: media.duration,
-          resumeAt: resumable ? media.position : 0,
-          backTo,
-          next: next
-            ? { ...watchLink({ media: next, upNext: after }), label: mediaLabel(next) }
-            : null,
-        },
-        progress: {
-          started: () => {
-            api.recordPlay(media.id).catch(() => undefined)
-          },
-          save: (position) => {
-            api.saveProgress({ id: media.id, position }).catch(() => undefined)
-          },
-          left: () => {
-            afterWatching({ queryClient, libraryId: media.libraryId }).catch(() => undefined)
-          },
-        },
-        posterUrl: api.thumbnailUrl(media),
-        escape: { label: 'Copy file link', run: copyLink },
-        escapeFeedback: copied,
-        favourite: {
-          isFavourite: media.favourite,
-          toggle: () => favourite.mutate(!media.favourite),
-        },
-        ...(opensInRavenPlayer && {
-          handoff: {
-            label: 'Open in raven player',
-            run: (at) =>
-              ravenPlayer.open(
-                playLinkFor({
-                  origin: window.location.origin,
-                  mediaId: media.id,
-                  at,
-                  next: upNext.map(({ id }) => id),
-                }),
-              ),
-          },
-        }),
-      }}
-    >
+    isHosting && (
       <Player engine={{ kind: 'html', source: { kind: 'server', media, api, mediaPlane } }} />
-    </PlayerServicesProvider>
+    )
   )
 }

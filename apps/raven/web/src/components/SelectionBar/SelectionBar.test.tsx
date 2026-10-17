@@ -44,12 +44,20 @@ const setUp = (entries: [string, WatchTarget[]][] = TARGETS) =>
         <Peek />
         <SelectButton />
         <ul>
-          <Card id="saga:9" />
+          {entries.slice(0, 2).map(([key]) => (
+            <Card key={key} id={key} />
+          ))}
         </ul>
-      </details>
-      <SelectionBar />
-    </SelectionScope>,
-  )
+        <details>
+          <summary>Folded</summary>
+          <ul>
+            <Card id="saga:9" />
+          </ul>
+        </details>
+        <SelectionBar />
+      </SelectionScope>
+    ),
+  })
 
 const selectMode = () => userEvent.click(screen.getByRole('button', { name: 'Select' }))
 const bar = () => screen.getByRole('region', { name: 'Selection' })

@@ -16,11 +16,13 @@ export const APP_ORIGIN = 'app://raven'
 export const APP_SCHEME = 'app'
 export const APP_HOST = 'raven'
 export const FILE_SCHEME = 'raven-file'
-export const REQUEST_CHANNEL = 'raven:request'
-export const EVENT_CHANNEL = 'raven:event'
+export const IPC_CHANNELS = {
+  request: 'raven:request',
+  event: 'raven:event',
+  player: 'raven:player',
+} as const
 export const MAX_QUEUE = 100
-export const PLAYER_PORT_CHANNEL = 'raven:player'
-export const PLAYER_PORT_MESSAGE = 'raven:player-port'
+export const WINDOW_MESSAGE_TYPES = { playerPort: 'raven:player-port' } as const
 /** Main's words once mpv has gone. They ride with reason `engine`, which is what the page reads. */
 export const ENGINE_STOPPED = "raven player's video engine stopped. Open the video again."
 /**
@@ -53,8 +55,17 @@ export const isServerTarget = object({
 
 export type ServerTarget = Infer<typeof isServerTarget>
 
+export const HTTP_METHODS = { get: 'GET', head: 'HEAD', put: 'PUT', post: 'POST' } as const
+
+/** The methods a server call may use; the app's own protocols also answer HEAD. */
+export const SERVER_METHODS = {
+  get: HTTP_METHODS.get,
+  put: HTTP_METHODS.put,
+  post: HTTP_METHODS.post,
+} as const
+
 /** The methods a page's server call may use; main matches each call against the allowlist besides. */
-export const isServerMethod = oneOf(['GET', 'PUT', 'POST'])
+export const isServerMethod = oneOf(Object.values(SERVER_METHODS))
 
 /** A stored server as Settings shows it. */
 export const isServerView = object({ serverId: isOpaqueId, origin: isString, name: isString })
@@ -117,21 +128,53 @@ export const isUpdateStatus = object({
 
 export type UpdateStatus = Infer<typeof isUpdateStatus>
 
+export const DESKTOP_REQUESTS = {
+  ready: 'ready',
+  openDialog: 'openDialog',
+  describeFile: 'describeFile',
+  savePosition: 'savePosition',
+  listRecents: 'listRecents',
+  openRecent: 'openRecent',
+  removeRecent: 'removeRecent',
+  clearRecents: 'clearRecents',
+  saveTracks: 'saveTracks',
+  windowButtons: 'windowButtons',
+  readOutput: 'readOutput',
+  writeOutput: 'writeOutput',
+  serverCall: 'serverCall',
+  listServers: 'listServers',
+  addServer: 'addServer',
+  renameServer: 'renameServer',
+  removeServer: 'removeServer',
+  openLink: 'openLink',
+  openInBrowser: 'openInBrowser',
+  noteServerTitle: 'noteServerTitle',
+  readUpdates: 'readUpdates',
+  setUpdateCheck: 'setUpdateCheck',
+  checkForUpdates: 'checkForUpdates',
+  openRelease: 'openRelease',
+} as const
+
 /** What the page asks main for. No variant carries a file path; a server call names its server by id. */
 export const isDesktopRequest = union(
   object({ type: oneOf(['ready']) }),
   object({ type: oneOf(['openDialog']) }),
   object({ type: oneOf(['describeFile']), fileId: isOpaqueId, queue: listOf(isOpaqueId) }),
   object({
-    type: oneOf(['savePosition']),
+    type: oneOf([DESKTOP_REQUESTS.describeFile]),
+    fileId: isOpaqueId,
+    queue: listOf(isOpaqueId),
+  }),
+  object({
+    type: oneOf([DESKTOP_REQUESTS.savePosition]),
     fileId: isOpaqueId,
     position: isNumber,
     duration: nullable(isNumber),
   }),
-  object({ type: oneOf(['listRecents']) }),
-  object({ type: oneOf(['openRecent']), recentId: isOpaqueId }),
-  object({ type: oneOf(['removeRecent']), recentId: isOpaqueId }),
-  object({ type: oneOf(['clearRecents']) }),
+  object({ type: oneOf([DESKTOP_REQUESTS.listRecents]) }),
+  object({ type: oneOf([DESKTOP_REQUESTS.openRecent]), recentId: isOpaqueId }),
+  object({ type: oneOf([DESKTOP_REQUESTS.removeRecent]), recentId: isOpaqueId }),
+  object({ type: oneOf([DESKTOP_REQUESTS.clearRecents]) }),
   object({
     type: oneOf(['saveTracks']),
     fileId: isOpaqueId,
@@ -148,12 +191,11 @@ export const isDesktopRequest = union(
     path: isString,
     body: nullable(isString),
   }),
-  object({ type: oneOf(['listServers']) }),
-  object({ type: oneOf(['addServer']), origin: isString }),
-  object({ type: oneOf(['renameServer']), serverId: isOpaqueId, name: isString }),
-  object({ type: oneOf(['removeServer']), serverId: isOpaqueId }),
-  object({ type: oneOf(['openLink']), link: isString }),
-  object({ type: oneOf(['openInBrowser']), serverId: isOpaqueId, mediaId: isMediaId }),
+  object({ type: oneOf([DESKTOP_REQUESTS.listServers]) }),
+  object({ type: oneOf([DESKTOP_REQUESTS.addServer]), origin: isString }),
+  object({ type: oneOf([DESKTOP_REQUESTS.renameServer]), serverId: isOpaqueId, name: isString }),
+  object({ type: oneOf([DESKTOP_REQUESTS.removeServer]), serverId: isOpaqueId }),
+  object({ type: oneOf([DESKTOP_REQUESTS.openLink]), link: isString }),
   object({
     type: oneOf(['noteServerTitle']),
     serverId: isOpaqueId,
@@ -255,6 +297,6 @@ export type PlayerConnectionStatus = Infer<typeof isPlayerConnection>
 
 /** What the preload forwards to the page on each `ready`; the port, when there is one, rides with it. */
 export const isPlayerPortMessage = object({
-  type: oneOf([PLAYER_PORT_MESSAGE]),
+  type: oneOf([WINDOW_MESSAGE_TYPES.playerPort]),
   connection: isPlayerConnection,
 })

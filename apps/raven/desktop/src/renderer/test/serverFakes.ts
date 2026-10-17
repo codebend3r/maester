@@ -1,5 +1,12 @@
 import type { DesktopReply, DesktopRequest, ServerView } from '@/shared/protocol'
 import { fakeClient } from '@/renderer/test/render'
+import {
+  DESKTOP_REQUESTS,
+  type DesktopReply,
+  type DesktopRequest,
+  type SERVER_METHODS,
+  type ServerView,
+} from '@/shared/protocol'
 
 export const S = '33333333-3333-4333-8333-333333333333'
 
@@ -19,7 +26,7 @@ export const reply = ({
 })
 
 /** `METHOD /path`, as the table names a call. */
-export type CallKey = `${'GET' | 'PUT' | 'POST'} ${string}`
+export type CallKey = `${(typeof SERVER_METHODS)[keyof typeof SERVER_METHODS]} ${string}`
 
 /** An answer the test may hold back: a reply, or a promise of one it settles later. */
 export type CallAnswer = DesktopReply | Promise<DesktopReply>
