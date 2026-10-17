@@ -22,15 +22,17 @@ const summary = ({
   id,
   title,
   type = 'movie',
+  year = 1999,
 }: {
   id: number
   title: string
   type?: ItemType
+  year?: number
 }): ItemSummary => ({
   id,
   type,
   title,
-  year: 1999,
+  year,
   show: null,
   season: null,
   episode: null,
@@ -56,7 +58,8 @@ describe("a credit's department", () => {
     { department: 'Production', role: 'Executive Co-Producer', expected: 'producing' },
     { department: 'Directing', role: 'Director', expected: 'directing' },
     { department: 'Writing', role: 'Screenplay', expected: 'writing' },
-    { department: 'Creator', role: 'Creator', expected: 'writing' },
+    { department: 'Creator', role: 'Original Concept', expected: 'writing' },
+    { department: 'Production', role: 'Creator', expected: 'writing' },
     { department: 'Production', role: 'Production Manager', expected: 'crew' },
     { department: 'Editing', role: 'Editor', expected: 'crew' },
   ])('files $role in $department under $expected', ({ department, role, expected }) => {
@@ -169,25 +172,31 @@ describe("a filmography's entries", () => {
     ).toEqual({ Open: 10, Locked: null, 'No File': null, 'Not Stored': null })
   })
 
-  it('adds the credits raven holds on a title TMDB does not list, with no date or poster', () => {
-    const heat = summary({ id: 40, title: 'Heat' })
+  it('adds the credits raven holds on a title TMDB does not list, dated as the item is', () => {
+    const heat = summary({ id: 40, title: 'Heat', year: 1995 })
+    const listed = summary({ id: 10, title: 'Listed' })
     const localCredits: LocalCredit[] = [
-      { item: heat, job: 'cast', role: 'Neil', tmdbId: '949' },
-      { item: heat, job: 'producer', role: null, tmdbId: '949' },
-      { item: summary({ id: 10, title: 'Listed' }), job: 'cast', role: 'Neo', tmdbId: '603' },
+      { item: heat, job: 'cast', role: 'Neil', tmdbId: '949', released: '1995-12-15' },
+      { item: heat, job: 'producer', role: null, tmdbId: '949', released: '1995-12-15' },
+      { item: listed, job: 'cast', role: 'Neo', tmdbId: '603', released: '1999-03-31' },
     ]
     const entries = toEntries({
       ...NONE,
-      rows: [row({ tmdbId: '603', title: 'Listed', itemId: 10, released: '1999-03-31' })],
+      rows: [
+        row({ tmdbId: '603', title: 'Listed', itemId: 10, released: '1999-03-31' }),
+        row({ tmdbId: '2', title: 'Newer', released: '2024-05-01' }),
+      ],
       localCredits,
     })
     expect(entries).toEqual([
+      expect.objectContaining({ title: 'Newer' }),
+      expect.objectContaining({ title: 'Listed', item: null }),
       {
         type: 'movie',
         tmdbId: '949',
         title: 'Heat',
-        year: 1999,
-        released: null,
+        year: 1995,
+        released: '1995-12-15',
         poster: null,
         credits: [
           { department: 'acting', role: 'Neil', episodes: null, isSelf: false },
@@ -195,7 +204,46 @@ describe("a filmography's entries", () => {
         ],
         item: heat,
       },
-      expect.objectContaining({ title: 'Listed', item: null }),
+    ])
+  })
+
+  it("adds raven's credit to a title TMDB lists, in a department TMDB lists none of theirs in", () => {
+    const matrix = summary({ id: 10, title: 'The Matrix' })
+    const [entry] = toEntries({
+      ...NONE,
+      rows: [
+        row({
+          tmdbId: '603',
+          title: 'The Matrix',
+          itemId: 10,
+          department: 'Production',
+          role: 'Executive Producer',
+        }),
+      ],
+      holding: new Map([[10, [1]]]),
+      summaries: new Map([[10, matrix]]),
+      localCredits: [
+        { item: matrix, job: 'cast', role: 'Neo', tmdbId: '603', released: '1999-03-31' },
+      ],
+    })
+    expect(entry?.credits).toEqual([
+      { department: 'acting', role: 'Neo', episodes: null, isSelf: false },
+      { department: 'producing', role: 'Executive Producer', episodes: null, isSelf: false },
+    ])
+    expect(entry?.item).toBe(matrix)
+  })
+
+  it("adds nothing of raven's to a title TMDB lists in that department already", () => {
+    const matrix = summary({ id: 10, title: 'The Matrix' })
+    const entries = toEntries({
+      ...NONE,
+      rows: [row({ tmdbId: '603', title: 'The Matrix', itemId: 10, role: 'Neo' })],
+      localCredits: [
+        { item: matrix, job: 'cast', role: 'Thomas Anderson', tmdbId: '603', released: null },
+      ],
+    })
+    expect(entries.map((entry) => entry.credits)).toEqual([
+      [{ department: 'acting', role: 'Neo', episodes: null, isSelf: false }],
     ])
   })
 

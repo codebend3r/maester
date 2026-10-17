@@ -320,8 +320,8 @@ describe('the libraries holding each item, and the people cleared up', () => {
       ],
     }
     const daysAgo = (days: number) => new Date(Date.now() - days * 24 * 60 * 60_000).toISOString()
-    people.saveFilmography({ personId: yesterday!, person, at: daysAgo(1) })
-    people.saveFilmography({ personId: longAgo!, person, at: daysAgo(200) })
+    people.saveFilmography({ personId: yesterday!, tmdbId: '1', person, at: daysAgo(1) })
+    people.saveFilmography({ personId: longAgo!, tmdbId: '2', person, at: daysAgo(200) })
     expect(people.filmographyRows(longAgo!)).toHaveLength(1)
 
     stored.clearUp()

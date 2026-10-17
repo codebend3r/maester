@@ -514,6 +514,10 @@ describe('movie metadata', () => {
     if (filmography.state !== 'ready') throw new Error(`Filmography ${filmography.state}`)
     const entry = (title: string) => filmography.entries.find((found) => found.title === title)
     expect(entry('The Matrix')?.item).toMatchObject({ id: matrix?.item?.id, title: 'The Matrix' })
+    // raven's own credit as Neo is TMDB's too, so it adds nothing.
+    expect(entry('The Matrix')?.credits).toEqual([
+      { department: 'acting', role: 'Neo', episodes: null, isSelf: false },
+    ])
     expect(entry('John Wick')).toMatchObject({ item: null, poster: '/poster245891.jpg' })
     expect(entry('The Late Show')?.credits).toEqual([
       { department: 'acting', role: 'Self', episodes: 3, isSelf: true },
@@ -522,8 +526,15 @@ describe('movie metadata', () => {
       { department: 'producing', role: 'Executive Producer', episodes: null, isSelf: false },
     ])
     expect(entry('A Film With Thanks')).toBeUndefined()
-    // TMDB's filmography leaves Heat out, so raven's own credit on it stands in.
-    expect(entry('Heat')).toMatchObject({ tmdbId: '949', released: null, item: { title: 'Heat' } })
+    // TMDB's filmography leaves Heat out, so raven's own credit on it stands in, in its year.
+    expect(entry('Heat')).toMatchObject({
+      tmdbId: '949',
+      released: '1995-12-15',
+      item: { title: 'Heat' },
+    })
+    const titles = filmography.entries.map((found) => found.title)
+    expect(titles.indexOf('Heat')).toBeGreaterThan(titles.indexOf('The Matrix'))
+    expect(titles.indexOf('Heat')).toBeLessThan(titles.indexOf('The Late Show'))
     expect((await app().inject({ method: 'GET', url: '/api/people/99999' })).statusCode).toBe(404)
   })
 

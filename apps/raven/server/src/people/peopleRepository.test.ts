@@ -97,6 +97,7 @@ describe("the people store's filmographies", () => {
   it("keeps what TMDB says of a person, and their credits in TMDB's order with raven's items", () => {
     people().saveFilmography({
       personId: state.personId,
+      tmdbId: '6384',
       person: KEANU,
       at: '2026-10-17T12:00:00.000Z',
     })
@@ -137,6 +138,7 @@ describe("the people store's filmographies", () => {
   it('replaces the credits it had with those of the next fetch', () => {
     people().saveFilmography({
       personId: state.personId,
+      tmdbId: '6384',
       person: { ...KEANU, credits: [{ ...KEANU.credits[2]!, position: 0 }] },
       at: '2026-11-01T12:00:00.000Z',
     })
@@ -149,7 +151,28 @@ describe("the people store's filmographies", () => {
   })
 
   it('stores nothing for a person cleared up while TMDB was answering', () => {
-    people().saveFilmography({ personId: 99_999, person: KEANU, at: '2026-10-17T12:00:00.000Z' })
+    people().saveFilmography({
+      personId: 99_999,
+      tmdbId: '6384',
+      person: KEANU,
+      at: '2026-10-17T12:00:00.000Z',
+    })
     expect(people().filmographyRows(99_999)).toEqual([])
+  })
+
+  it('stores nothing over someone else who has since been given that id', () => {
+    const before = people().profile(state.personId)
+    const rows = people().filmographyRows(state.personId)
+    people().saveFilmography({
+      personId: state.personId,
+      tmdbId: '1',
+      person: { ...KEANU, tmdbId: '1', name: 'Someone Else', credits: [] },
+      at: '2026-12-01T12:00:00.000Z',
+    })
+    expect(people().profile(state.personId)).toEqual(before)
+    expect(people().filmographyRows(state.personId)).toEqual(rows)
+    expect(repositories(database.get()).metadata.person(state.personId)?.name).toBe(
+      'Keanu Charles Reeves',
+    )
   })
 })

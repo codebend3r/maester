@@ -55,7 +55,8 @@ export class Filmographies {
 
   /** `ready` once a filmography is stored, `pending` while the first is fetched, else `unavailable`. */
   state({ personId }: { personId: number }): PersonFilmography['state'] {
-    return this.people.profile(personId)?.fetchedAt == null ? this.waiting(personId) : 'ready'
+    const fetchedAt = this.people.profile(personId)?.fetchedAt ?? null
+    return fetchedAt == null ? this.waiting(personId) : 'ready'
   }
 
   /** What a viewer who sees the libraries `sees` passes may see of a person's filmography. */
@@ -110,7 +111,7 @@ export class Filmographies {
   private async load({ personId, tmdbId }: { personId: number; tmdbId: string }): Promise<void> {
     try {
       const person = await this.gate.run(() => this.tmdb.person(tmdbId))
-      this.people.saveFilmography({ personId, person, at: new Date().toISOString() })
+      this.people.saveFilmography({ personId, tmdbId, person, at: new Date().toISOString() })
       this.failedAt.delete(personId)
     } catch (error) {
       this.failedAt.set(personId, Date.now())

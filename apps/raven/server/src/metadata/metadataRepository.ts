@@ -87,8 +87,11 @@ export type StoredItem = {
   number: number | null
 }
 
-/** A credit on a movie or show raven holds, with the title's TMDB id, which only the server reads. */
-export type LocalCredit = PersonDetails['credits'][number] & { tmdbId: string }
+/** A credit on a movie or show raven holds, with the title's TMDB id and date, which only the server reads. */
+export type LocalCredit = PersonDetails['credits'][number] & {
+  tmdbId: string
+  released: string | null
+}
 
 /** A person as raven's own credits know them; what TMDB says of them is the people store's. */
 export type StoredPerson = Pick<PersonDetails, 'id' | 'tmdbId' | 'name' | 'photoVersion'> & {
@@ -697,10 +700,16 @@ export class MetadataRepository {
     const credits = this.db
       .prepare<
         [number, number],
-        { item_id: number; tmdb_id: string; job: string; role: string | null }
+        {
+          item_id: number
+          tmdb_id: string
+          released: string | null
+          job: string
+          role: string | null
+        }
       >(
         `WITH RECURSIVE ${under('SELECT item_id, item_id FROM credits WHERE person_id = ?')}
-         SELECT c.item_id, i.tmdb_id, c.job, c.role
+         SELECT c.item_id, i.tmdb_id, i.released, c.job, c.role
            FROM credits c JOIN items i ON i.id = c.item_id
           WHERE c.person_id = ? AND i.type IN ('movie', 'show')
             AND c.item_id IN (SELECT u.root FROM under u JOIN media_items mi ON mi.item_id = u.id)
@@ -716,7 +725,15 @@ export class MetadataRepository {
       credits: credits.flatMap((credit) => {
         const item = summaries.get(credit.item_id)
         return item && isCreditJob(credit.job)
-          ? [{ item, job: credit.job, role: credit.role, tmdbId: credit.tmdb_id }]
+          ? [
+              {
+                item,
+                job: credit.job,
+                role: credit.role,
+                tmdbId: credit.tmdb_id,
+                released: credit.released,
+              },
+            ]
           : []
       }),
     }

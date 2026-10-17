@@ -68,6 +68,23 @@ const isIgnored = ({ department, role }: FilmographyRow): boolean =>
 const actingFirst = (credits: readonly FilmographyCredit[]): FilmographyCredit[] =>
   credits.toSorted((a, b) => Number(b.department === 'acting') - Number(a.department === 'acting'))
 
+/** raven's credits on a title in the departments none of TMDB's `listed` ones are in. */
+const unlistedOf = ({
+  listed,
+  local,
+}: {
+  listed: readonly FilmographyCredit[]
+  local: readonly LocalCredit[]
+}): FilmographyCredit[] =>
+  local
+    .map((credit) => ({
+      department: LOCAL_DEPARTMENTS[credit.job],
+      role: credit.role,
+      episodes: null,
+      isSelf: false,
+    }))
+    .filter((credit) => !listed.some((known) => known.department === credit.department))
+
 const byReleased = (a: FilmographyEntry, b: FilmographyEntry): number => {
   if (a.released === b.released) return 0
   if (a.released == null) return -1
@@ -81,10 +98,11 @@ const inOrder = (a: FilmographyEntry, b: FilmographyEntry): number =>
 
 /**
  * A person's filmography, one entry per title: TMDB's credits, less the
- * ignored jobs, and then the local credits on titles TMDB does not list.
- * An entry's `item` is set only when a library the viewer `sees` holds a
- * file of it, so a title that is only in a locked library, or has no file
- * at all, shows as not on raven.
+ * ignored jobs, then raven's own credits in a department TMDB lists none of
+ * theirs in for that title, or on a title TMDB does not list at all. An
+ * entry's `item` is set only when a library the viewer `sees` holds a file
+ * of it, so a title that is only in a locked library, or has no file at all,
+ * shows as not on raven.
  */
 export const toEntries = ({
   rows,
@@ -102,6 +120,7 @@ export const toEntries = ({
   localCredits: readonly LocalCredit[]
 }): FilmographyEntry[] => {
   const kept = rows.filter((row) => !isIgnored(row))
+  const localByItem = groupBy({ items: localCredits, key: (credit) => String(credit.item.id) })
   const listed = [
     ...groupBy({ items: kept, key: (row) => `${row.type}:${row.tmdbId}` }).values(),
   ].flatMap((group): FilmographyEntry[] => {
@@ -109,6 +128,13 @@ export const toEntries = ({
     if (!first) return []
     const stored = first.itemId == null ? null : (summaries.get(first.itemId) ?? null)
     const isShown = stored != null && (holding.get(stored.id) ?? []).some(sees)
+    const fromTmdb = group.map((row) => ({
+      department: departmentOf(row),
+      role: row.role,
+      episodes: row.episodes,
+      isSelf: isSelfAppearance(row),
+    }))
+    const local = first.itemId == null ? [] : (localByItem.get(String(first.itemId)) ?? [])
     return [
       {
         type: first.type,
@@ -117,42 +143,27 @@ export const toEntries = ({
         year: yearOf(first.released),
         released: first.released,
         poster: first.poster,
-        credits: actingFirst(
-          group.map((row) => ({
-            department: departmentOf(row),
-            role: row.role,
-            episodes: row.episodes,
-            isSelf: isSelfAppearance(row),
-          })),
-        ),
+        credits: actingFirst([...fromTmdb, ...unlistedOf({ listed: fromTmdb, local })]),
         item: isShown ? stored : null,
       },
     ]
   })
-  const listedItems = new Set(kept.flatMap((row) => row.itemId ?? []))
-  const unlisted = localCredits.filter((credit) => !listedItems.has(credit.item.id))
-  const local = [
-    ...groupBy({ items: unlisted, key: (credit) => String(credit.item.id) }).values(),
-  ].flatMap((credits): FilmographyEntry[] => {
+  const listedItems = new Set(
+    kept.flatMap((row) => (row.itemId == null ? [] : [String(row.itemId)])),
+  )
+  const local = [...localByItem.entries()].flatMap(([itemId, credits]): FilmographyEntry[] => {
     const [first] = credits
-    if (!first || !isMatchItemType(first.item.type)) return []
+    if (listedItems.has(itemId) || !first || !isMatchItemType(first.item.type)) return []
     return [
       {
         type: first.item.type,
         tmdbId: first.tmdbId,
         title: first.item.title,
         year: first.item.year,
-        // A summary has no date or TMDB poster; the page draws the item's own poster.
-        released: null,
+        released: first.released,
+        // The page draws the item's own poster.
         poster: null,
-        credits: actingFirst(
-          credits.map((credit) => ({
-            department: LOCAL_DEPARTMENTS[credit.job],
-            role: credit.role,
-            episodes: null,
-            isSelf: false,
-          })),
-        ),
+        credits: actingFirst(unlistedOf({ listed: [], local: credits })),
         item: first.item,
       },
     ]

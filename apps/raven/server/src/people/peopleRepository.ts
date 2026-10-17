@@ -92,13 +92,18 @@ export class PeopleRepository {
     }
   }
 
-  /** Puts what TMDB says of a person in place of what it said before, credits and all. */
+  /**
+   * Puts what TMDB says of a person in place of what it said before, credits
+   * and all. `tmdbId` is the one the fetch asked for.
+   */
   saveFilmography({
     personId,
+    tmdbId,
     person,
     at,
   }: {
     personId: number
+    tmdbId: string
     person: FetchedPerson
     at: string
   }): void {
@@ -109,10 +114,11 @@ export class PeopleRepository {
               SET name = @name, photo = @photo, imdb_id = @imdbId, birthday = @birthday,
                   deathday = @deathday, place_of_birth = @placeOfBirth, biography = @biography,
                   known_for = @knownFor, filmography_fetched_at = @at
-            WHERE id = @personId`,
+            WHERE id = @personId AND tmdb_id = @tmdbId`,
         )
         .run({
           personId,
+          tmdbId,
           at,
           name: person.name,
           photo: person.photo,
@@ -123,7 +129,8 @@ export class PeopleRepository {
           biography: person.biography,
           knownFor: person.knownFor,
         })
-      // A person cleared up while TMDB was answering has no row to hang credits on.
+      // A person cleared up while TMDB was answering has no row to hang credits
+      // on, and their id may since have gone to someone else.
       if (updated.changes === 0) return
       this.db.prepare('DELETE FROM person_credits WHERE person_id = ?').run(personId)
       const insert = this.db.prepare(
