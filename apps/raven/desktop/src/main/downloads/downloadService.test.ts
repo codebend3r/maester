@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import { LOCKED_STATUS, type DownloadTarget, type MediaItem, type Saga } from '@raven/core'
 import { EMPTY_CONFIG, type ConfigStore, type DesktopConfig } from '@/main/desktopConfig'
 import { ASK_TTL_MS } from '@/main/downloads/asks'
+import { AUTO_DELETE_DELAY_MS } from '@/main/downloads/autoDelete'
 import { DOWNLOAD_MESSAGES } from '@/main/downloads/downloadMessages'
 import {
   createDownloadService,
@@ -175,6 +176,8 @@ const setup = ({
   disk = {},
   videos = {},
   player = EMPTY_STATE,
+  startAt = NOW,
+  isPageReady = true,
 }: {
   replies?: Record<string, Reply>
   free?: number
@@ -185,6 +188,10 @@ const setup = ({
   /** Finished videos by path, kept apart from `disk`, whose seed holds every byte in memory. */
   videos?: Record<string, Video>
   player?: PlayerState
+  /** What the clock reads at launch. */
+  startAt?: number
+  /** Whether the page says ready at once, as it does a moment after every launch. */
+  isPageReady?: boolean
 } = {}) => {
   const table: Record<string, Reply> = {
     [libraryCall]: ok(library({ id: 1, watchedPercent: 90 })),
@@ -211,7 +218,7 @@ const setup = ({
       throw error
     },
   })
-  const clock = { now: NOW }
+  const clock = { now: startAt }
   const sent: DesktopEvent[] = []
   const warnings: string[] = []
   const made: string[] = []
@@ -276,6 +283,7 @@ const setup = ({
       return videoAt(path)
     },
   })
+  if (isPageReady) service.pageReady()
   return {
     service,
     store,
@@ -1427,6 +1435,43 @@ describe('reaching the server', () => {
     expect(entries(world)).toEqual([])
   })
 
+  it('owes the server what a Delete removed while it was unreachable, and sends it at the retry', async () => {
+    const world = setup({
+      initial: holding(withPending()),
+      videos: { [VIDEO]: FILE },
+      replies: { [playOf(11)]: { unreachable: 'offline' } },
+    })
+    await world.service.remove({ downloadId: ID })
+    expect(world.store.read()).toMatchObject({
+      entries: [],
+      owed: [{ serverId: SERVER_ID, mediaId: 11, pending: PLAYED }],
+    })
+    world.table[playOf(11)] = NO_CONTENT
+    world.table[progress(11, 750)] = NO_CONTENT
+    const before = world.log.length
+    fireAfter(world, SYNC_RETRY_MS)
+    await until(() => world.store.read().owed.length === 0)
+    expect(world.log.slice(before)).toEqual([playOf(11), progress(11, 750)])
+  })
+
+  it('owes nothing for a download deleted with nothing pending', async () => {
+    const world = setup({ initial: holding(entryFor({})), videos: { [VIDEO]: FILE } })
+    await world.service.remove({ downloadId: ID })
+    expect(world.store.read()).toMatchObject({ entries: [], owed: [] })
+  })
+
+  it('drops what a removed server was owed, and sends it nothing', async () => {
+    const world = setup({
+      initial: { ...holding(), owed: [{ serverId: SERVER_ID, mediaId: 11, pending: PLAYED }] },
+      replies: { [playOf(11)]: { unreachable: 'offline' } },
+    })
+    await world.service.removeServer({ serverId: SERVER_ID })
+    expect(world.store.read().owed).toEqual([])
+    const before = world.log.length
+    await world.service.removeAll()
+    expect(world.log.length).toBe(before)
+  })
+
   it('does not wait on the server to forget a server', async () => {
     const world = setup({
       initial: holding(withPending()),
@@ -1451,5 +1496,298 @@ describe('reaching the server', () => {
     await ticks(5)
     expect(world.log).toEqual([playOf(11)])
     expect(world.pending.size).toBe(0)
+  })
+})
+
+describe('deleting once watched', () => {
+  const ID = '0f8fad5b-d9cb-469f-a165-70867728950e'
+  const MINUTE = 60_000
+  const VIDEO = `${DOWNLOADS}/${SERVER_ID}/11/video.mkv`
+  const FILE: Video = { size: 2 * GIB, mtimeMs: MTIME }
+  const NO_CONTENT: Reply = { status: 204, body: '' }
+  const PLAY = keyOf({ name: 'recordPlay', mediaId: 11 })
+  const PROGRESS = keyOf({ name: 'saveProgress', mediaId: 11, position: 0 })
+  const DELETED = { type: 'notice', message: 'Deleted S01E01 Good News after watching' } as const
+  const holding = (...entries: DownloadEntry[]): DownloadsState => ({
+    ...EMPTY_DOWNLOADS,
+    entries,
+  })
+  const settingUp = (
+    entry: Partial<DownloadEntry>,
+    { isPageReady = true }: { isPageReady?: boolean } = {},
+  ) =>
+    setup({
+      initial: holding(entryFor({ autoDelete: true, ...entry })),
+      videos: { [VIDEO]: FILE },
+      replies: { [PLAY]: NO_CONTENT, [PROGRESS]: NO_CONTENT },
+      isPageReady,
+    })
+  const entries = (world: World) => world.store.read().entries
+  /** Runs the timers set for this long, and no others. */
+  const fireAfter = (world: World, ms: number): void => {
+    const due = [...world.pending].filter(([, timer]) => timer.ms === ms)
+    due.forEach(([handle, timer]) => {
+      world.pending.delete(handle)
+      timer.run()
+    })
+  }
+  /** Lets `ms` go by on the clock, then runs the timers set for that long. */
+  const after = (world: World, ms: number): void => {
+    world.clock.now += ms
+    fireAfter(world, ms)
+  }
+  const delays = (world: World) => [...world.pending.values()].map(({ ms }) => ms)
+  const lastList = (world: World) => {
+    const last = world.sent.findLast((event) => event.type === 'downloads')
+    if (last?.type !== 'downloads') throw new Error('expected a downloads event')
+    return last.downloads
+  }
+  /** Opens the download as the Downloads page's Play does, and the play page describes it. */
+  const play = async (world: World): Promise<string> => {
+    const reply = await world.service.open({ downloadId: ID })
+    if (reply.type !== 'play') throw new Error(`expected play, got ${reply.type}`)
+    world.service.noteOpened({ fileId: reply.target.fileId })
+    return reply.target.fileId
+  }
+  /** Saves a position as the play page's savePosition does: the player state, then the download. */
+  const reach = (world: World, { fileId, position }: { fileId: string; position: number }) => {
+    world.state.update((state) =>
+      savePosition(state, {
+        file: { path: VIDEO, ...FILE },
+        position,
+        duration: 3000,
+        at: world.clock.now,
+      }),
+    )
+    world.service.notePosition({ fileId, position, duration: 3000 })
+  }
+
+  it('deletes a download ten minutes after it counts as watched, once its page has left it', async () => {
+    const world = settingUp({})
+    await ticks(10)
+    const fileId = await play(world)
+    reach(world, { fileId, position: 2800 })
+    expect(world.service.views()[0]?.deletesAt).toBe(NOW + AUTO_DELETE_DELAY_MS)
+    world.service.playbackLeft({ fileId })
+    after(world, AUTO_DELETE_DELAY_MS)
+    await until(() => entries(world).length === 0)
+    // What was watched reaches the server before the file goes.
+    expect(world.log).toEqual([PLAY, PROGRESS])
+    expect(world.sent).toContainEqual(DELETED)
+    fireAfter(world, DOWNLOADS_EVENT_MS)
+    expect(lastList(world)).toEqual([])
+  })
+
+  it('deletes at once at launch a download watched more than ten minutes before', async () => {
+    const world = settingUp({ watchedAt: NOW - 11 * MINUTE })
+    await until(() => entries(world).length === 0)
+    expect(world.sent).toContainEqual(DELETED)
+  })
+
+  it("starts the launch's clocks only once the page says ready, so it hears the notice", async () => {
+    const world = settingUp({ watchedAt: NOW - 11 * MINUTE }, { isPageReady: false })
+    await ticks(20)
+    expect(entries(world)).toHaveLength(1)
+    expect(world.sent).not.toContainEqual(DELETED)
+    world.service.pageReady()
+    await until(() => entries(world).length === 0)
+    expect(world.sent).toContainEqual(DELETED)
+    world.service.pageReady()
+    await ticks(10)
+    expect(world.sent.filter((event) => event.type === 'notice')).toEqual([DELETED])
+  })
+
+  it('resumes the clock at launch with what is left, and the row says when', async () => {
+    const world = settingUp({ watchedAt: NOW - 3 * MINUTE })
+    await until(() => world.service.views()[0]?.deletesAt !== null)
+    expect(world.service.views()[0]?.deletesAt).toBe(NOW + 7 * MINUTE)
+    expect(delays(world)).toContain(7 * MINUTE)
+    fireAfter(world, DOWNLOADS_EVENT_MS)
+    expect(lastList(world)[0]?.deletesAt).toBe(NOW + 7 * MINUTE)
+  })
+
+  it('deletes at once after a sleep that outlasted its ten minutes, once the wake has settled', async () => {
+    const world = settingUp({ watchedAt: NOW - 3 * MINUTE })
+    await until(() => world.service.views()[0]?.deletesAt !== null)
+    world.service.onSuspend()
+    // The clock's timer stood still for the hour the Mac slept.
+    world.clock.now += 60 * MINUTE
+    world.service.onResume()
+    await ticks(10)
+    expect(entries(world)).toHaveLength(1)
+    fireAfter(world, RESUME_SETTLE_MS)
+    await until(() => entries(world).length === 0)
+    expect(world.sent).toContainEqual(DELETED)
+    expect(delays(world)).not.toContain(7 * MINUTE)
+  })
+
+  it('starts the ten minutes from the switch for a title already watched, and stops them when switched off', async () => {
+    const world = settingUp({ autoDelete: false, watchedAt: NOW - 30 * MINUTE })
+    await ticks(10)
+    const on = downloadsOf(world.service.setAutoDelete({ downloadId: ID, autoDelete: true }))
+    expect(on.downloads[0]?.deletesAt).toBe(NOW + AUTO_DELETE_DELAY_MS)
+    await ticks(5)
+    expect(entries(world)).toHaveLength(1)
+    const off = downloadsOf(world.service.setAutoDelete({ downloadId: ID, autoDelete: false }))
+    expect(off.downloads[0]?.deletesAt).toBeNull()
+    expect(delays(world)).not.toContain(AUTO_DELETE_DELAY_MS)
+  })
+
+  it('holds a deletion while the html engine plays its file, and runs it once the page leaves', async () => {
+    const world = settingUp({ watchedAt: NOW - 3 * MINUTE })
+    await until(() => world.service.views()[0]?.deletesAt !== null)
+    const fileId = await play(world)
+    after(world, 7 * MINUTE)
+    await ticks(10)
+    expect(entries(world)).toHaveLength(1)
+    world.service.playbackLeft({ fileId: '00000000-0000-4000-8000-0000000000ff' })
+    await ticks(10)
+    expect(entries(world)).toHaveLength(1)
+    world.service.playbackLeft({ fileId })
+    await until(() => entries(world).length === 0)
+    expect(world.sent).toContainEqual(DELETED)
+  })
+
+  it('keeps a deletion held while the page plays its file though the engine stopped, until the page leaves', async () => {
+    const world = settingUp({ watchedAt: NOW - 3 * MINUTE })
+    await until(() => world.service.views()[0]?.deletesAt !== null)
+    const fileId = await play(world)
+    world.service.notePlaying({ fileId })
+    after(world, 7 * MINUTE)
+    await ticks(10)
+    world.service.notePlaying({ fileId: null })
+    await ticks(10)
+    expect(entries(world)).toHaveLength(1)
+    world.service.playbackLeft({ fileId })
+    await until(() => entries(world).length === 0)
+    expect(world.sent).toContainEqual(DELETED)
+  })
+
+  it('runs a deletion held for the file the engine plays once the engine is on nothing of this computer', async () => {
+    const world = settingUp({ watchedAt: NOW - 3 * MINUTE })
+    await until(() => world.service.views()[0]?.deletesAt !== null)
+    const fileId = await play(world)
+    world.service.notePlaying({ fileId })
+    world.service.playbackLeft({ fileId })
+    after(world, 7 * MINUTE)
+    await ticks(10)
+    expect(entries(world)).toHaveLength(1)
+    world.service.notePlaying({ fileId: null })
+    await until(() => entries(world).length === 0)
+  })
+
+  it('keeps a title scrubbed back to its middle, and deletes it once it is played to its end', async () => {
+    const world = settingUp({})
+    await ticks(10)
+    const fileId = await play(world)
+    reach(world, { fileId, position: 2850 })
+    reach(world, { fileId, position: 1500 })
+    world.service.playbackLeft({ fileId })
+    after(world, AUTO_DELETE_DELAY_MS)
+    await ticks(10)
+    expect(entries(world)).toHaveLength(1)
+    world.service.noteOpened({ fileId })
+    reach(world, { fileId, position: 3000 })
+    await ticks(10)
+    expect(entries(world)).toHaveLength(1)
+    world.service.playbackLeft({ fileId })
+    await until(() => entries(world).length === 0)
+  })
+
+  it('counts from the switch at the next launch, for a title watched long before it', async () => {
+    const before = settingUp({ autoDelete: false, watchedAt: NOW - 24 * 60 * MINUTE })
+    await ticks(10)
+    before.service.setAutoDelete({ downloadId: ID, autoDelete: true })
+    before.service.dispose()
+    const world = setup({
+      initial: before.store.read(),
+      videos: { [VIDEO]: FILE },
+      startAt: NOW + 5 * MINUTE,
+    })
+    await until(() => world.service.views()[0]?.deletesAt !== null)
+    expect(world.service.views()[0]?.deletesAt).toBe(NOW + AUTO_DELETE_DELAY_MS)
+    expect(entries(world)).toHaveLength(1)
+    after(world, 5 * MINUTE)
+    await until(() => entries(world).length === 0)
+  })
+
+  it('owes the server what it deleted while the server was unreachable, and sends it once back', async () => {
+    const owed = { play: true, position: 2800, furthest: 2800, at: NOW - 11 * MINUTE }
+    const world = setup({
+      initial: holding(entryFor({ autoDelete: true, watchedAt: NOW - 11 * MINUTE, pending: owed })),
+      videos: { [VIDEO]: FILE },
+      replies: { [PLAY]: { unreachable: 'offline' }, [PROGRESS]: { unreachable: 'offline' } },
+    })
+    await until(() => entries(world).length === 0)
+    expect(world.sent).toContainEqual(DELETED)
+    expect(world.store.read().owed).toEqual([{ serverId: SERVER_ID, mediaId: 11, pending: owed }])
+    world.table[PLAY] = NO_CONTENT
+    world.table[PROGRESS] = NO_CONTENT
+    const before = world.log.length
+    fireAfter(world, SYNC_RETRY_MS)
+    await until(() => world.store.read().owed.length === 0)
+    expect(world.log.slice(before)).toEqual([PLAY, PROGRESS])
+  })
+
+  describe('while its deletion waits on the server', () => {
+    /** Watched eleven minutes ago with a position still owed, its server holding the answer. */
+    const waiting = async () => {
+      const world = settingUp({
+        watchedAt: NOW - 11 * MINUTE,
+        pending: { play: false, position: 2800, furthest: 2800, at: NOW - 11 * MINUTE },
+      })
+      const answer = Promise.withResolvers<void>()
+      world.silence.until = answer.promise
+      await until(() => delays(world).includes(SYNC_DELETE_WAIT_MS))
+      return { world, release: answer.resolve }
+    }
+
+    it('keeps a download opened meanwhile, and deletes it once the page leaves', async () => {
+      const { world, release } = await waiting()
+      const fileId = await play(world)
+      release()
+      await ticks(10)
+      expect(entries(world)).toHaveLength(1)
+      expect(world.sent).not.toContainEqual(DELETED)
+      world.service.playbackLeft({ fileId })
+      await until(() => entries(world).length === 0)
+      expect(world.sent).toContainEqual(DELETED)
+    })
+
+    it('keeps a download switched off meanwhile', async () => {
+      const { world, release } = await waiting()
+      world.service.setAutoDelete({ downloadId: ID, autoDelete: false })
+      release()
+      await ticks(10)
+      expect(entries(world)).toHaveLength(1)
+      expect(world.sent).not.toContainEqual(DELETED)
+    })
+  })
+
+  it("deletes a playing download when the viewer asks, whatever its clock's rules", async () => {
+    const world = settingUp({})
+    await ticks(10)
+    await play(world)
+    await world.service.remove({ downloadId: ID })
+    expect(entries(world)).toEqual([])
+    expect(world.sent).not.toContainEqual(DELETED)
+  })
+
+  it.each([
+    ['remove', (world: World) => world.service.remove({ downloadId: ID })],
+    ['removeAll', (world: World) => world.service.removeAll()],
+    ['removeServer', (world: World) => world.service.removeServer({ serverId: SERVER_ID })],
+  ])('stops the clock of a download deleted through %s', async (_, removing) => {
+    const world = settingUp({ watchedAt: NOW - 3 * MINUTE })
+    await until(() => world.service.views()[0]?.deletesAt !== null)
+    await removing(world)
+    expect(delays(world)).not.toContain(7 * MINUTE)
+  })
+
+  it('stops its clocks on dispose', async () => {
+    const world = settingUp({ watchedAt: NOW - 3 * MINUTE })
+    await until(() => world.service.views()[0]?.deletesAt !== null)
+    world.service.dispose()
+    expect(delays(world)).not.toContain(7 * MINUTE)
   })
 })

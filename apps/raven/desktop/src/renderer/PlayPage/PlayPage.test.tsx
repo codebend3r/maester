@@ -205,6 +205,63 @@ describe('PlayPage', () => {
     expect(saves().length).toBeGreaterThan(0)
   })
 
+  it('tells main it left the file once the player saved where it was', async () => {
+    const client = fakeClient({ request: clips })
+    const { router } = renderDesktop({ client, route: `/play/${A}` })
+    const video = await videoElement()
+    fireEvent(video, new Event('playing'))
+    const sent = () => client.request.mock.calls.map(([request]) => request)
+    expect(sent()).not.toContainEqual({ type: 'playbackLeft', fileId: A })
+    await userEvent.click(screen.getByRole('button', { name: 'Back' }))
+    await waitFor(() => expect(sent()).toContainEqual({ type: 'playbackLeft', fileId: A }))
+    const saved = sent().findLastIndex(
+      (request) => request.type === 'savePosition' && request.fileId === A,
+    )
+    const left = sent().findIndex((request) => request.type === 'playbackLeft')
+    expect(saved).toBeGreaterThan(-1)
+    expect(left).toBeGreaterThan(saved)
+    expect(router.state.location.pathname).toBe('/')
+  })
+
+  it('tells main it left a file for the next one, and a file it could not open', async () => {
+    const client = fakeClient({
+      request: describing((fileId) =>
+        fileId === A ? { type: 'file', file: CLIP_A } : { type: 'refused', message: 'Gone.' },
+      ),
+    })
+    const { router } = renderDesktop({ client, route: `/play/${A}` })
+    await videoElement()
+    await act(() => router.navigate(`/play/${B}`))
+    await screen.findByText('Gone.')
+    const lefts = () =>
+      client.request.mock.calls
+        .map(([request]) => request)
+        .filter((request) => request.type === 'playbackLeft')
+    await waitFor(() => expect(lefts()).toEqual([{ type: 'playbackLeft', fileId: A }]))
+    await userEvent.click(screen.getByRole('button', { name: 'Home' }))
+    await waitFor(() =>
+      expect(lefts()).toEqual([
+        { type: 'playbackLeft', fileId: A },
+        { type: 'playbackLeft', fileId: B },
+      ]),
+    )
+  })
+
+  it("says it left only once it leaves, not for StrictMode's second run of its effects", async () => {
+    const client = fakeClient({ request: clips })
+    const { router } = renderDesktop({ client, route: `/play/${A}`, isStrict: true })
+    await videoElement()
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    const lefts = () =>
+      client.request.mock.calls.filter(([request]) => request.type === 'playbackLeft')
+    expect(lefts()).toEqual([])
+    await userEvent.click(screen.getByRole('button', { name: 'Back' }))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+    await waitFor(() => expect(lefts()).toHaveLength(1))
+  })
+
   it('names the page it shows while main describes the file', async () => {
     const pending = Promise.withResolvers<DesktopReply>()
     const client = fakeClient({

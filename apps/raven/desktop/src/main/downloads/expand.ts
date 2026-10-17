@@ -374,7 +374,7 @@ export const expandTarget = async ({
       media,
       label,
       group: { kind, key: groupKey, title: groupTitle, order },
-      watchedPercent: percents.value[media.libraryId] ?? 0,
+      watchedPercent: percents.value[media.libraryId],
     })),
   }
 }
