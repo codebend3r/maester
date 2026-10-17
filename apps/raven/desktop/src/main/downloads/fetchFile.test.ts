@@ -583,3 +583,31 @@ describe('an abort', () => {
     expect(clock.pending.size).toBe(0)
   })
 })
+
+describe('a server that never answers', () => {
+  it('stalls once the headers are late, and aborts the request', async () => {
+    const { timers, fire, pending } = fakeTimers()
+    const seen: { signal: AbortSignal | null } = { signal: null }
+    const fetch: StreamFetch = ({ signal }) => {
+      seen.signal = signal
+      return new Promise((_resolve, reject) => {
+        signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))
+      })
+    }
+    const { part } = fakePart()
+    const outcome = run({ fetch, part, expectedSize: 10, timers })
+    await settle()
+    expect([...pending.values()].map(({ ms }) => ms)).toEqual([DOWNLOAD_STALL_MS])
+    fire()
+    expect(await outcome).toEqual({ ok: false, reason: 'stalled', status: null, bytes: 0 })
+    expect(seen.signal?.aborted).toBe(true)
+  })
+
+  it('clears that wait once the headers come', async () => {
+    const { timers, pending } = fakeTimers()
+    const { fetch } = fakeFetch({ replies: [reply({ status: 200, body: bodyOf([bytesOf(10)]) })] })
+    const { part } = fakePart()
+    expect(await run({ fetch, part, expectedSize: 10, timers })).toEqual({ ok: true, bytes: 10 })
+    expect(pending.size).toBe(0)
+  })
+})
