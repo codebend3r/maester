@@ -51,6 +51,10 @@ export type ServerConfig = ListenConfig & {
   omdbApiKey: string | null
   /** OMDb calls a day; a free key allows 1,000. */
   omdbDailyLimit: number
+  /** MDBList's key, for Rotten Tomatoes and Metacritic scores of shows too; null leaves it out. Never logged or sent to a client. */
+  mdblistApiKey: string | null
+  /** MDBList calls a day; a free key allows 1,000. */
+  mdblistDailyLimit: number
   /** raven's own Anthropic key, for the AI lookup of what matching leaves; null turns it off. Never logged or sent to a client. */
   anthropicApiKey: string | null
   /** The model the AI lookup asks: `claude-haiku-5-5`. */
@@ -101,6 +105,8 @@ export const readServerConfig = (env: NodeJS.ProcessEnv = process.env): ServerCo
   metadataCountry: (env.METADATA_COUNTRY?.trim() || 'US').toUpperCase(),
   omdbApiKey: env.OMDB_API_KEY?.trim() || null,
   omdbDailyLimit: Math.max(1, wholeNumber(env.OMDB_DAILY_LIMIT) ?? 1000),
+  mdblistApiKey: env.MDBLIST_API_KEY?.trim() || null,
+  mdblistDailyLimit: Math.max(1, wholeNumber(env.MDBLIST_DAILY_LIMIT) ?? 1000),
   anthropicApiKey: env.ANTHROPIC_API_KEY?.trim() || null,
   aiMatchModel: env.AI_MATCH_MODEL?.trim() || 'claude-haiku-5-5',
   aiMatchEffort: aiEffortFrom(env.AI_MATCH_EFFORT),

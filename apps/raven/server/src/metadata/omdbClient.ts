@@ -1,8 +1,15 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { type RatingSource, isRecord, isString } from '@raven/core'
+import {
+  METADATA_SERVICE_STATES,
+  type MatchItemType,
+  type MetadataServiceState,
+  isRecord,
+  isString,
+} from '@raven/core'
 import { CONTENT_TYPES, HEADERS } from '@shared/server'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { ERROR_NAMES } from '@/errorMessage'
+import type { ExternalScore, ScoreSource } from '@/metadata/scoreSources'
 import { METADATA_FETCH, type MetadataFetch } from '@/metadata/tmdbClient'
 
 const API = 'https://www.omdbapi.com/'
@@ -12,32 +19,24 @@ const OMDB_RESPONSES = { false: 'False' } as const
 
 const TIMEOUT_MS = 10_000
 
-/** A score from OMDb, out of 10 whatever its source counts in. */
-export type OmdbScore = { source: RatingSource; value: number }
-
-export type OmdbState = {
-  state: 'off' | 'ok' | 'failing'
-  error: string | null
-  /** Calls made today, against the daily limit. */
-  used: number
-}
-
 /** OMDb's names for each source, and how its string reads: "7.5/10", "85%", "74/100". */
-const SOURCES: Record<string, { source: RatingSource; scale: number }> = {
+const SOURCES: Record<string, { source: ExternalScore['source']; scale: number }> = {
   'Internet Movie Database': { source: 'imdb', scale: 1 },
   'Rotten Tomatoes': { source: 'rottenTomatoes', scale: 10 },
   Metacritic: { source: 'metacritic', scale: 10 },
 }
 
 /** The scores in an OMDb answer, each brought to a mark out of 10. */
-export const parseOmdbRatings = (body: unknown): OmdbScore[] => {
+export const parseOmdbRatings = (body: unknown): ExternalScore[] => {
   const ratings = isRecord(body) && Array.isArray(body.Ratings) ? body.Ratings : []
-  return ratings.flatMap((entry): OmdbScore[] => {
+  return ratings.flatMap((entry): ExternalScore[] => {
     if (!isRecord(entry) || !isString(entry.Source) || !isString(entry.Value)) return []
     const known = SOURCES[entry.Source]
     const number = Number.parseFloat(entry.Value)
     if (!known || !Number.isFinite(number)) return []
-    return [{ source: known.source, value: Math.round((number / known.scale) * 10) / 10 }]
+    return [
+      { source: known.source, value: Math.round((number / known.scale) * 10) / 10, votes: null },
+    ]
   })
 }
 
@@ -51,7 +50,8 @@ const today = (): string => new Date().toISOString().slice(0, 10)
  * few days. A refused key stops calls until a restart.
  */
 @Injectable()
-export class OmdbClient {
+export class OmdbClient implements ScoreSource {
+  readonly provider = 'omdb'
   private readonly budget = { day: today(), used: 0 }
   private readonly status: { error: string | null; refused: boolean } = {
     error: null,
@@ -72,7 +72,7 @@ export class OmdbClient {
   }
 
   /** Whether there is a key, it has not been refused, and today's calls are not spent. */
-  get enabled(): boolean {
+  enabled(): boolean {
     return (
       this.config.omdbApiKey != null &&
       !this.status.refused &&
@@ -85,19 +85,27 @@ export class OmdbClient {
     return Math.max(0, this.config.omdbDailyLimit - this.usedToday())
   }
 
-  state(): OmdbState {
-    if (this.config.omdbApiKey == null) return { state: 'off', error: null, used: 0 }
-    return {
-      state: this.status.error == null ? 'ok' : 'failing',
-      error: this.status.error,
-      used: this.usedToday(),
-    }
+  state(): MetadataServiceState {
+    if (this.config.omdbApiKey == null) return METADATA_SERVICE_STATES.off
+    return this.status.error == null ? METADATA_SERVICE_STATES.ok : METADATA_SERVICE_STATES.failing
+  }
+
+  /** OMDb is asked by IMDb id, so a title without one is not known to it. */
+  async lookUp({
+    imdbId,
+  }: {
+    type: MatchItemType
+    tmdbId: string
+    imdbId: string | null
+  }): Promise<ExternalScore[] | 'unknown'> {
+    if (imdbId == null) return 'unknown'
+    return this.ratings(imdbId)
   }
 
   /** The scores OMDb has for an IMDb id; none when it knows nothing of it. */
-  async ratings(imdbId: string): Promise<OmdbScore[]> {
+  async ratings(imdbId: string): Promise<ExternalScore[]> {
     const key = this.config.omdbApiKey
-    if (key == null || !this.enabled) throw new Error('OMDb is not available right now.')
+    if (key == null || !this.enabled()) throw new Error('OMDb is not available right now.')
     this.usedToday()
     this.budget.used += 1
     const query = new URLSearchParams({ i: imdbId, apikey: key })

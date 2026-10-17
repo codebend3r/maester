@@ -24,7 +24,7 @@ import { DatabaseService } from '@/db/database'
 import { parseJsonAs } from '@/db/json'
 import { ItemImagesRepository, lineOf, versionOf } from '@/metadata/itemImagesRepository'
 import { LOCAL } from '@/metadata/localItems'
-import type { OmdbScore } from '@/metadata/omdbClient'
+import type { ExternalScore } from '@/metadata/scoreSources'
 import type { FetchedItem, FetchedSaga, MovieExtras } from '@/metadata/tmdbClient'
 
 /** Rotten Tomatoes and Metacritic are critics; TMDB and IMDb are audiences. */
@@ -656,7 +656,7 @@ export class MetadataRepository {
   }
 
   /** Replaces an item's scores from OMDb, and notes when they were fetched. */
-  saveScores({ itemId, scores }: { itemId: number; scores: readonly OmdbScore[] }): void {
+  saveScores({ itemId, scores }: { itemId: number; scores: readonly ExternalScore[] }): void {
     this.db.transaction(() => {
       this.db
         .prepare(

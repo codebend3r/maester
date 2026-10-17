@@ -298,7 +298,7 @@ export class MetadataService implements OnApplicationBootstrap {
     const tmdb = this.tmdb.state()
     return {
       tmdb: tmdb.state,
-      omdb: this.omdb.state().state,
+      omdb: this.omdb.state(),
       pending: this.files.countPending(MATCHED_KINDS),
       error: tmdb.error,
       lastOk: tmdb.lastOk,

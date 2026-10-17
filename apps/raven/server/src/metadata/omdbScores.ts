@@ -20,7 +20,7 @@ export class OmdbScores {
   ) {}
 
   async fetch({ itemId, imdbId }: { itemId: number; imdbId: string | null }): Promise<void> {
-    if (imdbId == null || !this.omdb.enabled) return
+    if (imdbId == null || !this.omdb.enabled()) return
     try {
       this.metadata.saveScores({ itemId, scores: await this.omdb.ratings(imdbId) })
     } catch (error) {
@@ -30,7 +30,7 @@ export class OmdbScores {
 
   /** Items whose OMDb scores are missing or a month old, as far as today's calls go. */
   async fillDue(): Promise<void> {
-    if (!this.omdb.enabled) return
+    if (!this.omdb.enabled()) return
     const due = this.metadata.needingScores({
       before: new Date(Date.now() - 30 * DAY_MS).toISOString(),
       limit: this.omdb.remaining(),
@@ -38,7 +38,7 @@ export class OmdbScores {
     await due.reduce(
       (previous, item) =>
         previous.then(() =>
-          this.omdb.enabled ? this.fetch({ itemId: item.id, imdbId: item.imdbId }) : undefined,
+          this.omdb.enabled() ? this.fetch({ itemId: item.id, imdbId: item.imdbId }) : undefined,
         ),
       Promise.resolve(),
     )
