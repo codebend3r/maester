@@ -1,10 +1,16 @@
 import { describe, expect, it, mock } from 'bun:test'
+import { PLAYER_COMMANDS, type PlayerCommand } from '@raven/core'
 import type { NativePlayer } from '@raven/ui'
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { connectionsOf, fakeClient, renderDesktop, STUB_ROUTES } from '@/renderer/test/render'
 import { reply, S, serverClient } from '@/renderer/test/serverFakes'
-import type { DesktopReply, DesktopRequest, LocalFile } from '@/shared/protocol'
+import {
+  DESKTOP_REQUESTS,
+  type DesktopReply,
+  type DesktopRequest,
+  type LocalFile,
+} from '@/shared/protocol'
 import { mediaItemFor } from '@/shared/test/mediaItem'
 
 const A = '11111111-1111-4111-8111-111111111111'
@@ -19,8 +25,8 @@ const openDialog = async ({
 } = {}) => {
   const client = fakeClient({
     request: async (asked: DesktopRequest) => {
-      if (asked.type === 'listRecents') return { type: 'recents', recents: [] }
-      if (asked.type !== 'openLink') return { type: 'done' }
+      if (asked.type === DESKTOP_REQUESTS.listRecents) return { type: 'recents', recents: [] }
+      if (asked.type !== DESKTOP_REQUESTS.openLink) return { type: 'done' }
       return typeof answer === 'function' ? answer() : answer
     },
   })
@@ -35,7 +41,7 @@ const openDialog = async ({
 const linkRequestsOf = (client: ReturnType<typeof fakeClient>): DesktopRequest[] =>
   client.request.mock.calls
     .map(([request]) => request)
-    .filter((request) => request.type === 'openLink')
+    .filter((request) => request.type === DESKTOP_REQUESTS.openLink)
 
 describe('OpenLinkDialog', () => {
   it('opens from the File menu, explains itself, and puts focus in the field', async () => {
@@ -163,7 +169,13 @@ const fakePlayer = () => {
 }
 
 /** What a player key would send: none of it may come from a key pressed in the dialog. */
-const PLAYER_COMMANDS = new Set(['play', 'pause', 'seek', 'volume', 'stop'])
+const KEY_COMMANDS: ReadonlySet<PlayerCommand['type']> = new Set([
+  PLAYER_COMMANDS.play,
+  PLAYER_COMMANDS.pause,
+  PLAYER_COMMANDS.seek,
+  PLAYER_COMMANDS.volume,
+  PLAYER_COMMANDS.stop,
+])
 
 const CLIP: LocalFile = {
   fileId: A,
@@ -202,12 +214,14 @@ describe('OpenLinkDialog over a playing video', () => {
     })
     await screen.findByRole('heading', { name: 'Episode 1' })
     await waitFor(() =>
-      expect(fake.send.mock.calls.some(([command]) => command.type === 'load')).toBe(true),
+      expect(fake.send.mock.calls.some(([command]) => command.type === PLAYER_COMMANDS.load)).toBe(
+        true,
+      ),
     )
     const before = fake.send.mock.calls.length
     await pressOverPlayer(client)
     const after = fake.send.mock.calls.slice(before).map(([command]) => command.type)
-    expect(after.filter((type) => PLAYER_COMMANDS.has(type))).toEqual([])
+    expect(after.filter((type) => KEY_COMMANDS.has(type))).toEqual([])
     expect(router.state.location.pathname).toBe(`/server/${S}/7`)
     expect(screen.getByRole('heading', { name: 'Episode 1' })).toBeInTheDocument()
   })
@@ -215,8 +229,8 @@ describe('OpenLinkDialog over a playing video', () => {
   it('keeps its keys from a local video, and Escape closes only the dialog', async () => {
     const client = fakeClient({
       request: async (asked) => {
-        if (asked.type === 'describeFile') return { type: 'file', file: CLIP }
-        if (asked.type === 'listRecents') return { type: 'recents', recents: [] }
+        if (asked.type === DESKTOP_REQUESTS.describeFile) return { type: 'file', file: CLIP }
+        if (asked.type === DESKTOP_REQUESTS.listRecents) return { type: 'recents', recents: [] }
         return { type: 'done' }
       },
     })

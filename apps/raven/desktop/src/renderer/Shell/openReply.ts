@@ -54,20 +54,20 @@ export const applyReply = ({
   showNotice: (message: string) => void
 }) => {
   switch (reply.type) {
-    case 'play':
+    case DESKTOP_REPLIES.play:
       return void play({ navigate, pathname, target: reply.target })
-    case 'playServer':
+    case DESKTOP_REPLIES.playServer:
       return void playServer({ navigate, pathname, target: reply.target })
-    case 'refused':
+    case DESKTOP_REPLIES.refused:
       return showNotice(reply.message)
-    case 'file':
-    case 'recents':
-    case 'output':
-    case 'done':
-    case 'servers':
-    case 'serverReply':
-    case 'serverUnreachable':
-    case 'updates':
+    case DESKTOP_REPLIES.file:
+    case DESKTOP_REPLIES.recents:
+    case DESKTOP_REPLIES.output:
+    case DESKTOP_REPLIES.done:
+    case DESKTOP_REPLIES.servers:
+    case DESKTOP_REPLIES.serverReply:
+    case DESKTOP_REPLIES.serverUnreachable:
+    case DESKTOP_REPLIES.updates:
       return
     default: {
       const unreachable: never = reply

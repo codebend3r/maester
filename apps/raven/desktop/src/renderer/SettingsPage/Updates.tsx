@@ -59,8 +59,8 @@ export const Updates = ({ className }: { className?: string }) => {
     queryKey: UPDATES_KEY,
     queryFn: async (): Promise<UpdateStatus> => {
       const reply = await client.request({ type: 'readUpdates' })
-      if (reply.type === 'updates') return reply.status
-      throw new Error(reply.type === 'refused' ? reply.message : UNREADABLE)
+      if (reply.type === DESKTOP_REPLIES.updates) return reply.status
+      throw new Error(reply.type === DESKTOP_REPLIES.refused ? reply.message : UNREADABLE)
     },
     retry: false,
   })
@@ -70,13 +70,18 @@ export const Updates = ({ className }: { className?: string }) => {
     request,
     fallback,
   }: {
-    request: Extract<DesktopRequest, { type: 'setUpdateCheck' | 'checkForUpdates' }>
+    request: Extract<
+      DesktopRequest,
+      { type: typeof DESKTOP_REQUESTS.setUpdateCheck | typeof DESKTOP_REQUESTS.checkForUpdates }
+    >
     fallback: string
   }): Promise<boolean> => {
     setRefusal('')
     const reply = await client.request(request).catch(() => null)
-    if (reply === null || reply.type !== 'updates') {
-      setRefusal(reply !== null && reply.type === 'refused' ? reply.message : fallback)
+    if (reply === null || reply.type !== DESKTOP_REPLIES.updates) {
+      setRefusal(
+        reply !== null && reply.type === DESKTOP_REPLIES.refused ? reply.message : fallback,
+      )
       return false
     }
     queryClient.setQueryData(UPDATES_KEY, reply.status)

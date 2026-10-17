@@ -40,19 +40,37 @@ export const endAfterLog = async ({
  * it. The kill skips Chromium's own shutdown (the page's last localStorage writes, such
  * as its player preferences, can be lost) and the process exits with 137.
  */
-export const hardExitFor = ({ isEngineAlive }: { isEngineAlive: boolean }): 'kill' | 'exit' =>
-  isEngineAlive ? 'kill' : 'exit'
+export const HARD_EXITS = { kill: 'kill', exit: 'exit' } as const
+
+export const hardExitFor = ({
+  isEngineAlive,
+}: {
+  isEngineAlive: boolean
+}): (typeof HARD_EXITS)[keyof typeof HARD_EXITS] =>
+  isEngineAlive ? HARD_EXITS.kill : HARD_EXITS.exit
 
 /**
  * What a window close does once it stops waiting on mpv. With mpv alive, disposing the
  * window would pull its surface away and skip the stores, so the app quits instead and
  * its own gate flushes them; with mpv gone the window can go.
  */
+export const CLOSE_TIMEOUTS = { quitApp: 'quitApp', destroyWindow: 'destroyWindow' } as const
+
 export const closeTimeoutFor = ({
   isEngineAlive,
 }: {
   isEngineAlive: boolean
-}): 'quitApp' | 'destroyWindow' => (isEngineAlive ? 'quitApp' : 'destroyWindow')
+}): (typeof CLOSE_TIMEOUTS)[keyof typeof CLOSE_TIMEOUTS] =>
+  isEngineAlive ? CLOSE_TIMEOUTS.quitApp : CLOSE_TIMEOUTS.destroyWindow
+
+/** How each step of quitting ended; only running out of time changes what comes next. */
+const STEP_OUTCOMES = {
+  stopped: 'stopped',
+  failed: 'failed',
+  settled: 'settled',
+  flushed: 'flushed',
+  timedOut: 'timedOut',
+} as const
 
 /**
  * What quitting waits on, in the order it must happen: mpv stops while the saves in
@@ -95,15 +113,15 @@ export const createShutdown = ({
     if (hasTimedOut || !engine.isAlive()) return
     const outcome = await Promise.race([
       engine.destroy().then(
-        () => 'stopped' as const,
+        () => STEP_OUTCOMES.stopped,
         (error: unknown) => {
           warn(`raven player could not stop its video engine: ${messageOf(error)}`)
-          return 'failed' as const
+          return STEP_OUTCOMES.failed
         },
       ),
-      wait(DESTROY_MS).then(() => 'timedOut' as const),
+      wait(DESTROY_MS).then(() => STEP_OUTCOMES.timedOut),
     ])
-    if (outcome !== 'timedOut') return
+    if (outcome !== STEP_OUTCOMES.timedOut) return
     hasTimedOut = true
     warn(`raven player's video engine did not stop within ${DESTROY_MS} ms.`)
   }
@@ -112,12 +130,12 @@ export const createShutdown = ({
     if (!hasPendingWrites()) return
     const outcome = await Promise.race([
       writes.settle().then(
-        () => 'settled' as const,
-        () => 'settled' as const,
+        () => STEP_OUTCOMES.settled,
+        () => STEP_OUTCOMES.settled,
       ),
-      wait(DESTROY_MS).then(() => 'timedOut' as const),
+      wait(DESTROY_MS).then(() => STEP_OUTCOMES.timedOut),
     ])
-    if (outcome !== 'timedOut') return
+    if (outcome !== STEP_OUTCOMES.timedOut) return
     hasWritesTimedOut = true
     warn(`raven player's saves to a server did not finish within ${DESTROY_MS} ms.`)
   }
@@ -126,12 +144,12 @@ export const createShutdown = ({
     if (!hasPendingLog()) return
     const outcome = await Promise.race([
       log.flush().then(
-        () => 'flushed' as const,
-        () => 'flushed' as const,
+        () => STEP_OUTCOMES.flushed,
+        () => STEP_OUTCOMES.flushed,
       ),
-      wait(LOG_FLUSH_MS).then(() => 'timedOut' as const),
+      wait(LOG_FLUSH_MS).then(() => STEP_OUTCOMES.timedOut),
     ])
-    if (outcome !== 'timedOut') return
+    if (outcome !== STEP_OUTCOMES.timedOut) return
     hasLogTimedOut = true
     warn(`raven player's log did not write within ${LOG_FLUSH_MS} ms.`)
   }

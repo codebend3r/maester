@@ -157,9 +157,8 @@ export const DESKTOP_REQUESTS = {
 
 /** What the page asks main for. No variant carries a file path; a server call names its server by id. */
 export const isDesktopRequest = union(
-  object({ type: oneOf(['ready']) }),
-  object({ type: oneOf(['openDialog']) }),
-  object({ type: oneOf(['describeFile']), fileId: isOpaqueId, queue: listOf(isOpaqueId) }),
+  object({ type: oneOf([DESKTOP_REQUESTS.ready]) }),
+  object({ type: oneOf([DESKTOP_REQUESTS.openDialog]) }),
   object({
     type: oneOf([DESKTOP_REQUESTS.describeFile]),
     fileId: isOpaqueId,
@@ -176,16 +175,16 @@ export const isDesktopRequest = union(
   object({ type: oneOf([DESKTOP_REQUESTS.removeRecent]), recentId: isOpaqueId }),
   object({ type: oneOf([DESKTOP_REQUESTS.clearRecents]) }),
   object({
-    type: oneOf(['saveTracks']),
+    type: oneOf([DESKTOP_REQUESTS.saveTracks]),
     fileId: isOpaqueId,
     audio: nullable(isTrackIndex),
     subtitle: nullable(isString),
   }),
-  object({ type: oneOf(['windowButtons']), isVisible: isBoolean }),
-  object({ type: oneOf(['readOutput']) }),
-  object({ type: oneOf(['writeOutput']), output: isOutputSettings }),
+  object({ type: oneOf([DESKTOP_REQUESTS.windowButtons]), isVisible: isBoolean }),
+  object({ type: oneOf([DESKTOP_REQUESTS.readOutput]) }),
+  object({ type: oneOf([DESKTOP_REQUESTS.writeOutput]), output: isOutputSettings }),
   object({
-    type: oneOf(['serverCall']),
+    type: oneOf([DESKTOP_REQUESTS.serverCall]),
     serverId: isOpaqueId,
     method: isServerMethod,
     path: isString,
@@ -197,17 +196,22 @@ export const isDesktopRequest = union(
   object({ type: oneOf([DESKTOP_REQUESTS.removeServer]), serverId: isOpaqueId }),
   object({ type: oneOf([DESKTOP_REQUESTS.openLink]), link: isString }),
   object({
-    type: oneOf(['noteServerTitle']),
+    type: oneOf([DESKTOP_REQUESTS.openInBrowser]),
+    serverId: isOpaqueId,
+    mediaId: isMediaId,
+  }),
+  object({
+    type: oneOf([DESKTOP_REQUESTS.noteServerTitle]),
     serverId: isOpaqueId,
     mediaId: isMediaId,
     label: isString,
     watched: nullable(isNumber),
   }),
-  object({ type: oneOf(['readUpdates']) }),
-  object({ type: oneOf(['setUpdateCheck']), isEnabled: isBoolean }),
-  object({ type: oneOf(['checkForUpdates']) }),
+  object({ type: oneOf([DESKTOP_REQUESTS.readUpdates]) }),
+  object({ type: oneOf([DESKTOP_REQUESTS.setUpdateCheck]), isEnabled: isBoolean }),
+  object({ type: oneOf([DESKTOP_REQUESTS.checkForUpdates]) }),
   // No URL: main opens the release page it built from the tag (Ruling 19).
-  object({ type: oneOf(['openRelease']) }),
+  object({ type: oneOf([DESKTOP_REQUESTS.openRelease]) }),
 )
 
 export type DesktopRequest = Infer<typeof isDesktopRequest>
@@ -227,22 +231,22 @@ export const DESKTOP_REPLIES = {
 } as const
 
 export const isDesktopReply = union(
-  object({ type: oneOf(['play']), target: isPlayTarget }),
-  object({ type: oneOf(['playServer']), target: isServerTarget }),
-  object({ type: oneOf(['file']), file: isLocalFile }),
-  object({ type: oneOf(['recents']), recents: listOf(isRecentView) }),
+  object({ type: oneOf([DESKTOP_REPLIES.play]), target: isPlayTarget }),
+  object({ type: oneOf([DESKTOP_REPLIES.playServer]), target: isServerTarget }),
+  object({ type: oneOf([DESKTOP_REPLIES.file]), file: isLocalFile }),
+  object({ type: oneOf([DESKTOP_REPLIES.recents]), recents: listOf(isRecentView) }),
   object({
-    type: oneOf(['output']),
+    type: oneOf([DESKTOP_REPLIES.output]),
     output: isOutputSettings,
     devices: listOf(isAudioDevice),
     isEngineReady: isBoolean,
   }),
-  object({ type: oneOf(['done']) }),
-  object({ type: oneOf(['refused']), message: isString }),
-  object({ type: oneOf(['serverReply']), status: isNumber, body: isString }),
-  object({ type: oneOf(['serverUnreachable']), message: isString }),
-  object({ type: oneOf(['servers']), servers: listOf(isServerView) }),
-  object({ type: oneOf(['updates']), status: isUpdateStatus }),
+  object({ type: oneOf([DESKTOP_REPLIES.done]) }),
+  object({ type: oneOf([DESKTOP_REPLIES.refused]), message: isString }),
+  object({ type: oneOf([DESKTOP_REPLIES.serverReply]), status: isNumber, body: isString }),
+  object({ type: oneOf([DESKTOP_REPLIES.serverUnreachable]), message: isString }),
+  object({ type: oneOf([DESKTOP_REPLIES.servers]), servers: listOf(isServerView) }),
+  object({ type: oneOf([DESKTOP_REPLIES.updates]), status: isUpdateStatus }),
 )
 
 export type DesktopReply = Infer<typeof isDesktopReply>
@@ -280,8 +284,8 @@ export const ENVELOPE_KINDS = { page: 'page', drop: 'drop' } as const
  * carries paths (taken from the dropped files by `webUtils`, never from the page).
  */
 export const isInvokeEnvelope = union(
-  object({ kind: oneOf(['page']), request: isDesktopRequest }),
-  object({ kind: oneOf(['drop']), paths: listOf(isString) }),
+  object({ kind: oneOf([ENVELOPE_KINDS.page]), request: isDesktopRequest }),
+  object({ kind: oneOf([ENVELOPE_KINDS.drop]), paths: listOf(isString) }),
 )
 
 export type InvokeEnvelope = Infer<typeof isInvokeEnvelope>
@@ -289,8 +293,8 @@ export type InvokeEnvelope = Infer<typeof isInvokeEnvelope>
 export const PLAYER_CONNECTION_STATUSES = { native: 'native', unavailable: 'unavailable' } as const
 
 export const isPlayerConnection = union(
-  object({ status: oneOf(['native']) }),
-  object({ status: oneOf(['unavailable']), message: isString }),
+  object({ status: oneOf([PLAYER_CONNECTION_STATUSES.native]) }),
+  object({ status: oneOf([PLAYER_CONNECTION_STATUSES.unavailable]), message: isString }),
 )
 
 export type PlayerConnectionStatus = Infer<typeof isPlayerConnection>

@@ -2,14 +2,15 @@ import {
   isPlayerConnection,
   PLAYER_CONNECTION_STATUSES,
   type PlayerConnectionStatus,
+  WINDOW_MESSAGE_TYPES,
 } from '@/shared/protocol'
 
 const rebuild = (connection: PlayerConnectionStatus): PlayerConnectionStatus => {
   switch (connection.status) {
-    case 'native':
-      return { status: 'native' }
-    case 'unavailable':
-      return { status: 'unavailable', message: connection.message }
+    case PLAYER_CONNECTION_STATUSES.native:
+      return { status: PLAYER_CONNECTION_STATUSES.native }
+    case PLAYER_CONNECTION_STATUSES.unavailable:
+      return { status: PLAYER_CONNECTION_STATUSES.unavailable, message: connection.message }
     default: {
       const unreachable: never = connection
       return unreachable

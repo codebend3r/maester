@@ -1,4 +1,11 @@
-import { isPlayerEvent, isPlayerReply, type PlayerEvent } from '@raven/core'
+import {
+  isPlayerEvent,
+  isPlayerReply,
+  PLAYER_ERROR_REASONS,
+  PLAYER_EVENTS,
+  PLAYER_REFUSAL_REASONS,
+  type PlayerEvent,
+} from '@raven/core'
 import type { NativePlayer } from '@raven/ui'
 import { useSyncExternalStore } from 'react'
 import { useDesktop } from '@/renderer/stores/desktop'
@@ -8,9 +15,9 @@ import { isPlayerPortMessage, PLAYER_CONNECTION_STATUSES } from '@/shared/protoc
 export const CONNECTION_STATUSES = { waiting: 'waiting', ...PLAYER_CONNECTION_STATUSES } as const
 
 export type PlayerConnection =
-  | { status: 'waiting' }
-  | { status: 'native'; player: NativePlayer }
-  | { status: 'unavailable'; message: string }
+  | { status: typeof CONNECTION_STATUSES.waiting }
+  | { status: typeof CONNECTION_STATUSES.native; player: NativePlayer }
+  | { status: typeof CONNECTION_STATUSES.unavailable; message: string }
 
 export type PlayerConnections = {
   read: () => PlayerConnection
@@ -103,7 +110,10 @@ export const nativePlayerOver = ({
         return
       }
       entry.reject(
-        new PlayerRefusal({ message: data.message, isEngineGone: data.reason === 'engine' }),
+        new PlayerRefusal({
+          message: data.message,
+          isEngineGone: data.reason === PLAYER_REFUSAL_REASONS.engine,
+        }),
       )
       return
     }
@@ -146,7 +156,7 @@ export const nativePlayerOver = ({
   }
 }
 
-const WAITING: PlayerConnection = { status: 'waiting' }
+const WAITING: PlayerConnection = { status: CONNECTION_STATUSES.waiting }
 
 /** A refusal that means the native engine is gone for good: main said mpv stopped, or the port closed. */
 export const isEngineGone = (error: unknown): error is PlayerRefusal =>
@@ -155,8 +165,8 @@ export const isEngineGone = (error: unknown): error is PlayerRefusal =>
 /** The event main sends once when mpv stops under the page. */
 export const isEngineStop = (
   event: PlayerEvent,
-): event is Extract<PlayerEvent, { type: 'error' }> =>
-  event.type === 'error' && event.reason === 'engine'
+): event is Extract<PlayerEvent, { type: typeof PLAYER_EVENTS.error }> =>
+  event.type === PLAYER_EVENTS.error && event.reason === PLAYER_ERROR_REASONS.engine
 
 /**
  * Waits for the preload to hand over main's player. Only a message posted to this window
@@ -189,7 +199,7 @@ export const listenForPlayer = ({
   }
 
   const lose = (message: string) => {
-    if (connection.status !== 'native' || opened === null) return
+    if (connection.status !== CONNECTION_STATUSES.native || opened === null) return
     const gone = opened
     opened = null
     become({ status: 'unavailable', message })
@@ -212,7 +222,7 @@ export const listenForPlayer = ({
   }
 
   const deadline = setTimeout(() => {
-    if (connection.status !== 'waiting') return
+    if (connection.status !== CONNECTION_STATUSES.waiting) return
     become({ status: 'unavailable', message: PLAYER_NOT_HANDED })
   }, waitMs)
 
@@ -220,21 +230,21 @@ export const listenForPlayer = ({
     if (event.origin !== origin || event.source !== target) return
     const { data, ports } = event
     if (!isPlayerPortMessage(data)) return
-    if (connection.status !== 'waiting') {
+    if (connection.status !== CONNECTION_STATUSES.waiting) {
       // Main stops what it drives over a port it sees closed.
       ports.forEach((port) => port.close())
       return
     }
     const { connection: offered } = data
     switch (offered.status) {
-      case 'native': {
+      case PLAYER_CONNECTION_STATUSES.native: {
         const [port] = ports
         if (port === undefined || ports.length !== 1) return
         opened = nativePlayerOver({ port, timeoutMs: REPLY_TIMEOUT_MS })
         become({ status: 'native', player: watched(opened) })
         return
       }
-      case 'unavailable':
+      case PLAYER_CONNECTION_STATUSES.unavailable:
         if (ports.length !== 0) return
         become({ status: 'unavailable', message: offered.message })
         return

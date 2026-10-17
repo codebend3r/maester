@@ -1,5 +1,5 @@
 import { describe, expect, it, mock } from 'bun:test'
-import type { PlayerCommand, PlayerEvent } from '@raven/core'
+import { PLAYER_COMMANDS, type PlayerCommand, type PlayerEvent } from '@raven/core'
 import type { NativePlayer } from '@raven/ui'
 import { act, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -16,7 +16,7 @@ import {
   serverCallsOf,
   serverClient,
 } from '@/renderer/test/serverFakes'
-import { type DesktopReply, ENGINE_STOPPED } from '@/shared/protocol'
+import { DESKTOP_REQUESTS, type DesktopReply, ENGINE_STOPPED } from '@/shared/protocol'
 import { mediaItemFor } from '@/shared/test/mediaItem'
 
 const OTHER = '44444444-4444-4444-8444-444444444444'
@@ -53,12 +53,14 @@ type FakePlayer = ReturnType<typeof fakePlayer>
 const loadsOf = (fake: FakePlayer): Extract<PlayerCommand, { type: 'load' }>[] =>
   fake.send.mock.calls
     .map(([command]) => command)
-    .flatMap((command) => (command.type === 'load' ? [command] : []))
+    .flatMap((command) => (command.type === PLAYER_COMMANDS.load ? [command] : []))
 
 /** The player took the load: it sends its caption size only once the load is answered. */
 const loaded = ({ fake, count = 1 }: { fake: FakePlayer; count?: number }) =>
   waitFor(() => {
-    const scales = fake.send.mock.calls.filter(([command]) => command.type === 'subtitleScale')
+    const scales = fake.send.mock.calls.filter(
+      ([command]) => command.type === PLAYER_COMMANDS.subtitleScale,
+    )
     expect(scales).toHaveLength(count)
   })
 
@@ -300,7 +302,7 @@ describe('ServerPage', () => {
   it('offers no browser under Unplayable when main refuses the server source', async () => {
     const { fake } = playTitle({ calls: { 'GET /api/media/7': reply({ body: EPISODE }) } })
     fake.send.mockImplementation(async (command) => {
-      if (command.type === 'load') {
+      if (command.type === PLAYER_COMMANDS.load) {
         throw new PlayerRefusal({ message: MAIN_SERVER_GONE, isEngineGone: false })
       }
     })
@@ -502,7 +504,9 @@ describe('ServerPage', () => {
     const asked = () =>
       client.request.mock.calls
         .map(([request]) => request.type)
-        .filter((type) => type === 'listServers' || type === 'serverCall')
+        .filter(
+          (type) => type === DESKTOP_REQUESTS.listServers || type === DESKTOP_REQUESTS.serverCall,
+        )
     expect(asked()).toEqual([])
   })
 
@@ -514,7 +518,9 @@ describe('ServerPage', () => {
     ).toBeInTheDocument()
     expect(
       client.request.mock.calls.filter(
-        ([request]) => request.type === 'listServers' || request.type === 'serverCall',
+        ([request]) =>
+          request.type === DESKTOP_REQUESTS.listServers ||
+          request.type === DESKTOP_REQUESTS.serverCall,
       ),
     ).toEqual([])
   })

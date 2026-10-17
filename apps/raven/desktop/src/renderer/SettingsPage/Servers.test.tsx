@@ -4,7 +4,12 @@ import userEvent from '@testing-library/user-event'
 import { RECENTS_KEY } from '@/renderer/Shell/openReply'
 import { fakeClient, renderDesktop } from '@/renderer/test/render'
 import { S, VHAGAR } from '@/renderer/test/serverFakes'
-import type { DesktopReply, DesktopRequest, ServerView } from '@/shared/protocol'
+import {
+  DESKTOP_REQUESTS,
+  type DesktopReply,
+  type DesktopRequest,
+  type ServerView,
+} from '@/shared/protocol'
 
 const T = '44444444-4444-4444-8444-444444444444'
 
@@ -35,9 +40,9 @@ const mainWith = ({
   const client = fakeClient({
     request: async (asked: DesktopRequest) => {
       switch (asked.type) {
-        case 'listServers':
+        case DESKTOP_REQUESTS.listServers:
           return listed()
-        case 'listRecents':
+        case DESKTOP_REQUESTS.listRecents:
           return { type: 'recents', recents: [] }
         case DESKTOP_REQUESTS.addServer:
           if (answers.addServer !== undefined) return answers.addServer
@@ -490,7 +495,7 @@ describe('Servers', () => {
   it('says so when the servers cannot be read', async () => {
     const client = fakeClient({
       request: async (asked) =>
-        asked.type === 'listServers'
+        asked.type === DESKTOP_REQUESTS.listServers
           ? { type: 'refused', message: 'raven player could not read its servers.' }
           : { type: 'done' },
     })

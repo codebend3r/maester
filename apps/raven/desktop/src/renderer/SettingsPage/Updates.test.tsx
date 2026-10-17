@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'bun:test'
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { fakeClient, renderDesktop } from '@/renderer/test/render'
-import type { DesktopReply, DesktopRequest, UpdateStatus } from '@/shared/protocol'
+import {
+  DESKTOP_REQUESTS,
+  type DesktopReply,
+  type DesktopRequest,
+  type UpdateStatus,
+} from '@/shared/protocol'
 
 const FRESH: UpdateStatus = {
   isEnabled: true,
@@ -28,17 +33,17 @@ const mainWith = ({
   const client = fakeClient({
     request: async (asked: DesktopRequest): Promise<DesktopReply> => {
       switch (asked.type) {
-        case 'readUpdates':
+        case DESKTOP_REQUESTS.readUpdates:
           return { type: 'updates', status: stored.status }
-        case 'setUpdateCheck':
+        case DESKTOP_REQUESTS.setUpdateCheck:
           stored.status = { ...stored.status, isEnabled: asked.isEnabled }
           return { type: 'updates', status: stored.status }
-        case 'checkForUpdates':
+        case DESKTOP_REQUESTS.checkForUpdates:
           stored.status = { ...checked, isEnabled: stored.status.isEnabled }
           return { type: 'updates', status: stored.status }
-        case 'openRelease':
+        case DESKTOP_REQUESTS.openRelease:
           return opened
-        case 'listRecents':
+        case DESKTOP_REQUESTS.listRecents:
           return { type: 'recents', recents: [] }
         default:
           return { type: 'done' }
@@ -114,9 +119,9 @@ describe('Updates', () => {
     const replies: Array<(reply: DesktopReply) => void> = []
     const client = fakeClient({
       request: async (asked) => {
-        if (asked.type === 'readUpdates') return { type: 'updates', status: FRESH }
-        if (asked.type === 'listRecents') return { type: 'recents', recents: [] }
-        if (asked.type !== 'setUpdateCheck') return { type: 'done' }
+        if (asked.type === DESKTOP_REQUESTS.readUpdates) return { type: 'updates', status: FRESH }
+        if (asked.type === DESKTOP_REQUESTS.listRecents) return { type: 'recents', recents: [] }
+        if (asked.type !== DESKTOP_REQUESTS.setUpdateCheck) return { type: 'done' }
         const reply = Promise.withResolvers<DesktopReply>()
         replies.push(reply.resolve)
         return reply.promise
@@ -177,6 +182,29 @@ describe('Updates', () => {
     await userEvent.click(await within(section).findByRole('button', { name: "See what's new" }))
     await waitFor(() => expect(screen.queryByRole('complementary', { name: 'Update' })).toBeNull())
     expect(within(section).getByRole('button', { name: "See what's new" })).toHaveFocus()
+  })
+
+  it("keeps the place when Settings hides the Shell's notice while it holds focus", async () => {
+    const opened = Promise.withResolvers<DesktopReply>()
+    const client = fakeClient({
+      request: async (asked) => {
+        if (asked.type === DESKTOP_REQUESTS.readUpdates) {
+          return { type: 'updates', status: { ...FRESH, latest: '0.6.0' } }
+        }
+        if (asked.type === DESKTOP_REQUESTS.openRelease) return opened.promise
+        if (asked.type === DESKTOP_REQUESTS.listRecents) return { type: 'recents', recents: [] }
+        return { type: 'done' }
+      },
+    })
+    renderDesktop({ client, route: '/settings' })
+    const section = await screen.findByRole('region', { name: 'Updates' })
+    await client.emit({ type: 'updateAvailable', version: '0.6.0' })
+    const notice = screen.getByRole('complementary', { name: 'Update' })
+    await userEvent.click(await within(section).findByRole('button', { name: "See what's new" }))
+    within(notice).getByRole('button', { name: 'Dismiss' }).focus()
+    await act(async () => opened.resolve({ type: 'done' }))
+    expect(screen.queryByRole('complementary', { name: 'Update' })).toBeNull()
+    expect(screen.getByRole('heading', { name: 'Settings', level: 1 })).toHaveFocus()
   })
 
   it('says why main could not open the release page', async () => {

@@ -11,7 +11,7 @@ import { OUTPUT_KEY } from '@/renderer/PlayPage/playerServices'
 import styles from '@/renderer/SettingsPage/ThisComputer.module.scss'
 import { useDesktop } from '@/renderer/stores/desktop'
 import { CARRIED_FORMATS, carriesPassthrough } from '@/shared/carriedOutput'
-import type { AudioDevice } from '@/shared/protocol'
+import { type AudioDevice, DESKTOP_REPLIES } from '@/shared/protocol'
 
 /** Under `OUTPUT_KEY`, so saving invalidates this read and the Play page's together. */
 const COMPUTER_KEY = [...OUTPUT_KEY, 'computer'] as const
@@ -54,8 +54,8 @@ export const ThisComputer = ({ className }: { className?: string }) => {
     queryKey: COMPUTER_KEY,
     queryFn: async (): Promise<Read> => {
       const reply = await client.request({ type: 'readOutput' })
-      if (reply.type === 'output') return reply
-      throw new Error(reply.type === 'refused' ? reply.message : UNREADABLE)
+      if (reply.type === DESKTOP_REPLIES.output) return reply
+      throw new Error(reply.type === DESKTOP_REPLIES.refused ? reply.message : UNREADABLE)
     },
     staleTime: Infinity,
     retry: false,
@@ -69,9 +69,9 @@ export const ThisComputer = ({ className }: { className?: string }) => {
   const write = async ({ pick, base }: { pick: Pick; base: OutputSettings }) => {
     const next = pick.apply(confirmed.current ?? base)
     const reply = await client.request({ type: 'writeOutput', output: next }).catch(() => null)
-    if (reply === null || reply.type !== 'done') {
+    if (reply === null || reply.type !== DESKTOP_REPLIES.done) {
       settle(pick.id)
-      setRefusal(reply !== null && reply.type === 'refused' ? reply.message : UNSAVED)
+      setRefusal(reply !== null && reply.type === DESKTOP_REPLIES.refused ? reply.message : UNSAVED)
       return
     }
     confirmed.current = next
@@ -112,7 +112,7 @@ export const ThisComputer = ({ className }: { className?: string }) => {
       }
     })
 
-  const devices = (read.data?.devices ?? []).filter((device) => device.name !== 'auto')
+  const devices = (read.data?.devices ?? []).filter((device) => device.name !== AUDIO_DEVICES.auto)
   const isListed = (name: string) => devices.some((device) => device.name === name)
   const isEngineReady = read.data?.isEngineReady ?? false
   const isDeviceListMissing = !isEngineReady || devices.length === 0
@@ -141,7 +141,7 @@ export const ThisComputer = ({ className }: { className?: string }) => {
               </label>
             ))}
           </fieldset>
-          {shown.profile === 'passthrough' && (
+          {shown.profile === AUDIO_PROFILES.passthrough && (
             <>
               <fieldset className={styles.group}>
                 <legend>Formats your receiver decodes</legend>
@@ -167,7 +167,7 @@ export const ThisComputer = ({ className }: { className?: string }) => {
               </p>
             </>
           )}
-          {shown.profile === 'headphones' && (
+          {shown.profile === AUDIO_PROFILES.headphones && (
             <label className={styles.choice}>
               <input
                 type="checkbox"

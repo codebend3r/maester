@@ -1,10 +1,12 @@
 import {
+  ADMIN_LOCK_STATES,
   type ApiClient,
   ApiError,
   isLockedError,
   isMediaId,
   type MediaItem,
   mediaLabel,
+  PLAYER_ERROR_REASONS,
   type PlayerSource,
 } from '@raven/core'
 import {
@@ -266,7 +268,7 @@ const Ready = ({
   )
 
   const onMenu = useEffectEvent((action: MenuPlayerAction) => {
-    if (action !== 'next' || services.title.next === null) return
+    if (action !== MENU_PLAYER_ACTIONS.next || services.title.next === null) return
     const { to, state } = services.title.next
     void navigate(to, { replace: true, state })
   })
@@ -340,7 +342,7 @@ const NativeTitle = ({
 
   const onEngineError = useCallback<NonNullable<PlayerServices['onEngineError']>>(
     ({ reason }) => {
-      if (reason !== 'locked') return
+      if (reason !== PLAYER_ERROR_REASONS.locked) return
       setResumeFrom(lastSaved.current)
       void queryClient.invalidateQueries({ queryKey: mediaKey })
     },
@@ -414,7 +416,7 @@ const NativeTitle = ({
       )
     }
     if (adminLock.isPending || adminLock.isFetching) return <Waiting />
-    if (adminLock.data.state === 'on' && adminLock.data.available) {
+    if (adminLock.data.state === ADMIN_LOCK_STATES.on && adminLock.data.available) {
       return (
         <Locked
           key={`adminPassword:${media.errorUpdateCount}`}
@@ -449,7 +451,7 @@ const ServerTitle = ({ server, mediaId, at, next }: Title) => {
   const onLost = useCallback(() => setIsLost(true), [])
 
   if (chosen === null) return <Waiting />
-  if (chosen.status === 'unavailable' || isLost) {
+  if (chosen.status === CONNECTION_STATUSES.unavailable || isLost) {
     return <BrowserFallback server={server} mediaId={mediaId} isLost={isLost} />
   }
   return (

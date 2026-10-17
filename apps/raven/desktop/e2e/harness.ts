@@ -6,7 +6,14 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { _electron, type ElectronApplication, type Page } from '@playwright/test'
 import { withoutTestHooks } from '@/build/smokeVerdict'
 import { LOG_FILE } from '@/main/log/log'
-import { type DesktopReply, isDesktopReply } from '@/shared/protocol'
+import { ENGINE_MODES } from '@/main/player/engine'
+import { ERROR_CODES } from '@/main/stateStore'
+import {
+  DESKTOP_REPLIES,
+  DESKTOP_REQUESTS,
+  type DesktopReply,
+  isDesktopReply,
+} from '@/shared/protocol'
 
 // `cwd` with `args: ['.']` runs the built app the way `electron .` does: package.json's `main`.
 const PROJECT_DIR = join(import.meta.dirname, '..')
@@ -46,7 +53,7 @@ export const removeDir = async (path: string): Promise<void> => {
 }
 
 const isMissing = (error: unknown): boolean =>
-  error instanceof Error && 'code' in error && error.code === 'ENOENT'
+  error instanceof Error && 'code' in error && error.code === ERROR_CODES.enoent
 
 /**
  * The server session folders Electron keeps under `userData`. Only a missing `Partitions`

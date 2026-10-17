@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import type { PlayerEvent } from '@raven/core'
 import {
+  CONNECTION_STATUSES,
   isEngineGone,
   listenForPlayer,
   nativePlayerOver,
@@ -192,7 +193,8 @@ describe('listenForPlayer', () => {
     const first = channel()
     portMessage({ data: NATIVE, ports: [first.page] })
     const native = connections.read()
-    if (native.status !== 'native') throw new Error(`expected native, got ${native.status}`)
+    if (native.status !== CONNECTION_STATUSES.native)
+      throw new Error(`expected native, got ${native.status}`)
     const played = native.player.send({ type: 'play' })
     await wait()
     expect(first.received).toEqual([{ id: 1, command: { type: 'play' } }])
@@ -270,7 +272,8 @@ describe('listenForPlayer', () => {
     const { page, fromMain } = channel()
     portMessage({ data: NATIVE, ports: [page] })
     const native = connections.read()
-    if (native.status !== 'native') throw new Error(`expected native, got ${native.status}`)
+    if (native.status !== CONNECTION_STATUSES.native)
+      throw new Error(`expected native, got ${native.status}`)
     const refused = native.player.send({ type: 'play' })
     const loading = native.player.send({ type: 'pause' })
     await wait()
@@ -287,7 +290,8 @@ describe('listenForPlayer', () => {
     const { page, fromMain } = channel()
     portMessage({ data: NATIVE, ports: [page] })
     const native = connections.read()
-    if (native.status !== 'native') throw new Error(`expected native, got ${native.status}`)
+    if (native.status !== CONNECTION_STATUSES.native)
+      throw new Error(`expected native, got ${native.status}`)
     const worded = native.player.send({ type: 'play' })
     const gone = native.player.send({ type: 'pause' })
     await wait()
@@ -321,7 +325,8 @@ describe('listenForPlayer', () => {
     const { page, main } = channel()
     portMessage({ data: NATIVE, ports: [page] })
     const native = connections.read()
-    if (native.status !== 'native') throw new Error(`expected native, got ${native.status}`)
+    if (native.status !== CONNECTION_STATUSES.native)
+      throw new Error(`expected native, got ${native.status}`)
     main.close()
     await wait()
     await expect(native.player.send({ type: 'play' })).rejects.toThrow(PLAYER_CLOSED)

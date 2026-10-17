@@ -29,8 +29,11 @@ export type JsonStoreOptions<T> = {
   onError: (error: unknown) => void
 }
 
+/** The `code` of the Node system errors raven player tells apart. */
+export const ERROR_CODES = { enoent: 'ENOENT' } as const
+
 export const isMissingFile = (error: unknown): boolean =>
-  error instanceof Error && 'code' in error && error.code === 'ENOENT'
+  error instanceof Error && 'code' in error && error.code === ERROR_CODES.enoent
 
 const parseJson = (text: string): unknown => {
   try {

@@ -25,7 +25,7 @@ export const SettingsPage = () => {
     // Emptied first: a live region announces a change, so the same text twice needs a gap.
     setStatus('')
     const reply = await client.request({ type: 'clearRecents' })
-    if (reply.type === 'refused') {
+    if (reply.type === DESKTOP_REPLIES.refused) {
       setStatus(reply.message)
       return
     }

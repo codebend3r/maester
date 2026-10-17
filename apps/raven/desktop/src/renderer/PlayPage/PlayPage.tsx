@@ -17,6 +17,7 @@ import { NativePlaying } from '@/renderer/PlayPage/NativePlaying'
 import styles from '@/renderer/PlayPage/PlayPage.module.scss'
 import {
   ENGINE_MOVED,
+  ENGINE_USES,
   type EngineUse,
   isPlayState,
   OUTPUT_KEY,
@@ -27,7 +28,14 @@ import { type Chosen, useChosenEngine } from '@/renderer/PlayPage/useChosenEngin
 import { useDesktop } from '@/renderer/stores/desktop'
 import { useNotice } from '@/renderer/stores/notice'
 import { carriesPassthrough } from '@/shared/carriedOutput'
-import { fileUrlFor, isOpaqueId, type LocalFile, type MenuPlayerAction } from '@/shared/protocol'
+import {
+  DESKTOP_REPLIES,
+  fileUrlFor,
+  isOpaqueId,
+  type LocalFile,
+  MENU_PLAYER_ACTIONS,
+  type MenuPlayerAction,
+} from '@/shared/protocol'
 
 const NOT_OPENABLE = 'raven player cannot open that video.'
 
@@ -117,17 +125,17 @@ const Playing = ({
   // player neither remounts nor forgets the length it reported.
   // Chromium mixes the html engine's sound itself, so only mpv's bitstream fixes the volume.
   const services = useMemo(
-    () => ({ ...base, isVolumeFixed: isOutputFixed && engine === 'native' }),
+    () => ({ ...base, isVolumeFixed: isOutputFixed && engine === ENGINE_USES.native }),
     [base, isOutputFixed, engine],
   )
 
   const onMenu = useEffectEvent((action: MenuPlayerAction) => {
     // The html engine has no overlay, so Video Info says so rather than doing nothing.
-    if (action === 'stats' && engine !== 'native') {
+    if (action === MENU_PLAYER_ACTIONS.stats && engine !== ENGINE_USES.native) {
       showNotice(STATS_UNAVAILABLE)
       return
     }
-    if (action !== 'next' || services.title.next === null) return
+    if (action !== MENU_PLAYER_ACTIONS.next || services.title.next === null) return
     const { to, state } = services.title.next
     void navigate(to, { replace: true, state })
   })
@@ -169,7 +177,7 @@ const readOutput = async ({
   client: DesktopClient
 }): Promise<OutputSettings | null> => {
   const reply = await client.request({ type: 'readOutput' })
-  return reply.type === 'output' ? reply.output : null
+  return reply.type === DESKTOP_REPLIES.output ? reply.output : null
 }
 
 /** Whether "This computer" sends the bitstream untouched, which leaves mpv's volume nothing to do. */
@@ -193,8 +201,8 @@ const PlayPage = ({ fileId, queue }: { fileId: string; queue: string[] }) => {
     queryKey: ['desktop', 'file', fileId, queue],
     queryFn: async (): Promise<LocalFile> => {
       const reply = await client.request({ type: 'describeFile', fileId, queue })
-      if (reply.type === 'file') return reply.file
-      if (reply.type === 'refused') throw new Error(reply.message)
+      if (reply.type === DESKTOP_REPLIES.file) return reply.file
+      if (reply.type === DESKTOP_REPLIES.refused) throw new Error(reply.message)
       throw new Error(NOT_OPENABLE)
     },
     // Opening a file also records it as recent and reads its resume point:

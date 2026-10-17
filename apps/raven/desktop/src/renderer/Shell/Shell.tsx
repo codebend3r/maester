@@ -62,20 +62,20 @@ export const Shell = () => {
 
   const onEvent = useEffectEvent((event: DesktopEvent) => {
     switch (event.type) {
-      case 'play':
+      case DESKTOP_EVENTS.play:
         return void play({ navigate, pathname, target: event.target })
-      case 'playServer':
+      case DESKTOP_EVENTS.playServer:
         return void playServer({ navigate, pathname, target: event.target })
-      case 'navigate':
+      case DESKTOP_EVENTS.navigate:
         return void navigate('/settings')
-      case 'player':
+      case DESKTOP_EVENTS.player:
         return menu.emit(event.action)
-      case 'notice':
+      case DESKTOP_EVENTS.notice:
         return showNotice(event.message)
-      case 'openLink':
+      case DESKTOP_EVENTS.openLink:
         return setIsOpenLinkShown(true)
-      case 'updateAvailable':
-        setUpdate(event.version)
+      case DESKTOP_EVENTS.updateAvailable:
+        announceUpdate(event.version)
         // Settings reads main's status again, so an open Updates section shows the release too.
         return void queryClient.invalidateQueries({ queryKey: UPDATES_KEY })
       default: {

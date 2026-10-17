@@ -3,6 +3,7 @@ import { errorText } from '@/main/log/errorText'
 import {
   isCheckDue,
   RELEASES_URL,
+  UPDATE_FINDING_KINDS,
   UPDATE_PROBLEMS,
   type UpdateCheck,
   type UpdateFinding,
@@ -54,7 +55,7 @@ export const updateDialogFor = ({
   }
   const { finding } = check
   switch (finding.kind) {
-    case 'newer':
+    case UPDATE_FINDING_KINDS.newer:
       return {
         type: 'info',
         message: UPDATE_COPY.newer(finding.version),
@@ -64,7 +65,7 @@ export const updateDialogFor = ({
         cancelId: 1,
         opensRelease: true,
       }
-    case 'current':
+    case UPDATE_FINDING_KINDS.current:
       return {
         type: 'info',
         message: UPDATE_COPY.current(current),
@@ -111,7 +112,8 @@ export const createMenuCheck = ({
   const run = async (): Promise<void> => {
     const check = await updates.checkNow()
     // So an open Settings refreshes and the notice appears, as after a launch check.
-    if (check.ok && check.finding.kind === 'newer') announce(check.finding.version)
+    if (check.ok && check.finding.kind === UPDATE_FINDING_KINDS.newer)
+      announce(check.finding.version)
     const { opensRelease, ...options } = updateDialogFor({ check, current })
     const response = await show(options)
     if (!opensRelease || response !== 0) return
@@ -157,7 +159,7 @@ export type UpdateService = {
   openRelease: () => Promise<boolean>
 }
 
-type NewerFinding = Extract<UpdateFinding, { kind: 'newer' }>
+type NewerFinding = Extract<UpdateFinding, { kind: typeof UPDATE_FINDING_KINDS.newer }>
 
 export const createUpdateService = ({
   config,
@@ -208,7 +210,7 @@ export const createUpdateService = ({
       return result
     }
     problem = null
-    finding = result.finding.kind === 'newer' ? result.finding : null
+    finding = result.finding.kind === UPDATE_FINDING_KINDS.newer ? result.finding : null
     return result
   }
 
@@ -225,7 +227,8 @@ export const createUpdateService = ({
     const { isEnabled, checkedAt } = config.read().updates
     if (!isCheckDue({ isEnabled, checkedAt, now: now() })) return
     const result = await checkNow()
-    if (result.ok && result.finding.kind === 'newer') announce(result.finding.version)
+    if (result.ok && result.finding.kind === UPDATE_FINDING_KINDS.newer)
+      announce(result.finding.version)
   }
 
   const openRelease = async (): Promise<boolean> => {

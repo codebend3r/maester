@@ -1,10 +1,10 @@
 import { expect, test } from 'bun:test'
-import { DEFAULT_OUTPUT_SETTINGS, type OutputSettings } from '@raven/core'
+import { AUDIO_PROFILES, DEFAULT_OUTPUT_SETTINGS, type OutputSettings } from '@raven/core'
 import { carriedFormats, carriesPassthrough } from '@/shared/carriedOutput'
 
 const passthroughOf = (formats: OutputSettings['passthrough']): OutputSettings => ({
   ...DEFAULT_OUTPUT_SETTINGS,
-  profile: 'passthrough',
+  profile: AUDIO_PROFILES.passthrough,
   passthrough: formats,
 })
 
@@ -26,6 +26,10 @@ test('passthrough with no carried format plays as PCM', () => {
 })
 
 test('the other profiles never carry', () => {
-  expect(carriesPassthrough({ ...DEFAULT_OUTPUT_SETTINGS, profile: 'pcm' })).toBe(false)
-  expect(carriesPassthrough({ ...DEFAULT_OUTPUT_SETTINGS, profile: 'headphones' })).toBe(false)
+  expect(carriesPassthrough({ ...DEFAULT_OUTPUT_SETTINGS, profile: AUDIO_PROFILES.pcm })).toBe(
+    false,
+  )
+  expect(
+    carriesPassthrough({ ...DEFAULT_OUTPUT_SETTINGS, profile: AUDIO_PROFILES.headphones }),
+  ).toBe(false)
 })

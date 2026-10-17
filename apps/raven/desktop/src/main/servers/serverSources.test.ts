@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, jest, test } from 'bun:test'
-import type { MediaTracks, SubtitleTrack } from '@raven/core'
+import { type MediaTracks, PLAYER_SOURCE_KINDS, type SubtitleTrack } from '@raven/core'
 import type { ServerEntry } from '@/main/desktopConfig'
 import { PLAYER_MESSAGES, type ServerTarget } from '@/main/player/playerService'
 import type { AllowedCall } from '@/main/servers/allowlist'
@@ -143,7 +143,8 @@ describe('resolve', () => {
     }
     const { sources } = setup({ answer: () => reply({ status: 200, body: JSON.stringify(odd) }) })
     const resolved = await sources.resolve(SOURCE)
-    if (!resolved.ok || resolved.target.kind !== 'server') throw new Error('expected a server')
+    if (!resolved.ok || resolved.target.kind !== PLAYER_SOURCE_KINDS.server)
+      throw new Error('expected a server')
     expect(resolved.target.sidecars).toEqual([
       {
         url: 'https://raven.example/api/media/7/subtitles/external-12',
@@ -160,7 +161,8 @@ describe('resolve', () => {
       const resolving = sources.resolve(SOURCE)
       jest.advanceTimersByTime(TRACKS_TIMEOUT_MS)
       const resolved = await resolving
-      if (!resolved.ok || resolved.target.kind !== 'server') throw new Error('expected a server')
+      if (!resolved.ok || resolved.target.kind !== PLAYER_SOURCE_KINDS.server)
+        throw new Error('expected a server')
       expect(resolved.target.url).toBe(FILE_URL)
       expect(resolved.target.headerFields).toBe('Cookie: raven_unlock=a.b')
       expect(resolved.target.sidecars).toEqual([])
@@ -179,7 +181,8 @@ describe('resolve', () => {
   ] as const)('tracks answering %s give no sidecars and a warning', async (_label, answered) => {
     const { sources, warnings } = setup({ answer: () => answered })
     const resolved = await sources.resolve(SOURCE)
-    if (!resolved.ok || resolved.target.kind !== 'server') throw new Error('expected a server')
+    if (!resolved.ok || resolved.target.kind !== PLAYER_SOURCE_KINDS.server)
+      throw new Error('expected a server')
     expect(resolved.target.url).toBe(FILE_URL)
     expect(resolved.target.sidecars).toEqual([])
     expect(warnings.length).toBe(1)
@@ -198,7 +201,8 @@ describe('resolve', () => {
       },
     })
     const resolved = await sources.resolve(SOURCE)
-    if (!resolved.ok || resolved.target.kind !== 'server') throw new Error('expected a server')
+    if (!resolved.ok || resolved.target.kind !== PLAYER_SOURCE_KINDS.server)
+      throw new Error('expected a server')
     expect(resolved.target.sidecars).toEqual([])
     expect(warnings).toEqual(['no sidecars from Vhagar: its tracks failed: gone'])
   })
@@ -230,7 +234,8 @@ describe('resolve', () => {
   test('no cookies give an empty header, and only the two server cookies make one', async () => {
     const bare = setup({ cookies: [] })
     const resolved = await bare.sources.resolve(SOURCE)
-    if (!resolved.ok || resolved.target.kind !== 'server') throw new Error('expected a server')
+    if (!resolved.ok || resolved.target.kind !== PLAYER_SOURCE_KINDS.server)
+      throw new Error('expected a server')
     expect(resolved.target.headerFields).toBe('')
     const mixed = setup({
       cookies: [
@@ -240,7 +245,8 @@ describe('resolve', () => {
       ],
     })
     const both = await mixed.sources.resolve(SOURCE)
-    if (!both.ok || both.target.kind !== 'server') throw new Error('expected a server')
+    if (!both.ok || both.target.kind !== PLAYER_SOURCE_KINDS.server)
+      throw new Error('expected a server')
     expect(both.target.headerFields).toBe('Cookie: raven_unlock=a.b; raven_admin=c.d')
   })
 })
