@@ -5,7 +5,9 @@ import {
   NO_PENDING,
   advance,
   bytesOf,
+  clearOwed,
   clearPending,
+  dropOwed,
   entryById,
   entryByMedia,
   fail,
@@ -16,6 +18,7 @@ import {
   isWaitingOnOutage,
   noteWatched,
   notePending,
+  owedOf,
   pause,
   pauseEverything,
   pauseServer,
@@ -32,6 +35,7 @@ import {
   start,
   type DownloadEntry,
   type DownloadsState,
+  type Pending,
 } from '@/main/downloads/downloadState'
 
 const SERVER_A = '11111111-1111-4111-8111-111111111111'
@@ -76,6 +80,17 @@ describe('the guards', () => {
     })
     expect(isDownloadEntry(full)).toBe(true)
     expect(isDownloadsState(stateOf(full))).toBe(true)
+  })
+
+  it('accepts what removed downloads still owe their servers, and refuses an owed item of no server', () => {
+    const pending = { play: true, position: 12, furthest: 30, at: 5 }
+    expect(
+      isDownloadsState({ ...EMPTY_DOWNLOADS, owed: [{ serverId: SERVER_A, mediaId: 1, pending }] }),
+    ).toBe(true)
+    expect(
+      isDownloadsState({ ...EMPTY_DOWNLOADS, owed: [{ serverId: 'vhagar', mediaId: 1, pending }] }),
+    ).toBe(false)
+    expect(EMPTY_DOWNLOADS.owed).toEqual([])
   })
 
   it('refuses a status kind it does not know', () => {
@@ -379,6 +394,122 @@ describe('remove and removeServer', () => {
 
   it('removeAll of nothing returns the same state', () => {
     expect(removeAll(EMPTY_DOWNLOADS)).toBe(EMPTY_DOWNLOADS)
+  })
+})
+
+describe('what a removed download owes its server', () => {
+  const PLAYED: Pending = { play: true, position: 180, furthest: 190, at: 50 }
+  const owing = stateOf(
+    entry({ downloadId: id(1), mediaId: 1, pending: PLAYED }),
+    entry({ downloadId: id(2), mediaId: 2, serverId: SERVER_B, pending: PLAYED }),
+    entry({ downloadId: id(3), mediaId: 3 }),
+  )
+
+  it('remove moves the pending of the entry it drops into owed', () => {
+    const next = remove(owing, { downloadId: id(1) })
+    expect(next.entries.map((each) => each.downloadId)).toEqual([id(2), id(3)])
+    expect(next.owed).toEqual([{ serverId: SERVER_A, mediaId: 1, pending: PLAYED }])
+  })
+
+  it('remove of an entry with nothing pending owes nothing', () => {
+    expect(remove(owing, { downloadId: id(3) }).owed).toEqual([])
+  })
+
+  it('removeAll moves every pending into owed', () => {
+    expect(removeAll(owing).owed).toEqual([
+      { serverId: SERVER_A, mediaId: 1, pending: PLAYED },
+      { serverId: SERVER_B, mediaId: 2, pending: PLAYED },
+    ])
+  })
+
+  it("removeServer owes nothing for that server's entries, and drops what it was owed", () => {
+    const owed = remove(owing, { downloadId: id(1) })
+    const next = removeServer(removeServer(owed, { serverId: SERVER_A }), { serverId: SERVER_B })
+    expect(next.entries).toEqual([])
+    expect(next.owed).toEqual([])
+    expect(removeServer(owed, { serverId: SERVER_A }).owed).toEqual([])
+  })
+
+  it('removeServer of a server owed something but holding no entry drops it', () => {
+    const owed = remove(stateOf(entry({ pending: PLAYED })), { downloadId: ID })
+    expect(removeServer(owed, { serverId: SERVER_A }).owed).toEqual([])
+  })
+
+  it('folds a title already owed into one item: the play kept, the newer position, the furthest', () => {
+    const first = remove(owing, { downloadId: id(1) })
+    const again = queue(first, {
+      entries: [
+        entry({
+          downloadId: id(4),
+          mediaId: 1,
+          pending: { play: false, position: 20, furthest: 40, at: 90 },
+        }),
+      ],
+    })
+    expect(remove(again, { downloadId: id(4) }).owed).toEqual([
+      {
+        serverId: SERVER_A,
+        mediaId: 1,
+        pending: { play: true, position: 20, furthest: 190, at: 90 },
+      },
+    ])
+  })
+
+  it('owedOf finds an owed item by server and media, or null', () => {
+    const owed = remove(owing, { downloadId: id(1) })
+    expect(owedOf(owed, { serverId: SERVER_A, mediaId: 1 })?.pending).toEqual(PLAYED)
+    expect(owedOf(owed, { serverId: SERVER_B, mediaId: 1 })).toBeNull()
+  })
+
+  it('clearOwed clears what was sent, and drops the item once nothing is left', () => {
+    const owed = remove(owing, { downloadId: id(1) })
+    const key = { serverId: SERVER_A, mediaId: 1 }
+    const played = clearOwed(owed, {
+      ...key,
+      sentPlay: true,
+      sentPosition: null,
+      sentFurthest: null,
+    })
+    expect(owedOf(played, key)?.pending).toEqual({ ...PLAYED, play: false })
+    const furthest = clearOwed(played, {
+      ...key,
+      sentPlay: false,
+      sentPosition: null,
+      sentFurthest: 190,
+    })
+    expect(owedOf(furthest, key)?.pending).toEqual({ ...PLAYED, play: false, furthest: null })
+    expect(
+      clearOwed(furthest, { ...key, sentPlay: false, sentPosition: 180, sentFurthest: 180 }).owed,
+    ).toEqual([])
+  })
+
+  it('clearOwed keeps a position other than the one sent, and changes nothing for an item not owed', () => {
+    const owed = remove(owing, { downloadId: id(1) })
+    const key = { serverId: SERVER_A, mediaId: 1 }
+    const next = clearOwed(owed, { ...key, sentPlay: true, sentPosition: 100, sentFurthest: 190 })
+    expect(owedOf(next, key)?.pending).toEqual({
+      play: false,
+      position: 180,
+      furthest: null,
+      at: 50,
+    })
+    expect(
+      clearOwed(owed, {
+        serverId: SERVER_B,
+        mediaId: 1,
+        sentPlay: true,
+        sentPosition: 180,
+        sentFurthest: 190,
+      }),
+    ).toBe(owed)
+  })
+
+  it('dropOwed drops one item, and changes nothing for an item not owed', () => {
+    const owed = removeAll(owing)
+    expect(dropOwed(owed, { serverId: SERVER_A, mediaId: 1 }).owed).toEqual([
+      { serverId: SERVER_B, mediaId: 2, pending: PLAYED },
+    ])
+    expect(dropOwed(owed, { serverId: SERVER_A, mediaId: 2 })).toBe(owed)
   })
 })
 

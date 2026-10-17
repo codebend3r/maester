@@ -1,7 +1,7 @@
 import { join } from 'node:path'
 import { isMediaId } from '@raven/core'
 import type { ServerEntry } from '@/main/desktopConfig'
-import { remove, type DownloadEntry } from '@/main/downloads/downloadState'
+import { removeServer, type DownloadEntry } from '@/main/downloads/downloadState'
 import type { DownloadsStore } from '@/main/downloads/downloadStore'
 import { downloadsDirFor } from '@/main/downloads/space'
 import { errorText } from '@/main/log/errorText'
@@ -71,12 +71,13 @@ const sweepFolders = async ({
   // An unreadable config loads empty and is set aside; its servers' downloads must outlive that.
   const canDropServers = kept.length > 0
   const isKept = (serverId: string): boolean => kept.includes(serverId)
-  const dropped = canDropServers
-    ? store.read().entries.filter((entry) => !isKept(entry.serverId))
-    : []
-  store.update((state) =>
-    dropped.reduce((next, entry) => remove(next, { downloadId: entry.downloadId }), state),
-  )
+  const { entries, owed } = store.read()
+  const dropped = canDropServers ? entries.filter((entry) => !isKept(entry.serverId)) : []
+  // A server's removal that did not reach `downloads.json` ends here, as Remove server would:
+  // its downloads owe it nothing and what it was owed goes, since no call can reach it now.
+  const held = new Set([...entries, ...owed].map(({ serverId }) => serverId))
+  const gone = canDropServers ? [...held].filter((serverId) => !isKept(serverId)) : []
+  store.update((state) => gone.reduce((next, serverId) => removeServer(next, { serverId }), state))
   if (dropped.length > 0) {
     onRemoved(dropped)
     warn(`raven player dropped ${dropped.length} downloads of servers it no longer keeps`)

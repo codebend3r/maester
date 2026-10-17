@@ -3,8 +3,10 @@ import {
   EMPTY_DOWNLOADS,
   NO_PENDING,
   notePending,
+  remove,
   type DownloadEntry,
   type DownloadsState,
+  type Owed,
 } from '@/main/downloads/downloadState'
 import { createSync, settleWithin, SYNC_DEBOUNCE_MS, SYNC_RETRY_MS } from '@/main/downloads/sync'
 import type { AllowedCall } from '@/main/servers/allowlist'
@@ -64,8 +66,11 @@ const gate = () => {
   return { answer, open: held.open }
 }
 
-const setup = ({ entries = [entryFor()] }: { entries?: DownloadEntry[] } = {}) => {
-  const store = memoryStore({ ...EMPTY_DOWNLOADS, entries })
+const setup = ({
+  entries = [entryFor()],
+  owed = [],
+}: { entries?: DownloadEntry[]; owed?: Owed[] } = {}) => {
+  const store = memoryStore({ ...EMPTY_DOWNLOADS, entries, owed })
   const { timers, pending } = fakeTimers()
   const log: AllowedCall[] = []
   const server: { answer: (call: AllowedCall) => Promise<ServerCallResult> } = {
@@ -576,6 +581,133 @@ describe('runAll', () => {
     world.fireAt(SYNC_DEBOUNCE_MS)
     await ticks(5)
     expect(world.log).toEqual([])
+  })
+})
+
+describe('what removed downloads owe', () => {
+  const OWED_PENDING = { play: true, position: 300, furthest: 2900, at: NOW }
+  const owedFor = (overrides: Partial<Owed> = {}): Owed => ({
+    serverId: SERVER_ID,
+    mediaId: 11,
+    pending: OWED_PENDING,
+    ...overrides,
+  })
+
+  it('sends the play, the furthest and the last position of an owed item, then drops it', async () => {
+    const world = setup({ entries: [], owed: [owedFor()] })
+    await world.sync.runAll()
+    expect(world.log).toEqual([
+      { name: 'recordPlay', mediaId: 11 },
+      { name: 'saveProgress', mediaId: 11, position: 2900 },
+      { name: 'saveProgress', mediaId: 11, position: 300 },
+    ])
+    expect(world.store.read().owed).toEqual([])
+  })
+
+  it('keeps an owed item while its server is unreachable, and the retry sends it', async () => {
+    const world = setup({ entries: [], owed: [owedFor()] })
+    world.server.answer = async () => UNREACHABLE
+    await world.sync.runAll()
+    expect(world.store.read().owed).toEqual([owedFor()])
+    expect([...world.pending.values()].map(({ ms }) => ms)).toEqual([SYNC_RETRY_MS])
+    world.server.answer = async () => NO_CONTENT
+    world.fireAt(SYNC_RETRY_MS)
+    await ticks(10)
+    expect(world.store.read().owed).toEqual([])
+    expect(world.pending.size).toBe(0)
+  })
+
+  it('keeps what the server did not take yet, and sends no play twice', async () => {
+    const world = setup({ entries: [], owed: [owedFor()] })
+    world.server.answer = async (call) => (call.name === 'recordPlay' ? NO_CONTENT : UNREACHABLE)
+    await world.sync.runAll()
+    expect(world.store.read().owed).toEqual([
+      owedFor({ pending: { ...OWED_PENDING, play: false } }),
+    ])
+    world.server.answer = async () => NO_CONTENT
+    await world.sync.runAll()
+    expect(world.log.filter(({ name }) => name === 'recordPlay')).toHaveLength(1)
+    expect(world.store.read().owed).toEqual([])
+  })
+
+  it.each([403, 404])(
+    'drops an owed item the server answers %i for, and says so once without a path',
+    async (status) => {
+      const world = setup({ entries: [], owed: [owedFor(), owedFor({ mediaId: 12 })] })
+      world.server.answer = async (call) =>
+        call.name === 'recordPlay' && call.mediaId === 11
+          ? { ok: true, status, body: '' }
+          : NO_CONTENT
+      await world.sync.runAll()
+      expect(world.store.read().owed).toEqual([])
+      expect(world.log.filter((call) => 'mediaId' in call && call.mediaId === 11)).toEqual([
+        { name: 'recordPlay', mediaId: 11 },
+      ])
+      expect(world.warnings).toHaveLength(1)
+      expect(world.warnings[0]).toContain(String(status))
+      expect(world.warnings[0]).not.toContain('/api')
+    },
+  )
+
+  it('keeps an owed item on a 500 without a word', async () => {
+    const world = setup({ entries: [], owed: [owedFor()] })
+    world.server.answer = async () => ({ ok: true, status: 500, body: '' })
+    await world.sync.runAll()
+    expect(world.store.read().owed).toEqual([owedFor()])
+    expect(world.warnings).toEqual([])
+  })
+
+  it("sends a server's owed items and downloads one at a time, oldest pending first", async () => {
+    const world = setup({
+      entries: [
+        entryFor({
+          mediaId: 12,
+          pending: { ...NO_PENDING, position: 40, furthest: 40, at: NOW + 2 },
+        }),
+      ],
+      owed: [
+        owedFor({
+          mediaId: 13,
+          pending: { ...NO_PENDING, position: 50, furthest: 50, at: NOW + 3 },
+        }),
+        owedFor({ pending: { ...NO_PENDING, position: 30, furthest: 30, at: NOW + 1 } }),
+      ],
+    })
+    await world.sync.runAll()
+    expect(world.log).toEqual([
+      { name: 'saveProgress', mediaId: 11, position: 30 },
+      { name: 'saveProgress', mediaId: 12, position: 40 },
+      { name: 'saveProgress', mediaId: 13, position: 50 },
+    ])
+  })
+
+  it('clears what a send carried from the owed item when its download was removed meanwhile', async () => {
+    const world = setup()
+    const held = gate()
+    world.server.answer = (call) =>
+      call.name === 'recordPlay' ? held.answer : Promise.resolve(UNREACHABLE)
+    world.note({ play: true, position: 300 })
+    const running = world.sync.runFor({ downloadIds: [ID] })
+    await ticks(3)
+    world.store.update((state) => remove(state, { downloadId: ID }))
+    expect(world.store.read().owed).toHaveLength(1)
+    held.open(NO_CONTENT)
+    await running
+    expect(world.store.read().owed).toEqual([
+      {
+        serverId: SERVER_ID,
+        mediaId: 11,
+        pending: { play: false, position: 300, furthest: 300, at: NOW },
+      },
+    ])
+  })
+
+  it('runFor leaves owed items to the runs of every download', async () => {
+    const world = setup({ owed: [owedFor({ mediaId: 12 })] })
+    world.note({ position: 300 })
+    await world.sync.runFor({ downloadIds: [ID] })
+    expect(world.log).toEqual([{ name: 'saveProgress', mediaId: 11, position: 300 }])
+    expect(world.store.read().owed).toHaveLength(1)
   })
 })
 
