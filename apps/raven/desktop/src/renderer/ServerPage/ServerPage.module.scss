@@ -1,0 +1,15 @@
+.actions {
+  display: grid;
+  grid-auto-flow: column;
+  gap: var(--space-2);
+
+  @media (max-width: 30rem) {
+    grid-auto-flow: row;
+  }
+}
+
+// A plain stage under the unlock dialog; the dialog's Cancel is the way Home.
+.locked {
+  min-height: 100vh;
+  background: var(--color-stage);
+}

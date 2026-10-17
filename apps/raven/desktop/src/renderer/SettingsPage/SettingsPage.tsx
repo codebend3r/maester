@@ -3,9 +3,10 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@raven/ui'
 import { useDesktop } from '@/renderer/desktop/DesktopContext'
+import { Servers } from '@/renderer/SettingsPage/Servers'
 import styles from '@/renderer/SettingsPage/SettingsPage.module.scss'
 import { ThisComputer } from '@/renderer/SettingsPage/ThisComputer'
-import { RECENTS_KEY } from '@/renderer/Shell/Shell'
+import { RECENTS_KEY } from '@/renderer/Shell/openReply'
 
 export const SettingsPage = () => {
   const { client } = useDesktop()
@@ -40,6 +41,7 @@ export const SettingsPage = () => {
           Settings
         </h1>
       </header>
+      <Servers className={styles.servers} />
       <ThisComputer className={styles.computer} />
       <section className={styles.section} aria-labelledby="recents-title">
         <h2 id="recents-title">Recents</h2>

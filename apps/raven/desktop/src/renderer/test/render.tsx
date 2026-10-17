@@ -20,6 +20,7 @@ export const STUB_ROUTES: RouteObject[] = [
     children: [
       { index: true, element: <HomePage /> },
       { path: 'play/:fileId', element: <p>Playing</p> },
+      { path: 'server/:serverId/:mediaId', element: <p>Playing from a server</p> },
       { path: 'settings', element: <p>Settings page</p> },
     ],
   },

@@ -54,7 +54,7 @@ export const playerActionFor = (action: MenuPlayerAction): PlayerAction | null =
 }
 
 /** Main answers every request; one that fails to arrive is only worth a warning. */
-const requestQuietly = ({
+export const requestQuietly = ({
   client,
   request,
 }: {

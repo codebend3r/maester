@@ -2,9 +2,10 @@
   --gutter: var(--space-5);
 
   display: grid;
-  grid-template-rows: auto auto 1fr;
+  grid-template-rows: auto auto auto 1fr;
   grid-template-areas:
     'bar'
+    'servers'
     'computer'
     'recents';
   gap: var(--space-5);
@@ -39,6 +40,11 @@
   button {
     -webkit-app-region: no-drag;
   }
+}
+
+.servers {
+  grid-area: servers;
+  padding-inline: var(--gutter);
 }
 
 .computer {
