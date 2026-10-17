@@ -6,16 +6,19 @@ import type { ForgeConfig } from '@electron-forge/shared-types'
 import { FuseV1Options, FuseVersion } from '@electron/fuses'
 import { VIDEO_EXTENSIONS } from '@raven/core'
 import {
+  adHocApps,
   documentTypes,
   FUSES,
   isPackagedPath,
-  resealTargets,
   signingFrom,
 } from './src/build/forgeOptions'
+import { type RunCommand, signAdHoc } from './src/build/machO'
+import { MPV_STAGING } from './src/build/stageMpv'
 
 const APP_NAME = 'raven player'
 const signing = signingFrom(process.env)
-const run = promisify(execFile)
+const execFileAsync = promisify(execFile)
+const run: RunCommand = ({ command, args }) => execFileAsync(command, args)
 
 const config: ForgeConfig = {
   packagerConfig: {
@@ -30,6 +33,8 @@ const config: ForgeConfig = {
     ignore: (file) => !isPackagedPath(file),
     protocols: [{ name: 'raven link', schemes: ['raven'] }],
     extendInfo: documentTypes(VIDEO_EXTENSIONS),
+    // stage:mpv fills staging/mpv/darwin-arm64, so it lands at Contents/Resources/mpv/darwin-arm64.
+    extraResource: [MPV_STAGING],
     ...signing,
   },
   makers: [new MakerZIP({}, ['darwin'])],
@@ -48,12 +53,11 @@ const config: ForgeConfig = {
   ],
   hooks: {
     // An identity signs through osxSign after the packager is done; without one, nothing
-    // seals the final bundle, so it is resealed ad hoc here.
+    // seals the final bundle, so every Mach-O in it is signed ad hoc here, inside out.
     postPackage: async (_forgeConfig, { platform, outputPaths }) => {
-      await Promise.all(
-        resealTargets({ platform, signing, outputPaths, appName: APP_NAME }).map((args) =>
-          run('codesign', args),
-        ),
+      await adHocApps({ platform, signing, outputPaths, appName: APP_NAME }).reduce<Promise<void>>(
+        (previous, app) => previous.then(() => signAdHoc({ app, run })),
+        Promise.resolve(),
       )
     },
   },

@@ -145,24 +145,13 @@ export const isPackagedPath = (file: string): boolean =>
   file === '' || file === '/package.json' || file === '/dist' || file.startsWith('/dist/')
 
 /**
- * codesign's arguments to seal the finished bundle ad hoc. The fuses plugin re-signs right
- * after flipping the fuses, but the packager then renames the executables and writes the
- * final Info.plist, which breaks that seal; an app with a broken seal is "damaged" to
- * Gatekeeper once downloaded.
+ * The packaged apps to sign ad hoc: none off macOS, and none when an identity signs the app
+ * through osxSign after the packager is done. The fuses plugin re-signs right after flipping
+ * the fuses, but the packager then renames the executables and writes the final Info.plist,
+ * which breaks that seal; an app with a broken seal is "damaged" to Gatekeeper once
+ * downloaded.
  */
-export const adHocSealArgs = ({ app }: { app: string }): string[] => [
-  '--sign',
-  '-',
-  '--force',
-  '--deep',
-  app,
-]
-
-/**
- * One codesign argument list per packaged app to reseal: none off macOS, and none when an
- * identity signs the app through osxSign after the packager is done.
- */
-export const resealTargets = ({
+export const adHocApps = ({
   platform,
   signing,
   outputPaths,
@@ -172,7 +161,7 @@ export const resealTargets = ({
   signing: Signing
   outputPaths: readonly string[]
   appName: string
-}): string[][] => {
+}): string[] => {
   if (platform !== 'darwin' || signing.osxSign !== undefined) return []
-  return outputPaths.map((folder) => adHocSealArgs({ app: join(folder, `${appName}.app`) }))
+  return outputPaths.map((folder) => join(folder, `${appName}.app`))
 }

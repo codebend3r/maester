@@ -1,7 +1,7 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "extends": ["../../../tooling/oxlint/node.json"],
-  "ignorePatterns": ["dist", "out", "test-results"],
+  "ignorePatterns": ["dist", "out", "staging", "test-results"],
   "overrides": [
     {
       // Vite, Playwright and Forge read their config through a default export.
@@ -12,7 +12,7 @@
     },
     {
       // Forge loads its config with jiti, which does not read tsconfig `paths`, so
-      // forge.config.ts imports ./src/build/forgeOptions relatively.
+      // forge.config.ts imports its ./src/build files relatively.
       "files": ["forge.config.ts"],
       "rules": {
         "no-restricted-imports": "off"

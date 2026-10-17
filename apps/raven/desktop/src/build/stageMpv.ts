@@ -1,0 +1,70 @@
+import { existsSync } from 'node:fs'
+import { cp, rm } from 'node:fs/promises'
+import { join } from 'node:path'
+
+/**
+ * Copies the CI-built addon and libmpv beside the desktop project, where Forge's
+ * `extraResource` picks them up. forge.config.ts imports this file through jiti, which does
+ * not read tsconfig `paths`, so it imports nothing from the project.
+ */
+
+export const MPV_SOURCE = join(
+  '..',
+  '..',
+  '..',
+  'libs',
+  'raven',
+  'mpv',
+  'resources',
+  'darwin-arm64',
+)
+export const MPV_STAGING = join('staging', 'mpv')
+export const MPV_MACH_O = ['raven_mpv.node', 'lib/libmpv.2.dylib', 'lib/libMoltenVK.dylib'] as const
+export const STAGED_PATHS = [...MPV_MACH_O, 'provenance'] as const
+
+export const missingMpvFiles = ({ exists }: { exists: (relative: string) => boolean }): string[] =>
+  MPV_MACH_O.filter((relative) => !exists(relative))
+
+type StageFs = {
+  exists: (path: string) => boolean
+  remove: (path: string) => Promise<void>
+  copy: (paths: { from: string; to: string }) => Promise<void>
+}
+
+export const stageMpv = async ({
+  from,
+  to,
+  fs,
+}: {
+  from: string
+  to: string
+  fs: StageFs
+}): Promise<void> => {
+  const missing = missingMpvFiles({ exists: (relative) => fs.exists(join(from, relative)) })
+  if (missing.length > 0) {
+    throw new Error(
+      `raven player packages the video engine, and these are missing from ${from}: ${missing.join(', ')}. CI builds them (bunx nx run @raven/mpv:build:native).`,
+    )
+  }
+  await fs.remove(to)
+  await STAGED_PATHS.reduce(
+    (previous, path) =>
+      previous.then(() => fs.copy({ from: join(from, path), to: join(to, path) })),
+    Promise.resolve(),
+  )
+}
+
+const realFs: StageFs = {
+  exists: existsSync,
+  remove: (path) => rm(path, { recursive: true, force: true }),
+  copy: ({ from, to }) => cp(from, to, { recursive: true, verbatimSymlinks: true }),
+}
+
+if (import.meta.main) {
+  const project = join(import.meta.dirname, '..', '..')
+  await stageMpv({
+    from: join(project, MPV_SOURCE),
+    to: join(project, MPV_STAGING, 'darwin-arm64'),
+    fs: realFs,
+  })
+}
