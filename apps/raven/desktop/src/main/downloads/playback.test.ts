@@ -564,11 +564,11 @@ describe('the share watched', () => {
     )
     const entries = [entryFor({}), entryFor({ downloadId: OTHER_ID, mediaId: 12 })]
     const world = setup({ entries, videos: shelved(...entries), player })
-    expect(world.playback.watchedOf(ID)).toBeNull()
+    expect(world.playback.watchedOf(entryFor({}))).toBeNull()
     world.playback.readFiles(entries)
     await until(() => world.told.lists === 1)
-    expect(world.playback.watchedOf(ID)).toBe(0.5)
-    expect(world.playback.watchedOf(OTHER_ID)).toBeNull()
+    expect(world.playback.watchedOf(entryFor({}))).toBe(0.5)
+    expect(world.playback.watchedOf(entryFor({ downloadId: OTHER_ID, mediaId: 12 }))).toBeNull()
     expect(world.statted.toSorted()).toEqual([VIDEO, replaced])
   })
 
@@ -577,8 +577,8 @@ describe('the share watched', () => {
       entries: [entryFor({ watchedAt: NOW }), entryFor({ downloadId: OTHER_ID, mediaId: 12 })],
       player: remembering(VIDEO, videoOf(12)),
     })
-    expect(world.playback.watchedOf(ID)).toBe(1)
-    expect(world.playback.watchedOf(OTHER_ID)).toBeNull()
+    expect(world.playback.watchedOf(entryFor({ watchedAt: NOW }))).toBe(1)
+    expect(world.playback.watchedOf(entryFor({ downloadId: OTHER_ID, mediaId: 12 }))).toBeNull()
     expect(world.playback.isWatched({ path: VIDEO })).toBe(true)
     expect(world.playback.isWatched({ path: videoOf(12) })).toBe(false)
     expect(world.playback.isWatched({ path: MOVIE_PATH })).toBe(false)
@@ -590,7 +590,7 @@ describe('the share watched', () => {
     await until(() => world.statted.length === 1)
     await ticks(5)
     expect(world.told.lists).toBe(0)
-    expect(world.playback.watchedOf(ID)).toBeNull()
+    expect(world.playback.watchedOf(entryFor({}))).toBeNull()
   })
 
   it('keeps nothing for a download removed while its file was read', async () => {
@@ -608,7 +608,7 @@ describe('the share watched', () => {
     world.state.update((state) =>
       savePosition(state, { file: factsOf(VIDEO), position: 1500, duration: 3000, at: 1 }),
     )
-    expect(world.playback.watchedOf(ID)).toBeNull()
+    expect(world.playback.watchedOf(entryFor({}))).toBeNull()
     expect(world.told.lists).toBe(0)
   })
 
@@ -619,7 +619,7 @@ describe('the share watched', () => {
       savePosition(state, { file: factsOf(VIDEO), position: 750, duration: 3000, at: NOW }),
     )
     world.playback.notePosition({ fileId, position: 750, duration: 3000 })
-    expect(world.playback.watchedOf(ID)).toBe(0.25)
+    expect(world.playback.watchedOf(entryFor({}))).toBe(0.25)
   })
 })
 
@@ -632,10 +632,10 @@ describe('forget', () => {
     })
     const fileId = await opened(world)
     world.playback.notePosition({ fileId, position: 100, duration: 3000 })
-    expect(world.playback.watchedOf(ID)).not.toBeNull()
+    expect(world.playback.watchedOf(entryFor({}))).not.toBeNull()
     removing(world)
     expect(pathsIn(world.state.read())).toEqual({ recents: [MOVIE_PATH], resume: [MOVIE_PATH] })
-    expect(world.playback.watchedOf(ID)).toBeNull()
+    expect(world.playback.watchedOf(entryFor({}))).toBeNull()
   })
 
   it('leaves the player state as it was when nothing names the removed download', () => {

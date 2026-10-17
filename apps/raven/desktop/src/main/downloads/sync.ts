@@ -254,11 +254,14 @@ export const createSync = ({ store, calls, timers, warn }: SyncDeps): Sync => {
     armRetry()
   }
 
-  /** Runs one server's downloads one after another; one its server could not reach ends the round. */
+  /**
+   * Runs one server's downloads one after another; one its server could not reach ends the
+   * round, and so does `dispose`, which lets the send already out finish but starts no other.
+   */
   const runInTurn = (queue: readonly DownloadEntry[]): Promise<boolean> =>
     queue.reduce<Promise<boolean>>(
       (previous, { downloadId }) =>
-        previous.then((isReached) => (isReached ? run(downloadId) : false)),
+        previous.then((isReached) => (isReached && !isDisposed ? run(downloadId) : false)),
       Promise.resolve(true),
     )
 

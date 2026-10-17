@@ -153,7 +153,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
         size: entry.size,
         status: viewStatusOf({ status: entry.status, serverName }),
         autoDelete: entry.autoDelete,
-        watched: playback.watchedOf(entry.downloadId),
+        watched: playback.watchedOf(entry),
         deletesAt: null,
         needsUnlock: entry.status.kind === 'paused' && entry.status.reason === 'relocked',
       }

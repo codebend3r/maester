@@ -591,6 +591,27 @@ describe('dispose', () => {
     expect(world.pending.size).toBe(0)
     expect(world.log).toEqual([])
   })
+
+  it("lets a send already out finish, but starts no later download's send in its round", async () => {
+    const pendingAt = (at: number) => ({ play: false, position: 300, furthest: 300, at })
+    const world = setup({
+      entries: [
+        entryFor({ pending: pendingAt(NOW + 1) }),
+        entryFor({ downloadId: OTHER_ID, mediaId: 12, pending: pendingAt(NOW + 2) }),
+      ],
+    })
+    const held = gate()
+    world.server.answer = () => held.answer
+    const running = world.sync.runAll()
+    await ticks(3)
+    expect(world.log).toEqual([{ name: 'saveProgress', mediaId: 11, position: 300 }])
+    world.sync.dispose()
+    held.open(NO_CONTENT)
+    await running
+    expect(world.log).toEqual([{ name: 'saveProgress', mediaId: 11, position: 300 }])
+    expect(world.pendingOf()?.position).toBeNull()
+    expect(world.pendingOf(OTHER_ID)?.position).toBe(300)
+  })
 })
 
 describe('settleWithin', () => {
