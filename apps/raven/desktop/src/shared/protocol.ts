@@ -1,4 +1,15 @@
-import { type Infer, isNumber, isString, listOf, nullable, object, oneOf, union } from '@raven/core'
+import {
+  type Infer,
+  isBoolean,
+  isNumber,
+  isOutputSettings,
+  isString,
+  listOf,
+  nullable,
+  object,
+  oneOf,
+  union,
+} from '@raven/core'
 
 export const APP_ORIGIN = 'app://raven'
 export const APP_SCHEME = 'app'
@@ -7,6 +18,10 @@ export const FILE_SCHEME = 'raven-file'
 export const REQUEST_CHANNEL = 'raven:request'
 export const EVENT_CHANNEL = 'raven:event'
 export const MAX_QUEUE = 100
+export const PLAYER_PORT_CHANNEL = 'raven:player'
+export const PLAYER_PORT_MESSAGE = 'raven:player-port'
+/** Main's words once mpv has gone. They ride with reason `engine`, which is what the page reads. */
+export const ENGINE_STOPPED = "raven player's video engine stopped. Open the video again."
 
 // A standard scheme lowercases its host, so an id must already be lowercase to
 // survive a round trip through `raven-file://<id>`.
@@ -22,12 +37,21 @@ export const isPlayTarget = object({ fileId: isOpaqueId, queue: listOf(isOpaqueI
 
 export type PlayTarget = Infer<typeof isPlayTarget>
 
+/** An audio track's index as a pick names it: a whole number, 0 or more. */
+export const isTrackIndex = (value: unknown): value is number =>
+  isNumber(value) && Number.isInteger(value) && value >= 0
+
+export const isTrackChoice = object({ audio: nullable(isNumber), subtitle: nullable(isString) })
+
+export type TrackChoice = Infer<typeof isTrackChoice>
+
 export const isLocalFile = object({
   fileId: isOpaqueId,
   label: isString,
   folder: isString,
   resumeAt: isNumber,
   next: nullable(object({ fileId: isOpaqueId, label: isString, queue: listOf(isOpaqueId) })),
+  tracks: nullable(isTrackChoice),
 })
 
 export type LocalFile = Infer<typeof isLocalFile>
@@ -41,12 +65,17 @@ export const isRecentView = object({
 
 export type RecentView = Infer<typeof isRecentView>
 
+export const isAudioDevice = object({ name: isString, description: isString })
+
+export type AudioDevice = Infer<typeof isAudioDevice>
+
 export const isMenuPlayerAction = oneOf([
   'togglePlay',
   'skipBack',
   'skipForward',
   'next',
   'showShortcuts',
+  'stats',
 ])
 
 export type MenuPlayerAction = Infer<typeof isMenuPlayerAction>
@@ -66,6 +95,15 @@ export const isDesktopRequest = union(
   object({ type: oneOf(['openRecent']), recentId: isOpaqueId }),
   object({ type: oneOf(['removeRecent']), recentId: isOpaqueId }),
   object({ type: oneOf(['clearRecents']) }),
+  object({
+    type: oneOf(['saveTracks']),
+    fileId: isOpaqueId,
+    audio: nullable(isTrackIndex),
+    subtitle: nullable(isString),
+  }),
+  object({ type: oneOf(['windowButtons']), isVisible: isBoolean }),
+  object({ type: oneOf(['readOutput']) }),
+  object({ type: oneOf(['writeOutput']), output: isOutputSettings }),
 )
 
 export type DesktopRequest = Infer<typeof isDesktopRequest>
@@ -74,6 +112,12 @@ export const isDesktopReply = union(
   object({ type: oneOf(['play']), target: isPlayTarget }),
   object({ type: oneOf(['file']), file: isLocalFile }),
   object({ type: oneOf(['recents']), recents: listOf(isRecentView) }),
+  object({
+    type: oneOf(['output']),
+    output: isOutputSettings,
+    devices: listOf(isAudioDevice),
+    isEngineReady: isBoolean,
+  }),
   object({ type: oneOf(['done']) }),
   object({ type: oneOf(['refused']), message: isString }),
 )
@@ -101,3 +145,16 @@ export const isInvokeEnvelope = union(
 )
 
 export type InvokeEnvelope = Infer<typeof isInvokeEnvelope>
+
+export const isPlayerConnection = union(
+  object({ status: oneOf(['native']) }),
+  object({ status: oneOf(['unavailable']), message: isString }),
+)
+
+export type PlayerConnectionStatus = Infer<typeof isPlayerConnection>
+
+/** What the preload forwards to the page on each `ready`; the port, when there is one, rides with it. */
+export const isPlayerPortMessage = object({
+  type: oneOf([PLAYER_PORT_MESSAGE]),
+  connection: isPlayerConnection,
+})

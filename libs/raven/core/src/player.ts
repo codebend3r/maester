@@ -65,7 +65,40 @@ export type PlayerEvent = Infer<typeof isPlayerEvent>
 /** A command on the player's MessagePort, answered by a reply with the same id. */
 export const isPlayerRequest = object({ id: isNumber, command: isPlayerCommand })
 
+/** Why a command was refused: `engine` means the native engine is gone and will not answer again. */
+export const isPlayerRefusalReason = oneOf(['refused', 'engine'])
+
+export type PlayerRefusalReason = Infer<typeof isPlayerRefusalReason>
+
 export const isPlayerReply = union(
   object({ id: isNumber, ok: oneOf([true]) }),
-  object({ id: isNumber, ok: oneOf([false]), message: isString }),
+  object({ id: isNumber, ok: oneOf([false]), reason: isPlayerRefusalReason, message: isString }),
 )
+
+export const isAudioProfile = oneOf(['pcm', 'passthrough', 'headphones'])
+
+/** mpv's `audio-spdif` vocabulary. */
+export const isPassthroughFormat = oneOf(['ac3', 'eac3', 'dts', 'dts-hd', 'truehd'])
+
+export const isOutputSettings = object({
+  profile: isAudioProfile,
+  device: isString,
+  passthrough: listOf(isPassthroughFormat),
+  spatial: isBoolean,
+})
+
+export type AudioProfile = Infer<typeof isAudioProfile>
+export type PassthroughFormat = Infer<typeof isPassthroughFormat>
+
+/**
+ * `device` is mpv's `audio-device` name, and `'auto'` follows the system.
+ * `spatial` applies to the headphones profile only.
+ */
+export type OutputSettings = Infer<typeof isOutputSettings>
+
+export const DEFAULT_OUTPUT_SETTINGS: OutputSettings = {
+  profile: 'pcm',
+  device: 'auto',
+  passthrough: ['ac3', 'dts'],
+  spatial: false,
+}

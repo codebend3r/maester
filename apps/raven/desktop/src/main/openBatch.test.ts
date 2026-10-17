@@ -153,5 +153,13 @@ describe('eventForOpen', () => {
 
   it('sends nothing for a reply that opens nothing', () => {
     expect(eventForOpen({ type: 'done' })).toBeNull()
+    expect(
+      eventForOpen({
+        type: 'output',
+        output: { profile: 'pcm', device: 'auto', passthrough: [], spatial: false },
+        devices: [],
+        isEngineReady: false,
+      }),
+    ).toBeNull()
   })
 })

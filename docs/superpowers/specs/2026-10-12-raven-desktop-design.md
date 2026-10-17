@@ -566,7 +566,7 @@ The library-mode design loads the renderer from `http://127.0.0.1:<port>` with `
   - the JS thread uses only the async calls, `mpv_command_async` and `mpv_set_property_async`;
   - events drain through `mpv_set_wakeup_callback` into a threadsafe function;
   - `mpv_terminate_destroy`, which blocks, runs on a worker thread.
-- **Hardened by default:** `load-scripts=no`, `ytdl=no`, `osc=no`, `input-default-bindings=no`, `input-vo-keyboard=no`. Keys and mouse belong to the page. `load-scripts=no` stops user scripts only; mpv's built-in ones (stats, auto_profiles) still load, which the diagnostics overlay needs.
+- **Hardened by default:** `load-scripts=no`, `ytdl=no`, `osc=no`, `input-default-bindings=no`, `input-vo-keyboard=no`. Keys and mouse belong to the page. `load-scripts=no` stops user scripts only; mpv's built-in ones (stats, auto_profiles) still load, which the diagnostics overlay needs. `access-references=no` is also set (the player service sets it before the first load, refusing loads if it fails), which stops EDL, playlist and other reference files from opening paths the user never granted; the cost is that MKV ordered chapters and linked segments, mov reference files and archive references do not play.
 - **Async only from JavaScript.** The spike's synchronous `getProperty` goes; every read is an observed property or an async get, and each value passes its type guard in `src/mpv.ts`.
 
 ### Surfaces
@@ -918,6 +918,10 @@ Each implementation step is its own PR, stacked on the one before, with an imple
 ### Follow-ups
 
 Match the display's refresh rate to video; report the screen's colourspace from the moltenvk context; switch Windows into HDR for an HDR title; Now Playing and media keys (MPNowPlayingInfoCenter, SMTC, MPRIS); Wayland with HDR on Linux; advertise the server's canonical origin for web handoff; consider recents thumbnails. Silent updates remain gated on Developer ID signing.
+
+At the next addon rebuild: move `access-references=no` into the addon's init options; fix the addon's cleanup hook, which segfaults on teardown when a player is still alive (avoided today because mpv is destroyed, or the process killed, before Node tears down); pass playlist entry ids (`start-file` and its entry id) from the addon, so the stale-event gating no longer depends on reply ordering.
+
+Real-hardware gates still owed before P5 ships: the picture under the transparent page (the window-surface smoke used an empty page), full screen, detached DevTools, and the XDR and 120 Hz measurement. If that measurement fails, ship with `target-colorspace-hint=no`, the fallback in Risks.
 
 ## Spike outcomes
 

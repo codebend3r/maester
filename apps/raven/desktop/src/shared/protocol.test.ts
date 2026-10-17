@@ -15,8 +15,13 @@ import {
   isLocalFile,
   isMenuPlayerAction,
   isOpaqueId,
+  isPlayerConnection,
+  isPlayerPortMessage,
   isPlayTarget,
   isRecentView,
+  isTrackChoice,
+  PLAYER_PORT_CHANNEL,
+  PLAYER_PORT_MESSAGE,
 } from '@/shared/protocol'
 
 const id = '0f8fad5b-d9cb-469f-a165-70867728950e'
@@ -30,6 +35,8 @@ describe('constants', () => {
     expect(REQUEST_CHANNEL).toBe('raven:request')
     expect(EVENT_CHANNEL).toBe('raven:event')
     expect(MAX_QUEUE).toBe(100)
+    expect(PLAYER_PORT_CHANNEL).toBe('raven:player')
+    expect(PLAYER_PORT_MESSAGE).toBe('raven:player-port')
   })
 })
 
@@ -65,10 +72,18 @@ describe('the building blocks', () => {
         folder: 'Movies',
         resumeAt: 12,
         next: { fileId: other, label: 'next.mkv', queue: [other] },
+        tracks: { audio: 1, subtitle: 'embedded-0' },
       }),
     ).toBe(true)
     expect(
-      isLocalFile({ fileId: id, label: 'film.mkv', folder: 'Movies', resumeAt: 0, next: null }),
+      isLocalFile({
+        fileId: id,
+        label: 'film.mkv',
+        folder: 'Movies',
+        resumeAt: 0,
+        next: null,
+        tracks: null,
+      }),
     ).toBe(true)
     expect(isRecentView({ recentId: id, label: 'film.mkv', from: 'Movies', watched: null })).toBe(
       true,
@@ -77,7 +92,9 @@ describe('the building blocks', () => {
       true,
     )
     expect(
-      ['togglePlay', 'skipBack', 'skipForward', 'next', 'showShortcuts'].every(isMenuPlayerAction),
+      ['togglePlay', 'skipBack', 'skipForward', 'next', 'showShortcuts', 'stats'].every(
+        isMenuPlayerAction,
+      ),
     ).toBe(true)
   })
 
@@ -85,7 +102,20 @@ describe('the building blocks', () => {
     expect(isPlayTarget({ fileId: '/Users/me/film.mkv', queue: [] })).toBe(false)
     expect(isPlayTarget({ fileId: id, queue: ['/Users/me/next.mkv'] })).toBe(false)
     expect(isRecentView({ recentId: 'abc', label: 'a', from: 'b', watched: null })).toBe(false)
-    expect(isMenuPlayerAction('stats')).toBe(false)
+    expect(isMenuPlayerAction('devtools')).toBe(false)
+  })
+
+  it('accepts a track choice with either side empty and rejects a mistyped one', () => {
+    expect(isTrackChoice({ audio: null, subtitle: null })).toBe(true)
+    expect(isTrackChoice({ audio: 2, subtitle: 'sidecar-1' })).toBe(true)
+    expect(isTrackChoice({ audio: '2', subtitle: null })).toBe(false)
+    expect(isTrackChoice({ audio: 2 })).toBe(false)
+  })
+
+  it('rejects a local file without its track pick', () => {
+    expect(
+      isLocalFile({ fileId: id, label: 'film.mkv', folder: 'Movies', resumeAt: 0, next: null }),
+    ).toBe(false)
   })
 })
 
@@ -100,6 +130,17 @@ describe('isDesktopRequest', () => {
     [{ type: 'openRecent', recentId: id }],
     [{ type: 'removeRecent', recentId: id }],
     [{ type: 'clearRecents' }],
+    [{ type: 'saveTracks', fileId: id, audio: 1, subtitle: 'embedded-0' }],
+    [{ type: 'saveTracks', fileId: id, audio: null, subtitle: null }],
+    [{ type: 'saveTracks', fileId: id, audio: 0, subtitle: null }],
+    [{ type: 'windowButtons', isVisible: false }],
+    [{ type: 'readOutput' }],
+    [
+      {
+        type: 'writeOutput',
+        output: { profile: 'pcm', device: 'auto', passthrough: ['ac3'], spatial: false },
+      },
+    ],
   ])('accepts %j', (value) => {
     expect(isDesktopRequest(value)).toBe(true)
   })
@@ -108,6 +149,12 @@ describe('isDesktopRequest', () => {
     ['a path as the file id', { type: 'describeFile', fileId: '/Users/me/film.mkv', queue: [] }],
     ['a string position', { type: 'savePosition', fileId: id, position: '12', duration: null }],
     ['a missing duration', { type: 'savePosition', fileId: id, position: 12 }],
+    ['a string audio index', { type: 'saveTracks', fileId: id, audio: '1', subtitle: null }],
+    ['a fractional audio index', { type: 'saveTracks', fileId: id, audio: 1.5, subtitle: null }],
+    ['a negative audio index', { type: 'saveTracks', fileId: id, audio: -1, subtitle: null }],
+    ['a path in saveTracks', { type: 'saveTracks', fileId: '/m/a.mkv', audio: 1, subtitle: null }],
+    ['a string for the window buttons', { type: 'windowButtons', isVisible: 'yes' }],
+    ['partial output settings', { type: 'writeOutput', output: { profile: 'pcm' } }],
     ['an unknown type', { type: 'readFile', path: '/etc/hosts' }],
     ['no type', {}],
     ['a string', 'ready'],
@@ -122,7 +169,22 @@ describe('isDesktopReply', () => {
     [
       {
         type: 'file',
-        file: { fileId: id, label: 'a.mkv', folder: 'Movies', resumeAt: 0, next: null },
+        file: {
+          fileId: id,
+          label: 'a.mkv',
+          folder: 'Movies',
+          resumeAt: 0,
+          next: null,
+          tracks: null,
+        },
+      },
+    ],
+    [
+      {
+        type: 'output',
+        output: { profile: 'passthrough', device: 'auto', passthrough: ['dts'], spatial: false },
+        devices: [{ name: 'coreaudio/abc', description: 'Receiver' }],
+        isEngineReady: true,
       },
     ],
     [{ type: 'recents', recents: [{ recentId: id, label: 'a', from: 'b', watched: 0.25 }] }],
@@ -135,6 +197,14 @@ describe('isDesktopReply', () => {
 
   it('rejects a refusal without a message and an unknown type', () => {
     expect(isDesktopReply({ type: 'refused' })).toBe(false)
+    expect(
+      isDesktopReply({
+        type: 'output',
+        output: { profile: 'pcm', device: 'auto', passthrough: [], spatial: false },
+        devices: [{ name: 'a' }],
+        isEngineReady: true,
+      }),
+    ).toBe(false)
     expect(isDesktopReply({ type: 'exec' })).toBe(false)
   })
 })
@@ -143,6 +213,7 @@ describe('isDesktopEvent', () => {
   it.each([
     [{ type: 'play', target: { fileId: id, queue: [] } }],
     [{ type: 'player', action: 'togglePlay' }],
+    [{ type: 'player', action: 'stats' }],
     [{ type: 'navigate', to: 'settings' }],
     [{ type: 'notice', message: 'raven links open in a later release' }],
   ])('accepts %j', (value) => {
@@ -153,7 +224,6 @@ describe('isDesktopEvent', () => {
     ['navigating to devtools', { type: 'navigate', to: 'devtools' }],
     ['navigating home, which nothing in main sends', { type: 'navigate', to: 'home' }],
     ['recentsChanged, which nothing in main sends', { type: 'recentsChanged' }],
-    ['the stats action, which waits for P5', { type: 'player', action: 'stats' }],
     ['a notice without a message', { type: 'notice' }],
   ])('rejects %s', (_name, value) => {
     expect(isDesktopEvent(value)).toBe(false)
@@ -180,5 +250,37 @@ describe('isInvokeEnvelope', () => {
     ['a bare request', { type: 'ready' }],
   ])('rejects %s', (_name, value) => {
     expect(isInvokeEnvelope(value)).toBe(false)
+  })
+})
+
+describe('isPlayerPortMessage', () => {
+  it.each([
+    [{ type: 'raven:player-port', connection: { status: 'native' } }],
+    [
+      {
+        type: 'raven:player-port',
+        connection: { status: 'unavailable', message: 'libmpv is missing' },
+      },
+    ],
+  ])('accepts %j', (value) => {
+    expect(isPlayerPortMessage(value)).toBe(true)
+  })
+
+  it.each([
+    ['an unknown status', { type: 'raven:player-port', connection: { status: 'broken' } }],
+    [
+      'unavailable without a message',
+      { type: 'raven:player-port', connection: { status: 'unavailable' } },
+    ],
+    ['the channel name as the type', { type: 'raven:player', connection: { status: 'native' } }],
+    ['no connection', { type: 'raven:player-port' }],
+  ])('rejects %s', (_name, value) => {
+    expect(isPlayerPortMessage(value)).toBe(false)
+  })
+
+  it('narrows a connection on its own', () => {
+    expect(isPlayerConnection({ status: 'native' })).toBe(true)
+    expect(isPlayerConnection({ status: 'unavailable', message: 'x' })).toBe(true)
+    expect(isPlayerConnection({ status: 'unavailable' })).toBe(false)
   })
 })

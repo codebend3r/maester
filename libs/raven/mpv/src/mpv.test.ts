@@ -190,6 +190,44 @@ describe('mpv wrapper native boundary (no libmpv loaded)', () => {
     }
   })
 
+  test('a command reply calls onReply in stream order, before its promise settles', async () => {
+    const value = fixture()
+    const player = await value.open()
+    const order: string[] = []
+    value.events.splice(0)
+    const pending = player
+      .command({ args: ['pending'], onReply: ({ isOk }) => order.push(`reply ${isOk}`) })
+      .then(() => order.push('settled'))
+    const sent = value.calls.at(-1)
+    expect(sent).toEqual({ command: ['pending'] })
+    // The version read at open took id 1, so this command is id 2.
+    value.emit({ type: 'file-loaded' })
+    order.push(`events ${value.events.length}`)
+    value.emit({ type: 'reply', id: 2, error: 0, data: null })
+    value.emit({ type: 'playback-restart' })
+    order.push(`events ${value.events.length}`)
+    await pending
+    expect(order).toEqual(['events 1', 'reply true', 'events 2', 'settled'])
+
+    const failing: string[] = []
+    await expect(
+      player.command({ args: ['fail'], onReply: ({ isOk }) => failing.push(`reply ${isOk}`) }),
+    ).rejects.toThrow('mpv request failed (-4)')
+    expect(failing).toEqual(['reply false'])
+
+    await expect(
+      player.command({
+        args: ['ok'],
+        onReply: () => {
+          throw new Error('listener broke')
+        },
+      }),
+    ).rejects.toThrow('listener broke')
+    // Still answers commands without a hook, as before.
+    await player.command({ args: ['ok'] })
+    await player.destroy()
+  })
+
   test('overflow and shutdown reject outstanding requests; destruction is idempotent', async () => {
     const value = fixture()
     const player = await value.open()

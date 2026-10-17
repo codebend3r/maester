@@ -74,6 +74,7 @@ export const eventForOpen = (reply: DesktopReply): DesktopEvent | null => {
       return { type: 'notice', message: reply.message }
     case 'file':
     case 'recents':
+    case 'output':
     case 'done':
       return null
     default: {

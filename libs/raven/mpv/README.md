@@ -94,11 +94,24 @@ Dependencies are static except libmpv and MoltenVK. Every non-system dylib depen
 must resolve inside the resource directory; `audit:native` rejects host install
 names, host rpaths, missing source archives, non-arm64 binaries or invalid signatures.
 Install IDs are `@rpath`, library rpaths are loader-relative, and each Mach-O is
-signed ad hoc. The addon uses node-addon-api 8.5.0 and N-API 8 with Node 24.19.0
-headers checked against Node's official SHASUMS256.txt, independent of Electron's ABI.
-The headers and corresponding Node license are checksum-locked in the build script;
-cmake-js uses that project-local header directory rather than a host download cache. Build provenance records the
-repository revision, compiler, SDK, patches and artifact hashes. This is a pinned
+signed ad hoc.
+
+glslang 16 keeps all its code in `libglslang.a` and `libglslang-default-resource-limits.a`;
+`SPIRV`, `MachineIndependent`, `OSDependent` and `GenericCodeGen` are empty compatibility
+archives. libplacebo's meson finds only those four (it searches `vulkan-sdk` for them but
+not for the two real ones), and names no C++ runtime, so the libmpv link adds
+`-lglslang -lglslang-default-resource-limits -lc++` itself (`src/build/linkage.ts`).
+mpv's default `b_lundef=false` linked libmpv with `-undefined dynamic_lookup`, which
+shipped that gap as unresolved symbols and crashed the window surface in
+`pl_glslang_init`; the build passes `-Db_lundef=true` so a missing library fails the link.
+`audit:native` also reads `nm`: each undefined symbol must bind to a library the file
+loads (only the addon may look up N-API from its host), and libmpv must define glslang.
+
+The addon uses node-addon-api 8.5.0 and N-API 8 with Node 24.19.0 headers checked
+against Node's official SHASUMS256.txt, independent of Electron's ABI. The headers and
+corresponding Node license are checksum-locked in the build script; cmake-js uses that
+project-local header directory rather than a host download cache. Build provenance records
+the repository revision, compiler, SDK, patches and artifact hashes. This is a pinned
 build recipe, not a claim of byte-identical output across different Apple SDKs.
 
 ### Resources and source parity
