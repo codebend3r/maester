@@ -77,9 +77,10 @@ export type DownloadPlayback = {
   notePlaying: (input: { fileId: string | null }) => void
   /**
    * A download's share watched, as Home's recents show one: 1 once it is marked watched, else
-   * the share its resume spot gives, null until its file was read.
+   * the share its resume spot gives, null until its file was read. It takes the entry, so the
+   * views read every row's share without searching the list for each.
    */
-  watchedOf: (downloadId: string) => number | null
+  watchedOf: (entry: DownloadEntry) => number | null
   /** Whether the video at `path` is a download marked watched, which Home's recent shows whole. */
   isWatched: (input: { path: string }) => boolean
   /** Reads these ready downloads' files for their share watched, then tells the page. */
@@ -254,9 +255,9 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
     playing.downloadId = fileId === null ? null : (entryOfFile(fileId)?.downloadId ?? null)
   }
 
-  const watchedOf: DownloadPlayback['watchedOf'] = (downloadId) => {
-    if (isMarked(entryById(store.read(), { downloadId }))) return 1
-    const file = factsById.get(downloadId)
+  const watchedOf: DownloadPlayback['watchedOf'] = (entry) => {
+    if (isMarked(entry)) return 1
+    const file = factsById.get(entry.downloadId)
     return file === undefined ? null : watchedShare({ state: deps.state.read(), file })
   }
 
