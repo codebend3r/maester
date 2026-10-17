@@ -33,6 +33,44 @@ const FETCHED_AT = {
   mdblist: 'mdblist_fetched_at',
 } as const satisfies Record<ScoreProvider, string>
 
+/**
+ * When an item's scores from each provider are due, as SQL over `items` with
+ * `@before`. MDBList's are due when it has never answered or answered before
+ * then. OMDb's are due for a title with an IMDb id when OMDb has not answered
+ * since, and MDBList has not either or gave it no scores: the titles it does
+ * not know, whose fallback may have failed.
+ */
+const SCORES_DUE = {
+  mdblist: '(mdblist_fetched_at IS NULL OR mdblist_fetched_at < @before)',
+  omdb: `imdb_id IS NOT NULL
+    AND (omdb_fetched_at IS NULL OR omdb_fetched_at < @before)
+    AND (mdblist_fetched_at IS NULL OR mdblist_fetched_at < @before
+         OR NOT EXISTS (SELECT 1 FROM ratings r
+                         WHERE r.item_id = items.id AND r.provider = 'mdblist'))`,
+} as const satisfies Record<ScoreProvider, string>
+
+/** The movies and shows whose scores from `provider` are due, leaving out titles raven made up. */
+const scoresDueWhere = (provider: ScoreProvider): string =>
+  `type IN ('movie', 'show') AND tmdb_id NOT GLOB @local AND ${SCORES_DUE[provider]}`
+
+/**
+ * The order each provider's due scores are fetched in. MDBList's: first the
+ * titles it has never answered that lack a Rotten Tomatoes or Metacritic
+ * score, then the rest it has never answered, then the oldest. OMDb's: those
+ * neither provider has answered for the longest first.
+ */
+const SCORES_ORDER = {
+  mdblist: `CASE WHEN mdblist_fetched_at IS NOT NULL THEN 2
+                 WHEN EXISTS (SELECT 1 FROM ratings r
+                               WHERE r.item_id = items.id AND r.source = 'rottenTomatoes')
+                  AND EXISTS (SELECT 1 FROM ratings r
+                               WHERE r.item_id = items.id AND r.source = 'metacritic') THEN 1
+                 ELSE 0 END,
+            mdblist_fetched_at, id`,
+  // MAX of two columns is NULL when either is, so a stamp never set counts as ''.
+  omdb: "MAX(COALESCE(omdb_fetched_at, ''), COALESCE(mdblist_fetched_at, '')), id",
+} as const satisfies Record<ScoreProvider, string>
+
 /** Rotten Tomatoes and Metacritic are critics; TMDB and IMDb are audiences. */
 const RATING_KIND_OF: Record<RatingSource, Rating['kind']> = {
   tmdb: RATING_KINDS.audience,
@@ -700,16 +738,7 @@ export class MetadataRepository {
     })()
   }
 
-  /**
-   * Movies and shows whose scores from `provider` are due, as far as `limit`
-   * goes. MDBList's are due when it has never answered or answered before
-   * `before`: first the titles it has never answered that lack a Rotten
-   * Tomatoes or Metacritic score, then the rest it has never answered, then
-   * the oldest. OMDb's are due for a title with an IMDb id when OMDb has
-   * not answered since `before`, and MDBList has not either or gave it no
-   * scores: the titles it does not know, whose fallback may have failed.
-   * Those neither has answered for the longest go first.
-   */
+  /** Movies and shows whose scores from `provider` are due, in the order they are fetched, as far as `limit` goes. */
   scoresDue({
     provider,
     before,
@@ -719,30 +748,14 @@ export class MetadataRepository {
     before: string
     limit: number
   }): Array<ScoreTitle & { itemId: number }> {
-    // MAX of two columns is NULL when either is, so a stamp never set counts as ''.
-    const due =
-      provider === 'mdblist'
-        ? `(mdblist_fetched_at IS NULL OR mdblist_fetched_at < @before)
-          ORDER BY CASE WHEN mdblist_fetched_at IS NOT NULL THEN 2
-                        WHEN EXISTS (SELECT 1 FROM ratings r
-                                      WHERE r.item_id = items.id AND r.source = 'rottenTomatoes')
-                         AND EXISTS (SELECT 1 FROM ratings r
-                                      WHERE r.item_id = items.id AND r.source = 'metacritic') THEN 1
-                        ELSE 0 END,
-                   mdblist_fetched_at, id`
-        : `imdb_id IS NOT NULL
-            AND (omdb_fetched_at IS NULL OR omdb_fetched_at < @before)
-            AND (mdblist_fetched_at IS NULL OR mdblist_fetched_at < @before
-                 OR NOT EXISTS (SELECT 1 FROM ratings r
-                                 WHERE r.item_id = items.id AND r.provider = 'mdblist'))
-          ORDER BY MAX(COALESCE(omdb_fetched_at, ''), COALESCE(mdblist_fetched_at, '')), id`
     return this.db
       .prepare<
         { local: string; before: string; limit: number },
         { id: number; type: string; tmdb_id: string; imdb_id: string | null }
       >(
         `SELECT id, type, tmdb_id, imdb_id FROM items
-          WHERE type IN ('movie', 'show') AND tmdb_id NOT GLOB @local AND ${due}
+          WHERE ${scoresDueWhere(provider)}
+          ORDER BY ${SCORES_ORDER[provider]}
           LIMIT @limit`,
       )
       .all({ local: `${LOCAL}*`, before, limit })
@@ -751,6 +764,23 @@ export class MetadataRepository {
           ? [{ itemId: row.id, type: row.type, tmdbId: row.tmdb_id, imdbId: row.imdb_id }]
           : [],
       )
+  }
+
+  /** Whether an item's scores from `provider` are still due, by the rule `scoresDue` lists them by. */
+  isScoreDue({
+    itemId,
+    provider,
+    before,
+  }: {
+    itemId: number
+    provider: ScoreProvider
+    before: string
+  }): boolean {
+    return !!this.db
+      .prepare<{ id: number; local: string; before: string }, { id: number }>(
+        `SELECT id FROM items WHERE id = @id AND ${scoresDueWhere(provider)}`,
+      )
+      .get({ id: itemId, local: `${LOCAL}*`, before })
   }
 
   /** A person's page: the movies and shows on disk they are credited on, newest first. */

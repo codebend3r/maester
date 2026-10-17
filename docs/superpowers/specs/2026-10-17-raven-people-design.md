@@ -196,14 +196,17 @@ Migration 28:
 - `items.mdblist_fetched_at`.
 
 **Which source answers:**
-- With `MDBLIST_API_KEY` set and accepted, MDBList is the main source for movies and shows. OMDb is asked only for a title MDBList doesn't know.
-- Without it, OMDb is the main source as today.
+- With `MDBLIST_API_KEY` set and accepted, MDBList is the main source for movies and shows. OMDb is asked for a title MDBList doesn't know: at once when MDBList answers unknown, and in the sweep's fallback pass whenever OMDb's answer is missing or a month old, so a failed fallback is asked again.
+- Without it, or once MDBList's calls for the day are spent, OMDb is the main source as today.
 
 **Saving.** A provider's answer:
 - deletes only the rows that provider wrote and no longer sends;
 - never overwrites an MDBList row with an OMDb one.
 
-**Topping up.** Due scores are topped up by a `ScoreSweep` on its own queue, never the metadata queue, within each provider's daily budget (`MDBLIST_DAILY_LIMIT`, default 1000). It wakes after UTC midnight when the budget is spent, and 15 minutes after a failure.
+**Topping up.** Due scores are topped up by a `ScoreSweep` on its own queue, never the metadata queue, within each provider's daily budget (`MDBLIST_DAILY_LIMIT`, default 1000):
+- It drains the main source's due titles, then OMDb's for the titles MDBList doesn't know.
+- OMDb is due for a title with an IMDb id when its own answer is missing or a month old, and MDBList's is too or MDBList gave the title no scores.
+- It wakes after UTC midnight whenever a spent source still has titles due, and 15 minutes after a round that got no answer. A title that fails keeps its place, and the rest go on.
 
 **Health.** It reports `mdblist` beside `omdb`.
 

@@ -545,9 +545,10 @@ describe("each provider's scores", () => {
     const known = title({ tmdbId: '924', imdbId: 'tt924' })
     scoredByMdblist(known)
     stamp({ itemId: known, omdb: daysAgo(40), mdblist: daysAgo(1) })
-    stamp({ itemId: title({ tmdbId: '925', imdbId: 'tt925' }), omdb: daysAgo(1) })
-    title({ tmdbId: '926' })
-    title({ tmdbId: `${LOCAL}927`, imdbId: 'tt927' })
+    const fresh = title({ tmdbId: '925', imdbId: 'tt925' })
+    stamp({ itemId: fresh, omdb: daysAgo(1) })
+    const noImdb = title({ tmdbId: '926' })
+    const local = title({ tmdbId: `${LOCAL}927`, imdbId: 'tt927' })
 
     expect(
       stored
@@ -558,6 +559,20 @@ describe("each provider's scores", () => {
       [older, 'tt922'],
       [old, 'tt921'],
       [unknown, 'tt920'],
+    ])
+    const isDue = (itemId: number) =>
+      (['omdb', 'mdblist'] as const).map((provider) =>
+        stored.isScoreDue({ itemId, provider, before: daysAgo(30) }),
+      )
+    expect([unknown, old, older, never, known, fresh, noImdb, local].map(isDue)).toEqual([
+      [true, false],
+      [true, true],
+      [true, true],
+      [true, true],
+      [false, false],
+      [false, true],
+      [false, true],
+      [false, false],
     ])
   })
 })
