@@ -1,15 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   DEFAULT_LIBRARY_SETTINGS,
-  LIBRARY_KINDS,
+  FOLDER_LAYOUTS,
   type Library,
   type LibraryInput,
   type LibraryKind,
   type LibrarySettings,
   type PathLayout,
-  RATING_SOURCES,
   type RatingSource,
   defaultLibrarySettings,
+  isLibraryKind,
   isRatingSource,
   matchTypeFor,
   validateLibraryInput,
@@ -162,7 +162,7 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
           >
             <legend>Type</legend>
             <div className={styles.kinds}>
-              {LIBRARY_KINDS.map((kind) => (
+              {isLibraryKind.values.map((kind) => (
                 <div key={kind} className={styles.kind}>
                   <input
                     id={`${ids.kind}-${kind}`}
@@ -361,7 +361,7 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
                   id={`${ids.settings}-layout`}
                   type="checkbox"
                   className={styles.checkbox}
-                  checked={settings.folderLayout === 'auto'}
+                  checked={settings.folderLayout === FOLDER_LAYOUTS.auto}
                   onChange={(event) =>
                     setSettings((current) => ({
                       ...current,
@@ -402,7 +402,7 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
                   }}
                   aria-describedby={`${ids.settings}-ratings-hint`}
                 >
-                  {RATING_SOURCES.map((source) => (
+                  {isRatingSource.values.map((source) => (
                     <option key={source} value={source}>
                       {RATINGS_LABELS[source]}
                     </option>

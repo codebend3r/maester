@@ -10,7 +10,7 @@ export type MediaGroup = {
 }
 
 /** Resolution buckets from the largest frame down, as the cards label them. */
-const LARGEST_FIRST: readonly string[] = RESOLUTIONS.toReversed()
+const LARGEST_FIRST: readonly string[] = Object.values(RESOLUTIONS).toReversed()
 
 const UNPROBED = { key: 'unprobed', label: 'Not probed yet' }
 

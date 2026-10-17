@@ -1,4 +1,11 @@
-import type { FolderLayout, LibraryKind, PathLayout } from '@/contract'
+import {
+  FOLDER_LAYOUTS,
+  type FolderLayout,
+  ITEM_TYPES,
+  type LibraryKind,
+  PATH_LAYOUTS,
+  type PathLayout,
+} from '@/contract'
 import { matchTypeFor } from '@/libraryKinds'
 import { seasonFolderNumber, yearOf } from '@/naming'
 
@@ -34,7 +41,7 @@ export const groupFolderOf = ({
   layout: FolderLayout
 }): string | null => {
   const type = matchTypeFor(kind)
-  if (layout === 'flat' || type == null) return null
+  if (layout === FOLDER_LAYOUTS.flat || type == null) return null
   const [top, second, third] = folder.split(/[\\/]/).filter((segment) => segment !== '')
   if (top == null) return null
   if (isLetterFolder(top)) return isSeasonFolder(second) ? null : top

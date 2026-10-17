@@ -1,4 +1,6 @@
 import {
+  ITEM_TYPES,
+  LIBRARY_VIEWS,
   type LibrarySettings,
   type MediaItem,
   type ShowEntry,
@@ -20,8 +22,8 @@ import styles from '@/pages/LibraryPage/LibraryPage.module.scss'
 
 /** A TV library's shows laid out the way its view setting says; the grouped view is the grid, as the page itself splits matched from not. */
 const ShowsView = ({ settings, shows }: { settings: LibrarySettings; shows: ShowEntry[] }) => {
-  if (settings.view === 'list') return <ShowList shows={shows} />
-  if (settings.view === 'tiles') return <ShowTiles shows={shows} sort={settings.sort} />
+  if (settings.view === LIBRARY_VIEWS.list) return <ShowList shows={shows} />
+  if (settings.view === LIBRARY_VIEWS.tiles) return <ShowTiles shows={shows} sort={settings.sort} />
   return <ShowGrid shows={shows} ratingsSource={settings.ratingsSource} sort={settings.sort} />
 }
 
@@ -38,11 +40,11 @@ const isMovieLibrary = (settings: LibrarySettings): boolean =>
 const MediaView = ({ settings, items }: { settings: LibrarySettings; items: MediaItem[] }) => {
   const matchType = matchTypeFor(settings.kind)
   const movies = isMovieLibrary(settings)
-  if (settings.view === 'list')
+  if (settings.view === LIBRARY_VIEWS.list)
     return <MediaList items={items} movies={movies} matchType={matchType} />
-  if (settings.view === 'tiles')
+  if (settings.view === LIBRARY_VIEWS.tiles)
     return <MediaTiles items={items} posters={movies} matchType={matchType} sort={settings.sort} />
-  if (settings.view === 'grouped')
+  if (settings.view === LIBRARY_VIEWS.grouped)
     return (
       <MediaGroups
         items={items}
@@ -103,7 +105,8 @@ export const LibraryListing = ({
 
 /** Stand-ins shaped as the listing will be: rows, a TV library's wide show cards, or cards. */
 const ListingBones = ({ settings }: { settings: LibrarySettings }) => {
-  if (settings.view === 'list' || settings.view === 'tiles') return <MediaTilesSkeleton />
+  if (settings.view === LIBRARY_VIEWS.list || settings.view === LIBRARY_VIEWS.tiles)
+    return <MediaTilesSkeleton />
   if (listsShows(settings.kind)) return <ShowGridSkeleton />
   return <MediaGridSkeleton posters={isMovieLibrary(settings)} />
 }

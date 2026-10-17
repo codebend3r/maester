@@ -61,24 +61,54 @@ export type ScanStatus = Infer<typeof isScanStatus>
 /** Whether a scan is under way, walking or indexing. */
 export const isScanning = (scan: ScanStatus): boolean => scan.state !== 'idle'
 
-export const SORT_DIRECTIONS = ['ascending', 'descending'] as const
+export const SORT_DIRECTIONS = { ascending: 'ascending', descending: 'descending' } as const
 
-export type SortDirection = (typeof SORT_DIRECTIONS)[number]
+export type SortDirection = (typeof SORT_DIRECTIONS)[keyof typeof SORT_DIRECTIONS]
 
 /** Every field a library can be sorted on, in the order a menu offers them. */
-export const isSortFieldName = oneOf([
-  'title',
-  'added',
-  'changed',
-  'size',
-  'bitrate',
-  'resolution',
-  'release',
-  'rating',
-  'random',
-])
+export const SORT_FIELD_NAMES = {
+  title: 'title',
+  added: 'added',
+  changed: 'changed',
+  size: 'size',
+  bitrate: 'bitrate',
+  resolution: 'resolution',
+  release: 'release',
+  rating: 'rating',
+  random: 'random',
+} as const
+
+export const isSortFieldName = oneOf(Object.values(SORT_FIELD_NAMES))
 
 export type SortFieldName = Infer<typeof isSortFieldName>
+
+/** Every sort a listing can be in; `SORT_FIELDS` files each one under its field. */
+export const MEDIA_SORTS = {
+  title: 'title',
+  titleDesc: 'title-desc',
+  oldest: 'oldest',
+  added: 'added',
+  changedOld: 'changed-old',
+  changed: 'changed',
+  smallest: 'smallest',
+  largest: 'largest',
+  bitrateLow: 'bitrate-low',
+  bitrateHigh: 'bitrate-high',
+  resolutionLow: 'resolution-low',
+  resolutionHigh: 'resolution-high',
+  yearOld: 'year-old',
+  yearNew: 'year-new',
+  ratingLow: 'rating-low',
+  ratingHigh: 'rating-high',
+  random: 'random',
+} as const
+
+export const isMediaSort = oneOf(Object.values(MEDIA_SORTS))
+
+export type MediaSort = Infer<typeof isMediaSort>
+
+/** A field that runs either way, or one with the one sort. */
+export const SORT_FIELD_TYPES = { directed: 'directed', undirected: 'undirected' } as const
 
 /**
  * What a listing is sorted on, each field with its sorts: one for each way a
@@ -90,146 +120,179 @@ export type SortFieldName = Infer<typeof isSortFieldName>
  * client sends, so the order holds across refetches until it deals a new one.
  */
 export const SORT_FIELDS = {
-  title: { type: 'directed', ascending: 'title', descending: 'title-desc', start: 'ascending' },
-  added: { type: 'directed', ascending: 'oldest', descending: 'added', start: 'descending' },
+  title: {
+    type: SORT_FIELD_TYPES.directed,
+    ascending: MEDIA_SORTS.title,
+    descending: MEDIA_SORTS.titleDesc,
+    start: SORT_DIRECTIONS.ascending,
+  },
+  added: {
+    type: SORT_FIELD_TYPES.directed,
+    ascending: MEDIA_SORTS.oldest,
+    descending: MEDIA_SORTS.added,
+    start: SORT_DIRECTIONS.descending,
+  },
   changed: {
-    type: 'directed',
-    ascending: 'changed-old',
-    descending: 'changed',
-    start: 'descending',
+    type: SORT_FIELD_TYPES.directed,
+    ascending: MEDIA_SORTS.changedOld,
+    descending: MEDIA_SORTS.changed,
+    start: SORT_DIRECTIONS.descending,
+  },
+  size: {
+    type: SORT_FIELD_TYPES.directed,
+    ascending: MEDIA_SORTS.smallest,
+    descending: MEDIA_SORTS.largest,
+    start: SORT_DIRECTIONS.descending,
   },
   size: { type: 'directed', ascending: 'smallest', descending: 'largest', start: 'descending' },
   bitrate: {
-    type: 'directed',
-    ascending: 'bitrate-low',
-    descending: 'bitrate-high',
-    start: 'descending',
+    type: SORT_FIELD_TYPES.directed,
+    ascending: MEDIA_SORTS.bitrateLow,
+    descending: MEDIA_SORTS.bitrateHigh,
+    start: SORT_DIRECTIONS.descending,
   },
   resolution: {
-    type: 'directed',
-    ascending: 'resolution-low',
-    descending: 'resolution-high',
-    start: 'descending',
+    type: SORT_FIELD_TYPES.directed,
+    ascending: MEDIA_SORTS.resolutionLow,
+    descending: MEDIA_SORTS.resolutionHigh,
+    start: SORT_DIRECTIONS.descending,
+  },
+  release: {
+    type: SORT_FIELD_TYPES.directed,
+    ascending: MEDIA_SORTS.yearOld,
+    descending: MEDIA_SORTS.yearNew,
+    start: SORT_DIRECTIONS.descending,
   },
   release: { type: 'directed', ascending: 'year-old', descending: 'year-new', start: 'descending' },
   rating: {
-    type: 'directed',
-    ascending: 'rating-low',
-    descending: 'rating-high',
-    start: 'descending',
+    type: SORT_FIELD_TYPES.directed,
+    ascending: MEDIA_SORTS.ratingLow,
+    descending: MEDIA_SORTS.ratingHigh,
+    start: SORT_DIRECTIONS.descending,
   },
-  random: { type: 'undirected', sort: 'random' },
+  random: { type: SORT_FIELD_TYPES.undirected, sort: MEDIA_SORTS.random },
 } as const satisfies Record<
   SortFieldName,
-  | { type: 'directed'; ascending: string; descending: string; start: SortDirection }
-  | { type: 'undirected'; sort: string }
+  | {
+      type: typeof SORT_FIELD_TYPES.directed
+      ascending: MediaSort
+      descending: MediaSort
+      start: SortDirection
+    }
+  | { type: typeof SORT_FIELD_TYPES.undirected; sort: MediaSort }
 >
 
 type SortFieldRule = (typeof SORT_FIELDS)[SortFieldName]
 
-/** Every sort the table names, read off it; `MediaSort` is the same union, read off its guard. */
-type FieldSort =
-  | Extract<SortFieldRule, { type: 'directed' }>[SortDirection]
-  | Extract<SortFieldRule, { type: 'undirected' }>['sort']
-
 /** A field's sorts: one for each way it runs, or the one of a field with no way to it. */
-export const fieldSorts = (name: SortFieldName): FieldSort[] => {
+export const fieldSorts = (name: SortFieldName): MediaSort[] => {
   const field: SortFieldRule = SORT_FIELDS[name]
   return field.type === 'directed' ? [field.ascending, field.descending] : [field.sort]
 }
 
-/** Every sort of every field in `SORT_FIELDS`, which is the one place a sort is named. */
-export const isMediaSort = oneOf(isSortFieldName.values.flatMap(fieldSorts))
+export const LIBRARY_VIEWS = {
+  grid: 'grid',
+  list: 'list',
+  tiles: 'tiles',
+  grouped: 'grouped',
+} as const
 
-export type MediaSort = Infer<typeof isMediaSort>
-
-export const MEDIA_SORTS = isMediaSort.values
-
-export const isLibraryView = oneOf(['grid', 'list', 'tiles', 'grouped'])
+export const isLibraryView = oneOf(Object.values(LIBRARY_VIEWS))
 
 export type LibraryView = Infer<typeof isLibraryView>
 
-export const LIBRARY_VIEWS = isLibraryView.values
+export const LIBRARY_KINDS = {
+  movies: 'movies',
+  shows: 'shows',
+  animeMovies: 'animeMovies',
+  animeShows: 'animeShows',
+  familyMovies: 'familyMovies',
+  familyShows: 'familyShows',
+  documentaries: 'documentaries',
+  sports: 'sports',
+  youtube: 'youtube',
+  other: 'other',
+} as const
 
-export const isLibraryKind = oneOf([
-  'movies',
-  'shows',
-  'animeMovies',
-  'animeShows',
-  'familyMovies',
-  'familyShows',
-  'documentaries',
-  'sports',
-  'youtube',
-  'other',
-])
+export const isLibraryKind = oneOf(Object.values(LIBRARY_KINDS))
 
 export type LibraryKind = Infer<typeof isLibraryKind>
-
-export const LIBRARY_KINDS = isLibraryKind.values
 
 /**
  * The icons a library can wear, in the order Edit library offers them:
  * films and shows, then sport, then audio. Each type wears one of them
  * until its library picks another; the web app draws them.
  */
-export const isLibraryIconName = oneOf([
-  'film',
-  'tv',
-  'filmSpark',
-  'tvSpark',
-  'filmHeart',
-  'tvHeart',
-  'globe',
-  'tvGlobe',
-  'fourK',
-  'musicVideo',
-  'youtube',
-  'video',
-  'standUp',
-  'gamepad',
-  'trophy',
-  'octagon',
-  'basketball',
-  'soccer',
-  'americanFootball',
-  'headphones',
-  'music',
-  'disc',
-  'podcast',
-  'audiobook',
-])
+const LIBRARY_ICON_NAMES = {
+  film: 'film',
+  tv: 'tv',
+  filmSpark: 'filmSpark',
+  tvSpark: 'tvSpark',
+  filmHeart: 'filmHeart',
+  tvHeart: 'tvHeart',
+  globe: 'globe',
+  tvGlobe: 'tvGlobe',
+  fourK: 'fourK',
+  musicVideo: 'musicVideo',
+  youtube: 'youtube',
+  video: 'video',
+  standUp: 'standUp',
+  gamepad: 'gamepad',
+  trophy: 'trophy',
+  octagon: 'octagon',
+  basketball: 'basketball',
+  soccer: 'soccer',
+  americanFootball: 'americanFootball',
+  headphones: 'headphones',
+  music: 'music',
+  disc: 'disc',
+  podcast: 'podcast',
+  audiobook: 'audiobook',
+} as const
+
+export const isLibraryIconName = oneOf(Object.values(LIBRARY_ICON_NAMES))
 
 export type LibraryIconName = Infer<typeof isLibraryIconName>
 
-export const LIBRARY_ICON_NAMES = isLibraryIconName.values
+/** `match` buckets a matched library, of movies or shows, by how far matching got. */
+export const MEDIA_GROUPINGS = {
+  match: 'match',
+  resolution: 'resolution',
+  codec: 'codec',
+  month: 'month',
+} as const
 
-export const isMediaGroupBy = oneOf(['match', 'resolution', 'codec', 'month'])
+export const isMediaGroupBy = oneOf(Object.values(MEDIA_GROUPINGS))
 
 /** `match` buckets a matched library, of movies or shows, by how far matching got. */
 export type MediaGroupBy = Infer<typeof isMediaGroupBy>
 
-export const MEDIA_GROUPINGS = isMediaGroupBy.values
+export const RATING_SOURCES = {
+  tmdb: 'tmdb',
+  imdb: 'imdb',
+  rottenTomatoes: 'rottenTomatoes',
+  metacritic: 'metacritic',
+} as const
 
-export const isRatingSource = oneOf(['tmdb', 'imdb', 'rottenTomatoes', 'metacritic'])
+export const isRatingSource = oneOf(Object.values(RATING_SOURCES))
 
 export type RatingSource = Infer<typeof isRatingSource>
-
-export const RATING_SOURCES = isRatingSource.values
 
 /**
  * How a library's folders are read: `auto` reads letter folders (`A/`, `#/`)
  * and group folders (`Requests/`) as holding the titles; `flat` reads every
  * top folder as one title.
  */
-export const isFolderLayout = oneOf(['auto', 'flat'])
+export const FOLDER_LAYOUTS = { auto: 'auto', flat: 'flat' } as const
+
+export const isFolderLayout = oneOf(Object.values(FOLDER_LAYOUTS))
 
 export type FolderLayout = Infer<typeof isFolderLayout>
 
-export const FOLDER_LAYOUTS = isFolderLayout.values
-
 /** What a library path turned out to be on its last full scan. */
-export const isPathLayout = oneOf(['flat', 'lettered', 'grouped'])
+export const PATH_LAYOUTS = { flat: 'flat', lettered: 'lettered', grouped: 'grouped' } as const
+
+export const isPathLayout = oneOf(Object.values(PATH_LAYOUTS))
 
 export type PathLayout = Infer<typeof isPathLayout>
 
@@ -343,20 +406,37 @@ export type LibraryInput = {
   settings?: Partial<LibrarySettings>
 }
 
-export const isThumbnailState = oneOf(['pending', 'ready', 'failed'])
+export const THUMBNAIL_STATES = { pending: 'pending', ready: 'ready', failed: 'failed' } as const
+
+export const isThumbnailState = oneOf(Object.values(THUMBNAIL_STATES))
 
 export type ThumbnailState = Infer<typeof isThumbnailState>
-
-export const isMatchState = oneOf(['pending', 'matched', 'manual', 'unmatched', 'off'])
 
 /**
  * `pending` waits for matching, `matched` found its item by itself,
  * `manual` was chosen with Fix match, `unmatched` found nothing sure, and
  * `off` is a library that is not matched, or an extra.
  */
+export const MATCH_STATES = {
+  pending: 'pending',
+  matched: 'matched',
+  manual: 'manual',
+  unmatched: 'unmatched',
+  off: 'off',
+} as const
+
+export const isMatchState = oneOf(Object.values(MATCH_STATES))
+
 export type MatchState = Infer<typeof isMatchState>
 
-export const isItemType = oneOf(['movie', 'show', 'season', 'episode'])
+export const ITEM_TYPES = {
+  movie: 'movie',
+  show: 'show',
+  season: 'season',
+  episode: 'episode',
+} as const
+
+export const isItemType = oneOf(Object.values(ITEM_TYPES))
 
 export type ItemType = Infer<typeof isItemType>
 
@@ -634,6 +714,8 @@ export const isSlideshowMotion = oneOf(['fade', 'kenBurns', 'slide'])
 
 export type SlideshowMotion = Infer<typeof isSlideshowMotion>
 
+export const SAGA_BACKDROP_TYPES = { slideshow: 'slideshow', still: 'still' } as const
+
 /**
  * What a saga's page shows behind its title: its movies' backdrops in turn,
  * first to last and round again, or the one of them picked, held still.
@@ -889,6 +971,8 @@ export const isPlaybackSettingsState = object({
 
 export type PlaybackSettingsState = Infer<typeof isPlaybackSettingsState>
 
+export const TITLE_DISPLAYS = { logo: 'logo', text: 'text' } as const
+
 /** The values each display setting takes. */
 export const DISPLAY_CHOICES = {
   titles: ['logo', 'text'],
@@ -1008,9 +1092,11 @@ export type UnmatchedFile = Infer<typeof isUnmatchedFile>
 
 export const isUnmatchedList = listOf(isUnmatchedFile)
 
-export const isMetadataServiceState = oneOf(['off', 'ok', 'failing'])
-
 /** `off` when not configured, `failing` when the last call went wrong. */
+export const METADATA_SERVICE_STATES = { off: 'off', ok: 'ok', failing: 'failing' } as const
+
+export const isMetadataServiceState = oneOf(Object.values(METADATA_SERVICE_STATES))
+
 export type MetadataServiceState = Infer<typeof isMetadataServiceState>
 
 /** How metadata is doing, from `/api/health`. */
@@ -1076,6 +1162,8 @@ export const isLockState = object({
 })
 
 export type LockState = Infer<typeof isLockState>
+
+export const ADMIN_LOCK_STATES = { on: 'on', turningOn: 'turningOn', off: 'off' } as const
 
 /**
  * The admin lock, as it stands for this browser. It is on until the admin

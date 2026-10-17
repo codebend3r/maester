@@ -1,4 +1,10 @@
-import { type LibrarySettings, type MediaItem, type ShowEntry, groupMedia } from '@raven/core'
+import {
+  LIBRARY_VIEWS,
+  type LibrarySettings,
+  type MediaItem,
+  type ShowEntry,
+  groupMedia,
+} from '@raven/core'
 
 /** A library's listing: its shows (none outside a TV library), then the files listed as files. */
 export type Listing = { shows: ShowEntry[]; files: MediaItem[] }
@@ -30,7 +36,7 @@ export const playQueue = ({
 } => {
   const nextEpisodes = listing.shows.flatMap((entry) => entry.next ?? [])
   const shownFiles =
-    settings.view === 'grouped'
+    settings.view === LIBRARY_VIEWS.grouped
       ? groupMedia({ items: listing.files, by: settings.groupBy }).flatMap((group) => group.items)
       : listing.files
   const choices = [...nextEpisodes, ...listing.files]

@@ -1,11 +1,14 @@
 import {
   type MediaItem,
   type MediaSort,
+  RATING_SOURCES,
+  RESOLUTIONS,
   type RatingSource,
   type Resolution,
+  SORT_DIRECTIONS,
+  SORT_FIELD_NAMES,
   type ShowEntry,
   type SortFieldName,
-  RESOLUTIONS,
   pickScore,
   resolutionLabel,
   sortParts,
@@ -197,8 +200,8 @@ const dates = (at: (entry: Entry) => string | null): Ruler => ({
 
 /** Scores in whole points out of 10, a perfect 10 its own, written as the library's source writes them. */
 const scores = (source: RatingSource): Ruler => {
-  const isOutOfTen = source === 'imdb'
-  const unit = isOutOfTen || source === 'metacritic' ? null : '%'
+  const isOutOfTen = source === RATING_SOURCES.imdb
+  const unit = isOutOfTen || source === RATING_SOURCES.metacritic ? null : '%'
   const percent = unit ?? ''
   return {
     unit,
@@ -257,7 +260,7 @@ const rulers = ({
     step: hasShows ? SHOW_BITRATE_STEP : null,
   }),
   resolution: listed({
-    list: RESOLUTIONS,
+    list: Object.values(RESOLUTIONS),
     item: (entry) => entry.resolution,
     face: (resolution) => ({ label: resolution.replace(/p$/, ''), name: resolution }),
   }),
@@ -311,7 +314,7 @@ export const jumpScale = ({
     unit: ruler.unit,
     // In the listing's direction, those for entries with no value last, as the server sorts them.
     marks: [
-      ...(direction === 'descending' ? marks.toReversed() : marks),
+      ...(direction === SORT_DIRECTIONS.descending ? marks.toReversed() : marks),
       ...(known.length < values.length ? [UNKNOWN] : []),
     ],
     entries,

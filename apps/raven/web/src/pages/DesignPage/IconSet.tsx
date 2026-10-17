@@ -1,4 +1,4 @@
-import { LIBRARY_ICON_NAMES } from '@raven/core'
+import { isLibraryIconName } from '@raven/core'
 import { useEffect, useState } from 'react'
 import { ICON_NAMES, Icon, type IconName } from '@raven/ui'
 import { copyText } from '@/lib/clipboard'
@@ -24,7 +24,7 @@ const PLAYBACK = [
 
 const isPlayback = (name: IconName) => PLAYBACK.some((icon) => icon === name)
 
-const isLibraryIcon = (name: IconName) => LIBRARY_ICON_NAMES.some((icon) => icon === name)
+const isLibraryIcon = (name: IconName) => isLibraryIconName.values.some((icon) => icon === name)
 
 const GROUPS = [
   {

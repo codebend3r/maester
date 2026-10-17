@@ -1,7 +1,7 @@
 import { describe, expect, it, mock } from 'bun:test'
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { LIBRARY_ICON_NAMES, type MetadataHealth, createApiClient } from '@raven/core'
+import { type MetadataHealth, createApiClient, isLibraryIconName } from '@raven/core'
 import { library, metadataHealth } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 
@@ -272,7 +272,7 @@ describe('LibraryDialog', () => {
   it("offers every icon, the type's own checked until another is picked", async () => {
     renderWithProviders(<LibraryDialog onClose={() => undefined} />)
     const icons = within(screen.getByRole('group', { name: 'Icon' })).getAllByRole('radio')
-    expect(icons.map((radio) => radio.getAttribute('value'))).toEqual([...LIBRARY_ICON_NAMES])
+    expect(icons.map((radio) => radio.getAttribute('value'))).toEqual([...isLibraryIconName.values])
     expect(icons).toHaveLength(24)
     expect(screen.getByRole('radio', { name: 'Home videos icon' })).toBeChecked()
     await userEvent.type(screen.getByLabelText('Name'), 'UFC')

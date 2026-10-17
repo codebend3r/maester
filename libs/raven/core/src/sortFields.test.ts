@@ -1,18 +1,19 @@
 import { describe, expect, it } from 'bun:test'
-import { MEDIA_SORTS, type MediaSort, isSortFieldName } from '@/contract'
+import { type MediaSort, fieldSorts, isMediaSort, isSortFieldName } from '@/contract'
 import { sortFieldsFor } from '@/libraryKinds'
 import { reversedDirection, reversedSort, sortOf, sortParts, startingSort } from '@/sortFields'
 
 describe('sort fields', () => {
   it('reads every sort as its field and direction, and back again', () => {
-    MEDIA_SORTS.forEach((sort) => {
+    isMediaSort.values.forEach((sort) => {
       const { field, direction } = sortParts(sort)
       expect(sortOf({ field, direction: direction ?? 'ascending' })).toBe(sort)
     })
   })
 
   it('names every sort once, as one way a field runs', () => {
-    expect(MEDIA_SORTS).toHaveLength(new Set(MEDIA_SORTS).size)
+    expect(isMediaSort.values).toHaveLength(new Set(isMediaSort.values).size)
+    expect(isSortFieldName.values.flatMap(fieldSorts)).toEqual([...isMediaSort.values])
     const named: MediaSort[] = [
       'title',
       'title-desc',
@@ -32,7 +33,7 @@ describe('sort fields', () => {
       'rating-low',
       'random',
     ]
-    expect(MEDIA_SORTS.toSorted()).toEqual(named.toSorted())
+    expect(isMediaSort.values.toSorted()).toEqual(named.toSorted())
   })
 
   it('runs titles A to Z first, and the rest newest, biggest or best first', () => {
@@ -56,7 +57,7 @@ describe('sort fields', () => {
     expect(reversedSort('added')).toBe('oldest')
     expect(reversedSort('bitrate-low')).toBe('bitrate-high')
     expect(reversedSort('random')).toBe('random')
-    MEDIA_SORTS.forEach((sort) => {
+    isMediaSort.values.forEach((sort) => {
       expect(reversedSort(reversedSort(sort))).toBe(sort)
     })
   })

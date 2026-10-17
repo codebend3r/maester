@@ -1,6 +1,7 @@
 import {
   type MatchItemType,
   type MediaItem,
+  RATING_SOURCES,
   type RatingSource,
   cardTitle,
   formatBitrate,
@@ -143,16 +144,22 @@ type Column =
   | 'added'
   | 'changed'
 
-const score = (media: MediaItem, source: RatingSource): number | null =>
+const score = ({ media, source }: { media: MediaItem; source: RatingSource }): number | null =>
   media.item?.ratings.find((rating) => rating.source === source)?.value ?? null
 
 const COLUMNS: Record<Column, SortColumn<MediaItem>> = {
   title: { value: (media) => sortTitle(cardTitle(media).title), first: 'asc' },
   year: { value: (media) => cardTitle(media).year, first: 'desc' },
-  rottenTomatoes: { value: (media) => score(media, 'rottenTomatoes'), first: 'desc' },
-  imdb: { value: (media) => score(media, 'imdb'), first: 'desc' },
-  metacritic: { value: (media) => score(media, 'metacritic'), first: 'desc' },
-  tmdb: { value: (media) => score(media, 'tmdb'), first: 'desc' },
+  rottenTomatoes: {
+    value: (media) => score({ media, source: RATING_SOURCES.rottenTomatoes }),
+    first: 'desc',
+  },
+  imdb: { value: (media) => score({ media, source: RATING_SOURCES.imdb }), first: 'desc' },
+  metacritic: {
+    value: (media) => score({ media, source: RATING_SOURCES.metacritic }),
+    first: 'desc',
+  },
+  tmdb: { value: (media) => score({ media, source: RATING_SOURCES.tmdb }), first: 'desc' },
   length: { value: (media) => media.duration, first: 'desc' },
   resolution: {
     value: (media) =>
@@ -183,7 +190,15 @@ export const MediaList = ({
   matchType?: MatchItemType | null
 }) => {
   const { sorted, toggle, ariaSort } = useTableSort({ rows: items, columns: COLUMNS })
-  const header = (key: Column, label: string, className?: string) => (
+  const header = ({
+    key,
+    label,
+    className,
+  }: {
+    key: Column
+    label: string
+    className?: string
+  }) => (
     <SortHeader key={key} sort={ariaSort(key)} onToggle={() => toggle(key)} className={className}>
       {label}
     </SortHeader>
@@ -196,22 +211,30 @@ export const MediaList = ({
       >
         <thead>
           <tr>
-            {header('title', 'Title')}
-            {movies && header('year', 'Year', styles.number)}
+            {header({ key: 'title', label: 'Title' })}
+            {movies && header({ key: 'year', label: 'Year', className: styles.number })}
             {movies &&
               RATING_COLUMNS.map((column) =>
-                header(column.source, column.label, `${styles.number} ${styles.roomy}`),
+                header({
+                  key: column.source,
+                  label: column.label,
+                  className: `${styles.number} ${styles.roomy}`,
+                }),
               )}
-            {header(
-              'length',
-              'Length',
-              movies ? `${styles.number} ${styles.spare}` : styles.number,
-            )}
-            {header('resolution', 'Resolution', styles.roomy)}
-            {header('size', 'Size', `${styles.number} ${styles.extra}`)}
-            {header('bitrate', 'Bitrate', `${styles.number} ${styles.extra}`)}
-            {header('added', 'Added', styles.extra)}
-            {header('changed', 'Changed', styles.extra)}
+            {header({
+              key: 'length',
+              label: 'Length',
+              className: movies ? `${styles.number} ${styles.spare}` : styles.number,
+            })}
+            {header({ key: 'resolution', label: 'Resolution', className: styles.roomy })}
+            {header({ key: 'size', label: 'Size', className: `${styles.number} ${styles.extra}` })}
+            {header({
+              key: 'bitrate',
+              label: 'Bitrate',
+              className: `${styles.number} ${styles.extra}`,
+            })}
+            {header({ key: 'added', label: 'Added', className: styles.extra })}
+            {header({ key: 'changed', label: 'Changed', className: styles.extra })}
             <th scope="col">
               <span className="visually-hidden">Actions</span>
             </th>

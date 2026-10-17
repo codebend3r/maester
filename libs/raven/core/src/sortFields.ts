@@ -1,5 +1,6 @@
 import {
   type MediaSort,
+  SORT_DIRECTIONS,
   SORT_FIELDS,
   type SortDirection,
   type SortFieldName,
@@ -25,9 +26,16 @@ const isDirected = (name: SortFieldName): name is DirectedSortFieldName =>
 
 /** A sort as its field, and its direction when the field has one. */
 export const sortParts = (sort: MediaSort): SortParts => {
-  const field = isSortFieldName.values.find((name) => fieldSorts(name).includes(sort)) ?? 'title'
+  const field =
+    isSortFieldName.values.find((name) => fieldSorts(name).includes(sort)) ?? SORT_FIELD_NAMES.title
   if (!isDirected(field)) return { field, direction: null }
-  return { field, direction: SORT_FIELDS[field].ascending === sort ? 'ascending' : 'descending' }
+  return {
+    field,
+    direction:
+      SORT_FIELDS[field].ascending === sort
+        ? SORT_DIRECTIONS.ascending
+        : SORT_DIRECTIONS.descending,
+  }
 }
 
 /** The sort for a field run one way; a field with no direction has the one. */
@@ -49,8 +57,8 @@ export const startingSort = (field: SortFieldName): MediaSort => {
 }
 
 const REVERSED_DIRECTIONS = {
-  ascending: 'descending',
-  descending: 'ascending',
+  ascending: SORT_DIRECTIONS.descending,
+  descending: SORT_DIRECTIONS.ascending,
 } as const satisfies Record<SortDirection, SortDirection>
 
 /** The other way a field runs. */

@@ -70,7 +70,11 @@ const AGO_UNITS: ReadonlyArray<{ unit: Intl.RelativeTimeFormatUnit; seconds: num
 ]
 
 /** Narrow for a byline, "3d ago"; long for a card's words, "3 days ago", "yesterday". */
-const AGO_FORMATS = {
+export const TIME_AGO_STYLES = { narrow: 'narrow', long: 'long' } as const
+
+type TimeAgoStyle = (typeof TIME_AGO_STYLES)[keyof typeof TIME_AGO_STYLES]
+
+const AGO_FORMATS: Record<TimeAgoStyle, Intl.RelativeTimeFormat> = {
   narrow: new Intl.RelativeTimeFormat(undefined, { numeric: 'always', style: 'narrow' }),
   long: new Intl.RelativeTimeFormat(undefined, { numeric: 'auto', style: 'long' }),
 }
@@ -83,7 +87,7 @@ export const timeAgo = ({
 }: {
   at: string
   now?: Date
-  style?: keyof typeof AGO_FORMATS
+  style?: TimeAgoStyle
 }): string => {
   const seconds = Math.max(0, (now.getTime() - new Date(at).getTime()) / 1000)
   const found = AGO_UNITS.find((candidate) => seconds >= candidate.seconds)

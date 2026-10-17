@@ -1,4 +1,4 @@
-import { LIBRARY_ICON_NAMES, type LibraryIconName } from '@raven/core'
+import { type LibraryIconName, isLibraryIconName } from '@raven/core'
 import { useId } from 'react'
 import { Icon } from '@raven/ui'
 import { LIBRARY_ICON_LABELS } from '@/lib/libraryKinds'
@@ -18,7 +18,7 @@ export const IconPicker = ({
   const name = useId()
   return (
     <div className={styles.icons}>
-      {LIBRARY_ICON_NAMES.map((icon) => (
+      {isLibraryIconName.values.map((icon) => (
         <div key={icon} className={styles.choice}>
           <input
             id={`${name}-${icon}`}

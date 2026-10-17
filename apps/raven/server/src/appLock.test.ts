@@ -4,9 +4,9 @@ import { join } from 'node:path'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import {
   type ApiClient,
-  LIBRARY_KINDS,
   type LibraryInput,
   groupingsFor,
+  isLibraryKind,
   isRecord,
   sortsFor,
   viewsFor,
@@ -272,7 +272,7 @@ describe('a library locked behind the PIN', () => {
   it('stays locked whatever its type', async () => {
     const { cookie } = await unlock('3001')
     const { name, paths } = await api(cookie).getLibrary(state.private)
-    const answers = await LIBRARY_KINDS.reduce<Promise<string[]>>(async (done, kind) => {
+    const answers = await isLibraryKind.values.reduce<Promise<string[]>>(async (done, kind) => {
       const before = await done
       const saved = await api(cookie).updateLibrary({
         id: state.private,
@@ -286,7 +286,7 @@ describe('a library locked behind the PIN', () => {
         )
       return [...before, `${saved.settings.kind} locked=${saved.settings.locked} ${status}`]
     }, Promise.resolve([]))
-    expect(answers).toEqual(LIBRARY_KINDS.map((kind) => `${kind} locked=true 423`))
+    expect(answers).toEqual(isLibraryKind.values.map((kind) => `${kind} locked=true 423`))
     await app().get(MetadataService).whenIdle()
   })
 

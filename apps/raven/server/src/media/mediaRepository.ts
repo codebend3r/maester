@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common'
 import {
   DEFAULT_SAGA_BACKDROP,
   type LibraryBackdrop,
+  MEDIA_SORTS,
   type MediaItem,
   type MediaSort,
   type PosterEntry,
@@ -202,7 +203,7 @@ const NO_LIMIT = -1
  * reads them all and is cut after the shuffle.
  */
 const sqlLimit = ({ sort, limit }: { sort: MediaSort; limit: number | undefined }): number =>
-  sort === 'random' ? NO_LIMIT : (limit ?? NO_LIMIT)
+  sort === MEDIA_SORTS.random ? NO_LIMIT : (limit ?? NO_LIMIT)
 
 const YEAR = 'COALESCE(item_year, year)'
 
@@ -320,7 +321,7 @@ export class MediaRepository {
       )
       .all(libraryId, pattern, pattern, pattern, sqlLimit({ sort, limit }))
     const items = this.items(rows)
-    return sort === 'random' ? shuffle({ items, seed }).slice(0, limit) : items
+    return sort === MEDIA_SORTS.random ? shuffle({ items, seed }).slice(0, limit) : items
   }
 
   /**
@@ -424,7 +425,7 @@ export class MediaRepository {
         },
       ]
     })
-    return sort === 'random' ? shuffle({ items: entries, seed }).slice(0, limit) : entries
+    return sort === MEDIA_SORTS.random ? shuffle({ items: entries, seed }).slice(0, limit) : entries
   }
 
   /**
