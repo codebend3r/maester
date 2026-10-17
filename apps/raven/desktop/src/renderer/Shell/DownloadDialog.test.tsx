@@ -192,4 +192,52 @@ describe('DownloadDialog', () => {
     )
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   })
+
+  it('shows a notice and closes when confirming fails', async () => {
+    const client = fakeClient({
+      request: async (asked) => {
+        if (asked.type === 'confirmDownload') throw new Error('The connection closed.')
+        return asked.type === 'listRecents' ? { type: 'recents', recents: [] } : { type: 'done' }
+      },
+    })
+    await openAsk({ ask: ready(), client })
+    await userEvent.click(await screen.findByRole('button', { name: 'Download' }))
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'raven player could not reach its downloads. Try again.',
+    )
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('shows a notice and closes when asking again fails', async () => {
+    const base = serverClient({
+      calls: { 'POST /api/lock/unlock': reply({ body: { available: true, unlocked: true } }) },
+    })
+    const client = fakeClient({
+      request: async (asked) => {
+        if (asked.type === 'retryDownloadAsk') throw new Error('The connection closed.')
+        return base.request(asked)
+      },
+    })
+    await openAsk({ ask: { ...ready(), status: { kind: 'locked' } }, client })
+    await userEvent.type(await screen.findByLabelText('PIN'), '1234')
+    await userEvent.click(screen.getByRole('button', { name: 'Unlock' }))
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'raven player could not reach its downloads. Try again.',
+    )
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
+
+  it('asks for the PIN again when main still finds the ask locked', async () => {
+    const locked: DownloadAsk = { ...ready(), status: { kind: 'locked' } }
+    const client = serverClient({
+      calls: { 'POST /api/lock/unlock': reply({ body: { available: true, unlocked: true } }) },
+      replies: { retryDownloadAsk: { type: 'downloadAsk', ask: locked } },
+    })
+    await openAsk({ ask: locked, client })
+    await userEvent.type(await screen.findByLabelText('PIN'), '1234')
+    await userEvent.click(screen.getByRole('button', { name: 'Unlock' }))
+    await waitFor(() => expect(sentOfType({ client, type: 'retryDownloadAsk' })).toHaveLength(1))
+    await waitFor(() => expect(screen.getByLabelText('PIN')).toHaveValue(''))
+    expect(screen.getByRole('dialog', { name: 'Locked library' })).toBeInTheDocument()
+  })
 })

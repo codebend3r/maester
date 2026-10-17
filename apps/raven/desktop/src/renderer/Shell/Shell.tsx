@@ -147,7 +147,6 @@ export const Shell = () => {
       </div>
       {isOpenLinkShown && <OpenLinkDialog onClose={() => setIsOpenLinkShown(false)} />}
       {shownAsk !== null && (
-        // A new ask, or the same one once unlocked, opens a dialog of its own.
         <DownloadDialog key={shownAsk.instance} ask={shownAsk.ask} onClose={closeDownloadAsk} />
       )}
       {/* Always mounted: a live region is announced when its text changes, not when it appears. */}

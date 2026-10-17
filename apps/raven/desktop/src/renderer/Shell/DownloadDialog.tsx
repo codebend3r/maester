@@ -9,14 +9,18 @@ import {
   useRef,
   useState,
 } from 'react'
+import type { DesktopClient } from '@/renderer/desktop/client'
 import { serverApiFor } from '@/renderer/desktop/serverApi'
 import styles from '@/renderer/Shell/DownloadDialog.module.scss'
 import { useOpenReply } from '@/renderer/Shell/openReply'
+import { useNotice } from '@/renderer/stores/notice'
 import { SERVER_COPY } from '@/renderer/ServerPage/serverServices'
 import { useDesktop } from '@/renderer/stores/desktop'
 import {
   DESKTOP_REPLIES,
   DESKTOP_REQUESTS,
+  type DesktopReply,
+  type DesktopRequest,
   type DownloadAsk,
   type DownloadKind,
 } from '@/shared/protocol'
@@ -24,6 +28,16 @@ import {
 type ReadyStatus = Extract<DownloadAsk['status'], { kind: 'ready' }>
 
 const TITLE = 'Download to raven player'
+const UNREACHED = 'raven player could not reach its downloads. Try again.'
+
+/** Main's answer, or null when the request itself failed. */
+const askMain = ({
+  client,
+  request,
+}: {
+  client: DesktopClient
+  request: DesktopRequest
+}): Promise<DesktopReply | null> => client.request(request).catch(() => null)
 
 const nounFor = ({ kind, files }: { kind: DownloadKind; files: number }): string => {
   switch (kind) {
@@ -53,6 +67,7 @@ const ReadyDialog = ({
 }) => {
   const { client } = useDesktop()
   const openReply = useOpenReply()
+  const showNotice = useNotice((state) => state.show)
   const dialog = useRef<HTMLDialogElement>(null)
   const isConfirmed = useRef(false)
   const ids = { title: useId(), question: useId() }
@@ -70,8 +85,12 @@ const ReadyDialog = ({
 
   // Cancel, Escape and a click away all end here; only Download has already answered.
   const closed = () => {
-    if (!isConfirmed.current)
-      void client.request({ type: DESKTOP_REQUESTS.declineDownload, askId: ask.askId })
+    if (!isConfirmed.current) {
+      void askMain({
+        client,
+        request: { type: DESKTOP_REQUESTS.declineDownload, askId: ask.askId },
+      })
+    }
     onClose()
   }
 
@@ -88,13 +107,12 @@ const ReadyDialog = ({
     if (!canDownload || isConfirmed.current) return
     isConfirmed.current = true
     close()
-    openReply(
-      await client.request({
-        type: DESKTOP_REQUESTS.confirmDownload,
-        askId: ask.askId,
-        autoDelete,
-      }),
-    )
+    const reply = await askMain({
+      client,
+      request: { type: DESKTOP_REQUESTS.confirmDownload, askId: ask.askId, autoDelete },
+    })
+    if (reply === null) return showNotice(UNREACHED)
+    openReply(reply)
   }
 
   const question = `Download ${status.title} (${status.files} ${nounFor({ kind: status.downloadKind, files: status.files })}, ${formatBytes(status.bytes)}) from ${ask.serverName}?`
@@ -158,18 +176,20 @@ const LockedDialog = ({
 }) => {
   const { client } = useDesktop()
   const openReply = useOpenReply()
+  const showNotice = useNotice((state) => state.show)
   const api = useMemo(
     () => serverApiFor({ client, serverId: ask.serverId }),
     [client, ask.serverId],
   )
 
   const retry = async () => {
-    const reply = await client.request({
-      type: DESKTOP_REQUESTS.retryDownloadAsk,
-      askId: ask.askId,
+    const reply = await askMain({
+      client,
+      request: { type: DESKTOP_REQUESTS.retryDownloadAsk, askId: ask.askId },
     })
-    // A new ask replaces this one in the Shell; anything else is a notice, and this dialog is done.
-    if (reply.type !== DESKTOP_REPLIES.downloadAsk) onClose()
+    // The unlock dialog has closed itself, so nothing is left to show unless the Shell gets a new ask.
+    if (reply === null || reply.type !== DESKTOP_REPLIES.downloadAsk) onClose()
+    if (reply === null) return showNotice(UNREACHED)
     openReply(reply)
   }
 
@@ -184,7 +204,10 @@ const LockedDialog = ({
       unlock={(entered) => (secret === 'pin' ? api.unlock(entered) : api.unlockAdmin(entered))}
       onUnlocked={retry}
       onClose={() => {
-        void client.request({ type: DESKTOP_REQUESTS.declineDownload, askId: ask.askId })
+        void askMain({
+          client,
+          request: { type: DESKTOP_REQUESTS.declineDownload, askId: ask.askId },
+        })
         onClose()
       }}
     />
