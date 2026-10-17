@@ -57,7 +57,7 @@ export const FavouritesPage = () => {
 
   return (
     <section className={styles.page} aria-labelledby={id}>
-      <BackButton fallback={{ to: '/', label: 'Home' }} className={styles.back} />
+      <BackButton fallback={{ to: '/', label: 'Home' }} />
       <header className={styles.header}>
         <h1 id={id}>Favourites</h1>
         {favourites.isSuccess && (

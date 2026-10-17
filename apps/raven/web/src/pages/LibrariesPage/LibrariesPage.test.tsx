@@ -297,4 +297,31 @@ describe('LibrariesPage', () => {
     ).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Add library' })).toBeNull()
   })
+
+  it('keeps the way back to Home on the page that has no libraries', async () => {
+    spies.list.mockImplementation(async () => [])
+    renderWithProviders({ ui: <LibrariesPage /> })
+    expect(
+      await screen.findByRole('heading', { name: 'Point raven at your videos' }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('href', '/')
+  })
+
+  it('keeps the way back to Home on the page the server did not answer', async () => {
+    spies.list.mockImplementation(async () => {
+      throw new Error('offline')
+    })
+    renderWithProviders({ ui: <LibrariesPage /> })
+    expect(
+      await screen.findByRole('heading', { name: 'The server did not answer' }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('href', '/')
+  })
+
+  it('steps back where the app has been browsed, over the list', async () => {
+    spies.list.mockImplementation(async () => [library({ id: 2, name: 'Clips' })])
+    renderWithProviders({ ui: <LibrariesPage />, route: '/libraries', behind: ['/'] })
+    expect(await screen.findByRole('button', { name: 'Back' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Home' })).toBeNull()
+  })
 })

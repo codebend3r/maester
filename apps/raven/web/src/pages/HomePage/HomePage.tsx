@@ -234,8 +234,8 @@ export const HomePage = () => {
 
   return (
     <section className={styles.page} aria-labelledby={ids.title}>
-      <BackButton fallback={null} className={styles.back} />
       <header className={styles.header}>
+        <BackButton fallback={null} className={styles.back} />
         <h1 id={ids.title} className={styles.title}>
           Home
         </h1>

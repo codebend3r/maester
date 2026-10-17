@@ -6,12 +6,6 @@
   gap: var(--section-gap);
 }
 
-// The page's first row: it stops short of the theme button in the corner.
-.back {
-  justify-self: start;
-  max-width: calc(100% - var(--corner-clearance, 0px));
-}
-
 // The title, small, and the search at the right, clear of the theme button
 // in the corner; on a phone the search takes a row of its own under them.
 .header {
@@ -22,6 +16,19 @@
   gap: var(--space-4);
   min-height: var(--field-size);
   padding-inline-end: var(--corner-clearance, 0);
+}
+
+.back {
+  grid-area: back;
+}
+
+// With a way back, it takes the corner row and the title and search drop
+// under it; without, they take the corner row themselves.
+.header:has(.back) {
+  grid-template-areas:
+    'back back'
+    'title search';
+  padding-inline-end: 0;
 }
 
 .title {
@@ -156,6 +163,13 @@
       'search search';
     gap: var(--space-2);
     padding-inline-end: 0;
+  }
+
+  .header:has(.back) {
+    grid-template-areas:
+      'back back'
+      'title .'
+      'search search';
   }
 
   .title {

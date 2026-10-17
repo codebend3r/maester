@@ -4,18 +4,10 @@
   gap: var(--space-5);
 }
 
-// The page's first row: it stops short of the theme button in the corner.
-.back {
-  justify-self: start;
-  max-width: calc(100% - var(--corner-clearance, 0px));
-}
-
-// The page's second row: it stops short of the theme button in the corner.
 .header {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: var(--space-1);
-  padding-inline-end: var(--corner-clearance, 0);
 }
 
 .count {

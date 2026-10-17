@@ -58,11 +58,13 @@ describe('HomePage', () => {
     open({ inProgress: [], shelves: [] })
     expect(await screen.findByRole('heading', { level: 1, name: 'Home' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Back' })).toBeNull()
-    expect(screen.queryByRole('link', { name: 'Back' })).toBeNull()
+    // Home is the top of the app, so with nothing behind it there is no fallback link either.
+    expect(screen.queryAllByRole('link')).toEqual([])
     cleanup()
     spies.home.mockImplementation(async () => ({ inProgress: [], shelves: [] }))
     renderWithProviders({ ui: <HomePage />, route: '/', behind: ['/libraries'] })
     expect(await screen.findByRole('button', { name: 'Back' })).toBeInTheDocument()
+    expect(screen.queryAllByRole('link')).toEqual([])
   })
 
   it('puts what is in progress first, then a row for each pinned library', async () => {

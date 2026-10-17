@@ -4,32 +4,30 @@
   gap: var(--space-5);
 }
 
-// The page's first row: it stops short of the theme button in the corner.
-.back {
-  justify-self: start;
-  max-width: calc(100% - var(--corner-clearance, 0px));
-}
-
-// The title over how many there are, Add library at their right on the
-// summary's line. The theme button takes the page's top right corner, so the
-// title wraps short of it, and Add library sits low enough to clear it.
+// The way back, then the title over how many there are with Add library at
+// its right on the summary's line. The way back takes the corner row, so the
+// theme button clears everything under it.
 .header {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   grid-template-areas:
-    'title add'
-    'summary add';
-  gap: var(--space-1) var(--space-3);
+    'back back'
+    'heading add';
+  gap: var(--space-4) var(--space-3);
   align-items: end;
 }
 
-.title {
-  grid-area: title;
-  padding-inline-end: var(--corner-clearance, 0);
+.back {
+  grid-area: back;
+}
+
+.heading {
+  grid-area: heading;
+  display: grid;
+  gap: var(--space-1);
 }
 
 .summary {
-  grid-area: summary;
   color: var(--color-lichen);
   font-variant-numeric: tabular-nums;
 }
@@ -289,8 +287,8 @@
   .header {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
-      'title'
-      'summary'
+      'back'
+      'heading'
       'add';
   }
 

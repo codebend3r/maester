@@ -18,7 +18,7 @@ export const NotFoundPage = () => {
   const tone = useTheme((state) => themeOf(state.theme).tone)
   return (
     <section className={styles.page}>
-      <BackButton fallback={{ to: '/', label: 'Home' }} className={styles.back} />
+      <BackButton fallback={{ to: '/', label: 'Home' }} />
       <p className={styles.figures} aria-hidden="true">
         <span>4</span>
         <span className={styles.poster}>

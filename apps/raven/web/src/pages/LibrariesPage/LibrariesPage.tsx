@@ -24,6 +24,8 @@ import styles from '@/pages/LibrariesPage/LibrariesPage.module.scss'
 
 const count = new Intl.NumberFormat()
 
+const HOME = { to: '/', label: 'Home' }
+
 /** How many libraries there are and how many videos they hold between them. */
 const summaryOf = (libraries: readonly Library[]): string =>
   [
@@ -168,6 +170,7 @@ export const LibrariesPage = () => {
   if (libraries.isError) {
     return (
       <section className={styles.empty}>
+        <BackButton fallback={HOME} />
         <h1 className={styles.emptyTitle}>The server did not answer</h1>
         <p role="alert">{libraries.error.message}</p>
         <Button onClick={() => libraries.refetch()}>Try again</Button>
@@ -178,6 +181,7 @@ export const LibrariesPage = () => {
   if (libraries.data?.length === 0) {
     return (
       <section className={styles.empty}>
+        <BackButton fallback={HOME} />
         <h1 className={styles.emptyTitle}>Point raven at your videos</h1>
         <p>
           A library is a set of folders. Pick the ones that hold your movies or shows, and every
@@ -197,10 +201,12 @@ export const LibrariesPage = () => {
 
   return (
     <section className={styles.page}>
-      <BackButton fallback={{ to: '/', label: 'Home' }} className={styles.back} />
       <header className={styles.header}>
-        <h1 className={styles.title}>Libraries</h1>
-        {libraries.data && <p className={styles.summary}>{summaryOf(libraries.data)}</p>}
+        <BackButton fallback={HOME} className={styles.back} />
+        <hgroup className={styles.heading}>
+          <h1>Libraries</h1>
+          {libraries.data && <p className={styles.summary}>{summaryOf(libraries.data)}</p>}
+        </hgroup>
         <AdminOnly>
           <Button tone="primary" icon="plus" className={styles.add} onClick={() => setAdding(true)}>
             Add library

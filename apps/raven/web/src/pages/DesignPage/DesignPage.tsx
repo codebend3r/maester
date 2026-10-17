@@ -18,7 +18,7 @@ import styles from '@/pages/DesignPage/DesignPage.module.scss'
  */
 export const DesignPage = () => (
   <article className={styles.page} aria-labelledby="design-title">
-    <BackButton fallback={{ to: '/', label: 'Home' }} className={styles.back} />
+    <BackButton fallback={{ to: '/', label: 'Home' }} />
     <header className={styles.header}>
       <p className={styles.eyebrow}>Design system</p>
       <h1 id="design-title" className={styles.title}>

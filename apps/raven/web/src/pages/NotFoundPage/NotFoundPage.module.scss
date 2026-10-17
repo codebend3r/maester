@@ -9,11 +9,6 @@
   text-align: center;
 }
 
-// Over the figures, at the block's start rather than centred with them.
-.back {
-  justify-self: start;
-}
-
 // Twice the home hero's size: 104px on a phone to 208px on a wide screen.
 // The poster is sized in ems, so it keeps its place between the figures.
 .figures {

@@ -74,6 +74,9 @@ const Card = ({ item, role }: { item: ItemSummary; role: string | null }) => {
 const PersonSkeleton = () => (
   <>
     <div className={styles.header}>
+      <span className={styles.back}>
+        <Bone shape="button" />
+      </span>
       <span className={styles.photo}>
         <Bone shape="fill" />
       </span>
@@ -95,8 +98,8 @@ const PersonView = ({ person }: { person: PersonDetails }) => {
   const credits = groups.reduce((sum, group) => sum + group.credits.length, 0)
   return (
     <article className={styles.page} aria-labelledby={id}>
-      <BackButton fallback={{ to: '/', label: 'Home' }} className={styles.back} />
       <header className={styles.header}>
+        <BackButton fallback={{ to: '/', label: 'Home' }} className={styles.back} />
         <span className={photo ? styles.photo : `${styles.photo} ${styles.initials}`}>
           {photo ? (
             <img src={photo} alt="" decoding="async" />

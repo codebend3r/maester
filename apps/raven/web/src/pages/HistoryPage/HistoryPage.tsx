@@ -89,7 +89,7 @@ export const HistoryPage = () => {
 
   return (
     <section className={styles.page} aria-labelledby={ids.title}>
-      <BackButton fallback={{ to: `/libraries/${id}`, label: name }} className={styles.back} />
+      <BackButton fallback={{ to: `/libraries/${id}`, label: name }} />
 
       <header className={styles.header}>
         <h1 id={ids.title}>History</h1>

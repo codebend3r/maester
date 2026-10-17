@@ -498,8 +498,8 @@ export const SettingsPage = () => {
 
   return (
     <section className={styles.page} aria-labelledby={titleId}>
-      <BackButton fallback={{ to: '/', label: 'Home' }} className={styles.back} />
       <header className={styles.header}>
+        <BackButton fallback={{ to: '/', label: 'Home' }} className={styles.back} />
         <h1 id={titleId} className={styles.title}>
           Settings
         </h1>
