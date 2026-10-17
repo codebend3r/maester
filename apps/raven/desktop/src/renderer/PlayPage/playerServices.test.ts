@@ -81,6 +81,7 @@ describe('servicesFor', () => {
 
   it('saves the position with the length it was told', () => {
     const { services, client } = setup()
+    services.progress.started()
     services.progress.duration!(30)
     services.progress.save(12)
     services.progress.left(20)
@@ -95,6 +96,20 @@ describe('servicesFor', () => {
       fileId: A,
       position: 20,
       duration: 30,
+    })
+  })
+
+  it('sends no position for a file left before playback started', () => {
+    const { services, client } = setup()
+    services.progress.left(42)
+    expect(client.request).not.toHaveBeenCalled()
+    services.progress.started()
+    services.progress.left(43)
+    expect(client.request).toHaveBeenCalledWith({
+      type: 'savePosition',
+      fileId: A,
+      position: 43,
+      duration: null,
     })
   })
 
