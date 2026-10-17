@@ -1,7 +1,7 @@
 // The checkbox sits in the card's box, since a grid skips drawing its
 // offscreen cards (`content-visibility: auto`), which also clips whatever a
-// card draws outside it. The card places it; this decides when it shows.
-// A touch screen has no hover to bring it, so there it comes with select mode.
+// card draws outside it. The card places it; this decides when it shows:
+// only in select mode, on every card at once, never under a passing pointer.
 // Over a picture it sits on glass of the ground, as the badges do.
 .box {
   display: none;
@@ -12,22 +12,8 @@
   backdrop-filter: blur(8px);
 }
 
-@media (hover: hover) {
-  .box {
-    display: inline-grid;
-    opacity: 0;
-  }
-
-  [data-entry]:hover .box,
-  .box:focus-visible,
-  .box:checked {
-    opacity: 1;
-  }
-}
-
 [data-selecting] .box {
   display: inline-grid;
-  opacity: 1;
 }
 
 .box:checked {

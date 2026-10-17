@@ -16,14 +16,8 @@
     z-index: 1;
   }
 
-  // The checkbox shares the picture's top corner with the badges, which
-  // step aside while it shows.
-  @media (hover: hover) {
-    &:has(.select):hover {
-      --select-room: calc(1.5rem + var(--space-1));
-    }
-  }
-
+  // In select mode the checkbox shares the picture's top corner with the
+  // badges, which step aside for it.
   &:has(.select)[data-selecting] {
     --select-room: calc(1.5rem + var(--space-1));
   }
