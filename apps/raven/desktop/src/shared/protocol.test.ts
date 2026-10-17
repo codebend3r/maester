@@ -19,6 +19,7 @@ import {
   isDesktopEvent,
   isDesktopReply,
   isDesktopRequest,
+  isContainerName,
   isDownloadGroup,
   isDownloadKind,
   isDownloadStatus,
@@ -33,6 +34,7 @@ import {
   isServerMethod,
   isServerTarget,
   isServerView,
+  isSidecarTrackId,
   isTrackChoice,
   isUpdateStatus,
 } from '@/shared/protocol'
@@ -551,6 +553,19 @@ describe('isPlayerPortMessage', () => {
 })
 
 describe('the download guards', () => {
+  it('accepts a short lowercase container and refuses a path', () => {
+    expect(isContainerName('mkv')).toBe(true)
+    expect(isContainerName('../x')).toBe(false)
+    expect(isContainerName('')).toBe(false)
+    expect(isContainerName('matroska01')).toBe(false)
+  })
+
+  it('accepts external-<n> and refuses any other track id', () => {
+    expect(isSidecarTrackId('external-2')).toBe(true)
+    expect(isSidecarTrackId('embedded-0')).toBe(false)
+    expect(isSidecarTrackId('external-')).toBe(false)
+  })
+
   it('accepts every kind and refuses an unknown one', () => {
     ;['movie', 'episode', 'season', 'show', 'saga'].forEach((kind) => {
       expect(isDownloadKind(kind)).toBe(true)

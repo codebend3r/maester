@@ -72,6 +72,14 @@ export const isServerView = object({ serverId: isOpaqueId, origin: isString, nam
 
 export type ServerView = Infer<typeof isServerView>
 
+/** A container becomes `video.<container>` on disk, so only a short lowercase name passes. */
+export const isContainerName = (value: unknown): value is string =>
+  isString(value) && /^[a-z0-9]{1,8}$/u.test(value)
+
+/** A sidecar's track id becomes `subtitles/<trackId>.vtt` on disk, so only the server's `external-<n>` passes. */
+export const isSidecarTrackId = (value: unknown): value is string =>
+  isString(value) && /^external-\d+$/u.test(value)
+
 export const isDownloadKind = oneOf(['movie', 'episode', 'season', 'show', 'saga'])
 
 export type DownloadKind = Infer<typeof isDownloadKind>
