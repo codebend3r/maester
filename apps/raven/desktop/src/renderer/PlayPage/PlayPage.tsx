@@ -10,7 +10,7 @@ import {
 } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import type { OutputSettings } from '@raven/core'
-import { Button, Player, PlayerServicesProvider, useKeyShortcut } from '@raven/ui'
+import { Button, Player, type PlayerServices, useHostPlayer, useKeyShortcut } from '@raven/ui'
 import type { DesktopClient } from '@/renderer/desktop/client'
 import { CONNECTION_STATUSES } from '@/renderer/desktop/playerConnection'
 import { NativePlaying } from '@/renderer/PlayPage/NativePlaying'
@@ -102,7 +102,8 @@ const Playing = ({
   const [lostAt, setLostAt] = useState<number | null>(null)
   // The first loss counts: a refusal racing the engine's stop event reports the same moment.
   const onLost = useCallback((at: number) => setLostAt((current) => current ?? at), [])
-  const player = chosen.status === 'native' && lostAt === null ? chosen.player : null
+  const player =
+    chosen.status === CONNECTION_STATUSES.native && lostAt === null ? chosen.player : null
   const engine = engineUseFor({ isNative: player !== null, isLost: lostAt !== null })
   const played = useMemo(
     () => (lostAt === null ? file : { ...file, resumeAt: lostAt }),
@@ -138,19 +139,26 @@ const Playing = ({
     if (lostAt !== null) showNotice(ENGINE_MOVED)
   }, [lostAt, showNotice])
 
+  return player === null ? (
+    <HtmlPlaying services={services} fileId={file.fileId} />
+  ) : (
+    <NativePlaying
+      services={services}
+      player={player}
+      source={{ kind: 'file', fileId: file.fileId }}
+      resumeAt={file.resumeAt}
+      onLost={onLost}
+    />
+  )
+}
+
+/** The html engine, a host of its own: a loss mounts it, on the services that carry on from there. */
+const HtmlPlaying = ({ services, fileId }: { services: PlayerServices; fileId: string }) => {
+  const isHosting = useHostPlayer(services)
   return (
-    <PlayerServicesProvider services={services}>
-      {player === null ? (
-        <Player engine={{ kind: 'html', source: { kind: 'file', url: fileUrlFor(file.fileId) } }} />
-      ) : (
-        <NativePlaying
-          player={player}
-          source={{ kind: 'file', fileId: file.fileId }}
-          resumeAt={file.resumeAt}
-          onLost={onLost}
-        />
-      )}
-    </PlayerServicesProvider>
+    isHosting && (
+      <Player engine={{ kind: 'html', source: { kind: 'file', url: fileUrlFor(fileId) } }} />
+    )
   )
 }
 

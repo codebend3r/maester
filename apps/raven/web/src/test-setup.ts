@@ -2,7 +2,11 @@ import { afterEach } from 'bun:test'
 import { cleanup } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { usePlayerPrefs } from '@raven/ui'
+import { useCardLinks } from '@/stores/cardLinks'
+import { useHoverBackdrops } from '@/stores/hoverBackdrops'
+import { useOriginProbe } from '@/stores/originProbe'
 import { usePageBackdrop } from '@/stores/pageBackdrop'
+import { useSelectionScopes } from '@/stores/selectionScope'
 import { useSideMenu } from '@/stores/sideMenu'
 import { useTheme } from '@/stores/theme'
 import { useUnlockPrompt } from '@/stores/unlockPrompt'
@@ -17,6 +21,10 @@ const initialPageBackdrop = usePageBackdrop.getInitialState()
 const initialSideMenu = useSideMenu.getInitialState()
 const initialUnlockPrompt = useUnlockPrompt.getInitialState()
 const initialTheme = useTheme.getInitialState()
+const initialCardLinks = useCardLinks.getInitialState()
+const initialHoverBackdrops = useHoverBackdrops.getInitialState()
+const initialOriginProbe = useOriginProbe.getInitialState()
+const initialSelectionScopes = useSelectionScopes.getInitialState()
 
 // Bun test does not unmount between tests the way vitest globals do. The
 // stores reset after the unmount, or a store still subscribed to redraws
@@ -30,6 +38,10 @@ afterEach(() => {
   useSideMenu.setState(initialSideMenu, true)
   useUnlockPrompt.setState(initialUnlockPrompt, true)
   useTheme.setState(initialTheme, true)
+  useCardLinks.setState(initialCardLinks, true)
+  useHoverBackdrops.setState(initialHoverBackdrops, true)
+  useOriginProbe.setState(initialOriginProbe, true)
+  useSelectionScopes.setState(initialSelectionScopes, true)
   resetBrowserSupport()
   FakeEventSource.opened = []
   resetPolls()

@@ -6,7 +6,7 @@ import { useState } from 'react'
 import { Route, Routes } from 'react-router-dom'
 import type { NativePlayer } from '@/components/Player/engine'
 import { Player } from '@/components/Player/Player'
-import { type PlayerServices, PlayerServicesProvider } from '@/components/Player/PlayerServices'
+import type { PlayerServices } from '@/components/Player/PlayerServices'
 import { renderWithProviders } from '@/test/render'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
 
@@ -116,14 +116,15 @@ const renderNative = ({
   player: NativePlayer
   services?: PlayerServices
 }) =>
-  renderWithProviders(
-    <PlayerServicesProvider services={services}>
+  renderWithProviders({
+    ui: (
       <Routes>
         <Route path="/" element={<Host player={player} />} />
         <Route path="/next" element={<p>Next page</p>} />
       </Routes>
-    </PlayerServicesProvider>,
-  )
+    ),
+    services,
+  })
 
 const settled = () => act(async () => {})
 

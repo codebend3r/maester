@@ -2,7 +2,7 @@ import { type PlaybackMode, STREAM_TIME_SHIFT } from '@raven/core'
 import { useEffect, useRef } from 'react'
 import type { EngineHandle, EngineStats, HtmlSource } from '@/components/Player/engine'
 import styles from '@/components/Player/Player.module.scss'
-import { usePlayerServices } from '@/components/Player/PlayerServices'
+import { useHostServices } from '@/stores/playerServices'
 import { SubtitleOverlay } from '@/components/Player/SubtitleOverlay'
 import { useMediaSource } from '@/components/Player/useMediaSource'
 import { useSubtitleCues } from '@/components/Player/useSubtitleCues'
@@ -26,7 +26,7 @@ export const useHtmlEngine = ({
   onFailure: (message: string) => void
   toggleFullscreen: () => void
 }) => {
-  const { title, posterUrl } = usePlayerServices()
+  const { title, posterUrl } = useHostServices()
   const videoRef = useRef<HTMLVideoElement>(null)
   const volume = usePlayerPrefs((prefs) => prefs.volume)
   const muted = usePlayerPrefs((prefs) => prefs.muted)

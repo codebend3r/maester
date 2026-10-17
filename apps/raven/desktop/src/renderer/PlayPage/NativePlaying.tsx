@@ -1,5 +1,5 @@
-import type { PlayerSource } from '@raven/core'
-import { type NativePlayer, Player } from '@raven/ui'
+import { PLAYER_COMMANDS, PLAYER_EVENTS, type PlayerSource } from '@raven/core'
+import { type NativePlayer, Player, type PlayerServices, useHostPlayer } from '@raven/ui'
 import { useEffect, useMemo, useRef } from 'react'
 import { isEngineGone, isEngineStop, PlayerRefusal } from '@/renderer/desktop/playerConnection'
 
@@ -15,12 +15,14 @@ export const NativePlaying = ({
   onLost,
   onRefused,
 }: {
+  services: PlayerServices
   player: NativePlayer
   source: PlayerSource
   resumeAt: number
   onLost: (at: number) => void
   onRefused?: (message: string) => void
 }) => {
+  const isHosting = useHostPlayer(services)
   // Refs, so the page itself never renders on `time`.
   const position = useRef(resumeAt)
   // A `time` before the latest load is answered belongs to the file that load replaced.

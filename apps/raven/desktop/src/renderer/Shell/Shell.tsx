@@ -1,13 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useEffectEvent,
-  useRef,
-  useState,
-} from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { OpenLinkDialog } from '@/renderer/Shell/OpenLinkDialog'
 import { applyReply, play, playServer } from '@/renderer/Shell/openReply'
@@ -126,9 +118,9 @@ export const Shell = () => {
 
   useEffect(() => {
     if (notice === null) return
-    const timer = setTimeout(() => setNotice(null), NOTICE_MS)
+    const timer = setTimeout(clearNotice, NOTICE_MS)
     return () => clearTimeout(timer)
-  }, [notice])
+  }, [notice, clearNotice])
 
   return (
     <>

@@ -11,6 +11,7 @@ import { clientFor } from '@/renderer/desktop/client'
 import { createMenuHub } from '@/renderer/desktop/menuHub'
 import { listenForPlayer } from '@/renderer/desktop/playerConnection'
 import { desktopRoutes } from '@/renderer/routes'
+import { useDesktopBridge } from '@/renderer/stores/desktop'
 import { APP_ORIGIN } from '@/shared/protocol'
 
 const client = clientFor('ravenDesktop' in window ? window.ravenDesktop : undefined)
@@ -27,6 +28,8 @@ if (rootElement) {
       </main>,
     )
   } else {
+    // Before the first render, so every component that reads the bridge finds it.
+    useDesktopBridge.setState({ desktop: { client, menu: createMenuHub(), player } })
     root.render(
       <StrictMode>
         <QueryClientProvider client={new QueryClient()}>

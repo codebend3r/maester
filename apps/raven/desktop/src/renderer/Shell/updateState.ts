@@ -1,5 +1,3 @@
-import { createContext, useContext } from 'react'
-
 /** Main's release check status, as Settings reads it and the Shell refreshes it. */
 export const UPDATES_KEY = ['desktop', 'updates'] as const
 

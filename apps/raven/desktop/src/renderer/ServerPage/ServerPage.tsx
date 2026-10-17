@@ -11,7 +11,6 @@ import {
   Button,
   type NativePlayer,
   type PlayerServices,
-  PlayerServicesProvider,
   UnlockDialog,
   type UnlockSecret,
 } from '@raven/ui'
@@ -275,15 +274,14 @@ const Ready = ({
   useEffect(() => menu.subscribe(onMenu), [menu])
 
   return (
-    <PlayerServicesProvider services={services}>
-      <NativePlaying
-        player={player}
-        source={source}
-        resumeAt={resumeAt}
-        onLost={onLost}
-        onRefused={noteRefusal}
-      />
-    </PlayerServicesProvider>
+    <NativePlaying
+      services={services}
+      player={player}
+      source={source}
+      resumeAt={resumeAt}
+      onLost={onLost}
+      onRefused={noteRefusal}
+    />
   )
 }
 

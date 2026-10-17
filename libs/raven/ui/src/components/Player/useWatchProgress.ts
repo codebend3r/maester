@@ -1,5 +1,5 @@
 import { type RefObject, useEffect, useEffectEvent, useRef } from 'react'
-import { usePlayerServices } from '@/components/Player/PlayerServices'
+import { useHostServices } from '@/stores/playerServices'
 import type { VideoState } from '@/components/Player/useVideoState'
 
 const SAVE_EVERY_S = 10
@@ -14,7 +14,7 @@ export const useWatchProgress = ({
   position: RefObject<number>
   duration: number | null
 }): void => {
-  const { progress, title } = usePlayerServices()
+  const { progress, title } = useHostServices()
   const lastSaved = useRef(title.resumeAt)
   const started = useRef(false)
   const previous = useRef(state)

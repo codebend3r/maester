@@ -25,7 +25,7 @@ import { libraryQuery, sagasQuery } from '@/lib/queries'
 import { routeState, useRouteId } from '@/lib/routeQuery'
 import { sagaFacts, sagaRuntime, sagaTargets } from '@/lib/sagas'
 import { useWatchedToggle } from '@/lib/useWatchedChange'
-import { HoverBackdrops } from '@/lib/useHoverBackdrop'
+import { useOwnBackdrop } from '@/lib/useHoverBackdrop'
 import { sectionPath } from '@/pages/LibraryPage/librarySections'
 import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
 import { SagaBackdropDialog } from '@/pages/SagaPage/SagaBackdropDialog'
@@ -74,6 +74,12 @@ const SagaWatchedToggle = ({ saga, libraryId }: { saga: Saga; libraryId: number 
   return <WatchedToggle {...toggle} />
 }
 
+/** The saga has a backdrop of its own, which pointing at a movie leaves up. */
+const OwnBackdrop = ({ children }: { children: ReactNode }) => {
+  const isOwn = useOwnBackdrop()
+  return isOwn && children
+}
+
 /** The saga once its library is known and open to this browser. */
 const SagaView = ({ library, sagaId }: { library: Library; sagaId: string }) => {
   const titleId = useId()
@@ -98,8 +104,7 @@ const SagaView = ({ library, sagaId }: { library: Library; sagaId: string }) => 
   const [first, ...rest] = saga.media
 
   return (
-    // The saga has a backdrop of its own, which pointing at a movie leaves up.
-    <HoverBackdrops value={false}>
+    <OwnBackdrop>
       <SelectionScope
         {...sourceOf(
           saga.media.map((media) => [mediaEntryKey(media), [{ kind: 'media', id: media.id }]]),
@@ -160,7 +165,7 @@ const SagaView = ({ library, sagaId }: { library: Library; sagaId: string }) => 
           <SelectionBar />
         </section>
       </SelectionScope>
-    </HoverBackdrops>
+    </OwnBackdrop>
   )
 }
 

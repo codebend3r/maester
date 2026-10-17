@@ -6,7 +6,7 @@ import { preferredSubtitle } from '@/components/Player/selection'
 import { FIXED_VOLUME_NOTE } from '@/lib/fixedVolume'
 import { type PlayerAction, stepCaptionScale, stepSpeed } from '@/lib/shortcuts'
 import { languageName } from '@raven/core'
-import { usePlayerServices } from '@/components/Player/PlayerServices'
+import { useHostServices } from '@/stores/playerServices'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
 
 /** Frames per second to step by when the file does not say. */
@@ -50,7 +50,7 @@ export const usePlayerActions = ({
   const volume = usePlayerPrefs((prefs) => prefs.volume)
   const muted = usePlayerPrefs((prefs) => prefs.muted)
   const subtitles = usePlayerPrefs((prefs) => prefs.subtitles)
-  const { isVolumeFixed = false } = usePlayerServices()
+  const { isVolumeFixed = false } = useHostServices()
   const seek = actions.seek
 
   const togglePlay = () => {

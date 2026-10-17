@@ -1,5 +1,4 @@
 import type { PlayerErrorReason } from '@raven/core'
-import { createContext, type ReactNode, useContext } from 'react'
 import type { IconName } from '@/components/Icon/Icon'
 import type { PlayerAction } from '@/lib/shortcuts'
 
@@ -60,20 +59,4 @@ export type PlayerServices = {
   handoff?: Handoff
   /** The native engine's error, before Unplayable shows it, for a host that can recover (a relocked library). */
   onEngineError?: (error: { reason: PlayerErrorReason; message: string }) => void
-}
-
-const Services = createContext<PlayerServices | null>(null)
-
-export const PlayerServicesProvider = ({
-  services,
-  children,
-}: {
-  services: PlayerServices
-  children: ReactNode
-}) => <Services.Provider value={services}>{children}</Services.Provider>
-
-export const usePlayerServices = (): PlayerServices => {
-  const services = useContext(Services)
-  if (!services) throw new Error('PlayerServicesProvider is required')
-  return services
 }

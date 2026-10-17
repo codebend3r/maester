@@ -1,6 +1,6 @@
 import { Button } from '@/components/Button/Button'
 import styles from '@/components/Player/Player.module.scss'
-import { usePlayerServices } from '@/components/Player/PlayerServices'
+import { useHostServices } from '@/stores/playerServices'
 
 const PLAYER_HINT =
   'The file is served untouched, so a player that handles every format, like VLC or IINA, can open the same link.'
@@ -29,7 +29,7 @@ export const Unplayable = ({
     escapeHint,
     unplayableNote,
     handoff,
-  } = usePlayerServices()
+  } = useHostServices()
   const hint = escapeHint === undefined ? PLAYER_HINT : escapeHint
 
   return (

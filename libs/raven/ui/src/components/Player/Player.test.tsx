@@ -10,16 +10,13 @@ import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { Route, Routes } from 'react-router-dom'
 import { Player } from '@/components/Player/Player'
-import {
-  type PlayerFavourite,
-  PlayerServicesProvider,
-  type PlayerTitle,
-} from '@/components/Player/PlayerServices'
+import type { PlayerFavourite, PlayerTitle } from '@/components/Player/PlayerServices'
 import { api } from '@/test/api'
 import { setBrowserSupport, setStreamSupport } from '@/test/canPlay'
 import { mediaItem } from '@/test/fixtures'
 import { DEFAULT_PLAYBACK_STATE, renderWithProviders } from '@/test/render'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
+import { useHostPlayer } from '@/stores/playerServices'
 
 /** A host as the web's is: new services on every render, the player only once they are in the store. */
 const TestPlayer = ({
@@ -32,19 +29,16 @@ const TestPlayer = ({
   backTo: string
   next?: PlayerTitle['next']
   favourite?: PlayerFavourite
-}) => (
-  <PlayerServicesProvider
-    services={{
-      title: { label: media.title, duration: media.duration, resumeAt: 0, backTo, next },
-      posterUrl: null,
-      escape: null,
-      progress: { started: () => {}, save: () => {}, left: () => {} },
-      ...(favourite && { favourite }),
-    }}
-  >
-    <Player engine={{ kind: 'html', source: { kind: 'server', media, api } }} />
-  </PlayerServicesProvider>
-)
+}) => {
+  const isHosting = useHostPlayer({
+    title: { label: media.title, duration: media.duration, resumeAt: 0, backTo, next },
+    posterUrl: null,
+    escape: null,
+    progress: { started: () => {}, save: () => {}, left: () => {} },
+    ...(favourite && { favourite }),
+  })
+  return isHosting && <Player engine={{ kind: 'html', source: { kind: 'server', media, api } }} />
+}
 
 const subtitleTrack = (overrides: Partial<SubtitleTrack>): SubtitleTrack => ({
   id: 'embedded-0',
@@ -95,9 +89,9 @@ describe('Player', () => {
   })
 
   it('goes straight to the video when the browser can play the file', () => {
-    const { container } = renderWithProviders(
-      <TestPlayer media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />,
-    )
+    const { container } = renderWithProviders({
+      ui: <TestPlayer media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />,
+    })
     const video = container.querySelector('video')
     expect(video).toHaveAttribute('src', '/api/media/7/file')
     expect(video).toHaveAttribute('autoplay')
@@ -105,9 +99,9 @@ describe('Player', () => {
   })
 
   it('explains why a file cannot play instead of loading it', () => {
-    const { container } = renderWithProviders(
-      <TestPlayer media={mediaItem()} backTo="/libraries/2" />,
-    )
+    const { container } = renderWithProviders({
+      ui: <TestPlayer media={mediaItem()} backTo="/libraries/2" />,
+    })
     expect(container.querySelector('video')).toBeNull()
     expect(screen.getByText("This video can't play in this browser.")).toBeInTheDocument()
     expect(screen.getByText("The MKV container isn't supported here.")).toBeInTheDocument()
@@ -120,10 +114,10 @@ describe('Player', () => {
       settings: { ...DEFAULT_PLAYBACK_STATE.settings, transcoding: 'off' },
     }
     spies.push(spyOn(api, 'getPlaybackSettings').mockImplementation(async () => off))
-    const { container } = renderWithProviders(
-      <TestPlayer media={mediaItem()} backTo="/libraries/2" />,
-      { playback: null },
-    )
+    const { container } = renderWithProviders({
+      ui: <TestPlayer media={mediaItem()} backTo="/libraries/2" />,
+      playback: null,
+    })
     expect(screen.getByLabelText('Loading')).toBeInTheDocument()
     expect(container.querySelector('video')).toBeNull()
     // Nothing is converted, so the Matroska file has no way to play here.
@@ -135,10 +129,10 @@ describe('Player', () => {
       ...DEFAULT_PLAYBACK_STATE,
       settings: { ...DEFAULT_PLAYBACK_STATE.settings, directPlay: 'force' },
     }
-    const { container } = renderWithProviders(
-      <TestPlayer media={mediaItem()} backTo="/libraries/2" />,
-      { playback: forced },
-    )
+    const { container } = renderWithProviders({
+      ui: <TestPlayer media={mediaItem()} backTo="/libraries/2" />,
+      playback: forced,
+    })
     expect(container.querySelector('video')).toHaveAttribute('src', '/api/media/7/file')
     await userEvent.click(screen.getByRole('button', { name: /^Audio/ }))
     const menu = await screen.findByRole('dialog', { name: 'Audio' })
@@ -159,9 +153,9 @@ describe('Player', () => {
   })
 
   it('lets the viewer try anyway', async () => {
-    const { container } = renderWithProviders(
-      <TestPlayer media={mediaItem()} backTo="/libraries/2" />,
-    )
+    const { container } = renderWithProviders({
+      ui: <TestPlayer media={mediaItem()} backTo="/libraries/2" />,
+    })
     await userEvent.click(screen.getByRole('button', { name: 'Try playing anyway' }))
     expect(container.querySelector('video')).toHaveAttribute('src', '/api/media/7/file')
   })
@@ -174,9 +168,9 @@ describe('the player controls', () => {
   })
 
   it("draws its own controls rather than the browser's", () => {
-    const { container } = renderWithProviders(
-      <TestPlayer media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />,
-    )
+    const { container } = renderWithProviders({
+      ui: <TestPlayer media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />,
+    })
     expect(container.querySelector('video')).not.toHaveAttribute('controls')
     expect(screen.getByRole('button', { name: 'Play (k)' })).toBeInTheDocument()
     expect(screen.getByRole('slider', { name: 'Seek' })).toHaveAttribute(
@@ -187,9 +181,9 @@ describe('the player controls', () => {
   })
 
   it('lists audio, subtitles and speed in the menus their pills open', async () => {
-    renderWithProviders(
-      <TestPlayer media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />,
-    )
+    renderWithProviders({
+      ui: <TestPlayer media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />,
+    })
     await userEvent.click(screen.getByRole('button', { name: /^Audio/ }))
     const audioMenu = await screen.findByRole('dialog', { name: 'Audio' })
     const audio = within(within(audioMenu).getByRole('group', { name: 'Audio' }))
@@ -211,9 +205,9 @@ describe('the player controls', () => {
     spies.push(
       spyOn(api, 'getStreams').mockImplementation(async () => ({ video: null, audio: [] })),
     )
-    const { container } = renderWithProviders(
-      <TestPlayer media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />,
-    )
+    const { container } = renderWithProviders({
+      ui: <TestPlayer media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />,
+    })
     await userEvent.click(screen.getByRole('button', { name: /^Playback:/ }))
     const menu = await screen.findByRole('dialog', { name: 'Playback' })
     await userEvent.click(within(menu).getByRole('button', { name: 'Playback info' }))
@@ -232,9 +226,9 @@ describe('the player controls', () => {
   })
 
   it('remembers a subtitle choice for the next video', async () => {
-    renderWithProviders(
-      <TestPlayer media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />,
-    )
+    renderWithProviders({
+      ui: <TestPlayer media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />,
+    })
     await userEvent.click(screen.getByRole('button', { name: 'Subtitles: Off' }))
     const menu = await screen.findByRole('dialog', { name: 'Subtitles' })
     const subtitles = within(within(menu).getByRole('group', { name: 'Subtitles' }))
@@ -253,17 +247,17 @@ describe('the player controls', () => {
         { start: 0, end: 30, text: 'Hello <i>there</i>' },
       ]),
     )
-    renderWithProviders(
-      <TestPlayer media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />,
-    )
+    renderWithProviders({
+      ui: <TestPlayer media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />,
+    })
     expect(await screen.findByText('there')).toHaveClass('italic')
     expect(screen.getByText('Hello')).toBeInTheDocument()
   })
 
   it("answers YouTube's keys", async () => {
-    const { container } = renderWithProviders(
-      <TestPlayer media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />,
-    )
+    const { container } = renderWithProviders({
+      ui: <TestPlayer media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />,
+    })
     const video = container.querySelector('video')
     if (!video) throw new Error('no video')
     await screen.findByRole('button', { name: 'Subtitles: Off' })
@@ -295,9 +289,9 @@ describe('the player controls', () => {
   })
 
   it('leaves keys alone while the volume slider has them', () => {
-    const { container } = renderWithProviders(
-      <TestPlayer media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />,
-    )
+    const { container } = renderWithProviders({
+      ui: <TestPlayer media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />,
+    })
     const video = container.querySelector('video')
     fireEvent.keyDown(screen.getByRole('slider', { name: 'Volume' }), { key: 'l' })
     expect(video?.currentTime ?? null).toBe(0)
@@ -308,21 +302,23 @@ describe('the player controls', () => {
       mediaItem({ id: 8, title: 'Busboys 2 (2027)', container: 'mp4' }),
       mediaItem({ id: 9, title: 'Busboys 3 (2028)', container: 'mp4' }),
     ]
-    const { container } = renderWithProviders(
-      <Routes>
-        <Route
-          path="/"
-          element={
-            <TestPlayer
-              media={mediaItem({ container: 'mp4' })}
-              next={{ to: '/watch/8', state: { remaining: 9 }, label: upNext[0]?.title ?? '' }}
-              backTo="/libraries/2"
-            />
-          }
-        />
-        <Route path="watch/:id" element={<p>Playing the next video</p>} />
-      </Routes>,
-    )
+    const { container } = renderWithProviders({
+      ui: (
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <TestPlayer
+                media={mediaItem({ container: 'mp4' })}
+                next={{ to: '/watch/8', state: { remaining: 9 }, label: upNext[0]?.title ?? '' }}
+                backTo="/libraries/2"
+              />
+            }
+          />
+          <Route path="watch/:id" element={<p>Playing the next video</p>} />
+        </Routes>
+      ),
+    })
     expect(screen.getByRole('link', { name: /^Next: Busboys 2/ })).toHaveAttribute(
       'href',
       '/watch/8',
@@ -334,9 +330,9 @@ describe('the player controls', () => {
   })
 
   it('offers no next video when none came with it', () => {
-    renderWithProviders(
-      <TestPlayer media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />,
-    )
+    renderWithProviders({
+      ui: <TestPlayer media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />,
+    })
     expect(screen.queryByRole('link', { name: /^Next/ })).toBeNull()
   })
 
@@ -352,7 +348,7 @@ describe('the player controls', () => {
         />
       )
     }
-    renderWithProviders(<FavouriteHost />)
+    renderWithProviders({ ui: <FavouriteHost /> })
     const heart = screen.getByRole('button', { name: 'Favourite' })
     expect(heart).toHaveAttribute('aria-pressed', 'false')
 
@@ -366,9 +362,9 @@ describe('the player controls', () => {
   })
 
   it('offers no heart when the host keeps no favourites', () => {
-    renderWithProviders(
-      <TestPlayer media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />,
-    )
+    renderWithProviders({
+      ui: <TestPlayer media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />,
+    })
     expect(screen.queryByRole('button', { name: 'Favourite' })).toBeNull()
   })
 
@@ -376,9 +372,9 @@ describe('the player controls', () => {
     // Says it can stream, but this pretend browser has no MediaSource to stream into.
     setBrowserSupport((mime) => !mime.includes('mlpa'))
     setStreamSupport(() => true)
-    renderWithProviders(
-      <TestPlayer media={mediaItem({ audioCodec: 'truehd' })} backTo="/libraries/2" />,
-    )
+    renderWithProviders({
+      ui: <TestPlayer media={mediaItem({ audioCodec: 'truehd' })} backTo="/libraries/2" />,
+    })
     expect(await screen.findByText("This video can't play in this browser.")).toBeInTheDocument()
     expect(screen.getByText("This browser can't play converted video.")).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Try playing anyway' })).toBeNull()
@@ -400,13 +396,13 @@ describe('the player’s Back', () => {
   )
 
   it('goes back to the page that opened the player', async () => {
-    renderWithProviders(app(), { route: '/watch/7', behind: ['/libraries/2', '/movies/3'] })
+    renderWithProviders({ ui: app(), route: '/watch/7', behind: ['/libraries/2', '/movies/3'] })
     await userEvent.click(screen.getByRole('button', { name: 'Back' }))
     expect(await screen.findByText('The movie')).toBeInTheDocument()
   })
 
   it('goes back there on Escape too', async () => {
-    renderWithProviders(app(), { route: '/watch/7', behind: ['/movies/3'] })
+    renderWithProviders({ ui: app(), route: '/watch/7', behind: ['/movies/3'] })
     press('Escape')
     expect(await screen.findByText('The movie')).toBeInTheDocument()
   })
@@ -415,7 +411,7 @@ describe('the player’s Back', () => {
     spies.push(
       spyOn(api, 'getStreams').mockImplementation(async () => ({ video: null, audio: [] })),
     )
-    renderWithProviders(app(), { route: '/watch/7', behind: ['/movies/3'] })
+    renderWithProviders({ ui: app(), route: '/watch/7', behind: ['/movies/3'] })
     await userEvent.click(screen.getByRole('button', { name: /^Playback:/ }))
     const menu = await screen.findByRole('dialog', { name: 'Playback' })
     await userEvent.click(within(menu).getByRole('button', { name: 'Playback info' }))
@@ -428,24 +424,27 @@ describe('the player’s Back', () => {
   })
 
   it("leaves a host dialog's keys to it, Escape included", async () => {
-    const { container } = renderWithProviders(
-      <Routes>
-        <Route path="movies/3" element={<p>The movie</p>} />
-        <Route
-          path="watch/7"
-          element={
-            <>
-              <TestPlayer media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />
-              <dialog open aria-label="Open a link">
-                <input aria-label="Link" />
-                <button type="button">Open</button>
-              </dialog>
-            </>
-          }
-        />
-      </Routes>,
-      { route: '/watch/7', behind: ['/movies/3'] },
-    )
+    const { container } = renderWithProviders({
+      ui: (
+        <Routes>
+          <Route path="movies/3" element={<p>The movie</p>} />
+          <Route
+            path="watch/7"
+            element={
+              <>
+                <TestPlayer media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />
+                <dialog open aria-label="Open a link">
+                  <input aria-label="Link" />
+                  <button type="button">Open</button>
+                </dialog>
+              </>
+            }
+          />
+        </Routes>
+      ),
+      route: '/watch/7',
+      behind: ['/movies/3'],
+    })
     const video = container.querySelector('video')
     if (!video) throw new Error('no video')
     const host = screen.getByRole('dialog', { name: 'Open a link' })
@@ -460,13 +459,13 @@ describe('the player’s Back', () => {
   })
 
   it('goes back there from a video that cannot play', async () => {
-    renderWithProviders(app(mediaItem()), { route: '/watch/7', behind: ['/movies/3'] })
+    renderWithProviders({ ui: app(mediaItem()), route: '/watch/7', behind: ['/movies/3'] })
     await userEvent.click(screen.getByRole('button', { name: 'Back' }))
     expect(await screen.findByText('The movie')).toBeInTheDocument()
   })
 
   it('goes to the library when the player was opened straight from its address', async () => {
-    renderWithProviders(app(), { route: '/watch/7' })
+    renderWithProviders({ ui: app(), route: '/watch/7' })
     await userEvent.click(screen.getByRole('button', { name: 'Back' }))
     expect(await screen.findByText('The library')).toBeInTheDocument()
   })
@@ -488,7 +487,7 @@ describe('the player chrome', () => {
   })
 
   it('says under the title what is playing and how, and the pills say what each is set to', async () => {
-    renderWithProviders(<TestPlayer media={uhd} backTo="/libraries/2" />)
+    renderWithProviders({ ui: <TestPlayer media={uhd} backTo="/libraries/2" /> })
     expect(screen.getByRole('heading', { level: 1, name: 'Busboys' })).toBeInTheDocument()
     expect(screen.getByText('2026 · 4K HDR · Direct play')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Subtitles: Off' })).toHaveTextContent(
@@ -504,7 +503,7 @@ describe('the player chrome', () => {
   })
 
   it('opens one menu at a time and gives focus back to its pill', async () => {
-    renderWithProviders(<TestPlayer media={uhd} backTo="/libraries/2" />)
+    renderWithProviders({ ui: <TestPlayer media={uhd} backTo="/libraries/2" /> })
     const audioPill = await screen.findByRole('button', { name: 'Audio: English 5.1' })
     await userEvent.click(audioPill)
     expect(audioPill).toHaveAttribute('aria-expanded', 'true')
@@ -537,13 +536,15 @@ describe('the player chrome', () => {
   })
 
   it('keeps the heart in the top bar beside the title, filled once favourited', () => {
-    renderWithProviders(
-      <TestPlayer
-        media={uhd}
-        backTo="/libraries/2"
-        favourite={{ isFavourite: true, toggle: () => {} }}
-      />,
-    )
+    renderWithProviders({
+      ui: (
+        <TestPlayer
+          media={uhd}
+          backTo="/libraries/2"
+          favourite={{ isFavourite: true, toggle: () => {} }}
+        />
+      ),
+    })
     const heart = screen.getByRole('button', { name: 'Favourite' })
     expect(heart).toHaveAttribute('aria-pressed', 'true')
     expect(heart).toHaveClass('favourited')
@@ -553,7 +554,9 @@ describe('the player chrome', () => {
   })
 
   it('shows a large play mark while paused, and drops it once the video plays', () => {
-    const { container } = renderWithProviders(<TestPlayer media={uhd} backTo="/libraries/2" />)
+    const { container } = renderWithProviders({
+      ui: <TestPlayer media={uhd} backTo="/libraries/2" />,
+    })
     const video = container.querySelector('video')
     if (!video) throw new Error('no video')
     expect(container.querySelector('.paused')).toHaveAttribute('aria-hidden', 'true')
@@ -566,7 +569,9 @@ describe('the player chrome', () => {
   })
 
   it('skips ten seconds either way from the bar', async () => {
-    const { container } = renderWithProviders(<TestPlayer media={uhd} backTo="/libraries/2" />)
+    const { container } = renderWithProviders({
+      ui: <TestPlayer media={uhd} backTo="/libraries/2" />,
+    })
     const video = container.querySelector('video')
     if (!video) throw new Error('no video')
     const forward = screen.getByRole('button', { name: 'Forward 10 seconds (l)' })
@@ -590,9 +595,9 @@ describe('the controls fading out', () => {
   afterEach(() => jest.useRealTimers())
 
   const renderPlayer = () =>
-    renderWithProviders(
-      <TestPlayer media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />,
-    )
+    renderWithProviders({
+      ui: <TestPlayer media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />,
+    })
   const bar = () => screen.getByRole('slider', { name: 'Seek' }).closest('.controls')
   const idle = (ms: number) => act(() => jest.advanceTimersByTime(ms))
 

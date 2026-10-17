@@ -14,11 +14,7 @@ import userEvent from '@testing-library/user-event'
 import { type ReactNode, useEffect } from 'react'
 import { MemoryRouter } from 'react-router-dom'
 import { Player } from '@/components/Player/Player'
-import {
-  type HostActions,
-  PlayerServicesProvider,
-  type PlayerServices,
-} from '@/components/Player/PlayerServices'
+import type { HostActions, PlayerServices } from '@/components/Player/PlayerServices'
 import { PlayerChrome } from '@/components/Player/Stage'
 import { Unplayable } from '@/components/Player/Unplayable'
 import type { EngineActions, EngineHandle } from '@/components/Player/engine'
@@ -30,6 +26,7 @@ import type { PlayerAction } from '@/lib/shortcuts'
 import { api } from '@/test/api'
 import { renderWithProviders } from '@/test/render'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
+import { usePlayerServices } from '@/stores/playerServices'
 
 const servicesFor = (): PlayerServices => ({
   title: { label: 'Local clip', duration: 120, resumeAt: 20, backTo: '/', next: null },
@@ -78,13 +75,11 @@ describe('useWatchProgress state transitions', () => {
   it('starts on flowing frames, saves jumps, pause, end, pagehide and the final position', () => {
     const services = servicesFor()
     const position = { current: 20 }
-    const wrapper = ({ children }: { children: ReactNode }) => (
-      <PlayerServicesProvider services={services}>{children}</PlayerServicesProvider>
-    )
+    usePlayerServices.setState({ services })
     const initial = initialVideoState(20)
     const { rerender, unmount } = renderHook(
       ({ state }) => useWatchProgress({ state, position, duration: 120 }),
-      { initialProps: { state: initial }, wrapper },
+      { initialProps: { state: initial } },
     )
     rerender({ state: { ...initial, paused: false, waiting: true } })
     expect(services.progress.started).not.toHaveBeenCalled()
@@ -116,13 +111,10 @@ describe('useWatchProgress state transitions', () => {
 
   it('never wipes a resume point when frames did not play, but still reports leaving', () => {
     const services = servicesFor()
-    const wrapper = ({ children }: { children: ReactNode }) => (
-      <PlayerServicesProvider services={services}>{children}</PlayerServicesProvider>
-    )
+    usePlayerServices.setState({ services })
     const position = { current: 0 }
-    const { unmount } = renderHook(
-      () => useWatchProgress({ state: initialVideoState(20), position, duration: null }),
-      { wrapper },
+    const { unmount } = renderHook(() =>
+      useWatchProgress({ state: initialVideoState(20), position, duration: null }),
     )
     act(() => window.dispatchEvent(new Event('pagehide')))
     unmount()
@@ -140,15 +132,13 @@ describe('useWatchProgress duration sink', () => {
       progress: { ...servicesFor().progress, duration },
     }
     const position = { current: 0 }
-    const wrapper = ({ children }: { children: ReactNode }) => (
-      <PlayerServicesProvider services={services}>{children}</PlayerServicesProvider>
-    )
+    usePlayerServices.setState({ services })
     const state = initialVideoState(0)
     const initialProps: { length: number | null } = { length: null }
     const { rerender } = renderHook(
       ({ length }: { length: number | null }) =>
         useWatchProgress({ state, position, duration: length }),
-      { initialProps, wrapper },
+      { initialProps },
     )
     expect(duration).not.toHaveBeenCalled()
     rerender({ length: 120 })
@@ -160,18 +150,14 @@ describe('useWatchProgress duration sink', () => {
 
   it('renders without throwing when the sink has no duration', () => {
     const services = servicesFor()
-    const wrapper = ({ children }: { children: ReactNode }) => (
-      <PlayerServicesProvider services={services}>{children}</PlayerServicesProvider>
-    )
+    usePlayerServices.setState({ services })
     expect(() =>
-      renderHook(
-        () =>
-          useWatchProgress({
-            state: initialVideoState(0),
-            position: { current: 0 },
-            duration: 120,
-          }),
-        { wrapper },
+      renderHook(() =>
+        useWatchProgress({
+          state: initialVideoState(0),
+          position: { current: 0 },
+          duration: 120,
+        }),
       ),
     ).not.toThrow()
   })
@@ -192,8 +178,8 @@ describe('PlayerChrome with a fake engine handle', () => {
       drawsSubtitles: true,
       readStats: () => ({ engine: 'Test engine', viewport: null, frame: null, frames: null }),
     }
-    const { container } = renderWithProviders(
-      <PlayerServicesProvider services={services}>
+    const { container } = renderWithProviders({
+      ui: (
         <PlayerChrome
           engine={engine}
           onBack={() => {}}
@@ -202,8 +188,9 @@ describe('PlayerChrome with a fake engine handle', () => {
           subtitleStatus="off"
           fullscreen={{ fullscreen: false, toggle: () => {} }}
         />
-      </PlayerServicesProvider>,
-    )
+      ),
+      services: services,
+    })
     expect(container.querySelector('video')).toBeNull()
     expect(screen.getByText('Engine picture')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Play (k)' }))
@@ -238,8 +225,8 @@ describe('PlayerChrome Playback info', () => {
       drawsSubtitles: true,
       readStats: () => ({ engine: 'Test engine', viewport: null, frame: null, frames: null }),
     }
-    renderWithProviders(
-      <PlayerServicesProvider services={servicesFor()}>
+    renderWithProviders({
+      ui: (
         <PlayerChrome
           engine={engine}
           onBack={() => {}}
@@ -248,8 +235,9 @@ describe('PlayerChrome Playback info', () => {
           subtitleStatus="off"
           fullscreen={{ fullscreen: false, toggle: () => {} }}
         />
-      </PlayerServicesProvider>,
-    )
+      ),
+      services: servicesFor(),
+    })
     expect(screen.getByRole('button', { name: 'Start over' })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: /^Playback:/ }))
     await userEvent.click(screen.getByRole('button', { name: 'Playback info' }))
@@ -282,8 +270,8 @@ describe('PlayerChrome host actions', () => {
       drawsSubtitles: true,
       readStats: () => ({ engine: 'Test engine', viewport: null, frame: null, frames: null }),
     }
-    const { unmount } = renderWithProviders(
-      <PlayerServicesProvider services={services}>
+    const { unmount } = renderWithProviders({
+      ui: (
         <PlayerChrome
           engine={engine}
           onBack={() => {}}
@@ -292,8 +280,9 @@ describe('PlayerChrome host actions', () => {
           subtitleStatus="off"
           fullscreen={{ fullscreen: false, toggle: () => {} }}
         />
-      </PlayerServicesProvider>,
-    )
+      ),
+      services: services,
+    })
     expect(listeners.size).toBe(1)
     act(() => emit({ type: 'togglePlay' }))
     expect(actions.play).toHaveBeenCalledTimes(1)
@@ -310,11 +299,10 @@ describe('Player HTML local files', () => {
     const settings = spyOn(api, 'getPlaybackSettings')
     try {
       const services = servicesFor()
-      const { container, unmount } = renderWithProviders(
-        <PlayerServicesProvider services={services}>
-          <Player engine={{ kind: 'html', source: { kind: 'file', url: 'blob:local-clip' } }} />
-        </PlayerServicesProvider>,
-      )
+      const { container, unmount } = renderWithProviders({
+        ui: <Player engine={{ kind: 'html', source: { kind: 'file', url: 'blob:local-clip' } }} />,
+        services: services,
+      })
       const video = container.querySelector('video')
       expect(video).not.toBeNull()
       if (!video) return
@@ -361,11 +349,7 @@ describe('HTML engine surface focus', () => {
       })
       return null
     }
-    const { unmount } = renderWithProviders(
-      <PlayerServicesProvider services={servicesFor()}>
-        <Probe />
-      </PlayerServicesProvider>,
-    )
+    const { unmount } = renderWithProviders({ ui: <Probe />, services: servicesFor() })
     const handle = handles.at(-1)
     expect(handle).toBeDefined()
     if (!handle) return
@@ -391,11 +375,7 @@ describe('HTML engine stats', () => {
       })
       return engine.surface
     }
-    const { container, unmount } = renderWithProviders(
-      <PlayerServicesProvider services={servicesFor()}>
-        <Probe />
-      </PlayerServicesProvider>,
-    )
+    const { container, unmount } = renderWithProviders({ ui: <Probe />, services: servicesFor() })
     const handle = handles.at(-1)
     const video = container.querySelector('video')
     expect(handle).toBeDefined()
@@ -456,17 +436,17 @@ describe('PlayerChrome seams for a native host', () => {
       surface: <p>Engine picture</p>,
       drawsSubtitles: true,
     }
+    // Set before the render this element goes to, as a host does.
+    usePlayerServices.setState({ services })
     return (
-      <PlayerServicesProvider services={services}>
-        <PlayerChrome
-          engine={engine}
-          onBack={() => {}}
-          mode="direct"
-          selection={selection}
-          subtitleStatus="off"
-          fullscreen={{ fullscreen: false, toggle: () => {} }}
-        />
-      </PlayerServicesProvider>
+      <PlayerChrome
+        engine={engine}
+        onBack={() => {}}
+        mode="direct"
+        selection={selection}
+        subtitleStatus="off"
+        fullscreen={{ fullscreen: false, toggle: () => {} }}
+      />
     )
   }
   const idle = (ms: number) => act(() => jest.advanceTimersByTime(ms))
@@ -558,11 +538,10 @@ describe('PlayerChrome seams for a native host', () => {
 describe('Player shows the host note on Unplayable', () => {
   const failing = (note: string | undefined) => {
     const services: PlayerServices = { ...servicesFor(), unplayableNote: note }
-    const { container } = renderWithProviders(
-      <PlayerServicesProvider services={services}>
-        <Player engine={{ kind: 'html', source: { kind: 'file', url: 'blob:broken' } }} />
-      </PlayerServicesProvider>,
-    )
+    const { container } = renderWithProviders({
+      ui: <Player engine={{ kind: 'html', source: { kind: 'file', url: 'blob:broken' } }} />,
+      services: services,
+    })
     const video = container.querySelector('video')
     expect(video).not.toBeNull()
     if (video) fireEvent.error(video)
@@ -585,11 +564,10 @@ describe('Player hands a title off to another player', () => {
     'The file is served untouched, so a player that handles every format, like VLC or IINA, can open the same link.'
 
   const failing = (services: PlayerServices) => {
-    const { container } = renderWithProviders(
-      <PlayerServicesProvider services={services}>
-        <Player engine={{ kind: 'html', source: { kind: 'file', url: 'blob:broken' } }} />
-      </PlayerServicesProvider>,
-    )
+    const { container } = renderWithProviders({
+      ui: <Player engine={{ kind: 'html', source: { kind: 'file', url: 'blob:broken' } }} />,
+      services: services,
+    })
     const video = container.querySelector('video')
     expect(video).not.toBeNull()
     if (video) fireEvent.error(video)
@@ -661,11 +639,12 @@ describe('Player hands a title off to another player', () => {
 
   it('drops Try playing anyway from primary only while a handoff is offered', () => {
     const unplayable = (services: PlayerServices) =>
-      renderWithProviders(
-        <PlayerServicesProvider services={services}>
+      renderWithProviders({
+        ui: (
           <Unplayable problems={['No way to convert']} onBack={() => {}} onTryAnyway={() => {}} />
-        </PlayerServicesProvider>,
-      )
+        ),
+        services: services,
+      })
     unplayable(servicesFor())
     expect(screen.getByRole('button', { name: 'Try playing anyway' })).toHaveClass('primary')
     cleanup()
@@ -689,8 +668,8 @@ describe('PlayerChrome handoff in the playback menu', () => {
       surface: <p>Engine picture</p>,
       drawsSubtitles: true,
     }
-    return renderWithProviders(
-      <PlayerServicesProvider services={services}>
+    return renderWithProviders({
+      ui: (
         <PlayerChrome
           engine={engine}
           onBack={() => {}}
@@ -699,8 +678,9 @@ describe('PlayerChrome handoff in the playback menu', () => {
           subtitleStatus="off"
           fullscreen={{ fullscreen: false, toggle: () => {} }}
         />
-      </PlayerServicesProvider>,
-    )
+      ),
+      services: services,
+    })
   }
 
   it('offers the handoff in the playback menu, paused, at the current position', async () => {

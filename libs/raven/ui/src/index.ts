@@ -4,7 +4,7 @@ export type { ButtonTone, ButtonSize } from '@/components/Button/Button'
 export { UnlockDialog } from '@/components/UnlockDialog/UnlockDialog'
 export type { UnlockSecret } from '@/components/UnlockDialog/UnlockDialog'
 export { Player } from '@/components/Player/Player'
-export { PlayerServicesProvider } from '@/components/Player/PlayerServices'
+export { useHostPlayer } from '@/stores/playerServices'
 export type {
   Handoff,
   HostActions,

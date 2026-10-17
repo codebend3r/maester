@@ -9,7 +9,8 @@ import type { PlayerConnection, PlayerConnections } from '@/renderer/desktop/pla
 import { HomePage } from '@/renderer/HomePage/HomePage'
 import { desktopRoutes } from '@/renderer/routes'
 import { Shell } from '@/renderer/Shell/Shell'
-import type { DesktopEvent } from '@/shared/protocol'
+import { useDesktopBridge } from '@/renderer/stores/desktop'
+import { DESKTOP_REQUESTS, type DesktopEvent, DESKTOP_REPLIES } from '@/shared/protocol'
 
 /** The real Shell and Home, with stand-ins where they send the page, so Play's and Settings' requests stay out. */
 export const STUB_ROUTES: RouteObject[] = [
@@ -104,6 +105,8 @@ export const renderDesktop = ({
   const router = createMemoryRouter(routes, {
     initialEntries: [state === undefined ? route : { pathname: route, state }],
   })
+  // Before the render, as `main.tsx` does; the setup resets it after each test.
+  useDesktopBridge.setState({ desktop: { client, menu, player } })
   const app = (
     <QueryClientProvider client={queryClient}>
       <RouterProvider router={router} />

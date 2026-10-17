@@ -1,8 +1,6 @@
 import { useEffect } from 'react'
-import {
-  type SelectionScopeValue,
-  useSelectionScope,
-} from '@/components/SelectionScope/SelectionScope'
+import { useSelectionScope } from '@/components/SelectionScope/SelectionScope'
+import type { SelectionScopeValue } from '@/stores/selectionScope'
 
 /** The scope a `Peek` inside it found, for a test to drive select mode by hand. */
 export const peeked: { scope: SelectionScopeValue | null } = { scope: null }
