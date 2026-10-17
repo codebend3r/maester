@@ -326,13 +326,23 @@ export const setSidecars = (
         : { ...entry, sidecars: [...sidecars] },
   })
 
+/**
+ * Switching the option on for a title already watched moves an older `watchedAt` up to `at`:
+ * from then on it says when the ten-minute clock counts from, so the switch never deletes at
+ * once, not even at the next launch. Nothing else reads it as a time, only against null.
+ */
 export const setAutoDelete = (
   state: DownloadsState,
-  { downloadId, autoDelete }: { downloadId: string; autoDelete: boolean },
+  { downloadId, autoDelete, at }: { downloadId: string; autoDelete: boolean; at: number },
 ): DownloadsState =>
   changeEntry(state, {
     downloadId,
-    change: (entry) => (entry.autoDelete === autoDelete ? entry : { ...entry, autoDelete }),
+    change: (entry) => {
+      if (entry.autoDelete === autoDelete) return entry
+      const { watchedAt } = entry
+      const isRestarted = autoDelete && watchedAt !== null && watchedAt < at
+      return { ...entry, autoDelete, watchedAt: isRestarted ? at : watchedAt }
+    },
   })
 
 export const setAutoDeleteDefault = (

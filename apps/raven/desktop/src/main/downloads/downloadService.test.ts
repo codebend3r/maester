@@ -176,6 +176,7 @@ const setup = ({
   disk = {},
   videos = {},
   player = EMPTY_STATE,
+  startAt = NOW,
 }: {
   replies?: Record<string, Reply>
   free?: number
@@ -186,6 +187,8 @@ const setup = ({
   /** Finished videos by path, kept apart from `disk`, whose seed holds every byte in memory. */
   videos?: Record<string, Video>
   player?: PlayerState
+  /** What the clock reads at launch. */
+  startAt?: number
 } = {}) => {
   const table: Record<string, Reply> = {
     [libraryCall]: ok(library({ id: 1, watchedPercent: 90 })),
@@ -212,7 +215,7 @@ const setup = ({
       throw error
     },
   })
-  const clock = { now: NOW }
+  const clock = { now: startAt }
   const sent: DesktopEvent[] = []
   const warnings: string[] = []
   const made: string[] = []
@@ -1587,6 +1590,23 @@ describe('deleting once watched', () => {
     await ticks(10)
     expect(entries(world)).toHaveLength(1)
     world.service.playbackLeft({ fileId })
+    await until(() => entries(world).length === 0)
+  })
+
+  it('counts from the switch at the next launch, for a title watched long before it', async () => {
+    const before = settingUp({ autoDelete: false, watchedAt: NOW - 24 * 60 * MINUTE })
+    await ticks(10)
+    before.service.setAutoDelete({ downloadId: ID, autoDelete: true })
+    before.service.dispose()
+    const world = setup({
+      initial: before.store.read(),
+      videos: { [VIDEO]: FILE },
+      startAt: NOW + 5 * MINUTE,
+    })
+    await until(() => world.service.views()[0]?.deletesAt !== null)
+    expect(world.service.views()[0]?.deletesAt).toBe(NOW + AUTO_DELETE_DELAY_MS)
+    expect(entries(world)).toHaveLength(1)
+    after(world, 5 * MINUTE)
     await until(() => entries(world).length === 0)
   })
 

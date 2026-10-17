@@ -352,7 +352,8 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
 
   const setAutoDeleteOf: DownloadService['setAutoDelete'] = ({ downloadId, autoDelete }) => {
     if (!isKnown(downloadId)) return unknown()
-    change((state) => setAutoDelete(state, { downloadId, autoDelete }))
+    const at = deps.now()
+    change((state) => setAutoDelete(state, { downloadId, autoDelete, at }))
     if (autoDelete) deleteClock.schedule({ downloadId })
     else deleteClock.cancel({ downloadId })
     return list()

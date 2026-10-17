@@ -399,13 +399,33 @@ describe('setSidecars', () => {
 
 describe('auto-delete', () => {
   it('setAutoDelete sets one entry', () => {
-    const next = setAutoDelete(stateOf(entry()), { downloadId: ID, autoDelete: true })
+    const next = setAutoDelete(stateOf(entry()), { downloadId: ID, autoDelete: true, at: 500 })
     expect(next.entries[0]?.autoDelete).toBe(true)
   })
 
   it('setAutoDelete to the same value returns the same state', () => {
-    const state = stateOf(entry())
-    expect(setAutoDelete(state, { downloadId: ID, autoDelete: false })).toBe(state)
+    const state = stateOf(entry({ autoDelete: true, watchedAt: 100 }))
+    expect(setAutoDelete(state, { downloadId: ID, autoDelete: true, at: 500 })).toBe(state)
+  })
+
+  it('setAutoDelete moves an older watchedAt up to the switch when it is turned on', () => {
+    const next = setAutoDelete(stateOf(entry({ watchedAt: 100 })), {
+      downloadId: ID,
+      autoDelete: true,
+      at: 500,
+    })
+    expect(next.entries[0]).toMatchObject({ autoDelete: true, watchedAt: 500 })
+  })
+
+  it('setAutoDelete leaves watchedAt when turned off, and a title not watched unwatched', () => {
+    const off = setAutoDelete(stateOf(entry({ autoDelete: true, watchedAt: 100 })), {
+      downloadId: ID,
+      autoDelete: false,
+      at: 500,
+    })
+    expect(off.entries[0]).toMatchObject({ autoDelete: false, watchedAt: 100 })
+    const unwatched = setAutoDelete(stateOf(entry()), { downloadId: ID, autoDelete: true, at: 500 })
+    expect(unwatched.entries[0]?.watchedAt).toBeNull()
   })
 
   it('setAutoDeleteDefault sets the default, and the same value changes nothing', () => {
@@ -682,7 +702,7 @@ describe('an unknown download id', () => {
     ['finish', () => finish(state, { downloadId: unknown })],
     ['remove', () => remove(state, { downloadId: unknown })],
     ['setSidecars', () => setSidecars(state, { downloadId: unknown, sidecars: [] })],
-    ['setAutoDelete', () => setAutoDelete(state, { downloadId: unknown, autoDelete: true })],
+    ['setAutoDelete', () => setAutoDelete(state, { downloadId: unknown, autoDelete: true, at: 1 })],
     [
       'noteWatched',
       () => noteWatched(state, { downloadId: unknown, position: 1, duration: 1, at: 1 }),

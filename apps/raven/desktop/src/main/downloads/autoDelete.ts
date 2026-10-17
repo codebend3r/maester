@@ -28,8 +28,8 @@ export type AutoDelete = {
   /** At launch: a clock for every ready download set to delete once watched and watched. */
   rebuild: () => void
   /**
-   * After a position is noted or the switch is turned on: a download with no clock gets one,
-   * ten minutes from now, and a deletion that waits on the viewer is tried again.
+   * After a position is noted or the switch is turned on: a download with no clock gets one at
+   * `watchedAt` plus the delay, and a deletion that waits on the viewer is tried again.
    */
   schedule: (input: { downloadId: string }) => void
   cancel: (input: { downloadId: string }) => void
@@ -152,12 +152,9 @@ export const createAutoDelete = (deps: AutoDeleteDeps): AutoDelete => {
   }
 
   const schedule: AutoDelete['schedule'] = ({ downloadId }) => {
-    const watchedAt = watchedAtOf(entryOf(downloadId))
-    if (watchedAt === null) return cancel({ downloadId })
     const clock = clocks.get(downloadId)
-    // A title watched before the switch was turned on starts its ten minutes from the switch.
-    if (clock === undefined) {
-      return arm({ downloadId, at: Math.max(watchedAt, deps.now()) + AUTO_DELETE_DELAY_MS })
+    if (clock === undefined || watchedAtOf(entryOf(downloadId)) === null) {
+      return armFromStore(downloadId)
     }
     if (clock.kind === 'held') due(downloadId)
   }
