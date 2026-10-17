@@ -39,11 +39,19 @@ const splitOrigin = (
   return { scheme, host, port: isDefaultPort ? null : port }
 }
 
-const isPlainOrigin = (value: string): boolean => {
-  if (!URL.canParse(value)) return false
+/** The origin in its canonical form (lower case host, default port gone), or null for a path, query, fragment or login. */
+const normalisedOrigin = (value: string): string | null => {
+  if (!URL.canParse(value)) return null
   const url = new URL(value)
-  if (url.origin !== value.replace(/\/+$/, '')) return false
-  return url.protocol === 'https:' || (url.protocol === 'http:' && url.hostname === 'localhost')
+  const isBare =
+    /^\/*$/.test(url.pathname) &&
+    url.search === '' &&
+    url.hash === '' &&
+    url.username === '' &&
+    url.password === ''
+  const isAllowedScheme =
+    url.protocol === 'https:' || (url.protocol === 'http:' && url.hostname === 'localhost')
+  return isBare && isAllowedScheme ? url.origin : null
 }
 
 const originProblem = (entry: string): string =>
@@ -61,8 +69,9 @@ const parseMediaOrigin = (
       problem: `${MEDIA_PLANE_ENV.origins} entry "${entry}" has an unknown kind; use lan, tailnet or public.`,
     }
   }
-  if (!isPlainOrigin(url)) return { origin: null, problem: originProblem(entry) }
-  return { origin: { kind, url: url.replace(/\/+$/, '') }, problem: null }
+  const origin = normalisedOrigin(url)
+  if (origin === null) return { origin: null, problem: originProblem(entry) }
+  return { origin: { kind, url: origin }, problem: null }
 }
 
 /** `kind:url` entries, comma separated and best first; an entry that is not valid is dropped and named. */
@@ -87,7 +96,7 @@ const hasValidWildcard = (host: string): boolean => {
 }
 
 const webOriginProblem = (entry: string): string =>
-  `${MEDIA_PLANE_ENV.webOrigins} entry "${entry}" is not an https origin with no path (http is for localhost only, and a * may only start the first label).`
+  `${MEDIA_PLANE_ENV.webOrigins} entry "${entry}" is not an https origin with no path (http is for localhost only). A * is allowed once, in the first hostname label only, anywhere in it, and stands for one or more characters other than a dot.`
 
 const parseWebOrigin = (entry: string): string | null => {
   const parts = splitOrigin(entry)

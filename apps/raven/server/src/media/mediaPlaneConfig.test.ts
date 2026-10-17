@@ -33,6 +33,18 @@ describe('parseMediaOrigins', () => {
     expect(parsed.problems[2]).toContain('https://c.example')
   })
 
+  it('lower-cases the host and drops a default port', () => {
+    expect(
+      parseMediaOrigins('lan:https://A.example,tailnet:https://a.example:443').origins,
+    ).toEqual([
+      { kind: 'lan', url: 'https://a.example' },
+      { kind: 'tailnet', url: 'https://a.example' },
+    ])
+    expect(parseMediaOrigins('lan:https://a.example:8443').origins).toEqual([
+      { kind: 'lan', url: 'https://a.example:8443' },
+    ])
+  })
+
   it('drops a query and a fragment', () => {
     const parsed = parseMediaOrigins('lan:https://a.example?x=1,lan:https://a.example#top')
     expect(parsed.origins).toEqual([])
@@ -79,7 +91,16 @@ describe('parseWebOrigins and isAllowedWebOrigin', () => {
     ).toBe(false)
   })
 
-  it('matches a * as exactly one first label', () => {
+  it('drops a default port and ignores case', () => {
+    expect(parseWebOrigins('https://x.example:443,http://localhost:80').origins).toEqual([
+      'https://x.example',
+      'http://localhost',
+    ])
+    const allowed = parseWebOrigins('https://raven-player.netlify.app').origins
+    expect(isAllowedWebOrigin({ origin: 'HTTPS://Raven-Player.Netlify.App', allowed })).toBe(true)
+  })
+
+  it('matches a * as one or more characters of the first label, never a dot', () => {
     const allowed = parseWebOrigins('https://*--raven-player.netlify.app').origins
     expect(allowed).toHaveLength(1)
     expect(
