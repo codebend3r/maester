@@ -3,6 +3,7 @@ import { act, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { THEMES, parseTokens } from '@raven/ui'
 import { useTheme } from '@/stores/theme'
+import { Route, Routes, useLocation, useNavigationType } from 'react-router-dom'
 import { renderWithProviders } from '@/test/render'
 
 // Vite hands the page globals.scss as text; Bun cannot, so the tests give it
@@ -152,17 +153,41 @@ describe('DesignPage', () => {
     const contents = screen.getByRole('navigation', { name: 'On this page' })
     const links = within(contents).getAllByRole('link')
     expect(links.map((link) => [link.textContent, link.getAttribute('href')])).toEqual([
-      ['01Logo', '#logo'],
-      ['02Colour', '#colour'],
-      ['03Tokens', '#tokens'],
-      ['04Text', '#text'],
-      ['05Forms', '#forms'],
-      ['06Content', '#content'],
-      ['07Components', '#components'],
+      ['01Logo', '/#logo'],
+      ['02Colour', '/#colour'],
+      ['03Tokens', '/#tokens'],
+      ['04Text', '/#text'],
+      ['05Forms', '/#forms'],
+      ['06Content', '/#content'],
+      ['07Components', '/#components'],
     ])
     expect(screen.getByRole('heading', { level: 2, name: 'Components' })).toHaveTextContent(
       '07Components',
     )
+  })
+
+  it('scrolls to a section from the contents bar and replaces the address, not pushing one', async () => {
+    const scrolled = spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {})
+    const Where = () => {
+      const { hash } = useLocation()
+      return <output aria-label="Address">{`${hash} by ${useNavigationType()}`}</output>
+    }
+    renderWithProviders({
+      ui: (
+        <>
+          <DesignPage />
+          <Routes>
+            <Route path="*" element={<Where />} />
+          </Routes>
+        </>
+      ),
+      route: '/design',
+      behind: ['/'],
+    })
+    await userEvent.click(screen.getByRole('link', { name: 'Forms' }))
+    expect(screen.getByRole('status', { name: 'Address' })).toHaveTextContent('#forms by REPLACE')
+    expect(scrolled.mock.contexts[0]).toBe(document.getElementById('forms'))
+    scrolled.mockRestore()
   })
 
   it('shows every heading level and the common form controls', () => {

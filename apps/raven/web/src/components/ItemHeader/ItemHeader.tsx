@@ -2,7 +2,7 @@ import type { Rating, SlideshowMotion } from '@raven/core'
 import { Fragment, type ReactNode, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Icon } from '@raven/ui'
-import { BackButton } from '@/components/BackButton/BackButton'
+import { type BackFallback, BackButton } from '@/components/BackButton/BackButton'
 import { LogoImage } from '@/components/LogoImage/LogoImage'
 import { RatingChips } from '@/components/RatingChips/RatingChips'
 import { Bone } from '@/components/Skeleton/Skeleton'
@@ -206,7 +206,7 @@ export const ItemHeader = ({
   /** The title as art, shown in its place: a movie's logo. */
   logo?: string | null
   /** Where the page goes back to, over the backdrop's top corner. */
-  back: { to: string; label: string }
+  back: BackFallback
   /** A line of how far through the item the viewer is, where the page has one. */
   progress?: HeaderProgress
   /** The page's own actions: Play, favourite, Watched, Select. */

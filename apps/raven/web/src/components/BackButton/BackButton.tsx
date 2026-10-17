@@ -2,6 +2,12 @@ import { Button, ButtonLink, useCanGoBack } from '@raven/ui'
 import { useNavigate } from 'react-router-dom'
 import styles from '@/components/BackButton/BackButton.module.scss'
 
+/** Where a page goes back to when nothing of the app is behind it, and what it is called. */
+export type BackFallback = { to: string; label: string }
+
+/** The way back for a page that hangs off the home page. */
+export const HOME = { to: '/', label: 'Home' } as const satisfies BackFallback
+
 /**
  * A step back through the app's own history, as the browser's Back would, so
  * the page behind comes back scrolled where it was. A page opened straight
@@ -12,7 +18,7 @@ export const BackButton = ({
   fallback,
   className,
 }: {
-  fallback: { to: string; label: string } | null
+  fallback: BackFallback | null
   className?: string
 }) => {
   const navigate = useNavigate()

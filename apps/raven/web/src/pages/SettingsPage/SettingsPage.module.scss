@@ -352,6 +352,7 @@
   .header {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
+      'back'
       'title'
       'reset';
     justify-items: start;

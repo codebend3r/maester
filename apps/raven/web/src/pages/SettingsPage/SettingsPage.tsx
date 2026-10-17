@@ -12,7 +12,7 @@ import {
 import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { Button, Icon, type IconName, usePlayerPrefs } from '@raven/ui'
-import { BackButton } from '@/components/BackButton/BackButton'
+import { BackButton, HOME } from '@/components/BackButton/BackButton'
 import { Bone, Loading } from '@/components/Skeleton/Skeleton'
 import { useCanManage } from '@/lib/adminLock'
 import { api } from '@/lib/api'
@@ -499,7 +499,7 @@ export const SettingsPage = () => {
   return (
     <section className={styles.page} aria-labelledby={titleId}>
       <header className={styles.header}>
-        <BackButton fallback={{ to: '/', label: 'Home' }} className={styles.back} />
+        <BackButton fallback={HOME} className={styles.back} />
         <h1 id={titleId} className={styles.title}>
           Settings
         </h1>

@@ -3,7 +3,7 @@ import { type Library, isScanning } from '@raven/core'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
-import { BackButton } from '@/components/BackButton/BackButton'
+import { BackButton, HOME } from '@/components/BackButton/BackButton'
 import { Button } from '@raven/ui'
 import { LibraryActions, useLibraryActions } from '@/components/LibraryActions/LibraryActions'
 import { LibraryDialog } from '@/components/LibraryDialog/LibraryDialog'
@@ -23,8 +23,6 @@ import { mutationKeys } from '@/lib/queryClient'
 import styles from '@/pages/LibrariesPage/LibrariesPage.module.scss'
 
 const count = new Intl.NumberFormat()
-
-const HOME = { to: '/', label: 'Home' }
 
 /** How many libraries there are and how many videos they hold between them. */
 const summaryOf = (libraries: readonly Library[]): string =>
@@ -170,10 +168,12 @@ export const LibrariesPage = () => {
   if (libraries.isError) {
     return (
       <section className={styles.empty}>
-        <BackButton fallback={HOME} />
-        <h1 className={styles.emptyTitle}>The server did not answer</h1>
-        <p role="alert">{libraries.error.message}</p>
-        <Button onClick={() => libraries.refetch()}>Try again</Button>
+        <BackButton fallback={HOME} className={styles.back} />
+        <div className={styles.emptyBody}>
+          <h1 className={styles.emptyTitle}>The server did not answer</h1>
+          <p role="alert">{libraries.error.message}</p>
+          <Button onClick={() => libraries.refetch()}>Try again</Button>
+        </div>
       </section>
     )
   }
@@ -181,20 +181,22 @@ export const LibrariesPage = () => {
   if (libraries.data?.length === 0) {
     return (
       <section className={styles.empty}>
-        <BackButton fallback={HOME} />
-        <h1 className={styles.emptyTitle}>Point raven at your videos</h1>
-        <p>
-          A library is a set of folders. Pick the ones that hold your movies or shows, and every
-          video inside is indexed, given a thumbnail, and ready to play.
-        </p>
-        {canManage ? (
-          <Button tone="primary" icon="plus" onClick={() => setAdding(true)}>
-            Add library
-          </Button>
-        ) : (
-          <p>Turn the admin lock off in Settings to add one.</p>
-        )}
-        {dialog}
+        <BackButton fallback={HOME} className={styles.back} />
+        <div className={styles.emptyBody}>
+          <h1 className={styles.emptyTitle}>Point raven at your videos</h1>
+          <p>
+            A library is a set of folders. Pick the ones that hold your movies or shows, and every
+            video inside is indexed, given a thumbnail, and ready to play.
+          </p>
+          {canManage ? (
+            <Button tone="primary" icon="plus" onClick={() => setAdding(true)}>
+              Add library
+            </Button>
+          ) : (
+            <p>Turn the admin lock off in Settings to add one.</p>
+          )}
+          {dialog}
+        </div>
       </section>
     )
   }

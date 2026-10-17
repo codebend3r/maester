@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { screen } from '@testing-library/react'
+import { cleanup, screen } from '@testing-library/react'
 import { RouteState } from '@/components/RouteState/RouteState'
 import { renderWithProviders } from '@/test/render'
 
@@ -17,6 +17,18 @@ describe('RouteState', () => {
     const alert = screen.getByRole('alert')
     expect(alert).toHaveTextContent('The server did not answer')
     expect(alert.querySelector('svg')?.dataset.icon).toBe('alert')
+  })
+
+  it('offers a way back above the failure where the app has been browsed, and none on a first visit', () => {
+    const failed = (
+      <RouteState state={{ state: 'error', message: 'Down' }} noun="page" shape={null} />
+    )
+    renderWithProviders({ ui: failed, route: '/people/7', behind: ['/'] })
+    expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument()
+    cleanup()
+    renderWithProviders({ ui: failed, route: '/people/7' })
+    expect(screen.queryByRole('button', { name: 'Back' })).toBeNull()
+    expect(screen.queryAllByRole('link')).toEqual([])
   })
 
   it('stands in for the page in grey while it is read, naming it to a screen reader', () => {

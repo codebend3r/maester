@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { ITEM_TYPES, type MediaItem, type PosterEntry } from '@raven/core'
 import { useId } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { BackButton } from '@/components/BackButton/BackButton'
+import { BackButton, HOME } from '@/components/BackButton/BackButton'
 import { PosterCard } from '@/components/PosterCard/PosterCard'
 import { Loading, SkeletonCards } from '@/components/Skeleton/Skeleton'
 import { plural } from '@/lib/plural'
@@ -57,7 +57,7 @@ export const FavouritesPage = () => {
 
   return (
     <section className={styles.page} aria-labelledby={id}>
-      <BackButton fallback={{ to: '/', label: 'Home' }} />
+      <BackButton fallback={HOME} />
       <header className={styles.header}>
         <h1 id={id}>Favourites</h1>
         {favourites.isSuccess && (

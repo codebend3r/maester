@@ -2,12 +2,12 @@ import { afterEach, describe, expect, it } from 'bun:test'
 import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes, useLocation } from 'react-router-dom'
-import { BackButton } from '@/components/BackButton/BackButton'
+import { type BackFallback, BackButton } from '@/components/BackButton/BackButton'
 import { renderWithProviders } from '@/test/render'
 
 const Probe = () => <p>{`at ${useLocation().pathname}`}</p>
 
-const app = (fallback: { to: string; label: string } | null) => (
+const app = (fallback: BackFallback | null) => (
   <Routes>
     <Route path="movies/3" element={<Probe />} />
     <Route path="people/7" element={<BackButton fallback={fallback} />} />
