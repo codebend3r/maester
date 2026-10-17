@@ -72,6 +72,25 @@ export const isServerView = object({ serverId: isOpaqueId, origin: isString, nam
 
 export type ServerView = Infer<typeof isServerView>
 
+export const isDownloadKind = oneOf(['movie', 'episode', 'season', 'show', 'saga'])
+
+export type DownloadKind = Infer<typeof isDownloadKind>
+
+/** Where a download sits in its group: `order` is the play order, a season times 10000 plus the episode, or a saga's index. */
+export const isDownloadGroup = object({ kind: isDownloadKind, title: isString, order: isNumber })
+
+export type DownloadGroup = Infer<typeof isDownloadGroup>
+
+export const isDownloadStatus = union(
+  object({ kind: oneOf(['queued']) }),
+  object({ kind: oneOf(['downloading']), bytes: isNumber }),
+  object({ kind: oneOf(['paused']), bytes: isNumber, message: nullable(isString) }),
+  object({ kind: oneOf(['failed']), bytes: isNumber, message: isString }),
+  object({ kind: oneOf(['ready']) }),
+)
+
+export type DownloadStatus = Infer<typeof isDownloadStatus>
+
 /** An audio track's index as a pick names it: a whole number, 0 or more. */
 export const isTrackIndex = (value: unknown): value is number =>
   isNumber(value) && Number.isInteger(value) && value >= 0
