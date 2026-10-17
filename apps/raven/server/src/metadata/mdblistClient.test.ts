@@ -48,6 +48,34 @@ describe('parseMdblistRatings', () => {
     ).toEqual([{ source: 'metacritic', value: 6, votes: null }])
   })
 
+  it('drops a score outside 0 to 100', () => {
+    expect(
+      parseMdblistRatings({
+        ratings: [
+          { source: 'imdb', score: 101 },
+          { source: 'tomatoes', score: -1 },
+          { source: 'metacritic', score: 100 },
+          { source: 'imdb', score: 0 },
+        ],
+      }),
+    ).toEqual([
+      { source: 'metacritic', value: 10, votes: null },
+      { source: 'imdb', value: 0, votes: null },
+    ])
+  })
+
+  it('does not take a source name from the object prototype', () => {
+    expect(
+      parseMdblistRatings({
+        ratings: [
+          { source: 'constructor', score: 50 },
+          { source: 'toString', score: 50 },
+          { source: '__proto__', score: 50 },
+        ],
+      }),
+    ).toEqual([])
+  })
+
   it('reads nothing from an answer without ratings', () => {
     expect(parseMdblistRatings({})).toEqual([])
     expect(parseMdblistRatings({ ratings: 'none' })).toEqual([])
@@ -122,6 +150,22 @@ describe('MdblistClient', () => {
     expect(tmdb.state.mdblistCalls).toBe(1)
   })
 
+  it('keeps the key out of what it throws and reports', async () => {
+    const key = 'mdb-secret-key-8f3a91'
+    const tmdb = fakeTmdb({ movies: [] })
+    const refused = new MdblistClient(config({ key }), tmdb.fetch)
+    const refusal = await refused.lookUp(show).catch((error: unknown) => error)
+    expect(refusal).toBeInstanceOf(Error)
+    expect(String(refusal)).not.toContain(key)
+    expect(refused.state()).toBe('failing')
+
+    tmdb.state.down = true
+    const unreachable = new MdblistClient(config({ key }), tmdb.fetch)
+    const failure = await unreachable.lookUp(show).catch((error: unknown) => error)
+    expect(String(failure)).toContain('could not be reached')
+    expect(String(failure)).not.toContain(key)
+  })
+
   it('spends the day when MDBList says its limit is exceeded, until midnight UTC', async () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date('2026-10-11T20:00:00Z'))
@@ -140,6 +184,25 @@ describe('MdblistClient', () => {
     await expect(client.lookUp(show)).resolves.toEqual([{ source: 'imdb', value: 8, votes: null }])
     expect(client.remaining()).toBe(999)
     expect(client.state()).toBe('ok')
+  })
+
+  it('waits a second for a 429 that names no Retry-After', async () => {
+    vi.useFakeTimers()
+    const answers = [
+      new Response(JSON.stringify({ error: 'API rate limit exceeded!' }), { status: 429 }),
+      new Response(JSON.stringify({ ratings: [{ source: 'imdb', score: 70 }] })),
+    ]
+    const calls: string[] = []
+    const fetch: MetadataFetch = async ({ url }) => {
+      calls.push(url)
+      return answers.shift() ?? new Response(null, { status: 500 })
+    }
+    const result = new MdblistClient(config(), fetch).lookUp(show)
+    await vi.advanceTimersByTimeAsync(999)
+    expect(calls).toHaveLength(1)
+    await vi.advanceTimersByTimeAsync(500)
+    await expect(result).resolves.toEqual([{ source: 'imdb', value: 7, votes: null }])
+    expect(calls).toHaveLength(2)
   })
 
   it('waits out a burst 429 and asks again', async () => {

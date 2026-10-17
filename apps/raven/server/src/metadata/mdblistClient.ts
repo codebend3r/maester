@@ -23,7 +23,7 @@ const RETRIES = 3
 const DAILY_LIMIT_ERROR = 'Daily API limit exceeded!'
 
 // The URL, a rating's fields and how an unknown title answers are unconfirmed
-// until checked with a key; they live in the next three helpers alone.
+// until checked with a key; they live in the next four helpers alone.
 
 const mdblistUrl = ({
   type,
@@ -40,19 +40,23 @@ const mdblistUrl = ({
 const ratingsIn = (body: unknown): unknown[] | null =>
   isRecord(body) && Array.isArray(body.ratings) ? body.ratings : null
 
+/** Whether an answer says MDBList has nothing on the title: a 404, or no `ratings`. */
+const isUnknownTitle = ({ status, body }: { status: number; body: unknown }): boolean =>
+  status === 404 || ratingsIn(body) == null
+
 /** MDBList's names for each source we keep. Its `score` is 0 to 100 whatever the source counts in. */
-const SOURCES: Record<string, ExternalScore['source']> = {
-  imdb: 'imdb',
-  tomatoes: 'rottenTomatoes',
-  metacritic: 'metacritic',
-}
+const SOURCES = new Map<string, ExternalScore['source']>([
+  ['imdb', 'imdb'],
+  ['tomatoes', 'rottenTomatoes'],
+  ['metacritic', 'metacritic'],
+])
 
 /** The scores in an MDBList answer, each brought to a mark out of 10. */
 export const parseMdblistRatings = (body: unknown): ExternalScore[] =>
   (ratingsIn(body) ?? []).flatMap((entry): ExternalScore[] => {
     if (!isRecord(entry) || !isString(entry.source) || !isNumber(entry.score)) return []
-    const source = SOURCES[entry.source]
-    if (!source) return []
+    const source = SOURCES.get(entry.source)
+    if (source == null || entry.score < 0 || entry.score > 100) return []
     return [
       {
         source,
@@ -69,6 +73,8 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
 
 /** Seconds from a `Retry-After` header, capped so a strange answer cannot stall a pass for long. */
 const retryAfterMs = (header: string | null): number => {
+  // Number(null) and Number('') are 0, which would not wait at all.
+  if (header == null || header.trim() === '') return 1000
   const seconds = Number(header)
   return Number.isFinite(seconds) && seconds >= 0 ? Math.min(seconds, 30) * 1000 : 1000
 }
@@ -132,7 +138,6 @@ export class MdblistClient implements ScoreSource {
   }): Promise<ExternalScore[] | 'unknown'> {
     const key = this.config.mdblistApiKey
     if (key == null || !this.enabled()) throw new Error('MDBList is not available right now.')
-    this.usedToday()
     this.budget.used += 1
     const url = mdblistUrl({ type, tmdbId, key })
 
@@ -171,17 +176,15 @@ export class MdblistClient implements ScoreSource {
           return attempt(retriesLeft - 1)
         }
       }
-      if (response.status === 404) {
-        this.status.error = null
-        return 'unknown'
-      }
-      if (!response.ok) {
+      if (response.status !== 404 && !response.ok) {
         this.status.error = `MDBList answered ${response.status}.`
         throw new Error(this.status.error)
       }
       const body: unknown = await response.json().catch(() => null)
       this.status.error = null
-      return ratingsIn(body) == null ? 'unknown' : parseMdblistRatings(body)
+      return isUnknownTitle({ status: response.status, body })
+        ? 'unknown'
+        : parseMdblistRatings(body)
     }
 
     return attempt(RETRIES)
