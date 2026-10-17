@@ -1,0 +1,427 @@
+import { describe, expect, it } from 'bun:test'
+import {
+  DOWNLOADS_FILE,
+  EMPTY_DOWNLOADS,
+  NO_PENDING,
+  advance,
+  bytesOf,
+  clearPending,
+  entryById,
+  entryByMedia,
+  fail,
+  finish,
+  isDownloadEntry,
+  isDownloadsState,
+  noteWatched,
+  notePending,
+  pause,
+  pauseServer,
+  queue,
+  remove,
+  removeServer,
+  resume,
+  setAutoDelete,
+  setAutoDeleteDefault,
+  sortDownloads,
+  start,
+  type DownloadEntry,
+  type DownloadsState,
+} from '@/main/downloads/downloadState'
+
+const SERVER_A = '11111111-1111-4111-8111-111111111111'
+const SERVER_B = '22222222-2222-4222-8222-222222222222'
+const id = (n: number): string => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
+
+const entry = (overrides: Partial<DownloadEntry> = {}): DownloadEntry => ({
+  downloadId: id(1),
+  serverId: SERVER_A,
+  mediaId: 1,
+  label: 'The Two Towers',
+  group: { kind: 'movie', title: 'The Two Towers', order: 0 },
+  container: 'mkv',
+  size: 1000,
+  duration: 200,
+  watchedPercent: 90,
+  sidecars: [],
+  status: { kind: 'queued' },
+  autoDelete: false,
+  watchedAt: null,
+  pending: NO_PENDING,
+  createdAt: 100,
+  ...overrides,
+})
+
+const stateOf = (...entries: DownloadEntry[]): DownloadsState => ({ ...EMPTY_DOWNLOADS, entries })
+
+const ID = id(1)
+
+describe('the guards', () => {
+  it('names the file', () => {
+    expect(DOWNLOADS_FILE).toBe('downloads.json')
+  })
+
+  it('accepts the empty state and a full entry', () => {
+    expect(isDownloadsState(EMPTY_DOWNLOADS)).toBe(true)
+    const full = entry({
+      sidecars: [{ trackId: 'external-3', title: 'English', language: 'en' }],
+      status: { kind: 'paused', bytes: 10, message: null },
+      pending: { play: true, position: 12, at: 5 },
+    })
+    expect(isDownloadEntry(full)).toBe(true)
+    expect(isDownloadsState(stateOf(full))).toBe(true)
+  })
+
+  it('refuses a status kind it does not know', () => {
+    expect(isDownloadEntry({ ...entry(), status: { kind: 'stalled', bytes: 1 } })).toBe(false)
+    expect(isDownloadsState({ ...EMPTY_DOWNLOADS, version: 2 })).toBe(false)
+  })
+
+  it('refuses a download id that is not opaque', () => {
+    expect(isDownloadEntry(entry({ downloadId: 'one' }))).toBe(false)
+  })
+})
+
+describe('lookups', () => {
+  const state = stateOf(entry(), entry({ downloadId: id(2), serverId: SERVER_B, mediaId: 2 }))
+
+  it('finds by download id, or null', () => {
+    expect(entryById(state, { downloadId: id(2) })?.mediaId).toBe(2)
+    expect(entryById(state, { downloadId: id(9) })).toBeNull()
+  })
+
+  it('finds by server and media, or null', () => {
+    expect(entryByMedia(state, { serverId: SERVER_B, mediaId: 2 })?.downloadId).toBe(id(2))
+    expect(entryByMedia(state, { serverId: SERVER_A, mediaId: 2 })).toBeNull()
+  })
+})
+
+describe('queue', () => {
+  it('appends in order', () => {
+    const one = entry({ downloadId: id(1), mediaId: 1 })
+    const two = entry({ downloadId: id(2), mediaId: 2 })
+    expect(queue(EMPTY_DOWNLOADS, { entries: [one, two] }).entries).toEqual([one, two])
+  })
+
+  it('skips a server and media already there, and repeats inside the batch', () => {
+    const one = entry({ downloadId: id(1), mediaId: 1 })
+    const again = entry({ downloadId: id(2), mediaId: 1 })
+    const other = entry({ downloadId: id(3), mediaId: 1, serverId: SERVER_B })
+    const next = queue(stateOf(one), { entries: [again, other, { ...other, downloadId: id(4) }] })
+    expect(next.entries.map((each) => each.downloadId)).toEqual([id(1), id(3)])
+  })
+
+  it('returns the same state when nothing is new', () => {
+    const state = stateOf(entry())
+    expect(queue(state, { entries: [entry({ downloadId: id(2) })] })).toBe(state)
+    expect(queue(state, { entries: [] })).toBe(state)
+  })
+})
+
+describe('start', () => {
+  it.each([
+    ['queued', { kind: 'queued' as const }, 0],
+    ['paused', { kind: 'paused' as const, bytes: 40, message: 'offline' }, 40],
+    ['failed', { kind: 'failed' as const, bytes: 70, message: 'boom' }, 70],
+  ])('moves %s to downloading at its bytes', (_name, status, bytes) => {
+    const next = start(stateOf(entry({ status })), { downloadId: ID })
+    expect(next.entries[0]?.status).toEqual({ kind: 'downloading', bytes })
+  })
+
+  it.each([
+    ['ready', { kind: 'ready' as const }],
+    ['downloading', { kind: 'downloading' as const, bytes: 5 }],
+  ])('refuses %s with the same state', (_name, status) => {
+    const state = stateOf(entry({ status }))
+    expect(start(state, { downloadId: ID })).toBe(state)
+  })
+})
+
+describe('advance', () => {
+  it('moves the bytes of a downloading entry', () => {
+    const state = stateOf(entry({ status: { kind: 'downloading', bytes: 5 } }))
+    expect(advance(state, { downloadId: ID, bytes: 50 }).entries[0]?.status).toEqual({
+      kind: 'downloading',
+      bytes: 50,
+    })
+  })
+
+  it('refuses any other status with the same state', () => {
+    const state = stateOf(entry({ status: { kind: 'paused', bytes: 5, message: null } }))
+    expect(advance(state, { downloadId: ID, bytes: 50 })).toBe(state)
+  })
+})
+
+describe('pause', () => {
+  it('keeps the bytes and the message', () => {
+    const state = stateOf(entry({ status: { kind: 'downloading', bytes: 30 } }))
+    expect(pause(state, { downloadId: ID, message: 'Offline' }).entries[0]?.status).toEqual({
+      kind: 'paused',
+      bytes: 30,
+      message: 'Offline',
+    })
+  })
+
+  it('pauses a queued entry at zero bytes, with no message', () => {
+    expect(pause(stateOf(entry()), { downloadId: ID, message: null }).entries[0]?.status).toEqual({
+      kind: 'paused',
+      bytes: 0,
+      message: null,
+    })
+  })
+
+  it('refuses a ready entry with the same state', () => {
+    const state = stateOf(entry({ status: { kind: 'ready' } }))
+    expect(pause(state, { downloadId: ID, message: null })).toBe(state)
+  })
+})
+
+describe('pauseServer', () => {
+  it('pauses only that server queued and downloading entries', () => {
+    const state = stateOf(
+      entry({ downloadId: id(1), mediaId: 1, status: { kind: 'queued' } }),
+      entry({ downloadId: id(2), mediaId: 2, status: { kind: 'downloading', bytes: 9 } }),
+      entry({ downloadId: id(3), mediaId: 3, status: { kind: 'ready' } }),
+      entry({ downloadId: id(4), mediaId: 4, status: { kind: 'failed', bytes: 1, message: 'x' } }),
+      entry({ downloadId: id(5), mediaId: 5, serverId: SERVER_B }),
+    )
+    const next = pauseServer(state, { serverId: SERVER_A, message: 'Locked' })
+    expect(next.entries.map((each) => each.status)).toEqual([
+      { kind: 'paused', bytes: 0, message: 'Locked' },
+      { kind: 'paused', bytes: 9, message: 'Locked' },
+      { kind: 'ready' },
+      { kind: 'failed', bytes: 1, message: 'x' },
+      { kind: 'queued' },
+    ])
+  })
+
+  it('returns the same state when nothing is touched', () => {
+    const state = stateOf(entry({ status: { kind: 'ready' } }))
+    expect(pauseServer(state, { serverId: SERVER_A, message: null })).toBe(state)
+    expect(pauseServer(state, { serverId: SERVER_B, message: null })).toBe(state)
+  })
+})
+
+describe('resume', () => {
+  it.each([
+    ['paused', { kind: 'paused' as const, bytes: 3, message: null }],
+    ['failed', { kind: 'failed' as const, bytes: 3, message: 'x' }],
+  ])('makes %s queued', (_name, status) => {
+    expect(resume(stateOf(entry({ status })), { downloadId: ID }).entries[0]?.status).toEqual({
+      kind: 'queued',
+    })
+  })
+
+  it('refuses a downloading entry with the same state', () => {
+    const state = stateOf(entry({ status: { kind: 'downloading', bytes: 3 } }))
+    expect(resume(state, { downloadId: ID })).toBe(state)
+  })
+})
+
+describe('fail and finish', () => {
+  it('fail keeps the bytes and the message', () => {
+    const state = stateOf(entry({ status: { kind: 'downloading', bytes: 12 } }))
+    expect(fail(state, { downloadId: ID, message: 'disk full' }).entries[0]?.status).toEqual({
+      kind: 'failed',
+      bytes: 12,
+      message: 'disk full',
+    })
+  })
+
+  it('finish makes the entry ready', () => {
+    const state = stateOf(entry({ status: { kind: 'downloading', bytes: 1000 } }))
+    expect(finish(state, { downloadId: ID }).entries[0]?.status).toEqual({ kind: 'ready' })
+  })
+
+  it('a ready entry stays as it is', () => {
+    const state = stateOf(entry({ status: { kind: 'ready' } }))
+    expect(fail(state, { downloadId: ID, message: 'x' })).toBe(state)
+    expect(finish(state, { downloadId: ID })).toBe(state)
+  })
+})
+
+describe('remove and removeServer', () => {
+  const state = stateOf(
+    entry({ downloadId: id(1), mediaId: 1 }),
+    entry({ downloadId: id(2), mediaId: 2, serverId: SERVER_B }),
+  )
+
+  it('remove drops one entry', () => {
+    expect(remove(state, { downloadId: id(1) }).entries.map((each) => each.downloadId)).toEqual([
+      id(2),
+    ])
+  })
+
+  it('removeServer drops that server entries', () => {
+    expect(
+      removeServer(state, { serverId: SERVER_B }).entries.map((each) => each.downloadId),
+    ).toEqual([id(1)])
+  })
+
+  it('removeServer for a server with none returns the same state', () => {
+    expect(removeServer(state, { serverId: id(9) })).toBe(state)
+  })
+})
+
+describe('auto-delete', () => {
+  it('setAutoDelete sets one entry', () => {
+    const next = setAutoDelete(stateOf(entry()), { downloadId: ID, autoDelete: true })
+    expect(next.entries[0]?.autoDelete).toBe(true)
+  })
+
+  it('setAutoDelete to the same value returns the same state', () => {
+    const state = stateOf(entry())
+    expect(setAutoDelete(state, { downloadId: ID, autoDelete: false })).toBe(state)
+  })
+
+  it('setAutoDeleteDefault sets the default, and the same value changes nothing', () => {
+    const on = setAutoDeleteDefault(EMPTY_DOWNLOADS, { autoDelete: true })
+    expect(on.autoDeleteDefault).toBe(true)
+    expect(setAutoDeleteDefault(on, { autoDelete: true })).toBe(on)
+  })
+})
+
+describe('noteWatched', () => {
+  const watch = (state: DownloadsState, position: number, duration: number | null = 200) =>
+    noteWatched(state, { downloadId: ID, position, duration, at: 777 })
+
+  it('sets watchedAt once the position reaches the percent', () => {
+    expect(watch(stateOf(entry()), 180).entries[0]?.watchedAt).toBe(777)
+  })
+
+  it('does nothing before the percent', () => {
+    const state = stateOf(entry())
+    expect(watch(state, 179)).toBe(state)
+  })
+
+  it('keeps an earlier watchedAt', () => {
+    const state = stateOf(entry({ watchedAt: 5 }))
+    expect(watch(state, 200)).toBe(state)
+  })
+
+  it('uses the entry duration when the request has none', () => {
+    expect(watch(stateOf(entry({ duration: 100 })), 90, null).entries[0]?.watchedAt).toBe(777)
+  })
+
+  it('sets nothing when both durations are null', () => {
+    const state = stateOf(entry({ duration: null }))
+    expect(watch(state, 500, null)).toBe(state)
+  })
+
+  it('prefers the request duration over the entry one', () => {
+    const state = stateOf(entry({ duration: 100 }))
+    expect(watch(state, 90, 1000)).toBe(state)
+  })
+})
+
+describe('pending', () => {
+  it('notePending records what the server has not heard', () => {
+    const next = notePending(stateOf(entry()), {
+      downloadId: ID,
+      play: true,
+      position: 42,
+      at: 9,
+    })
+    expect(next.entries[0]?.pending).toEqual({ play: true, position: 42, at: 9 })
+  })
+
+  it('clearPending clears the play and the position it sent', () => {
+    const state = stateOf(entry({ pending: { play: true, position: 42, at: 9 } }))
+    const next = clearPending(state, { downloadId: ID, sentPosition: 42 })
+    expect(next.entries[0]?.pending).toEqual({ play: false, position: null, at: 9 })
+  })
+
+  it('clearPending keeps a newer position', () => {
+    const state = stateOf(entry({ pending: { play: true, position: 60, at: 12 } }))
+    const next = clearPending(state, { downloadId: ID, sentPosition: 42 })
+    expect(next.entries[0]?.pending).toEqual({ play: false, position: 60, at: 12 })
+  })
+
+  it('clearPending of nothing pending returns the same state', () => {
+    const state = stateOf(entry())
+    expect(clearPending(state, { downloadId: ID, sentPosition: null })).toBe(state)
+  })
+})
+
+describe('bytesOf', () => {
+  it('is the size when ready, else the status bytes, else 0', () => {
+    expect(bytesOf(entry({ status: { kind: 'ready' } }))).toBe(1000)
+    expect(bytesOf(entry({ status: { kind: 'downloading', bytes: 7 } }))).toBe(7)
+    expect(bytesOf(entry({ status: { kind: 'paused', bytes: 8, message: null } }))).toBe(8)
+    expect(bytesOf(entry({ status: { kind: 'failed', bytes: 9, message: 'x' } }))).toBe(9)
+    expect(bytesOf(entry({ status: { kind: 'queued' } }))).toBe(0)
+  })
+})
+
+describe('sortDownloads', () => {
+  const row = (n: number, title: string, order: number, createdAt: number): DownloadEntry =>
+    entry({
+      downloadId: id(n),
+      mediaId: n,
+      group: { kind: 'season', title, order },
+      createdAt,
+    })
+
+  it('puts the newest first when no row is grouped', () => {
+    const rows = [row(1, 'A', 0, 10), row(2, 'B', 0, 30), row(3, 'C', 0, 20)]
+    expect(sortDownloads(rows).map((each) => each.mediaId)).toEqual([2, 3, 1])
+  })
+
+  it('keeps a group together in order, under its newest row, newest group first', () => {
+    const rows = [
+      row(1, 'Show', 2, 50),
+      row(2, 'Movie', 0, 40),
+      row(3, 'Show', 1, 10),
+      row(4, 'Other', 0, 60),
+      row(5, 'Show', 3, 20),
+    ]
+    expect(sortDownloads(rows).map((each) => each.mediaId)).toEqual([4, 3, 1, 5, 2])
+  })
+
+  it('groups only within a server', () => {
+    const rows = [
+      row(1, 'Show', 1, 10),
+      entry({
+        downloadId: id(2),
+        mediaId: 2,
+        serverId: SERVER_B,
+        group: { kind: 'season', title: 'Show', order: 0 },
+        createdAt: 30,
+      }),
+      row(3, 'Show', 2, 20),
+    ]
+    expect(sortDownloads(rows).map((each) => each.mediaId)).toEqual([2, 1, 3])
+  })
+
+  it('does not change its input', () => {
+    const rows = [row(1, 'A', 0, 10), row(2, 'B', 0, 30)]
+    sortDownloads(rows)
+    expect(rows.map((each) => each.mediaId)).toEqual([1, 2])
+  })
+})
+
+describe('an unknown download id', () => {
+  const state = stateOf(entry())
+  const unknown = id(9)
+
+  it.each([
+    ['start', () => start(state, { downloadId: unknown })],
+    ['advance', () => advance(state, { downloadId: unknown, bytes: 1 })],
+    ['pause', () => pause(state, { downloadId: unknown, message: null })],
+    ['resume', () => resume(state, { downloadId: unknown })],
+    ['fail', () => fail(state, { downloadId: unknown, message: 'x' })],
+    ['finish', () => finish(state, { downloadId: unknown })],
+    ['remove', () => remove(state, { downloadId: unknown })],
+    ['setAutoDelete', () => setAutoDelete(state, { downloadId: unknown, autoDelete: true })],
+    [
+      'noteWatched',
+      () => noteWatched(state, { downloadId: unknown, position: 1, duration: 1, at: 1 }),
+    ],
+    [
+      'notePending',
+      () => notePending(state, { downloadId: unknown, play: true, position: 1, at: 1 }),
+    ],
+    ['clearPending', () => clearPending(state, { downloadId: unknown, sentPosition: null })],
+  ])('%s returns the same state', (_name, run) => {
+    expect(run()).toBe(state)
+  })
+})

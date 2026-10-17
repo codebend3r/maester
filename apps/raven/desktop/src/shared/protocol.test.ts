@@ -11,6 +11,9 @@ import {
   isDesktopEvent,
   isDesktopReply,
   isDesktopRequest,
+  isDownloadGroup,
+  isDownloadKind,
+  isDownloadStatus,
   isInvokeEnvelope,
   isLocalFile,
   isMenuPlayerAction,
@@ -421,5 +424,34 @@ describe('isPlayerPortMessage', () => {
     expect(isPlayerConnection({ status: 'native' })).toBe(true)
     expect(isPlayerConnection({ status: 'unavailable', message: 'x' })).toBe(true)
     expect(isPlayerConnection({ status: 'unavailable' })).toBe(false)
+  })
+})
+
+describe('the download guards', () => {
+  it('accepts every kind and refuses an unknown one', () => {
+    ;['movie', 'episode', 'season', 'show', 'saga'].forEach((kind) => {
+      expect(isDownloadKind(kind)).toBe(true)
+    })
+    expect(isDownloadKind('album')).toBe(false)
+  })
+
+  it('accepts a group and refuses one of an unknown kind', () => {
+    expect(isDownloadGroup({ kind: 'season', title: 'Severance', order: 20004 })).toBe(true)
+    expect(isDownloadGroup({ kind: 'album', title: 'Severance', order: 1 })).toBe(false)
+    expect(isDownloadGroup({ kind: 'season', title: 'Severance' })).toBe(false)
+  })
+
+  it('accepts each status and refuses an unknown kind', () => {
+    ;[
+      { kind: 'queued' },
+      { kind: 'downloading', bytes: 5 },
+      { kind: 'paused', bytes: 5, message: null },
+      { kind: 'failed', bytes: 5, message: 'disk full' },
+      { kind: 'ready' },
+    ].forEach((status) => {
+      expect(isDownloadStatus(status)).toBe(true)
+    })
+    expect(isDownloadStatus({ kind: 'stalled', bytes: 5 })).toBe(false)
+    expect(isDownloadStatus({ kind: 'failed', bytes: 5 })).toBe(false)
   })
 })
