@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import type { ApiClient } from '@raven/core'
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createApp } from '@/app'
 import type { ServerConfig } from '@/config'
 import { DatabaseService } from '@/db/database'
@@ -130,6 +130,14 @@ const refreshServer = ({
         .get(DatabaseService)
         .db.prepare<[], { requests: number }>('SELECT COUNT(*) AS requests FROM score_requests')
         .get()?.requests ?? 0,
+    /** The movies the server's one library holds, which a Refresh asks for. */
+    titles: (): number =>
+      app()
+        .get(DatabaseService)
+        .db.prepare<[], { titles: number }>(
+          "SELECT COUNT(*) AS titles FROM items WHERE type = 'movie'",
+        )
+        .get()?.titles ?? 0,
   }
 }
 
@@ -172,6 +180,10 @@ describe('a library Refresh', () => {
 
   beforeAll(server.open)
 
+  afterEach(() => {
+    holding.isMdblistDown = false
+  })
+
   afterAll(async () => {
     holding.mdblist?.gate.open()
     await server.close()
@@ -183,12 +195,13 @@ describe('a library Refresh', () => {
     tmdb.state.mdblist = { ...tmdb.state.mdblist, 'movie:949': { rottenTomatoes: 90 } }
     tmdb.state.movies = tmdb.state.movies.with(0, { ...HEAT, voteAverage: 7.5 })
     await copyFile(server.at('Heat (1995).mp4'), server.at('Ronin (1998).mp4'))
+    const titles = server.titles()
 
     const refreshed = await refresh()
     expect(refreshed.ratingsRefresh).toEqual({
       state: 'running',
       done: 0,
-      total: 2,
+      total: titles,
       startedAt: expect.any(String),
     })
 
@@ -213,7 +226,11 @@ describe('a library Refresh', () => {
 
     const second = await refresh()
 
-    expect(first.ratingsRefresh).toMatchObject({ state: 'running', done: 0, total: 3 })
+    expect(first.ratingsRefresh).toMatchObject({
+      state: 'running',
+      done: 0,
+      total: server.titles(),
+    })
     expect(second.ratingsRefresh).toEqual(first.ratingsRefresh)
     mdblist.letGo()
     await server.settle()
@@ -223,23 +240,27 @@ describe('a library Refresh', () => {
   it('waits for MDBList while it is down, saying when it asks again', async () => {
     holding.isMdblistDown = true
 
+    const titles = server.titles()
+
     const refreshed = await refresh()
-    expect(refreshed.ratingsRefresh).toMatchObject({ state: 'running', done: 0, total: 3 })
+    expect(refreshed.ratingsRefresh).toMatchObject({ state: 'running', done: 0, total: titles })
     await server.settle()
 
     const { ratingsRefresh } = await library()
     if (ratingsRefresh.state !== 'waiting')
       throw new Error(`The Refresh is ${ratingsRefresh.state}`)
-    expect(ratingsRefresh).toMatchObject({ done: 0, total: 3, reason: 'unavailable' })
+    expect(ratingsRefresh).toMatchObject({ done: 0, total: titles, reason: 'unavailable' })
     const wait = Date.parse(ratingsRefresh.resumesAt) - Date.now()
     expect(wait).toBeGreaterThan(14 * 60_000)
     expect(wait).toBeLessThanOrEqual(15 * 60_000)
   })
 
   it('drops what it asked for with the library', async () => {
-    // MDBList is still down, so the Refresh still waits on every title.
+    // With MDBList down, the Refresh waits on every title.
+    holding.isMdblistDown = true
     await refresh()
-    expect(server.requests()).toBe(3)
+    expect(server.titles()).toBeGreaterThanOrEqual(2)
+    expect(server.requests()).toBe(server.titles())
 
     await server.api().deleteLibrary(server.state.libraryId)
 
@@ -274,12 +295,13 @@ describe("a Refresh past MDBList's daily limit", () => {
   )
   beforeAll(server.open)
 
-  afterAll(async () => {
+  afterEach(() => {
     vi.useRealTimers()
-    await server.close()
   })
 
-  it('does two titles a day, and leaves the third, which OMDb answered, to MDBList after midnight UTC', async () => {
+  afterAll(server.close)
+
+  it('does two titles a day, keeps its progress through a restart, and finishes the third after midnight UTC', async () => {
     vi.setSystemTime(NEXT_NOON)
     const calls = { mdblist: tmdb.state.mdblistCalls, omdb: tmdb.state.omdbCalls }
 
@@ -291,10 +313,12 @@ describe("a Refresh past MDBList's daily limit", () => {
       startedAt: NEXT_NOON.toISOString(),
     })
 
+    // MDBList answers two titles, and OMDb the third without settling it.
     await server.settle()
     expect(tmdb.state.mdblistCalls - calls.mdblist).toBe(2)
     expect(tmdb.state.omdbCalls - calls.omdb).toBe(1)
-    expect((await library()).ratingsRefresh).toEqual({
+    const waiting = (await library()).ratingsRefresh
+    expect(waiting).toEqual({
       state: 'waiting',
       done: 2,
       total: 3,
@@ -302,27 +326,18 @@ describe("a Refresh past MDBList's daily limit", () => {
       reason: 'budget',
       resumesAt: MIDNIGHT.toISOString(),
     })
-  })
 
-  it('keeps its count and what is done through a restart', async () => {
-    const before = (await library()).ratingsRefresh
     // A new client counts no calls yet today; MDBList's own answer says the day is spent.
     tmdb.state.mdblistSpent = true
-
     await server.restart()
     await server.settle()
+    expect((await library()).ratingsRefresh).toEqual(waiting)
 
-    expect((await library()).ratingsRefresh).toEqual(before)
-  })
-
-  it('finishes once MDBList answers for the last title after midnight UTC', async () => {
     tmdb.state.mdblistSpent = false
     const afterMidnight = new Date(MIDNIGHT.getTime() + 60_000)
     vi.setSystemTime(afterMidnight)
-
     server.app().get(ScoreSweep).kick()
     await server.settle()
-
     expect((await library()).ratingsRefresh).toEqual({
       state: 'idle',
       finishedAt: afterMidnight.toISOString(),
