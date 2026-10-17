@@ -48,6 +48,10 @@ export const fakeDisk = (seed: Record<string, number> = {}) => {
   const dirs = new Set<string>(Object.keys(seed).map(parentOf))
   const removed: string[] = []
   const appendError: { value: unknown } = { value: undefined }
+  /** Folders whose making fails. */
+  const unmakeable = new Set<string>()
+  /** What a listing waits on before it answers, so a test can hold one. */
+  const listing: { hold: Promise<void> } = { hold: Promise.resolve() }
 
   const sizeOf = (path: string): number =>
     (files.get(path) ?? []).reduce((sum, chunk) => sum + chunk.length, 0)
@@ -70,6 +74,7 @@ export const fakeDisk = (seed: Record<string, number> = {}) => {
 
   const fs: QueueFs = {
     mkdir: async (path) => {
+      if (unmakeable.has(path)) throw fsError({ code: 'EACCES', syscall: 'mkdir' })
       dirs.add(path)
     },
     rename: async (from, to) => {
@@ -89,6 +94,7 @@ export const fakeDisk = (seed: Record<string, number> = {}) => {
       goneDirs.forEach((key) => dirs.delete(key))
     },
     readdir: async (dir) => {
+      await listing.hold
       const names = [...files.keys(), ...texts.keys(), ...dirs]
         .filter((path) => path.startsWith(`${dir}/`))
         .map((path) => path.slice(dir.length + 1).split('/')[0] ?? '')
@@ -105,9 +111,10 @@ export const fakeDisk = (seed: Record<string, number> = {}) => {
       needsFolder(path)
       texts.set(path, text)
     },
+    size: async (path) => sizeOf(path),
   }
 
-  return { fs, files, texts, dirs, removed, appendError, sizeOf }
+  return { fs, files, texts, dirs, removed, appendError, unmakeable, listing, sizeOf }
 }
 
 export type Answer = {

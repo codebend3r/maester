@@ -113,6 +113,7 @@ import {
 import {
   createJsonStore,
   createStateStore,
+  isMissingFile,
   loadState,
   type StateFs,
   type StateStore,
@@ -547,12 +548,21 @@ const startApp = (): void => {
         readdir: (path) => readdir(path),
         openPart,
         writeFile: (path, text) => writeFile(path, text, 'utf8'),
+        size: (path) =>
+          stat(path).then(
+            ({ size }) => size,
+            (error: unknown) => {
+              if (isMissingFile(error)) return 0
+              throw error
+            },
+          ),
       },
       showItemInFolder: (path) => shell.showItemInFolder(path),
       ready: app.whenReady(),
     })
-    // Before the quit gate's own `before-quit`, so every fetch has let go of its part before
-    // the stores flush; what was downloading stays so for the next launch.
+    // Before the quit gate's own `before-quit`, so every fetch is aborted before the stores
+    // flush; what was downloading stays so for the next launch. The runs let go
+    // asynchronously, and a late `advance` from one is written by the gate's second flush.
     app.once('before-quit', () => downloads.dispose())
 
     const trust = withTrustLog({

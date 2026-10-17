@@ -132,6 +132,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     // The queue's changes go through `change` too, so its progress reaches the page.
     store: { ...store, update: change },
     serverOf: (serverId) => serverById({ config: config.read(), serverId }),
+    servers: () => config.read().servers,
     access: deps.access,
     fetchFor: deps.fetchFor,
     calls: deps.calls,

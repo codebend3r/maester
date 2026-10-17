@@ -271,6 +271,7 @@ describe('constants', () => {
       'Vhagar answered 401',
     )
     expect(DOWNLOAD_MESSAGES.relocked('Vhagar')).toBe('Vhagar locked this library again')
+    expect(DOWNLOAD_MESSAGES.unreachable('Vhagar')).toBe('Vhagar could not be reached')
     expect(DOWNLOAD_MESSAGES.downloaded('Dune')).toBe('Downloaded Dune')
     expect(DOWNLOAD_MESSAGES.failed({ label: 'Dune', why: 'Not enough space' })).toBe(
       'Could not download Dune: Not enough space',
