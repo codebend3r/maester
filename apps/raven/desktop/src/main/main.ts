@@ -468,10 +468,11 @@ const startApp = (): void => {
       warn,
     })
     const downloadsFile = join(userData, DOWNLOADS_FILE)
+    const loadedDownloads = await loadDownloads({ fs: stateFs, file: downloadsFile, now: Date.now })
     const downloadsStore = createJsonStore({
       fs: stateFs,
       file: downloadsFile,
-      initial: await loadDownloads({ fs: stateFs, file: downloadsFile, now: Date.now }),
+      initial: loadedDownloads.state,
       timers,
       debounceMs: DOWNLOADS_DEBOUNCE_MS,
       onError: (error) => {
@@ -545,6 +546,7 @@ const startApp = (): void => {
       },
       showItemInFolder: (path) => shell.showItemInFolder(path),
       ready: app.whenReady(),
+      wasSetAside: loadedDownloads.wasSetAside,
     })
     // Before the quit gate's own `before-quit`, so every fetch is aborted before the stores
     // flush; what was downloading stays so for the next launch. The runs let go

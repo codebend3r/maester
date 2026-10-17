@@ -59,6 +59,12 @@ import { isOpaqueId, SERVER_GONE } from '@/shared/protocol'
 
 export const DOWNLOAD_CONCURRENCY = 2
 
+/** The soonest a ticket is renewed, so one already close to lapsing is not read again at once. */
+export const RENEWAL_MIN_MS = 60_000
+
+/** Node runs a longer delay at once, so no timer is ever armed for more. */
+const TIMER_MAX_MS = 2 ** 31 - 1
+
 const NOT_FOUND_STATUS = 404
 
 /** The parts of `node:fs/promises` the queue uses; main passes a recursive `mkdir` and a forced, recursive `rm`. */
@@ -106,8 +112,11 @@ export type DownloadQueue = {
   removeServer: (input: { serverId: string }) => Promise<void>
   /** Aborts every file, drops them all and removes the whole downloads folder. */
   removeAll: () => Promise<void>
-  /** At launch: drops the files of servers no longer kept and removes the folders no file names. Never rejects. */
-  sweep: () => Promise<void>
+  /**
+   * At launch: drops the files of servers no longer kept and removes the folders no file
+   * names, but no media folder when `downloads.json` was set aside. Never rejects.
+   */
+  sweep: (input: { wasSetAside: boolean }) => Promise<void>
   /** Aborts every fetch; the entries stay as they are for the next launch. */
   dispose: () => void
 }
@@ -269,6 +278,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
         failUnreachable({ job, message: outcome.message })
         return null
       case 'unreadable':
+      case 'gone':
         failEntry({ entry, message: outcome.message })
         return null
       default: {
@@ -288,7 +298,8 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
   }): unknown => {
     if (access.kind !== 'origin') return undefined
     const ms = access.expiresAt - MEDIA_TICKET_REFRESH_SECONDS * 1000 - deps.now()
-    return ms > 0 ? timers.set(() => refresh.abort(stopping('refresh')), ms) : undefined
+    const delay = Math.min(Math.max(ms, RENEWAL_MIN_MS), TIMER_MAX_MS)
+    return timers.set(() => refresh.abort(stopping('refresh')), delay)
   }
 
   const fetchOnce = async ({
@@ -349,6 +360,12 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
       case 'unauthorized':
       case 'status': {
         const status = outcome.status ?? 0
+        // A proxy in front of a restarting server answers 502 to 504: an outage, not a refusal.
+        if (status >= 500) {
+          deps.access.forget(server.id)
+          failUnreachable({ job, message: CALL_MESSAGES.unreachable(server.name) })
+          return
+        }
         failEntry({
           entry,
           message:
@@ -635,7 +652,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
       return []
     })
 
-  const sweepFolders = async (): Promise<void> => {
+  const sweepFolders = async ({ wasSetAside }: { wasSetAside: boolean }): Promise<void> => {
     const kept = deps.servers().map(({ id }) => id)
     // An unreadable config loads empty and is set aside; its servers' downloads must outlive that.
     const canDropServers = kept.length > 0
@@ -657,10 +674,14 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
       store
         .read()
         .entries.some((entry) => entry.serverId === serverId && String(entry.mediaId) === name)
+    if (wasSetAside) {
+      deps.warn('raven player kept every download folder: its list of downloads was set aside')
+    }
+    // A set-aside list names nothing, so every folder would look unnamed; they wait for a later launch.
     const unnamed = (
       await Promise.all(
         servers
-          .filter(isKept)
+          .filter((serverId) => !wasSetAside && isKept(serverId))
           .map(async (serverId) =>
             (await namesIn(join(root, serverId)))
               .filter((name) => isMediaFolder(name) && !isNamed({ serverId, name }))
@@ -699,8 +720,8 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     remove: removeOne,
     removeServer: removeServerAll,
     removeAll: removeEverything,
-    sweep: () => {
-      const sweeping = sweepFolders()
+    sweep: (input) => {
+      const sweeping = sweepFolders(input)
         .catch((error: unknown) => {
           deps.warn(`raven player could not sweep its downloads: ${loggable(errorText(error))}`)
         })

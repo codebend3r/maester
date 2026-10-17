@@ -93,6 +93,15 @@ describe('the guards', () => {
   it('refuses a download id that is not opaque', () => {
     expect(isDownloadEntry(entry({ downloadId: 'one' }))).toBe(false)
   })
+
+  it('takes a size only as a whole number of bytes above 0', () => {
+    expect(isDownloadEntry(entry({ size: 1 }))).toBe(true)
+    expect(isDownloadEntry(entry({ size: Number.MAX_SAFE_INTEGER }))).toBe(true)
+    expect(isDownloadEntry(entry({ size: -1 }))).toBe(false)
+    expect(isDownloadEntry(entry({ size: 0 }))).toBe(false)
+    expect(isDownloadEntry(entry({ size: 1.5 }))).toBe(false)
+    expect(isDownloadEntry(entry({ size: Number.MAX_SAFE_INTEGER + 1 }))).toBe(false)
+  })
 })
 
 describe('lookups', () => {

@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'bun:test'
-import { LOCKED_STATUS, MEDIA_PROBE_BYTES, type MediaOrigin } from '@raven/core'
+import {
+  LOCKED_STATUS,
+  MEDIA_PROBE_BYTES,
+  MEDIA_TICKET_SECONDS,
+  type MediaOrigin,
+} from '@raven/core'
 import type { ServerEntry } from '@/main/desktopConfig'
+import { EXPAND_MESSAGES } from '@/main/downloads/expand'
 import {
   createMediaAccess,
   fileUrlFor,
@@ -12,6 +18,7 @@ import {
   type AccessOutcome,
   type ProbeFetch,
 } from '@/main/downloads/mediaAccess'
+import { CALL_MESSAGES } from '@/main/servers/serverCalls'
 import { fakeCalls, keyOf, ok, type Reply } from '@/main/test/serverFakes'
 import { SERVER_GONE } from '@/shared/protocol'
 
@@ -22,6 +29,9 @@ const SERVER: ServerEntry = {
   name: 'Vhagar',
   addedAt: 0,
 }
+
+const NOW = 1_700_000_000_000
+const HOUR_MS = 3_600_000
 
 const LAN: MediaOrigin = { kind: 'lan', url: 'http://192.168.1.5:3000' }
 const LAN_TWO: MediaOrigin = { kind: 'lan', url: 'http://192.168.1.6:3000' }
@@ -70,10 +80,12 @@ const run = ({
   replies,
   probe,
   server = SERVER,
+  now = 0,
 }: {
   replies: Record<string, Reply>
   probe: ProbeFetch
   server?: ServerEntry | null
+  now?: number
 }) => {
   const { calls, log } = fakeCalls(replies)
   const warnings: string[] = []
@@ -81,7 +93,7 @@ const run = ({
     calls,
     serverOf: (serverId) => (server !== null && serverId === server.id ? server : null),
     probe,
-    now: () => 0,
+    now: () => now,
     warn: (message) => {
       warnings.push(message)
     },
@@ -253,15 +265,76 @@ describe('createMediaAccess', () => {
     )
   })
 
-  it('answers unreadable for a ticket read that is not a 200', async () => {
+  it('answers unreadable for a ticket read refused with another 4xx', async () => {
     const { probe } = answeringProbe({ [LAN.url]: { status: 200, firstByteMs: 3 } })
     const { access } = run({
-      replies: { ...withOrigins([LAN]), [ticketCall(7)]: { status: 500, body: '' } },
+      replies: { ...withOrigins([LAN]), [ticketCall(7)]: { status: 400, body: '' } },
       probe,
     })
     expect(failed(await access.accessFor({ serverId: SERVER_ID, mediaId: 7 })).reason).toBe(
       'unreadable',
     )
+  })
+
+  it.each([500, 502, 503, 504])(
+    'answers unreachable for a ticket read the proxy answers %i',
+    async (status) => {
+      const { probe } = answeringProbe({ [LAN.url]: { status: 200, firstByteMs: 3 } })
+      const { access } = run({
+        replies: { ...withOrigins([LAN]), [ticketCall(7)]: { status, body: '' } },
+        probe,
+      })
+      expect(failed(await access.accessFor({ serverId: SERVER_ID, mediaId: 7 }))).toEqual({
+        ok: false,
+        reason: 'unreachable',
+        message: CALL_MESSAGES.unreachable('Vhagar'),
+      })
+    },
+  )
+
+  it('answers gone when the ticket read finds no such title', async () => {
+    const { probe } = answeringProbe({ [LAN.url]: { status: 200, firstByteMs: 3 } })
+    const { access } = run({
+      replies: { ...withOrigins([LAN]), [ticketCall(7)]: { status: 404, body: '' } },
+      probe,
+    })
+    expect(failed(await access.accessFor({ serverId: SERVER_ID, mediaId: 7 }))).toEqual({
+      ok: false,
+      reason: 'gone',
+      message: EXPAND_MESSAGES.gone('Vhagar'),
+    })
+  })
+
+  it.each([
+    ['in milliseconds', NOW + 6 * HOUR_MS],
+    ['already past', NOW / 1000 - 1],
+    ['due now', NOW / 1000],
+    ['further off than two ticket lives', (NOW + 2 * MEDIA_TICKET_SECONDS * 1000) / 1000 + 1],
+    ['not a number', Number.NaN],
+  ])('answers unreadable for a ticket whose expiry is %s', async (_name, expiresAt) => {
+    const { probe } = answeringProbe({ [LAN.url]: { status: 200, firstByteMs: 3 } })
+    const { access } = run({
+      replies: { ...withOrigins([LAN]), [ticketCall(7)]: ok({ ticket: 'tkt', expiresAt }) },
+      probe,
+      now: NOW,
+    })
+    expect(failed(await access.accessFor({ serverId: SERVER_ID, mediaId: 7 })).reason).toBe(
+      'unreadable',
+    )
+  })
+
+  it('takes a ticket that lapses within two ticket lives, in epoch milliseconds', async () => {
+    const { probe } = answeringProbe({ [LAN.url]: { status: 200, firstByteMs: 3 } })
+    const last = (NOW + 2 * MEDIA_TICKET_SECONDS * 1000) / 1000
+    const { access } = run({
+      replies: { ...withOrigins([LAN]), [ticketCall(7)]: ok({ ticket: 'tkt', expiresAt: last }) },
+      probe,
+      now: NOW,
+    })
+    expect(succeeded(await access.accessFor({ serverId: SERVER_ID, mediaId: 7 }))).toMatchObject({
+      kind: 'origin',
+      expiresAt: last * 1000,
+    })
   })
 
   it('falls back to the cookie path, naming no URL, on a bad origins body', async () => {

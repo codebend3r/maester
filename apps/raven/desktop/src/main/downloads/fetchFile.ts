@@ -213,6 +213,7 @@ const download = async ({
   }
   if (from > expectedSize) {
     await part.truncate()
+    if (!canRestart) return failure({ reason: 'changed', bytes: 0 })
     return download({ ...input, canRestart: false })
   }
   // A server that takes the request and never answers it stalls the file as a silent body does.

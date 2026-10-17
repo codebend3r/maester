@@ -43,6 +43,8 @@ export type DownloadServiceDeps = {
   showItemInFolder: (path: string) => void
   /** Settles once the network can be used (main's `app.whenReady()`); the launch's first kick waits on it. */
   ready: Promise<void>
+  /** `downloads.json` could not be read and was set aside, so the launch sweep keeps every folder. */
+  wasSetAside: boolean
 }
 
 type ById = { downloadId: string }
@@ -246,7 +248,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
   }
 
   // A launch picks up what the last run left, once the folders no download names are gone.
-  Promise.all([queue.sweep(), deps.ready])
+  Promise.all([queue.sweep({ wasSetAside: deps.wasSetAside }), deps.ready])
     .then(queue.kick)
     .catch((error: unknown) => {
       deps.warn(`raven player could not resume its downloads: ${loggable(errorText(error))}`)

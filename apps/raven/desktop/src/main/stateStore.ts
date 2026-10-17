@@ -41,31 +41,39 @@ const parseJson = (text: string): unknown => {
 }
 
 /** Never throws: whatever cannot be read as a `T` is kept aside and the app starts with `empty`. */
-export const loadJson = async <T>({
-  fs,
-  file,
-  now,
-  guard,
-  empty,
-}: {
+/** What a JSON file held: nothing, a value its guard accepts, or something else, now set aside. */
+export type JsonRead<T> = { kind: 'missing' } | { kind: 'read'; value: T } | { kind: 'setAside' }
+
+type JsonFile<T> = {
   fs: StateFs
   file: string
   now: () => number
   guard: (value: unknown) => value is T
-  empty: T
-}): Promise<T> => {
+}
+
+export const readJsonFile = async <T>({
+  fs,
+  file,
+  now,
+  guard,
+}: JsonFile<T>): Promise<JsonRead<T>> => {
   const text = await fs.readFile(file).then(
     (read) => ({ found: true as const, read }),
     (error: unknown) => ({ found: false as const, error }),
   )
-  if (!text.found && isMissingFile(text.error)) return empty
+  if (!text.found && isMissingFile(text.error)) return { kind: 'missing' }
   if (text.found) {
     const parsed = parseJson(text.read)
-    if (guard(parsed)) return parsed
+    if (guard(parsed)) return { kind: 'read', value: parsed }
   }
   // Keep the unreadable file for a person to inspect; the next save would otherwise replace it.
   await fs.rename(file, `${file}.corrupt-${now()}`).catch(() => undefined)
-  return empty
+  return { kind: 'setAside' }
+}
+
+export const loadJson = async <T>({ empty, ...input }: JsonFile<T> & { empty: T }): Promise<T> => {
+  const read = await readJsonFile(input)
+  return read.kind === 'read' ? read.value : empty
 }
 
 export const loadState = ({

@@ -199,6 +199,7 @@ const setup = ({
     fs: drive.fs,
     showItemInFolder: (path) => shown.push(path),
     ready: Promise.resolve(),
+    wasSetAside: false,
   })
   return {
     service,
@@ -392,6 +393,18 @@ describe('ask', () => {
     ).toEqual({ type: 'refused', message: EXPAND_MESSAGES.unreadable('Vhagar') })
     expect(world.warnings.join('\n')).toContain('Fellowship (2001)')
     expect(world.warnings.join('\n')).not.toContain('../../x')
+  })
+
+  it.each([
+    ['below 0', -1],
+    ['0', 0],
+    ['not whole', 2.5],
+  ])('refuses a file whose size is %s, and warns by its title', async (_name, size) => {
+    const world = setup({ replies: { [mediaCall(9)]: ok({ ...MOVIE, size }) } })
+    expect(
+      await world.service.ask({ serverId: SERVER_ID, target: { kind: 'media', mediaId: 9 } }),
+    ).toEqual({ type: 'refused', message: EXPAND_MESSAGES.unreadable('Vhagar') })
+    expect(world.warnings.join('\n')).toContain('Fellowship (2001)')
   })
 
   it('refuses a server raven player no longer keeps, and calls nothing', async () => {

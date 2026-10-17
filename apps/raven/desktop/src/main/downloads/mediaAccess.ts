@@ -4,15 +4,25 @@ import {
   isMediaTicket,
   LOCKED_STATUS,
   MEDIA_PROBE_BYTES,
+  MEDIA_TICKET_SECONDS,
   toQueryString,
   type MediaOrigin,
   type MediaOriginKind,
 } from '@raven/core'
 import type { ServerEntry } from '@/main/desktopConfig'
-import { loggable, type ServerCalls } from '@/main/servers/serverCalls'
+import { EXPAND_MESSAGES } from '@/main/downloads/expand'
+import { CALL_MESSAGES, loggable, type ServerCalls } from '@/main/servers/serverCalls'
 import { isSidecarTrackId, SERVER_GONE } from '@/shared/protocol'
 
 export const PROBE_TIMEOUT_MS = 2000
+
+/**
+ * The furthest off a ticket's expiry may be. Past it, or already past, the server's number is
+ * not a ticket's: a renewal timed from it would fire at once, on every fetch, for good.
+ */
+export const TICKET_HORIZON_MS = 2 * MEDIA_TICKET_SECONDS * 1000
+
+const NOT_FOUND_STATUS = 404
 
 /** The nearer the origin, the lower the rank, and the lower rank wins the pick. */
 export const ORIGIN_KIND_RANK = { lan: 0, tailnet: 1, public: 2 } as const satisfies Record<
@@ -32,7 +42,7 @@ export type Access =
 
 export type AccessOutcome =
   | { ok: true; access: Access }
-  | { ok: false; reason: 'locked' | 'unreachable' | 'unreadable'; message: string }
+  | { ok: false; reason: 'locked' | 'unreachable' | 'unreadable' | 'gone'; message: string }
 
 export type MediaAccess = {
   accessFor: (input: { serverId: string; mediaId: number }) => Promise<AccessOutcome>
@@ -128,6 +138,7 @@ export const createMediaAccess = ({
   calls,
   serverOf,
   probe,
+  now,
   warn,
 }: {
   calls: Pick<ServerCalls, 'call'>
@@ -207,22 +218,26 @@ export const createMediaAccess = ({
     if (reply.status === LOCKED_STATUS) {
       return { ok: false, reason: 'locked', message: `${server.name} locked this library again` }
     }
-    const body = reply.status === 200 ? readJson(reply.body) : null
-    if (!isMediaTicket(body)) {
-      return {
-        ok: false,
-        reason: 'unreadable',
-        message: `${server.name} sent something raven player cannot read.`,
-      }
+    if (reply.status === NOT_FOUND_STATUS) {
+      return { ok: false, reason: 'gone', message: EXPAND_MESSAGES.gone(server.name) }
     }
+    // A proxy in front of a restarting server answers 502 to 504: an outage, not a refusal.
+    if (reply.status >= 500) {
+      return { ok: false, reason: 'unreachable', message: CALL_MESSAGES.unreachable(server.name) }
+    }
+    const unreadable: AccessOutcome = {
+      ok: false,
+      reason: 'unreadable',
+      message: `${server.name} sent something raven player cannot read.`,
+    }
+    const body = reply.status === 200 ? readJson(reply.body) : null
+    if (!isMediaTicket(body)) return unreadable
+    const expiresAt = body.expiresAt * 1000
+    const at = now()
+    if (!(expiresAt > at && expiresAt <= at + TICKET_HORIZON_MS)) return unreadable
     return {
       ok: true,
-      access: {
-        kind: 'origin',
-        url: origin.url,
-        ticket: body.ticket,
-        expiresAt: body.expiresAt * 1000,
-      },
+      access: { kind: 'origin', url: origin.url, ticket: body.ticket, expiresAt },
     }
   }
 
