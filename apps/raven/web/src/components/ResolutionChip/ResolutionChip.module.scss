@@ -1,11 +1,15 @@
+// Glass of the ground with a hairline, so it reads over a pale picture too.
 .chip {
   display: inline-grid;
   padding: var(--space-0) var(--space-1);
   border-radius: var(--radius-sm);
   background: var(--color-night-glass);
-  box-shadow: var(--shadow-outline);
+  box-shadow: inset 0 0 0 1px var(--color-line);
+  backdrop-filter: blur(8px);
   color: var(--color-bark);
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-2xs);
   font-weight: 700;
   line-height: var(--line-tight);
+  letter-spacing: 0.06em;
+  white-space: nowrap;
 }

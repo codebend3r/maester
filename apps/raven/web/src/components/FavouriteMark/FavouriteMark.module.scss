@@ -1,5 +1,35 @@
+// The heart is drawn solid: its tint layer filled all the way.
 .mark {
+  --icon-tint: 1;
+
   display: grid;
-  align-items: center;
+  place-items: center;
+  pointer-events: none;
+}
+
+// Inline-level, so it sits in a line of facts rather than breaking it.
+.inline {
+  display: inline-grid;
+  vertical-align: middle;
   color: var(--color-bark);
+}
+
+// On glass of the ground, as the check beside it is.
+.overlay {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-night-glass);
+  backdrop-filter: blur(8px);
+  color: var(--color-bark);
+
+  @media (forced-colors: active) {
+    border: 1px solid currentcolor;
+  }
+}
+
+// Over a frame grab's scrim, which keeps its dark in every theme.
+.scrim {
+  color: var(--color-on-picture);
+  filter: drop-shadow(var(--shadow-text));
 }

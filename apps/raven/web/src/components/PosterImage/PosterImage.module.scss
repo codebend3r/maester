@@ -5,11 +5,13 @@
   object-fit: cover;
 }
 
-// The title's first letter, in the middle of the frame.
+// The title's first letter, dim in the middle of the frame. The frame sets
+// how large through `--poster-letter`: a grid's poster far larger than a tile's.
 .placeholder {
   display: grid;
   place-items: center;
+  color: var(--color-moss-line);
   font-family: var(--font-display);
-  font-size: var(--font-size-xl);
-  color: var(--color-lichen);
+  font-size: var(--poster-letter, var(--font-size-xl));
+  line-height: 1;
 }

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'bun:test'
 import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
-import { ShowCard, ShowGrid } from '@/components/ShowCard/ShowCard'
+import { ShowCard, ShowGrid, ShowGridSkeleton } from '@/components/ShowCard/ShowCard'
 import { ShowList, ShowTiles } from '@/components/ShowCard/ShowViews'
 import { POSTER_SIZES } from '@/lib/posters'
 import { showEntry } from '@/test/fixtures'
@@ -72,7 +72,7 @@ describe('ShowCard', () => {
     expect(row.container.querySelector('img')).toHaveAttribute('sizes', POSTER_SIZES.row)
     const grid = renderWithProviders(<ShowGrid shows={[showEntry()]} />)
     expect(grid.container.querySelector('img')).toHaveAttribute('srcset', srcset)
-    expect(grid.container.querySelector('img')).toHaveAttribute('sizes', POSTER_SIZES.grid)
+    expect(grid.container.querySelector('img')).toHaveAttribute('sizes', POSTER_SIZES.showCard)
     const tiles = renderWithProviders(<ShowTiles shows={[showEntry()]} />)
     expect(tiles.container.querySelector('img')).toHaveAttribute('srcset', srcset)
     expect(tiles.container.querySelector('img')).toHaveAttribute('sizes', POSTER_SIZES.showTile)
@@ -123,6 +123,61 @@ describe('ShowCard', () => {
     )
     expect(screen.queryByText(/unwatched/)).toBeNull()
     expect(screen.queryByText('Watched')).toBeNull()
+  })
+
+  it('names the next episode on the wide card, and plays it from there', () => {
+    renderWithProviders(<ShowGrid shows={[showEntry()]} />)
+    const play = screen.getByRole('link', { name: 'Play Severance S01E02' })
+    expect(play).toHaveAttribute('href', '/watch/12')
+    expect(play).toHaveTextContent('S01E02 · Half Loop')
+    expect(screen.getByRole('link', { name: 'Severance' })).toHaveAttribute('href', '/shows/4')
+  })
+
+  it('says every episode is watched on the wide card once none is left', () => {
+    renderWithProviders(<ShowGrid shows={[showEntry({ watchedEpisodes: 9, next: null })]} />)
+    expect(screen.getByText('All watched')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /^Play/ })).toBeNull()
+  })
+
+  it('shows the number unwatched on the wide card, and nothing for a show not started', () => {
+    renderWithProviders(<ShowGrid shows={[showEntry({ watchedEpisodes: 3 })]} />)
+    expect(screen.getByText('6')).toBeInTheDocument()
+    expect(screen.getByText('6 unwatched episodes')).toBeInTheDocument()
+    cleanup()
+    renderWithProviders(<ShowGrid shows={[showEntry()]} />)
+    expect(screen.queryByText(/unwatched/)).toBeNull()
+    expect(screen.queryByText('All watched')).toBeNull()
+  })
+
+  it("washes the wide card in its poster, fetched at the poster's own width", () => {
+    const { container } = renderWithProviders(<ShowGrid shows={[showEntry()]} />)
+    const [poster, wash] = [...container.querySelectorAll('img')]
+    expect(wash).toHaveAttribute('alt', '')
+    expect(wash?.getAttribute('srcset')).toBe(poster?.getAttribute('srcset'))
+    expect(wash?.getAttribute('sizes')).toBe(poster?.getAttribute('sizes'))
+  })
+
+  it('falls back to the initial when the poster fails to load', () => {
+    const { container } = renderWithProviders(
+      <ul>
+        <ShowCard sizes={POSTER_SIZES.row} entry={showEntry()} />
+      </ul>,
+    )
+    fireEvent.error(container.querySelector('img') ?? document.body)
+    expect(container.querySelector('img')).toBeNull()
+    expect(container.querySelector('a[aria-hidden="true"]')).toHaveTextContent('S')
+  })
+
+  it('stands in for the wide cards while they load', () => {
+    const { container } = renderWithProviders(<ShowGridSkeleton count={3} />)
+    expect(container.querySelectorAll('li')).toHaveLength(3)
+  })
+
+  it('gives each list row a small poster out of the tab order', () => {
+    const { container } = renderWithProviders(<ShowList shows={[showEntry()]} />)
+    const poster = container.querySelector('tbody img')
+    expect(poster).toHaveAttribute('sizes', POSTER_SIZES.list)
+    expect(poster?.closest('a')).toHaveAttribute('tabindex', '-1')
   })
 
   it('shows the count in a list row and in a tile', () => {

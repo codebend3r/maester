@@ -1,39 +1,32 @@
+// The table's room is the page's to give, and the side menu narrows it
+// whatever the screen's width, so the columns drop by the room the table
+// has rather than by the screen's. Contained, the room also never grows
+// to the table's own width and pushes the page wider than the screen.
+.room {
+  container-type: inline-size;
+}
+
+// The element defaults draw the table; this sets its rhythm: eyebrow
+// headers, faint rules between rows and a tint under the pointer.
 .table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--font-size-sm);
-
-  th,
-  td {
-    padding: var(--space-1) var(--space-2);
-    text-align: left;
-    vertical-align: middle;
-  }
-
   thead th {
-    color: var(--color-lichen);
-    font-size: var(--font-size-xs);
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    white-space: nowrap;
-    border-bottom: 1px solid var(--color-moss);
+    padding-block: var(--space-2);
   }
 
-  tbody tr {
-    border-bottom: 1px solid var(--color-moss);
-
-    &:hover {
-      background: var(--color-canopy);
-    }
+  tbody tr:hover {
+    background: var(--color-hover);
   }
 
   tbody th {
     font-weight: 400;
   }
 
+  th,
   td {
-    color: var(--color-lichen);
+    padding-inline: var(--space-1);
+  }
+
+  td {
     white-space: nowrap;
   }
 }
@@ -50,16 +43,23 @@
   width: 3rem;
 }
 
-// The title and, beside it, how much of the show is watched.
+// The title's column takes whatever the facts leave, so a title is never
+// squeezed to a letter a line.
+.titleHeader {
+  width: 100%;
+}
+
+// The small poster, the title and, beside it, how much of the show is watched.
 .titleCell {
   display: grid;
-  grid-template-columns: auto auto auto;
+  grid-template-columns: auto auto minmax(0, max-content) auto;
   justify-content: start;
   align-items: center;
-  gap: var(--space-1);
+  gap: var(--space-2);
 }
 
 .title {
+  color: var(--color-bark);
   font-weight: 600;
   text-decoration: none;
   overflow-wrap: anywhere;
@@ -70,27 +70,34 @@
   }
 }
 
+// A quiet round button, the leaf's under the pointer.
 .play {
+  --icon-tint: 1;
+
   display: grid;
   place-items: center;
-  width: 2.5rem;
-  height: 2.5rem;
-  border: 1px solid var(--color-moss);
-  border-radius: 50%;
+  width: var(--control-size);
+  height: var(--control-size);
+  border-radius: var(--radius-pill);
+  background: var(--color-moss);
   color: var(--color-bark);
 
   &:hover {
     background: var(--color-leaf);
+    color: var(--color-on-leaf);
   }
 }
 
+// The tiles side by side, as many as fit at 20rem or more.
 .tiles {
   display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(20rem, 100%), 1fr));
+  gap: var(--space-2);
 
   // A library can hold thousands of shows, so the browser lays out and
   // draws only those near the screen. One it skips stands in at the height
   // it had when last drawn, else at about a tile's height 1440 wide. The
-  // stand-in is what sits inside the tile's padding and rule, which add to it.
+  // stand-in is what sits inside the tile's padding, which adds to it.
   > li {
     content-visibility: auto;
     contain-intrinsic-block-size: auto 9rem;
@@ -103,20 +110,35 @@
   }
 }
 
+// A card on the canopy: the poster, the words, and the play button.
 .tile {
   position: relative;
   display: grid;
   grid-template-columns: clamp(4rem, 14vw, 6rem) minmax(0, 1fr) auto;
+  grid-template-areas: 'poster body play';
   gap: var(--space-3);
   align-items: center;
-  padding: var(--space-2) 0;
-  border-bottom: 1px solid var(--color-moss);
+  padding: var(--space-2);
+  border-radius: var(--radius-lg);
+  background: var(--color-canopy);
+
+  &:hover {
+    background: var(--color-canopy-hi);
+  }
+
+  > .frame {
+    grid-area: poster;
+  }
+
+  > .play {
+    grid-area: play;
+  }
 }
 
 // Over the poster's top corner, inside the tile's padding.
 .select {
   position: absolute;
-  inset: calc(var(--space-2) + var(--space-0)) auto auto var(--space-0);
+  inset: calc(var(--space-2) + var(--space-0)) auto auto calc(var(--space-2) + var(--space-0));
   z-index: 2;
 }
 
@@ -124,13 +146,24 @@
   display: grid;
   grid-template-areas: 'frame';
   aspect-ratio: 2 / 3;
-  border-radius: var(--radius-sm);
+  // One cell the shape sets, which a tall picture cannot stretch.
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 0;
+  border-radius: var(--radius-md);
   overflow: hidden;
-  background: var(--color-canopy);
+  background: var(--color-deep);
+  text-decoration: none;
 
   &:hover .image {
     filter: brightness(1.12);
   }
+}
+
+// A row's poster, smaller.
+.rowFrame {
+  width: 2.25rem;
+  border-radius: var(--radius-sm);
 }
 
 .image,
@@ -142,38 +175,63 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-
-  @media (prefers-reduced-motion: no-preference) {
-    transition: filter 150ms ease-out;
-  }
 }
 
 .placeholder {
   display: grid;
   place-items: center;
+  color: var(--color-moss-line);
   font-family: var(--font-display);
   font-size: var(--font-size-lg);
-  color: var(--color-lichen);
+  line-height: 1;
 }
 
 .body {
+  grid-area: body;
   display: grid;
   gap: var(--space-0);
   min-width: 0;
 }
 
+// The facts read as one line of words, wrapping between facts rather than
+// inside one, a dot apart.
 .facts {
+  color: var(--color-birch);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-body);
+}
+
+.fact {
+  display: inline-block;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.fact:has(+ .fact)::after {
+  content: '·' / '';
+  padding-inline: var(--space-0);
+}
+
+// The scores small, as a card shows them, as many to a line as fit.
+.scores {
   display: grid;
-  grid-auto-flow: column;
-  justify-content: start;
-  align-items: center;
-  gap: var(--space-2);
-  color: var(--color-lichen);
+  grid-template-columns: repeat(auto-fill, 4.5rem);
+  gap: var(--space-0) var(--space-1);
+  color: var(--color-birch);
   font-size: var(--font-size-xs);
 }
 
-@media (max-width: 40rem) {
+@container (max-width: 48rem) {
   .roomy {
+    display: none;
+  }
+}
+
+// A phone's room keeps the title, its count and the play button rather
+// than its poster, years and episodes.
+@container (max-width: 30rem) {
+  .rowFrame,
+  .spare {
     display: none;
   }
 }
@@ -184,4 +242,17 @@
   color: var(--color-bark);
   font-size: var(--font-size-xs);
   font-stretch: 90%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .tile,
+  .play {
+    transition:
+      background-color 150ms ease,
+      color 150ms ease;
+  }
+
+  .image {
+    transition: filter 150ms ease-out;
+  }
 }

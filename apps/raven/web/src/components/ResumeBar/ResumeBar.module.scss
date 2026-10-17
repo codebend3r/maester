@@ -2,12 +2,16 @@
   display: grid;
 }
 
+// Over a picture: a dark track that keeps its dark in every theme.
 .overlay {
   background: var(--color-shade);
 }
 
+// On the ground: a hairline track with rounded ends.
 .inline {
-  background: var(--color-moss);
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--color-line-strong);
 }
 
 .fill {

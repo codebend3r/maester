@@ -127,6 +127,30 @@ describe('MediaCard', () => {
     expect(screen.queryByText('Watched')).toBeNull()
   })
 
+  it('badges its resolution and HDR over the picture, and lists its codec and size', () => {
+    renderWithProviders(<MediaCard media={mediaItem({ hdr: true })} />)
+    expect(screen.getByLabelText('Video resolution: 1080p')).toHaveTextContent('1080p')
+    expect(screen.getByLabelText('HDR')).toHaveTextContent('HDR')
+    expect(screen.getByText('HEVC')).toBeInTheDocument()
+    expect(screen.getByText('1.6 GB')).toBeInTheDocument()
+  })
+
+  it('says how long is left of a video partway through, and nothing of one not started', () => {
+    renderWithProviders(<MediaCard media={mediaItem({ position: 1500 })} />)
+    expect(screen.getByText('72 min left')).toBeInTheDocument()
+    expect(screen.getByText('Partly watched')).toBeInTheDocument()
+    cleanup()
+    renderWithProviders(<MediaCard media={mediaItem()} />)
+    expect(screen.queryByText(/min left/)).toBeNull()
+  })
+
+  it('draws the heart over the picture and says Favourite once, beside its facts', () => {
+    const { container } = renderWithProviders(<MediaCard media={mediaItem({ favourite: true })} />)
+    expect(screen.getAllByText('Favourite')).toHaveLength(1)
+    const picture = container.querySelector('a[aria-hidden="true"]')
+    expect(picture?.querySelector('svg')).not.toBeNull()
+  })
+
   it('shows the check with the resume bar for a rewatch', () => {
     const { container } = renderWithProviders(
       <MediaCard media={mediaItem({ watched: true, position: 30, duration: 120 })} />,

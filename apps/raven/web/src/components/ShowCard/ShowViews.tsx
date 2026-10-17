@@ -5,11 +5,12 @@ import {
   episodeCode,
   showSortFact,
   sortTitle,
+  watchedStateOf,
 } from '@raven/core'
 import { useState } from 'react'
 import { CardLink } from '@/components/CardLink/CardLink'
 import { Icon } from '@raven/ui'
-import { RatingChips, ScoreChip } from '@/components/RatingChips/RatingChips'
+import { ScoreChip } from '@/components/RatingChips/RatingChips'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { SortHeader } from '@/components/SortHeader/SortHeader'
 import { WatchedCount } from '@/components/WatchedCount/WatchedCount'
@@ -40,13 +41,24 @@ const NextPlay = ({ entry }: { entry: ShowEntry }) => {
   )
 }
 
-/** A show's small poster, or its initial; a second way to the page, so out of the tab order. */
-const SmallPoster = ({ entry }: { entry: ShowEntry }) => {
+/**
+ * A show's small poster, or its initial; a second way to the page, so out
+ * of the tab order. A list's row shows it smaller than a tile.
+ */
+const SmallPoster = ({ entry, inRow = false }: { entry: ShowEntry; inRow?: boolean }) => {
   const { show } = entry
-  const poster = posterSources({ item: show, sizes: POSTER_SIZES.showTile })
+  const poster = posterSources({
+    item: show,
+    sizes: inRow ? POSTER_SIZES.list : POSTER_SIZES.showTile,
+  })
   const [failed, setFailed] = useState(false)
   return (
-    <CardLink to={`/shows/${show.id}`} className={styles.frame} tabIndex={-1} aria-hidden="true">
+    <CardLink
+      to={`/shows/${show.id}`}
+      className={inRow ? `${styles.frame} ${styles.rowFrame}` : styles.frame}
+      tabIndex={-1}
+      aria-hidden="true"
+    >
       {poster && !failed ? (
         <img
           className={styles.image}
@@ -85,14 +97,15 @@ const COLUMNS: Record<Column, SortColumn<ShowEntry>> = {
   tmdb: { value: (entry) => score(entry, 'tmdb'), first: 'desc' },
 }
 
-/** One show as a table row. */
+/** One show as a table row, its small poster before its title. */
 const ShowRow = ({ entry }: { entry: ShowEntry }) => {
   const select = useSelectable({ key: showEntryKey(entry.show), title: entry.show.title })
   return (
     <tr className={styles.row} data-entry={showEntryKey(entry.show)} {...select.rootProps}>
-      <th scope="row">
+      <th scope="row" className={styles.titleHeader}>
         <div className={styles.titleCell}>
           <SelectCheckbox select={select} />
+          <SmallPoster entry={entry} inRow />
           <CardLink
             to={`/shows/${entry.show.id}`}
             className={styles.title}
@@ -103,10 +116,10 @@ const ShowRow = ({ entry }: { entry: ShowEntry }) => {
           <WatchedCount watched={entry.watchedEpisodes} total={entry.episodes} />
         </div>
       </th>
-      <td className={styles.number}>
+      <td className={`${styles.number} ${styles.spare}`}>
         {showYears({ year: entry.show.year, endedYear: entry.endedYear }) ?? ''}
       </td>
-      <td className={styles.number}>{entry.episodes}</td>
+      <td className={`${styles.number} ${styles.spare}`}>{entry.episodes}</td>
       {RATING_COLUMNS.map((column) => {
         const rating = entry.show.ratings.find((it) => it.source === column.source)
         return (
@@ -124,35 +137,37 @@ const ShowRow = ({ entry }: { entry: ShowEntry }) => {
 export const ShowList = ({ shows }: { shows: ShowEntry[] }) => {
   const { sorted, toggle, ariaSort } = useTableSort({ rows: shows, columns: COLUMNS })
   const header = (key: Column, label: string, className?: string) => (
-    <SortHeader sort={ariaSort(key)} onToggle={() => toggle(key)} className={className}>
+    <SortHeader key={key} sort={ariaSort(key)} onToggle={() => toggle(key)} className={className}>
       {label}
     </SortHeader>
   )
   return (
-    <table className={styles.table} aria-label="Shows">
-      <thead>
-        <tr>
-          {header('title', 'Title')}
-          {header('years', 'Years', styles.number)}
-          {header('episodes', 'Episodes', styles.number)}
-          {RATING_COLUMNS.map((column) =>
-            header(column.source, column.label, `${styles.number} ${styles.roomy}`),
-          )}
-          <th scope="col">
-            <span className="visually-hidden">Play</span>
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        {sorted.map((entry) => (
-          <ShowRow key={entry.show.id} entry={entry} />
-        ))}
-      </tbody>
-    </table>
+    <div className={styles.room}>
+      <table className={styles.table} aria-label="Shows">
+        <thead>
+          <tr>
+            {header('title', 'Title')}
+            {header('years', 'Years', `${styles.number} ${styles.spare}`)}
+            {header('episodes', 'Episodes', `${styles.number} ${styles.spare}`)}
+            {RATING_COLUMNS.map((column) =>
+              header(column.source, column.label, `${styles.number} ${styles.roomy}`),
+            )}
+            <th scope="col">
+              <span className="visually-hidden">Play</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map((entry) => (
+            <ShowRow key={entry.show.id} entry={entry} />
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }
 
-/** One show as a row with a small poster, its title and facts beside it. */
+/** One show as a tile: a card with a small poster, its title and facts beside it. */
 const ShowTile = ({ entry, sort }: { entry: ShowEntry; sort: MediaSort | undefined }) => {
   const select = useSelectable({ key: showEntryKey(entry.show), title: entry.show.title })
   const sorted = sort ? showSortFact({ entry, sort }) : null
@@ -160,6 +175,8 @@ const ShowTile = ({ entry, sort }: { entry: ShowEntry; sort: MediaSort | undefin
     showYears({ year: entry.show.year, endedYear: entry.endedYear }),
     episodesLabel(entry),
   ].filter((fact): fact is string => fact != null)
+  const isStarted =
+    watchedStateOf({ watched: entry.watchedEpisodes, total: entry.episodes }) !== 'unwatched'
   return (
     <li className={styles.tile} data-entry={showEntryKey(entry.show)} {...select.rootProps}>
       <SelectCheckbox select={select} className={styles.select} />
@@ -175,18 +192,32 @@ const ShowTile = ({ entry, sort }: { entry: ShowEntry; sort: MediaSort | undefin
         {sorted && <span className={styles.sorted}>{sorted}</span>}
         <span className={styles.facts}>
           {facts.map((fact) => (
-            <span key={fact}>{fact}</span>
+            <span key={fact} className={styles.fact}>
+              {fact}
+            </span>
           ))}
-          <WatchedCount watched={entry.watchedEpisodes} total={entry.episodes} />
+          {isStarted && (
+            <span className={styles.fact}>
+              <WatchedCount watched={entry.watchedEpisodes} total={entry.episodes} />
+            </span>
+          )}
         </span>
-        <RatingChips ratings={entry.show.ratings} />
+        {entry.show.ratings.length > 0 && (
+          <ul className={styles.scores} aria-label="Ratings">
+            {entry.show.ratings.map((rating) => (
+              <li key={rating.source}>
+                <ScoreChip rating={rating} />
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
       {!select.selecting && <NextPlay entry={entry} />}
     </li>
   )
 }
 
-/** Every show as a row with a small poster, its title and facts beside it. */
+/** Every show as a tile, as many side by side as fit, each a small poster beside its facts. */
 export const ShowTiles = ({
   shows,
   sort,
