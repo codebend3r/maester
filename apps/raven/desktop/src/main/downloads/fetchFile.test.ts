@@ -343,6 +343,38 @@ describe('a resume', () => {
   })
 })
 
+describe('a part that is already whole', () => {
+  it('is ok with no request and one progress call when it equals the expected size', async () => {
+    const { fetch, calls } = fakeFetch({ replies: [] })
+    const { part, flags } = fakePart({ disk: [bytesOf(6), bytesOf(4)] })
+    const reported: number[] = []
+    const outcome = await run({
+      fetch,
+      part,
+      expectedSize: 10,
+      onProgress: (bytes) => reported.push(bytes),
+    })
+    expect(outcome).toEqual({ ok: true, bytes: 10 })
+    expect(calls).toHaveLength(0)
+    expect(reported).toEqual([10])
+    expect(flags.truncates).toBe(0)
+    expect(flags.closes).toBe(1)
+  })
+
+  it('is truncated and fetched from 0 with no Range when it is larger than expected', async () => {
+    const { fetch, calls } = fakeFetch({
+      replies: [reply({ status: 200, body: bodyOf([bytesOf(10)]) })],
+    })
+    const { part, chunks, flags } = fakePart({ disk: [bytesOf(15)] })
+    const outcome = await run({ fetch, part, expectedSize: 10 })
+    expect(outcome).toEqual({ ok: true, bytes: 10 })
+    expect(calls).toEqual([{ url: URL_OF_FILE, headers: {} }])
+    expect(flags.truncates).toBe(1)
+    expect(sizeOf(chunks)).toBe(10)
+    expect(flags.closes).toBe(1)
+  })
+})
+
 describe('the size', () => {
   it('is changed and truncated when the body is short', async () => {
     const { fetch } = fakeFetch({ replies: [reply({ status: 200, body: bodyOf([bytesOf(7)]) })] })
@@ -452,9 +484,11 @@ describe('a refusal', () => {
     expect(flags.closes).toBe(1)
   })
 
-  it('maps 416 to changed', async () => {
-    const { outcome, flags } = await refused({ status: 416, disk: [bytesOf(4)] })
-    expect(outcome).toEqual({ ok: false, reason: 'changed', status: 416, bytes: 4 })
+  it('maps 416 to changed, and truncates the part it can no longer use', async () => {
+    const { outcome, flags, chunks } = await refused({ status: 416, disk: [bytesOf(4)] })
+    expect(outcome).toEqual({ ok: false, reason: 'changed', status: 416, bytes: 0 })
+    expect(flags.truncates).toBe(1)
+    expect(sizeOf(chunks)).toBe(0)
     expect(flags.closes).toBe(1)
   })
 
