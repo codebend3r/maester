@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { Button } from '@raven/ui'
 import { useDesktop } from '@/renderer/desktop/DesktopContext'
 import styles from '@/renderer/SettingsPage/SettingsPage.module.scss'
+import { ThisComputer } from '@/renderer/SettingsPage/ThisComputer'
 import { RECENTS_KEY } from '@/renderer/Shell/Shell'
 
 export const SettingsPage = () => {
@@ -39,6 +40,7 @@ export const SettingsPage = () => {
           Settings
         </h1>
       </header>
+      <ThisComputer className={styles.computer} />
       <section className={styles.section} aria-labelledby="recents-title">
         <h2 id="recents-title">Recents</h2>
         <p>raven player remembers the videos you open and where you stopped.</p>

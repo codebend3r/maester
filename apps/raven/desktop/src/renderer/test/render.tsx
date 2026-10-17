@@ -6,6 +6,7 @@ import { createMemoryRouter, type RouteObject, RouterProvider } from 'react-rout
 import type { DesktopClient } from '@/renderer/desktop/client'
 import { DesktopProvider } from '@/renderer/desktop/DesktopContext'
 import { createMenuHub } from '@/renderer/desktop/menuHub'
+import type { PlayerConnection, PlayerConnections } from '@/renderer/desktop/playerConnection'
 import { HomePage } from '@/renderer/HomePage/HomePage'
 import { desktopRoutes } from '@/renderer/routes'
 import { Shell } from '@/renderer/Shell/Shell'
@@ -55,12 +56,39 @@ export const fakeClient = (overrides: FakeOverrides = {}) => {
   }
 }
 
+/** A connection that changes only when the test says so. */
+export const connectionsOf = (initial: PlayerConnection) => {
+  const listeners = new Set<() => void>()
+  let connection = initial
+  return {
+    read: () => connection,
+    subscribe: (listener: () => void) => {
+      listeners.add(listener)
+      return () => {
+        listeners.delete(listener)
+      }
+    },
+    set: (next: PlayerConnection) =>
+      act(() => {
+        connection = next
+        listeners.forEach((listener) => listener())
+      }),
+  } satisfies PlayerConnections & { set: (next: PlayerConnection) => void }
+}
+
+/** P4's pages play through the html engine, as they do with no video engine. */
+const NO_ENGINE: PlayerConnection = {
+  status: 'unavailable',
+  message: 'The video engine is off for this test.',
+}
+
 export const renderDesktop = ({
   client,
   route = '/',
   state,
   routes = desktopRoutes,
   isStrict = false,
+  player = connectionsOf(NO_ENGINE),
 }: {
   client: DesktopClient
   route?: string
@@ -69,6 +97,7 @@ export const renderDesktop = ({
   routes?: RouteObject[]
   /** Mounts under StrictMode, which runs every effect twice in development. */
   isStrict?: boolean
+  player?: PlayerConnections
 }) => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const menu = createMenuHub()
@@ -77,7 +106,7 @@ export const renderDesktop = ({
   })
   const app = (
     <QueryClientProvider client={queryClient}>
-      <DesktopProvider client={client} menu={menu}>
+      <DesktopProvider client={client} menu={menu} player={player}>
         <RouterProvider router={router} />
       </DesktopProvider>
     </QueryClientProvider>

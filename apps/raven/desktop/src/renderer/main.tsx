@@ -10,9 +10,13 @@ import '@/renderer/styles/desktop.scss'
 import { clientFor } from '@/renderer/desktop/client'
 import { DesktopProvider } from '@/renderer/desktop/DesktopContext'
 import { createMenuHub } from '@/renderer/desktop/menuHub'
+import { listenForPlayer } from '@/renderer/desktop/playerConnection'
 import { desktopRoutes } from '@/renderer/routes'
+import { APP_ORIGIN } from '@/shared/protocol'
 
 const client = clientFor('ravenDesktop' in window ? window.ravenDesktop : undefined)
+// Listening before the first render, so the hand-over that answers the Shell's `ready` is heard.
+const player = listenForPlayer({ target: window, origin: APP_ORIGIN })
 const rootElement = document.getElementById('root')
 
 if (rootElement) {
@@ -27,7 +31,7 @@ if (rootElement) {
     root.render(
       <StrictMode>
         <QueryClientProvider client={new QueryClient()}>
-          <DesktopProvider client={client} menu={createMenuHub()}>
+          <DesktopProvider client={client} menu={createMenuHub()} player={player}>
             <RouterProvider router={createMemoryRouter(desktopRoutes)} />
           </DesktopProvider>
         </QueryClientProvider>

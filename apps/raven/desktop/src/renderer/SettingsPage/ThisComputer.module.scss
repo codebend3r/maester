@@ -1,0 +1,63 @@
+.computer {
+  display: grid;
+  gap: var(--space-3);
+  align-content: start;
+  justify-items: start;
+  min-width: 0;
+
+  h2 {
+    font-family: var(--font-display);
+    font-size: var(--font-size-lg);
+    font-weight: 400;
+  }
+
+  p {
+    max-width: var(--measure);
+  }
+
+  output {
+    color: var(--color-lichen);
+    font-size: var(--font-size-sm);
+  }
+}
+
+.refusal {
+  padding-inline-start: var(--space-2);
+  border-inline-start: var(--border-thick) solid var(--color-leaf-bright);
+  font-size: var(--font-size-sm);
+}
+
+.group {
+  justify-self: stretch;
+  max-width: var(--measure);
+}
+
+.choice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: center;
+  cursor: pointer;
+
+  input:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+.device {
+  display: grid;
+  gap: var(--space-1);
+  justify-self: stretch;
+  max-width: var(--measure);
+
+  select {
+    min-width: 0;
+    max-width: 100%;
+
+    &:focus-visible {
+      outline: var(--focus-ring);
+      outline-offset: 2px;
+    }
+  }
+}
