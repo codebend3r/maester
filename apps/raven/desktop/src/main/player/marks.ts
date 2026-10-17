@@ -12,8 +12,8 @@ type Histogram = Pick<
 const NS_PER_MS = 1e6
 
 /**
- * The budget marks (Ruling 14), on stdout until the log lands: the first frame after
- * each load, and the main thread's p99 event loop delay while a video plays.
+ * The budget marks (P5 Ruling 14, P7 Ruling 13): the first frame after each load, the cold
+ * open to its first frame, and the main thread's p99 event loop delay while a video plays.
  */
 export const createMarks = ({
   isEnabled,
@@ -29,6 +29,11 @@ export const createMarks = ({
   histogram: () => Histogram
 }) => {
   let loadedAt: number | null = null
+  // The cold open is measured once a run: `waiting` from the first early `opened` until
+  // its first frame, `done` after, so neither a later open nor a later frame measures again.
+  let coldOpen: { stage: 'none' } | { stage: 'waiting'; at: number } | { stage: 'done' } = {
+    stage: 'none',
+  }
   let histogram: Histogram | null = null
   let timer: unknown = null
 
@@ -64,10 +69,19 @@ export const createMarks = ({
         return service.handle(command)
       },
     }),
+    /** A file opened before the window was ready, the cold "Open With" the budget times. */
+    opened: () => {
+      if (coldOpen.stage !== 'none') return
+      coldOpen = { stage: 'waiting', at: now() }
+    },
     firstFrame: () => {
       if (!isEnabled || loadedAt === null) return
-      write(`raven-first-frame-ms ${Math.round(now() - loadedAt)}\n`)
+      const at = now()
+      write(`raven-first-frame-ms ${Math.round(at - loadedAt)}\n`)
       loadedAt = null
+      if (coldOpen.stage !== 'waiting') return
+      write(`raven-open-to-frame-ms ${Math.round(at - coldOpen.at)}\n`)
+      coldOpen = { stage: 'done' }
     },
     playing: (isPlaying: boolean) => {
       if (!isEnabled) return
