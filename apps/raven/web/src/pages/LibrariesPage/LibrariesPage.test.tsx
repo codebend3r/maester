@@ -164,7 +164,19 @@ describe('LibrariesPage', () => {
       within(folders)
         .getAllByRole('listitem')
         .map((item) => item.textContent),
-    ).toEqual(['/media/TV', '/mnt/archive/TV'])
+    ).toEqual(['/mediaTV', '/mnt/archiveTV'])
+  })
+
+  it('groups the folders under one parent into a single line', async () => {
+    spies.list.mockImplementation(async () => [
+      library({ name: 'Shows', paths: ['/media/vermithor/TV', '/media/vermithor/Mini-Series'] }),
+    ])
+    renderWithProviders({ ui: <LibrariesPage /> })
+    const folders = await screen.findByRole('list', { name: 'Folders' })
+    const lines = within(folders).getAllByRole('listitem')
+    expect(lines).toHaveLength(1)
+    expect(within(lines[0]).getByText('/media/vermithor')).toBeTruthy()
+    expect(within(lines[0]).getByText('TV · Mini-Series')).toBeTruthy()
   })
 
   it('stands in for the libraries while they are read', async () => {
@@ -247,7 +259,7 @@ describe('LibrariesPage', () => {
     expect(row).toHaveTextContent('Other · Locked · 12 videos')
     expect(row?.querySelector(BACKDROP)).toBeNull()
     expect(screen.queryByRole('list', { name: 'Folders' })).toBeNull()
-    expect(screen.queryByText('/media/Tutorials')).toBeNull()
+    expect(screen.queryByText('/media')).toBeNull()
   })
 
   it('shows an unlocked library like any other, saying it is unlocked', async () => {
@@ -262,7 +274,7 @@ describe('LibrariesPage', () => {
     ])
     spies.lock.mockImplementation(async () => ({ available: true, unlocked: true }))
     renderWithProviders({ ui: <LibrariesPage /> })
-    expect(await screen.findByText('/media/Tutorials')).toBeInTheDocument()
+    expect(await screen.findByText('/media')).toBeInTheDocument()
     const row = screen.getByRole('link', { name: 'Tutorials' }).closest('li')
     expect(row).toHaveTextContent('Other · Unlocked · 12 videos')
     expect(row?.querySelector(BACKDROP)).not.toBeNull()
