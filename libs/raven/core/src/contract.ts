@@ -1257,7 +1257,7 @@ export const isMediaOrigins = object({ origins: listOf(isMediaOrigin) })
 
 export type MediaOrigins = Infer<typeof isMediaOrigins>
 
-/** A signed, expiring pass for one media id; `expiresAt` is in epoch seconds. */
+/** A signed, expiring pass for one media id; `expiresAt` is in epoch milliseconds. */
 export const isMediaTicket = object({ ticket: isString, expiresAt: isNumber })
 
 export type MediaTicket = Infer<typeof isMediaTicket>

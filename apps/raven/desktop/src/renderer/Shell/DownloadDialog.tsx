@@ -11,6 +11,7 @@ import {
 } from 'react'
 import type { DesktopClient } from '@/renderer/desktop/client'
 import { useDesktop } from '@/renderer/desktop/DesktopContext'
+import { UNREACHED } from '@/renderer/desktop/downloadsApi'
 import { serverApiFor } from '@/renderer/desktop/serverApi'
 import styles from '@/renderer/Shell/DownloadDialog.module.scss'
 import { useNotice, useOpenReply } from '@/renderer/Shell/openReply'
@@ -20,7 +21,6 @@ import type { DesktopReply, DesktopRequest, DownloadAsk, DownloadKind } from '@/
 type ReadyStatus = Extract<DownloadAsk['status'], { kind: 'ready' }>
 
 const TITLE = 'Download to raven player'
-const UNREACHED = 'raven player could not reach its downloads. Try again.'
 
 /** Main's answer, or null when the request itself failed. */
 const askMain = ({

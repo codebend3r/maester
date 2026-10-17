@@ -54,6 +54,7 @@ const ASK = { askId: id, serverId: other, serverName: 'Vhagar', autoDelete: fals
 
 const VIEW = {
   downloadId: id,
+  serverId: other,
   label: 'The Two Towers (2002)',
   group: {
     kind: 'saga',
@@ -602,6 +603,11 @@ describe('the download ask and views', () => {
     expect(isDownloadView({ ...VIEW, watched: 0.4, deletesAt: 1_700_000_600_000 })).toBe(true)
     expect(isDownloadView({ ...VIEW, needsUnlock: 'no' })).toBe(false)
     expect(isDownloadView({ ...VIEW, status: { kind: 'stalled' } })).toBe(false)
+  })
+
+  it('names its server by an opaque id, never an origin', () => {
+    expect(isDownloadView({ ...VIEW, serverId: 'https://raven.example' })).toBe(false)
+    expect(isDownloadView({ ...VIEW, serverId: undefined })).toBe(false)
   })
 
   it('accepts the space line and refuses one with a string', () => {

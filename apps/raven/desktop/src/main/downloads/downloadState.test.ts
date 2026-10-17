@@ -12,17 +12,21 @@ import {
   finish,
   isDownloadEntry,
   isDownloadsState,
+  isWaitingOnOutage,
   noteWatched,
   notePending,
   pause,
+  pauseEverything,
   pauseServer,
   queue,
   remove,
+  removeAll,
   removeServer,
   resume,
   sameGroup,
   setAutoDelete,
   setAutoDeleteDefault,
+  setSidecars,
   sortDownloads,
   start,
   type DownloadEntry,
@@ -65,7 +69,7 @@ describe('the guards', () => {
     expect(isDownloadsState(EMPTY_DOWNLOADS)).toBe(true)
     const full = entry({
       sidecars: [{ trackId: 'external-3', title: 'English', language: 'en' }],
-      status: { kind: 'paused', bytes: 10, message: null },
+      status: { kind: 'paused', bytes: 10, reason: 'viewer' },
       pending: { play: true, position: 12, at: 5 },
     })
     expect(isDownloadEntry(full)).toBe(true)
@@ -75,6 +79,20 @@ describe('the guards', () => {
   it('refuses a status kind it does not know', () => {
     expect(isDownloadEntry({ ...entry(), status: { kind: 'stalled', bytes: 1 } })).toBe(false)
     expect(isDownloadsState({ ...EMPTY_DOWNLOADS, version: 2 })).toBe(false)
+  })
+
+  it('keeps why a download stopped as a reason, never as the words the page shows', () => {
+    const withStatus = (status: unknown) => ({ ...entry(), status })
+    expect(isDownloadEntry(withStatus({ kind: 'paused', bytes: 1, reason: 'relocked' }))).toBe(true)
+    expect(
+      isDownloadEntry(withStatus({ kind: 'failed', bytes: 1, reason: 'other', message: 'x' })),
+    ).toBe(true)
+    expect(isDownloadEntry(withStatus({ kind: 'paused', bytes: 1, message: null }))).toBe(false)
+    expect(isDownloadEntry(withStatus({ kind: 'paused', bytes: 1, reason: 'asleep' }))).toBe(false)
+    expect(isDownloadEntry(withStatus({ kind: 'failed', bytes: 1, message: 'x' }))).toBe(false)
+    expect(
+      isDownloadEntry(withStatus({ kind: 'failed', bytes: 1, reason: 'relocked', message: '' })),
+    ).toBe(false)
   })
 
   it('refuses a container or a track id that is not a safe path segment', () => {
@@ -90,6 +108,15 @@ describe('the guards', () => {
 
   it('refuses a download id that is not opaque', () => {
     expect(isDownloadEntry(entry({ downloadId: 'one' }))).toBe(false)
+  })
+
+  it('takes a size only as a whole number of bytes above 0', () => {
+    expect(isDownloadEntry(entry({ size: 1 }))).toBe(true)
+    expect(isDownloadEntry(entry({ size: Number.MAX_SAFE_INTEGER }))).toBe(true)
+    expect(isDownloadEntry(entry({ size: -1 }))).toBe(false)
+    expect(isDownloadEntry(entry({ size: 0 }))).toBe(false)
+    expect(isDownloadEntry(entry({ size: 1.5 }))).toBe(false)
+    expect(isDownloadEntry(entry({ size: Number.MAX_SAFE_INTEGER + 1 }))).toBe(false)
   })
 })
 
@@ -130,16 +157,15 @@ describe('queue', () => {
 })
 
 describe('start', () => {
-  it.each([
-    ['queued', { kind: 'queued' as const }, 0],
-    ['paused', { kind: 'paused' as const, bytes: 40, message: 'offline' }, 40],
-    ['failed', { kind: 'failed' as const, bytes: 70, message: 'boom' }, 70],
-  ])('moves %s to downloading at its bytes', (_name, status, bytes) => {
-    const next = start(stateOf(entry({ status })), { downloadId: ID })
-    expect(next.entries[0]?.status).toEqual({ kind: 'downloading', bytes })
+  it('moves a queued entry to downloading at 0 bytes', () => {
+    const next = start(stateOf(entry({ status: { kind: 'queued' } })), { downloadId: ID })
+    expect(next.entries[0]?.status).toEqual({ kind: 'downloading', bytes: 0 })
   })
 
+  // A run that began for a queued file must not undo a pause or a failure that came meanwhile.
   it.each([
+    ['paused', { kind: 'paused' as const, bytes: 40, reason: 'noSpace' as const }],
+    ['failed', { kind: 'failed' as const, bytes: 70, reason: 'other' as const, message: 'boom' }],
     ['ready', { kind: 'ready' as const }],
     ['downloading', { kind: 'downloading' as const, bytes: 5 }],
   ])('refuses %s with the same state', (_name, status) => {
@@ -158,32 +184,35 @@ describe('advance', () => {
   })
 
   it('refuses any other status with the same state', () => {
-    const state = stateOf(entry({ status: { kind: 'paused', bytes: 5, message: null } }))
+    const state = stateOf(entry({ status: { kind: 'paused', bytes: 5, reason: 'viewer' } }))
     expect(advance(state, { downloadId: ID, bytes: 50 })).toBe(state)
+  })
+
+  it('returns the same state for the bytes it already has', () => {
+    const state = stateOf(entry({ status: { kind: 'downloading', bytes: 5 } }))
+    expect(advance(state, { downloadId: ID, bytes: 5 })).toBe(state)
   })
 })
 
 describe('pause', () => {
-  it('keeps the bytes and the message', () => {
+  it('keeps the bytes and the reason', () => {
     const state = stateOf(entry({ status: { kind: 'downloading', bytes: 30 } }))
-    expect(pause(state, { downloadId: ID, message: 'Offline' }).entries[0]?.status).toEqual({
+    expect(pause(state, { downloadId: ID, reason: 'unreachable' }).entries[0]?.status).toEqual({
       kind: 'paused',
       bytes: 30,
-      message: 'Offline',
+      reason: 'unreachable',
     })
   })
 
-  it('pauses a queued entry at zero bytes, with no message', () => {
-    expect(pause(stateOf(entry()), { downloadId: ID, message: null }).entries[0]?.status).toEqual({
-      kind: 'paused',
-      bytes: 0,
-      message: null,
-    })
+  it('pauses a queued entry at zero bytes, for the viewer', () => {
+    expect(
+      pause(stateOf(entry()), { downloadId: ID, reason: 'viewer' }).entries[0]?.status,
+    ).toEqual({ kind: 'paused', bytes: 0, reason: 'viewer' })
   })
 
   it('refuses a ready entry with the same state', () => {
     const state = stateOf(entry({ status: { kind: 'ready' } }))
-    expect(pause(state, { downloadId: ID, message: null })).toBe(state)
+    expect(pause(state, { downloadId: ID, reason: 'viewer' })).toBe(state)
   })
 })
 
@@ -193,30 +222,89 @@ describe('pauseServer', () => {
       entry({ downloadId: id(1), mediaId: 1, status: { kind: 'queued' } }),
       entry({ downloadId: id(2), mediaId: 2, status: { kind: 'downloading', bytes: 9 } }),
       entry({ downloadId: id(3), mediaId: 3, status: { kind: 'ready' } }),
-      entry({ downloadId: id(4), mediaId: 4, status: { kind: 'failed', bytes: 1, message: 'x' } }),
+      entry({
+        downloadId: id(4),
+        mediaId: 4,
+        status: { kind: 'failed', bytes: 1, reason: 'other', message: 'x' },
+      }),
       entry({ downloadId: id(5), mediaId: 5, serverId: SERVER_B }),
     )
-    const next = pauseServer(state, { serverId: SERVER_A, message: 'Locked' })
+    const next = pauseServer(state, { serverId: SERVER_A, reason: 'relocked' })
     expect(next.entries.map((each) => each.status)).toEqual([
-      { kind: 'paused', bytes: 0, message: 'Locked' },
-      { kind: 'paused', bytes: 9, message: 'Locked' },
+      { kind: 'paused', bytes: 0, reason: 'relocked' },
+      { kind: 'paused', bytes: 9, reason: 'relocked' },
       { kind: 'ready' },
-      { kind: 'failed', bytes: 1, message: 'x' },
+      { kind: 'failed', bytes: 1, reason: 'other', message: 'x' },
       { kind: 'queued' },
     ])
   })
 
   it('returns the same state when nothing is touched', () => {
     const state = stateOf(entry({ status: { kind: 'ready' } }))
-    expect(pauseServer(state, { serverId: SERVER_A, message: null })).toBe(state)
-    expect(pauseServer(state, { serverId: SERVER_B, message: null })).toBe(state)
+    expect(pauseServer(state, { serverId: SERVER_A, reason: 'viewer' })).toBe(state)
+    expect(pauseServer(state, { serverId: SERVER_B, reason: 'viewer' })).toBe(state)
+  })
+})
+
+describe('pauseEverything', () => {
+  it('pauses what runs or waits, and what waits on an outage, for the viewer', () => {
+    const state = stateOf(
+      entry({ downloadId: id(1), mediaId: 1, status: { kind: 'queued' } }),
+      entry({ downloadId: id(2), mediaId: 2, status: { kind: 'downloading', bytes: 9 } }),
+      entry({
+        downloadId: id(3),
+        mediaId: 3,
+        status: { kind: 'paused', bytes: 4, reason: 'unreachable' },
+      }),
+      entry({
+        downloadId: id(4),
+        mediaId: 4,
+        status: { kind: 'failed', bytes: 5, reason: 'unreachable', message: '' },
+      }),
+      entry({
+        downloadId: id(5),
+        mediaId: 5,
+        status: { kind: 'paused', bytes: 6, reason: 'relocked' },
+      }),
+      entry({
+        downloadId: id(6),
+        mediaId: 6,
+        status: { kind: 'failed', bytes: 7, reason: 'changed', message: '' },
+      }),
+      entry({ downloadId: id(7), mediaId: 7, status: { kind: 'ready' } }),
+    )
+    expect(pauseEverything(state).entries.map((each) => each.status)).toEqual([
+      { kind: 'paused', bytes: 0, reason: 'viewer' },
+      { kind: 'paused', bytes: 9, reason: 'viewer' },
+      { kind: 'paused', bytes: 4, reason: 'viewer' },
+      { kind: 'paused', bytes: 5, reason: 'viewer' },
+      { kind: 'paused', bytes: 6, reason: 'relocked' },
+      { kind: 'failed', bytes: 7, reason: 'changed', message: '' },
+      { kind: 'ready' },
+    ])
+  })
+
+  it('returns the same state when nothing is touched', () => {
+    const state = stateOf(entry({ status: { kind: 'paused', bytes: 1, reason: 'viewer' } }))
+    expect(pauseEverything(state)).toBe(state)
+  })
+})
+
+describe('isWaitingOnOutage', () => {
+  it('is true for a file paused or failed for an outage, and no other', () => {
+    const of = (status: DownloadEntry['status']) => isWaitingOnOutage(entry({ status }))
+    expect(of({ kind: 'paused', bytes: 0, reason: 'unreachable' })).toBe(true)
+    expect(of({ kind: 'failed', bytes: 0, reason: 'unreachable', message: '' })).toBe(true)
+    expect(of({ kind: 'paused', bytes: 0, reason: 'viewer' })).toBe(false)
+    expect(of({ kind: 'failed', bytes: 0, reason: 'gone', message: '' })).toBe(false)
+    expect(of({ kind: 'queued' })).toBe(false)
   })
 })
 
 describe('resume', () => {
   it.each([
-    ['paused', { kind: 'paused' as const, bytes: 3, message: null }],
-    ['failed', { kind: 'failed' as const, bytes: 3, message: 'x' }],
+    ['paused', { kind: 'paused' as const, bytes: 3, reason: 'viewer' as const }],
+    ['failed', { kind: 'failed' as const, bytes: 3, reason: 'other' as const, message: 'x' }],
   ])('makes %s queued', (_name, status) => {
     expect(resume(stateOf(entry({ status })), { downloadId: ID }).entries[0]?.status).toEqual({
       kind: 'queued',
@@ -230,12 +318,20 @@ describe('resume', () => {
 })
 
 describe('fail and finish', () => {
-  it('fail keeps the bytes and the message', () => {
+  it('fail keeps the bytes, the reason and the words of an other failure', () => {
     const state = stateOf(entry({ status: { kind: 'downloading', bytes: 12 } }))
-    expect(fail(state, { downloadId: ID, message: 'disk full' }).entries[0]?.status).toEqual({
+    expect(
+      fail(state, { downloadId: ID, reason: 'other', message: 'write EIO' }).entries[0]?.status,
+    ).toEqual({ kind: 'failed', bytes: 12, reason: 'other', message: 'write EIO' })
+  })
+
+  it('fail keeps no words for a reason that says it all', () => {
+    const state = stateOf(entry({ status: { kind: 'downloading', bytes: 12 } }))
+    expect(fail(state, { downloadId: ID, reason: 'noSpace' }).entries[0]?.status).toEqual({
       kind: 'failed',
       bytes: 12,
-      message: 'disk full',
+      reason: 'noSpace',
+      message: '',
     })
   })
 
@@ -246,7 +342,7 @@ describe('fail and finish', () => {
 
   it('a ready entry stays as it is', () => {
     const state = stateOf(entry({ status: { kind: 'ready' } }))
-    expect(fail(state, { downloadId: ID, message: 'x' })).toBe(state)
+    expect(fail(state, { downloadId: ID, reason: 'changed' })).toBe(state)
     expect(finish(state, { downloadId: ID })).toBe(state)
   })
 })
@@ -271,6 +367,31 @@ describe('remove and removeServer', () => {
 
   it('removeServer for a server with none returns the same state', () => {
     expect(removeServer(state, { serverId: id(9) })).toBe(state)
+  })
+
+  it('removeAll drops every entry and keeps the default', () => {
+    const next = removeAll({ ...state, autoDeleteDefault: true })
+    expect(next.entries).toEqual([])
+    expect(next.autoDeleteDefault).toBe(true)
+  })
+
+  it('removeAll of nothing returns the same state', () => {
+    expect(removeAll(EMPTY_DOWNLOADS)).toBe(EMPTY_DOWNLOADS)
+  })
+})
+
+describe('setSidecars', () => {
+  const sidecars = [{ trackId: 'external-0', title: 'English', language: 'en' }]
+
+  it('sets the subtitles kept beside the video', () => {
+    expect(
+      setSidecars(stateOf(entry()), { downloadId: ID, sidecars }).entries[0]?.sidecars,
+    ).toEqual(sidecars)
+  })
+
+  it('returns the same state for no subtitles where there were none', () => {
+    const state = stateOf(entry())
+    expect(setSidecars(state, { downloadId: ID, sidecars: [] })).toBe(state)
   })
 })
 
@@ -369,8 +490,10 @@ describe('bytesOf', () => {
   it('is the size when ready, else the status bytes, else 0', () => {
     expect(bytesOf(entry({ status: { kind: 'ready' } }))).toBe(1000)
     expect(bytesOf(entry({ status: { kind: 'downloading', bytes: 7 } }))).toBe(7)
-    expect(bytesOf(entry({ status: { kind: 'paused', bytes: 8, message: null } }))).toBe(8)
-    expect(bytesOf(entry({ status: { kind: 'failed', bytes: 9, message: 'x' } }))).toBe(9)
+    expect(bytesOf(entry({ status: { kind: 'paused', bytes: 8, reason: 'viewer' } }))).toBe(8)
+    expect(
+      bytesOf(entry({ status: { kind: 'failed', bytes: 9, reason: 'gone', message: '' } })),
+    ).toBe(9)
     expect(bytesOf(entry({ status: { kind: 'queued' } }))).toBe(0)
   })
 })
@@ -487,11 +610,12 @@ describe('an unknown download id', () => {
   it.each([
     ['start', () => start(state, { downloadId: unknown })],
     ['advance', () => advance(state, { downloadId: unknown, bytes: 1 })],
-    ['pause', () => pause(state, { downloadId: unknown, message: null })],
+    ['pause', () => pause(state, { downloadId: unknown, reason: 'viewer' })],
     ['resume', () => resume(state, { downloadId: unknown })],
-    ['fail', () => fail(state, { downloadId: unknown, message: 'x' })],
+    ['fail', () => fail(state, { downloadId: unknown, reason: 'changed' })],
     ['finish', () => finish(state, { downloadId: unknown })],
     ['remove', () => remove(state, { downloadId: unknown })],
+    ['setSidecars', () => setSidecars(state, { downloadId: unknown, sidecars: [] })],
     ['setAutoDelete', () => setAutoDelete(state, { downloadId: unknown, autoDelete: true })],
     [
       'noteWatched',

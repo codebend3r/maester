@@ -8,6 +8,7 @@ import {
 } from '@/main/player/playerService'
 import { cookieHeader } from '@/main/servers/cookieHeader'
 import { loggable, type ServerCallResult, type ServerCalls } from '@/main/servers/serverCalls'
+import { sidecarTracksOf } from '@/main/servers/sidecarTracks'
 import { messageOf } from '@/shared/messageOf'
 import { isOpaqueId, SERVER_GONE } from '@/shared/protocol'
 
@@ -27,9 +28,6 @@ export const EXPLAIN_TIMEOUT_MS = 5000
  * title (or a Back after it) for long: past this the title plays without sidecars.
  */
 export const TRACKS_TIMEOUT_MS = 3000
-
-// The server names its sidecars `external-N` (Ruling 18); nothing else goes into a path.
-const SIDECAR_ID = /^external-\d+$/u
 
 const NOT_FOUND_STATUS = 404
 
@@ -127,14 +125,11 @@ export const createServerSources = ({
         warn(`no sidecars from ${name}: its tracks were not a track list`)
         return []
       }
-      // Only the server's own files beside the video: embedded tracks come from the file.
-      return parsed.value.subtitles
-        .filter((track) => track.source === 'external' && SIDECAR_ID.test(track.id))
-        .map((track) => ({
-          url: `${server.origin}/api/media/${mediaId}/subtitles/${encodeURIComponent(track.id)}`,
-          title: track.title ?? '',
-          language: track.language ?? '',
-        }))
+      return sidecarTracksOf(parsed.value).map((track) => ({
+        url: `${server.origin}/api/media/${mediaId}/subtitles/${encodeURIComponent(track.id)}`,
+        title: track.title ?? '',
+        language: track.language ?? '',
+      }))
     } catch (error) {
       warn(`no sidecars from ${name}: ${loggable(messageOf(error))}`)
       return []
