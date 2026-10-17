@@ -226,8 +226,11 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
     if (queued !== null) {
       return { fileId: queued.fileId, label: titleOf(queued), queue: queue.slice(index + 1) }
     }
-    // GrantedFile keeps only the real path, so a symlinked file's next comes from the folder it really lives in.
-    const following = await grantNext({ path: file.path, readdir, grants })
+    // A download's next is the rest of its group, each in a folder of its own. GrantedFile keeps
+    // only the real path, so a symlinked file's next comes from the folder it really lives in.
+    const following =
+      (await deps.downloads.nextOf({ fileId: file.fileId })) ??
+      (await grantNext({ path: file.path, readdir, grants }))
     if (following === null) return null
     return { fileId: following.fileId, label: titleOf(following), queue: [] }
   }
