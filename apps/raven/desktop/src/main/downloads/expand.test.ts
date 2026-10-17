@@ -232,6 +232,56 @@ describe('expandTarget', () => {
     })
   })
 
+  it('lists a two-episode file once, as its first episode', async () => {
+    const both = file({ id: 11 })
+    const { expansion } = run({
+      replies: {
+        [itemCall(5)]: ok(
+          details({
+            id: 5,
+            type: 'season',
+            title: 'Season 1',
+            show,
+            season: 1,
+            children: [
+              episode({ id: 51, season: 1, number: 1, title: 'Part One', primary: both }),
+              episode({ id: 52, season: 1, number: 2, title: 'Part Two', primary: both }),
+              episode({ id: 53, season: 1, number: 3, title: 'After', primary: file({ id: 13 }) }),
+            ],
+          }),
+        ),
+      },
+      target: { kind: 'item', itemId: 5 },
+    })
+    const result = succeeded(await expansion)
+    expect(result.files.map(({ media, label, group }) => [media.id, label, group.order])).toEqual([
+      [11, 'S01E01 Part One', 10_001],
+      [13, 'S01E03 After', 10_003],
+    ])
+  })
+
+  it('counts a two-episode file once toward the cap', async () => {
+    const shared = file({ id: 1 })
+    const children = Array.from({ length: DOWNLOAD_MAX_FILES + 1 }, (_, index) =>
+      episode({
+        id: 1000 + index,
+        season: 1,
+        number: index + 1,
+        title: `Episode ${index + 1}`,
+        primary: index < 2 ? shared : file({ id: index + 1 }),
+      }),
+    )
+    const { expansion } = run({
+      replies: {
+        [itemCall(5)]: ok(
+          details({ id: 5, type: 'season', title: 'Season 1', show, season: 1, children }),
+        ),
+      },
+      target: { kind: 'item', itemId: 5 },
+    })
+    expect(succeeded(await expansion).files).toHaveLength(DOWNLOAD_MAX_FILES)
+  })
+
   it("keys an episode, its season and its show by the show's item id", async () => {
     const episodeFile = mediaItemFor({
       id: 9,

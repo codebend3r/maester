@@ -90,6 +90,17 @@ const movieGroupKey = (media: MediaItem): string => `movie:${media.id}`
 const sagaGroupKey = ({ libraryId, tmdbId }: { libraryId: number; tmdbId: string }): string =>
   `saga:${libraryId}:${tmdbId}`
 
+/** Both episodes of a two-episode file name that one file as their `primary`: it is fetched once, as the first. */
+const oncePerFile = (entries: readonly Entry[]): Entry[] => [
+  ...entries
+    .reduce(
+      (byMedia, entry) =>
+        byMedia.has(entry.media.id) ? byMedia : byMedia.set(entry.media.id, entry),
+      new Map<number, Entry>(),
+    )
+    .values(),
+]
+
 const isSuccess = (status: number): boolean => status >= 200 && status < 300
 
 const parse = (body: string): unknown => {
@@ -346,7 +357,8 @@ export const expandTarget = async ({
   const server = { calls, serverId, serverName }
   const draft = await draftOf({ server, target })
   if (!draft.ok) return draft.failure
-  const { kind, title, groupTitle, groupKey, entries } = draft.value
+  const { kind, title, groupTitle, groupKey } = draft.value
+  const entries = oncePerFile(draft.value.entries)
   if (entries.length > DOWNLOAD_MAX_FILES) {
     return { ok: false, reason: 'tooMany', message: EXPAND_MESSAGES.tooMany }
   }
