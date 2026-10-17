@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { act, cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { type Home, type HomeSearch, mediaLabel } from '@raven/core'
+import { type Home, type HomeSearch, type ItemDetails, mediaLabel } from '@raven/core'
 import { Link, useLocation } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { POSTER_SIZES } from '@/lib/posters'
 import { HomePage } from '@/pages/HomePage/HomePage'
-import { library, matchedMovie, mediaItem, showEntry } from '@/test/fixtures'
+import { itemSummary, library, matchedMovie, mediaItem, showEntry } from '@/test/fixtures'
 import { held } from '@/test/held'
 import { renderWithProviders } from '@/test/render'
 import { EPISODE_TWO, SEASON_ONE_CARD } from '@/test/tv'
@@ -29,6 +29,7 @@ describe('HomePage', () => {
     home: spyOn(api, 'getHome'),
     libraries: spyOn(api, 'listLibraries'),
     search: spyOn(api, 'searchHome'),
+    item: spyOn(api, 'getItem'),
   }
 
   const open = (home: Home) => {
@@ -42,6 +43,7 @@ describe('HomePage', () => {
     spies.home.mockReset()
     spies.libraries.mockReset()
     spies.search.mockReset()
+    spies.item.mockReset()
   })
 
   it('stands in for its shelves while home is read, hiding the stand-ins from a screen reader', async () => {
@@ -82,6 +84,30 @@ describe('HomePage', () => {
     )
   })
 
+  it('leads with the newest arrival that has a poster and a backdrop, ahead of what is in progress', async () => {
+    spies.item.mockImplementation(() => held<ItemDetails>().promise)
+    const pictured = matchedMovie({ item: itemSummary({ backdropVersion: 'b1' }) })
+    open({
+      inProgress: [{ media: EPISODE_TWO, poster: SEASON_ONE_CARD }],
+      shelves: [
+        { libraryId: 2, type: 'media', media: [pictured] },
+        { libraryId: 3, type: 'shows', shows: [showEntry()] },
+      ],
+    })
+    const hero = await screen.findByRole('region', { name: 'Just added' })
+    expect(within(hero).getByText('New in Films')).toBeInTheDocument()
+    expect(
+      screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent),
+    ).toEqual(['Busboys', 'Continue watching', 'Films', 'Series'])
+    expect(spies.item.mock.calls).toEqual([[40]])
+  })
+
+  it('leaves the hero out when no arrival has the pictures for it', async () => {
+    open({ inProgress: [], shelves: [{ libraryId: 2, type: 'media', media: [matchedMovie()] }] })
+    await screen.findByRole('heading', { name: 'Films' })
+    expect(screen.queryByRole('region', { name: 'Just added' })).toBeNull()
+  })
+
   it("lays each library's row out as the library does: posters, shows, frame grabs", async () => {
     open({
       inProgress: [],
@@ -106,7 +132,7 @@ describe('HomePage', () => {
     )
   })
 
-  it('sizes every poster as the rows lay them out, eight, four or two across', async () => {
+  it('sizes every poster as its row or tile lays it out', async () => {
     open({
       inProgress: [{ media: EPISODE_TWO, poster: SEASON_ONE_CARD }],
       shelves: [
@@ -119,7 +145,7 @@ describe('HomePage', () => {
       shelf(name).querySelector('img'),
     )
     expect(posters.map((poster) => poster?.getAttribute('sizes'))).toEqual([
-      POSTER_SIZES.row,
+      POSTER_SIZES.showTile,
       POSTER_SIZES.row,
       POSTER_SIZES.row,
     ])
@@ -128,14 +154,22 @@ describe('HomePage', () => {
     ])
   })
 
-  it('shows every video in progress, past the eight a library row holds', async () => {
+  it('shows the first six videos in progress, and every one behind Show all', async () => {
+    const user = userEvent.setup()
     const watching = Array.from({ length: 10 }, (_, index) => ({
       media: mediaItem({ id: 100 + index, title: `Halfway ${index}`, position: 60 }),
       poster: null,
     }))
     open({ inProgress: watching, shelves: [] })
     await screen.findByRole('heading', { name: 'Continue watching' })
-    expect(within(shelf('Continue watching')).getAllByRole('listitem')).toHaveLength(10)
+    const section = shelf('Continue watching')
+    expect(within(section).getAllByRole('listitem')).toHaveLength(6)
+
+    await user.click(within(section).getByRole('button', { name: 'Show all 10' }))
+    expect(within(section).getAllByRole('listitem')).toHaveLength(10)
+
+    await user.click(within(section).getByRole('button', { name: 'Show fewer' }))
+    expect(within(section).getAllByRole('listitem')).toHaveLength(6)
   })
 
   it('leaves the row out when nothing is in progress', async () => {

@@ -1,18 +1,23 @@
 import { useQuery } from '@tanstack/react-query'
 import { type HomeShelf, type Library, matchTypeFor } from '@raven/core'
+import { Icon } from '@raven/ui'
 import { type ReactNode, useId } from 'react'
 import { Link } from 'react-router-dom'
 import { MediaCard } from '@/components/MediaCard/MediaCard'
 import { PosterCard } from '@/components/PosterCard/PosterCard'
 import { SearchField } from '@/components/SearchField/SearchField'
+import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
 import { ShowCard } from '@/components/ShowCard/ShowCard'
 import { Bone, Loading, SkeletonCards } from '@/components/Skeleton/Skeleton'
 import { POSTER_SIZES } from '@/lib/posters'
 import { homeQuery, homeSearchQuery, librariesQuery } from '@/lib/queries'
 import { useAddressSearch } from '@/lib/useSearch'
+import { ContinueWatching } from '@/pages/HomePage/ContinueWatching'
+import { HomeHero } from '@/pages/HomePage/HomeHero'
+import { featuredOf } from '@/pages/HomePage/featured'
 import styles from '@/pages/HomePage/HomePage.module.scss'
 
-/** A titled row of cards, or a line saying it has none yet. */
+/** A row of cards under its ruled heading, or a line saying it has none yet. */
 const Shelf = ({
   title,
   isEmpty,
@@ -26,9 +31,7 @@ const Shelf = ({
   const id = useId()
   return (
     <section className={styles.shelf} aria-labelledby={id}>
-      <h2 id={id} className={styles.heading}>
-        {title}
-      </h2>
+      <SectionHeading id={id}>{title}</SectionHeading>
       {isEmpty ? (
         <p className={styles.message}>Nothing here yet.</p>
       ) : (
@@ -114,9 +117,31 @@ const withLibraries = ({
     return library ? [{ shelf, library }] : []
   })
 
-/** Rows of cards standing in while they are read. */
-const SkeletonShelves = ({ label, count }: { label: string; count: number }) => (
+/** Rows of cards standing in while they are read, under the hero's shape when home has one. */
+const SkeletonShelves = ({
+  label,
+  count,
+  hasHero = false,
+}: {
+  label: string
+  count: number
+  hasHero?: boolean
+}) => (
   <Loading label={label}>
+    {hasHero && (
+      <div className={styles.skeletonHero}>
+        <div className={styles.skeletonWords}>
+          <Bone shape="small" width="short" />
+          <Bone shape="hero" width="most" />
+          <Bone shape="text" width="most" />
+          <Bone shape="text" width="half" />
+          <Bone shape="button" />
+        </div>
+        <div className={styles.skeletonPoster}>
+          <Bone shape="poster" />
+        </div>
+      </div>
+    )}
     {Array.from({ length: count }, (_, index) => (
       <section key={index} className={styles.shelf}>
         <Bone shape="heading" width="short" />
@@ -134,7 +159,7 @@ const SearchResults = ({ query, libraries }: { query: string; libraries: Library
   const shelves = withLibraries({ shelves: results.data ?? [], libraries })
   return (
     <section
-      className={styles.results}
+      className={styles.sections}
       aria-label={`Search results for ${query}`}
       aria-busy={results.isFetching}
     >
@@ -154,21 +179,22 @@ const SearchResults = ({ query, libraries }: { query: string; libraries: Library
   )
 }
 
-/** What is being watched, then each pinned library's newest arrivals. */
+/** The newest arrivals in turn, then what is being watched, then each pinned library's newest. */
 const Shelves = ({ libraries }: { libraries: Library[] }) => {
   const home = useQuery(homeQuery)
   const shelves = withLibraries({ shelves: home.data?.shelves ?? [], libraries })
+  const featured = featuredOf(shelves)
   const inProgress = home.data?.inProgress ?? []
   const isBare = home.isSuccess && inProgress.length === 0 && home.data.shelves.length === 0
 
   return (
-    <>
+    <div className={styles.sections}>
       {home.isError && (
         <p className={styles.message} role="alert">
           {home.error.message}
         </p>
       )}
-      {home.isPending && <SkeletonShelves label="Gathering your libraries" count={2} />}
+      {home.isPending && <SkeletonShelves label="Gathering your libraries" count={2} hasHero />}
       {isBare && (
         <p className={styles.message}>
           Nothing to show yet. Pin a library in its settings and its newest videos show here, and
@@ -176,26 +202,22 @@ const Shelves = ({ libraries }: { libraries: Library[] }) => {
         </p>
       )}
 
-      {inProgress.length > 0 && (
-        <Shelf title="Continue watching" isEmpty={false}>
-          {inProgress.map(({ media, poster }) => (
-            <PosterCard key={media.id} media={media} poster={poster} sizes={POSTER_SIZES.row} />
-          ))}
-        </Shelf>
-      )}
+      {featured.length > 0 && <HomeHero featured={featured} />}
+      {inProgress.length > 0 && <ContinueWatching entries={inProgress} />}
       {shelves.map(({ shelf, library }) => (
         <LibraryShelf key={library.id} shelf={shelf} library={library} />
       ))}
-    </>
+    </div>
   )
 }
 
 /**
- * `/`: a search through every library, then what is being watched, as
- * posters (an episode wears its season's), then a row for each pinned
- * library with its eight newest arrivals, in the side menu's order. A
- * search, which rides in the address as `?q=`, shows what it found in place
- * of the rows. Libraries still locked stay off it until the PIN opens them.
+ * `/`: a search through every library, then the newest arrivals with
+ * artwork taking turns in the hero, then what is being watched, as wide
+ * tiles, then a row for each pinned library with its eight newest
+ * arrivals, in the side menu's order. A search, which rides in the address
+ * as `?q=`, shows what it found in place of all of it. Libraries still
+ * locked stay off it until the PIN opens them.
  */
 export const HomePage = () => {
   const ids = { title: useId(), search: useId() }
@@ -219,6 +241,9 @@ export const HomePage = () => {
             className={styles.input}
             placeholder="Search every library"
           />
+          <span className={styles.searchIcon}>
+            <Icon name="search" size={20} />
+          </span>
         </search>
       </header>
 

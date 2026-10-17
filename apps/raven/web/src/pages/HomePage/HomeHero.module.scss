@@ -1,0 +1,296 @@
+// The words and their controls at the left, centred on the fan of posters
+// at the right; under 64rem the fan goes above them. Its own stacking, so
+// the wash can sit under the words without going under the page.
+.hero {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  grid-template-rows: 1fr auto auto 1fr;
+  grid-template-areas:
+    '. stack'
+    'slide stack'
+    'controls stack'
+    '. stack';
+  gap: 0 var(--space-5);
+}
+
+// The arrival's backdrop, blurred to a colour and faded out at its edges,
+// up behind the fan. It stops at the hero's right edge: past it, it would
+// widen the page.
+.wash {
+  position: absolute;
+  top: calc(-1 * var(--space-8));
+  right: 0;
+  z-index: -1;
+  display: grid;
+  grid-template-areas: 'wash';
+  width: min(47.5rem, 100%);
+  height: 41.25rem;
+  pointer-events: none;
+}
+
+.backdrop {
+  grid-area: wash;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  filter: blur(var(--space-6)) brightness(1.2);
+  mask-image: radial-gradient(closest-side, var(--color-stage), transparent);
+}
+
+.shown {
+  opacity: var(--glow);
+}
+
+// Every arrival's words in one cell, as tall as the tallest of them.
+.slides {
+  grid-area: slide;
+  display: grid;
+  grid-template-areas: 'turn';
+}
+
+// Each line as wide as the column, so a long word breaks inside it rather
+// than running under the fan. A shorter one sits at the foot of the cell,
+// so Play and Details hold their place from one arrival to the next.
+.slide {
+  grid-area: turn;
+  align-self: end;
+  display: grid;
+  gap: var(--space-4);
+  visibility: hidden;
+  opacity: 0;
+}
+
+.current {
+  visibility: visible;
+  opacity: 1;
+}
+
+// A short rule, then where it arrived.
+.eyebrow {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-birch);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+
+  &::before {
+    content: '';
+    width: var(--space-5);
+    height: 1px;
+    background: currentcolor;
+  }
+}
+
+// A long name breaks between syllables, else anywhere, before it would
+// run off a phone.
+.title {
+  font-size: var(--font-size-display);
+  line-height: var(--line-display);
+  letter-spacing: var(--tracking-display);
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
+.long {
+  font-size: var(--font-size-hero);
+}
+
+.longest {
+  font-size: var(--font-size-2xl);
+  line-height: var(--line-heading);
+}
+
+// Room for three lines whether or not the words have come, so the buttons
+// under them hold still as the arrivals change.
+.line {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  max-width: 30rem;
+  min-height: calc(3em * var(--line-body));
+  overflow: hidden;
+  color: var(--color-birch);
+  font-size: var(--font-size-lg);
+  line-height: var(--line-body);
+  text-wrap: pretty;
+}
+
+// Play and Details, then what it is beside them; under them on a phone.
+.actions {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas: 'buttons facts';
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+}
+
+.buttons {
+  grid-area: buttons;
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  gap: var(--space-2);
+}
+
+.facts {
+  grid-area: facts;
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.controls {
+  grid-area: controls;
+  display: grid;
+  padding-top: var(--space-5);
+  grid-auto-flow: column;
+  justify-content: start;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.count {
+  padding-inline-start: var(--space-1);
+  color: var(--color-lichen);
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+}
+
+// The fan sizes from its column, so it never spills past the gutter.
+.stack {
+  grid-area: stack;
+  container-type: inline-size;
+  display: grid;
+}
+
+// Every poster in one cell, the arrival on top, the ones before and after
+// it tilted out to either side, the rest tucked out of sight behind.
+.fan {
+  --main: min(18.75rem, 56cqi);
+
+  display: grid;
+  grid-template-areas: 'poster';
+  justify-items: center;
+  align-items: start;
+  isolation: isolate;
+  height: calc(var(--main) * 1.62);
+}
+
+.poster {
+  grid-area: poster;
+  width: var(--main);
+  aspect-ratio: 2 / 3;
+  border-radius: var(--radius-lg);
+  object-fit: cover;
+  background: var(--color-canopy);
+  box-shadow: var(--shadow-hero);
+}
+
+.front {
+  z-index: 3;
+  translate: 0 calc(var(--main) * 0.03);
+}
+
+.previous {
+  z-index: 1;
+  translate: calc(var(--main) * -0.54) calc(var(--main) * 0.02);
+  rotate: -9deg;
+  scale: 0.73;
+  opacity: 0.7;
+}
+
+.next {
+  z-index: 2;
+  translate: calc(var(--main) * 0.54) 0;
+  rotate: 8deg;
+  scale: 0.73;
+  opacity: 0.7;
+}
+
+.away {
+  z-index: 0;
+  translate: 0 calc(var(--main) * 0.1);
+  scale: 0.6;
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .backdrop {
+    transition: opacity 800ms ease-out;
+  }
+
+  // Hidden only once faded out, shown as it starts to fade in.
+  .slide {
+    transition:
+      opacity 400ms ease-out,
+      visibility 400ms;
+  }
+
+  .poster {
+    transition:
+      translate 600ms var(--ease-out),
+      rotate 600ms var(--ease-out),
+      scale 600ms var(--ease-out),
+      opacity 600ms var(--ease-out);
+  }
+}
+
+@media (max-width: 64rem) {
+  .hero {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    grid-template-areas:
+      'stack'
+      'slide'
+      'controls';
+    row-gap: var(--space-5);
+  }
+
+  .controls {
+    padding-top: 0;
+  }
+
+  .fan {
+    --main: min(14.375rem, 62cqi);
+  }
+}
+
+// The posters either side tuck in under the one on top, to fit a phone.
+@media (max-width: 48rem) {
+  .hero {
+    gap: var(--space-4);
+  }
+
+  .fan {
+    --main: min(15rem, 62cqi);
+  }
+
+  .previous {
+    translate: calc(var(--main) * -0.35) calc(var(--main) * 0.02);
+  }
+
+  .next {
+    translate: calc(var(--main) * 0.35) 0;
+  }
+
+  .line {
+    font-size: var(--font-size-md);
+  }
+}
+
+@media (max-width: 30rem) {
+  .actions {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'buttons'
+      'facts';
+  }
+}

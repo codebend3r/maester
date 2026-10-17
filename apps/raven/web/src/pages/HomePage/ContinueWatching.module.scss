@@ -1,0 +1,220 @@
+.section {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+// The picture at the left, the words along the foot beside it. The tile is
+// a picture in every theme, its own artwork blurred to a colour under a
+// scrim, so its words keep the fixed light ink of words on a picture.
+.tile {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas: 'play copy';
+  align-items: end;
+  gap: var(--space-4);
+  min-height: 12.5rem;
+  padding: var(--space-4);
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background: var(--color-stage);
+  color: var(--color-on-picture);
+
+  // Darkest under the words at the left, so they read on any picture.
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(110deg, var(--color-picture-scrim) 30%, var(--color-shade));
+  }
+
+  // The ring goes round the whole tile, which the picture's link covers.
+  &:has(.play:focus-visible) {
+    outline: var(--focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+// Scaled past the tile's edges, which the blur would otherwise leave pale.
+.tint {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  scale: 1.3;
+  filter: blur(var(--space-5)) brightness(0.85);
+}
+
+.tile:hover .tint {
+  filter: blur(var(--space-5)) brightness(1);
+}
+
+// The picture is the link that resumes the video, and it reaches across
+// the whole tile, under its name's own link and its menu.
+.play {
+  grid-area: play;
+  display: grid;
+  border-radius: var(--radius-md);
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+  }
+
+  &:focus-visible {
+    outline: none;
+  }
+}
+
+// A frame grab's shape, or a poster's.
+.frame {
+  display: grid;
+  grid-template-areas: 'frame';
+  width: 10rem;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: var(--color-shade);
+  box-shadow: var(--shadow-panel);
+}
+
+.poster {
+  width: 6rem;
+  aspect-ratio: 2 / 3;
+}
+
+.picture {
+  grid-area: frame;
+  display: grid;
+}
+
+// Play, in the middle of the picture, while the tile is pointed at or focused.
+.mark {
+  grid-area: frame;
+  place-self: center;
+  display: grid;
+  place-items: center;
+  width: var(--control-size);
+  height: var(--control-size);
+  border-radius: var(--radius-pill);
+  background: var(--color-leaf);
+  color: var(--color-on-leaf);
+  opacity: 0;
+}
+
+.tile:hover .mark,
+.play:focus-visible .mark {
+  opacity: 1;
+}
+
+.copy {
+  grid-area: copy;
+  display: grid;
+  align-content: end;
+  gap: var(--space-0);
+}
+
+// Above the picture's link, so its own click opens the page.
+.title {
+  position: relative;
+  z-index: 1;
+  justify-self: start;
+  font-family: var(--font-display);
+  font-size: var(--font-size-xl);
+  line-height: var(--line-heading);
+  color: inherit;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.link {
+  border-radius: var(--radius-sm);
+
+  &:hover {
+    text-decoration: underline;
+    text-decoration-color: currentcolor;
+    text-underline-offset: 0.18em;
+  }
+
+  &:focus-visible {
+    outline: var(--focus-ring);
+    outline-color: var(--color-on-picture);
+    outline-offset: 2px;
+  }
+}
+
+.line {
+  color: var(--color-on-picture-soft);
+  font-size: var(--font-size-sm);
+}
+
+.progress {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'bar left';
+  align-items: center;
+  gap: var(--space-2);
+  padding-top: var(--space-1);
+}
+
+.bar {
+  grid-area: bar;
+  height: 4px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+}
+
+.left {
+  grid-area: left;
+  color: var(--color-on-picture-soft);
+  font-size: var(--font-size-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .tint {
+    transition: filter 200ms ease-out;
+  }
+
+  .mark {
+    transition: opacity 150ms ease-out;
+  }
+}
+
+@media (max-width: 48rem) {
+  .tiles {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-3);
+  }
+
+  .tile {
+    gap: var(--space-3);
+    min-height: 9.5rem;
+    padding: var(--space-3);
+  }
+
+  .frame {
+    width: 7.5rem;
+  }
+
+  .poster {
+    width: 5rem;
+  }
+
+  .title {
+    font-size: var(--font-size-lg);
+  }
+}
