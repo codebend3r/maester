@@ -12,9 +12,11 @@ import {
   finish,
   isDownloadEntry,
   isDownloadsState,
+  isWaitingOnOutage,
   noteWatched,
   notePending,
   pause,
+  pauseEverything,
   pauseServer,
   queue,
   remove,
@@ -241,6 +243,61 @@ describe('pauseServer', () => {
     const state = stateOf(entry({ status: { kind: 'ready' } }))
     expect(pauseServer(state, { serverId: SERVER_A, reason: 'viewer' })).toBe(state)
     expect(pauseServer(state, { serverId: SERVER_B, reason: 'viewer' })).toBe(state)
+  })
+})
+
+describe('pauseEverything', () => {
+  it('pauses what runs or waits, and what waits on an outage, for the viewer', () => {
+    const state = stateOf(
+      entry({ downloadId: id(1), mediaId: 1, status: { kind: 'queued' } }),
+      entry({ downloadId: id(2), mediaId: 2, status: { kind: 'downloading', bytes: 9 } }),
+      entry({
+        downloadId: id(3),
+        mediaId: 3,
+        status: { kind: 'paused', bytes: 4, reason: 'unreachable' },
+      }),
+      entry({
+        downloadId: id(4),
+        mediaId: 4,
+        status: { kind: 'failed', bytes: 5, reason: 'unreachable', message: '' },
+      }),
+      entry({
+        downloadId: id(5),
+        mediaId: 5,
+        status: { kind: 'paused', bytes: 6, reason: 'relocked' },
+      }),
+      entry({
+        downloadId: id(6),
+        mediaId: 6,
+        status: { kind: 'failed', bytes: 7, reason: 'changed', message: '' },
+      }),
+      entry({ downloadId: id(7), mediaId: 7, status: { kind: 'ready' } }),
+    )
+    expect(pauseEverything(state).entries.map((each) => each.status)).toEqual([
+      { kind: 'paused', bytes: 0, reason: 'viewer' },
+      { kind: 'paused', bytes: 9, reason: 'viewer' },
+      { kind: 'paused', bytes: 4, reason: 'viewer' },
+      { kind: 'paused', bytes: 5, reason: 'viewer' },
+      { kind: 'paused', bytes: 6, reason: 'relocked' },
+      { kind: 'failed', bytes: 7, reason: 'changed', message: '' },
+      { kind: 'ready' },
+    ])
+  })
+
+  it('returns the same state when nothing is touched', () => {
+    const state = stateOf(entry({ status: { kind: 'paused', bytes: 1, reason: 'viewer' } }))
+    expect(pauseEverything(state)).toBe(state)
+  })
+})
+
+describe('isWaitingOnOutage', () => {
+  it('is true for a file paused or failed for an outage, and no other', () => {
+    const of = (status: DownloadEntry['status']) => isWaitingOnOutage(entry({ status }))
+    expect(of({ kind: 'paused', bytes: 0, reason: 'unreachable' })).toBe(true)
+    expect(of({ kind: 'failed', bytes: 0, reason: 'unreachable', message: '' })).toBe(true)
+    expect(of({ kind: 'paused', bytes: 0, reason: 'viewer' })).toBe(false)
+    expect(of({ kind: 'failed', bytes: 0, reason: 'gone', message: '' })).toBe(false)
+    expect(of({ kind: 'queued' })).toBe(false)
   })
 })
 

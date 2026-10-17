@@ -16,19 +16,22 @@ import type { DownloadView, SpaceView } from '@/shared/protocol'
 const EMPTY =
   'Nothing downloaded yet. Open a title in raven on the web and choose Download to raven player.'
 
-/** The header's one button for every download at once. */
+/** A header button for every download at once. */
 type Bulk = { name: 'Pause all' | 'Resume all'; icon: IconName; request: DownloadsChange }
 
-/** Pause all while anything runs, else Resume all while anything waits paused, else nothing. */
-const bulkOf = (downloads: DownloadView[]): Bulk | null => {
-  if (downloads.some(isInProgress)) {
-    return { name: 'Pause all', icon: 'pause', request: { type: 'pauseAllDownloads' } }
-  }
-  if (downloads.some((view) => view.status.kind === 'paused')) {
-    return { name: 'Resume all', icon: 'download', request: { type: 'resumeAllDownloads' } }
-  }
-  return null
+const PAUSE_ALL: Bulk = { name: 'Pause all', icon: 'pause', request: { type: 'pauseAllDownloads' } }
+
+const RESUME_ALL: Bulk = {
+  name: 'Resume all',
+  icon: 'download',
+  request: { type: 'resumeAllDownloads' },
 }
+
+/** Pause all while anything is queued or downloading, and Resume all while anything waits paused. */
+const bulksOf = (downloads: DownloadView[]): Bulk[] => [
+  ...(downloads.some(isInProgress) ? [PAUSE_ALL] : []),
+  ...(downloads.some((view) => view.status.kind === 'paused') ? [RESUME_ALL] : []),
+]
 
 const spaceLine = ({ used, free, total }: SpaceView): string =>
   `${formatBytes(used)} of downloads · ${formatBytes(free)} free of ${formatBytes(total)}`
@@ -51,7 +54,7 @@ export const DownloadsPage = () => {
   }, [])
 
   const list = downloads.data?.downloads ?? null
-  const bulk = bulkOf(list ?? [])
+  const bulks = bulksOf(list ?? [])
   const disk = space.data ?? null
 
   return (
@@ -63,14 +66,14 @@ export const DownloadsPage = () => {
         <h1 id="downloads-title" className={styles.title} tabIndex={-1} ref={title}>
           Downloads
         </h1>
-        {bulk !== null && (
-          <Button
-            className={styles.bulk}
-            icon={bulk.icon}
-            onClick={() => void change(bulk.request)}
-          >
-            {bulk.name}
-          </Button>
+        {bulks.length > 0 && (
+          <div className={styles.bulk}>
+            {bulks.map((bulk) => (
+              <Button key={bulk.name} icon={bulk.icon} onClick={() => void change(bulk.request)}>
+                {bulk.name}
+              </Button>
+            ))}
+          </div>
         )}
         {disk !== null && (
           <>

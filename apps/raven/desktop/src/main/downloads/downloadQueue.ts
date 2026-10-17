@@ -12,7 +12,9 @@ import {
   entryById,
   fail,
   finish,
+  isWaitingOnOutage,
   pause,
+  pauseEverything,
   pauseServer,
   remove,
   removeAll,
@@ -66,6 +68,12 @@ export const RENEWAL_MIN_MS = 60_000
 /** Node runs a longer delay at once, so no timer is ever armed for more. */
 const TIMER_MAX_MS = 2 ** 31 - 1
 
+/** How often the files waiting on an outage are tried again, while any waits. */
+export const OUTAGE_RETRY_MS = 300_000
+
+/** How long a wake from sleep is given for the network to come back before files start again. */
+export const RESUME_SETTLE_MS = 5000
+
 const NOT_FOUND_STATUS = 404
 
 /** The parts of `node:fs/promises` the queue uses; main passes a recursive `mkdir` and a forced, recursive `rm`. */
@@ -103,8 +111,15 @@ export type DownloadQueue = {
   /** Starts queued files, and files a last run left downloading, up to `DOWNLOAD_CONCURRENCY`. */
   kick: () => void
   pause: (input: { downloadId: string }) => Promise<void>
+  /** Requeues the file; a file paused by a relock requeues every file its server's relock paused. */
   resume: (input: { downloadId: string }) => void
   retry: (input: { downloadId: string }) => void
+  /** Requeues every file waiting on an outage and starts what can start: at launch, after the sweep. */
+  retryOutages: () => void
+  /** The computer is going to sleep: every fetch stops, its file left downloading, and none starts. */
+  onSuspend: () => void
+  /** The computer woke: files start again once `RESUME_SETTLE_MS` has passed. */
+  onResume: () => void
   pauseAll: () => Promise<void>
   resumeAll: () => void
   /** Aborts the file, drops it and removes its folder. */
@@ -123,7 +138,7 @@ export type DownloadQueue = {
 }
 
 /** Why a run's fetch was aborted: a renewed ticket fetches again, the rest leave the entry as the caller set it. */
-const STOP_REASONS = ['refresh', 'pause', 'remove', 'dispose'] as const
+const STOP_REASONS = ['refresh', 'pause', 'remove', 'suspend', 'dispose'] as const
 
 type StopReason = (typeof STOP_REASONS)[number]
 
@@ -136,6 +151,9 @@ const stopReasonOf = (signal: AbortSignal): StopReason | null => {
   if (!(reason instanceof DOMException)) return null
   return STOP_REASONS.find((known) => known === reason.message) ?? null
 }
+
+const isRelocked = ({ status }: DownloadEntry): boolean =>
+  status.kind === 'paused' && status.reason === 'relocked'
 
 /** A file being fetched: `stop` aborts it, and `done` settles once it has let go of its files. */
 type Run = { serverId: string; stop: AbortController; done: Promise<void> }
@@ -186,6 +204,10 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
   let isDisposed = false
   /** The launch sweep while it runs: a kick meanwhile waits, so the sweep never takes a new file's folder. */
   const launch: { sweeping: Promise<void> | null } = { sweeping: null }
+  /** The one timer that tries the files waiting on an outage again. */
+  const outage: { retry: unknown } = { retry: undefined }
+  /** Asleep from a suspend until the settle after the wake; nothing starts meanwhile. */
+  const sleep: { isAsleep: boolean; settle: unknown } = { isAsleep: false, settle: undefined }
 
   const partsOf = (entry: DownloadEntry) => ({
     userData,
@@ -267,6 +289,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
   const failUnreachable = (job: Job): void => {
     failEntry({ entry: job.entry, reason: 'unreachable' })
     pauseServerOf({ job, reason: 'unreachable' })
+    syncOutageRetry()
     deps.warn(
       `raven player could not reach ${loggable(job.server.name)} for ${loggable(job.entry.label)}`,
     )
@@ -572,7 +595,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
   }
 
   const kick = (): void => {
-    if (isDisposed) return
+    if (isDisposed || sleep.isAsleep) return
     if (launch.sweeping !== null) {
       launch.sweeping.then(kick).catch((error: unknown) => {
         deps.warn(`raven player's downloads stopped short: ${loggable(errorText(error))}`)
@@ -599,28 +622,89 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     kick()
   }
 
-  const requeue: DownloadQueue['resume'] = ({ downloadId }) => {
-    store.update((state) => resume(state, { downloadId }))
+  const clearOutageRetry = (): void => {
+    timers.clear(outage.retry)
+    outage.retry = undefined
+  }
+
+  /** Arms the outage retry while any file waits on an outage, and drops it once none does. */
+  const syncOutageRetry = (): void => {
+    if (isDisposed || !store.read().entries.some(isWaitingOnOutage)) {
+      clearOutageRetry()
+      return
+    }
+    if (outage.retry !== undefined) return
+    outage.retry = timers.set(() => {
+      outage.retry = undefined
+      retryOutages()
+    }, OUTAGE_RETRY_MS)
+  }
+
+  const resumeEach = (downloadIds: readonly string[]): void => {
+    store.update((state) =>
+      downloadIds.reduce((next, downloadId) => resume(next, { downloadId }), state),
+    )
+    syncOutageRetry()
     kick()
   }
 
-  const pauseAll: DownloadQueue['pauseAll'] = async () => {
-    store.update((state) =>
-      state.entries.reduce(
-        (next, entry) => pause(next, { downloadId: entry.downloadId, reason: 'viewer' }),
-        state,
-      ),
+  const retryOutages: DownloadQueue['retryOutages'] = () => {
+    if (isDisposed) return
+    resumeEach(
+      store
+        .read()
+        .entries.filter(isWaitingOnOutage)
+        .map(({ downloadId }) => downloadId),
     )
+  }
+
+  // One unlock lifts the lock for every file of the server, so one Resume takes them all.
+  const resumeOne: DownloadQueue['resume'] = ({ downloadId }) => {
+    const entry = entryById(store.read(), { downloadId })
+    if (entry === null) return
+    const relocked = isRelocked(entry)
+      ? store
+          .read()
+          .entries.filter((other) => other.serverId === entry.serverId && isRelocked(other))
+      : [entry]
+    resumeEach(relocked.map((other) => other.downloadId))
+  }
+
+  const retryOne: DownloadQueue['retry'] = ({ downloadId }) => resumeEach([downloadId])
+
+  const pauseAll: DownloadQueue['pauseAll'] = async () => {
+    store.update(pauseEverything)
+    syncOutageRetry()
     await stopRuns({ reason: 'pause', isStopped: () => true })
   }
 
   const resumeAll: DownloadQueue['resumeAll'] = () => {
-    store.update((state) =>
-      state.entries
-        .filter((entry) => entry.status.kind === 'paused')
-        .reduce((next, entry) => resume(next, { downloadId: entry.downloadId }), state),
+    resumeEach(
+      store
+        .read()
+        .entries.filter((entry) => entry.status.kind === 'paused')
+        .map(({ downloadId }) => downloadId),
     )
-    kick()
+  }
+
+  const onSuspend: DownloadQueue['onSuspend'] = () => {
+    if (isDisposed) return
+    sleep.isAsleep = true
+    timers.clear(sleep.settle)
+    sleep.settle = undefined
+    stopRuns({ reason: 'suspend', isStopped: () => true }).catch(() => undefined)
+  }
+
+  const onResume: DownloadQueue['onResume'] = () => {
+    if (isDisposed) return
+    timers.clear(sleep.settle)
+    sleep.settle = timers.set(() => {
+      sleep.settle = undefined
+      sleep.isAsleep = false
+      // A wake may come on another network, so each server's origin is picked again.
+      deps.servers().forEach(({ id }) => deps.access.forget(id))
+      retryOutages()
+    }, RESUME_SETTLE_MS)
   }
 
   /** Removes a folder; one that stays is swept at the next launch, so a failure is only logged. */
@@ -634,6 +718,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     const entry = entryById(store.read(), { downloadId })
     if (entry === null) return
     store.update((state) => remove(state, { downloadId }))
+    syncOutageRetry()
     await stopOne({ downloadId, reason: 'remove' })
     await removeFolder({
       path: entryDirFor(partsOf(entry)),
@@ -645,6 +730,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
   const removeServerAll: DownloadQueue['removeServer'] = async ({ serverId }) => {
     if (!isOpaqueId(serverId)) return
     store.update((state) => removeServer(state, { serverId }))
+    syncOutageRetry()
     deps.access.forget(serverId)
     await stopRuns({ reason: 'remove', isStopped: ({ run }) => run.serverId === serverId })
     await removeFolder({
@@ -656,6 +742,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
 
   const removeEverything: DownloadQueue['removeAll'] = async () => {
     store.update(removeAll)
+    syncOutageRetry()
     await stopRuns({ reason: 'remove', isStopped: () => true })
     await removeFolder({ path: downloadsDirFor({ userData }), what: 'its downloads' })
   }
@@ -724,14 +811,20 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
 
   const dispose: DownloadQueue['dispose'] = () => {
     isDisposed = true
+    clearOutageRetry()
+    timers.clear(sleep.settle)
+    sleep.settle = undefined
     running.forEach((run) => run.stop.abort(stopping('dispose')))
   }
 
   return {
     kick,
     pause: pauseOne,
-    resume: requeue,
-    retry: requeue,
+    resume: resumeOne,
+    retry: retryOne,
+    retryOutages,
+    onSuspend,
+    onResume,
     pauseAll,
     resumeAll,
     remove: removeOne,

@@ -340,7 +340,9 @@ describe('DownloadsPage', () => {
   })
 
   it('offers Pause all while anything is queued or downloading', async () => {
-    const { client } = await openPage({ downloads: ROWS })
+    const { client } = await openPage({
+      downloads: ROWS.filter(({ status }) => status.kind !== 'paused'),
+    })
     await userEvent.click(await screen.findByRole('button', { name: 'Pause all' }))
     expect(sentOfType({ client, type: 'pauseAllDownloads' })).toEqual([
       { type: 'pauseAllDownloads' },
@@ -359,6 +361,22 @@ describe('DownloadsPage', () => {
       { type: 'resumeAllDownloads' },
     ])
     expect(screen.queryByRole('button', { name: 'Pause all' })).toBeNull()
+  })
+
+  it('offers Resume all beside Pause all while one row is paused and another downloads', async () => {
+    const { client } = await openPage({
+      downloads: ROWS.filter(({ downloadId }) => downloadId === DL_1 || downloadId === DL_3),
+    })
+    const pauseAll = await screen.findByRole('button', { name: 'Pause all' })
+    const resumeAll = screen.getByRole('button', { name: 'Resume all' })
+    expect(
+      [...document.querySelectorAll('header button')].map((button) => button.textContent),
+    ).toEqual(['Back', 'Pause all', 'Resume all'])
+    await userEvent.click(resumeAll)
+    expect(sentOfType({ client, type: 'resumeAllDownloads' })).toEqual([
+      { type: 'resumeAllDownloads' },
+    ])
+    expect(pauseAll).toBeInTheDocument()
   })
 
   it('offers neither when nothing is in progress or paused', async () => {

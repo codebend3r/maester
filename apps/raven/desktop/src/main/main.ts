@@ -31,6 +31,7 @@ import {
   type MessagePortMain,
   net,
   type OpenDialogOptions,
+  powerMonitor,
   powerSaveBlocker,
   protocol,
   screen,
@@ -728,6 +729,10 @@ const startApp = (): void => {
     app.on('will-quit', quitGate)
 
     await app.whenReady()
+    // `powerMonitor` answers only once the app is ready. A sleep stops the downloads where
+    // they are, and the wake starts them again.
+    powerMonitor.on('suspend', () => downloads.onSuspend())
+    powerMonitor.on('resume', () => downloads.onResume())
     serveSchemes({ grants })
     secureContents()
     answerRequests({ service, grants })

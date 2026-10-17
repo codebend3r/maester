@@ -15,6 +15,7 @@ import {
   type DownloadsState,
   type EntryStatus,
 } from '@/main/downloads/downloadState'
+import { RESUME_SETTLE_MS } from '@/main/downloads/downloadQueue'
 import { DOWNLOADS_DEBOUNCE_MS } from '@/main/downloads/downloadStore'
 import { EXPAND_MESSAGES } from '@/main/downloads/expand'
 import type { AccessOutcome } from '@/main/downloads/mediaAccess'
@@ -978,6 +979,31 @@ describe('the queue', () => {
     expect(
       viewStatusOf({ status: { kind: 'paused', bytes: 0, reason: 'noSpace' }, serverName: '' }),
     ).toEqual({ kind: 'paused', bytes: 0, message: 'Not enough space' })
+  })
+
+  it('requeues at launch what an outage stopped', async () => {
+    const world = setup({
+      initial: holding(queuedFile({ status: { kind: 'paused', bytes: 0, reason: 'unreachable' } })),
+      access: async () => FAR_TICKET,
+    })
+    await until(() => world.network.fileRequests().length === 1)
+    expect(statusOf(world)).toEqual({ kind: 'downloading', bytes: 0 })
+  })
+
+  it('stops its fetches on a sleep without a word, and starts them again after the wake', async () => {
+    const world = setup({ initial: holding(queuedFile()), access: async () => FAR_TICKET })
+    await until(() => world.network.fileRequests().length === 1)
+    world.service.onSuspend()
+    expect(world.network.fileRequests()[0]?.signal.aborted).toBe(true)
+    await ticks(10)
+    expect(statusOf(world)).toEqual({ kind: 'downloading', bytes: 0 })
+    world.service.onResume()
+    const settle = [...world.pending].find(([, timer]) => timer.ms === RESUME_SETTLE_MS)
+    expect(settle).toBeDefined()
+    world.pending.delete(settle?.[0] ?? 0)
+    settle?.[1].run()
+    await until(() => world.network.fileRequests().length === 2)
+    expect(world.sent.filter(({ type }) => type === 'notice')).toEqual([])
   })
 
   it('sends no downloads event after dispose, even as its fetches stop', async () => {
