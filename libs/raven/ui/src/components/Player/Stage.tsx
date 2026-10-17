@@ -228,7 +228,7 @@ export const PlayerChrome = ({
   }
 
   const chromeShown = idle.active
-  const about = aboutLine({ media, label, mode })
+  const about = aboutLine({ media, label, mode, context: title.context ?? null })
 
   // The scrubber and the clock keep what they showed while the controls are
   // hidden, so a quiet page changes nothing in the DOM. Adjusting state during

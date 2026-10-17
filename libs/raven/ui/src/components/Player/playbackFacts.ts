@@ -32,21 +32,26 @@ export const pictureLabel = (media: MediaItem): string | null => {
 }
 
 /**
- * The line under the player's title: the year, unless the title already
- * ends with it, then the picture and how it is playing.
+ * The line under the player's title: where the title came from when the host
+ * names it, the year, unless the title already ends with it, then the picture
+ * and how it is playing.
  */
 export const aboutLine = ({
   media,
   label,
   mode,
+  context = null,
 }: {
   media: MediaItem | null
   label: string
   mode: PlaybackMode
+  context?: string | null
 }): string => {
   const year = media?.item?.year ?? media?.year ?? null
   const shownYear = year != null && !label.includes(`(${year})`) ? String(year) : null
-  return joined({ parts: [shownYear, media ? pictureLabel(media) : null, MODE_NAMES[mode]] })
+  return joined({
+    parts: [context, shownYear, media ? pictureLabel(media) : null, MODE_NAMES[mode]],
+  })
 }
 
 /**
