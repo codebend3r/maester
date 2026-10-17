@@ -19,30 +19,46 @@ const lookingNote = (found: number): string =>
     ? 'Looking through the folders'
     : `Looking through the folders, ${plural({ n: found, one: 'video', many: 'videos' })} found so far`
 
+/**
+ * When the library was last fully scanned and last quick-scanned, as far as
+ * either has run: "Full scan 2 h ago · Quick scan 4 min ago". A library
+ * quick-scanned but never fully scanned since the times were kept says so.
+ */
+const scannedNote = ({ finishedAt, quickScannedAt }: Status): string | null => {
+  if (!finishedAt && !quickScannedAt) return null
+  return [
+    finishedAt ? `Full scan ${since(finishedAt)}` : 'No full scan yet',
+    ...(quickScannedAt ? [`Quick scan ${since(quickScannedAt)}`] : []),
+  ].join(' · ')
+}
+
 /** Live scan progress, or when the library was last brought up to date. */
-export const ScanStatus = ({ scan }: { scan: Status }) => (
-  <div className={styles.status} aria-live="polite">
-    {isScanning(scan) ? (
-      <>
-        <span>
-          {scan.state === 'walking'
-            ? lookingNote(scan.found)
-            : `Indexing ${count.format(scan.processed)} of ${count.format(scan.found)}`}
+export const ScanStatus = ({ scan }: { scan: Status }) => {
+  const scanned = scannedNote(scan)
+  return (
+    <div className={styles.status} aria-live="polite">
+      {isScanning(scan) ? (
+        <>
+          <span>
+            {scan.state === 'walking'
+              ? lookingNote(scan.found)
+              : `Indexing ${count.format(scan.processed)} of ${count.format(scan.found)}`}
+          </span>
+          <progress
+            className={styles.bar}
+            max={Math.max(scan.found, 1)}
+            value={scan.state === 'walking' ? undefined : scan.processed}
+            aria-label="Scan progress"
+          />
+        </>
+      ) : (
+        !!scanned && <span>{scanned}</span>
+      )}
+      {!!scan.error && (
+        <span className={styles.error} role="alert">
+          {scan.error}
         </span>
-        <progress
-          className={styles.bar}
-          max={Math.max(scan.found, 1)}
-          value={scan.state === 'walking' ? undefined : scan.processed}
-          aria-label="Scan progress"
-        />
-      </>
-    ) : (
-      !!scan.finishedAt && <span>Scanned {since(scan.finishedAt)}</span>
-    )}
-    {!!scan.error && (
-      <span className={styles.error} role="alert">
-        {scan.error}
-      </span>
-    )}
-  </div>
-)
+      )}
+    </div>
+  )
+}

@@ -401,6 +401,12 @@ export const MIGRATIONS: readonly string[] = [
        JOIN playback_progress p ON p.media_id = m.id
       WHERE m.duration > 0 AND p.position >= m.duration * l.watched_percent / 100.0);
   `,
+  // When each library's last full scan and last quick scan finished, so the
+  // Libraries page still says after a restart. Null until each has run.
+  `
+  ALTER TABLE libraries ADD COLUMN full_scanned_at TEXT;
+  ALTER TABLE libraries ADD COLUMN quick_scanned_at TEXT;
+  `,
 ]
 
 /** The index's file in the data folder. Before raven was renamed it was `weirwood.db`. */

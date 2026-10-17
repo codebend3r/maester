@@ -21,7 +21,7 @@ services:
     env_file:
       - .env
     environment:
-      - RESCAN_INTERVAL_MINUTES=0
+      - QUICK_SCAN_INTERVAL_MINUTES=10
     volumes:
       - /volume1/docker/raven/data:/config
       # Every NAS's share under /media/<nas>, read-write so deleting in the

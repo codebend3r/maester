@@ -296,8 +296,9 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
             />
             <label htmlFor={`${ids.settings}-refresh`}>Refresh automatically</label>
             <p id={`${ids.settings}-refresh-hint`} className={styles.settingHint}>
-              Watch the folders and take in videos as they are added, removed, renamed or replaced.
-              A share that does not report its changes still needs a rescan.
+              Watch the folders and take in videos as they are added, removed, renamed or replaced,
+              and quick-scan the library every few minutes for a share that does not report its
+              changes. A video replaced under its own name waits for a rescan.
             </p>
           </div>
           <div className={styles.setting}>

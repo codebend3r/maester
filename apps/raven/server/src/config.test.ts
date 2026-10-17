@@ -2,6 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { readServerConfig } from '@/config'
 
 describe('readServerConfig', () => {
+  it('quick-scans on boot and every 10 minutes unless told otherwise', () => {
+    expect(readServerConfig({})).toMatchObject({ scanOnStart: true, quickScanIntervalMinutes: 10 })
+    expect(
+      readServerConfig({ SCAN_ON_START: 'false', QUICK_SCAN_INTERVAL_MINUTES: '0' }),
+    ).toMatchObject({ scanOnStart: false, quickScanIntervalMinutes: 0 })
+  })
+
   it('leaves the AI lookup off without a key, on Haiku 5.5 at low effort, 200 a day', () => {
     expect(readServerConfig({})).toMatchObject({
       anthropicApiKey: null,

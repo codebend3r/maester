@@ -25,6 +25,9 @@ export type LibraryRecord = {
   settings: LibrarySettings
 }
 
+/** When a library's last full scan and last quick scan finished; null before each has run. */
+export type ScanTimes = { fullScannedAt: string | null; quickScannedAt: string | null }
+
 type LibraryRow = {
   id: number
   name: string
@@ -213,6 +216,29 @@ export class LibrariesRepository {
     this.db.transaction(() => {
       layouts.forEach(({ path, layout, groups }) => update.run(layout, groups, id, path))
     })()
+  }
+
+  /** What the library remembers of its scans across restarts; none for a library that is not there. */
+  scanTimes(id: number): ScanTimes {
+    const row = this.db
+      .prepare<[number], { full_scanned_at: string | null; quick_scanned_at: string | null }>(
+        'SELECT full_scanned_at, quick_scanned_at FROM libraries WHERE id = ?',
+      )
+      .get(id)
+    return {
+      fullScannedAt: row?.full_scanned_at ?? null,
+      quickScannedAt: row?.quick_scanned_at ?? null,
+    }
+  }
+
+  /** When a full scan of the library finished, kept so a restart does not forget it. */
+  markFullScan({ id, at }: { id: number; at: string }): void {
+    this.db.prepare('UPDATE libraries SET full_scanned_at = ? WHERE id = ?').run(at, id)
+  }
+
+  /** When a quick scan of the library finished, kept so a restart does not forget it. */
+  markQuickScan({ id, at }: { id: number; at: string }): void {
+    this.db.prepare('UPDATE libraries SET quick_scanned_at = ? WHERE id = ?').run(at, id)
   }
 
   /** Each path a library keeps holds on to what a scan found it to be; a new one starts unread. */

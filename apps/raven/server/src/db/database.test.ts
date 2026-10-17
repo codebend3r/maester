@@ -287,6 +287,22 @@ describe('migrations', () => {
     database.onModuleDestroy()
   })
 
+  it('gives a library made before scan times were kept none yet', () => {
+    const before = new Sqlite(join(state.dir, 'raven.db'))
+    MIGRATIONS.slice(0, 25).forEach((sql) => before.exec(sql))
+    before.pragma('user_version = 25')
+    before.exec(
+      "INSERT INTO libraries (name, created_at) VALUES ('Movies', '2026-01-01T00:00:00.000Z')",
+    )
+    before.close()
+
+    const database = new DatabaseService({ ...readServerConfig({}), dataDir: state.dir })
+    expect(
+      database.db.prepare('SELECT full_scanned_at, quick_scanned_at FROM libraries').get(),
+    ).toEqual({ full_scanned_at: null, quick_scanned_at: null })
+    database.onModuleDestroy()
+  })
+
   it('kinds the plays, moves the old default to 95 and drops the spots a watched play would have cleared', () => {
     const before = new Sqlite(join(state.dir, 'raven.db'))
     MIGRATIONS.slice(0, 24).forEach((sql) => before.exec(sql))

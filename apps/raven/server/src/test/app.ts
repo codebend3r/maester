@@ -105,6 +105,6 @@ export const testConfig = ({
   webDir,
   browseRoot: mediaDir,
   scanOnStart: false,
-  rescanIntervalMinutes: 0,
+  quickScanIntervalMinutes: 0,
   adminPassword: ADMIN_PASSWORD,
 })

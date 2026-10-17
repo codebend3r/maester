@@ -204,7 +204,7 @@ describe('Fix match confidence', () => {
         webDir: null,
         browseRoot: state.root,
         scanOnStart: false,
-        rescanIntervalMinutes: 0,
+        quickScanIntervalMinutes: 0,
         tmdbApiToken: 'test-token',
         libraryPin: '3001',
         adminPassword: ADMIN_PASSWORD,
