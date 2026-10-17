@@ -2,11 +2,12 @@
   --gutter: var(--space-5);
 
   display: grid;
-  grid-template-rows: auto auto auto 1fr;
+  grid-template-rows: auto auto auto auto 1fr;
   grid-template-areas:
     'bar'
     'servers'
     'computer'
+    'updates'
     'recents';
   gap: var(--space-5);
   align-content: start;
@@ -49,6 +50,11 @@
 
 .computer {
   grid-area: computer;
+  padding-inline: var(--gutter);
+}
+
+.updates {
+  grid-area: updates;
   padding-inline: var(--gutter);
 }
 
