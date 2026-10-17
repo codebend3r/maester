@@ -8,15 +8,9 @@ import {
   nullable,
   object,
   oneOf,
+  union,
 } from '@raven/core'
-import {
-  isContainerName,
-  isDownloadGroup,
-  isDownloadStatus,
-  isOpaqueId,
-  isSidecarTrackId,
-  type DownloadStatus,
-} from '@/shared/protocol'
+import { isContainerName, isDownloadGroup, isOpaqueId, isSidecarTrackId } from '@/shared/protocol'
 
 export const DOWNLOADS_FILE = 'downloads.json'
 
@@ -30,6 +24,24 @@ export const isFileSize = (value: unknown): value is number =>
 /** What the server has not heard yet: a play to record, and the last position to report. */
 const isPending = object({ play: isBoolean, position: nullable(isNumber), at: isNumber })
 
+/** Why a download waits paused: the viewer paused it, or the queue did for the disk, a relock or an outage. */
+const isPauseReason = oneOf(['viewer', 'noSpace', 'relocked', 'unreachable'])
+
+/** Why a download failed. Only `other` has words of its own, kept in the status's `message`. */
+const isFailReason = oneOf(['noSpace', 'changed', 'unauthorized', 'unreachable', 'gone', 'other'])
+
+/**
+ * A download's status as `downloads.json` keeps it: why it stopped is a reason, and the page's
+ * words are built from it when the page reads it, so renaming a server changes no reason.
+ */
+const isEntryStatus = union(
+  object({ kind: oneOf(['queued']) }),
+  object({ kind: oneOf(['downloading']), bytes: isNumber }),
+  object({ kind: oneOf(['paused']), bytes: isNumber, reason: isPauseReason }),
+  object({ kind: oneOf(['failed']), bytes: isNumber, reason: isFailReason, message: isString }),
+  object({ kind: oneOf(['ready']) }),
+)
+
 export const isDownloadEntry = object({
   downloadId: isOpaqueId,
   serverId: isOpaqueId,
@@ -41,7 +53,7 @@ export const isDownloadEntry = object({
   duration: nullable(isNumber),
   watchedPercent: isNumber,
   sidecars: listOf(isSidecar),
-  status: isDownloadStatus,
+  status: isEntryStatus,
   autoDelete: isBoolean,
   watchedAt: nullable(isNumber),
   pending: isPending,
@@ -54,6 +66,9 @@ export const isDownloadsState = object({
   autoDeleteDefault: isBoolean,
 })
 
+export type PauseReason = Infer<typeof isPauseReason>
+export type FailReason = Infer<typeof isFailReason>
+export type EntryStatus = Infer<typeof isEntryStatus>
 export type Sidecar = Infer<typeof isSidecar>
 export type Pending = Infer<typeof isPending>
 export type DownloadEntry = Infer<typeof isDownloadEntry>
@@ -111,10 +126,7 @@ const changeEntry = (
   }
 }
 
-const withStatus = (
-  entry: DownloadEntry,
-  { status }: { status: DownloadStatus },
-): DownloadEntry => ({
+const withStatus = (entry: DownloadEntry, { status }: { status: EntryStatus }): DownloadEntry => ({
   ...entry,
   status,
 })
@@ -171,27 +183,27 @@ export const advance = (
 const isPausable = (entry: DownloadEntry): boolean =>
   entry.status.kind === 'queued' || entry.status.kind === 'downloading'
 
-const paused = (entry: DownloadEntry, { message }: { message: string | null }): DownloadEntry =>
+const paused = (entry: DownloadEntry, { reason }: { reason: PauseReason }): DownloadEntry =>
   isPausable(entry)
-    ? withStatus(entry, { status: { kind: 'paused', bytes: bytesOf(entry), message } })
+    ? withStatus(entry, { status: { kind: 'paused', bytes: bytesOf(entry), reason } })
     : entry
 
 export const pause = (
   state: DownloadsState,
-  { downloadId, message }: { downloadId: string; message: string | null },
+  { downloadId, reason }: { downloadId: string; reason: PauseReason },
 ): DownloadsState =>
-  changeEntry(state, { downloadId, change: (entry) => paused(entry, { message }) })
+  changeEntry(state, { downloadId, change: (entry) => paused(entry, { reason }) })
 
 export const pauseServer = (
   state: DownloadsState,
-  { serverId, message }: { serverId: string; message: string | null },
+  { serverId, reason }: { serverId: string; reason: PauseReason },
 ): DownloadsState => {
   const isTouched = (entry: DownloadEntry): boolean =>
     entry.serverId === serverId && isPausable(entry)
   if (!state.entries.some(isTouched)) return state
   return {
     ...state,
-    entries: state.entries.map((entry) => (isTouched(entry) ? paused(entry, { message }) : entry)),
+    entries: state.entries.map((entry) => (isTouched(entry) ? paused(entry, { reason }) : entry)),
   }
 }
 
@@ -207,16 +219,23 @@ export const resume = (
         : entry,
   })
 
+/** `message` is the words of an `other` failure; every other reason says it all and keeps none. */
 export const fail = (
   state: DownloadsState,
-  { downloadId, message }: { downloadId: string; message: string },
+  {
+    downloadId,
+    reason,
+    message = '',
+  }: { downloadId: string; reason: FailReason; message?: string },
 ): DownloadsState =>
   changeEntry(state, {
     downloadId,
     change: (entry) =>
       entry.status.kind === 'ready'
         ? entry
-        : withStatus(entry, { status: { kind: 'failed', bytes: bytesOf(entry), message } }),
+        : withStatus(entry, {
+            status: { kind: 'failed', bytes: bytesOf(entry), reason, message },
+          }),
   })
 
 export const finish = (

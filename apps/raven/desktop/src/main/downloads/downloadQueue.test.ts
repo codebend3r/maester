@@ -19,7 +19,6 @@ import { EXPAND_MESSAGES } from '@/main/downloads/expand'
 import { DOWNLOAD_STALL_MS } from '@/main/downloads/fetchFile'
 import { createMediaAccess, type AccessOutcome } from '@/main/downloads/mediaAccess'
 import { SPACE_RESERVE_BYTES } from '@/main/downloads/space'
-import { CALL_MESSAGES } from '@/main/servers/serverCalls'
 import {
   COOKIE_ACCESS,
   fakeAccess,
@@ -96,6 +95,8 @@ const memoryStore = (initial: DownloadsState): DownloadsStore => {
 }
 
 const FAR_TICKET = ticketFor({ ticket: 'one', expiresAt: NOW + 6 * HOUR })
+
+const failedUnreachable = { kind: 'failed', bytes: 0, reason: 'unreachable', message: '' } as const
 
 const LOCKED: AccessOutcome = {
   ok: false,
@@ -224,8 +225,8 @@ describe('kick', () => {
   it('starts nothing paused, failed or ready', async () => {
     const world = setup({
       entries: [
-        entryFor(1, { status: { kind: 'paused', bytes: 0, message: null } }),
-        entryFor(2, { status: { kind: 'failed', bytes: 0, message: 'x' } }),
+        entryFor(1, { status: { kind: 'paused', bytes: 0, reason: 'viewer' } }),
+        entryFor(2, { status: { kind: 'failed', bytes: 0, reason: 'other', message: 'x' } }),
         entryFor(3, { status: { kind: 'ready' } }),
       ],
     })
@@ -241,7 +242,7 @@ describe('kick', () => {
     await world.queue.pause({ downloadId: idOf(1) })
     await until(() => world.network.fileRequests().length === 3)
     expect(world.network.fileRequests()[2]?.url).toBe(fileUrl(3))
-    expect(world.statusOf(1)).toEqual({ kind: 'paused', bytes: 0, message: null })
+    expect(world.statusOf(1)).toEqual({ kind: 'paused', bytes: 0, reason: 'viewer' })
   })
 })
 
@@ -258,8 +259,8 @@ describe('space', () => {
     })
     world.queue.kick()
     await until(() => world.statusOf(1)?.kind === 'failed')
-    expect(world.statusOf(1)).toEqual({ kind: 'failed', bytes: 0, message: 'Not enough space' })
-    expect(world.statusOf(2)).toEqual({ kind: 'paused', bytes: 0, message: 'Not enough space' })
+    expect(world.statusOf(1)).toEqual({ kind: 'failed', bytes: 0, reason: 'noSpace', message: '' })
+    expect(world.statusOf(2)).toEqual({ kind: 'paused', bytes: 0, reason: 'noSpace' })
     await until(() => world.network.fileRequests().length === 2)
     expect(world.network.fileRequests().map(({ url }) => url)).toEqual([fileUrl(5), fileUrl(6)])
     expect(world.failed.map(({ downloadId }) => downloadId)).toEqual([idOf(1)])
@@ -272,7 +273,7 @@ describe('space', () => {
       entries: [
         entryFor(1, {
           size: 12_288,
-          status: { kind: 'failed', bytes: 8192, message: 'Not enough space' },
+          status: { kind: 'failed', bytes: 8192, reason: 'noSpace', message: '' },
         }),
       ],
       disk: { [partOf(1)]: 8192 },
@@ -300,7 +301,7 @@ describe('space', () => {
     world.drive.appendError.value = fsError({ code: 'ENOSPC', syscall: 'write' })
     world.queue.kick()
     await until(() => world.statusOf(1)?.kind === 'failed')
-    expect(world.statusOf(1)).toEqual({ kind: 'failed', bytes: 0, message: 'Not enough space' })
+    expect(world.statusOf(1)).toEqual({ kind: 'failed', bytes: 0, reason: 'noSpace', message: '' })
     expect(world.drive.files.has(partOf(1))).toBe(true)
   })
 })
@@ -313,11 +314,7 @@ describe('a relock', () => {
     })
     world.queue.kick()
     await until(() => world.network.fileRequests().length === 1)
-    const relocked = {
-      kind: 'paused',
-      bytes: 0,
-      message: DOWNLOAD_MESSAGES.relocked('Vhagar'),
-    } as const
+    const relocked = { kind: 'paused', bytes: 0, reason: 'relocked' } as const
     expect(world.statusOf(1)).toEqual(relocked)
     expect(world.statusOf(2)).toEqual(relocked)
     expect(world.network.fileRequests()[0]?.serverId).toBe(OTHER_SERVER_ID)
@@ -335,11 +332,7 @@ describe('a relock', () => {
     world.network.answers.file = () => refused(423)
     world.queue.kick()
     await until(() => world.statusOf(1)?.kind === 'paused')
-    expect(world.statusOf(1)).toEqual({
-      kind: 'paused',
-      bytes: 0,
-      message: DOWNLOAD_MESSAGES.relocked('Vhagar'),
-    })
+    expect(world.statusOf(1)).toEqual({ kind: 'paused', bytes: 0, reason: 'relocked' })
     expect(world.network.fileRequests().map(({ url }) => url)).toEqual([
       fileUrl(1),
       fileUrl(1, 'two'),
@@ -353,7 +346,7 @@ describe('an outage', () => {
     reason: 'unreachable',
     message: 'raven player could not reach Vhagar.',
   }
-  const waiting = { kind: 'paused', bytes: 0, message: 'Vhagar could not be reached' } as const
+  const waiting = { kind: 'paused', bytes: 0, reason: 'unreachable' } as const
 
   it('fails the file that stalls and pauses the rest of its server, while another server goes on', async () => {
     const world = setup({
@@ -369,11 +362,7 @@ describe('an outage', () => {
     )
     world.fireAfter(DOWNLOAD_STALL_MS)
     await until(() => world.network.fileRequests().length === 2)
-    expect(world.statusOf(1)).toEqual({
-      kind: 'failed',
-      bytes: 0,
-      message: CALL_MESSAGES.unreachable('Vhagar'),
-    })
+    expect(world.statusOf(1)).toEqual(failedUnreachable)
     expect(world.statusOf(2)).toEqual(waiting)
     expect(world.statusOf(3)).toEqual(waiting)
     expect(world.network.fileRequests().map(({ serverId }) => serverId)).toEqual([
@@ -397,11 +386,7 @@ describe('an outage', () => {
     })
     world.queue.kick()
     await until(() => world.network.fileRequests().length === 1)
-    expect(world.statusOf(1)).toEqual({
-      kind: 'failed',
-      bytes: 0,
-      message: 'raven player could not reach Vhagar.',
-    })
+    expect(world.statusOf(1)).toEqual(failedUnreachable)
     expect(world.statusOf(2)).toEqual(waiting)
     expect(world.statusOf(3)).toEqual(waiting)
     expect(world.network.fileRequests()[0]?.serverId).toBe(OTHER_SERVER_ID)
@@ -432,11 +417,7 @@ describe('an outage', () => {
     })
     world.queue.kick()
     await until(() => world.network.fileRequests().length === 1)
-    expect(world.statusOf(1)).toEqual({
-      kind: 'failed',
-      bytes: 0,
-      message: CALL_MESSAGES.unreachable('Vhagar'),
-    })
+    expect(world.statusOf(1)).toEqual(failedUnreachable)
     expect(world.statusOf(2)).toEqual(waiting)
     expect(world.statusOf(3)).toEqual(waiting)
     expect(world.network.fileRequests()[0]?.serverId).toBe(OTHER_SERVER_ID)
@@ -450,11 +431,7 @@ describe('an outage', () => {
       request.serverId === SERVER_ID ? refused(503) : serving({ size: 8 })(request)
     world.queue.kick()
     await until(() => world.statusOf(5)?.kind === 'ready')
-    expect(world.statusOf(1)).toEqual({
-      kind: 'failed',
-      bytes: 0,
-      message: CALL_MESSAGES.unreachable('Vhagar'),
-    })
+    expect(world.statusOf(1)).toEqual(failedUnreachable)
     expect(world.statusOf(2)).toEqual(waiting)
     expect(world.statusOf(3)).toEqual(waiting)
     expect(world.media.forgotten).toEqual([SERVER_ID])
@@ -465,7 +442,7 @@ describe('an outage', () => {
 describe('pause, resume and retry', () => {
   it('resumes a paused file from the bytes on disk', async () => {
     const world = setup({
-      entries: [entryFor(1, { status: { kind: 'paused', bytes: 4, message: null } })],
+      entries: [entryFor(1, { status: { kind: 'paused', bytes: 4, reason: 'viewer' } })],
       disk: { [partOf(1)]: 4 },
     })
     world.network.answers.file = serving({ size: 8, sent: 0, isEnding: false })
@@ -478,7 +455,9 @@ describe('pause, resume and retry', () => {
 
   it('retries a failed file', async () => {
     const world = setup({
-      entries: [entryFor(1, { status: { kind: 'failed', bytes: 0, message: 'x' } })],
+      entries: [
+        entryFor(1, { status: { kind: 'failed', bytes: 0, reason: 'other', message: 'x' } }),
+      ],
     })
     world.queue.retry({ downloadId: idOf(1) })
     await until(() => world.network.fileRequests().length === 1)
@@ -490,7 +469,7 @@ describe('pause, resume and retry', () => {
     world.queue.kick()
     await until(() => world.network.fileRequests().length === 2)
     await world.queue.pauseAll()
-    const paused = { kind: 'paused', bytes: 0, message: null } as const
+    const paused = { kind: 'paused', bytes: 0, reason: 'viewer' } as const
     expect([1, 2, 3].map(world.statusOf)).toEqual([paused, paused, paused])
     expect(world.network.fileRequests().every(({ signal }) => signal.aborted)).toBe(true)
     await ticks(10)
@@ -500,13 +479,13 @@ describe('pause, resume and retry', () => {
   it('resumes every paused file and leaves a failed one', () => {
     const world = setup({
       entries: [
-        entryFor(1, { status: { kind: 'paused', bytes: 0, message: null } }),
-        entryFor(2, { status: { kind: 'failed', bytes: 0, message: 'x' } }),
+        entryFor(1, { status: { kind: 'paused', bytes: 0, reason: 'viewer' } }),
+        entryFor(2, { status: { kind: 'failed', bytes: 0, reason: 'other', message: 'x' } }),
       ],
     })
     world.queue.resumeAll()
     expect(world.statusOf(1)).toEqual({ kind: 'queued' })
-    expect(world.statusOf(2)).toEqual({ kind: 'failed', bytes: 0, message: 'x' })
+    expect(world.statusOf(2)).toEqual({ kind: 'failed', bytes: 0, reason: 'other', message: 'x' })
   })
 })
 
@@ -628,7 +607,8 @@ describe('the ticket', () => {
     expect(world.statusOf(1)).toEqual({
       kind: 'failed',
       bytes: 0,
-      message: DOWNLOAD_MESSAGES.answered({ serverName: 'Vhagar', status: 401 }),
+      reason: 'unauthorized',
+      message: '',
     })
     expect(world.media.asked).toHaveLength(2)
     expect(world.failed.map(({ downloadId }) => downloadId)).toEqual([idOf(1)])
@@ -707,20 +687,27 @@ describe('a finished file', () => {
 
 describe('a failed file', () => {
   it.each([
-    ['changed', (): Answer => ({ status: 200, body: null }), DOWNLOAD_MESSAGES.changed],
-    ['gone', (): Answer => refused(404), EXPAND_MESSAGES.gone('Vhagar')],
+    [
+      'changed',
+      (): Answer => ({ status: 200, body: null }),
+      { reason: 'changed', message: '' } as const,
+    ],
+    ['gone', (): Answer => refused(404), { reason: 'gone', message: '' } as const],
     [
       'refused',
       (): Answer => refused(403),
-      DOWNLOAD_MESSAGES.answered({ serverName: 'Vhagar', status: 403 }),
+      {
+        reason: 'other',
+        message: DOWNLOAD_MESSAGES.answered({ serverName: 'Vhagar', status: 403 }),
+      } as const,
     ],
-  ])('fails as %s with why, keeps going, and is told', async (_name, answer, message) => {
+  ])('fails as %s with why, keeps going, and is told', async (_name, answer, why) => {
     const world = setup({ entries: [entryFor(1), entryFor(2), entryFor(3)] })
     world.network.answers.file = (request) =>
       request.url.includes('/media/1/') ? answer() : serving({ size: 8 })(request)
     world.queue.kick()
     await until(() => world.statusOf(3)?.kind === 'ready')
-    expect(world.statusOf(1)).toEqual({ kind: 'failed', bytes: 0, message })
+    expect(world.statusOf(1)).toEqual({ kind: 'failed', bytes: 0, ...why })
     expect(world.failed.map(({ downloadId }) => downloadId)).toEqual([idOf(1)])
   })
 
@@ -731,11 +718,7 @@ describe('a failed file', () => {
     }
     world.queue.kick()
     await until(() => world.statusOf(1)?.kind === 'failed')
-    expect(world.statusOf(1)).toEqual({
-      kind: 'failed',
-      bytes: 0,
-      message: CALL_MESSAGES.unreachable('Vhagar'),
-    })
+    expect(world.statusOf(1)).toEqual(failedUnreachable)
     expect(world.media.forgotten).toEqual([SERVER_ID])
   })
 
@@ -750,11 +733,7 @@ describe('a failed file', () => {
     world.network.answers.file = serving({ size: 8 })
     world.queue.kick()
     await until(() => world.statusOf(2)?.kind === 'ready')
-    expect(world.statusOf(1)).toEqual({
-      kind: 'failed',
-      bytes: 0,
-      message: EXPAND_MESSAGES.gone('Vhagar'),
-    })
+    expect(world.statusOf(1)).toEqual({ kind: 'failed', bytes: 0, reason: 'gone', message: '' })
     expect(world.failed.map(({ downloadId }) => downloadId)).toEqual([idOf(1)])
   })
 
@@ -765,7 +744,12 @@ describe('a failed file', () => {
     })
     world.queue.kick()
     await until(() => world.statusOf(1)?.kind === 'failed')
-    expect(world.statusOf(1)).toEqual({ kind: 'failed', bytes: 0, message: 'Vhagar mumbled.' })
+    expect(world.statusOf(1)).toEqual({
+      kind: 'failed',
+      bytes: 0,
+      reason: 'other',
+      message: 'Vhagar mumbled.',
+    })
   })
 
   it('fails with the write error, keeps the part and logs the title only', async () => {
@@ -774,7 +758,12 @@ describe('a failed file', () => {
     world.drive.appendError.value = fsError({ code: 'EIO', syscall: 'write' })
     world.queue.kick()
     await until(() => world.statusOf(1)?.kind === 'failed')
-    expect(world.statusOf(1)).toEqual({ kind: 'failed', bytes: 0, message: 'write EIO' })
+    expect(world.statusOf(1)).toEqual({
+      kind: 'failed',
+      bytes: 0,
+      reason: 'other',
+      message: 'write EIO',
+    })
     expect(world.drive.files.has(partOf(1))).toBe(true)
     const log = world.warnings.join('\n')
     expect(log).toContain('Episode 1')

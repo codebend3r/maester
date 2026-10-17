@@ -3,12 +3,17 @@ import { LOCKED_STATUS, type DownloadTarget, type MediaItem, type Saga } from '@
 import { EMPTY_CONFIG, type ConfigStore, type DesktopConfig } from '@/main/desktopConfig'
 import { ASK_TTL_MS } from '@/main/downloads/asks'
 import { DOWNLOAD_MESSAGES } from '@/main/downloads/downloadMessages'
-import { createDownloadService, DOWNLOADS_EVENT_MS } from '@/main/downloads/downloadService'
+import {
+  createDownloadService,
+  DOWNLOADS_EVENT_MS,
+  viewStatusOf,
+} from '@/main/downloads/downloadService'
 import {
   EMPTY_DOWNLOADS,
   NO_PENDING,
   type DownloadEntry,
   type DownloadsState,
+  type EntryStatus,
 } from '@/main/downloads/downloadState'
 import { DOWNLOADS_DEBOUNCE_MS } from '@/main/downloads/downloadStore'
 import { EXPAND_MESSAGES } from '@/main/downloads/expand'
@@ -631,7 +636,7 @@ describe('list and views', () => {
       label: 'Dune (2021)',
       group: { kind: 'movie', key: 'movie:41', title: 'Dune (2021)', order: 0 },
       createdAt: NOW - 5000,
-      status: { kind: 'paused', bytes: 7, message: null },
+      status: { kind: 'paused', bytes: 7, reason: 'viewer' },
       watchedAt: NOW - 100,
     })
     const newer = entryFor({ status: { kind: 'downloading', bytes: GIB }, autoDelete: true })
@@ -789,11 +794,11 @@ describe('the queue', () => {
   it('resumes and retries through the queue', async () => {
     const world = setup({
       initial: holding(
-        queuedFile({ status: { kind: 'paused', bytes: 0, message: null } }),
+        queuedFile({ status: { kind: 'paused', bytes: 0, reason: 'viewer' } }),
         queuedFile({
           downloadId: OTHER_ID,
           mediaId: 12,
-          status: { kind: 'failed', bytes: 0, message: 'x' },
+          status: { kind: 'failed', bytes: 0, reason: 'other', message: 'x' },
         }),
       ),
       access: async () => FAR_TICKET,
@@ -901,20 +906,78 @@ describe('the queue', () => {
     expect(world.sent.filter(({ type }) => type === 'notice')).toEqual([])
   })
 
-  it('marks a row paused by a relock as needing the unlock', () => {
+  it('marks a row paused by a relock as needing the unlock, even once its server is renamed', () => {
     const world = setup({
       initial: holding(
-        entryFor({
-          status: { kind: 'paused', bytes: 0, message: DOWNLOAD_MESSAGES.relocked('Vhagar') },
-        }),
+        entryFor({ status: { kind: 'paused', bytes: 0, reason: 'relocked' } }),
         entryFor({
           downloadId: OTHER_ID,
           mediaId: 12,
-          status: { kind: 'paused', bytes: 0, message: null },
+          status: { kind: 'paused', bytes: 0, reason: 'viewer' },
         }),
       ),
     })
     expect(world.service.views().map(({ needsUnlock }) => needsUnlock)).toEqual([true, false])
+    world.config.update((config) => ({
+      ...config,
+      servers: config.servers.map((server) => ({ ...server, name: 'Caraxes' })),
+    }))
+    const [relocked] = world.service.views()
+    expect(relocked?.needsUnlock).toBe(true)
+    expect(relocked?.status).toEqual({
+      kind: 'paused',
+      bytes: 0,
+      message: DOWNLOAD_MESSAGES.relocked('Caraxes'),
+    })
+  })
+
+  it("words each stopped row by its reason and its server's name", () => {
+    const stopped = (n: number, status: EntryStatus): DownloadEntry =>
+      entryFor({
+        downloadId: `00000000-0000-4000-8000-0000000000b${n}`,
+        mediaId: 20 + n,
+        createdAt: NOW - n,
+        status,
+      })
+    const world = setup({
+      initial: holding(
+        stopped(1, { kind: 'paused', bytes: 1, reason: 'viewer' }),
+        stopped(2, { kind: 'paused', bytes: 2, reason: 'noSpace' }),
+        stopped(3, { kind: 'paused', bytes: 3, reason: 'unreachable' }),
+        stopped(4, { kind: 'failed', bytes: 4, reason: 'noSpace', message: '' }),
+        stopped(5, { kind: 'failed', bytes: 5, reason: 'changed', message: '' }),
+        stopped(6, { kind: 'failed', bytes: 6, reason: 'unauthorized', message: '' }),
+        stopped(7, { kind: 'failed', bytes: 7, reason: 'unreachable', message: '' }),
+        stopped(8, { kind: 'failed', bytes: 8, reason: 'gone', message: '' }),
+        stopped(9, { kind: 'failed', bytes: 9, reason: 'other', message: 'write EIO' }),
+      ),
+    })
+    expect(world.service.views().map(({ status }) => status)).toEqual([
+      { kind: 'paused', bytes: 1, message: null },
+      { kind: 'paused', bytes: 2, message: 'Not enough space' },
+      { kind: 'paused', bytes: 3, message: 'Vhagar could not be reached' },
+      { kind: 'failed', bytes: 4, message: 'Not enough space' },
+      { kind: 'failed', bytes: 5, message: 'The file changed on the server' },
+      { kind: 'failed', bytes: 6, message: 'Vhagar answered 401' },
+      { kind: 'failed', bytes: 7, message: 'Vhagar could not be reached' },
+      { kind: 'failed', bytes: 8, message: EXPAND_MESSAGES.gone('Vhagar') },
+      { kind: 'failed', bytes: 9, message: 'write EIO' },
+    ])
+  })
+
+  it('says the server is gone for a reason that names a server raven player no longer keeps', () => {
+    expect(
+      viewStatusOf({ status: { kind: 'paused', bytes: 0, reason: 'relocked' }, serverName: '' }),
+    ).toEqual({ kind: 'paused', bytes: 0, message: SERVER_GONE })
+    expect(
+      viewStatusOf({
+        status: { kind: 'failed', bytes: 0, reason: 'gone', message: '' },
+        serverName: '',
+      }),
+    ).toEqual({ kind: 'failed', bytes: 0, message: SERVER_GONE })
+    expect(
+      viewStatusOf({ status: { kind: 'paused', bytes: 0, reason: 'noSpace' }, serverName: '' }),
+    ).toEqual({ kind: 'paused', bytes: 0, message: 'Not enough space' })
   })
 
   it('sends no downloads event after dispose, even as its fetches stop', async () => {
