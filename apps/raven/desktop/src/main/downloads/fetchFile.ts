@@ -39,6 +39,8 @@ export type FetchOutcome =
       bytes: number
     }
 
+const UNSATISFIABLE_RANGE_STATUS = 416
+
 type FailureReason = Extract<FetchOutcome, { ok: false }>['reason']
 
 type FetchInput = {
@@ -90,7 +92,7 @@ const refusalFor = (status: number): { reason: FailureReason; status: number } |
       return { reason: 'unauthorized', status }
     case LOCKED_STATUS:
       return { reason: 'locked', status }
-    case 416:
+    case UNSATISFIABLE_RANGE_STATUS:
       return { reason: 'changed', status }
     default:
       return { reason: 'status', status }
@@ -206,8 +208,16 @@ const download = async ({
   canRestart,
   ...input
 }: FetchInput & { canRestart: boolean }): Promise<FetchOutcome> => {
-  const { fetch, url, part, signal, stallMs } = input
+  const { fetch, url, part, signal, stallMs, expectedSize, onProgress } = input
   const from = await part.size()
+  if (from === expectedSize) {
+    onProgress(from)
+    return { ok: true, bytes: from }
+  }
+  if (from > expectedSize) {
+    await part.truncate()
+    return download({ ...input, canRestart: false })
+  }
   const answer = await fetch({
     url,
     headers: from > 0 ? { Range: `bytes=${from}-` } : {},
@@ -224,6 +234,11 @@ const download = async ({
   const refusal = refusalFor(response.status)
   if (refusal !== null) {
     await discard(response.body)
+    if (refusal.status === UNSATISFIABLE_RANGE_STATUS) {
+      // The server's file is now shorter than the bytes on disk; keeping them would earn the same 416 on every retry.
+      await part.truncate()
+      return failure({ ...refusal, bytes: 0 })
+    }
     return failure({ ...refusal, bytes: from })
   }
   const plan = planFor({
