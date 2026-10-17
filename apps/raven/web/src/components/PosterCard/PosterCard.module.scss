@@ -18,14 +18,8 @@
     z-index: 1;
   }
 
-  // The checkbox shares the poster's top corner with the resolution, which
-  // steps aside while it shows.
-  @media (hover: hover) {
-    &:has(.select):hover {
-      --select-room: calc(1.5rem + var(--space-1));
-    }
-  }
-
+  // In select mode the checkbox shares the poster's top corner with the
+  // resolution, which steps aside for it.
   &:has(.select)[data-selecting] {
     --select-room: calc(1.5rem + var(--space-1));
   }

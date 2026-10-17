@@ -8,7 +8,7 @@ Decided with the user:
 - Marking watched records a play, so it shows in History and Recently finished.
 - Marking unwatched is a clean slate: the plays marks wrote go, real plays stay in History but stop counting, and only plays after it count.
 - One threshold: **Watched at**, 95% by default, counts a play as watched and clears its resume spot. Libraries still at the old default, 90, move to 95.
-- Select mode starts from a Select button or a checkbox shown on hover; shift-click selects a range; a bar at the bottom marks the selection.
+- Select mode starts from a Select button; shift-click selects a range; a bar at the bottom marks the selection.
 
 ## What the viewer sees
 
@@ -18,7 +18,7 @@ Decided with the user:
 - The movie and episode pages have a **Watched** toggle beside the favourite heart. The show, season and saga pages have one beside Play, which reads as partly pressed when some of what they hold is watched: pressing it marks everything watched, and pressing it again marks everything unwatched.
 - Each episode row on a season page has its own **Watched** toggle.
 - History notes a marked video as "Marked watched". Its plays count only real plays.
-- **Select** sits in the library toolbar, in a small header on each other tab (In progress, Favourites, Recently finished, Sagas), and beside Play on the saga, show and season pages. With a mouse, each card also shows a checkbox on hover; ticking it starts select mode with that card selected.
+- **Select** sits in the library toolbar, in a small header on each other tab (In progress, Favourites, Recently finished, Sagas), and beside Play on the saga, show and season pages. In select mode every card shows a checkbox.
 - In select mode a click on a card selects or deselects it instead of opening it, and shift-click selects every card between the last one clicked and this one, in the order they show. A bar at the bottom says how many are selected and offers **Select all**, **Mark watched**, **Mark unwatched**, **Clear** and **Done**. After marking, the selection stays and the bar says "Marked 12 watched", so the other button reverses it.
 - Leaving the page or tab, **Done**, or Escape ends select mode.
 
@@ -143,7 +143,7 @@ In `libs/raven/core/src/contract.ts`:
 - **Ranges.** Shift-click ranges go by DOM order, using `useScrollReset.ts`'s selector (`[data-entry]:not(details:not([open]) *)`). `MediaList` sorts on the client and `MediaGroups` closes its buckets, so data order would be wrong. **Select all** takes `allKeys()`, closed buckets included.
 - **Clicks.** `useSelectable(key)` gives a card its checkbox props and an `onClickCapture` on the card root that prevents the click and toggles in select mode. `CardLink` and react-router's `Link` already leave a prevented click alone, so neither changes, and shift-click no longer opens a window.
 - **The checkbox** is an `<input type="checkbox">` labelled "Select {title}", inside the card box: `content-visibility: auto` clips anything outside it.
-  - Outside select mode it shows only under `@media (hover: hover)` on hover or focus within, with `tabIndex={-1}`, so thousands of cards add no tab stops.
+  - Outside select mode it is not shown, and has `tabIndex={-1}`, so thousands of cards add no tab stops.
   - In select mode it shows on every card and is the card's only tab stop: links take `tabIndex={-1}`, and the play overlay and menu trigger hide.
 - **`SelectionBar`** (`components/SelectionBar`):
   - A `section` labelled "Selection", sticky at the bottom of the main column. It is laid out as a grid that wraps to two rows below `30rem` and fits 320px.
@@ -158,7 +158,7 @@ In `libs/raven/core/src/contract.ts`:
 
 - The check is never the only signal: `WatchedMark` and `WatchedCount` carry hidden text, and toggles use `aria-pressed` (`mixed` when partly).
 - Select mode keeps one tab stop per card, labelled with its title. The bar's count and outcome are announced politely, and Escape leaves, returning focus to Select.
-- The checkbox shows on focus as well as hover, and every control has a visible `:focus-visible` from `--focus-ring`.
+- Every control has a visible `:focus-visible` from `--focus-ring`.
 - Works at 320px; the bar wraps.
 
 ## Testing
@@ -200,7 +200,7 @@ In `libs/raven/core/src/contract.ts`:
 - `watchedEdits` covering every cache and returning the same reference when nothing changes.
 - `afterWatched` and `afterWatching` invalidations.
 - The "Marked watched" note.
-- **Select mode:** the Select button and hover checkbox start it; a click toggles and does not navigate; shift-click selects a DOM-order range in a client-sorted list; Select all includes closed buckets; the bar's count, outcome, failure and Done; Escape and focus return; tab order in select mode.
+- **Select mode:** the Select button starts it; a click toggles and does not navigate; shift-click selects a DOM-order range in a client-sorted list; Select all includes closed buckets; the bar's count, outcome, failure and Done; Escape and focus return; tab order in select mode.
 - Coverage stays above the floors in `apps/raven/web/package.json`.
 
 ## Docs

@@ -39,14 +39,8 @@
     z-index: 1;
   }
 
-  // The checkbox shares the poster's top corner with the resolution, which
-  // steps aside while it shows.
-  @media (hover: hover) {
-    &:has(.select):hover {
-      --select-room: calc(1.5rem + var(--space-1));
-    }
-  }
-
+  // In select mode the checkbox shares the poster's top corner with the
+  // resolution, which steps aside for it.
   &:has(.select)[data-selecting] {
     --select-room: calc(1.5rem + var(--space-1));
   }
@@ -318,6 +312,8 @@
 }
 
 // The next episode, as the one action the card is for, its play icon solid.
+// It waits for the pointer or the focus on its card, as the poster cards'
+// play button does, and is always out on a touch screen.
 .next {
   --icon-tint: 1;
 
@@ -335,9 +331,25 @@
   font-size: var(--font-size-sm);
   font-weight: 600;
   text-decoration: none;
+  opacity: 0;
 
   &:hover {
     background: var(--color-leaf-hi);
+  }
+
+  &:focus-visible {
+    opacity: 1;
+  }
+}
+
+.wide:hover .next,
+.wide:focus-within .next {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .next {
+    opacity: 1;
   }
 }
 
@@ -376,6 +388,8 @@
   }
 
   .next {
-    transition: background-color 150ms ease;
+    transition:
+      opacity 150ms ease-out,
+      background-color 150ms ease;
   }
 }
