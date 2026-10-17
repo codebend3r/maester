@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { PLAY_LINK_MAX_NEXT, isMediaId, playLinkFor } from '@/playLink'
+import { PLAY_LINK_MAX_NEXT, downloadLinkFor, isMediaId, playLinkFor } from '@/playLink'
 
 describe('isMediaId', () => {
   it.each([1, 7, 9007199254740991])('accepts %p', (value) => {
@@ -67,5 +67,61 @@ describe('playLinkFor', () => {
 
   it('writes a negative start as 0', () => {
     expect(playLinkFor({ origin, mediaId: 7, at: -5, next: [] })).toContain('&at=0')
+  })
+})
+
+describe('downloadLinkFor', () => {
+  const origin = 'https://raven.example'
+
+  it('names a file', () => {
+    expect(downloadLinkFor({ origin, target: { kind: 'media', mediaId: 7 } })).toBe(
+      'raven://download?server=https%3A%2F%2Fraven.example&media=7',
+    )
+  })
+
+  it('names an item', () => {
+    expect(downloadLinkFor({ origin, target: { kind: 'item', itemId: 10 } })).toBe(
+      'raven://download?server=https%3A%2F%2Fraven.example&item=10',
+    )
+  })
+
+  it('names a saga by library and collection', () => {
+    expect(downloadLinkFor({ origin, target: { kind: 'saga', libraryId: 1, tmdbId: '100' } })).toBe(
+      'raven://download?server=https%3A%2F%2Fraven.example&saga=1%3A100',
+    )
+  })
+
+  it.each([0, -1, 1.5, Number.NaN, 2 ** 53])('refuses a file id of %p', (mediaId) => {
+    expect(() => downloadLinkFor({ origin, target: { kind: 'media', mediaId } })).toThrow(
+      RangeError,
+    )
+  })
+
+  it.each([0, -1, 1.5, Number.NaN, 2 ** 53])('refuses an item id of %p', (itemId) => {
+    expect(() => downloadLinkFor({ origin, target: { kind: 'item', itemId } })).toThrow(RangeError)
+  })
+
+  it('refuses a library id that is not one', () => {
+    expect(() =>
+      downloadLinkFor({ origin, target: { kind: 'saga', libraryId: 0, tmdbId: '100' } }),
+    ).toThrow(RangeError)
+  })
+
+  it.each(['abc', '', '0', '012', '-1', '1.5', ' 1', '1 ', '12345678901234567'])(
+    'refuses a collection id of %p',
+    (tmdbId) => {
+      expect(() =>
+        downloadLinkFor({ origin, target: { kind: 'saga', libraryId: 1, tmdbId } }),
+      ).toThrow(RangeError)
+    },
+  )
+
+  it('accepts a collection id of sixteen digits', () => {
+    expect(
+      downloadLinkFor({
+        origin,
+        target: { kind: 'saga', libraryId: 1, tmdbId: '1234567890123456' },
+      }),
+    ).toContain('&saga=1%3A1234567890123456')
   })
 })

@@ -27,3 +27,42 @@ export const playLinkFor = ({ origin, mediaId, at, next }: PlayRequest): string 
   if (queue.length === 0) return `raven://play?${query}`
   return `raven://play?${query}&${toQueryString({ next: queue.join(',') })}`
 }
+
+/** What a download link asks the desktop to keep: one file, one title, or one collection of a library. */
+export type DownloadTarget =
+  | { kind: 'media'; mediaId: number }
+  | { kind: 'item'; itemId: number }
+  | { kind: 'saga'; libraryId: number; tmdbId: string }
+
+export type DownloadRequest = { origin: string; target: DownloadTarget }
+
+const isCollectionId = (value: unknown): value is string =>
+  typeof value === 'string' && /^[1-9]\d{0,15}$/u.test(value)
+
+/** The link for a download; throws for an id that is not one. */
+export const downloadLinkFor = ({ origin, target }: DownloadRequest): string => {
+  switch (target.kind) {
+    case 'media': {
+      if (!isMediaId(target.mediaId)) throw new RangeError(`${target.mediaId} is not a media id`)
+      return `raven://download?${toQueryString({ server: origin, media: String(target.mediaId) })}`
+    }
+    case 'item': {
+      if (!isMediaId(target.itemId)) throw new RangeError(`${target.itemId} is not an item id`)
+      return `raven://download?${toQueryString({ server: origin, item: String(target.itemId) })}`
+    }
+    case 'saga': {
+      if (!isMediaId(target.libraryId)) {
+        throw new RangeError(`${target.libraryId} is not a library id`)
+      }
+      if (!isCollectionId(target.tmdbId)) {
+        throw new RangeError(`${target.tmdbId} is not a collection id`)
+      }
+      const saga = `${target.libraryId}:${target.tmdbId}`
+      return `raven://download?${toQueryString({ server: origin, saga })}`
+    }
+    default: {
+      const unreachable: never = target
+      throw new RangeError(`unknown download target ${JSON.stringify(unreachable)}`)
+    }
+  }
+}
