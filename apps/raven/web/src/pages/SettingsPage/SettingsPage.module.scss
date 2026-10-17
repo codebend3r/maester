@@ -55,7 +55,8 @@
 }
 
 .heading,
-.legend {
+.legend,
+.subheading {
   display: grid;
   grid-auto-flow: column;
   justify-content: start;
@@ -88,6 +89,14 @@
 .legend {
   padding: 0;
   font-weight: 600;
+}
+
+// What this browser keeps for itself, headed as a setting's legend reads.
+.subheading {
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  line-height: var(--line-body);
 }
 
 .choices {

@@ -7,6 +7,7 @@ import {
   DEFAULT_PLAYBACK_SETTINGS,
   type PlaybackSettingsState,
 } from '@raven/core'
+import { usePlayerPrefs } from '@raven/ui'
 import { api } from '@/lib/api'
 import { SettingsPage } from '@/pages/SettingsPage/SettingsPage'
 import { held } from '@/test/held'
@@ -28,7 +29,7 @@ const CHANGED: PlaybackSettingsState = {
   },
 }
 
-const iconOf = (element: HTMLElement) => element.querySelector('svg')?.dataset.icon
+const iconOf = (element: HTMLElement) => element.querySelector('svg')?.dataset.icon ?? null
 
 describe('SettingsPage', () => {
   const spies = {
@@ -273,5 +274,52 @@ describe('the admin lock on SettingsPage', () => {
     expect(screen.getByText(/to turn it off/)).toHaveTextContent(
       "Set ADMIN_PASSWORD in raven's .env to turn it off.",
     )
+  })
+})
+
+describe('Open videos in raven player on SettingsPage', () => {
+  const spies = { get: spyOn(api, 'getPlaybackSettings') }
+
+  beforeEach(() => spies.get.mockImplementation(async () => STATE))
+  afterEach(() => Object.values(spies).forEach((spy) => spy.mockReset()))
+
+  const toggle = () => screen.getByRole('checkbox', { name: /^Open videos in raven player/ })
+
+  it('sits in Playback, off until this browser turns it on', async () => {
+    renderWithProviders(<SettingsPage />, { playback: null })
+    const playback = screen.getByRole('region', { name: 'Playback' })
+    await within(playback).findByRole('radio', { name: /Remux only/ })
+    expect(within(playback).getByRole('heading', { name: 'This browser' })).toBeInTheDocument()
+    expect(toggle()).not.toBeChecked()
+    expect(toggle().closest('label')).toHaveTextContent(
+      "Offers raven player for videos this browser cannot play, and in the player's settings. Turn it on only where raven player is installed.",
+    )
+    await userEvent.click(toggle())
+    expect(toggle()).toBeChecked()
+    expect(usePlayerPrefs.getState().opensInRavenPlayer).toBe(true)
+    await userEvent.click(toggle())
+    expect(usePlayerPrefs.getState().opensInRavenPlayer).toBe(false)
+  })
+
+  it('stays open to change while the admin lock keeps the server settings', async () => {
+    renderWithProviders(<SettingsPage />, {
+      playback: null,
+      adminLock: { state: 'on', available: true },
+    })
+    expect(await screen.findByRole('radio', { name: /Remux only/ })).toBeDisabled()
+    expect(screen.getByRole('checkbox', { name: /Tone map HDR/ })).toBeDisabled()
+    expect(toggle()).toBeEnabled()
+    await userEvent.click(toggle())
+    expect(usePlayerPrefs.getState().opensInRavenPlayer).toBe(true)
+  })
+
+  it('can be changed before the server settings are read, or when they cannot be', async () => {
+    spies.get.mockImplementation(async () => {
+      throw new Error('The server is away.')
+    })
+    renderWithProviders(<SettingsPage />, { playback: null })
+    expect(await screen.findByText('The server is away.')).toBeInTheDocument()
+    await userEvent.click(toggle())
+    expect(usePlayerPrefs.getState().opensInRavenPlayer).toBe(true)
   })
 })

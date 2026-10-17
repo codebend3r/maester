@@ -10,7 +10,7 @@ import {
 } from '@raven/core'
 import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
-import { Button, Icon, type IconName } from '@raven/ui'
+import { Button, Icon, type IconName, usePlayerPrefs } from '@raven/ui'
 import { Bone, Loading } from '@/components/Skeleton/Skeleton'
 import { useCanManage } from '@/lib/adminLock'
 import { api } from '@/lib/api'
@@ -153,7 +153,9 @@ const SettingsSkeleton = ({ count }: { count: number }) =>
  * One source of settings: its heading and what it covers, that the admin
  * lock keeps them as they are, why they could not be read or saved, `shape`
  * while they are read, and its settings once known. One fieldset holds them
- * all, disabled while the admin lock is on or a reset is saving.
+ * all, disabled while the admin lock is on or a reset is saving. `browser`
+ * holds what this browser keeps for itself, after and outside that fieldset,
+ * so neither the admin lock nor the server's answer has a say in it.
  */
 const SettingsSection = <T,>({
   icon,
@@ -163,6 +165,7 @@ const SettingsSection = <T,>({
   query,
   shape,
   saveError,
+  browser,
   children,
 }: {
   icon: IconName
@@ -172,6 +175,7 @@ const SettingsSection = <T,>({
   query: UseQueryResult<T>
   shape: ReactNode
   saveError: Error | null
+  browser?: ReactNode
   children: (data: T) => ReactNode
 }) => {
   const headingId = useId()
@@ -200,6 +204,37 @@ const SettingsSection = <T,>({
         </fieldset>
       )}
       {query.isPending && <Loading label="Reading the settings">{shape}</Loading>}
+      {browser}
+    </section>
+  )
+}
+
+/**
+ * Playback that this browser keeps for itself. Off by default: a page cannot
+ * tell whether raven player is installed, and a `raven://` link nothing
+ * handles does nothing in Chrome and shows an error in Safari.
+ */
+const BrowserPlayback = () => {
+  const opensInRavenPlayer = usePlayerPrefs((prefs) => prefs.opensInRavenPlayer)
+  const setOpensInRavenPlayer = usePlayerPrefs((prefs) => prefs.setOpensInRavenPlayer)
+  // Headed rather than grouped: the section's groups are the server's settings.
+  return (
+    <section className={styles.setting}>
+      <h3 className={styles.subheading}>
+        <Titled icon="globe">This browser</Titled>
+      </h3>
+      <label className={styles.choice}>
+        <input
+          type="checkbox"
+          checked={opensInRavenPlayer}
+          onChange={(event) => setOpensInRavenPlayer(event.target.checked)}
+        />
+        <span className={styles.choiceLabel}>Open videos in raven player</span>
+        <span className={styles.choiceHint}>
+          Offers raven player for videos this browser cannot play, and in the player's settings.
+          Turn it on only where raven player is installed.
+        </span>
+      </label>
     </section>
   )
 }
@@ -493,6 +528,7 @@ export const SettingsPage = () => {
         query={playback}
         shape={<SettingsSkeleton count={Object.keys(DEFAULT_PLAYBACK_SETTINGS).length} />}
         saveError={save.failure}
+        browser={<BrowserPlayback />}
       >
         {({ settings: current, effective }) => (
           <>
