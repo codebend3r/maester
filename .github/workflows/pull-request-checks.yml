@@ -36,6 +36,7 @@ jobs:
       # uv runs against the committed lockfiles, never re-resolving them.
       UV_FROZEN: '1'
     steps:
+      # The PR's merge commit with its base, which is what lands if it merges.
       - name: 📥 Checkout
         uses: actions/checkout@v7
 
@@ -65,35 +66,25 @@ jobs:
         if: env.NX_CLOUD_ACCESS_TOKEN == ''
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
 
+      # Fails instead of rewriting bun.lock when package.json and the lockfile disagree.
       - name: 📦 Install
         run: bun install --frozen-lockfile
-
-      # Each step runs the root script you would run locally. The agents stay up
-      # until the last step's target, `build`, is done (.nx/ci-config.yaml), so
-      # a new step goes before it.
-
-      # typos over the whole repo, dotfiles included.
-      - name: 🔤 Spellcheck
-        run: bun run spellcheck
-
-      # No tracked .js, .jsx, .mjs or .cjs file anywhere.
-      - name: 🟦 TypeScript only
-        run: bun run typescript-only
-
-      # No package.json script chained with `&&`, `||` or `;`.
-      - name: 🧩 One command per script
-        run: bun run one-command-per-script
-
-      # ruff, oxlint and gale.
-      - name: 🧹 Lint
-        run: bun run lint
 
       # ruff format, and oxfmt for each project and the root files.
       - name: 🎨 Format check
         run: bun run format:check
 
+      # tsc for every TypeScript project, without emitting.
       - name: 🔎 Typecheck
         run: bun run typecheck
+
+      # typos over the whole repo, dotfiles included.
+      - name: 🔤 Spellcheck
+        run: bun run spellcheck
+
+      # ruff, oxlint and gale.
+      - name: 🧹 Lint
+        run: bun run lint
 
       # pytest, vitest and bun test. raven's server and core tests encode real
       # clips with ffmpeg. `static` keeps every test's output; Nx's CI default
@@ -101,6 +92,15 @@ jobs:
       - name: 🧪 Unit tests
         run: bun run test --outputStyle=static
 
+      # knip: no unused file, export, type or dependency. Then no module class
+      # that no TSX reads.
+      - name: 🪦 Dead code
+        run: |
+          bun run dead-code
+          bun run dead-css
+
+      # Every project's build. The agents stay up until this target is done
+      # (.nx/ci-config.yaml), so a new step goes before it.
       - name: 🏗️ Build
         run: bun run build
 
@@ -115,6 +115,8 @@ jobs:
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
       HOMEBREW_NO_AUTO_UPDATE: '1'
     steps:
+      # The PR's head commit, not the merge commit, so the artifact names below match
+      # the commit that was built.
       - name: 📥 Checkout exact PR head
         uses: actions/checkout@v7
         with:
@@ -128,8 +130,9 @@ jobs:
       # Both only read the built resources, so Nx runs them at once. test:native is
       # cached, keyed on the native sources, the build recipe and the Xcode version.
       - name: 🔎 Audit native resources and run the real headless libmpv tests
-        run: bunx nx run-many -p @raven/mpv -t audit:native test:native
+        run: bun run mpv:native
 
+      # The addon, its two dylibs and their license notices, as built for this commit.
       - name: 📤 Native playback resources
         uses: actions/upload-artifact@v7
         with:
@@ -137,6 +140,9 @@ jobs:
           path: libs/raven/mpv/resources/darwin-arm64
           if-no-files-found: error
 
+      # Every pinned upstream archive, both patches, the build scripts and the exact
+      # revision those binaries came from: mpv's GPL and FFmpeg's LGPL want the source
+      # beside the binaries.
       - name: 📤 Matching native sources
         uses: actions/upload-artifact@v7
         with:
@@ -153,6 +159,7 @@ jobs:
           libs/raven/mpv/resources/darwin-arm64
           libs/raven/mpv/native-build/prefix/bin/ffmpeg
 
+      # Only the jobs below read it, so it lives for a day.
       - name: 📤 Playback handoff
         uses: actions/upload-artifact@v7
         with:
@@ -173,44 +180,53 @@ jobs:
       # Keeps the Xcode version the cached app is keyed on the same as the native job's.
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
     steps:
+      # The same head commit the native job built, so its handoff matches these sources.
       - name: 📥 Checkout exact PR head
         uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha }}
 
+      # Bun's version comes from `packageManager` in package.json.
       - name: 🍞 Set up Bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: package.json
 
+      # Fails instead of rewriting bun.lock when package.json and the lockfile disagree.
       - name: 📦 Install
         run: bun install --frozen-lockfile
 
+      # The tar the native job packed, into the runner's temp folder.
       - name: 📥 Native handoff
         uses: actions/download-artifact@v8
         with:
           name: raven-native-handoff-${{ github.event.pull_request.head.sha }}
           path: ${{ runner.temp }}
 
+      # Puts the addon, dylibs and ffmpeg back where the native job built them.
       - name: 📂 Unpack the native handoff
         run: tar -xf "$RUNNER_TEMP/raven-native-handoff.tar"
 
       # Vite's log carries the renderer's gzip sizes, for the 250 KB budget. Nx replays it
       # on a cache hit.
       - name: 🏗️ Build desktop app
-        run: bunx nx run @raven/desktop:build
+        run: bun run desktop:build
 
       # Cached on the app's and the native sources, the Xcode version and the signing
       # environment, so an unchanged app restores from Nx Cloud.
       - name: 📦 Make the unsigned app
-        run: bunx nx run @raven/desktop:make
+        run: bun run desktop:make
 
+      # otool, lipo and codesign over every Mach-O file in the app: its architectures,
+      # links, rpaths and signature.
       - name: 🔎 Audit the packaged bundle
-        run: bunx nx run @raven/desktop:audit:bundle
+        run: bun run desktop:audit:bundle
 
+      # Launches the packaged app with no test hooks and checks it starts and quits cleanly.
       - name: 🚬 Smoke the packaged app
-        run: bunx nx run @raven/desktop:smoke:packaged
+        run: bun run desktop:smoke:packaged
 
+      # The unsigned app, for trying the PR's build by hand.
       - name: 📤 Unsigned raven player
         uses: actions/upload-artifact@v7
         with:
@@ -242,33 +258,40 @@ jobs:
       # software H.264 encoder on a VM without a hardware one.
       RAVEN_E2E_FFMPEG: ${{ github.workspace }}/libs/raven/mpv/native-build/prefix/bin/ffmpeg
     steps:
+      # The same head commit the native job built, so its handoff matches these sources.
       - name: 📥 Checkout exact PR head
         uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha }}
 
+      # Bun's version comes from `packageManager` in package.json.
       - name: 🍞 Set up Bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: package.json
 
+      # Fails instead of rewriting bun.lock when package.json and the lockfile disagree.
       - name: 📦 Install
         run: bun install --frozen-lockfile
 
+      # The tar the native job packed, into the runner's temp folder.
       - name: 📥 Playback handoff
         uses: actions/download-artifact@v8
         with:
           name: raven-native-handoff-${{ github.event.pull_request.head.sha }}
           path: ${{ runner.temp }}
 
+      # Puts the addon, dylibs and ffmpeg back where the native job built them.
       - name: 📂 Unpack the playback handoff
         run: tar -xf "$RUNNER_TEMP/raven-native-handoff.tar"
 
       # Cached on the desktop and native sources and the Xcode version, so a PR that
-      # changes neither restores the result from Nx Cloud.
+      # changes neither restores the result from Nx Cloud. Each matrix target has a
+      # `desktop:` root script of the same name.
       - name: ${{ matrix.check.name }}
-        run: bunx nx run @raven/desktop:${{ matrix.check.target }}
+        run: bun run desktop:${{ matrix.check.target }}
 
+      # Playwright's traces, only when a check failed, to replay what went wrong.
       - name: 📤 End to end traces
         if: failure() && matrix.check.traces
         uses: actions/upload-artifact@v7
@@ -286,6 +309,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
+      # Prints each needed job's result, then fails on the first that isn't a success.
       - name: ✅ Every desktop job passed
         env:
           RESULTS: ${{ join(needs.*.result, ' ') }}
@@ -295,6 +319,7 @@ jobs:
             test "$result" = success
           done
 
+  # The production images, built and health checked by the shared smoke workflow.
   smoke:
     name: 🐳 Smoke test
     uses: ./.github/workflows/smoke-test.yml

@@ -10,22 +10,22 @@
     }
   },
   "scripts": {
+    "audit:native": "bun src/build/auditNative.ts",
     "build": "bun run --sequential build:clean build:compile build:aliases",
+    "build:aliases": "tsc-alias -p tsconfig.build.json",
     "build:clean": "rm -rf dist",
     "build:compile": "tsc -p tsconfig.build.json",
-    "build:aliases": "tsc-alias -p tsconfig.build.json",
-    "typecheck": "tsgo --noEmit",
-    "lint:ts": "oxlint",
-    "lint:ts:fix": "oxlint --fix",
+    "build:native": "bun src/build/buildAddon.ts",
+    "fetch:libmpv": "bun src/build/buildLibmpv.ts",
+    "fetch:sources": "bun src/build/fetchSources.ts",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
+    "lint:ts": "oxlint",
+    "lint:ts:fix": "oxlint --fix",
     "test": "bun test --dots src",
-    "test:watch": "bun test --dots --watch src",
-    "fetch:sources": "bun src/build/fetchSources.ts",
-    "fetch:libmpv": "bun src/build/buildLibmpv.ts",
-    "build:native": "bun src/build/buildAddon.ts",
     "test:native": "node --import tsx --test --test-timeout=120000 test/native.test.ts",
-    "audit:native": "bun src/build/auditNative.ts"
+    "test:watch": "bun test --dots --watch src",
+    "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
     "@raven/core": "workspace:*",

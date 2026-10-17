@@ -6,7 +6,7 @@
 - Run tasks through Nx from the repo root: `bunx nx run @luwin/api:test`, `bunx nx run-many -t test`, `bun run verify`, `bun run affected`.
 - Never put a `.env` at the repo root; Nx loads it into every task. Each product reads its own beside its compose file.
 - Commits and PRs follow the `commit-format` and `pr-format` skills (`MAE:` prefix).
-- lefthook's git hooks (`lefthook.yml`) run on every commit and push: pre-commit runs lint-staged (`lint-staged.config.ts`) to lint and format the staged files, and pre-push runs the checks `verify` runs, one at a time. Never skip them with `--no-verify` or `LEFTHOOK=0`; fix what they report.
+- lefthook's git hooks (`lefthook.yml`) run on every commit and push: pre-commit runs lint-staged (`lint-staged.config.ts`) to lint and format the staged files, and pre-push runs the checks `verify` runs but `dead-code` and `dead-css`, which only the PR checks run, one at a time, then the CLAUDE.md audit (`scripts/audit_claude_md.sh`, also `bun run audit`): headless Claude Code reads the commits being pushed against this file and the product `CLAUDE.md`s for the rules no linter checks, and a violation stops the push. Never skip them with `--no-verify` or `LEFTHOOK=0`; fix what they report.
 - TypeScript only: no `.js`, `.jsx`, `.mjs` or `.cjs` files anywhere, config files included. The pre-push hook and the `typescript-only` target (in `verify`, `affected` and the PR checks) reject them.
 - A `package.json` script runs one command. Steps become scripts of their own, chained with `bun run --sequential build:clean build:compile` (or `--parallel`), never with `&&`, `||` or `;`. The pre-push hook and the `one-command-per-script` target (in `verify`, `affected` and the PR checks) reject a chained script.
 - Every import of a project's own modules goes through its `@/` alias and names no extension: `@/lib/api`, never `./api`, `../lib/api` or `@/lib/api.js`. oxlint's `no-restricted-imports` fails on anything else. Non-TypeScript assets keep their extension (`@/components/Player/Player.module.scss`). Node needs relative `.js` paths at runtime, so the server and core builds run `tsc-alias` after `tsc` to rewrite the alias in `dist` only.
@@ -23,6 +23,21 @@ These apply to every TypeScript project: everything but `@luwin/api` and the Pyt
 - If a type can't be inferred and narrowing is not an option, use `unknown`.
 - Model alternatives as discriminated unions so invalid states are unrepresentable. Switch on the discriminant and exhaustiveness-check the `default` case by assigning to `never`.
 - No enums. Use `as const` arrays or objects and derive the union from them: `(typeof X)[number]`, `keyof typeof X`.
+- No string literals that act as identifiers. A status, a kind, a discriminant tag, a route path, an event or channel name, a header, a storage or query key, an environment variable name, an error code: each is a value of an `as const` object or array, declared once and imported wherever it is read, compared or switched on. The constant is the single source of truth and the types come from it, never the other way round:
+
+  ```ts
+  export const ROLES = {
+    admin: 'ADMIN_ROLE',
+    editor: 'EDITOR_ROLE',
+    viewer: 'VIEWER_ROLE',
+  } as const
+  export type RoleKey = keyof typeof ROLES
+  export type Role = (typeof ROLES)[RoleKey]
+  ```
+
+  Code then writes `ROLES.admin`, never `'ADMIN_ROLE'`, so a misspelling is a compile error instead of a branch that never runs. The guard for the boundary checks against `Object.values(ROLES)`. Text a person reads (UI copy, error and log messages, test names), import paths, SCSS module class references (`styles.card`), the result of `typeof` and the literal inside the constant's own declaration are exempt: they are copy or already typed, not identifiers.
+
+- No dead code. Every export has an importer, every file is reachable from an entry point, every function, variable, parameter and type is read, and every dependency in `package.json` is imported. Delete what is unused instead of commenting it out or keeping it for later; git has it. oxlint's `no-unused-vars` catches the locals, and the `dead-code` target (knip, in `verify`, `affected` and the PR checks) catches unused exports, files and dependencies.
 - `type` aliases, never `interface`, except where declaration merging requires one (the `.d.ts` augmentation of bun:test's `Matchers`). oxlint's `consistent-type-definitions` enforces it.
 - Use `as const satisfies <Type>` to check a literal value against a type without widening it.
 - Derive types from their single source of truth instead of writing a parallel shape by hand: `typeof` for values, `ReturnType` and `Parameters` for functions, indexed access for part of another type.
@@ -47,10 +62,19 @@ These apply to every TypeScript project: everything but `@luwin/api` and the Pyt
 - Named exports only. A config file a tool reads through a default export (`vite.config.ts`, `vitest.config.ts`) is exempt in its project's `.oxlintrc.json`.
 - Name booleans as predicates: `is`, `has`, `should`, `can`.
 
+## React
+
+These apply to every React project: `@raven/web`, `@rookery/web`, `@raven/ui` and the desktop renderer in `@raven/desktop`.
+
+- Global state lives in zustand, never in a React context. State that more than one component reads or writes is a store in the project's `src/stores/` (the desktop's is `src/renderer/stores/`, beside its only React code), made with `create` (`apps/raven/web/src/stores/theme.ts`, `libs/raven/ui/src/stores/playerPrefs.ts`). A component reads it through a selector, `useTheme((state) => state.theme)`, so it re-renders only when its slice changes. Never write a `createContext` and a `*Provider` to pass state, a setter or a callback down the tree: the component that needs the value imports the store.
+- State one component owns stays in `useState` or `useReducer`, and server data stays in TanStack Query. A store holds client state the tree shares, not a copy of an API response.
+- The one exception is a provider a library requires: TanStack Query's `QueryClientProvider`, React Router's `RouterProvider`.
+
 ## CSS
 
 These apply to the web apps, `@raven/web` and `@rookery/web`, to `@raven/ui`, whose styles both raven clients import, and to the desktop renderer in `@raven/desktop`. Each app has its own tokens, so "the app's `globals.scss`" means `libs/raven/ui/src/styles/globals.scss` for raven and `apps/rookery/web/src/styles/globals.scss` for rookery.
 
+- No dead selectors. Every class in a `*.module.scss` is referenced from the component that imports it, and every rule in `globals.scss` and `elements.scss` matches an element some component renders. Delete a selector when its last use goes; a stale class in a module is dead code. The `dead-css` target (in `verify`, `affected` and the PR checks) fails on a module class no TSX reads.
 - Component styles are SCSS modules (`*.module.scss`), imported through the `@/` alias, never a relative path. The `react-ts-css` editor extension flags aliased imports as unresolved; that is a tooling bug to fix in tooling, not a reason to relativize the import.
 - Raven's shared styles live in `libs/raven/ui/src/styles/`; rookery's remain in its web app. The app's `globals.scss` holds the design tokens, resets and typographic primitives. raven also has `libs/raven/ui/src/styles/elements.scss`, the default look of each element, inside `:where()` so any class beats it. Everything else belongs in a component module.
 - Containers drive layout: the container defines the child's available width and height, its padding, and the spacing between children; the children only care about their content. Moving a child to a different container may lay it out differently, because the container specifies the layout.

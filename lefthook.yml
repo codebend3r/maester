@@ -3,32 +3,44 @@ pre-commit:
   jobs:
     # Lints and formats the staged files and restages what it fixes (lint-staged.config.ts).
     - name: 🧹 lint-staged
-      run: bunx lint-staged
+      run: bun run lint-staged
 
 # The checks `bun run verify` runs, one at a time, stopping at the first that fails.
+# All but dead-code and dead-css, which the PR checks run instead.
 pre-push:
-  piped: true
+  parallel: true
   jobs:
     - name: ✨ format check
-      run: bunx nx run-many -t format:check
+      run: bun run format:check
 
     - name: 🔎 typecheck
-      run: bunx nx run-many -t typecheck
+      run: bun run typecheck
+
+    - name: 🟦 TypeScript only
+      run: bun run typescript-only
 
     - name: 🐍 lint python
-      run: bunx nx run-many -t lint:py
+      run: bun run lint:py
 
-    - name: 🟦 lint typescript
-      run: bunx nx run-many -t lint:ts
+    - name: 🚧 lint typescript
+      run: bun run lint:ts
 
     - name: 🎨 lint css
-      run: bunx nx run-many -t lint:css
+      run: bun run lint:css
 
     - name: 📝 spellcheck
-      run: bunx nx run-many -t spellcheck
+      run: bun run spellcheck
+
+    - name: 🧩 One command per script
+      run: bun run one-command-per-script
 
     - name: 🧪 test
-      run: bunx nx run-many -t test
+      run: bun run test
 
     - name: 📦 build
-      run: bunx nx run-many -t build
+      run: bun run build
+
+    # Last, once every deterministic check has passed: Claude Code reads the
+    # commits being pushed against CLAUDE.md for the rules no linter checks.
+    # - name: 🧭 CLAUDE.md audit
+    #   run: bash scripts/audit_claude_md.sh

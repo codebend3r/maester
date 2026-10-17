@@ -1,6 +1,6 @@
 ---
 name: pr-format
-description: Use when opening, drafting, or editing a pull request in maester — "open a PR", "write the PR description", `gh pr create`, `gh pr edit`, "update the PR body", "clean up the PR", "add screenshots to the PR", or after pushing new commits to a branch with an open PR. Covers the `MAE:` title, the What / Why / Testing body split by Nx project, screenshots of visual changes, keeping the PR in sync with the branch, and zero agent attribution. For commit messages, use `commit-format`.
+description: Use when opening, drafting, or editing a pull request in maester: "open a PR", "write the PR description", `gh pr create`, `gh pr edit`, "update the PR body", "clean up the PR", "add screenshots to the PR", or after pushing new commits to a branch with an open PR. Covers the `MAE:` title, the What / Why / Testing body split by Nx project, screenshots of visual changes, keeping the PR in sync with the branch, and zero agent attribution. For commit messages, use `commit-format`.
 ---
 
 # PR format
@@ -118,4 +118,4 @@ Strip any attribution line an older body had.
 
 ## Reporting back
 
-In chat only, one line per action: `🔀 PR #<n> created — MAE: <title>`, `📝 PR #<n> synced with the branch`, `🖼️ PR #<n> screenshots added`.
+In chat only, one line per action: `🔀 PR #<n> created: MAE: <title>`, `📝 PR #<n> synced with the branch`, `🖼️ PR #<n> screenshots added`.
