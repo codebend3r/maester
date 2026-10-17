@@ -34,6 +34,7 @@ import { sendImage } from '@/items/sendImage'
 import { PrivateBy } from '@/lock/lockGuard'
 import { MediaArtifacts } from '@/media/mediaArtifacts'
 import { type MediaFile, MediaIndex } from '@/media/mediaIndex'
+import { MediaPlane } from '@/media/mediaPlaneMark'
 import { MediaRepository } from '@/media/mediaRepository'
 import { parseRange } from '@/media/range'
 import { ViewingRepository } from '@/media/viewingRepository'
@@ -179,6 +180,7 @@ export class MediaController {
    * range request, so the server does nothing but read. Files the client
    * cannot decode as they are go through `PlaybackController`'s stream.
    */
+  @MediaPlane()
   @Get(':id/file')
   async file(
     @Param('id', ParseIntPipe) id: number,

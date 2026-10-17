@@ -21,6 +21,7 @@ import { parseStreams } from '@/ffmpeg/streams'
 import { PrivateBy } from '@/lock/lockGuard'
 import { SettingsRepository } from '@/settings/settingsRepository'
 import { type MediaFile, MediaIndex } from '@/media/mediaIndex'
+import { MediaPlane } from '@/media/mediaPlaneMark'
 import { SubtitlesService } from '@/playback/subtitlesService'
 import { TracksService } from '@/playback/tracksService'
 
@@ -62,6 +63,7 @@ export class PlaybackController {
   }
 
   /** WebVTT for one track; `window` picks the stretch of an embedded one. */
+  @MediaPlane()
   @Get(':id/subtitles/:trackId')
   async subtitle(
     @Param('id', ParseIntPipe) id: number,
@@ -84,6 +86,7 @@ export class PlaybackController {
    * response is open and is killed the moment the client lets go, which
    * happens on every seek outside what is buffered.
    */
+  @MediaPlane()
   @Get(':id/stream')
   async stream(
     @Param('id', ParseIntPipe) id: number,

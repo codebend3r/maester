@@ -52,9 +52,21 @@ class LooseController {
 describe('who each route is for', () => {
   it('reads each route with its own audience, or else its controller’s', () => {
     expect(routeMarks([ShelvesController])).toEqual([
-      { method: 'GET', path: '/api/shelves', lock: null, audience: 'admin' },
-      { method: 'PUT', path: '/api/shelves/order', lock: null, audience: 'viewers' },
-      { method: 'DELETE', path: '/api/shelves/empty', lock: null, audience: 'admin' },
+      { method: 'GET', path: '/api/shelves', lock: null, audience: 'admin', mediaPlane: false },
+      {
+        method: 'PUT',
+        path: '/api/shelves/order',
+        lock: null,
+        audience: 'viewers',
+        mediaPlane: false,
+      },
+      {
+        method: 'DELETE',
+        path: '/api/shelves/empty',
+        lock: null,
+        audience: 'admin',
+        mediaPlane: false,
+      },
     ])
   })
 
