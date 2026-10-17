@@ -457,6 +457,29 @@ describe('TmdbClient', () => {
       runtime: 170,
     })
   })
+
+  it("reads a movie's or show's score alone, with nothing appended", async () => {
+    const tmdb = fakeTmdb({
+      movies: [{ id: 949, title: 'Heat', released: '1995-12-15', voteAverage: 7.9 }],
+      shows: [{ id: 1396, title: 'Breaking Bad', first: '2008-01-20', seasons: {} }],
+    })
+    const client = new TmdbClient(config(), tmdb.fetch)
+    expect(await client.score({ type: 'movie', tmdbId: '949' })).toEqual({
+      value: 7.9,
+      votes: 1000,
+    })
+    expect(await client.score({ type: 'show', tmdbId: '1396' })).toEqual({ value: 8.5, votes: 500 })
+    expect(tmdb.state.calls.map((url) => new URL(url).pathname)).toEqual([
+      '/3/movie/949',
+      '/3/tv/1396',
+    ])
+    expect(
+      tmdb.state.calls.map((url) => new URL(url).searchParams.get('append_to_response')),
+    ).toEqual([null, null])
+    await expect(client.score({ type: 'movie', tmdbId: '1' })).rejects.toMatchObject({
+      kind: 'not-found',
+    })
+  })
 })
 
 describe('toShow and toSeason', () => {

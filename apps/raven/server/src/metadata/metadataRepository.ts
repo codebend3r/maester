@@ -49,9 +49,25 @@ const SCORES_DUE = {
                          WHERE r.item_id = items.id AND r.provider = 'mdblist'))`,
 } as const satisfies Record<ScoreProvider, string>
 
-/** The movies and shows whose scores from `provider` are due, leaving out titles raven made up. */
+/**
+ * Whether a library's Refresh asked for an item's scores and `provider` has
+ * not answered since that Refresh began, as SQL over `items`: so each
+ * provider is asked once a Refresh, past the 30-day wait, whether or not
+ * its answer settles the request.
+ */
+const requestedFrom = (provider: ScoreProvider): string =>
+  `EXISTS (SELECT 1 FROM score_requests r JOIN libraries l ON l.id = r.library_id
+            WHERE r.item_id = items.id
+              AND (items.${FETCHED_AT[provider]} IS NULL
+                   OR items.${FETCHED_AT[provider]} < l.ratings_refresh_started_at))`
+
+/**
+ * The movies and shows whose scores from `provider` are due, by their age
+ * or a Refresh, leaving out titles raven made up.
+ */
 const scoresDueWhere = (provider: ScoreProvider): string =>
-  `type IN ('movie', 'show') AND tmdb_id NOT GLOB @local AND ${SCORES_DUE[provider]}`
+  `type IN ('movie', 'show') AND tmdb_id NOT GLOB @local
+   AND ((${SCORES_DUE[provider]}) OR ${requestedFrom(provider)})`
 
 /**
  * The order each provider's due scores are fetched in. MDBList's: first the
@@ -157,6 +173,30 @@ const SCORES_DUE_DAYS = 30
 /** The time before which a provider's answer is due again, as `scoresDue` takes it. */
 export const scoresDueBefore = (): string =>
   new Date(Date.now() - SCORES_DUE_DAYS * DAY_MS).toISOString()
+
+/** A movie or show whose scores are due, and whether a Refresh asked for it. */
+export type DueScores = ScoreTitle & { itemId: number; isRequested: boolean }
+
+type DueRow = {
+  id: number
+  type: string
+  tmdb_id: string
+  imdb_id: string | null
+  requested: number
+}
+
+const toDueScores = (row: DueRow): DueScores[] =>
+  isMatchItemType(row.type)
+    ? [
+        {
+          itemId: row.id,
+          type: row.type,
+          tmdbId: row.tmdb_id,
+          imdbId: row.imdb_id,
+          isRequested: row.requested === 1,
+        },
+      ]
+    : []
 
 const genresOf = (json: string): string[] => parseJsonAs({ json, guard: isStringArray }) ?? []
 
@@ -401,12 +441,7 @@ export class MetadataRepository {
         if (ref != null) image.run(id, kind, ref)
       })
 
-      this.db.prepare(`DELETE FROM ratings WHERE item_id = ? AND source = 'tmdb'`).run(id)
-      if (item.rating) {
-        this.db
-          .prepare(`INSERT INTO ratings (item_id, source, value, votes) VALUES (?, 'tmdb', ?, ?)`)
-          .run(id, item.rating.value, item.rating.votes)
-      }
+      this.saveTmdbRating({ itemId: id, rating: item.rating })
 
       this.db.prepare('DELETE FROM reviews WHERE item_id = ?').run(id)
       const review = this.db.prepare(
@@ -748,7 +783,24 @@ export class MetadataRepository {
     })()
   }
 
-  /** Movies and shows whose scores from `provider` are due, in the order they are fetched, as far as `limit` goes. */
+  /** Replaces an item's TMDB score, or drops it for none; nothing for an item that has gone. */
+  saveTmdbRating({ itemId, rating }: { itemId: number; rating: FetchedItem['rating'] }): void {
+    this.db.transaction(() => {
+      this.db.prepare(`DELETE FROM ratings WHERE item_id = ? AND source = 'tmdb'`).run(itemId)
+      if (rating == null) return
+      this.db
+        .prepare(
+          `INSERT INTO ratings (item_id, source, value, votes)
+           SELECT id, 'tmdb', ?, ? FROM items WHERE id = ?`,
+        )
+        .run(rating.value, rating.votes, itemId)
+    })()
+  }
+
+  /**
+   * Movies and shows whose scores from `provider` are due, in the order they
+   * are fetched, as far as `limit` goes: those a Refresh asked for first.
+   */
   scoresDue({
     provider,
     before,
@@ -757,23 +809,90 @@ export class MetadataRepository {
     provider: ScoreProvider
     before: string
     limit: number
-  }): Array<ScoreTitle & { itemId: number }> {
+  }): DueScores[] {
     return this.db
-      .prepare<
-        { local: string; before: string; limit: number },
-        { id: number; type: string; tmdb_id: string; imdb_id: string | null }
-      >(
-        `SELECT id, type, tmdb_id, imdb_id FROM items
+      .prepare<{ local: string; before: string; limit: number }, DueRow>(
+        `SELECT id, type, tmdb_id, imdb_id, ${requestedFrom(provider)} AS requested FROM items
           WHERE ${scoresDueWhere(provider)}
-          ORDER BY ${SCORES_ORDER[provider]}
+          ORDER BY requested DESC, ${SCORES_ORDER[provider]}
           LIMIT @limit`,
       )
       .all({ local: `${LOCAL}*`, before, limit })
-      .flatMap((row) =>
-        isMatchItemType(row.type)
-          ? [{ itemId: row.id, type: row.type, tmdbId: row.tmdb_id, imdbId: row.imdb_id }]
-          : [],
+      .flatMap(toDueScores)
+  }
+
+  /**
+   * Asks for fresh scores for each movie and show a library holds, reached
+   * up from its files through their episodes and seasons, but those raven
+   * made up. Answers how many it asked for.
+   */
+  requestScores(libraryId: number): number {
+    return this.db
+      .prepare<{ libraryId: number; local: string }>(
+        `WITH RECURSIVE up(id) AS (
+           SELECT mi.item_id FROM media m JOIN media_items mi ON mi.media_id = m.id
+            WHERE m.library_id = @libraryId
+           UNION SELECT i.parent_id FROM items i JOIN up ON i.id = up.id
+            WHERE i.parent_id IS NOT NULL)
+         INSERT OR IGNORE INTO score_requests (library_id, item_id)
+         SELECT @libraryId, i.id FROM up JOIN items i ON i.id = up.id
+          WHERE i.type IN ('movie', 'show') AND i.tmdb_id NOT GLOB @local`,
       )
+      .run({ libraryId, local: `${LOCAL}*` }).changes
+  }
+
+  /** How many titles a library's Refresh asked for are still waiting. */
+  requestsLeft(libraryId: number): number {
+    return (
+      this.db
+        .prepare<[number], { requests: number }>(
+          'SELECT COUNT(*) AS requests FROM score_requests WHERE library_id = ?',
+        )
+        .get(libraryId)?.requests ?? 0
+    )
+  }
+
+  /** Whether any library's Refresh still waits on a title. */
+  hasRequests(): boolean {
+    return !!this.db.prepare('SELECT 1 FROM score_requests LIMIT 1').get()
+  }
+
+  /** Whether a Refresh still waits on the item. */
+  isRequested(itemId: number): boolean {
+    return !!this.db.prepare('SELECT 1 FROM score_requests WHERE item_id = ? LIMIT 1').get(itemId)
+  }
+
+  /** The titles a Refresh still waits on, as far as `limit` goes. */
+  requestedTitles(limit: number): DueScores[] {
+    return this.db
+      .prepare<[number], DueRow>(
+        `SELECT id, type, tmdb_id, imdb_id, 1 AS requested FROM items
+          WHERE id IN (SELECT item_id FROM score_requests)
+          ORDER BY id
+          LIMIT ?`,
+      )
+      .all(limit)
+      .flatMap(toDueScores)
+  }
+
+  /** Settles every library's request for the item's scores. */
+  clearRequest(itemId: number): void {
+    this.db.prepare('DELETE FROM score_requests WHERE item_id = ?').run(itemId)
+  }
+
+  /**
+   * Settles each request `provider` has answered since its Refresh began:
+   * those it answered before it became the provider that settles them.
+   */
+  settleRequests(provider: ScoreProvider): void {
+    this.db
+      .prepare(
+        `DELETE FROM score_requests
+          WHERE (SELECT ${FETCHED_AT[provider]} FROM items WHERE id = score_requests.item_id)
+                >= (SELECT ratings_refresh_started_at FROM libraries
+                     WHERE id = score_requests.library_id)`,
+      )
+      .run()
   }
 
   /** Whether an item's scores from `provider` are still due, by the rule `scoresDue` lists them by. */

@@ -3,6 +3,7 @@ import type { ProbeResult } from '@/ffmpeg/probe'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { MediaIndex } from '@/media/mediaIndex'
 import { MatchFiles } from '@/metadata/matchFiles'
+import { BLANK_ITEM } from '@/metadata/tmdbClient'
 import { testDatabase } from '@/test/database'
 import { repositories } from '@/test/repositories'
 
@@ -128,6 +129,50 @@ describe('libraries', () => {
       { path: '/media/Films', layout: 'lettered', groups: 26 },
       { path: '/media/New', layout: null, groups: 0 },
     ])
+  })
+
+  it('remembers a Refresh, and finishes each with no title left waiting', () => {
+    const libraries = new LibrariesRepository(database.get())
+    const { metadata } = repositories(database.get())
+    const index = new MediaIndex(database.get())
+    const library = (name: string): { id: number; itemId: number } => {
+      const { id } = libraries.create({ name, paths: [`/${name}`], settings: { kind: 'movies' } })
+      const itemId = metadata.save({
+        item: { ...BLANK_ITEM, type: 'movie', tmdbId: name, number: null, title: name },
+      })
+      metadata.link({
+        mediaIds: [
+          index.insert({
+            libraryId: id,
+            kind: 'movies',
+            file: { path: `/${name}/${name}.mkv`, root: `/${name}`, size: 1, mtimeMs: 1 },
+          }),
+        ],
+        itemIds: [itemId],
+      })
+      return { id, itemId }
+    }
+    const { id: waiting } = library('Waiting')
+    const { id: done, itemId: doneItem } = library('Done')
+    const { id: idle } = library('Idle')
+    expect(libraries.ratingsRefresh(idle)).toEqual({ startedAt: null, total: 0, finishedAt: null })
+
+    const at = '2026-10-17T09:00:00.000Z'
+    libraries.startRatingsRefresh({ id: waiting, at, total: metadata.requestScores(waiting) })
+    libraries.startRatingsRefresh({ id: done, at, total: metadata.requestScores(done) })
+    expect(libraries.ratingsRefresh(waiting)).toEqual({ startedAt: at, total: 1, finishedAt: null })
+    metadata.clearRequest(doneItem)
+
+    const finished = '2026-10-17T09:05:00.000Z'
+    libraries.finishRatingsRefreshes(finished)
+    expect(libraries.ratingsRefresh(waiting)).toEqual({ startedAt: at, total: 1, finishedAt: null })
+    expect(libraries.ratingsRefresh(done)).toEqual({
+      startedAt: null,
+      total: 1,
+      finishedAt: finished,
+    })
+    expect(libraries.ratingsRefresh(idle)).toEqual({ startedAt: null, total: 0, finishedAt: null })
+    expect(libraries.ratingsRefresh(-1)).toEqual({ startedAt: null, total: 0, finishedAt: null })
   })
 })
 

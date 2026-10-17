@@ -22,6 +22,8 @@ export type ScoreSource = {
   provider: ScoreProvider
   /** Whether there is a key, it has not been refused, and today's calls are not spent. */
   enabled: () => boolean
+  /** Whether there is a key it has not had refused, whether or not today's calls are spent. */
+  hasUsableKey: () => boolean
   /** How many calls are left today. */
   remaining: () => number
   state: () => MetadataServiceState

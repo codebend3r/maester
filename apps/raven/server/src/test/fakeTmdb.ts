@@ -42,6 +42,8 @@ export type FakeMovie = {
   runtime?: number
   /** TMDB's `popularity` in a search; left out when not given. */
   popularity?: number
+  /** TMDB's `vote_average`: 8.2 when not given. */
+  voteAverage?: number
 }
 
 /**
@@ -75,7 +77,7 @@ export const movieBody = (movie: FakeMovie): Record<string, unknown> => ({
   belongs_to_collection: movie.saga
     ? { id: movie.saga.id, name: movie.saga.name, poster_path: null, backdrop_path: null }
     : null,
-  vote_average: 8.2,
+  vote_average: movie.voteAverage ?? 8.2,
   vote_count: 1000,
   external_ids: { imdb_id: movie.imdbId ?? null },
   reviews: {

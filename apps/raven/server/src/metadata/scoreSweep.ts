@@ -6,9 +6,12 @@ import {
   type OnModuleDestroy,
 } from '@nestjs/common'
 import { errorMessage } from '@/errorMessage'
-import { MetadataRepository, scoresDueBefore } from '@/metadata/metadataRepository'
-import type { ScoreProvider, ScoreSource, ScoreTitle } from '@/metadata/scoreSources'
+import { LibrariesRepository } from '@/libraries/librariesRepository'
+import { notFound } from '@/metadata/matchPass'
+import { type DueScores, MetadataRepository, scoresDueBefore } from '@/metadata/metadataRepository'
+import type { ScoreProvider, ScoreSource } from '@/metadata/scoreSources'
 import { Scores } from '@/metadata/scores'
+import { TmdbClient } from '@/metadata/tmdbClient'
 import { createTaskQueue, mapWithConcurrency } from '@/scanner/concurrency'
 
 /** How long the sweep waits to try again after a drain that asked and got no answer at all. */
@@ -20,6 +23,9 @@ const AT_ONCE = 2
 /** The sweep's one key on its queue. */
 const SWEEP_TASKS = { drain: 'drain' } as const
 
+/** How many requested titles a round asks TMDB alone about, which has no daily budget to keep to. */
+const TMDB_ROUND = 50
+
 /**
  * How many failed calls in a row end a round: enough to step past a title
  * that keeps failing, few enough that a source that is down does not spend
@@ -30,46 +36,61 @@ export const GIVE_UP_AFTER = 3
 /** Why the sweep stopped with scores still due, and when it starts again. */
 export type ScorePause = { reason: 'budget' | 'unavailable'; resumesAt: string }
 
-type DueTitle = ScoreTitle & { itemId: number }
+/** Who a round asks: a score source, or TMDB alone for a Refresh's titles while no score source has a usable key. */
+type Asked = ScoreProvider | 'tmdb'
 
-/** One source's due titles as of `before`, and how each is asked for while that source is still the one to ask. */
+/** The titles due from whoever a round asks, and how each is asked for while that one is still the one to ask. */
 type Round = {
-  source: ScoreSource
-  due: DueTitle[]
-  before: string
+  asked: Asked
+  due: DueScores[]
+  /** Whether a title is still due, by the rule it was listed by. */
+  isDue: (title: DueScores) => boolean
   isCurrent: () => boolean
-  fetch: (title: DueTitle) => Promise<boolean>
+  /** Whether today's calls ran out, which hands the round over rather than failing the title. */
+  isSpent: () => boolean
+  fetch: (title: DueScores) => Promise<boolean>
 }
 
 /**
- * How a drain ended: with nothing left it waits on (`done`); with titles
- * waiting on a spent source while another still has calls (`someSpent`);
- * with no source left with calls (`budget`); or having asked and got no
- * answer at all (`unavailable`).
+ * How a drain ended: with nothing left it waits on (`done`); with titles a
+ * Refresh asked for left that the source settling them can still be asked
+ * for today (`requests`); with titles waiting on a spent source while
+ * another still has calls (`someSpent`); with no source left with calls
+ * (`budget`); or having asked and got no answer at all (`unavailable`).
  */
-type Stop = 'done' | 'someSpent' | 'budget' | 'unavailable'
+type Stop = 'done' | 'requests' | 'someSpent' | 'budget' | 'unavailable'
 
 /**
  * How a drain's rounds ended: on a round with failures and no answer, or
- * with nothing left to ask; and the sources that answered along the way.
+ * with nothing left to ask; and who answered along the way.
  */
-type Drained = { isSilent: boolean; answeredBy: ReadonlySet<ScoreProvider> }
+type Drained = { isSilent: boolean; answeredBy: ReadonlySet<Asked> }
 
 /** What became of one title in a round. */
 type Outcome = 'answered' | 'failed' | 'skipped'
+
+/** What the log says when the sweep sets its next wake, before the time. */
+const WAKE_NOTES = {
+  unavailable: 'No score source answered; trying again at',
+  spent: 'Scores from a source whose calls are spent today wait for',
+  requests: 'Titles a Refresh asked for and has yet to get are asked again at',
+} as const
 
 /** A minute past the next midnight UTC, when every provider's day has turned. */
 const afterMidnight = (now: Date): Date =>
   new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 1))
 
 /**
- * Tops up the scores that are missing or a month old, on a queue of its own
- * so a top-up waiting days on a daily budget never holds up matching. It
- * asks the primary source first, then OMDb for the titles MDBList does not
- * know, two titles at a time. The titles a source failed on are skipped
- * until a drain gets an answer from it, so titles that keep failing cannot
- * hold up the rest. It wakes again after midnight UTC while a spent source
- * still has titles due, and 15 minutes after a drain that got no answer.
+ * Tops up the scores that are missing or a month old, and those a library's
+ * Refresh asked for, on a queue of its own so a top-up waiting days on a
+ * daily budget never holds up matching. It asks the primary source first,
+ * then OMDb for the titles MDBList does not know, two titles at a time, and
+ * TMDB too for its own score of each title a Refresh asked for. The titles
+ * a source failed on are skipped until a drain gets an answer from it, so
+ * titles that keep failing cannot hold up the rest. It wakes again after
+ * midnight UTC while a spent source still has titles due, 15 minutes after
+ * a drain that got no answer, and 15 minutes after any drain while a
+ * Refresh still waits on titles the source settling them can be asked for.
  */
 @Injectable()
 export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
@@ -80,12 +101,19 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
     wake: NodeJS.Timeout | null
     isClosed: boolean
     /** The items each source failed on, which later rounds and drains skip until it answers again. */
-    failed: Record<ScoreProvider, ReadonlySet<number>>
-  } = { pause: null, wake: null, isClosed: false, failed: { mdblist: new Set(), omdb: new Set() } }
+    failed: Record<Asked, ReadonlySet<number>>
+  } = {
+    pause: null,
+    wake: null,
+    isClosed: false,
+    failed: { mdblist: new Set(), omdb: new Set(), tmdb: new Set() },
+  }
 
   constructor(
     @Inject(MetadataRepository) private readonly metadata: MetadataRepository,
     @Inject(Scores) private readonly scores: Scores,
+    @Inject(LibrariesRepository) private readonly libraries: LibrariesRepository,
+    @Inject(TmdbClient) private readonly tmdb: Pick<TmdbClient, 'score'>,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -113,6 +141,17 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
     return this.state.pause
   }
 
+  /**
+   * Why the titles a Refresh asked for wait, and until when: the sweep's own
+   * pause, else midnight UTC while the source that settles them has spent
+   * its day, which `pause` leaves out while another source still has calls.
+   */
+  requestsPause(): ScorePause | null {
+    if (this.state.pause) return this.state.pause
+    if (!this.isSettlerSpent()) return null
+    return { reason: 'budget', resumesAt: afterMidnight(new Date()).toISOString() }
+  }
+
   private async drain(): Promise<void> {
     this.state.pause = null
     const stop = await this.drainOnce().catch((error: unknown) => {
@@ -121,17 +160,21 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
     })
     if (this.state.wake) clearTimeout(this.state.wake)
     this.state.wake = null
+    const retry = new Date(Date.now() + RETRY_MS)
     switch (stop) {
       case 'done':
         return
+      case 'requests':
+        this.wakeAt({ at: retry, pause: null, why: 'requests' })
+        return
       case 'someSpent':
-        this.wakeAt({ at: afterMidnight(new Date()), pause: null })
+        this.wakeAt({ at: afterMidnight(new Date()), pause: null, why: 'spent' })
         return
       case 'budget':
-        this.wakeAt({ at: afterMidnight(new Date()), pause: 'budget' })
+        this.wakeAt({ at: afterMidnight(new Date()), pause: 'budget', why: 'spent' })
         return
       case 'unavailable':
-        this.wakeAt({ at: new Date(Date.now() + RETRY_MS), pause: 'unavailable' })
+        this.wakeAt({ at: retry, pause: 'unavailable', why: 'unavailable' })
         return
       default: {
         const unknown: never = stop
@@ -141,53 +184,64 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   /** Kicks a drain at `at`, saying why the sweep waits when `pause` names a reason. */
-  private wakeAt({ at, pause }: { at: Date; pause: ScorePause['reason'] | null }): void {
+  private wakeAt({
+    at,
+    pause,
+    why,
+  }: {
+    at: Date
+    pause: ScorePause['reason'] | null
+    why: keyof typeof WAKE_NOTES
+  }): void {
     const resumesAt = at.toISOString()
     this.state.pause = pause == null ? null : { reason: pause, resumesAt }
     if (this.state.isClosed) return
-    this.logger.log(
-      pause === 'unavailable'
-        ? `No score source answered; trying again at ${resumesAt}.`
-        : `Scores from a source whose calls are spent today wait for ${resumesAt}.`,
-    )
+    this.logger.log(`${WAKE_NOTES[why]} ${resumesAt}.`)
     this.state.wake = setTimeout(() => this.kick(), at.getTime() - Date.now())
     this.state.wake.unref()
   }
 
   /**
-   * Tops up, then forgets the failures that should be asked again, and says
-   * how the drain ended. Only a drain that asked and got no answer at all
-   * tries again in 15 minutes; one that answered and left failures behind
-   * waits for the next kick.
+   * Tops up, then forgets the failures that should be asked again, settles
+   * what it can, and says how the drain ended. A drain that asked and got no
+   * answer at all tries again in 15 minutes, and so does one that leaves a
+   * Refresh waiting on titles the source settling them can still be asked
+   * for, so failed ones do not wait a day; one that answered and left other
+   * failures behind waits for the next kick.
    */
   private async drainOnce(): Promise<Stop> {
     const { isSilent, answeredBy } = await this.topUp(new Set())
     // The database closes with the app.
     if (this.state.isClosed) return 'done'
     this.forgetFailures({ answeredBy, hasRunOut: !isSilent })
+    this.settle()
     if (isSilent && answeredBy.size === 0) return 'unavailable'
+    if (this.metadata.hasRequests() && !this.isSettlerSpent()) return 'requests'
     if (!this.isWaitingForMidnight()) return 'done'
     return this.scores.primary() == null ? 'budget' : 'someSpent'
   }
 
   /**
    * Round after round until nothing is due that a source can be asked for,
-   * or a round has failures and no answer. A source whose day runs out
-   * midway hands over to the next. Each title that fails joins its source's
-   * failures, so later rounds skip it.
+   * a round has failures and no answer, or a round asks nothing while its
+   * source is still the one to ask, which would only list the same titles
+   * again. A source whose day runs out midway hands over to the next. Each
+   * title that fails joins its source's failures, so later rounds skip it.
    */
-  private async topUp(answeredBy: ReadonlySet<ScoreProvider>): Promise<Drained> {
+  private async topUp(answeredBy: ReadonlySet<Asked>): Promise<Drained> {
     if (this.state.isClosed) return { isSilent: false, answeredBy }
     const round = this.nextRound()
     if (round == null) return { isSilent: false, answeredBy }
     const { answered, failedIds } = await this.run(round)
-    const { provider } = round.source
+    const { asked } = round
     this.state.failed = {
       ...this.state.failed,
-      [provider]: new Set([...this.state.failed[provider], ...failedIds]),
+      [asked]: new Set([...this.state.failed[asked], ...failedIds]),
     }
-    const hasAnswered = answered > 0 ? new Set([...answeredBy, provider]) : answeredBy
+    const hasAnswered = answered > 0 ? new Set([...answeredBy, asked]) : answeredBy
     if (answered === 0 && failedIds.length > 0) return { isSilent: true, answeredBy: hasAnswered }
+    if (answered === 0 && round.isCurrent()) return { isSilent: false, answeredBy: hasAnswered }
+    if (!this.state.isClosed) this.settle()
     return this.topUp(hasAnswered)
   }
 
@@ -201,67 +255,151 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
     answeredBy,
     hasRunOut,
   }: {
-    answeredBy: ReadonlySet<ScoreProvider>
+    answeredBy: ReadonlySet<Asked>
     hasRunOut: boolean
   }): void {
     const before = scoresDueBefore()
-    const kept = (provider: ScoreProvider): ReadonlySet<number> => {
-      const failed = this.state.failed[provider]
-      if (answeredBy.has(provider)) return new Set()
+    const kept = (asked: Asked): ReadonlySet<number> => {
+      const failed = this.state.failed[asked]
+      if (answeredBy.has(asked)) return new Set()
       if (!hasRunOut || failed.size === 0) return failed
-      const due = this.metadata.scoresDue({ provider, before, limit: failed.size + 1 })
+      const due = this.listDue({ asked, before, limit: failed.size + 1 })
       return due.every((title) => failed.has(title.itemId)) ? new Set() : failed
     }
-    this.state.failed = { mdblist: kept('mdblist'), omdb: kept('omdb') }
+    this.state.failed = { mdblist: kept('mdblist'), omdb: kept('omdb'), tmdb: kept('tmdb') }
+  }
+
+  /**
+   * Settles the requests the source that settles them has answered since
+   * their Refresh began, which matters once that source has changed (a key
+   * refused or taken away), and finishes each Refresh with nothing left.
+   */
+  private settle(): void {
+    const settler = this.scores.settler()
+    if (settler != null) this.metadata.settleRequests(settler.provider)
+    this.libraries.finishRatingsRefreshes(new Date().toISOString())
   }
 
   /**
    * The primary's due titles, or once those are done, OMDb's for what MDBList
-   * does not know, each past the titles that source has failed on.
+   * does not know, each past the titles that source has failed on. With no
+   * score source that has a usable key, TMDB's score alone for the titles a
+   * Refresh asked for.
    */
   private nextRound(): Round | null {
-    const { failed } = this.state
     const before = scoresDueBefore()
     const primary = this.scores.primary()
-    if (primary == null) return null
-    const due = this.due({ source: primary, before, skip: failed[primary.provider] })
-    if (due.length > 0) {
-      return {
-        source: primary,
-        due,
-        before,
-        isCurrent: () => this.scores.primary() === primary,
-        fetch: (title) => this.scores.fetch(title),
-      }
-    }
+    if (primary == null) return this.scores.settler() == null ? this.tmdbRound() : null
+    const first = this.sourceRound({
+      source: primary,
+      before,
+      isCurrent: () => this.scores.primary() === primary,
+      fetch: (title) => this.scores.fetch(title),
+    })
+    if (first.due.length > 0) return first
     const fallback = this.scores.fallback()
     if (fallback == null) return null
-    const fallbackDue = this.due({ source: fallback, before, skip: failed[fallback.provider] })
-    if (fallbackDue.length === 0) return null
-    return {
+    const second = this.sourceRound({
       source: fallback,
-      due: fallbackDue,
       before,
       isCurrent: () => this.scores.fallback() === fallback,
       fetch: (title) => this.scores.fetchFallback(title),
-    }
+    })
+    return second.due.length > 0 ? second : null
   }
 
-  /** A source's due titles but those in `skip`, as far as its calls left today go. */
-  private due({
+  /** A score source's round: its due titles as of `before`, as far as its calls left today go. */
+  private sourceRound({
     source,
     before,
-    skip,
+    isCurrent,
+    fetch,
   }: {
     source: ScoreSource
     before: string
-    skip: ReadonlySet<number>
-  }): DueTitle[] {
-    const limit = source.remaining()
-    return this.metadata
-      .scoresDue({ provider: source.provider, before, limit: limit + skip.size })
+    isCurrent: () => boolean
+    fetch: (title: DueScores) => Promise<boolean>
+  }): Round {
+    const { provider } = source
+    return {
+      asked: provider,
+      due: this.due({ asked: provider, before, limit: source.remaining() }),
+      isDue: ({ itemId }) => this.metadata.isScoreDue({ itemId, provider, before }),
+      isCurrent,
+      isSpent: () => source.remaining() === 0,
+      fetch: async (title) => {
+        if (title.isRequested) await this.fetchTmdbScore(title)
+        if (this.state.isClosed) return false
+        return fetch(title)
+      },
+    }
+  }
+
+  /** The titles a Refresh asked for, each settled by TMDB's score alone, while no score source has a usable key. */
+  private tmdbRound(): Round | null {
+    const due = this.due({ asked: 'tmdb', before: scoresDueBefore(), limit: TMDB_ROUND })
+    if (due.length === 0) return null
+    return {
+      asked: 'tmdb',
+      due,
+      isDue: ({ itemId }) => this.metadata.isRequested(itemId),
+      isCurrent: () => this.scores.settler() == null,
+      isSpent: () => false,
+      fetch: async (title) => {
+        if (!(await this.fetchTmdbScore(title))) return false
+        this.metadata.clearRequest(title.itemId)
+        return true
+      },
+    }
+  }
+
+  /** The titles due from `asked` but those it failed on, as far as `limit` goes. */
+  private due({
+    asked,
+    before,
+    limit,
+  }: {
+    asked: Asked
+    before: string
+    limit: number
+  }): DueScores[] {
+    const skip = this.state.failed[asked]
+    return this.listDue({ asked, before, limit: limit + skip.size })
       .filter((title) => !skip.has(title.itemId))
       .slice(0, limit)
+  }
+
+  /** What `asked` has due, in the order it is asked: a source's due scores, or the titles a Refresh asked for. */
+  private listDue({
+    asked,
+    before,
+    limit,
+  }: {
+    asked: Asked
+    before: string
+    limit: number
+  }): DueScores[] {
+    return asked === 'tmdb'
+      ? this.metadata.requestedTitles(limit)
+      : this.metadata.scoresDue({ provider: asked, before, limit })
+  }
+
+  /**
+   * Fetches TMDB's own score for a title and keeps it. A title TMDB no
+   * longer has keeps the score it had, and counts as answered, as there is
+   * nothing to ask it for. False when the call failed.
+   */
+  private async fetchTmdbScore({ itemId, type, tmdbId }: DueScores): Promise<boolean> {
+    try {
+      const rating = await this.tmdb.score({ type, tmdbId })
+      if (this.state.isClosed) return false
+      this.metadata.saveTmdbRating({ itemId, rating })
+      return true
+    } catch (error) {
+      if (notFound(error)) return true
+      this.logger.warn(`No TMDB score for ${type} ${tmdbId}: ${errorMessage(error)}`)
+      return false
+    }
   }
 
   /**
@@ -273,10 +411,10 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
    * titles answered, and which failed.
    */
   private async run({
-    source,
     due,
-    before,
+    isDue,
     isCurrent,
+    isSpent,
     fetch,
   }: Round): Promise<{ answered: number; failedIds: number[] }> {
     const streak = { failedInARow: 0 }
@@ -287,17 +425,12 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
         if (this.state.isClosed || streak.failedInARow >= GIVE_UP_AFTER || !isCurrent()) {
           return 'skipped'
         }
-        const isDue = this.metadata.isScoreDue({
-          itemId: title.itemId,
-          provider: source.provider,
-          before,
-        })
-        if (!isDue) return 'skipped'
+        if (!isDue(title)) return 'skipped'
         if (await fetch(title)) {
           streak.failedInARow = 0
           return 'answered'
         }
-        if (source.remaining() === 0 || !isCurrent()) return 'skipped'
+        if (isSpent() || !isCurrent()) return 'skipped'
         streak.failedInARow += 1
         return 'failed'
       },
@@ -308,6 +441,12 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
         outcomes[index] === 'failed' ? [title.itemId] : [],
       ),
     }
+  }
+
+  /** Whether the source that settles a Refresh's requests has a usable key and has spent today's calls. */
+  private isSettlerSpent(): boolean {
+    const settler = this.scores.settler()
+    return settler != null && settler.remaining() === 0
   }
 
   /** Whether a source with a key has spent today's calls while titles still wait on it. */

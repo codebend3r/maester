@@ -28,6 +28,16 @@ export type LibraryRecord = {
 /** When a library's last full scan and last quick scan finished; null before each has run. */
 export type ScanTimes = { fullScannedAt: string | null; quickScannedAt: string | null }
 
+/**
+ * A library's Refresh as stored: when the one under way began, null when
+ * none is; how many titles it asked for; and when the last one finished.
+ */
+export type RatingsRefreshRecord = {
+  startedAt: string | null
+  total: number
+  finishedAt: string | null
+}
+
 type LibraryRow = {
   id: number
   name: string
@@ -239,6 +249,48 @@ export class LibrariesRepository {
   /** When a quick scan of the library finished, kept so a restart does not forget it. */
   markQuickScan({ id, at }: { id: number; at: string }): void {
     this.db.prepare('UPDATE libraries SET quick_scanned_at = ? WHERE id = ?').run(at, id)
+  }
+
+  /** Notes that a Refresh began at `at`, asking for `total` titles. */
+  startRatingsRefresh({ id, at, total }: { id: number; at: string; total: number }): void {
+    this.db
+      .prepare(
+        'UPDATE libraries SET ratings_refresh_started_at = ?, ratings_refresh_total = ? WHERE id = ?',
+      )
+      .run(at, total, id)
+  }
+
+  /** The library's Refresh as it was left, across restarts; none for a library that is not there. */
+  ratingsRefresh(id: number): RatingsRefreshRecord {
+    const row = this.db
+      .prepare<
+        [number],
+        {
+          ratings_refresh_started_at: string | null
+          ratings_refresh_total: number
+          ratings_refreshed_at: string | null
+        }
+      >(
+        `SELECT ratings_refresh_started_at, ratings_refresh_total, ratings_refreshed_at
+           FROM libraries WHERE id = ?`,
+      )
+      .get(id)
+    return {
+      startedAt: row?.ratings_refresh_started_at ?? null,
+      total: row?.ratings_refresh_total ?? 0,
+      finishedAt: row?.ratings_refreshed_at ?? null,
+    }
+  }
+
+  /** Finishes, at `at`, each Refresh under way with no title left waiting. */
+  finishRatingsRefreshes(at: string): void {
+    this.db
+      .prepare(
+        `UPDATE libraries SET ratings_refreshed_at = ?, ratings_refresh_started_at = NULL
+          WHERE ratings_refresh_started_at IS NOT NULL
+            AND NOT EXISTS (SELECT 1 FROM score_requests r WHERE r.library_id = libraries.id)`,
+      )
+      .run(at)
   }
 
   /** Each path a library keeps holds on to what a scan found it to be; a new one starts unread. */

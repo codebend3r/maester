@@ -141,7 +141,11 @@ export class MdblistClient implements ScoreSource {
   }
 
   enabled(): boolean {
-    return this.config.mdblistApiKey != null && !this.status.refused && this.remaining() > 0
+    return this.hasUsableKey() && this.remaining() > 0
+  }
+
+  hasUsableKey(): boolean {
+    return this.config.mdblistApiKey != null && !this.status.refused
   }
 
   /** Today's calls left: the configured limit's, or fewer when MDBList last said so. */

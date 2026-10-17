@@ -276,6 +276,58 @@ describe('the libraries holding each item, and the people cleared up', () => {
     expect(metadata().librariesHoldingEach([]).size).toBe(0)
   })
 
+  it("asks for the scores of a library's movies and shows, reaching a show through its episodes, and of nothing else", () => {
+    const stored = metadata()
+    const local = stored.save({
+      item: {
+        ...BLANK_ITEM,
+        type: 'movie',
+        tmdbId: `${LOCAL}700`,
+        number: null,
+        title: 'Home video',
+      },
+    })
+    stored.link({
+      mediaIds: [file({ libraryId: ids.shows, root: '/tv', name: 'Home video.mkv' })],
+      itemIds: [local],
+    })
+    const filmsOnly = stored.save({
+      item: { ...BLANK_ITEM, type: 'movie', tmdbId: '701', number: null, title: 'Films only' },
+    })
+    stored.link({
+      mediaIds: [file({ libraryId: ids.films, root: '/films', name: 'Films only.mkv' })],
+      itemIds: [filmsOnly],
+    })
+    const requested = () =>
+      database
+        .get()
+        .db.prepare<[], { library_id: number; item_id: number }>(
+          'SELECT library_id, item_id FROM score_requests ORDER BY library_id, item_id',
+        )
+        .all()
+
+    expect(stored.requestScores(ids.shows)).toBe(2)
+    expect(requested()).toEqual(
+      [
+        { library_id: ids.shows, item_id: ids.show },
+        { library_id: ids.shows, item_id: ids.movie },
+      ].toSorted((a, b) => a.item_id - b.item_id),
+    )
+    expect(stored.requestsLeft(ids.shows)).toBe(2)
+    expect(stored.requestsLeft(ids.films)).toBe(0)
+    expect(stored.isRequested(filmsOnly)).toBe(false)
+    expect(stored.requestScores(ids.shows)).toBe(0)
+
+    stored.clearRequest(ids.movie)
+    expect(stored.requestsLeft(ids.shows)).toBe(1)
+    expect(stored.isRequested(ids.movie)).toBe(false)
+    expect(stored.requestedTitles(10).map((title) => title.itemId)).toEqual([ids.show])
+
+    new LibrariesRepository(database.get()).remove(ids.shows)
+    expect(requested()).toEqual([])
+    expect(stored.hasRequests()).toBe(false)
+  })
+
   it('keeps a person with no credits whose filmography was fetched lately, and their credits go with them', () => {
     const stored = metadata()
     const people = new PeopleRepository(database.get())
@@ -540,7 +592,13 @@ describe("each provider's scores", () => {
     const due = stored.scoresDue({ provider: 'mdblist', before: daysAgo(30), limit: 10 })
     expect(due.map((item) => item.itemId)).toEqual([noCritics, complete, older, old])
     expect(due.map((item) => item.itemId)).not.toContain(season)
-    expect(due[0]).toEqual({ itemId: noCritics, type: 'show', tmdbId: '911', imdbId: null })
+    expect(due[0]).toEqual({
+      itemId: noCritics,
+      type: 'show',
+      tmdbId: '911',
+      imdbId: null,
+      isRequested: false,
+    })
     expect(
       stored
         .scoresDue({ provider: 'mdblist', before: daysAgo(30), limit: 2 })
@@ -597,5 +655,88 @@ describe("each provider's scores", () => {
       [false, true],
       [false, false],
     ])
+  })
+
+  it('lists a title a Refresh asked for first, and counts it due from each provider until that one answers since', () => {
+    database.get().db.prepare('DELETE FROM items').run()
+    const stored = metadata()
+    const libraries = new LibrariesRepository(database.get())
+    const { id: libraryId } = libraries.create({
+      name: 'Films',
+      paths: ['/films'],
+      settings: { kind: 'movies' },
+    })
+    const never = title({ tmdbId: '930', imdbId: 'tt930' })
+    const fresh = title({ tmdbId: '931', imdbId: 'tt931' })
+    stamp({ itemId: fresh, omdb: daysAgo(2), mdblist: daysAgo(2) })
+    stored.link({
+      mediaIds: [
+        new MediaIndex(database.get()).insert({
+          libraryId,
+          kind: 'movies',
+          file: { path: '/films/931.mkv', root: '/films', size: 1, mtimeMs: 1 },
+        }),
+      ],
+      itemIds: [fresh],
+    })
+    const isDue = () =>
+      (['mdblist', 'omdb'] as const).map((provider) =>
+        stored.isScoreDue({ itemId: fresh, provider, before: daysAgo(30) }),
+      )
+    expect(isDue()).toEqual([false, false])
+
+    expect(stored.requestScores(libraryId)).toBe(1)
+    libraries.startRatingsRefresh({ id: libraryId, at: daysAgo(1), total: 1 })
+
+    expect(isDue()).toEqual([true, true])
+    expect(
+      stored
+        .scoresDue({ provider: 'mdblist', before: daysAgo(30), limit: 10 })
+        .map((item) => [item.itemId, item.isRequested]),
+    ).toEqual([
+      [fresh, true],
+      [never, false],
+    ])
+    stored.saveScores({ itemId: fresh, provider: 'mdblist', scores: [] })
+    expect(isDue()).toEqual([false, true])
+    stored.settleRequests('omdb')
+    expect(stored.requestsLeft(libraryId)).toBe(1)
+    stored.saveScores({ itemId: fresh, provider: 'omdb', scores: [] })
+    expect(isDue()).toEqual([false, false])
+    stored.settleRequests('omdb')
+    expect(stored.requestsLeft(libraryId)).toBe(0)
+  })
+
+  it("replaces an item's TMDB score alone, and drops it for none", () => {
+    const stored = metadata()
+    const id = stored.save({
+      item: {
+        ...BLANK_ITEM,
+        type: 'movie',
+        tmdbId: '940',
+        number: null,
+        title: 'Title 940',
+        rating: { value: 7.1, votes: 50 },
+      },
+    })
+    stored.saveScores({
+      itemId: id,
+      provider: 'omdb',
+      scores: [score({ source: 'imdb', value: 8 })],
+    })
+
+    stored.saveTmdbRating({ itemId: id, rating: { value: 7.4, votes: 60 } })
+    expect(rows(id)).toEqual([
+      { source: 'imdb', value: 8, votes: null, provider: 'omdb' },
+      { source: 'tmdb', value: 7.4, votes: 60, provider: 'tmdb' },
+    ])
+    stored.saveTmdbRating({ itemId: id, rating: null })
+    expect(rows(id)).toEqual([{ source: 'imdb', value: 8, votes: null, provider: 'omdb' }])
+
+    stored.remove(id)
+    expect(() =>
+      stored.saveTmdbRating({ itemId: id, rating: { value: 7, votes: 1 } }),
+    ).not.toThrow()
+    expect(rows(id)).toEqual([])
   })
 })
