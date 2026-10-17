@@ -465,6 +465,9 @@ describe('movie metadata', () => {
     expect(response.statusCode).toBe(200)
     expect(response.json()).toMatchObject({
       name: 'Keanu Reeves',
+      tmdbId: expect.any(String),
+      profile: null,
+      filmography: { state: 'unavailable' },
       credits: expect.arrayContaining([
         expect.objectContaining({
           item: expect.objectContaining({ title: 'The Matrix' }),

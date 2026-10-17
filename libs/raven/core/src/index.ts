@@ -1,6 +1,7 @@
 export * from '@/apiClient'
 export * from '@/candidateTiers'
 export * from '@/contract'
+export * from '@/filmography'
 export * from '@/folderLayout'
 export * from '@/format'
 export * from '@/grouping'

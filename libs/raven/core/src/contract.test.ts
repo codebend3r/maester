@@ -46,6 +46,7 @@ import {
   isUnmatchedFile,
   isUnmatchedList,
   isPersonDetails,
+  isPersonFilmography,
   isRating,
   isReview,
   isSeasonSummary,
@@ -314,13 +315,48 @@ describe('the metadata guards', () => {
     expect(
       isPersonDetails({
         id: 1,
+        tmdbId: '6384',
         name: 'Keanu Reeves',
         photoVersion: null,
+        profile: null,
+        filmography: { state: 'unavailable' },
         credits: [{ item: itemSummary(), job: 'cast', role: 'Neo' }],
       }),
     ).toBe(true)
     const { ratingsSource: _source, ...settings } = library().settings
     expect(isLibrary({ ...library(), settings })).toBe(false)
+  })
+
+  it("accepts each state of a person's filmography and refuses a malformed one", () => {
+    const entry = {
+      type: 'movie',
+      tmdbId: '603',
+      title: 'The Matrix',
+      year: 1999,
+      released: '1999-03-31',
+      poster: '/abc.jpg',
+      credits: [{ department: 'acting', role: 'Neo', episodes: null, isSelf: false }],
+      item: null,
+    }
+    expect(isPersonFilmography({ state: 'unavailable' })).toBe(true)
+    expect(isPersonFilmography({ state: 'pending' })).toBe(true)
+    expect(
+      isPersonFilmography({
+        state: 'ready',
+        fetchedAt: '2026-10-17T00:00:00.000Z',
+        entries: [entry],
+      }),
+    ).toBe(true)
+    expect(isPersonFilmography({ state: 'ready', fetchedAt: '2026-10-17T00:00:00.000Z' })).toBe(
+      false,
+    )
+    expect(
+      isPersonFilmography({
+        state: 'ready',
+        fetchedAt: '2026-10-17T00:00:00.000Z',
+        entries: [{ ...entry, type: 'season' }],
+      }),
+    ).toBe(false)
   })
 
   it('accepts match candidates and the metadata health', () => {

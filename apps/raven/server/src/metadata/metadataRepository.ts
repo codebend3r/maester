@@ -676,8 +676,8 @@ export class MetadataRepository {
   /** A person's page: the movies and shows on disk they are credited on, newest first. */
   person(id: number): PersonDetails | null {
     const row = this.db
-      .prepare<[number], { id: number; name: string; photo: string | null }>(
-        'SELECT id, name, photo FROM people WHERE id = ?',
+      .prepare<[number], { id: number; tmdb_id: string; name: string; photo: string | null }>(
+        'SELECT id, tmdb_id, name, photo FROM people WHERE id = ?',
       )
       .get(id)
     if (!row) return null
@@ -694,8 +694,11 @@ export class MetadataRepository {
     const summaries = this.summaries(credits.map((credit) => credit.item_id))
     return {
       id: row.id,
+      tmdbId: row.tmdb_id,
       name: row.name,
       photoVersion: row.photo == null ? null : versionOf(`tmdb:${row.photo}`),
+      profile: null,
+      filmography: { state: 'unavailable' },
       credits: credits.flatMap((credit) => {
         const item = summaries.get(credit.item_id)
         return item && isCreditJob(credit.job) ? [{ item, job: credit.job, role: credit.role }] : []

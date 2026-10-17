@@ -56,6 +56,7 @@ import {
   type PlaybackSettings,
   type PlaybackSettingsState,
   type PosterEntry,
+  type PosterWidth,
   type ProgressChange,
   type Saga,
   type SagaBackdrop,
@@ -842,6 +843,19 @@ export const createApiClient = ({
     /** A Fix match result's poster, through the server's image cache. */
     candidatePosterUrl: (poster: string | null): string | null =>
       poster == null ? null : url(`/api/images/poster${poster}`),
+
+    /**
+     * A TMDB poster path at each width the server keeps, for an `img`'s `src`
+     * and `srcset`; `src` is the middle width, for a browser with no `srcset`.
+     */
+    tmdbPosterSources: (poster: string): { src: string; srcSet: string } => {
+      const at = (width: PosterWidth): string =>
+        url(`/api/images/poster${poster}?${toQueryString({ w: String(width) })}`)
+      return {
+        src: at(POSTER_WIDTHS[1]),
+        srcSet: POSTER_WIDTHS.map((width) => `${at(width)} ${width}w`).join(', '),
+      }
+    },
 
     /** How the server plays video, and what that comes to on this machine. */
     getPlaybackSettings: (): Promise<PlaybackSettingsState> =>
