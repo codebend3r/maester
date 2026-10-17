@@ -349,17 +349,37 @@ describe('notePosition', () => {
     const fileId = await opened(world)
     world.clock.now = NOW + 1
     world.playback.notePosition({ fileId, position: 100, duration: 3000 })
-    expect(entryOf(world)?.pending).toEqual({ play: true, position: 100, at: NOW + 1 })
+    expect(entryOf(world)?.pending).toEqual({
+      play: true,
+      position: 100,
+      furthest: 100,
+      at: NOW + 1,
+    })
     // What a sync sent is cleared, so a second play would show.
     world.store.update((state) =>
-      clearPending(state, { downloadId: ID, sentPlay: true, sentPosition: 100 }),
+      clearPending(state, {
+        downloadId: ID,
+        sentPlay: true,
+        sentPosition: 100,
+        sentFurthest: 100,
+      }),
     )
     world.clock.now = NOW + 2
     world.playback.notePosition({ fileId, position: 200, duration: 3000 })
-    expect(entryOf(world)?.pending).toEqual({ play: false, position: 200, at: NOW + 2 })
+    expect(entryOf(world)?.pending).toEqual({
+      play: false,
+      position: 200,
+      furthest: 200,
+      at: NOW + 2,
+    })
     expect(await opened(world)).toBe(fileId)
     world.playback.notePosition({ fileId, position: 300, duration: 3000 })
-    expect(entryOf(world)?.pending).toEqual({ play: true, position: 300, at: NOW + 2 })
+    expect(entryOf(world)?.pending).toEqual({
+      play: true,
+      position: 300,
+      furthest: 300,
+      at: NOW + 2,
+    })
   })
 
   it('tells the sync after each position noted for a download, and for no other file', async () => {
@@ -403,10 +423,10 @@ describe('notePosition', () => {
     const fileId = await granted(world, VIDEO)
     expect(world.playback.sidecarsOf(fileId)).toHaveLength(1)
     world.playback.notePosition({ fileId, position: 100, duration: 3000 })
-    expect(entryOf(world)?.pending).toEqual({ play: false, position: 100, at: NOW })
+    expect(entryOf(world)?.pending).toEqual({ play: false, position: 100, furthest: 100, at: NOW })
     world.playback.noteOpened({ fileId })
     world.playback.notePosition({ fileId, position: 150, duration: 3000 })
-    expect(entryOf(world)?.pending).toEqual({ play: true, position: 150, at: NOW })
+    expect(entryOf(world)?.pending).toEqual({ play: true, position: 150, furthest: 150, at: NOW })
   })
 
   it('notes nothing for a file that is not a download', async () => {
@@ -431,7 +451,12 @@ describe('notePosition', () => {
       sidecars: [{ trackId: 'external-0', title: 'English', language: 'en' }],
     })
     world.playback.notePosition({ fileId, position: 100, duration: 3000 })
-    expect(entryOf(world, OTHER_ID)?.pending).toEqual({ play: false, position: 100, at: NOW })
+    expect(entryOf(world, OTHER_ID)?.pending).toEqual({
+      play: false,
+      position: 100,
+      furthest: 100,
+      at: NOW,
+    })
     expect(world.playback.sidecarsOf(fileId)).toHaveLength(1)
   })
 
@@ -447,7 +472,12 @@ describe('notePosition', () => {
     downloadedAgain(world)
     world.playback.notePosition({ fileId, position: 100, duration: 3000 })
     // The open that raced the removal counts no play for the new download.
-    expect(entryOf(world, OTHER_ID)?.pending).toEqual({ play: false, position: 100, at: NOW })
+    expect(entryOf(world, OTHER_ID)?.pending).toEqual({
+      play: false,
+      position: 100,
+      furthest: 100,
+      at: NOW,
+    })
   })
 })
 

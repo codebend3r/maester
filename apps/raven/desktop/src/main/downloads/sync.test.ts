@@ -152,7 +152,7 @@ describe('touch', () => {
     world.note({ play: true, position: 300 })
     world.fireAt(SYNC_DEBOUNCE_MS)
     await ticks(5)
-    expect(world.pendingOf()).toEqual({ play: false, position: null, at: NOW })
+    expect(world.pendingOf()).toEqual({ play: false, position: null, furthest: null, at: NOW })
     expect(world.pending.size).toBe(1)
     world.fireAt(SYNC_RETRY_MS)
     await ticks(3)
@@ -171,12 +171,12 @@ describe('touch', () => {
     world.note({ position: 360 })
     held.open(NO_CONTENT)
     await ticks(5)
-    expect(world.pendingOf()).toEqual({ play: false, position: 360, at: NOW })
+    expect(world.pendingOf()).toEqual({ play: false, position: 360, furthest: 360, at: NOW })
     world.server.answer = async () => NO_CONTENT
     world.fireAt(SYNC_DEBOUNCE_MS)
     await ticks(5)
     expect(world.log.slice(2)).toEqual([{ name: 'saveProgress', mediaId: 11, position: 360 }])
-    expect(world.pendingOf()).toEqual({ play: false, position: null, at: NOW })
+    expect(world.pendingOf()).toEqual({ play: false, position: null, furthest: null, at: NOW })
   })
 
   it('sends a play flagged while the position is out on the next round', async () => {
@@ -190,7 +190,7 @@ describe('touch', () => {
     world.note({ play: true, position: 360 })
     held.open(NO_CONTENT)
     await ticks(5)
-    expect(world.pendingOf()).toEqual({ play: true, position: 360, at: NOW })
+    expect(world.pendingOf()).toEqual({ play: true, position: 360, furthest: 360, at: NOW })
     world.server.answer = async () => NO_CONTENT
     world.fireAt(SYNC_DEBOUNCE_MS)
     await ticks(5)
@@ -198,7 +198,7 @@ describe('touch', () => {
       { name: 'recordPlay', mediaId: 11 },
       { name: 'saveProgress', mediaId: 11, position: 360 },
     ])
-    expect(world.pendingOf()).toEqual({ play: false, position: null, at: NOW })
+    expect(world.pendingOf()).toEqual({ play: false, position: null, furthest: null, at: NOW })
   })
 
   it('starts no second send for a download whose calls are still out', async () => {
@@ -233,7 +233,7 @@ describe('touch', () => {
     world.fireAt(SYNC_DEBOUNCE_MS)
     await ticks(5)
     expect(world.log).toEqual([{ name: 'recordPlay', mediaId: 11 }])
-    expect(world.pendingOf()).toEqual({ play: true, position: 300, at: NOW })
+    expect(world.pendingOf()).toEqual({ play: true, position: 300, furthest: 300, at: NOW })
   })
 
   it('keeps the play when only the position fails, and does not send the play again', async () => {
@@ -243,11 +243,75 @@ describe('touch', () => {
     world.note({ play: true, position: 300 })
     world.fireAt(SYNC_DEBOUNCE_MS)
     await ticks(5)
-    expect(world.pendingOf()).toEqual({ play: false, position: 300, at: NOW })
+    expect(world.pendingOf()).toEqual({ play: false, position: 300, furthest: 300, at: NOW })
     world.server.answer = async () => NO_CONTENT
     world.fireAt(SYNC_RETRY_MS)
     await ticks(5)
     expect(world.log.slice(2)).toEqual([{ name: 'saveProgress', mediaId: 11, position: 300 }])
+  })
+})
+
+describe('a scrub back', () => {
+  it('sends the play, then the furthest position, then the last, and clears them all', async () => {
+    const world = setup()
+    world.note({ play: true, position: 2850 })
+    world.note({ position: 2100 })
+    world.fireAt(SYNC_DEBOUNCE_MS)
+    await ticks(8)
+    expect(world.log).toEqual([
+      { name: 'recordPlay', mediaId: 11 },
+      { name: 'saveProgress', mediaId: 11, position: 2850 },
+      { name: 'saveProgress', mediaId: 11, position: 2100 },
+    ])
+    expect(world.pendingOf()).toEqual({ play: false, position: null, furthest: null, at: NOW })
+  })
+
+  it('sends no furthest call when the last position is the furthest', async () => {
+    const world = setup()
+    world.note({ position: 2100 })
+    world.note({ position: 2850 })
+    await world.sync.runAll()
+    expect(world.log).toEqual([{ name: 'saveProgress', mediaId: 11, position: 2850 }])
+    expect(world.pendingOf()).toEqual({ play: false, position: null, furthest: null, at: NOW })
+  })
+
+  it('keeps a furthest raised during the call, and sends it before the last on the next round', async () => {
+    const world = setup()
+    const held = gate()
+    world.server.answer = (call) =>
+      call.name === 'saveProgress' && call.position === 2100
+        ? held.answer
+        : Promise.resolve(NO_CONTENT)
+    world.note({ position: 2850 })
+    world.note({ position: 2100 })
+    world.fireAt(SYNC_DEBOUNCE_MS)
+    await ticks(8)
+    world.note({ position: 2950 })
+    world.note({ position: 2200 })
+    held.open(NO_CONTENT)
+    await ticks(5)
+    expect(world.pendingOf()).toEqual({ play: false, position: 2200, furthest: 2950, at: NOW })
+    world.fireAt(SYNC_DEBOUNCE_MS)
+    await ticks(8)
+    expect(world.log.slice(2)).toEqual([
+      { name: 'saveProgress', mediaId: 11, position: 2950 },
+      { name: 'saveProgress', mediaId: 11, position: 2200 },
+    ])
+    expect(world.pendingOf()).toEqual({ play: false, position: null, furthest: null, at: NOW })
+  })
+
+  it('stops the round when the furthest call fails, and keeps both positions', async () => {
+    const world = setup()
+    world.server.answer = async (call) =>
+      call.name === 'saveProgress' ? { ok: false, message: 'unreachable' } : NO_CONTENT
+    world.note({ play: true, position: 2850 })
+    world.note({ position: 2100 })
+    await world.sync.runAll()
+    expect(world.log).toEqual([
+      { name: 'recordPlay', mediaId: 11 },
+      { name: 'saveProgress', mediaId: 11, position: 2850 },
+    ])
+    expect(world.pendingOf()).toEqual({ play: false, position: 2100, furthest: 2850, at: NOW })
   })
 })
 
@@ -258,7 +322,7 @@ describe('an answer that is no success', () => {
     world.note({ play: true, position: 300 })
     world.fireAt(SYNC_DEBOUNCE_MS)
     await ticks(5)
-    expect(world.pendingOf()).toEqual({ play: true, position: 300, at: NOW })
+    expect(world.pendingOf()).toEqual({ play: true, position: 300, furthest: 300, at: NOW })
     expect(world.warnings).toEqual([])
     expect([...world.pending.values()].map(({ ms }) => ms)).toEqual([SYNC_RETRY_MS])
     world.server.answer = async () => NO_CONTENT
@@ -268,7 +332,7 @@ describe('an answer that is no success', () => {
       { name: 'recordPlay', mediaId: 11 },
       { name: 'saveProgress', mediaId: 11, position: 300 },
     ])
-    expect(world.pendingOf()).toEqual({ play: false, position: null, at: NOW })
+    expect(world.pendingOf()).toEqual({ play: false, position: null, furthest: null, at: NOW })
   })
 
   it('arms the retry again while something is still pending after a retry', async () => {
@@ -286,7 +350,7 @@ describe('an answer that is no success', () => {
     world.note({ position: 300 })
     world.fireAt(SYNC_DEBOUNCE_MS)
     await ticks(5)
-    expect(world.pendingOf()).toEqual({ play: false, position: 300, at: NOW })
+    expect(world.pendingOf()).toEqual({ play: false, position: 300, furthest: 300, at: NOW })
     expect(world.warnings).toHaveLength(1)
     expect(world.warnings[0]).toContain('S01E01 Good News')
     expect(world.warnings[0]).toContain('404')
@@ -332,7 +396,7 @@ describe('an answer that is no success', () => {
     world.server.answer = async () => ({ ok: true, status, body: '' })
     world.note({ play: true, position: 300 })
     await world.sync.runAll()
-    expect(world.pendingOf()).toEqual({ play: true, position: 300, at: NOW })
+    expect(world.pendingOf()).toEqual({ play: true, position: 300, furthest: 300, at: NOW })
     expect(world.warnings).toEqual([])
   })
 
@@ -345,7 +409,7 @@ describe('an answer that is no success', () => {
     await world.sync.runAll()
     expect(world.warnings).toHaveLength(1)
     expect(world.warnings[0]).toContain('S01E01 Good News')
-    expect(world.pendingOf()).toEqual({ play: false, position: 300, at: NOW })
+    expect(world.pendingOf()).toEqual({ play: false, position: 300, furthest: 300, at: NOW })
   })
 })
 
@@ -356,7 +420,7 @@ describe('runAll', () => {
     world.note({ position: 300 })
     await world.sync.runAll()
     expect(world.log).toEqual([{ name: 'saveProgress', mediaId: 11, position: 300 }])
-    expect(world.pendingOf()).toEqual({ play: false, position: null, at: NOW })
+    expect(world.pendingOf()).toEqual({ play: false, position: null, furthest: null, at: NOW })
   })
 
   it('settles only after the answers are in', async () => {

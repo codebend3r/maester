@@ -21,8 +21,17 @@ const isSidecar = object({ trackId: isSidecarTrackId, title: isString, language:
 export const isFileSize = (value: unknown): value is number =>
   isNumber(value) && Number.isSafeInteger(value) && value > 0
 
-/** What the server has not heard yet: a play to record, and the last position to report. */
-const isPending = object({ play: isBoolean, position: nullable(isNumber), at: isNumber })
+/**
+ * What the server has not heard yet: a play to record, the last position to report, and the
+ * furthest position since the last send. The server keeps how far a play got as the most it
+ * hears, so a scrub back after the end must not be all it hears.
+ */
+const isPending = object({
+  play: isBoolean,
+  position: nullable(isNumber),
+  furthest: nullable(isNumber),
+  at: isNumber,
+})
 
 /** Why a download waits paused: the viewer paused it, or the queue did for the disk, a relock or an outage. */
 const isPauseReason = oneOf(['viewer', 'noSpace', 'relocked', 'unreachable'])
@@ -76,7 +85,7 @@ export type DownloadsState = Infer<typeof isDownloadsState>
 
 export const EMPTY_DOWNLOADS: DownloadsState = { version: 1, entries: [], autoDeleteDefault: false }
 
-export const NO_PENDING: Pending = { play: false, position: null, at: 0 }
+export const NO_PENDING: Pending = { play: false, position: null, furthest: null, at: 0 }
 
 export const entryById = (
   state: DownloadsState,
@@ -339,7 +348,10 @@ export const noteWatched = (
     },
   })
 
-/** `play` is sticky: a position report must not erase a play the server has not heard. */
+/**
+ * `play` is sticky: a position report must not erase a play the server has not heard. `furthest`
+ * only rises until a send clears it.
+ */
 export const notePending = (
   state: DownloadsState,
   {
@@ -347,20 +359,25 @@ export const notePending = (
     play,
     position,
     at,
-  }: { downloadId: string; play: boolean; position: number | null; at: number },
+  }: { downloadId: string; play: boolean; position: number; at: number },
 ): DownloadsState =>
   changeEntry(state, {
     downloadId,
     change: (entry) => ({
       ...entry,
-      pending: { play: entry.pending.play || play, position, at },
+      pending: {
+        play: entry.pending.play || play,
+        position,
+        furthest: Math.max(entry.pending.furthest ?? position, position),
+        at,
+      },
     }),
   })
 
 /**
  * Clears what a sync sent. A position saved during the call differs from `sentPosition` and
- * stays; a play is cleared only when `sentPlay`, so one flagged by an open during a call that
- * did not carry it stays too.
+ * stays, as a furthest raised during it differs from `sentFurthest`; a play is cleared only when
+ * `sentPlay`, so one flagged by an open during a call that did not carry it stays too.
  */
 export const clearPending = (
   state: DownloadsState,
@@ -368,15 +385,25 @@ export const clearPending = (
     downloadId,
     sentPlay,
     sentPosition,
-  }: { downloadId: string; sentPlay: boolean; sentPosition: number | null },
+    sentFurthest,
+  }: {
+    downloadId: string
+    sentPlay: boolean
+    sentPosition: number | null
+    sentFurthest: number | null
+  },
 ): DownloadsState =>
   changeEntry(state, {
     downloadId,
     change: (entry) => {
-      const position = entry.pending.position === sentPosition ? null : entry.pending.position
-      const play = sentPlay ? false : entry.pending.play
-      if (play === entry.pending.play && position === entry.pending.position) return entry
-      return { ...entry, pending: { ...entry.pending, play, position } }
+      const { pending } = entry
+      const position = pending.position === sentPosition ? null : pending.position
+      const furthest = pending.furthest === sentFurthest ? null : pending.furthest
+      const play = sentPlay ? false : pending.play
+      if (play === pending.play && position === pending.position && furthest === pending.furthest) {
+        return entry
+      }
+      return { ...entry, pending: { ...pending, play, position, furthest } }
     },
   })
 
