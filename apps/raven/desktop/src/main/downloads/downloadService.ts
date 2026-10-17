@@ -85,6 +85,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
       const serverName = serverNameOf(entry.serverId)
       return {
         downloadId: entry.downloadId,
+        serverId: entry.serverId,
         label: entry.label,
         group: entry.group,
         serverName,
