@@ -872,6 +872,23 @@ describe('createPlayerService', () => {
         'mpv warn demux: <file>: bad index',
       ])
     })
+
+    test('a warning names a sidecar only as <file>, by its path or its name', async () => {
+      const { service, warnings, loaded } = setup({ sidecarsOf: () => FILE_SIDECARS })
+      await loaded()
+      warnings.splice(0)
+      service.receive({
+        type: 'log',
+        level: 'error',
+        prefix: 'sub',
+        text: "Can't open subtitle file /m/Film.en.vtt",
+      })
+      service.receive({ type: 'log', level: 'warn', prefix: 'sub', text: 'Film.es.vtt: bad cue' })
+      expect(warnings).toEqual([
+        "mpv error sub: Can't open subtitle file <file>",
+        'mpv warn sub: <file>: bad cue',
+      ])
+    })
   })
 
   describe('commands', () => {
