@@ -274,6 +274,79 @@ Run a single target through Nx: `bunx nx run @raven/server:test`, `bunx nx run @
 
 The server and core tests need `ffmpeg` and `ffprobe` on the PATH: the end-to-end suite encodes real clips and drives the API against them.
 
+## raven player (macOS)
+
+raven player is raven's player as a Mac app, for Apple Silicon. It plays videos from your own disk under the same controls as the web, through libmpv rather than the browser, so MKV, HEVC, Dolby audio, DTS and TrueHD all play as they are, with no remux or transcode. It also plays a raven server's titles handed to it from raven web. It does not browse a library yet; the web does that.
+
+### Install it
+
+Each release (`vX.Y.Z`) on the repo's [Releases page](https://github.com/codebend3r/maester/releases) carries four assets: `raven-player-<version>-arm64.dmg`, the same app as `raven-player-<version>-arm64.zip`, `raven-player-<version>-sources.tar.gz` (the sources of libmpv and every library it is built from) and `SHA256SUMS`. Pick the newest entry with three numbers, such as `v0.6.0`. The `vX.Y.Z.N` entries, the one marked Latest among them, are builds of each merge and carry no app.
+
+1. Download the dmg (or the zip) and `SHA256SUMS`, and check them in Terminal, in that folder: `shasum -a 256 -c SHA256SUMS --ignore-missing`. Each file you downloaded says `OK`.
+2. Open the dmg and drag raven player to Applications (or unzip the zip and move raven player there).
+3. Open it. The first time, macOS says it cannot verify the app, because raven player is signed ad hoc rather than by an identified developer. Open System Settings, then Privacy & Security, and choose Open Anyway beside raven player; macOS asks you to confirm, then for an administrator's password. You do this once.
+
+If you would rather use Terminal for step 3, `xattr -dr com.apple.quarantine "/Applications/raven player.app"` removes the download's quarantine, and the app then opens without asking.
+
+The app keeps its settings, servers, recents and resume points in `~/Library/Application Support/raven`.
+
+### Open a video
+
+- **Open** (Command O), or the button on Home, picks a video. **Drop** one or more videos on the window: the first plays and the rest follow it, in the order dropped.
+- **From Finder:** Open With, raven player, or drop a video on the Dock icon. raven player registers for movie types at `Alternate` rank, so installing it changes nothing Finder does until you say so: hold Option in Finder's Open With menu for Always Open With, or use Get Info, Open with, raven player, Change All.
+- **Open Recent** in the File menu, and the recents on Home (the last 50, each with how far you got). A local file resumes where it stopped.
+- **Next in folder:** when a local video ends, the next one in its folder (by natural order, so `Episode 2` before `Episode 10`) plays, and Next shows it as soon as playback starts.
+
+### Servers and handoff
+
+- **Add a server** in Settings, by its address (`https://raven.<tailnet>.ts.net`), or by following a link to it. Either way raven player asks first, in a dialog of its own, "Add the raven server at ...?", and fetches nothing before you agree. It keeps at most 20; removing one signs raven player out of it.
+- **A session per server:** each server's cookies stay in that server's own session, so one server's unlock never reaches another, and the page never holds them.
+- **Locked libraries** ask for the PIN, after the admin password when that server's admin lock is on. The unlock lasts while raven player runs, so a relaunch asks for the PIN again.
+- **From raven web:** turn on **Open videos in raven player** in raven web's Settings, in each browser on a Mac where raven player is installed. The web then offers "Open in raven player" for videos that browser cannot play, and in the player's settings; the browser asks before handing the link over. Progress and history go back to the server as they do from the web. Without a working video engine, raven player opens a server title in your browser instead.
+- **raven web on Netlify** hands over the address it was opened at, the Netlify site. Add the server's own address (its Funnel address) to raven player rather than the Netlify site's, so video comes straight from the server and not through Netlify's proxy.
+
+### This computer
+
+Settings, This computer, picks how sound leaves the Mac:
+
+- **Speakers or TV (PCM, up to 7.1)**, the default: everything is decoded and mixed for the output.
+- **Receiver passthrough:** the formats your receiver decodes go to it as they are. On macOS that is Dolby Digital (AC3) and DTS core; TrueHD, DTS-HD MA and E-AC3 still play as PCM. The receiver then sets the volume.
+- **Headphones**, with spatial audio for AirPods.
+
+The output device is the system's unless you pick one.
+
+### Diagnostics
+
+- **Logs** are in `~/Library/Logs/raven` (Help, Show Logs): `raven.log`, rotated through `raven.log.1` to `raven.log.4` at 1 MB each. They record launches, what kind of thing was opened (`open file .mkv`, `open server title 7 on Vhagar`), refusals, mpv's warnings and errors, and the budget marks (`raven-launch-ms`, `raven-memory-idle-mb`, `raven-quit-ms` and the rest). Every line is redacted before it is written: no cookie values, PINs, passwords, request bodies, file paths or file names. The log does name your servers and their addresses (`open server title 7 on Vhagar`, a server's origin in a trust warning, a server's file URL in an mpv warning), so read it before you attach it to a public issue.
+- **Crash reports** stay on the Mac, in `~/Library/Application Support/raven/Crashpad` (Help, Show Crash Reports). Nothing uploads them.
+- **Copy Diagnostics** (Help) puts six lines on the clipboard for a bug report: raven player's version and whether it is packaged, the macOS version, the Electron, Chromium and Node versions, the mpv and FFmpeg versions (or why the video engine is unavailable), hardware decoding, and the display's refresh rate and EDR headroom. It holds no paths, file names, server addresses or cookies.
+
+Nothing leaves the Mac unless you send it.
+
+### Updates
+
+Once a day at launch, raven player asks GitHub for the repo's releases and looks for a newer full release (`vX.Y.Z`, not a draft or a prerelease) with its dmg attached. GitHub lists the releases by tag name, so a run of `vX.Y.Z.N` builds can push the app's release off the first page; raven player reads up to five pages of 100. It says this is the newest release only when it found that release in what it read; when GitHub listed none with the app, it says so instead. It sends nothing else, and installs nothing. A newer release shows a quiet notice on Home and Settings, "raven player X.Y.Z is out.", with **See what's new** (the release page) and **Dismiss**. Check for Updates in the raven player menu and **Check now** in Settings, Updates, check at any time; turn off **Check for updates once a day** there to stop the daily check. While raven player is signed ad hoc it cannot update itself: download the new release and install it over the old one.
+
+### Build it
+
+From the repo root, on an Apple Silicon Mac, with the CI-built libmpv and addon in `libs/raven/mpv/resources/darwin-arm64` (see the [library README](../../libs/raven/mpv/README.md); they are built in CI, not on a laptop):
+
+```bash
+bunx nx run @raven/desktop:dev            # builds, then runs electron . (unpackaged)
+bunx nx run @raven/desktop:make           # the signed-ad-hoc app, its dmg and zip, under apps/raven/desktop/out
+bunx nx run @raven/desktop:audit:bundle   # every Mach-O arm64, signed, linked only inside the app
+bunx nx run @raven/desktop:smoke:packaged # launches the packaged app, waits for its marks, quits it
+bunx nx run @raven/desktop:e2e            # Playwright against electron .
+```
+
+`smoke:packaged` runs the packaged app as a person would, with your own `~/Library/Application Support/raven` and `~/Library/Logs/raven`, and refuses to start while another raven player runs. In the PR checks, the `📦 Desktop app` job runs `make`, `audit:bundle` and `smoke:packaged` and uploads the app as `raven-player-darwin-arm64-<sha>`, and `🎬 Desktop end to end` runs `e2e`.
+
+### Release it
+
+1. Cut the release with the `version-bump` skill, with `--push`: one `Release vX.Y.Z` commit and its tag, pushed together. The tag runs `release.yml`, which makes the GitHub release from the commit log, and `desktop-release.yml`, which builds, audits and smoke-tests raven player, waits for that release, attaches the dmg, the zip, the sources and `SHA256SUMS`, and appends the install notes (`apps/raven/desktop/release/install-notes.md`) once. A re-run replaces the assets and leaves the notes. Only a three-number tag (`v0.6.0`, `v0.6.0-rc.1`) runs it; a `vX.Y.Z.N` build tag never does.
+2. A pull request that touches the release's files (the workflow, the shared native build action, `forge.config.ts`, `src/build/` or `release/`) runs `desktop-release.yml` as a dry run, which builds the assets as a workflow artifact and never publishes. So does a run from the Actions tab.
+3. Dispatching that dry run on `main` before tagging builds what the tag will, at the old version (the tag builds the Release commit, which carries the new one, and checks the tag against it), so a broken release shows before the tag exists. It does not make the tag's build faster. Both workflows restore the libmpv source build (`@raven/mpv:fetch:libmpv`, an Nx cached target) only from Nx Cloud, and the repository has no `NX_CLOUD_ACCESS_TOKEN` secret yet. The `.nx/cache` fallback saves nothing: Nx 23 keeps its local cache in `~/.nx/<workspace id>/cache`, and even moved to `.nx/cache` with `NX_CACHE_DIRECTORY` it is found only through a database named for the machine, so the next runner misses it. So every `🎞️ Desktop native` job and every release build compiles libmpv from source, 11 to 14 minutes on recent runs, well inside the release job's 150 minutes. Once the secret is set, Nx Cloud serves the build to a later run with the same inputs (the source lock, the patches, the build scripts, node-addon-api's version and the Xcode version).
+
 ## Layout
 
 ```
@@ -283,9 +356,14 @@ apps/raven/
                  metadata: the TMDB client, matching, the image cache and the item routes
   web/           @raven/web: React 19 + Vite: libraries, the grid, list, tiles and groups, history,
                  movie pages and Fix match, the browser player host, the /design page
+  desktop/       @raven/desktop: raven player, the Electron app: main process (grants, servers,
+                 the player service over libmpv, logs, updates), preload, renderer, packaging
+                 (src/build), e2e
   Dockerfile, docker-compose.yml, docker-compose.vhagar.yml, vhagar-update.sh, .env.example
 libs/raven/
   ui/            @raven/ui: shared React player, HTML engine, buttons, icons and styles.
+  mpv/           @raven/mpv: the N-API addon over our pinned libmpv build, its macOS video surface
+                 and the typed async wrapper; libmpv and the addon are built in CI.
   core/          @raven/core: API types and guards, the typed API client, the direct-play check,
                  reading names, formatting. No DOM or Node APIs, so a React Native app can use
                  it unchanged.
@@ -329,3 +407,6 @@ A native iOS or Android app would be another `apps/raven/` entry that imports `@
 - Picture subtitles (PGS, VobSub) would need burning in or OCR.
 - On VAAPI, HDR is converted to BT.709 on the GPU rather than tone mapped. That suits HLG; HDR10 (PQ) comes out flat.
 - No QSV; Intel GPUs go through VAAPI.
+- raven player plays only: it has no library mode, local or remote, so browsing, scanning and matching stay with the server and the web.
+- raven player runs only on Apple Silicon Macs: no Intel Macs, Windows or Linux yet.
+- raven player is signed ad hoc, not with a Developer ID or notarized, so it needs Open Anyway once and cannot update itself.

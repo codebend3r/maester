@@ -1,0 +1,144 @@
+name: 🖥️ Desktop release
+
+# Builds raven player for macOS arm64 and attaches it to the release of each pushed
+# vX.Y.Z tag (scripts/bump_version.sh --push): the dmg, the zip, the libmpv sources
+# tarball and SHA256SUMS. release.yml still creates that release from the commit log;
+# this workflow waits for it, uploads the assets with --clobber (a re-run replaces
+# them) and appends the install notes once. Only three-number tags run it, so a
+# vX.Y.Z.N build tag never builds the app.
+#
+# A pull request that touches the release's own files, or a run from the Actions
+# tab, is the dry run: it builds and uploads the assets as an artifact, and never
+# publishes.
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-*'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/desktop-release.yml
+      - .github/actions/raven-desktop-native/**
+      - apps/raven/desktop/forge.config.ts
+      - apps/raven/desktop/src/build/**
+      - apps/raven/desktop/release/**
+
+permissions:
+  contents: read
+
+# A newer push to a PR cancels its dry run; a tag's run always finishes.
+concurrency:
+  group: desktop-release-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: 🖥️ Build raven player for macOS arm64
+    # Standard macos-26 is arm64; macos-26-intel is explicitly not supported.
+    runs-on: macos-26
+    # Room for a cold libmpv source build when no cache holds it.
+    timeout-minutes: 150
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      HOMEBREW_NO_AUTO_UPDATE: '1'
+      # Only this job runs Nx. Nx Cloud's remote cache restores the libmpv source build a
+      # run on the same inputs already did; unset (no secret, a fork's PR), nothing does.
+      NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      # Fails before the long build when the tag and the app disagree on the version.
+      - name: 🏷️ Check the tag
+        if: github.event_name == 'push'
+        run: |
+          version=$(jq -r .version apps/raven/desktop/package.json)
+          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "::error::$GITHUB_REF_NAME is not v$version, the version in apps/raven/desktop/package.json."
+            exit 1
+          fi
+
+      - name: 🔩 Build the native pieces
+        uses: ./.github/actions/raven-desktop-native
+
+      # Both only read the built resources, so Nx runs them at once.
+      - name: 🔎 Audit native resources and run the real headless libmpv tests
+        run: bunx nx run-many -p @raven/mpv -t audit:native test:native
+
+      - name: 📦 Make the unsigned app
+        run: bunx nx run @raven/desktop:make
+
+      - name: 🔎 Audit the packaged bundle
+        run: bunx nx run @raven/desktop:audit:bundle
+
+      - name: 🚬 Smoke the packaged app
+        run: bunx nx run @raven/desktop:smoke:packaged
+
+      - name: 🗂️ Gather the release assets
+        run: bunx nx run @raven/desktop:release:assets
+
+      - name: 📤 raven player release assets
+        uses: actions/upload-artifact@v7
+        with:
+          name: raven-player-release-${{ github.sha }}
+          path: apps/raven/desktop/out/release
+          if-no-files-found: error
+
+  publish:
+    name: 🏷️ Attach raven player to the release
+    needs: build
+    if: github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    # Uploading assets and editing the notes write to the repo; nothing else here does.
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ github.ref_name }}
+    steps:
+      # For the install notes file.
+      - name: 📥 Checkout
+        uses: actions/checkout@v7
+
+      - name: 📥 Download the release assets
+        uses: actions/download-artifact@v8
+        with:
+          name: raven-player-release-${{ github.sha }}
+          path: release
+
+      # release.yml makes the release from the same tag push, and may not be done yet.
+      - name: ⏳ Wait for the release
+        run: |
+          tries=1
+          until gh release view "$TAG" > /dev/null 2>&1; do
+            if [ "$tries" -ge 30 ]; then
+              echo "::error::$TAG still has no release after 30 tries; release.yml makes it."
+              exit 1
+            fi
+            echo "$TAG has no release yet (try $tries of 30); waiting 20 s."
+            tries=$((tries + 1))
+            sleep 20
+          done
+
+      - name: 📤 Upload the assets
+        run: gh release upload "$TAG" release/* --clobber
+
+      # Only once: a re-run finds the heading already in the notes and leaves them.
+      - name: 📝 Append the install notes
+        run: |
+          body=$(gh release view "$TAG" --json body -q .body)
+          if tr -d '\r' <<< "$body" | grep -qx '## Installing raven player'; then
+            echo "$TAG's notes already say how to install raven player."
+            exit 0
+          fi
+          {
+            printf '%s\n' "$body"
+            echo
+            # The notes name the assets by version; the tag is v plus that version.
+            sed "s/<version>/${TAG#v}/g" apps/raven/desktop/release/install-notes.md
+          } > notes.md
+          gh release edit "$TAG" --notes-file notes.md
