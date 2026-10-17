@@ -169,6 +169,22 @@ describe('PlayPage', () => {
     expect(described).toBeGreaterThan(saved)
   })
 
+  it('sends no position for a video left before it played, and sends one once it played', async () => {
+    const client = fakeClient({ request: clips })
+    const { router } = renderDesktop({ client, route: `/play/${A}` })
+    await videoElement()
+    await userEvent.click(screen.getByRole('button', { name: 'Back' }))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+    const saves = () =>
+      client.request.mock.calls.filter(([request]) => request.type === 'savePosition')
+    expect(saves()).toEqual([])
+    await act(() => router.navigate(`/play/${A}`))
+    fireEvent(await videoElement(), new Event('playing'))
+    await userEvent.click(screen.getByRole('button', { name: 'Back' }))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+    expect(saves().length).toBeGreaterThan(0)
+  })
+
   it('names the page it shows while main describes the file', async () => {
     const pending = Promise.withResolvers<DesktopReply>()
     const client = fakeClient({
