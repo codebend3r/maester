@@ -71,6 +71,11 @@ export const menuTemplate = ({
           role: 'recentDocuments',
           submenu: [{ role: 'clearRecentDocuments' }],
         },
+        {
+          label: 'Open Link…',
+          accelerator: 'CommandOrControl+L',
+          click: () => actions.send({ type: 'openLink' }),
+        },
         SEPARATOR,
         { role: 'close' },
       ],

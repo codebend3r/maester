@@ -31,25 +31,33 @@ export const closeTimeoutFor = ({
 }): 'quitApp' | 'destroyWindow' => (isEngineAlive ? 'quitApp' : 'destroyWindow')
 
 /**
- * What quitting waits on, in the order it must happen: mpv stops first, so nothing it
- * plays outlives the stores it would report into, then every store writes.
+ * What quitting waits on, in the order it must happen: mpv stops while the saves in
+ * flight to a server finish, so nothing it plays outlives the stores it would report
+ * into, then every store writes. Each is given `DESTROY_MS`, so the stores still write
+ * within the quit gate's bound.
  */
 export const createShutdown = ({
   engine,
   stores,
+  writes,
   warn,
   wait,
 }: {
   engine: { isAlive: () => boolean; destroy: () => Promise<void> }
   stores: readonly { isDirty: () => boolean; flush: () => Promise<void> }[]
+  writes: { hasPending: () => boolean; settle: () => Promise<void> }
   warn: (message: string) => void
   wait: (ms: number) => Promise<void>
 }): { isPending: () => boolean; settle: () => Promise<void> } => {
-  // Once mpv has missed its deadline, a later settle (the quit gate's second attempt)
-  // goes straight to the stores rather than waiting on it again.
+  // Once mpv or the saves have missed their deadline, a later settle (the quit gate's
+  // second attempt) goes straight to the stores rather than waiting on them again.
   let hasTimedOut = false
+  let hasWritesTimedOut = false
 
-  const isPending = () => engine.isAlive() || stores.some((store) => store.isDirty())
+  const hasPendingWrites = () => !hasWritesTimedOut && writes.hasPending()
+
+  const isPending = () =>
+    engine.isAlive() || hasPendingWrites() || stores.some((store) => store.isDirty())
 
   const stopEngine = async () => {
     if (hasTimedOut || !engine.isAlive()) return
@@ -68,8 +76,22 @@ export const createShutdown = ({
     warn(`raven player's video engine did not stop within ${DESTROY_MS} ms.`)
   }
 
+  const settleWrites = async () => {
+    if (!hasPendingWrites()) return
+    const outcome = await Promise.race([
+      writes.settle().then(
+        () => 'settled' as const,
+        () => 'settled' as const,
+      ),
+      wait(DESTROY_MS).then(() => 'timedOut' as const),
+    ])
+    if (outcome !== 'timedOut') return
+    hasWritesTimedOut = true
+    warn(`raven player's saves to a server did not finish within ${DESTROY_MS} ms.`)
+  }
+
   const settle = async () => {
-    await stopEngine()
+    await Promise.all([stopEngine(), settleWrites()])
     await Promise.all(stores.map((store) => store.flush()))
   }
 

@@ -108,6 +108,17 @@ describe('menuTemplate', () => {
     expect((recent.submenu ?? []).map((entry) => entry.role)).toEqual(['clearRecentDocuments'])
   })
 
+  it('opens a link from Open Link… with Command L, just after Open Recent', () => {
+    const { template, sent } = setup()
+    const file = topLevel({ template, name: 'File' })
+    const labels = (file.submenu ?? []).map((entry) => entry.label ?? entry.role ?? entry.type)
+    expect(labels.indexOf('Open Link…')).toBe(labels.indexOf('Open Recent') + 1)
+    const openLink = itemOf({ menu: file, label: 'Open Link…' })
+    expect(openLink.accelerator).toBe('CommandOrControl+L')
+    click(openLink)
+    expect(sent).toEqual([{ type: 'openLink' }])
+  })
+
   it('ends the File menu with Close Window', () => {
     const { template } = setup()
     expect((topLevel({ template, name: 'File' }).submenu ?? []).at(-1)?.role ?? null).toBe('close')
@@ -200,8 +211,6 @@ describe('menuTemplate', () => {
     ;[
       'Check for Updates',
       'Check for Updates…',
-      'Open Link',
-      'Open Link…',
       'Show Logs',
       'Show Crash Reports',
       'Copy Diagnostics',

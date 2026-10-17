@@ -8,7 +8,12 @@ import {
   addRecent,
   clearRecents,
   isPlayerState,
+  noteServerRecent,
+  RECENT_LABEL_MAX,
+  recentKey,
   removeRecent,
+  removeRecentByKey,
+  removeServerRecents,
   resumeFor,
   savePosition,
   setTrackPick,
@@ -46,7 +51,7 @@ describe('addRecent', () => {
       path: '/b.mkv',
       at: 2,
     })
-    expect(state.recents.map((entry) => entry.path)).toEqual(['/b.mkv', '/a.mkv'])
+    expect(state.recents.map(recentKey)).toEqual(['file:/b.mkv', 'file:/a.mkv'])
     expect(state.recents[0]).toEqual({ kind: 'file', path: '/b.mkv', openedAt: 2 })
   })
 
@@ -54,7 +59,7 @@ describe('addRecent', () => {
     const first = addRecent(EMPTY_STATE, { path: '/a.mkv', at: 1 })
     const second = addRecent(first, { path: '/b.mkv', at: 2 })
     const again = addRecent(second, { path: '/a.mkv', at: 3 })
-    expect(again.recents.map((entry) => entry.path)).toEqual(['/a.mkv', '/b.mkv'])
+    expect(again.recents.map(recentKey)).toEqual(['file:/a.mkv', 'file:/b.mkv'])
     expect(again.recents[0]!.openedAt).toBe(3)
   })
 
@@ -63,15 +68,15 @@ describe('addRecent', () => {
       addRecent(current, { path: `/f${index}.mkv`, at: index }),
     )
     expect(state.recents.length).toBe(50)
-    expect(state.recents.some((entry) => entry.path === '/f0.mkv')).toBe(false)
-    expect(state.recents[0]!.path).toBe('/f50.mkv')
+    expect(state.recents.some((entry) => recentKey(entry) === 'file:/f0.mkv')).toBe(false)
+    expect(recentKey(state.recents[0]!)).toBe('file:/f50.mkv')
   })
 })
 
 describe('removeRecent and clearRecents', () => {
   it('removes one path and keeps the rest', () => {
     const state = addRecent(addRecent(EMPTY_STATE, { path: '/a', at: 1 }), { path: '/b', at: 2 })
-    expect(removeRecent(state, { path: '/a' }).recents.map((entry) => entry.path)).toEqual(['/b'])
+    expect(removeRecent(state, { path: '/a' }).recents.map(recentKey)).toEqual(['file:/b'])
   })
 
   it('clears every recent but leaves the rest of the state', () => {
@@ -84,6 +89,151 @@ describe('removeRecent and clearRecents', () => {
     const state = clearRecents(addRecent(saved, { path: '/a', at: 1 }))
     expect(state.recents).toEqual([])
     expect(state.resume.length).toBe(1)
+  })
+})
+
+const SERVER = '0f8fad5b-d9cb-469f-a165-70867728950e'
+const OTHER_SERVER = '7c9e6679-7425-40de-944b-e07fc1f90ae7'
+
+const noteDune = ({
+  state,
+  label = 'Dune',
+  watched = 0.25,
+  at,
+}: {
+  state: PlayerState
+  label?: string
+  watched?: number | null
+  at: number
+}): PlayerState => noteServerRecent(state, { serverId: SERVER, mediaId: 7, label, watched, at })
+
+describe('server recents', () => {
+  const labelOf = ({ label }: { label: string }): string => {
+    const [entry] = noteDune({ state: EMPTY_STATE, label, at: 1 }).recents
+    return entry?.kind === 'server' ? entry.label : ''
+  }
+
+  it('collapses whitespace and trims a label', () => {
+    expect(labelOf({ label: '  Dune:\t Part\n Two  ' })).toBe('Dune: Part Two')
+  })
+
+  it('drops control and format characters from a label, bidi overrides and zero widths too', () => {
+    expect(labelOf({ label: 'Du\u202ene\u200b\u0007 2' })).toBe('Dune 2')
+  })
+
+  it('keeps the joiners a Persian title and an emoji need, and drops the rest', () => {
+    const persian = '\u0645\u06cc\u200c\u062e\u0648\u0627\u0647\u0645'
+    const family = '\u{1F468}\u200d\u{1F469}\u200d\u{1F467}'
+    expect(labelOf({ label: `${persian}\u202e ${family}\u200b` })).toBe(`${persian} ${family}`)
+  })
+
+  it('cuts a label of 201 code points to the first 200', () => {
+    expect(labelOf({ label: 'a'.repeat(RECENT_LABEL_MAX + 1) })).toBe('a'.repeat(RECENT_LABEL_MAX))
+    expect(RECENT_LABEL_MAX).toBe(200)
+  })
+
+  it('never splits a surrogate pair at the cut', () => {
+    const label = `${'a'.repeat(RECENT_LABEL_MAX - 1)}\u{1F985}b`
+    expect(labelOf({ label })).toBe(`${'a'.repeat(RECENT_LABEL_MAX - 1)}\u{1F985}`)
+  })
+
+  it('keys a file by its path and a server title by its server and media ids', () => {
+    expect(recentKey({ kind: 'file', path: '/m/a.mkv', openedAt: 1 })).toBe('file:/m/a.mkv')
+    expect(
+      recentKey({
+        kind: 'server',
+        serverId: SERVER,
+        mediaId: 7,
+        label: 'Dune',
+        watched: null,
+        openedAt: 1,
+      }),
+    ).toBe(`server:${SERVER}:7`)
+  })
+
+  it('keeps one entry per title, newest first, with the latest label and share', () => {
+    const first = noteDune({ state: EMPTY_STATE, at: 1 })
+    const between = addRecent(first, { path: '/a.mkv', at: 2 })
+    const state = noteDune({ state: between, label: 'Dune: Part One', watched: 0.5, at: 3 })
+    expect(state.recents).toEqual([
+      {
+        kind: 'server',
+        serverId: SERVER,
+        mediaId: 7,
+        label: 'Dune: Part One',
+        watched: 0.5,
+        openedAt: 3,
+      },
+      { kind: 'file', path: '/a.mkv', openedAt: 2 },
+    ])
+  })
+
+  it('tells a server title apart from another server and another title', () => {
+    const state = [
+      { serverId: SERVER, mediaId: 7 },
+      { serverId: OTHER_SERVER, mediaId: 7 },
+      { serverId: SERVER, mediaId: 8 },
+    ].reduce(
+      (current, { serverId, mediaId }, index) =>
+        noteServerRecent(current, { serverId, mediaId, label: 'x', watched: null, at: index }),
+      EMPTY_STATE,
+    )
+    expect(state.recents).toHaveLength(3)
+  })
+
+  it('shares the cap of 50 with the files', () => {
+    const files = withMany(RECENTS_CAP - 1, (current, index) =>
+      addRecent(current, { path: `/f${index}.mkv`, at: index }),
+    )
+    const state = addRecent(noteDune({ state: files, at: 100 }), { path: '/last.mkv', at: 101 })
+    expect(state.recents).toHaveLength(RECENTS_CAP)
+    expect(state.recents.map(recentKey).slice(0, 2)).toEqual([
+      'file:/last.mkv',
+      `server:${SERVER}:7`,
+    ])
+    expect(state.recents.some((entry) => recentKey(entry) === 'file:/f0.mkv')).toBe(false)
+  })
+
+  it('removes one entry by its key, whichever kind it is', () => {
+    const state = addRecent(noteDune({ state: EMPTY_STATE, at: 1 }), { path: '/a.mkv', at: 2 })
+    expect(removeRecentByKey(state, { key: `server:${SERVER}:7` }).recents.map(recentKey)).toEqual([
+      'file:/a.mkv',
+    ])
+    expect(removeRecentByKey(state, { key: 'file:/a.mkv' }).recents.map(recentKey)).toEqual([
+      `server:${SERVER}:7`,
+    ])
+  })
+
+  it("drops only the removed server's titles", () => {
+    const state = [
+      (current: PlayerState) => noteDune({ state: current, at: 1 }),
+      (current: PlayerState) => addRecent(current, { path: '/a.mkv', at: 2 }),
+      (current: PlayerState) =>
+        noteServerRecent(current, {
+          serverId: OTHER_SERVER,
+          mediaId: 7,
+          label: 'Dune',
+          watched: null,
+          at: 3,
+        }),
+      (current: PlayerState) =>
+        noteServerRecent(current, {
+          serverId: SERVER,
+          mediaId: 9,
+          label: 'Arrival',
+          watched: null,
+          at: 4,
+        }),
+    ].reduce((current, step) => step(current), EMPTY_STATE)
+    expect(removeServerRecents(state, { serverId: SERVER }).recents.map(recentKey)).toEqual([
+      `server:${OTHER_SERVER}:7`,
+      'file:/a.mkv',
+    ])
+  })
+
+  it('clears both kinds', () => {
+    const state = addRecent(noteDune({ state: EMPTY_STATE, at: 1 }), { path: '/a.mkv', at: 2 })
+    expect(clearRecents(state).recents).toEqual([])
   })
 })
 
@@ -368,6 +518,31 @@ describe('isPlayerState', () => {
     expect(isPlayerState(JSON.parse(JSON.stringify(state)))).toBe(true)
   })
 
+  it('accepts a version 1 file written before server titles, holding only file recents', () => {
+    const written = {
+      version: 1,
+      recents: [
+        { kind: 'file', path: '/m/a.mkv', openedAt: 2 },
+        { kind: 'file', path: '/m/b.mkv', openedAt: 1 },
+      ],
+      resume: [],
+      tracks: [],
+      window: null,
+    }
+    expect(isPlayerState(JSON.parse(JSON.stringify(written)))).toBe(true)
+  })
+
+  it('accepts server recents after a JSON round trip and rejects a malformed one', () => {
+    const state = noteDune({ state: EMPTY_STATE, at: 1 })
+    expect(isPlayerState(JSON.parse(JSON.stringify(state)))).toBe(true)
+    const [entry] = state.recents
+    expect(isPlayerState({ ...state, recents: [{ ...entry, serverId: 'raven.example' }] })).toBe(
+      false,
+    )
+    expect(isPlayerState({ ...state, recents: [{ ...entry, mediaId: 0 }] })).toBe(false)
+    expect(isPlayerState({ ...state, recents: [{ ...entry, watched: '0.5' }] })).toBe(false)
+  })
+
   it('rejects another version', () => {
     expect(isPlayerState({ ...EMPTY_STATE, version: 2 })).toBe(false)
   })
@@ -389,11 +564,17 @@ describe('purity', () => {
       duration: 120,
       at: 1,
     })
-    const withPick = setTrackPick(base, { path: '/a', audio: 1, subtitle: 'en', at: 1 })
+    const withPick = noteDune({
+      state: setTrackPick(base, { path: '/a', audio: 1, subtitle: 'en', at: 1 }),
+      at: 1,
+    })
     const reducers: Array<(state: PlayerState) => PlayerState> = [
       (state) => addRecent(state, { path: '/b', at: 2 }),
       (state) => addRecent(state, { path: '/a', at: 2 }),
       (state) => removeRecent(state, { path: '/a' }),
+      (state) => noteDune({ state, at: 2 }),
+      (state) => removeRecentByKey(state, { key: 'file:/a' }),
+      (state) => removeServerRecents(state, { serverId: SERVER }),
       (state) => clearRecents(state),
       (state) => savePosition(state, { file: facts('/a'), position: 50, duration: 120, at: 2 }),
       (state) => savePosition(state, { file: facts('/a'), position: 0, duration: 120, at: 2 }),

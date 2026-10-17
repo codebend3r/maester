@@ -65,17 +65,22 @@ export const launchPaths = ({
   return pathsFromArgv(appIndex === -1 ? argv : argv.toSpliced(appIndex, 1))
 }
 
-/** What the page is told after main opens files on its own (Finder, a second launch). */
+/** What the page is told after main opens files or links on its own (Finder, a second launch, `open-url`). */
 export const eventForOpen = (reply: DesktopReply): DesktopEvent | null => {
   switch (reply.type) {
     case 'play':
       return { type: 'play', target: reply.target }
+    case 'playServer':
+      return { type: 'playServer', target: reply.target }
     case 'refused':
       return { type: 'notice', message: reply.message }
     case 'file':
     case 'recents':
     case 'output':
     case 'done':
+    case 'servers':
+    case 'serverReply':
+    case 'serverUnreachable':
       return null
     default: {
       const unreachable: never = reply

@@ -1,6 +1,7 @@
 import {
   type Infer,
   isBoolean,
+  isMediaId,
   isNumber,
   isOutputSettings,
   isString,
@@ -22,6 +23,11 @@ export const PLAYER_PORT_CHANNEL = 'raven:player'
 export const PLAYER_PORT_MESSAGE = 'raven:player-port'
 /** Main's words once mpv has gone. They ride with reason `engine`, which is what the page reads. */
 export const ENGINE_STOPPED = "raven player's video engine stopped. Open the video again."
+/**
+ * Main's words for a server raven player no longer keeps. The page reads them to drop
+ * "Open in browser", which main would refuse, so both sides use this one constant.
+ */
+export const SERVER_GONE = 'That server is no longer in raven player.'
 
 // A standard scheme lowercases its host, so an id must already be lowercase to
 // survive a round trip through `raven-file://<id>`.
@@ -36,6 +42,24 @@ export const fileUrlFor = (fileId: string): string => `${FILE_SCHEME}://${fileId
 export const isPlayTarget = object({ fileId: isOpaqueId, queue: listOf(isOpaqueId) })
 
 export type PlayTarget = Infer<typeof isPlayTarget>
+
+/** A title on a trusted server, by ids only: the page never holds the server's origin. */
+export const isServerTarget = object({
+  serverId: isOpaqueId,
+  mediaId: isMediaId,
+  at: isNumber,
+  next: listOf(isMediaId),
+})
+
+export type ServerTarget = Infer<typeof isServerTarget>
+
+/** The methods a page's server call may use; main matches each call against the allowlist besides. */
+export const isServerMethod = oneOf(['GET', 'PUT', 'POST'])
+
+/** A stored server as Settings shows it. */
+export const isServerView = object({ serverId: isOpaqueId, origin: isString, name: isString })
+
+export type ServerView = Infer<typeof isServerView>
 
 /** An audio track's index as a pick names it: a whole number, 0 or more. */
 export const isTrackIndex = (value: unknown): value is number =>
@@ -80,7 +104,7 @@ export const isMenuPlayerAction = oneOf([
 
 export type MenuPlayerAction = Infer<typeof isMenuPlayerAction>
 
-/** What the page asks main for. No variant carries a path. */
+/** What the page asks main for. No variant carries a file path; a server call names its server by id. */
 export const isDesktopRequest = union(
   object({ type: oneOf(['ready']) }),
   object({ type: oneOf(['openDialog']) }),
@@ -104,12 +128,33 @@ export const isDesktopRequest = union(
   object({ type: oneOf(['windowButtons']), isVisible: isBoolean }),
   object({ type: oneOf(['readOutput']) }),
   object({ type: oneOf(['writeOutput']), output: isOutputSettings }),
+  object({
+    type: oneOf(['serverCall']),
+    serverId: isOpaqueId,
+    method: isServerMethod,
+    path: isString,
+    body: nullable(isString),
+  }),
+  object({ type: oneOf(['listServers']) }),
+  object({ type: oneOf(['addServer']), origin: isString }),
+  object({ type: oneOf(['renameServer']), serverId: isOpaqueId, name: isString }),
+  object({ type: oneOf(['removeServer']), serverId: isOpaqueId }),
+  object({ type: oneOf(['openLink']), link: isString }),
+  object({ type: oneOf(['openInBrowser']), serverId: isOpaqueId, mediaId: isMediaId }),
+  object({
+    type: oneOf(['noteServerTitle']),
+    serverId: isOpaqueId,
+    mediaId: isMediaId,
+    label: isString,
+    watched: nullable(isNumber),
+  }),
 )
 
 export type DesktopRequest = Infer<typeof isDesktopRequest>
 
 export const isDesktopReply = union(
   object({ type: oneOf(['play']), target: isPlayTarget }),
+  object({ type: oneOf(['playServer']), target: isServerTarget }),
   object({ type: oneOf(['file']), file: isLocalFile }),
   object({ type: oneOf(['recents']), recents: listOf(isRecentView) }),
   object({
@@ -120,16 +165,21 @@ export const isDesktopReply = union(
   }),
   object({ type: oneOf(['done']) }),
   object({ type: oneOf(['refused']), message: isString }),
+  object({ type: oneOf(['serverReply']), status: isNumber, body: isString }),
+  object({ type: oneOf(['serverUnreachable']), message: isString }),
+  object({ type: oneOf(['servers']), servers: listOf(isServerView) }),
 )
 
 export type DesktopReply = Infer<typeof isDesktopReply>
 
-/** What main pushes on its own: menu actions, `open-file`, notices. */
+/** What main pushes on its own: menu actions (File > Open Link among them), `open-file`, links, notices. */
 export const isDesktopEvent = union(
   object({ type: oneOf(['play']), target: isPlayTarget }),
   object({ type: oneOf(['player']), action: isMenuPlayerAction }),
   object({ type: oneOf(['navigate']), to: oneOf(['settings']) }),
   object({ type: oneOf(['notice']), message: isString }),
+  object({ type: oneOf(['playServer']), target: isServerTarget }),
+  object({ type: oneOf(['openLink']) }),
 )
 
 export type DesktopEvent = Infer<typeof isDesktopEvent>

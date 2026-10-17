@@ -151,8 +151,16 @@ describe('eventForOpen', () => {
     ).toEqual({ type: 'notice', message: 'raven player opens video files only.' })
   })
 
+  it('turns a server title into a playServer event', () => {
+    const target = { serverId: NEXT, mediaId: 7, at: 30, next: [8] }
+    expect(eventForOpen({ type: 'playServer', target })).toEqual({ type: 'playServer', target })
+  })
+
   it('sends nothing for a reply that opens nothing', () => {
     expect(eventForOpen({ type: 'done' })).toBeNull()
+    expect(eventForOpen({ type: 'servers', servers: [] })).toBeNull()
+    expect(eventForOpen({ type: 'serverReply', status: 200, body: '{}' })).toBeNull()
+    expect(eventForOpen({ type: 'serverUnreachable', message: 'gone' })).toBeNull()
     expect(
       eventForOpen({
         type: 'output',
