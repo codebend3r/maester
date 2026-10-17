@@ -165,6 +165,7 @@ export const createStreamSession = <S extends MediaSourceLike>({
   start,
   url,
   onError,
+  onUnreachable,
   environment,
 }: {
   video: VideoLike
@@ -175,6 +176,11 @@ export const createStreamSession = <S extends MediaSourceLike>({
   start: number
   url: (start: number) => string
   onError: (message: string) => void
+  /**
+   * A request that was refused before any answer came back, not an abort:
+   * the origin could not be reached. Called before `onError` hears of it.
+   */
+  onUnreachable?: () => void
   environment: StreamEnvironment<S>
 }): StreamSession => {
   const state: SessionState = {
@@ -295,9 +301,12 @@ export const createStreamSession = <S extends MediaSourceLike>({
         await updateEnd(buffer)
       }
       if (!current(generation)) return
-      const response = await environment.fetch(url(Math.max(0, from)), {
-        signal: controller.signal,
-      })
+      const response = await environment
+        .fetch(url(Math.max(0, from)), { signal: controller.signal })
+        .catch((error: unknown) => {
+          if (current(generation) && !isAbort(error)) onUnreachable?.()
+          throw error
+        })
       if (!current(generation)) return
       if (!response.ok || !response.body) {
         fail(`The server could not convert this video (${response.status}).`)

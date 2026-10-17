@@ -7,6 +7,7 @@ import type {
   PlayerSource,
 } from '@raven/core'
 import type { ReactNode, RefObject } from 'react'
+import type { MediaPlane } from '@/components/Player/useMediaPlane'
 import type { VideoState } from '@/components/Player/useVideoState'
 
 export type EngineActions = {
@@ -48,7 +49,7 @@ export type EngineHandle = {
 }
 
 export type HtmlSource =
-  | { kind: 'server'; media: MediaItem; api: ApiClient }
+  | { kind: 'server'; media: MediaItem; api: ApiClient; mediaPlane?: MediaPlane }
   | { kind: 'file'; url: string }
 
 /** A player in another process: commands out, each answered once, and events in. */

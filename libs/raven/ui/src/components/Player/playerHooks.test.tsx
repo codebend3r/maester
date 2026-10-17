@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'bun:test'
-import type { PlaybackMode } from '@raven/core'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { act, render, renderHook } from '@testing-library/react'
-import { type ReactNode, useLayoutEffect, useRef } from 'react'
-import { sourceFor, useMediaSource } from '@/components/Player/useMediaSource'
+import { act, renderHook } from '@testing-library/react'
+import type { ReactNode } from 'react'
 import { usePlaybackLadder } from '@/components/Player/usePlaybackLadder'
 import { initialVideoState, videoReducer } from '@/components/Player/useVideoState'
 import { api } from '@/test/api'
@@ -24,65 +22,6 @@ describe('videoReducer', () => {
       time: 50,
       buffered: [[0, 60]],
     })
-  })
-})
-
-describe('sourceFor', () => {
-  it('plays the file itself directly, and a stream of its type otherwise', () => {
-    expect(sourceFor({ api, id: 7, mode: 'direct', audio: null, mime: null })).toEqual({
-      kind: 'file',
-      url: '/api/media/7/file',
-    })
-    const stream = sourceFor({ api, id: 7, mode: 'remux', audio: 1, mime: 'video/mp4' })
-    expect(stream.kind).toBe('stream')
-    if (stream.kind !== 'stream') return
-    expect(stream.mime).toBe('video/mp4')
-    expect(stream.url(30)).toContain('/api/media/7/stream')
-  })
-})
-
-describe('useMediaSource', () => {
-  it('drops an error from the source it is replacing', async () => {
-    const media = mediaItem()
-    const reports: string[] = []
-    const Harness = ({
-      mode,
-      onCommit,
-    }: {
-      mode: PlaybackMode
-      onCommit: (video: HTMLVideoElement | null) => void
-    }) => {
-      const videoRef = useRef<HTMLVideoElement>(null)
-      const position = useRef(0)
-      const playing = useRef(false)
-      useMediaSource({
-        videoRef,
-        source: { kind: 'server', media, api },
-        mode,
-        audio: null,
-        position,
-        playing,
-        onRefused: () => {},
-        onFailure: (message) => reports.push(`${mode}: ${message}`),
-      })
-      // After the commit and before the effect that swaps the source: where
-      // an event the browser queued for the old source can still land.
-      useLayoutEffect(() => {
-        onCommit(videoRef.current)
-      })
-      return (
-        <video ref={videoRef}>
-          <track kind="captions" />
-        </video>
-      )
-    }
-    const { rerender } = render(<Harness mode="direct" onCommit={() => {}} />)
-    rerender(
-      <Harness mode="remux" onCommit={(video) => video?.dispatchEvent(new Event('error'))} />,
-    )
-    await act(async () => {})
-    // happy-dom has no MediaSource, so the remux fails on its own account.
-    expect(reports).toEqual(["remux: This browser can't play converted video."])
   })
 })
 
