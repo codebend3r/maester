@@ -46,12 +46,13 @@ const HistoryDaySection = ({
   )
 }
 
-/** The history on its way, before its library is known: the way back, its title and intro over rows of tiles. */
+/** The history on its way, before its library is known: the way back, its title and intro, its switch, over tiles. */
 const HistorySkeleton = () => (
   <>
     <Bone shape="button" />
     <Bone shape="hero" width="half" />
     <Bone shape="text" width="most" />
+    <Bone shape="button" />
     <MediaTilesSkeleton />
   </>
 )
@@ -83,14 +84,12 @@ export const HistoryPage = () => {
 
   return (
     <section className={styles.page} aria-labelledby={ids.title}>
-      <ButtonLink to={`/libraries/${id}`} icon="back" className={styles.back}>
+      <ButtonLink to={`/libraries/${id}`} tone="pill" icon="back" className={styles.back}>
         {name}
       </ButtonLink>
 
       <header className={styles.header}>
-        <h1 id={ids.title} className={styles.title}>
-          History
-        </h1>
+        <h1 id={ids.title}>History</h1>
         <p className={styles.intro}>
           Videos played or marked in {name}, last played first. One counts as watched once playback
           gets {settings.watchedPercent}% of the way through, or when it is marked, which the
@@ -101,8 +100,9 @@ export const HistoryPage = () => {
       <fieldset className={styles.shows}>
         <legend className="visually-hidden">Show</legend>
         {SHOWS.map((option) => (
-          <Button
+          <button
             key={option.show}
+            type="button"
             className={styles.show}
             aria-pressed={show === option.show}
             onClick={() => {
@@ -111,7 +111,7 @@ export const HistoryPage = () => {
             }}
           >
             {option.label}
-          </Button>
+          </button>
         ))}
       </fieldset>
 

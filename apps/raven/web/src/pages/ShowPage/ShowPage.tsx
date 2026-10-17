@@ -12,6 +12,7 @@ import { ItemHeader, ItemHeaderSkeleton, pictureBackdrop } from '@/components/It
 import { MetadataEditor } from '@/components/MetadataEditor/MetadataEditor'
 import { ReviewCards } from '@/components/ReviewCards/ReviewCards'
 import { RouteState } from '@/components/RouteState/RouteState'
+import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
 import { SelectButton } from '@/components/SelectButton/SelectButton'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { SelectionBar } from '@/components/SelectionBar/SelectionBar'
@@ -25,7 +26,7 @@ import { seasonEntryKey } from '@/lib/entryKeys'
 import { createdBy, showFacts } from '@/lib/itemFacts'
 import { itemPath, watchLink } from '@/lib/itemLinks'
 import { POSTER_SIZES, posterSources } from '@/lib/posters'
-import { nextEpisodeQuery } from '@/lib/queries'
+import { librariesQuery, nextEpisodeQuery } from '@/lib/queries'
 import { useRouteItem } from '@/lib/routeQuery'
 import { useSelectable } from '@/lib/useSelectable'
 import { useWatchedToggle } from '@/lib/useWatchedChange'
@@ -53,9 +54,11 @@ const SeasonCard = ({ season, show }: { season: SeasonSummary; show: ItemDetails
             className={styles.seasonWatched}
           />
         </span>
-        <span className={styles.seasonTitle}>{season.title}</span>
-        <span className={styles.seasonCount}>
-          {count} {count === 1 ? 'episode' : 'episodes'}
+        <span className={styles.seasonText}>
+          <span className={styles.seasonTitle}>{season.title}</span>
+          <span className={styles.seasonCount}>
+            {count} {count === 1 ? 'episode' : 'episodes'}
+          </span>
         </span>
       </Link>
     </li>
@@ -70,6 +73,7 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
   const [editingMetadata, setEditingMetadata] = useState(false)
   const next = useQuery(nextEpisodeQuery(details.id))
   const libraryId = next.data?.libraryId ?? details.versions[0]?.libraryId
+  const libraryName = useQuery(librariesQuery).data?.find((entry) => entry.id === libraryId)?.name
   const code = next.data?.item ? episodeCode(next.data.item) : null
   const seasons = details.children.flatMap((child) => (child.type === 'season' ? [child] : []))
   const toggle = useWatchedToggle({
@@ -93,9 +97,10 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
         <ItemHeader
           back={{
             to: libraryId == null ? '/libraries' : `/libraries/${libraryId}`,
-            label: 'Library',
+            label: libraryName ?? 'Library',
           }}
           titleId={ids.title}
+          eyebrow={['Show']}
           title={details.title}
           byline={createdBy(details)}
           contentRating={details.contentRating}
@@ -116,6 +121,27 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
               version: details.backdropVersion,
             }),
           )}
+          manage={
+            <AdminOnly>
+              <Button
+                icon="edit"
+                aria-pressed={editingImages}
+                onClick={() => setEditingImages((editing) => !editing)}
+              >
+                Edit images
+              </Button>
+              <Button
+                icon="edit"
+                aria-pressed={editingMetadata}
+                onClick={() => setEditingMetadata((editing) => !editing)}
+              >
+                Edit metadata
+              </Button>
+              <Button icon="search" onClick={() => setFixing(true)}>
+                Fix match
+              </Button>
+            </AdminOnly>
+          }
         >
           {next.data && (
             <ButtonLink tone="primary" icon="play" {...watchLink({ media: next.data })}>
@@ -124,25 +150,6 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
           )}
           <WatchedToggle {...toggle} />
           <SelectButton />
-          <AdminOnly>
-            <Button
-              icon="edit"
-              aria-pressed={editingImages}
-              onClick={() => setEditingImages((editing) => !editing)}
-            >
-              Edit images
-            </Button>
-            <Button
-              icon="edit"
-              aria-pressed={editingMetadata}
-              onClick={() => setEditingMetadata((editing) => !editing)}
-            >
-              Edit metadata
-            </Button>
-            <Button icon="search" onClick={() => setFixing(true)}>
-              Fix match
-            </Button>
-          </AdminOnly>
         </ItemHeader>
 
         {details.aiMatch && <AiMatchNote aiMatch={details.aiMatch} />}
@@ -169,9 +176,7 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
 
         {seasons.length > 0 && (
           <section className={styles.seasons} aria-labelledby={ids.seasons}>
-            <h2 id={ids.seasons} className={styles.heading}>
-              Seasons
-            </h2>
+            <SectionHeading id={ids.seasons}>Seasons</SectionHeading>
             <ul className={styles.seasonRow}>
               {seasons.map((season) => (
                 <SeasonCard key={season.id} season={season} show={details} />
@@ -211,7 +216,11 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
   )
 }
 
-/** `/shows/:id`: a show's backdrop, poster, creator, years, network, seasons and people. */
+/**
+ * `/shows/:id`: a show's backdrop, poster, creator, years, network, scores
+ * and Play for the next episode, then its summary, its seasons as posters in
+ * a row, its people and its reviews.
+ */
 export const ShowPage = () => {
   const page = useRouteItem('show')
   if (page.state !== 'ready')

@@ -1,27 +1,30 @@
 .page {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-5);
+  gap: var(--space-6);
 }
 
+// The page's first row, clear of the theme button in the corner: the photo
+// beside the name, which stack on a phone.
 .header {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas: 'photo named';
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--space-4) var(--space-5);
+  padding-inline-end: var(--corner-clearance, 0);
 }
 
 .photo {
+  grid-area: photo;
   display: grid;
   place-items: center;
-  width: clamp(5rem, 14vw, 8rem);
+  width: 12.5rem;
   aspect-ratio: 1;
   overflow: hidden;
   border-radius: 50%;
   background: var(--color-canopy);
-  color: var(--color-lichen);
-  font-family: var(--font-display);
-  font-size: var(--font-size-xl);
+  box-shadow: var(--shadow-poster);
 
   img {
     width: 100%;
@@ -30,29 +33,49 @@
   }
 }
 
-.name {
+// No photo: their initials in the serif on a wash of the theme's own colours.
+.initials {
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--color-lichen) 50%, var(--color-moss)),
+    var(--color-deep)
+  );
+  color: var(--color-bark);
   font-family: var(--font-display);
   font-size: var(--font-size-hero);
-  font-weight: 400;
-  line-height: var(--line-tight);
-  overflow-wrap: anywhere;
+  line-height: 1;
+}
+
+.named {
+  grid-area: named;
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.eyebrow {
+  color: var(--color-lichen);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+}
+
+.name {
+  font-size: var(--font-size-title);
+  overflow-wrap: break-word;
+  hyphens: auto;
 }
 
 .group {
   display: grid;
-  gap: var(--space-2);
-}
-
-.heading {
-  font-family: var(--font-display);
-  font-size: var(--font-size-lg);
-  font-weight: 400;
+  gap: var(--space-4);
 }
 
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(10rem, 100%), 1fr));
-  gap: var(--space-4) var(--space-3);
+  gap: var(--space-5) var(--space-3);
 }
 
 .card {
@@ -61,7 +84,7 @@
 
 .link {
   display: grid;
-  gap: var(--space-0);
+  gap: var(--space-2);
   border-radius: var(--radius-md);
   text-decoration: none;
 
@@ -78,6 +101,7 @@
   overflow: hidden;
   border-radius: var(--radius-md);
   background: var(--color-canopy);
+  box-shadow: var(--shadow-poster);
   color: var(--color-lichen);
   font-family: var(--font-display);
   font-size: var(--font-size-xl);
@@ -87,6 +111,20 @@
     height: 100%;
     object-fit: cover;
   }
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition: translate 250ms var(--ease-out);
+
+    .link:hover & {
+      translate: 0 calc(-1 * var(--space-0));
+    }
+  }
+}
+
+.words {
+  display: grid;
+  gap: var(--space-0);
+  min-width: 0;
 }
 
 .title {
@@ -95,16 +133,31 @@
   overflow-wrap: anywhere;
 }
 
+// The year and their part as one line of text, a dot between them.
 .facts {
-  display: grid;
-  grid-auto-flow: column;
-  justify-content: start;
-  gap: var(--space-2);
   color: var(--color-lichen);
   font-size: var(--font-size-xs);
+
+  span + span::before {
+    content: ' · ';
+  }
 }
 
 .message {
   max-width: var(--measure);
   color: var(--color-lichen);
+}
+
+@media (max-width: 48rem) {
+  .header {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'photo'
+      'named';
+    align-items: start;
+  }
+
+  .photo {
+    width: 8.75rem;
+  }
 }

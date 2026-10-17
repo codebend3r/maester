@@ -3,7 +3,7 @@ import { cleanup, screen, within } from '@testing-library/react'
 import { Route, Routes } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { POSTER_SIZES } from '@/lib/posters'
-import { PersonPage, groupCredits } from '@/pages/PersonPage/PersonPage'
+import { PersonPage, groupCredits, initialsOf } from '@/pages/PersonPage/PersonPage'
 import { itemSummary } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 
@@ -22,6 +22,14 @@ describe('groupCredits', () => {
       ['Acting', 2],
       ['Producing', 1],
     ])
+  })
+})
+
+describe('initialsOf', () => {
+  it('takes the first letter of the first two words', () => {
+    expect(initialsOf('Rebecca Ferguson')).toBe('RF')
+    expect(initialsOf('guillermo  del Toro')).toBe('GD')
+    expect(initialsOf('Zendaya')).toBe('Z')
   })
 })
 
@@ -70,5 +78,52 @@ describe('PersonPage', () => {
       `/api/items/1/images/poster?v=${MATRIX.posterVersion} 500w`,
     ])
     expect(poster).toHaveAttribute('sizes', POSTER_SIZES.grid)
+  })
+
+  it("counts their credits over their name, and each group's titles by its heading", async () => {
+    spy.mockImplementation(async () => ({
+      id: 7,
+      name: 'Keanu Reeves',
+      photoVersion: 'k1',
+      credits: [
+        { item: MATRIX, job: 'cast', role: 'Neo' },
+        { item: SHOW, job: 'guest', role: 'Himself' },
+        { item: SHOW, job: 'director', role: 'Director' },
+      ],
+    }))
+    renderWithProviders(
+      <Routes>
+        <Route path="people/:id" element={<PersonPage />} />
+      </Routes>,
+      { route: '/people/7' },
+    )
+    expect(await screen.findByText('In your libraries · 3 credits')).toBeInTheDocument()
+    expect(
+      within(screen.getByRole('region', { name: 'Acting' })).getByText('2 titles'),
+    ).toBeInTheDocument()
+    expect(
+      within(screen.getByRole('region', { name: 'Directing' })).getByText('1 title'),
+    ).toBeInTheDocument()
+  })
+
+  it('shows their initials where they have no photo, and says when nothing credits them', async () => {
+    spy.mockImplementation(async () => ({
+      id: 8,
+      name: 'Bertha Navarro',
+      photoVersion: null,
+      credits: [],
+    }))
+    const { container } = renderWithProviders(
+      <Routes>
+        <Route path="people/:id" element={<PersonPage />} />
+      </Routes>,
+      { route: '/people/8' },
+    )
+    expect(
+      await screen.findByText('Nothing in raven credits Bertha Navarro yet.'),
+    ).toBeInTheDocument()
+    expect(screen.getByText('BN')).toHaveAttribute('aria-hidden', 'true')
+    expect(container.querySelector('header img')).toBeNull()
+    expect(screen.queryByText(/In your libraries/)).toBeNull()
   })
 })

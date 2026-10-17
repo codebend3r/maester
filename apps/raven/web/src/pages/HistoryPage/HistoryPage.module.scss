@@ -1,52 +1,71 @@
 .page {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-4);
+  gap: var(--space-5);
 }
 
+// The page's first row: it stops short of the theme button in the corner.
 .back {
   justify-self: start;
-  border-color: transparent;
-  padding-left: 0;
+  max-width: calc(100% - var(--corner-clearance, 0px));
+  overflow: hidden;
 }
 
 .header {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-1);
-}
-
-.title {
-  font-family: var(--font-display);
-  font-size: var(--font-size-hero);
-  font-weight: 400;
-  line-height: var(--line-tight);
+  gap: var(--space-2);
 }
 
 .intro {
   max-width: var(--measure);
-  color: var(--color-lichen);
+  color: var(--color-birch);
+  text-wrap: pretty;
 }
 
+// A well with the two lists side by side, the one shown filled in.
 .shows {
   display: grid;
   grid-auto-flow: column;
-  justify-content: start;
-  gap: var(--space-1);
+  justify-self: start;
+  gap: var(--space-0);
   min-width: 0;
-  padding: 0;
+  padding: var(--space-0);
   border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--color-canopy);
 }
 
-// The list shown reads as switched on, like the library's chosen view.
-.show[aria-pressed='true'] {
-  background: var(--color-canopy);
-  border-color: var(--color-lichen);
+.show {
+  min-height: var(--control-size);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-lichen);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition:
+      background-color 150ms ease,
+      color 150ms ease;
+  }
+
+  &:hover {
+    color: var(--color-bark);
+  }
+
+  &[aria-pressed='true'] {
+    background: var(--color-moss);
+    color: var(--color-bark);
+  }
 }
 
 .days {
   display: grid;
-  gap: var(--space-6);
+  gap: var(--space-5);
 }
 
 .day {
@@ -55,16 +74,12 @@
 }
 
 .heading {
-  padding-bottom: var(--space-1);
-  border-bottom: 1px solid var(--color-moss);
-  font-family: var(--font-display);
   font-size: var(--font-size-xl);
-  font-weight: 400;
   line-height: var(--line-tight);
 }
 
 .more {
-  justify-self: start;
+  justify-self: center;
 }
 
 .message {
