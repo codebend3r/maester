@@ -14,7 +14,6 @@
     "dev:rookery": "nx run-many -t dev -p @rookery/server @rookery/web",
     "build": "nx run-many -t build",
     "test": "nx run-many -t test",
-    "test:ci": "nx run-many -t test --outputStyle=static",
     "typecheck": "nx run-many -t typecheck",
     "lint": "nx run-many -t lint:py lint:ts lint:css",
     "lint:fix": "nx run-many -t lint:py:fix lint:ts:fix lint:css:fix",

@@ -1,0 +1,19 @@
+# Nx Cloud reads this for every CI run that `nx-cloud start-nx-agents` starts
+# (the ✅ Checks job in .github/workflows/pull-request-checks.yml).
+# https://nx.dev/docs/reference/nx-cloud/ci-config
+dte:
+  # The agents boot from the launch template in .nx/workflows/agents.yaml.
+  distribute-on: 3 linux-medium
+lifecycle:
+  # Every target `bun run verify` runs, so the agents stop once the last one is done.
+  stop-after:
+    - spellcheck
+    - typescript-only
+    - one-command-per-script
+    - lint:py
+    - lint:ts
+    - lint:css
+    - format:check
+    - typecheck
+    - test
+    - build
