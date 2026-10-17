@@ -45,9 +45,9 @@ export class PeopleController {
     if (!person) throw new NotFoundException(`No person ${id}`)
     const viewer = this.lock.viewer({ cookie })
     const credits = person.credits.filter((credit) => viewer.seesItem(credit.item.id))
-    // Only someone this browser finds in raven is worth asking TMDB about,
-    // so walking every id asks it nothing.
-    if (credits.length > 0) await this.filmographies.ensure({ personId: id })
+    // A person whose titles are all hidden from this browser is never looked
+    // up; the rest share two lookups at a time, with 20 waiting.
+    const asked = credits.length > 0 ? await this.filmographies.ensure({ personId: id }) : null
     // Read again, for the name and photo a fetch just brought.
     const latest = this.people.profile(id) ?? { ...person, profile: null }
     return {
@@ -59,6 +59,7 @@ export class PeopleController {
         personId: id,
         sees: viewer.seesLibrary,
         localCredits: credits,
+        isTurnedAway: asked?.isTurnedAway ?? false,
       }),
       credits: credits.map(({ item, job, role }) => ({ item, job, role })),
     }

@@ -45,32 +45,44 @@ export class Filmographies {
   /**
    * Fetches a person's filmography when it is missing, waiting for it until
    * the deadline, or behind the stored one when that is stale. Never throws.
+   * `isTurnedAway` says a first fetch was wanted but the line was full.
    */
-  async ensure({ personId }: { personId: number }): Promise<void> {
+  async ensure({ personId }: { personId: number }): Promise<{ isTurnedAway: boolean }> {
     const stored = this.people.profile(personId)
-    if (!stored) return
+    if (!stored) return { isTurnedAway: false }
     const { tmdbId, fetchedAt } = stored
     if (fetchedAt != null) {
-      if (Date.now() - Date.parse(fetchedAt) < FRESH_DAYS * DAY_MS) return
-      if (this.mayFetch(personId)) void this.fetch({ personId, tmdbId })
-      return
+      const isFresh = Date.now() - Date.parse(fetchedAt) < FRESH_DAYS * DAY_MS
+      if (!isFresh && this.mayFetch(personId)) void this.fetch({ personId, tmdbId })
+      return { isTurnedAway: false }
     }
-    if (!this.mayFetch(personId)) return
-    await this.withinDeadline(this.fetch({ personId, tmdbId }))
+    if (!this.mayFetch(personId)) return { isTurnedAway: false }
+    const fetching = this.fetch({ personId, tmdbId })
+    if (!fetching) return { isTurnedAway: true }
+    await this.withinDeadline(fetching)
+    return { isTurnedAway: false }
   }
 
-  /** What a viewer who sees the libraries `sees` passes may see of a person's filmography. */
+  /**
+   * What a viewer who sees the libraries `sees` passes may see of a person's
+   * filmography. One `ensure` turned away is `pending`, so the page asks
+   * again once the line moves.
+   */
   read({
     personId,
     sees,
     localCredits,
+    isTurnedAway = false,
   }: {
     personId: number
     sees: (libraryId: number) => boolean
     localCredits: readonly LocalCredit[]
+    isTurnedAway?: boolean
   }): PersonFilmography {
     const fetchedAt = this.people.profile(personId)?.fetchedAt ?? null
-    if (fetchedAt == null) return { state: this.waiting(personId) }
+    if (fetchedAt == null) {
+      return { state: isTurnedAway || this.inFlight.has(personId) ? 'pending' : 'unavailable' }
+    }
     const rows = this.people.filmographyRows(personId)
     const itemIds = rows.flatMap((row) => row.itemId ?? [])
     return {
@@ -86,22 +98,20 @@ export class Filmographies {
     }
   }
 
-  private waiting(personId: number): 'pending' | 'unavailable' {
-    return this.inFlight.has(personId) ? 'pending' : 'unavailable'
-  }
-
   /** TMDB is on, and has not failed this person in the last ten minutes. */
   private mayFetch(personId: number): boolean {
     const failed = this.failedAt.get(personId)
     return this.tmdb.enabled && (failed == null || Date.now() - failed >= FAILURE_MEMORY_MS)
   }
 
-  /** The person's fetch, started or joined. */
-  private fetch({ personId, tmdbId }: { personId: number; tmdbId: string }): Promise<void> {
+  /**
+   * The person's fetch, started or joined, or null when the line is full.
+   * That is no failure of this person's, so the next view tries again.
+   */
+  private fetch({ personId, tmdbId }: { personId: number; tmdbId: string }): Promise<void> | null {
     const running = this.inFlight.get(personId)
     if (running) return running
-    // A full line is no failure of this person's, so the next view tries again.
-    if (this.inFlight.size >= AT_ONCE + MOST_WAITING) return Promise.resolve()
+    if (this.inFlight.size >= AT_ONCE + MOST_WAITING) return null
     const fetching = this.load({ personId, tmdbId }).finally(() => {
       this.inFlight.delete(personId)
     })

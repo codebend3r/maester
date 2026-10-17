@@ -226,7 +226,7 @@ describe("a person's filmography from TMDB", () => {
     expect(tmdb.state.calls).toBe(3)
   })
 
-  it('turns a person away once twenty wait their turn, and fetches them when asked again', async () => {
+  it('turns a person away as pending once twenty wait their turn, and fetches them when asked again', async () => {
     vi.useFakeTimers()
     const { tmdb, filmographies, stateOf } = setUp()
     const waiting = Array.from({ length: 2 + MOST_WAITING }, newPerson)
@@ -237,16 +237,20 @@ describe("a person's filmography from TMDB", () => {
     await ensuring
     expect(waiting.map(stateOf).every((state) => state === 'pending')).toBe(true)
 
-    // It answers at once, with no deadline to wait out.
-    await filmographies.ensure({ personId: turnedAway })
-    expect(stateOf(turnedAway)).toBe('unavailable')
+    // It answers at once, with no deadline to wait out, and the page is told to ask again.
+    const { isTurnedAway } = await filmographies.ensure({ personId: turnedAway })
+    expect(isTurnedAway).toBe(true)
+    expect(
+      filmographies.read({ personId: turnedAway, sees: () => true, localCredits: [], isTurnedAway })
+        .state,
+    ).toBe('pending')
     expect(tmdb.state.calls).toBe(2)
 
     letGo()
     await vi.waitFor(() =>
       expect(waiting.map(stateOf).every((state) => state === 'ready')).toBe(true),
     )
-    await filmographies.ensure({ personId: turnedAway })
+    expect(await filmographies.ensure({ personId: turnedAway })).toEqual({ isTurnedAway: false })
     expect(stateOf(turnedAway)).toBe('ready')
     expect(tmdb.state.calls).toBe(3 + MOST_WAITING)
   })
