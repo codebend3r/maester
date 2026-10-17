@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import { formatBytes } from '@raven/core'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { watchedLabel } from '@/renderer/HomePage/HomePage'
+import { watchedLabel } from '@/renderer/desktop/watched'
 import { SERVER_COPY } from '@/renderer/ServerPage/serverServices'
 import {
   DL_1,
@@ -12,11 +12,12 @@ import {
   DL_5,
   downloadsMain,
   GB,
+  settleInAct,
   SPACE,
   viewOf,
 } from '@/renderer/test/downloadFakes'
 import { fakeClient, renderDesktop } from '@/renderer/test/render'
-import { reply, S, sentOfType } from '@/renderer/test/serverFakes'
+import { heldReply, reply, S, sentOfType } from '@/renderer/test/serverFakes'
 import type { DownloadView } from '@/shared/protocol'
 
 const ROWS: DownloadView[] = [
@@ -88,7 +89,7 @@ describe('DownloadsPage', () => {
     const meter = await screen.findByRole('meter', { name: 'Disk' })
     expect(meter).toHaveAttribute('min', '0')
     expect(meter).toHaveAttribute('max', String(SPACE.total))
-    expect(meter).toHaveAttribute('value', String(SPACE.total - SPACE.free))
+    expect(meter).toHaveAttribute('value', String(SPACE.used))
     expect(
       screen.getByText(
         `${formatBytes(SPACE.used)} of downloads · ${formatBytes(SPACE.free)} free of ${formatBytes(SPACE.total)}`,
@@ -381,6 +382,60 @@ describe('DownloadsPage', () => {
     expect(await screen.findByRole('status')).toHaveTextContent(
       'That download is no longer in raven player.',
     )
+  })
+
+  it('reads the disk again when main pushes a file finished or gone, not on progress', async () => {
+    const { client } = await openPage({ downloads: ROWS })
+    await screen.findByRole('meter', { name: 'Disk' })
+    await rowOf('S01E01 Good News')
+    const readsOfSpace = () => sentOfType({ client, type: 'readSpace' }).length
+    expect(readsOfSpace()).toBe(1)
+    const withFirst = (status: DownloadView['status']) =>
+      ROWS.map((view) => (view.downloadId === DL_1 ? { ...view, status } : view))
+    await client.emit({
+      type: 'downloads',
+      downloads: withFirst({ kind: 'downloading', bytes: 1.5 * GB }),
+      autoDeleteDefault: false,
+    })
+    expect(
+      await screen.findByRole('progressbar', {
+        name: `${formatBytes(1.5 * GB)} of ${formatBytes(2 * GB)}`,
+      }),
+    ).toBeInTheDocument()
+    expect(readsOfSpace()).toBe(1)
+    await client.emit({
+      type: 'downloads',
+      downloads: withFirst({ kind: 'ready' }),
+      autoDeleteDefault: false,
+    })
+    await waitFor(() => expect(readsOfSpace()).toBe(2))
+    await client.emit({
+      type: 'downloads',
+      downloads: withFirst({ kind: 'ready' }).filter((view) => view.downloadId !== DL_5),
+      autoDeleteDefault: false,
+    })
+    await waitFor(() => expect(readsOfSpace()).toBe(3))
+  })
+
+  it('sends one delete however often the question is answered while main works', async () => {
+    const main = downloadsMain({ downloads: ROWS })
+    const held = heldReply()
+    const client = fakeClient({
+      request: async (request) =>
+        request.type === 'deleteDownload' ? held.promise : main.respond(request),
+    })
+    renderDesktop({ client, route: '/downloads' })
+    const row = await rowOf('The Two Towers (2002)')
+    await userEvent.click(within(row).getByRole('button', { name: 'Delete The Two Towers (2002)' }))
+    const confirm = within(row).getByRole('button', { name: 'Delete' })
+    await userEvent.dblClick(confirm)
+    expect(confirm).toHaveAttribute('aria-disabled', 'true')
+    expect(sentOfType({ client, type: 'deleteDownload' })).toHaveLength(1)
+    await settleInAct(() =>
+      held.resolve(main.respond({ type: 'deleteDownload', downloadId: DL_5 })),
+    )
+    expect(screen.queryByText('The Two Towers (2002)')).toBeNull()
+    expect(sentOfType({ client, type: 'deleteDownload' })).toHaveLength(1)
   })
 
   it('says so when main does not answer a change', async () => {

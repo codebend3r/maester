@@ -1,3 +1,4 @@
+import { act } from '@testing-library/react'
 import { fakeClient } from '@/renderer/test/render'
 import { S } from '@/renderer/test/serverFakes'
 import type { DesktopReply, DesktopRequest, DownloadView, SpaceView } from '@/shared/protocol'
@@ -27,6 +28,16 @@ export const viewOf = (overrides: Partial<DownloadView> = {}): DownloadView => (
   needsUnlock: false,
   ...overrides,
 })
+
+/**
+ * Settles a held reply and lets the page finish with it inside act, so the DOM is final before
+ * the next query: a `waitFor` that sees a row leave mid-wait can hang under happy-dom.
+ */
+export const settleInAct = (settle: () => void) =>
+  act(async () => {
+    settle()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+  })
 
 type Answers = Partial<Record<DesktopRequest['type'], DesktopReply>>
 

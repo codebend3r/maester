@@ -34,18 +34,37 @@ export const useDownloads = (): UseQueryResult<DownloadsData> => {
   })
 }
 
-/** What main pushes when a download changes: it replaces what the list holds. */
-export const applyDownloadsEvent = ({
-  queryClient,
-  event,
-}: {
-  queryClient: QueryClient
-  event: DownloadsData
-}) =>
+type ListChange = { queryClient: QueryClient; event: DownloadsData }
+
+const setDownloads = ({ queryClient, event }: ListChange) =>
   queryClient.setQueryData<DownloadsData>(DOWNLOADS_KEY, {
     downloads: event.downloads,
     autoDeleteDefault: event.autoDeleteDefault,
   })
+
+/** A file finished or left the list: what moves the disk's numbers, unlike progress. */
+const movesDisk = ({ before, after }: { before: DownloadView[]; after: DownloadView[] }) => {
+  const kept = new Set(after.map((view) => view.downloadId))
+  const wasReady = new Set(
+    before.filter((view) => view.status.kind === 'ready').map((view) => view.downloadId),
+  )
+  return (
+    before.some((view) => !kept.has(view.downloadId)) ||
+    after.some((view) => view.status.kind === 'ready' && !wasReady.has(view.downloadId))
+  )
+}
+
+/**
+ * What main pushes when a download changes: it replaces what the list holds. The disk is read
+ * again only when a file finished or left, never for progress, which comes four times a second.
+ */
+export const applyDownloadsEvent = ({ queryClient, event }: ListChange) => {
+  const before = queryClient.getQueryData<DownloadsData>(DOWNLOADS_KEY)?.downloads ?? []
+  setDownloads({ queryClient, event })
+  if (!movesDisk({ before, after: event.downloads })) return
+  // Not awaited, and it cannot reject: the line follows the disk's read.
+  void queryClient.invalidateQueries({ queryKey: SPACE_KEY })
+}
 
 /** The disk raven player keeps its downloads on. */
 export const useSpace = (): UseQueryResult<SpaceView> => {
@@ -100,7 +119,7 @@ export const useChangeDownloads = (): ((request: DownloadsChange) => Promise<boo
     }
     switch (reply.type) {
       case 'downloads':
-        applyDownloadsEvent({ queryClient, event: reply })
+        setDownloads({ queryClient, event: reply })
         // Not awaited, and it cannot reject: the change is made, and the line follows the disk's read.
         void queryClient.invalidateQueries({ queryKey: SPACE_KEY })
         return true

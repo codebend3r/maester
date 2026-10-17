@@ -3,6 +3,11 @@
 
   display: grid;
   grid-template-columns: minmax(0, 1fr);
+  // The alert, the empty note and the list never show together, so they share one region
+  // and no empty row doubles the gap under the header.
+  grid-template-areas:
+    'bar'
+    'list';
   gap: var(--space-4);
   align-content: start;
   min-height: 100vh;
@@ -17,6 +22,7 @@
 
 // The window has no title bar of its own: this strip is what you drag it by.
 .bar {
+  grid-area: bar;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   grid-template-areas:
@@ -73,10 +79,12 @@
 }
 
 .note {
+  grid-area: list;
   padding-inline: var(--gutter);
 }
 
 .list {
+  grid-area: list;
   display: grid;
   gap: var(--space-2);
   padding-inline: var(--gutter);
@@ -223,4 +231,10 @@
   grid-auto-flow: column;
   gap: var(--space-1);
   justify-content: start;
+
+  // Held while main deletes; still focusable, so focus stays on it.
+  button[aria-disabled='true'] {
+    cursor: progress;
+    opacity: 0.55;
+  }
 }

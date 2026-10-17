@@ -4,8 +4,8 @@ import { type KeyboardEvent, useEffect, useId, useRef, useState } from 'react'
 import { useDesktop } from '@/renderer/desktop/DesktopContext'
 import { UNREACHED, useChangeDownloads } from '@/renderer/desktop/downloadsApi'
 import { serverApiFor } from '@/renderer/desktop/serverApi'
+import { watchedLabel } from '@/renderer/desktop/watched'
 import styles from '@/renderer/DownloadsPage/DownloadsPage.module.scss'
-import { watchedLabel } from '@/renderer/HomePage/HomePage'
 import { SERVER_COPY } from '@/renderer/ServerPage/serverServices'
 import { useNotice, useOpenReply } from '@/renderer/Shell/openReply'
 import type { DownloadStatus, DownloadView } from '@/shared/protocol'
@@ -91,6 +91,8 @@ export const DownloadRow = ({
   const showNotice = useNotice()
   const [mode, setMode] = useState<RowMode>('view')
   const [isUnlocking, setIsUnlocking] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const isDeletingNow = useRef(false)
   const row = useRef<HTMLLIElement>(null)
   const deleteButton = useRef<HTMLButtonElement>(null)
   const cancelButton = useRef<HTMLButtonElement>(null)
@@ -137,7 +139,12 @@ export const DownloadRow = ({
   }
 
   const remove = async () => {
+    if (isDeletingNow.current) return
+    isDeletingNow.current = true
+    setIsDeleting(true)
     const isDeleted = await change({ type: 'deleteDownload', downloadId })
+    isDeletingNow.current = false
+    setIsDeleting(false)
     setMode('view')
     if (isDeleted) onDeleted()
   }
@@ -159,9 +166,11 @@ export const DownloadRow = ({
             {`Delete ${label}? ${formatBytes(view.size)} will be freed.`}
           </p>
           <div className={styles.confirm}>
+            {/* aria-disabled, not disabled: disabling the focused button would drop focus to the page. */}
             <Button
               tone="danger"
               aria-describedby={ids.question}
+              aria-disabled={isDeleting}
               onClick={() => void remove()}
               onKeyDown={backOnEscape}
             >
