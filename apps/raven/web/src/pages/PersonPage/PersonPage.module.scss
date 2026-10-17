@@ -4,13 +4,15 @@
   gap: var(--space-6);
 }
 
-// The way back, then the photo beside the name, which stack on a phone.
+// The way back, then the photo beside who they are, which stack on a phone.
+// Who they are sits level with the photo until it runs taller, and then
+// the photo keeps to the top.
 .header {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   grid-template-areas:
     'back back'
-    'photo named';
+    'photo about';
   align-items: center;
   gap: var(--space-4) var(--space-5);
 }
@@ -21,6 +23,7 @@
 
 .photo {
   grid-area: photo;
+  align-self: start;
   display: grid;
   place-items: center;
   width: 12.5rem;
@@ -50,11 +53,19 @@
   line-height: 1;
 }
 
+// The name and its eyebrow, when and where they were born, the biography
+// and the links, one under the next; a part TMDB leaves out leaves no gap.
+.about {
+  grid-area: about;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+  min-width: 0;
+}
+
 .named {
-  grid-area: named;
   display: grid;
   gap: var(--space-1);
-  min-width: 0;
 }
 
 .eyebrow {
@@ -69,6 +80,54 @@
   font-size: var(--font-size-title);
   overflow-wrap: break-word;
   hyphens: auto;
+}
+
+.life {
+  color: var(--color-birch);
+  text-wrap: pretty;
+}
+
+// The biography as a lead, its paragraphs kept, and More or Less on its
+// left edge under it.
+.bio {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-1);
+}
+
+.biography {
+  max-width: var(--measure);
+  color: var(--color-birch);
+  line-height: var(--line-relaxed);
+  white-space: pre-line;
+  text-wrap: pretty;
+}
+
+.clamped {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+// A word, lit only under the pointer.
+.more {
+  min-height: var(--space-5);
+  padding: 0;
+}
+
+.links {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  gap: var(--space-1);
+}
+
+// The search, the tabs and the table under the section's heading.
+.filmography {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
 }
 
 .group {
@@ -158,7 +217,7 @@
     grid-template-areas:
       'back'
       'photo'
-      'named';
+      'about';
     align-items: start;
   }
 

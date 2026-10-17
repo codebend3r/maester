@@ -1,0 +1,209 @@
+// The table's room is the page's to give, and the side menu narrows it
+// whatever the screen's width, so the columns drop by the room the table
+// has rather than by the screen's. Contained, the room also never grows
+// to the table's own width and pushes the page wider than the screen.
+.room {
+  container-type: inline-size;
+}
+
+// The element defaults draw the table; this sets its rhythm, as a TV
+// library's list does: eyebrow headers, faint rules between rows and a
+// tint under the pointer.
+.table {
+  thead th {
+    padding-block: var(--space-2);
+  }
+
+  tbody tr:hover {
+    background: var(--color-hover);
+  }
+
+  tbody th {
+    font-weight: 400;
+  }
+
+  th,
+  td {
+    padding-inline: var(--space-1);
+  }
+
+  td {
+    white-space: nowrap;
+  }
+}
+
+.number {
+  font-variant-numeric: tabular-nums;
+}
+
+// A title with no date yet: smaller than a year, and spaced like an eyebrow.
+.undated {
+  font-size: var(--font-size-xs);
+  letter-spacing: var(--tracking-eyebrow);
+}
+
+// The small poster, then the title with whether it is a movie or a show
+// after its last word, as one run of text, so a title that wraps keeps the
+// stamp beside it.
+.titleCell {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas: 'poster named';
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.named {
+  grid-area: named;
+}
+
+.title {
+  color: var(--color-bark);
+  font-weight: 600;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+
+  &:hover {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+}
+
+// Movie or TV, as a small stamp in the eyebrow's type.
+.kind {
+  padding: 0 var(--space-0);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-sm);
+  color: var(--color-lichen);
+  font-size: var(--font-size-2xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.frame {
+  grid-area: poster;
+  display: grid;
+  grid-template-areas: 'frame';
+  // One cell the shape sets, which a tall picture cannot stretch.
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  width: 2.25rem;
+  aspect-ratio: 2 / 3;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--color-deep);
+}
+
+.image,
+.placeholder {
+  grid-area: frame;
+}
+
+.image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.placeholder {
+  display: grid;
+  place-items: center;
+  color: var(--color-moss-line);
+  font-family: var(--font-display);
+  font-size: var(--font-size-lg);
+  line-height: 1;
+}
+
+// Their parts, wrapping as they need to, the episodes on a line under them.
+.roles {
+  display: block;
+  color: var(--color-birch);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.episodes {
+  display: block;
+  font-size: var(--font-size-xs);
+}
+
+.department {
+  font-size: var(--font-size-xs);
+}
+
+// What raven holds: a small pill in the leaf's colours, to read at a glance.
+.onRaven {
+  display: inline-grid;
+  align-items: center;
+  min-height: 1.75rem;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--color-leaf);
+  color: var(--color-on-leaf);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  text-decoration: none;
+
+  &:hover {
+    background: var(--color-leaf-hi);
+  }
+}
+
+// What it does not: plain words, out of the way.
+.notOnRaven {
+  font-size: var(--font-size-xs);
+}
+
+@container (max-width: 48rem) {
+  .roomy {
+    display: none;
+  }
+}
+
+// A phone's room keeps the year, the title and whether raven holds it,
+// rather than the poster and the parts, and the title takes all the room
+// the other two leave.
+@container (max-width: 30rem) {
+  .frame,
+  .spare {
+    display: none;
+  }
+
+  .titleHeader {
+    width: 100%;
+  }
+
+  .titleCell {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'named';
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .onRaven {
+    transition: background-color 150ms ease;
+  }
+}
+
+// Stand-ins for the rows, laid out as the table lays them.
+.bones {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.boneRow {
+  display: grid;
+  grid-template-columns: 3rem 2.25rem minmax(0, 1fr) 5rem;
+  align-items: center;
+  gap: var(--space-2);
+  padding-block: var(--space-1);
+  border-bottom: 1px solid var(--color-line-faint);
+}
+
+.boneFrame {
+  display: grid;
+  aspect-ratio: 2 / 3;
+}
