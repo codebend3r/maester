@@ -207,6 +207,15 @@
   gap: var(--space-1);
 }
 
+// A row of three, a host's handoff before Try playing anyway and the escape,
+// needs about 39rem of window; one or two keep their row down to 30rem.
+@media (max-width: 40rem) {
+  .panelActions:has(> :nth-child(3)) {
+    grid-auto-flow: row;
+    justify-content: stretch;
+  }
+}
+
 @media (max-width: 30rem) {
   .panelActions {
     grid-auto-flow: row;

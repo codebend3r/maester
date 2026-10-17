@@ -20,6 +20,10 @@
   display: grid;
   pointer-events: auto;
   color: var(--color-bark);
+  grid-template-areas:
+    'header'
+    'groups'
+    'footer';
   grid-template-rows: auto minmax(0, 1fr) auto;
   gap: var(--space-2);
   width: min(26rem, 100%);
@@ -29,9 +33,20 @@
   border-radius: var(--radius-md);
   background: var(--color-canopy-glass);
   box-shadow: var(--shadow-panel);
+
+  // A row of its own only when there is a handoff, so the menu without one keeps its gaps.
+  &:has(> .handoff) {
+    grid-template-areas:
+      'header'
+      'groups'
+      'handoff'
+      'footer';
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
+  }
 }
 
 .header {
+  grid-area: header;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
@@ -62,6 +77,7 @@
 }
 
 .groups {
+  grid-area: groups;
   display: grid;
   gap: var(--space-3);
   overflow-y: auto;
@@ -149,7 +165,34 @@
   font-size: var(--font-size-xs);
 }
 
+.handoff {
+  grid-area: handoff;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-1);
+  align-items: center;
+  padding: var(--space-1);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-bark);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  text-align: start;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--color-moss);
+  }
+
+  &:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: -2px;
+  }
+}
+
 .footer {
+  grid-area: footer;
   display: grid;
   gap: var(--space-0);
   padding-top: var(--space-1);

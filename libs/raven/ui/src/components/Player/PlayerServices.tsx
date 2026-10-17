@@ -1,4 +1,6 @@
+import type { PlayerErrorReason } from '@raven/core'
 import { createContext, type ReactNode, useContext } from 'react'
+import type { IconName } from '@/components/Icon/Icon'
 import type { PlayerAction } from '@/lib/shortcuts'
 
 export type ProgressSink = {
@@ -31,11 +33,16 @@ export type PlayerTitle = {
 /** A track pick a person made by hand: an audio index and a subtitle id. */
 export type TrackChoice = { audio: number | null; subtitle: string | null }
 
+/** Another player that can take this title over, starting at a position in seconds. */
+export type Handoff = { label: string; run: (at: number) => void }
+
 export type PlayerServices = {
   title: PlayerTitle
   progress: ProgressSink
   posterUrl: string | null
-  escape: { label: string; run: () => void } | null
+  escape: { label: string; run: () => void; icon?: IconName } | null
+  /** Under Unplayable's escape. Left out: the VLC and IINA hint; null: none. */
+  escapeHint?: string | null
   /** The host owns feedback from its escape action, including clipboard failures. */
   escapeFeedback?: string | null
   hostActions?: HostActions
@@ -49,6 +56,10 @@ export type PlayerServices = {
   isVolumeFixed?: boolean
   /** Replaces Unplayable's "This video can't play in this browser." */
   unplayableNote?: string
+  /** Plays this title in another player: Unplayable's first action, and the settings menu's last. */
+  handoff?: Handoff
+  /** The native engine's error, before Unplayable shows it, for a host that can recover (a relocked library). */
+  onEngineError?: (error: { reason: PlayerErrorReason; message: string }) => void
 }
 
 const Services = createContext<PlayerServices | null>(null)

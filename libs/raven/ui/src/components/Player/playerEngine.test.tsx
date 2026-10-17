@@ -1,6 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, jest, mock, spyOn } from 'bun:test'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { act, fireEvent, render, renderHook, screen } from '@testing-library/react'
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  renderHook,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { type ReactNode, useEffect } from 'react'
 import { MemoryRouter } from 'react-router-dom'
@@ -11,6 +20,7 @@ import {
   type PlayerServices,
 } from '@/components/Player/PlayerServices'
 import { PlayerChrome } from '@/components/Player/Stage'
+import { Unplayable } from '@/components/Player/Unplayable'
 import type { EngineActions, EngineHandle } from '@/components/Player/engine'
 import type { TrackSelection } from '@/components/Player/useTrackSelection'
 import { useHtmlEngine } from '@/components/Player/useHtmlEngine'
@@ -19,6 +29,7 @@ import { useWatchProgress } from '@/components/Player/useWatchProgress'
 import type { PlayerAction } from '@/lib/shortcuts'
 import { api } from '@/test/api'
 import { renderWithProviders } from '@/test/render'
+import { usePlayerPrefs } from '@/stores/playerPrefs'
 
 const servicesFor = (): PlayerServices => ({
   title: { label: 'Local clip', duration: 120, resumeAt: 20, backTo: '/', next: null },
@@ -565,5 +576,171 @@ describe('Player shows the host note on Unplayable', () => {
   it('keeps the browser wording without a note', () => {
     failing(undefined)
     expect(screen.getByText("This video can't play in this browser.")).toBeInTheDocument()
+  })
+})
+
+describe('Player hands a title off to another player', () => {
+  const VLC_HINT =
+    'The file is served untouched, so a player that handles every format, like VLC or IINA, can open the same link.'
+
+  const failing = (services: PlayerServices) => {
+    const { container } = renderWithProviders(
+      <PlayerServicesProvider services={services}>
+        <Player engine={{ kind: 'html', source: { kind: 'file', url: 'blob:broken' } }} />
+      </PlayerServicesProvider>,
+    )
+    const video = container.querySelector('video')
+    expect(video).not.toBeNull()
+    if (video) fireEvent.error(video)
+    return { container }
+  }
+
+  const panelButtons = () =>
+    within(screen.getByRole('region', { name: 'Local clip' }))
+      .getAllByRole('button')
+      .map((button) => button.textContent)
+
+  it("offers the host's handoff first on Unplayable", async () => {
+    const run = mock((_at: number) => {})
+    const copy = mock(() => {})
+    failing({
+      ...servicesFor(),
+      handoff: { label: 'Open in raven player', run },
+      escape: { label: 'Copy file link', run: copy },
+    })
+    expect(panelButtons()).toEqual(['Back', 'Open in raven player', 'Copy file link'])
+    const handoff = screen.getByRole('button', { name: 'Open in raven player' })
+    expect(handoff).toHaveClass('primary')
+    expect(handoff.querySelector('[data-icon]')).toHaveAttribute('data-icon', 'play')
+    await userEvent.click(handoff)
+    expect(run).toHaveBeenCalledTimes(1)
+    expect(run).toHaveBeenCalledWith(20)
+    expect(copy).not.toHaveBeenCalled()
+  })
+
+  it('keeps Unplayable as it was without a handoff', () => {
+    failing({ ...servicesFor(), escape: { label: 'Copy file link', run: () => {} } })
+    expect(panelButtons()).toEqual(['Back', 'Copy file link'])
+    const copy = screen.getByRole('button', { name: 'Copy file link' })
+    expect(copy.querySelector('[data-icon]')).toHaveAttribute('data-icon', 'copy')
+    expect(screen.getByText(VLC_HINT)).toBeInTheDocument()
+    cleanup()
+
+    failing({
+      ...servicesFor(),
+      escape: { label: 'Open in browser', run: () => {}, icon: 'globe' },
+      escapeHint: null,
+    })
+    const browser = screen.getByRole('button', { name: 'Open in browser' })
+    expect(browser.querySelector('[data-icon]')).toHaveAttribute('data-icon', 'globe')
+    expect(screen.queryByText(VLC_HINT)).toBeNull()
+    cleanup()
+
+    failing({
+      ...servicesFor(),
+      escape: { label: 'Open in browser', run: () => {} },
+      escapeHint: 'The browser can play it.',
+    })
+    expect(screen.getByText('The browser can play it.')).toBeInTheDocument()
+    expect(screen.queryByText(VLC_HINT)).toBeNull()
+  })
+
+  it('writes no hint paragraph for an empty hint', () => {
+    const { container } = failing({
+      ...servicesFor(),
+      escape: { label: 'Open in browser', run: () => {} },
+      escapeHint: '',
+    })
+    expect(screen.queryByText(VLC_HINT)).toBeNull()
+    const hints = [...container.querySelectorAll('p')].filter(
+      (paragraph) => paragraph.getAttribute('aria-live') === null && paragraph.textContent === '',
+    )
+    expect(hints).toEqual([])
+  })
+
+  it('drops Try playing anyway from primary only while a handoff is offered', () => {
+    const unplayable = (services: PlayerServices) =>
+      renderWithProviders(
+        <PlayerServicesProvider services={services}>
+          <Unplayable problems={['No way to convert']} onBack={() => {}} onTryAnyway={() => {}} />
+        </PlayerServicesProvider>,
+      )
+    unplayable(servicesFor())
+    expect(screen.getByRole('button', { name: 'Try playing anyway' })).toHaveClass('primary')
+    cleanup()
+
+    unplayable({ ...servicesFor(), handoff: { label: 'Open in raven player', run: () => {} } })
+    expect(screen.getByRole('button', { name: 'Open in raven player' })).toHaveClass('primary')
+    expect(screen.getByRole('button', { name: 'Try playing anyway' })).not.toHaveClass('primary')
+  })
+})
+
+describe('PlayerChrome handoff in the settings menu', () => {
+  const chrome = ({ services, actions }: { services: PlayerServices; actions: EngineActions }) => {
+    const engine: EngineHandle = {
+      state: { ...initialVideoState(20), paused: false },
+      duration: 120,
+      position: { current: 42.7 },
+      tracks: null,
+      actions,
+      readStats: () => ({ engine: 'Test engine', viewport: null, frame: null, frames: null }),
+      focusSurface: () => {},
+      surface: <p>Engine picture</p>,
+      drawsSubtitles: true,
+    }
+    return renderWithProviders(
+      <PlayerServicesProvider services={services}>
+        <PlayerChrome
+          engine={engine}
+          onBack={() => {}}
+          mode="direct"
+          selection={selection}
+          subtitleStatus="off"
+          fullscreen={{ fullscreen: false, toggle: () => {} }}
+        />
+      </PlayerServicesProvider>,
+    )
+  }
+
+  it('offers the handoff in the settings menu, paused, at the current position', async () => {
+    const order: string[] = []
+    const actions: EngineActions = {
+      ...actionsFor(),
+      pause: mock(() => {
+        order.push('pause')
+      }),
+    }
+    const run = mock((_at: number) => {
+      order.push('run')
+    })
+    chrome({
+      services: { ...servicesFor(), handoff: { label: 'Open in raven player', run } },
+      actions,
+    })
+    await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    const menu = await screen.findByRole('dialog', { name: 'Settings' })
+    const handoff = within(menu).getByRole('button', { name: 'Open in raven player' })
+    expect(handoff.querySelector('[data-icon]')).toHaveAttribute('data-icon', 'play')
+    await userEvent.click(handoff)
+    expect(order).toEqual(['pause', 'run'])
+    expect(run).toHaveBeenCalledWith(42.7)
+    expect(screen.queryByRole('dialog', { name: 'Settings' })).toBeNull()
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Settings' })).toHaveFocus())
+  })
+
+  it('has no handoff in the settings menu without one', async () => {
+    chrome({ services: servicesFor(), actions: actionsFor() })
+    await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    const menu = await screen.findByRole('dialog', { name: 'Settings' })
+    expect(within(menu).queryByRole('button', { name: 'Open in raven player' })).toBeNull()
+  })
+})
+
+describe('player preferences', () => {
+  it('remembers whether to open videos in raven player', () => {
+    expect(usePlayerPrefs.getState().opensInRavenPlayer).toBe(false)
+    act(() => usePlayerPrefs.getState().setOpensInRavenPlayer(true))
+    expect(usePlayerPrefs.getState().opensInRavenPlayer).toBe(true)
+    expect(window.localStorage.getItem('raven-player')).toContain('"opensInRavenPlayer":true')
   })
 })

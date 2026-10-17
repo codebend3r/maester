@@ -10,10 +10,13 @@ type PlayerPrefs = {
   subtitles: { on: boolean; language: string | null }
   /** The audio language last picked by hand; null while the file's default has been fine. */
   audioLanguage: string | null
+  /** Whether this browser offers "Open in raven player"; off, since a page cannot tell the app is installed. */
+  opensInRavenPlayer: boolean
   setVolume: ({ volume, muted }: { volume: number; muted: boolean }) => void
   setCaptionScale: (captionScale: number) => void
   setSubtitles: (subtitles: { on: boolean; language: string | null }) => void
   setAudioLanguage: (audioLanguage: string | null) => void
+  setOpensInRavenPlayer: (isOn: boolean) => void
 }
 
 /** Volume, subtitles and audio language carry over from one video to the next, and across visits. */
@@ -25,20 +28,30 @@ export const usePlayerPrefs = create<PlayerPrefs>()(
       captionScale: 1,
       subtitles: { on: false, language: null },
       audioLanguage: null,
+      opensInRavenPlayer: false,
       setVolume: ({ volume, muted }) => set({ volume, muted }),
       setCaptionScale: (captionScale) => set({ captionScale }),
       setSubtitles: (subtitles) => set({ subtitles }),
       setAudioLanguage: (audioLanguage) => set({ audioLanguage }),
+      setOpensInRavenPlayer: (isOn) => set({ opensInRavenPlayer: isOn }),
     }),
     {
       name: 'raven-player',
       storage: createJSONStorage(() => window.localStorage),
-      partialize: ({ volume, muted, captionScale, subtitles, audioLanguage }) => ({
+      partialize: ({
         volume,
         muted,
         captionScale,
         subtitles,
         audioLanguage,
+        opensInRavenPlayer,
+      }) => ({
+        volume,
+        muted,
+        captionScale,
+        subtitles,
+        audioLanguage,
+        opensInRavenPlayer,
       }),
     },
   ),

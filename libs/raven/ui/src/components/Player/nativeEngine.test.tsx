@@ -266,6 +266,54 @@ describe('the native engine', () => {
     expect(screen.getByText('raven player could not play this video.')).toBeInTheDocument()
   })
 
+  it('tells the host about an engine error before Unplayable shows', async () => {
+    const fake = fakePlayer()
+    const seen: string[] = []
+    const onEngineError = mock((error: { reason: string; message: string }) => {
+      seen.push(`${error.reason}: ${error.message}`)
+      // Unplayable has not replaced the controls yet.
+      if (screen.queryByText('Locked again') === null) seen.push('before Unplayable')
+    })
+    renderNative({ player: fake.player, services: servicesFor({ onEngineError }) })
+    await settled()
+    await fake.emit({ type: 'error', reason: 'locked', message: 'Locked again' })
+    expect(onEngineError).toHaveBeenCalledTimes(1)
+    expect(onEngineError).toHaveBeenCalledWith({ reason: 'locked', message: 'Locked again' })
+    expect(seen).toEqual(['locked: Locked again', 'before Unplayable'])
+    expect(screen.getByText('Locked again')).toBeInTheDocument()
+  })
+
+  it('still shows Unplayable when the host throws on an engine error', async () => {
+    const fake = fakePlayer()
+    // Delivered by hand, so the throw is caught inside `act` and the render still flushes.
+    const listeners: ((event: PlayerEvent) => void)[] = []
+    const player: NativePlayer = {
+      ...fake.player,
+      subscribe: (listener) => {
+        listeners.push(listener)
+        return fake.player.subscribe(listener)
+      },
+    }
+    const onEngineError = mock(() => {
+      throw new Error('host failed')
+    })
+    renderNative({ player, services: servicesFor({ onEngineError }) })
+    await settled()
+    const thrown: unknown[] = []
+    act(() => {
+      listeners.forEach((listener) => {
+        try {
+          listener({ type: 'error', reason: 'open', message: 'Could not open it' })
+        } catch (error) {
+          thrown.push(error)
+        }
+      })
+    })
+    expect(thrown).toHaveLength(1)
+    expect(onEngineError).toHaveBeenCalledTimes(1)
+    expect(await screen.findByText('Could not open it')).toBeInTheDocument()
+  })
+
   it('shows Unplayable on a refused load', async () => {
     const fake = fakePlayer({ loadError: new Error('That video is no longer open.') })
     renderNative({ player: fake.player })

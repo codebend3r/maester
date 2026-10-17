@@ -1,4 +1,4 @@
-import type { MediaTracks, PlayerSource } from '@raven/core'
+import type { MediaTracks, PlayerEvent, PlayerSource } from '@raven/core'
 import { useEffect, useEffectEvent, useReducer, useRef, useState } from 'react'
 import { type EngineHandle, type NativePlayer, sendQuietly } from '@/components/Player/engine'
 import { fromPlayerEvent, rangesFrom } from '@/components/Player/fromPlayerEvent'
@@ -33,7 +33,7 @@ export const useNativeEngine = ({
   onFailure: (message: string) => void
   toggleFullscreen: () => void
 }): { engine: EngineHandle; selection: ReturnType<typeof useNativeTrackSelection> } => {
-  const { title, trackPicks, isVolumeFixed = false } = usePlayerServices()
+  const { title, trackPicks, isVolumeFixed = false, onEngineError } = usePlayerServices()
   const setVolume = usePlayerPrefs((prefs) => prefs.setVolume)
   const setCaptionScale = usePlayerPrefs((prefs) => prefs.setCaptionScale)
   const [state, dispatch] = useReducer(videoReducer, title.resumeAt, initialVideoState)
@@ -44,6 +44,12 @@ export const useNativeEngine = ({
   const selection = useNativeTrackSelection({ tracks, player })
 
   const fail = useEffectEvent(onFailure)
+  const tellHost = useEffectEvent(
+    ({ reason, message }: Extract<PlayerEvent, { type: 'error' }>) => {
+      if (onEngineError === undefined) return
+      onEngineError({ reason, message })
+    },
+  )
   const current = useEffectEvent(() => ({
     source,
     resumeAt: title.resumeAt,
@@ -62,7 +68,9 @@ export const useNativeEngine = ({
           setTracks(event.tracks)
           return
         case 'error':
+          // Unplayable first, so a host callback that throws cannot keep it away.
           fail(event.message === '' ? COULD_NOT_PLAY : event.message)
+          tellHost(event)
           return
         case 'time':
           position.current = event.time

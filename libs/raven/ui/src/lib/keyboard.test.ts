@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { isShortcut } from '@/lib/keyboard'
+import { isInForeignDialog, isShortcut } from '@/lib/keyboard'
 
 const press = ({
   key,
@@ -50,5 +50,34 @@ describe('isShortcut', () => {
     Object.defineProperty(event, 'target', { value: box })
     expect(isShortcut({ event, key: 'b' })).toBe(false)
     expect(isShortcut({ event, key: 'b', inCheckboxes: true })).toBe(true)
+  })
+})
+
+describe('isInForeignDialog', () => {
+  const build = () => {
+    const root = document.createElement('div')
+    const own = document.createElement('dialog')
+    const ownButton = document.createElement('button')
+    own.append(ownButton)
+    root.append(own)
+    const foreign = document.createElement('dialog')
+    const field = document.createElement('input')
+    foreign.append(field)
+    const outside = document.createElement('button')
+    document.body.append(root, foreign, outside)
+    return { root, ownButton, field, outside }
+  }
+
+  it('is true for a key in a dialog outside the root only', () => {
+    const { root, ownButton, field, outside } = build()
+    expect(isInForeignDialog({ target: field, root })).toBe(true)
+    expect(isInForeignDialog({ target: ownButton, root })).toBe(false)
+    expect(isInForeignDialog({ target: outside, root })).toBe(false)
+    expect(isInForeignDialog({ target: window, root })).toBe(false)
+  })
+
+  it('treats every dialog as foreign before the root has mounted', () => {
+    const { ownButton } = build()
+    expect(isInForeignDialog({ target: ownButton, root: null })).toBe(true)
   })
 })
