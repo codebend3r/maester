@@ -1,0 +1,65 @@
+// Along the foot of a phone's screen, glass over the page, clear of the
+// home indicator. Its rows, padding and hairline make the shell's
+// --tab-bar-height, the room the page leaves under itself. Over the page's
+// own layers, a card's and the selection bar's included; a dialog's top
+// layer still covers it.
+.tabs {
+  position: fixed;
+  inset: auto 0 0;
+  z-index: 5;
+  display: none;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-rows: var(--control-size-large);
+  gap: var(--space-0);
+  padding: var(--space-0) var(--space-1) calc(var(--space-0) + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--color-line);
+  background: var(--color-night-haze);
+  backdrop-filter: blur(20px);
+}
+
+@media (max-width: 48rem) {
+  .tabs {
+    display: grid;
+  }
+}
+
+// The icon over its name, marked like the side menu's current row.
+.tab {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--space-0);
+  border-radius: var(--radius-md);
+  color: var(--color-lichen);
+  font-size: var(--font-size-2xs);
+  font-weight: 600;
+  line-height: var(--line-tight);
+  text-decoration: none;
+
+  &:hover {
+    color: var(--color-bark);
+  }
+
+  &[aria-current='page'] {
+    --icon-tint: 0.4;
+
+    background: var(--color-moss);
+    color: var(--color-bark);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .tab {
+    transition:
+      background-color 150ms ease,
+      color 150ms ease;
+  }
+}
+
+.label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -16,58 +16,107 @@
 
   @media (prefers-reduced-motion: no-preference) {
     transition:
-      background-color 120ms ease-out,
-      border-color 120ms ease-out;
+      background-color 150ms ease,
+      border-color 150ms ease,
+      box-shadow 150ms ease,
+      transform 150ms ease;
+
+    &:active:not(:disabled) {
+      transform: scale(0.97);
+    }
   }
 
+  // Disabled reads as an outline with nothing in it, whatever its tone.
   &:disabled {
+    border-color: var(--color-line);
+    background: transparent;
+    color: var(--color-moss-line);
+    box-shadow: none;
     cursor: not-allowed;
-    opacity: 0.55;
+  }
+}
+
+.quiet {
+  background: var(--color-moss);
+  color: var(--color-bark);
+
+  &:hover:not(:disabled, [aria-disabled='true']) {
+    background: var(--color-moss-hi);
   }
 }
 
 .primary {
   background: var(--color-leaf);
-  color: var(--color-bark);
+  color: var(--color-on-leaf);
 
   &:hover:not(:disabled, [aria-disabled='true']) {
-    background: var(--color-leaf-bright);
-  }
-}
-
-.quiet {
-  background: transparent;
-  border-color: var(--color-moss);
-  color: var(--color-bark);
-
-  &:hover:not(:disabled, [aria-disabled='true']) {
-    background: var(--color-canopy);
+    background: var(--color-leaf-hi);
   }
 }
 
 .danger {
+  border-color: color-mix(in srgb, var(--color-leaf-bright) 60%, transparent);
   background: transparent;
-  border-color: var(--color-leaf-bright);
   color: var(--color-bark);
 
   &:hover:not(:disabled, [aria-disabled='true']) {
-    background: var(--color-leaf);
+    border-color: var(--color-leaf-bright);
+    background: color-mix(in srgb, var(--color-leaf-bright) 14%, transparent);
   }
 }
 
-// Bigger in every way, its icon with it, as the icon is sized in ems. A
-// phone has no room for it beside the page's other actions, so there it
-// keeps the regular size.
+// Glass over a backdrop, so it reads on a picture and on the bare page.
+.pill {
+  min-height: var(--field-size);
+  padding: 0 var(--space-3) 0 var(--space-2);
+  border-color: var(--color-line-strong);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-night) 60%, transparent);
+  backdrop-filter: blur(12px);
+  font-weight: 500;
+
+  &:hover:not(:disabled, [aria-disabled='true']) {
+    background: color-mix(in srgb, var(--color-bark) 10%, var(--color-night));
+  }
+}
+
+.ghost {
+  background: transparent;
+  color: var(--color-bark);
+
+  &:hover:not(:disabled, [aria-disabled='true']) {
+    background: var(--color-hover);
+  }
+}
+
+// Bigger in every way, its icon with it, as the icon is sized in ems, and
+// lifted on a glow of its own colour. A phone has no room for it beside the
+// page's other actions, so there it keeps the regular size.
 .large {
   @media not (max-width: 30rem) {
     min-height: var(--control-size-large);
     padding: var(--space-2) var(--space-5);
     gap: var(--space-2);
-    font-size: var(--font-size-lg);
+    font-size: var(--font-size-md);
+  }
+
+  &.primary {
+    box-shadow: 0 10px 26px color-mix(in srgb, var(--color-leaf) 35%, transparent);
+
+    &:hover:not(:disabled, [aria-disabled='true']) {
+      box-shadow: 0 14px 32px color-mix(in srgb, var(--color-leaf) 50%, transparent);
+    }
   }
 }
 
+// Round, as wide as it is tall.
 .iconOnly {
-  padding: var(--space-1);
   min-width: var(--control-size);
+  padding: 0;
+  border-radius: var(--radius-pill);
+
+  &.pill {
+    min-width: var(--field-size);
+    padding: 0;
+  }
 }

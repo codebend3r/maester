@@ -1,31 +1,35 @@
+// A panel on the page, or the dialog's whole body from a card's menu: the
+// title and Done over a hairline, then the files and the pictures.
 .editor {
   display: grid;
-  gap: var(--space-4);
-  padding: var(--space-4);
-  border: 1px solid var(--color-moss);
-  border-radius: var(--radius-md);
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-5);
+  padding: var(--space-4) var(--space-5) var(--space-5);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-xl);
   background: var(--color-canopy);
+
+  @media (max-width: 30rem) {
+    padding: var(--space-3) var(--space-4) var(--space-4);
+  }
 }
 
 // From a card's menu the editor is the dialog's own panel, so the dialog
-// itself has no frame.
+// itself has no frame. It lets go of the measure elements.scss caps a
+// dialog at, as the pictures want the room.
 .dialog {
   width: min(60rem, calc(100vw - 2 * var(--space-3)));
+  max-width: none;
   max-height: calc(100dvh - 2 * var(--space-3));
   padding: 0;
   border: 0;
   background: transparent;
-  color: var(--color-bark);
-
-  &::backdrop {
-    background: var(--color-scrim);
-  }
 }
 
 .waiting {
-  padding: var(--space-4);
-  border: 1px solid var(--color-moss);
-  border-radius: var(--radius-md);
+  padding: var(--space-5);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-xl);
   background: var(--color-canopy);
   color: var(--color-lichen);
 }
@@ -33,15 +37,20 @@
 .header {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'heading done';
   align-items: center;
   gap: var(--space-2);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-line);
+
+  > :last-child {
+    grid-area: done;
+  }
 }
 
 .heading {
-  font-family: var(--font-display);
+  grid-area: heading;
   font-size: var(--font-size-xl);
-  font-weight: 400;
-  line-height: var(--line-tight);
 }
 
 .group {
@@ -50,9 +59,7 @@
 }
 
 .groupHeading {
-  font-family: var(--font-display);
   font-size: var(--font-size-lg);
-  font-weight: 400;
 }
 
 .hint {
@@ -62,7 +69,15 @@
 }
 
 .error {
-  color: var(--color-leaf-bright);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-1);
+  align-items: center;
+  font-size: var(--font-size-sm);
+
+  svg {
+    color: var(--color-leaf-bright);
+  }
 }
 
 .versions {
@@ -73,7 +88,7 @@
   display: grid;
   gap: 2px;
   padding: var(--space-2) 0;
-  border-bottom: 1px solid var(--color-moss);
+  border-bottom: 1px solid var(--color-line-faint);
 }
 
 .facts {
@@ -87,6 +102,7 @@
 
 .file {
   color: var(--color-lichen);
+  font-family: var(--font-mono);
   font-size: var(--font-size-xs);
   overflow-wrap: anywhere;
 }
@@ -96,7 +112,7 @@
   grid-auto-flow: column;
   justify-content: start;
   gap: var(--space-1);
-  border-bottom: 1px solid var(--color-moss);
+  border-bottom: 1px solid var(--color-line);
 }
 
 .tab {
@@ -113,12 +129,18 @@
   font-size: var(--font-size-lg);
   cursor: pointer;
 
+  @media (prefers-reduced-motion: no-preference) {
+    transition:
+      color 150ms ease,
+      border-color 150ms ease;
+  }
+
   &:hover {
     color: var(--color-bark);
   }
 
   &:focus-visible {
-    outline: 2px solid var(--color-bark);
+    outline: var(--focus-ring);
     outline-offset: 2px;
   }
 
@@ -156,12 +178,12 @@
 
 .option {
   display: grid;
-  gap: var(--space-0);
+  gap: var(--space-1);
   width: 100%;
-  padding: var(--space-0);
-  border: 2px solid transparent;
-  border-radius: var(--radius-md);
-  background: var(--color-night);
+  padding: var(--space-1);
+  border: 2px solid var(--color-line-faint);
+  border-radius: var(--radius-lg);
+  background: var(--color-deep);
   color: var(--color-bark);
   text-align: left;
   cursor: pointer;
@@ -169,21 +191,23 @@
   img {
     display: block;
     width: 100%;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-md);
     object-fit: cover;
   }
 
   &:hover:not(:disabled) {
-    border-color: var(--color-lichen);
+    border-color: var(--color-line-strong);
   }
 
   &:focus-visible {
-    outline: 2px solid var(--color-bark);
+    outline: var(--focus-ring);
     outline-offset: 2px;
   }
 
+  // The one shown now, chosen as a choice is everywhere: bark around it.
   &[aria-pressed='true'] {
-    border-color: var(--color-leaf-bright);
+    border-color: var(--color-bark);
+    background: var(--color-moss);
     cursor: default;
   }
 
@@ -201,10 +225,12 @@
   aspect-ratio: 16 / 9;
 }
 
-// A logo keeps its own shape, held in a short band, on the night it is shown on.
+// A logo keeps its own shape, held in a short band, on the dark glass it is
+// shown on over a backdrop, whatever the theme.
 .logos .option img {
   aspect-ratio: 3 / 1;
   padding: var(--space-2);
+  background: var(--color-picture-glass);
   object-fit: contain;
 }
 
@@ -215,6 +241,8 @@
 
 @media (prefers-reduced-motion: no-preference) {
   .option {
-    transition: border-color 120ms ease;
+    transition:
+      border-color 150ms ease,
+      background-color 150ms ease;
   }
 }

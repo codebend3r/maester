@@ -1,6 +1,7 @@
 import { useMutation } from '@tanstack/react-query'
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react'
 import { Button } from '@/components/Button/Button'
+import { Icon } from '@/components/Icon/Icon'
 import styles from '@/components/UnlockDialog/UnlockDialog.module.scss'
 
 /** The words and field for each secret a server can ask for; the hints are the web's own. */
@@ -93,6 +94,7 @@ export const UnlockDialog = ({
         </div>
         {attempt.isError && (
           <p role="alert" className={styles.error}>
+            <Icon name="alert" size={16} />
             {attempt.error.message}
           </p>
         )}

@@ -1,39 +1,34 @@
 .dialog {
   width: min(44rem, calc(100vw - 2 * var(--space-3)));
+  max-width: none;
   max-height: calc(100dvh - 2 * var(--space-3));
   padding: 0;
-  border: 1px solid var(--color-moss);
-  border-radius: var(--radius-md);
-  background: var(--color-canopy);
-  color: var(--color-bark);
-
-  &::backdrop {
-    background: var(--color-scrim);
-  }
 }
 
 .body {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-3);
-  padding: var(--space-4);
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-5) var(--space-4);
+
+  @media (max-width: 30rem) {
+    padding: var(--space-4) var(--space-4) var(--space-3);
+  }
 }
 
 .header {
   display: grid;
-  gap: var(--space-0);
+  gap: var(--space-1);
 }
 
 .title {
-  font-family: var(--font-display);
   font-size: var(--font-size-xl);
-  font-weight: 400;
-  line-height: var(--line-tight);
 }
 
 .file {
   color: var(--color-lichen);
-  font-size: var(--font-size-sm);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
   overflow-wrap: anywhere;
 }
 
@@ -42,7 +37,7 @@
   grid-template-columns: minmax(0, 1fr) 6rem auto;
   grid-template-areas: 'title year submit';
   align-items: end;
-  gap: var(--space-1);
+  gap: var(--space-2);
 }
 
 .titleField {
@@ -53,28 +48,27 @@
   grid-area: year;
 }
 
+// As tall as the fields beside it.
 .submit {
   grid-area: submit;
+  min-height: var(--field-size);
 }
 
+// Fields take their look from elements.scss; on the dialog's canopy they sit
+// in a well instead, or they would vanish into it.
 .field {
   display: grid;
-  gap: var(--space-0);
-  font-size: var(--font-size-sm);
-  font-weight: 600;
+  gap: var(--space-1);
+
+  label {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+  }
 
   input {
-    min-height: 2.5rem;
-    padding: var(--space-1) var(--space-2);
-    border: 1px solid var(--color-moss);
-    border-radius: var(--radius-md);
-    background: var(--color-night);
-    font-weight: 400;
+    width: 100%;
+    background-color: var(--color-deep);
   }
-}
-
-.yearInput {
-  width: 100%;
 }
 
 @media (max-width: 30rem) {
@@ -104,14 +98,15 @@
   grid-template-columns: 3.5rem minmax(0, 1fr) auto;
   grid-template-areas: 'poster details choose';
   align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-1);
-  border-radius: var(--radius-md);
-  background: var(--color-night);
+  gap: var(--space-3);
+  padding: var(--space-2);
+  border: 1px solid var(--color-line-faint);
+  border-radius: var(--radius-lg);
+  background: var(--color-deep);
 }
 
 .best {
-  box-shadow: inset 0 0 0 1px var(--color-fern);
+  border-color: var(--color-fern);
 }
 
 .poster {
@@ -203,7 +198,9 @@
 }
 
 .name {
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-size: var(--font-size-lg);
+  line-height: var(--line-tight);
   overflow-wrap: anywhere;
 }
 
@@ -222,24 +219,41 @@
 }
 
 .error {
-  padding: var(--space-2) var(--space-3);
-  border-left: 2px solid var(--color-leaf-bright);
-  background: var(--color-night);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-1);
+  align-items: center;
   font-size: var(--font-size-sm);
+
+  svg {
+    color: var(--color-leaf-bright);
+  }
 }
 
+// Stays at the foot of the dialog as the results scroll under it: Not a
+// movie at the start, Cancel at the end.
 .actions {
+  position: sticky;
+  bottom: 0;
   display: grid;
-  grid-auto-flow: column;
-  justify-content: space-between;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: 'none . cancel';
   gap: var(--space-1);
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid var(--color-line);
+  background: var(--color-canopy);
+
+  @media (max-width: 30rem) {
+    padding: var(--space-3) var(--space-4);
+  }
 }
 
-.actionsEnd {
-  display: grid;
-  grid-auto-flow: column;
-  justify-content: end;
-  gap: var(--space-1);
+.none {
+  grid-area: none;
+}
+
+.cancel {
+  grid-area: cancel;
 }
 
 @media (max-width: 30rem) {

@@ -3,13 +3,18 @@ import { Link } from 'react-router-dom'
 import { Icon, type IconName, type IconSize } from '@/components/Icon/Icon'
 import styles from '@/components/Button/Button.module.scss'
 
-export type ButtonTone = 'primary' | 'quiet' | 'danger'
+/**
+ * `quiet`, the default, is a moss fill; `primary` is the one action a screen
+ * is for; `danger` undoes something for good; `pill` is a way back, glass over
+ * whatever is behind it; `ghost` has no fill until it is pointed at.
+ */
+export type ButtonTone = 'primary' | 'quiet' | 'danger' | 'pill' | 'ghost'
 
 /** `large` is for the one action a page is for, as Play all is on a saga's. */
 export type ButtonSize = 'regular' | 'large'
 
 /** A large button's icon is in ems, so it shrinks with the button on a phone. */
-const ICON_SIZES = { regular: 20, large: '1.3em' } as const satisfies Record<ButtonSize, IconSize>
+const ICON_SIZES = { regular: 18, large: '1.15em' } as const satisfies Record<ButtonSize, IconSize>
 
 /** A caller's className adds placement (grid area, alignment) on top of the button's own look. */
 const classes = ({
