@@ -104,7 +104,9 @@ export type ServerTarget = {
   headerFields: string
   sidecars: readonly { url: string; title: string; language: string }[]
 }
-export type LoadTarget = { kind: 'file'; path: string } | ServerTarget
+export type LocalSidecar = { path: string; title: string; language: string }
+export type FileTarget = { kind: 'file'; path: string; sidecars: readonly LocalSidecar[] }
+export type LoadTarget = FileTarget | ServerTarget
 export type ResolvedSource = { ok: true; target: LoadTarget } | { ok: false; message: string }
 export type FailureExplainer = (input: {
   target: ServerTarget
@@ -138,11 +140,14 @@ export const resolveSourceWith =
   ({
     grants,
     servers,
+    sidecarsOf,
   }: {
     grants: Pick<Grants, 'fileOf'>
     servers: {
       resolve: (source: Extract<PlayerSource, { kind: 'server' }>) => Promise<ResolvedSource>
     }
+    /** The subtitle files that belong to a granted file, keyed by its `fileId`. */
+    sidecarsOf: (fileId: string) => readonly LocalSidecar[]
   }) =>
   async (source: PlayerSource): Promise<ResolvedSource> => {
     switch (source.kind) {
@@ -151,7 +156,10 @@ export const resolveSourceWith =
       case 'file': {
         const file = grants.fileOf(source.fileId)
         if (file === null) return { ok: false, message: PLAYER_MESSAGES.notOpen }
-        return { ok: true, target: { kind: 'file', path: file.path } }
+        return {
+          ok: true,
+          target: { kind: 'file', path: file.path, sidecars: sidecarsOf(source.fileId) },
+        }
       }
       default: {
         const unreachable: never = source
@@ -232,6 +240,38 @@ const locationOf = (target: LoadTarget): string => {
     }
   }
 }
+
+type Sidecar = { location: string; title: string; language: string }
+
+/** What `sub-add` is given for each of a target's sidecars: a URL for a server, a path for a file. */
+const sidecarsOfTarget = (target: LoadTarget): readonly Sidecar[] => {
+  switch (target.kind) {
+    case 'file':
+      return target.sidecars.map(({ path, title, language }) => ({
+        location: path,
+        title,
+        language,
+      }))
+    case 'server':
+      return target.sidecars.map(({ url, title, language }) => ({
+        location: url,
+        title,
+        language,
+      }))
+    default: {
+      const unreachable: never = target
+      return unreachable
+    }
+  }
+}
+
+const subAddArgs = ({ location, title, language }: Sidecar): string[] => [
+  'sub-add',
+  location,
+  'auto',
+  title,
+  language,
+]
 
 const clamp = ({ value, min, max }: { value: number; min: number; max: number }) =>
   Math.min(max, Math.max(min, value))
@@ -584,20 +624,18 @@ export const createPlayerService = ({
     }
   }
 
-  /** Adds a server's sidecars one at a time, in order; false when overtaken. */
+  /** Adds a title's sidecars one at a time, in order; false when overtaken. */
   const addSidecars = ({
     sidecars,
     token,
   }: {
-    sidecars: ServerTarget['sidecars']
+    sidecars: readonly Sidecar[]
     token: number
   }): Promise<boolean> =>
     sidecars.reduce<Promise<boolean>>(async (chain, sidecar, position) => {
       if (!(await chain)) return false
       try {
-        await mpv.command({
-          args: ['sub-add', sidecar.url, 'auto', sidecar.title, sidecar.language],
-        })
+        await mpv.command({ args: subAddArgs(sidecar) })
       } catch (error) {
         warn(`mpv sub-add of sidecar ${position} failed: ${messageOf(error)}`)
       }
@@ -605,16 +643,18 @@ export const createPlayerService = ({
     }, Promise.resolve(true))
 
   /**
-   * Waits for a server title's sidecars, but no longer than `SIDECAR_BUDGET_MS`: a slow
-   * server must not hold the first events back. Late sidecars still go in, in order, and
+   * Waits for a title's sidecars, but no longer than `SIDECAR_BUDGET_MS`: a slow
+   * server or disk must not hold the first events back. Late sidecars still go in, in order, and
    * reach the page through `track-list`; `pending` is that chain when it outlasted the
    * budget, and `isCurrent` is false when the load was overtaken.
    */
   const sidecarsWithinBudget = async ({
     sidecars,
+    kind,
     token,
   }: {
-    sidecars: ServerTarget['sidecars']
+    sidecars: readonly Sidecar[]
+    kind: LoadTarget['kind']
     token: number
   }): Promise<{ isCurrent: boolean; pending: Promise<boolean> | null }> => {
     const budget: { handle: unknown } = { handle: null }
@@ -625,7 +665,7 @@ export const createPlayerService = ({
     try {
       const outcome = await Promise.race([adding, late])
       if (outcome !== 'late') return { isCurrent: outcome && token === epoch, pending: null }
-      warn('server sidecars are slow; the title starts without them')
+      warn(`${kind} sidecars are slow; the title starts without them`)
       return { isCurrent: token === epoch, pending: adding }
     } finally {
       timers.clear(budget.handle)
@@ -658,11 +698,11 @@ export const createPlayerService = ({
   }
 
   const snapshot = async (token: number) => {
-    const server = serverOpened()
+    const toAdd = opened === null ? [] : sidecarsOfTarget(opened)
     const sidecars =
-      server === null
+      opened === null || (opened.kind === 'file' && toAdd.length === 0)
         ? { isCurrent: true, pending: null }
-        : await sidecarsWithinBudget({ sidecars: server.sidecars, token })
+        : await sidecarsWithinBudget({ sidecars: toAdd, kind: opened.kind, token })
     if (!sidecars.isCurrent) return
     const list = await readOr({ name: 'track-list', fallback: [] })
     const fps = await readOr({ name: 'container-fps', fallback: null })
