@@ -1,6 +1,6 @@
 # raven desktop: a player-first Electron app on shared React UI and embedded mpv
 
-Status: proposed, not yet reviewed. This is the canonical desktop spec, consolidating the original 2026-10-12 desktop design and the 2026-10-14 player-first design. The first release is **raven player on macOS arm64**; library modes and other architectures follow in the same app. The companion server work remains in `2026-10-12-raven-transcoding-design.md`.
+Status: phase 1 is built through P7, the first release of raven player for macOS arm64 (`docs/superpowers/plans/2026-10-17-raven-desktop-release.md`); "P7 release outcomes" under "Spike outcomes" records where it narrowed this spec, the budgets measured, and the hardware checks still owed. Phase 2 and 3 are not started. This is the canonical desktop spec, consolidating the original 2026-10-12 desktop design and the 2026-10-14 player-first design. The first release is **raven player on macOS arm64**; library modes and other architectures follow in the same app. The companion server work remains in `2026-10-12-raven-transcoding-design.md`.
 
 The server spike and the macOS half of the native video spike ran on 2026-10-12. "Spike outcomes" records their results, including the XDR checks still owed; a spike passing does not mean the production implementation has shipped.
 
@@ -425,7 +425,7 @@ Every way in ends in the same call in the main process, `grant(path)`. It checks
 - **One session per server**, `persist:server:<serverId>`, for the same reason as the per-mode library sessions below: cookies are scoped by host, and one server's unlock must not ride along to another.
 - **The allowlist.** The renderer's `ApiClient` is `createApiClient({ fetch: bridgedFetch })`, so the player calls the same typed methods the web does. `bridgedFetch` sends `{ serverId, method, path, body }` to the main process, which runs it with `ses.fetch` only when the method and path match one of the eight calls listed in "What exploration found". Anything else is refused and logged. Replies are JSON and small, so the main process stays quiet.
 - **mpv reads the file itself:** `/api/media/:id/file` with the session's `raven_unlock` and `raven_admin` cookies as a `Cookie` header (section 5, "Sources"), with the cache forced on. Sidecar subtitles from the server's track list are added with `sub-add` against `/api/media/:id/subtitles/<trackId>`, the same way.
-- **Locked libraries:** a `403` on `getMedia` opens `UnlockDialog` for the PIN. While the server's admin lock hides locked libraries the title answers `404`, so the app asks for the admin password first, then the PIN, as Verification describes for remote mode.
+- **Locked libraries:** a `423 Locked` on `getMedia` opens `UnlockDialog` for the PIN. While the server's admin lock hides locked libraries the title answers `404`, so the app asks for the admin password first, then the PIN, as Verification describes for remote mode.
 - **Progress and history** go to the server through the same calls the web makes. Quitting waits up to 1 s for saves in flight.
 - **Fallback:** without libmpv, a server title opens at `<origin>/watch/<id>` in the default browser.
 
@@ -754,7 +754,7 @@ The mapping is a pure function in `@raven/ui` (`fromPlayerEvent`), tested on its
 ### First-release packaging and operations
 
 - **Packaging:** Electron Forge makes a dmg and a zip for arm64. libmpv and the addon sit outside the asar, every Mach-O signed (section 5, "Bundling libmpv"). No ffmpeg ships: there is no server to run it.
-- **Signing:** ad hoc for now. `forge.config.ts` wires Developer ID signing and notarization (`osxSign` and `osxNotarize` with a keychain profile) behind environment variables, off until a certificate exists. The first launch of an ad hoc build needs the "Open Anyway" step in Privacy and Security once; the release notes say how.
+- **Signing:** ad hoc for now. `forge.config.ts` wires Developer ID signing and notarization (`osxSign` and `osxNotarize` with a keychain profile) behind environment variables, off until a certificate exists. The first launch of an ad hoc build needs the "Open Anyway" step in Privacy & Security once; the release notes say how.
 - **Updates:** at launch, at most once a day, and from the menu, the app reads the latest release of `codebend3r/maester` from GitHub and compares versions. A newer one shows a quiet notice with a link to its release page. Squirrel.Mac requires a Developer ID signature, so silent updates wait for one; `updates.ts` is shaped so the notice can become an install then. The check can be switched off.
 - **Version:** the app takes the workspace's shared version, so `version-bump` covers it and About shows it.
 - **Crash reports:** `crashReporter.start({ uploadToServer: false })` keeps minidumps in `crashDumps`. A rotating log (5 files of 1 MB in `logs`) records launches, opens, the bridge's refusals, mpv's warnings and errors, and the budget marks. Help offers Show Logs, Show Crash Reports and Copy Diagnostics (app, Electron, mpv and FFmpeg versions, `hwdec` support, the display's refresh rate and EDR headroom). Nothing leaves the machine unless the user sends it.
@@ -917,13 +917,68 @@ Each implementation step is its own PR, stacked on the one before, with an imple
 
 ### Follow-ups
 
-Match the display's refresh rate to video; report the screen's colourspace from the moltenvk context; switch Windows into HDR for an HDR title; Now Playing and media keys (MPNowPlayingInfoCenter, SMTC, MPRIS); Wayland with HDR on Linux; advertise the server's canonical origin for web handoff; consider recents thumbnails. Silent updates remain gated on Developer ID signing.
+Match the display's refresh rate to video; report the screen's colourspace from the moltenvk context; switch Windows into HDR for an HDR title; Now Playing and media keys (MPNowPlayingInfoCenter, SMTC, MPRIS); Wayland with HDR on Linux; advertise the server's canonical origin for web handoff; consider recents thumbnails.
+
+Release: Developer ID signing and notarization once a certificate exists (`signingFrom` already reads `RAVEN_SIGN_IDENTITY` and `RAVEN_NOTARIZE_PROFILE`), then silent updates through Squirrel.Mac, which needs that signature. `hdiutil create`, `attach` and `detach` print a deprecation warning on macOS 27 that points to `diskutil image`; the dmg maker swaps to it when the runners reach macOS 27. The libmpv cache in CI restores nothing yet: set the `NX_CLOUD_ACCESS_TOKEN` repository secret. A fallback without Nx Cloud needs more than `NX_CACHE_DIRECTORY`: Nx 23 finds a cached task only through its database in `.nx/workspace-data`, named for the machine's hardware UUID, so a restored `.nx/cache` misses on a new runner. The fallback would cache that folder too and rename the database to the runner's UUID, or cache `fetch:libmpv`'s outputs and skip the target when they are restored. Idle memory on Home measures about 425 MB packaged and unpackaged against the 300 MB budget: find what holds it, or revisit the budget. Give the update check one stable place to read, so it no longer pages through a list GitHub sorts by tag name: either `main-smoke-test.yml` stops marking its `vX.Y.Z.N` build releases `--latest` (or makes them prereleases), so `/releases/latest` names the app's release again, or `desktop-release.yml` publishes a fixed pointer such as a `latest.json` asset on a dedicated tag. Until then, more than 5 pages of 100 between the newest release and a `v0.10.0` listed after it could still hide that release.
 
 At the next addon rebuild: move `access-references=no` into the addon's init options; fix the addon's cleanup hook, which segfaults on teardown when a player is still alive (avoided today because mpv is destroyed, or the process killed, before Node tears down); pass playlist entry ids (`start-file` and its entry id) from the addon, so the stale-event gating no longer depends on reply ordering.
 
 Real-hardware gates still owed before P5 ships: the picture under the transparent page (the window-surface smoke used an empty page), full screen, detached DevTools, and the XDR and 120 Hz measurement. If that measurement fails, ship with `target-colorspace-hint=no`, the fallback in Risks.
 
 ## Spike outcomes
+
+### P7 release outcomes, 2026-10-16
+
+P7 shipped as planned in `docs/superpowers/plans/2026-10-17-raven-desktop-release.md`. Where its Rulings change or narrow this spec:
+
+1. **Staging.** `stage:mpv` copies exactly `raven_mpv.node`, `lib/libmpv.2.dylib`, `lib/libMoltenVK.dylib` and `provenance/` from the CI build into `staging/mpv/darwin-arm64`, and Forge's `extraResource` puts them at `Contents/Resources/mpv/darwin-arm64`, outside the asar, rather than `asar.unpack`. `package` and `make` fail when any of the three Mach-O files is missing.
+2. **Inside-out signing.** The `postPackage` hook signs every Mach-O file and nested bundle ad hoc, deepest first, then the app, and never with `--deep`; it then verifies with `codesign --verify --deep --strict`.
+3. **The dmg** comes from a small Forge maker over `hdiutil` and `ditto`, not `@electron-forge/maker-dmg`, whose `appdmg` needs node-gyp addons that Bun never builds.
+4. **Release assets** have no spaces, and the sources ship with them: `raven-player-<version>-arm64.dmg`, `raven-player-<version>-arm64.zip`, `raven-player-<version>-sources.tar.gz` (every pinned upstream archive, both patches, the build scripts and the repository revision) and `SHA256SUMS`. The repository is public, so this is the source offer the Risks table asks of a public build.
+5. **The tag filter.** `desktop-release.yml` runs on `v[0-9]+.[0-9]+.[0-9]+` and `v[0-9]+.[0-9]+.[0-9]+-*` only, not `v*`, so a `vX.Y.Z.N` build tag never builds the app. It fails fast unless the tag matches the desktop's version, waits up to 10 minutes for `release.yml`'s release, uploads with `--clobber` and appends `apps/raven/desktop/release/install-notes.md` once.
+6. **The dry run** is a path-filtered `pull_request` run or a `workflow_dispatch`; neither publishes. Only a tag push runs the `publish` job.
+7. **One composite action**, `.github/actions/raven-desktop-native`, builds the native pieces for the PR checks' `🎞️ Desktop native` job and the release alike. After main's #186 it restores the libmpv source build through Nx Cloud (`@raven/mpv:fetch:libmpv` is a cached Nx target). Main's #195 dropped the `.nx/cache` fallback in `actions/cache`, which never hit: Nx 23 keeps its local cache in `~/.nx/<workspace id>/cache`, so its post step found no `.nx/cache` and saved nothing. In practice nothing is restored yet: the repository has no `NX_CLOUD_ACCESS_TOKEN` secret (the jobs log it empty). `NX_CACHE_DIRECTORY` alone would not bring a local fallback back, since Nx finds a cached task through a database named for the machine (Follow-ups). Every Desktop native job and release build compiles libmpv cold, 11 to 14 minutes on the runs of 2026-10-16, inside the release job's 150-minute timeout.
+8. **The update check reads the releases list,** `GET /repos/codebend3r/maester/releases?per_page=100`, not `/releases/latest`, which names a build release with no app. It takes the highest `vX.Y.Z` that is neither a draft nor a prerelease and carries `raven-player-<X.Y.Z>-arm64.dmg`, and builds the release page link from the tag. Nothing is downloaded. GitHub orders the list by tag name, not by date, so every `vX.Y.Z.N` build sorts above its own release and `v0.10.0` sorts below `v0.9.x`: the check follows `Link: rel="next"` for up to 5 pages, only to the same list on `api.github.com` (whose next links name the repository by id, `/repositories/1388607730/releases`), within one 2 MiB budget across pages, and stops early once it sees a newer release. It says this copy is the newest only when it saw a full release at or below the running version; when nothing it read carried the app it reports "GitHub listed no raven player release." as a problem. A running prerelease sits below its own release and above every older one, so `0.6.0-rc.1` is offered `0.6.0` and never `0.5.x`.
+9. **`desktop-config.json` is version 3,** with `updates: { isEnabled, checkedAt }`; a launch check is due when it is on and `checkedAt` is missing, a day old or in the future. The menu's check always runs.
+10. **Unpackaged, the launch check runs only with `RAVEN_DESKTOP_RELEASES_URL` set,** so `dev` and e2e never call GitHub on their own.
+11. **Logs live in `~/Library/Logs/raven`** (section 7's `logs`), pinned with `app.setAppLogsPath`: `raven.log`, then `raven.log.1` to `raven.log.4`, each at most 1,048,576 bytes, the folder `0o700` and the files `0o600`. Crash dumps go to `<userData>/Crashpad`.
+12. **What the log never holds:** cookie values, request bodies, PINs, passwords, file paths or file names. Opens are logged as `open file .mkv` or `open server title 7 on <server name>`; every line is redacted, stripped of control characters and cut at 4,096 characters, and at most 200 lines are written per 10 s, with one count of the dropped.
+13. **The budget marks are always on and always logged,** packaged too: `raven-launch-ms`, `raven-quit-ms`, `raven-open-to-frame-ms`, `raven-memory-idle-mb`, `raven-memory-playing-mb` and `raven-cpu-paused-percent`. `raven-quit-ms` runs from the first `before-quit` to `will-quit`, so it does not include the final log flush that follows.
+14. **No addon rebuild.** The three "next addon rebuild" items stay in Follow-ups; the release ships the addon and libmpv that P5 and P6 CI exercised.
+15. **Copy Diagnostics** holds six lines: the app's version and whether it is packaged, macOS, Electron, Chromium and Node, mpv and FFmpeg (or why the engine is unavailable), `hwdec=auto` with `hwdec-current`, and the display's refresh rate from Electron and from mpv with the EDR headroom. No paths, file names, server origins or names, or cookies.
+16. **The packaged smoke** launches the packaged binary with no test hook, waits for its launch, engine and launch-mark lines in the real `~/Library/Logs/raven/raven.log`, and sends `SIGTERM`, which runs `before-quit` (proved in Task 10; no fallback was needed), then expects the quit mark and an exit within 5 s.
+17. **The version** stays the workspace's: the bundle audit checks the packaged `CFBundleShortVersionString` against `package.json`, and the release workflow checks the tag.
+18. **Developer ID signing and notarization** stay wired behind `RAVEN_SIGN_IDENTITY` and `RAVEN_NOTARIZE_PROFILE`, which no workflow sets.
+19. **The update notice is quiet:** an `aside` on Home and Settings only, never on a watch route, with "See what's new" and "Dismiss". The renderer never holds the release URL.
+
+The section 4 "Locked libraries" line said a locked title answers `403`; the server answers `423 Locked`, and `404` while the admin lock hides the library. It is corrected above.
+
+**Budgets measured** on the packaged app that `make` built for Task 10 (its app code is this branch's), on the Apple M1 Max under macOS 27.0.1 (26A434) that ran the P0 spike, with an LG HDR 5K at 60 Hz and a load average near 3.5 from other work. Three direct launches of `Contents/MacOS/raven player` with no test hook, quit with `SIGTERM`, read from `~/Library/Logs/raven/raven.log`. They came soon after a build and the Task 10 smoke, not cold since login; the first ran on an empty profile.
+
+| Budget | Target | Measured | Notes |
+| --- | --- | --- | --- |
+| Launch, cold | 800 ms | owed | No launch was cold since login. The first launch on an empty profile marked `raven-launch-ms 224`; Task 10's smoke marked 226 |
+| Launch, warm | 400 ms | 205 and 221 ms | The second and third launches |
+| Memory, idle on Home | 300 MB | 424 MB, over | `raven-memory-idle-mb 424` after 60 s on an empty Home. Unpackaged it measured about 428 MB in Task 3. The budget is not met; see Follow-ups |
+| Quit | under 1 s, no process left | 123, 151 and 104 ms | `raven-quit-ms`, which excludes the final log flush; each run exited within 1 s of `SIGTERM` and `pgrep -f "raven player"` found nothing. Task 10's smoke marked 104 |
+| Finder Open With to first frame of M1, cold | 1.5 s | owed | `raven-open-to-frame-ms`, needs a person: "Testing for the PR" |
+| CPU while paused | under 2% | owed | `raven-cpu-paused-percent` after playing M1 and pausing 60 s, needs a person: "Testing for the PR" |
+| Memory, playing M2 for 10 minutes | 700 MB plus the demuxer cache | owed | `raven-memory-playing-mb`, "Testing for the PR" |
+| XDR: EDR highlights, 0 drops in 10 minutes at 120 Hz | Verification | owed | No XDR display at hand, "Testing for the PR" |
+
+The raw marks:
+
+```
+2026-10-16T22:19:28.780Z info raven-launch-ms 224
+2026-10-16T22:19:28.968Z info raven-quit-ms 123
+2026-10-16T22:19:36.709Z info raven-launch-ms 205
+2026-10-16T22:19:36.891Z info raven-quit-ms 151
+2026-10-16T22:19:42.510Z info raven-launch-ms 221
+2026-10-16T22:20:42.436Z info raven-memory-idle-mb 424
+2026-10-16T22:20:42.598Z info raven-quit-ms 104
+```
+
+The hardware gates in the plan's "Testing for the PR" remain owed to a person: Gatekeeper on a downloaded build, Finder Open With, double-click and Dock drop, Safari and Chrome `raven://` clicks, the XDR display, the budgets above marked owed, Help and updates by hand, and the app without its engine.
 
 ### P0 player integration feasibility, 2026-10-15: conditional pass
 

@@ -68,8 +68,11 @@ component on that disposable runner only. No local system installation is implie
 `fetch:libmpv` is a cached Nx target (about 7 minutes cold), keyed on the source lock, the
 patches, the build scripts in `src/build/`, node-addon-api's version and the Xcode version. The
 addon's sources and build, the audit, the tests and the package version stay out of the key: the
-audit only accepts or rejects what the build made, and `build:native` reruns it. CI sets `NX_CLOUD_ACCESS_TOKEN` from a repository secret so
-Nx Cloud serves it to every later run; with no token it caches in `.nx/cache` only.
+audit only accepts or rejects what the build made, and `build:native` reruns it. CI passes
+`NX_CLOUD_ACCESS_TOKEN` from a repository secret, so once that secret exists Nx Cloud serves the
+build to every later run with the same inputs. Until then nothing carries it from one run to the
+next: Nx 23 keeps its local cache under `~/.nx/<workspace id>/cache` and finds an entry only
+through a database named for the machine, so each fresh runner builds libmpv from source.
 Homebrew may provide build tools, never the shipped runtime dependencies.
 Both MoltenVK Xcode stages keep separate derived-data directories under
 `native-build/xcode-derived-data`, outside the upstream packaging cleanup of

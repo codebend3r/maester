@@ -31,7 +31,10 @@
     "install:electron": "install-electron",
     "stage:mpv": "bun src/build/stageMpv.ts",
     "package": "electron-forge package",
-    "make": "electron-forge make"
+    "make": "electron-forge make",
+    "audit:bundle": "bun src/build/auditBundle.ts",
+    "smoke:packaged": "bun src/build/smokePackaged.ts",
+    "release:assets": "bun src/build/releaseAssets.ts"
   },
   "dependencies": {
     "@fontsource-variable/instrument-sans": "5.3.0",
@@ -105,7 +108,10 @@
       "install:electron",
       "stage:mpv",
       "package",
-      "make"
+      "make",
+      "audit:bundle",
+      "smoke:packaged",
+      "release:assets"
     ],
     "targets": {
       "dev": {
@@ -185,6 +191,15 @@
         "outputs": [
           "{projectRoot}/out"
         ]
+      },
+      "audit:bundle": {
+        "cache": false
+      },
+      "smoke:packaged": {
+        "cache": false
+      },
+      "release:assets": {
+        "cache": false
       }
     }
   },

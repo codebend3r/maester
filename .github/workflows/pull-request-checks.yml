@@ -85,8 +85,8 @@ jobs:
       - name: ${{ matrix.check.name }}
         run: ${{ matrix.check.run }}
 
-  # The desktop jobs run side by side: packaging needs only the bundled app, and the two
-  # playback checks share one native build, handed over as an artifact.
+  # One native build feeds the other desktop jobs, handed over as an artifact: the app
+  # job packages its addon and dylibs, and the two playback checks load them side by side.
   desktop-native:
     name: 🎞️ Desktop native
     # Standard macos-26 is arm64; macos-26-intel is explicitly not supported.
@@ -101,32 +101,10 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: 🍞 Set up Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version-file: package.json
-
-      - name: 🛠️ Prepare disposable native toolchain
-        run: |
-          test "$(uname -m)" = arm64
-          xcodebuild -version
-          if ! xcrun metal --version; then
-            xcodebuild -downloadComponent MetalToolchain
-          fi
-          xcrun metal --version
-          brew install cmake ninja meson pkgconf
-
-      - name: 📦 Install
-        run: bun install --frozen-lockfile
-
-      # fetch:libmpv is an Nx cached task, so Nx Cloud restores the source build for any
-      # run with the same inputs. With no token (a fork's PR) it builds cold: Nx 23 ties
-      # .nx/cache to a per-machine database, so restoring it on a fresh runner never hits.
-      - name: 🎞️ Build self-contained libmpv and MoltenVK from source
-        run: bunx nx run @raven/mpv:fetch:libmpv
-
-      - name: 🔩 Build N-API addon
-        run: bunx nx run @raven/mpv:build:native
+      # Bun, the toolchain, the install, the cached libmpv build and the addon, shared
+      # with desktop-release.yml so a release builds as this does.
+      - name: 🔩 Build the native pieces
+        uses: ./.github/actions/raven-desktop-native
 
       # Both only read the built resources, so Nx runs them at once. test:native is
       # cached, keyed on the native sources, the build recipe and the Xcode version.
@@ -147,8 +125,9 @@ jobs:
           path: libs/raven/mpv/native-build/source-bundle
           if-no-files-found: error
 
-      # What the playback jobs load: the addon and its dylibs, and the source-built ffmpeg
-      # that makes their clips. A tar keeps ffmpeg's execute bit, which an artifact drops.
+      # What the app and playback jobs load: the addon and its dylibs, and the source-built
+      # ffmpeg that makes the playback clips. A tar keeps ffmpeg's execute bit, which an
+      # artifact drops.
       - name: 📦 Pack the playback handoff
         run: >-
           tar -cf "$RUNNER_TEMP/raven-native-handoff.tar"
@@ -165,11 +144,15 @@ jobs:
           # A re-run of this job replaces the handoff its first attempt left.
           overwrite: true
 
-  # Forge packages only the bundled app, never libmpv, so this starts at once.
+  # Forge bundles the addon and libmpv (stage:mpv), so this waits for the native build.
   desktop-app:
     name: 📦 Desktop app
+    needs: desktop-native
     runs-on: macos-26
     timeout-minutes: 30
+    env:
+      # Keeps the Xcode version the cached app is keyed on the same as the native job's.
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
     steps:
       - name: 📥 Checkout exact PR head
         uses: actions/checkout@v7
@@ -184,15 +167,30 @@ jobs:
       - name: 📦 Install
         run: bun install --frozen-lockfile
 
+      - name: 📥 Native handoff
+        uses: actions/download-artifact@v8
+        with:
+          name: raven-native-handoff-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}
+
+      - name: 📂 Unpack the native handoff
+        run: tar -xf "$RUNNER_TEMP/raven-native-handoff.tar"
+
       # Vite's log carries the renderer's gzip sizes, for the 250 KB budget. Nx replays it
       # on a cache hit.
       - name: 🏗️ Build desktop app
         run: bunx nx run @raven/desktop:build
 
-      # Cached on the app's sources and the signing environment, so an unchanged app
-      # restores from Nx Cloud.
+      # Cached on the app's and the native sources, the Xcode version and the signing
+      # environment, so an unchanged app restores from Nx Cloud.
       - name: 📦 Make the unsigned app
         run: bunx nx run @raven/desktop:make
+
+      - name: 🔎 Audit the packaged bundle
+        run: bunx nx run @raven/desktop:audit:bundle
+
+      - name: 🚬 Smoke the packaged app
+        run: bunx nx run @raven/desktop:smoke:packaged
 
       - name: 📤 Unsigned raven player
         uses: actions/upload-artifact@v7
