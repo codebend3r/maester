@@ -45,6 +45,8 @@ export const preflightHeaders = ({
 
 const withOrigin = (existing: string | number | string[] | undefined): string => {
   const current = Array.isArray(existing) ? existing.join(', ') : String(existing ?? '')
+  const names = current.split(',').map((name) => name.trim().toLowerCase())
+  if (names.includes('origin')) return current
   return current === '' ? 'Origin' : `${current}, Origin`
 }
 

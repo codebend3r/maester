@@ -25,7 +25,16 @@ const SIX_HOURS = 21_600_000
 
 const NETLIFY = 'https://raven-player.netlify.app'
 
-const SIDECAR = ['1', '00:00:00,200 --> 00:00:01,000', 'Hello', ''].join('\n')
+// Long enough to pass @fastify/compress's threshold, so a browser gets it packed.
+const SIDECAR = Array.from({ length: 80 }, (_, index) => {
+  const second = String(index).padStart(2, '0')
+  return [
+    String(index + 1),
+    `00:00:${second},200 --> 00:00:${second},900`,
+    index === 0 ? 'Hello' : `Line number ${index + 1} of a long subtitle track`,
+    '',
+  ].join('\n')
+}).join('\n')
 
 const EXPOSED = 'content-length, content-range, accept-ranges'
 
@@ -370,15 +379,31 @@ describe('the media plane routes', () => {
       })
     })
 
-    it('adds Origin to a vary the response already has', async () => {
+    it('merges Origin into the vary that compression sets, once', async () => {
       const ticket = await ticketFor(locked())
       const response = await asBrowser({
         url: `/api/media/${locked()}/subtitles/external-0?t=${ticket}`,
-        headers: { 'accept-encoding': 'gzip' },
+        headers: { 'accept-encoding': 'br' },
       })
-      const vary = String(response.headers.vary).split(/,\s*/)
-      expect(vary).toContain('Origin')
-      expect(vary.filter((name) => name === 'Origin')).toHaveLength(1)
+      expect(response.statusCode).toBe(200)
+      expect(response.headers['content-encoding']).toBe('br')
+      const vary = String(response.headers.vary)
+        .split(',')
+        .map((name) => name.trim().toLowerCase())
+      expect(vary).toContain('accept-encoding')
+      expect(vary.filter((name) => name === 'origin')).toHaveLength(1)
+    })
+
+    it('carries the CORS headers on a HEAD for the file', async () => {
+      const ticket = await ticketFor(locked())
+      const response = await on().app.inject({
+        method: 'HEAD',
+        url: `/api/media/${locked()}/file?t=${ticket}`,
+        headers: { origin: NETLIFY },
+      })
+      expect(response.statusCode).toBe(200)
+      expect(response.headers['access-control-allow-origin']).toBe(NETLIFY)
+      expect(response.headers['access-control-expose-headers']).toBe(EXPOSED)
     })
 
     it('refuses the stream with a ticket for another video, an expired one and a tampered one (423)', async () => {

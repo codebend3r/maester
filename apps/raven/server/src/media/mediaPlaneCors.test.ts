@@ -1,9 +1,11 @@
+import Fastify from 'fastify'
 import { describe, expect, it } from 'vitest'
 import { CONTROLLERS } from '@/appModule'
 import {
   mediaPlanePaths,
   pathMatcher,
   preflightHeaders,
+  registerMediaPlaneCors,
   responseHeaders,
 } from '@/media/mediaPlaneCors'
 
@@ -76,5 +78,42 @@ describe('mediaPlanePaths', () => {
       '/api/media/:id/stream',
       '/api/media/:id/subtitles/:trackId',
     ])
+  })
+})
+
+describe('registerMediaPlaneCors', () => {
+  /** A route whose vary is already set when the hook runs, as compression or a controller would leave it. */
+  const varyOf = async (
+    existing: string | null,
+  ): Promise<string | number | string[] | undefined> => {
+    const fastify = Fastify()
+    fastify.addHook('onRequest', async (_request, reply) => {
+      if (existing !== null) reply.header('vary', existing)
+    })
+    registerMediaPlaneCors({
+      fastify,
+      isMediaPlanePath: pathMatcher(['/api/media/:id/file']),
+      isAllowedOrigin: (origin) => origin === ORIGIN,
+    })
+    fastify.get('/api/media/:id/file', async () => 'bytes')
+    const response = await fastify.inject({
+      method: 'GET',
+      url: '/api/media/1/file',
+      headers: { origin: ORIGIN },
+    })
+    await fastify.close()
+    return response.headers.vary
+  }
+
+  it('sets vary to Origin when the reply has none', async () => {
+    expect(await varyOf(null)).toBe('Origin')
+  })
+
+  it('appends Origin to a vary the reply already has', async () => {
+    expect(await varyOf('accept-encoding')).toBe('accept-encoding, Origin')
+  })
+
+  it('does not list Origin twice', async () => {
+    expect(await varyOf('Accept-Encoding, origin')).toBe('Accept-Encoding, origin')
   })
 })
