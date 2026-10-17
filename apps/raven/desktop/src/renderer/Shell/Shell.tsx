@@ -42,7 +42,12 @@ export const Shell = () => {
   const [notice, setNotice] = useState<{ message: string } | null>(null)
   const showNotice = useCallback((message: string) => setNotice({ message }), [])
   const [isOpenLinkShown, setIsOpenLinkShown] = useState(false)
-  const [ask, setAsk] = useState<DownloadAsk | null>(null)
+  // `instance` counts the asks shown, so an ask main sends again opens a dialog of its own.
+  const [shown, setShown] = useState<{ ask: DownloadAsk; instance: number } | null>(null)
+  const showDownloadAsk = useCallback(
+    (ask: DownloadAsk) => setShown((last) => ({ ask, instance: (last?.instance ?? 0) + 1 })),
+    [],
+  )
   // The newer version main announced, until See what's new or Dismiss; kept for the session only.
   const [update, setUpdate] = useState<string | null>(null)
   const queryClient = useQueryClient()
@@ -60,7 +65,7 @@ export const Shell = () => {
   }, [])
 
   const openReply = (reply: DesktopReply) =>
-    applyReply({ reply, navigate, pathname, showNotice, showDownloadAsk: setAsk })
+    applyReply({ reply, navigate, pathname, showNotice, showDownloadAsk })
   const isDragging = useFileDrop({ client, onReply: openReply })
 
   const onEvent = useEffectEvent((event: DesktopEvent) => {
@@ -82,7 +87,7 @@ export const Shell = () => {
         // Settings reads main's status again, so an open Updates section shows the release too.
         return void queryClient.invalidateQueries({ queryKey: UPDATES_KEY })
       case 'downloadAsk':
-        return setAsk(event.ask)
+        return showDownloadAsk(event.ask)
       case 'downloads':
         return void applyDownloadsEvent({ queryClient, event })
       default: {
@@ -132,7 +137,7 @@ export const Shell = () => {
   return (
     <DraggingContext.Provider value={isDragging}>
       <NoticeContext.Provider value={showNotice}>
-        <DownloadAskContext.Provider value={setAsk}>
+        <DownloadAskContext.Provider value={showDownloadAsk}>
           <HideUpdateProvider value={hideUpdate}>
             <div className={styles.shell}>
               <div ref={page} className={styles.page}>
@@ -145,13 +150,8 @@ export const Shell = () => {
               )}
             </div>
             {isOpenLinkShown && <OpenLinkDialog onClose={() => setIsOpenLinkShown(false)} />}
-            {ask !== null && (
-              // A new ask, or the same one once unlocked, opens a dialog of its own.
-              <DownloadDialog
-                key={`${ask.askId}:${ask.status.kind}`}
-                ask={ask}
-                onClose={() => setAsk(null)}
-              />
+            {shown !== null && (
+              <DownloadDialog key={shown.instance} ask={shown.ask} onClose={() => setShown(null)} />
             )}
             {/* Always mounted: a live region is announced when its text changes, not when it appears. */}
             <output className={styles.notices}>
