@@ -10,7 +10,7 @@ describe('MediaTiles', () => {
   afterEach(restorePixelRatio)
 
   it('shows each video with its facts and the folder it sits in', () => {
-    renderWithProviders(<MediaTiles items={[mediaItem({ folder: 'Comedy/2026' })]} />)
+    renderWithProviders({ ui: <MediaTiles items={[mediaItem({ folder: 'Comedy/2026' })]} /> })
     const tile = screen.getByRole('listitem')
     expect(within(tile).getByRole('link', { name: 'Busboys (2026)' })).toHaveAttribute(
       'href',
@@ -24,7 +24,9 @@ describe('MediaTiles', () => {
   })
 
   it("gives a Movies library's tile a poster no wider than its small column needs", () => {
-    const { container } = renderWithProviders(<MediaTiles items={[matchedMovie()]} posters />)
+    const { container } = renderWithProviders({
+      ui: <MediaTiles items={[matchedMovie()]} posters />,
+    })
     const poster = container.querySelector('img')
     expect(poster).toHaveAttribute('src', '/api/items/40/images/poster?v=p1')
     expect(poster?.getAttribute('srcset')).toContain('/api/items/40/images/poster?v=p1&w=185 185w')
@@ -33,33 +35,37 @@ describe('MediaTiles', () => {
 
   it('keeps the widths at 3x, where a tile poster 56 px wide needs no more than 185', () => {
     atPixelRatio(3)
-    const { container } = renderWithProviders(<MediaTiles items={[matchedMovie()]} posters />)
+    const { container } = renderWithProviders({
+      ui: <MediaTiles items={[matchedMovie()]} posters />,
+    })
     expect(container.querySelector('img')).toHaveAttribute('sizes', POSTER_SIZES.movieTile)
   })
 
   it('shows the check for a watched video and not for another', () => {
-    renderWithProviders(<MediaTiles items={[mediaItem({ watched: true })]} />)
+    renderWithProviders({ ui: <MediaTiles items={[mediaItem({ watched: true })]} /> })
     expect(screen.getByText('Watched')).toBeInTheDocument()
     cleanup()
-    renderWithProviders(<MediaTiles items={[mediaItem()]} />)
+    renderWithProviders({ ui: <MediaTiles items={[mediaItem()]} /> })
     expect(screen.queryByText('Watched')).toBeNull()
   })
 
   it('shows the check with the resume bar for a rewatch, on a poster tile too', () => {
     const rewatch = matchedMovie({ watched: true, position: 30, duration: 120 })
-    const { container } = renderWithProviders(<MediaTiles items={[rewatch]} posters />)
+    const { container } = renderWithProviders({ ui: <MediaTiles items={[rewatch]} posters /> })
     expect(screen.getByText('Watched')).toBeInTheDocument()
     expect(container.querySelector('[style]')).toHaveStyle({ width: '25%' })
   })
 
   it('leaves the check off the history, whose notes say what was watched', () => {
-    renderWithProviders(
-      <MediaTiles
-        items={[mediaItem({ watched: true })]}
-        note={() => '100% watched'}
-        withWatched={false}
-      />,
-    )
+    renderWithProviders({
+      ui: (
+        <MediaTiles
+          items={[mediaItem({ watched: true })]}
+          note={() => '100% watched'}
+          withWatched={false}
+        />
+      ),
+    })
     expect(screen.queryByText('Watched')).toBeNull()
   })
 })

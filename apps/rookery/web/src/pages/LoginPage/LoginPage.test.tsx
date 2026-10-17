@@ -10,12 +10,17 @@ const json = (body: unknown, status = 200) =>
 
 describe('LoginPage', () => {
   it.each(Object.entries(ERROR_MESSAGES))('explains error=%s', (code, message) => {
-    renderAt(<LoginPage />, { route: `/?error=${code}` })
+    renderAt({ ui: <LoginPage />, route: `/?error=${code}` })
     expect(screen.getByRole('alert')).toHaveTextContent(message)
   })
 
+  it('reads an error code it does not know as unreachable', () => {
+    renderAt({ ui: <LoginPage />, route: '/?error=made_up' })
+    expect(screen.getByRole('alert')).toHaveTextContent(ERROR_MESSAGES[AUTH_ERRORS.unreachable])
+  })
+
   it('shows no message on a fresh visit', () => {
-    renderAt(<LoginPage />)
+    renderAt({ ui: <LoginPage /> })
     expect(screen.queryByRole('alert')).toBeNull()
   })
 
@@ -24,7 +29,7 @@ describe('LoginPage', () => {
       json({ auth_url: 'https://app.plex.tv/auth#?code=abc' }),
     )
     const goTo = spyOn(browser, 'goTo').mockImplementation(() => {})
-    renderAt(<LoginPage />, { route: '/?return_to=https%3A%2F%2Fluwin.example.com%2F' })
+    renderAt({ ui: <LoginPage />, route: '/?return_to=https%3A%2F%2Fluwin.example.com%2F' })
 
     await userEvent.click(screen.getByRole('button', { name: 'Sign in with Plex' }))
 
@@ -39,11 +44,13 @@ describe('LoginPage', () => {
   it('says so when Plex is down, and lets the friend try again', async () => {
     spyOn(globalThis, 'fetch').mockResolvedValue(json({ reason: 'plex_unavailable' }, 503))
     const goTo = spyOn(browser, 'goTo').mockImplementation(() => {})
-    renderAt(<LoginPage />)
+    renderAt({ ui: <LoginPage /> })
 
     await userEvent.click(screen.getByRole('button', { name: 'Sign in with Plex' }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(ERROR_MESSAGES.plex_unavailable)
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      ERROR_MESSAGES[AUTH_ERRORS.plexUnavailable],
+    )
     expect(screen.getByRole('button', { name: 'Sign in with Plex' })).toBeEnabled()
     expect(goTo).not.toHaveBeenCalled()
   })

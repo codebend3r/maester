@@ -511,10 +511,13 @@ describe('isPlayerState', () => {
           duration: null,
           at: 1,
         }),
-        { path: '/a', audio: null, subtitle: null, at: 1 },
-      ),
-      { bounds: { x: 0, y: 0, width: 1, height: 1, displayId: 1 } },
-    )
+        path: '/a',
+        audio: null,
+        subtitle: null,
+        at: 1,
+      }),
+      bounds: { x: 0, y: 0, width: 1, height: 1, displayId: 1 },
+    })
     expect(isPlayerState(JSON.parse(JSON.stringify(state)))).toBe(true)
   })
 

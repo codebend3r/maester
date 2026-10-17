@@ -17,12 +17,14 @@ describe('PosterCard', () => {
   const shownBehind = () => usePageBackdrop.getState().current
 
   it("lays its movie's backdrop behind the page while pointed at, and puts it away after", async () => {
-    const { container } = renderWithProviders(
-      <PosterCard
-        sizes={POSTER_SIZES.grid}
-        media={matchedMovie({ item: itemSummary({ backdropVersion: 'b9' }) })}
-      />,
-    )
+    const { container } = renderWithProviders({
+      ui: (
+        <PosterCard
+          sizes={POSTER_SIZES.grid}
+          media={matchedMovie({ item: itemSummary({ backdropVersion: 'b9' }) })}
+        />
+      ),
+    })
     const card = container.querySelector('li') ?? document.body
     fireEvent.pointerEnter(card, { pointerType: 'mouse' })
     await waitFor(() => expect(shownBehind()).toBe('/api/items/40/images/backdrop?v=b9'))
@@ -32,41 +34,47 @@ describe('PosterCard', () => {
   })
 
   it('shows the backdrop as soon as the card is focused', () => {
-    renderWithProviders(
-      <PosterCard
-        sizes={POSTER_SIZES.grid}
-        media={matchedMovie({ item: itemSummary({ backdropVersion: 'b9' }) })}
-      />,
-    )
+    renderWithProviders({
+      ui: (
+        <PosterCard
+          sizes={POSTER_SIZES.grid}
+          media={matchedMovie({ item: itemSummary({ backdropVersion: 'b9' }) })}
+        />
+      ),
+    })
     fireEvent.focus(screen.getByRole('link', { name: 'Busboys' }))
     expect(shownBehind()).toBe('/api/items/40/images/backdrop?v=b9')
   })
 
   it('leaves the page alone for a touch, and for a movie with no backdrop', async () => {
-    const { container } = renderWithProviders(
-      <PosterCard
-        sizes={POSTER_SIZES.grid}
-        media={matchedMovie({ item: itemSummary({ backdropVersion: 'b9' }) })}
-      />,
-    )
+    const { container } = renderWithProviders({
+      ui: (
+        <PosterCard
+          sizes={POSTER_SIZES.grid}
+          media={matchedMovie({ item: itemSummary({ backdropVersion: 'b9' }) })}
+        />
+      ),
+    })
     fireEvent.pointerEnter(container.querySelector('li') ?? document.body, {
       pointerType: 'touch',
     })
-    renderWithProviders(<PosterCard sizes={POSTER_SIZES.grid} media={matchedMovie({ id: 8 })} />)
+    renderWithProviders({
+      ui: <PosterCard sizes={POSTER_SIZES.grid} media={matchedMovie({ id: 8 })} />,
+    })
     fireEvent.focus(screen.getAllByRole('link', { name: 'Busboys' })[1] ?? document.body)
     await new Promise((resolve) => setTimeout(resolve, 200))
     expect(shownBehind()).toBeNull()
   })
 
   it('shows the value its listing is sorted by', () => {
-    renderWithProviders(
-      <PosterCard sizes={POSTER_SIZES.grid} media={matchedMovie()} sort="bitrate-high" />,
-    )
+    renderWithProviders({
+      ui: <PosterCard sizes={POSTER_SIZES.grid} media={matchedMovie()} sort="bitrate-high" />,
+    })
     expect(screen.getByText('2.2 Mb/s')).toBeInTheDocument()
   })
 
   it("opens a matched movie's page, plays from its button, and shows the year", () => {
-    renderWithProviders(<PosterCard sizes={POSTER_SIZES.grid} media={matchedMovie()} />)
+    renderWithProviders({ ui: <PosterCard sizes={POSTER_SIZES.grid} media={matchedMovie()} /> })
     expect(screen.getByRole('link', { name: 'Busboys' })).toHaveAttribute(
       'href',
       '/movies/40?library=2',
@@ -77,9 +85,9 @@ describe('PosterCard', () => {
   })
 
   it('offers its poster at each width, so the browser fetches the narrowest its grid needs', () => {
-    const { container } = renderWithProviders(
-      <PosterCard sizes={POSTER_SIZES.grid} media={matchedMovie()} />,
-    )
+    const { container } = renderWithProviders({
+      ui: <PosterCard sizes={POSTER_SIZES.grid} media={matchedMovie()} />,
+    })
     expect(picture(container)).toHaveAttribute(
       'srcset',
       [
@@ -96,7 +104,7 @@ describe('PosterCard', () => {
     const at = (ratio: number) => {
       atPixelRatio(ratio)
       return picture(
-        renderWithProviders(<PosterCard sizes={POSTER_SIZES.grid} media={matchedMovie()} />)
+        renderWithProviders({ ui: <PosterCard sizes={POSTER_SIZES.grid} media={matchedMovie()} /> })
           .container,
       )
     }
@@ -111,9 +119,9 @@ describe('PosterCard', () => {
   })
 
   it('falls back from the poster to the frame grab, then to a letter', () => {
-    const { container } = renderWithProviders(
-      <PosterCard sizes={POSTER_SIZES.grid} media={matchedMovie()} />,
-    )
+    const { container } = renderWithProviders({
+      ui: <PosterCard sizes={POSTER_SIZES.grid} media={matchedMovie()} />,
+    })
     expect(picture(container)).toHaveAttribute('src', '/api/items/40/images/poster?v=p1')
     fireEvent.error(picture(container) ?? document.body)
     expect(picture(container)).toHaveAttribute('src', '/api/media/7/thumbnail?v=1')
@@ -125,60 +133,66 @@ describe('PosterCard', () => {
   })
 
   it('uses the frame grab straight away when there is no poster', () => {
-    const { container } = renderWithProviders(
-      <PosterCard
-        sizes={POSTER_SIZES.grid}
-        media={matchedMovie({ item: itemSummary({ posterVersion: null }) })}
-      />,
-    )
+    const { container } = renderWithProviders({
+      ui: (
+        <PosterCard
+          sizes={POSTER_SIZES.grid}
+          media={matchedMovie({ item: itemSummary({ posterVersion: null }) })}
+        />
+      ),
+    })
     expect(picture(container)).toHaveAttribute('src', '/api/media/7/thumbnail?v=1')
   })
 
   it('says how many versions there are', () => {
-    renderWithProviders(
-      <PosterCard sizes={POSTER_SIZES.grid} media={matchedMovie({ versions: 2 })} />,
-    )
+    renderWithProviders({
+      ui: <PosterCard sizes={POSTER_SIZES.grid} media={matchedMovie({ versions: 2 })} />,
+    })
     expect(screen.getByText('2 versions')).toBeInTheDocument()
   })
 
   it('opens the player for an unmatched file and says it is not matched', () => {
-    renderWithProviders(
-      <PosterCard
-        sizes={POSTER_SIZES.grid}
-        media={mediaItem({ title: 'Home Movie', year: 2019, match: 'unmatched' })}
-      />,
-    )
+    renderWithProviders({
+      ui: (
+        <PosterCard
+          sizes={POSTER_SIZES.grid}
+          media={mediaItem({ title: 'Home Movie', year: 2019, match: 'unmatched' })}
+        />
+      ),
+    })
     expect(screen.getByRole('link', { name: 'Home Movie' })).toHaveAttribute('href', '/watch/7')
     expect(screen.queryByRole('link', { name: /^Play/ })).toBeNull()
     expect(screen.getByText('Not matched')).toBeInTheDocument()
   })
 
   it('shows the check for a watched video and not for another', () => {
-    renderWithProviders(
-      <PosterCard sizes={POSTER_SIZES.grid} media={matchedMovie({ watched: true })} />,
-    )
+    renderWithProviders({
+      ui: <PosterCard sizes={POSTER_SIZES.grid} media={matchedMovie({ watched: true })} />,
+    })
     expect(screen.getByText('Watched')).toBeInTheDocument()
     cleanup()
-    renderWithProviders(<PosterCard sizes={POSTER_SIZES.grid} media={matchedMovie()} />)
+    renderWithProviders({ ui: <PosterCard sizes={POSTER_SIZES.grid} media={matchedMovie()} /> })
     expect(screen.queryByText('Watched')).toBeNull()
   })
 
   it('draws the heart over the poster and says Favourite once, beside its facts', () => {
-    const { container } = renderWithProviders(
-      <PosterCard sizes={POSTER_SIZES.grid} media={matchedMovie({ favourite: true })} />,
-    )
+    const { container } = renderWithProviders({
+      ui: <PosterCard sizes={POSTER_SIZES.grid} media={matchedMovie({ favourite: true })} />,
+    })
     expect(screen.getAllByText('Favourite')).toHaveLength(1)
     const poster = container.querySelector('a[aria-hidden="true"]')
     expect(poster?.querySelector('svg')).not.toBeNull()
   })
 
   it('shows the check with the resume bar for a rewatch', () => {
-    const { container } = renderWithProviders(
-      <PosterCard
-        sizes={POSTER_SIZES.grid}
-        media={matchedMovie({ watched: true, position: 30, duration: 120 })}
-      />,
-    )
+    const { container } = renderWithProviders({
+      ui: (
+        <PosterCard
+          sizes={POSTER_SIZES.grid}
+          media={matchedMovie({ watched: true, position: 30, duration: 120 })}
+        />
+      ),
+    })
     expect(screen.getByText('Watched')).toBeInTheDocument()
     expect(container.querySelector('[style]')).toHaveStyle({ width: '25%' })
   })

@@ -35,7 +35,7 @@ export const createOpenBatch = <T>({
       if (held.length < BATCH_CAP) held = [...held, item]
       if (!isReady) return
       if (timer !== undefined) timers.clear(timer)
-      timer = timers.set(release, delayMs)
+      timer = timers.set({ run: release, ms: delayMs })
     },
     ready: () => {
       if (isReady) return

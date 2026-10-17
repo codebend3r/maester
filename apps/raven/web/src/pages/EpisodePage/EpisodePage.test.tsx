@@ -37,12 +37,14 @@ describe('EpisodePage', () => {
       defaultAudio: null,
       frameRate: null,
     }))
-    renderWithProviders(
-      <Routes>
-        <Route path="episodes/:id" element={<EpisodePage />} />
-      </Routes>,
-      { route },
-    )
+    renderWithProviders({
+      ui: (
+        <Routes>
+          <Route path="episodes/:id" element={<EpisodePage />} />
+        </Routes>
+      ),
+      route,
+    })
   }
 
   it('shows the show and number, the title, air date, summary, guests and Resume', async () => {
@@ -81,12 +83,14 @@ describe('EpisodePage', () => {
       if (id === 5) return SEASON_ONE
       return id === 6 ? episodeDetails(EPISODE_ONE) : episodeDetails(EPISODE_TWO)
     })
-    renderWithProviders(
-      <Routes>
-        <Route path="episodes/:id" element={<EpisodePage />} />
-      </Routes>,
-      { route: '/episodes/7' },
-    )
+    renderWithProviders({
+      ui: (
+        <Routes>
+          <Route path="episodes/:id" element={<EpisodePage />} />
+        </Routes>
+      ),
+      route: '/episodes/7',
+    })
     const either = await screen.findByRole('navigation', { name: 'Episodes either side' })
     const previous = within(either).getByRole('link', { name: 'Previous: Good News About Hell' })
     expect(previous).toHaveAttribute('href', `/episodes/6?library=${EPISODE_TWO.libraryId}`)

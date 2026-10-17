@@ -11,7 +11,7 @@ describe('HomePage', () => {
         { status: 200 },
       ),
     )
-    renderAt(<HomePage />)
+    renderAt({ ui: <HomePage /> })
 
     expect(await screen.findByRole('heading', { name: 'Signed in as alice' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Sign out' })).toHaveAttribute('href', '/logout')
@@ -19,7 +19,7 @@ describe('HomePage', () => {
 
   it('sends anyone without a session to /login', async () => {
     spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 401 }))
-    renderAt(<HomePage />)
+    renderAt({ ui: <HomePage /> })
     expect(await screen.findByText('login page')).toBeInTheDocument()
   })
 })

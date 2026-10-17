@@ -41,16 +41,18 @@ describe('ImageEditor', () => {
   ) => {
     spies.options.mockImplementation(async () => OPTIONS)
     spies.choose.mockImplementation(async () => itemDetails({ posterVersion: 'new' }))
-    renderWithProviders(
-      <ImageEditor
-        details={itemDetails(overrides)}
-        libraries={[library({ id: 2, name: 'Films' })]}
-        itemKind={itemKind}
-        onDone={() => {
-          state.done += 1
-        }}
-      />,
-    )
+    renderWithProviders({
+      ui: (
+        <ImageEditor
+          details={itemDetails(overrides)}
+          libraries={[library({ id: 2, name: 'Films' })]}
+          itemKind={itemKind}
+          onDone={() => {
+            state.done += 1
+          }}
+        />
+      ),
+    })
   }
 
   afterEach(() => {

@@ -18,13 +18,15 @@ describe('ShuffleButton', () => {
   const random = spyOn(api, 'randomEpisode')
 
   const open = () =>
-    renderWithProviders(
-      <Routes>
-        <Route path="shows/:id" element={<ShuffleButton itemId={4}>Shuffle</ShuffleButton>} />
-        <Route path="watch/:id" element={<Watching />} />
-      </Routes>,
-      { route: '/shows/4' },
-    )
+    renderWithProviders({
+      ui: (
+        <Routes>
+          <Route path="shows/:id" element={<ShuffleButton itemId={4}>Shuffle</ShuffleButton>} />
+          <Route path="watch/:id" element={<Watching />} />
+        </Routes>
+      ),
+      route: '/shows/4',
+    })
 
   afterEach(() => {
     random.mockReset()

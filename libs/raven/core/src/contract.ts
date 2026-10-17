@@ -710,7 +710,9 @@ export type PosterEntry = Infer<typeof isPosterEntry>
 export const isPosterEntries = listOf(isPosterEntry)
 
 /** How a saga's slideshow moves from one movie's backdrop to the next. */
-export const isSlideshowMotion = oneOf(['fade', 'kenBurns', 'slide'])
+export const SLIDESHOW_MOTIONS = { fade: 'fade', kenBurns: 'kenBurns', slide: 'slide' } as const
+
+export const isSlideshowMotion = oneOf(Object.values(SLIDESHOW_MOTIONS))
 
 export type SlideshowMotion = Infer<typeof isSlideshowMotion>
 
@@ -722,14 +724,17 @@ export const SAGA_BACKDROP_TYPES = { slideshow: 'slideshow', still: 'still' } as
  * `PUT /api/libraries/:id/sagas/:sagaId/backdrop` takes it and answers with it.
  */
 export const isSagaBackdrop = union(
-  object({ type: oneOf(['slideshow']), motion: isSlideshowMotion }),
-  object({ type: oneOf(['still']), itemId: isNumber }),
+  object({ type: oneOf([SAGA_BACKDROP_TYPES.slideshow]), motion: isSlideshowMotion }),
+  object({ type: oneOf([SAGA_BACKDROP_TYPES.still]), itemId: isNumber }),
 )
 
 export type SagaBackdrop = Infer<typeof isSagaBackdrop>
 
 /** A saga's backdrop until its library picks another. */
-export const DEFAULT_SAGA_BACKDROP: SagaBackdrop = { type: 'slideshow', motion: 'fade' }
+export const DEFAULT_SAGA_BACKDROP: SagaBackdrop = {
+  type: SAGA_BACKDROP_TYPES.slideshow,
+  motion: SLIDESHOW_MOTIONS.fade,
+}
 
 /**
  * A saga: a TMDB collection (The Lord of the Rings Collection, say) and the
@@ -986,7 +991,7 @@ export const isDisplaySettings = object({
 
 export type DisplaySettings = Infer<typeof isDisplaySettings>
 
-export const DEFAULT_DISPLAY_SETTINGS: DisplaySettings = { titles: 'logo' }
+export const DEFAULT_DISPLAY_SETTINGS: DisplaySettings = { titles: TITLE_DISPLAYS.logo }
 
 /** A change sends any of the fields; each given must be a value the setting takes. */
 export const isDisplaySettingsChange = exactPartial(isDisplaySettings.shape)

@@ -8,7 +8,7 @@ import { renderWithProviders } from '@/test/render'
 
 describe('MediaList', () => {
   it('lays each video out as a row of its facts under named columns', () => {
-    renderWithProviders(<MediaList items={[mediaItem()]} />)
+    renderWithProviders({ ui: <MediaList items={[mediaItem()]} /> })
     const table = screen.getByRole('table', { name: 'Videos' })
     expect(
       within(table)
@@ -29,7 +29,17 @@ describe('MediaList', () => {
   })
 
   it('gives each rating its own column in a Movies library, and sorts on a header click', async () => {
-    const rated = (id: number, title: string, imdb: number | null, tmdb: number) =>
+    const rated = ({
+      id,
+      title,
+      imdb,
+      tmdb,
+    }: {
+      id: number
+      title: string
+      imdb: number | null
+      tmdb: number
+    }) =>
       matchedMovie({
         id,
         title,
@@ -44,12 +54,18 @@ describe('MediaList', () => {
           ],
         }),
       })
-    renderWithProviders(
-      <MediaList
-        movies
-        items={[rated(1, 'Low', 6.1, 7), rated(2, 'None', null, 9), rated(3, 'High', 8.8, 5)]}
-      />,
-    )
+    renderWithProviders({
+      ui: (
+        <MediaList
+          movies
+          items={[
+            rated({ id: 1, title: 'Low', imdb: 6.1, tmdb: 7 }),
+            rated({ id: 2, title: 'None', imdb: null, tmdb: 9 }),
+            rated({ id: 3, title: 'High', imdb: 8.8, tmdb: 5 }),
+          ]}
+        />
+      ),
+    })
     const table = screen.getByRole('table', { name: 'Videos' })
     expect(
       within(table)
@@ -88,13 +104,13 @@ describe('MediaList', () => {
   })
 
   it('gives each row a small poster in a Movies library, a frame grab elsewhere, out of the tab order', () => {
-    const movies = renderWithProviders(<MediaList movies items={[matchedMovie()]} />)
+    const movies = renderWithProviders({ ui: <MediaList movies items={[matchedMovie()]} /> })
     const poster = movies.container.querySelector('tbody img')
     expect(poster).toHaveAttribute('src', '/api/items/40/images/poster?v=p1')
     expect(poster).toHaveAttribute('sizes', POSTER_SIZES.list)
     expect(poster?.closest('a')).toHaveAttribute('tabindex', '-1')
     movies.unmount()
-    const files = renderWithProviders(<MediaList items={[mediaItem()]} />)
+    const files = renderWithProviders({ ui: <MediaList items={[mediaItem()]} /> })
     expect(files.container.querySelector('tbody img')).toHaveAttribute(
       'src',
       '/api/media/7/thumbnail?v=1',
@@ -102,11 +118,13 @@ describe('MediaList', () => {
   })
 
   it('leaves the facts of an unprobed video blank rather than guessing', () => {
-    renderWithProviders(
-      <MediaList
-        items={[mediaItem({ duration: null, width: null, height: null, bitrate: null })]}
-      />,
-    )
+    renderWithProviders({
+      ui: (
+        <MediaList
+          items={[mediaItem({ duration: null, width: null, height: null, bitrate: null })]}
+        />
+      ),
+    })
     const [, row] = screen.getAllByRole('row')
     if (!row) throw new Error('no data row')
     const cells = within(row)
@@ -116,7 +134,9 @@ describe('MediaList', () => {
   })
 
   it('shows the check in the title cell of a watched video, and leaves the header alone', () => {
-    renderWithProviders(<MediaList items={[mediaItem({ watched: true }), mediaItem({ id: 8 })]} />)
+    renderWithProviders({
+      ui: <MediaList items={[mediaItem({ watched: true }), mediaItem({ id: 8 })]} />,
+    })
     const [header, watched, unwatched] = screen.getAllByRole('row')
     if (!header || !watched || !unwatched) throw new Error('rows missing')
     expect(within(watched).getByRole('rowheader')).toHaveTextContent('Watched')

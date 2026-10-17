@@ -55,11 +55,7 @@ const MediaRow = ({
   const link = cardLink({ media, pages: movies })
   const thumbnail = api.thumbnailUrl(media)
   return (
-    <tr
-      className={`${styles.row} ${menu.hostClass}`}
-      data-entry={mediaEntryKey(media)}
-      {...select.rootProps}
-    >
+    <tr className={menu.hostClass} data-entry={mediaEntryKey(media)} {...select.rootProps}>
       <th scope="row" className={styles.titleHeader}>
         <div className={styles.titleCell}>
           <SelectCheckbox select={select} className={styles.select} />

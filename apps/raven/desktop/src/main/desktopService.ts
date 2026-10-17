@@ -50,7 +50,7 @@ export const MESSAGES = {
 } as const
 
 /** How long Home waits on one file's check: a sleeping network share can block for minutes. */
-export const RECENT_CHECK_MS = 500
+const RECENT_CHECK_MS = 500
 
 export type DesktopServiceDeps = {
   grants: Grants
@@ -285,7 +285,7 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
 
   const factsWithin = (path: string): Promise<FileFacts | null> => {
     const timeout = Promise.withResolvers<null>()
-    const timer = deps.timers.set(() => timeout.resolve(null), RECENT_CHECK_MS)
+    const timer = deps.timers.set({ run: () => timeout.resolve(null), ms: RECENT_CHECK_MS })
     return Promise.race([factsOf(path), timeout.promise]).finally(() => deps.timers.clear(timer))
   }
 

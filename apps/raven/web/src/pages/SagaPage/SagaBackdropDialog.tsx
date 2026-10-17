@@ -2,8 +2,6 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   type Saga,
   type SagaBackdrop,
-  type SlideshowMotion,
-  isSlideshowMotion,
   sagaCover,
   sagaPictures,
 } from '@raven/core'
@@ -14,9 +12,9 @@ import { afterSagaBackdrop } from '@/lib/invalidate'
 import styles from '@/pages/SagaPage/SagaBackdropDialog.module.scss'
 
 /** A way for the slideshow to go, or `off` for the cover held still. */
-type Choice = SlideshowMotion | 'off'
+const CHOICES = { ...SLIDESHOW_MOTIONS, off: 'off' } as const
 
-const CHOICES = [...isSlideshowMotion.values, 'off'] as const satisfies readonly Choice[]
+type Choice = (typeof CHOICES)[keyof typeof CHOICES]
 
 const LABELS = {
   fade: { label: 'Crossfade', hint: 'Each picture fades into the next.' },
@@ -43,7 +41,7 @@ export const SagaBackdropDialog = ({
   const ids = { title: useId(), choice: useId(), cover: useId() }
   const queryClient = useQueryClient()
   const [choice, setChoice] = useState<Choice>(
-    saga.backdrop.type === 'slideshow' ? saga.backdrop.motion : 'off',
+    saga.backdrop.type === SAGA_BACKDROP_TYPES.slideshow ? saga.backdrop.motion : CHOICES.off,
   )
   // The cover the page shows, so a pick whose movie has left the saga starts
   // on the one standing in for it, and kept while the motions are tried.
@@ -54,8 +52,8 @@ export const SagaBackdropDialog = ({
   }, [])
 
   const chosen = (): SagaBackdrop | null => {
-    if (choice !== 'off') return { type: 'slideshow', motion: choice }
-    return coverId == null ? null : { type: 'still', itemId: coverId }
+    if (choice !== CHOICES.off) return { type: SAGA_BACKDROP_TYPES.slideshow, motion: choice }
+    return coverId == null ? null : { type: SAGA_BACKDROP_TYPES.still, itemId: coverId }
   }
 
   const save = useMutation({
@@ -85,14 +83,14 @@ export const SagaBackdropDialog = ({
           <p className={styles.hint}>
             Behind the title, each movie's backdrop in turn, first to last and round again.
           </p>
-          {CHOICES.map((each) => (
+          {Object.values(CHOICES).map((each) => (
             <div key={each} className={styles.choice}>
               <input
                 id={`${ids.choice}-${each}`}
                 type="radio"
                 name={ids.choice}
                 checked={choice === each}
-                disabled={each === 'off' && coverId == null}
+                disabled={each === CHOICES.off && coverId == null}
                 onChange={() => setChoice(each)}
                 aria-describedby={`${ids.choice}-${each}-hint`}
               />
@@ -104,7 +102,7 @@ export const SagaBackdropDialog = ({
           ))}
         </fieldset>
 
-        {choice === 'off' && (
+        {choice === CHOICES.off && (
           <fieldset className={styles.field}>
             <legend>Picture</legend>
             <ul className={styles.pictures}>

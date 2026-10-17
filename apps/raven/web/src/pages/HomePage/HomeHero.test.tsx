@@ -67,7 +67,7 @@ describe('HomeHero', () => {
   const details = spyOn(api, 'getItem')
 
   const open = (featured: Featured[] = ARRIVALS) => {
-    renderWithProviders(<HomeHero featured={featured} />)
+    renderWithProviders({ ui: <HomeHero featured={featured} /> })
   }
 
   afterEach(() => {

@@ -5,17 +5,44 @@ export type ServerMethod = (typeof SERVER_METHODS)[number]
 export const MAX_BODY = 4096
 export const MAX_SECRET = 256
 
-export type AllowedCall =
-  | { name: 'getMedia'; mediaId: number }
-  | { name: 'getTracks'; mediaId: number }
-  | { name: 'saveProgress'; mediaId: number; position: number }
-  | { name: 'recordPlay'; mediaId: number }
-  | { name: 'getLock' }
-  | { name: 'unlock'; pin: string }
-  | { name: 'getAdminLock' }
-  | { name: 'unlockAdmin'; password: string }
+/** The eight calls main makes for the page, by name. */
+export const CALL_NAMES = {
+  getMedia: 'getMedia',
+  getTracks: 'getTracks',
+  saveProgress: 'saveProgress',
+  recordPlay: 'recordPlay',
+  getLock: 'getLock',
+  unlock: 'unlock',
+  getAdminLock: 'getAdminLock',
+  unlockAdmin: 'unlockAdmin',
+} as const
 
-type Body = { kind: 'none' } | { kind: 'json'; value: unknown } | { kind: 'bad' }
+export type AllowedCall =
+  | { name: typeof CALL_NAMES.getMedia; mediaId: number }
+  | { name: typeof CALL_NAMES.getTracks; mediaId: number }
+  | { name: typeof CALL_NAMES.saveProgress; mediaId: number; position: number }
+  | { name: typeof CALL_NAMES.recordPlay; mediaId: number }
+  | { name: typeof CALL_NAMES.getLock }
+  | { name: typeof CALL_NAMES.unlock; pin: string }
+  | { name: typeof CALL_NAMES.getAdminLock }
+  | { name: typeof CALL_NAMES.unlockAdmin; password: string }
+
+/** The fixed paths among the calls; the media calls' paths carry the media id. */
+export const API_PATHS = {
+  lock: '/api/lock',
+  unlock: '/api/lock/unlock',
+  admin: '/api/admin',
+  adminUnlock: '/api/admin/unlock',
+} as const
+
+const BODY_KINDS = { none: 'none', json: 'json', bad: 'bad' } as const
+
+type Body =
+  | { kind: typeof BODY_KINDS.none }
+  | { kind: typeof BODY_KINDS.json; value: unknown }
+  | { kind: typeof BODY_KINDS.bad }
+
+const ROUTE_KINDS = { media: 'media', fixed: 'fixed' } as const
 
 type Route =
   | {
@@ -31,7 +58,7 @@ type Route =
       read: (input: { body: Body }) => AllowedCall | null
     }
 
-const NONE = { kind: 'none' } as const satisfies Body
+const NONE = { kind: BODY_KINDS.none } as const satisfies Body
 
 const readBody = (body: string | null): Body => {
   if (body === null) return NONE

@@ -35,17 +35,19 @@ describe('MetadataEditor', () => {
   const open = (edition: string | null = 'Extended Cut') => {
     spies.state.mockImplementation(async () => STATE)
     spies.save.mockImplementation(async () => itemDetails({ title: 'Heat (Extended Cut)' }))
-    renderWithProviders(
-      <MetadataEditor
-        details={itemDetails({
-          versions: [matchedMovie({ id: 1, edition }), matchedMovie({ id: 2, edition: null })],
-        })}
-        itemKind="movie"
-        onDone={() => {
-          done.count += 1
-        }}
-      />,
-    )
+    renderWithProviders({
+      ui: (
+        <MetadataEditor
+          details={itemDetails({
+            versions: [matchedMovie({ id: 1, edition }), matchedMovie({ id: 2, edition: null })],
+          })}
+          itemKind="movie"
+          onDone={() => {
+            done.count += 1
+          }}
+        />
+      ),
+    })
   }
 
   afterEach(() => {

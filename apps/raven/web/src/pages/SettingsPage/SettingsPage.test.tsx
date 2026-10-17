@@ -66,7 +66,7 @@ describe('SettingsPage', () => {
 
   it('shows each playback setting with its choices and what the hardware comes to', async () => {
     spies.get.mockImplementation(async () => STATE)
-    renderWithProviders(<SettingsPage />, { playback: null, display: null })
+    renderWithProviders({ ui: <SettingsPage />, playback: null, display: null })
     expect(await screen.findByRole('radio', { name: /Remux and transcode/ })).toBeChecked()
     expect(screen.getByRole('radio', { name: /^1080p/ })).toBeChecked()
     expect(screen.getByRole('radio', { name: /^Auto/ })).toBeChecked()
@@ -76,7 +76,7 @@ describe('SettingsPage', () => {
 
   it('marks the section and each setting with an icon of its own', async () => {
     spies.get.mockImplementation(async () => STATE)
-    renderWithProviders(<SettingsPage />, { playback: null, display: null })
+    renderWithProviders({ ui: <SettingsPage />, playback: null, display: null })
     expect(iconOf(await screen.findByRole('heading', { name: 'Playback' }))).toBe('playback')
     expect(iconOf(await screen.findByRole('heading', { name: 'Display' }))).toBe('image')
     await screen.findByRole('group', { name: 'Movie titles' })
@@ -86,7 +86,7 @@ describe('SettingsPage', () => {
 
   it('puts every setting back to its default on a second click', async () => {
     servePlayback(CHANGED)
-    renderWithProviders(<SettingsPage />, { playback: null, display: null })
+    renderWithProviders({ ui: <SettingsPage />, playback: null, display: null })
     await userEvent.click(await screen.findByRole('button', { name: 'Reset to defaults' }))
     expect(spies.set).not.toHaveBeenCalled()
     await userEvent.click(screen.getByRole('button', { name: 'Reset all' }))
@@ -103,7 +103,7 @@ describe('SettingsPage', () => {
     spies.setDisplay.mockImplementation(async () => {
       throw new Error('The server did not answer')
     })
-    renderWithProviders(<SettingsPage />, { playback: null, display: null })
+    renderWithProviders({ ui: <SettingsPage />, playback: null, display: null })
     await userEvent.click(await screen.findByRole('button', { name: 'Reset to defaults' }))
     await userEvent.click(screen.getByRole('button', { name: 'Reset all' }))
     expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -118,7 +118,7 @@ describe('SettingsPage', () => {
 
   it('shows movie titles as logos, and spells them out once Text is chosen', async () => {
     spies.get.mockImplementation(async () => STATE)
-    renderWithProviders(<SettingsPage />, { playback: null, display: null })
+    renderWithProviders({ ui: <SettingsPage />, playback: null, display: null })
     const titles = await screen.findByRole('group', { name: 'Movie titles' })
     expect(within(titles).getByRole('radio', { name: /^Logo/ })).toBeChecked()
     await userEvent.click(within(titles).getByRole('radio', { name: /^Text/ }))
@@ -129,7 +129,7 @@ describe('SettingsPage', () => {
 
   it('keeps the settings when the reset is cancelled', async () => {
     spies.get.mockImplementation(async () => CHANGED)
-    renderWithProviders(<SettingsPage />, { playback: null, display: null })
+    renderWithProviders({ ui: <SettingsPage />, playback: null, display: null })
     await userEvent.click(await screen.findByRole('button', { name: 'Reset to defaults' }))
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(spies.set).not.toHaveBeenCalled()
@@ -139,13 +139,13 @@ describe('SettingsPage', () => {
 
   it('has nothing to reset while every setting is at its default', async () => {
     spies.get.mockImplementation(async () => STATE)
-    renderWithProviders(<SettingsPage />, { playback: null, display: null })
+    renderWithProviders({ ui: <SettingsPage />, playback: null, display: null })
     expect(await screen.findByRole('button', { name: 'Reset to defaults' })).toBeDisabled()
   })
 
   it('saves a choice as soon as it is picked', async () => {
     servePlayback(STATE)
-    renderWithProviders(<SettingsPage />, { playback: null, display: null })
+    renderWithProviders({ ui: <SettingsPage />, playback: null, display: null })
     await userEvent.click(await screen.findByRole('radio', { name: /Remux only/ }))
     await waitFor(() => expect(spies.set).toHaveBeenCalledWith({ transcoding: 'remuxOnly' }))
     expect(screen.getByRole('radio', { name: /Remux only/ })).toBeChecked()
@@ -156,7 +156,7 @@ describe('SettingsPage', () => {
   it('shows a choice at once, every setting still open while it saves', async () => {
     spies.get.mockImplementation(async () => STATE)
     spies.set.mockImplementation(() => held<PlaybackSettingsState>().promise)
-    renderWithProviders(<SettingsPage />, { playback: null, display: null })
+    renderWithProviders({ ui: <SettingsPage />, playback: null, display: null })
     await userEvent.click(await screen.findByRole('radio', { name: /Remux only/ }))
     await waitFor(() => expect(screen.getByRole('radio', { name: /Remux only/ })).toBeChecked())
     expect(screen.getByRole('radio', { name: /^High/ })).toBeEnabled()
@@ -167,7 +167,7 @@ describe('SettingsPage', () => {
     spies.set.mockImplementation(async () => {
       throw new Error('The server is away.')
     })
-    renderWithProviders(<SettingsPage />, { playback: null, display: null })
+    renderWithProviders({ ui: <SettingsPage />, playback: null, display: null })
     await userEvent.click(await screen.findByRole('radio', { name: /Remux only/ }))
     expect(await screen.findByText('Could not save: The server is away.')).toBeInTheDocument()
     expect(screen.getByRole('radio', { name: /Remux and transcode/ })).toBeChecked()
@@ -175,7 +175,8 @@ describe('SettingsPage', () => {
 
   it('shows the settings but keeps them as they are while the admin lock is on', async () => {
     servePlayback(CHANGED)
-    renderWithProviders(<SettingsPage />, {
+    renderWithProviders({
+      ui: <SettingsPage />,
       playback: null,
       display: null,
       adminLock: { state: 'on', available: true },
@@ -196,7 +197,7 @@ describe('SettingsPage', () => {
 
   it('stands in for the settings while they are read', async () => {
     spies.get.mockImplementation(() => held<PlaybackSettingsState>().promise)
-    renderWithProviders(<SettingsPage />, { playback: null, display: null })
+    renderWithProviders({ ui: <SettingsPage />, playback: null, display: null })
     expect(screen.getAllByText('Reading the settings')).not.toEqual([])
   })
 })
@@ -217,13 +218,14 @@ describe('the admin lock on SettingsPage', () => {
   const toggle = () => screen.getByRole('checkbox', { name: /^Admin lock/ })
 
   it('ends the page, and turns off only with the password', async () => {
+    const rightPassword = 'Soft-Wing-27'
     spies.unlock.mockImplementation(async (password) => {
-      if (password !== 'Soft-Wing-27') {
+      if (password !== rightPassword) {
         throw new ApiError({ status: 401, message: 'That password is not right.' })
       }
       return { state: 'off' }
     })
-    renderWithProviders(<SettingsPage />, { adminLock: { state: 'on', available: true } })
+    renderWithProviders({ ui: <SettingsPage />, adminLock: { state: 'on', available: true } })
     expect(screen.getAllByRole('region').at(-1)).toHaveAccessibleName('Admin')
     expect(toggle()).toBeChecked()
 
@@ -235,15 +237,15 @@ describe('the admin lock on SettingsPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('That password is not right.')
     expect(toggle()).not.toBeChecked()
 
-    await userEvent.type(screen.getByLabelText('Admin password'), 'Soft-Wing-27')
+    await userEvent.type(screen.getByLabelText('Admin password'), rightPassword)
     await userEvent.click(screen.getByRole('button', { name: 'Turn off' }))
     await waitFor(() => expect(screen.queryByLabelText('Admin password')).toBeNull())
     expect(toggle()).not.toBeChecked()
-    expect(spies.unlock.mock.calls).toEqual([['soft-wing-27'], ['Soft-Wing-27']])
+    expect(spies.unlock.mock.calls).toEqual([['soft-wing-27'], [rightPassword]])
   })
 
   it('stays on when the password is not given after all', async () => {
-    renderWithProviders(<SettingsPage />, { adminLock: { state: 'on', available: true } })
+    renderWithProviders({ ui: <SettingsPage />, adminLock: { state: 'on', available: true } })
     await userEvent.click(toggle())
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(screen.queryByLabelText('Admin password')).toBeNull()
@@ -254,7 +256,7 @@ describe('the admin lock on SettingsPage', () => {
   it('turns on after a wait, in which it goes off again with no password', async () => {
     spies.lock.mockImplementation(async () => ({ state: 'turningOn', remainingMs: 15_000 }))
     spies.keep.mockImplementation(async () => ({ state: 'off' }))
-    renderWithProviders(<SettingsPage />, { adminLock: { state: 'off' } })
+    renderWithProviders({ ui: <SettingsPage />, adminLock: { state: 'off' } })
     expect(toggle()).not.toBeChecked()
 
     await userEvent.click(toggle())
@@ -268,7 +270,7 @@ describe('the admin lock on SettingsPage', () => {
   })
 
   it('cannot be turned off until the server has a password', async () => {
-    renderWithProviders(<SettingsPage />, { adminLock: { state: 'on', available: false } })
+    renderWithProviders({ ui: <SettingsPage />, adminLock: { state: 'on', available: false } })
     expect(toggle()).toBeChecked()
     expect(toggle()).toBeDisabled()
     expect(screen.getByText(/to turn it off/)).toHaveTextContent(
@@ -286,7 +288,7 @@ describe('Open videos in raven player on SettingsPage', () => {
   const toggle = () => screen.getByRole('checkbox', { name: /^Open videos in raven player/ })
 
   it('sits in Playback, off until this browser turns it on', async () => {
-    renderWithProviders(<SettingsPage />, { playback: null })
+    renderWithProviders({ ui: <SettingsPage />, playback: null })
     const playback = screen.getByRole('region', { name: 'Playback' })
     await within(playback).findByRole('radio', { name: /Remux only/ })
     expect(within(playback).getByRole('heading', { name: 'This browser' })).toBeInTheDocument()
@@ -302,7 +304,8 @@ describe('Open videos in raven player on SettingsPage', () => {
   })
 
   it('stays open to change while the admin lock keeps the server settings', async () => {
-    renderWithProviders(<SettingsPage />, {
+    renderWithProviders({
+      ui: <SettingsPage />,
       playback: null,
       adminLock: { state: 'on', available: true },
     })
@@ -317,7 +320,7 @@ describe('Open videos in raven player on SettingsPage', () => {
     spies.get.mockImplementation(async () => {
       throw new Error('The server is away.')
     })
-    renderWithProviders(<SettingsPage />, { playback: null })
+    renderWithProviders({ ui: <SettingsPage />, playback: null })
     expect(await screen.findByText('The server is away.')).toBeInTheDocument()
     await userEvent.click(toggle())
     expect(usePlayerPrefs.getState().opensInRavenPlayer).toBe(true)

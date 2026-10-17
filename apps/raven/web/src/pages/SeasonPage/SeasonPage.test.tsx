@@ -19,13 +19,15 @@ describe('SeasonPage', () => {
       if (id === 5) return SEASON_ONE
       throw new Error(`no item ${id}`)
     })
-    renderWithProviders(
-      <Routes>
-        <Route path="shows/:id/seasons/:number" element={<SeasonPage />} />
-        <Route path="watch/:id" element={<Watching />} />
-      </Routes>,
-      { route },
-    )
+    renderWithProviders({
+      ui: (
+        <Routes>
+          <Route path="shows/:id/seasons/:number" element={<SeasonPage />} />
+          <Route path="watch/:id" element={<Watching />} />
+        </Routes>
+      ),
+      route,
+    })
   }
 
   afterEach(() => {
@@ -95,12 +97,14 @@ describe('SeasonPage', () => {
       if (id === 5) return season
       throw new Error(`no item ${id}`)
     })
-    renderWithProviders(
-      <Routes>
-        <Route path="shows/:id/seasons/:number" element={<SeasonPage />} />
-      </Routes>,
-      { route: '/shows/4/seasons/1' },
-    )
+    renderWithProviders({
+      ui: (
+        <Routes>
+          <Route path="shows/:id/seasons/:number" element={<SeasonPage />} />
+        </Routes>
+      ),
+      route: '/shows/4/seasons/1',
+    })
   }
 
   it('plays the first episode not yet watched, and says how many are', async () => {

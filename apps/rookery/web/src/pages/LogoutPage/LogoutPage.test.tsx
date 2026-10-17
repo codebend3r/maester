@@ -10,7 +10,7 @@ describe('LogoutPage', () => {
       new Response(JSON.stringify({ next: 'https://luwin.example.com/' }), { status: 200 }),
     )
     const goTo = spyOn(browser, 'goTo').mockImplementation(() => {})
-    renderAt(<LogoutPage />, { route: '/?return_to=https%3A%2F%2Fluwin.example.com%2F' })
+    renderAt({ ui: <LogoutPage />, route: '/?return_to=https%3A%2F%2Fluwin.example.com%2F' })
 
     await waitFor(() => expect(goTo).toHaveBeenCalledWith('https://luwin.example.com/'))
     const [url, init = {}] = fetch.mock.calls[0] ?? []
@@ -22,7 +22,7 @@ describe('LogoutPage', () => {
   it('says so when the sign-out fails', async () => {
     spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('offline'))
     const goTo = spyOn(browser, 'goTo').mockImplementation(() => {})
-    renderAt(<LogoutPage />)
+    renderAt({ ui: <LogoutPage /> })
 
     expect(await screen.findByRole('alert')).toHaveTextContent('could not sign you out')
     expect(goTo).not.toHaveBeenCalled()

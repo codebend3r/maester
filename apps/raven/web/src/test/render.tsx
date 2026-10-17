@@ -13,7 +13,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { CardLinks } from '@/components/CardLink/CardLink'
 import { MediaOriginProbe } from '@/components/MediaOriginProbe/MediaOriginProbe'
 import { queryKeys } from '@/lib/queryClient'
-import { SharedPlaybackPolicy } from '@/lib/sharedPlaybackPolicy'
+import { PrefetchPlaybackSettings } from '@/lib/prefetchPlaybackSettings'
 
 /** The server's playback settings as a fresh install has them. */
 export const DEFAULT_PLAYBACK_STATE: PlaybackSettingsState = {
@@ -32,25 +32,24 @@ export const DEFAULT_PLAYBACK_STATE: PlaybackSettingsState = {
  * `libraries` is the list the side menu reads, for a test that has it read.
  * Returns what Testing Library's `render` does, and the query client.
  */
-export const renderWithProviders = (
-  ui: ReactNode,
-  {
-    route = '/',
-    behind = [],
-    playback = DEFAULT_PLAYBACK_STATE,
-    display = DEFAULT_DISPLAY_SETTINGS,
-    adminLock = { state: 'off' },
-    libraries = null,
-  }: {
-    route?: string
-    /** Pages already in history before `route`, oldest first, as if the app had been browsed there. */
-    behind?: string[]
-    playback?: PlaybackSettingsState | null
-    display?: DisplaySettings | null
-    adminLock?: AdminLock | null
-    libraries?: Library[] | null
-  } = {},
-) => {
+export const renderWithProviders = ({
+  ui,
+  route = '/',
+  behind = [],
+  playback = DEFAULT_PLAYBACK_STATE,
+  display = DEFAULT_DISPLAY_SETTINGS,
+  adminLock = { state: ADMIN_LOCK_STATES.off },
+  libraries = null,
+}: {
+  ui: ReactNode
+  route?: string
+  /** Pages already in history before `route`, oldest first, as if the app had been browsed there. */
+  behind?: string[]
+  playback?: PlaybackSettingsState | null
+  display?: DisplaySettings | null
+  adminLock?: AdminLock | null
+  libraries?: Library[] | null
+}) => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   if (playback) client.setQueryData(queryKeys.playbackSettings, playback)
   if (display) client.setQueryData(queryKeys.displaySettings, display)
@@ -59,11 +58,11 @@ export const renderWithProviders = (
   const rendered = render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[...behind, route]} initialIndex={behind.length}>
-        <SharedPlaybackPolicy>
+        <PrefetchPlaybackSettings>
           <MediaOriginProbe>
             <CardLinks>{ui}</CardLinks>
           </MediaOriginProbe>
-        </SharedPlaybackPolicy>
+        </PrefetchPlaybackSettings>
       </MemoryRouter>
     </QueryClientProvider>,
   )

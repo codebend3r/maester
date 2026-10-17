@@ -117,10 +117,10 @@ const setup = ({
       if (text === undefined) throw missing(path)
       return text
     },
-    writeFile: async (path, data) => {
+    writeFile: async ({ path, data }) => {
       disk.set(path, data)
     },
-    rename: async (from, to) => {
+    rename: async ({ from, to }) => {
       const text = disk.get(from)
       if (text !== undefined) disk.set(to, text)
       disk.delete(from)
@@ -147,7 +147,7 @@ const setup = ({
   const pendingTimers = new Map<number, () => void>()
   const timerCount = { next: 0 }
   const timers: Timers = {
-    set: (run) => {
+    set: ({ run }) => {
       timerCount.next += 1
       pendingTimers.set(timerCount.next, run)
       return timerCount.next

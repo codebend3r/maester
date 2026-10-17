@@ -39,7 +39,7 @@ export const parseVersion = (text: string): ReleaseVersion | null => {
   return { major, minor, patch }
 }
 
-export const compareVersions = (a: ReleaseVersion, b: ReleaseVersion): number =>
+export const compareVersions = ({ a, b }: { a: ReleaseVersion; b: ReleaseVersion }): number =>
   [a.major - b.major, a.minor - b.minor, a.patch - b.patch].find(
     (difference) => difference !== 0,
   ) ?? 0
@@ -85,7 +85,7 @@ const isNewer = ({
   candidate: ReleaseVersion
   running: RunningVersion
 }): boolean => {
-  const difference = compareVersions(candidate, running.version)
+  const difference = compareVersions({ a: candidate, b: running.version })
   return difference > 0 || (difference === 0 && running.isPrerelease)
 }
 
@@ -120,7 +120,7 @@ export const findUpdate = ({
     const candidate = candidateOf(release)
     if (!candidate) return best
     if (!best) return candidate
-    return compareVersions(candidate.version, best.version) > 0 ? candidate : best
+    return compareVersions({ a: candidate.version, b: best.version }) > 0 ? candidate : best
   }, null)
   if (!highest) return failed(UPDATE_PROBLEMS.unlisted)
   const running = parseRunning(current) ?? { version: ZERO_VERSION, isPrerelease: false }
@@ -167,10 +167,10 @@ export const nextPageUrl = ({
   return isGithubList || isStartList ? next.href : null
 }
 
-export type UpdateFetch = (
-  url: string,
-  init: { headers: Record<string, string>; signal: AbortSignal },
-) => Promise<{
+export type UpdateFetch = (input: {
+  url: string
+  init: { headers: Record<string, string>; signal: AbortSignal }
+}) => Promise<{
   status: number
   headers: { get: (name: string) => string | null }
   text: () => Promise<string>
@@ -206,13 +206,13 @@ const readPage = async ({
 }: {
   fetch: UpdateFetch
   url: string
-  init: Parameters<UpdateFetch>[1]
+  init: Parameters<UpdateFetch>[0]['init']
   start: string
   charsLeft: number
 }): Promise<PageRead> => {
   // Through `then`, so a fetch that throws before returning its promise is a rejection too.
   const response = await Promise.resolve()
-    .then(() => fetch(url, init))
+    .then(() => fetch({ url, init }))
     .catch(() => null)
   if (!response) return { ok: false, problem: UPDATE_PROBLEMS.unreachable }
   if (response.status === 403 || response.status === 429) {
@@ -250,7 +250,7 @@ const walk = async ({
 }: {
   fetch: UpdateFetch
   url: string
-  init: Parameters<UpdateFetch>[1]
+  init: Parameters<UpdateFetch>[0]['init']
   start: string
   current: string
   seen: unknown[]

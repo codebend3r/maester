@@ -6,11 +6,19 @@ import { browser } from '@/lib/browser'
 import styles from '@/pages/LoginPage/LoginPage.module.scss'
 
 /** What went wrong, keyed by the `error` the server puts on `/login`, or by `AuthError.code`. */
-export const ERROR_MESSAGES: Record<string, string> = {
-  not_approved: 'Plex did not confirm the sign-in. Try again, and approve it on the Plex page.',
-  expired: 'That sign-in ran out of time, or was started in another browser. Try again.',
-  plex_unavailable: 'Plex is not answering right now. Try again in a minute.',
-  unreachable: 'rookery could not start the sign-in. Try again.',
+export const ERROR_MESSAGES = {
+  [AUTH_ERRORS.notApproved]:
+    'Plex did not confirm the sign-in. Try again, and approve it on the Plex page.',
+  [AUTH_ERRORS.expired]:
+    'That sign-in ran out of time, or was started in another browser. Try again.',
+  [AUTH_ERRORS.plexUnavailable]: 'Plex is not answering right now. Try again in a minute.',
+  [AUTH_ERRORS.unreachable]: 'rookery could not start the sign-in. Try again.',
+} as const satisfies Record<AuthErrorCode, string>
+
+/** The `error` on `/login`, which anyone can type; a code rookery does not know reads as `unreachable`. */
+const errorIn = (value: string | null): AuthErrorCode | null => {
+  if (!value) return null
+  return isAuthErrorCode(value) ? value : AUTH_ERRORS.unreachable
 }
 
 /**
@@ -36,7 +44,7 @@ export const LoginPage = () => {
     )
   }
 
-  const message = error ? (ERROR_MESSAGES[error] ?? ERROR_MESSAGES.unreachable) : null
+  const message = error ? ERROR_MESSAGES[error] : null
 
   return (
     <Frame>

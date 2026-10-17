@@ -37,7 +37,7 @@ describe('LibrariesPage', () => {
 
   it("offers each library's history, a rescan and Edit, each named for its library", async () => {
     spies.list.mockImplementation(async () => [library({ id: 2, name: 'Clips' })])
-    renderWithProviders(<LibrariesPage />)
+    renderWithProviders({ ui: <LibrariesPage /> })
     expect(await screen.findByRole('link', { name: 'History Clips' })).toHaveAttribute(
       'href',
       '/libraries/2/history',
@@ -59,7 +59,7 @@ describe('LibrariesPage', () => {
     spies.list.mockImplementation(async () => [films])
     spies.health.mockImplementation(async () => metadataHealth())
     spies.match.mockImplementation(async () => matched)
-    renderWithProviders(<LibrariesPage />)
+    renderWithProviders({ ui: <LibrariesPage /> })
     const button = await screen.findByRole('button', { name: 'Match again Films' })
     await waitFor(() => expect(button).toBeEnabled())
     spies.list.mockImplementation(async () => [matched])
@@ -70,7 +70,7 @@ describe('LibrariesPage', () => {
 
   it('opens Edit on the library, with its name filled in', async () => {
     spies.list.mockImplementation(async () => [library({ id: 2, name: 'Clips' })])
-    renderWithProviders(<LibrariesPage />)
+    renderWithProviders({ ui: <LibrariesPage /> })
     await userEvent.click(await screen.findByRole('button', { name: 'Edit Clips' }))
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByLabelText('Name')).toHaveValue('Clips')
@@ -81,7 +81,7 @@ describe('LibrariesPage', () => {
       library({ id: 3, name: 'Tutorials', settings: { ...library().settings, locked: true } }),
     ])
     spies.lock.mockImplementation(async () => ({ available: true, unlocked: false }))
-    renderWithProviders(<LibrariesPage />)
+    renderWithProviders({ ui: <LibrariesPage /> })
     await userEvent.click(await screen.findByRole('button', { name: 'Edit Tutorials' }))
     expect(useUnlockPrompt.getState().open).toBe(true)
     expect(screen.queryByRole('dialog')).toBeNull()
@@ -96,7 +96,7 @@ describe('LibrariesPage', () => {
       sent.push(request)
       return movies
     })
-    renderWithProviders(<LibrariesPage />)
+    renderWithProviders({ ui: <LibrariesPage /> })
     const pin = await screen.findByRole('button', { name: 'Pin Movies' })
     expect(pin).toHaveAttribute('aria-pressed', 'true')
     await userEvent.click(pin)
@@ -107,7 +107,7 @@ describe('LibrariesPage', () => {
     const clips = library({ name: 'Clips', settings: { ...library().settings, pinned: false } })
     spies.list.mockImplementation(async () => [clips])
     spies.view.mockImplementation(() => held<Library>().promise)
-    renderWithProviders(<LibrariesPage />)
+    renderWithProviders({ ui: <LibrariesPage /> })
     const pin = await screen.findByRole('button', { name: 'Pin Clips' })
     await userEvent.click(pin)
     await waitFor(() => expect(pin).toHaveAttribute('aria-pressed', 'true'))
@@ -120,7 +120,7 @@ describe('LibrariesPage', () => {
     spies.view.mockImplementation(async () => {
       throw new Error('The server is away.')
     })
-    renderWithProviders(<LibrariesPage />)
+    renderWithProviders({ ui: <LibrariesPage /> })
     const pin = await screen.findByRole('button', { name: 'Pin Clips' })
     await userEvent.click(pin)
     await waitFor(() => expect(pin).toHaveAttribute('aria-pressed', 'false'))
@@ -131,7 +131,7 @@ describe('LibrariesPage', () => {
       library({ id: 1, name: 'Films' }),
       library({ id: 2, name: 'Clips', settings: { ...library().settings, pinned: false } }),
     ])
-    renderWithProviders(<LibrariesPage />)
+    renderWithProviders({ ui: <LibrariesPage /> })
     const pinned = await screen.findByRole('button', { name: 'Pin Films' })
     const unpinned = screen.getByRole('button', { name: 'Pin Clips' })
     expect(within(pinned).getByText('Pinned')).toHaveAttribute('aria-hidden', 'true')
@@ -144,13 +144,13 @@ describe('LibrariesPage', () => {
       library({ id: 1, name: 'Films', itemCount: 1204 }),
       library({ id: 2, name: 'Clips', itemCount: 12 }),
     ])
-    renderWithProviders(<LibrariesPage />)
+    renderWithProviders({ ui: <LibrariesPage /> })
     expect(await screen.findByText('2 libraries · 1,216 videos')).toBeInTheDocument()
   })
 
   it('counts one library and one video in the singular', async () => {
     spies.list.mockImplementation(async () => [library({ name: 'Clips', itemCount: 1 })])
-    renderWithProviders(<LibrariesPage />)
+    renderWithProviders({ ui: <LibrariesPage /> })
     expect(await screen.findByText('1 library · 1 video')).toBeInTheDocument()
   })
 
@@ -158,7 +158,7 @@ describe('LibrariesPage', () => {
     spies.list.mockImplementation(async () => [
       library({ name: 'Shows', paths: ['/media/TV', '/mnt/archive/TV'] }),
     ])
-    renderWithProviders(<LibrariesPage />)
+    renderWithProviders({ ui: <LibrariesPage /> })
     const folders = await screen.findByRole('list', { name: 'Folders' })
     expect(
       within(folders)
@@ -169,7 +169,7 @@ describe('LibrariesPage', () => {
 
   it('stands in for the libraries while they are read', async () => {
     spies.list.mockImplementation(() => held<Library[]>().promise)
-    renderWithProviders(<LibrariesPage />)
+    renderWithProviders({ ui: <LibrariesPage /> })
     expect(await screen.findByText('Gathering your libraries')).toBeInTheDocument()
   })
 
@@ -177,7 +177,7 @@ describe('LibrariesPage', () => {
     spies.list.mockImplementation(async () => [
       library({ name: 'Clips', settings: { ...library().settings, pinned: false } }),
     ])
-    renderWithProviders(<LibrariesPage />)
+    renderWithProviders({ ui: <LibrariesPage /> })
     expect(await screen.findByRole('button', { name: 'Pin Clips' })).toHaveAttribute(
       'aria-pressed',
       'false',
@@ -192,7 +192,7 @@ describe('LibrariesPage', () => {
         settings: { ...library().settings, kind: 'shows' },
       }),
     ])
-    renderWithProviders(<LibrariesPage />)
+    renderWithProviders({ ui: <LibrariesPage /> })
     expect(await screen.findByText('TV shows · 1,268 videos')).toBeInTheDocument()
   })
 
@@ -205,7 +205,7 @@ describe('LibrariesPage', () => {
         settings: { ...library().settings, kind: 'other', locked: true },
       }),
     ])
-    renderWithProviders(<LibrariesPage />)
+    renderWithProviders({ ui: <LibrariesPage /> })
     const iconsBeside = async (name: string) => {
       const icon = (await screen.findByRole('link', { name })).previousElementSibling
       return [...(icon?.querySelectorAll('svg') ?? [])].map((svg) => svg.dataset.icon)
@@ -220,7 +220,7 @@ describe('LibrariesPage', () => {
       library({ id: 2, name: 'Clips', backdrop: { type: 'thumbnail', id: 9, version: 41 } }),
       library({ id: 3, name: 'Empty' }),
     ])
-    renderWithProviders(<LibrariesPage />)
+    renderWithProviders({ ui: <LibrariesPage /> })
     const pictureBehind = async (name: string) => {
       const row = (await screen.findByRole('link', { name })).closest('li')
       const picture = row?.querySelector(BACKDROP)
@@ -242,7 +242,7 @@ describe('LibrariesPage', () => {
     })
     spies.list.mockImplementation(async () => [tutorials])
     spies.lock.mockImplementation(async () => ({ available: true, unlocked: false }))
-    renderWithProviders(<LibrariesPage />)
+    renderWithProviders({ ui: <LibrariesPage /> })
     const row = (await screen.findByRole('link', { name: 'Tutorials' })).closest('li')
     expect(row).toHaveTextContent('Other · Locked · 12 videos')
     expect(row?.querySelector(BACKDROP)).toBeNull()
@@ -261,7 +261,7 @@ describe('LibrariesPage', () => {
       }),
     ])
     spies.lock.mockImplementation(async () => ({ available: true, unlocked: true }))
-    renderWithProviders(<LibrariesPage />)
+    renderWithProviders({ ui: <LibrariesPage /> })
     expect(await screen.findByText('/media/Tutorials')).toBeInTheDocument()
     const row = screen.getByRole('link', { name: 'Tutorials' }).closest('li')
     expect(row).toHaveTextContent('Other · Unlocked · 12 videos')
@@ -277,13 +277,13 @@ describe('LibrariesPage', () => {
         settings: { ...library().settings, kind: 'movies' },
       }),
     ])
-    renderWithProviders(<LibrariesPage />)
+    renderWithProviders({ ui: <LibrariesPage /> })
     expect(await screen.findByText('Movies · 1,217 videos · 22 not matched')).toBeInTheDocument()
   })
 
   it('leaves Add library and Rescan out while the admin lock is on, but keeps the pin', async () => {
     spies.list.mockImplementation(async () => [library({ name: 'Clips' })])
-    renderWithProviders(<LibrariesPage />, { adminLock: { state: 'on', available: true } })
+    renderWithProviders({ ui: <LibrariesPage />, adminLock: { state: 'on', available: true } })
     expect(await screen.findByRole('button', { name: 'Pin Clips' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Add library' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Rescan' })).toBeNull()
@@ -291,7 +291,7 @@ describe('LibrariesPage', () => {
 
   it('says how to add the first library while the admin lock is on', async () => {
     spies.list.mockImplementation(async () => [])
-    renderWithProviders(<LibrariesPage />, { adminLock: { state: 'on', available: true } })
+    renderWithProviders({ ui: <LibrariesPage />, adminLock: { state: 'on', available: true } })
     expect(
       await screen.findByText('Turn the admin lock off in Settings to add one.'),
     ).toBeInTheDocument()

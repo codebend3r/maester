@@ -60,10 +60,13 @@ export const createBudgets = ({
   let isDisposed = false
 
   const sample = () => {
-    timer = timers.set(() => {
-      mark(`raven-memory-playing-mb ${sumMetrics(metrics()).memoryMb}\n`)
-      sample()
-    }, sampleMs)
+    timer = timers.set({
+      run: () => {
+        mark(`raven-memory-playing-mb ${sumMetrics(metrics()).memoryMb}\n`)
+        sample()
+      },
+      ms: sampleMs,
+    })
   }
 
   const start = (next: BudgetState) => {
@@ -80,10 +83,13 @@ export const createBudgets = ({
       case 'paused':
         // Electron's CPU figure covers the time since the previous call, so this one starts it.
         metrics()
-        timer = timers.set(() => {
-          timer = null
-          mark(`raven-cpu-paused-percent ${sumMetrics(metrics()).cpuPercent}\n`)
-        }, windowMs)
+        timer = timers.set({
+          run: () => {
+            timer = null
+            mark(`raven-cpu-paused-percent ${sumMetrics(metrics()).cpuPercent}\n`)
+          },
+          ms: windowMs,
+        })
         return
       default: {
         const unreachable: never = next

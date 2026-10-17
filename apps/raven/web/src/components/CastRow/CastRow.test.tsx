@@ -19,7 +19,7 @@ describe('castMembers', () => {
 
 describe('CastRow', () => {
   it('shows photos where TMDB has them and initials where it does not', () => {
-    const { container } = renderWithProviders(<CastRow credits={itemDetails().credits} />)
+    const { container } = renderWithProviders({ ui: <CastRow credits={itemDetails().credits} /> })
     expect(screen.getByRole('heading', { name: 'Cast & Crew' })).toBeInTheDocument()
     expect(screen.getByText('Rudy / Director')).toBeInTheDocument()
     expect(container.querySelector('img')).toHaveAttribute('src', '/api/people/1/photo?v=k1')
@@ -28,7 +28,7 @@ describe('CastRow', () => {
   })
 
   it('scrolls a page at a time from its buttons, and takes focus to scroll by keyboard', async () => {
-    renderWithProviders(<CastRow credits={itemDetails().credits} />)
+    renderWithProviders({ ui: <CastRow credits={itemDetails().credits} /> })
     const row = screen.getByRole('list', { name: 'Cast & Crew' })
     Object.defineProperty(row, 'clientWidth', { value: 800 })
     const scrolled: number[] = []
@@ -42,7 +42,7 @@ describe('CastRow', () => {
   })
 
   it('shows nothing without credits', () => {
-    const { container } = renderWithProviders(<CastRow credits={[]} />)
+    const { container } = renderWithProviders({ ui: <CastRow credits={[]} /> })
     expect(container.textContent).toBe('')
   })
 })

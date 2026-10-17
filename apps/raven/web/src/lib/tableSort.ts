@@ -10,7 +10,9 @@ export type SortColumn<T> = {
 
 export type ActiveSort<K extends string> = { key: K; direction: SortDirection }
 
-const compare = (a: number | string | null, b: number | string | null): number => {
+type SortValue = ReturnType<SortColumn<unknown>['value']>
+
+const compare = ({ a, b }: { a: SortValue; b: SortValue }): number => {
   if (a == null && b == null) return 0
   // Rows with nothing to sort by go last whichever way the column points.
   if (a == null) return 1
@@ -35,7 +37,7 @@ export const sortRows = <T, K extends string>({
   return rows
     .map((row, index) => ({ row, index, value: column.value(row) }))
     .toSorted((a, b) => {
-      const byValue = compare(a.value, b.value)
+      const byValue = compare({ a: a.value, b: b.value })
       // A missing value sorts last either way; otherwise the direction applies.
       if (a.value == null || b.value == null) return byValue
       return byValue * sign || a.index - b.index

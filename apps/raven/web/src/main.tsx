@@ -10,7 +10,7 @@ import { AppRoutes } from '@/AppRoutes'
 import { CardLinks } from '@/components/CardLink/CardLink'
 import { MediaOriginProbe } from '@/components/MediaOriginProbe/MediaOriginProbe'
 import { createQueryClient } from '@/lib/queryClient'
-import { SharedPlaybackPolicy } from '@/lib/sharedPlaybackPolicy'
+import { PrefetchPlaybackSettings } from '@/lib/prefetchPlaybackSettings'
 import { followTheme } from '@/stores/theme'
 
 const queryClient = createQueryClient()
@@ -22,13 +22,13 @@ if (rootElement) {
     <StrictMode>
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
-          <SharedPlaybackPolicy>
+          <PrefetchPlaybackSettings>
             <MediaOriginProbe>
               <CardLinks>
                 <AppRoutes />
               </CardLinks>
             </MediaOriginProbe>
-          </SharedPlaybackPolicy>
+          </PrefetchPlaybackSettings>
         </BrowserRouter>
       </QueryClientProvider>
     </StrictMode>,

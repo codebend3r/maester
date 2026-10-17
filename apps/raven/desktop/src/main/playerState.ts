@@ -17,6 +17,8 @@ export const RESUME_CAP = 1000
 export const TRACKS_CAP = 1000
 export const END_MARGIN_S = 10
 
+export const RECENT_KINDS = { file: 'file', server: 'server' } as const
+
 const isFileRecent = object({
   kind: oneOf(['file']),
   path: isString,

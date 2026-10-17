@@ -16,7 +16,7 @@ describe('FavouritesPage', () => {
       { media: mediaItem({ id: 1, title: 'First', favourite: true }), poster: null },
       { media: mediaItem({ id: 2, title: 'Second', favourite: true }), poster: null },
     ])
-    renderWithProviders(<FavouritesPage />)
+    renderWithProviders({ ui: <FavouritesPage /> })
     expect(await screen.findByRole('link', { name: 'First' })).toHaveAttribute('href', '/watch/1')
     expect(screen.getByRole('link', { name: 'Second' })).toHaveAttribute('href', '/watch/2')
     spy.mockRestore()
@@ -26,7 +26,7 @@ describe('FavouritesPage', () => {
     const spy = spyOn(api, 'listFavourites').mockImplementation(async () => [
       { media: matchedMovie({ favourite: true }), poster: itemSummary() },
     ])
-    renderWithProviders(<FavouritesPage />)
+    renderWithProviders({ ui: <FavouritesPage /> })
     expect(await screen.findByRole('link', { name: 'Busboys' })).toHaveAttribute(
       'href',
       '/movies/40?library=2',
@@ -39,7 +39,7 @@ describe('FavouritesPage', () => {
     const spy = spyOn(api, 'listFavourites').mockImplementation(async () => [
       { media: { ...EPISODE_TWO, favourite: true }, poster: SEASON_ONE_CARD },
     ])
-    const { container } = renderWithProviders(<FavouritesPage />)
+    const { container } = renderWithProviders({ ui: <FavouritesPage /> })
     expect(await screen.findByRole('link', { name: mediaLabel(EPISODE_TWO) })).toHaveAttribute(
       'href',
       '/episodes/7?library=2',
@@ -56,7 +56,7 @@ describe('FavouritesPage', () => {
 
   it('explains how to add one when there are none', async () => {
     const spy = spyOn(api, 'listFavourites').mockImplementation(async () => [])
-    renderWithProviders(<FavouritesPage />)
+    renderWithProviders({ ui: <FavouritesPage /> })
     expect(await screen.findByText(/No favourites yet/)).toBeInTheDocument()
     spy.mockRestore()
   })
@@ -78,20 +78,28 @@ describe('FavouritesPage', () => {
     /** Where the page's address stands, so a test can see what rides in it. */
     const Address = () => <output data-testid="address">{useLocation().search}</output>
 
-    const serve = (entries: PosterEntry[], route = '/favourites') => {
+    const serve = ({
+      entries,
+      route = '/favourites',
+    }: {
+      entries: PosterEntry[]
+      route?: string
+    }) => {
       const spy = spyOn(api, 'listFavourites').mockImplementation(async () => entries)
-      renderWithProviders(
-        <>
-          <FavouritesPage />
-          <Address />
-        </>,
-        { route },
-      )
+      renderWithProviders({
+        ui: (
+          <>
+            <FavouritesPage />
+            <Address />
+          </>
+        ),
+        route,
+      })
       return spy
     }
 
     it('offers each kind among the favourites, and narrows to the one picked', async () => {
-      const spy = serve([MOVIE, EPISODE, HOME_VIDEO])
+      const spy = serve({ entries: [MOVIE, EPISODE, HOME_VIDEO] })
       expect(await screen.findByRole('link', { name: 'Busboys' })).toBeInTheDocument()
       expect(screen.getByText('3 videos')).toBeInTheDocument()
       const pills = within(screen.getByRole('group', { name: 'Show' }))
@@ -122,7 +130,7 @@ describe('FavouritesPage', () => {
     })
 
     it('starts on the kind the address names', async () => {
-      const spy = serve([MOVIE, EPISODE], '/favourites?kind=movies')
+      const spy = serve({ entries: [MOVIE, EPISODE], route: '/favourites?kind=movies' })
       expect(await screen.findByRole('link', { name: 'Busboys' })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Movies' })).toHaveAttribute('aria-pressed', 'true')
       expect(screen.queryByRole('link', { name: mediaLabel(EPISODE_TWO) })).toBeNull()
@@ -130,7 +138,7 @@ describe('FavouritesPage', () => {
     })
 
     it('shows them all when the address names a kind there are none of, or none at all', async () => {
-      const spy = serve([MOVIE, EPISODE], '/favourites?kind=other')
+      const spy = serve({ entries: [MOVIE, EPISODE], route: '/favourites?kind=other' })
       expect(await screen.findByRole('link', { name: 'Busboys' })).toBeInTheDocument()
       expect(screen.getByRole('link', { name: mediaLabel(EPISODE_TWO) })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true')
@@ -138,10 +146,10 @@ describe('FavouritesPage', () => {
     })
 
     it('has nothing to filter while every favourite is of one kind', async () => {
-      const spy = serve(
-        [MOVIE, { ...MOVIE, media: { ...MOVIE.media, id: 2 } }],
-        '/favourites?kind=episodes',
-      )
+      const spy = serve({
+        entries: [MOVIE, { ...MOVIE, media: { ...MOVIE.media, id: 2 } }],
+        route: '/favourites?kind=episodes',
+      })
       expect(await screen.findAllByRole('link', { name: 'Busboys' })).toHaveLength(2)
       expect(screen.queryByRole('group', { name: 'Show' })).toBeNull()
       spy.mockRestore()

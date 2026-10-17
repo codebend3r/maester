@@ -37,10 +37,10 @@ const fakeFs = ({ initial }: { initial: Record<string, string> }) => {
       if (text === undefined) throw missing({ path })
       return text
     },
-    writeFile: async (path, data) => {
+    writeFile: async ({ path, data }) => {
       files.set(path, data)
     },
-    rename: async (from, to) => {
+    rename: async ({ from, to }) => {
       const text = files.get(from)
       if (text === undefined) throw missing({ path: from })
       files.delete(from)

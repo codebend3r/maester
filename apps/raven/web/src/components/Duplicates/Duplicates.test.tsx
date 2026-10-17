@@ -103,9 +103,9 @@ describe('the Duplicates tab', () => {
   /** The tab as the library page opens it, its listing read through the query. */
   const show = async (listing: DuplicatesListing = LISTING) => {
     spies.list.mockImplementation(async () => listing)
-    renderWithProviders(
-      <SectionView library={library({ id: 2, name: 'Films' })} section="duplicates" />,
-    )
+    renderWithProviders({
+      ui: <SectionView library={library({ id: 2, name: 'Films' })} section="duplicates" />,
+    })
     await waitFor(() => expect(spies.list).toHaveBeenCalledWith(2))
     await waitFor(() => expect(screen.queryByText('Loading')).toBeNull())
   }
@@ -251,10 +251,10 @@ describe('the Duplicates tab', () => {
 
   it('leaves splitting and putting back together out while the admin lock is on', async () => {
     spies.list.mockImplementation(async () => AFTER_SPLIT)
-    renderWithProviders(
-      <SectionView library={library({ id: 2, name: 'Films' })} section="duplicates" />,
-      { adminLock: { state: 'on', available: true } },
-    )
+    renderWithProviders({
+      ui: <SectionView library={library({ id: 2, name: 'Films' })} section="duplicates" />,
+      adminLock: { state: 'on', available: true },
+    })
     expect(await screen.findByRole('article', { name: 'Alexander' })).toBeInTheDocument()
     expect(screen.getByRole('article', { name: 'Heat' })).toBeInTheDocument()
     expect(screen.queryAllByRole('button', { name: /split apart|put back together/i })).toEqual([])

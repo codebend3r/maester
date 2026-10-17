@@ -103,11 +103,14 @@ describe('the building blocks', () => {
     expect(isRecentView({ recentId: id, label: 'film.mkv', from: 'Movies', watched: 0.5 })).toBe(
       true,
     )
-    expect(
-      ['togglePlay', 'skipBack', 'skipForward', 'next', 'showShortcuts', 'stats'].every(
-        isMenuPlayerAction,
-      ),
-    ).toBe(true)
+    expect(isMenuPlayerAction.values).toEqual([
+      'togglePlay',
+      'skipBack',
+      'skipForward',
+      'next',
+      'showShortcuts',
+      'stats',
+    ])
   })
 
   it('rejects ids that are not opaque and unknown actions', () => {

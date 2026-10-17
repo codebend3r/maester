@@ -41,12 +41,14 @@ describe('HistoryPage', () => {
       asked.push({ limit, watchedOnly })
       return entries(!!watchedOnly).slice(0, limit)
     })
-    renderWithProviders(
-      <Routes>
-        <Route path="libraries/:id/history" element={<HistoryPage />} />
-      </Routes>,
-      { route: '/libraries/2/history' },
-    )
+    renderWithProviders({
+      ui: (
+        <Routes>
+          <Route path="libraries/:id/history" element={<HistoryPage />} />
+        </Routes>
+      ),
+      route: '/libraries/2/history',
+    })
   }
 
   afterEach(() => {

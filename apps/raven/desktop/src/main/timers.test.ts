@@ -7,7 +7,7 @@ describe('createNodeTimers', () => {
   it('runs a timer after its delay', async () => {
     const timers = createNodeTimers()
     const runs: string[] = []
-    timers.set(() => runs.push('ran'), 5)
+    timers.set({ run: () => runs.push('ran'), ms: 5 })
     await sleep(20)
     expect(runs).toEqual(['ran'])
   })
@@ -15,7 +15,7 @@ describe('createNodeTimers', () => {
   it('cancels a timer it set', async () => {
     const timers = createNodeTimers()
     const runs: string[] = []
-    const handle = timers.set(() => runs.push('ran'), 5)
+    const handle = timers.set({ run: () => runs.push('ran'), ms: 5 })
     timers.clear(handle)
     await sleep(20)
     expect(runs).toEqual([])
@@ -24,7 +24,7 @@ describe('createNodeTimers', () => {
   it('ignores a handle it never gave out', async () => {
     const timers = createNodeTimers()
     const runs: string[] = []
-    timers.set(() => runs.push('ran'), 5)
+    timers.set({ run: () => runs.push('ran'), ms: 5 })
     timers.clear('not a handle')
     timers.clear(undefined)
     await sleep(20)

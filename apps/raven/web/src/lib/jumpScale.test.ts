@@ -9,7 +9,13 @@ const strip = (scale: ReturnType<typeof jumpScale>): string[] =>
   scale?.marks.map((mark) => (scale.entries.has(mark.key) ? mark.label : `(${mark.label})`)) ?? []
 
 /** The entries under the mark labelled `label`. */
-const under = (scale: ReturnType<typeof jumpScale>, label: string): string[] => {
+const under = ({
+  scale,
+  label,
+}: {
+  scale: ReturnType<typeof jumpScale>
+  label: string
+}): string[] => {
   const mark = scale?.marks.find((each) => each.label === label)
   return [...(scale?.entries.get(mark?.key ?? '') ?? [])]
 }
@@ -33,7 +39,7 @@ describe('jumpScale', () => {
     const az = jumpScale({ sort: 'title', files, source: 'tmdb' })
     expect(az?.field).toBe('title')
     expect(az?.marks.map((mark) => mark.label).slice(0, 3)).toEqual(['#', 'A', 'B'])
-    expect(under(az, 'H')).toEqual([mediaEntryKey(files[0] ?? movie({}))])
+    expect(under({ scale: az, label: 'H' })).toEqual([mediaEntryKey(files[0] ?? movie({}))])
     const za = jumpScale({ sort: 'title-desc', files, source: 'tmdb' })
     expect(za?.marks.map((mark) => mark.label).slice(0, 2)).toEqual(['Z', 'Y'])
     expect(za?.marks.at(-1)?.label).toBe('#')
@@ -70,7 +76,7 @@ describe('jumpScale', () => {
       '?',
     ])
     expect(scale?.marks[0]?.name).toBe('75 to 80 Mb/s')
-    expect(under(scale, '?')).toEqual(['media:4'])
+    expect(under({ scale, label: '?' })).toEqual(['media:4'])
   })
 
   it('steps size in round GB, smallest first when turned around', () => {
@@ -133,7 +139,7 @@ describe('jumpScale', () => {
   })
 
   it("steps scores by whole points, written the way the library's source writes them", () => {
-    const rated = (value: number, id: number) =>
+    const rated = ({ value, id }: { value: number; id: number }) =>
       movie({
         id,
         item: itemSummary({
@@ -144,7 +150,7 @@ describe('jumpScale', () => {
           ],
         }),
       })
-    const files = [rated(8.6, 1), rated(6.4, 2)]
+    const files = [rated({ value: 8.6, id: 1 }), rated({ value: 6.4, id: 2 })]
     const imdb = jumpScale({ sort: 'rating-high', files, source: 'imdb' })
     expect(strip(imdb)).toEqual(['8', '(7)', '6'])
     expect(imdb?.unit).toBeNull()
@@ -195,16 +201,19 @@ describe('jumpScale', () => {
     const scale = jumpScale({ sort: 'bitrate-high', files: [], shows, source: 'tmdb' })
     expect(scale?.field).toBe('bitrate')
     expect(strip(scale)).toEqual(['15', '(10)', '(5)', '0'])
-    expect(under(scale, '0')).toEqual(['show:9'])
+    expect(under({ scale, label: '0' })).toEqual(['show:9'])
   })
 
   it("has no strip for a TV library's order by when files changed, which its shows do not have", () => {
     const show = { ...showEntry(), show: itemSummary({ id: 9, type: 'show', title: 'The Wire' }) }
     const files = [movie({ id: 1, changedAt: '2026-10-03T12:00:00Z' })]
     expect(jumpScale({ sort: 'changed', files, shows: [show], source: 'tmdb' })).toBeNull()
-    expect(under(jumpScale({ sort: 'title', files, shows: [show], source: 'tmdb' }), 'W')).toEqual([
-      'show:9',
-    ])
+    expect(
+      under({
+        scale: jumpScale({ sort: 'title', files, shows: [show], source: 'tmdb' }),
+        label: 'W',
+      }),
+    ).toEqual(['show:9'])
   })
 
   it('reads months in UTC, as the grouped view buckets them', () => {

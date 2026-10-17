@@ -38,18 +38,20 @@ const files = [
 ]
 
 const renderShows = () =>
-  renderWithProviders(
-    <UnmatchedShows
-      files={files}
-      renderFiles={(group) => (
-        <ul aria-label="Episodes">
-          {group.map((file) => (
-            <li key={file.id}>{file.title}</li>
-          ))}
-        </ul>
-      )}
-    />,
-  )
+  renderWithProviders({
+    ui: (
+      <UnmatchedShows
+        files={files}
+        renderFiles={(group) => (
+          <ul aria-label="Episodes">
+            {group.map((file) => (
+              <li key={file.id}>{file.title}</li>
+            ))}
+          </ul>
+        )}
+      />
+    ),
+  })
 
 describe('UnmatchedShows', () => {
   it('lists one collapsed entry per show folder, with its episode count', () => {
@@ -99,23 +101,29 @@ describe('UnmatchedShows', () => {
   })
 
   it('names a show read from no name by its first file', () => {
-    renderWithProviders(
-      <UnmatchedShows
-        files={[mediaItem({ id: 9, title: 'S01E02', folder: 'Season 1', fileName: 'S01E02.mkv' })]}
-        renderFiles={() => null}
-      />,
-    )
+    renderWithProviders({
+      ui: (
+        <UnmatchedShows
+          files={[
+            mediaItem({ id: 9, title: 'S01E02', folder: 'Season 1', fileName: 'S01E02.mkv' }),
+          ]}
+          renderFiles={() => null}
+        />
+      ),
+    })
     expect(screen.getByRole('button', { name: 'Fix match for S01E02' })).toBeInTheDocument()
   })
 
   it("shows what the AI lookup suggests in the show's entry, with Accept and its one Fix match", async () => {
-    renderWithProviders(
-      <UnmatchedShows
-        files={files}
-        renderFiles={() => null}
-        suggestionOf={(file) => (file.id === 1 ? aiSuggestion() : null)}
-      />,
-    )
+    renderWithProviders({
+      ui: (
+        <UnmatchedShows
+          files={files}
+          renderFiles={() => null}
+          suggestionOf={(file) => (file.id === 1 ? aiSuggestion() : null)}
+        />
+      ),
+    })
     const [archie] = screen.getAllByRole('listitem')
     expect(
       within(archie!).getByRole('article', {
@@ -133,13 +141,15 @@ describe('UnmatchedShows', () => {
   })
 
   it('keeps the card of a show whose first file is still pending, accepting it for a file it is for', async () => {
-    renderWithProviders(
-      <UnmatchedShows
-        files={[{ ...files[0]!, match: 'pending' }, files[1]!]}
-        renderFiles={() => null}
-        suggestionOf={(file) => (file.id === 2 ? aiSuggestion() : null)}
-      />,
-    )
+    renderWithProviders({
+      ui: (
+        <UnmatchedShows
+          files={[{ ...files[0]!, match: 'pending' }, files[1]!]}
+          renderFiles={() => null}
+          suggestionOf={(file) => (file.id === 2 ? aiSuggestion() : null)}
+        />
+      ),
+    })
     await userEvent.click(
       screen.getByRole('button', {
         name: 'Accept Archie: The Man Who Became Cary Grant (2023) for Archie',
@@ -149,9 +159,15 @@ describe('UnmatchedShows', () => {
   })
 
   it("hands focus back to the suggestion's Fix match once its dialog is cancelled", async () => {
-    renderWithProviders(
-      <UnmatchedShows files={files} renderFiles={() => null} suggestionOf={() => aiSuggestion()} />,
-    )
+    renderWithProviders({
+      ui: (
+        <UnmatchedShows
+          files={files}
+          renderFiles={() => null}
+          suggestionOf={() => aiSuggestion()}
+        />
+      ),
+    })
     const fix = screen.getByRole('button', { name: 'Fix match for Archie' })
     expect(fix.closest('article')).not.toBeNull()
     await userEvent.click(fix)

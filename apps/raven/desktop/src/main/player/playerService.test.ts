@@ -323,7 +323,7 @@ const createFakeTimers = () => {
   const pending = new Map<number, { run: () => void; ms: number }>()
   const counter = { next: 1 }
   const timers: Timers = {
-    set: (run, ms) => {
+    set: ({ run, ms }) => {
       const handle = counter.next
       counter.next += 1
       pending.set(handle, { run, ms })
@@ -346,7 +346,7 @@ const createTimedTimers = () => {
   const state = { now: 0, next: 1 }
   const pending = new Map<number, { run: () => void; at: number; ms: number }>()
   const timers: Timers = {
-    set: (run, ms) => {
+    set: ({ run, ms }) => {
       const handle = state.next
       state.next += 1
       pending.set(handle, { run, at: state.now + ms, ms })

@@ -30,7 +30,8 @@ const show = ({
 }: {
   card: readonly [MediaItem, ...MediaItem[]]
   everyCard?: readonly MediaItem[]
-}) => renderWithProviders(<MovieFiles files={card} everyCard={everyCard} itemId={STRAYS.id} />)
+}) =>
+  renderWithProviders({ ui: <MovieFiles files={card} everyCard={everyCard} itemId={STRAYS.id} /> })
 
 describe('MovieFiles', () => {
   const spies = { split: spyOn(api, 'splitDuplicate'), join: spyOn(api, 'joinSplit') }
