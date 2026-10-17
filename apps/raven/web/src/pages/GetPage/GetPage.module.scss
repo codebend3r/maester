@@ -1,0 +1,227 @@
+// The glow is wider than a phone; clip, not hidden, so the header still sticks.
+.page {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'header'
+    'main'
+    'footer';
+  min-height: 100dvh;
+  overflow-x: clip;
+  background: var(--color-night);
+  color: var(--color-bark);
+}
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  grid-area: header;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-areas: 'brand nav theme';
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--gutter);
+  background: var(--color-night-haze);
+  backdrop-filter: blur(14px);
+}
+
+.brand {
+  grid-area: brand;
+  display: grid;
+  justify-content: start;
+}
+
+.nav {
+  grid-area: nav;
+  display: grid;
+  grid-auto-flow: column;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.theme {
+  grid-area: theme;
+}
+
+// The hero's own download sits just below on a phone.
+.jump {
+  display: grid;
+  align-items: center;
+  min-height: var(--field-size);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  text-decoration: none;
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition: background-color 150ms ease;
+  }
+
+  &:hover {
+    background: var(--color-hover);
+  }
+
+  @media (max-width: 30rem) {
+    display: none;
+  }
+}
+
+.openApp {
+  min-height: var(--field-size);
+  border-radius: var(--radius-pill);
+}
+
+.main {
+  grid-area: main;
+  display: grid;
+  align-content: start;
+}
+
+// The copy over a wash of the theme's play colour, then the window.
+.hero {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: var(--space-6);
+  padding: var(--section-gap) var(--gutter) 0;
+  text-align: center;
+  isolation: isolate;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: calc(-1 * var(--space-10));
+    left: 50%;
+    z-index: -1;
+    width: min(68.75rem, 140vw);
+    height: 45rem;
+    transform: translateX(-50%);
+    background: radial-gradient(
+      closest-side,
+      color-mix(in srgb, var(--color-leaf) 40%, transparent),
+      transparent
+    );
+    opacity: var(--glow);
+    pointer-events: none;
+  }
+}
+
+.intro {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-4);
+  max-width: 56.25rem;
+}
+
+.headline {
+  font-size: var(--font-size-display);
+}
+
+.pitch {
+  max-width: var(--measure);
+  color: var(--color-birch);
+  font-size: var(--font-size-lg);
+  text-wrap: pretty;
+}
+
+.actions {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: center;
+  gap: var(--space-2);
+
+  @media (max-width: 40rem) {
+    grid-auto-flow: row;
+    justify-content: stretch;
+    width: 100%;
+  }
+}
+
+.needs {
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+
+  a {
+    color: var(--color-birch);
+  }
+}
+
+.features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17.5rem), 1fr));
+  gap: var(--space-5) var(--space-6);
+  justify-self: center;
+  width: min(100%, 81.25rem);
+  padding: clamp(var(--space-7), 8vw, var(--space-10)) var(--gutter);
+  border-top: 1px solid var(--color-line-faint);
+}
+
+.feature {
+  display: grid;
+  align-content: start;
+  justify-items: start;
+  gap: var(--space-2);
+}
+
+.featureIcon {
+  display: grid;
+  place-items: center;
+  width: var(--control-size-tall);
+  height: var(--control-size-tall);
+  border-radius: var(--radius-lg);
+  background: var(--color-moss);
+}
+
+.featureTitle {
+  font-size: var(--font-size-xl);
+  line-height: var(--line-tight);
+}
+
+.featureText {
+  color: var(--color-birch);
+  line-height: var(--line-relaxed);
+  text-wrap: pretty;
+}
+
+.footer {
+  grid-area: footer;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'about links';
+  gap: var(--space-3);
+  padding: var(--space-5) var(--gutter) var(--space-6);
+  border-top: 1px solid var(--color-line-faint);
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+
+  @media (max-width: 40rem) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'about'
+      'links';
+  }
+}
+
+.about {
+  grid-area: about;
+}
+
+.links {
+  grid-area: links;
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  gap: var(--space-4);
+
+  a {
+    color: var(--color-birch);
+  }
+
+  @media (max-width: 30rem) {
+    grid-auto-flow: row;
+    gap: var(--space-1);
+  }
+}
