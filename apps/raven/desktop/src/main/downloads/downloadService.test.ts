@@ -1578,6 +1578,17 @@ describe('deleting once watched', () => {
     expect(world.sent).toContainEqual(DELETED)
   })
 
+  it('runs a deletion held for the file playing once the player is on nothing of this computer', async () => {
+    const world = settingUp({ watchedAt: NOW - 3 * MINUTE })
+    await until(() => world.service.views()[0]?.deletesAt !== null)
+    await play(world)
+    after(world, 7 * MINUTE)
+    await ticks(10)
+    expect(entries(world)).toHaveLength(1)
+    world.service.notePlaying({ fileId: null })
+    await until(() => entries(world).length === 0)
+  })
+
   it('keeps a title scrubbed back to its middle, and deletes it once it is played to its end', async () => {
     const world = settingUp({})
     await ticks(10)

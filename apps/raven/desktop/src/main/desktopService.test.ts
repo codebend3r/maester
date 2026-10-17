@@ -517,6 +517,12 @@ describe('handle', () => {
     expect(spies.ready).toBe(1)
   })
 
+  it('tells the downloads a page that says ready plays nothing, as after a reload mid-play', async () => {
+    const { service, reached } = setup({ files: {} })
+    await service.handle({ kind: 'page', request: { type: 'ready' } })
+    expect(reached).toEqual([{ name: 'notePlaying', input: { fileId: null } }])
+  })
+
   it('opens the dialog on request', async () => {
     const { service, spies } = setup({ files: show, dialog: ['/m/Show/Episode 2.mkv'] })
     const reply = await service.handle({ kind: 'page', request: { type: 'openDialog' } })
