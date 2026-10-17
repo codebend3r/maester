@@ -6,10 +6,10 @@ import type { SubtitleCue } from '@/contract'
  * a window reads only its own stretch. Five minutes keeps the first one
  * quick even on a remux over SMB.
  */
-export const SUBTITLE_WINDOW_SECONDS = 300
+const SUBTITLE_WINDOW_SECONDS = 300
 
 /** Each window starts this much early, so a cue straddling the boundary is not lost. */
-export const SUBTITLE_WINDOW_LEAD = 10
+const SUBTITLE_WINDOW_LEAD = 10
 
 /** The next window is fetched this long before playback reaches it. */
 const PREFETCH_SECONDS = 60

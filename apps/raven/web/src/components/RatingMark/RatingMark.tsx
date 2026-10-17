@@ -6,7 +6,7 @@ import styles from '@/components/RatingMark/RatingMark.module.scss'
 export const isFresh = (rating: Rating): boolean => rating.value >= 6
 
 /** Metacritic's bands: green from 61, yellow from 40, red below. */
-export const metacriticBand = (rating: Rating): 'green' | 'yellow' | 'red' => {
+const metacriticBand = (rating: Rating): 'green' | 'yellow' | 'red' => {
   const score = Math.round(rating.value * 10)
   if (score >= 61) return 'green'
   if (score >= 40) return 'yellow'

@@ -4,7 +4,7 @@ import { fileFacts } from '@/lib/itemFacts'
 import styles from '@/components/PlayableItemView/FileFacts.module.scss'
 
 /** The file's facts as label and value: its tracks, then its container, bitrate and size. */
-export const allFileFacts = ({
+const allFileFacts = ({
   media,
   tracks,
 }: {

@@ -2,7 +2,7 @@ import { useDeferredValue, useEffect, useState } from 'react'
 import { useLocation, useSearchParams } from 'react-router-dom'
 
 /** How long a search box waits after the last keystroke before it searches. */
-export const SEARCH_DELAY_MS = 200
+const SEARCH_DELAY_MS = 200
 
 /**
  * A search box's state: the text as typed, and the `query` it asks for,

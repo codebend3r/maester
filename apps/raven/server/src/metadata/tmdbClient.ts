@@ -95,7 +95,7 @@ export type FetchedCredit = {
 }
 
 /** A review by a TMDB member, as TMDB hands it on. */
-export type FetchedReview = {
+type FetchedReview = {
   tmdbId: string
   author: string
   /** TMDB's path for the avatar; anything else TMDB passes on is dropped. */
@@ -168,7 +168,7 @@ export const BLANK_ITEM: Omit<FetchedItem, 'type' | 'tmdbId' | 'number' | 'title
 }
 
 /** One of TMDB's pictures for a movie or show. */
-export type TmdbImage = {
+type TmdbImage = {
   path: string
   width: number | null
   height: number | null
@@ -230,12 +230,12 @@ const records = (value: unknown): Array<Record<string, unknown>> => list(value).
 const idOf = (value: unknown): string | null =>
   isNumber(value) ? String(value) : isString(value) && value !== '' ? value : null
 
-export const imagePath = (value: unknown): string | null => {
+const imagePath = (value: unknown): string | null => {
   const path = text(value)
   return path != null && TMDB_IMAGE_PATH.test(path) ? path : null
 }
 
-export const yearOf = (date: string | null): number | null => {
+const yearOf = (date: string | null): number | null => {
   const year = Number(date?.slice(0, 4) ?? '')
   return date != null && /^\d{4}/.test(date) && year > 0 ? year : null
 }
@@ -301,7 +301,7 @@ const toMovieExtras = ({
 })
 
 /** Reviews appended to a movie or show, newest first. */
-export const toReviews = (reviews: unknown): FetchedReview[] =>
+const toReviews = (reviews: unknown): FetchedReview[] =>
   records(record(reviews).results)
     .flatMap((entry): FetchedReview[] => {
       const tmdbId = text(entry.id)
@@ -394,7 +394,7 @@ const castCredits = ({ cast, job }: { cast: unknown; job: 'cast' | 'guest' }): F
       return found ? [{ ...found, job, role: text(entry.character) }] : []
     })
 
-export const crewCredits = (crew: unknown): FetchedCredit[] =>
+const crewCredits = (crew: unknown): FetchedCredit[] =>
   records(crew).flatMap((entry) => {
     const found = person(entry)
     const role = text(entry.job)
@@ -568,7 +568,7 @@ export const toSeason = (
 }
 
 /** A movie with its credits, release dates and external ids appended. */
-export const toMovie = ({
+const toMovie = ({
   body,
   country,
   language,

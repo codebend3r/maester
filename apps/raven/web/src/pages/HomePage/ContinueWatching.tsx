@@ -124,7 +124,7 @@ const ContinueTile = ({ entry }: { entry: PosterEntry }) => {
 }
 
 /** Three rows of two: as many as fit before the library rows without burying them. */
-export const FIRST_TILES = 6
+const FIRST_TILES = 6
 
 /**
  * Every video in progress, the most recently watched first, as wide tiles

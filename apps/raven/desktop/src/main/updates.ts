@@ -7,9 +7,9 @@ const RELEASE_LIST_PATHS = [
   '/repos/codebend3r/maester/releases',
   '/repositories/1388607730/releases',
 ] as const
-export const RELEASE_PAGE_PREFIX = 'https://github.com/codebend3r/maester/releases/tag/'
+const RELEASE_PAGE_PREFIX = 'https://github.com/codebend3r/maester/releases/tag/'
 export const CHECK_INTERVAL_MS = 86_400_000
-export const UPDATE_TIMEOUT_MS = 10_000
+const UPDATE_TIMEOUT_MS = 10_000
 /** Across every page read. */
 export const MAX_RELEASES_CHARS = 2_097_152
 export const MAX_RELEASE_PAGES = 5

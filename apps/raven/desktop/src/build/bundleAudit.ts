@@ -169,7 +169,7 @@ export const bundleProblems = ({
 export type ToolRun = (command: { command: string; args: string[] }) => Promise<string>
 
 /** What a failed command said: its standard error when it wrote one, else its message. */
-export const failureText = (error: unknown): string => {
+const failureText = (error: unknown): string => {
   if (
     typeof error === 'object' &&
     error !== null &&

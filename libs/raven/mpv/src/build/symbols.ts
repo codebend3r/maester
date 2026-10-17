@@ -44,7 +44,7 @@ type Policy = {
 // pl_glslang_compile the second. Both were null in the libmpv whose window surface crashed.
 const glslangEntryPoints = ['__ZN7glslang17InitializeProcessEv', '__Z19GetDefaultResourcesv']
 
-export const symbolPolicies = {
+const symbolPolicies = {
   'lib/libMoltenVK.dylib': { lookups: [], defines: [] },
   'lib/libmpv.2.dylib': { lookups: [], defines: glslangEntryPoints },
   // An N-API addon links with `-undefined dynamic_lookup`; Node or Electron supplies N-API,

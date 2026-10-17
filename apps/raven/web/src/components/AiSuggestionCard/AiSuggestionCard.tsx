@@ -8,7 +8,7 @@ import { afterMatch } from '@/lib/invalidate'
 import styles from '@/components/AiSuggestionCard/AiSuggestionCard.module.scss'
 
 /** A suggestion's title as a person reads it, with its year when TMDB gives one. */
-export const suggestedName = (suggestion: AiSuggestion): string =>
+const suggestedName = (suggestion: AiSuggestion): string =>
   suggestion.year == null ? suggestion.title : `${suggestion.title} (${suggestion.year})`
 
 /**

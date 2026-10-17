@@ -6,7 +6,7 @@ import { BEST_FIRST } from '@/media/mediaSql'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 
 /** A file of a card, with the length that a mark records as how far it got. */
-export type WatchFile = { id: number; duration: number | null }
+type WatchFile = { id: number; duration: number | null }
 
 /**
  * What a listing shows as one entry, in one library: the files of a movie

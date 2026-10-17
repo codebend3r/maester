@@ -24,7 +24,7 @@ const MARK_LINE = /^raven-([a-z][a-z0-9-]*) (\d+(?:\.\d+)?)$/
 const QUIT_OUTCOMES = { closed: 'closed', timeout: 'timeout' } as const
 
 /** The marks main has printed so far, in order, and whether its stdout has closed. */
-export type Marks = {
+type Marks = {
   seen: ReadonlyArray<{ name: string; value: number }>
   isClosed: boolean
   /** Calls `listener` on every mark and on close, until the returned function is called. */

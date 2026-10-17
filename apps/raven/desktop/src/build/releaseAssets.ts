@@ -5,7 +5,7 @@ import { basename, dirname, join, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import { dmgFileName, versionOf } from '@/build/dmgMaker'
 
-export const RELEASE_DIR = join('out', 'release')
+const RELEASE_DIR = join('out', 'release')
 export const SOURCE_BUNDLE = join(
   '..',
   '..',

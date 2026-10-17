@@ -18,7 +18,7 @@ export type PortLike = {
 }
 
 export const UNKNOWN_COMMAND = 'raven player does not understand that command.'
-export const BUSY = 'raven player is busy. Try again.'
+const BUSY = 'raven player is busy. Try again.'
 
 /** Requests waiting or in flight before the port refuses more; the page never needs this many. */
 export const MAX_PENDING = 100

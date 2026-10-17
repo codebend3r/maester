@@ -164,7 +164,6 @@ describe('isDesktopRequest', () => {
         output: { profile: 'pcm', device: 'auto', passthrough: ['ac3'], spatial: false },
       },
     ],
-    [{ type: 'serverCall', serverId: id, method: 'GET', path: '/api/media/7', body: null }],
     [
       {
         type: DESKTOP_REQUESTS.serverCall,
@@ -282,7 +281,6 @@ describe('isDesktopRequest', () => {
       'a browser open with a media id of zero',
       { type: DESKTOP_REQUESTS.openInBrowser, serverId: id, mediaId: 0 },
     ],
-    ['a browser open with a media id of zero', { type: 'openInBrowser', serverId: id, mediaId: 0 }],
     [
       'a browser open with a string media id',
       { type: DESKTOP_REQUESTS.openInBrowser, serverId: id, mediaId: '7' },
@@ -330,13 +328,6 @@ describe('isDesktopReply', () => {
         isEngineReady: true,
       },
     ],
-    [{ type: 'recents', recents: [{ recentId: id, label: 'a', from: 'b', watched: 0.25 }] }],
-    [{ type: 'recents', recents: [] }],
-    [{ type: 'done' }],
-    [{ type: 'refused', message: 'no such file' }],
-    [{ type: 'playServer', target: { serverId: id, mediaId: 7, at: 30, next: [8, 9] } }],
-    [{ type: 'serverReply', status: 200, body: '{"state":"off"}' }],
-    [{ type: 'serverUnreachable', message: 'raven player could not reach raven.example.' }],
     [
       {
         type: DESKTOP_REPLIES.recents,
@@ -507,7 +498,6 @@ describe('isInvokeEnvelope', () => {
 
 describe('isPlayerPortMessage', () => {
   it.each([
-    [{ type: 'raven:player-port', connection: { status: 'native' } }],
     [
       {
         type: WINDOW_MESSAGE_TYPES.playerPort,

@@ -106,10 +106,6 @@ const GROUPS: readonly Group[] = [
     has: (token) => token.group === TOKEN_GROUPS.line,
     sample: () => SAMPLES.line,
   },
-  { name: 'Radius', has: (token) => token.group === 'radius', sample: () => 'radius' },
-  { name: 'Typefaces', has: (token) => token.group === 'font', sample: () => 'family' },
-  { name: 'Type scale', has: (token) => token.group === 'font-size', sample: () => 'size' },
-  { name: 'Line height', has: (token) => token.group === 'line', sample: () => 'line' },
   {
     name: 'Tracking',
     has: named('--tracking-'),
@@ -132,7 +128,6 @@ const GROUPS: readonly Group[] = [
     has: (token) => token.group !== TOKEN_GROUPS.colour,
     sample: sizeSample,
   },
-  { name: 'Layout and focus', has: (token) => token.group !== 'colour', sample: sizeSample },
 ]
 
 /** Every token but the colours, in the groups the tokens page shows, each with how it is drawn. */

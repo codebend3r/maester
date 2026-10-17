@@ -14,10 +14,10 @@ import { LockService, type Viewer } from '@/lock/lockService'
 import { MediaRepository } from '@/media/mediaRepository'
 
 /** How many of a pinned library's newest arrivals its shelf on the home page holds. */
-export const SHELF_SIZE = 8
+const SHELF_SIZE = 8
 
 /** How many of a library's matches a search from home shows; the library's own search lists them all. */
-export const SEARCH_SHELF_SIZE = 16
+const SEARCH_SHELF_SIZE = 16
 
 /** The home page cuts across libraries, as favourites do, so it hangs off its own root. */
 @Controller('api/home')

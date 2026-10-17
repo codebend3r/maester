@@ -6,7 +6,7 @@ import {
 } from '@/contract'
 import { isRecord, isString } from '@/schema'
 
-export const LIBRARY_NAME_MAX = 80
+const LIBRARY_NAME_MAX = 80
 
 export type LibraryInputResult = { ok: true; value: LibraryInput } | { ok: false; errors: string[] }
 

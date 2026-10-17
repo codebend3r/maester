@@ -10,7 +10,7 @@ import {
 } from '@/main/updates'
 import type { UpdateStatus } from '@/shared/protocol'
 
-export const RELEASES_HOOK = 'RAVEN_DESKTOP_RELEASES_URL'
+const RELEASES_HOOK = 'RAVEN_DESKTOP_RELEASES_URL'
 
 export const UPDATE_COPY = {
   newer: (version: string) => `raven player ${version} is out.`,

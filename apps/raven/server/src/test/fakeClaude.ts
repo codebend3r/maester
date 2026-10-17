@@ -45,7 +45,7 @@ export type FakeReply =
   | { kind: typeof FAKE_REPLY_KINDS.say; text: string }
 
 /** A request raven sent Claude. */
-export type SeenRequest = {
+type SeenRequest = {
   url: string
   apiKey: string | null
   /** The bearer token header, which raven never sends. */

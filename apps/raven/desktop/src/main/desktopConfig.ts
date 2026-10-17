@@ -31,7 +31,7 @@ export const isServerEntry = object({
 export type ServerEntry = Infer<typeof isServerEntry>
 
 /** Whether the release check runs at launch, and when it last answered. */
-export const isUpdateSettings = object({ isEnabled: isBoolean, checkedAt: nullable(isNumber) })
+const isUpdateSettings = object({ isEnabled: isBoolean, checkedAt: nullable(isNumber) })
 
 export type UpdateSettings = Infer<typeof isUpdateSettings>
 

@@ -183,7 +183,7 @@ export const ShowCard = ({
  * page and its play button starts that episode at once. The wash is the
  * poster again, blurred: the same file, so nothing more is fetched.
  */
-export const WideShowCard = ({
+const WideShowCard = ({
   entry,
   ratingsSource = 'tmdb',
   sort,

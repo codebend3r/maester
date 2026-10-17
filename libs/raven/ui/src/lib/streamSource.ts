@@ -57,7 +57,7 @@ export type VideoLike = {
   removeEventListener: (type: string, listener: Listener) => void
 }
 
-export type StreamResponse = {
+type StreamResponse = {
   ok: boolean
   status: number
   body: ReadableStream<Uint8Array<ArrayBuffer>> | null

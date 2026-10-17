@@ -63,6 +63,4 @@ export const useFileDrop = ({
       window.removeEventListener('drop', drop)
     }
   }, [client])
-
-  return isDragging
 }

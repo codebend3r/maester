@@ -17,7 +17,7 @@ import { mediaEntryKey, showEntryKey } from '@/lib/entryKeys'
 import { LETTERS, type Letter, SPECIAL_LETTERS, mediaLetter, showLetter } from '@/lib/letters'
 
 /** One step of the jump strip. */
-export type JumpMark = {
+type JumpMark = {
   key: string
   /** What the strip shows: `A`, `70`, `4K`, `2020`, `Oct`. */
   label: string
