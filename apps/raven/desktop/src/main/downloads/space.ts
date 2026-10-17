@@ -30,10 +30,21 @@ type EntryParts = { userData: string; serverId: string; mediaId: number }
 export const downloadsDirFor = ({ userData }: { userData: string }): string =>
   join(userData, DOWNLOADS_DIR)
 
-export const entryDirFor = ({ userData, serverId, mediaId }: EntryParts): string => {
+/** One server's downloads, the folder removing that server removes. */
+export const serverDirFor = ({
+  userData,
+  serverId,
+}: {
+  userData: string
+  serverId: string
+}): string => {
   if (!isOpaqueId(serverId)) throw new RangeError('A download needs a server id')
+  return join(downloadsDirFor({ userData }), serverId)
+}
+
+export const entryDirFor = ({ userData, serverId, mediaId }: EntryParts): string => {
   if (!isMediaId(mediaId)) throw new RangeError('A download needs a media id')
-  return join(downloadsDirFor({ userData }), serverId, String(mediaId))
+  return join(serverDirFor({ userData, serverId }), String(mediaId))
 }
 
 export const videoPathFor = ({
@@ -48,7 +59,9 @@ export const videoPathFor = ({
 export const partPathFor = (parts: EntryParts & { container: string }): string =>
   `${videoPathFor(parts)}.part`
 
+export const subtitlesDirFor = (parts: EntryParts): string => join(entryDirFor(parts), 'subtitles')
+
 export const sidecarPathFor = ({ trackId, ...entry }: EntryParts & { trackId: string }): string => {
   if (!isSidecarTrackId(trackId)) throw new RangeError('A subtitle needs an external track id')
-  return join(entryDirFor(entry), 'subtitles', `${trackId}.vtt`)
+  return join(subtitlesDirFor(entry), `${trackId}.vtt`)
 }

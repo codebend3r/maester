@@ -91,6 +91,45 @@ const fakeDownloads = () => {
     },
     views: () => [],
     dispose: () => undefined,
+    pause: async (input) => {
+      note('pause', input)
+      return DOWNLOADS_REPLY
+    },
+    resume: (input) => {
+      note('resume', input)
+      return DOWNLOADS_REPLY
+    },
+    retry: (input) => {
+      note('retry', input)
+      return DOWNLOADS_REPLY
+    },
+    remove: async (input) => {
+      note('remove', input)
+      return DOWNLOADS_REPLY
+    },
+    setAutoDelete: (input) => {
+      note('setAutoDelete', input)
+      return DOWNLOADS_REPLY
+    },
+    pauseAll: async () => {
+      note('pauseAll')
+      return DOWNLOADS_REPLY
+    },
+    resumeAll: () => {
+      note('resumeAll')
+      return DOWNLOADS_REPLY
+    },
+    removeAll: async () => {
+      note('removeAll')
+      return DOWNLOADS_REPLY
+    },
+    removeServer: async (input) => {
+      note('removeServer', input)
+    },
+    showFolder: async () => {
+      note('showFolder')
+      return { type: 'done' }
+    },
   }
   return { downloads, reached }
 }
@@ -1549,19 +1588,54 @@ describe('downloads', () => {
   })
 
   it.each([
-    [{ type: 'openDownload', downloadId: ASK_ID }],
-    [{ type: 'pauseDownload', downloadId: ASK_ID }],
-    [{ type: 'resumeDownload', downloadId: ASK_ID }],
-    [{ type: 'retryDownload', downloadId: ASK_ID }],
-    [{ type: 'deleteDownload', downloadId: ASK_ID }],
-    [{ type: 'setDownloadAutoDelete', downloadId: ASK_ID, autoDelete: true }],
-    [{ type: 'pauseAllDownloads' }],
-    [{ type: 'resumeAllDownloads' }],
-    [{ type: 'deleteAllDownloads' }],
-    [{ type: 'showDownloadsFolder' }],
-  ])('refuses %j, which raven player does not do yet', async (request) => {
+    [
+      { type: 'pauseDownload', downloadId: ASK_ID },
+      { name: 'pause', input: { downloadId: ASK_ID } },
+    ],
+    [
+      { type: 'resumeDownload', downloadId: ASK_ID },
+      { name: 'resume', input: { downloadId: ASK_ID } },
+    ],
+    [
+      { type: 'retryDownload', downloadId: ASK_ID },
+      { name: 'retry', input: { downloadId: ASK_ID } },
+    ],
+    [
+      { type: 'deleteDownload', downloadId: ASK_ID },
+      { name: 'remove', input: { downloadId: ASK_ID } },
+    ],
+    [
+      { type: 'setDownloadAutoDelete', downloadId: ASK_ID, autoDelete: true },
+      { name: 'setAutoDelete', input: { downloadId: ASK_ID, autoDelete: true } },
+    ],
+    [{ type: 'pauseAllDownloads' }, { name: 'pauseAll', input: null }],
+    [{ type: 'resumeAllDownloads' }, { name: 'resumeAll', input: null }],
+    [{ type: 'deleteAllDownloads' }, { name: 'removeAll', input: null }],
+  ])('hands %j to the download service and answers its list', async (request, call) => {
     const { service, reached } = setup({ files: {} })
-    expect(await ask({ service, request })).toEqual({
+    expect(await ask({ service, request })).toEqual(DOWNLOADS_REPLY)
+    expect(reached).toEqual([call])
+  })
+
+  it('hands showDownloadsFolder to the download service', async () => {
+    const { service, reached } = setup({ files: {} })
+    expect(await ask({ service, request: { type: 'showDownloadsFolder' } })).toEqual({
+      type: 'done',
+    })
+    expect(reached).toEqual([{ name: 'showFolder', input: null }])
+  })
+
+  it('refuses a download action that names its download by anything but an opaque id', async () => {
+    const { service, reached } = setup({ files: {} })
+    expect(
+      await ask({ service, request: { type: 'deleteDownload', downloadId: '../downloads' } }),
+    ).toEqual({ type: 'refused', message: MESSAGES.unknownRequest })
+    expect(reached).toEqual([])
+  })
+
+  it('refuses openDownload, which raven player does not do yet', async () => {
+    const { service, reached } = setup({ files: {} })
+    expect(await ask({ service, request: { type: 'openDownload', downloadId: ASK_ID } })).toEqual({
       type: 'refused',
       message: MESSAGES.unknownRequest,
     })

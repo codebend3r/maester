@@ -233,6 +233,9 @@ export const remove = (
     ? { ...state, entries: state.entries.filter((entry) => entry.downloadId !== downloadId) }
     : state
 
+export const removeAll = (state: DownloadsState): DownloadsState =>
+  state.entries.length === 0 ? state : { ...state, entries: [] }
+
 export const removeServer = (
   state: DownloadsState,
   { serverId }: { serverId: string },
@@ -240,6 +243,19 @@ export const removeServer = (
   const kept = state.entries.filter((entry) => entry.serverId !== serverId)
   return kept.length === state.entries.length ? state : { ...state, entries: kept }
 }
+
+/** The subtitles a finished download keeps beside its video. */
+export const setSidecars = (
+  state: DownloadsState,
+  { downloadId, sidecars }: { downloadId: string; sidecars: readonly Sidecar[] },
+): DownloadsState =>
+  changeEntry(state, {
+    downloadId,
+    change: (entry) =>
+      entry.sidecars.length === 0 && sidecars.length === 0
+        ? entry
+        : { ...entry, sidecars: [...sidecars] },
+  })
 
 export const setAutoDelete = (
   state: DownloadsState,
