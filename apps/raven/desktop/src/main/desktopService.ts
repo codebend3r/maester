@@ -170,6 +170,14 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
     return recentId
   }
 
+  // A download's video is `video.<container>` in a folder named by its media id, so its title
+  // and its server come from the download service, and any other file names itself.
+  const titleOf = ({ path, name }: { path: string; name: string }): string =>
+    deps.downloads.labelOf({ path }) ?? titleFromFileName(name)
+
+  const fromOf = (path: string): string =>
+    deps.downloads.fromLabelOf({ path }) ?? basename(dirname(path))
+
   const openPaths = async (paths: readonly string[]): Promise<DesktopReply> => {
     if (paths.length === 0) return refused(MESSAGES.nothingDropped)
     const results = await Promise.all(paths.slice(0, MAX_QUEUE + 1).map(grants.grant))
@@ -216,16 +224,12 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
     const index = queue.findIndex((fileId) => grants.fileOf(fileId) !== null)
     const queued = index === -1 ? null : grants.fileOf(queue[index] ?? '')
     if (queued !== null) {
-      return {
-        fileId: queued.fileId,
-        label: titleFromFileName(queued.name),
-        queue: queue.slice(index + 1),
-      }
+      return { fileId: queued.fileId, label: titleOf(queued), queue: queue.slice(index + 1) }
     }
     // GrantedFile keeps only the real path, so a symlinked file's next comes from the folder it really lives in.
     const following = await grantNext({ path: file.path, readdir, grants })
     if (following === null) return null
-    return { fileId: following.fileId, label: titleFromFileName(following.name), queue: [] }
+    return { fileId: following.fileId, label: titleOf(following), queue: [] }
   }
 
   const describeFile = async (
@@ -235,12 +239,14 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
     if (file === null) return refused(MESSAGES.notOpen)
     store.update((state) => addRecent({ state, path: file.path, at: now() }))
     deps.addRecentDocument(file.path)
+    // The page describes a file each time it opens one, so this is where a play begins.
+    deps.downloads.noteOpened({ fileId: file.fileId })
     return {
       type: 'file',
       file: {
         fileId: file.fileId,
-        label: titleFromFileName(file.name),
-        folder: basename(dirname(file.path)),
+        label: titleOf(file),
+        folder: fromOf(file.path),
         resumeAt: resumeFor({ state: store.read(), file }),
         next: await nextAfter({ file, queue: request.queue }),
         tracks: trackPickFor({ state: store.read(), path: file.path }),
@@ -262,6 +268,11 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
         at: now(),
       }),
     )
+    deps.downloads.notePosition({
+      fileId: file.fileId,
+      position: request.position,
+      duration: request.duration,
+    })
     return DONE
   }
 
@@ -325,8 +336,8 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
       case RECENT_KINDS.file:
         return {
           recentId: recentIdFor({ entry }),
-          label: titleFromFileName(basename(entry.path)),
-          from: basename(dirname(entry.path)),
+          label: titleOf({ path: entry.path, name: basename(entry.path) }),
+          from: fromOf(entry.path),
           watched: await shareOf({ state, path: entry.path }),
         }
       case RECENT_KINDS.server: {
@@ -580,9 +591,8 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
         return deps.downloads.removeAll()
       case DESKTOP_REQUESTS.showDownloadsFolder:
         return deps.downloads.showFolder()
-      // The page may send this already; main refuses it until it can play a download.
       case DESKTOP_REQUESTS.openDownload:
-        return refused(MESSAGES.unknownRequest)
+        return deps.downloads.open({ downloadId: request.downloadId })
       default: {
         const unreachable: never = request
         return unreachable

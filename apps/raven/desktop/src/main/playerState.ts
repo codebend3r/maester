@@ -236,6 +236,12 @@ export const savePosition = ({
   }
 }
 
+/** Drops the path's resume spot; with none, the same state, so the store writes nothing. */
+export const forgetResume = ({ state, path }: { state: PlayerState; path: string }): PlayerState =>
+  state.resume.some((entry) => entry.path === path)
+    ? { ...state, resume: state.resume.filter((entry) => entry.path !== path) }
+    : state
+
 export const resumeFor = ({ state, file }: { state: PlayerState; file: FileFacts }): number => {
   const saved = savedFor({ state, file })
   if (!saved) return 0
