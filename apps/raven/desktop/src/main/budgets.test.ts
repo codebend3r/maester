@@ -7,7 +7,9 @@ import {
   type MetricLike,
   stateOf,
   sumMetrics,
+  syncRetryFrom,
 } from '@/main/budgets'
+import { SYNC_RETRY_MS } from '@/main/downloads/sync'
 import { fakeTimers } from '@/main/test/playerFakes'
 
 const WINDOW_MS = 60_000
@@ -165,5 +167,32 @@ describe('budgetWindowFrom', () => {
     expect(budgetWindowFrom({ isPackaged: false, env: env('2000') })).toBe(2000)
     expect(budgetWindowFrom({ isPackaged: false, env: env('100') })).toBe(100)
     expect(budgetWindowFrom({ isPackaged: false, env: env('600000') })).toBe(600_000)
+  })
+})
+
+describe('syncRetryFrom', () => {
+  const env = (value: string | undefined) => ({ RAVEN_DESKTOP_SYNC_RETRY_MS: value })
+
+  test('a packaged app never reads the hook', () => {
+    expect(syncRetryFrom({ isPackaged: true, env: env('2000') })).toBeNull()
+  })
+
+  test('unpackaged, only a whole number from 1 to the five minutes it shortens counts', () => {
+    expect(syncRetryFrom({ isPackaged: false, env: env(undefined) })).toBeNull()
+    expect(syncRetryFrom({ isPackaged: false, env: env('') })).toBeNull()
+    expect(syncRetryFrom({ isPackaged: false, env: env('abc') })).toBeNull()
+    expect(syncRetryFrom({ isPackaged: false, env: env('0') })).toBeNull()
+    expect(syncRetryFrom({ isPackaged: false, env: env('-2000') })).toBeNull()
+    expect(syncRetryFrom({ isPackaged: false, env: env('1500.5') })).toBeNull()
+    expect(syncRetryFrom({ isPackaged: false, env: env('300001') })).toBeNull()
+    expect(syncRetryFrom({ isPackaged: false, env: env('1') })).toBe(1)
+    expect(syncRetryFrom({ isPackaged: false, env: env('2000') })).toBe(2000)
+    expect(syncRetryFrom({ isPackaged: false, env: env('300000') })).toBe(SYNC_RETRY_MS)
+  })
+
+  test('reads only its own hook', () => {
+    expect(
+      syncRetryFrom({ isPackaged: false, env: { RAVEN_DESKTOP_BUDGET_MS: '2000' } }),
+    ).toBeNull()
   })
 })

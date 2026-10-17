@@ -24,6 +24,8 @@ export type SyncDeps = {
   calls: Pick<ServerCalls, 'call'>
   timers: Timers
   warn: (message: string) => void
+  /** How often the server is tried again; `SYNC_RETRY_MS` unless main's test hook shortens it. */
+  retryMs?: number
 }
 
 export type Sync = {
@@ -132,7 +134,13 @@ const queuesByServer = (dues: readonly Due[]): Due[][] => [
     .values(),
 ]
 
-export const createSync = ({ store, calls, timers, warn }: SyncDeps): Sync => {
+export const createSync = ({
+  store,
+  calls,
+  timers,
+  warn,
+  retryMs = SYNC_RETRY_MS,
+}: SyncDeps): Sync => {
   const debouncing = new Map<string, unknown>()
   /** Each send while it is out, by `keyOf`; it settles false when its server could not be reached. */
   const inFlight = new Map<string, Promise<boolean>>()
@@ -289,7 +297,7 @@ export const createSync = ({ store, calls, timers, warn }: SyncDeps): Sync => {
         retry.timer = undefined
         runAll().catch(warnFailed({ label: null }))
       },
-      ms: SYNC_RETRY_MS,
+      ms: retryMs,
     })
   }
 

@@ -178,6 +178,7 @@ const setup = ({
   player = EMPTY_STATE,
   startAt = NOW,
   isPageReady = true,
+  syncRetryMs,
 }: {
   replies?: Record<string, Reply>
   free?: number
@@ -192,6 +193,8 @@ const setup = ({
   startAt?: number
   /** Whether the page says ready at once, as it does a moment after every launch. */
   isPageReady?: boolean
+  /** The sync's retry, as main's test hook sets it; none leaves the spec's five minutes. */
+  syncRetryMs?: number
 } = {}) => {
   const table: Record<string, Reply> = {
     [libraryCall]: ok(library({ id: 1, watchedPercent: 90 })),
@@ -276,6 +279,7 @@ const setup = ({
     showItemInFolder: (path) => shown.push(path),
     ready: Promise.resolve(),
     wasSetAside: false,
+    syncRetryMs,
     grants,
     state,
     stat: async (path) => {
@@ -1383,6 +1387,24 @@ describe('reaching the server', () => {
     world.table[playOf(11)] = NO_CONTENT
     world.table[progress(11, 750)] = NO_CONTENT
     fireAfter(world, SYNC_RETRY_MS)
+    await until(() => entries(world)[0]?.pending.position === null)
+  })
+
+  it('tries again after the sync retry it was given in place of SYNC_RETRY_MS', async () => {
+    const world = setup({
+      initial: holding(withPending()),
+      videos: { [VIDEO]: FILE },
+      replies: { [playOf(11)]: { unreachable: 'offline' } },
+      syncRetryMs: 7000,
+    })
+    await until(() => world.log.length === 1)
+    await ticks(3)
+    const delays = [...world.pending.values()].map(({ ms }) => ms)
+    expect(delays).toContain(7000)
+    expect(delays).not.toContain(SYNC_RETRY_MS)
+    world.table[playOf(11)] = NO_CONTENT
+    world.table[progress(11, 750)] = NO_CONTENT
+    fireAfter(world, 7000)
     await until(() => entries(world)[0]?.pending.position === null)
   })
 

@@ -69,7 +69,8 @@ const gate = () => {
 const setup = ({
   entries = [entryFor()],
   owed = [],
-}: { entries?: DownloadEntry[]; owed?: Owed[] } = {}) => {
+  retryMs,
+}: { entries?: DownloadEntry[]; owed?: Owed[]; retryMs?: number } = {}) => {
   const store = memoryStore({ ...EMPTY_DOWNLOADS, entries, owed })
   const { timers, pending } = fakeTimers()
   const log: AllowedCall[] = []
@@ -87,6 +88,7 @@ const setup = ({
     },
     timers,
     warn: (message) => warnings.push(message),
+    retryMs,
   })
   /** Records a play and a position for a download, as playback does, then touches it. */
   const note = ({
@@ -340,6 +342,23 @@ describe('an answer that is no success', () => {
     expect([...world.pending.values()].map(({ ms }) => ms)).toEqual([SYNC_RETRY_MS])
     world.server.answer = async () => NO_CONTENT
     world.fireAt(SYNC_RETRY_MS)
+    await ticks(5)
+    expect(world.log.slice(1)).toEqual([
+      { name: 'recordPlay', mediaId: 11 },
+      { name: 'saveProgress', mediaId: 11, position: 300 },
+    ])
+    expect(world.pendingOf()).toEqual({ play: false, position: null, furthest: null, at: NOW })
+  })
+
+  it('tries again after the retry it was given in place of the five minutes', async () => {
+    const world = setup({ retryMs: 7000 })
+    world.server.answer = async () => UNREACHABLE
+    world.note({ play: true, position: 300 })
+    world.fireAt(SYNC_DEBOUNCE_MS)
+    await ticks(5)
+    expect([...world.pending.values()].map(({ ms }) => ms)).toEqual([7000])
+    world.server.answer = async () => NO_CONTENT
+    world.fireAt(7000)
     await ticks(5)
     expect(world.log.slice(1)).toEqual([
       { name: 'recordPlay', mediaId: 11 },
