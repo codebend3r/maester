@@ -1,4 +1,5 @@
 import { MESSAGES } from '@/main/desktopService'
+import { errorText, isFsError } from '@/main/log/errorText'
 import { APP_ORIGIN, type DesktopReply } from '@/shared/protocol'
 
 const REFUSED = {
@@ -6,8 +7,9 @@ const REFUSED = {
   message: MESSAGES.unknownRequest,
 } as const satisfies DesktopReply
 
+// A file system error's message, and so its stack, names a path the log must not hold.
 const describeError = (error: unknown): string =>
-  error instanceof Error ? (error.stack ?? error.message) : String(error)
+  error instanceof Error && !isFsError(error) ? (error.stack ?? error.message) : errorText(error)
 
 /**
  * The request channel's door: only the app's own frame is answered, every refusal

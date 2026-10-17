@@ -1,3 +1,4 @@
+import { basename } from 'node:path'
 import {
   isNumber,
   type OutputSettings,
@@ -129,6 +130,9 @@ export const EOF_SHORT_S = 5
 
 /** How far a buffered range edge must move before the page hears of it. */
 const BUFFERED_STEP_S = 0.5
+
+/** What a warning says in place of the open file's path or name. */
+const OPEN_FILE = '<file>'
 
 export const resolveSourceWith =
   ({
@@ -294,10 +298,19 @@ export const createPlayerService = ({
   onFirstFrame: () => void
   warn: (message: string) => void
 }): PlayerService => {
+  // What the newest load opened, and its ticket, which an ending explains and a server's
+  // removal stops.
+  let opened: LoadTarget | null = null
+  // mpv's warnings name the file it plays, which the log must not hold (Ruling 12).
+  const withoutOpenFile = (message: string): string => {
+    if (opened === null || opened.kind !== 'file') return message
+    const { path } = opened
+    return message.replaceAll(path, OPEN_FILE).replaceAll(basename(path), OPEN_FILE)
+  }
   // These run inside the wrapper's event drain, so nothing they throw may escape.
   const warn = (message: string) => {
     try {
-      reportWarning(message)
+      reportWarning(withoutOpenFile(message))
     } catch {
       // A warning that cannot be written has nowhere left to go.
     }
@@ -342,9 +355,6 @@ export const createPlayerService = ({
   let loadTicket = 0
   // The load still resolving a server's source, so that server going away can cancel it.
   let resolving: { ticket: number; serverId: string } | null = null
-  // What the newest load opened, and its ticket, which an ending explains and a server's
-  // removal stops.
-  let opened: LoadTarget | null = null
   let openedTicket = 0
   // Loads whose server went away while they resolved or waited on mpv: they answer that.
   let removedTickets: ReadonlySet<number> = new Set()
