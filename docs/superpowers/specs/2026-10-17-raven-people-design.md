@@ -196,7 +196,7 @@ Migration 28:
 - `items.mdblist_fetched_at`.
 
 **Which source answers:**
-- With `MDBLIST_API_KEY` set and accepted, MDBList is the main source for movies and shows. OMDb is asked for a title MDBList doesn't know: at once when MDBList answers unknown, and in the sweep's fallback pass whenever OMDb's answer is missing or a month old, so a failed fallback is asked again.
+- With `MDBLIST_API_KEY` set and accepted, MDBList is the main source for movies and shows. OMDb is also asked for a title MDBList doesn't know or couldn't answer: at once when MDBList answers unknown, and in the sweep's fallback pass whenever OMDb's answer is missing or a month old, so a failed fallback is asked again.
 - Without it, or once MDBList's calls for the day are spent, OMDb is the main source as today.
 
 **Saving.** A provider's answer:
@@ -207,8 +207,9 @@ Migration 28:
 - It drains the main source's due titles, then OMDb's for the titles MDBList doesn't know.
 - OMDb is due for a title with an IMDb id when its own answer is missing or a month old, and MDBList's is too or MDBList gave the title no scores.
 - It wakes after UTC midnight whenever a spent source still has titles due.
-- A round stops after three failed calls in a row. A title that fails is skipped for the rest of the drain and keeps its place for the next one, so titles that keep failing cannot starve the rest. Two rounds in a row with failures and no answer take the source as down.
-- It wakes 15 minutes after a drain that found the source down or left failed titles behind.
+- A round stops after three failed calls in a row, and a round with failures and no answer ends the drain.
+- Later rounds and drains skip the titles a source failed on, until a drain gets an answer from that source or every title due from it has failed. Titles that keep failing at the head of the list then cost one call each per try, and each try reaches four titles further down.
+- It wakes 15 minutes after a drain that asked and got no answer at all. A drain that answered and left failures behind waits for the next kick: the daily sweep, or midnight when a budget is spent.
 
 **Health.** It reports `mdblist` beside `omdb`.
 

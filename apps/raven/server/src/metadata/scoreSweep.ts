@@ -13,7 +13,7 @@ import { createTaskQueue, mapWithConcurrency } from '@/scanner/concurrency'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
-/** How long the sweep waits to try again after a source seemed down or titles failed. */
+/** How long the sweep waits to try again after a drain that asked and got no answer at all. */
 export const RETRY_MS = 15 * 60 * 1000
 
 /** How many titles are asked about at once. */
@@ -44,19 +44,18 @@ type Round = {
 }
 
 /**
- * How a drain ended: with nothing left it can ask for; with titles waiting
- * on a spent source while another still has calls (`someSpent`); with no
- * source left with calls (`budget`); or with a source that seemed down, or
- * titles that failed, to try again (`unavailable`).
+ * How a drain ended: with nothing left it waits on (`done`); with titles
+ * waiting on a spent source while another still has calls (`someSpent`);
+ * with no source left with calls (`budget`); or having asked and got no
+ * answer at all (`unavailable`).
  */
 type Stop = 'done' | 'someSpent' | 'budget' | 'unavailable'
 
 /**
- * What one drain has learned so far: the items each source failed on, which
- * its later rounds skip so they cannot starve it, and whether its last round
- * had failures and no answer.
+ * How a drain's rounds ended: on a round with failures and no answer, or
+ * with nothing left to ask; and the sources that answered along the way.
  */
-type Progress = { failed: Record<ScoreProvider, ReadonlySet<number>>; wasLastSilent: boolean }
+type Drained = { isSilent: boolean; answeredBy: ReadonlySet<ScoreProvider> }
 
 /** What became of one title in a round. */
 type Outcome = 'answered' | 'failed' | 'skipped'
@@ -69,9 +68,10 @@ const afterMidnight = (now: Date): Date =>
  * Tops up the scores that are missing or a month old, on a queue of its own
  * so a top-up waiting days on a daily budget never holds up matching. It
  * asks the primary source first, then OMDb for the titles MDBList does not
- * know, two titles at a time. It wakes again after midnight UTC while a
- * spent source still has titles due, and 15 minutes after a source seemed
- * down or titles failed.
+ * know, two titles at a time. The titles a source failed on are skipped
+ * until a drain gets an answer from it, so titles that keep failing cannot
+ * hold up the rest. It wakes again after midnight UTC while a spent source
+ * still has titles due, and 15 minutes after a drain that got no answer.
  */
 @Injectable()
 export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
@@ -81,7 +81,9 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
     pause: ScorePause | null
     wake: NodeJS.Timeout | null
     isClosed: boolean
-  } = { pause: null, wake: null, isClosed: false }
+    /** The items each source failed on, which later rounds and drains skip until it answers again. */
+    failed: Record<ScoreProvider, ReadonlySet<number>>
+  } = { pause: null, wake: null, isClosed: false, failed: { mdblist: new Set(), omdb: new Set() } }
 
   constructor(
     @Inject(MetadataRepository) private readonly metadata: MetadataRepository,
@@ -115,11 +117,7 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
 
   private async drain(): Promise<void> {
     this.state.pause = null
-    const start: Progress = {
-      failed: { mdblist: new Set(), omdb: new Set() },
-      wasLastSilent: false,
-    }
-    const stop = await this.topUp(start).catch((error: unknown) => {
+    const stop = await this.drainOnce().catch((error: unknown) => {
       this.logger.error(`Topping up scores failed: ${errorMessage(error)}`)
       return 'unavailable' as const
     })
@@ -151,7 +149,7 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
     if (this.state.isClosed) return
     this.logger.log(
       pause === 'unavailable'
-        ? `Some scores could not be fetched; trying again at ${resumesAt}.`
+        ? `No score source answered; trying again at ${resumesAt}.`
         : `Scores from a source whose calls are spent today wait for ${resumesAt}.`,
     )
     this.state.wake = setTimeout(() => this.kick(), at.getTime() - Date.now())
@@ -159,37 +157,69 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   /**
-   * Round after round until nothing is due that a source can be asked for.
-   * A source whose day runs out midway hands over to the next. A title that
-   * fails is skipped for the rest of the drain, and tried again on the next.
-   * Two rounds in a row with failures and no answer take the source as down.
+   * Tops up, then forgets the failures that should be asked again, and says
+   * how the drain ended. Only a drain that asked and got no answer at all
+   * tries again in 15 minutes; one that answered and left failures behind
+   * waits for the next kick.
    */
-  private async topUp(progress: Progress): Promise<Stop> {
-    const round = this.nextRound(progress)
-    if (round != null) {
-      const { answered, failedIds } = await this.run(round)
-      const isSilent = answered === 0 && failedIds.length > 0
-      if (isSilent && progress.wasLastSilent) return 'unavailable'
-      const { provider } = round.source
-      return this.topUp({
-        failed: {
-          ...progress.failed,
-          [provider]: new Set([...progress.failed[provider], ...failedIds]),
-        },
-        wasLastSilent: isSilent,
-      })
+  private async drainOnce(): Promise<Stop> {
+    const { isSilent, answeredBy } = await this.topUp(new Set())
+    this.forgetFailures({ answeredBy, hasRunOut: !isSilent })
+    if (isSilent && answeredBy.size === 0) return 'unavailable'
+    if (!this.isWaitingForMidnight()) return 'done'
+    return this.scores.primary() == null ? 'budget' : 'someSpent'
+  }
+
+  /**
+   * Round after round until nothing is due that a source can be asked for,
+   * or a round has failures and no answer. A source whose day runs out
+   * midway hands over to the next. Each title that fails joins its source's
+   * failures, so later rounds skip it.
+   */
+  private async topUp(answeredBy: ReadonlySet<ScoreProvider>): Promise<Drained> {
+    const round = this.nextRound()
+    if (round == null) return { isSilent: false, answeredBy }
+    const { answered, failedIds } = await this.run(round)
+    const { provider } = round.source
+    this.state.failed = {
+      ...this.state.failed,
+      [provider]: new Set([...this.state.failed[provider], ...failedIds]),
     }
-    const isWaitingForMidnight = this.isWaitingForMidnight()
-    if (isWaitingForMidnight && this.scores.primary() == null) return 'budget'
-    if (Object.values(progress.failed).some((ids) => ids.size > 0)) return 'unavailable'
-    return isWaitingForMidnight ? 'someSpent' : 'done'
+    const hasAnswered = answered > 0 ? new Set([...answeredBy, provider]) : answeredBy
+    if (answered === 0 && failedIds.length > 0) return { isSilent: true, answeredBy: hasAnswered }
+    return this.topUp(hasAnswered)
+  }
+
+  /**
+   * Forgets the failures of each source that answered this drain, so the
+   * titles it failed on are asked again on the next. After a drain that ran
+   * out of titles to ask, it also forgets those of a source whose due titles
+   * have all failed, so the next drain is not left with nothing to ask.
+   */
+  private forgetFailures({
+    answeredBy,
+    hasRunOut,
+  }: {
+    answeredBy: ReadonlySet<ScoreProvider>
+    hasRunOut: boolean
+  }): void {
+    const before = new Date(Date.now() - 30 * DAY_MS).toISOString()
+    const kept = (provider: ScoreProvider): ReadonlySet<number> => {
+      const failed = this.state.failed[provider]
+      if (answeredBy.has(provider)) return new Set()
+      if (!hasRunOut || failed.size === 0) return failed
+      const due = this.metadata.scoresDue({ provider, before, limit: failed.size + 1 })
+      return due.every((title) => failed.has(title.itemId)) ? new Set() : failed
+    }
+    this.state.failed = { mdblist: kept('mdblist'), omdb: kept('omdb') }
   }
 
   /**
    * The primary's due titles, or once those are done, OMDb's for what MDBList
-   * does not know, each past the titles that source failed on this drain.
+   * does not know, each past the titles that source has failed on.
    */
-  private nextRound({ failed }: Progress): Round | null {
+  private nextRound(): Round | null {
+    const { failed } = this.state
     const before = new Date(Date.now() - 30 * DAY_MS).toISOString()
     const primary = this.scores.primary()
     if (primary == null) return null
