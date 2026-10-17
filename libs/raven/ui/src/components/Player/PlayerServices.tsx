@@ -14,6 +14,12 @@ export type HostActions = {
   subscribe: (listener: (action: PlayerAction) => void) => () => void
 }
 
+/** The playing video's favourite, for a host that keeps them; the host owns the change. */
+export type PlayerFavourite = {
+  isFavourite: boolean
+  toggle: () => void
+}
+
 export type PlayerTitle = {
   label: string
   duration: number | null
@@ -30,6 +36,8 @@ export type PlayerServices = {
   /** The host owns feedback from its escape action, including clipboard failures. */
   escapeFeedback?: string | null
   hostActions?: HostActions
+  /** Without it the player shows no heart, as a local file has no favourite. */
+  favourite?: PlayerFavourite
 }
 
 const Services = createContext<PlayerServices | null>(null)

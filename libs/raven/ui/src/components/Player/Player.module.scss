@@ -56,10 +56,10 @@
   position: relative;
   z-index: 2;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   grid-template-areas:
-    'back title next'
-    '. resumed resumed';
+    'back title favourite next'
+    '. resumed resumed resumed';
   gap: var(--space-1) var(--space-2);
   align-items: center;
   padding: calc(var(--space-3) + var(--titlebar-inset)) clamp(var(--space-3), 3vw, var(--space-5))
@@ -79,6 +79,21 @@
 .back {
   grid-area: back;
   border-color: transparent;
+}
+
+// The playing video's heart, when the host keeps favourites.
+.favourite {
+  grid-area: favourite;
+  border-color: transparent;
+}
+
+// Filled as well as red, so a favourite does not rest on colour alone.
+.favourited {
+  color: var(--color-leaf-bright);
+
+  > svg {
+    fill: currentcolor;
+  }
 }
 
 // What plays next, when the video came with more to play after it.

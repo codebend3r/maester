@@ -9,6 +9,7 @@ import { useLocation } from 'react-router-dom'
 import { readWatchState } from '@/lib/itemLinks'
 import { mediaQuery } from '@/lib/queries'
 import { routeState, useRouteId } from '@/lib/routeQuery'
+import { useMediaMutations } from '@/lib/useMediaMutations'
 import styles from '@/pages/WatchPage/WatchPage.module.scss'
 
 /**
@@ -55,7 +56,11 @@ export const WatchPage = () => {
   )
 }
 
-/** The browser host owns server history, links and clipboard behavior. */
+/**
+ * The browser host owns server history, favourites, links and clipboard
+ * behavior. A favourite marked here patches the cached video WatchPage
+ * reads, so `media` brings the heart its new state before the server answers.
+ */
 export const WatchPlayer = ({
   media,
   upNext,
@@ -66,6 +71,7 @@ export const WatchPlayer = ({
   backTo: string
 }) => {
   const queryClient = useQueryClient()
+  const { favourite } = useMediaMutations({ media })
   const [copied, setCopied] = useState<string | null>(null)
   const [next, ...after] = upNext
   const resumable = media.position > 0 && media.position < (media.duration ?? Infinity) - 10
@@ -102,6 +108,10 @@ export const WatchPlayer = ({
         posterUrl: api.thumbnailUrl(media),
         escape: { label: 'Copy file link', run: copyLink },
         escapeFeedback: copied,
+        favourite: {
+          isFavourite: media.favourite,
+          toggle: () => favourite.mutate(!media.favourite),
+        },
       }}
     >
       <Player engine={{ kind: 'html', source: { kind: 'server', media, api } }} />

@@ -5,6 +5,7 @@ export { Player } from '@/components/Player/Player'
 export { PlayerServicesProvider } from '@/components/Player/PlayerServices'
 export type {
   HostActions,
+  PlayerFavourite,
   PlayerServices,
   PlayerTitle,
   ProgressSink,

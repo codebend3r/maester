@@ -8,7 +8,7 @@ import {
   useState,
 } from 'react'
 import type { Engine, EngineHandle } from '@/components/Player/engine'
-import { usePlayerServices } from '@/components/Player/PlayerServices'
+import { type PlayerFavourite, usePlayerServices } from '@/components/Player/PlayerServices'
 import { useHtmlEngine } from '@/components/Player/useHtmlEngine'
 import type { SubtitleStatus } from '@/components/Player/useSubtitleCues'
 import { Button, ButtonLink } from '@/components/Button/Button'
@@ -97,7 +97,7 @@ export const PlayerChrome = ({
   /** The library file playing, for Playback info; null for a local file. */
   file?: PlaybackFile | null
 }) => {
-  const { title, hostActions } = usePlayerServices()
+  const { title, hostActions, favourite } = usePlayerServices()
   const label = title.label
   const { state, duration, actions } = engine
   const seek = actions.seek
@@ -199,6 +199,14 @@ export const PlayerChrome = ({
     engine.focusSurface()
   }
 
+  const toggleFavourite = (current: PlayerFavourite) => {
+    current.toggle()
+    flash({
+      icon: 'heart',
+      text: current.isFavourite ? 'Removed from favourites' : 'Added to favourites',
+    })
+  }
+
   const chromeShown = idle.active
 
   return (
@@ -221,6 +229,17 @@ export const PlayerChrome = ({
       >
         <Button icon="back" aria-label="Back" className={styles.back} onClick={onBack} />
         <h1 className={styles.title}>{label}</h1>
+        {favourite && (
+          <Button
+            icon="heart"
+            aria-label="Favourite"
+            aria-pressed={favourite.isFavourite}
+            className={[styles.favourite, favourite.isFavourite ? styles.favourited : '']
+              .filter(Boolean)
+              .join(' ')}
+            onClick={() => toggleFavourite(favourite)}
+          />
+        )}
         {nextLink && (
           <ButtonLink
             to={nextLink.to}
