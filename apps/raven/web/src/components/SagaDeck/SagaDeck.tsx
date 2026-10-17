@@ -1,11 +1,14 @@
 import { type Saga, sagaCover } from '@raven/core'
 import { Link } from 'react-router-dom'
 import { PosterImage } from '@/components/PosterImage/PosterImage'
+import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { WatchedCount } from '@/components/WatchedCount/WatchedCount'
 import { api } from '@/lib/api'
 import { POSTER_SIZES } from '@/lib/posters'
+import { sagaEntryKey } from '@/lib/entryKeys'
 import { sagaFacts, sagaPath } from '@/lib/sagas'
 import { useHoverBackdrop } from '@/lib/useHoverBackdrop'
+import { useSelectable } from '@/lib/useSelectable'
 import styles from '@/components/SagaDeck/SagaDeck.module.scss'
 
 /**
@@ -18,9 +21,11 @@ import styles from '@/components/SagaDeck/SagaDeck.module.scss'
 const SagaDeck = ({ saga, to }: { saga: Saga; to: string }) => {
   const cover = sagaCover(saga)
   const hover = useHoverBackdrop(cover && api.sagaPictureUrl(cover))
+  const select = useSelectable({ key: sagaEntryKey(saga), title: saga.name })
   return (
-    <li className={styles.item} {...hover}>
-      <Link to={to} className={styles.card}>
+    <li className={styles.item} data-entry={sagaEntryKey(saga)} {...hover} {...select.rootProps}>
+      <SelectCheckbox select={select} className={styles.select} />
+      <Link to={to} className={styles.card} tabIndex={select.linkTabIndex}>
         <span
           className={styles.deck}
           aria-hidden="true"

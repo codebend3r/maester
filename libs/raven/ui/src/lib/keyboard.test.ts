@@ -36,4 +36,19 @@ describe('isShortcut', () => {
     expect(press({ key: 'b', target: input })).toBe(false)
     expect(press({ key: 'b', target: button })).toBe(false)
   })
+
+  it('leaves a press something already handled', () => {
+    const event = new KeyboardEvent('keydown', { key: 'b', bubbles: true, cancelable: true })
+    event.preventDefault()
+    expect(isShortcut({ event, key: 'b' })).toBe(false)
+  })
+
+  it('lets a checkbox through only when asked', () => {
+    const box = document.createElement('input')
+    box.type = 'checkbox'
+    const event = new KeyboardEvent('keydown', { key: 'b', bubbles: true })
+    Object.defineProperty(event, 'target', { value: box })
+    expect(isShortcut({ event, key: 'b' })).toBe(false)
+    expect(isShortcut({ event, key: 'b', inCheckboxes: true })).toBe(true)
+  })
 })

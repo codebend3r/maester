@@ -12,9 +12,12 @@ type TopCard = { index: number; entry: string; top: number }
  */
 const topCards = new Map<string, TopCard>()
 
+/** A card (`data-entry`) that is on show, not folded away in a closed bucket. */
+export const ENTRY_SELECTOR = '[data-entry]:not(details:not([open]) *)'
+
 /** The page's cards in the order it stacks them down the screen, but for those folded away in a closed bucket. */
 const cardsOnPage = (): HTMLElement[] =>
-  Array.from(document.querySelectorAll<HTMLElement>('[data-entry]:not(details:not([open]) *)'))
+  Array.from(document.querySelectorAll<HTMLElement>(ENTRY_SELECTOR))
 
 /** Where among `cards` the first to reach below the top of the screen is, found by halves. */
 const firstBelowTop = ({

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
-import { cleanup, screen, within } from '@testing-library/react'
+import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ItemDetails } from '@raven/core'
 import { Route, Routes } from 'react-router-dom'
@@ -25,10 +25,7 @@ describe('SeasonPage', () => {
     )
   }
 
-  afterEach(() => {
-    cleanup()
-    spies.item.mockReset()
-  })
+  afterEach(() => spies.item.mockReset())
 
   it('lists the episodes on disk in order, each with its air date, length and Play', async () => {
     open()
@@ -139,5 +136,31 @@ describe('SeasonPage', () => {
     const [first, second] = within(list).getAllByRole('listitem')
     expect(first?.querySelector('a[aria-hidden] svg')).not.toBeNull()
     expect(second?.querySelector('a[aria-hidden] svg')).toBeNull()
+  })
+
+  it('selects its episode rows from a Select button, and marks them by item', async () => {
+    const calls: unknown[] = []
+    const set = spyOn(api, 'setWatched').mockImplementation(async (input) => {
+      calls.push(input)
+    })
+    open()
+    await userEvent.click(await screen.findByRole('button', { name: 'Select' }))
+    expect(screen.queryByRole('link', { name: 'Play Half Loop' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Watched Half Loop' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('link', { name: '1. Good News About Hell' }))
+    expect(screen.queryByText('Good News About Hell is an episode.')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select Half Loop' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Mark watched' }))
+    await waitFor(() => expect(calls).toHaveLength(1))
+    set.mockRestore()
+    expect(calls).toEqual([
+      {
+        watched: true,
+        targets: [
+          { kind: 'item', id: 6, libraryId: null },
+          { kind: 'item', id: 7, libraryId: null },
+        ],
+      },
+    ])
   })
 })

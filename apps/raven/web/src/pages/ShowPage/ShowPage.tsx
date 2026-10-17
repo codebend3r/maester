@@ -12,16 +12,22 @@ import { ItemHeader, ItemHeaderSkeleton, pictureBackdrop } from '@/components/It
 import { MetadataEditor } from '@/components/MetadataEditor/MetadataEditor'
 import { ReviewCards } from '@/components/ReviewCards/ReviewCards'
 import { RouteState } from '@/components/RouteState/RouteState'
+import { SelectButton } from '@/components/SelectButton/SelectButton'
+import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
+import { SelectionBar } from '@/components/SelectionBar/SelectionBar'
+import { SelectionScope, sourceOf } from '@/components/SelectionScope/SelectionScope'
 import { Summary } from '@/components/Summary/Summary'
 import { TmdbCredit } from '@/components/TmdbCredit/TmdbCredit'
 import { WatchedCount } from '@/components/WatchedCount/WatchedCount'
 import { WatchedToggle } from '@/components/WatchedToggle/WatchedToggle'
 import { api } from '@/lib/api'
+import { seasonEntryKey } from '@/lib/entryKeys'
 import { createdBy, showFacts } from '@/lib/itemFacts'
 import { itemPath, watchLink } from '@/lib/itemLinks'
 import { POSTER_SIZES, posterSources } from '@/lib/posters'
 import { nextEpisodeQuery } from '@/lib/queries'
 import { useRouteItem } from '@/lib/routeQuery'
+import { useSelectable } from '@/lib/useSelectable'
 import { useWatchedToggle } from '@/lib/useWatchedChange'
 import styles from '@/pages/ShowPage/ShowPage.module.scss'
 
@@ -30,9 +36,11 @@ const SeasonCard = ({ season, show }: { season: SeasonSummary; show: ItemDetails
   const poster = posterSources({ item: season, sizes: POSTER_SIZES.season })
   const to = itemPath(season) ?? `/shows/${show.id}`
   const count = season.episodeCount
+  const select = useSelectable({ key: seasonEntryKey(season), title: season.title })
   return (
-    <li className={styles.season}>
-      <Link to={to} className={styles.seasonLink}>
+    <li className={styles.season} data-entry={seasonEntryKey(season)} {...select.rootProps}>
+      <SelectCheckbox select={select} className={styles.select} />
+      <Link to={to} className={styles.seasonLink} tabIndex={select.linkTabIndex}>
         <span className={styles.seasonPoster}>
           {poster ? (
             <img {...poster} alt="" loading="lazy" decoding="async" />
@@ -73,117 +81,133 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
   })
 
   return (
-    <article className={styles.page} aria-labelledby={ids.title}>
-      <ItemHeader
-        back={{
-          to: libraryId == null ? '/libraries' : `/libraries/${libraryId}`,
-          label: 'Library',
-        }}
-        titleId={ids.title}
-        title={details.title}
-        byline={createdBy(details)}
-        contentRating={details.contentRating}
-        facts={showFacts(details)}
-        ratings={details.ratings}
-        picture={{
-          shape: 'poster',
-          url: api.itemImageUrl({
-            id: details.id,
-            kind: 'poster',
-            version: details.posterVersion,
-          }),
-        }}
-        backdrop={pictureBackdrop(
-          api.itemImageUrl({ id: details.id, kind: 'backdrop', version: details.backdropVersion }),
-        )}
-      >
-        {next.data && (
-          <ButtonLink tone="primary" icon="play" {...watchLink({ media: next.data })}>
-            {code ? `Play ${code}` : 'Play'}
-          </ButtonLink>
-        )}
-        <WatchedToggle {...toggle} />
-        <AdminOnly>
-          <Button
-            icon="edit"
-            aria-pressed={editingImages}
-            onClick={() => setEditingImages((editing) => !editing)}
-          >
-            Edit images
-          </Button>
-          <Button
-            icon="edit"
-            aria-pressed={editingMetadata}
-            onClick={() => setEditingMetadata((editing) => !editing)}
-          >
-            Edit metadata
-          </Button>
-          <Button icon="search" onClick={() => setFixing(true)}>
-            Fix match
-          </Button>
-        </AdminOnly>
-      </ItemHeader>
-
-      {details.aiMatch && <AiMatchNote aiMatch={details.aiMatch} />}
-
-      <AdminOnly>
-        {editingImages && (
-          <ImageEditor
-            details={details}
-            libraries={[]}
-            itemKind="show"
-            onDone={() => setEditingImages(false)}
-          />
-        )}
-        {editingMetadata && (
-          <MetadataEditor
-            details={details}
-            itemKind="show"
-            onDone={() => setEditingMetadata(false)}
-          />
-        )}
-      </AdminOnly>
-
-      <Summary tagline={details.tagline} summary={details.summary} />
-
-      {seasons.length > 0 && (
-        <section className={styles.seasons} aria-labelledby={ids.seasons}>
-          <h2 id={ids.seasons} className={styles.heading}>
-            Seasons
-          </h2>
-          <ul className={styles.seasonRow}>
-            {seasons.map((season) => (
-              <SeasonCard key={season.id} season={season} show={details} />
-            ))}
-          </ul>
-        </section>
+    <SelectionScope
+      {...sourceOf(
+        seasons.map((season) => [
+          seasonEntryKey(season),
+          [{ kind: 'item', id: season.id, libraryId: null }],
+        ]),
       )}
+    >
+      <article className={styles.page} aria-labelledby={ids.title}>
+        <ItemHeader
+          back={{
+            to: libraryId == null ? '/libraries' : `/libraries/${libraryId}`,
+            label: 'Library',
+          }}
+          titleId={ids.title}
+          title={details.title}
+          byline={createdBy(details)}
+          contentRating={details.contentRating}
+          facts={showFacts(details)}
+          ratings={details.ratings}
+          picture={{
+            shape: 'poster',
+            url: api.itemImageUrl({
+              id: details.id,
+              kind: 'poster',
+              version: details.posterVersion,
+            }),
+          }}
+          backdrop={pictureBackdrop(
+            api.itemImageUrl({
+              id: details.id,
+              kind: 'backdrop',
+              version: details.backdropVersion,
+            }),
+          )}
+        >
+          {next.data && (
+            <ButtonLink tone="primary" icon="play" {...watchLink({ media: next.data })}>
+              {code ? `Play ${code}` : 'Play'}
+            </ButtonLink>
+          )}
+          <WatchedToggle {...toggle} />
+          <SelectButton />
+          <AdminOnly>
+            <Button
+              icon="edit"
+              aria-pressed={editingImages}
+              onClick={() => setEditingImages((editing) => !editing)}
+            >
+              Edit images
+            </Button>
+            <Button
+              icon="edit"
+              aria-pressed={editingMetadata}
+              onClick={() => setEditingMetadata((editing) => !editing)}
+            >
+              Edit metadata
+            </Button>
+            <Button icon="search" onClick={() => setFixing(true)}>
+              Fix match
+            </Button>
+          </AdminOnly>
+        </ItemHeader>
 
-      <CastRow credits={details.credits} />
-      <ReviewCards reviews={details.reviews} />
-      <TmdbCredit />
+        {details.aiMatch && <AiMatchNote aiMatch={details.aiMatch} />}
 
-      <AdminOnly>
-        {fixing && (
-          <FixMatchDialog
-            type="show"
-            title={details.title}
-            year={details.year}
-            libraryId={libraryId}
-            subject={{ kind: 'item', id: details.id }}
-            aiMatch={details.aiMatch}
-            allowNone={false}
-            match={(tmdbId) =>
-              tmdbId == null
-                ? Promise.reject(new Error('Pick a show.'))
-                : api.setItemMatch({ itemId: details.id, tmdbId })
-            }
-            onMatched={(moved) => navigate(`/shows/${moved.id}`, { replace: true })}
-            onClose={() => setFixing(false)}
-          />
+        <AdminOnly>
+          {editingImages && (
+            <ImageEditor
+              details={details}
+              libraries={[]}
+              itemKind="show"
+              onDone={() => setEditingImages(false)}
+            />
+          )}
+          {editingMetadata && (
+            <MetadataEditor
+              details={details}
+              itemKind="show"
+              onDone={() => setEditingMetadata(false)}
+            />
+          )}
+        </AdminOnly>
+
+        <Summary tagline={details.tagline} summary={details.summary} />
+
+        {seasons.length > 0 && (
+          <section className={styles.seasons} aria-labelledby={ids.seasons}>
+            <h2 id={ids.seasons} className={styles.heading}>
+              Seasons
+            </h2>
+            <ul className={styles.seasonRow}>
+              {seasons.map((season) => (
+                <SeasonCard key={season.id} season={season} show={details} />
+              ))}
+            </ul>
+          </section>
         )}
-      </AdminOnly>
-    </article>
+
+        <CastRow credits={details.credits} />
+        <ReviewCards reviews={details.reviews} />
+        <TmdbCredit />
+
+        <SelectionBar />
+
+        <AdminOnly>
+          {fixing && (
+            <FixMatchDialog
+              type="show"
+              title={details.title}
+              year={details.year}
+              libraryId={libraryId}
+              subject={{ kind: 'item', id: details.id }}
+              aiMatch={details.aiMatch}
+              allowNone={false}
+              match={(tmdbId) =>
+                tmdbId == null
+                  ? Promise.reject(new Error('Pick a show.'))
+                  : api.setItemMatch({ itemId: details.id, tmdbId })
+              }
+              onMatched={(moved) => navigate(`/shows/${moved.id}`, { replace: true })}
+              onClose={() => setFixing(false)}
+            />
+          )}
+        </AdminOnly>
+      </article>
+    </SelectionScope>
   )
 }
 

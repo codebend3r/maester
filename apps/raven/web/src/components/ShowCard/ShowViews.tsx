@@ -10,12 +10,14 @@ import { useState } from 'react'
 import { CardLink } from '@/components/CardLink/CardLink'
 import { Icon } from '@raven/ui'
 import { RatingChips, ScoreChip } from '@/components/RatingChips/RatingChips'
+import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { SortHeader } from '@/components/SortHeader/SortHeader'
 import { WatchedCount } from '@/components/WatchedCount/WatchedCount'
 import { showYears } from '@/lib/itemLinks'
 import { POSTER_SIZES, posterSources } from '@/lib/posters'
 import { type SortColumn, useTableSort } from '@/lib/tableSort'
 import { showEntryKey } from '@/lib/entryKeys'
+import { useSelectable } from '@/lib/useSelectable'
 import styles from '@/components/ShowCard/ShowViews.module.scss'
 
 const episodesLabel = (entry: ShowEntry): string =>
@@ -83,11 +85,46 @@ const COLUMNS: Record<Column, SortColumn<ShowEntry>> = {
   tmdb: { value: (entry) => score(entry, 'tmdb'), first: 'desc' },
 }
 
+/** One show as a table row. */
+const ShowRow = ({ entry }: { entry: ShowEntry }) => {
+  const select = useSelectable({ key: showEntryKey(entry.show), title: entry.show.title })
+  return (
+    <tr className={styles.row} data-entry={showEntryKey(entry.show)} {...select.rootProps}>
+      <th scope="row">
+        <div className={styles.titleCell}>
+          <SelectCheckbox select={select} />
+          <CardLink
+            to={`/shows/${entry.show.id}`}
+            className={styles.title}
+            tabIndex={select.linkTabIndex}
+          >
+            {entry.show.title}
+          </CardLink>
+          <WatchedCount watched={entry.watchedEpisodes} total={entry.episodes} />
+        </div>
+      </th>
+      <td className={styles.number}>
+        {showYears({ year: entry.show.year, endedYear: entry.endedYear }) ?? ''}
+      </td>
+      <td className={styles.number}>{entry.episodes}</td>
+      {RATING_COLUMNS.map((column) => {
+        const rating = entry.show.ratings.find((it) => it.source === column.source)
+        return (
+          <td key={column.source} className={`${styles.number} ${styles.roomy}`}>
+            {rating && <ScoreChip rating={rating} />}
+          </td>
+        )
+      })}
+      <td className={styles.playCell}>{!select.selecting && <NextPlay entry={entry} />}</td>
+    </tr>
+  )
+}
+
 /** Every show as a row of facts: title, years, episodes on disk and each of its scores, every column sortable. */
 export const ShowList = ({ shows }: { shows: ShowEntry[] }) => {
   const { sorted, toggle, ariaSort } = useTableSort({ rows: shows, columns: COLUMNS })
   const header = (key: Column, label: string, className?: string) => (
-    <SortHeader key={key} sort={ariaSort(key)} onToggle={() => toggle(key)} className={className}>
+    <SortHeader sort={ariaSort(key)} onToggle={() => toggle(key)} className={className}>
       {label}
     </SortHeader>
   )
@@ -108,34 +145,44 @@ export const ShowList = ({ shows }: { shows: ShowEntry[] }) => {
       </thead>
       <tbody>
         {sorted.map((entry) => (
-          <tr key={entry.show.id} className={styles.row} data-entry={showEntryKey(entry.show)}>
-            <th scope="row">
-              <div className={styles.titleCell}>
-                <CardLink to={`/shows/${entry.show.id}`} className={styles.title}>
-                  {entry.show.title}
-                </CardLink>
-                <WatchedCount watched={entry.watchedEpisodes} total={entry.episodes} />
-              </div>
-            </th>
-            <td className={styles.number}>
-              {showYears({ year: entry.show.year, endedYear: entry.endedYear }) ?? ''}
-            </td>
-            <td className={styles.number}>{entry.episodes}</td>
-            {RATING_COLUMNS.map((column) => {
-              const rating = entry.show.ratings.find((it) => it.source === column.source)
-              return (
-                <td key={column.source} className={`${styles.number} ${styles.roomy}`}>
-                  {rating && <ScoreChip rating={rating} />}
-                </td>
-              )
-            })}
-            <td className={styles.playCell}>
-              <NextPlay entry={entry} />
-            </td>
-          </tr>
+          <ShowRow key={entry.show.id} entry={entry} />
         ))}
       </tbody>
     </table>
+  )
+}
+
+/** One show as a row with a small poster, its title and facts beside it. */
+const ShowTile = ({ entry, sort }: { entry: ShowEntry; sort: MediaSort | undefined }) => {
+  const select = useSelectable({ key: showEntryKey(entry.show), title: entry.show.title })
+  const sorted = sort ? showSortFact({ entry, sort }) : null
+  const facts = [
+    showYears({ year: entry.show.year, endedYear: entry.endedYear }),
+    episodesLabel(entry),
+  ].filter((fact): fact is string => fact != null)
+  return (
+    <li className={styles.tile} data-entry={showEntryKey(entry.show)} {...select.rootProps}>
+      <SelectCheckbox select={select} className={styles.select} />
+      <SmallPoster entry={entry} />
+      <div className={styles.body}>
+        <CardLink
+          to={`/shows/${entry.show.id}`}
+          className={styles.title}
+          tabIndex={select.linkTabIndex}
+        >
+          {entry.show.title}
+        </CardLink>
+        {sorted && <span className={styles.sorted}>{sorted}</span>}
+        <span className={styles.facts}>
+          {facts.map((fact) => (
+            <span key={fact}>{fact}</span>
+          ))}
+          <WatchedCount watched={entry.watchedEpisodes} total={entry.episodes} />
+        </span>
+        <RatingChips ratings={entry.show.ratings} />
+      </div>
+      {!select.selecting && <NextPlay entry={entry} />}
+    </li>
   )
 }
 
@@ -149,31 +196,8 @@ export const ShowTiles = ({
   sort?: MediaSort
 }) => (
   <ul className={styles.tiles} aria-label="Shows">
-    {shows.map((entry) => {
-      const sorted = sort ? showSortFact({ entry, sort }) : null
-      const facts = [
-        showYears({ year: entry.show.year, endedYear: entry.endedYear }),
-        episodesLabel(entry),
-      ].filter((fact): fact is string => fact != null)
-      return (
-        <li key={entry.show.id} className={styles.tile} data-entry={showEntryKey(entry.show)}>
-          <SmallPoster entry={entry} />
-          <div className={styles.body}>
-            <CardLink to={`/shows/${entry.show.id}`} className={styles.title}>
-              {entry.show.title}
-            </CardLink>
-            {sorted && <span className={styles.sorted}>{sorted}</span>}
-            <span className={styles.facts}>
-              {facts.map((fact) => (
-                <span key={fact}>{fact}</span>
-              ))}
-              <WatchedCount watched={entry.watchedEpisodes} total={entry.episodes} />
-            </span>
-            <RatingChips ratings={entry.show.ratings} />
-          </div>
-          <NextPlay entry={entry} />
-        </li>
-      )
-    })}
+    {shows.map((entry) => (
+      <ShowTile key={entry.show.id} entry={entry} sort={sort} />
+    ))}
   </ul>
 )

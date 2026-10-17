@@ -1,4 +1,4 @@
-import { type Saga, formatRuntime } from '@raven/core'
+import { type Saga, type WatchTarget, formatRuntime } from '@raven/core'
 
 const count = new Intl.NumberFormat()
 
@@ -23,3 +23,15 @@ export const sagaRuntime = (saga: Saga): string | null => {
 /** A saga's own page, under its library's. */
 export const sagaPath = ({ libraryId, saga }: { libraryId: number; saga: Saga }): string =>
   `/libraries/${libraryId}/sagas/${encodeURIComponent(saga.tmdbId)}`
+
+/** A saga's movies as targets: each by its item in the saga's library, else its own file. */
+export const sagaTargets = ({
+  saga,
+  libraryId,
+}: {
+  saga: Saga
+  libraryId: number
+}): WatchTarget[] =>
+  saga.media.map((media) =>
+    media.item ? { kind: 'item', id: media.item.id, libraryId } : { kind: 'media', id: media.id },
+  )

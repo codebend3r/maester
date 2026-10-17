@@ -67,6 +67,13 @@
   inset: var(--space-1) var(--space-1) auto auto;
 }
 
+// In the poster's top corner opposite the check, over the picture and its hover filter.
+.select {
+  position: absolute;
+  inset: var(--space-1) auto auto var(--space-1);
+  z-index: 2;
+}
+
 .title {
   grid-area: title;
   display: -webkit-box;

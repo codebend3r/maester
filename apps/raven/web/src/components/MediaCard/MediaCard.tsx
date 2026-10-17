@@ -12,10 +12,12 @@ import { FavouriteMark } from '@/components/FavouriteMark/FavouriteMark'
 import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
 import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
+import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { WatchedMark, WatchedWords } from '@/components/WatchedMark/WatchedMark'
 import { api } from '@/lib/api'
 import { cardLink, watchLink } from '@/lib/itemLinks'
 import { mediaEntryKey } from '@/lib/entryKeys'
+import { useSelectable } from '@/lib/useSelectable'
 import styles from '@/components/MediaCard/MediaCard.module.scss'
 
 /**
@@ -40,6 +42,7 @@ export const MediaCard = ({
   const menu = useCardMenu({ media, matchType })
   const thumbnail = api.thumbnailUrl(media)
   const label = mediaLabel(media)
+  const select = useSelectable({ key: mediaEntryKey(media), title: label })
   const play = watchLink({ media })
   const page = cardLink({ media, pages: true })
   const sorted = sort ? sortFact({ media, sort }) : null
@@ -64,13 +67,19 @@ export const MediaCard = ({
   )
 
   return (
-    <li className={`${styles.card} ${menu.hostClass}`} data-entry={mediaEntryKey(media)}>
+    <li
+      className={`${styles.card} ${menu.hostClass}`}
+      data-entry={mediaEntryKey(media)}
+      {...select.rootProps}
+    >
+      <SelectCheckbox select={select} className={styles.select} />
       {page.state == null ? (
         <span className={styles.split}>
           <CardLink
             {...play}
             className={styles.picture}
             aria-label={`Play ${label}`}
+            tabIndex={select.linkTabIndex}
             onContextMenu={menu.onContextMenu}
           >
             {frame}
@@ -78,13 +87,19 @@ export const MediaCard = ({
           <CardLink
             {...page}
             className={`${styles.title} ${styles.titleLink}`}
+            tabIndex={select.linkTabIndex}
             onContextMenu={menu.onContextMenu}
           >
             {label}
           </CardLink>
         </span>
       ) : (
-        <CardLink {...play} className={styles.link} onContextMenu={menu.onContextMenu}>
+        <CardLink
+          {...play}
+          className={styles.link}
+          tabIndex={select.linkTabIndex}
+          onContextMenu={menu.onContextMenu}
+        >
           {frame}
           <span className={styles.title}>{label}</span>
         </CardLink>

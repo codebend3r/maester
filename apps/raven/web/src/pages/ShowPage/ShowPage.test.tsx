@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
-import { cleanup, screen } from '@testing-library/react'
+import { cleanup, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { AdminLock, ItemDetails } from '@raven/core'
 import { Route, Routes, useParams } from 'react-router-dom'
@@ -41,7 +41,6 @@ describe('ShowPage', () => {
   }
 
   afterEach(() => {
-    cleanup()
     spies.item.mockReset()
     spies.next.mockReset()
     spies.search.mockReset()
@@ -201,5 +200,20 @@ describe('ShowPage', () => {
       { watched: true, targets },
       { watched: false, targets },
     ])
+  })
+
+  it('selects its season cards from a Select button, and marks them by item with no library', async () => {
+    const calls: unknown[] = []
+    const set = spyOn(api, 'setWatched').mockImplementation(async (input) => {
+      calls.push(input)
+    })
+    open()
+    await userEvent.click(await screen.findByRole('button', { name: 'Select' }))
+    await userEvent.click(screen.getByRole('link', { name: /Season 1/ }))
+    expect(screen.queryByText(/^Show /)).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Mark unwatched' }))
+    await waitFor(() => expect(calls).toHaveLength(1))
+    set.mockRestore()
+    expect(calls).toEqual([{ watched: false, targets: [{ kind: 'item', id: 5, libraryId: null }] }])
   })
 })
