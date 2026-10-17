@@ -76,14 +76,19 @@
   text-transform: uppercase;
 }
 
+// TMDB's text can hold a run with no space to wrap at, as a long one-word
+// name or a biography's non-breaking spaces from Wikipedia, which would
+// otherwise set how wide the header is and push the page past a phone's
+// screen. Any point in such a run may break.
 .name {
   font-size: var(--font-size-title);
-  overflow-wrap: break-word;
+  overflow-wrap: anywhere;
   hyphens: auto;
 }
 
 .life {
   color: var(--color-birch);
+  overflow-wrap: anywhere;
   text-wrap: pretty;
 }
 
@@ -100,6 +105,7 @@
   color: var(--color-birch);
   line-height: var(--line-relaxed);
   white-space: pre-line;
+  overflow-wrap: anywhere;
   text-wrap: pretty;
 }
 
