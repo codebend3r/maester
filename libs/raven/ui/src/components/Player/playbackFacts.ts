@@ -1,6 +1,7 @@
 import {
   type MediaItem,
   type MediaTracks,
+  PLAYBACK_MODES,
   type PlaybackMode,
   type SubtitleTrack,
   formatChannels,
@@ -60,7 +61,7 @@ export const qualityLabel = ({
   media: MediaItem | null
   mode: PlaybackMode
 }): string => {
-  const picture = media && mode !== 'transcode' ? resolutionLabel(media) : null
+  const picture = media && mode !== PLAYBACK_MODES.transcode ? resolutionLabel(media) : null
   return joined({ parts: [picture, MODE_NAMES[mode]] })
 }
 

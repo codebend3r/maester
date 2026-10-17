@@ -1,5 +1,12 @@
 import { useQueries } from '@tanstack/react-query'
-import { type SubtitleCue, type SubtitleTrack, mergeCues, subtitleWindows } from '@raven/core'
+import {
+  PLAYER_SOURCE_KINDS,
+  SUBTITLE_SOURCES,
+  type SubtitleCue,
+  type SubtitleTrack,
+  mergeCues,
+  subtitleWindows,
+} from '@raven/core'
 import type { HtmlSource } from '@/components/Player/engine'
 import { playerQueriesFor } from '@/lib/playerQueries'
 
@@ -23,14 +30,14 @@ export const useSubtitleCues = ({
   duration: number | null
 }): { cues: SubtitleCue[]; status: SubtitleStatus } => {
   const windows =
-    track == null || source.kind === 'file'
+    track == null || source.kind === PLAYER_SOURCE_KINDS.file
       ? []
-      : track.source === 'external'
+      : track.source === SUBTITLE_SOURCES.external
         ? [0]
         : subtitleWindows({ time, duration })
   return useQueries({
     queries:
-      track == null || source.kind === 'file'
+      track == null || source.kind === PLAYER_SOURCE_KINDS.file
         ? []
         : windows.map((window) =>
             playerQueriesFor(source.api).subtitles({

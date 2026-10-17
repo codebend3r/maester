@@ -1,4 +1,5 @@
-import { type PlaybackMode, formatDuration } from '@raven/core'
+import { KEYS } from '@/lib/keyboard'
+import { PLAYER_SOURCE_KINDS, type PlaybackMode, formatDuration } from '@raven/core'
 import {
   type ReactNode,
   type SyntheticEvent,
@@ -27,13 +28,13 @@ import { type PlaybackFile, PlaybackInfo } from '@/components/Player/PlaybackInf
 import { playingAudio } from '@/components/Player/selection'
 import { SettingsMenu } from '@/components/Player/SettingsMenu'
 import { ShortcutsDialog } from '@/components/Player/ShortcutsDialog'
-import { type Overlay, usePlayerActions } from '@/components/Player/usePlayerActions'
+import { OVERLAYS, type Overlay, usePlayerActions } from '@/components/Player/usePlayerActions'
 import { useBezel, useFullscreen, useIdle } from '@/components/Player/useStageChrome'
 import { useUpNext } from '@/components/Player/useUpNext'
 import type { TrackSelection } from '@/components/Player/useTrackSelection'
 import { useWatchProgress } from '@/components/Player/useWatchProgress'
 import { isInForeignDialog, isTypingTarget } from '@/lib/keyboard'
-import { type PlayerAction, shortcutFor } from '@/lib/shortcuts'
+import { PLAYER_ACTIONS, type PlayerAction, shortcutFor } from '@/lib/shortcuts'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
 import { useHostServices } from '@/stores/playerServices'
 
@@ -67,7 +68,7 @@ export const Stage = ({ engine, ...props }: StageProps) => {
     <PlayerChrome
       {...props}
       {...html}
-      file={source.kind === 'server' ? source : null}
+      file={source.kind === PLAYER_SOURCE_KINDS.server ? source : null}
       fullscreen={fullscreen}
     />
   )
@@ -112,7 +113,7 @@ export const PlayerChrome = ({
   const nextLink = useUpNext({ ended: state.ended })
   const idle = useIdle(IDLE_MS)
   const { bezel, flash } = useBezel()
-  const [overlay, setOverlay] = useState<Overlay>('none')
+  const [overlay, setOverlay] = useState<Overlay>(OVERLAYS.none)
   // Apart from the overlay: it stays open over the video, menus and all.
   const [infoOpen, setInfoOpen] = useState(false)
   const [resumedAt, setResumedAt] = useState<number | null>(
@@ -131,7 +132,7 @@ export const PlayerChrome = ({
   }, [label])
 
   const closeMenu = () => {
-    setOverlay('none')
+    setOverlay(OVERLAYS.none)
     if (menuButton.current !== null) menuButton.current.focus()
   }
 
@@ -169,14 +170,20 @@ export const PlayerChrome = ({
     const action = shortcutFor(event)
     // Form controls keep their own keys (the radios' arrows, the volume
     // slider's); only Escape reaches past them, to close what they sit in.
-    if (isTypingTarget(event.target) && (action === null || action.type !== 'escape')) return
+    const isEscape = action !== null && action.type === PLAYER_ACTIONS.escape
+    if (isTypingTarget(event.target) && !isEscape) return
     // A focused button or link answers Space and Enter itself.
-    if (isControlTarget(event.target) && (event.key === ' ' || event.key === 'Enter')) return
+    const isPress = event.key === KEYS.space || event.key === KEYS.enter
+    if (isControlTarget(event.target) && isPress) return
     if (!action) return
     // An engine without the video info overlay leaves `i` to the page.
-    if (action.type === 'toggleStats' && actions.toggleStats === undefined) return
+    if (action.type === PLAYER_ACTIONS.toggleStats && actions.toggleStats === undefined) return
     // With the shortcut list open, the keys only close it.
-    if (overlay === 'shortcuts' && action.type !== 'escape' && action.type !== 'showShortcuts') {
+    if (
+      overlay === OVERLAYS.shortcuts &&
+      action.type !== PLAYER_ACTIONS.escape &&
+      action.type !== PLAYER_ACTIONS.showShortcuts
+    ) {
       return
     }
     event.preventDefault()
@@ -200,7 +207,7 @@ export const PlayerChrome = ({
     if (!isMenuSection(overlay) || !(target instanceof Node)) return
     const isInMenu = menu.current?.contains(target) ?? false
     if (isInMenu || (menuButton.current?.contains(target) ?? false)) return
-    setOverlay('none')
+    setOverlay(OVERLAYS.none)
   }
 
   const handOff = (to: Handoff) => {
@@ -339,7 +346,7 @@ export const PlayerChrome = ({
         settingsButton={menuButton}
         onTogglePlay={controls.togglePlay}
         onSeek={seek}
-        onSkip={(seconds) => controls.act({ type: 'seekBy', seconds })}
+        onSkip={(seconds) => controls.act({ type: PLAYER_ACTIONS.seekBy, seconds })}
         onVolume={controls.changeVolume}
         onToggleMute={controls.toggleMute}
         onToggleMenu={toggleMenu}
@@ -380,8 +387,11 @@ export const PlayerChrome = ({
           {...(handoff && { onHandoff: () => handOff(handoff), handoffLabel: handoff.label })}
         />
       )}
-      {overlay === 'shortcuts' && (
-        <ShortcutsDialog canShowStats={!!actions.toggleStats} onClose={() => setOverlay('none')} />
+      {overlay === OVERLAYS.shortcuts && (
+        <ShortcutsDialog
+          canShowStats={!!actions.toggleStats}
+          onClose={() => setOverlay(OVERLAYS.none)}
+        />
       )}
     </div>
   )

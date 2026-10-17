@@ -3,6 +3,7 @@ import {
   type MediaItem,
   type PlaybackMode,
   DEFAULT_PLAYBACK_SETTINGS,
+  PLAYBACK_MODES,
   planPlayback,
 } from '@raven/core'
 import { useMemo, useState } from 'react'
@@ -18,12 +19,26 @@ const sameLadder = ({ a, b }: { a: Ladder; b: Ladder }): boolean =>
   a.modes.length === b.modes.length &&
   a.modes.every((mode, index) => mode === b.modes[index])
 
+export const PLAYBACK_STATUSES = {
+  waiting: 'waiting',
+  unplayable: 'unplayable',
+  playing: 'playing',
+} as const
+
 export type PlaybackStatus =
   /** What picks the first source, the server's playback settings, is on its way. */
-  | { status: 'waiting' }
-  | { status: 'unplayable'; problems: string[]; tryAnyway: (() => void) | null }
+  | { status: typeof PLAYBACK_STATUSES.waiting }
+  | {
+      status: typeof PLAYBACK_STATUSES.unplayable
+      problems: string[]
+      tryAnyway: (() => void) | null
+    }
   /** `fail` steps down to the next way, or gives up once none is left. */
-  | { status: 'playing'; mode: PlaybackMode; fail: (message: string) => void }
+  | {
+      status: typeof PLAYBACK_STATUSES.playing
+      mode: PlaybackMode
+      fail: (message: string) => void
+    }
 
 /**
  * How to play a file. The original goes straight to the browser when it can
@@ -63,23 +78,23 @@ export const usePlaybackLadder = ({
 
   // The server's settings say whether to force the original file and what it
   // converts; a plan made without them starts a stream it may refuse.
-  if (!plan) return { status: 'waiting' }
+  if (!plan) return { status: PLAYBACK_STATUSES.waiting }
 
   const ladder: Ladder = {
-    modes: plan.modes.length === 0 && forced ? ['direct'] : plan.modes,
+    modes: plan.modes.length === 0 && forced ? [PLAYBACK_MODES.direct] : plan.modes,
     audio,
   }
   const step = fallback != null && sameLadder({ a: fallback.ladder, b: ladder }) ? fallback.step : 0
   const mode = ladder.modes[step]
   if (failure != null || mode == null) {
     return {
-      status: 'unplayable',
+      status: PLAYBACK_STATUSES.unplayable,
       problems: failure != null ? [failure, ...plan.problems] : plan.problems,
       tryAnyway: failure == null && !forced ? () => setForced(true) : null,
     }
   }
   return {
-    status: 'playing',
+    status: PLAYBACK_STATUSES.playing,
     mode,
     fail: (message) => {
       if (step + 1 < ladder.modes.length) setFallback({ ladder, step: step + 1 })

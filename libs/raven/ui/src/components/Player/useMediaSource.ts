@@ -1,13 +1,22 @@
-import { type ApiClient, type MediaAccess, type PlaybackMode, streamMimeType } from '@raven/core'
+import {
+  type ApiClient,
+  type MediaAccess,
+  PLAYBACK_MODES,
+  PLAYER_SOURCE_KINDS,
+  type PlaybackMode,
+  streamMimeType,
+} from '@raven/core'
 import { type RefObject, useEffect, useEffectEvent, useRef } from 'react'
 import { useVideoEvents } from '@/components/Player/useVideoEvents'
 import type { HtmlSource } from '@/components/Player/engine'
 import { browserEnvironment, createStreamSession } from '@/lib/streamSource'
 
+export const VIDEO_SOURCE_KINDS = { file: 'file', stream: 'stream' } as const
+
 /** What the video plays: the file itself, or a converted stream of a known type. */
 export type VideoSource =
-  | { kind: 'file'; url: string }
-  | { kind: 'stream'; mime: string; url: (start: number) => string }
+  | { kind: typeof VIDEO_SOURCE_KINDS.file; url: string }
+  | { kind: typeof VIDEO_SOURCE_KINDS.stream; mime: string; url: (start: number) => string }
 
 export const sourceFor = ({
   api,
@@ -27,10 +36,10 @@ export const sourceFor = ({
   /** Read for each URL built, so a stream's next request carries the newest ticket. */
   access: () => MediaAccess | null
 }): VideoSource =>
-  mode === 'direct' || mime == null
-    ? { kind: 'file', url: api.fileUrl({ id, access: access() }) }
+  mode === PLAYBACK_MODES.direct || mime == null
+    ? { kind: VIDEO_SOURCE_KINDS.file, url: api.fileUrl({ id, access: access() }) }
     : {
-        kind: 'stream',
+        kind: VIDEO_SOURCE_KINDS.stream,
         mime,
         url: (start) => api.streamUrl({ id, mode, start, audio, access: access() }),
       }
@@ -71,13 +80,15 @@ export const useMediaSource = ({
   onFailure: (message: string) => void
 }): void => {
   const mime =
-    mode === 'direct' || htmlSource.kind === 'file'
+    mode === PLAYBACK_MODES.direct || htmlSource.kind === PLAYER_SOURCE_KINDS.file
       ? null
       : streamMimeType({ media: htmlSource.media, mode })
-  const id = htmlSource.kind === 'server' ? htmlSource.media.id : htmlSource.url
-  const api = htmlSource.kind === 'server' ? htmlSource.api : null
-  const knownDuration = htmlSource.kind === 'server' ? htmlSource.media.duration : null
-  const access = htmlSource.kind === 'server' ? (htmlSource.mediaPlane?.access ?? null) : null
+  const id = htmlSource.kind === PLAYER_SOURCE_KINDS.server ? htmlSource.media.id : htmlSource.url
+  const api = htmlSource.kind === PLAYER_SOURCE_KINDS.server ? htmlSource.api : null
+  const knownDuration =
+    htmlSource.kind === PLAYER_SOURCE_KINDS.server ? htmlSource.media.duration : null
+  const access =
+    htmlSource.kind === PLAYER_SOURCE_KINDS.server ? (htmlSource.mediaPlane?.access ?? null) : null
   const accessRef = useRef(access)
   useEffect(() => {
     accessRef.current = access
@@ -85,7 +96,7 @@ export const useMediaSource = ({
   const originUrl = access?.origin.url ?? null
   // A stream reads the newest ticket on its next request; a <video src> holds
   // its address and would keep asking with the old ticket until it died.
-  const fileTicket = mode === 'direct' ? (access?.ticket ?? null) : null
+  const fileTicket = mode === PLAYBACK_MODES.direct ? (access?.ticket ?? null) : null
   // The source this render wants, and the one attached. They differ from
   // the commit that picks a new source until the effect swaps it in, and a
   // failure the browser queued for the old one can land in between; it
@@ -99,7 +110,7 @@ export const useMediaSource = ({
   // A running stream outlives renders; its failures reach the latest `report`.
   const fail = useEffectEvent((message: string) => report(message))
   const unreachable = useEffectEvent(() => {
-    if (htmlSource.kind === 'server') htmlSource.mediaPlane?.reportUnreachable()
+    if (htmlSource.kind === PLAYER_SOURCE_KINDS.server) htmlSource.mediaPlane?.reportUnreachable()
   })
 
   useVideoEvents({
@@ -129,7 +140,7 @@ export const useMediaSource = ({
       const play = () => {
         if (playing.current) element.play()?.catch(() => onRefused())
       }
-      if (source.kind === 'file') {
+      if (source.kind === VIDEO_SOURCE_KINDS.file) {
         const onReady = () => {
           if (from > 0) element.currentTime = from
           play()

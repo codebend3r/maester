@@ -9,6 +9,11 @@ type ProbeSetup = {
   now?: () => number
 }
 
+const VISIBILITY_STATES = { hidden: 'hidden' } as const satisfies Record<
+  string,
+  DocumentVisibilityState
+>
+
 const browserFetch: ProbeFetch = (url, init) => window.fetch(url, init)
 const browserNow = (): number => performance.now()
 
@@ -71,9 +76,9 @@ export const useMediaOriginProbe = ({
   }, [run])
 
   useEffect(() => {
-    hiddenAt.current = document.visibilityState === 'hidden' ? Date.now() : null
+    hiddenAt.current = document.visibilityState === VISIBILITY_STATES.hidden ? Date.now() : null
     const onVisibility = () => {
-      if (document.visibilityState === 'hidden') {
+      if (document.visibilityState === VISIBILITY_STATES.hidden) {
         hiddenAt.current = Date.now()
         return
       }

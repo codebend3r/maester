@@ -1,4 +1,5 @@
 import {
+  SUBTITLE_SOURCES,
   type AudioTrack,
   type SubtitleTrack,
   languageName,
@@ -27,7 +28,7 @@ export const subtitleLabel = (track: SubtitleTrack): TrackLabel => ({
     track.title,
     track.forced && 'Forced',
     track.hearingImpaired && 'SDH',
-    track.source === 'external' && 'File',
+    track.source === SUBTITLE_SOURCES.external && 'File',
     !track.supported && "Picture subtitles, can't be shown",
   ]),
 })

@@ -38,7 +38,7 @@ export const useMediaPlane = ({
   const { refetch } = ticket
   const refreshTicket = useCallback(async () => {
     const result = await refetch()
-    return result.status === 'success'
+    return result.isSuccess
   }, [refetch])
   return { access, refreshTicket, reportUnreachable: reprobe }
 }

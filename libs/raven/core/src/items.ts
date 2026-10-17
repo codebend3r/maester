@@ -23,11 +23,11 @@ export const episodeCode = ({
 
 /** "The Matrix (1999)", or "Severance · S01E02 · Half Loop" for an episode. */
 export const itemLabel = (item: ItemSummary): string => {
-  if (item.type === 'episode' || item.type === 'season') {
+  if (item.type === ITEM_TYPES.episode || item.type === ITEM_TYPES.season) {
     return [
       item.show?.title ?? null,
       episodeCode(item),
-      item.type === 'episode' ? item.title : null,
+      item.type === ITEM_TYPES.episode ? item.title : null,
     ]
       .filter((part): part is string => part != null && part !== '')
       .join(' · ')
@@ -57,7 +57,7 @@ export const primaryVersion = (versions: readonly MediaItem[]): MediaItem | unde
  */
 export const cardTitle = (media: MediaItem): { title: string; year: number | null } => {
   if (!media.item) return { title: media.title, year: media.year }
-  if (media.item.type === 'episode') return { title: itemLabel(media.item), year: null }
+  if (media.item.type === ITEM_TYPES.episode) return { title: itemLabel(media.item), year: null }
   const title = media.variant == null ? media.item.title : `${media.item.title} (${media.variant})`
   return { title, year: media.item.year }
 }

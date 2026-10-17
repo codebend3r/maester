@@ -1,4 +1,4 @@
-import type { MediaTracks, PlaybackMode } from '@raven/core'
+import { type MediaTracks, PLAYBACK_MODES, type PlaybackMode } from '@raven/core'
 
 /**
  * The audio track to start on: the file's default, unless the viewer last
@@ -54,6 +54,6 @@ export const playingAudio = ({
   audio: number | null
   playsPickedAudio?: boolean
 }): number | null =>
-  mode === 'direct' && !playsPickedAudio
+  mode === PLAYBACK_MODES.direct && !playsPickedAudio
     ? (tracks?.defaultAudio ?? null)
     : (audio ?? tracks?.defaultAudio ?? null)

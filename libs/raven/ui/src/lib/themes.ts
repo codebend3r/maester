@@ -1,4 +1,6 @@
-export type ThemeTone = 'dark' | 'light'
+export const THEME_TONES = { dark: 'dark', light: 'light' } as const
+
+export type ThemeTone = (typeof THEME_TONES)[keyof typeof THEME_TONES]
 
 type Theme = {
   id: string

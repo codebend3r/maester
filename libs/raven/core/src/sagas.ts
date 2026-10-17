@@ -1,4 +1,4 @@
-import type { ItemSummary, Saga } from '@/contract'
+import { type ItemSummary, SAGA_BACKDROP_TYPES, type Saga } from '@/contract'
 
 /** A movie's backdrop, by the item it belongs to and the version that names the picture, and the movie's title. */
 export type SagaPicture = {
@@ -29,6 +29,8 @@ export const sagaCover = (saga: Saga): SagaPicture | null => {
   const pictures = sagaPictures(saga)
   const { backdrop } = saga
   const picked =
-    backdrop.type === 'still' ? pictures.find((picture) => picture.id === backdrop.itemId) : null
+    backdrop.type === SAGA_BACKDROP_TYPES.still
+      ? pictures.find((picture) => picture.id === backdrop.itemId)
+      : null
   return picked ?? pictures[0] ?? null
 }

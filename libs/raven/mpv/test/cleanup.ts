@@ -3,6 +3,9 @@ import { createRequire } from 'node:module'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { isMainThread, Worker, workerData } from 'node:worker_threads'
 import { isNumber, isRecord, object } from '@raven/core'
+import { MPV_COMMANDS, MPV_SURFACE_KINDS } from '@/mpv'
+import { MPV_PROPERTIES } from '@/properties'
+import { CLEANUP_MODES, isCleanupMode } from '@/test/cleanupModes'
 
 const ignoreEvent = () => {}
 const isCounts = object({ owners: isNumber, callbacks: isNumber, handles: isNumber })
@@ -48,8 +51,7 @@ const collectUntil = async ({
 if (isMainThread) {
   const clip = process.argv[2]
   const mode = process.argv[3]
-  if (!clip || !['explicit', 'gc', 'environment'].includes(mode ?? ''))
-    throw new Error('Missing cleanup-test fixture or mode')
+  if (!clip || !isCleanupMode(mode)) throw new Error('Missing cleanup-test fixture or mode')
   assert.deepEqual(counts(), { owners: 0, callbacks: 0, handles: 0 })
   // Keep this environment's addon loaded so its process-wide counters outlive
   // each worker's N-API environment, including discarded TSFN callbacks.
@@ -68,29 +70,30 @@ if (isMainThread) {
   }, Promise.resolve())
 } else {
   const data: unknown = workerData
-  if (!isRecord(data) || typeof data.clip !== 'string' || typeof data.mode !== 'string')
+  if (!isRecord(data) || typeof data.clip !== 'string' || !isCleanupMode(data.mode))
     throw new Error('Invalid cleanup worker data')
   const { clip, mode } = data
   await (async () => {
     const players = Array.from({ length: 8 }, () => {
-      const player: unknown = create({ kind: 'headless' }, ignoreEvent)
+      const player: unknown = create({ kind: MPV_SURFACE_KINDS.headless }, ignoreEvent)
       if (!isHandle(player)) throw new Error('Invalid native cleanup-test handle')
-      player.observe('pause')
-      player.observe('time-pos')
-      player.command(1, ['loadfile', clip])
+      player.observe(MPV_PROPERTIES.pause)
+      player.observe(MPV_PROPERTIES.timePos)
+      player.command(1, [MPV_COMMANDS.loadfile, clip])
       Array.from({ length: 32 }).forEach((_value, index) => {
-        player.set(index + 2, 'pause', index % 2 === 0)
+        player.set(index + 2, MPV_PROPERTIES.pause, index % 2 === 0)
       })
       return player
     })
-    if (mode === 'explicit') await Promise.all(players.map((player) => player.destroy()))
+    if (mode === CLEANUP_MODES.explicit)
+      await Promise.all(players.map((player) => player.destroy()))
     // GC/environment modes intentionally abandon engines with wakeups in flight.
   })()
-  if (mode === 'explicit') {
+  if (mode === CLEANUP_MODES.explicit) {
     await collectUntil({ matches: () => counts().owners === 0 && counts().callbacks === 0 })
     assert.equal(counts().handles, 0)
   }
-  if (mode === 'gc') {
+  if (mode === CLEANUP_MODES.gc) {
     await collectUntil({ matches: () => counts().handles === 0 })
     // The async cleanup hook intentionally retains abandoned owners until exit.
     // The parent verifies those owners and their TSFNs are then reclaimed too.

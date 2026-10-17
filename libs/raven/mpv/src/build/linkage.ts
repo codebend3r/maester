@@ -7,6 +7,9 @@
  */
 export const libmpvLinkLibraries = ['glslang', 'glslang-default-resource-limits', 'c++'] as const
 
+/** The search paths a bundled library or the addon may carry: beside itself, or its `lib`. */
+export const RPATHS = { loaderPath: '@loader_path', loaderPathLib: '@loader_path/lib' } as const
+
 export const withLinkLibraries = <T extends { LDFLAGS: string }>({
   env,
   libraries,

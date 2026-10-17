@@ -9,10 +9,12 @@ import {
   type MediaItem,
   isScanning,
 } from '@raven/core'
+import { CACHE_POLICIES, CONTENT_TYPES, ENCODINGS, HEADERS } from '@shared/server'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createApp } from '@/app'
 import { DatabaseService } from '@/db/database'
 import { ServerEvents } from '@/events/serverEvents'
+import { RAVEN_CACHE_POLICIES, RAVEN_CONTENT_TYPES, RAVEN_HEADERS } from '@/http'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { MediaIndex } from '@/media/mediaIndex'
 import { ScannerService } from '@/scanner/scannerService'
@@ -232,16 +234,16 @@ describe('the media server', () => {
         app().inject({
           method: 'GET',
           url,
-          headers: { cookie: state.admin, 'accept-encoding': BROWSER_ENCODINGS },
+          headers: { cookie: state.admin, [HEADERS.acceptEncoding]: BROWSER_ENCODINGS },
         }),
         app().inject({ method: 'GET', url, headers: { cookie: state.admin } }),
       ])
-      expect(packed.headers['content-encoding']).toBe('br')
-      expect(packed.headers.vary).toContain('accept-encoding')
+      expect(packed.headers[HEADERS.contentEncoding]).toBe(ENCODINGS.br)
+      expect(packed.headers.vary).toContain(HEADERS.acceptEncoding)
       // What the PIN opens for one browser must never sit in Netlify's cache.
-      expect(packed.headers['cache-control'] ?? '').not.toContain('public')
+      expect(packed.headers[HEADERS.cacheControl] ?? '').not.toContain('public')
       expect(packed.rawPayload.length).toBeLessThan(plain.rawPayload.length / 2)
-      expect(plain.headers['content-encoding']).toBeUndefined()
+      expect(plain.headers[HEADERS.contentEncoding]).toBeUndefined()
       expect(decodedBody(packed).equals(plain.rawPayload)).toBe(true)
     })
 
@@ -260,12 +262,12 @@ describe('the media server', () => {
       const response = await app().inject({
         method: 'GET',
         url: url ?? '',
-        headers: { 'accept-encoding': BROWSER_ENCODINGS },
+        headers: { [HEADERS.acceptEncoding]: BROWSER_ENCODINGS },
       })
       expect(response.statusCode).toBe(200)
-      expect(response.headers['content-type']).toBe('image/jpeg')
-      expect(response.headers['content-encoding']).toBeUndefined()
-      expect(response.headers['cache-control']).toBe('private, max-age=31536000, immutable')
+      expect(response.headers[HEADERS.contentType]).toBe(RAVEN_CONTENT_TYPES.jpeg)
+      expect(response.headers[HEADERS.contentEncoding]).toBeUndefined()
+      expect(response.headers[HEADERS.cacheControl]).toBe(RAVEN_CACHE_POLICIES.privateImmutable)
       expect([...response.rawPayload.subarray(0, 2)]).toEqual([0xff, 0xd8])
     })
 
@@ -275,7 +277,7 @@ describe('the media server', () => {
         const response = await app().inject({
           method: 'GET',
           url: api().fileUrl({ id: movie?.id ?? -1 }),
-          headers: { range: 'bytes=0-99', 'accept-encoding': BROWSER_ENCODINGS },
+          headers: { range: 'bytes=0-99', [HEADERS.acceptEncoding]: BROWSER_ENCODINGS },
         })
         expect(response.statusCode).toBe(206)
         expect(response.headers['content-type']).toBe('video/mp4')
@@ -292,12 +294,12 @@ describe('the media server', () => {
         const response = await app().inject({
           method: 'GET',
           url: api().fileUrl({ id: episode?.id ?? -1 }),
-          headers: { 'accept-encoding': BROWSER_ENCODINGS },
+          headers: { [HEADERS.acceptEncoding]: BROWSER_ENCODINGS },
         })
         expect(response.statusCode).toBe(200)
-        expect(response.headers['content-type']).toBe('video/x-matroska')
-        expect(response.headers['content-encoding']).toBeUndefined()
-        expect(response.headers['content-length']).toBe(String(episode?.size))
+        expect(response.headers[HEADERS.contentType]).toBe('video/x-matroska')
+        expect(response.headers[HEADERS.contentEncoding]).toBeUndefined()
+        expect(response.headers[HEADERS.contentLength]).toBe(String(episode?.size))
         expect(response.rawPayload).toHaveLength(episode?.size ?? -1)
       })
 
@@ -309,7 +311,7 @@ describe('the media server', () => {
           headers: { range: `bytes=${(movie?.size ?? 0) + 10}-` },
         })
         expect(response.statusCode).toBe(416)
-        expect(response.headers['content-range']).toBe(`bytes */${movie?.size}`)
+        expect(response.headers[HEADERS.contentRange]).toBe(`bytes */${movie?.size}`)
       })
     })
 
@@ -822,19 +824,19 @@ describe('serving the web app', () => {
   it('caches fingerprinted assets for good', async () => {
     const response = await app().inject({ method: 'GET', url: '/assets/app-1234.js' })
     expect(response.statusCode).toBe(200)
-    expect(response.headers['cache-control']).toContain('immutable')
+    expect(response.headers[HEADERS.cacheControl]).toContain('immutable')
   })
 
   it('compresses the page and the script for a browser that takes it, cached as before', async () => {
     const get = (url: string) =>
-      app().inject({ method: 'GET', url, headers: { 'accept-encoding': BROWSER_ENCODINGS } })
+      app().inject({ method: 'GET', url, headers: { [HEADERS.acceptEncoding]: BROWSER_ENCODINGS } })
     const page = await get('/')
-    expect(page.headers['content-encoding']).toBe('br')
-    expect(page.headers['cache-control']).toBe('no-cache')
+    expect(page.headers[HEADERS.contentEncoding]).toBe(ENCODINGS.br)
+    expect(page.headers[HEADERS.cacheControl]).toBe(CACHE_POLICIES.noCache)
     expect(decodedBody(page).toString()).toBe(PAGE)
     const script = await get('/assets/app-1234.js')
-    expect(script.headers['content-encoding']).toBe('br')
-    expect(script.headers['cache-control']).toBe('public, max-age=31536000, immutable')
+    expect(script.headers[HEADERS.contentEncoding]).toBe(ENCODINGS.br)
+    expect(script.headers[HEADERS.cacheControl]).toBe(CACHE_POLICIES.immutable)
     expect(decodedBody(script).toString()).toBe(SCRIPT)
   })
 
@@ -871,11 +873,11 @@ describe('live updates', () => {
     const aborter = new AbortController()
     try {
       const response = await fetch(`${await app().getUrl()}/api/events`, {
-        headers: { 'accept-encoding': BROWSER_ENCODINGS },
+        headers: { [HEADERS.acceptEncoding]: BROWSER_ENCODINGS },
         signal: aborter.signal,
       })
-      expect(response.headers.get('content-type')).toContain('text/event-stream')
-      expect(response.headers.get('content-encoding')).toBeNull()
+      expect(response.headers.get(HEADERS.contentType)).toContain(CONTENT_TYPES.eventStream)
+      expect(response.headers.get(HEADERS.contentEncoding)).toBeNull()
       const reader = response.body?.getReader()
       if (!reader) throw new Error('no body to read')
       const decoder = new TextDecoder()

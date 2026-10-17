@@ -2,11 +2,15 @@ import { Stream } from 'node:stream'
 import { constants } from 'node:zlib'
 import fastifyCompress from '@fastify/compress'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
+import { CONTENT_TYPES, HEADERS } from '@/http'
 
 // The plugin's own list adds octet-stream, which on a media server is a video.
 // Anything else it takes from mime-db, which marks no video and neither JPEG
 // nor PNG compressible.
 const COMPRESSIBLE = /^text\/(?!event-stream)|[+/](?:json|xml)(?:;|$)/u
+
+/** The content codings offered, in order of preference. */
+export const ENCODINGS = { br: 'br', gzip: 'gzip' } as const
 
 const isStream = (payload: unknown): payload is Stream | ReadableStream =>
   payload instanceof Stream || payload instanceof ReadableStream
@@ -33,8 +37,8 @@ export const compressResponses = async ({
   // A Range asks for bytes of the uncompressed file, so it is answered as it
   // always was. `x-no-compression` is the plugin's way to skip one request.
   fastify.addHook('onRequest', async (request) => {
-    if (request.headers.range !== undefined) {
-      request.headers = { ...request.headers, 'x-no-compression': 'range' }
+    if (request.headers[HEADERS.range] !== undefined) {
+      request.headers = { ...request.headers, [HEADERS.xNoCompression]: 'range' }
     }
   })
   // The plugin compresses a reply with no type as JSON, and Fastify names no
@@ -42,13 +46,13 @@ export const compressResponses = async ({
   // its length. Called bytes, it goes out as it is. Fastify runs this hook
   // before the plugin's, which it adds to each route.
   fastify.addHook('onSend', async (_request, reply, payload) => {
-    if (reply.getHeader('content-type') === undefined && isStream(payload)) {
-      reply.header('content-type', 'application/octet-stream')
+    if (reply.getHeader(HEADERS.contentType) === undefined && isStream(payload)) {
+      reply.header(HEADERS.contentType, CONTENT_TYPES.octetStream)
     }
     return payload
   })
   await app.register(fastifyCompress, {
-    encodings: ['br', 'gzip'],
+    encodings: [ENCODINGS.br, ENCODINGS.gzip],
     customTypes: COMPRESSIBLE,
     brotliOptions: { params: { [constants.BROTLI_PARAM_QUALITY]: 4 } },
     zlibOptions: { level: 1 },

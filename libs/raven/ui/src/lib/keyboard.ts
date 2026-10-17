@@ -16,8 +16,10 @@ export const KEYS = {
 export const isTypingTarget = (target: EventTarget | null): boolean =>
   target instanceof HTMLElement && !!target.closest('input, select, textarea')
 
+const INPUT_TYPES = { checkbox: 'checkbox' } as const
+
 const isCheckbox = (target: EventTarget | null): boolean =>
-  target instanceof HTMLInputElement && target.type === 'checkbox'
+  target instanceof HTMLInputElement && target.type === INPUT_TYPES.checkbox
 
 /** Whether a key comes from a dialog outside `root`: a dialog someone else opened keeps its keys. */
 export const isInForeignDialog = ({

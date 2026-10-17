@@ -4,6 +4,13 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { isString, listOf, object, type Infer } from '@raven/core'
 
+const PLATFORMS = { darwin: 'darwin' } as const satisfies Record<string, NodeJS.Platform>
+export const ARCHITECTURES = {
+  arm64: 'arm64',
+} as const satisfies Record<string, NodeJS.Architecture>
+/** The platform a native build is for, as its provenance records it. */
+export const BUILD_TARGETS = { darwinArm64: 'darwin-arm64' } as const
+
 export const project = fileURLToPath(new URL('../..', import.meta.url))
 export const work = resolve(project, 'native-build')
 export const prefix = resolve(work, 'prefix')
@@ -76,6 +83,6 @@ export const write = async ({ path, content }: { path: string; content: string |
   await Bun.write(path, content)
 }
 export const requireMacArm = () => {
-  if (process.platform !== 'darwin' || process.arch !== 'arm64')
+  if (process.platform !== PLATFORMS.darwin || process.arch !== ARCHITECTURES.arm64)
     throw new Error('Native playback supports macOS arm64 only')
 }

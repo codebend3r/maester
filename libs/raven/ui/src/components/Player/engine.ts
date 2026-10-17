@@ -1,10 +1,11 @@
-import type {
-  ApiClient,
-  MediaItem,
-  MediaTracks,
-  PlayerCommand,
-  PlayerEvent,
-  PlayerSource,
+import {
+  type ApiClient,
+  type MediaItem,
+  type MediaTracks,
+  type PlayerCommand,
+  type PlayerEvent,
+  type PlayerSource,
+  PLAYER_SOURCE_KINDS,
 } from '@raven/core'
 import type { ReactNode, RefObject } from 'react'
 import type { MediaPlane } from '@/components/Player/useMediaPlane'
@@ -49,8 +50,13 @@ export type EngineHandle = {
 }
 
 export type HtmlSource =
-  | { kind: 'server'; media: MediaItem; api: ApiClient; mediaPlane?: MediaPlane }
-  | { kind: 'file'; url: string }
+  | {
+      kind: typeof PLAYER_SOURCE_KINDS.server
+      media: MediaItem
+      api: ApiClient
+      mediaPlane?: MediaPlane
+    }
+  | { kind: typeof PLAYER_SOURCE_KINDS.file; url: string }
 
 /** A player in another process: commands out, each answered once, and events in. */
 export type NativePlayer = {
@@ -58,16 +64,19 @@ export type NativePlayer = {
   subscribe: (listener: (event: PlayerEvent) => void) => () => void
 }
 
+/** The browser's own `<video>`, or a player in another process. */
+export const ENGINE_KINDS = { html: 'html', native: 'native' } as const
+
 export type Engine =
-  | { kind: 'html'; source: HtmlSource }
-  | { kind: 'native'; player: NativePlayer; source: PlayerSource }
+  | { kind: typeof ENGINE_KINDS.html; source: HtmlSource }
+  | { kind: typeof ENGINE_KINDS.native; player: NativePlayer; source: PlayerSource }
 
 /** One key per video, so a different source remounts the native stage. */
 export const sourceKey = (source: PlayerSource): string => {
   switch (source.kind) {
-    case 'server':
+    case PLAYER_SOURCE_KINDS.server:
       return `server:${source.serverId}:${source.mediaId}`
-    case 'file':
+    case PLAYER_SOURCE_KINDS.file:
       return `file:${source.fileId}`
     default: {
       const unknown: never = source

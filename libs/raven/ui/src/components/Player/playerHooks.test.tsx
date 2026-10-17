@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, renderHook } from '@testing-library/react'
 import type { ReactNode } from 'react'
-import { usePlaybackLadder } from '@/components/Player/usePlaybackLadder'
+import { PLAYBACK_STATUSES, usePlaybackLadder } from '@/components/Player/usePlaybackLadder'
 import { initialVideoState, videoReducer } from '@/components/Player/useVideoState'
 import { api } from '@/test/api'
 import { playerQueryKeys as queryKeys } from '@/lib/playerQueryKeys'
@@ -46,18 +46,18 @@ describe('usePlaybackLadder', () => {
       { wrapper: withSettings },
     )
     const first = result.current
-    expect(first.status).toBe('playing')
-    if (first.status !== 'playing') return
+    expect(first.status).toBe(PLAYBACK_STATUSES.playing)
+    if (first.status !== PLAYBACK_STATUSES.playing) return
     const firstMode = first.mode
     act(() => first.fail('first broke'))
     const second = result.current
-    if (second.status === 'playing') {
+    if (second.status === PLAYBACK_STATUSES.playing) {
       expect(second.mode).not.toBe(firstMode)
       act(() => second.fail('second broke'))
     }
     const last = result.current
-    expect(last.status).toBe('unplayable')
-    if (last.status !== 'unplayable') return
+    expect(last.status).toBe(PLAYBACK_STATUSES.unplayable)
+    if (last.status !== PLAYBACK_STATUSES.unplayable) return
     expect(last.tryAnyway).toBeNull()
   })
 })

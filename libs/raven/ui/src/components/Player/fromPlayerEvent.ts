@@ -1,5 +1,5 @@
-import type { PlayerEvent } from '@raven/core'
-import type { Ranges, VideoEvent } from '@/components/Player/useVideoState'
+import { PLAYER_EVENTS, type PlayerEvent } from '@raven/core'
+import { type Ranges, VIDEO_EVENTS, type VideoEvent } from '@/components/Player/useVideoState'
 
 export const rangesFrom = (ranges: readonly { start: number; end: number }[]): Ranges =>
   ranges.map(({ start, end }): [number, number] => [start, end])
@@ -17,25 +17,25 @@ export const fromPlayerEvent = ({
   buffered: Ranges
 }): VideoEvent | null => {
   switch (event.type) {
-    case 'time':
-      return { type: 'moved', time: event.time, buffered }
-    case 'buffered':
-      return { type: 'buffered', buffered: rangesFrom(event.ranges) }
-    case 'paused':
-      return { type: event.paused ? 'paused' : 'played' }
-    case 'waiting':
-      return { type: event.waiting ? 'waiting' : 'flowing' }
-    case 'duration':
+    case PLAYER_EVENTS.time:
+      return { type: VIDEO_EVENTS.moved, time: event.time, buffered }
+    case PLAYER_EVENTS.buffered:
+      return { type: VIDEO_EVENTS.buffered, buffered: rangesFrom(event.ranges) }
+    case PLAYER_EVENTS.paused:
+      return { type: event.paused ? VIDEO_EVENTS.paused : VIDEO_EVENTS.played }
+    case PLAYER_EVENTS.waiting:
+      return { type: event.waiting ? VIDEO_EVENTS.waiting : VIDEO_EVENTS.flowing }
+    case PLAYER_EVENTS.duration:
       return {
-        type: 'duration',
+        type: VIDEO_EVENTS.duration,
         duration: event.duration != null && event.duration > 0 ? event.duration : null,
       }
-    case 'rate':
-      return { type: 'rate', rate: event.rate }
-    case 'ended':
-      return { type: 'ended' }
-    case 'tracks':
-    case 'error':
+    case PLAYER_EVENTS.rate:
+      return { type: VIDEO_EVENTS.rate, rate: event.rate }
+    case PLAYER_EVENTS.ended:
+      return { type: VIDEO_EVENTS.ended }
+    case PLAYER_EVENTS.tracks:
+    case PLAYER_EVENTS.error:
       return null
     default: {
       const unknown: never = event

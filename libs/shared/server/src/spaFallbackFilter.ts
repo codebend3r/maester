@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { type ArgumentsHost, Catch, type ExceptionFilter, NotFoundException } from '@nestjs/common'
 import type { FastifyReply, FastifyRequest } from 'fastify'
+import { CACHE_POLICIES, CONTENT_TYPES, HEADERS, HTTP_METHODS } from '@/http'
 
 /**
  * Client-side routes have no file behind them, so any GET outside the
@@ -31,7 +32,7 @@ export class SpaFallbackFilter implements ExceptionFilter {
     const request = http.getRequest<FastifyRequest>()
     const reply = http.getResponse<FastifyReply>()
     const isApp =
-      request.method === 'GET' &&
+      request.method === HTTP_METHODS.get &&
       !this.serverPrefixes.some((prefix) => request.url.startsWith(prefix))
 
     const notFound = () => void reply.code(404).send(exception.getResponse())
@@ -41,8 +42,8 @@ export class SpaFallbackFilter implements ExceptionFilter {
       (html) =>
         void reply
           .code(200)
-          .header('content-type', 'text/html; charset=utf-8')
-          .header('cache-control', 'no-cache')
+          .header(HEADERS.contentType, CONTENT_TYPES.html)
+          .header(HEADERS.cacheControl, CACHE_POLICIES.noCache)
           .send(html),
       notFound,
     )

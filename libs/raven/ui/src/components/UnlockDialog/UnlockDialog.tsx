@@ -4,6 +4,10 @@ import { Button } from '@/components/Button/Button'
 import { Icon } from '@/components/Icon/Icon'
 import styles from '@/components/UnlockDialog/UnlockDialog.module.scss'
 
+export const UNLOCK_SECRETS = { pin: 'pin', adminPassword: 'adminPassword' } as const
+
+export type UnlockSecret = (typeof UNLOCK_SECRETS)[keyof typeof UNLOCK_SECRETS]
+
 /** The words and field for each secret a server can ask for; the hints are the web's own. */
 const SECRETS = {
   pin: {
@@ -18,9 +22,7 @@ const SECRETS = {
     inputMode: undefined,
     hint: 'Enter the admin password to see the locked libraries in this browser.',
   },
-} as const
-
-export type UnlockSecret = keyof typeof SECRETS
+} as const satisfies Record<UnlockSecret, unknown>
 
 /** Asks for a secret over whatever page asked; the host unlocks, and says what reads again. */
 export const UnlockDialog = ({

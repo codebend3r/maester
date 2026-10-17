@@ -1,6 +1,6 @@
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { flag, readListenConfig, wholeNumber } from '@/env'
+import { flag, LISTEN_ENV_VARS, readListenConfig, wholeNumber } from '@/env'
 
 describe('wholeNumber', () => {
   it('reads a whole number at or above zero', () => {
@@ -53,7 +53,12 @@ describe('readListenConfig', () => {
   })
 
   it('reads PORT, HOST, DATA_DIR and WEB_DIR, resolving the folders', () => {
-    const env = { PORT: '9000', HOST: ' 127.0.0.1 ', DATA_DIR: '/config', WEB_DIR: 'web' }
+    const env = {
+      [LISTEN_ENV_VARS.port]: '9000',
+      [LISTEN_ENV_VARS.host]: ' 127.0.0.1 ',
+      [LISTEN_ENV_VARS.dataDir]: '/config',
+      [LISTEN_ENV_VARS.webDir]: 'web',
+    }
     expect(readListenConfig({ env, defaultPort: 8030 })).toEqual({
       port: 9000,
       host: '127.0.0.1',
@@ -63,7 +68,10 @@ describe('readListenConfig', () => {
   })
 
   it('keeps the default port for a PORT that is not a whole number, and no web app for a blank WEB_DIR', () => {
-    const config = readListenConfig({ env: { PORT: 'http', WEB_DIR: '  ' }, defaultPort: 8484 })
+    const config = readListenConfig({
+      env: { [LISTEN_ENV_VARS.port]: 'http', [LISTEN_ENV_VARS.webDir]: '  ' },
+      defaultPort: 8484,
+    })
     expect(config.port).toBe(8484)
     expect(config.webDir).toBeNull()
   })

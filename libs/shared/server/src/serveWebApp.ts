@@ -1,6 +1,7 @@
 import { join } from 'node:path'
 import fastifyStatic from '@fastify/static'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
+import { CACHE_POLICIES, HEADERS } from '@/http'
 import { SpaFallbackFilter } from '@/spaFallbackFilter'
 
 /**
@@ -29,8 +30,8 @@ export const serveWebApp = async ({
       // Vite fingerprints everything under /assets, so it never goes stale.
       setHeaders: (reply, path) => {
         reply.header(
-          'cache-control',
-          path.includes('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache',
+          HEADERS.cacheControl,
+          path.includes('/assets/') ? CACHE_POLICIES.immutable : CACHE_POLICIES.noCache,
         )
       },
     })

@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test'
-import type { MediaTracks, PlayerCommand, PlayerEvent } from '@raven/core'
+import {
+  type MediaTracks,
+  PLAYER_COMMANDS,
+  type PlayerCommand,
+  type PlayerEvent,
+} from '@raven/core'
 import { act, fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
@@ -26,7 +31,7 @@ const fakePlayer = ({
     send: (command) => {
       sent.push(command)
       if (refuse.includes(command.type)) return Promise.reject(new Error('Not now.'))
-      if (command.type !== 'load') return Promise.resolve()
+      if (command.type !== PLAYER_COMMANDS.load) return Promise.resolve()
       if (loadError) return Promise.reject(loadError)
       if (!deferLoad) return Promise.resolve()
       return new Promise<void>((resolve, reject) => {
@@ -391,7 +396,7 @@ describe('the native engine', () => {
     await settled()
     await userEvent.click(screen.getByRole('button', { name: /Rerender/ }))
     await settled()
-    expect(types(fake.sent).filter((type) => type === 'load')).toHaveLength(1)
+    expect(types(fake.sent).filter((type) => type === PLAYER_COMMANDS.load)).toHaveLength(1)
     expect(types(fake.sent)).not.toContain('stop')
   })
 

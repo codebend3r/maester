@@ -1,4 +1,4 @@
-import { type PlaybackMode, STREAM_TIME_SHIFT } from '@raven/core'
+import { PLAYBACK_MODES, type PlaybackMode, STREAM_TIME_SHIFT } from '@raven/core'
 import { useEffect, useRef } from 'react'
 import type { EngineHandle, EngineStats, HtmlSource } from '@/components/Player/engine'
 import styles from '@/components/Player/Player.module.scss'
@@ -33,7 +33,7 @@ export const useHtmlEngine = ({
   const setVolume = usePlayerPrefs((prefs) => prefs.setVolume)
   const captionScale = usePlayerPrefs((prefs) => prefs.captionScale)
   const setCaptionScale = usePlayerPrefs((prefs) => prefs.setCaptionScale)
-  const shift = mode === 'direct' ? 0 : STREAM_TIME_SHIFT
+  const shift = mode === PLAYBACK_MODES.direct ? 0 : STREAM_TIME_SHIFT
   const playback = useVideoState({
     videoRef,
     shift,

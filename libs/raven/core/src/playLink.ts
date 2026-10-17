@@ -28,11 +28,13 @@ export const playLinkFor = ({ origin, mediaId, at, next }: PlayRequest): string 
   return `raven://play?${query}&${toQueryString({ next: queue.join(',') })}`
 }
 
+export const DOWNLOAD_TARGET_KINDS = { media: 'media', item: 'item', saga: 'saga' } as const
+
 /** What a download link asks the desktop to keep: one file, one title, or one collection of a library. */
 export type DownloadTarget =
-  | { kind: 'media'; mediaId: number }
-  | { kind: 'item'; itemId: number }
-  | { kind: 'saga'; libraryId: number; tmdbId: string }
+  | { kind: typeof DOWNLOAD_TARGET_KINDS.media; mediaId: number }
+  | { kind: typeof DOWNLOAD_TARGET_KINDS.item; itemId: number }
+  | { kind: typeof DOWNLOAD_TARGET_KINDS.saga; libraryId: number; tmdbId: string }
 
 export type DownloadRequest = { origin: string; target: DownloadTarget }
 
@@ -42,15 +44,15 @@ const isCollectionId = (value: unknown): value is string =>
 /** The link for a download; throws for an id that is not one. */
 export const downloadLinkFor = ({ origin, target }: DownloadRequest): string => {
   switch (target.kind) {
-    case 'media': {
+    case DOWNLOAD_TARGET_KINDS.media: {
       if (!isMediaId(target.mediaId)) throw new RangeError(`${target.mediaId} is not a media id`)
       return `raven://download?${toQueryString({ server: origin, media: String(target.mediaId) })}`
     }
-    case 'item': {
+    case DOWNLOAD_TARGET_KINDS.item: {
       if (!isMediaId(target.itemId)) throw new RangeError(`${target.itemId} is not an item id`)
       return `raven://download?${toQueryString({ server: origin, item: String(target.itemId) })}`
     }
-    case 'saga': {
+    case DOWNLOAD_TARGET_KINDS.saga: {
       if (!isMediaId(target.libraryId)) {
         throw new RangeError(`${target.libraryId} is not a library id`)
       }

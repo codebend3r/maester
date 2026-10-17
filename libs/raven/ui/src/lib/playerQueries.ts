@@ -1,10 +1,12 @@
-import { queryOptions } from '@tanstack/react-query'
+import { type QueryStatus, queryOptions } from '@tanstack/react-query'
 import { type ApiClient, MEDIA_TICKET_REFRESH_SECONDS, MEDIA_TICKET_SECONDS } from '@raven/core'
 import { playerQueryKeys as queryKeys } from '@/lib/playerQueryKeys'
 
 const TICKET_REFRESH_MS = (MEDIA_TICKET_SECONDS - MEDIA_TICKET_REFRESH_SECONDS) * 1000
 
 const REFUSED_RETRY_MS = 60_000
+
+const QUERY_STATUSES = { error: 'error' } as const satisfies Record<string, QueryStatus>
 
 /** Keeps a ticket that is already due from being refetched in a tight loop. */
 const MIN_REFRESH_WAIT_MS = 1000
@@ -38,7 +40,7 @@ export const playerQueriesFor = (api: ApiClient) => ({
       retry: false,
       refetchInterval: (query) => {
         // A refused fetch, the first included, is retried gently: a relocked library answers 423.
-        if (query.state.status === 'error') return REFUSED_RETRY_MS
+        if (query.state.status === QUERY_STATUSES.error) return REFUSED_RETRY_MS
         if (query.state.dataUpdatedAt === 0) return TICKET_REFRESH_MS
         return Math.max(
           MIN_REFRESH_WAIT_MS,

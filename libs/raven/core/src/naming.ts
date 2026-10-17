@@ -459,7 +459,10 @@ const TMDB_COUNTRIES: Readonly<Record<string, string>> = { UK: 'GB' }
  */
 export const splitCountry = (name: string): { title: string; country: string | null } => {
   const code = COUNTRY_SUFFIX.exec(name)?.[1]?.toUpperCase() ?? null
-  return { title: name.replace(COUNTRY_SUFFIX, ''), country: code === 'UK' ? 'GB' : code }
+  return {
+    title: name.replace(COUNTRY_SUFFIX, ''),
+    country: code == null ? null : (TMDB_COUNTRIES[code] ?? code),
+  }
 }
 
 /** `S01E02`, `S1E2`, `S01E123`, `S01E01-E02`, `S01E01E02`, and `1x02`. */

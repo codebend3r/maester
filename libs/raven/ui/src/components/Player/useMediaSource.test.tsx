@@ -3,7 +3,7 @@ import type { MediaAccess, PlaybackMode } from '@raven/core'
 import { act, render } from '@testing-library/react'
 import { useLayoutEffect, useRef } from 'react'
 import type { MediaPlane } from '@/components/Player/useMediaPlane'
-import { sourceFor, useMediaSource } from '@/components/Player/useMediaSource'
+import { VIDEO_SOURCE_KINDS, sourceFor, useMediaSource } from '@/components/Player/useMediaSource'
 import { api } from '@/test/api'
 import { mediaItem } from '@/test/fixtures'
 
@@ -31,8 +31,8 @@ describe('sourceFor', () => {
       mime: 'video/mp4',
       access: () => null,
     })
-    expect(stream.kind).toBe('stream')
-    if (stream.kind !== 'stream') return
+    expect(stream.kind).toBe(VIDEO_SOURCE_KINDS.stream)
+    if (stream.kind !== VIDEO_SOURCE_KINDS.stream) return
     expect(stream.mime).toBe('video/mp4')
     expect(stream.url(30)).toContain('/api/media/7/stream')
   })
@@ -48,7 +48,7 @@ describe('sourceFor', () => {
       mime: 'video/mp4',
       access: () => access(tickets[asked++] ?? 'late'),
     })
-    if (stream.kind !== 'stream') throw new Error('expected a stream')
+    if (stream.kind !== VIDEO_SOURCE_KINDS.stream) throw new Error('expected a stream')
     const first = stream.url(0)
     const second = stream.url(0)
     expect(first).toStartWith('https://raven.home.example/api/media/7/stream')

@@ -1,3 +1,4 @@
+import { HEADERS } from '@shared/server'
 import {
   Body,
   ConflictException,
@@ -14,11 +15,12 @@ import { type AdminLock, isAdminUnlockRequest } from '@raven/core'
 import type { FastifyReply } from 'fastify'
 import { ForViewers } from '@/admin/adminGuard'
 import { type AdminChange, AdminService } from '@/admin/adminService'
+import { RAVEN_HEADERS } from '@/http'
 import { parseBody } from '@/parseBody'
 
 /** The lock as a change leaves it, with the cookie that carries it set on the reply. */
 const applied = ({ change, reply }: { change: AdminChange; reply: FastifyReply }): AdminLock => {
-  reply.header('set-cookie', change.cookie)
+  reply.header(HEADERS.setCookie, change.cookie)
   return change.lock
 }
 
@@ -29,7 +31,7 @@ export class AdminController {
   /** The lock in this browser; a session still open gets its cookie renewed, so it never runs out while in use. */
   @Get()
   state(
-    @Headers('cookie') cookie: string | undefined,
+    @Headers(RAVEN_HEADERS.cookie) cookie: string | undefined,
     @Res({ passthrough: true }) reply: FastifyReply,
   ): AdminLock {
     const renewed = this.admin.renewed({ cookie })
@@ -48,7 +50,7 @@ export class AdminController {
     })
     const unlocking = this.admin.unlock(password)
     if (!unlocking.ok) throw new HttpException(unlocking.message, unlocking.status)
-    reply.header('set-cookie', unlocking.cookie)
+    reply.header(HEADERS.setCookie, unlocking.cookie)
     return { state: 'off' }
   }
 
@@ -57,7 +59,7 @@ export class AdminController {
   @Post('lock')
   @HttpCode(200)
   lock(
-    @Headers('cookie') cookie: string | undefined,
+    @Headers(RAVEN_HEADERS.cookie) cookie: string | undefined,
     @Res({ passthrough: true }) reply: FastifyReply,
   ): AdminLock {
     const change = this.admin.lock({ cookie })
@@ -69,7 +71,7 @@ export class AdminController {
   @Post('keep-unlocked')
   @HttpCode(200)
   keepUnlocked(
-    @Headers('cookie') cookie: string | undefined,
+    @Headers(RAVEN_HEADERS.cookie) cookie: string | undefined,
     @Res({ passthrough: true }) reply: FastifyReply,
   ): AdminLock {
     const change = this.admin.keepUnlocked({ cookie })

@@ -4,7 +4,13 @@ import type { EngineHandle } from '@/components/Player/engine'
 import type { MenuSection } from '@/components/Player/menus'
 import { preferredSubtitle } from '@/components/Player/selection'
 import { FIXED_VOLUME_NOTE } from '@/lib/fixedVolume'
-import { type PlayerAction, stepCaptionScale, stepSpeed } from '@/lib/shortcuts'
+import {
+  PLAYER_ACTIONS,
+  type PlayerAction,
+  SEEK_EDGES,
+  stepCaptionScale,
+  stepSpeed,
+} from '@/lib/shortcuts'
 import { languageName } from '@raven/core'
 import { useHostServices } from '@/stores/playerServices'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
@@ -15,8 +21,10 @@ const FALLBACK_FRAME_RATE = 24
 const clamp = ({ value, min, max }: { value: number; min: number; max: number }): number =>
   Math.min(max, Math.max(min, value))
 
+export const OVERLAYS = { none: 'none', shortcuts: 'shortcuts' } as const
+
 /** What sits over the picture besides the controls: one pill's menu or the shortcuts, never both. */
-export type Overlay = 'none' | 'shortcuts' | MenuSection
+export type Overlay = (typeof OVERLAYS)[keyof typeof OVERLAYS] | MenuSection
 
 /**
  * What the player does, for the keys and the buttons alike: `act` answers a
@@ -112,60 +120,62 @@ export const usePlayerActions = ({
   const act = (action: PlayerAction) => {
     const now = position.current
     switch (action.type) {
-      case 'togglePlay':
+      case PLAYER_ACTIONS.togglePlay:
         flash({ icon: state.paused ? 'play' : 'pause', text: state.paused ? 'Play' : 'Pause' })
         togglePlay()
         return
-      case 'seekBy':
+      case PLAYER_ACTIONS.seekBy:
         seek(now + action.seconds)
         flash({
           icon: action.seconds < 0 ? 'rewind' : 'forward',
           text: `${action.seconds < 0 ? 'Back' : 'Forward'} ${Math.abs(action.seconds)}s`,
         })
         return
-      case 'seekToFraction':
+      case PLAYER_ACTIONS.seekToFraction:
         if (duration == null) return
         seek(duration * action.fraction)
         flash({ icon: 'forward', text: `${Math.round(action.fraction * 100)}%` })
         return
-      case 'seekToEdge':
-        seek(action.edge === 'start' ? 0 : (duration ?? now))
+      case PLAYER_ACTIONS.seekToEdge:
+        seek(action.edge === SEEK_EDGES.start ? 0 : (duration ?? now))
         return
-      case 'volumeBy':
+      case PLAYER_ACTIONS.volumeBy:
         changeVolume((muted ? 0 : volume) + action.delta)
         return
-      case 'toggleMute':
+      case PLAYER_ACTIONS.toggleMute:
         toggleMute()
         return
-      case 'toggleFullscreen':
+      case PLAYER_ACTIONS.toggleFullscreen:
         toggleFullscreen()
         return
-      case 'toggleSubtitles':
+      case PLAYER_ACTIONS.toggleSubtitles:
         toggleSubtitles()
         return
-      case 'stepFrame':
+      case PLAYER_ACTIONS.stepFrame:
         if (!state.paused) actions.pause()
         seek(now + action.direction / (selection.tracks?.frameRate ?? FALLBACK_FRAME_RATE))
         return
-      case 'stepSpeed':
+      case PLAYER_ACTIONS.stepSpeed:
         changeRate(stepSpeed({ current: state.rate, direction: action.direction }))
         return
-      case 'stepCaptionSize': {
+      case PLAYER_ACTIONS.stepCaptionSize: {
         const next = stepCaptionScale({ current: captionScale, direction: action.direction })
         actions.setSubtitleScale(next)
         flash({ icon: 'captions', text: `Subtitles ${Math.round(next * 100)}%` })
         return
       }
-      case 'toggleStats':
+      case PLAYER_ACTIONS.toggleStats:
         if (actions.toggleStats === undefined) return
         actions.toggleStats()
         return
-      case 'showShortcuts':
-        setOverlay((current) => (current === 'shortcuts' ? 'none' : 'shortcuts'))
+      case PLAYER_ACTIONS.showShortcuts:
+        setOverlay((current) =>
+          current === OVERLAYS.shortcuts ? OVERLAYS.none : OVERLAYS.shortcuts,
+        )
         return
-      case 'escape':
-        if (overlay === 'shortcuts') setOverlay(() => 'none')
-        else if (overlay !== 'none') closeMenu()
+      case PLAYER_ACTIONS.escape:
+        if (overlay === OVERLAYS.shortcuts) setOverlay(() => OVERLAYS.none)
+        else if (overlay !== OVERLAYS.none) closeMenu()
         else if (closeInfo) closeInfo()
         else if (document.fullscreenElement) void document.exitFullscreen()
         else leave()

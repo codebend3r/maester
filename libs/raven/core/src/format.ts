@@ -83,7 +83,7 @@ const AGO_FORMATS: Record<TimeAgoStyle, Intl.RelativeTimeFormat> = {
 export const timeAgo = ({
   at,
   now = new Date(),
-  style = 'narrow',
+  style = TIME_AGO_STYLES.narrow,
 }: {
   at: string
   now?: Date

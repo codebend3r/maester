@@ -1,5 +1,11 @@
 import { describe, expect, test } from 'bun:test'
-import { libraryName, parseDefinitions, parseImports, symbolProblems } from '@/build/symbols'
+import {
+  IMPORT_KINDS,
+  libraryName,
+  parseDefinitions,
+  parseImports,
+  symbolProblems,
+} from '@/build/symbols'
 
 // Lines copied from `nm -um` and `nm -jU` of the CI libmpv built from f24529e, whose
 // window surface crashed in pl_glslang_init, and of its addon.
@@ -35,20 +41,20 @@ const libmpvDependencies = [
 describe('parseImports', () => {
   test('reads what each undefined symbol binds to, keeping weak imports and spaces in names', () => {
     expect(parseImports({ listing: brokenImports })).toEqual([
-      { kind: 'bound', symbol: '_CVBufferCopyAttachments', library: 'CoreVideo' },
+      { kind: IMPORT_KINDS.bound, symbol: '_CVBufferCopyAttachments', library: 'CoreVideo' },
       {
-        kind: 'bound',
+        kind: IMPORT_KINDS.bound,
         symbol: '__swift_FORCE_LOAD_$_swiftCoreFoundation',
         library: 'libswiftCoreFoundation',
       },
-      { kind: 'bound', symbol: '_$s7Elements10SetAlgebraPTl', library: 'libswiftCore' },
-      { kind: 'lookup', symbol: '__Z19GetDefaultResourcesv' },
-      { kind: 'lookup', symbol: '__ZN7glslang17InitializeProcessEv' },
-      { kind: 'lookup', symbol: '__Znwm' },
+      { kind: IMPORT_KINDS.bound, symbol: '_$s7Elements10SetAlgebraPTl', library: 'libswiftCore' },
+      { kind: IMPORT_KINDS.lookup, symbol: '__Z19GetDefaultResourcesv' },
+      { kind: IMPORT_KINDS.lookup, symbol: '__ZN7glslang17InitializeProcessEv' },
+      { kind: IMPORT_KINDS.lookup, symbol: '__Znwm' },
     ])
     expect(
       parseImports({ listing: '  (undefined) external -[Some method:] (from Foundation)' }),
-    ).toEqual([{ kind: 'bound', symbol: '-[Some method:]', library: 'Foundation' }])
+    ).toEqual([{ kind: IMPORT_KINDS.bound, symbol: '-[Some method:]', library: 'Foundation' }])
   })
 
   test('rejects a line it cannot read rather than letting it pass unchecked', () => {
@@ -104,8 +110,8 @@ describe('symbolProblems', () => {
       symbolProblems({
         file: 'lib/libmpv.2.dylib',
         imports: [
-          { kind: 'bound', symbol: '_CVBufferCopyAttachments', library: 'CoreVideo' },
-          { kind: 'bound', symbol: '__Znwm', library: 'libc++' },
+          { kind: IMPORT_KINDS.bound, symbol: '_CVBufferCopyAttachments', library: 'CoreVideo' },
+          { kind: IMPORT_KINDS.bound, symbol: '__Znwm', library: 'libc++' },
         ],
         definitions: parseDefinitions({ listing: fixedDefinitions }),
         dependencies: libmpvDependencies,
@@ -117,7 +123,7 @@ describe('symbolProblems', () => {
     expect(
       symbolProblems({
         file: 'lib/libMoltenVK.dylib',
-        imports: [{ kind: 'bound', symbol: '_vkFoo', library: 'libvulkan' }],
+        imports: [{ kind: IMPORT_KINDS.bound, symbol: '_vkFoo', library: 'libvulkan' }],
         definitions: new Set(),
         dependencies: ['@rpath/libMoltenVK.dylib', '/usr/lib/libSystem.B.dylib'],
       }),
@@ -130,12 +136,12 @@ describe('symbolProblems', () => {
       symbolProblems({
         file: 'raven_mpv.node',
         imports: [
-          { kind: 'lookup', symbol: '_napi_create_function' },
-          { kind: 'lookup', symbol: '_node_api_get_module_file_name' },
-          { kind: 'lookup', symbol: '_uv_async_init' },
-          { kind: 'lookup', symbol: '_uv_async_send' },
-          { kind: 'lookup', symbol: '_uv_close' },
-          { kind: 'bound', symbol: '_mpv_create', library: 'libmpv' },
+          { kind: IMPORT_KINDS.lookup, symbol: '_napi_create_function' },
+          { kind: IMPORT_KINDS.lookup, symbol: '_node_api_get_module_file_name' },
+          { kind: IMPORT_KINDS.lookup, symbol: '_uv_async_init' },
+          { kind: IMPORT_KINDS.lookup, symbol: '_uv_async_send' },
+          { kind: IMPORT_KINDS.lookup, symbol: '_uv_close' },
+          { kind: IMPORT_KINDS.bound, symbol: '_mpv_create', library: 'libmpv' },
         ],
         definitions: new Set(),
         dependencies,
@@ -145,8 +151,8 @@ describe('symbolProblems', () => {
       symbolProblems({
         file: 'raven_mpv.node',
         imports: [
-          { kind: 'lookup', symbol: '_napi_create_function' },
-          { kind: 'lookup', symbol: '_mpv_create' },
+          { kind: IMPORT_KINDS.lookup, symbol: '_napi_create_function' },
+          { kind: IMPORT_KINDS.lookup, symbol: '_mpv_create' },
         ],
         definitions: new Set(),
         dependencies,

@@ -23,7 +23,9 @@ export type ObjectGuard<S extends Shape> = Guard<{ [K in keyof S]: Infer<S[K]> }
 }
 
 /** A guard for one of a fixed set of values, with the values kept for a menu or a loop. */
-export type OneOfGuard<T extends readonly Literal[]> = Guard<T[number]> & { readonly values: T }
+export type OneOfGuard<T extends readonly Literal[]> = Guard<T[number]> & {
+  readonly values: Readonly<T>
+}
 
 type Literal = string | number | boolean
 

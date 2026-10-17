@@ -4,11 +4,13 @@ import { join } from 'node:path'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import {
   type ApiClient,
+  ITEM_TYPES,
   type ItemChild,
   type LibraryInput,
   MAX_WATCH_TARGETS,
   type WatchTarget,
 } from '@raven/core'
+import { CONTENT_TYPES, HEADERS } from '@shared/server'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '@/app'
 import { DatabaseService } from '@/db/database'
@@ -48,7 +50,7 @@ describe('marking videos watched', () => {
       method: 'PUT',
       url: '/api/watched',
       payload: body === undefined ? undefined : JSON.stringify(body),
-      headers: { 'content-type': 'application/json', ...(cookie ? { cookie } : {}) },
+      headers: { [HEADERS.contentType]: CONTENT_TYPES.json, ...(cookie ? { cookie } : {}) },
     })
   const setWatched = ({
     watched,
@@ -226,13 +228,12 @@ describe('marking videos watched', () => {
     })
     const season = await api().getItem(item('Andor'))
     expect(
-      season.children.map((child) => (child.type === 'season' ? child.watchedCount : -1)),
+      season.children.map((child) => (child.type === ITEM_TYPES.season ? child.watchedCount : -1)),
     ).toEqual([2])
     const episodes = await childrenOf('Andor season')
-    expect(episodes.map((child) => (child.type === 'episode' ? child.watched : null))).toEqual([
-      true,
-      true,
-    ])
+    expect(
+      episodes.map((child) => (child.type === ITEM_TYPES.episode ? child.watched : null)),
+    ).toEqual([true, true])
     expect(await api().nextEpisode(item('Andor'))).toBeNull()
     await setWatched({
       watched: false,
@@ -306,7 +307,7 @@ describe('marking videos watched', () => {
       api(cookie)
         .getItem(item('Mixed season'))
         .then(({ children }) =>
-          children.map((child) => (child.type === 'episode' ? child.watched : null)),
+          children.map((child) => (child.type === ITEM_TYPES.episode ? child.watched : null)),
         )
     expect(await episodes(unlocked)).toEqual([true, true])
     expect(await episodes()).toEqual([true])

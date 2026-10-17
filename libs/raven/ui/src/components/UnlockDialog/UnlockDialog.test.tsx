@@ -3,7 +3,11 @@ import { ApiError } from '@raven/core'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
-import { type UnlockSecret, UnlockDialog } from '@/components/UnlockDialog/UnlockDialog'
+import {
+  UNLOCK_SECRETS,
+  type UnlockSecret,
+  UnlockDialog,
+} from '@/components/UnlockDialog/UnlockDialog'
 import { renderWithProviders } from '@/test/render'
 
 /** Renders the dialog for `secret`, noting each host callback in `calls` as it runs. */
@@ -77,7 +81,7 @@ const AdminThenPin = ({
         unlock={unlock}
         onUnlocked={() => {
           calls.push(`unlocked ${secret}`)
-          setSecret(secret === 'adminPassword' ? 'pin' : null)
+          setSecret(secret === UNLOCK_SECRETS.adminPassword ? UNLOCK_SECRETS.pin : null)
         }}
         onClose={() => {
           calls.push('onClose')
@@ -184,7 +188,7 @@ describe('UnlockDialog', () => {
 
     await userEvent.type(pin, '3001{Enter}')
     await waitUntilClosed({ dialog: pinDialog })
-    expect(entered).toEqual(['wrong', 'hunter2', '3001'])
+    expect(entered).toEqual([wrongPassword, 'hunter2', '3001'])
     expect(calls).toEqual(['unlocked adminPassword', 'unlocked pin'])
   })
 

@@ -1,4 +1,4 @@
-import type { MediaTracks, PlayerEvent, PlayerSource } from '@raven/core'
+import { type MediaTracks, PLAYER_EVENTS, type PlayerEvent, type PlayerSource } from '@raven/core'
 import { useEffect, useEffectEvent, useReducer, useRef, useState } from 'react'
 import { type EngineHandle, type NativePlayer, sendQuietly } from '@/components/Player/engine'
 import { fromPlayerEvent, rangesFrom } from '@/components/Player/fromPlayerEvent'
@@ -45,7 +45,7 @@ export const useNativeEngine = ({
 
   const fail = useEffectEvent(onFailure)
   const tellHost = useEffectEvent(
-    ({ reason, message }: Extract<PlayerEvent, { type: 'error' }>) => {
+    ({ reason, message }: Extract<PlayerEvent, { type: typeof PLAYER_EVENTS.error }>) => {
       if (onEngineError === undefined) return
       onEngineError({ reason, message })
     },
@@ -64,18 +64,18 @@ export const useNativeEngine = ({
     const unsubscribe = player.subscribe((event) => {
       if (!isLoaded) return
       switch (event.type) {
-        case 'tracks':
+        case PLAYER_EVENTS.tracks:
           setTracks(event.tracks)
           return
-        case 'error':
+        case PLAYER_EVENTS.error:
           // Unplayable first, so a host callback that throws cannot keep it away.
           fail(event.message === '' ? COULD_NOT_PLAY : event.message)
           tellHost(event)
           return
-        case 'time':
+        case PLAYER_EVENTS.time:
           position.current = event.time
           break
-        case 'buffered':
+        case PLAYER_EVENTS.buffered:
           buffered.current = rangesFrom(event.ranges)
           break
         default:
