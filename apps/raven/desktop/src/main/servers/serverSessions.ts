@@ -1,7 +1,7 @@
 import { join } from 'node:path'
 import { isRecord } from '@raven/core'
 import { fetchThrough, loggable, type ServerFetch } from '@/main/servers/serverCalls'
-import type { Timers } from '@/main/stateStore'
+import { ERROR_CODES, type Timers } from '@/main/stateStore'
 import { messageOf } from '@/shared/messageOf'
 import { isOpaqueId } from '@/shared/protocol'
 
@@ -14,6 +14,9 @@ export const PARTITIONS_DIR = 'Partitions'
 // Electron 44 names a `persist:server:<id>` partition's folder by its name past `persist:`,
 // escaped: `server%3A<id>`.
 const PARTITION_FOLDER = /^server%3A(.+)$/u
+
+/** How a step that races its budget ends. */
+const RACE_OUTCOMES = { cleared: 'cleared', late: 'late' } as const
 
 /** The parts of an Electron `Session` a server's calls, cookies and removal use. */
 export type ServerSession = {
@@ -77,17 +80,17 @@ export const createServerSessions = ({
     // A server this run never used still has its session on disk, so it is opened to clear it.
     const session = sessionOf(serverId)
     const timer: { handle: unknown } = { handle: undefined }
-    const deadline = new Promise<'late'>((resolve) => {
-      timer.handle = timers.set(() => resolve('late'), FORGET_TIMEOUT_MS)
+    const deadline = new Promise<typeof RACE_OUTCOMES.late>((resolve) => {
+      timer.handle = timers.set({ run: () => resolve(RACE_OUTCOMES.late), ms: FORGET_TIMEOUT_MS })
     })
     try {
       const outcome = await Promise.race([
         Promise.all([session.clearStorageData(), session.clearCache()]).then(
-          () => 'cleared' as const,
+          () => RACE_OUTCOMES.cleared,
         ),
         deadline,
       ])
-      if (outcome === 'late') {
+      if (outcome === RACE_OUTCOMES.late) {
         warn(
           `raven player gave up clearing server ${serverId}'s session after ${FORGET_TIMEOUT_MS} ms`,
         )
@@ -122,7 +125,7 @@ export const orphanPartitions = ({
     return id !== null && isOpaqueId(id) && !keep.includes(id)
   })
 
-const isMissing = (error: unknown): boolean => isRecord(error) && error.code === 'ENOENT'
+const isMissing = (error: unknown): boolean => isRecord(error) && error.code === ERROR_CODES.enoent
 
 /**
  * How long launch waits to list the partitions folder. Listing comes before any server
@@ -159,11 +162,11 @@ export const clearOrphanPartitions = async ({
     return []
   })
   const budget: { handle: unknown } = { handle: null }
-  const late = new Promise<'late'>((resolve) => {
-    budget.handle = timers.set(() => resolve('late'), ORPHAN_LIST_MS)
+  const late = new Promise<typeof RACE_OUTCOMES.late>((resolve) => {
+    budget.handle = timers.set({ run: () => resolve(RACE_OUTCOMES.late), ms: ORPHAN_LIST_MS })
   })
   const names = await Promise.race([listing, late]).finally(() => timers.clear(budget.handle))
-  if (names === 'late') {
+  if (names === RACE_OUTCOMES.late) {
     warn(
       `raven player did not list its server sessions within ${ORPHAN_LIST_MS} ms, so it clears none this time`,
     )

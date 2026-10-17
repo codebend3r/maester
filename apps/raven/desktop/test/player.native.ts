@@ -12,10 +12,17 @@ import {
   isRecord,
   object,
   type OutputSettings,
+  PLAYER_EVENTS,
   type PlayerCommand,
   type PlayerEvent,
 } from '@raven/core'
-import { type MpvEvent, openMpv } from '@raven/mpv'
+import {
+  MPV_END_FILE_REASONS,
+  MPV_EVENTS,
+  MPV_TRACK_TYPES,
+  type MpvEvent,
+  openMpv,
+} from '@raven/mpv'
 import { CLIP_SECONDS, type Clips, makeClips, makeTrackClip } from '@/e2e/clips'
 import {
   FIXTURE_MEDIA,
@@ -46,6 +53,11 @@ import {
 } from '@/main/servers/serverSources'
 import { NO_SERVERS, noExplanation } from '@/main/test/playerFakes'
 import { createNodeTimers } from '@/main/timers'
+
+/** The id the server gives a title's first sidecar (Ruling 18). */
+const SIDECAR_ID = 'external-0'
+
+const sidecarOfMedia = (mediaId: number) => `/api/media/${mediaId}/subtitles/${SIDECAR_ID}`
 
 const WAIT_MS = 10000
 const DESTROY_MS = 5000
@@ -213,7 +225,7 @@ const openHarness = async ({
     surface: { kind: 'headless' },
     addonPath,
     onEvent: (event) => {
-      if (event.type !== 'property' && event.type !== 'log') raw.push(event)
+      if (event.type !== MPV_EVENTS.property && event.type !== MPV_EVENTS.log) raw.push(event)
       relay.receive(event)
     },
   })
@@ -448,7 +460,7 @@ describe('the desktop player service against headless libmpv', () => {
         settled.subtitles.map(({ id, source }) => ({ id, source })),
         [
           { id: 'embedded-0', source: 'embedded' },
-          { id: 'external-0', source: 'external' },
+          { id: SIDECAR_ID, source: 'external' },
         ],
       )
       const list = await mpv.read({ name: 'track-list' })
@@ -456,9 +468,11 @@ describe('the desktop player service against headless libmpv', () => {
         settled,
         tracksFromMpv({ list, frameRate: await mpv.read({ name: 'container-fps' }) }),
       )
-      const external = list.find((track) => track.type === 'sub' && track.external === true)
+      const external = list.find(
+        (track) => track.type === MPV_TRACK_TYPES.sub && track.external === true,
+      )
       assert.ok(external, 'mpv did not load the sidecar')
-      await sendOk({ type: 'subtitle', id: 'external-0' })
+      await sendOk({ type: 'subtitle', id: SIDECAR_ID })
       assert.equal(await mpv.read({ name: 'sid' }), external.id)
     })
   })
@@ -583,8 +597,8 @@ describe('the desktop player service against headless libmpv', () => {
     await withHarness(async ({ mpv, playing, sendOk }) => {
       await playing({ fileId: 't1' })
       const list = await mpv.read({ name: 'track-list' })
-      const second = list.filter((track) => track.type === 'audio')[1]
-      const subtitle = list.find((track) => track.type === 'sub')
+      const second = list.filter((track) => track.type === MPV_TRACK_TYPES.audio)[1]
+      const subtitle = list.find((track) => track.type === MPV_TRACK_TYPES.sub)
       assert.ok(second && subtitle, 'the clip lacks its second audio track or its subtitle')
       await sendOk({ type: 'audio', index: 1 })
       assert.equal(await mpv.read({ name: 'aid' }), second.id)
@@ -606,11 +620,11 @@ describe('the desktop player service against headless libmpv', () => {
       const list = await mpv.read({ name: 'track-list' })
       assert.equal(
         await mpv.read({ name: 'aid' }),
-        list.filter((track) => track.type === 'audio')[1]?.id ?? null,
+        list.filter((track) => track.type === MPV_TRACK_TYPES.audio)[1]?.id ?? null,
       )
       assert.equal(
         await mpv.read({ name: 'sid' }),
-        list.find((track) => track.type === 'sub')?.id ?? null,
+        list.find((track) => track.type === MPV_TRACK_TYPES.sub)?.id ?? null,
       )
     })
   })
@@ -654,18 +668,26 @@ describe('the desktop player service against headless libmpv', () => {
         await waitFor({
           label: `${fileId} closing in mpv`,
           check: async () =>
-            raw.slice(mark).some((event) => event.type === 'end-file' && event.reason === 'error'),
+            raw
+              .slice(mark)
+              .some(
+                (event) =>
+                  event.type === MPV_EVENTS.endFile && event.reason === MPV_END_FILE_REASONS.error,
+              ),
         })
         await sleep(SETTLE_MS)
         const said = raw.slice(mark)
         // `access-references=no`: mpv refuses the reference itself, so nothing expands.
         assert.deepEqual(
-          said.filter((event) => event.type === 'file-loaded'),
+          said.filter((event) => event.type === MPV_EVENTS.fileLoaded),
           [],
           `${fileId} opened what it names`,
         )
         assert.deepEqual(
-          said.filter((event) => event.type === 'end-file' && event.reason === 'redirect'),
+          said.filter(
+            (event) =>
+              event.type === MPV_EVENTS.endFile && event.reason === MPV_END_FILE_REASONS.redirect,
+          ),
           [],
           `${fileId} expanded`,
         )
@@ -701,11 +723,12 @@ describe('the desktop player service against headless libmpv', () => {
           assert.equal(error.reason, 'open')
           const said = raw.slice(mark)
           const closed = said.findIndex(
-            (event) => event.type === 'end-file' && event.reason === 'error',
+            (event) =>
+              event.type === MPV_EVENTS.endFile && event.reason === MPV_END_FILE_REASONS.error,
           )
           assert.ok(closed >= 0, `mpv never refused the playlist after a ${gap} ms gap`)
           assert.ok(
-            said.slice(closed).every((event) => event.type !== 'file-loaded'),
+            said.slice(closed).every((event) => event.type !== MPV_EVENTS.fileLoaded),
             `mpv opened a file after refusing the playlist (${gap} ms gap)`,
           )
         },
@@ -969,7 +992,7 @@ const targetFor = ({
   sidecars: hasSidecar
     ? [
         {
-          url: `${origin}/api/media/${mediaId}/subtitles/external-0`,
+          url: `${origin}/api/media/${mediaId}/subtitles/${SIDECAR_ID}`,
           title: 'English',
           language: 'en',
         },
@@ -1101,7 +1124,9 @@ describe('server titles against headless libmpv', () => {
           'raven_unlock=elsewhere.secret',
         ])
         assert.ok(
-          fixture.elsewhere.seen.some(({ path }) => path === '/api/media/2/subtitles/external-0'),
+          fixture.elsewhere.seen.some(
+            ({ path }) => path === sidecarOfMedia(fixture.titles.elsewhere.mediaId),
+          ),
           "B's sidecar was never fetched",
         )
         assert.deepEqual(harness.errorsOf(), [])
@@ -1349,7 +1374,7 @@ const requestsTo = ({
 }) => log.slice(from).filter((request) => request.path === path)
 
 const fileOfMedia = (mediaId: number) => `/api/media/${mediaId}/file`
-const SIDECAR_PATH = `/api/media/${FIXTURE_MEDIA.first}/subtitles/external-0`
+const SIDECAR_PATH = sidecarOfMedia(FIXTURE_MEDIA.first)
 
 /** The first byte a `Range: bytes=<n>-` header asks for, or null for a whole file. */
 const rangeStart = (range: string | null) => {
@@ -1359,7 +1384,7 @@ const rangeStart = (range: string | null) => {
 
 const externalTrackId = async ({ harness }: { harness: Harness }) =>
   (await harness.mpv.read({ name: 'track-list' })).find(
-    (track) => track.type === 'sub' && track.external === true,
+    (track) => track.type === MPV_TRACK_TYPES.sub && track.external === true,
   )?.id ?? null
 
 /**
@@ -1485,7 +1510,7 @@ describe('server titles from a raven fixture server', () => {
           settled.subtitles.map(({ id, source, language }) => ({ id, source, language })),
           [
             { id: 'embedded-0', source: 'embedded', language: 'en' },
-            { id: 'external-0', source: 'external', language: 'en' },
+            { id: SIDECAR_ID, source: 'external', language: 'en' },
           ],
         )
         assert.deepEqual(
@@ -1503,7 +1528,7 @@ describe('server titles from a raven fixture server', () => {
         )
         const external = await externalTrackId({ harness })
         assert.ok(external !== null, 'mpv did not list the sidecar')
-        await harness.sendOk({ type: 'subtitle', id: 'external-0' })
+        await harness.sendOk({ type: 'subtitle', id: SIDECAR_ID })
         assert.equal(await harness.mpv.read({ name: 'sid' }), external)
       },
     })
@@ -1542,7 +1567,7 @@ describe('server titles from a raven fixture server', () => {
           [`no sidecars from ${FIXTURE_SERVER.name}: its tracks answered 423`],
         )
         assert.deepEqual(
-          harness.raw.filter((event) => event.type === 'file-loaded'),
+          harness.raw.filter((event) => event.type === MPV_EVENTS.fileLoaded),
           [],
           'mpv opened the locked title',
         )
@@ -1597,7 +1622,7 @@ describe('server titles from a raven fixture server', () => {
           ['loading'],
         )
         assert.deepEqual(
-          harness.raw.filter((event) => event.type === 'file-loaded'),
+          harness.raw.filter((event) => event.type === MPV_EVENTS.fileLoaded),
           [],
           'mpv opened the page',
         )
@@ -1844,7 +1869,7 @@ describe('a slow raven fixture server', () => {
           await playingTitle({
             harness,
             mediaId: FIXTURE_MEDIA.first,
-            subtitle: 'external-0',
+            subtitle: SIDECAR_ID,
             timeoutMs: SIDECAR_BUDGET_MS + WAIT_MS,
           })
           const elapsed = Date.now() - started
@@ -1864,7 +1889,7 @@ describe('a slow raven fixture server', () => {
             label: 'the late sidecar listed',
             matches: where({
               type: 'tracks',
-              holds: (event) => event.tracks.subtitles.some(({ id }) => id === 'external-0'),
+              holds: (event) => event.tracks.subtitles.some(({ id }) => id === SIDECAR_ID),
             }),
           })
           release()
@@ -2078,7 +2103,7 @@ describe('a raven fixture server that goes away mid-film', () => {
           const at = harness.events.indexOf(failure)
           const times = harness.events.filter(where({ type: 'time' }))
           assert.ok(
-            harness.events.slice(at).every((event) => event.type !== 'time'),
+            harness.events.slice(at).every((event) => event.type !== PLAYER_EVENTS.time),
             'the clock moved after the title stopped',
           )
           assert.ok(
@@ -2134,7 +2159,7 @@ describe('a raven fixture server that goes away mid-film', () => {
             'mpv never asked for the file',
           )
           assert.deepEqual(
-            harness.raw.filter((event) => event.type === 'file-loaded'),
+            harness.raw.filter((event) => event.type === MPV_EVENTS.fileLoaded),
             [],
             'mpv opened the stalled file',
           )
@@ -2183,7 +2208,7 @@ describe('a raven fixture server that goes away mid-film', () => {
           })
           const at = harness.events.indexOf(failure)
           assert.ok(
-            harness.events.slice(at).every((event) => event.type !== 'time'),
+            harness.events.slice(at).every((event) => event.type !== PLAYER_EVENTS.time),
             'the clock moved after the title stopped',
           )
         },

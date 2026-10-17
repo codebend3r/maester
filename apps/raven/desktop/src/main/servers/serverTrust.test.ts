@@ -4,6 +4,7 @@ import { createJsonStore, type StateFs } from '@/main/stateStore'
 import { NAME_MAX, SERVERS_CAP, renameServer } from '@/main/servers/serverList'
 import {
   TRUST_MESSAGES,
+  TRUST_OUTCOME_KINDS,
   TRUST_STEP_MS,
   createServerTrust,
   trustDetailFor,
@@ -68,11 +69,13 @@ const handConfirm = () => {
   return { confirm, asked, answer }
 }
 
-type ProbeAnswer = 'raven' | 'notRaven' | 'throws'
+const PROBE_ANSWERS = { raven: 'raven', notRaven: 'notRaven', throws: 'throws' } as const
+
+type ProbeAnswer = (typeof PROBE_ANSWERS)[keyof typeof PROBE_ANSWERS]
 
 const setup = ({
   servers = [],
-  probeAnswer = 'raven',
+  probeAnswer = PROBE_ANSWERS.raven,
   isForgetBroken = false,
   ids = [],
 }: {
@@ -112,8 +115,8 @@ const setup = ({
     probe: async (input) => {
       probes.push(input)
       log.push('probe')
-      if (probeAnswer === 'throws') throw new Error('socket hang up')
-      return probeAnswer === 'raven'
+      if (probeAnswer === PROBE_ANSWERS.throws) throw new Error('socket hang up')
+      return probeAnswer === PROBE_ANSWERS.raven
     },
     forget: async (serverId) => {
       forgotten.push(serverId)
@@ -354,14 +357,16 @@ describe('createServerTrust', () => {
   it('names a punycode server by its punycode host, never its unicode letters', async () => {
     const world = setup()
     const outcome = await answered({ world, origin: 'https://\u0440aypal.example', isYes: true })
-    if (outcome.kind !== 'trusted') throw new Error(`expected trusted, got ${outcome.kind}`)
+    if (outcome.kind !== TRUST_OUTCOME_KINDS.trusted)
+      throw new Error(`expected trusted, got ${outcome.kind}`)
     expect(outcome.server.name).toBe('xn--aypal-uye.example')
   })
 
   it('names a server by its host and port when the port is not the default', async () => {
     const world = setup()
     const outcome = await answered({ world, origin: 'http://127.0.0.1:8080', isYes: true })
-    if (outcome.kind !== 'trusted') throw new Error(`expected trusted, got ${outcome.kind}`)
+    if (outcome.kind !== TRUST_OUTCOME_KINDS.trusted)
+      throw new Error(`expected trusted, got ${outcome.kind}`)
     expect(outcome.server.name).toBe('127.0.0.1:8080')
   })
 
@@ -370,7 +375,8 @@ describe('createServerTrust', () => {
     const host = `${label}.${label}.example`
     const world = setup()
     const outcome = await answered({ world, origin: `https://${host}`, isYes: true })
-    if (outcome.kind !== 'trusted') throw new Error(`expected trusted, got ${outcome.kind}`)
+    if (outcome.kind !== TRUST_OUTCOME_KINDS.trusted)
+      throw new Error(`expected trusted, got ${outcome.kind}`)
     expect(outcome.server.name).toBe(host.slice(0, NAME_MAX))
     expect(outcome.server.origin).toBe(`https://${host}`)
     expect(world.config.read().servers.map((server) => server.name)).toEqual([
@@ -378,7 +384,7 @@ describe('createServerTrust', () => {
     ])
   })
 
-  it.each([['notRaven' as const], ['throws' as const]])(
+  it.each([[PROBE_ANSWERS.notRaven], [PROBE_ANSWERS.throws]])(
     'forgets the fresh session and stores nothing when the probe is %s',
     async (probeAnswer) => {
       const world = setup({ probeAnswer })
@@ -392,7 +398,7 @@ describe('createServerTrust', () => {
   )
 
   it('asks again from a link after a server was unreachable', async () => {
-    const world = setup({ probeAnswer: 'notRaven' })
+    const world = setup({ probeAnswer: PROBE_ANSWERS.notRaven })
     await answered({ world, isYes: true })
     await answered({ world, isYes: false })
     expect(world.prompt.asked).toEqual([ORIGIN, ORIGIN])
@@ -677,7 +683,7 @@ describe('createServerTrust', () => {
   })
 
   it('warns when forgetting a failed probe session fails, and still answers', async () => {
-    const world = setup({ probeAnswer: 'notRaven', isForgetBroken: true })
+    const world = setup({ probeAnswer: PROBE_ANSWERS.notRaven, isForgetBroken: true })
     expect(await answered({ world, isYes: true })).toEqual({ kind: 'unreachable', origin: ORIGIN })
     expect(world.warnings.join('\n')).toContain('session busy')
   })
@@ -685,7 +691,8 @@ describe('createServerTrust', () => {
   it('asks again from a link for a server that was removed', async () => {
     const world = setup()
     const added = await answered({ world, isYes: true })
-    if (added.kind !== 'trusted') throw new Error(`expected trusted, got ${added.kind}`)
+    if (added.kind !== TRUST_OUTCOME_KINDS.trusted)
+      throw new Error(`expected trusted, got ${added.kind}`)
     expect(await world.trust.remove(added.server.id)).toBe(true)
     const again = answered({ world, isYes: true })
     const outcome = await again
@@ -701,7 +708,8 @@ describe('createServerTrust', () => {
     const world = setup()
     await answered({ world, isYes: false })
     const added = await answered({ world, from: 'app', isYes: true })
-    if (added.kind !== 'trusted') throw new Error(`expected trusted, got ${added.kind}`)
+    if (added.kind !== TRUST_OUTCOME_KINDS.trusted)
+      throw new Error(`expected trusted, got ${added.kind}`)
     await world.trust.remove(added.server.id)
     await answered({ world, from: 'link', isYes: false })
     expect(world.prompt.asked).toEqual([ORIGIN, ORIGIN, ORIGIN])

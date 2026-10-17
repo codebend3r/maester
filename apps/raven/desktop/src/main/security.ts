@@ -1,3 +1,4 @@
+import { URL_PROTOCOLS } from '@/shared/playLink'
 import { APP_HOST, APP_SCHEME } from '@/shared/protocol'
 
 /** The one permission the page may have: Electron names permissions as plain strings. */
@@ -25,7 +26,7 @@ export const isAppUrl = (url: string): boolean => {
 
 export const isExternalLink = (url: string): boolean => {
   const protocol = parse(url)?.protocol ?? ''
-  return protocol === 'http:' || protocol === 'https:'
+  return protocol === URL_PROTOCOLS.http || protocol === URL_PROTOCOLS.https
 }
 
 export const windowOpenFor = (url: string): { action: 'deny'; shouldOpenExternally: boolean } => ({

@@ -1,4 +1,4 @@
-import type { MediaItem } from '@raven/core'
+import { MATCH_STATES, type MediaItem, THUMBNAIL_STATES } from '@raven/core'
 
 /** A whole server title, as `GET /api/media/:id` answers it, with what a test cares about changed. */
 export const mediaItemFor = (overrides: Partial<MediaItem>): MediaItem => ({
@@ -18,14 +18,14 @@ export const mediaItemFor = (overrides: Partial<MediaItem>): MediaItem => ({
   audioCodec: 'eac3',
   audioChannels: 6,
   bitrate: 5_000_000,
-  thumbnail: 'ready',
+  thumbnail: THUMBNAIL_STATES.ready,
   thumbnailVersion: 1,
   position: 0,
   favourite: false,
   watched: false,
   addedAt: '2026-10-16T00:00:00.000Z',
   changedAt: '2026-10-16T00:00:00.000Z',
-  match: 'off',
+  match: MATCH_STATES.off,
   year: null,
   edition: null,
   item: null,

@@ -3,7 +3,7 @@ import { DEFAULT_OUTPUT_SETTINGS, type OutputSettings } from '@raven/core'
 import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { fakeClient, renderDesktop } from '@/renderer/test/render'
-import type { AudioDevice, DesktopRequest } from '@/shared/protocol'
+import { type AudioDevice, DESKTOP_REQUESTS, type DesktopRequest } from '@/shared/protocol'
 
 const DEVICES: AudioDevice[] = [
   { name: 'auto', description: 'Autoselect device' },
@@ -30,10 +30,10 @@ const mainWith = ({
   const writes: OutputSettings[] = []
   const client = fakeClient({
     request: async (asked: DesktopRequest) => {
-      if (asked.type === 'readOutput') {
+      if (asked.type === DESKTOP_REQUESTS.readOutput) {
         return { type: 'output', output: stored.output, devices, isEngineReady }
       }
-      if (asked.type === 'writeOutput') {
+      if (asked.type === DESKTOP_REQUESTS.writeOutput) {
         writes.push(asked.output)
         if (isRejecting) throw new Error('port closed')
         if (refusal !== null) return { type: 'refused', message: refusal }
@@ -233,7 +233,7 @@ describe('ThisComputer', () => {
     const writes: OutputSettings[] = []
     const client = fakeClient({
       request: async (asked: DesktopRequest) => {
-        if (asked.type === 'readOutput') {
+        if (asked.type === DESKTOP_REQUESTS.readOutput) {
           return {
             type: 'output',
             output: DEFAULT_OUTPUT_SETTINGS,
@@ -241,7 +241,7 @@ describe('ThisComputer', () => {
             isEngineReady: true,
           }
         }
-        if (asked.type !== 'writeOutput') return { type: 'recents', recents: [] }
+        if (asked.type !== DESKTOP_REQUESTS.writeOutput) return { type: 'recents', recents: [] }
         writes.push(asked.output)
         const reply = Promise.withResolvers<
           { type: 'done' } | { type: 'refused'; message: string }
@@ -354,7 +354,7 @@ describe('ThisComputer', () => {
   it('says so when the settings cannot be read, and offers no controls to overwrite them', async () => {
     const client = fakeClient({
       request: async (asked) =>
-        asked.type === 'readOutput'
+        asked.type === DESKTOP_REQUESTS.readOutput
           ? { type: 'refused', message: 'raven player could not read its settings.' }
           : { type: 'recents', recents: [] },
     })

@@ -94,10 +94,12 @@ import { createServerSources } from '@/main/servers/serverSources'
 import { createServerTrust, withTrustLog } from '@/main/servers/serverTrust'
 import { confirmWith } from '@/main/servers/trustPrompt'
 import {
+  CLOSE_TIMEOUTS,
   closeTimeoutFor,
   createShutdown,
   DESTROY_MS,
   endAfterLog,
+  HARD_EXITS,
   hardExitFor,
   QUIT_FLUSH_MS,
 } from '@/main/shutdown'
@@ -579,10 +581,10 @@ const startApp = (): void => {
         const ending = hardExitFor({ isEngineAlive })
         const end = () => {
           switch (ending) {
-            case 'kill':
+            case HARD_EXITS.kill:
               process.kill(process.pid, 'SIGKILL')
               return
-            case 'exit':
+            case HARD_EXITS.exit:
               app.exit(0)
               return
             default: {
@@ -1063,11 +1065,11 @@ const attachPlayer = ({
       exit: () => {
         const ending = closeTimeoutFor({ isEngineAlive: engine.isAlive() })
         switch (ending) {
-          case 'quitApp':
+          case CLOSE_TIMEOUTS.quitApp:
             // The app's gate flushes the stores, then ends the process however it must.
             app.quit()
             return
-          case 'destroyWindow':
+          case CLOSE_TIMEOUTS.destroyWindow:
             window.destroy()
             return
           default: {

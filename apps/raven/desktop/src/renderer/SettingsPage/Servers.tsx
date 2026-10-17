@@ -29,18 +29,24 @@ const ANSWER_KINDS = { servers: 'servers', declined: 'declined', refused: 'refus
 
 /** Main's answer to a change: the servers it now keeps, a declined prompt, or a refusal already shown. */
 type Answer =
-  | { kind: 'servers'; servers: ServerView[] }
-  | { kind: 'declined' }
-  | { kind: 'refused' }
+  | { kind: typeof ANSWER_KINDS.servers; servers: ServerView[] }
+  | { kind: typeof ANSWER_KINDS.declined }
+  | { kind: typeof ANSWER_KINDS.refused }
+
+const ROW_MODES = { view: 'view', rename: 'rename', remove: 'remove' } as const
 
 /** What a row shows: the server, its rename form, or the question before a removal. */
-type RowMode = 'view' | 'rename' | 'remove'
+type RowMode = (typeof ROW_MODES)[keyof typeof ROW_MODES]
 
 /** One row at a time is renaming or confirming; opening another puts the first back. */
-type Active = { serverId: string; mode: Exclude<RowMode, 'view'> }
+type Active = { serverId: string; mode: Exclude<RowMode, typeof ROW_MODES.view> }
+
+const ABOUT_KINDS = { add: 'add', rename: 'rename', remove: 'remove' } as const
 
 /** What the section's alert speaks of: the add form, or one row's rename or removal. */
-type About = { kind: 'add' } | { kind: 'rename' | 'remove'; serverId: string }
+type About =
+  | { kind: typeof ABOUT_KINDS.add }
+  | { kind: typeof ABOUT_KINDS.rename | typeof ABOUT_KINDS.remove; serverId: string }
 
 type Refusal = { message: string; about: About }
 
@@ -82,13 +88,13 @@ const ServerRow = ({
   useEffect(() => {
     const previous = previousMode.current
     previousMode.current = mode
-    if (mode === 'rename') return focus(field.current)
-    if (mode === 'remove') return focus(keepButton.current)
-    if (previous === 'view') return
+    if (mode === ROW_MODES.rename) return focus(field.current)
+    if (mode === ROW_MODES.remove) return focus(keepButton.current)
+    if (previous === ROW_MODES.view) return
     const active = document.activeElement
     const isFocusLost = active === null || active === document.body
     if (!isFocusLost && !(row.current?.contains(active) ?? false)) return
-    focus(previous === 'rename' ? renameButton.current : removeButton.current)
+    focus(previous === ROW_MODES.rename ? renameButton.current : removeButton.current)
   }, [mode])
 
   const openRename = () => {
@@ -104,14 +110,14 @@ const ServerRow = ({
   }
 
   const backOnEscape = (event: KeyboardEvent) => {
-    if (event.key !== 'Escape') return
+    if (event.key !== KEYS.escape) return
     event.preventDefault()
     onMode('view')
   }
 
   const content = () => {
     switch (mode) {
-      case 'rename':
+      case ROW_MODES.rename:
         return (
           <form className={styles.rename} onSubmit={(event) => void save(event)}>
             <label className={styles.renameField}>
@@ -138,7 +144,7 @@ const ServerRow = ({
             </div>
           </form>
         )
-      case 'remove':
+      case ROW_MODES.remove:
         return (
           <div className={styles.confirm}>
             <p id={questionId} className={styles.question}>
@@ -159,7 +165,7 @@ const ServerRow = ({
             </div>
           </div>
         )
-      case 'view':
+      case ROW_MODES.view:
         return (
           <>
             <span className={styles.name}>{server.name}</span>
@@ -188,7 +194,7 @@ const ServerRow = ({
   }
 
   return (
-    <li ref={row} className={mode === 'view' ? styles.server : styles.open}>
+    <li ref={row} className={mode === ROW_MODES.view ? styles.server : styles.open}>
       {content()}
     </li>
   )
@@ -226,24 +232,24 @@ export const Servers = ({ className }: { className?: string }) => {
     const reply = await client.request(change).catch(() => null)
     if (reply === null) return refuse(UNCHANGED)
     switch (reply.type) {
-      case 'servers':
+      case DESKTOP_REPLIES.servers:
         queryClient.setQueryData(SERVERS_KEY, reply.servers)
         // A removed server takes its recents with it, so Home reads them again.
         await queryClient.invalidateQueries({ queryKey: RECENTS_KEY })
         return { kind: 'servers', servers: reply.servers }
       // The person said no to main's prompt, so there is nothing to say.
-      case 'done':
+      case DESKTOP_REPLIES.done:
         return { kind: 'declined' }
-      case 'refused':
+      case DESKTOP_REPLIES.refused:
         return refuse(reply.message)
-      case 'play':
-      case 'playServer':
-      case 'file':
-      case 'recents':
-      case 'output':
-      case 'serverReply':
-      case 'serverUnreachable':
-      case 'updates':
+      case DESKTOP_REPLIES.play:
+      case DESKTOP_REPLIES.playServer:
+      case DESKTOP_REPLIES.file:
+      case DESKTOP_REPLIES.recents:
+      case DESKTOP_REPLIES.output:
+      case DESKTOP_REPLIES.serverReply:
+      case DESKTOP_REPLIES.serverUnreachable:
+      case DESKTOP_REPLIES.updates:
         return refuse(UNCHANGED)
       default: {
         const unreachable: never = reply
@@ -262,8 +268,8 @@ export const Servers = ({ className }: { className?: string }) => {
     const answer = await send({ change: { type: 'addServer', origin }, about: { kind: 'add' } })
     isAddingNow.current = false
     setIsAdding(false)
-    if (answer.kind === 'refused') return focus(addressField.current)
-    if (answer.kind !== 'servers') return
+    if (answer.kind === ANSWER_KINDS.refused) return focus(addressField.current)
+    if (answer.kind !== ANSWER_KINDS.servers) return
     setAddress('')
     // Main answers a known origin with the list as it was.
     const isNew = answer.servers.some((server) => !before.has(server.serverId))
@@ -275,7 +281,7 @@ export const Servers = ({ className }: { className?: string }) => {
       change: { type: 'renameServer', serverId: server.serverId, name },
       about: { kind: 'rename', serverId: server.serverId },
     })
-    if (answer.kind !== 'servers') return false
+    if (answer.kind !== ANSWER_KINDS.servers) return false
     setActive(null)
     // Main cleans the name, so the status says the one it kept.
     const kept =
@@ -290,7 +296,7 @@ export const Servers = ({ className }: { className?: string }) => {
       change: { type: 'removeServer', serverId: server.serverId },
       about: { kind: 'remove', serverId: server.serverId },
     })
-    if (answer.kind !== 'servers') return
+    if (answer.kind !== ANSWER_KINDS.servers) return
     // Main keeps a server whose removal it could not save, and answers with it still listed.
     if (answer.servers.some((candidate) => candidate.serverId === server.serverId)) {
       setActive(null)
@@ -312,7 +318,7 @@ export const Servers = ({ className }: { className?: string }) => {
   const changeMode = ({ serverId, mode }: { serverId: string; mode: RowMode }) => {
     // An editor opening or closing starts afresh, so no field is invalid from an old answer.
     setRefusal(null)
-    setActive(mode === 'view' ? null : { serverId, mode })
+    setActive(mode === ROW_MODES.view ? null : { serverId, mode })
   }
 
   /** The alert's id for a row, while it speaks of that row's `kind` of change. */
@@ -321,14 +327,14 @@ export const Servers = ({ className }: { className?: string }) => {
     kind,
   }: {
     serverId: string
-    kind: 'rename' | 'remove'
+    kind: typeof ABOUT_KINDS.rename | typeof ABOUT_KINDS.remove
   }): string | null => {
     if (refusal === null || refusal.about.kind !== kind) return null
     return refusal.about.serverId === serverId ? refusalId : null
   }
 
   const list = servers.data ?? null
-  const isAddRefused = refusal !== null && refusal.about.kind === 'add'
+  const isAddRefused = refusal !== null && refusal.about.kind === ABOUT_KINDS.add
 
   return (
     <section className={`${styles.servers} ${className ?? ''}`} aria-labelledby="servers-title">
@@ -352,7 +358,7 @@ export const Servers = ({ className }: { className?: string }) => {
                 server={server}
                 mode={mode}
                 renameRefusalId={
-                  mode === 'rename'
+                  mode === ROW_MODES.rename
                     ? refusalIdFor({ serverId: server.serverId, kind: 'rename' })
                     : null
                 }

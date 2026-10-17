@@ -7,30 +7,32 @@ import { DESKTOP_REPLIES, type DesktopReply } from '@/shared/protocol'
 
 const UNOPENED = 'raven player could not open that link. Try again.'
 
+const OUTCOME_KINDS = { play: 'play', close: 'close', stay: 'stay' } as const
+
 /** What the dialog does with main's answer: leave and play, leave quietly, or stay and say why. */
 type Outcome =
-  | { kind: 'play'; reply: DesktopReply }
-  | { kind: 'close' }
-  | { kind: 'stay'; message: string }
+  | { kind: typeof OUTCOME_KINDS.play; reply: DesktopReply }
+  | { kind: typeof OUTCOME_KINDS.close }
+  | { kind: typeof OUTCOME_KINDS.stay; message: string }
 
 const outcomeOf = (reply: DesktopReply | null): Outcome => {
   if (reply === null) return { kind: 'stay', message: UNOPENED }
   switch (reply.type) {
-    case 'play':
-    case 'playServer':
+    case DESKTOP_REPLIES.play:
+    case DESKTOP_REPLIES.playServer:
       return { kind: 'play', reply }
     // The person said no to the trust prompt, so there is nothing to say.
-    case 'done':
+    case DESKTOP_REPLIES.done:
       return { kind: 'close' }
-    case 'refused':
+    case DESKTOP_REPLIES.refused:
       return { kind: 'stay', message: reply.message }
-    case 'file':
-    case 'recents':
-    case 'output':
-    case 'servers':
-    case 'serverReply':
-    case 'serverUnreachable':
-    case 'updates':
+    case DESKTOP_REPLIES.file:
+    case DESKTOP_REPLIES.recents:
+    case DESKTOP_REPLIES.output:
+    case DESKTOP_REPLIES.servers:
+    case DESKTOP_REPLIES.serverReply:
+    case DESKTOP_REPLIES.serverUnreachable:
+    case DESKTOP_REPLIES.updates:
       return { kind: 'stay', message: UNOPENED }
     default: {
       const unreachable: never = reply
@@ -76,7 +78,7 @@ export const OpenLinkDialog = ({ onClose }: { onClose: () => void }) => {
   // itself, so it never depends on the browser's cancel, which a cancelled keydown suppresses.
   const keepKeys = (event: KeyboardEvent) => {
     event.stopPropagation()
-    if (event.key !== 'Escape') return
+    if (event.key !== KEYS.escape) return
     event.preventDefault()
     close()
   }
@@ -94,12 +96,12 @@ export const OpenLinkDialog = ({ onClose }: { onClose: () => void }) => {
     setIsPending(false)
     const outcome = outcomeOf(reply)
     switch (outcome.kind) {
-      case 'play':
+      case OUTCOME_KINDS.play:
         openReply(outcome.reply)
         return close()
-      case 'close':
+      case OUTCOME_KINDS.close:
         return close()
-      case 'stay':
+      case OUTCOME_KINDS.stay:
         setRefusal(outcome.message)
         // Back to the link, so the person can correct it.
         if (field.current !== null) field.current.focus()

@@ -1,4 +1,5 @@
 import {
+  DOWNLOAD_TARGET_KINDS,
   type DownloadRequest,
   PLAY_LINK_MAX_NEXT,
   type PlayRequest,
@@ -8,6 +9,11 @@ import {
 
 export const MAX_LINK_LENGTH = 4096
 export const MAX_ORIGIN_LENGTH = 2048
+
+/** `URL.protocol` for the schemes a link or a server address may use. */
+export const URL_PROTOCOLS = { http: 'http:', https: 'https:', raven: 'raven:' } as const
+const ROOT_PATH = '/'
+const UNREACHABLE_PORT = '0'
 
 // `new URL` silently drops tabs and newlines and ignores zero-width characters
 // in a host, so what it would rewrite is refused up front.
@@ -32,10 +38,10 @@ export const serverOriginOf = (raw: string): string | null => {
   if (HIDDEN.test(address) || !HTTP_ORIGIN_ONLY.test(address)) return null
   const url = parse(address)
   if (url === null) return null
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') return null
-  if (url.hostname === '' || url.pathname !== '/') return null
+  if (url.protocol !== URL_PROTOCOLS.http && url.protocol !== URL_PROTOCOLS.https) return null
+  if (url.hostname === '' || url.pathname !== ROOT_PATH) return null
   // A trailing dot names the same host as a second origin; port 0 reaches nothing.
-  if (url.hostname.endsWith('.') || url.port === '0') return null
+  if (url.hostname.endsWith('.') || url.port === UNREACHABLE_PORT) return null
   return url.origin
 }
 
@@ -76,7 +82,7 @@ const readRavenParams = ({
   // `raven:` is not a special scheme, so `new URL` keeps the host's case as written.
   if (url.host.toLowerCase() !== host) return null
   if (url.username !== '' || url.password !== '' || url.port !== '') return null
-  if (url.pathname !== '' && url.pathname !== '/') return null
+  if (url.pathname !== '' && url.pathname !== ROOT_PATH) return null
   // `url.hash` is empty for a bare `#`, which `href` keeps.
   if (url.href.includes('#')) return null
 
@@ -113,17 +119,17 @@ const targetOf = ({
   if (named.length !== 1) return null
   if (media !== undefined) {
     const mediaId = mediaIdOf(media)
-    return mediaId === null ? null : { kind: 'media', mediaId }
+    return mediaId === null ? null : { kind: DOWNLOAD_TARGET_KINDS.media, mediaId }
   }
   if (item !== undefined) {
     const itemId = mediaIdOf(item)
-    return itemId === null ? null : { kind: 'item', itemId }
+    return itemId === null ? null : { kind: DOWNLOAD_TARGET_KINDS.item, itemId }
   }
   const match = SAGA.exec(saga ?? '')
   const libraryId = mediaIdOf(match?.[1] ?? '')
   const tmdbId = match?.[2]
   if (libraryId === null || tmdbId === undefined) return null
-  return { kind: 'saga', libraryId, tmdbId }
+  return { kind: DOWNLOAD_TARGET_KINDS.saga, libraryId, tmdbId }
 }
 
 const readDownloadQuery = ({ url }: { url: URL }): DownloadRequest | null => {
@@ -149,8 +155,10 @@ export const readPlayLink = (link: string): PlayRequest | null => {
   if (text.length > MAX_LINK_LENGTH || HIDDEN.test(text)) return null
   const url = parse(text)
   if (url === null) return null
-  if (url.protocol === 'raven:') return readPlayQuery({ url })
-  if (url.protocol === 'http:' || url.protocol === 'https:') return readWatchPage({ url, text })
+  if (url.protocol === URL_PROTOCOLS.raven) return readPlayQuery({ url })
+  if (url.protocol === URL_PROTOCOLS.http || url.protocol === URL_PROTOCOLS.https) {
+    return readWatchPage({ url, text })
+  }
   return null
 }
 
@@ -159,7 +167,7 @@ export const readDownloadLink = (link: string): DownloadRequest | null => {
   const text = link.trim()
   if (text.length > MAX_LINK_LENGTH || HIDDEN.test(text)) return null
   const url = parse(text)
-  if (url === null || url.protocol !== 'raven:') return null
+  if (url === null || url.protocol !== URL_PROTOCOLS.raven) return null
   return readDownloadQuery({ url })
 }
 

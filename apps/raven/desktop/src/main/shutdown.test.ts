@@ -1,10 +1,12 @@
 import { describe, expect, mock, test } from 'bun:test'
 import { createQuitGate } from '@/main/quitGate'
 import {
+  CLOSE_TIMEOUTS,
   closeTimeoutFor,
   createShutdown,
   DESTROY_MS,
   endAfterLog,
+  HARD_EXITS,
   hardExitFor,
   LOG_FLUSH_MS,
   QUIT_FLUSH_MS,
@@ -569,21 +571,21 @@ describe('endAfterLog', () => {
 
 describe('hardExitFor', () => {
   test('kills the process while mpv is alive, since teardown would wait on it forever', () => {
-    expect(hardExitFor({ isEngineAlive: true })).toBe('kill')
+    expect(hardExitFor({ isEngineAlive: true })).toBe(HARD_EXITS.kill)
   })
 
   test('exits normally once mpv is gone', () => {
-    expect(hardExitFor({ isEngineAlive: false })).toBe('exit')
+    expect(hardExitFor({ isEngineAlive: false })).toBe(HARD_EXITS.exit)
   })
 })
 
 describe('closeTimeoutFor', () => {
   test('a window close that timed out on a live mpv quits the app, so the stores flush', () => {
-    expect(closeTimeoutFor({ isEngineAlive: true })).toBe('quitApp')
+    expect(closeTimeoutFor({ isEngineAlive: true })).toBe(CLOSE_TIMEOUTS.quitApp)
   })
 
   test('a window close that timed out after mpv died destroys the window', () => {
-    expect(closeTimeoutFor({ isEngineAlive: false })).toBe('destroyWindow')
+    expect(closeTimeoutFor({ isEngineAlive: false })).toBe(CLOSE_TIMEOUTS.destroyWindow)
   })
 })
 

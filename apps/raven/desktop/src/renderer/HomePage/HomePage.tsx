@@ -27,8 +27,8 @@ export const HomePage = () => {
     queryKey: RECENTS_KEY,
     queryFn: async (): Promise<RecentView[]> => {
       const reply = await client.request({ type: 'listRecents' })
-      if (reply.type === 'recents') return reply.recents
-      if (reply.type === 'refused') throw new Error(reply.message)
+      if (reply.type === DESKTOP_REPLIES.recents) return reply.recents
+      if (reply.type === DESKTOP_REPLIES.refused) throw new Error(reply.message)
       throw new Error('raven player could not list your recent videos.')
     },
   })

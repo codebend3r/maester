@@ -1,6 +1,7 @@
 import { isLockState } from '@raven/core'
 import type { ServerEntry } from '@/main/desktopConfig'
 import {
+  CALL_NAMES,
   isWrite,
   matchCall,
   requestFor,
@@ -263,7 +264,7 @@ export const probeServer = async ({
   fetch: ServerFetch
   origin: string
 }): Promise<boolean> => {
-  const { method, path, body } = requestFor({ name: 'getLock' })
+  const { method, path, body } = requestFor({ name: CALL_NAMES.getLock })
   try {
     const reply = await fetch({
       url: `${origin}${path}`,

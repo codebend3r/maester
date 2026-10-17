@@ -29,6 +29,7 @@ const NEXT_WAIT_MS = 15_000
 // clear one as `#00000000`, and `getBackgroundColor` leaves the alpha off.
 const NIGHT = '#15201E'
 const CLEAR = '#000000'
+const ERROR_CODES = { eperm: 'EPERM' } as const
 
 const heading = ({ page, name }: { page: Page; name: string }) =>
   page.getByRole('heading', { name, exact: true })
@@ -137,7 +138,7 @@ const isAlive = (pid: number): boolean => {
     process.kill(pid, 0)
     return true
   } catch (error) {
-    return error instanceof Error && 'code' in error && error.code === 'EPERM'
+    return error instanceof Error && 'code' in error && error.code === ERROR_CODES.eperm
   }
 }
 

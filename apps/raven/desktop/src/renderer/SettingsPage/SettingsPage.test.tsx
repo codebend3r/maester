@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { fakeClient, renderDesktop } from '@/renderer/test/render'
+import { DESKTOP_REQUESTS } from '@/shared/protocol'
 
 describe('SettingsPage', () => {
   it('focuses its heading on arrival', async () => {
@@ -28,8 +29,8 @@ describe('SettingsPage', () => {
     const replies: Array<(reply: { type: 'done' }) => void> = []
     const client = fakeClient({
       request: async (asked) => {
-        if (asked.type === 'listRecents') return { type: 'recents', recents: [] }
-        if (asked.type !== 'clearRecents') return { type: 'done' }
+        if (asked.type === DESKTOP_REQUESTS.listRecents) return { type: 'recents', recents: [] }
+        if (asked.type !== DESKTOP_REQUESTS.clearRecents) return { type: 'done' }
         const reply = Promise.withResolvers<{ type: 'done' }>()
         replies.push(reply.resolve)
         return reply.promise
@@ -51,7 +52,7 @@ describe('SettingsPage', () => {
   it('says why when main refuses to clear', async () => {
     const client = fakeClient({
       request: async (asked) =>
-        asked.type === 'clearRecents'
+        asked.type === DESKTOP_REQUESTS.clearRecents
           ? { type: 'refused', message: 'raven player could not do that. Try again.' }
           : { type: 'recents', recents: [] },
     })

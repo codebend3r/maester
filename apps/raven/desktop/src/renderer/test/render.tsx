@@ -26,7 +26,7 @@ export const STUB_ROUTES: RouteObject[] = [
   },
 ]
 
-const DONE = { type: 'done' } as const
+const DONE = { type: DESKTOP_REPLIES.done } as const
 
 type FakeOverrides = Partial<DesktopClient>
 
@@ -35,7 +35,8 @@ export const fakeClient = (overrides: FakeOverrides = {}) => {
   const listeners = new Set<(event: DesktopEvent) => void>()
   const request = mock<DesktopClient['request']>(
     overrides.request ??
-      (async (asked) => (asked.type === 'listRecents' ? { type: 'recents', recents: [] } : DONE)),
+      (async (asked) =>
+        asked.type === DESKTOP_REQUESTS.listRecents ? { type: 'recents', recents: [] } : DONE),
   )
   const dropFiles = mock<DesktopClient['dropFiles']>(
     overrides.dropFiles ?? (async () => ({ type: 'done' })),

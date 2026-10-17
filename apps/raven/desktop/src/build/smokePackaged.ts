@@ -17,6 +17,7 @@ import {
 } from '@/build/smokeVerdict'
 import { LOG_FILE } from '@/main/log/log'
 import { logsDirFor } from '@/main/log/opens'
+import { ERROR_CODES } from '@/main/stateStore'
 
 const POLL_MS = 250
 const RUNNING_PATTERN = 'raven player.app/Contents/MacOS/raven player'
@@ -26,7 +27,10 @@ const execFileAsync = promisify(execFile)
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
 const isMissing = (error: unknown): boolean =>
-  typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT'
+  typeof error === 'object' &&
+  error !== null &&
+  'code' in error &&
+  error.code === ERROR_CODES.enoent
 
 const sizeOf = async ({ path }: { path: string }): Promise<number> => {
   try {

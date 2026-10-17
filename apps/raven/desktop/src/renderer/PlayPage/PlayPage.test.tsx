@@ -12,6 +12,7 @@ import {
 import {
   isPlayerRequest,
   type OutputSettings,
+  PLAYER_COMMANDS,
   type PlayerCommand,
   type PlayerEvent,
   type PlayerRefusalReason,
@@ -25,6 +26,7 @@ import { ENGINE_MOVED, ENGINE_NOTES, STATS_UNAVAILABLE } from '@/renderer/PlayPa
 import { connectionsOf, fakeClient, renderDesktop } from '@/renderer/test/render'
 import {
   APP_ORIGIN,
+  DESKTOP_REQUESTS,
   type DesktopReply,
   type DesktopRequest,
   ENGINE_STOPPED,
@@ -55,8 +57,8 @@ const CLIP_B: LocalFile = {
 const describing =
   (reply: (fileId: string) => DesktopReply) =>
   async (request: DesktopRequest): Promise<DesktopReply> => {
-    if (request.type === 'describeFile') return reply(request.fileId)
-    if (request.type === 'listRecents') return { type: 'recents', recents: [] }
+    if (request.type === DESKTOP_REQUESTS.describeFile) return reply(request.fileId)
+    if (request.type === DESKTOP_REQUESTS.listRecents) return { type: 'recents', recents: [] }
     return { type: 'done' }
   }
 
@@ -163,7 +165,7 @@ describe('PlayPage', () => {
       (request) => request.type === DESKTOP_REQUESTS.savePosition && request.fileId === A,
     )
     const described = sent.findIndex(
-      (request) => request.type === 'describeFile' && request.fileId === B,
+      (request) => request.type === DESKTOP_REQUESTS.describeFile && request.fileId === B,
     )
     expect(saved).toBeGreaterThan(-1)
     expect(described).toBeGreaterThan(saved)
@@ -173,7 +175,7 @@ describe('PlayPage', () => {
     const pending = Promise.withResolvers<DesktopReply>()
     const client = fakeClient({
       request: async (request) =>
-        request.type === 'describeFile' ? pending.promise : { type: 'done' },
+        request.type === DESKTOP_REQUESTS.describeFile ? pending.promise : { type: 'done' },
     })
     renderDesktop({ client, route: `/play/${A}` })
     const waiting = await screen.findByRole('main', { name: 'Opening video' })
@@ -207,9 +209,9 @@ describe('PlayPage', () => {
     expect(
       await screen.findByRole('heading', { name: "This video can't be opened" }),
     ).toBeInTheDocument()
-    expect(client.request.mock.calls.some(([request]) => request.type === 'describeFile')).toBe(
-      false,
-    )
+    expect(
+      client.request.mock.calls.some(([request]) => request.type === DESKTOP_REQUESTS.describeFile),
+    ).toBe(false)
   })
 })
 
@@ -327,7 +329,7 @@ describe('PlayPage engines', () => {
     const output = describing((fileId) => ({ type: 'file', file: fileId === A ? CLIP_A : CLIP_B }))
     const client = fakeClient({
       request: async (request) =>
-        request.type === 'readOutput'
+        request.type === DESKTOP_REQUESTS.readOutput
           ? { type: 'output', output: PASSTHROUGH, devices: [], isEngineReady: true }
           : output(request),
     })
@@ -339,13 +341,15 @@ describe('PlayPage engines', () => {
     await screen.findByRole('heading', { name: 'Clip 01' })
     expect(screen.getByRole('slider', { name: 'Volume' })).toBeDisabled()
     await settled()
-    expect(fake.send.mock.calls.some(([command]) => command.type === 'volume')).toBe(false)
+    expect(fake.send.mock.calls.some(([command]) => command.type === PLAYER_COMMANDS.volume)).toBe(
+      false,
+    )
   })
 
   it('keeps the volume for the html engine, which mixes the sound itself', async () => {
     const client = fakeClient({
       request: async (request) =>
-        request.type === 'readOutput'
+        request.type === DESKTOP_REQUESTS.readOutput
           ? { type: 'output', output: PASSTHROUGH, devices: [], isEngineReady: false }
           : clips(request),
     })
@@ -358,7 +362,7 @@ describe('PlayPage engines', () => {
     const fake = fakePlayer()
     const client = fakeClient({
       request: async (request) =>
-        request.type === 'readOutput'
+        request.type === DESKTOP_REQUESTS.readOutput
           ? {
               type: 'output',
               output: { ...PASSTHROUGH, passthrough: ['truehd', 'eac3'] },
@@ -380,7 +384,7 @@ describe('PlayPage engines', () => {
     const fake = fakePlayer()
     const client = fakeClient({
       request: async (request) =>
-        request.type === 'readOutput'
+        request.type === DESKTOP_REQUESTS.readOutput
           ? {
               type: 'output',
               output: { ...PASSTHROUGH, passthrough: [] },
@@ -441,7 +445,7 @@ describe('PlayPage engines', () => {
     player.set({ status: 'unavailable', message: 'No engine.' })
     await settled()
     expect(document.querySelector('video')).toBeNull()
-    expect(commandTypes(fake.send).filter((type) => type === 'load')).toHaveLength(1)
+    expect(commandTypes(fake.send).filter((type) => type === PLAYER_COMMANDS.load)).toHaveLength(1)
     expect(commandTypes(fake.send)).not.toContain('stop')
   })
 
@@ -464,7 +468,8 @@ describe('PlayPage engines', () => {
     const fake = fakePlayer()
     const output = Promise.withResolvers<DesktopReply>()
     const client = fakeClient({
-      request: async (request) => (request.type === 'readOutput' ? output.promise : clips(request)),
+      request: async (request) =>
+        request.type === DESKTOP_REQUESTS.readOutput ? output.promise : clips(request),
     })
     renderDesktop({
       client,
@@ -478,7 +483,7 @@ describe('PlayPage engines', () => {
       output.resolve({ type: 'output', output: PASSTHROUGH, devices: [], isEngineReady: true }),
     )
     await waitFor(() => expect(screen.getByRole('slider', { name: 'Volume' })).toBeDisabled())
-    expect(commandTypes(fake.send).filter((type) => type === 'load')).toHaveLength(1)
+    expect(commandTypes(fake.send).filter((type) => type === PLAYER_COMMANDS.load)).toHaveLength(1)
     expect(commandTypes(fake.send)).not.toContain('stop')
   })
 
@@ -566,7 +571,7 @@ const handedOver = () => {
     const data: unknown = event.data
     if (!isPlayerRequest(data)) return
     commands.push(data.command)
-    if (data.command.type === 'load') await held.load
+    if (data.command.type === PLAYER_COMMANDS.load) await held.load
     const refusal = refusals.get(data.command.type)
     port2.postMessage(
       refusal === undefined ? { id: data.id, ok: true } : { id: data.id, ok: false, ...refusal },
@@ -754,7 +759,7 @@ describe('PlayPage when the video engine stops', () => {
     await settled()
     const lifecycle = main.commands
       .map((command) => command.type)
-      .filter((type) => type === 'load' || type === 'stop')
+      .filter((type) => type === PLAYER_COMMANDS.load || type === PLAYER_COMMANDS.stop)
     expect(lifecycle).toEqual(['load', 'stop', 'load'])
     main.fromMain({ type: 'duration', duration: 30 })
     main.fromMain({ type: 'time', time: 12 })
@@ -791,7 +796,7 @@ describe('PlayPage when the video engine stops', () => {
     await settled()
     main.fromMain({ type: 'error', reason: 'engine', message: ENGINE_STOPPED })
     await sourcedVideo({ fileId: A })
-    const loads = () => main.commands.filter((command) => command.type === 'load')
+    const loads = () => main.commands.filter((command) => command.type === PLAYER_COMMANDS.load)
     expect(loads()).toHaveLength(1)
     await act(() => router.navigate(`/play/${B}`))
     await screen.findByRole('heading', { name: 'Clip 02' })

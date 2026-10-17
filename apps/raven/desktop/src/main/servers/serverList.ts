@@ -26,7 +26,7 @@ export const ADD_REFUSALS = { full: 'full', invalid: 'invalid', taken: 'taken' }
 
 export type AddOutcome =
   | { ok: true; config: DesktopConfig; server: ServerEntry }
-  | { ok: false; reason: 'full' | 'invalid' | 'taken' }
+  | { ok: false; reason: (typeof ADD_REFUSALS)[keyof typeof ADD_REFUSALS] }
 
 export const addServer = ({
   config,

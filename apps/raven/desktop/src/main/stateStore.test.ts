@@ -4,6 +4,7 @@ import { EMPTY_CONFIG, isDesktopConfig } from '@/main/desktopConfig'
 import {
   createJsonStore,
   createStateStore,
+  ERROR_CODES,
   isMissingFile,
   loadJson,
   loadState,
@@ -14,10 +15,18 @@ import {
 const FILE = '/data/player-state.json'
 const TMP = `${FILE}.tmp`
 
-type Call = { op: 'readFile' | 'writeFile' | 'rename'; args: string[] }
+const FS_OPS = {
+  readFile: 'readFile',
+  writeFile: 'writeFile',
+  rename: 'rename',
+} as const satisfies { [K in keyof StateFs]: K }
+
+type Call = { op: keyof StateFs; args: string[] }
 
 const missing = (path: string): Error =>
-  Object.assign(new Error(`ENOENT: no such file or directory, open '${path}'`), { code: 'ENOENT' })
+  Object.assign(new Error(`ENOENT: no such file or directory, open '${path}'`), {
+    code: ERROR_CODES.enoent,
+  })
 
 const createFakeFs = (initial: Record<string, string> = {}) => {
   const files = new Map(Object.entries(initial))
@@ -31,13 +40,13 @@ const createFakeFs = (initial: Record<string, string> = {}) => {
 
   const fs: StateFs = {
     readFile: async (path) => {
-      calls.push({ op: 'readFile', args: [path] })
+      calls.push({ op: FS_OPS.readFile, args: [path] })
       const text = files.get(path)
       if (text === undefined) throw missing(path)
       return text
     },
-    writeFile: async (path, data) => {
-      calls.push({ op: 'writeFile', args: [path, data] })
+    writeFile: async ({ path, data }) => {
+      calls.push({ op: FS_OPS.writeFile, args: [path, data] })
       const gate = state.gates.shift()
       if (gate) await gate
       if (state.failWrites > 0) {
@@ -46,8 +55,8 @@ const createFakeFs = (initial: Record<string, string> = {}) => {
       }
       files.set(path, data)
     },
-    rename: async (from, to) => {
-      calls.push({ op: 'rename', args: [from, to] })
+    rename: async ({ from, to }) => {
+      calls.push({ op: FS_OPS.rename, args: [from, to] })
       if (state.failRenames > 0) {
         state.failRenames -= 1
         throw new Error('rename refused')
@@ -94,7 +103,7 @@ const createFakeTimers = () => {
 
 const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 0))
 
-const writes = (calls: Call[]) => calls.filter((call) => call.op === 'writeFile')
+const writes = (calls: Call[]) => calls.filter((call) => call.op === FS_OPS.writeFile)
 
 const named = (path: string): PlayerState => addRecent({ state: EMPTY_STATE, path, at: 1 })
 
@@ -133,7 +142,7 @@ describe('loadState', () => {
   it('loads EMPTY_STATE for a missing file and renames nothing', async () => {
     const { fs, calls } = createFakeFs()
     expect(await loadState({ fs, file: FILE, now })).toEqual(EMPTY_STATE)
-    expect(calls.filter((call) => call.op === 'rename')).toEqual([])
+    expect(calls.filter((call) => call.op === FS_OPS.rename)).toEqual([])
   })
 
   it('keeps a truncated file as .corrupt-<time> and loads empty', async () => {
@@ -160,7 +169,7 @@ describe('loadState', () => {
     const written = named('/a.mkv')
     const { fs, calls } = createFakeFs({ [FILE]: JSON.stringify(written) })
     expect(await loadState({ fs, file: FILE, now })).toEqual(written)
-    expect(calls.filter((call) => call.op === 'rename')).toEqual([])
+    expect(calls.filter((call) => call.op === FS_OPS.rename)).toEqual([])
   })
 
   it('still yields empty when the rename fails, and never throws', async () => {
@@ -377,7 +386,7 @@ describe('loadJson', () => {
     }
     const { fs, calls } = createFakeFs({ [CONFIG]: JSON.stringify(written) })
     expect(await load(fs)).toEqual(written)
-    expect(calls.filter((call) => call.op === 'rename')).toEqual([])
+    expect(calls.filter((call) => call.op === FS_OPS.rename)).toEqual([])
   })
 
   it('returns the empty value for a missing file', async () => {

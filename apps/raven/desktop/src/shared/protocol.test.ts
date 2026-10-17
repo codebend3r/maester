@@ -8,6 +8,7 @@ import {
   DESKTOP_REQUESTS,
   ENVELOPE_KINDS,
   FILE_SCHEME,
+  IPC_CHANNELS,
   MAX_QUEUE,
   MENU_PLAYER_ACTIONS,
   NAVIGATION_TARGETS,
@@ -159,7 +160,7 @@ describe('isDesktopRequest', () => {
     [{ type: DESKTOP_REQUESTS.readOutput }],
     [
       {
-        type: 'writeOutput',
+        type: DESKTOP_REQUESTS.writeOutput,
         output: { profile: 'pcm', device: 'auto', passthrough: ['ac3'], spatial: false },
       },
     ],
@@ -249,7 +250,13 @@ describe('isDesktopRequest', () => {
     ['partial output settings', { type: DESKTOP_REQUESTS.writeOutput, output: { profile: 'pcm' } }],
     [
       'a server call with a method off the list',
-      { type: 'serverCall', serverId: id, method: 'DELETE', path: '/api/media/7', body: null },
+      {
+        type: DESKTOP_REQUESTS.serverCall,
+        serverId: id,
+        method: 'DELETE',
+        path: '/api/media/7',
+        body: null,
+      },
     ],
     [
       'a server call naming a host for the server',
@@ -278,7 +285,7 @@ describe('isDesktopRequest', () => {
     ['a browser open with a media id of zero', { type: 'openInBrowser', serverId: id, mediaId: 0 }],
     [
       'a browser open with a string media id',
-      { type: 'openInBrowser', serverId: id, mediaId: '7' },
+      { type: DESKTOP_REQUESTS.openInBrowser, serverId: id, mediaId: '7' },
     ],
     [
       'a server title noted without its share watched',
@@ -293,7 +300,7 @@ describe('isDesktopRequest', () => {
     ['an update switch with no value', { type: DESKTOP_REQUESTS.setUpdateCheck }],
     ['an unknown type', { type: 'readFile', path: '/etc/hosts' }],
     ['no type', {}],
-    ['a string', 'ready'],
+    ['a string', DESKTOP_REQUESTS.ready],
   ])('rejects %s', (_name, value) => {
     expect(isDesktopRequest(value)).toBe(false)
   })
@@ -301,10 +308,10 @@ describe('isDesktopRequest', () => {
 
 describe('isDesktopReply', () => {
   it.each([
-    [{ type: 'play', target: { fileId: id, queue: [] } }],
+    [{ type: DESKTOP_REPLIES.play, target: { fileId: id, queue: [] } }],
     [
       {
-        type: 'file',
+        type: DESKTOP_REPLIES.file,
         file: {
           fileId: id,
           label: 'a.mkv',
@@ -317,7 +324,7 @@ describe('isDesktopReply', () => {
     ],
     [
       {
-        type: 'output',
+        type: DESKTOP_REPLIES.output,
         output: { profile: 'passthrough', device: 'auto', passthrough: ['dts'], spatial: false },
         devices: [{ name: 'coreaudio/abc', description: 'Receiver' }],
         isEngineReady: true,
@@ -332,15 +339,37 @@ describe('isDesktopReply', () => {
     [{ type: 'serverUnreachable', message: 'raven player could not reach raven.example.' }],
     [
       {
-        type: 'servers',
+        type: DESKTOP_REPLIES.recents,
+        recents: [{ recentId: id, label: 'a', from: 'b', watched: 0.25 }],
+      },
+    ],
+    [{ type: DESKTOP_REPLIES.recents, recents: [] }],
+    [{ type: DESKTOP_REPLIES.done }],
+    [{ type: DESKTOP_REPLIES.refused, message: 'no such file' }],
+    [
+      {
+        type: DESKTOP_REPLIES.playServer,
+        target: { serverId: id, mediaId: 7, at: 30, next: [8, 9] },
+      },
+    ],
+    [{ type: DESKTOP_REPLIES.serverReply, status: 200, body: '{"state":"off"}' }],
+    [
+      {
+        type: DESKTOP_REPLIES.serverUnreachable,
+        message: 'raven player could not reach raven.example.',
+      },
+    ],
+    [
+      {
+        type: DESKTOP_REPLIES.servers,
         servers: [{ serverId: id, origin: 'https://raven.example', name: 'Home' }],
       },
     ],
-    [{ type: 'servers', servers: [] }],
-    [{ type: 'updates', status: UPDATES }],
+    [{ type: DESKTOP_REPLIES.servers, servers: [] }],
+    [{ type: DESKTOP_REPLIES.updates, status: UPDATES }],
     [
       {
-        type: 'updates',
+        type: DESKTOP_REPLIES.updates,
         status: { ...UPDATES, checkedAt: 1_700_000_000_000, latest: '0.6.0', problem: null },
       },
     ],
@@ -349,17 +378,21 @@ describe('isDesktopReply', () => {
   })
 
   it('rejects a server reply without a status and a server list holding a bare origin', () => {
-    expect(isDesktopReply({ type: 'serverReply', body: '' })).toBe(false)
-    expect(isDesktopReply({ type: 'serverUnreachable' })).toBe(false)
-    expect(isDesktopReply({ type: 'servers', servers: ['https://raven.example'] })).toBe(false)
+    expect(isDesktopReply({ type: DESKTOP_REPLIES.serverReply, body: '' })).toBe(false)
+    expect(isDesktopReply({ type: DESKTOP_REPLIES.serverUnreachable })).toBe(false)
+    expect(
+      isDesktopReply({ type: DESKTOP_REPLIES.servers, servers: ['https://raven.example'] }),
+    ).toBe(false)
   })
 
   it('rejects an update status whose latest is a number or that lacks a field', () => {
-    expect(isDesktopReply({ type: 'updates', status: { ...UPDATES, latest: 3 } })).toBe(false)
-    expect(isDesktopReply({ type: 'updates', status: { ...UPDATES, isEnabled: 'yes' } })).toBe(
-      false,
-    )
-    expect(isDesktopReply({ type: 'updates' })).toBe(false)
+    expect(
+      isDesktopReply({ type: DESKTOP_REPLIES.updates, status: { ...UPDATES, latest: 3 } }),
+    ).toBe(false)
+    expect(
+      isDesktopReply({ type: DESKTOP_REPLIES.updates, status: { ...UPDATES, isEnabled: 'yes' } }),
+    ).toBe(false)
+    expect(isDesktopReply({ type: DESKTOP_REPLIES.updates })).toBe(false)
     expect(
       isUpdateStatus({ isEnabled: true, current: '0.5.4', checkedAt: null, latest: null }),
     ).toBe(false)
@@ -367,10 +400,10 @@ describe('isDesktopReply', () => {
   })
 
   it('rejects a refusal without a message and an unknown type', () => {
-    expect(isDesktopReply({ type: 'refused' })).toBe(false)
+    expect(isDesktopReply({ type: DESKTOP_REPLIES.refused })).toBe(false)
     expect(
       isDesktopReply({
-        type: 'output',
+        type: DESKTOP_REPLIES.output,
         output: { profile: 'pcm', device: 'auto', passthrough: [], spatial: false },
         devices: [{ name: 'a' }],
         isEngineReady: true,
@@ -395,7 +428,7 @@ describe('isServerTarget', () => {
     ['no queue', { serverId: id, mediaId: 7, at: 0 }],
   ])('rejects %s', (_name, value) => {
     expect(isServerTarget(value)).toBe(false)
-    expect(isDesktopReply({ type: 'playServer', target: value })).toBe(false)
+    expect(isDesktopReply({ type: DESKTOP_REPLIES.playServer, target: value })).toBe(false)
   })
 })
 
@@ -417,29 +450,32 @@ describe('isServerMethod and isServerView', () => {
 
 describe('isDesktopEvent', () => {
   it.each([
-    [{ type: 'play', target: { fileId: id, queue: [] } }],
-    [{ type: 'player', action: 'togglePlay' }],
-    [{ type: 'player', action: 'stats' }],
-    [{ type: 'navigate', to: 'settings' }],
-    [{ type: 'notice', message: 'raven links open in a later release' }],
-    [{ type: 'playServer', target: { serverId: id, mediaId: 7, at: 30, next: [8] } }],
-    [{ type: 'openLink' }],
-    [{ type: 'updateAvailable', version: '0.6.0' }],
+    [{ type: DESKTOP_EVENTS.play, target: { fileId: id, queue: [] } }],
+    [{ type: DESKTOP_EVENTS.player, action: MENU_PLAYER_ACTIONS.togglePlay }],
+    [{ type: DESKTOP_EVENTS.player, action: MENU_PLAYER_ACTIONS.stats }],
+    [{ type: DESKTOP_EVENTS.navigate, to: NAVIGATION_TARGETS.settings }],
+    [{ type: DESKTOP_EVENTS.notice, message: 'raven links open in a later release' }],
+    [{ type: DESKTOP_EVENTS.playServer, target: { serverId: id, mediaId: 7, at: 30, next: [8] } }],
+    [{ type: DESKTOP_EVENTS.openLink }],
+    [{ type: DESKTOP_EVENTS.updateAvailable, version: '0.6.0' }],
   ])('accepts %j', (value) => {
     expect(isDesktopEvent(value)).toBe(true)
   })
 
   it.each([
-    ['navigating to devtools', { type: 'navigate', to: 'devtools' }],
-    ['navigating home, which nothing in main sends', { type: 'navigate', to: 'home' }],
+    ['navigating to devtools', { type: DESKTOP_EVENTS.navigate, to: 'devtools' }],
+    ['navigating home, which nothing in main sends', { type: DESKTOP_EVENTS.navigate, to: 'home' }],
     ['recentsChanged, which nothing in main sends', { type: 'recentsChanged' }],
-    ['a notice without a message', { type: 'notice' }],
-    ['a newer release without its version', { type: 'updateAvailable' }],
-    ['a newer release with a number for its version', { type: 'updateAvailable', version: 6 }],
-    ['openRecent, which only the page asks for', { type: 'openRecent' }],
+    ['a notice without a message', { type: DESKTOP_EVENTS.notice }],
+    ['a newer release without its version', { type: DESKTOP_EVENTS.updateAvailable }],
+    [
+      'a newer release with a number for its version',
+      { type: DESKTOP_EVENTS.updateAvailable, version: 6 },
+    ],
+    ['openRecent, which only the page asks for', { type: DESKTOP_REQUESTS.openRecent }],
     [
       'a server title queueing a fractional id',
-      { type: 'playServer', target: { serverId: id, mediaId: 7, at: 0, next: [1.5] } },
+      { type: DESKTOP_EVENTS.playServer, target: { serverId: id, mediaId: 7, at: 0, next: [1.5] } },
     ],
   ])('rejects %s', (_name, value) => {
     expect(isDesktopEvent(value)).toBe(false)
@@ -448,10 +484,10 @@ describe('isDesktopEvent', () => {
 
 describe('isInvokeEnvelope', () => {
   it.each([
-    [{ kind: 'page', request: { type: 'ready' } }],
-    [{ kind: 'page', request: { type: 'openRecent', recentId: id } }],
-    [{ kind: 'drop', paths: ['/Users/me/film.mkv', '/Users/me/next.mkv'] }],
-    [{ kind: 'drop', paths: [] }],
+    [{ kind: ENVELOPE_KINDS.page, request: { type: DESKTOP_REQUESTS.ready } }],
+    [{ kind: ENVELOPE_KINDS.page, request: { type: DESKTOP_REQUESTS.openRecent, recentId: id } }],
+    [{ kind: ENVELOPE_KINDS.drop, paths: ['/Users/me/film.mkv', '/Users/me/next.mkv'] }],
+    [{ kind: ENVELOPE_KINDS.drop, paths: [] }],
   ])('accepts %j', (value) => {
     expect(isInvokeEnvelope(value)).toBe(true)
   })
@@ -459,11 +495,11 @@ describe('isInvokeEnvelope', () => {
   it.each([
     [
       'a page request off the list',
-      { kind: 'page', request: { type: 'readFile', path: '/etc/hosts' } },
+      { kind: ENVELOPE_KINDS.page, request: { type: 'readFile', path: '/etc/hosts' } },
     ],
-    ['a drop of numbers', { kind: 'drop', paths: [1] }],
+    ['a drop of numbers', { kind: ENVELOPE_KINDS.drop, paths: [1] }],
     ['an unknown kind', { kind: 'shell', command: 'ls' }],
-    ['a bare request', { type: 'ready' }],
+    ['a bare request', { type: DESKTOP_REQUESTS.ready }],
   ])('rejects %s', (_name, value) => {
     expect(isInvokeEnvelope(value)).toBe(false)
   })
@@ -474,8 +510,17 @@ describe('isPlayerPortMessage', () => {
     [{ type: 'raven:player-port', connection: { status: 'native' } }],
     [
       {
-        type: 'raven:player-port',
-        connection: { status: 'unavailable', message: 'libmpv is missing' },
+        type: WINDOW_MESSAGE_TYPES.playerPort,
+        connection: { status: PLAYER_CONNECTION_STATUSES.native },
+      },
+    ],
+    [
+      {
+        type: WINDOW_MESSAGE_TYPES.playerPort,
+        connection: {
+          status: PLAYER_CONNECTION_STATUSES.unavailable,
+          message: 'libmpv is missing',
+        },
       },
     ],
   ])('accepts %j', (value) => {
@@ -483,20 +528,31 @@ describe('isPlayerPortMessage', () => {
   })
 
   it.each([
-    ['an unknown status', { type: 'raven:player-port', connection: { status: 'broken' } }],
+    [
+      'an unknown status',
+      { type: WINDOW_MESSAGE_TYPES.playerPort, connection: { status: 'broken' } },
+    ],
     [
       'unavailable without a message',
-      { type: 'raven:player-port', connection: { status: 'unavailable' } },
+      {
+        type: WINDOW_MESSAGE_TYPES.playerPort,
+        connection: { status: PLAYER_CONNECTION_STATUSES.unavailable },
+      },
     ],
-    ['the channel name as the type', { type: 'raven:player', connection: { status: 'native' } }],
-    ['no connection', { type: 'raven:player-port' }],
+    [
+      'the channel name as the type',
+      { type: IPC_CHANNELS.player, connection: { status: PLAYER_CONNECTION_STATUSES.native } },
+    ],
+    ['no connection', { type: WINDOW_MESSAGE_TYPES.playerPort }],
   ])('rejects %s', (_name, value) => {
     expect(isPlayerPortMessage(value)).toBe(false)
   })
 
   it('narrows a connection on its own', () => {
-    expect(isPlayerConnection({ status: 'native' })).toBe(true)
-    expect(isPlayerConnection({ status: 'unavailable', message: 'x' })).toBe(true)
-    expect(isPlayerConnection({ status: 'unavailable' })).toBe(false)
+    expect(isPlayerConnection({ status: PLAYER_CONNECTION_STATUSES.native })).toBe(true)
+    expect(
+      isPlayerConnection({ status: PLAYER_CONNECTION_STATUSES.unavailable, message: 'x' }),
+    ).toBe(true)
+    expect(isPlayerConnection({ status: PLAYER_CONNECTION_STATUSES.unavailable })).toBe(false)
   })
 })

@@ -1,27 +1,28 @@
 import type { PlayerAction, PlayerServices } from '@raven/ui'
-import { type Infer, listOf, object } from '@raven/core'
+import { listOf, object } from '@raven/core'
 import type { DesktopClient } from '@/renderer/desktop/client'
 import type { MenuHub } from '@/renderer/desktop/menuHub'
 import {
   type DesktopRequest,
   isOpaqueId,
   type LocalFile,
+  MENU_PLAYER_ACTIONS,
   type MenuPlayerAction,
 } from '@/shared/protocol'
 
 /** What the Shell leaves in `location.state` when it opens a video. */
 export const isPlayState = object({ queue: listOf(isOpaqueId) })
 
-export type PlayState = Infer<typeof isPlayState>
+/** Which engine plays, and for the html one, why: the native one never started, or it stopped. */
+export const ENGINE_USES = { native: 'native', fallback: 'fallback', stopped: 'stopped' } as const
+
+export type EngineUse = (typeof ENGINE_USES)[keyof typeof ENGINE_USES]
 
 export const ENGINE_NOTES = {
   native: 'raven player could not play this video.',
   fallback: "raven player's video engine did not start, and this video needs it.",
   stopped: "raven player's video engine stopped, and this video needs it.",
-} as const
-
-/** Which engine plays, and for the html one, why: the native one never started, or it stopped. */
-export type EngineUse = keyof typeof ENGINE_NOTES
+} as const satisfies Record<EngineUse, string>
 
 export const ENGINE_MOVED =
   "raven player's video engine stopped, so this video moved to the built-in player."
@@ -34,17 +35,17 @@ export const OUTPUT_KEY = ['desktop', 'output'] as const
 /** The Playback menu's actions as the player's own; Next is the page's, not the player's. */
 export const playerActionFor = (action: MenuPlayerAction): PlayerAction | null => {
   switch (action) {
-    case 'togglePlay':
+    case MENU_PLAYER_ACTIONS.togglePlay:
       return { type: 'togglePlay' }
-    case 'skipBack':
+    case MENU_PLAYER_ACTIONS.skipBack:
       return { type: 'seekBy', seconds: -10 }
-    case 'skipForward':
+    case MENU_PLAYER_ACTIONS.skipForward:
       return { type: 'seekBy', seconds: 10 }
-    case 'showShortcuts':
+    case MENU_PLAYER_ACTIONS.showShortcuts:
       return { type: 'showShortcuts' }
-    case 'stats':
+    case MENU_PLAYER_ACTIONS.stats:
       return { type: 'toggleStats' }
-    case 'next':
+    case MENU_PLAYER_ACTIONS.next:
       return null
     default: {
       const unreachable: never = action

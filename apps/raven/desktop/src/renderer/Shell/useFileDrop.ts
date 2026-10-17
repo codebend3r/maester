@@ -30,7 +30,8 @@ export const useFileDrop = ({
 
   useEffect(() => {
     // Selected text and links are dragged too; only files are a drop to play.
-    const hasFiles = (event: DragEvent) => event.dataTransfer?.types.includes('Files') ?? false
+    const hasFiles = (event: DragEvent) =>
+      event.dataTransfer?.types.includes(DRAG_TYPES.files) ?? false
     const enter = (event: DragEvent) => {
       if (!hasFiles(event)) return
       depth.current += 1

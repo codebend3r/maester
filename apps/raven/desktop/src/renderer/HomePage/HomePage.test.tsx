@@ -3,7 +3,7 @@ import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { watchedLabel } from '@/renderer/HomePage/HomePage'
 import { fakeClient, renderDesktop, STUB_ROUTES } from '@/renderer/test/render'
-import type { DesktopReply, DesktopRequest } from '@/shared/protocol'
+import { DESKTOP_REQUESTS, type DesktopReply, type DesktopRequest } from '@/shared/protocol'
 
 const ID_A = '11111111-1111-4111-8111-111111111111'
 const RECENT_1 = '44444444-4444-4444-8444-444444444444'
@@ -24,7 +24,9 @@ const answering =
   }) =>
   async (request: DesktopRequest): Promise<DesktopReply> =>
     others[request.type] ??
-    (request.type === 'listRecents' ? { type: 'recents', recents } : { type: 'done' })
+    (request.type === DESKTOP_REQUESTS.listRecents
+      ? { type: 'recents', recents }
+      : { type: 'done' })
 
 const settled = () => screen.findByText('Nothing opened yet.')
 
@@ -89,7 +91,9 @@ describe('HomePage', () => {
     expect(client.request).toHaveBeenCalledWith({ type: 'removeRecent', recentId: RECENT_1 })
     await waitFor(() =>
       expect(
-        client.request.mock.calls.filter(([request]) => request.type === 'listRecents'),
+        client.request.mock.calls.filter(
+          ([request]) => request.type === DESKTOP_REQUESTS.listRecents,
+        ),
       ).toHaveLength(2),
     )
   })

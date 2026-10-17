@@ -55,7 +55,9 @@ export const serverClient = ({
   replies?: Partial<Record<DesktopRequest['type'], DesktopReply>>
 }) => {
   const answered = new Map<string, number>()
-  const answer = (request: Extract<DesktopRequest, { type: 'serverCall' }>): CallAnswer => {
+  const answer = (
+    request: Extract<DesktopRequest, { type: typeof DESKTOP_REQUESTS.serverCall }>,
+  ): CallAnswer => {
     const key = `${request.method} ${request.path}`
     const entry = Object.entries(calls).find(([name]) => name === key)?.[1] ?? null
     if (entry === null) return reply({ status: 404, body: { message: 'Not found' } })
@@ -67,11 +69,11 @@ export const serverClient = ({
   return fakeClient({
     request: async (request) => {
       switch (request.type) {
-        case 'listServers':
+        case DESKTOP_REQUESTS.listServers:
           return { type: 'servers', servers }
-        case 'listRecents':
+        case DESKTOP_REQUESTS.listRecents:
           return { type: 'recents', recents: [] }
-        case 'serverCall':
+        case DESKTOP_REQUESTS.serverCall:
           return answer(request)
         default:
           return replies[request.type] ?? { type: 'done' }
@@ -84,7 +86,7 @@ export const serverClient = ({
 export const serverCallsOf = (client: ReturnType<typeof fakeClient>) =>
   client.request.mock.calls
     .map(([request]) => request)
-    .flatMap((request) => (request.type === 'serverCall' ? [request] : []))
+    .flatMap((request) => (request.type === DESKTOP_REQUESTS.serverCall ? [request] : []))
 
 export const callNamesOf = (client: ReturnType<typeof fakeClient>): string[] =>
   serverCallsOf(client).map((request) => `${request.method} ${request.path}`)

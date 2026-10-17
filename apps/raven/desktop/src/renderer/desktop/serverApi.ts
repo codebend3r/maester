@@ -46,8 +46,11 @@ export const bridgedFetch =
       path: url,
       body: init?.body ?? null,
     })
-    if (reply.type === 'serverReply') return responseOf(reply)
-    if (reply.type === 'serverUnreachable' || reply.type === 'refused') {
+    if (reply.type === DESKTOP_REPLIES.serverReply) return responseOf(reply)
+    if (
+      reply.type === DESKTOP_REPLIES.serverUnreachable ||
+      reply.type === DESKTOP_REPLIES.refused
+    ) {
       throw new ServerUnreachable(reply.message)
     }
     throw new ServerUnreachable(UNREADABLE)
@@ -71,8 +74,8 @@ export const useServers = (): UseQueryResult<ServerView[]> => {
     queryKey: SERVERS_KEY,
     queryFn: async () => {
       const reply = await client.request({ type: 'listServers' })
-      if (reply.type === 'servers') return reply.servers
-      throw new Error(reply.type === 'refused' ? reply.message : NO_SERVERS)
+      if (reply.type === DESKTOP_REPLIES.servers) return reply.servers
+      throw new Error(reply.type === DESKTOP_REPLIES.refused ? reply.message : NO_SERVERS)
     },
     retry: false,
   })

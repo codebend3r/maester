@@ -12,7 +12,7 @@ import type { PlayerServices } from '@raven/ui'
 import type { DesktopClient } from '@/renderer/desktop/client'
 import type { MenuHub } from '@/renderer/desktop/menuHub'
 import { playerActionFor, requestQuietly } from '@/renderer/PlayPage/playerServices'
-import { type DesktopReply, SERVER_GONE, type ServerView } from '@/shared/protocol'
+import { DESKTOP_REPLIES, type DesktopReply, SERVER_GONE, type ServerView } from '@/shared/protocol'
 
 /** What the Shell leaves in `location.state` when it opens a server title. */
 export const isServerPlayState = object({ at: isNumber, next: listOf(isMediaId) })
@@ -65,7 +65,7 @@ export const openInBrowser = ({
 
 /** Main's reason for not opening the browser, or null when it did. */
 export const browserRefusalOf = (reply: DesktopReply): string | null =>
-  reply.type === 'refused' ? reply.message : null
+  reply.type === DESKTOP_REPLIES.refused ? reply.message : null
 
 /** A server call whose failure costs only a warning: the history or a saved spot. */
 const callQuietly = ({ call, what }: { call: Promise<unknown>; what: string }) => {

@@ -6,9 +6,11 @@ import { isEngineGone, isEngineStop, PlayerRefusal } from '@/renderer/desktop/pl
 /**
  * The native engine, watched for its loss: mpv stopping under the page, or main answering
  * that it has. `onLost` gets where the video was, for the page to carry on from there;
- * `onRefused` hears main's reason when it turns a load down.
+ * `onRefused` hears main's reason when it turns a load down. It hosts the player it renders,
+ * so the host lives exactly as long as the player.
  */
 export const NativePlaying = ({
+  services,
   player,
   source,
   resumeAt,
@@ -30,20 +32,21 @@ export const NativePlaying = ({
   const watched = useMemo<NativePlayer>(
     () => ({
       send: (command) => {
-        if (command.type === 'seek') position.current = command.time
-        if (command.type === 'load') {
+        if (command.type === PLAYER_COMMANDS.seek) position.current = command.time
+        if (command.type === PLAYER_COMMANDS.load) {
           load.current = { latest: load.current.latest + 1, isAnswered: false }
         }
         const sent = load.current.latest
         return player.send(command).then(
           () => {
-            if (command.type !== 'load' || sent !== load.current.latest) return
+            if (command.type !== PLAYER_COMMANDS.load || sent !== load.current.latest) return
             load.current = { latest: sent, isAnswered: true }
             position.current = command.start
           },
           (error: unknown) => {
             if (isEngineGone(error)) onLost(position.current)
-            const isRefusedLoad = command.type === 'load' && error instanceof PlayerRefusal
+            const isRefusedLoad =
+              command.type === PLAYER_COMMANDS.load && error instanceof PlayerRefusal
             if (isRefusedLoad && !error.isEngineGone && onRefused !== undefined) {
               onRefused(error.message)
             }
@@ -59,7 +62,7 @@ export const NativePlaying = ({
   useEffect(
     () =>
       player.subscribe((event) => {
-        if (event.type === 'time') {
+        if (event.type === PLAYER_EVENTS.time) {
           if (load.current.isAnswered) position.current = event.time
           return
         }
@@ -68,5 +71,5 @@ export const NativePlaying = ({
     [player, onLost],
   )
 
-  return <Player engine={{ kind: 'native', player: watched, source }} />
+  return isHosting && <Player engine={{ kind: 'native', player: watched, source }} />
 }

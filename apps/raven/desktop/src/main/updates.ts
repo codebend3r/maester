@@ -44,9 +44,11 @@ export const compareVersions = ({ a, b }: { a: ReleaseVersion; b: ReleaseVersion
     (difference) => difference !== 0,
   ) ?? 0
 
+export const UPDATE_FINDING_KINDS = { current: 'current', newer: 'newer' } as const
+
 export type UpdateFinding =
-  | { kind: 'current' }
-  | { kind: 'newer'; version: string; pageUrl: string }
+  | { kind: typeof UPDATE_FINDING_KINDS.current }
+  | { kind: typeof UPDATE_FINDING_KINDS.newer; version: string; pageUrl: string }
 
 export const UPDATE_PROBLEMS = {
   unreachable: 'GitHub did not answer.',
@@ -125,12 +127,12 @@ export const findUpdate = ({
   if (!highest) return failed(UPDATE_PROBLEMS.unlisted)
   const running = parseRunning(current) ?? { version: ZERO_VERSION, isPrerelease: false }
   if (!isNewer({ candidate: highest.version, running })) {
-    return { ok: true, finding: { kind: 'current' } }
+    return { ok: true, finding: { kind: UPDATE_FINDING_KINDS.current } }
   }
   return {
     ok: true,
     finding: {
-      kind: 'newer',
+      kind: UPDATE_FINDING_KINDS.newer,
       version: highest.text,
       pageUrl: `${RELEASE_PAGE_PREFIX}v${highest.text}`,
     },
@@ -189,9 +191,12 @@ type PageRead =
   | { ok: true; releases: unknown[]; next: string | null; chars: number }
   | { ok: false; problem: string }
 
+/** The header GitHub names the next page of the list in. */
+export const LINK_HEADER = 'link'
+
 const linkOf = (headers: { get: (name: string) => string | null }): string | null => {
   try {
-    return headers.get('link')
+    return headers.get(LINK_HEADER)
   } catch {
     return null
   }
@@ -261,7 +266,7 @@ const walk = async ({
   if (!page.ok) return failed(page.problem)
   const releases = [...seen, ...page.releases]
   const found = findUpdate({ releases, current })
-  const hasNewer = found.ok && found.finding.kind === 'newer'
+  const hasNewer = found.ok && found.finding.kind === UPDATE_FINDING_KINDS.newer
   if (hasNewer || page.next === null || pagesLeft <= 1) return found
   return walk({
     fetch,

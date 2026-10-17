@@ -20,7 +20,7 @@ import {
   rotationMoves,
   type LogFs,
 } from '@/main/log/log'
-import { isMissingFile, type Timers } from '@/main/stateStore'
+import { ERROR_CODES, isMissingFile, type Timers } from '@/main/stateStore'
 
 const DIR = '/logs'
 const FILE = `${DIR}/${LOG_FILE}`
@@ -77,14 +77,14 @@ const createFakeFs = (initial: Record<string, string> = {}) => {
       calls.push({ op: LOG_FS_OPS.rename, args: [from, to] })
       check({ op: LOG_FS_OPS.rename, path: from })
       const text = disk.get(from)
-      if (text === undefined) throw fsError({ code: 'ENOENT', path: from })
+      if (text === undefined) throw fsError({ code: ERROR_CODES.enoent, path: from })
       disk.delete(from)
       disk.set(to, text)
     },
     remove: async (path) => {
-      calls.push({ op: 'remove', args: [path] })
-      check({ op: 'remove', path })
-      if (!disk.has(path)) throw fsError({ code: 'ENOENT', path })
+      calls.push({ op: LOG_FS_OPS.remove, args: [path] })
+      check({ op: LOG_FS_OPS.remove, path })
+      if (!disk.has(path)) throw fsError({ code: ERROR_CODES.enoent, path })
       disk.delete(path)
     },
   }

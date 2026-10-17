@@ -2,6 +2,7 @@ import { domainToUnicode } from 'node:url'
 import type { ConfigStore, DesktopConfig, ServerEntry } from '@/main/desktopConfig'
 import { loggable } from '@/main/servers/serverCalls'
 import {
+  ADD_REFUSALS,
   NAME_MAX,
   SERVERS_CAP,
   addServer,
@@ -228,12 +229,14 @@ export const createServerTrust = (deps: ServerTrustDeps): ServerTrust => {
     } catch (error) {
       warn(`raven player could not keep ${origin}: ${loggable(messageOf(error))}`)
       await forget(serverId)
-      return { kind: 'unsaved' }
+      return { kind: TRUST_OUTCOME_KINDS.unsaved }
     }
     const stored = serverByOrigin({ config: deps.config.read(), origin })
     if (stored === null) {
       await forget(serverId)
-      return refusal.reason === 'full' ? { kind: 'full' } : { kind: 'unsaved' }
+      return refusal.reason === ADD_REFUSALS.full
+        ? { kind: TRUST_OUTCOME_KINDS.full }
+        : { kind: TRUST_OUTCOME_KINDS.unsaved }
     }
     // Stored, by this trust or meanwhile by another: a link may ask about it again.
     declinedFromLinks.delete(origin)
@@ -249,22 +252,22 @@ export const createServerTrust = (deps: ServerTrustDeps): ServerTrust => {
     from,
   }: {
     origin: string
-    from: 'link' | 'app'
+    from: TrustSource
   }): Promise<TrustOutcome> => {
     const answer = await consentFor(origin)
     if (answer !== true) {
-      if (answer === false && from === 'link') declinedFromLinks.add(origin)
-      return { kind: 'declined' }
+      if (answer === false && from === TRUST_SOURCES.link) declinedFromLinks.add(origin)
+      return { kind: TRUST_OUTCOME_KINDS.declined }
     }
     const serverId = newId()
     // The id names a session on disk, so one that is not fresh and opaque must not make one.
     if (serverId === null || serverById({ config: deps.config.read(), serverId }) !== null) {
       warn(`raven player made an unusable id for ${origin}`)
-      return { kind: 'unsaved' }
+      return { kind: TRUST_OUTCOME_KINDS.unsaved }
     }
     if (!(await isRaven({ serverId, origin }))) {
       await forget(serverId)
-      return { kind: 'unreachable', origin }
+      return { kind: TRUST_OUTCOME_KINDS.unreachable, origin }
     }
     return keep({ serverId, origin })
   }
@@ -273,7 +276,7 @@ export const createServerTrust = (deps: ServerTrustDeps): ServerTrust => {
     trust: async ({ origin: raw, from }) => {
       // `serverOriginOf` refuses a host ending in a dot, which would store one server twice.
       const origin = serverOriginOf(raw)
-      if (origin === null) return { kind: 'invalid' }
+      if (origin === null) return { kind: TRUST_OUTCOME_KINDS.invalid }
       const config = deps.config.read()
       const known = serverByOrigin({ config, origin })
       if (known !== null) return { kind: TRUST_OUTCOME_KINDS.trusted, server: known, isNew: false }
@@ -311,10 +314,13 @@ export const createServerTrust = (deps: ServerTrustDeps): ServerTrust => {
   }
 }
 
-const FROM_LABELS = { link: 'a link', app: 'the app' } as const
+const FROM_LABELS = {
+  [TRUST_SOURCES.link]: 'a link',
+  [TRUST_SOURCES.app]: 'the app',
+} as const satisfies Record<TrustSource, string>
 
 const outcomeLabel = (outcome: TrustOutcome): string =>
-  outcome.kind === 'trusted'
+  outcome.kind === TRUST_OUTCOME_KINDS.trusted
     ? `trusted ${outcome.server.id}${outcome.isNew ? ' (new)' : ''}`
     : outcome.kind
 

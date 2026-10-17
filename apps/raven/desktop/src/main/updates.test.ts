@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import {
   CHECK_INTERVAL_MS,
+  LINK_HEADER,
   MAX_RELEASE_PAGES,
   MAX_RELEASES_CHARS,
   nextPageUrl,
@@ -319,7 +320,7 @@ const serving = (pages: Record<string, Reply>) => {
     const { status, text, link = null } = pages[url] ?? { status: 404, text: '' }
     return {
       status,
-      headers: { get: (name: string) => (name.toLowerCase() === 'link' ? link : null) },
+      headers: { get: (name: string) => (name.toLowerCase() === LINK_HEADER ? link : null) },
       text: async () => text,
     }
   }

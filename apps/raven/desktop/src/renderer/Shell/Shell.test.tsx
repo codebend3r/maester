@@ -1,11 +1,12 @@
 import { describe, expect, it, jest, mock, spyOn } from 'bun:test'
-import { act, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { NavigationType } from 'react-router-dom'
 import { useDragging } from '@/renderer/stores/dragging'
 import { useNotice } from '@/renderer/stores/notice'
 import { useUpdateNotice } from '@/renderer/stores/updateNotice'
 import { fakeClient, renderDesktop, STUB_ROUTES } from '@/renderer/test/render'
+import { DESKTOP_REQUESTS } from '@/shared/protocol'
 
 const ID_A = '11111111-1111-4111-8111-111111111111'
 const ID_B = '22222222-2222-4222-8222-222222222222'
@@ -30,7 +31,9 @@ describe('Shell', () => {
     await settled()
     expect(client.request).toHaveBeenCalledWith({ type: 'ready' })
     const subscribed = client.subscribe.mock.invocationCallOrder[0] ?? Infinity
-    const readyAt = client.request.mock.calls.findIndex(([request]) => request.type === 'ready')
+    const readyAt = client.request.mock.calls.findIndex(
+      ([request]) => request.type === DESKTOP_REQUESTS.ready,
+    )
     const asked = client.request.mock.invocationCallOrder[readyAt] ?? 0
     expect(subscribed).toBeLessThan(asked)
   })
@@ -39,7 +42,9 @@ describe('Shell', () => {
     const client = fakeClient()
     renderDesktop({ client, routes: STUB_ROUTES, isStrict: true })
     await settled()
-    const ready = client.request.mock.calls.filter(([request]) => request.type === 'ready')
+    const ready = client.request.mock.calls.filter(
+      ([request]) => request.type === DESKTOP_REQUESTS.ready,
+    )
     expect(ready).toHaveLength(1)
     expect(client.subscribe).toHaveBeenCalledTimes(2)
   })
@@ -332,8 +337,8 @@ describe('Shell', () => {
     it('says why main could not open the release page', async () => {
       const client = fakeClient({
         request: async (asked) => {
-          if (asked.type === 'listRecents') return { type: 'recents', recents: [] }
-          if (asked.type === 'openRelease') {
+          if (asked.type === DESKTOP_REQUESTS.listRecents) return { type: 'recents', recents: [] }
+          if (asked.type === DESKTOP_REQUESTS.openRelease) {
             return { type: 'refused', message: 'raven player has not found a newer release.' }
           }
           return { type: 'done' }
