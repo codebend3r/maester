@@ -322,6 +322,39 @@ describe('ask', () => {
     expect(ask.status).toMatchObject({ kind: 'ready', fits: false })
   })
 
+  it('fits less while other files are queued or downloading, and shows only its own bytes', async () => {
+    const room = 41 * GIB + SPACE_RESERVE_BYTES + 5 * GIB
+    const alone = setup({ replies: { [mediaCall(9)]: ok(MOVIE) }, free: room })
+    expect(
+      (await askFor({ world: alone, target: { kind: 'media', mediaId: 9 } })).status,
+    ).toMatchObject({ kind: 'ready', bytes: 41 * GIB, fits: true })
+    const busy = setup({
+      replies: { [mediaCall(9)]: ok(MOVIE) },
+      free: room,
+      initial: {
+        ...EMPTY_DOWNLOADS,
+        entries: [
+          entryFor({ mediaId: 11, size: 4 * GIB, status: { kind: 'queued' } }),
+          entryFor({
+            downloadId: '00000000-0000-4000-8000-0000000000a1',
+            mediaId: 12,
+            size: 4 * GIB,
+            status: { kind: 'downloading', bytes: 2 * GIB },
+          }),
+          entryFor({
+            downloadId: '00000000-0000-4000-8000-0000000000a2',
+            mediaId: 13,
+            size: 40 * GIB,
+            status: { kind: 'paused', bytes: 0, reason: 'viewer' },
+          }),
+        ],
+      },
+    })
+    expect(
+      (await askFor({ world: busy, target: { kind: 'media', mediaId: 9 } })).status,
+    ).toMatchObject({ kind: 'ready', bytes: 41 * GIB, fits: false })
+  })
+
   it('counts and sizes only the files not yet downloaded', async () => {
     const world = setup({
       replies: { [itemCall(5)]: ok(SEASON) },

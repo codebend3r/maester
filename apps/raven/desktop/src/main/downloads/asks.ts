@@ -2,6 +2,7 @@ import { isMediaId, type DownloadTarget } from '@raven/core'
 import type { ConfigStore } from '@/main/desktopConfig'
 import { DOWNLOAD_MESSAGES } from '@/main/downloads/downloadMessages'
 import {
+  bytesOf,
   entryByMedia,
   isFileSize,
   NO_PENDING,
@@ -125,6 +126,11 @@ export const createDownloadAsks = (deps: DownloadAsksDeps): DownloadAsks => {
       fs: deps.space,
       dir: downloadsDirFor({ userData: deps.userData }),
     })
+    // The files already on their way take their room first; the dialog names only the new ones.
+    const owed = store
+      .read()
+      .entries.filter(({ status }) => status.kind === 'queued' || status.kind === 'downloading')
+      .reduce((sum, entry) => sum + Math.max(entry.size - bytesOf(entry), 0), 0)
     return {
       kind: 'ready',
       title: expansion.title,
@@ -132,7 +138,7 @@ export const createDownloadAsks = (deps: DownloadAsksDeps): DownloadAsks => {
       files: expansion.files.length,
       bytes,
       free,
-      fits: fits({ bytes, free }),
+      fits: fits({ bytes: bytes + owed, free }),
     }
   }
 
