@@ -28,7 +28,7 @@ export const HomePage = () => {
 
   return (
     <Frame>
-      {state.kind === 'signed_in' && (
+      {state.kind === HOME_STATE_KINDS.signedIn && (
         <>
           <div className={styles.who}>
             {state.user.thumb ? (
@@ -48,8 +48,8 @@ export const HomePage = () => {
           </Link>
         </>
       )}
-      {state.kind === 'loading' && <p className={styles.lede}>One moment.</p>}
-      {state.kind === 'failed' && (
+      {state.kind === HOME_STATE_KINDS.loading && <p className={styles.lede}>One moment.</p>}
+      {state.kind === HOME_STATE_KINDS.failed && (
         <p role="alert" className={styles.error}>
           rookery is not answering right now. Try again in a minute.
         </p>

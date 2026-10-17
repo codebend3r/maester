@@ -1,4 +1,5 @@
 import {
+  MATCH_STATES,
   type MatchItemType,
   type MediaItem,
   type MediaSort,
@@ -138,7 +139,9 @@ const MediaTile = ({
           </ul>
         )}
         {media.folder !== '' && <span className={styles.folder}>{media.folder}</span>}
-        {posters && media.match === 'unmatched' && <span className={styles.note}>Not matched</span>}
+        {posters && media.match === MATCH_STATES.unmatched && (
+          <span className={styles.note}>Not matched</span>
+        )}
         {note !== null && <span className={styles.note}>{note}</span>}
         <PlaybackNote media={media} />
       </div>

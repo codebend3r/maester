@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Frame } from '@/components/Frame/Frame'
-import { AuthError, startSignIn } from '@/lib/api'
+import { AUTH_ERRORS, AuthError, type AuthErrorCode, isAuthErrorCode, startSignIn } from '@/lib/api'
 import { browser } from '@/lib/browser'
 import styles from '@/pages/LoginPage/LoginPage.module.scss'
 
@@ -29,7 +29,7 @@ const errorIn = (value: string | null): AuthErrorCode | null => {
 export const LoginPage = () => {
   const [params] = useSearchParams()
   const returnTo = params.get('return_to')
-  const [error, setError] = useState(params.get('error'))
+  const [error, setError] = useState(errorIn(params.get('error')))
   const [busy, setBusy] = useState(false)
 
   const begin = () => {
@@ -39,7 +39,7 @@ export const LoginPage = () => {
       (authUrl) => browser.goTo(authUrl),
       (failure: unknown) => {
         setBusy(false)
-        setError(failure instanceof AuthError ? failure.code : 'unreachable')
+        setError(failure instanceof AuthError ? failure.code : AUTH_ERRORS.unreachable)
       },
     )
   }

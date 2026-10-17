@@ -12,6 +12,7 @@ import { useSideMenu } from '@/stores/sideMenu'
 import { FakeEventSource } from '@/test/eventSource'
 import { library } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
+import { MEDIUM_SCREEN } from '@/components/AppShell/useIsMediumScreen'
 
 const renderShell = (route: string) =>
   renderWithProviders({
@@ -44,19 +45,21 @@ const iconOf = (element: HTMLElement) => element.querySelector('svg')?.dataset.i
 const iconsOf = (element: HTMLElement) =>
   [...element.querySelectorAll('svg')].map((svg) => svg.dataset.icon)
 
+const SCREEN_SIZES = { wide: 'wide', medium: 'medium' } as const
+
 // `all` matches any screen and `not all` none, so only a medium screen
 // matches the side menu's query for one.
 const real = window.matchMedia.bind(window)
 const screenOf =
-  (size: 'wide' | 'medium') =>
+  (size: (typeof SCREEN_SIZES)[keyof typeof SCREEN_SIZES]) =>
   (query: string): MediaQueryList =>
-    real(size === 'medium' && query === '(max-width: 64rem)' ? 'all' : 'not all')
+    real(size === SCREEN_SIZES.medium && query === MEDIUM_SCREEN ? 'all' : 'not all')
 
 describe('AppShell', () => {
   const spies = { list: spyOn(api, 'listLibraries'), media: spyOn(window, 'matchMedia') }
 
   beforeEach(() => {
-    spies.media.mockImplementation(screenOf('wide'))
+    spies.media.mockImplementation(screenOf(SCREEN_SIZES.wide))
   })
 
   afterEach(() => {
@@ -365,7 +368,7 @@ describe('AppShell', () => {
   })
 
   it('keeps to its icons on a medium screen, where the toggle and B step aside', async () => {
-    spies.media.mockImplementation(screenOf('medium'))
+    spies.media.mockImplementation(screenOf(SCREEN_SIZES.medium))
     spies.list.mockImplementation(async () => [
       library({ id: 1, name: 'Tutorials', settings: { ...library().settings, locked: true } }),
     ])

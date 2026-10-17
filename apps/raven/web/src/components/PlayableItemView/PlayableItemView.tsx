@@ -4,6 +4,7 @@ import {
   type Library,
   type MatchItemType,
   type MediaItem,
+  TITLE_DISPLAYS,
   formatDuration,
   formatRuntime,
 } from '@raven/core'
@@ -40,6 +41,9 @@ import styles from '@/components/PlayableItemView/PlayableItemView.module.scss'
 
 type Facts = { details: ItemDetails; primary: MediaItem }
 
+/** A movie has a poster and a backdrop; an episode has its still, else the file's frame grab, for both. */
+const PAGE_PICTURES = { posterAndBackdrop: 'poster and backdrop', still: 'still' } as const
+
 /** How a movie's page and an episode's page differ; everything else they share. */
 type PlayableConfig = {
   matchType: MatchItemType
@@ -48,8 +52,7 @@ type PlayableConfig = {
   eyebrow: (details: ItemDetails) => string[]
   byline: (details: ItemDetails) => string | null
   facts: (facts: Facts) => string[]
-  /** A movie has a poster and a backdrop; an episode has its still, else the file's frame grab, for both. */
-  pictures: 'poster and backdrop' | 'still'
+  pictures: (typeof PAGE_PICTURES)[keyof typeof PAGE_PICTURES]
   /** Whether the page offers Edit images and Edit metadata, once the admin lock is off. */
   editable: boolean
   showsTagline: boolean
@@ -74,7 +77,7 @@ const PLAYABLE = {
     eyebrow: () => [],
     byline: directedBy,
     facts: movieFacts,
-    pictures: 'poster and backdrop',
+    pictures: PAGE_PICTURES.posterAndBackdrop,
     editable: true,
     showsTagline: true,
     showsContentRating: true,
@@ -93,7 +96,7 @@ const PLAYABLE = {
     eyebrow: (details) => [episodeByline(details)].filter(Boolean),
     byline: () => null,
     facts: episodeFacts,
-    pictures: 'still',
+    pictures: PAGE_PICTURES.still,
     editable: false,
     showsTagline: false,
     showsContentRating: false,
@@ -150,7 +153,7 @@ export const PlayableItemView = ({
   const libraries = useQuery(librariesQuery)
   const tracks = useQuery(tracksQuery(primary.id))
   // A logo until Settings says to spell titles out, as a fresh install does.
-  const showsLogo = useQuery(displaySettingsQuery).data?.titles !== 'text'
+  const showsLogo = useQuery(displaySettingsQuery).data?.titles !== TITLE_DISPLAYS.text
   const known = libraries.data ?? []
   const back = config.back({ details, primary, libraries: known })
   const tagline = config.showsTagline ? details.tagline : null
@@ -179,7 +182,7 @@ export const PlayableItemView = ({
             ? api.itemImageUrl({ id: details.id, kind: 'logo', version: details.logoVersion })
             : null
         }
-        {...(config.pictures === 'poster and backdrop'
+        {...(config.pictures === PAGE_PICTURES.posterAndBackdrop
           ? {
               picture: {
                 shape: 'poster',

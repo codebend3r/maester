@@ -3,6 +3,7 @@ import {
   RATING_SOURCES,
   type RatingSource,
   type ShowEntry,
+  WATCHED_STATES,
   episodeCode,
   showSortFact,
   sortTitle,
@@ -108,7 +109,7 @@ const COLUMNS: Record<Column, SortColumn<ShowEntry>> = {
 const ShowRow = ({ entry }: { entry: ShowEntry }) => {
   const select = useSelectable({ key: showEntryKey(entry.show), title: entry.show.title })
   return (
-    <tr className={styles.row} data-entry={showEntryKey(entry.show)} {...select.rootProps}>
+    <tr data-entry={showEntryKey(entry.show)} {...select.rootProps}>
       <th scope="row" className={styles.titleHeader}>
         <div className={styles.titleCell}>
           <SelectCheckbox select={select} />
@@ -203,7 +204,8 @@ const ShowTile = ({ entry, sort }: { entry: ShowEntry; sort: MediaSort | undefin
     episodesLabel(entry),
   ].filter((fact): fact is string => fact != null)
   const isStarted =
-    watchedStateOf({ watched: entry.watchedEpisodes, total: entry.episodes }) !== 'unwatched'
+    watchedStateOf({ watched: entry.watchedEpisodes, total: entry.episodes }) !==
+    WATCHED_STATES.unwatched
   return (
     <li className={styles.tile} data-entry={showEntryKey(entry.show)} {...select.rootProps}>
       <SelectCheckbox select={select} className={styles.select} />

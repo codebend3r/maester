@@ -1,5 +1,7 @@
 /** How a logo reads: mostly dark, mostly light, or in colours that read on either ground. */
-export type LogoTone = 'dark' | 'light' | 'mixed'
+export const LOGO_TONES = { dark: 'dark', light: 'light', mixed: 'mixed' } as const
+
+export type LogoTone = (typeof LOGO_TONES)[keyof typeof LOGO_TONES]
 
 /**
  * How pixels read, as RGBA bytes in a row: by the visible ones' mean

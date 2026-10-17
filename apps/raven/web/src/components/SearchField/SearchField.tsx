@@ -1,3 +1,4 @@
+import { KEYS } from '@raven/ui'
 import type { ComponentProps } from 'react'
 import type { Search } from '@/lib/useSearch'
 import styles from '@/components/SearchField/SearchField.module.scss'
@@ -23,7 +24,7 @@ export const SearchField = ({
     value={search.text}
     onChange={(event) => search.setText(event.target.value)}
     onKeyDown={(event) => {
-      if (event.key === 'Enter') search.searchNow()
+      if (event.key === KEYS.enter) search.searchNow()
     }}
   />
 )

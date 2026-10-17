@@ -1,5 +1,6 @@
 import {
   type ItemSummary,
+  MATCH_STATES,
   type MatchItemType,
   type MediaItem,
   type MediaSort,
@@ -102,7 +103,7 @@ export const PosterCard = ({
     year == null ? null : String(year),
     media.versions > 1 ? `${media.versions} versions` : null,
     year == null && media.versions === 1 ? formatRuntime(media.duration) : null,
-    media.match === 'unmatched' ? 'Not matched' : null,
+    media.match === MATCH_STATES.unmatched ? 'Not matched' : null,
   ].filter((fact): fact is string => fact != null && fact !== sorted)
 
   return (

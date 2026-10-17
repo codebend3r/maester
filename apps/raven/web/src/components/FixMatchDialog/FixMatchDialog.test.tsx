@@ -1,7 +1,13 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { AiMatch, MatchItemType, MatchSubject, MediaItem } from '@raven/core'
+import {
+  type AiMatch,
+  MATCH_SUBJECT_KINDS,
+  type MatchItemType,
+  type MatchSubject,
+  type MediaItem,
+} from '@raven/core'
 import { useState } from 'react'
 import { MediaMenu } from '@/components/MediaMenu/MediaMenu'
 import { api } from '@/lib/api'
@@ -190,7 +196,11 @@ describe('Fix match', () => {
     await waitFor(() => expect(searched).toEqual(['Busboys|2026', 'Bus Boys|2026']))
     await userEvent.clear(screen.getByRole('textbox', { name: 'Year' }))
     await waitFor(() => expect(searched).toEqual(['Busboys|2026', 'Bus Boys|2026', 'Bus Boys|']))
-    expect(subjects.every((each) => each?.kind === 'media' && each.id === unmatched.id)).toBe(true)
+    expect(
+      subjects.every(
+        (each) => each?.kind === MATCH_SUBJECT_KINDS.media && each.id === unmatched.id,
+      ),
+    ).toBe(true)
   })
 
   it('searches at once with the Search button, without waiting for typing to pause', async () => {

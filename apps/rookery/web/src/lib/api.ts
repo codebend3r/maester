@@ -29,7 +29,7 @@ export const isAuthErrorCode = (value: unknown): value is AuthErrorCode =>
   Object.values(AUTH_ERRORS).some((code) => code === value)
 
 export class AuthError extends Error {
-  constructor(readonly code: 'plex_unavailable' | 'unreachable') {
+  constructor(readonly code: typeof AUTH_ERRORS.plexUnavailable | typeof AUTH_ERRORS.unreachable) {
     super(code)
   }
 }
@@ -40,10 +40,15 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const isUser = (value: unknown): value is User =>
   isRecord(value) && typeof value.id === 'string' && typeof value.display_name === 'string'
 
+/** What a write carries; the server refuses anything but JSON. */
+export const HTTP_METHODS = { post: 'POST' } as const
+export const HEADERS = { contentType: 'content-type' } as const
+export const CONTENT_TYPES = { json: 'application/json' } as const
+
 const postJson = async ({ url, body }: { url: string; body: Record<string, string> }) => {
   const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    method: HTTP_METHODS.post,
+    headers: { [HEADERS.contentType]: CONTENT_TYPES.json },
     body: JSON.stringify(body),
   })
   const parsed: unknown = await response.json().catch(() => null)
@@ -59,10 +64,10 @@ export const startSignIn = async ({ returnTo }: { returnTo: string | null }): Pr
     url: '/api/auth/plex/start',
     body: withReturnTo(returnTo),
   }).catch(() => null)
-  if (response == null) throw new AuthError('unreachable')
-  if (response.status === 503) throw new AuthError('plex_unavailable')
+  if (response == null) throw new AuthError(AUTH_ERRORS.unreachable)
+  if (response.status === 503) throw new AuthError(AUTH_ERRORS.plexUnavailable)
   const authUrl = isRecord(response.body) ? response.body.auth_url : null
-  if (!response.ok || typeof authUrl !== 'string') throw new AuthError('unreachable')
+  if (!response.ok || typeof authUrl !== 'string') throw new AuthError(AUTH_ERRORS.unreachable)
   return authUrl
 }
 
@@ -70,7 +75,7 @@ export const startSignIn = async ({ returnTo }: { returnTo: string | null }): Pr
 export const signOut = async ({ returnTo }: { returnTo: string | null }): Promise<string> => {
   const response = await postJson({ url: '/api/auth/logout', body: withReturnTo(returnTo) })
   const next = isRecord(response.body) ? response.body.next : null
-  if (!response.ok || typeof next !== 'string') throw new AuthError('unreachable')
+  if (!response.ok || typeof next !== 'string') throw new AuthError(AUTH_ERRORS.unreachable)
   return next
 }
 
@@ -80,6 +85,6 @@ export const fetchMe = async (): Promise<User | null> => {
   if (response.status === 401) return null
   const body: unknown = await response.json().catch(() => null)
   const user = isRecord(body) ? body.user : null
-  if (!response.ok || !isUser(user)) throw new AuthError('unreachable')
+  if (!response.ok || !isUser(user)) throw new AuthError(AUTH_ERRORS.unreachable)
   return user
 }

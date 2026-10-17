@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { type EpisodeSummary, type ItemDetails, episodeCode } from '@raven/core'
+import { type EpisodeSummary, ITEM_TYPES, type ItemDetails, episodeCode } from '@raven/core'
 import { Link } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { inLibrary } from '@/lib/itemLinks'
@@ -23,11 +23,11 @@ export const useNeighbours = (
 ): Array<{ direction: 'Previous' | 'Next'; episode: EpisodeSummary }> => {
   const show = useQuery(itemQuery(episode.show?.id ?? null))
   const season = show.data?.children.find(
-    (child) => child.type === 'season' && child.season === episode.season,
+    (child) => child.type === ITEM_TYPES.season && child.season === episode.season,
   )
   const seasonQuery = useQuery(itemQuery(season?.id ?? null))
   const episodes = (seasonQuery.data?.children ?? []).flatMap((child) =>
-    child.type === 'episode' ? [child] : [],
+    child.type === ITEM_TYPES.episode ? [child] : [],
   )
   const at = episodes.findIndex((each) => each.id === episode.id)
   if (at < 0) return []

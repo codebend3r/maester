@@ -9,9 +9,11 @@ import {
   type ItemDetails,
   type Library,
   type MatchItemType,
+  languageName,
+  LANGUAGE_FALLBACKS,
 } from '@raven/core'
 import { useId, useState } from 'react'
-import { Button, Icon } from '@raven/ui'
+import { Button, Icon, KEYS } from '@raven/ui'
 import { LogoImage } from '@/components/LogoImage/LogoImage'
 import { api } from '@/lib/api'
 import { afterItemEdited } from '@/lib/invalidate'
@@ -28,17 +30,20 @@ const KIND_LABELS: Record<ChoosableImageKind, string> = {
 /** What a picture is, for its label: where it comes from, its size and its language. */
 const describe = (option: ImageOption): string =>
   [
-    option.source === 'local' ? 'Beside the files' : 'TMDB',
+    option.source === IMAGE_SOURCES.local ? 'Beside the files' : 'TMDB',
     option.width != null && option.height != null ? `${option.width} by ${option.height}` : null,
-    option.source === 'local'
+    option.source === IMAGE_SOURCES.local
       ? null
-      : (languageName({ tag: option.language, fallback: 'original' }) ?? 'No text'),
+      : (languageName({ tag: option.language, fallback: LANGUAGE_FALLBACKS.original }) ??
+        'No text'),
   ]
     .filter((part): part is string => part != null)
     .join(', ')
 
 const choiceOf = (option: ImageOption): ImageChoice =>
-  option.source === 'local' ? { source: 'local' } : { source: 'tmdb', ref: option.ref }
+  option.source === IMAGE_SOURCES.local
+    ? { source: IMAGE_SOURCES.local }
+    : { source: IMAGE_SOURCES.tmdb, ref: option.ref }
 
 /** A movie's pictures include its logo; a show's page shows none, so it has no logo to choose. */
 const KINDS_OF: Record<MatchItemType, readonly ChoosableImageKind[]> = {
@@ -146,7 +151,7 @@ export const ImageEditor = ({
         </Button>
       </header>
 
-      {itemKind === 'movie' && (
+      {itemKind === ITEM_TYPES.movie && (
         <section className={styles.group} aria-labelledby={ids.versions}>
           <h3 id={ids.versions} className={styles.groupHeading}>
             {details.versions.length === 1 ? 'This file' : 'Linked files'}
@@ -208,9 +213,9 @@ export const ImageEditor = ({
                 className={styles.tab}
                 onClick={() => setTab(kind)}
                 onKeyDown={(event) => {
-                  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+                  if (event.key !== KEYS.arrowLeft && event.key !== KEYS.arrowRight) return
                   event.preventDefault()
-                  const step = event.key === 'ArrowRight' ? 1 : kinds.length - 1
+                  const step = event.key === KEYS.arrowRight ? 1 : kinds.length - 1
                   const next = kinds[(kinds.indexOf(kind) + step) % kinds.length] ?? kind
                   setTab(next)
                   document.getElementById(`${ids.tabs}-${next}`)?.focus()

@@ -28,8 +28,12 @@ const SCORE_ORDER = [
   RATING_SOURCES.tmdb,
 ] as const satisfies readonly RatingSource[]
 
+const CHIP_TYPES = { scored: 'scored', unscored: 'unscored' } as const
+
 /** A chip: a source's score, or a source that has none for this item. */
-type Chip = { type: 'scored'; rating: Rating } | { type: 'unscored'; source: RatingSource }
+type Chip =
+  | { type: typeof CHIP_TYPES.scored; rating: Rating }
+  | { type: typeof CHIP_TYPES.unscored; source: RatingSource }
 
 const chipsFor = ({
   ratings,
@@ -41,16 +45,16 @@ const chipsFor = ({
   shouldShowEverySource
     ? SCORE_ORDER.map((source): Chip => {
         const rating = ratings.find((each) => each.source === source)
-        return rating ? { type: 'scored', rating } : { type: 'unscored', source }
+        return rating ? { type: CHIP_TYPES.scored, rating } : { type: CHIP_TYPES.unscored, source }
       })
-    : ratings.map((rating): Chip => ({ type: 'scored', rating }))
+    : ratings.map((rating): Chip => ({ type: CHIP_TYPES.scored, rating }))
 
 const chipSource = (chip: Chip): RatingSource =>
-  chip.type === 'scored' ? chip.rating.source : chip.source
+  chip.type === CHIP_TYPES.scored ? chip.rating.source : chip.source
 
 const ChipItem = ({ chip }: { chip: Chip }) => {
   switch (chip.type) {
-    case 'scored':
+    case CHIP_TYPES.scored:
       return (
         <li className={styles.chip} aria-label={ratingLabel(chip.rating)}>
           <RatingMark rating={chip.rating} />
@@ -59,7 +63,7 @@ const ChipItem = ({ chip }: { chip: Chip }) => {
           </span>
         </li>
       )
-    case 'unscored':
+    case CHIP_TYPES.unscored:
       return (
         <li
           className={`${styles.chip} ${styles.unscored}`}

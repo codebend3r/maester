@@ -11,10 +11,14 @@ import { useWatchedChange } from '@/lib/useWatchedChange'
 import type { SelectionScopeValue } from '@/stores/selectionScope'
 import styles from '@/components/SelectionBar/SelectionBar.module.scss'
 
+const OUTCOME_TYPES = { marked: 'marked', failed: 'failed' } as const
+
 /** What marking the selection came to, for the selection it was made on. */
 type Result = {
   keys: ReadonlySet<string>
-  outcome: { type: 'marked'; count: number; watched: boolean } | { type: 'failed' }
+  outcome:
+    | { type: typeof OUTCOME_TYPES.marked; count: number; watched: boolean }
+    | { type: typeof OUTCOME_TYPES.failed }
 }
 
 /** `list` cut into parts of at most `size`, in order. */
@@ -41,9 +45,9 @@ const SelectingBar = ({ scope }: { scope: SelectionScopeValue }) => {
           change.mutateAsync({ watched, targets: part }),
         ),
       )
-      setResult({ keys, outcome: { type: 'marked', count: keys.size, watched } })
+      setResult({ keys, outcome: { type: OUTCOME_TYPES.marked, count: keys.size, watched } })
     } catch {
-      setResult({ keys, outcome: { type: 'failed' } })
+      setResult({ keys, outcome: { type: OUTCOME_TYPES.failed } })
     }
   }
 
@@ -57,14 +61,14 @@ const SelectingBar = ({ scope }: { scope: SelectionScopeValue }) => {
       <div className={styles.status}>
         <output className={styles.count}>
           <span>{keys.size} selected</span>
-          {outcome?.type === 'marked' && (
+          {outcome?.type === OUTCOME_TYPES.marked && (
             <span className={styles.outcome}>
               <span className="visually-hidden">. </span>
               Marked {outcome.count} {outcome.watched ? 'watched' : 'unwatched'}
             </span>
           )}
         </output>
-        {outcome?.type === 'failed' && (
+        {outcome?.type === OUTCOME_TYPES.failed && (
           <p className={styles.failure} role="alert">
             Could not mark. Try again.
           </p>
