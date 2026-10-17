@@ -1,8 +1,10 @@
 import { type NavigateFunction, useLocation, useNavigate } from 'react-router-dom'
+import { useDownloadAsk } from '@/renderer/stores/downloadAsk'
 import { useNotice } from '@/renderer/stores/notice'
 import {
   DESKTOP_REPLIES,
   type DesktopReply,
+  type DownloadAsk,
   type PlayTarget,
   type ServerTarget,
 } from '@/shared/protocol'
@@ -47,17 +49,21 @@ export const applyReply = ({
   navigate,
   pathname,
   showNotice,
+  showDownloadAsk,
 }: {
   reply: DesktopReply
   navigate: NavigateFunction
   pathname: string
   showNotice: (message: string) => void
+  showDownloadAsk: (ask: DownloadAsk) => void
 }) => {
   switch (reply.type) {
     case DESKTOP_REPLIES.play:
       return void play({ navigate, pathname, target: reply.target })
     case DESKTOP_REPLIES.playServer:
       return void playServer({ navigate, pathname, target: reply.target })
+    case DESKTOP_REPLIES.downloadAsk:
+      return showDownloadAsk(reply.ask)
     case DESKTOP_REPLIES.refused:
       return showNotice(reply.message)
     case DESKTOP_REPLIES.file:
@@ -68,6 +74,8 @@ export const applyReply = ({
     case DESKTOP_REPLIES.serverReply:
     case DESKTOP_REPLIES.serverUnreachable:
     case DESKTOP_REPLIES.updates:
+    case DESKTOP_REPLIES.downloads:
+    case DESKTOP_REPLIES.space:
       return
     default: {
       const unreachable: never = reply
@@ -81,5 +89,6 @@ export const useOpenReply = (): ((reply: DesktopReply) => void) => {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const showNotice = useNotice((state) => state.show)
-  return (reply) => applyReply({ reply, navigate, pathname, showNotice })
+  const showDownloadAsk = useDownloadAsk((state) => state.show)
+  return (reply) => applyReply({ reply, navigate, pathname, showNotice, showDownloadAsk })
 }

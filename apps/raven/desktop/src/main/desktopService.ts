@@ -1,6 +1,7 @@
 import { basename, dirname } from 'node:path'
 import { type OutputSettings, titleFromFileName } from '@raven/core'
 import { type ConfigStore, type DesktopConfig, pickOutput } from '@/main/desktopConfig'
+import type { DownloadService } from '@/main/downloads/downloadService'
 import { grantNext } from '@/main/folder'
 import { GRANT_REFUSALS, type GrantedFile, type GrantRefusal, type Grants } from '@/main/grants'
 import {
@@ -86,6 +87,7 @@ export type DesktopServiceDeps = {
   links: LinkOpener
   openExternal: (url: string) => Promise<void>
   updates: UpdateService
+  downloads: DownloadService
 }
 
 export type DesktopService = {
@@ -545,6 +547,30 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
         return checkForUpdates()
       case DESKTOP_REQUESTS.openRelease:
         return openRelease()
+      case DESKTOP_REQUESTS.confirmDownload:
+        return deps.downloads.confirm({ askId: request.askId, autoDelete: request.autoDelete })
+      case DESKTOP_REQUESTS.declineDownload:
+        return deps.downloads.decline({ askId: request.askId })
+      case DESKTOP_REQUESTS.retryDownloadAsk:
+        return deps.downloads.retryAsk({ askId: request.askId })
+      case DESKTOP_REQUESTS.listDownloads:
+        return deps.downloads.list()
+      case DESKTOP_REQUESTS.readSpace:
+        return deps.downloads.readSpace()
+      case DESKTOP_REQUESTS.setDownloadDefaults:
+        return deps.downloads.setDefaults({ autoDelete: request.autoDelete })
+      // The page may send these already; main refuses them until it can act on them.
+      case DESKTOP_REQUESTS.openDownload:
+      case DESKTOP_REQUESTS.pauseDownload:
+      case DESKTOP_REQUESTS.resumeDownload:
+      case DESKTOP_REQUESTS.retryDownload:
+      case DESKTOP_REQUESTS.deleteDownload:
+      case DESKTOP_REQUESTS.setDownloadAutoDelete:
+      case DESKTOP_REQUESTS.pauseAllDownloads:
+      case DESKTOP_REQUESTS.resumeAllDownloads:
+      case DESKTOP_REQUESTS.deleteAllDownloads:
+      case DESKTOP_REQUESTS.showDownloadsFolder:
+        return refused(MESSAGES.unknownRequest)
       default: {
         const unreachable: never = request
         return unreachable

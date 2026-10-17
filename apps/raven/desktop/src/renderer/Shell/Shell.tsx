@@ -8,6 +8,7 @@ import { UPDATES_KEY } from '@/renderer/Shell/updateState'
 import { useFileDrop } from '@/renderer/Shell/useFileDrop'
 import styles from '@/renderer/Shell/Shell.module.scss'
 import { useDesktop } from '@/renderer/stores/desktop'
+import { useDownloadAsk } from '@/renderer/stores/downloadAsk'
 import { useNotice } from '@/renderer/stores/notice'
 import { useUpdateNotice } from '@/renderer/stores/updateNotice'
 import { DESKTOP_EVENTS, type DesktopEvent, type DesktopReply } from '@/shared/protocol'
@@ -24,6 +25,7 @@ export const Shell = () => {
   const notice = useNotice((state) => state.notice)
   const showNotice = useNotice((state) => state.show)
   const clearNotice = useNotice((state) => state.clear)
+  const showDownloadAsk = useDownloadAsk((state) => state.show)
   const [isOpenLinkShown, setIsOpenLinkShown] = useState(false)
   const update = useUpdateNotice((state) => state.version)
   const announceUpdate = useUpdateNotice((state) => state.announce)
@@ -57,7 +59,8 @@ export const Shell = () => {
     [clearNotice, hideUpdate],
   )
 
-  const openReply = (reply: DesktopReply) => applyReply({ reply, navigate, pathname, showNotice })
+  const openReply = (reply: DesktopReply) =>
+    applyReply({ reply, navigate, pathname, showNotice, showDownloadAsk })
   useFileDrop({ client, onReply: openReply })
 
   const onEvent = useEffectEvent((event: DesktopEvent) => {
@@ -78,6 +81,10 @@ export const Shell = () => {
         announceUpdate(event.version)
         // Settings reads main's status again, so an open Updates section shows the release too.
         return void queryClient.invalidateQueries({ queryKey: UPDATES_KEY })
+      // Nothing shows a download ask or the downloads list yet, so both go unheard.
+      case DESKTOP_EVENTS.downloadAsk:
+      case DESKTOP_EVENTS.downloads:
+        return
       default: {
         const unreachable: never = event
         return unreachable

@@ -20,6 +20,8 @@ const outcomeOf = (reply: DesktopReply | null): Outcome => {
   switch (reply.type) {
     case DESKTOP_REPLIES.play:
     case DESKTOP_REPLIES.playServer:
+    // A download link leaves for the download dialog, which applying the reply opens.
+    case DESKTOP_REPLIES.downloadAsk:
       return { kind: 'play', reply }
     // The person said no to the trust prompt, so there is nothing to say.
     case DESKTOP_REPLIES.done:
@@ -33,6 +35,8 @@ const outcomeOf = (reply: DesktopReply | null): Outcome => {
     case DESKTOP_REPLIES.serverReply:
     case DESKTOP_REPLIES.serverUnreachable:
     case DESKTOP_REPLIES.updates:
+    case DESKTOP_REPLIES.downloads:
+    case DESKTOP_REPLIES.space:
       return { kind: 'stay', message: UNOPENED }
     default: {
       const unreachable: never = reply

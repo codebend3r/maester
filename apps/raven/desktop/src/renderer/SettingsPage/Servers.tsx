@@ -250,6 +250,9 @@ export const Servers = ({ className }: { className?: string }) => {
       case DESKTOP_REPLIES.serverReply:
       case DESKTOP_REPLIES.serverUnreachable:
       case DESKTOP_REPLIES.updates:
+      case DESKTOP_REPLIES.downloadAsk:
+      case DESKTOP_REPLIES.downloads:
+      case DESKTOP_REPLIES.space:
         return refuse(UNCHANGED)
       default: {
         const unreachable: never = reply
