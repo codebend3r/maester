@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import { DEFAULT_OUTPUT_SETTINGS, type PassthroughFormat } from '@raven/core'
 import {
   CONFIG_FILE,
+  DEFAULT_UPDATE_SETTINGS,
   EMPTY_CONFIG,
   isDesktopConfig,
   isServerEntry,
@@ -9,6 +10,7 @@ import {
   loadConfig,
   pickOutput,
   setOutput,
+  setUpdates,
   upgradeConfig,
   type ServerEntry,
 } from '@/main/desktopConfig'
@@ -53,18 +55,34 @@ describe('isDesktopConfig', () => {
     expect(isDesktopConfig(EMPTY_CONFIG)).toBe(true)
   })
 
-  it('is version 2 with no servers', () => {
-    expect(EMPTY_CONFIG).toEqual({ version: 2, output: DEFAULT_OUTPUT_SETTINGS, servers: [] })
+  it('is version 3 with no servers and the release check on', () => {
+    expect(EMPTY_CONFIG).toEqual({
+      version: 3,
+      output: DEFAULT_OUTPUT_SETTINGS,
+      servers: [],
+      updates: { isEnabled: true, checkedAt: null },
+    })
   })
 
   it('rejects another version', () => {
-    expect(isDesktopConfig({ ...EMPTY_CONFIG, version: 1 })).toBe(false)
-    expect(isDesktopConfig({ ...EMPTY_CONFIG, version: 3 })).toBe(false)
+    expect(isDesktopConfig({ ...EMPTY_CONFIG, version: 2 })).toBe(false)
+    expect(isDesktopConfig({ ...EMPTY_CONFIG, version: 4 })).toBe(false)
   })
 
-  it('rejects a config without output or without servers', () => {
-    expect(isDesktopConfig({ version: 2, servers: [] })).toBe(false)
-    expect(isDesktopConfig({ version: 2, output: DEFAULT_OUTPUT_SETTINGS })).toBe(false)
+  it('rejects a config without output, servers or updates', () => {
+    const { output, servers, updates } = EMPTY_CONFIG
+    expect(isDesktopConfig({ version: 3, servers, updates })).toBe(false)
+    expect(isDesktopConfig({ version: 3, output, updates })).toBe(false)
+    expect(isDesktopConfig({ version: 3, output, servers })).toBe(false)
+  })
+
+  it('rejects update settings that fail their guard', () => {
+    expect(
+      isDesktopConfig({ ...EMPTY_CONFIG, updates: { isEnabled: 'yes', checkedAt: null } }),
+    ).toBe(false)
+    expect(
+      isDesktopConfig({ ...EMPTY_CONFIG, updates: { isEnabled: true, checkedAt: 'now' } }),
+    ).toBe(false)
   })
 
   it('rejects a server that fails the entry guard', () => {
@@ -103,19 +121,38 @@ describe('isStoredConfig', () => {
     expect(isStoredConfig({ version: 1, output: DEFAULT_OUTPUT_SETTINGS })).toBe(true)
   })
 
-  it('accepts a version 2 file', () => {
+  it('accepts a version 2 file without update settings', () => {
+    expect(isStoredConfig({ version: 2, output: DEFAULT_OUTPUT_SETTINGS, servers: [] })).toBe(true)
+  })
+
+  it('accepts a version 3 file', () => {
     expect(isStoredConfig(EMPTY_CONFIG)).toBe(true)
   })
 
   it('rejects an unknown version', () => {
-    expect(isStoredConfig({ ...EMPTY_CONFIG, version: 3 })).toBe(false)
+    expect(isStoredConfig({ ...EMPTY_CONFIG, version: 4 })).toBe(false)
   })
 })
 
 describe('upgradeConfig', () => {
-  it('turns version 1 into version 2 with no servers', () => {
+  it('turns version 1 into version 3 with no servers and the release check on', () => {
     const output = { ...DEFAULT_OUTPUT_SETTINGS, profile: 'passthrough' as const }
-    expect(upgradeConfig({ version: 1, output })).toEqual({ version: 2, output, servers: [] })
+    expect(upgradeConfig({ version: 1, output })).toEqual({
+      version: 3,
+      output,
+      servers: [],
+      updates: { isEnabled: true, checkedAt: null },
+    })
+  })
+
+  it('turns version 2 into version 3 with its servers and the release check on', () => {
+    const servers = [entryFor({ n: 1 })]
+    expect(upgradeConfig({ version: 2, output: DEFAULT_OUTPUT_SETTINGS, servers })).toEqual({
+      version: 3,
+      output: DEFAULT_OUTPUT_SETTINGS,
+      servers,
+      updates: { isEnabled: true, checkedAt: null },
+    })
   })
 
   it('rebuilds the version 1 output from its four fields', () => {
@@ -124,9 +161,30 @@ describe('upgradeConfig', () => {
     expect(Object.keys(upgraded.output).length).toBe(4)
   })
 
-  it('keeps a version 2 config as it is', () => {
-    const config = { ...EMPTY_CONFIG, servers: [entryFor({ n: 1 }), entryFor({ n: 2 })] }
+  it('keeps a version 3 config as it is', () => {
+    const config = {
+      ...EMPTY_CONFIG,
+      servers: [entryFor({ n: 1 }), entryFor({ n: 2 })],
+      updates: { isEnabled: false, checkedAt: 5 },
+    }
     expect(upgradeConfig(config)).toEqual(config)
+  })
+
+  it('gives every upgraded config its own update settings', () => {
+    const fromOne = upgradeConfig({ version: 1, output: DEFAULT_OUTPUT_SETTINGS })
+    const fromTwo = upgradeConfig({ version: 2, output: DEFAULT_OUTPUT_SETTINGS, servers: [] })
+    const shared = [DEFAULT_UPDATE_SETTINGS, EMPTY_CONFIG.updates, fromOne.updates, fromTwo.updates]
+    expect(new Set(shared).size).toBe(shared.length)
+    expect(fromOne.updates).toEqual(DEFAULT_UPDATE_SETTINGS)
+    expect(fromTwo.updates).toEqual(DEFAULT_UPDATE_SETTINGS)
+  })
+
+  it('rebuilds the version 3 update settings from their two fields', () => {
+    const updates = { isEnabled: false, checkedAt: 5, url: 'https://evil.example/' }
+    expect(upgradeConfig({ ...EMPTY_CONFIG, updates }).updates).toEqual({
+      isEnabled: false,
+      checkedAt: 5,
+    })
   })
 
   it('keeps the first twenty servers whose id and origin were not seen before, in order', () => {
@@ -192,15 +250,26 @@ describe('loadConfig', () => {
   const now = () => 1700000000000
   const load = ({ fs }: { fs: StateFs }) => loadConfig({ fs, file: FILE, now })
 
-  it('reads a version 1 file as version 2 with no servers', async () => {
+  it('reads a version 1 file as version 3 with no servers', async () => {
     const output = { ...DEFAULT_OUTPUT_SETTINGS, spatial: true }
     const { fs, files } = fakeFs({ initial: { [FILE]: JSON.stringify({ version: 1, output }) } })
-    expect(await load({ fs })).toEqual({ version: 2, output, servers: [] })
+    expect(await load({ fs })).toEqual({ ...EMPTY_CONFIG, output })
     expect([...files.keys()]).toEqual([FILE])
   })
 
-  it('reads a version 2 file with its servers', async () => {
-    const written = { ...EMPTY_CONFIG, servers: [entryFor({ n: 1 })] }
+  it('reads a version 2 file as version 3 with its servers', async () => {
+    const servers = [entryFor({ n: 1 })]
+    const written = { version: 2, output: DEFAULT_OUTPUT_SETTINGS, servers }
+    const { fs } = fakeFs({ initial: { [FILE]: JSON.stringify(written) } })
+    expect(await load({ fs })).toEqual({ ...EMPTY_CONFIG, servers })
+  })
+
+  it('reads a version 3 file with its update settings', async () => {
+    const written = {
+      ...EMPTY_CONFIG,
+      servers: [entryFor({ n: 1 })],
+      updates: { isEnabled: false, checkedAt: 5 },
+    }
     const { fs } = fakeFs({ initial: { [FILE]: JSON.stringify(written) } })
     expect(await load({ fs })).toEqual(written)
   })
@@ -218,7 +287,7 @@ describe('loadConfig', () => {
   })
 
   it('renames a file from a later version aside and starts empty', async () => {
-    const text = JSON.stringify({ ...EMPTY_CONFIG, version: 3 })
+    const text = JSON.stringify({ ...EMPTY_CONFIG, version: 4 })
     const { fs, files } = fakeFs({ initial: { [FILE]: text } })
     expect(await load({ fs })).toEqual(EMPTY_CONFIG)
     expect(files.has(FILE)).toBe(false)
@@ -249,6 +318,17 @@ describe('setOutput', () => {
     const next = setOutput({ config: EMPTY_CONFIG, output })
     expect(next).not.toBe(EMPTY_CONFIG)
     expect(next.output).toEqual(output)
+    expect(EMPTY_CONFIG).toEqual(before)
+  })
+})
+
+describe('setUpdates', () => {
+  it('returns a new config and leaves its input untouched', () => {
+    const before = structuredClone(EMPTY_CONFIG)
+    const updates = { isEnabled: false, checkedAt: 7 }
+    const next = setUpdates({ config: EMPTY_CONFIG, updates })
+    expect(next).not.toBe(EMPTY_CONFIG)
+    expect(next).toEqual({ ...EMPTY_CONFIG, updates })
     expect(EMPTY_CONFIG).toEqual(before)
   })
 })

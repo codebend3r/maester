@@ -1,10 +1,12 @@
 import {
   DEFAULT_OUTPUT_SETTINGS,
+  isBoolean,
   isNumber,
   isOutputSettings,
   isPassthroughFormat,
   isString,
   listOf,
+  nullable,
   object,
   oneOf,
   union,
@@ -28,26 +30,39 @@ export const isServerEntry = object({
 
 export type ServerEntry = Infer<typeof isServerEntry>
 
+/** Whether the release check runs at launch, and when it last answered. */
+export const isUpdateSettings = object({ isEnabled: isBoolean, checkedAt: nullable(isNumber) })
+
+export type UpdateSettings = Infer<typeof isUpdateSettings>
+
+export const DEFAULT_UPDATE_SETTINGS: UpdateSettings = { isEnabled: true, checkedAt: null }
+
 export const isDesktopConfig = object({
-  version: oneOf([2]),
+  version: oneOf([3]),
   output: isOutputSettings,
   servers: listOf(isServerEntry),
+  updates: isUpdateSettings,
 })
 
 export type DesktopConfig = Infer<typeof isDesktopConfig>
 
-/** What a file on disk may hold: this version, or the one before servers existed. */
+/**
+ * What a file on disk may hold: this version, the one before the release check, or the
+ * one before servers existed.
+ */
 export const isStoredConfig = union(
   object({ version: oneOf([1]), output: isOutputSettings }),
+  object({ version: oneOf([2]), output: isOutputSettings, servers: listOf(isServerEntry) }),
   isDesktopConfig,
 )
 
 export type ConfigStore = JsonStore<DesktopConfig>
 
 export const EMPTY_CONFIG: DesktopConfig = {
-  version: 2,
+  version: 3,
   output: DEFAULT_OUTPUT_SETTINGS,
   servers: [],
+  updates: { ...DEFAULT_UPDATE_SETTINGS },
 }
 
 export const setOutput = ({
@@ -59,6 +74,17 @@ export const setOutput = ({
 }): DesktopConfig => ({
   ...config,
   output,
+})
+
+export const setUpdates = ({
+  config,
+  updates,
+}: {
+  config: DesktopConfig
+  updates: UpdateSettings
+}): DesktopConfig => ({
+  ...config,
+  updates,
 })
 
 /** Rebuilds the settings from the four known fields, so nothing else a caller sent is stored. */
@@ -93,12 +119,25 @@ const uniqueServers = (servers: readonly ServerEntry[]): ServerEntry[] =>
 export const upgradeConfig = (stored: Infer<typeof isStoredConfig>): DesktopConfig => {
   switch (stored.version) {
     case 1:
-      return { version: 2, output: pickOutput(stored.output), servers: [] }
+      return {
+        version: 3,
+        output: pickOutput(stored.output),
+        servers: [],
+        updates: { ...DEFAULT_UPDATE_SETTINGS },
+      }
     case 2:
       return {
-        version: 2,
+        version: 3,
         output: pickOutput(stored.output),
         servers: uniqueServers(stored.servers),
+        updates: { ...DEFAULT_UPDATE_SETTINGS },
+      }
+    case 3:
+      return {
+        version: 3,
+        output: pickOutput(stored.output),
+        servers: uniqueServers(stored.servers),
+        updates: { isEnabled: stored.updates.isEnabled, checkedAt: stored.updates.checkedAt },
       }
     default: {
       const unreachable: never = stored
