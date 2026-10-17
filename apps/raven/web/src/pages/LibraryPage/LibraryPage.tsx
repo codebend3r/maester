@@ -34,7 +34,7 @@ const LibraryView = ({ library, section }: { library: Library; section: LibraryS
 
   return (
     <section className={styles.page} aria-labelledby={titleId}>
-      <ButtonLink to="/libraries" icon="back" className={styles.back}>
+      <ButtonLink to="/libraries" tone="pill" icon="back" className={styles.back}>
         Libraries
       </ButtonLink>
 

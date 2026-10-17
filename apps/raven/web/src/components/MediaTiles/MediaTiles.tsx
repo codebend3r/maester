@@ -15,7 +15,7 @@ import { FavouriteMark } from '@/components/FavouriteMark/FavouriteMark'
 import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
 import { PosterFrame } from '@/components/PosterCard/PosterCard'
-import { RatingChips } from '@/components/RatingChips/RatingChips'
+import { ScoreChip } from '@/components/RatingChips/RatingChips'
 import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { Bone } from '@/components/Skeleton/Skeleton'
@@ -28,10 +28,11 @@ import { useSelectable } from '@/lib/useSelectable'
 import styles from '@/components/MediaTiles/MediaTiles.module.scss'
 
 /**
- * One video as a row with a small thumbnail, or a small poster in a Movies
- * library. The picture is a second way to the same place, so it stays out
- * of the tab order and the reading order; the title is the link. A right
- * click on either opens the row's menu.
+ * One video as a tile: a card with a small thumbnail, or a small poster in
+ * a Movies library, beside its facts, and its menu's button in the corner.
+ * The picture is a second way to the same place, so it stays out of the tab
+ * order and the reading order; the title is the link. A right click on
+ * either opens the tile's menu.
  */
 const MediaTile = ({
   media,
@@ -48,7 +49,7 @@ const MediaTile = ({
   matchType: MatchItemType | null
   sort: MediaSort | undefined
 }) => {
-  const menu = useCardMenu({ media, matchType, inline: true })
+  const menu = useCardMenu({ media, matchType })
   const thumbnail = api.thumbnailUrl(media)
   const link = cardLink({ media, pages: posters })
   const { year } = cardTitle(media)
@@ -114,14 +115,28 @@ const MediaTile = ({
         </CardLink>
         {sorted && <span className={styles.sorted}>{sorted}</span>}
         <span className={styles.facts}>
-          <FavouriteMark media={media} />
+          {media.favourite && (
+            <span className={styles.fact}>
+              <FavouriteMark media={media} />
+            </span>
+          )}
           {facts.map((fact) => (
-            <span key={fact}>{fact}</span>
+            <span key={fact} className={styles.fact}>
+              {fact}
+            </span>
           ))}
           <PartlyWatched media={media} />
           <WatchedWords watched={withWatched && media.watched} />
         </span>
-        {posters && media.item && <RatingChips ratings={media.item.ratings} />}
+        {posters && media.item && media.item.ratings.length > 0 && (
+          <ul className={styles.scores} aria-label="Ratings">
+            {media.item.ratings.map((rating) => (
+              <li key={rating.source}>
+                <ScoreChip rating={rating} />
+              </li>
+            ))}
+          </ul>
+        )}
         {media.folder !== '' && <span className={styles.folder}>{media.folder}</span>}
         {posters && media.match === 'unmatched' && <span className={styles.note}>Not matched</span>}
         {note !== null && <span className={styles.note}>{note}</span>}
@@ -133,8 +148,9 @@ const MediaTile = ({
 }
 
 /**
- * Every video as a taller row with a small thumbnail beside its facts.
- * `note` adds a line of the caller's own under a video, as the history does.
+ * Every video as a tile, a card with a small thumbnail beside its facts, as
+ * many side by side as fit. `note` adds a line of the caller's own under a
+ * video, as the history does.
  */
 export const MediaTiles = ({
   items,
@@ -177,13 +193,13 @@ const TileSkeleton = () => (
       <Bone shape="fill" />
     </span>
     <div className={styles.body}>
-      <Bone shape="text" width="half" />
-      <Bone shape="small" width="short" />
+      <Bone shape="text" width="most" />
+      <Bone shape="small" width="half" />
     </div>
   </li>
 )
 
-/** The tiles while they are on their way, as rows of stand-ins; a list stands in the same. */
+/** The tiles while they are on their way, as tiles of stand-ins; a list stands in the same. */
 export const MediaTilesSkeleton = ({ count = 6 }: { count?: number }) => (
   <ul className={styles.tiles}>
     {Array.from({ length: count }, (_, index) => (

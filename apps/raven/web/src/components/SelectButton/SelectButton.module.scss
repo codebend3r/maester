@@ -1,0 +1,16 @@
+// A toggle pill: an outline while off, bark with night's text while on, as a
+// chosen filter reads.
+.select[aria-pressed] {
+  border-color: var(--color-line-strong);
+  border-radius: var(--radius-pill);
+}
+
+.select[aria-pressed='true'] {
+  border-color: var(--color-bark);
+  background: var(--color-bark);
+  color: var(--color-night);
+
+  &:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--color-bark) 88%, var(--color-night));
+  }
+}

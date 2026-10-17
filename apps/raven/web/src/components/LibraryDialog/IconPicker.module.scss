@@ -19,19 +19,24 @@
     display: grid;
     place-items: center;
     aspect-ratio: 1;
-    border: 1px solid var(--color-moss);
+    border: 1px solid var(--color-line);
     border-radius: var(--radius-md);
-    background: var(--color-night);
+    background: var(--color-deep);
     color: var(--color-lichen);
     cursor: pointer;
   }
 
   label:hover {
+    border-color: var(--color-line-strong);
     color: var(--color-bark);
   }
 
+  // Chosen, as a choice is everywhere: bark around it, the moss fill and
+  // the icon's tint doubled.
   input:checked + label {
-    border-color: var(--color-leaf-bright);
+    --icon-tint: 0.4;
+
+    border-color: var(--color-bark);
     background: var(--color-moss);
     color: var(--color-bark);
   }
@@ -45,8 +50,8 @@
 @media (prefers-reduced-motion: no-preference) {
   .choice label {
     transition:
-      color 120ms ease-out,
-      border-color 120ms ease-out,
-      background-color 120ms ease-out;
+      color 150ms ease,
+      border-color 150ms ease,
+      background-color 150ms ease;
   }
 }

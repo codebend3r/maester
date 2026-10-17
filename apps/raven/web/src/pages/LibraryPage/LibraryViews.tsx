@@ -11,7 +11,7 @@ import { MediaGrid, MediaGridSkeleton } from '@/components/MediaGrid/MediaGrid'
 import { MediaGroups } from '@/components/MediaGroups/MediaGroups'
 import { MediaList } from '@/components/MediaList/MediaList'
 import { MediaTiles, MediaTilesSkeleton } from '@/components/MediaTiles/MediaTiles'
-import { ShowGrid } from '@/components/ShowCard/ShowCard'
+import { ShowGrid, ShowGridSkeleton } from '@/components/ShowCard/ShowCard'
 import { ShowList, ShowTiles } from '@/components/ShowCard/ShowViews'
 import { Loading } from '@/components/Skeleton/Skeleton'
 import { UnmatchedShows } from '@/components/UnmatchedShows/UnmatchedShows'
@@ -101,17 +101,20 @@ export const LibraryListing = ({
   )
 }
 
+/** Stand-ins shaped as the listing will be: rows, a TV library's wide show cards, or cards. */
+const ListingBones = ({ settings }: { settings: LibrarySettings }) => {
+  if (settings.view === 'list' || settings.view === 'tiles') return <MediaTilesSkeleton />
+  if (listsShows(settings.kind)) return <ShowGridSkeleton />
+  return <MediaGridSkeleton posters={isMovieLibrary(settings)} />
+}
+
 /**
  * The listing while it is on its way, laid out as its view lays it out:
- * rows for a list or tiles, else cards, posters for a TV library's shows
- * and a Movies library's films.
+ * rows for a list or tiles, wide cards for a TV library's shows, else
+ * cards, posters for a Movies library's films.
  */
 export const LibraryListingSkeleton = ({ settings }: { settings: LibrarySettings }) => (
   <Loading label={`Gathering the ${listsShows(settings.kind) ? 'shows' : 'videos'}`}>
-    {settings.view === 'list' || settings.view === 'tiles' ? (
-      <MediaTilesSkeleton />
-    ) : (
-      <MediaGridSkeleton posters={listsShows(settings.kind) || isMovieLibrary(settings)} />
-    )}
+    <ListingBones settings={settings} />
   </Loading>
 )

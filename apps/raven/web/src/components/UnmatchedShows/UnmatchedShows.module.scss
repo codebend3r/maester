@@ -14,7 +14,7 @@
   // The suggestion and the files region bring their own top padding, so an
   // entry without them adds no row gap.
   gap: 0 var(--space-2);
-  border-bottom: 1px solid var(--color-moss);
+  border-bottom: 1px solid var(--color-line);
   padding-bottom: var(--space-1);
 }
 
@@ -27,13 +27,13 @@
   min-height: var(--control-size);
   padding: 0 var(--space-1);
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   background: none;
   text-align: start;
   cursor: pointer;
 
-  &:hover .title {
-    color: var(--color-bark);
+  &:hover {
+    background: var(--color-hover);
   }
 
   &:focus-visible {

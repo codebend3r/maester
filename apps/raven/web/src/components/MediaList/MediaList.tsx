@@ -12,12 +12,15 @@ import {
 import { CardLink } from '@/components/CardLink/CardLink'
 import { FavouriteMark } from '@/components/FavouriteMark/FavouriteMark'
 import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
+import { PosterImage } from '@/components/PosterImage/PosterImage'
 import { ScoreChip } from '@/components/RatingChips/RatingChips'
 import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { SortHeader } from '@/components/SortHeader/SortHeader'
 import { WatchedMark } from '@/components/WatchedMark/WatchedMark'
+import { api } from '@/lib/api'
 import { cardLink } from '@/lib/itemLinks'
+import { POSTER_SIZES } from '@/lib/posters'
 import { type SortColumn, useTableSort } from '@/lib/tableSort'
 import { mediaEntryKey } from '@/lib/entryKeys'
 import { useSelectable } from '@/lib/useSelectable'
@@ -30,9 +33,11 @@ const day = new Intl.DateTimeFormat(undefined, {
 })
 
 /**
- * One video as a table row; a right click on its title opens the row's
- * menu. In a Movies library the title opens the movie's page and a Year
- * column follows it.
+ * One video as a table row, its small poster or frame grab before its
+ * title; a right click on either opens the row's menu. The picture is a
+ * second way to the same place, so it stays out of the tab order and the
+ * reading order. In a Movies library the title opens the movie's page and a
+ * Year column follows it.
  */
 const MediaRow = ({
   media,
@@ -46,17 +51,40 @@ const MediaRow = ({
   const menu = useCardMenu({ media, matchType, inline: true })
   const { title, year } = cardTitle(media)
   const select = useSelectable({ key: mediaEntryKey(media), title })
+  const link = cardLink({ media, pages: movies })
+  const thumbnail = api.thumbnailUrl(media)
   return (
     <tr
       className={`${styles.row} ${menu.hostClass}`}
       data-entry={mediaEntryKey(media)}
       {...select.rootProps}
     >
-      <th scope="row">
+      <th scope="row" className={styles.titleHeader}>
         <div className={styles.titleCell}>
           <SelectCheckbox select={select} className={styles.select} />
           <CardLink
-            {...cardLink({ media, pages: movies })}
+            {...link}
+            className={movies ? styles.poster : styles.frame}
+            tabIndex={-1}
+            aria-hidden="true"
+            onContextMenu={menu.onContextMenu}
+          >
+            {movies ? (
+              <PosterImage media={media} sizes={POSTER_SIZES.list} />
+            ) : (
+              thumbnail && (
+                <img
+                  className={styles.thumbnail}
+                  src={thumbnail}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                />
+              )
+            )}
+          </CardLink>
+          <CardLink
+            {...link}
             className={styles.title}
             tabIndex={select.linkTabIndex}
             onContextMenu={menu.onContextMenu}
@@ -81,7 +109,9 @@ const MediaRow = ({
             </td>
           )
         })}
-      <td className={styles.number}>{formatRuntime(media.duration)}</td>
+      <td className={movies ? `${styles.number} ${styles.spare}` : styles.number}>
+        {formatRuntime(media.duration)}
+      </td>
       <td className={styles.roomy}>{resolutionLabel(media)}</td>
       <td className={`${styles.number} ${styles.extra}`}>{formatBytes(media.size)}</td>
       <td className={`${styles.number} ${styles.extra}`}>{formatBitrate(media.bitrate)}</td>
@@ -137,9 +167,9 @@ const COLUMNS: Record<Column, SortColumn<MediaItem>> = {
 
 /**
  * Every video as a row of facts, each column sortable with a click (the
- * library's own order comes back on the third). A narrow screen keeps
- * title, length and resolution; a phone drops resolution too, so titles
- * have room to read.
+ * library's own order comes back on the third). The columns go by the room
+ * the table has: a narrow one keeps title, length and resolution, then
+ * drops resolution too, so titles have room to read.
  */
 export const MediaList = ({
   items,
@@ -159,31 +189,40 @@ export const MediaList = ({
     </SortHeader>
   )
   return (
-    <table className={styles.table} aria-label="Videos">
-      <thead>
-        <tr>
-          {header('title', 'Title')}
-          {movies && header('year', 'Year', styles.number)}
-          {movies &&
-            RATING_COLUMNS.map((column) =>
-              header(column.source, column.label, `${styles.number} ${styles.roomy}`),
+    <div className={styles.room}>
+      <table
+        className={movies ? `${styles.table} ${styles.movies}` : styles.table}
+        aria-label="Videos"
+      >
+        <thead>
+          <tr>
+            {header('title', 'Title')}
+            {movies && header('year', 'Year', styles.number)}
+            {movies &&
+              RATING_COLUMNS.map((column) =>
+                header(column.source, column.label, `${styles.number} ${styles.roomy}`),
+              )}
+            {header(
+              'length',
+              'Length',
+              movies ? `${styles.number} ${styles.spare}` : styles.number,
             )}
-          {header('length', 'Length', styles.number)}
-          {header('resolution', 'Resolution', styles.roomy)}
-          {header('size', 'Size', `${styles.number} ${styles.extra}`)}
-          {header('bitrate', 'Bitrate', `${styles.number} ${styles.extra}`)}
-          {header('added', 'Added', styles.extra)}
-          {header('changed', 'Changed', styles.extra)}
-          <th scope="col">
-            <span className="visually-hidden">Actions</span>
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        {sorted.map((item) => (
-          <MediaRow key={item.id} media={item} movies={movies} matchType={matchType} />
-        ))}
-      </tbody>
-    </table>
+            {header('resolution', 'Resolution', styles.roomy)}
+            {header('size', 'Size', `${styles.number} ${styles.extra}`)}
+            {header('bitrate', 'Bitrate', `${styles.number} ${styles.extra}`)}
+            {header('added', 'Added', styles.extra)}
+            {header('changed', 'Changed', styles.extra)}
+            <th scope="col">
+              <span className="visually-hidden">Actions</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map((item) => (
+            <MediaRow key={item.id} media={item} movies={movies} matchType={matchType} />
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }

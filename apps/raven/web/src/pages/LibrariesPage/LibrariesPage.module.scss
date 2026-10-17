@@ -4,79 +4,113 @@
   gap: var(--space-5);
 }
 
+// The title over how many there are, Add library at their right on the
+// summary's line. The theme button takes the page's top right corner, so the
+// title wraps short of it, and Add library sits low enough to clear it.
 .header {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--space-3);
+  grid-template-areas:
+    'title add'
+    'summary add';
+  gap: var(--space-1) var(--space-3);
   align-items: end;
 }
 
 .title {
-  font-family: var(--font-display);
-  font-size: var(--font-size-hero);
-  font-weight: 400;
-  line-height: var(--line-tight);
+  grid-area: title;
+  padding-inline-end: var(--corner-clearance, 0);
+}
+
+.summary {
+  grid-area: summary;
+  color: var(--color-lichen);
+  font-variant-numeric: tabular-nums;
+}
+
+.add {
+  grid-area: add;
+  justify-self: end;
 }
 
 .list {
   display: grid;
-  border-top: 1px solid var(--color-moss);
+  gap: var(--space-2);
 }
 
-// The backdrop and the details share one cell, the backdrop beneath.
+// A card: the picture and the details share its one cell, the picture beneath.
+// The card is a container, so its details lay out by its own width, whatever
+// the side menu takes.
 .row {
+  container-type: inline-size;
   display: grid;
-  grid-template-areas: 'row';
-  border-bottom: 1px solid var(--color-moss);
+  grid-template-areas: 'card';
+  overflow: hidden;
+  border: 1px solid var(--color-line-faint);
+  border-radius: var(--radius-xl);
+  background: var(--color-canopy);
+}
+
+.row:hover {
+  background: var(--color-canopy-hi);
 }
 
 // A library on its way: a line for its name over one for its counts.
 .rowSkeleton {
   display: grid;
   gap: var(--space-1);
-  padding: var(--space-4) 0;
-  border-bottom: 1px solid var(--color-moss);
+  padding: var(--space-4);
+  border: 1px solid var(--color-line-faint);
+  border-radius: var(--radius-xl);
+  background: var(--color-canopy);
 }
 
 .backdrop,
 .details {
-  grid-area: row;
+  grid-area: card;
 }
 
-// Decorative: the library's newest video, faded in from the left so the name
-// stays clear. Its opacity would paint it over the details, and its clicks
-// with it, so it takes none and the details sit above.
+// Decorative: the library's newest video over the card's right half, faded
+// in from its left edge so the name stays clear. Its opacity would paint it
+// over the details, and its clicks with it, so it takes none and the details
+// sit above.
 .backdrop {
+  justify-self: end;
+  width: 55%;
   background-position: center 25%;
   background-size: cover;
-  opacity: 0;
-  mask-image: linear-gradient(to right, transparent, var(--color-stage) 60%);
+  opacity: 0.32;
+  mask-image: linear-gradient(to right, transparent, var(--color-stage) 70%);
   pointer-events: none;
 }
 
-.row:hover .backdrop,
-.row:focus-within .backdrop {
-  opacity: 0.22;
+.row:is(:hover, :focus-within) .backdrop {
+  opacity: 0.45;
 }
 
-// The icon hangs beside the name, and the lines below line up with the name.
+// The icon's well down the left, the lines beside it, the buttons at the right.
 .details {
   z-index: 1;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   grid-template-areas:
-    'icon name count'
-    '. paths paths'
-    '. status status'
-    '. actions actions';
+    'icon name actions'
+    'icon count actions'
+    'icon paths actions'
+    'icon status actions';
   gap: var(--space-1) var(--space-3);
-  padding: var(--space-4) 0;
+  align-content: start;
+  padding: var(--space-4);
 }
 
-.icon {
+.well {
   grid-area: icon;
-  align-self: center;
-  color: var(--color-lichen);
+  display: grid;
+  place-items: center;
+  width: var(--control-size-tall);
+  height: var(--control-size-tall);
+  border-radius: var(--radius-lg);
+  background: var(--color-moss);
 }
 
 .name {
@@ -97,17 +131,30 @@
 
 .count {
   grid-area: count;
-  align-self: end;
-  color: var(--color-lichen);
+  color: var(--color-birch);
   font-size: var(--font-size-sm);
-  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
+// The folders as chips, in as many columns as the card has room for; a
+// long path wraps inside its chip.
 .paths {
   grid-area: paths;
   display: grid;
-  color: var(--color-lichen);
-  font-size: var(--font-size-sm);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr));
+  gap: var(--space-1);
+}
+
+.path {
+  justify-self: start;
+  max-width: 100%;
+  padding: var(--space-0) var(--space-2);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-bark) 7%, transparent);
+  color: var(--color-birch);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
   overflow-wrap: anywhere;
 }
 
@@ -121,30 +168,102 @@
 .error {
   padding: var(--space-2) var(--space-3);
   border-left: 2px solid var(--color-leaf-bright);
+  border-radius: var(--radius-sm);
   background: var(--color-night);
   font-size: var(--font-size-sm);
 }
 
-// Five buttons outgrow a row beside the side menu, so they wrap onto as many
-// lines as the width needs, each as wide as the widest label.
 .actions {
   grid-area: actions;
   display: grid;
-  grid-template-columns: repeat(auto-fill, 9.5rem);
+  grid-auto-flow: column;
+  align-self: center;
+  justify-content: end;
   gap: var(--space-1);
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .backdrop {
-    transition: opacity 300ms ease-out;
+// A disabled button is an empty outline, which the picture would show
+// through; a haze of the card keeps its word legible.
+.actions > button:disabled {
+  background: var(--color-canopy-haze);
+}
+
+// Pin as a toggle: outlined with an empty pin while off, the moss fill and a
+// filled pin while on.
+.pin[aria-pressed] {
+  border-color: var(--color-line-strong);
+}
+
+.pin[aria-pressed='false'] {
+  --icon-tint: 0;
+
+  background: transparent;
+  color: var(--color-birch);
+
+  &:hover:not(:disabled) {
+    background: var(--color-hover);
+    color: var(--color-bark);
   }
 }
 
-// Pinned reads as switched on: the same lit ground as the current page in the side menu.
 .pin[aria-pressed='true'] {
-  color: var(--color-bark);
-  background: var(--color-canopy);
-  border-color: var(--color-lichen);
+  --icon-tint: 0.9;
+}
+
+// The admin lock off gives a card four buttons or five, which need a wide
+// card to sit beside the details; anything narrower puts them under the
+// details, as wide as they need, as many to a line as fit.
+@container (max-width: 64rem) {
+  .details:has(.actions > :nth-child(4)) {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      'icon name'
+      'icon count'
+      'icon paths'
+      'icon status'
+      'actions actions';
+    row-gap: var(--space-1);
+  }
+
+  .details:has(.actions > :nth-child(4)) .actions {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(auto-fill, minmax(7.5rem, max-content));
+    justify-content: start;
+    padding-top: var(--space-2);
+  }
+}
+
+@container (max-width: 40rem) {
+  .details {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      'icon name'
+      'icon count'
+      'icon paths'
+      'icon status'
+      'actions actions';
+  }
+
+  .actions {
+    justify-content: start;
+    padding-top: var(--space-2);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .row {
+    transition:
+      background-color 200ms ease,
+      translate 200ms var(--ease-out);
+  }
+
+  .row:hover {
+    translate: 0 calc(-1 * var(--space-0) / 2);
+  }
+
+  .backdrop {
+    transition: opacity 300ms ease-out;
+  }
 }
 
 .empty {
@@ -157,30 +276,25 @@
 }
 
 .emptyTitle {
-  font-family: var(--font-display);
-  font-size: var(--font-size-hero);
-  font-weight: 400;
-  line-height: var(--line-tight);
   color: var(--color-bark);
 }
 
 @media (max-width: 48rem) {
   .header {
     grid-template-columns: minmax(0, 1fr);
-    justify-items: start;
-  }
-
-  .details {
-    grid-template-columns: auto minmax(0, 1fr);
     grid-template-areas:
-      'icon name'
-      '. count'
-      '. paths'
-      '. status'
-      '. actions';
+      'title'
+      'summary'
+      'add';
   }
 
-  .count {
+  .add {
     justify-self: start;
+  }
+}
+
+@media (max-width: 30rem) {
+  .details {
+    padding: var(--space-3);
   }
 }

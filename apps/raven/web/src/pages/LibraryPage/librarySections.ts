@@ -1,4 +1,4 @@
-import { type LibraryKind, matchTypeFor } from '@raven/core'
+import { type Library, type LibraryKind, matchTypeFor } from '@raven/core'
 
 /**
  * The tabs of a library's page, in order. Each but All is its own address
@@ -24,22 +24,38 @@ const matchedToMovies = (kind: LibraryKind): boolean => matchTypeFor(kind) === '
 
 const matched = (kind: LibraryKind): boolean => matchTypeFor(kind) != null
 
+/** What a tab's count reads from: the counts the library itself carries. */
+type Counted = Pick<Library, 'itemCount' | 'unmatchedCount'>
+
+/** A tab whose count would take its own listing to read, so it shows none. */
+const uncounted = (): number | null => null
+
 /**
- * What each tab is called, and which types of library have it: Sagas and
- * Duplicates only where files are matched to movies, and Not matched
- * wherever files are matched at all.
+ * What each tab is called, which types of library have it, and the count
+ * beside it. Sagas and Duplicates are only where files are matched to
+ * movies, and Not matched wherever files are matched at all. Only All and
+ * Not matched are counted, from the library's own counts, Not matched while
+ * it holds any; every other count would take that tab's listing to read.
  */
 export const SECTIONS = {
-  all: { label: 'All', isFor: always },
-  'in-progress': { label: 'In progress', isFor: always },
-  favourites: { label: 'Favourites', isFor: always },
-  sagas: { label: 'Sagas', isFor: matchedToMovies },
-  'not-matched': { label: 'Not matched', isFor: matched },
-  duplicates: { label: 'Duplicates', isFor: matchedToMovies },
-  finished: { label: 'Recently finished', isFor: always },
+  all: { label: 'All', isFor: always, count: (library: Counted) => library.itemCount },
+  'in-progress': { label: 'In progress', isFor: always, count: uncounted },
+  favourites: { label: 'Favourites', isFor: always, count: uncounted },
+  sagas: { label: 'Sagas', isFor: matchedToMovies, count: uncounted },
+  'not-matched': {
+    label: 'Not matched',
+    isFor: matched,
+    count: (library: Counted) => (library.unmatchedCount > 0 ? library.unmatchedCount : null),
+  },
+  duplicates: { label: 'Duplicates', isFor: matchedToMovies, count: uncounted },
+  finished: { label: 'Recently finished', isFor: always, count: uncounted },
 } as const satisfies Record<
   LibrarySection,
-  { label: string; isFor: (kind: LibraryKind) => boolean }
+  {
+    label: string
+    isFor: (kind: LibraryKind) => boolean
+    count: (library: Counted) => number | null
+  }
 >
 
 /** Whether a library of `kind` has the tab. */

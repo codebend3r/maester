@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'bun:test'
 import {
+  LIBRARY_SECTIONS,
   type LibrarySection,
+  SECTIONS,
   sectionFrom,
   sectionPath,
   sectionsFor,
@@ -42,5 +44,13 @@ describe('the tabs of a library', () => {
   it("puts All at the library's own address and every other tab beneath it", () => {
     expect(sectionPath({ libraryId: 4, section: 'all' })).toBe('/libraries/4')
     expect(sectionPath({ libraryId: 4, section: 'not-matched' })).toBe('/libraries/4/not-matched')
+  })
+
+  it("counts All and Not matched from the library's own counts, and no other tab", () => {
+    const counts = { itemCount: 1204, unmatchedCount: 3 }
+    const countOf = (section: LibrarySection) => SECTIONS[section].count(counts)
+    expect(LIBRARY_SECTIONS.map(countOf)).toEqual([1204, null, null, null, 3, null, null])
+    expect(SECTIONS['not-matched'].count({ itemCount: 1204, unmatchedCount: 0 })).toBeNull()
+    expect(SECTIONS.all.count({ itemCount: 0, unmatchedCount: 0 })).toBe(0)
   })
 })

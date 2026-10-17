@@ -17,7 +17,7 @@ import {
   viewsFor,
 } from '@raven/core'
 import { useId } from 'react'
-import { Button } from '@raven/ui'
+import { Button, Icon } from '@raven/ui'
 import type { IconName } from '@raven/ui'
 import { SearchField } from '@/components/SearchField/SearchField'
 import { SelectButton } from '@/components/SelectButton/SelectButton'
@@ -64,7 +64,9 @@ const DirectionButton = ({
   const labels = DIRECTIONS[field]
   return (
     <Button
+      tone="ghost"
       icon={direction}
+      className={styles.direction}
       title={`Sort ${labels[reversedDirection(direction)].toLowerCase()} instead`}
       onClick={() => onChange({ sort: reversedSort(settings.sort) })}
     >
@@ -89,13 +91,14 @@ const GROUPINGS: Record<MediaGroupBy, string> = {
 }
 
 /**
- * Search, then how the library is ordered and laid out: what it is sorted
- * on, and beside it which way, where that means something. Sort, view and
- * grouping are the library's own settings, already coherent with its type,
- * so the options are its type's: `onChange` gets just the one that changed.
- * Group by shows only in the grouped view. Play and Shuffle are
- * always there, and wait until there is something to play; Select starts
- * select mode in the scope the toolbar sits in.
+ * Two rows: search, then what the library is sorted on and beside it which
+ * way, where that means something, and the grouping in the grouped view;
+ * under them Play, Shuffle and Select, and at the far end the views as one
+ * segmented control. Sort, view and grouping are the library's own
+ * settings, already coherent with its type, so the options are its type's:
+ * `onChange` gets just the one that changed. Play and Shuffle are always
+ * there, and wait until there is something to play; Select starts select
+ * mode in the scope the toolbar sits in.
  */
 export const LibraryToolbar = ({
   name,
@@ -117,20 +120,23 @@ export const LibraryToolbar = ({
   const ids = { search: useId(), sort: useId(), group: useId() }
   return (
     <search className={styles.toolbar}>
-      <div className={styles.search}>
-        <label htmlFor={ids.search} className="visually-hidden">
-          Search {name}
-        </label>
-        <SearchField
-          id={ids.search}
-          search={search}
-          className={styles.input}
-          placeholder={`Search ${name}`}
-        />
-      </div>
+      <div className={styles.find}>
+        <div className={styles.search}>
+          <label htmlFor={ids.search} className="visually-hidden">
+            Search {name}
+          </label>
+          <span className={styles.searchIcon}>
+            <Icon name="search" size={18} />
+          </span>
+          <SearchField
+            id={ids.search}
+            search={search}
+            className={styles.input}
+            placeholder={`Search ${name}`}
+          />
+        </div>
 
-      <div className={styles.options}>
-        <div className={styles.field}>
+        <div className={`${styles.picker} ${styles.sort}`}>
           <label htmlFor={ids.sort} className={styles.label}>
             Sort
           </label>
@@ -149,10 +155,11 @@ export const LibraryToolbar = ({
               </option>
             ))}
           </select>
-          <DirectionButton settings={settings} onChange={onChange} />
         </div>
+        <DirectionButton settings={settings} onChange={onChange} />
+
         {settings.view === 'grouped' && (
-          <div className={styles.field}>
+          <div className={`${styles.picker} ${styles.group}`}>
             <label htmlFor={ids.group} className={styles.label}>
               Group by
             </label>
@@ -172,6 +179,9 @@ export const LibraryToolbar = ({
             </select>
           </div>
         )}
+      </div>
+
+      <div className={styles.act}>
         <div className={styles.play}>
           <Button tone="primary" icon="play" disabled={!playable} onClick={onPlay}>
             Play
@@ -181,22 +191,23 @@ export const LibraryToolbar = ({
           </Button>
           <SelectButton />
         </div>
-      </div>
 
-      <fieldset className={styles.views}>
-        <legend className="visually-hidden">View</legend>
-        {viewsFor(settings.kind).map((view) => (
-          <Button
-            key={view}
-            icon={VIEWS[view].icon}
-            className={styles.view}
-            aria-label={VIEWS[view].label}
-            title={VIEWS[view].label}
-            aria-pressed={settings.view === view}
-            onClick={() => onChange({ view })}
-          />
-        ))}
-      </fieldset>
+        <fieldset className={styles.views}>
+          <legend className="visually-hidden">View</legend>
+          {viewsFor(settings.kind).map((view) => (
+            <Button
+              key={view}
+              tone="ghost"
+              icon={VIEWS[view].icon}
+              className={styles.view}
+              aria-label={VIEWS[view].label}
+              title={VIEWS[view].label}
+              aria-pressed={settings.view === view}
+              onClick={() => onChange({ view })}
+            />
+          ))}
+        </fieldset>
+      </div>
     </search>
   )
 }

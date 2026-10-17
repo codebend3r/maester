@@ -4,32 +4,59 @@
   gap: var(--space-0);
   color: var(--color-lichen);
   font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+// The bar first, what the scan is doing beside it; on a narrow screen the
+// words go under the bar.
+.scanning {
+  display: grid;
+  grid-template-columns: 12rem minmax(0, max-content);
+  grid-template-areas: 'bar note';
+  gap: var(--space-0) var(--space-2);
+  align-items: center;
+}
+
+.note {
+  grid-area: note;
+  color: var(--color-birch);
 }
 
 .bar {
-  width: 12rem;
-  max-width: 100%;
-  height: 3px;
+  grid-area: bar;
+  width: 100%;
+  height: var(--space-0);
   appearance: none;
   border: 0;
-  border-radius: 2px;
-  background: var(--color-moss);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-bark) 12%, transparent);
   overflow: hidden;
 
   &::-webkit-progress-bar {
-    background: var(--color-moss);
+    background: color-mix(in srgb, var(--color-bark) 12%, transparent);
   }
 
   &::-webkit-progress-value {
-    background: var(--color-bark);
+    border-radius: var(--radius-pill);
+    background: var(--color-leaf-bright);
   }
 
   &::-moz-progress-bar {
-    background: var(--color-bark);
+    border-radius: var(--radius-pill);
+    background: var(--color-leaf-bright);
   }
 }
 
 .error {
   color: var(--color-bark);
   overflow-wrap: anywhere;
+}
+
+@media (max-width: 30rem) {
+  .scanning {
+    grid-template-columns: minmax(0, 12rem);
+    grid-template-areas:
+      'bar'
+      'note';
+  }
 }

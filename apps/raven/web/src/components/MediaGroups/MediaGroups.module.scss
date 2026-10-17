@@ -1,4 +1,5 @@
+// The buckets stacked, each ruled off from the next.
 .groups {
   display: grid;
-  gap: var(--space-3);
+  grid-template-columns: minmax(0, 1fr);
 }
