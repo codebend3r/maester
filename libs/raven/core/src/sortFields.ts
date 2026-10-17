@@ -2,6 +2,8 @@ import {
   type MediaSort,
   SORT_DIRECTIONS,
   SORT_FIELDS,
+  SORT_FIELD_NAMES,
+  SORT_FIELD_TYPES,
   type SortDirection,
   type SortFieldName,
   fieldSorts,
@@ -13,7 +15,11 @@ export type SortField = (typeof SORT_FIELDS)[SortFieldName]
 
 /** The fields that run either way, which every field but Random does. */
 export type DirectedSortFieldName = {
-  [Name in SortFieldName]: (typeof SORT_FIELDS)[Name] extends { type: 'directed' } ? Name : never
+  [Name in SortFieldName]: (typeof SORT_FIELDS)[Name] extends {
+    type: typeof SORT_FIELD_TYPES.directed
+  }
+    ? Name
+    : never
 }[SortFieldName]
 
 /** A sort as its field and the way it runs; a field with no way to it, as Random, has none. */
@@ -22,7 +28,7 @@ export type SortParts =
   | { field: Exclude<SortFieldName, DirectedSortFieldName>; direction: null }
 
 const isDirected = (name: SortFieldName): name is DirectedSortFieldName =>
-  SORT_FIELDS[name].type === 'directed'
+  SORT_FIELDS[name].type === SORT_FIELD_TYPES.directed
 
 /** A sort as its field, and its direction when the field has one. */
 export const sortParts = (sort: MediaSort): SortParts => {
@@ -47,13 +53,13 @@ export const sortOf = ({
   direction: SortDirection
 }): MediaSort => {
   const rule: SortField = SORT_FIELDS[field]
-  return rule.type === 'directed' ? rule[direction] : rule.sort
+  return rule.type === SORT_FIELD_TYPES.directed ? rule[direction] : rule.sort
 }
 
 /** A field as a library first sorts on it: in the direction it starts in. */
 export const startingSort = (field: SortFieldName): MediaSort => {
   const rule: SortField = SORT_FIELDS[field]
-  return rule.type === 'directed' ? rule[rule.start] : rule.sort
+  return rule.type === SORT_FIELD_TYPES.directed ? rule[rule.start] : rule.sort
 }
 
 const REVERSED_DIRECTIONS = {

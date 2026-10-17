@@ -46,13 +46,15 @@ export const groupFolderOf = ({
   if (top == null) return null
   if (isLetterFolder(top)) return isSeasonFolder(second) ? null : top
   if (second == null) return null
-  if (type === 'show') return !isSeasonFolder(second) && isSeasonFolder(third) ? top : null
+  if (type === ITEM_TYPES.show) return !isSeasonFolder(second) && isSeasonFolder(third) ? top : null
   return yearOf(top) == null && yearOf(second) != null ? top : null
 }
 
 /** What a library path is, from the group folders its files were found in. */
 export const describeLayout = (groupFolders: readonly string[]): PathLayout => {
   const distinct = [...new Set(groupFolders)]
-  if (distinct.length === 0) return 'flat'
-  return distinct.filter(isLetterFolder).length * 2 >= distinct.length ? 'lettered' : 'grouped'
+  if (distinct.length === 0) return PATH_LAYOUTS.flat
+  return distinct.filter(isLetterFolder).length * 2 >= distinct.length
+    ? PATH_LAYOUTS.lettered
+    : PATH_LAYOUTS.grouped
 }

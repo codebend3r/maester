@@ -30,7 +30,9 @@ import { MAX_WATCH_TARGETS } from '@/watched'
  * A scan first walks the library's paths for videos, then indexes what it
  * found; `idle` between scans.
  */
-export const isScanState = oneOf(['idle', 'walking', 'indexing'])
+export const SCAN_STATES = { idle: 'idle', walking: 'walking', indexing: 'indexing' } as const
+
+export const isScanState = oneOf(Object.values(SCAN_STATES))
 
 export type ScanState = Infer<typeof isScanState>
 
@@ -187,7 +189,9 @@ type SortFieldRule = (typeof SORT_FIELDS)[SortFieldName]
 /** A field's sorts: one for each way it runs, or the one of a field with no way to it. */
 export const fieldSorts = (name: SortFieldName): MediaSort[] => {
   const field: SortFieldRule = SORT_FIELDS[name]
-  return field.type === 'directed' ? [field.ascending, field.descending] : [field.sort]
+  return field.type === SORT_FIELD_TYPES.directed
+    ? [field.ascending, field.descending]
+    : [field.sort]
 }
 
 export const LIBRARY_VIEWS = {
@@ -357,14 +361,16 @@ export const isLibraryViewChange = exactPartial({
 
 export type LibraryViewChange = Infer<typeof isLibraryViewChange>
 
+export const LIBRARY_BACKDROP_TYPES = { item: 'item', thumbnail: 'thumbnail' } as const
+
 /**
  * The picture that stands for a library's newest video: the backdrop of its
  * movie or show (an episode's comes from its show), else the video's own
  * thumbnail. `item` names the movie or show, `thumbnail` the video.
  */
 export const isLibraryBackdrop = union(
-  object({ type: oneOf(['item']), id: isNumber, version: isString }),
-  object({ type: oneOf(['thumbnail']), id: isNumber, version: isNumber }),
+  object({ type: oneOf([LIBRARY_BACKDROP_TYPES.item]), id: isNumber, version: isString }),
+  object({ type: oneOf([LIBRARY_BACKDROP_TYPES.thumbnail]), id: isNumber, version: isNumber }),
 )
 
 export type LibraryBackdrop = Infer<typeof isLibraryBackdrop>
@@ -441,14 +447,16 @@ export const isItemType = oneOf(Object.values(ITEM_TYPES))
 export type ItemType = Infer<typeof isItemType>
 
 /** What Fix match and matching look files up as on TMDB, and what Edit images chooses pictures for. */
-export const isMatchItemType = oneOf(['movie', 'show'] satisfies ItemType[])
+export const isMatchItemType = oneOf([ITEM_TYPES.movie, ITEM_TYPES.show])
 
 export type MatchItemType = Infer<typeof isMatchItemType>
 
+/** Rotten Tomatoes and Metacritic are critics; TMDB and IMDb are audiences. */
+export const RATING_KINDS = { critic: 'critic', audience: 'audience' } as const
+
 export const isRating = object({
   source: isRatingSource,
-  /** Rotten Tomatoes and Metacritic are critics; TMDB and IMDb are audiences. */
-  kind: oneOf(['critic', 'audience']),
+  kind: oneOf(Object.values(RATING_KINDS)),
   /** Out of 10. */
   value: isNumber,
   votes: nullable(isNumber),
@@ -545,7 +553,16 @@ export type MediaItem = Infer<typeof isMediaItem>
 
 export const isMediaList = listOf(isMediaItem)
 
-export const isCreditJob = oneOf(['cast', 'guest', 'director', 'writer', 'creator', 'producer'])
+export const CREDIT_JOBS = {
+  cast: 'cast',
+  guest: 'guest',
+  director: 'director',
+  writer: 'writer',
+  creator: 'creator',
+  producer: 'producer',
+} as const
+
+export const isCreditJob = oneOf(Object.values(CREDIT_JOBS))
 
 export type CreditJob = Infer<typeof isCreditJob>
 
@@ -580,7 +597,7 @@ export type Review = Infer<typeof isReview>
 /** A season on its show's page: its card, and how many of its episodes are on disk. */
 export const isSeasonSummary = object({
   ...isItemSummary.shape,
-  type: oneOf(['season']),
+  type: oneOf([ITEM_TYPES.season]),
   /** Its episodes with a file this browser may see. */
   episodeCount: isNumber,
   /** Of `episodeCount`, those watched. */
@@ -592,7 +609,7 @@ export type SeasonSummary = Infer<typeof isSeasonSummary>
 /** An episode on its season's page: what its row shows, and the file Play starts. */
 export const isEpisodeSummary = object({
   ...isItemSummary.shape,
-  type: oneOf(['episode']),
+  type: oneOf([ITEM_TYPES.episode]),
   summary: nullable(isString),
   released: nullable(isString),
   /** Minutes, from TMDB; the row prefers the file's own length. */
@@ -682,14 +699,20 @@ export const isShowListing = object({
 
 export type ShowListing = Infer<typeof isShowListing>
 
+export const HOME_SHELF_TYPES = { shows: 'shows', media: 'media' } as const
+
 /**
  * A library's row on the home page: a pinned library's newest arrivals,
  * newest first, or what a search found in it, by title. A TV shows library
  * gives its shows; any other library gives its videos.
  */
 export const isHomeShelf = union(
-  object({ libraryId: isNumber, type: oneOf(['shows']), shows: listOf(isShowEntry) }),
-  object({ libraryId: isNumber, type: oneOf(['media']), media: isMediaList }),
+  object({
+    libraryId: isNumber,
+    type: oneOf([HOME_SHELF_TYPES.shows]),
+    shows: listOf(isShowEntry),
+  }),
+  object({ libraryId: isNumber, type: oneOf([HOME_SHELF_TYPES.media]), media: isMediaList }),
 )
 
 export type HomeShelf = Infer<typeof isHomeShelf>
@@ -794,7 +817,9 @@ export type Duplicates = Infer<typeof isDuplicates>
  * How a card's files are split: `apart` gives each its own card; `smart`
  * gives each cut its own, keeping the files of one cut together.
  */
-export const isSplitHow = oneOf(['apart', 'smart'])
+export const SPLIT_HOWS = { apart: 'apart', smart: 'smart' } as const
+
+export const isSplitHow = oneOf(Object.values(SPLIT_HOWS))
 
 export type SplitHow = Infer<typeof isSplitHow>
 
@@ -870,9 +895,12 @@ export const POSTER_WIDTHS = isPosterWidth.values
 export const posterWidthFrom = (param: unknown): PosterWidth | null =>
   POSTER_WIDTHS.find((width) => String(width) === param) ?? null
 
+/** Where a picture comes from: a file beside the media, or TMDB. */
+export const IMAGE_SOURCES = { local: 'local', tmdb: 'tmdb' } as const
+
 /** One picture a movie or show could show: a file beside the media, or one of TMDB's. */
 export const isImageOption = object({
-  source: oneOf(['local', 'tmdb']),
+  source: oneOf(Object.values(IMAGE_SOURCES)),
   /** The file's path for `local`; TMDB's path for `tmdb`, served through `imageOptionUrl`. */
   ref: isString,
   width: nullable(isNumber),
@@ -900,19 +928,32 @@ export type ChoosableImageKind = keyof ItemImageOptions
 
 /** What Edit images picks: one of TMDB's pictures, or the one beside the media. */
 export const isImageChoice = union(
-  object({ source: oneOf(['tmdb']), ref: isString }),
-  object({ source: oneOf(['local']) }),
+  object({ source: oneOf([IMAGE_SOURCES.tmdb]), ref: isString }),
+  object({ source: oneOf([IMAGE_SOURCES.local]) }),
 )
 
 export type ImageChoice = Infer<typeof isImageChoice>
 
+export const DIRECT_PLAYS = { auto: 'auto', force: 'force' } as const
+
+export const TRANSCODINGS = { on: 'on', remuxOnly: 'remuxOnly', off: 'off' } as const
+
+const QUALITIES = { low: 'low', medium: 'medium', high: 'high' } as const
+
+export const HW_ACCELS = {
+  auto: 'auto',
+  videotoolbox: 'videotoolbox',
+  vaapi: 'vaapi',
+  none: 'none',
+} as const
+
 /** The values each playback setting takes. */
 export const PLAYBACK_CHOICES = {
-  directPlay: ['auto', 'force'],
-  transcoding: ['on', 'remuxOnly', 'off'],
+  directPlay: Object.values(DIRECT_PLAYS),
+  transcoding: Object.values(TRANSCODINGS),
   maxHeight: [2160, 1080, 720],
-  quality: ['low', 'medium', 'high'],
-  hwAccel: ['auto', 'videotoolbox', 'vaapi', 'none'],
+  quality: Object.values(QUALITIES),
+  hwAccel: Object.values(HW_ACCELS),
 } as const
 
 export const isHwAccel = oneOf(PLAYBACK_CHOICES.hwAccel)
@@ -947,18 +988,24 @@ export const isPlaybackSettings = object({
 export type PlaybackSettings = Infer<typeof isPlaybackSettings>
 
 export const DEFAULT_PLAYBACK_SETTINGS: PlaybackSettings = {
-  directPlay: 'auto',
-  transcoding: 'on',
+  directPlay: DIRECT_PLAYS.auto,
+  transcoding: TRANSCODINGS.on,
   maxHeight: 1080,
-  quality: 'medium',
-  hwAccel: 'auto',
+  quality: QUALITIES.medium,
+  hwAccel: HW_ACCELS.auto,
   tonemap: true,
 }
 
 /** A change sends any of the fields; each given must be a value the setting takes. */
 export const isPlaybackSettingsChange = exactPartial(isPlaybackSettings.shape)
 
-export const isEncoderKind = oneOf(['software', 'vaapi', 'videotoolbox'])
+export const ENCODER_KINDS = {
+  software: 'software',
+  vaapi: 'vaapi',
+  videotoolbox: 'videotoolbox',
+} as const
+
+export const isEncoderKind = oneOf(Object.values(ENCODER_KINDS))
 
 /** What transcodes encode with: the CPU, or a GPU through VAAPI or VideoToolbox. */
 export type EncoderKind = Infer<typeof isEncoderKind>
@@ -980,7 +1027,7 @@ export const TITLE_DISPLAYS = { logo: 'logo', text: 'text' } as const
 
 /** The values each display setting takes. */
 export const DISPLAY_CHOICES = {
-  titles: ['logo', 'text'],
+  titles: Object.values(TITLE_DISPLAYS),
 } as const
 
 /** How pages look, set once for every viewer in Settings. */
@@ -1053,10 +1100,12 @@ export type MatchCandidate = Infer<typeof isMatchCandidate>
 
 export const isMatchCandidateList = listOf(isMatchCandidate)
 
+export const MATCH_SUBJECT_KINDS = { media: 'media', item: 'item' } as const
+
 /** What a Fix match search is for: a file (and the show folder it is in), or a matched show. */
 export const isMatchSubject = union(
-  object({ kind: oneOf(['media']), id: isNumber }),
-  object({ kind: oneOf(['item']), id: isNumber }),
+  object({ kind: oneOf([MATCH_SUBJECT_KINDS.media]), id: isNumber }),
+  object({ kind: oneOf([MATCH_SUBJECT_KINDS.item]), id: isNumber }),
 )
 
 export type MatchSubject = Infer<typeof isMatchSubject>
@@ -1124,9 +1173,11 @@ export const isMetadataHealth = object({
 
 export type MetadataHealth = Infer<typeof isMetadataHealth>
 
+export const HEALTH_STATUSES = { ok: 'ok' } as const
+
 /** What `/api/health` answers: the server is up, and how its parts are doing. */
 export const isServerHealth = object({
-  status: oneOf(['ok']),
+  status: oneOf(Object.values(HEALTH_STATUSES)),
   /** null when ffmpeg is missing, in which case nothing but direct play works. */
   ffmpeg: nullable(isString),
   /** Whether HDR thumbnails and transcodes get tone mapped to SDR. */
@@ -1179,9 +1230,9 @@ export const ADMIN_LOCK_STATES = { on: 'on', turningOn: 'turningOn', off: 'off' 
  * answer) before it holds, and until then it goes off again with no password.
  */
 export const isAdminLock = union(
-  object({ state: oneOf(['on']), available: isBoolean }),
-  object({ state: oneOf(['turningOn']), remainingMs: isNumber }),
-  object({ state: oneOf(['off']) }),
+  object({ state: oneOf([ADMIN_LOCK_STATES.on]), available: isBoolean }),
+  object({ state: oneOf([ADMIN_LOCK_STATES.turningOn]), remainingMs: isNumber }),
+  object({ state: oneOf([ADMIN_LOCK_STATES.off]) }),
 )
 
 export type AdminLock = Infer<typeof isAdminLock>
@@ -1193,12 +1244,14 @@ export const isMediaLocation = object({
 
 export type MediaLocation = Infer<typeof isMediaLocation>
 
+export const SERVER_EVENT_TYPES = { library: 'library' } as const
+
 /**
  * What the server tells a client as it happens: a library's videos changed,
  * so whatever shows them should be read again.
  */
 export const isServerEvent = object({
-  type: oneOf(['library']),
+  type: oneOf(Object.values(SERVER_EVENT_TYPES)),
   libraryId: isNumber,
 })
 
@@ -1234,9 +1287,11 @@ export const isAudioTrack = object({
 
 export type AudioTrack = Infer<typeof isAudioTrack>
 
-export const isSubtitleSource = oneOf(['embedded', 'external'])
-
 /** Embedded in the video file, or a file of its own beside it. */
+export const SUBTITLE_SOURCES = { embedded: 'embedded', external: 'external' } as const
+
+export const isSubtitleSource = oneOf(Object.values(SUBTITLE_SOURCES))
+
 export type SubtitleSource = Infer<typeof isSubtitleSource>
 
 export const isSubtitleTrack = object({
@@ -1270,7 +1325,14 @@ export const isMediaTracks = object({
 export type MediaTracks = Infer<typeof isMediaTracks>
 
 /** How the picture's light is encoded: plain SDR, or one of the HDR formats. */
-export const isVideoRange = oneOf(['sdr', 'hdr10', 'hlg', 'dolbyVision'])
+export const VIDEO_RANGES = {
+  sdr: 'sdr',
+  hdr10: 'hdr10',
+  hlg: 'hlg',
+  dolbyVision: 'dolbyVision',
+} as const
+
+export const isVideoRange = oneOf(Object.values(VIDEO_RANGES))
 
 export type VideoRange = Infer<typeof isVideoRange>
 
@@ -1320,15 +1382,17 @@ export type SubtitleCue = {
   text: string
 }
 
-export const isPlaybackMode = oneOf(['direct', 'remux', 'transcode'])
-
 /**
  * How a file reaches the player: the original bytes, a remux with the video
  * copied and the audio converted, or a full conversion of both.
  */
+export const PLAYBACK_MODES = { direct: 'direct', remux: 'remux', transcode: 'transcode' } as const
+
+export const isPlaybackMode = oneOf(Object.values(PLAYBACK_MODES))
+
 export type PlaybackMode = Infer<typeof isPlaybackMode>
 
-export const isStreamMode = oneOf(['remux', 'transcode']) satisfies Guard<PlaybackMode>
+export const isStreamMode = oneOf([PLAYBACK_MODES.remux, PLAYBACK_MODES.transcode])
 
 /** The two ways the server can convert a file on the fly. */
 export type StreamMode = Infer<typeof isStreamMode>
@@ -1336,7 +1400,9 @@ export type StreamMode = Infer<typeof isStreamMode>
 export const STREAM_MODES = isStreamMode.values
 
 /** How far an origin reaches: the home network, the tailnet or the open internet. */
-export const isMediaOriginKind = oneOf(['lan', 'tailnet', 'public'])
+const MEDIA_ORIGIN_KINDS = { lan: 'lan', tailnet: 'tailnet', public: 'public' } as const
+
+export const isMediaOriginKind = oneOf(Object.values(MEDIA_ORIGIN_KINDS))
 
 export type MediaOriginKind = Infer<typeof isMediaOriginKind>
 
@@ -1386,14 +1452,20 @@ export const isFavouriteChange = object({
 
 export type FavouriteChange = Infer<typeof isFavouriteChange>
 
+export const WATCH_TARGET_KINDS = { media: 'media', item: 'item' } as const
+
 /**
  * What `PUT /api/watched` marks: the card a file is on, or every card under
  * an item (a show, season, episode or movie) in one library, or in every
  * library the viewer may see when `libraryId` is null.
  */
 export const isWatchTarget = union(
-  object({ kind: oneOf(['media']), id: isNumber }),
-  object({ kind: oneOf(['item']), id: isNumber, libraryId: nullable(isNumber) }),
+  object({ kind: oneOf([WATCH_TARGET_KINDS.media]), id: isNumber }),
+  object({
+    kind: oneOf([WATCH_TARGET_KINDS.item]),
+    id: isNumber,
+    libraryId: nullable(isNumber),
+  }),
 )
 
 export type WatchTarget = Infer<typeof isWatchTarget>

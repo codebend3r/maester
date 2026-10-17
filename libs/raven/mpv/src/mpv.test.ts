@@ -1,28 +1,45 @@
 import { describe, expect, test } from 'bun:test'
-import { openMpv, type MpvEvent } from '@/mpv'
+import {
+  MPV_COMMANDS,
+  MPV_END_FILE_REASONS,
+  MPV_EVENTS,
+  MPV_SURFACE_KINDS,
+  NATIVE_MESSAGES,
+  openMpv,
+  type MpvEvent,
+} from '@/mpv'
+import { MPV_CHOICES, MPV_PROPERTIES } from '@/properties'
+
+/** Commands only this fake engine knows: each makes it answer, or not, in its own way. */
+const FAKE_COMMANDS = { throw: 'throw', pending: 'pending', fail: 'fail', ok: 'ok' } as const
 
 const fixture = ({ version = 'mpv 0.41.0', apiVersion = 131077 } = {}) => {
   let receive = (_event: unknown) => {}
   let destroys = 0
   const calls: unknown[] = []
   const values = new Map<string, unknown>([
-    ['mpv-version', version],
-    ['pause', true],
+    [MPV_PROPERTIES.mpvVersion, version],
+    [MPV_PROPERTIES.pause, true],
   ])
   const emit = (event: unknown) => receive(event)
   const native = {
     command: (id: number, args: string[]) => {
       calls.push({ command: args })
-      if (args[0] === 'throw') throw new Error('command refused')
-      if (args[0] !== 'pending')
-        emit({ type: 'reply', id, error: args[0] === 'fail' ? -4 : 0, data: null })
+      if (args[0] === FAKE_COMMANDS.throw) throw new Error('command refused')
+      if (args[0] !== FAKE_COMMANDS.pending)
+        emit({
+          type: NATIVE_MESSAGES.reply,
+          id,
+          error: args[0] === FAKE_COMMANDS.fail ? -4 : 0,
+          data: null,
+        })
     },
     get: (id: number, name: string) => {
-      emit({ type: 'reply', id, error: 0, data: values.get(name) })
+      emit({ type: NATIVE_MESSAGES.reply, id, error: 0, data: values.get(name) })
     },
     set: (id: number, name: string, value: string | boolean | number) => {
       calls.push({ name, value })
-      emit({ type: 'reply', id, error: 0, data: null })
+      emit({ type: NATIVE_MESSAGES.reply, id, error: 0, data: null })
     },
     observe: (name: string) => {
       calls.push({ observe: name })
@@ -42,7 +59,7 @@ const fixture = ({ version = 'mpv 0.41.0', apiVersion = 131077 } = {}) => {
   })
   const open = () =>
     openMpv({
-      surface: { kind: 'headless' },
+      surface: { kind: MPV_SURFACE_KINDS.headless },
       onEvent: (event) => {
         events.push(event)
       },
@@ -55,7 +72,7 @@ describe('mpv wrapper native boundary (no libmpv loaded)', () => {
   test('rejects missing, malformed, incompatible and outdated native engines', async () => {
     await expect(
       openMpv({
-        surface: { kind: 'headless' },
+        surface: { kind: MPV_SURFACE_KINDS.headless },
         onEvent: () => {},
         loadAddon: () => {
           throw new Error('missing addon')
@@ -63,7 +80,11 @@ describe('mpv wrapper native boundary (no libmpv loaded)', () => {
       }),
     ).rejects.toThrow('missing addon')
     await expect(
-      openMpv({ surface: { kind: 'headless' }, onEvent: () => {}, loadAddon: () => ({}) }),
+      openMpv({
+        surface: { kind: MPV_SURFACE_KINDS.headless },
+        onEvent: () => {},
+        loadAddon: () => ({}),
+      }),
     ).rejects.toThrow('Invalid raven mpv addon')
     await expect(fixture({ apiVersion: 65540 }).open()).rejects.toThrow('client API')
     await expect(fixture({ apiVersion: 131077.5 }).open()).rejects.toThrow('client API')
@@ -73,12 +94,12 @@ describe('mpv wrapper native boundary (no libmpv loaded)', () => {
     expect(outdated.destroyed()).toBe(1)
     await expect(fixture({ version: 'invalid' }).open()).rejects.toThrow('0.40')
     const malformed = fixture()
-    malformed.values.set('mpv-version', 4)
+    malformed.values.set(MPV_PROPERTIES.mpvVersion, 4)
     await expect(malformed.open()).rejects.toThrow('Invalid mpv property')
     expect(malformed.destroyed()).toBe(1)
     await expect(
       openMpv({
-        surface: { kind: 'headless' },
+        surface: { kind: MPV_SURFACE_KINDS.headless },
         onEvent: () => {},
         loadAddon: () => ({ apiVersion: 131077, create: () => ({}) }),
       }),
@@ -103,20 +124,22 @@ describe('mpv wrapper native boundary (no libmpv loaded)', () => {
     const player = await value.open()
     try {
       expect(player.version).toBe('mpv 0.41.0')
-      expect(await player.read({ name: 'pause' })).toBe(true)
-      await player.command({ args: ['seek', '4', 'absolute'] })
-      await player.set({ name: 'volume', value: 50 })
-      player.observe({ name: 'pause' })
+      expect(await player.read({ name: MPV_PROPERTIES.pause })).toBe(true)
+      await player.command({ args: [MPV_COMMANDS.seek, '4', 'absolute'] })
+      await player.set({ name: MPV_PROPERTIES.speed, value: 2 })
+      player.observe({ name: MPV_PROPERTIES.pause })
       expect(value.calls).toEqual([
-        { command: ['seek', '4', 'absolute'] },
-        { name: 'volume', value: 50 },
-        { observe: 'pause' },
+        { command: [MPV_COMMANDS.seek, '4', 'absolute'] },
+        { name: MPV_PROPERTIES.speed, value: 2 },
+        { observe: MPV_PROPERTIES.pause },
       ])
-      await expect(player.command({ args: ['fail'] })).rejects.toThrow('-4')
-      await expect(player.command({ args: ['throw'] })).rejects.toThrow('refused')
-      value.values.set('pause', 'yes')
-      await expect(player.read({ name: 'pause' })).rejects.toThrow('Invalid mpv property: pause')
-      await expect(player.set({ name: 'volume', value: Number.NaN })).rejects.toThrow(
+      await expect(player.command({ args: [FAKE_COMMANDS.fail] })).rejects.toThrow('-4')
+      await expect(player.command({ args: [FAKE_COMMANDS.throw] })).rejects.toThrow('refused')
+      value.values.set(MPV_PROPERTIES.pause, 'yes')
+      await expect(player.read({ name: MPV_PROPERTIES.pause })).rejects.toThrow(
+        'Invalid mpv property: pause',
+      )
+      await expect(player.set({ name: MPV_PROPERTIES.speed, value: Number.NaN })).rejects.toThrow(
         'Invalid mpv property value',
       )
       expect(player.display()).toEqual({ refreshRate: 60, edrHeadroom: 1, sortRepairs: 2 })
@@ -132,26 +155,30 @@ describe('mpv wrapper native boundary (no libmpv loaded)', () => {
     const player = await value.open()
     try {
       const events: MpvEvent[] = [
-        { type: 'property', name: 'pause', data: true },
-        { type: 'file-loaded' },
-        { type: 'playback-restart' },
-        { type: 'end-file', reason: 'eof', error: 0 },
-        { type: 'log', level: 'warn', prefix: 'demux', text: 'warning' },
+        { type: MPV_EVENTS.property, name: MPV_PROPERTIES.pause, data: true },
+        { type: MPV_EVENTS.fileLoaded },
+        { type: MPV_EVENTS.playbackRestart },
+        { type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.eof, error: 0 },
+        { type: MPV_EVENTS.log, level: 'warn', prefix: 'demux', text: 'warning' },
       ]
       events.forEach(value.emit)
-      value.emit({ type: 'reply', id: 999, error: 0, data: null })
+      value.emit({ type: NATIVE_MESSAGES.reply, id: 999, error: 0, data: null })
       expect(value.events).toEqual(events)
-      const waiting = player.command({ args: ['pending'] })
+      const waiting = player.command({ args: [FAKE_COMMANDS.pending] })
       const rejected = waiting.then(
         () => null,
         (error: unknown) => error,
       )
-      value.emit({ type: 'property', name: 'pause', data: 'yes' })
+      value.emit({ type: MPV_EVENTS.property, name: MPV_PROPERTIES.pause, data: 'yes' })
       expect(await rejected).toEqual(new Error('Invalid native mpv event'))
-      value.emit({ type: 'property', name: 'unknown', data: 1 })
-      value.emit({ type: 'end-file', reason: 'eof', error: 'no' })
-      expect(value.events.slice(-3)).toEqual(
-        Array.from({ length: 3 }, () => ({ type: 'error', message: 'Invalid native mpv event' })),
+      value.emit({ type: MPV_EVENTS.property, name: 'unknown', data: 1 })
+      value.emit({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.eof, error: 'no' })
+      value.emit({ type: MPV_EVENTS.endFile, reason: 'unplugged', error: 0 })
+      expect(value.events.slice(-4)).toEqual(
+        Array.from({ length: 4 }, () => ({
+          type: MPV_EVENTS.error,
+          message: 'Invalid native mpv event',
+        })),
       )
     } finally {
       await player.destroy()
@@ -162,18 +189,22 @@ describe('mpv wrapper native boundary (no libmpv loaded)', () => {
     const value = fixture()
     const player = await value.open()
     try {
-      const waiting = player.command({ args: ['pending'] }).then(
+      const waiting = player.command({ args: [FAKE_COMMANDS.pending] }).then(
         () => null,
         (error: unknown) => error,
       )
       const choices = [
-        { type: 'property', name: 'aid', data: 'auto' },
-        { type: 'property', name: 'sid', data: 'auto' },
-        { type: 'property', name: 'aid', data: false },
-        { type: 'property', name: 'sid', data: false },
-        { type: 'property', name: 'target-colorspace-hint', data: false },
-        { type: 'property', name: 'target-colorspace-hint', data: true },
-        { type: 'property', name: 'target-colorspace-hint', data: 'auto' },
+        { type: MPV_EVENTS.property, name: MPV_PROPERTIES.aid, data: MPV_CHOICES.auto },
+        { type: MPV_EVENTS.property, name: MPV_PROPERTIES.sid, data: MPV_CHOICES.auto },
+        { type: MPV_EVENTS.property, name: MPV_PROPERTIES.aid, data: false },
+        { type: MPV_EVENTS.property, name: MPV_PROPERTIES.sid, data: false },
+        { type: MPV_EVENTS.property, name: MPV_PROPERTIES.targetColorspaceHint, data: false },
+        { type: MPV_EVENTS.property, name: MPV_PROPERTIES.targetColorspaceHint, data: true },
+        {
+          type: MPV_EVENTS.property,
+          name: MPV_PROPERTIES.targetColorspaceHint,
+          data: MPV_CHOICES.auto,
+        },
       ] as const
       await choices.reduce(async (previous, choice) => {
         await previous
@@ -182,7 +213,7 @@ describe('mpv wrapper native boundary (no libmpv loaded)', () => {
         expect(await player.read({ name: choice.name })).toBe(choice.data)
       }, Promise.resolve())
       // The version read uses id 1. Only this explicit reply should resolve id 2.
-      value.emit({ type: 'reply', id: 2, error: 0, data: null })
+      value.emit({ type: NATIVE_MESSAGES.reply, id: 2, error: 0, data: null })
       expect(await waiting).toBeNull()
       expect(value.events).toEqual([...choices])
     } finally {
@@ -196,51 +227,57 @@ describe('mpv wrapper native boundary (no libmpv loaded)', () => {
     const order: string[] = []
     value.events.splice(0)
     const pending = player
-      .command({ args: ['pending'], onReply: ({ isOk }) => order.push(`reply ${isOk}`) })
+      .command({
+        args: [FAKE_COMMANDS.pending],
+        onReply: ({ isOk }) => order.push(`reply ${isOk}`),
+      })
       .then(() => order.push('settled'))
     const sent = value.calls.at(-1)
-    expect(sent).toEqual({ command: ['pending'] })
+    expect(sent).toEqual({ command: [FAKE_COMMANDS.pending] })
     // The version read at open took id 1, so this command is id 2.
-    value.emit({ type: 'file-loaded' })
+    value.emit({ type: MPV_EVENTS.fileLoaded })
     order.push(`events ${value.events.length}`)
-    value.emit({ type: 'reply', id: 2, error: 0, data: null })
-    value.emit({ type: 'playback-restart' })
+    value.emit({ type: NATIVE_MESSAGES.reply, id: 2, error: 0, data: null })
+    value.emit({ type: MPV_EVENTS.playbackRestart })
     order.push(`events ${value.events.length}`)
     await pending
     expect(order).toEqual(['events 1', 'reply true', 'events 2', 'settled'])
 
     const failing: string[] = []
     await expect(
-      player.command({ args: ['fail'], onReply: ({ isOk }) => failing.push(`reply ${isOk}`) }),
+      player.command({
+        args: [FAKE_COMMANDS.fail],
+        onReply: ({ isOk }) => failing.push(`reply ${isOk}`),
+      }),
     ).rejects.toThrow('mpv request failed (-4)')
     expect(failing).toEqual(['reply false'])
 
     await expect(
       player.command({
-        args: ['ok'],
+        args: [FAKE_COMMANDS.ok],
         onReply: () => {
           throw new Error('listener broke')
         },
       }),
     ).rejects.toThrow('listener broke')
     // Still answers commands without a hook, as before.
-    await player.command({ args: ['ok'] })
+    await player.command({ args: [FAKE_COMMANDS.ok] })
     await player.destroy()
   })
 
   test('overflow and shutdown reject outstanding requests; destruction is idempotent', async () => {
     const value = fixture()
     const player = await value.open()
-    await ['overflow', 'shutdown'].reduce(async (previous, type) => {
+    await [MPV_EVENTS.overflow, MPV_EVENTS.shutdown].reduce(async (previous, type) => {
       await previous
-      const rejected = player.command({ args: ['pending'] }).then(
+      const rejected = player.command({ args: [FAKE_COMMANDS.pending] }).then(
         () => null,
         (error: unknown) => error,
       )
       value.emit({ type })
       expect(await rejected).toEqual(new Error(`mpv ${type}`))
     }, Promise.resolve())
-    const rejected = player.command({ args: ['pending'] }).then(
+    const rejected = player.command({ args: [FAKE_COMMANDS.pending] }).then(
       () => null,
       (error: unknown) => error,
     )
@@ -249,11 +286,11 @@ describe('mpv wrapper native boundary (no libmpv loaded)', () => {
     await first
     expect(await rejected).toEqual(new Error('mpv is destroyed'))
     expect(value.destroyed()).toBe(1)
-    await expect(player.read({ name: 'pause' })).rejects.toThrow('destroyed')
-    expect(() => player.observe({ name: 'pause' })).toThrow('destroyed')
+    await expect(player.read({ name: MPV_PROPERTIES.pause })).rejects.toThrow('destroyed')
+    expect(() => player.observe({ name: MPV_PROPERTIES.pause })).toThrow('destroyed')
     expect(() => player.display()).toThrow('destroyed')
     const before = value.events.length
-    value.emit({ type: 'file-loaded' })
+    value.emit({ type: MPV_EVENTS.fileLoaded })
     expect(value.events).toHaveLength(before)
   })
 })

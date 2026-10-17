@@ -12,9 +12,9 @@ import { sortParts } from '@/sortFields'
 type Fact = (args: { media: MediaItem; now: Date }) => string | null
 
 const added: Fact = ({ media, now }) =>
-  `Added ${timeAgo({ at: media.addedAt, now, style: 'long' })}`
+  `Added ${timeAgo({ at: media.addedAt, now, style: TIME_AGO_STYLES.long })}`
 const changed: Fact = ({ media, now }) =>
-  `Changed ${timeAgo({ at: media.changedAt, now, style: 'long' })}`
+  `Changed ${timeAgo({ at: media.changedAt, now, style: TIME_AGO_STYLES.long })}`
 const size: Fact = ({ media }) => formatBytes(media.size)
 const bitrate: Fact = ({ media }) => formatBitrate(media.bitrate)
 const resolution: Fact = ({ media }) => resolutionLabel(media)
@@ -64,17 +64,17 @@ export const showSortFact = ({
 }): string | null => {
   const { field } = sortParts(sort)
   switch (field) {
-    case 'added':
-      return `Added ${timeAgo({ at: entry.addedAt, now, style: 'long' })}`
-    case 'bitrate':
+    case SORT_FIELD_NAMES.added:
+      return `Added ${timeAgo({ at: entry.addedAt, now, style: TIME_AGO_STYLES.long })}`
+    case SORT_FIELD_NAMES.bitrate:
       return formatBitrate(entry.bitrate)
-    case 'title':
-    case 'changed':
-    case 'size':
-    case 'resolution':
-    case 'release':
-    case 'rating':
-    case 'random':
+    case SORT_FIELD_NAMES.title:
+    case SORT_FIELD_NAMES.changed:
+    case SORT_FIELD_NAMES.size:
+    case SORT_FIELD_NAMES.resolution:
+    case SORT_FIELD_NAMES.release:
+    case SORT_FIELD_NAMES.rating:
+    case SORT_FIELD_NAMES.random:
       return null
     default: {
       const unknown: never = field

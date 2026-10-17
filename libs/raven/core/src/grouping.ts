@@ -1,6 +1,6 @@
 import { RESOLUTIONS, resolutionLabel } from '@/media'
 import { codecLabel } from '@/playback'
-import type { MatchState, MediaGroupBy, MediaItem } from '@/contract'
+import { MATCH_STATES, type MatchState, type MediaGroupBy, type MediaItem } from '@/contract'
 
 /** One bucket of the grouped view, its videos in the order they came in. */
 export type MediaGroup = {
@@ -16,14 +16,18 @@ const UNPROBED = { key: 'unprobed', label: 'Not probed yet' }
 
 /** The match buckets in the order shown: what was found, what is still being looked up, what was not, and the rest. */
 const MATCHES: readonly { key: string; label: string; states: readonly MatchState[] }[] = [
-  { key: 'matched', label: 'Matched', states: ['matched', 'manual'] },
-  { key: 'pending', label: 'Matching', states: ['pending'] },
-  { key: 'unmatched', label: 'Not matched', states: ['unmatched'] },
-  { key: 'off', label: 'Extras and other files', states: ['off'] },
+  {
+    key: MATCH_STATES.matched,
+    label: 'Matched',
+    states: [MATCH_STATES.matched, MATCH_STATES.manual],
+  },
+  { key: MATCH_STATES.pending, label: 'Matching', states: [MATCH_STATES.pending] },
+  { key: MATCH_STATES.unmatched, label: 'Not matched', states: [MATCH_STATES.unmatched] },
+  { key: MATCH_STATES.off, label: 'Extras and other files', states: [MATCH_STATES.off] },
 ]
 
 const matchKey = (item: MediaItem): string =>
-  MATCHES.find((bucket) => bucket.states.includes(item.match))?.key ?? 'off'
+  MATCHES.find((bucket) => bucket.states.includes(item.match))?.key ?? MATCH_STATES.off
 
 const matchOrder = (key: string): number => MATCHES.findIndex((bucket) => bucket.key === key)
 

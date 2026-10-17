@@ -1,4 +1,12 @@
-import type { MediaItem, PlaybackMode, PlaybackSettings, StreamMode } from '@/contract'
+import {
+  DIRECT_PLAYS,
+  type MediaItem,
+  PLAYBACK_MODES,
+  type PlaybackMode,
+  type PlaybackSettings,
+  type StreamMode,
+  TRANSCODINGS,
+} from '@/contract'
 
 /**
  * Asks the client whether it can decode a MIME type such as
@@ -167,7 +175,7 @@ const STREAM_AUDIO = 'mp4a.40.2'
  */
 export const streamMimeType = ({ media, mode }: { media: MediaItem; mode: StreamMode }): string => {
   const video =
-    mode === 'transcode' || media.videoCodec == null
+    mode === PLAYBACK_MODES.transcode || media.videoCodec == null
       ? videoCodecString({ codec: 'h264', bitDepth: 8 })
       : videoCodecString({ codec: media.videoCodec, bitDepth: media.videoBitDepth })
   const codecs = [video, media.audioCodec == null ? null : STREAM_AUDIO].filter(
@@ -177,7 +185,11 @@ export const streamMimeType = ({ media, mode }: { media: MediaItem; mode: Stream
 }
 
 /** Best first: cheapest for the server and truest to the file. */
-const PLAYBACK_ORDER: readonly PlaybackMode[] = ['direct', 'remux', 'transcode']
+const PLAYBACK_ORDER: readonly PlaybackMode[] = [
+  PLAYBACK_MODES.direct,
+  PLAYBACK_MODES.remux,
+  PLAYBACK_MODES.transcode,
+]
 
 export type PlaybackPlan = {
   /**
@@ -221,17 +233,21 @@ export const planPlayback = ({
   const check = checkDirectPlay({ media, canPlay })
   const direct = check.playable && defaultAudio
   const remux =
-    policy.transcoding !== 'off' &&
+    policy.transcoding !== TRANSCODINGS.off &&
     (media.videoCodec == null || COPYABLE_VIDEO.has(media.videoCodec)) &&
-    canStream(streamMimeType({ media, mode: 'remux' }))
+    canStream(streamMimeType({ media, mode: PLAYBACK_MODES.remux }))
   const transcode =
-    policy.transcoding === 'on' && canStream(streamMimeType({ media, mode: 'transcode' }))
+    policy.transcoding === TRANSCODINGS.on &&
+    canStream(streamMimeType({ media, mode: PLAYBACK_MODES.transcode }))
   // Forced, the original file is sent whatever the check says. Only another
   // audio track, which the file cannot switch to, goes through a remux
   // first: the video stays as it is either way.
-  if (policy.directPlay === 'force') {
+  if (policy.directPlay === DIRECT_PLAYS.force) {
     return {
-      modes: !defaultAudio && remux ? ['remux', 'direct'] : ['direct'],
+      modes:
+        !defaultAudio && remux
+          ? [PLAYBACK_MODES.remux, PLAYBACK_MODES.direct]
+          : [PLAYBACK_MODES.direct],
       problems: check.problems,
     }
   }
@@ -240,7 +256,7 @@ export const planPlayback = ({
   // Without any way to convert, a file that would play as it is still
   // plays, on its default audio track.
   return {
-    modes: modes.length === 0 && check.playable ? ['direct'] : modes,
+    modes: modes.length === 0 && check.playable ? [PLAYBACK_MODES.direct] : modes,
     problems: check.problems,
   }
 }

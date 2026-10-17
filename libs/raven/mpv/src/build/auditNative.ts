@@ -1,8 +1,10 @@
 import { basename, resolve } from 'node:path'
 import { isRecord, isString, listOf, object } from '@raven/core'
 import { nodeHeaders } from '@/build/nodeHeaders'
+import { RPATHS } from '@/build/linkage'
 import { parseDefinitions, parseImports, symbolProblems, type AuditedFile } from '@/build/symbols'
 import {
+  ARCHITECTURES,
   digest,
   output,
   project,
@@ -121,7 +123,7 @@ export const auditNative = async ({ requireAddon = true }: { requireAddon?: bool
   const inspected = await Promise.all(
     files.map(async (file) => {
       const path = resolve(resources, file)
-      if ((await output({ args: ['lipo', '-archs', path] })) !== 'arm64')
+      if ((await output({ args: ['lipo', '-archs', path] })) !== ARCHITECTURES.arm64)
         throw new Error(`Not arm64-only: ${file}`)
       const id = (await output({ args: ['otool', '-D', path] })).split('\n')[1]
       if (id !== `@rpath/${basename(file)}`) throw new Error(`Nonrelocatable install id: ${file}`)
@@ -146,7 +148,7 @@ export const auditNative = async ({ requireAddon = true }: { requireAddon?: bool
       const rpaths = [...commands.matchAll(/cmd LC_RPATH\s+cmdsize \d+\s+path (\S+) /g)].map(
         (match) => match[1],
       )
-      if (!rpaths.every((rpath) => rpath === '@loader_path' || rpath === '@loader_path/lib'))
+      if (!rpaths.every((rpath) => rpath === RPATHS.loaderPath || rpath === RPATHS.loaderPathLib))
         throw new Error(`Host rpath in ${file}`)
       const relativeDependencies = dependencies.filter(
         (dependency) =>
@@ -154,7 +156,7 @@ export const auditNative = async ({ requireAddon = true }: { requireAddon?: bool
       )
       if (
         relativeDependencies.length > 0 &&
-        !rpaths.includes(file.endsWith('.node') ? '@loader_path/lib' : '@loader_path')
+        !rpaths.includes(file.endsWith('.node') ? RPATHS.loaderPathLib : RPATHS.loaderPath)
       )
         throw new Error(`Missing loader-relative search path in ${file}`)
       const symbolIssues = await inspectSymbols({ file, path, dependencies })

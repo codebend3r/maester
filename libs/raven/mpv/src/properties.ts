@@ -16,9 +16,14 @@ const optional =
   (value: unknown): value is T | undefined =>
     value === undefined || guard(value)
 
+export const MPV_TRACK_TYPES = { audio: 'audio', sub: 'sub', video: 'video' } as const
+
+/** The word mpv answers beside a flag or a number when it chooses for itself. */
+export const MPV_CHOICES = { auto: 'auto' } as const
+
 export const isMpvTrack = object({
   id: isNumber,
-  type: oneOf(['audio', 'sub', 'video']),
+  type: oneOf(Object.values(MPV_TRACK_TYPES)),
   selected: optional(isBoolean),
   default: optional(isBoolean),
   external: optional(isBoolean),
@@ -31,42 +36,74 @@ export const isMpvTrack = object({
 })
 export type MpvTrack = Infer<typeof isMpvTrack>
 
+export const MPV_PROPERTIES = {
+  mpvVersion: 'mpv-version',
+  optionsConfig: 'options/config',
+  optionsLoadScripts: 'options/load-scripts',
+  optionsYtdl: 'options/ytdl',
+  optionsOsc: 'options/osc',
+  optionsInputDefaultBindings: 'options/input-default-bindings',
+  optionsInputVoKeyboard: 'options/input-vo-keyboard',
+  optionsCache: 'options/cache',
+  optionsDemuxerMaxBytes: 'options/demuxer-max-bytes',
+  optionsDemuxerMaxBackBytes: 'options/demuxer-max-back-bytes',
+  ffmpegVersion: 'ffmpeg-version',
+  timePos: 'time-pos',
+  duration: 'duration',
+  pause: 'pause',
+  pausedForCache: 'paused-for-cache',
+  seeking: 'seeking',
+  speed: 'speed',
+  aid: 'aid',
+  sid: 'sid',
+  trackList: 'track-list',
+  containerFps: 'container-fps',
+  audioDeviceList: 'audio-device-list',
+  demuxerCacheState: 'demuxer-cache-state',
+  hwdecCurrent: 'hwdec-current',
+  frameDropCount: 'frame-drop-count',
+  decoderFrameDropCount: 'decoder-frame-drop-count',
+  displayFpsOverride: 'display-fps-override',
+  targetColorspaceHint: 'target-colorspace-hint',
+} as const
+
+export type MpvProperty = (typeof MPV_PROPERTIES)[keyof typeof MPV_PROPERTIES]
+
 export const propertyGuards = {
-  'mpv-version': isString,
-  'options/config': isBoolean,
-  'options/load-scripts': isBoolean,
-  'options/ytdl': isBoolean,
-  'options/osc': isBoolean,
-  'options/input-default-bindings': isBoolean,
-  'options/input-vo-keyboard': isBoolean,
+  [MPV_PROPERTIES.mpvVersion]: isString,
+  [MPV_PROPERTIES.optionsConfig]: isBoolean,
+  [MPV_PROPERTIES.optionsLoadScripts]: isBoolean,
+  [MPV_PROPERTIES.optionsYtdl]: isBoolean,
+  [MPV_PROPERTIES.optionsOsc]: isBoolean,
+  [MPV_PROPERTIES.optionsInputDefaultBindings]: isBoolean,
+  [MPV_PROPERTIES.optionsInputVoKeyboard]: isBoolean,
   // mpv reports `cache=yes` as the flag `true` and `no` as `false`.
-  'options/cache': union(isBoolean, oneOf(['auto'])),
-  'options/demuxer-max-bytes': isNumber,
-  'options/demuxer-max-back-bytes': isNumber,
-  'ffmpeg-version': isString,
-  'time-pos': nullable(isNumber),
-  duration: nullable(isNumber),
-  pause: isBoolean,
+  [MPV_PROPERTIES.optionsCache]: union(isBoolean, oneOf([MPV_CHOICES.auto])),
+  [MPV_PROPERTIES.optionsDemuxerMaxBytes]: isNumber,
+  [MPV_PROPERTIES.optionsDemuxerMaxBackBytes]: isNumber,
+  [MPV_PROPERTIES.ffmpegVersion]: isString,
+  [MPV_PROPERTIES.timePos]: nullable(isNumber),
+  [MPV_PROPERTIES.duration]: nullable(isNumber),
+  [MPV_PROPERTIES.pause]: isBoolean,
   // Unavailable (null) while mpv is idle, which is before and after every file.
-  'paused-for-cache': nullable(isBoolean),
-  seeking: nullable(isBoolean),
-  speed: isNumber,
-  aid: nullable(union(isNumber, oneOf([false, 'auto']))),
-  sid: nullable(union(isNumber, oneOf([false, 'auto']))),
-  'track-list': listOf(isMpvTrack),
-  'container-fps': nullable(isNumber),
-  'audio-device-list': listOf(object({ name: isString, description: isString })),
-  'demuxer-cache-state': nullable(
+  [MPV_PROPERTIES.pausedForCache]: nullable(isBoolean),
+  [MPV_PROPERTIES.seeking]: nullable(isBoolean),
+  [MPV_PROPERTIES.speed]: isNumber,
+  [MPV_PROPERTIES.aid]: nullable(union(isNumber, oneOf([false, MPV_CHOICES.auto]))),
+  [MPV_PROPERTIES.sid]: nullable(union(isNumber, oneOf([false, MPV_CHOICES.auto]))),
+  [MPV_PROPERTIES.trackList]: listOf(isMpvTrack),
+  [MPV_PROPERTIES.containerFps]: nullable(isNumber),
+  [MPV_PROPERTIES.audioDeviceList]: listOf(object({ name: isString, description: isString })),
+  [MPV_PROPERTIES.demuxerCacheState]: nullable(
     object({
       'seekable-ranges': listOf(object({ start: isNumber, end: isNumber })),
     }),
   ),
-  'hwdec-current': isString,
-  'frame-drop-count': isNumber,
-  'decoder-frame-drop-count': isNumber,
-  'display-fps-override': isNumber,
-  'target-colorspace-hint': union(isBoolean, oneOf(['auto'])),
-} as const
+  [MPV_PROPERTIES.hwdecCurrent]: isString,
+  [MPV_PROPERTIES.frameDropCount]: isNumber,
+  [MPV_PROPERTIES.decoderFrameDropCount]: isNumber,
+  [MPV_PROPERTIES.displayFpsOverride]: isNumber,
+  [MPV_PROPERTIES.targetColorspaceHint]: union(isBoolean, oneOf([MPV_CHOICES.auto])),
+} as const satisfies { [K in MpvProperty]: Guard<unknown> }
 
-export type MpvProperty = keyof typeof propertyGuards
 export type MpvPropertyValue<K extends MpvProperty> = Infer<(typeof propertyGuards)[K]>

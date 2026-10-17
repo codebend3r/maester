@@ -27,6 +27,16 @@ const ANYTHING = {} as const satisfies CandidateTier
 
 const { animation, family, documentary } = TMDB_GENRES
 
+/** The results a type of library can prefer, each a set of tiers in `TIER_SETS`. */
+export const TIER_SET_NAMES = {
+  any: 'any',
+  anime: 'anime',
+  family: 'family',
+  documentary: 'documentary',
+} as const
+
+export type TierSet = (typeof TIER_SET_NAMES)[keyof typeof TIER_SET_NAMES]
+
 /**
  * The tiers each type of library searches, in order: the first that picks a
  * result wins. Every set ends with every result, so a type never matches
@@ -42,9 +52,7 @@ export const TIER_SETS = {
   ],
   family: [{ genres: [family, animation] }, ANYTHING],
   documentary: [{ genres: [documentary] }, ANYTHING],
-} as const satisfies Record<string, readonly CandidateTier[]>
-
-export type TierSet = keyof typeof TIER_SETS
+} as const satisfies Record<TierSet, readonly CandidateTier[]>
 
 /** Whether a tier is every result: the only tier a lone result in the name's year is taken from. */
 export const isUnfiltered = (tier: CandidateTier): boolean =>

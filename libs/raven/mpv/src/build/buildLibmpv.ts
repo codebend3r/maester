@@ -4,8 +4,9 @@ import { fetchSources } from '@/build/fetchSources'
 import { refreshSourceBundle } from '@/build/sourceBundle'
 import { auditNative } from '@/build/auditNative'
 import { moltenvkBuildCommands } from '@/build/moltenvk'
-import { libmpvLinkLibraries, withLinkLibraries } from '@/build/linkage'
+import { libmpvLinkLibraries, RPATHS, withLinkLibraries } from '@/build/linkage'
 import {
+  BUILD_TARGETS,
   digest,
   output,
   prefix,
@@ -394,7 +395,7 @@ await run({
   args: [
     'install_name_tool',
     '-add_rpath',
-    '@loader_path',
+    RPATHS.loaderPath,
     resolve(resources, 'lib/libmpv.2.dylib'),
   ],
 })
@@ -433,7 +434,7 @@ await write({
   content:
     JSON.stringify(
       {
-        platform: 'darwin-arm64',
+        platform: BUILD_TARGETS.darwinArm64,
         revision: await output({ args: ['git', 'rev-parse', 'HEAD'] }),
         sources: digest(JSON.stringify(locked)),
         xcode: await output({ args: ['xcodebuild', '-version'] }),

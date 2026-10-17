@@ -162,9 +162,9 @@ export const parseServerEvent = (data: string): ServerEvent | null => {
 const subjectQuery = (subject: MatchSubject | null): Record<string, string> => {
   if (subject == null) return {}
   switch (subject.kind) {
-    case 'media':
+    case MATCH_SUBJECT_KINDS.media:
       return { mediaId: String(subject.id) }
-    case 'item':
+    case MATCH_SUBJECT_KINDS.item:
       return { itemId: String(subject.id) }
     default: {
       const unreachable: never = subject
@@ -547,7 +547,7 @@ export const createApiClient = ({
 
     /** null until the server has generated one; versioned so it can be cached forever. */
     thumbnailUrl: (media: MediaItem): string | null =>
-      media.thumbnail === 'ready'
+      media.thumbnail === THUMBNAIL_STATES.ready
         ? thumbnailAt({ id: media.id, version: media.thumbnailVersion })
         : null,
 
@@ -806,7 +806,7 @@ export const createApiClient = ({
       kind: ChoosableImageKind
       option: ImageOption
     }): string =>
-      option.source === 'local'
+      option.source === IMAGE_SOURCES.local
         ? url(`/api/items/${id}/images/${kind}/local`)
         : url(`/api/images/${kind}${option.ref}`),
 

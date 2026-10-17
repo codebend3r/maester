@@ -10,15 +10,70 @@ import {
   oneOf,
   union,
 } from '@raven/core'
-import { propertyGuards, type MpvProperty, type MpvPropertyValue } from '@/properties'
+import {
+  MPV_PROPERTIES,
+  propertyGuards,
+  type MpvProperty,
+  type MpvPropertyValue,
+} from '@/properties'
+
+export const MPV_EVENTS = {
+  property: 'property',
+  fileLoaded: 'file-loaded',
+  playbackRestart: 'playback-restart',
+  endFile: 'end-file',
+  log: 'log',
+  shutdown: 'shutdown',
+  overflow: 'overflow',
+  error: 'error',
+} as const
+
+/** What the addon sends that is not an event: the answer to one request. */
+export const NATIVE_MESSAGES = { reply: 'reply' } as const
+
+/** Why a file ended, as the addon names mpv's reasons. */
+export const MPV_END_FILE_REASONS = {
+  eof: 'eof',
+  error: 'error',
+  stop: 'stop',
+  quit: 'quit',
+  redirect: 'redirect',
+} as const
+
+/** The mpv commands raven sends, each the first of a command's `args`. */
+export const MPV_COMMANDS = {
+  loadfile: 'loadfile',
+  seek: 'seek',
+  subAdd: 'sub-add',
+  stop: 'stop',
+  scriptBinding: 'script-binding',
+  aoReload: 'ao-reload',
+} as const
 
 const isUnknown = (_value: unknown): _value is unknown => true
-const isReply = object({ type: oneOf(['reply']), id: isNumber, error: isNumber, data: isUnknown })
-const isProperty = object({ type: oneOf(['property']), name: isString, data: isUnknown })
+const isReply = object({
+  type: oneOf([NATIVE_MESSAGES.reply]),
+  id: isNumber,
+  error: isNumber,
+  data: isUnknown,
+})
+const isProperty = object({ type: oneOf([MPV_EVENTS.property]), name: isString, data: isUnknown })
 const isOtherEvent = union(
-  object({ type: oneOf(['file-loaded', 'playback-restart', 'shutdown', 'overflow']) }),
-  object({ type: oneOf(['end-file']), reason: isString, error: isNumber }),
-  object({ type: oneOf(['log']), level: isString, prefix: isString, text: isString }),
+  object({
+    type: oneOf([
+      MPV_EVENTS.fileLoaded,
+      MPV_EVENTS.playbackRestart,
+      MPV_EVENTS.shutdown,
+      MPV_EVENTS.overflow,
+    ]),
+  }),
+  // The addon maps every mpv reason onto these five, with `redirect` for the rest.
+  object({
+    type: oneOf([MPV_EVENTS.endFile]),
+    reason: oneOf(Object.values(MPV_END_FILE_REASONS)),
+    error: isNumber,
+  }),
+  object({ type: oneOf([MPV_EVENTS.log]), level: isString, prefix: isString, text: isString }),
 )
 const isDisplayInfo = object({
   refreshRate: isNumber,
@@ -27,12 +82,14 @@ const isDisplayInfo = object({
 })
 
 type MpvPropertyEvent = {
-  [K in MpvProperty]: { type: 'property'; name: K; data: MpvPropertyValue<K> }
+  [K in MpvProperty]: { type: typeof MPV_EVENTS.property; name: K; data: MpvPropertyValue<K> }
 }[MpvProperty]
 export type MpvEvent =
   | Infer<typeof isOtherEvent>
   | MpvPropertyEvent
-  | { type: 'error'; message: string }
+  | { type: typeof MPV_EVENTS.error; message: string }
+
+export const MPV_SURFACE_KINDS = { headless: 'headless', window: 'window' } as const
 
 export type MpvSurface = { kind: 'headless' } | { kind: 'window'; handle: Buffer }
 
@@ -129,13 +186,13 @@ export const openMpv = async ({
         return
       }
     } else if (isOtherEvent(value)) {
-      if (value.type === 'overflow' || value.type === 'shutdown')
+      if (value.type === MPV_EVENTS.overflow || value.type === MPV_EVENTS.shutdown)
         rejectPending(new Error(`mpv ${value.type}`))
       onEvent(value)
       return
     }
     rejectPending(new Error('Invalid native mpv event'))
-    onEvent({ type: 'error', message: 'Invalid native mpv event' })
+    onEvent({ type: MPV_EVENTS.error, message: 'Invalid native mpv event' })
   }
   const native: unknown = addon.create(surface, receive)
   if (!isNativeHandle(native)) throw new Error('Invalid raven mpv handle')
@@ -184,7 +241,7 @@ export const openMpv = async ({
     return destruction
   }
   try {
-    const version = await read({ name: 'mpv-version' })
+    const version = await read({ name: MPV_PROPERTIES.mpvVersion })
     if (!supportsVersion(version)) throw new Error('libmpv 0.40 or newer is required')
     return {
       version,

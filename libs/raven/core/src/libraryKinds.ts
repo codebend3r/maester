@@ -1,4 +1,4 @@
-import { type CandidateTier, TIER_SETS, type TierSet } from '@/candidateTiers'
+import { type CandidateTier, TIER_SETS, TIER_SET_NAMES, type TierSet } from '@/candidateTiers'
 import {
   FOLDER_LAYOUTS,
   ITEM_TYPES,
@@ -42,21 +42,21 @@ export type KindRules = {
 }
 
 /** Release years come from names, and scores from TMDB, which only matched libraries read. */
-const MATCHED_FIELDS: readonly SortFieldName[] = ['release', 'rating']
+const MATCHED_FIELDS: readonly SortFieldName[] = [SORT_FIELD_NAMES.release, SORT_FIELD_NAMES.rating]
 
 /**
  * Fields only a file has, which a TV library's show cards cannot sort on. A
  * show's bitrate is the mean of its files', so shows sort on that.
  */
-const FILE_FIELDS: readonly SortFieldName[] = ['size', 'resolution']
+const FILE_FIELDS: readonly SortFieldName[] = [SORT_FIELD_NAMES.size, SORT_FIELD_NAMES.resolution]
 
 const without = <T>({ all, left }: { all: readonly T[]; left: readonly T[] }): T[] =>
   all.filter((item) => !left.includes(item))
 
 /** A library of movies starts grouped into matched and not. */
 const MOVIE_RULES = {
-  matches: 'movie',
-  prefer: 'any',
+  matches: ITEM_TYPES.movie,
+  prefer: TIER_SET_NAMES.any,
   fields: isSortFieldName.values,
   views: isLibraryView.values,
   groupings: isMediaGroupBy.values,
@@ -70,8 +70,8 @@ const MOVIE_RULES = {
  * no sort on a field only a file has.
  */
 const SHOW_RULES = {
-  matches: 'show',
-  prefer: 'any',
+  matches: ITEM_TYPES.show,
+  prefer: TIER_SET_NAMES.any,
   fields: without({ all: isSortFieldName.values, left: FILE_FIELDS }),
   views: without({ all: isLibraryView.values, left: [LIBRARY_VIEWS.grouped] }),
   groupings: isMediaGroupBy.values,
@@ -82,7 +82,7 @@ const SHOW_RULES = {
 /** A library that is never matched has no years, scores or match to sort or group by. */
 const UNMATCHED_RULES = {
   matches: null,
-  prefer: 'any',
+  prefer: TIER_SET_NAMES.any,
   fields: without({ all: isSortFieldName.values, left: MATCHED_FIELDS }),
   views: isLibraryView.values,
   groupings: without({ all: isMediaGroupBy.values, left: [MEDIA_GROUPINGS.match] }),
@@ -100,11 +100,11 @@ const UNMATCHED_RULES = {
 export const KIND_RULES = {
   movies: MOVIE_RULES,
   shows: SHOW_RULES,
-  animeMovies: { ...MOVIE_RULES, prefer: 'anime' },
-  animeShows: { ...SHOW_RULES, prefer: 'anime' },
-  familyMovies: { ...MOVIE_RULES, prefer: 'family' },
-  familyShows: { ...SHOW_RULES, prefer: 'family' },
-  documentaries: { ...MOVIE_RULES, prefer: 'documentary' },
+  animeMovies: { ...MOVIE_RULES, prefer: TIER_SET_NAMES.anime },
+  animeShows: { ...SHOW_RULES, prefer: TIER_SET_NAMES.anime },
+  familyMovies: { ...MOVIE_RULES, prefer: TIER_SET_NAMES.family },
+  familyShows: { ...SHOW_RULES, prefer: TIER_SET_NAMES.family },
+  documentaries: { ...MOVIE_RULES, prefer: TIER_SET_NAMES.documentary },
   sports: MOVIE_RULES,
   youtube: UNMATCHED_RULES,
   other: UNMATCHED_RULES,

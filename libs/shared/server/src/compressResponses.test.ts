@@ -9,7 +9,8 @@ import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fa
 import type { FastifyReply } from 'fastify'
 import { type Observable, Subject, map } from 'rxjs'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { compressResponses } from '@/compressResponses'
+import { ENCODINGS, compressResponses } from '@/compressResponses'
+import { CACHE_POLICIES, CONTENT_TYPES, HEADERS, HTTP_METHODS } from '@/http'
 import { serveWebApp } from '@/serveWebApp'
 
 const LIST = Array.from({ length: 200 }, (_, id) => ({ id, title: `Video ${id}`, year: 2026 }))
@@ -41,20 +42,20 @@ class SampleController {
   @Get('blob')
   async blob(@Res() reply: FastifyReply): Promise<void> {
     await reply
-      .header('content-type', 'application/octet-stream')
-      .header('content-length', BLOB.length)
+      .header(HEADERS.contentType, CONTENT_TYPES.octetStream)
+      .header(HEADERS.contentLength, BLOB.length)
       .send(BLOB)
   }
 
   // As `reply.send(createReadStream(video))` would, with no type named.
   @Get('untyped')
   async untyped(@Res() reply: FastifyReply): Promise<void> {
-    await reply.header('content-length', BLOB.length).send(Readable.from([BLOB]))
+    await reply.header(HEADERS.contentLength, BLOB.length).send(Readable.from([BLOB]))
   }
 
   @Get('subtitles')
   async subtitles(@Res() reply: FastifyReply): Promise<void> {
-    await reply.header('content-type', 'text/vtt; charset=utf-8').send(VTT)
+    await reply.header(HEADERS.contentType, CONTENT_TYPES.vtt).send(VTT)
   }
 
   @Post('echo')
@@ -73,9 +74,9 @@ class SampleModule {}
 
 /** The body as a browser's fetch hands it over, unpacked from whatever it was sent in. */
 const decoded = (response: { headers: Record<string, unknown>; rawPayload: Buffer }): Buffer => {
-  const encoding = response.headers['content-encoding']
-  if (encoding === 'br') return brotliDecompressSync(response.rawPayload)
-  if (encoding === 'gzip') return gunzipSync(response.rawPayload)
+  const encoding = response.headers[HEADERS.contentEncoding]
+  if (encoding === ENCODINGS.br) return brotliDecompressSync(response.rawPayload)
+  if (encoding === ENCODINGS.gzip) return gunzipSync(response.rawPayload)
   if (encoding === undefined) return response.rawPayload
   throw new Error(`Answered in ${String(encoding)}, which nobody asked for`)
 }
@@ -90,7 +91,7 @@ describe('compressResponses', () => {
     return state.app
   }
   const get = ({ url, headers = {} }: { url: string; headers?: Record<string, string> }) =>
-    app().inject({ method: 'GET', url, headers })
+    app().inject({ method: HTTP_METHODS.get, url, headers })
 
   beforeAll(async () => {
     state.dir = await mkdtemp(join(tmpdir(), 'shared-compress-'))
@@ -120,16 +121,16 @@ describe('compressResponses', () => {
   it('compresses JSON with Brotli where the browser takes it, and gzip where it only takes gzip', async () => {
     const answers = await Promise.all(
       [BROWSER, 'br, gzip', 'gzip, deflate'].map((accept) =>
-        get({ url: '/api/list', headers: { 'accept-encoding': accept } }),
+        get({ url: '/api/list', headers: { [HEADERS.acceptEncoding]: accept } }),
       ),
     )
-    expect(answers.map((answer) => answer.headers['content-encoding'])).toEqual([
-      'br',
-      'br',
-      'gzip',
+    expect(answers.map((answer) => answer.headers[HEADERS.contentEncoding])).toEqual([
+      ENCODINGS.br,
+      ENCODINGS.br,
+      ENCODINGS.gzip,
     ])
     answers.forEach((answer) => {
-      expect(answer.headers.vary).toContain('accept-encoding')
+      expect(answer.headers[HEADERS.vary]).toContain(HEADERS.acceptEncoding)
       expect(answer.rawPayload.length).toBeLessThan(JSON.stringify(LIST).length / 4)
       expect(JSON.parse(decoded(answer).toString())).toEqual(LIST)
     })
@@ -138,86 +139,95 @@ describe('compressResponses', () => {
   it('answers a client that takes no compression as it always has', async () => {
     const answers = await Promise.all([
       get({ url: '/api/list' }),
-      get({ url: '/api/list', headers: { 'accept-encoding': 'identity' } }),
+      get({ url: '/api/list', headers: { [HEADERS.acceptEncoding]: 'identity' } }),
     ])
     answers.forEach((answer) => {
-      expect(answer.headers['content-encoding']).toBeUndefined()
+      expect(answer.headers[HEADERS.contentEncoding]).toBeUndefined()
       expect(answer.json()).toEqual(LIST)
     })
   })
 
   it("compresses the web app's page, script and SVG, cached as before", async () => {
     const files = [
-      { url: '/', body: PAGE, cache: 'no-cache' },
-      { url: '/assets/app-1a2b.js', body: SCRIPT, cache: 'public, max-age=31536000, immutable' },
-      { url: '/assets/logo-3c4d.svg', body: LOGO, cache: 'public, max-age=31536000, immutable' },
+      { url: '/', body: PAGE, cache: CACHE_POLICIES.noCache },
+      { url: '/assets/app-1a2b.js', body: SCRIPT, cache: CACHE_POLICIES.immutable },
+      { url: '/assets/logo-3c4d.svg', body: LOGO, cache: CACHE_POLICIES.immutable },
     ]
     const answers = await Promise.all(
-      files.map(({ url }) => get({ url, headers: { 'accept-encoding': BROWSER } })),
+      files.map(({ url }) => get({ url, headers: { [HEADERS.acceptEncoding]: BROWSER } })),
     )
     answers.forEach((answer, index) => {
       expect(answer.statusCode).toBe(200)
-      expect(answer.headers['content-encoding']).toBe('br')
-      expect(answer.headers['cache-control']).toBe(files[index]!.cache)
+      expect(answer.headers[HEADERS.contentEncoding]).toBe(ENCODINGS.br)
+      expect(answer.headers[HEADERS.cacheControl]).toBe(files[index]!.cache)
       expect(decoded(answer).toString()).toBe(files[index]!.body)
     })
   })
 
   it('compresses WebVTT subtitles', async () => {
-    const answer = await get({ url: '/api/subtitles', headers: { 'accept-encoding': BROWSER } })
-    expect(answer.headers['content-encoding']).toBe('br')
+    const answer = await get({
+      url: '/api/subtitles',
+      headers: { [HEADERS.acceptEncoding]: BROWSER },
+    })
+    expect(answer.headers[HEADERS.contentEncoding]).toBe(ENCODINGS.br)
     expect(decoded(answer).toString()).toBe(VTT)
   })
 
   it('sends a picture as it is', async () => {
     const answer = await get({
       url: '/assets/poster-5e6f.png',
-      headers: { 'accept-encoding': BROWSER },
+      headers: { [HEADERS.acceptEncoding]: BROWSER },
     })
-    expect(answer.headers['content-encoding']).toBeUndefined()
-    expect(answer.headers['content-length']).toBe(String(POSTER.length))
+    expect(answer.headers[HEADERS.contentEncoding]).toBeUndefined()
+    expect(answer.headers[HEADERS.contentLength]).toBe(String(POSTER.length))
     expect(answer.rawPayload.equals(POSTER)).toBe(true)
   })
 
   it('sends binary as it is, its length included', async () => {
-    const answer = await get({ url: '/api/blob', headers: { 'accept-encoding': BROWSER } })
-    expect(answer.headers['content-encoding']).toBeUndefined()
-    expect(answer.headers['content-length']).toBe(String(BLOB.length))
+    const answer = await get({ url: '/api/blob', headers: { [HEADERS.acceptEncoding]: BROWSER } })
+    expect(answer.headers[HEADERS.contentEncoding]).toBeUndefined()
+    expect(answer.headers[HEADERS.contentLength]).toBe(String(BLOB.length))
     expect(answer.rawPayload.equals(BLOB)).toBe(true)
   })
 
   it('sends a stream that names no type as it is, its length included', async () => {
-    const answer = await get({ url: '/api/untyped', headers: { 'accept-encoding': BROWSER } })
-    expect(answer.headers['content-encoding']).toBeUndefined()
-    expect(answer.headers['content-length']).toBe(String(BLOB.length))
+    const answer = await get({
+      url: '/api/untyped',
+      headers: { [HEADERS.acceptEncoding]: BROWSER },
+    })
+    expect(answer.headers[HEADERS.contentEncoding]).toBeUndefined()
+    expect(answer.headers[HEADERS.contentLength]).toBe(String(BLOB.length))
     expect(answer.rawPayload.equals(BLOB)).toBe(true)
   })
 
   it('answers a Range request with the bytes asked for, uncompressed, whatever the route', async () => {
     const partial = await get({
       url: '/assets/app-1a2b.js',
-      headers: { 'accept-encoding': BROWSER, range: 'bytes=0-99' },
+      headers: { [HEADERS.acceptEncoding]: BROWSER, [HEADERS.range]: 'bytes=0-99' },
     })
     expect(partial.statusCode).toBe(206)
-    expect(partial.headers['content-encoding']).toBeUndefined()
-    expect(partial.headers['content-range']).toBe(`bytes 0-99/${Buffer.byteLength(SCRIPT)}`)
+    expect(partial.headers[HEADERS.contentEncoding]).toBeUndefined()
+    expect(partial.headers[HEADERS.contentRange]).toBe(`bytes 0-99/${Buffer.byteLength(SCRIPT)}`)
     expect(partial.body).toBe(SCRIPT.slice(0, 100))
 
     // A route that ignores the range still answers it as it always has.
     const whole = await get({
       url: '/api/list',
-      headers: { 'accept-encoding': BROWSER, range: 'bytes=0-99' },
+      headers: { [HEADERS.acceptEncoding]: BROWSER, [HEADERS.range]: 'bytes=0-99' },
     })
     expect(whole.statusCode).toBe(200)
-    expect(whole.headers['content-encoding']).toBeUndefined()
+    expect(whole.headers[HEADERS.contentEncoding]).toBeUndefined()
     expect(whole.json()).toEqual(LIST)
   })
 
   it('takes a request body as it is sent, never unpacking it', async () => {
     const answer = await app().inject({
-      method: 'POST',
+      method: HTTP_METHODS.post,
       url: '/api/echo',
-      headers: { 'content-type': 'application/json', 'content-encoding': 'gzip' },
+      headers: {
+        [HEADERS.contentType]: CONTENT_TYPES.json,
+        [HEADERS.contentEncoding]: ENCODINGS.gzip,
+      },
       payload: gzipSync(JSON.stringify({ name: 'Films' })),
     })
     expect(answer.statusCode).toBe(400)
@@ -234,11 +244,11 @@ describe('compressResponses', () => {
     const aborter = new AbortController()
     try {
       const response = await fetch(`${await listening.getUrl()}/api/events`, {
-        headers: { 'accept-encoding': BROWSER },
+        headers: { [HEADERS.acceptEncoding]: BROWSER },
         signal: aborter.signal,
       })
-      expect(response.headers.get('content-type')).toContain('text/event-stream')
-      expect(response.headers.get('content-encoding')).toBeNull()
+      expect(response.headers.get(HEADERS.contentType)).toContain(CONTENT_TYPES.eventStream)
+      expect(response.headers.get(HEADERS.contentEncoding)).toBeNull()
       const reader = response.body?.getReader()
       if (!reader) throw new Error('No body to read')
       const decoder = new TextDecoder()

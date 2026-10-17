@@ -8,7 +8,18 @@ import {
   type PlayerRefusalReason,
   type PlayerSource,
 } from '@raven/core'
-import type { Mpv, MpvEvent, MpvProperty, MpvPropertyValue, MpvTrack } from '@raven/mpv'
+import {
+  MPV_CHOICES,
+  MPV_COMMANDS,
+  MPV_END_FILE_REASONS,
+  MPV_EVENTS,
+  MPV_PROPERTIES,
+  type Mpv,
+  type MpvEvent,
+  type MpvProperty,
+  type MpvPropertyValue,
+  type MpvTrack,
+} from '@raven/mpv'
 import type { Grants } from '@/main/grants'
 import { displayOptions } from '@/main/player/displayOptions'
 import { HARDENED_OPTIONS } from '@/main/player/engine'

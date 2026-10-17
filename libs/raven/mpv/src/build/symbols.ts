@@ -1,8 +1,10 @@
 import { basename } from 'node:path'
 
+export const IMPORT_KINDS = { bound: 'bound', lookup: 'lookup' } as const
+
 export type Import =
-  | { kind: 'bound'; symbol: string; library: string }
-  | { kind: 'lookup'; symbol: string }
+  | { kind: typeof IMPORT_KINDS.bound; symbol: string; library: string }
+  | { kind: typeof IMPORT_KINDS.lookup; symbol: string }
 
 // `nm -um` prints every undefined symbol with the library it binds to, or marks it
 // "dynamically looked up" when the link was told to leave it unresolved.
@@ -18,7 +20,9 @@ export const parseImports = ({ listing }: { listing: string }): Import[] =>
       const groups = importLine.exec(line)?.groups ?? {}
       const { symbol, library } = groups
       if (symbol === undefined) throw new Error(`Unrecognized nm import line: ${line}`)
-      return library === undefined ? { kind: 'lookup', symbol } : { kind: 'bound', symbol, library }
+      return library === undefined
+        ? { kind: IMPORT_KINDS.lookup, symbol }
+        : { kind: IMPORT_KINDS.bound, symbol, library }
     })
 
 /** Names from `nm -jU`, one per line; Swift and Objective-C names can hold spaces. */
@@ -67,13 +71,13 @@ export const symbolProblems = ({
   const policy: Policy = symbolPolicies[file]
   const loaded = new Set(dependencies.map((installName) => libraryName({ installName })))
   const lookups = imports
-    .filter((entry) => entry.kind === 'lookup')
+    .filter((entry) => entry.kind === IMPORT_KINDS.lookup)
     .map((entry) => entry.symbol)
     .filter((symbol) => !policy.lookups.some((prefix) => symbol.startsWith(prefix)))
   const glslang = lookups.filter(isGlslang)
   const undefinedEntryPoints = policy.defines.filter((symbol) => !definitions.has(symbol))
   const strays = imports.flatMap((entry) =>
-    entry.kind === 'bound' && !loaded.has(entry.library)
+    entry.kind === IMPORT_KINDS.bound && !loaded.has(entry.library)
       ? [`${file} binds ${entry.symbol} to ${entry.library}, which it does not load`]
       : [],
   )

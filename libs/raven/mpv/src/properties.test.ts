@@ -1,30 +1,39 @@
 import { expect, test } from 'bun:test'
-import { isMpvTrack, propertyGuards, type MpvProperty, type MpvPropertyValue } from '@/properties'
+import { AUDIO_DEVICES } from '@raven/core'
+import {
+  isMpvTrack,
+  MPV_CHOICES,
+  MPV_PROPERTIES,
+  MPV_TRACK_TYPES,
+  propertyGuards,
+  type MpvProperty,
+  type MpvPropertyValue,
+} from '@/properties'
 
 const examples = {
-  'mpv-version': 'mpv 0.41.0',
-  'ffmpeg-version': '8.1.2',
-  'options/config': false,
-  'options/load-scripts': false,
-  'options/ytdl': false,
-  'options/osc': false,
-  'options/input-default-bindings': false,
-  'options/input-vo-keyboard': false,
-  'options/cache': true,
-  'options/demuxer-max-bytes': 1_073_741_824,
-  'options/demuxer-max-back-bytes': 268_435_456,
-  'time-pos': 3,
-  duration: 12,
-  pause: false,
-  'paused-for-cache': false,
-  seeking: false,
-  speed: 1,
-  aid: 1,
-  sid: false,
-  'track-list': [
+  [MPV_PROPERTIES.mpvVersion]: 'mpv 0.41.0',
+  [MPV_PROPERTIES.ffmpegVersion]: '8.1.2',
+  [MPV_PROPERTIES.optionsConfig]: false,
+  [MPV_PROPERTIES.optionsLoadScripts]: false,
+  [MPV_PROPERTIES.optionsYtdl]: false,
+  [MPV_PROPERTIES.optionsOsc]: false,
+  [MPV_PROPERTIES.optionsInputDefaultBindings]: false,
+  [MPV_PROPERTIES.optionsInputVoKeyboard]: false,
+  [MPV_PROPERTIES.optionsCache]: true,
+  [MPV_PROPERTIES.optionsDemuxerMaxBytes]: 1_073_741_824,
+  [MPV_PROPERTIES.optionsDemuxerMaxBackBytes]: 268_435_456,
+  [MPV_PROPERTIES.timePos]: 3,
+  [MPV_PROPERTIES.duration]: 12,
+  [MPV_PROPERTIES.pause]: false,
+  [MPV_PROPERTIES.pausedForCache]: false,
+  [MPV_PROPERTIES.seeking]: false,
+  [MPV_PROPERTIES.speed]: 1,
+  [MPV_PROPERTIES.aid]: 1,
+  [MPV_PROPERTIES.sid]: false,
+  [MPV_PROPERTIES.trackList]: [
     {
       id: 1,
-      type: 'audio',
+      type: MPV_TRACK_TYPES.audio,
       lang: 'eng',
       'demux-channel-count': 2,
       selected: true,
@@ -36,14 +45,14 @@ const examples = {
       codec: 'aac',
     },
   ],
-  'container-fps': 24,
-  'audio-device-list': [{ name: 'auto', description: 'Default' }],
-  'demuxer-cache-state': { 'seekable-ranges': [{ start: 0, end: 12 }] },
-  'hwdec-current': 'videotoolbox',
-  'frame-drop-count': 0,
-  'decoder-frame-drop-count': 0,
-  'display-fps-override': 60,
-  'target-colorspace-hint': false,
+  [MPV_PROPERTIES.containerFps]: 24,
+  [MPV_PROPERTIES.audioDeviceList]: [{ name: AUDIO_DEVICES.auto, description: 'Default' }],
+  [MPV_PROPERTIES.demuxerCacheState]: { 'seekable-ranges': [{ start: 0, end: 12 }] },
+  [MPV_PROPERTIES.hwdecCurrent]: 'videotoolbox',
+  [MPV_PROPERTIES.frameDropCount]: 0,
+  [MPV_PROPERTIES.decoderFrameDropCount]: 0,
+  [MPV_PROPERTIES.displayFpsOverride]: 60,
+  [MPV_PROPERTIES.targetColorspaceHint]: false,
 } as const satisfies { [K in MpvProperty]: MpvPropertyValue<K> }
 
 test('every named native property accepts its shape and rejects malformed values', () => {
@@ -53,37 +62,39 @@ test('every named native property accepts its shape and rejects malformed values
     expect(guard(Number.NaN)).toBe(false)
     expect(guard(Number.POSITIVE_INFINITY)).toBe(false)
   })
-  expect(propertyGuards['time-pos'](null)).toBe(true)
-  expect(propertyGuards['duration'](null)).toBe(true)
+  expect(propertyGuards[MPV_PROPERTIES.timePos](null)).toBe(true)
+  expect(propertyGuards[MPV_PROPERTIES.duration](null)).toBe(true)
   // Real libmpv reports these unavailable (null) while idle, before and after each file.
-  expect(propertyGuards['paused-for-cache'](null)).toBe(true)
-  expect(propertyGuards.seeking(null)).toBe(true)
-  ;[propertyGuards.aid, propertyGuards.sid].forEach((guard) => {
-    ;[null, 1, false, 'auto'].forEach((value) => {
+  expect(propertyGuards[MPV_PROPERTIES.pausedForCache](null)).toBe(true)
+  expect(propertyGuards[MPV_PROPERTIES.seeking](null)).toBe(true)
+  ;[propertyGuards[MPV_PROPERTIES.aid], propertyGuards[MPV_PROPERTIES.sid]].forEach((guard) => {
+    ;[null, 1, false, MPV_CHOICES.auto].forEach((value) => {
       expect(guard(value)).toBe(true)
     })
     ;[true, 'no', 'yes', 'invalid'].forEach((value) => {
       expect(guard(value)).toBe(false)
     })
   })
-  ;[false, true, 'auto'].forEach((value) => {
-    expect(propertyGuards['target-colorspace-hint'](value)).toBe(true)
+  ;[false, true, MPV_CHOICES.auto].forEach((value) => {
+    expect(propertyGuards[MPV_PROPERTIES.targetColorspaceHint](value)).toBe(true)
   })
   ;['no', 'yes', 'invalid', 1, null].forEach((value) => {
-    expect(propertyGuards['target-colorspace-hint'](value)).toBe(false)
+    expect(propertyGuards[MPV_PROPERTIES.targetColorspaceHint](value)).toBe(false)
   })
   expect(
-    propertyGuards['demuxer-cache-state']({ 'seekable-ranges': [{ start: '0', end: 1 }] }),
+    propertyGuards[MPV_PROPERTIES.demuxerCacheState]({
+      'seekable-ranges': [{ start: '0', end: 1 }],
+    }),
   ).toBe(false)
-  expect(propertyGuards['audio-device-list']([{ name: 'auto' }])).toBe(false)
+  expect(propertyGuards[MPV_PROPERTIES.audioDeviceList]([{ name: AUDIO_DEVICES.auto }])).toBe(false)
 })
 
 test('track-list narrows optional mpv fields at the native boundary', () => {
-  expect(isMpvTrack({ id: 1, type: 'audio' })).toBe(true)
+  expect(isMpvTrack({ id: 1, type: MPV_TRACK_TYPES.audio })).toBe(true)
   expect(
     isMpvTrack({
       id: 2,
-      type: 'sub',
+      type: MPV_TRACK_TYPES.sub,
       selected: true,
       external: false,
       default: true,
@@ -91,12 +102,16 @@ test('track-list narrows optional mpv fields at the native boundary', () => {
       codec: 'ass',
     }),
   ).toBe(true)
-  expect(isMpvTrack({ id: 2, type: 'sub', forced: true, 'hearing-impaired': false })).toBe(true)
-  expect(isMpvTrack({ id: 2, type: 'sub', forced: 'yes' })).toBe(false)
-  expect(isMpvTrack({ id: 2, type: 'sub', 'hearing-impaired': 1 })).toBe(false)
+  expect(
+    isMpvTrack({ id: 2, type: MPV_TRACK_TYPES.sub, forced: true, 'hearing-impaired': false }),
+  ).toBe(true)
+  expect(isMpvTrack({ id: 2, type: MPV_TRACK_TYPES.sub, forced: 'yes' })).toBe(false)
+  expect(isMpvTrack({ id: 2, type: MPV_TRACK_TYPES.sub, 'hearing-impaired': 1 })).toBe(false)
   expect(isMpvTrack({ id: 1, type: 'attachment' })).toBe(false)
-  expect(isMpvTrack({ id: 1, type: 'audio', lang: 42 })).toBe(false)
-  expect(isMpvTrack({ id: 1, type: 'audio', 'demux-channel-count': '2' })).toBe(false)
-  expect(isMpvTrack({ id: 1, type: 'sub', external: 'yes' })).toBe(false)
-  expect(propertyGuards['track-list']([{ id: '1', type: 'audio' }])).toBe(false)
+  expect(isMpvTrack({ id: 1, type: MPV_TRACK_TYPES.audio, lang: 42 })).toBe(false)
+  expect(isMpvTrack({ id: 1, type: MPV_TRACK_TYPES.audio, 'demux-channel-count': '2' })).toBe(false)
+  expect(isMpvTrack({ id: 1, type: MPV_TRACK_TYPES.sub, external: 'yes' })).toBe(false)
+  expect(propertyGuards[MPV_PROPERTIES.trackList]([{ id: '1', type: MPV_TRACK_TYPES.audio }])).toBe(
+    false,
+  )
 })

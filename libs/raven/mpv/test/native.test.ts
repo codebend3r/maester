@@ -5,9 +5,18 @@ import { setTimeout as sleep } from 'node:timers/promises'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
-import { openMpv, type Mpv, type MpvEvent } from '@/mpv'
-import { propertyGuards } from '@/properties'
+import {
+  MPV_COMMANDS,
+  MPV_END_FILE_REASONS,
+  MPV_EVENTS,
+  MPV_SURFACE_KINDS,
+  openMpv,
+  type Mpv,
+  type MpvEvent,
+} from '@/mpv'
+import { MPV_CHOICES, MPV_PROPERTIES, MPV_TRACK_TYPES, propertyGuards } from '@/properties'
 import { project } from '@/build/context'
+import { isCleanupMode } from '@/test/cleanupModes'
 
 const directory = await mkdtemp(resolve(tmpdir(), 'raven-mpv-native-'))
 const clip = resolve(directory, 'tracks.mkv')
@@ -70,9 +79,9 @@ const harness = async () => {
   const listeners = new Set<(event: MpvEvent) => void>()
   const errors: MpvEvent[] = []
   const player = await openMpv({
-    surface: { kind: 'headless' },
+    surface: { kind: MPV_SURFACE_KINDS.headless },
     onEvent: (event) => {
-      if (event.type === 'error' || event.type === 'overflow') errors.push(event)
+      if (event.type === MPV_EVENTS.error || event.type === MPV_EVENTS.overflow) errors.push(event)
       listeners.forEach((listener) => listener(event))
     },
   })
@@ -120,10 +129,10 @@ const harness = async () => {
   return { player, eventAfter, errors }
 }
 const load = async (value: Awaited<ReturnType<typeof harness>>) => {
-  await value.player.set({ name: 'pause', value: true })
+  await value.player.set({ name: MPV_PROPERTIES.pause, value: true })
   await value.eventAfter({
-    type: 'file-loaded',
-    action: () => value.player.command({ args: ['loadfile', clip] }),
+    type: MPV_EVENTS.fileLoaded,
+    action: () => value.player.command({ args: [MPV_COMMANDS.loadfile, clip] }),
   })
 }
 const positionNear = async ({
@@ -133,7 +142,7 @@ const positionNear = async ({
   player: Mpv
   remaining?: number
 }): Promise<number> => {
-  const position = await player.read({ name: 'time-pos' })
+  const position = await player.read({ name: MPV_PROPERTIES.timePos })
   if (position !== null && Math.abs(position - 4) < 0.25) return position
   if (remaining === 0) throw new Error('Seek never reached target')
   await sleep(20)
@@ -145,110 +154,123 @@ test('real libmpv loads generated MKV, observes, seeks, switches audio/subtitles
   const { player } = value
   try {
     console.warn(
-      `Native runtime: ${player.version}; FFmpeg ${await player.read({ name: 'ffmpeg-version' })}`,
+      `Native runtime: ${player.version}; FFmpeg ${await player.read({ name: MPV_PROPERTIES.ffmpegVersion })}`,
     )
     await Promise.all(
-      (
-        [
-          'options/config',
-          'options/load-scripts',
-          'options/ytdl',
-          'options/osc',
-          'options/input-default-bindings',
-          'options/input-vo-keyboard',
-        ] as const
-      ).map(async (name) => {
+      [
+        MPV_PROPERTIES.optionsConfig,
+        MPV_PROPERTIES.optionsLoadScripts,
+        MPV_PROPERTIES.optionsYtdl,
+        MPV_PROPERTIES.optionsOsc,
+        MPV_PROPERTIES.optionsInputDefaultBindings,
+        MPV_PROPERTIES.optionsInputVoKeyboard,
+      ].map(async (name) => {
         assert.equal(await player.read({ name }), false)
       }),
     )
     // The addon forces the cache on with its own sizes, whatever the stream.
-    assert.equal(await player.read({ name: 'options/cache' }), true)
-    assert.equal(await player.read({ name: 'options/demuxer-max-bytes' }), 1_073_741_824)
-    assert.equal(await player.read({ name: 'options/demuxer-max-back-bytes' }), 268_435_456)
-    await (['aid', 'sid'] as const).reduce(async (previous, name) => {
+    assert.equal(await player.read({ name: MPV_PROPERTIES.optionsCache }), true)
+    assert.equal(await player.read({ name: MPV_PROPERTIES.optionsDemuxerMaxBytes }), 1_073_741_824)
+    assert.equal(
+      await player.read({ name: MPV_PROPERTIES.optionsDemuxerMaxBackBytes }),
+      268_435_456,
+    )
+    await [MPV_PROPERTIES.aid, MPV_PROPERTIES.sid].reduce(async (previous, name) => {
       await previous
       await value.eventAfter({
-        type: 'property',
+        type: MPV_EVENTS.property,
         matches: (event) =>
-          event.type === 'property' && event.name === name && event.data === 'auto',
+          event.type === MPV_EVENTS.property &&
+          event.name === name &&
+          event.data === MPV_CHOICES.auto,
         action: async () => player.observe({ name }),
       })
-      assert.equal(await player.read({ name }), 'auto')
+      assert.equal(await player.read({ name }), MPV_CHOICES.auto)
     }, Promise.resolve())
-    await player.set({ name: 'speed', value: 1.25 })
-    assert.equal(await player.read({ name: 'speed' }), 1.25)
-    await player.set({ name: 'speed', value: 1 })
+    await player.set({ name: MPV_PROPERTIES.speed, value: 1.25 })
+    assert.equal(await player.read({ name: MPV_PROPERTIES.speed }), 1.25)
+    await player.set({ name: MPV_PROPERTIES.speed, value: 1 })
     await [false, true].reduce(async (previous, hint) => {
       await previous
       const observation = await value.eventAfter({
-        type: 'property',
+        type: MPV_EVENTS.property,
         matches: (event) =>
-          event.type === 'property' &&
-          event.name === 'target-colorspace-hint' &&
+          event.type === MPV_EVENTS.property &&
+          event.name === MPV_PROPERTIES.targetColorspaceHint &&
           event.data === hint,
         action: async () => {
-          player.observe({ name: 'target-colorspace-hint' })
-          await player.set({ name: 'target-colorspace-hint', value: hint })
+          player.observe({ name: MPV_PROPERTIES.targetColorspaceHint })
+          await player.set({ name: MPV_PROPERTIES.targetColorspaceHint, value: hint })
         },
       })
-      assert.equal(observation.type, 'property')
-      assert.equal(await player.read({ name: 'target-colorspace-hint' }), hint)
+      assert.equal(observation.type, MPV_EVENTS.property)
+      assert.equal(await player.read({ name: MPV_PROPERTIES.targetColorspaceHint }), hint)
     }, Promise.resolve())
     await load(value)
-    assert.ok(((await player.read({ name: 'duration' })) ?? 0) > 11)
-    const tracks = await player.read({ name: 'track-list' })
-    const audio = tracks.filter((track) => track.type === 'audio')
+    assert.ok(((await player.read({ name: MPV_PROPERTIES.duration })) ?? 0) > 11)
+    const tracks = await player.read({ name: MPV_PROPERTIES.trackList })
+    const audio = tracks.filter((track) => track.type === MPV_TRACK_TYPES.audio)
     assert.equal(audio.length, 2)
-    assert.equal(tracks.filter((track) => track.type === 'sub').length, 1)
+    assert.equal(tracks.filter((track) => track.type === MPV_TRACK_TYPES.sub).length, 1)
     const second = audio[1]
     if (!second) throw new Error('Missing generated audio track')
-    await player.set({ name: 'aid', value: second.id })
-    assert.equal(await player.read({ name: 'aid' }), second.id)
-    await player.command({ args: ['sub-add', sidecar, 'select'] })
-    const subtitles = (await player.read({ name: 'track-list' })).filter(
-      (track) => track.type === 'sub',
+    await player.set({ name: MPV_PROPERTIES.aid, value: second.id })
+    assert.equal(await player.read({ name: MPV_PROPERTIES.aid }), second.id)
+    await player.command({ args: [MPV_COMMANDS.subAdd, sidecar, 'select'] })
+    const subtitles = (await player.read({ name: MPV_PROPERTIES.trackList })).filter(
+      (track) => track.type === MPV_TRACK_TYPES.sub,
     )
     assert.equal(subtitles.length, 2)
     const external = subtitles.find((track) => track.external)
     if (!external) throw new Error('Sidecar was not loaded')
-    await player.set({ name: 'sid', value: external.id })
-    assert.equal(await player.read({ name: 'sid' }), external.id)
-    await (['aid', 'sid'] as const).reduce(async (previous, name) => {
+    await player.set({ name: MPV_PROPERTIES.sid, value: external.id })
+    assert.equal(await player.read({ name: MPV_PROPERTIES.sid }), external.id)
+    await [MPV_PROPERTIES.aid, MPV_PROPERTIES.sid].reduce(async (previous, name) => {
       await previous
       const observation = await value.eventAfter({
-        type: 'property',
+        type: MPV_EVENTS.property,
         matches: (event) =>
-          event.type === 'property' && event.name === name && event.data === false,
+          event.type === MPV_EVENTS.property && event.name === name && event.data === false,
         action: async () => {
           player.observe({ name })
           await player.set({ name, value: false })
         },
       })
-      assert.equal(observation.type, 'property')
+      assert.equal(observation.type, MPV_EVENTS.property)
       assert.equal(await player.read({ name }), false)
     }, Promise.resolve())
-    player.observe({ name: 'pause' })
+    player.observe({ name: MPV_PROPERTIES.pause })
     const paused = await value.eventAfter({
-      type: 'property',
+      type: MPV_EVENTS.property,
       matches: (event) =>
-        event.type === 'property' && event.name === 'pause' && event.data === false,
-      action: () => player.set({ name: 'pause', value: false }),
+        event.type === MPV_EVENTS.property &&
+        event.name === MPV_PROPERTIES.pause &&
+        event.data === false,
+      action: () => player.set({ name: MPV_PROPERTIES.pause, value: false }),
     })
-    assert.equal(paused.type, 'property')
-    await player.set({ name: 'pause', value: true })
-    await player.command({ args: ['seek', '4', 'absolute+exact'] })
+    assert.equal(paused.type, MPV_EVENTS.property)
+    await player.set({ name: MPV_PROPERTIES.pause, value: true })
+    await player.command({ args: [MPV_COMMANDS.seek, '4', 'absolute+exact'] })
     assert.ok(Math.abs((await positionNear({ player })) - 4) < 0.25)
     const ended = await value.eventAfter({
-      type: 'end-file',
-      action: () => player.command({ args: ['stop'] }),
+      type: MPV_EVENTS.endFile,
+      action: () => player.command({ args: [MPV_COMMANDS.stop] }),
     })
-    assert.deepEqual(ended, { type: 'end-file', reason: 'stop', error: 0 })
-    assert.ok(propertyGuards['track-list'](await player.read({ name: 'track-list' })))
+    assert.deepEqual(ended, {
+      type: MPV_EVENTS.endFile,
+      reason: MPV_END_FILE_REASONS.stop,
+      error: 0,
+    })
+    assert.ok(
+      propertyGuards[MPV_PROPERTIES.trackList](
+        await player.read({ name: MPV_PROPERTIES.trackList }),
+      ),
+    )
     assert.deepEqual(value.errors, [])
   } finally {
     await player.destroy()
   }
-  await assert.rejects(player.read({ name: 'pause' }), /destroyed/)
+  await assert.rejects(player.read({ name: MPV_PROPERTIES.pause }), /destroyed/)
   await player.destroy()
 })
 
@@ -266,7 +288,7 @@ test(
         const value = await harness()
         try {
           await load(value)
-          await value.player.command({ args: ['stop'] })
+          await value.player.command({ args: [MPV_COMMANDS.stop] })
           assert.deepEqual(value.errors, [])
         } finally {
           await value.player.destroy()
@@ -283,7 +305,7 @@ test(
   'native wake/teardown races reclaim owners, handles and callbacks across environments',
   { timeout: 120000 },
   async () => {
-    await ['explicit', 'environment', 'gc'].reduce(async (previous, mode) => {
+    await isCleanupMode.values.reduce(async (previous, mode) => {
       await previous
       const child = spawn(
         process.execPath,
@@ -311,7 +333,10 @@ test(
 
 test('native initialization rejects an invalid window handle without substituting a headless surface', async () => {
   await assert.rejects(
-    openMpv({ surface: { kind: 'window', handle: Buffer.alloc(0) }, onEvent: () => {} }),
+    openMpv({
+      surface: { kind: MPV_SURFACE_KINDS.window, handle: Buffer.alloc(0) },
+      onEvent: () => {},
+    }),
     /window handle size/,
   )
 })
@@ -320,12 +345,15 @@ test('real file-open errors arrive as guarded end-file events', async () => {
   const value = await harness()
   try {
     const event = await value.eventAfter({
-      type: 'end-file',
-      action: () => value.player.command({ args: ['loadfile', resolve(directory, 'absent.mkv')] }),
+      type: MPV_EVENTS.endFile,
+      action: () =>
+        value.player.command({
+          args: [MPV_COMMANDS.loadfile, resolve(directory, 'absent.mkv')],
+        }),
     })
-    assert.equal(event.type, 'end-file')
-    if (event.type !== 'end-file') throw new Error('Missing end-file error')
-    assert.equal(event.reason, 'error')
+    assert.equal(event.type, MPV_EVENTS.endFile)
+    if (event.type !== MPV_EVENTS.endFile) throw new Error('Missing end-file error')
+    assert.equal(event.reason, MPV_END_FILE_REASONS.error)
     assert.ok(event.error < 0)
     assert.deepEqual(value.errors, [])
   } finally {

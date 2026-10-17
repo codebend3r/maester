@@ -32,6 +32,13 @@ export type ListenConfig = {
   webDir: string | null
 }
 
+export const LISTEN_ENV_VARS = {
+  port: 'PORT',
+  host: 'HOST',
+  dataDir: 'DATA_DIR',
+  webDir: 'WEB_DIR',
+} as const
+
 /** `PORT`, `HOST`, `DATA_DIR` and `WEB_DIR`, with `defaultPort` when `PORT` is not a whole number. */
 export const readListenConfig = ({
   env,
@@ -39,9 +46,12 @@ export const readListenConfig = ({
 }: {
   env: NodeJS.ProcessEnv
   defaultPort: number
-}): ListenConfig => ({
-  port: wholeNumber(env.PORT) ?? defaultPort,
-  host: env.HOST?.trim() || '0.0.0.0',
-  dataDir: resolve(env.DATA_DIR?.trim() || './data'),
-  webDir: env.WEB_DIR?.trim() ? resolve(env.WEB_DIR.trim()) : null,
-})
+}): ListenConfig => {
+  const webDir = env[LISTEN_ENV_VARS.webDir]?.trim()
+  return {
+    port: wholeNumber(env[LISTEN_ENV_VARS.port]) ?? defaultPort,
+    host: env[LISTEN_ENV_VARS.host]?.trim() || '0.0.0.0',
+    dataDir: resolve(env[LISTEN_ENV_VARS.dataDir]?.trim() || './data'),
+    webDir: webDir ? resolve(webDir) : null,
+  }
+}
