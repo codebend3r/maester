@@ -121,6 +121,29 @@ describe('useMediaPlane', () => {
     expect(getMediaTicket).toHaveBeenCalledTimes(2)
   })
 
+  it('retries a refused refresh a minute later, not a second later', async () => {
+    jest.useFakeTimers()
+    let isRefusing = false
+    const getMediaTicket = mock(async () => {
+      if (isRefusing) throw new Error('locked')
+      return { ticket: 'fine', expiresAt: 1 }
+    })
+    const { result } = renderHook(
+      () => useMediaPlane({ api: apiWithTickets(getMediaTicket), mediaId: 1, reprobe: () => {} }),
+      { wrapper: harness() },
+    )
+    pickOrigin(lan)
+    await advance(0)
+    isRefusing = true
+    await advance(REFRESH_MS + 1000)
+    expect(getMediaTicket).toHaveBeenCalledTimes(2)
+    await advance(59_000)
+    expect(getMediaTicket).toHaveBeenCalledTimes(2)
+    await advance(2000)
+    expect(getMediaTicket).toHaveBeenCalledTimes(3)
+    expect(result.current.access?.ticket).toBe('fine')
+  })
+
   it('refreshTicket answers whether the server gave a new ticket', async () => {
     let isRefusing = false
     const getMediaTicket = mock(async () => {
