@@ -12,9 +12,12 @@ import {
   isDesktopReply,
   isDesktopRequest,
   isContainerName,
+  isDownloadAsk,
+  isDownloadAskStatus,
   isDownloadGroup,
   isDownloadKind,
   isDownloadStatus,
+  isDownloadView,
   isInvokeEnvelope,
   isLocalFile,
   isMenuPlayerAction,
@@ -27,6 +30,7 @@ import {
   isServerTarget,
   isServerView,
   isSidecarTrackId,
+  isSpaceView,
   isTrackChoice,
   isUpdateStatus,
   PLAYER_PORT_CHANNEL,
@@ -35,6 +39,31 @@ import {
 
 const id = '0f8fad5b-d9cb-469f-a165-70867728950e'
 const other = '7c9e6679-7425-40de-944b-e07fc1f90ae7'
+
+const READY = {
+  kind: 'ready',
+  title: 'The Lord of the Rings Collection',
+  downloadKind: 'saga',
+  files: 3,
+  bytes: 44_236_810_240,
+  free: 442_381_631_488,
+  fits: true,
+} as const
+
+const ASK = { askId: id, serverId: other, serverName: 'Vhagar', autoDelete: false, status: READY }
+
+const VIEW = {
+  downloadId: id,
+  label: 'The Two Towers (2002)',
+  group: { kind: 'saga', title: 'The Lord of the Rings Collection', order: 1 },
+  serverName: 'Vhagar',
+  size: 15_891_378_995,
+  status: { kind: 'downloading', bytes: 12_992_272_384 },
+  autoDelete: true,
+  watched: null,
+  deletesAt: null,
+  needsUnlock: false,
+} as const
 
 const UPDATES = {
   isEnabled: true,
@@ -180,6 +209,22 @@ describe('isDesktopRequest', () => {
     [{ type: 'setUpdateCheck', isEnabled: false }],
     [{ type: 'checkForUpdates' }],
     [{ type: 'openRelease' }],
+    [{ type: 'confirmDownload', askId: id, autoDelete: true }],
+    [{ type: 'declineDownload', askId: id }],
+    [{ type: 'retryDownloadAsk', askId: id }],
+    [{ type: 'listDownloads' }],
+    [{ type: 'openDownload', downloadId: id }],
+    [{ type: 'pauseDownload', downloadId: id }],
+    [{ type: 'resumeDownload', downloadId: id }],
+    [{ type: 'retryDownload', downloadId: id }],
+    [{ type: 'deleteDownload', downloadId: id }],
+    [{ type: 'setDownloadAutoDelete', downloadId: id, autoDelete: false }],
+    [{ type: 'pauseAllDownloads' }],
+    [{ type: 'resumeAllDownloads' }],
+    [{ type: 'deleteAllDownloads' }],
+    [{ type: 'readSpace' }],
+    [{ type: 'setDownloadDefaults', autoDelete: true }],
+    [{ type: 'showDownloadsFolder' }],
   ])('accepts %j', (value) => {
     expect(isDesktopRequest(value)).toBe(true)
   })
@@ -219,6 +264,22 @@ describe('isDesktopRequest', () => {
     ['a rename to a number', { type: 'renameServer', serverId: id, name: 7 }],
     ['an update switch set by a string', { type: 'setUpdateCheck', isEnabled: 'true' }],
     ['an update switch with no value', { type: 'setUpdateCheck' }],
+    ['a confirmation without its choice', { type: 'confirmDownload', askId: id }],
+    [
+      'a confirmation naming its ask by a path',
+      { type: 'confirmDownload', askId: '/Users/me/film.mkv', autoDelete: false },
+    ],
+    ['a retry naming its ask by a number', { type: 'retryDownloadAsk', askId: 7 }],
+    [
+      'a download named by its path',
+      { type: 'openDownload', downloadId: '/Users/me/Library/raven/downloads/a/7/video.mkv' },
+    ],
+    ['a delete with no download', { type: 'deleteDownload' }],
+    [
+      'an auto-delete switch set by a string',
+      { type: 'setDownloadAutoDelete', downloadId: id, autoDelete: 'yes' },
+    ],
+    ['a default with no value', { type: 'setDownloadDefaults' }],
     ['an unknown type', { type: 'readFile', path: '/etc/hosts' }],
     ['no type', {}],
     ['a string', 'ready'],
@@ -272,8 +333,43 @@ describe('isDesktopReply', () => {
         status: { ...UPDATES, checkedAt: 1_700_000_000_000, latest: '0.6.0', problem: null },
       },
     ],
+    [{ type: 'downloadAsk', ask: ASK }],
+    [{ type: 'downloadAsk', ask: { ...ASK, status: { kind: 'locked' } } }],
+    [{ type: 'downloadAsk', ask: { ...ASK, autoDelete: true, status: { kind: 'hidden' } } }],
+    [{ type: 'downloads', downloads: [VIEW], autoDeleteDefault: false }],
+    [{ type: 'downloads', downloads: [], autoDeleteDefault: true }],
+    [{ type: 'space', space: { free: 442_381_631_488, total: 994_662_584_320, used: 0 } }],
   ])('accepts %j', (value) => {
     expect(isDesktopReply(value)).toBe(true)
+  })
+
+  it.each([
+    ['an ask named by a path', { type: 'downloadAsk', ask: { ...ASK, askId: '/tmp/ask' } }],
+    [
+      'an ask naming its server by its origin',
+      { type: 'downloadAsk', ask: { ...ASK, serverId: 'https://raven.example' } },
+    ],
+    [
+      'an ask whose ready status lacks whether it fits',
+      { type: 'downloadAsk', ask: { ...ASK, status: { ...READY, fits: undefined } } },
+    ],
+    [
+      'an ask of an unknown status',
+      { type: 'downloadAsk', ask: { ...ASK, status: { kind: 'unlocked' } } },
+    ],
+    ['an ask without its default', { type: 'downloadAsk', ask: { ...ASK, autoDelete: undefined } }],
+    [
+      'a download named by its path',
+      {
+        type: 'downloads',
+        downloads: [{ ...VIEW, downloadId: '/Users/me/Library/raven/downloads/a/7/video.mkv' }],
+        autoDeleteDefault: false,
+      },
+    ],
+    ['a list without its default', { type: 'downloads', downloads: [] }],
+    ['a space without what downloads use', { type: 'space', space: { free: 1, total: 2 } }],
+  ])('rejects %s', (_name, value) => {
+    expect(isDesktopReply(value)).toBe(false)
   })
 
   it('rejects a server reply without a status and a server list holding a bare origin', () => {
@@ -353,6 +449,8 @@ describe('isDesktopEvent', () => {
     [{ type: 'playServer', target: { serverId: id, mediaId: 7, at: 30, next: [8] } }],
     [{ type: 'openLink' }],
     [{ type: 'updateAvailable', version: '0.6.0' }],
+    [{ type: 'downloadAsk', ask: ASK }],
+    [{ type: 'downloads', downloads: [VIEW], autoDeleteDefault: false }],
   ])('accepts %j', (value) => {
     expect(isDesktopEvent(value)).toBe(true)
   })
@@ -365,6 +463,11 @@ describe('isDesktopEvent', () => {
     ['a newer release without its version', { type: 'updateAvailable' }],
     ['a newer release with a number for its version', { type: 'updateAvailable', version: 6 }],
     ['openRecent, which only the page asks for', { type: 'openRecent' }],
+    [
+      'space, which only the page asks for',
+      { type: 'space', space: { free: 1, total: 2, used: 0 } },
+    ],
+    ['a list of downloads without its default', { type: 'downloads', downloads: [VIEW] }],
     [
       'a server title queueing a fractional id',
       { type: 'playServer', target: { serverId: id, mediaId: 7, at: 0, next: [1.5] } },
@@ -468,5 +571,33 @@ describe('the download guards', () => {
     })
     expect(isDownloadStatus({ kind: 'stalled', bytes: 5 })).toBe(false)
     expect(isDownloadStatus({ kind: 'failed', bytes: 5 })).toBe(false)
+  })
+})
+
+describe('the download ask and views', () => {
+  it('accepts each status of an ask', () => {
+    expect(isDownloadAskStatus(READY)).toBe(true)
+    expect(isDownloadAskStatus({ kind: 'locked' })).toBe(true)
+    expect(isDownloadAskStatus({ kind: 'hidden' })).toBe(true)
+    expect(isDownloadAskStatus({ ...READY, downloadKind: 'album' })).toBe(false)
+    expect(isDownloadAskStatus({ ...READY, files: '3' })).toBe(false)
+  })
+
+  it('accepts an ask by ids and refuses one whose ids are a path or an origin', () => {
+    expect(isDownloadAsk(ASK)).toBe(true)
+    expect(isDownloadAsk({ ...ASK, askId: '../downloads.json' })).toBe(false)
+    expect(isDownloadAsk({ ...ASK, serverId: 'https://raven.example' })).toBe(false)
+  })
+
+  it('accepts a view with or without its watched share and deletion time', () => {
+    expect(isDownloadView(VIEW)).toBe(true)
+    expect(isDownloadView({ ...VIEW, watched: 0.4, deletesAt: 1_700_000_600_000 })).toBe(true)
+    expect(isDownloadView({ ...VIEW, needsUnlock: 'no' })).toBe(false)
+    expect(isDownloadView({ ...VIEW, status: { kind: 'stalled' } })).toBe(false)
+  })
+
+  it('accepts the space line and refuses one with a string', () => {
+    expect(isSpaceView({ free: 1, total: 2, used: 0 })).toBe(true)
+    expect(isSpaceView({ free: '1', total: 2, used: 0 })).toBe(false)
   })
 })

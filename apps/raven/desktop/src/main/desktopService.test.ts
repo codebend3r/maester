@@ -5,6 +5,7 @@ import { createGrants } from '@/main/grants'
 import { createStateStore, type StateFs, type Timers } from '@/main/stateStore'
 import { EMPTY_STATE } from '@/main/playerState'
 import { createDesktopService, MESSAGES } from '@/main/desktopService'
+import type { DownloadService } from '@/main/downloads/downloadService'
 import { EMPTY_CONFIG, type ConfigStore, type DesktopConfig } from '@/main/desktopConfig'
 import { CALL_MESSAGES, type ServerCallResult } from '@/main/servers/serverCalls'
 import { removeServer } from '@/main/servers/serverList'
@@ -39,6 +40,60 @@ const OUTPUT_ANSWER = {
 
 const SERVER = '0f8fad5b-d9cb-469f-a165-70867728950e'
 const OTHER_SERVER = '7c9e6679-7425-40de-944b-e07fc1f90ae7'
+
+const ASK_ID = '00000000-0000-4000-8000-0000000000aa'
+
+const DOWNLOADS_REPLY = {
+  type: 'downloads',
+  downloads: [],
+  autoDeleteDefault: false,
+} as const satisfies DesktopReply
+
+const SPACE_REPLY = {
+  type: 'space',
+  space: { free: 1, total: 2, used: 0 },
+} as const satisfies DesktopReply
+
+/** A download service that records what reached it and answers each with a fixed reply. */
+const fakeDownloads = () => {
+  const reached: { name: string; input: unknown }[] = []
+  const note = (name: string, input: unknown = null) => {
+    reached.push({ name, input })
+  }
+  const downloads: DownloadService = {
+    ask: async (input) => {
+      note('ask', input)
+      return { type: 'done' }
+    },
+    retryAsk: async (input) => {
+      note('retryAsk', input)
+      return { type: 'done' }
+    },
+    confirm: async (input) => {
+      note('confirm', input)
+      return DOWNLOADS_REPLY
+    },
+    decline: (input) => {
+      note('decline', input)
+      return { type: 'done' }
+    },
+    list: () => {
+      note('list')
+      return DOWNLOADS_REPLY
+    },
+    readSpace: async () => {
+      note('readSpace')
+      return SPACE_REPLY
+    },
+    setDefaults: (input) => {
+      note('setDefaults', input)
+      return { ...DOWNLOADS_REPLY, autoDeleteDefault: input.autoDelete }
+    },
+    views: () => [],
+    dispose: () => undefined,
+  }
+  return { downloads, reached }
+}
 
 const SERVER_ENTRY = {
   id: SERVER,
@@ -188,8 +243,10 @@ const setup = ({
     announce: () => undefined,
     warn: () => undefined,
   })
+  const { downloads, reached } = fakeDownloads()
   const service = createDesktopService({
     updates,
+    downloads,
     config,
     serverCalls: {
       callFromPage: async (input) => {
@@ -282,6 +339,7 @@ const setup = ({
     store,
     config,
     server,
+    reached,
     releases,
     table,
     stats,
@@ -1437,5 +1495,76 @@ describe('updates', () => {
     await ask({ service, request: { type: 'checkForUpdates' } })
     expect(await ask({ service, request: { type: 'openRelease' } })).toEqual({ type: 'done' })
     expect(releases.opened).toEqual([PAGE])
+  })
+})
+
+describe('downloads', () => {
+  type Service = ReturnType<typeof setup>['service']
+  const ask = ({ service, request }: { service: Service; request: unknown }) =>
+    service.handle({ kind: 'page', request })
+
+  it('hands a confirmation to the download service and answers its list', async () => {
+    const { service, reached } = setup({ files: {} })
+    expect(
+      await ask({ service, request: { type: 'confirmDownload', askId: ASK_ID, autoDelete: true } }),
+    ).toEqual(DOWNLOADS_REPLY)
+    expect(reached).toEqual([{ name: 'confirm', input: { askId: ASK_ID, autoDelete: true } }])
+  })
+
+  it('answers listDownloads from the download service', async () => {
+    const { service, reached } = setup({ files: {} })
+    expect(await ask({ service, request: { type: 'listDownloads' } })).toEqual(DOWNLOADS_REPLY)
+    expect(reached).toEqual([{ name: 'list', input: null }])
+  })
+
+  it.each([
+    [
+      { type: 'declineDownload', askId: ASK_ID },
+      { name: 'decline', input: { askId: ASK_ID } },
+    ],
+    [
+      { type: 'retryDownloadAsk', askId: ASK_ID },
+      { name: 'retryAsk', input: { askId: ASK_ID } },
+    ],
+    [{ type: 'readSpace' }, { name: 'readSpace', input: null }],
+    [
+      { type: 'setDownloadDefaults', autoDelete: true },
+      { name: 'setDefaults', input: { autoDelete: true } },
+    ],
+  ])('hands %j to the download service', async (request, call) => {
+    const { service, reached } = setup({ files: {} })
+    await ask({ service, request })
+    expect(reached).toEqual([call])
+  })
+
+  it('refuses a confirmation that names its ask by anything but an opaque id', async () => {
+    const { service, reached } = setup({ files: {} })
+    expect(
+      await ask({
+        service,
+        request: { type: 'confirmDownload', askId: '../downloads.json', autoDelete: false },
+      }),
+    ).toEqual({ type: 'refused', message: MESSAGES.unknownRequest })
+    expect(reached).toEqual([])
+  })
+
+  it.each([
+    [{ type: 'openDownload', downloadId: ASK_ID }],
+    [{ type: 'pauseDownload', downloadId: ASK_ID }],
+    [{ type: 'resumeDownload', downloadId: ASK_ID }],
+    [{ type: 'retryDownload', downloadId: ASK_ID }],
+    [{ type: 'deleteDownload', downloadId: ASK_ID }],
+    [{ type: 'setDownloadAutoDelete', downloadId: ASK_ID, autoDelete: true }],
+    [{ type: 'pauseAllDownloads' }],
+    [{ type: 'resumeAllDownloads' }],
+    [{ type: 'deleteAllDownloads' }],
+    [{ type: 'showDownloadsFolder' }],
+  ])('refuses %j, which raven player does not do yet', async (request) => {
+    const { service, reached } = setup({ files: {} })
+    expect(await ask({ service, request })).toEqual({
+      type: 'refused',
+      message: MESSAGES.unknownRequest,
+    })
+    expect(reached).toEqual([])
   })
 })

@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react'
 import { type NavigateFunction, useLocation, useNavigate } from 'react-router-dom'
-import type { DesktopReply, PlayTarget, ServerTarget } from '@/shared/protocol'
+import type { DesktopReply, DownloadAsk, PlayTarget, ServerTarget } from '@/shared/protocol'
 
 export const RECENTS_KEY = ['desktop', 'recents'] as const
 
@@ -9,6 +9,9 @@ export const NoticeContext = createContext<(message: string) => void>(() => unde
 
 /** Says something in the Shell's live region, which outlasts the page that said it. */
 export const useNotice = (): ((message: string) => void) => useContext(NoticeContext)
+
+/** The Shell provides it to show the download dialog; a page outside the Shell shows nothing. */
+export const DownloadAskContext = createContext<(ask: DownloadAsk) => void>(() => undefined)
 
 const isPlaying = ({ pathname }: { pathname: string }): boolean =>
   pathname.startsWith('/play/') || pathname.startsWith('/server/')
@@ -48,17 +51,21 @@ export const applyReply = ({
   navigate,
   pathname,
   showNotice,
+  showDownloadAsk,
 }: {
   reply: DesktopReply
   navigate: NavigateFunction
   pathname: string
   showNotice: (message: string) => void
+  showDownloadAsk: (ask: DownloadAsk) => void
 }) => {
   switch (reply.type) {
     case 'play':
       return void play({ navigate, pathname, target: reply.target })
     case 'playServer':
       return void playServer({ navigate, pathname, target: reply.target })
+    case 'downloadAsk':
+      return showDownloadAsk(reply.ask)
     case 'refused':
       return showNotice(reply.message)
     case 'file':
@@ -69,6 +76,8 @@ export const applyReply = ({
     case 'serverReply':
     case 'serverUnreachable':
     case 'updates':
+    case 'downloads':
+    case 'space':
       return
     default: {
       const unreachable: never = reply
@@ -82,5 +91,6 @@ export const useOpenReply = (): ((reply: DesktopReply) => void) => {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const showNotice = useContext(NoticeContext)
-  return (reply) => applyReply({ reply, navigate, pathname, showNotice })
+  const showDownloadAsk = useContext(DownloadAskContext)
+  return (reply) => applyReply({ reply, navigate, pathname, showNotice, showDownloadAsk })
 }

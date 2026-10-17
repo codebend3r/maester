@@ -50,7 +50,9 @@ export const Shell = () => {
     if (heading !== null) heading.focus()
   }, [])
 
-  const openReply = (reply: DesktopReply) => applyReply({ reply, navigate, pathname, showNotice })
+  // No dialog shows a download ask yet, so the Shell lets one go.
+  const openReply = (reply: DesktopReply) =>
+    applyReply({ reply, navigate, pathname, showNotice, showDownloadAsk: () => undefined })
   const isDragging = useFileDrop({ client, onReply: openReply })
 
   const onEvent = useEffectEvent((event: DesktopEvent) => {
@@ -71,6 +73,10 @@ export const Shell = () => {
         setUpdate(event.version)
         // Settings reads main's status again, so an open Updates section shows the release too.
         return void queryClient.invalidateQueries({ queryKey: UPDATES_KEY })
+      // Nothing shows a download ask or the downloads list yet, so both go unheard.
+      case 'downloadAsk':
+      case 'downloads':
+        return
       default: {
         const unreachable: never = event
         return unreachable

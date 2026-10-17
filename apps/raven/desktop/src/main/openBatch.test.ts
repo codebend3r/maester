@@ -156,8 +156,21 @@ describe('eventForOpen', () => {
     expect(eventForOpen({ type: 'playServer', target })).toEqual({ type: 'playServer', target })
   })
 
+  it('turns a download ask into the event that shows it', () => {
+    const ask = {
+      askId: FILM,
+      serverId: NEXT,
+      serverName: 'Vhagar',
+      autoDelete: false,
+      status: { kind: 'locked' },
+    } as const
+    expect(eventForOpen({ type: 'downloadAsk', ask })).toEqual({ type: 'downloadAsk', ask })
+  })
+
   it('sends nothing for a reply that opens nothing', () => {
     expect(eventForOpen({ type: 'done' })).toBeNull()
+    expect(eventForOpen({ type: 'downloads', downloads: [], autoDeleteDefault: false })).toBeNull()
+    expect(eventForOpen({ type: 'space', space: { free: 1, total: 2, used: 0 } })).toBeNull()
     expect(eventForOpen({ type: 'servers', servers: [] })).toBeNull()
     expect(eventForOpen({ type: 'serverReply', status: 200, body: '{}' })).toBeNull()
     expect(eventForOpen({ type: 'serverUnreachable', message: 'gone' })).toBeNull()

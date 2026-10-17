@@ -1,14 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import {
-  LOCKED_STATUS,
-  type EpisodeSummary,
-  type ItemDetails,
-  type ItemSummary,
-  type Library,
-  type MediaItem,
-  type Saga,
-  type SeasonSummary,
-} from '@raven/core'
+import { LOCKED_STATUS, type MediaItem, type Saga } from '@raven/core'
 import {
   DOWNLOAD_MAX_FILES,
   EXPAND_MESSAGES,
@@ -16,138 +7,22 @@ import {
   expandTarget,
   type Expansion,
 } from '@/main/downloads/expand'
-import { requestFor, type AllowedCall } from '@/main/servers/allowlist'
-import type { ServerCalls } from '@/main/servers/serverCalls'
+import {
+  details,
+  episode,
+  fakeCalls,
+  keyOf,
+  library,
+  ok,
+  season,
+  show,
+  summary,
+  type Reply,
+} from '@/main/test/serverFakes'
 import { mediaItemFor } from '@/shared/test/mediaItem'
 
 const SERVER_ID = '6f1c1c0e-3b0a-4f4e-8a55-0d2f3c5b7e11'
 const SERVER_NAME = 'Vhagar'
-
-type Reply = { status: number; body: unknown } | { unreachable: string }
-
-const keyOf = (call: AllowedCall): string => {
-  const { method, path } = requestFor(call)
-  return `${method} ${path}`
-}
-
-const ok = (body: unknown): Reply => ({ status: 200, body })
-
-const fakeCalls = (replies: Record<string, Reply>) => {
-  const log: string[] = []
-  const calls: Pick<ServerCalls, 'call'> = {
-    call: async ({ call }) => {
-      const key = keyOf(call)
-      log.push(key)
-      const reply = replies[key] ?? { status: 404, body: '' }
-      if ('unreachable' in reply) return { ok: false, message: reply.unreachable }
-      const body = typeof reply.body === 'string' ? reply.body : JSON.stringify(reply.body)
-      return { ok: true, status: reply.status, body }
-    },
-  }
-  return { calls, log }
-}
-
-const summary = (overrides: Partial<ItemSummary>): ItemSummary => ({
-  id: 1,
-  type: 'movie',
-  title: 'Fellowship',
-  year: 2001,
-  show: null,
-  season: null,
-  episode: null,
-  posterVersion: null,
-  backdropVersion: null,
-  ratings: [],
-  ...overrides,
-})
-
-const details = (overrides: Partial<ItemDetails>): ItemDetails => ({
-  ...summary({}),
-  tmdbId: '120',
-  imdbId: null,
-  originalTitle: null,
-  tagline: null,
-  summary: null,
-  contentRating: null,
-  released: null,
-  ended: null,
-  runtime: null,
-  studio: null,
-  genres: [],
-  logoVersion: null,
-  aiMatch: null,
-  credits: [],
-  reviews: [],
-  versions: [],
-  children: [],
-  ...overrides,
-})
-
-const library = (overrides: { id: number; watchedPercent: number }): Library => ({
-  id: overrides.id,
-  name: 'Library',
-  paths: [],
-  layouts: [],
-  itemCount: 0,
-  unmatchedCount: 0,
-  createdAt: '2026-10-16T00:00:00.000Z',
-  scan: {
-    state: 'idle',
-    found: 0,
-    processed: 0,
-    startedAt: null,
-    finishedAt: null,
-    quickScannedAt: null,
-    error: null,
-  },
-  settings: {
-    saveProgress: true,
-    pinned: true,
-    sort: 'title',
-    view: 'grid',
-    groupBy: 'resolution',
-    watchedPercent: overrides.watchedPercent,
-    kind: 'other',
-    ratingsSource: 'tmdb',
-    autoRefresh: true,
-    locked: false,
-    folderLayout: 'auto',
-    icon: null,
-  },
-  backdrop: null,
-})
-
-const show = { id: 4, title: 'Severance' }
-
-const episode = ({
-  id,
-  season,
-  number,
-  title,
-  primary,
-}: {
-  id: number
-  season: number
-  number: number
-  title: string
-  primary: MediaItem | null
-}): EpisodeSummary => ({
-  ...summary({ id, type: 'episode', title, show, season, episode: number }),
-  type: 'episode',
-  summary: null,
-  released: null,
-  runtime: null,
-  stillVersion: null,
-  watched: false,
-  primary,
-})
-
-const season = ({ id, number }: { id: number; number: number }): SeasonSummary => ({
-  ...summary({ id, type: 'season', title: `Season ${number}`, show, season: number }),
-  type: 'season',
-  episodeCount: 2,
-  watchedCount: 0,
-})
 
 const file = ({ id, libraryId = 1 }: { id: number; libraryId?: number }): MediaItem =>
   mediaItemFor({ id, libraryId, title: `File ${id}` })

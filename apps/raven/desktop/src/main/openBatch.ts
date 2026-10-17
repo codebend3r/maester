@@ -72,6 +72,8 @@ export const eventForOpen = (reply: DesktopReply): DesktopEvent | null => {
       return { type: 'play', target: reply.target }
     case 'playServer':
       return { type: 'playServer', target: reply.target }
+    case 'downloadAsk':
+      return { type: 'downloadAsk', ask: reply.ask }
     case 'refused':
       return { type: 'notice', message: reply.message }
     case 'file':
@@ -82,6 +84,8 @@ export const eventForOpen = (reply: DesktopReply): DesktopEvent | null => {
     case 'serverReply':
     case 'serverUnreachable':
     case 'updates':
+    case 'downloads':
+    case 'space':
       return null
     default: {
       const unreachable: never = reply
