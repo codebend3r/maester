@@ -87,6 +87,12 @@ export type DownloadService = Pick<DownloadAsks, 'ask' | 'retryAsk' | 'confirm' 
     pauseAll: () => Promise<DesktopReply>
     resumeAll: () => DesktopReply
     removeAll: () => Promise<DesktopReply>
+    /**
+     * The page said ready: a new page, playing nothing, since a reload mid-play left no unmount
+     * to say the player left its file. The first one starts the clocks of what deletes once
+     * watched, so what they tell at launch reaches a page that listens.
+     */
+    pageReady: () => void
     /** Called when a server is removed from raven player (Ruling 17). */
     removeServer: (input: { serverId: string }) => Promise<void>
     showFolder: () => Promise<DesktopReply>
@@ -139,6 +145,10 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
   const { store, config } = deps
   const announcing: { timer: unknown } = { timer: undefined }
   let isDisposed = false
+  const firstPage: { ready: () => void } = { ready: () => undefined }
+  const isPageReady = new Promise<void>((resolve) => {
+    firstPage.ready = resolve
+  })
 
   // Declared before everything that reads it. Its own dependencies are read only once a clock
   // runs, after construction, so they may come later.
@@ -409,18 +419,25 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     queue.dispose()
   }
 
+  // `send` drops an event while there is no window, so a deletion due at once waits for the
+  // first page to say ready before it tells of itself. A page that never does starts none.
+  const startClocks = async (): Promise<void> => {
+    await isPageReady
+    if (isDisposed) return
+    deleteClock.rebuild()
+    // The page may have listed the downloads before their clocks ran.
+    if (views().some(({ deletesAt }) => deletesAt !== null)) announce()
+  }
+
   // A launch picks up what the last run left, once the folders no download names are gone,
-  // reads each file it kept for its share watched, starts the clocks of what deletes once
-  // watched, and tries again what an outage stopped. A deletion due at once waits for the
+  // reads each file it kept for its share watched, tries again what an outage stopped and
+  // starts the clocks of what deletes once watched. A deletion due at once waits for the
   // network, so the server hears what was watched before the file goes.
   const resumeLaunch = async (): Promise<void> => {
     await Promise.all([queue.sweep({ wasSetAside: deps.wasSetAside }), deps.ready])
     playback.readFiles(store.read().entries.filter(({ status }) => status.kind === 'ready'))
-    deleteClock.rebuild()
-    // The page may have listed the downloads before their clocks ran.
-    if (views().some(({ deletesAt }) => deletesAt !== null)) announce()
     queue.retryOutages()
-    await sync.runAll()
+    await Promise.all([startClocks(), sync.runAll()])
   }
   resumeLaunch().catch((error: unknown) => {
     deps.warn(`raven player could not resume its downloads: ${loggable(errorText(error))}`)
@@ -443,6 +460,10 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     pauseAll,
     resumeAll,
     removeAll,
+    pageReady: () => {
+      playback.notePlaying({ fileId: null })
+      firstPage.ready()
+    },
     removeServer: queue.removeServer,
     showFolder,
     open: playback.open,
