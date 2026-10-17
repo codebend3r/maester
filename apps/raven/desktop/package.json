@@ -112,16 +112,36 @@
         ]
       },
       "e2e": {
-        "cache": false,
+        "cache": true,
         "dependsOn": [
           "build",
           "install:electron"
+        ],
+        "inputs": [
+          "default",
+          "^production",
+          {
+            "runtime": "xcodebuild -version"
+          },
+          {
+            "runtime": "uname -m"
+          }
         ]
       },
       "test:native": {
-        "cache": false,
+        "cache": true,
         "dependsOn": [
           "^build"
+        ],
+        "inputs": [
+          "default",
+          "^production",
+          {
+            "runtime": "xcodebuild -version"
+          },
+          {
+            "runtime": "uname -m"
+          }
         ]
       },
       "install:electron": {
@@ -134,9 +154,25 @@
         ]
       },
       "make": {
-        "cache": false,
+        "cache": true,
         "dependsOn": [
           "build"
+        ],
+        "inputs": [
+          "production",
+          "^production",
+          {
+            "env": "RAVEN_SIGN_IDENTITY"
+          },
+          {
+            "env": "RAVEN_NOTARIZE_PROFILE"
+          },
+          {
+            "runtime": "uname -m"
+          }
+        ],
+        "outputs": [
+          "{projectRoot}/out"
         ]
       }
     }

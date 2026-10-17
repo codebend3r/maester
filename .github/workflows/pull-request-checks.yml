@@ -85,8 +85,10 @@ jobs:
       - name: ${{ matrix.check.name }}
         run: ${{ matrix.check.run }}
 
-  desktop:
-    name: 🖥️ Desktop
+  # The desktop jobs run side by side: packaging needs only the bundled app, and the two
+  # playback checks share one native build, handed over as an artifact.
+  desktop-native:
+    name: 🎞️ Desktop native
     # Standard macos-26 is arm64; macos-26-intel is explicitly not supported.
     runs-on: macos-26
     timeout-minutes: 120
@@ -117,9 +119,6 @@ jobs:
       - name: 📦 Install
         run: bun install --frozen-lockfile
 
-      - name: 🏗️ Build TypeScript wrapper
-        run: bunx nx run @raven/mpv:build
-
       # fetch:libmpv is an Nx cached task, so Nx Cloud restores the source build for any
       # run with the same inputs. With no token (a fork's PR) it builds cold: Nx 23 ties
       # .nx/cache to a per-machine database, so restoring it on a fresh runner never hits.
@@ -129,16 +128,10 @@ jobs:
       - name: 🔩 Build N-API addon
         run: bunx nx run @raven/mpv:build:native
 
-      - name: 🔎 Audit native dependencies, sources and signatures
-        run: bunx nx run @raven/mpv:audit:native
-
-      - name: 🧪 Real headless libmpv tests
-        run: bunx nx run @raven/mpv:test:native
-
-      - name: 🧪 Desktop player against headless libmpv
-        run: bunx nx run @raven/desktop:test:native
-        env:
-          RAVEN_E2E_FFMPEG: ${{ github.workspace }}/libs/raven/mpv/native-build/prefix/bin/ffmpeg
+      # Both only read the built resources, so Nx runs them at once. test:native is
+      # cached, keyed on the native sources, the build recipe and the Xcode version.
+      - name: 🔎 Audit native resources and run the real headless libmpv tests
+        run: bunx nx run-many -p @raven/mpv -t audit:native test:native
 
       - name: 📤 Native playback resources
         uses: actions/upload-artifact@v7
@@ -154,28 +147,50 @@ jobs:
           path: libs/raven/mpv/native-build/source-bundle
           if-no-files-found: error
 
-      # Vite's log carries the renderer's gzip sizes, for the 250 KB budget.
+      # What the playback jobs load: the addon and its dylibs, and the source-built ffmpeg
+      # that makes their clips. A tar keeps ffmpeg's execute bit, which an artifact drops.
+      - name: 📦 Pack the playback handoff
+        run: >-
+          tar -cf "$RUNNER_TEMP/raven-native-handoff.tar"
+          libs/raven/mpv/resources/darwin-arm64
+          libs/raven/mpv/native-build/prefix/bin/ffmpeg
+
+      - name: 📤 Playback handoff
+        uses: actions/upload-artifact@v7
+        with:
+          name: raven-native-handoff-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/raven-native-handoff.tar
+          if-no-files-found: error
+          retention-days: 1
+          # A re-run of this job replaces the handoff its first attempt left.
+          overwrite: true
+
+  # Forge packages only the bundled app, never libmpv, so this starts at once.
+  desktop-app:
+    name: 📦 Desktop app
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - name: 📥 Checkout exact PR head
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: 🍞 Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      - name: 📦 Install
+        run: bun install --frozen-lockfile
+
+      # Vite's log carries the renderer's gzip sizes, for the 250 KB budget. Nx replays it
+      # on a cache hit.
       - name: 🏗️ Build desktop app
         run: bunx nx run @raven/desktop:build
 
-      # Runs `electron .`, never the packaged app, whose fuses turn off the inspector
-      # Playwright needs; the runner's logged-in GUI session shows the window. Electron 44
-      # has no postinstall, so the target's `install:electron` step fetches the binary.
-      - name: 🎬 Desktop end to end
-        run: bunx nx run @raven/desktop:e2e
-        env:
-          # The source-built ffmpeg above has VideoToolbox; `-allow_sw 1` falls back to
-          # Apple's software H.264 encoder on a VM without a hardware one.
-          RAVEN_E2E_FFMPEG: ${{ github.workspace }}/libs/raven/mpv/native-build/prefix/bin/ffmpeg
-
-      - name: 📤 End to end traces
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: raven-desktop-e2e-traces-${{ github.event.pull_request.head.sha }}
-          path: apps/raven/desktop/test-results
-          if-no-files-found: ignore
-
+      # Cached on the app's sources and the signing environment, so an unchanged app
+      # restores from Nx Cloud.
       - name: 📦 Make the unsigned app
         run: bunx nx run @raven/desktop:make
 
@@ -185,6 +200,83 @@ jobs:
           name: raven-player-darwin-arm64-${{ github.event.pull_request.head.sha }}
           path: apps/raven/desktop/out/make
           if-no-files-found: error
+
+  desktop-playback:
+    name: ${{ matrix.check.name }}
+    needs: desktop-native
+    runs-on: macos-26
+    timeout-minutes: 30
+    strategy:
+      fail-fast: true
+      matrix:
+        check:
+          - name: 🧪 Desktop player against headless libmpv
+            target: test:native
+          # Runs `electron .`, never the packaged app, whose fuses turn off the inspector
+          # Playwright needs; the runner's logged-in GUI session shows the window. Electron 44
+          # has no postinstall, so the target's `install:electron` step fetches the binary.
+          - name: 🎬 Desktop end to end
+            target: e2e
+            traces: true
+    env:
+      # Keeps the Xcode version the cached results are keyed on the same as the native job's.
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      # The source-built ffmpeg has VideoToolbox; `-allow_sw 1` falls back to Apple's
+      # software H.264 encoder on a VM without a hardware one.
+      RAVEN_E2E_FFMPEG: ${{ github.workspace }}/libs/raven/mpv/native-build/prefix/bin/ffmpeg
+    steps:
+      - name: 📥 Checkout exact PR head
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: 🍞 Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      - name: 📦 Install
+        run: bun install --frozen-lockfile
+
+      - name: 📥 Playback handoff
+        uses: actions/download-artifact@v8
+        with:
+          name: raven-native-handoff-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}
+
+      - name: 📂 Unpack the playback handoff
+        run: tar -xf "$RUNNER_TEMP/raven-native-handoff.tar"
+
+      # Cached on the desktop and native sources and the Xcode version, so a PR that
+      # changes neither restores the result from Nx Cloud.
+      - name: ${{ matrix.check.name }}
+        run: bunx nx run @raven/desktop:${{ matrix.check.target }}
+
+      - name: 📤 End to end traces
+        if: failure() && matrix.check.traces
+        uses: actions/upload-artifact@v7
+        with:
+          name: raven-desktop-e2e-traces-${{ github.event.pull_request.head.sha }}
+          path: apps/raven/desktop/test-results
+          if-no-files-found: ignore
+
+  # The "Protect main" ruleset requires a check named 🖥️ Desktop, so this one stands
+  # for every desktop job and passes only when all of them did.
+  desktop:
+    name: 🖥️ Desktop
+    needs: [desktop-native, desktop-app, desktop-playback]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: ✅ Every desktop job passed
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "$RESULTS"
+          for result in $RESULTS; do
+            test "$result" = success
+          done
 
   smoke:
     name: 🐳 Smoke test

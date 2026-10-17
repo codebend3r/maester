@@ -65,8 +65,10 @@ change `xcode-select`. Supply `DEVELOPER_DIR` explicitly when necessary. CI uses
 Xcode 26.6 on the standard `macos-26` arm64 runner and may install Apple's Metal
 component on that disposable runner only. No local system installation is implied.
 
-`fetch:libmpv` is a cached Nx target (about 7 minutes cold), keyed on `native/`, `src/build/`,
-the lockfile and the Xcode version. CI sets `NX_CLOUD_ACCESS_TOKEN` from a repository secret so
+`fetch:libmpv` is a cached Nx target (about 7 minutes cold), keyed on the source lock, the
+patches, the build scripts in `src/build/`, node-addon-api's version and the Xcode version. The
+addon's sources and build, the audit, the tests and the package version stay out of the key: the
+audit only accepts or rejects what the build made, and `build:native` reruns it. CI sets `NX_CLOUD_ACCESS_TOKEN` from a repository secret so
 Nx Cloud serves it to every later run; with no token it caches in `.nx/cache` only.
 Homebrew may provide build tools, never the shipped runtime dependencies.
 Both MoltenVK Xcode stages keep separate derived-data directories under
@@ -160,6 +162,11 @@ after each worker exits rather than just a successful exit code. Abandoned owner
 remain held by their async cleanup hooks until environment exit, even after GC
 terminates their mpv handles. A timer running across the load cycles is a liveness
 check, not a p99 performance measurement.
+
+`test:native` is a cached Nx target, keyed on this project's files (the native sources and
+build scripts among them), its dependencies' production files and the Xcode version, which
+together fix the addon and libmpv it loads. A run whose inputs match an earlier pass restores
+that pass. It loads the built resources rather than building them, so `build:native` runs first.
 
 Local P3 implementation/review readiness can be conditional on generic gates and
 syntax-only Objective-C++ checks when the developer's Metal Toolchain is absent.
