@@ -64,7 +64,7 @@ describe('loadDownloads', () => {
           serverId: '11111111-1111-4111-8111-111111111111',
           mediaId: 1,
           label: 'The Two Towers',
-          group: { kind: 'movie', title: 'The Two Towers', order: 0 },
+          group: { kind: 'movie', key: 'movie:1', title: 'The Two Towers', order: 0 },
           container: 'mkv',
           size: 1000,
           duration: null,
