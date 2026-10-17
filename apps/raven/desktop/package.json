@@ -29,6 +29,7 @@
     "dev": "electron .",
     "e2e": "playwright test",
     "install:electron": "install-electron",
+    "stage:mpv": "bun src/build/stageMpv.ts",
     "package": "electron-forge package",
     "make": "electron-forge make"
   },
@@ -101,6 +102,7 @@
       "dev",
       "e2e",
       "install:electron",
+      "stage:mpv",
       "package",
       "make"
     ],
@@ -147,16 +149,21 @@
       "install:electron": {
         "cache": false
       },
+      "stage:mpv": {
+        "cache": false
+      },
       "package": {
         "cache": false,
         "dependsOn": [
-          "build"
+          "build",
+          "stage:mpv"
         ]
       },
       "make": {
         "cache": true,
         "dependsOn": [
-          "build"
+          "build",
+          "stage:mpv"
         ],
         "inputs": [
           "production",
@@ -166,6 +173,9 @@
           },
           {
             "env": "RAVEN_NOTARIZE_PROFILE"
+          },
+          {
+            "runtime": "xcodebuild -version"
           },
           {
             "runtime": "uname -m"

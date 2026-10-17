@@ -9,5 +9,5 @@
   "bracketSpacing": true,
   "endOfLine": "lf",
   "insertFinalNewline": true,
-  "ignorePatterns": ["dist", "out", "test-results", "bun.lock"]
+  "ignorePatterns": ["dist", "out", "staging", "test-results", "bun.lock"]
 }

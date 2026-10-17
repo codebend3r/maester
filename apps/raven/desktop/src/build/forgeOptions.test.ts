@@ -1,13 +1,12 @@
 import { describe, expect, it } from 'bun:test'
 import { VIDEO_EXTENSIONS } from '@raven/core'
 import {
-  adHocSealArgs,
+  adHocApps,
   DOCUMENT_UTIS,
   type DocumentUti,
   documentTypes,
   FUSES,
   isPackagedPath,
-  resealTargets,
   signingFrom,
   utiFor,
 } from '@/build/forgeOptions'
@@ -138,33 +137,18 @@ describe('signingFrom', () => {
   })
 })
 
-describe('adHocSealArgs', () => {
-  it('reseals the whole bundle ad hoc, nested helpers included', () => {
-    expect(adHocSealArgs({ app: '/out/raven player.app' })).toEqual([
-      '--sign',
-      '-',
-      '--force',
-      '--deep',
-      '/out/raven player.app',
-    ])
-  })
-})
+describe('adHocApps', () => {
+  const outputPaths = ['/o/raven player-darwin-arm64']
 
-describe('resealTargets', () => {
-  const outputPaths = ['/out/raven player-darwin-arm64', '/out/raven player-darwin-x64']
-
-  it('reseals each packaged app ad hoc on macOS without an identity', () => {
+  it('signs each packaged app ad hoc on macOS without an identity', () => {
     expect(
-      resealTargets({ platform: 'darwin', signing: {}, outputPaths, appName: 'raven player' }),
-    ).toEqual([
-      adHocSealArgs({ app: '/out/raven player-darwin-arm64/raven player.app' }),
-      adHocSealArgs({ app: '/out/raven player-darwin-x64/raven player.app' }),
-    ])
+      adHocApps({ platform: 'darwin', signing: {}, outputPaths, appName: 'raven player' }),
+    ).toEqual(['/o/raven player-darwin-arm64/raven player.app'])
   })
 
-  it('reseals nothing when an identity signs the app', () => {
+  it('signs nothing ad hoc when an identity signs the app', () => {
     expect(
-      resealTargets({
+      adHocApps({
         platform: 'darwin',
         signing: { osxSign: { identity: 'Developer ID Application: Someone' } },
         outputPaths,
@@ -173,9 +157,9 @@ describe('resealTargets', () => {
     ).toEqual([])
   })
 
-  it('reseals nothing off macOS', () => {
+  it('signs nothing off macOS', () => {
     expect(
-      resealTargets({ platform: 'linux', signing: {}, outputPaths, appName: 'raven player' }),
+      adHocApps({ platform: 'linux', signing: {}, outputPaths, appName: 'raven player' }),
     ).toEqual([])
   })
 })
