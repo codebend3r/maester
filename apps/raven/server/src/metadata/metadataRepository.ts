@@ -151,6 +151,13 @@ const DAY_MS = 24 * 60 * 60 * 1000
 /** A person whose filmography was fetched this recently keeps their id with no credits left. */
 const FILMOGRAPHY_KEPT_DAYS = 180
 
+/** How old a provider's answer gets before its scores are due again. */
+const SCORES_DUE_DAYS = 30
+
+/** The time before which a provider's answer is due again, as `scoresDue` takes it. */
+export const scoresDueBefore = (): string =>
+  new Date(Date.now() - SCORES_DUE_DAYS * DAY_MS).toISOString()
+
 const genresOf = (json: string): string[] => parseJsonAs({ json, guard: isStringArray }) ?? []
 
 /** Movies, shows, seasons and episodes as TMDB describes them, with their people, scores and pictures. */
@@ -701,8 +708,9 @@ export class MetadataRepository {
 
   /**
    * Stores what one provider answered for an item and notes when. The rows
-   * it wrote before and no longer sends go; the others' rows stay, and an
-   * MDBList score is never overwritten by OMDb's.
+   * it wrote before and no longer sends go; the others' rows stay. OMDb
+   * writes over an MDBList score only once MDBList's answer is due again, so
+   * scores from an MDBList that has gone away do not freeze.
    */
   saveScores({
     itemId,
@@ -730,10 +738,12 @@ export class MetadataRepository {
         `INSERT INTO ratings (item_id, source, value, votes, provider) VALUES (?, ?, ?, ?, ?)
          ON CONFLICT (item_id, source) DO UPDATE
            SET value = excluded.value, votes = excluded.votes, provider = excluded.provider
-         WHERE ratings.provider = excluded.provider OR excluded.provider = 'mdblist'`,
+         WHERE ratings.provider = excluded.provider OR excluded.provider = 'mdblist'
+            OR (SELECT COALESCE(mdblist_fetched_at, '') FROM items WHERE id = excluded.item_id) < ?`,
       )
+      const before = scoresDueBefore()
       scores.forEach((score) =>
-        upsert.run(itemId, score.source, score.value, score.votes, provider),
+        upsert.run(itemId, score.source, score.value, score.votes, provider, before),
       )
     })()
   }

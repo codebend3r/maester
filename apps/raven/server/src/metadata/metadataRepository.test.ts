@@ -422,6 +422,29 @@ describe("each provider's scores", () => {
     expect(rows(id)).toEqual([{ source: 'imdb', value: 8.4, votes: 1200, provider: 'mdblist' }])
   })
 
+  it("lets OMDb write over MDBList's scores once MDBList's answer is due again, keeping those OMDb does not send", () => {
+    const id = title({ tmdbId: '906' })
+    const stored = metadata()
+    stored.saveScores({
+      itemId: id,
+      provider: 'mdblist',
+      scores: [
+        score({ source: 'rottenTomatoes', value: 9.1 }),
+        score({ source: 'metacritic', value: 8 }),
+      ],
+    })
+    stamp({ itemId: id, mdblist: daysAgo(31) })
+    stored.saveScores({
+      itemId: id,
+      provider: 'omdb',
+      scores: [score({ source: 'rottenTomatoes', value: 5 })],
+    })
+    expect(rows(id)).toEqual([
+      { source: 'metacritic', value: 8, votes: null, provider: 'mdblist' },
+      { source: 'rottenTomatoes', value: 5, votes: null, provider: 'omdb' },
+    ])
+  })
+
   it("writes MDBList's Rotten Tomatoes score over OMDb's", () => {
     const id = title({ tmdbId: '902' })
     const stored = metadata()

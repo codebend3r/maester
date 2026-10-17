@@ -201,7 +201,7 @@ Migration 28:
 
 **Saving.** A provider's answer:
 - deletes only the rows that provider wrote and no longer sends;
-- never overwrites an MDBList row with an OMDb one.
+- never overwrites an MDBList row with an OMDb one while MDBList's answer is under 30 days old. Past that, OMDb's answer replaces it, so scores from an MDBList key that has gone away do not freeze.
 
 **Topping up.** Due scores are topped up by a `ScoreSweep` on its own queue, never the metadata queue, within each provider's daily budget (`MDBLIST_DAILY_LIMIT`, default 1000):
 - It drains the main source's due titles, then OMDb's for the titles MDBList doesn't know.
