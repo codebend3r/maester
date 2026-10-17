@@ -117,14 +117,88 @@ describe('MdblistClient', () => {
     ).resolves.toEqual([{ source: 'metacritic', value: 7.3, votes: null }])
   })
 
-  it('answers unknown for a title it has nothing on, and for an answer with no ratings', async () => {
+  it('answers unknown for a title it has nothing on, a 404', async () => {
     const tmdb = fakeTmdb({ movies: [] })
     const client = new MdblistClient(config(), tmdb.fetch)
     await expect(client.lookUp(show)).resolves.toBe('unknown')
     expect(client.state()).toBe('ok')
+  })
 
+  it('fails on an answer without ratings, rather than take it for an unknown title', async () => {
     const bare: MetadataFetch = async () => new Response(JSON.stringify({ id: 100 }))
-    await expect(new MdblistClient(config(), bare).lookUp(show)).resolves.toBe('unknown')
+    const client = new MdblistClient(config(), bare)
+    await expect(client.lookUp(show)).rejects.toThrow('MDBList answered without ratings.')
+    expect(client.state()).toBe('failing')
+
+    const notJson: MetadataFetch = async () => new Response('<html>Moved</html>')
+    await expect(new MdblistClient(config(), notJson).lookUp(show)).rejects.toThrow(
+      'without ratings',
+    )
+    const erring: MetadataFetch = async () =>
+      new Response(JSON.stringify({ error: 'Something went wrong' }))
+    await expect(new MdblistClient(config(), erring).lookUp(show)).rejects.toThrow(
+      'without ratings',
+    )
+  })
+
+  it("keeps to MDBList's own count of calls left, down to a spent day, until midnight UTC", async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-11T20:00:00Z'))
+    const lefts = ['2', null, null]
+    const fetch: MetadataFetch = async () => {
+      const left = lefts.shift() ?? null
+      return new Response(JSON.stringify({ ratings: [{ source: 'imdb', score: 70 }] }), {
+        headers: left == null ? {} : { 'x-ratelimit-remaining': left },
+      })
+    }
+    const client = new MdblistClient(config(), fetch)
+    expect(client.remaining()).toBe(1000)
+
+    await client.lookUp(show)
+    expect(client.remaining()).toBe(2)
+    await client.lookUp(show)
+    expect(client.remaining()).toBe(1)
+    await client.lookUp(show)
+    expect(client.remaining()).toBe(0)
+    expect(client.enabled()).toBe(false)
+    await expect(client.lookUp(show)).rejects.toThrow('not available')
+    expect(client.state()).toBe('ok')
+
+    vi.setSystemTime(new Date('2026-10-12T00:00:01Z'))
+    expect(client.remaining()).toBe(1000)
+    expect(client.enabled()).toBe(true)
+  })
+
+  it('takes a reported zero left as a spent day', async () => {
+    const fetch: MetadataFetch = async () =>
+      new Response(JSON.stringify({ ratings: [{ source: 'imdb', score: 70 }] }), {
+        headers: { 'x-ratelimit-remaining': '0' },
+      })
+    const client = new MdblistClient(config(), fetch)
+    await expect(client.lookUp(show)).resolves.toEqual([{ source: 'imdb', value: 7, votes: null }])
+    expect(client.remaining()).toBe(0)
+    expect(client.enabled()).toBe(false)
+  })
+
+  it('takes a 429 that waits past the 5-minute window, or counts none left, as a spent day', async () => {
+    const spentBy = async (headers: Record<string, string>) => {
+      const calls: string[] = []
+      const fetch: MetadataFetch = async ({ url }) => {
+        calls.push(url)
+        return new Response(JSON.stringify({ error: 'Too many requests' }), {
+          status: 429,
+          headers,
+        })
+      }
+      const client = new MdblistClient(config(), fetch)
+      await expect(client.lookUp(show)).rejects.toThrow('daily limit')
+      return { remaining: client.remaining(), calls: calls.length }
+    }
+    await expect(spentBy({ 'retry-after': '301' })).resolves.toEqual({ remaining: 0, calls: 1 })
+    await expect(spentBy({ 'retry-after': '0', 'x-ratelimit-remaining': '0' })).resolves.toEqual({
+      remaining: 0,
+      calls: 1,
+    })
   })
 
   it('counts down the budget and stops at the limit', async () => {

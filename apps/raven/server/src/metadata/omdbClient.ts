@@ -1,15 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common'
-import {
-  METADATA_SERVICE_STATES,
-  type MatchItemType,
-  type MetadataServiceState,
-  isRecord,
-  isString,
-} from '@raven/core'
+import { METADATA_SERVICE_STATES, type MetadataServiceState, isRecord, isString } from '@raven/core'
 import { CONTENT_TYPES, HEADERS } from '@shared/server'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { ERROR_NAMES } from '@/errorMessage'
-import type { ExternalScore, ScoreSource } from '@/metadata/scoreSources'
+import type { ExternalScore, ScoreSource, ScoreTitle } from '@/metadata/scoreSources'
 import { METADATA_FETCH, type MetadataFetch } from '@/metadata/tmdbClient'
 
 const API = 'https://www.omdbapi.com/'
@@ -91,13 +85,7 @@ export class OmdbClient implements ScoreSource {
   }
 
   /** OMDb is asked by IMDb id, so a title without one is not known to it. */
-  async lookUp({
-    imdbId,
-  }: {
-    type: MatchItemType
-    tmdbId: string
-    imdbId: string | null
-  }): Promise<ExternalScore[] | 'unknown'> {
+  async lookUp({ imdbId }: ScoreTitle): Promise<ExternalScore[] | 'unknown'> {
     if (imdbId == null) return 'unknown'
     return this.ratings(imdbId)
   }

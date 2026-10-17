@@ -8,7 +8,7 @@ import {
 } from '@raven/core'
 import { CONTENT_TYPES, HEADERS } from '@shared/server'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
-import type { ExternalScore, ScoreSource } from '@/metadata/scoreSources'
+import type { ExternalScore, ScoreSource, ScoreTitle } from '@/metadata/scoreSources'
 import { METADATA_FETCH, type MetadataFetch } from '@/metadata/tmdbClient'
 import { createRateLimit } from '@/scanner/concurrency'
 
@@ -21,6 +21,9 @@ const RETRIES = 3
 
 /** What MDBList says when the day's calls are spent, as against a burst that only needs a pause. */
 const DAILY_LIMIT_ERROR = 'Daily API limit exceeded!'
+
+/** The longest wait a burst's 429 asks for: past MDBList's 5-minute window, the day is spent. */
+const BURST_WAIT_SECONDS = 300
 
 // The URL, a rating's fields and how an unknown title answers are unconfirmed
 // until checked with a key; they live in the next four helpers alone.
@@ -36,13 +39,16 @@ const mdblistUrl = ({
 }): string =>
   `${API}/tmdb/${type}/${encodeURIComponent(tmdbId)}/?${new URLSearchParams({ apikey: key }).toString()}`
 
-/** The `ratings` of an answer, or null when it has none, which is how an unknown title reads. */
+/**
+ * The `ratings` of an answer, or null when it has none. An answer without
+ * them is not one raven understands, so it is a failure, never an unknown
+ * title: that would wipe the title's stored scores.
+ */
 const ratingsIn = (body: unknown): unknown[] | null =>
   isRecord(body) && Array.isArray(body.ratings) ? body.ratings : null
 
-/** Whether an answer says MDBList has nothing on the title: a 404, or no `ratings`. */
-const isUnknownTitle = ({ status, body }: { status: number; body: unknown }): boolean =>
-  status === 404 || ratingsIn(body) == null
+/** Whether an answer says MDBList has nothing on the title: a 404, and nothing else. */
+const isUnknownTitle = (status: number): boolean => status === 404
 
 /** MDBList's names for each source we keep. Its `score` is 0 to 100 whatever the source counts in. */
 const SOURCES = new Map<string, ExternalScore['source']>([
@@ -71,27 +77,50 @@ const today = (): string => new Date().toISOString().slice(0, 10)
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
-/** Seconds from a `Retry-After` header, capped so a strange answer cannot stall a pass for long. */
-const retryAfterMs = (header: string | null): number => {
-  // Number(null) and Number('') are 0, which would not wait at all.
-  if (header == null || header.trim() === '') return 1000
-  const seconds = Number(header)
-  return Number.isFinite(seconds) && seconds >= 0 ? Math.min(seconds, 30) * 1000 : 1000
+/** A header's whole number of zero or more, or null when it is missing or reads otherwise. */
+const wholeHeader = (header: string | null): number | null => {
+  // Number(null) and Number('') are 0, which would read as a real count.
+  if (header == null || header.trim() === '') return null
+  const value = Number(header)
+  return Number.isInteger(value) && value >= 0 ? value : null
 }
+
+/** Seconds from a `Retry-After` header, capped so a strange answer cannot stall a pass for long. */
+const retryAfterMs = (header: string | null): number =>
+  Math.min(wholeHeader(header) ?? 1, 30) * 1000
+
+/**
+ * Whether a 429 means the day is spent rather than a burst: MDBList says so,
+ * asks to wait past its 5-minute window, or counts no calls left.
+ */
+const isDaySpent = ({ body, headers }: { body: unknown; headers: Headers }): boolean =>
+  (isRecord(body) && body.error === DAILY_LIMIT_ERROR) ||
+  (wholeHeader(headers.get('retry-after')) ?? 0) > BURST_WAIT_SECONDS ||
+  wholeHeader(headers.get('x-ratelimit-remaining')) === 0
 
 /**
  * MDBList, for IMDb, Rotten Tomatoes and Metacritic scores by TMDB id, which
  * it has for shows where OMDb has none. A free key allows a thousand calls a
  * day, so the client counts its own and stops at the configured limit until
- * midnight UTC; MDBList saying the day is spent does the same. It keeps to 3
- * calls a second with 2 in flight and waits out a burst's 429. A refused key
- * stops calls until a restart.
+ * midnight UTC, or sooner when MDBList's own count of calls left says so: a
+ * restart mid-day, or another app on the account, would otherwise overspend.
+ * MDBList saying the day is spent does the same. It keeps to 3 calls a second
+ * with 2 in flight and waits out a burst's 429. A refused key stops calls
+ * until a restart.
  */
 @Injectable()
 export class MdblistClient implements ScoreSource {
   readonly provider = 'mdblist'
   private readonly limit = createRateLimit({ perSecond: 3, inFlight: 2 })
-  private readonly budget = { day: today(), used: 0 }
+  /**
+   * Today's calls, and the calls left MDBList last reported: as of the call
+   * numbered `atCall`, so the calls made since are taken off it.
+   */
+  private readonly budget: {
+    day: string
+    used: number
+    reported: { left: number; atCall: number } | null
+  } = { day: today(), used: 0, reported: null }
   private readonly status: { error: string | null; refused: boolean } = {
     error: null,
     refused: false,
@@ -106,20 +135,30 @@ export class MdblistClient implements ScoreSource {
     if (this.budget.day !== today()) {
       this.budget.day = today()
       this.budget.used = 0
+      this.budget.reported = null
     }
     return this.budget.used
   }
 
   enabled(): boolean {
-    return (
-      this.config.mdblistApiKey != null &&
-      !this.status.refused &&
-      this.usedToday() < this.config.mdblistDailyLimit
-    )
+    return this.config.mdblistApiKey != null && !this.status.refused && this.remaining() > 0
   }
 
+  /** Today's calls left: the configured limit's, or fewer when MDBList last said so. */
   remaining(): number {
-    return Math.max(0, this.config.mdblistDailyLimit - this.usedToday())
+    const used = this.usedToday()
+    const { reported } = this.budget
+    const byLimit = this.config.mdblistDailyLimit - used
+    const byMdblist = reported == null ? byLimit : reported.left - (used - reported.atCall)
+    return Math.max(0, Math.min(byLimit, byMdblist))
+  }
+
+  /** Notes the calls left that an answer to call `atCall` reports, unless a later call's is known. */
+  private noteReported({ headers, atCall }: { headers: Headers; atCall: number }): void {
+    const left = wholeHeader(headers.get('x-ratelimit-remaining'))
+    const { reported } = this.budget
+    if (left == null || (reported != null && reported.atCall > atCall)) return
+    this.budget.reported = { left, atCall }
   }
 
   state(): MetadataServiceState {
@@ -128,17 +167,12 @@ export class MdblistClient implements ScoreSource {
   }
 
   /** The scores MDBList has for a TMDB id; `'unknown'` when it knows nothing of it. */
-  async lookUp({
-    type,
-    tmdbId,
-  }: {
-    type: MatchItemType
-    tmdbId: string
-    imdbId: string | null
-  }): Promise<ExternalScore[] | 'unknown'> {
+  async lookUp({ type, tmdbId }: ScoreTitle): Promise<ExternalScore[] | 'unknown'> {
     const key = this.config.mdblistApiKey
     if (key == null || !this.enabled()) throw new Error('MDBList is not available right now.')
     this.budget.used += 1
+    const day = this.budget.day
+    const atCall = this.budget.used
     const url = mdblistUrl({ type, tmdbId, key })
 
     const attempt = async (retriesLeft: number): Promise<ExternalScore[] | 'unknown'> => {
@@ -166,9 +200,9 @@ export class MdblistClient implements ScoreSource {
       }
       if (response.status === 429) {
         const body: unknown = await response.json().catch(() => null)
-        if (isRecord(body) && body.error === DAILY_LIMIT_ERROR) {
+        if (isDaySpent({ body, headers: response.headers })) {
           this.budget.used = this.config.mdblistDailyLimit
-          this.status.error = `MDBList's daily limit is spent: ${DAILY_LIMIT_ERROR}`
+          this.status.error = "MDBList's daily limit is spent."
           throw new Error(this.status.error)
         }
         if (retriesLeft > 0) {
@@ -176,15 +210,22 @@ export class MdblistClient implements ScoreSource {
           return attempt(retriesLeft - 1)
         }
       }
-      if (response.status !== 404 && !response.ok) {
+      if (isUnknownTitle(response.status)) {
+        this.status.error = null
+        return 'unknown'
+      }
+      if (!response.ok) {
         this.status.error = `MDBList answered ${response.status}.`
         throw new Error(this.status.error)
       }
+      if (this.budget.day === day) this.noteReported({ headers: response.headers, atCall })
       const body: unknown = await response.json().catch(() => null)
+      if (ratingsIn(body) == null) {
+        this.status.error = 'MDBList answered without ratings.'
+        throw new Error(this.status.error)
+      }
       this.status.error = null
-      return isUnknownTitle({ status: response.status, body })
-        ? 'unknown'
-        : parseMdblistRatings(body)
+      return parseMdblistRatings(body)
     }
 
     return attempt(RETRIES)
