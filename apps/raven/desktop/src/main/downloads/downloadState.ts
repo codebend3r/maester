@@ -315,16 +315,18 @@ const groupKey = (entry: DownloadEntry): string =>
  * in `group.order`. A lone row is a group of one, so it sorts by its own `createdAt`.
  */
 export const sortDownloads = (entries: readonly DownloadEntry[]): DownloadEntry[] => {
-  const newestOf = (entry: DownloadEntry): number =>
-    entries
-      .filter((other) => groupKey(other) === groupKey(entry))
-      .reduce((newest, other) => Math.max(newest, other.createdAt), entry.createdAt)
-  const ranked = entries.map((entry) => ({ entry, key: groupKey(entry), newest: newestOf(entry) }))
-  return ranked
+  const keyed = entries.map((entry) => ({ entry, groupId: groupKey(entry) }))
+  const newest = keyed.reduce(
+    (latest, { entry, groupId }) =>
+      latest.set(groupId, Math.max(latest.get(groupId) ?? entry.createdAt, entry.createdAt)),
+    new Map<string, number>(),
+  )
+  return keyed
+    .map((row) => ({ ...row, newest: newest.get(row.groupId) ?? row.entry.createdAt }))
     .toSorted(
       (a, b) =>
         b.newest - a.newest ||
-        a.key.localeCompare(b.key) ||
+        a.groupId.localeCompare(b.groupId) ||
         a.entry.group.order - b.entry.group.order ||
         b.entry.createdAt - a.entry.createdAt,
     )
