@@ -1086,7 +1086,8 @@ const attachPlayer = ({
       // Made before anything can load: it hardens mpv first and refuses loads if that fails.
       const service = createPlayerService({
         mpv,
-        resolveSource: resolveSourceWith({ grants, servers }),
+        // No file has sidecars until a download is played as a local file.
+        resolveSource: resolveSourceWith({ grants, servers, sidecarsOf: () => [] }),
         explain: sources.explain,
         canChooseAo: mode === ENGINE_MODES.window,
         timers,
