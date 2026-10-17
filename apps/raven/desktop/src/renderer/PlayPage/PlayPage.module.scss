@@ -1,7 +1,17 @@
 .waiting {
+  --gutter: var(--space-5);
+
+  display: grid;
+  grid-template-rows: auto;
+  grid-template-areas: 'bar';
+  align-content: start;
   min-height: 100vh;
   background: var(--color-stage);
   -webkit-app-region: drag;
+
+  @media (max-width: 48rem) {
+    --gutter: var(--space-3);
+  }
 }
 
 .refused {

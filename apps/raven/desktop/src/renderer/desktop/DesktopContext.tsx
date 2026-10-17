@@ -1,13 +1,19 @@
 import { createContext, type ReactNode, useContext, useMemo } from 'react'
 import type { DesktopClient } from '@/renderer/desktop/client'
 import type { MenuHub } from '@/renderer/desktop/menuHub'
+import type { PlayerConnections } from '@/renderer/desktop/playerConnection'
 
-type Desktop = { client: DesktopClient; menu: MenuHub }
+type Desktop = { client: DesktopClient; menu: MenuHub; player: PlayerConnections }
 
 const DesktopContext = createContext<Desktop | null>(null)
 
-export const DesktopProvider = ({ client, menu, children }: Desktop & { children: ReactNode }) => {
-  const desktop = useMemo(() => ({ client, menu }), [client, menu])
+export const DesktopProvider = ({
+  client,
+  menu,
+  player,
+  children,
+}: Desktop & { children: ReactNode }) => {
+  const desktop = useMemo(() => ({ client, menu, player }), [client, menu, player])
   return <DesktopContext.Provider value={desktop}>{children}</DesktopContext.Provider>
 }
 

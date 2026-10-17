@@ -1,21 +1,25 @@
-.notice {
+// A layer over the window with the notice in its own area along the top, so it never
+// sits over a player's controls along the bottom, and every click goes through it.
+.notices {
   position: fixed;
-  inset-block-end: var(--space-4);
-  inset-inline-start: 50%;
-  translate: -50% 0;
-  width: max-content;
-  max-width: min(var(--measure), calc(100vw - var(--space-4) * 2));
+  inset: 0;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    'notice'
+    '.';
+  justify-items: center;
+  padding: calc(var(--titlebar-inset) + var(--space-2)) var(--space-4) 0;
+  pointer-events: none;
+}
+
+.notice {
+  grid-area: notice;
+  max-width: min(var(--measure), 100%);
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--color-moss);
   border-radius: var(--radius-md);
   background: var(--color-canopy-glass);
   box-shadow: var(--shadow-menu);
   font-size: var(--font-size-sm);
-
-  // Nothing to show: keep the live region in the page, but not its box.
-  &:empty {
-    padding: 0;
-    border: 0;
-    box-shadow: none;
-  }
 }

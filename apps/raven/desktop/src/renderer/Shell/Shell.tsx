@@ -22,6 +22,9 @@ const NoticeContext = createContext<(message: string) => void>(() => undefined)
 
 export const useDragging = (): boolean => useContext(DraggingContext)
 
+/** Says something in the Shell's live region, which outlasts the page that said it. */
+export const useNotice = (): ((message: string) => void) => useContext(NoticeContext)
+
 /** A new video replaces the one playing, so Back always returns Home. */
 const play = ({
   navigate,
@@ -55,6 +58,7 @@ const applyReply = ({
       return showNotice(reply.message)
     case 'file':
     case 'recents':
+    case 'output':
     case 'done':
       return
     default: {
@@ -123,7 +127,9 @@ export const Shell = () => {
       <NoticeContext.Provider value={showNotice}>
         <Outlet />
         {/* Always mounted: a live region is announced when its text changes, not when it appears. */}
-        <output className={styles.notice}>{notice?.message ?? ''}</output>
+        <output className={styles.notices}>
+          {notice !== null && <span className={styles.notice}>{notice.message}</span>}
+        </output>
       </NoticeContext.Provider>
     </DraggingContext.Provider>
   )
