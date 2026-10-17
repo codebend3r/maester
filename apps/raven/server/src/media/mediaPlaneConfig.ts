@@ -77,15 +77,13 @@ export const parseMediaOrigins = (
 }
 
 /**
- * A `*` is allowed in the first label only, as the whole label or ahead of a
- * literal tail (`*--site`, `deploy-*--site`). Anywhere else it would let a
- * stranger's hostname in.
+ * At most one `*`, and only in the first label, where it can sit anywhere.
+ * A star in a later label would let a stranger's hostname in.
  */
 const hasValidWildcard = (host: string): boolean => {
   const [first = '', ...rest] = host.split('.')
   if (rest.some((label) => label.includes('*'))) return false
-  if (!first.includes('*')) return true
-  return first === '*' || (first.split('*').length === 2 && !first.endsWith('*'))
+  return first.split('*').length <= 2
 }
 
 const webOriginProblem = (entry: string): string =>
