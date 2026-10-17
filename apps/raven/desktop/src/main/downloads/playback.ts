@@ -41,6 +41,8 @@ export type DownloadPlaybackDeps = {
   change: (apply: (state: DownloadsState) => DownloadsState) => void
   /** Tells the page the list changed when only a share watched did. */
   announce: () => void
+  /** A position was recorded as pending for this download, so the server is owed it. */
+  onNoted: (input: { downloadId: string }) => void
 }
 
 export type DownloadPlayback = {
@@ -196,6 +198,7 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
         at,
       }),
     )
+    deps.onNoted({ downloadId })
   }
 
   const notePlaying: DownloadPlayback['notePlaying'] = ({ fileId }) => {
