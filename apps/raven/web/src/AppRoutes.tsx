@@ -1,6 +1,6 @@
 import { Route, Routes } from 'react-router-dom'
 import { AppShell } from '@/components/AppShell/AppShell'
-import { UnlockDialog } from '@/components/UnlockDialog/UnlockDialog'
+import { PinPrompt } from '@/components/PinPrompt/PinPrompt'
 import { DesignPage } from '@/pages/DesignPage/DesignPage'
 import { FavouritesPage } from '@/pages/FavouritesPage/FavouritesPage'
 import { HistoryPage } from '@/pages/HistoryPage/HistoryPage'
@@ -41,6 +41,6 @@ export const AppRoutes = () => (
       <Route path="watch/:id" element={<WatchPage />} />
     </Routes>
     {/* Over any page, the player too: whatever sits in a locked library asks for the PIN. */}
-    <UnlockDialog />
+    <PinPrompt />
   </>
 )

@@ -2,14 +2,14 @@ import { describe, expect, it, spyOn } from 'bun:test'
 import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ApiError } from '@raven/core'
-import { UnlockDialog } from '@/components/UnlockDialog/UnlockDialog'
+import { PinPrompt } from '@/components/PinPrompt/PinPrompt'
 import { api } from '@/lib/api'
 import { useUnlockPrompt } from '@/stores/unlockPrompt'
 import { renderWithProviders } from '@/test/render'
 
-describe('UnlockDialog', () => {
+describe('PinPrompt', () => {
   it('stays away until something asks for the PIN', () => {
-    renderWithProviders(<UnlockDialog />)
+    renderWithProviders(<PinPrompt />)
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
@@ -21,7 +21,7 @@ describe('UnlockDialog', () => {
       return { available: true, unlocked: true }
     })
     useUnlockPrompt.getState().ask()
-    renderWithProviders(<UnlockDialog />)
+    renderWithProviders(<PinPrompt />)
     const pin = await screen.findByLabelText('PIN')
     await userEvent.type(pin, '1234{Enter}')
     expect(await screen.findByRole('alert')).toHaveTextContent('That PIN is not right.')

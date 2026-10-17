@@ -1,6 +1,12 @@
-import { type MediaItem, mediaLabel } from '@raven/core'
+import { type MediaItem, mediaLabel, playLinkFor } from '@raven/core'
 import { useState } from 'react'
-import { PlayerServicesProvider, ButtonLink, Player, useLeaveFullscreen } from '@raven/ui'
+import {
+  PlayerServicesProvider,
+  ButtonLink,
+  Player,
+  useLeaveFullscreen,
+  usePlayerPrefs,
+} from '@raven/ui'
 import { api } from '@/lib/api'
 import { afterWatching } from '@/lib/invalidate'
 import { watchLink } from '@/lib/itemLinks'
@@ -8,6 +14,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useLocation } from 'react-router-dom'
 import { readWatchState } from '@/lib/itemLinks'
 import { mediaQuery } from '@/lib/queries'
+import { ravenPlayer } from '@/lib/ravenPlayer'
 import { routeState, useRouteId } from '@/lib/routeQuery'
 import { useMediaMutations } from '@/lib/useMediaMutations'
 import styles from '@/pages/WatchPage/WatchPage.module.scss'
@@ -73,6 +80,7 @@ export const WatchPlayer = ({
   const queryClient = useQueryClient()
   const { favourite } = useMediaMutations({ media })
   const [copied, setCopied] = useState<string | null>(null)
+  const opensInRavenPlayer = usePlayerPrefs((prefs) => prefs.opensInRavenPlayer)
   const [next, ...after] = upNext
   const resumable = media.position > 0 && media.position < (media.duration ?? Infinity) - 10
   const copyLink = () => {
@@ -112,6 +120,20 @@ export const WatchPlayer = ({
           isFavourite: media.favourite,
           toggle: () => favourite.mutate(!media.favourite),
         },
+        ...(opensInRavenPlayer && {
+          handoff: {
+            label: 'Open in raven player',
+            run: (at) =>
+              ravenPlayer.open(
+                playLinkFor({
+                  origin: window.location.origin,
+                  mediaId: media.id,
+                  at,
+                  next: upNext.map(({ id }) => id),
+                }),
+              ),
+          },
+        }),
       }}
     >
       <Player engine={{ kind: 'html', source: { kind: 'server', media, api } }} />
