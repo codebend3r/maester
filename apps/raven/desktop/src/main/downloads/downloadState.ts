@@ -341,7 +341,7 @@ const furthestOf = (a: number | null, b: number | null): number | null =>
   a === null ? b : Math.max(a, b ?? a)
 
 /**
- * Two pendings of one title as one: a play either owes, the newer last position, and the
+ * Two pending records of one title as one: a play either owes, the newer last position, and the
  * furthest of both, as `notePending` folds a report into what is pending.
  */
 const mergePending = ({ a, b }: { a: Pending; b: Pending }): Pending => {
