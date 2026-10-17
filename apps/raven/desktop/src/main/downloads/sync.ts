@@ -41,32 +41,59 @@ const isSuccess = (status: number): boolean => status >= 200 && status < 300
 /** The statuses that say the server will never take this, or not yet, and are worth a line in the log. */
 const isLogged = (status: number): boolean => status === 403 || status === 404
 
+/** How a call went: the server took it, answered something else, or could not be reached. */
+type Delivery = 'taken' | 'refused' | 'unreachable'
+
+/**
+ * Each server's due downloads, oldest pending first: a server hears its downloads one at a time
+ * in the order they were made, so each report replaces the one before as it did when made.
+ */
+const queuesByServer = (entries: readonly DownloadEntry[]): DownloadEntry[][] => [
+  ...entries
+    .toSorted((a, b) => a.pending.at - b.pending.at)
+    .reduce(
+      (queues, entry) => queues.set(entry.serverId, [...(queues.get(entry.serverId) ?? []), entry]),
+      new Map<string, DownloadEntry[]>(),
+    )
+    .values(),
+]
+
 export const createSync = ({ store, calls, timers, warn }: SyncDeps): Sync => {
   const debouncing = new Map<string, unknown>()
-  const inFlight = new Map<string, Promise<void>>()
+  /** Each download's send while it is out; it settles false when its server could not be reached. */
+  const inFlight = new Map<string, Promise<boolean>>()
   /** Downloads touched while their calls were out, which owe another send once the answers land. */
   const touchedDuring = new Set<string>()
   /** Downloads whose 403 or 404 was logged, so a server that keeps answering so is heard of once. */
   const logged = new Set<string>()
+  /**
+   * Servers whose last call could not reach them. Their downloads' touches wait for the retry
+   * instead of sending on every save, until a call the server takes.
+   */
+  const unreachable = new Set<string>()
   const retry: { timer: unknown } = { timer: undefined }
   let isDisposed = false
 
   const entryOf = (downloadId: string): DownloadEntry | null =>
     entryById(store.read(), { downloadId })
 
-  /** Sends one call; true when the server took it, so what it carried can be cleared. */
+  /** Sends one call; `taken` when the server took it, so what it carried can be cleared. */
   const deliver = async ({
     entry,
     call,
   }: {
     entry: DownloadEntry
     call: AllowedCall
-  }): Promise<boolean> => {
+  }): Promise<Delivery> => {
     const result = await calls.call({ serverId: entry.serverId, call })
-    if (!result.ok) return false
+    if (!result.ok) {
+      unreachable.add(entry.serverId)
+      return 'unreachable'
+    }
     if (isSuccess(result.status)) {
+      unreachable.delete(entry.serverId)
       logged.delete(entry.downloadId)
-      return true
+      return 'taken'
     }
     if (isLogged(result.status) && !logged.has(entry.downloadId)) {
       logged.add(entry.downloadId)
@@ -74,7 +101,7 @@ export const createSync = ({ store, calls, timers, warn }: SyncDeps): Sync => {
         `raven player could not tell its server what was watched of ${loggable(entry.label)}: it answered ${result.status}`,
       )
     }
-    return false
+    return 'refused'
   }
 
   const warnFailed =
@@ -95,18 +122,18 @@ export const createSync = ({ store, calls, timers, warn }: SyncDeps): Sync => {
 
   /**
    * The furthest position, when it is past the last: the server keeps how far a play got as the
-   * most it hears, so it hears this before a scrub back. True when the round may go on.
+   * most it hears, so it hears this before a scrub back. `taken` when the round may go on.
    */
-  const sendFurthest = async (downloadId: string): Promise<boolean> => {
+  const sendFurthest = async (downloadId: string): Promise<Delivery> => {
     const entry = entryOf(downloadId)
-    if (entry === null) return false
+    if (entry === null) return 'refused'
     const { furthest, position } = entry.pending
-    if (furthest === null || (position !== null && furthest <= position)) return true
-    const isSaved = await deliver({
+    if (furthest === null || (position !== null && furthest <= position)) return 'taken'
+    const delivery = await deliver({
       entry,
       call: { name: 'saveProgress', mediaId: entry.mediaId, position: furthest },
     })
-    if (!isSaved) return false
+    if (delivery !== 'taken') return delivery
     store.update((state) =>
       clearPending(state, {
         downloadId,
@@ -115,21 +142,24 @@ export const createSync = ({ store, calls, timers, warn }: SyncDeps): Sync => {
         sentFurthest: furthest,
       }),
     )
-    return true
+    return 'taken'
   }
 
-  // The play goes first: the server must hear it before a position that may mark the title watched.
-  const send = async (downloadId: string): Promise<void> => {
+  /**
+   * Sends one download's pending; false when its server could not be reached. The play goes
+   * first: the server must hear it before a position that may mark the title watched.
+   */
+  const send = async (downloadId: string): Promise<boolean> => {
     const first = entryOf(downloadId)
-    if (first === null || !hasPending(first)) return
+    if (first === null || !hasPending(first)) return true
     if (first.pending.play) {
-      const isPlayed = await deliver({
+      const played = await deliver({
         entry: first,
         call: { name: 'recordPlay', mediaId: first.mediaId },
       })
       // The play stays pending when the answer was lost, though the server may have taken it:
       // delivery is at least once, so a play can be recorded twice but never none.
-      if (!isPlayed) return
+      if (played !== 'taken') return played !== 'unreachable'
       store.update((state) =>
         clearPending(state, {
           downloadId,
@@ -139,16 +169,17 @@ export const createSync = ({ store, calls, timers, warn }: SyncDeps): Sync => {
         }),
       )
     }
-    if (!(await sendFurthest(downloadId))) return
+    const reached = await sendFurthest(downloadId)
+    if (reached !== 'taken') return reached !== 'unreachable'
     // Read again: the position may have moved while the play or the furthest was out.
     const entry = entryOf(downloadId)
     const position = entry?.pending.position ?? null
-    if (entry === null || position === null) return
-    const isSaved = await deliver({
+    if (entry === null || position === null) return true
+    const saved = await deliver({
       entry,
       call: { name: 'saveProgress', mediaId: entry.mediaId, position },
     })
-    if (!isSaved) return
+    if (saved !== 'taken') return saved !== 'unreachable'
     // A furthest no further than this position is covered by it.
     store.update((state) =>
       clearPending(state, {
@@ -158,6 +189,7 @@ export const createSync = ({ store, calls, timers, warn }: SyncDeps): Sync => {
         sentFurthest: position,
       }),
     )
+    return true
   }
 
   const isAnythingPending = (): boolean => store.read().entries.some(hasPending)
@@ -172,6 +204,9 @@ export const createSync = ({ store, calls, timers, warn }: SyncDeps): Sync => {
 
   const debounce = (downloadId: string): void => {
     if (isDisposed || debouncing.has(downloadId)) return
+    const entry = entryOf(downloadId)
+    // A server that could not be reached hears this download at the retry, not every save.
+    if (entry !== null && unreachable.has(entry.serverId)) return
     // A timer already running is left alone, not pushed back: positions arrive every few
     // seconds, and one that kept resetting it would send nothing while a title plays.
     debouncing.set(
@@ -183,27 +218,30 @@ export const createSync = ({ store, calls, timers, warn }: SyncDeps): Sync => {
     )
   }
 
-  /** Sends one download's pending now. A download already out is awaited, never sent twice. */
-  const run = (downloadId: string): Promise<void> => {
+  /**
+   * Sends one download's pending now; false when its server could not be reached. A download
+   * already out is awaited, never sent twice.
+   */
+  const run = (downloadId: string): Promise<boolean> => {
     const sending = inFlight.get(downloadId)
     if (sending !== undefined) return sending
     const handle = debouncing.get(downloadId)
     if (handle !== undefined) timers.clear(handle)
     debouncing.delete(downloadId)
     const entry = entryOf(downloadId)
-    if (entry === null || !hasPending(entry)) return Promise.resolve()
-    const sent = (async (): Promise<void> => {
-      try {
-        await send(downloadId)
-      } catch (error) {
+    if (entry === null || !hasPending(entry)) return Promise.resolve(true)
+    const sent = (async (): Promise<boolean> => {
+      const isReached = await send(downloadId).catch((error: unknown) => {
         warnFailed({ label: entry.label })(error)
-      }
+        return true
+      })
       inFlight.delete(downloadId)
       const isOwed = touchedDuring.delete(downloadId)
       const next = entryOf(downloadId)
       if (isOwed && next !== null && hasPending(next)) debounce(downloadId)
       pruneLogged()
       armRetry()
+      return isReached
     })()
     inFlight.set(downloadId, sent)
     return sent
@@ -216,14 +254,26 @@ export const createSync = ({ store, calls, timers, warn }: SyncDeps): Sync => {
     armRetry()
   }
 
+  /** Runs one server's downloads one after another; one its server could not reach ends the round. */
+  const runInTurn = (queue: readonly DownloadEntry[]): Promise<boolean> =>
+    queue.reduce<Promise<boolean>>(
+      (previous, { downloadId }) =>
+        previous.then((isReached) => (isReached ? run(downloadId) : false)),
+      Promise.resolve(true),
+    )
+
   const runFor: Sync['runFor'] = async ({ downloadIds }) => {
     if (isDisposed) return
     pruneLogged()
-    const due = downloadIds.filter((downloadId) => {
+    const due = downloadIds.flatMap((downloadId) => {
       const entry = entryOf(downloadId)
-      return inFlight.has(downloadId) || (entry !== null && hasPending(entry))
+      return entry !== null && (inFlight.has(downloadId) || hasPending(entry)) ? [entry] : []
     })
-    await Promise.all(due.map(run))
+    // A download removed while its calls are out is still awaited.
+    const leaving = downloadIds.filter(
+      (downloadId) => entryOf(downloadId) === null && inFlight.has(downloadId),
+    )
+    await Promise.all([...leaving.map(run), ...queuesByServer(due).map(runInTurn)])
   }
 
   const runAll: Sync['runAll'] = () =>
