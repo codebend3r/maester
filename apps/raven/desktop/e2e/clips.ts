@@ -39,14 +39,19 @@ const encodeArgs = (output: string): string[] => [
   output,
 ]
 
-const encode = ({ binary, output }: { binary: string; output: string }): Promise<void> =>
-  new Promise((resolve, reject) => {
-    execFile(binary, encodeArgs(output), (error, _stdout, stderr) => {
+const run = ({ binary, args, output }: { binary: string; args: string[]; output: string }) =>
+  new Promise<void>((resolve, reject) => {
+    execFile(binary, args, (error, _stdout, stderr) => {
       if (error === null) return resolve()
       const detail = stderr.trim() === '' ? error.message : stderr.trim()
       reject(new Error(`${binary} could not make the e2e clip ${output}: ${detail}`))
     })
   })
+
+const encode = ({ binary, output }: { binary: string; output: string }): Promise<void> =>
+  run({ binary, args: encodeArgs(output), output })
+
+const ffmpegBinary = () => process.env.RAVEN_E2E_FFMPEG ?? 'ffmpeg'
 
 /**
  * Two 30 second clips in a fresh temp folder, beside the decoys a real folder holds: an
@@ -54,7 +59,7 @@ const encode = ({ binary, output }: { binary: string; output: string }): Promise
  * space and an accent, which must survive the trip to the page.
  */
 export const makeClips = async (): Promise<Clips> => {
-  const binary = process.env.RAVEN_E2E_FFMPEG ?? 'ffmpeg'
+  const binary = ffmpegBinary()
   const folder = await mkdtemp(join(tmpdir(), 'raven-e2e-clips-'))
   const first = join(folder, 'Clip 01.mp4')
   const second = join(folder, 'Clip 02 Été.mp4')
@@ -68,4 +73,72 @@ export const makeClips = async (): Promise<Clips> => {
     throw error
   })
   return { folder, first, second }
+}
+
+// The same encoders `@raven/mpv`'s native test uses, all built into ffmpeg.
+const trackArgs = ({ subtitles, output }: { subtitles: string; output: string }): string[] => [
+  '-hide_banner',
+  '-loglevel',
+  'error',
+  '-y',
+  '-f',
+  'lavfi',
+  '-i',
+  'testsrc2=size=320x180:rate=24',
+  '-f',
+  'lavfi',
+  '-i',
+  'sine=frequency=440:sample_rate=48000',
+  '-f',
+  'lavfi',
+  '-i',
+  'sine=frequency=880:sample_rate=48000',
+  '-i',
+  subtitles,
+  '-map',
+  '0:v',
+  '-map',
+  '1:a',
+  '-map',
+  '2:a',
+  '-map',
+  '3:s',
+  '-t',
+  `${CLIP_SECONDS}`,
+  '-c:v',
+  'mpeg4',
+  '-c:a',
+  'aac',
+  '-c:s',
+  'srt',
+  '-metadata:s:a:0',
+  'language=eng',
+  '-metadata:s:a:1',
+  'language=fra',
+  '-metadata:s:s:0',
+  'language=eng',
+  output,
+]
+
+/**
+ * A 30 second MKV with two audio tracks (English, French) and an embedded English
+ * subtitle, beside `notes.mkv`, a text file named like a video. The subtitle source is
+ * named apart from the clip so mpv does not also load it as a sidecar.
+ */
+export const makeTrackClip = async (): Promise<{ folder: string; path: string }> => {
+  const binary = ffmpegBinary()
+  const folder = await mkdtemp(join(tmpdir(), 'raven-native-clips-'))
+  const path = join(folder, 'Tracks 01.mkv')
+  const subtitles = join(folder, 'source.srt')
+  try {
+    await Promise.all([
+      writeFile(subtitles, '1\n00:00:00,000 --> 00:00:29,000\nraven track fixture\n'),
+      writeFile(join(folder, 'notes.mkv'), 'not a video'),
+    ])
+    await run({ binary, args: trackArgs({ subtitles, output: path }), output: path })
+  } catch (error) {
+    await rm(folder, { recursive: true, force: true })
+    throw error
+  }
+  return { folder, path }
 }

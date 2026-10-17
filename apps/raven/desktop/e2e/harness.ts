@@ -1,6 +1,7 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { createInterface } from 'node:readline'
 import { setTimeout as delay } from 'node:timers/promises'
 import { _electron, type ElectronApplication, type Page } from '@playwright/test'
 import { type DesktopReply, isDesktopReply } from '@/shared/protocol'
@@ -9,13 +10,21 @@ import { type DesktopReply, isDesktopReply } from '@/shared/protocol'
 const PROJECT_DIR = join(import.meta.dirname, '..')
 // A quit that hangs is a bug (the quit gate gives up flushing after a second), not a slow test.
 const QUIT_MS = 10_000
-const LAUNCH_MARK = /raven-launch-ms (\d+)/
+// Every budget mark main prints on stdout (Ruling 14): `raven-<name> <n>` on a line of its own.
+const MARK_LINE = /^raven-([a-z][a-z0-9-]*) (\d+)$/
+
+/** The marks main has printed so far, in order, and whether its stdout has closed. */
+export type Marks = {
+  seen: ReadonlyArray<{ name: string; value: number }>
+  isClosed: boolean
+  /** Calls `listener` on every mark and on close, until the returned function is called. */
+  watch: (listener: () => void) => () => void
+}
 
 export type Launched = {
   app: ElectronApplication
   page: Page
-  /** main's `raven-launch-ms` mark, or null when the app exits without printing it. */
-  launchMs: Promise<number | null>
+  marks: Marks
 }
 
 export const freshUserData = (): Promise<string> => mkdtemp(join(tmpdir(), 'raven-e2e-user-'))
@@ -32,45 +41,75 @@ const hasExited = (app: ElectronApplication): boolean => {
 }
 
 // Listens from the moment launch returns: Playwright holds `ready` until it has connected,
-// so the window, and the mark printed when it is ready to show, come after.
-const readLaunchMark = (app: ElectronApplication): Promise<number | null> =>
-  new Promise((resolve) => {
-    const { stdout } = app.process()
-    if (stdout === null) return resolve(null)
-    let text = ''
-    const onData = (chunk: Buffer) => {
-      text += chunk.toString('utf8')
-      const ms = LAUNCH_MARK.exec(text)?.[1] ?? null
-      if (ms === null) return
-      stdout.off('data', onData)
-      resolve(Number(ms))
-    }
-    stdout.on('data', onData)
-    stdout.once('close', () => resolve(null))
+// so the window, and every mark printed from then on, come after.
+const readMarks = (app: ElectronApplication): Marks => {
+  const listeners = new Set<() => void>()
+  const marks = {
+    seen: new Array<{ name: string; value: number }>(),
+    isClosed: false,
+    watch: (listener: () => void) => {
+      listeners.add(listener)
+      return () => {
+        listeners.delete(listener)
+      }
+    },
+  }
+  const tell = () => [...listeners].forEach((listener) => listener())
+  const { stdout } = app.process()
+  if (stdout === null) {
+    marks.isClosed = true
+    return marks
+  }
+  const lines = createInterface({ input: stdout })
+  lines.on('line', (line) => {
+    const match = MARK_LINE.exec(line)
+    if (match === null) return
+    const [, name = '', value = ''] = match
+    marks.seen.push({ name, value: Number(value) })
+    tell()
   })
+  lines.once('close', () => {
+    marks.isClosed = true
+    tell()
+  })
+  return marks
+}
 
 /**
- * main's launch mark, failing with a clear error when it has not been seen `ms` after the
- * window opened (it is printed at ready-to-show, so it is never far behind).
+ * The first `raven-<name>` mark main printed in this run, waiting up to `ms` for it, and
+ * failing with a clear error when it has not come or the app quit first.
  */
-export const launchMarkWithin = async ({
-  launched,
+export const markWithin = ({
+  launched: { marks },
+  name,
   ms,
 }: {
   launched: Launched
+  name: string
   ms: number
-}): Promise<number> => {
-  const deadline = new AbortController()
-  const mark = await Promise.race([
-    launched.launchMs,
-    delay(ms, 'timeout' as const, { signal: deadline.signal }),
-  ])
-  deadline.abort()
-  if (mark === 'timeout')
-    throw new Error(`raven player's launch mark was not seen within ${ms} ms.`)
-  if (mark === null) throw new Error('raven player quit before printing its launch mark.')
-  return mark
-}
+}): Promise<number> =>
+  new Promise((resolve, reject) => {
+    const settle = (finish: () => void) => {
+      clearTimeout(timer)
+      unwatch()
+      finish()
+    }
+    const check = () => {
+      const found = marks.seen.find((mark) => mark.name === name)
+      if (found !== undefined) return settle(() => resolve(found.value))
+      if (!marks.isClosed) return
+      settle(() => reject(new Error(`raven player quit before printing its ${name} mark.`)))
+    }
+    const timer = setTimeout(() => {
+      settle(() => reject(new Error(`raven player's ${name} mark was not seen within ${ms} ms.`)))
+    }, ms)
+    const unwatch = marks.watch(check)
+    check()
+  })
+
+/** main's launch mark, printed at ready-to-show, so it is never far behind the window. */
+export const launchMarkWithin = ({ launched, ms }: { launched: Launched; ms: number }) =>
+  markWithin({ launched, name: 'launch-ms', ms })
 
 /** Quits the app as a person would and waits for its process to end, killing it past the deadline. */
 export const closeApp = async ({ app }: { app: ElectronApplication }): Promise<void> => {
@@ -86,31 +125,43 @@ export const closeApp = async ({ app }: { app: ElectronApplication }): Promise<v
   throw new Error(`raven player did not quit within ${QUIT_MS} ms.`)
 }
 
-export const launchApp = async ({ userData }: { userData: string }): Promise<Launched> => {
+/** Headless mpv (`vo=null`, `ao=null`), or none, which is the html fallback's run (Ruling 15). */
+export type MpvMode = 'headless' | 'off'
+
+export const launchApp = async ({
+  userData,
+  mpv = 'headless',
+}: {
+  userData: string
+  mpv?: MpvMode
+}): Promise<Launched> => {
   const app = await _electron.launch({
     // Chromium's fake audio sink: playback is clocked by the audio output, so a real device
     // whose clock has stalled (an asleep USB interface) would freeze `currentTime` at 0.
     args: ['--disable-audio-output', '.'],
     cwd: PROJECT_DIR,
-    env: { ...process.env, RAVEN_DESKTOP_USER_DATA: userData },
+    // e2e never drives the window surface (Ruling 15).
+    env: { ...process.env, RAVEN_DESKTOP_USER_DATA: userData, RAVEN_DESKTOP_MPV: mpv },
   })
-  const launchMs = readLaunchMark(app)
+  const marks = readMarks(app)
   const page = await app.firstWindow().catch(async (error: unknown) => {
     await closeApp({ app }).catch(() => undefined)
     throw error
   })
-  return { app, page, launchMs }
+  return { app, page, marks }
 }
 
 /** Launches the app, runs `run` against it and always quits it after, so no process outlives a test. */
 export const withApp = async <T>({
   userData,
+  mpv,
   run,
 }: {
   userData: string
+  mpv?: MpvMode
   run: (launched: Launched) => Promise<T>
 }): Promise<T> => {
-  const launched = await launchApp({ userData })
+  const launched = await launchApp({ userData, mpv })
   const result = await run(launched).catch(async (error: unknown) => {
     await closeApp({ app: launched.app }).catch(() => undefined)
     throw error
@@ -153,4 +204,19 @@ export const requestFromPage = async ({
     return answer
   }, request)
   return isDesktopReply(reply) ? reply : null
+}
+
+/** The share of `label` main has stored as watched, in whole percent, as Home labels it. */
+export const watchedPercent = async ({
+  page,
+  label,
+}: {
+  page: Page
+  label: string
+}): Promise<number | null> => {
+  const reply = await requestFromPage({ page, request: { type: 'listRecents' } })
+  if (reply === null || reply.type !== 'recents') return null
+  const recent = reply.recents.find((entry) => entry.label === label)
+  if (recent === undefined || recent.watched === null) return null
+  return Math.round(recent.watched * 100)
 }

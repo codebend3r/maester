@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test'
 import { type Clips, makeClips } from '@/e2e/clips'
-import { freshUserData, openFile, removeDir, requestFromPage, withApp } from '@/e2e/harness'
+import { freshUserData, openFile, removeDir, watchedPercent, withApp } from '@/e2e/harness'
 
 type VideoFacts = { readyState: number; paused: boolean; currentTime: number }
 
@@ -33,18 +33,35 @@ const distanceFrom = async ({ page, seconds }: { page: Page; seconds: number }) 
   return facts === null ? Number.POSITIVE_INFINITY : Math.abs(facts.currentTime - seconds)
 }
 
-/** The share of `label` main has stored as watched, in whole percent, as Home labels it. */
-const watchedPercent = async ({ page, label }: { page: Page; label: string }) => {
-  const reply = await requestFromPage({ page, request: { type: 'listRecents' } })
-  if (reply === null || reply.type !== 'recents') return null
-  const recent = reply.recents.find((entry) => entry.label === label)
-  if (recent === undefined || recent.watched === null) return null
-  return Math.round(recent.watched * 100)
-}
-
 const homeHeading = (page: Page) => page.getByRole('heading', { name: 'raven player' })
 
-test.describe.serial('playing a local file', () => {
+/** Drops a File the page made, which main refuses with a notice. */
+const dropForgedFile = ({ page, name }: { page: Page; name: string }) =>
+  page.evaluate((fileName) => {
+    const transfer = new DataTransfer()
+    transfer.items.add(new File(['x'], fileName, { type: 'video/mp4' }))
+    window.dispatchEvent(
+      new DragEvent('drop', { dataTransfer: transfer, bubbles: true, cancelable: true }),
+    )
+  }, name)
+
+/** A notice over the watch route sits wholly above the controls bar's timeline. */
+const expectNoticeClearOfControls = async (page: Page) => {
+  await dropForgedFile({ page, name: 'Not a path.mp4' })
+  const notice = page.getByText('Drop a video file to play it.')
+  await expect(notice).toBeVisible()
+  const noticeBox = await notice.boundingBox()
+  const timelineBox = await page.getByRole('slider', { name: /seek/i }).boundingBox()
+  expect(noticeBox).not.toBeNull()
+  expect(timelineBox).not.toBeNull()
+  if (noticeBox === null || timelineBox === null) return
+  expect(noticeBox.y + noticeBox.height).toBeLessThan(timelineBox.y)
+}
+
+// The html engine's suite: with no video engine, local files play through Chromium.
+const MPV = 'off'
+
+test.describe.serial('playing a local file through the web engine fallback', () => {
   let userData = ''
   let clips: Clips = { folder: '', first: '', second: '' }
 
@@ -60,6 +77,7 @@ test.describe.serial('playing a local file', () => {
   test('opens a clip from Finder, plays, pauses, seeks and resumes after a relaunch', async () => {
     await withApp({
       userData,
+      mpv: MPV,
       run: async ({ app, page }) => {
         await openFile({ app, path: clips.first })
         await expect(page.getByRole('heading', { name: 'Clip 01', exact: true })).toBeVisible()
@@ -82,6 +100,7 @@ test.describe.serial('playing a local file', () => {
 
     await withApp({
       userData,
+      mpv: MPV,
       run: async ({ app, page }) => {
         await openFile({ app, path: clips.first })
         await expect(page.getByText('Resumed at 0:15')).toBeVisible()
@@ -91,6 +110,7 @@ test.describe.serial('playing a local file', () => {
           .poll(async () => (await videoFacts(page))?.currentTime ?? 0)
           .toBeGreaterThanOrEqual(14)
         await expectClockAdvancing(page)
+        await expectNoticeClearOfControls(page)
 
         // It plays on from 0:15, so park it at half way again for the next test: pause,
         // then 0% (a jump of ten seconds or more saves) and back to 50%, both saved.
@@ -108,6 +128,7 @@ test.describe.serial('playing a local file', () => {
   test('lists recents after a relaunch and removes one', async () => {
     await withApp({
       userData,
+      mpv: MPV,
       run: async ({ page }) => {
         const recent = page.getByRole('button', { name: 'Clip 01' })
         await expect(recent).toBeVisible()
@@ -127,16 +148,11 @@ test.describe.serial('playing a local file', () => {
   test('refuses a File the page made', async () => {
     await withApp({
       userData,
+      mpv: MPV,
       run: async ({ page }) => {
         await expect(homeHeading(page)).toBeVisible()
         // Named for a real video, so a path taken from the name would play it.
-        await page.evaluate((name) => {
-          const transfer = new DataTransfer()
-          transfer.items.add(new File(['x'], name, { type: 'video/mp4' }))
-          window.dispatchEvent(
-            new DragEvent('drop', { dataTransfer: transfer, bubbles: true, cancelable: true }),
-          )
-        }, clips.first)
+        await dropForgedFile({ page, name: clips.first })
 
         await expect(page.getByRole('status')).toHaveText('Drop a video file to play it.')
         expect(page.url()).toBe('app://raven/')

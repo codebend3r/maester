@@ -19,7 +19,7 @@
       }
     },
     {
-      "files": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/renderer/test/**"],
+      "files": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/renderer/test/**", "test/**"],
       "rules": {
         "typescript/no-non-null-assertion": "off",
         "unicorn/consistent-function-scoping": "off"
