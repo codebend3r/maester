@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { createReadStream } from 'node:fs'
-import { readdir, readFile, realpath, rename, stat, writeFile } from 'node:fs/promises'
+import { readdir, readFile, realpath, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { monitorEventLoopDelay } from 'node:perf_hooks'
 import { Readable } from 'node:stream'
@@ -23,13 +23,7 @@ import {
   shell,
 } from 'electron'
 import { createAppHandler } from '@/main/appProtocol'
-import {
-  CONFIG_FILE,
-  type ConfigStore,
-  EMPTY_CONFIG,
-  isDesktopConfig,
-  setOutput,
-} from '@/main/desktopConfig'
+import { CONFIG_FILE, type ConfigStore, loadConfig, setOutput } from '@/main/desktopConfig'
 import { createDesktopService, type DesktopService } from '@/main/desktopService'
 import { createFileHandler } from '@/main/fileProtocol'
 import { createGrants, type Grants } from '@/main/grants'
@@ -51,8 +45,20 @@ import {
 import { createSleepGuard } from '@/main/player/sleepGuard'
 import { setWindowBounds } from '@/main/playerState'
 import { createQuitGate } from '@/main/quitGate'
+import { createQuitMark } from '@/main/quitMark'
 import { createRequestHandler } from '@/main/requestHandler'
 import { isAppUrl, isPermissionAllowed, isTrustedSender, windowOpenFor } from '@/main/security'
+import { createLinkOpener } from '@/main/servers/linkOpener'
+import { createServerCalls, probeServer } from '@/main/servers/serverCalls'
+import { serverById } from '@/main/servers/serverList'
+import {
+  clearOrphanPartitions,
+  createServerSessions,
+  PARTITIONS_DIR,
+} from '@/main/servers/serverSessions'
+import { createServerSources } from '@/main/servers/serverSources'
+import { createServerTrust, withTrustLog } from '@/main/servers/serverTrust'
+import { confirmWith } from '@/main/servers/trustPrompt'
 import {
   closeTimeoutFor,
   createShutdown,
@@ -63,7 +69,6 @@ import {
 import {
   createJsonStore,
   createStateStore,
-  loadJson,
   loadState,
   type StateFs,
   type StateStore,
@@ -85,7 +90,10 @@ import { messageOf } from '@/shared/messageOf'
 const launchedAt = performance.now()
 
 const PRODUCT_NAME = 'raven player'
-const LINK_NOTICE = 'raven links open server titles, which this version cannot play yet.'
+const STORE_NOTICES = {
+  state: 'raven player could not save your recent videos.',
+  config: 'raven player could not save its settings.',
+} as const
 // Finder sends one `open-file` per file; this gathers a multi-file open into one batch.
 const OPEN_BATCH_MS = 100
 const STATE_DEBOUNCE_MS = 2000
@@ -139,6 +147,16 @@ const startApp = (): void => {
       privileges: { standard: true, secure: true, stream: true },
     },
   ])
+
+  const quitMark = createQuitMark({
+    isEnabled: !app.isPackaged,
+    now: () => performance.now(),
+    write: (line) => {
+      process.stdout.write(line)
+    },
+  })
+  app.on('before-quit', quitMark.started)
+  app.on('quit', quitMark.ended)
 
   const windows: { current: BrowserWindow | null } = { current: null }
   const players: { current: WindowPlayer | null } = { current: null }
@@ -202,13 +220,23 @@ const startApp = (): void => {
       })
     },
   })
-  // P4 cannot play server titles, so every link is answered with one notice per batch.
+  // Shown first, so the trust sheet a link may raise is on a window the person can see.
+  const openLinksFromMain = async (links: readonly string[]): Promise<void> => {
+    const service = await services.ready
+    if (service === null) return
+    reveal()
+    announce(await service.openLinks(links))
+    reveal()
+  }
+
+  // The opener acts on the first link of a burst and asks about one server at a time.
   const linkBatch = createOpenBatch<string>({
     delayMs: OPEN_BATCH_MS,
     timers,
-    deliver: () => {
-      send({ type: 'notice', message: LINK_NOTICE })
-      reveal()
+    deliver: (links) => {
+      openLinksFromMain(links).catch((error: unknown) => {
+        console.error('raven player could not open that link.', error)
+      })
     },
   })
 
@@ -246,6 +274,7 @@ const startApp = (): void => {
       debounceMs: STATE_DEBOUNCE_MS,
       onError: (error) => {
         console.error('raven player could not save its state.', error)
+        send({ type: 'notice', message: STORE_NOTICES.state })
       },
     })
     const configFile = join(userData, CONFIG_FILE)
@@ -253,20 +282,74 @@ const startApp = (): void => {
     const config = createJsonStore({
       fs: stateFs,
       file: configFile,
-      initial: await loadJson({
-        fs: stateFs,
-        file: configFile,
-        now: Date.now,
-        guard: isDesktopConfig,
-        empty: EMPTY_CONFIG,
-      }),
+      initial: await loadConfig({ fs: stateFs, file: configFile, now: Date.now }),
       timers,
       debounceMs: 0,
       onError: (error) => {
         console.error('raven player could not save its settings.', error)
+        send({ type: 'notice', message: STORE_NOTICES.config })
       },
     })
+    // Listed before any server session is made, so none of the folders it removes is
+    // open; the removals go on while the window opens.
+    const orphans = await clearOrphanPartitions({
+      dir: join(userData, PARTITIONS_DIR),
+      keep: config.read().servers.map(({ id }) => id),
+      fs: {
+        readdir: (path) => readdir(path),
+        remove: (path) => rm(path, { recursive: true, force: true }),
+      },
+      timers,
+      warn,
+    })
+    orphans.removing.catch((error: unknown) => {
+      warn(`raven player could not clear its old server sessions: ${messageOf(error)}`)
+    })
     const grants = createGrants({ fs: { realpath, stat }, newId: randomUUID })
+    const serverOf = (serverId: string) => serverById(config.read(), { serverId })
+    const sessions = createServerSessions({
+      fromPartition: (partition) => session.fromPartition(partition),
+      timers,
+      warn,
+    })
+    const serverCalls = createServerCalls({ serverOf, fetchFor: sessions.fetchFor, warn })
+    const sources = createServerSources({
+      serverOf,
+      cookiesFor: sessions.cookiesFor,
+      calls: serverCalls,
+      warn,
+    })
+    const trust = withTrustLog({
+      trust: createServerTrust({
+        config,
+        // Read off `dialog` at each call, never kept, so the e2e can stand in for the sheet.
+        confirm: confirmWith({
+          show: (prompt) => {
+            const window = liveWindow()
+            return window === null
+              ? dialog.showMessageBox(prompt)
+              : dialog.showMessageBox(window, prompt)
+          },
+        }),
+        // The new server's session is made here, after the person said yes.
+        probe: ({ serverId, origin }) =>
+          probeServer({ fetch: sessions.fetchFor(serverId), origin }),
+        forget: sessions.forget,
+        // A title of the removed server stops, and the page hears it from the player.
+        onRemoved: (serverId) => {
+          const engine = currentEngine()
+          if (engine === null) return
+          engine.service.resetIfServer(serverId).catch((error: unknown) => {
+            warn(`raven player could not stop a removed server's title: ${messageOf(error)}`)
+          })
+        },
+        newId: randomUUID,
+        now: Date.now,
+        timers,
+        warn,
+      }),
+      warn,
+    })
 
     const showOpenDialog = async (): Promise<string[]> => {
       const options = {
@@ -327,6 +410,11 @@ const startApp = (): void => {
         if (window === null) return
         showWindowButtons({ window, isVisible })
       },
+      config,
+      serverCalls,
+      trust,
+      links: createLinkOpener({ trust, warn }),
+      openExternal: (url) => shell.openExternal(url),
     })
 
     // mpv stops before the stores flush and before Electron tears the window down.
@@ -337,6 +425,7 @@ const startApp = (): void => {
           players.current === null ? Promise.resolve() : players.current.engine.destroy(),
       },
       stores: [store, config],
+      writes: { hasPending: serverCalls.hasPendingWrites, settle: serverCalls.settleWrites },
       warn,
       wait: (ms) => sleep(ms),
     })
@@ -350,6 +439,7 @@ const startApp = (): void => {
       exit: () => {
         const isEngineAlive = players.current !== null && players.current.engine.isAlive()
         const ending = hardExitFor({ isEngineAlive })
+        quitMark.ended()
         switch (ending) {
           case 'kill':
             process.kill(process.pid, 'SIGKILL')
@@ -401,7 +491,7 @@ const startApp = (): void => {
 
     const window = openWindow({ store })
     windows.current = window
-    players.current = attachPlayer({ window, grants, config })
+    players.current = attachPlayer({ window, grants, config, sources })
     window.on('closed', () => {
       windows.current = null
     })
@@ -578,10 +668,12 @@ const attachPlayer = ({
   window,
   grants,
   config,
+  sources,
 }: {
   window: BrowserWindow
   grants: Grants
   config: ConfigStore
+  sources: ReturnType<typeof createServerSources>
 }) => {
   const mode = engineMode()
   // mpv's events arrive from the moment it opens; the service exists a moment later.
@@ -633,7 +725,8 @@ const attachPlayer = ({
       // Made before anything can load: it hardens mpv first and refuses loads if that fails.
       const service = createPlayerService({
         mpv,
-        resolveSource: resolveSourceWith({ grants }),
+        resolveSource: resolveSourceWith({ grants, servers: sources }),
+        explain: sources.explain,
         canChooseAo: mode === 'window',
         timers,
         onActivity: activity.report,
@@ -659,7 +752,10 @@ const attachPlayer = ({
         open: openNative,
         warn: (message) => warn(`raven player could not open its video engine: ${message}`),
       }),
-    destroyOf: ({ mpv }) => mpv.destroy(),
+    destroyOf: ({ mpv, service }) => {
+      service.dispose()
+      return mpv.destroy()
+    },
     watch: watchService,
     warn,
   })

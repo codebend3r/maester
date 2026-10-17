@@ -12,9 +12,14 @@ const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 0))
 
 const never = () => new Promise<void>(() => undefined)
 
-/** A shutdown whose destroy deadline never passes unless the test says so. */
-const shutdownOf = (input: Omit<Parameters<typeof createShutdown>[0], 'wait'>) =>
-  createShutdown({ wait: never, ...input })
+type ShutdownDeps = Parameters<typeof createShutdown>[0]
+
+const noWrites: ShutdownDeps['writes'] = { hasPending: () => false, settle: async () => {} }
+
+/** A shutdown whose deadlines never pass unless the test says so, with no saves in flight unless given. */
+const shutdownOf = (
+  input: Omit<ShutdownDeps, 'wait' | 'writes'> & { writes?: ShutdownDeps['writes'] },
+) => createShutdown({ wait: never, writes: noWrites, ...input })
 
 const fakeEngine = ({
   log,
@@ -171,6 +176,7 @@ describe('a destroy that never settles', () => {
     const shutdown = createShutdown({
       engine,
       stores: [fakeStore({ log, name: 'state', isDirty: true }).store],
+      writes: noWrites,
       warn,
       wait: (ms) => {
         waits.push(ms)
@@ -202,6 +208,7 @@ describe('a destroy that never settles', () => {
     const shutdown = createShutdown({
       engine,
       stores: [store.store],
+      writes: noWrites,
       warn: () => {},
       wait: (ms) => {
         waits.push(ms)
@@ -217,6 +224,129 @@ describe('a destroy that never settles', () => {
     expect(waits).toEqual([DESTROY_MS])
     expect(state.destroys).toBe(1)
     expect(log).toEqual(['destroy', 'flush state', 'flush state'])
+  })
+})
+
+/** Saves in flight to a server: pending until `finish` settles them. */
+const fakeWrites = ({ log }: { log: string[] }) => {
+  const done = Promise.withResolvers<void>()
+  const state = { isPending: true }
+  return {
+    finish: () => {
+      state.isPending = false
+      done.resolve()
+    },
+    writes: {
+      hasPending: () => state.isPending,
+      settle: async () => {
+        log.push('writes')
+        await done.promise
+        log.push('writes settled')
+      },
+    },
+  }
+}
+
+describe('saves in flight', () => {
+  test('keep the quit pending with the engine gone and every store clean', () => {
+    const log: string[] = []
+    const { engine, state } = fakeEngine({ log })
+    state.isAlive = false
+    const shutdown = shutdownOf({
+      engine,
+      stores: [fakeStore({ log, name: 'state', isDirty: false }).store],
+      writes: fakeWrites({ log }).writes,
+      warn: () => {},
+    })
+    expect(shutdown.isPending()).toBe(true)
+  })
+
+  test('nothing in flight leaves nothing pending', () => {
+    const log: string[] = []
+    const { engine, state } = fakeEngine({ log })
+    state.isAlive = false
+    const shutdown = shutdownOf({
+      engine,
+      stores: [fakeStore({ log, name: 'state', isDirty: false }).store],
+      writes: noWrites,
+      warn: () => {},
+    })
+    expect(shutdown.isPending()).toBe(false)
+  })
+
+  test('settle waits for them before any store flushes, while the engine stops alongside', async () => {
+    const log: string[] = []
+    const destroyed = Promise.withResolvers<void>()
+    const { engine } = fakeEngine({ log, destroy: () => destroyed.promise })
+    const saves = fakeWrites({ log })
+    const shutdown = shutdownOf({
+      engine,
+      stores: [fakeStore({ log, name: 'state', isDirty: true }).store],
+      writes: saves.writes,
+      warn: () => {},
+    })
+    const settling = shutdown.settle()
+    await settle()
+    expect(log.toSorted()).toEqual(['destroy', 'writes'])
+    destroyed.resolve()
+    await settle()
+    expect(log).not.toContain('flush state')
+    saves.finish()
+    await settling
+    expect(log.slice(-2)).toEqual(['writes settled', 'flush state'])
+    expect(shutdown.isPending()).toBe(false)
+  })
+
+  test('a save that never settles is given DESTROY_MS, warned, and the stores flush anyway', async () => {
+    const log: string[] = []
+    const warn = mock((_message: string) => {})
+    const deadline = Promise.withResolvers<void>()
+    const waits: number[] = []
+    const { engine, state } = fakeEngine({ log })
+    state.isAlive = false
+    const shutdown = createShutdown({
+      engine,
+      stores: [fakeStore({ log, name: 'state', isDirty: true }).store],
+      writes: fakeWrites({ log }).writes,
+      warn,
+      wait: (ms) => {
+        waits.push(ms)
+        return deadline.promise
+      },
+    })
+    const settling = shutdown.settle()
+    await settle()
+    expect(log).toEqual(['writes'])
+    expect(waits).toEqual([DESTROY_MS])
+    deadline.resolve()
+    await settling
+    expect(log).toEqual(['writes', 'flush state'])
+    expect(warn).toHaveBeenCalledTimes(1)
+    expect(warn.mock.calls[0]?.[0] ?? '').toContain('saves')
+    // Given up on, so they no longer hold the quit, and a later settle does not wait again.
+    expect(shutdown.isPending()).toBe(false)
+    await shutdown.settle()
+    expect(waits).toEqual([DESTROY_MS])
+  })
+
+  test('a settle with nothing in flight waits on no deadline for them', async () => {
+    const log: string[] = []
+    const waits: number[] = []
+    const { engine, state } = fakeEngine({ log })
+    state.isAlive = false
+    const shutdown = createShutdown({
+      engine,
+      stores: [fakeStore({ log, name: 'state', isDirty: true }).store],
+      writes: noWrites,
+      warn: () => {},
+      wait: (ms) => {
+        waits.push(ms)
+        return never()
+      },
+    })
+    await shutdown.settle()
+    expect(waits).toEqual([])
+    expect(log).toEqual(['flush state'])
   })
 })
 

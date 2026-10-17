@@ -19,6 +19,9 @@ import {
   isPlayerPortMessage,
   isPlayTarget,
   isRecentView,
+  isServerMethod,
+  isServerTarget,
+  isServerView,
   isTrackChoice,
   PLAYER_PORT_CHANNEL,
   PLAYER_PORT_MESSAGE,
@@ -141,6 +144,24 @@ describe('isDesktopRequest', () => {
         output: { profile: 'pcm', device: 'auto', passthrough: ['ac3'], spatial: false },
       },
     ],
+    [{ type: 'serverCall', serverId: id, method: 'GET', path: '/api/media/7', body: null }],
+    [
+      {
+        type: 'serverCall',
+        serverId: id,
+        method: 'PUT',
+        path: '/api/media/7/progress',
+        body: '{}',
+      },
+    ],
+    [{ type: 'listServers' }],
+    [{ type: 'addServer', origin: 'https://raven.example' }],
+    [{ type: 'renameServer', serverId: id, name: 'Home' }],
+    [{ type: 'removeServer', serverId: id }],
+    [{ type: 'openLink', link: 'raven://play?server=https://raven.example&media=7' }],
+    [{ type: 'openInBrowser', serverId: id, mediaId: 7 }],
+    [{ type: 'noteServerTitle', serverId: id, mediaId: 7, label: 'Dune', watched: 0.5 }],
+    [{ type: 'noteServerTitle', serverId: id, mediaId: 7, label: 'Dune', watched: null }],
   ])('accepts %j', (value) => {
     expect(isDesktopRequest(value)).toBe(true)
   })
@@ -155,6 +176,29 @@ describe('isDesktopRequest', () => {
     ['a path in saveTracks', { type: 'saveTracks', fileId: '/m/a.mkv', audio: 1, subtitle: null }],
     ['a string for the window buttons', { type: 'windowButtons', isVisible: 'yes' }],
     ['partial output settings', { type: 'writeOutput', output: { profile: 'pcm' } }],
+    [
+      'a server call with a method off the list',
+      { type: 'serverCall', serverId: id, method: 'DELETE', path: '/api/media/7', body: null },
+    ],
+    [
+      'a server call naming a host for the server',
+      { type: 'serverCall', serverId: 'vhagar', method: 'GET', path: '/api/media/7', body: null },
+    ],
+    [
+      'a server call with a number for its body',
+      { type: 'serverCall', serverId: id, method: 'POST', path: '/api/media/7/plays', body: 3 },
+    ],
+    ['a browser open with a media id of zero', { type: 'openInBrowser', serverId: id, mediaId: 0 }],
+    [
+      'a browser open with a string media id',
+      { type: 'openInBrowser', serverId: id, mediaId: '7' },
+    ],
+    [
+      'a server title noted without its share watched',
+      { type: 'noteServerTitle', serverId: id, mediaId: 7, label: 'Dune' },
+    ],
+    ['a server added without an origin', { type: 'addServer' }],
+    ['a rename to a number', { type: 'renameServer', serverId: id, name: 7 }],
     ['an unknown type', { type: 'readFile', path: '/etc/hosts' }],
     ['no type', {}],
     ['a string', 'ready'],
@@ -191,8 +235,24 @@ describe('isDesktopReply', () => {
     [{ type: 'recents', recents: [] }],
     [{ type: 'done' }],
     [{ type: 'refused', message: 'no such file' }],
+    [{ type: 'playServer', target: { serverId: id, mediaId: 7, at: 30, next: [8, 9] } }],
+    [{ type: 'serverReply', status: 200, body: '{"state":"off"}' }],
+    [{ type: 'serverUnreachable', message: 'raven player could not reach raven.example.' }],
+    [
+      {
+        type: 'servers',
+        servers: [{ serverId: id, origin: 'https://raven.example', name: 'Home' }],
+      },
+    ],
+    [{ type: 'servers', servers: [] }],
   ])('accepts %j', (value) => {
     expect(isDesktopReply(value)).toBe(true)
+  })
+
+  it('rejects a server reply without a status and a server list holding a bare origin', () => {
+    expect(isDesktopReply({ type: 'serverReply', body: '' })).toBe(false)
+    expect(isDesktopReply({ type: 'serverUnreachable' })).toBe(false)
+    expect(isDesktopReply({ type: 'servers', servers: ['https://raven.example'] })).toBe(false)
   })
 
   it('rejects a refusal without a message and an unknown type', () => {
@@ -209,6 +269,41 @@ describe('isDesktopReply', () => {
   })
 })
 
+describe('isServerTarget', () => {
+  it('accepts a server id, a media id, a start and a queue of media ids', () => {
+    expect(isServerTarget({ serverId: id, mediaId: 7, at: 0, next: [] })).toBe(true)
+  })
+
+  it.each([
+    ['a server id that is not opaque', { serverId: 'raven.example', mediaId: 7, at: 0, next: [] }],
+    ['a media id of zero', { serverId: id, mediaId: 0, at: 0, next: [] }],
+    ['a fractional media id', { serverId: id, mediaId: 1.5, at: 0, next: [] }],
+    ['a start that is not a number', { serverId: id, mediaId: 7, at: '30', next: [] }],
+    ['a start of x', { serverId: id, mediaId: 7, at: 'x', next: [] }],
+    ['a queue holding a negative id', { serverId: id, mediaId: 7, at: 0, next: [-1] }],
+    ['no queue', { serverId: id, mediaId: 7, at: 0 }],
+  ])('rejects %s', (_name, value) => {
+    expect(isServerTarget(value)).toBe(false)
+    expect(isDesktopReply({ type: 'playServer', target: value })).toBe(false)
+  })
+})
+
+describe('isServerMethod and isServerView', () => {
+  it('names the three methods a server call may use', () => {
+    expect(isServerMethod.values).toEqual(['GET', 'PUT', 'POST'])
+    expect(isServerMethod('DELETE')).toBe(false)
+    expect(isServerMethod('get')).toBe(false)
+  })
+
+  it('accepts a server by its id, origin and name, and rejects one named by its host', () => {
+    expect(isServerView({ serverId: id, origin: 'https://raven.example', name: 'Home' })).toBe(true)
+    expect(
+      isServerView({ serverId: 'raven.example', origin: 'https://raven.example', name: 'a' }),
+    ).toBe(false)
+    expect(isServerView({ serverId: id, origin: 'https://raven.example' })).toBe(false)
+  })
+})
+
 describe('isDesktopEvent', () => {
   it.each([
     [{ type: 'play', target: { fileId: id, queue: [] } }],
@@ -216,6 +311,8 @@ describe('isDesktopEvent', () => {
     [{ type: 'player', action: 'stats' }],
     [{ type: 'navigate', to: 'settings' }],
     [{ type: 'notice', message: 'raven links open in a later release' }],
+    [{ type: 'playServer', target: { serverId: id, mediaId: 7, at: 30, next: [8] } }],
+    [{ type: 'openLink' }],
   ])('accepts %j', (value) => {
     expect(isDesktopEvent(value)).toBe(true)
   })
@@ -225,6 +322,11 @@ describe('isDesktopEvent', () => {
     ['navigating home, which nothing in main sends', { type: 'navigate', to: 'home' }],
     ['recentsChanged, which nothing in main sends', { type: 'recentsChanged' }],
     ['a notice without a message', { type: 'notice' }],
+    ['openRecent, which only the page asks for', { type: 'openRecent' }],
+    [
+      'a server title queueing a fractional id',
+      { type: 'playServer', target: { serverId: id, mediaId: 7, at: 0, next: [1.5] } },
+    ],
   ])('rejects %s', (_name, value) => {
     expect(isDesktopEvent(value)).toBe(false)
   })
