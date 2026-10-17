@@ -170,7 +170,7 @@ const matchRoute = ({
   }
 }
 
-/** One of the thirteen calls the page may make, read from what it sent, or null for anything else. */
+/** One of the thirteen allowlisted calls, read from what was sent, or null for anything else. */
 export const matchCall = ({
   method,
   path,
@@ -253,6 +253,34 @@ export const isWrite = (call: AllowedCall): boolean => {
     case 'getMediaOrigins':
     case 'getMediaTicket':
       return false
+    default: {
+      const unreachable: never = call
+      return unreachable
+    }
+  }
+}
+
+/**
+ * Whether the page may make a call. A media ticket and the origin list are main's alone:
+ * main builds every media URL itself, so the page never holds a ticket or learns an origin.
+ */
+export const isPageCall = (call: AllowedCall): boolean => {
+  switch (call.name) {
+    case 'getMediaOrigins':
+    case 'getMediaTicket':
+      return false
+    case 'getMedia':
+    case 'getTracks':
+    case 'saveProgress':
+    case 'recordPlay':
+    case 'getLock':
+    case 'unlock':
+    case 'getAdminLock':
+    case 'unlockAdmin':
+    case 'getItem':
+    case 'getLibrary':
+    case 'getSagas':
+      return true
     default: {
       const unreachable: never = call
       return unreachable

@@ -182,7 +182,7 @@ Progress positions for a download are kept where every local file's are: `player
 
 ## Expanding a link
 
-`expand.ts` turns a `DownloadRequest` into the files to fetch. Five reads join the allowlist in `allowlist.ts`, each a `GET` main makes on its own and the page may also make: three for the expansion, two for fetching (below).
+`expand.ts` turns a `DownloadRequest` into the files to fetch. Five reads join the allowlist in `allowlist.ts`, each a `GET` main makes on its own: three for the expansion, which the page may also make, and two for fetching (below), which `isPageCall` keeps to main, so the page never reads a ticket or an origin.
 
 | Call | Path | For |
 | --- | --- | --- |
