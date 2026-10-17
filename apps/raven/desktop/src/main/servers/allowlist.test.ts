@@ -63,6 +63,41 @@ const ACCEPTED: readonly Accepted[] = [
     call: { name: 'unlockAdmin', password: 'hunter2' },
     sentBody: '{"password":"hunter2"}',
   },
+  {
+    method: 'GET',
+    path: '/api/items/10',
+    body: null,
+    call: { name: 'getItem', itemId: 10 },
+    sentBody: null,
+  },
+  {
+    method: 'GET',
+    path: '/api/libraries/3',
+    body: null,
+    call: { name: 'getLibrary', libraryId: 3 },
+    sentBody: null,
+  },
+  {
+    method: 'GET',
+    path: '/api/libraries/3/sagas',
+    body: null,
+    call: { name: 'getSagas', libraryId: 3 },
+    sentBody: null,
+  },
+  {
+    method: 'GET',
+    path: '/api/media-origins',
+    body: null,
+    call: { name: 'getMediaOrigins' },
+    sentBody: null,
+  },
+  {
+    method: 'GET',
+    path: '/api/media/7/ticket',
+    body: null,
+    call: { name: 'getMediaTicket', mediaId: 7 },
+    sentBody: null,
+  },
 ]
 
 const CASES = ACCEPTED.map((entry) => [entry.call.name, entry] as const)
@@ -87,7 +122,7 @@ describe('the allowlist values', () => {
   })
 })
 
-describe('matchCall accepts exactly the eight calls', () => {
+describe('matchCall accepts exactly the thirteen calls', () => {
   it.each(CASES)('accepts %s', (_name, { method, path, body, call }) => {
     expect(matchCall({ method, path, body })).toEqual(call)
   })
@@ -174,7 +209,7 @@ describe('requestFor', () => {
 })
 
 describe('isWrite', () => {
-  it('is true for saveProgress and recordPlay only', () => {
+  it('is true for saveProgress and recordPlay only, so the five new reads are not writes', () => {
     expect(ACCEPTED.filter(({ call }) => isWrite(call)).map(({ call }) => call.name)).toEqual([
       'saveProgress',
       'recordPlay',
@@ -206,6 +241,39 @@ describe('matchCall refuses calls off the list', () => {
     refuse({ method: 'GET', path: '/api/administrator' })
     refuse({ method: 'GET', path: '/api/media' })
     refuse({ method: 'GET', path: '/api/media/' })
+  })
+})
+
+describe('matchCall refuses the new reads when they are not exact', () => {
+  it('refuses a trailing slash, a leading zero and a query', () => {
+    refuse({ method: 'GET', path: '/api/items/10/' })
+    refuse({ method: 'GET', path: '/api/items/010' })
+    refuse({ method: 'GET', path: '/api/libraries/03/sagas' })
+    refuse({ method: 'GET', path: '/api/libraries/3/sagas/' })
+    refuse({ method: 'GET', path: '/api/media/7/ticket?x=1' })
+    refuse({ method: 'GET', path: '/api/media-origins/ping' })
+    refuse({ method: 'GET', path: '/api/media-origins?x=1' })
+  })
+
+  it('refuses a write method on any of the five', () => {
+    refuse({ method: 'POST', path: '/api/items/10' })
+    refuse({ method: 'PUT', path: '/api/libraries/3' })
+    refuse({ method: 'POST', path: '/api/libraries/3/sagas' })
+    refuse({ method: 'POST', path: '/api/media-origins' })
+    refuse({ method: 'POST', path: '/api/media/7/ticket' })
+  })
+
+  it('refuses a body on any of the five', () => {
+    refuse({ method: 'GET', path: '/api/items/10', body: '{}' })
+    refuse({ method: 'GET', path: '/api/libraries/3', body: '{}' })
+    refuse({ method: 'GET', path: '/api/libraries/3/sagas', body: '{}' })
+    refuse({ method: 'GET', path: '/api/media-origins', body: '{}' })
+    refuse({ method: 'GET', path: '/api/media/7/ticket', body: '{}' })
+  })
+
+  it('refuses an id past the safe integers', () => {
+    refuse({ method: 'GET', path: '/api/items/9007199254740992' })
+    refuse({ method: 'GET', path: '/api/libraries/9007199254740992' })
   })
 })
 

@@ -337,6 +337,24 @@ describe('createServerCalls.call', () => {
     ])
   })
 
+  it('fetches a media ticket from the stored origin with JSON accepted and no body', async () => {
+    const { calls, sent } = setup({ answer: () => reply({ text: '{"ticket":"t"}' }) })
+    const result = await calls.call({
+      serverId: SERVER.id,
+      call: { name: 'getMediaTicket', mediaId: 7 },
+    })
+    expect(result).toEqual({ ok: true, status: 200, body: '{"ticket":"t"}' })
+    expect(sent).toEqual([
+      {
+        url: 'https://raven.example/api/media/7/ticket',
+        method: 'GET',
+        headers: { accept: 'application/json' },
+        body: null,
+        timeoutMs: CALL_TIMEOUT_MS,
+      },
+    ])
+  })
+
   it('sends a content type and the rebuilt body with a saveProgress', async () => {
     const { calls, sent } = setup({ answer: () => reply({ status: 204, text: '' }) })
     const result = await calls.call({
