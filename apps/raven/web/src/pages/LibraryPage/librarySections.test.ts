@@ -49,7 +49,15 @@ describe('the tabs of a library', () => {
   it("counts All and Not matched from the library's own counts, and no other tab", () => {
     const counts = { itemCount: 1204, unmatchedCount: 3 }
     const countOf = (section: LibrarySection) => SECTIONS[section].count(counts)
-    expect(LIBRARY_SECTIONS.map(countOf)).toEqual([1204, null, null, null, 3, null, null])
+    expect(Object.values(LIBRARY_SECTIONS).map(countOf)).toEqual([
+      1204,
+      null,
+      null,
+      null,
+      3,
+      null,
+      null,
+    ])
     expect(SECTIONS['not-matched'].count({ itemCount: 1204, unmatchedCount: 0 })).toBeNull()
     expect(SECTIONS.all.count({ itemCount: 0, unmatchedCount: 0 })).toBe(0)
   })

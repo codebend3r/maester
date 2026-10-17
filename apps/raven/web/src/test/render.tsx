@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
+  ADMIN_LOCK_STATES,
   type AdminLock,
   DEFAULT_DISPLAY_SETTINGS,
   DEFAULT_PLAYBACK_SETTINGS,

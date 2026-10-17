@@ -3,6 +3,7 @@ import {
   type MediaSort,
   type RatingSource,
   type ShowEntry,
+  WATCHED_STATES,
   episodeCode,
   pickScore,
   showSortFact,
@@ -196,7 +197,8 @@ export const WideShowCard = ({
   const card = useShowCard({ entry, ratingsSource, sort })
   const wash = posterSources({ item: show, sizes: POSTER_SIZES.showCard })
   const isWatched =
-    watchedStateOf({ watched: entry.watchedEpisodes, total: entry.episodes }) === 'watched'
+    watchedStateOf({ watched: entry.watchedEpisodes, total: entry.episodes }) ===
+    WATCHED_STATES.watched
   const nextLabel = [card.code, next?.item?.title].filter(Boolean).join(' · ')
 
   return (

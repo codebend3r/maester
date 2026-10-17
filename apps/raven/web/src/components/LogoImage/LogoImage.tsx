@@ -1,6 +1,6 @@
-import { themeOf } from '@raven/ui'
+import { THEME_TONES, themeOf } from '@raven/ui'
 import { useState } from 'react'
-import { type LogoTone, logoTone } from '@/lib/logoTone'
+import { LOGO_TONES, type LogoTone, logoTone } from '@/lib/logoTone'
 import { useTheme } from '@/stores/theme'
 import styles from '@/components/LogoImage/LogoImage.module.scss'
 
@@ -23,11 +23,11 @@ export const LogoImage = ({
   loading?: 'lazy' | 'eager'
   onError?: () => void
 }) => {
-  const [tone, setTone] = useState<LogoTone>('mixed')
+  const [tone, setTone] = useState<LogoTone>(LOGO_TONES.mixed)
   const ground = themeOf(useTheme((state) => state.theme)).tone
   const recolour =
-    (tone === 'dark' && ground === 'dark' && styles.whitened) ||
-    (tone === 'light' && ground === 'light' && styles.inked) ||
+    (tone === LOGO_TONES.dark && ground === THEME_TONES.dark && styles.whitened) ||
+    (tone === LOGO_TONES.light && ground === THEME_TONES.light && styles.inked) ||
     undefined
   const classes = [className, recolour].filter((name): name is string => !!name)
   return (

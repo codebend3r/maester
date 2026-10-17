@@ -35,7 +35,7 @@ const ShowsView = ({ settings, shows }: { settings: LibrarySettings; shows: Show
  */
 /** A Movies library lays its videos out as posters; any other, as frame grabs. */
 const isMovieLibrary = (settings: LibrarySettings): boolean =>
-  matchTypeFor(settings.kind) === 'movie'
+  matchTypeFor(settings.kind) === ITEM_TYPES.movie
 
 const MediaView = ({ settings, items }: { settings: LibrarySettings; items: MediaItem[] }) => {
   const matchType = matchTypeFor(settings.kind)

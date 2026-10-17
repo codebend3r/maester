@@ -1,7 +1,9 @@
 import { type UseMutationResult, useQuery } from '@tanstack/react-query'
 import {
   type AiMatch,
+  ITEM_TYPES,
   type ItemSummary,
+  MATCH_STATES,
   type MatchItemType,
   type MediaItem,
   mediaLabel,
@@ -16,7 +18,7 @@ import {
   useState,
 } from 'react'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
-import { Button, Icon, type IconName } from '@raven/ui'
+import { Button, Icon, type IconName, KEYS } from '@raven/ui'
 import { FixMatchDialog } from '@/components/FixMatchDialog/FixMatchDialog'
 import { ImageEditorDialog } from '@/components/ImageEditor/ImageEditorDialog'
 import { api } from '@/lib/api'
@@ -91,8 +93,8 @@ const ConfirmDelete = ({
  * none for a file matched to nothing.
  */
 const artworkOf = (item: ItemSummary | null): { id: number; kind: MatchItemType } | null => {
-  if (item?.type === 'movie') return { id: item.id, kind: 'movie' }
-  if (item?.type === 'episode' && item.show) return { id: item.show.id, kind: 'show' }
+  if (item?.type === ITEM_TYPES.movie) return { id: item.id, kind: 'movie' }
+  if (item?.type === ITEM_TYPES.episode && item.show) return { id: item.show.id, kind: 'show' }
   return null
 }
 
@@ -201,11 +203,11 @@ const MenuBody = ({
   const [fixing, setFixing] = useState(false)
   const [editingImages, setEditingImages] = useState(false)
   const { favourite, watched, remove, refresh } = useMediaMutations({ media })
-  const matchable = matchType != null && media.match !== 'off'
+  const matchable = matchType != null && media.match !== MATCH_STATES.off
   const item = media.item
   // Only a movie's details carry an AI note: an episode's never do.
   const itemDetails = useQuery(
-    itemQuery(fixing && matchType === 'movie' ? (item?.id ?? null) : null),
+    itemQuery(fixing && matchType === ITEM_TYPES.movie ? (item?.id ?? null) : null),
   )
   const artwork = artworkOf(item)
 
@@ -236,16 +238,16 @@ const MenuBody = ({
   const onKeyDown = (event: KeyboardEvent<HTMLUListElement>) => {
     const buttons = items()
     const index = buttons.findIndex((button) => button === document.activeElement)
-    if (event.key === 'Escape') {
+    if (event.key === KEYS.escape) {
       event.preventDefault()
       close({ refocus: true })
-    } else if (event.key === 'ArrowDown') {
+    } else if (event.key === KEYS.arrowDown) {
       event.preventDefault()
       buttons[(index + 1) % buttons.length]?.focus()
-    } else if (event.key === 'ArrowUp') {
+    } else if (event.key === KEYS.arrowUp) {
       event.preventDefault()
       buttons[index <= 0 ? buttons.length - 1 : index - 1]?.focus()
-    } else if (event.key === 'Tab') {
+    } else if (event.key === KEYS.tab) {
       onOpenChange(false)
     }
   }

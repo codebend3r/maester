@@ -1,8 +1,10 @@
 import { type UseQueryResult, useQuery } from '@tanstack/react-query'
 import {
   type AiSuggestion,
+  ITEM_TYPES,
   type Library,
   type LibrarySettings,
+  METADATA_SERVICE_STATES,
   type MediaItem,
   type PosterEntry,
   type UnmatchedFile,
@@ -41,7 +43,12 @@ import {
 } from '@/lib/queries'
 import { LibraryListing, LibraryListingSkeleton } from '@/pages/LibraryPage/LibraryViews'
 import { SelectableCards } from '@/pages/LibraryPage/SelectableCards'
-import { type ListingState, NOTHING_LISTED, playQueue } from '@/pages/LibraryPage/libraryShape'
+import {
+  LISTING_STATES,
+  type ListingState,
+  NOTHING_LISTED,
+  playQueue,
+} from '@/pages/LibraryPage/libraryShape'
 import type { LibrarySection } from '@/pages/LibraryPage/librarySections'
 import { useAiLookupsDone } from '@/pages/LibraryPage/useAiLookupsDone'
 import { useLibraryListing } from '@/pages/LibraryPage/useLibraryListing'
@@ -138,15 +145,15 @@ const ListingBody = ({
   empty: string | null
 }) => {
   switch (listing.state) {
-    case 'pending':
+    case LISTING_STATES.pending:
       return <LibraryListingSkeleton settings={settings} />
-    case 'failed':
+    case LISTING_STATES.failed:
       return (
         <p className={styles.message} role="alert">
           {listing.error.message}
         </p>
       )
-    case 'listed':
+    case LISTING_STATES.listed:
       return empty ? (
         <p className={styles.message}>{empty}</p>
       ) : (
@@ -177,7 +184,7 @@ const AllSection = ({ library }: { library: Library }) => {
     seed: view.seed,
     scanning,
   })
-  const listed = listing.state === 'listed' ? listing : NOTHING_LISTED
+  const listed = listing.state === LISTING_STATES.listed ? listing : NOTHING_LISTED
   const queue = playQueue({ settings, listing: listed })
   // The strip down the side follows the order: letters for titles, steps of
   // the value sorted by for the rest, none for a random order.
@@ -188,7 +195,7 @@ const AllSection = ({ library }: { library: Library }) => {
     source: settings.ratingsSource,
   })
   const empty =
-    listing.state === 'listed'
+    listing.state === LISTING_STATES.listed
       ? emptyMessage({
           empty: listed.shows.length === 0 && listed.files.length === 0,
           query: view.query,
@@ -323,7 +330,7 @@ const notMatchedHint = ({
 }): string => {
   const title = matchType ?? 'title'
   if (!canManage) return `Turn the admin lock off in Settings to point these at the right ${title}.`
-  if (matchType === 'show') {
+  if (matchType === ITEM_TYPES.show) {
     return 'Choose Fix match beside a show to point its folder at the right show.'
   }
   return `Open a file's menu and choose Fix match to point it at the right ${title}.`
@@ -339,7 +346,7 @@ const notMatchedHint = ({
 const NotMatchedSection = ({ library }: { library: Library }) => {
   const matchType = matchTypeFor(library.settings.kind)
   const metadata = useQuery(metadataHealthQuery)
-  const canMatch = metadata.data?.tmdb === 'ok'
+  const canMatch = metadata.data?.tmdb === METADATA_SERVICE_STATES.ok
   const canManage = useCanManage()
   const query = useQuery({
     ...unmatchedQuery(library.id),
@@ -351,13 +358,13 @@ const NotMatchedSection = ({ library }: { library: Library }) => {
   return (
     <SectionBody
       query={query}
-      shape={matchType === 'show' ? <MediaTilesSkeleton /> : <MediaGridSkeleton />}
+      shape={matchType === ITEM_TYPES.show ? <MediaTilesSkeleton /> : <MediaGridSkeleton />}
       empty={whenEmpty(`Every file in ${library.name} is matched.`)}
     >
       {(files) => (
         <>
           <p className={styles.message}>{notMatchedHint({ matchType, canManage })}</p>
-          {matchType === 'show' ? (
+          {matchType === ITEM_TYPES.show ? (
             <UnmatchedShows
               files={files}
               suggestionOf={suggestionsIn(files)}
@@ -428,7 +435,7 @@ const FinishedSection = ({ library }: { library: Library }) => {
             <MediaTiles
               items={entries.map((entry) => entry.media)}
               note={(media) => notes.get(media.id) ?? null}
-              posters={matchType === 'movie'}
+              posters={matchType === ITEM_TYPES.movie}
               matchType={matchType}
             />
             <ButtonLink

@@ -42,13 +42,18 @@ export const showListQuery = (listing: Listing) =>
     placeholderData: keepPreviousData,
   })
 
+/** What a history lists: what was watched by the library's own measure, or everything that played. */
+export const HISTORY_SHOWS = { watched: 'watched', all: 'all' } as const
+
+export type HistoryShow = (typeof HISTORY_SHOWS)[keyof typeof HISTORY_SHOWS]
+
 export const historyQuery = ({
   libraryId,
   show,
   limit,
 }: {
   libraryId: number | null
-  show: 'watched' | 'all'
+  show: HistoryShow
   limit: number
 }) =>
   queryOptions({
@@ -56,7 +61,7 @@ export const historyQuery = ({
     queryFn:
       libraryId == null
         ? skipToken
-        : () => api.listHistory({ libraryId, limit, watchedOnly: show === 'watched' }),
+        : () => api.listHistory({ libraryId, limit, watchedOnly: show === HISTORY_SHOWS.watched }),
     placeholderData: keepPreviousData,
   })
 
@@ -197,7 +202,7 @@ export const adminLockQuery = queryOptions({
   staleTime: 60_000,
   refetchInterval: (query) => {
     const lock = query.state.data
-    return lock?.state === 'turningOn' ? lock.remainingMs + PAST_DUE_MS : false
+    return lock?.state === ADMIN_LOCK_STATES.turningOn ? lock.remainingMs + PAST_DUE_MS : false
   },
 })
 

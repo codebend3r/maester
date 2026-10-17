@@ -5,17 +5,17 @@ import { ITEM_TYPES, type Library, type LibraryKind, matchTypeFor } from '@raven
  * beneath the library's, `/libraries/:id/sagas`, so a tab can be linked to
  * and the back button steps between them.
  */
-export const LIBRARY_SECTIONS = [
-  'all',
-  'in-progress',
-  'favourites',
-  'sagas',
-  'not-matched',
-  'duplicates',
-  'finished',
-] as const
+export const LIBRARY_SECTIONS = {
+  all: 'all',
+  inProgress: 'in-progress',
+  favourites: 'favourites',
+  sagas: 'sagas',
+  notMatched: 'not-matched',
+  duplicates: 'duplicates',
+  finished: 'finished',
+} as const
 
-export type LibrarySection = (typeof LIBRARY_SECTIONS)[number]
+export type LibrarySection = (typeof LIBRARY_SECTIONS)[keyof typeof LIBRARY_SECTIONS]
 
 const always = (): boolean => true
 
@@ -68,7 +68,7 @@ export const hasSection = ({
 }): boolean => SECTIONS[section].isFor(kind)
 
 export const sectionsFor = (kind: LibraryKind): LibrarySection[] =>
-  LIBRARY_SECTIONS.filter((section) => hasSection({ kind, section }))
+  Object.values(LIBRARY_SECTIONS).filter((section) => hasSection({ kind, section }))
 
 /** A tab's address; All is the library's own. */
 export const sectionPath = ({
@@ -77,13 +77,20 @@ export const sectionPath = ({
 }: {
   libraryId: number
   section: LibrarySection
-}): string => (section === 'all' ? `/libraries/${libraryId}` : `/libraries/${libraryId}/${section}`)
+}): string =>
+  section === LIBRARY_SECTIONS.all
+    ? `/libraries/${libraryId}`
+    : `/libraries/${libraryId}/${section}`
 
 /**
  * The tab a `:section` route param names: All when there is none, and null
  * for one that names no tab, `all` included, as All has no address of its own.
  */
 export const sectionFrom = (param: string | undefined): LibrarySection | null => {
-  if (param === undefined) return 'all'
-  return LIBRARY_SECTIONS.find((section) => section !== 'all' && section === param) ?? null
+  if (param === undefined) return LIBRARY_SECTIONS.all
+  return (
+    Object.values(LIBRARY_SECTIONS).find(
+      (section) => section !== LIBRARY_SECTIONS.all && section === param,
+    ) ?? null
+  )
 }

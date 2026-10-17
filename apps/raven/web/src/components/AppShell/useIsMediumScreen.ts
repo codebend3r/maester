@@ -5,7 +5,7 @@ import { useSyncExternalStore } from 'react'
  * says. The stylesheet lays the menu out by the same `max-width: 64rem`, so
  * the two always agree.
  */
-const MEDIUM_SCREEN = '(max-width: 64rem)'
+export const MEDIUM_SCREEN = '(max-width: 64rem)'
 
 const followScreen = (onChange: () => void) => {
   const query = window.matchMedia(MEDIUM_SCREEN)

@@ -1,27 +1,44 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type {
-  ItemDetails,
-  ItemMetadata,
-  ItemMetadataChange,
-  MatchItemType,
-  MediaItem,
+import {
+  ITEM_TYPES,
+  type ItemDetails,
+  type ItemMetadata,
+  type ItemMetadataChange,
+  type MatchItemType,
+  type MediaItem,
 } from '@raven/core'
 import { type FormEvent, useId, useState } from 'react'
 import { Button, Icon } from '@raven/ui'
 import { MovieFiles } from '@/components/MovieFiles/MovieFiles'
 import { api } from '@/lib/api'
-import { afterItemEdited } from '@/lib/invalidate'
+import { EDITED_PARTS, afterItemEdited } from '@/lib/invalidate'
 import { itemMetadataQuery } from '@/lib/queries'
 import styles from '@/components/MetadataEditor/MetadataEditor.module.scss'
 
 type Field = keyof ItemMetadata
 
-const FIELDS: readonly { key: Field; label: string; kind: 'text' | 'number' | 'long' }[] = [
-  { key: 'title', label: 'Title', kind: 'text' },
-  { key: 'year', label: 'Year', kind: 'number' },
-  { key: 'contentRating', label: 'Content rating', kind: 'text' },
-  { key: 'tagline', label: 'Tagline', kind: 'text' },
-  { key: 'summary', label: 'Summary', kind: 'long' },
+/** Each field the form edits, by its key in `ItemMetadata`. */
+const FIELD_KEYS = {
+  title: 'title',
+  year: 'year',
+  contentRating: 'contentRating',
+  tagline: 'tagline',
+  summary: 'summary',
+} as const satisfies { [K in Field]: K }
+
+/** The box a field is typed in: a line, a number, or several lines. */
+const FIELD_KINDS = { text: 'text', number: 'number', long: 'long' } as const
+
+const FIELDS: readonly {
+  key: Field
+  label: string
+  kind: (typeof FIELD_KINDS)[keyof typeof FIELD_KINDS]
+}[] = [
+  { key: FIELD_KEYS.title, label: 'Title', kind: FIELD_KINDS.text },
+  { key: FIELD_KEYS.year, label: 'Year', kind: FIELD_KINDS.number },
+  { key: FIELD_KEYS.contentRating, label: 'Content rating', kind: FIELD_KINDS.text },
+  { key: FIELD_KEYS.tagline, label: 'Tagline', kind: FIELD_KINDS.text },
+  { key: FIELD_KEYS.summary, label: 'Summary', kind: FIELD_KINDS.long },
 ]
 
 /** What the form holds: every field as text, so an empty box means "nothing". */
@@ -39,13 +56,13 @@ const toDraft = (metadata: ItemMetadata): Draft => ({
 const valueOf = ({ key, text }: { key: Field; text: string }): string | number | null => {
   const trimmed = text.trim()
   if (trimmed === '') return null
-  if (key !== 'year') return trimmed
+  if (key !== FIELD_KEYS.year) return trimmed
   const year = Number.parseInt(trimmed, 10)
   return Number.isInteger(year) ? year : null
 }
 
 /** The edition a file name carries, for the wand: the first version that has one. */
-export const editionFrom = (versions: readonly ItemDetails['versions'][number][]): string | null =>
+const editionFrom = (versions: readonly ItemDetails['versions'][number][]): string | null =>
   versions.find((version) => version.edition != null)?.edition ?? null
 
 /**
@@ -80,12 +97,12 @@ export const MetadataEditor = ({
   const save = useMutation({
     mutationFn: (change: ItemMetadataChange) => api.setItemMetadata({ id: details.id, change }),
     onSuccess: async (updated) => {
-      await afterItemEdited({ queryClient, updated, part: 'metadata' })
+      await afterItemEdited({ queryClient, updated, part: EDITED_PARTS.metadata })
       onDone()
     },
   })
 
-  const edition = itemKind === 'movie' ? editionFrom(details.versions) : null
+  const edition = itemKind === ITEM_TYPES.movie ? editionFrom(details.versions) : null
   const [first, ...rest] = details.versions
   const original = state.data?.original
 
@@ -98,7 +115,7 @@ export const MetadataEditor = ({
     // which shows nothing, as null would bring TMDB's back.
     const change = FIELDS.reduce<ItemMetadataChange>((sent, field) => {
       const value = valueOf({ key: field.key, text: draft[field.key] })
-      const empty = field.key === 'year' ? 0 : ''
+      const empty = field.key === FIELD_KEYS.year ? 0 : ''
       return { ...sent, [field.key]: value === original[field.key] ? null : (value ?? empty) }
     }, {})
     save.mutate(change)
@@ -114,7 +131,7 @@ export const MetadataEditor = ({
           Cancel
         </Button>
       </header>
-      {itemKind === 'movie' && first && (
+      {itemKind === ITEM_TYPES.movie && first && (
         <MovieFiles files={[first, ...rest]} everyCard={everyCard} itemId={details.id} />
       )}
       <p className={styles.hint}>
@@ -143,9 +160,11 @@ export const MetadataEditor = ({
               <div key={field.key} className={styles.field}>
                 <label htmlFor={id}>{field.label}</label>
                 <div
-                  className={field.key === 'title' && edition ? styles.withWand : styles.control}
+                  className={
+                    field.key === FIELD_KEYS.title && edition ? styles.withWand : styles.control
+                  }
                 >
-                  {field.kind === 'long' ? (
+                  {field.kind === FIELD_KINDS.long ? (
                     <textarea
                       id={id}
                       rows={4}
@@ -155,13 +174,13 @@ export const MetadataEditor = ({
                   ) : (
                     <input
                       id={id}
-                      type={field.kind === 'number' ? 'number' : 'text'}
-                      inputMode={field.kind === 'number' ? 'numeric' : undefined}
+                      type={field.kind === FIELD_KINDS.number ? 'number' : 'text'}
+                      inputMode={field.kind === FIELD_KINDS.number ? 'numeric' : undefined}
                       value={draft[field.key]}
                       onChange={(event) => setDraft({ ...draft, [field.key]: event.target.value })}
                     />
                   )}
-                  {field.key === 'title' && edition && (
+                  {field.key === FIELD_KEYS.title && edition && (
                     <Button
                       icon="wand"
                       aria-label={`Add the edition from the file name: ${edition}`}

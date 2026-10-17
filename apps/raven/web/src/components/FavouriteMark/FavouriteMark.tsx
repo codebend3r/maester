@@ -6,6 +6,8 @@ import styles from '@/components/FavouriteMark/FavouriteMark.module.scss'
 export const FavouriteWords = ({ media }: { media: MediaItem }) =>
   media.favourite && <span className="visually-hidden">Favourite</span>
 
+const FAVOURITE_TONES = { inline: 'inline', overlay: 'overlay', scrim: 'scrim' } as const
+
 /**
  * A solid heart for a favourite; nothing for any other video. `inline` sits
  * beside a card's facts, `overlay` is a disc on glass over a poster, beside
@@ -16,12 +18,12 @@ export const FavouriteWords = ({ media }: { media: MediaItem }) =>
  */
 export const FavouriteMark = ({
   media,
-  tone = 'inline',
+  tone = FAVOURITE_TONES.inline,
   decorative = false,
   className,
 }: {
   media: MediaItem
-  tone?: 'inline' | 'overlay' | 'scrim'
+  tone?: (typeof FAVOURITE_TONES)[keyof typeof FAVOURITE_TONES]
   decorative?: boolean
   className?: string
 }) =>
@@ -30,7 +32,7 @@ export const FavouriteMark = ({
       className={[styles.mark, styles[tone], className ?? ''].filter(Boolean).join(' ')}
       aria-hidden={decorative ? 'true' : undefined}
     >
-      <Icon name="heart" size={tone === 'scrim' ? 18 : 14} />
+      <Icon name="heart" size={tone === FAVOURITE_TONES.scrim ? 18 : 14} />
       {!decorative && <FavouriteWords media={media} />}
     </span>
   )

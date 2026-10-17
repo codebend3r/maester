@@ -1,11 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   type AiMatch,
+  CONFIDENCE_TIERS,
   type ConfidenceTier,
   confidenceTierOf,
   type MatchCandidate,
   type MatchItemType,
   type MatchSubject,
+  confidenceTierOf,
 } from '@raven/core'
 import { type FormEvent, useEffect, useId, useRef } from 'react'
 import { AiMatchNote } from '@/components/AiMatchNote/AiMatchNote'
@@ -57,7 +59,7 @@ const Candidate = ({
           </span>
         )}
         <span className={`${styles.stamp} ${styles[tier]}`} aria-hidden="true">
-          {tier === 'strong' && <Icon name="check" size={12} />}
+          {tier === CONFIDENCE_TIERS.strong && <Icon name="check" size={12} />}
           {candidate.confidence}
         </span>
       </span>
@@ -233,7 +235,10 @@ export const FixMatchDialog = <T,>({
                 <Candidate
                   key={candidate.tmdbId}
                   candidate={candidate}
-                  isBest={index === 0 && confidenceTierOf(candidate.confidence) === 'strong'}
+                  isBest={
+                    index === 0 &&
+                    confidenceTierOf(candidate.confidence) === CONFIDENCE_TIERS.strong
+                  }
                   disabled={choose.isPending}
                   onChoose={() => choose.mutate(candidate.tmdbId)}
                 />

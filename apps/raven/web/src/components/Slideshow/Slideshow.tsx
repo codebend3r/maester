@@ -50,7 +50,7 @@ export const slideRoles = <T,>({
   })
 }
 
-const LESS_MOTION = '(prefers-reduced-motion: reduce)'
+export const LESS_MOTION = '(prefers-reduced-motion: reduce)'
 
 const followLessMotion = (onChange: () => void) => {
   const query = window.matchMedia(LESS_MOTION)

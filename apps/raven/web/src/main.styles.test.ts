@@ -59,6 +59,9 @@ test('shared emitted CSS keeps Button defaults before Player overrides', async (
   expectPlayerOverridesAfterPrimitives(css)
 })
 
+/** The `type` of a file the bundle emits that is not a chunk of code. */
+const OUTPUT_TYPES = { asset: 'asset' } as const
+
 test('web emitted CSS keeps shared Button defaults before host and Player overrides', async () => {
   // Build in memory: DOM test loaders do not exercise Vite's extracted CSS ordering.
   const result = await build({
@@ -70,7 +73,7 @@ test('web emitted CSS keeps shared Button defaults before host and Player overri
   const stylesheets = outputs
     .flatMap((output) => ('output' in output ? output.output : []))
     .flatMap((output) =>
-      output.type === 'asset' && output.fileName.endsWith('.css') ? [output.source] : [],
+      output.type === OUTPUT_TYPES.asset && output.fileName.endsWith('.css') ? [output.source] : [],
     )
   expect(stylesheets).toHaveLength(1)
   const source = stylesheets[0]

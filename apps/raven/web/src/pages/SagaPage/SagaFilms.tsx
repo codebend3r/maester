@@ -23,7 +23,9 @@ import { useSelectable } from '@/lib/useSelectable'
 import styles from '@/pages/SagaPage/SagaFilms.module.scss'
 
 /** Where a movie stands in the saga: watched, the one to watch next, or neither. */
-type Standing = 'watched' | 'next' | 'later'
+const STANDINGS = { watched: 'watched', next: 'next', later: 'later' } as const
+
+type Standing = (typeof STANDINGS)[keyof typeof STANDINGS]
 
 const TAGS = {
   watched: { label: 'Watched', className: styles.watchedTag },
@@ -32,11 +34,11 @@ const TAGS = {
 } as const satisfies Record<Standing, { label: string; className: string | undefined } | null>
 
 /** Each movie's standing: the watched ones, then the first not watched is up next. */
-export const standings = (media: readonly MediaItem[]): Standing[] => {
+const standings = (media: readonly MediaItem[]): Standing[] => {
   const next = media.findIndex((each) => !each.watched)
   return media.map((each, index) => {
-    if (each.watched) return 'watched'
-    return index === next ? 'next' : 'later'
+    if (each.watched) return STANDINGS.watched
+    return index === next ? STANDINGS.next : STANDINGS.later
   })
 }
 
@@ -81,7 +83,7 @@ const SagaFilm = ({
     : null
   return (
     <li
-      className={[styles.film, menu.hostClass, standing === 'watched' ? styles.seen : '']
+      className={[styles.film, menu.hostClass, standing === STANDINGS.watched ? styles.seen : '']
         .filter(Boolean)
         .join(' ')}
       data-entry={mediaEntryKey(media)}
@@ -158,7 +160,7 @@ export const SagaFilms = ({
           key={each.id}
           media={each}
           place={index + 1}
-          standing={standing[index] ?? 'later'}
+          standing={standing[index] ?? STANDINGS.later}
           ratingsSource={ratingsSource}
         />
       ))}

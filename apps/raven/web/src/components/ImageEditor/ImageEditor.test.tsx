@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { ItemImageOptions } from '@raven/core'
+import { IMAGE_SOURCES, ITEM_TYPES, type ItemImageOptions, type MatchItemType } from '@raven/core'
 import { ImageEditor } from '@/components/ImageEditor/ImageEditor'
 import { api } from '@/lib/api'
 import { itemDetails, library, matchedMovie } from '@/test/fixtures'
@@ -35,10 +35,13 @@ describe('ImageEditor', () => {
   }
   const state = { done: 0 }
 
-  const open = (
-    overrides: Parameters<typeof itemDetails>[0] = {},
-    itemKind: 'movie' | 'show' = 'movie',
-  ) => {
+  const open = ({
+    overrides = {},
+    itemKind = ITEM_TYPES.movie,
+  }: {
+    overrides?: Parameters<typeof itemDetails>[0]
+    itemKind?: MatchItemType
+  } = {}) => {
     spies.options.mockImplementation(async () => OPTIONS)
     spies.choose.mockImplementation(async () => itemDetails({ posterVersion: 'new' }))
     renderWithProviders({
@@ -93,7 +96,7 @@ describe('ImageEditor', () => {
             ...OPTIONS,
             poster: OPTIONS.poster.map((option) => ({
               ...option,
-              current: option.source === 'tmdb',
+              current: option.source === IMAGE_SOURCES.tmdb,
             })),
           }
         : OPTIONS,
@@ -156,7 +159,7 @@ describe('ImageEditor', () => {
   })
 
   it('has no logo tab for a show, whose page shows none', async () => {
-    open({}, 'show')
+    open({ itemKind: ITEM_TYPES.show })
     const tabs = await screen.findByRole('tablist', { name: 'Pictures' })
     expect(
       within(tabs)
@@ -167,14 +170,16 @@ describe('ImageEditor', () => {
 
   it('lists the linked files that share the pictures, and closes with Done', async () => {
     open({
-      versions: [
-        matchedMovie({ id: 1, fileName: 'Avatar (2009) Remux-2160p.mkv', edition: null }),
-        matchedMovie({
-          id: 2,
-          fileName: 'Avatar (2009) {edition-Extended} Remux-2160p.mkv',
-          edition: 'Extended',
-        }),
-      ],
+      overrides: {
+        versions: [
+          matchedMovie({ id: 1, fileName: 'Avatar (2009) Remux-2160p.mkv', edition: null }),
+          matchedMovie({
+            id: 2,
+            fileName: 'Avatar (2009) {edition-Extended} Remux-2160p.mkv',
+            edition: 'Extended',
+          }),
+        ],
+      },
     })
     expect(await screen.findByRole('heading', { name: 'Linked files' })).toBeInTheDocument()
     expect(screen.getByText('Avatar (2009) {edition-Extended} Remux-2160p.mkv')).toBeInTheDocument()

@@ -1,4 +1,5 @@
 import {
+  CREDIT_JOBS,
   type ItemDetails,
   type MediaItem,
   type MediaTracks,
@@ -37,7 +38,9 @@ export const unique = (values: readonly string[]): string[] =>
 /** "Directed by Lana Wachowski and Lilly Wachowski", or null without a director. */
 export const directedBy = (details: ItemDetails): string | null => {
   const directors = unique(
-    details.credits.filter((credit) => credit.job === 'director').map((credit) => credit.name),
+    details.credits
+      .filter((credit) => credit.job === CREDIT_JOBS.director)
+      .map((credit) => credit.name),
   )
   return directors.length > 0 ? `Directed by ${joinNames(directors)}` : null
 }
@@ -45,7 +48,9 @@ export const directedBy = (details: ItemDetails): string | null => {
 /** "Created by Dan Erickson", or null without a creator. */
 export const createdBy = (details: ItemDetails): string | null => {
   const creators = unique(
-    details.credits.filter((credit) => credit.job === 'creator').map((credit) => credit.name),
+    details.credits
+      .filter((credit) => credit.job === CREDIT_JOBS.creator)
+      .map((credit) => credit.name),
   )
   return creators.length > 0 ? `Created by ${joinNames(creators)}` : null
 }

@@ -1,6 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
-import { type Library, type Saga, sagaCover, sagaPictures, watchedStateOf } from '@raven/core'
-import { useId, useState } from 'react'
+import {
+  type Library,
+  SAGA_BACKDROP_TYPES,
+  type Saga,
+  sagaCover,
+  sagaPictures,
+  watchedStateOf,
+} from '@raven/core'
+import { type ReactNode, useId, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { Button, ButtonLink } from '@raven/ui'
@@ -20,9 +27,9 @@ import { WatchedToggle } from '@/components/WatchedToggle/WatchedToggle'
 import { api } from '@/lib/api'
 import { mediaEntryKey } from '@/lib/entryKeys'
 import { watchLink } from '@/lib/itemLinks'
-import { useLibraryLock } from '@/lib/libraryLock'
+import { LIBRARY_LOCK_STATES, useLibraryLock } from '@/lib/libraryLock'
 import { libraryQuery, sagasQuery } from '@/lib/queries'
-import { routeState, useRouteId } from '@/lib/routeQuery'
+import { ROUTE_STATES, routeState, useRouteId } from '@/lib/routeQuery'
 import { sagaFacts, sagaRuntime, sagaTargets } from '@/lib/sagas'
 import { useWatchedToggle } from '@/lib/useWatchedChange'
 import { useOwnBackdrop } from '@/lib/useHoverBackdrop'
@@ -47,11 +54,11 @@ const SagaSkeleton = () => (
 const headerBackdrop = (saga: Saga): HeaderBackdrop | null => {
   const { backdrop } = saga
   switch (backdrop.type) {
-    case 'slideshow': {
+    case SAGA_BACKDROP_TYPES.slideshow: {
       const slides = sagaPictures(saga).map((picture) => api.sagaPictureUrl(picture))
       return slides.length === 0 ? null : { type: 'slideshow', slides, motion: backdrop.motion }
     }
-    case 'still': {
+    case SAGA_BACKDROP_TYPES.still: {
       const cover = sagaCover(saga)
       return cover && { type: 'picture', url: api.sagaPictureUrl(cover) }
     }
@@ -93,7 +100,7 @@ const SagaView = ({ library, sagaId }: { library: Library; sagaId: string }) => 
       error: sagas.error,
     },
   })
-  if (page.state !== 'ready')
+  if (page.state !== ROUTE_STATES.ready)
     return <RouteState state={page} noun="saga" shape={<SagaSkeleton />} />
   if (page.data == null) return <NotFoundPage />
   const saga = page.data
@@ -183,14 +190,14 @@ export const SagaPage = () => {
   const library = useQuery(libraryQuery(libraryId))
   const lock = useLibraryLock(library.data)
   const page = routeState({ id: libraryId, query: library })
-  if (page.state !== 'ready')
+  if (page.state !== ROUTE_STATES.ready)
     return <RouteState state={page} noun="saga" shape={<SagaSkeleton />} />
   switch (lock.state) {
-    case 'checking':
+    case LIBRARY_LOCK_STATES.checking:
       return null
-    case 'shut':
+    case LIBRARY_LOCK_STATES.shut:
       return <LockedLibrary name={page.data.name} available={lock.available} />
-    case 'open':
+    case LIBRARY_LOCK_STATES.open:
       return <SagaView library={page.data} sagaId={sagaId} />
     default: {
       const unknown: never = lock

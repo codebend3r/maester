@@ -1,4 +1,4 @@
-import { type ScanStatus as Status, isScanning } from '@raven/core'
+import { SCAN_STATES, type ScanStatus as Status, isScanning } from '@raven/core'
 import { plural } from '@/lib/plural'
 import styles from '@/components/ScanStatus/ScanStatus.module.scss'
 
@@ -43,14 +43,14 @@ export const ScanStatus = ({ scan }: { scan: Status }) => {
       {isScanning(scan) ? (
         <div className={styles.scanning}>
           <span className={styles.note}>
-            {scan.state === 'walking'
+            {scan.state === SCAN_STATES.walking
               ? lookingNote(scan.found)
               : `Indexing ${count.format(scan.processed)} of ${count.format(scan.found)}`}
           </span>
           <progress
             className={styles.bar}
             max={Math.max(scan.found, 1)}
-            value={scan.state === 'walking' ? undefined : scan.processed}
+            value={scan.state === SCAN_STATES.walking ? undefined : scan.processed}
             aria-label="Scan progress"
           />
         </div>

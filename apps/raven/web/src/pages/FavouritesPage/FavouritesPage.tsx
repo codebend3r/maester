@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import type { MediaItem, PosterEntry } from '@raven/core'
+import { ITEM_TYPES, type MediaItem, type PosterEntry } from '@raven/core'
 import { useId } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { PosterCard } from '@/components/PosterCard/PosterCard'
@@ -25,9 +25,9 @@ const isKind = (value: string | null): value is Kind => KINDS.some((kind) => kin
 /** A favourite is a video: a movie's, an episode's, or one matched to neither. */
 const kindOf = (media: MediaItem): Kind => {
   switch (media.item?.type) {
-    case 'movie':
+    case ITEM_TYPES.movie:
       return 'movies'
-    case 'episode':
+    case ITEM_TYPES.episode:
       return 'episodes'
     default:
       return 'other'

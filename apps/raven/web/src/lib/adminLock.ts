@@ -1,11 +1,11 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import type { AdminLock } from '@raven/core'
+import { ADMIN_LOCK_STATES, type AdminLock } from '@raven/core'
 import { useEffect, useRef } from 'react'
 import { adminLockQuery } from '@/lib/queries'
 
 /** Whether the admin lock holds: on, or not yet known, as the server then treats this browser too. */
 export const isAdminLocked = (lock: AdminLock | undefined): boolean =>
-  (lock?.state ?? 'on') === 'on'
+  (lock?.state ?? ADMIN_LOCK_STATES.on) === ADMIN_LOCK_STATES.on
 
 /**
  * Whether this browser may manage raven: call the routes the server marks

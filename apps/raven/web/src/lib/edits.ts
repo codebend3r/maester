@@ -1,14 +1,15 @@
-import type {
-  Duplicate,
-  Duplicates,
-  HistoryEntry,
-  HomeSearch,
-  HomeShelf,
-  LibrarySettings,
-  MediaItem,
-  PosterEntry,
-  Saga,
-  ShowListing,
+import {
+  type Duplicate,
+  type Duplicates,
+  HOME_SHELF_TYPES,
+  type HistoryEntry,
+  type HomeSearch,
+  type HomeShelf,
+  type LibrarySettings,
+  type MediaItem,
+  type PosterEntry,
+  type Saga,
+  type ShowListing,
 } from '@raven/core'
 import { type Edit, edit, editAll } from '@/lib/optimistic'
 import {
@@ -80,9 +81,9 @@ export const favouriteEdits = ({
   const markShelves = (shelves: HomeShelf[]): HomeShelf[] =>
     mapWhere({
       items: shelves,
-      matches: (shelf) => shelf.type === 'media' && shelf.media.some(isVideo),
+      matches: (shelf) => shelf.type === HOME_SHELF_TYPES.media && shelf.media.some(isVideo),
       change: (shelf) =>
-        shelf.type === 'media' ? { ...shelf, media: markAll(shelf.media) } : shelf,
+        shelf.type === HOME_SHELF_TYPES.media ? { ...shelf, media: markAll(shelf.media) } : shelf,
     })
   const favourites = (entries: PosterEntry[]): PosterEntry[] => {
     if (favourite) return markEntries(entries)
@@ -170,9 +171,9 @@ export const watchedEdits = ({
   const markShelves = (shelves: HomeShelf[]): HomeShelf[] =>
     mapWhere({
       items: shelves,
-      matches: (shelf) => shelf.type === 'media' && shelf.media.some(needsMark),
+      matches: (shelf) => shelf.type === HOME_SHELF_TYPES.media && shelf.media.some(needsMark),
       change: (shelf) =>
-        shelf.type === 'media' ? { ...shelf, media: markAll(shelf.media) } : shelf,
+        shelf.type === HOME_SHELF_TYPES.media ? { ...shelf, media: markAll(shelf.media) } : shelf,
     })
   const markHistory = (entries: HistoryEntry[]): HistoryEntry[] =>
     mapWhere({

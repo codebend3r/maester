@@ -3,7 +3,7 @@ import { ItemHeaderSkeleton } from '@/components/ItemHeader/ItemHeader'
 import { PlayableItemView } from '@/components/PlayableItemView/PlayableItemView'
 import { RouteState } from '@/components/RouteState/RouteState'
 import { libraryFiles, queryId } from '@/lib/itemLinks'
-import { useRouteItem } from '@/lib/routeQuery'
+import { ROUTE_STATES, useRouteItem } from '@/lib/routeQuery'
 import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
 
 /**
@@ -15,7 +15,7 @@ import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
 export const EpisodePage = () => {
   const page = useRouteItem('episode')
   const [params] = useSearchParams()
-  if (page.state !== 'ready')
+  if (page.state !== ROUTE_STATES.ready)
     return <RouteState state={page} noun="episode" shape={<ItemHeaderSkeleton picture="still" />} />
   const shown = libraryFiles({
     versions: page.data.versions,

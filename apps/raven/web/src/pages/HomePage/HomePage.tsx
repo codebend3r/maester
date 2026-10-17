@@ -1,5 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
-import { type HomeShelf, type Library, matchTypeFor } from '@raven/core'
+import {
+  HOME_SHELF_TYPES,
+  type HomeShelf,
+  ITEM_TYPES,
+  type Library,
+  matchTypeFor,
+} from '@raven/core'
 import { Icon } from '@raven/ui'
 import { type ReactNode, useId } from 'react'
 import { Link } from 'react-router-dom'
@@ -66,7 +72,7 @@ const LibraryShelf = ({
     </Link>
   )
   switch (shelf.type) {
-    case 'shows':
+    case HOME_SHELF_TYPES.shows:
       return (
         <Shelf title={title} isEmpty={shelf.shows.length === 0}>
           {shelf.shows.map((entry) => (
@@ -79,11 +85,11 @@ const LibraryShelf = ({
           ))}
         </Shelf>
       )
-    case 'media':
+    case HOME_SHELF_TYPES.media:
       return (
         <Shelf title={title} isEmpty={shelf.media.length === 0}>
           {shelf.media.map((media) =>
-            matchType === 'movie' ? (
+            matchType === ITEM_TYPES.movie ? (
               <PosterCard
                 key={media.id}
                 media={media}

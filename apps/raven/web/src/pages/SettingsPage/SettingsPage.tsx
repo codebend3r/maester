@@ -1,5 +1,6 @@
 import { type UseQueryResult, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  ADMIN_LOCK_STATES,
   type AdminLock,
   DEFAULT_DISPLAY_SETTINGS,
   DEFAULT_PLAYBACK_SETTINGS,
@@ -262,7 +263,7 @@ const Countdown = ({ deadline }: { deadline: number }) => {
 /** What the admin lock's toggle says under it; `readAt` is when the lock was read, its countdown's start. */
 const AdminLockHint = ({ lock, readAt }: { lock: AdminLock; readAt: number }) => {
   switch (lock.state) {
-    case 'on':
+    case ADMIN_LOCK_STATES.on:
       return lock.available ? (
         'Turning it off asks for the admin password.'
       ) : (
@@ -270,14 +271,14 @@ const AdminLockHint = ({ lock, readAt }: { lock: AdminLock; readAt: number }) =>
           Set <code>ADMIN_PASSWORD</code> in raven's <code>.env</code> to turn it off.
         </>
       )
-    case 'turningOn':
+    case ADMIN_LOCK_STATES.turningOn:
       return (
         <>
           Turns on in <Countdown deadline={readAt + lock.remainingMs} />. Until then, turning it off
           needs no password.
         </>
       )
-    case 'off':
+    case ADMIN_LOCK_STATES.off:
       return 'Off in this browser until it is turned back on, through refreshes, restarts and redeploys. Turned on, it waits a moment first, so a slip costs no password.'
     default: {
       const unknown: never = lock
@@ -319,7 +320,7 @@ const AdminLockSection = () => {
   })
   const busy = unlock.isPending || turnOn.isPending || keepOff.isPending
   const failure = turnOn.error ?? keepOff.error
-  const isAskingNow = isAsking && current?.state === 'on'
+  const isAskingNow = isAsking && current?.state === ADMIN_LOCK_STATES.on
 
   useEffect(() => {
     if (isAskingNow) passwordInput.current?.focus()
@@ -327,14 +328,14 @@ const AdminLockSection = () => {
 
   const toggle = ({ from, checked }: { from: AdminLock; checked: boolean }): void => {
     switch (from.state) {
-      case 'on':
+      case ADMIN_LOCK_STATES.on:
         unlock.reset()
         setAsking(!checked)
         return
-      case 'turningOn':
+      case ADMIN_LOCK_STATES.turningOn:
         if (!checked) keepOff.mutate()
         return
-      case 'off':
+      case ADMIN_LOCK_STATES.off:
         if (checked) turnOn.mutate()
         return
       default: {
@@ -383,8 +384,8 @@ const AdminLockSection = () => {
           <input
             type="checkbox"
             className={styles.switch}
-            checked={current.state !== 'off' && !isAskingNow}
-            disabled={busy || (current.state === 'on' && !current.available)}
+            checked={current.state !== ADMIN_LOCK_STATES.off && !isAskingNow}
+            disabled={busy || (current.state === ADMIN_LOCK_STATES.on && !current.available)}
             onChange={(event) => toggle({ from: current, checked: event.target.checked })}
           />
           <span className={styles.choiceLabel}>Admin lock</span>

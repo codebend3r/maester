@@ -14,7 +14,7 @@ import { api } from '@/lib/api'
 import { librarySettingsEdits } from '@/lib/edits'
 import { afterPins } from '@/lib/invalidate'
 import { KINDS } from '@/lib/libraryKinds'
-import { lockState } from '@/lib/libraryLock'
+import { LIBRARY_LOCK_STATES, lockState } from '@/lib/libraryLock'
 import { useOptimisticMutation } from '@/lib/optimistic'
 import { plural } from '@/lib/plural'
 import { librariesQuery, lockQuery } from '@/lib/queries'
@@ -214,7 +214,8 @@ export const LibrariesPage = () => {
               key={library.id}
               library={library}
               isShut={
-                lockState({ locked: library.settings.locked, lock: lock.data }).state !== 'open'
+                lockState({ locked: library.settings.locked, lock: lock.data }).state !==
+                LIBRARY_LOCK_STATES.open
               }
             />
           ))}

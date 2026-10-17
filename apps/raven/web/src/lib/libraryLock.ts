@@ -7,10 +7,12 @@ import { lockQuery } from '@/lib/queries'
  * the PIN was entered, shut until then, and checking while the server has
  * yet to say. `available` is whether a PIN is set at all, so Unlock can work.
  */
+export const LIBRARY_LOCK_STATES = { open: 'open', checking: 'checking', shut: 'shut' } as const
+
 export type LibraryLock =
-  | { state: 'open' }
-  | { state: 'checking' }
-  | { state: 'shut'; available: boolean }
+  | { state: typeof LIBRARY_LOCK_STATES.open }
+  | { state: typeof LIBRARY_LOCK_STATES.checking }
+  | { state: typeof LIBRARY_LOCK_STATES.shut; available: boolean }
 
 export const lockState = ({
   locked,
@@ -19,10 +21,10 @@ export const lockState = ({
   locked: boolean
   lock: LockState | undefined
 }): LibraryLock => {
-  if (!locked) return { state: 'open' }
-  if (!lock) return { state: 'checking' }
-  if (lock.unlocked) return { state: 'open' }
-  return { state: 'shut', available: lock.available }
+  if (!locked) return { state: LIBRARY_LOCK_STATES.open }
+  if (!lock) return { state: LIBRARY_LOCK_STATES.checking }
+  if (lock.unlocked) return { state: LIBRARY_LOCK_STATES.open }
+  return { state: LIBRARY_LOCK_STATES.shut, available: lock.available }
 }
 
 /**

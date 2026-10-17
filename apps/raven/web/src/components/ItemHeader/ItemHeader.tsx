@@ -9,31 +9,42 @@ import { Slideshow } from '@/components/Slideshow/Slideshow'
 import type { watchLink } from '@/lib/itemLinks'
 import styles from '@/components/ItemHeader/ItemHeader.module.scss'
 
+/** What sits beside the title: a poster, an episode's still, or no picture at all. */
+const PICTURE_SHAPES = { poster: 'poster', still: 'still', none: 'none' } as const
+
+type PictureShape = (typeof PICTURE_SHAPES)[keyof typeof PICTURE_SHAPES]
+
 /** The picture beside the title: a poster, or an episode's still, and the video it plays if it plays one. */
 export type HeaderPicture = {
-  shape: 'poster' | 'still'
+  shape: Exclude<PictureShape, typeof PICTURE_SHAPES.none>
   /** null for none yet: the title's first letter stands in. */
   url: string | null
   play?: ReturnType<typeof watchLink> & { label: string }
 }
 
+const HEADER_BACKDROP_TYPES = { picture: 'picture', slideshow: 'slideshow' } as const
+
 /** What fades into the page behind the header: one picture, or several in turn, by their urls. */
 export type HeaderBackdrop =
-  | { type: 'picture'; url: string }
-  | { type: 'slideshow'; slides: readonly string[]; motion: SlideshowMotion }
+  | { type: typeof HEADER_BACKDROP_TYPES.picture; url: string }
+  | {
+      type: typeof HEADER_BACKDROP_TYPES.slideshow
+      slides: readonly string[]
+      motion: SlideshowMotion
+    }
 
 /** How far through the item the viewer is, 0 to 1, and the words for it: "2 of 3 watched", "23m left". */
 export type HeaderProgress = { fraction: number; label: string }
 
 /** A page's one picture behind its header, or none while it has none. */
 export const pictureBackdrop = (url: string | null): HeaderBackdrop | null =>
-  url == null ? null : { type: 'picture', url }
+  url == null ? null : { type: HEADER_BACKDROP_TYPES.picture, url }
 
 const BackdropPicture = ({ backdrop }: { backdrop: HeaderBackdrop }) => {
   switch (backdrop.type) {
-    case 'picture':
+    case HEADER_BACKDROP_TYPES.picture:
       return <img className={styles.backdropPicture} src={backdrop.url} alt="" decoding="async" />
-    case 'slideshow':
+    case HEADER_BACKDROP_TYPES.slideshow:
       return (
         <Slideshow
           className={styles.backdropPicture}
@@ -63,7 +74,7 @@ const LAYOUTS = {
   poster: styles.content,
   still: `${styles.content} ${styles.withStill}`,
   none: `${styles.content} ${styles.noPicture}`,
-} as const satisfies Record<HeaderPicture['shape'] | 'none', string | undefined>
+} as const satisfies Record<PictureShape, string | undefined>
 
 /** Each picture's frame: a poster's, or the wider one of a still. */
 const PICTURES = {
@@ -209,7 +220,7 @@ export const ItemHeader = ({
         <span className={styles.backLabel}>{back.label}</span>
       </ButtonLink>
     </div>
-    <div className={LAYOUTS[picture?.shape ?? 'none']}>
+    <div className={LAYOUTS[picture?.shape ?? PICTURE_SHAPES.none]}>
       {picture && <Picture picture={picture} title={title} />}
       <div className={styles.details}>
         {eyebrow.length > 0 && (
@@ -256,13 +267,13 @@ export const ItemHeader = ({
  * the way back, its picture's place, then lines for the title, the byline
  * and facts, and the buttons.
  */
-export const ItemHeaderSkeleton = ({ picture }: { picture: HeaderPicture['shape'] | 'none' }) => (
+export const ItemHeaderSkeleton = ({ picture }: { picture: PictureShape }) => (
   <div className={styles.hero}>
     <div className={styles.top}>
       <Bone shape="button" />
     </div>
     <div className={LAYOUTS[picture]}>
-      {picture !== 'none' && (
+      {picture !== PICTURE_SHAPES.none && (
         <span className={PICTURES[picture]}>
           <Bone shape="fill" />
         </span>

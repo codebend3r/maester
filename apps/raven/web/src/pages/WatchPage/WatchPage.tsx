@@ -17,7 +17,7 @@ import { useLocation } from 'react-router-dom'
 import { readWatchState } from '@/lib/itemLinks'
 import { mediaQuery } from '@/lib/queries'
 import { ravenPlayer } from '@/lib/ravenPlayer'
-import { routeState, useRouteId } from '@/lib/routeQuery'
+import { ROUTE_STATES, routeState, useRouteId } from '@/lib/routeQuery'
 import { useMediaMutations } from '@/lib/useMediaMutations'
 import styles from '@/pages/WatchPage/WatchPage.module.scss'
 
@@ -37,7 +37,7 @@ export const WatchPage = () => {
   })
   useLeaveFullscreen()
 
-  if (page.state === 'ready') {
+  if (page.state === ROUTE_STATES.ready) {
     return (
       <WatchPlayer
         key={page.data.id}
@@ -49,12 +49,14 @@ export const WatchPage = () => {
   }
   return (
     <main className={styles.page}>
-      {page.state === 'loading' ? (
+      {page.state === ROUTE_STATES.loading ? (
         <p aria-live="polite">Loading</p>
       ) : (
         <>
           <p role="alert">
-            {page.state === 'missing' ? 'This video is no longer in any library.' : page.message}
+            {page.state === ROUTE_STATES.missing
+              ? 'This video is no longer in any library.'
+              : page.message}
           </p>
           <ButtonLink to="/libraries" tone="pill" icon="back" className={styles.back}>
             Back to libraries

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { type Library, isScanning, matchTypeFor } from '@raven/core'
+import { type Library, METADATA_SERVICE_STATES, isScanning, matchTypeFor } from '@raven/core'
 import { useState } from 'react'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { Button, ButtonLink } from '@raven/ui'
@@ -56,7 +56,7 @@ export const LibraryActions = ({
   const matchType = matchTypeFor(library.settings.kind)
   // Files only leave pending while TMDB answers, so Match again waits on it.
   const metadata = useQuery({ ...metadataHealthQuery, enabled: matchType != null })
-  const canMatch = metadata.data?.tmdb === 'ok'
+  const canMatch = metadata.data?.tmdb === METADATA_SERVICE_STATES.ok
   const whose = <span className="visually-hidden"> {library.name}</span>
 
   // A locked library's folders stay on the server until the PIN is entered,

@@ -1,4 +1,5 @@
 import {
+  HOME_SHELF_TYPES,
   type HomeShelf,
   type ItemSummary,
   type Library,
@@ -105,9 +106,9 @@ const fromShow = ({ entry, library }: { entry: ShowEntry; library: Library }): F
 /** A shelf's arrivals that have the pictures the hero needs, newest first, as the shelf has them. */
 const candidates = ({ shelf, library }: { shelf: HomeShelf; library: Library }): Featured[] => {
   switch (shelf.type) {
-    case 'shows':
+    case HOME_SHELF_TYPES.shows:
       return shelf.shows.flatMap((entry) => fromShow({ entry, library }))
-    case 'media':
+    case HOME_SHELF_TYPES.media:
       return shelf.media.flatMap((media) => fromMedia({ media, library }))
     default: {
       const unknown: never = shelf

@@ -61,7 +61,7 @@ export const isScanStatus = object({
 export type ScanStatus = Infer<typeof isScanStatus>
 
 /** Whether a scan is under way, walking or indexing. */
-export const isScanning = (scan: ScanStatus): boolean => scan.state !== 'idle'
+export const isScanning = (scan: ScanStatus): boolean => scan.state !== SCAN_STATES.idle
 
 export const SORT_DIRECTIONS = { ascending: 'ascending', descending: 'descending' } as const
 

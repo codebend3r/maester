@@ -6,6 +6,8 @@ import {
   type LibraryInput,
   type LibraryKind,
   type LibrarySettings,
+  METADATA_SERVICE_STATES,
+  PATH_LAYOUTS,
   type PathLayout,
   type RatingSource,
   defaultLibrarySettings,
@@ -42,8 +44,10 @@ const pathLayoutLabel = ({
   groups: number
 }): string => {
   if (layout == null) return 'not scanned yet'
-  if (layout === 'flat') return 'one folder per title'
-  return layout === 'lettered' ? `letter folders (${groups})` : `group folders (${groups})`
+  if (layout === PATH_LAYOUTS.flat) return 'one folder per title'
+  return layout === PATH_LAYOUTS.lettered
+    ? `letter folders (${groups})`
+    : `group folders (${groups})`
 }
 
 /**
@@ -75,7 +79,7 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const metadata = useQuery(metadataHealthQuery)
   // `off` is exactly "no key": a key that fails is the health check's to report.
-  const isAiOff = metadata.data?.ai === 'off'
+  const isAiOff = metadata.data?.ai === METADATA_SERVICE_STATES.off
   const lock = useQuery(lockQuery)
   const lockable = !!lock.data?.available
 
@@ -177,7 +181,7 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
               ))}
             </div>
             <p id={`${ids.kind}-hint`} className={styles.hint}>
-              {metadata.data?.tmdb === 'off' ? (
+              {metadata.data?.tmdb === METADATA_SERVICE_STATES.off ? (
                 <>
                   Set <code>TMDB_API_TOKEN</code> in raven's <code>.env</code> for posters and
                   details.

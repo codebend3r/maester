@@ -1,5 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
-import { type EpisodeSummary, type ItemDetails, episodeCode, watchedStateOf } from '@raven/core'
+import {
+  type EpisodeSummary,
+  ITEM_TYPES,
+  type ItemDetails,
+  episodeCode,
+  watchedStateOf,
+} from '@raven/core'
 import { useId } from 'react'
 import { Link } from 'react-router-dom'
 import { ButtonLink, Icon } from '@raven/ui'
@@ -27,7 +33,7 @@ import { formatAirDate, runtimeFact } from '@/lib/itemFacts'
 import { watchLink } from '@/lib/itemLinks'
 import { plural } from '@/lib/plural'
 import { itemQuery } from '@/lib/queries'
-import { routeState, useRouteId } from '@/lib/routeQuery'
+import { ROUTE_STATES, routeState, useRouteId } from '@/lib/routeQuery'
 import { useSelectable } from '@/lib/useSelectable'
 import { useWatchedToggle } from '@/lib/useWatchedChange'
 import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
@@ -115,7 +121,9 @@ const EpisodeRow = ({ episode }: { episode: EpisodeSummary }) => {
 
 const SeasonView = ({ show, season }: { show: ItemDetails; season: ItemDetails }) => {
   const ids = { title: useId(), episodes: useId() }
-  const episodes = season.children.flatMap((child) => (child.type === 'episode' ? [child] : []))
+  const episodes = season.children.flatMap((child) =>
+    child.type === ITEM_TYPES.episode ? [child] : [],
+  )
   const count = episodes.length
   const watchedCount = episodes.filter((episode) => episode.watched).length
   // The first episode on disk not yet watched that has a file to play.
@@ -205,11 +213,11 @@ export const SeasonPage = () => {
   const seasonQuery = useQuery(itemQuery(summary?.id ?? null))
 
   const show = routeState({ id: number == null ? null : showId, query: showQuery })
-  if (show.state !== 'ready')
+  if (show.state !== ROUTE_STATES.ready)
     return <RouteState state={show} noun="season" shape={<ItemHeaderSkeleton picture="poster" />} />
   if (!summary) return <NotFoundPage />
   const season = routeState({ id: summary.id, query: seasonQuery })
-  if (season.state !== 'ready')
+  if (season.state !== ROUTE_STATES.ready)
     return (
       <RouteState state={season} noun="season" shape={<ItemHeaderSkeleton picture="poster" />} />
     )
