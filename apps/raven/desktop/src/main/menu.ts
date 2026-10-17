@@ -4,6 +4,7 @@ import type { DesktopEvent, MenuPlayerAction } from '@/shared/protocol'
 export type MenuActions = {
   openDialog: () => void
   send: (event: DesktopEvent) => void
+  toggleDevTools: () => void
 }
 
 /**
@@ -22,18 +23,21 @@ const PLAYBACK = [
   { label: 'Skip Back', action: 'skipBack' },
   { label: 'Skip Forward', action: 'skipForward' },
   { label: 'Next', action: 'next' },
+  { label: 'Video Info', action: 'stats' },
 ] as const satisfies readonly { label: string; action: MenuPlayerAction }[]
 
 /**
- * The P4 menus from the spec's "Menus" table. Every accelerator holds a modifier:
+ * The menus from the spec's "Menus" table. Every accelerator holds a modifier:
  * single keys stay with the page, or a menu would take Space and the arrows from
  * the PIN field and the volume slider.
  */
 export const menuTemplate = ({
   appName,
+  isDevelopment,
   actions,
 }: {
   appName: string
+  isDevelopment: boolean
   actions: MenuActions
 }): MenuEntry[] => {
   const player = (action: MenuPlayerAction) => () => actions.send({ type: 'player', action })
@@ -75,7 +79,22 @@ export const menuTemplate = ({
       label: 'Playback',
       submenu: PLAYBACK.map(({ label, action }) => ({ label, click: player(action) })),
     },
-    { label: 'View', submenu: [{ role: 'togglefullscreen' }] },
+    {
+      label: 'View',
+      submenu: [
+        { role: 'togglefullscreen' },
+        ...(isDevelopment
+          ? [
+              SEPARATOR,
+              {
+                label: 'Toggle Developer Tools',
+                accelerator: 'Alt+CommandOrControl+I',
+                click: actions.toggleDevTools,
+              },
+            ]
+          : []),
+      ],
+    },
     { label: 'Window', role: 'windowMenu' },
     {
       label: 'Help',

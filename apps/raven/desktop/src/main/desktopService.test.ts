@@ -5,6 +5,7 @@ import { createGrants } from '@/main/grants'
 import { createStateStore, type StateFs, type Timers } from '@/main/stateStore'
 import { EMPTY_STATE } from '@/main/playerState'
 import { createDesktopService, MESSAGES } from '@/main/desktopService'
+import type { OutputSettings } from '@raven/core'
 
 type Entry = { real: string; isFile: boolean; size: number; mtimeMs: number }
 
@@ -19,12 +20,26 @@ const sequentialId = (): (() => string) => {
   }
 }
 
+const OUTPUT_ANSWER = {
+  output: { profile: 'passthrough', device: 'auto', passthrough: ['dts'], spatial: false },
+  devices: [{ name: 'coreaudio/abc', description: 'Receiver' }],
+  isEngineReady: true,
+} as const satisfies {
+  output: OutputSettings
+  devices: { name: string; description: string }[]
+  isEngineReady: boolean
+}
+
 const setup = ({
   files,
   dialog = [],
   addRecentDocument,
   stat,
+  failOutputWrite = false,
+  failOutputRead = false,
 }: {
+  failOutputWrite?: boolean
+  failOutputRead?: boolean
   files: Record<string, Partial<Entry>>
   dialog?: string[] | Error
   addRecentDocument?: (path: string) => void
@@ -83,7 +98,9 @@ const setup = ({
 
   const recentDocuments: string[] = []
   const errors: unknown[] = []
-  const spies = { recentDocuments, cleared: 0, ready: 0, dialogCalls: 0, errors }
+  const written: OutputSettings[] = []
+  const buttons: boolean[] = []
+  const spies = { recentDocuments, cleared: 0, ready: 0, dialogCalls: 0, errors, written, buttons }
   const clock = { now: 5000 }
   const statCalls: string[] = []
   const pendingTimers = new Map<number, () => void>()
@@ -140,6 +157,19 @@ const setup = ({
     },
     newId: () => `10${recentId().slice(2)}`,
     now: () => clock.now,
+    output: {
+      read: async () => {
+        if (failOutputRead) throw new Error('engine gone')
+        return OUTPUT_ANSWER
+      },
+      write: async (output) => {
+        if (failOutputWrite) throw new Error('disk full')
+        spies.written.push(output)
+      },
+    },
+    setWindowButtons: (isVisible) => {
+      spies.buttons.push(isVisible)
+    },
   })
   return {
     service,
@@ -181,16 +211,16 @@ describe('handle', () => {
     const { service } = setup({ files: show })
     const target = idOf(await service.openPaths(['/m/Show/Episode 1.mkv']))
     const refused = { type: 'refused', message: MESSAGES.unknownRequest } as const
-    const save = (position: unknown, duration: unknown) =>
+    const save = ({ position, duration }: { position: unknown; duration: unknown }) =>
       service.handle({
         kind: 'page',
         request: { type: 'savePosition', fileId: target.fileId, position, duration },
       })
-    expect(await save(Number.NaN, 120)).toEqual(refused)
-    expect(await save(Infinity, 120)).toEqual(refused)
-    expect(await save(40, Number.NaN)).toEqual(refused)
-    expect(await save('40', 120)).toEqual(refused)
-    expect(await save(40, 120)).toEqual({ type: 'done' })
+    expect(await save({ position: Number.NaN, duration: 120 })).toEqual(refused)
+    expect(await save({ position: Infinity, duration: 120 })).toEqual(refused)
+    expect(await save({ position: 40, duration: Number.NaN })).toEqual(refused)
+    expect(await save({ position: '40', duration: 120 })).toEqual(refused)
+    expect(await save({ position: 40, duration: 120 })).toEqual({ type: 'done' })
   })
 
   it('refuses a drop with no paths', async () => {
@@ -305,16 +335,20 @@ describe('openDialog', () => {
 })
 
 describe('describeFile', () => {
-  const describeFile = (
-    service: ReturnType<typeof setup>['service'],
-    fileId: string,
-    queue: string[] = [],
-  ) => service.handle({ kind: 'page', request: { type: 'describeFile', fileId, queue } })
+  const describeFile = ({
+    service,
+    fileId,
+    queue = [],
+  }: {
+    service: ReturnType<typeof setup>['service']
+    fileId: string
+    queue?: string[]
+  }) => service.handle({ kind: 'page', request: { type: 'describeFile', fileId, queue } })
 
   it('describes the file, finds the next in its folder and records the open', async () => {
     const { service, spies, store } = setup({ files: show })
     const { fileId } = idOf(await service.openPaths(['/m/Show/Episode 1.mkv']))
-    const reply = await describeFile(service, fileId)
+    const reply = await describeFile({ service, fileId })
     if (reply.type !== 'file') throw new Error(`expected file, got ${reply.type}`)
     expect(reply.file).toMatchObject({
       fileId,
@@ -334,7 +368,7 @@ describe('describeFile', () => {
   it('has no next after the last video', async () => {
     const { service } = setup({ files: show })
     const { fileId } = idOf(await service.openPaths(['/m/Show/Episode 10.mkv']))
-    const reply = await describeFile(service, fileId)
+    const reply = await describeFile({ service, fileId })
     expect(reply.type === 'file' && reply.file.next).toBeNull()
   })
 
@@ -347,7 +381,7 @@ describe('describeFile', () => {
         '/m/Show/Episode 2.mkv',
       ]),
     )
-    const reply = await describeFile(service, target.fileId, target.queue)
+    const reply = await describeFile({ service, fileId: target.fileId, queue: target.queue })
     if (reply.type !== 'file') throw new Error('expected file')
     expect(reply.file.next!.label).toBe('Film')
     expect(reply.file.next!.queue).toEqual(target.queue.slice(1))
@@ -359,7 +393,11 @@ describe('describeFile', () => {
       await service.openPaths(['/m/Show/Episode 1.mkv', '/m/Show/Episode 10.mkv']),
     )
     const stranger = '00000000-0000-4000-8000-0000000000ff'
-    const reply = await describeFile(service, target.fileId, [stranger, ...target.queue])
+    const reply = await describeFile({
+      service,
+      fileId: target.fileId,
+      queue: [stranger, ...target.queue],
+    })
     if (reply.type !== 'file') throw new Error('expected file')
     expect(reply.file.next!.label).toBe('Episode 10')
     expect(reply.file.next!.queue).toEqual([])
@@ -369,7 +407,7 @@ describe('describeFile', () => {
     const { service } = setup({ files: show })
     const { fileId } = idOf(await service.openPaths(['/m/Show/Episode 1.mkv']))
     const stranger = '00000000-0000-4000-8000-0000000000ff'
-    const reply = await describeFile(service, fileId, [stranger])
+    const reply = await describeFile({ service, fileId, queue: [stranger] })
     expect(reply.type === 'file' && reply.file.next!.label).toBe('Episode 2')
   })
 
@@ -378,7 +416,7 @@ describe('describeFile', () => {
       files: { ...show, '/links/watch.mkv': { real: '/m/Show/Episode 1.mkv' } },
     })
     const { fileId } = idOf(await service.openPaths(['/links/watch.mkv']))
-    const reply = await describeFile(service, fileId)
+    const reply = await describeFile({ service, fileId })
     if (reply.type !== 'file') throw new Error('expected file')
     expect(reply.file.folder).toBe('Show')
     expect(reply.file.next!.label).toBe('Episode 2')
@@ -386,47 +424,66 @@ describe('describeFile', () => {
 
   it('is refused notOpen for an id that was never granted', async () => {
     const { service } = setup({ files: {} })
-    expect(await describeFile(service, '00000000-0000-4000-8000-0000000000aa')).toEqual({
-      type: 'refused',
-      message: MESSAGES.notOpen,
-    })
+    expect(await describeFile({ service, fileId: '00000000-0000-4000-8000-0000000000aa' })).toEqual(
+      {
+        type: 'refused',
+        message: MESSAGES.notOpen,
+      },
+    )
   })
 })
 
 describe('savePosition', () => {
-  const save = (
-    service: ReturnType<typeof setup>['service'],
-    fileId: string,
-    position: number,
-    duration: number | null,
-  ) =>
+  const save = ({
+    service,
+    fileId,
+    position,
+    duration,
+  }: {
+    service: ReturnType<typeof setup>['service']
+    fileId: string
+    position: number
+    duration: number | null
+  }) =>
     service.handle({ kind: 'page', request: { type: 'savePosition', fileId, position, duration } })
-  const describe1 = (service: ReturnType<typeof setup>['service'], fileId: string) =>
-    service.handle({ kind: 'page', request: { type: 'describeFile', fileId, queue: [] } })
+  const describe1 = ({
+    service,
+    fileId,
+  }: {
+    service: ReturnType<typeof setup>['service']
+    fileId: string
+  }) => service.handle({ kind: 'page', request: { type: 'describeFile', fileId, queue: [] } })
 
   it('resumes from the saved position', async () => {
     const { service } = setup({ files: show })
     const { fileId } = idOf(await service.openPaths(['/m/Show/Episode 1.mkv']))
-    expect(await save(service, fileId, 40, 120)).toEqual({ type: 'done' })
-    const reply = await describe1(service, fileId)
+    expect(await save({ service, fileId, position: 40, duration: 120 })).toEqual({ type: 'done' })
+    const reply = await describe1({ service, fileId })
     expect(reply.type === 'file' && reply.file.resumeAt).toBe(40)
   })
 
   it('starts at 0 once the file changed on disk and was granted again', async () => {
     const { service, table } = setup({ files: show })
     const first = idOf(await service.openPaths(['/m/Show/Episode 1.mkv']))
-    await save(service, first.fileId, 40, 120)
+    await save({ service, fileId: first.fileId, position: 40, duration: 120 })
     const entry = table.get('/m/Show/Episode 1.mkv')
     if (!entry) throw new Error('fixture missing')
     table.set('/m/Show/Episode 1.mkv', { ...entry, mtimeMs: 2000 })
     const again = idOf(await service.openPaths(['/m/Show/Episode 1.mkv']))
-    const reply = await describe1(service, again.fileId)
+    const reply = await describe1({ service, fileId: again.fileId })
     expect(reply.type === 'file' && reply.file.resumeAt).toBe(0)
   })
 
   it('is refused notOpen for an id that was never granted', async () => {
     const { service } = setup({ files: {} })
-    expect(await save(service, '00000000-0000-4000-8000-0000000000aa', 40, 120)).toEqual({
+    expect(
+      await save({
+        service,
+        fileId: '00000000-0000-4000-8000-0000000000aa',
+        position: 40,
+        duration: 120,
+      }),
+    ).toEqual({
       type: 'refused',
       message: MESSAGES.notOpen,
     })
@@ -436,8 +493,168 @@ describe('savePosition', () => {
     const { service, store, clock } = setup({ files: show })
     const { fileId } = idOf(await service.openPaths(['/m/Show/Episode 1.mkv']))
     clock.now = 9000
-    await save(service, fileId, 40, null)
+    await save({ service, fileId, position: 40, duration: null })
     expect(store.read().resume[0]).toMatchObject({ position: 40, duration: null, playedAt: 9000 })
+  })
+})
+
+describe('saveTracks', () => {
+  const saveTracks = ({
+    service,
+    fileId,
+    audio,
+    subtitle,
+  }: {
+    service: ReturnType<typeof setup>['service']
+    fileId: string
+    audio: unknown
+    subtitle: unknown
+  }) => service.handle({ kind: 'page', request: { type: 'saveTracks', fileId, audio, subtitle } })
+  const describing = ({
+    service,
+    fileId,
+  }: {
+    service: ReturnType<typeof setup>['service']
+    fileId: string
+  }) => service.handle({ kind: 'page', request: { type: 'describeFile', fileId, queue: [] } })
+
+  it('describes a file with no pick as tracks null', async () => {
+    const { service } = setup({ files: show })
+    const { fileId } = idOf(await service.openPaths(['/m/Show/Episode 1.mkv']))
+    const reply = await describing({ service, fileId })
+    expect(reply.type === 'file' && reply.file.tracks).toBeNull()
+  })
+
+  it('stores the pick and hands it back on the next describeFile', async () => {
+    const { service, store, clock } = setup({ files: show })
+    const { fileId } = idOf(await service.openPaths(['/m/Show/Episode 1.mkv']))
+    clock.now = 7000
+    expect(await saveTracks({ service, fileId, audio: 1, subtitle: 'embedded-0' })).toEqual({
+      type: 'done',
+    })
+    const reply = await describing({ service, fileId })
+    expect(reply.type === 'file' && reply.file.tracks).toEqual({ audio: 1, subtitle: 'embedded-0' })
+    expect(store.read().tracks).toEqual([
+      { path: '/m/Show/Episode 1.mkv', audio: 1, subtitle: 'embedded-0', pickedAt: 7000 },
+    ])
+  })
+
+  it('is refused notOpen for an id that was never granted', async () => {
+    const { service, store } = setup({ files: {} })
+    expect(
+      await saveTracks({
+        service,
+        fileId: '00000000-0000-4000-8000-0000000000aa',
+        audio: 1,
+        subtitle: null,
+      }),
+    ).toEqual({
+      type: 'refused',
+      message: MESSAGES.notOpen,
+    })
+    expect(store.read().tracks).toEqual([])
+  })
+
+  it('refuses a track index that is not a whole number 0 or more, and stores nothing', async () => {
+    const { service, store } = setup({ files: show })
+    const { fileId } = idOf(await service.openPaths(['/m/Show/Episode 1.mkv']))
+    const refused = { type: 'refused', message: MESSAGES.unknownRequest } as const
+    expect(await saveTracks({ service, fileId, audio: Number.NaN, subtitle: null })).toEqual(
+      refused,
+    )
+    expect(await saveTracks({ service, fileId, audio: Infinity, subtitle: null })).toEqual(refused)
+    expect(await saveTracks({ service, fileId, audio: '1', subtitle: null })).toEqual(refused)
+    expect(await saveTracks({ service, fileId, audio: 1.5, subtitle: null })).toEqual(refused)
+    expect(await saveTracks({ service, fileId, audio: -1, subtitle: null })).toEqual(refused)
+    expect(store.read().tracks).toEqual([])
+  })
+})
+
+describe('windowButtons', () => {
+  it('passes the visibility on and replies done', async () => {
+    const { service, spies } = setup({ files: {} })
+    expect(
+      await service.handle({ kind: 'page', request: { type: 'windowButtons', isVisible: false } }),
+    ).toEqual({ type: 'done' })
+    await service.handle({ kind: 'page', request: { type: 'windowButtons', isVisible: true } })
+    expect(spies.buttons).toEqual([false, true])
+  })
+
+  it('refuses a visibility that is not a boolean', async () => {
+    const { service, spies } = setup({ files: {} })
+    expect(
+      await service.handle({ kind: 'page', request: { type: 'windowButtons', isVisible: 'yes' } }),
+    ).toEqual({ type: 'refused', message: MESSAGES.unknownRequest })
+    expect(spies.buttons).toEqual([])
+  })
+})
+
+describe('output', () => {
+  it('answers readOutput with what the output dependency reads', async () => {
+    const { service } = setup({ files: {} })
+    expect(await service.handle({ kind: 'page', request: { type: 'readOutput' } })).toEqual({
+      type: 'output',
+      ...OUTPUT_ANSWER,
+    })
+  })
+
+  it('answers a failing read with a refusal, not a rejection, and reports the error', async () => {
+    const { service, spies } = setup({ files: {}, failOutputRead: true })
+    expect(await service.handle({ kind: 'page', request: { type: 'readOutput' } })).toEqual({
+      type: 'refused',
+      message: MESSAGES.failed,
+    })
+    expect(spies.errors).toHaveLength(1)
+  })
+
+  it('writes the settings rebuilt from the known fields, with passthrough deduplicated and ordered', async () => {
+    const { service, spies } = setup({ files: {} })
+    const reply = await service.handle({
+      kind: 'page',
+      request: {
+        type: 'writeOutput',
+        output: {
+          profile: 'passthrough',
+          device: 'coreaudio/abc',
+          passthrough: ['dts', 'ac3', 'dts'],
+          spatial: false,
+        },
+      },
+    })
+    expect(reply).toEqual({ type: 'done' })
+    expect(spies.written).toEqual([
+      {
+        profile: 'passthrough',
+        device: 'coreaudio/abc',
+        passthrough: ['ac3', 'dts'],
+        spatial: false,
+      },
+    ])
+  })
+
+  it('refuses settings that are not valid and writes nothing', async () => {
+    const { service, spies } = setup({ files: {} })
+    expect(
+      await service.handle({
+        kind: 'page',
+        request: { type: 'writeOutput', output: { profile: 'pcm' } },
+      }),
+    ).toEqual({ type: 'refused', message: MESSAGES.unknownRequest })
+    expect(spies.written).toEqual([])
+  })
+
+  it('answers a failing write with a refusal, not a rejection, and reports the error', async () => {
+    const { service, spies } = setup({ files: {}, failOutputWrite: true })
+    expect(
+      await service.handle({
+        kind: 'page',
+        request: {
+          type: 'writeOutput',
+          output: { profile: 'pcm', device: 'auto', passthrough: [], spatial: false },
+        },
+      }),
+    ).toEqual({ type: 'refused', message: MESSAGES.failed })
+    expect(spies.errors).toHaveLength(1)
   })
 })
 
@@ -475,7 +692,13 @@ describe('recents', () => {
     if (reply.type !== 'recents') throw new Error(`expected recents, got ${reply.type}`)
     return reply.recents
   }
-  const open = async (service: ReturnType<typeof setup>['service'], path: string) => {
+  const open = async ({
+    service,
+    path,
+  }: {
+    service: ReturnType<typeof setup>['service']
+    path: string
+  }) => {
     const { fileId } = idOf(await service.openPaths([path]))
     await service.handle({ kind: 'page', request: { type: 'describeFile', fileId, queue: [] } })
     return fileId
@@ -483,13 +706,13 @@ describe('recents', () => {
 
   it('lists the newest first with the share watched and no path', async () => {
     const { service, clock } = setup({ files: show })
-    const first = await open(service, '/m/Show/Episode 1.mkv')
+    const first = await open({ service, path: '/m/Show/Episode 1.mkv' })
     await service.handle({
       kind: 'page',
       request: { type: 'savePosition', fileId: first, position: 40, duration: 120 },
     })
     clock.now = 6000
-    await open(service, '/m/Show/Episode 2.mkv')
+    await open({ service, path: '/m/Show/Episode 2.mkv' })
     const list = await recents(service)
     expect(list.map((recent) => recent.label)).toEqual(['Episode 2', 'Episode 1'])
     expect(list.map((recent) => recent.watched)).toEqual([null, expect.any(Number)])
@@ -501,7 +724,7 @@ describe('recents', () => {
 
   it('keeps a recent id stable for the session', async () => {
     const { service } = setup({ files: show })
-    await open(service, '/m/Show/Episode 1.mkv')
+    await open({ service, path: '/m/Show/Episode 1.mkv' })
     const [one] = await recents(service)
     const [two] = await recents(service)
     expect(one!.recentId).toBe(two!.recentId)
@@ -509,7 +732,7 @@ describe('recents', () => {
 
   it('opens a recent, and keeps it when the file has gone', async () => {
     const { service, table } = setup({ files: show })
-    await open(service, '/m/Show/Episode 1.mkv')
+    await open({ service, path: '/m/Show/Episode 1.mkv' })
     const [recent] = await recents(service)
     if (!recent) throw new Error('no recent')
     const reply = await service.handle({
@@ -539,8 +762,8 @@ describe('recents', () => {
 
   it('removes one recent and clears all', async () => {
     const { service, spies } = setup({ files: show })
-    await open(service, '/m/Show/Episode 1.mkv')
-    await open(service, '/m/Show/Episode 2.mkv')
+    await open({ service, path: '/m/Show/Episode 1.mkv' })
+    await open({ service, path: '/m/Show/Episode 2.mkv' })
     const [newest] = await recents(service)
     if (!newest) throw new Error('no recent')
     expect(
@@ -559,9 +782,9 @@ describe('recents', () => {
 
   it('no longer opens a removed recent, nor any recent after a clear', async () => {
     const { service } = setup({ files: show })
-    await open(service, '/m/Show/Episode 1.mkv')
-    await open(service, '/m/Show/Episode 2.mkv')
-    await open(service, '/m/Show/Episode 10.mkv')
+    await open({ service, path: '/m/Show/Episode 1.mkv' })
+    await open({ service, path: '/m/Show/Episode 2.mkv' })
+    await open({ service, path: '/m/Show/Episode 10.mkv' })
     const [removed, ...kept] = await recents(service)
     if (!removed) throw new Error('no recent')
     const openRecent = (recentId: string) =>
@@ -582,7 +805,7 @@ describe('recents', () => {
 
   it('shows no progress for a file replaced since its position was saved', async () => {
     const { service, table } = setup({ files: show })
-    const fileId = await open(service, '/m/Show/Episode 1.mkv')
+    const fileId = await open({ service, path: '/m/Show/Episode 1.mkv' })
     await service.handle({
       kind: 'page',
       request: { type: 'savePosition', fileId, position: 40, duration: 120 },
@@ -599,7 +822,7 @@ describe('recents', () => {
 
   it('keeps the progress when the player leaves before it learns the length', async () => {
     const { service } = setup({ files: show })
-    const fileId = await open(service, '/m/Show/Episode 1.mkv')
+    const fileId = await open({ service, path: '/m/Show/Episode 1.mkv' })
     const save = (duration: number | null) =>
       service.handle({
         kind: 'page',
@@ -622,7 +845,7 @@ describe('recents', () => {
       },
     })
     const save = async (path: string) => {
-      const fileId = await open(service, path)
+      const fileId = await open({ service, path })
       await service.handle({
         kind: 'page',
         request: { type: 'savePosition', fileId, position: 30, duration: 120 },
@@ -645,8 +868,8 @@ describe('recents', () => {
   it('checks a path once however many lists are waiting on it', async () => {
     const held = Promise.withResolvers<{ size: number; mtimeMs: number }>()
     const { service, statCalls, fireTimers } = setup({ files: show, stat: () => held.promise })
-    const fileId = await open(service, '/m/Show/Episode 1.mkv')
-    await open(service, '/m/Show/Episode 2.mkv')
+    const fileId = await open({ service, path: '/m/Show/Episode 1.mkv' })
+    await open({ service, path: '/m/Show/Episode 2.mkv' })
     await service.handle({
       kind: 'page',
       request: { type: 'savePosition', fileId, position: 30, duration: 120 },
@@ -670,7 +893,7 @@ describe('recents', () => {
 
   it('shows no progress for a recent whose file has gone', async () => {
     const { service, table } = setup({ files: show })
-    const fileId = await open(service, '/m/Show/Episode 1.mkv')
+    const fileId = await open({ service, path: '/m/Show/Episode 1.mkv' })
     await service.handle({
       kind: 'page',
       request: { type: 'savePosition', fileId, position: 40, duration: 120 },
