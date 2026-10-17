@@ -768,7 +768,8 @@ describe('list and views', () => {
           deletesAt: null,
           needsUnlock: false,
         },
-        expect.objectContaining({ downloadId: older.downloadId, watched: null }),
+        // Marked watched, so watched whole, though no file was read for its share.
+        expect.objectContaining({ downloadId: older.downloadId, watched: 1 }),
       ],
       autoDeleteDefault: true,
     })
@@ -1190,6 +1191,20 @@ describe('playing a download', () => {
     expect(world.service.views()[0]?.watched).toBe(0.25)
     world.fire()
     expect(lastList(world)[0]?.watched).toBe(0.25)
+  })
+
+  it('reads a download watched to its end as watched whole, though the end dropped its resume spot', async () => {
+    const world = setup({ initial: holding(entryFor({})), videos: { [VIDEO]: FILE } })
+    const { fileId } = targetOf(await world.service.open({ downloadId: ID }))
+    world.state.update((state) =>
+      savePosition(state, { file: factsOf(VIDEO), position: 2995, duration: 3000, at: NOW }),
+    )
+    world.service.notePosition({ fileId, position: 2995, duration: 3000 })
+    expect(world.state.read().resume).toEqual([])
+    expect(entryOf(world)?.watchedAt).toBe(NOW)
+    expect(world.service.views()[0]?.watched).toBe(1)
+    expect(world.service.isWatched({ path: VIDEO })).toBe(true)
+    expect(world.service.isWatched({ path: MOVIE_PATH })).toBe(false)
   })
 
   it.each([

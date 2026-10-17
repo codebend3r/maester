@@ -76,10 +76,13 @@ const fakeDownloads = ({
   grants,
   savedPosition,
   serverPosition,
+  watched,
 }: {
   grants: Grants
   savedPosition: () => number | null
   serverPosition: number
+  /** The download videos marked watched. */
+  watched: readonly string[]
 }) => {
   const reached: { name: string; input: unknown }[] = []
   const resumeAt: (number | null)[] = []
@@ -96,6 +99,7 @@ const fakeDownloads = ({
       path.startsWith(`${DOWNLOADED}/`) ? 'Downloaded from Vhagar' : null,
     labelOf: ({ path }) => DOWNLOAD_LABELS.get(path) ?? null,
     serverPositionOf: () => serverPosition,
+    isWatched: ({ path }) => watched.includes(path),
     // The first download's next is the second, as its group would have it; any other file has none.
     nextOf: async ({ fileId }) => {
       if (grants.fileOf(fileId)?.path !== DOWNLOAD_ONE) return null
@@ -218,7 +222,10 @@ const setup = ({
   failBrowser = false,
   updateAnswers = [],
   serverPosition = 0,
+  watched = [],
 }: {
+  /** The download videos the fake download service says are marked watched. */
+  watched?: string[]
   updateAnswers?: UpdateCheck[]
   /** What the fake download service says the server had as every file's resume spot. */
   serverPosition?: number
@@ -338,6 +345,7 @@ const setup = ({
     grants,
     savedPosition: () => store.read().resume[0]?.position ?? null,
     serverPosition,
+    watched,
   })
   const service = createDesktopService({
     updates,
@@ -1061,6 +1069,17 @@ describe('recents', () => {
     expect(list.map(({ label, from }) => [label, from])).toEqual([
       ['S01E01 Good News', 'Downloaded from Vhagar'],
       ['Episode 1', 'Show'],
+    ])
+  })
+
+  it('lists a download marked watched as watched whole, though it has no resume spot', async () => {
+    const { service } = setup({ files: { ...show, [DOWNLOAD_ONE]: {} }, watched: [DOWNLOAD_ONE] })
+    await open({ service, path: '/m/Show/Episode 1.mkv' })
+    await open({ service, path: DOWNLOAD_ONE })
+    const list = await recents(service)
+    expect(list.map(({ label, watched }) => [label, watched])).toEqual([
+      ['S01E01 Good News', 1],
+      ['Episode 1', null],
     ])
   })
 

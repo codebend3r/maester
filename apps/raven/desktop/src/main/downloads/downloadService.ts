@@ -71,6 +71,7 @@ export type DownloadService = Pick<DownloadAsks, 'ask' | 'retryAsk' | 'confirm' 
     | 'noteOpened'
     | 'notePosition'
     | 'notePlaying'
+    | 'isWatched'
   > & {
     list: () => DesktopReply
     readSpace: () => Promise<DesktopReply>
@@ -389,6 +390,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     noteOpened: playback.noteOpened,
     notePosition: playback.notePosition,
     notePlaying: playback.notePlaying,
+    isWatched: playback.isWatched,
     onSuspend: queue.onSuspend,
     onResume: queue.onResume,
     dispose,

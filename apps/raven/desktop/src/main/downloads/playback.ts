@@ -72,8 +72,13 @@ export type DownloadPlayback = {
   notePosition: (input: { fileId: string; position: number; duration: number | null }) => void
   /** What the player loaded: a granted file, or nothing of this computer's (a server title, Home). */
   notePlaying: (input: { fileId: string | null }) => void
-  /** A download's share watched, as Home's recents show one; null until its file was read. */
+  /**
+   * A download's share watched, as Home's recents show one: 1 once it is marked watched, else
+   * the share its resume spot gives, null until its file was read.
+   */
   watchedOf: (downloadId: string) => number | null
+  /** Whether the video at `path` is a download marked watched, which Home's recent shows whole. */
+  isWatched: (input: { path: string }) => boolean
   /** Reads these ready downloads' files for their share watched, then tells the page. */
   readFiles: (entries: readonly DownloadEntry[]) => void
   /** The queue's `onRemoved`: what names a removed download goes, its recent and resume spot too. */
@@ -91,6 +96,10 @@ const forgetVideos = (state: PlayerState, { paths }: { paths: readonly string[] 
     .filter(isNamed)
     .reduce((next, path) => forgetResume(removeRecent(next, { path }), { path }), state)
 }
+
+// Reaching the end drops the resume spot, so a download marked watched is read whole.
+const isMarked = (entry: DownloadEntry | null): boolean =>
+  entry !== null && entry.watchedAt !== null
 
 /** The play side of raven player's downloads: a download played as a local file, and what it leaves. */
 export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlayback => {
@@ -241,6 +250,7 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
   }
 
   const watchedOf: DownloadPlayback['watchedOf'] = (downloadId) => {
+    if (isMarked(entryById(store.read(), { downloadId }))) return 1
     const file = factsById.get(downloadId)
     return file === undefined ? null : watchedShare(deps.state.read(), { file })
   }
@@ -293,6 +303,7 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
     notePosition,
     notePlaying,
     watchedOf,
+    isWatched: ({ path }) => isMarked(entryAt(path)),
     readFiles,
     forget,
   }

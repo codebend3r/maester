@@ -330,7 +330,9 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
           recentId: recentIdFor({ entry }),
           label: titleOf({ path: entry.path, name: basename(entry.path) }),
           from: fromOf(entry.path),
-          watched: await shareOf({ state, path: entry.path }),
+          watched: deps.downloads.isWatched({ path: entry.path })
+            ? 1
+            : await shareOf({ state, path: entry.path }),
         }
       case 'server': {
         // A title whose server has gone cannot be played, so Home does not offer it.
