@@ -401,6 +401,12 @@ const searchWords = (title: string): string =>
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .trim()
 
+/** OMDb's answer for an IMDb id, as its `Ratings` strings. */
+export type FakeOmdb = Record<
+  string,
+  { imdb?: string; rottenTomatoes?: string; metacritic?: string }
+>
+
 /**
  * TMDB in miniature: searches by a title or alternative title holding the
  * query (year optional), `/find` by IMDb id, and movies by id. `down` makes every call fail as if TMDB were
@@ -411,12 +417,6 @@ const searchWords = (title: string): string =>
  * `holdPerson` does the same for one person's `/person/{id}`; `personCalls`
  * counts those.
  */
-/** OMDb's answer for an IMDb id, as its `Ratings` strings. */
-export type FakeOmdb = Record<
-  string,
-  { imdb?: string; rottenTomatoes?: string; metacritic?: string }
->
-
 export const fakeTmdb = ({
   movies,
   shows = [],
