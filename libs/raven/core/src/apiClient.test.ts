@@ -159,6 +159,15 @@ describe('createApiClient', () => {
     })
   })
 
+  it('asks the server to refresh a library', async () => {
+    const { client, calls } = clientReturning(respond({ body: library() }))
+    await expect(client.refreshLibrary(3)).resolves.toEqual(library())
+    expect(calls[0]).toMatchObject({
+      url: 'http://nas:8484/api/libraries/3/refresh',
+      init: { method: 'POST' },
+    })
+  })
+
   it('reads and writes an item’s metadata over TMDB’s', async () => {
     const state: ItemMetadataState = {
       shown: {

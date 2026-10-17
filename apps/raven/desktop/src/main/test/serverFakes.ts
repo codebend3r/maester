@@ -6,6 +6,7 @@ import type {
   MediaItem,
   SeasonSummary,
 } from '@raven/core'
+import { RATINGS_REFRESH_STATES } from '@raven/core'
 import { requestFor, type AllowedCall } from '@/main/servers/allowlist'
 import type { ServerCalls } from '@/main/servers/serverCalls'
 
@@ -107,6 +108,7 @@ export const library = (overrides: { id: number; watchedPercent: number }): Libr
     icon: null,
   },
   backdrop: null,
+  ratingsRefresh: { state: RATINGS_REFRESH_STATES.idle, finishedAt: null },
 })
 
 export const show = { id: 4, title: 'Severance' }

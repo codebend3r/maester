@@ -45,6 +45,7 @@ import { AdminOnly, ForViewers } from '@/admin/adminGuard'
 import { AdminService } from '@/admin/adminService'
 import { RAVEN_HEADERS } from '@/http'
 import { type LibraryRecord, LibrariesRepository, samePaths } from '@/libraries/librariesRepository'
+import { RatingsRefresh } from '@/libraries/ratingsRefresh'
 import { PrivateBy, Public } from '@/lock/lockGuard'
 import { LockService } from '@/lock/lockService'
 import { MediaArtifacts } from '@/media/mediaArtifacts'
@@ -104,6 +105,7 @@ export class LibrariesController {
     @Inject(LibraryWatcher) private readonly watcher: LibraryWatcher,
     @Inject(LockService) private readonly lock: LockService,
     @Inject(AdminService) private readonly admin: AdminService,
+    @Inject(RatingsRefresh) private readonly ratings: RatingsRefresh,
   ) {}
 
   /** A library can only be locked behind a PIN that can open it again. */
@@ -116,16 +118,15 @@ export class LibrariesController {
   }
 
   /**
-   * A library as a client sees it: its scan's live status, and its newest
-   * video's picture. Without `canSee` a library still locked to the browser
-   * keeps its folders, its picture and what its last scan said about them
-   * (which names the folders) to itself, and shows only its name, type and
-   * counts. Without `isAdmin`, which is the admin lock off in this browser,
-   * no library shows its folders or the scan failure that names them: only
-   * the admin sees where files live. Every route says which, so none
-   * reveals a locked library by leaving it out: the public ones ask the
-   * lock, while the guarded ones, and creating a library, pass true, as
-   * whoever reaches them sees it all.
+   * A library as a client sees it: its scan's live status, where its
+   * Refresh stands, and its newest video's picture. Without `canSee` a
+   * library still locked to the browser keeps its folders, its picture and
+   * what its last scan said about them (which names the folders) to itself,
+   * and shows only its name, type, counts and Refresh. Without `isAdmin`,
+   * which is the admin lock off in this browser, no library shows its
+   * folders or the scan failure that names them. Every route says which:
+   * the public ones ask the lock, while the guarded ones, and creating a
+   * library, pass true, as whoever reaches them sees it all.
    */
   private withStatus({
     record,
@@ -137,13 +138,17 @@ export class LibrariesController {
     isAdmin: boolean
   }): Library {
     const scan = this.scanner.status(record.id)
-    if (canSee && isAdmin) return { ...record, scan, backdrop: this.media.backdropOf(record.id) }
+    const ratingsRefresh = this.ratings.status(record.id)
+    if (canSee && isAdmin) {
+      return { ...record, scan, ratingsRefresh, backdrop: this.media.backdropOf(record.id) }
+    }
     const hiddenError = canSee ? HIDDEN_SCAN_ERROR : LOCKED_SCAN_ERROR
     return {
       ...record,
       paths: [],
       layouts: [],
       scan: { ...scan, error: scan.error == null ? null : hiddenError },
+      ratingsRefresh,
       backdrop: canSee ? this.media.backdropOf(record.id) : null,
     }
   }
@@ -274,6 +279,20 @@ export class LibrariesController {
   scan(@Param('id', ParseIntPipe) id: number): Library {
     const record = this.find(id)
     this.scanner.scan(id)
+    return this.withStatus({ record, canSee: true, isAdmin: true })
+  }
+
+  /**
+   * Refresh: a quick scan for new files, and every movie's and show's
+   * ratings fetched again. Pressed again while one runs, it only scans; the
+   * response already reports the Refresh as under way.
+   */
+  @AdminOnly()
+  @Post(':id/refresh')
+  @HttpCode(200)
+  refresh(@Param('id', ParseIntPipe) id: number): Library {
+    const record = this.find(id)
+    this.ratings.start(id)
     return this.withStatus({ record, canSee: true, isAdmin: true })
   }
 

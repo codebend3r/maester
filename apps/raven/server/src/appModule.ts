@@ -23,6 +23,7 @@ import { PeopleController } from '@/items/peopleController'
 import { ReviewsController } from '@/items/reviewsController'
 import { LibrariesController } from '@/libraries/librariesController'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
+import { RatingsRefresh } from '@/libraries/ratingsRefresh'
 import { LockController } from '@/lock/lockController'
 import { LockGuard } from '@/lock/lockGuard'
 import { LockService } from '@/lock/lockService'
@@ -177,6 +178,7 @@ export class AppModule {
         SubtitlesService,
         MediaArtifacts,
         ScannerService,
+        RatingsRefresh,
         LibraryWatcher,
         AdminService,
         LockService,
