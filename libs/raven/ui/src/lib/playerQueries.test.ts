@@ -11,6 +11,7 @@ describe('playerQueriesFor', () => {
     const client = {
       ...api,
       getTracks: mock(async () => tracks),
+      getStreams: mock(async () => ({ video: null, audio: [] })),
       getSubtitles: mock(async () => []),
       getPlaybackSettings: mock(async () => DEFAULT_PLAYBACK_STATE),
     }
@@ -18,12 +19,15 @@ describe('playerQueriesFor', () => {
     const cache = new QueryClient()
     const input = { id: 7, trackId: 'embedded-0', window: 0 }
     expect(queryKeys.mediaTracks(7)).toEqual(queries.tracks(7).queryKey)
+    expect(queryKeys.mediaStreams(7)).toEqual(queries.streams(7).queryKey)
     expect(queryKeys.subtitles(input)).toEqual(queries.subtitles(input).queryKey)
     expect(queryKeys.playbackSettings).toEqual(queries.playbackSettings.queryKey)
     await cache.fetchQuery(queries.tracks(7))
+    await cache.fetchQuery(queries.streams(7))
     await cache.fetchQuery(queries.subtitles(input))
     await cache.fetchQuery(queries.playbackSettings)
     expect(client.getTracks).toHaveBeenCalledWith(7)
+    expect(client.getStreams).toHaveBeenCalledWith(7)
     expect(client.getSubtitles).toHaveBeenCalledWith(input)
     expect(client.getPlaybackSettings).toHaveBeenCalledTimes(1)
     expect(cache.getQueryData<typeof tracks>(queryKeys.mediaTracks(7))).toEqual(tracks)

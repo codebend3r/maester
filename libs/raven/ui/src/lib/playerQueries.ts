@@ -10,6 +10,14 @@ export const playerQueriesFor = (api: ApiClient) => ({
       staleTime: Infinity,
       retry: false,
     }),
+  /** Probed afresh by the server on each fetch, so fetched once per file. */
+  streams: (id: number) =>
+    queryOptions({
+      queryKey: queryKeys.mediaStreams(id),
+      queryFn: () => api.getStreams(id),
+      staleTime: Infinity,
+      retry: false,
+    }),
   subtitles: (input: { id: number; trackId: string; window: number }) =>
     queryOptions({
       queryKey: queryKeys.subtitles(input),

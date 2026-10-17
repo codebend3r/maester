@@ -1,0 +1,122 @@
+// A see-through layer over the stage whose padding parks the panel top
+// left, under the back button and the title, and clear of the control bar.
+.layer {
+  grid-area: stage;
+  position: relative;
+  z-index: 3;
+  display: grid;
+  align-items: start;
+  justify-items: start;
+  padding: calc(var(--space-8) + var(--titlebar-inset)) clamp(var(--space-2), 3vw, var(--space-5))
+    5.5rem;
+  pointer-events: none;
+}
+
+// In the canopy glass of the settings menu, its sibling.
+.panel {
+  // Undo the browser's centring of a <dialog>; the layer places this one.
+  position: static;
+  inset: auto;
+  margin: 0;
+  display: grid;
+  pointer-events: auto;
+  color: var(--color-bark);
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: var(--space-2);
+  width: min(26rem, 100%);
+  max-height: calc(100dvh - var(--space-8) - var(--titlebar-inset) - 5.5rem);
+  padding: var(--space-3);
+  border: 1px solid var(--color-moss);
+  border-radius: var(--radius-md);
+  background: var(--color-canopy-glass);
+  box-shadow: var(--shadow-panel);
+}
+
+.header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.heading {
+  font-family: var(--font-display);
+  font-size: var(--font-size-lg);
+  font-weight: 400;
+}
+
+.close {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-lichen);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--color-moss);
+    color: var(--color-bark);
+  }
+}
+
+.sections {
+  display: grid;
+  gap: var(--space-3);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.section {
+  display: grid;
+  gap: var(--space-0);
+}
+
+// The settings menu's group legends, so the two panels read as one family.
+.title {
+  color: var(--color-lichen);
+  font-family: var(--font-body);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  line-height: var(--line-body);
+  text-transform: uppercase;
+}
+
+.facts {
+  display: grid;
+  gap: 2px;
+}
+
+// The terms share one column, so the values line up down the panel.
+.fact {
+  display: grid;
+  grid-template-columns: 7.5rem minmax(0, 1fr);
+  gap: var(--space-2);
+  font-size: var(--font-size-sm);
+}
+
+.term {
+  color: var(--color-lichen);
+  font-weight: 400;
+}
+
+// Counters tick once a second; even digits keep them from jittering.
+.value {
+  color: var(--color-bark);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.note {
+  color: var(--color-lichen);
+  font-size: var(--font-size-xs);
+}
+
+@media (max-width: 30rem) {
+  .fact {
+    grid-template-columns: 7rem minmax(0, 1fr);
+  }
+}

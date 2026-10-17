@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import type { MediaTracks, SubtitleTrack } from '@raven/core'
-import { preferredAudio, preferredSubtitle } from '@/components/Player/selection'
+import { playingAudio, preferredAudio, preferredSubtitle } from '@/components/Player/selection'
 
 const subtitle = (overrides: Partial<SubtitleTrack>): SubtitleTrack => ({
   id: 'embedded-0',
@@ -59,5 +59,18 @@ describe('preferredSubtitle', () => {
       'embedded-1',
     )
     expect(preferredSubtitle({ tracks, subtitles: { on: true, language: 'fr' } })).toBeNull()
+  })
+})
+
+describe('playingAudio', () => {
+  it('plays the picked track on a converted stream, else the default', () => {
+    expect(playingAudio({ mode: 'remux', tracks, audio: 1 })).toBe(1)
+    expect(playingAudio({ mode: 'transcode', tracks, audio: null })).toBe(0)
+    expect(playingAudio({ mode: 'remux', tracks: null, audio: null })).toBeNull()
+  })
+
+  it("plays the file's own default in direct play, whichever was picked", () => {
+    expect(playingAudio({ mode: 'direct', tracks, audio: 1 })).toBe(0)
+    expect(playingAudio({ mode: 'direct', tracks: null, audio: 1 })).toBeNull()
   })
 })

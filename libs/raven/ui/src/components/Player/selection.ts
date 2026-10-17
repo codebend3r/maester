@@ -1,4 +1,4 @@
-import type { MediaTracks } from '@raven/core'
+import type { MediaTracks, PlaybackMode } from '@raven/core'
 
 /**
  * The audio track to start on: the file's default, unless the viewer last
@@ -37,3 +37,18 @@ export const preferredSubtitle = ({
   )
   return (matching.find((track) => !track.forced) ?? matching[0])?.id ?? null
 }
+
+/**
+ * The audio track playing: the picked one, else the file's default. The
+ * original file plays its own default track, whichever was picked.
+ */
+export const playingAudio = ({
+  mode,
+  tracks,
+  audio,
+}: {
+  mode: PlaybackMode
+  tracks: MediaTracks | null
+  audio: number | null
+}): number | null =>
+  mode === 'direct' ? (tracks?.defaultAudio ?? null) : (audio ?? tracks?.defaultAudio ?? null)

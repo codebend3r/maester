@@ -1169,6 +1169,47 @@ export const isMediaTracks = object({
 
 export type MediaTracks = Infer<typeof isMediaTracks>
 
+/** How the picture's light is encoded: plain SDR, or one of the HDR formats. */
+export const isVideoRange = oneOf(['sdr', 'hdr10', 'hlg', 'dolbyVision'])
+
+export type VideoRange = Infer<typeof isVideoRange>
+
+/** What ffprobe says of the picture beyond what the index keeps. */
+export const isVideoStream = object({
+  /** ffprobe codec name: 'h264', 'hevc', ... */
+  codec: nullable(isString),
+  /** The codec's profile as ffprobe names it: 'High', 'Main 10'. */
+  profile: nullable(isString),
+  /** Bits per second; Matroska says only when its muxer wrote a `BPS` tag. */
+  bitrate: nullable(isNumber),
+  range: isVideoRange,
+})
+
+export type VideoStream = Infer<typeof isVideoStream>
+
+export const isAudioStream = object({
+  /** Position among the file's audio tracks, as an `AudioTrack`'s index counts them. */
+  index: isNumber,
+  codec: nullable(isString),
+  /** 'LC', 'DTS-HD MA', 'Dolby TrueHD + Dolby Atmos', ... */
+  profile: nullable(isString),
+  channels: nullable(isNumber),
+  bitrate: nullable(isNumber),
+  /** Samples per second: 48000. */
+  sampleRate: nullable(isNumber),
+})
+
+export type AudioStream = Infer<typeof isAudioStream>
+
+/** A file's picture and sound in detail, read for the player's Playback info. */
+export const isMediaStreams = object({
+  /** Null for a file with no picture but cover art. */
+  video: nullable(isVideoStream),
+  audio: listOf(isAudioStream),
+})
+
+export type MediaStreams = Infer<typeof isMediaStreams>
+
 /**
  * One subtitle, timed against the file. `text` may hold `<i>`, `<b>` and `<u>`.
  * Read from WebVTT by `parseWebVtt`, never from JSON, so it has no guard.

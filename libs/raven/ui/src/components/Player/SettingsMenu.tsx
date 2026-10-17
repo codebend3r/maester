@@ -2,6 +2,7 @@ import { type PlaybackMode, describeMode } from '@raven/core'
 import { type RefObject, useEffect, useId, useRef } from 'react'
 import { Icon } from '@/components/Icon/Icon'
 import styles from '@/components/Player/SettingsMenu.module.scss'
+import { playingAudio } from '@/components/Player/selection'
 import type { SubtitleStatus } from '@/components/Player/useSubtitleCues'
 import type { TrackSelection } from '@/components/Player/useTrackSelection'
 import { SPEEDS } from '@/lib/shortcuts'
@@ -46,7 +47,8 @@ const Option = ({
 /**
  * Audio, subtitles and speed, as native radio groups so the arrow keys,
  * the space bar and screen readers all work as they do anywhere else. The
- * last line says how the file is reaching the browser.
+ * footer says how the file is reaching the browser, and opens Playback info
+ * for the detail.
  */
 export const SettingsMenu = ({
   menuRef,
@@ -55,6 +57,7 @@ export const SettingsMenu = ({
   rate,
   mode,
   onPickRate,
+  onShowInfo,
   onClose,
 }: {
   menuRef: RefObject<HTMLDialogElement | null>
@@ -63,15 +66,14 @@ export const SettingsMenu = ({
   rate: number
   mode: PlaybackMode
   onPickRate: (rate: number) => void
+  onShowInfo: () => void
   onClose: () => void
 }) => {
   const subtitleId = subtitle?.id ?? null
   const id = useId()
   const heading = `${id}-heading`
   const first = useRef<HTMLFieldSetElement>(null)
-  // The original file plays its own default track, whichever was picked.
-  const playingAudio =
-    mode === 'direct' ? (tracks?.defaultAudio ?? null) : (audio ?? tracks?.defaultAudio ?? null)
+  const playing = playingAudio({ mode, tracks, audio })
 
   // Opening the menu puts the keyboard on the chosen option of the first group.
   useEffect(() => {
@@ -107,7 +109,7 @@ export const SettingsMenu = ({
                   <Option
                     key={track.index}
                     name={`${id}-audio`}
-                    checked={track.index === playingAudio}
+                    checked={track.index === playing}
                     label={label.name}
                     details={label.details}
                     onSelect={() => pickAudio(track.index)}
@@ -158,7 +160,13 @@ export const SettingsMenu = ({
             </div>
           </fieldset>
         </div>
-        <p className={styles.mode}>{describeMode(mode)}</p>
+        <footer className={styles.footer}>
+          <p className={styles.mode}>{describeMode(mode)}</p>
+          <button type="button" className={styles.info} onClick={onShowInfo}>
+            <span>Playback info</span>
+            <Icon name="next" size={16} />
+          </button>
+        </footer>
       </dialog>
     </div>
   )
