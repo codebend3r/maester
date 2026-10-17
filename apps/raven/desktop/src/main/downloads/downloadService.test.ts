@@ -1593,6 +1593,50 @@ describe('deleting once watched', () => {
     await until(() => entries(world).length === 0)
   })
 
+  describe('while its deletion waits on the server', () => {
+    /** Watched eleven minutes ago with a position still owed, its server holding the answer. */
+    const waiting = async () => {
+      const world = settingUp({
+        watchedAt: NOW - 11 * MINUTE,
+        pending: { play: false, position: 2800, furthest: 2800, at: NOW - 11 * MINUTE },
+      })
+      const answer = Promise.withResolvers<void>()
+      world.silence.until = answer.promise
+      await until(() => delays(world).includes(SYNC_DELETE_WAIT_MS))
+      return { world, release: answer.resolve }
+    }
+
+    it('keeps a download opened meanwhile, and deletes it once the page leaves', async () => {
+      const { world, release } = await waiting()
+      const fileId = await play(world)
+      release()
+      await ticks(10)
+      expect(entries(world)).toHaveLength(1)
+      expect(world.sent).not.toContainEqual(DELETED)
+      world.service.playbackLeft({ fileId })
+      await until(() => entries(world).length === 0)
+      expect(world.sent).toContainEqual(DELETED)
+    })
+
+    it('keeps a download switched off meanwhile', async () => {
+      const { world, release } = await waiting()
+      world.service.setAutoDelete({ downloadId: ID, autoDelete: false })
+      release()
+      await ticks(10)
+      expect(entries(world)).toHaveLength(1)
+      expect(world.sent).not.toContainEqual(DELETED)
+    })
+  })
+
+  it("deletes a playing download when the viewer asks, whatever its clock's rules", async () => {
+    const world = settingUp({})
+    await ticks(10)
+    await play(world)
+    await world.service.remove({ downloadId: ID })
+    expect(entries(world)).toEqual([])
+    expect(world.sent).not.toContainEqual(DELETED)
+  })
+
   it.each([
     ['remove', (world: World) => world.service.remove({ downloadId: ID })],
     ['removeAll', (world: World) => world.service.removeAll()],
