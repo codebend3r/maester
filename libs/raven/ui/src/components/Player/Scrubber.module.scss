@@ -1,25 +1,28 @@
 // A tall hit area around a thin rail: easy to grab, quiet to look at. The
-// rail thickens on hover, and the playhead is a weirwood leaf.
+// rail thickens on hover, and the playhead is a round thumb.
 .scrubber {
   position: relative;
   display: grid;
   align-items: center;
-  height: 1.5rem;
+  height: var(--space-4);
   cursor: pointer;
   touch-action: none;
 
   &:focus-visible {
     outline: var(--focus-ring);
-    outline-offset: 2px;
+    outline-offset: var(--space-0);
     border-radius: var(--radius-sm);
   }
 }
 
+// The chapter gaps are cut by a mask the component sets; this is their width.
 .rail {
+  --chapter-gap: var(--space-0);
+
   position: relative;
-  height: 4px;
+  height: 5px;
   overflow: hidden;
-  border-radius: 2px;
+  border-radius: var(--radius-pill);
   background: var(--color-bark-faint);
 
   @media (prefers-reduced-motion: no-preference) {
@@ -44,47 +47,45 @@
   background: var(--color-lichen-faint);
 }
 
+// The one colour in the chrome that follows the theme.
 .played {
   left: 0;
   background: var(--color-leaf-bright);
 }
 
-// Two rounded corners and two sharp ones make a leaf; the turn points it
-// up the timeline.
 .head {
   position: absolute;
   top: 50%;
-  width: 0.9rem;
-  height: 0.9rem;
-  border-radius: 0 70%;
-  background: var(--color-leaf-bright);
-  box-shadow: var(--shadow-outline);
-  transform: translate(-50%, -50%) rotate(45deg) scale(0.8);
+  width: var(--space-3);
+  height: var(--space-3);
+  border-radius: 50%;
+  background: var(--color-on-picture);
+  box-shadow: 0 0 0 var(--space-0) var(--color-shade);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
 
   @media (prefers-reduced-motion: no-preference) {
     transition: transform 120ms ease-out;
   }
-
-  pointer-events: none;
 }
 
 .scrubber:hover .head,
 .dragging .head,
 .scrubber:focus-visible .head {
-  transform: translate(-50%, -50%) rotate(45deg) scale(1.1);
+  transform: translate(-50%, -50%) scale(1.15);
 }
 
 .tip {
   position: absolute;
-  bottom: calc(100% + var(--space-0));
-  padding: 0.1rem var(--space-1);
-  border: 1px solid var(--color-moss);
+  bottom: calc(100% + var(--space-1));
+  padding: var(--space-0) var(--space-1);
   border-radius: var(--radius-sm);
-  background: var(--color-canopy);
-  color: var(--color-bark);
+  background: var(--color-picture-glass);
+  color: var(--color-on-picture);
   font-size: var(--font-size-xs);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   transform: translateX(-50%);
+  backdrop-filter: blur(12px);
   pointer-events: none;
 }

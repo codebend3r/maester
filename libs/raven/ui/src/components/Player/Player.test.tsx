@@ -139,8 +139,8 @@ describe('Player', () => {
       { playback: forced },
     )
     expect(container.querySelector('video')).toHaveAttribute('src', '/api/media/7/file')
-    await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
-    const menu = await screen.findByRole('dialog', { name: 'Settings' })
+    await userEvent.click(screen.getByRole('button', { name: /^Audio/ }))
+    const menu = await screen.findByRole('dialog', { name: 'Audio' })
     await userEvent.click(
       await within(within(menu).getByRole('group', { name: 'Audio' })).findByRole('radio', {
         name: /Japanese/,
@@ -149,7 +149,7 @@ describe('Player', () => {
     // Without a stream to remux into, the file plays on, with its default track.
     expect(container.querySelector('video')).toHaveAttribute('src', '/api/media/7/file')
     const audio = within(
-      within(await screen.findByRole('dialog', { name: 'Settings' })).getByRole('group', {
+      within(await screen.findByRole('dialog', { name: 'Audio' })).getByRole('group', {
         name: 'Audio',
       }),
     )
@@ -185,40 +185,45 @@ describe('the player controls', () => {
     expect(screen.getByRole('slider', { name: 'Volume' })).toBeInTheDocument()
   })
 
-  it('lists audio, subtitles and speed in the settings menu', async () => {
+  it('lists audio, subtitles and speed in the menus their pills open', async () => {
     renderWithProviders(
       <TestPlayer media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />,
     )
-    await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
-    const menu = await screen.findByRole('dialog', { name: 'Settings' })
-    const audio = within(within(menu).getByRole('group', { name: 'Audio' }))
+    await userEvent.click(screen.getByRole('button', { name: /^Audio/ }))
+    const audioMenu = await screen.findByRole('dialog', { name: 'Audio' })
+    const audio = within(within(audioMenu).getByRole('group', { name: 'Audio' }))
     expect(await audio.findByRole('radio', { name: /English/ })).toBeChecked()
     expect(audio.getByRole('radio', { name: /Japanese/ })).not.toBeChecked()
-    const subtitles = within(within(menu).getByRole('group', { name: 'Subtitles' }))
+    await userEvent.click(screen.getByRole('button', { name: /^Subtitles/ }))
+    const subtitleMenu = await screen.findByRole('dialog', { name: 'Subtitles' })
+    expect(screen.queryByRole('dialog', { name: 'Audio' })).toBeNull()
+    const subtitles = within(within(subtitleMenu).getByRole('group', { name: 'Subtitles' }))
     expect(subtitles.getByRole('radio', { name: 'Off' })).toBeChecked()
     expect(subtitles.getByRole('radio', { name: /Japanese/ })).toBeDisabled()
-    expect(within(menu).getByRole('radio', { name: 'Normal' })).toBeChecked()
-    expect(within(menu).getByText('Playing the original file')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /^Playback:/ }))
+    const playback = await screen.findByRole('dialog', { name: 'Playback' })
+    expect(within(playback).getByRole('radio', { name: 'Normal' })).toBeChecked()
+    expect(within(playback).getByText('Playing the original file')).toBeInTheDocument()
   })
 
-  it('opens Playback info from the settings menu and keeps it over the video until closed', async () => {
+  it('opens Playback info from the Playback menu and keeps it over the video until closed', async () => {
     spies.push(
       spyOn(api, 'getStreams').mockImplementation(async () => ({ video: null, audio: [] })),
     )
     const { container } = renderWithProviders(
       <TestPlayer media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />,
     )
-    await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
-    const menu = await screen.findByRole('dialog', { name: 'Settings' })
+    await userEvent.click(screen.getByRole('button', { name: /^Playback:/ }))
+    const menu = await screen.findByRole('dialog', { name: 'Playback' })
     await userEvent.click(within(menu).getByRole('button', { name: 'Playback info' }))
-    expect(screen.queryByRole('dialog', { name: 'Settings' })).toBeNull()
+    expect(screen.queryByRole('dialog', { name: 'Playback' })).toBeNull()
     const info = screen.getByRole('dialog', { name: 'Playback info' })
     expect(within(info).getByText('HTML video')).toBeInTheDocument()
     expect(within(info).getByText('Direct play')).toBeInTheDocument()
     expect(within(info).getByText('MP4')).toBeInTheDocument()
     // The menu opens again beside it.
-    await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
-    expect(await screen.findByRole('dialog', { name: 'Settings' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /^Playback:/ }))
+    expect(await screen.findByRole('dialog', { name: 'Playback' })).toBeInTheDocument()
     expect(screen.getByRole('dialog', { name: 'Playback info' })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Close playback info' }))
     expect(screen.queryByRole('dialog', { name: 'Playback info' })).toBeNull()
@@ -229,13 +234,13 @@ describe('the player controls', () => {
     renderWithProviders(
       <TestPlayer media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />,
     )
-    await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
-    const menu = await screen.findByRole('dialog', { name: 'Settings' })
+    await userEvent.click(screen.getByRole('button', { name: 'Subtitles: Off' }))
+    const menu = await screen.findByRole('dialog', { name: 'Subtitles' })
     const subtitles = within(within(menu).getByRole('group', { name: 'Subtitles' }))
     await userEvent.click(await subtitles.findByRole('radio', { name: /^English/ }))
     expect(usePlayerPrefs.getState().subtitles).toEqual({ on: true, language: 'en' })
-    expect(screen.getByRole('button', { name: 'Subtitles off (c)' })).toHaveAttribute(
-      'aria-pressed',
+    expect(screen.getByRole('button', { name: 'Subtitles: English' })).toHaveAttribute(
+      'aria-expanded',
       'true',
     )
   })
@@ -260,7 +265,7 @@ describe('the player controls', () => {
     )
     const video = container.querySelector('video')
     if (!video) throw new Error('no video')
-    await screen.findByRole('button', { name: 'Subtitles on (c)' })
+    await screen.findByRole('button', { name: 'Subtitles: Off' })
     await act(async () => {
       await api.getTracks(7)
     })
@@ -410,8 +415,8 @@ describe('the player’s Back', () => {
       spyOn(api, 'getStreams').mockImplementation(async () => ({ video: null, audio: [] })),
     )
     renderWithProviders(app(), { route: '/watch/7', behind: ['/movies/3'] })
-    await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
-    const menu = await screen.findByRole('dialog', { name: 'Settings' })
+    await userEvent.click(screen.getByRole('button', { name: /^Playback:/ }))
+    const menu = await screen.findByRole('dialog', { name: 'Playback' })
     await userEvent.click(within(menu).getByRole('button', { name: 'Playback info' }))
     expect(screen.getByRole('dialog', { name: 'Playback info' })).toBeInTheDocument()
     press('Escape')
@@ -466,6 +471,114 @@ describe('the player’s Back', () => {
   })
 })
 
+describe('the player chrome', () => {
+  beforeEach(() => {
+    stubTracks()
+    spies.push(spyOn(api, 'getSubtitles').mockImplementation(async () => []))
+  })
+
+  const uhd = mediaItem({
+    container: 'mp4',
+    title: 'Busboys',
+    year: 2026,
+    width: 3840,
+    height: 2160,
+    hdr: true,
+  })
+
+  it('says under the title what is playing and how, and the pills say what each is set to', async () => {
+    renderWithProviders(<TestPlayer media={uhd} backTo="/libraries/2" />)
+    expect(screen.getByRole('heading', { level: 1, name: 'Busboys' })).toBeInTheDocument()
+    expect(screen.getByText('2026 · 4K HDR · Direct play')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Subtitles: Off' })).toHaveTextContent(
+      'Subtitles · Off',
+    )
+    expect(await screen.findByRole('button', { name: 'Audio: English 5.1' })).toHaveTextContent(
+      'Audio · English 5.1',
+    )
+    expect(screen.getByRole('button', { name: 'Playback: 4K · Direct play' })).toHaveTextContent(
+      /^4K · Direct play$/,
+    )
+    expect(screen.getByRole('button', { name: 'Full screen (f)' })).toHaveTextContent('Full screen')
+  })
+
+  it('opens one menu at a time and gives focus back to its pill', async () => {
+    renderWithProviders(<TestPlayer media={uhd} backTo="/libraries/2" />)
+    const audioPill = await screen.findByRole('button', { name: 'Audio: English 5.1' })
+    await userEvent.click(audioPill)
+    expect(audioPill).toHaveAttribute('aria-expanded', 'true')
+    const menu = screen.getByRole('dialog', { name: 'Audio' })
+    expect(document.activeElement).toBe(within(menu).getByRole('radio', { name: /English/ }))
+    // A key press on another pill switches straight to its menu, keyboard and all.
+    fireEvent.click(screen.getByRole('button', { name: 'Subtitles: Off' }))
+    const subtitleMenu = screen.getByRole('dialog', { name: 'Subtitles' })
+    expect(document.activeElement).toBe(within(subtitleMenu).getByRole('radio', { name: 'Off' }))
+    fireEvent.click(audioPill)
+    press('Escape')
+    expect(screen.queryByRole('dialog', { name: 'Audio' })).toBeNull()
+    expect(document.activeElement).toBe(audioPill)
+    expect(audioPill).toHaveAttribute('aria-expanded', 'false')
+
+    const subtitlesPill = screen.getByRole('button', { name: 'Subtitles: Off' })
+    await userEvent.click(subtitlesPill)
+    expect(screen.getByRole('dialog', { name: 'Subtitles' })).toBeInTheDocument()
+    await userEvent.click(subtitlesPill)
+    expect(screen.queryByRole('dialog', { name: 'Subtitles' })).toBeNull()
+    expect(document.activeElement).toBe(subtitlesPill)
+
+    await userEvent.click(screen.getByRole('button', { name: /^Playback:/ }))
+    await userEvent.click(screen.getByRole('button', { name: 'Close menu' }))
+    expect(screen.queryByRole('dialog', { name: 'Playback' })).toBeNull()
+
+    await userEvent.click(screen.getByRole('button', { name: /^Playback:/ }))
+    await userEvent.click(screen.getByRole('slider', { name: 'Seek' }))
+    expect(screen.queryByRole('dialog', { name: 'Playback' })).toBeNull()
+  })
+
+  it('keeps the heart in the top bar beside the title, filled once favourited', () => {
+    renderWithProviders(
+      <TestPlayer
+        media={uhd}
+        backTo="/libraries/2"
+        favourite={{ isFavourite: true, toggle: () => {} }}
+      />,
+    )
+    const heart = screen.getByRole('button', { name: 'Favourite' })
+    expect(heart).toHaveAttribute('aria-pressed', 'true')
+    expect(heart).toHaveClass('favourited')
+    expect(heart.closest('header')).toContainElement(
+      screen.getByRole('heading', { level: 1, name: 'Busboys' }),
+    )
+  })
+
+  it('shows a large play mark while paused, and drops it once the video plays', () => {
+    const { container } = renderWithProviders(<TestPlayer media={uhd} backTo="/libraries/2" />)
+    const video = container.querySelector('video')
+    if (!video) throw new Error('no video')
+    expect(container.querySelector('.paused')).toHaveAttribute('aria-hidden', 'true')
+    act(() => {
+      video.dispatchEvent(new Event('play'))
+      video.dispatchEvent(new Event('playing'))
+    })
+    expect(container.querySelector('.paused')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Pause (k)' })).toBeInTheDocument()
+  })
+
+  it('skips ten seconds either way from the bar', async () => {
+    const { container } = renderWithProviders(<TestPlayer media={uhd} backTo="/libraries/2" />)
+    const video = container.querySelector('video')
+    if (!video) throw new Error('no video')
+    const forward = screen.getByRole('button', { name: 'Forward 10 seconds (l)' })
+    expect(forward).toHaveTextContent('+10')
+    await userEvent.click(forward)
+    expect(video.currentTime).toBe(10)
+    const back = screen.getByRole('button', { name: 'Back 10 seconds (j)' })
+    expect(back).toHaveTextContent('-10')
+    await userEvent.click(back)
+    expect(video.currentTime).toBe(0)
+  })
+})
+
 // Last in the file: with the fake timers ahead of them, the Back tests above time out.
 describe('the controls fading out', () => {
   const IDLE_MS = 10_000
@@ -515,10 +628,10 @@ describe('the controls fading out', () => {
     expect(bar()).toHaveClass('hidden')
   })
 
-  it('hides them while the settings menu is open', () => {
+  it('hides them while a menu is open', () => {
     renderPlayer()
-    act(() => screen.getByRole('button', { name: 'Settings' }).click())
-    expect(screen.getByRole('dialog', { name: 'Settings' })).toBeInTheDocument()
+    act(() => screen.getByRole('button', { name: /^Playback:/ }).click())
+    expect(screen.getByRole('dialog', { name: 'Playback' })).toBeInTheDocument()
     idle(IDLE_MS)
     expect(bar()).toHaveClass('hidden')
   })

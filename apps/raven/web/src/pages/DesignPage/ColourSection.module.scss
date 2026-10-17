@@ -1,0 +1,263 @@
+.body {
+  display: grid;
+  gap: var(--space-4);
+}
+
+// The four grounds as one band, each in the ink that reads best on it.
+.band {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(12.5rem, 100%), 1fr));
+  overflow: hidden;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-xl);
+}
+
+.ground {
+  display: grid;
+  align-content: space-between;
+  gap: var(--space-4);
+  min-height: 13.75rem;
+  padding: var(--space-4);
+}
+
+.groundWord {
+  font-family: var(--font-display);
+  font-size: var(--font-size-2xl);
+  line-height: var(--line-display);
+}
+
+.groundLabel {
+  display: grid;
+  gap: 2px;
+}
+
+.groundName {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.groundValue {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-size: var(--font-size-xs);
+  opacity: 0.8;
+}
+
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(14.5rem, 100%), 1fr));
+  gap: var(--space-3);
+}
+
+// The ratios sit at the foot of every card, however long its note.
+.swatch {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-2) var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--color-canopy);
+}
+
+.swatchTop {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+}
+
+.chip {
+  display: block;
+  height: 4.5rem;
+  border-radius: var(--radius-md);
+  box-shadow: inset 0 0 0 1px var(--color-line);
+}
+
+.swatchText {
+  display: grid;
+  gap: 2px;
+  padding: 0 var(--space-0);
+}
+
+.tokenName {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.tokenValue {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-lichen);
+  font-size: var(--font-size-xs);
+  overflow-wrap: anywhere;
+}
+
+.swatchNote {
+  padding: 0 var(--space-0);
+  color: var(--color-birch);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-body);
+}
+
+.ratios {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  gap: var(--space-1);
+  padding: 0 var(--space-0);
+}
+
+.ratio {
+  display: grid;
+  grid-auto-flow: column;
+  gap: var(--space-0);
+  padding: 2px var(--space-1);
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-xs);
+  white-space: nowrap;
+
+  dt {
+    font-weight: 400;
+  }
+
+  dd {
+    color: inherit;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+// Enough for body text: filled. Short of it: an outline, quieter.
+.passes {
+  background: var(--color-moss);
+  color: var(--color-birch);
+}
+
+.falls {
+  box-shadow: inset 0 0 0 1px var(--color-line);
+  color: var(--color-lichen);
+}
+
+.varies {
+  background: var(--color-line-faint);
+  color: var(--color-birch);
+}
+
+.note {
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+}
+
+.themes {
+  display: grid;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+}
+
+.themesHeader {
+  display: grid;
+  gap: var(--space-0);
+  max-width: var(--measure);
+}
+
+.themesTitle {
+  font-size: var(--font-size-lg);
+}
+
+.themeList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(9rem, 100%), 1fr));
+  gap: var(--space-2);
+}
+
+// Wears its own theme through data-theme, so every var() here is that
+// theme's. The hairline is mixed here rather than read from --color-line,
+// which the page works out once, from the theme it wears.
+.theme {
+  display: grid;
+  align-content: start;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--color-bark) 12%, transparent);
+  border-radius: var(--radius-lg);
+  background: var(--color-night);
+  color: var(--color-bark);
+
+  &[aria-current='true'] {
+    border-color: var(--color-bark);
+  }
+}
+
+.themeChips {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  gap: var(--space-0);
+}
+
+.themeChip {
+  width: var(--space-3);
+  height: var(--space-3);
+  border-radius: var(--radius-pill);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-bark) 16%, transparent);
+}
+
+.themeName {
+  font-family: var(--font-display);
+  font-size: var(--font-size-lg);
+  font-weight: 400;
+}
+
+.themeNote {
+  color: var(--color-lichen);
+  font-size: var(--font-size-xs);
+}
+
+.themeSample {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: center;
+  padding-top: var(--space-1);
+}
+
+.themePlay {
+  display: grid;
+  grid-auto-flow: column;
+  gap: var(--space-0);
+  align-items: center;
+  padding: var(--space-0) var(--space-2);
+  border-radius: var(--radius-md);
+  background: var(--color-leaf);
+  color: var(--color-on-leaf);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+}
+
+.themeTrack {
+  display: grid;
+  height: var(--space-0);
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--color-moss);
+}
+
+.themeProgress {
+  width: 40%;
+  background: var(--color-leaf-bright);
+}
+
+.worn {
+  justify-self: start;
+  padding: 2px var(--space-1);
+  border-radius: var(--radius-pill);
+  background: var(--color-moss);
+  color: var(--color-bark);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+}

@@ -1,4 +1,8 @@
+// Waiting for the video or saying why it is not there, on the player's own
+// dark stage in every theme, so nothing flashes light before it plays.
 .page {
+  --focus-ring: var(--border-thick) solid var(--color-on-picture);
+
   display: grid;
   gap: var(--space-3);
   place-content: center;
@@ -6,5 +10,18 @@
   min-height: 100dvh;
   padding: var(--space-3);
   background: var(--color-stage);
-  color: var(--color-lichen);
+  color: var(--color-on-picture-soft);
+  color-scheme: dark;
+  text-align: center;
+}
+
+// Dark glass, as the player's own back button is.
+.back {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--color-on-picture) 12%, var(--color-picture-glass));
+  color: var(--color-on-picture);
+
+  &:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--color-on-picture) 22%, var(--color-picture-glass));
+  }
 }

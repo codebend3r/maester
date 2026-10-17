@@ -7,12 +7,12 @@
   display: grid;
   align-items: start;
   justify-items: start;
-  padding: calc(var(--space-8) + var(--titlebar-inset)) clamp(var(--space-2), 3vw, var(--space-5))
-    5.5rem;
+  padding: calc(var(--space-8) + var(--space-4) + var(--titlebar-inset)) var(--space-4)
+    var(--space-10);
   pointer-events: none;
 }
 
-// In the canopy glass of the settings menu, its sibling.
+// Dark glass over the picture in every theme, like the menu that opens it.
 .panel {
   // Undo the browser's centring of a <dialog>; the layer places this one.
   position: static;
@@ -20,16 +20,19 @@
   margin: 0;
   display: grid;
   pointer-events: auto;
-  color: var(--color-bark);
   grid-template-rows: auto minmax(0, 1fr);
   gap: var(--space-2);
   width: min(26rem, 100%);
-  max-height: calc(100dvh - var(--space-8) - var(--titlebar-inset) - 5.5rem);
+  max-height: calc(
+    100dvh - var(--space-8) - var(--space-4) - var(--titlebar-inset) - var(--space-10)
+  );
   padding: var(--space-3);
-  border: 1px solid var(--color-moss);
-  border-radius: var(--radius-md);
-  background: var(--color-canopy-glass);
+  border: 1px solid color-mix(in srgb, var(--color-on-picture) 12%, transparent);
+  border-radius: var(--radius-lg);
+  background: var(--color-picture-glass);
+  color: var(--color-on-picture);
   box-shadow: var(--shadow-panel);
+  backdrop-filter: blur(14px);
 }
 
 .header {
@@ -42,23 +45,24 @@
   font-family: var(--font-display);
   font-size: var(--font-size-lg);
   font-weight: 400;
+  line-height: var(--line-tight);
 }
 
 .close {
   display: grid;
   place-items: center;
-  width: 2.25rem;
-  height: 2.25rem;
+  width: var(--control-size);
+  height: var(--control-size);
   padding: 0;
   border: 0;
   border-radius: 50%;
   background: transparent;
-  color: var(--color-lichen);
+  color: var(--color-on-picture-soft);
   cursor: pointer;
 
   &:hover {
-    background: var(--color-moss);
-    color: var(--color-bark);
+    background: color-mix(in srgb, var(--color-on-picture) 12%, transparent);
+    color: var(--color-on-picture);
   }
 }
 
@@ -74,13 +78,13 @@
   gap: var(--space-0);
 }
 
-// The settings menu's group legends, so the two panels read as one family.
+// The menus' group legends, so the panel and the menus read as one family.
 .title {
-  color: var(--color-lichen);
+  color: var(--color-on-picture-soft);
   font-family: var(--font-body);
   font-size: var(--font-size-xs);
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: var(--tracking-eyebrow);
   line-height: var(--line-body);
   text-transform: uppercase;
 }
@@ -99,23 +103,34 @@
 }
 
 .term {
-  color: var(--color-lichen);
+  color: var(--color-on-picture-soft);
   font-weight: 400;
 }
 
 // Counters tick once a second; even digits keep them from jittering.
 .value {
-  color: var(--color-bark);
+  color: var(--color-on-picture);
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
 }
 
 .note {
-  color: var(--color-lichen);
+  color: var(--color-on-picture-soft);
   font-size: var(--font-size-xs);
 }
 
 @media (max-width: 30rem) {
+  .layer {
+    padding: calc(var(--space-8) + var(--titlebar-inset)) var(--space-3)
+      calc(var(--space-10) + var(--space-7));
+  }
+
+  .panel {
+    max-height: calc(
+      100dvh - var(--space-8) - var(--titlebar-inset) - var(--space-10) - var(--space-7)
+    );
+  }
+
   .fact {
     grid-template-columns: 7rem minmax(0, 1fr);
   }

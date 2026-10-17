@@ -1,0 +1,128 @@
+.marks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(16rem, 100%), 1fr));
+  gap: var(--space-4);
+}
+
+.mark {
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+// Each mark is drawn for one ground, so the ground is part of the specimen.
+.ground {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 4 / 3;
+  min-width: 0;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-xl);
+}
+
+.groundNight {
+  background: var(--color-night);
+}
+
+.groundBark {
+  background: var(--color-bark);
+}
+
+// Sized by its width, so the ground keeps its own shape; at this width the
+// mark stands a little over half the ground's height.
+.markImage {
+  width: 40%;
+  height: auto;
+}
+
+.markText {
+  display: grid;
+  gap: var(--space-0);
+}
+
+.markName {
+  font-size: var(--font-size-lg);
+}
+
+.file {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-lichen);
+  font-size: var(--font-size-xs);
+  overflow-wrap: anywhere;
+}
+
+.markNote {
+  color: var(--color-birch);
+  font-size: var(--font-size-sm);
+}
+
+// On bark, so the night tile shows its edges.
+.favicons {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  align-items: end;
+  gap: var(--space-5);
+  justify-self: start;
+  max-width: 100%;
+  padding: var(--space-4) var(--space-5);
+  overflow-x: auto;
+  border-radius: var(--radius-xl);
+  background: var(--color-bark);
+  color: var(--color-night);
+}
+
+.favicon {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+}
+
+.size {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  white-space: nowrap;
+}
+
+.homeIcon {
+  border-radius: var(--radius-lg);
+}
+
+.lockups {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(12rem, 100%), max-content));
+  gap: var(--space-3);
+}
+
+.lockup {
+  display: grid;
+  justify-items: start;
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-lg);
+  background: var(--color-canopy);
+}
+
+// Turned over: bark for the ground, night for the word, and the mark drawn
+// for the other tone.
+.lockupInverse {
+  grid-template-columns: auto auto;
+  align-items: center;
+  gap: var(--space-1);
+  background: var(--color-bark);
+  color: var(--color-night);
+}
+
+.lockupMark {
+  width: auto;
+  height: var(--space-5);
+}
+
+.lockupWord {
+  font-family: var(--font-display);
+  font-size: var(--font-size-lg);
+  line-height: var(--line-tight);
+}

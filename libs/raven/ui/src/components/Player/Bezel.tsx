@@ -10,7 +10,7 @@ export type BezelState = { id: number; icon: IconName; text: string }
  */
 export const Bezel = ({ bezel }: { bezel: BezelState }) => (
   <div className={styles.bezel} aria-hidden="true">
-    <Icon name={bezel.icon} size={30} />
+    <Icon name={bezel.icon} size={36} />
     <span className={styles.text}>{bezel.text}</span>
   </div>
 )

@@ -1,7 +1,22 @@
+// The contents bar is the article's own child, beside the sections rather
+// than in the header, so it stays stuck for the whole page. The sections'
+// padding is what keeps the first one well clear of it.
 .page {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-6);
+  gap: var(--space-5);
+}
+
+.sections {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-10);
+  padding-top: var(--space-8);
+
+  @media (max-width: 48rem) {
+    gap: var(--space-7);
+    padding-top: var(--space-5);
+  }
 }
 
 .header {
@@ -10,97 +25,198 @@
   gap: var(--space-3);
 }
 
-.title {
-  font-family: var(--font-display);
-  font-size: var(--font-size-hero);
-  font-weight: 400;
-  line-height: var(--line-tight);
-}
-
-.lede {
-  max-width: var(--measure);
-  color: var(--color-lichen);
-}
-
-.contents {
+// The first row, as tall as the theme button and clear of it.
+.eyebrow {
   display: grid;
-  grid-auto-flow: column;
+  grid-template-columns: var(--space-5) auto;
   justify-content: start;
-  gap: var(--space-1);
-  overflow-x: auto;
-}
-
-.contentsLink {
-  display: block;
-  padding: var(--space-0) var(--space-2);
-  border: 1px solid var(--color-moss);
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-sm);
+  gap: var(--space-2);
+  align-items: center;
+  min-height: var(--field-size);
+  padding-inline-end: var(--corner-clearance, 0);
+  color: var(--color-birch);
+  font-size: var(--font-size-xs);
   font-weight: 600;
-  text-decoration: none;
-  white-space: nowrap;
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
 
-  &:hover {
-    background: var(--color-canopy);
+  &::before {
+    content: '';
+    height: 1px;
+    background: currentcolor;
   }
 }
 
+.title {
+  font-size: var(--font-size-display);
+}
+
+.lede {
+  max-width: 47.5rem;
+  color: var(--color-birch);
+  font-size: var(--font-size-lg);
+  line-height: var(--line-relaxed);
+  text-wrap: pretty;
+
+  @media (max-width: 30rem) {
+    font-size: var(--font-size-md);
+  }
+}
+
+// One row of pills on glass, scrolling sideways where the page is too narrow
+// for all of them, and never under the theme button.
+.contents {
+  position: sticky;
+  top: var(--space-2);
+  z-index: 5;
+  justify-self: start;
+  max-width: calc(100% - var(--corner-clearance, 0px));
+  padding: var(--space-0);
+  overflow-x: auto;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-canopy-haze);
+  backdrop-filter: blur(16px);
+  scrollbar-width: none;
+}
+
+.contentsList {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  gap: var(--space-0);
+}
+
+.contentsLink {
+  display: grid;
+  grid-auto-flow: column;
+  align-items: baseline;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  color: var(--color-birch);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition:
+      background-color 150ms ease,
+      color 150ms ease;
+  }
+
+  &:hover {
+    background: var(--color-moss);
+    color: var(--color-bark);
+  }
+
+  // Inside the bar's scroll edge, which would clip a ring drawn outside.
+  &:focus-visible {
+    outline-offset: -2px;
+  }
+}
+
+.contentsNumber {
+  color: var(--color-moss-line);
+  font-family: var(--font-display);
+  font-size: var(--font-size-xs);
+}
+
+// Clear of the stuck contents bar when the page jumps to it.
 .section {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-5);
-  scroll-margin-top: var(--space-4);
+  scroll-margin-top: var(--space-8);
 }
 
 .sectionHeader {
   display: grid;
-  gap: var(--space-1);
-  padding-bottom: var(--space-2);
-  border-bottom: 1px solid var(--color-moss);
 }
 
+// Between a section heading and a page title, as befits a chapter of a page
+// that is all sections.
 .sectionTitle {
-  font-family: var(--font-display);
-  font-size: var(--font-size-xl);
-  font-weight: 400;
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-line);
+  font-size: calc((var(--font-size-2xl) + var(--font-size-hero)) / 2);
+  line-height: var(--line-display);
+}
+
+.sectionNumber {
+  color: var(--color-moss-line);
+  font-size: var(--font-size-lg);
 }
 
 .intro {
-  max-width: var(--measure);
-  color: var(--color-lichen);
+  max-width: 40rem;
+  padding: var(--space-3) 0 var(--space-4);
+  color: var(--color-birch);
+  line-height: var(--line-relaxed);
+  text-wrap: pretty;
 }
 
+// A row: the name and a note at the left, the specimen at the right, a
+// hairline under all but the last. One column on a narrow screen.
 .specimen {
   display: grid;
+  grid-template-columns: 13.75rem minmax(0, 1fr);
+  grid-template-areas: 'head body';
+  gap: var(--space-3) var(--space-6);
+  padding: var(--space-5) 0;
+  border-bottom: 1px solid var(--color-line-faint);
+
+  &:last-child {
+    border-bottom: 0;
+  }
+
+  @media (max-width: 48rem) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'head'
+      'body';
+  }
+}
+
+.wide {
   grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-2);
+  grid-template-areas:
+    'head'
+    'body';
+
+  .specimenHeader {
+    max-width: var(--measure);
+  }
 }
 
 .specimenHeader {
+  grid-area: head;
   display: grid;
-  gap: var(--space-0);
+  align-content: start;
+  gap: var(--space-1);
 }
 
 .specimenName {
-  font-family: var(--font-body);
-  font-size: var(--font-size-sm);
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--color-lichen);
+  font-size: var(--font-size-lg);
 }
 
 .specimenBody {
+  grid-area: body;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-2);
+  gap: var(--space-3);
   min-width: 0;
 }
 
-.note,
-.hint {
+.note {
   color: var(--color-lichen);
   font-size: var(--font-size-sm);
+  line-height: var(--line-body);
 }
 
 .stack {
@@ -109,240 +225,171 @@
   gap: var(--space-2);
 }
 
+// A run of buttons and the like, as many to a line as fit.
 .row {
   display: grid;
-  grid-auto-flow: row;
-  grid-template-columns: repeat(auto-fill, minmax(min(10rem, 100%), max-content));
-  gap: var(--space-1);
+  grid-template-columns: repeat(auto-fill, minmax(min(9rem, 100%), max-content));
+  gap: var(--space-2);
   align-items: center;
+  justify-items: start;
+}
+
+.measure {
+  display: grid;
+  max-width: 40rem;
 }
 
 .columns {
   max-width: none;
-  grid-template-columns: repeat(auto-fit, minmax(min(14rem, 100%), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(11rem, 100%), 1fr));
   align-items: start;
 }
 
-// Logo.
-.marks {
+// Text.
+.headings {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(15rem, 100%), 1fr));
-  gap: var(--space-4) var(--space-3);
+  gap: var(--space-3);
 }
 
-.markCard {
+.headingRow {
   display: grid;
-  align-content: start;
-  gap: var(--space-0);
+  grid-template-columns: var(--space-5) minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: baseline;
 }
 
-// Each mark is drawn for one ground, so the ground is part of the specimen.
-.markGround {
-  display: grid;
-  place-items: center;
-  padding: var(--space-4);
-  border: 1px solid var(--color-moss);
-  border-radius: var(--radius-md);
-}
-
-.groundNight {
-  background: var(--color-night);
-}
-
-.groundBark {
-  background: var(--color-bark);
-}
-
-.markName {
-  font-size: var(--font-size-sm);
-  font-weight: 600;
-}
-
-.markImage {
-  width: auto;
-  height: 8rem;
-}
-
-// On bark, so the night tile shows its edges.
-.favicons {
-  display: grid;
-  grid-auto-flow: column;
-  justify-content: start;
-  align-items: end;
-  gap: var(--space-4);
-  justify-self: start;
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-md);
-  background: var(--color-bark);
-  color: var(--color-night);
-}
-
-.favicon {
-  display: grid;
-  justify-items: center;
-  gap: var(--space-1);
+.tag {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-moss-line);
   font-size: var(--font-size-xs);
 }
 
-.lockup {
-  display: grid;
-  justify-items: start;
-}
-
-// Colour.
-.swatches {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(15rem, 100%), 1fr));
-  gap: var(--space-4) var(--space-3);
-}
-
-.swatch {
-  display: grid;
-  align-content: start;
-  gap: var(--space-0);
-}
-
-.chip {
-  display: block;
-  height: 5rem;
-  border: 1px solid var(--color-moss);
-  border-radius: var(--radius-md);
-}
-
-.tokenName {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
-  font-weight: 600;
-}
-
-.tokenValue {
-  justify-self: start;
-  overflow-wrap: anywhere;
-}
-
-.contrast {
-  display: grid;
-  gap: 0;
-  font-size: var(--font-size-xs);
-}
-
-.contrastRow {
-  display: grid;
-  grid-template-columns: 6rem auto;
-  justify-content: start;
-
-  dt {
-    font-weight: 400;
-    color: var(--color-lichen);
-  }
-
-  dd {
-    color: var(--color-bark);
-    font-variant-numeric: tabular-nums;
-  }
-}
-
-// Tokens.
-.tokenTable {
-  td,
-  th {
-    vertical-align: middle;
-  }
-}
-
-.rowNote {
-  display: block;
-  max-width: 24rem;
-  color: var(--color-lichen);
-  font-size: var(--font-size-xs);
-}
-
-.spaceBar {
-  display: block;
-  height: 0.75rem;
-  background: var(--color-lichen);
-}
-
-.radiusBox {
-  display: block;
-  width: 3rem;
-  height: 3rem;
-  border: 1.5px solid var(--color-lichen);
-}
-
-.typeSample {
-  display: block;
-  color: var(--color-bark);
-  line-height: var(--line-tight);
-}
-
-.lineSample {
-  display: block;
-  max-width: 14rem;
-  color: var(--color-bark);
-}
-
-.focusSample {
-  display: block;
-  width: 3rem;
-  height: 2rem;
-  border-radius: var(--radius-md);
-  outline-offset: 3px;
-}
-
-.noSample {
-  display: none;
+.prompt {
+  color: var(--color-moss-line);
+  user-select: none;
 }
 
 // Forms.
 .form {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-5);
 }
 
 .fields {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(15rem, 100%), 1fr));
-  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fill, minmax(min(13.75rem, 100%), 1fr));
+  gap: var(--space-4);
   align-items: start;
 }
 
 .field {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-0);
+  gap: var(--space-1);
+}
 
-  > label {
-    font-size: var(--font-size-sm);
-    font-weight: 600;
+.labelRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  align-items: baseline;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.disabledLabel {
+  color: var(--color-lichen);
+}
+
+.reading {
+  color: var(--color-lichen);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.error {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-1);
+  align-items: center;
+  font-size: var(--font-size-sm);
+
+  svg {
+    color: var(--color-leaf-bright);
   }
+}
+
+.gauge {
+  width: 100%;
+}
+
+.choiceGroups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(15rem, 100%), 1fr));
+  gap: var(--space-5);
+  align-items: start;
 }
 
 .choices {
   display: grid;
-  gap: var(--space-1);
+  gap: var(--space-0);
 }
 
 .choice {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: var(--space-1);
+  gap: var(--space-2);
   align-items: center;
   justify-self: start;
+  min-height: var(--control-size);
+}
+
+// A group of radios under an eyebrow, not boxed in.
+.radios {
+  display: grid;
+  gap: var(--space-0);
+  padding: 0;
+  border: 0;
+}
+
+.legend {
+  padding: 0 0 var(--space-0);
+  color: var(--color-birch);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
 }
 
 // Content.
+.table {
+  max-width: 40rem;
+}
+
+.number {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.figure {
+  max-width: 32.5rem;
+}
+
 .figureFrame {
   display: grid;
   place-items: center;
-  max-width: 24rem;
   aspect-ratio: 16 / 9;
-  border-radius: var(--radius-md);
-  background: var(--color-canopy);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, var(--color-moss), var(--color-deep));
   color: var(--color-lichen);
   font-family: var(--font-display);
   font-size: var(--font-size-xl);
+}
+
+.dialog {
+  width: min(28.75rem, calc(100vw - 2 * var(--space-3)));
 }
 
 .dialogBody {
@@ -350,40 +397,95 @@
   gap: var(--space-3);
 }
 
-// Components.
-.icons {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr));
-  gap: var(--space-2);
+.dialogTitle {
+  font-size: var(--font-size-xl);
 }
 
-.icon {
+.dialogText {
+  color: var(--color-birch);
+}
+
+.dialogActions {
   display: grid;
-  justify-items: center;
+  grid-auto-flow: column;
+  justify-content: end;
   gap: var(--space-1);
-  padding: var(--space-2);
-  border: 1px solid var(--color-moss);
-  border-radius: var(--radius-md);
+  padding-top: var(--space-1);
+}
+
+// Components.
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(15rem, 100%), 1fr));
+  gap: var(--space-3);
+}
+
+.card {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-canopy);
+}
+
+.eyebrowLabel {
+  color: var(--color-lichen);
   font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+}
+
+.ruledList {
+  display: grid;
+  max-width: 40rem;
 }
 
 .noteRow {
   display: grid;
-  grid-template-columns: minmax(0, 12rem) minmax(0, 1fr);
-  gap: var(--space-2);
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-1) var(--space-3);
   align-items: center;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-line-faint);
+
+  @media (max-width: 30rem) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.noteTitle {
+  font-family: var(--font-display);
+  font-size: var(--font-size-lg);
 }
 
 .cardSample {
   display: grid;
-  max-width: 20rem;
+  max-width: 23.75rem;
 }
 
+// Black, with a made-up picture inset as a letterboxed film would be, and
+// the bar over its foot.
 .stage {
   display: grid;
-  align-content: end;
-  min-height: 9rem;
-  border-radius: var(--radius-md);
-  background: var(--color-stage);
+  grid-template-areas: 'stack';
+  aspect-ratio: 16 / 9;
   overflow: hidden;
+  border-radius: var(--radius-lg);
+  background: var(--color-stage);
+}
+
+.picture {
+  grid-area: stack;
+  background: linear-gradient(135deg, var(--color-moss), var(--color-deep));
+  clip-path: inset(8% 0);
+}
+
+// The bar places itself in a 'stage' area, as in the player.
+.controlsLayer {
+  grid-area: stack;
+  align-self: end;
+  display: grid;
+  grid-template-areas: 'stage';
 }

@@ -229,13 +229,14 @@ describe('the native engine', () => {
     })
     await settled()
     await fake.emit({ type: 'tracks', tracks: TRACKS })
-    await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    await userEvent.click(screen.getByRole('button', { name: /^Audio/ }))
     await userEvent.click(await screen.findByRole('radio', { name: /French/ }))
     expect(fake.sent).toContainEqual({ type: 'audio', index: 1 })
     expect(usePlayerPrefs.getState().audioLanguage).toBe('fr')
     expect(save).toHaveBeenCalledWith({ audio: 1, subtitle: null })
     expect(screen.getByRole('radio', { name: /French/ })).toBeChecked()
 
+    await userEvent.click(screen.getByRole('button', { name: /^Subtitles/ }))
     await userEvent.click(
       within(screen.getByRole('group', { name: 'Subtitles' })).getByRole('radio', {
         name: /English/,
@@ -353,8 +354,8 @@ describe('the native engine', () => {
     const fake = fakePlayer()
     renderNative({ player: fake.player })
     await settled()
-    await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
-    const menu = await screen.findByRole('dialog', { name: 'Settings' })
+    await userEvent.click(screen.getByRole('button', { name: /^Playback:/ }))
+    const menu = await screen.findByRole('dialog', { name: 'Playback' })
     await userEvent.click(within(menu).getByRole('button', { name: 'Playback info' }))
     const info = screen.getByRole('dialog', { name: 'Playback info' })
     expect(within(info).getByText('mpv')).toBeInTheDocument()
@@ -479,7 +480,7 @@ describe('the native engine', () => {
     fireEvent.keyDown(window, { key: 'i' })
     await settled()
     expect(warn).toHaveBeenCalledWith('raven player refused stats: Not now.')
-    await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    await userEvent.click(screen.getByRole('button', { name: /^Audio/ }))
     await userEvent.click(await screen.findByRole('radio', { name: /French/ }))
     await settled()
     expect(fake.sent).toContainEqual({ type: 'audio', index: 1 })

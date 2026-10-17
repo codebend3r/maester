@@ -1,8 +1,9 @@
 import { type PlaybackMode, describeMode } from '@raven/core'
 import { type RefObject, useEffect, useId, useRef } from 'react'
 import { Icon } from '@/components/Icon/Icon'
-import styles from '@/components/Player/SettingsMenu.module.scss'
+import { MENU_TITLES, type MenuSection } from '@/components/Player/menus'
 import { playingAudio } from '@/components/Player/selection'
+import styles from '@/components/Player/SettingsMenu.module.scss'
 import type { SubtitleStatus } from '@/components/Player/useSubtitleCues'
 import type { TrackSelection } from '@/components/Player/useTrackSelection'
 import { SPEEDS } from '@/lib/shortcuts'
@@ -44,24 +45,114 @@ const Option = ({
   </label>
 )
 
+type GroupProps = {
+  /** Names the radio group; the menu's heading where the group is the whole menu. */
+  labelledBy: string
+  selection: TrackSelection
+  mode: PlaybackMode
+  subtitleStatus: SubtitleStatus
+}
+
+const tracksNoteOf = ({ tracksFailed, tracksPending }: TrackSelection): string | null => {
+  if (tracksFailed) return 'Tracks unavailable.'
+  return tracksPending ? 'Reading tracks' : null
+}
+
+const AudioGroup = ({ labelledBy, selection, mode }: GroupProps) => {
+  const { tracks, audio, playsPickedAudio, pickAudio } = selection
+  const playing = playingAudio({ mode, tracks, audio, playsPickedAudio })
+  return (
+    <fieldset className={styles.group} aria-labelledby={labelledBy}>
+      {tracks != null && tracks.audio.length > 0 ? (
+        tracks.audio.map((track) => {
+          const label = audioLabel(track)
+          return (
+            <Option
+              key={track.index}
+              name={`${labelledBy}-audio`}
+              checked={track.index === playing}
+              label={label.name}
+              details={label.details}
+              onSelect={() => pickAudio(track.index)}
+            />
+          )
+        })
+      ) : (
+        <p className={styles.note}>{tracksNoteOf(selection) ?? 'No audio tracks.'}</p>
+      )}
+    </fieldset>
+  )
+}
+
+const SubtitleGroup = ({ labelledBy, selection, subtitleStatus }: GroupProps) => {
+  const { tracks, subtitle, pickSubtitle } = selection
+  const subtitleId = subtitle?.id ?? null
+  const tracksNote = tracksNoteOf(selection)
+  const subtitleNote = SUBTITLE_STATUS[subtitleStatus]
+  return (
+    <fieldset className={styles.group} aria-labelledby={labelledBy}>
+      <Option
+        name={`${labelledBy}-subtitles`}
+        checked={subtitleId == null}
+        label="Off"
+        onSelect={() => pickSubtitle(null)}
+      />
+      {(tracks?.subtitles ?? []).map((track) => {
+        const label = subtitleLabel(track)
+        return (
+          <Option
+            key={track.id}
+            name={`${labelledBy}-subtitles`}
+            checked={track.id === subtitleId}
+            disabled={!track.supported}
+            label={label.name}
+            details={label.details}
+            onSelect={() => pickSubtitle(track.id)}
+          />
+        )
+      })}
+      {!!tracksNote && tracks == null && <p className={styles.note}>{tracksNote}</p>}
+      {!!subtitleNote && <output className={styles.note}>{subtitleNote}</output>}
+    </fieldset>
+  )
+}
+
+const SpeedGroup = ({
+  name,
+  rate,
+  onPickRate,
+}: {
+  name: string
+  rate: number
+  onPickRate: (rate: number) => void
+}) => (
+  <fieldset className={styles.group}>
+    <legend className={styles.legend}>Speed</legend>
+    <div className={styles.speeds}>
+      {SPEEDS.map((speed) => (
+        <Option
+          key={speed}
+          name={`${name}-speed`}
+          checked={speed === rate}
+          label={speed === 1 ? 'Normal' : `${speed}×`}
+          onSelect={() => onPickRate(speed)}
+        />
+      ))}
+    </div>
+  </fieldset>
+)
+
 /**
- * Audio, subtitles and speed, as native radio groups so the arrow keys,
- * the space bar and screen readers all work as they do anywhere else. A
- * host's handoff sits under them. The footer says how the file is reaching
- * the browser, and opens Playback info for the detail.
+ * The menu a pill opens over the picture: the audio tracks, the subtitles,
+ * or how the file is reaching the browser, with Playback info for the
+ * detail, a host's handoff, and the speed under them. Each choice is a
+ * native radio group, so the arrow keys, the space bar and screen readers
+ * all work as they do anywhere else.
  */
 export const SettingsMenu = ({
+  section,
   menuRef,
-  selection: {
-    tracks,
-    tracksFailed,
-    tracksPending,
-    audio,
-    subtitle,
-    playsPickedAudio,
-    pickAudio,
-    pickSubtitle,
-  },
+  selection,
   subtitleStatus,
   rate,
   mode,
@@ -71,6 +162,7 @@ export const SettingsMenu = ({
   onHandoff,
   handoffLabel,
 }: {
+  section: MenuSection
   menuRef: RefObject<HTMLDialogElement | null>
   selection: TrackSelection
   subtitleStatus: SubtitleStatus
@@ -82,111 +174,63 @@ export const SettingsMenu = ({
   onHandoff?: () => void
   handoffLabel?: string
 }) => {
-  const subtitleId = subtitle?.id ?? null
   const id = useId()
   const heading = `${id}-heading`
-  const first = useRef<HTMLFieldSetElement>(null)
-  const playing = playingAudio({ mode, tracks, audio, playsPickedAudio })
+  const group: GroupProps = { labelledBy: heading, selection, mode, subtitleStatus }
+  const groups = useRef<HTMLDivElement>(null)
 
-  // Opening the menu puts the keyboard on the chosen option of the first group.
+  // Opening a menu puts the keyboard on its chosen option.
   useEffect(() => {
-    const checked = first.current?.querySelector<HTMLInputElement>('input:checked') ?? null
+    const checked = groups.current?.querySelector<HTMLInputElement>('input:checked') ?? null
     if (checked !== null) checked.focus()
   }, [])
 
-  const tracksNote = tracksFailed ? 'Tracks unavailable.' : tracksPending ? 'Reading tracks' : null
-  const subtitleNote = SUBTITLE_STATUS[subtitleStatus]
+  const body = (() => {
+    switch (section) {
+      case 'audio':
+        return <AudioGroup {...group} />
+      case 'subtitles':
+        return <SubtitleGroup {...group} />
+      case 'playback':
+        return (
+          <>
+            <div className={styles.playing}>
+              <p className={styles.mode}>{describeMode(mode)}</p>
+              <button type="button" className={styles.info} onClick={onShowInfo}>
+                <span>Playback info</span>
+                <Icon name="next" size={16} />
+              </button>
+              {!!onHandoff && !!handoffLabel && (
+                <button type="button" className={styles.handoff} onClick={onHandoff}>
+                  <Icon name="play" size={18} />
+                  <span>{handoffLabel}</span>
+                </button>
+              )}
+            </div>
+            <SpeedGroup name={id} rate={rate} onPickRate={onPickRate} />
+          </>
+        )
+      default: {
+        const unknown: never = section
+        return unknown
+      }
+    }
+  })()
 
   return (
     <div className={styles.layer}>
       <dialog ref={menuRef} open className={styles.menu} aria-labelledby={heading}>
         <header className={styles.header}>
           <h2 id={heading} className={styles.heading}>
-            Settings
+            {MENU_TITLES[section]}
           </h2>
-          <button
-            type="button"
-            className={styles.close}
-            aria-label="Close settings"
-            onClick={onClose}
-          >
+          <button type="button" className={styles.close} aria-label="Close menu" onClick={onClose}>
             <Icon name="close" size={18} />
           </button>
         </header>
-        <div className={styles.groups}>
-          <fieldset ref={first} className={styles.group}>
-            <legend className={styles.legend}>Audio</legend>
-            {tracks != null && tracks.audio.length > 0 ? (
-              tracks.audio.map((track) => {
-                const label = audioLabel(track)
-                return (
-                  <Option
-                    key={track.index}
-                    name={`${id}-audio`}
-                    checked={track.index === playing}
-                    label={label.name}
-                    details={label.details}
-                    onSelect={() => pickAudio(track.index)}
-                  />
-                )
-              })
-            ) : (
-              <p className={styles.note}>{tracksNote ?? 'No audio tracks.'}</p>
-            )}
-          </fieldset>
-          <fieldset className={styles.group}>
-            <legend className={styles.legend}>Subtitles</legend>
-            <Option
-              name={`${id}-subtitles`}
-              checked={subtitleId == null}
-              label="Off"
-              onSelect={() => pickSubtitle(null)}
-            />
-            {(tracks?.subtitles ?? []).map((track) => {
-              const label = subtitleLabel(track)
-              return (
-                <Option
-                  key={track.id}
-                  name={`${id}-subtitles`}
-                  checked={track.id === subtitleId}
-                  disabled={!track.supported}
-                  label={label.name}
-                  details={label.details}
-                  onSelect={() => pickSubtitle(track.id)}
-                />
-              )
-            })}
-            {!!tracksNote && tracks == null && <p className={styles.note}>{tracksNote}</p>}
-            {!!subtitleNote && <output className={styles.note}>{subtitleNote}</output>}
-          </fieldset>
-          <fieldset className={styles.group}>
-            <legend className={styles.legend}>Speed</legend>
-            <div className={styles.speeds}>
-              {SPEEDS.map((speed) => (
-                <Option
-                  key={speed}
-                  name={`${id}-speed`}
-                  checked={speed === rate}
-                  label={speed === 1 ? 'Normal' : `${speed}×`}
-                  onSelect={() => onPickRate(speed)}
-                />
-              ))}
-            </div>
-          </fieldset>
+        <div ref={groups} className={styles.groups}>
+          {body}
         </div>
-        {!!onHandoff && !!handoffLabel && (
-          <button type="button" className={styles.handoff} onClick={onHandoff}>
-            <Icon name="play" size={18} />
-            <span>{handoffLabel}</span>
-          </button>
-        )}
-        <footer className={styles.footer}>
-          <p className={styles.mode}>{describeMode(mode)}</p>
-          <button type="button" className={styles.info} onClick={onShowInfo}>
-            <span>Playback info</span>
-            <Icon name="next" size={16} />
-          </button>
-        </footer>
       </dialog>
     </div>
   )

@@ -101,6 +101,15 @@ const repliesTo = async ({ page, type }: { page: Page; type: string }) => {
 const lastReplyOf = async ({ page, type }: { page: Page; type: string }) =>
   (await repliesTo({ page, type })).at(-1) ?? null
 
+/** The volume, in whole percent, of the last volume command the page sent mpv; null before any. */
+const lastVolumeSent = async (page: Page): Promise<number | null> => {
+  const { requests } = await trafficOf({ page })
+  const volumes = requests.flatMap(({ command }) =>
+    command.type === 'volume' ? [Math.round(command.volume * 100)] : [],
+  )
+  return volumes.at(-1) ?? null
+}
+
 /** The pids `pgrep` lists as children of `pid`; it exits 1, with no output, when there are none. */
 const childrenOf = ({ pid }: { pid: number }) =>
   new Promise<number[]>((resolve) => {
@@ -140,10 +149,11 @@ const backgroundOf = (app: ElectronApplication): Promise<string | null> =>
 const audioGroup = (page: Page) => page.getByRole('group', { name: 'Audio' })
 const subtitleGroup = (page: Page) => page.getByRole('group', { name: 'Subtitles' })
 
-const openSettings = async (page: Page) => {
+/** Opens the menu behind the Audio or Subtitles pill, whose radios are named for it. */
+const openMenu = async ({ page, name }: { page: Page; name: 'Audio' | 'Subtitles' }) => {
   await wake(page)
-  await page.getByRole('button', { name: 'Settings' }).click()
-  await expect(audioGroup(page)).toBeVisible()
+  await page.getByRole('button', { name: new RegExp(`^${name}`) }).click()
+  await expect(page.getByRole('group', { name })).toBeVisible()
 }
 
 test.describe.serial('playing a local file through mpv', () => {
@@ -167,14 +177,14 @@ test.describe.serial('playing a local file through mpv', () => {
       userData,
       run: async (launched) => {
         const { app, page } = launched
+        await tapPlayerPort({ page })
         await playNatively({ app, page, path: clips.first, title: 'Clip 01' })
 
-        const volume = page.getByRole('slider', { name: 'Volume' })
-        await wake(page)
-        const loud = Number(await volume.inputValue())
+        // Read from what mpv is sent, since the slider hides on a window as narrow as CI's.
+        await expect.poll(() => lastVolumeSent(page)).not.toBeNull()
+        const loud = (await lastVolumeSent(page)) ?? 0
         await page.keyboard.press('ArrowDown')
-        await wake(page)
-        await expect(volume).toHaveValue(`${loud - 5}`)
+        await expect.poll(() => lastVolumeSent(page)).toBe(loud - 5)
 
         // Paused before the seek, so the position main stores is exactly half way.
         await page.keyboard.press('k')
@@ -235,14 +245,15 @@ test.describe.serial('playing a local file through mpv', () => {
       run: async ({ app, page }) => {
         await tapPlayerPort({ page })
         await playNatively({ app, page, path: tracks.path, title: 'Tracks 01' })
-        await openSettings(page)
+        await openMenu({ page, name: 'Audio' })
         await expect(audioGroup(page).getByRole('radio', { name: 'English' })).toBeChecked()
-        await expect(subtitleGroup(page).getByRole('radio', { name: 'Off' })).toBeChecked()
 
         await audioGroup(page).getByRole('radio', { name: 'French' }).check()
         await expect(audioGroup(page).getByRole('radio', { name: 'French' })).toBeChecked()
         await expect.poll(() => lastReplyOf({ page, type: 'audio' })).toMatchObject({ ok: true })
 
+        await openMenu({ page, name: 'Subtitles' })
+        await expect(subtitleGroup(page).getByRole('radio', { name: 'Off' })).toBeChecked()
         await subtitleGroup(page).getByRole('radio', { name: 'English' }).check()
         await expect(subtitleGroup(page).getByRole('radio', { name: 'English' })).toBeChecked()
         await expect.poll(() => lastReplyOf({ page, type: 'subtitle' })).toMatchObject({ ok: true })
@@ -271,8 +282,9 @@ test.describe.serial('playing a local file through mpv', () => {
           audio: 1,
           subtitle: 'embedded-0',
         })
-        await openSettings(page)
+        await openMenu({ page, name: 'Audio' })
         await expect(audioGroup(page).getByRole('radio', { name: 'French' })).toBeChecked()
+        await openMenu({ page, name: 'Subtitles' })
         await expect(subtitleGroup(page).getByRole('radio', { name: 'English' })).toBeChecked()
       },
     })

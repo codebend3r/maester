@@ -54,7 +54,7 @@ export const WatchPage = () => {
           <p role="alert">
             {page.state === 'missing' ? 'This video is no longer in any library.' : page.message}
           </p>
-          <ButtonLink to="/libraries" icon="back">
+          <ButtonLink to="/libraries" tone="pill" icon="back" className={styles.back}>
             Back to libraries
           </ButtonLink>
         </>

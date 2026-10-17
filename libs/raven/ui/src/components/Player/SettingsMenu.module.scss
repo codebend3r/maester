@@ -1,5 +1,5 @@
 // A see-through layer over the stage whose padding parks the menu above the
-// settings button, bottom right, clear of the control bar.
+// pills, bottom right, clear of the control bar.
 .layer {
   grid-area: stage;
   position: relative;
@@ -7,11 +7,11 @@
   display: grid;
   align-items: end;
   justify-items: end;
-  padding: var(--space-3) clamp(var(--space-2), 3vw, var(--space-5)) 5.5rem;
+  padding: var(--space-3) var(--space-4) var(--space-10);
   pointer-events: none;
 }
 
-// In the canopy colour of every other panel in raven.
+// Dark glass over the picture in every theme, like the pills that open it.
 .menu {
   // Undo the browser's centring of a <dialog>; the layer places this one.
   position: static;
@@ -19,34 +19,20 @@
   margin: 0;
   display: grid;
   pointer-events: auto;
-  color: var(--color-bark);
-  grid-template-areas:
-    'header'
-    'groups'
-    'footer';
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: var(--space-2);
-  width: min(26rem, 100%);
-  max-height: min(32rem, calc(100dvh - 8rem));
+  width: min(22rem, 100%);
+  max-height: min(32rem, calc(100dvh - 10rem));
   padding: var(--space-3);
-  border: 1px solid var(--color-moss);
-  border-radius: var(--radius-md);
-  background: var(--color-canopy-glass);
+  border: 1px solid color-mix(in srgb, var(--color-on-picture) 12%, transparent);
+  border-radius: var(--radius-lg);
+  background: var(--color-picture-glass);
+  color: var(--color-on-picture);
   box-shadow: var(--shadow-panel);
-
-  // A row of its own only when there is a handoff, so the menu without one keeps its gaps.
-  &:has(> .handoff) {
-    grid-template-areas:
-      'header'
-      'groups'
-      'handoff'
-      'footer';
-    grid-template-rows: auto minmax(0, 1fr) auto auto;
-  }
+  backdrop-filter: blur(14px);
 }
 
 .header {
-  grid-area: header;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
@@ -56,28 +42,28 @@
   font-family: var(--font-display);
   font-size: var(--font-size-lg);
   font-weight: 400;
+  line-height: var(--line-tight);
 }
 
 .close {
   display: grid;
   place-items: center;
-  width: 2.25rem;
-  height: 2.25rem;
+  width: var(--control-size);
+  height: var(--control-size);
   padding: 0;
   border: 0;
   border-radius: 50%;
   background: transparent;
-  color: var(--color-lichen);
+  color: var(--color-on-picture-soft);
   cursor: pointer;
 
   &:hover {
-    background: var(--color-moss);
-    color: var(--color-bark);
+    background: color-mix(in srgb, var(--color-on-picture) 12%, transparent);
+    color: var(--color-on-picture);
   }
 }
 
 .groups {
-  grid-area: groups;
   display: grid;
   gap: var(--space-3);
   overflow-y: auto;
@@ -94,10 +80,10 @@
 
 .legend {
   padding: 0 0 var(--space-0);
-  color: var(--color-lichen);
+  color: var(--color-on-picture-soft);
   font-size: var(--font-size-xs);
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: var(--tracking-eyebrow);
   text-transform: uppercase;
 }
 
@@ -107,14 +93,14 @@
   grid-template-areas:
     'radio label'
     '. details';
-  column-gap: var(--space-1);
+  column-gap: var(--space-2);
   align-items: center;
-  padding: var(--space-0) var(--space-1);
-  border-radius: var(--radius-sm);
+  padding: var(--space-1);
+  border-radius: var(--radius-md);
   cursor: pointer;
 
   &:hover {
-    background: var(--color-moss);
+    background: color-mix(in srgb, var(--color-on-picture) 10%, transparent);
   }
 
   &:has(.radio:focus-visible) {
@@ -132,8 +118,19 @@
   }
 }
 
+// The element default draws the radio in the theme's text colour; over the
+// picture it takes the fixed light one.
 .radio {
   grid-area: radio;
+  border-color: var(--color-on-picture-soft);
+
+  &::before {
+    background: var(--color-on-picture);
+  }
+
+  &:checked {
+    border-color: var(--color-on-picture);
+  }
 
   // The label's outline shows focus instead.
   &:focus-visible {
@@ -148,7 +145,7 @@
 
 .details {
   grid-area: details;
-  color: var(--color-lichen);
+  color: var(--color-on-picture-soft);
   font-size: var(--font-size-xs);
 }
 
@@ -161,28 +158,66 @@
 .note {
   display: block;
   padding: var(--space-0) var(--space-1);
-  color: var(--color-lichen);
+  color: var(--color-on-picture-soft);
   font-size: var(--font-size-xs);
 }
 
+// How the file reaches the browser, and the way to the detail, ruled off
+// from the speed under them.
+.playing {
+  display: grid;
+  gap: var(--space-0);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-on-picture) 12%, transparent);
+}
+
+.mode {
+  padding: 0 var(--space-1);
+  color: var(--color-on-picture-soft);
+  font-size: var(--font-size-sm);
+}
+
+// A row like the options under it, with a chevron for the panel it opens.
+.info {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  padding: var(--space-1);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-on-picture);
+  font-size: var(--font-size-sm);
+  text-align: start;
+  cursor: pointer;
+
+  &:hover {
+    background: color-mix(in srgb, var(--color-on-picture) 10%, transparent);
+  }
+
+  &:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: -2px;
+  }
+}
+
+// A host's other player, as a row like Playback info's, led by its play mark.
 .handoff {
-  grid-area: handoff;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: var(--space-1);
   align-items: center;
   padding: var(--space-1);
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   background: transparent;
-  color: var(--color-bark);
-  font: inherit;
+  color: var(--color-on-picture);
   font-size: var(--font-size-sm);
   text-align: start;
   cursor: pointer;
 
   &:hover {
-    background: var(--color-moss);
+    background: color-mix(in srgb, var(--color-on-picture) 10%, transparent);
   }
 
   &:focus-visible {
@@ -191,39 +226,8 @@
   }
 }
 
-.footer {
-  grid-area: footer;
-  display: grid;
-  gap: var(--space-0);
-  padding-top: var(--space-1);
-  border-top: 1px solid var(--color-moss);
-}
-
-.mode {
-  color: var(--color-lichen);
-  font-size: var(--font-size-xs);
-}
-
-// A row like the options above it, with a chevron for the panel it opens.
-.info {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  padding: var(--space-0) var(--space-1);
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--color-bark);
-  font-size: var(--font-size-sm);
-  text-align: start;
-  cursor: pointer;
-
-  &:hover {
-    background: var(--color-moss);
-  }
-
-  &:focus-visible {
-    outline: var(--focus-ring);
-    outline-offset: -2px;
+@media (max-width: 30rem) {
+  .layer {
+    padding: var(--space-3) var(--space-3) calc(var(--space-10) + var(--space-7));
   }
 }

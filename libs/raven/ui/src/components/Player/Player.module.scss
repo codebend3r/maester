@@ -1,9 +1,16 @@
+// The player keeps one dark look over the picture in every theme: its text,
+// glass and focus ring are the fixed on-picture colours, and only the
+// timeline's played stretch follows the theme.
 .stage {
+  --focus-ring: var(--border-thick) solid var(--color-on-picture);
+
   position: fixed;
   inset: 0;
   display: grid;
   grid-template-areas: 'stage';
   background: var(--color-stage);
+  color: var(--color-on-picture);
+  color-scheme: dark;
 }
 
 .idle {
@@ -48,6 +55,38 @@
   }
 }
 
+// The large mark in the middle while paused. It lets clicks through to the
+// picture, which plays, and waits a beat before showing, so the flash after
+// a key press has gone and an autoplay that starts at once never shows it.
+.paused {
+  grid-area: stage;
+  place-self: center;
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: calc(2 * var(--control-size-tall));
+  height: calc(2 * var(--control-size-tall));
+  border-radius: 50%;
+  background: var(--color-picture-scrim);
+  color: var(--color-on-picture);
+  backdrop-filter: blur(10px);
+  pointer-events: none;
+
+  @media (prefers-reduced-motion: no-preference) {
+    animation: arrive 300ms var(--ease-out) 400ms backwards;
+  }
+}
+
+@keyframes arrive {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+}
+
+// The top bar: the way back, then the title over what is playing and how,
+// the heart beside them, and what plays next at the far end.
 .chrome {
   grid-area: stage;
   align-self: start;
@@ -56,14 +95,14 @@
   position: relative;
   z-index: 2;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto minmax(0, max-content) auto minmax(0, 1fr) auto;
   grid-template-areas:
-    'back title favourite next'
-    '. resumed resumed resumed';
-  gap: var(--space-1) var(--space-2);
+    'back title favourite . next'
+    'back about favourite . next'
+    '. resumed resumed resumed resumed';
+  gap: 0 var(--space-3);
   align-items: center;
-  padding: calc(var(--space-3) + var(--titlebar-inset)) clamp(var(--space-3), 3vw, var(--space-5))
-    var(--space-6);
+  padding: calc(var(--space-4) + var(--titlebar-inset)) var(--space-4) var(--space-7);
   background: var(--fade-from-top);
   // Browsers ignore this; the desktop's window drags by the player header.
   -webkit-app-region: drag;
@@ -92,38 +131,85 @@
   height: 100dvh;
 }
 
-.back {
-  grid-area: back;
+// Round dark glass over the picture, in place of the button's own look.
+@mixin glass-button {
   border-color: transparent;
+  background: color-mix(in srgb, var(--color-on-picture) 12%, var(--color-picture-glass));
+  color: var(--color-on-picture);
+  backdrop-filter: blur(12px);
+
+  &:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--color-on-picture) 22%, var(--color-picture-glass));
+  }
+}
+
+.back {
+  @include glass-button;
+
+  grid-area: back;
+  min-width: var(--control-size-tall);
+  min-height: var(--control-size-tall);
 }
 
 // The playing video's heart, when the host keeps favourites.
 .favourite {
+  @include glass-button;
+
   grid-area: favourite;
-  border-color: transparent;
+  min-width: var(--control-size-tall);
+  min-height: var(--control-size-tall);
 }
 
-// Filled as well as red, so a favourite does not rest on colour alone.
+// Filled as well as coloured, so a favourite does not rest on colour alone,
+// and it springs as it fills.
 .favourited {
   color: var(--color-leaf-bright);
 
   > svg {
     fill: currentcolor;
   }
+
+  @media (prefers-reduced-motion: no-preference) {
+    animation: heart 400ms var(--ease-spring);
+  }
+}
+
+@keyframes heart {
+  30% {
+    transform: scale(0.85);
+  }
+
+  70% {
+    transform: scale(1.12);
+  }
 }
 
 // What plays next, when the video came with more to play after it.
 .next {
+  @include glass-button;
+
   grid-area: next;
-  border-color: transparent;
+  border-radius: var(--radius-pill);
 }
 
 .title {
   grid-area: title;
+  align-self: end;
   font-family: var(--font-display);
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-xl);
   font-weight: 400;
   line-height: var(--line-tight);
+  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.about {
+  grid-area: about;
+  align-self: start;
+  color: var(--color-on-picture-soft);
+  font-size: var(--font-size-sm);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -136,18 +222,47 @@
   justify-content: start;
   gap: var(--space-2);
   align-items: center;
-  color: var(--color-bark);
+  padding-top: var(--space-2);
+  color: var(--color-on-picture);
   font-size: var(--font-size-sm);
 }
 
+.startOver {
+  @include glass-button;
+
+  border-radius: var(--radius-pill);
+}
+
+@media (max-width: 30rem) {
+  .chrome {
+    gap: 0 var(--space-2);
+    padding: calc(var(--space-3) + var(--titlebar-inset)) var(--space-3) var(--space-6);
+  }
+
+  .back,
+  .favourite {
+    min-width: var(--field-size);
+    min-height: var(--field-size);
+  }
+
+  .title {
+    font-size: var(--font-size-lg);
+  }
+}
+
+// Dark in every theme, like the player it stands in for.
 .unplayable {
+  --focus-ring: var(--border-thick) solid var(--color-on-picture);
+
   position: fixed;
   inset: 0;
   display: grid;
   grid-template-areas: 'panel';
   place-items: center;
   padding: var(--space-3);
-  background: var(--color-night);
+  background: var(--color-stage);
+  color: var(--color-on-picture);
+  color-scheme: dark;
   overflow-y: auto;
 }
 
@@ -168,15 +283,30 @@
   gap: var(--space-3);
   width: min(var(--measure), 100%);
   padding: var(--space-5);
-  border: 1px solid var(--color-moss);
-  border-radius: var(--radius-md);
-  background: var(--color-canopy);
+  border: 1px solid color-mix(in srgb, var(--color-on-picture) 12%, transparent);
+  border-radius: var(--radius-xl);
+  background: var(--color-picture-glass);
+  box-shadow: var(--shadow-panel);
+  backdrop-filter: blur(14px);
 }
 
+// A way back that reads as text, its arrow lined up with the panel's words.
 .panelBack {
   justify-self: start;
   border-color: transparent;
   padding-left: 0;
+  background: transparent;
+  color: var(--color-on-picture);
+
+  &:hover:not(:disabled) {
+    background: transparent;
+    color: var(--color-on-picture-soft);
+  }
+}
+
+// The panel's other quiet button wears the player's dark glass.
+.escape {
+  @include glass-button;
 }
 
 .panelTitle {
@@ -195,7 +325,7 @@
 }
 
 .hint {
-  color: var(--color-lichen);
+  color: var(--color-on-picture-soft);
   font-size: var(--font-size-sm);
   overflow-wrap: anywhere;
 }

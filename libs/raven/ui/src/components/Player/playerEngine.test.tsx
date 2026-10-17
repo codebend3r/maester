@@ -251,7 +251,7 @@ describe('PlayerChrome Playback info', () => {
       </PlayerServicesProvider>,
     )
     expect(screen.getByRole('button', { name: 'Start over' })).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    await userEvent.click(screen.getByRole('button', { name: /^Playback:/ }))
     await userEvent.click(screen.getByRole('button', { name: 'Playback info' }))
     expect(screen.getByRole('dialog', { name: 'Playback info' })).toBeInTheDocument()
     expect(screen.getByText('Test engine')).toBeInTheDocument()
@@ -331,7 +331,8 @@ describe('Player HTML local files', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Start over' }))
       expect(video.currentTime).toBe(0)
       expect(document.activeElement).toBe(video)
-      await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
+      await userEvent.click(screen.getByRole('button', { name: /^Audio/ }))
+      expect(screen.getByText('No audio tracks.')).toBeInTheDocument()
       expect(screen.queryByText('Reading tracks')).toBeNull()
       expect(tracks).not.toHaveBeenCalled()
       expect(settings).not.toHaveBeenCalled()
@@ -675,7 +676,7 @@ describe('Player hands a title off to another player', () => {
   })
 })
 
-describe('PlayerChrome handoff in the settings menu', () => {
+describe('PlayerChrome handoff in the playback menu', () => {
   const chrome = ({ services, actions }: { services: PlayerServices; actions: EngineActions }) => {
     const engine: EngineHandle = {
       state: { ...initialVideoState(20), paused: false },
@@ -702,7 +703,7 @@ describe('PlayerChrome handoff in the settings menu', () => {
     )
   }
 
-  it('offers the handoff in the settings menu, paused, at the current position', async () => {
+  it('offers the handoff in the playback menu, paused, at the current position', async () => {
     const order: string[] = []
     const actions: EngineActions = {
       ...actionsFor(),
@@ -717,21 +718,21 @@ describe('PlayerChrome handoff in the settings menu', () => {
       services: { ...servicesFor(), handoff: { label: 'Open in raven player', run } },
       actions,
     })
-    await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
-    const menu = await screen.findByRole('dialog', { name: 'Settings' })
+    await userEvent.click(screen.getByRole('button', { name: /^Playback:/ }))
+    const menu = await screen.findByRole('dialog', { name: 'Playback' })
     const handoff = within(menu).getByRole('button', { name: 'Open in raven player' })
     expect(handoff.querySelector('[data-icon]')).toHaveAttribute('data-icon', 'play')
     await userEvent.click(handoff)
     expect(order).toEqual(['pause', 'run'])
     expect(run).toHaveBeenCalledWith(42.7)
-    expect(screen.queryByRole('dialog', { name: 'Settings' })).toBeNull()
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Settings' })).toHaveFocus())
+    expect(screen.queryByRole('dialog', { name: 'Playback' })).toBeNull()
+    await waitFor(() => expect(screen.getByRole('button', { name: /^Playback:/ })).toHaveFocus())
   })
 
-  it('has no handoff in the settings menu without one', async () => {
+  it('has no handoff in the playback menu without one', async () => {
     chrome({ services: servicesFor(), actions: actionsFor() })
-    await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
-    const menu = await screen.findByRole('dialog', { name: 'Settings' })
+    await userEvent.click(screen.getByRole('button', { name: /^Playback:/ }))
+    const menu = await screen.findByRole('dialog', { name: 'Playback' })
     expect(within(menu).queryByRole('button', { name: 'Open in raven player' })).toBeNull()
   })
 })
