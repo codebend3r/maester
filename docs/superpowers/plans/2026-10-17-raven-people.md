@@ -134,7 +134,7 @@ Accept an optional `className` so a header can place it. Copy the visual treatme
 - `LibrariesPage.module.scss` (`.paths` and `.path`, lines ~141-159);
 - `LibrariesPage.test.tsx`.
 
-**`groupFolders(paths: readonly string[]): Array<{ parent: string; names: string[] }>`:**
+**`foldersByParent(paths: readonly string[]): Array<{ parent: string; names: string[] }>`:**
 - Split each path at its last `/`.
 - The parent is everything before it, or `/` when that is empty. The name is everything after it.
 - Group by parent in the order parents first appear, keeping each name's order.

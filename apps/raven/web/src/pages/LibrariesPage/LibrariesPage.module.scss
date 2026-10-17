@@ -141,12 +141,13 @@
 }
 
 // The folders a line to a parent, its names after it. The lines share the
-// parent column, so the names line up under one another; a long name wraps in
-// its own column.
+// parent column, so the names line up under one another. The column is capped
+// at half the width, so a long parent wraps inside it and leaves the names
+// room; a long name wraps in its own column.
 .paths {
   grid-area: paths;
   display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
+  grid-template-columns: fit-content(50%) minmax(0, 1fr);
   gap: var(--space-0) var(--space-3);
 }
 

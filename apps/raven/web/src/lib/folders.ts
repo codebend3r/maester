@@ -5,7 +5,7 @@ export type FolderGroup = { parent: string; names: string[] }
  * each parent first appears, so seven paths on four drives read as four lines.
  * A path straight under the root has `/` for its parent.
  */
-export const groupFolders = (paths: readonly string[]): FolderGroup[] =>
+export const foldersByParent = (paths: readonly string[]): FolderGroup[] =>
   paths.reduce<FolderGroup[]>((groups, path) => {
     const cut = path.lastIndexOf('/')
     const parent = path.slice(0, cut) || '/'

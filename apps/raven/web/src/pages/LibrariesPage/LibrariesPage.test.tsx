@@ -163,8 +163,11 @@ describe('LibrariesPage', () => {
     expect(
       within(folders)
         .getAllByRole('listitem')
-        .map((item) => item.textContent),
-    ).toEqual(['/mediaTV', '/mnt/archiveTV'])
+        .map((item) => Array.from(item.children, (part) => part.textContent)),
+    ).toEqual([
+      ['/media', 'TV'],
+      ['/mnt/archive', 'TV'],
+    ])
   })
 
   it('groups the folders under one parent into a single line', async () => {

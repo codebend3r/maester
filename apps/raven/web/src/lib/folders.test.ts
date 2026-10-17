@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'bun:test'
-import { groupFolders } from '@/lib/folders'
+import { foldersByParent } from '@/lib/folders'
 
-describe('groupFolders', () => {
+describe('foldersByParent', () => {
   it('gives one path one group holding one name', () => {
-    expect(groupFolders(['/media/Movies'])).toEqual([{ parent: '/media', names: ['Movies'] }])
+    expect(foldersByParent(['/media/Movies'])).toEqual([{ parent: '/media', names: ['Movies'] }])
   })
 
   it('groups the TV Shows library by drive, in the order each first appears', () => {
     expect(
-      groupFolders([
+      foldersByParent([
         '/media/vermithor/Media/TV',
         '/media/caraxes/Media/TV',
         '/media/syrax/Media/Sitcoms',
@@ -26,6 +26,6 @@ describe('groupFolders', () => {
   })
 
   it('gives a path straight under the root the parent /', () => {
-    expect(groupFolders(['/media'])).toEqual([{ parent: '/', names: ['media'] }])
+    expect(foldersByParent(['/media'])).toEqual([{ parent: '/', names: ['media'] }])
   })
 })
