@@ -89,6 +89,24 @@ describe('pickOrigin', () => {
     ).toEqual(origin('public'))
   })
 
+  it('is null when every probe is dead', () => {
+    expect(
+      pickOrigin([
+        probe({ kind: 'lan', bytesPerSecond: 0 }),
+        probe({ kind: 'public', bytesPerSecond: Number.NaN }),
+      ]),
+    ).toBeNull()
+  })
+
+  it('counts a non-finite score as zero, so one NaN probe cannot null the pick', () => {
+    expect(
+      pickOrigin([
+        probe({ kind: 'lan', bytesPerSecond: 100e6, firstByteMs: Number.NaN }),
+        probe({ kind: 'public', bytesPerSecond: 1e6 }),
+      ]),
+    ).toEqual(origin('public'))
+  })
+
   it('is null with nothing answered', () => {
     expect(pickOrigin([])).toBeNull()
   })
