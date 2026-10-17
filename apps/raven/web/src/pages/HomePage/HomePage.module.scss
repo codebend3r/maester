@@ -1,46 +1,72 @@
-.page {
+// The header, then the hero, the tiles and the rows, a section's gap apart.
+.page,
+.sections {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-6);
+  gap: var(--section-gap);
 }
 
-// The title, and the search beside it; on a narrow screen the search goes under it.
+// The title, small, and the search at the right, clear of the theme button
+// in the corner; on a phone the search takes a row of its own under them.
 .header {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 36rem);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 26.25rem);
   grid-template-areas: 'title search';
-  gap: var(--space-3);
   align-items: center;
+  gap: var(--space-4);
+  min-height: var(--field-size);
+  padding-inline-end: var(--corner-clearance, 0);
 }
 
 .title {
   grid-area: title;
-  font-family: var(--font-display);
-  font-size: var(--font-size-hero);
-  font-weight: 400;
+  color: var(--color-lichen);
+  font-size: var(--font-size-lg);
   line-height: var(--line-tight);
+  letter-spacing: normal;
 }
 
+// The icon lies over the field's start and lets clicks through to it.
 .search {
   grid-area: search;
-}
-
-// Home's way into every library, so it is the page's biggest control, in
-// the title's face but a cooler colour, so what is typed reads apart from it.
-.input {
-  width: 100%;
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-md);
-  color: var(--color-birch);
-  font-family: var(--font-display);
-  font-size: var(--font-size-xl);
-}
-
-// A search's rows stand where the shelves were, spaced as they are.
-.results {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-6);
+  grid-template-areas: 'field';
+  align-items: center;
+}
+
+// An underline rather than a box, in the display face.
+.input {
+  grid-area: field;
+  width: 100%;
+  padding: 0 var(--space-0) 0 calc(var(--space-0) + 1.25rem + var(--space-2));
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-bark) 20%, transparent);
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-bark);
+  font-family: var(--font-display);
+  font-size: var(--font-size-lg);
+  text-overflow: ellipsis;
+
+  &:hover:not(:focus-visible) {
+    border-bottom-color: color-mix(in srgb, var(--color-bark) 40%, transparent);
+  }
+
+  // The underline thickens and darkens in place of the field's ring.
+  &:focus-visible {
+    border-bottom-color: var(--color-bark);
+    outline: none;
+    box-shadow: 0 1px 0 var(--color-bark);
+  }
+}
+
+.searchIcon {
+  grid-area: field;
+  justify-self: start;
+  display: grid;
+  padding-inline-start: var(--space-0);
+  color: var(--color-lichen);
+  pointer-events: none;
 }
 
 .message {
@@ -51,14 +77,7 @@
 .shelf {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-3);
-}
-
-.heading {
-  font-family: var(--font-display);
-  font-size: var(--font-size-xl);
-  font-weight: 400;
-  line-height: var(--line-tight);
+  gap: var(--space-4);
 }
 
 .headingLink {
@@ -67,36 +86,80 @@
 
   &:hover {
     text-decoration: underline;
-    text-underline-offset: 0.2em;
+    text-decoration-color: var(--color-leaf-bright);
+    text-underline-offset: 0.18em;
   }
 }
 
-// Eight to a row; the row in progress holds every one, so it wraps onto more.
+// Eight to a row, as `POSTER_SIZES.row` measures them.
 .row {
   display: grid;
   grid-template-columns: repeat(8, minmax(0, 1fr));
   gap: var(--space-4) var(--space-3);
 }
 
+// The hero's shape while home is read: words at the left, a poster beside them.
+.skeletonHero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  grid-template-areas: 'words poster';
+  align-items: center;
+  gap: var(--space-5);
+}
+
+.skeletonWords {
+  grid-area: words;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.skeletonPoster {
+  grid-area: poster;
+  justify-self: center;
+  display: grid;
+  width: min(18.75rem, 100%);
+}
+
 @media (max-width: 64rem) {
+  .header {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 20rem);
+  }
+
   .row {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .skeletonHero {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'poster'
+      'words';
+  }
+
+  .skeletonPoster {
+    width: min(14.375rem, 62%);
+  }
+}
+
+// Only the title's row needs to clear the corner; the search runs full width under it.
+@media (max-width: 48rem) {
+  .header {
+    grid-template-columns: minmax(0, 1fr) var(--corner-clearance, 0);
+    grid-template-areas:
+      'title .'
+      'search search';
+    gap: var(--space-2);
+    padding-inline-end: 0;
+  }
+
+  .title {
+    display: grid;
+    align-items: center;
+    min-height: var(--field-size);
   }
 }
 
 @media (max-width: 40rem) {
-  .input {
-    padding: var(--space-2) var(--space-3);
-    font-size: var(--font-size-lg);
-  }
-
-  .header {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas:
-      'title'
-      'search';
-  }
-
   .row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

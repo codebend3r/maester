@@ -1,0 +1,26 @@
+.head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'title aside';
+  gap: var(--space-3);
+  align-items: end;
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-line);
+}
+
+.title {
+  grid-area: title;
+  font-size: var(--font-size-2xl);
+  line-height: var(--line-heading);
+}
+
+// A count reads as a quiet note; controls sit on the heading's baseline.
+.aside {
+  grid-area: aside;
+  display: grid;
+  grid-auto-flow: column;
+  gap: var(--space-1);
+  align-items: center;
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+}
