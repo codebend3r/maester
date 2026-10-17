@@ -2,7 +2,10 @@ import { describe, expect, it } from 'bun:test'
 import {
   DEFAULT_SAGA_BACKDROP,
   ITEM_IMAGE_KINDS,
+  MEDIA_PROBE_BYTES,
   MEDIA_SORTS,
+  MEDIA_TICKET_REFRESH_SECONDS,
+  MEDIA_TICKET_SECONDS,
   POSTER_OWN_WIDTH,
   POSTER_WIDTHS,
   STREAM_MODES,
@@ -34,6 +37,9 @@ import {
   isItemDetails,
   isItemSummary,
   isLibrary,
+  isMediaOrigin,
+  isMediaOrigins,
+  isMediaTicket,
   isMatchCandidate,
   isMediaItem,
   isMediaLocation,
@@ -612,5 +618,32 @@ describe('the AI lookup', () => {
     expect(isItemDetails({ ...itemDetails(), aiMatch: { why: 'x' } })).toBe(false)
     const { aiMatch: _aiMatch, ...without } = itemDetails()
     expect(isItemDetails(without)).toBe(false)
+  })
+})
+
+describe('the media plane guards', () => {
+  it('takes an origin of a known kind with a url', () => {
+    expect(isMediaOrigin({ kind: 'lan', url: 'https://raven.home.example.com' })).toBe(true)
+    expect(isMediaOrigin({ kind: 'vpn', url: 'https://raven.home.example.com' })).toBe(false)
+    expect(isMediaOrigin({ kind: 'lan' })).toBe(false)
+  })
+
+  it('takes a list of origins, empty included', () => {
+    expect(isMediaOrigins({ origins: [] })).toBe(true)
+    expect(
+      isMediaOrigins({ origins: [{ kind: 'tailnet', url: 'https://raven.tail.ts.net' }] }),
+    ).toBe(true)
+    expect(isMediaOrigins({ origins: [{ kind: 'tailnet' }] })).toBe(false)
+  })
+
+  it('takes a ticket with an expiry', () => {
+    expect(isMediaTicket({ ticket: 'abc.def', expiresAt: 1_800_000_000 })).toBe(true)
+    expect(isMediaTicket({ ticket: 'abc.def', expiresAt: '1800000000' })).toBe(false)
+  })
+
+  it('refreshes a ticket well before it expires', () => {
+    expect(MEDIA_TICKET_SECONDS).toBe(21_600)
+    expect(MEDIA_TICKET_REFRESH_SECONDS).toBeLessThan(MEDIA_TICKET_SECONDS)
+    expect(MEDIA_PROBE_BYTES).toBe(262_144)
   })
 })

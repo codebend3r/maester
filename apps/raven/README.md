@@ -400,6 +400,9 @@ A native iOS or Android app would be another `apps/raven/` entry that imports `@
 | `AI_DAILY_LIMIT`              | `200`                          | AI lookups a day                             |
 | `LIBRARY_PIN`                 | unset                          | The PIN that opens locked libraries          |
 | `ADMIN_PASSWORD`              | unset                          | Turns the [admin lock](#admin-lock) off; 10 characters or more, mixing cases, a digit and a symbol. Unset or weaker, the lock stays on |
+| `RAVEN_MEDIA_ORIGINS`         | unset                          | Where the browser may fetch media from, best first: `kind:url` entries, comma separated, `kind` being `lan`, `tailnet` or `public`. https only, with no path; `http` is for `localhost`. Needs `RAVEN_MEDIA_SECRET` |
+| `RAVEN_WEB_ORIGINS`           | unset                          | Web app origins allowed to call the media routes cross-origin. A `*` stands for one hostname label (`https://deploy-preview-*--raven-player.netlify.app`); `http` is for `localhost` |
+| `RAVEN_MEDIA_SECRET`          | unset                          | Signs media tickets: 32 random bytes or more, base64. Rotating it ends every ticket |
 
 ## Not there yet
 
