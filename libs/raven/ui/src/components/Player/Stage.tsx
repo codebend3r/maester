@@ -8,7 +8,11 @@ import {
   useState,
 } from 'react'
 import type { Engine, EngineHandle } from '@/components/Player/engine'
-import { type PlayerFavourite, usePlayerServices } from '@/components/Player/PlayerServices'
+import {
+  type Handoff,
+  type PlayerFavourite,
+  usePlayerServices,
+} from '@/components/Player/PlayerServices'
 import { useHtmlEngine } from '@/components/Player/useHtmlEngine'
 import type { SubtitleStatus } from '@/components/Player/useSubtitleCues'
 import { Button, ButtonLink } from '@/components/Button/Button'
@@ -24,7 +28,7 @@ import { useBezel, useFullscreen, useIdle } from '@/components/Player/useStageCh
 import { useUpNext } from '@/components/Player/useUpNext'
 import type { TrackSelection } from '@/components/Player/useTrackSelection'
 import { useWatchProgress } from '@/components/Player/useWatchProgress'
-import { isTypingTarget } from '@/lib/keyboard'
+import { isInForeignDialog, isTypingTarget } from '@/lib/keyboard'
 import { type PlayerAction, shortcutFor } from '@/lib/shortcuts'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
 
@@ -85,10 +89,11 @@ export const PlayerChrome = ({
   /** The library file playing, for Playback info; null for a local file. */
   file?: PlaybackFile | null
 }) => {
-  const { title, hostActions, favourite, chrome, isVolumeFixed } = usePlayerServices()
+  const { title, hostActions, favourite, chrome, isVolumeFixed, handoff } = usePlayerServices()
   const label = title.label
   const { state, duration, actions } = engine
   const seek = actions.seek
+  const root = useRef<HTMLDivElement>(null)
   const menu = useRef<HTMLDialogElement>(null)
   const settingsButton = useRef<HTMLButtonElement>(null)
   const volume = usePlayerPrefs((prefs) => prefs.volume)
@@ -145,6 +150,8 @@ export const PlayerChrome = ({
   })
 
   const onKey = useEffectEvent((event: KeyboardEvent) => {
+    // A host's dialog over the player keeps its keys, Escape included: they close it, not the player.
+    if (isInForeignDialog({ target: event.target, root: root.current })) return
     idle.wake()
     const action = shortcutFor(event)
     // Form controls keep their own keys (the radios' arrows, the volume
@@ -181,6 +188,12 @@ export const PlayerChrome = ({
     const isInMenu = menu.current?.contains(target) ?? false
     if (isInMenu || (settingsButton.current?.contains(target) ?? false)) return
     setOverlay('none')
+  }
+
+  const handOff = (to: Handoff) => {
+    actions.pause()
+    to.run(engine.position.current)
+    closeMenu()
   }
 
   const startOver = () => {
@@ -220,6 +233,7 @@ export const PlayerChrome = ({
 
   return (
     <div
+      ref={root}
       className={[styles.stage, chromeShown ? '' : styles.idle].filter(Boolean).join(' ')}
       onPointerMove={idle.wake}
       onPointerDown={onStagePointerDown}
@@ -320,6 +334,7 @@ export const PlayerChrome = ({
           onPickRate={controls.changeRate}
           onShowInfo={showInfo}
           onClose={closeMenu}
+          {...(handoff && { onHandoff: () => handOff(handoff), handoffLabel: handoff.label })}
         />
       )}
       {overlay === 'shortcuts' && (

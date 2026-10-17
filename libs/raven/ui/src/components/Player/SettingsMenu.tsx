@@ -46,9 +46,9 @@ const Option = ({
 
 /**
  * Audio, subtitles and speed, as native radio groups so the arrow keys,
- * the space bar and screen readers all work as they do anywhere else. The
- * footer says how the file is reaching the browser, and opens Playback info
- * for the detail.
+ * the space bar and screen readers all work as they do anywhere else. A
+ * host's handoff sits under them. The footer says how the file is reaching
+ * the browser, and opens Playback info for the detail.
  */
 export const SettingsMenu = ({
   menuRef,
@@ -68,6 +68,8 @@ export const SettingsMenu = ({
   onPickRate,
   onShowInfo,
   onClose,
+  onHandoff,
+  handoffLabel,
 }: {
   menuRef: RefObject<HTMLDialogElement | null>
   selection: TrackSelection
@@ -77,6 +79,8 @@ export const SettingsMenu = ({
   onPickRate: (rate: number) => void
   onShowInfo: () => void
   onClose: () => void
+  onHandoff?: () => void
+  handoffLabel?: string
 }) => {
   const subtitleId = subtitle?.id ?? null
   const id = useId()
@@ -170,6 +174,12 @@ export const SettingsMenu = ({
             </div>
           </fieldset>
         </div>
+        {!!onHandoff && !!handoffLabel && (
+          <button type="button" className={styles.handoff} onClick={onHandoff}>
+            <Icon name="play" size={18} />
+            <span>{handoffLabel}</span>
+          </button>
+        )}
         <footer className={styles.footer}>
           <p className={styles.mode}>{describeMode(mode)}</p>
           <button type="button" className={styles.info} onClick={onShowInfo}>

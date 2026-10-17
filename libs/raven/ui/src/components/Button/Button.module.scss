@@ -30,7 +30,7 @@
   background: var(--color-leaf);
   color: var(--color-bark);
 
-  &:hover:not(:disabled) {
+  &:hover:not(:disabled, [aria-disabled='true']) {
     background: var(--color-leaf-bright);
   }
 }
@@ -40,7 +40,7 @@
   border-color: var(--color-moss);
   color: var(--color-bark);
 
-  &:hover:not(:disabled) {
+  &:hover:not(:disabled, [aria-disabled='true']) {
     background: var(--color-canopy);
   }
 }
@@ -50,7 +50,7 @@
   border-color: var(--color-leaf-bright);
   color: var(--color-bark);
 
-  &:hover:not(:disabled) {
+  &:hover:not(:disabled, [aria-disabled='true']) {
     background: var(--color-leaf);
   }
 }

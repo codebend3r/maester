@@ -48,6 +48,8 @@ const isTimeRange = object({ start: isNumber, end: isNumber })
 
 export const isPlayerErrorReason = oneOf(['open', 'decode', 'network', 'locked', 'engine'])
 
+export type PlayerErrorReason = Infer<typeof isPlayerErrorReason>
+
 export const isPlayerEvent = union(
   object({ type: oneOf(['time']), time: isNumber }),
   object({ type: oneOf(['buffered']), ranges: listOf(isTimeRange) }),

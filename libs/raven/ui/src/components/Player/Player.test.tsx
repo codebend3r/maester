@@ -294,7 +294,7 @@ describe('the player controls', () => {
     )
     const video = container.querySelector('video')
     fireEvent.keyDown(screen.getByRole('slider', { name: 'Volume' }), { key: 'l' })
-    expect(video?.currentTime).toBe(0)
+    expect(video?.currentTime ?? null).toBe(0)
   })
 
   it('plays the next video in line once this one ends, and offers it sooner', async () => {
@@ -419,6 +419,38 @@ describe('the player’s Back', () => {
     expect(screen.queryByText('The movie')).toBeNull()
     press('Escape')
     expect(await screen.findByText('The movie')).toBeInTheDocument()
+  })
+
+  it("leaves a host dialog's keys to it, Escape included", async () => {
+    const { container } = renderWithProviders(
+      <Routes>
+        <Route path="movies/3" element={<p>The movie</p>} />
+        <Route
+          path="watch/7"
+          element={
+            <>
+              <TestPlayer media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />
+              <dialog open aria-label="Open a link">
+                <input aria-label="Link" />
+                <button type="button">Open</button>
+              </dialog>
+            </>
+          }
+        />
+      </Routes>,
+      { route: '/watch/7', behind: ['/movies/3'] },
+    )
+    const video = container.querySelector('video')
+    if (!video) throw new Error('no video')
+    const host = screen.getByRole('dialog', { name: 'Open a link' })
+    const escape = fireEvent.keyDown(within(host).getByRole('textbox', { name: 'Link' }), {
+      key: 'Escape',
+    })
+    expect(escape).toBe(true)
+    fireEvent.keyDown(within(host).getByRole('button', { name: 'Open' }), { key: 'l' })
+    expect(video.currentTime).toBe(0)
+    expect(screen.queryByText('The movie')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument()
   })
 
   it('goes back there from a video that cannot play', async () => {

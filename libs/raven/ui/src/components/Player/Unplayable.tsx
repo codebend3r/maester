@@ -2,6 +2,9 @@ import { Button } from '@/components/Button/Button'
 import styles from '@/components/Player/Player.module.scss'
 import { usePlayerServices } from '@/components/Player/PlayerServices'
 
+const PLAYER_HINT =
+  'The file is served untouched, so a player that handles every format, like VLC or IINA, can open the same link.'
+
 /**
  * What stands in for the video when nothing this browser and server can do
  * together will play it: no way to convert, or every way tried and failed.
@@ -23,8 +26,11 @@ export const Unplayable = ({
     posterUrl: thumbnail,
     escape,
     escapeFeedback,
+    escapeHint,
     unplayableNote,
+    handoff,
   } = usePlayerServices()
+  const hint = escapeHint === undefined ? PLAYER_HINT : escapeHint
 
   return (
     <section className={styles.unplayable} aria-labelledby="unplayable-title">
@@ -42,20 +48,20 @@ export const Unplayable = ({
             <li key={problem}>{problem}</li>
           ))}
         </ul>
-        {escape && (
-          <p className={styles.hint}>
-            The file is served untouched, so a player that handles every format, like VLC or IINA,
-            can open the same link.
-          </p>
-        )}
+        {escape && !!hint && <p className={styles.hint}>{hint}</p>}
         <div className={styles.panelActions}>
+          {handoff && (
+            <Button tone="primary" icon="play" onClick={() => handoff.run(title.resumeAt)}>
+              {handoff.label}
+            </Button>
+          )}
           {!!onTryAnyway && (
-            <Button tone="primary" onClick={onTryAnyway}>
+            <Button tone={handoff ? 'quiet' : 'primary'} onClick={onTryAnyway}>
               Try playing anyway
             </Button>
           )}
           {escape && (
-            <Button icon="copy" onClick={escape.run}>
+            <Button icon={escape.icon ?? 'copy'} onClick={escape.run}>
               {escape.label}
             </Button>
           )}

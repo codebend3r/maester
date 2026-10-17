@@ -7,6 +7,19 @@ export const isTypingTarget = (target: EventTarget | null): boolean =>
 const isCheckbox = (target: EventTarget | null): boolean =>
   target instanceof HTMLInputElement && target.type === 'checkbox'
 
+/** Whether a key comes from a dialog outside `root`: a dialog someone else opened keeps its keys. */
+export const isInForeignDialog = ({
+  target,
+  root,
+}: {
+  target: EventTarget | null
+  root: Element | null
+}): boolean => {
+  if (!(target instanceof Element)) return false
+  const dialog = target.closest('dialog')
+  return dialog !== null && !(root?.contains(dialog) ?? false)
+}
+
 /**
  * Whether a press is `key` on its own, whatever its case: no Ctrl, Cmd or
  * Alt (those belong to the browser), no auto-repeat, not already handled by
