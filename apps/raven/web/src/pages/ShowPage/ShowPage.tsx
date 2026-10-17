@@ -13,6 +13,7 @@ import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { AiMatchNote } from '@/components/AiMatchNote/AiMatchNote'
 import { Button, ButtonLink } from '@raven/ui'
 import { CastRow } from '@/components/CastRow/CastRow'
+import { DownloadButton } from '@/components/DownloadButton/DownloadButton'
 import { FavouriteButton } from '@/components/FavouriteButton/FavouriteButton'
 import { FixMatchDialog } from '@/components/FixMatchDialog/FixMatchDialog'
 import { ImageEditor } from '@/components/ImageEditor/ImageEditor'
@@ -173,6 +174,7 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
             <FavouriteButton isFavourite={details.favourite} onToggle={favourite.mutate} />
           )}
           {episodeCount > 0 && <ShuffleButton itemId={details.id}>Shuffle</ShuffleButton>}
+          <DownloadButton target={{ kind: 'item', itemId: details.id }} />
           <WatchedToggle {...toggle} />
           <SelectButton />
         </ItemHeader>

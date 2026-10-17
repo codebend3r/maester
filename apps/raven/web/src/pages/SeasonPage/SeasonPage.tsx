@@ -9,6 +9,7 @@ import {
 import { useId } from 'react'
 import { Link } from 'react-router-dom'
 import { ButtonLink, Icon } from '@raven/ui'
+import { DownloadButton } from '@/components/DownloadButton/DownloadButton'
 import { FavouriteButton } from '@/components/FavouriteButton/FavouriteButton'
 import {
   Dotted,
@@ -180,6 +181,7 @@ const SeasonView = ({ show, season }: { show: ItemDetails; season: ItemDetails }
           )}
           {hasFiles && <ShuffleButton itemId={season.id}>Shuffle season</ShuffleButton>}
           {hasFiles && <ShuffleButton itemId={show.id}>Shuffle show</ShuffleButton>}
+          <DownloadButton target={{ kind: 'item', itemId: season.id }} />
           <WatchedToggle {...toggle} />
           <SelectButton />
         </ItemHeader>

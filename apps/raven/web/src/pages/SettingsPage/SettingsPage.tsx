@@ -242,8 +242,9 @@ const BrowserPlayback = () => {
         />
         <span className={styles.choiceLabel}>Open videos in raven player</span>
         <span className={styles.choiceHint}>
-          Offers raven player for videos this browser cannot play, and in the player's settings.
-          Turn it on only where raven player is installed.
+          Offers raven player for videos this browser cannot play, in the player's settings, and
+          Download to raven player on a title's page. Turn it on only where raven player is
+          installed.
         </span>
       </label>
     </section>

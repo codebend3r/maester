@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { usePlayerPrefs } from '@raven/ui'
 import { ITEM_TYPES, type ItemDetails } from '@raven/core'
 import { Route, Routes, useParams } from 'react-router-dom'
 import { api } from '@/lib/api'
+import { ravenPlayer } from '@/lib/ravenPlayer'
 import { SeasonPage } from '@/pages/SeasonPage/SeasonPage'
 import { renderWithProviders } from '@/test/render'
 import { EPISODE_ONE, EPISODE_TWO, SEASON_ONE, SEVERANCE } from '@/test/tv'
@@ -200,5 +202,30 @@ describe('SeasonPage', () => {
         ],
       },
     ])
+  })
+
+  describe('Download to raven player', () => {
+    const handoff = spyOn(ravenPlayer, 'open').mockImplementation(() => {})
+
+    afterEach(() => {
+      handoff.mockClear()
+      usePlayerPrefs.setState({ opensInRavenPlayer: false })
+    })
+
+    it('is left out while this browser does not open videos in raven player', async () => {
+      open()
+      await screen.findByRole('heading', { name: 'Season 1' })
+      expect(screen.queryByRole('button', { name: 'Download to raven player' })).toBeNull()
+    })
+
+    it('hands the season to raven player', async () => {
+      usePlayerPrefs.setState({ opensInRavenPlayer: true })
+      open()
+      await userEvent.click(await screen.findByRole('button', { name: 'Download to raven player' }))
+      expect(handoff).toHaveBeenCalledTimes(1)
+      expect(handoff).toHaveBeenCalledWith(
+        `raven://download?server=${encodeURIComponent(window.location.origin)}&item=5`,
+      )
+    })
   })
 })

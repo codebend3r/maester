@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { cleanup, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { usePlayerPrefs } from '@raven/ui'
 import type { AdminLock, ItemDetails } from '@raven/core'
 import { Route, Routes, useParams } from 'react-router-dom'
 import { api } from '@/lib/api'
+import { ravenPlayer } from '@/lib/ravenPlayer'
 import { POSTER_SIZES } from '@/lib/posters'
 import { ShowPage } from '@/pages/ShowPage/ShowPage'
 import { itemDetails, library } from '@/test/fixtures'
@@ -284,5 +286,30 @@ describe('ShowPage', () => {
     await waitFor(() => expect(calls).toHaveLength(1))
     set.mockRestore()
     expect(calls).toEqual([{ watched: false, targets: [{ kind: 'item', id: 5, libraryId: null }] }])
+  })
+
+  describe('Download to raven player', () => {
+    const handoff = spyOn(ravenPlayer, 'open').mockImplementation(() => {})
+
+    afterEach(() => {
+      handoff.mockClear()
+      usePlayerPrefs.setState({ opensInRavenPlayer: false })
+    })
+
+    it('is left out while this browser does not open videos in raven player', async () => {
+      open()
+      await screen.findByRole('heading', { name: 'Severance' })
+      expect(screen.queryByRole('button', { name: 'Download to raven player' })).toBeNull()
+    })
+
+    it('hands the show to raven player', async () => {
+      usePlayerPrefs.setState({ opensInRavenPlayer: true })
+      open()
+      await userEvent.click(await screen.findByRole('button', { name: 'Download to raven player' }))
+      expect(handoff).toHaveBeenCalledTimes(1)
+      expect(handoff).toHaveBeenCalledWith(
+        `raven://download?server=${encodeURIComponent(window.location.origin)}&item=4`,
+      )
+    })
   })
 })

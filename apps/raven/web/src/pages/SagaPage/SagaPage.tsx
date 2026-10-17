@@ -16,6 +16,7 @@ import {
   ItemHeader,
   ItemHeaderSkeleton,
 } from '@/components/ItemHeader/ItemHeader'
+import { DownloadButton } from '@/components/DownloadButton/DownloadButton'
 import { LockedLibrary } from '@/components/LockedLibrary/LockedLibrary'
 import { MediaGridSkeleton } from '@/components/MediaGrid/MediaGrid'
 import { RouteState } from '@/components/RouteState/RouteState'
@@ -151,6 +152,7 @@ const SagaView = ({ library, sagaId }: { library: Library; sagaId: string }) => 
                 Play all
               </ButtonLink>
             )}
+            <DownloadButton target={{ kind: 'saga', libraryId: library.id, tmdbId: saga.tmdbId }} />
             {first && <SagaWatchedToggle saga={saga} libraryId={library.id} />}
             <SelectButton />
           </ItemHeader>
