@@ -99,7 +99,7 @@ const Titled = ({ icon, children }: { icon: IconName; children: string }) => (
   </>
 )
 
-/** One setting as a group of radio buttons, each with a line saying what it means. */
+/** One setting as a group of radio cards, each with a line saying what it means; the chosen one is filled. */
 const Setting = <V extends string | number>({
   label,
   icon,
@@ -139,13 +139,13 @@ const Setting = <V extends string | number>({
   )
 }
 
-/** `count` settings on their way: each a title over a choice or two. */
+/** `count` settings on their way: each a title over a card or two. */
 const SettingsSkeleton = ({ count }: { count: number }) =>
   Array.from({ length: count }, (_, index) => (
     <span key={index} className={styles.choices}>
       <Bone shape="text" width="short" />
-      <Bone shape="small" width="most" />
-      <Bone shape="small" width="half" />
+      <Bone shape="heading" />
+      <Bone shape="heading" />
     </span>
   ))
 
@@ -182,11 +182,20 @@ const SettingsSection = <T,>({
   const canManage = useCanManage()
   return (
     <section className={styles.section} aria-labelledby={headingId}>
-      <h2 id={headingId} className={styles.heading}>
-        <Titled icon={icon}>{title}</Titled>
-      </h2>
-      <p className={styles.hint}>{hint}</p>
-      {!canManage && <p className={styles.hint}>Turn the admin lock off below to change these.</p>}
+      <header className={styles.sectionHead}>
+        <h2 id={headingId} className={styles.heading}>
+          <Titled icon={icon}>{title}</Titled>
+        </h2>
+        <p className={styles.help}>
+          {hint}
+          {!canManage && (
+            <>
+              {' '}
+              <span>Turn the admin lock off below to change these.</span>
+            </>
+          )}
+        </p>
+      </header>
       {query.isError && (
         <p className={styles.error} role="alert">
           {query.error.message}
@@ -342,15 +351,18 @@ const AdminLockSection = () => {
 
   return (
     <section className={styles.section} aria-labelledby={headingId}>
-      <h2 id={headingId} className={styles.heading}>
-        <Titled icon="lock">Admin</Titled>
-      </h2>
-      <p className={styles.hint}>
-        On in every browser until the admin password is entered there. While it is on, raven can be
-        watched but not managed: no library is added, edited, scanned or matched, no match, metadata
-        or image is changed, the settings above stay as they are, and no video is deleted or has its
-        file's path shown. Locked libraries are hidden altogether, so nothing asks for their PIN.
-      </p>
+      <header className={styles.sectionHead}>
+        <h2 id={headingId} className={styles.heading}>
+          <Titled icon="lock">Admin</Titled>
+        </h2>
+        <p className={styles.help}>
+          On in every browser until the admin password is entered there. While it is on, raven can
+          be watched but not managed: no library is added, edited, scanned or matched, no match,
+          metadata or image is changed, the settings above stay as they are, and no video is deleted
+          or has its file's path shown. Locked libraries are hidden altogether, so nothing asks for
+          their PIN.
+        </p>
+      </header>
       {lock.isError && (
         <p className={styles.error} role="alert">
           {lock.error.message}
@@ -367,9 +379,10 @@ const AdminLockSection = () => {
         </Loading>
       )}
       {current && (
-        <label className={styles.choice}>
+        <label className={styles.lock}>
           <input
             type="checkbox"
+            className={styles.switch}
             checked={current.state !== 'off' && !isAskingNow}
             disabled={busy || (current.state === 'on' && !current.available)}
             onChange={(event) => toggle({ from: current, checked: event.target.checked })}
@@ -388,6 +401,7 @@ const AdminLockSection = () => {
           <input
             ref={passwordInput}
             id={passwordId}
+            className={styles.passwordInput}
             type="password"
             autoComplete="current-password"
             value={password}
@@ -487,27 +501,33 @@ export const SettingsPage = () => {
           Settings
         </h1>
         <AdminOnly>
-          {settings && (
-            <div className={styles.reset}>
-              {isConfirming ? (
-                <>
-                  <p className={styles.hint}>Every setting goes back to its default.</p>
-                  <Button tone="danger" icon="reset" disabled={busy} onClick={() => reset.mutate()}>
-                    Reset all
-                  </Button>
-                  <Button onClick={() => setConfirming(false)}>Cancel</Button>
-                </>
-              ) : (
+          {settings &&
+            (isConfirming ? (
+              <div className={styles.asking}>
+                <p className={styles.confirm}>Every setting goes back to its default.</p>
                 <Button
+                  tone="primary"
                   icon="reset"
-                  disabled={busy || isAllAtDefaults}
-                  onClick={() => setConfirming(true)}
+                  className={styles.resetAll}
+                  disabled={busy}
+                  onClick={() => reset.mutate()}
                 >
-                  Reset to defaults
+                  Reset all
                 </Button>
-              )}
-            </div>
-          )}
+                <Button className={styles.cancel} onClick={() => setConfirming(false)}>
+                  Cancel
+                </Button>
+              </div>
+            ) : (
+              <Button
+                icon="reset"
+                className={styles.reset}
+                disabled={busy || isAllAtDefaults}
+                onClick={() => setConfirming(true)}
+              >
+                Reset to defaults
+              </Button>
+            ))}
         </AdminOnly>
       </header>
       <output className={styles.status}>

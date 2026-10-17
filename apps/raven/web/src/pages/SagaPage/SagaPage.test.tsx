@@ -22,15 +22,18 @@ const movie = ({
   title,
   year,
   backdropVersion = null,
+  watched = false,
 }: {
   id: number
   title: string
   year: number
   backdropVersion?: string | null
+  watched?: boolean
 }) =>
   matchedMovie({
     id,
     title,
+    watched,
     duration: 2 * 3600 + 58 * 60,
     item: itemSummary({ id: id * 10, title, year, backdropVersion }),
   })
@@ -111,14 +114,43 @@ describe('SagaPage', () => {
     )
   })
 
-  it("fetches each movie's poster no wider than the saga's grid shows it", async () => {
+  it('numbers its movies, saying which are watched and which is up next', async () => {
+    spies.get.mockImplementation(async () =>
+      library({ id: 2, name: 'Films', settings: { ...library().settings, kind: 'movies' } }),
+    )
+    spies.sagas.mockImplementation(async () => [
+      {
+        ...RINGS,
+        media: [
+          movie({ id: 7, title: 'The Fellowship of the Ring', year: 2001, watched: true }),
+          movie({ id: 8, title: 'The Two Towers', year: 2002 }),
+          movie({ id: 9, title: 'The Return of the King', year: 2003 }),
+        ],
+      },
+    ])
+    renderWithProviders(
+      <Routes>
+        <Route path="libraries/:id/sagas/:sagaId" element={<SagaPage />} />
+      </Routes>,
+      { route: '/libraries/2/sagas/119' },
+    )
+    const order = await screen.findByRole('region', { name: 'In order' })
+    const rows = within(order).getAllByRole('listitem')
+    expect(rows.map((row) => row.textContent?.slice(0, 2))).toEqual(['01', '02', '03'])
+    expect(within(rows[0] ?? order).getByText('Watched')).toBeInTheDocument()
+    expect(within(rows[1] ?? order).getByText('Up next')).toBeInTheDocument()
+    expect(within(rows[2] ?? order).queryByText(/Watched|Up next/)).toBeNull()
+    expect(screen.getByText('1 of 3 watched')).toBeInTheDocument()
+  })
+
+  it("fetches each movie's poster no wider than the saga's list shows it", async () => {
     open()
     await screen.findByRole('heading', { name: 'The Lord of the Rings Collection' })
     const posters = [...document.querySelectorAll('img[src*="/images/poster"]')]
     expect(posters.map((poster) => poster.getAttribute('sizes'))).toEqual([
-      POSTER_SIZES.grid,
-      POSTER_SIZES.grid,
-      POSTER_SIZES.grid,
+      POSTER_SIZES.movieTile,
+      POSTER_SIZES.movieTile,
+      POSTER_SIZES.movieTile,
     ])
   })
 

@@ -1,6 +1,8 @@
 import { describe, expect, it, spyOn } from 'bun:test'
-import { screen } from '@testing-library/react'
-import { mediaLabel } from '@raven/core'
+import { screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { type PosterEntry, mediaLabel } from '@raven/core'
+import { useLocation } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { POSTER_SIZES } from '@/lib/posters'
 import { FavouritesPage } from '@/pages/FavouritesPage/FavouritesPage'
@@ -57,5 +59,92 @@ describe('FavouritesPage', () => {
     renderWithProviders(<FavouritesPage />)
     expect(await screen.findByText(/No favourites yet/)).toBeInTheDocument()
     spy.mockRestore()
+  })
+
+  describe('the kind filter', () => {
+    const MOVIE: PosterEntry = {
+      media: matchedMovie({ id: 1, favourite: true }),
+      poster: itemSummary(),
+    }
+    const EPISODE: PosterEntry = {
+      media: { ...EPISODE_TWO, favourite: true },
+      poster: SEASON_ONE_CARD,
+    }
+    const HOME_VIDEO: PosterEntry = {
+      media: mediaItem({ id: 3, title: 'Birthday', favourite: true }),
+      poster: null,
+    }
+
+    /** Where the page's address stands, so a test can see what rides in it. */
+    const Address = () => <output data-testid="address">{useLocation().search}</output>
+
+    const serve = (entries: PosterEntry[], route = '/favourites') => {
+      const spy = spyOn(api, 'listFavourites').mockImplementation(async () => entries)
+      renderWithProviders(
+        <>
+          <FavouritesPage />
+          <Address />
+        </>,
+        { route },
+      )
+      return spy
+    }
+
+    it('offers each kind among the favourites, and narrows to the one picked', async () => {
+      const spy = serve([MOVIE, EPISODE, HOME_VIDEO])
+      expect(await screen.findByRole('link', { name: 'Busboys' })).toBeInTheDocument()
+      expect(screen.getByText('3 videos')).toBeInTheDocument()
+      const pills = within(screen.getByRole('group', { name: 'Show' }))
+        .getAllByRole('button')
+        .map((pill) => pill.textContent)
+      expect(pills).toEqual(['All', 'Movies', 'Episodes', 'Other videos'])
+      expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true')
+
+      await userEvent.click(screen.getByRole('button', { name: 'Episodes' }))
+      expect(screen.getByRole('button', { name: 'Episodes' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      )
+      expect(screen.getByRole('link', { name: mediaLabel(EPISODE_TWO) })).toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: 'Busboys' })).toBeNull()
+      expect(screen.queryByRole('link', { name: 'Birthday' })).toBeNull()
+      expect(screen.getByText('1 video')).toBeInTheDocument()
+      expect(screen.getByTestId('address')).toHaveTextContent('?kind=episodes')
+
+      await userEvent.click(screen.getByRole('button', { name: 'Other videos' }))
+      expect(screen.getByRole('link', { name: 'Birthday' })).toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: mediaLabel(EPISODE_TWO) })).toBeNull()
+
+      await userEvent.click(screen.getByRole('button', { name: 'All' }))
+      expect(screen.getByRole('link', { name: 'Busboys' })).toBeInTheDocument()
+      expect(screen.getByTestId('address')).toBeEmptyDOMElement()
+      spy.mockRestore()
+    })
+
+    it('starts on the kind the address names', async () => {
+      const spy = serve([MOVIE, EPISODE], '/favourites?kind=movies')
+      expect(await screen.findByRole('link', { name: 'Busboys' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Movies' })).toHaveAttribute('aria-pressed', 'true')
+      expect(screen.queryByRole('link', { name: mediaLabel(EPISODE_TWO) })).toBeNull()
+      spy.mockRestore()
+    })
+
+    it('shows them all when the address names a kind there are none of, or none at all', async () => {
+      const spy = serve([MOVIE, EPISODE], '/favourites?kind=other')
+      expect(await screen.findByRole('link', { name: 'Busboys' })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: mediaLabel(EPISODE_TWO) })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true')
+      spy.mockRestore()
+    })
+
+    it('has nothing to filter while every favourite is of one kind', async () => {
+      const spy = serve(
+        [MOVIE, { ...MOVIE, media: { ...MOVIE.media, id: 2 } }],
+        '/favourites?kind=episodes',
+      )
+      expect(await screen.findAllByRole('link', { name: 'Busboys' })).toHaveLength(2)
+      expect(screen.queryByRole('group', { name: 'Show' })).toBeNull()
+      spy.mockRestore()
+    })
   })
 })

@@ -6,7 +6,7 @@ import { Route, Routes, useParams } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { POSTER_SIZES } from '@/lib/posters'
 import { ShowPage } from '@/pages/ShowPage/ShowPage'
-import { itemDetails } from '@/test/fixtures'
+import { itemDetails, library } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 import { EPISODE_TWO, SEASON_ONE_SUMMARY, SEVERANCE } from '@/test/tv'
 
@@ -59,6 +59,22 @@ describe('ShowPage', () => {
       'href',
       '/watch/13',
     )
+  })
+
+  it('says it is a show, and names its library on the way back', async () => {
+    spies.item.mockImplementation(async () => SEVERANCE)
+    spies.next.mockImplementation(async () => EPISODE_TWO)
+    renderWithProviders(
+      <Routes>
+        <Route path="shows/:id" element={<ShowPage />} />
+      </Routes>,
+      { route: '/shows/4', libraries: [library({ id: EPISODE_TWO.libraryId, name: 'Series' })] },
+    )
+    expect(await screen.findByRole('link', { name: 'Series' })).toHaveAttribute(
+      'href',
+      `/libraries/${EPISODE_TWO.libraryId}`,
+    )
+    expect(screen.getByText('Show')).toBeInTheDocument()
   })
 
   it('leaves Edit images, Edit metadata and Fix match out while the admin lock is on', async () => {

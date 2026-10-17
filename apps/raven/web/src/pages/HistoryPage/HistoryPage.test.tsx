@@ -65,6 +65,8 @@ describe('HistoryPage', () => {
       screen.getByText(/played or marked in .*95% of the way through, or when it is marked/),
     ).toBeInTheDocument()
     expect(asked.at(-1)).toEqual({ limit: 100, watchedOnly: true })
+    expect(screen.getByRole('link', { name: 'Movies' })).toHaveAttribute('href', '/libraries/2')
+    expect(screen.getByRole('button', { name: 'Watched' })).toHaveAttribute('aria-pressed', 'true')
   })
 
   it('shows everything played, finished or not, when asked', async () => {

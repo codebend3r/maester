@@ -10,8 +10,9 @@ import {
   ItemHeaderSkeleton,
 } from '@/components/ItemHeader/ItemHeader'
 import { LockedLibrary } from '@/components/LockedLibrary/LockedLibrary'
-import { MediaGrid, MediaGridSkeleton } from '@/components/MediaGrid/MediaGrid'
+import { MediaGridSkeleton } from '@/components/MediaGrid/MediaGrid'
 import { RouteState } from '@/components/RouteState/RouteState'
+import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
 import { SelectButton } from '@/components/SelectButton/SelectButton'
 import { SelectionBar } from '@/components/SelectionBar/SelectionBar'
 import { SelectionScope, sourceOf } from '@/components/SelectionScope/SelectionScope'
@@ -28,9 +29,10 @@ import { HoverBackdrops } from '@/lib/useHoverBackdrop'
 import { sectionPath } from '@/pages/LibraryPage/librarySections'
 import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
 import { SagaBackdropDialog } from '@/pages/SagaPage/SagaBackdropDialog'
+import { SagaFilms } from '@/pages/SagaPage/SagaFilms'
 import styles from '@/pages/SagaPage/SagaPage.module.scss'
 
-/** A saga on its way: its title and facts over a grid of posters. */
+/** A saga on its way: its title and facts over stand-ins for its movies. */
 const SagaSkeleton = () => (
   <>
     <ItemHeaderSkeleton picture="none" />
@@ -75,6 +77,7 @@ const SagaWatchedToggle = ({ saga, libraryId }: { saga: Saga; libraryId: number 
 /** The saga once its library is known and open to this browser. */
 const SagaView = ({ library, sagaId }: { library: Library; sagaId: string }) => {
   const titleId = useId()
+  const filmsId = useId()
   const [isEditing, setEditing] = useState(false)
   const sagas = useQuery(sagasQuery(library.id))
   const page = routeState({
@@ -89,6 +92,8 @@ const SagaView = ({ library, sagaId }: { library: Library; sagaId: string }) => 
   if (page.data == null) return <NotFoundPage />
   const saga = page.data
   const runtime = sagaRuntime(saga)
+  const [count, ...span] = sagaFacts(saga)
+  const watchedCount = saga.media.filter((media) => media.watched).length
   const backdrop = headerBackdrop(saga)
   const [first, ...rest] = saga.media
 
@@ -104,46 +109,54 @@ const SagaView = ({ library, sagaId }: { library: Library; sagaId: string }) => 
           <ItemHeader
             back={{ to: sectionPath({ libraryId: library.id, section: 'sagas' }), label: 'Sagas' }}
             titleId={titleId}
+            eyebrow={['Saga', count].filter((part): part is string => part != null)}
             title={saga.name}
             byline={library.name}
             contentRating={null}
-            facts={[...sagaFacts(saga), ...(runtime ? [runtime] : [])]}
+            facts={[...span, ...(runtime ? [runtime] : [])]}
             ratings={[]}
+            progress={
+              saga.media.length > 0
+                ? {
+                    fraction: watchedCount / saga.media.length,
+                    label: `${watchedCount} of ${saga.media.length} watched`,
+                  }
+                : undefined
+            }
             backdrop={backdrop}
+            manage={
+              backdrop && (
+                <AdminOnly>
+                  <Button icon="edit" onClick={() => setEditing(true)}>
+                    Edit backdrop
+                  </Button>
+                </AdminOnly>
+              )
+            }
           >
             {first && (
-              <ButtonLink
-                tone="primary"
-                size="large"
-                icon="play"
-                {...watchLink({ media: first, upNext: rest })}
-              >
+              <ButtonLink tone="primary" icon="play" {...watchLink({ media: first, upNext: rest })}>
                 Play all
               </ButtonLink>
             )}
             {first && <SagaWatchedToggle saga={saga} libraryId={library.id} />}
             <SelectButton />
-            {backdrop && (
-              <AdminOnly>
-                <Button icon="edit" onClick={() => setEditing(true)}>
-                  Edit backdrop
-                </Button>
-                {isEditing && (
-                  <SagaBackdropDialog
-                    libraryId={library.id}
-                    saga={saga}
-                    onClose={() => setEditing(false)}
-                  />
-                )}
-              </AdminOnly>
-            )}
           </ItemHeader>
-          <MediaGrid
-            items={saga.media}
-            posters
-            matchType="movie"
-            ratingsSource={library.settings.ratingsSource}
-          />
+          <section className={styles.films} aria-labelledby={filmsId}>
+            <SectionHeading id={filmsId} aside="Release order">
+              In order
+            </SectionHeading>
+            <SagaFilms media={saga.media} ratingsSource={library.settings.ratingsSource} />
+          </section>
+          <AdminOnly>
+            {isEditing && (
+              <SagaBackdropDialog
+                libraryId={library.id}
+                saga={saga}
+                onClose={() => setEditing(false)}
+              />
+            )}
+          </AdminOnly>
           <SelectionBar />
         </section>
       </SelectionScope>
@@ -153,10 +166,11 @@ const SagaView = ({ library, sagaId }: { library: Library; sagaId: string }) => 
 
 /**
  * `/libraries/:id/sagas/:sagaId`: one saga, under its movies' backdrops in
- * turn or the one it holds still, with Play all, which plays its movies one
- * after another, and its movies oldest first, to pick one to watch. A saga
- * in a library still locked to this browser waits for the PIN, as the
- * library's page does.
+ * turn or the one it holds still, with how many of them are watched and
+ * Play all, which plays its movies one after another, then its movies
+ * numbered in release order, each saying whether it is watched or up next,
+ * to pick one to watch. A saga in a library still locked to this browser
+ * waits for the PIN, as the library's page does.
  */
 export const SagaPage = () => {
   const libraryId = useRouteId()

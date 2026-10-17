@@ -1,11 +1,17 @@
 import { useQuery } from '@tanstack/react-query'
-import { type EpisodeSummary, type ItemDetails, watchedStateOf } from '@raven/core'
+import { type EpisodeSummary, type ItemDetails, episodeCode, watchedStateOf } from '@raven/core'
 import { useId } from 'react'
 import { Link } from 'react-router-dom'
-import { Icon } from '@raven/ui'
-import { ItemHeader, ItemHeaderSkeleton, pictureBackdrop } from '@/components/ItemHeader/ItemHeader'
+import { ButtonLink, Icon } from '@raven/ui'
+import {
+  Dotted,
+  ItemHeader,
+  ItemHeaderSkeleton,
+  pictureBackdrop,
+} from '@/components/ItemHeader/ItemHeader'
 import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { RouteState } from '@/components/RouteState/RouteState'
+import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
 import { SelectButton } from '@/components/SelectButton/SelectButton'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { SelectionBar } from '@/components/SelectionBar/SelectionBar'
@@ -18,6 +24,7 @@ import { api } from '@/lib/api'
 import { episodeEntryKey } from '@/lib/entryKeys'
 import { formatAirDate, runtimeFact } from '@/lib/itemFacts'
 import { watchLink } from '@/lib/itemLinks'
+import { plural } from '@/lib/plural'
 import { itemQuery } from '@/lib/queries'
 import { routeState, useRouteId } from '@/lib/routeQuery'
 import { useSelectable } from '@/lib/useSelectable'
@@ -25,7 +32,11 @@ import { useWatchedToggle } from '@/lib/useWatchedChange'
 import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
 import styles from '@/pages/SeasonPage/SeasonPage.module.scss'
 
-/** One episode on disk: its still, number and title, air date and length, two lines of summary, Watched and Play. */
+/**
+ * One episode on disk, on a row that lights under the pointer: its still
+ * with the check or where playback stopped, its number and title, air date
+ * and length, three lines of summary, then Watched and Play.
+ */
 const EpisodeRow = ({ episode }: { episode: EpisodeSummary }) => {
   const select = useSelectable({ key: episodeEntryKey(episode), title: episode.title })
   const toggle = useWatchedToggle({
@@ -44,7 +55,6 @@ const EpisodeRow = ({ episode }: { episode: EpisodeSummary }) => {
     formatAirDate(episode.released),
     runtimeFact({ file, runtime: episode.runtime }),
   ].filter((fact): fact is string => fact != null)
-  const number = episode.episode == null ? '' : `${episode.episode}. `
 
   return (
     <li className={styles.episode} data-entry={episodeEntryKey(episode)} {...select.rootProps}>
@@ -60,44 +70,43 @@ const EpisodeRow = ({ episode }: { episode: EpisodeSummary }) => {
         ) : (
           <span className={styles.stillPlaceholder}>{episode.episode ?? ''}</span>
         )}
-        {file && <ResumeBar media={file} className={styles.resume} />}
-        <WatchedMark decorative watched={episode.watched} className={styles.watched} />
+        <span className={styles.overlay}>
+          <WatchedMark decorative watched={episode.watched} className={styles.watched} />
+          {file && <ResumeBar media={file} className={styles.resume} />}
+        </span>
       </Link>
       <div className={styles.body}>
-        <Link
-          to={`/episodes/${episode.id}`}
-          className={styles.title}
-          tabIndex={select.linkTabIndex}
-        >
-          {number}
-          {episode.title}
-        </Link>
+        <p className={styles.heading}>
+          {episode.episode != null && <span className={styles.code}>E{episode.episode}</span>}
+          <Link
+            to={`/episodes/${episode.id}`}
+            className={styles.title}
+            tabIndex={select.linkTabIndex}
+          >
+            {episode.title}
+          </Link>
+        </p>
         {facts.length > 0 && (
           <span className={styles.facts}>
-            {facts.map((fact) => (
-              <span key={fact}>{fact}</span>
-            ))}
+            <Dotted parts={facts} />
           </span>
         )}
         {episode.summary && <p className={styles.overview}>{episode.summary}</p>}
         {file && <PartlyWatched media={file} />}
       </div>
       {!select.selecting && (
-        <WatchedToggle
-          {...toggle}
-          label={`Watched ${episode.title}`}
-          isLabelShown={false}
-          className={styles.toggle}
-        />
-      )}
-      {file && !select.selecting && (
-        <Link
-          {...watchLink({ media: file })}
-          className={styles.play}
-          aria-label={`Play ${episode.title}`}
-        >
-          <Icon name="play" size={16} />
-        </Link>
+        <span className={styles.actions}>
+          <WatchedToggle {...toggle} label={`Watched ${episode.title}`} isLabelShown={false} />
+          {file && (
+            <Link
+              {...watchLink({ media: file })}
+              className={styles.play}
+              aria-label={`Play ${episode.title}`}
+            >
+              <Icon name="play" size={14} />
+            </Link>
+          )}
+        </span>
       )}
     </li>
   )
@@ -107,13 +116,16 @@ const SeasonView = ({ show, season }: { show: ItemDetails; season: ItemDetails }
   const ids = { title: useId(), episodes: useId() }
   const episodes = season.children.flatMap((child) => (child.type === 'episode' ? [child] : []))
   const count = episodes.length
+  const watchedCount = episodes.filter((episode) => episode.watched).length
+  // The first episode on disk not yet watched that has a file to play.
+  const next = episodes.find((episode) => !episode.watched && episode.primary != null)
+  const nextFile = next?.primary ?? null
+  const nextCode = next ? episodeCode(next) : null
   const toggle = useWatchedToggle({
-    state: watchedStateOf({
-      watched: episodes.filter((episode) => episode.watched).length,
-      total: count,
-    }),
+    state: watchedStateOf({ watched: watchedCount, total: count }),
     targets: [{ kind: 'item', id: season.id, libraryId: null }],
   })
+  const watchedWords = `${watchedCount} of ${count} watched`
   return (
     <SelectionScope
       {...sourceOf(
@@ -127,14 +139,16 @@ const SeasonView = ({ show, season }: { show: ItemDetails; season: ItemDetails }
         <ItemHeader
           back={{ to: `/shows/${show.id}`, label: show.title }}
           titleId={ids.title}
+          eyebrow={[show.title]}
           title={season.title}
-          byline={show.title}
-          contentRating={null}
+          byline={null}
+          contentRating={show.contentRating}
           facts={[
             season.year == null ? null : String(season.year),
-            `${count} ${count === 1 ? 'episode' : 'episodes'}`,
+            plural({ n: count, one: 'episode', many: 'episodes' }),
           ].filter((fact): fact is string => fact != null)}
           ratings={[]}
+          progress={count > 0 ? { fraction: watchedCount / count, label: watchedWords } : undefined}
           picture={{
             shape: 'poster',
             url: api.itemImageUrl({ id: season.id, kind: 'poster', version: season.posterVersion }),
@@ -143,6 +157,11 @@ const SeasonView = ({ show, season }: { show: ItemDetails; season: ItemDetails }
             api.itemImageUrl({ id: show.id, kind: 'backdrop', version: show.backdropVersion }),
           )}
         >
+          {nextFile && (
+            <ButtonLink tone="primary" icon="play" {...watchLink({ media: nextFile })}>
+              {nextCode ? `Play ${nextCode}` : 'Play'}
+            </ButtonLink>
+          )}
           <WatchedToggle {...toggle} />
           <SelectButton />
         </ItemHeader>
@@ -150,9 +169,9 @@ const SeasonView = ({ show, season }: { show: ItemDetails; season: ItemDetails }
         <Summary tagline={null} summary={season.summary} />
 
         <section aria-labelledby={ids.episodes} className={styles.episodes}>
-          <h2 id={ids.episodes} className="visually-hidden">
+          <SectionHeading id={ids.episodes} aside={count > 0 && watchedWords}>
             Episodes
-          </h2>
+          </SectionHeading>
           <ol className={styles.list}>
             {episodes.map((episode) => (
               <EpisodeRow key={episode.id} episode={episode} />
@@ -168,7 +187,11 @@ const SeasonView = ({ show, season }: { show: ItemDetails; season: ItemDetails }
   )
 }
 
-/** `/shows/:id/seasons/:number`: a season's poster and summary, then its episodes on disk in order. */
+/**
+ * `/shows/:id/seasons/:number`: a season's poster under its show's
+ * backdrop, how much of it is watched and Play for the next episode, its
+ * summary, then its episodes on disk in order.
+ */
 export const SeasonPage = () => {
   const showId = useRouteId()
   const number = useRouteId('number')

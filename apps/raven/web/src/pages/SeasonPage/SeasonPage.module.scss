@@ -1,48 +1,62 @@
 .page {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-5);
+  gap: var(--section-gap);
 }
 
 .episodes {
   display: grid;
+  gap: var(--space-1);
 }
 
 .list {
   display: grid;
 }
 
+// The still, what the episode is, then its Watched and Play. The row lights
+// under the pointer, rounded, with no rule of its own.
 .episode {
+  --still-width: 16.25rem;
+
   position: relative;
   display: grid;
-  grid-template-columns: clamp(7rem, 24vw, 14rem) minmax(0, 1fr) auto auto;
-  grid-template-areas: 'still body toggle play';
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-2) 0;
-  border-bottom: 1px solid var(--color-moss);
+  grid-template-columns: var(--still-width) minmax(0, 1fr) auto;
+  grid-template-areas: 'still body actions';
+  align-items: start;
+  gap: var(--space-3) var(--space-4);
+  padding: var(--space-3) var(--space-2);
+  border-radius: var(--radius-lg);
+
+  &:hover {
+    background: var(--color-hover);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition: background-color 150ms ease;
+  }
 }
 
 // Over the still's top corner, inside the row's padding.
 .select {
   position: absolute;
-  inset: calc(var(--space-2) + var(--space-0)) auto auto var(--space-0);
+  inset: calc(var(--space-3) + var(--space-1)) auto auto calc(var(--space-2) + var(--space-1));
   z-index: 2;
 }
 
+// The still, with where playback stopped along its foot and the check in
+// its corner, both drawn in the picture's own light.
 .still {
   grid-area: still;
   display: grid;
-  grid-template-areas: 'frame';
+  // One cell exactly the frame's size, so a still of another shape is
+  // cropped to it and the check and the line stay inside.
+  grid-template: 'frame' minmax(0, 1fr) / minmax(0, 1fr);
   aspect-ratio: 16 / 9;
-  border-radius: var(--radius-sm);
   overflow: hidden;
+  border-radius: var(--radius-md);
   background: var(--color-canopy);
 
-  img,
-  .stillPlaceholder,
-  .resume,
-  .watched {
+  > * {
     grid-area: frame;
   }
 
@@ -56,38 +70,66 @@
 .stillPlaceholder {
   display: grid;
   place-items: center;
-  font-family: var(--font-display);
-  font-size: var(--font-size-lg);
   color: var(--color-lichen);
+  font-family: var(--font-display);
+  font-size: var(--font-size-xl);
 }
 
-// Where playback stopped: the one red mark on the row.
-.resume {
-  align-self: end;
-  height: 3px;
+// The check in the top corner and where playback stopped along the foot,
+// both inset from the still's edges.
+.overlay {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'check'
+    '.'
+    'resume';
+  padding: var(--space-2);
 }
 
-// A check in the still's top corner.
 .watched {
-  align-self: start;
+  grid-area: check;
   justify-self: end;
-  inset: var(--space-0) var(--space-0) auto auto;
-  position: relative;
 }
 
-.toggle {
-  grid-area: toggle;
+// The one red mark on the row.
+.resume {
+  grid-area: resume;
+  height: var(--space-0);
+  border-radius: var(--radius-pill);
 }
 
 .body {
   grid-area: body;
   display: grid;
-  gap: 2px;
+  align-content: start;
+  gap: var(--space-1);
   min-width: 0;
 }
 
-.title {
+// The number small and spaced out, then the title in the serif.
+.heading {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas: 'code title';
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.code {
+  grid-area: code;
+  color: var(--color-birch);
+  font-size: var(--font-size-xs);
   font-weight: 600;
+  letter-spacing: var(--tracking-eyebrow);
+  font-variant-numeric: tabular-nums;
+}
+
+.title {
+  grid-area: title;
+  font-family: var(--font-display);
+  font-size: var(--font-size-lg);
+  line-height: var(--line-tight);
   text-decoration: none;
   overflow-wrap: anywhere;
 
@@ -98,44 +140,69 @@
 }
 
 .facts {
-  display: grid;
-  grid-auto-flow: column;
-  justify-content: start;
-  gap: var(--space-2);
-  color: var(--color-lichen);
-  font-size: var(--font-size-xs);
-  font-stretch: 90%;
-}
-
-.overview {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
   color: var(--color-lichen);
   font-size: var(--font-size-sm);
 }
 
+.overview {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  max-width: 40rem;
+  color: var(--color-birch);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-body);
+  text-wrap: pretty;
+}
+
+.actions {
+  grid-area: actions;
+  display: grid;
+  grid-auto-flow: column;
+  align-items: center;
+  gap: var(--space-1);
+}
+
 .play {
-  grid-area: play;
   display: grid;
   place-items: center;
-  width: 2.5rem;
-  height: 2.5rem;
-  border: 1px solid var(--color-moss);
-  border-radius: 50%;
+  width: var(--control-size);
+  height: var(--control-size);
+  border-radius: var(--radius-pill);
+  background: var(--color-moss);
   color: var(--color-bark);
 
   &:hover {
-    background: var(--color-canopy);
+    background: var(--color-leaf);
+    color: var(--color-on-leaf);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition:
+      background-color 150ms ease,
+      color 150ms ease;
   }
 }
 
-@media (max-width: 30rem) {
+@media (max-width: 64rem) {
   .episode {
-    grid-template-columns: minmax(0, 1fr) auto auto;
+    --still-width: 13.75rem;
+  }
+}
+
+// The still across the row, what the episode is under it, the buttons
+// beside the title.
+@media (max-width: 48rem) {
+  .episode {
+    grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
-      'still toggle play'
-      'body body body';
+      'still still'
+      'body actions';
+    padding-inline: 0;
+  }
+
+  .select {
+    inset: calc(var(--space-3) + var(--space-1)) auto auto var(--space-1);
   }
 }

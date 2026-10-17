@@ -1,31 +1,58 @@
 .page {
   display: grid;
-  gap: var(--space-5);
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-6);
+  max-width: 56rem;
 }
 
+// The page's first row: the title, and Reset to defaults at its right,
+// both clear of the theme button in the corner.
 .header {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: 1fr auto;
   grid-template-areas: 'title reset';
   align-items: end;
   gap: var(--space-3);
+  min-height: var(--field-size);
+  padding-inline-end: var(--corner-clearance, 0);
 }
 
 .title {
   grid-area: title;
-  font-family: var(--font-display);
-  font-size: var(--font-size-hero);
-  font-weight: 400;
-  line-height: var(--line-tight);
 }
 
-// Reset to defaults, or the question it asks first, in a row of its own.
 .reset {
   grid-area: reset;
+}
+
+// The question Reset to defaults asks first, over its two answers, which
+// take the button's place; the question wraps to their width.
+.asking {
+  grid-area: reset;
   display: grid;
-  grid-auto-flow: column;
-  align-items: center;
-  gap: var(--space-1);
+  grid-template-columns: auto auto;
+  grid-template-areas:
+    'confirm confirm'
+    'all cancel';
+  gap: var(--space-1) var(--space-2);
+}
+
+.confirm {
+  grid-area: confirm;
+  width: 0;
+  min-width: 100%;
+  color: var(--color-birch);
+  font-size: var(--font-size-sm);
+  text-align: end;
+  text-wrap: balance;
+}
+
+.resetAll {
+  grid-area: all;
+}
+
+.cancel {
+  grid-area: cancel;
 }
 
 // Says the reset is done; empty, it takes no room.
@@ -40,18 +67,16 @@
 
 .section {
   display: grid;
-  gap: var(--space-3);
-  max-width: var(--measure);
+  gap: var(--space-4);
 }
 
-// A section's settings, held in one fieldset so the admin lock or a reset
-// disables them all at once; spaced as the section around it.
-.settings {
+// A section's title in the large serif and a line of help, ruled off from
+// its settings.
+.sectionHead {
   display: grid;
-  gap: var(--space-3);
-  margin: 0;
-  padding: 0;
-  border: 0;
+  gap: var(--space-1);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-line);
 }
 
 .heading,
@@ -61,13 +86,32 @@
   grid-auto-flow: column;
   justify-content: start;
   align-items: center;
-  gap: var(--space-1);
+  gap: var(--space-2);
+
+  svg {
+    color: var(--color-lichen);
+  }
 }
 
-.heading {
-  font-family: var(--font-display);
-  font-size: var(--font-size-xl);
-  font-weight: 400;
+// The icon grows with the heading it leads.
+.heading svg {
+  width: 0.7em;
+  height: 0.7em;
+}
+
+.help {
+  max-width: var(--measure);
+  color: var(--color-lichen);
+}
+
+// A section's settings, held in one fieldset so the admin lock or a reset
+// disables them all at once; spaced as the section around it.
+.settings {
+  display: grid;
+  gap: var(--space-5);
+  margin: 0;
+  padding: 0;
+  border: 0;
 }
 
 .hint {
@@ -86,8 +130,10 @@
   border: 0;
 }
 
+// A legend sits outside its fieldset's grid, so no gap reaches it.
 .legend {
-  padding: 0;
+  padding: 0 0 var(--space-2);
+  font-size: var(--font-size-md);
   font-weight: 600;
 }
 
@@ -104,37 +150,84 @@
   gap: var(--space-1);
 }
 
+// A choice as a card: its radio or checkbox, its label, and what it means
+// under that. The chosen card is filled and ruled.
 .choice {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   grid-template-areas:
     'input label'
     '. hint';
-  align-items: baseline;
-  gap: 0 var(--space-1);
-  padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--color-moss);
-  border-radius: var(--radius-md);
+  align-items: center;
+  gap: var(--space-0) var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius-lg);
   cursor: pointer;
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition:
+      background-color 150ms ease,
+      border-color 150ms ease;
+  }
 
   input {
     grid-area: input;
+    width: 1.25rem;
+    height: 1.25rem;
+    border-width: var(--border-thick);
+
+    &:checked {
+      border-color: var(--color-leaf-bright);
+    }
+
+    &::before {
+      background: var(--color-leaf-bright);
+    }
+  }
+
+  &:hover:not(:has(input:disabled)) {
+    background: var(--color-hover);
   }
 
   &:has(input:checked) {
-    border-color: var(--color-lichen);
+    border-color: var(--color-line-strong);
+    background: var(--color-canopy);
   }
 
   &:has(input:focus-visible) {
-    outline: 2px solid var(--color-bark);
+    outline: var(--focus-ring);
     outline-offset: 2px;
   }
 
-  // As elements.scss dims a disabled control; the card is the control here.
+  // Kept as they are: the chosen card still shows, the others step back.
   &:has(input:disabled) {
     cursor: not-allowed;
-    opacity: 0.55;
+
+    input {
+      opacity: 1;
+    }
   }
+
+  &:has(input:disabled:not(:checked)) {
+    opacity: 0.6;
+  }
+}
+
+// The radio's own focus ring gives way to the card's.
+.choice input:focus-visible {
+  outline: none;
+}
+
+// Checked, a radio is a ring around a dot in the accent, and a checkbox a
+// ring around a tick.
+.choice input[type='radio']::before {
+  width: 0.625rem;
+  height: 0.625rem;
+}
+
+.choice input[type='checkbox']:checked {
+  background: transparent;
 }
 
 .choiceLabel {
@@ -146,22 +239,105 @@
   grid-area: hint;
   color: var(--color-lichen);
   font-size: var(--font-size-sm);
+  text-wrap: pretty;
 }
 
-// The admin password, asked for under the toggle it turns off.
+// The admin lock: a switch on a card of its own.
+.lock {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    'input label'
+    'input hint';
+  align-items: center;
+  gap: 0 var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--color-canopy);
+  cursor: pointer;
+
+  &:has(input:disabled) {
+    cursor: not-allowed;
+  }
+}
+
+// A track with a knob that slides across, in the accent while the lock is on.
+.switch {
+  --track: 1.75rem;
+  --knob: 1.375rem;
+  --inset: calc((var(--track) - var(--knob)) / 2);
+
+  grid-area: input;
+  place-content: center start;
+  width: 3rem;
+  height: var(--track);
+  padding-inline: var(--inset);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-moss-hi);
+
+  &::before {
+    width: var(--knob);
+    height: var(--knob);
+    border-radius: 50%;
+    background: var(--color-lichen);
+    clip-path: none;
+    transform: none;
+  }
+
+  &:checked {
+    background: var(--color-leaf);
+  }
+
+  &:checked::before {
+    background: var(--color-on-leaf);
+    translate: calc(3rem - var(--knob) - 2 * var(--inset)) 0;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition: background-color 200ms ease;
+
+    &::before {
+      transition:
+        translate 300ms var(--ease-spring),
+        background-color 200ms ease;
+    }
+  }
+}
+
+// The admin password, asked for under the switch it turns off: the field
+// beside its buttons, which drop under it on a phone.
 .password {
   display: grid;
-  gap: var(--space-1);
-  padding: var(--space-2);
-  border: 1px solid var(--color-moss);
-  border-radius: var(--radius-md);
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'label label'
+    'input actions'
+    'error error';
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+
+  .error {
+    grid-area: error;
+  }
 }
 
 .passwordLabel {
+  grid-area: label;
+  font-size: var(--font-size-sm);
   font-weight: 600;
 }
 
+.passwordInput {
+  grid-area: input;
+  background-color: var(--color-deep);
+}
+
 .actions {
+  grid-area: actions;
   display: grid;
   grid-auto-flow: column;
   justify-content: start;
@@ -177,9 +353,16 @@
     justify-items: start;
   }
 
-  // The question and its buttons wrap rather than run off a phone.
-  .reset {
-    grid-auto-flow: row;
-    grid-template-columns: repeat(auto-fit, minmax(min-content, max-content));
+  .confirm {
+    text-align: start;
+  }
+
+  .password {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'label'
+      'input'
+      'error'
+      'actions';
   }
 }

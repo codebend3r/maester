@@ -35,7 +35,7 @@ describe('SeasonPage', () => {
     const rows = within(list).getAllByRole('listitem')
     expect(rows).toHaveLength(2)
     expect(
-      within(rows[0] ?? list).getByRole('link', { name: '1. Good News About Hell' }),
+      within(rows[0] ?? list).getByRole('link', { name: 'Good News About Hell' }),
     ).toHaveAttribute('href', '/episodes/6')
     expect(await within(rows[0] ?? list).findByText(/18 Feb 2022|Feb 18, 2022/)).toBeInTheDocument()
     expect(within(rows[0] ?? list).getByText('57m')).toBeInTheDocument()
@@ -84,6 +84,22 @@ describe('SeasonPage', () => {
       { route: '/shows/4/seasons/1' },
     )
   }
+
+  it('plays the first episode not yet watched, and says how many are', async () => {
+    openWith(withWatched([true, false]))
+    expect(await screen.findByRole('link', { name: 'Play S01E02' })).toHaveAttribute(
+      'href',
+      '/watch/13',
+    )
+    expect(screen.getAllByText('1 of 2 watched')).toHaveLength(2)
+    expect(screen.getByText('E2')).toBeInTheDocument()
+  })
+
+  it('offers no Play once every episode is watched', async () => {
+    openWith(withWatched([true, true]))
+    expect(await screen.findAllByText('2 of 2 watched')).toHaveLength(2)
+    expect(screen.queryByRole('link', { name: /^Play S/ })).toBeNull()
+  })
 
   it('reads as partly pressed when some episodes are watched', async () => {
     openWith(withWatched([true, false]))
@@ -147,7 +163,7 @@ describe('SeasonPage', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Select' }))
     expect(screen.queryByRole('link', { name: 'Play Half Loop' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Watched Half Loop' })).not.toBeInTheDocument()
-    await userEvent.click(screen.getByRole('link', { name: '1. Good News About Hell' }))
+    await userEvent.click(screen.getByRole('link', { name: 'Good News About Hell' }))
     expect(screen.queryByText('Good News About Hell is an episode.')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('checkbox', { name: 'Select Half Loop' }))
     await userEvent.click(screen.getByRole('button', { name: 'Mark watched' }))

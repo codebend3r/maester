@@ -1,34 +1,78 @@
 .page {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-4);
+  gap: var(--space-5);
 }
 
+// The page's first row: it stops short of the theme button in the corner.
 .header {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: var(--space-1);
-}
-
-.title {
-  font-family: var(--font-display);
-  font-size: var(--font-size-hero);
-  font-weight: 400;
-  line-height: var(--line-tight);
+  padding-inline-end: var(--corner-clearance, 0);
 }
 
 .count {
   color: var(--color-lichen);
 }
 
+// A run of pills, each as wide as its word.
+.kinds {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: 0;
+  border: 0;
+}
+
+// Outlined until chosen; the chosen one is filled in the text colour.
+.kind {
+  min-height: var(--control-size);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-bark);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition:
+      background-color 150ms ease,
+      color 150ms ease;
+  }
+
+  &:hover {
+    background: var(--color-hover);
+  }
+
+  &[aria-pressed='true'] {
+    border-color: var(--color-bark);
+    background: var(--color-bark);
+    color: var(--color-night);
+  }
+}
+
 // The poster grid a Movies library has.
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(10rem, 100%), 1fr));
-  gap: var(--space-4) var(--space-3);
+  gap: var(--space-5) var(--space-3);
 }
 
 .message {
   max-width: var(--measure);
   color: var(--color-lichen);
+}
+
+// On a phone the pills wrap, as many to a row as fit, sharing its width.
+@media (max-width: 30rem) {
+  .kinds {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr));
+  }
 }
