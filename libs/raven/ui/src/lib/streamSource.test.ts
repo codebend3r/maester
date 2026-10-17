@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import {
+  BUFFER_EVENTS,
+  MEDIA_SOURCE_STATES,
   type MediaSourceLike,
   type SourceBufferLike,
   type StreamEnvironment,
@@ -52,15 +54,17 @@ const fakeBuffer = (source: { readyState: string }) => {
     appended: 0,
     cutAt: null,
   }
-  const finish = (type: 'updateend' | 'error') =>
+  const finish = (type: (typeof BUFFER_EVENTS)[keyof typeof BUFFER_EVENTS]) =>
     queueMicrotask(() => {
       state.updating = false
       events.emit(type)
-      if (type === 'error') events.emit('updateend')
+      if (type === BUFFER_EVENTS.error) events.emit(BUFFER_EVENTS.updateEnd)
     })
   // Appending to or removing from an ended source opens it again.
   const reopen = () => {
-    if (source.readyState === 'ended') source.readyState = 'open'
+    if (source.readyState === MEDIA_SOURCE_STATES.ended) {
+      source.readyState = MEDIA_SOURCE_STATES.open
+    }
   }
   const buffer: SourceBufferLike = {
     get updating() {
@@ -74,7 +78,7 @@ const fakeBuffer = (source: { readyState: string }) => {
       reopen()
       state.updating = true
       if (state.cutAt != null && state.cutAt !== from) {
-        finish('error')
+        finish(BUFFER_EVENTS.error)
         return
       }
       const last = state.ranges.at(-1)
@@ -84,7 +88,7 @@ const fakeBuffer = (source: { readyState: string }) => {
           : [...state.ranges, [from, to]]
       state.appended += 1
       state.cutAt = cut ? to : null
-      finish('updateend')
+      finish(BUFFER_EVENTS.updateEnd)
     },
     remove: (start, end) => {
       reopen()
@@ -95,10 +99,10 @@ const fakeBuffer = (source: { readyState: string }) => {
         ])
         .filter(([from, to]) => !(from >= start && to <= end) && to > from)
       state.updating = true
-      finish('updateend')
+      finish(BUFFER_EVENTS.updateEnd)
     },
     abort: () => {
-      if (source.readyState !== 'open') {
+      if (source.readyState !== MEDIA_SOURCE_STATES.open) {
         throw new DOMException('The source is not open.', 'InvalidStateError')
       }
       state.updating = false
@@ -138,7 +142,12 @@ const setup = ({
   ok?: boolean
 } = {}) => {
   const sourceEvents = listeners()
-  const sourceState = { readyState: 'closed', ended: 0, duration: NaN, mime: '' }
+  const sourceState: { readyState: string; ended: number; duration: number; mime: string } = {
+    readyState: MEDIA_SOURCE_STATES.closed,
+    ended: 0,
+    duration: NaN,
+    mime: '',
+  }
   const { buffer, state: bufferState } = fakeBuffer(sourceState)
   const source: MediaSourceLike = {
     get readyState() {
@@ -155,7 +164,7 @@ const setup = ({
       return buffer
     },
     endOfStream: () => {
-      sourceState.readyState = 'ended'
+      sourceState.readyState = MEDIA_SOURCE_STATES.ended
       sourceState.ended += 1
     },
     addEventListener: sourceEvents.addEventListener,
@@ -167,7 +176,7 @@ const setup = ({
     createMediaSource: () => source,
     attach: () => {
       queueMicrotask(() => {
-        sourceState.readyState = 'open'
+        sourceState.readyState = MEDIA_SOURCE_STATES.open
         sourceEvents.emit('sourceopen')
       })
       return () => {}

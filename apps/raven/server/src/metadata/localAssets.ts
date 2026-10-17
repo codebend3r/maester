@@ -3,6 +3,9 @@ import { SCAN_FILESYSTEM } from '@/scanner/walk'
 
 const IMAGE_EXTENSION = /\.(jpe?g|png|webp)$/i
 
+/** The NFO file names raven reads, as Kodi names them. */
+const NFO_NAMES = { show: 'tvshow.nfo' } as const
+
 /** A folder's file names, read through the scan's filesystem gate; none when it cannot be read. */
 export const listFolder = (dir: string): Promise<string[]> =>
   SCAN_FILESYSTEM.run(() => readdir(dir).catch((): string[] => []))
@@ -62,7 +65,7 @@ export type ShowAssets = {
 export const showAssets = (names: readonly string[]): ShowAssets => ({
   poster: firstImage({ names, stems: ['poster', 'folder', 'show'] }),
   backdrop: firstImage({ names, stems: ['fanart', 'backdrop', 'background'] }),
-  nfo: names.find((name) => name.toLowerCase() === 'tvshow.nfo') ?? null,
+  nfo: names.find((name) => name.toLowerCase() === NFO_NAMES.show) ?? null,
 })
 
 /** A season's poster: `Season01`, `season01-poster`, or `season-specials-poster` for season 0. */

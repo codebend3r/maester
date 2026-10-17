@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import {
+  MATCH_STATES,
   type MediaItem,
   isItemDetails,
   isLibrary,
@@ -367,7 +368,7 @@ describe('matching by library type', () => {
     tmdb.state.failing = ['/tv/30991/season/2']
     await setKind('animeShows')
     const states = (await mediaOf()).map((item) => item.match)
-    expect(states.every((match) => match === 'pending')).toBe(true)
+    expect(states.every((match) => match === MATCH_STATES.pending)).toBe(true)
     tmdb.state.failing = []
     await asAdmin({ method: 'POST', url: `/api/libraries/${state.library}/scan` })
     await settle()

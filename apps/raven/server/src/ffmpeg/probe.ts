@@ -15,6 +15,14 @@ export type ProbeResult = {
 
 type Stream = Record<string, unknown>
 
+/** ffprobe's `codec_type` for each kind of stream. */
+export const CODEC_TYPES = { video: 'video', audio: 'audio', subtitle: 'subtitle' } as const
+
+export type CodecType = (typeof CODEC_TYPES)[keyof typeof CODEC_TYPES]
+
+/** ffprobe's `color_transfer` for the two HDR transfers: PQ, which HDR10 uses, and HLG. */
+export const COLOR_TRANSFERS = { pq: 'smpte2084', hlg: 'arib-std-b67' } as const
+
 /** ffprobe reports most numbers as strings ("5812.768000"); both shapes are accepted. */
 export const numeric = (value: unknown): number | null => {
   const parsed = isString(value) ? Number(value) : value
@@ -34,7 +42,7 @@ const bitDepthOf = (stream: Stream): number | null => {
   return pixelFormat === '' ? null : 8
 }
 
-const HDR_TRANSFERS: ReadonlySet<string> = new Set(['smpte2084', 'arib-std-b67'])
+const HDR_TRANSFERS: ReadonlySet<string> = new Set(Object.values(COLOR_TRANSFERS))
 
 /** Whether the stream carries a Dolby Vision configuration record. */
 export const hasDolbyVision = (stream: Stream): boolean => {
@@ -62,9 +70,10 @@ export const parseProbe = (output: unknown): ProbeResult | null => {
   const format = isRecord(output.format) ? output.format : {}
 
   const video = streams.find(
-    (stream) => stream.codec_type === 'video' && !disposition({ stream, flag: 'attached_pic' }),
+    (stream) =>
+      stream.codec_type === CODEC_TYPES.video && !disposition({ stream, flag: 'attached_pic' }),
   )
-  const audioTracks = streams.filter((stream) => stream.codec_type === 'audio')
+  const audioTracks = streams.filter((stream) => stream.codec_type === CODEC_TYPES.audio)
   const audio =
     audioTracks.find((stream) => disposition({ stream, flag: 'default' })) ?? audioTracks[0]
 

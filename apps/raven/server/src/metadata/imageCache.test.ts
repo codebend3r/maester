@@ -2,9 +2,11 @@ import { mkdtemp, readFile, rm, stat, utimes, writeFile } from 'node:fs/promises
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DEFAULT_PLAYBACK_SETTINGS, POSTER_WIDTHS } from '@raven/core'
+import { HEADERS } from '@shared/server'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { readServerConfig } from '@/config'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
+import { RAVEN_CONTENT_TYPES } from '@/http'
 import { ImageCache } from '@/metadata/imageCache'
 import { encodeImage, jpegSize } from '@/test/clips'
 import { FAKE_JPEG } from '@/test/fakeTmdb'
@@ -58,7 +60,9 @@ describe('the image cache', () => {
       config,
       async ({ url }) => {
         state.calls.push(url)
-        return new Response(FAKE_JPEG, { headers: { 'content-type': 'image/jpeg' } })
+        return new Response(FAKE_JPEG, {
+          headers: { [HEADERS.contentType]: RAVEN_CONTENT_TYPES.jpeg },
+        })
       },
       state.ffmpeg,
     )

@@ -5,6 +5,7 @@ import {
   type OnApplicationBootstrap,
   type OnModuleDestroy,
 } from '@nestjs/common'
+import { ITEM_TYPES } from '@raven/core'
 import { FolderReader } from '@/metadata/folderReader'
 import { ItemPictures } from '@/metadata/itemPictures'
 import { isLocal } from '@/metadata/localItems'
@@ -80,21 +81,21 @@ export class ItemRefresher implements OnApplicationBootstrap, OnModuleDestroy {
 
   private async fetch(item: StoredItem): Promise<void> {
     switch (item.type) {
-      case 'movie':
-      case 'show': {
+      case ITEM_TYPES.movie:
+      case ITEM_TYPES.show: {
         const fetched =
-          item.type === 'movie'
+          item.type === ITEM_TYPES.movie
             ? await this.tmdb.movie(item.tmdbId)
             : await this.tmdb.show(item.tmdbId)
         this.metadata.save({ item: fetched })
-        if (item.type === 'show') await this.refreshSeasons(item.id)
+        if (item.type === ITEM_TYPES.show) await this.refreshSeasons(item.id)
         await this.scores.fetch({ itemId: item.id, imdbId: fetched.imdbId })
         return
       }
-      case 'season':
+      case ITEM_TYPES.season:
         await this.refreshSeason(item)
         return
-      case 'episode': {
+      case ITEM_TYPES.episode: {
         const season = item.parentId == null ? null : this.metadata.get(item.parentId)
         if (season) await this.refreshSeason(season)
         return
@@ -142,8 +143,8 @@ export class ItemRefresher implements OnApplicationBootstrap, OnModuleDestroy {
       releasedAfter: new Date(now - 90 * DAY_MS).toISOString().slice(0, 10),
     }
     const stale = [
-      ...this.metadata.stale({ type: 'movie', ...window }),
-      ...this.metadata.stale({ type: 'show', ...window }),
+      ...this.metadata.stale({ type: ITEM_TYPES.movie, ...window }),
+      ...this.metadata.stale({ type: ITEM_TYPES.show, ...window }),
     ]
     const guard = new PassGuard({
       logger: this.logger,

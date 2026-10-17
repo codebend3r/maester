@@ -3,10 +3,12 @@ import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import { isRecord } from '@raven/core'
 import { type ServerConfig, readServerConfig } from '@/config'
 
-export const ROUTE_METHODS = ['GET', 'POST', 'PUT', 'DELETE'] as const
+export const ROUTE_METHODS = { ...HTTP_METHODS, put: 'PUT', delete: 'DELETE' } as const
 
-export const isRouteMethod = (value: string): value is (typeof ROUTE_METHODS)[number] =>
-  ROUTE_METHODS.some((method) => method === value)
+export type RouteMethod = (typeof ROUTE_METHODS)[keyof typeof ROUTE_METHODS]
+
+export const isRouteMethod = (value: string): value is RouteMethod =>
+  Object.values(ROUTE_METHODS).some((method) => method === value)
 
 /** A watcher that never fires, for tests that scan by hand. */
 export const NOT_WATCHING = { watchFolder: () => ({ close: () => undefined }) }

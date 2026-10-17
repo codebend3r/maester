@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common'
 import type { PersonDetails } from '@raven/core'
 import type { FastifyReply } from 'fastify'
+import { RAVEN_HEADERS } from '@/http'
 import { sendImage } from '@/items/sendImage'
 import { Public } from '@/lock/lockGuard'
 import { LockService } from '@/lock/lockService'
@@ -31,7 +32,7 @@ export class PeopleController {
   @Get(':id')
   get(
     @Param('id', ParseIntPipe) id: number,
-    @Headers('cookie') cookie: string | undefined,
+    @Headers(RAVEN_HEADERS.cookie) cookie: string | undefined,
   ): PersonDetails {
     const person = this.metadata.person(id)
     if (!person) throw new NotFoundException(`No person ${id}`)

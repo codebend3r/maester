@@ -1,14 +1,21 @@
 import {
   type AudioStream,
   type MediaStreams,
+  VIDEO_RANGES,
   type VideoRange,
   type VideoStream,
   isRecord,
   isString,
 } from '@raven/core'
-import { hasDolbyVision, numeric } from '@/ffmpeg/probe'
+import { CODEC_TYPES, COLOR_TRANSFERS, hasDolbyVision, numeric } from '@/ffmpeg/probe'
 
 type Stream = Record<string, unknown>
+
+/** What ffprobe says for a codec with no profile names, lower-cased. */
+const PROFILES = { unknown: 'unknown' } as const
+
+/** mkvmerge's tag for a stream's bitrate, `BPS-eng` and the like in older versions. */
+const TAGS = { bps: 'BPS' } as const
 
 const text = (value: unknown): string | null =>
   isString(value) && value.trim() !== '' ? value.trim() : null
@@ -16,7 +23,7 @@ const text = (value: unknown): string | null =>
 /** ffprobe says 'unknown' for a codec it has no profile names for. */
 const profileOf = (stream: Stream): string | null => {
   const profile = text(stream.profile)
-  return profile == null || profile.toLowerCase() === 'unknown' ? null : profile
+  return profile == null || profile.toLowerCase() === PROFILES.unknown ? null : profile
 }
 
 /**
@@ -25,16 +32,18 @@ const profileOf = (stream: Stream): string | null => {
  */
 const bitrateOf = (stream: Stream): number | null => {
   const tags = isRecord(stream.tags) ? stream.tags : {}
-  const tagged = Object.entries(tags).find(([name]) => name === 'BPS' || name.startsWith('BPS-'))
+  const tagged = Object.entries(tags).find(
+    ([name]) => name === TAGS.bps || name.startsWith(`${TAGS.bps}-`),
+  )
   return numeric(stream.bit_rate) ?? numeric(tagged?.[1])
 }
 
 /** Dolby Vision wins over the HDR10 or HLG base layer it may sit on. */
 const rangeOf = (stream: Stream): VideoRange => {
-  if (hasDolbyVision(stream)) return 'dolbyVision'
-  if (stream.color_transfer === 'smpte2084') return 'hdr10'
-  if (stream.color_transfer === 'arib-std-b67') return 'hlg'
-  return 'sdr'
+  if (hasDolbyVision(stream)) return VIDEO_RANGES.dolbyVision
+  if (stream.color_transfer === COLOR_TRANSFERS.pq) return VIDEO_RANGES.hdr10
+  if (stream.color_transfer === COLOR_TRANSFERS.hlg) return VIDEO_RANGES.hlg
+  return VIDEO_RANGES.sdr
 }
 
 const isCoverArt = (stream: Stream): boolean =>
@@ -50,7 +59,9 @@ export const parseStreams = (output: unknown): MediaStreams => {
   const streams = (isRecord(output) && Array.isArray(output.streams) ? output.streams : []).filter(
     isRecord,
   )
-  const picture = streams.find((stream) => stream.codec_type === 'video' && !isCoverArt(stream))
+  const picture = streams.find(
+    (stream) => stream.codec_type === CODEC_TYPES.video && !isCoverArt(stream),
+  )
   const video: VideoStream | null = picture
     ? {
         codec: text(picture.codec_name),
@@ -60,7 +71,7 @@ export const parseStreams = (output: unknown): MediaStreams => {
       }
     : null
   const audio = streams
-    .filter((stream) => stream.codec_type === 'audio')
+    .filter((stream) => stream.codec_type === CODEC_TYPES.audio)
     .map((stream, index): AudioStream => ({
       index,
       codec: text(stream.codec_name),

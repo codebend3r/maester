@@ -5,6 +5,8 @@ import {
   isItemType,
   isRatingSource,
   isStringArray,
+  ITEM_IMAGE_KINDS,
+  ITEM_TYPES,
   type ItemDetails,
   type ItemSummary,
   type ItemType,
@@ -566,9 +568,13 @@ export class MetadataRepository {
       // An episode has a still where the others have a backdrop.
       backdropVersion:
         this.images
-          .versions({ ids: [id], kind: row.type === 'episode' ? 'still' : 'backdrop' })
+          .versions({
+            ids: [id],
+            kind:
+              row.type === ITEM_TYPES.episode ? ITEM_IMAGE_KINDS.still : ITEM_IMAGE_KINDS.backdrop,
+          })
           .get(id) ?? null,
-      logoVersion: this.images.versions({ ids: [id], kind: 'logo' }).get(id) ?? null,
+      logoVersion: this.images.versions({ ids: [id], kind: ITEM_IMAGE_KINDS.logo }).get(id) ?? null,
       credits: this.credits(id),
       reviews: this.reviews(id),
     }

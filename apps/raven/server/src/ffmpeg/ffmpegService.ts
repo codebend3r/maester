@@ -9,6 +9,7 @@ import {
   type OnApplicationBootstrap,
   type OnModuleDestroy,
 } from '@nestjs/common'
+import { ENCODER_KINDS, HW_ACCELS } from '@raven/core'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { SettingsRepository } from '@/settings/settingsRepository'
 import { encoderTestArgs } from '@/ffmpeg/args'
@@ -145,7 +146,7 @@ export class FfmpegService implements OnApplicationBootstrap, OnModuleDestroy {
     // The setting wins over HW_ACCEL, unless it leaves the choice to the machine.
     const preferred = this.settings.playback().hwAccel
     const candidates = encoderCandidates({
-      hwAccel: preferred === 'auto' ? this.config.hwAccel : preferred,
+      hwAccel: preferred === HW_ACCELS.auto ? this.config.hwAccel : preferred,
       platform: process.platform,
       vaapiDevice: this.config.vaapiDevice,
       deviceExists: existsSync(this.config.vaapiDevice),
@@ -157,7 +158,7 @@ export class FfmpegService implements OnApplicationBootstrap, OnModuleDestroy {
     )
     const chosen = working ?? SOFTWARE
     this.logger.log(
-      `Transcodes encode with ${chosen.kind === 'software' ? 'libx264 on the CPU' : chosen.kind}`,
+      `Transcodes encode with ${chosen.kind === ENCODER_KINDS.software ? 'libx264 on the CPU' : chosen.kind}`,
     )
     return chosen
   }

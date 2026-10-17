@@ -1,3 +1,4 @@
+import { ITEM_TYPES } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { itemChildren } from '@/items/itemChildren'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
@@ -130,7 +131,7 @@ describe("a page's children", () => {
       media,
     })
     expect(
-      everything.map((child) => (child.type === 'season' ? child.episodeCount : null)),
+      everything.map((child) => (child.type === ITEM_TYPES.season ? child.episodeCount : null)),
     ).toEqual([2, 1])
     const locked = itemChildren({
       parentId: state.showId,
@@ -139,9 +140,9 @@ describe("a page's children", () => {
       media,
     })
     expect(locked.map((child) => child.id)).toEqual([state.seasons[0]])
-    expect(locked.map((child) => (child.type === 'season' ? child.episodeCount : null))).toEqual([
-      1,
-    ])
+    expect(
+      locked.map((child) => (child.type === ITEM_TYPES.season ? child.episodeCount : null)),
+    ).toEqual([1])
   })
 
   it('gives each episode its row and the file Play starts, from what this browser may see', () => {
@@ -192,7 +193,7 @@ describe("a page's children", () => {
       const viewer = viewerHiding({ hidden, metadata })
       return {
         seasons: itemChildren({ parentId: state.showId, viewer, metadata, media }).flatMap(
-          (child) => (child.type === 'season' ? [child.watchedCount] : []),
+          (child) => (child.type === ITEM_TYPES.season ? [child.watchedCount] : []),
         ),
         episodes: itemChildren({ parentId: seasonOne, viewer, metadata, media }).flatMap((child) =>
           child.type === ITEM_TYPES.episode ? [child.watched] : [],

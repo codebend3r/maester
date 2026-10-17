@@ -144,8 +144,11 @@ export class PlaybackController {
       throw new BadRequestException(`No audio track ${audio}`)
     }
     const tonemap =
-      mode === 'transcode' && file.hdr && playback.tonemap && (await this.ffmpeg.canTonemap())
-    const encoder = mode === 'transcode' ? await this.ffmpeg.videoEncoder() : SOFTWARE
+      mode === PLAYBACK_MODES.transcode &&
+      file.hdr &&
+      playback.tonemap &&
+      (await this.ffmpeg.canTonemap())
+    const encoder = mode === PLAYBACK_MODES.transcode ? await this.ffmpeg.videoEncoder() : SOFTWARE
 
     const child = this.ffmpeg.stream(
       streamArgs({

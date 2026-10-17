@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import {
   DEFAULT_SAGA_BACKDROP,
-  ITEM_IMAGE_KINDS,
   MEDIA_PROBE_BYTES,
   MEDIA_TICKET_REFRESH_SECONDS,
   MEDIA_TICKET_SECONDS,
@@ -410,7 +409,7 @@ describe('the choice lists', () => {
     expect(isMediaSort('loudest')).toBe(false)
     expect(STREAM_MODES).toEqual(['remux', 'transcode'])
     expect(isStreamMode('direct')).toBe(false)
-    expect(ITEM_IMAGE_KINDS).toEqual(['poster', 'backdrop', 'still', 'logo'])
+    expect(isItemImageKind.values).toEqual(['poster', 'backdrop', 'still', 'logo'])
     expect(isItemImageKind('banner')).toBe(false)
     expect(isHwAccel('vaapi')).toBe(true)
     expect(isHwAccel('cuda')).toBe(false)

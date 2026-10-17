@@ -51,6 +51,11 @@ import {
   type StreamMode,
   type SubtitleCue,
   type UnlockRequest,
+  IMAGE_SOURCES,
+  ITEM_IMAGE_KINDS,
+  LIBRARY_BACKDROP_TYPES,
+  MATCH_SUBJECT_KINDS,
+  THUMBNAIL_STATES,
   isAdminLock,
   isDirectoryListing,
   isDisplaySettings,
@@ -676,7 +681,7 @@ export const createApiClient = ({
     posterSrcSet: ({ id, version }: { id: number; version: string | null }): string | null => {
       if (version == null) return null
       // Built once and widened by hand: a library lists thousands of posters.
-      const own = itemImageAt({ id, kind: 'poster', version })
+      const own = itemImageAt({ id, kind: ITEM_IMAGE_KINDS.poster, version })
       return POSTER_WIDTHS.map((width) =>
         width === POSTER_OWN_WIDTH ? `${own} ${width}w` : `${own}&w=${width} ${width}w`,
       ).join(', ')
@@ -684,14 +689,18 @@ export const createApiClient = ({
 
     /** One of a saga's movies' backdrops; versioned, so cached for good. */
     sagaPictureUrl: (picture: SagaPicture): string =>
-      itemImageAt({ id: picture.id, kind: 'backdrop', version: picture.version }),
+      itemImageAt({ id: picture.id, kind: ITEM_IMAGE_KINDS.backdrop, version: picture.version }),
 
     /** The picture behind a library's row on the Libraries page; versioned, so cached for good. */
     libraryBackdropUrl: (backdrop: LibraryBackdrop): string => {
       switch (backdrop.type) {
-        case 'item':
-          return itemImageAt({ id: backdrop.id, kind: 'backdrop', version: backdrop.version })
-        case 'thumbnail':
+        case LIBRARY_BACKDROP_TYPES.item:
+          return itemImageAt({
+            id: backdrop.id,
+            kind: ITEM_IMAGE_KINDS.backdrop,
+            version: backdrop.version,
+          })
+        case LIBRARY_BACKDROP_TYPES.thumbnail:
           return thumbnailAt({ id: backdrop.id, version: backdrop.version })
         default: {
           const unknown: never = backdrop

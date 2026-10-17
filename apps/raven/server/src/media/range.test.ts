@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseRange } from '@/media/range'
+import { RANGE_OUTCOMES, parseRange } from '@/media/range'
 
 describe('parseRange', () => {
   const size = 1000
@@ -16,7 +16,7 @@ describe('parseRange', () => {
   })
 
   it.each(['bytes=1000-', 'bytes=50-10', 'bytes=-0'])('refuses %s', (header) => {
-    expect(parseRange({ header, size })).toBe('unsatisfiable')
+    expect(parseRange({ header, size })).toBe(RANGE_OUTCOMES.unsatisfiable)
   })
 
   it.each([undefined, '', 'items=0-10', 'bytes=-'])('serves everything for %s', (header) => {

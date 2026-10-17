@@ -1,4 +1,4 @@
-import { type ItemChild, type ItemSummary, primaryVersion } from '@raven/core'
+import { ITEM_TYPES, type ItemChild, type ItemSummary, primaryVersion } from '@raven/core'
 import type { Viewer } from '@/lock/lockService'
 import type { MediaRepository } from '@/media/mediaRepository'
 import type { MetadataRepository } from '@/metadata/metadataRepository'
@@ -30,8 +30,8 @@ export const itemChildren = ({
   media: MediaRepository
 }): ItemChild[] => {
   const children = metadata.childrenOnDisk(parentId).filter((child) => viewer.seesItem(child.id))
-  const episodeIds = ofType({ children, type: 'episode' })
-  const onDisk = metadata.episodesOnDisk(ofType({ children, type: 'season' }))
+  const episodeIds = ofType({ children, type: ITEM_TYPES.episode })
+  const onDisk = metadata.episodesOnDisk(ofType({ children, type: ITEM_TYPES.season }))
   const rows = metadata.episodeRows(episodeIds)
   const files = media.forItems(episodeIds)
   const watched = new Set(
@@ -41,18 +41,18 @@ export const itemChildren = ({
   )
   return children.flatMap((child): ItemChild[] => {
     switch (child.type) {
-      case 'season': {
+      case ITEM_TYPES.season: {
         const shown = (onDisk.get(child.id) ?? []).filter((id) => viewer.seesItem(id))
         return [
           {
             ...child,
-            type: 'season',
+            type: ITEM_TYPES.season,
             episodeCount: shown.length,
             watchedCount: shown.filter((id) => watched.has(id)).length,
           },
         ]
       }
-      case 'episode': {
+      case ITEM_TYPES.episode: {
         const row = rows.get(child.id)
         const visible = (files.get(child.id) ?? []).filter((file) =>
           viewer.seesLibrary(file.libraryId),
@@ -60,7 +60,7 @@ export const itemChildren = ({
         return [
           {
             ...child,
-            type: 'episode',
+            type: ITEM_TYPES.episode,
             summary: row?.summary ?? null,
             released: row?.released ?? null,
             runtime: row?.runtime ?? null,
@@ -71,8 +71,8 @@ export const itemChildren = ({
         ]
       }
       // A movie or show is never a child.
-      case 'movie':
-      case 'show':
+      case ITEM_TYPES.movie:
+      case ITEM_TYPES.show:
         return []
       default: {
         const unknown: never = child.type

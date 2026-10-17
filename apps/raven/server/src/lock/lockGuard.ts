@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 import { LOCKED_STATUS, isString } from '@raven/core'
+import { HTTP_METHODS } from '@shared/server'
 import { AdminService } from '@/admin/adminService'
 import { LockService, PRIVACIES, type Privacy } from '@/lock/lockService'
 import { isMediaPlaneRoute } from '@/media/mediaPlaneMark'
@@ -26,12 +27,15 @@ const NOT_FOUND: Record<Privacy, string> = {
 }
 
 /** What a route says about the lock: what its `:id` names, or that it holds nothing back. */
-export type LockMark = Privacy | 'public'
+export const LOCK_MARKS = { ...PRIVACIES, public: 'public' } as const
+
+export type LockMark = (typeof LOCK_MARKS)[keyof typeof LOCK_MARKS]
 
 const isPrivacy = (value: unknown): value is Privacy =>
-  PRIVACIES.some((privacy) => privacy === value)
+  Object.values(PRIVACIES).some((privacy) => privacy === value)
 
-const isLockMark = (value: unknown): value is LockMark => value === 'public' || isPrivacy(value)
+const isLockMark = (value: unknown): value is LockMark =>
+  value === LOCK_MARKS.public || isPrivacy(value)
 
 /**
  * Marks a route, or every route of a controller, whose `:id` sits in a
@@ -44,7 +48,7 @@ export const PrivateBy = (privacy: Privacy) => SetMetadata(PRIVACY, privacy)
  * back by it: what it names is not in a library, or it hides what this
  * browser may not see itself. A route's own mark wins over its controller's.
  */
-export const Public = () => SetMetadata(PRIVACY, 'public')
+export const Public = () => SetMetadata(PRIVACY, LOCK_MARKS.public)
 
 const decorators = new Reflector()
 
@@ -65,10 +69,10 @@ const takesId = (path: string): boolean => path.split('/').includes(':id')
  */
 export const lockMarkProblems = (routes: readonly RouteMark[]): string[] =>
   routes.flatMap(({ method, path, lock, mediaPlane }) => {
-    if (mediaPlane && method !== 'GET') {
+    if (mediaPlane && method !== HTTP_METHODS.get) {
       return [`${method} ${path} is marked MediaPlane but is not a GET`]
     }
-    if (mediaPlane && isPrivacy(lock) && lock !== 'media') {
+    if (mediaPlane && isPrivacy(lock) && lock !== PRIVACIES.media) {
       return [
         `${method} ${path} is marked MediaPlane but is held by PrivateBy('${lock}') rather than 'media'`,
       ]
@@ -107,7 +111,7 @@ export class LockGuard implements CanActivate {
     const id = Number(params.id)
     const ticket = query.t
     if (
-      mark === 'media' &&
+      mark === PRIVACIES.media &&
       isMediaPlaneRoute([context.getHandler(), context.getClass()]) &&
       isString(ticket) &&
       this.tickets.verify({ ticket, id })

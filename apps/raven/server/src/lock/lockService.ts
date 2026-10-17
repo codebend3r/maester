@@ -10,9 +10,9 @@ import { MediaIndex } from '@/media/mediaIndex'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 
 /** What a route's `:id` names, so its library can be found: a library, a video, or a movie or show. */
-export type Privacy = 'library' | 'media' | 'item'
+export const PRIVACIES = { library: 'library', media: 'media', item: 'item' } as const
 
-export const PRIVACIES: readonly Privacy[] = ['library', 'media', 'item']
+export type Privacy = (typeof PRIVACIES)[keyof typeof PRIVACIES]
 
 /** What one request may see of the locked libraries. */
 export type Viewer = {
@@ -107,13 +107,13 @@ export class LockService {
     }
     const sees = ({ privacy, id }: { privacy: Privacy; id: number }): boolean => {
       switch (privacy) {
-        case 'library':
+        case PRIVACIES.library:
           return seesLibrary(id)
-        case 'media': {
+        case PRIVACIES.media: {
           const libraryId = this.index.libraryOf(id)
           return libraryId == null || seesLibrary(libraryId)
         }
-        case 'item':
+        case PRIVACIES.item:
           return seesItem(id)
         default: {
           const unknown: never = privacy

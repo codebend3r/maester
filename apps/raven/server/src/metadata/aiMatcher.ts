@@ -1,11 +1,11 @@
 import { relative } from 'node:path'
 import type { Anthropic } from '@anthropic-ai/sdk'
 import { Inject, Injectable } from '@nestjs/common'
-import { type MatchItemType, parseMovieName } from '@raven/core'
+import { ITEM_TYPES, type MatchItemType, parseMovieName } from '@raven/core'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import type { LibraryRecord } from '@/libraries/librariesRepository'
 import { AiClient } from '@/metadata/aiClient'
-import type { AiOutcome, AiPick } from '@/metadata/aiDecisions'
+import { AI_OUTCOME_KINDS, type AiOutcome, type AiPick } from '@/metadata/aiDecisions'
 import {
   AI_INPUT_BOUNDS,
   AI_SEARCH_RESULTS,
@@ -24,6 +24,19 @@ import { movieSearchTitles, readShowFile, showSearchTitles } from '@/metadata/ma
 import { notFound } from '@/metadata/matchPass'
 import { filePlace } from '@/metadata/places'
 import { type SearchResult, TmdbClient } from '@/metadata/tmdbClient'
+
+/** The reasons a turn stops that it tells apart. */
+export const STOP_REASONS = {
+  endTurn: 'end_turn',
+  refusal: 'refusal',
+  toolUse: 'tool_use',
+} as const satisfies Record<string, NonNullable<Anthropic.Message['stop_reason']>>
+
+/** The content block a tool call comes in. */
+const BLOCK_TYPES = { toolUse: 'tool_use' } as const satisfies Record<
+  string,
+  Anthropic.Message['content'][number]['type']
+>
 
 /** How many file names a lookup is sent, spread over the group. */
 export const AI_FILE_SAMPLE = 12
@@ -71,7 +84,7 @@ const readingOf = ({
   type: MatchItemType
   first: MatchFile
 }): Pick<AiGroup, 'parsed' | 'tried'> => {
-  if (type === 'show') {
+  if (type === ITEM_TYPES.show) {
     const parsed = readShowFile(first)
     return {
       parsed: { title: parsed.show, year: parsed.year },
@@ -125,7 +138,7 @@ type Lookup = { group: AiGroup; offered: Map<string, AiPick> }
 const offeredKey = ({ type, tmdbId }: { type: MatchItemType; tmdbId: string }): string =>
   `${type}:${tmdbId}`
 
-const undecided = (reason: string): AiOutcome => ({ kind: 'undecided', reason })
+const undecided = (reason: string): AiOutcome => ({ kind: AI_OUTCOME_KINDS.undecided, reason })
 
 const answer = ({
   use,
@@ -210,10 +223,14 @@ export class AiMatcher {
   }): Promise<AiOutcome> {
     const response = await this.ai.send(this.request(messages))
     // Haiku 5.5 has no server-side fallback for a refusal, so it is no decision.
-    if (response.stop_reason === 'refusal') return undecided('Claude declined to look this up.')
-    if (response.stop_reason !== 'tool_use') return undecided('The lookup ended without a choice.')
+    if (response.stop_reason === STOP_REASONS.refusal) {
+      return undecided('Claude declined to look this up.')
+    }
+    if (response.stop_reason !== STOP_REASONS.toolUse) {
+      return undecided('The lookup ended without a choice.')
+    }
     const uses = response.content.filter(
-      (block): block is Anthropic.ToolUseBlock => block.type === 'tool_use',
+      (block): block is Anthropic.ToolUseBlock => block.type === BLOCK_TYPES.toolUse,
     )
     const choice = uses.find((use) => use.name === AI_TOOL_NAMES.choose)
     if (choice != null) return this.choose({ lookup, input: choice.input })
@@ -264,7 +281,7 @@ export class AiMatcher {
     }
     const asked = { query: input.query, year: input.year }
     const found = (
-      input.type === 'movie'
+      input.type === ITEM_TYPES.movie
         ? await this.tmdb.searchMovies(asked)
         : await this.tmdb.searchShows(asked)
     ).slice(0, AI_SEARCH_RESULTS)
@@ -289,7 +306,7 @@ export class AiMatcher {
         isError: true,
       })
     }
-    if (!lookup.offered.has(offeredKey({ type: 'show', tmdbId: input.tmdbId }))) {
+    if (!lookup.offered.has(offeredKey({ type: ITEM_TYPES.show, tmdbId: input.tmdbId }))) {
       return answer({
         use,
         content: `Show ${input.tmdbId} came from no search in this lookup; search for it first.`,
@@ -323,12 +340,14 @@ export class AiMatcher {
   private choose({ lookup, input }: { lookup: Lookup; input: unknown }): AiOutcome {
     if (!isChooseInput(input)) return undecided('Its answer did not fit choose_match.')
     const reason = input.reason.trim().slice(0, REASON_LENGTH)
-    if (input.tmdbId == null) return { kind: 'none', confidence: input.confidence, reason }
+    if (input.tmdbId == null) {
+      return { kind: AI_OUTCOME_KINDS.none, confidence: input.confidence, reason }
+    }
     const pick = lookup.offered.get(offeredKey({ type: lookup.group.type, tmdbId: input.tmdbId }))
     // An id no search offered in this lookup is never trusted, however sure Claude is.
     if (pick == null) {
       return undecided(`It chose ${input.tmdbId}, which no search in the lookup returned.`)
     }
-    return { kind: 'chosen', pick, confidence: input.confidence, reason }
+    return { kind: AI_OUTCOME_KINDS.chosen, pick, confidence: input.confidence, reason }
   }
 }

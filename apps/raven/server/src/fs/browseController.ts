@@ -33,7 +33,7 @@ export class BrowseController {
   async browse(@Query('path') requested?: string): Promise<DirectoryListing> {
     const root = await realpath(this.config.browseRoot).catch(() => this.config.browseRoot)
     const target = await realpath(resolve(requested?.trim() || root)).catch((error: unknown) => {
-      throw errorCode(error) === 'ENOENT'
+      throw errorCode(error) === ERROR_CODES.enoent
         ? new NotFoundException('That folder does not exist')
         : new BadRequestException('That folder cannot be opened')
     })
@@ -42,7 +42,7 @@ export class BrowseController {
     }
 
     const entries = await readdir(target, { withFileTypes: true }).catch((error: unknown) => {
-      throw errorCode(error) === 'EACCES' || errorCode(error) === 'EPERM'
+      throw errorCode(error) === ERROR_CODES.eacces || errorCode(error) === ERROR_CODES.eperm
         ? new ForbiddenException('No permission to read that folder')
         : new BadRequestException('That folder cannot be read')
     })

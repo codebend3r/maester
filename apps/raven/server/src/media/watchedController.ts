@@ -1,6 +1,7 @@
 import { Body, Controller, Headers, HttpCode, Inject, Put } from '@nestjs/common'
 import { isWatchedChange, MAX_WATCH_TARGETS } from '@raven/core'
 import { ForViewers } from '@/admin/adminGuard'
+import { RAVEN_HEADERS } from '@/http'
 import { LockService } from '@/lock/lockService'
 import { WatchedCards } from '@/media/watchedCards'
 import { WatchedRepository } from '@/media/watchedRepository'
@@ -24,7 +25,7 @@ export class WatchedController {
   @ForViewers()
   @Put()
   @HttpCode(204)
-  set(@Body() body: unknown, @Headers('cookie') cookie: string | undefined): void {
+  set(@Body() body: unknown, @Headers(RAVEN_HEADERS.cookie) cookie: string | undefined): void {
     const change = parseBody({
       guard: isWatchedChange,
       body,
