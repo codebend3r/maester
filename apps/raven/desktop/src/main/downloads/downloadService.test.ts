@@ -177,6 +177,7 @@ const setup = ({
   videos = {},
   player = EMPTY_STATE,
   startAt = NOW,
+  isPageReady = true,
 }: {
   replies?: Record<string, Reply>
   free?: number
@@ -189,6 +190,8 @@ const setup = ({
   player?: PlayerState
   /** What the clock reads at launch. */
   startAt?: number
+  /** Whether the page says ready at once, as it does a moment after every launch. */
+  isPageReady?: boolean
 } = {}) => {
   const table: Record<string, Reply> = {
     [libraryCall]: ok(library({ id: 1, watchedPercent: 90 })),
@@ -280,6 +283,7 @@ const setup = ({
       return videoAt(path)
     },
   })
+  if (isPageReady) service.pageReady()
   return {
     service,
     store,
@@ -1471,11 +1475,15 @@ describe('deleting once watched', () => {
     ...EMPTY_DOWNLOADS,
     entries,
   })
-  const settingUp = (entry: Partial<DownloadEntry>) =>
+  const settingUp = (
+    entry: Partial<DownloadEntry>,
+    { isPageReady = true }: { isPageReady?: boolean } = {},
+  ) =>
     setup({
       initial: holding(entryFor({ autoDelete: true, ...entry })),
       videos: { [VIDEO]: FILE },
       replies: { [PLAY]: NO_CONTENT, [PROGRESS]: NO_CONTENT },
+      isPageReady,
     })
   const entries = (world: World) => world.store.read().entries
   /** Runs the timers set for this long, and no others. */
@@ -1537,6 +1545,19 @@ describe('deleting once watched', () => {
     const world = settingUp({ watchedAt: NOW - 11 * MINUTE })
     await until(() => entries(world).length === 0)
     expect(world.sent).toContainEqual(DELETED)
+  })
+
+  it("starts the launch's clocks only once the page says ready, so it hears the notice", async () => {
+    const world = settingUp({ watchedAt: NOW - 11 * MINUTE }, { isPageReady: false })
+    await ticks(20)
+    expect(entries(world)).toHaveLength(1)
+    expect(world.sent).not.toContainEqual(DELETED)
+    world.service.pageReady()
+    await until(() => entries(world).length === 0)
+    expect(world.sent).toContainEqual(DELETED)
+    world.service.pageReady()
+    await ticks(10)
+    expect(world.sent.filter((event) => event.type === 'notice')).toEqual([DELETED])
   })
 
   it('resumes the clock at launch with what is left, and the row says when', async () => {

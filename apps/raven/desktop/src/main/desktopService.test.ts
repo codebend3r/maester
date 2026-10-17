@@ -113,6 +113,7 @@ const fakeDownloads = ({
     },
     notePlaying: (input) => note('notePlaying', input),
     playbackLeft: (input) => note('playbackLeft', input),
+    pageReady: () => note('pageReady'),
     ask: async (input) => {
       note('ask', input)
       return { type: 'done' }
@@ -517,10 +518,10 @@ describe('handle', () => {
     expect(spies.ready).toBe(1)
   })
 
-  it('tells the downloads a page that says ready plays nothing, as after a reload mid-play', async () => {
+  it('tells the downloads a page said ready, which plays nothing after a reload mid-play', async () => {
     const { service, reached } = setup({ files: {} })
     await service.handle({ kind: 'page', request: { type: 'ready' } })
-    expect(reached).toEqual([{ name: 'notePlaying', input: { fileId: null } }])
+    expect(reached).toEqual([{ name: 'pageReady', input: null }])
   })
 
   it('opens the dialog on request', async () => {
