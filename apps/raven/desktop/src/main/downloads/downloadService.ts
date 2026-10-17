@@ -271,6 +271,9 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
       playback.forget(entries)
       entries.forEach(({ downloadId }) => deleteClock.cancel({ downloadId }))
     },
+    // After the settle, so a deletion that came due in the sleep finds the network back and
+    // the server hears what was watched first.
+    onAwake: () => deleteClock.rearm(),
     onFailed: (entry) => {
       const { status } = entry
       if (status.kind !== 'failed') return

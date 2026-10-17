@@ -2,7 +2,7 @@ import { entryById, type DownloadEntry } from '@/main/downloads/downloadState'
 import type { DownloadsStore } from '@/main/downloads/downloadStore'
 import { errorText } from '@/main/log/errorText'
 import { loggable } from '@/main/servers/serverCalls'
-import type { Timers } from '@/main/stateStore'
+import { TIMER_MAX_MS, type Timers } from '@/main/stateStore'
 
 /** A download set to delete once watched goes this long after it counts as watched. */
 export const AUTO_DELETE_DELAY_MS = 600_000
@@ -35,6 +35,11 @@ export type AutoDelete = {
   cancel: (input: { downloadId: string }) => void
   /** The player left a download: any deletion held while its file played is tried again. */
   playbackLeft: () => void
+  /**
+   * After a sleep: every running clock is armed again from its time. A timer stands still
+   * while the Mac sleeps, so one left alone would delete late by the length of the sleep.
+   */
+  rearm: () => void
   /** When the clock deletes this download, while it runs; null once it waits on the viewer. */
   deletesAt: (input: { downloadId: string }) => number | null
   dispose: () => void
@@ -130,11 +135,14 @@ export const createAutoDelete = (deps: AutoDeleteDeps): AutoDelete => {
     })
   }
 
+  // A wait past what a timer holds (a clock put back since the title was watched) is cut to it,
+  // and the timer then arms the rest, so the clock never runs out early.
   const arm = ({ downloadId, at }: { downloadId: string; at: number }): void => {
     if (isDisposed) return
     const wait = at - deps.now()
     if (wait <= 0) return due(downloadId)
-    clocks.set(downloadId, { kind: 'running', at, timer: timers.set(() => due(downloadId), wait) })
+    const timer = timers.set(() => arm({ downloadId, at }), Math.min(wait, TIMER_MAX_MS))
+    clocks.set(downloadId, { kind: 'running', at, timer })
   }
 
   /** A clock at `watchedAt` plus the delay, read off the store now; none when not set to delete. */
@@ -165,6 +173,14 @@ export const createAutoDelete = (deps: AutoDeleteDeps): AutoDelete => {
       .forEach(([downloadId]) => due(downloadId))
   }
 
+  const rearm: AutoDelete['rearm'] = () => {
+    ;[...clocks].forEach(([downloadId, clock]) => {
+      if (clock.kind !== 'running') return
+      timers.clear(clock.timer)
+      arm({ downloadId, at: clock.at })
+    })
+  }
+
   const deletesAt: AutoDelete['deletesAt'] = ({ downloadId }) => {
     const clock = clocks.get(downloadId)
     return clock?.kind === 'running' ? clock.at : null
@@ -175,5 +191,5 @@ export const createAutoDelete = (deps: AutoDeleteDeps): AutoDelete => {
     ;[...clocks.keys()].forEach((downloadId) => cancel({ downloadId }))
   }
 
-  return { rebuild, schedule, cancel, playbackLeft, deletesAt, dispose }
+  return { rebuild, schedule, cancel, playbackLeft, rearm, deletesAt, dispose }
 }

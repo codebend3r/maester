@@ -1606,6 +1606,21 @@ describe('deleting once watched', () => {
     expect(lastList(world)[0]?.deletesAt).toBe(NOW + 7 * MINUTE)
   })
 
+  it('deletes at once after a sleep that outlasted its ten minutes, once the wake has settled', async () => {
+    const world = settingUp({ watchedAt: NOW - 3 * MINUTE })
+    await until(() => world.service.views()[0]?.deletesAt !== null)
+    world.service.onSuspend()
+    // The clock's timer stood still for the hour the Mac slept.
+    world.clock.now += 60 * MINUTE
+    world.service.onResume()
+    await ticks(10)
+    expect(entries(world)).toHaveLength(1)
+    fireAfter(world, RESUME_SETTLE_MS)
+    await until(() => entries(world).length === 0)
+    expect(world.sent).toContainEqual(DELETED)
+    expect(delays(world)).not.toContain(7 * MINUTE)
+  })
+
   it('starts the ten minutes from the switch for a title already watched, and stops them when switched off', async () => {
     const world = settingUp({ autoDelete: false, watchedAt: NOW - 30 * MINUTE })
     await ticks(10)
