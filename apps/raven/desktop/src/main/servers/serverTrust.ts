@@ -101,16 +101,20 @@ type AddRefusal = Extract<ReturnType<typeof addServer>, { ok: false }>['reason']
  * `addServer`, with the host cut to a name's length. The host is ASCII, so cutting it
  * splits no character. A refusal leaves the config as it is and is told to `onRefused`.
  */
-const withServer = (
-  config: DesktopConfig,
-  {
-    id,
-    origin,
-    at,
-    onRefused,
-  }: { id: string; origin: string; at: number; onRefused: (reason: AddRefusal) => void },
-): DesktopConfig => {
-  const added = addServer(config, { id, origin, at })
+const withServer = ({
+  config,
+  id,
+  origin,
+  at,
+  onRefused,
+}: {
+  config: DesktopConfig
+  id: string
+  origin: string
+  at: number
+  onRefused: (reason: AddRefusal) => void
+}): DesktopConfig => {
+  const added = addServer({ config, id, origin, at })
   if (!added.ok) {
     onRefused(added.reason)
     return config
@@ -211,7 +215,8 @@ export const createServerTrust = (deps: ServerTrustDeps): ServerTrust => {
     const refusal: { reason: AddRefusal | null } = { reason: null }
     try {
       deps.config.update((config) =>
-        withServer(config, {
+        withServer({
+          config,
           id: serverId,
           origin,
           at: deps.now(),
@@ -225,7 +230,7 @@ export const createServerTrust = (deps: ServerTrustDeps): ServerTrust => {
       await forget(serverId)
       return { kind: 'unsaved' }
     }
-    const stored = serverByOrigin(deps.config.read(), { origin })
+    const stored = serverByOrigin({ config: deps.config.read(), origin })
     if (stored === null) {
       await forget(serverId)
       return refusal.reason === 'full' ? { kind: 'full' } : { kind: 'unsaved' }
@@ -234,9 +239,9 @@ export const createServerTrust = (deps: ServerTrustDeps): ServerTrust => {
     declinedFromLinks.delete(origin)
     if (stored.id !== serverId) {
       await forget(serverId)
-      return { kind: 'trusted', server: stored, isNew: false }
+      return { kind: TRUST_OUTCOME_KINDS.trusted, server: stored, isNew: false }
     }
-    return { kind: 'trusted', server: stored, isNew: true }
+    return { kind: TRUST_OUTCOME_KINDS.trusted, server: stored, isNew: true }
   }
 
   const ask = async ({
@@ -253,7 +258,7 @@ export const createServerTrust = (deps: ServerTrustDeps): ServerTrust => {
     }
     const serverId = newId()
     // The id names a session on disk, so one that is not fresh and opaque must not make one.
-    if (serverId === null || serverById(deps.config.read(), { serverId }) !== null) {
+    if (serverId === null || serverById({ config: deps.config.read(), serverId }) !== null) {
       warn(`raven player made an unusable id for ${origin}`)
       return { kind: 'unsaved' }
     }
@@ -270,11 +275,13 @@ export const createServerTrust = (deps: ServerTrustDeps): ServerTrust => {
       const origin = serverOriginOf(raw)
       if (origin === null) return { kind: 'invalid' }
       const config = deps.config.read()
-      const known = serverByOrigin(config, { origin })
-      if (known !== null) return { kind: 'trusted', server: known, isNew: false }
-      if (config.servers.length >= SERVERS_CAP) return { kind: 'full' }
-      if (from === 'link' && declinedFromLinks.has(origin)) return { kind: 'declined' }
-      if (state.isAsking) return { kind: 'busy' }
+      const known = serverByOrigin({ config, origin })
+      if (known !== null) return { kind: TRUST_OUTCOME_KINDS.trusted, server: known, isNew: false }
+      if (config.servers.length >= SERVERS_CAP) return { kind: TRUST_OUTCOME_KINDS.full }
+      if (from === TRUST_SOURCES.link && declinedFromLinks.has(origin)) {
+        return { kind: TRUST_OUTCOME_KINDS.declined }
+      }
+      if (state.isAsking) return { kind: TRUST_OUTCOME_KINDS.busy }
       state.isAsking = true
       try {
         return await ask({ origin, from })
@@ -283,9 +290,9 @@ export const createServerTrust = (deps: ServerTrustDeps): ServerTrust => {
       }
     },
     remove: async (serverId) => {
-      if (serverById(deps.config.read(), { serverId }) === null) return false
+      if (serverById({ config: deps.config.read(), serverId }) === null) return false
       try {
-        deps.config.update((config) => removeServer(config, { serverId }))
+        deps.config.update((config) => removeServer({ config, serverId }))
       } catch (error) {
         warn(`raven player could not remove server ${serverId}: ${loggable(messageOf(error))}`)
         return false

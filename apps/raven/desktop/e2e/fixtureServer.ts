@@ -3,6 +3,8 @@ import { readFile } from 'node:fs/promises'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { basename, extname } from 'node:path'
 import { isMediaTracks, isRecord, isString, type MediaTracks } from '@raven/core'
+import { API_PATHS } from '@/main/servers/allowlist'
+import { SERVER_METHODS } from '@/shared/protocol'
 import { mediaItemFor } from '@/shared/test/mediaItem'
 
 /**
@@ -10,6 +12,26 @@ import { mediaItemFor } from '@/shared/test/mediaItem'
  * proxy's sign-in page in front of a server does.
  */
 export const FIXTURE_MEDIA = { first: 1, second: 2, redirecting: 3, page: 4 } as const
+
+/** `METHOD path` for the lock routes, as `answer` reads a request. */
+const API_ROUTES = {
+  lock: `${SERVER_METHODS.get} ${API_PATHS.lock}`,
+  unlock: `${SERVER_METHODS.post} ${API_PATHS.unlock}`,
+  admin: `${SERVER_METHODS.get} ${API_PATHS.admin}`,
+  adminUnlock: `${SERVER_METHODS.post} ${API_PATHS.adminUnlock}`,
+} as const
+
+/** `METHOD rest` for a title's routes, `rest` being what follows `/api/media/<id>`. */
+const MEDIA_ROUTES = {
+  item: `${SERVER_METHODS.get} `,
+  tracks: `${SERVER_METHODS.get} /tracks`,
+  sidecar: `${SERVER_METHODS.get} /subtitles/external-0`,
+  file: `${SERVER_METHODS.get} /file`,
+  progress: `${SERVER_METHODS.put} /progress`,
+  plays: `${SERVER_METHODS.post} /plays`,
+} as const
+
+const FIXTURE_ADMIN_KINDS = { off: 'off', password: 'password', noPassword: 'noPassword' } as const
 
 /**
  * The admin lock as this browser meets it:
@@ -607,7 +629,10 @@ export const startFixtureServer = async ({
   const home = listener({ serve: answer })
   const away = listener({
     serve: ({ request, response }) => {
-      if (request.method === 'GET' && request.url === fileOf(FIXTURE_MEDIA.redirecting)) {
+      if (
+        request.method === SERVER_METHODS.get &&
+        request.url === fileOf(FIXTURE_MEDIA.redirecting)
+      ) {
         return sendFile({ request, response, path: clips.tracks, bytes: tracksBytes })
       }
       return sendJson({ response, status: 404, body: { message: 'Not found' } })

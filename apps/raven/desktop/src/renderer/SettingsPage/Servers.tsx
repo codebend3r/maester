@@ -1,16 +1,31 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { type FormEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react'
-import { Button } from '@raven/ui'
-import { useDesktop } from '@/renderer/desktop/DesktopContext'
+import { Button, KEYS } from '@raven/ui'
 import { SERVERS_KEY, useServers } from '@/renderer/desktop/serverApi'
 import styles from '@/renderer/SettingsPage/Servers.module.scss'
 import { RECENTS_KEY } from '@/renderer/Shell/openReply'
-import type { DesktopRequest, ServerView } from '@/shared/protocol'
+import { useDesktop } from '@/renderer/stores/desktop'
+import {
+  DESKTOP_REPLIES,
+  type DESKTOP_REQUESTS,
+  type DesktopRequest,
+  type ServerView,
+} from '@/shared/protocol'
 
 const UNCHANGED = 'raven player could not change its servers. Try again.'
 const ALREADY_ADDED = 'That server is already in raven player.'
 
-type ServerChange = Extract<DesktopRequest, { type: 'addServer' | 'renameServer' | 'removeServer' }>
+type ServerChange = Extract<
+  DesktopRequest,
+  {
+    type:
+      | typeof DESKTOP_REQUESTS.addServer
+      | typeof DESKTOP_REQUESTS.renameServer
+      | typeof DESKTOP_REQUESTS.removeServer
+  }
+>
+
+const ANSWER_KINDS = { servers: 'servers', declined: 'declined', refused: 'refused' } as const
 
 /** Main's answer to a change: the servers it now keeps, a declined prompt, or a refusal already shown. */
 type Answer =

@@ -211,7 +211,7 @@ const setup = ({
       remove: async (serverId) => {
         server.removed.push(serverId)
         const isKnown = config.read().servers.some((entry) => entry.id === serverId)
-        config.update((current) => removeServer(current, { serverId }))
+        config.update((current) => removeServer({ config: current, serverId }))
         return isKnown
       },
     },

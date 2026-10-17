@@ -1,8 +1,11 @@
 import { isPlayerEvent, isPlayerReply, type PlayerEvent } from '@raven/core'
 import type { NativePlayer } from '@raven/ui'
 import { useSyncExternalStore } from 'react'
-import { useDesktop } from '@/renderer/desktop/DesktopContext'
-import { isPlayerPortMessage } from '@/shared/protocol'
+import { useDesktop } from '@/renderer/stores/desktop'
+import { isPlayerPortMessage, PLAYER_CONNECTION_STATUSES } from '@/shared/protocol'
+
+/** The page's player as it stands: main's answer, or waiting for one. */
+export const CONNECTION_STATUSES = { waiting: 'waiting', ...PLAYER_CONNECTION_STATUSES } as const
 
 export type PlayerConnection =
   | { status: 'waiting' }
@@ -261,7 +264,7 @@ export const listenForPlayer = ({
   }
 }
 
-/** The page's player connection, read through the `DesktopProvider`. */
+/** The page's player connection, read through the desktop bridge's store. */
 export const usePlayerConnection = (): PlayerConnection => {
   const { player } = useDesktop()
   return useSyncExternalStore(player.subscribe, player.read)

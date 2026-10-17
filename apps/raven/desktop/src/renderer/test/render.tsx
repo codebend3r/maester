@@ -4,7 +4,6 @@ import { render } from '@testing-library/react'
 import { act, StrictMode } from 'react'
 import { createMemoryRouter, type RouteObject, RouterProvider } from 'react-router-dom'
 import type { DesktopClient } from '@/renderer/desktop/client'
-import { DesktopProvider } from '@/renderer/desktop/DesktopContext'
 import { createMenuHub } from '@/renderer/desktop/menuHub'
 import type { PlayerConnection, PlayerConnections } from '@/renderer/desktop/playerConnection'
 import { HomePage } from '@/renderer/HomePage/HomePage'
@@ -107,9 +106,7 @@ export const renderDesktop = ({
   })
   const app = (
     <QueryClientProvider client={queryClient}>
-      <DesktopProvider client={client} menu={menu} player={player}>
-        <RouterProvider router={router} />
-      </DesktopProvider>
+      <RouterProvider router={router} />
     </QueryClientProvider>
   )
   render(isStrict ? <StrictMode>{app}</StrictMode> : app)

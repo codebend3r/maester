@@ -8,7 +8,6 @@ import '@fontsource-variable/instrument-sans/wdth.css'
 import '@raven/ui/styles.css'
 import '@/renderer/styles/desktop.scss'
 import { clientFor } from '@/renderer/desktop/client'
-import { DesktopProvider } from '@/renderer/desktop/DesktopContext'
 import { createMenuHub } from '@/renderer/desktop/menuHub'
 import { listenForPlayer } from '@/renderer/desktop/playerConnection'
 import { desktopRoutes } from '@/renderer/routes'
@@ -31,9 +30,7 @@ if (rootElement) {
     root.render(
       <StrictMode>
         <QueryClientProvider client={new QueryClient()}>
-          <DesktopProvider client={client} menu={createMenuHub()} player={player}>
-            <RouterProvider router={createMemoryRouter(desktopRoutes)} />
-          </DesktopProvider>
+          <RouterProvider router={createMemoryRouter(desktopRoutes)} />
         </QueryClientProvider>
       </StrictMode>,
     )

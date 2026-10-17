@@ -2,6 +2,9 @@ import { describe, expect, it, jest, mock, spyOn } from 'bun:test'
 import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { NavigationType } from 'react-router-dom'
+import { useDragging } from '@/renderer/stores/dragging'
+import { useNotice } from '@/renderer/stores/notice'
+import { useUpdateNotice } from '@/renderer/stores/updateNotice'
 import { fakeClient, renderDesktop, STUB_ROUTES } from '@/renderer/test/render'
 
 const ID_A = '11111111-1111-4111-8111-111111111111'
@@ -348,6 +351,24 @@ describe('Shell', () => {
         ),
       )
     })
+  })
+
+  it('leaves no notice, update or drag behind once it unmounts', async () => {
+    const client = fakeClient()
+    renderDesktop({ client, routes: STUB_ROUTES })
+    await settled()
+    await client.emit({ type: 'notice', message: 'Opened from a link.' })
+    await client.emit({ type: 'updateAvailable', version: '0.6.0' })
+    const enter = new Event('dragenter')
+    Object.defineProperty(enter, 'dataTransfer', { value: { types: ['Files'] } })
+    act(() => {
+      window.dispatchEvent(enter)
+    })
+    expect(useDragging.getState().isDragging).toBe(true)
+    cleanup()
+    expect(useNotice.getState().notice).toBeNull()
+    expect(useUpdateNotice.getState().version).toBeNull()
+    expect(useDragging.getState().isDragging).toBe(false)
   })
 
   it('refuses the browser default for dragover', async () => {

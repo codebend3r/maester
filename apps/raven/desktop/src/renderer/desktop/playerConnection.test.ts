@@ -9,7 +9,7 @@ import {
   PLAYER_NOT_HANDED,
   PlayerRefusal,
 } from '@/renderer/desktop/playerConnection'
-import { APP_ORIGIN, ENGINE_STOPPED, PLAYER_PORT_MESSAGE } from '@/shared/protocol'
+import { APP_ORIGIN, ENGINE_STOPPED, IPC_CHANNELS, WINDOW_MESSAGE_TYPES } from '@/shared/protocol'
 
 const wait = (ms = 5) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -148,9 +148,9 @@ const portMessage = ({
   window.dispatchEvent(new MessageEvent('message', { data, origin, source, ports }))
 }
 
-const NATIVE = { type: PLAYER_PORT_MESSAGE, connection: { status: 'native' } } as const
+const NATIVE = { type: WINDOW_MESSAGE_TYPES.playerPort, connection: { status: 'native' } } as const
 const UNAVAILABLE = {
-  type: PLAYER_PORT_MESSAGE,
+  type: WINDOW_MESSAGE_TYPES.playerPort,
   connection: { status: 'unavailable', message: 'The video engine is off for this run.' },
 } as const
 
@@ -175,10 +175,12 @@ describe('listenForPlayer', () => {
     const { page } = channel()
     portMessage({ data: NATIVE, origin: 'https://example.com', ports: [page] })
     portMessage({ data: NATIVE, source: null, ports: [page] })
-    portMessage({ data: { ...NATIVE, type: 'raven:player' }, ports: [page] })
+    portMessage({ data: { ...NATIVE, type: IPC_CHANNELS.player }, ports: [page] })
     portMessage({ data: NATIVE, ports: [] })
     portMessage({ data: NATIVE, ports: [page, channel().page] })
-    portMessage({ data: { type: PLAYER_PORT_MESSAGE, connection: { status: 'unavailable' } } })
+    portMessage({
+      data: { type: WINDOW_MESSAGE_TYPES.playerPort, connection: { status: 'unavailable' } },
+    })
     expect(connections.read()).toEqual({ status: 'waiting' })
     expect(heard).toEqual([])
   })

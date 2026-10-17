@@ -3,10 +3,17 @@ import {
   APP_HOST,
   APP_ORIGIN,
   APP_SCHEME,
-  EVENT_CHANNEL,
+  DESKTOP_EVENTS,
+  DESKTOP_REPLIES,
+  DESKTOP_REQUESTS,
+  ENVELOPE_KINDS,
   FILE_SCHEME,
   MAX_QUEUE,
-  REQUEST_CHANNEL,
+  MENU_PLAYER_ACTIONS,
+  NAVIGATION_TARGETS,
+  PLAYER_CONNECTION_STATUSES,
+  SERVER_METHODS,
+  WINDOW_MESSAGE_TYPES,
   fileUrlFor,
   isDesktopEvent,
   isDesktopReply,
@@ -24,8 +31,6 @@ import {
   isServerView,
   isTrackChoice,
   isUpdateStatus,
-  PLAYER_PORT_CHANNEL,
-  PLAYER_PORT_MESSAGE,
 } from '@/shared/protocol'
 
 const id = '0f8fad5b-d9cb-469f-a165-70867728950e'
@@ -44,11 +49,13 @@ describe('constants', () => {
     expect(APP_ORIGIN).toBe('app://raven')
     expect(`${APP_SCHEME}://${APP_HOST}`).toBe(APP_ORIGIN)
     expect(FILE_SCHEME).toBe('raven-file')
-    expect(REQUEST_CHANNEL).toBe('raven:request')
-    expect(EVENT_CHANNEL).toBe('raven:event')
+    expect(IPC_CHANNELS).toEqual({
+      request: 'raven:request',
+      event: 'raven:event',
+      player: 'raven:player',
+    })
     expect(MAX_QUEUE).toBe(100)
-    expect(PLAYER_PORT_CHANNEL).toBe('raven:player')
-    expect(PLAYER_PORT_MESSAGE).toBe('raven:player-port')
+    expect(WINDOW_MESSAGE_TYPES.playerPort).toBe('raven:player-port')
   })
 })
 
@@ -136,20 +143,20 @@ describe('the building blocks', () => {
 
 describe('isDesktopRequest', () => {
   it.each([
-    [{ type: 'ready' }],
-    [{ type: 'openDialog' }],
-    [{ type: 'describeFile', fileId: id, queue: [other] }],
-    [{ type: 'savePosition', fileId: id, position: 12.5, duration: 600 }],
-    [{ type: 'savePosition', fileId: id, position: 12.5, duration: null }],
-    [{ type: 'listRecents' }],
-    [{ type: 'openRecent', recentId: id }],
-    [{ type: 'removeRecent', recentId: id }],
-    [{ type: 'clearRecents' }],
-    [{ type: 'saveTracks', fileId: id, audio: 1, subtitle: 'embedded-0' }],
-    [{ type: 'saveTracks', fileId: id, audio: null, subtitle: null }],
-    [{ type: 'saveTracks', fileId: id, audio: 0, subtitle: null }],
-    [{ type: 'windowButtons', isVisible: false }],
-    [{ type: 'readOutput' }],
+    [{ type: DESKTOP_REQUESTS.ready }],
+    [{ type: DESKTOP_REQUESTS.openDialog }],
+    [{ type: DESKTOP_REQUESTS.describeFile, fileId: id, queue: [other] }],
+    [{ type: DESKTOP_REQUESTS.savePosition, fileId: id, position: 12.5, duration: 600 }],
+    [{ type: DESKTOP_REQUESTS.savePosition, fileId: id, position: 12.5, duration: null }],
+    [{ type: DESKTOP_REQUESTS.listRecents }],
+    [{ type: DESKTOP_REQUESTS.openRecent, recentId: id }],
+    [{ type: DESKTOP_REQUESTS.removeRecent, recentId: id }],
+    [{ type: DESKTOP_REQUESTS.clearRecents }],
+    [{ type: DESKTOP_REQUESTS.saveTracks, fileId: id, audio: 1, subtitle: 'embedded-0' }],
+    [{ type: DESKTOP_REQUESTS.saveTracks, fileId: id, audio: null, subtitle: null }],
+    [{ type: DESKTOP_REQUESTS.saveTracks, fileId: id, audio: 0, subtitle: null }],
+    [{ type: DESKTOP_REQUESTS.windowButtons, isVisible: false }],
+    [{ type: DESKTOP_REQUESTS.readOutput }],
     [
       {
         type: 'writeOutput',
@@ -159,50 +166,114 @@ describe('isDesktopRequest', () => {
     [{ type: 'serverCall', serverId: id, method: 'GET', path: '/api/media/7', body: null }],
     [
       {
-        type: 'serverCall',
+        type: DESKTOP_REQUESTS.serverCall,
         serverId: id,
-        method: 'PUT',
+        method: SERVER_METHODS.get,
+        path: '/api/media/7',
+        body: null,
+      },
+    ],
+    [
+      {
+        type: DESKTOP_REQUESTS.serverCall,
+        serverId: id,
+        method: SERVER_METHODS.put,
         path: '/api/media/7/progress',
         body: '{}',
       },
     ],
-    [{ type: 'listServers' }],
-    [{ type: 'addServer', origin: 'https://raven.example' }],
-    [{ type: 'renameServer', serverId: id, name: 'Home' }],
-    [{ type: 'removeServer', serverId: id }],
-    [{ type: 'openLink', link: 'raven://play?server=https://raven.example&media=7' }],
-    [{ type: 'openInBrowser', serverId: id, mediaId: 7 }],
-    [{ type: 'noteServerTitle', serverId: id, mediaId: 7, label: 'Dune', watched: 0.5 }],
-    [{ type: 'noteServerTitle', serverId: id, mediaId: 7, label: 'Dune', watched: null }],
-    [{ type: 'readUpdates' }],
-    [{ type: 'setUpdateCheck', isEnabled: false }],
-    [{ type: 'checkForUpdates' }],
-    [{ type: 'openRelease' }],
+    [{ type: DESKTOP_REQUESTS.listServers }],
+    [{ type: DESKTOP_REQUESTS.addServer, origin: 'https://raven.example' }],
+    [{ type: DESKTOP_REQUESTS.renameServer, serverId: id, name: 'Home' }],
+    [{ type: DESKTOP_REQUESTS.removeServer, serverId: id }],
+    [
+      {
+        type: DESKTOP_REQUESTS.openLink,
+        link: 'raven://play?server=https://raven.example&media=7',
+      },
+    ],
+    [{ type: DESKTOP_REQUESTS.openInBrowser, serverId: id, mediaId: 7 }],
+    [
+      {
+        type: DESKTOP_REQUESTS.noteServerTitle,
+        serverId: id,
+        mediaId: 7,
+        label: 'Dune',
+        watched: 0.5,
+      },
+    ],
+    [
+      {
+        type: DESKTOP_REQUESTS.noteServerTitle,
+        serverId: id,
+        mediaId: 7,
+        label: 'Dune',
+        watched: null,
+      },
+    ],
+    [{ type: DESKTOP_REQUESTS.readUpdates }],
+    [{ type: DESKTOP_REQUESTS.setUpdateCheck, isEnabled: false }],
+    [{ type: DESKTOP_REQUESTS.checkForUpdates }],
+    [{ type: DESKTOP_REQUESTS.openRelease }],
   ])('accepts %j', (value) => {
     expect(isDesktopRequest(value)).toBe(true)
   })
 
   it.each([
-    ['a path as the file id', { type: 'describeFile', fileId: '/Users/me/film.mkv', queue: [] }],
-    ['a string position', { type: 'savePosition', fileId: id, position: '12', duration: null }],
-    ['a missing duration', { type: 'savePosition', fileId: id, position: 12 }],
-    ['a string audio index', { type: 'saveTracks', fileId: id, audio: '1', subtitle: null }],
-    ['a fractional audio index', { type: 'saveTracks', fileId: id, audio: 1.5, subtitle: null }],
-    ['a negative audio index', { type: 'saveTracks', fileId: id, audio: -1, subtitle: null }],
-    ['a path in saveTracks', { type: 'saveTracks', fileId: '/m/a.mkv', audio: 1, subtitle: null }],
-    ['a string for the window buttons', { type: 'windowButtons', isVisible: 'yes' }],
-    ['partial output settings', { type: 'writeOutput', output: { profile: 'pcm' } }],
+    [
+      'a path as the file id',
+      { type: DESKTOP_REQUESTS.describeFile, fileId: '/Users/me/film.mkv', queue: [] },
+    ],
+    [
+      'a string position',
+      { type: DESKTOP_REQUESTS.savePosition, fileId: id, position: '12', duration: null },
+    ],
+    ['a missing duration', { type: DESKTOP_REQUESTS.savePosition, fileId: id, position: 12 }],
+    [
+      'a string audio index',
+      { type: DESKTOP_REQUESTS.saveTracks, fileId: id, audio: '1', subtitle: null },
+    ],
+    [
+      'a fractional audio index',
+      { type: DESKTOP_REQUESTS.saveTracks, fileId: id, audio: 1.5, subtitle: null },
+    ],
+    [
+      'a negative audio index',
+      { type: DESKTOP_REQUESTS.saveTracks, fileId: id, audio: -1, subtitle: null },
+    ],
+    [
+      'a path in saveTracks',
+      { type: DESKTOP_REQUESTS.saveTracks, fileId: '/m/a.mkv', audio: 1, subtitle: null },
+    ],
+    ['a string for the window buttons', { type: DESKTOP_REQUESTS.windowButtons, isVisible: 'yes' }],
+    ['partial output settings', { type: DESKTOP_REQUESTS.writeOutput, output: { profile: 'pcm' } }],
     [
       'a server call with a method off the list',
       { type: 'serverCall', serverId: id, method: 'DELETE', path: '/api/media/7', body: null },
     ],
     [
       'a server call naming a host for the server',
-      { type: 'serverCall', serverId: 'vhagar', method: 'GET', path: '/api/media/7', body: null },
+      {
+        type: DESKTOP_REQUESTS.serverCall,
+        serverId: 'vhagar',
+        method: SERVER_METHODS.get,
+        path: '/api/media/7',
+        body: null,
+      },
     ],
     [
       'a server call with a number for its body',
-      { type: 'serverCall', serverId: id, method: 'POST', path: '/api/media/7/plays', body: 3 },
+      {
+        type: DESKTOP_REQUESTS.serverCall,
+        serverId: id,
+        method: SERVER_METHODS.post,
+        path: '/api/media/7/plays',
+        body: 3,
+      },
+    ],
+    [
+      'a browser open with a media id of zero',
+      { type: DESKTOP_REQUESTS.openInBrowser, serverId: id, mediaId: 0 },
     ],
     ['a browser open with a media id of zero', { type: 'openInBrowser', serverId: id, mediaId: 0 }],
     [
@@ -211,12 +282,15 @@ describe('isDesktopRequest', () => {
     ],
     [
       'a server title noted without its share watched',
-      { type: 'noteServerTitle', serverId: id, mediaId: 7, label: 'Dune' },
+      { type: DESKTOP_REQUESTS.noteServerTitle, serverId: id, mediaId: 7, label: 'Dune' },
     ],
-    ['a server added without an origin', { type: 'addServer' }],
-    ['a rename to a number', { type: 'renameServer', serverId: id, name: 7 }],
-    ['an update switch set by a string', { type: 'setUpdateCheck', isEnabled: 'true' }],
-    ['an update switch with no value', { type: 'setUpdateCheck' }],
+    ['a server added without an origin', { type: DESKTOP_REQUESTS.addServer }],
+    ['a rename to a number', { type: DESKTOP_REQUESTS.renameServer, serverId: id, name: 7 }],
+    [
+      'an update switch set by a string',
+      { type: DESKTOP_REQUESTS.setUpdateCheck, isEnabled: 'true' },
+    ],
+    ['an update switch with no value', { type: DESKTOP_REQUESTS.setUpdateCheck }],
     ['an unknown type', { type: 'readFile', path: '/etc/hosts' }],
     ['no type', {}],
     ['a string', 'ready'],

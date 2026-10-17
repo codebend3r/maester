@@ -114,7 +114,18 @@ export const AUDIO_PROFILES = {
 export const isAudioProfile = oneOf(Object.values(AUDIO_PROFILES))
 
 /** mpv's `audio-spdif` vocabulary. */
-export const isPassthroughFormat = oneOf(['ac3', 'eac3', 'dts', 'dts-hd', 'truehd'])
+export const PASSTHROUGH_FORMATS = {
+  ac3: 'ac3',
+  eac3: 'eac3',
+  dts: 'dts',
+  dtsHd: 'dts-hd',
+  truehd: 'truehd',
+} as const
+
+export const isPassthroughFormat = oneOf(Object.values(PASSTHROUGH_FORMATS))
+
+/** mpv's `audio-device` names raven knows by heart: `auto` follows the system. */
+export const AUDIO_DEVICES = { auto: 'auto' } as const
 
 export const isOutputSettings = object({
   profile: isAudioProfile,

@@ -1,7 +1,7 @@
 import { isAdminUnlockRequest, isMediaId, isProgressChange, isUnlockRequest } from '@raven/core'
+import { SERVER_METHODS } from '@/shared/protocol'
 
-export const SERVER_METHODS = ['GET', 'PUT', 'POST'] as const
-export type ServerMethod = (typeof SERVER_METHODS)[number]
+export type ServerMethod = (typeof SERVER_METHODS)[keyof typeof SERVER_METHODS]
 export const MAX_BODY = 4096
 export const MAX_SECRET = 256
 
@@ -83,20 +83,20 @@ const bare =
 // escape, extra slash or absolute URL can match; `$` without the `m` flag ends the input.
 const ROUTES: readonly Route[] = [
   {
-    kind: 'media',
-    method: 'GET',
+    kind: ROUTE_KINDS.media,
+    method: SERVER_METHODS.get,
     pattern: /^\/api\/media\/([1-9]\d{0,15})$/u,
     read: ({ mediaId, body }) => bare({ name: 'getMedia', mediaId })({ body }),
   },
   {
-    kind: 'media',
-    method: 'GET',
+    kind: ROUTE_KINDS.media,
+    method: SERVER_METHODS.get,
     pattern: /^\/api\/media\/([1-9]\d{0,15})\/tracks$/u,
     read: ({ mediaId, body }) => bare({ name: 'getTracks', mediaId })({ body }),
   },
   {
-    kind: 'media',
-    method: 'PUT',
+    kind: ROUTE_KINDS.media,
+    method: SERVER_METHODS.put,
     pattern: /^\/api\/media\/([1-9]\d{0,15})\/progress$/u,
     read: ({ mediaId, body }) =>
       body.kind === 'json' && isProgressChange(body.value)
@@ -104,16 +104,22 @@ const ROUTES: readonly Route[] = [
         : null,
   },
   {
-    kind: 'media',
-    method: 'POST',
+    kind: ROUTE_KINDS.media,
+    method: SERVER_METHODS.post,
     pattern: /^\/api\/media\/([1-9]\d{0,15})\/plays$/u,
-    read: ({ mediaId, body }) => bare({ name: 'recordPlay', mediaId })({ body }),
+    read: ({ mediaId, body }) => bare({ name: CALL_NAMES.recordPlay, mediaId })({ body }),
+  },
+  {
+    kind: ROUTE_KINDS.fixed,
+    method: SERVER_METHODS.get,
+    path: API_PATHS.lock,
+    read: bare({ name: CALL_NAMES.getLock }),
   },
   { kind: 'fixed', method: 'GET', path: '/api/lock', read: bare({ name: 'getLock' }) },
   {
-    kind: 'fixed',
-    method: 'POST',
-    path: '/api/lock/unlock',
+    kind: ROUTE_KINDS.fixed,
+    method: SERVER_METHODS.post,
+    path: API_PATHS.unlock,
     read: ({ body }) =>
       body.kind === 'json' && isUnlockRequest(body.value) && isSecret(body.value.pin)
         ? { name: 'unlock', pin: body.value.pin }
@@ -121,9 +127,15 @@ const ROUTES: readonly Route[] = [
   },
   { kind: 'fixed', method: 'GET', path: '/api/admin', read: bare({ name: 'getAdminLock' }) },
   {
-    kind: 'fixed',
-    method: 'POST',
-    path: '/api/admin/unlock',
+    kind: ROUTE_KINDS.fixed,
+    method: SERVER_METHODS.get,
+    path: API_PATHS.admin,
+    read: bare({ name: CALL_NAMES.getAdminLock }),
+  },
+  {
+    kind: ROUTE_KINDS.fixed,
+    method: SERVER_METHODS.post,
+    path: API_PATHS.adminUnlock,
     read: ({ body }) =>
       body.kind === 'json' && isAdminUnlockRequest(body.value) && isSecret(body.value.password)
         ? { name: 'unlockAdmin', password: body.value.password }
@@ -186,28 +198,32 @@ export const requestFor = (
   call: AllowedCall,
 ): { method: ServerMethod; path: string; body: string | null } => {
   switch (call.name) {
-    case 'getMedia':
-      return { method: 'GET', path: `/api/media/${call.mediaId}`, body: null }
-    case 'getTracks':
-      return { method: 'GET', path: `/api/media/${call.mediaId}/tracks`, body: null }
-    case 'saveProgress':
+    case CALL_NAMES.getMedia:
+      return { method: SERVER_METHODS.get, path: `/api/media/${call.mediaId}`, body: null }
+    case CALL_NAMES.getTracks:
+      return { method: SERVER_METHODS.get, path: `/api/media/${call.mediaId}/tracks`, body: null }
+    case CALL_NAMES.saveProgress:
       return {
-        method: 'PUT',
+        method: SERVER_METHODS.put,
         path: `/api/media/${call.mediaId}/progress`,
         body: JSON.stringify({ position: call.position }),
       }
-    case 'recordPlay':
-      return { method: 'POST', path: `/api/media/${call.mediaId}/plays`, body: null }
-    case 'getLock':
-      return { method: 'GET', path: '/api/lock', body: null }
-    case 'unlock':
-      return { method: 'POST', path: '/api/lock/unlock', body: JSON.stringify({ pin: call.pin }) }
-    case 'getAdminLock':
-      return { method: 'GET', path: '/api/admin', body: null }
-    case 'unlockAdmin':
+    case CALL_NAMES.recordPlay:
+      return { method: SERVER_METHODS.post, path: `/api/media/${call.mediaId}/plays`, body: null }
+    case CALL_NAMES.getLock:
+      return { method: SERVER_METHODS.get, path: API_PATHS.lock, body: null }
+    case CALL_NAMES.unlock:
       return {
-        method: 'POST',
-        path: '/api/admin/unlock',
+        method: SERVER_METHODS.post,
+        path: API_PATHS.unlock,
+        body: JSON.stringify({ pin: call.pin }),
+      }
+    case CALL_NAMES.getAdminLock:
+      return { method: SERVER_METHODS.get, path: API_PATHS.admin, body: null }
+    case CALL_NAMES.unlockAdmin:
+      return {
+        method: SERVER_METHODS.post,
+        path: API_PATHS.adminUnlock,
         body: JSON.stringify({ password: call.password }),
       }
     default: {

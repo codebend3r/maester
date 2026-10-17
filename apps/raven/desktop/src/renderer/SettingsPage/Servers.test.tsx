@@ -39,17 +39,17 @@ const mainWith = ({
           return listed()
         case 'listRecents':
           return { type: 'recents', recents: [] }
-        case 'addServer':
+        case DESKTOP_REQUESTS.addServer:
           if (answers.addServer !== undefined) return answers.addServer
           stored.servers = [...stored.servers, ADDED]
           return listed()
-        case 'renameServer':
+        case DESKTOP_REQUESTS.renameServer:
           if (answers.renameServer !== undefined) return answers.renameServer
           stored.servers = stored.servers.map((server) =>
             server.serverId === asked.serverId ? { ...server, name: asked.name.trim() } : server,
           )
           return listed()
-        case 'removeServer':
+        case DESKTOP_REQUESTS.removeServer:
           if (answers.removeServer !== undefined) return answers.removeServer
           stored.servers = stored.servers.filter((server) => server.serverId !== asked.serverId)
           return listed()
@@ -403,8 +403,9 @@ describe('Servers', () => {
     const held = Promise.withResolvers<DesktopReply>()
     const client = fakeClient({
       request: async (asked) => {
-        if (asked.type === 'listServers') return { type: 'servers', servers: [VHAGAR] }
-        if (asked.type === 'addServer') return held.promise
+        if (asked.type === DESKTOP_REQUESTS.listServers)
+          return { type: 'servers', servers: [VHAGAR] }
+        if (asked.type === DESKTOP_REQUESTS.addServer) return held.promise
         return { type: 'done' }
       },
     })
@@ -448,8 +449,9 @@ describe('Servers', () => {
   it('says so when main does not answer at all', async () => {
     const client = fakeClient({
       request: async (asked) => {
-        if (asked.type === 'listServers') return { type: 'servers', servers: [VHAGAR] }
-        if (asked.type === 'removeServer') throw new Error('port closed')
+        if (asked.type === DESKTOP_REQUESTS.listServers)
+          return { type: 'servers', servers: [VHAGAR] }
+        if (asked.type === DESKTOP_REQUESTS.removeServer) throw new Error('port closed')
         return { type: 'done' }
       },
     })

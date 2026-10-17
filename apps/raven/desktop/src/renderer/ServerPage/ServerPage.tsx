@@ -18,7 +18,7 @@ import {
 import { skipToken, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
-import { useDesktop } from '@/renderer/desktop/DesktopContext'
+import { CONNECTION_STATUSES } from '@/renderer/desktop/playerConnection'
 import { serverApiFor, useServers } from '@/renderer/desktop/serverApi'
 import { NativePlaying } from '@/renderer/PlayPage/NativePlaying'
 import { Refused, useIsOutputFixed, Waiting } from '@/renderer/PlayPage/PlayPage'
@@ -35,7 +35,14 @@ import {
   serverServicesFor,
   shareOf,
 } from '@/renderer/ServerPage/serverServices'
-import { type MenuPlayerAction, isOpaqueId, SERVER_GONE, type ServerView } from '@/shared/protocol'
+import { useDesktop } from '@/renderer/stores/desktop'
+import {
+  isOpaqueId,
+  MENU_PLAYER_ACTIONS,
+  type MenuPlayerAction,
+  SERVER_GONE,
+  type ServerView,
+} from '@/shared/protocol'
 
 const NOT_OPENABLE = 'raven player cannot open that title.'
 

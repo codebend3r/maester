@@ -37,7 +37,7 @@ const isServerRecent = object({
 
 export const isRecentEntry = union(isFileRecent, isServerRecent)
 
-export const isResumeEntry = object({
+const isResumeEntry = object({
   path: isString,
   size: isNumber,
   mtimeMs: isNumber,
@@ -46,7 +46,7 @@ export const isResumeEntry = object({
   playedAt: isNumber,
 })
 
-export const isTrackPick = object({
+const isTrackPick = object({
   path: isString,
   audio: nullable(isNumber),
   subtitle: nullable(isString),
@@ -70,8 +70,7 @@ export const isPlayerState = object({
 })
 
 export type RecentEntry = Infer<typeof isRecentEntry>
-export type ResumeEntry = Infer<typeof isResumeEntry>
-export type TrackPick = Infer<typeof isTrackPick>
+type ResumeEntry = Infer<typeof isResumeEntry>
 export type WindowBounds = Infer<typeof isWindowBounds>
 export type PlayerState = Infer<typeof isPlayerState>
 
@@ -110,7 +109,7 @@ export const recentKey = (entry: RecentEntry): string => {
 }
 
 /** Puts `entry` first, dropping any older entry with its key, and keeps the newest `RECENTS_CAP`. */
-const withRecent = (state: PlayerState, { entry }: { entry: RecentEntry }): PlayerState => {
+const withRecent = ({ state, entry }: { state: PlayerState; entry: RecentEntry }): PlayerState => {
   const key = recentKey(entry)
   return {
     ...state,
@@ -121,10 +120,15 @@ const withRecent = (state: PlayerState, { entry }: { entry: RecentEntry }): Play
   }
 }
 
-export const addRecent = (
-  state: PlayerState,
-  { path, at }: { path: string; at: number },
-): PlayerState => withRecent(state, { entry: { kind: 'file', path, openedAt: at } })
+export const addRecent = ({
+  state,
+  path,
+  at,
+}: {
+  state: PlayerState
+  path: string
+  at: number
+}): PlayerState => withRecent({ state, entry: { kind: RECENT_KINDS.file, path, openedAt: at } })
 
 /** A label the page sent is kept to a sensible length, so it cannot swell the state file. */
 export const RECENT_LABEL_MAX = 200
@@ -132,17 +136,23 @@ export const RECENT_LABEL_MAX = 200
 const clampShare = (watched: number | null): number | null =>
   watched === null ? null : Math.min(1, Math.max(0, watched))
 
-export const noteServerRecent = (
-  state: PlayerState,
-  {
-    serverId,
-    mediaId,
-    label,
-    watched,
-    at,
-  }: { serverId: string; mediaId: number; label: string; watched: number | null; at: number },
-): PlayerState =>
-  withRecent(state, {
+export const noteServerRecent = ({
+  state,
+  serverId,
+  mediaId,
+  label,
+  watched,
+  at,
+}: {
+  state: PlayerState
+  serverId: string
+  mediaId: number
+  label: string
+  watched: number | null
+  at: number
+}): PlayerState =>
+  withRecent({
+    state,
     entry: {
       kind: 'server',
       serverId,
@@ -153,18 +163,27 @@ export const noteServerRecent = (
     },
   })
 
-export const removeRecentByKey = (state: PlayerState, { key }: { key: string }): PlayerState => ({
+export const removeRecentByKey = ({
+  state,
+  key,
+}: {
+  state: PlayerState
+  key: string
+}): PlayerState => ({
   ...state,
   recents: state.recents.filter((entry) => recentKey(entry) !== key),
 })
 
-export const removeRecent = (state: PlayerState, { path }: { path: string }): PlayerState =>
-  removeRecentByKey(state, { key: recentKey({ kind: 'file', path, openedAt: 0 }) })
+export const removeRecent = ({ state, path }: { state: PlayerState; path: string }): PlayerState =>
+  removeRecentByKey({ state, key: recentKey({ kind: RECENT_KINDS.file, path, openedAt: 0 }) })
 
-export const removeServerRecents = (
-  state: PlayerState,
-  { serverId }: { serverId: string },
-): PlayerState => ({
+export const removeServerRecents = ({
+  state,
+  serverId,
+}: {
+  state: PlayerState
+  serverId: string
+}): PlayerState => ({
   ...state,
   recents: state.recents.filter((entry) => entry.kind !== 'server' || entry.serverId !== serverId),
 })
@@ -180,24 +199,28 @@ const isFinished = ({
 }): boolean => position <= 0 || (duration !== null && position >= duration - END_MARGIN_S)
 
 /** The saved entry for this file as it is now: a replaced file (other size or mtime) has none. */
-const savedFor = (state: PlayerState, { file }: { file: FileFacts }): ResumeEntry | null => {
+const savedFor = ({ state, file }: { state: PlayerState; file: FileFacts }): ResumeEntry | null => {
   const saved = state.resume.find((entry) => entry.path === file.path)
   if (!saved) return null
   if (saved.size !== file.size || saved.mtimeMs !== file.mtimeMs) return null
   return saved
 }
 
-export const savePosition = (
-  state: PlayerState,
-  {
-    file,
-    position,
-    duration: reported,
-    at,
-  }: { file: FileFacts; position: number; duration: number | null; at: number },
-): PlayerState => {
+export const savePosition = ({
+  state,
+  file,
+  position,
+  duration: reported,
+  at,
+}: {
+  state: PlayerState
+  file: FileFacts
+  position: number
+  duration: number | null
+  at: number
+}): PlayerState => {
   // A player that leaves before it learns the length reports none; the length known before still holds.
-  const duration = reported ?? savedFor(state, { file })?.duration ?? null
+  const duration = reported ?? savedFor({ state, file })?.duration ?? null
   if (isFinished({ position, duration })) {
     return { ...state, resume: state.resume.filter((entry) => entry.path !== file.path) }
   }
@@ -211,27 +234,37 @@ export const savePosition = (
   }
 }
 
-export const resumeFor = (state: PlayerState, { file }: { file: FileFacts }): number => {
-  const saved = savedFor(state, { file })
+export const resumeFor = ({ state, file }: { state: PlayerState; file: FileFacts }): number => {
+  const saved = savedFor({ state, file })
   if (!saved) return 0
   return isFinished(saved) ? 0 : saved.position
 }
 
-export const watchedShare = (state: PlayerState, { file }: { file: FileFacts }): number | null => {
-  const saved = savedFor(state, { file })
+export const watchedShare = ({
+  state,
+  file,
+}: {
+  state: PlayerState
+  file: FileFacts
+}): number | null => {
+  const saved = savedFor({ state, file })
   if (!saved || saved.duration === null || saved.duration <= 0) return null
   return Math.min(1, Math.max(0, saved.position / saved.duration))
 }
 
-export const setTrackPick = (
-  state: PlayerState,
-  {
-    path,
-    audio,
-    subtitle,
-    at,
-  }: { path: string; audio: number | null; subtitle: string | null; at: number },
-): PlayerState => ({
+export const setTrackPick = ({
+  state,
+  path,
+  audio,
+  subtitle,
+  at,
+}: {
+  state: PlayerState
+  path: string
+  audio: number | null
+  subtitle: string | null
+  at: number
+}): PlayerState => ({
   ...state,
   tracks: upsertFirst({
     list: state.tracks,
@@ -240,16 +273,22 @@ export const setTrackPick = (
   }),
 })
 
-export const trackPickFor = (
-  state: PlayerState,
-  { path }: { path: string },
-): { audio: number | null; subtitle: string | null } | null => {
+export const trackPickFor = ({
+  state,
+  path,
+}: {
+  state: PlayerState
+  path: string
+}): { audio: number | null; subtitle: string | null } | null => {
   const pick = state.tracks.find((entry) => entry.path === path)
   if (!pick) return null
   return { audio: pick.audio, subtitle: pick.subtitle }
 }
 
-export const setWindowBounds = (
-  state: PlayerState,
-  { bounds }: { bounds: WindowBounds },
-): PlayerState => ({ ...state, window: bounds })
+export const setWindowBounds = ({
+  state,
+  bounds,
+}: {
+  state: PlayerState
+  bounds: WindowBounds
+}): PlayerState => ({ ...state, window: bounds })

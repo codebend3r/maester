@@ -1,14 +1,14 @@
 import { createContext, useContext } from 'react'
 import { type NavigateFunction, useLocation, useNavigate } from 'react-router-dom'
-import type { DesktopReply, PlayTarget, ServerTarget } from '@/shared/protocol'
+import { useNotice } from '@/renderer/stores/notice'
+import {
+  DESKTOP_REPLIES,
+  type DesktopReply,
+  type PlayTarget,
+  type ServerTarget,
+} from '@/shared/protocol'
 
 export const RECENTS_KEY = ['desktop', 'recents'] as const
-
-/** The Shell provides it; a page outside the Shell says nothing. */
-export const NoticeContext = createContext<(message: string) => void>(() => undefined)
-
-/** Says something in the Shell's live region, which outlasts the page that said it. */
-export const useNotice = (): ((message: string) => void) => useContext(NoticeContext)
 
 const isPlaying = ({ pathname }: { pathname: string }): boolean =>
   pathname.startsWith('/play/') || pathname.startsWith('/server/')
@@ -81,6 +81,6 @@ export const applyReply = ({
 export const useOpenReply = (): ((reply: DesktopReply) => void) => {
   const navigate = useNavigate()
   const { pathname } = useLocation()
-  const showNotice = useContext(NoticeContext)
+  const showNotice = useNotice((state) => state.show)
   return (reply) => applyReply({ reply, navigate, pathname, showNotice })
 }

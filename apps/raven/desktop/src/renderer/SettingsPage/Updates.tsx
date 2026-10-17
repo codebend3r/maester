@@ -1,10 +1,16 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useId, useRef, useState } from 'react'
 import { Button } from '@raven/ui'
-import { useDesktop } from '@/renderer/desktop/DesktopContext'
 import styles from '@/renderer/SettingsPage/Updates.module.scss'
-import { UNOPENED, UPDATES_KEY, useHideUpdate } from '@/renderer/Shell/updateState'
-import type { DesktopRequest, UpdateStatus } from '@/shared/protocol'
+import { UNOPENED, UPDATES_KEY } from '@/renderer/Shell/updateState'
+import { useDesktop } from '@/renderer/stores/desktop'
+import { useUpdateNotice } from '@/renderer/stores/updateNotice'
+import {
+  DESKTOP_REPLIES,
+  type DESKTOP_REQUESTS,
+  type DesktopRequest,
+  type UpdateStatus,
+} from '@/shared/protocol'
 
 // Main's `UPDATE_COPY`, repeated: the page cannot import main.
 const COPY = {
@@ -37,7 +43,7 @@ const resultsOf = ({
 export const Updates = ({ className }: { className?: string }) => {
   const { client } = useDesktop()
   const queryClient = useQueryClient()
-  const hideUpdate = useHideUpdate()
+  const hideUpdate = useUpdateNotice((state) => state.hide)
   const hintId = useId()
   const isCheckingNow = useRef(false)
   const [isChecking, setIsChecking] = useState(false)
@@ -101,8 +107,8 @@ export const Updates = ({ className }: { className?: string }) => {
     setRefusal('')
     const reply = await client.request({ type: 'openRelease' }).catch(() => null)
     // The page is open now, so the Shell's notice has said what it had to.
-    if (reply !== null && reply.type === 'done') return hideUpdate()
-    setRefusal(reply !== null && reply.type === 'refused' ? reply.message : UNOPENED)
+    if (reply !== null && reply.type === DESKTOP_REPLIES.done) return hideUpdate()
+    setRefusal(reply !== null && reply.type === DESKTOP_REPLIES.refused ? reply.message : UNOPENED)
   }
 
   const status = read.data ?? null

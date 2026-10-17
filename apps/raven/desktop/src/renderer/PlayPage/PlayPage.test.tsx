@@ -29,7 +29,7 @@ import {
   type DesktopRequest,
   ENGINE_STOPPED,
   type LocalFile,
-  PLAYER_PORT_MESSAGE,
+  WINDOW_MESSAGE_TYPES,
 } from '@/shared/protocol'
 
 const A = '11111111-1111-4111-8111-111111111111'
@@ -160,7 +160,7 @@ describe('PlayPage', () => {
     await screen.findByRole('heading', { name: 'Clip 02' })
     const sent = client.request.mock.calls.map(([request]) => request)
     const saved = sent.findIndex(
-      (request) => request.type === 'savePosition' && request.fileId === A,
+      (request) => request.type === DESKTOP_REQUESTS.savePosition && request.fileId === A,
     )
     const described = sent.findIndex(
       (request) => request.type === 'describeFile' && request.fileId === B,
@@ -575,7 +575,7 @@ const handedOver = () => {
   port2.start()
   window.dispatchEvent(
     new MessageEvent('message', {
-      data: { type: PLAYER_PORT_MESSAGE, connection: { status: 'native' } },
+      data: { type: WINDOW_MESSAGE_TYPES.playerPort, connection: { status: 'native' } },
       origin: APP_ORIGIN,
       source: window,
       ports: [port1],

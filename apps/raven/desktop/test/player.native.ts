@@ -24,6 +24,7 @@ import {
   type FixtureServer,
   startFixtureServer,
 } from '@/e2e/fixtureServer'
+import { SERVER_METHODS } from '@/shared/protocol'
 import type { ServerEntry } from '@/main/desktopConfig'
 import { addonPathFor } from '@/main/player/engine'
 import {
@@ -1497,7 +1498,7 @@ describe('server titles from a raven fixture server', () => {
         const sidecars = requestsTo({ log: fixture.requests, path: SIDECAR_PATH, from: mark })
         assert.ok(sidecars.length > 0, 'mpv never asked for the sidecar')
         assert.ok(
-          sidecars.every(({ method, hasUnlock }) => method === 'GET' && hasUnlock),
+          sidecars.every(({ method, hasUnlock }) => method === SERVER_METHODS.get && hasUnlock),
           'the sidecar request went without the unlock cookie',
         )
         const external = await externalTrackId({ harness })

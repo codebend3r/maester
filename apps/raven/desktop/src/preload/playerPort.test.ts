@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { forwardPlayerPort } from '@/preload/playerPort'
-import { PLAYER_PORT_MESSAGE } from '@/shared/protocol'
+import { PLAYER_CONNECTION_STATUSES, WINDOW_MESSAGE_TYPES } from '@/shared/protocol'
 
 const { port1, port2 } = new MessageChannel()
 
@@ -20,7 +20,10 @@ describe('forwardPlayerPort', () => {
   test('forwards a native connection with its one port', () => {
     expect(forward({ payload: { status: 'native' }, ports: [port1] })).toEqual([
       {
-        message: { type: PLAYER_PORT_MESSAGE, connection: { status: 'native' } },
+        message: {
+          type: WINDOW_MESSAGE_TYPES.playerPort,
+          connection: { status: PLAYER_CONNECTION_STATUSES.native },
+        },
         transfer: [port1],
       },
     ])
@@ -37,8 +40,8 @@ describe('forwardPlayerPort', () => {
     expect(forward({ payload: { status: 'unavailable', message: 'x' }, ports: [] })).toEqual([
       {
         message: {
-          type: PLAYER_PORT_MESSAGE,
-          connection: { status: 'unavailable', message: 'x' },
+          type: WINDOW_MESSAGE_TYPES.playerPort,
+          connection: { status: PLAYER_CONNECTION_STATUSES.unavailable, message: 'x' },
         },
         transfer: [],
       },
@@ -63,16 +66,16 @@ describe('forwardPlayerPort', () => {
   test('rebuilds the connection from its known fields only', () => {
     const [sent] = forward({ payload: { status: 'native', path: '/x' }, ports: [port1] })
     expect(sent!.message).toStrictEqual({
-      type: PLAYER_PORT_MESSAGE,
-      connection: { status: 'native' },
+      type: WINDOW_MESSAGE_TYPES.playerPort,
+      connection: { status: PLAYER_CONNECTION_STATUSES.native },
     })
     const [unavailable] = forward({
       payload: { status: 'unavailable', message: 'x', path: '/x' },
       ports: [],
     })
     expect(unavailable!.message).toStrictEqual({
-      type: PLAYER_PORT_MESSAGE,
-      connection: { status: 'unavailable', message: 'x' },
+      type: WINDOW_MESSAGE_TYPES.playerPort,
+      connection: { status: PLAYER_CONNECTION_STATUSES.unavailable, message: 'x' },
     })
   })
 })

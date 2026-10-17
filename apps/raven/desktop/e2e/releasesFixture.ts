@@ -1,4 +1,7 @@
 import { createServer } from 'node:http'
+import { SERVER_METHODS } from '@/shared/protocol'
+
+const RELEASES_PATH = '/releases'
 
 export type ReleasesFixture = {
   /** What `RAVEN_DESKTOP_RELEASES_URL` points at. */
@@ -32,7 +35,12 @@ export const startReleasesFixture = async ({
     const { pathname, searchParams } = new URL(request.url ?? '/', 'http://127.0.0.1')
     const page = pageOf(searchParams)
     const body = bodies.at(page - 1)
-    if (request.method !== 'GET' || pathname !== '/releases' || page === 0 || body === undefined) {
+    if (
+      request.method !== SERVER_METHODS.get ||
+      pathname !== RELEASES_PATH ||
+      page === 0 ||
+      body === undefined
+    ) {
       response.writeHead(404).end()
       return
     }

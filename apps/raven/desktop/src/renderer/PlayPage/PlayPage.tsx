@@ -12,7 +12,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import type { OutputSettings } from '@raven/core'
 import { Button, Player, PlayerServicesProvider, useKeyShortcut } from '@raven/ui'
 import type { DesktopClient } from '@/renderer/desktop/client'
-import { useDesktop } from '@/renderer/desktop/DesktopContext'
+import { CONNECTION_STATUSES } from '@/renderer/desktop/playerConnection'
 import { NativePlaying } from '@/renderer/PlayPage/NativePlaying'
 import styles from '@/renderer/PlayPage/PlayPage.module.scss'
 import {
@@ -24,7 +24,8 @@ import {
   STATS_UNAVAILABLE,
 } from '@/renderer/PlayPage/playerServices'
 import { type Chosen, useChosenEngine } from '@/renderer/PlayPage/useChosenEngine'
-import { useNotice } from '@/renderer/Shell/openReply'
+import { useDesktop } from '@/renderer/stores/desktop'
+import { useNotice } from '@/renderer/stores/notice'
 import { carriesPassthrough } from '@/shared/carriedOutput'
 import { fileUrlFor, isOpaqueId, type LocalFile, type MenuPlayerAction } from '@/shared/protocol'
 
@@ -97,7 +98,7 @@ const Playing = ({
 }) => {
   const { client, menu } = useDesktop()
   const navigate = useNavigate()
-  const showNotice = useNotice()
+  const showNotice = useNotice((state) => state.show)
   const [lostAt, setLostAt] = useState<number | null>(null)
   // The first loss counts: a refusal racing the engine's stop event reports the same moment.
   const onLost = useCallback((at: number) => setLostAt((current) => current ?? at), [])

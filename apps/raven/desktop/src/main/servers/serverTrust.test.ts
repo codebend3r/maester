@@ -237,7 +237,8 @@ describe('createServerTrust', () => {
 
   it('keeps a renamed record as it is, unicode name and all', async () => {
     const stored = entryFor({ n: 1 })
-    const renamed = renameServer(configWith({ servers: [stored] }), {
+    const renamed = renameServer({
+      config: configWith({ servers: [stored] }),
       serverId: stored.id,
       name: 'Vhagar \u{1F409} NAS',
     })

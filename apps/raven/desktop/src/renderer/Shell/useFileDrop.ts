@@ -1,10 +1,17 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import type { DesktopClient } from '@/renderer/desktop/client'
+import { useDragging } from '@/renderer/stores/dragging'
 import type { DesktopReply } from '@/shared/protocol'
 
+/** `DataTransfer.types` names a drag of files this way; the DOM types it as a plain string. */
+const DRAG_TYPES = { files: 'Files' } as const
+
+const setIsDragging = (isDragging: boolean) => useDragging.setState({ isDragging })
+
 /**
- * Whether files are being dragged over the window, and the drop itself: the
- * files go to main in the order dropped, and what main answers goes to `onReply`.
+ * Whether files are being dragged over the window, kept in `useDragging`, and the
+ * drop itself: the files go to main in the order dropped, and what main answers
+ * goes to `onReply`.
  */
 export const useFileDrop = ({
   client,
