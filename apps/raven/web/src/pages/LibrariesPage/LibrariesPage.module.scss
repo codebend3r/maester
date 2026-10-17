@@ -4,6 +4,12 @@
   gap: var(--space-5);
 }
 
+// The page's first row: it stops short of the theme button in the corner.
+.back {
+  justify-self: start;
+  max-width: calc(100% - var(--corner-clearance, 0px));
+}
+
 // The title over how many there are, Add library at their right on the
 // summary's line. The theme button takes the page's top right corner, so the
 // title wraps short of it, and Add library sits low enough to clear it.

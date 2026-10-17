@@ -9,6 +9,7 @@ import {
 import { Icon } from '@raven/ui'
 import { type ReactNode, useId } from 'react'
 import { Link } from 'react-router-dom'
+import { BackButton } from '@/components/BackButton/BackButton'
 import { MediaCard } from '@/components/MediaCard/MediaCard'
 import { PosterCard } from '@/components/PosterCard/PosterCard'
 import { SearchField } from '@/components/SearchField/SearchField'
@@ -233,6 +234,7 @@ export const HomePage = () => {
 
   return (
     <section className={styles.page} aria-labelledby={ids.title}>
+      <BackButton fallback={null} className={styles.back} />
       <header className={styles.header}>
         <h1 id={ids.title} className={styles.title}>
           Home

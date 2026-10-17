@@ -1,4 +1,5 @@
 import { ButtonLink, themeOf } from '@raven/ui'
+import { BackButton } from '@/components/BackButton/BackButton'
 import { useTheme } from '@/stores/theme'
 import styles from '@/pages/NotFoundPage/NotFoundPage.module.scss'
 
@@ -17,6 +18,7 @@ export const NotFoundPage = () => {
   const tone = useTheme((state) => themeOf(state.theme).tone)
   return (
     <section className={styles.page}>
+      <BackButton fallback={{ to: '/', label: 'Home' }} className={styles.back} />
       <p className={styles.figures} aria-hidden="true">
         <span>4</span>
         <span className={styles.poster}>

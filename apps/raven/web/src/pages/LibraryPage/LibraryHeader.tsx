@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { Library } from '@raven/core'
 import { Button } from '@raven/ui'
+import { BackButton } from '@/components/BackButton/BackButton'
 import { LibraryActions, type useLibraryActions } from '@/components/LibraryActions/LibraryActions'
 import { LibraryIcon } from '@/components/LibraryIcon/LibraryIcon'
 import { ScanStatus } from '@/components/ScanStatus/ScanStatus'
@@ -36,6 +37,7 @@ export const LibraryHeader = ({
 
   return (
     <header className={styles.header}>
+      <BackButton fallback={{ to: '/libraries', label: 'Libraries' }} className={styles.back} />
       <div className={styles.heading}>
         <h1 id={titleId} className={styles.title}>
           <LibraryIcon settings={settings} size="0.6em" className={styles.titleIcon} />

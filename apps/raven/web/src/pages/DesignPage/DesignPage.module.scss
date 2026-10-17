@@ -7,6 +7,12 @@
   gap: var(--space-5);
 }
 
+// The page's first row: it stops short of the theme button in the corner.
+.back {
+  justify-self: start;
+  max-width: calc(100% - var(--corner-clearance, 0px));
+}
+
 .sections {
   display: grid;
   grid-template-columns: minmax(0, 1fr);

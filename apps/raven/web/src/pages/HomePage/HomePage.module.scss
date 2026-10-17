@@ -6,6 +6,12 @@
   gap: var(--section-gap);
 }
 
+// The page's first row: it stops short of the theme button in the corner.
+.back {
+  justify-self: start;
+  max-width: calc(100% - var(--corner-clearance, 0px));
+}
+
 // The title, small, and the search at the right, clear of the theme button
 // in the corner; on a phone the search takes a row of its own under them.
 .header {

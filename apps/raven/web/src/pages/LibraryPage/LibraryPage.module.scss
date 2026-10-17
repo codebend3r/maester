@@ -13,19 +13,28 @@
   }
 }
 
-.back {
-  justify-self: start;
-}
-
+// The way back over the heading, which is the rest of the header.
 // The header is a container, so its buttons go under the title by the room
 // the page leaves it, whatever the side menu takes.
 .header {
   container-type: inline-size;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    'back'
+    'heading';
+  gap: var(--space-4);
+}
+
+.back {
+  grid-area: back;
+  justify-self: start;
 }
 
 // The title over its counts, the buttons at their right on the counts' line,
 // and how the scan stands under them.
 .heading {
+  grid-area: heading;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   grid-template-areas:

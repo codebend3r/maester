@@ -3,6 +3,7 @@ import { type Library, isScanning } from '@raven/core'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
+import { BackButton } from '@/components/BackButton/BackButton'
 import { Button } from '@raven/ui'
 import { LibraryActions, useLibraryActions } from '@/components/LibraryActions/LibraryActions'
 import { LibraryDialog } from '@/components/LibraryDialog/LibraryDialog'
@@ -196,6 +197,7 @@ export const LibrariesPage = () => {
 
   return (
     <section className={styles.page}>
+      <BackButton fallback={{ to: '/', label: 'Home' }} className={styles.back} />
       <header className={styles.header}>
         <h1 className={styles.title}>Libraries</h1>
         {libraries.data && <p className={styles.summary}>{summaryOf(libraries.data)}</p>}

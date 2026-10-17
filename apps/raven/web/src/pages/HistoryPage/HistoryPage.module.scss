@@ -8,7 +8,6 @@
 .back {
   justify-self: start;
   max-width: calc(100% - var(--corner-clearance, 0px));
-  overflow: hidden;
 }
 
 .header {

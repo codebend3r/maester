@@ -4,7 +4,13 @@
   gap: var(--space-6);
 }
 
-// The page's first row, clear of the theme button in the corner: the photo
+// The page's first row: it stops short of the theme button in the corner.
+.back {
+  justify-self: start;
+  max-width: calc(100% - var(--corner-clearance, 0px));
+}
+
+// The page's second row, clear of the theme button in the corner: the photo
 // beside the name, which stack on a phone.
 .header {
   display: grid;

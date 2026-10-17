@@ -1,4 +1,5 @@
 import { designTokens } from '@raven/ui/designTokens'
+import { BackButton } from '@/components/BackButton/BackButton'
 import { ColourSection } from '@/pages/DesignPage/ColourSection'
 import { ComponentsSection } from '@/pages/DesignPage/ComponentsSection'
 import { ContentSection } from '@/pages/DesignPage/ContentSection'
@@ -17,6 +18,7 @@ import styles from '@/pages/DesignPage/DesignPage.module.scss'
  */
 export const DesignPage = () => (
   <article className={styles.page} aria-labelledby="design-title">
+    <BackButton fallback={{ to: '/', label: 'Home' }} className={styles.back} />
     <header className={styles.header}>
       <p className={styles.eyebrow}>Design system</p>
       <h1 id="design-title" className={styles.title}>

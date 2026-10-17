@@ -5,7 +5,13 @@
   max-width: 56rem;
 }
 
-// The page's first row: the title, and Reset to defaults at its right,
+// The page's first row: it stops short of the theme button in the corner.
+.back {
+  justify-self: start;
+  max-width: calc(100% - var(--corner-clearance, 0px));
+}
+
+// The page's second row: the title, and Reset to defaults at its right,
 // both clear of the theme button in the corner.
 .header {
   display: grid;
