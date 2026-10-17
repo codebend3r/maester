@@ -751,14 +751,17 @@ describe('the metadata calls', () => {
     expect(client.candidatePosterUrl('/abc.jpg')).toBe('http://nas:8484/api/images/poster/abc.jpg')
   })
 
-  it('lists a TMDB poster at each width, with the middle one as its src', () => {
+  it('lists a TMDB poster at each width, the middle as its src and the widest at its own URL', () => {
     const { client } = clientReturning(respond({}))
+    expect(client.tmdbPosterSources('/abc.jpg').srcSet).toContain(
+      `${client.candidatePosterUrl('/abc.jpg')} 500w`,
+    )
     expect(client.tmdbPosterSources('/abc.jpg')).toEqual({
       src: 'http://nas:8484/api/images/poster/abc.jpg?w=342',
       srcSet: [
         'http://nas:8484/api/images/poster/abc.jpg?w=185 185w',
         'http://nas:8484/api/images/poster/abc.jpg?w=342 342w',
-        'http://nas:8484/api/images/poster/abc.jpg?w=500 500w',
+        'http://nas:8484/api/images/poster/abc.jpg 500w',
       ].join(', '),
     })
   })

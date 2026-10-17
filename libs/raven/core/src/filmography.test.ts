@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'bun:test'
 import { type FilmographyCredit, type FilmographyEntry } from '@/contract'
-import { ageOn, entriesOn, isFilmographyTab, selfCount, tabCounts } from '@/filmography'
+import {
+  ageOn,
+  entriesOn,
+  hasSelfCredits,
+  isFilmographyTab,
+  selfCount,
+  tabCounts,
+} from '@/filmography'
 
 const credit = (overrides: Partial<FilmographyCredit> = {}): FilmographyCredit => ({
   department: 'acting',
@@ -100,6 +107,23 @@ describe('selfCount', () => {
   })
 })
 
+describe('hasSelfCredits', () => {
+  it('is true for a credit as themselves, alone on its title or beside other work', () => {
+    expect(hasSelfCredits(ENTRIES)).toBe(true)
+    const mixed = entry({
+      title: 'Five Came Back',
+      credits: [credit({ role: 'Self', isSelf: true }), credit({ department: 'producing' })],
+    })
+    expect(selfCount([MATRIX, mixed])).toBe(0)
+    expect(hasSelfCredits([MATRIX, mixed])).toBe(true)
+  })
+
+  it('is false with no credit as themselves', () => {
+    expect(hasSelfCredits([MATRIX, SCREENPLAY])).toBe(false)
+    expect(hasSelfCredits([])).toBe(false)
+  })
+})
+
 describe('isFilmographyTab', () => {
   it('accepts the tabs and not crew', () => {
     expect(isFilmographyTab('all')).toBe(true)
@@ -112,6 +136,18 @@ describe('ageOn', () => {
     expect(ageOn({ birthday: '2000-11-21', on: '2026-10-17' })).toBe(25)
     expect(ageOn({ birthday: '2000-11-21', on: '2026-11-21' })).toBe(26)
     expect(ageOn({ birthday: '1956-07-09', on: '2026-07-08' })).toBe(69)
+  })
+
+  it('counts a Feb 29 birthday as not yet come on Feb 28, and come on Mar 1', () => {
+    expect(ageOn({ birthday: '2000-02-29', on: '2026-02-28' })).toBe(25)
+    expect(ageOn({ birthday: '2000-02-29', on: '2026-03-01' })).toBe(26)
+    expect(ageOn({ birthday: '2000-02-29', on: '2028-02-29' })).toBe(28)
+  })
+
+  it('is null for a day before the birthday', () => {
+    expect(ageOn({ birthday: '2000-11-21', on: '2000-11-20' })).toBeNull()
+    expect(ageOn({ birthday: '2000-11-21', on: '1999-12-31' })).toBeNull()
+    expect(ageOn({ birthday: '2000-11-21', on: '2000-11-21' })).toBe(0)
   })
 
   it('is null for a missing or malformed date', () => {

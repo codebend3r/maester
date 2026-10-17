@@ -847,10 +847,13 @@ export const createApiClient = ({
     /**
      * A TMDB poster path at each width the server keeps, for an `img`'s `src`
      * and `srcset`; `src` is the middle width, for a browser with no `srcset`.
+     * The widest is the URL with no width, as in `posterSrcSet`, so it is the
+     * one `candidatePosterUrl` asks for and the browser keeps one copy.
      */
     tmdbPosterSources: (poster: string): { src: string; srcSet: string } => {
+      const own = url(`/api/images/poster${poster}`)
       const at = (width: PosterWidth): string =>
-        url(`/api/images/poster${poster}?${toQueryString({ w: String(width) })}`)
+        width === POSTER_OWN_WIDTH ? own : `${own}?${toQueryString({ w: String(width) })}`
       return {
         src: at(POSTER_WIDTHS[1]),
         srcSet: POSTER_WIDTHS.map((width) => `${at(width)} ${width}w`).join(', '),
