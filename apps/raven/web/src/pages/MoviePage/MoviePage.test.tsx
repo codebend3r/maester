@@ -69,13 +69,17 @@ describe('MoviePage', () => {
       defaultAudio: 0,
       frameRate: 24,
     }))
-    renderWithProviders(
-      <Routes>
-        <Route path="movies/:id" element={<MoviePage />} />
-        <Route path="watch/:id" element={<Watching />} />
-      </Routes>,
-      { route, display, adminLock },
-    )
+    renderWithProviders({
+      ui: (
+        <Routes>
+          <Route path="movies/:id" element={<MoviePage />} />
+          <Route path="watch/:id" element={<Watching />} />
+        </Routes>
+      ),
+      route,
+      display,
+      adminLock,
+    })
   }
 
   afterEach(() => {
@@ -87,12 +91,14 @@ describe('MoviePage', () => {
 
   it('stands in for the movie while it is read, saying so to a screen reader', async () => {
     spies.item.mockImplementation(() => held<ItemDetails>().promise)
-    renderWithProviders(
-      <Routes>
-        <Route path="movies/:id" element={<MoviePage />} />
-      </Routes>,
-      { route: '/movies/40' },
-    )
+    renderWithProviders({
+      ui: (
+        <Routes>
+          <Route path="movies/:id" element={<MoviePage />} />
+        </Routes>
+      ),
+      route: '/movies/40',
+    })
     expect(await screen.findByText('Opening the movie')).toBeInTheDocument()
     expect(screen.queryByRole('heading')).toBeNull()
   })

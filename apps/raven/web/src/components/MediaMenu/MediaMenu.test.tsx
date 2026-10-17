@@ -30,7 +30,7 @@ describe('MediaMenu', () => {
       calls.push(input)
       return mediaItem({ favourite: input.favourite })
     })
-    renderWithProviders(<Harness media={mediaItem()} />)
+    renderWithProviders({ ui: <Harness media={mediaItem()} /> })
     await openMenu()
     await userEvent.click(screen.getByRole('menuitem', { name: 'Favourite' }))
     spy.mockRestore()
@@ -43,7 +43,7 @@ describe('MediaMenu', () => {
     const spy = spyOn(api, 'deleteMedia').mockImplementation(async (id) => {
       deleted.push(id)
     })
-    renderWithProviders(<Harness media={mediaItem()} />)
+    renderWithProviders({ ui: <Harness media={mediaItem()} /> })
     await openMenu()
     await userEvent.click(screen.getByRole('menuitem', { name: 'Delete' }))
     expect(deleted).toEqual([])
@@ -58,7 +58,7 @@ describe('MediaMenu', () => {
     const spy = spyOn(api, 'deleteMedia').mockImplementation(async (id) => {
       deleted.push(id)
     })
-    renderWithProviders(<Harness media={mediaItem()} />)
+    renderWithProviders({ ui: <Harness media={mediaItem()} /> })
     await openMenu()
     await userEvent.click(screen.getByRole('menuitem', { name: 'Delete' }))
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
@@ -72,7 +72,7 @@ describe('MediaMenu', () => {
     const spy = spyOn(api, 'setWatched').mockImplementation(async (input) => {
       calls.push(input)
     })
-    renderWithProviders(<Harness media={mediaItem()} />)
+    renderWithProviders({ ui: <Harness media={mediaItem()} /> })
     await openMenu()
     await userEvent.click(screen.getByRole('menuitem', { name: 'Mark as watched' }))
     spy.mockRestore()
@@ -85,7 +85,7 @@ describe('MediaMenu', () => {
     const spy = spyOn(api, 'setWatched').mockImplementation(async (input) => {
       calls.push(input)
     })
-    renderWithProviders(<Harness media={mediaItem({ watched: true })} />)
+    renderWithProviders({ ui: <Harness media={mediaItem({ watched: true })} /> })
     await openMenu()
     expect(screen.queryByRole('menuitem', { name: 'Mark as watched' })).toBeNull()
     await userEvent.click(screen.getByRole('menuitem', { name: 'Mark as unwatched' }))
@@ -95,7 +95,8 @@ describe('MediaMenu', () => {
 
   it('offers Favourite and Mark as watched, and nothing else, while the admin lock is on', async () => {
     const location = spyOn(api, 'getMediaLocation')
-    renderWithProviders(<Harness media={matchedMovie()} matchType="movie" />, {
+    renderWithProviders({
+      ui: <Harness media={matchedMovie()} matchType="movie" />,
       adminLock: { state: 'on', available: true },
     })
     await userEvent.click(screen.getByRole('button', { name: /^Options for / }))
@@ -112,7 +113,7 @@ describe('MediaMenu', () => {
     const spy = spyOn(api, 'deleteMedia').mockImplementation(async () => {
       throw new ApiError({ status: 500, message: reason })
     })
-    renderWithProviders(<Harness media={mediaItem()} />)
+    renderWithProviders({ ui: <Harness media={mediaItem()} /> })
     await openMenu()
     await userEvent.click(screen.getByRole('menuitem', { name: 'Delete' }))
     await userEvent.click(screen.getByRole('button', { name: 'Delete for good' }))
@@ -143,7 +144,7 @@ describe('MediaMenu', () => {
 
     it("opens a movie's pictures in a dialog over the page, and closes on Done", async () => {
       serve()
-      renderWithProviders(<Harness media={matchedMovie()} />)
+      renderWithProviders({ ui: <Harness media={matchedMovie()} /> })
       await openAny()
       await userEvent.click(screen.getByRole('menuitem', { name: 'Edit images' }))
       const dialog = await screen.findByRole('dialog', { name: 'Edit images' })
@@ -162,7 +163,7 @@ describe('MediaMenu', () => {
         match: 'matched',
         item: itemSummary({ id: 91, type: 'episode', show: { id: 90, title: 'Severance' } }),
       })
-      renderWithProviders(<Harness media={episode} />)
+      renderWithProviders({ ui: <Harness media={episode} /> })
       await openAny()
       await userEvent.click(screen.getByRole('menuitem', { name: 'Edit images' }))
       await screen.findByRole('dialog', { name: 'Edit images' })
@@ -170,14 +171,14 @@ describe('MediaMenu', () => {
     })
 
     it('is not offered for a file matched to nothing', async () => {
-      renderWithProviders(<Harness media={mediaItem()} />)
+      renderWithProviders({ ui: <Harness media={mediaItem()} /> })
       await openAny()
       expect(screen.queryByRole('menuitem', { name: 'Edit images' })).toBeNull()
     })
   })
 
   it('closes with Escape and hands focus back to its button', async () => {
-    renderWithProviders(<Harness media={mediaItem()} />)
+    renderWithProviders({ ui: <Harness media={mediaItem()} /> })
     await openMenu()
     expect(screen.getByRole('menu')).toBeInTheDocument()
     await userEvent.keyboard('{Escape}')
@@ -200,7 +201,7 @@ describe('MediaMenu', () => {
     })
     // As raven is over HTTPS or on localhost, where the Clipboard API is allowed.
     Object.defineProperty(window, 'isSecureContext', { value: true, configurable: true })
-    renderWithProviders(<Harness media={mediaItem()} />)
+    renderWithProviders({ ui: <Harness media={mediaItem()} /> })
     await openMenu()
     const item = await screen.findByRole('menuitem', { name: /Copy file path/ })
     expect(await within(item).findByText(path)).toBeInTheDocument()

@@ -17,7 +17,7 @@ const setUp = () => {
   return { result, client }
 }
 
-const change = (id: number, watched: boolean) => ({
+const change = ({ id, watched }: { id: number; watched: boolean }) => ({
   watched,
   targets: [{ kind: 'item' as const, id, libraryId: null }],
 })
@@ -31,7 +31,7 @@ describe('useWatchedChange', () => {
     const answer = held<void>()
     spy.mockImplementation(() => answer.promise)
     const { result, client } = setUp()
-    act(() => result.current.mutate(change(40, true)))
+    act(() => result.current.mutate(change({ id: 40, watched: true })))
     await waitFor(() => expect(spy).toHaveBeenCalledTimes(1))
     expect(client.getQueryState(queryKeys.item(40))?.isInvalidated).toBe(false)
     answer.answer()
@@ -47,7 +47,7 @@ describe('useWatchedChange', () => {
     })
     const { result } = setUp()
     act(() => {
-      result.current.mutate(change(40, true))
+      result.current.mutate(change({ id: 40, watched: true }))
       result.current.mutate({ watched: false, targets: [] })
     })
     await waitFor(() => expect(seen).toEqual([1]))

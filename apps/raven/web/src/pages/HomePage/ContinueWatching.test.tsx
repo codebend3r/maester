@@ -55,14 +55,16 @@ describe('ContinueWatching', () => {
   afterEach(cleanup)
 
   it('shows each video in progress as a tile under its heading, the most recent first', () => {
-    renderWithProviders(
-      <ContinueWatching
-        entries={[
-          { media: EPISODE_TWO, poster: SEASON_ONE_CARD },
-          { media: MOVIE, poster: MOVIE.item },
-        ]}
-      />,
-    )
+    renderWithProviders({
+      ui: (
+        <ContinueWatching
+          entries={[
+            { media: EPISODE_TWO, poster: SEASON_ONE_CARD },
+            { media: MOVIE, poster: MOVIE.item },
+          ]}
+        />
+      ),
+    })
     expect(within(section()).getByRole('heading', { level: 2 })).toHaveTextContent(
       'Continue watching',
     )
@@ -73,9 +75,9 @@ describe('ContinueWatching', () => {
   })
 
   it('resumes the video from anywhere on the tile, and opens its page from its name', () => {
-    renderWithProviders(
-      <ContinueWatching entries={[{ media: EPISODE_TWO, poster: SEASON_ONE_CARD }]} />,
-    )
+    renderWithProviders({
+      ui: <ContinueWatching entries={[{ media: EPISODE_TWO, poster: SEASON_ONE_CARD }]} />,
+    })
     const [tile] = tiles()
     expect(
       within(tile!).getByRole('link', { name: `Play ${mediaLabel(EPISODE_TWO)}` }),
@@ -87,9 +89,9 @@ describe('ContinueWatching', () => {
   })
 
   it("wears its season's poster, as wide as the tile shows it, and is tinted with the narrowest", () => {
-    renderWithProviders(
-      <ContinueWatching entries={[{ media: EPISODE_TWO, poster: SEASON_ONE_CARD }]} />,
-    )
+    renderWithProviders({
+      ui: <ContinueWatching entries={[{ media: EPISODE_TWO, poster: SEASON_ONE_CARD }]} />,
+    })
     const [poster, tint] = [...section().querySelectorAll('img')]
     expect(poster?.getAttribute('src')).toContain('/api/items/5/images/poster')
     expect(poster?.getAttribute('sizes')).toBe(POSTER_SIZES.showTile)
@@ -105,14 +107,14 @@ describe('ContinueWatching', () => {
       position: 60,
       thumbnailVersion: 3,
     })
-    renderWithProviders(<ContinueWatching entries={[{ media: clip, poster: null }]} />)
+    renderWithProviders({ ui: <ContinueWatching entries={[{ media: clip, poster: null }]} /> })
     const sources = [...section().querySelectorAll('img')].map((img) => img.getAttribute('src'))
     expect(sources).toEqual(['/api/media/8/thumbnail?v=3', '/api/media/8/thumbnail?v=3'])
   })
 
   it('has only the link that plays a file with no page, its name as plain words', () => {
     const clip = mediaItem({ id: 8, title: 'Clip', duration: 600, position: 60 })
-    renderWithProviders(<ContinueWatching entries={[{ media: clip, poster: null }]} />)
+    renderWithProviders({ ui: <ContinueWatching entries={[{ media: clip, poster: null }]} /> })
     expect(
       within(section())
         .getAllByRole('link')
@@ -123,13 +125,15 @@ describe('ContinueWatching', () => {
 
   it('stands a letter in for a video with no picture at all, untinted', () => {
     const blank = mediaItem({ id: 9, title: 'Blank', thumbnail: 'pending', position: 30 })
-    renderWithProviders(<ContinueWatching entries={[{ media: blank, poster: null }]} />)
+    renderWithProviders({ ui: <ContinueWatching entries={[{ media: blank, poster: null }]} /> })
     expect(section().querySelectorAll('img')).toHaveLength(0)
     expect(within(section()).getByText('B')).toBeInTheDocument()
   })
 
   it("opens the card's menu on a right click", () => {
-    renderWithProviders(<ContinueWatching entries={[{ media: MOVIE, poster: MOVIE.item }]} />)
+    renderWithProviders({
+      ui: <ContinueWatching entries={[{ media: MOVIE, poster: MOVIE.item }]} />,
+    })
     fireEvent.contextMenu(within(section()).getByRole('link', { name: 'Play Busboys (2026)' }))
     expect(screen.getByRole('menu')).toBeInTheDocument()
   })

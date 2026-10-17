@@ -94,10 +94,14 @@ describe('historyNote', () => {
 describe('finishedNote', () => {
   it('names the day a finished video last played, and how often it has past once', () => {
     const now = new Date(2026, 9, 11, 20, 0)
-    const finished = (playedAt: Date, plays = 1) =>
+    const finished = ({ playedAt, plays = 1 }: { playedAt: Date; plays?: number }) =>
       finishedNote({ entry: entry({ playedAt, plays, watched: true }), now })
-    expect(finished(new Date(2026, 9, 11, 9, 0))).toBe('Today')
-    expect(finished(new Date(2026, 9, 10, 9, 0), 3)).toBe('Yesterday · 3 plays')
-    expect(finished(new Date(2026, 9, 2, 9, 0))).toBe(dayName({ date: new Date(2026, 9, 2) }))
+    expect(finished({ playedAt: new Date(2026, 9, 11, 9, 0) })).toBe('Today')
+    expect(finished({ playedAt: new Date(2026, 9, 10, 9, 0), plays: 3 })).toBe(
+      'Yesterday · 3 plays',
+    )
+    expect(finished({ playedAt: new Date(2026, 9, 2, 9, 0) })).toBe(
+      dayName({ date: new Date(2026, 9, 2) }),
+    )
   })
 })

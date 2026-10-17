@@ -81,13 +81,16 @@ describe('SagaPage', () => {
       }),
     )
     spies.sagas.mockImplementation(async () => [{ ...RINGS, backdrop }])
-    renderWithProviders(
-      <Routes>
-        <Route path="libraries/:id/sagas/:sagaId" element={<SagaPage />} />
-        <Route path="watch/:id" element={<WatchProbe />} />
-      </Routes>,
-      { route, adminLock },
-    )
+    renderWithProviders({
+      ui: (
+        <Routes>
+          <Route path="libraries/:id/sagas/:sagaId" element={<SagaPage />} />
+          <Route path="watch/:id" element={<WatchProbe />} />
+        </Routes>
+      ),
+      route,
+      adminLock,
+    })
   }
 
   it('shows the saga under its backdrop, with each of its movies to play, oldest first', async () => {
@@ -128,12 +131,14 @@ describe('SagaPage', () => {
         ],
       },
     ])
-    renderWithProviders(
-      <Routes>
-        <Route path="libraries/:id/sagas/:sagaId" element={<SagaPage />} />
-      </Routes>,
-      { route: '/libraries/2/sagas/119' },
-    )
+    renderWithProviders({
+      ui: (
+        <Routes>
+          <Route path="libraries/:id/sagas/:sagaId" element={<SagaPage />} />
+        </Routes>
+      ),
+      route: '/libraries/2/sagas/119',
+    })
     const order = await screen.findByRole('region', { name: 'In order' })
     const rows = within(order).getAllByRole('listitem')
     expect(rows.map((row) => row.textContent?.slice(0, 2))).toEqual(['01', '02', '03'])

@@ -14,14 +14,16 @@ describe('ShowCard', () => {
 
   it("lays its show's backdrop behind the page while pointed at", async () => {
     const entry = showEntry()
-    const { container } = renderWithProviders(
-      <ul>
-        <ShowCard
-          sizes={POSTER_SIZES.row}
-          entry={{ ...entry, show: { ...entry.show, backdropVersion: 'b9' } }}
-        />
-      </ul>,
-    )
+    const { container } = renderWithProviders({
+      ui: (
+        <ul>
+          <ShowCard
+            sizes={POSTER_SIZES.row}
+            entry={{ ...entry, show: { ...entry.show, backdropVersion: 'b9' } }}
+          />
+        </ul>
+      ),
+    })
     fireEvent.pointerEnter(container.querySelector('li') ?? document.body, {
       pointerType: 'mouse',
     })
@@ -32,20 +34,24 @@ describe('ShowCard', () => {
 
   it('says when its newest episode came when shows are sorted by when they were added', () => {
     const addedAt = new Date(Date.now() - 3 * 24 * 3600 * 1000).toISOString()
-    renderWithProviders(
-      <ul>
-        <ShowCard sizes={POSTER_SIZES.row} entry={showEntry({ addedAt })} sort="added" />
-      </ul>,
-    )
+    renderWithProviders({
+      ui: (
+        <ul>
+          <ShowCard sizes={POSTER_SIZES.row} entry={showEntry({ addedAt })} sort="added" />
+        </ul>
+      ),
+    })
     expect(screen.getByText('Added 3 days ago')).toBeInTheDocument()
   })
 
   it("opens the show's page, plays the next episode, and says the years and count", () => {
-    const { container } = renderWithProviders(
-      <ul>
-        <ShowCard sizes={POSTER_SIZES.row} entry={showEntry()} />
-      </ul>,
-    )
+    const { container } = renderWithProviders({
+      ui: (
+        <ul>
+          <ShowCard sizes={POSTER_SIZES.row} entry={showEntry()} />
+        </ul>
+      ),
+    })
     expect(screen.getByRole('link', { name: 'Severance' })).toHaveAttribute('href', '/shows/4')
     expect(screen.getByRole('link', { name: 'Play Severance S01E02' })).toHaveAttribute(
       'href',
@@ -63,70 +69,80 @@ describe('ShowCard', () => {
       '/api/items/4/images/poster?v=p1&w=342 342w',
       '/api/items/4/images/poster?v=p1 500w',
     ].join(', ')
-    const row = renderWithProviders(
-      <ul>
-        <ShowCard sizes={POSTER_SIZES.row} entry={showEntry()} />
-      </ul>,
-    )
+    const row = renderWithProviders({
+      ui: (
+        <ul>
+          <ShowCard sizes={POSTER_SIZES.row} entry={showEntry()} />
+        </ul>
+      ),
+    })
     expect(row.container.querySelector('img')).toHaveAttribute('srcset', srcset)
     expect(row.container.querySelector('img')).toHaveAttribute('sizes', POSTER_SIZES.row)
-    const grid = renderWithProviders(<ShowGrid shows={[showEntry()]} />)
+    const grid = renderWithProviders({ ui: <ShowGrid shows={[showEntry()]} /> })
     expect(grid.container.querySelector('img')).toHaveAttribute('srcset', srcset)
     expect(grid.container.querySelector('img')).toHaveAttribute('sizes', POSTER_SIZES.showCard)
-    const tiles = renderWithProviders(<ShowTiles shows={[showEntry()]} />)
+    const tiles = renderWithProviders({ ui: <ShowTiles shows={[showEntry()]} /> })
     expect(tiles.container.querySelector('img')).toHaveAttribute('srcset', srcset)
     expect(tiles.container.querySelector('img')).toHaveAttribute('sizes', POSTER_SIZES.showTile)
   })
 
   it('gives an ended show both years, and no play button once every episode is watched', () => {
-    renderWithProviders(
-      <ShowGrid
-        shows={[
-          showEntry({
-            show: { ...showEntry().show, year: 2014 },
-            endedYear: 2024,
-            episodes: 1,
-            next: null,
-          }),
-        ]}
-      />,
-    )
+    renderWithProviders({
+      ui: (
+        <ShowGrid
+          shows={[
+            showEntry({
+              show: { ...showEntry().show, year: 2014 },
+              endedYear: 2024,
+              episodes: 1,
+              next: null,
+            }),
+          ]}
+        />
+      ),
+    })
     expect(screen.getByText('2014 to 2024')).toBeInTheDocument()
     expect(screen.getByText('1 episode')).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /^Play/ })).toBeNull()
   })
 
   it('shows the number unwatched, with its words, when some episodes are', () => {
-    renderWithProviders(
-      <ul>
-        <ShowCard sizes={POSTER_SIZES.row} entry={showEntry({ watchedEpisodes: 3 })} />
-      </ul>,
-    )
+    renderWithProviders({
+      ui: (
+        <ul>
+          <ShowCard sizes={POSTER_SIZES.row} entry={showEntry({ watchedEpisodes: 3 })} />
+        </ul>
+      ),
+    })
     expect(screen.getByText('6')).toBeInTheDocument()
     expect(screen.getByText('6 unwatched episodes')).toBeInTheDocument()
   })
 
   it('shows the check when every episode is watched', () => {
-    renderWithProviders(
-      <ul>
-        <ShowCard sizes={POSTER_SIZES.row} entry={showEntry({ watchedEpisodes: 9 })} />
-      </ul>,
-    )
+    renderWithProviders({
+      ui: (
+        <ul>
+          <ShowCard sizes={POSTER_SIZES.row} entry={showEntry({ watchedEpisodes: 9 })} />
+        </ul>
+      ),
+    })
     expect(screen.getByText('Watched')).toBeInTheDocument()
   })
 
   it('shows nothing when none is watched', () => {
-    renderWithProviders(
-      <ul>
-        <ShowCard sizes={POSTER_SIZES.row} entry={showEntry()} />
-      </ul>,
-    )
+    renderWithProviders({
+      ui: (
+        <ul>
+          <ShowCard sizes={POSTER_SIZES.row} entry={showEntry()} />
+        </ul>
+      ),
+    })
     expect(screen.queryByText(/unwatched/)).toBeNull()
     expect(screen.queryByText('Watched')).toBeNull()
   })
 
   it('names the next episode on the wide card, and plays it from there', () => {
-    renderWithProviders(<ShowGrid shows={[showEntry()]} />)
+    renderWithProviders({ ui: <ShowGrid shows={[showEntry()]} /> })
     const play = screen.getByRole('link', { name: 'Play Severance S01E02' })
     expect(play).toHaveAttribute('href', '/watch/12')
     expect(play).toHaveTextContent('S01E02 · Half Loop')
@@ -134,23 +150,25 @@ describe('ShowCard', () => {
   })
 
   it('says every episode is watched on the wide card once none is left', () => {
-    renderWithProviders(<ShowGrid shows={[showEntry({ watchedEpisodes: 9, next: null })]} />)
+    renderWithProviders({
+      ui: <ShowGrid shows={[showEntry({ watchedEpisodes: 9, next: null })]} />,
+    })
     expect(screen.getByText('All watched')).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /^Play/ })).toBeNull()
   })
 
   it('shows the number unwatched on the wide card, and nothing for a show not started', () => {
-    renderWithProviders(<ShowGrid shows={[showEntry({ watchedEpisodes: 3 })]} />)
+    renderWithProviders({ ui: <ShowGrid shows={[showEntry({ watchedEpisodes: 3 })]} /> })
     expect(screen.getByText('6')).toBeInTheDocument()
     expect(screen.getByText('6 unwatched episodes')).toBeInTheDocument()
     cleanup()
-    renderWithProviders(<ShowGrid shows={[showEntry()]} />)
+    renderWithProviders({ ui: <ShowGrid shows={[showEntry()]} /> })
     expect(screen.queryByText(/unwatched/)).toBeNull()
     expect(screen.queryByText('All watched')).toBeNull()
   })
 
   it("washes the wide card in its poster, fetched at the poster's own width", () => {
-    const { container } = renderWithProviders(<ShowGrid shows={[showEntry()]} />)
+    const { container } = renderWithProviders({ ui: <ShowGrid shows={[showEntry()]} /> })
     const [poster, wash] = [...container.querySelectorAll('img')]
     expect(wash).toHaveAttribute('alt', '')
     expect(wash?.getAttribute('srcset')).toBe(poster?.getAttribute('srcset'))
@@ -158,45 +176,49 @@ describe('ShowCard', () => {
   })
 
   it('falls back to the initial when the poster fails to load', () => {
-    const { container } = renderWithProviders(
-      <ul>
-        <ShowCard sizes={POSTER_SIZES.row} entry={showEntry()} />
-      </ul>,
-    )
+    const { container } = renderWithProviders({
+      ui: (
+        <ul>
+          <ShowCard sizes={POSTER_SIZES.row} entry={showEntry()} />
+        </ul>
+      ),
+    })
     fireEvent.error(container.querySelector('img') ?? document.body)
     expect(container.querySelector('img')).toBeNull()
     expect(container.querySelector('a[aria-hidden="true"]')).toHaveTextContent('S')
   })
 
   it('stands in for the wide cards while they load', () => {
-    const { container } = renderWithProviders(<ShowGridSkeleton count={3} />)
+    const { container } = renderWithProviders({ ui: <ShowGridSkeleton count={3} /> })
     expect(container.querySelectorAll('li')).toHaveLength(3)
   })
 
   it('gives each list row a small poster out of the tab order', () => {
-    const { container } = renderWithProviders(<ShowList shows={[showEntry()]} />)
+    const { container } = renderWithProviders({ ui: <ShowList shows={[showEntry()]} /> })
     const poster = container.querySelector('tbody img')
     expect(poster).toHaveAttribute('sizes', POSTER_SIZES.list)
     expect(poster?.closest('a')).toHaveAttribute('tabindex', '-1')
   })
 
   it('shows the count in a list row and in a tile', () => {
-    renderWithProviders(<ShowList shows={[showEntry({ watchedEpisodes: 3 })]} />)
+    renderWithProviders({ ui: <ShowList shows={[showEntry({ watchedEpisodes: 3 })]} /> })
     const [, row] = screen.getAllByRole('row')
     if (!row) throw new Error('no data row')
     expect(row).toHaveTextContent('6 unwatched episodes')
     cleanup()
-    renderWithProviders(<ShowTiles shows={[showEntry({ watchedEpisodes: 9 })]} />)
+    renderWithProviders({ ui: <ShowTiles shows={[showEntry({ watchedEpisodes: 9 })]} /> })
     expect(screen.getByText('Watched')).toBeInTheDocument()
   })
 
   it('shows nothing in a list row or a tile when none is watched', () => {
-    const { container } = renderWithProviders(
-      <>
-        <ShowList shows={[showEntry()]} />
-        <ShowTiles shows={[showEntry()]} />
-      </>,
-    )
+    const { container } = renderWithProviders({
+      ui: (
+        <>
+          <ShowList shows={[showEntry()]} />
+          <ShowTiles shows={[showEntry()]} />
+        </>
+      ),
+    })
     expect(container).not.toHaveTextContent('unwatched')
     expect(container).not.toHaveTextContent('Watched')
   })

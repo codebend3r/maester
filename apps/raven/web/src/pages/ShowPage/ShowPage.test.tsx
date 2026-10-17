@@ -31,14 +31,17 @@ describe('ShowPage', () => {
   } = {}) => {
     spies.item.mockImplementation(async () => details)
     spies.next.mockImplementation(async () => EPISODE_TWO)
-    renderWithProviders(
-      <Routes>
-        <Route path="shows/:id" element={<ShowPage />} />
-        <Route path="watch/:id" element={<Watching />} />
-        <Route path="elsewhere/:id" element={<Elsewhere />} />
-      </Routes>,
-      { route: '/shows/4', adminLock },
-    )
+    renderWithProviders({
+      ui: (
+        <Routes>
+          <Route path="shows/:id" element={<ShowPage />} />
+          <Route path="watch/:id" element={<Watching />} />
+          <Route path="elsewhere/:id" element={<Elsewhere />} />
+        </Routes>
+      ),
+      route: '/shows/4',
+      adminLock,
+    })
   }
 
   afterEach(() => {
@@ -80,12 +83,15 @@ describe('ShowPage', () => {
   it('says it is a show, and names its library on the way back', async () => {
     spies.item.mockImplementation(async () => SEVERANCE)
     spies.next.mockImplementation(async () => EPISODE_TWO)
-    renderWithProviders(
-      <Routes>
-        <Route path="shows/:id" element={<ShowPage />} />
-      </Routes>,
-      { route: '/shows/4', libraries: [library({ id: EPISODE_TWO.libraryId, name: 'Series' })] },
-    )
+    renderWithProviders({
+      ui: (
+        <Routes>
+          <Route path="shows/:id" element={<ShowPage />} />
+        </Routes>
+      ),
+      route: '/shows/4',
+      libraries: [library({ id: EPISODE_TWO.libraryId, name: 'Series' })],
+    })
     expect(await screen.findByRole('link', { name: 'Series' })).toHaveAttribute(
       'href',
       `/libraries/${EPISODE_TWO.libraryId}`,

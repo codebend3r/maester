@@ -7,19 +7,21 @@ import { renderWithProviders } from '@/test/render'
 
 describe('ReviewCards', () => {
   it('shows each review with its author, score and four lines, and the whole thing as text on Read', async () => {
-    renderWithProviders(
-      <ReviewCards
-        reviews={[
-          review({
-            id: 1,
-            author: 'Mallory',
-            rating: 7,
-            content: 'First paragraph with <b>tags</b>.\n\nSecond paragraph.',
-          }),
-          review({ id: 2, author: 'Nobody Here', rating: null, avatarVersion: null }),
-        ]}
-      />,
-    )
+    renderWithProviders({
+      ui: (
+        <ReviewCards
+          reviews={[
+            review({
+              id: 1,
+              author: 'Mallory',
+              rating: 7,
+              content: 'First paragraph with <b>tags</b>.\n\nSecond paragraph.',
+            }),
+            review({ id: 2, author: 'Nobody Here', rating: null, avatarVersion: null }),
+          ]}
+        />
+      ),
+    })
     expect(screen.getByRole('heading', { name: 'Reviews from TMDB members' })).toBeInTheDocument()
     expect(screen.getByText('Mallory')).toBeInTheDocument()
     expect(screen.getByText('7 out of 10')).toBeInTheDocument()
@@ -38,7 +40,7 @@ describe('ReviewCards', () => {
   })
 
   it('shows nothing without reviews', () => {
-    const { container } = renderWithProviders(<ReviewCards reviews={[]} />)
+    const { container } = renderWithProviders({ ui: <ReviewCards reviews={[]} /> })
     expect(container.textContent).toBe('')
   })
 })

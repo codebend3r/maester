@@ -52,7 +52,7 @@ describe('DesignPage', () => {
   })
 
   it('shows a swatch for every colour token, with its value, note and contrast', () => {
-    renderWithProviders(<DesignPage />)
+    renderWithProviders({ ui: <DesignPage /> })
     const colours = screen.getByRole('region', { name: 'Colour' })
     const swatches = swatchesIn(colours)
     expect(swatches.map((swatch) => within(swatch).getByRole('heading').textContent)).toEqual([
@@ -76,7 +76,7 @@ describe('DesignPage', () => {
     style.textContent = "[data-theme='patina'] { --color-bark: #1b2825; --color-night: #ebe5d8; }"
     document.head.append(style)
     document.documentElement.style.setProperty('--color-bark', '#FFF')
-    renderWithProviders(<DesignPage />)
+    renderWithProviders({ ui: <DesignPage /> })
     const colours = screen.getByRole('region', { name: 'Colour' })
     expect(swatchesIn(colours)[2]).toHaveTextContent('#ffffff')
 
@@ -92,7 +92,7 @@ describe('DesignPage', () => {
 
   it('shows every theme in its own colours, the one worn marked', () => {
     act(() => useTheme.getState().pick('oxblood'))
-    renderWithProviders(<DesignPage />)
+    renderWithProviders({ ui: <DesignPage /> })
     const strip = within(screen.getByRole('region', { name: 'Colour' })).getByRole('list', {
       name: 'Themes',
     })
@@ -101,13 +101,14 @@ describe('DesignPage', () => {
       THEMES.map((theme) => theme.name),
     )
     expect(themes.map((theme) => theme.dataset.theme)).toEqual(THEMES.map((theme) => theme.id))
-    const worn = themes.filter((theme) => theme.getAttribute('aria-current') === 'true')
+    const worn = themes.filter((theme) => theme.hasAttribute('aria-current'))
     expect(worn.map((theme) => theme.dataset.theme)).toEqual(['oxblood'])
+    expect(worn[0]).toHaveAttribute('aria-current', 'true')
     expect(worn[0]).toHaveTextContent('Worn now')
   })
 
   it('shows each version of the logo and the favicon at its sizes', () => {
-    renderWithProviders(<DesignPage />)
+    renderWithProviders({ ui: <DesignPage /> })
     const logo = screen.getByRole('region', { name: 'Logo' })
     const images = within(logo).getAllByRole('img')
     expect(images.map((image) => [image.getAttribute('alt'), image.getAttribute('src')])).toEqual([
@@ -123,7 +124,7 @@ describe('DesignPage', () => {
   })
 
   it('lists the other tokens by group with their values', () => {
-    renderWithProviders(<DesignPage />)
+    renderWithProviders({ ui: <DesignPage /> })
     const tokens = screen.getByRole('region', { name: 'Tokens' })
     expect(tokens).toHaveTextContent('--space-3')
     expect(tokens).toHaveTextContent('1rem')
@@ -147,7 +148,7 @@ describe('DesignPage', () => {
   })
 
   it('numbers the sections in the contents bar and their headings', () => {
-    renderWithProviders(<DesignPage />)
+    renderWithProviders({ ui: <DesignPage /> })
     const contents = screen.getByRole('navigation', { name: 'On this page' })
     const links = within(contents).getAllByRole('link')
     expect(links.map((link) => [link.textContent, link.getAttribute('href')])).toEqual([
@@ -165,7 +166,7 @@ describe('DesignPage', () => {
   })
 
   it('shows every heading level and the common form controls', () => {
-    renderWithProviders(<DesignPage />)
+    renderWithProviders({ ui: <DesignPage /> })
     const text = screen.getByRole('region', { name: 'Text' })
     expect(
       [1, 2, 3, 4, 5, 6].map((level) => within(text).getAllByRole('heading', { level }).length > 0),
@@ -182,7 +183,7 @@ describe('DesignPage', () => {
   })
 
   it('shows the app components under their own names', () => {
-    renderWithProviders(<DesignPage />)
+    renderWithProviders({ ui: <DesignPage /> })
     const components = screen.getByRole('region', { name: 'Components' })
     const names = within(components)
       .getAllByRole('heading', { level: 3 })
@@ -206,7 +207,7 @@ describe('DesignPage', () => {
     const write = spyOn(navigator.clipboard, 'writeText').mockImplementation(async (text) => {
       copied.push(text)
     })
-    renderWithProviders(<DesignPage />)
+    renderWithProviders({ ui: <DesignPage /> })
     const film = screen.getByRole('button', { name: 'Copy film' })
     await userEvent.click(film)
     write.mockRestore()
@@ -221,7 +222,7 @@ describe('DesignPage', () => {
     const write = spyOn(navigator.clipboard, 'writeText').mockImplementation(async () => {
       throw new Error('Denied')
     })
-    renderWithProviders(<DesignPage />)
+    renderWithProviders({ ui: <DesignPage /> })
     const play = screen.getByRole('button', { name: 'Copy play' })
     await userEvent.click(play)
     write.mockRestore()

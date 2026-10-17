@@ -13,13 +13,15 @@ const Where = () => {
 }
 
 const renderLink = ({ link, route = '/libraries/2' }: { link: ReactNode; route?: string }) =>
-  renderWithProviders(
-    <>
-      {link}
-      <Where />
-    </>,
-    { route },
-  )
+  renderWithProviders({
+    ui: (
+      <>
+        {link}
+        <Where />
+      </>
+    ),
+    route,
+  })
 
 const where = () => screen.getByTestId('where').textContent
 

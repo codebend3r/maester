@@ -35,7 +35,7 @@ describe('HomePage', () => {
   const open = (home: Home) => {
     spies.home.mockImplementation(async () => home)
     spies.libraries.mockImplementation(async () => LIBRARIES)
-    renderWithProviders(<HomePage />)
+    renderWithProviders({ ui: <HomePage /> })
   }
 
   afterEach(() => {
@@ -49,7 +49,7 @@ describe('HomePage', () => {
   it('stands in for its shelves while home is read, hiding the stand-ins from a screen reader', async () => {
     spies.home.mockImplementation(() => held<Home>().promise)
     spies.libraries.mockImplementation(async () => LIBRARIES)
-    renderWithProviders(<HomePage />)
+    renderWithProviders({ ui: <HomePage /> })
     expect(await screen.findByText('Gathering your libraries')).toBeInTheDocument()
     expect(screen.queryAllByRole('listitem')).toEqual([])
   })
@@ -203,14 +203,16 @@ describe('HomePage', () => {
       spies.home.mockImplementation(async () => HOME)
       spies.libraries.mockImplementation(async () => LIBRARIES)
       spies.search.mockImplementation(async () => found)
-      renderWithProviders(
-        <>
-          <Link to="/">Back home</Link>
-          <AddressProbe />
-          <HomePage />
-        </>,
-        { route },
-      )
+      renderWithProviders({
+        ui: (
+          <>
+            <Link to="/">Back home</Link>
+            <AddressProbe />
+            <HomePage />
+          </>
+        ),
+        route,
+      })
     }
 
     const searchbox = () => screen.getByRole('searchbox', { name: 'Search every library' })

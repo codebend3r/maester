@@ -96,15 +96,15 @@ describe('SuggestedMovies', () => {
   })
 
   it('shows nothing when the lookup suggested nothing', () => {
-    const { container } = renderWithProviders(
-      <SuggestedMovies files={FILES.slice(4)} libraryId={2} />,
-    )
+    const { container } = renderWithProviders({
+      ui: <SuggestedMovies files={FILES.slice(4)} libraryId={2} />,
+    })
     expect(container).toBeEmptyDOMElement()
   })
 
   it("accepts a suggestion for the folder's first file, pointing it as Fix match would", async () => {
     spies.setMatch.mockImplementation(async () => unmatchedFile({ id: 1, match: 'manual' }))
-    renderWithProviders(<SuggestedMovies files={FILES} libraryId={2} />)
+    renderWithProviders({ ui: <SuggestedMovies files={FILES} libraryId={2} /> })
     expect(screen.getByRole('region', { name: 'Suggested by AI' })).toBeInTheDocument()
     expect(screen.getAllByRole('article')).toHaveLength(3)
     await userEvent.click(
@@ -116,14 +116,14 @@ describe('SuggestedMovies', () => {
   })
 
   it('counts the suggestions beside its heading', () => {
-    renderWithProviders(<SuggestedMovies files={FILES} libraryId={2} />)
+    renderWithProviders({ ui: <SuggestedMovies files={FILES} libraryId={2} /> })
     const section = screen.getByRole('region', { name: 'Suggested by AI' })
     expect(within(section).getByRole('heading', { level: 2 })).toHaveTextContent('Suggested by AI')
     expect(within(section).getByText('3 suggestions')).toBeInTheDocument()
   })
 
   it('makes a card for each movie of a folder that holds two, labelled by its file', () => {
-    renderWithProviders(<SuggestedMovies files={ODDS} libraryId={2} />)
+    renderWithProviders({ ui: <SuggestedMovies files={ODDS} libraryId={2} /> })
     expect(screen.getAllByRole('article')).toHaveLength(2)
     expect(screen.getByText('Heat (1995).mkv')).toBeInTheDocument()
     expect(
@@ -133,7 +133,7 @@ describe('SuggestedMovies', () => {
 
   it("opens Fix match on the file's title, and hands focus back after", async () => {
     spies.search.mockImplementation(async () => [])
-    renderWithProviders(<SuggestedMovies files={FILES.slice(2, 3)} libraryId={2} />)
+    renderWithProviders({ ui: <SuggestedMovies files={FILES.slice(2, 3)} libraryId={2} /> })
     const fix = screen.getByRole('button', { name: 'Fix match for Heat.mkv' })
     await userEvent.click(fix)
     expect(screen.getByRole('searchbox', { name: 'Title' })).toHaveValue('Heat')

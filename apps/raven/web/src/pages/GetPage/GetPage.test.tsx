@@ -11,14 +11,16 @@ const IPHONE =
   'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1'
 
 const renderGet = (route = '/get') =>
-  renderWithProviders(
-    <Routes>
-      <Route path="/get" element={<GetPage />} />
-      <Route path="/" element={<p>home</p>} />
-      <Route path="/libraries" element={<p>libraries</p>} />
-    </Routes>,
-    { route },
-  )
+  renderWithProviders({
+    ui: (
+      <Routes>
+        <Route path="/get" element={<GetPage />} />
+        <Route path="/" element={<p>home</p>} />
+        <Route path="/libraries" element={<p>libraries</p>} />
+      </Routes>
+    ),
+    route,
+  })
 
 /** Pretends to be another browser until the test is done. */
 const browseWith = (userAgent: string) =>
@@ -155,7 +157,7 @@ describe('GetPage', () => {
   })
 
   it('takes the whole screen at /get, outside the side menu', () => {
-    renderWithProviders(<AppRoutes />, { route: '/get' })
+    renderWithProviders({ ui: <AppRoutes />, route: '/get' })
 
     expect(screen.queryByRole('navigation', { name: 'Main' })).toBeNull()
     expect(

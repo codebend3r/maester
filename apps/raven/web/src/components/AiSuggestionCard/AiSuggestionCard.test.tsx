@@ -19,9 +19,9 @@ const card = ({
   onFix?: () => void
   suggestion?: AiSuggestion
 } = {}) =>
-  renderWithProviders(
-    <AiSuggestionCard suggestion={suggestion} subject="Archie" accept={accept} onFix={onFix} />,
-  )
+  renderWithProviders({
+    ui: <AiSuggestionCard suggestion={suggestion} subject="Archie" accept={accept} onFix={onFix} />,
+  })
 
 describe('AiSuggestionCard', () => {
   it('shows the poster, what it suggests, and why', () => {

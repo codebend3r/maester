@@ -11,7 +11,23 @@ export type User = {
   thumb: string | null
 }
 
-/** Why a sign-in or sign-out could not go ahead; the login page has a message for each. */
+/**
+ * Why a sign-in or sign-out could not go ahead; the login page has a message
+ * for each. The first three are the server's `/login?error=` codes;
+ * `unreachable` is rookery itself not answering.
+ */
+export const AUTH_ERRORS = {
+  notApproved: 'not_approved',
+  expired: 'expired',
+  plexUnavailable: 'plex_unavailable',
+  unreachable: 'unreachable',
+} as const
+
+export type AuthErrorCode = (typeof AUTH_ERRORS)[keyof typeof AUTH_ERRORS]
+
+export const isAuthErrorCode = (value: unknown): value is AuthErrorCode =>
+  Object.values(AUTH_ERRORS).some((code) => code === value)
+
 export class AuthError extends Error {
   constructor(readonly code: 'plex_unavailable' | 'unreachable') {
     super(code)

@@ -14,25 +14,27 @@ import { library } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 
 const renderShell = (route: string) =>
-  renderWithProviders(
-    <Routes>
-      <Route element={<AppShell />}>
-        <Route index element={<p>home</p>} />
-        <Route path="libraries" element={<p>libraries</p>} />
-        <Route path="favourites" element={<p>favourites</p>} />
-        <Route path="libraries/:id" element={<p>library</p>} />
-        <Route
-          path="search"
-          element={
-            <label>
-              Search <input />
-            </label>
-          }
-        />
-      </Route>
-    </Routes>,
-    { route },
-  )
+  renderWithProviders({
+    ui: (
+      <Routes>
+        <Route element={<AppShell />}>
+          <Route index element={<p>home</p>} />
+          <Route path="libraries" element={<p>libraries</p>} />
+          <Route path="favourites" element={<p>favourites</p>} />
+          <Route path="libraries/:id" element={<p>library</p>} />
+          <Route
+            path="search"
+            element={
+              <label>
+                Search <input />
+              </label>
+            }
+          />
+        </Route>
+      </Routes>
+    ),
+    route,
+  })
 
 const nav = () => screen.getByRole('navigation', { name: 'Main' })
 const tabs = () => screen.getByRole('navigation', { name: 'Tabs' })

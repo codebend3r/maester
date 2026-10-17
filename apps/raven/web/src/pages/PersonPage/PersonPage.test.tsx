@@ -50,12 +50,14 @@ describe('PersonPage', () => {
         { item: SHOW, job: 'director', role: 'Director' },
       ],
     }))
-    renderWithProviders(
-      <Routes>
-        <Route path="people/:id" element={<PersonPage />} />
-      </Routes>,
-      { route: '/people/7' },
-    )
+    renderWithProviders({
+      ui: (
+        <Routes>
+          <Route path="people/:id" element={<PersonPage />} />
+        </Routes>
+      ),
+      route: '/people/7',
+    })
     expect(
       await screen.findByRole('heading', { level: 1, name: 'Keanu Reeves' }),
     ).toBeInTheDocument()
@@ -91,12 +93,14 @@ describe('PersonPage', () => {
         { item: SHOW, job: 'director', role: 'Director' },
       ],
     }))
-    renderWithProviders(
-      <Routes>
-        <Route path="people/:id" element={<PersonPage />} />
-      </Routes>,
-      { route: '/people/7' },
-    )
+    renderWithProviders({
+      ui: (
+        <Routes>
+          <Route path="people/:id" element={<PersonPage />} />
+        </Routes>
+      ),
+      route: '/people/7',
+    })
     expect(await screen.findByText('In your libraries · 3 credits')).toBeInTheDocument()
     expect(
       within(screen.getByRole('region', { name: 'Acting' })).getByText('2 titles'),
@@ -113,12 +117,14 @@ describe('PersonPage', () => {
       photoVersion: null,
       credits: [],
     }))
-    const { container } = renderWithProviders(
-      <Routes>
-        <Route path="people/:id" element={<PersonPage />} />
-      </Routes>,
-      { route: '/people/8' },
-    )
+    const { container } = renderWithProviders({
+      ui: (
+        <Routes>
+          <Route path="people/:id" element={<PersonPage />} />
+        </Routes>
+      ),
+      route: '/people/8',
+    })
     expect(
       await screen.findByText('Nothing in raven credits Bertha Navarro yet.'),
     ).toBeInTheDocument()

@@ -13,13 +13,15 @@ import { held } from '@/test/held'
 import { renderWithProviders } from '@/test/render'
 
 const renderSignIn = (onSignIn: SignIn) =>
-  renderWithProviders(
-    <Routes>
-      <Route path="/sign-in" element={<SignInPage onSignIn={onSignIn} />} />
-      <Route path="/" element={<p>home</p>} />
-    </Routes>,
-    { route: '/sign-in' },
-  )
+  renderWithProviders({
+    ui: (
+      <Routes>
+        <Route path="/sign-in" element={<SignInPage onSignIn={onSignIn} />} />
+        <Route path="/" element={<p>home</p>} />
+      </Routes>
+    ),
+    route: '/sign-in',
+  })
 
 const server = () => screen.getByLabelText('Server')
 const name = () => screen.getByLabelText('Name')
@@ -159,7 +161,7 @@ describe('SignInPage', () => {
 
   it('takes the whole screen at /sign-in, saying there are no accounts yet', async () => {
     const user = userEvent.setup()
-    renderWithProviders(<AppRoutes />, { route: '/sign-in' })
+    renderWithProviders({ ui: <AppRoutes />, route: '/sign-in' })
 
     expect(screen.queryByRole('navigation', { name: 'Main' })).toBeNull()
     expect(screen.getByRole('main')).toContainElement(screen.getByRole('heading', { level: 1 }))

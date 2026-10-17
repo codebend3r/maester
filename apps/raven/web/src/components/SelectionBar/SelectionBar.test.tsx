@@ -38,17 +38,11 @@ const TARGETS: [string, WatchTarget[]][] = [
 ]
 
 const setUp = (entries: [string, WatchTarget[]][] = TARGETS) =>
-  renderWithProviders(
-    <SelectionScope {...sourceOf(entries)}>
-      <Peek />
-      <SelectButton />
-      <ul>
-        {entries.slice(0, 2).map(([key]) => (
-          <Card key={key} id={key} />
-        ))}
-      </ul>
-      <details>
-        <summary>Folded</summary>
+  renderWithProviders({
+    ui: (
+      <SelectionScope {...sourceOf(entries)}>
+        <Peek />
+        <SelectButton />
         <ul>
           <Card id="saga:9" />
         </ul>
@@ -213,16 +207,18 @@ describe('SelectionBar', () => {
   })
 
   it('leaves Escape to an open dialog first', async () => {
-    renderWithProviders(
-      <SelectionScope {...sourceOf([])}>
-        <Peek />
-        <SelectButton />
-        <SelectionBar />
-        <dialog open>
-          <button type="button">Inside</button>
-        </dialog>
-      </SelectionScope>,
-    )
+    renderWithProviders({
+      ui: (
+        <SelectionScope {...sourceOf([])}>
+          <Peek />
+          <SelectButton />
+          <SelectionBar />
+          <dialog open>
+            <button type="button">Inside</button>
+          </dialog>
+        </SelectionScope>
+      ),
+    })
     await userEvent.click(screen.getByRole('button', { name: 'Select' }))
     screen.getByRole('button', { name: 'Inside' }).focus()
     await userEvent.keyboard('{Escape}')
@@ -233,16 +229,18 @@ describe('SelectionBar', () => {
   })
 
   it('leaves Escape to whatever handled it already', async () => {
-    renderWithProviders(
-      <SelectionScope {...sourceOf([])}>
-        <Peek />
-        <SelectButton />
-        <SelectionBar />
-        <button type="button" onKeyDown={(event) => event.preventDefault()}>
-          Handles it
-        </button>
-      </SelectionScope>,
-    )
+    renderWithProviders({
+      ui: (
+        <SelectionScope {...sourceOf([])}>
+          <Peek />
+          <SelectButton />
+          <SelectionBar />
+          <button type="button" onKeyDown={(event) => event.preventDefault()}>
+            Handles it
+          </button>
+        </SelectionScope>
+      ),
+    })
     await userEvent.click(screen.getByRole('button', { name: 'Select' }))
     screen.getByRole('button', { name: 'Handles it' }).focus()
     await userEvent.keyboard('{Escape}')
@@ -250,14 +248,16 @@ describe('SelectionBar', () => {
   })
 
   it('leaves a right click to the browser while selecting', async () => {
-    renderWithProviders(
-      <SelectionScope {...sourceOf([])}>
-        <Peek />
-        <ul>
-          <MediaCard media={mediaItem({ id: 5, title: 'Pilot' })} />
-        </ul>
-      </SelectionScope>,
-    )
+    renderWithProviders({
+      ui: (
+        <SelectionScope {...sourceOf([])}>
+          <Peek />
+          <ul>
+            <MediaCard media={mediaItem({ id: 5, title: 'Pilot' })} />
+          </ul>
+        </SelectionScope>
+      ),
+    })
     act(() => peeked.scope?.store.getState().start())
     const proceeded = fireEvent.contextMenu(screen.getByRole('link', { name: 'Pilot' }))
     expect(proceeded).toBe(true)

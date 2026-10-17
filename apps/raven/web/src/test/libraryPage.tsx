@@ -28,14 +28,18 @@ export const renderLibraryPage = ({
   libraries?: Library[] | null
   adminLock?: AdminLock
 } = {}) =>
-  renderWithProviders(
-    <>
-      <Routes>
-        <Route path="libraries/:id" element={<LibraryPage />} />
-        <Route path="libraries/:id/:section" element={<LibraryPage />} />
-        <Route path="watch/:id" element={<Watching />} />
-      </Routes>
-      <Address />
-    </>,
-    { route, libraries, adminLock },
-  )
+  renderWithProviders({
+    ui: (
+      <>
+        <Routes>
+          <Route path="libraries/:id" element={<LibraryPage />} />
+          <Route path="libraries/:id/:section" element={<LibraryPage />} />
+          <Route path="watch/:id" element={<Watching />} />
+        </Routes>
+        <Address />
+      </>
+    ),
+    route,
+    libraries,
+    adminLock,
+  })

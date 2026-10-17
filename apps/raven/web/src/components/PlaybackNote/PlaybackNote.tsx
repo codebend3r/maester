@@ -1,17 +1,16 @@
 import { type MediaItem, planPlayback } from '@raven/core'
 import { Icon } from '@raven/ui'
 import { browserCanPlay, browserCanStream } from '@raven/ui/canPlay'
-import { useSharedPlaybackPolicy } from '@/lib/sharedPlaybackPolicy'
+import { usePlaybackPolicy } from '@/lib/usePlaybackPolicy'
 import styles from '@/components/PlaybackNote/PlaybackNote.module.scss'
 
 /**
  * Warns when this browser cannot play a video at all, as the server's
  * playback settings have it. Nothing when it plays, directly or converted
  * on the server, as most 4K files are, or before those settings are known.
- * The settings come from `SharedPlaybackPolicy`, as a grid holds thousands.
  */
 export const PlaybackNote = ({ media }: { media: MediaItem }) => {
-  const policy = useSharedPlaybackPolicy()
+  const policy = usePlaybackPolicy()
   if (!policy) return null
   const plan = planPlayback({
     media,

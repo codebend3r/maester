@@ -8,21 +8,23 @@ import { renderWithProviders } from '@/test/render'
 
 describe('SagaDecks', () => {
   it('fetches each poster in a deck no wider than the deck shows it', () => {
-    const { container } = renderWithProviders(
-      <SagaDecks
-        libraryId={2}
-        sagas={[
-          {
-            tmdbId: '119',
-            name: 'The Lord of the Rings Collection',
-            backdrop: DEFAULT_SAGA_BACKDROP,
-            media: [1, 2].map((id) =>
-              matchedMovie({ id, item: itemSummary({ id: id * 10, posterVersion: `p${id}` }) }),
-            ),
-          },
-        ]}
-      />,
-    )
+    const { container } = renderWithProviders({
+      ui: (
+        <SagaDecks
+          libraryId={2}
+          sagas={[
+            {
+              tmdbId: '119',
+              name: 'The Lord of the Rings Collection',
+              backdrop: DEFAULT_SAGA_BACKDROP,
+              media: [1, 2].map((id) =>
+                matchedMovie({ id, item: itemSummary({ id: id * 10, posterVersion: `p${id}` }) }),
+              ),
+            },
+          ]}
+        />
+      ),
+    })
     const posters = [...container.querySelectorAll('img')]
     expect(posters.map((poster) => poster.getAttribute('srcset')?.split(', ')[0])).toEqual([
       '/api/items/10/images/poster?v=p1&w=185 185w',
@@ -48,15 +50,15 @@ describe('SagaDecks', () => {
   })
 
   it('shows the number of movies left unwatched, counted from its movies', () => {
-    renderWithProviders(<SagaDecks libraryId={2} sagas={[saga([true, false, false])]} />)
+    renderWithProviders({ ui: <SagaDecks libraryId={2} sagas={[saga([true, false, false])]} /> })
     expect(screen.getByText('2 unwatched movies')).toBeInTheDocument()
   })
 
   it('shows the check when every movie is watched, and nothing when none is', () => {
-    renderWithProviders(<SagaDecks libraryId={2} sagas={[saga([true, true])]} />)
+    renderWithProviders({ ui: <SagaDecks libraryId={2} sagas={[saga([true, true])]} /> })
     expect(screen.getByText('Watched')).toBeInTheDocument()
     cleanup()
-    renderWithProviders(<SagaDecks libraryId={2} sagas={[saga([false, false])]} />)
+    renderWithProviders({ ui: <SagaDecks libraryId={2} sagas={[saga([false, false])]} /> })
     expect(screen.queryByText('Watched')).toBeNull()
     expect(screen.queryByText(/unwatched/)).toBeNull()
   })

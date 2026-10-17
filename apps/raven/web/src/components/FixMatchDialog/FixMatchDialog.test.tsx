@@ -62,7 +62,7 @@ describe('Fix match', () => {
 
   const openWith = async (candidates: ReturnType<typeof candidate>[]) => {
     spies.search.mockImplementation(async () => candidates)
-    renderWithProviders(<Harness media={unmatched} onMatched={() => {}} />)
+    renderWithProviders({ ui: <Harness media={unmatched} onMatched={() => {}} /> })
     await userEvent.click(screen.getByRole('button', { name: 'Options for Busboys (2026)' }))
     await userEvent.click(screen.getByRole('menuitem', { name: 'Fix match' }))
     await screen.findByRole('button', { name: `Choose Busboys (${candidates[0]?.year})` })
@@ -150,7 +150,9 @@ describe('Fix match', () => {
       return matchedMovie({ match: 'manual' })
     })
     const matched: MediaItem[] = []
-    renderWithProviders(<Harness media={unmatched} onMatched={(media) => matched.push(media)} />)
+    renderWithProviders({
+      ui: <Harness media={unmatched} onMatched={(media) => matched.push(media)} />,
+    })
 
     await userEvent.click(screen.getByRole('button', { name: 'Options for Busboys (2026)' }))
     await userEvent.click(screen.getByRole('menuitem', { name: 'Fix match' }))
@@ -179,7 +181,7 @@ describe('Fix match', () => {
       subjects.push(request.subject)
       return []
     })
-    renderWithProviders(<Harness media={unmatched} onMatched={() => undefined} />)
+    renderWithProviders({ ui: <Harness media={unmatched} onMatched={() => undefined} /> })
     await userEvent.click(screen.getByRole('button', { name: 'Options for Busboys (2026)' }))
     await userEvent.click(screen.getByRole('menuitem', { name: 'Fix match' }))
     await screen.findByText(/TMDB has nothing by that name/)
@@ -197,7 +199,7 @@ describe('Fix match', () => {
       searched.push(`${request.query}|${request.year ?? ''}`)
       return []
     })
-    renderWithProviders(<Harness media={unmatched} onMatched={() => undefined} />)
+    renderWithProviders({ ui: <Harness media={unmatched} onMatched={() => undefined} /> })
     await userEvent.click(screen.getByRole('button', { name: 'Options for Busboys (2026)' }))
     await userEvent.click(screen.getByRole('menuitem', { name: 'Fix match' }))
     await screen.findByText(/TMDB has nothing by that name/)
@@ -213,7 +215,7 @@ describe('Fix match', () => {
       chosen.push(tmdbId)
       return { ...unmatched, match: 'unmatched' }
     })
-    renderWithProviders(<Harness media={unmatched} onMatched={() => undefined} />)
+    renderWithProviders({ ui: <Harness media={unmatched} onMatched={() => undefined} /> })
     await userEvent.click(screen.getByRole('button', { name: 'Options for Busboys (2026)' }))
     await userEvent.click(screen.getByRole('menuitem', { name: 'Fix match' }))
     await userEvent.click(screen.getByRole('button', { name: 'Not a movie' }))
@@ -221,28 +223,32 @@ describe('Fix match', () => {
   })
 
   it('offers Refresh details only once a file is matched', async () => {
-    renderWithProviders(
-      <Harness media={matchedMovie({ item: itemSummary() })} onMatched={() => undefined} />,
-    )
+    renderWithProviders({
+      ui: <Harness media={matchedMovie({ item: itemSummary() })} onMatched={() => undefined} />,
+    })
     await userEvent.click(screen.getByRole('button', { name: 'Options for Busboys (2026)' }))
     expect(screen.getByRole('menuitem', { name: 'Refresh details' })).toBeInTheDocument()
   })
 
   it('offers neither in a library that does not match its files', async () => {
-    renderWithProviders(<MediaMenu media={mediaItem()} open onOpenChange={() => undefined} />)
+    renderWithProviders({
+      ui: <MediaMenu media={mediaItem()} open onOpenChange={() => undefined} />,
+    })
     expect(screen.queryByRole('menuitem', { name: 'Fix match' })).toBeNull()
     expect(screen.queryByRole('menuitem', { name: 'Refresh details' })).toBeNull()
   })
 
   it('says the file was matched by AI, and why, above the search', async () => {
     spies.search.mockImplementation(async () => [])
-    renderWithProviders(
-      <Harness
-        media={unmatched}
-        onMatched={() => undefined}
-        aiMatch={{ reason: 'The title and year fit.' }}
-      />,
-    )
+    renderWithProviders({
+      ui: (
+        <Harness
+          media={unmatched}
+          onMatched={() => undefined}
+          aiMatch={{ reason: 'The title and year fit.' }}
+        />
+      ),
+    })
     await userEvent.click(screen.getByRole('button', { name: 'Options for Busboys (2026)' }))
     await userEvent.click(screen.getByRole('menuitem', { name: 'Fix match' }))
     expect(screen.getByRole('dialog')).toHaveTextContent('Matched by AI. The title and year fit.')
@@ -250,20 +256,22 @@ describe('Fix match', () => {
 
   it('has the note describe the dialog, so a screen reader hears it on opening', async () => {
     spies.search.mockImplementation(async () => [])
-    const first = renderWithProviders(
-      <Harness
-        media={unmatched}
-        onMatched={() => undefined}
-        aiMatch={{ reason: 'The title and year fit.' }}
-      />,
-    )
+    const first = renderWithProviders({
+      ui: (
+        <Harness
+          media={unmatched}
+          onMatched={() => undefined}
+          aiMatch={{ reason: 'The title and year fit.' }}
+        />
+      ),
+    })
     await userEvent.click(screen.getByRole('button', { name: 'Options for Busboys (2026)' }))
     await userEvent.click(screen.getByRole('menuitem', { name: 'Fix match' }))
     expect(screen.getByRole('dialog')).toHaveAccessibleDescription(
       'Matched by AI. The title and year fit.',
     )
     first.unmount()
-    renderWithProviders(<Harness media={unmatched} onMatched={() => undefined} />)
+    renderWithProviders({ ui: <Harness media={unmatched} onMatched={() => undefined} /> })
     await userEvent.click(screen.getByRole('button', { name: 'Options for Busboys (2026)' }))
     await userEvent.click(screen.getByRole('menuitem', { name: 'Fix match' }))
     expect(screen.getByRole('dialog')).not.toHaveAttribute('aria-describedby')
@@ -274,16 +282,16 @@ describe('Fix match', () => {
     spies.item.mockImplementation(async () =>
       itemDetails({ aiMatch: { reason: 'Only one result fits.' } }),
     )
-    const first = renderWithProviders(
-      <Harness media={matchedMovie()} onMatched={() => undefined} />,
-    )
+    const first = renderWithProviders({
+      ui: <Harness media={matchedMovie()} onMatched={() => undefined} />,
+    })
     await userEvent.click(screen.getByRole('button', { name: 'Options for Busboys (2026)' }))
     await userEvent.click(screen.getByRole('menuitem', { name: 'Fix match' }))
     await waitFor(() =>
       expect(screen.getByRole('dialog')).toHaveTextContent('Matched by AI. Only one result fits.'),
     )
     first.unmount()
-    renderWithProviders(<Harness media={unmatched} onMatched={() => undefined} />)
+    renderWithProviders({ ui: <Harness media={unmatched} onMatched={() => undefined} /> })
     await userEvent.click(screen.getByRole('button', { name: 'Options for Busboys (2026)' }))
     await userEvent.click(screen.getByRole('menuitem', { name: 'Fix match' }))
     expect(screen.getByRole('dialog')).not.toHaveTextContent('Matched by AI.')
@@ -303,7 +311,9 @@ describe('Fix match', () => {
         episode: 1,
       }),
     })
-    renderWithProviders(<Harness media={episode} matchType="show" onMatched={() => undefined} />)
+    renderWithProviders({
+      ui: <Harness media={episode} matchType="show" onMatched={() => undefined} />,
+    })
     await userEvent.click(screen.getByRole('button', { name: /^Options for/ }))
     await userEvent.click(screen.getByRole('menuitem', { name: 'Fix match' }))
     expect(screen.getByRole('dialog')).toBeInTheDocument()

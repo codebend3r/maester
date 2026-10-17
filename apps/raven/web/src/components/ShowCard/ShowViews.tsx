@@ -143,7 +143,15 @@ const ShowRow = ({ entry }: { entry: ShowEntry }) => {
 /** Every show as a row of facts: title, years, episodes on disk and each of its scores, every column sortable. */
 export const ShowList = ({ shows }: { shows: ShowEntry[] }) => {
   const { sorted, toggle, ariaSort } = useTableSort({ rows: shows, columns: COLUMNS })
-  const header = (key: Column, label: string, className?: string) => (
+  const header = ({
+    key,
+    label,
+    className,
+  }: {
+    key: Column
+    label: string
+    className?: string
+  }) => (
     <SortHeader key={key} sort={ariaSort(key)} onToggle={() => toggle(key)} className={className}>
       {label}
     </SortHeader>
@@ -153,11 +161,23 @@ export const ShowList = ({ shows }: { shows: ShowEntry[] }) => {
       <table className={styles.table} aria-label="Shows">
         <thead>
           <tr>
-            {header('title', 'Title')}
-            {header('years', 'Years', `${styles.number} ${styles.spare}`)}
-            {header('episodes', 'Episodes', `${styles.number} ${styles.spare}`)}
+            {header({ key: 'title', label: 'Title' })}
+            {header({
+              key: 'years',
+              label: 'Years',
+              className: `${styles.number} ${styles.spare}`,
+            })}
+            {header({
+              key: 'episodes',
+              label: 'Episodes',
+              className: `${styles.number} ${styles.spare}`,
+            })}
             {RATING_COLUMNS.map((column) =>
-              header(column.source, column.label, `${styles.number} ${styles.roomy}`),
+              header({
+                key: column.source,
+                label: column.label,
+                className: `${styles.number} ${styles.roomy}`,
+              }),
             )}
             <th scope="col">
               <span className="visually-hidden">Play</span>
