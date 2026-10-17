@@ -4,6 +4,7 @@ import '@testing-library/jest-dom'
 import { usePlayerPrefs } from '@raven/ui'
 import { usePageBackdrop } from '@/stores/pageBackdrop'
 import { useSideMenu } from '@/stores/sideMenu'
+import { useTheme } from '@/stores/theme'
 import { useUnlockPrompt } from '@/stores/unlockPrompt'
 import { resetBrowserSupport } from '@/test/canPlay'
 import { FakeEventSource } from '@/test/eventSource'
@@ -15,6 +16,7 @@ const initialPrefs = usePlayerPrefs.getInitialState()
 const initialPageBackdrop = usePageBackdrop.getInitialState()
 const initialSideMenu = useSideMenu.getInitialState()
 const initialUnlockPrompt = useUnlockPrompt.getInitialState()
+const initialTheme = useTheme.getInitialState()
 
 // Bun test does not unmount between tests the way vitest globals do. The
 // stores reset after the unmount, or a store still subscribed to redraws
@@ -27,6 +29,7 @@ afterEach(() => {
   usePageBackdrop.setState(initialPageBackdrop, true)
   useSideMenu.setState(initialSideMenu, true)
   useUnlockPrompt.setState(initialUnlockPrompt, true)
+  useTheme.setState(initialTheme, true)
   resetBrowserSupport()
   FakeEventSource.opened = []
   resetPolls()

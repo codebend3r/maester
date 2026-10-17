@@ -10,8 +10,10 @@ import { AppRoutes } from '@/AppRoutes'
 import { CardLinks } from '@/components/CardLink/CardLink'
 import { createQueryClient } from '@/lib/queryClient'
 import { SharedPlaybackPolicy } from '@/lib/sharedPlaybackPolicy'
+import { followTheme } from '@/stores/theme'
 
 const queryClient = createQueryClient()
+followTheme()
 const rootElement = document.getElementById('root')
 
 if (rootElement) {

@@ -1,4 +1,9 @@
-// A dark logo drawn in white, so it reads on the night.
+// A dark logo drawn in white, so it reads on a dark ground.
 .whitened {
   filter: brightness(0) invert(1);
+}
+
+// A light logo drawn in ink, so it reads on a light ground.
+.inked {
+  filter: brightness(0);
 }

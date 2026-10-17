@@ -1,0 +1,40 @@
+export type ThemeTone = 'dark' | 'light'
+
+type Theme = {
+  id: string
+  name: string
+  /** One line under the name in the picker: the ground, then what Play wears. */
+  note: string
+  /** A light theme wears the logo drawn for light grounds. */
+  tone: ThemeTone
+}
+
+/**
+ * The themes a viewer can pick, Verdigris first as the default. Their
+ * colours live in styles/themes.scss under each id, and nowhere else.
+ */
+export const THEMES = [
+  { id: 'verdigris', name: 'Verdigris', note: 'Dark teal, oxblood play', tone: 'dark' },
+  { id: 'bronze', name: 'Bronze', note: 'Warm umber, verdigris play', tone: 'dark' },
+  { id: 'nocturne', name: 'Nocturne', note: 'Ink blue, copper play', tone: 'dark' },
+  { id: 'oxblood', name: 'Oxblood', note: 'Deep wine, gilt play', tone: 'dark' },
+  { id: 'patina', name: 'Patina', note: 'Light parchment, teal ink', tone: 'light' },
+  { id: 'mint', name: 'Mint', note: 'Cool mint, coral play', tone: 'light' },
+  {
+    id: 'contrast',
+    name: 'High contrast',
+    note: 'Black, white and yellow, 7:1 or more',
+    tone: 'dark',
+  },
+] as const satisfies readonly Theme[]
+
+export type ThemeId = (typeof THEMES)[number]['id']
+
+export const DEFAULT_THEME = 'verdigris' satisfies ThemeId
+
+export const isThemeId = (value: unknown): value is ThemeId =>
+  THEMES.some((theme) => theme.id === value)
+
+/** The theme by its id. */
+export const themeOf = (id: ThemeId): (typeof THEMES)[number] =>
+  THEMES.find((theme) => theme.id === id) ?? THEMES[0]
