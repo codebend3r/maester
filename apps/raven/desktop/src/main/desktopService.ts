@@ -244,12 +244,14 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
     deps.addRecentDocument(file.path)
     // The page describes a file each time it opens one, so this is where a play begins.
     deps.downloads.noteOpened({ fileId: file.fileId })
+    const downloadedFrom = deps.downloads.fromLabelOf({ path: file.path })
     return {
       type: 'file',
       file: {
         fileId: file.fileId,
         label: titleOf(file),
-        folder: fromOf(file.path),
+        folder: downloadedFrom ?? basename(dirname(file.path)),
+        isDownload: downloadedFrom !== null,
         resumeAt: resumeFor({
           state: store.read(),
           file,

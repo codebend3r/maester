@@ -181,6 +181,7 @@ const CLIP: LocalFile = {
   fileId: A,
   label: 'Clip 01',
   folder: 'Clips',
+  isDownload: false,
   resumeAt: 0,
   next: null,
   tracks: null,

@@ -89,6 +89,8 @@ export const servicesFor = ({
   return {
     title: {
       label: file.label,
+      // Only a download's folder says where it came from; any other file's is just its folder.
+      context: file.isDownload ? file.folder : null,
       duration: null,
       resumeAt: file.resumeAt,
       backTo: '/',
