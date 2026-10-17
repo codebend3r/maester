@@ -2,12 +2,13 @@ import type { PlayRequest } from '@raven/core'
 import { loggable } from '@/main/servers/serverCalls'
 import { TRUST_MESSAGES, type ServerTrust, type TrustOutcome } from '@/main/servers/serverTrust'
 import { messageOf } from '@/shared/messageOf'
-import { readPlayLink } from '@/shared/playLink'
+import { readDownloadLink, readPlayLink } from '@/shared/playLink'
 import type { DesktopReply } from '@/shared/protocol'
 
 export const LINK_MESSAGES = {
   unreadable:
-    'raven player could not read that link. It opens raven://play links and raven watch pages.',
+    'raven player could not read that link. It opens raven://play and raven://download links and raven watch pages.',
+  downloadsSoon: 'raven player cannot download titles yet.',
 } as const
 
 const LINK_LOG_MAX = 100
@@ -73,6 +74,9 @@ export const createLinkOpener = ({
   const open: LinkOpener['open'] = async ({ link, from }) => {
     const request = readPlayLink(link)
     if (request === null) {
+      if (readDownloadLink(link) !== null) {
+        return { type: 'refused', message: LINK_MESSAGES.downloadsSoon }
+      }
       safeWarn(`raven player could not read a link: ${loggable(link.slice(0, LINK_LOG_MAX))}`)
       return { type: 'refused', message: LINK_MESSAGES.unreadable }
     }

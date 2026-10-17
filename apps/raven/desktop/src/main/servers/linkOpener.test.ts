@@ -105,6 +105,19 @@ describe('createLinkOpener', () => {
   })
 
   it.each([
+    ['raven://download?server=https%3A%2F%2Fraven.example&media=7'],
+    ['raven://download?server=https%3A%2F%2Fraven.example&item=10'],
+    ['raven://download?server=https%3A%2F%2Fraven.example&saga=1%3A100'],
+  ])('refuses the download link %j for now and never trusts', async (link) => {
+    const world = setup()
+    expect(await world.opener.open({ link, from: 'link' })).toEqual({
+      type: 'refused',
+      message: LINK_MESSAGES.downloadsSoon,
+    })
+    expect(world.asked).toEqual([])
+  })
+
+  it.each([
     ['javascript:alert(1)'],
     ['file:///etc/passwd'],
     [`raven://play?server=${encodeURIComponent(ORIGIN)}&media=1&next=${'1,'.repeat(100)}1`],

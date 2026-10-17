@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'bun:test'
-import { type PlayRequest, playLinkFor } from '@raven/core'
+import { type DownloadRequest, type PlayRequest, downloadLinkFor, playLinkFor } from '@raven/core'
 import {
   MAX_LINK_LENGTH,
   MAX_ORIGIN_LENGTH,
   isServerOrigin,
+  readDownloadLink,
   readPlayLink,
   serverOriginOf,
   watchUrlFor,
@@ -285,6 +286,91 @@ describe('readPlayLink', () => {
 
   it('refuses a malformed percent escape', () => {
     expect(readPlayLink(`raven://play?${server}&media=%E0%A4%A`)).toBeNull()
+  })
+})
+
+describe('readDownloadLink', () => {
+  const server = 'server=https%3A%2F%2Fraven.example'
+  const base = `raven://download?${server}`
+
+  it.each<[string, DownloadRequest['target']]>([
+    ['media=7', { kind: 'media', mediaId: 7 }],
+    ['item=10', { kind: 'item', itemId: 10 }],
+    ['saga=1%3A100', { kind: 'saga', libraryId: 1, tmdbId: '100' }],
+  ])('reads %s', (query, target) => {
+    expect(readDownloadLink(`${base}&${query}`)).toEqual({
+      origin: 'https://raven.example',
+      target,
+    })
+  })
+
+  it.each<DownloadRequest>([
+    { origin: 'https://raven.example', target: { kind: 'media', mediaId: 7 } },
+    { origin: 'http://[::1]:3000', target: { kind: 'item', itemId: 9007199254740991 } },
+    { origin: 'https://raven.example', target: { kind: 'saga', libraryId: 2, tmdbId: '86311' } },
+  ])('reads back what downloadLinkFor wrote for %p', (request) => {
+    expect(readDownloadLink(downloadLinkFor(request))).toEqual(request)
+  })
+
+  it('reads the download host in any case, with a slash and padding', () => {
+    expect(readDownloadLink(`  raven://DOWNLOAD/?${server}&media=7  `)?.target ?? null).toEqual({
+      kind: 'media',
+      mediaId: 7,
+    })
+  })
+
+  it('normalises the server it carries', () => {
+    expect(
+      readDownloadLink('raven://download?server=HTTPS%3A%2F%2FRaven.Example%3A443%2F&media=7')
+        ?.origin ?? null,
+    ).toBe('https://raven.example')
+  })
+
+  it.each([
+    ['two targets at once', `${base}&media=7&item=10`],
+    ['all three targets', `${base}&media=7&item=10&saga=1%3A100`],
+    ['no target', base],
+    ['a repeated media', `${base}&media=7&media=8`],
+    ['a repeated server', `${base}&${server}&media=7`],
+    ['an at key', `${base}&media=7&at=5`],
+    ['a next key', `${base}&media=7&next=8`],
+    ['an unknown key', `${base}&media=7&url=https://x`],
+    ['a hash', `${base}&media=7#x`],
+    ['a bare hash', `${base}&media=7#`],
+    ['missing server', 'raven://download?media=7'],
+    ['a javascript server', 'raven://download?server=javascript%3Aalert(1)&media=7'],
+    ['a path on the server', 'raven://download?server=https%3A%2F%2Fx%2Fpath&media=7'],
+    ['media=0', `${base}&media=0`],
+    ['media=007', `${base}&media=007`],
+    ['media=1.5', `${base}&media=1.5`],
+    ['item=abc', `${base}&item=abc`],
+    ['item past safe integers', `${base}&item=9007199254740992`],
+    ['saga=1:abc', `${base}&saga=1%3Aabc`],
+    ['saga with no collection', `${base}&saga=1%3A`],
+    ['saga with no library', `${base}&saga=%3A100`],
+    ['saga=0:100', `${base}&saga=0%3A100`],
+    ['saga=1:0', `${base}&saga=1%3A0`],
+    ['saga=1:007', `${base}&saga=1%3A007`],
+    ['saga with a third part', `${base}&saga=1%3A100%3A2`],
+    ['saga with no colon', `${base}&saga=1100`],
+    ['saga with a collection past 16 digits', `${base}&saga=1%3A12345678901234567`],
+    ['another host', `raven://open?${server}&media=7`],
+    ['a path after download', `raven://download/x?${server}&media=7`],
+    ['credentials on the host', `raven://u:p@download?${server}&media=7`],
+    ['a port on the host', `raven://download:80?${server}&media=7`],
+    ['another scheme', `ravens://download?${server}&media=7`],
+    ['the limit plus one', `${base}&media=7&x=${'1'.repeat(MAX_LINK_LENGTH)}`],
+    ['a raven://play link', `raven://play?${server}&media=7`],
+    ['a watch page', 'https://raven.example/watch/7'],
+    ['a javascript link', 'javascript:alert(1)'],
+    ['not a link', 'not a link'],
+    ['nothing', ''],
+  ])('refuses %s', (_, link) => {
+    expect(readDownloadLink(link)).toBeNull()
+  })
+
+  it('keeps readPlayLink from reading a download link', () => {
+    expect(readPlayLink(`${base}&media=7`)).toBeNull()
   })
 })
 
