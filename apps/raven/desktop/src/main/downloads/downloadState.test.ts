@@ -470,19 +470,25 @@ describe('pending', () => {
 
   it('clearPending clears the play and the position it sent', () => {
     const state = stateOf(entry({ pending: { play: true, position: 42, at: 9 } }))
-    const next = clearPending(state, { downloadId: ID, sentPosition: 42 })
+    const next = clearPending(state, { downloadId: ID, sentPlay: true, sentPosition: 42 })
     expect(next.entries[0]?.pending).toEqual({ play: false, position: null, at: 9 })
+  })
+
+  it('clearPending keeps a play it did not send', () => {
+    const state = stateOf(entry({ pending: { play: true, position: 42, at: 9 } }))
+    const next = clearPending(state, { downloadId: ID, sentPlay: false, sentPosition: 42 })
+    expect(next.entries[0]?.pending).toEqual({ play: true, position: null, at: 9 })
   })
 
   it('clearPending keeps a newer position', () => {
     const state = stateOf(entry({ pending: { play: true, position: 60, at: 12 } }))
-    const next = clearPending(state, { downloadId: ID, sentPosition: 42 })
+    const next = clearPending(state, { downloadId: ID, sentPlay: true, sentPosition: 42 })
     expect(next.entries[0]?.pending).toEqual({ play: false, position: 60, at: 12 })
   })
 
   it('clearPending of nothing pending returns the same state', () => {
     const state = stateOf(entry())
-    expect(clearPending(state, { downloadId: ID, sentPosition: null })).toBe(state)
+    expect(clearPending(state, { downloadId: ID, sentPlay: true, sentPosition: null })).toBe(state)
   })
 })
 
@@ -625,7 +631,10 @@ describe('an unknown download id', () => {
       'notePending',
       () => notePending(state, { downloadId: unknown, play: true, position: 1, at: 1 }),
     ],
-    ['clearPending', () => clearPending(state, { downloadId: unknown, sentPosition: null })],
+    [
+      'clearPending',
+      () => clearPending(state, { downloadId: unknown, sentPlay: true, sentPosition: null }),
+    ],
   ])('%s returns the same state', (_name, run) => {
     expect(run()).toBe(state)
   })

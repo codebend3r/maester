@@ -23,7 +23,7 @@ import {
   type DownloadPlaybackDeps,
 } from '@/main/downloads/playback'
 import { downloadsDirFor, readSpace, type SpaceFs } from '@/main/downloads/space'
-import { createSync } from '@/main/downloads/sync'
+import { createSync, settleWithin } from '@/main/downloads/sync'
 import { errorText } from '@/main/log/errorText'
 import { loggable, type ServerCalls } from '@/main/servers/serverCalls'
 import { serverById } from '@/main/servers/serverList'
@@ -195,18 +195,8 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     })
   }
 
-  /** Waits for `work`, or `SYNC_DELETE_WAIT_MS` at most, whichever comes first. */
-  const settleWithin = async (work: Promise<void>): Promise<void> => {
-    const waited: { handle: unknown } = { handle: undefined }
-    const timedOut = new Promise<void>((resolve) => {
-      waited.handle = deps.timers.set({ run: resolve, ms: SYNC_DELETE_WAIT_MS })
-    })
-    try {
-      await Promise.race([work, timedOut])
-    } finally {
-      deps.timers.clear(waited.handle)
-    }
-  }
+  const waitForSync = (work: Promise<void>): Promise<void> =>
+    settleWithin({ work, timers: deps.timers, ms: SYNC_DELETE_WAIT_MS, warn: deps.warn })
 
   const playback = createDownloadPlayback({
     store,
@@ -303,7 +293,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
 
   const remove: DownloadService['remove'] = async ({ downloadId }) => {
     if (!isKnown(downloadId)) return unknown()
-    await settleWithin(sync.runFor({ downloadIds: [downloadId] }))
+    await waitForSync(sync.runFor({ downloadIds: [downloadId] }))
     await queue.remove({ downloadId })
     return list()
   }
@@ -325,7 +315,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
   }
 
   const removeAll: DownloadService['removeAll'] = async () => {
-    await settleWithin(sync.runAll())
+    await waitForSync(sync.runAll())
     await queue.removeAll()
     return list()
   }

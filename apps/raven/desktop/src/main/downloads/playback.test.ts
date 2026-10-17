@@ -351,7 +351,9 @@ describe('notePosition', () => {
     world.playback.notePosition({ fileId, position: 100, duration: 3000 })
     expect(entryOf(world)?.pending).toEqual({ play: true, position: 100, at: NOW + 1 })
     // What a sync sent is cleared, so a second play would show.
-    world.store.update((state) => clearPending(state, { downloadId: ID, sentPosition: 100 }))
+    world.store.update((state) =>
+      clearPending(state, { downloadId: ID, sentPlay: true, sentPosition: 100 }),
+    )
     world.clock.now = NOW + 2
     world.playback.notePosition({ fileId, position: 200, duration: 3000 })
     expect(entryOf(world)?.pending).toEqual({ play: false, position: 200, at: NOW + 2 })
