@@ -6,6 +6,7 @@ import {
   type MediaOrigin,
 } from '@raven/core'
 import type { ServerEntry } from '@/main/desktopConfig'
+import { DOWNLOAD_MESSAGES } from '@/main/downloads/downloadMessages'
 import { EXPAND_MESSAGES } from '@/main/downloads/expand'
 import {
   createMediaAccess,
@@ -241,7 +242,7 @@ describe('createMediaAccess', () => {
     })
     const outcome = failed(await access.accessFor({ serverId: SERVER_ID, mediaId: 7 }))
     expect(outcome.reason).toBe('locked')
-    expect(outcome.message).toBe('Vhagar locked this library again')
+    expect(outcome.message).toBe(DOWNLOAD_MESSAGES.relocked('Vhagar'))
   })
 
   it('answers unreachable when the ticket read fails to connect', async () => {

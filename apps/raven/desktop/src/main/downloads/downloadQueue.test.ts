@@ -8,6 +8,7 @@ import {
   OUTAGE_RETRY_MS,
   RENEWAL_MIN_MS,
   RESUME_SETTLE_MS,
+  SIDECAR_MAX_BYTES,
 } from '@/main/downloads/downloadQueue'
 import {
   EMPTY_DOWNLOADS,
@@ -36,6 +37,7 @@ import {
   ticks,
   tracksWith,
   until,
+  whole,
   type Answer,
 } from '@/main/test/downloadFakes'
 import { fakeTimers } from '@/main/test/playerFakes'
@@ -287,6 +289,22 @@ describe('space', () => {
     expect(world.statusOf(1)).toEqual({ kind: 'downloading', bytes: 8192 })
   })
 
+  it('stops a file of the group that was still reading its ticket, which stays paused', async () => {
+    const ticket = Promise.withResolvers<AccessOutcome>()
+    const world = setup({
+      free: 10 * GIB,
+      entries: [entryFor(2), entryFor(1, { size: 50 * GIB })],
+      access: ({ mediaId }) => (mediaId === 2 ? ticket.promise : Promise.resolve(FAR_TICKET)),
+    })
+    world.queue.kick()
+    await until(() => world.statusOf(1)?.kind === 'failed')
+    expect(world.statusOf(2)).toEqual({ kind: 'paused', bytes: 0, reason: 'noSpace' })
+    ticket.resolve(FAR_TICKET)
+    await ticks(10)
+    expect(world.statusOf(2)).toEqual({ kind: 'paused', bytes: 0, reason: 'noSpace' })
+    expect(world.network.fileRequests()).toEqual([])
+  })
+
   it('starts no second file that the first one still needs the room for', async () => {
     const world = setup({
       free: SPACE_RESERVE_BYTES + 12,
@@ -448,6 +466,23 @@ describe('an outage', () => {
     ])
   })
 
+  it("keeps the bytes of the server's running files an outage pauses", async () => {
+    const second = Promise.withResolvers<AccessOutcome>()
+    const world = setup({
+      entries: [entryFor(1), entryFor(2)],
+      access: ({ mediaId }) => (mediaId === 2 ? second.promise : Promise.resolve(FAR_TICKET)),
+    })
+    world.network.answers.file = (request) =>
+      request.url.includes('/media/1/')
+        ? serving({ size: 8, sent: 2, isEnding: false })(request)
+        : refused(503)
+    world.queue.kick()
+    await until(() => world.drive.sizeOf(partOf(1)) === 2)
+    second.resolve(FAR_TICKET)
+    await until(() => world.statusOf(1)?.kind === 'paused')
+    expect(world.statusOf(1)).toEqual({ kind: 'paused', bytes: 2, reason: 'unreachable' })
+  })
+
   it('fails the file whose access cannot be read and pauses the rest of its server', async () => {
     const world = setup({
       entries: [entryFor(1), entryFor(2), entryFor(3), entryFor(5, { serverId: OTHER_SERVER_ID })],
@@ -531,6 +566,28 @@ describe('pause, resume and retry', () => {
     world.queue.retry({ downloadId: idOf(1) })
     await until(() => world.network.fileRequests().length === 1)
     expect(world.statusOf(1)).toEqual({ kind: 'downloading', bytes: 0 })
+  })
+
+  it('keeps the bytes a paused file had written, as many as its part holds', async () => {
+    const world = setup({ entries: [entryFor(1)] })
+    world.network.answers.file = serving({ size: 8, sent: 5, isEnding: false })
+    world.queue.kick()
+    await until(() => world.drive.sizeOf(partOf(1)) === 5)
+    expect(world.statusOf(1)).toEqual({ kind: 'downloading', bytes: 0 })
+    await world.queue.pause({ downloadId: idOf(1) })
+    expect(world.statusOf(1)).toEqual({ kind: 'paused', bytes: 5, reason: 'viewer' })
+  })
+
+  it('keeps the bytes of every file Pause all stops', async () => {
+    const world = setup({ entries: [entryFor(1), entryFor(2)] })
+    world.network.answers.file = serving({ size: 8, sent: 3, isEnding: false })
+    world.queue.kick()
+    await until(() => world.drive.sizeOf(partOf(1)) === 3 && world.drive.sizeOf(partOf(2)) === 3)
+    await world.queue.pauseAll()
+    expect([1, 2].map(world.statusOf)).toEqual([
+      { kind: 'paused', bytes: 3, reason: 'viewer' },
+      { kind: 'paused', bytes: 3, reason: 'viewer' },
+    ])
   })
 
   it('pauses everything with no message and aborts what runs', async () => {
@@ -684,6 +741,26 @@ describe('the ticket', () => {
   })
 })
 
+describe('a file whose video is already whole', () => {
+  it('finishes without a fetch when a crash came between the rename and the save', async () => {
+    const world = setup({
+      entries: [entryFor(1, { status: { kind: 'downloading', bytes: 4 } })],
+      disk: { [videoOf(1)]: 8 },
+    })
+    world.queue.kick()
+    await until(() => world.statusOf(1)?.kind === 'ready')
+    expect(world.network.requests).toEqual([])
+    expect(world.media.asked).toEqual([])
+    expect(world.finished.map(({ downloadId }) => downloadId)).toEqual([idOf(1)])
+  })
+
+  it('fetches again when the video on disk is not the whole file', async () => {
+    const world = setup({ entries: [entryFor(1)], disk: { [videoOf(1)]: 3 } })
+    world.queue.kick()
+    await until(() => world.network.fileRequests().length === 1)
+  })
+})
+
 describe('a finished file', () => {
   it('has its part renamed, its subtitles written and set, and is announced', async () => {
     const world = setup({
@@ -723,6 +800,28 @@ describe('a finished file', () => {
     expect(log).toContain('external-0')
     expect(log).not.toContain('t=one')
     expect(log).not.toContain(DOWNLOADS)
+  })
+
+  it('skips a subtitle larger than it keeps, logging the title and track only', async () => {
+    const world = setup({
+      entries: [entryFor(1)],
+      tracks: tracksWith([subtitleTrack({ id: 'external-0' })]),
+    })
+    world.network.answers.file = serving({ size: 8 })
+    world.network.answers.sidecar = () => ({
+      status: 200,
+      body: whole([new Uint8Array(SIDECAR_MAX_BYTES), new Uint8Array(1)]),
+    })
+    world.queue.kick()
+    await until(() => world.statusOf(1)?.kind === 'ready')
+    expect(SIDECAR_MAX_BYTES).toBe(16 * 1024 ** 2)
+    expect(world.drive.texts.size).toBe(0)
+    expect(entryById(world.store.read(), { downloadId: idOf(1) })?.sidecars).toEqual([])
+    const log = world.warnings.join('\n')
+    expect(log).toContain('Episode 1')
+    expect(log).toContain('external-0')
+    expect(log).not.toContain(DOWNLOADS)
+    expect(log).not.toContain('t=one')
   })
 
   it('finishes with no subtitles when their folder cannot be made', async () => {
@@ -1088,6 +1187,15 @@ describe('a sleep', () => {
     expect(world.failed).toEqual([])
   })
 
+  it('keeps the bytes each stopped file had written', async () => {
+    const world = setup({ entries: [entryFor(1)] })
+    world.network.answers.file = serving({ size: 8, sent: 6, isEnding: false })
+    world.queue.kick()
+    await until(() => world.drive.sizeOf(partOf(1)) === 6)
+    world.queue.onSuspend()
+    expect(world.statusOf(1)).toEqual({ kind: 'downloading', bytes: 6 })
+  })
+
   it('starts them again from the bytes on disk once the wake has settled', async () => {
     const world = setup({ entries: [entryFor(1, { size: 8 })] })
     world.network.answers.file = serving({ size: 8, sent: 4, isEnding: false })
@@ -1134,5 +1242,14 @@ describe('dispose', () => {
       { kind: 'queued' },
     ])
     expect(world.failed).toEqual([])
+  })
+
+  it('keeps the bytes each file had written, while it is still downloading', async () => {
+    const world = setup({ entries: [entryFor(1)] })
+    world.network.answers.file = serving({ size: 8, sent: 7, isEnding: false })
+    world.queue.kick()
+    await until(() => world.drive.sizeOf(partOf(1)) === 7)
+    world.queue.dispose()
+    expect(world.statusOf(1)).toEqual({ kind: 'downloading', bytes: 7 })
   })
 })

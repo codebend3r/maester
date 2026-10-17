@@ -157,20 +157,15 @@ describe('queue', () => {
 })
 
 describe('start', () => {
-  it.each([
-    ['queued', { kind: 'queued' as const }, 0],
-    ['paused', { kind: 'paused' as const, bytes: 40, reason: 'unreachable' as const }, 40],
-    [
-      'failed',
-      { kind: 'failed' as const, bytes: 70, reason: 'other' as const, message: 'boom' },
-      70,
-    ],
-  ])('moves %s to downloading at its bytes', (_name, status, bytes) => {
-    const next = start(stateOf(entry({ status })), { downloadId: ID })
-    expect(next.entries[0]?.status).toEqual({ kind: 'downloading', bytes })
+  it('moves a queued entry to downloading at 0 bytes', () => {
+    const next = start(stateOf(entry({ status: { kind: 'queued' } })), { downloadId: ID })
+    expect(next.entries[0]?.status).toEqual({ kind: 'downloading', bytes: 0 })
   })
 
+  // A run that began for a queued file must not undo a pause or a failure that came meanwhile.
   it.each([
+    ['paused', { kind: 'paused' as const, bytes: 40, reason: 'noSpace' as const }],
+    ['failed', { kind: 'failed' as const, bytes: 70, reason: 'other' as const, message: 'boom' }],
     ['ready', { kind: 'ready' as const }],
     ['downloading', { kind: 'downloading' as const, bytes: 5 }],
   ])('refuses %s with the same state', (_name, status) => {
@@ -191,6 +186,11 @@ describe('advance', () => {
   it('refuses any other status with the same state', () => {
     const state = stateOf(entry({ status: { kind: 'paused', bytes: 5, reason: 'viewer' } }))
     expect(advance(state, { downloadId: ID, bytes: 50 })).toBe(state)
+  })
+
+  it('returns the same state for the bytes it already has', () => {
+    const state = stateOf(entry({ status: { kind: 'downloading', bytes: 5 } }))
+    expect(advance(state, { downloadId: ID, bytes: 5 })).toBe(state)
   })
 })
 
