@@ -161,6 +161,7 @@ const setup = ({
   const names = new Map([[SERVER_ID, 'Vhagar']])
   const statted: string[] = []
   const told = { lists: 0 }
+  const noted: string[] = []
   const playback = createDownloadPlayback({
     store,
     userData: USER_DATA,
@@ -178,6 +179,7 @@ const setup = ({
     announce: () => {
       told.lists += 1
     },
+    onNoted: ({ downloadId }) => noted.push(downloadId),
   })
   return {
     playback,
@@ -192,6 +194,7 @@ const setup = ({
     names,
     statted,
     told,
+    noted,
   }
 }
 
@@ -355,6 +358,17 @@ describe('notePosition', () => {
     expect(await opened(world)).toBe(fileId)
     world.playback.notePosition({ fileId, position: 300, duration: 3000 })
     expect(entryOf(world)?.pending).toEqual({ play: true, position: 300, at: NOW + 2 })
+  })
+
+  it('tells the sync after each position noted for a download, and for no other file', async () => {
+    const world = setup({ entries: [entryFor({})], videos: { [VIDEO]: FILE, [MOVIE_PATH]: FILE } })
+    const fileId = await opened(world)
+    world.playback.notePosition({ fileId, position: 100, duration: 3000 })
+    world.playback.notePosition({ fileId, position: 200, duration: 3000 })
+    expect(world.noted).toEqual([ID, ID])
+    const otherId = await granted(world, MOVIE_PATH)
+    world.playback.notePosition({ fileId: otherId, position: 100, duration: 3000 })
+    expect(world.noted).toEqual([ID, ID])
   })
 
   it("marks a download watched once a position reaches its library's Watched at, and keeps the first time", async () => {

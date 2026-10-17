@@ -23,6 +23,7 @@ import {
   type DownloadPlaybackDeps,
 } from '@/main/downloads/playback'
 import { downloadsDirFor, readSpace, type SpaceFs } from '@/main/downloads/space'
+import { createSync } from '@/main/downloads/sync'
 import { errorText } from '@/main/log/errorText'
 import { loggable, type ServerCalls } from '@/main/servers/serverCalls'
 import { serverById } from '@/main/servers/serverList'
@@ -31,6 +32,9 @@ import type { DesktopEvent, DesktopReply, DownloadStatus, DownloadView } from '@
 
 /** The `downloads` event goes out at most once in this long, so progress cannot flood the page. */
 export const DOWNLOADS_EVENT_MS = 250
+
+/** A deletion waits this long at most for the server to hear what was watched, then deletes anyway. */
+export const SYNC_DELETE_WAIT_MS = 2000
 
 export type DownloadServiceDeps = {
   store: DownloadsStore
@@ -181,6 +185,29 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     if (!isDisposed) deps.send({ type: 'notice', message })
   }
 
+  const sync = createSync({ store, calls: deps.calls, timers: deps.timers, warn: deps.warn })
+
+  const runSync = (work: Promise<void>): void => {
+    work.catch((error: unknown) => {
+      deps.warn(
+        `raven player could not tell its servers what was watched: ${loggable(errorText(error))}`,
+      )
+    })
+  }
+
+  /** Waits for `work`, or `SYNC_DELETE_WAIT_MS` at most, whichever comes first. */
+  const settleWithin = async (work: Promise<void>): Promise<void> => {
+    const waited: { handle: unknown } = { handle: undefined }
+    const timedOut = new Promise<void>((resolve) => {
+      waited.handle = deps.timers.set({ run: resolve, ms: SYNC_DELETE_WAIT_MS })
+    })
+    try {
+      await Promise.race([work, timedOut])
+    } finally {
+      deps.timers.clear(waited.handle)
+    }
+  }
+
   const playback = createDownloadPlayback({
     store,
     userData: deps.userData,
@@ -192,6 +219,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     serverNameOf,
     change,
     announce,
+    onNoted: sync.touch,
   })
 
   const queue = createDownloadQueue({
@@ -239,6 +267,12 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     list,
   })
 
+  // Only the page asking for the list sends what is pending; the list that events and replies carry does not.
+  const listAndSync: DownloadService['list'] = () => {
+    runSync(sync.runAll())
+    return list()
+  }
+
   const confirm: DownloadService['confirm'] = async (input) => {
     const reply = await asks.confirm(input)
     queue.kick()
@@ -269,6 +303,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
 
   const remove: DownloadService['remove'] = async ({ downloadId }) => {
     if (!isKnown(downloadId)) return unknown()
+    await settleWithin(sync.runFor({ downloadIds: [downloadId] }))
     await queue.remove({ downloadId })
     return list()
   }
@@ -290,6 +325,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
   }
 
   const removeAll: DownloadService['removeAll'] = async () => {
+    await settleWithin(sync.runAll())
     await queue.removeAll()
     return list()
   }
@@ -320,6 +356,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     if (announcing.timer !== undefined) deps.timers.clear(announcing.timer)
     announcing.timer = undefined
     asks.clear()
+    sync.dispose()
     queue.dispose()
   }
 
@@ -329,6 +366,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     await Promise.all([queue.sweep({ wasSetAside: deps.wasSetAside }), deps.ready])
     playback.readFiles(store.read().entries.filter(({ status }) => status.kind === 'ready'))
     queue.retryOutages()
+    await sync.runAll()
   }
   resumeLaunch().catch((error: unknown) => {
     deps.warn(`raven player could not resume its downloads: ${loggable(errorText(error))}`)
@@ -339,7 +377,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     retryAsk: asks.retryAsk,
     confirm,
     decline: asks.decline,
-    list,
+    list: listAndSync,
     readSpace: readSpaceView,
     setDefaults,
     views,

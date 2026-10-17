@@ -6,6 +6,7 @@ import { DOWNLOAD_MESSAGES } from '@/main/downloads/downloadMessages'
 import {
   createDownloadService,
   DOWNLOADS_EVENT_MS,
+  SYNC_DELETE_WAIT_MS,
   viewStatusOf,
 } from '@/main/downloads/downloadService'
 import {
@@ -17,6 +18,7 @@ import {
 } from '@/main/downloads/downloadState'
 import { RESUME_SETTLE_MS } from '@/main/downloads/downloadQueue'
 import { DOWNLOADS_DEBOUNCE_MS } from '@/main/downloads/downloadStore'
+import { SYNC_DEBOUNCE_MS, SYNC_RETRY_MS } from '@/main/downloads/sync'
 import { EXPAND_MESSAGES } from '@/main/downloads/expand'
 import type { AccessOutcome } from '@/main/downloads/mediaAccess'
 import { SPACE_RESERVE_BYTES } from '@/main/downloads/space'
@@ -181,7 +183,15 @@ const setup = ({
     [libraryCall]: ok(library({ id: 1, watchedPercent: 90 })),
     ...replies,
   }
-  const { calls, log } = fakeCalls(table)
+  const { calls: answering, log } = fakeCalls(table)
+  /** Server calls wait on this before they are answered, so a test can leave the server silent. */
+  const silence: { until: Promise<void> } = { until: Promise.resolve() }
+  const calls: typeof answering = {
+    call: async (input) => {
+      await silence.until
+      return answering.call(input)
+    },
+  }
   const { timers, fire, pending } = fakeTimers()
   const config = memoryConfig()
   const store = createJsonStore({
@@ -269,6 +279,7 @@ const setup = ({
     config,
     table,
     log,
+    silence,
     fire,
     pending,
     clock,
@@ -1249,5 +1260,175 @@ describe('playing a download', () => {
     world.network.answers.file = serving({ size: 8 })
     await until(() => world.service.views()[0]?.watched !== null)
     expect(world.service.views()[0]?.watched).toBe(0.5)
+  })
+})
+
+describe('reaching the server', () => {
+  const ID = '0f8fad5b-d9cb-469f-a165-70867728950e'
+  const OTHER_ID = '00000000-0000-4000-8000-0000000000a1'
+  const VIDEO = `${DOWNLOADS}/${SERVER_ID}/11/video.mkv`
+  const OTHER_VIDEO = `${DOWNLOADS}/${SERVER_ID}/12/video.mkv`
+  const FILE: Video = { size: 2 * GIB, mtimeMs: MTIME }
+  const PLAYED = { play: true, position: 750, at: NOW }
+  const progress = (mediaId: number, position: number): string =>
+    keyOf({ name: 'saveProgress', mediaId, position })
+  const playOf = (mediaId: number): string => keyOf({ name: 'recordPlay', mediaId })
+  const NO_CONTENT: Reply = { status: 204, body: '' }
+  const holding = (...entries: DownloadEntry[]): DownloadsState => ({
+    ...EMPTY_DOWNLOADS,
+    entries,
+  })
+  const withPending = (overrides: Partial<DownloadEntry> = {}): DownloadEntry =>
+    entryFor({ pending: PLAYED, ...overrides })
+  const entries = (world: World) => world.store.read().entries
+  /** Runs the timers set for this long, and no others. */
+  const fireAfter = (world: World, ms: number): void => {
+    const due = [...world.pending].filter(([, timer]) => timer.ms === ms)
+    due.forEach(([handle, timer]) => {
+      world.pending.delete(handle)
+      timer.run()
+    })
+  }
+
+  it('sends what a position saved for a download left pending, once the debounce has run', async () => {
+    const world = setup({
+      initial: holding(entryFor({})),
+      videos: { [VIDEO]: FILE },
+      replies: { [playOf(11)]: NO_CONTENT, [progress(11, 750)]: NO_CONTENT },
+    })
+    // The launch sends what is pending once, so the position is saved after it.
+    await ticks(10)
+    const granted = await world.grants.grant(VIDEO)
+    if (!granted.ok) throw new Error('expected a grant')
+    world.service.noteOpened({ fileId: granted.file.fileId })
+    world.service.notePosition({ fileId: granted.file.fileId, position: 750, duration: 3000 })
+    await ticks(5)
+    expect(world.log).toEqual([])
+    fireAfter(world, SYNC_DEBOUNCE_MS)
+    await until(() => world.log.length === 2)
+    expect(world.log).toEqual([playOf(11), progress(11, 750)])
+    await until(() => entries(world)[0]?.pending.position === null)
+    expect(entries(world)[0]?.pending.play).toBe(false)
+  })
+
+  it('sends at launch what the last run left pending', async () => {
+    const world = setup({
+      initial: holding(withPending()),
+      videos: { [VIDEO]: FILE },
+      replies: { [playOf(11)]: NO_CONTENT, [progress(11, 750)]: NO_CONTENT },
+    })
+    await until(() => world.log.length === 2)
+    expect(world.log).toEqual([playOf(11), progress(11, 750)])
+    await until(() => entries(world)[0]?.pending.position === null)
+  })
+
+  it('sends again when the Downloads page is listed, but not for the list an event carries', async () => {
+    const world = setup({
+      initial: holding(withPending()),
+      videos: { [VIDEO]: FILE },
+      replies: { [playOf(11)]: { unreachable: 'offline' } },
+    })
+    await until(() => world.log.length === 1)
+    await ticks(3)
+    fireAfter(world, DOWNLOADS_EVENT_MS)
+    await ticks(5)
+    expect(world.log).toEqual([playOf(11)])
+    world.table[playOf(11)] = NO_CONTENT
+    world.table[progress(11, 750)] = NO_CONTENT
+    world.service.list()
+    await until(() => world.log.length === 3)
+    expect(world.log.slice(1)).toEqual([playOf(11), progress(11, 750)])
+  })
+
+  it('tries again after SYNC_RETRY_MS while something is pending', async () => {
+    const world = setup({
+      initial: holding(withPending()),
+      videos: { [VIDEO]: FILE },
+      replies: { [playOf(11)]: { unreachable: 'offline' } },
+    })
+    await until(() => world.log.length === 1)
+    await ticks(3)
+    expect([...world.pending.values()].some(({ ms }) => ms === SYNC_RETRY_MS)).toBe(true)
+    world.table[playOf(11)] = NO_CONTENT
+    world.table[progress(11, 750)] = NO_CONTENT
+    fireAfter(world, SYNC_RETRY_MS)
+    await until(() => entries(world)[0]?.pending.position === null)
+  })
+
+  it('deletes within the wait when its server stays silent', async () => {
+    const world = setup({
+      initial: holding(withPending()),
+      videos: { [VIDEO]: FILE },
+    })
+    world.silence.until = new Promise(() => undefined)
+    const removing = world.service.remove({ downloadId: ID })
+    await ticks(5)
+    expect(entries(world)).toHaveLength(1)
+    expect([...world.pending.values()].some(({ ms }) => ms === SYNC_DELETE_WAIT_MS)).toBe(true)
+    world.fire()
+    await removing
+    expect(entries(world)).toEqual([])
+  })
+
+  it('sends a download its pending position before it deletes it', async () => {
+    const world = setup({
+      initial: holding(withPending()),
+      videos: { [VIDEO]: FILE },
+      replies: { [playOf(11)]: NO_CONTENT, [progress(11, 750)]: NO_CONTENT },
+    })
+    const release: { open: () => void } = { open: () => undefined }
+    world.silence.until = new Promise((resolve) => {
+      release.open = resolve
+    })
+    const removing = world.service.remove({ downloadId: ID })
+    await ticks(5)
+    expect(entries(world)).toHaveLength(1)
+    release.open()
+    await removing
+    expect(world.log).toEqual([playOf(11), progress(11, 750)])
+    expect(entries(world)).toEqual([])
+  })
+
+  it('sends every pending position before it deletes all, and still deletes when the server stays silent', async () => {
+    const world = setup({
+      initial: holding(
+        withPending(),
+        withPending({ downloadId: OTHER_ID, mediaId: 12, pending: PLAYED }),
+      ),
+      videos: { [VIDEO]: FILE, [OTHER_VIDEO]: FILE },
+    })
+    world.silence.until = new Promise(() => undefined)
+    const removing = world.service.removeAll()
+    await ticks(5)
+    expect(entries(world)).toHaveLength(2)
+    world.fire()
+    await removing
+    expect(entries(world)).toEqual([])
+  })
+
+  it('does not wait on the server to forget a server', async () => {
+    const world = setup({
+      initial: holding(withPending()),
+      videos: { [VIDEO]: FILE },
+    })
+    world.silence.until = new Promise(() => undefined)
+    await world.service.removeServer({ serverId: SERVER_ID })
+    expect(entries(world)).toEqual([])
+  })
+
+  it('sends nothing more after dispose', async () => {
+    const world = setup({
+      initial: holding(withPending()),
+      videos: { [VIDEO]: FILE },
+      replies: { [playOf(11)]: { unreachable: 'offline' } },
+    })
+    await until(() => world.log.length === 1)
+    await ticks(3)
+    world.service.dispose()
+    world.fire()
+    world.service.list()
+    await ticks(5)
+    expect(world.log).toEqual([playOf(11)])
+    expect(world.pending.size).toBe(0)
   })
 })
