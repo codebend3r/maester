@@ -13,8 +13,8 @@ import { MatchFiles } from '@/metadata/matchFiles'
 import { notFound } from '@/metadata/matchPass'
 import { MetadataRepository, type StoredItem } from '@/metadata/metadataRepository'
 import { MetadataService } from '@/metadata/metadataService'
-import { OmdbScores } from '@/metadata/omdbScores'
 import { PASS_CONCURRENCY, PassGuard } from '@/metadata/passGuard'
+import { Scores } from '@/metadata/scores'
 import { TmdbClient } from '@/metadata/tmdbClient'
 import { mapWithConcurrency } from '@/scanner/concurrency'
 
@@ -36,7 +36,7 @@ export class ItemRefresher implements OnApplicationBootstrap, OnModuleDestroy {
     @Inject(MetadataRepository) private readonly metadata: MetadataRepository,
     @Inject(MatchFiles) private readonly files: MatchFiles,
     @Inject(TmdbClient) private readonly tmdb: TmdbClient,
-    @Inject(OmdbScores) private readonly scores: OmdbScores,
+    @Inject(Scores) private readonly scores: Scores,
     @Inject(ItemPictures) private readonly pictures: ItemPictures,
   ) {}
 
@@ -89,7 +89,12 @@ export class ItemRefresher implements OnApplicationBootstrap, OnModuleDestroy {
             : await this.tmdb.show(item.tmdbId)
         this.metadata.save({ item: fetched })
         if (item.type === ITEM_TYPES.show) await this.refreshSeasons(item.id)
-        await this.scores.fetch({ itemId: item.id, imdbId: fetched.imdbId })
+        await this.scores.fetch({
+          itemId: item.id,
+          type: item.type,
+          tmdbId: item.tmdbId,
+          imdbId: fetched.imdbId,
+        })
         return
       }
       case ITEM_TYPES.season:

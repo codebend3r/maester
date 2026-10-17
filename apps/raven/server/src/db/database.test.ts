@@ -365,4 +365,30 @@ describe('migrations', () => {
     ).toThrow()
     database.onModuleDestroy()
   })
+
+  it("marks the scores kept before as OMDb's, and TMDB's as TMDB's", () => {
+    const before = new Sqlite(join(state.dir, 'raven.db'))
+    MIGRATIONS.slice(0, 28).forEach((sql) => before.exec(sql))
+    before.pragma('user_version = 28')
+    before.exec(
+      `INSERT INTO items (id, type, tmdb_id, title, sort_title, fetched_at, omdb_fetched_at)
+       VALUES (1, 'movie', '603', 'The Matrix', 'matrix', '2026-01-01', '2026-01-02');
+       INSERT INTO ratings (item_id, source, value, votes) VALUES
+         (1, 'tmdb', 8.2, 100), (1, 'imdb', 8.7, NULL), (1, 'rottenTomatoes', 8.3, NULL);`,
+    )
+    before.close()
+
+    const database = new DatabaseService({ ...readServerConfig({}), dataDir: state.dir })
+    expect(
+      database.db.prepare('SELECT source, provider FROM ratings ORDER BY source').all(),
+    ).toEqual([
+      { source: 'imdb', provider: 'omdb' },
+      { source: 'rottenTomatoes', provider: 'omdb' },
+      { source: 'tmdb', provider: 'tmdb' },
+    ])
+    expect(
+      database.db.prepare('SELECT omdb_fetched_at, mdblist_fetched_at FROM items').get(),
+    ).toEqual({ omdb_fetched_at: '2026-01-02', mdblist_fetched_at: null })
+    database.onModuleDestroy()
+  })
 })

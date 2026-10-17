@@ -445,6 +445,14 @@ export const MIGRATIONS: readonly string[] = [
     PRIMARY KEY (person_id, credit_id)
   );
   `,
+  // Which provider wrote each score, so MDBList's and OMDb's never wipe each
+  // other's, and when MDBList last answered for an item. Every score that is
+  // not TMDB's came from OMDb until now.
+  `
+  ALTER TABLE ratings ADD COLUMN provider TEXT NOT NULL DEFAULT 'tmdb';
+  UPDATE ratings SET provider = 'omdb' WHERE source <> 'tmdb';
+  ALTER TABLE items ADD COLUMN mdblist_fetched_at TEXT;
+  `,
 ]
 
 /** The index's file in the data folder. Before raven was renamed it was `weirwood.db`. */

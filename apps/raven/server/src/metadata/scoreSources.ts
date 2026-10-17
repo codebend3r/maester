@@ -10,6 +10,9 @@ export type ExternalScore = {
   votes: number | null
 }
 
+/** A movie or show to ask about: by its TMDB id, and its IMDb id when it has one. */
+export type ScoreTitle = { type: MatchItemType; tmdbId: string; imdbId: string | null }
+
 /**
  * A place to ask for a title's IMDb, Rotten Tomatoes and Metacritic scores.
  * A failure throws; `'unknown'` is an answer, for a title the source has
@@ -22,9 +25,5 @@ export type ScoreSource = {
   /** How many calls are left today. */
   remaining: () => number
   state: () => MetadataServiceState
-  lookUp: (title: {
-    type: MatchItemType
-    tmdbId: string
-    imdbId: string | null
-  }) => Promise<ExternalScore[] | 'unknown'>
+  lookUp: (title: ScoreTitle) => Promise<ExternalScore[] | 'unknown'>
 }

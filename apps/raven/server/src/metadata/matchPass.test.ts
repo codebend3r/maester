@@ -6,8 +6,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { readServerConfig } from '@/config'
 import { MatchFiles } from '@/metadata/matchFiles'
 import { MatchPass } from '@/metadata/matchPass'
+import { MdblistClient } from '@/metadata/mdblistClient'
 import { OmdbClient } from '@/metadata/omdbClient'
-import { OmdbScores } from '@/metadata/omdbScores'
+import { Scores } from '@/metadata/scores'
 import { TmdbClient } from '@/metadata/tmdbClient'
 import { testDatabase } from '@/test/database'
 import { fakeTmdb } from '@/test/fakeTmdb'
@@ -61,7 +62,11 @@ describe('a matching pass', () => {
       tmdb: new TmdbClient(config, tmdb.fetch),
       metadata,
       files: new MatchFiles(database.get(), metadata),
-      scores: new OmdbScores(metadata, new OmdbClient(config, tmdb.fetch)),
+      scores: new Scores(
+        metadata,
+        new OmdbClient(config, tmdb.fetch),
+        new MdblistClient(config, tmdb.fetch),
+      ),
       logger: new Logger('MatchPassTest'),
       prefer,
     })
@@ -312,7 +317,11 @@ describe('looking up the other titles of a show', () => {
       tmdb: new TmdbClient(config, tmdb.fetch),
       metadata,
       files: new MatchFiles(database.get(), metadata),
-      scores: new OmdbScores(metadata, new OmdbClient(config, tmdb.fetch)),
+      scores: new Scores(
+        metadata,
+        new OmdbClient(config, tmdb.fetch),
+        new MdblistClient(config, tmdb.fetch),
+      ),
       logger: new Logger('MatchPassTest'),
       prefer: TIER_SETS.any,
     })
@@ -368,7 +377,11 @@ describe('looking up the other titles of a show known only by an alternative', (
       tmdb: new TmdbClient(config, tmdb.fetch),
       metadata,
       files: new MatchFiles(database.get(), metadata),
-      scores: new OmdbScores(metadata, new OmdbClient(config, tmdb.fetch)),
+      scores: new Scores(
+        metadata,
+        new OmdbClient(config, tmdb.fetch),
+        new MdblistClient(config, tmdb.fetch),
+      ),
       logger: new Logger('MatchPassTest'),
       prefer: TIER_SETS.any,
     })

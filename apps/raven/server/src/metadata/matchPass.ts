@@ -14,9 +14,9 @@ import { FIX_MATCH_KINDS, type FixMatch, type MatchFiles } from '@/metadata/matc
 import { pickByTiers, pickMatch } from '@/metadata/matcher'
 import type { MetadataRepository } from '@/metadata/metadataRepository'
 import { readNfoIds } from '@/metadata/nfo'
-import type { OmdbScores } from '@/metadata/omdbScores'
 import { OnceEach } from '@/metadata/onceEach'
 import { PassGuard } from '@/metadata/passGuard'
+import type { Scores } from '@/metadata/scores'
 import {
   type SearchResult,
   TMDB_ERROR_KINDS,
@@ -78,7 +78,7 @@ export type MatchPassDeps = {
   tmdb: TmdbClient
   metadata: MetadataRepository
   files: MatchFiles
-  scores: OmdbScores
+  scores: Scores
   logger: Logger
 }
 
@@ -315,7 +315,7 @@ export class MatchPass {
           const item =
             type === ITEM_TYPES.movie ? await tmdb.movie(tmdbId) : await tmdb.show(tmdbId)
           const id = metadata.save({ item })
-          await scores.fetch({ itemId: id, imdbId: item.imdbId })
+          await scores.fetch({ itemId: id, type, tmdbId, imdbId: item.imdbId })
           return id
         } catch (error) {
           if (notFound(error)) return null

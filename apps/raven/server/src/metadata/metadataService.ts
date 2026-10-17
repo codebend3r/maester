@@ -37,9 +37,9 @@ import { createMatchers, type KindMatcher } from '@/metadata/matchers'
 import { MatchPass } from '@/metadata/matchPass'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 import { OmdbClient } from '@/metadata/omdbClient'
-import { OmdbScores } from '@/metadata/omdbScores'
 import { PASS_CONCURRENCY } from '@/metadata/passGuard'
 import { filePlace, groupPlaceOf, showPlace } from '@/metadata/places'
+import { Scores } from '@/metadata/scores'
 import { TmdbClient } from '@/metadata/tmdbClient'
 import { createTaskQueue, mapWithConcurrency } from '@/scanner/concurrency'
 import { type LayoutRow, indexedLayoutsOf, planRelayout } from '@/scanner/layout'
@@ -89,7 +89,7 @@ export class MetadataService implements OnApplicationBootstrap {
     @Inject(MetadataRepository) private readonly metadata: MetadataRepository,
     @Inject(TmdbClient) private readonly tmdb: TmdbClient,
     @Inject(OmdbClient) private readonly omdb: OmdbClient,
-    @Inject(OmdbScores) private readonly scores: OmdbScores,
+    @Inject(Scores) private readonly scores: Scores,
     @Inject(ItemPictures) private readonly pictures: ItemPictures,
     @Inject(AiClient) private readonly ai: AiClient,
     @Inject(AiMatcher) private readonly aiMatcher: AiMatcher,
