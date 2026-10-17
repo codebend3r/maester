@@ -10,15 +10,14 @@ const lan: MediaOrigin = { kind: 'lan', url: 'https://lan.example' }
 const pub: MediaOrigin = { kind: 'public', url: 'https://public.example' }
 const NOW = 1_700_000_000_000
 
-/** Both origins answer in full; the public one is twice as fast, so it wins outside the band. */
+/** The lan origin never answers well and the public one answers in full, so the public one always wins. */
 const answering = (): ProbeFetch =>
   mock(async (url: string) => {
-    const isPublic = url.startsWith(pub.url)
+    if (url.startsWith(lan.url)) return { ok: false, body: null }
     return {
       ok: true,
       body: new ReadableStream<Uint8Array>({
-        pull: async (controller) => {
-          await new Promise((resolve) => setTimeout(resolve, isPublic ? 1 : 12))
+        pull: (controller) => {
           controller.enqueue(new Uint8Array(MEDIA_PROBE_BYTES))
           controller.close()
         },
@@ -122,7 +121,7 @@ describe('useMediaOriginProbe', () => {
     expect(fetch).toHaveBeenCalledTimes(6)
   })
 
-  it('does not start a probe while one is running', async () => {
+  it('folds re-probes asked for while one runs into a single follow-up', async () => {
     const getMediaOrigins = mock(async () => ({ origins: [lan] }))
     const { result } = renderHook(() =>
       useMediaOriginProbe({ api: { ...api, getMediaOrigins }, fetch: answering() }),
@@ -132,7 +131,7 @@ describe('useMediaOriginProbe', () => {
       result.current.reprobe()
     })
     await settle()
-    expect(getMediaOrigins).toHaveBeenCalledTimes(1)
+    expect(getMediaOrigins).toHaveBeenCalledTimes(2)
   })
 
   it('re-probes on visibilitychange only after ten minutes hidden', async () => {
@@ -161,6 +160,43 @@ describe('useMediaOriginProbe', () => {
     await settle()
     expect(useMediaOrigin.getState().pick?.origin).toEqual(lan)
     expect(useMediaOrigin.getState().isProbing).toBe(false)
+  })
+
+  it('runs once more after a probe in flight when a re-probe was asked for meanwhile', async () => {
+    let release: () => void = () => {}
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let calls = 0
+    const getMediaOrigins = mock(async () => {
+      calls += 1
+      if (calls === 1) await gate
+      return { origins: [lan, pub] }
+    })
+    const fetch = answering()
+    const { result } = renderHook(() =>
+      useMediaOriginProbe({ api: { ...api, getMediaOrigins }, fetch }),
+    )
+    act(() => result.current.reprobe())
+    await settle()
+    expect(getMediaOrigins).toHaveBeenCalledTimes(1)
+    release()
+    await settle()
+    expect(getMediaOrigins).toHaveBeenCalledTimes(2)
+    expect(fetch).toHaveBeenCalledTimes(4)
+    expect(useMediaOrigin.getState().isProbing).toBe(false)
+  })
+
+  it('counts a tab opened in the background as hidden from the start', async () => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' })
+    const fetch = answering()
+    renderHook(() => useMediaOriginProbe({ api: clientWith({ origins: [lan, pub] }), fetch }))
+    await settle()
+    expect(fetch).toHaveBeenCalledTimes(2)
+    setSystemTime(new Date(NOW + PICK_FRESH_MS))
+    setVisibility('visible')
+    await settle()
+    expect(fetch).toHaveBeenCalledTimes(4)
   })
 
   it('stops listening on unmount', async () => {

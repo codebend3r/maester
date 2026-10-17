@@ -40,6 +40,10 @@ const measure = async ({
   const response = await fetch(api.pingUrl({ origin }), { signal, cache: 'no-store' })
   if (!response.ok || !response.body) return null
   const reader = response.body.getReader()
+  // A fetch that ignores its signal would otherwise keep reading after the timeout.
+  signal.addEventListener('abort', () => void reader.cancel().catch(() => undefined), {
+    once: true,
+  })
   const first = await reader.read()
   const firstByteAt = now()
   if (first.done) return null

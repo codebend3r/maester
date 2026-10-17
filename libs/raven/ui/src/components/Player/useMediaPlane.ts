@@ -28,9 +28,9 @@ export const useMediaPlane = ({
     ...playerQueriesFor(api).mediaTicket(mediaId),
     enabled: pick !== null,
   })
-  const kind = pick?.origin.kind
-  const url = pick?.origin.url
-  const ticketValue = ticket.data?.ticket
+  const kind = pick?.origin.kind ?? null
+  const url = pick?.origin.url ?? null
+  const ticketValue = ticket.data?.ticket ?? null
   const access = useMemo<MediaAccess | null>(
     () => (kind && url && ticketValue ? { origin: { kind, url }, ticket: ticketValue } : null),
     [kind, url, ticketValue],
