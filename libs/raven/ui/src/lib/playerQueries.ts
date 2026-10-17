@@ -4,6 +4,8 @@ import { playerQueryKeys as queryKeys } from '@/lib/playerQueryKeys'
 
 const TICKET_REFRESH_MS = (MEDIA_TICKET_SECONDS - MEDIA_TICKET_REFRESH_SECONDS) * 1000
 
+const REFUSED_RETRY_MS = 60_000
+
 /** Keeps a ticket that is already due from being refetched in a tight loop. */
 const MIN_REFRESH_WAIT_MS = 1000
 
@@ -34,13 +36,15 @@ export const playerQueriesFor = (api: ApiClient) => ({
       queryFn: () => api.getMediaTicket(id),
       staleTime: Infinity,
       retry: false,
-      refetchInterval: (query) =>
-        query.state.dataUpdatedAt === 0
-          ? TICKET_REFRESH_MS
-          : Math.max(
-              MIN_REFRESH_WAIT_MS,
-              query.state.dataUpdatedAt + TICKET_REFRESH_MS - Date.now(),
-            ),
+      refetchInterval: (query) => {
+        if (query.state.dataUpdatedAt === 0) return TICKET_REFRESH_MS
+        // A refused refresh (a relocked library answers 423) is retried gently, not every second.
+        if (query.state.status === 'error') return REFUSED_RETRY_MS
+        return Math.max(
+          MIN_REFRESH_WAIT_MS,
+          query.state.dataUpdatedAt + TICKET_REFRESH_MS - Date.now(),
+        )
+      },
       refetchIntervalInBackground: true,
     }),
   subtitles: (input: { id: number; trackId: string; window: number }) =>
