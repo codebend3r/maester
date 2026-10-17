@@ -841,26 +841,23 @@ export class MetadataRepository {
 
   /** The libraries holding a file of the item, or of any season or episode under it. */
   librariesHolding(itemId: number): number[] {
-    return this.db
-      .prepare<[number], { library_id: number }>(
-        `WITH RECURSIVE ${under('SELECT id, id FROM items WHERE id = ?')}
-         SELECT DISTINCT m.library_id FROM under u
-           JOIN media_items mi ON mi.item_id = u.id
-           JOIN media m ON m.id = mi.media_id`,
-      )
-      .all(itemId)
-      .map((row) => row.library_id)
+    return this.librariesHoldingEach([itemId]).get(itemId) ?? []
   }
 
-  /** `librariesHolding` for each item at once; an item no library holds is left out. */
+  /**
+   * `librariesHolding` for each item at once; an item no library holds is
+   * left out. The CROSS JOINs walk down from the items to their files: for
+   * one item, SQLite would rather read every file in library order for the
+   * DISTINCT, a hundredth of a second each time on a real library.
+   */
   librariesHoldingEach(itemIds: readonly number[]): Map<number, number[]> {
     if (itemIds.length === 0) return new Map()
     return this.db
       .prepare<[string], { root: number; library_id: number }>(
         `WITH RECURSIVE ${under('SELECT value, value FROM json_each(?)')}
          SELECT DISTINCT u.root, m.library_id FROM under u
-           JOIN media_items mi ON mi.item_id = u.id
-           JOIN media m ON m.id = mi.media_id`,
+           CROSS JOIN media_items mi ON mi.item_id = u.id
+           CROSS JOIN media m ON m.id = mi.media_id`,
       )
       .all(JSON.stringify([...new Set(itemIds)]))
       .reduce(
