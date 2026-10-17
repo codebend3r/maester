@@ -428,14 +428,37 @@ describe('confirm', () => {
     expect(world.sent).toEqual([{ type: 'notice', message: 'Downloading 2 episodes from Vhagar' }])
     world.fire()
     expect(downloadEvents(world.sent)).toEqual([
-      { type: 'downloads', downloads: reply.downloads, autoDeleteDefault: false },
+      { type: 'downloads', downloads: reply.downloads, autoDeleteDefault: true },
     ])
-    expect(reply.autoDeleteDefault).toBe(false)
+    expect(reply.autoDeleteDefault).toBe(true)
     expect(reply.downloads.map(({ label }) => label)).toEqual([
       'S01E01 Good News',
       'S01E02 Half Loop',
       'S01E03 In Perpetuity',
     ])
+  })
+
+  it("keeps the dialog's choice as the default the next ask starts from", async () => {
+    const world = setup({ replies: { [mediaCall(9)]: ok(MOVIE), [itemCall(5)]: ok(SEASON) } })
+    const ask = await askFor({ world, target: { kind: 'media', mediaId: 9 } })
+    expect(ask.autoDelete).toBe(false)
+    await world.service.confirm({ askId: ask.askId, autoDelete: true })
+    expect(world.service.list()).toMatchObject({ type: 'downloads', autoDeleteDefault: true })
+    expect((await askFor({ world, target: { kind: 'item', itemId: 5 } })).autoDelete).toBe(true)
+    world.fire()
+    expect(downloadEvents(world.sent)).toEqual([
+      expect.objectContaining({ type: 'downloads', autoDeleteDefault: true }),
+    ])
+  })
+
+  it('keeps the choice even when every file was queued meanwhile', async () => {
+    const world = setup({ replies: { [mediaCall(9)]: ok(MOVIE) } })
+    const first = await askFor({ world, target: { kind: 'media', mediaId: 9 } })
+    const second = await askFor({ world, target: { kind: 'media', mediaId: 9 } })
+    await world.service.confirm({ askId: first.askId, autoDelete: false })
+    await world.service.confirm({ askId: second.askId, autoDelete: true })
+    expect(world.store.read()).toMatchObject({ autoDeleteDefault: true })
+    expect(world.store.read().entries).toHaveLength(1)
   })
 
   it('names the one file it queues', async () => {

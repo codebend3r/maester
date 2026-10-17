@@ -326,9 +326,10 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     const entries = fresh.map((file) =>
       entryOf({ file, downloadId: deps.newId(), serverId, autoDelete, createdAt }),
     )
+    // The dialog's checkbox starts from the last choice made, so the choice becomes the default.
+    change((state) => setAutoDeleteDefault(queue(state, { entries }), { autoDelete }))
     const [first] = fresh
     if (first !== undefined) {
-      change((state) => queue(state, { entries }))
       deps.send({
         type: 'notice',
         message: DOWNLOAD_MESSAGES.queued({
