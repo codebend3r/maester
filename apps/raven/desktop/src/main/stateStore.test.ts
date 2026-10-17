@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'bun:test'
 import { EMPTY_STATE, addRecent, type PlayerState } from '@/main/playerState'
+import { EMPTY_CONFIG, isDesktopConfig } from '@/main/desktopConfig'
 import {
+  createJsonStore,
   createStateStore,
   isMissingFile,
+  loadJson,
   loadState,
   type StateFs,
   type Timers,
@@ -349,5 +352,71 @@ describe('createStateStore', () => {
     held.release()
     await Promise.all([firstFlush, secondFlush])
     expect(writes(calls).length).toBe(1)
+  })
+})
+
+describe('loadJson', () => {
+  const now = () => 1700000000000
+  const CONFIG = '/data/desktop-config.json'
+  const load = (fs: StateFs) =>
+    loadJson({ fs, file: CONFIG, now, guard: isDesktopConfig, empty: EMPTY_CONFIG })
+
+  it('loads a valid config as written', async () => {
+    const written = {
+      ...EMPTY_CONFIG,
+      output: { ...EMPTY_CONFIG.output, profile: 'passthrough' as const },
+    }
+    const { fs, calls } = createFakeFs({ [CONFIG]: JSON.stringify(written) })
+    expect(await load(fs)).toEqual(written)
+    expect(calls.filter((call) => call.op === 'rename')).toEqual([])
+  })
+
+  it('returns the empty value for a missing file', async () => {
+    const { fs } = createFakeFs()
+    expect(await load(fs)).toEqual(EMPTY_CONFIG)
+  })
+
+  it('keeps a truncated config as .corrupt-<time> and loads empty', async () => {
+    const { fs, files } = createFakeFs({ [CONFIG]: '{"version":1,' })
+    expect(await load(fs)).toEqual(EMPTY_CONFIG)
+    expect(files.has(CONFIG)).toBe(false)
+    expect(files.get(`${CONFIG}.corrupt-1700000000000`)).toBe('{"version":1,')
+  })
+
+  it('keeps valid JSON its guard rejects as .corrupt-<time> and loads empty', async () => {
+    const text = JSON.stringify({ version: 1, output: { profile: 'loud' } })
+    const { fs, files } = createFakeFs({ [CONFIG]: text })
+    expect(await load(fs)).toEqual(EMPTY_CONFIG)
+    expect(files.has(CONFIG)).toBe(false)
+    expect(files.get(`${CONFIG}.corrupt-1700000000000`)).toBe(text)
+  })
+})
+
+describe('createJsonStore', () => {
+  it('writes a value that is not player state through its .tmp file, then renames it into place', async () => {
+    const CONFIG = '/data/desktop-config.json'
+    const fake = createFakeFs()
+    const clock = createFakeTimers()
+    const store = createJsonStore({
+      fs: fake.fs,
+      file: CONFIG,
+      initial: EMPTY_CONFIG,
+      timers: clock.timers,
+      debounceMs: 0,
+      onError: () => {},
+    })
+    const next = { ...EMPTY_CONFIG, output: { ...EMPTY_CONFIG.output, spatial: true } }
+    store.update(() => next)
+    expect(clock.delays).toEqual([0])
+    clock.fire()
+    await settle()
+    expect(fake.calls.map((call) => ({ op: call.op, path: call.args[0] }))).toEqual([
+      { op: 'writeFile', path: `${CONFIG}.tmp` },
+      { op: 'rename', path: `${CONFIG}.tmp` },
+    ])
+    expect(fake.calls.at(-1)?.args[1] ?? null).toBe(CONFIG)
+    expect(JSON.parse(fake.files.get(CONFIG) ?? 'null')).toEqual(next)
+    expect(fake.files.has(`${CONFIG}.tmp`)).toBe(false)
+    expect(store.isDirty()).toBe(false)
   })
 })

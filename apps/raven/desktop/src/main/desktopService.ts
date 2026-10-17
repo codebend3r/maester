@@ -1,5 +1,6 @@
 import { basename, dirname } from 'node:path'
-import { titleFromFileName } from '@raven/core'
+import { type OutputSettings, titleFromFileName } from '@raven/core'
+import { pickOutput } from '@/main/desktopConfig'
 import { grantNext } from '@/main/folder'
 import type { GrantedFile, GrantRefusal, Grants } from '@/main/grants'
 import {
@@ -10,10 +11,13 @@ import {
   removeRecent,
   resumeFor,
   savePosition,
+  setTrackPick,
+  trackPickFor,
   watchedShare,
 } from '@/main/playerState'
 import type { StateStore, Timers } from '@/main/stateStore'
 import {
+  type AudioDevice,
   type DesktopReply,
   type DesktopRequest,
   type InvokeEnvelope,
@@ -47,6 +51,11 @@ export type DesktopServiceDeps = {
   onError: (error: unknown) => void
   newId: () => string
   now: () => number
+  output: {
+    read: () => Promise<{ output: OutputSettings; devices: AudioDevice[]; isEngineReady: boolean }>
+    write: (output: OutputSettings) => Promise<void>
+  }
+  setWindowButtons: (isVisible: boolean) => void
 }
 
 export type DesktopService = {
@@ -160,6 +169,7 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
         folder: basename(dirname(file.path)),
         resumeAt: resumeFor(store.read(), { file }),
         next: await nextAfter({ file, queue: request.queue }),
+        tracks: trackPickFor(store.read(), { path: file.path }),
       },
     }
   }
@@ -174,6 +184,20 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
         file: { path: file.path, size: file.size, mtimeMs: file.mtimeMs },
         position: request.position,
         duration: request.duration,
+        at: now(),
+      }),
+    )
+    return DONE
+  }
+
+  const saveTracks = (request: Extract<DesktopRequest, { type: 'saveTracks' }>): DesktopReply => {
+    const file = grants.fileOf(request.fileId)
+    if (file === null) return refused(MESSAGES.notOpen)
+    store.update((state) =>
+      setTrackPick(state, {
+        path: file.path,
+        audio: request.audio,
+        subtitle: request.subtitle,
         at: now(),
       }),
     )
@@ -277,6 +301,16 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
         return dropRecent(request.recentId)
       case 'clearRecents':
         return dropAllRecents()
+      case 'saveTracks':
+        return saveTracks(request)
+      case 'windowButtons':
+        deps.setWindowButtons(request.isVisible)
+        return DONE
+      case 'readOutput':
+        return { type: 'output', ...(await deps.output.read()) }
+      case 'writeOutput':
+        await deps.output.write(pickOutput(request.output))
+        return DONE
       default: {
         const unreachable: never = request
         return unreachable

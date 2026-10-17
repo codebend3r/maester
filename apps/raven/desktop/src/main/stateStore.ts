@@ -11,11 +11,22 @@ export type Timers = {
   clear: (handle: unknown) => void
 }
 
-export type StateStore = {
-  read: () => PlayerState
-  update: (change: (state: PlayerState) => PlayerState) => void
+export type JsonStore<T> = {
+  read: () => T
+  update: (change: (value: T) => T) => void
   flush: () => Promise<void>
   isDirty: () => boolean
+}
+
+export type StateStore = JsonStore<PlayerState>
+
+export type JsonStoreOptions<T> = {
+  fs: StateFs
+  file: string
+  initial: T
+  timers: Timers
+  debounceMs: number
+  onError: (error: unknown) => void
 }
 
 export const isMissingFile = (error: unknown): boolean =>
@@ -29,8 +40,35 @@ const parseJson = (text: string): unknown => {
   }
 }
 
-/** Never throws: whatever cannot be read as a state is kept aside and the app starts empty. */
-export const loadState = async ({
+/** Never throws: whatever cannot be read as a `T` is kept aside and the app starts with `empty`. */
+export const loadJson = async <T>({
+  fs,
+  file,
+  now,
+  guard,
+  empty,
+}: {
+  fs: StateFs
+  file: string
+  now: () => number
+  guard: (value: unknown) => value is T
+  empty: T
+}): Promise<T> => {
+  const text = await fs.readFile(file).then(
+    (read) => ({ found: true as const, read }),
+    (error: unknown) => ({ found: false as const, error }),
+  )
+  if (!text.found && isMissingFile(text.error)) return empty
+  if (text.found) {
+    const parsed = parseJson(text.read)
+    if (guard(parsed)) return parsed
+  }
+  // Keep the unreadable file for a person to inspect; the next save would otherwise replace it.
+  await fs.rename(file, `${file}.corrupt-${now()}`).catch(() => undefined)
+  return empty
+}
+
+export const loadState = ({
   fs,
   file,
   now,
@@ -38,38 +76,18 @@ export const loadState = async ({
   fs: StateFs
   file: string
   now: () => number
-}): Promise<PlayerState> => {
-  const text = await fs.readFile(file).then(
-    (read) => ({ found: true as const, read }),
-    (error: unknown) => ({ found: false as const, error }),
-  )
-  if (!text.found && isMissingFile(text.error)) return EMPTY_STATE
-  if (text.found) {
-    const parsed = parseJson(text.read)
-    if (isPlayerState(parsed)) return parsed
-  }
-  // Keep the unreadable file for a person to inspect; the next save would otherwise replace it.
-  await fs.rename(file, `${file}.corrupt-${now()}`).catch(() => undefined)
-  return EMPTY_STATE
-}
+}): Promise<PlayerState> => loadJson({ fs, file, now, guard: isPlayerState, empty: EMPTY_STATE })
 
-export const createStateStore = ({
+export const createJsonStore = <T>({
   fs,
   file,
   initial,
   timers,
   debounceMs,
   onError,
-}: {
-  fs: StateFs
-  file: string
-  initial: PlayerState
-  timers: Timers
-  debounceMs: number
-  onError: (error: unknown) => void
-}): StateStore => {
+}: JsonStoreOptions<T>): JsonStore<T> => {
   const tmp = `${file}.tmp`
-  let state = initial
+  let value = initial
   let version = 0
   let savedVersion = 0
   let timer: unknown
@@ -86,9 +104,9 @@ export const createStateStore = ({
   // Never rejects, so the queue it extends never rejects either.
   const writeIfDirty = async (): Promise<void> => {
     if (savedVersion === version) return
-    const writing = { state, version }
+    const writing = { value, version }
     try {
-      await fs.writeFile(tmp, JSON.stringify(writing.state))
+      await fs.writeFile(tmp, JSON.stringify(writing.value))
       await fs.rename(tmp, file)
       savedVersion = writing.version
     } catch (error) {
@@ -108,10 +126,10 @@ export const createStateStore = ({
   }
 
   return {
-    read: () => state,
+    read: () => value,
     isDirty: () => savedVersion !== version,
     update: (change) => {
-      state = change(state)
+      value = change(value)
       version += 1
       cancelTimer()
       timer = timers.set(() => {
@@ -125,3 +143,6 @@ export const createStateStore = ({
     },
   }
 }
+
+export const createStateStore = (options: JsonStoreOptions<PlayerState>): StateStore =>
+  createJsonStore(options)
