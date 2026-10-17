@@ -5,7 +5,7 @@ import {
   isFilmographyTab,
   tabCounts,
 } from '@raven/core'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Loading } from '@/components/Skeleton/Skeleton'
 import { useAddressSearch } from '@/lib/useSearch'
@@ -38,6 +38,23 @@ const emptyMessage = ({
   return noTitles(name)
 }
 
+/**
+ * Whether every credit is an appearance as themselves. Hiding those would
+ * leave nothing, so then they show from the start and the toggle goes.
+ */
+const isOnlySelf = (entries: readonly FilmographyEntry[]): boolean =>
+  tabCounts({ entries, isSelfShown: false }).all === 0
+
+/**
+ * How many titles raven holds of those the table lists as it opens, on All
+ * with appearances as themselves hidden, so the count over their name
+ * matches the On raven marks under it.
+ */
+export const heldOnOpening = (entries: readonly FilmographyEntry[]): number =>
+  entriesOn({ entries, tab: 'all', isSelfShown: isOnlySelf(entries) }).filter(
+    (entry) => entry.item != null,
+  ).length
+
 /** A person's whole filmography on its way: rows of stand-ins, which a screen reader hears as `name`'s. */
 export const FilmographySkeleton = ({ name }: { name: string }) => (
   <Loading label={`Fetching ${name}'s filmography`}>
@@ -60,32 +77,34 @@ export const Filmography = ({
   const search = useAddressSearch()
   const [address] = useSearchParams()
   const [isSelfAsked, setIsSelfAsked] = useState(false)
-  // Hiding appearances as themselves from someone who has nothing else would
-  // leave an empty table, so then they show and the toggle goes.
-  const isOnlySelf = tabCounts({ entries, isSelfShown: false }).all === 0
-  const isSelfShown = isSelfAsked || isOnlySelf
-  const counts = tabCounts({ entries, isSelfShown })
+  const hasOnlySelf = useMemo(() => isOnlySelf(entries), [entries])
+  const isSelfShown = isSelfAsked || hasOnlySelf
+  const counts = useMemo(() => tabCounts({ entries, isSelfShown }), [entries, isSelfShown])
   const asked = address.get('credits')
   const tab = isFilmographyTab(asked) && counts[asked] > 0 ? asked : 'all'
-  const query = fold(search.query)
-  const rows = entriesOn({ entries, tab, isSelfShown }).filter((entry) => matches({ entry, query }))
+  // Each keystroke draws the page again, but the rows, and so the table,
+  // change only once the query the search settles on does.
+  const query = search.query
+  const rows = useMemo(() => {
+    const folded = fold(query)
+    return entriesOn({ entries, tab, isSelfShown }).filter((entry) =>
+      matches({ entry, query: folded }),
+    )
+  }, [entries, tab, isSelfShown, query])
   if (entries.length === 0) return <p className={styles.message}>{noTitles(name)}</p>
-  const message = emptyMessage({ rows: rows.length, query: search.query, name })
+  const message = emptyMessage({ rows: rows.length, query, name })
   return (
     <>
       <FilmographyToolbar
         search={search}
         tab={tab}
         counts={counts}
-        hasSelfCredits={hasSelfCredits(entries) && !isOnlySelf}
+        hasSelfCredits={hasSelfCredits(entries) && !hasOnlySelf}
         isSelfShown={isSelfShown}
         onSelfShownChange={setIsSelfAsked}
       />
-      {message == null ? (
-        <FilmographyTable entries={rows} tab={tab} />
-      ) : (
-        <p className={styles.message}>{message}</p>
-      )}
+      <FilmographyTable entries={rows} tab={tab} isHidden={message != null} />
+      {message != null && <p className={styles.message}>{message}</p>}
     </>
   )
 }

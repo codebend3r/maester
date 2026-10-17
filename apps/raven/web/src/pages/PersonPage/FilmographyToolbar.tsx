@@ -28,8 +28,9 @@ const tabSearch = ({ address, tab }: { address: URLSearchParams; tab: Filmograph
 /**
  * The search over titles and roles, the toggle for appearances as
  * themselves where there are any, and the tabs with something on them,
- * All always, each with its count for the eye. The tabs replace the address
- * rather than stack on it, so Back leaves the page.
+ * All always. Each tab is named with its count, "Directing, 52", so a
+ * screen reader hears the two apart rather than run together. The tabs
+ * replace the address rather than stack on it, so Back leaves the page.
  */
 export const FilmographyToolbar = ({
   search,
@@ -85,11 +86,10 @@ export const FilmographyToolbar = ({
                 replace
                 className={styles.tab}
                 aria-current={each === tab ? 'page' : undefined}
+                aria-label={`${TAB_LABELS[each]}, ${count.format(counts[each])}`}
               >
                 {TAB_LABELS[each]}
-                <span className={styles.tabCount} aria-hidden="true">
-                  {count.format(counts[each])}
-                </span>
+                <span className={styles.tabCount}>{count.format(counts[each])}</span>
               </Link>
             </li>
           ))}

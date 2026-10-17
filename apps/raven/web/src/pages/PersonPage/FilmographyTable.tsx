@@ -4,7 +4,7 @@ import {
   type FilmographyTab,
   sortTitle,
 } from '@raven/core'
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { CardLink } from '@/components/CardLink/CardLink'
 import { Bone } from '@/components/Skeleton/Skeleton'
 import { SortHeader } from '@/components/SortHeader/SortHeader'
@@ -37,13 +37,15 @@ const departmentsOf = (entry: FilmographyEntry): string =>
 
 /**
  * The most episodes of a show any one of their parts covers, or null where
- * TMDB counts none. The most rather than the sum, as two parts in a show
- * can share an episode.
+ * TMDB counts none; its 0 is no count either. The most rather than the sum,
+ * as two parts in a show can share an episode.
  */
 const episodesOf = (entry: FilmographyEntry): number | null =>
   entry.credits.reduce<number | null>(
     (most, credit) =>
-      credit.episodes == null ? most : Math.max(most ?? credit.episodes, credit.episodes),
+      credit.episodes == null || credit.episodes === 0
+        ? most
+        : Math.max(most ?? credit.episodes, credit.episodes),
     null,
   )
 
@@ -154,29 +156,42 @@ const FilmographyRow = ({
 /**
  * The titles a tab lists, as rows of facts in the server's order until a
  * column is sorted: Year, Title and On raven sort. Department shows on All
- * alone, the one tab that mixes them.
+ * alone, the one tab that mixes them. A search that matches nothing hides
+ * the table rather than dropping it, so its sort is there when the rows
+ * come back. Memoized, so typing in the search draws the rows again only
+ * once the query it asks for changes.
  */
-export const FilmographyTable = ({
+export const FilmographyTable = memo(function FilmographyTable({
   entries,
   tab,
+  isHidden,
 }: {
   entries: readonly FilmographyEntry[]
   tab: FilmographyTab
-}) => {
+  isHidden: boolean
+}) {
   const { sorted, toggle, ariaSort } = useTableSort({ rows: entries, columns: COLUMNS })
   const hasDepartment = tab === 'all'
-  const header = (key: Column, label: string, className?: string) => (
-    <SortHeader sort={ariaSort(key)} onToggle={() => toggle(key)} className={className}>
+  const header = ({
+    column,
+    label,
+    className,
+  }: {
+    column: Column
+    label: string
+    className?: string
+  }) => (
+    <SortHeader sort={ariaSort(column)} onToggle={() => toggle(column)} className={className}>
       {label}
     </SortHeader>
   )
   return (
-    <div className={styles.room}>
+    <div className={styles.room} hidden={isHidden}>
       <table className={styles.table} aria-label="Filmography">
         <thead>
           <tr>
-            {header('year', 'Year', styles.number)}
-            {header('title', 'Title')}
+            {header({ column: 'year', label: 'Year', className: styles.number })}
+            {header({ column: 'title', label: 'Title' })}
             <th scope="col" className={styles.spare}>
               Role
             </th>
@@ -185,7 +200,7 @@ export const FilmographyTable = ({
                 Department
               </th>
             )}
-            {header('onRaven', 'On raven')}
+            {header({ column: 'onRaven', label: 'On raven' })}
           </tr>
         </thead>
         <tbody>
@@ -200,7 +215,7 @@ export const FilmographyTable = ({
       </table>
     </div>
   )
-}
+})
 
 /** Rows of a filmography on their way: a year, a poster, a title and a mark apiece. */
 export const FilmographyBones = () => (

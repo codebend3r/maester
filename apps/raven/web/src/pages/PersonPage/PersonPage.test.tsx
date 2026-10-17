@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
-import type { FilmographyCredit, FilmographyEntry, PersonDetails, PersonProfile } from '@raven/core'
+import {
+  ApiError,
+  type FilmographyCredit,
+  type FilmographyEntry,
+  type PersonDetails,
+  type PersonProfile,
+} from '@raven/core'
 import { Route, Routes, useLocation } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { POSTER_SIZES } from '@/lib/posters'
@@ -100,10 +106,10 @@ const ready = (entries: FilmographyEntry[]): PersonDetails['filmography'] => ({
   entries,
 })
 
-/** Where the page's address is, written out so a test can read it. */
+/** Where the app's address is, written out so a test can read it, on any page. */
 const Address = () => {
-  const { search } = useLocation()
-  return <output aria-label="Address">{search}</output>
+  const { pathname, search } = useLocation()
+  return <output aria-label="Address">{`${pathname}${search}`}</output>
 }
 
 const renderPerson = ({
@@ -112,21 +118,18 @@ const renderPerson = ({
 }: { route?: string; behind?: string[] } = {}) =>
   renderWithProviders({
     ui: (
-      <Routes>
-        <Route
-          path="people/:id"
-          element={
-            <>
-              <PersonPage />
-              <Address />
-            </>
-          }
-        />
-      </Routes>
+      <>
+        <Routes>
+          <Route path="people/:id" element={<PersonPage />} />
+        </Routes>
+        <Address />
+      </>
     ),
     route,
     behind,
   })
+
+const address = () => screen.getByLabelText('Address')
 
 const table = () => screen.getByRole('table', { name: 'Filmography' })
 
@@ -273,6 +276,26 @@ describe('PersonPage', () => {
       expect(screen.queryByRole('link', { name: 'IMDb' })).toBeNull()
     })
 
+    it('counts the titles raven holds as the table opens, so the count matches its marks', async () => {
+      spy.mockImplementation(async () =>
+        person({
+          profile: profile({ knownFor: 'Acting' }),
+          filmography: ready(
+            ENTRIES.map((each) =>
+              each.title === 'The Tonight Show' ? { ...each, item: SHOW } : each,
+            ),
+          ),
+        }),
+      )
+      renderPerson()
+      expect(await screen.findByText('Acting · 1 title on raven')).toBeInTheDocument()
+      const marks = () => within(table()).getAllByRole('link', { name: / on raven$/ })
+      expect(marks()).toHaveLength(1)
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Show appearances as themselves' }))
+      expect(marks()).toHaveLength(2)
+      expect(screen.getByText('Acting · 1 title on raven')).toBeInTheDocument()
+    })
+
     it('opens a biography that four lines clip with More, and closes it with Less', async () => {
       const heights = { scrollHeight: 240, clientHeight: 104 }
       Object.entries(heights).forEach(([name, value]) =>
@@ -374,6 +397,10 @@ describe('PersonPage', () => {
       spy.mockImplementation(async () => person({ filmography: ready(ENTRIES) }))
       renderPerson({ route: '/people/7?q=a' })
       const tabs = within(await screen.findByRole('navigation', { name: 'Credits' }))
+      // Each count is seen and heard: "Directing, 1".
+      ;['All, 4', 'Acting, 2', 'Directing, 1', 'Writing, 1', 'Producing, 1'].forEach((name) =>
+        expect(tabs.getByRole('link', { name })).toBeInTheDocument(),
+      )
       expect(tabs.getAllByRole('link').map((link) => link.textContent)).toEqual([
         'All4',
         'Acting2',
@@ -381,16 +408,26 @@ describe('PersonPage', () => {
         'Writing1',
         'Producing1',
       ])
-      expect(tabs.getByRole('link', { name: 'All' })).toHaveAttribute('aria-current', 'page')
-      const acting = tabs.getByRole('link', { name: 'Acting' })
+      expect(tabs.getByRole('link', { name: 'All, 4' })).toHaveAttribute('aria-current', 'page')
+      const acting = tabs.getByRole('link', { name: 'Acting, 2' })
       expect(acting).toHaveAttribute('href', '/people/7?q=a&credits=acting')
       fireEvent.click(acting)
       await waitFor(() => expect(titles()).toEqual(['John Wick: Chapter 5', 'The Matrix']))
-      expect(tabs.getByRole('link', { name: 'Acting' })).toHaveAttribute('aria-current', 'page')
+      expect(tabs.getByRole('link', { name: 'Acting, 2' })).toHaveAttribute('aria-current', 'page')
       expect(screen.queryByRole('columnheader', { name: 'Department' })).toBeNull()
-      fireEvent.click(tabs.getByRole('link', { name: 'All' }))
-      await waitFor(() => expect(screen.getByLabelText('Address')).toHaveTextContent(/^\?q=a$/))
+      fireEvent.click(tabs.getByRole('link', { name: 'All, 4' }))
+      await waitFor(() => expect(address()).toHaveTextContent(/^\/people\/7\?q=a$/))
       expect(screen.getByRole('columnheader', { name: 'Department' })).toBeInTheDocument()
+    })
+
+    it('swaps tabs in place, so Back leaves the page rather than stepping through them', async () => {
+      spy.mockImplementation(async () => person({ filmography: ready(ENTRIES) }))
+      renderPerson({ behind: ['/movies/1'] })
+      const tabs = within(await screen.findByRole('navigation', { name: 'Credits' }))
+      fireEvent.click(tabs.getByRole('link', { name: 'Acting, 2' }))
+      await waitFor(() => expect(address()).toHaveTextContent('/people/7?credits=acting'))
+      fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+      await waitFor(() => expect(address()).toHaveTextContent(/^\/movies\/1$/))
     })
 
     it('hides a tab with nothing on it, and lists All for an address asking for one', async () => {
@@ -399,9 +436,9 @@ describe('PersonPage', () => {
       )
       renderPerson({ route: '/people/7?credits=producing' })
       const tabs = within(await screen.findByRole('navigation', { name: 'Credits' }))
-      expect(tabs.queryByRole('link', { name: 'Producing' })).toBeNull()
-      expect(tabs.queryByRole('link', { name: 'Directing' })).toBeNull()
-      expect(tabs.getByRole('link', { name: 'All' })).toHaveAttribute('aria-current', 'page')
+      expect(tabs.queryByRole('link', { name: /^Producing/ })).toBeNull()
+      expect(tabs.queryByRole('link', { name: /^Directing/ })).toBeNull()
+      expect(tabs.getByRole('link', { name: 'All, 3' })).toHaveAttribute('aria-current', 'page')
       expect(titles()).toEqual(['John Wick: Chapter 5', 'Émile', 'The Matrix'])
     })
 
@@ -415,7 +452,7 @@ describe('PersonPage', () => {
       fireEvent.change(box, { target: { value: 'neo' } })
       fireEvent.keyDown(box, { key: 'Enter' })
       expect(titles()).toEqual(['The Matrix'])
-      await waitFor(() => expect(screen.getByLabelText('Address')).toHaveTextContent('?q=neo'))
+      await waitFor(() => expect(address()).toHaveTextContent('/people/7?q=neo'))
       fireEvent.change(box, { target: { value: 'Speed' } })
       fireEvent.keyDown(box, { key: 'Enter' })
       expect(screen.getByText('No titles match "Speed".')).toBeInTheDocument()
@@ -433,9 +470,9 @@ describe('PersonPage', () => {
       expect(within(rowOf('The Tonight Show')).getByText('3 episodes')).toBeInTheDocument()
       expect(
         within(screen.getByRole('navigation', { name: 'Credits' })).getByRole('link', {
-          name: 'Acting',
-        }).textContent,
-      ).toBe('Acting3')
+          name: 'Acting, 3',
+        }),
+      ).toBeInTheDocument()
     })
 
     it('offers the toggle for a self credit beside other work on a title', async () => {
@@ -461,13 +498,16 @@ describe('PersonPage', () => {
     it('shows someone with nothing but appearances as themselves, with no toggle', async () => {
       spy.mockImplementation(async () =>
         person({
-          filmography: ready([entry({ credits: [credit({ role: 'Host', isSelf: true })] })]),
+          filmography: ready([
+            entry({ item: MATRIX, credits: [credit({ role: 'Host', isSelf: true })] }),
+          ]),
         }),
       )
       renderPerson()
       await screen.findByRole('table', { name: 'Filmography' })
       expect(titles()).toEqual(['The Matrix'])
       expect(screen.queryByRole('checkbox')).toBeNull()
+      expect(screen.getByText('1 title on raven')).toBeInTheDocument()
     })
 
     it('sorts by title, by year and by whether raven holds it, and back', async () => {
@@ -490,6 +530,65 @@ describe('PersonPage', () => {
         'aria-sort',
         'descending',
       )
+    })
+
+    it('keeps the sort through a search that matches nothing', async () => {
+      spy.mockImplementation(async () => person({ filmography: ready(ENTRIES) }))
+      renderPerson()
+      await screen.findByRole('table', { name: 'Filmography' })
+      fireEvent.click(
+        within(screen.getByRole('columnheader', { name: 'Title' })).getByRole('button', {
+          name: 'Title',
+        }),
+      )
+      const box = screen.getByRole('searchbox', { name: 'Search titles' })
+      fireEvent.change(box, { target: { value: 'Speed' } })
+      fireEvent.keyDown(box, { key: 'Enter' })
+      expect(screen.queryByRole('table', { name: 'Filmography' })).toBeNull()
+      fireEvent.change(box, { target: { value: '' } })
+      fireEvent.keyDown(box, { key: 'Enter' })
+      expect(titles()).toEqual(['Émile', 'John Wick: Chapter 5', 'The Matrix', 'Severance'])
+      expect(screen.getByRole('columnheader', { name: 'Title' })).toHaveAttribute(
+        'aria-sort',
+        'ascending',
+      )
+    })
+
+    it('draws the rows again only once the search settles, not on each keystroke', async () => {
+      const posters = spyOn(api, 'tmdbPosterSources')
+      try {
+        spy.mockImplementation(async () => person({ filmography: ready(ENTRIES) }))
+        renderPerson()
+        await screen.findByRole('table', { name: 'Filmography' })
+        const drawn = posters.mock.calls.length
+        expect(drawn).toBeGreaterThan(0)
+        const box = screen.getByRole('searchbox', { name: 'Search titles' })
+        fireEvent.change(box, { target: { value: 'w' } })
+        fireEvent.change(box, { target: { value: 'wi' } })
+        expect(posters.mock.calls.length).toBe(drawn)
+        await waitFor(() => expect(titles()).toEqual(['John Wick: Chapter 5']))
+        expect(posters.mock.calls.length).toBeGreaterThan(drawn)
+      } finally {
+        posters.mockRestore()
+      }
+    })
+
+    it('counts no episodes where TMDB counts 0', async () => {
+      spy.mockImplementation(async () =>
+        person({
+          filmography: ready([
+            entry({
+              type: 'show',
+              title: 'Speed Racer',
+              credits: [credit({ role: 'Racer', episodes: 0 })],
+            }),
+          ]),
+        }),
+      )
+      renderPerson()
+      await screen.findByRole('table', { name: 'Filmography' })
+      expect(within(rowOf('Speed Racer')).getByText('Racer')).toBeInTheDocument()
+      expect(within(rowOf('Speed Racer')).queryByText(/episode/)).toBeNull()
     })
 
     it('says when TMDB lists nothing for them', async () => {
@@ -532,6 +631,24 @@ describe('PersonPage', () => {
       await wait(100)
       expect(spy).toHaveBeenCalledTimes(3)
     })
+  })
+
+  it('keeps the page up through an ask that fails while it waits, and asks again', async () => {
+    pollFast()
+    spy.mockImplementationOnce(async () => person({ filmography: { state: 'pending' } }))
+    spy.mockImplementationOnce(async () => {
+      throw new ApiError({ status: 502, message: 'Bad gateway' })
+    })
+    const third = held<PersonDetails>()
+    spy.mockImplementationOnce(() => third.promise)
+    renderPerson()
+    await screen.findByText("Fetching Keanu Reeves's filmography")
+    // The failed ask has settled once the next one is out.
+    await waitFor(() => expect(spy).toHaveBeenCalledTimes(3))
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.getByText("Fetching Keanu Reeves's filmography")).toBeInTheDocument()
+    await act(async () => third.answer(person({ filmography: ready(ENTRIES) })))
+    expect(await screen.findByRole('table', { name: 'Filmography' })).toBeInTheDocument()
   })
 
   describe('when TMDB has no filmography to give', () => {

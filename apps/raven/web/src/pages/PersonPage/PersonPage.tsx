@@ -11,7 +11,7 @@ import { plural } from '@/lib/plural'
 import { POSTER_SIZES, posterSources } from '@/lib/posters'
 import { personQuery } from '@/lib/queries'
 import { ROUTE_STATES, routeState, useRouteId } from '@/lib/routeQuery'
-import { Filmography, FilmographySkeleton } from '@/pages/PersonPage/Filmography'
+import { Filmography, FilmographySkeleton, heldOnOpening } from '@/pages/PersonPage/Filmography'
 import { FilmographyBones } from '@/pages/PersonPage/FilmographyTable'
 import { PersonHeader } from '@/pages/PersonPage/PersonHeader'
 import styles from '@/pages/PersonPage/PersonPage.module.scss'
@@ -39,8 +39,9 @@ export const groupCredits = (credits: readonly Credit[]): CreditGroup[] =>
 
 /**
  * The line over their name: what they are known for and how many of their
- * titles raven holds, once TMDB's filmography is in; until then, how many
- * credits raven's own titles give them.
+ * titles raven holds, once TMDB's filmography is in, counted as the table
+ * opens so it matches the On raven marks; until then, how many credits
+ * raven's own titles give them.
  */
 const eyebrowOf = ({
   person,
@@ -50,7 +51,7 @@ const eyebrowOf = ({
   groups: readonly CreditGroup[]
 }): string | null => {
   if (person.filmography.state === 'ready') {
-    const held = person.filmography.entries.filter((entry) => entry.item != null).length
+    const held = heldOnOpening(person.filmography.entries)
     const parts = [
       person.profile?.knownFor ?? null,
       held > 0 ? `${plural({ n: held, one: 'title', many: 'titles' })} on raven` : null,
