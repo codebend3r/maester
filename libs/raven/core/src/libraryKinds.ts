@@ -1,16 +1,24 @@
 import { type CandidateTier, TIER_SETS, type TierSet } from '@/candidateTiers'
 import {
+  FOLDER_LAYOUTS,
+  ITEM_TYPES,
   LIBRARY_KINDS,
   LIBRARY_VIEWS,
   type LibraryKind,
   type LibrarySettings,
   type LibraryView,
   MEDIA_GROUPINGS,
+  MEDIA_SORTS,
   type MediaGroupBy,
   type MatchItemType,
   type MediaSort,
+  RATING_SOURCES,
+  SORT_FIELD_NAMES,
   type SortFieldName,
   fieldSorts,
+  isLibraryKind,
+  isLibraryView,
+  isMediaGroupBy,
   isSortFieldName,
 } from '@/contract'
 import { sortParts } from '@/sortFields'
@@ -50,10 +58,10 @@ const MOVIE_RULES = {
   matches: 'movie',
   prefer: 'any',
   fields: isSortFieldName.values,
-  views: LIBRARY_VIEWS,
-  groupings: MEDIA_GROUPINGS,
-  view: 'grouped',
-  groupBy: 'match',
+  views: isLibraryView.values,
+  groupings: isMediaGroupBy.values,
+  view: LIBRARY_VIEWS.grouped,
+  groupBy: MEDIA_GROUPINGS.match,
 } as const satisfies KindRules
 
 /**
@@ -65,10 +73,10 @@ const SHOW_RULES = {
   matches: 'show',
   prefer: 'any',
   fields: without({ all: isSortFieldName.values, left: FILE_FIELDS }),
-  views: without({ all: LIBRARY_VIEWS, left: ['grouped'] }),
-  groupings: MEDIA_GROUPINGS,
-  view: 'grid',
-  groupBy: 'resolution',
+  views: without({ all: isLibraryView.values, left: [LIBRARY_VIEWS.grouped] }),
+  groupings: isMediaGroupBy.values,
+  view: LIBRARY_VIEWS.grid,
+  groupBy: MEDIA_GROUPINGS.resolution,
 } as const satisfies KindRules
 
 /** A library that is never matched has no years, scores or match to sort or group by. */
@@ -76,10 +84,10 @@ const UNMATCHED_RULES = {
   matches: null,
   prefer: 'any',
   fields: without({ all: isSortFieldName.values, left: MATCHED_FIELDS }),
-  views: LIBRARY_VIEWS,
-  groupings: without({ all: MEDIA_GROUPINGS, left: ['match'] }),
-  view: 'grid',
-  groupBy: 'resolution',
+  views: isLibraryView.values,
+  groupings: without({ all: isMediaGroupBy.values, left: [MEDIA_GROUPINGS.match] }),
+  view: LIBRARY_VIEWS.grid,
+  groupBy: MEDIA_GROUPINGS.resolution,
 } as const satisfies KindRules
 
 /**
@@ -133,12 +141,12 @@ export const matchesAlike = ({
   KIND_RULES[before].prefer === KIND_RULES[after].prefer
 
 /** The types of library that are matched against TMDB. */
-export const MATCHED_KINDS: readonly LibraryKind[] = LIBRARY_KINDS.filter(
+export const MATCHED_KINDS: readonly LibraryKind[] = isLibraryKind.values.filter(
   (kind) => matchTypeFor(kind) != null,
 )
 
 /** Whether the library's cards are its shows, with its files no show was found for listed apart. */
-export const listsShows = (kind: LibraryKind): boolean => matchTypeFor(kind) === 'show'
+export const listsShows = (kind: LibraryKind): boolean => matchTypeFor(kind) === ITEM_TYPES.show
 
 /** The fields a library of `kind` can sort on, in the order a menu offers them. */
 export const sortFieldsFor = (kind: LibraryKind): readonly SortFieldName[] =>
@@ -156,15 +164,15 @@ export const groupingsFor = (kind: LibraryKind): readonly MediaGroupBy[] =>
 export const DEFAULT_LIBRARY_SETTINGS: LibrarySettings = {
   saveProgress: true,
   pinned: true,
-  sort: 'title',
-  view: 'grid',
-  groupBy: 'resolution',
+  sort: MEDIA_SORTS.title,
+  view: LIBRARY_VIEWS.grid,
+  groupBy: MEDIA_GROUPINGS.resolution,
   watchedPercent: 95,
-  kind: 'other',
-  ratingsSource: 'tmdb',
+  kind: LIBRARY_KINDS.other,
+  ratingsSource: RATING_SOURCES.tmdb,
   autoRefresh: true,
   locked: false,
-  folderLayout: 'auto',
+  folderLayout: FOLDER_LAYOUTS.auto,
   icon: null,
 }
 

@@ -3,7 +3,6 @@ import {
   DEFAULT_SAGA_BACKDROP,
   ITEM_IMAGE_KINDS,
   MEDIA_PROBE_BYTES,
-  MEDIA_SORTS,
   MEDIA_TICKET_REFRESH_SECONDS,
   MEDIA_TICKET_SECONDS,
   POSTER_OWN_WIDTH,
@@ -406,7 +405,7 @@ describe('isMediaLocation', () => {
 
 describe('the choice lists', () => {
   it('derive each union from its own list', () => {
-    expect(MEDIA_SORTS).toHaveLength(17)
+    expect(isMediaSort.values).toHaveLength(17)
     expect(isMediaSort('rating-high')).toBe(true)
     expect(isMediaSort('loudest')).toBe(false)
     expect(STREAM_MODES).toEqual(['remux', 'transcode'])

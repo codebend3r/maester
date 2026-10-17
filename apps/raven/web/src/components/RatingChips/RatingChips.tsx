@@ -1,4 +1,4 @@
-import { type Rating, type RatingSource, formatScore } from '@raven/core'
+import { RATING_SOURCES, type Rating, type RatingSource, formatScore } from '@raven/core'
 import { RatingMark, SourceMark, isFresh } from '@/components/RatingMark/RatingMark'
 import styles from '@/components/RatingChips/RatingChips.module.scss'
 
@@ -11,20 +11,21 @@ const NAMES: Record<RatingSource, string> = {
 
 /** What a screen reader hears: "Rotten Tomatoes critics, 41%, rotten" or "TMDB audience score, 82%". */
 export const ratingLabel = (rating: Rating): string => {
-  if (rating.source === 'rottenTomatoes') {
+  if (rating.source === RATING_SOURCES.rottenTomatoes) {
     return `Rotten Tomatoes critics, ${formatScore(rating)}, ${isFresh(rating) ? 'fresh' : 'rotten'}`
   }
-  if (rating.source === 'metacritic') return `Metacritic, ${formatScore(rating)} out of 100`
-  if (rating.source === 'imdb') return `IMDb, ${formatScore(rating)} out of 10`
+  if (rating.source === RATING_SOURCES.metacritic)
+    return `Metacritic, ${formatScore(rating)} out of 100`
+  if (rating.source === RATING_SOURCES.imdb) return `IMDb, ${formatScore(rating)} out of 10`
   return `${NAMES[rating.source]} ${rating.kind} score, ${formatScore(rating)}`
 }
 
 /** Every source, in the order the server lists an item's scores. */
-export const SCORE_ORDER = [
-  'rottenTomatoes',
-  'imdb',
-  'metacritic',
-  'tmdb',
+const SCORE_ORDER = [
+  RATING_SOURCES.rottenTomatoes,
+  RATING_SOURCES.imdb,
+  RATING_SOURCES.metacritic,
+  RATING_SOURCES.tmdb,
 ] as const satisfies readonly RatingSource[]
 
 /** A chip: a source's score, or a source that has none for this item. */

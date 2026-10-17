@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import {
   type Library,
   type LibraryViewChange,
+  MEDIA_SORTS,
   coherentSettings,
   isLibraryView,
   isMediaGroupBy,
@@ -77,7 +78,7 @@ export const useLibraryView = ({ library }: { library: Library }) => {
     /** The search once typing settles. */
     query: search.query,
     /** The random sort's deal; 0 for every other sort, so they share a cache entry. */
-    seed: settings.sort === 'random' ? seed : 0,
+    seed: settings.sort === MEDIA_SORTS.random ? seed : 0,
     change: (change: LibraryViewChange) => {
       setAddress(writeView({ params: address, change }), { replace: true })
       save.mutate({ id: library.id, change })

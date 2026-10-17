@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
-import { LIBRARY_KINDS } from '@raven/core'
+import { isLibraryKind } from '@raven/core'
 import { act, cleanup, fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router-dom'
@@ -174,7 +174,7 @@ describe('AppShell', () => {
 
   it("gives each pinned library its type's icon", async () => {
     spies.list.mockImplementation(async () =>
-      LIBRARY_KINDS.map((kind, index) =>
+      isLibraryKind.values.map((kind, index) =>
         library({ id: index + 1, name: kind, settings: { ...library().settings, kind } }),
       ),
     )
@@ -210,7 +210,7 @@ describe('AppShell', () => {
 
   it("keeps a locked library's type icon, with a lock on it, whatever its type", async () => {
     spies.list.mockImplementation(async () =>
-      LIBRARY_KINDS.map((kind, index) =>
+      isLibraryKind.values.map((kind, index) =>
         library({
           id: index + 1,
           name: kind,
@@ -221,13 +221,13 @@ describe('AppShell', () => {
     renderShell('/')
     const pinned = await within(nav()).findByRole('list', { name: 'Pinned' })
     expect(within(pinned).getAllByRole('link').map(iconsOf)).toEqual(
-      LIBRARY_KINDS.map((kind) => [KINDS[kind].icon, 'lock']),
+      isLibraryKind.values.map((kind) => [KINDS[kind].icon, 'lock']),
     )
     expect(
       within(pinned)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(LIBRARY_KINDS.map((kind) => `${kind} (locked)`))
+    ).toEqual(isLibraryKind.values.map((kind) => `${kind} (locked)`))
   })
 
   it('says a locked library is locked in its tooltip once the menu collapses', async () => {

@@ -1,4 +1,4 @@
-import { type MediaSort, isMediaSort } from '@/contract'
+import { MEDIA_SORTS, type MediaSort, isMediaSort } from '@/contract'
 import { fromQueryString, toQueryString } from '@/query'
 import { isString } from '@/schema'
 
@@ -18,10 +18,10 @@ export type MediaListParams = Required<MediaListOptions>
  * by the client and read back by the server, so the two agree on it.
  */
 export const mediaListQuery = {
-  encode: ({ search = '', sort = 'title', seed }: MediaListOptions): string =>
+  encode: ({ search = '', sort = MEDIA_SORTS.title, seed }: MediaListOptions): string =>
     toQueryString({
       sort,
-      ...(sort === 'random' && seed !== undefined ? { seed: String(seed) } : {}),
+      ...(sort === MEDIA_SORTS.random && seed !== undefined ? { seed: String(seed) } : {}),
       ...(search.trim() ? { q: search.trim() } : {}),
     }),
 
@@ -31,7 +31,7 @@ export const mediaListQuery = {
     const seed = isString(params.seed) ? Number.parseInt(params.seed, 10) : Number.NaN
     return {
       search: isString(params.q) ? params.q : '',
-      sort: isMediaSort(params.sort) ? params.sort : 'title',
+      sort: isMediaSort(params.sort) ? params.sort : MEDIA_SORTS.title,
       seed: Number.isInteger(seed) ? seed : 0,
     }
   },

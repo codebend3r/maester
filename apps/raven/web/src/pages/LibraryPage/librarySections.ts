@@ -1,4 +1,4 @@
-import { type Library, type LibraryKind, matchTypeFor } from '@raven/core'
+import { ITEM_TYPES, type Library, type LibraryKind, matchTypeFor } from '@raven/core'
 
 /**
  * The tabs of a library's page, in order. Each but All is its own address
@@ -20,7 +20,7 @@ export type LibrarySection = (typeof LIBRARY_SECTIONS)[number]
 const always = (): boolean => true
 
 /** TMDB keeps collections of movies alone, and only a movie gathers several files on one card. */
-const matchedToMovies = (kind: LibraryKind): boolean => matchTypeFor(kind) === 'movie'
+const matchedToMovies = (kind: LibraryKind): boolean => matchTypeFor(kind) === ITEM_TYPES.movie
 
 const matched = (kind: LibraryKind): boolean => matchTypeFor(kind) != null
 

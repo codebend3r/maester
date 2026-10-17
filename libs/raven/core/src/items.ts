@@ -1,4 +1,11 @@
-import type { ItemSummary, MediaItem, Rating, RatingSource } from '@/contract'
+import {
+  ITEM_TYPES,
+  type ItemSummary,
+  type MediaItem,
+  RATING_SOURCES,
+  type Rating,
+  type RatingSource,
+} from '@/contract'
 
 const pad = (value: number): string => String(value).padStart(2, '0')
 
@@ -64,12 +71,12 @@ export const pickScore = ({
   source: RatingSource
 }): Rating | null =>
   ratings.find((rating) => rating.source === source) ??
-  ratings.find((rating) => rating.source === 'tmdb') ??
+  ratings.find((rating) => rating.source === RATING_SOURCES.tmdb) ??
   null
 
 /** How a score reads for its source: "82%", "7.5" out of 10, or "74" out of 100. */
 export const formatScore = (rating: Rating): string => {
-  if (rating.source === 'imdb') return rating.value.toFixed(1)
-  if (rating.source === 'metacritic') return String(Math.round(rating.value * 10))
+  if (rating.source === RATING_SOURCES.imdb) return rating.value.toFixed(1)
+  if (rating.source === RATING_SOURCES.metacritic) return String(Math.round(rating.value * 10))
   return `${Math.round(rating.value * 10)}%`
 }

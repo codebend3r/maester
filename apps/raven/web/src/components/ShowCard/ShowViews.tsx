@@ -1,5 +1,6 @@
 import {
   type MediaSort,
+  RATING_SOURCES,
   type RatingSource,
   type ShowEntry,
   episodeCode,
@@ -84,17 +85,23 @@ const RATING_COLUMNS: readonly { source: RatingSource; label: string }[] = [
 
 type Column = 'title' | 'years' | 'episodes' | RatingSource
 
-const score = (entry: ShowEntry, source: RatingSource): number | null =>
+const score = ({ entry, source }: { entry: ShowEntry; source: RatingSource }): number | null =>
   entry.show.ratings.find((rating) => rating.source === source)?.value ?? null
 
 const COLUMNS: Record<Column, SortColumn<ShowEntry>> = {
   title: { value: (entry) => sortTitle(entry.show.title), first: 'asc' },
   years: { value: (entry) => entry.show.year, first: 'desc' },
   episodes: { value: (entry) => entry.episodes, first: 'desc' },
-  rottenTomatoes: { value: (entry) => score(entry, 'rottenTomatoes'), first: 'desc' },
-  imdb: { value: (entry) => score(entry, 'imdb'), first: 'desc' },
-  metacritic: { value: (entry) => score(entry, 'metacritic'), first: 'desc' },
-  tmdb: { value: (entry) => score(entry, 'tmdb'), first: 'desc' },
+  rottenTomatoes: {
+    value: (entry) => score({ entry, source: RATING_SOURCES.rottenTomatoes }),
+    first: 'desc',
+  },
+  imdb: { value: (entry) => score({ entry, source: RATING_SOURCES.imdb }), first: 'desc' },
+  metacritic: {
+    value: (entry) => score({ entry, source: RATING_SOURCES.metacritic }),
+    first: 'desc',
+  },
+  tmdb: { value: (entry) => score({ entry, source: RATING_SOURCES.tmdb }), first: 'desc' },
 }
 
 /** One show as a table row, its small poster before its title. */

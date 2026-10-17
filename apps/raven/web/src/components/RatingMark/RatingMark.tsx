@@ -1,4 +1,4 @@
-import type { Rating, RatingSource } from '@raven/core'
+import { RATING_SOURCES, type Rating, type RatingSource } from '@raven/core'
 import type { ReactNode } from 'react'
 import styles from '@/components/RatingMark/RatingMark.module.scss'
 
@@ -77,7 +77,7 @@ const Mark = ({
  */
 export const RatingMark = ({ rating, size = 26 }: { rating: Rating; size?: number }) => {
   switch (rating.source) {
-    case 'rottenTomatoes':
+    case RATING_SOURCES.rottenTomatoes:
       return isFresh(rating) ? (
         <Mark className={`${styles.round} ${styles.fresh}`} size={size}>
           <Tomato size={size * 0.62} />
@@ -87,14 +87,14 @@ export const RatingMark = ({ rating, size = 26 }: { rating: Rating; size?: numbe
           <Splat size={size * 0.62} />
         </Mark>
       )
-    case 'metacritic':
+    case RATING_SOURCES.metacritic:
       return (
         <Mark className={`${styles.badge} ${BANDS[metacriticBand(rating)]}`} size={size}>
           {WORDS.metacritic}
         </Mark>
       )
-    case 'imdb':
-    case 'tmdb':
+    case RATING_SOURCES.imdb:
+    case RATING_SOURCES.tmdb:
       return (
         <Mark className={LOOKS[rating.source]} size={size}>
           {WORDS[rating.source]}

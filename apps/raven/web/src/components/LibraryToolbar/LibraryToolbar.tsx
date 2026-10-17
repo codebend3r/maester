@@ -1,5 +1,6 @@
 import {
   type DirectedSortFieldName,
+  LIBRARY_VIEWS,
   type LibrarySettings,
   type LibraryView,
   type LibraryViewChange,
@@ -158,7 +159,7 @@ export const LibraryToolbar = ({
         </div>
         <DirectionButton settings={settings} onChange={onChange} />
 
-        {settings.view === 'grouped' && (
+        {settings.view === LIBRARY_VIEWS.grouped && (
           <div className={`${styles.picker} ${styles.group}`}>
             <label htmlFor={ids.group} className={styles.label}>
               Group by

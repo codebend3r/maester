@@ -1,5 +1,11 @@
-import type { MediaItem, MediaSort, ShowEntry, SortFieldName } from '@/contract'
-import { formatBitrate, formatBytes, timeAgo } from '@/format'
+import {
+  type MediaItem,
+  type MediaSort,
+  SORT_FIELD_NAMES,
+  type ShowEntry,
+  type SortFieldName,
+} from '@/contract'
+import { TIME_AGO_STYLES, formatBitrate, formatBytes, timeAgo } from '@/format'
 import { resolutionLabel } from '@/media'
 import { sortParts } from '@/sortFields'
 
