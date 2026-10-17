@@ -568,6 +568,18 @@ describe('the share watched', () => {
     expect(world.statted.toSorted()).toEqual([VIDEO, replaced])
   })
 
+  it('reads 1 for a download marked watched, whatever its resume spot says', async () => {
+    const world = setup({
+      entries: [entryFor({ watchedAt: NOW }), entryFor({ downloadId: OTHER_ID, mediaId: 12 })],
+      player: remembering(VIDEO, videoOf(12)),
+    })
+    expect(world.playback.watchedOf(ID)).toBe(1)
+    expect(world.playback.watchedOf(OTHER_ID)).toBeNull()
+    expect(world.playback.isWatched({ path: VIDEO })).toBe(true)
+    expect(world.playback.isWatched({ path: videoOf(12) })).toBe(false)
+    expect(world.playback.isWatched({ path: MOVIE_PATH })).toBe(false)
+  })
+
   it('tells the page nothing when no file could be read', async () => {
     const world = setup({ entries: [entryFor({})] })
     world.playback.readFiles([entryFor({})])
