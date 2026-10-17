@@ -7,9 +7,14 @@ import {
 } from '@raven/core'
 import { act, fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { useState } from 'react'
 import { Route, Routes } from 'react-router-dom'
 import { Player } from '@/components/Player/Player'
-import { PlayerServicesProvider, type PlayerTitle } from '@/components/Player/PlayerServices'
+import {
+  type PlayerFavourite,
+  PlayerServicesProvider,
+  type PlayerTitle,
+} from '@/components/Player/PlayerServices'
 import { api } from '@/test/api'
 import { setBrowserSupport, setStreamSupport } from '@/test/canPlay'
 import { mediaItem } from '@/test/fixtures'
@@ -20,10 +25,12 @@ const TestPlayer = ({
   media,
   backTo,
   next = null,
+  favourite,
 }: {
   media: MediaItem
   backTo: string
   next?: PlayerTitle['next']
+  favourite?: PlayerFavourite
 }) => (
   <PlayerServicesProvider
     services={{
@@ -31,6 +38,7 @@ const TestPlayer = ({
       posterUrl: null,
       escape: null,
       progress: { started: () => {}, save: () => {}, left: () => {} },
+      ...(favourite && { favourite }),
     }}
   >
     <Player engine={{ kind: 'html', source: { kind: 'server', media, api } }} />
@@ -324,6 +332,38 @@ describe('the player controls', () => {
       <TestPlayer media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />,
     )
     expect(screen.queryByRole('link', { name: /^Next/ })).toBeNull()
+  })
+
+  it('favourites the video from the player, and says so', async () => {
+    /** The host keeps the favourite; the player only shows it and asks for the change. */
+    const FavouriteHost = () => {
+      const [isFavourite, setFavourite] = useState(false)
+      return (
+        <TestPlayer
+          media={mediaItem({ container: 'mp4' })}
+          backTo="/libraries/2"
+          favourite={{ isFavourite, toggle: () => setFavourite((marked) => !marked) }}
+        />
+      )
+    }
+    renderWithProviders(<FavouriteHost />)
+    const heart = screen.getByRole('button', { name: 'Favourite' })
+    expect(heart).toHaveAttribute('aria-pressed', 'false')
+
+    await userEvent.click(heart)
+    expect(heart).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getAllByText('Added to favourites')).not.toHaveLength(0)
+
+    await userEvent.click(heart)
+    expect(heart).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getAllByText('Removed from favourites')).not.toHaveLength(0)
+  })
+
+  it('offers no heart when the host keeps no favourites', () => {
+    renderWithProviders(
+      <TestPlayer media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />,
+    )
+    expect(screen.queryByRole('button', { name: 'Favourite' })).toBeNull()
   })
 
   it('steps down through every conversion before giving up', async () => {

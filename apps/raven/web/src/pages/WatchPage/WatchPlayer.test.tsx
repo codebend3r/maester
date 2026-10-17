@@ -1,13 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
-import type { MediaTracks, SubtitleTrack } from '@raven/core'
-import { act, fireEvent, screen } from '@testing-library/react'
+import type { MediaItem, MediaTracks, SubtitleTrack } from '@raven/core'
+import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router-dom'
 import { WatchProbe } from '@/test/watchProbe'
-import { WatchPlayer as Player } from '@/pages/WatchPage/WatchPage'
+import { WatchPlayer as Player, WatchPage } from '@/pages/WatchPage/WatchPage'
 import { api } from '@/lib/api'
 import { setBrowserSupport } from '@/test/canPlay'
 import { mediaItem } from '@/test/fixtures'
+import { held } from '@/test/held'
 import { renderWithProviders } from '@/test/render'
 
 const subtitleTrack = (overrides: Partial<SubtitleTrack>): SubtitleTrack => ({
@@ -127,6 +128,40 @@ describe('shared player capability module', () => {
     )
     expect(container.querySelector('video')).toBeNull()
     expect(screen.getByText("This video can't play in this browser.")).toBeInTheDocument()
+  })
+})
+
+describe('WatchPage favourite', () => {
+  beforeEach(() => stubTracks())
+
+  it('favourites the video while it plays, showing the heart before the server answers', async () => {
+    // The server's copy of the video, which a favourite changes and every read returns.
+    let saved: MediaItem = mediaItem({ container: 'mp4', favourite: false })
+    spies.push(spyOn(api, 'getMedia').mockImplementation(async () => saved))
+    const answer = held<MediaItem>()
+    const setFavourite = spyOn(api, 'setFavourite').mockImplementation(({ favourite }) => {
+      saved = { ...saved, favourite }
+      return answer.promise
+    })
+    spies.push(setFavourite)
+    renderWithProviders(
+      <Routes>
+        <Route path="watch/:id" element={<WatchPage />} />
+      </Routes>,
+      { route: '/watch/7' },
+    )
+    const heart = await screen.findByRole('button', { name: 'Favourite' })
+    expect(heart).toHaveAttribute('aria-pressed', 'false')
+
+    await userEvent.click(heart)
+    await waitFor(() => expect(heart).toHaveAttribute('aria-pressed', 'true'))
+    expect(setFavourite).toHaveBeenCalledWith({ id: 7, favourite: true })
+
+    await act(async () => answer.answer(saved))
+    expect(screen.getByRole('button', { name: 'Favourite' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
   })
 })
 
