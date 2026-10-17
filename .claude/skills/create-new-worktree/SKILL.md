@@ -6,7 +6,7 @@ argument-hint: <name>
 
 # Create a new worktree
 
-A new worktree gets a new branch, cut from fresh `origin/main`, in `.claude/worktrees/<name>`, with its own `node_modules` and the gitignored `.env` files the main checkout has. Anything less leaves a worktree that commits fine but cannot run `bunx nx`, or a branch that starts from whatever the current checkout happened to be on.
+A new worktree gets a new branch, cut from fresh `origin/main`, in `.claude/worktrees/<name>`, with its own `node_modules` and the gitignored `.env` files the main checkout has, and it shows up in Supacode's sidebar before the procedure reports done. Anything less leaves a worktree that commits fine but cannot run `bunx nx`, a branch that starts from whatever the current checkout happened to be on, or a worktree the user cannot see in Supacode.
 
 ## Argument
 
@@ -55,11 +55,16 @@ find "$root/apps" -maxdepth 2 \( -name .env -o -name .env.local \) -print | whil
 done
 
 ( cd "$dir" && bun install --frozen-lockfile )
+
+# Supacode does not reliably notice a worktree made with plain git; this makes it rescan the repo
+supacode repo open "$root"
 ```
 
 The variable is `dir`, not `path`: in zsh, `path` is the array bound to `PATH`, and assigning it leaves every following command "not found".
 
 `bun install` runs lefthook's postinstall, which re-installs the hooks into the shared `.git/hooks`. That is harmless and expected.
+
+`supacode repo open` is the step that puts the worktree in Supacode's sidebar. Supacode sometimes picks up a plain `git worktree add` on its own and sometimes still has not seconds later, so the procedure always forces the rescan instead of waiting to see. `supacode repo worktree-new` is not a substitute: it puts the worktree in `~/.supacode/repos/`, not in `.claude/worktrees/`. The command prints nothing on success. Outside a Supacode terminal, or in a sandbox that blocks its socket, it fails with "Operation not permitted" or cannot find the socket; then say so in the report and tell the user to run it themselves.
 
 ## Verify
 
@@ -70,9 +75,10 @@ git -C "$dir" status --short --branch
 git -C "$dir" log --oneline origin/main..HEAD
 git -C "$dir" config --get "branch.<name>.remote" || echo "no upstream, as intended"
 ( cd "$dir" && bunx nx show projects )
+supacode worktree status -w "$(printf '%s/' "$dir" | sed 's|/|%2F|g')"
 ```
 
-Expected: the new path is listed on branch `<name>`, status shows `## <name>` with nothing modified, the log is empty (no commits past `origin/main`), the branch has no remote, and Nx lists every project. Report the absolute path and the branch.
+Expected: the new path is listed on branch `<name>`, status shows `## <name>` with nothing modified, the log is empty (no commits past `origin/main`), the branch has no remote, Nx lists every project, and Supacode answers `status=unpinned` with `archived=false` rather than `Worktree not found`. Supacode's worktree id is the absolute path with a trailing slash, percent-encoded (`%2FUsers%2F...%2Fmulti-select-fix%2F`), which is what the `sed` builds. Report the absolute path, the branch, and that Supacode lists it.
 
 ## Working in it
 
@@ -97,3 +103,4 @@ Expected: the new path is listed on branch `<name>`, status shows `## <name>` wi
 | Forgetting the `.env` files                         | They are gitignored, so the worktree has none and the servers start without their config. The existing `offline-mode` worktree was created without them. |
 | Putting it in `.worktrees/` or `~/.supacode/...`    | Neither is ignored here nor in use. `.claude/worktrees/` is.                                                                                             |
 | Running the procedure from inside another worktree  | `--show-toplevel` then points at that worktree and the new one nests inside it. Start from the main checkout.                                            |
+| Skipping `supacode repo open`                       | Supacode may never list the worktree, and `supacode worktree status` answers `Worktree not found`. Run `supacode repo open "$root"` and check again.     |
