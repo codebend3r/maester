@@ -27,6 +27,8 @@ const examples = {
       selected: true,
       default: true,
       external: false,
+      forced: false,
+      'hearing-impaired': false,
       title: 'English',
       codec: 'aac',
     },
@@ -50,6 +52,9 @@ test('every named native property accepts its shape and rejects malformed values
   })
   expect(propertyGuards['time-pos'](null)).toBe(true)
   expect(propertyGuards['duration'](null)).toBe(true)
+  // Real libmpv reports these unavailable (null) while idle, before and after each file.
+  expect(propertyGuards['paused-for-cache'](null)).toBe(true)
+  expect(propertyGuards.seeking(null)).toBe(true)
   ;[propertyGuards.aid, propertyGuards.sid].forEach((guard) => {
     ;[null, 1, false, 'auto'].forEach((value) => {
       expect(guard(value)).toBe(true)
@@ -83,6 +88,9 @@ test('track-list narrows optional mpv fields at the native boundary', () => {
       codec: 'ass',
     }),
   ).toBe(true)
+  expect(isMpvTrack({ id: 2, type: 'sub', forced: true, 'hearing-impaired': false })).toBe(true)
+  expect(isMpvTrack({ id: 2, type: 'sub', forced: 'yes' })).toBe(false)
+  expect(isMpvTrack({ id: 2, type: 'sub', 'hearing-impaired': 1 })).toBe(false)
   expect(isMpvTrack({ id: 1, type: 'attachment' })).toBe(false)
   expect(isMpvTrack({ id: 1, type: 'audio', lang: 42 })).toBe(false)
   expect(isMpvTrack({ id: 1, type: 'audio', 'demux-channel-count': '2' })).toBe(false)

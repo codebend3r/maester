@@ -4,6 +4,7 @@ import { fetchSources } from '@/build/fetchSources'
 import { refreshSourceBundle } from '@/build/sourceBundle'
 import { auditNative } from '@/build/auditNative'
 import { moltenvkBuildCommands } from '@/build/moltenvk'
+import { libmpvLinkLibraries, withLinkLibraries } from '@/build/linkage'
 import {
   digest,
   output,
@@ -65,7 +66,15 @@ await locked.reduce(async (previous, source) => {
   })
 }, Promise.resolve())
 
-const meson = async ({ name, options }: { name: string; options: string[] }) => {
+const meson = async ({
+  name,
+  options,
+  stepEnv = env,
+}: {
+  name: string
+  options: string[]
+  stepEnv?: Record<string, string>
+}) => {
   const build = resolve(src(name), '_build')
   await run({
     args: [
@@ -83,10 +92,10 @@ const meson = async ({ name, options }: { name: string; options: string[] }) => 
       '-Dprefer_static=true',
       ...options,
     ],
-    env,
+    env: stepEnv,
   })
-  await run({ args: ['meson', 'compile', '-C', build, '-j', jobs], env })
-  await run({ args: ['meson', 'install', '-C', build], env })
+  await run({ args: ['meson', 'compile', '-C', build, '-j', jobs], env: stepEnv })
+  await run({ args: ['meson', 'install', '-C', build], env: stepEnv })
 }
 const cmake = async ({ name, options }: { name: string; options: string[] }) => {
   const build = resolve(src(name), '_build')
@@ -229,7 +238,8 @@ await meson({
     '-Dvulkan=enabled',
     '-Dvk-proc-addr=enabled',
     '-Dglslang=enabled',
-    // libplacebo's meson only searches the compiler's default dirs plus this one for libSPIRV.a
+    // libplacebo's meson searches this directory for libSPIRV.a, but not for libglslang.a or
+    // libglslang-default-resource-limits.a, so libmpv's link names those itself
     `-Dvulkan-sdk=${prefix}`,
     '-Ddovi=enabled',
     '-Ddemos=false',
@@ -316,7 +326,11 @@ await ['0001-player-add-moltenvk-context.patch', '0002-moltenvk-resize.patch'].r
 )
 await meson({
   name: 'mpv',
+  stepEnv: withLinkLibraries({ env, libraries: libmpvLinkLibraries }),
   options: [
+    // mpv defaults b_lundef to false, which makes meson link libmpv with
+    // `-undefined dynamic_lookup` and ship unresolved symbols; true fails the link instead
+    '-Db_lundef=true',
     '-Ddefault_library=shared',
     // prefer_static makes meson look only for a static libiconv, which macOS does not ship
     '-Dprefer_static=false',

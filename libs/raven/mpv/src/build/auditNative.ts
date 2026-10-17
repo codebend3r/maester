@@ -1,6 +1,7 @@
 import { basename, resolve } from 'node:path'
 import { isRecord, isString, listOf, object } from '@raven/core'
 import { nodeHeaders } from '@/build/nodeHeaders'
+import { parseDefinitions, parseImports, symbolProblems, type AuditedFile } from '@/build/symbols'
 import {
   digest,
   output,
@@ -13,12 +14,29 @@ import {
   write,
 } from '@/build/context'
 
+/** Every undefined symbol must bind to a library the file loads; nm is in Xcode and its CLI tools. */
+export const inspectSymbols = async ({
+  file,
+  path,
+  dependencies,
+}: {
+  file: AuditedFile
+  path: string
+  dependencies: string[]
+}) =>
+  symbolProblems({
+    file,
+    imports: parseImports({ listing: await output({ args: ['nm', '-um', path] }) }),
+    definitions: parseDefinitions({ listing: await output({ args: ['nm', '-jU', path] }) }),
+    dependencies,
+  })
+
 export const auditNative = async ({ requireAddon = true }: { requireAddon?: boolean } = {}) => {
   requireMacArm()
-  const files = [
+  const files: AuditedFile[] = [
     'lib/libMoltenVK.dylib',
     'lib/libmpv.2.dylib',
-    ...(requireAddon ? ['raven_mpv.node'] : []),
+    ...(requireAddon ? ['raven_mpv.node' as const] : []),
   ]
   const locked = await sources()
   await locked.reduce(async (previous, source) => {
@@ -139,6 +157,8 @@ export const auditNative = async ({ requireAddon = true }: { requireAddon?: bool
         !rpaths.includes(file.endsWith('.node') ? '@loader_path/lib' : '@loader_path')
       )
         throw new Error(`Missing loader-relative search path in ${file}`)
+      const symbolIssues = await inspectSymbols({ file, path, dependencies })
+      if (symbolIssues.length > 0) throw new Error(symbolIssues.join('\n'))
       await run({ args: ['codesign', '--verify', '--strict', path] })
       return { file, sha256: digest(await Bun.file(path).bytes()), dependencies, rpaths }
     }),

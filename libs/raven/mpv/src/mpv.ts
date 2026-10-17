@@ -68,7 +68,13 @@ type Pending = {
   resolve: (value: unknown) => void
   reject: (error: Error) => void
   timer: ReturnType<typeof setTimeout>
+  onReply: (reply: MpvReply) => void
 }
+
+/** What a reply said, handed to `onReply` before its promise settles. */
+export type MpvReply = { isOk: boolean }
+
+const ignoreReply = () => {}
 
 /** Main-process API only. The renderer must use the allowlisted PlayerCommand bridge, never this API. */
 export const openMpv = async ({
@@ -107,6 +113,12 @@ export const openMpv = async ({
       if (!request) return
       pending.delete(value.id)
       clearTimeout(request.timer)
+      try {
+        request.onReply({ isOk: value.error >= 0 })
+      } catch (error) {
+        request.reject(error instanceof Error ? error : new Error(String(error)))
+        return
+      }
       if (value.error < 0) request.reject(new Error(`mpv request failed (${value.error})`))
       else request.resolve(value.data)
       return
@@ -128,7 +140,13 @@ export const openMpv = async ({
   const native: unknown = addon.create(surface, receive)
   if (!isNativeHandle(native)) throw new Error('Invalid raven mpv handle')
 
-  const request = (send: (id: number) => void) =>
+  const request = ({
+    send,
+    onReply = ignoreReply,
+  }: {
+    send: (id: number) => void
+    onReply?: (reply: MpvReply) => void
+  }) =>
     new Promise<unknown>((resolve, reject) => {
       if (isDestroyed) {
         reject(new Error('mpv is destroyed'))
@@ -139,7 +157,7 @@ export const openMpv = async ({
         pending.delete(id)
         reject(new Error('mpv request timed out'))
       }, 10000)
-      pending.set(id, { resolve, reject, timer })
+      pending.set(id, { resolve, reject, timer, onReply })
       try {
         send(id)
       } catch (error) {
@@ -153,7 +171,7 @@ export const openMpv = async ({
   }: {
     name: K
   }): Promise<MpvPropertyValue<K>> => {
-    const value = await request((id) => native.get(id, name))
+    const value = await request({ send: (id) => native.get(id, name) })
     const guard = propertyGuard(name)
     if (!guard(value)) throw new Error(`Invalid mpv property: ${name}`)
     return value
@@ -171,13 +189,24 @@ export const openMpv = async ({
     return {
       version,
       read,
-      command: async ({ args }: { args: string[] }) => {
-        await request((id) => native.command(id, args))
+      /**
+       * `onReply` runs synchronously when mpv's reply arrives, in order with the events
+       * around it, whatever the reply says. The promise settles later: the addon delivers
+       * up to 256 events a turn, so its continuation runs after the events behind the reply.
+       */
+      command: async ({
+        args,
+        onReply,
+      }: {
+        args: string[]
+        onReply?: (reply: MpvReply) => void
+      }) => {
+        await request({ send: (id) => native.command(id, args), onReply })
       },
       set: async ({ name, value }: { name: string; value: string | number | boolean }) => {
         if (!(isString(value) || isNumber(value) || isBoolean(value)))
           throw new Error('Invalid mpv property value')
-        await request((id) => native.set(id, name, value))
+        await request({ send: (id) => native.set(id, name, value) })
       },
       observe: ({ name }: { name: MpvProperty }) => {
         if (isDestroyed) throw new Error('mpv is destroyed')

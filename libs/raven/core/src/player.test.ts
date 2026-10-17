@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'bun:test'
 import {
+  DEFAULT_OUTPUT_SETTINGS,
+  isOutputSettings,
+  isPassthroughFormat,
   isPlayerCommand,
   isPlayerErrorReason,
   isPlayerEvent,
@@ -122,8 +125,11 @@ describe('isPlayerReply', () => {
     expect(isPlayerReply({ id: 1, ok: true })).toBe(true)
   })
 
-  it('accepts a failure with its message', () => {
-    expect(isPlayerReply({ id: 1, ok: false, message: 'x' })).toBe(true)
+  it('accepts a failure with a known reason and its message, and nothing less', () => {
+    expect(isPlayerReply({ id: 1, ok: false, reason: 'refused', message: 'x' })).toBe(true)
+    expect(isPlayerReply({ id: 1, ok: false, reason: 'engine', message: 'x' })).toBe(true)
+    expect(isPlayerReply({ id: 1, ok: false, message: 'x' })).toBe(false)
+    expect(isPlayerReply({ id: 1, ok: false, reason: 'gone', message: 'x' })).toBe(false)
   })
 
   it('rejects a failure without a message', () => {
@@ -132,5 +138,40 @@ describe('isPlayerReply', () => {
 
   it('rejects a non-boolean ok', () => {
     expect(isPlayerReply({ id: 1, ok: 'yes' })).toBe(false)
+  })
+})
+
+describe('isOutputSettings', () => {
+  const headphones = {
+    profile: 'headphones',
+    device: 'coreaudio/BuiltInSpeakerDevice',
+    passthrough: [],
+    spatial: true,
+  }
+
+  it('accepts the defaults and a headphones profile', () => {
+    expect(isOutputSettings(DEFAULT_OUTPUT_SETTINGS)).toBe(true)
+    expect(isOutputSettings(headphones)).toBe(true)
+  })
+
+  it('rejects an unknown profile', () => {
+    expect(isOutputSettings({ ...headphones, profile: 'bitstream' })).toBe(false)
+  })
+
+  it('rejects an unknown passthrough format', () => {
+    expect(isOutputSettings({ ...headphones, passthrough: ['mp3'] })).toBe(false)
+  })
+
+  it('rejects a numeric device', () => {
+    expect(isOutputSettings({ ...headphones, device: 3 })).toBe(false)
+  })
+
+  it('rejects a missing spatial', () => {
+    const { spatial: _spatial, ...rest } = headphones
+    expect(isOutputSettings(rest)).toBe(false)
+  })
+
+  it('lists the passthrough formats in mpv order', () => {
+    expect(isPassthroughFormat.values).toEqual(['ac3', 'eac3', 'dts', 'dts-hd', 'truehd'])
   })
 })
