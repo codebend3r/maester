@@ -9,6 +9,7 @@ const scanning = (overrides: Partial<Status>): Status => ({
   processed: 0,
   startedAt: '2026-10-12T04:38:34.481Z',
   finishedAt: null,
+  quickScannedAt: null,
   error: null,
   ...overrides,
 })
@@ -29,5 +30,30 @@ describe('ScanStatus', () => {
   it('counts the indexing once the walk is done', () => {
     render(<ScanStatus scan={scanning({ state: 'indexing', found: 12, processed: 5 })} />)
     expect(screen.getByText('Indexing 5 of 12')).toBeInTheDocument()
+  })
+
+  it('says when the last full scan and the last quick scan were, once idle', () => {
+    render(
+      <ScanStatus
+        scan={scanning({
+          state: 'idle',
+          finishedAt: new Date(Date.now() - 2 * 3_600_000).toISOString(),
+          quickScannedAt: new Date(Date.now() - 4 * 60_000).toISOString(),
+        })}
+      />,
+    )
+    expect(screen.getByText('Full scan 2 h ago · Quick scan 4 min ago')).toBeInTheDocument()
+  })
+
+  it('owns up to a library quick-scanned but never fully scanned since the times were kept', () => {
+    render(
+      <ScanStatus scan={scanning({ state: 'idle', quickScannedAt: new Date().toISOString() })} />,
+    )
+    expect(screen.getByText('No full scan yet · Quick scan just now')).toBeInTheDocument()
+  })
+
+  it('says nothing of a library no scan has reached', () => {
+    const { container } = render(<ScanStatus scan={scanning({ state: 'idle' })} />)
+    expect(container.querySelector('span')).toBeNull()
   })
 })

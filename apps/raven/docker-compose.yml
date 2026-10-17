@@ -22,8 +22,11 @@ services:
       - path: .env
         required: false
     environment:
-      # Rescan every library on a timer (minutes); 0 means only on boot and on demand.
-      - RESCAN_INTERVAL_MINUTES=0
+      # Quick-scan every library that refreshes automatically on a timer
+      # (minutes), taking in new, renamed and deleted videos without reading
+      # the files it knows; 0 means only on boot. A full scan runs only on
+      # Rescan, a new library or a change of its folders.
+      - QUICK_SCAN_INTERVAL_MINUTES=10
     # Transcode on an Intel GPU: pass its render node in and join the group
     # that owns it on the host (`stat -c %g /dev/dri/renderD128`). /api/health
     # then reports "encoder": "vaapi"; without these it stays on the CPU.

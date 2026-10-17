@@ -24,6 +24,7 @@ export const library = (overrides: Partial<Library> = {}): Library => ({
     processed: 0,
     startedAt: null,
     finishedAt: null,
+    quickScannedAt: null,
     error: null,
   },
   settings: {

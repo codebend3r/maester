@@ -165,7 +165,6 @@ describe('a library whose folders cannot be watched', () => {
       config: testConfig({ dataDir: join(state.root, 'data'), mediaDir: state.root }),
       quiet: true,
       watch: {
-        fallbackScanMs: 100,
         watchFolder: ({ root, onError }) => {
           state.watches.push(root)
           if (state.failing)
@@ -186,12 +185,12 @@ describe('a library whose folders cannot be watched', () => {
     await rm(state.root, { recursive: true, force: true })
   })
 
-  it('is scanned on a timer instead, so new videos still turn up', async () => {
+  it('is left to the quick scan, which still takes in new videos', async () => {
     await copyFile(join(media(), 'Heat (1995).mp4'), join(media(), 'Ronin (1998).mp4'))
-    const items = await eventually({
-      read: listMedia,
-      check: (current) => current.length === 2,
-    })
+    expect((await listMedia()).length).toBe(1)
+    app().get(ScannerService).quickScan(state.libraryId)
+    await app().get(ScannerService).whenIdle(state.libraryId)
+    const items = await listMedia()
     expect(items.map((item) => item.fileName).toSorted()).toEqual([
       'Heat (1995).mp4',
       'Ronin (1998).mp4',

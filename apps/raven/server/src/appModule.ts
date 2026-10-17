@@ -76,11 +76,10 @@ export const CONTROLLERS = [
   AdminController,
 ] as const
 
-/** Folders stay still for 2 s before a refresh; a library that cannot be watched is scanned every 10 min. */
+/** Folders stay still for 2 s before a refresh. */
 const DEFAULT_WATCH: WatchOptions = {
   watchFolder,
   quietMs: 2_000,
-  fallbackScanMs: 10 * 60_000,
 }
 
 /**

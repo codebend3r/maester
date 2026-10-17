@@ -18,7 +18,7 @@ import { MetadataService } from '@/metadata/metadataService'
 import { mapWithConcurrency } from '@/scanner/concurrency'
 import { layoutsOf, withTitleRoots } from '@/scanner/layout'
 import { type Reconciled, changesAnything, reconcile } from '@/scanner/reconcile'
-import { type WalkResult, isUnder, outermost, walkVideos } from '@/scanner/walk'
+import { type KnownStats, type WalkResult, isUnder, outermost, walkVideos } from '@/scanner/walk'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
 
 const IDLE: ScanStatus = {
@@ -27,24 +27,48 @@ const IDLE: ScanStatus = {
   processed: 0,
   startedAt: null,
   finishedAt: null,
+  quickScannedAt: null,
   error: null,
 }
 
-/** What a scan looks at: every path of the library, or just the places under them that changed. */
-type Scope = { kind: 'library' } | { kind: 'places'; places: readonly string[] }
+/**
+ * What a scan looks at: every path of the library, reading every file (a
+ * full scan); every path, reading only the files it does not know, and
+ * those at `places` (a quick scan); or just the places that changed.
+ */
+export type Scope =
+  | { kind: 'library' }
+  | { kind: 'quick'; places: readonly string[] }
+  | { kind: 'places'; places: readonly string[] }
 
-/** Two scans waiting their turn, as one: a full scan covers any places, and places add up. */
-const merge = ({ waiting, scope }: { waiting: Scope | null; scope: Scope }): Scope => {
+/**
+ * Two scans waiting their turn, as one: a full scan covers anything, a
+ * quick scan covers a refresh as long as it still reads the refresh's
+ * places, and places add up.
+ */
+export const mergeScopes = ({ waiting, scope }: { waiting: Scope | null; scope: Scope }): Scope => {
   if (waiting == null) return scope
   if (waiting.kind === 'library' || scope.kind === 'library') return { kind: 'library' }
-  return { kind: 'places', places: outermost([...waiting.places, ...scope.places]) }
+  const places = outermost([...waiting.places, ...scope.places])
+  if (waiting.kind === 'quick' || scope.kind === 'quick') return { kind: 'quick', places }
+  return { kind: 'places', places }
 }
 
 /**
- * Whether a scan of `scope` speaks for an indexed path. A library scan
- * speaks for everything, so files under a path since dropped go too; a
- * refresh only for its places. Nothing under a place that could not be
- * read is touched.
+ * What a quick scan takes as read: the size and modification time the index
+ * holds for a file, unless the file sits at one of the places a refresh
+ * asked to read, where it is stat'ed as a refresh would.
+ */
+const knownOutside =
+  ({ indexed, places }: { indexed: ReadonlyMap<string, KnownStats>; places: readonly string[] }) =>
+  (path: string): KnownStats | null =>
+    places.some((place) => isUnder({ path, root: place })) ? null : (indexed.get(path) ?? null)
+
+/**
+ * Whether a scan of `scope` speaks for an indexed path. A full or quick
+ * scan walks every path, so it speaks for everything, and files under a
+ * path since dropped go too; a refresh only for its places. Nothing under a
+ * place that could not be read is touched.
  */
 const inScope = ({
   path,
@@ -55,7 +79,7 @@ const inScope = ({
   scope: Scope
   unreadable: readonly string[]
 }): boolean =>
-  (scope.kind === 'library' || scope.places.some((place) => isUnder({ path, root: place }))) &&
+  (scope.kind !== 'places' || scope.places.some((place) => isUnder({ path, root: place }))) &&
   !unreadable.some((place) => isUnder({ path, root: place }))
 
 /** What a scan found and did, for the log. */
@@ -78,8 +102,12 @@ type Slot = { running: Promise<void>; next: Scope | null }
  * moved ones, re-probes replaced ones, drops deleted ones, hands every
  * freshly probed file to the thumbnail queue, and the library to metadata
  * for matching. Scans are incremental (an unchanged size and mtime skips
- * ffprobe), so a rescan of a settled library is mostly directory listing,
- * and a refresh looks only at the places its watcher saw change.
+ * ffprobe). A full scan reads every file and runs only when asked: Rescan,
+ * a new library, or a change of its folders. A quick scan, on boot and on
+ * a timer, reads only the folders and the files it does not know, so it
+ * takes in new, renamed and deleted files at a fraction of the cost, never
+ * taking over the scan status; a file replaced under its name waits for a
+ * full scan. A refresh looks only at the places the watcher saw change.
  */
 @Injectable()
 export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
@@ -101,9 +129,12 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
   ) {}
 
   onApplicationBootstrap(): void {
-    if (this.config.scanOnStart) this.scanAll()
-    if (this.config.rescanIntervalMinutes > 0) {
-      this.timer = setInterval(() => this.scanAll(), this.config.rescanIntervalMinutes * 60_000)
+    if (this.config.scanOnStart) this.quickScanAll()
+    if (this.config.quickScanIntervalMinutes > 0) {
+      this.timer = setInterval(
+        () => this.quickScanRefreshing(),
+        this.config.quickScanIntervalMinutes * 60_000,
+      )
       this.timer.unref()
     }
   }
@@ -112,18 +143,38 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
     if (this.timer) clearInterval(this.timer)
   }
 
+  /** The library's live status; before anything has run this process, what its record remembers. */
   status(libraryId: number): ScanStatus {
-    return this.statuses.get(libraryId) ?? IDLE
+    const live = this.statuses.get(libraryId)
+    if (live) return live
+    const { fullScannedAt, quickScannedAt } = this.libraries.scanTimes(libraryId)
+    const remembered: ScanStatus = { ...IDLE, finishedAt: fullScannedAt, quickScannedAt }
+    this.statuses.set(libraryId, remembered)
+    return remembered
   }
 
-  scanAll(): void {
-    this.libraries.list().forEach((library) => this.scan(library.id))
+  /** Every library, on boot: whatever changed while the server was down. */
+  quickScanAll(): void {
+    this.libraries.list().forEach((library) => this.quickScan(library.id))
+  }
+
+  /** The libraries that refresh automatically, on the timer. */
+  private quickScanRefreshing(): void {
+    this.libraries
+      .list()
+      .filter((library) => library.settings.autoRefresh)
+      .forEach((library) => this.quickScan(library.id))
   }
 
   /** Starts a full scan, or queues one behind the scan under way, and returns the status. */
   scan(libraryId: number): ScanStatus {
     this.request({ libraryId, scope: { kind: 'library' } })
     return this.status(libraryId)
+  }
+
+  /** Starts a quick scan, or queues one behind the scan under way. */
+  quickScan(libraryId: number): void {
+    this.request({ libraryId, scope: { kind: 'quick', places: [] } })
   }
 
   /** Looks again at just the places that changed, after any scan of the library under way. */
@@ -155,7 +206,7 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
   private request({ libraryId, scope }: { libraryId: number; scope: Scope }): void {
     const slot = this.slots.get(libraryId)
     if (slot) {
-      slot.next = merge({ waiting: slot.next, scope })
+      slot.next = mergeScopes({ waiting: slot.next, scope })
       return
     }
     this.start({ libraryId, scope })
@@ -181,6 +232,8 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
     switch (scope.kind) {
       case 'library':
         return this.scanLibrary(library)
+      case 'quick':
+        return this.quickScanLibrary({ library, places: scope.places })
       case 'places':
         return this.refreshPlaces({ library, places: scope.places })
       default: {
@@ -224,19 +277,64 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
       this.thumbnails.retryPending()
 
       const unreadable = walk.unreadable.map((place) => `Could not read ${place}.`)
-      this.update(library.id, {
-        state: 'idle',
-        finishedAt: new Date().toISOString(),
+      this.finishFullScan({
+        library,
         error: unreadable.length > 0 ? unreadable.join(' ') : null,
       })
       this.logger.log(`Scanned "${library.name}": ${summary({ walk, changes, toProbe })}`)
     } catch (error) {
-      this.update(library.id, {
-        state: 'idle',
-        finishedAt: new Date().toISOString(),
-        error: errorMessage(error),
-      })
+      this.finishFullScan({ library, error: errorMessage(error) })
       this.logger.error(`Scan of "${library.name}" failed: ${errorMessage(error)}`)
+    }
+  }
+
+  /** The full scan is over: its end is remembered, so a restart still says when it was. */
+  private finishFullScan({
+    library,
+    error,
+  }: {
+    library: LibraryRecord
+    error: string | null
+  }): void {
+    const at = new Date().toISOString()
+    this.libraries.markFullScan({ id: library.id, at })
+    this.update(library.id, { state: 'idle', finishedAt: at, error })
+  }
+
+  /**
+   * A quick scan: every path, reading only the files the index does not
+   * know, and those at `places`. The status keeps the last full scan's
+   * progress and outcome; only its quick scan time moves on.
+   */
+  private async quickScanLibrary({
+    library,
+    places,
+  }: {
+    library: LibraryRecord
+    places: readonly string[]
+  }): Promise<void> {
+    try {
+      const { walk, changes, toProbe } = await this.reindex({
+        library,
+        scope: { kind: 'quick', places },
+      })
+      if (changesAnything(changes) || toProbe.length > 0) {
+        this.metadata.enqueue(library.id)
+        await this.probe({ toProbe, onProbed: () => undefined })
+      }
+      // A path it could not read (a share that is down) leaves the scan unfinished, so the time stands.
+      if (walk.unreadable.length > 0) {
+        this.logger.warn(
+          `Quick scan of "${library.name}" could not read ${walk.unreadable.join(', ')}`,
+        )
+        return
+      }
+      const at = new Date().toISOString()
+      this.libraries.markQuickScan({ id: library.id, at })
+      this.update(library.id, { quickScannedAt: at })
+      this.logger.log(`Quick scan of "${library.name}": ${summary({ walk, changes, toProbe })}`)
+    } catch (error) {
+      this.logger.warn(`Quick scan of "${library.name}" failed: ${errorMessage(error)}`)
     }
   }
 
@@ -283,15 +381,15 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
     /** A full scan's count of videos found while it walks; a refresh keeps the status as it is. */
     onFound?: (count: number) => void
   }): Promise<{ walk: WalkResult; changes: Reconciled; toProbe: ProbeTarget[] }> {
+    const indexed = this.index.forLibrary(library.id)
     const walk = await walkVideos({
       roots: library.paths,
-      places: scope.kind === 'library' ? library.paths : scope.places,
+      places: scope.kind === 'places' ? scope.places : library.paths,
       onFound,
+      known: scope.kind === 'quick' ? knownOutside({ indexed, places: scope.places }) : undefined,
     })
     const known = new Map(
-      Array.from(this.index.forLibrary(library.id)).filter(([path]) =>
-        inScope({ path, scope, unreadable: walk.unreadable }),
-      ),
+      Array.from(indexed).filter(([path]) => inScope({ path, scope, unreadable: walk.unreadable })),
     )
     // A layout or type change can land during the walk; what follows is
     // synchronous, so the settings read here are the ones the files are filed under.

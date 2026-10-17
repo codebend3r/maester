@@ -233,6 +233,9 @@ const lookAt = async ({
   return { files: [], errors: [], unreadable: rootThere ? null : root }
 }
 
+/** The size and modification time a walk may take for a file instead of reading them. */
+export type KnownStats = Pick<FoundFile, 'size' | 'mtimeMs'>
+
 /**
  * Every video file at the given places under a library's paths, with the
  * size and mtime the scanner diffs against the index; a full scan's places
@@ -240,7 +243,8 @@ const lookAt = async ({
  * walk skips, are passed over. A file reachable from two overlapping paths
  * is reported once, under the first. `limit` caps the folders and files
  * this walk has open; `gate` caps filesystem calls across every walk that
- * shares it.
+ * shares it. A file `known` answers for is taken as it says, without a
+ * stat: a quick scan reads only the folders and the files new to it.
  */
 export const walkVideos = async ({
   roots,
@@ -248,6 +252,7 @@ export const walkVideos = async ({
   limit = 16,
   gate = SCAN_FILESYSTEM,
   onFound,
+  known = () => null,
 }: {
   roots: readonly string[]
   places?: readonly string[]
@@ -255,6 +260,8 @@ export const walkVideos = async ({
   gate?: Gate
   /** Told how many videos each folder held as the walk reads it, for a count that climbs. */
   onFound?: (count: number) => void
+  /** What is already known of a file at this path, or null to read it from disk. */
+  known?: (path: string) => KnownStats | null
 }): Promise<WalkResult> => {
   const looked = await Promise.all(
     places
@@ -281,6 +288,8 @@ export const walkVideos = async ({
     items: candidates,
     limit,
     fn: async ({ root, path }) => {
+      const had = known(path)
+      if (had) return [{ path, root, size: had.size, mtimeMs: had.mtimeMs }]
       const info = await gate.run(() => stat(path)).catch(() => null)
       return info ? [{ path, root, size: info.size, mtimeMs: Math.round(info.mtimeMs) }] : []
     },

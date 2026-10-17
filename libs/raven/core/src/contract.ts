@@ -44,8 +44,15 @@ export const isScanStatus = object({
   /** Files already indexed: unchanged ones count straight away, new and changed ones once probed. */
   processed: isNumber,
   startedAt: nullable(isString),
+  /** When the last full scan finished, kept across restarts; null before any. */
   finishedAt: nullable(isString),
-  /** The last scan's failure, cleared when the next scan starts. */
+  /**
+   * When the last quick scan finished, kept across restarts; null before
+   * any. A quick scan takes in new, renamed and deleted files without
+   * reading the files it knows, and never takes over the scan status.
+   */
+  quickScannedAt: nullable(isString),
+  /** The last full scan's failure, cleared when the next scan starts. */
   error: nullable(isString),
 })
 

@@ -31,10 +31,10 @@ export type ServerConfig = ListenConfig & {
   ffmpegTimeoutSeconds: number
   /** Thumbnail width in pixels; the height follows the aspect ratio. */
   thumbnailWidth: number
-  /** Rescan every library on boot, picking up whatever changed while the server was down. */
+  /** Quick-scan every library on boot, picking up whatever changed while the server was down. */
   scanOnStart: boolean
-  /** Rescan every library this often; 0 turns the timer off. */
-  rescanIntervalMinutes: number
+  /** Quick-scan every library that refreshes automatically this often; 0 turns the timer off. */
+  quickScanIntervalMinutes: number
   /** How transcodes encode: `auto` tries the GPU this machine has, `none` keeps to the CPU. */
   hwAccel: HwAccel
   /** The VAAPI render node, passed into the container on a NAS with a GPU. */
@@ -88,7 +88,7 @@ export const readServerConfig = (env: NodeJS.ProcessEnv = process.env): ServerCo
   ffmpegTimeoutSeconds: Math.max(1, wholeNumber(env.FFMPEG_TIMEOUT_SECONDS) ?? 90),
   thumbnailWidth: Math.max(160, wholeNumber(env.THUMBNAIL_WIDTH) ?? 480),
   scanOnStart: flag({ value: env.SCAN_ON_START, fallback: true }),
-  rescanIntervalMinutes: wholeNumber(env.RESCAN_INTERVAL_MINUTES) ?? 0,
+  quickScanIntervalMinutes: wholeNumber(env.QUICK_SCAN_INTERVAL_MINUTES) ?? 10,
   hwAccel: hwAccelFrom(env.HW_ACCEL),
   vaapiDevice: env.VAAPI_DEVICE?.trim() || '/dev/dri/renderD128',
   tmdbApiToken: env.TMDB_API_TOKEN?.trim() || null,

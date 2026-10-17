@@ -87,6 +87,31 @@ describe('walkVideos', () => {
     expect(counts.peak).toBe(2)
   })
 
+  it('takes a known file as `known` says, without a stat, and reads the rest', async () => {
+    const inner = createGate({ limit: 2 })
+    const counts = { calls: 0 }
+    const gate: Gate = {
+      run: (task) => {
+        counts.calls += 1
+        return inner.run(task)
+      },
+    }
+    const result = await walkVideos({
+      roots: [at('Movies')],
+      gate,
+      known: (path) => (path.endsWith('.mkv') ? { size: 99, mtimeMs: 7 } : null),
+    })
+    const files = result.files
+      .map(({ path, size, mtimeMs }) => ({ path, size, mtimeMs }))
+      .toSorted((a, b) => a.path.localeCompare(b.path))
+    expect(files).toEqual([
+      { path: at('Movies', 'Heat (1995)', 'Heat (1995).mkv'), size: 99, mtimeMs: 7 },
+      { path: at('Movies', 'linked.mp4'), size: 20, mtimeMs: expect.any(Number) },
+    ])
+    // Stat: Movies. Readdir: Movies, Heat. Stat: the symlink, then linked.mp4; never the mkv.
+    expect(counts.calls).toBe(5)
+  })
+
   it('reports a file under overlapping paths once', async () => {
     const result = await walkVideos({ roots: [at('TV'), at('TV', 'Show')] })
     expect(result.files).toHaveLength(1)

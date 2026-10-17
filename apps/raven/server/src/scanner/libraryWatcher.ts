@@ -16,14 +16,12 @@ export type WatchOptions = {
   watchFolder: WatchFolder
   /** How long a library's folders must stay still before the places that changed are looked at. */
   quietMs: number
-  /** How often a library whose folders cannot be watched is scanned instead. */
-  fallbackScanMs: number
 }
 
 /** The DI token the watch options are provided under. */
 export const WATCH_OPTIONS = Symbol('WATCH_OPTIONS')
 
-/** A library's folders watched, with the places changed since they were last looked at; or, failing that, a timer. */
+/** A library's folders watched, with the places changed since they were last looked at; or, failing that, left to the quick scan. */
 type Watch =
   | {
       mode: 'watching'
@@ -32,15 +30,16 @@ type Watch =
       changed: Set<string>
       quiet: NodeJS.Timeout | null
     }
-  | { mode: 'polling'; paths: readonly string[]; timer: NodeJS.Timeout }
+  | { mode: 'unwatched'; paths: readonly string[] }
 
 /**
  * Refreshes each library that refreshes automatically as its folders
  * change. Changes gather until the folders have been still for a moment (a
  * copy in progress keeps them busy), then just the places that changed are
  * looked at again. A library whose folders cannot be watched (a share that
- * went away, or a system out of watches) is scanned on a timer instead, and
- * watched again once any library is saved.
+ * went away, or a system out of watches) is left to the scanner's quick
+ * scan, which runs on a timer whether or not the folders are watched, and
+ * is watched again once any library is saved.
  */
 @Injectable()
 export class LibraryWatcher implements OnApplicationBootstrap, OnModuleDestroy {
@@ -72,7 +71,7 @@ export class LibraryWatcher implements OnApplicationBootstrap, OnModuleDestroy {
     Array.from(this.watches.entries())
       .filter(
         ([id, watch]) =>
-          watch.mode === 'polling' ||
+          watch.mode === 'unwatched' ||
           !samePaths({ before: watch.paths, after: wanted.get(id)?.paths ?? [] }),
       )
       .forEach(([id]) => this.stop(id))
@@ -110,8 +109,7 @@ export class LibraryWatcher implements OnApplicationBootstrap, OnModuleDestroy {
         watch.watchers.forEach((watcher) => watcher.close())
         if (watch.quiet) clearTimeout(watch.quiet)
         break
-      case 'polling':
-        clearInterval(watch.timer)
+      case 'unwatched':
         break
       default: {
         const unknown: never = watch
@@ -141,13 +139,10 @@ export class LibraryWatcher implements OnApplicationBootstrap, OnModuleDestroy {
 
   private fallBack({ library, error }: { library: LibraryRecord; error: unknown }): void {
     if (this.watches.get(library.id)?.mode !== 'watching') return
-    const minutes = Math.round(this.options.fallbackScanMs / 60_000)
     this.logger.warn(
-      `Could not watch the folders of "${library.name}" (${errorMessage(error)}); scanning it every ${minutes} min instead`,
+      `Could not watch the folders of "${library.name}" (${errorMessage(error)}); its quick scan will find the changes`,
     )
     this.stop(library.id)
-    const timer = setInterval(() => this.scanner.scan(library.id), this.options.fallbackScanMs)
-    timer.unref()
-    this.watches.set(library.id, { mode: 'polling', paths: library.paths, timer })
+    this.watches.set(library.id, { mode: 'unwatched', paths: library.paths })
   }
 }
