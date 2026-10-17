@@ -32,6 +32,7 @@ export const DOWNLOAD_MESSAGES = {
   answered: ({ serverName, status }: { serverName: string; status: number }): string =>
     `${serverName} answered ${status}`,
   relocked: (name: string): string => `${name} locked this library again`,
+  unreachable: (name: string): string => `${name} could not be reached`,
   downloaded: (label: string): string => `Downloaded ${label}`,
   failed: ({ label, why }: { label: string; why: string }): string =>
     `Could not download ${label}: ${why}`,

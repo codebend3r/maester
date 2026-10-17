@@ -9,7 +9,6 @@ import type { ServerEntry } from '@/main/desktopConfig'
 import { DOWNLOAD_MESSAGES } from '@/main/downloads/downloadMessages'
 import {
   advance,
-  bytesOf,
   entryById,
   fail,
   finish,
@@ -70,11 +69,15 @@ export type QueueFs = {
   readdir: (path: string) => Promise<string[]>
   openPart: (path: string) => Promise<PartFile>
   writeFile: (path: string, text: string) => Promise<void>
+  /** A file's size, 0 when there is no such file. */
+  size: (path: string) => Promise<number>
 }
 
 export type DownloadQueueDeps = {
   store: DownloadsStore
   serverOf: (serverId: string) => ServerEntry | null
+  /** Every server raven player keeps, as the config holds them now. */
+  servers: () => readonly ServerEntry[]
   access: MediaAccess
   /** The session's fetch, cookies along, for the cookie kind; a bare fetch with no cookie for an origin. Both `redirect: 'error'`. */
   fetchFor: (input: { serverId: string; access: Access }) => StreamFetch
@@ -171,6 +174,8 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
   const { store, fs, userData, timers } = deps
   const running = new Map<string, Run>()
   let isDisposed = false
+  /** The launch sweep while it runs: a kick meanwhile waits, so the sweep never takes a new file's folder. */
+  const launch: { sweeping: Promise<void> | null } = { sweeping: null }
 
   const partsOf = (entry: DownloadEntry) => ({
     userData,
@@ -218,20 +223,33 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     return Promise.all(stopped.map(([, run]) => run.done)).then(() => undefined)
   }
 
-  /** The server locked its library again: every file of it waits paused, running ones too. */
-  const relock = ({ entry, server }: Job): void => {
-    store.update((state) =>
-      pauseServer(state, {
-        serverId: server.id,
-        message: DOWNLOAD_MESSAGES.relocked(server.name),
-      }),
-    )
+  /** Every other waiting or running file of the job's server waits paused with `message`. */
+  const pauseServerOf = ({ job, message }: { job: Job; message: string }): void => {
+    const { entry, server } = job
+    store.update((state) => pauseServer(state, { serverId: server.id, message }))
     stopRuns({
       reason: 'pause',
       isStopped: ({ downloadId, run }) =>
         run.serverId === server.id && downloadId !== entry.downloadId,
     }).catch(() => undefined)
-    deps.warn(`${loggable(server.name)} locked ${loggable(entry.label)}'s library again`)
+  }
+
+  /** The server locked its library again: every file of it waits paused, running ones too. */
+  const relock = (job: Job): void => {
+    pauseServerOf({ job, message: DOWNLOAD_MESSAGES.relocked(job.server.name) })
+    deps.warn(`${loggable(job.server.name)} locked ${loggable(job.entry.label)}'s library again`)
+  }
+
+  /**
+   * The server could not be reached: this file fails, its part kept, and the rest of the
+   * server's files wait paused, so an outage costs one failure rather than the whole queue.
+   */
+  const failUnreachable = ({ job, message }: { job: Job; message: string }): void => {
+    failEntry({ entry: job.entry, message })
+    pauseServerOf({ job, message: DOWNLOAD_MESSAGES.unreachable(job.server.name) })
+    deps.warn(
+      `raven player could not reach ${loggable(job.server.name)} for ${loggable(job.entry.label)}`,
+    )
   }
 
   /** A new access, or null once the file has been failed or paused for why there is none. */
@@ -248,6 +266,8 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
         relock(job)
         return null
       case 'unreachable':
+        failUnreachable({ job, message: outcome.message })
+        return null
       case 'unreadable':
         failEntry({ entry, message: outcome.message })
         return null
@@ -281,6 +301,8 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     signal: AbortSignal
   }): Promise<FetchOutcome> => {
     const { entry, server } = job
+    // `bytes` is advisory, for the views, so it may be stored mid-stream: every resume reads
+    // `part.size()` for its `Range` and corrects it.
     const onDisk = (bytes: number): void =>
       store.update((state) => advance(state, { downloadId: entry.downloadId, bytes }))
     const part = await fs.openPart(partPathFor(partsOf(entry)))
@@ -322,7 +344,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
       case 'aborted':
         // The origin picked may be the one that went away; the next file probes again.
         deps.access.forget(server.id)
-        failEntry({ entry, message: CALL_MESSAGES.unreachable(server.name) })
+        failUnreachable({ job, message: CALL_MESSAGES.unreachable(server.name) })
         return
       case 'unauthorized':
       case 'status': {
@@ -346,7 +368,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
   /**
    * Fetches the video into its `.part` and answers the access it ended with, or null once the
    * file has been failed, paused or stopped. A ticket about to lapse is renewed, and a 401 or
-   * 423 reads a new access once before it counts.
+   * 423 reads a new access once per ticket before it counts.
    */
   const fetchVideo = async ({
     job,
@@ -374,7 +396,8 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     }
     const next = await accessOf(job)
     if (next === null) return null
-    return fetchVideo({ job, access: next, hasRetried: hasRetried || !isRenewal })
+    // A renewed ticket gets its own re-read, so a long file can meet a server restart in each ticket's life.
+    return fetchVideo({ job, access: next, hasRetried: !isRenewal })
   }
 
   const tracksOf = async ({ entry, signal }: Job): Promise<SubtitleTrack[]> => {
@@ -439,7 +462,16 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
   const sidecarsFor = async ({ job, access }: { job: Job; access: Access }): Promise<Sidecar[]> => {
     const tracks = await tracksOf(job)
     if (tracks.length === 0 || job.signal.aborted) return []
-    await fs.mkdir(subtitlesDirFor(partsOf(job.entry)))
+    const isMade = await fs.mkdir(subtitlesDirFor(partsOf(job.entry))).then(
+      () => true,
+      () => false,
+    )
+    if (!isMade) {
+      deps.warn(
+        `raven player kept no subtitles for ${loggable(job.entry.label)}: no folder for them`,
+      )
+      return []
+    }
     const written = await Promise.all(tracks.map((track) => fetchSidecar({ job, access, track })))
     return written.flatMap((sidecar) => (sidecar === null ? [] : [sidecar]))
   }
@@ -461,8 +493,10 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     }
     const job: Job = { entry, server, signal }
     const { free } = await readSpace({ fs: deps.space, dir: downloadsDirFor({ userData }) })
+    // A resumed or retried file needs only what its part lacks, whatever its status says.
+    const onDisk = await fs.size(partPathFor(partsOf(entry)))
     if (signal.aborted) return
-    if (!fits({ bytes: entry.size - bytesOf(entry), free })) {
+    if (!fits({ bytes: entry.size - onDisk, free })) {
       failForSpace(entry)
       return
     }
@@ -505,6 +539,12 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
 
   const kick = (): void => {
     if (isDisposed) return
+    if (launch.sweeping !== null) {
+      launch.sweeping.then(kick).catch((error: unknown) => {
+        deps.warn(`raven player's downloads stopped short: ${loggable(errorText(error))}`)
+      })
+      return
+    }
     const slots = DOWNLOAD_CONCURRENCY - running.size
     if (slots <= 0) return
     const isIdle = (entry: DownloadEntry): boolean => !running.has(entry.downloadId)
@@ -596,8 +636,13 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     })
 
   const sweepFolders = async (): Promise<void> => {
-    const isKept = (serverId: string): boolean => deps.serverOf(serverId) !== null
-    const dropped = store.read().entries.filter((entry) => !isKept(entry.serverId))
+    const kept = deps.servers().map(({ id }) => id)
+    // An unreadable config loads empty and is set aside; its servers' downloads must outlive that.
+    const canDropServers = kept.length > 0
+    const isKept = (serverId: string): boolean => kept.includes(serverId)
+    const dropped = canDropServers
+      ? store.read().entries.filter((entry) => !isKept(entry.serverId))
+      : []
     store.update((state) =>
       dropped.reduce((next, entry) => remove(next, { downloadId: entry.downloadId }), state),
     )
@@ -606,7 +651,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     }
     const root = downloadsDirFor({ userData })
     const servers = (await namesIn(root)).filter(isOpaqueId)
-    const goneServers = servers.filter((serverId) => !isKept(serverId))
+    const goneServers = canDropServers ? servers.filter((serverId) => !isKept(serverId)) : []
     // Read as each folder is listed, so a file queued meanwhile keeps its folder.
     const isNamed = ({ serverId, name }: { serverId: string; name: string }): boolean =>
       store
@@ -654,10 +699,17 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     remove: removeOne,
     removeServer: removeServerAll,
     removeAll: removeEverything,
-    sweep: () =>
-      sweepFolders().catch((error: unknown) => {
-        deps.warn(`raven player could not sweep its downloads: ${loggable(errorText(error))}`)
-      }),
+    sweep: () => {
+      const sweeping = sweepFolders()
+        .catch((error: unknown) => {
+          deps.warn(`raven player could not sweep its downloads: ${loggable(errorText(error))}`)
+        })
+        .finally(() => {
+          launch.sweeping = null
+        })
+      launch.sweeping = sweeping
+      return sweeping
+    },
     dispose,
   }
 }

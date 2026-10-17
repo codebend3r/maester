@@ -12,7 +12,9 @@ import {
 } from '@/main/downloads/downloadState'
 import type { DownloadsStore } from '@/main/downloads/downloadStore'
 import { EXPAND_MESSAGES } from '@/main/downloads/expand'
+import { DOWNLOAD_STALL_MS } from '@/main/downloads/fetchFile'
 import type { AccessOutcome } from '@/main/downloads/mediaAccess'
+import { SPACE_RESERVE_BYTES } from '@/main/downloads/space'
 import { CALL_MESSAGES } from '@/main/servers/serverCalls'
 import {
   COOKIE_ACCESS,
@@ -103,12 +105,14 @@ const setup = ({
   access = async () => FAR_TICKET,
   disk = {},
   tracks = tracksWith([]),
+  servers = SERVERS,
 }: {
   entries?: DownloadEntry[]
   free?: number
   access?: (input: { serverId: string; mediaId: number }) => Promise<AccessOutcome>
   disk?: Record<string, number>
   tracks?: MediaTracks
+  servers?: ServerEntry[]
 } = {}) => {
   const store = memoryStore({ ...EMPTY_DOWNLOADS, entries })
   const { timers, pending } = fakeTimers()
@@ -124,7 +128,8 @@ const setup = ({
   const warnings: string[] = []
   const queue = createDownloadQueue({
     store,
-    serverOf: (serverId) => SERVERS.find((server) => server.id === serverId) ?? null,
+    serverOf: (serverId) => servers.find((server) => server.id === serverId) ?? null,
+    servers: () => servers,
     access: media.access,
     fetchFor: network.fetchFor,
     calls,
@@ -257,6 +262,34 @@ describe('space', () => {
     expect(world.drive.dirs.has(dirOf(1))).toBe(false)
   })
 
+  it('counts the part on disk, so a retried file needs only what it lacks', async () => {
+    const world = setup({
+      free: SPACE_RESERVE_BYTES + 4096,
+      entries: [
+        entryFor(1, {
+          size: 12_288,
+          status: { kind: 'failed', bytes: 8192, message: 'Not enough space' },
+        }),
+      ],
+      disk: { [partOf(1)]: 8192 },
+    })
+    world.network.answers.file = serving({ size: 12_288, sent: 0, isEnding: false })
+    world.queue.retry({ downloadId: idOf(1) })
+    await until(() => world.network.fileRequests().length === 1)
+    expect(world.network.fileRequests()[0]?.headers).toEqual({ Range: 'bytes=8192-' })
+    expect(world.statusOf(1)).toEqual({ kind: 'downloading', bytes: 8192 })
+  })
+
+  it('still fails a file with no part that needs more than that', async () => {
+    const world = setup({
+      free: SPACE_RESERVE_BYTES + 4096,
+      entries: [entryFor(1, { size: 12_288 })],
+    })
+    world.queue.kick()
+    await until(() => world.statusOf(1)?.kind === 'failed')
+    expect(world.network.fileRequests()).toEqual([])
+  })
+
   it('fails a file the disk fills under the same way, and keeps its part', async () => {
     const world = setup({ entries: [entryFor(1), entryFor(2)] })
     world.network.answers.file = serving({ size: 8 })
@@ -307,6 +340,68 @@ describe('a relock', () => {
       fileUrl(1),
       fileUrl(1, 'two'),
     ])
+  })
+})
+
+describe('an outage', () => {
+  const unreachableAccess: AccessOutcome = {
+    ok: false,
+    reason: 'unreachable',
+    message: 'raven player could not reach Vhagar.',
+  }
+  const waiting = { kind: 'paused', bytes: 0, message: 'Vhagar could not be reached' } as const
+
+  it('fails the file that stalls and pauses the rest of its server, while another server goes on', async () => {
+    const world = setup({
+      entries: [entryFor(1), entryFor(2), entryFor(3), entryFor(5, { serverId: OTHER_SERVER_ID })],
+      access: ({ mediaId }) =>
+        mediaId === 2 ? new Promise<AccessOutcome>(() => undefined) : Promise.resolve(FAR_TICKET),
+    })
+    world.queue.kick()
+    await until(
+      () =>
+        world.media.asked.length === 2 &&
+        [...world.pending.values()].some(({ ms }) => ms === DOWNLOAD_STALL_MS),
+    )
+    world.fireAfter(DOWNLOAD_STALL_MS)
+    await until(() => world.network.fileRequests().length === 2)
+    expect(world.statusOf(1)).toEqual({
+      kind: 'failed',
+      bytes: 0,
+      message: CALL_MESSAGES.unreachable('Vhagar'),
+    })
+    expect(world.statusOf(2)).toEqual(waiting)
+    expect(world.statusOf(3)).toEqual(waiting)
+    expect(world.network.fileRequests().map(({ serverId }) => serverId)).toEqual([
+      SERVER_ID,
+      OTHER_SERVER_ID,
+    ])
+    expect(world.failed.map(({ downloadId }) => downloadId)).toEqual([idOf(1)])
+    expect(world.drive.files.has(partOf(1))).toBe(true)
+    world.queue.resumeAll()
+    expect([1, 2, 3].map(world.statusOf)).toEqual([
+      expect.objectContaining({ kind: 'failed' }),
+      { kind: 'queued' },
+      { kind: 'queued' },
+    ])
+  })
+
+  it('fails the file whose access cannot be read and pauses the rest of its server', async () => {
+    const world = setup({
+      entries: [entryFor(1), entryFor(2), entryFor(3), entryFor(5, { serverId: OTHER_SERVER_ID })],
+      access: async ({ serverId }) => (serverId === SERVER_ID ? unreachableAccess : FAR_TICKET),
+    })
+    world.queue.kick()
+    await until(() => world.network.fileRequests().length === 1)
+    expect(world.statusOf(1)).toEqual({
+      kind: 'failed',
+      bytes: 0,
+      message: 'raven player could not reach Vhagar.',
+    })
+    expect(world.statusOf(2)).toEqual(waiting)
+    expect(world.statusOf(3)).toEqual(waiting)
+    expect(world.network.fileRequests()[0]?.serverId).toBe(OTHER_SERVER_ID)
+    expect(world.failed).toHaveLength(1)
   })
 })
 
@@ -415,6 +510,38 @@ describe('the ticket', () => {
     ])
   })
 
+  it('gives each renewed ticket its own re-read on a 401', async () => {
+    const ticket = (name: string, minutes: number) =>
+      Promise.resolve(ticketFor({ ticket: name, expiresAt: NOW + minutes * MINUTE }))
+    const world = setup({
+      entries: [entryFor(1)],
+      access: inTurn([
+        ticket('one', 360),
+        ticket('two', 15),
+        ticket('three', 360),
+        ticket('four', 360),
+      ]),
+    })
+    const next = inTurn([
+      () => refused(401),
+      serving({ size: 8, sent: 4, isEnding: false }),
+      () => refused(401),
+      serving({ size: 8 }),
+    ])
+    world.network.answers.file = (request) => next()(request)
+    world.queue.kick()
+    await until(() => world.drive.sizeOf(partOf(1)) === 4)
+    world.fireAfter(5 * MINUTE)
+    await until(() => world.statusOf(1)?.kind === 'ready')
+    expect(world.network.fileRequests().map(({ url }) => url)).toEqual([
+      fileUrl(1, 'one'),
+      fileUrl(1, 'two'),
+      fileUrl(1, 'three'),
+      fileUrl(1, 'four'),
+    ])
+    expect(world.network.fileRequests()[3]?.headers).toEqual({ Range: 'bytes=4-' })
+  })
+
   it('fails the file on a second 401 with what the server answered', async () => {
     const world = setup({
       entries: [entryFor(1)],
@@ -475,6 +602,24 @@ describe('a finished file', () => {
     expect(log).toContain('external-0')
     expect(log).not.toContain('t=one')
     expect(log).not.toContain(DOWNLOADS)
+  })
+
+  it('finishes with no subtitles when their folder cannot be made', async () => {
+    const world = setup({
+      entries: [entryFor(1)],
+      tracks: tracksWith([subtitleTrack({ id: 'external-0' })]),
+    })
+    world.drive.unmakeable.add(`${dirOf(1)}/subtitles`)
+    world.network.answers.file = serving({ size: 8 })
+    world.queue.kick()
+    await until(() => world.statusOf(1)?.kind === 'ready')
+    expect(world.drive.sizeOf(videoOf(1))).toBe(8)
+    expect(world.network.sidecarRequests()).toEqual([])
+    expect(entryById(world.store.read(), { downloadId: idOf(1) })?.sidecars).toEqual([])
+    expect(world.finished).toHaveLength(1)
+    expect(world.warnings).toHaveLength(1)
+    expect(world.warnings[0]).toContain('Episode 1')
+    expect(world.warnings[0]).not.toContain(DOWNLOADS)
   })
 
   it('finishes with no subtitles when the track list cannot be read', async () => {
@@ -632,6 +777,36 @@ describe('a relaunch', () => {
     expect(log).not.toContain(DOWNLOADS)
     expect(log).not.toContain(GONE_SERVER_ID)
     expect(world.warnings).toHaveLength(3)
+  })
+
+  it('drops nothing and removes no server folder when the config holds no server', async () => {
+    const world = setup({
+      servers: [],
+      entries: [entryFor(1), entryFor(9, { serverId: GONE_SERVER_ID })],
+      disk: {
+        [partOf(1)]: 4,
+        [`${dirOf(7)}/video.mkv`]: 8,
+        [`${dirOf(3, GONE_SERVER_ID)}/video.mkv`]: 8,
+      },
+    })
+    await world.queue.sweep()
+    expect(world.drive.removed).toEqual([])
+    expect(world.store.read().entries).toHaveLength(2)
+    expect(world.warnings).toEqual([])
+  })
+
+  it('holds a kick made while the sweep runs until it is done', async () => {
+    const world = setup({ entries: [entryFor(1)] })
+    const listing = Promise.withResolvers<void>()
+    world.drive.listing.hold = listing.promise
+    const sweeping = world.queue.sweep()
+    world.queue.kick()
+    await ticks(10)
+    expect(world.network.fileRequests()).toEqual([])
+    expect(world.statusOf(1)).toEqual({ kind: 'queued' })
+    listing.resolve()
+    await sweeping
+    await until(() => world.network.fileRequests().length === 1)
   })
 
   it('sweeps nothing when there is no downloads folder yet', async () => {
