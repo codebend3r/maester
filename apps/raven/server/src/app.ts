@@ -1,10 +1,12 @@
 import { NestFactory } from '@nestjs/core'
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify'
 import { compressResponses, serveWebApp } from '@shared/server'
-import { AppModule } from '@/appModule'
+import { AppModule, CONTROLLERS } from '@/appModule'
 import type { ServerConfig } from '@/config'
 import type { AiFetch } from '@/metadata/aiClient'
 import type { MetadataFetch } from '@/metadata/tmdbClient'
+import { isAllowedWebOrigin } from '@/media/mediaPlaneConfig'
+import { mediaPlanePaths, pathMatcher, registerMediaPlaneCors } from '@/media/mediaPlaneCors'
 import type { WatchOptions } from '@/scanner/libraryWatcher'
 
 /**
@@ -34,8 +36,16 @@ export const createApp = async ({
   )
 
   await compressResponses({ app })
-  // In Docker the server hands out the built web app too, so there is one
-  // port and no CORS. In development Vite serves it and proxies /api here.
+  registerMediaPlaneCors({
+    fastify: app.getHttpAdapter().getInstance(),
+    isMediaPlanePath: pathMatcher(mediaPlanePaths(CONTROLLERS)),
+    isAllowedOrigin: (origin) =>
+      isAllowedWebOrigin({ origin, allowed: config.mediaPlane.webOrigins }),
+  })
+  // In Docker the server hands out the built web app too, so it and the API
+  // share one port. Only the media plane routes answer CORS, for the web
+  // origins in RAVEN_WEB_ORIGINS. In development Vite serves the app and
+  // proxies /api here.
   await serveWebApp({ app, webDir: config.webDir, serverPrefixes: ['/api/'] })
   app.enableShutdownHooks()
   return app
