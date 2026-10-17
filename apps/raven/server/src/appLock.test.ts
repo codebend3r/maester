@@ -186,7 +186,7 @@ describe('a library locked behind the PIN', () => {
     // What the client only builds an address for, a player loads by hand.
     const loaded = await Promise.all(
       [
-        api().fileUrl(id),
+        api().fileUrl({ id }),
         `/api/media/${id}/thumbnail`,
         api().streamUrl({ id, mode: 'remux', start: 0, audio: null }),
       ].map(async (url) => (await inject({ method: 'GET', url })).statusCode),

@@ -4,6 +4,7 @@ import {
   ApiError,
   type FetchInit,
   type FetchResponse,
+  type MediaAccess,
   createApiClient,
   isLockedError,
   parseServerEvent,
@@ -160,7 +161,7 @@ describe('createApiClient', () => {
 
   it('points a player at the original file', () => {
     const { client } = clientReturning(respond({}))
-    expect(client.fileUrl(5)).toBe('http://nas:8484/api/media/5/file')
+    expect(client.fileUrl({ id: 5 })).toBe('http://nas:8484/api/media/5/file')
   })
 
   it('marks a favourite and returns the updated item', async () => {
@@ -455,6 +456,37 @@ describe('playback calls', () => {
     )
     await expect(client.getSubtitles({ id: 7, trackId: 'x' })).rejects.toThrow(
       'No subtitle track x',
+    )
+  })
+
+  it('builds media URLs on the access origin with its ticket, and relative ones without', () => {
+    const { client } = clientReturning(respond({}))
+    const access = {
+      origin: { kind: 'lan', url: 'https://raven.home.example' },
+      ticket: 'abc.def',
+    } as const satisfies MediaAccess
+    expect(client.fileUrl({ id: 3, access })).toBe(
+      'https://raven.home.example/api/media/3/file?t=abc.def',
+    )
+    expect(client.streamUrl({ id: 3, mode: 'remux', start: 0, audio: null, access })).toBe(
+      'https://raven.home.example/api/media/3/stream?mode=remux&start=0&t=abc.def',
+    )
+    expect(client.streamUrl({ id: 3, mode: 'remux', start: 0, audio: 1, access })).toBe(
+      'https://raven.home.example/api/media/3/stream?mode=remux&start=0&audio=1&t=abc.def',
+    )
+    expect(client.fileUrl({ id: 3, access: null })).toBe('http://nas:8484/api/media/3/file')
+  })
+
+  it('fetches subtitles from the access origin with the ticket', async () => {
+    const vtt = 'WEBVTT\n\n05:01.000 --> 05:02.000\nHello'
+    const { client, calls } = clientReturning(respond({ body: vtt }))
+    const access = {
+      origin: { kind: 'tailnet', url: 'https://raven.tail.example' },
+      ticket: 'abc.def',
+    } as const satisfies MediaAccess
+    await client.getSubtitles({ id: 7, trackId: 'embedded-2', window: 1, access })
+    expect(calls[0]?.url).toBe(
+      'https://raven.tail.example/api/media/7/subtitles/embedded-2?window=1&t=abc.def',
     )
   })
 
