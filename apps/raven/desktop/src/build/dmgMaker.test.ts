@@ -3,7 +3,15 @@ import { existsSync } from 'node:fs'
 import { mkdtemp, readlink, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { dmgFileName, hdiutilArgs, MakerDmg, makeDmg, versionOf } from '@/build/dmgMaker'
+import {
+  DMG_TOOLS,
+  dmgFileName,
+  hdiutilArgs,
+  MakerDmg,
+  makeDmg,
+  PLATFORMS,
+  versionOf,
+} from '@/build/dmgMaker'
 
 describe('dmgFileName', () => {
   it('names the dmg without spaces, by version and arch', () => {
@@ -66,7 +74,7 @@ describe('MakerDmg', () => {
 
   it('runs only on macOS', () => {
     expect(new MakerDmg({}, ['darwin']).isSupportedOnCurrentPlatform()).toBe(
-      process.platform === 'darwin',
+      process.platform === PLATFORMS.darwin,
     )
   })
 })
@@ -98,7 +106,9 @@ describe('makeDmg', () => {
       ...options(),
       run: async ({ command, args }) => {
         calls.push({ command, args })
-        if (command === 'hdiutil') links.push(await readlink(join(args[4] ?? '', 'Applications')))
+        if (command === DMG_TOOLS.hdiutil) {
+          links.push(await readlink(join(args[4] ?? '', 'Applications')))
+        }
       },
     })
     expect(made).toEqual([output()])
@@ -123,8 +133,8 @@ describe('makeDmg', () => {
     const making = makeDmg({
       ...options(),
       run: async ({ command, args }) => {
-        if (command === 'ditto') stages.push(dirname(args[1] ?? ''))
-        if (command === 'hdiutil') throw new Error('hdiutil: create failed')
+        if (command === DMG_TOOLS.ditto) stages.push(dirname(args[1] ?? ''))
+        if (command === DMG_TOOLS.hdiutil) throw new Error('hdiutil: create failed')
       },
     })
     await expect(making).rejects.toThrow('hdiutil: create failed')

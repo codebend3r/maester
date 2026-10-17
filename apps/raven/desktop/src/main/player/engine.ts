@@ -1,9 +1,14 @@
 import { join } from 'node:path'
-import type { MpvSurface } from '@raven/mpv'
-import type { MpvOption } from '@/main/player/outputOptions'
+import { MPV_SURFACE_KINDS, type MpvSurface } from '@raven/mpv'
+import { MPV_OPTIONS, type MpvOption } from '@/main/player/outputOptions'
 import { messageOf } from '@/shared/messageOf'
 
-export type EngineMode = 'window' | 'headless' | 'off'
+/** A surface's kind, or `off` for the test hook's run with no native engine at all. */
+export const ENGINE_MODES = { ...MPV_SURFACE_KINDS, off: 'off' } as const
+
+export type EngineMode = (typeof ENGINE_MODES)[keyof typeof ENGINE_MODES]
+
+const ENGINE_HOOK = 'RAVEN_DESKTOP_MPV'
 
 export const engineModeFrom = ({
   isPackaged,
@@ -12,10 +17,10 @@ export const engineModeFrom = ({
   isPackaged: boolean
   env: Readonly<Record<string, string | undefined>>
 }): EngineMode => {
-  if (isPackaged) return 'window'
-  const requested = env['RAVEN_DESKTOP_MPV']
-  if (requested === 'headless' || requested === 'off') return requested
-  return 'window'
+  if (isPackaged) return ENGINE_MODES.window
+  const requested = env[ENGINE_HOOK]
+  if (requested === ENGINE_MODES.headless || requested === ENGINE_MODES.off) return requested
+  return ENGINE_MODES.window
 }
 
 const ADDON = 'raven_mpv.node'
@@ -40,7 +45,7 @@ export const addonPathFor = ({
  * archives that point at other files stop working.
  */
 export const HARDENED_OPTIONS = [
-  { name: 'access-references', value: false },
+  { name: MPV_OPTIONS.accessReferences, value: false },
 ] as const satisfies readonly MpvOption[]
 
 /**
@@ -50,7 +55,7 @@ export const HARDENED_OPTIONS = [
  * the first load, since the output reads it when it is made.
  */
 export const HEADLESS_OPTIONS = [
-  { name: 'vo-null-fps', value: 60 },
+  { name: MPV_OPTIONS.voNullFps, value: 60 },
 ] as const satisfies readonly MpvOption[]
 
 /**
@@ -60,9 +65,9 @@ export const HEADLESS_OPTIONS = [
  */
 export const engineOptionsFor = ({ surface }: { surface: MpvSurface }): readonly MpvOption[] => {
   switch (surface.kind) {
-    case 'headless':
+    case MPV_SURFACE_KINDS.headless:
       return HEADLESS_OPTIONS
-    case 'window':
+    case MPV_SURFACE_KINDS.window:
       return []
     default: {
       const unreachable: never = surface
@@ -77,9 +82,11 @@ export const ENGINE_MESSAGES = {
   off: 'The video engine is off for this run.',
 } as const
 
+export const ENGINE_STATUSES = { native: 'native', unavailable: 'unavailable' } as const
+
 export type OpenedEngine<T> =
-  | { status: 'native'; engine: T }
-  | { status: 'unavailable'; message: string }
+  | { status: typeof ENGINE_STATUSES.native; engine: T }
+  | { status: typeof ENGINE_STATUSES.unavailable; message: string }
 
 export const openEngine = async <T>({
   mode,
@@ -88,15 +95,17 @@ export const openEngine = async <T>({
   warn,
 }: {
   mode: EngineMode
-  surfaceFor: (mode: 'window' | 'headless') => MpvSurface
+  surfaceFor: (mode: Exclude<EngineMode, typeof ENGINE_MODES.off>) => MpvSurface
   open: (surface: MpvSurface) => Promise<T>
   warn: (message: string) => void
 }): Promise<OpenedEngine<T>> => {
-  if (mode === 'off') return { status: 'unavailable', message: ENGINE_MESSAGES.off }
+  if (mode === ENGINE_MODES.off) {
+    return { status: ENGINE_STATUSES.unavailable, message: ENGINE_MESSAGES.off }
+  }
   try {
-    return { status: 'native', engine: await open(surfaceFor(mode)) }
+    return { status: ENGINE_STATUSES.native, engine: await open(surfaceFor(mode)) }
   } catch (error) {
     warn(messageOf(error))
-    return { status: 'unavailable', message: ENGINE_MESSAGES.unavailable }
+    return { status: ENGINE_STATUSES.unavailable, message: ENGINE_MESSAGES.unavailable }
   }
 }

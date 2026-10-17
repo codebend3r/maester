@@ -30,11 +30,13 @@ export const sumMetrics = (
   return { memoryMb: Math.round(total.kb / 1024), cpuPercent: Math.round(total.cpu * 10) / 10 }
 }
 
-export type BudgetState = 'home' | 'playing' | 'paused'
+export const BUDGET_STATES = { home: 'home', playing: 'playing', paused: 'paused' } as const
+
+export type BudgetState = (typeof BUDGET_STATES)[keyof typeof BUDGET_STATES]
 
 export const stateOf = (activity: PlayerActivity): BudgetState => {
-  if (!activity.isShowing) return 'home'
-  return activity.isPlaying ? 'playing' : 'paused'
+  if (!activity.isShowing) return BUDGET_STATES.home
+  return activity.isPlaying ? BUDGET_STATES.playing : BUDGET_STATES.paused
 }
 
 /**
@@ -55,7 +57,7 @@ export const createBudgets = ({
   windowMs: number
   sampleMs: number
 }): { report: (activity: PlayerActivity) => void; dispose: () => void } => {
-  let state: BudgetState = 'home'
+  let state: BudgetState = BUDGET_STATES.home
   let timer: unknown = null
   let isDisposed = false
 
@@ -71,16 +73,19 @@ export const createBudgets = ({
 
   const start = (next: BudgetState) => {
     switch (next) {
-      case 'home':
-        timer = timers.set(() => {
-          timer = null
-          mark(`raven-memory-idle-mb ${sumMetrics(metrics()).memoryMb}\n`)
-        }, windowMs)
+      case BUDGET_STATES.home:
+        timer = timers.set({
+          run: () => {
+            timer = null
+            mark(`raven-memory-idle-mb ${sumMetrics(metrics()).memoryMb}\n`)
+          },
+          ms: windowMs,
+        })
         return
-      case 'playing':
+      case BUDGET_STATES.playing:
         sample()
         return
-      case 'paused':
+      case BUDGET_STATES.paused:
         // Electron's CPU figure covers the time since the previous call, so this one starts it.
         metrics()
         timer = timers.set({

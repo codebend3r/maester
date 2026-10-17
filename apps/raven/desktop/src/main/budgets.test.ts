@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import {
+  BUDGET_STATES,
   BUDGETS,
   budgetWindowFrom,
   createBudgets,
@@ -56,13 +57,13 @@ describe('sumMetrics', () => {
 
 describe('stateOf', () => {
   test('nothing showing is Home, whether or not it plays', () => {
-    expect(stateOf(HOME)).toBe('home')
-    expect(stateOf({ isPlaying: true, isShowing: false })).toBe('home')
+    expect(stateOf(HOME)).toBe(BUDGET_STATES.home)
+    expect(stateOf({ isPlaying: true, isShowing: false })).toBe(BUDGET_STATES.home)
   })
 
   test('a video showing is playing or paused', () => {
-    expect(stateOf(PLAYING)).toBe('playing')
-    expect(stateOf(PAUSED)).toBe('paused')
+    expect(stateOf(PLAYING)).toBe(BUDGET_STATES.playing)
+    expect(stateOf(PAUSED)).toBe(BUDGET_STATES.paused)
   })
 })
 

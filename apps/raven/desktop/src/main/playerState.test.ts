@@ -9,6 +9,7 @@ import {
   clearRecents,
   isPlayerState,
   noteServerRecent,
+  RECENT_KINDS,
   RECENT_LABEL_MAX,
   recentKey,
   removeRecent,
@@ -122,7 +123,7 @@ const noteDune = ({
 describe('server recents', () => {
   const labelOf = ({ label }: { label: string }): string => {
     const [entry] = noteDune({ state: EMPTY_STATE, label, at: 1 }).recents
-    return entry?.kind === 'server' ? entry.label : ''
+    return entry?.kind === RECENT_KINDS.server ? entry.label : ''
   }
 
   it('collapses whitespace and trims a label', () => {

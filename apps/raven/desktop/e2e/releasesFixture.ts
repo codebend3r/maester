@@ -54,7 +54,7 @@ export const startReleasesFixture = async ({
   })
   const address = server.address()
   if (address === null || typeof address === 'string') throw new Error('No releases fixture port')
-  served.url = `http://127.0.0.1:${address.port}/releases`
+  served.url = `http://127.0.0.1:${address.port}${RELEASES_PATH}`
   return {
     url: served.url,
     requests: () => counted.releases,

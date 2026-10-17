@@ -28,7 +28,7 @@ export const replyForTrust = ({
   request: PlayRequest
 }): DesktopReply => {
   switch (outcome.kind) {
-    case 'trusted':
+    case TRUST_OUTCOME_KINDS.trusted:
       return {
         type: 'playServer',
         target: {
@@ -38,17 +38,17 @@ export const replyForTrust = ({
           next: request.next,
         },
       }
-    case 'declined':
+    case TRUST_OUTCOME_KINDS.declined:
       return { type: 'done' }
-    case 'full':
+    case TRUST_OUTCOME_KINDS.full:
       return { type: 'refused', message: TRUST_MESSAGES.full }
-    case 'busy':
+    case TRUST_OUTCOME_KINDS.busy:
       return { type: 'refused', message: TRUST_MESSAGES.busy }
-    case 'unreachable':
+    case TRUST_OUTCOME_KINDS.unreachable:
       return { type: 'refused', message: TRUST_MESSAGES.unreachable(outcome.origin) }
-    case 'invalid':
+    case TRUST_OUTCOME_KINDS.invalid:
       return { type: 'refused', message: TRUST_MESSAGES.invalid }
-    case 'unsaved':
+    case TRUST_OUTCOME_KINDS.unsaved:
       return { type: 'refused', message: TRUST_MESSAGES.unsaved }
     default: {
       const unreachable: never = outcome
@@ -91,7 +91,7 @@ export const createLinkOpener = ({
       .then(() => trust.trust({ origin: request.origin, from }))
       .catch((error: unknown): TrustOutcome => {
         safeWarn(`raven player could not trust ${request.origin}: ${loggable(messageOf(error))}`)
-        return { kind: 'unsaved' }
+        return { kind: TRUST_OUTCOME_KINDS.unsaved }
       })
     return replyForTrust({ outcome, request })
   }
@@ -107,7 +107,7 @@ export const createLinkOpener = ({
           `raven player opened the first of ${links.length} links and dropped ${dropped.length}`,
         )
       }
-      return open({ link: first, from: 'link' })
+      return open({ link: first, from: TRUST_SOURCES.link })
     },
   }
 }

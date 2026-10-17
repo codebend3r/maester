@@ -1,6 +1,11 @@
 import { expect, test } from 'bun:test'
 import type { OutputSettings } from '@raven/core'
-import { isVolumeFixedFor, outputOptions, readDevices } from '@/main/player/outputOptions'
+import {
+  isVolumeFixedFor,
+  MPV_OPTIONS,
+  outputOptions,
+  readDevices,
+} from '@/main/player/outputOptions'
 
 const devices = [
   { name: 'auto', description: 'Autoselect device' },
@@ -109,7 +114,7 @@ test('canChooseAo false leaves every ao entry out', () => {
   ] as const satisfies readonly OutputSettings[]
   profiles.forEach((output) => {
     const options = outputOptions({ output, devices, canChooseAo: false })
-    expect(options.some((option) => option.name === 'ao')).toBe(false)
+    expect(options.some((option) => option.name === MPV_OPTIONS.ao)).toBe(false)
     expect(options.length).toBeGreaterThan(0)
   })
 })
@@ -129,7 +134,7 @@ const passthroughOf = (formats: OutputSettings['passthrough']): OutputSettings =
 
 const spdifOf = (output: OutputSettings) =>
   outputOptions({ output, devices, canChooseAo: true }).find(
-    (option) => option.name === 'audio-spdif',
+    (option) => option.name === MPV_OPTIONS.audioSpdif,
   )?.value ?? null
 
 test('passthrough emits only the formats CoreAudio carries', () => {

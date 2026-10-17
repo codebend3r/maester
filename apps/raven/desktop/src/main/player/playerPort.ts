@@ -1,4 +1,10 @@
-import { type Infer, isNumber, isPlayerReply, isPlayerRequest } from '@raven/core'
+import {
+  type Infer,
+  isNumber,
+  isPlayerReply,
+  isPlayerRequest,
+  PLAYER_REFUSAL_REASONS,
+} from '@raven/core'
 import { PLAYER_MESSAGES, type PlayerService } from '@/main/player/playerService'
 import { messageOf } from '@/shared/messageOf'
 
@@ -23,7 +29,7 @@ type PlayerReply = Infer<typeof isPlayerReply>
 const refusal = ({ id, message }: { id: number; message: string }): PlayerReply => ({
   id,
   ok: false,
-  reason: 'refused',
+  reason: PLAYER_REFUSAL_REASONS.refused,
   message,
 })
 

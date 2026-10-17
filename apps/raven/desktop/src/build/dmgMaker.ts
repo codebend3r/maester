@@ -13,6 +13,11 @@ import type { ForgePlatform } from '@electron-forge/shared-types'
  * `paths`, so it imports nothing from the project.
  */
 
+export const PLATFORMS = { darwin: 'darwin' } as const satisfies Record<string, NodeJS.Platform>
+
+/** The macOS tools the dmg is made with. */
+export const DMG_TOOLS = { ditto: 'ditto', hdiutil: 'hdiutil' } as const
+
 export const dmgFileName = ({ version, arch }: { version: string; arch: string }): string =>
   `raven-player-${version}-${arch}.dmg`
 
@@ -77,10 +82,10 @@ export const makeDmg = async ({
   const stage = await mkdtemp(join(tmpdir(), 'raven-dmg-'))
   try {
     // ditto keeps the signatures, extended attributes and framework symlinks intact.
-    await run({ command: 'ditto', args: [join(dir, bundle), join(stage, bundle)] })
+    await run({ command: DMG_TOOLS.ditto, args: [join(dir, bundle), join(stage, bundle)] })
     await symlink('/Applications', join(stage, 'Applications'))
     await run({
-      command: 'hdiutil',
+      command: DMG_TOOLS.hdiutil,
       args: hdiutilArgs({ volumeName: appName, sourceDir: stage, output }),
     })
   } finally {
@@ -92,12 +97,12 @@ export const makeDmg = async ({
 export class MakerDmg extends MakerBase<EmptyConfig> {
   name = 'dmg'
 
-  defaultPlatforms: ForgePlatform[] = ['darwin']
+  defaultPlatforms: ForgePlatform[] = [PLATFORMS.darwin]
 
-  override requiredExternalBinaries: string[] = ['ditto', 'hdiutil']
+  override requiredExternalBinaries: string[] = [DMG_TOOLS.ditto, DMG_TOOLS.hdiutil]
 
   override isSupportedOnCurrentPlatform(): boolean {
-    return process.platform === 'darwin'
+    return process.platform === PLATFORMS.darwin
   }
 
   override async make({

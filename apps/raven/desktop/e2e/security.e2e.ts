@@ -3,6 +3,7 @@ import { playLinkFor } from '@raven/core'
 import { expect, test } from '@playwright/test'
 import { type Clips, makeClips } from '@/e2e/clips'
 import { routesOf, startFixtureServer } from '@/e2e/fixtureServer'
+import { API_PATHS } from '@/main/servers/allowlist'
 import {
   browserOpens,
   closeApp,
@@ -18,7 +19,7 @@ import {
   trustPrompts,
   withApp,
 } from '@/e2e/harness'
-import { isDesktopReply } from '@/shared/protocol'
+import { DESKTOP_REPLIES, isDesktopReply } from '@/shared/protocol'
 
 // Written out rather than imported, so the test checks the header against the spec, not
 // against the module that sends it.
@@ -191,7 +192,7 @@ test.describe('the security baseline', () => {
     })
     const redirecting = await startListener({
       answer: ({ request, response }) => {
-        if (request.url === '/api/lock') {
+        if (request.url === API_PATHS.lock) {
           response.writeHead(200, {
             'content-type': 'application/json',
             'set-cookie': 'raven_unlock=a.b; Path=/api; HttpOnly; SameSite=Strict',
@@ -242,11 +243,15 @@ test.describe('the security baseline', () => {
         request: { type: 'addServer', origin: fixture.origin },
       })
       const [serverId = ''] =
-        added !== null && added.type === 'servers' ? added.servers.map((s) => s.serverId) : []
+        added !== null && added.type === DESKTOP_REPLIES.servers
+          ? added.servers.map((s) => s.serverId)
+          : []
       expect(serverId).not.toBe('')
       const listed = await requestFromPage({ page, request: { type: 'listServers' } })
       expect(
-        listed !== null && listed.type === 'servers' ? listed.servers.map((s) => s.serverId) : [],
+        listed !== null && listed.type === DESKTOP_REPLIES.servers
+          ? listed.servers.map((s) => s.serverId)
+          : [],
       ).toEqual([serverId])
       const probed = fixture.requests.length
 

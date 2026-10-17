@@ -1,8 +1,8 @@
-import { ENGINE_MESSAGES, type OpenedEngine } from '@/main/player/engine'
+import { ENGINE_MESSAGES, ENGINE_STATUSES, type OpenedEngine } from '@/main/player/engine'
 import { connectPort, type PortLike } from '@/main/player/playerPort'
 import type { PlayerService } from '@/main/player/playerService'
 import type { Timers } from '@/main/stateStore'
-import type { PlayerConnectionStatus } from '@/shared/protocol'
+import { PLAYER_CONNECTION_STATUSES, type PlayerConnectionStatus } from '@/shared/protocol'
 import { messageOf } from '@/shared/messageOf'
 
 /**
@@ -12,7 +12,7 @@ import { messageOf } from '@/shared/messageOf'
 export const OPEN_MS = 5000
 
 const UNAVAILABLE = {
-  status: 'unavailable',
+  status: ENGINE_STATUSES.unavailable,
   message: ENGINE_MESSAGES.unavailable,
 } as const satisfies OpenedEngine<never>
 
@@ -69,15 +69,18 @@ export const createConnector = <T extends { service: PlayerService }, R>({
 
   const hand = ({ opened }: { opened: OpenedEngine<T> }) => {
     switch (opened.status) {
-      case 'unavailable':
-        post({ connection: { status: 'unavailable', message: opened.message }, ports: [] })
+      case ENGINE_STATUSES.unavailable:
+        post({
+          connection: { status: PLAYER_CONNECTION_STATUSES.unavailable, message: opened.message },
+          ports: [],
+        })
         return
-      case 'native': {
+      case ENGINE_STATUSES.native: {
         const { local, remote } = channel()
         const connection = connectPort({ port: local, service: opened.engine.service, warn })
         current = connection
         try {
-          post({ connection: { status: 'native' }, ports: [remote] })
+          post({ connection: { status: PLAYER_CONNECTION_STATUSES.native }, ports: [remote] })
         } catch (error) {
           warn(`raven player could not hand the page its player: ${messageOf(error)}`)
           connection.close()

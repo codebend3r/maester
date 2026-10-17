@@ -1,3 +1,4 @@
+import { MPV_PROPERTIES } from '@raven/mpv'
 import type { MpvOption } from '@/main/player/outputOptions'
 
 export const displayOptions = ({
@@ -8,9 +9,9 @@ export const displayOptions = ({
   edrHeadroom: number
 }): MpvOption[] => [
   ...(Number.isFinite(refreshRate) && refreshRate > 0
-    ? [{ name: 'display-fps-override', value: refreshRate }]
+    ? [{ name: MPV_PROPERTIES.displayFpsOverride, value: refreshRate }]
     : []),
-  { name: 'target-colorspace-hint', value: edrHeadroom > 1 ? 'yes' : 'no' },
+  { name: MPV_PROPERTIES.targetColorspaceHint, value: edrHeadroom > 1 ? 'yes' : 'no' },
 ]
 
 /**

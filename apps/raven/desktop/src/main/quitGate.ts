@@ -1,3 +1,5 @@
+const FLUSH_OUTCOMES = { flushed: 'flushed', failed: 'failed', timedOut: 'timedOut' } as const
+
 /**
  * Holds a quit until the state store has written, for at most `timeoutMs`: a hung
  * or failed write must never keep the app open. The store does not retry a failed
@@ -24,16 +26,16 @@ export const createQuitGate = ({
   let isFlushing = false
 
   const save = async (): Promise<void> => {
-    const deadline = wait(timeoutMs).then(() => 'timedOut' as const)
+    const deadline = wait(timeoutMs).then(() => FLUSH_OUTCOMES.timedOut)
     const attempt = () =>
       Promise.race([
         flush().then(
-          () => 'flushed' as const,
-          () => 'failed' as const,
+          () => FLUSH_OUTCOMES.flushed,
+          () => FLUSH_OUTCOMES.failed,
         ),
         deadline,
       ])
-    if ((await attempt()) === 'flushed' && isDirty()) await attempt()
+    if ((await attempt()) === FLUSH_OUTCOMES.flushed && isDirty()) await attempt()
     isFlushing = false
     if (isDirty()) {
       exit()

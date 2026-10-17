@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process'
 import { type ElectronApplication, expect, type Page, test } from '@playwright/test'
+import { PLAYER_COMMANDS, PLAYER_EVENTS, type PlayerCommand } from '@raven/core'
 import { type Clips, makeClips, makeTrackClip } from '@/e2e/clips'
 import {
   closeApp,
@@ -91,21 +92,21 @@ const playNatively = async ({
 }
 
 /** The reply to each request of `type` the page sent, in order; null for one not answered yet. */
-const repliesTo = async ({ page, type }: { page: Page; type: string }) => {
+const repliesTo = async ({ page, type }: { page: Page; type: PlayerCommand['type'] }) => {
   const { requests, replies } = await trafficOf({ page })
   return requests
     .filter((sent) => sent.command.type === type)
     .map((sent) => replies.find((reply) => reply.id === sent.id) ?? null)
 }
 
-const lastReplyOf = async ({ page, type }: { page: Page; type: string }) =>
+const lastReplyOf = async ({ page, type }: { page: Page; type: PlayerCommand['type'] }) =>
   (await repliesTo({ page, type })).at(-1) ?? null
 
 /** The volume, in whole percent, of the last volume command the page sent mpv; null before any. */
 const lastVolumeSent = async (page: Page): Promise<number | null> => {
   const { requests } = await trafficOf({ page })
   const volumes = requests.flatMap(({ command }) =>
-    command.type === 'volume' ? [Math.round(command.volume * 100)] : [],
+    command.type === PLAYER_COMMANDS.volume ? [Math.round(command.volume * 100)] : [],
   )
   return volumes.at(-1) ?? null
 }
@@ -250,17 +251,23 @@ test.describe.serial('playing a local file through mpv', () => {
 
         await audioGroup(page).getByRole('radio', { name: 'French' }).check()
         await expect(audioGroup(page).getByRole('radio', { name: 'French' })).toBeChecked()
-        await expect.poll(() => lastReplyOf({ page, type: 'audio' })).toMatchObject({ ok: true })
+        await expect
+          .poll(() => lastReplyOf({ page, type: PLAYER_COMMANDS.audio }))
+          .toMatchObject({ ok: true })
 
         await openMenu({ page, name: 'Subtitles' })
         await expect(subtitleGroup(page).getByRole('radio', { name: 'Off' })).toBeChecked()
         await subtitleGroup(page).getByRole('radio', { name: 'English' }).check()
         await expect(subtitleGroup(page).getByRole('radio', { name: 'English' })).toBeChecked()
-        await expect.poll(() => lastReplyOf({ page, type: 'subtitle' })).toMatchObject({ ok: true })
+        await expect
+          .poll(() => lastReplyOf({ page, type: PLAYER_COMMANDS.subtitle }))
+          .toMatchObject({ ok: true })
 
         const { requests } = await trafficOf({ page })
         expect(
-          requests.map(({ command }) => command).filter((command) => command.type === 'audio'),
+          requests
+            .map(({ command }) => command)
+            .filter((command) => command.type === PLAYER_COMMANDS.audio),
         ).toEqual([{ type: 'audio', index: 1 }])
         await expectClockAdvancing(page)
       },
@@ -272,11 +279,13 @@ test.describe.serial('playing a local file through mpv', () => {
         await tapPlayerPort({ page })
         await openFile({ app, path: tracks.path })
         await expect(heading({ page, name: 'Tracks 01' })).toBeVisible()
-        await expect.poll(() => lastReplyOf({ page, type: 'load' })).toMatchObject({ ok: true })
+        await expect
+          .poll(() => lastReplyOf({ page, type: PLAYER_COMMANDS.load }))
+          .toMatchObject({ ok: true })
         // The stored pick goes to mpv with the load itself, not as a later switch.
         const { requests } = await trafficOf({ page })
         expect(
-          requests.find(({ command }) => command.type === 'load')?.command ?? null,
+          requests.find(({ command }) => command.type === PLAYER_COMMANDS.load)?.command ?? null,
         ).toMatchObject({
           type: 'load',
           audio: 1,
@@ -302,7 +311,9 @@ test.describe.serial('playing a local file through mpv', () => {
         await expect(page.getByText('Video info')).toHaveCount(0)
 
         await page.keyboard.press('i')
-        await expect.poll(() => lastReplyOf({ page, type: 'stats' })).toMatchObject({ ok: true })
+        await expect
+          .poll(() => lastReplyOf({ page, type: PLAYER_COMMANDS.stats }))
+          .toMatchObject({ ok: true })
         await expect(page.getByRole('status').filter({ hasText: /\S/ })).toHaveCount(0)
         await expectNative(page)
         await expectClockAdvancing(page)
@@ -319,10 +330,12 @@ test.describe.serial('playing a local file through mpv', () => {
         await page.keyboard.press('Escape')
         await expect(homeHeading(page)).toBeVisible()
         await expect(page.locator('html')).not.toHaveAttribute('data-surface', 'native')
-        await expect.poll(() => lastReplyOf({ page, type: 'stop' })).toMatchObject({ ok: true })
+        await expect
+          .poll(() => lastReplyOf({ page, type: PLAYER_COMMANDS.stop }))
+          .toMatchObject({ ok: true })
         expect(await backgroundOf(app)).toBe(NIGHT)
 
-        const stops = (await repliesTo({ page, type: 'stop' })).length
+        const stops = (await repliesTo({ page, type: PLAYER_COMMANDS.stop })).length
         await playNatively({ app, page, path: clips.second, title: 'Clip 02 Été' })
         await wake(page)
         await page.getByRole('button', { name: 'Back', exact: true }).click()
@@ -330,7 +343,7 @@ test.describe.serial('playing a local file through mpv', () => {
         await expect(page.locator('html')).not.toHaveAttribute('data-surface', 'native')
         await expect
           .poll(async () => {
-            const added = (await repliesTo({ page, type: 'stop' })).slice(stops)
+            const added = (await repliesTo({ page, type: PLAYER_COMMANDS.stop })).slice(stops)
             return added.length > 0 && added.every((reply) => reply?.ok ?? false)
           })
           .toBe(true)
@@ -356,9 +369,11 @@ test.describe.serial('playing a local file through mpv', () => {
         await expect(page.locator('html')).not.toHaveAttribute('data-surface', 'native')
 
         await playNatively({ app, page, path: clips.second, title: 'Clip 02 Été' })
-        await expect.poll(() => lastReplyOf({ page, type: 'load' })).toMatchObject({ ok: true })
+        await expect
+          .poll(() => lastReplyOf({ page, type: PLAYER_COMMANDS.load }))
+          .toMatchObject({ ok: true })
         expect(
-          (await trafficOf({ page })).events.filter((event) => event.type === 'error'),
+          (await trafficOf({ page })).events.filter((event) => event.type === PLAYER_EVENTS.error),
         ).toEqual([])
       },
     })

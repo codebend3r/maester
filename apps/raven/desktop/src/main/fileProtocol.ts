@@ -1,12 +1,20 @@
+import { HTTP_METHODS } from '@/shared/protocol'
 import { extensionOf } from '@raven/core'
+import { ALLOWED_METHODS } from '@/main/appProtocol'
 import type { Grants } from '@/main/grants'
 
-export type ByteRange =
-  | { kind: 'all' }
-  | { kind: 'range'; start: number; end: number }
-  | { kind: 'unsatisfiable' }
+const BYTE_RANGE_KINDS = {
+  all: 'all',
+  range: 'range',
+  unsatisfiable: 'unsatisfiable',
+} as const
 
-const ALL: ByteRange = { kind: 'all' }
+export type ByteRange =
+  | { kind: typeof BYTE_RANGE_KINDS.all }
+  | { kind: typeof BYTE_RANGE_KINDS.range; start: number; end: number }
+  | { kind: typeof BYTE_RANGE_KINDS.unsatisfiable }
+
+const ALL: ByteRange = { kind: BYTE_RANGE_KINDS.all }
 const SINGLE_RANGE = /^bytes=(\d*)-(\d*)$/
 
 /** One byte range and nothing else: anything malformed or multi-range is served whole. */
@@ -25,15 +33,15 @@ export const parseRange = ({
   if (first === '') {
     if (last === '') return ALL
     const length = Number(last)
-    if (length === 0 || size === 0) return { kind: 'unsatisfiable' }
-    return { kind: 'range', start: Math.max(0, size - length), end: size - 1 }
+    if (length === 0 || size === 0) return { kind: BYTE_RANGE_KINDS.unsatisfiable }
+    return { kind: BYTE_RANGE_KINDS.range, start: Math.max(0, size - length), end: size - 1 }
   }
 
   const start = Number(first)
   if (last !== '' && Number(last) < start) return ALL
-  if (start >= size) return { kind: 'unsatisfiable' }
+  if (start >= size) return { kind: BYTE_RANGE_KINDS.unsatisfiable }
   const end = last === '' ? size - 1 : Math.min(Number(last), size - 1)
-  return { kind: 'range', start, end }
+  return { kind: BYTE_RANGE_KINDS.range, start, end }
 }
 
 const CONTENT_TYPES = new Map(
@@ -83,8 +91,8 @@ export const createFileHandler = ({
   readRange: (input: { path: string; start: number; end: number }) => ReadableStream<Uint8Array>
 }): ((request: Request) => Promise<Response>) => {
   return async (request) => {
-    if (request.method !== 'GET' && request.method !== 'HEAD') {
-      return answer({ status: 405, headers: { Allow: 'GET, HEAD' } })
+    if (request.method !== HTTP_METHODS.get && request.method !== HTTP_METHODS.head) {
+      return answer({ status: 405, headers: { Allow: ALLOWED_METHODS } })
     }
     const host = hostOf(request.url)
     const file = host === null ? null : grants.fileOf(host)
@@ -94,7 +102,7 @@ export const createFileHandler = ({
     if (stats === null) return answer({ status: 404 })
 
     const { size } = stats
-    const isHead = request.method === 'HEAD'
+    const isHead = request.method === HTTP_METHODS.head
     const common = {
       'Accept-Ranges': 'bytes',
       'Content-Type': contentTypeFor(file.name),
@@ -106,20 +114,23 @@ export const createFileHandler = ({
     }
 
     const range = parseRange({ header: request.headers.get('Range'), size })
-    if (range.kind === 'unsatisfiable') {
+    if (range.kind === BYTE_RANGE_KINDS.unsatisfiable) {
       return answer({
         status: 416,
         headers: { ...common, 'Content-Length': '0', 'Content-Range': `bytes */${size}` },
       })
     }
 
-    const { start, end } = range.kind === 'range' ? range : { start: 0, end: size - 1 }
+    const { start, end } =
+      range.kind === BYTE_RANGE_KINDS.range ? range : { start: 0, end: size - 1 }
     const headers = {
       ...common,
       'Content-Length': `${end - start + 1}`,
-      ...(range.kind === 'range' && { 'Content-Range': `bytes ${start}-${end}/${size}` }),
+      ...(range.kind === BYTE_RANGE_KINDS.range && {
+        'Content-Range': `bytes ${start}-${end}/${size}`,
+      }),
     }
-    const status = range.kind === 'range' ? 206 : 200
+    const status = range.kind === BYTE_RANGE_KINDS.range ? 206 : 200
     if (isHead) return answer({ status, headers })
     try {
       return answer({ status, headers, body: readRange({ path: file.path, start, end }) })

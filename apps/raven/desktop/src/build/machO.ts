@@ -20,7 +20,12 @@ export const isMachO = (header: Uint8Array): boolean => {
   return MACH_O_MAGICS.some((known) => known === magic)
 }
 
-export type Signable = { path: string; kind: 'machO' | 'bundle' }
+export const SIGNABLE_KINDS = { machO: 'machO', bundle: 'bundle' } as const
+
+export type Signable = {
+  path: string
+  kind: (typeof SIGNABLE_KINDS)[keyof typeof SIGNABLE_KINDS]
+}
 
 const BUNDLE_SUFFIXES = ['.app', '.framework'] as const
 
@@ -70,10 +75,10 @@ const signableOf = async ({
   const path = pathOf(entry)
   if (entry.isDirectory()) {
     const isBundle = BUNDLE_SUFFIXES.some((suffix) => entry.name.endsWith(suffix))
-    return isBundle && path !== app ? { path, kind: 'bundle' } : null
+    return isBundle && path !== app ? { path, kind: SIGNABLE_KINDS.bundle } : null
   }
   if (!entry.isFile()) return null
-  return isMachO(await readHeader({ path })) ? { path, kind: 'machO' } : null
+  return isMachO(await readHeader({ path })) ? { path, kind: SIGNABLE_KINDS.machO } : null
 }
 
 /** Every regular Mach-O file and every nested `.app` or `.framework` inside the app; symlinks are skipped. */

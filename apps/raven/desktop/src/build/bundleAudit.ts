@@ -19,6 +19,16 @@ const EXECUTABLE_DIR = join('Contents', 'MacOS')
 const COMPATIBILITY = / \(compatibility version [^)]*\)$/
 const RPATH_PATH = /^\s*path (.+) \(offset \d+\)$/m
 const MAIN_COMMAND = /^\s*cmd LC_MAIN$/m
+const PARENT_DIR = '..'
+
+/** What the audit reads of each Mach-O file: the tool and the flag that asks for it. */
+export const MACH_O_READS = {
+  links: { command: 'otool', flag: '-L' },
+  loadCommands: { command: 'otool', flag: '-l' },
+  archs: { command: 'lipo', flag: '-archs' },
+} as const
+
+type MachORead = (typeof MACH_O_READS)[keyof typeof MACH_O_READS]
 
 /** The paths after the header line, without "(compatibility ...)". */
 export const parseLinks = (otoolL: string): string[] =>
@@ -71,7 +81,7 @@ const resolveRelative = ({ path, file }: { path: string; file: AuditedFile }): s
 }
 
 const isOutsideApp = (relative: string): boolean =>
-  relative === '..' || relative.startsWith(`..${sep}`) || isAbsolute(relative)
+  relative === PARENT_DIR || relative.startsWith(`${PARENT_DIR}${sep}`) || isAbsolute(relative)
 
 const climbsOut = ({ path, file }: { path: string; file: AuditedFile }): boolean => {
   const resolved = resolveRelative({ path, file })
@@ -176,19 +186,19 @@ type ToolAnswer = { ok: true; output: string } | { ok: false; problem: string }
 
 const ask = async ({
   run,
-  command,
-  args,
+  read: { command, flag },
+  path,
   relative,
 }: {
   run: ToolRun
-  command: string
-  args: string[]
+  read: MachORead
+  path: string
   relative: string
 }): Promise<ToolAnswer> => {
   try {
-    return { ok: true, output: await run({ command, args }) }
+    return { ok: true, output: await run({ command, args: [flag, path] }) }
   } catch (error) {
-    const tool = `${command} ${args[0] ?? ''}`
+    const tool = `${command} ${flag}`
     return { ok: false, problem: `${relative} could not be read by ${tool}: ${failureText(error)}` }
   }
 }
@@ -228,9 +238,9 @@ export const auditMachO = async ({
   run: ToolRun
 }): Promise<{ file: AuditedFile | null; problems: string[] }> => {
   const [links, load, archs, signature] = await Promise.all([
-    ask({ run, command: 'otool', args: ['-L', otoolPath], relative }),
-    ask({ run, command: 'otool', args: ['-l', otoolPath], relative }),
-    ask({ run, command: 'lipo', args: ['-archs', path], relative }),
+    ask({ run, read: MACH_O_READS.links, path: otoolPath, relative }),
+    ask({ run, read: MACH_O_READS.loadCommands, path: otoolPath, relative }),
+    ask({ run, read: MACH_O_READS.archs, path, relative }),
     signatureProblems({ run, args: ['--verify', '--strict', path], name: relative }),
   ])
   if (!links.ok || !load.ok || !archs.ok) {

@@ -5,6 +5,7 @@ import {
   type AuditedFile,
   bundleProblems,
   fileProblems,
+  MACH_O_READS,
   MPV_IN_APP,
   parseArchs,
   parseIsExecutable,
@@ -294,9 +295,9 @@ describe('auditMachO', () => {
     async ({ command, args }) => {
       const key = `${command} ${args[0] ?? ''}`
       if (key in failures) throw failures[key]
-      if (key === 'otool -L') return OTOOL_L
-      if (key === 'otool -l') return OTOOL_LOAD
-      if (key === 'lipo -archs') return 'arm64\n'
+      if (key === keyOf(MACH_O_READS.links)) return OTOOL_L
+      if (key === keyOf(MACH_O_READS.loadCommands)) return OTOOL_LOAD
+      if (key === keyOf(MACH_O_READS.archs)) return 'arm64\n'
       return ''
     }
 
@@ -320,8 +321,8 @@ describe('auditMachO', () => {
 
   it('names the file and the tool when otool or lipo fails, and audits nothing more of it', async () => {
     const run = answers({
-      'otool -L': stderrError('otool: truncated or malformed object'),
-      'lipo -archs': new Error('spawn lipo ENOENT'),
+      [keyOf(MACH_O_READS.links)]: stderrError('otool: truncated or malformed object'),
+      [keyOf(MACH_O_READS.archs)]: new Error('spawn lipo ENOENT'),
     })
     expect(await auditMachO({ relative: RELATIVE, path: PATH, otoolPath: PATH, run })).toEqual({
       file: null,

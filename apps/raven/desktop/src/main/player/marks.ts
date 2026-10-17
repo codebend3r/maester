@@ -1,4 +1,5 @@
 import type { monitorEventLoopDelay } from 'node:perf_hooks'
+import { PLAYER_COMMANDS } from '@raven/core'
 import type { PlayerService } from '@/main/player/playerService'
 import type { Timers } from '@/main/stateStore'
 
@@ -10,6 +11,8 @@ type Histogram = Pick<
 >
 
 const NS_PER_MS = 1e6
+
+const COLD_OPEN_STAGES = { none: 'none', waiting: 'waiting', done: 'done' } as const
 
 /**
  * The budget marks (P5 Ruling 14, P7 Ruling 13): the first frame after each load, the cold
@@ -31,9 +34,10 @@ export const createMarks = ({
   let loadedAt: number | null = null
   // The cold open is measured once a run: `waiting` from the first early `opened` until
   // its first frame, `done` after, so neither a later open nor a later frame measures again.
-  let coldOpen: { stage: 'none' } | { stage: 'waiting'; at: number } | { stage: 'done' } = {
-    stage: 'none',
-  }
+  let coldOpen:
+    | { stage: typeof COLD_OPEN_STAGES.none }
+    | { stage: typeof COLD_OPEN_STAGES.waiting; at: number }
+    | { stage: typeof COLD_OPEN_STAGES.done } = { stage: COLD_OPEN_STAGES.none }
   let histogram: Histogram | null = null
   let timer: unknown = null
 
@@ -65,23 +69,23 @@ export const createMarks = ({
     tracking: (service: PlayerService): PlayerService => ({
       ...service,
       handle: (command) => {
-        if (command.type === 'load') loadedAt = now()
+        if (command.type === PLAYER_COMMANDS.load) loadedAt = now()
         return service.handle(command)
       },
     }),
     /** A file opened before the window was ready, the cold "Open With" the budget times. */
     opened: () => {
-      if (coldOpen.stage !== 'none') return
-      coldOpen = { stage: 'waiting', at: now() }
+      if (coldOpen.stage !== COLD_OPEN_STAGES.none) return
+      coldOpen = { stage: COLD_OPEN_STAGES.waiting, at: now() }
     },
     firstFrame: () => {
       if (!isEnabled || loadedAt === null) return
       const at = now()
       write(`raven-first-frame-ms ${Math.round(at - loadedAt)}\n`)
       loadedAt = null
-      if (coldOpen.stage !== 'waiting') return
+      if (coldOpen.stage !== COLD_OPEN_STAGES.waiting) return
       write(`raven-open-to-frame-ms ${Math.round(at - coldOpen.at)}\n`)
-      coldOpen = { stage: 'done' }
+      coldOpen = { stage: COLD_OPEN_STAGES.done }
     },
     playing: (isPlaying: boolean) => {
       if (!isEnabled) return

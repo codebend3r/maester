@@ -91,7 +91,9 @@ export type MpvEvent =
 
 export const MPV_SURFACE_KINDS = { headless: 'headless', window: 'window' } as const
 
-export type MpvSurface = { kind: 'headless' } | { kind: 'window'; handle: Buffer }
+export type MpvSurface =
+  | { kind: typeof MPV_SURFACE_KINDS.headless }
+  | { kind: typeof MPV_SURFACE_KINDS.window; handle: Buffer }
 
 type NativeHandle = {
   command: (id: number, args: string[]) => void

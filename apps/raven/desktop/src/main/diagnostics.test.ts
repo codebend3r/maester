@@ -6,6 +6,7 @@ import {
   readEngineDiagnostics,
   unavailableReason,
 } from '@/main/diagnostics'
+import { MPV_PROPERTIES } from '@raven/mpv'
 import { ENGINE_MESSAGES } from '@/main/player/engine'
 
 const NATIVE = {
@@ -118,7 +119,7 @@ describe('readEngineDiagnostics', () => {
         mpv: {
           version: 'mpv v0.41.0',
           read: async ({ name }) => {
-            if (name === 'hwdec-current') throw new Error('property unavailable')
+            if (name === MPV_PROPERTIES.hwdecCurrent) throw new Error('property unavailable')
             return '8.1.2'
           },
           display: () => {
@@ -146,7 +147,9 @@ describe('readEngineDiagnostics with a hung engine', () => {
       mpv: {
         version: 'mpv v0.41.0',
         read: ({ name }) =>
-          name === 'ffmpeg-version' ? Promise.resolve('8.1.2') : new Promise<string>(() => {}),
+          name === MPV_PROPERTIES.ffmpegVersion
+            ? Promise.resolve('8.1.2')
+            : new Promise<string>(() => {}),
         display: () => ({ refreshRate: 60, edrHeadroom: 1 }),
       },
       readMs: 20,

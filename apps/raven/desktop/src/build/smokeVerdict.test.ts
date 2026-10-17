@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { logLinesSince, smokeGaps, withoutTestHooks } from '@/build/smokeVerdict'
+import { logLinesSince, SMOKE_STAGES, smokeGaps, withoutTestHooks } from '@/build/smokeVerdict'
 
 const LAUNCH =
   '2026-10-16T12:00:00.000Z info launch raven player 0.5.4 (packaged), Electron 44.7.0, macOS 27.0.0'
@@ -10,24 +10,24 @@ const STARTED = [LAUNCH, ENGINE, LAUNCH_MARK]
 
 describe('smokeGaps', () => {
   it('passes the started stage on the launch, engine and launch mark lines', () => {
-    expect(smokeGaps({ lines: STARTED, stage: 'started', version: '0.5.4' })).toEqual([])
+    expect(smokeGaps({ lines: STARTED, stage: SMOKE_STAGES.started, version: '0.5.4' })).toEqual([])
   })
 
   it('still wants the quit mark for the quit stage', () => {
-    expect(smokeGaps({ lines: STARTED, stage: 'quit', version: '0.5.4' })).toEqual([
+    expect(smokeGaps({ lines: STARTED, stage: SMOKE_STAGES.quit, version: '0.5.4' })).toEqual([
       'raven-quit-ms ',
     ])
   })
 
   it('wants the packaged launch line', () => {
     const lines = [LAUNCH.replace('(packaged)', '(unpackaged)'), ENGINE, LAUNCH_MARK]
-    expect(smokeGaps({ lines, stage: 'started', version: '0.5.4' })).toEqual([
+    expect(smokeGaps({ lines, stage: SMOKE_STAGES.started, version: '0.5.4' })).toEqual([
       'launch raven player 0.5.4 (packaged)',
     ])
   })
 
   it('wants the version package.json names', () => {
-    expect(smokeGaps({ lines: STARTED, stage: 'started', version: '0.5.5' })).toEqual([
+    expect(smokeGaps({ lines: STARTED, stage: SMOKE_STAGES.started, version: '0.5.5' })).toEqual([
       'launch raven player 0.5.5 (packaged)',
     ])
   })
@@ -36,18 +36,22 @@ describe('smokeGaps', () => {
     const failure =
       '2026-10-16T12:00:00.400Z warn raven player could not open its video engine: no addon'
     expect(
-      smokeGaps({ lines: [LAUNCH, failure, LAUNCH_MARK], stage: 'started', version: '0.5.4' }),
+      smokeGaps({
+        lines: [LAUNCH, failure, LAUNCH_MARK],
+        stage: SMOKE_STAGES.started,
+        version: '0.5.4',
+      }),
     ).toEqual([`the video engine did not open: ${failure}`])
   })
 
   it('passes the quit stage on all four lines', () => {
-    expect(smokeGaps({ lines: [...STARTED, QUIT_MARK], stage: 'quit', version: '0.5.4' })).toEqual(
-      [],
-    )
+    expect(
+      smokeGaps({ lines: [...STARTED, QUIT_MARK], stage: SMOKE_STAGES.quit, version: '0.5.4' }),
+    ).toEqual([])
   })
 
   it('names every needle of an empty log, in order', () => {
-    expect(smokeGaps({ lines: [], stage: 'quit', version: '0.5.4' })).toEqual([
+    expect(smokeGaps({ lines: [], stage: SMOKE_STAGES.quit, version: '0.5.4' })).toEqual([
       'launch raven player 0.5.4 (packaged)',
       'video engine ready: mpv v',
       'raven-launch-ms ',
