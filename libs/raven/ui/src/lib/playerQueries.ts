@@ -2,6 +2,11 @@ import { queryOptions } from '@tanstack/react-query'
 import { type ApiClient, MEDIA_TICKET_REFRESH_SECONDS, MEDIA_TICKET_SECONDS } from '@raven/core'
 import { playerQueryKeys as queryKeys } from '@/lib/playerQueryKeys'
 
+const TICKET_REFRESH_MS = (MEDIA_TICKET_SECONDS - MEDIA_TICKET_REFRESH_SECONDS) * 1000
+
+/** Keeps a ticket that is already due from being refetched in a tight loop. */
+const MIN_REFRESH_WAIT_MS = 1000
+
 export const playerQueriesFor = (api: ApiClient) => ({
   tracks: (id: number) =>
     queryOptions({
@@ -19,8 +24,9 @@ export const playerQueriesFor = (api: ApiClient) => ({
       retry: false,
     }),
   /**
-   * Refetched on a timer counted from receipt, not from `expiresAt`, so a skewed
-   * browser clock cannot leave the player holding an expired ticket.
+   * Refetched a fixed time after the ticket arrived, not after `expiresAt` (a skewed
+   * browser clock cannot leave the player holding an expired ticket), and not after
+   * the last mount (a cached ticket keeps its age across a remount).
    */
   mediaTicket: (id: number) =>
     queryOptions({
@@ -28,7 +34,13 @@ export const playerQueriesFor = (api: ApiClient) => ({
       queryFn: () => api.getMediaTicket(id),
       staleTime: Infinity,
       retry: false,
-      refetchInterval: (MEDIA_TICKET_SECONDS - MEDIA_TICKET_REFRESH_SECONDS) * 1000,
+      refetchInterval: (query) =>
+        query.state.dataUpdatedAt === 0
+          ? TICKET_REFRESH_MS
+          : Math.max(
+              MIN_REFRESH_WAIT_MS,
+              query.state.dataUpdatedAt + TICKET_REFRESH_MS - Date.now(),
+            ),
       refetchIntervalInBackground: true,
     }),
   subtitles: (input: { id: number; trackId: string; window: number }) =>

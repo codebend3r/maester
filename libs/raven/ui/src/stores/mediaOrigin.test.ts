@@ -54,7 +54,7 @@ describe('useMediaOrigin', () => {
     expect(useMediaOrigin.getState().pick).toBeNull()
   })
 
-  it('still works when sessionStorage throws', () => {
+  it('keeps the pick in the store when sessionStorage throws', () => {
     withThrowingSessionStorage(() => {
       useMediaOrigin.getState().setPick({ origin, at: 7 })
       expect(useMediaOrigin.getState().pick).toEqual({ origin, at: 7 })

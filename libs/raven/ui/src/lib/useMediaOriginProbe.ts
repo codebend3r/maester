@@ -28,10 +28,15 @@ export const useMediaOriginProbe = ({
     setup.current = { api, fetch, now }
   }, [api, fetch, now])
   const hiddenAt = useRef<number | null>(null)
+  const isForcedPending = useRef(false)
 
-  const run = useCallback(async ({ isForced }: { isForced: boolean }) => {
+  const run = useCallback(async function runProbe({ isForced }: { isForced: boolean }) {
     const { isProbing, setPick, setProbing } = useMediaOrigin.getState()
-    if (isProbing) return
+    if (isProbing) {
+      // Unreachable or back online while a probe runs: what it measures may predate that, so go again after it.
+      if (isForced) isForcedPending.current = true
+      return
+    }
     setProbing(true)
     try {
       const current = setup.current
@@ -40,8 +45,9 @@ export const useMediaOriginProbe = ({
       const { pick } = useMediaOrigin.getState()
       const isKept =
         !isForced &&
+        pick !== null &&
         isFreshPick({ pick, now: Date.now() }) &&
-        origins.some(({ url }) => url === pick?.origin.url)
+        origins.some(({ url }) => url === pick.origin.url)
       if (isKept) return
       const winner = pickOrigin(await probeOrigins({ origins, ...current }))
       setPick(winner ? { origin: winner, at: Date.now() } : null)
@@ -49,6 +55,10 @@ export const useMediaOriginProbe = ({
       // The pick stays as it was; the next event tries again.
     } finally {
       setProbing(false)
+      if (isForcedPending.current) {
+        isForcedPending.current = false
+        void runProbe({ isForced: true })
+      }
     }
   }, [])
 
@@ -61,6 +71,7 @@ export const useMediaOriginProbe = ({
   }, [run])
 
   useEffect(() => {
+    hiddenAt.current = document.visibilityState === 'hidden' ? Date.now() : null
     const onVisibility = () => {
       if (document.visibilityState === 'hidden') {
         hiddenAt.current = Date.now()

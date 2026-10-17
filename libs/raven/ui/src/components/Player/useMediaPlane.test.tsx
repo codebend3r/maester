@@ -93,6 +93,34 @@ describe('useMediaPlane', () => {
     expect(result.current.access?.ticket).toBe('t2')
   })
 
+  it("counts the refresh from the ticket's arrival across a remount, not from the remount", async () => {
+    jest.useFakeTimers()
+    let issued = 0
+    const getMediaTicket = mock(async () => ({ ticket: `t${++issued}`, expiresAt: 1 }))
+    const client = new QueryClient()
+    const mount = () =>
+      renderHook(
+        () => useMediaPlane({ api: apiWithTickets(getMediaTicket), mediaId: 1, reprobe: () => {} }),
+        { wrapper: harness({ client }) },
+      )
+    const hour = 3_600_000
+    const first = mount()
+    pickOrigin(lan)
+    await advance(0)
+    expect(getMediaTicket).toHaveBeenCalledTimes(1)
+    await advance(3 * hour)
+    first.unmount()
+    await advance(2 * 60_000)
+    mount()
+    await advance(0)
+    expect(getMediaTicket).toHaveBeenCalledTimes(1)
+    // 5 h 50 min after the first receipt is 2 h 48 min after the remount.
+    await advance(REFRESH_MS - 3 * hour - 2 * 60_000 - 1000)
+    expect(getMediaTicket).toHaveBeenCalledTimes(1)
+    await advance(2000)
+    expect(getMediaTicket).toHaveBeenCalledTimes(2)
+  })
+
   it('refreshTicket answers whether the server gave a new ticket', async () => {
     let isRefusing = false
     const getMediaTicket = mock(async () => {
@@ -125,7 +153,7 @@ describe('mediaTicket query', () => {
     const options = playerQueriesFor(api).mediaTicket(1)
     expect(options.staleTime).toBe(Infinity)
     expect(options.retry).toBe(false)
-    expect(options.refetchInterval).toBe(REFRESH_MS)
+    expect(typeof options.refetchInterval).toBe('function')
     expect(options.refetchIntervalInBackground).toBe(true)
   })
 })

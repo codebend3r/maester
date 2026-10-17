@@ -103,6 +103,18 @@ describe('probeOrigin', () => {
     expect(signals[0]?.aborted).toBe(true)
   })
 
+  it('cancels the body of a fetch that ignores its signal once time is up', async () => {
+    const { now } = clock()
+    const cancel = mock(() => {})
+    const fetch: ProbeFetch = async () => ({
+      ok: true,
+      body: new ReadableStream<Uint8Array>({ pull: () => new Promise(() => {}), cancel }),
+    })
+    expect(await probeOrigin({ origin: lan, api, fetch, now, timeoutMs: 20 })).toBeNull()
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    expect(cancel).toHaveBeenCalledTimes(1)
+  })
+
   it('gives null on timeout when the body stalls after the headers', async () => {
     const { now } = clock()
     const fetch: ProbeFetch = async () => ({
