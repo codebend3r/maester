@@ -1,0 +1,12 @@
+# Nx Cloud reads this for every CI run that `nx-cloud start-nx-agents` starts
+# (the ✅ Checks job in .github/workflows/pull-request-checks.yml).
+# https://nx.dev/docs/reference/nx-cloud/ci-config
+dte:
+  # The agents boot from the launch template in .nx/workflows/agents.yaml.
+  distribute-on: 3 linux-medium
+lifecycle:
+  # The ✅ Checks job runs one nx command per step and `build` last, so the agents
+  # stop once its last task is done. A step after `build` would find the run
+  # closed, and Nx Cloud would fail it: add its target here or keep `build` last.
+  stop-after:
+    - build
