@@ -3,6 +3,7 @@ import { createReadStream } from 'node:fs'
 import {
   appendFile,
   mkdir,
+  open,
   readdir,
   readFile,
   realpath,
@@ -50,6 +51,8 @@ import { diagnosticsText, readEngineDiagnostics, unavailableReason } from '@/mai
 import { createDownloadService } from '@/main/downloads/downloadService'
 import { DOWNLOADS_FILE } from '@/main/downloads/downloadState'
 import { DOWNLOADS_DEBOUNCE_MS, loadDownloads } from '@/main/downloads/downloadStore'
+import type { PartFile, StreamFetch } from '@/main/downloads/fetchFile'
+import { type Access, createMediaAccess, type ProbeFetch } from '@/main/downloads/mediaAccess'
 import { createFileHandler } from '@/main/fileProtocol'
 import { createGrants, type Grants } from '@/main/grants'
 import { createHelpActions } from '@/main/help'
@@ -146,9 +149,46 @@ const NIGHT = '#15201e'
 
 const timers = createNodeTimers()
 
-// No cookie rides along, a redirect away from the releases list fails, and nothing is cached.
-const fetchReleases: UpdateFetch = ({ url, init }) =>
-  net.fetch(url, { ...init, credentials: 'omit', redirect: 'error', cache: 'no-store' })
+// No cookie rides along, a redirect fails rather than carry the request elsewhere, and
+// nothing is cached: the releases list, a media origin's probe and a ticketed download.
+const fetchBare = ({
+  url,
+  init,
+}: {
+  url: string
+  init: { headers: Record<string, string>; signal: AbortSignal }
+}) => net.fetch(url, { ...init, credentials: 'omit', redirect: 'error', cache: 'no-store' })
+
+const fetchReleases: UpdateFetch = fetchBare
+
+/**
+ * Ruling 6's probe: its time is from the call to the first chunk of the body, the rest of
+ * which is dropped. The timeout covers the read too, so a probe that stalls rejects.
+ */
+const probeOrigin: ProbeFetch = async ({ url, timeoutMs }) => {
+  const startedAt = performance.now()
+  const response = await fetchBare({
+    url,
+    init: { headers: {}, signal: AbortSignal.timeout(timeoutMs) },
+  })
+  const reader = response.body === null ? null : response.body.getReader()
+  if (reader !== null) await reader.read()
+  const firstByteMs = performance.now() - startedAt
+  if (reader !== null) await reader.cancel().catch(() => undefined)
+  return { status: response.status, firstByteMs }
+}
+
+/** A download's `.part`, opened to append; its size is read from disk each time. */
+const openPart = async (path: string): Promise<PartFile> => {
+  const handle = await open(path, 'a+')
+  return {
+    size: async () => (await handle.stat()).size,
+    append: (chunk) => handle.appendFile(chunk),
+    truncate: () => handle.truncate(0),
+    // On disk before the bytes it holds are counted, so a crash leaves a part the resume can trust.
+    close: () => handle.datasync().finally(() => handle.close()),
+  }
+}
 
 /** The traffic lights are macOS's; elsewhere there is nothing to show or hide. */
 const showWindowButtons = ({
@@ -440,6 +480,81 @@ const startApp = (): void => {
       calls: serverCalls,
       warn,
     })
+    const downloadsFile = join(userData, DOWNLOADS_FILE)
+    const downloadsStore = createJsonStore({
+      fs: stateFs,
+      file: downloadsFile,
+      initial: await loadDownloads({ fs: stateFs, file: downloadsFile, now: Date.now }),
+      timers,
+      debounceMs: DOWNLOADS_DEBOUNCE_MS,
+      onError: (error) => {
+        reportError({ text: 'raven player could not save its downloads.', error })
+        send({ type: 'notice', message: STORE_NOTICES.downloads })
+      },
+    })
+    // The cookie path rides the server's own session; an origin gets a ticket and no cookie.
+    const fetchDownload = ({
+      serverId,
+      access,
+    }: {
+      serverId: string
+      access: Access
+    }): StreamFetch => {
+      switch (access.kind) {
+        case 'cookie':
+          return ({ url, headers, signal }) =>
+            sessions.sessionOf(serverId).fetch(url, {
+              headers,
+              signal,
+              credentials: 'include',
+              redirect: 'error',
+              cache: 'no-store',
+            })
+        case 'origin':
+          return ({ url, headers, signal }) => fetchBare({ url, init: { headers, signal } })
+        default: {
+          const unreachable: never = access
+          return unreachable
+        }
+      }
+    }
+    const downloads = createDownloadService({
+      store: downloadsStore,
+      config,
+      calls: serverCalls,
+      userData,
+      space: {
+        mkdir: (path) => mkdir(path, { recursive: true }).then(() => undefined),
+        statfs: (path) => statfs(path),
+      },
+      timers,
+      now: Date.now,
+      newId: randomUUID,
+      send,
+      warn,
+      access: createMediaAccess({
+        calls: serverCalls,
+        serverOf,
+        probe: probeOrigin,
+        now: Date.now,
+        warn,
+      }),
+      fetchFor: fetchDownload,
+      fs: {
+        mkdir: (path) => mkdir(path, { recursive: true }).then(() => undefined),
+        rename: (from, to) => rename(from, to),
+        rm: (path) => rm(path, { recursive: true, force: true }),
+        readdir: (path) => readdir(path),
+        openPart,
+        writeFile: (path, text) => writeFile(path, text, 'utf8'),
+      },
+      showItemInFolder: (path) => shell.showItemInFolder(path),
+      ready: app.whenReady(),
+    })
+    // Before the quit gate's own `before-quit`, so every fetch has let go of its part before
+    // the stores flush; what was downloading stays so for the next launch.
+    app.once('before-quit', () => downloads.dispose())
+
     const trust = withTrustLog({
       trust: createServerTrust({
         config,
@@ -456,8 +571,12 @@ const startApp = (): void => {
         probe: ({ serverId, origin }) =>
           probeServer({ fetch: sessions.fetchFor(serverId), origin }),
         forget: sessions.forget,
-        // A title of the removed server stops, and the page hears it from the player.
+        // A title of the removed server stops, and the page hears it from the player. Its
+        // downloads go with it (Ruling 17).
         onRemoved: (serverId) => {
+          downloads.removeServer({ serverId }).catch((error: unknown) => {
+            warn(`raven player could not remove a removed server's downloads: ${errorText(error)}`)
+          })
           const engine = currentEngine()
           if (engine === null) return
           engine.service.resetIfServer(serverId).catch((error: unknown) => {
@@ -469,34 +588,6 @@ const startApp = (): void => {
         timers,
         warn,
       }),
-      warn,
-    })
-
-    const downloadsFile = join(userData, DOWNLOADS_FILE)
-    const downloadsStore = createJsonStore({
-      fs: stateFs,
-      file: downloadsFile,
-      initial: await loadDownloads({ fs: stateFs, file: downloadsFile, now: Date.now }),
-      timers,
-      debounceMs: DOWNLOADS_DEBOUNCE_MS,
-      onError: (error) => {
-        reportError({ text: 'raven player could not save its downloads.', error })
-        send({ type: 'notice', message: STORE_NOTICES.downloads })
-      },
-    })
-    const downloads = createDownloadService({
-      store: downloadsStore,
-      config,
-      calls: serverCalls,
-      userData,
-      space: {
-        mkdir: (path) => mkdir(path, { recursive: true }).then(() => undefined),
-        statfs: (path) => statfs(path),
-      },
-      timers,
-      now: Date.now,
-      newId: randomUUID,
-      send,
       warn,
     })
 

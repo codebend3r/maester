@@ -29,6 +29,8 @@ export const DOWNLOAD_MESSAGES = {
       : `Downloading ${files} ${FILE_NOUNS[kind]} from ${serverName}`,
   noSpace: 'Not enough space',
   changed: 'The file changed on the server',
+  answered: ({ serverName, status }: { serverName: string; status: number }): string =>
+    `${serverName} answered ${status}`,
   relocked: (name: string): string => `${name} locked this library again`,
   downloaded: (label: string): string => `Downloaded ${label}`,
   failed: ({ label, why }: { label: string; why: string }): string =>

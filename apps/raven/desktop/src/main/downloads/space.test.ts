@@ -6,8 +6,10 @@ import {
   fits,
   partPathFor,
   readSpace,
+  serverDirFor,
   sidecarPathFor,
   SPACE_RESERVE_BYTES,
+  subtitlesDirFor,
   videoPathFor,
   type SpaceFs,
 } from '@/main/downloads/space'
@@ -53,7 +55,11 @@ describe('path builders', () => {
   it('lays the downloads folder out under userData', () => {
     expect(DOWNLOADS_DIR).toBe('downloads')
     expect(downloadsDirFor({ userData: USER_DATA })).toBe('/data/downloads')
+    expect(serverDirFor({ userData: USER_DATA, serverId: SERVER_ID })).toBe(
+      `/data/downloads/${SERVER_ID}`,
+    )
     expect(entryDirFor(part)).toBe(`/data/downloads/${SERVER_ID}/42`)
+    expect(subtitlesDirFor(part)).toBe(`/data/downloads/${SERVER_ID}/42/subtitles`)
     expect(videoPathFor({ ...part, container: 'mkv' })).toBe(
       `/data/downloads/${SERVER_ID}/42/video.mkv`,
     )
@@ -78,6 +84,7 @@ describe('path builders', () => {
 
   it('refuses a server id that is not an opaque id', () => {
     const bad = { ...part, serverId: '../etc' }
+    expect(() => serverDirFor({ userData: USER_DATA, serverId: '..' })).toThrow(RangeError)
     expect(() => entryDirFor(bad)).toThrow(RangeError)
     expect(() => videoPathFor({ ...bad, container: 'mkv' })).toThrow(RangeError)
     expect(() => partPathFor({ ...bad, container: 'mkv' })).toThrow(RangeError)

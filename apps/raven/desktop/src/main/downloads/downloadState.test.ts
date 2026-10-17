@@ -18,11 +18,13 @@ import {
   pauseServer,
   queue,
   remove,
+  removeAll,
   removeServer,
   resume,
   sameGroup,
   setAutoDelete,
   setAutoDeleteDefault,
+  setSidecars,
   sortDownloads,
   start,
   type DownloadEntry,
@@ -272,6 +274,31 @@ describe('remove and removeServer', () => {
   it('removeServer for a server with none returns the same state', () => {
     expect(removeServer(state, { serverId: id(9) })).toBe(state)
   })
+
+  it('removeAll drops every entry and keeps the default', () => {
+    const next = removeAll({ ...state, autoDeleteDefault: true })
+    expect(next.entries).toEqual([])
+    expect(next.autoDeleteDefault).toBe(true)
+  })
+
+  it('removeAll of nothing returns the same state', () => {
+    expect(removeAll(EMPTY_DOWNLOADS)).toBe(EMPTY_DOWNLOADS)
+  })
+})
+
+describe('setSidecars', () => {
+  const sidecars = [{ trackId: 'external-0', title: 'English', language: 'en' }]
+
+  it('sets the subtitles kept beside the video', () => {
+    expect(
+      setSidecars(stateOf(entry()), { downloadId: ID, sidecars }).entries[0]?.sidecars,
+    ).toEqual(sidecars)
+  })
+
+  it('returns the same state for no subtitles where there were none', () => {
+    const state = stateOf(entry())
+    expect(setSidecars(state, { downloadId: ID, sidecars: [] })).toBe(state)
+  })
 })
 
 describe('auto-delete', () => {
@@ -492,6 +519,7 @@ describe('an unknown download id', () => {
     ['fail', () => fail(state, { downloadId: unknown, message: 'x' })],
     ['finish', () => finish(state, { downloadId: unknown })],
     ['remove', () => remove(state, { downloadId: unknown })],
+    ['setSidecars', () => setSidecars(state, { downloadId: unknown, sidecars: [] })],
     ['setAutoDelete', () => setAutoDelete(state, { downloadId: unknown, autoDelete: true })],
     [
       'noteWatched',
