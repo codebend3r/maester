@@ -1330,6 +1330,7 @@ export type MetadataServiceState = Infer<typeof isMetadataServiceState>
 export const isMetadataHealth = object({
   tmdb: isMetadataServiceState,
   omdb: isMetadataServiceState,
+  mdblist: isMetadataServiceState,
   /** Files waiting to be matched. */
   pending: isNumber,
   /** Why TMDB is failing, never the token itself. */

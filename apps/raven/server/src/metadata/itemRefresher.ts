@@ -15,6 +15,7 @@ import { MetadataRepository, type StoredItem } from '@/metadata/metadataReposito
 import { MetadataService } from '@/metadata/metadataService'
 import { PASS_CONCURRENCY, PassGuard } from '@/metadata/passGuard'
 import { Scores } from '@/metadata/scores'
+import { ScoreSweep } from '@/metadata/scoreSweep'
 import { TmdbClient } from '@/metadata/tmdbClient'
 import { mapWithConcurrency } from '@/scanner/concurrency'
 
@@ -37,6 +38,7 @@ export class ItemRefresher implements OnApplicationBootstrap, OnModuleDestroy {
     @Inject(MatchFiles) private readonly files: MatchFiles,
     @Inject(TmdbClient) private readonly tmdb: TmdbClient,
     @Inject(Scores) private readonly scores: Scores,
+    @Inject(ScoreSweep) private readonly scoreSweep: ScoreSweep,
     @Inject(ItemPictures) private readonly pictures: ItemPictures,
   ) {}
 
@@ -138,6 +140,7 @@ export class ItemRefresher implements OnApplicationBootstrap, OnModuleDestroy {
    * Refreshes movies and shows fetched more than 30 days ago, or more than 7
    * days ago when they came out in the last 90 days or the show still airs.
    * One that fails is logged and the rest go on; TMDB going away stops it.
+   * The scores due are topped up on their own queue, which this only wakes.
    */
   async sweep(): Promise<void> {
     if (!this.tmdb.enabled) return
@@ -163,7 +166,7 @@ export class ItemRefresher implements OnApplicationBootstrap, OnModuleDestroy {
     })
     guard.reportStop()
     await this.fillTitleExtras()
-    await this.scores.fillDue()
+    this.scoreSweep.kick()
     await this.pictures.clearUp()
   }
 

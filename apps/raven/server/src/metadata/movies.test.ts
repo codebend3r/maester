@@ -27,6 +27,7 @@ import { RAVEN_CACHE_POLICIES, RAVEN_CONTENT_TYPES } from '@/http'
 import { ItemRefresher } from '@/metadata/itemRefresher'
 import { MatchFiles } from '@/metadata/matchFiles'
 import { MetadataService } from '@/metadata/metadataService'
+import { ScoreSweep } from '@/metadata/scoreSweep'
 import { ScannerService } from '@/scanner/scannerService'
 import { type InjectOptions, adminCookie, eventually, injectAs, testConfig } from '@/test/app'
 import { encodeClip, encodeImage, jpegSize } from '@/test/clips'
@@ -92,6 +93,7 @@ describe('movie metadata', () => {
   const settle = async () => {
     await app().get(ScannerService).whenIdle(state.library)
     await app().get(MetadataService).whenIdle()
+    await app().get(ScoreSweep).whenIdle()
     await app().get(ThumbnailService).whenIdle()
   }
   const list = async (query = ''): Promise<MediaItem[]> =>
@@ -841,6 +843,7 @@ describe('movie metadata', () => {
     expect(isMetadataHealth(metadata) && metadata).toMatchObject({
       tmdb: 'ok',
       omdb: 'ok',
+      mdblist: 'off',
       pending: 0,
       ai: 'off',
       aiRemaining: 0,

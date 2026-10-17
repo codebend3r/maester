@@ -21,6 +21,7 @@ import { createApp } from '@/app'
 import { DatabaseService } from '@/db/database'
 import { ItemRefresher } from '@/metadata/itemRefresher'
 import { MetadataService } from '@/metadata/metadataService'
+import { ScoreSweep } from '@/metadata/scoreSweep'
 import { ScannerService } from '@/scanner/scannerService'
 import { type InjectOptions, adminCookie, injectAs, testConfig } from '@/test/app'
 import { encodeClip, encodeImage } from '@/test/clips'
@@ -698,6 +699,7 @@ describe('TV show scores from MDBList', () => {
     }).id
     await app().get(ScannerService).whenIdle(state.library)
     await app().get(MetadataService).whenIdle()
+    await app().get(ScoreSweep).whenIdle()
     await app().get(ThumbnailService).whenIdle()
   })
 

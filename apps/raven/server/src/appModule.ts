@@ -56,6 +56,7 @@ import { MetadataRepository } from '@/metadata/metadataRepository'
 import { MetadataService } from '@/metadata/metadataService'
 import { OmdbClient } from '@/metadata/omdbClient'
 import { Scores } from '@/metadata/scores'
+import { ScoreSweep } from '@/metadata/scoreSweep'
 import { METADATA_FETCH, type MetadataFetch, TmdbClient } from '@/metadata/tmdbClient'
 import { Filmographies } from '@/people/filmographies'
 import { PeopleRepository } from '@/people/peopleRepository'
@@ -166,6 +167,7 @@ export class AppModule {
         AiMatcher,
         ImageCache,
         Scores,
+        ScoreSweep,
         ItemPictures,
         MetadataService,
         ItemRefresher,

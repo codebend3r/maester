@@ -35,6 +35,7 @@ import {
 } from '@/metadata/matchFiles'
 import { createMatchers, type KindMatcher } from '@/metadata/matchers'
 import { MatchPass } from '@/metadata/matchPass'
+import { MdblistClient } from '@/metadata/mdblistClient'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 import { OmdbClient } from '@/metadata/omdbClient'
 import { PASS_CONCURRENCY } from '@/metadata/passGuard'
@@ -89,6 +90,7 @@ export class MetadataService implements OnApplicationBootstrap {
     @Inject(MetadataRepository) private readonly metadata: MetadataRepository,
     @Inject(TmdbClient) private readonly tmdb: TmdbClient,
     @Inject(OmdbClient) private readonly omdb: OmdbClient,
+    @Inject(MdblistClient) private readonly mdblist: MdblistClient,
     @Inject(Scores) private readonly scores: Scores,
     @Inject(ItemPictures) private readonly pictures: ItemPictures,
     @Inject(AiClient) private readonly ai: AiClient,
@@ -299,6 +301,7 @@ export class MetadataService implements OnApplicationBootstrap {
     return {
       tmdb: tmdb.state,
       omdb: this.omdb.state(),
+      mdblist: this.mdblist.state(),
       pending: this.files.countPending(MATCHED_KINDS),
       error: tmdb.error,
       lastOk: tmdb.lastOk,

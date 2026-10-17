@@ -46,10 +46,11 @@ export const library = (overrides: Partial<Library> = {}): Library => ({
   ...overrides,
 })
 
-/** How metadata stands: TMDB answering, OMDb and the AI lookup off, nothing pending. */
+/** How metadata stands: TMDB answering, OMDb, MDBList and the AI lookup off, nothing pending. */
 export const metadataHealth = (overrides: Partial<MetadataHealth> = {}): MetadataHealth => ({
   tmdb: 'ok',
   omdb: 'off',
+  mdblist: 'off',
   pending: 0,
   error: null,
   lastOk: null,

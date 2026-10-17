@@ -705,8 +705,10 @@ export class MetadataRepository {
    * goes. MDBList's are due when it has never answered or answered before
    * `before`: first the titles it has never answered that lack a Rotten
    * Tomatoes or Metacritic score, then the rest it has never answered, then
-   * the oldest. OMDb's are due for a title with an IMDb id when neither
-   * provider has answered since `before`, oldest first.
+   * the oldest. OMDb's are due for a title with an IMDb id when OMDb has
+   * not answered since `before`, and MDBList has not either or gave it no
+   * scores: the titles it does not know, whose fallback may have failed.
+   * Those neither has answered for the longest go first.
    */
   scoresDue({
     provider,
@@ -729,7 +731,10 @@ export class MetadataRepository {
                         ELSE 0 END,
                    mdblist_fetched_at, id`
         : `imdb_id IS NOT NULL
-            AND MAX(COALESCE(omdb_fetched_at, ''), COALESCE(mdblist_fetched_at, '')) < @before
+            AND (omdb_fetched_at IS NULL OR omdb_fetched_at < @before)
+            AND (mdblist_fetched_at IS NULL OR mdblist_fetched_at < @before
+                 OR NOT EXISTS (SELECT 1 FROM ratings r
+                                 WHERE r.item_id = items.id AND r.provider = 'mdblist'))
           ORDER BY MAX(COALESCE(omdb_fetched_at, ''), COALESCE(mdblist_fetched_at, '')), id`
     return this.db
       .prepare<

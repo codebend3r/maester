@@ -5,16 +5,15 @@ import { MetadataRepository } from '@/metadata/metadataRepository'
 import { OmdbClient } from '@/metadata/omdbClient'
 import type { ExternalScore, ScoreProvider, ScoreSource, ScoreTitle } from '@/metadata/scoreSources'
 
-const DAY_MS = 24 * 60 * 60 * 1000
-
 const NAMES = { omdb: 'OMDb', mdblist: 'MDBList' } as const satisfies Record<ScoreProvider, string>
 
 /**
  * IMDb, Rotten Tomatoes and Metacritic scores for a movie or show, while a
  * key and today's calls allow. MDBList is asked first when it can be, and
- * OMDb only for a title MDBList does not know; without MDBList, OMDb is
- * asked. Each provider's answer is kept as its own. A call that fails is
- * noted on its client and tried again another day.
+ * OMDb only for a title MDBList does not know; without MDBList, or once its
+ * calls for the day are spent, OMDb is asked. Each provider's answer is kept
+ * as its own. A call that fails is noted on its client and tried again on a
+ * later sweep.
  */
 @Injectable()
 export class Scores {
@@ -48,19 +47,20 @@ export class Scores {
     return answer != null
   }
 
-  /** Items whose scores from the primary source are missing or a month old, as far as today's calls go. */
-  async fillDue(): Promise<void> {
-    const source = this.primary()
-    if (source == null) return
-    const due = this.metadata.scoresDue({
-      provider: source.provider,
-      before: new Date(Date.now() - 30 * DAY_MS).toISOString(),
-      limit: source.remaining(),
-    })
-    await due.reduce<Promise<unknown>>(
-      (previous, item) =>
-        previous.then(() => (this.primary() === source ? this.fetch(item) : false)),
-      Promise.resolve(),
+  /** OMDb while MDBList is the primary and OMDb can be asked too: for the titles MDBList does not know. */
+  fallback(): ScoreSource | null {
+    return this.primary() === this.mdblist && this.omdb.enabled() ? this.omdb : null
+  }
+
+  /** Asks OMDb alone, for a title MDBList does not know. False when OMDb failed. */
+  async fetchFallback({ itemId, ...title }: ScoreTitle & { itemId: number }): Promise<boolean> {
+    return (await this.ask({ source: this.omdb, itemId, title })) != null
+  }
+
+  /** The sources with a key whose calls for today are spent, which midnight UTC brings back. */
+  spent(): ScoreSource[] {
+    return [this.mdblist, this.omdb].filter(
+      (source) => source.state() !== 'off' && source.remaining() === 0,
     )
   }
 

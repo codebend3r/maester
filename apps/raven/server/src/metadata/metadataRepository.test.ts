@@ -503,10 +503,10 @@ describe("each provider's scores", () => {
       ],
     })
     const noCritics = title({ type: 'show', tmdbId: '911' })
-    const older = title({ tmdbId: '912' })
-    stamp({ itemId: older, mdblist: daysAgo(40) })
-    const old = title({ tmdbId: '913' })
+    const old = title({ tmdbId: '912' })
     stamp({ itemId: old, mdblist: daysAgo(35) })
+    const older = title({ tmdbId: '913' })
+    stamp({ itemId: older, mdblist: daysAgo(40) })
     stamp({ itemId: title({ tmdbId: '914' }), mdblist: daysAgo(1) })
     title({ tmdbId: `${LOCAL}915` })
     const season = metadata().save({
@@ -525,31 +525,39 @@ describe("each provider's scores", () => {
     ).toEqual([noCritics, complete])
   })
 
-  it("puts OMDb's titles with an IMDb id that neither provider answered for lately first, oldest first", () => {
+  it("lists OMDb's titles with an IMDb id that it and MDBList have not answered lately, or MDBList does not know, longest unasked first", () => {
     database.get().db.prepare('DELETE FROM items').run()
     const stored = metadata()
-    const never = title({ tmdbId: '920', imdbId: 'tt920' })
-    const older = title({ tmdbId: '921', imdbId: 'tt921' })
-    stamp({ itemId: older, omdb: daysAgo(40) })
-    const old = title({ tmdbId: '922', imdbId: 'tt922' })
+    const scoredByMdblist = (itemId: number) =>
+      stored.saveScores({
+        itemId,
+        provider: 'mdblist',
+        scores: [score({ source: 'imdb', value: 8 })],
+      })
+    const unknown = title({ tmdbId: '920', imdbId: 'tt920' })
+    stamp({ itemId: unknown, omdb: daysAgo(40), mdblist: daysAgo(1) })
+    const old = title({ tmdbId: '921', imdbId: 'tt921' })
+    scoredByMdblist(old)
     stamp({ itemId: old, mdblist: daysAgo(35) })
-    stamp({
-      itemId: title({ tmdbId: '923', imdbId: 'tt923' }),
-      omdb: daysAgo(40),
-      mdblist: daysAgo(1),
-    })
-    stamp({ itemId: title({ tmdbId: '924', imdbId: 'tt924' }), omdb: daysAgo(1) })
-    title({ tmdbId: '925' })
-    title({ tmdbId: `${LOCAL}926`, imdbId: 'tt926' })
+    const older = title({ tmdbId: '922', imdbId: 'tt922' })
+    stamp({ itemId: older, omdb: daysAgo(40) })
+    const never = title({ tmdbId: '923', imdbId: 'tt923' })
+    const known = title({ tmdbId: '924', imdbId: 'tt924' })
+    scoredByMdblist(known)
+    stamp({ itemId: known, omdb: daysAgo(40), mdblist: daysAgo(1) })
+    stamp({ itemId: title({ tmdbId: '925', imdbId: 'tt925' }), omdb: daysAgo(1) })
+    title({ tmdbId: '926' })
+    title({ tmdbId: `${LOCAL}927`, imdbId: 'tt927' })
 
     expect(
       stored
         .scoresDue({ provider: 'omdb', before: daysAgo(30), limit: 10 })
         .map((item) => [item.itemId, item.imdbId]),
     ).toEqual([
-      [never, 'tt920'],
-      [older, 'tt921'],
-      [old, 'tt922'],
+      [never, 'tt923'],
+      [older, 'tt922'],
+      [old, 'tt921'],
+      [unknown, 'tt920'],
     ])
   })
 })

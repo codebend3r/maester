@@ -386,6 +386,7 @@ describe('the metadata guards', () => {
       isMetadataHealth({
         tmdb: 'off',
         omdb: 'off',
+        mdblist: 'off',
         pending: 0,
         error: null,
         lastOk: null,
@@ -397,6 +398,19 @@ describe('the metadata guards', () => {
     expect(
       isMetadataHealth({
         tmdb: 'broken',
+        omdb: 'off',
+        mdblist: 'off',
+        pending: 0,
+        error: null,
+        lastOk: null,
+        ai: 'off',
+        aiRemaining: 0,
+        aiPending: 0,
+      }),
+    ).toBe(false)
+    expect(
+      isMetadataHealth({
+        tmdb: 'ok',
         omdb: 'off',
         pending: 0,
         error: null,
@@ -413,6 +427,7 @@ describe('the metadata guards', () => {
       isMetadataHealth({
         tmdb: 'ok',
         omdb: 'off',
+        mdblist: 'off',
         pending: 0,
         error: null,
         lastOk: null,
@@ -611,6 +626,7 @@ describe('isServerHealth', () => {
       metadata: {
         tmdb: 'off',
         omdb: 'off',
+        mdblist: 'off',
         pending: 0,
         error: null,
         lastOk: null,

@@ -32,7 +32,7 @@ const fakeSource = ({
     state: () => 'ok',
     lookUp,
   }
-  return { source, lookUp }
+  return { source, lookUp, state }
 }
 
 const rottenTomatoes = (value: number): ExternalScore => ({
@@ -154,19 +154,36 @@ describe('asking for scores', () => {
     expect(stamps(title.itemId)).toEqual({ omdb: null, mdblist: null })
   })
 
-  it("fills what is due from the primary source, as far as today's calls go", async () => {
-    database.get().db.prepare('DELETE FROM items').run()
-    const titles = ['7', '8', '9'].map(movie)
-    const mdblist = fakeSource({ provider: 'mdblist', answer: [rottenTomatoes(9.1)], remaining: 2 })
+  it('asks OMDb alone for a title MDBList does not know, and answers false when it fails', async () => {
+    const mdblist = fakeSource({ provider: 'mdblist', answer: [rottenTomatoes(9.1)] })
     const omdb = fakeSource({ provider: 'omdb', answer: [rottenTomatoes(5)] })
+    const title = movie('7')
+    const asking = scores({ omdb: omdb.source, mdblist: mdblist.source })
 
-    await scores({ omdb: omdb.source, mdblist: mdblist.source }).fillDue()
-    expect(mdblist.lookUp).toHaveBeenCalledTimes(2)
-    expect(omdb.lookUp).not.toHaveBeenCalled()
-    expect(titles.map((title) => stamps(title.itemId)?.mdblist != null)).toEqual([
-      true,
-      true,
-      false,
-    ])
+    await expect(asking.fetchFallback(title)).resolves.toBe(true)
+    expect(mdblist.lookUp).not.toHaveBeenCalled()
+    expect(rows(title.itemId)).toEqual([{ source: 'rottenTomatoes', value: 5, provider: 'omdb' }])
+    expect(stamps(title.itemId)).toEqual({ omdb: expect.any(String), mdblist: null })
+
+    omdb.state.answer = new Error('OMDb could not be reached.')
+    await expect(asking.fetchFallback(movie('8'))).resolves.toBe(false)
+  })
+
+  it('offers OMDb as the fallback only beside MDBList, and names the sources whose day is spent', () => {
+    const mdblist = fakeSource({ provider: 'mdblist', answer: [] })
+    const omdb = fakeSource({ provider: 'omdb', answer: [] })
+    const asking = scores({ omdb: omdb.source, mdblist: mdblist.source })
+
+    expect(asking.fallback()).toBe(omdb.source)
+    expect(asking.spent()).toEqual([])
+
+    mdblist.state.remaining = 0
+    expect(asking.primary()).toBe(omdb.source)
+    expect(asking.fallback()).toBeNull()
+    expect(asking.spent()).toEqual([mdblist.source])
+
+    omdb.state.remaining = 0
+    expect(asking.primary()).toBeNull()
+    expect(asking.spent()).toEqual([mdblist.source, omdb.source])
   })
 })
