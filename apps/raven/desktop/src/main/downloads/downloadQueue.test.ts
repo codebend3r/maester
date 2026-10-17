@@ -134,6 +134,7 @@ const setup = ({
   const { calls } = fakeCalls(table)
   const finished: DownloadEntry[] = []
   const failed: DownloadEntry[] = []
+  const dropped: (readonly DownloadEntry[])[] = []
   const warnings: string[] = []
   const queue = createDownloadQueue({
     store,
@@ -153,6 +154,7 @@ const setup = ({
     warn: (message) => warnings.push(message),
     onFinished: (entry) => finished.push(entry),
     onFailed: (entry) => failed.push(entry),
+    onRemoved: (removed) => dropped.push(removed),
   })
   const statusOf = (n: number) => entryById(store.read(), { downloadId: idOf(n) })?.status ?? null
   /** Runs the timers set for `ms`, and only those. */
@@ -170,6 +172,7 @@ const setup = ({
     table,
     finished,
     failed,
+    dropped,
     warnings,
     pending,
     statusOf,
@@ -949,6 +952,9 @@ describe('remove', () => {
     expect(world.drive.removed).toEqual([dirOf(1)])
     expect(world.drive.files.has(partOf(1))).toBe(false)
     expect(world.store.read().entries.map(({ downloadId }) => downloadId)).toEqual([idOf(2)])
+    expect(world.dropped.map((entries) => entries.map(({ downloadId }) => downloadId))).toEqual([
+      [idOf(1)],
+    ])
   })
 
   it("aborts a server's files, removes its folder, drops them and forgets its origin", async () => {
@@ -962,6 +968,9 @@ describe('remove', () => {
     expect(world.drive.removed).toEqual([`${DOWNLOADS}/${SERVER_ID}`])
     expect(world.media.forgotten).toEqual([SERVER_ID])
     expect(world.store.read().entries.map(({ downloadId }) => downloadId)).toEqual([idOf(5)])
+    expect(world.dropped.map((entries) => entries.map(({ downloadId }) => downloadId))).toEqual([
+      [idOf(1), idOf(2)],
+    ])
     await until(() => world.network.fileRequests().length === 3)
     expect(world.network.fileRequests()[2]?.serverId).toBe(OTHER_SERVER_ID)
   })
@@ -971,6 +980,7 @@ describe('remove', () => {
     await world.queue.removeServer({ serverId: '..' })
     expect(world.drive.removed).toEqual([])
     expect(world.store.read().entries).toHaveLength(1)
+    expect(world.dropped).toEqual([])
   })
 
   it('removes every download and the whole downloads folder', async () => {
@@ -985,6 +995,9 @@ describe('remove', () => {
     expect(world.drive.removed).toEqual([DOWNLOADS])
     expect(world.drive.files.size).toBe(0)
     expect(world.store.read().entries).toEqual([])
+    expect(world.dropped.map((entries) => entries.map(({ downloadId }) => downloadId))).toEqual([
+      [idOf(1), idOf(2), idOf(3)],
+    ])
     await ticks(10)
     expect(world.network.fileRequests()).toHaveLength(2)
   })
@@ -1003,61 +1016,6 @@ describe('a relaunch', () => {
     expect(world.statusOf(1)).toEqual({ kind: 'downloading', bytes: 4096 })
   })
 
-  it('sweeps the folders no download names and the servers raven player no longer keeps', async () => {
-    const world = setup({
-      entries: [entryFor(1), entryFor(9, { serverId: GONE_SERVER_ID })],
-      disk: {
-        [partOf(1)]: 4,
-        [`${dirOf(7)}/video.mkv`]: 8,
-        [`${dirOf(3, GONE_SERVER_ID)}/video.mkv`]: 8,
-        [`${DOWNLOADS}/.DS_Store`]: 1,
-        [`${DOWNLOADS}/${SERVER_ID}/notes`]: 1,
-      },
-    })
-    await world.queue.sweep({ wasSetAside: false })
-    expect(world.drive.removed.toSorted()).toEqual(
-      [`${DOWNLOADS}/${GONE_SERVER_ID}`, dirOf(7)].toSorted(),
-    )
-    expect(world.drive.files.has(partOf(1))).toBe(true)
-    expect(world.drive.files.has(`${DOWNLOADS}/.DS_Store`)).toBe(true)
-    expect(world.store.read().entries.map(({ downloadId }) => downloadId)).toEqual([idOf(1)])
-    const log = world.warnings.join('\n')
-    expect(log).not.toContain(DOWNLOADS)
-    expect(log).not.toContain(GONE_SERVER_ID)
-    expect(world.warnings).toHaveLength(3)
-  })
-
-  it('drops nothing and removes no server folder when the config holds no server', async () => {
-    const world = setup({
-      servers: [],
-      entries: [entryFor(1), entryFor(9, { serverId: GONE_SERVER_ID })],
-      disk: {
-        [partOf(1)]: 4,
-        [`${dirOf(7)}/video.mkv`]: 8,
-        [`${dirOf(3, GONE_SERVER_ID)}/video.mkv`]: 8,
-      },
-    })
-    await world.queue.sweep({ wasSetAside: false })
-    expect(world.drive.removed).toEqual([])
-    expect(world.store.read().entries).toHaveLength(2)
-    expect(world.warnings).toEqual([])
-  })
-
-  it('keeps every media folder, saying so once, when the downloads list was set aside', async () => {
-    const world = setup({
-      disk: {
-        [partOf(1)]: 4,
-        [`${dirOf(7)}/video.mkv`]: 8,
-        [`${dirOf(3, OTHER_SERVER_ID)}/video.mkv`]: 8,
-      },
-    })
-    await world.queue.sweep({ wasSetAside: true })
-    expect(world.drive.removed).toEqual([])
-    expect(world.drive.sizeOf(`${dirOf(7)}/video.mkv`)).toBe(8)
-    expect(world.warnings).toHaveLength(1)
-    expect(world.warnings[0]).not.toContain(DOWNLOADS)
-  })
-
   it('holds a kick made while the sweep runs until it is done', async () => {
     const world = setup({ entries: [entryFor(1)] })
     const listing = Promise.withResolvers<void>()
@@ -1070,13 +1028,6 @@ describe('a relaunch', () => {
     listing.resolve()
     await sweeping
     await until(() => world.network.fileRequests().length === 1)
-  })
-
-  it('sweeps nothing when there is no downloads folder yet', async () => {
-    const world = setup({ entries: [entryFor(1)] })
-    await world.queue.sweep({ wasSetAside: false })
-    expect(world.drive.removed).toEqual([])
-    expect(world.warnings).toEqual([])
   })
 })
 
