@@ -625,6 +625,7 @@ describe('describeFile', () => {
       fileId,
       label: 'Episode 1',
       folder: 'Show',
+      isDownload: false,
       resumeAt: 0,
     })
     expect(reply.file.next!.label).toBe('Episode 2')
@@ -712,6 +713,7 @@ describe('describeFile', () => {
       fileId: target.fileId,
       label: 'S01E01 Good News',
       folder: 'Downloaded from Vhagar',
+      isDownload: true,
     })
     expect(reply.file.next).toMatchObject({ label: 'S01E02 Half Loop' })
     expect(reached).toEqual([{ name: 'noteOpened', input: { fileId: target.fileId } }])

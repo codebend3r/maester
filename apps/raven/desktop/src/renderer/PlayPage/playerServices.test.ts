@@ -19,6 +19,7 @@ const FILE: LocalFile = {
   fileId: A,
   label: 'Clip 01',
   folder: 'Clips',
+  isDownload: false,
   resumeAt: 42,
   next: null,
   tracks: null,
@@ -53,11 +54,20 @@ describe('servicesFor', () => {
   it('describes the title with no next video', () => {
     expect(setup().services.title).toEqual({
       label: 'Clip 01',
+      context: null,
       duration: null,
       resumeAt: 42,
       backTo: '/',
       next: null,
     })
+  })
+
+  it('names where a download came from, and no folder for any other file', () => {
+    const download = setup({
+      file: { ...FILE, folder: 'Downloaded from Vhagar', isDownload: true },
+    })
+    expect(download.services.title.context).toBe('Downloaded from Vhagar')
+    expect(setup().services.title.context).toBeNull()
   })
 
   it('links the next video with its queue', () => {

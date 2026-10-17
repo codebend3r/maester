@@ -122,6 +122,7 @@ describe('the building blocks', () => {
         fileId: id,
         label: 'film.mkv',
         folder: 'Movies',
+        isDownload: false,
         resumeAt: 12,
         next: { fileId: other, label: 'next.mkv', queue: [other] },
         tracks: { audio: 1, subtitle: 'embedded-0' },
@@ -132,6 +133,7 @@ describe('the building blocks', () => {
         fileId: id,
         label: 'film.mkv',
         folder: 'Movies',
+        isDownload: false,
         resumeAt: 0,
         next: null,
         tracks: null,
@@ -162,6 +164,19 @@ describe('the building blocks', () => {
     expect(isTrackChoice({ audio: 2, subtitle: 'sidecar-1' })).toBe(true)
     expect(isTrackChoice({ audio: '2', subtitle: null })).toBe(false)
     expect(isTrackChoice({ audio: 2 })).toBe(false)
+  })
+
+  it('rejects a local file that does not say whether it is a download', () => {
+    expect(
+      isLocalFile({
+        fileId: id,
+        label: 'film.mkv',
+        folder: 'Movies',
+        resumeAt: 0,
+        next: null,
+        tracks: null,
+      }),
+    ).toBe(false)
   })
 
   it('rejects a local file without its track pick', () => {
@@ -304,6 +319,7 @@ describe('isDesktopReply', () => {
           fileId: id,
           label: 'a.mkv',
           folder: 'Movies',
+          isDownload: false,
           resumeAt: 0,
           next: null,
           tracks: null,
