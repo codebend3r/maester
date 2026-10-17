@@ -14,15 +14,20 @@ export type AllowedCall =
   | { name: 'unlock'; pin: string }
   | { name: 'getAdminLock' }
   | { name: 'unlockAdmin'; password: string }
+  | { name: 'getItem'; itemId: number }
+  | { name: 'getLibrary'; libraryId: number }
+  | { name: 'getSagas'; libraryId: number }
+  | { name: 'getMediaOrigins' }
+  | { name: 'getMediaTicket'; mediaId: number }
 
 type Body = { kind: 'none' } | { kind: 'json'; value: unknown } | { kind: 'bad' }
 
 type Route =
   | {
-      kind: 'media'
+      kind: 'numbered'
       method: ServerMethod
       pattern: RegExp
-      read: (input: { mediaId: number; body: Body }) => AllowedCall | null
+      read: (input: { id: number; body: Body }) => AllowedCall | null
     }
   | {
       kind: 'fixed'
@@ -56,31 +61,61 @@ const bare =
 // escape, extra slash or absolute URL can match; `$` without the `m` flag ends the input.
 const ROUTES: readonly Route[] = [
   {
-    kind: 'media',
+    kind: 'numbered',
     method: 'GET',
     pattern: /^\/api\/media\/([1-9]\d{0,15})$/u,
-    read: ({ mediaId, body }) => bare({ name: 'getMedia', mediaId })({ body }),
+    read: ({ id, body }) => bare({ name: 'getMedia', mediaId: id })({ body }),
   },
   {
-    kind: 'media',
+    kind: 'numbered',
     method: 'GET',
     pattern: /^\/api\/media\/([1-9]\d{0,15})\/tracks$/u,
-    read: ({ mediaId, body }) => bare({ name: 'getTracks', mediaId })({ body }),
+    read: ({ id, body }) => bare({ name: 'getTracks', mediaId: id })({ body }),
   },
   {
-    kind: 'media',
+    kind: 'numbered',
     method: 'PUT',
     pattern: /^\/api\/media\/([1-9]\d{0,15})\/progress$/u,
-    read: ({ mediaId, body }) =>
+    read: ({ id, body }) =>
       body.kind === 'json' && isProgressChange(body.value)
-        ? { name: 'saveProgress', mediaId, position: body.value.position }
+        ? { name: 'saveProgress', mediaId: id, position: body.value.position }
         : null,
   },
   {
-    kind: 'media',
+    kind: 'numbered',
     method: 'POST',
     pattern: /^\/api\/media\/([1-9]\d{0,15})\/plays$/u,
-    read: ({ mediaId, body }) => bare({ name: 'recordPlay', mediaId })({ body }),
+    read: ({ id, body }) => bare({ name: 'recordPlay', mediaId: id })({ body }),
+  },
+  {
+    kind: 'numbered',
+    method: 'GET',
+    pattern: /^\/api\/items\/([1-9]\d{0,15})$/u,
+    read: ({ id, body }) => bare({ name: 'getItem', itemId: id })({ body }),
+  },
+  {
+    kind: 'numbered',
+    method: 'GET',
+    pattern: /^\/api\/libraries\/([1-9]\d{0,15})$/u,
+    read: ({ id, body }) => bare({ name: 'getLibrary', libraryId: id })({ body }),
+  },
+  {
+    kind: 'numbered',
+    method: 'GET',
+    pattern: /^\/api\/libraries\/([1-9]\d{0,15})\/sagas$/u,
+    read: ({ id, body }) => bare({ name: 'getSagas', libraryId: id })({ body }),
+  },
+  {
+    kind: 'numbered',
+    method: 'GET',
+    pattern: /^\/api\/media\/([1-9]\d{0,15})\/ticket$/u,
+    read: ({ id, body }) => bare({ name: 'getMediaTicket', mediaId: id })({ body }),
+  },
+  {
+    kind: 'fixed',
+    method: 'GET',
+    path: '/api/media-origins',
+    read: bare({ name: 'getMediaOrigins' }),
   },
   { kind: 'fixed', method: 'GET', path: '/api/lock', read: bare({ name: 'getLock' }) },
   {
@@ -104,12 +139,12 @@ const ROUTES: readonly Route[] = [
   },
 ]
 
-/** The id a media route captured, when it is a media id written the one way it can be. */
-const mediaIdOf = ({ pattern, path }: { pattern: RegExp; path: string }): number | null => {
+/** The id a numbered route captured, when it is an id written the one way it can be. */
+const idOf = ({ pattern, path }: { pattern: RegExp; path: string }): number | null => {
   const digits = pattern.exec(path)?.[1] ?? null
   if (digits === null) return null
-  const mediaId = Number(digits)
-  return isMediaId(mediaId) && String(mediaId) === digits ? mediaId : null
+  const id = Number(digits)
+  return isMediaId(id) && String(id) === digits ? id : null
 }
 
 const matchRoute = ({
@@ -124,9 +159,9 @@ const matchRoute = ({
   switch (route.kind) {
     case 'fixed':
       return route.path === path ? route.read({ body }) : null
-    case 'media': {
-      const mediaId = mediaIdOf({ pattern: route.pattern, path })
-      return mediaId === null ? null : route.read({ mediaId, body })
+    case 'numbered': {
+      const id = idOf({ pattern: route.pattern, path })
+      return id === null ? null : route.read({ id, body })
     }
     default: {
       const unreachable: never = route
@@ -135,7 +170,7 @@ const matchRoute = ({
   }
 }
 
-/** One of the eight calls the page may make, read from what it sent, or null for anything else. */
+/** One of the thirteen calls the page may make, read from what it sent, or null for anything else. */
 export const matchCall = ({
   method,
   path,
@@ -183,6 +218,16 @@ export const requestFor = (
         path: '/api/admin/unlock',
         body: JSON.stringify({ password: call.password }),
       }
+    case 'getItem':
+      return { method: 'GET', path: `/api/items/${call.itemId}`, body: null }
+    case 'getLibrary':
+      return { method: 'GET', path: `/api/libraries/${call.libraryId}`, body: null }
+    case 'getSagas':
+      return { method: 'GET', path: `/api/libraries/${call.libraryId}/sagas`, body: null }
+    case 'getMediaOrigins':
+      return { method: 'GET', path: '/api/media-origins', body: null }
+    case 'getMediaTicket':
+      return { method: 'GET', path: `/api/media/${call.mediaId}/ticket`, body: null }
     default: {
       const unreachable: never = call
       return unreachable
@@ -202,6 +247,11 @@ export const isWrite = (call: AllowedCall): boolean => {
     case 'unlock':
     case 'getAdminLock':
     case 'unlockAdmin':
+    case 'getItem':
+    case 'getLibrary':
+    case 'getSagas':
+    case 'getMediaOrigins':
+    case 'getMediaTicket':
       return false
     default: {
       const unreachable: never = call
