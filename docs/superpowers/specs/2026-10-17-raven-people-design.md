@@ -35,7 +35,20 @@ Taken with the user on 2026-10-17:
   - No `credit_id` repeats within a person.
   - Sizes: Isabel May has 28 cast and 2 crew; Tom Hanks 283 and 88; Steven Spielberg 238 and 284.
   - Self appearances: 163 of Tom Hanks's 283 cast credits are "Self" roles or on Talk or News titles. Roles seen: `Self`, `Self (archive footage)`, `Self - Guest`, `Self - Presenter`, `Self - Narrator`, `Himself`, `self`.
-- **MDBList.** To confirm before Step 5 with a real key: the endpoint (expected `GET https://api.mdblist.com/tmdb/{movie|show}/{tmdbId}?apikey=`), how an unknown title answers, `ratings[].{source,value,score,votes}` for `imdb`, `tomatoes` and `metacritic`, the daily limit (documented 1,000 a day free, 1,000 reads per 5 minutes per account) and what a 429 looks like. Results go here.
+- **MDBList, from its public OpenAPI schema (`https://api.mdblist.com/schema/`, read 2026-10-17 without a key):**
+  - **One title:** `GET https://api.mdblist.com/tmdb/{movie|show}/{tmdbId}/?apikey=<key>`. The key goes in the `apikey` query parameter.
+  - **What it answers:** `{ id, imdb_id, title, year, type, score, ratings: object[] }`. The schema doesn't spell out a rating's fields.
+  - **A bad key** answers `401 {"error":"Invalid API key"}`. This was checked against the live API.
+  - **Daily limit:** per account, shared by all of its keys. The free tier gets 1,000 requests a day, reset at 00:00 UTC. Successful answers report it in `X-RateLimit-Limit`, `X-RateLimit-Remaining` and `X-RateLimit-Reset` (a Unix time).
+  - **5-minute limit:** 1,000 reads per fixed window.
+  - **Going over either limit** answers `429` with `Retry-After`. The `error` field reads `Daily API limit exceeded!` or `API rate limit exceeded!`.
+  - **Batches:** `POST /tmdb/{movie|show}/` takes `{ ids }`, and `POST /rating/{movie|show}/{source}` takes up to 10 ids on the free tier, but returns one source per call.
+- **Still to confirm with a real key:**
+  - each rating's fields, expected `{ source, value, score, votes }` with sources `imdb`, `tomatoes` and `metacritic`, `score` out of 100;
+  - how an unknown title answers;
+  - the media batch's size limit.
+
+  raven starts with one title per call, which allows 1,000 titles a day. Batching is a later step.
 
 ## 1. Going back
 

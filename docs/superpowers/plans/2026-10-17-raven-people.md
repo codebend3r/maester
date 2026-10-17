@@ -531,11 +531,16 @@ A failure throws; `'unknown'` is an answer.
 
 **`MdblistClient implements ScoreSource`:**
 - Fetches through the same fetch token `OmdbClient` uses.
-- `export const parseMdblistRatings(body: unknown): ExternalScore[]`, using the spike's field names:
-  - `imdb`: `value` out of 10, `votes`;
-  - `tomatoes`: score / 10 to one decimal;
-  - `metacritic`: score / 10 to one decimal;
-  - every other source and every null score dropped.
+- The URL is `https://api.mdblist.com/tmdb/{movie|show}/{tmdbId}/?apikey=<key>`, built in one place (spec, Spike).
+- `export const parseMdblistRatings(body: unknown): ExternalScore[]` reads `ratings[]` items of `{ source, value, score, votes }`. These fields are expected but not yet confirmed with a key, so keep every assumption inside this one function:
+  - `imdb`, `tomatoes` and `metacritic` each take `score / 10` to one decimal. `score` is MDBList's 0 to 100 normalisation, so IMDb's 8.3 arrives as 83.
+  - `votes` is kept when it is a number.
+  - Every other source, a null `score`, and a malformed item are dropped.
+- Status handling:
+  - 401 refuses the key.
+  - 404, or a body with no `ratings` array, answers `'unknown'`.
+  - 429 whose `error` is `Daily API limit exceeded!` spends the day.
+  - Any other 429 waits for `Retry-After`, as TMDB's client does.
 - In-memory daily budget like `OmdbClient`'s.
 - `createRateLimit({ perSecond: 3, inFlight: 2 })` from `scanner/concurrency.ts`.
 - A 401 refuses the key until restart (`state()` `failing`, `enabled()` false). A 429 marks the day spent (`remaining()` 0 until UTC midnight).
