@@ -25,6 +25,7 @@ import { MediaArtifacts } from '@/media/mediaArtifacts'
 import { MediaController } from '@/media/mediaController'
 import { MediaIndex } from '@/media/mediaIndex'
 import { MediaRepository } from '@/media/mediaRepository'
+import { MediaTickets } from '@/media/mediaTickets'
 import { SagaBackdrops } from '@/media/sagaBackdrops'
 import { MovieSplits } from '@/media/movieSplits'
 import { ViewingRepository } from '@/media/viewingRepository'
@@ -144,6 +145,7 @@ export class AppModule {
         LibraryWatcher,
         AdminService,
         LockService,
+        MediaTickets,
         // Every route passes the lock first; those marked PrivateBy, or on a controller that is, are held.
         { provide: APP_GUARD, useClass: LockGuard },
         // Then the admin lock, which holds back the routes marked AdminOnly.
