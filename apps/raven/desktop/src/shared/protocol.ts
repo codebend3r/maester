@@ -84,8 +84,17 @@ export const isDownloadKind = oneOf(['movie', 'episode', 'season', 'show', 'saga
 
 export type DownloadKind = Infer<typeof isDownloadKind>
 
-/** Where a download sits in its group: `order` is the play order, a season times 10000 plus the episode, or a saga's index. */
-export const isDownloadGroup = object({ kind: isDownloadKind, title: isString, order: isNumber })
+/**
+ * Where a download sits in its group. `key` names the group on its server: `show:<itemId>` for an
+ * episode, season or show, `saga:<libraryId>:<tmdbId>` or `movie:<mediaId>`. `order` is the play
+ * order, a season times 10000 plus the episode, or a saga's index.
+ */
+export const isDownloadGroup = object({
+  kind: isDownloadKind,
+  key: isString,
+  title: isString,
+  order: isNumber,
+})
 
 export type DownloadGroup = Infer<typeof isDownloadGroup>
 

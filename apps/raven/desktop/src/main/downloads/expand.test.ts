@@ -115,7 +115,7 @@ describe('expandTarget', () => {
       {
         media: movie,
         label: 'Fellowship (2001)',
-        group: { kind: 'movie', title: 'Fellowship (2001)', order: 0 },
+        group: { kind: 'movie', key: 'movie:9', title: 'Fellowship (2001)', order: 0 },
         watchedPercent: 90,
       },
     ])
@@ -135,7 +135,12 @@ describe('expandTarget', () => {
     const result = succeeded(await expansion)
     expect(result.kind).toBe('episode')
     expect(result.files[0]?.label).toBe('S01E02 Half Loop')
-    expect(result.files[0]?.group).toEqual({ kind: 'episode', title: 'Severance', order: 10_002 })
+    expect(result.files[0]?.group).toEqual({
+      kind: 'episode',
+      key: 'show:4',
+      title: 'Severance',
+      order: 10_002,
+    })
   })
 
   it('reads a show, then each season in order, and lists each episode', async () => {
@@ -185,9 +190,9 @@ describe('expandTarget', () => {
     expect(result.kind).toBe('show')
     expect(result.title).toBe('Severance')
     expect(result.files.map(({ media, label, group }) => [media.id, label, group])).toEqual([
-      [11, 'S01E01 Good News', { kind: 'show', title: 'Severance', order: 10_001 }],
-      [12, 'S01E02 Half Loop', { kind: 'show', title: 'Severance', order: 10_002 }],
-      [21, 'S02E01 Hello', { kind: 'show', title: 'Severance', order: 20_001 }],
+      [11, 'S01E01 Good News', { kind: 'show', key: 'show:4', title: 'Severance', order: 10_001 }],
+      [12, 'S01E02 Half Loop', { kind: 'show', key: 'show:4', title: 'Severance', order: 10_002 }],
+      [21, 'S02E01 Hello', { kind: 'show', key: 'show:4', title: 'Severance', order: 20_001 }],
     ])
     expect(log.slice(0, 3)).toEqual([itemCall(4), itemCall(5), itemCall(6)])
   })
@@ -219,7 +224,71 @@ describe('expandTarget', () => {
     const result = succeeded(await expansion)
     expect(result.kind).toBe('season')
     expect(result.title).toBe('Severance · S01')
-    expect(result.files[0]?.group).toEqual({ kind: 'season', title: 'Severance', order: 10_001 })
+    expect(result.files[0]?.group).toEqual({
+      kind: 'season',
+      key: 'show:4',
+      title: 'Severance',
+      order: 10_001,
+    })
+  })
+
+  it("keys an episode, its season and its show by the show's item id", async () => {
+    const episodeFile = mediaItemFor({
+      id: 9,
+      title: 'Half Loop',
+      item: summary({ id: 52, type: 'episode', title: 'Half Loop', show, season: 1, episode: 2 }),
+    })
+    const seasonDetails = details({
+      id: 5,
+      type: 'season',
+      title: 'Season 1',
+      show,
+      season: 1,
+      children: [episode({ id: 51, season: 1, number: 1, title: 'A', primary: file({ id: 11 }) })],
+    })
+    const replies = {
+      [mediaCall(9)]: ok(episodeFile),
+      [itemCall(5)]: ok(seasonDetails),
+      [itemCall(4)]: ok(
+        details({
+          id: 4,
+          type: 'show',
+          title: 'Severance',
+          children: [season({ id: 5, number: 1 })],
+        }),
+      ),
+    }
+    const keys = await Promise.all(
+      [
+        { kind: 'media', mediaId: 9 } as const,
+        { kind: 'item', itemId: 5 } as const,
+        { kind: 'item', itemId: 4 } as const,
+      ].map(
+        async (target) => succeeded(await run({ replies, target }).expansion).files[0]?.group.key,
+      ),
+    )
+    expect(keys).toEqual(['show:4', 'show:4', 'show:4'])
+  })
+
+  it('keys a season the server places under no show by its own id', async () => {
+    const { expansion } = run({
+      replies: {
+        [itemCall(5)]: ok(
+          details({
+            id: 5,
+            type: 'season',
+            title: 'Season 1',
+            show: null,
+            season: 1,
+            children: [
+              episode({ id: 51, season: 1, number: 1, title: 'A', primary: file({ id: 11 }) }),
+            ],
+          }),
+        ),
+      },
+      target: { kind: 'item', itemId: 5 },
+    })
+    expect(succeeded(await expansion).files[0]?.group.key).toBe('item:5')
   })
 
   it('takes the first version of an episode item', async () => {
@@ -243,7 +312,12 @@ describe('expandTarget', () => {
     expect(result.kind).toBe('episode')
     expect(result.files.map(({ media }) => media.id)).toEqual([31])
     expect(result.files[0]?.label).toBe('S01E02 Half Loop')
-    expect(result.files[0]?.group).toEqual({ kind: 'episode', title: 'Severance', order: 10_002 })
+    expect(result.files[0]?.group).toEqual({
+      kind: 'episode',
+      key: 'show:4',
+      title: 'Severance',
+      order: 10_002,
+    })
   })
 
   it('takes the first version of a movie item', async () => {
@@ -263,6 +337,7 @@ describe('expandTarget', () => {
     expect(result.files).toHaveLength(1)
     expect(result.files[0]?.media.id).toBe(31)
     expect(result.files[0]?.group.order).toBe(0)
+    expect(result.files[0]?.group.key).toBe('movie:31')
   })
 
   it('answers gone for a movie with no file this session may see', async () => {
@@ -299,12 +374,12 @@ describe('expandTarget', () => {
       [
         41,
         'Fellowship (2001)',
-        { kind: 'saga', title: 'The Lord of the Rings Collection', order: 0 },
+        { kind: 'saga', key: 'saga:1:119', title: 'The Lord of the Rings Collection', order: 0 },
       ],
       [
         42,
         'Two Towers (2002)',
-        { kind: 'saga', title: 'The Lord of the Rings Collection', order: 1 },
+        { kind: 'saga', key: 'saga:1:119', title: 'The Lord of the Rings Collection', order: 1 },
       ],
     ])
   })

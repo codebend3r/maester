@@ -20,6 +20,7 @@ import {
   remove,
   removeServer,
   resume,
+  sameGroup,
   setAutoDelete,
   setAutoDeleteDefault,
   sortDownloads,
@@ -37,7 +38,7 @@ const entry = (overrides: Partial<DownloadEntry> = {}): DownloadEntry => ({
   serverId: SERVER_A,
   mediaId: 1,
   label: 'The Two Towers',
-  group: { kind: 'movie', title: 'The Two Towers', order: 0 },
+  group: { kind: 'movie', key: 'movie:1', title: 'The Two Towers', order: 0 },
   container: 'mkv',
   size: 1000,
   duration: 200,
@@ -375,61 +376,107 @@ describe('bytesOf', () => {
 })
 
 describe('sortDownloads', () => {
-  const row = (n: number, title: string, order: number, createdAt: number): DownloadEntry =>
+  const row = (n: number, key: string, order: number, createdAt: number): DownloadEntry =>
     entry({
       downloadId: id(n),
       mediaId: n,
-      group: { kind: 'season', title, order },
+      group: { kind: 'season', key, title: 'Severance', order },
       createdAt,
     })
 
   it('puts the newest first when no row is grouped', () => {
-    const rows = [row(1, 'A', 0, 10), row(2, 'B', 0, 30), row(3, 'C', 0, 20)]
+    const rows = [row(1, 'show:1', 0, 10), row(2, 'show:2', 0, 30), row(3, 'show:3', 0, 20)]
     expect(sortDownloads(rows).map((each) => each.mediaId)).toEqual([2, 3, 1])
   })
 
   it('keeps a group together in order, under its newest row, newest group first', () => {
     const rows = [
-      row(1, 'Show', 2, 50),
-      row(2, 'Movie', 0, 40),
-      row(3, 'Show', 1, 10),
-      row(4, 'Other', 0, 60),
-      row(5, 'Show', 3, 20),
+      row(1, 'show:4', 2, 50),
+      row(2, 'movie:2', 0, 40),
+      row(3, 'show:4', 1, 10),
+      row(4, 'show:9', 0, 60),
+      row(5, 'show:4', 3, 20),
     ]
     expect(sortDownloads(rows).map((each) => each.mediaId)).toEqual([4, 3, 1, 5, 2])
   })
 
   it('groups only within a server', () => {
     const rows = [
-      row(1, 'Show', 1, 10),
+      row(1, 'show:4', 1, 10),
       entry({
         downloadId: id(2),
         mediaId: 2,
         serverId: SERVER_B,
-        group: { kind: 'season', title: 'Show', order: 0 },
+        group: { kind: 'season', key: 'show:4', title: 'Severance', order: 0 },
         createdAt: 30,
       }),
-      row(3, 'Show', 2, 20),
+      row(3, 'show:4', 2, 20),
     ]
     expect(sortDownloads(rows).map((each) => each.mediaId)).toEqual([2, 1, 3])
   })
 
-  it('keeps a movie and a saga of the same title on one server apart', () => {
-    const of = (n: number, kind: 'movie' | 'saga', order: number, createdAt: number) =>
+  it('puts an episode downloaded alone with its season downloaded later', () => {
+    const alone = entry({
+      downloadId: id(1),
+      mediaId: 1,
+      group: { kind: 'episode', key: 'show:4', title: 'Severance', order: 10_002 },
+      createdAt: 10,
+    })
+    const movie = row(2, 'movie:2', 0, 20)
+    const first = row(3, 'show:4', 10_001, 30)
+    const third = row(4, 'show:4', 10_003, 30)
+    expect(sameGroup({ a: alone, b: first })).toBe(true)
+    expect(sortDownloads([alone, movie, first, third]).map((each) => each.mediaId)).toEqual([
+      3, 1, 4, 2,
+    ])
+  })
+
+  it('keeps two shows of one name on one server apart', () => {
+    const of = (n: number, key: string, order: number, createdAt: number) =>
       entry({
         downloadId: id(n),
         mediaId: n,
-        group: { kind, title: 'Dune', order },
+        group: { kind: 'show', key, title: 'The Office', order },
         createdAt,
       })
-    const rows = [of(1, 'movie', 0, 10), of(2, 'saga', 1, 30), of(3, 'movie', 2, 20)]
-    expect(sortDownloads(rows).map((each) => each.mediaId)).toEqual([2, 1, 3])
+    const pilot = of(1, 'show:7', 10_001, 10)
+    const remake = of(2, 'show:8', 10_001, 20)
+    const second = of(3, 'show:7', 10_002, 30)
+    expect(sameGroup({ a: pilot, b: remake })).toBe(false)
+    expect(sortDownloads([pilot, remake, second]).map((each) => each.mediaId)).toEqual([1, 3, 2])
   })
 
   it('does not change its input', () => {
-    const rows = [row(1, 'A', 0, 10), row(2, 'B', 0, 30)]
+    const rows = [row(1, 'show:1', 0, 10), row(2, 'show:2', 0, 30)]
     sortDownloads(rows)
     expect(rows.map((each) => each.mediaId)).toEqual([1, 2])
+  })
+})
+
+describe('sameGroup', () => {
+  const of = (overrides: Partial<DownloadEntry>): DownloadEntry =>
+    entry({
+      group: { kind: 'season', key: 'show:4', title: 'Severance', order: 10_001 },
+      ...overrides,
+    })
+
+  it('is true for one key on one server, whatever the kind, title or order', () => {
+    expect(
+      sameGroup({
+        a: of({}),
+        b: of({ group: { kind: 'episode', key: 'show:4', title: 'Renamed', order: 20_005 } }),
+      }),
+    ).toBe(true)
+  })
+
+  it('is false for another key or another server', () => {
+    expect(
+      sameGroup({
+        a: of({}),
+        b: of({ group: { kind: 'season', key: 'show:5', title: 'Severance', order: 10_001 } }),
+      }),
+    ).toBe(false)
+    expect(sameGroup({ a: of({}), b: of({ serverId: SERVER_B }) })).toBe(false)
   })
 })
 

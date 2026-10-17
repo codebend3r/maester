@@ -11,18 +11,19 @@ import {
   type DownloadTarget,
   type Guard,
   type ItemDetails,
+  type ItemSummary,
   type MediaItem,
 } from '@raven/core'
 import type { AllowedCall } from '@/main/servers/allowlist'
 import { CALL_MESSAGES, type ServerCalls } from '@/main/servers/serverCalls'
-import type { DownloadKind } from '@/shared/protocol'
+import type { DownloadGroup, DownloadKind } from '@/shared/protocol'
 
 export const DOWNLOAD_MAX_FILES = 500
 
 export type ExpandedFile = {
   media: MediaItem
   label: string
-  group: { kind: DownloadKind; title: string; order: number }
+  group: DownloadGroup
   watchedPercent: number
 }
 
@@ -46,7 +47,13 @@ const HIDDEN_MESSAGE = (name: string): string => `${name} keeps that behind its 
 type Failure = Extract<Expansion, { ok: false }>
 type Read<T> = { ok: true; value: T } | { ok: false; failure: Failure }
 type Entry = { media: MediaItem; label: string; order: number }
-type Draft = { kind: DownloadKind; title: string; groupTitle: string; entries: Entry[] }
+type Draft = {
+  kind: DownloadKind
+  title: string
+  groupTitle: string
+  groupKey: string
+  entries: Entry[]
+}
 type Calls = Pick<ServerCalls, 'call'>
 type Server = { calls: Calls; serverId: string; serverName: string }
 
@@ -70,6 +77,18 @@ const episodeOrder = ({
   season: number | null
   episode: number | null
 }): number => (season ?? 0) * 10_000 + (episode ?? 0)
+
+/** An episode, its season and its show share one group, whichever of them was asked for. */
+const showGroupKey = ({ id, type, show }: Pick<ItemSummary, 'id' | 'type' | 'show'>): string => {
+  if (type === 'show') return `show:${id}`
+  // The server names no show only for a season or episode it cannot place under one.
+  return show === null ? `item:${id}` : `show:${show.id}`
+}
+
+const movieGroupKey = (media: MediaItem): string => `movie:${media.id}`
+
+const sagaGroupKey = ({ libraryId, tmdbId }: { libraryId: number; tmdbId: string }): string =>
+  `saga:${libraryId}:${tmdbId}`
 
 const isSuccess = (status: number): boolean => status >= 200 && status < 300
 
@@ -139,6 +158,7 @@ const draftOfMedia = (media: MediaItem): Draft => {
       kind: 'movie',
       title,
       groupTitle: title,
+      groupKey: movieGroupKey(media),
       entries: [{ media, label: title, order: 0 }],
     }
   }
@@ -146,6 +166,7 @@ const draftOfMedia = (media: MediaItem): Draft => {
     kind: 'episode',
     title: mediaLabel(media),
     groupTitle: item.show?.title ?? item.title,
+    groupKey: showGroupKey(item),
     entries: [{ media, label: episodeLabel(item), order: episodeOrder(item) }],
   }
 }
@@ -179,6 +200,7 @@ const draftOfShow = async ({
       kind: 'show',
       title: details.title,
       groupTitle: details.title,
+      groupKey: showGroupKey(details),
       entries: entries.value,
     },
   }
@@ -195,7 +217,10 @@ const draftOfItem = async ({
   switch (details.type) {
     case 'movie': {
       if (first === undefined) return goneFor(server)
-      return { ok: true, value: { ...draftOfMedia(first), kind: 'movie' } }
+      return {
+        ok: true,
+        value: { ...draftOfMedia(first), kind: 'movie', groupKey: movieGroupKey(first) },
+      }
     }
     case 'episode': {
       if (first === undefined) return goneFor(server)
@@ -205,6 +230,7 @@ const draftOfItem = async ({
           kind: 'episode',
           title: itemLabel(details),
           groupTitle: details.show?.title ?? details.title,
+          groupKey: showGroupKey(details),
           entries: [{ media: first, label: episodeLabel(details), order: episodeOrder(details) }],
         },
       }
@@ -216,6 +242,7 @@ const draftOfItem = async ({
           kind: 'season',
           title: itemLabel(details),
           groupTitle: details.show?.title ?? details.title,
+          groupKey: showGroupKey(details),
           entries: episodesOf(details),
         },
       }
@@ -267,6 +294,7 @@ const draftOf = async ({
           kind: 'saga',
           title: saga.name,
           groupTitle: saga.name,
+          groupKey: sagaGroupKey(target),
           entries: saga.media.map((media, order) => ({ media, label: mediaLabel(media), order })),
         },
       }
@@ -318,7 +346,7 @@ export const expandTarget = async ({
   const server = { calls, serverId, serverName }
   const draft = await draftOf({ server, target })
   if (!draft.ok) return draft.failure
-  const { kind, title, groupTitle, entries } = draft.value
+  const { kind, title, groupTitle, groupKey, entries } = draft.value
   if (entries.length > DOWNLOAD_MAX_FILES) {
     return { ok: false, reason: 'tooMany', message: EXPAND_MESSAGES.tooMany }
   }
@@ -333,7 +361,7 @@ export const expandTarget = async ({
     files: kept.map(({ media, label, order }) => ({
       media,
       label,
-      group: { kind, title: groupTitle, order },
+      group: { kind, key: groupKey, title: groupTitle, order },
       watchedPercent: percents.value[media.libraryId] ?? 0,
     })),
   }

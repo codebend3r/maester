@@ -307,15 +307,20 @@ export const clearPending = (
     },
   })
 
-const groupKey = (entry: DownloadEntry): string =>
-  JSON.stringify([entry.serverId, entry.group.kind, entry.group.title])
+/** The group a row is in, as one string a `Map` can key by: its server and its `group.key`. */
+const groupIdOf = ({ serverId, group }: DownloadEntry): string =>
+  JSON.stringify([serverId, group.key])
+
+/** Whether two rows are one group: the same server and the same `group.key`, whatever their kind or title. */
+export const sameGroup = ({ a, b }: { a: DownloadEntry; b: DownloadEntry }): boolean =>
+  groupIdOf(a) === groupIdOf(b)
 
 /**
  * Newest group first, by the newest `createdAt` among its rows, with a group's rows together
  * in `group.order`. A lone row is a group of one, so it sorts by its own `createdAt`.
  */
 export const sortDownloads = (entries: readonly DownloadEntry[]): DownloadEntry[] => {
-  const keyed = entries.map((entry) => ({ entry, groupId: groupKey(entry) }))
+  const keyed = entries.map((entry) => ({ entry, groupId: groupIdOf(entry) }))
   const newest = keyed.reduce(
     (latest, { entry, groupId }) =>
       latest.set(groupId, Math.max(latest.get(groupId) ?? entry.createdAt, entry.createdAt)),

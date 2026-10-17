@@ -61,7 +61,12 @@ const ASK = { askId: id, serverId: other, serverName: 'Vhagar', autoDelete: fals
 const VIEW = {
   downloadId: id,
   label: 'The Two Towers (2002)',
-  group: { kind: 'saga', title: 'The Lord of the Rings Collection', order: 1 },
+  group: {
+    kind: 'saga',
+    key: 'saga:1:119',
+    title: 'The Lord of the Rings Collection',
+    order: 1,
+  },
   serverName: 'Vhagar',
   size: 15_891_378_995,
   status: { kind: 'downloading', bytes: 12_992_272_384 },
@@ -701,10 +706,13 @@ describe('the download guards', () => {
     expect(isDownloadKind('album')).toBe(false)
   })
 
-  it('accepts a group and refuses one of an unknown kind', () => {
-    expect(isDownloadGroup({ kind: 'season', title: 'Severance', order: 20004 })).toBe(true)
-    expect(isDownloadGroup({ kind: 'album', title: 'Severance', order: 1 })).toBe(false)
-    expect(isDownloadGroup({ kind: 'season', title: 'Severance' })).toBe(false)
+  it('accepts a group and refuses one of an unknown kind or with no key', () => {
+    const group = { kind: 'season', key: 'show:4', title: 'Severance', order: 20004 }
+    expect(isDownloadGroup(group)).toBe(true)
+    expect(isDownloadGroup({ ...group, kind: 'album' })).toBe(false)
+    expect(isDownloadGroup({ kind: 'season', title: 'Severance', order: 20004 })).toBe(false)
+    expect(isDownloadGroup({ ...group, key: 4 })).toBe(false)
+    expect(isDownloadGroup({ kind: 'season', key: 'show:4', title: 'Severance' })).toBe(false)
   })
 
   it('accepts each status and refuses an unknown kind', () => {
