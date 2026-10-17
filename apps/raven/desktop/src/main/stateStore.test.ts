@@ -189,6 +189,15 @@ describe('createStateStore', () => {
     expect(store.isDirty()).toBe(false)
   })
 
+  it('an update that changes nothing marks nothing dirty and writes nothing', async () => {
+    const { store, calls, fire } = setup()
+    store.update((current) => current)
+    expect(store.isDirty()).toBe(false)
+    fire()
+    await settle()
+    expect(writes(calls)).toEqual([])
+  })
+
   it('writes nothing until the timer fires', async () => {
     const { store, calls } = setup()
     store.update(() => named('/a'))
