@@ -26,6 +26,8 @@ import {
   type MediaItem,
   matchTypeFor,
   parseEpisodeName,
+  POSTER_WIDTHS,
+  posterWidthFrom,
   showFolderOf,
   splitCountry,
   ITEM_TYPES,
@@ -300,22 +302,28 @@ export class MatchController {
 
   /**
    * A search result's poster, or a poster, backdrop or logo Edit images
-   * offers, through the cache, so the browser never talks to TMDB.
+   * offers, through the cache, so the browser never talks to TMDB. A poster
+   * comes narrower when `w` asks, as a filmography's thumbnails do.
    */
   @Public()
   @Get('images/:use/:file')
   async candidate(
     @Param('use') use: string,
     @Param('file') file: string,
+    @Query('w') asked: unknown,
     @Res() reply: FastifyReply,
   ): Promise<void> {
     const path = `/${file}`
     if (!isChoosableImageKind(use) || !TMDB_IMAGE_PATH.test(path)) {
       throw new NotFoundException('No such picture')
     }
+    const posterWidth = asked === undefined ? undefined : posterWidthFrom(asked)
+    if (posterWidth === null || (posterWidth !== undefined && use !== 'poster')) {
+      throw new BadRequestException(`w must be one of ${POSTER_WIDTHS.join(', ')}, for a poster`)
+    }
     await sendImage({
       reply,
-      path: await this.images.tmdb({ path, width: IMAGE_WIDTHS[use] }),
+      path: await this.images.tmdb({ path, width: posterWidth ?? IMAGE_WIDTHS[use] }),
       version: file,
     })
   }

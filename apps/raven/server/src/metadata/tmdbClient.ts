@@ -280,7 +280,7 @@ const imagePath = (value: unknown): string | null => {
   return path != null && TMDB_IMAGE_PATH.test(path) ? path : null
 }
 
-const yearOf = (date: string | null): number | null => {
+export const yearOf = (date: string | null): number | null => {
   const year = Number(date?.slice(0, 4) ?? '')
   return date != null && /^\d{4}/.test(date) && year > 0 ? year : null
 }

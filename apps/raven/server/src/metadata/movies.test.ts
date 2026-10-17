@@ -14,6 +14,7 @@ import {
   isMediaItem,
   isMediaList,
   isMetadataHealth,
+  isPersonDetails,
   isRecord,
   isSagaList,
   sagaCover,
@@ -454,20 +455,52 @@ describe('movie metadata', () => {
     expect(avatar.rawPayload.equals(FAKE_JPEG)).toBe(true)
   })
 
-  it("serves a person's page with what raven holds of theirs", async () => {
+  it("serves a person's page with their whole filmography from TMDB, and what raven holds of theirs", async () => {
     const matrix = (await list()).find((item) => item.item?.title === 'The Matrix')
     const details = shape({
       response: await app().inject({ method: 'GET', url: `/api/items/${matrix?.item?.id}` }),
       guard: isItemDetails,
     })
-    const keanu = details.credits.find((credit) => credit.name === 'Keanu Reeves')
-    const response = await app().inject({ method: 'GET', url: `/api/people/${keanu?.personId}` })
-    expect(response.statusCode).toBe(200)
-    expect(response.json()).toMatchObject({
-      name: 'Keanu Reeves',
-      tmdbId: expect.any(String),
+    const personAt = async (name: string) => {
+      const personId = details.credits.find((credit) => credit.name === name)?.personId
+      return app().inject({ method: 'GET', url: `/api/people/${personId}` })
+    }
+
+    // TMDB is away the first time anyone asks for him, so the page has only raven's credits.
+    tmdb.state.down = true
+    const fishburne = shape({
+      response: await personAt('Laurence Fishburne'),
+      guard: isPersonDetails,
+    })
+    tmdb.state.down = false
+    expect(fishburne).toMatchObject({
+      name: 'Laurence Fishburne',
       profile: null,
       filmography: { state: 'unavailable' },
+      credits: expect.arrayContaining([
+        expect.objectContaining({
+          item: expect.objectContaining({ title: 'The Matrix' }),
+          job: 'cast',
+          role: 'Morpheus',
+        }),
+      ]),
+    })
+
+    const response = await personAt('Keanu Reeves')
+    expect(response.statusCode).toBe(200)
+    expect(String(response.headers['cache-control'] ?? '')).not.toContain('public')
+    const keanu = shape({ response, guard: isPersonDetails })
+    expect(keanu).toMatchObject({
+      name: 'Keanu Reeves',
+      tmdbId: '6384',
+      profile: {
+        imdbId: 'nm0000206',
+        birthday: '1964-09-02',
+        deathday: null,
+        placeOfBirth: 'Beirut, Lebanon',
+        biography: 'Keanu Charles Reeves is a Canadian actor.',
+        knownFor: 'Acting',
+      },
       credits: expect.arrayContaining([
         expect.objectContaining({
           item: expect.objectContaining({ title: 'The Matrix' }),
@@ -476,7 +509,40 @@ describe('movie metadata', () => {
         }),
       ]),
     })
+    expect(keanu.credits.every((credit) => !('tmdbId' in credit))).toBe(true)
+    const { filmography } = keanu
+    if (filmography.state !== 'ready') throw new Error(`Filmography ${filmography.state}`)
+    const entry = (title: string) => filmography.entries.find((found) => found.title === title)
+    expect(entry('The Matrix')?.item).toMatchObject({ id: matrix?.item?.id, title: 'The Matrix' })
+    expect(entry('John Wick')).toMatchObject({ item: null, poster: '/poster245891.jpg' })
+    expect(entry('The Late Show')?.credits).toEqual([
+      { department: 'acting', role: 'Self', episodes: 3, isSelf: true },
+    ])
+    expect(entry('Bill & Ted Face the Music')?.credits).toEqual([
+      { department: 'producing', role: 'Executive Producer', episodes: null, isSelf: false },
+    ])
+    expect(entry('A Film With Thanks')).toBeUndefined()
+    // TMDB's filmography leaves Heat out, so raven's own credit on it stands in.
+    expect(entry('Heat')).toMatchObject({ tmdbId: '949', released: null, item: { title: 'Heat' } })
     expect((await app().inject({ method: 'GET', url: '/api/people/99999' })).statusCode).toBe(404)
+  })
+
+  it("serves a filmography's TMDB posters at the width a thumbnail asks for", async () => {
+    const at = (query: string) =>
+      app().inject({ method: 'GET', url: `/api/images/poster/poster245891.jpg${query}` })
+    const small = await at('?w=185')
+    expect(small.statusCode).toBe(200)
+    expect(small.rawPayload.equals(FAKE_JPEG)).toBe(true)
+    expect(tmdb.state.calls).toContain('https://image.tmdb.org/t/p/w185/poster245891.jpg')
+    expect((await at('')).statusCode).toBe(200)
+    expect(tmdb.state.calls).toContain('https://image.tmdb.org/t/p/w500/poster245891.jpg')
+    expect((await at('?w=200')).statusCode).toBe(400)
+    const backdrop = await app().inject({
+      method: 'GET',
+      url: '/api/images/backdrop/backdrop603.jpg?w=185',
+    })
+    expect(backdrop.statusCode).toBe(400)
+    expect(tmdb.state.calls.some((url) => url.includes('/w200/'))).toBe(false)
   })
 
   it("serves the poster beside the movie, scaled, and TMDB's backdrop from the cache", async () => {

@@ -38,6 +38,7 @@ import {
   testConfig,
 } from '@/test/app'
 import { encodeClip } from '@/test/clips'
+import { fakeTmdb } from '@/test/fakeTmdb'
 import { apiFor } from '@/test/server'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
 
@@ -316,6 +317,82 @@ describe('a library locked behind the PIN', () => {
     )
     expect(statuses).toEqual([401, 401, 401, 401, 401, 429])
     await expect(api().unlock('3001')).rejects.toMatchObject({ status: 429 })
+  })
+})
+
+/** A title only a locked library holds is on raven for a person's page only once the PIN opens it. */
+describe("a person's filmography beside a locked library", () => {
+  const state: {
+    root: string
+    admin: string
+    pin: string
+    matrix: number
+    keanu: number
+    app: NestFastifyApplication | null
+  } = { root: '', admin: '', pin: '', matrix: 0, keanu: 0, app: null }
+  const app = (): NestFastifyApplication => {
+    if (!state.app) throw new Error('app not started')
+    return state.app
+  }
+  const at = (...parts: string[]) => join(state.root, 'media', ...parts)
+
+  beforeAll(async () => {
+    state.root = await mkdtemp(join(tmpdir(), 'raven-locked-people-'))
+    await encodeClip({ path: at('Private', 'The Matrix (1999).mp4'), seconds: 1 })
+    state.app = await createApp({
+      config: {
+        ...testConfig({ dataDir: join(state.root, 'data'), mediaDir: state.root }),
+        libraryPin: '3001',
+        tmdbApiToken: 'test-token',
+      },
+      quiet: true,
+      watch: NOT_WATCHING,
+      metadataFetch: fakeTmdb({
+        movies: [{ id: 603, title: 'The Matrix', released: '1999-03-31' }],
+      }).fetch,
+    })
+    await state.app.init()
+    state.admin = await adminCookie(state.app)
+    const library = await apiFor({ app: app(), cookie: state.admin }).createLibrary({
+      name: 'Films',
+      paths: [at('Private')],
+      settings: { kind: 'movies', locked: true },
+    })
+    await app().get(ScannerService).whenIdle(library.id)
+    await app().get(MetadataService).whenIdle()
+    await app().get(ThumbnailService).whenIdle()
+    const metadata = app().get(MetadataRepository)
+    state.matrix = metadata.find({ type: 'movie', tmdbId: '603' })?.id ?? 0
+    state.keanu =
+      metadata.credits(state.matrix).find((credit) => credit.name === 'Keanu Reeves')?.personId ?? 0
+    state.pin = cookieSet(
+      await app().inject({ method: 'POST', url: '/api/lock/unlock', payload: { pin: '3001' } }),
+    )
+  })
+
+  afterAll(async () => {
+    await state.app?.close()
+    await rm(state.root, { recursive: true, force: true, maxRetries: 5 })
+  })
+
+  it('names the item only for a browser the PIN opened the library for', async () => {
+    const pageFor = async (...cookie: string[]) => {
+      const person = await apiFor({ app: app(), cookie: cookies(...cookie) }).getPerson(state.keanu)
+      if (person.filmography.state !== 'ready') {
+        throw new Error(`Filmography ${person.filmography.state}`)
+      }
+      return {
+        matrix: person.filmography.entries.find((entry) => entry.tmdbId === '603')?.item ?? null,
+        credits: person.credits.map((credit) => credit.item.id),
+      }
+    }
+    expect(await pageFor(state.admin)).toEqual({ matrix: null, credits: [] })
+    // While the admin lock holds, the PIN opens nothing.
+    expect(await pageFor(state.pin)).toEqual({ matrix: null, credits: [] })
+    expect(await pageFor(state.admin, state.pin)).toEqual({
+      matrix: expect.objectContaining({ id: state.matrix, title: 'The Matrix' }),
+      credits: [state.matrix],
+    })
   })
 })
 

@@ -87,6 +87,19 @@ export type StoredItem = {
   number: number | null
 }
 
+/** A credit on a movie or show raven holds, with the title's TMDB id, which only the server reads. */
+export type LocalCredit = PersonDetails['credits'][number] & { tmdbId: string }
+
+/** A person as raven's own credits know them; what TMDB says of them is the people store's. */
+export type StoredPerson = Pick<PersonDetails, 'id' | 'tmdbId' | 'name' | 'photoVersion'> & {
+  credits: LocalCredit[]
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/** A person whose filmography was fetched this recently keeps their id with no credits left. */
+const FILMOGRAPHY_KEPT_DAYS = 180
+
 const genresOf = (json: string): string[] => parseJsonAs({ json, guard: isStringArray }) ?? []
 
 /** Movies, shows, seasons and episodes as TMDB describes them, with their people, scores and pictures. */
@@ -674,7 +687,7 @@ export class MetadataRepository {
   }
 
   /** A person's page: the movies and shows on disk they are credited on, newest first. */
-  person(id: number): PersonDetails | null {
+  person(id: number): StoredPerson | null {
     const row = this.db
       .prepare<[number], { id: number; tmdb_id: string; name: string; photo: string | null }>(
         'SELECT id, tmdb_id, name, photo FROM people WHERE id = ?',
@@ -682,9 +695,12 @@ export class MetadataRepository {
       .get(id)
     if (!row) return null
     const credits = this.db
-      .prepare<[number, number], { item_id: number; job: string; role: string | null }>(
+      .prepare<
+        [number, number],
+        { item_id: number; tmdb_id: string; job: string; role: string | null }
+      >(
         `WITH RECURSIVE ${under('SELECT item_id, item_id FROM credits WHERE person_id = ?')}
-         SELECT c.item_id, c.job, c.role
+         SELECT c.item_id, i.tmdb_id, c.job, c.role
            FROM credits c JOIN items i ON i.id = c.item_id
           WHERE c.person_id = ? AND i.type IN ('movie', 'show')
             AND c.item_id IN (SELECT u.root FROM under u JOIN media_items mi ON mi.item_id = u.id)
@@ -697,11 +713,11 @@ export class MetadataRepository {
       tmdbId: row.tmdb_id,
       name: row.name,
       photoVersion: row.photo == null ? null : versionOf(`tmdb:${row.photo}`),
-      profile: null,
-      filmography: { state: 'unavailable' },
       credits: credits.flatMap((credit) => {
         const item = summaries.get(credit.item_id)
-        return item && isCreditJob(credit.job) ? [{ item, job: credit.job, role: credit.role }] : []
+        return item && isCreditJob(credit.job)
+          ? [{ item, job: credit.job, role: credit.role, tmdbId: credit.tmdb_id }]
+          : []
       }),
     }
   }
@@ -819,10 +835,28 @@ export class MetadataRepository {
       .map((row) => row.library_id)
   }
 
+  /** `librariesHolding` for each item at once; an item no library holds is left out. */
+  librariesHoldingEach(itemIds: readonly number[]): Map<number, number[]> {
+    if (itemIds.length === 0) return new Map()
+    return this.db
+      .prepare<[string], { root: number; library_id: number }>(
+        `WITH RECURSIVE ${under('SELECT value, value FROM json_each(?)')}
+         SELECT DISTINCT u.root, m.library_id FROM under u
+           JOIN media_items mi ON mi.item_id = u.id
+           JOIN media m ON m.id = mi.media_id`,
+      )
+      .all(JSON.stringify([...new Set(itemIds)]))
+      .reduce(
+        (byItem, row) => byItem.set(row.root, [...(byItem.get(row.root) ?? []), row.library_id]),
+        new Map<number, number[]>(),
+      )
+  }
+
   /**
    * Removes movies with no file, shows and seasons with nothing under them,
-   * and people left with no credits. Returns what is still stored, for the
-   * image cache's sweep.
+   * and people left with no credits, but for those whose filmography was
+   * fetched in the last 180 days, so a person someone looked at keeps their
+   * page. Returns what is still stored, for the image cache's sweep.
    */
   clearUp(): { tmdbPaths: Set<string>; itemIds: Set<number> } {
     this.db.transaction(() => {
@@ -835,8 +869,13 @@ export class MetadataRepository {
         DELETE FROM items WHERE type = 'show'
           AND id NOT IN (SELECT parent_id FROM items WHERE parent_id IS NOT NULL)
           AND id NOT IN (SELECT item_id FROM media_items);
-        DELETE FROM people WHERE id NOT IN (SELECT person_id FROM credits);
       `)
+      this.db
+        .prepare<[string]>(
+          `DELETE FROM people WHERE id NOT IN (SELECT person_id FROM credits)
+             AND (filmography_fetched_at IS NULL OR filmography_fetched_at < ?)`,
+        )
+        .run(new Date(Date.now() - FILMOGRAPHY_KEPT_DAYS * DAY_MS).toISOString())
     })()
     const tmdbPaths = new Set(
       this.db

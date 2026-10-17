@@ -56,6 +56,8 @@ import { MetadataService } from '@/metadata/metadataService'
 import { OmdbClient } from '@/metadata/omdbClient'
 import { OmdbScores } from '@/metadata/omdbScores'
 import { METADATA_FETCH, type MetadataFetch, TmdbClient } from '@/metadata/tmdbClient'
+import { Filmographies } from '@/people/filmographies'
+import { PeopleRepository } from '@/people/peopleRepository'
 import { PlaybackController } from '@/playback/playbackController'
 import { SubtitlesService } from '@/playback/subtitlesService'
 import { StreamsController } from '@/streams/streamsController'
@@ -142,6 +144,7 @@ export class AppModule {
         SettingsRepository,
         ItemImagesRepository,
         MetadataRepository,
+        PeopleRepository,
         ItemOverrides,
         SagaBackdrops,
         MediaRepository,
@@ -155,6 +158,7 @@ export class AppModule {
         AiDecisions,
         TmdbClient,
         MatchFactsCache,
+        Filmographies,
         OmdbClient,
         AiClient,
         AiMatcher,
