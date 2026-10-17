@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@raven/ui'
 import { useDesktop } from '@/renderer/desktop/DesktopContext'
+import { Downloads } from '@/renderer/SettingsPage/Downloads'
 import { Servers } from '@/renderer/SettingsPage/Servers'
 import styles from '@/renderer/SettingsPage/SettingsPage.module.scss'
 import { ThisComputer } from '@/renderer/SettingsPage/ThisComputer'
@@ -43,6 +44,7 @@ export const SettingsPage = () => {
         </h1>
       </header>
       <Servers className={styles.servers} />
+      <Downloads className={styles.downloads} />
       <ThisComputer className={styles.computer} />
       <Updates className={styles.updates} />
       <section className={styles.section} aria-labelledby="recents-title">

@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@raven/ui'
 import { useDesktop } from '@/renderer/desktop/DesktopContext'
+import { isInProgress, useDownloads } from '@/renderer/desktop/downloadsApi'
 import styles from '@/renderer/HomePage/HomePage.module.scss'
 import { RECENTS_KEY, useOpenReply } from '@/renderer/Shell/openReply'
 import { useDragging } from '@/renderer/Shell/Shell'
@@ -10,6 +11,28 @@ import type { RecentView } from '@/shared/protocol'
 
 export const watchedLabel = (watched: number | null): string =>
   watched === null ? 'Not started' : `${Math.round(watched * 100)}% watched`
+
+/** Downloads' button, with the count of what is still queued or downloading. */
+const DownloadsButton = () => {
+  const navigate = useNavigate()
+  const downloads = useDownloads()
+  const count = (downloads.data?.downloads ?? []).filter(isInProgress).length
+  return (
+    <span className={styles.downloads}>
+      <Button
+        icon="download"
+        aria-label={count === 0 ? 'Downloads' : `Downloads, ${count} in progress`}
+        onClick={() => void navigate('/downloads')}
+      />
+      {/* The button's name says the count, so the badge is for the eye only. */}
+      {count > 0 && (
+        <span className={styles.badge} aria-hidden="true">
+          {count}
+        </span>
+      )}
+    </span>
+  )
+}
 
 export const HomePage = () => {
   const { client } = useDesktop()
@@ -47,6 +70,7 @@ export const HomePage = () => {
         <h1 id="home-title" tabIndex={-1} ref={title}>
           raven player
         </h1>
+        <DownloadsButton />
         <Button icon="settings" aria-label="Settings" onClick={() => void navigate('/settings')} />
       </header>
       <section className={styles.open} aria-labelledby="open-title">
