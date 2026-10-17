@@ -34,11 +34,17 @@ const TMDB_ROUND = 50
 export const GIVE_UP_AFTER = 3
 
 /**
- * How many times the source that settles a Refresh's request may fail on
- * its title before the Refresh gives the title up, so one that source
- * always fails on cannot hold the Refresh open, or keep spending calls.
+ * How many failures of the source that settles a Refresh's request, counted
+ * at most once per `RETRY_MS`, it takes to give the title up, so one that
+ * source always fails on cannot hold the Refresh open for good.
  */
 export const REQUEST_TRIES = 3
+
+/** How old the first of those failures must be, so an outage or presses close together give nothing up. */
+export const REQUEST_PATIENCE_MS = 24 * 60 * 60 * 1000
+
+/** The failures counted on one requested title: how many, and when the first and the last were. */
+type RequestFailures = { count: number; firstAt: number; lastAt: number }
 
 /** Why the sweep stopped with scores still due, and when it starts again. */
 export type ScorePause = { reason: 'budget' | 'unavailable'; resumesAt: string }
@@ -109,8 +115,8 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
     isClosed: boolean
     /** The items each source failed on, which later rounds and drains skip until it answers again. */
     failed: Record<Asked, ReadonlySet<number>>
-    /** How often the source that settles each requested item has failed on it, since a restart. */
-    requestFailures: ReadonlyMap<number, number>
+    /** The failures counted on each requested item by the source that settles it, since a restart. */
+    requestFailures: ReadonlyMap<number, RequestFailures>
   } = {
     pause: null,
     wake: null,
@@ -160,14 +166,15 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   /**
-   * Why the titles a Refresh asked for wait, and until when: the sweep's own
-   * pause, else midnight UTC while the source that settles them has spent
-   * its day, which `pause` leaves out while another source still has calls.
+   * Why the titles a Refresh asked for wait, and until when: midnight UTC
+   * while the source that settles them has spent its day, whatever else
+   * waits, as nothing settles them before; else the sweep's own pause.
    */
   requestsPause(): ScorePause | null {
-    if (this.state.pause) return this.state.pause
-    if (!this.isSettlerSpent()) return null
-    return { reason: 'budget', resumesAt: afterMidnight(new Date()).toISOString() }
+    if (this.isSettlerSpent()) {
+      return { reason: 'budget', resumesAt: afterMidnight(new Date()).toISOString() }
+    }
+    return this.state.pause
   }
 
   private async drain(): Promise<void> {
@@ -290,8 +297,9 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
 
   /**
    * Counts the failures of the source that settles a Refresh's requests on
-   * the titles it asked for, and gives up each title it has failed on
-   * `REQUEST_TRIES` times: its request goes, and it keeps the scores it had.
+   * the titles it asked for, one at most per `RETRY_MS` for each, and gives
+   * up each title with `REQUEST_TRIES` of them, the first a day old or more:
+   * its request goes, and it keeps the scores it had.
    */
   private countRequestFailures({
     round,
@@ -301,20 +309,23 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
     failedIds: readonly number[]
   }): void {
     if (round.asked !== (this.scores.settler()?.provider ?? 'tmdb')) return
+    const now = Date.now()
     const failed = new Set(failedIds)
     const counts = round.due
       .filter((title) => title.isRequested && failed.has(title.itemId))
-      .reduce(
-        (counted, { itemId }) => counted.set(itemId, (counted.get(itemId) ?? 0) + 1),
-        new Map(this.state.requestFailures),
-      )
-    const givenUp = [...counts].flatMap(([itemId, count]) =>
-      count >= REQUEST_TRIES ? [itemId] : [],
+      .reduce((counted, { itemId }) => {
+        const before = counted.get(itemId)
+        if (before == null) return counted.set(itemId, { count: 1, firstAt: now, lastAt: now })
+        if (now - before.lastAt < RETRY_MS) return counted
+        return counted.set(itemId, { ...before, count: before.count + 1, lastAt: now })
+      }, new Map(this.state.requestFailures))
+    const givenUp = [...counts].flatMap(([itemId, { count, firstAt }]) =>
+      count >= REQUEST_TRIES && now - firstAt >= REQUEST_PATIENCE_MS ? [itemId] : [],
     )
     givenUp.forEach((itemId) => {
       this.metadata.clearRequest(itemId)
       this.logger.warn(
-        `Gave up on item ${itemId} for a Refresh after ${REQUEST_TRIES} failed calls; it keeps the scores it had.`,
+        `Gave up on item ${itemId} for a Refresh after a day of failed calls; it keeps the scores it had.`,
       )
     })
     this.state.requestFailures = new Map(
@@ -326,9 +337,16 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
    * Settles the requests the source that settles them has answered since
    * their Refresh began, which matters once that source has changed (a key
    * refused or taken away), forgets the failures counted on titles no
-   * longer requested, and finishes each Refresh with nothing left.
+   * longer requested, and finishes each Refresh with nothing left. Once no
+   * source can settle a request at all, every Refresh stops waiting.
    */
   private settle(): void {
+    if (!this.canSettle() && this.metadata.hasRequests()) {
+      this.metadata.clearRequests()
+      this.logger.warn(
+        'No source can answer a Refresh now, so it stops waiting; its titles keep the scores they had.',
+      )
+    }
     const settler = this.scores.settler()
     if (settler != null) this.metadata.settleRequests(settler.provider)
     this.state.requestFailures = new Map(
@@ -346,7 +364,9 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
   private nextRound(): Round | null {
     const before = scoresDueBefore()
     const primary = this.scores.primary()
-    if (primary == null) return this.scores.settler() == null ? this.tmdbRound() : null
+    if (primary == null) {
+      return this.scores.settler() == null && this.tmdb.enabled ? this.tmdbRound() : null
+    }
     const first = this.sourceRound({
       source: primary,
       before,
@@ -385,8 +405,9 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
       isCurrent,
       isSpent: () => source.remaining() === 0,
       fetch: async (title) => {
-        if (title.isRequested) await this.fetchTmdbScore(title)
-        if (this.state.isClosed) return false
+        if (title.isRequested && this.tmdb.enabled) await this.fetchTmdbScore(title)
+        // While TMDB answered, another title's call may have spent this source's day; the next round asks.
+        if (this.state.isClosed || !isCurrent()) return false
         return fetch(title)
       },
     }
@@ -487,7 +508,7 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
           streak.failedInARow = 0
           return 'answered'
         }
-        if (isSpent() || !isCurrent()) return 'skipped'
+        if (this.state.isClosed || isSpent() || !isCurrent()) return 'skipped'
         streak.failedInARow += 1
         return 'failed'
       },

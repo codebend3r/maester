@@ -860,6 +860,11 @@ export class MetadataRepository {
     this.db.prepare('DELETE FROM score_requests WHERE item_id = ?').run(itemId)
   }
 
+  /** Drops every request, for when no source could ever answer one. */
+  clearRequests(): void {
+    this.db.prepare('DELETE FROM score_requests').run()
+  }
+
   /**
    * Settles each request `provider` has answered since its Refresh began:
    * those it answered before it became the provider that settles them.

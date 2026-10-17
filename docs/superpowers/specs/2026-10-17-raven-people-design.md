@@ -225,11 +225,11 @@ Migration 28:
 
   Should that source change mid-Refresh (a key refused or taken away), what the new one already answered since the Refresh began settles too.
 - **Retries.** A drain that leaves requests the settling source can still be asked for today wakes 15 minutes later, with the status `waiting` for `unavailable` until then, so a requested title that failed is asked again the same day: 15 minutes after a drain that got answers, which forgets its failures, and 30 minutes or more after one that got none, whose failures the next drain still skips.
-- **Giving up.** After three failures of the settling source on a requested title, counted since a restart, the request goes with a log line naming the item's id, and the title keeps the scores it had.
-- **Nothing to settle.** With no score source that has a usable key and TMDB off or refused, no request could ever settle, so a Refresh asks for nothing and its ratings part finishes at once while the quick scan runs.
-- **Starting and finishing.** The requests and the Refresh's start are written in one transaction. A Refresh whose last request left outside the sweep (the title deleted, or settled by Refresh details) finishes when its status is next read.
+- **Giving up.** The settling source's failures on a requested title are counted at most once every 15 minutes, since a restart, so an outage or presses close together give nothing up. Once a title has three counted failures and the first of them is a day old or more, its request goes with a log line naming the item's id, and the title keeps the scores it had.
+- **Nothing to settle.** With no score source that has a usable key and TMDB off or refused, no request could ever settle, so a Refresh asks for nothing and its ratings part finishes at once while the quick scan runs. Should that come about mid-Refresh, say TMDB refusing the token of a server with no score source, every request goes with one log line, and the light TMDB fetch is not tried while TMDB is off or refused.
+- **Starting and finishing.** The requests and the Refresh's start are written in one transaction. A Refresh whose last request left outside the sweep (the title deleted, or settled by Refresh details) finishes when its status is next read, or when Refresh is pressed again, which then starts a new one.
 - **Status.** `Library.ratingsRefresh` is one of:
   - `idle` (`finishedAt`);
   - `running` (`done`, `total`, `startedAt`);
-  - `waiting` (also `reason`: `budget` or `unavailable`, and `resumesAt`). `budget` covers the sweep's own pause and a day the settling source's calls are spent while another source still has calls.
+  - `waiting` (also `reason`: `budget` or `unavailable`, and `resumesAt`). `budget`, with midnight UTC, whenever the settling source's calls for the day are spent, even while the sweep waits on another source that failed, as nothing settles a request before then; else the sweep's own pause.
 - **Card and header.** Refresh shows beside Rescan, under the admin lock. The status line reads `Refreshing ratings · <done> of <total>`, or `Ratings: <done> of <total> · the rest after midnight UTC (daily limit)`.
