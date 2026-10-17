@@ -2,14 +2,16 @@ import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ItemDetails } from '@raven/core'
-import { Route, Routes } from 'react-router-dom'
+import { Route, Routes, useParams } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { SeasonPage } from '@/pages/SeasonPage/SeasonPage'
 import { renderWithProviders } from '@/test/render'
-import { SEASON_ONE, SEVERANCE } from '@/test/tv'
+import { EPISODE_ONE, EPISODE_TWO, SEASON_ONE, SEVERANCE } from '@/test/tv'
+
+const Watching = () => <p>Watching {useParams().id}</p>
 
 describe('SeasonPage', () => {
-  const spies = { item: spyOn(api, 'getItem') }
+  const spies = { item: spyOn(api, 'getItem'), random: spyOn(api, 'randomEpisode') }
 
   const open = (route = '/shows/4/seasons/1') => {
     spies.item.mockImplementation(async (id) => {
@@ -20,12 +22,16 @@ describe('SeasonPage', () => {
     renderWithProviders(
       <Routes>
         <Route path="shows/:id/seasons/:number" element={<SeasonPage />} />
+        <Route path="watch/:id" element={<Watching />} />
       </Routes>,
       { route },
     )
   }
 
-  afterEach(() => spies.item.mockReset())
+  afterEach(() => {
+    spies.item.mockReset()
+    spies.random.mockReset()
+  })
 
   it('lists the episodes on disk in order, each with its air date, length and Play', async () => {
     open()
@@ -44,6 +50,18 @@ describe('SeasonPage', () => {
       '/watch/13',
     )
     expect(within(rows[1] ?? list).getByText('Partly watched')).toBeInTheDocument()
+  })
+
+  it('plays a random episode of the season, or of the whole show, on Shuffle', async () => {
+    spies.random.mockImplementation(async (id) => (id === 5 ? EPISODE_ONE : EPISODE_TWO))
+    open()
+    await userEvent.click(await screen.findByRole('button', { name: 'Shuffle season' }))
+    expect(await screen.findByText('Watching 12')).toBeInTheDocument()
+    cleanup()
+    open()
+    await userEvent.click(await screen.findByRole('button', { name: 'Shuffle show' }))
+    expect(await screen.findByText('Watching 13')).toBeInTheDocument()
+    expect(spies.random.mock.calls).toEqual([[5], [4]])
   })
 
   it('shows every row from the season alone, asking for no episode', async () => {

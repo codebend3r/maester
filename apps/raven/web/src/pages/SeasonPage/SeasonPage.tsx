@@ -16,6 +16,7 @@ import { SelectButton } from '@/components/SelectButton/SelectButton'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { SelectionBar } from '@/components/SelectionBar/SelectionBar'
 import { SelectionScope, sourceOf } from '@/components/SelectionScope/SelectionScope'
+import { ShuffleButton } from '@/components/ShuffleButton/ShuffleButton'
 import { Summary } from '@/components/Summary/Summary'
 import { TmdbCredit } from '@/components/TmdbCredit/TmdbCredit'
 import { WatchedMark } from '@/components/WatchedMark/WatchedMark'
@@ -121,6 +122,7 @@ const SeasonView = ({ show, season }: { show: ItemDetails; season: ItemDetails }
   const next = episodes.find((episode) => !episode.watched && episode.primary != null)
   const nextFile = next?.primary ?? null
   const nextCode = next ? episodeCode(next) : null
+  const hasFiles = episodes.some((episode) => episode.primary != null)
   const toggle = useWatchedToggle({
     state: watchedStateOf({ watched: watchedCount, total: count }),
     targets: [{ kind: 'item', id: season.id, libraryId: null }],
@@ -162,6 +164,8 @@ const SeasonView = ({ show, season }: { show: ItemDetails; season: ItemDetails }
               {nextCode ? `Play ${nextCode}` : 'Play'}
             </ButtonLink>
           )}
+          {hasFiles && <ShuffleButton itemId={season.id}>Shuffle season</ShuffleButton>}
+          {hasFiles && <ShuffleButton itemId={show.id}>Shuffle show</ShuffleButton>}
           <WatchedToggle {...toggle} />
           <SelectButton />
         </ItemHeader>
@@ -189,8 +193,9 @@ const SeasonView = ({ show, season }: { show: ItemDetails; season: ItemDetails }
 
 /**
  * `/shows/:id/seasons/:number`: a season's poster under its show's
- * backdrop, how much of it is watched and Play for the next episode, its
- * summary, then its episodes on disk in order.
+ * backdrop, how much of it is watched, Play for the next episode and Shuffle
+ * for a random one of the season or the show, its summary, then its episodes
+ * on disk in order.
  */
 export const SeasonPage = () => {
   const showId = useRouteId()

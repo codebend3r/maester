@@ -1,0 +1,48 @@
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Button } from '@raven/ui'
+import { api } from '@/lib/api'
+import { watchLink } from '@/lib/itemLinks'
+
+type PickState = 'idle' | 'picking' | 'empty'
+
+const LABELS = {
+  idle: null,
+  picking: 'Picking',
+  empty: 'Nothing to play',
+} as const satisfies Record<PickState, string | null>
+
+/**
+ * Plays an episode picked at random from under `itemId`, a show or a season,
+ * among the files this browser may see. The server picks, so a show's page
+ * offers it without loading a single episode. `children` is the label,
+ * "Shuffle" or "Shuffle season".
+ */
+export const ShuffleButton = ({ itemId, children }: { itemId: number; children: string }) => {
+  const navigate = useNavigate()
+  const [state, setState] = useState<PickState>('idle')
+  const pick = () => {
+    setState('picking')
+    api
+      .randomEpisode(itemId)
+      .then((media) => {
+        if (!media) {
+          setState('empty')
+          return
+        }
+        const link = watchLink({ media })
+        navigate(link.to, { state: link.state })
+      })
+      .catch(() => setState('idle'))
+  }
+  return (
+    <Button
+      icon="shuffle"
+      onClick={pick}
+      disabled={state !== 'idle'}
+      aria-busy={state === 'picking'}
+    >
+      {LABELS[state] ?? children}
+    </Button>
+  )
+}

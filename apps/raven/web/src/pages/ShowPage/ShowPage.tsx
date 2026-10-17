@@ -17,6 +17,7 @@ import { SelectButton } from '@/components/SelectButton/SelectButton'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { SelectionBar } from '@/components/SelectionBar/SelectionBar'
 import { SelectionScope, sourceOf } from '@/components/SelectionScope/SelectionScope'
+import { ShuffleButton } from '@/components/ShuffleButton/ShuffleButton'
 import { Summary } from '@/components/Summary/Summary'
 import { TmdbCredit } from '@/components/TmdbCredit/TmdbCredit'
 import { WatchedCount } from '@/components/WatchedCount/WatchedCount'
@@ -76,10 +77,11 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
   const libraryName = useQuery(librariesQuery).data?.find((entry) => entry.id === libraryId)?.name
   const code = next.data?.item ? episodeCode(next.data.item) : null
   const seasons = details.children.flatMap((child) => (child.type === 'season' ? [child] : []))
+  const episodeCount = seasons.reduce((sum, season) => sum + season.episodeCount, 0)
   const toggle = useWatchedToggle({
     state: watchedStateOf({
       watched: seasons.reduce((sum, season) => sum + season.watchedCount, 0),
-      total: seasons.reduce((sum, season) => sum + season.episodeCount, 0),
+      total: episodeCount,
     }),
     targets: [{ kind: 'item', id: details.id, libraryId: null }],
   })
@@ -148,6 +150,7 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
               {code ? `Play ${code}` : 'Play'}
             </ButtonLink>
           )}
+          {episodeCount > 0 && <ShuffleButton itemId={details.id}>Shuffle</ShuffleButton>}
           <WatchedToggle {...toggle} />
           <SelectButton />
         </ItemHeader>
@@ -217,9 +220,9 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
 }
 
 /**
- * `/shows/:id`: a show's backdrop, poster, creator, years, network, scores
- * and Play for the next episode, then its summary, its seasons as posters in
- * a row, its people and its reviews.
+ * `/shows/:id`: a show's backdrop, poster, creator, years, network, scores,
+ * Play for the next episode and Shuffle for a random one, then its summary,
+ * its seasons as posters in a row, its people and its reviews.
  */
 export const ShowPage = () => {
   const page = useRouteItem('show')

@@ -443,6 +443,42 @@ export class MediaRepository {
   }
 
   /**
+   * An episode on disk under `itemId`, a show or a season, picked at random:
+   * every episode is as likely as the next, however many files it has, and
+   * the best of its files in `libraryIds` is the one. Null with no episode
+   * there to play. `roll` is the die, 0 up to 1, so a test can load it.
+   */
+  randomEpisode({
+    itemId,
+    libraryIds,
+    roll = Math.random,
+  }: {
+    itemId: number
+    libraryIds: readonly number[]
+    roll?: () => number
+  }): MediaItem | null {
+    const rows = this.db
+      .prepare<[number, number, string], { media_id: number }>(
+        `WITH files AS (
+           SELECT m.id AS media_id, e.id AS episode_id, COALESCE(m.width * m.height, 0) AS pixels
+             FROM media m
+             JOIN media_items mi ON mi.media_id = m.id
+             JOIN shown_items e ON e.id = mi.item_id AND e.type = 'episode'
+             JOIN shown_items s ON s.id = e.parent_id
+            WHERE (s.id = ? OR s.parent_id = ?)
+              AND m.library_id IN (SELECT value FROM json_each(?))),
+         ranked AS (
+           SELECT episode_id, media_id,
+                  ROW_NUMBER() OVER (PARTITION BY episode_id ORDER BY pixels DESC, media_id) AS rank
+             FROM files)
+         SELECT media_id FROM ranked WHERE rank = 1 ORDER BY episode_id`,
+      )
+      .all(itemId, itemId, JSON.stringify(libraryIds))
+    const picked = rows[Math.min(rows.length - 1, Math.floor(roll() * rows.length))]
+    return picked == null ? null : this.get(picked.media_id)
+  }
+
+  /**
    * The episodes among `ids` that are watched, each once for every library
    * where one of its files is: a page counts only the libraries it may show.
    */

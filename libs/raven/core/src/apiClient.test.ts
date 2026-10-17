@@ -583,6 +583,12 @@ describe('the metadata calls', () => {
     expect(calls[0]?.url).toBe('http://nas:8484/api/items/4/next')
   })
 
+  it('asks for a random episode of a show or a season, which may be none', async () => {
+    const { client, calls } = clientReturning(respond({ body: null }))
+    await expect(client.randomEpisode(5)).resolves.toBeNull()
+    expect(calls[0]?.url).toBe('http://nas:8484/api/items/5/random')
+  })
+
   it("re-points a show's files", async () => {
     const { client, calls } = clientReturning(respond({ body: itemDetails() }))
     await client.setItemMatch({ itemId: 4, tmdbId: '95396' })
