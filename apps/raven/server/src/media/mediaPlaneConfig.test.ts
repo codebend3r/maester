@@ -97,8 +97,9 @@ describe('parseWebOrigins and isAllowedWebOrigin', () => {
     )
   })
 
-  it('matches a * inside the first label ahead of a literal tail', () => {
+  it('matches a * anywhere in the first label', () => {
     const allowed = parseWebOrigins('https://deploy-preview-*--raven-player.netlify.app').origins
+    expect(allowed).toHaveLength(1)
     expect(
       isAllowedWebOrigin({
         origin: 'https://deploy-preview-12--raven-player.netlify.app',
@@ -108,16 +109,26 @@ describe('parseWebOrigins and isAllowedWebOrigin', () => {
     expect(
       isAllowedWebOrigin({ origin: 'https://deploy-preview---raven-player.netlify.app', allowed }),
     ).toBe(false)
+    expect(isAllowedWebOrigin({ origin: 'https://a.b--raven-player.netlify.app', allowed })).toBe(
+      false,
+    )
+    const atEnd = parseWebOrigins('https://raven-*.netlify.app').origins
+    expect(isAllowedWebOrigin({ origin: 'https://raven-12.netlify.app', allowed: atEnd })).toBe(
+      true,
+    )
+    expect(isAllowedWebOrigin({ origin: 'https://raven-.netlify.app', allowed: atEnd })).toBe(false)
   })
 
-  it('refuses a * anywhere but as the first label', () => {
+  it('refuses a * in a later label, a second *, or a * outside the host, naming each', () => {
     const parsed = parseWebOrigins(
-      'https://raven-*.netlify.app,https://a.*.netlify.app,https://*.netlify.app',
+      'https://raven-*.netlify.app,https://a.*.netlify.app,https://*.netlify.app,https://*-*.netlify.app,https://x.example:*,ht*ps://x.example',
     )
-    expect(parsed.origins).toEqual(['https://*.netlify.app'])
-    expect(parsed.problems).toHaveLength(2)
-    expect(parsed.problems[0]).toContain('https://raven-*.netlify.app')
-    expect(parsed.problems[1]).toContain('https://a.*.netlify.app')
+    expect(parsed.origins).toEqual(['https://raven-*.netlify.app', 'https://*.netlify.app'])
+    expect(parsed.problems).toHaveLength(4)
+    expect(parsed.problems[0]).toContain('https://a.*.netlify.app')
+    expect(parsed.problems[1]).toContain('https://*-*.netlify.app')
+    expect(parsed.problems[2]).toContain('https://x.example:*')
+    expect(parsed.problems[3]).toContain('ht*ps://x.example')
   })
 
   it('never matches a missing origin or "null"', () => {
