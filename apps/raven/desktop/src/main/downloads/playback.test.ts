@@ -525,6 +525,44 @@ describe('notePosition', () => {
   })
 })
 
+describe('what is playing', () => {
+  const SECOND = episodeOf(2)
+
+  it('holds a download playing from the moment the page opens its file until the page leaves it', async () => {
+    const world = setup({ entries: [entryFor({})], videos: { [VIDEO]: FILE } })
+    const fileId = await opened(world)
+    expect(world.playback.isPlaying(ID)).toBe(false)
+    world.playback.noteOpened({ fileId })
+    expect(world.playback.isPlaying(ID)).toBe(true)
+    world.playback.playbackLeft({ fileId })
+    expect(world.playback.isPlaying(ID)).toBe(false)
+  })
+
+  it('keeps the next file playing when the page leaves the one before it late', async () => {
+    const world = setup({ entries: [entryFor({}), SECOND], videos: shelved(entryFor({}), SECOND) })
+    const first = await opened(world)
+    const second = await opened(world, SECOND.downloadId)
+    world.playback.noteOpened({ fileId: first })
+    world.playback.noteOpened({ fileId: second })
+    expect(world.playback.isPlaying(ID)).toBe(false)
+    world.playback.playbackLeft({ fileId: first })
+    expect(world.playback.isPlaying(SECOND.downloadId)).toBe(true)
+  })
+
+  it('leaves a download for a file that is no download, a server title and the player hiding', async () => {
+    const world = setup({ entries: [entryFor({})], videos: { [VIDEO]: FILE, [MOVIE_PATH]: FILE } })
+    const fileId = await opened(world)
+    const movie = await granted(world, MOVIE_PATH)
+    world.playback.noteOpened({ fileId })
+    world.playback.noteOpened({ fileId: movie })
+    expect(world.playback.isPlaying(ID)).toBe(false)
+    world.playback.notePlaying({ fileId })
+    expect(world.playback.isPlaying(ID)).toBe(true)
+    world.playback.notePlaying({ fileId: null })
+    expect(world.playback.isPlaying(ID)).toBe(false)
+  })
+})
+
 describe('where a download starts', () => {
   it("answers the server's resume spot for a download, and 0 for any other file", async () => {
     const world = setup({

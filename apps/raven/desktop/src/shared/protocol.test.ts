@@ -286,6 +286,7 @@ describe('isDesktopRequest', () => {
     [{ type: DESKTOP_REQUESTS.readSpace }],
     [{ type: DESKTOP_REQUESTS.setDownloadDefaults, autoDelete: true }],
     [{ type: DESKTOP_REQUESTS.showDownloadsFolder }],
+    [{ type: DESKTOP_REQUESTS.playbackLeft, fileId: id }],
   ])('accepts %j', (value) => {
     expect(isDesktopRequest(value)).toBe(true)
   })
@@ -294,6 +295,10 @@ describe('isDesktopRequest', () => {
     [
       'a path as the file id',
       { type: DESKTOP_REQUESTS.describeFile, fileId: '/Users/me/film.mkv', queue: [] },
+    ],
+    [
+      'a path for the file left',
+      { type: DESKTOP_REQUESTS.playbackLeft, fileId: '/Users/me/film.mkv' },
     ],
     [
       'a string position',
