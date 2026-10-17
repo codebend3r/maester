@@ -74,10 +74,17 @@ export const isDownloadEntry = object({
   createdAt: isNumber,
 })
 
+/**
+ * What a removed download still owed its server, kept until the server hears it: removing a
+ * download offline, as its auto-delete does, must not lose what was watched. One item per title.
+ */
+const isOwed = object({ serverId: isOpaqueId, mediaId: isMediaId, pending: isPending })
+
 export const isDownloadsState = object({
   version: oneOf([1]),
   entries: listOf(isDownloadEntry),
   autoDeleteDefault: isBoolean,
+  owed: listOf(isOwed),
 })
 
 export type PauseReason = Infer<typeof isPauseReason>
@@ -86,9 +93,15 @@ export type EntryStatus = Infer<typeof isEntryStatus>
 export type Sidecar = Infer<typeof isSidecar>
 export type Pending = Infer<typeof isPending>
 export type DownloadEntry = Infer<typeof isDownloadEntry>
+export type Owed = Infer<typeof isOwed>
 export type DownloadsState = Infer<typeof isDownloadsState>
 
-export const EMPTY_DOWNLOADS: DownloadsState = { version: 1, entries: [], autoDeleteDefault: false }
+export const EMPTY_DOWNLOADS: DownloadsState = {
+  version: 1,
+  entries: [],
+  autoDeleteDefault: false,
+  owed: [],
+}
 
 export const NO_PENDING: Pending = { play: false, position: null, furthest: null, at: 0 }
 
@@ -287,23 +300,117 @@ export const finish = (
       entry.status.kind === 'ready' ? entry : withStatus(entry, { status: { kind: 'ready' } }),
   })
 
+/** Whether the server has yet to hear something of this download or owed item. */
+export const hasPending = ({ pending }: { pending: Pending }): boolean =>
+  pending.play || pending.position !== null || pending.furthest !== null
+
+/** What one round of a sync sent: the play, if it went, and the positions it carried. */
+type Sent = { sentPlay: boolean; sentPosition: number | null; sentFurthest: number | null }
+
+/** `pending` less what a sync sent; the same object when the send cleared nothing. */
+const clearedOf = (pending: Pending, { sentPlay, sentPosition, sentFurthest }: Sent): Pending => {
+  const position = pending.position === sentPosition ? null : pending.position
+  const furthest = pending.furthest === sentFurthest ? null : pending.furthest
+  const play = sentPlay ? false : pending.play
+  if (play === pending.play && position === pending.position && furthest === pending.furthest) {
+    return pending
+  }
+  return { ...pending, play, position, furthest }
+}
+
+type Title = { serverId: string; mediaId: number }
+
+const isTitle =
+  ({ serverId, mediaId }: Title) =>
+  (item: Title): boolean =>
+    item.serverId === serverId && item.mediaId === mediaId
+
+export const owedOf = (state: DownloadsState, title: Title): Owed | null =>
+  state.owed.find(isTitle(title)) ?? null
+
+/** The higher of two positions, either of which may be none. */
+const furthestOf = (a: number | null, b: number | null): number | null =>
+  a === null ? b : Math.max(a, b ?? a)
+
+/**
+ * Two pendings of one title as one: a play either owes, the newer last position, and the
+ * furthest of both, as `notePending` folds a report into what is pending.
+ */
+const mergePending = ({ a, b }: { a: Pending; b: Pending }): Pending => {
+  const [older, newer] = a.at <= b.at ? [a, b] : [b, a]
+  return {
+    play: a.play || b.play,
+    position: newer.position ?? older.position,
+    furthest: furthestOf(a.furthest, b.furthest),
+    at: newer.at,
+  }
+}
+
+/** `owed` with what these removed entries still owed their servers folded in. */
+const owe = (state: DownloadsState, { entries }: { entries: readonly DownloadEntry[] }): Owed[] =>
+  entries.filter(hasPending).reduce<Owed[]>((owed, { serverId, mediaId, pending }) => {
+    const known = owed.find(isTitle({ serverId, mediaId }))
+    if (known === undefined) return [...owed, { serverId, mediaId, pending }]
+    const merged = { ...known, pending: mergePending({ a: known.pending, b: pending }) }
+    return owed.map((item) => (item === known ? merged : item))
+  }, state.owed)
+
+/** Drops one entry; what the server has not heard of it moves to `owed` in the same change. */
 export const remove = (
   state: DownloadsState,
   { downloadId }: { downloadId: string },
-): DownloadsState =>
-  entryById(state, { downloadId })
-    ? { ...state, entries: state.entries.filter((entry) => entry.downloadId !== downloadId) }
-    : state
+): DownloadsState => {
+  const removed = entryById(state, { downloadId })
+  if (removed === null) return state
+  return {
+    ...state,
+    entries: state.entries.filter((entry) => entry !== removed),
+    owed: owe(state, { entries: [removed] }),
+  }
+}
 
+/** Drops every entry; what the servers have not heard of them moves to `owed`. */
 export const removeAll = (state: DownloadsState): DownloadsState =>
-  state.entries.length === 0 ? state : { ...state, entries: [] }
+  state.entries.length === 0
+    ? state
+    : { ...state, entries: [], owed: owe(state, { entries: state.entries }) }
 
+/**
+ * Drops a server's entries and what it was owed: raven player no longer keeps the server, so
+ * nothing could reach it.
+ */
 export const removeServer = (
   state: DownloadsState,
   { serverId }: { serverId: string },
 ): DownloadsState => {
   const kept = state.entries.filter((entry) => entry.serverId !== serverId)
-  return kept.length === state.entries.length ? state : { ...state, entries: kept }
+  const owed = state.owed.filter((item) => item.serverId !== serverId)
+  return kept.length === state.entries.length && owed.length === state.owed.length
+    ? state
+    : { ...state, entries: kept, owed }
+}
+
+/** What the server took is no longer owed; an item it took all of goes. */
+export const clearOwed = (
+  state: DownloadsState,
+  { serverId, mediaId, sentPlay, sentPosition, sentFurthest }: Title & Sent,
+): DownloadsState => {
+  const current = owedOf(state, { serverId, mediaId })
+  if (current === null) return state
+  const pending = clearedOf(current.pending, { sentPlay, sentPosition, sentFurthest })
+  if (pending === current.pending) return state
+  const owed = hasPending({ pending })
+    ? state.owed.map((item) => (item === current ? { ...item, pending } : item))
+    : state.owed.filter((item) => item !== current)
+  return { ...state, owed }
+}
+
+/** The server will never take this owed item (a 403 or a 404), so it goes. */
+export const dropOwed = (state: DownloadsState, title: Title): DownloadsState => {
+  const current = owedOf(state, title)
+  return current === null
+    ? state
+    : { ...state, owed: state.owed.filter((item) => item !== current) }
 }
 
 /** The subtitles a finished download keeps beside its video. */
@@ -406,29 +513,13 @@ export const notePending = (
  */
 export const clearPending = (
   state: DownloadsState,
-  {
-    downloadId,
-    sentPlay,
-    sentPosition,
-    sentFurthest,
-  }: {
-    downloadId: string
-    sentPlay: boolean
-    sentPosition: number | null
-    sentFurthest: number | null
-  },
+  { downloadId, sentPlay, sentPosition, sentFurthest }: { downloadId: string } & Sent,
 ): DownloadsState =>
   changeEntry(state, {
     downloadId,
     change: (entry) => {
-      const { pending } = entry
-      const position = pending.position === sentPosition ? null : pending.position
-      const furthest = pending.furthest === sentFurthest ? null : pending.furthest
-      const play = sentPlay ? false : pending.play
-      if (play === pending.play && position === pending.position && furthest === pending.furthest) {
-        return entry
-      }
-      return { ...entry, pending: { ...pending, play, position, furthest } }
+      const pending = clearedOf(entry.pending, { sentPlay, sentPosition, sentFurthest })
+      return pending === entry.pending ? entry : { ...entry, pending }
     },
   })
 

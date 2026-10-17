@@ -1437,6 +1437,43 @@ describe('reaching the server', () => {
     expect(entries(world)).toEqual([])
   })
 
+  it('owes the server what a Delete removed while it was unreachable, and sends it at the retry', async () => {
+    const world = setup({
+      initial: holding(withPending()),
+      videos: { [VIDEO]: FILE },
+      replies: { [playOf(11)]: { unreachable: 'offline' } },
+    })
+    await world.service.remove({ downloadId: ID })
+    expect(world.store.read()).toMatchObject({
+      entries: [],
+      owed: [{ serverId: SERVER_ID, mediaId: 11, pending: PLAYED }],
+    })
+    world.table[playOf(11)] = NO_CONTENT
+    world.table[progress(11, 750)] = NO_CONTENT
+    const before = world.log.length
+    fireAfter(world, SYNC_RETRY_MS)
+    await until(() => world.store.read().owed.length === 0)
+    expect(world.log.slice(before)).toEqual([playOf(11), progress(11, 750)])
+  })
+
+  it('owes nothing for a download deleted with nothing pending', async () => {
+    const world = setup({ initial: holding(entryFor({})), videos: { [VIDEO]: FILE } })
+    await world.service.remove({ downloadId: ID })
+    expect(world.store.read()).toMatchObject({ entries: [], owed: [] })
+  })
+
+  it('drops what a removed server was owed, and sends it nothing', async () => {
+    const world = setup({
+      initial: { ...holding(), owed: [{ serverId: SERVER_ID, mediaId: 11, pending: PLAYED }] },
+      replies: { [playOf(11)]: { unreachable: 'offline' } },
+    })
+    await world.service.removeServer({ serverId: SERVER_ID })
+    expect(world.store.read().owed).toEqual([])
+    const before = world.log.length
+    await world.service.removeAll()
+    expect(world.log.length).toBe(before)
+  })
+
   it('does not wait on the server to forget a server', async () => {
     const world = setup({
       initial: holding(withPending()),
@@ -1643,6 +1680,24 @@ describe('deleting once watched', () => {
     expect(entries(world)).toHaveLength(1)
     after(world, 5 * MINUTE)
     await until(() => entries(world).length === 0)
+  })
+
+  it('owes the server what it deleted while the server was unreachable, and sends it once back', async () => {
+    const owed = { play: true, position: 2800, furthest: 2800, at: NOW - 11 * MINUTE }
+    const world = setup({
+      initial: holding(entryFor({ autoDelete: true, watchedAt: NOW - 11 * MINUTE, pending: owed })),
+      videos: { [VIDEO]: FILE },
+      replies: { [PLAY]: { unreachable: 'offline' }, [PROGRESS]: { unreachable: 'offline' } },
+    })
+    await until(() => entries(world).length === 0)
+    expect(world.sent).toContainEqual(DELETED)
+    expect(world.store.read().owed).toEqual([{ serverId: SERVER_ID, mediaId: 11, pending: owed }])
+    world.table[PLAY] = NO_CONTENT
+    world.table[PROGRESS] = NO_CONTENT
+    const before = world.log.length
+    fireAfter(world, SYNC_RETRY_MS)
+    await until(() => world.store.read().owed.length === 0)
+    expect(world.log.slice(before)).toEqual([PLAY, PROGRESS])
   })
 
   describe('while its deletion waits on the server', () => {

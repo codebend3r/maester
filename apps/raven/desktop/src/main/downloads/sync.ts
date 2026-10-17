@@ -1,4 +1,13 @@
-import { entryById, clearPending, type DownloadEntry } from '@/main/downloads/downloadState'
+import {
+  clearOwed,
+  clearPending,
+  dropOwed,
+  entryById,
+  hasPending,
+  owedOf,
+  type DownloadsState,
+  type Pending,
+} from '@/main/downloads/downloadState'
 import type { DownloadsStore } from '@/main/downloads/downloadStore'
 import { errorText } from '@/main/log/errorText'
 import type { AllowedCall } from '@/main/servers/allowlist'
@@ -20,7 +29,7 @@ export type SyncDeps = {
 export type Sync = {
   /** A download has something new pending; it goes out once the debounce has run. */
   touch: (input: { downloadId: string }) => void
-  /** Sends what every download has pending now; settles once the answers are in. */
+  /** Sends what every download, and every removed one, has pending now; settles once the answers are in. */
   runAll: () => Promise<void>
   /** Sends what these downloads have pending now; settles once the answers are in. */
   runFor: (input: { downloadIds: readonly string[] }) => Promise<void>
@@ -33,39 +42,95 @@ export type Sync = {
   dispose: () => void
 }
 
-const hasPending = ({ pending }: DownloadEntry): boolean =>
-  pending.play || pending.position !== null || pending.furthest !== null
-
 const isSuccess = (status: number): boolean => status >= 200 && status < 300
 
 /** The statuses that say the server will never take this, or not yet, and are worth a line in the log. */
 const isLogged = (status: number): boolean => status === 403 || status === 404
 
-/** How a call went: the server took it, answered something else, or could not be reached. */
-type Delivery = 'taken' | 'refused' | 'unreachable'
+/**
+ * How a call went: the server took it, refused it for good or for now (a 403 or a 404),
+ * answered something else, or could not be reached.
+ */
+type Delivery = 'taken' | 'denied' | 'refused' | 'unreachable'
+
+/** What a send is for: a download, or what a removed download still owed its server. */
+type Owing =
+  | { kind: 'entry'; downloadId: string }
+  | { kind: 'owed'; serverId: string; mediaId: number }
+
+/** What an owing has pending now, with what its calls need. A removed download has no title. */
+type Due = {
+  owing: Owing
+  serverId: string
+  mediaId: number
+  label: string | null
+  pending: Pending
+}
+
+const entryOwing = (downloadId: string): Owing => ({ kind: 'entry', downloadId })
+
+/** One string per owing, so the maps can key by it: a download id, or its server and media. */
+const keyOf = (owing: Owing): string => {
+  switch (owing.kind) {
+    case 'entry':
+      return owing.downloadId
+    case 'owed':
+      return JSON.stringify([owing.serverId, owing.mediaId])
+    default: {
+      const unreachable: never = owing
+      return unreachable
+    }
+  }
+}
+
+const dueIn = (state: DownloadsState, owing: Owing): Due | null => {
+  switch (owing.kind) {
+    case 'entry': {
+      const entry = entryById(state, owing)
+      if (entry === null) return null
+      const { serverId, mediaId, label, pending } = entry
+      return { owing, serverId, mediaId, label, pending }
+    }
+    case 'owed': {
+      const owed = owedOf(state, owing)
+      if (owed === null) return null
+      return {
+        owing,
+        serverId: owed.serverId,
+        mediaId: owed.mediaId,
+        label: null,
+        pending: owed.pending,
+      }
+    }
+    default: {
+      const unreachable: never = owing
+      return unreachable
+    }
+  }
+}
 
 /**
- * Each server's due downloads, oldest pending first: a server hears its downloads one at a time
- * in the order they were made, so each report replaces the one before as it did when made.
+ * Each server's due downloads and owed items, oldest pending first: a server hears them one at
+ * a time in the order they were made, so each report replaces the one before as it did when made.
  */
-const queuesByServer = (entries: readonly DownloadEntry[]): DownloadEntry[][] => [
-  ...entries
+const queuesByServer = (dues: readonly Due[]): Due[][] => [
+  ...dues
     .toSorted((a, b) => a.pending.at - b.pending.at)
     .reduce(
-      (queues, entry) => queues.set(entry.serverId, [...(queues.get(entry.serverId) ?? []), entry]),
-      new Map<string, DownloadEntry[]>(),
+      (queues, due) => queues.set(due.serverId, [...(queues.get(due.serverId) ?? []), due]),
+      new Map<string, Due[]>(),
     )
     .values(),
 ]
 
 export const createSync = ({ store, calls, timers, warn }: SyncDeps): Sync => {
   const debouncing = new Map<string, unknown>()
-  /** Each download's send while it is out; it settles false when its server could not be reached. */
+  /** Each send while it is out, by `keyOf`; it settles false when its server could not be reached. */
   const inFlight = new Map<string, Promise<boolean>>()
   /** Downloads touched while their calls were out, which owe another send once the answers land. */
   const touchedDuring = new Set<string>()
-  /** Downloads whose 403 or 404 was logged, so a server that keeps answering so is heard of once. */
-  const logged = new Set<string>()
+  /** Owings whose 403 or 404 was logged, by `keyOf`, so a server that keeps answering so is heard of once. */
+  const logged = new Map<string, Owing>()
   /**
    * Servers whose last call could not reach them. Their downloads' touches wait for the retry
    * instead of sending on every save, until a call the server takes.
@@ -74,34 +139,67 @@ export const createSync = ({ store, calls, timers, warn }: SyncDeps): Sync => {
   const retry: { timer: unknown } = { timer: undefined }
   let isDisposed = false
 
-  const entryOf = (downloadId: string): DownloadEntry | null =>
-    entryById(store.read(), { downloadId })
+  const dueOf = (owing: Owing): Due | null => dueIn(store.read(), owing)
 
   /** Sends one call; `taken` when the server took it, so what it carried can be cleared. */
-  const deliver = async ({
-    entry,
-    call,
-  }: {
-    entry: DownloadEntry
-    call: AllowedCall
-  }): Promise<Delivery> => {
-    const result = await calls.call({ serverId: entry.serverId, call })
+  const deliver = async ({ due, call }: { due: Due; call: AllowedCall }): Promise<Delivery> => {
+    const result = await calls.call({ serverId: due.serverId, call })
     if (!result.ok) {
-      unreachable.add(entry.serverId)
+      unreachable.add(due.serverId)
       return 'unreachable'
     }
+    const key = keyOf(due.owing)
     if (isSuccess(result.status)) {
-      unreachable.delete(entry.serverId)
-      logged.delete(entry.downloadId)
+      unreachable.delete(due.serverId)
+      logged.delete(key)
       return 'taken'
     }
-    if (isLogged(result.status) && !logged.has(entry.downloadId)) {
-      logged.add(entry.downloadId)
+    if (!isLogged(result.status)) return 'refused'
+    if (!logged.has(key)) {
+      logged.set(key, due.owing)
+      const what = due.label === null ? 'a deleted download' : loggable(due.label)
       warn(
-        `raven player could not tell its server what was watched of ${loggable(entry.label)}: it answered ${result.status}`,
+        `raven player could not tell its server what was watched of ${what}: it answered ${result.status}`,
       )
     }
-    return 'refused'
+    return 'denied'
+  }
+
+  /**
+   * What a call that was not taken leaves: a download keeps its pending for the next round (a
+   * relocked library hears it after the unlock), and an owed item the server denies goes, since
+   * no later download will ever clear it. False when the server could not be reached.
+   */
+  const notTaken = ({ due, delivery }: { due: Due; delivery: Delivery }): boolean => {
+    const { owing } = due
+    if (delivery === 'denied' && owing.kind === 'owed') {
+      store.update((state) => dropOwed(state, owing))
+    }
+    return delivery !== 'unreachable'
+  }
+
+  /**
+   * Clears what the server took. A download removed while its call was out has moved its
+   * pending to `owed`, so it is cleared there, and never sent twice.
+   */
+  const clearSent = ({
+    due,
+    sentPlay,
+    sentPosition,
+    sentFurthest,
+  }: {
+    due: Due
+    sentPlay: boolean
+    sentPosition: number | null
+    sentFurthest: number | null
+  }): void => {
+    const sent = { sentPlay, sentPosition, sentFurthest }
+    const { owing, serverId, mediaId } = due
+    store.update((state) =>
+      owing.kind === 'entry' && entryById(state, owing) !== null
+        ? clearPending(state, { downloadId: owing.downloadId, ...sent })
+        : clearOwed(state, { serverId, mediaId, ...sent }),
+    )
   }
 
   const warnFailed =
@@ -113,86 +211,66 @@ export const createSync = ({ store, calls, timers, warn }: SyncDeps): Sync => {
       )
     }
 
-  /** Forgets the logged downloads that are gone, so the set holds only those still held. */
+  /** Forgets the logged owings that are gone, so the map holds only those still held. */
   const pruneLogged = (): void => {
-    ;[...logged]
-      .filter((downloadId) => entryOf(downloadId) === null)
-      .forEach((downloadId) => logged.delete(downloadId))
+    ;[...logged].filter(([, owing]) => dueOf(owing) === null).forEach(([key]) => logged.delete(key))
   }
 
   /**
    * The furthest position, when it is past the last: the server keeps how far a play got as the
    * most it hears, so it hears this before a scrub back. `taken` when the round may go on.
    */
-  const sendFurthest = async (downloadId: string): Promise<Delivery> => {
-    const entry = entryOf(downloadId)
-    if (entry === null) return 'refused'
-    const { furthest, position } = entry.pending
+  const sendFurthest = async (owing: Owing): Promise<Delivery> => {
+    const due = dueOf(owing)
+    if (due === null) return 'refused'
+    const { furthest, position } = due.pending
     if (furthest === null || (position !== null && furthest <= position)) return 'taken'
     const delivery = await deliver({
-      entry,
-      call: { name: 'saveProgress', mediaId: entry.mediaId, position: furthest },
+      due,
+      call: { name: 'saveProgress', mediaId: due.mediaId, position: furthest },
     })
-    if (delivery !== 'taken') return delivery
-    store.update((state) =>
-      clearPending(state, {
-        downloadId,
-        sentPlay: false,
-        sentPosition: null,
-        sentFurthest: furthest,
-      }),
-    )
+    if (delivery !== 'taken') return notTaken({ due, delivery }) ? 'refused' : 'unreachable'
+    clearSent({ due, sentPlay: false, sentPosition: null, sentFurthest: furthest })
     return 'taken'
   }
 
   /**
-   * Sends one download's pending; false when its server could not be reached. The play goes
+   * Sends one owing's pending; false when its server could not be reached. The play goes
    * first: the server must hear it before a position that may mark the title watched.
    */
-  const send = async (downloadId: string): Promise<boolean> => {
-    const first = entryOf(downloadId)
+  const send = async (owing: Owing): Promise<boolean> => {
+    const first = dueOf(owing)
     if (first === null || !hasPending(first)) return true
     if (first.pending.play) {
       const played = await deliver({
-        entry: first,
+        due: first,
         call: { name: 'recordPlay', mediaId: first.mediaId },
       })
       // The play stays pending when the answer was lost, though the server may have taken it:
       // delivery is at least once, so a play can be recorded twice but never none.
-      if (played !== 'taken') return played !== 'unreachable'
-      store.update((state) =>
-        clearPending(state, {
-          downloadId,
-          sentPlay: true,
-          sentPosition: null,
-          sentFurthest: null,
-        }),
-      )
+      if (played !== 'taken') return notTaken({ due: first, delivery: played })
+      clearSent({ due: first, sentPlay: true, sentPosition: null, sentFurthest: null })
     }
-    const reached = await sendFurthest(downloadId)
+    const reached = await sendFurthest(owing)
     if (reached !== 'taken') return reached !== 'unreachable'
     // Read again: the position may have moved while the play or the furthest was out.
-    const entry = entryOf(downloadId)
-    const position = entry?.pending.position ?? null
-    if (entry === null || position === null) return true
+    const due = dueOf(owing)
+    const position = due?.pending.position ?? null
+    if (due === null || position === null) return true
     const saved = await deliver({
-      entry,
-      call: { name: 'saveProgress', mediaId: entry.mediaId, position },
+      due,
+      call: { name: 'saveProgress', mediaId: due.mediaId, position },
     })
-    if (saved !== 'taken') return saved !== 'unreachable'
+    if (saved !== 'taken') return notTaken({ due, delivery: saved })
     // A furthest no further than this position is covered by it.
-    store.update((state) =>
-      clearPending(state, {
-        downloadId,
-        sentPlay: false,
-        sentPosition: position,
-        sentFurthest: position,
-      }),
-    )
+    clearSent({ due, sentPlay: false, sentPosition: position, sentFurthest: position })
     return true
   }
 
-  const isAnythingPending = (): boolean => store.read().entries.some(hasPending)
+  const isAnythingPending = (): boolean => {
+    const { entries, owed } = store.read()
+    return entries.some(hasPending) || owed.some(hasPending)
+  }
 
   const armRetry = (): void => {
     if (isDisposed || retry.timer !== undefined || !isAnythingPending()) return
@@ -207,7 +285,7 @@ export const createSync = ({ store, calls, timers, warn }: SyncDeps): Sync => {
 
   const debounce = (downloadId: string): void => {
     if (isDisposed || debouncing.has(downloadId)) return
-    const entry = entryOf(downloadId)
+    const entry = entryById(store.read(), { downloadId })
     // A server that could not be reached hears this download at the retry, not every save.
     if (entry !== null && unreachable.has(entry.serverId)) return
     // A timer already running is left alone, not pushed back: positions arrive every few
@@ -217,7 +295,8 @@ export const createSync = ({ store, calls, timers, warn }: SyncDeps): Sync => {
       timers.set({
         run: () => {
           debouncing.delete(downloadId)
-          run(downloadId).catch(warnFailed({ label: entryOf(downloadId)?.label ?? null }))
+          const owing = entryOwing(downloadId)
+          run(owing).catch(warnFailed({ label: dueOf(owing)?.label ?? null }))
         },
         ms: SYNC_DEBOUNCE_MS,
       }),
@@ -225,31 +304,34 @@ export const createSync = ({ store, calls, timers, warn }: SyncDeps): Sync => {
   }
 
   /**
-   * Sends one download's pending now; false when its server could not be reached. A download
-   * already out is awaited, never sent twice.
+   * Sends one owing's pending now; false when its server could not be reached. One already out
+   * is awaited, never sent twice.
    */
-  const run = (downloadId: string): Promise<boolean> => {
-    const sending = inFlight.get(downloadId)
+  const run = (owing: Owing): Promise<boolean> => {
+    const key = keyOf(owing)
+    const sending = inFlight.get(key)
     if (sending !== undefined) return sending
-    const handle = debouncing.get(downloadId)
+    const handle = debouncing.get(key)
     if (handle !== undefined) timers.clear(handle)
-    debouncing.delete(downloadId)
-    const entry = entryOf(downloadId)
-    if (entry === null || !hasPending(entry)) return Promise.resolve(true)
+    debouncing.delete(key)
+    const due = dueOf(owing)
+    if (due === null || !hasPending(due)) return Promise.resolve(true)
     const sent = (async (): Promise<boolean> => {
-      const isReached = await send(downloadId).catch((error: unknown) => {
-        warnFailed({ label: entry.label })(error)
+      const isReached = await send(owing).catch((error: unknown) => {
+        warnFailed({ label: due.label })(error)
         return true
       })
-      inFlight.delete(downloadId)
-      const isOwed = touchedDuring.delete(downloadId)
-      const next = entryOf(downloadId)
-      if (isOwed && next !== null && hasPending(next)) debounce(downloadId)
+      inFlight.delete(key)
+      const isTouched = touchedDuring.delete(key)
+      const next = dueOf(owing)
+      if (isTouched && owing.kind === 'entry' && next !== null && hasPending(next)) {
+        debounce(owing.downloadId)
+      }
       pruneLogged()
       armRetry()
       return isReached
     })()
-    inFlight.set(downloadId, sent)
+    inFlight.set(key, sent)
     return sent
   }
 
@@ -261,32 +343,38 @@ export const createSync = ({ store, calls, timers, warn }: SyncDeps): Sync => {
   }
 
   /**
-   * Runs one server's downloads one after another; one its server could not reach ends the
-   * round, and so does `dispose`, which lets the send already out finish but starts no other.
+   * Runs one server's owings one after another; one its server could not reach ends the round,
+   * and so does `dispose`, which lets the send already out finish but starts no other.
    */
-  const runInTurn = (queue: readonly DownloadEntry[]): Promise<boolean> =>
+  const runInTurn = (queue: readonly Due[]): Promise<boolean> =>
     queue.reduce<Promise<boolean>>(
-      (previous, { downloadId }) =>
-        previous.then((isReached) => (isReached && !isDisposed ? run(downloadId) : false)),
+      (previous, { owing }) =>
+        previous.then((isReached) => (isReached && !isDisposed ? run(owing) : false)),
       Promise.resolve(true),
     )
 
-  const runFor: Sync['runFor'] = async ({ downloadIds }) => {
+  /** Runs these owings, each server's in turn; one already out is awaited however it stands now. */
+  const runEach = async (owings: readonly Owing[]): Promise<void> => {
     if (isDisposed) return
     pruneLogged()
-    const due = downloadIds.flatMap((downloadId) => {
-      const entry = entryOf(downloadId)
-      return entry !== null && (inFlight.has(downloadId) || hasPending(entry)) ? [entry] : []
+    const dues = owings.flatMap((owing) => {
+      const due = dueOf(owing)
+      return due !== null && (inFlight.has(keyOf(owing)) || hasPending(due)) ? [due] : []
     })
     // A download removed while its calls are out is still awaited.
-    const leaving = downloadIds.filter(
-      (downloadId) => entryOf(downloadId) === null && inFlight.has(downloadId),
-    )
-    await Promise.all([...leaving.map(run), ...queuesByServer(due).map(runInTurn)])
+    const leaving = owings.filter((owing) => dueOf(owing) === null && inFlight.has(keyOf(owing)))
+    await Promise.all([...leaving.map(run), ...queuesByServer(dues).map(runInTurn)])
   }
 
-  const runAll: Sync['runAll'] = () =>
-    runFor({ downloadIds: store.read().entries.map(({ downloadId }) => downloadId) })
+  const runFor: Sync['runFor'] = ({ downloadIds }) => runEach(downloadIds.map(entryOwing))
+
+  const runAll: Sync['runAll'] = () => {
+    const { entries, owed } = store.read()
+    return runEach([
+      ...entries.map(({ downloadId }) => entryOwing(downloadId)),
+      ...owed.map(({ serverId, mediaId }): Owing => ({ kind: 'owed', serverId, mediaId })),
+    ])
+  }
 
   const dispose: Sync['dispose'] = () => {
     isDisposed = true
