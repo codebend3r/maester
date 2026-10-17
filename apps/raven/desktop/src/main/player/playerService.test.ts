@@ -788,6 +788,23 @@ describe('createPlayerService', () => {
       service.receive({ type: 'log', level: 'warn', prefix: 'ffmpeg', text: 'bad packet' })
       expect(warnings).toEqual(['mpv warn ffmpeg: bad packet'])
     })
+
+    test('a warning names the open file only as <file>, by its path or its name', async () => {
+      const { service, warnings, loaded } = setup()
+      await loaded()
+      warnings.splice(0)
+      service.receive({
+        type: 'log',
+        level: 'error',
+        prefix: 'file',
+        text: "Cannot open file '/m/Film.mkv': Permission denied",
+      })
+      service.receive({ type: 'log', level: 'warn', prefix: 'demux', text: 'Film.mkv: bad index' })
+      expect(warnings).toEqual([
+        "mpv error file: Cannot open file '<file>': Permission denied",
+        'mpv warn demux: <file>: bad index',
+      ])
+    })
   })
 
   describe('commands', () => {

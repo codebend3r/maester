@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test'
+import { realpath } from 'node:fs/promises'
 import { MESSAGES } from '@/main/desktopService'
 import { createRequestHandler } from '@/main/requestHandler'
 import { isTrustedSender } from '@/main/security'
@@ -81,6 +82,20 @@ describe('createRequestHandler', () => {
     })
     await handler({ frameUrl: 'app://raven/', payload: ENVELOPE })
     expect(warnings[0]).toContain('at showOpenDialog (main.ts:180:5)')
+  })
+
+  it('names only the call and code of a file system error, never its path or stack', async () => {
+    const failure: unknown = await realpath('/Volumes/raven-missing-volume/Secret Film.mkv').then(
+      () => null,
+      (error: unknown) => error,
+    )
+    const { handler, warnings } = setup(async () => {
+      throw failure
+    })
+    await handler({ frameUrl: 'app://raven/', payload: ENVELOPE })
+    // Node names the call `realpath`, Bun `lstat`.
+    expect(warnings).toHaveLength(1)
+    expect(warnings[0] ?? '').toMatch(/^raven player failed to answer a request: [a-z]+ ENOENT$/)
   })
 
   it('falls back to the message of an error without a stack', async () => {
