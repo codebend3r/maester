@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { ApiError, type ItemDetails, type ItemType } from '@raven/core'
+import { ApiError, type ItemDetails, type ItemType, isLockedError } from '@raven/core'
 import { useParams } from 'react-router-dom'
 import { itemQuery } from '@/lib/queries'
 
@@ -31,7 +31,9 @@ export const useRouteId = (param = 'id'): number | null => {
 
 /**
  * A query for what the address names, as one of four states: nothing there
- * (no id, or a 404), a failure, on its way, or ready.
+ * (no id, or a 404), a failure, on its way, or ready. A page already read
+ * stays up through a failed read behind it, as a poll's, since the next read
+ * may well work; only a 404, or a library locked since, takes it down.
  */
 export const routeState = <T>({
   id,
@@ -44,7 +46,9 @@ export const routeState = <T>({
   if (query.error instanceof ApiError && query.error.status === 404) {
     return { state: ROUTE_STATES.missing }
   }
-  if (query.error) return { state: ROUTE_STATES.error, message: query.error.message }
+  if (query.error && (query.data === undefined || isLockedError(query.error))) {
+    return { state: ROUTE_STATES.error, message: query.error.message }
+  }
   if (query.data === undefined) return { state: ROUTE_STATES.loading }
   return { state: ROUTE_STATES.ready, data: query.data }
 }
