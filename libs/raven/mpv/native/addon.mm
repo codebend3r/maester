@@ -1,4 +1,5 @@
 #include <napi.h>
+#include <uv.h>
 #include <mpv/client.h>
 #import "surface.h"
 #include <atomic>
@@ -16,6 +17,13 @@ static std::atomic<unsigned> ownerCount{0};
 static std::atomic<unsigned> callbackCount{0};
 static std::atomic<unsigned> handleCount{0};
 
+struct Player;
+struct CleanupSignal {
+    uv_async_t async;
+    napi_async_cleanup_hook_handle hook;
+    std::shared_ptr<Player> *owner;
+};
+
 struct Player {
     Player() { ++ownerCount; }
     ~Player() { --ownerCount; }
@@ -29,6 +37,7 @@ struct Player {
     RavenSurface surface;
     napi_async_cleanup_hook_handle cleanupHook = nullptr;
     std::shared_ptr<Player> *cleanupOwner = nullptr;
+    uv_loop_t *loop = nullptr;
     std::chrono::steady_clock::time_point lastTime;
 
     static Napi::Value node(Napi::Env env, const mpv_node *value, unsigned depth = 0) {
@@ -175,19 +184,33 @@ struct Player {
         auto owner = static_cast<std::shared_ptr<Player> *>(data);
         auto player = *owner;
         player->disconnect();
-        std::thread([player, owner, hook] {
+        // Removing the hook updates Node's exit counters and immediate queue, which only the
+        // loop thread may touch: from the terminating thread it can hang or abort exit. The
+        // engine terminates off the loop, then this handle wakes the loop to finish there.
+        auto signal = new CleanupSignal{{}, hook, owner};
+        if (uv_async_init(player->loop, &signal->async, signalCleanup) != 0) {
+            delete signal;
             player->terminate();
-            if (player->surface.content) {
-                dispatch_async(dispatch_get_main_queue(), ^{
-                    player->surface.detach();
-                    napi_remove_async_cleanup_hook(hook);
-                    delete owner;
-                });
-            } else {
-                napi_remove_async_cleanup_hook(hook);
-                delete owner;
-            }
+            finishCleanup(hook, owner);
+            return;
+        }
+        signal->async.data = signal;
+        std::thread([player, signal] {
+            player->terminate();
+            uv_async_send(&signal->async);
         }).detach();
+    }
+    static void signalCleanup(uv_async_t *async) {
+        uv_close(reinterpret_cast<uv_handle_t *>(async), [](uv_handle_t *handle) {
+            auto signal = static_cast<CleanupSignal *>(handle->data);
+            finishCleanup(signal->hook, signal->owner);
+            delete signal;
+        });
+    }
+    static void finishCleanup(napi_async_cleanup_hook_handle hook, std::shared_ptr<Player> *owner) {
+        (*owner)->surface.detach();
+        napi_remove_async_cleanup_hook(hook);
+        delete owner;
     }
 };
 
@@ -306,7 +329,8 @@ public:
         napi_unref_threadsafe_function(env, player->callback);
         player->isAlive = true;
         player->cleanupOwner = new std::shared_ptr<Player>(player);
-        if (napi_add_async_cleanup_hook(env, Player::cleanup, player->cleanupOwner, &player->cleanupHook) != napi_ok) {
+        if (napi_get_uv_event_loop(env, &player->loop) != napi_ok ||
+            napi_add_async_cleanup_hook(env, Player::cleanup, player->cleanupOwner, &player->cleanupHook) != napi_ok) {
             delete player->cleanupOwner;
             player->cleanupOwner = nullptr;
             player->disconnect();
