@@ -5,8 +5,10 @@ import {
   ButtonLink,
   Player,
   useLeaveFullscreen,
+  useMediaPlane,
   usePlayerPrefs,
 } from '@raven/ui'
+import { useReprobe } from '@/components/MediaOriginProbe/MediaOriginProbe'
 import { api } from '@/lib/api'
 import { afterWatching } from '@/lib/invalidate'
 import { watchLink } from '@/lib/itemLinks'
@@ -83,10 +85,13 @@ export const WatchPlayer = ({
   const opensInRavenPlayer = usePlayerPrefs((prefs) => prefs.opensInRavenPlayer)
   const [next, ...after] = upNext
   const resumable = media.position > 0 && media.position < (media.duration ?? Infinity) - 10
+  const mediaPlane = useMediaPlane({ api, mediaId: media.id, reprobe: useReprobe() })
   const copyLink = () => {
-    const link = new URL(api.fileUrl({ id: media.id }), window.location.origin).href
+    const href = api.fileUrl({ id: media.id, access: mediaPlane.access })
+    const link = href.startsWith('/') ? new URL(href, window.location.origin).href : href
+    const lasts = mediaPlane.access ? '; it works for 6 hours' : ''
     navigator.clipboard.writeText(link).then(
-      () => setCopied('Link copied. Paste it into VLC or IINA to play it there.'),
+      () => setCopied(`Link copied. Paste it into VLC or IINA to play it there${lasts}.`),
       () => setCopied(`Copy this link: ${link}`),
     )
   }
@@ -136,7 +141,7 @@ export const WatchPlayer = ({
         }),
       }}
     >
-      <Player engine={{ kind: 'html', source: { kind: 'server', media, api } }} />
+      <Player engine={{ kind: 'html', source: { kind: 'server', media, api, mediaPlane } }} />
     </PlayerServicesProvider>
   )
 }

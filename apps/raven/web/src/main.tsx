@@ -8,6 +8,7 @@ import '@fontsource-variable/instrument-sans/wdth.css'
 import '@raven/ui/styles.css'
 import { AppRoutes } from '@/AppRoutes'
 import { CardLinks } from '@/components/CardLink/CardLink'
+import { MediaOriginProbe } from '@/components/MediaOriginProbe/MediaOriginProbe'
 import { createQueryClient } from '@/lib/queryClient'
 import { SharedPlaybackPolicy } from '@/lib/sharedPlaybackPolicy'
 import { followTheme } from '@/stores/theme'
@@ -22,9 +23,11 @@ if (rootElement) {
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
           <SharedPlaybackPolicy>
-            <CardLinks>
-              <AppRoutes />
-            </CardLinks>
+            <MediaOriginProbe>
+              <CardLinks>
+                <AppRoutes />
+              </CardLinks>
+            </MediaOriginProbe>
           </SharedPlaybackPolicy>
         </BrowserRouter>
       </QueryClientProvider>

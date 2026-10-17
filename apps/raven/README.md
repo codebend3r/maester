@@ -71,7 +71,36 @@ The web app can also be served from Netlify, with `/api` proxied to the Funnel a
 2. In the site's environment variables, set `RAVEN_API_ORIGIN` to the Funnel address, `https://raven.<tailnet>.ts.net`. The build writes it into a `_redirects` file, and fails on Netlify without it.
 3. So the side menu shows the build number (`X.Y.Z.N`) and not `package.json`'s `X.Y.Z`, add a build hook under Build & deploy, Build hooks, for `main`, and save its URL as the repo secret `NETLIFY_BUILD_HOOK`. Netlify builds a push before CI has tagged it, so after the tag exists `main-smoke-test.yml` calls the hook, and `netlify-build.sh` (the build command) bakes the tag on that commit into the build as `VITE_RAVEN_VERSION`. Until the secret exists the `netlify` job warns and skips, and the site keeps `X.Y.Z`.
 
-Every `/api` request goes through Netlify, video included, so playback counts against the site's bandwidth, and Netlify gives a proxied request 26 seconds to start answering. raven marks its pictures `private`, so Netlify's cache never keeps one that the PIN opened for a single browser. raven compresses its JSON and subtitles with Brotli, or gzip for a browser that offers nothing better, so the Movies listing of about 3 MB leaves raven as about 360 KB; video, JPEG and PNG pictures, and live updates go as they are. Whether Netlify's proxy passes the compressed answer on to the browser is still to be checked: `curl -s -o /dev/null -D - -H 'Accept-Encoding: br' https://<site>/api/libraries` should show `content-encoding: br`. It has to be a GET, since raven answers a HEAD of an API route uncompressed.
+#### The control plane and the media plane
+
+Netlify carries the control plane: the JSON, the pictures, the cookies and the live events, all through `/api`. The video, the original file and the subtitles are the media plane, and they go straight from the browser to Vhagar over the best origin it can reach, so playback does not count against the site's bandwidth. The same `/api` proxy stays as the fallback.
+
+- **Three variables on Vhagar** turn it on, all in the [Configuration](#configuration) table: `RAVEN_MEDIA_ORIGINS` lists the origins, best first, as `kind:url` (`lan`, `tailnet` or `public`); `RAVEN_WEB_ORIGINS` names the web app origins allowed to call the media routes, your Netlify site and, with one `*` in its first hostname label, its deploy previews; `RAVEN_MEDIA_SECRET` signs the tickets. With `RAVEN_MEDIA_ORIGINS` unset, nothing changes.
+- **The probe.** When the app opens, and again when the network comes back or the tab returns after a long absence, the browser fetches 256 KB from each origin and picks the one that answers best, preferring `lan` over `tailnet` over `public` when they are close. It keeps the pick in `sessionStorage` for 10 minutes, and probes again if a stream cannot reach it.
+- **The ticket.** The page asks raven through Netlify for a ticket, which stands in for the PIN cookie on the media origin, whose cookies Netlify's page cannot send. A ticket is good for 6 hours and for one video, sets no cookie and opens nothing else. The link that "Copy file link" copies carries it too, so it plays in VLC or IINA for those 6 hours.
+- **The fallback.** When no origin answers, or none is set, the player uses `/api` through Netlify as before. Thumbnails and JSON always do.
+
+What Vhagar needs for each kind:
+
+- `lan`: a DSM reverse proxy rule, or Caddy, for `raven.home.<domain>` to `raven:8484`; a certificate for that name by DNS challenge; and a local DNS record, on the router or in DSM's DNS Server, pointing the name at Vhagar's LAN IP. It has to be https, since the Netlify page is, and a plain `http://` LAN address is blocked as mixed content.
+- `tailnet`: Tailscale Serve already terminates TLS for the `ts.net` name inside the tailnet. Confirm the viewing devices are on the tailnet and that the ACL lets them reach the `raven` node on 443.
+- `public`: unchanged, the Funnel address.
+
+The first time a public page reaches a LAN address, Chrome asks to allow access to devices on the local network. Allow it, or the `lan` origin never answers and the probe moves on to the next one.
+
+To try it on one machine, put this in `apps/raven/.env`, run `bun run dev:raven`, and open Vite at `http://localhost:5173`:
+
+```bash
+RAVEN_MEDIA_ORIGINS=lan:http://localhost:8484
+RAVEN_WEB_ORIGINS=http://localhost:5173
+RAVEN_MEDIA_SECRET=$(openssl rand -base64 32)   # paste the value; .env does not expand $(...)
+```
+
+Play a clip and open the browser's Network tab: the `stream` request goes to `http://localhost:8484/api/media/<id>/stream?...&t=...` and its response carries `access-control-allow-origin: http://localhost:5173`, while `tracks` and the thumbnails stay on `:5173`. Stop the server and reload, and the player falls back to the relative `/api` URL.
+
+#### What still goes through Netlify
+
+Netlify gives a proxied request 26 seconds to start answering, and counts its bandwidth. raven marks its pictures `private`, so Netlify's cache never keeps one that the PIN opened for a single browser. raven compresses its JSON and subtitles with Brotli, or gzip for a browser that offers nothing better, so the Movies listing of about 3 MB leaves raven as about 360 KB; video, JPEG and PNG pictures, and live updates go as they are. Whether Netlify's proxy passes the compressed answer on to the browser is still to be checked: `curl -s -o /dev/null -D - -H 'Accept-Encoding: br' https://<site>/api/libraries` should show `content-encoding: br`. It has to be a GET, since raven answers a HEAD of an API route uncompressed.
 
 ### Coming from weirwood
 
