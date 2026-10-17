@@ -407,6 +407,12 @@ describe('resumeFor', () => {
     })
     expect(resumeFor(unknown, { file: facts('/a') })).toBe(40)
   })
+
+  it('returns the fallback only when the file has no saved spot', () => {
+    expect(resumeFor(saved, { file: facts('/other'), fallback: 4200 })).toBe(4200)
+    expect(resumeFor(saved, { file: facts('/a', { size: 999 }), fallback: 4200 })).toBe(4200)
+    expect(resumeFor(saved, { file: facts('/a'), fallback: 4200 })).toBe(40)
+  })
 })
 
 describe('forgetResume', () => {

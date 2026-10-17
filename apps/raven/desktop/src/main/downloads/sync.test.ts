@@ -34,6 +34,7 @@ const entryFor = (overrides: Partial<DownloadEntry> = {}): DownloadEntry => ({
   status: { kind: 'ready' },
   autoDelete: false,
   watchedAt: null,
+  serverPosition: 0,
   pending: NO_PENDING,
   createdAt: NOW - 1000,
   ...overrides,

@@ -39,6 +39,7 @@ const entryFor = (n: number, overrides: Partial<DownloadEntry> = {}): DownloadEn
   status: { kind: 'queued' },
   autoDelete: false,
   watchedAt: null,
+  serverPosition: 0,
   pending: NO_PENDING,
   createdAt: 1,
   ...overrides,

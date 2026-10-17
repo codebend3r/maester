@@ -135,7 +135,13 @@ const SEASON = details({
   season: 1,
   children: [
     episode({ id: 51, season: 1, number: 1, title: 'Good News', primary: episodeFile(11) }),
-    episode({ id: 52, season: 1, number: 2, title: 'Half Loop', primary: episodeFile(12) }),
+    episode({
+      id: 52,
+      season: 1,
+      number: 2,
+      title: 'Half Loop',
+      primary: { ...episodeFile(12), position: 4200 },
+    }),
     episode({ id: 53, season: 1, number: 3, title: 'In Perpetuity', primary: episodeFile(13) }),
   ],
 })
@@ -154,6 +160,7 @@ const entryFor = (overrides: Partial<DownloadEntry>): DownloadEntry => ({
   status: { kind: 'ready' },
   autoDelete: false,
   watchedAt: null,
+  serverPosition: 0,
   pending: NO_PENDING,
   createdAt: NOW - 1000,
   ...overrides,
@@ -586,6 +593,7 @@ describe('confirm', () => {
         status: { kind: 'queued' },
         autoDelete: true,
         watchedAt: null,
+        serverPosition: 4200,
         pending: NO_PENDING,
         createdAt: NOW + 5000,
       },

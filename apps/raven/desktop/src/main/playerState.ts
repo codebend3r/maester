@@ -215,9 +215,13 @@ export const forgetResume = (state: PlayerState, { path }: { path: string }): Pl
     ? { ...state, resume: state.resume.filter((entry) => entry.path !== path) }
     : state
 
-export const resumeFor = (state: PlayerState, { file }: { file: FileFacts }): number => {
+/** Where the file starts: its saved spot, or `fallback` when it has none (a download's server spot). */
+export const resumeFor = (
+  state: PlayerState,
+  { file, fallback = 0 }: { file: FileFacts; fallback?: number },
+): number => {
   const saved = savedFor(state, { file })
-  if (!saved) return 0
+  if (!saved) return fallback
   return isFinished(saved) ? 0 : saved.position
 }
 

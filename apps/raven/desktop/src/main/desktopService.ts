@@ -237,7 +237,10 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
         fileId: file.fileId,
         label: titleOf(file),
         folder: fromOf(file.path),
-        resumeAt: resumeFor(store.read(), { file }),
+        resumeAt: resumeFor(store.read(), {
+          file,
+          fallback: deps.downloads.serverPositionOf({ fileId: file.fileId }),
+        }),
         next: await nextAfter({ file, queue: request.queue }),
         tracks: trackPickFor(store.read(), { path: file.path }),
       },

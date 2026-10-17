@@ -72,7 +72,13 @@ const PLAY_REPLY = {
  * knows the two videos under `DOWNLOADED`, and `resumeAt` holds the position each
  * `notePosition` found already saved.
  */
-const fakeDownloads = ({ savedPosition }: { savedPosition: () => number | null }) => {
+const fakeDownloads = ({
+  savedPosition,
+  serverPosition,
+}: {
+  savedPosition: () => number | null
+  serverPosition: number
+}) => {
   const reached: { name: string; input: unknown }[] = []
   const resumeAt: (number | null)[] = []
   const note = (name: string, input: unknown = null) => {
@@ -87,6 +93,7 @@ const fakeDownloads = ({ savedPosition }: { savedPosition: () => number | null }
     fromLabelOf: ({ path }) =>
       path.startsWith(`${DOWNLOADED}/`) ? 'Downloaded from Vhagar' : null,
     labelOf: ({ path }) => DOWNLOAD_LABELS.get(path) ?? null,
+    serverPositionOf: () => serverPosition,
     noteOpened: (input) => note('noteOpened', input),
     notePosition: (input) => {
       note('notePosition', input)
@@ -202,8 +209,11 @@ const setup = ({
   callResult = { ok: true, status: 200, body: '{}' },
   failBrowser = false,
   updateAnswers = [],
+  serverPosition = 0,
 }: {
   updateAnswers?: UpdateCheck[]
+  /** What the fake download service says the server had as every file's resume spot. */
+  serverPosition?: number
   failOutputWrite?: boolean
   failOutputRead?: boolean
   trustOutcome?: TrustOutcome
@@ -318,6 +328,7 @@ const setup = ({
   })
   const { downloads, reached, resumeAt } = fakeDownloads({
     savedPosition: () => store.read().resume[0]?.position ?? null,
+    serverPosition,
   })
   const service = createDesktopService({
     updates,
@@ -754,6 +765,23 @@ describe('savePosition', () => {
       { name: 'notePosition', input: { fileId, position: 40, duration: null } },
     ])
     expect(resumeAt).toEqual([40])
+  })
+
+  it("starts a download with no local spot at the server's spot, and at the local one once saved", async () => {
+    const { service } = setup({ files: { [DOWNLOAD_ONE]: {} }, serverPosition: 4200 })
+    const { fileId } = idOf(await service.openPaths([DOWNLOAD_ONE]))
+    const fresh = await describe1({ service, fileId })
+    expect(fresh.type === 'file' && fresh.file.resumeAt).toBe(4200)
+    await save({ service, fileId, position: 100, duration: 3000 })
+    const saved = await describe1({ service, fileId })
+    expect(saved.type === 'file' && saved.file.resumeAt).toBe(100)
+  })
+
+  it('starts a download at 0 when the server had no spot for it', async () => {
+    const { service } = setup({ files: { [DOWNLOAD_ONE]: {} } })
+    const { fileId } = idOf(await service.openPaths([DOWNLOAD_ONE]))
+    const reply = await describe1({ service, fileId })
+    expect(reply.type === 'file' && reply.file.resumeAt).toBe(0)
   })
 
   it('stamps the save with the clock', async () => {

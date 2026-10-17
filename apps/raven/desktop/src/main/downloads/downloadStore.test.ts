@@ -73,6 +73,7 @@ describe('loadDownloads', () => {
           status: { kind: 'ready' },
           autoDelete: false,
           watchedAt: null,
+          serverPosition: 0,
           pending: NO_PENDING,
           createdAt: 1,
         },
