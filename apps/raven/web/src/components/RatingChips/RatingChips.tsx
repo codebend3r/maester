@@ -64,9 +64,7 @@ const ChipItem = ({ chip }: { chip: Chip }) => {
           className={`${styles.chip} ${styles.unscored}`}
           aria-label={`${NAMES[chip.source]}: no score`}
         >
-          <span className={styles.unscoredMark}>
-            <SourceMark source={chip.source} />
-          </span>
+          <SourceMark source={chip.source} />
           <span className={styles.value} aria-hidden="true">
             -
           </span>
@@ -80,7 +78,7 @@ const ChipItem = ({ chip }: { chip: Chip }) => {
 }
 
 /**
- * One chip per score, each with its source's mark and its value. With
+ * One pill per score, each with its source's mark and its value. With
  * `shouldShowEverySource`, as a movie's page has it, every source gets a
  * chip in a fixed order, and one with no score for the item says so.
  */

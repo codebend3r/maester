@@ -6,9 +6,11 @@ import styles from '@/components/PosterOverlay/PosterOverlay.module.scss'
 import type { AppPath } from '@/lib/itemLinks'
 
 /**
- * What a card lays over its poster: the video's resolution at the top and,
- * given a link, a play button at the bottom. It reveals both while its card,
- * the parent, is pointed at or focused, and always on touch screens.
+ * What a card lays over its poster: the video's resolution in the top
+ * corner and, given a link, a play button in the bottom one. It reveals both
+ * while its card (`[data-entry]`) is pointed at or focused, and always on
+ * touch screens. The card moves the resolution aside by `--select-room`
+ * while its checkbox shares that corner.
  */
 export const PosterOverlay = ({
   media,

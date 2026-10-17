@@ -11,40 +11,48 @@
     'play';
   grid-template-rows: auto minmax(0, 1fr) auto;
   justify-items: start;
-  padding: var(--space-1);
+  padding: var(--space-2);
   pointer-events: none;
 }
 
 .quality {
   grid-area: quality;
   display: grid;
+  translate: var(--select-room, 0) 0;
   opacity: 0;
 
   @media (prefers-reduced-motion: no-preference) {
-    transition: opacity 120ms ease-out;
+    transition:
+      opacity 150ms ease-out,
+      translate 250ms var(--ease-out);
   }
 }
 
+// A round button on dark glass, which keeps its dark in every theme, and
+// the one action's leaf under the pointer.
 .play {
   grid-area: play;
   display: grid;
   place-items: center;
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 50%;
-  background: var(--color-scrim);
-  color: var(--color-bark);
+  width: var(--control-size);
+  height: var(--control-size);
+  border-radius: var(--radius-pill);
+  background: var(--color-picture-glass);
+  backdrop-filter: blur(8px);
+  color: var(--color-on-picture);
   opacity: 0;
   pointer-events: auto;
 
   @media (prefers-reduced-motion: no-preference) {
     transition:
-      opacity 120ms ease-out,
-      background-color 120ms ease-out;
+      opacity 150ms ease-out,
+      background-color 150ms ease,
+      color 150ms ease;
   }
 
   &:hover {
     background: var(--color-leaf);
+    color: var(--color-on-leaf);
   }
 
   &:focus-visible {
@@ -52,9 +60,9 @@
   }
 }
 
-:hover > .overlay .quality,
-:hover > .overlay .play,
-:focus-within > .overlay .quality {
+[data-entry]:hover .quality,
+[data-entry]:hover .play,
+[data-entry]:focus-within .quality {
   opacity: 1;
 }
 

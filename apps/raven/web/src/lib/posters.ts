@@ -14,11 +14,13 @@ import { api } from '@/lib/api'
  */
 export const POSTER_SIZES = {
   /**
-   * A grid of `repeat(auto-fill, minmax(min(10rem, 100%), 1fr))`: a library's,
-   * a saga's, a person's and the favourites'. One column on a phone, then
-   * columns of 160 to 248 px; past 64rem, four or more under 204 px.
+   * `MediaGrid`'s posters, columns of 168 px at least with 16 px between,
+   * 150 px under 64rem and 128 px under 48rem: a library's, a saga's, a
+   * person's and the favourites'. Two columns that just miss fitting a third
+   * are the widest it lays out, half a column and a gap wider than the
+   * least: 200 px under 48rem, 233 px under 64rem and 260 px past it.
    */
-  grid: 'auto, (max-width: 30rem) calc(100vw - 2rem), (max-width: 64rem) 15.5rem, 12.75rem',
+  grid: 'auto, (max-width: 48rem) 12.5rem, (max-width: 64rem) 14.625rem, 16.25rem',
   /**
    * Home's rows: two, four, then eight across the page, which stops growing
    * at 120rem.
@@ -30,8 +32,12 @@ export const POSTER_SIZES = {
   season: '9rem',
   /** A TV library's tile: `clamp(4rem, 14vw, 6rem)`. */
   showTile: 'auto, 6rem',
+  /** A TV library's card, its poster beside its words: `6rem`. */
+  showCard: '6rem',
   /** A Movies library's tile: `clamp(3.5rem, 12vw, 5rem)`. */
   movieTile: 'auto, 5rem',
+  /** A row of a Movies or TV library's list: `2.25rem`. */
+  list: '2.25rem',
   /** A movie on the Duplicates tab. */
   duplicate: '(max-width: 30rem) 3.5rem, 5rem',
 } as const
@@ -43,12 +49,14 @@ export type PosterSizes = (typeof POSTER_SIZES)[keyof typeof POSTER_SIZES]
  * measure as its `sizes`, or below it where the layout allows narrower.
  */
 const NARROWEST: Record<PosterSizes, number> = {
-  [POSTER_SIZES.grid]: 160,
+  [POSTER_SIZES.grid]: 128,
   [POSTER_SIZES.row]: 70,
   [POSTER_SIZES.deck]: 118,
   [POSTER_SIZES.season]: 144,
   [POSTER_SIZES.showTile]: 64,
+  [POSTER_SIZES.showCard]: 96,
   [POSTER_SIZES.movieTile]: 56,
+  [POSTER_SIZES.list]: 36,
   [POSTER_SIZES.duplicate]: 56,
 }
 

@@ -91,7 +91,7 @@ describe('PosterCard', () => {
     expect(picture(container)).toHaveAttribute('sizes', POSTER_SIZES.grid)
   })
 
-  // A grid poster is at least 160 px wide, so 342 px covers it up to 342 / 160 = 2.1375x.
+  // A grid poster is at least 128 px wide, so 342 px covers it up to 342 / 128 = 2.67x.
   it('leaves the widths out on a screen dense enough to need the widest anyway', () => {
     const at = (ratio: number) => {
       atPixelRatio(ratio)
@@ -100,8 +100,8 @@ describe('PosterCard', () => {
           .container,
       )
     }
-    expect(at(2.1)).toHaveAttribute('sizes', POSTER_SIZES.grid)
-    const dense = [at(2.25), at(3)]
+    expect(at(2.6)).toHaveAttribute('sizes', POSTER_SIZES.grid)
+    const dense = [at(2.75), at(3)]
     expect(dense.map((poster) => poster?.getAttribute('src'))).toEqual([
       '/api/items/40/images/poster?v=p1',
       '/api/items/40/images/poster?v=p1',
@@ -161,6 +161,15 @@ describe('PosterCard', () => {
     cleanup()
     renderWithProviders(<PosterCard sizes={POSTER_SIZES.grid} media={matchedMovie()} />)
     expect(screen.queryByText('Watched')).toBeNull()
+  })
+
+  it('draws the heart over the poster and says Favourite once, beside its facts', () => {
+    const { container } = renderWithProviders(
+      <PosterCard sizes={POSTER_SIZES.grid} media={matchedMovie({ favourite: true })} />,
+    )
+    expect(screen.getAllByText('Favourite')).toHaveLength(1)
+    const poster = container.querySelector('a[aria-hidden="true"]')
+    expect(poster?.querySelector('svg')).not.toBeNull()
   })
 
   it('shows the check with the resume bar for a rewatch', () => {

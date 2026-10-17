@@ -1,11 +1,12 @@
-// Over a picture, so on glass of the ground, as a score chip is.
+// Over a picture, so on glass of the ground, as a badge is.
 .mark {
   display: grid;
   place-items: center;
   width: 1.5rem;
   height: 1.5rem;
-  border-radius: 50%;
-  background: var(--color-night-veil);
+  border-radius: var(--radius-pill);
+  background: var(--color-night-glass);
+  backdrop-filter: blur(8px);
   color: var(--color-bark);
   pointer-events: none;
 

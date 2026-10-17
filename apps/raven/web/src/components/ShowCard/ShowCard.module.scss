@@ -1,15 +1,15 @@
-// Posters are narrower than frame grabs, so more fit a row.
+// The wide cards side by side, as many as fit at 280 px or more.
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(10rem, 100%), 1fr));
-  gap: var(--space-4) var(--space-3);
+  grid-template-columns: repeat(auto-fill, minmax(min(17.5rem, 100%), 1fr));
+  gap: var(--space-3);
 
   // A library can hold thousands of shows, so the browser lays out and
   // draws only those near the screen. One it skips stands in at the height
-  // it had when last drawn, else at about a card's height 1440 wide.
+  // it had when last drawn, else at a card's height.
   > li {
     content-visibility: auto;
-    contain-intrinsic-block-size: auto 21rem;
+    contain-intrinsic-block-size: auto 11rem;
   }
 
   // Skipping also clips what a card draws to its box, which would cut off
@@ -19,30 +19,52 @@
   }
 }
 
-// Areas stack the picture, the play button over it, then the words.
+// The poster over its words, as a home row lays it out. Raised while
+// pointed at or focused, so the lifted poster lies over the cards after it.
 .card {
+  --poster-letter: var(--font-size-title);
+
   position: relative;
   display: grid;
   grid-template-areas:
-    'frame'
-    'title'
-    'sorted'
-    'facts';
-  grid-template-rows: auto auto auto auto;
+    'poster'
+    'words';
+  grid-template-columns: minmax(0, 1fr);
   align-content: start;
-  gap: var(--space-0);
+  gap: var(--space-2);
   min-width: 0;
 
-  &:hover .image,
-  &:focus-within .image {
-    filter: brightness(1.12);
+  &:hover,
+  &:focus-within {
+    z-index: 1;
   }
+
+  // The checkbox shares the poster's top corner with the resolution, which
+  // steps aside while it shows.
+  @media (hover: hover) {
+    &:has(.select):hover {
+      --select-room: calc(1.5rem + var(--space-1));
+    }
+  }
+
+  &:has(.select)[data-selecting] {
+    --select-room: calc(1.5rem + var(--space-1));
+  }
+}
+
+// The picture, the overlay and the checkbox, which lift as one.
+.poster {
+  grid-area: poster;
+  position: relative;
+  display: grid;
+  grid-template-areas: 'frame';
 }
 
 .picture {
   grid-area: frame;
   display: grid;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
+  text-decoration: none;
 }
 
 .frame {
@@ -53,60 +75,75 @@
   // the layout of a library of thousands of cards.
   align-self: start;
   aspect-ratio: 2 / 3;
-  border-radius: var(--radius-md);
+  // One cell the shape sets, which a tall picture cannot stretch.
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 0;
+  border-radius: var(--radius-lg);
   overflow: hidden;
   background: var(--color-canopy);
-}
+  box-shadow: var(--shadow-poster);
 
-.image,
-.placeholder,
-.watched {
-  grid-area: frame;
-}
-
-// The number left, or a check, in the poster's top corner, over the picture
-// and its hover filter.
-.watched {
-  position: relative;
-  z-index: 1;
-  align-self: start;
-  justify-self: end;
-  inset: var(--space-1) var(--space-1) auto auto;
+  > * {
+    grid-area: frame;
+  }
 }
 
 .image {
   width: 100%;
   height: 100%;
   object-fit: cover;
-
-  @media (prefers-reduced-motion: no-preference) {
-    transition: filter 150ms ease-out;
-  }
 }
 
+.card:hover .image,
+.card:has(:focus-visible) .image,
+.wide:hover .image {
+  filter: brightness(1.12);
+}
+
+// The title's first letter, dim in the middle of the frame.
 .placeholder {
   display: grid;
   place-items: center;
+  color: var(--color-moss-line);
   font-family: var(--font-display);
-  font-size: var(--font-size-xl);
-  color: var(--color-lichen);
+  font-size: var(--poster-letter, var(--font-size-xl));
+  line-height: 1;
+}
+
+// The number left, or a check, in the poster's top corner, over the picture
+// and its hover filter.
+.marks {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  align-self: start;
+  justify-self: end;
+  padding: var(--space-2);
 }
 
 // In the poster's top corner opposite the count, over the picture and its hover filter.
 .select {
   position: absolute;
-  inset: var(--space-1) auto auto var(--space-1);
+  inset: var(--space-2) auto auto var(--space-2);
   z-index: 2;
 }
 
+.words {
+  grid-area: words;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+}
+
 .title {
-  grid-area: title;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  font-size: var(--font-size-sm);
   font-weight: 600;
-  line-height: 1.3;
+  line-height: var(--line-body);
   text-decoration: none;
   overflow-wrap: anywhere;
 
@@ -116,22 +153,229 @@
   }
 }
 
+// The facts read as one line of words, wrapping between facts rather than
+// inside one, a dot apart.
 .facts {
-  grid-area: facts;
-  display: grid;
-  grid-auto-flow: column;
-  justify-content: start;
-  gap: var(--space-2);
   color: var(--color-lichen);
   font-size: var(--font-size-xs);
+  line-height: var(--line-body);
   font-stretch: 90%;
+}
+
+.fact {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.fact:has(+ .fact)::after {
+  content: '·' / '';
+  padding-inline: var(--space-0);
 }
 
 // The value the listing is sorted by: a line of its own above the facts, so
 // a long one ("Added 3 days ago") never squeezes them, and a shade brighter.
 .sorted {
+  color: var(--color-bark);
+  font-size: var(--font-size-xs);
+  font-stretch: 90%;
+}
+
+// The wide card: its poster beside its words, on the canopy washed toward
+// the poster's colours from the far side. `--ground` is what the wash
+// starts from, a shade lighter under the pointer.
+.wide {
+  --ground: var(--color-canopy);
+
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: 6rem minmax(0, 1fr);
+  grid-template-areas: 'poster body';
+  gap: var(--space-3);
+  padding: var(--space-3);
+  overflow: hidden;
+  border-radius: var(--radius-xl);
+  background: var(--ground);
+
+  &:hover {
+    --ground: var(--color-canopy-hi);
+  }
+
+  // Over the wash, which shows through as the ground gives way.
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(110deg, var(--ground) 40%, transparent);
+  }
+}
+
+// The poster again, blurred into a colour: as strong as the theme's glow,
+// so none in high contrast.
+.wash {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: var(--glow);
+  filter: blur(24px);
+  scale: 1.4;
+  pointer-events: none;
+}
+
+.widePicture {
+  grid-area: poster;
+  display: grid;
+  align-self: start;
+  border-radius: var(--radius-md);
+  text-decoration: none;
+}
+
+.wideFrame {
+  display: grid;
+  grid-template-areas: 'frame';
+  aspect-ratio: 2 / 3;
+  // One cell the shape sets, which a tall picture cannot stretch.
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 0;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-moss);
+  box-shadow: var(--shadow-menu);
+
+  > * {
+    grid-area: frame;
+  }
+}
+
+.wideMarks {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  align-self: start;
+  justify-self: end;
+  padding: var(--space-1);
+}
+
+// Over the poster's top corner, inside the card's padding.
+.wideSelect {
+  position: absolute;
+  inset: calc(var(--space-3) + var(--space-1)) auto auto calc(var(--space-3) + var(--space-1));
+  z-index: 2;
+}
+
+// The words, and the next episode's button settled at their foot.
+.body {
+  grid-area: body;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'title'
+    'sorted'
+    'facts'
+    '.'
+    'action';
+  gap: var(--space-0);
+  min-width: 0;
+}
+
+.wideTitle {
+  grid-area: title;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-family: var(--font-display);
+  font-size: var(--font-size-lg);
+  line-height: var(--line-tight);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+
+  &:hover {
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.18em;
+  }
+}
+
+.wideSorted {
   grid-area: sorted;
   color: var(--color-bark);
   font-size: var(--font-size-xs);
   font-stretch: 90%;
+}
+
+.wideFacts {
+  grid-area: facts;
+  color: var(--color-birch);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-body);
+}
+
+// The next episode, as the one action the card is for, its play icon solid.
+.next {
+  --icon-tint: 1;
+
+  grid-area: action;
+  display: grid;
+  grid-template-columns: auto minmax(0, auto);
+  align-items: center;
+  justify-self: start;
+  gap: var(--space-1);
+  max-width: 100%;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-leaf);
+  color: var(--color-on-leaf);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  text-decoration: none;
+
+  &:hover {
+    background: var(--color-leaf-hi);
+  }
+}
+
+.nextLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.done {
+  grid-area: action;
+  display: grid;
+  grid-auto-flow: column;
+  align-items: center;
+  justify-content: start;
+  gap: var(--space-1);
+  color: var(--color-lichen);
+  font-size: var(--font-size-xs);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .poster {
+    transition:
+      translate 250ms var(--ease-out),
+      rotate 250ms var(--ease-out);
+  }
+
+  .card:hover .poster,
+  .card:has(:focus-visible) .poster {
+    translate: 0 -6px;
+    rotate: -1deg;
+  }
+
+  .image {
+    transition: filter 150ms ease-out;
+  }
+
+  .next {
+    transition: background-color 150ms ease;
+  }
 }

@@ -10,7 +10,7 @@ import {
   sortFact,
 } from '@raven/core'
 import { CardLink } from '@/components/CardLink/CardLink'
-import { FavouriteMark } from '@/components/FavouriteMark/FavouriteMark'
+import { FavouriteMark, FavouriteWords } from '@/components/FavouriteMark/FavouriteMark'
 import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
 import { PosterOverlay } from '@/components/PosterOverlay/PosterOverlay'
@@ -29,24 +29,31 @@ import styles from '@/components/PosterCard/PosterCard.module.scss'
 
 /**
  * The picture a poster card shows, with where playback stopped along its
- * foot and a check in its corner when it is watched. A rewatch has both.
+ * foot and its marks in the top corner: the heart for a favourite, then the
+ * check when it is watched. A rewatch has both the check and the line.
  */
 export const PosterFrame = ({
   media,
   poster,
   sizes,
   withWatched = true,
+  withFavourite = false,
 }: {
   media: MediaItem
   poster?: ItemSummary | null
   sizes: PosterSizes
   /** Off where the card's note already says. */
   withWatched?: boolean
+  /** On where the poster is large enough to carry the heart as well. */
+  withFavourite?: boolean
 }) => (
   <span className={styles.frame}>
     <PosterImage media={media} poster={poster} sizes={sizes} />
     <ResumeBar media={media} className={styles.resume} />
-    <WatchedMark decorative watched={withWatched && media.watched} className={styles.watched} />
+    <span className={styles.marks}>
+      {withFavourite && <FavouriteMark media={media} tone="overlay" decorative />}
+      <WatchedMark decorative watched={withWatched && media.watched} />
+    </span>
   </span>
 )
 
@@ -54,10 +61,11 @@ const backdropOf = (item: ItemSummary | null | undefined): string | null =>
   item ? api.itemImageUrl({ id: item.id, kind: 'backdrop', version: item.backdropVersion }) : null
 
 /**
- * A movie as a poster, its title and year beneath. A matched card opens the
+ * A movie as a poster, its title and facts beneath. A matched card opens the
  * movie's page and its play button plays at once; anything else opens the
  * player, as a frame-grab card does. A right click opens the card's menu.
- * Sorted, it shows the value its listing is sorted by above its facts.
+ * Sorted, it shows the value its listing is sorted by above its facts. The
+ * poster lifts toward the pointer, carrying its checkbox and menu with it.
  */
 export const PosterCard = ({
   media,
@@ -94,6 +102,7 @@ export const PosterCard = ({
     year == null ? null : String(year),
     media.versions > 1 ? `${media.versions} versions` : null,
     year == null && media.versions === 1 ? formatRuntime(media.duration) : null,
+    media.match === 'unmatched' ? 'Not matched' : null,
   ].filter((fact): fact is string => fact != null && fact !== sorted)
 
   return (
@@ -103,43 +112,54 @@ export const PosterCard = ({
       {...hover}
       {...select.rootProps}
     >
-      <CardLink
-        {...link}
-        className={styles.picture}
-        tabIndex={-1}
-        aria-hidden="true"
-        onContextMenu={menu.onContextMenu}
-      >
-        <PosterFrame media={media} poster={poster} sizes={sizes} />
-      </CardLink>
-      <SelectCheckbox select={select} className={styles.select} />
-      <PosterOverlay
-        media={media}
-        play={
-          hasPage && !select.selecting ? { ...watchLink({ media }), label: `Play ${title}` } : null
-        }
-      />
-      <CardLink
-        {...link}
-        className={styles.title}
-        tabIndex={select.linkTabIndex}
-        onContextMenu={menu.onContextMenu}
-      >
-        {title}
-      </CardLink>
-      {sorted && <span className={styles.sorted}>{sorted}</span>}
-      <span className={styles.facts}>
-        <FavouriteMark media={media} />
-        {facts.map((fact) => (
-          <span key={fact}>{fact}</span>
-        ))}
-        {score && <ScoreChip rating={score} />}
-        {media.match === 'unmatched' && <span>Not matched</span>}
-        <PartlyWatched media={media} />
-        <WatchedWords watched={media.watched} />
-      </span>
-      <PlaybackNote media={media} />
-      {menu.menu}
+      <div className={styles.poster}>
+        <CardLink
+          {...link}
+          className={styles.picture}
+          tabIndex={-1}
+          aria-hidden="true"
+          onContextMenu={menu.onContextMenu}
+        >
+          <PosterFrame media={media} poster={poster} sizes={sizes} withFavourite />
+        </CardLink>
+        <SelectCheckbox select={select} className={styles.select} />
+        <PosterOverlay
+          media={media}
+          play={
+            hasPage && !select.selecting
+              ? { ...watchLink({ media }), label: `Play ${title}` }
+              : null
+          }
+        />
+        {menu.menu}
+      </div>
+      <div className={styles.words}>
+        <CardLink
+          {...link}
+          className={styles.title}
+          tabIndex={select.linkTabIndex}
+          onContextMenu={menu.onContextMenu}
+        >
+          {title}
+        </CardLink>
+        {sorted && <span className={styles.sorted}>{sorted}</span>}
+        <span className={styles.facts}>
+          {facts.map((fact) => (
+            <span key={fact} className={styles.fact}>
+              {fact}
+            </span>
+          ))}
+          {score && (
+            <span className={styles.fact}>
+              <ScoreChip rating={score} />
+            </span>
+          )}
+          <FavouriteWords media={media} />
+          <PartlyWatched media={media} />
+          <WatchedWords watched={media.watched} />
+        </span>
+        <PlaybackNote media={media} />
+      </div>
     </li>
   )
 }
