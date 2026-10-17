@@ -22,10 +22,11 @@ import {
   setSidecars,
   start,
   type DownloadEntry,
+  type FailReason,
+  type PauseReason,
   type Sidecar,
 } from '@/main/downloads/downloadState'
 import type { DownloadsStore } from '@/main/downloads/downloadStore'
-import { EXPAND_MESSAGES } from '@/main/downloads/expand'
 import {
   DOWNLOAD_STALL_MS,
   fetchToFile,
@@ -52,7 +53,7 @@ import {
   type SpaceFs,
 } from '@/main/downloads/space'
 import { errorText } from '@/main/log/errorText'
-import { CALL_MESSAGES, loggable, type ServerCalls } from '@/main/servers/serverCalls'
+import { loggable, type ServerCalls } from '@/main/servers/serverCalls'
 import { sidecarTracksOf } from '@/main/servers/sidecarTracks'
 import { isMissingFile, type Timers } from '@/main/stateStore'
 import { isOpaqueId, SERVER_GONE } from '@/shared/protocol'
@@ -198,16 +199,23 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     if (entry !== null && entry.status.kind === 'failed') deps.onFailed(entry)
   }
 
-  const failEntry = ({ entry, message }: { entry: DownloadEntry; message: string }): void => {
-    store.update((state) => fail(state, { downloadId: entry.downloadId, message }))
+  const failEntry = ({
+    entry,
+    reason,
+    message,
+  }: {
+    entry: DownloadEntry
+    reason: FailReason
+    message?: string
+  }): void => {
+    store.update((state) => fail(state, { downloadId: entry.downloadId, reason, message }))
     told(entry.downloadId)
   }
 
   /** The disk is full: this file fails, and the files of its group still waiting wait paused. */
   const failForSpace = (entry: DownloadEntry): void => {
-    const message = DOWNLOAD_MESSAGES.noSpace
     store.update((state) => {
-      const failed = fail(state, { downloadId: entry.downloadId, message })
+      const failed = fail(state, { downloadId: entry.downloadId, reason: 'noSpace' })
       return failed.entries
         .filter(
           (other) =>
@@ -215,7 +223,10 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
             other.status.kind === 'queued' &&
             sameGroup({ a: entry, b: other }),
         )
-        .reduce((next, other) => pause(next, { downloadId: other.downloadId, message }), failed)
+        .reduce(
+          (next, other) => pause(next, { downloadId: other.downloadId, reason: 'noSpace' }),
+          failed,
+        )
     })
     told(entry.downloadId)
   }
@@ -232,10 +243,10 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     return Promise.all(stopped.map(([, run]) => run.done)).then(() => undefined)
   }
 
-  /** Every other waiting or running file of the job's server waits paused with `message`. */
-  const pauseServerOf = ({ job, message }: { job: Job; message: string }): void => {
+  /** Every other waiting or running file of the job's server waits paused for `reason`. */
+  const pauseServerOf = ({ job, reason }: { job: Job; reason: PauseReason }): void => {
     const { entry, server } = job
-    store.update((state) => pauseServer(state, { serverId: server.id, message }))
+    store.update((state) => pauseServer(state, { serverId: server.id, reason }))
     stopRuns({
       reason: 'pause',
       isStopped: ({ downloadId, run }) =>
@@ -245,7 +256,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
 
   /** The server locked its library again: every file of it waits paused, running ones too. */
   const relock = (job: Job): void => {
-    pauseServerOf({ job, message: DOWNLOAD_MESSAGES.relocked(job.server.name) })
+    pauseServerOf({ job, reason: 'relocked' })
     deps.warn(`${loggable(job.server.name)} locked ${loggable(job.entry.label)}'s library again`)
   }
 
@@ -253,9 +264,9 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
    * The server could not be reached: this file fails, its part kept, and the rest of the
    * server's files wait paused, so an outage costs one failure rather than the whole queue.
    */
-  const failUnreachable = ({ job, message }: { job: Job; message: string }): void => {
-    failEntry({ entry: job.entry, message })
-    pauseServerOf({ job, message: DOWNLOAD_MESSAGES.unreachable(job.server.name) })
+  const failUnreachable = (job: Job): void => {
+    failEntry({ entry: job.entry, reason: 'unreachable' })
+    pauseServerOf({ job, reason: 'unreachable' })
     deps.warn(
       `raven player could not reach ${loggable(job.server.name)} for ${loggable(job.entry.label)}`,
     )
@@ -275,11 +286,13 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
         relock(job)
         return null
       case 'unreachable':
-        failUnreachable({ job, message: outcome.message })
+        failUnreachable(job)
         return null
       case 'unreadable':
+        failEntry({ entry, reason: 'other', message: outcome.message })
+        return null
       case 'gone':
-        failEntry({ entry, message: outcome.message })
+        failEntry({ entry, reason: 'gone' })
         return null
       default: {
         const unreachable: never = outcome.reason
@@ -348,30 +361,34 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
         failForSpace(entry)
         return
       case 'changed':
-        failEntry({ entry, message: DOWNLOAD_MESSAGES.changed })
+        failEntry({ entry, reason: 'changed' })
         return
       case 'unreachable':
       case 'stalled':
       case 'aborted':
         // The origin picked may be the one that went away; the next file probes again.
         deps.access.forget(server.id)
-        failUnreachable({ job, message: CALL_MESSAGES.unreachable(server.name) })
+        failUnreachable(job)
         return
       case 'unauthorized':
+        failEntry({ entry, reason: 'unauthorized' })
+        return
       case 'status': {
         const status = outcome.status ?? 0
         // A proxy in front of a restarting server answers 502 to 504: an outage, not a refusal.
         if (status >= 500) {
           deps.access.forget(server.id)
-          failUnreachable({ job, message: CALL_MESSAGES.unreachable(server.name) })
+          failUnreachable(job)
+          return
+        }
+        if (status === NOT_FOUND_STATUS) {
+          failEntry({ entry, reason: 'gone' })
           return
         }
         failEntry({
           entry,
-          message:
-            status === NOT_FOUND_STATUS
-              ? EXPAND_MESSAGES.gone(server.name)
-              : DOWNLOAD_MESSAGES.answered({ serverName: server.name, status }),
+          reason: 'other',
+          message: DOWNLOAD_MESSAGES.answered({ serverName: server.name, status }),
         })
         return
       }
@@ -505,7 +522,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     if (entry === null) return
     const server = deps.serverOf(entry.serverId)
     if (server === null) {
-      failEntry({ entry, message: SERVER_GONE })
+      failEntry({ entry, reason: 'other', message: SERVER_GONE })
       return
     }
     const job: Job = { entry, server, signal }
@@ -541,7 +558,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     work({ downloadId, signal: stop.signal })
       .catch((error: unknown) => {
         if (stop.signal.aborted) return
-        failEntry({ entry, message: errorText(error) })
+        failEntry({ entry, reason: 'other', message: errorText(error) })
         deps.warn(`raven player could not download ${loggable(entry.label)}`)
       })
       .finally(() => {
@@ -577,7 +594,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     stopRuns({ reason, isStopped: (candidate) => candidate.downloadId === downloadId })
 
   const pauseOne: DownloadQueue['pause'] = async ({ downloadId }) => {
-    store.update((state) => pause(state, { downloadId, message: null }))
+    store.update((state) => pause(state, { downloadId, reason: 'viewer' }))
     await stopOne({ downloadId, reason: 'pause' })
     kick()
   }
@@ -590,7 +607,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
   const pauseAll: DownloadQueue['pauseAll'] = async () => {
     store.update((state) =>
       state.entries.reduce(
-        (next, entry) => pause(next, { downloadId: entry.downloadId, message: null }),
+        (next, entry) => pause(next, { downloadId: entry.downloadId, reason: 'viewer' }),
         state,
       ),
     )

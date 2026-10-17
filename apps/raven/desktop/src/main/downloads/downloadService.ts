@@ -1,6 +1,6 @@
 import type { ConfigStore } from '@/main/desktopConfig'
 import { createDownloadAsks, type DownloadAsks } from '@/main/downloads/asks'
-import { DOWNLOAD_MESSAGES } from '@/main/downloads/downloadMessages'
+import { DOWNLOAD_MESSAGES, failedMessage, pausedMessage } from '@/main/downloads/downloadMessages'
 import {
   createDownloadQueue,
   type DownloadQueueDeps,
@@ -12,6 +12,7 @@ import {
   setAutoDelete,
   setAutoDeleteDefault,
   sortDownloads,
+  type EntryStatus,
   type DownloadsState,
 } from '@/main/downloads/downloadState'
 import type { DownloadsStore } from '@/main/downloads/downloadStore'
@@ -21,7 +22,7 @@ import { errorText } from '@/main/log/errorText'
 import { loggable, type ServerCalls } from '@/main/servers/serverCalls'
 import { serverById } from '@/main/servers/serverList'
 import type { Timers } from '@/main/stateStore'
-import type { DesktopEvent, DesktopReply, DownloadView } from '@/shared/protocol'
+import type { DesktopEvent, DesktopReply, DownloadStatus, DownloadView } from '@/shared/protocol'
 
 /** The `downloads` event goes out at most once in this long, so progress cannot flood the page. */
 export const DOWNLOADS_EVENT_MS = 250
@@ -74,6 +75,38 @@ type DownloadsList = Extract<DesktopEvent, { type: 'downloads' }>
 
 const refused = (message: string): DesktopReply => ({ type: 'refused', message })
 
+/** A stored status as the page reads it: its reason in words, named by the server's name now. */
+export const viewStatusOf = ({
+  status,
+  serverName,
+}: {
+  status: EntryStatus
+  serverName: string
+}): DownloadStatus => {
+  switch (status.kind) {
+    case 'queued':
+    case 'downloading':
+    case 'ready':
+      return status
+    case 'paused':
+      return {
+        kind: 'paused',
+        bytes: status.bytes,
+        message: pausedMessage({ reason: status.reason, serverName }),
+      }
+    case 'failed':
+      return {
+        kind: 'failed',
+        bytes: status.bytes,
+        message: failedMessage({ reason: status.reason, message: status.message, serverName }),
+      }
+    default: {
+      const unreachable: never = status
+      return unreachable
+    }
+  }
+}
+
 export const createDownloadService = (deps: DownloadServiceDeps): DownloadService => {
   const { store, config } = deps
   const announcing: { timer: unknown } = { timer: undefined }
@@ -92,13 +125,11 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
         group: entry.group,
         serverName,
         size: entry.size,
-        status: entry.status,
+        status: viewStatusOf({ status: entry.status, serverName }),
         autoDelete: entry.autoDelete,
         watched: null,
         deletesAt: null,
-        needsUnlock:
-          entry.status.kind === 'paused' &&
-          entry.status.message === DOWNLOAD_MESSAGES.relocked(serverName),
+        needsUnlock: entry.status.kind === 'paused' && entry.status.reason === 'relocked',
       }
     })
 
@@ -144,8 +175,14 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     warn: deps.warn,
     onFinished: (entry) => notice(DOWNLOAD_MESSAGES.downloaded(entry.label)),
     onFailed: (entry) => {
-      if (entry.status.kind !== 'failed') return
-      notice(DOWNLOAD_MESSAGES.failed({ label: entry.label, why: entry.status.message }))
+      const { status } = entry
+      if (status.kind !== 'failed') return
+      const why = failedMessage({
+        reason: status.reason,
+        message: status.message,
+        serverName: serverNameOf(entry.serverId),
+      })
+      notice(DOWNLOAD_MESSAGES.failed({ label: entry.label, why }))
     },
   })
 
