@@ -1,4 +1,4 @@
-import { isMediaTracks, MEDIA_TICKET_REFRESH_SECONDS, type SubtitleTrack } from '@raven/core'
+import { isMediaTracks, type SubtitleTrack } from '@raven/core'
 import type { ServerEntry } from '@/main/desktopConfig'
 import { DOWNLOAD_MESSAGES } from '@/main/downloads/downloadMessages'
 import {
@@ -58,7 +58,7 @@ import { isOpaqueId, SERVER_GONE } from '@/shared/protocol'
 
 export const DOWNLOAD_CONCURRENCY = 2
 
-/** The soonest a ticket is renewed, so one already close to lapsing is not read again at once. */
+/** The soonest a renewal comes, so a ticket already due is not read again at once. */
 export const RENEWAL_MIN_MS = 60_000
 
 /** Node runs a longer delay at once, so no timer is ever armed for more. */
@@ -394,7 +394,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     }
   }
 
-  /** Aborts the fetch `MEDIA_TICKET_REFRESH_SECONDS` before its ticket lapses, so a new one is read (Ruling 7). */
+  /** Aborts the fetch when its ticket is due for renewal, so a new one is read (Ruling 7). */
   const renewalFor = ({
     access,
     refresh,
@@ -403,7 +403,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     refresh: AbortController
   }): unknown => {
     if (access.kind !== 'origin') return undefined
-    const ms = access.expiresAt - MEDIA_TICKET_REFRESH_SECONDS * 1000 - deps.now()
+    const ms = access.renewAt - deps.now()
     const delay = Math.min(Math.max(ms, RENEWAL_MIN_MS), TIMER_MAX_MS)
     return timers.set(() => refresh.abort(stopping('refresh')), delay)
   }
