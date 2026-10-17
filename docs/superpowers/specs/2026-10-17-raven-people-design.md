@@ -206,7 +206,9 @@ Migration 28:
 **Topping up.** Due scores are topped up by a `ScoreSweep` on its own queue, never the metadata queue, within each provider's daily budget (`MDBLIST_DAILY_LIMIT`, default 1000):
 - It drains the main source's due titles, then OMDb's for the titles MDBList doesn't know.
 - OMDb is due for a title with an IMDb id when its own answer is missing or a month old, and MDBList's is too or MDBList gave the title no scores.
-- It wakes after UTC midnight whenever a spent source still has titles due, and 15 minutes after a round that got no answer. A title that fails keeps its place, and the rest go on.
+- It wakes after UTC midnight whenever a spent source still has titles due.
+- A round stops after three failed calls in a row. A title that fails is skipped for the rest of the drain and keeps its place for the next one, so titles that keep failing cannot starve the rest. Two rounds in a row with failures and no answer take the source as down.
+- It wakes 15 minutes after a drain that found the source down or left failed titles behind.
 
 **Health.** It reports `mdblist` beside `omdb`.
 

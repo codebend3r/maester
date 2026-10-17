@@ -327,7 +327,7 @@ describe('the score sweep', () => {
     expect(sweep.pause()).toBeNull()
   })
 
-  it('goes on past a title that keeps failing, and pauses once a round gets no answer', async () => {
+  it('goes on past a title that keeps failing, asks it once a drain, and again on the next', async () => {
     fakeClock()
     const titles = movies(['1', '2', '3', '4'])
     const mdblist = fakeSource({
@@ -341,17 +341,47 @@ describe('the score sweep', () => {
     await sweep.whenIdle()
 
     expect(isStamped(titles)).toEqual([false, true, true, true])
-    expect(askedFor(mdblist.lookUp).filter((tmdbId) => tmdbId === '1')).toHaveLength(2)
-    expect(mdblist.lookUp).toHaveBeenCalledTimes(5)
+    expect(askedFor(mdblist.lookUp).toSorted()).toEqual(['1', '2', '3', '4'])
     expect(sweep.pause()).toEqual({
       reason: 'unavailable',
       resumesAt: new Date(Date.now() + RETRY_MS).toISOString(),
     })
+
+    sweep.kick()
+    await sweep.whenIdle()
+    expect(askedFor(mdblist.lookUp).slice(4)).toEqual(['1'])
   })
 
-  it('gives a round up after three failures in a row, and tries again 15 minutes later', async () => {
+  it('reaches the titles behind four that keep failing, asking each of those once a drain', async () => {
     fakeClock()
-    const titles = movies(['1', '2', '3', '4', '5', '6'])
+    const titles = movies(['1', '2', '3', '4', '5', '6', '7', '8'])
+    const failing = new Set(['1', '2', '3', '4'])
+    const mdblist = fakeSource({
+      provider: 'mdblist',
+      answer: ({ tmdbId }) =>
+        failing.has(tmdbId) ? new Error('MDBList answered 500.') : [rottenTomatoes(9.1)],
+    })
+    const { sweep } = sweepWith({ omdb: OMDB_OFF().source, mdblist: mdblist.source })
+
+    sweep.kick()
+    await sweep.whenIdle()
+
+    expect(isStamped(titles)).toEqual([false, false, false, false, true, true, true, true])
+    expect(askedFor(mdblist.lookUp).toSorted()).toEqual(['1', '2', '3', '4', '5', '6', '7', '8'])
+    expect(sweep.pause()).toEqual({
+      reason: 'unavailable',
+      resumesAt: new Date(Date.now() + RETRY_MS).toISOString(),
+    })
+
+    await vi.advanceTimersByTimeAsync(RETRY_MS)
+    await sweep.whenIdle()
+    expect(askedFor(mdblist.lookUp).slice(8).toSorted()).toEqual(['1', '2', '3', '4'])
+    expect(isStamped(titles)).toEqual([false, false, false, false, true, true, true, true])
+  })
+
+  it('takes a source as down after two rounds in a row with no answer, and tries again 15 minutes later', async () => {
+    fakeClock()
+    const titles = movies(['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'])
     const mdblist = fakeSource({
       provider: 'mdblist',
       answer: () => new Error('MDBList could not be reached.'),
@@ -361,10 +391,10 @@ describe('the score sweep', () => {
     sweep.kick()
     await sweep.whenIdle()
 
-    // The third failure in a row ends the round; the call beside it was already in flight.
+    // Each round ends at the third failure in a row, with the call beside it already in flight.
     expect(GIVE_UP_AFTER).toBe(3)
-    expect(mdblist.lookUp).toHaveBeenCalledTimes(4)
-    expect(isStamped(titles)).toEqual([false, false, false, false, false, false])
+    expect(askedFor(mdblist.lookUp)).toEqual(['1', '2', '3', '4', '5', '6', '7', '8'])
+    expect(isStamped(titles).some((isDone) => isDone)).toBe(false)
     expect(sweep.pause()).toEqual({
       reason: 'unavailable',
       resumesAt: new Date(Date.now() + RETRY_MS).toISOString(),
@@ -372,11 +402,11 @@ describe('the score sweep', () => {
 
     mdblist.state.answer = () => [rottenTomatoes(9.1)]
     await vi.advanceTimersByTimeAsync(RETRY_MS - 1000)
-    expect(mdblist.lookUp).toHaveBeenCalledTimes(4)
+    expect(mdblist.lookUp).toHaveBeenCalledTimes(8)
 
     await vi.advanceTimersByTimeAsync(1000)
     await sweep.whenIdle()
-    expect(isStamped(titles)).toEqual([true, true, true, true, true, true])
+    expect(isStamped(titles).every((isDone) => isDone)).toBe(true)
     expect(sweep.pause()).toBeNull()
   })
 

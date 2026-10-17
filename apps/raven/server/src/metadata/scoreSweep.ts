@@ -7,13 +7,13 @@ import {
 } from '@nestjs/common'
 import { errorMessage } from '@/errorMessage'
 import { MetadataRepository } from '@/metadata/metadataRepository'
-import type { ScoreSource, ScoreTitle } from '@/metadata/scoreSources'
+import type { ScoreProvider, ScoreSource, ScoreTitle } from '@/metadata/scoreSources'
 import { Scores } from '@/metadata/scores'
 import { createTaskQueue, mapWithConcurrency } from '@/scanner/concurrency'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
-/** How long a round with no answer waits before the sweep tries again. */
+/** How long the sweep waits to try again after a source seemed down or titles failed. */
 export const RETRY_MS = 15 * 60 * 1000
 
 /** How many titles are asked about at once. */
@@ -46,9 +46,20 @@ type Round = {
 /**
  * How a drain ended: with nothing left it can ask for; with titles waiting
  * on a spent source while another still has calls (`someSpent`); with no
- * source left with calls (`budget`); or with a round no source answered.
+ * source left with calls (`budget`); or with a source that seemed down, or
+ * titles that failed, to try again (`unavailable`).
  */
 type Stop = 'done' | 'someSpent' | 'budget' | 'unavailable'
+
+/**
+ * What one drain has learned so far: the items each source failed on, which
+ * its later rounds skip so they cannot starve it, and whether its last round
+ * had failures and no answer.
+ */
+type Progress = { failed: Record<ScoreProvider, ReadonlySet<number>>; wasLastSilent: boolean }
+
+/** What became of one title in a round. */
+type Outcome = 'answered' | 'failed' | 'skipped'
 
 /** A minute past the next midnight UTC, when every provider's day has turned. */
 const afterMidnight = (now: Date): Date =>
@@ -59,8 +70,8 @@ const afterMidnight = (now: Date): Date =>
  * so a top-up waiting days on a daily budget never holds up matching. It
  * asks the primary source first, then OMDb for the titles MDBList does not
  * know, two titles at a time. It wakes again after midnight UTC while a
- * spent source still has titles due, and 15 minutes after a round no source
- * answered.
+ * spent source still has titles due, and 15 minutes after a source seemed
+ * down or titles failed.
  */
 @Injectable()
 export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
@@ -104,7 +115,11 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
 
   private async drain(): Promise<void> {
     this.state.pause = null
-    const stop = await this.topUp().catch((error: unknown) => {
+    const start: Progress = {
+      failed: { mdblist: new Set(), omdb: new Set() },
+      wasLastSilent: false,
+    }
+    const stop = await this.topUp(start).catch((error: unknown) => {
       this.logger.error(`Topping up scores failed: ${errorMessage(error)}`)
       return 'unavailable' as const
     })
@@ -136,7 +151,7 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
     if (this.state.isClosed) return
     this.logger.log(
       pause === 'unavailable'
-        ? `No score source answered; trying again at ${resumesAt}.`
+        ? `Some scores could not be fetched; trying again at ${resumesAt}.`
         : `Scores from a source whose calls are spent today wait for ${resumesAt}.`,
     )
     this.state.wake = setTimeout(() => this.kick(), at.getTime() - Date.now())
@@ -145,27 +160,40 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
 
   /**
    * Round after round until nothing is due that a source can be asked for.
-   * A source whose day runs out midway hands over to the next; a round with
-   * any answer goes on to the next, and one with failures and no answer
-   * stops the drain.
+   * A source whose day runs out midway hands over to the next. A title that
+   * fails is skipped for the rest of the drain, and tried again on the next.
+   * Two rounds in a row with failures and no answer take the source as down.
    */
-  private async topUp(): Promise<Stop> {
-    const round = this.nextRound()
-    if (round != null) return (await this.run(round)) ? this.topUp() : 'unavailable'
-    if (!this.isWaitingForMidnight()) return 'done'
-    return this.scores.primary() == null ? 'budget' : 'someSpent'
+  private async topUp(progress: Progress): Promise<Stop> {
+    const round = this.nextRound(progress)
+    if (round != null) {
+      const { answered, failedIds } = await this.run(round)
+      const isSilent = answered === 0 && failedIds.length > 0
+      if (isSilent && progress.wasLastSilent) return 'unavailable'
+      const { provider } = round.source
+      return this.topUp({
+        failed: {
+          ...progress.failed,
+          [provider]: new Set([...progress.failed[provider], ...failedIds]),
+        },
+        wasLastSilent: isSilent,
+      })
+    }
+    const isWaitingForMidnight = this.isWaitingForMidnight()
+    if (isWaitingForMidnight && this.scores.primary() == null) return 'budget'
+    if (Object.values(progress.failed).some((ids) => ids.size > 0)) return 'unavailable'
+    return isWaitingForMidnight ? 'someSpent' : 'done'
   }
 
-  /** The primary's due titles, or once those are done, OMDb's for what MDBList does not know. */
-  private nextRound(): Round | null {
+  /**
+   * The primary's due titles, or once those are done, OMDb's for what MDBList
+   * does not know, each past the titles that source failed on this drain.
+   */
+  private nextRound({ failed }: Progress): Round | null {
     const before = new Date(Date.now() - 30 * DAY_MS).toISOString()
     const primary = this.scores.primary()
     if (primary == null) return null
-    const due = this.metadata.scoresDue({
-      provider: primary.provider,
-      before,
-      limit: primary.remaining(),
-    })
+    const due = this.due({ source: primary, before, skip: failed[primary.provider] })
     if (due.length > 0) {
       return {
         source: primary,
@@ -177,11 +205,7 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
     }
     const fallback = this.scores.fallback()
     if (fallback == null) return null
-    const fallbackDue = this.metadata.scoresDue({
-      provider: fallback.provider,
-      before,
-      limit: fallback.remaining(),
-    })
+    const fallbackDue = this.due({ source: fallback, before, skip: failed[fallback.provider] })
     if (fallbackDue.length === 0) return null
     return {
       source: fallback,
@@ -192,37 +216,64 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
     }
   }
 
+  /** A source's due titles but those in `skip`, as far as its calls left today go. */
+  private due({
+    source,
+    before,
+    skip,
+  }: {
+    source: ScoreSource
+    before: string
+    skip: ReadonlySet<number>
+  }): DueTitle[] {
+    const limit = source.remaining()
+    return this.metadata
+      .scoresDue({ provider: source.provider, before, limit: limit + skip.size })
+      .filter((title) => !skip.has(title.itemId))
+      .slice(0, limit)
+  }
+
   /**
    * Asks for each title still due while the round's source is still the one
-   * to ask; one matched or refreshed since the round began is skipped. A
-   * title that fails keeps its place for a later round. A call that spent
-   * the source's day is no failure: the next round hands over. False when
-   * the round had failures and no answer.
+   * to ask; one matched or refreshed since the round began is skipped. The
+   * round ends early after three failures in a row. A call that spent the
+   * source's day is no failure: the next round hands over. How many titles
+   * answered, and which failed.
    */
-  private async run({ source, due, before, isCurrent, fetch }: Round): Promise<boolean> {
-    const tally = { answered: 0, failed: 0, failedInARow: 0 }
-    await mapWithConcurrency({
+  private async run({
+    source,
+    due,
+    before,
+    isCurrent,
+    fetch,
+  }: Round): Promise<{ answered: number; failedIds: number[] }> {
+    const streak = { failedInARow: 0 }
+    const outcomes = await mapWithConcurrency({
       items: due,
       limit: AT_ONCE,
-      fn: async (title) => {
-        if (tally.failedInARow >= GIVE_UP_AFTER || !isCurrent()) return
+      fn: async (title): Promise<Outcome> => {
+        if (streak.failedInARow >= GIVE_UP_AFTER || !isCurrent()) return 'skipped'
         const isDue = this.metadata.isScoreDue({
           itemId: title.itemId,
           provider: source.provider,
           before,
         })
-        if (!isDue) return
+        if (!isDue) return 'skipped'
         if (await fetch(title)) {
-          tally.answered += 1
-          tally.failedInARow = 0
-          return
+          streak.failedInARow = 0
+          return 'answered'
         }
-        if (source.remaining() === 0) return
-        tally.failed += 1
-        tally.failedInARow += 1
+        if (source.remaining() === 0) return 'skipped'
+        streak.failedInARow += 1
+        return 'failed'
       },
     })
-    return tally.answered > 0 || tally.failed === 0
+    return {
+      answered: outcomes.filter((outcome) => outcome === 'answered').length,
+      failedIds: due.flatMap((title, index) =>
+        outcomes[index] === 'failed' ? [title.itemId] : [],
+      ),
+    }
   }
 
   /** Whether a source with a key has spent today's calls while titles still wait on it. */
