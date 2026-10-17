@@ -79,6 +79,7 @@ export const servicesFor = ({
 }): PlayerServices => {
   // Main stores a share watched, which needs the length only the engine learns.
   let length: number | null = null
+  let hasStarted = false
   const savePosition = (position: number) =>
     requestQuietly({
       client,
@@ -87,6 +88,8 @@ export const servicesFor = ({
   return {
     title: {
       label: file.label,
+      // Only a download's folder says where it came from; any other file's is just its folder.
+      context: file.isDownload ? file.folder : null,
       duration: null,
       resumeAt: file.resumeAt,
       backTo: '/',
@@ -100,10 +103,16 @@ export const servicesFor = ({
             },
     },
     progress: {
-      // A local file has no watch history to open.
-      started: () => undefined,
+      // A local file has no watch history to open, so this only marks that playback began.
+      started: () => {
+        hasStarted = true
+      },
       save: savePosition,
-      left: savePosition,
+      // The player reports a leave even before playback began, and main counts a download's
+      // first position after an open as a play, so a file left while it loads says nothing.
+      left: (position) => {
+        if (hasStarted) savePosition(position)
+      },
       duration: (seconds) => {
         length = seconds
       },

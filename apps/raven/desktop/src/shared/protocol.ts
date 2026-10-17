@@ -157,7 +157,10 @@ export type TrackChoice = Infer<typeof isTrackChoice>
 export const isLocalFile = object({
   fileId: isOpaqueId,
   label: isString,
+  /** The folder the file is in, or for a download "Downloaded from <server>". */
   folder: isString,
+  /** A download's `folder` says where it came from, so the player's header names it. */
+  isDownload: isBoolean,
   resumeAt: isNumber,
   next: nullable(object({ fileId: isOpaqueId, label: isString, queue: listOf(isOpaqueId) })),
   tracks: nullable(isTrackChoice),

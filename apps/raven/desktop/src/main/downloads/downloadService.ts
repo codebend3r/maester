@@ -17,7 +17,13 @@ import {
 } from '@/main/downloads/downloadState'
 import type { DownloadsStore } from '@/main/downloads/downloadStore'
 import type { MediaAccess } from '@/main/downloads/mediaAccess'
+import {
+  createDownloadPlayback,
+  type DownloadPlayback,
+  type DownloadPlaybackDeps,
+} from '@/main/downloads/playback'
 import { downloadsDirFor, readSpace, type SpaceFs } from '@/main/downloads/space'
+import { createSync, settleWithin } from '@/main/downloads/sync'
 import { errorText } from '@/main/log/errorText'
 import { loggable, type ServerCalls } from '@/main/servers/serverCalls'
 import { serverById } from '@/main/servers/serverList'
@@ -26,6 +32,9 @@ import type { DesktopEvent, DesktopReply, DownloadStatus, DownloadView } from '@
 
 /** The `downloads` event goes out at most once in this long, so progress cannot flood the page. */
 export const DOWNLOADS_EVENT_MS = 250
+
+/** A deletion waits this long at most for the server to hear what was watched, then deletes anyway. */
+export const SYNC_DELETE_WAIT_MS = 2000
 
 export type DownloadServiceDeps = {
   store: DownloadsStore
@@ -46,33 +55,46 @@ export type DownloadServiceDeps = {
   ready: Promise<void>
   /** `downloads.json` could not be read and was set aside, so the launch sweep keeps every folder. */
   wasSetAside: boolean
-}
+} & Pick<DownloadPlaybackDeps, 'grants' | 'state' | 'stat'>
 
 type ById = { downloadId: string }
 
-export type DownloadService = Pick<DownloadAsks, 'ask' | 'retryAsk' | 'confirm' | 'decline'> & {
-  list: () => DesktopReply
-  readSpace: () => Promise<DesktopReply>
-  setDefaults: (input: { autoDelete: boolean }) => DesktopReply
-  views: () => DownloadView[]
-  pause: (input: ById) => Promise<DesktopReply>
-  resume: (input: ById) => DesktopReply
-  retry: (input: ById) => DesktopReply
-  remove: (input: ById) => Promise<DesktopReply>
-  setAutoDelete: (input: ById & { autoDelete: boolean }) => DesktopReply
-  pauseAll: () => Promise<DesktopReply>
-  resumeAll: () => DesktopReply
-  removeAll: () => Promise<DesktopReply>
-  /** Called when a server is removed from raven player (Ruling 17). */
-  removeServer: (input: { serverId: string }) => Promise<void>
-  showFolder: () => Promise<DesktopReply>
-  /** Main's `powerMonitor` `suspend`: every fetch stops and its file waits for the wake. */
-  onSuspend: () => void
-  /** Main's `powerMonitor` `resume`: files start again once the network has had a moment. */
-  onResume: () => void
-  /** Stops the events and every fetch; after it the page hears nothing more. */
-  dispose: () => void
-}
+export type DownloadService = Pick<DownloadAsks, 'ask' | 'retryAsk' | 'confirm' | 'decline'> &
+  Pick<
+    DownloadPlayback,
+    | 'open'
+    | 'nextOf'
+    | 'sidecarsOf'
+    | 'fromLabelOf'
+    | 'labelOf'
+    | 'serverPositionOf'
+    | 'noteOpened'
+    | 'notePosition'
+    | 'notePlaying'
+    | 'isWatched'
+  > & {
+    list: () => DesktopReply
+    readSpace: () => Promise<DesktopReply>
+    setDefaults: (input: { autoDelete: boolean }) => DesktopReply
+    views: () => DownloadView[]
+    pause: (input: ById) => Promise<DesktopReply>
+    resume: (input: ById) => DesktopReply
+    retry: (input: ById) => DesktopReply
+    remove: (input: ById) => Promise<DesktopReply>
+    setAutoDelete: (input: ById & { autoDelete: boolean }) => DesktopReply
+    pauseAll: () => Promise<DesktopReply>
+    resumeAll: () => DesktopReply
+    removeAll: () => Promise<DesktopReply>
+    /** Called when a server is removed from raven player (Ruling 17). */
+    removeServer: (input: { serverId: string }) => Promise<void>
+    showFolder: () => Promise<DesktopReply>
+    /** Main's `powerMonitor` `suspend`: every fetch stops and its file waits for the wake. */
+    onSuspend: () => void
+    /** Main's `powerMonitor` `resume`: files start again once the network has had a moment. */
+    onResume: () => void
+    /** Stops the events and every fetch; after it the page hears nothing more. */
+    dispose: () => void
+  }
 
 /** The list as both the `downloads` reply and the `downloads` event carry it. */
 type DownloadsList = Extract<DesktopEvent, { type: 'downloads' }>
@@ -131,7 +153,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
         size: entry.size,
         status: viewStatusOf({ status: entry.status, serverName }),
         autoDelete: entry.autoDelete,
-        watched: null,
+        watched: playback.watchedOf(entry.downloadId),
         deletesAt: null,
         needsUnlock: entry.status.kind === 'paused' && entry.status.reason === 'relocked',
       }
@@ -163,6 +185,33 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     if (!isDisposed) deps.send({ type: 'notice', message })
   }
 
+  const sync = createSync({ store, calls: deps.calls, timers: deps.timers, warn: deps.warn })
+
+  const runSync = (work: Promise<void>): void => {
+    work.catch((error: unknown) => {
+      deps.warn(
+        `raven player could not tell its servers what was watched: ${loggable(errorText(error))}`,
+      )
+    })
+  }
+
+  const waitForSync = (work: Promise<void>): Promise<void> =>
+    settleWithin({ work, timers: deps.timers, ms: SYNC_DELETE_WAIT_MS, warn: deps.warn })
+
+  const playback = createDownloadPlayback({
+    store,
+    userData: deps.userData,
+    grants: deps.grants,
+    state: deps.state,
+    stat: deps.stat,
+    now: deps.now,
+    warn: deps.warn,
+    serverNameOf,
+    change,
+    announce,
+    onNoted: sync.touch,
+  })
+
   const queue = createDownloadQueue({
     // The queue's changes go through `change` too, so its progress reaches the page.
     store: { ...store, update: change },
@@ -177,9 +226,11 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     timers: deps.timers,
     now: deps.now,
     warn: deps.warn,
-    onFinished: (entry) => notice(DOWNLOAD_MESSAGES.downloaded(entry.label)),
-    // Nothing else names a download yet, so a removal has nothing more to drop.
-    onRemoved: () => undefined,
+    onFinished: (entry) => {
+      notice(DOWNLOAD_MESSAGES.downloaded(entry.label))
+      playback.readFiles([entry])
+    },
+    onRemoved: playback.forget,
     onFailed: (entry) => {
       const { status } = entry
       if (status.kind !== 'failed') return
@@ -205,6 +256,12 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     change,
     list,
   })
+
+  // Only the page asking for the list sends what is pending; the list that events and replies carry does not.
+  const listAndSync: DownloadService['list'] = () => {
+    runSync(sync.runAll())
+    return list()
+  }
 
   const confirm: DownloadService['confirm'] = async (input) => {
     const reply = await asks.confirm(input)
@@ -236,6 +293,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
 
   const remove: DownloadService['remove'] = async ({ downloadId }) => {
     if (!isKnown(downloadId)) return unknown()
+    await waitForSync(sync.runFor({ downloadIds: [downloadId] }))
     await queue.remove({ downloadId })
     return list()
   }
@@ -257,6 +315,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
   }
 
   const removeAll: DownloadService['removeAll'] = async () => {
+    await waitForSync(sync.runAll())
     await queue.removeAll()
     return list()
   }
@@ -287,23 +346,28 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     if (announcing.timer !== undefined) deps.timers.clear(announcing.timer)
     announcing.timer = undefined
     asks.clear()
+    sync.dispose()
     queue.dispose()
   }
 
   // A launch picks up what the last run left, once the folders no download names are gone,
-  // and tries again what an outage stopped.
-  Promise.all([queue.sweep({ wasSetAside: deps.wasSetAside }), deps.ready])
-    .then(queue.retryOutages)
-    .catch((error: unknown) => {
-      deps.warn(`raven player could not resume its downloads: ${loggable(errorText(error))}`)
-    })
+  // reads each file it kept for its share watched, and tries again what an outage stopped.
+  const resumeLaunch = async (): Promise<void> => {
+    await Promise.all([queue.sweep({ wasSetAside: deps.wasSetAside }), deps.ready])
+    playback.readFiles(store.read().entries.filter(({ status }) => status.kind === 'ready'))
+    queue.retryOutages()
+    await sync.runAll()
+  }
+  resumeLaunch().catch((error: unknown) => {
+    deps.warn(`raven player could not resume its downloads: ${loggable(errorText(error))}`)
+  })
 
   return {
     ask: asks.ask,
     retryAsk: asks.retryAsk,
     confirm,
     decline: asks.decline,
-    list,
+    list: listAndSync,
     readSpace: readSpaceView,
     setDefaults,
     views,
@@ -317,6 +381,16 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     removeAll,
     removeServer: queue.removeServer,
     showFolder,
+    open: playback.open,
+    nextOf: playback.nextOf,
+    sidecarsOf: playback.sidecarsOf,
+    fromLabelOf: playback.fromLabelOf,
+    labelOf: playback.labelOf,
+    serverPositionOf: playback.serverPositionOf,
+    noteOpened: playback.noteOpened,
+    notePosition: playback.notePosition,
+    notePlaying: playback.notePlaying,
+    isWatched: playback.isWatched,
     onSuspend: queue.onSuspend,
     onResume: queue.onResume,
     dispose,

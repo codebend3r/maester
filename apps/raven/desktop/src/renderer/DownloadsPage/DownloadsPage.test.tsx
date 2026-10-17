@@ -170,6 +170,22 @@ describe('DownloadsPage', () => {
     ).toBeInTheDocument()
   })
 
+  it('says a ready row watched whole is 100% watched', async () => {
+    await openPage({
+      downloads: [
+        viewOf({
+          downloadId: DL_5,
+          label: 'The Two Towers (2002)',
+          status: { kind: 'ready' },
+          watched: 1,
+        }),
+      ],
+    })
+    const row = await rowOf('The Two Towers (2002)')
+    expect(within(row).getByRole('progressbar', { name: watchedLabel(1) })).toBeInTheDocument()
+    expect(watchedLabel(1)).toBe('100% watched')
+  })
+
   it('offers each row the action its status allows', async () => {
     await openPage({ downloads: ROWS })
     const buttonsOf = async (label: string) =>

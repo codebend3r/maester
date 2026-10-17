@@ -48,7 +48,7 @@ import {
 import { CONFIG_FILE, type ConfigStore, loadConfig, setOutput } from '@/main/desktopConfig'
 import { createDesktopService, type DesktopService } from '@/main/desktopService'
 import { diagnosticsText, readEngineDiagnostics, unavailableReason } from '@/main/diagnostics'
-import { createDownloadService } from '@/main/downloads/downloadService'
+import { createDownloadService, type DownloadService } from '@/main/downloads/downloadService'
 import { DOWNLOADS_FILE } from '@/main/downloads/downloadState'
 import { DOWNLOADS_DEBOUNCE_MS, loadDownloads } from '@/main/downloads/downloadStore'
 import type { PartFile, StreamFetch } from '@/main/downloads/fetchFile'
@@ -507,11 +507,14 @@ const startApp = (): void => {
         }
       }
     }
+    // Grants hold real paths, so the downloads are named from the real folder too: a profile
+    // reached through a link (a temporary folder on macOS) would otherwise match none of them.
+    const downloadsUserData = await realpath(userData).catch(() => userData)
     const downloads = createDownloadService({
       store: downloadsStore,
       config,
       calls: serverCalls,
-      userData,
+      userData: downloadsUserData,
       space: {
         mkdir: (path) => mkdir(path, { recursive: true }).then(() => undefined),
         statfs: (path) => statfs(path),
@@ -548,6 +551,9 @@ const startApp = (): void => {
       showItemInFolder: (path) => shell.showItemInFolder(path),
       ready: app.whenReady(),
       wasSetAside: loadedDownloads.wasSetAside,
+      grants,
+      state: store,
+      stat: (path) => stat(path),
     })
     // Before the quit gate's own `before-quit`: each running file's bytes on disk are saved
     // while it is still downloading, then every fetch is aborted, so the gate's first flush
@@ -816,7 +822,7 @@ const startApp = (): void => {
       windowMs: budgetWindow ?? BUDGET_WINDOW_MS,
       sampleMs: budgetWindow ?? PLAYING_SAMPLE_MS,
     })
-    players.current = attachPlayer({ window, grants, config, sources, marks, budgets })
+    players.current = attachPlayer({ window, grants, config, sources, marks, budgets, downloads })
     // A quit holds the window open while it flushes, so no budget timer may fire meanwhile.
     app.once('before-quit', () => budgets.dispose())
     window.on('closed', () => {
@@ -1001,6 +1007,7 @@ const attachPlayer = ({
   sources,
   marks,
   budgets,
+  downloads,
 }: {
   window: BrowserWindow
   grants: Grants
@@ -1008,6 +1015,7 @@ const attachPlayer = ({
   sources: ReturnType<typeof createServerSources>
   marks: ReturnType<typeof createMarks>
   budgets: ReturnType<typeof createBudgets>
+  downloads: Pick<DownloadService, 'sidecarsOf' | 'notePlaying'>
 }) => {
   const mode = engineMode()
   // mpv's events arrive from the moment it opens; the service exists a moment later.
@@ -1021,6 +1029,13 @@ const attachPlayer = ({
       }
       return resolved
     },
+  }
+  const resolveFrom = resolveSourceWith({ grants, servers, sidecarsOf: downloads.sidecarsOf })
+  // Told as each load begins, in the order the loads come: a server title that resolves
+  // slowly must not clear a download loaded after it.
+  const resolveSource: typeof resolveFrom = (source) => {
+    downloads.notePlaying({ fileId: source.kind === 'file' ? source.fileId : null })
+    return resolveFrom(source)
   }
   const sleepGuard = createSleepGuard({
     start: () => powerSaveBlocker.start('prevent-display-sleep'),
@@ -1038,6 +1053,7 @@ const attachPlayer = ({
     onShowing: (isShowing) => {
       latest = { ...latest, isShowing }
       budgets.report(latest)
+      if (!isShowing) downloads.notePlaying({ fileId: null })
       if (window.isDestroyed()) return
       window.setBackgroundColor(isShowing ? CLEAR : NIGHT)
       // Home always shows the traffic lights, whatever the watch route last asked for.
@@ -1066,7 +1082,7 @@ const attachPlayer = ({
       // Made before anything can load: it hardens mpv first and refuses loads if that fails.
       const service = createPlayerService({
         mpv,
-        resolveSource: resolveSourceWith({ grants, servers }),
+        resolveSource,
         explain: sources.explain,
         canChooseAo: mode === 'window',
         timers,

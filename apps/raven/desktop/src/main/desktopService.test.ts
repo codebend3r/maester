@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import { dirname, basename } from 'node:path'
 import { isOpaqueId, MAX_QUEUE } from '@/shared/protocol'
-import { createGrants } from '@/main/grants'
+import { createGrants, type Grants } from '@/main/grants'
 import { createStateStore, type StateFs, type Timers } from '@/main/stateStore'
 import { EMPTY_STATE } from '@/main/playerState'
 import { createDesktopService, MESSAGES } from '@/main/desktopService'
@@ -54,13 +54,64 @@ const SPACE_REPLY = {
   space: { free: 1, total: 2, used: 0 },
 } as const satisfies DesktopReply
 
-/** A download service that records what reached it and answers each with a fixed reply. */
-const fakeDownloads = () => {
+const DOWNLOADED = `/data/downloads/${SERVER}`
+const DOWNLOAD_ONE = `${DOWNLOADED}/11/video.mkv`
+const DOWNLOAD_TWO = `${DOWNLOADED}/12/video.mkv`
+const DOWNLOAD_LABELS = new Map([
+  [DOWNLOAD_ONE, 'S01E01 Good News'],
+  [DOWNLOAD_TWO, 'S01E02 Half Loop'],
+])
+
+const PLAY_REPLY = {
+  type: 'play',
+  target: { fileId: '00000000-0000-4000-8000-0000000000bb', queue: [] },
+} as const satisfies DesktopReply
+
+/**
+ * A download service that records what reached it and answers each with a fixed reply. It
+ * knows the two videos under `DOWNLOADED`, and `resumeAt` holds the position each
+ * `notePosition` found already saved.
+ */
+const fakeDownloads = ({
+  grants,
+  savedPosition,
+  serverPosition,
+  watched,
+}: {
+  grants: Grants
+  savedPosition: () => number | null
+  serverPosition: number
+  /** The download videos marked watched. */
+  watched: readonly string[]
+}) => {
   const reached: { name: string; input: unknown }[] = []
+  const resumeAt: (number | null)[] = []
   const note = (name: string, input: unknown = null) => {
     reached.push({ name, input })
   }
   const downloads: DownloadService = {
+    open: async (input) => {
+      note('open', input)
+      return PLAY_REPLY
+    },
+    sidecarsOf: () => [],
+    fromLabelOf: ({ path }) =>
+      path.startsWith(`${DOWNLOADED}/`) ? 'Downloaded from Vhagar' : null,
+    labelOf: ({ path }) => DOWNLOAD_LABELS.get(path) ?? null,
+    serverPositionOf: () => serverPosition,
+    isWatched: ({ path }) => watched.includes(path),
+    // The first download's next is the second, as its group would have it; any other file has none.
+    nextOf: async ({ fileId }) => {
+      if (grants.fileOf(fileId)?.path !== DOWNLOAD_ONE) return null
+      const result = await grants.grant(DOWNLOAD_TWO)
+      return result.ok ? result.file : null
+    },
+    noteOpened: (input) => note('noteOpened', input),
+    notePosition: (input) => {
+      note('notePosition', input)
+      resumeAt.push(savedPosition())
+    },
+    notePlaying: (input) => note('notePlaying', input),
     ask: async (input) => {
       note('ask', input)
       return { type: 'done' }
@@ -133,7 +184,7 @@ const fakeDownloads = () => {
       return { type: 'done' }
     },
   }
-  return { downloads, reached }
+  return { downloads, reached, resumeAt }
 }
 
 const SERVER_ENTRY = {
@@ -170,8 +221,14 @@ const setup = ({
   callResult = { ok: true, status: 200, body: '{}' },
   failBrowser = false,
   updateAnswers = [],
+  serverPosition = 0,
+  watched = [],
 }: {
+  /** The download videos the fake download service says are marked watched. */
+  watched?: string[]
   updateAnswers?: UpdateCheck[]
+  /** What the fake download service says the server had as every file's resume spot. */
+  serverPosition?: number
   failOutputWrite?: boolean
   failOutputRead?: boolean
   trustOutcome?: TrustOutcome
@@ -284,7 +341,12 @@ const setup = ({
     announce: () => undefined,
     warn: () => undefined,
   })
-  const { downloads, reached } = fakeDownloads()
+  const { downloads, reached, resumeAt } = fakeDownloads({
+    grants,
+    savedPosition: () => store.read().resume[0]?.position ?? null,
+    serverPosition,
+    watched,
+  })
   const service = createDesktopService({
     updates,
     downloads,
@@ -381,6 +443,7 @@ const setup = ({
     config,
     server,
     reached,
+    resumeAt,
     releases,
     table,
     stats,
@@ -562,6 +625,7 @@ describe('describeFile', () => {
       fileId,
       label: 'Episode 1',
       folder: 'Show',
+      isDownload: false,
       resumeAt: 0,
     })
     expect(reply.file.next!.label).toBe('Episode 2')
@@ -639,6 +703,57 @@ describe('describeFile', () => {
       },
     )
   })
+
+  it('describes a download by its title and its server, and tells the download service it opened', async () => {
+    const { service, reached } = setup({ files: { [DOWNLOAD_ONE]: {}, [DOWNLOAD_TWO]: {} } })
+    const target = idOf(await service.openPaths([DOWNLOAD_ONE, DOWNLOAD_TWO]))
+    const reply = await describeFile({ service, fileId: target.fileId, queue: target.queue })
+    if (reply.type !== 'file') throw new Error(`expected file, got ${reply.type}`)
+    expect(reply.file).toMatchObject({
+      fileId: target.fileId,
+      label: 'S01E01 Good News',
+      folder: 'Downloaded from Vhagar',
+      isDownload: true,
+    })
+    expect(reply.file.next).toMatchObject({ label: 'S01E02 Half Loop' })
+    expect(reached).toEqual([{ name: 'noteOpened', input: { fileId: target.fileId } }])
+  })
+
+  it('keeps a download out of File > Open Recent', async () => {
+    const { service, spies } = setup({ files: { ...show, [DOWNLOAD_ONE]: {} } })
+    const download = idOf(await service.openPaths([DOWNLOAD_ONE]))
+    await describeFile({ service, fileId: download.fileId })
+    const episode = idOf(await service.openPaths(['/m/Show/Episode 1.mkv']))
+    await describeFile({ service, fileId: episode.fileId })
+    expect(spies.recentDocuments).toEqual(['/m/Show/Episode 1.mkv'])
+  })
+
+  it("offers a download's next of its group when its queue is empty, as when opened from the recents", async () => {
+    const { service } = setup({ files: { [DOWNLOAD_ONE]: {}, [DOWNLOAD_TWO]: {} } })
+    const first = idOf(await service.openPaths([DOWNLOAD_ONE]))
+    await describeFile({ service, fileId: first.fileId })
+    const listed = await service.handle({ kind: 'page', request: { type: 'listRecents' } })
+    if (listed.type !== 'recents') throw new Error(`expected recents, got ${listed.type}`)
+    const [recent] = listed.recents
+    if (recent === undefined) throw new Error('no recent')
+    const reopened = idOf(
+      await service.handle({
+        kind: 'page',
+        request: { type: 'openRecent', recentId: recent.recentId },
+      }),
+    )
+    expect(reopened.queue).toEqual([])
+    const reply = await describeFile({ service, fileId: reopened.fileId })
+    if (reply.type !== 'file') throw new Error(`expected file, got ${reply.type}`)
+    expect(reply.file.next).toMatchObject({ label: 'S01E02 Half Loop', queue: [] })
+  })
+
+  it('offers no next after the last download of its group', async () => {
+    const { service } = setup({ files: { [DOWNLOAD_ONE]: {}, [DOWNLOAD_TWO]: {} } })
+    const { fileId } = idOf(await service.openPaths([DOWNLOAD_TWO]))
+    const reply = await describeFile({ service, fileId })
+    expect(reply.type === 'file' && reply.file.next).toBeNull()
+  })
 })
 
 describe('savePosition', () => {
@@ -695,6 +810,33 @@ describe('savePosition', () => {
       type: 'refused',
       message: MESSAGES.notOpen,
     })
+  })
+
+  it('notes the position with the download service once it is saved', async () => {
+    const { service, reached, resumeAt } = setup({ files: show })
+    const { fileId } = idOf(await service.openPaths(['/m/Show/Episode 1.mkv']))
+    await save({ service, fileId, position: 40, duration: null })
+    expect(reached).toEqual([
+      { name: 'notePosition', input: { fileId, position: 40, duration: null } },
+    ])
+    expect(resumeAt).toEqual([40])
+  })
+
+  it("starts a download with no local spot at the server's spot, and at the local one once saved", async () => {
+    const { service } = setup({ files: { [DOWNLOAD_ONE]: {} }, serverPosition: 4200 })
+    const { fileId } = idOf(await service.openPaths([DOWNLOAD_ONE]))
+    const fresh = await describe1({ service, fileId })
+    expect(fresh.type === 'file' && fresh.file.resumeAt).toBe(4200)
+    await save({ service, fileId, position: 100, duration: 3000 })
+    const saved = await describe1({ service, fileId })
+    expect(saved.type === 'file' && saved.file.resumeAt).toBe(100)
+  })
+
+  it('starts a download at 0 when the server had no spot for it', async () => {
+    const { service } = setup({ files: { [DOWNLOAD_ONE]: {} } })
+    const { fileId } = idOf(await service.openPaths([DOWNLOAD_ONE]))
+    const reply = await describe1({ service, fileId })
+    expect(reply.type === 'file' && reply.file.resumeAt).toBe(0)
   })
 
   it('stamps the save with the clock', async () => {
@@ -928,6 +1070,28 @@ describe('recents', () => {
     expect(list.every((recent) => recent.from === 'Show')).toBe(true)
     expect(list.every((recent) => isOpaqueId(recent.recentId))).toBe(true)
     expect(JSON.stringify(list)).not.toContain('/')
+  })
+
+  it('lists a download by its title and where it came from', async () => {
+    const { service } = setup({ files: { ...show, [DOWNLOAD_ONE]: {} } })
+    await open({ service, path: '/m/Show/Episode 1.mkv' })
+    await open({ service, path: DOWNLOAD_ONE })
+    const list = await recents(service)
+    expect(list.map(({ label, from }) => [label, from])).toEqual([
+      ['S01E01 Good News', 'Downloaded from Vhagar'],
+      ['Episode 1', 'Show'],
+    ])
+  })
+
+  it('lists a download marked watched as watched whole, though it has no resume spot', async () => {
+    const { service } = setup({ files: { ...show, [DOWNLOAD_ONE]: {} }, watched: [DOWNLOAD_ONE] })
+    await open({ service, path: '/m/Show/Episode 1.mkv' })
+    await open({ service, path: DOWNLOAD_ONE })
+    const list = await recents(service)
+    expect(list.map(({ label, watched }) => [label, watched])).toEqual([
+      ['S01E01 Good News', 1],
+      ['Episode 1', null],
+    ])
   })
 
   it('keeps a recent id stable for the session', async () => {
@@ -1635,12 +1799,19 @@ describe('downloads', () => {
     expect(reached).toEqual([])
   })
 
-  it('refuses openDownload, which raven player does not do yet', async () => {
+  it('hands openDownload to the download service and answers what it plays', async () => {
     const { service, reached } = setup({ files: {} })
-    expect(await ask({ service, request: { type: 'openDownload', downloadId: ASK_ID } })).toEqual({
-      type: 'refused',
-      message: MESSAGES.unknownRequest,
-    })
+    expect(await ask({ service, request: { type: 'openDownload', downloadId: ASK_ID } })).toEqual(
+      PLAY_REPLY,
+    )
+    expect(reached).toEqual([{ name: 'open', input: { downloadId: ASK_ID } }])
+  })
+
+  it('refuses openDownload naming its download by anything but an opaque id', async () => {
+    const { service, reached } = setup({ files: {} })
+    expect(
+      await ask({ service, request: { type: 'openDownload', downloadId: '../downloads' } }),
+    ).toEqual({ type: 'refused', message: MESSAGES.unknownRequest })
     expect(reached).toEqual([])
   })
 })
