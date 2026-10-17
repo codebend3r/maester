@@ -30,6 +30,19 @@ describe('ScanStatus', () => {
   it('counts the indexing once the walk is done', () => {
     render(<ScanStatus scan={scanning({ state: 'indexing', found: 12, processed: 5 })} />)
     expect(screen.getByText('Indexing 5 of 12')).toBeInTheDocument()
+    expect(screen.getByRole('progressbar', { name: 'Scan progress' })).toHaveAttribute('value', '5')
+  })
+
+  it('says when the library was last scanned, and why the scan failed', () => {
+    const finishedAt = new Date(Date.now() - 2 * 60 * 60_000).toISOString()
+    render(
+      <ScanStatus
+        scan={scanning({ state: 'idle', finishedAt, error: 'Could not read /media/Movies.' })}
+      />,
+    )
+    expect(screen.getByText('Full scan 2 h ago')).toBeInTheDocument()
+    expect(screen.queryByRole('progressbar')).toBeNull()
+    expect(screen.getByRole('alert')).toHaveTextContent('Could not read /media/Movies.')
   })
 
   it('says when the last full scan and the last quick scan were, once idle', () => {

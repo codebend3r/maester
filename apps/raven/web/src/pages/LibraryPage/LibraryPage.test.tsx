@@ -399,7 +399,7 @@ describe('LibraryPage for TV shows', () => {
     spies.match.mockReset()
   })
 
-  const serve = (settings: Partial<LibrarySettings> = {}) => {
+  const answerTv = (settings: Partial<LibrarySettings> = {}) => {
     spies.get.mockImplementation(async () =>
       library({
         id: 2,
@@ -416,8 +416,20 @@ describe('LibraryPage for TV shows', () => {
       shows: [showEntry()],
       unmatched: [unknownEpisode('unmatched')],
     }))
+  }
+
+  const serve = (settings: Partial<LibrarySettings> = {}) => {
+    answerTv(settings)
     renderLibraryPage()
   }
+
+  it("stands wide show cards in while a TV library's shows are read", async () => {
+    answerTv()
+    spies.shows.mockImplementation(() => held<Awaited<ReturnType<typeof api.listShows>>>().promise)
+    const { container } = renderLibraryPage()
+    expect(await screen.findByText('Gathering the shows')).toBeInTheDocument()
+    expect(container.querySelectorAll('li.wide')).toHaveLength(6)
+  })
 
   it('lists shows as posters, with the files no show was found for after', async () => {
     serve()

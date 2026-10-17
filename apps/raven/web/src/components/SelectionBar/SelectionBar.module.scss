@@ -1,18 +1,22 @@
-// Sticks to the foot of the screen while its section is in view, over the cards.
+// Sticks to the foot of the screen while its section is in view, over the
+// cards, and above the tab bar where a phone has one.
 .bar {
+  --tab-room: var(--tab-bar-room, 0px);
+
   position: sticky;
-  bottom: var(--space-3);
+  bottom: calc(var(--space-3) + var(--tab-room));
   z-index: 3;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   grid-template-areas: 'status actions';
   align-items: center;
   gap: var(--space-2) var(--space-3);
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--color-moss-line);
-  border-radius: var(--radius-md);
-  background: var(--color-canopy);
-  box-shadow: var(--shadow-panel);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-xl);
+  background: var(--color-canopy-glass);
+  backdrop-filter: blur(14px);
+  box-shadow: var(--shadow-popover);
 
   @media (prefers-reduced-motion: no-preference) {
     animation: rise 160ms ease-out;
@@ -64,6 +68,7 @@
 
 @media (max-width: 48rem) {
   .bar {
+    padding: var(--space-3);
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
       'status'

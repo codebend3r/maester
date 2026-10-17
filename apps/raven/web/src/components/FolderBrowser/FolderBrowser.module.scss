@@ -1,18 +1,21 @@
+// A well in the dialog: where it is, the folders inside, and the button
+// that takes it at the end.
 .browser {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    'location'
+    'list'
+    'use';
   gap: var(--space-2);
-  padding: var(--space-3);
-  border: 1px solid var(--color-moss);
-  border-radius: var(--radius-md);
-  background: var(--color-night);
-
-  > :last-child {
-    justify-self: start;
-  }
+  padding: var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+  background: var(--color-deep);
 }
 
 .location {
+  grid-area: location;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: var(--space-2);
@@ -20,33 +23,52 @@
 }
 
 .path {
+  font-family: var(--font-mono);
   font-size: var(--font-size-sm);
   overflow-wrap: anywhere;
+}
+
+.list,
+.message {
+  grid-area: list;
 }
 
 .list {
   display: grid;
   max-height: 16rem;
   overflow-y: auto;
-  border-top: 1px solid var(--color-moss);
+  border-top: 1px solid var(--color-line-faint);
 }
 
 .entry {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: var(--space-1);
+  gap: var(--space-2);
   align-items: center;
   width: 100%;
-  padding: var(--space-1) var(--space-0);
+  min-height: var(--control-size);
+  padding: var(--space-1) var(--space-2);
   border: 0;
-  border-bottom: 1px solid var(--color-moss);
+  border-bottom: 1px solid var(--color-line-faint);
   background: transparent;
-  color: var(--color-bark);
+  color: var(--color-birch);
   text-align: left;
   cursor: pointer;
 
+  @media (prefers-reduced-motion: no-preference) {
+    transition:
+      background-color 150ms ease,
+      color 150ms ease;
+  }
+
   &:hover {
-    background: var(--color-canopy);
+    background: var(--color-hover);
+    color: var(--color-bark);
+  }
+
+  // Inside the list's scroll edge, which would clip a ring drawn outside.
+  &:focus-visible {
+    outline-offset: -2px;
   }
 }
 
@@ -55,6 +77,12 @@
 }
 
 .message {
+  padding: var(--space-1) var(--space-2);
   color: var(--color-lichen);
   font-size: var(--font-size-sm);
+}
+
+.use {
+  grid-area: use;
+  justify-self: end;
 }

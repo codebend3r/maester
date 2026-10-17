@@ -126,6 +126,47 @@ describe('LibrariesPage', () => {
     await waitFor(() => expect(pin).toHaveAttribute('aria-pressed', 'false'))
   })
 
+  it('reads Pinned on a pinned library and Pin on one that is not, its name the same either way', async () => {
+    spies.list.mockImplementation(async () => [
+      library({ id: 1, name: 'Films' }),
+      library({ id: 2, name: 'Clips', settings: { ...library().settings, pinned: false } }),
+    ])
+    renderWithProviders(<LibrariesPage />)
+    const pinned = await screen.findByRole('button', { name: 'Pin Films' })
+    const unpinned = screen.getByRole('button', { name: 'Pin Clips' })
+    expect(within(pinned).getByText('Pinned')).toHaveAttribute('aria-hidden', 'true')
+    expect(within(unpinned).getByText('Pin')).toHaveAttribute('aria-hidden', 'true')
+    expect(within(unpinned).queryByText('Pinned')).toBeNull()
+  })
+
+  it('says how many libraries there are and how many videos they hold between them', async () => {
+    spies.list.mockImplementation(async () => [
+      library({ id: 1, name: 'Films', itemCount: 1204 }),
+      library({ id: 2, name: 'Clips', itemCount: 12 }),
+    ])
+    renderWithProviders(<LibrariesPage />)
+    expect(await screen.findByText('2 libraries · 1,216 videos')).toBeInTheDocument()
+  })
+
+  it('counts one library and one video in the singular', async () => {
+    spies.list.mockImplementation(async () => [library({ name: 'Clips', itemCount: 1 })])
+    renderWithProviders(<LibrariesPage />)
+    expect(await screen.findByText('1 library · 1 video')).toBeInTheDocument()
+  })
+
+  it("lists each of a library's folders", async () => {
+    spies.list.mockImplementation(async () => [
+      library({ name: 'Shows', paths: ['/media/TV', '/mnt/archive/TV'] }),
+    ])
+    renderWithProviders(<LibrariesPage />)
+    const folders = await screen.findByRole('list', { name: 'Folders' })
+    expect(
+      within(folders)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual(['/media/TV', '/mnt/archive/TV'])
+  })
+
   it('stands in for the libraries while they are read', async () => {
     spies.list.mockImplementation(() => held<Library[]>().promise)
     renderWithProviders(<LibrariesPage />)

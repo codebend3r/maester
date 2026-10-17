@@ -6,7 +6,8 @@ import styles from '@/components/FolderBrowser/FolderBrowser.module.scss'
 
 /**
  * Walks the server's folders (as the server sees them: container paths under
- * Docker) so a library path is picked rather than typed from memory.
+ * Docker) so a library path is picked rather than typed from memory: where
+ * it is, with the way up, the folders inside, and Use this folder.
  */
 export const FolderBrowser = ({
   onChoose,
@@ -53,6 +54,7 @@ export const FolderBrowser = ({
 
       <Button
         tone="primary"
+        className={styles.use}
         disabled={!listing.data || alreadyAdded}
         onClick={() => listing.data && onChoose(listing.data.path)}
       >

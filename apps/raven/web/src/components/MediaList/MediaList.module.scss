@@ -1,35 +1,28 @@
+// The table's room is the page's to give, and the side menu narrows it
+// whatever the screen's width, so the columns drop by the room the table
+// has rather than by the screen's. Contained, the room also never grows
+// to the table's own width and pushes the page wider than the screen.
+.room {
+  container-type: inline-size;
+}
+
+// The element defaults draw the table; this sets its rhythm: eyebrow
+// headers, faint rules between rows and a tint under the pointer.
 .table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--font-size-sm);
+  thead th {
+    padding-block: var(--space-2);
+  }
+
+  tbody tr:hover {
+    background: var(--color-hover);
+  }
 
   th,
   td {
-    padding: var(--space-1) var(--space-2);
-    text-align: left;
-    vertical-align: middle;
-  }
-
-  thead th {
-    color: var(--color-lichen);
-    font-size: var(--font-size-xs);
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    white-space: nowrap;
-    border-bottom: 1px solid var(--color-moss);
-  }
-
-  tbody tr {
-    border-bottom: 1px solid var(--color-moss);
-
-    &:hover {
-      background: var(--color-canopy);
-    }
+    padding-inline: var(--space-1);
   }
 
   td {
-    color: var(--color-lichen);
     white-space: nowrap;
   }
 }
@@ -42,15 +35,22 @@
   }
 }
 
-// The th stays a table cell so the columns size properly; its title, heart
-// and resume line are laid out in here.
+// The title's column takes whatever the facts leave, so a title is never
+// squeezed to a letter a line.
+.titleHeader {
+  width: 100%;
+}
+
+// The th stays a table cell so the columns size properly; its picture,
+// title, marks and resume line are laid out in here.
 .titleCell {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr) auto;
   grid-template-areas:
-    'select title mark'
-    '. resume resume';
-  gap: var(--space-0) var(--space-1);
+    'select picture title mark'
+    'select picture resume resume';
+  gap: var(--space-0) var(--space-2);
   align-items: center;
   font-weight: 400;
 }
@@ -59,8 +59,41 @@
   grid-area: select;
 }
 
+// A small poster in a Movies library, a small frame grab elsewhere.
+.poster,
+.frame {
+  grid-area: picture;
+  display: grid;
+  // One cell the shape sets, which a tall picture cannot stretch.
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 0;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--color-canopy);
+  text-decoration: none;
+}
+
+.poster {
+  width: 2.25rem;
+  aspect-ratio: 2 / 3;
+}
+
+.frame {
+  width: 4rem;
+  aspect-ratio: 16 / 9;
+}
+
+.thumbnail {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .title {
   grid-area: title;
+  align-self: center;
+  color: var(--color-bark);
   font-weight: 600;
   text-decoration: none;
   overflow-wrap: anywhere;
@@ -71,7 +104,7 @@
   }
 }
 
-// Where playback stopped, as a thin line under the title.
+// The check and the heart beside the title.
 .mark {
   grid-area: mark;
   display: grid;
@@ -80,8 +113,10 @@
   gap: var(--space-1);
 }
 
+// Where playback stopped, as a thin line under the title.
 .resume {
   grid-area: resume;
+  align-self: start;
   height: 3px;
   max-width: 12rem;
 }
@@ -90,21 +125,33 @@
   width: 1px;
 }
 
-@media (max-width: 48rem) {
-  .extra {
+// A Movies library's year and four scores take room the files' facts do
+// not, so its columns drop sooner.
+@container (max-width: 80rem) {
+  .movies .extra {
     display: none;
-  }
-
-  .table {
-    th,
-    td {
-      padding: var(--space-1);
-    }
   }
 }
 
-@media (max-width: 30rem) {
-  .roomy {
+@container (max-width: 56rem) {
+  .movies .roomy {
+    display: none;
+  }
+}
+
+@container (max-width: 48rem) {
+  .extra {
+    display: none;
+  }
+}
+
+// A phone's room keeps the title rather than its picture, and a Movies
+// library's year rather than its length.
+@container (max-width: 30rem) {
+  .roomy,
+  .spare,
+  .poster,
+  .frame {
     display: none;
   }
 }

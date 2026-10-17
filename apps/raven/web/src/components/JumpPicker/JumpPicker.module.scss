@@ -1,22 +1,28 @@
-// Fixed to the right edge, half way down, so it holds still as the page
-// scrolls. Each step is a 27th of the screen's height, the alphabet's
-// share, so the longest strip always fits and a shorter one sits tighter.
-// As wide as its widest step, a number or a decade where it is not letters.
+// Fixed to the right edge, so it holds still as the page scrolls, centred in
+// the height between the theme button's corner at the top and, on a phone,
+// the tab bar at the foot, so it clears both. Each step is a 27th of that
+// height, the alphabet's share, so the longest strip always fits and a
+// shorter one sits tighter. As wide as its widest step, a number or a decade
+// where it is not letters.
 .picker {
+  --jump-top: calc(var(--page-top, 2rem) + var(--field-size) + var(--space-2));
+  --jump-bottom: calc(var(--space-3) + var(--tab-bar-room, 0px));
+
   position: fixed;
-  top: 50%;
+  top: calc((var(--jump-top) + 100dvh - var(--jump-bottom)) / 2);
   right: var(--space-1);
   z-index: 1;
   display: grid;
-  border: 1px solid var(--color-moss);
-  border-radius: var(--radius-md);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
   background: var(--color-night-glass);
+  backdrop-filter: blur(12px);
   translate: 0 -50%;
 }
 
 // The unit the numbers below count in.
 .unit {
-  padding: var(--space-1) var(--space-0) 0;
+  padding: var(--space-2) var(--space-0) 0;
   color: var(--color-lichen);
   font-size: var(--font-size-xs);
   text-align: center;
@@ -24,21 +30,22 @@
 
 .marks {
   display: grid;
-  padding: var(--space-1) 0;
+  padding: var(--space-2) 0;
 }
 
 .item {
   display: grid;
 }
 
+// The strip's padding and its unit's line come off the height first.
 .mark {
   display: grid;
   place-items: center;
   min-width: var(--space-4);
-  height: calc(min(100dvh - 8rem, 40rem) / 27);
+  height: calc(min(100dvh - var(--jump-top) - var(--jump-bottom) - 3.5rem, 40rem) / 27);
   padding: 0 var(--space-0);
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-pill);
   background: none;
   color: var(--color-lichen);
   font-size: var(--font-size-xs);
@@ -49,11 +56,11 @@
 
   &:hover:not(:disabled) {
     color: var(--color-bark);
-    background: var(--color-canopy);
+    background: var(--color-moss);
   }
 
   &:disabled {
-    color: var(--color-lichen-faint);
+    color: var(--color-moss-line);
     cursor: default;
   }
 

@@ -1,46 +1,84 @@
+// The frame, its corners and its shadow are elements.scss's; the dialog sets
+// its width, lets go of the measure elements.scss caps it at, and leaves the
+// padding to the form so the footer can run edge to edge.
 .dialog {
-  width: min(var(--measure), calc(100vw - 2 * var(--space-3)));
+  width: min(40rem, calc(100vw - 2 * var(--space-3)));
+  max-width: none;
   max-height: calc(100dvh - 2 * var(--space-3));
   padding: 0;
-  border: 1px solid var(--color-moss);
-  border-radius: var(--radius-md);
-  background: var(--color-canopy);
-  color: var(--color-bark);
-
-  &::backdrop {
-    background: var(--color-scrim);
-  }
 }
 
 .form {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-4);
-  padding: var(--space-4);
+  grid-template-areas:
+    'title'
+    'body'
+    'actions';
 }
 
 .title {
-  font-family: var(--font-display);
+  grid-area: title;
+  padding: var(--space-5) var(--space-5) var(--space-4);
   font-size: var(--font-size-xl);
-  font-weight: 400;
-  line-height: var(--line-tight);
+
+  @media (max-width: 30rem) {
+    padding: var(--space-4) var(--space-4) var(--space-3);
+  }
 }
 
 .field {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: var(--space-1);
-  min-width: 0;
-  padding: 0;
-  border: 0;
 
-  // Only the field's own label or legend: labels inside a control, like the
-  // icon picker's tiles, keep their own look.
-  > label,
-  > legend {
-    padding: 0;
-    font-weight: 600;
+  > label {
     font-size: var(--font-size-sm);
+    font-weight: 600;
+  }
+}
+
+.group {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+  min-width: 0;
+
+  // The group's own legend, as an eyebrow: labels inside a control, like
+  // the icon picker's tiles, keep their own look.
+  > legend {
+    padding: 0 0 var(--space-2);
+    color: var(--color-birch);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase;
+  }
+}
+
+// One group after another, a hairline under each but the last. The line is
+// each group's bottom border: a fieldset's top border runs through its legend.
+.body {
+  grid-area: body;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+  padding: 0 var(--space-5) var(--space-5);
+
+  > * {
+    padding: 0 0 var(--space-4);
+    border: 0;
+    border-bottom: 1px solid var(--color-line-faint);
+    border-radius: 0;
+  }
+
+  > :last-child {
+    padding-bottom: 0;
+    border-bottom: 0;
+  }
+
+  @media (max-width: 30rem) {
+    padding: 0 var(--space-4) var(--space-4);
   }
 }
 
@@ -51,7 +89,7 @@
 .kinds {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-1) var(--space-4);
+  gap: 0 var(--space-4);
 
   @media (max-width: 30rem) {
     grid-template-columns: minmax(0, 1fr);
@@ -61,12 +99,12 @@
 .kind {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: var(--space-1);
+  gap: var(--space-2);
   align-items: center;
+  min-height: var(--control-size);
 
   label {
-    font-size: var(--font-size-md);
-    font-weight: 400;
+    cursor: pointer;
   }
 }
 
@@ -76,27 +114,31 @@
 }
 
 // Fields take their look from elements.scss; on the dialog's canopy they sit
-// on night instead, or they would vanish into it.
+// in a well instead, or they would vanish into it.
 .input {
   width: 100%;
-  background-color: var(--color-night);
+  background-color: var(--color-deep);
 }
 
 .paths {
   display: grid;
-  gap: var(--space-0);
+  gap: var(--space-1);
 }
 
 .pathRow {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--space-1);
+  gap: var(--space-2);
   align-items: center;
-  padding-left: var(--space-2);
-  border-left: 2px solid var(--color-leaf-bright);
+  padding: var(--space-0) var(--space-0) var(--space-0) var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-deep);
 }
 
 .pathText {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
   overflow-wrap: anywhere;
 }
 
@@ -106,13 +148,12 @@
   grid-template-areas:
     'box label'
     '. hint';
-  gap: var(--space-0) var(--space-1);
+  gap: 2px var(--space-2);
   align-items: center;
 
   label {
     grid-area: label;
-    font-size: var(--font-size-md);
-    font-weight: 400;
+    cursor: pointer;
   }
 }
 
@@ -132,8 +173,6 @@
 
   label {
     grid-area: label;
-    font-size: var(--font-size-md);
-    font-weight: 400;
   }
 }
 
@@ -159,18 +198,13 @@
   gap: var(--space-0);
   color: var(--color-lichen);
   font-size: var(--font-size-sm);
-
-  p {
-    margin: 0;
-  }
 }
 
 .layouts {
   display: grid;
   gap: var(--space-0);
-  margin: 0;
-  padding: 0;
-  list-style: none;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
   overflow-wrap: anywhere;
 }
 
@@ -178,22 +212,39 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--space-1);
+  align-items: center;
 }
 
 .errors {
   display: grid;
-  gap: var(--space-0);
-  padding: var(--space-2) var(--space-3);
-  border-left: 2px solid var(--color-leaf-bright);
-  background: var(--color-night);
-  font-size: var(--font-size-sm);
+  gap: var(--space-1);
 }
 
+.error {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-1);
+  align-items: center;
+  font-size: var(--font-size-sm);
+
+  svg {
+    color: var(--color-leaf-bright);
+  }
+}
+
+// Stays at the foot of the dialog as the form scrolls under it, on the
+// dialog's own canopy: Delete at the start, Cancel then Save at the end.
 .actions {
+  grid-area: actions;
+  position: sticky;
+  bottom: 0;
   display: grid;
   grid-template-columns: 1fr auto auto;
   grid-template-areas: 'delete cancel save';
   gap: var(--space-1);
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid var(--color-line);
+  background: var(--color-canopy);
 
   > :nth-last-child(2) {
     grid-area: cancel;
@@ -215,5 +266,6 @@
     grid-template-areas:
       'cancel save'
       'delete delete';
+    padding: var(--space-3) var(--space-4);
   }
 }

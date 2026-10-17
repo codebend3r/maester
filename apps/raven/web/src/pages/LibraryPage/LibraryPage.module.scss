@@ -15,17 +15,23 @@
 
 .back {
   justify-self: start;
-  border-color: transparent;
-  padding-left: 0;
 }
 
+// The header is a container, so its buttons go under the title by the room
+// the page leaves it, whatever the side menu takes.
 .header {
+  container-type: inline-size;
+}
+
+// The title over its counts, the buttons at their right on the counts' line,
+// and how the scan stands under them.
+.heading {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   grid-template-areas:
     'title actions'
     'count actions'
-    'status actions';
+    'status .';
   gap: var(--space-1) var(--space-4);
   align-items: end;
 }
@@ -35,12 +41,12 @@
   grid-area: title;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: var(--space-3);
+  gap: var(--space-2);
   align-items: center;
-  font-family: var(--font-display);
-  font-size: var(--font-size-hero);
-  font-weight: 400;
-  line-height: var(--line-tight);
+}
+
+.titleIcon {
+  color: var(--color-lichen);
 }
 
 .name {
@@ -50,6 +56,7 @@
 .count {
   grid-area: count;
   color: var(--color-lichen);
+  font-variant-numeric: tabular-nums;
 }
 
 .status {
@@ -60,23 +67,68 @@
   grid-area: actions;
   display: grid;
   grid-auto-flow: column;
+  grid-auto-rows: var(--field-size);
   gap: var(--space-1);
+}
+
+// The admin lock off gives the header four buttons or five, which leave the
+// title too little room beside them on a narrower page; then they go under
+// it, as many to a line as fit. A phone always puts them under it.
+@container (max-width: 48rem) {
+  .heading:has(.actions > :nth-child(4)) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'title'
+      'count'
+      'status'
+      'actions';
+  }
+
+  .heading:has(.actions > :nth-child(4)) .actions {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(auto-fill, minmax(7.5rem, max-content));
+    padding-top: var(--space-2);
+  }
+}
+
+@container (max-width: 30rem) {
+  .heading {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'title'
+      'count'
+      'status'
+      'actions';
+  }
+
+  .actions {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(auto-fill, minmax(7.5rem, max-content));
+    padding-top: var(--space-2);
+  }
 }
 
 .buckets {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-3);
 }
 
-// The tabs as one row over a rule, the open one underlined. A narrow screen
-// scrolls the row, so each tab draws its focus ring inside itself, where the
-// scrolling cannot clip it.
+// The tabs as one row over a hairline, the open one underlined in the leaf.
+// A narrow screen scrolls the row sideways, so each tab draws its focus ring
+// inside itself, where the scrolling cannot clip it.
+.tabsNav {
+  min-width: 0;
+}
+
 .tabs {
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: max-content;
-  border-bottom: 1px solid var(--color-moss);
+  gap: var(--space-0);
+  border-bottom: 1px solid var(--color-line);
   overflow-x: auto;
+  scrollbar-width: none;
 }
 
 .tabItem {
@@ -84,11 +136,13 @@
 }
 
 .tab {
-  padding: var(--space-1) var(--space-2);
-  border-bottom: 2px solid transparent;
-  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  display: grid;
+  grid-auto-flow: column;
+  gap: var(--space-1);
+  align-items: baseline;
+  padding: var(--space-2) var(--space-3);
   color: var(--color-lichen);
-  font-weight: 600;
+  font-weight: 500;
   text-decoration: none;
   white-space: nowrap;
 
@@ -98,7 +152,7 @@
 
   &[aria-current='page'] {
     color: var(--color-bark);
-    border-bottom-color: var(--color-leaf-bright);
+    box-shadow: inset 0 calc(-1 * var(--border-thick)) 0 var(--color-leaf);
   }
 
   &:focus-visible {
@@ -106,16 +160,25 @@
   }
 }
 
+.tabCount {
+  color: var(--color-lichen);
+  font-size: var(--font-size-xs);
+  font-variant-numeric: tabular-nums;
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .tab {
     transition:
       color 120ms ease-out,
-      border-color 120ms ease-out;
+      box-shadow 120ms ease-out;
   }
 }
 
+// One column as wide as the page and no wider, so a wide table scrolls in
+// its own place rather than stretching the toolbar past the screen.
 .section {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-4);
 }
 
@@ -132,19 +195,4 @@
 .message {
   max-width: var(--measure);
   color: var(--color-lichen);
-}
-
-@media (max-width: 48rem) {
-  .header {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas:
-      'title'
-      'count'
-      'status'
-      'actions';
-  }
-
-  .actions {
-    justify-content: start;
-  }
 }

@@ -39,9 +39,9 @@ export const useLibraryActions = (library: Library) => {
 
 /**
  * A library's history, and Rescan, Match again and Edit with the admin lock
- * off, in its page's header and in its row on the Libraries page. Each names
- * its library to a screen reader, as the list has the same buttons on every
- * row.
+ * off, in its page's header and on its card on the Libraries page, as words
+ * alone. Each names its library to a screen reader, as the list has the same
+ * buttons on every card.
  */
 export const LibraryActions = ({
   library,
@@ -68,12 +68,9 @@ export const LibraryActions = ({
 
   return (
     <>
-      <ButtonLink to={`/libraries/${library.id}/history`} icon="history">
-        History{whose}
-      </ButtonLink>
+      <ButtonLink to={`/libraries/${library.id}/history`}>History{whose}</ButtonLink>
       <AdminOnly>
         <Button
-          icon="rescan"
           disabled={isScanning(library.scan) || rescan.isPending}
           onClick={() => rescan.mutate()}
         >
@@ -81,7 +78,6 @@ export const LibraryActions = ({
         </Button>
         {matchType && (
           <Button
-            icon="search"
             disabled={!canMatch || library.unmatchedCount === 0 || rematch.isPending}
             title={`Search TMDB again for the files no ${matchType} was found for`}
             onClick={() => rematch.mutate()}
@@ -89,9 +85,7 @@ export const LibraryActions = ({
             Match again{whose}
           </Button>
         )}
-        <Button icon="edit" onClick={edit}>
-          Edit{whose}
-        </Button>
+        <Button onClick={edit}>Edit{whose}</Button>
         {isEditing && <LibraryDialog library={library} onClose={() => setEditing(false)} />}
       </AdminOnly>
     </>

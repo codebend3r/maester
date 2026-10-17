@@ -4,11 +4,13 @@ import {
   useSelection,
   useSelectionScope,
 } from '@/components/SelectionScope/SelectionScope'
+import styles from '@/components/SelectButton/SelectButton.module.scss'
 
 /**
  * Starts select mode in the scope it sits in, and ends it when pressed
- * again. It gets the focus back when the bar closes the mode. Outside a
- * scope there is nothing to select, so it is not there.
+ * again: a pill, outlined while off and filled in bark while selecting. It
+ * gets the focus back when the bar closes the mode. Outside a scope there
+ * is nothing to select, so it is not there.
  */
 export const SelectButton = ({ className }: { className?: string }) => {
   const scope = useSelectionScope()
@@ -18,8 +20,9 @@ export const SelectButton = ({ className }: { className?: string }) => {
   return (
     <Button
       ref={ref}
+      tone="ghost"
       icon="check"
-      className={className}
+      className={className ? `${styles.select} ${className}` : styles.select}
       aria-pressed={selecting}
       onClick={() => (selecting ? scope.store.getState().end() : scope.store.getState().start())}
     >

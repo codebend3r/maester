@@ -78,7 +78,7 @@ describe('LibraryPage tabs', () => {
     const links = within(await screen.findByRole('navigation', { name: 'Sections' })).getAllByRole(
       'link',
     )
-    expect(links.map((link) => link.textContent)).toEqual([
+    const names = [
       'All',
       'In progress',
       'Favourites',
@@ -86,7 +86,9 @@ describe('LibraryPage tabs', () => {
       'Not matched',
       'Duplicates',
       'Recently finished',
-    ])
+    ]
+    expect(links).toHaveLength(names.length)
+    names.forEach((name, index) => expect(links[index]).toHaveAccessibleName(name))
     expect(links.map((link) => link.getAttribute('href'))).toEqual([
       '/libraries/2',
       '/libraries/2/in-progress',
@@ -97,6 +99,33 @@ describe('LibraryPage tabs', () => {
       '/libraries/2/finished',
     ])
     expect(screen.getByRole('link', { name: 'All' })).toHaveAttribute('aria-current', 'page')
+  })
+
+  it('counts the videos beside All and the files not matched beside Not matched, and no other tab', async () => {
+    spies.get.mockImplementation(async () =>
+      library({
+        id: 2,
+        name: 'Films',
+        itemCount: 1204,
+        unmatchedCount: 3,
+        settings: { ...library().settings, kind: 'movies' },
+      }),
+    )
+    renderLibraryPage()
+    const all = await screen.findByRole('link', { name: 'All' })
+    expect(all).toHaveTextContent('All1,204')
+    expect(screen.getByRole('link', { name: 'Not matched' })).toHaveTextContent('Not matched3')
+    expect(screen.getByRole('link', { name: 'In progress' })).toHaveTextContent(/^In progress$/)
+    // The header says the counts aloud, so beside the tabs they are for the eye.
+    expect(within(all).getByText('1,204')).toHaveAttribute('aria-hidden', 'true')
+  })
+
+  it('leaves Not matched uncounted while every file is matched', async () => {
+    open()
+    expect(await screen.findByRole('link', { name: 'Not matched' })).toHaveTextContent(
+      /^Not matched$/,
+    )
+    expect(screen.getByRole('link', { name: 'All' })).toHaveTextContent('All12')
   })
 
   it('opens Duplicates on the movies holding more than one file', async () => {

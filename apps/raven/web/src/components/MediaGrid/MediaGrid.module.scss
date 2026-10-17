@@ -1,29 +1,46 @@
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(15rem, 100%), 1fr));
-  gap: var(--space-5) var(--space-4);
+  gap: calc(var(--space-4) + var(--space-0)) var(--space-4);
 
   // A library can hold thousands of cards, so the browser lays out and
   // draws only those near the screen. One it skips stands in at the height
   // it had when last drawn, else at about a card's height 1440 wide.
+  // Skipping clips what a card draws to its box, so it may draw a little
+  // past it for its picture's shadow.
   > li {
     content-visibility: auto;
-    contain-intrinsic-block-size: auto 14rem;
+    contain-intrinsic-block-size: auto 16rem;
+    overflow-clip-margin: var(--space-6);
   }
 
-  // Skipping also clips what a card draws to its box, which would cut off
-  // a focus ring, so a card holding the focus is drawn whole.
+  // The clip would also cut off a focus ring and a picture lifting to the
+  // pointer, so a card pointed at or holding the focus is drawn whole.
+  > li:hover,
   > li:focus-within {
     content-visibility: visible;
   }
 }
 
-// Posters are narrower than frame grabs, so more fit a row.
+// Posters are narrower than frame grabs, so more fit a row, and narrower
+// still on a narrower screen.
 .posters {
-  grid-template-columns: repeat(auto-fill, minmax(min(10rem, 100%), 1fr));
-  gap: var(--space-4) var(--space-3);
+  grid-template-columns: repeat(auto-fill, minmax(min(10.5rem, 100%), 1fr));
+  gap: calc(var(--space-4) + var(--space-0)) var(--space-3);
 
   > li {
-    contain-intrinsic-block-size: auto 20rem;
+    contain-intrinsic-block-size: auto 22rem;
+  }
+}
+
+@media (max-width: 64rem) {
+  .posters {
+    grid-template-columns: repeat(auto-fill, minmax(min(9.375rem, 100%), 1fr));
+  }
+}
+
+@media (max-width: 48rem) {
+  .posters {
+    grid-template-columns: repeat(auto-fill, minmax(min(8rem, 100%), 1fr));
   }
 }

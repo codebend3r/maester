@@ -17,7 +17,7 @@ import {
 } from '@raven/core'
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button } from '@raven/ui'
+import { Button, Icon } from '@raven/ui'
 import { FolderBrowser } from '@/components/FolderBrowser/FolderBrowser'
 import { IconPicker } from '@/components/LibraryDialog/IconPicker'
 import { api } from '@/lib/api'
@@ -47,9 +47,11 @@ const pathLayoutLabel = ({
 }
 
 /**
- * Creates a library, or edits one when `library` is given. A native modal
- * <dialog> handles focus trapping and Escape; closing hands focus back to
- * whatever opened it.
+ * Creates a library, or edits one when `library` is given: its name, type,
+ * icon, folders and settings in hairline-ruled groups, and the actions in a
+ * footer that stays in view as the form scrolls, Delete at its start and
+ * Save at its end. A native modal <dialog> handles focus trapping and
+ * Escape; closing hands focus back to whatever opened it.
  */
 export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose: () => void }) => {
   const dialog = useRef<HTMLDialogElement>(null)
@@ -140,287 +142,292 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
           {library ? 'Edit library' : 'Add a library'}
         </h2>
 
-        <div className={styles.field}>
-          <label htmlFor={ids.name}>Name</label>
-          <input
-            id={ids.name}
-            className={styles.input}
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            placeholder="Movies"
-            autoComplete="off"
-            aria-describedby={errors.length > 0 ? ids.errors : undefined}
-          />
-        </div>
-
-        <fieldset
-          className={styles.field}
-          aria-describedby={isAiOff ? `${ids.kind}-hint ${ids.kind}-ai-hint` : `${ids.kind}-hint`}
-        >
-          <legend>Type</legend>
-          <div className={styles.kinds}>
-            {LIBRARY_KINDS.map((kind) => (
-              <div key={kind} className={styles.kind}>
-                <input
-                  id={`${ids.kind}-${kind}`}
-                  type="radio"
-                  name={ids.kind}
-                  value={kind}
-                  checked={settings.kind === kind}
-                  onChange={() => pickKind(kind)}
-                />
-                <label htmlFor={`${ids.kind}-${kind}`}>{KINDS[kind].label}</label>
-              </div>
-            ))}
+        <div className={styles.body}>
+          <div className={styles.field}>
+            <label htmlFor={ids.name}>Name</label>
+            <input
+              id={ids.name}
+              className={styles.input}
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="Movies"
+              autoComplete="off"
+              aria-describedby={errors.length > 0 ? ids.errors : undefined}
+            />
           </div>
-          <p id={`${ids.kind}-hint`} className={styles.hint}>
-            {metadata.data?.tmdb === 'off' ? (
-              <>
-                Set <code>TMDB_API_TOKEN</code> in raven's <code>.env</code> for posters and
-                details.
-              </>
-            ) : (
-              'Movies, TV shows, anime, family, documentaries and sporting events get posters and details from TMDB.'
-            )}
-          </p>
-          {isAiOff && (
-            <p id={`${ids.kind}-ai-hint`} className={styles.hint}>
-              Set <code>ANTHROPIC_API_KEY</code> in raven's <code>.env</code> to look up titles the
-              matcher misses.
-            </p>
-          )}
-        </fieldset>
 
-        <fieldset className={styles.field} aria-describedby={`${ids.icon}-hint`}>
-          <legend>Icon</legend>
-          <IconPicker
-            value={libraryIconOf(settings)}
-            onChange={(icon) => setSettings((current) => ({ ...current, icon }))}
-          />
-          <p id={`${ids.icon}-hint`} className={styles.hint}>
-            Shown in the side menu, on the library's page and on Libraries. Until one is picked, the
-            library wears its type's.
-          </p>
-        </fieldset>
-
-        <fieldset className={styles.field} aria-describedby={ids.folders}>
-          <legend>Folders</legend>
-          <p id={ids.folders} className={styles.hint}>
-            Every video in these folders and the folders inside them joins the library.
-          </p>
-          {paths.length > 0 && (
-            <ul className={styles.paths}>
-              {paths.map((path) => (
-                <li key={path} className={styles.pathRow}>
-                  <span className={styles.pathText}>{path}</span>
-                  <Button
-                    icon="close"
-                    aria-label={`Remove ${path}`}
-                    onClick={() => setPaths((current) => current.filter((item) => item !== path))}
+          <fieldset
+            className={styles.group}
+            aria-describedby={isAiOff ? `${ids.kind}-hint ${ids.kind}-ai-hint` : `${ids.kind}-hint`}
+          >
+            <legend>Type</legend>
+            <div className={styles.kinds}>
+              {LIBRARY_KINDS.map((kind) => (
+                <div key={kind} className={styles.kind}>
+                  <input
+                    id={`${ids.kind}-${kind}`}
+                    type="radio"
+                    name={ids.kind}
+                    value={kind}
+                    checked={settings.kind === kind}
+                    onChange={() => pickKind(kind)}
                   />
+                  <label htmlFor={`${ids.kind}-${kind}`}>{KINDS[kind].label}</label>
+                </div>
+              ))}
+            </div>
+            <p id={`${ids.kind}-hint`} className={styles.hint}>
+              {metadata.data?.tmdb === 'off' ? (
+                <>
+                  Set <code>TMDB_API_TOKEN</code> in raven's <code>.env</code> for posters and
+                  details.
+                </>
+              ) : (
+                'Movies, TV shows, anime, family, documentaries and sporting events get posters and details from TMDB.'
+              )}
+            </p>
+            {isAiOff && (
+              <p id={`${ids.kind}-ai-hint`} className={styles.hint}>
+                Set <code>ANTHROPIC_API_KEY</code> in raven's <code>.env</code> to look up titles
+                the matcher misses.
+              </p>
+            )}
+          </fieldset>
+
+          <fieldset className={styles.group} aria-describedby={`${ids.icon}-hint`}>
+            <legend>Icon</legend>
+            <IconPicker
+              value={libraryIconOf(settings)}
+              onChange={(icon) => setSettings((current) => ({ ...current, icon }))}
+            />
+            <p id={`${ids.icon}-hint`} className={styles.hint}>
+              Shown in the side menu, on the library's page and on Libraries. Until one is picked,
+              the library wears its type's.
+            </p>
+          </fieldset>
+
+          <fieldset className={styles.group} aria-describedby={ids.folders}>
+            <legend>Folders</legend>
+            <p id={ids.folders} className={styles.hint}>
+              Every video in these folders and the folders inside them joins the library.
+            </p>
+            {paths.length > 0 && (
+              <ul className={styles.paths}>
+                {paths.map((path) => (
+                  <li key={path} className={styles.pathRow}>
+                    <span className={styles.pathText}>{path}</span>
+                    <Button
+                      icon="close"
+                      aria-label={`Remove ${path}`}
+                      onClick={() => setPaths((current) => current.filter((item) => item !== path))}
+                    />
+                  </li>
+                ))}
+              </ul>
+            )}
+            <FolderBrowser onChoose={addPath} exclude={paths} />
+            <div className={styles.typed}>
+              <label htmlFor={`${ids.folders}-typed`} className="visually-hidden">
+                Folder path
+              </label>
+              <input
+                id={`${ids.folders}-typed`}
+                className={styles.input}
+                value={typedPath}
+                onChange={(event) => setTypedPath(event.target.value)}
+                placeholder="Or type a path, like /media/movies"
+                autoComplete="off"
+              />
+              <Button
+                icon="plus"
+                disabled={typedPath.trim() === ''}
+                onClick={() => {
+                  addPath(typedPath.trim())
+                  setTypedPath('')
+                }}
+              >
+                Add
+              </Button>
+            </div>
+          </fieldset>
+
+          <fieldset className={styles.group}>
+            <legend>Settings</legend>
+            <div className={styles.setting}>
+              <input
+                id={`${ids.settings}-progress`}
+                type="checkbox"
+                className={styles.checkbox}
+                checked={settings.saveProgress}
+                onChange={(event) =>
+                  setSettings((current) => ({ ...current, saveProgress: event.target.checked }))
+                }
+                aria-describedby={`${ids.settings}-progress-hint`}
+              />
+              <label htmlFor={`${ids.settings}-progress`}>Save where each video stopped</label>
+              <p id={`${ids.settings}-progress-hint`} className={styles.settingHint}>
+                Leave a video and come back to pick up where you stopped. Turning this off keeps
+                saved spots for later.
+              </p>
+            </div>
+            <div className={styles.setting}>
+              <input
+                id={`${ids.settings}-pinned`}
+                type="checkbox"
+                className={styles.checkbox}
+                checked={settings.pinned}
+                onChange={(event) =>
+                  setSettings((current) => ({ ...current, pinned: event.target.checked }))
+                }
+                aria-describedby={`${ids.settings}-pinned-hint`}
+              />
+              <label htmlFor={`${ids.settings}-pinned`}>Pin to the side menu</label>
+              <p id={`${ids.settings}-pinned-hint`} className={styles.settingHint}>
+                Pinned libraries get their own link in the side menu.
+              </p>
+            </div>
+            <div className={styles.setting}>
+              <input
+                id={`${ids.settings}-refresh`}
+                type="checkbox"
+                className={styles.checkbox}
+                checked={settings.autoRefresh}
+                onChange={(event) =>
+                  setSettings((current) => ({ ...current, autoRefresh: event.target.checked }))
+                }
+                aria-describedby={`${ids.settings}-refresh-hint`}
+              />
+              <label htmlFor={`${ids.settings}-refresh`}>Refresh automatically</label>
+              <p id={`${ids.settings}-refresh-hint`} className={styles.settingHint}>
+                Watch the folders and take in videos as they are added, removed, renamed or
+                replaced, and quick-scan the library every few minutes for a share that does not
+                report its changes. A video replaced under its own name waits for a rescan.
+              </p>
+            </div>
+            <div className={styles.setting}>
+              <input
+                id={`${ids.settings}-locked`}
+                type="checkbox"
+                className={styles.checkbox}
+                checked={settings.locked}
+                disabled={!lockable && !settings.locked}
+                onChange={(event) =>
+                  setSettings((current) => ({ ...current, locked: event.target.checked }))
+                }
+                aria-describedby={`${ids.settings}-locked-hint`}
+              />
+              <label htmlFor={`${ids.settings}-locked`}>Lock with the PIN</label>
+              <p id={`${ids.settings}-locked-hint`} className={styles.settingHint}>
+                {lockable &&
+                  'Keep its videos private: they stay hidden until the PIN is entered in this browser.'}
+                {!lockable && (
+                  <>
+                    Set <code>LIBRARY_PIN</code> in raven's <code>.env</code> to lock a library.
+                  </>
+                )}
+              </p>
+            </div>
+            <div className={styles.watched}>
+              <label htmlFor={`${ids.settings}-watched`}>Watched at</label>
+              <span className={styles.percent}>
+                <input
+                  id={`${ids.settings}-watched`}
+                  type="number"
+                  inputMode="numeric"
+                  className={styles.input}
+                  min={1}
+                  max={100}
+                  step={1}
+                  value={Number.isNaN(settings.watchedPercent) ? '' : settings.watchedPercent}
+                  onChange={(event) => {
+                    const typed = event.target.value
+                    setSettings((current) => ({
+                      ...current,
+                      watchedPercent: typed === '' ? Number.NaN : Number(typed),
+                    }))
+                  }}
+                  aria-describedby={`${ids.settings}-watched-hint`}
+                />
+                <span aria-hidden="true">%</span>
+              </span>
+              <p id={`${ids.settings}-watched-hint`} className={styles.settingHint}>
+                A video counts as watched once playback gets this far through it, and its resume
+                spot clears there too. Set low, a video gives up its spot early.
+              </p>
+            </div>
+            {matchTypeFor(settings.kind) != null && (
+              <div className={styles.setting}>
+                <input
+                  id={`${ids.settings}-layout`}
+                  type="checkbox"
+                  className={styles.checkbox}
+                  checked={settings.folderLayout === 'auto'}
+                  onChange={(event) =>
+                    setSettings((current) => ({
+                      ...current,
+                      folderLayout: event.target.checked ? 'auto' : 'flat',
+                    }))
+                  }
+                  aria-describedby={`${ids.settings}-layout-hint`}
+                />
+                <label htmlFor={`${ids.settings}-layout`}>Read letter and group folders</label>
+                <div className={styles.layoutHint}>
+                  <p id={`${ids.settings}-layout-hint`}>
+                    Shows and movies inside letter folders (A, B, #) and group folders such as
+                    Requests are read as titles of their own. Turn this off when those folder names
+                    are the titles.
+                  </p>
+                  {!!library && library.layouts.length > 0 && (
+                    <ul className={styles.layouts}>
+                      {library.layouts.map((entry) => (
+                        <li key={entry.path}>{`${entry.path}: ${pathLayoutLabel(entry)}`}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            )}
+            {matchTypeFor(settings.kind) != null && (
+              <div className={styles.watched}>
+                <label htmlFor={`${ids.settings}-ratings`}>Ratings shown</label>
+                <select
+                  id={`${ids.settings}-ratings`}
+                  className={styles.input}
+                  value={settings.ratingsSource}
+                  onChange={(event) => {
+                    const ratingsSource = event.target.value
+                    if (isRatingSource(ratingsSource)) {
+                      setSettings((current) => ({ ...current, ratingsSource }))
+                    }
+                  }}
+                  aria-describedby={`${ids.settings}-ratings-hint`}
+                >
+                  {RATING_SOURCES.map((source) => (
+                    <option key={source} value={source}>
+                      {RATINGS_LABELS[source]}
+                    </option>
+                  ))}
+                </select>
+                <p id={`${ids.settings}-ratings-hint`} className={styles.settingHint}>
+                  The score on cards, and the one the rating sorts use. Where that source has none,
+                  TMDB's stands in. IMDb, Rotten Tomatoes and Metacritic need{' '}
+                  <code>OMDB_API_KEY</code>.
+                </p>
+              </div>
+            )}
+          </fieldset>
+
+          {errors.length > 0 && (
+            <ul id={ids.errors} className={styles.errors} role="alert">
+              {errors.map((error) => (
+                <li key={error} className={styles.error}>
+                  <Icon name="alert" size={16} />
+                  {error}
                 </li>
               ))}
             </ul>
           )}
-          <FolderBrowser onChoose={addPath} exclude={paths} />
-          <div className={styles.typed}>
-            <label htmlFor={`${ids.folders}-typed`} className="visually-hidden">
-              Folder path
-            </label>
-            <input
-              id={`${ids.folders}-typed`}
-              className={styles.input}
-              value={typedPath}
-              onChange={(event) => setTypedPath(event.target.value)}
-              placeholder="Or type a path, like /media/movies"
-              autoComplete="off"
-            />
-            <Button
-              icon="plus"
-              disabled={typedPath.trim() === ''}
-              onClick={() => {
-                addPath(typedPath.trim())
-                setTypedPath('')
-              }}
-            >
-              Add
-            </Button>
-          </div>
-        </fieldset>
-
-        <fieldset className={styles.field}>
-          <legend>Settings</legend>
-          <div className={styles.setting}>
-            <input
-              id={`${ids.settings}-progress`}
-              type="checkbox"
-              className={styles.checkbox}
-              checked={settings.saveProgress}
-              onChange={(event) =>
-                setSettings((current) => ({ ...current, saveProgress: event.target.checked }))
-              }
-              aria-describedby={`${ids.settings}-progress-hint`}
-            />
-            <label htmlFor={`${ids.settings}-progress`}>Save where each video stopped</label>
-            <p id={`${ids.settings}-progress-hint`} className={styles.settingHint}>
-              Leave a video and come back to pick up where you stopped. Turning this off keeps saved
-              spots for later.
-            </p>
-          </div>
-          <div className={styles.setting}>
-            <input
-              id={`${ids.settings}-pinned`}
-              type="checkbox"
-              className={styles.checkbox}
-              checked={settings.pinned}
-              onChange={(event) =>
-                setSettings((current) => ({ ...current, pinned: event.target.checked }))
-              }
-              aria-describedby={`${ids.settings}-pinned-hint`}
-            />
-            <label htmlFor={`${ids.settings}-pinned`}>Pin to the side menu</label>
-            <p id={`${ids.settings}-pinned-hint`} className={styles.settingHint}>
-              Pinned libraries get their own link in the side menu.
-            </p>
-          </div>
-          <div className={styles.setting}>
-            <input
-              id={`${ids.settings}-refresh`}
-              type="checkbox"
-              className={styles.checkbox}
-              checked={settings.autoRefresh}
-              onChange={(event) =>
-                setSettings((current) => ({ ...current, autoRefresh: event.target.checked }))
-              }
-              aria-describedby={`${ids.settings}-refresh-hint`}
-            />
-            <label htmlFor={`${ids.settings}-refresh`}>Refresh automatically</label>
-            <p id={`${ids.settings}-refresh-hint`} className={styles.settingHint}>
-              Watch the folders and take in videos as they are added, removed, renamed or replaced,
-              and quick-scan the library every few minutes for a share that does not report its
-              changes. A video replaced under its own name waits for a rescan.
-            </p>
-          </div>
-          <div className={styles.setting}>
-            <input
-              id={`${ids.settings}-locked`}
-              type="checkbox"
-              className={styles.checkbox}
-              checked={settings.locked}
-              disabled={!lockable && !settings.locked}
-              onChange={(event) =>
-                setSettings((current) => ({ ...current, locked: event.target.checked }))
-              }
-              aria-describedby={`${ids.settings}-locked-hint`}
-            />
-            <label htmlFor={`${ids.settings}-locked`}>Lock with the PIN</label>
-            <p id={`${ids.settings}-locked-hint`} className={styles.settingHint}>
-              {lockable &&
-                'Keep its videos private: they stay hidden until the PIN is entered in this browser.'}
-              {!lockable && (
-                <>
-                  Set <code>LIBRARY_PIN</code> in raven's <code>.env</code> to lock a library.
-                </>
-              )}
-            </p>
-          </div>
-          <div className={styles.watched}>
-            <label htmlFor={`${ids.settings}-watched`}>Watched at</label>
-            <span className={styles.percent}>
-              <input
-                id={`${ids.settings}-watched`}
-                type="number"
-                inputMode="numeric"
-                className={styles.input}
-                min={1}
-                max={100}
-                step={1}
-                value={Number.isNaN(settings.watchedPercent) ? '' : settings.watchedPercent}
-                onChange={(event) => {
-                  const typed = event.target.value
-                  setSettings((current) => ({
-                    ...current,
-                    watchedPercent: typed === '' ? Number.NaN : Number(typed),
-                  }))
-                }}
-                aria-describedby={`${ids.settings}-watched-hint`}
-              />
-              <span aria-hidden="true">%</span>
-            </span>
-            <p id={`${ids.settings}-watched-hint`} className={styles.settingHint}>
-              A video counts as watched once playback gets this far through it, and its resume spot
-              clears there too. Set low, a video gives up its spot early.
-            </p>
-          </div>
-          {matchTypeFor(settings.kind) != null && (
-            <div className={styles.setting}>
-              <input
-                id={`${ids.settings}-layout`}
-                type="checkbox"
-                className={styles.checkbox}
-                checked={settings.folderLayout === 'auto'}
-                onChange={(event) =>
-                  setSettings((current) => ({
-                    ...current,
-                    folderLayout: event.target.checked ? 'auto' : 'flat',
-                  }))
-                }
-                aria-describedby={`${ids.settings}-layout-hint`}
-              />
-              <label htmlFor={`${ids.settings}-layout`}>Read letter and group folders</label>
-              <div className={styles.layoutHint}>
-                <p id={`${ids.settings}-layout-hint`}>
-                  Shows and movies inside letter folders (A, B, #) and group folders such as
-                  Requests are read as titles of their own. Turn this off when those folder names
-                  are the titles.
-                </p>
-                {!!library && library.layouts.length > 0 && (
-                  <ul className={styles.layouts}>
-                    {library.layouts.map((entry) => (
-                      <li key={entry.path}>{`${entry.path}: ${pathLayoutLabel(entry)}`}</li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </div>
-          )}
-          {matchTypeFor(settings.kind) != null && (
-            <div className={styles.watched}>
-              <label htmlFor={`${ids.settings}-ratings`}>Ratings shown</label>
-              <select
-                id={`${ids.settings}-ratings`}
-                className={styles.input}
-                value={settings.ratingsSource}
-                onChange={(event) => {
-                  const ratingsSource = event.target.value
-                  if (isRatingSource(ratingsSource)) {
-                    setSettings((current) => ({ ...current, ratingsSource }))
-                  }
-                }}
-                aria-describedby={`${ids.settings}-ratings-hint`}
-              >
-                {RATING_SOURCES.map((source) => (
-                  <option key={source} value={source}>
-                    {RATINGS_LABELS[source]}
-                  </option>
-                ))}
-              </select>
-              <p id={`${ids.settings}-ratings-hint`} className={styles.settingHint}>
-                The score on cards, and the one the rating sorts use. Where that source has none,
-                TMDB's stands in. IMDb, Rotten Tomatoes and Metacritic need{' '}
-                <code>OMDB_API_KEY</code>.
-              </p>
-            </div>
-          )}
-        </fieldset>
-
-        {errors.length > 0 && (
-          <ul id={ids.errors} className={styles.errors} role="alert">
-            {errors.map((error) => (
-              <li key={error}>{error}</li>
-            ))}
-          </ul>
-        )}
+        </div>
 
         <div className={styles.actions}>
           {!!library && (

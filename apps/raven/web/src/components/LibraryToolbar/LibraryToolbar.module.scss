@@ -1,97 +1,210 @@
-// Search on the left, the sort and its options beside it, the view buttons
-// at the far end. On a narrow screen each takes a row of its own.
+// Two rows: finding and ordering, then playing and viewing. The toolbar is a
+// container, so its rows fold by the room the page leaves it, whatever the
+// side menu takes.
 .toolbar {
+  container-type: inline-size;
   display: grid;
-  grid-template-columns: minmax(0, 24rem) minmax(0, 1fr) auto;
-  grid-template-areas: 'search options views';
-  gap: var(--space-2) var(--space-3);
-  align-items: center;
-  padding-bottom: var(--space-3);
-  border-bottom: 1px solid var(--color-moss);
+  gap: var(--space-2);
 }
 
+// Search, then the sort and which way it runs, then the grouping in the
+// grouped view.
+.find {
+  display: grid;
+  grid-template-columns: minmax(0, 26.25rem) auto auto auto;
+  grid-template-areas: 'search sort direction group';
+  justify-content: start;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+// Play, Shuffle and Select, the views at the far end.
+.act {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: 'play . views';
+  align-items: center;
+  gap: var(--space-2);
+}
+
+// The magnifier sits inside the field, over its left padding.
 .search {
   grid-area: search;
-}
-
-.options {
-  grid-area: options;
   display: grid;
-  grid-auto-flow: column;
-  justify-content: start;
-  gap: var(--space-2);
+  grid-template-areas: 'field';
   align-items: center;
 }
 
-.field {
+.searchIcon {
+  grid-area: field;
+  z-index: 1;
   display: grid;
-  grid-auto-flow: column;
+  justify-self: start;
+  padding-inline-start: var(--space-3);
+  color: var(--color-lichen);
+  pointer-events: none;
+}
+
+.input {
+  grid-area: field;
+  width: 100%;
+  padding-inline-start: var(--space-6);
+}
+
+// A select drawn as a field with its label inside: the label muted, the
+// choice after it. The box takes the field's edge, hover and focus glow, so
+// the select inside has none of its own.
+.picker {
+  display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: var(--space-1);
   align-items: center;
+  min-height: var(--field-size);
+  padding-inline-start: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--color-bark) 12%, transparent);
+  border-radius: var(--radius-md);
+  background: var(--color-canopy);
+
+  &:hover {
+    border-color: color-mix(in srgb, var(--color-bark) 28%, transparent);
+  }
+
+  &:has(:focus-visible) {
+    border-color: var(--color-bark);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-bark) 14%, transparent);
+  }
 }
 
-.play {
-  display: grid;
-  grid-auto-flow: column;
-  justify-content: start;
-  gap: var(--space-1);
+.sort {
+  grid-area: sort;
+}
+
+.group {
+  grid-area: group;
 }
 
 .label {
   color: var(--color-lichen);
-  font-size: var(--font-size-sm);
+  cursor: pointer;
 }
 
+.select {
+  align-self: stretch;
+  min-width: 0;
+  min-height: 0;
+  padding-block: 0;
+  padding-inline-start: var(--space-1);
+  border: 0;
+  background-color: transparent;
+
+  &:focus-visible {
+    box-shadow: none;
+  }
+}
+
+// Which way the sort runs, as an outlined pill.
+.find .direction {
+  grid-area: direction;
+  border-color: var(--color-line-strong);
+  border-radius: var(--radius-pill);
+}
+
+.play {
+  grid-area: play;
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  gap: var(--space-1);
+}
+
+// The views as one segmented control: a well of the card's colour holding
+// a button for each, the chosen one lit in moss.
 .views {
   grid-area: views;
   display: grid;
   grid-auto-flow: column;
-  gap: var(--space-0);
   min-width: 0;
-  padding: 0;
+  padding: calc((var(--field-size) - var(--control-size)) / 2);
   border: 0;
-}
-
-.input {
-  width: 100%;
-}
-
-// Fields and the select's chevron come from elements.scss.
-.select {
-  min-width: 0;
-}
-
-// The chosen view reads as switched on, like the current page in the side menu.
-.view[aria-pressed='true'] {
+  border-radius: var(--radius-lg);
   background: var(--color-canopy);
-  border-color: var(--color-lichen);
 }
 
-@media (max-width: 64rem) {
-  .toolbar {
-    grid-template-columns: minmax(0, 1fr) auto;
+.views .view {
+  border-radius: var(--radius-md);
+  color: var(--color-lichen);
+
+  &:hover:not(:disabled) {
+    color: var(--color-bark);
+  }
+
+  &[aria-pressed='true'] {
+    --icon-tint: 0.4;
+
+    background: var(--color-moss);
+    color: var(--color-bark);
+  }
+
+  &[aria-pressed='true']:hover:not(:disabled) {
+    background: var(--color-moss-hi);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .picker {
+    transition:
+      border-color 150ms ease,
+      box-shadow 150ms ease;
+  }
+}
+
+// The grouping beside the rest leaves the search too little room on a
+// narrower page, so the search takes a row of its own above them.
+@container (max-width: 48rem) {
+  .find:has(.group) {
+    grid-template-columns: minmax(0, max-content) auto minmax(0, max-content) minmax(0, 1fr);
     grid-template-areas:
-      'search views'
-      'options options';
-  }
-
-  .options {
-    grid-auto-flow: row;
-    grid-template-columns: repeat(auto-fit, minmax(min(14rem, 100%), max-content));
+      'search search search search'
+      'sort direction group .';
   }
 }
 
-@media (max-width: 30rem) {
-  .toolbar {
+@container (max-width: 40rem) {
+  .find {
+    grid-template-columns: minmax(0, max-content) auto minmax(0, 1fr);
+    grid-template-areas:
+      'search search search'
+      'sort direction .';
+  }
+
+  .find:has(.group) {
+    grid-template-columns: minmax(0, max-content) auto minmax(0, 1fr);
+    grid-template-areas:
+      'search search search'
+      'sort direction .'
+      'group group group';
+  }
+
+  .group {
+    justify-self: start;
+  }
+}
+
+// On a phone the views take a row of their own, under Play, and the play
+// buttons go two or three to a line, as the width has room for.
+@container (max-width: 30rem) {
+  .act {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
-      'search'
-      'options'
+      'play'
       'views';
   }
 
+  .play {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(auto-fill, minmax(6.5rem, max-content));
+  }
+
   .views {
-    justify-content: start;
+    justify-self: start;
   }
 }
