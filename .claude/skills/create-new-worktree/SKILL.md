@@ -1,11 +1,21 @@
 ---
 name: create-new-worktree
 description: Use when a new piece of maester work should start in its own git worktree cut from main: "create a worktree", "new worktree for X", "make me a worktree", "start X in a worktree", "spin up a worktree off main", or when a plan, spec step or stacked PR needs a checkout beside the main one. Not for opening a worktree on a branch that already exists.
+argument-hint: <name>
 ---
 
 # Create a new worktree
 
 A new worktree gets a new branch, cut from fresh `origin/main`, in `.claude/worktrees/<name>`, with its own `node_modules` and the gitignored `.env` files the main checkout has. Anything less leaves a worktree that commits fine but cannot run `bunx nx`, or a branch that starts from whatever the current checkout happened to be on.
+
+## Argument
+
+`/create-new-worktree <name>` names both the directory and the branch: `/create-new-worktree critics-ratings-redesign` makes `.claude/worktrees/critics-ratings-redesign` on branch `critics-ratings-redesign`.
+
+The argument given this time: `$ARGUMENTS`
+
+- Given: use it as `name` in the procedure, unchanged. If it fails the name check below, say why and stop; do not quietly rewrite it.
+- Empty: pick a name per the Name section from the work described, and say which name was chosen before creating anything.
 
 ## Where and from what
 
@@ -28,7 +38,7 @@ Run from the main checkout (`/Users/snowball/Developer/git/maester`), not from i
 
 ```bash
 set -e
-name="watch-later-queue"   # the work's name, per the rule above
+name="$ARGUMENTS"   # the argument, or the name chosen per the Name section
 root="$(git rev-parse --show-toplevel)"
 dir="$root/.claude/worktrees/$name"
 
