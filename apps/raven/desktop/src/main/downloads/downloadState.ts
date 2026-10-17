@@ -364,17 +364,26 @@ export const notePending = (
     }),
   })
 
-/** Clears what a sync sent; a position saved during the call differs from `sentPosition` and stays. */
+/**
+ * Clears what a sync sent. A position saved during the call differs from `sentPosition` and
+ * stays; a play is cleared only when `sentPlay`, so one flagged by an open during a call that
+ * did not carry it stays too.
+ */
 export const clearPending = (
   state: DownloadsState,
-  { downloadId, sentPosition }: { downloadId: string; sentPosition: number | null },
+  {
+    downloadId,
+    sentPlay,
+    sentPosition,
+  }: { downloadId: string; sentPlay: boolean; sentPosition: number | null },
 ): DownloadsState =>
   changeEntry(state, {
     downloadId,
     change: (entry) => {
       const position = entry.pending.position === sentPosition ? null : entry.pending.position
-      if (!entry.pending.play && position === entry.pending.position) return entry
-      return { ...entry, pending: { ...entry.pending, play: false, position } }
+      const play = sentPlay ? false : entry.pending.play
+      if (play === entry.pending.play && position === entry.pending.position) return entry
+      return { ...entry, pending: { ...entry.pending, play, position } }
     },
   })
 

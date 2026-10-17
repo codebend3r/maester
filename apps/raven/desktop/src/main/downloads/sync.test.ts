@@ -6,7 +6,7 @@ import {
   type DownloadEntry,
   type DownloadsState,
 } from '@/main/downloads/downloadState'
-import { createSync, SYNC_DEBOUNCE_MS, SYNC_RETRY_MS } from '@/main/downloads/sync'
+import { createSync, settleWithin, SYNC_DEBOUNCE_MS, SYNC_RETRY_MS } from '@/main/downloads/sync'
 import type { AllowedCall } from '@/main/servers/allowlist'
 import type { ServerCallResult } from '@/main/servers/serverCalls'
 import type { JsonStore } from '@/main/stateStore'
@@ -179,6 +179,28 @@ describe('touch', () => {
     expect(world.pendingOf()).toEqual({ play: false, position: null, at: NOW })
   })
 
+  it('sends a play flagged while the position is out on the next round', async () => {
+    const world = setup()
+    const held = gate()
+    world.server.answer = () => held.answer
+    world.note({ position: 300 })
+    world.fireAt(SYNC_DEBOUNCE_MS)
+    await ticks(3)
+    expect(world.log).toEqual([{ name: 'saveProgress', mediaId: 11, position: 300 }])
+    world.note({ play: true, position: 360 })
+    held.open(NO_CONTENT)
+    await ticks(5)
+    expect(world.pendingOf()).toEqual({ play: true, position: 360, at: NOW })
+    world.server.answer = async () => NO_CONTENT
+    world.fireAt(SYNC_DEBOUNCE_MS)
+    await ticks(5)
+    expect(world.log.slice(1)).toEqual([
+      { name: 'recordPlay', mediaId: 11 },
+      { name: 'saveProgress', mediaId: 11, position: 360 },
+    ])
+    expect(world.pendingOf()).toEqual({ play: false, position: null, at: NOW })
+  })
+
   it('starts no second send for a download whose calls are still out', async () => {
     const world = setup()
     const held = gate()
@@ -291,6 +313,20 @@ describe('an answer that is no success', () => {
     expect(world.warnings).toHaveLength(2)
   })
 
+  it('forgets a logged download once it is gone, so a new one of the same id is logged', async () => {
+    const world = setup()
+    world.server.answer = async () => ({ ok: true, status: 404, body: '' })
+    world.note({ position: 300 })
+    await world.sync.runAll()
+    expect(world.warnings).toHaveLength(1)
+    world.store.update((state) => ({ ...state, entries: [] }))
+    await world.sync.runAll()
+    world.store.update((state) => ({ ...state, entries: [entryFor()] }))
+    world.note({ position: 300 })
+    await world.sync.runAll()
+    expect(world.warnings).toHaveLength(2)
+  })
+
   it.each([401, 423, 500])('keeps pending on a %i without a word', async (status) => {
     const world = setup()
     world.server.answer = async () => ({ ok: true, status, body: '' })
@@ -384,5 +420,38 @@ describe('dispose', () => {
     await world.sync.runAll()
     expect(world.pending.size).toBe(0)
     expect(world.log).toEqual([])
+  })
+})
+
+describe('settleWithin', () => {
+  const setupWait = () => {
+    const { timers, pending } = fakeTimers()
+    const warnings: string[] = []
+    const wait = (work: Promise<void>) =>
+      settleWithin({ work, timers, ms: 2000, warn: (message) => warnings.push(message) })
+    return { wait, pending, warnings }
+  }
+
+  it('settles when the work does, and clears its timer', async () => {
+    const world = setupWait()
+    await world.wait(Promise.resolve())
+    expect(world.pending.size).toBe(0)
+  })
+
+  it('settles when the wait is over, though the work never does', async () => {
+    const world = setupWait()
+    const waiting = world.wait(new Promise(() => undefined))
+    const [timer] = [...world.pending.values()]
+    expect(timer?.ms).toBe(2000)
+    timer?.run()
+    await waiting
+  })
+
+  it('settles, and warns without a title, when the work rejects', async () => {
+    const world = setupWait()
+    await world.wait(Promise.reject(new Error('boom')))
+    expect(world.warnings).toHaveLength(1)
+    expect(world.warnings[0]).toContain('boom')
+    expect(world.pending.size).toBe(0)
   })
 })

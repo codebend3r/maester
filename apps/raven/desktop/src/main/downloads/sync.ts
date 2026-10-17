@@ -24,7 +24,12 @@ export type Sync = {
   runAll: () => Promise<void>
   /** Sends what these downloads have pending now; settles once the answers are in. */
   runFor: (input: { downloadIds: readonly string[] }) => Promise<void>
-  /** Clears every timer; what is still in flight lands and is not followed up. */
+  /**
+   * Clears every timer; a send already out finishes and is not followed up. Quitting waits on
+   * it through the server calls' `settleWrites`, which settles before the stores flush, and a
+   * clear that comes a tick late leaves the store dirty for the quit gate's second flush.
+   * Whatever is not cleared is sent at the next launch.
+   */
   dispose: () => void
 }
 
@@ -72,6 +77,22 @@ export const createSync = ({ store, calls, timers, warn }: SyncDeps): Sync => {
     return false
   }
 
+  const warnFailed =
+    ({ label }: { label: string | null }) =>
+    (error: unknown): void => {
+      const what = label === null ? '' : ` of ${loggable(label)}`
+      warn(
+        `raven player could not tell its server what was watched${what}: ${loggable(errorText(error))}`,
+      )
+    }
+
+  /** Forgets the logged downloads that are gone, so the set holds only those still held. */
+  const pruneLogged = (): void => {
+    ;[...logged]
+      .filter((downloadId) => entryOf(downloadId) === null)
+      .forEach((downloadId) => logged.delete(downloadId))
+  }
+
   // The play goes first: the server must hear it before a position that may mark the title watched.
   const send = async (downloadId: string): Promise<void> => {
     const first = entryOf(downloadId)
@@ -81,8 +102,12 @@ export const createSync = ({ store, calls, timers, warn }: SyncDeps): Sync => {
         entry: first,
         call: { name: 'recordPlay', mediaId: first.mediaId },
       })
+      // The play stays pending when the answer was lost, though the server may have taken it:
+      // delivery is at least once, so a play can be recorded twice but never none.
       if (!isPlayed) return
-      store.update((state) => clearPending(state, { downloadId, sentPosition: null }))
+      store.update((state) =>
+        clearPending(state, { downloadId, sentPlay: true, sentPosition: null }),
+      )
     }
     // Read again: the position may have moved while the play was out.
     const entry = entryOf(downloadId)
@@ -93,7 +118,9 @@ export const createSync = ({ store, calls, timers, warn }: SyncDeps): Sync => {
       call: { name: 'saveProgress', mediaId: entry.mediaId, position },
     })
     if (!isSaved) return
-    store.update((state) => clearPending(state, { downloadId, sentPosition: position }))
+    store.update((state) =>
+      clearPending(state, { downloadId, sentPlay: false, sentPosition: position }),
+    )
   }
 
   const isAnythingPending = (): boolean => store.read().entries.some(hasPending)
@@ -102,7 +129,7 @@ export const createSync = ({ store, calls, timers, warn }: SyncDeps): Sync => {
     if (isDisposed || retry.timer !== undefined || !isAnythingPending()) return
     retry.timer = timers.set(() => {
       retry.timer = undefined
-      runAll().catch(() => undefined)
+      runAll().catch(warnFailed({ label: null }))
     }, SYNC_RETRY_MS)
   }
 
@@ -114,7 +141,7 @@ export const createSync = ({ store, calls, timers, warn }: SyncDeps): Sync => {
       downloadId,
       timers.set(() => {
         debouncing.delete(downloadId)
-        run(downloadId).catch(() => undefined)
+        run(downloadId).catch(warnFailed({ label: entryOf(downloadId)?.label ?? null }))
       }, SYNC_DEBOUNCE_MS),
     )
   }
@@ -132,14 +159,13 @@ export const createSync = ({ store, calls, timers, warn }: SyncDeps): Sync => {
       try {
         await send(downloadId)
       } catch (error) {
-        warn(
-          `raven player could not tell its server what was watched of ${loggable(entry.label)}: ${loggable(errorText(error))}`,
-        )
+        warnFailed({ label: entry.label })(error)
       }
       inFlight.delete(downloadId)
       const isOwed = touchedDuring.delete(downloadId)
       const next = entryOf(downloadId)
       if (isOwed && next !== null && hasPending(next)) debounce(downloadId)
+      pruneLogged()
       armRetry()
     })()
     inFlight.set(downloadId, sent)
@@ -155,6 +181,7 @@ export const createSync = ({ store, calls, timers, warn }: SyncDeps): Sync => {
 
   const runFor: Sync['runFor'] = async ({ downloadIds }) => {
     if (isDisposed) return
+    pruneLogged()
     const due = downloadIds.filter((downloadId) => {
       const entry = entryOf(downloadId)
       return inFlight.has(downloadId) || (entry !== null && hasPending(entry))
@@ -174,4 +201,34 @@ export const createSync = ({ store, calls, timers, warn }: SyncDeps): Sync => {
   }
 
   return { touch, runAll, runFor, dispose }
+}
+
+/**
+ * Waits for `work`, or `ms` at most, whichever comes first, and never rejects: a deletion that
+ * waited on the server goes ahead whatever became of the wait.
+ */
+export const settleWithin = async ({
+  work,
+  timers,
+  ms,
+  warn,
+}: {
+  work: Promise<void>
+  timers: Timers
+  ms: number
+  warn: (message: string) => void
+}): Promise<void> => {
+  const waited: { handle: unknown } = { handle: undefined }
+  const timedOut = new Promise<void>((resolve) => {
+    waited.handle = timers.set(resolve, ms)
+  })
+  try {
+    await Promise.race([work, timedOut])
+  } catch (error) {
+    warn(
+      `raven player could not finish telling its server what was watched: ${loggable(errorText(error))}`,
+    )
+  } finally {
+    timers.clear(waited.handle)
+  }
 }
