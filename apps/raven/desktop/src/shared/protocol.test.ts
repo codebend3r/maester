@@ -246,12 +246,14 @@ describe('isDesktopRequest', () => {
     [{ type: 'readSpace' }],
     [{ type: 'setDownloadDefaults', autoDelete: true }],
     [{ type: 'showDownloadsFolder' }],
+    [{ type: 'playbackLeft', fileId: id }],
   ])('accepts %j', (value) => {
     expect(isDesktopRequest(value)).toBe(true)
   })
 
   it.each([
     ['a path as the file id', { type: 'describeFile', fileId: '/Users/me/film.mkv', queue: [] }],
+    ['a path for the file left', { type: 'playbackLeft', fileId: '/Users/me/film.mkv' }],
     ['a string position', { type: 'savePosition', fileId: id, position: '12', duration: null }],
     ['a missing duration', { type: 'savePosition', fileId: id, position: 12 }],
     ['a string audio index', { type: 'saveTracks', fileId: id, audio: '1', subtitle: null }],

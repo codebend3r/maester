@@ -20,6 +20,7 @@ import {
   type EngineUse,
   isPlayState,
   OUTPUT_KEY,
+  requestQuietly,
   servicesFor,
   STATS_UNAVAILABLE,
 } from '@/renderer/PlayPage/playerServices'
@@ -176,8 +177,29 @@ export const useIsOutputFixed = (): boolean => {
   return settings !== null && carriesPassthrough(settings)
 }
 
+/**
+ * Tells main the page left its file, so a deletion that waited for the player can run. React
+ * runs this cleanup before the Player's, whose unmount saves where it was, so the leave waits
+ * a turn for main to read that position first; StrictMode's remount in that turn takes it back.
+ */
+const useLeaveSignal = ({ client, fileId }: { client: DesktopClient; fileId: string }) => {
+  const leaving = useRef<symbol | null>(null)
+  useEffect(() => {
+    leaving.current = null
+    return () => {
+      const leave = Symbol('leave')
+      leaving.current = leave
+      queueMicrotask(() => {
+        if (leaving.current !== leave) return
+        requestQuietly({ client, request: { type: 'playbackLeft', fileId } })
+      })
+    }
+  }, [client, fileId])
+}
+
 const PlayPage = ({ fileId, queue }: { fileId: string; queue: string[] }) => {
   const { client } = useDesktop()
+  useLeaveSignal({ client, fileId })
   const chosen = useChosenEngine()
   const isOutputFixed = useIsOutputFixed()
   const file = useQuery({

@@ -112,6 +112,7 @@ const fakeDownloads = ({
       resumeAt.push(savedPosition())
     },
     notePlaying: (input) => note('notePlaying', input),
+    playbackLeft: (input) => note('playbackLeft', input),
     ask: async (input) => {
       note('ask', input)
       return { type: 'done' }
@@ -1805,6 +1806,22 @@ describe('downloads', () => {
       PLAY_REPLY,
     )
     expect(reached).toEqual([{ name: 'open', input: { downloadId: ASK_ID } }])
+  })
+
+  it('tells the download service the page left a file', async () => {
+    const { service, reached } = setup({ files: {} })
+    expect(await ask({ service, request: { type: 'playbackLeft', fileId: ASK_ID } })).toEqual({
+      type: 'done',
+    })
+    expect(reached).toEqual([{ name: 'playbackLeft', input: { fileId: ASK_ID } }])
+  })
+
+  it('refuses playbackLeft naming its file by anything but an opaque id', async () => {
+    const { service, reached } = setup({ files: {} })
+    expect(
+      await ask({ service, request: { type: 'playbackLeft', fileId: '/Movies/x.mkv' } }),
+    ).toEqual({ type: 'refused', message: MESSAGES.unknownRequest })
+    expect(reached).toEqual([])
   })
 
   it('refuses openDownload naming its download by anything but an opaque id', async () => {

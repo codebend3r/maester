@@ -591,6 +591,9 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
         return deps.downloads.showFolder()
       case 'openDownload':
         return deps.downloads.open({ downloadId: request.downloadId })
+      case 'playbackLeft':
+        deps.downloads.playbackLeft({ fileId: request.fileId })
+        return DONE
       default: {
         const unreachable: never = request
         return unreachable

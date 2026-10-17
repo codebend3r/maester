@@ -268,6 +268,8 @@ export const isDesktopRequest = union(
   object({ type: oneOf(['readSpace']) }),
   object({ type: oneOf(['setDownloadDefaults']), autoDelete: isBoolean }),
   object({ type: oneOf(['showDownloadsFolder']) }),
+  // The play page left this file, so a deletion waiting for the player to leave it can run.
+  object({ type: oneOf(['playbackLeft']), fileId: isOpaqueId }),
 )
 
 export type DesktopRequest = Infer<typeof isDesktopRequest>
