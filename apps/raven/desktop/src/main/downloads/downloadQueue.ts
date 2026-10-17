@@ -9,6 +9,7 @@ import type { ServerEntry } from '@/main/desktopConfig'
 import { DOWNLOAD_MESSAGES } from '@/main/downloads/downloadMessages'
 import {
   advance,
+  bytesOf,
   entryById,
   fail,
   finish,
@@ -156,10 +157,18 @@ const isRelocked = ({ status }: DownloadEntry): boolean =>
   status.kind === 'paused' && status.reason === 'relocked'
 
 /** A file being fetched: `stop` aborts it, and `done` settles once it has let go of its files. */
-type Run = { serverId: string; stop: AbortController; done: Promise<void> }
+type Run = { serverId: string; stop: AbortController; done: Promise<void>; disk: RunDisk }
+
+/**
+ * What a run's part holds, counted as it is written, and whether its space check has passed:
+ * from then on, what it still lacks is room another file may not take.
+ */
+type RunDisk = { size: number; bytes: number; hasRoom: boolean }
 
 /** What one file's run needs at every step. */
-type Job = { entry: DownloadEntry; server: ServerEntry; signal: AbortSignal }
+type Job = { entry: DownloadEntry; server: ServerEntry; signal: AbortSignal; disk: RunDisk }
+
+const lackedBy = ({ disk }: Run): number => (disk.hasRoom ? Math.max(disk.size - disk.bytes, 0) : 0)
 
 type Failure = Extract<FetchOutcome, { ok: false }>
 
@@ -347,7 +356,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     access: Access
     signal: AbortSignal
   }): Promise<FetchOutcome> => {
-    const { entry, server } = job
+    const { entry, server, disk } = job
     // `bytes` is advisory, for the views, so it may be stored mid-stream: every resume reads
     // `part.size()` for its `Range` and corrects it.
     const onDisk = (bytes: number): void =>
@@ -356,13 +365,23 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     return fetchToFile({
       fetch: deps.fetchFor({ serverId: entry.serverId, access }),
       url: fileUrlFor({ access, origin: server.origin, mediaId: entry.mediaId }),
-      // A resumed row shows the bytes already on disk at once, not from the first progress step.
+      // The run counts every byte as it lands; a resumed row shows the bytes already on disk at
+      // once, not from the first progress step.
       part: {
         ...part,
         size: async () => {
           const bytes = await part.size()
+          disk.bytes = bytes
           onDisk(bytes)
           return bytes
+        },
+        append: async (chunk) => {
+          await part.append(chunk)
+          disk.bytes += chunk.length
+        },
+        truncate: async () => {
+          await part.truncate()
+          disk.bytes = 0
         },
       },
       expectedSize: entry.size,
@@ -537,9 +556,11 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
   const work = async ({
     downloadId,
     signal,
+    disk,
   }: {
     downloadId: string
     signal: AbortSignal
+    disk: RunDisk
   }): Promise<void> => {
     const entry = entryById(store.read(), { downloadId })
     if (entry === null) return
@@ -548,15 +569,19 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
       failEntry({ entry, reason: 'other', message: SERVER_GONE })
       return
     }
-    const job: Job = { entry, server, signal }
+    const job: Job = { entry, server, signal, disk }
     const { free } = await readSpace({ fs: deps.space, dir: downloadsDirFor({ userData }) })
     // A resumed or retried file needs only what its part lacks, whatever its status says.
     const onDisk = await fs.size(partPathFor(partsOf(entry)))
     if (signal.aborted) return
-    if (!fits({ bytes: entry.size - onDisk, free })) {
+    // Checked and claimed in one turn, so two runs never both count on the same room.
+    const claimed = [...running.values()].reduce((sum, run) => sum + lackedBy(run), 0)
+    if (!fits({ bytes: entry.size - onDisk, free: free - claimed })) {
       failForSpace(entry)
       return
     }
+    disk.bytes = onDisk
+    disk.hasRoom = true
     const access = await accessOf(job)
     if (access === null) return
     store.update((state) => start(state, { downloadId }))
@@ -577,8 +602,9 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     const { downloadId } = entry
     const stop = new AbortController()
     const settled = Promise.withResolvers<void>()
-    running.set(downloadId, { serverId: entry.serverId, stop, done: settled.promise })
-    work({ downloadId, signal: stop.signal })
+    const disk: RunDisk = { size: entry.size, bytes: bytesOf(entry), hasRoom: false }
+    running.set(downloadId, { serverId: entry.serverId, stop, done: settled.promise, disk })
+    work({ downloadId, signal: stop.signal, disk })
       .catch((error: unknown) => {
         if (stop.signal.aborted) return
         failEntry({ entry, reason: 'other', message: errorText(error) })

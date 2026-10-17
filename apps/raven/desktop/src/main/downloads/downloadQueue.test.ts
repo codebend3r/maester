@@ -287,6 +287,36 @@ describe('space', () => {
     expect(world.statusOf(1)).toEqual({ kind: 'downloading', bytes: 8192 })
   })
 
+  it('starts no second file that the first one still needs the room for', async () => {
+    const world = setup({
+      free: SPACE_RESERVE_BYTES + 12,
+      entries: [
+        entryFor(1, { group: MOVIE, label: 'Dune (2021)' }),
+        entryFor(2, { group: { ...MOVIE, key: 'movie:91', title: 'Arrival (2016)' } }),
+      ],
+    })
+    world.queue.kick()
+    await until(() => world.statusOf(2)?.kind === 'failed')
+    await ticks(10)
+    expect(world.network.fileRequests().map(({ url }) => url)).toEqual([fileUrl(1)])
+    expect(world.statusOf(2)).toEqual({ kind: 'failed', bytes: 0, reason: 'noSpace', message: '' })
+  })
+
+  it('counts only what the running file still lacks, so a file whose part is nearly whole leaves room', async () => {
+    const world = setup({
+      free: SPACE_RESERVE_BYTES + 10,
+      entries: [
+        entryFor(1, { group: MOVIE, status: { kind: 'downloading', bytes: 6 } }),
+        entryFor(2, { group: { ...MOVIE, key: 'movie:91', title: 'Arrival (2016)' } }),
+      ],
+      disk: { [partOf(1)]: 6 },
+    })
+    world.network.answers.file = serving({ size: 8, sent: 0, isEnding: false })
+    world.queue.kick()
+    await until(() => world.network.fileRequests().length === 2)
+    expect(world.statusOf(2)).toEqual({ kind: 'downloading', bytes: 0 })
+  })
+
   it('still fails a file with no part that needs more than that', async () => {
     const world = setup({
       free: SPACE_RESERVE_BYTES + 4096,
