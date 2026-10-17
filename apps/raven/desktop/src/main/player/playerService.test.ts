@@ -11,13 +11,23 @@ import {
 import {
   BUFFERED_MS,
   createPlayerService,
+  type FailureExplainer,
+  guardedMpv,
   type MpvControl,
   OBSERVED,
+  PER_FILE_OPTIONS,
   PLAYER_MESSAGES,
   type PlayerActivity,
+  type PlayerOutcome,
+  type PlayerService,
+  type ResolvedSource,
   resolveSourceWith,
+  SERVER_STALL_MS,
+  type ServerTarget,
+  SIDECAR_BUDGET_MS,
   TIME_MS,
 } from '@/main/player/playerService'
+import { engineOptionsFor, HARDENED_OPTIONS } from '@/main/player/engine'
 import type { Timers } from '@/main/stateStore'
 
 const mpvTrack = (fields: Pick<MpvTrack, 'id' | 'type'> & Partial<MpvTrack>): MpvTrack => ({
@@ -49,6 +59,114 @@ const LOAD = {
   subtitle: 'embedded-0',
 } as const satisfies PlayerCommand
 
+const SERVER_ID = '00000000-0000-4000-8000-000000000001'
+const OTHER_SERVER_ID = '00000000-0000-4000-8000-000000000002'
+const GONE_SERVER_ID = '00000000-0000-4000-8000-000000000003'
+const SERVER_URL = 'https://raven.example/api/media/7/file'
+const SIDECAR_URLS = [
+  'https://raven.example/api/media/7/subtitles/external-0',
+  'https://raven.example/api/media/7/subtitles/external-1',
+] as const
+
+const SERVER_TARGET: ServerTarget = {
+  kind: 'server',
+  serverId: SERVER_ID,
+  mediaId: 7,
+  url: SERVER_URL,
+  headerFields: 'Cookie: raven_unlock=a.b',
+  sidecars: [
+    { url: SIDECAR_URLS[0], title: 'Spanish', language: 'es' },
+    { url: SIDECAR_URLS[1], title: '', language: '' },
+  ],
+}
+
+const OTHER_TARGET: ServerTarget = {
+  kind: 'server',
+  serverId: OTHER_SERVER_ID,
+  mediaId: 9,
+  url: 'https://other.example/api/media/9/file',
+  headerFields: '',
+  sidecars: [],
+}
+
+const SERVER_LOAD = {
+  type: 'load',
+  source: { kind: 'server', serverId: SERVER_ID, mediaId: 7 },
+  start: 30,
+  audio: null,
+  subtitle: null,
+} as const satisfies PlayerCommand
+
+const OTHER_LOAD = {
+  ...SERVER_LOAD,
+  source: { kind: 'server', serverId: OTHER_SERVER_ID, mediaId: 9 },
+} as const satisfies PlayerCommand
+
+/** A sidecar as mpv lists it once `sub-add` has added it: the file's third subtitle. */
+const LATE_SIDECAR = mpvTrack({ id: 3, type: 'sub', lang: 'spa', codec: 'webvtt', external: true })
+
+const GONE_MESSAGE = 'That server is no longer in raven player.'
+const LOCKED = { reason: 'locked', message: 'Vhagar locked this library again.' } as const
+
+/** Server sources that know two servers; `hold` keeps the next resolve until `release`. */
+const fakeServers = () => {
+  const held: (() => void)[] = []
+  const flags = { shouldHold: false }
+  const resolve = async (source: {
+    serverId: string
+    mediaId: number
+  }): Promise<ResolvedSource> => {
+    if (flags.shouldHold) {
+      flags.shouldHold = false
+      await new Promise<void>((resume) => {
+        held.push(resume)
+      })
+    }
+    if (source.serverId === SERVER_ID) return { ok: true, target: SERVER_TARGET }
+    if (source.serverId === OTHER_SERVER_ID) return { ok: true, target: OTHER_TARGET }
+    return { ok: false, message: GONE_MESSAGE }
+  }
+  return {
+    servers: { resolve },
+    hold: () => {
+      flags.shouldHold = true
+    },
+    release: () => {
+      const next = held.shift()
+      if (next) next()
+    },
+  }
+}
+
+type ExplainMode = 'answer' | 'hold' | 'reject'
+
+/** An explainer that answers `LOCKED`, rejects, or holds its answer until `release`. */
+const fakeExplain = () => {
+  const asked: Parameters<FailureExplainer>[0][] = []
+  const held: (() => void)[] = []
+  const state: { mode: ExplainMode } = { mode: 'answer' }
+  const explain: FailureExplainer = async (input) => {
+    asked.push(input)
+    if (state.mode === 'reject') throw new Error('explain failed')
+    if (state.mode === 'hold') {
+      await new Promise<void>((resume) => {
+        held.push(resume)
+      })
+    }
+    return LOCKED
+  }
+  return {
+    explain,
+    asked,
+    use: (mode: ExplainMode) => {
+      state.mode = mode
+    },
+    release: () => {
+      held.splice(0).forEach((resume) => resume())
+    },
+  }
+}
+
 const PCM: OutputSettings = { profile: 'pcm', device: 'auto', passthrough: [], spatial: false }
 const PASSTHROUGH: OutputSettings = { ...PCM, profile: 'passthrough', passthrough: ['ac3'] }
 
@@ -75,6 +193,9 @@ const ignoreReply = () => {}
 const createFakeMpv = () => {
   const log: string[] = []
   const reads: string[] = []
+  // Every command's arguments as sent, and every call in the order it was made, reads too.
+  const commands: (readonly string[])[] = []
+  const timeline: string[] = []
   const observed: string[] = []
   const values = new Map<string, unknown>([
     ['track-list', LIST],
@@ -128,15 +249,19 @@ const createFakeMpv = () => {
     command: async ({ args, onReply }) => {
       const entry = args.join(' ')
       log.push(entry)
+      commands.push(args)
+      timeline.push(entry)
       await reply({ entry, onReply })
     },
     set: async ({ name, value }) => {
       const entry = `set ${name} ${String(value)}`
       log.push(entry)
+      timeline.push(entry)
       await reply({ entry })
     },
     read: async <K extends MpvProperty>({ name }: { name: K }) => {
       reads.push(name)
+      timeline.push(`read ${name}`)
       await reply({ entry: `read ${name}` })
       const value = values.get(name)
       if (!isValueOf(name)(value)) throw new Error('mpv request failed (-10)')
@@ -151,6 +276,8 @@ const createFakeMpv = () => {
     control,
     log,
     reads,
+    commands,
+    timeline,
     observed,
     values,
     connect: (receive: (event: MpvEvent) => void) => {
@@ -163,6 +290,13 @@ const createFakeMpv = () => {
     release: () => {
       flags.holding = null
       held.splice(0).forEach(answer)
+    },
+    /** Answers only what is held for calls starting with `prefix`, and goes on holding. */
+    releaseOnly: (prefix: string) => {
+      const due = held.filter(({ entry }) => entry.startsWith(prefix))
+      const kept = held.filter(({ entry }) => !entry.startsWith(prefix))
+      held.splice(0, held.length, ...kept)
+      due.forEach(answer)
     },
     /** Answers what is held newest first, as no ordered stream would. */
     releaseNewestFirst: () => {
@@ -207,21 +341,48 @@ const createFakeTimers = () => {
   return { timers, fire, pending }
 }
 
+/** Timers on a clock that moves only by `advance`, which runs what fell due in the order set. */
+const createTimedTimers = () => {
+  const state = { now: 0, next: 1 }
+  const pending = new Map<number, { run: () => void; at: number; ms: number }>()
+  const timers: Timers = {
+    set: (run, ms) => {
+      const handle = state.next
+      state.next += 1
+      pending.set(handle, { run, at: state.now + ms, ms })
+      return handle
+    },
+    clear: (handle) => {
+      if (typeof handle === 'number') pending.delete(handle)
+    },
+  }
+  const advance = (ms: number) => {
+    state.now += ms
+    const due = [...pending.entries()].filter(([, timer]) => timer.at <= state.now)
+    due.forEach(([handle]) => pending.delete(handle))
+    due.forEach(([, timer]) => timer.run())
+  }
+  return { timers, advance, pending }
+}
+
 const fileOf = (fileId: string) =>
   fileId === 'f1' ? { fileId, path: '/m/Film.mkv', name: 'Film.mkv', size: 1, mtimeMs: 1 } : null
 
-const setup = () => {
+const setup = ({ timers }: { timers?: Timers } = {}) => {
   const mpv = createFakeMpv()
   const clock = createFakeTimers()
+  const servers = fakeServers()
+  const explainer = fakeExplain()
   const events: PlayerEvent[] = []
   const activity: PlayerActivity[] = []
   const warnings: string[] = []
   const counts = { firstFrames: 0 }
   const service = createPlayerService({
     mpv: mpv.control,
-    resolveSource: resolveSourceWith({ grants: { fileOf } }),
+    resolveSource: resolveSourceWith({ grants: { fileOf }, servers: servers.servers }),
+    explain: explainer.explain,
     canChooseAo: false,
-    timers: clock.timers,
+    timers: timers ?? clock.timers,
     onActivity: (next) => {
       activity.push(next)
     },
@@ -262,6 +423,8 @@ const setup = () => {
     service,
     mpv,
     clock,
+    servers,
+    explainer,
     events,
     activity,
     warnings,
@@ -279,7 +442,8 @@ describe('hardening', () => {
     const mpv = createFakeMpv()
     createPlayerService({
       mpv: mpv.control,
-      resolveSource: resolveSourceWith({ grants: { fileOf } }),
+      resolveSource: resolveSourceWith({ grants: { fileOf }, servers: fakeServers().servers }),
+      explain: fakeExplain().explain,
       canChooseAo: false,
       timers: createFakeTimers().timers,
       onActivity: () => {},
@@ -295,7 +459,8 @@ describe('hardening', () => {
     const warnings: string[] = []
     const service = createPlayerService({
       mpv: mpv.control,
-      resolveSource: resolveSourceWith({ grants: { fileOf } }),
+      resolveSource: resolveSourceWith({ grants: { fileOf }, servers: fakeServers().servers }),
+      explain: fakeExplain().explain,
       canChooseAo: false,
       timers: createFakeTimers().timers,
       onActivity: () => {},
@@ -320,21 +485,35 @@ describe('hardening', () => {
 })
 
 describe('resolveSourceWith', () => {
-  const resolve = resolveSourceWith({ grants: { fileOf } })
+  const resolve = resolveSourceWith({ grants: { fileOf }, servers: fakeServers().servers })
 
-  test('a granted file resolves to its path', () => {
-    expect(resolve({ kind: 'file', fileId: 'f1' })).toEqual({ ok: true, path: '/m/Film.mkv' })
+  test('a granted file resolves to its path', async () => {
+    expect(await resolve({ kind: 'file', fileId: 'f1' })).toEqual({
+      ok: true,
+      target: { kind: 'file', path: '/m/Film.mkv' },
+    })
   })
 
-  test('an unknown file and a server title are refused', () => {
-    expect(resolve({ kind: 'file', fileId: 'nope' })).toEqual({
+  test('an unknown file is refused', async () => {
+    expect(await resolve({ kind: 'file', fileId: 'nope' })).toEqual({
       ok: false,
       message: PLAYER_MESSAGES.notOpen,
     })
-    expect(resolve({ kind: 'server', serverId: 's1', mediaId: 4 })).toEqual({
-      ok: false,
-      message: PLAYER_MESSAGES.serverTitles,
+  })
+
+  test('a server title is what the server sources make of it', async () => {
+    expect(await resolve({ kind: 'server', serverId: SERVER_ID, mediaId: 7 })).toEqual({
+      ok: true,
+      target: SERVER_TARGET,
     })
+    expect(await resolve({ kind: 'server', serverId: GONE_SERVER_ID, mediaId: 7 })).toEqual({
+      ok: false,
+      message: GONE_MESSAGE,
+    })
+  })
+
+  test('the player messages no longer turn server titles away', () => {
+    expect(Object.keys(PLAYER_MESSAGES)).not.toContain('serverTitles')
   })
 })
 
@@ -351,11 +530,14 @@ describe('createPlayerService', () => {
       expect(mpv.log).toEqual(['set pause false', 'loadfile /m/Film.mkv replace -1 start=0'])
     })
 
-    test('a server title and an unknown file are refused without touching mpv', async () => {
+    test('a removed server and an unknown file are refused without touching mpv', async () => {
       const { service, mpv } = setup()
       expect(
-        await service.handle({ ...LOAD, source: { kind: 'server', serverId: 's1', mediaId: 3 } }),
-      ).toEqual({ ok: false, reason: 'refused', message: PLAYER_MESSAGES.serverTitles })
+        await service.handle({
+          ...LOAD,
+          source: { kind: 'server', serverId: GONE_SERVER_ID, mediaId: 3 },
+        }),
+      ).toEqual({ ok: false, reason: 'refused', message: GONE_MESSAGE })
       expect(await service.handle({ ...LOAD, source: { kind: 'file', fileId: 'f2' } })).toEqual({
         ok: false,
         reason: 'refused',
@@ -1100,7 +1282,8 @@ describe('createPlayerService', () => {
       const events: PlayerEvent[] = []
       const service = createPlayerService({
         mpv: mpv.control,
-        resolveSource: resolveSourceWith({ grants: { fileOf } }),
+        resolveSource: resolveSourceWith({ grants: { fileOf }, servers: fakeServers().servers }),
+        explain: fakeExplain().explain,
         canChooseAo: false,
         timers: createFakeTimers().timers,
         onActivity: () => {
@@ -1514,6 +1697,783 @@ describe('createPlayerService', () => {
       clear()
       clock.fire()
       expect(events).toEqual([])
+      expect(clock.pending.size).toBe(0)
+    })
+  })
+
+  describe('a server title its server leaves waiting', () => {
+    const waiting = ({ service, data }: { service: PlayerService; data: boolean }) =>
+      service.receive({ type: 'property', name: 'paused-for-cache', data })
+    const stalls = (pending: ReturnType<typeof createTimedTimers>['pending']) =>
+      [...pending.values()].filter(({ ms }) => ms === SERVER_STALL_MS)
+
+    test('is a lost connection once it has waited the whole budget, and mpv stops', async () => {
+      const clock = createTimedTimers()
+      const { service, mpv, events, activity, loaded, clear, warnings } = setup({
+        timers: clock.timers,
+      })
+      await loaded(SERVER_LOAD)
+      clear()
+      waiting({ service, data: true })
+      clock.advance(SERVER_STALL_MS - 1)
+      expect(events.filter(({ type }) => type === 'error')).toEqual([])
+      clock.advance(1)
+      expect(events.filter(({ type }) => type === 'error')).toEqual([
+        { type: 'error', reason: 'network', message: PLAYER_MESSAGES.lost },
+      ])
+      expect(mpv.log).toEqual(['stop'])
+      expect(activity.at(-1)).toEqual({ isPlaying: false, isShowing: true })
+      expect(warnings.some((warning) => warning.includes(`${SERVER_STALL_MS} ms`))).toBe(true)
+      // The stop's own ending and anything after it belong to no load.
+      service.receive({ type: 'end-file', reason: 'error', error: -10 })
+      waiting({ service, data: false })
+      await settle()
+      expect(events.filter(({ type }) => type === 'error')).toHaveLength(1)
+      expect(clock.pending.size).toBe(0)
+    })
+
+    test('waiting that ends one millisecond before the budget is nothing', async () => {
+      const clock = createTimedTimers()
+      const { service, events, loaded } = setup({ timers: clock.timers })
+      await loaded(SERVER_LOAD)
+      waiting({ service, data: true })
+      clock.advance(SERVER_STALL_MS - 1)
+      waiting({ service, data: false })
+      clock.advance(SERVER_STALL_MS * 2)
+      expect(events.filter(({ type }) => type === 'error')).toEqual([])
+      expect(stalls(clock.pending)).toEqual([])
+    })
+
+    test('the clock moving starts the budget over', async () => {
+      const clock = createTimedTimers()
+      const { service, events, loaded, time } = setup({ timers: clock.timers })
+      await loaded(SERVER_LOAD)
+      time(31)
+      waiting({ service, data: true })
+      clock.advance(SERVER_STALL_MS - 1)
+      time(31.5)
+      clock.advance(SERVER_STALL_MS - 1)
+      expect(events.filter(({ type }) => type === 'error')).toEqual([])
+      clock.advance(1)
+      expect(events.filter(({ type }) => type === 'error')).toHaveLength(1)
+    })
+
+    test('a local file is never stopped for waiting', async () => {
+      const clock = createTimedTimers()
+      const { service, events, loaded } = setup({ timers: clock.timers })
+      await loaded()
+      waiting({ service, data: true })
+      expect(stalls(clock.pending)).toEqual([])
+      clock.advance(SERVER_STALL_MS * 2)
+      expect(events.filter(({ type }) => type === 'error')).toEqual([])
+    })
+
+    test('a paused title that is not waiting is never stopped', async () => {
+      const clock = createTimedTimers()
+      const { service, events, loaded } = setup({ timers: clock.timers })
+      await loaded(SERVER_LOAD)
+      service.receive({ type: 'property', name: 'pause', data: true })
+      expect(stalls(clock.pending)).toEqual([])
+      clock.advance(SERVER_STALL_MS * 2)
+      expect(events.filter(({ type }) => type === 'error')).toEqual([])
+    })
+
+    test('a stop, a file load or a reset clears the budget', async () => {
+      const clock = createTimedTimers()
+      const { service, events, loaded } = setup({ timers: clock.timers })
+      await loaded(SERVER_LOAD)
+      waiting({ service, data: true })
+      expect(stalls(clock.pending)).toHaveLength(1)
+      await service.handle({ type: 'stop' })
+      expect(stalls(clock.pending)).toEqual([])
+      await loaded(SERVER_LOAD)
+      waiting({ service, data: true })
+      expect(await service.handle(LOAD)).toEqual({ ok: true })
+      expect(stalls(clock.pending)).toEqual([])
+      await loaded(SERVER_LOAD)
+      waiting({ service, data: true })
+      await service.reset()
+      expect(stalls(clock.pending)).toEqual([])
+      clock.advance(SERVER_STALL_MS * 2)
+      expect(events.filter(({ type }) => type === 'error')).toEqual([])
+    })
+
+    test('a new server load starts a budget of its own', async () => {
+      const clock = createTimedTimers()
+      const { service, events, loaded } = setup({ timers: clock.timers })
+      await loaded(SERVER_LOAD)
+      waiting({ service, data: true })
+      clock.advance(SERVER_STALL_MS - 1)
+      expect(await service.handle(OTHER_LOAD)).toEqual({ ok: true })
+      expect(stalls(clock.pending)).toHaveLength(1)
+      clock.advance(1)
+      expect(events.filter(({ type }) => type === 'error')).toEqual([])
+      clock.advance(SERVER_STALL_MS - 1)
+      expect(events.filter(({ type }) => type === 'error')).toEqual([
+        { type: 'error', reason: 'network', message: PLAYER_MESSAGES.lost },
+      ])
+    })
+
+    test('a server title that never loads is a lost connection after the budget', async () => {
+      const clock = createTimedTimers()
+      const { service, mpv, events, activity } = setup({ timers: clock.timers })
+      expect(await service.handle(SERVER_LOAD)).toEqual({ ok: true })
+      clock.advance(SERVER_STALL_MS - 1)
+      expect(events.filter(({ type }) => type === 'error')).toEqual([])
+      clock.advance(1)
+      expect(events.filter(({ type }) => type === 'error')).toEqual([
+        { type: 'error', reason: 'network', message: PLAYER_MESSAGES.lost },
+      ])
+      expect(mpv.log.at(-1)).toBe('stop')
+      expect(activity.at(-1)).toEqual({ isPlaying: false, isShowing: true })
+      // A file-loaded or an error ending after the stop belongs to no load.
+      service.receive({ type: 'file-loaded' })
+      service.receive({ type: 'end-file', reason: 'error', error: -13 })
+      await settle()
+      expect(events.filter(({ type }) => type === 'error')).toHaveLength(1)
+      expect(events.filter(({ type }) => type === 'paused')).toEqual([])
+    })
+
+    test('a stall budget that runs out while the load waits on mpv sends no loadfile', async () => {
+      const clock = createTimedTimers()
+      const { service, mpv, events } = setup({ timers: clock.timers })
+      mpv.hold('set pause')
+      const loading = service.handle(SERVER_LOAD)
+      await settle()
+      clock.advance(SERVER_STALL_MS)
+      mpv.release()
+      expect(await loading).toEqual({
+        ok: false,
+        reason: 'refused',
+        message: PLAYER_MESSAGES.lost,
+      })
+      expect(mpv.log.some((entry) => entry.startsWith('loadfile'))).toBe(false)
+      expect(events.filter(({ type }) => type === 'error')).toHaveLength(1)
+    })
+
+    test('a stall budget that runs out while the loadfile waits answers refused', async () => {
+      const clock = createTimedTimers()
+      const { service, mpv } = setup({ timers: clock.timers })
+      mpv.hold('loadfile')
+      const loading = service.handle(SERVER_LOAD)
+      await settle()
+      clock.advance(SERVER_STALL_MS)
+      mpv.release()
+      expect(await loading).toEqual({
+        ok: false,
+        reason: 'refused',
+        message: PLAYER_MESSAGES.lost,
+      })
+    })
+
+    test('a time read that finds the clock moved starts the budget over', async () => {
+      const clock = createTimedTimers()
+      const { service, mpv, events, loaded, time } = setup({ timers: clock.timers })
+      await loaded(SERVER_LOAD)
+      time(30)
+      waiting({ service, data: true })
+      clock.advance(SERVER_STALL_MS - 1)
+      mpv.values.set('time-pos', 31)
+      service.receive({ type: 'playback-restart' })
+      await settle()
+      clock.advance(SERVER_STALL_MS - 1)
+      expect(events.filter(({ type }) => type === 'error')).toEqual([])
+      clock.advance(1)
+      expect(events.filter(({ type }) => type === 'error')).toHaveLength(1)
+    })
+
+    test('a time read that finds the clock still keeps the budget running', async () => {
+      const clock = createTimedTimers()
+      const { service, mpv, events, loaded, time } = setup({ timers: clock.timers })
+      await loaded(SERVER_LOAD)
+      time(30)
+      waiting({ service, data: true })
+      clock.advance(SERVER_STALL_MS - 1)
+      mpv.values.set('time-pos', 30)
+      service.receive({ type: 'playback-restart' })
+      await settle()
+      clock.advance(1)
+      expect(events.filter(({ type }) => type === 'error')).toHaveLength(1)
+    })
+
+    test('file-loaded ends the opening budget', async () => {
+      const clock = createTimedTimers()
+      const { service, events } = setup({ timers: clock.timers })
+      expect(await service.handle(SERVER_LOAD)).toEqual({ ok: true })
+      expect(stalls(clock.pending)).toHaveLength(1)
+      clock.advance(SERVER_STALL_MS - 1)
+      service.receive({ type: 'file-loaded' })
+      await settle()
+      expect(stalls(clock.pending)).toEqual([])
+      clock.advance(SERVER_STALL_MS * 2)
+      expect(events.filter(({ type }) => type === 'error')).toEqual([])
+    })
+
+    test('a local file opening has no budget', async () => {
+      const clock = createTimedTimers()
+      const { service, events } = setup({ timers: clock.timers })
+      expect(await service.handle(LOAD)).toEqual({ ok: true })
+      expect(stalls(clock.pending)).toEqual([])
+      clock.advance(SERVER_STALL_MS * 2)
+      expect(events.filter(({ type }) => type === 'error')).toEqual([])
+    })
+
+    test('a stop or a reset while opening clears the budget', async () => {
+      const clock = createTimedTimers()
+      const { service, events } = setup({ timers: clock.timers })
+      expect(await service.handle(SERVER_LOAD)).toEqual({ ok: true })
+      await service.handle({ type: 'stop' })
+      expect(stalls(clock.pending)).toEqual([])
+      expect(await service.handle(SERVER_LOAD)).toEqual({ ok: true })
+      await service.reset()
+      expect(stalls(clock.pending)).toEqual([])
+      clock.advance(SERVER_STALL_MS * 2)
+      expect(events.filter(({ type }) => type === 'error')).toEqual([])
+    })
+
+    test('dispose drops the budget and tells no one', async () => {
+      const clock = createTimedTimers()
+      const { service, mpv, events, loaded, clear } = setup({ timers: clock.timers })
+      await loaded(SERVER_LOAD)
+      waiting({ service, data: true })
+      clear()
+      service.dispose()
+      expect(clock.pending.size).toBe(0)
+      clock.advance(SERVER_STALL_MS * 2)
+      expect(events).toEqual([])
+      expect(mpv.log).toEqual([])
+    })
+
+    test('no load after dispose arms a timer or reaches mpv', async () => {
+      const clock = createTimedTimers()
+      const { service, mpv, loaded, clear } = setup({ timers: clock.timers })
+      await loaded(SERVER_LOAD)
+      clear()
+      service.dispose()
+      expect(await service.handle(SERVER_LOAD)).toEqual({
+        ok: false,
+        reason: 'engine',
+        message: PLAYER_MESSAGES.engineStopped,
+      })
+      expect(clock.pending.size).toBe(0)
+      expect(mpv.log).toEqual([])
+      expect(service.isDead()).toBe(true)
+    })
+
+    test('a load still resolving at dispose arms no timer once it resolves', async () => {
+      const clock = createTimedTimers()
+      const { service, mpv, servers } = setup({ timers: clock.timers })
+      servers.hold()
+      const loading = service.handle(SERVER_LOAD)
+      await settle()
+      service.dispose()
+      servers.release()
+      expect(await loading).toEqual({
+        ok: false,
+        reason: 'engine',
+        message: PLAYER_MESSAGES.engineStopped,
+      })
+      expect(clock.pending.size).toBe(0)
+      expect(mpv.log).toEqual([])
+    })
+
+    test('a cache that runs dry while the sidecars go in keeps the budget running', async () => {
+      const clock = createTimedTimers()
+      const { service, mpv, events } = setup({ timers: clock.timers })
+      mpv.hold('sub-add')
+      expect(await service.handle(SERVER_LOAD)).toEqual({ ok: true })
+      service.receive({ type: 'file-loaded' })
+      await settle()
+      waiting({ service, data: true })
+      // The sidecars outlast their budget, so the first snapshot goes on without them.
+      clock.advance(SIDECAR_BUDGET_MS)
+      await settle()
+      await settle()
+      expect(events.filter(({ type }) => type === 'paused')).toHaveLength(1)
+      expect(events.findLast(({ type }) => type === 'waiting')).toEqual({
+        type: 'waiting',
+        waiting: true,
+      })
+      expect(stalls(clock.pending)).toHaveLength(1)
+      clock.advance(SERVER_STALL_MS)
+      expect(events.filter(({ type }) => type === 'error')).toEqual([
+        { type: 'error', reason: 'network', message: PLAYER_MESSAGES.lost },
+      ])
+      mpv.release()
+    })
+  })
+
+  describe('server titles', () => {
+    test('a server load carries its cookie, the redirect and reconnect limits and the network timeout on its own loadfile', async () => {
+      const { service, mpv } = setup()
+      expect(await service.handle(SERVER_LOAD)).toEqual({ ok: true })
+      expect(mpv.log).toEqual([
+        'set pause false',
+        'loadfile https://raven.example/api/media/7/file replace -1 start=30,http-header-fields=%24%Cookie: raven_unlock=a.b,stream-lavf-o=%37%max_redirects=0,reconnect_delay_max=3,network-timeout=15',
+      ])
+    })
+
+    test('a file load after a server title carries nothing of it', async () => {
+      const { service, mpv, loaded, clear } = setup()
+      await loaded(SERVER_LOAD)
+      clear()
+      expect(await service.handle(LOAD)).toEqual({ ok: true })
+      expect(mpv.log).toEqual(['set pause false', 'loadfile /m/Film.mkv replace -1 start=0'])
+    })
+
+    test('a server with no cookies sends no header, and still no redirect', async () => {
+      const { service, mpv } = setup()
+      expect(await service.handle(OTHER_LOAD)).toEqual({ ok: true })
+      expect(mpv.log).toEqual([
+        'set pause false',
+        'loadfile https://other.example/api/media/9/file replace -1 start=30,stream-lavf-o=%37%max_redirects=0,reconnect_delay_max=3,network-timeout=15',
+      ])
+    })
+
+    test('nothing ever sets a per-file option globally', async () => {
+      const { service, mpv, loaded, time } = setup()
+      await loaded(SERVER_LOAD)
+      time(40)
+      service.receive({ type: 'end-file', reason: 'error', error: -13 })
+      await loaded()
+      await loaded(OTHER_LOAD)
+      await service.applyOutput({ output: PASSTHROUGH, devices: [] })
+      await service.applyDisplay({ refreshRate: 60, edrHeadroom: 2 })
+      await service.handle({ type: 'stop' })
+      await service.resetIfServer(SERVER_ID)
+      const options = [
+        ...HARDENED_OPTIONS,
+        ...engineOptionsFor({ surface: { kind: 'headless' } }),
+        ...engineOptionsFor({ surface: { kind: 'window', handle: Buffer.alloc(8) } }),
+      ]
+      expect(
+        [...mpv.log, ...options.map(({ name }) => `set ${name}`)].filter((entry) =>
+          PER_FILE_OPTIONS.some((name) => entry.startsWith(`set ${name}`)),
+        ),
+      ).toEqual([])
+    })
+
+    test('the guard refuses a per-file option by any name or command, and passes the rest', async () => {
+      const mpv = createFakeMpv()
+      const guarded = guardedMpv(mpv.control)
+      const names = PER_FILE_OPTIONS.flatMap((name) => [
+        name,
+        `${name}-append`,
+        `${name}-set`,
+        `${name}-add`,
+        `file-local-options/${name}`,
+        `options/${name}`,
+      ])
+      await Promise.all(
+        names.map((name) =>
+          expect(guarded.set({ name, value: 'Cookie: raven_unlock=a.b' })).rejects.toThrow(
+            'is set per file, never globally',
+          ),
+        ),
+      )
+      await Promise.all(
+        ['set', 'change-list', 'add', 'cycle-values'].flatMap((command) =>
+          names.map((name) =>
+            expect(
+              guarded.command({ args: [command, name, 'append', 'Cookie: raven_unlock=a.b'] }),
+            ).rejects.toThrow('is set per file, never globally'),
+          ),
+        ),
+      )
+      expect(mpv.log).toEqual([])
+      await guarded.set({ name: 'pause', value: true })
+      await guarded.command({ args: ['sub-add', SIDECAR_URLS[0], 'auto', '', ''] })
+      await guarded.command({
+        args: [
+          'loadfile',
+          SERVER_URL,
+          'replace',
+          '-1',
+          'start=0,stream-lavf-o=%37%max_redirects=0,reconnect_delay_max=3,network-timeout=15',
+        ],
+      })
+      expect(mpv.log).toEqual([
+        'set pause true',
+        `sub-add ${SIDECAR_URLS[0]} auto  `,
+        `loadfile ${SERVER_URL} replace -1 start=0,stream-lavf-o=%37%max_redirects=0,reconnect_delay_max=3,network-timeout=15`,
+      ])
+    })
+
+    test('the guard reads every argument of a command but loadfile', async () => {
+      const mpv = createFakeMpv()
+      const guarded = guardedMpv(mpv.control)
+      await Promise.all(
+        PER_FILE_OPTIONS.flatMap((name) => [
+          expect(
+            guarded.command({ args: ['script-message-to', 'console', 'set', name, 'x'] }),
+          ).rejects.toThrow(`${name} is set per file, never globally`),
+          expect(
+            guarded.command({ args: ['change-list', 'pause', `file-local-options/${name}`] }),
+          ).rejects.toThrow('is set per file, never globally'),
+        ]),
+      )
+      expect(mpv.log).toEqual([])
+    })
+
+    test('a load overtaken while its source resolves sends nothing to mpv', async () => {
+      const { service, mpv, servers } = setup()
+      servers.hold()
+      const first = service.handle(SERVER_LOAD)
+      await settle()
+      expect(await service.handle(LOAD)).toEqual({ ok: true })
+      servers.release()
+      expect(await first).toEqual({ ok: true })
+      expect(mpv.log).toEqual(['set pause false', 'loadfile /m/Film.mkv replace -1 start=0'])
+    })
+
+    test('a stop while the source resolves sends no loadfile after it', async () => {
+      const { service, mpv, servers } = setup()
+      servers.hold()
+      const loading = service.handle(SERVER_LOAD)
+      await settle()
+      expect(await service.handle({ type: 'stop' })).toEqual({ ok: true })
+      servers.release()
+      expect(await loading).toEqual({ ok: true })
+      expect(mpv.log).toEqual(['stop'])
+    })
+
+    test('the sidecars are added in order before the track list is read', async () => {
+      const { mpv, loaded } = setup()
+      await loaded(SERVER_LOAD)
+      expect(mpv.commands.filter(([name]) => name === 'sub-add')).toEqual([
+        ['sub-add', SIDECAR_URLS[0], 'auto', 'Spanish', 'es'],
+        ['sub-add', SIDECAR_URLS[1], 'auto', '', ''],
+      ])
+      const second = mpv.timeline.indexOf(`sub-add ${SIDECAR_URLS[1]} auto  `)
+      expect(second).toBeGreaterThan(
+        mpv.timeline.indexOf(`sub-add ${SIDECAR_URLS[0]} auto Spanish es`),
+      )
+      expect(mpv.timeline.indexOf('read track-list')).toBeGreaterThan(second)
+    })
+
+    test('a file adds no sidecars', async () => {
+      const { mpv, loaded } = setup()
+      await loaded()
+      expect(mpv.commands.filter(([name]) => name === 'sub-add')).toEqual([])
+    })
+
+    test('a failing sidecar is warned, without its URL, and the next one still added', async () => {
+      const { mpv, types, warnings, loaded } = setup()
+      mpv.failOn(`sub-add ${SIDECAR_URLS[0]}`)
+      await loaded(SERVER_LOAD)
+      expect(mpv.commands.filter(([name]) => name === 'sub-add').length).toBe(2)
+      expect(warnings).toEqual(['mpv sub-add of sidecar 0 failed: mpv request failed (-12)'])
+      expect(types()).toEqual(['paused', 'duration', 'rate', 'waiting', 'tracks'])
+    })
+
+    test('a stop while a sidecar is added adds no more and emits no snapshot', async () => {
+      const { service, mpv, events, loaded } = setup()
+      mpv.hold('sub-add')
+      const loading = loaded(SERVER_LOAD)
+      await settle()
+      expect(await service.handle({ type: 'stop' })).toEqual({ ok: true })
+      mpv.release()
+      await loading
+      await settle()
+      expect(mpv.commands.filter(([name]) => name === 'sub-add').length).toBe(1)
+      expect(mpv.reads).toEqual([])
+      expect(events).toEqual([])
+    })
+
+    test('an error end-file while loaded emits what the server explains', async () => {
+      const { service, explainer, events, loaded, clear } = setup()
+      await loaded(SERVER_LOAD)
+      clear()
+      service.receive({ type: 'end-file', reason: 'error', error: -13 })
+      await settle()
+      expect(explainer.asked).toEqual([{ target: SERVER_TARGET, phase: 'loaded' }])
+      expect(events).toEqual([{ type: 'error', ...LOCKED }])
+    })
+
+    test('an error end-file while loading is explained as an open failure', async () => {
+      const { service, explainer, events } = setup()
+      await service.handle(SERVER_LOAD)
+      service.receive({ type: 'end-file', reason: 'error', error: -13 })
+      await settle()
+      expect(explainer.asked).toEqual([{ target: SERVER_TARGET, phase: 'loading' }])
+      expect(events).toEqual([{ type: 'error', ...LOCKED }])
+    })
+
+    test('a short eof on a server title is explained too', async () => {
+      const { service, explainer, events, loaded, clear, time } = setup()
+      await loaded(SERVER_LOAD)
+      time(40)
+      clear()
+      service.receive({ type: 'end-file', reason: 'eof', error: 0 })
+      await settle()
+      expect(explainer.asked).toEqual([{ target: SERVER_TARGET, phase: 'loaded' }])
+      expect(events).toEqual([{ type: 'error', ...LOCKED }])
+    })
+
+    test('a server title that plays to its end is ended, with nothing to explain', async () => {
+      const { service, explainer, events, loaded, clear, time } = setup()
+      await loaded(SERVER_LOAD)
+      time(119)
+      clear()
+      service.receive({ type: 'end-file', reason: 'eof', error: 0 })
+      await settle()
+      expect(explainer.asked).toEqual([])
+      expect(events).toEqual([{ type: 'ended' }])
+    })
+
+    test("a file's errors are not explained", async () => {
+      const { service, explainer, events, loaded, clear } = setup()
+      await loaded()
+      clear()
+      service.receive({ type: 'end-file', reason: 'error', error: -13 })
+      await settle()
+      expect(explainer.asked).toEqual([])
+      expect(events).toEqual([
+        { type: 'error', reason: 'decode', message: PLAYER_MESSAGES.stopped },
+      ])
+    })
+
+    test('an explanation overtaken by a new load emits nothing', async () => {
+      const { service, explainer, events, loaded, clear } = setup()
+      await loaded(SERVER_LOAD)
+      clear()
+      explainer.use('hold')
+      service.receive({ type: 'end-file', reason: 'error', error: -13 })
+      await settle()
+      expect(await service.handle(LOAD)).toEqual({ ok: true })
+      explainer.release()
+      await settle()
+      expect(events).toEqual([])
+    })
+
+    test('an explanation that rejects is a lost connection', async () => {
+      const { service, explainer, events, loaded, clear } = setup()
+      await loaded(SERVER_LOAD)
+      clear()
+      explainer.use('reject')
+      service.receive({ type: 'end-file', reason: 'error', error: -13 })
+      await settle()
+      expect(events).toEqual([{ type: 'error', reason: 'network', message: PLAYER_MESSAGES.lost }])
+    })
+
+    test('resetIfServer stops only a title from that server', async () => {
+      const { service, mpv, activity, loaded, clear } = setup()
+      await loaded(SERVER_LOAD)
+      clear()
+      await service.resetIfServer(OTHER_SERVER_ID)
+      expect(mpv.log).toEqual([])
+      await service.resetIfServer(SERVER_ID)
+      expect(mpv.log).toEqual(['stop'])
+      expect(activity).toEqual([{ isPlaying: false, isShowing: false }])
+    })
+
+    test('resetIfServer tells the page why its playing title stopped', async () => {
+      const { service, events, loaded, clear } = setup()
+      await loaded(SERVER_LOAD)
+      clear()
+      await service.resetIfServer(SERVER_ID)
+      expect(events).toEqual([
+        { type: 'error', reason: 'open', message: PLAYER_MESSAGES.serverGone },
+      ])
+    })
+
+    test('resetIfServer tells a load that began while it stopped nothing of the gone server', async () => {
+      const { service, mpv, events, loaded, clear } = setup()
+      await loaded(SERVER_LOAD)
+      clear()
+      mpv.hold('stop')
+      const resetting = service.resetIfServer(SERVER_ID)
+      await settle()
+      const loading = service.handle(LOAD)
+      await settle()
+      mpv.release()
+      await resetting
+      expect(await loading).toEqual({ ok: true })
+      expect(events.filter(({ type }) => type === 'error')).toEqual([])
+    })
+
+    test('resetIfServer leaves a file alone', async () => {
+      const { service, mpv, loaded, clear } = setup()
+      await loaded(SERVER_LOAD)
+      await loaded()
+      clear()
+      await service.resetIfServer(SERVER_ID)
+      expect(mpv.log).toEqual([])
+    })
+
+    test('resetIfServer refuses a load from that server still resolving, which sends nothing', async () => {
+      const { service, mpv, servers } = setup()
+      servers.hold()
+      const loading = service.handle(SERVER_LOAD)
+      await settle()
+      await service.resetIfServer(SERVER_ID)
+      servers.release()
+      expect(await loading).toEqual({
+        ok: false,
+        reason: 'refused',
+        message: PLAYER_MESSAGES.serverGone,
+      })
+      expect(mpv.log).toEqual([])
+    })
+
+    test('resetIfServer refuses a load from that server still waiting on mpv, and stops it', async () => {
+      const { service, mpv } = setup()
+      mpv.hold('set pause')
+      const loading = service.handle(SERVER_LOAD)
+      await settle()
+      const resetting = service.resetIfServer(SERVER_ID)
+      mpv.release()
+      await resetting
+      expect(await loading).toEqual({
+        ok: false,
+        reason: 'refused',
+        message: PLAYER_MESSAGES.serverGone,
+      })
+      expect(mpv.log).toEqual(['set pause false', 'stop'])
+    })
+
+    test('resetIfServer for another server leaves a resolving load to play', async () => {
+      const { service, mpv, servers } = setup()
+      servers.hold()
+      const loading = service.handle(SERVER_LOAD)
+      await settle()
+      await service.resetIfServer(OTHER_SERVER_ID)
+      servers.release()
+      expect(await loading).toEqual({ ok: true })
+      expect(mpv.log.at(-1)).toStartWith('loadfile https://raven.example/api/media/7/file')
+    })
+
+    test('slow sidecars hold the first snapshot back no longer than the budget', async () => {
+      const { service, mpv, clock, types, warnings } = setup()
+      mpv.hold('sub-add')
+      expect(await service.handle(SERVER_LOAD)).toEqual({ ok: true })
+      service.receive({ type: 'file-loaded' })
+      await settle()
+      expect(mpv.reads).toEqual([])
+      expect([...clock.pending.values()].map(({ ms }) => ms)).toEqual([SIDECAR_BUDGET_MS])
+      clock.fire()
+      await settle()
+      expect(types()).toEqual(['paused', 'duration', 'rate', 'waiting', 'tracks'])
+      expect(warnings).toEqual(['server sidecars are slow; the title starts without them'])
+      mpv.release()
+      await settle()
+      expect(mpv.commands.filter(([name]) => name === 'sub-add').length).toBe(2)
+      expect(SIDECAR_BUDGET_MS).toBe(3000)
+    })
+
+    test('a wanted sidecar that came after the budget is selected once it is in', async () => {
+      const { service, mpv, clock } = setup()
+      mpv.hold('sub-add')
+      expect(await service.handle({ ...SERVER_LOAD, subtitle: 'external-0' })).toEqual({
+        ok: true,
+      })
+      service.receive({ type: 'file-loaded' })
+      await settle()
+      clock.fire()
+      await settle()
+      expect(mpv.log.filter((entry) => entry.startsWith('set sid'))).toEqual(['set sid no'])
+      mpv.values.set('track-list', [...LIST, LATE_SIDECAR])
+      mpv.release()
+      await settle()
+      expect(mpv.log.filter((entry) => entry.startsWith('set sid'))).toEqual([
+        'set sid no',
+        'set sid 3',
+      ])
+    })
+
+    test('a late sidecar is not selected once the page picked another subtitle', async () => {
+      const { service, mpv, clock } = setup()
+      mpv.hold('sub-add')
+      await service.handle({ ...SERVER_LOAD, subtitle: 'external-0' })
+      service.receive({ type: 'file-loaded' })
+      await settle()
+      clock.fire()
+      await settle()
+      expect(await service.handle({ type: 'subtitle', id: 'embedded-1' })).toEqual({ ok: true })
+      mpv.values.set('track-list', [...LIST, LATE_SIDECAR])
+      mpv.release()
+      await settle()
+      expect(mpv.log.filter((entry) => entry.startsWith('set sid'))).toEqual([
+        'set sid no',
+        'set sid 2',
+      ])
+    })
+
+    test('a late sidecar is not selected over a pick still on its way to mpv', async () => {
+      const { service, mpv, clock } = setup()
+      mpv.hold('sub-add')
+      await service.handle({ ...SERVER_LOAD, subtitle: 'external-0' })
+      service.receive({ type: 'file-loaded' })
+      await settle()
+      clock.fire()
+      await settle()
+      mpv.hold('set sid')
+      const picking = service.handle({ type: 'subtitle', id: 'embedded-1' })
+      await settle()
+      mpv.values.set('track-list', [...LIST, LATE_SIDECAR])
+      mpv.releaseOnly('sub-add')
+      await settle()
+      await settle()
+      mpv.release()
+      expect(await picking).toEqual({ ok: true })
+      await settle()
+      expect(mpv.log.filter((entry) => entry.startsWith('set sid'))).toEqual([
+        'set sid no',
+        'set sid 2',
+      ])
+    })
+
+    test('a late sidecar is not selected once another load took over', async () => {
+      const { service, mpv, clock } = setup()
+      mpv.hold('sub-add')
+      await service.handle({ ...SERVER_LOAD, subtitle: 'external-0' })
+      service.receive({ type: 'file-loaded' })
+      await settle()
+      clock.fire()
+      await settle()
+      mpv.values.set('track-list', [...LIST, LATE_SIDECAR])
+      const reloading = service.handle(LOAD)
+      mpv.release()
+      expect(await reloading).toEqual({ ok: true })
+      await settle()
+      expect(mpv.log.filter((entry) => entry.startsWith('set sid'))).toEqual(['set sid no'])
+    })
+
+    test('a sidecar that came in time is selected by the snapshot itself', async () => {
+      const { service, mpv } = setup()
+      mpv.values.set('track-list', [...LIST, LATE_SIDECAR])
+      await service.handle({ ...SERVER_LOAD, subtitle: 'external-0' })
+      service.receive({ type: 'file-loaded' })
+      await settle()
+      expect(mpv.log.filter((entry) => entry.startsWith('set sid'))).toEqual(['set sid 3'])
+    })
+
+    test('every load of a removed server answers that it is gone, the playing one and one resolving', async () => {
+      const { service, mpv, servers, loaded } = setup()
+      mpv.hold('set pause')
+      const loading = service.handle(SERVER_LOAD)
+      await settle()
+      servers.hold()
+      const resolving = service.handle({ ...SERVER_LOAD, start: 5 })
+      await settle()
+      const resetting = service.resetIfServer(SERVER_ID)
+      mpv.release()
+      await resetting
+      servers.release()
+      const gone: PlayerOutcome = {
+        ok: false,
+        reason: 'refused',
+        message: PLAYER_MESSAGES.serverGone,
+      }
+      expect(await loading).toEqual(gone)
+      expect(await resolving).toEqual(gone)
+      expect(mpv.log.some((entry) => entry.startsWith('loadfile'))).toBe(false)
+      await loaded()
+    })
+
+    test('sidecars that finish in time leave no budget timer behind', async () => {
+      const { clock, loaded } = setup()
+      await loaded(SERVER_LOAD)
       expect(clock.pending.size).toBe(0)
     })
   })

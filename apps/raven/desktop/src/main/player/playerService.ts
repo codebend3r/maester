@@ -2,6 +2,7 @@ import {
   isNumber,
   type OutputSettings,
   type PlayerCommand,
+  type PlayerErrorReason,
   type PlayerEvent,
   type PlayerRefusalReason,
   type PlayerSource,
@@ -13,7 +14,7 @@ import { HARDENED_OPTIONS } from '@/main/player/engine'
 import { isVolumeFixedFor, type MpvOption, outputOptions } from '@/main/player/outputOptions'
 import { aidFor, sidFor, tracksFromMpv } from '@/main/player/tracksFromMpv'
 import type { Timers } from '@/main/stateStore'
-import { type AudioDevice, ENGINE_STOPPED, isTrackIndex } from '@/shared/protocol'
+import { type AudioDevice, ENGINE_STOPPED, isTrackIndex, SERVER_GONE } from '@/shared/protocol'
 import { messageOf } from '@/shared/messageOf'
 
 export type MpvControl = Pick<Mpv, 'command' | 'set' | 'read' | 'observe'>
@@ -23,14 +24,91 @@ export type PlayerOutcome =
 export type PlayerActivity = { isPlaying: boolean; isShowing: boolean }
 
 export const PLAYER_MESSAGES = {
-  serverTitles: 'raven player cannot play server titles yet.',
   notOpen: 'That video is no longer open. Open it again from Home.',
   cannotOpen: 'raven player could not open this video.',
   stopped: 'raven player could not keep playing this video.',
   engineStopped: ENGINE_STOPPED,
   noTrack: 'That track is not in this video.',
   failed: 'raven player could not do that.',
+  serverGone: SERVER_GONE,
+  /** A server title's failure when the server could not say why; the source names the server when it can. */
+  lost: 'raven player lost its connection to the server. Where you stopped last is saved there.',
 } as const
+
+/**
+ * Sent with every server title. lavf must not follow a redirect, which would carry the
+ * server's cookie to wherever it points (Ruling 14). mpv has lavf reconnect a dropped
+ * stream after 0, 1, 3 and 7 s and gives every read 60 s: these keep 0, 1 and 3 s (a
+ * Wi-Fi blip) and 15 s a read, so a server that went away stops its title about 4 s
+ * after the last byte. One that hangs would cost seven reads (about 2 minutes), so the
+ * service's stall budget (`SERVER_STALL_MS`) ends the title first.
+ * `stream-lavf-o` is applied after mpv's own lavf defaults, so it overrides them.
+ */
+export const SERVER_LOAD_OPTIONS = {
+  lavf: 'max_redirects=0,reconnect_delay_max=3',
+  networkTimeout: 15,
+} as const
+
+/**
+ * Options a server title carries on its own `loadfile`, never set globally: mpv reads
+ * them as it opens a stream, not when a command is sent, so a global value set for the
+ * next title could ride on the request of the one before. Per-file values also end with
+ * their file, and a global set would override them.
+ */
+export const PER_FILE_OPTIONS = ['http-header-fields', 'stream-lavf-o', 'network-timeout'] as const
+
+/**
+ * Any way of naming a per-file option outside `loadfile`: itself, its list suffixes
+ * (`-append`, `-set`, ...) and its `file-local-options/` or `options/` paths.
+ */
+const namesPerFileOption = (name: string): boolean =>
+  PER_FILE_OPTIONS.some((option) => name.includes(option))
+
+/**
+ * mpv as the service reaches it: a per-file option set, changed or cycled by any route
+ * but the `loadfile` options fails before mpv hears of it.
+ */
+export const guardedMpv = (mpv: MpvControl): MpvControl => ({
+  ...mpv,
+  set: async (option) => {
+    if (namesPerFileOption(option.name)) {
+      throw new Error(`${option.name} is set per file, never globally`)
+    }
+    await mpv.set(option)
+  },
+  command: async (input) => {
+    const [name = ''] = input.args
+    const named = name === 'loadfile' ? undefined : input.args.find(namesPerFileOption)
+    if (named !== undefined) throw new Error(`${named} is set per file, never globally`)
+    await mpv.command(input)
+  },
+})
+
+/** How long a server title's first snapshot waits for its sidecars before it goes on. */
+export const SIDECAR_BUDGET_MS = 3000
+
+/**
+ * How long a server title may wait on its server without the clock moving before the
+ * service gives up on it. lavf's own timeouts and reconnects let a server that accepts
+ * and then sends nothing hold the page for about two minutes.
+ */
+export const SERVER_STALL_MS = 30_000
+
+export type ServerTarget = {
+  kind: 'server'
+  serverId: string
+  mediaId: number
+  url: string
+  /** `Cookie: ...` from the server's own session, or '' when it holds none. */
+  headerFields: string
+  sidecars: readonly { url: string; title: string; language: string }[]
+}
+export type LoadTarget = { kind: 'file'; path: string } | ServerTarget
+export type ResolvedSource = { ok: true; target: LoadTarget } | { ok: false; message: string }
+export type FailureExplainer = (input: {
+  target: ServerTarget
+  phase: 'loading' | 'loaded'
+}) => Promise<{ reason: PlayerErrorReason; message: string }>
 
 export const OBSERVED = [
   'time-pos',
@@ -53,15 +131,23 @@ export const EOF_SHORT_S = 5
 const BUFFERED_STEP_S = 0.5
 
 export const resolveSourceWith =
-  ({ grants }: { grants: Pick<Grants, 'fileOf'> }) =>
-  (source: PlayerSource): { ok: true; path: string } | { ok: false; message: string } => {
+  ({
+    grants,
+    servers,
+  }: {
+    grants: Pick<Grants, 'fileOf'>
+    servers: {
+      resolve: (source: Extract<PlayerSource, { kind: 'server' }>) => Promise<ResolvedSource>
+    }
+  }) =>
+  async (source: PlayerSource): Promise<ResolvedSource> => {
     switch (source.kind) {
       case 'server':
-        return { ok: false, message: PLAYER_MESSAGES.serverTitles }
+        return servers.resolve(source)
       case 'file': {
         const file = grants.fileOf(source.fileId)
         if (file === null) return { ok: false, message: PLAYER_MESSAGES.notOpen }
-        return { ok: true, path: file.path }
+        return { ok: true, target: { kind: 'file', path: file.path } }
       }
       default: {
         const unreachable: never = source
@@ -77,6 +163,13 @@ export type PlayerService = {
   /** True once mpv shut down or overflowed: nothing it is asked will play again. */
   isDead: () => boolean
   reset: () => Promise<void>
+  /** Stops a title from `serverId`, playing or still resolving, as that server goes away. */
+  resetIfServer: (serverId: string) => Promise<void>
+  /**
+   * Forgets the title and every timer without telling mpv or the page, as its mpv is
+   * destroyed, so no budget outlives the engine.
+   */
+  dispose: () => void
   applyOutput: (input: { output: OutputSettings; devices: readonly AudioDevice[] }) => Promise<void>
   applyDisplay: (input: { refreshRate: number; edrHeadroom: number }) => Promise<void>
 }
@@ -93,6 +186,47 @@ const ENGINE_GONE: PlayerOutcome = {
   ok: false,
   reason: 'engine',
   message: PLAYER_MESSAGES.engineStopped,
+}
+
+/** mpv's `%len%` quoting, so a value may hold `,` or `=` without ending the option. */
+const quoted = (value: string): string => `%${new TextEncoder().encode(value).length}%${value}`
+
+/**
+ * The `loadfile` options for a target: where it starts, and for a server title its
+ * cookie, the redirect and reconnect limits and the network timeout, which mpv applies
+ * to this file alone (sidecars added while it plays included) and drops when it ends.
+ */
+const loadfileOptionsFor = ({ target, start }: { target: LoadTarget; start: number }): string => {
+  switch (target.kind) {
+    case 'file':
+      return `start=${start}`
+    case 'server':
+      return [
+        `start=${start}`,
+        ...(target.headerFields === ''
+          ? []
+          : [`http-header-fields=${quoted(target.headerFields)}`]),
+        `stream-lavf-o=${quoted(SERVER_LOAD_OPTIONS.lavf)}`,
+        `network-timeout=${SERVER_LOAD_OPTIONS.networkTimeout}`,
+      ].join(',')
+    default: {
+      const unreachable: never = target
+      return unreachable
+    }
+  }
+}
+
+const locationOf = (target: LoadTarget): string => {
+  switch (target.kind) {
+    case 'file':
+      return target.path
+    case 'server':
+      return target.url
+    default: {
+      const unreachable: never = target
+      return unreachable
+    }
+  }
 }
 
 const clamp = ({ value, min, max }: { value: number; min: number; max: number }) =>
@@ -139,18 +273,23 @@ const numbersOf = (command: PlayerCommand): number[] => {
 }
 
 export const createPlayerService = ({
-  mpv,
+  mpv: unguarded,
   resolveSource,
+  explain,
   canChooseAo,
   timers,
+  serverStallMs = SERVER_STALL_MS,
   onActivity: reportActivity,
   onFirstFrame: reportFirstFrame,
   warn: reportWarning,
 }: {
   mpv: MpvControl
   resolveSource: ReturnType<typeof resolveSourceWith>
+  explain: FailureExplainer
   canChooseAo: boolean
   timers: Timers
+  /** `SERVER_STALL_MS` unless a test needs it short. */
+  serverStallMs?: number
   onActivity: (activity: PlayerActivity) => void
   onFirstFrame: () => void
   warn: (message: string) => void
@@ -178,6 +317,8 @@ export const createPlayerService = ({
     }
   }
 
+  const mpv = guardedMpv(unguarded)
+
   const listeners = new Set<(event: PlayerEvent) => void>()
   // A function, so the check after an await reads the phase as it is then.
   const isDead = () => phase === 'dead'
@@ -196,6 +337,22 @@ export const createPlayerService = ({
   // redirect that comes before it belongs to the file this load replaces, and one after
   // a refused loadfile belongs to no load at all.
   let answeredGeneration = -1
+  // Bumped by every load and stop, and by a server going away, so a load still resolving
+  // its source notices it was overtaken before it touches anything.
+  let loadTicket = 0
+  // The load still resolving a server's source, so that server going away can cancel it.
+  let resolving: { ticket: number; serverId: string } | null = null
+  // What the newest load opened, and its ticket, which an ending explains and a server's
+  // removal stops.
+  let opened: LoadTarget | null = null
+  let openedTicket = 0
+  // Loads whose server went away while they resolved or waited on mpv: they answer that.
+  let removedTickets: ReadonlySet<number> = new Set()
+  // Loads the stall budget ended while they waited on mpv: they answer a lost connection.
+  let stalledTickets: ReadonlySet<number> = new Set()
+  // Bumped as each subtitle pick starts, before mpv hears it, so a late sidecar's
+  // selection can tell a pick still on its way.
+  let subtitlePicks = 0
   let wanted: Wanted = { audio: null, subtitle: null }
   let pendingSeek: number | null = null
   let loadStart = 0
@@ -212,6 +369,7 @@ export const createPlayerService = ({
   let bufferedLatest: readonly Range[] | null = null
   let bufferedTimer: unknown = null
   let timeTimer: unknown = null
+  let stallTimer: unknown = null
   let timeHeld: number | null = null
   // The newest time handed to the page, sent or held, and a count of the seeks sent, so
   // a time read that answers late cannot step the clock back unless a seek moved it.
@@ -239,6 +397,15 @@ export const createPlayerService = ({
     bufferedTimer = null
     bufferedShown = null
     bufferedLatest = null
+  }
+
+  /** What the newest load opened, when it is a server title. */
+  const serverOpened = (): ServerTarget | null =>
+    opened !== null && opened.kind === 'server' ? opened : null
+
+  const clearStall = () => {
+    if (stallTimer !== null) timers.clear(stallTimer)
+    stallTimer = null
   }
 
   const clearTime = () => {
@@ -272,6 +439,7 @@ export const createPlayerService = ({
     isPausedForCache = false
     isSeeking = false
     isWaiting = false
+    clearStall()
     clearBuffered()
   }
 
@@ -283,6 +451,37 @@ export const createPlayerService = ({
     isAwaitingFirstFrame = false
     clearBuffered()
     clearTime()
+    clearStall()
+  }
+
+  /** Whether the server owes the title something: still opening, or loaded and waiting. */
+  const isOwed = () =>
+    serverOpened() !== null && (phase === 'loading' || (phase === 'loaded' && isWaiting))
+
+  /**
+   * The server has kept a title opening, or loaded and waiting with its clock still, for
+   * `serverStallMs`: the load ends as a lost connection, as a file that stops does. The
+   * load itself was answered once mpv took its loadfile, so the page hears it here.
+   */
+  const onServerStalled = (token: number) => {
+    stallTimer = null
+    if (token !== epoch || !isOwed()) return
+    stalledTickets = new Set([...stalledTickets, openedTicket])
+    settleTo('idle')
+    warn(`a server title waited ${serverStallMs} ms on its server, so it stops`)
+    emit({ type: 'error', reason: 'network', message: PLAYER_MESSAGES.lost })
+    onActivity({ isPlaying: false, isShowing: true })
+    mpv.command({ args: ['stop'] }).catch((error: unknown) => {
+      warn(`mpv stop failed: ${messageOf(error)}`)
+    })
+  }
+
+  /** Starts the stall budget over while the server owes the title something; clears it otherwise. */
+  const restartStall = () => {
+    clearStall()
+    if (!isOwed()) return
+    const token = epoch
+    stallTimer = timers.set(() => onServerStalled(token), serverStallMs)
   }
 
   const showBuffered = (ranges: readonly Range[]) => {
@@ -309,6 +508,7 @@ export const createPlayerService = ({
     const next = isPausedForCache || isSeeking
     if (next === isWaiting) return
     isWaiting = next
+    restartStall()
     emit({ type: 'waiting', waiting: next })
   }
 
@@ -374,7 +574,86 @@ export const createPlayerService = ({
     }
   }
 
+  /** Adds a server's sidecars one at a time, in order; false when overtaken. */
+  const addSidecars = ({
+    sidecars,
+    token,
+  }: {
+    sidecars: ServerTarget['sidecars']
+    token: number
+  }): Promise<boolean> =>
+    sidecars.reduce<Promise<boolean>>(async (chain, sidecar, position) => {
+      if (!(await chain)) return false
+      try {
+        await mpv.command({
+          args: ['sub-add', sidecar.url, 'auto', sidecar.title, sidecar.language],
+        })
+      } catch (error) {
+        warn(`mpv sub-add of sidecar ${position} failed: ${messageOf(error)}`)
+      }
+      return token === epoch
+    }, Promise.resolve(true))
+
+  /**
+   * Waits for a server title's sidecars, but no longer than `SIDECAR_BUDGET_MS`: a slow
+   * server must not hold the first events back. Late sidecars still go in, in order, and
+   * reach the page through `track-list`; `pending` is that chain when it outlasted the
+   * budget, and `isCurrent` is false when the load was overtaken.
+   */
+  const sidecarsWithinBudget = async ({
+    sidecars,
+    token,
+  }: {
+    sidecars: ServerTarget['sidecars']
+    token: number
+  }): Promise<{ isCurrent: boolean; pending: Promise<boolean> | null }> => {
+    const budget: { handle: unknown } = { handle: null }
+    const late = new Promise<'late'>((resolve) => {
+      budget.handle = timers.set(() => resolve('late'), SIDECAR_BUDGET_MS)
+    })
+    const adding = addSidecars({ sidecars, token })
+    try {
+      const outcome = await Promise.race([adding, late])
+      if (outcome !== 'late') return { isCurrent: outcome && token === epoch, pending: null }
+      warn('server sidecars are slow; the title starts without them')
+      return { isCurrent: token === epoch, pending: adding }
+    } finally {
+      timers.clear(budget.handle)
+    }
+  }
+
+  /**
+   * The subtitle the load asked for may be a sidecar that came after the budget: once the
+   * late sidecars are in, it is selected, unless the file changed or the page picked
+   * another meanwhile, even one mpv has not answered yet.
+   */
+  const selectLateSubtitle = async ({
+    pending,
+    token,
+    id,
+  }: {
+    pending: Promise<boolean>
+    token: number
+    id: string
+  }) => {
+    const picks = subtitlePicks
+    const isWanted = () => token === epoch && subtitlePicks === picks && wanted.subtitle === id
+    const isCurrent = await pending
+    if (!isCurrent || !isWanted()) return
+    const list = await readOr({ name: 'track-list', fallback: [] })
+    if (!isWanted()) return
+    const sid = sidFor({ list, id })
+    if (sid === null) return
+    await setQuietly({ name: 'sid', value: sid })
+  }
+
   const snapshot = async (token: number) => {
+    const server = serverOpened()
+    const sidecars =
+      server === null
+        ? { isCurrent: true, pending: null }
+        : await sidecarsWithinBudget({ sidecars: server.sidecars, token })
+    if (!sidecars.isCurrent) return
     const list = await readOr({ name: 'track-list', fallback: [] })
     const fps = await readOr({ name: 'container-fps', fallback: null })
     const length = await readOr({ name: 'duration', fallback: null })
@@ -386,6 +665,14 @@ export const createPlayerService = ({
     if (token !== epoch) return
     await setQuietly({ name: 'sid', value: sidOf(wanted.subtitle) })
     if (token !== epoch) return
+    const missing = wanted.subtitle
+    if (sidecars.pending !== null && missing !== null && sidFor({ list, id: missing }) === null) {
+      selectLateSubtitle({ pending: sidecars.pending, token, id: missing }).catch(
+        (error: unknown) => {
+          warn(`player could not select a late subtitle: ${messageOf(error)}`)
+        },
+      )
+    }
     if (pendingSeek !== null) {
       try {
         await sendSeek(seekTarget(pendingSeek))
@@ -399,8 +686,10 @@ export const createPlayerService = ({
     emit({ type: 'paused', paused })
     emit({ type: 'duration', duration })
     emit({ type: 'rate', rate })
-    isWaiting = false
-    emit({ type: 'waiting', waiting: false })
+    // The cache may have run dry while the sidecars were added; the budget goes on then.
+    isWaiting = isPausedForCache || isSeeking
+    restartStall()
+    emit({ type: 'waiting', waiting: isWaiting })
     emitTracks()
     onActivity({ isPlaying: !paused, isShowing: true })
   }
@@ -439,6 +728,41 @@ export const createPlayerService = ({
     })
   }
 
+  /**
+   * An error the page hears: as it is for a file, or as the server explains it for a
+   * server title, unless something newer overtook the ending while the server answered.
+   */
+  const emitFailure = ({
+    failure,
+    during,
+  }: {
+    failure: { reason: PlayerErrorReason; message: string }
+    during: 'loading' | 'loaded'
+  }) => {
+    const asked = serverOpened()
+    if (asked === null) {
+      emit({ type: 'error', ...failure })
+      return
+    }
+    const token = epoch
+    const explainSafely = async () => {
+      try {
+        return await explain({ target: asked, phase: during })
+      } catch (error) {
+        warn(`player could not explain a server failure: ${messageOf(error)}`)
+        return { reason: 'network', message: PLAYER_MESSAGES.lost } as const
+      }
+    }
+    const report = async () => {
+      const explained = await explainSafely()
+      if (token !== epoch) return
+      emit({ type: 'error', reason: explained.reason, message: explained.message })
+    }
+    report().catch((error: unknown) => {
+      warn(`player could not report a server failure: ${messageOf(error)}`)
+    })
+  }
+
   const onEndFile = ({ reason, error }: { reason: string; error: number }) => {
     if (answeredGeneration !== generation) return
     if (reason === 'redirect') {
@@ -453,7 +777,10 @@ export const createPlayerService = ({
       settleTo('idle')
       if (reason === 'error') {
         warn(`mpv could not open the file (${error})`)
-        emit({ type: 'error', reason: 'open', message: PLAYER_MESSAGES.cannotOpen })
+        emitFailure({
+          failure: { reason: 'open', message: PLAYER_MESSAGES.cannotOpen },
+          during: 'loading',
+        })
       }
       onActivity({ isPlaying: false, isShowing: true })
       return
@@ -464,7 +791,10 @@ export const createPlayerService = ({
     settleTo('idle')
     if (reason === 'error' || isShort) {
       warn(`mpv stopped playing the file (${reason} ${error})`)
-      emit({ type: 'error', reason: 'decode', message: PLAYER_MESSAGES.stopped })
+      emitFailure({
+        failure: { reason: 'decode', message: PLAYER_MESSAGES.stopped },
+        during: 'loaded',
+      })
     } else if (reason === 'eof') {
       emit({ type: 'ended' })
     }
@@ -497,6 +827,7 @@ export const createPlayerService = ({
       // A seek sent during the read makes it stale; that seek's playback-restart reads again.
       if (seeks !== seeksBefore) return
       if (shownTime !== null && time < shownTime) return
+      if (stallTimer !== null && time !== lastTime) restartStall()
       lastTime = time
       showTime(time)
     }
@@ -517,6 +848,7 @@ export const createPlayerService = ({
     switch (event.name) {
       case 'time-pos':
         if (event.data === null) return
+        if (stallTimer !== null && event.data !== lastTime) restartStall()
         lastTime = event.data
         showTime(event.data)
         return
@@ -605,8 +937,28 @@ export const createPlayerService = ({
   }
 
   const load = async (command: Extract<PlayerCommand, { type: 'load' }>) => {
-    const resolved = resolveSource(command.source)
+    loadTicket += 1
+    const ticket = loadTicket
+    resolving =
+      command.source.kind === 'server' ? { ticket, serverId: command.source.serverId } : null
+    // What a load overtaken while it waits answers: its server going away or its stall
+    // budget running out is a refusal the page can show, since nothing will play; an
+    // engine stop is a failure, and a newer load or a stop is no failure of this one.
+    const bail = () => {
+      if (isDead()) return ENGINE_GONE
+      if (removedTickets.has(ticket)) return refuse(PLAYER_MESSAGES.serverGone)
+      if (stalledTickets.has(ticket)) return refuse(PLAYER_MESSAGES.lost)
+      return OK
+    }
+    const resolved = await resolveSource(command.source).finally(() => {
+      if (resolving !== null && resolving.ticket === ticket) resolving = null
+    })
+    // A newer load, a stop or the server going away while the source resolved: this load
+    // touches nothing, as one overtaken while it waits on mpv sends no loadfile.
+    if (ticket !== loadTicket || isDead()) return bail()
     if (!resolved.ok) return refuse(resolved.message)
+    opened = resolved.target
+    openedTicket = ticket
     phase = 'loading'
     epoch += 1
     generation += 1
@@ -616,10 +968,12 @@ export const createPlayerService = ({
     loadStart = Math.max(0, command.start)
     isAwaitingFirstFrame = true
     resetFile()
+    // A server that sends its headers and then nothing would hold mpv's probe for minutes.
+    restartStall()
     onActivity({ isPlaying: false, isShowing: true })
     try {
       const isHardened = await hardening
-      if (token !== generation) return overtaken()
+      if (token !== generation) return bail()
       if (!isHardened) {
         settleTo('idle')
         onActivity({ isPlaying: false, isShowing: false })
@@ -629,14 +983,20 @@ export const createPlayerService = ({
       // A stop, reset or newer load overtook this one: sending loadfile now would play
       // a file no page shows. A newer load or a stop is not a failure of this load, so
       // it answers ok; an engine that stopped meanwhile is, so the page can fall back.
-      if (token !== generation) return overtaken()
+      if (token !== generation) return bail()
       await mpv.command({
-        args: ['loadfile', resolved.path, 'replace', '-1', `start=${loadStart}`],
+        args: [
+          'loadfile',
+          locationOf(resolved.target),
+          'replace',
+          '-1',
+          loadfileOptionsFor({ target: resolved.target, start: loadStart }),
+        ],
         onReply: ({ isOk }) => {
           if (isOk) answeredGeneration = Math.max(answeredGeneration, token)
         },
       })
-      return overtaken()
+      return bail()
     } catch (error) {
       if (token === generation) {
         settleTo('idle')
@@ -674,6 +1034,7 @@ export const createPlayerService = ({
   }
 
   const subtitle = async (id: string | null) => {
+    subtitlePicks += 1
     if (phase === 'loading') {
       wanted = { ...wanted, subtitle: id }
       return OK
@@ -689,6 +1050,8 @@ export const createPlayerService = ({
   }
 
   const stop = async () => {
+    loadTicket += 1
+    resolving = null
     settleTo('idle')
     onActivity({ isPlaying: false, isShowing: false })
     await mpv.command({ args: ['stop'] })
@@ -751,6 +1114,11 @@ export const createPlayerService = ({
     }
   }
 
+  const reset = async () => {
+    if (phase === 'idle' || phase === 'dead') return
+    await handle({ type: 'stop' })
+  }
+
   // Sent before anything else, so mpv applies it before any loadfile. It fails closed:
   // a failed set refuses every load.
   const harden = async (options: readonly MpvOption[]): Promise<boolean> => {
@@ -778,9 +1146,34 @@ export const createPlayerService = ({
         listeners.delete(listener)
       }
     },
-    reset: async () => {
-      if (phase === 'idle' || phase === 'dead') return
-      await handle({ type: 'stop' })
+    reset,
+    // Latches as dead: the mpv behind it is destroyed, so no later load may arm a timer.
+    dispose: () => {
+      if (phase === 'dead') return
+      loadTicket += 1
+      resolving = null
+      settleTo('dead')
+    },
+    resetIfServer: async (serverId) => {
+      if (resolving !== null && resolving.serverId === serverId) {
+        removedTickets = new Set([...removedTickets, resolving.ticket])
+        loadTicket += 1
+        resolving = null
+      }
+      if ((serverOpened()?.serverId ?? null) !== serverId) return
+      if (phase !== 'loading' && phase !== 'loaded') return
+      // A load still waiting is answered as refused; a title already playing has no answer
+      // left to carry that, so the page hears it as an error.
+      const isPlaying = phase === 'loaded'
+      removedTickets = new Set([...removedTickets, openedTicket])
+      // The stop takes its ticket before its first await; a load started while mpv
+      // stops takes another, and its page must not hear of the gone server.
+      const stopping = reset()
+      const ticket = loadTicket
+      await stopping
+      if (isPlaying && ticket === loadTicket) {
+        emit({ type: 'error', reason: 'open', message: PLAYER_MESSAGES.serverGone })
+      }
     },
     applyOutput: async ({ output, devices }) => {
       if (phase === 'dead') return
