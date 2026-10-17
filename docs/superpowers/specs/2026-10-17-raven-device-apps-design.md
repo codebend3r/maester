@@ -1,0 +1,275 @@
+# raven device apps: iPhone, iPad, Apple TV and Android TV
+
+Status: proposed, awaiting approval. This builds on the desktop spec, `2026-10-12-raven-desktop-design.md` (its `Engine` and `PlayerServices` contracts, its server list and per-server sessions, and its D1 plan to lift the query layer out of the web app), and on the direct media spec, `2026-10-16-raven-direct-media-design.md` (media origins and media tickets, which are how a native player fetches video without a cookie). It was written from the conversation of 2026-10-17 without a brainstorm; every choice below is either what the user settled in that conversation, marked "decided", or the author's call, marked as such.
+
+## Context
+
+raven's clients today are a browser and the macOS desktop player. iPhone and iPad already play raven in Safari, through `ManagedMediaSource`, but as a web page: no icon on the home screen, no Picture in Picture, no AirPlay, no background audio, and a sign-in that lives in a cookie Safari may drop. Apple TV and Android TV have no client at all: tvOS has no browser engine, and a TV's browser is not something anyone watches a film in.
+
+This adds one app, **raven**, built once and shipped to four screens: iPhone, iPad, Apple TV and Android TV. It is a viewer's app: browse, search, resume, play, mark watched and favourite. Managing the library stays in the web app.
+
+Decided with the user:
+
+- **One codebase for all four screens**, React Native through Expo on the `react-native-tvos` fork. It is the only mainstream stack that reaches both Apple TV and Android TV from one project, and it imports `@raven/core` unchanged.
+- **The app lives in this workspace**, at `apps/raven/app`, as an Nx project under the repo's rules: TypeScript only, Nx targets from `package.json` scripts, bun test where it can run.
+- **Video plays through the platform's player**: AVPlayer on iPhone, iPad and Apple TV, ExoPlayer on Android TV, both behind `react-native-video`. No libmpv in this app.
+- **The server gains an HLS route**, because AVPlayer plays HLS and progressive MP4 only, never the fMP4 over MSE stream the browser uses, and never MKV. Android TV uses the same route when it cannot direct play.
+- **The pure logic now sitting in `@raven/ui` and `@raven/web` moves out first**, so the app shares one query layer, one player state machine and one set of helpers with the web and desktop instead of copying them. No library is duplicated.
+- **Android TV is "for fun"**: it ships from the same code with the same screens, and it never holds the Apple screens back. A feature that works on Apple TV but not yet on Android TV is fine.
+- **Distribution starts free.** A Personal Team in Xcode installs the app on the user's own iPhone, iPad and Apple TV, expiring weekly. The paid Apple Developer Program (TestFlight, year-long installs, the App Store) is a later decision, and the same membership would also notarize the desktop app.
+
+## Goals
+
+- On Apple TV, from the home screen to a playing 4K HEVC remux in under three remote clicks once signed in: Continue watching, pick, play.
+- Every file the web player can play, the app can play, by direct play where the device decodes it and by the server's remux or transcode where it does not, with the same step-down ladder the web uses.
+- Where you stopped, what you watched and what you favourited are the server's, as they are from the browser: Continue watching and the watched marks come out the same on every client.
+- One app, two layouts: a touch layout for iPhone and iPad, a focus-driven layout for the two TVs, over the same screens, data and player.
+- Nothing is copied from the web app. The app imports what the web app imports.
+
+## Non-goals
+
+- Managing the library: scanning, matching, editing metadata, images, playback settings, the admin lock. The admin routes are never called. If an admin wants those on a tablet, the web app is there.
+- Offline downloads on iPhone and iPad. The `raven://download` link and the desktop's download ledger are a follow-up, once the desktop's downloads have shipped and shown what the server needs.
+- Android phones and tablets. The Android TV build runs on them, but no layout is designed for them.
+- Accounts or per-viewer anything. The server has one PIN and one set of progress.
+- Casting, Chromecast, SharePlay. AirPlay is whatever AVPlayer gives for free.
+- Replacing the browser's MSE pipeline. HLS is a second output of the same ffmpeg, for native players; the web keeps its stream.
+
+## Anti-goals
+
+- A player that only plays MP4. If the app cannot play the user's MKV remuxes it has failed, however good the screens look.
+- A second query layer, a second player reducer, a second `itemFacts`. The moment the app carries a copy of something the web has, the two drift. The extraction PRs come first for this reason.
+- A TV layout that is the phone layout scaled up. Focus, the Siri remote's swipe and the Android remote's d-pad are the interaction model; a design that needs a pointer has failed.
+- A route that needs the PIN cookie on a media request. Native players do not carry cookies reliably; media goes by ticket.
+
+## What the viewer sees
+
+### Sign in
+
+The first launch asks for the server's address, as the desktop's Settings does, and the PIN if the server has one. The app keeps a list of servers, one active at a time, exactly the desktop's model: a name, an origin, a session. Switching servers is in Settings.
+
+### Home
+
+The server's `GET /api/home`: Continue watching, Recently added, and the libraries. On TV, horizontal shelves with a focused card grown and lit by the theme's focus ring. On a phone, the same shelves scrolled vertically.
+
+### Library
+
+A library's grid, with the sorts, views and groupings `KIND_RULES` allows for its kind, the same `coherentSettings` the web applies. Letter and group folders as the web shows them. A search box per the repo's rule: debounced, searches when typing pauses or on Enter, never on each keystroke. On TV the on-screen keyboard is the platform's.
+
+### Item
+
+A movie, a show, a season or an episode: poster, backdrop, synopsis, cast, the files on the card, a Play or Resume button, Mark watched, Favourite. The same facts `itemFacts` computes for the web.
+
+### Player
+
+The platform's player with raven's own controls on top where the platform lets it, and the platform's where it does not:
+
+- **iPhone and iPad**: raven's controls, as the web's, over `react-native-video`. Picture in Picture and AirPlay through AVPlayer. Background audio off; this is video.
+- **Apple TV**: the system transport is what people expect from the Siri remote, so the player uses AVPlayerViewController's controls, with raven adding the audio and subtitle pickers through HLS renditions and the info the panel shows. A custom control strip on tvOS is the author's call to avoid: it would fight the remote's gestures.
+- **Android TV**: `react-native-video`'s ExoPlayer with raven's controls driven by the d-pad.
+
+Progress is reported as the web reports it (`saveProgress`, `recordPlay`, the watched percentage per library), so the server's Continue watching and History are right whichever client played.
+
+### Settings
+
+Servers, the theme from `THEMES` (the seven the web has), and playback: prefer direct play, allow transcode, the maximum resolution the app asks for away from home. No server settings.
+
+## The app
+
+### Project
+
+`apps/raven/app`, package `@raven/app`, an Expo app on the `react-native-tvos` fork, `expo-router` for navigation. Scripts, each one command and listed in `nx.includedScripts`:
+
+| Script | Does |
+| --- | --- |
+| `start` | Metro for a device or simulator |
+| `prebuild:apple`, `prebuild:android` | Generates the native projects; the Apple one with `EXPO_TV=1` for the tvOS target |
+| `build:ios`, `build:tvos`, `build:android-tv` | Simulator or emulator builds, for CI and the e2e |
+| `typecheck`, `lint:ts`, `format`, `format:check`, `test` | As every project |
+| `e2e` | Maestro flows on the tvOS simulator and the Android TV emulator; macOS only, so it sits with the desktop's Mac-only targets |
+
+The native projects (`ios/`, `android/`) are generated and gitignored. Everything checked in is TypeScript and the Expo config.
+
+### Stack
+
+| Piece | Choice | Why |
+| --- | --- | --- |
+| Runtime | Expo SDK on `react-native-tvos`, the newest the fork supports | TV needs the fork; Expo gives prebuild, config plugins and the dev client |
+| Navigation | `expo-router` | File routes, one tree, platform layouts by `Platform.isTV` |
+| Data | TanStack Query and zustand | What the web and `@raven/ui` already use; the shared query layer needs them |
+| Video | `react-native-video` | AVPlayer and ExoPlayer behind one component, HLS and progressive on both, subtitle and audio track selection, PiP |
+| Styling | React Native styles from the shared tokens | No SCSS on native; `@raven/ui/designTokens` supplies the values, `THEMES` the themes |
+| Tests | bun test for everything that imports no `react-native`; see Testing for the rest | The repo's runner first |
+
+### Structure
+
+```
+apps/raven/app/
+  app/                 expo-router routes: (phone)/ and (tv)/ layouts over shared screens
+  src/
+    screens/           Home, Library, Item, Player, Settings, SignIn: one component each, layout-agnostic
+    layouts/           PhoneShelf, TvShelf, focus helpers, the two Player chromes
+    platform/          canPlay tables, the Platform object the shared layer wants
+    servers/           the server list, sessions, the cookie jar, tickets
+    stores/            app-only zustand stores
+  app.config.ts, metro.config.ts, babel.config.ts (see Repo fit)
+```
+
+The screens take their data from the shared query hooks and render through layout components picked by platform. A screen never reads `Platform.isTV` itself; the layout does.
+
+## Playing
+
+### The ladder
+
+`planPlayback` in `@raven/core` already takes a policy and a `canPlay`. The app gives it a table per platform instead of the browser's `canPlayType`, and the ladder is the web's: direct play, then the server's remux, then its transcode, stepping down from the same spot when a mode fails to start or decode.
+
+### Apple: iPhone, iPad, Apple TV
+
+AVPlayer plays progressive MP4 and MOV over HTTP ranges, and HLS. Nothing else.
+
+- **Direct play**: `container` is `mp4` or `mov`, `videoCodec` is `h264` or `hevc` (any bit depth, HDR10 and Dolby Vision profile 5 or 8 included on Apple TV 4K; Dolby Vision profile 7, which lives in MKV, is never direct), `audioCodec` is `aac`, `ac3`, `eac3`, `alac` or `flac`. The source is `GET /api/media/:id/file?t=<ticket>` on the chosen media origin. HEVC in MP4 under the `hev1` tag may refuse, so `canPlay` answers "maybe" for `mp4` and `hevc`, and a refusal steps down.
+- **Remux** (MKV, and anything the table refuses by container only): the HLS route in remux mode. Video copied, re-tagged `hvc1` for HEVC as the MSE stream does. Audio the device decodes is copied; DTS, DTS-HD, TrueHD, Opus and Vorbis are transcoded to E-AC-3 keeping the channel count, since AVPlayer passes E-AC-3 through to a receiver.
+- **Transcode**: the HLS route in transcode mode, the server's encoder, tone mapping and quality settings as the web gets them, capped by the app's away-from-home resolution setting.
+- **Subtitles**: HLS subtitle renditions built from the server's WebVTT route, so AVPlayer shows them with the system's subtitle styling and picker. Sidecar and embedded alike, since the server already serves both as VTT.
+
+### Android TV
+
+ExoPlayer plays MKV, MP4 and HLS, and decodes HEVC, AV1, VP9 and H.264; DTS and TrueHD depend on the device's passthrough.
+
+- **Direct play**: the file route by ticket, for `mkv`, `mp4`, `mov` and `webm` with any video codec the device reports and audio it decodes or passes through. The table starts generous and narrows from what fails in use.
+- **Remux and transcode**: the same HLS route. ExoPlayer plays the same playlists AVPlayer does.
+
+### HDR
+
+On Apple TV, HLS carries HDR10 and Dolby Vision when the segments do, and AVPlayer switches the display. The HLS route copies the colour metadata on remux. Tone mapping on transcode follows the server's existing setting. Nothing in the app decides HDR.
+
+## Server: the HLS route
+
+A new output of the same ffmpeg, next to `GET /api/media/:id/stream`, marked `@MediaPlane()` and held by `PrivateBy('media')` so a ticket opens it:
+
+```
+GET /api/media/:id/hls/master.m3u8?mode=remux|transcode&audio=<index>&t=<ticket>
+GET /api/media/:id/hls/video.m3u8?mode=...&audio=...&t=...
+GET /api/media/:id/hls/sub/:trackId.m3u8?t=...
+GET /api/media/:id/hls/:session/:n.m4s?t=...
+GET /api/media/:id/hls/:session/init.mp4?t=...
+```
+
+- **The playlist is the whole film from the start**, a VOD playlist listing every segment with its duration, so the player's scrubber is the real timeline and a seek is a request for segment `n`. This is how Plex and Jellyfin do it, and it is what makes seeking on a TV feel right. A growing playlist that follows ffmpeg would make the scrubber lie.
+- **Segments are produced on demand.** A session is one ffmpeg run writing segments to a temp folder (`-f segment`, fMP4, six seconds nominal). A request for a segment the session has not written, outside the window it is writing towards, kills the session's ffmpeg and starts one at that segment's start time. A request for a written segment is served from the folder. The server's existing rule holds: the moment the client lets go, ffmpeg is killed; a session is dropped after sixty seconds without a request, its folder deleted.
+- **Segment boundaries.** On transcode, `-force_key_frames` every six seconds makes the segments equal and the playlist exact. On remux, video is copied, so segments can only start on the file's keyframes: the server probes the keyframe timestamps once per file (`ffprobe -skip_frame nokey`), keeps them beside the tracks it already caches, and the playlist's segment durations are the real keyframe gaps. A file whose keyframe gaps exceed twenty seconds plays through transcode instead; the playlist route says so with a 409 the app treats as a step down.
+- **Timestamps** keep the file's clock plus `STREAM_TIME_SHIFT`, as the MSE stream does, so the HLS and MSE outputs agree with each other and with progress reports.
+- **Audio** is selected per session with the same `audio` query as the stream route. Changing the audio track in the player is a new session at the current time.
+- **Subtitles** are a subtitle rendition per track in the master playlist, each a WebVTT playlist cut into the same six-second windows from the existing VTT route, so the existing route does the work and nothing new parses subtitles.
+- **Settings** apply as to the stream route: transcoding off refuses both modes with 403, remux only refuses transcode.
+- **Load**: one ffmpeg per session, one session per device. The segment folder is bounded: at most the last thirty segments of a session are kept.
+
+Nothing changes for the stream route or the browser.
+
+## Reaching the server
+
+- **Servers and sessions.** The app keeps the desktop's model: a list of servers with a name and an origin, one active, each with its own cookie jar. The PIN unlock is `POST /api/lock/unlock` as the web does it, and the cookie is held per server by the app, never by the system's shared jar (the Android TV build and the iOS build both pin their jars to the app).
+- **Tickets.** Every media request the native player makes, file, playlist or segment, carries a media ticket (`?t=`) from `GET /api/media/:id/ticket`, refreshed by the app before it expires. This needs `RAVEN_MEDIA_SECRET` set on the server; a server that answers 503 to the ticket route is told to the viewer in plain words on sign-in ("This server can't hand out media tickets. Set `RAVEN_MEDIA_SECRET` on it to play in the app"), and the app falls back to sending the server's cookie as a request header through `react-native-video`'s `headers`, which works on both players for direct play and HLS alike. Tickets are the path; the header is the fallback for a server not yet configured.
+- **Media origins.** `GET /api/media-origins` and `pickOrigin` from the direct media spec apply unchanged: on launch and on network change the app probes the origins and plays from the fastest. A native app has no mixed-content rule, but iOS and tvOS block plain `http://` through App Transport Security, so a dev build that reaches a LAN origin without TLS sets `NSAllowsLocalNetworking` in the Expo config; the server's list stays HTTPS-only and release builds do not relax it.
+- **Allowlist.** Like the desktop, the app calls a fixed set of viewer routes and nothing marked `@AdminOnly()`. The set is the `@ForViewers()` and `@Public()` reads plus `saveProgress`, `recordPlay`, the watched and favourite changes, `unlock`, `ticket` and the media plane. A test in the app asserts the set against the server's route marks so a new admin route can never slip in.
+
+## Extraction: what moves before the app exists
+
+Three PRs, no behaviour change, each leaving web and desktop importing from the new home.
+
+### `@raven/core` takes the pure helpers
+
+From `apps/raven/web/src/lib`: `itemFacts`, `itemLinks`, `entryKeys`, `edits`, `history`, `letters`, `libraryKinds` (the web's, merged with core's own), `mediaProgress`, `tableSort`, `plural`, `sagas`, `version`, `routeQuery`, `jumpScale`. From `apps/raven/web/src/stores`: `selection`, `pageBackdrop`, `unlockPrompt`, each with its storage, if any, taken as a parameter. From `@raven/ui`: `parseTokens`, `themes`, `trackLabels`, `shortcuts`. Their tests move with them. Anything that touches `window`, `document` or `localStorage` stays where it is.
+
+### `@raven/ui` gains a DOM-free entry
+
+A new subpath export, `@raven/ui/headless`, beside `./canPlay` and `./designTokens`, built from a second entry whose module graph imports no `react-dom` and no SCSS:
+
+- the player state: `useVideoState`'s reducer and types, `fromPlayerEvent`, the `Engine` and `PlayerServices` contracts, `PlayerServicesProvider`;
+- the query layer lifted from web: `queries`, `queryClient`, `invalidate`, `useMediaMutations`, `useWatchedChange`, `usePlaybackPolicy`, `sharedPlaybackPolicy`, `optimistic`, `useServerEvents` with its event source taken as a parameter, joined by ui's own `playerQueries` and `playerQueryKeys`;
+- `playerPrefs`, with `createJSONStorage`'s storage passed in instead of `window.localStorage`.
+
+One more thing the spike found about core itself: `format.ts` builds `Intl.RelativeTimeFormat` and `grouping.ts` builds `Intl.DateTimeFormat` at module scope, and `languageName.ts` builds `Intl.DisplayNames`. Hermes, the engine under React Native, has no `Intl.RelativeTimeFormat` and no `Intl.DisplayNames`, so importing core crashes the app at startup with "undefined cannot be used as a constructor". The app's entry file loads the formatjs polyfills (`@formatjs/intl-getcanonicallocales`, `intl-locale`, `intl-pluralrules`, `intl-relativetimeformat`, `intl-displaynames`, with their `en` locale data) before anything imports core, which the spike verified on both TVs. Core stays as it is: the polyfills are the platform's concern, as `fetch` is.
+
+A test imports the built `headless` entry under bun with no DOM globals and fails if anything in it reaches for one. The web app and the desktop renderer import the lifted modules back from here. This is the desktop spec's D1 extraction, done now because a third client needs it.
+
+### `@raven/web` keeps what is the browser's
+
+`api.ts`, `clipboard`, `posters`, `holdInPlace`, `logoTone`, `useSelectable`, `useScrollReset`, `useSearch`, `useReturnFocus`, `useHoverBackdrop`, the `theme` and `sideMenu` stores, and every component.
+
+## Repo fit
+
+- **TypeScript only.** Expo and Metro default to `metro.config.js` and `babel.config.js`, but the spike showed that Expo 58's Metro and Babel read `metro.config.ts` and `babel.config.ts` directly, and `app.config.ts` has always been supported. The app has no JavaScript files and the rule holds as written. The generated `ios/` and `android/` folders are gitignored, so their build scripts never meet the check.
+- **One command per script.** Expo's CLI commands are single commands; chains use `bun run --sequential`.
+- **Imports** go through `@/` with no extension; Metro's resolver is given the alias in `metro.config.ts`, matching `tsconfig.json`.
+- **Tooling.** A fourth tsconfig preset, `tooling/tsconfig/react-native.json`, extends the base with `jsx: react-native` and the fork's types. `tooling/oxlint/react.json` applies as is. No gale, no SCSS, no `tooling/web`.
+- **Nx.** The app's `nx` block lists its scripts, tags `scope:raven` and `lang:ts`, and `implicitDependencies` on nothing: its imports of `@raven/core` and `@raven/ui` are the graph. `verify` and `affected` run its `typecheck`, `lint:ts`, `format:check` and `test`; the builds and `e2e` are Mac-only and sit behind the `🖥️ Desktop` check with the desktop's.
+- **Versioning.** `bump_version.sh` bumps `@raven/app` with the rest; the Expo config reads `version` from `package.json` and sets `ios.buildNumber` and `android.versionCode` from the CI run number.
+
+## Testing
+
+- **bun test** for every module that imports nothing from `react-native`: `platform/canPlay` tables, the servers and tickets logic, the allowlist test, the stores, and the shared layer's tests which already run that way.
+- **Screens and layouts**: `jest-expo`, as a second `test:screens` script listed in `includedScripts`. The spike showed bun cannot get there: React Native ships Flow-typed source bun cannot parse, a Babel preload that strips it then trips over Babel's module interop under bun, and the native-module mocks of React Native's jest setup still wait behind that. The limit is written in the app's `CLAUDE.md`: jest for files that render a native component, bun for everything else, never both for one file.
+- **e2e**: Maestro flows on the tvOS simulator and the Android TV emulator against a raven server started from the repo with a fixture library, as the desktop's e2e does: sign in, open Home, play a title, scrub, resume. Mac only.
+- **Server**: the HLS route gets vitest coverage like the stream route: playlist arithmetic from keyframe lists, session restart on an out-of-window segment, cleanup, the 403s and the 409.
+- **Real devices**: the user's Apple TV 4K and an Android TV, installed from Xcode and Android Studio. The playback ladder is checked against the desktop spec's M1 to M15 media set on the NAS.
+
+## Distribution
+
+- **Now**: a Personal Team in Xcode, installs from Xcode to the user's own devices, reinstalled weekly. Android TV sideloads an APK over `adb` with no account at all.
+- **Later, if wanted**: the Apple Developer Program for TestFlight and year-long installs, which also unlocks Developer ID signing for the desktop app. Google Play for Android TV if it is ever more than for fun.
+- **CI** builds the simulator and emulator apps on every PR that touches the app or what it imports, and attaches them to the release like the desktop's artifacts. No signing in CI until a certificate exists.
+
+## Order of work (one PR each, spike first)
+
+0. **Spike**: done on 2026-10-17, results below.
+1. **core takes the pure helpers.** Web and ui import them back. No behaviour change.
+2. **ui's headless entry.** The player state and the lifted query layer, with the no-DOM test. Web and desktop import back.
+3. **Server: HLS route**, keyframe probing, sessions, subtitle renditions, tests.
+4. **App scaffold**: the Nx project, the tsconfig preset, Expo config, the servers and sign-in screen, Home on both layouts, CI builds.
+5. **Library, Item, search** on both layouts.
+6. **Player on iPhone and iPad**: the ladder, tickets, origins, progress, watched.
+7. **Player on Apple TV**: the system controls, HLS renditions, focus.
+8. **Android TV**: ExoPlayer direct play table, d-pad controls, its e2e.
+9. **Settings, themes, polish**, and the real-device pass over M1 to M15.
+
+Each PR is reviewed as a whole branch against `main` and lands on its own, per the workspace's stacked-PR practice.
+
+## Spike results (2026-10-17)
+
+A throwaway Expo app on the TV fork, built in a scratch folder outside the workspace, importing `@raven/core` from its built `dist` and playing Apple's public "bip bop" HLS stream through `react-native-video`. It ran on the Apple TV 4K simulator (tvOS 27, Xcode 27) and on an Android TV emulator (Android 16, API 36, `tv_4k` profile). Both played the stream: tvOS through AVPlayer, Android TV through ExoPlayer, each reporting `Platform.isTV` true.
+
+| Question | Answer |
+| --- | --- |
+| Do Metro and Babel read `.ts` configs? | Yes. A resolver only `metro.config.ts` knows and a plugin only `babel.config.ts` knows both showed up in the bundle, and on both screens. No JavaScript file is needed. |
+| Does core import and run? | Yes, once the Intl polyfills load first (see Extraction). Without them the app crashes at startup on `Intl.RelativeTimeFormat`. |
+| Does the fork's Expo SDK build on this Xcode? | Yes. Expo 58.0.14 pairs with React Native 0.88, and the fork's matching build is `react-native-tvos@0.88.0-0`, a prerelease: the fork's stable tags lag one minor behind. The generated project is a true tvOS target (`SDKROOT appletvos`, deployment target 16.4) and still needs CocoaPods, which was not on this Mac and had to be installed. |
+| Can bun test render a native component? | No. See Testing. |
+| Does Android TV build from the same project? | Yes. `EXPO_TV=1` prebuild emits the leanback launcher and the no-touchscreen feature, Gradle 9.4 builds it with Android Studio's bundled JDK, and the APK runs on the TV emulator. |
+
+Versions the spike ran, which PR 4 pins: Expo 58.0.14, `react-native-tvos` 0.88.0-0, `react-native-video` 6.19.3, `@react-native-tvos/config-tv` 0.1.7, Metro 0.87.1, Babel 7.29.
+
+Two things the spike learned about the dev loop:
+
+- **Metro needs watchman on this Mac.** Without it, Metro served stale bundles after every file change, and even after `bun add`, until restarted with `--clear`. The app's README says to `brew install watchman`, and the `start` script fails fast when it is missing.
+- **The simulator plays audio through the Mac.** A test stream with sound is audible at the desk. Worth knowing before an e2e run.
+
+Not verified by the spike, left for PR 4: Metro resolving `@raven/core` through the Bun workspace symlink (the spike's `file:` dependency copied core into `node_modules`), `@formatjs/intl-displaynames`'s `exports` map, which Metro warns about and falls back from, HDR output, and anything on a real device.
+
+## Left to the builder
+
+- The exact `canPlay` tables per platform. Start from Apple's documented formats and ExoPlayer's, narrow from what fails on the real devices.
+- The segment length (six seconds is the author's starting point) and the keyframe-gap limit for remux.
+- How the TV shelves page: all at once from `/api/home`, or by library as focus nears the end.
+- The focus order and the back-button behaviour on each TV, within the platform's conventions.
+- The look of the two layouts, from the Verdigris tokens and themes. The design page in the web app is the reference; nothing is re-themed.
+
+## Risks
+
+- **The fork lags.** `react-native-tvos` follows React Native a release or two behind, and Expo's TV support follows the fork. The app pins both and upgrades deliberately, like the desktop pins Electron.
+- **`react-native-video` on tvOS.** Supported, but the tvOS path gets less use than iOS. The spike plays HLS there before anything else is built.
+- **Dolby Vision profile 7.** MKV remuxes carrying it play as HDR10 on Apple TV through the remux route, not Dolby Vision. Profile 8 in MP4 is fine. Documented, not fixed.
+- **Vhagar's CPU.** Transcodes on a Synology are the transcoding spec's problem, not this one's, but a TV asking for a 4K transcode will show it. The app's resolution cap exists for this.
+- **Weekly reinstalls** on the free team are a chore on an Apple TV. This is the pressure that will decide the paid program.
+- **Jest in the repo.** A second test runner enters the workspace for one project. Contained by the rule in the app's `CLAUDE.md`.
+- **A prerelease fork.** Expo 58 wants React Native 0.88, and the fork only has 0.88 as a prerelease today. Either the app pins that prerelease until the fork's `0.88-stable` tag lands, or it starts on Expo 57 with the fork's stable 0.87. PR 4 decides from what the fork has published by then.
