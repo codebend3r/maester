@@ -630,6 +630,7 @@ describe('list and views', () => {
       downloads: [
         {
           downloadId: newer.downloadId,
+          serverId: SERVER_ID,
           label: 'S01E01 Good News',
           group: { kind: 'season', key: 'show:4', title: 'Severance', order: 10_001 },
           serverName: 'Vhagar',
@@ -647,11 +648,10 @@ describe('list and views', () => {
     expect(world.service.views()).toEqual(downloadsOf(world.service.list()).downloads)
   })
 
-  it('carries no path, origin or media id to the page', () => {
+  it('carries no path, origin or media id to the page, only the server by its id', () => {
     const world = setup({ initial: { ...EMPTY_DOWNLOADS, entries: [entryFor({})] } })
     const text = JSON.stringify(world.service.list())
     expect(text).not.toContain('vhagar.example')
-    expect(text).not.toContain(SERVER_ID)
     expect(text).not.toContain('mediaId')
     expect(text).not.toContain(USER_DATA)
   })

@@ -136,9 +136,10 @@ export const isDownloadAsk = object({
 
 export type DownloadAsk = Infer<typeof isDownloadAsk>
 
-/** A download as the page shows it: by its opaque id, with no server id, media id or path. */
+/** A download as the page shows it: it and its server by opaque ids, with no media id, origin or path. */
 export const isDownloadView = object({
   downloadId: isOpaqueId,
+  serverId: isOpaqueId,
   label: isString,
   group: isDownloadGroup,
   serverName: isString,
