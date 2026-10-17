@@ -6,12 +6,10 @@ import {
   type OnModuleDestroy,
 } from '@nestjs/common'
 import { errorMessage } from '@/errorMessage'
-import { MetadataRepository } from '@/metadata/metadataRepository'
+import { MetadataRepository, scoresDueBefore } from '@/metadata/metadataRepository'
 import type { ScoreProvider, ScoreSource, ScoreTitle } from '@/metadata/scoreSources'
 import { Scores } from '@/metadata/scores'
 import { createTaskQueue, mapWithConcurrency } from '@/scanner/concurrency'
-
-const DAY_MS = 24 * 60 * 60 * 1000
 
 /** How long the sweep waits to try again after a drain that asked and got no answer at all. */
 export const RETRY_MS = 15 * 60 * 1000
@@ -164,6 +162,8 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
    */
   private async drainOnce(): Promise<Stop> {
     const { isSilent, answeredBy } = await this.topUp(new Set())
+    // The database closes with the app.
+    if (this.state.isClosed) return 'done'
     this.forgetFailures({ answeredBy, hasRunOut: !isSilent })
     if (isSilent && answeredBy.size === 0) return 'unavailable'
     if (!this.isWaitingForMidnight()) return 'done'
@@ -177,6 +177,7 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
    * failures, so later rounds skip it.
    */
   private async topUp(answeredBy: ReadonlySet<ScoreProvider>): Promise<Drained> {
+    if (this.state.isClosed) return { isSilent: false, answeredBy }
     const round = this.nextRound()
     if (round == null) return { isSilent: false, answeredBy }
     const { answered, failedIds } = await this.run(round)
@@ -203,7 +204,7 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
     answeredBy: ReadonlySet<ScoreProvider>
     hasRunOut: boolean
   }): void {
-    const before = new Date(Date.now() - 30 * DAY_MS).toISOString()
+    const before = scoresDueBefore()
     const kept = (provider: ScoreProvider): ReadonlySet<number> => {
       const failed = this.state.failed[provider]
       if (answeredBy.has(provider)) return new Set()
@@ -220,7 +221,7 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
    */
   private nextRound(): Round | null {
     const { failed } = this.state
-    const before = new Date(Date.now() - 30 * DAY_MS).toISOString()
+    const before = scoresDueBefore()
     const primary = this.scores.primary()
     if (primary == null) return null
     const due = this.due({ source: primary, before, skip: failed[primary.provider] })
@@ -265,10 +266,11 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
 
   /**
    * Asks for each title still due while the round's source is still the one
-   * to ask; one matched or refreshed since the round began is skipped. The
-   * round ends early after three failures in a row. A call that spent the
-   * source's day is no failure: the next round hands over. How many titles
-   * answered, and which failed.
+   * to ask and the app is up; one matched or refreshed since the round began
+   * is skipped. The round ends early after three failures in a row. A call
+   * that spent the source's day, or after which it is no longer the one to
+   * ask (a refused key), is no failure: the next round hands over. How many
+   * titles answered, and which failed.
    */
   private async run({
     source,
@@ -282,7 +284,9 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
       items: due,
       limit: AT_ONCE,
       fn: async (title): Promise<Outcome> => {
-        if (streak.failedInARow >= GIVE_UP_AFTER || !isCurrent()) return 'skipped'
+        if (this.state.isClosed || streak.failedInARow >= GIVE_UP_AFTER || !isCurrent()) {
+          return 'skipped'
+        }
         const isDue = this.metadata.isScoreDue({
           itemId: title.itemId,
           provider: source.provider,
@@ -293,7 +297,7 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
           streak.failedInARow = 0
           return 'answered'
         }
-        if (source.remaining() === 0) return 'skipped'
+        if (source.remaining() === 0 || !isCurrent()) return 'skipped'
         streak.failedInARow += 1
         return 'failed'
       },
@@ -308,7 +312,7 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
 
   /** Whether a source with a key has spent today's calls while titles still wait on it. */
   private isWaitingForMidnight(): boolean {
-    const before = new Date(Date.now() - 30 * DAY_MS).toISOString()
+    const before = scoresDueBefore()
     return this.scores
       .spent()
       .some(

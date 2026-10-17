@@ -41,6 +41,7 @@ import { OmdbClient } from '@/metadata/omdbClient'
 import { PASS_CONCURRENCY } from '@/metadata/passGuard'
 import { filePlace, groupPlaceOf, showPlace } from '@/metadata/places'
 import { Scores } from '@/metadata/scores'
+import { ScoreSweep } from '@/metadata/scoreSweep'
 import { TmdbClient } from '@/metadata/tmdbClient'
 import { createTaskQueue, mapWithConcurrency } from '@/scanner/concurrency'
 import { type LayoutRow, indexedLayoutsOf, planRelayout } from '@/scanner/layout'
@@ -92,6 +93,7 @@ export class MetadataService implements OnApplicationBootstrap {
     @Inject(OmdbClient) private readonly omdb: OmdbClient,
     @Inject(MdblistClient) private readonly mdblist: MdblistClient,
     @Inject(Scores) private readonly scores: Scores,
+    @Inject(ScoreSweep) private readonly scoreSweep: ScoreSweep,
     @Inject(ItemPictures) private readonly pictures: ItemPictures,
     @Inject(AiClient) private readonly ai: AiClient,
     @Inject(AiMatcher) private readonly aiMatcher: AiMatcher,
@@ -393,10 +395,13 @@ export class MetadataService implements OnApplicationBootstrap {
    * A pass, after which the planner's statistics follow what it stored and
    * cleared up: a library's first can add thousands of items, credits and
    * people. A pass TMDB stopped ends here too, with what it stored by then.
+   * The score sweep then looks for what the pass left due, such as the
+   * titles matched after a score source's day ran out, and sets its wake.
    */
   private async pass(libraryId: number): Promise<void> {
     await this.matchAndClearUp(libraryId)
     this.database.refreshStatistics()
+    this.scoreSweep.kick()
   }
 
   private async matchAndClearUp(libraryId: number): Promise<void> {

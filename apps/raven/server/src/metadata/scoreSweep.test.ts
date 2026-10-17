@@ -29,7 +29,8 @@ const today = (): string => new Date().toISOString().slice(0, 10)
  * A score source that counts its calls against `limit` a UTC day, as the
  * real clients do, and answers each with `answer`: given the title and the
  * call's number, from 1. Each call waits for `until` first, so a test can
- * hold the calls in flight. `spend` uses the day up, as a source told so does.
+ * hold the calls in flight. `spend` uses the day up, as a source told so
+ * does, and `refuse` turns it off with calls left, as a refused key does.
  */
 const fakeSource = ({
   provider,
@@ -44,6 +45,7 @@ const fakeSource = ({
 }) => {
   const state = {
     answer,
+    isRefused: false,
     until: Promise.resolve(),
     day: today(),
     used: 0,
@@ -61,6 +63,9 @@ const fakeSource = ({
   const spend = (): void => {
     state.used = limit
   }
+  const refuse = (): void => {
+    state.isRefused = true
+  }
   const lookUp = vi.fn<ScoreSource['lookUp']>(async (title) => {
     if (usedToday() >= limit) throw new Error(`${provider} is not available right now.`)
     state.used += 1
@@ -75,9 +80,12 @@ const fakeSource = ({
   })
   const source: ScoreSource = {
     provider,
-    enabled: () => hasKey && usedToday() < limit,
+    enabled: () => hasKey && !state.isRefused && usedToday() < limit,
     remaining: () => Math.max(0, limit - usedToday()),
-    state: () => (hasKey ? 'ok' : 'off'),
+    state: () => {
+      if (!hasKey) return 'off'
+      return state.isRefused ? 'failing' : 'ok'
+    },
     lookUp,
   }
   /** Holds every call from now until the returned function lets them go. */
@@ -88,7 +96,7 @@ const fakeSource = ({
     })
     return () => gate.open()
   }
-  return { source, lookUp, state, spend, hold }
+  return { source, lookUp, state, spend, refuse, hold }
 }
 
 const rottenTomatoes = (value: number): ExternalScore => ({
@@ -513,6 +521,49 @@ describe('the score sweep', () => {
     expect([first, second, third].map((itemId) => rows(itemId)[0]?.value)).toEqual([9.1, 9.1, 7])
   })
 
+  it('hands over to OMDb in the same drain when MDBList refuses the key', async () => {
+    const titles = movies(['1', '2', '3'])
+    const mdblist = fakeSource({
+      provider: 'mdblist',
+      answer: () => new Error('MDBList refused the key (401).'),
+    })
+    const omdb = fakeSource({ provider: 'omdb', answer: () => [rottenTomatoes(5)] })
+    const { sweep } = sweepWith({ omdb: omdb.source, mdblist: mdblist.source })
+    const letGo = mdblist.hold()
+
+    sweep.kick()
+    expect(mdblist.lookUp).toHaveBeenCalledTimes(2)
+    mdblist.refuse()
+    letGo()
+    await sweep.whenIdle()
+
+    expect(askedFor(omdb.lookUp).toSorted()).toEqual(['1', '2', '3'])
+    expect(titles.map((itemId) => rows(itemId).map((row) => row.provider))).toEqual([
+      ['omdb'],
+      ['omdb'],
+      ['omdb'],
+    ])
+    expect(sweep.pause()).toBeNull()
+  })
+
+  it('starts no call and reads nothing more once the app shuts down mid-drain', async () => {
+    movies(['1', '2', '3', '4'])
+    const mdblist = fakeSource({ provider: 'mdblist', answer: () => [rottenTomatoes(9.1)] })
+    const { sweep, repository } = sweepWith({ omdb: OMDB_OFF().source, mdblist: mdblist.source })
+    const letGo = mdblist.hold()
+
+    sweep.kick()
+    expect(mdblist.lookUp).toHaveBeenCalledTimes(2)
+    const lists = vi.spyOn(repository, 'scoresDue')
+    sweep.onModuleDestroy()
+    letGo()
+    await sweep.whenIdle()
+
+    expect(mdblist.lookUp).toHaveBeenCalledTimes(2)
+    expect(lists).not.toHaveBeenCalled()
+    expect(sweep.pause()).toBeNull()
+  })
+
   it('does nothing for a kick after shutdown', async () => {
     movies(['1'])
     const mdblist = fakeSource({ provider: 'mdblist', answer: () => [rottenTomatoes(9.1)] })
@@ -692,5 +743,65 @@ describe('the score sweep beside matching', () => {
     held.gate.open()
     await swept
     expect(mdblistStamp()).not.toBe(stale)
+  })
+})
+
+/** As a browser with the admin lock off, so the library can be added. */
+describe('the score sweep after a matching pass', () => {
+  const tmdb = fakeTmdb({
+    movies: [
+      { id: 949, title: 'Heat', released: '1995-12-15' },
+      { id: 1538, title: 'Collateral', released: '2004-08-05' },
+    ],
+    mdblist: { 'movie:949': { rottenTomatoes: 87 }, 'movie:1538': { rottenTomatoes: 86 } },
+  })
+  const state: { root: string; app: NestFastifyApplication | null } = { root: '', app: null }
+  const app = (): NestFastifyApplication => {
+    if (!state.app) throw new Error('app not started')
+    return state.app
+  }
+
+  beforeAll(async () => {
+    state.root = await mkdtemp(join(tmpdir(), 'raven-score-sweep-pass-'))
+    const media = join(state.root, 'media')
+    await Promise.all([
+      encodeClip({ path: join(media, 'Heat (1995).mp4'), seconds: 1 }),
+      encodeClip({ path: join(media, 'Collateral (2004).mp4'), seconds: 1 }),
+    ])
+    state.app = await createApp({
+      config: {
+        ...testConfig({ dataDir: join(state.root, 'data'), mediaDir: state.root }),
+        tmdbApiToken: 'test-token',
+        mdblistApiKey: 'mdblist-key',
+        mdblistDailyLimit: 1,
+      },
+      quiet: true,
+      metadataFetch: tmdb.fetch,
+      watch: NOT_WATCHING,
+    })
+    await state.app.init()
+    const admin = await adminCookie(state.app)
+    const created = await apiFor({ app: state.app, cookie: admin }).createLibrary({
+      name: 'Films',
+      paths: [media],
+      settings: { kind: 'movies' },
+    })
+    await app().get(ScannerService).whenIdle(created.id)
+    await app().get(MetadataService).whenIdle()
+    await app().get(ScoreSweep).whenIdle()
+    await app().get(ThumbnailService).whenIdle()
+  })
+
+  afterAll(async () => {
+    await state.app?.close()
+    await rm(state.root, { recursive: true, force: true })
+  })
+
+  it('wakes after midnight UTC when a matching pass spent the day', () => {
+    expect(tmdb.state.mdblistCalls).toBe(1)
+    expect(app().get(ScoreSweep).pause()).toEqual({
+      reason: 'budget',
+      resumesAt: expect.stringMatching(/T00:01:00\.000Z$/),
+    })
   })
 })
