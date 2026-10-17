@@ -2,7 +2,7 @@ import { mkdirSync } from 'node:fs'
 import { mkdir, readFile, readdir, rename, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Inject, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common'
-import { subtitleWindowRange } from '@raven/core'
+import { SUBTITLE_SOURCES, subtitleWindowRange } from '@raven/core'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { subtitleFileArgs, subtitleWindowArgs } from '@/ffmpeg/args'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
@@ -52,7 +52,7 @@ export class SubtitlesService {
       )
     }
     const number = Number(trackId.split('-')[1])
-    const sidecar = track.source === 'external' ? sidecars[number] : undefined
+    const sidecar = track.source === SUBTITLE_SOURCES.external ? sidecars[number] : undefined
     const part = sidecar ? 'all' : String(window)
     const folder = join(this.dir, String(file.id))
     const path = join(folder, `${file.mtimeMs}-${trackId}-${part}.vtt`)

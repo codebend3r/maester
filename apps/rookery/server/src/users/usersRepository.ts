@@ -20,7 +20,8 @@ export type PlexLogin = {
 type UserRow = { id: string; display_name: string; email: string | null; thumb: string | null }
 type LoginRow = { subject: string; username: string | null; email: string | null }
 
-const PLEX = 'plex'
+/** The ways a person signs in, as the `logins.provider` column holds them. */
+const LOGIN_PROVIDERS = { plex: 'plex' } as const
 
 const toUser = (row: UserRow): User => ({
   id: row.id,
@@ -49,7 +50,7 @@ export class UsersRepository {
       .prepare<[string, string], LoginRow>(
         'SELECT subject, username, email FROM logins WHERE user_id = ? AND provider = ?',
       )
-      .get(userId, PLEX)
+      .get(userId, LOGIN_PROVIDERS.plex)
     return row ? { id: row.subject, username: row.username, email: row.email } : null
   }
 
@@ -64,7 +65,7 @@ export class UsersRepository {
         .prepare<[string, string], { user_id: string }>(
           'SELECT user_id FROM logins WHERE provider = ? AND subject = ?',
         )
-        .get(PLEX, account.id)
+        .get(LOGIN_PROVIDERS.plex, account.id)
       const userId = login?.user_id ?? randomUUID()
       if (login) {
         this.db
@@ -72,7 +73,7 @@ export class UsersRepository {
             `UPDATE logins SET username = ?, email = ?, last_used_at = ?
              WHERE provider = ? AND subject = ?`,
           )
-          .run(account.username, account.email, at, PLEX, account.id)
+          .run(account.username, account.email, at, LOGIN_PROVIDERS.plex, account.id)
         this.db
           .prepare(
             `UPDATE users SET display_name = ?, email = ?, thumb = ?, last_seen_at = ?
@@ -92,7 +93,7 @@ export class UsersRepository {
                (provider, subject, user_id, username, email, created_at, last_used_at)
              VALUES (?, ?, ?, ?, ?, ?, ?)`,
           )
-          .run(PLEX, account.id, userId, account.username, account.email, at, at)
+          .run(LOGIN_PROVIDERS.plex, account.id, userId, account.username, account.email, at, at)
       }
       const user = this.get(userId)
       if (!user) throw new Error(`user ${userId} vanished during sign-in`)

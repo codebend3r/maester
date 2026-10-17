@@ -8,6 +8,7 @@ export const SESSION_COOKIE = 'maester_session'
 export const PIN_COOKIE = 'rookery_pin'
 /** The pin cookie only needs to reach the callback. */
 const PIN_PATH = '/auth/plex'
+const SESSION_PATH = '/'
 
 const serialize = ({
   name,
@@ -40,7 +41,7 @@ export const sessionCookie = ({ token, config }: { token: string; config: Server
   serialize({
     name: SESSION_COOKIE,
     value: token,
-    path: '/',
+    path: SESSION_PATH,
     maxAgeSeconds: seconds(SESSION_MS),
     domain: config.cookieDomain,
     secure: config.secureCookies,
@@ -51,7 +52,7 @@ export const clearedSessionCookie = ({ config }: { config: ServerConfig }) =>
   serialize({
     name: SESSION_COOKIE,
     value: '',
-    path: '/',
+    path: SESSION_PATH,
     maxAgeSeconds: 0,
     domain: config.cookieDomain,
     secure: config.secureCookies,

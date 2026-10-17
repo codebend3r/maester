@@ -1,15 +1,48 @@
-import { isRecord, isString } from '@raven/core'
+import { STOP_REASONS } from '@/metadata/aiMatcher'
+import type { Anthropic } from '@anthropic-ai/sdk'
+import { type MatchItemType, isRecord, isString } from '@raven/core'
+import { CONTENT_TYPES, HEADERS } from '@shared/server'
+import { RAVEN_HEADERS } from '@/http'
 import type { AiFetch } from '@/metadata/aiClient'
+import { type AiConfidence } from '@/metadata/aiDecisions'
+import { AI_TOOL_NAMES } from '@/metadata/aiTools'
+
+const FAKE_REPLY_KINDS = {
+  search: 'search',
+  episodes: 'episodes',
+  choose: 'choose',
+  call: 'call',
+  refuse: 'refuse',
+  say: 'say',
+} as const
+
+const ROLES = { assistant: 'assistant' } as const satisfies Record<
+  string,
+  Anthropic.Message['role']
+>
+
+/** The headers the SDK sends a key in and reads a retry hint from. */
+const CLAUDE_HEADERS = { apiKey: 'x-api-key', shouldRetry: 'x-should-retry' } as const
 
 /** One reply Claude gives in a lookup, in turn: a tool call, a refusal, or words and no tool. */
 export type FakeReply =
-  | { kind: 'search'; type: 'movie' | 'show'; query: string; year: number | null }
-  | { kind: 'episodes'; tmdbId: string; season: number }
-  | { kind: 'choose'; tmdbId: string | null; confidence: 'high' | 'low'; reason: string }
+  | {
+      kind: typeof FAKE_REPLY_KINDS.search
+      type: MatchItemType
+      query: string
+      year: number | null
+    }
+  | { kind: typeof FAKE_REPLY_KINDS.episodes; tmdbId: string; season: number }
+  | {
+      kind: typeof FAKE_REPLY_KINDS.choose
+      tmdbId: string | null
+      confidence: AiConfidence
+      reason: string
+    }
   /** Any tool call, as written, for one raven must refuse to run. */
-  | { kind: 'call'; name: string; input: Record<string, unknown> }
-  | { kind: 'refuse' }
-  | { kind: 'say'; text: string }
+  | { kind: typeof FAKE_REPLY_KINDS.call; name: string; input: Record<string, unknown> }
+  | { kind: typeof FAKE_REPLY_KINDS.refuse }
+  | { kind: typeof FAKE_REPLY_KINDS.say; text: string }
 
 /** A request raven sent Claude. */
 export type SeenRequest = {
@@ -37,7 +70,7 @@ const json = ({
 }): Response =>
   new Response(JSON.stringify(body), {
     status,
-    headers: { 'content-type': 'application/json', ...headers },
+    headers: { [HEADERS.contentType]: CONTENT_TYPES.json, ...headers },
   })
 
 const messagesOf = (body: Record<string, unknown>): unknown[] =>
@@ -54,7 +87,7 @@ const placeOf = (body: Record<string, unknown>): string | null => {
 }
 
 const turnOf = (body: Record<string, unknown>): number =>
-  messagesOf(body).filter((message) => isRecord(message) && message.role === 'assistant').length
+  messagesOf(body).filter((message) => isRecord(message) && message.role === ROLES.assistant).length
 
 const toolUse = ({
   turn,
@@ -80,54 +113,57 @@ const answerFor = ({
 }): { stop: string; content: unknown[] } => {
   const thinking = { type: 'thinking', thinking: '', signature: `signature-${turn}` }
   if (reply == null) {
-    return { stop: 'end_turn', content: [thinking, { type: 'text', text: 'I could not decide.' }] }
+    return {
+      stop: STOP_REASONS.endTurn,
+      content: [thinking, { type: 'text', text: 'I could not decide.' }],
+    }
   }
   switch (reply.kind) {
-    case 'search':
+    case FAKE_REPLY_KINDS.search:
       return {
-        stop: 'tool_use',
+        stop: STOP_REASONS.toolUse,
         content: [
           thinking,
           toolUse({
             turn,
-            name: 'search_tmdb',
+            name: AI_TOOL_NAMES.search,
             input: { type: reply.type, query: reply.query, year: reply.year },
           }),
         ],
       }
-    case 'episodes':
+    case FAKE_REPLY_KINDS.episodes:
       return {
-        stop: 'tool_use',
+        stop: STOP_REASONS.toolUse,
         content: [
           thinking,
           toolUse({
             turn,
-            name: 'list_episodes',
+            name: AI_TOOL_NAMES.episodes,
             input: { tmdbId: reply.tmdbId, season: reply.season },
           }),
         ],
       }
-    case 'choose':
+    case FAKE_REPLY_KINDS.choose:
       return {
-        stop: 'tool_use',
+        stop: STOP_REASONS.toolUse,
         content: [
           thinking,
           toolUse({
             turn,
-            name: 'choose_match',
+            name: AI_TOOL_NAMES.choose,
             input: { tmdbId: reply.tmdbId, confidence: reply.confidence, reason: reply.reason },
           }),
         ],
       }
-    case 'call':
+    case FAKE_REPLY_KINDS.call:
       return {
-        stop: 'tool_use',
+        stop: STOP_REASONS.toolUse,
         content: [thinking, toolUse({ turn, name: reply.name, input: reply.input })],
       }
-    case 'refuse':
-      return { stop: 'refusal', content: [] }
-    case 'say':
-      return { stop: 'end_turn', content: [thinking, { type: 'text', text: reply.text }] }
+    case FAKE_REPLY_KINDS.refuse:
+      return { stop: STOP_REASONS.refusal, content: [] }
+    case FAKE_REPLY_KINDS.say:
+      return { stop: STOP_REASONS.endTurn, content: [thinking, { type: 'text', text: reply.text }] }
     default: {
       const unreachable: never = reply
       return unreachable
@@ -177,8 +213,8 @@ export const fakeClaude = ({
     const headers = new Headers(init?.headers)
     state.requests.push({
       url: String(input),
-      apiKey: headers.get('x-api-key'),
-      authorization: headers.get('authorization'),
+      apiKey: headers.get(CLAUDE_HEADERS.apiKey),
+      authorization: headers.get(RAVEN_HEADERS.authorization),
       raw,
       body,
       place,
@@ -189,7 +225,7 @@ export const fakeClaude = ({
       return json({
         body: { type: 'error', error: { type: 'api_error', message: state.message } },
         status: state.status,
-        headers: { 'x-should-retry': 'false' },
+        headers: { [CLAUDE_HEADERS.shouldRetry]: 'false' },
       })
     }
     const answer = answerFor({ reply: (lookups[place ?? ''] ?? []).at(turn), turn })
@@ -203,7 +239,9 @@ export const fakeClaude = ({
         stop_reason: answer.stop,
         stop_sequence: null,
         stop_details:
-          answer.stop === 'refusal' ? { type: 'refusal', category: null, explanation: null } : null,
+          answer.stop === STOP_REASONS.refusal
+            ? { type: 'refusal', category: null, explanation: null }
+            : null,
         container: null,
         diagnostics: null,
         usage: {

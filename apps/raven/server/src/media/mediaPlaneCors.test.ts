@@ -1,7 +1,10 @@
+import { HEADERS } from '@shared/server'
 import Fastify from 'fastify'
 import { describe, expect, it } from 'vitest'
 import { CONTROLLERS } from '@/appModule'
 import {
+  CORS_FLAGS,
+  CORS_HEADERS,
   mediaPlanePaths,
   pathMatcher,
   preflightHeaders,
@@ -38,22 +41,22 @@ describe('pathMatcher', () => {
 describe('preflightHeaders', () => {
   it('allows the origin, GET, HEAD and OPTIONS with a range header, for ten minutes', () => {
     expect(preflightHeaders({ origin: ORIGIN, wantsPrivateNetwork: false })).toEqual({
-      'access-control-allow-origin': ORIGIN,
+      [CORS_HEADERS.allowOrigin]: ORIGIN,
       vary: 'Origin',
-      'access-control-allow-methods': 'GET, HEAD, OPTIONS',
-      'access-control-allow-headers': 'range',
-      'access-control-max-age': '600',
+      [CORS_HEADERS.allowMethods]: 'GET, HEAD, OPTIONS',
+      [CORS_HEADERS.allowHeaders]: HEADERS.range,
+      [CORS_HEADERS.maxAge]: '600',
     })
   })
 
   it('adds the private network allowance when it was asked for', () => {
     expect(preflightHeaders({ origin: ORIGIN, wantsPrivateNetwork: true })).toEqual({
-      'access-control-allow-origin': ORIGIN,
+      [CORS_HEADERS.allowOrigin]: ORIGIN,
       vary: 'Origin',
-      'access-control-allow-methods': 'GET, HEAD, OPTIONS',
-      'access-control-allow-headers': 'range',
-      'access-control-max-age': '600',
-      'access-control-allow-private-network': 'true',
+      [CORS_HEADERS.allowMethods]: 'GET, HEAD, OPTIONS',
+      [CORS_HEADERS.allowHeaders]: HEADERS.range,
+      [CORS_HEADERS.maxAge]: '600',
+      [CORS_HEADERS.allowPrivateNetwork]: CORS_FLAGS.true,
     })
   })
 })
@@ -62,11 +65,11 @@ describe('responseHeaders', () => {
   it('names the origin and exposes the headers a player reads, with no credentials', () => {
     const headers = responseHeaders(ORIGIN)
     expect(headers).toEqual({
-      'access-control-allow-origin': ORIGIN,
+      [CORS_HEADERS.allowOrigin]: ORIGIN,
       vary: 'Origin',
-      'access-control-expose-headers': 'content-length, content-range, accept-ranges',
+      [CORS_HEADERS.exposeHeaders]: 'content-length, content-range, accept-ranges',
     })
-    expect(Object.keys(headers)).not.toContain('access-control-allow-credentials')
+    expect(Object.keys(headers)).not.toContain(CORS_HEADERS.allowCredentials)
   })
 })
 
@@ -88,7 +91,7 @@ describe('registerMediaPlaneCors', () => {
   ): Promise<string | number | string[] | undefined> => {
     const fastify = Fastify()
     fastify.addHook('onRequest', async (_request, reply) => {
-      if (existing !== null) reply.header('vary', existing)
+      if (existing !== null) reply.header(HEADERS.vary, existing)
     })
     registerMediaPlaneCors({
       fastify,
@@ -110,7 +113,7 @@ describe('registerMediaPlaneCors', () => {
   })
 
   it('appends Origin to a vary the reply already has', async () => {
-    expect(await varyOf('accept-encoding')).toBe('accept-encoding, Origin')
+    expect(await varyOf(HEADERS.acceptEncoding)).toBe('accept-encoding, Origin')
   })
 
   it('does not list Origin twice', async () => {

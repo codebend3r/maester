@@ -14,6 +14,13 @@ import type { FastifyRequest } from 'fastify'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import type { PublicUser } from '@/auth/authController'
 import { AccountService } from '@/sessions/accountService'
+import { SESSION_KINDS } from '@/sessions/sessionsRepository'
+
+/** Why `/internal/session` refused before looking the token up. */
+const INTERNAL_ERRORS = { serviceToken: 'service_token', tokenRequired: 'token_required' } as const
+
+/** The `Authorization` scheme apps present the service token under, with its trailing space. */
+const BEARER = 'Bearer '
 
 /** What an app learns about the person behind a session cookie. */
 export type SessionInfo = {
@@ -39,17 +46,17 @@ export class InternalController {
   @HttpCode(200)
   session(@Req() request: FastifyRequest, @Body() body: unknown): SessionInfo {
     const header = request.headers.authorization ?? ''
-    const given = header.startsWith('Bearer ') ? header.slice('Bearer '.length) : ''
+    const given = header.startsWith(BEARER) ? header.slice(BEARER.length) : ''
     if (!given || !sameSecret({ given, expected: this.config.serviceToken })) {
-      throw new UnauthorizedException({ reason: 'service_token' })
+      throw new UnauthorizedException({ reason: INTERNAL_ERRORS.serviceToken })
     }
     const token =
       typeof body === 'object' && body != null && 'token' in body && typeof body.token === 'string'
         ? body.token
         : null
-    if (!token) throw new BadRequestException({ reason: 'token_required' })
+    if (!token) throw new BadRequestException({ reason: INTERNAL_ERRORS.tokenRequired })
     const account = this.accounts.forToken(token)
-    if (account.kind !== 'live') throw new NotFoundException({ reason: account.kind })
+    if (account.kind !== SESSION_KINDS.live) throw new NotFoundException({ reason: account.kind })
     const { id, displayName, email, thumb } = account.user
     return {
       user: { id, display_name: displayName, email, thumb },

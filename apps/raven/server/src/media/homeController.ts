@@ -1,5 +1,6 @@
 import { Controller, Get, Headers, Inject, Query } from '@nestjs/common'
 import {
+  HOME_SHELF_TYPES,
   type Home,
   type HomeSearch,
   type HomeShelf,
@@ -7,6 +8,7 @@ import {
   isString,
   listsShows,
 } from '@raven/core'
+import { RAVEN_HEADERS } from '@/http'
 import { type LibraryRecord, LibrariesRepository } from '@/libraries/librariesRepository'
 import { LockService, type Viewer } from '@/lock/lockService'
 import { MediaRepository } from '@/media/mediaRepository'
@@ -54,7 +56,7 @@ export class HomeController {
    * library's newest arrivals; libraries still locked stay out.
    */
   @Get()
-  home(@Headers('cookie') cookie: string | undefined): Home {
+  home(@Headers(RAVEN_HEADERS.cookie) cookie: string | undefined): Home {
     const viewer = this.lock.viewer({ cookie })
     const shelves = this.seenBy(viewer)
       .filter((library) => library.settings.pinned)
@@ -73,11 +75,16 @@ export class HomeController {
    * still locked stay out.
    */
   @Get('search')
-  search(@Headers('cookie') cookie: string | undefined, @Query('q') q: unknown): HomeSearch {
+  search(
+    @Headers(RAVEN_HEADERS.cookie) cookie: string | undefined,
+    @Query('q') q: unknown,
+  ): HomeSearch {
     const search = isString(q) ? q.trim() : ''
     if (!search) return []
     return this.seenBy(this.lock.viewer({ cookie }))
       .map((library) => this.shelf({ library, search, sort: 'title', limit: SEARCH_SHELF_SIZE }))
-      .filter((shelf) => (shelf.type === 'shows' ? shelf.shows : shelf.media).length > 0)
+      .filter(
+        (shelf) => (shelf.type === HOME_SHELF_TYPES.shows ? shelf.shows : shelf.media).length > 0,
+      )
   }
 }

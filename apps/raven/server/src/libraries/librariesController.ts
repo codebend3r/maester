@@ -37,8 +37,12 @@ import {
   sagaPictures,
   type UnmatchedFile,
   validateLibraryInput,
+  ITEM_TYPES,
+  METADATA_SERVICE_STATES,
+  SAGA_BACKDROP_TYPES,
 } from '@raven/core'
 import { AdminOnly, ForViewers } from '@/admin/adminGuard'
+import { RAVEN_HEADERS } from '@/http'
 import { type LibraryRecord, LibrariesRepository, samePaths } from '@/libraries/librariesRepository'
 import { PrivateBy, Public } from '@/lock/lockGuard'
 import { LockService } from '@/lock/lockService'
@@ -65,6 +69,9 @@ const listParams = (query: unknown): MediaListParams =>
 
 /** A locked library's scan failure, in place of the message, which names its folders. */
 export const LOCKED_SCAN_ERROR = 'The last scan ran into trouble. Enter the PIN to see what.'
+
+/** What a query flag such as `?watched=true` says when it is on. */
+const QUERY_FLAGS = { true: 'true' } as const
 
 /** How many history entries a request gets unless it asks, and the most it may ask for. */
 const HISTORY_LIMIT = { fallback: 100, most: 500 }
@@ -132,7 +139,7 @@ export class LibrariesController {
   /** Every library, but a locked one while the admin lock holds. */
   @Public()
   @Get()
-  list(@Headers('cookie') cookie: string | undefined): Library[] {
+  list(@Headers(RAVEN_HEADERS.cookie) cookie: string | undefined): Library[] {
     const viewer = this.lock.viewer({ cookie })
     return this.libraries
       .list()
@@ -148,7 +155,7 @@ export class LibrariesController {
   @Get(':id')
   get(
     @Param('id', ParseIntPipe) id: number,
-    @Headers('cookie') cookie: string | undefined,
+    @Headers(RAVEN_HEADERS.cookie) cookie: string | undefined,
   ): Library {
     const record = this.find(id)
     const viewer = this.lock.viewer({ cookie })
@@ -250,7 +257,7 @@ export class LibrariesController {
     if (matchTypeFor(record.settings.kind) == null) {
       throw new BadRequestException('Only a library of movies or shows is matched.')
     }
-    if (this.metadata.health().tmdb === 'off') {
+    if (this.metadata.health().tmdb === METADATA_SERVICE_STATES.off) {
       throw new ServiceUnavailableException('Set TMDB_API_TOKEN to match files.')
     }
     this.metadata.retryUnmatched(id)
@@ -269,7 +276,7 @@ export class LibrariesController {
     return this.viewing.history({
       libraryId: id,
       limit: historyLimit(limit),
-      watchedOnly: watched === 'true',
+      watchedOnly: watched === QUERY_FLAGS.true,
     })
   }
 
@@ -308,7 +315,7 @@ export class LibrariesController {
   @Get(':id/sagas')
   listSagas(@Param('id', ParseIntPipe) id: number): Saga[] {
     const record = this.find(id)
-    return matchTypeFor(record.settings.kind) === 'movie' ? this.media.listSagas(id) : []
+    return matchTypeFor(record.settings.kind) === ITEM_TYPES.movie ? this.media.listSagas(id) : []
   }
 
   /**
@@ -330,7 +337,7 @@ export class LibrariesController {
       message: 'Send a slideshow and its motion, or the movie whose backdrop to hold still.',
     })
     const isOwnPicture =
-      backdrop.type === 'slideshow' ||
+      backdrop.type === SAGA_BACKDROP_TYPES.slideshow ||
       sagaPictures(saga).some((picture) => picture.id === backdrop.itemId)
     if (!isOwnPicture) throw new BadRequestException(`${saga.name} has no such backdrop.`)
     this.sagaBackdrops.save({ libraryId: id, sagaId, backdrop })
@@ -353,7 +360,7 @@ export class LibrariesController {
   /** A library matched to movies; the others keep each file on its own card, with nothing to split. */
   private findMovies(id: number): LibraryRecord {
     const record = this.find(id)
-    if (matchTypeFor(record.settings.kind) !== 'movie') {
+    if (matchTypeFor(record.settings.kind) !== ITEM_TYPES.movie) {
       throw new BadRequestException('Only a library of movies has duplicates to split.')
     }
     return record
@@ -363,7 +370,7 @@ export class LibrariesController {
   @Get(':id/duplicates')
   listDuplicates(@Param('id', ParseIntPipe) id: number): Duplicates {
     const record = this.find(id)
-    return matchTypeFor(record.settings.kind) === 'movie' ? this.splits.list(id) : []
+    return matchTypeFor(record.settings.kind) === ITEM_TYPES.movie ? this.splits.list(id) : []
   }
 
   /** Splits a card, named by any file on it: every file apart, or by cut. */

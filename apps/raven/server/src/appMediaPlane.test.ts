@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '@/app'
 import type { ServerConfig } from '@/config'
 import { MediaIndex } from '@/media/mediaIndex'
+import { CORS_FLAGS, CORS_HEADERS } from '@/media/mediaPlaneCors'
 import { MediaTickets } from '@/media/mediaTickets'
 import { ScannerService } from '@/scanner/scannerService'
 import { NOT_WATCHING, adminCookie, cookieSet, cookies, testConfig } from '@/test/app'
@@ -274,8 +275,8 @@ describe('the media plane routes', () => {
         url: `/api/media/${on().video}/stream`,
         headers: {
           origin,
-          'access-control-request-method': 'GET',
-          ...(privateNetwork ? { 'access-control-request-private-network': 'true' } : {}),
+          [CORS_HEADERS.requestMethod]: HTTP_METHODS.get,
+          ...(privateNetwork ? { [CORS_HEADERS.requestPrivateNetwork]: CORS_FLAGS.true } : {}),
         },
       })
 
@@ -283,18 +284,18 @@ describe('the media plane routes', () => {
       const response = await preflight({ origin: NETLIFY, privateNetwork: true })
       expect(response.statusCode).toBe(204)
       expect(response.headers).toMatchObject({
-        'access-control-allow-origin': NETLIFY,
+        [CORS_HEADERS.allowOrigin]: NETLIFY,
         vary: 'Origin',
-        'access-control-allow-methods': 'GET, HEAD, OPTIONS',
-        'access-control-allow-headers': 'range',
-        'access-control-max-age': '600',
-        'access-control-allow-private-network': 'true',
+        [CORS_HEADERS.allowMethods]: 'GET, HEAD, OPTIONS',
+        [CORS_HEADERS.allowHeaders]: HEADERS.range,
+        [CORS_HEADERS.maxAge]: '600',
+        [CORS_HEADERS.allowPrivateNetwork]: CORS_FLAGS.true,
       })
-      expect(response.headers['access-control-allow-credentials']).toBeUndefined()
+      expect(response.headers[CORS_HEADERS.allowCredentials]).toBeUndefined()
       expect(response.body).toBe('')
       const plain = await preflight({ origin: NETLIFY })
       expect(plain.statusCode).toBe(204)
-      expect(plain.headers['access-control-allow-private-network']).toBeUndefined()
+      expect(plain.headers[CORS_HEADERS.allowPrivateNetwork]).toBeUndefined()
     })
 
     it('answers the preflight for a deploy preview and for localhost', async () => {
@@ -304,9 +305,7 @@ describe('the media plane routes', () => {
       ]
       const responses = await Promise.all(origins.map((origin) => preflight({ origin })))
       expect(responses.map(({ statusCode }) => statusCode)).toEqual([204, 204])
-      expect(responses.map(({ headers }) => headers['access-control-allow-origin'])).toEqual(
-        origins,
-      )
+      expect(responses.map(({ headers }) => headers[CORS_HEADERS.allowOrigin])).toEqual(origins)
     })
 
     it('answers the preflight for the other media plane routes, and for no other', async () => {
@@ -314,7 +313,7 @@ describe('the media plane routes', () => {
         on().app.inject({
           method: 'OPTIONS',
           url,
-          headers: { origin: NETLIFY, 'access-control-request-method': 'GET' },
+          headers: { origin: NETLIFY, [CORS_HEADERS.requestMethod]: HTTP_METHODS.get },
         })
       const video = on().video
       const open = await Promise.all(
@@ -328,7 +327,7 @@ describe('the media plane routes', () => {
       const shut = await Promise.all(
         [`/api/media/${video}`, `/api/media/${video}/ticket`, '/api/media-origins'].map(ask),
       )
-      expect(shut.map(({ headers }) => headers['access-control-allow-origin'])).toEqual([
+      expect(shut.map(({ headers }) => headers[CORS_HEADERS.allowOrigin])).toEqual([
         undefined,
         undefined,
         undefined,
@@ -375,10 +374,10 @@ describe('the media plane routes', () => {
       const ping = await asBrowser({ url: '/api/media-origins/ping?bytes=10' })
       expect(ping.statusCode).toBe(200)
       ;[stream, file, subtitles, ping].forEach((response) => {
-        expect(response.headers['access-control-allow-origin']).toBe(NETLIFY)
+        expect(response.headers[CORS_HEADERS.allowOrigin]).toBe(NETLIFY)
         expect(response.headers.vary).toContain('Origin')
-        expect(response.headers['access-control-expose-headers']).toBe(EXPOSED)
-        expect(response.headers['access-control-allow-credentials']).toBeUndefined()
+        expect(response.headers[CORS_HEADERS.exposeHeaders]).toBe(EXPOSED)
+        expect(response.headers[CORS_HEADERS.allowCredentials]).toBeUndefined()
       })
     })
 
@@ -393,8 +392,8 @@ describe('the media plane routes', () => {
       const vary = String(response.headers.vary)
         .split(',')
         .map((name) => name.trim().toLowerCase())
-      expect(vary).toContain('accept-encoding')
-      expect(vary.filter((name) => name === 'origin')).toHaveLength(1)
+      expect(vary).toContain(HEADERS.acceptEncoding)
+      expect(vary.filter((name) => name === CORS_HEADERS.origin)).toHaveLength(1)
     })
 
     it('carries the CORS headers on a HEAD for the file', async () => {
@@ -405,8 +404,8 @@ describe('the media plane routes', () => {
         headers: { origin: NETLIFY },
       })
       expect(response.statusCode).toBe(200)
-      expect(response.headers['access-control-allow-origin']).toBe(NETLIFY)
-      expect(response.headers['access-control-expose-headers']).toBe(EXPOSED)
+      expect(response.headers[CORS_HEADERS.allowOrigin]).toBe(NETLIFY)
+      expect(response.headers[CORS_HEADERS.exposeHeaders]).toBe(EXPOSED)
     })
 
     it('refuses the stream with a ticket for another video, an expired one and a tampered one (423)', async () => {
@@ -429,8 +428,8 @@ describe('the media plane routes', () => {
       )
       expect(refused.map(({ statusCode }) => statusCode)).toEqual([423, 423, 423, 423])
       refused.forEach((response) => {
-        expect(response.headers['access-control-allow-origin']).toBe(NETLIFY)
-        expect(response.headers['access-control-expose-headers']).toBe(EXPOSED)
+        expect(response.headers[CORS_HEADERS.allowOrigin]).toBe(NETLIFY)
+        expect(response.headers[CORS_HEADERS.exposeHeaders]).toBe(EXPOSED)
       })
       const underAdminLock = await asBrowser({
         url: `/api/media/${locked()}/stream?mode=remux&t=${tampered}`,

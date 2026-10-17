@@ -17,6 +17,14 @@ import { STREAM_TIME_SHIFT } from '@raven/core'
 
 type Listener = () => void
 
+/** A media source's `readyState`, which the stand-in below types as a plain string. */
+export const MEDIA_SOURCE_STATES = { closed: 'closed', open: 'open', ended: 'ended' } as const
+
+/** What a source buffer fires when an append or a removal is done, or has failed. */
+export const BUFFER_EVENTS = { updateEnd: 'updateend', error: 'error' } as const
+
+const ERROR_NAMES = { quotaExceeded: 'QuotaExceededError', abort: 'AbortError' } as const
+
 type Ranges = {
   readonly length: number
   start: (index: number) => number
@@ -116,23 +124,24 @@ const nextEvent = ({ target, types }: { target: VideoLike; types: string[] }): P
 const updateEnd = (buffer: SourceBufferLike): Promise<void> =>
   new Promise((resolve, reject) => {
     const finish = () => {
-      buffer.removeEventListener('updateend', finish)
-      buffer.removeEventListener('error', fail)
+      buffer.removeEventListener(BUFFER_EVENTS.updateEnd, finish)
+      buffer.removeEventListener(BUFFER_EVENTS.error, fail)
       resolve()
     }
     const fail = () => {
-      buffer.removeEventListener('updateend', finish)
-      buffer.removeEventListener('error', fail)
+      buffer.removeEventListener(BUFFER_EVENTS.updateEnd, finish)
+      buffer.removeEventListener(BUFFER_EVENTS.error, fail)
       reject(new Error('The browser could not take the converted video.'))
     }
-    buffer.addEventListener('updateend', finish)
-    buffer.addEventListener('error', fail)
+    buffer.addEventListener(BUFFER_EVENTS.updateEnd, finish)
+    buffer.addEventListener(BUFFER_EVENTS.error, fail)
   })
 
 const isQuotaError = (error: unknown): boolean =>
-  error instanceof Error && error.name === 'QuotaExceededError'
+  error instanceof Error && error.name === ERROR_NAMES.quotaExceeded
 
-const isAbort = (error: unknown): boolean => error instanceof Error && error.name === 'AbortError'
+const isAbort = (error: unknown): boolean =>
+  error instanceof Error && error.name === ERROR_NAMES.abort
 
 /** The browser's own Media Source Extensions, managed (iOS Safari) or classic, for `video`. */
 export const browserEnvironment = (video: HTMLVideoElement): StreamEnvironment<MediaSource> => ({
@@ -273,7 +282,9 @@ export const createStreamSession = <S extends MediaSourceLike>({
     }
     if (done) {
       await settle(buffer)
-      if (current(generation) && source?.readyState === 'open') source.endOfStream()
+      if (current(generation) && source?.readyState === MEDIA_SOURCE_STATES.open) {
+        source.endOfStream()
+      }
       return
     }
     await append({ buffer, chunk: value, generation })
@@ -295,7 +306,7 @@ export const createStreamSession = <S extends MediaSourceLike>({
       // what is buffered leaves the parser holding that fragment; the new
       // stream would be read as its rest. Only abort lets go of it, and
       // it throws once the stream has ended, which leaves nothing held.
-      if (source?.readyState === 'open') buffer.abort()
+      if (source?.readyState === MEDIA_SOURCE_STATES.open) buffer.abort()
       if (buffer.buffered.length > 0) {
         buffer.remove(0, Infinity)
         await updateEnd(buffer)

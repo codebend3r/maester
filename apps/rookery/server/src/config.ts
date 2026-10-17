@@ -25,12 +25,22 @@ export const SERVER_CONFIG = Symbol('SERVER_CONFIG')
 /** Raised naming every required variable the environment lacks, or every one it holds badly. */
 export class ConfigError extends Error {}
 
-const REQUIRED = ['PUBLIC_URL', 'SERVICE_TOKEN'] as const
+/** What rookery reads itself; `readListenConfig` reads the `LISTEN_ENV_VARS`. */
+export const ENV_VARS = {
+  publicUrl: 'PUBLIC_URL',
+  serviceToken: 'SERVICE_TOKEN',
+  appOrigins: 'APP_ORIGINS',
+  cookieDomain: 'COOKIE_DOMAIN',
+} as const
+
+const REQUIRED = [ENV_VARS.publicUrl, ENV_VARS.serviceToken] as const
+
+const PROTOCOLS = { http: 'http:', https: 'https:' } as const
 
 const originOf = (value: string): string | null => {
   try {
     const url = new URL(value)
-    return url.protocol === 'http:' || url.protocol === 'https:' ? url.origin : null
+    return url.protocol === PROTOCOLS.http || url.protocol === PROTOCOLS.https ? url.origin : null
   } catch {
     return null
   }
@@ -47,13 +57,13 @@ export const readServerConfig = (env: NodeJS.ProcessEnv = process.env): ServerCo
   if (missing.length > 0) {
     throw new ConfigError(`missing required environment: ${missing.join(', ')}`)
   }
-  const publicUrl = (env.PUBLIC_URL ?? '').trim().replace(/\/+$/, '')
-  const appOrigins = list(env.APP_ORIGINS)
+  const publicUrl = (env[ENV_VARS.publicUrl] ?? '').trim().replace(/\/+$/, '')
+  const appOrigins = list(env[ENV_VARS.appOrigins])
   const invalid = [
-    ...(originOf(publicUrl) ? [] : [`PUBLIC_URL (${publicUrl})`]),
+    ...(originOf(publicUrl) ? [] : [`${ENV_VARS.publicUrl} (${publicUrl})`]),
     ...appOrigins
       .filter((origin) => originOf(origin) == null)
-      .map((origin) => `APP_ORIGINS (${origin})`),
+      .map((origin) => `${ENV_VARS.appOrigins} (${origin})`),
   ]
   if (invalid.length > 0) {
     throw new ConfigError(`not an http(s) URL: ${invalid.join(', ')}`)
@@ -61,10 +71,10 @@ export const readServerConfig = (env: NodeJS.ProcessEnv = process.env): ServerCo
   return {
     ...readListenConfig({ env, defaultPort: 8030 }),
     publicUrl,
-    serviceToken: (env.SERVICE_TOKEN ?? '').trim(),
+    serviceToken: (env[ENV_VARS.serviceToken] ?? '').trim(),
     appOrigins: appOrigins.flatMap((origin) => originOf(origin) ?? []),
-    cookieDomain: env.COOKIE_DOMAIN?.trim().replace(/^\./, '') || null,
-    secureCookies: publicUrl.startsWith('https:'),
+    cookieDomain: env[ENV_VARS.cookieDomain]?.trim().replace(/^\./, '') || null,
+    secureCookies: publicUrl.startsWith(PROTOCOLS.https),
     pinCheckAttempts: 5,
     pinCheckDelayMs: 1000,
   }

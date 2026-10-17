@@ -1,4 +1,7 @@
-import type { HwAccel } from '@raven/core'
+import { ENCODER_KINDS, HW_ACCELS, type HwAccel } from '@raven/core'
+
+/** The `process.platform` that has VideoToolbox. */
+const PLATFORMS = { darwin: 'darwin' } as const satisfies Record<string, NodeJS.Platform>
 
 /**
  * How transcodes encode video: on the CPU with libx264, or on a GPU. VAAPI
@@ -6,11 +9,11 @@ import type { HwAccel } from '@raven/core'
  * drives the media engine in every Mac.
  */
 export type VideoEncoder =
-  | { kind: 'software' }
-  | { kind: 'videotoolbox' }
-  | { kind: 'vaapi'; device: string }
+  | { kind: typeof ENCODER_KINDS.software }
+  | { kind: typeof ENCODER_KINDS.videotoolbox }
+  | { kind: typeof ENCODER_KINDS.vaapi; device: string }
 
-export const SOFTWARE: VideoEncoder = { kind: 'software' }
+export const SOFTWARE: VideoEncoder = { kind: ENCODER_KINDS.software }
 
 /**
  * The GPU encoders worth a test encode, best first, for a setting on this
@@ -27,10 +30,13 @@ export const encoderCandidates = ({
   vaapiDevice: string
   deviceExists: boolean
 }): VideoEncoder[] => {
-  const videotoolbox: VideoEncoder[] = platform === 'darwin' ? [{ kind: 'videotoolbox' }] : []
-  const vaapi: VideoEncoder[] = deviceExists ? [{ kind: 'vaapi', device: vaapiDevice }] : []
-  if (hwAccel === 'videotoolbox') return videotoolbox
-  if (hwAccel === 'vaapi') return vaapi
-  if (hwAccel === 'auto') return [...videotoolbox, ...vaapi]
+  const videotoolbox: VideoEncoder[] =
+    platform === PLATFORMS.darwin ? [{ kind: ENCODER_KINDS.videotoolbox }] : []
+  const vaapi: VideoEncoder[] = deviceExists
+    ? [{ kind: ENCODER_KINDS.vaapi, device: vaapiDevice }]
+    : []
+  if (hwAccel === HW_ACCELS.videotoolbox) return videotoolbox
+  if (hwAccel === HW_ACCELS.vaapi) return vaapi
+  if (hwAccel === HW_ACCELS.auto) return [...videotoolbox, ...vaapi]
   return []
 }

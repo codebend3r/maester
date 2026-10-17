@@ -1,9 +1,16 @@
 import { dirname, join } from 'node:path'
 import { Inject, Injectable } from '@nestjs/common'
-import { ITEM_IMAGE_KINDS, type ItemImageKind, POSTER_WIDTHS, parseEpisodeName } from '@raven/core'
+import {
+  ITEM_IMAGE_KINDS,
+  ITEM_TYPES,
+  type ItemImageKind,
+  POSTER_WIDTHS,
+  isItemImageKind,
+  parseEpisodeName,
+} from '@raven/core'
 import type { FolderReader } from '@/metadata/folderReader'
 import { ImageCache } from '@/metadata/imageCache'
-import { ItemImagesRepository } from '@/metadata/itemImagesRepository'
+import { ItemImagesRepository, STORED_IMAGE_SOURCES } from '@/metadata/itemImagesRepository'
 import { episodeStill, movieAssets, seasonPoster, showAssets } from '@/metadata/localAssets'
 import { type MatchFile, MatchFiles } from '@/metadata/matchFiles'
 import { MetadataRepository, type StoredItem } from '@/metadata/metadataRepository'
@@ -17,7 +24,7 @@ const found = ({ kind, dir, name }: { kind: ItemImageKind; dir: string; name: st
 /** For each kind, the first file's picture that has one: the best file's folder wins. */
 const firstOfEach = (pictures: readonly LocalImages[]): LocalImages =>
   Object.fromEntries(
-    ITEM_IMAGE_KINDS.flatMap((kind) => {
+    isItemImageKind.values.flatMap((kind) => {
       const ref = pictures.find((picture) => picture[kind] != null)?.[kind]
       return ref == null ? [] : [[kind, ref]]
     }),
@@ -85,7 +92,7 @@ export class ItemPictures {
   }): Promise<LocalImages> {
     const dir = dirname(file.path)
     switch (item.type) {
-      case 'movie': {
+      case ITEM_TYPES.movie: {
         const assets = movieAssets({
           names: await folders.names(dir),
           stem: stemOf(file.fileName),
@@ -96,7 +103,7 @@ export class ItemPictures {
           ...found({ kind: 'backdrop', dir, name: assets.backdrop }),
         }
       }
-      case 'show': {
+      case ITEM_TYPES.show: {
         const showDir = showDirOf(file)
         const assets = showAssets(await folders.names(showDir))
         return {
@@ -104,7 +111,7 @@ export class ItemPictures {
           ...found({ kind: 'backdrop', dir: showDir, name: assets.backdrop }),
         }
       }
-      case 'season': {
+      case ITEM_TYPES.season: {
         if (item.number == null) return {}
         // A season poster sits in the show's folder, or in the season's own.
         const showDir = showDirOf(file)
@@ -119,7 +126,7 @@ export class ItemPictures {
           name: seasonPoster({ names: await folders.names(dir), number: item.number }),
         })
       }
-      case 'episode': {
+      case ITEM_TYPES.episode: {
         // A file of two episodes keeps its still for the first.
         const [first] = parseEpisodeName(file).episodes
         if (item.number == null || first !== item.number) return {}
@@ -142,12 +149,12 @@ export class ItemPictures {
    * whatever the screen.
    */
   warmPoster(itemId: number): void {
-    const image = this.stored.image({ itemId, kind: 'poster' })
+    const image = this.stored.image({ itemId, kind: ITEM_IMAGE_KINDS.poster })
     if (!image) return
     POSTER_WIDTHS.forEach((width) => {
       const made =
-        image.source === 'local'
-          ? this.images.local({ itemId, kind: 'poster', source: image.ref, width })
+        image.source === STORED_IMAGE_SOURCES.local
+          ? this.images.local({ itemId, kind: ITEM_IMAGE_KINDS.poster, source: image.ref, width })
           : this.images.tmdb({ path: image.ref, width })
       void made.catch(() => null)
     })

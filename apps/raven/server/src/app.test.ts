@@ -17,10 +17,12 @@ import { ServerEvents } from '@/events/serverEvents'
 import { RAVEN_CACHE_POLICIES, RAVEN_CONTENT_TYPES, RAVEN_HEADERS } from '@/http'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { MediaIndex } from '@/media/mediaIndex'
+import { RANGE_UNITS } from '@/media/range'
 import { ScannerService } from '@/scanner/scannerService'
 import {
   BROWSER_ENCODINGS,
   NOT_WATCHING,
+  ROUTE_METHODS,
   adminCookie,
   decodedBody,
   isRouteMethod,
@@ -140,7 +142,7 @@ describe('the media server', () => {
           { method: 'GET', url: '/api/home/search?q=buck' },
         ].map(async ({ method, url, payload }) => {
           const response = await app().inject({
-            method: isRouteMethod(method) ? method : 'GET',
+            method: isRouteMethod(method) ? method : ROUTE_METHODS.get,
             url,
             payload,
           })
@@ -280,10 +282,10 @@ describe('the media server', () => {
           headers: { range: 'bytes=0-99', [HEADERS.acceptEncoding]: BROWSER_ENCODINGS },
         })
         expect(response.statusCode).toBe(206)
-        expect(response.headers['content-type']).toBe('video/mp4')
-        expect(response.headers['content-encoding']).toBeUndefined()
-        expect(response.headers['accept-ranges']).toBe('bytes')
-        expect(response.headers['content-range']).toBe(`bytes 0-99/${movie?.size}`)
+        expect(response.headers[HEADERS.contentType]).toBe('video/mp4')
+        expect(response.headers[HEADERS.contentEncoding]).toBeUndefined()
+        expect(response.headers[RAVEN_HEADERS.acceptRanges]).toBe(RANGE_UNITS.bytes)
+        expect(response.headers[HEADERS.contentRange]).toBe(`bytes 0-99/${movie?.size}`)
         expect(response.rawPayload).toHaveLength(100)
         const onDisk = await readFile(join(state.media, 'Movies', 'Big.Buck.Test.2008.mp4'))
         expect(response.rawPayload.equals(onDisk.subarray(0, 100))).toBe(true)

@@ -21,22 +21,25 @@ import {
 import {
   type MediaItem,
   type MediaLocation,
+  THUMBNAIL_STATES,
   containerMimeType,
   isFavouriteChange,
   isProgressChange,
   isRecord,
   isString,
 } from '@raven/core'
+import { CONTENT_TYPES, HEADERS } from '@shared/server'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { AdminOnly, ForViewers } from '@/admin/adminGuard'
-import { errorMessage } from '@/errorMessage'
+import { ERROR_CODES, errorMessage } from '@/errorMessage'
+import { RAVEN_CACHE_POLICIES, RAVEN_HEADERS } from '@/http'
 import { sendImage } from '@/items/sendImage'
 import { PrivateBy } from '@/lock/lockGuard'
 import { MediaArtifacts } from '@/media/mediaArtifacts'
 import { type MediaFile, MediaIndex } from '@/media/mediaIndex'
 import { MediaPlane } from '@/media/mediaPlaneMark'
 import { MediaRepository } from '@/media/mediaRepository'
-import { parseRange } from '@/media/range'
+import { RANGE_OUTCOMES, RANGE_UNITS, parseRange } from '@/media/range'
 import { ViewingRepository } from '@/media/viewingRepository'
 import { parseBody } from '@/parseBody'
 import { ScannerService } from '@/scanner/scannerService'
@@ -57,8 +60,10 @@ const readFile = ({ path, start, end }: { path: string; start?: number; end?: nu
 /** What a client is told when the file stays put. Never the path: that stays server-side. */
 const deleteFailure = (error: unknown): string => {
   const code = errorCode(error)
-  if (code === 'EROFS') return 'Could not delete the file: its folder is mounted read-only.'
-  if (code === 'EACCES' || code === 'EPERM') {
+  if (code === ERROR_CODES.erofs) {
+    return 'Could not delete the file: its folder is mounted read-only.'
+  }
+  if (code === ERROR_CODES.eacces || code === ERROR_CODES.eperm) {
     return 'Could not delete the file: the server is not allowed to write to its folder.'
   }
   return `Could not delete the file${code ? ` (${code})` : ''}.`
@@ -154,7 +159,7 @@ export class MediaController {
     try {
       await unlink(file.path)
     } catch (error) {
-      if (errorCode(error) !== 'ENOENT') {
+      if (errorCode(error) !== ERROR_CODES.enoent) {
         this.logger.warn(`Could not delete ${file.path}: ${errorMessage(error)}`)
         throw new InternalServerErrorException(deleteFailure(error))
       }
@@ -170,7 +175,7 @@ export class MediaController {
     @Res() reply: FastifyReply,
   ): Promise<void> {
     const file = this.fileOf(id)
-    const path = file.thumbnail === 'ready' ? this.thumbnails.pathFor(id) : null
+    const path = file.thumbnail === THUMBNAIL_STATES.ready ? this.thumbnails.pathFor(id) : null
     await sendImage({ reply, path, version })
   }
 
@@ -194,22 +199,22 @@ export class MediaController {
     const size = info.size
     const range = parseRange({ header: request.headers.range, size })
     reply
-      .header('accept-ranges', 'bytes')
-      .header('content-type', containerMimeType(file.container) ?? 'application/octet-stream')
-      .header('cache-control', 'private, max-age=0, must-revalidate')
+      .header(RAVEN_HEADERS.acceptRanges, RANGE_UNITS.bytes)
+      .header(HEADERS.contentType, containerMimeType(file.container) ?? CONTENT_TYPES.octetStream)
+      .header(HEADERS.cacheControl, RAVEN_CACHE_POLICIES.privateRevalidate)
 
-    if (range === 'unsatisfiable') {
-      await reply.code(416).header('content-range', `bytes */${size}`).send()
+    if (range === RANGE_OUTCOMES.unsatisfiable) {
+      await reply.code(416).header(HEADERS.contentRange, `${RANGE_UNITS.bytes} */${size}`).send()
       return
     }
     if (range == null) {
-      await reply.header('content-length', size).send(readFile({ path: file.path }))
+      await reply.header(HEADERS.contentLength, size).send(readFile({ path: file.path }))
       return
     }
     await reply
       .code(206)
-      .header('content-range', `bytes ${range.start}-${range.end}/${size}`)
-      .header('content-length', range.end - range.start + 1)
+      .header(HEADERS.contentRange, `${RANGE_UNITS.bytes} ${range.start}-${range.end}/${size}`)
+      .header(HEADERS.contentLength, range.end - range.start + 1)
       .send(readFile({ path: file.path, start: range.start, end: range.end }))
   }
 }

@@ -1,3 +1,5 @@
+import { CONTENT_TYPES, HTTP_METHODS, HEADERS } from '@shared/server'
+
 /**
  * Plex's PIN sign-in, as plex.tv documents it for third-party apps: create a
  * strong PIN, send the browser to Plex's auth app with the PIN's code, and
@@ -6,12 +8,20 @@
  */
 
 /** The plex.tv client headers maester has always sent, so plex.tv keeps seeing the same app. */
-export const PLEX_PRODUCT = 'maester'
-export const PLEX_CLIENT_ID = 'maester'
+const PLEX_PRODUCT = 'maester'
+const PLEX_CLIENT_ID = 'maester'
 
 const PLEX_TV = 'https://plex.tv'
 const PLEX_AUTH_APP = 'https://app.plex.tv/auth'
 const TIMEOUT_MS = 10_000
+
+const PLEX_HEADERS = {
+  product: 'X-Plex-Product',
+  clientIdentifier: 'X-Plex-Client-Identifier',
+  token: 'X-Plex-Token',
+} as const
+
+type HttpMethod = (typeof HTTP_METHODS)[keyof typeof HTTP_METHODS]
 
 export type PlexPin = { id: string; code: string }
 
@@ -55,11 +65,11 @@ const idText = (value: unknown): string | null =>
 
 export class HttpPlexTv implements PlexTv {
   private async request({
-    method = 'GET',
+    method = HTTP_METHODS.get,
     path,
     token,
   }: {
-    method?: 'GET' | 'POST'
+    method?: HttpMethod
     path: string
     token?: string
   }): Promise<{ status: number; body: unknown }> {
@@ -67,10 +77,10 @@ export class HttpPlexTv implements PlexTv {
       const response = await fetch(`${PLEX_TV}${path}`, {
         method,
         headers: {
-          accept: 'application/json',
-          'X-Plex-Product': PLEX_PRODUCT,
-          'X-Plex-Client-Identifier': PLEX_CLIENT_ID,
-          ...(token ? { 'X-Plex-Token': token } : {}),
+          [HEADERS.accept]: CONTENT_TYPES.json,
+          [PLEX_HEADERS.product]: PLEX_PRODUCT,
+          [PLEX_HEADERS.clientIdentifier]: PLEX_CLIENT_ID,
+          ...(token ? { [PLEX_HEADERS.token]: token } : {}),
         },
         signal: AbortSignal.timeout(TIMEOUT_MS),
       })
@@ -83,7 +93,7 @@ export class HttpPlexTv implements PlexTv {
 
   async createPin(): Promise<PlexPin> {
     const { status, body } = await this.request({
-      method: 'POST',
+      method: HTTP_METHODS.post,
       path: '/api/v2/pins?strong=true',
     })
     const id = isRecord(body) ? idText(body.id) : null

@@ -1,3 +1,4 @@
+import { HEADERS } from '@shared/server'
 import { mkdirSync } from 'node:fs'
 import { readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -6,6 +7,7 @@ import { type ItemImageKind, POSTER_OWN_WIDTH, POSTER_WIDTHS, type PosterWidth }
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { imageScaleArgs } from '@/ffmpeg/args'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
+import { RAVEN_CONTENT_TYPES } from '@/http'
 import { METADATA_FETCH, type MetadataFetch, TMDB_IMAGE_PATH } from '@/metadata/tmdbClient'
 import { type Gate, createGate } from '@/scanner/concurrency'
 
@@ -44,7 +46,7 @@ const temporary = ({ dir, extension }: { dir: string; extension: string }): stri
   join(dir, `.${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`)
 
 export const contentTypeOf = (path: string): string =>
-  path.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg'
+  path.toLowerCase().endsWith('.png') ? RAVEN_CONTENT_TYPES.png : RAVEN_CONTENT_TYPES.jpeg
 
 /**
  * Posters, backdrops, photos and stills on disk beside the thumbnails, each

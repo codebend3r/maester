@@ -1,4 +1,4 @@
-import type { StreamMode } from '@raven/core'
+import { ENCODER_KINDS, PLAYBACK_MODES, type StreamMode } from '@raven/core'
 import { SOFTWARE, type VideoEncoder } from '@/ffmpeg/encoder'
 
 const QUIET = ['-hide_banner', '-loglevel', 'error', '-nostdin']
@@ -76,8 +76,11 @@ const QUALITY: Record<TranscodeQuality, { crf: string; qp: string; bitrate: stri
   high: { crf: '18', qp: '18', bitrate: '16M' },
 }
 
+/** ffprobe's `codec_name` for the codecs the args treat apart. */
+const VIDEO_CODECS = { h264: 'h264', hevc: 'hevc' } as const
+
 /** Codecs every Intel GPU recent enough for VAAPI decodes; anything else decodes on the CPU. */
-const GPU_DECODES: ReadonlySet<string> = new Set(['h264', 'hevc'])
+const GPU_DECODES: ReadonlySet<string> = new Set([VIDEO_CODECS.h264, VIDEO_CODECS.hevc])
 
 /**
  * The flags before `-i` and the video encoding after it, for a transcode.
@@ -111,7 +114,7 @@ const transcodeVideo = ({
   // and seeks quickly.
   const shared = ['-profile:v', 'high', '-g', '48']
 
-  if (encoder.kind === 'videotoolbox') {
+  if (encoder.kind === ENCODER_KINDS.videotoolbox) {
     return {
       input: ['-hwaccel', 'videotoolbox'],
       output: [
@@ -128,7 +131,7 @@ const transcodeVideo = ({
     }
   }
 
-  if (encoder.kind === 'vaapi') {
+  if (encoder.kind === ENCODER_KINDS.vaapi) {
     const device = ['-init_hw_device', `vaapi=va:${encoder.device}`, '-filter_hw_device', 'va']
     const gpuDecode = videoCodec != null && GPU_DECODES.has(videoCodec)
     const toBt709 = tonemap
@@ -231,11 +234,11 @@ export const streamArgs = ({
   quality?: TranscodeQuality
 }): string[] => {
   const video =
-    mode === 'remux'
+    mode === PLAYBACK_MODES.remux
       ? // Safari only plays HEVC in MP4 under the hvc1 tag.
         {
           input: [],
-          output: ['-c:v', 'copy', ...(videoCodec === 'hevc' ? ['-tag:v', 'hvc1'] : [])],
+          output: ['-c:v', 'copy', ...(videoCodec === VIDEO_CODECS.hevc ? ['-tag:v', 'hvc1'] : [])],
         }
       : transcodeVideo({ encoder, videoCodec, tonemap, maxHeight, quality })
   return [

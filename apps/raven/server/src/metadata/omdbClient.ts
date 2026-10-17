@@ -1,9 +1,14 @@
 import { Inject, Injectable } from '@nestjs/common'
 import { type RatingSource, isRecord, isString } from '@raven/core'
+import { CONTENT_TYPES, HEADERS } from '@shared/server'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
+import { ERROR_NAMES } from '@/errorMessage'
 import { METADATA_FETCH, type MetadataFetch } from '@/metadata/tmdbClient'
 
 const API = 'https://www.omdbapi.com/'
+
+/** OMDb's `Response` field, a string, when it has nothing to give. */
+const OMDB_RESPONSES = { false: 'False' } as const
 
 const TIMEOUT_MS = 10_000
 
@@ -96,12 +101,15 @@ export class OmdbClient {
     this.usedToday()
     this.budget.used += 1
     const query = new URLSearchParams({ i: imdbId, apikey: key })
-    const response = await this.fetch(`${API}?${query.toString()}`, {
-      headers: { accept: 'application/json' },
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+    const response = await this.fetch({
+      url: `${API}?${query.toString()}`,
+      init: {
+        headers: { [HEADERS.accept]: CONTENT_TYPES.json },
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      },
     }).catch((error: unknown) => {
       this.status.error =
-        error instanceof Error && error.name === 'TimeoutError'
+        error instanceof Error && error.name === ERROR_NAMES.timeoutError
           ? 'OMDb did not answer within 10 seconds.'
           : 'OMDb could not be reached.'
       throw new Error(this.status.error)
@@ -121,7 +129,7 @@ export class OmdbClient {
       throw new Error(this.status.error)
     }
     const body: unknown = await response.json().catch(() => null)
-    if (isRecord(body) && body.Response === 'False') {
+    if (isRecord(body) && body.Response === OMDB_RESPONSES.false) {
       const reason = isString(body.Error) ? body.Error : 'OMDb said no.'
       // Should a wrong key or a limit hit answer 200, the reason still tells.
       if (/api key/i.test(reason)) {

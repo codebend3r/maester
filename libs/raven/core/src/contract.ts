@@ -862,12 +862,17 @@ export const isPersonDetails = object({
 export type PersonDetails = Infer<typeof isPersonDetails>
 
 /** A logo is the title drawn as art, on a clear ground, for a movie's page. */
-export const isItemImageKind = oneOf(['poster', 'backdrop', 'still', 'logo'])
+export const ITEM_IMAGE_KINDS = {
+  poster: 'poster',
+  backdrop: 'backdrop',
+  still: 'still',
+  logo: 'logo',
+} as const
+
+export const isItemImageKind = oneOf(Object.values(ITEM_IMAGE_KINDS))
 
 /** The pictures an item can have. */
 export type ItemImageKind = Infer<typeof isItemImageKind>
-
-export const ITEM_IMAGE_KINDS = isItemImageKind.values
 
 /**
  * A poster's own width: what it is served at when no width is asked for, and

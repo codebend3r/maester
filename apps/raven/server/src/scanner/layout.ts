@@ -1,6 +1,7 @@
 import { dirname, join, relative } from 'node:path'
 import {
   type FolderLayout,
+  ITEM_TYPES,
   type LibraryKind,
   type PathLayout,
   describeLayout,
@@ -117,7 +118,7 @@ const fixPlacesOf = ({
   file: { folder: string; fileName: string }
 }): FixPlaces => {
   const own = filePlace(file)
-  if (matchTypeFor(kind) === 'show') return { title: showPlace(file), own }
+  if (matchTypeFor(kind) === ITEM_TYPES.show) return { title: showPlace(file), own }
   return { title: file.folder === '' ? own : file.folder, own }
 }
 
@@ -126,10 +127,12 @@ const placesIn = (places: FixPlaces): string[] =>
   places.title === places.own ? [places.own] : [places.title, places.own]
 
 /** What becomes of one Fix match: it stays where it is, goes, or moves to one new place. */
+const FIX_FATES = { stays: 'stays', goes: 'goes', moves: 'moves' } as const
+
 type FixFate = { from: string } & (
-  | { fate: 'stays' }
-  | { fate: 'goes' }
-  | { fate: 'moves'; to: string; isOwn: boolean }
+  | { fate: typeof FIX_FATES.stays }
+  | { fate: typeof FIX_FATES.goes }
+  | { fate: typeof FIX_FATES.moves; to: string; isOwn: boolean }
 )
 
 /**
@@ -194,20 +197,25 @@ export const planRelayout = ({
         covered.map((file) => (from === file.before.own ? file.after.own : file.after.title)),
       ),
     ]
-    if (targets.length > 1) return { from, fate: 'goes' }
+    if (targets.length > 1) return { from, fate: FIX_FATES.goes }
     const [to] = targets
-    if (to == null || to === from) return { from, fate: 'stays' }
+    if (to == null || to === from) return { from, fate: FIX_FATES.stays }
     const ids = new Set(covered.map((file) => file.id))
     const holdsOnlyTheirs = (place: string) =>
       (after.get(place) ?? []).every((entry) => ids.has(entry.file.id))
     if (holdsOnlyTheirs(to)) {
-      return { from, fate: 'moves', to, isOwn: covered.every((file) => file.before.own === from) }
+      return {
+        from,
+        fate: FIX_FATES.moves,
+        to,
+        isOwn: covered.every((file) => file.before.own === from),
+      }
     }
-    return holdsOnlyTheirs(from) ? { from, fate: 'stays' } : { from, fate: 'goes' }
+    return holdsOnlyTheirs(from) ? { from, fate: FIX_FATES.stays } : { from, fate: FIX_FATES.goes }
   }
   const fates = overrides.map(fateOf)
   const rivals = groupBy({
-    items: fates.flatMap((fixed) => (fixed.fate === 'moves' ? [fixed] : [])),
+    items: fates.flatMap((fixed) => (fixed.fate === FIX_FATES.moves ? [fixed] : [])),
     key: (fixed) => fixed.to,
   })
   return {
@@ -215,11 +223,11 @@ export const planRelayout = ({
     overrides: fates.flatMap((fixed): RelayoutPlan['overrides'] => {
       switch (fixed.fate) {
         // Only one kept for a place with no files can stay where another lands.
-        case 'stays':
+        case FIX_FATES.stays:
           return rivals.has(fixed.from) ? [{ from: fixed.from, to: null }] : []
-        case 'goes':
+        case FIX_FATES.goes:
           return [{ from: fixed.from, to: null }]
-        case 'moves': {
+        case FIX_FATES.moves: {
           const claims = rivals.get(fixed.to) ?? []
           const isWinner =
             claims.length === 1 ||

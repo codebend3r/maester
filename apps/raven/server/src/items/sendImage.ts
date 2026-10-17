@@ -1,7 +1,9 @@
 import { createReadStream } from 'node:fs'
 import { stat } from 'node:fs/promises'
 import { NotFoundException } from '@nestjs/common'
+import { HEADERS } from '@shared/server'
 import type { FastifyReply } from 'fastify'
+import { RAVEN_CACHE_POLICIES } from '@/http'
 import { contentTypeOf } from '@/metadata/imageCache'
 
 /**
@@ -22,11 +24,11 @@ export const sendImage = async ({
   const info = path == null ? null : await stat(path).catch(() => null)
   if (path == null || !info?.isFile()) throw new NotFoundException('No picture')
   await reply
-    .header('content-type', contentTypeOf(path))
-    .header('content-length', info.size)
+    .header(HEADERS.contentType, contentTypeOf(path))
+    .header(HEADERS.contentLength, info.size)
     .header(
-      'cache-control',
-      version ? 'private, max-age=31536000, immutable' : 'private, max-age=60',
+      HEADERS.cacheControl,
+      version ? RAVEN_CACHE_POLICIES.privateImmutable : RAVEN_CACHE_POLICIES.privateMinute,
     )
     .send(createReadStream(path))
 }

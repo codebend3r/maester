@@ -15,13 +15,24 @@ import { SessionsRepository } from '@/sessions/sessionsRepository'
 import { UsersRepository } from '@/users/usersRepository'
 
 /** Why a sign-in came back without a session; `/login` shows a message for each. */
-export type SignInError = 'not_approved' | 'expired' | 'plex_unavailable'
+export const SIGN_IN_ERRORS = {
+  notApproved: 'not_approved',
+  expired: 'expired',
+  plexUnavailable: 'plex_unavailable',
+} as const
+
+type SignInError = (typeof SIGN_IN_ERRORS)[keyof typeof SIGN_IN_ERRORS]
+
+export const SIGN_IN_RESULT_KINDS = { signedIn: 'signed_in', failed: 'failed' } as const
 
 export type SignInResult =
-  | { kind: 'signed_in'; token: string; returnTo: string }
-  | { kind: 'failed'; error: SignInError; returnTo: string | null }
+  | { kind: typeof SIGN_IN_RESULT_KINDS.signedIn; token: string; returnTo: string }
+  | { kind: typeof SIGN_IN_RESULT_KINDS.failed; error: SignInError; returnTo: string | null }
 
 export const CALLBACK_PATH = '/auth/plex/callback'
+
+/** The web app's pages the server sends a browser to. */
+export const PAGE_PATHS = { home: '/', login: '/login' } as const
 
 @Injectable()
 export class SignInService {
@@ -48,7 +59,7 @@ export class SignInService {
     const pin = await this.plex.createPin()
     const pendingId = this.pending.create({
       pin,
-      returnTo: this.returnTo({ value: returnTo, fallback: '/' }),
+      returnTo: this.returnTo({ value: returnTo, fallback: PAGE_PATHS.home }),
       now: this.clock(),
     })
     return {
@@ -67,23 +78,25 @@ export class SignInService {
    */
   async complete({ pendingId }: { pendingId: string | null }): Promise<SignInResult> {
     const pending = pendingId ? this.pending.live({ id: pendingId, now: this.clock() }) : null
-    if (!pending) return { kind: 'failed', error: 'expired', returnTo: null }
+    if (!pending) {
+      return { kind: SIGN_IN_RESULT_KINDS.failed, error: SIGN_IN_ERRORS.expired, returnTo: null }
+    }
     const failed = (error: SignInError): SignInResult => ({
-      kind: 'failed',
+      kind: SIGN_IN_RESULT_KINDS.failed,
       error,
       returnTo: pending.returnTo,
     })
     try {
       const token = await this.claimToken({ pin: pending.pin })
-      if (token == null) return failed('not_approved')
+      if (token == null) return failed(SIGN_IN_ERRORS.notApproved)
       const account = await this.plex.account(token)
       const now = this.clock()
       const user = this.users.signInWithPlex({ account, now })
       const session = this.sessions.create({ userId: user.id, now })
       this.pending.delete(pending.id)
-      return { kind: 'signed_in', token: session, returnTo: pending.returnTo }
+      return { kind: SIGN_IN_RESULT_KINDS.signedIn, token: session, returnTo: pending.returnTo }
     } catch (error) {
-      if (error instanceof PlexUnavailable) return failed('plex_unavailable')
+      if (error instanceof PlexUnavailable) return failed(SIGN_IN_ERRORS.plexUnavailable)
       throw error
     }
   }

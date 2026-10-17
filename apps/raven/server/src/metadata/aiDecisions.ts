@@ -3,21 +3,30 @@ import { type AiSuggestion, type Infer, oneOf } from '@raven/core'
 import { DatabaseService } from '@/db/database'
 
 /** How sure the AI lookup was: `high` is matched, `low` is a suggestion. */
-export const isAiConfidence = oneOf(['high', 'low'])
+export const AI_CONFIDENCES = { high: 'high', low: 'low' } as const
+
+export const isAiConfidence = oneOf(Object.values(AI_CONFIDENCES))
 
 export type AiConfidence = Infer<typeof isAiConfidence>
 
 /** The movie or show the AI lookup chose, as the search that offered it described it. */
 export type AiPick = Omit<AiSuggestion, 'reason' | 'place'>
 
+export const AI_OUTCOME_KINDS = { chosen: 'chosen', none: 'none', undecided: 'undecided' } as const
+
 /** How one lookup came out. */
 export type AiOutcome =
   /** Claude chose a result `search_tmdb` offered in the lookup. */
-  | { kind: 'chosen'; pick: AiPick; confidence: AiConfidence; reason: string }
+  | {
+      kind: typeof AI_OUTCOME_KINDS.chosen
+      pick: AiPick
+      confidence: AiConfidence
+      reason: string
+    }
   /** Claude chose nothing: no result fits, or the files are another show's. */
-  | { kind: 'none'; confidence: AiConfidence; reason: string }
+  | { kind: typeof AI_OUTCOME_KINDS.none; confidence: AiConfidence; reason: string }
   /** No decision: a refusal, no `choose_match`, an id never offered, or out of turns. */
-  | { kind: 'undecided'; reason: string }
+  | { kind: typeof AI_OUTCOME_KINDS.undecided; reason: string }
 
 /** Where a decision is kept: a group's place in a library, as a Fix match is. */
 export type DecisionPlace = { libraryId: number; place: string }
@@ -35,9 +44,9 @@ type Row = {
 /** How an outcome is kept: one with no decision counts as low, with no id. */
 const rowOf = (outcome: AiOutcome): Row => {
   switch (outcome.kind) {
-    case 'chosen':
+    case AI_OUTCOME_KINDS.chosen:
       return { ...outcome.pick, confidence: outcome.confidence, reason: outcome.reason }
-    case 'none':
+    case AI_OUTCOME_KINDS.none:
       return {
         tmdbId: null,
         title: null,
@@ -46,13 +55,13 @@ const rowOf = (outcome: AiOutcome): Row => {
         confidence: outcome.confidence,
         reason: outcome.reason,
       }
-    case 'undecided':
+    case AI_OUTCOME_KINDS.undecided:
       return {
         tmdbId: null,
         title: null,
         year: null,
         poster: null,
-        confidence: 'low',
+        confidence: AI_CONFIDENCES.low,
         reason: outcome.reason,
       }
     default: {

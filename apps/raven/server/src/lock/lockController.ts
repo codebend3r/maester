@@ -1,3 +1,4 @@
+import { HEADERS } from '@shared/server'
 import {
   Body,
   Controller,
@@ -12,6 +13,7 @@ import {
 import { type LockState, isUnlockRequest } from '@raven/core'
 import type { FastifyReply } from 'fastify'
 import { ForViewers } from '@/admin/adminGuard'
+import { RAVEN_HEADERS } from '@/http'
 import { LockService } from '@/lock/lockService'
 import { parseBody } from '@/parseBody'
 
@@ -20,7 +22,7 @@ export class LockController {
   constructor(@Inject(LockService) private readonly lock: LockService) {}
 
   @Get()
-  state(@Headers('cookie') cookie: string | undefined): LockState {
+  state(@Headers(RAVEN_HEADERS.cookie) cookie: string | undefined): LockState {
     return this.lock.state({ cookie })
   }
 
@@ -32,7 +34,7 @@ export class LockController {
     const { pin } = parseBody({ guard: isUnlockRequest, body, message: 'pin must be text' })
     const unlocking = this.lock.unlock(pin)
     if (!unlocking.ok) throw new HttpException(unlocking.message, unlocking.status)
-    reply.header('set-cookie', unlocking.cookie)
+    reply.header(HEADERS.setCookie, unlocking.cookie)
     return { available: true, unlocked: true }
   }
 
@@ -41,7 +43,7 @@ export class LockController {
   @Post('lock')
   @HttpCode(200)
   relock(@Res({ passthrough: true }) reply: FastifyReply): LockState {
-    reply.header('set-cookie', this.lock.lockCookie())
+    reply.header(HEADERS.setCookie, this.lock.lockCookie())
     return { available: this.lock.available, unlocked: false }
   }
 }

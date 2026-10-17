@@ -17,6 +17,7 @@ import { AUDIENCES } from '@/admin/adminGuard'
 import { createApp } from '@/app'
 import { CONTROLLERS } from '@/appModule'
 import { LOCKED_SCAN_ERROR } from '@/libraries/librariesController'
+import { LOCK_MARKS } from '@/lock/lockGuard'
 import type { Privacy } from '@/lock/lockService'
 import { MediaIndex } from '@/media/mediaIndex'
 import { MetadataRepository } from '@/metadata/metadataRepository'
@@ -28,6 +29,7 @@ import {
   ADMIN_PASSWORD,
   NOT_WATCHING,
   ROUTE_METHODS,
+  type RouteMethod,
   adminCookie,
   cookieSet,
   cookies,
@@ -57,7 +59,7 @@ describe('a library locked behind the PIN', () => {
   const api = (cookie?: string): ApiClient =>
     apiFor({ app: app(), cookie: cookies(state.admin, cookie) })
   /** A request by hand from the same browser. */
-  const inject = ({ method, url }: { method: (typeof ROUTE_METHODS)[number]; url: string }) =>
+  const inject = ({ method, url }: { method: RouteMethod; url: string }) =>
     app().inject({ method, url, headers: { cookie: state.admin } })
   const at = (...parts: string[]) => join(state.root, 'media', ...parts)
   /**
@@ -204,7 +206,7 @@ describe('a library locked behind the PIN', () => {
       item: state.privateItem,
     }
     const held = routeMarks(CONTROLLERS).flatMap((route) =>
-      route.lock == null || route.lock === 'public' || !isRouteMethod(route.method)
+      route.lock == null || route.lock === LOCK_MARKS.public || !isRouteMethod(route.method)
         ? []
         : [
             {
@@ -488,13 +490,16 @@ describe('the admin lock', () => {
     const absent = 999999
     const ids: Record<Privacy, number> = { library: absent, media: absent, item: state.openItem }
     const managing = routeMarks(CONTROLLERS).flatMap(({ method, path, lock, audience }) =>
-      audience !== 'admin' || !isRouteMethod(method)
+      audience !== AUDIENCES.admin || !isRouteMethod(method)
         ? []
         : [
             {
               method,
               url: path
-                .replace(':id', String(lock == null || lock === 'public' ? absent : ids[lock]))
+                .replace(
+                  ':id',
+                  String(lock == null || lock === LOCK_MARKS.public ? absent : ids[lock]),
+                )
                 .replace(/:\w+/g, 'poster'),
             },
           ],
@@ -514,7 +519,7 @@ describe('the admin lock', () => {
     expect(admitted.filter(({ code }) => code === 403).map(({ route }) => route)).toEqual([])
     expect(
       admitted
-        .filter(({ method, code }) => method !== 'GET' && code < 400)
+        .filter(({ method, code }) => method !== ROUTE_METHODS.get && code < 400)
         .map(({ route }) => route),
     ).toEqual([])
   })

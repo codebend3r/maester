@@ -1,12 +1,15 @@
 import { brotliDecompressSync, gunzipSync } from 'node:zlib'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import { isRecord } from '@raven/core'
+import { ENCODINGS, HEADERS, HTTP_METHODS } from '@shared/server'
 import { type ServerConfig, readServerConfig } from '@/config'
 
-export const ROUTE_METHODS = ['GET', 'POST', 'PUT', 'DELETE'] as const
+export const ROUTE_METHODS = { ...HTTP_METHODS, put: 'PUT', delete: 'DELETE' } as const
 
-export const isRouteMethod = (value: string): value is (typeof ROUTE_METHODS)[number] =>
-  ROUTE_METHODS.some((method) => method === value)
+export type RouteMethod = (typeof ROUTE_METHODS)[keyof typeof ROUTE_METHODS]
+
+export const isRouteMethod = (value: string): value is RouteMethod =>
+  Object.values(ROUTE_METHODS).some((method) => method === value)
 
 /** A watcher that never fires, for tests that scan by hand. */
 export const NOT_WATCHING = { watchFolder: () => ({ close: () => undefined }) }
@@ -40,9 +43,9 @@ export const decodedBody = (response: {
   headers: Record<string, unknown>
   rawPayload: Buffer
 }): Buffer => {
-  const encoding = response.headers['content-encoding']
-  if (encoding === 'br') return brotliDecompressSync(response.rawPayload)
-  if (encoding === 'gzip') return gunzipSync(response.rawPayload)
+  const encoding = response.headers[HEADERS.contentEncoding]
+  if (encoding === ENCODINGS.br) return brotliDecompressSync(response.rawPayload)
+  if (encoding === ENCODINGS.gzip) return gunzipSync(response.rawPayload)
   if (encoding === undefined) return response.rawPayload
   throw new Error(`Answered in ${String(encoding)}, which no browser asked for`)
 }
@@ -59,7 +62,7 @@ export const ADMIN_PASSWORD = 'Raven-Admin-2026'
 
 /** The cookie a response sets, as a browser sends it back: its name and value, no attributes. */
 export const cookieSet = (response: { headers: Record<string, unknown> }): string => {
-  const header = response.headers['set-cookie']
+  const header = response.headers[HEADERS.setCookie]
   return typeof header === 'string' ? (header.split(';')[0] ?? '') : ''
 }
 

@@ -163,7 +163,7 @@ export const showBody = (show: FakeShow): Record<string, unknown> => ({
   tagline: 'A tagline.',
   episode_run_time: [45],
   number_of_episodes: Object.entries(show.seasons)
-    .filter(([number]) => number !== '0')
+    .filter(([number]) => Number(number) !== 0)
     .reduce((sum, [, episodes]) => sum + episodes.length, 0),
   seasons: Object.entries(show.seasons).map(([number, episodes]) => ({
     season_number: Number(number),
@@ -310,7 +310,7 @@ export const fakeTmdb = ({
     state.calls.push(url)
     if (state.down) throw new TypeError('fetch failed')
     const parsed = new URL(url)
-    if (parsed.host === 'www.omdbapi.com') {
+    if (parsed.host === HOSTS.omdb) {
       state.omdbCalls += 1
       if (parsed.searchParams.get('apikey') !== 'omdb-key') {
         return json({ body: { Response: 'False', Error: 'Invalid API key!' }, status: 401 })
@@ -332,19 +332,21 @@ export const fakeTmdb = ({
         },
       })
     }
-    if (parsed.host === 'image.tmdb.org') {
-      return new Response(FAKE_JPEG, { headers: { 'content-type': 'image/jpeg' } })
+    if (parsed.host === HOSTS.images) {
+      return new Response(FAKE_JPEG, {
+        headers: { [HEADERS.contentType]: RAVEN_CONTENT_TYPES.jpeg },
+      })
     }
     const path = parsed.pathname.replace(/^\/3/, '')
     if (state.failing.some((prefix) => path.startsWith(prefix))) throw new TypeError('fetch failed')
     const query = parsed.searchParams
     const appended = (query.get('append_to_response') ?? '').split(',')
 
-    if (path === '/search/movie') {
+    if (path === TMDB_SEARCH_ROUTES.movie) {
       const title = query.get('query') ?? ''
       await held.get(title.toLowerCase())
       const year = query.get('year')
-      const isAdultIncluded = query.get('include_adult') === 'true'
+      const isAdultIncluded = query.get('include_adult') === QUERY_FLAGS.true
       const results = state.movies.filter(
         (movie) =>
           [movie.title, ...(movie.alternativeTitles ?? [])].some((each) =>
@@ -354,21 +356,23 @@ export const fakeTmdb = ({
           (isAdultIncluded || !movie.isHiddenFromSearch),
       )
       return json({
-        results: results.map((movie) => ({
-          id: movie.id,
-          title: movie.title,
-          original_title: movie.originalTitle ?? movie.title,
-          release_date: movie.released,
-          genre_ids: movie.genreIds ?? [28, 878],
-          original_language: movie.language ?? 'en',
-          popularity: movie.popularity,
-          overview: `${movie.title} is a film.`,
-          poster_path: movie.poster === undefined ? `/poster${movie.id}.jpg` : movie.poster,
-        })),
+        body: {
+          results: results.map((movie) => ({
+            id: movie.id,
+            title: movie.title,
+            original_title: movie.originalTitle ?? movie.title,
+            release_date: movie.released,
+            genre_ids: movie.genreIds ?? [28, 878],
+            original_language: movie.language ?? 'en',
+            popularity: movie.popularity,
+            overview: `${movie.title} is a film.`,
+            poster_path: movie.poster === undefined ? `/poster${movie.id}.jpg` : movie.poster,
+          })),
+        },
       })
     }
 
-    if (path === '/search/tv') {
+    if (path === TMDB_SEARCH_ROUTES.show) {
       const title = query.get('query') ?? ''
       const year = query.get('first_air_date_year')
       const results = state.shows.filter(
@@ -379,18 +383,20 @@ export const fakeTmdb = ({
           (year == null || Math.abs(yearOf(show.first) - Number(year)) <= 1),
       )
       return json({
-        results: results.map((show) => ({
-          id: show.id,
-          name: show.title,
-          original_name: show.title,
-          first_air_date: show.first,
-          origin_country: show.countries ?? ['US'],
-          genre_ids: show.genreIds ?? [18],
-          original_language: show.language ?? 'en',
-          popularity: show.popularity,
-          overview: `${show.title} is a show.`,
-          poster_path: `/showposter${show.id}.jpg`,
-        })),
+        body: {
+          results: results.map((show) => ({
+            id: show.id,
+            name: show.title,
+            original_name: show.title,
+            first_air_date: show.first,
+            origin_country: show.countries ?? ['US'],
+            genre_ids: show.genreIds ?? [18],
+            original_language: show.language ?? 'en',
+            popularity: show.popularity,
+            overview: `${show.title} is a show.`,
+            poster_path: `/showposter${show.id}.jpg`,
+          })),
+        },
       })
     }
 
@@ -399,9 +405,13 @@ export const fakeTmdb = ({
       const id = decodeURIComponent(find[1] ?? '')
       const source = query.get('external_source')
       const movieHits =
-        source === 'imdb_id' ? state.movies.filter((movie) => movie.imdbId === id) : []
+        source === TMDB_EXTERNAL_SOURCES.imdbId
+          ? state.movies.filter((movie) => movie.imdbId === id)
+          : []
       const showHits = state.shows.filter((show) =>
-        source === 'tvdb_id' ? show.tvdbId === id : source === 'imdb_id' && `tt${show.id}` === id,
+        source === TMDB_EXTERNAL_SOURCES.tvdbId
+          ? show.tvdbId === id
+          : source === TMDB_EXTERNAL_SOURCES.imdbId && `tt${show.id}` === id,
       )
       return json({
         body: {
@@ -425,18 +435,20 @@ export const fakeTmdb = ({
       const found = state.shows.find((entry) => String(entry.id) === show[1])
       return found
         ? json({
-            ...showBody(found),
-            ...(appended.includes('alternative_titles')
-              ? {
-                  alternative_titles: {
-                    results: (found.alternativeTitles ?? []).map((title) => ({
-                      iso_3166_1: 'GB',
-                      title,
-                      type: '',
-                    })),
-                  },
-                }
-              : {}),
+            body: {
+              ...showBody(found),
+              ...(appended.includes('alternative_titles')
+                ? {
+                    alternative_titles: {
+                      results: (found.alternativeTitles ?? []).map((title) => ({
+                        iso_3166_1: 'GB',
+                        title,
+                        type: '',
+                      })),
+                    },
+                  }
+                : {}),
+            },
           })
         : json({ body: { status_code: 34 }, status: 404 })
     }
@@ -445,7 +457,7 @@ export const fakeTmdb = ({
     if (images) {
       const id = Number(images[2])
       const known =
-        images[1] === 'movie'
+        images[1] === TMDB_SEGMENTS.movie
           ? state.movies.some((entry) => entry.id === id)
           : state.shows.some((entry) => entry.id === id)
       if (!known) return json({ body: { status_code: 34 }, status: 404 })
@@ -475,28 +487,32 @@ export const fakeTmdb = ({
     const alternatives = /^\/(movie|tv)\/(\d+)\/alternative_titles$/.exec(path)
     if (alternatives) {
       const id = Number(alternatives[2])
-      if (alternatives[1] === 'tv') {
+      if (alternatives[1] === TMDB_SEGMENTS.show) {
         const titled = state.shows.find((entry) => entry.id === id)
         return titled
           ? json({
-              id,
-              results: (titled.alternativeTitles ?? []).map((title) => ({
-                iso_3166_1: 'GB',
-                title,
-                type: '',
-              })),
+              body: {
+                id,
+                results: (titled.alternativeTitles ?? []).map((title) => ({
+                  iso_3166_1: 'GB',
+                  title,
+                  type: '',
+                })),
+              },
             })
           : json({ body: { status_code: 34 }, status: 404 })
       }
       const found = state.movies.find((entry) => entry.id === id)
       return found
         ? json({
-            id,
-            titles: (found.alternativeTitles ?? []).map((title) => ({
-              iso_3166_1: 'US',
-              title,
-              type: '',
-            })),
+            body: {
+              id,
+              titles: (found.alternativeTitles ?? []).map((title) => ({
+                iso_3166_1: 'US',
+                title,
+                type: '',
+              })),
+            },
           })
         : json({ body: { status_code: 34 }, status: 404 })
     }
@@ -506,18 +522,20 @@ export const fakeTmdb = ({
       const found = state.movies.find((entry) => String(entry.id) === movie[1])
       return found
         ? json({
-            ...movieBody(found),
-            ...(appended.includes('alternative_titles')
-              ? {
-                  alternative_titles: {
-                    titles: (found.alternativeTitles ?? []).map((title) => ({
-                      iso_3166_1: 'US',
-                      title,
-                      type: '',
-                    })),
-                  },
-                }
-              : {}),
+            body: {
+              ...movieBody(found),
+              ...(appended.includes('alternative_titles')
+                ? {
+                    alternative_titles: {
+                      titles: (found.alternativeTitles ?? []).map((title) => ({
+                        iso_3166_1: 'US',
+                        title,
+                        type: '',
+                      })),
+                    },
+                  }
+                : {}),
+            },
           })
         : json({ body: { status_code: 34 }, status: 404 })
     }

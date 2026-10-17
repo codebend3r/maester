@@ -10,7 +10,7 @@ import {
   ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common'
-import { readCookie } from '@shared/server'
+import { readCookie, HEADERS } from '@shared/server'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import {
@@ -21,9 +21,22 @@ import {
   pinCookie,
   sessionCookie,
 } from '@/auth/cookies'
-import { CALLBACK_PATH, SignInService } from '@/auth/signInService'
+import {
+  CALLBACK_PATH,
+  PAGE_PATHS,
+  SIGN_IN_ERRORS,
+  SIGN_IN_RESULT_KINDS,
+  SignInService,
+} from '@/auth/signInService'
 import { PlexUnavailable } from '@/plex/plexTv'
 import { AccountService } from '@/sessions/accountService'
+import { SESSION_KINDS } from '@/sessions/sessionsRepository'
+
+/** The headers these routes set that `@shared/server`'s `HEADERS` does not name. */
+const REPLY_HEADERS = { location: 'location' } as const
+
+/** Why a route that needs a session refused the request. */
+export const SESSION_ERRORS = { signedOut: 'signed_out' } as const
 
 export type PublicUser = {
   id: string
@@ -57,11 +70,11 @@ export class AuthController {
       const { pendingId, authUrl } = await this.signIn.start({
         returnTo: returnToIn(body),
       })
-      reply.header('set-cookie', pinCookie({ id: pendingId, config: this.config }))
+      reply.header(HEADERS.setCookie, pinCookie({ id: pendingId, config: this.config }))
       return { auth_url: authUrl }
     } catch (error) {
       if (error instanceof PlexUnavailable) {
-        throw new ServiceUnavailableException({ reason: 'plex_unavailable' })
+        throw new ServiceUnavailableException({ reason: SIGN_IN_ERRORS.plexUnavailable })
       }
       throw error
     }
@@ -72,19 +85,24 @@ export class AuthController {
     const result = await this.signIn.complete({
       pendingId: readCookie({ header: request.headers.cookie, name: PIN_COOKIE }),
     })
-    if (result.kind === 'signed_in') {
-      reply.header('set-cookie', [
+    if (result.kind === SIGN_IN_RESULT_KINDS.signedIn) {
+      reply.header(HEADERS.setCookie, [
         sessionCookie({ token: result.token, config: this.config }),
         clearedPinCookie({ config: this.config }),
       ])
-      return void reply.code(303).header('location', result.returnTo).send()
+      return void reply.code(303).header(REPLY_HEADERS.location, result.returnTo).send()
     }
     const query = new URLSearchParams({
       error: result.error,
-      ...(result.returnTo && result.returnTo !== '/' ? { return_to: result.returnTo } : {}),
+      ...(result.returnTo && result.returnTo !== PAGE_PATHS.home
+        ? { return_to: result.returnTo }
+        : {}),
     })
-    reply.header('set-cookie', clearedPinCookie({ config: this.config }))
-    return void reply.code(303).header('location', `/login?${query.toString()}`).send()
+    reply.header(HEADERS.setCookie, clearedPinCookie({ config: this.config }))
+    return void reply
+      .code(303)
+      .header(REPLY_HEADERS.location, `${PAGE_PATHS.login}?${query.toString()}`)
+      .send()
   }
 
   @Post('api/auth/logout')
@@ -95,14 +113,16 @@ export class AuthController {
     @Res({ passthrough: true }) reply: FastifyReply,
   ): { next: string } {
     this.signIn.signOut({ token: sessionToken(request) })
-    reply.header('set-cookie', clearedSessionCookie({ config: this.config }))
-    return { next: this.signIn.returnTo({ value: returnToIn(body), fallback: '/login' }) }
+    reply.header(HEADERS.setCookie, clearedSessionCookie({ config: this.config }))
+    return { next: this.signIn.returnTo({ value: returnToIn(body), fallback: PAGE_PATHS.login }) }
   }
 
   @Get('api/me')
   me(@Req() request: FastifyRequest): { user: PublicUser } {
     const account = this.accounts.forToken(sessionToken(request))
-    if (account.kind !== 'live') throw new UnauthorizedException({ reason: 'signed_out' })
+    if (account.kind !== SESSION_KINDS.live) {
+      throw new UnauthorizedException({ reason: SESSION_ERRORS.signedOut })
+    }
     const { id, displayName, email, thumb } = account.user
     return { user: { id, display_name: displayName, email, thumb } }
   }

@@ -1,7 +1,14 @@
-import { type FSWatcher, watch } from 'node:fs'
+import { type FSWatcher, type WatchEventType, watch } from 'node:fs'
 import { join } from 'node:path'
 import { isRecord } from '@raven/core'
+import { ERROR_CODES } from '@/errorMessage'
 import { foldersUnder, isUnder } from '@/scanner/walk'
+
+/** The `fs.watch` event a folder watch follows up. */
+const WATCH_EVENTS = { rename: 'rename' } as const satisfies Record<string, WatchEventType>
+
+/** The `process.platform` whose `fs.watch` cannot watch a whole tree at once. */
+const PLATFORMS = { linux: 'linux' } as const satisfies Record<string, NodeJS.Platform>
 
 /** A watch that has stopped once closed. */
 export type Watching = { close: () => void }
@@ -20,7 +27,7 @@ export type WatchFolder = (args: {
 
 /** The system has no watches left to give, which no later folder will fix. */
 const isOutOfWatches = (error: unknown): boolean =>
-  isRecord(error) && (error.code === 'ENOSPC' || error.code === 'EMFILE')
+  isRecord(error) && (error.code === ERROR_CODES.enospc || error.code === ERROR_CODES.emfile)
 
 /** macOS and Windows watch a whole tree with one native watch. */
 export const watchTree: WatchFolder = ({ root, onChange, onError }) => {
@@ -62,7 +69,7 @@ export const watchEachFolder: WatchFolder = ({ root, onChange, onError }) => {
         const path = name == null ? folder : join(folder, name)
         onChange(path)
         // Only a rename adds or takes away a folder; a change is a file being written.
-        if (event === 'rename') void follow(path)
+        if (event === WATCH_EVENTS.rename) void follow(path)
       })
       // A folder deleted under the watch errors here; only the root's matters.
       watcher.on('error', (error) => {
@@ -102,4 +109,4 @@ export const watchEachFolder: WatchFolder = ({ root, onChange, onError }) => {
 
 /** Watches a library path the cheapest way the platform has. */
 export const watchFolder: WatchFolder = (args) =>
-  process.platform === 'linux' ? watchEachFolder(args) : watchTree(args)
+  process.platform === PLATFORMS.linux ? watchEachFolder(args) : watchTree(args)

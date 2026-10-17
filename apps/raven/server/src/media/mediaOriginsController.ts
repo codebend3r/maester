@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto'
 import { Controller, Get, Header, Inject, Logger, Query, Res } from '@nestjs/common'
 import { MEDIA_PROBE_BYTES, type MediaOrigins } from '@raven/core'
-import { wholeNumber } from '@shared/server'
+import { CONTENT_TYPES, HEADERS, wholeNumber, CACHE_POLICIES } from '@shared/server'
 import type { FastifyReply } from 'fastify'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { Public } from '@/lock/lockGuard'
@@ -28,7 +28,7 @@ export class MediaOriginsController {
     config.mediaPlane.problems.forEach((problem) => logger.warn(problem))
   }
 
-  @Header('cache-control', 'no-store')
+  @Header(HEADERS.cacheControl, CACHE_POLICIES.noStore)
   @Get()
   list(): MediaOrigins {
     return { origins: this.tickets.isOn ? this.config.mediaPlane.origins : [] }
@@ -45,9 +45,9 @@ export class MediaOriginsController {
     const asked = wholeNumber(bytes) ?? MEDIA_PROBE_BYTES
     const length = Math.min(Math.max(asked, 1), MAX_PROBE_BYTES)
     await reply
-      .header('content-type', 'application/octet-stream')
-      .header('content-length', length)
-      .header('cache-control', 'no-store')
+      .header(HEADERS.contentType, CONTENT_TYPES.octetStream)
+      .header(HEADERS.contentLength, length)
+      .header(HEADERS.cacheControl, CACHE_POLICIES.noStore)
       .send(this.noise.subarray(0, length))
   }
 }

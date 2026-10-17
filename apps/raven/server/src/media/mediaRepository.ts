@@ -1,6 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common'
 import {
   DEFAULT_SAGA_BACKDROP,
+  ITEM_TYPES,
+  LIBRARY_BACKDROP_TYPES,
   type LibraryBackdrop,
   MEDIA_SORTS,
   type MediaItem,
@@ -8,6 +10,7 @@ import {
   type PosterEntry,
   type Saga,
   type ShowEntry,
+  THUMBNAIL_STATES,
   isMatchState,
   isThumbnailState,
   readCut,
@@ -106,7 +109,7 @@ const SELECT_MEDIA = `${SELECT_COLUMNS}${FROM_MEDIA}`
  * its movie's own card, and for anything but a movie.
  */
 const variantOf = (row: MediaRow): string | null => {
-  if (row.item_type !== 'movie' || row.split == null) return null
+  if (row.item_type !== ITEM_TYPES.movie || row.split == null) return null
   if (row.split.startsWith('cut:')) return row.split.slice('cut:'.length)
   const titles = [row.item_tmdb_title, row.item_tmdb_original_title]
   return readCut({ fileName: row.file_name, titles })?.label ?? readRelease(row.file_name)
@@ -143,7 +146,7 @@ const toItem = (row: MediaRow): MediaItem => ({
   item: null,
   versions: row.versions,
   variant: variantOf(row),
-  card: row.item_type === 'movie' ? row.split : null,
+  card: row.item_type === ITEM_TYPES.movie ? row.split : null,
 })
 
 /** A show in a TV library's listing, before its next episode is looked up. */
@@ -574,9 +577,9 @@ export class MediaRepository {
       .get(libraryId)
     if (!newest) return null
     const backdrop = newest.item_id == null ? null : this.images.backdropFor(newest.item_id)
-    if (backdrop) return { type: 'item', ...backdrop }
-    return newest.thumbnail === 'ready'
-      ? { type: 'thumbnail', id: newest.id, version: newest.mtime_ms }
+    if (backdrop) return { type: LIBRARY_BACKDROP_TYPES.item, ...backdrop }
+    return newest.thumbnail === THUMBNAIL_STATES.ready
+      ? { type: LIBRARY_BACKDROP_TYPES.thumbnail, id: newest.id, version: newest.mtime_ms }
       : null
   }
 

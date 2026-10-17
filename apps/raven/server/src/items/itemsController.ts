@@ -17,6 +17,9 @@ import {
 } from '@nestjs/common'
 import {
   type ChoosableImageKind,
+  IMAGE_SOURCES,
+  ITEM_IMAGE_KINDS,
+  ITEM_TYPES,
   type ImageOption,
   isImageChoice,
   isItemImageKind,
@@ -32,6 +35,7 @@ import {
 } from '@raven/core'
 import type { FastifyReply } from 'fastify'
 import { AdminOnly } from '@/admin/adminGuard'
+import { RAVEN_HEADERS } from '@/http'
 import { isChoosableImageKind } from '@/items/imageKinds'
 import { itemChildren } from '@/items/itemChildren'
 import { sendImage } from '@/items/sendImage'
@@ -40,7 +44,7 @@ import { PrivateBy } from '@/lock/lockGuard'
 import { LockService } from '@/lock/lockService'
 import { MediaRepository } from '@/media/mediaRepository'
 import { IMAGE_WIDTHS, ImageCache } from '@/metadata/imageCache'
-import { ItemImagesRepository } from '@/metadata/itemImagesRepository'
+import { ItemImagesRepository, STORED_IMAGE_SOURCES } from '@/metadata/itemImagesRepository'
 import { ItemOverrides } from '@/metadata/itemOverrides'
 import { ItemRefresher } from '@/metadata/itemRefresher'
 import { isLocal } from '@/metadata/localItems'
@@ -97,11 +101,13 @@ export class ItemsController {
   async setMatch(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: unknown,
-    @Headers('cookie') cookie: string | undefined,
+    @Headers(RAVEN_HEADERS.cookie) cookie: string | undefined,
   ): Promise<ItemDetails> {
     const item = this.metadata.get(id)
     if (!item) throw new NotFoundException(`No item ${id}`)
-    if (item.type !== 'show') throw new BadRequestException('Only a show can be re-pointed here.')
+    if (item.type !== ITEM_TYPES.show) {
+      throw new BadRequestException('Only a show can be re-pointed here.')
+    }
     if (!isShowMatchChoice(body)) throw new BadRequestException('tmdbId must be a TMDB id')
     if (!this.tmdb.enabled)
       throw new ServiceUnavailableException('Set TMDB_API_TOKEN to search TMDB.')
@@ -118,7 +124,7 @@ export class ItemsController {
   @Get(':id')
   get(
     @Param('id', ParseIntPipe) id: number,
-    @Headers('cookie') cookie: string | undefined,
+    @Headers(RAVEN_HEADERS.cookie) cookie: string | undefined,
   ): ItemDetails {
     return this.details({ id, cookie })
   }
@@ -130,7 +136,7 @@ export class ItemsController {
   @Get(':id/next')
   next(
     @Param('id', ParseIntPipe) id: number,
-    @Headers('cookie') cookie: string | undefined,
+    @Headers(RAVEN_HEADERS.cookie) cookie: string | undefined,
   ): MediaItem | null {
     this.requireItem(id)
     const viewer = this.lock.viewer({ cookie })
@@ -145,7 +151,7 @@ export class ItemsController {
   @Get(':id/random')
   random(
     @Param('id', ParseIntPipe) id: number,
-    @Headers('cookie') cookie: string | undefined,
+    @Headers(RAVEN_HEADERS.cookie) cookie: string | undefined,
   ): MediaItem | null {
     this.requireItem(id)
     const viewer = this.lock.viewer({ cookie })
@@ -159,7 +165,7 @@ export class ItemsController {
   @HttpCode(200)
   async refresh(
     @Param('id', ParseIntPipe) id: number,
-    @Headers('cookie') cookie: string | undefined,
+    @Headers(RAVEN_HEADERS.cookie) cookie: string | undefined,
   ): Promise<ItemDetails> {
     this.requireItem(id)
     if (!this.tmdb.enabled) {
@@ -193,7 +199,7 @@ export class ItemsController {
   setMetadata(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: unknown,
-    @Headers('cookie') cookie: string | undefined,
+    @Headers(RAVEN_HEADERS.cookie) cookie: string | undefined,
   ): ItemDetails {
     this.requireItem(id)
     if (!isItemMetadataChange(body)) {
@@ -234,8 +240,8 @@ export class ItemsController {
         : { poster: [], backdrop: [], logo: [] }
     const options = (kind: ChoosableImageKind): ImageOption[] => {
       const current = this.stored.image({ itemId: id, kind })
-      const local = this.stored.imageFrom({ itemId: id, kind, source: 'local' })
-      const own = this.stored.imageFrom({ itemId: id, kind, source: 'tmdb' })
+      const local = this.stored.imageFrom({ itemId: id, kind, source: STORED_IMAGE_SOURCES.local })
+      const own = this.stored.imageFrom({ itemId: id, kind, source: STORED_IMAGE_SOURCES.tmdb })
       const tmdb = fetched[kind]
       // TMDB's own choice is offered even when the images call left it out.
       const listed =
@@ -247,29 +253,29 @@ export class ItemsController {
           ? []
           : [
               {
-                source: 'local' as const,
+                source: IMAGE_SOURCES.local,
                 ref: local,
                 width: null,
                 height: null,
                 language: null,
-                current: current?.source === 'local',
+                current: current?.source === STORED_IMAGE_SOURCES.local,
               },
             ]),
         ...listed.map((image) => ({
-          source: 'tmdb' as const,
+          source: IMAGE_SOURCES.tmdb,
           ref: image.path,
           width: image.width,
           height: image.height,
           language: image.language,
-          current: current?.source !== 'local' && current?.ref === image.path,
+          current: current?.source !== STORED_IMAGE_SOURCES.local && current?.ref === image.path,
         })),
       ]
     }
     return {
-      poster: options('poster'),
-      backdrop: options('backdrop'),
+      poster: options(ITEM_IMAGE_KINDS.poster),
+      backdrop: options(ITEM_IMAGE_KINDS.backdrop),
       // A show's page shows no logo, so it has none to choose.
-      logo: type === 'movie' ? options('logo') : [],
+      logo: type === ITEM_TYPES.movie ? options(ITEM_IMAGE_KINDS.logo) : [],
     }
   }
 
@@ -280,20 +286,20 @@ export class ItemsController {
     @Param('id', ParseIntPipe) id: number,
     @Param('kind') kind: string,
     @Body() body: unknown,
-    @Headers('cookie') cookie: string | undefined,
+    @Headers(RAVEN_HEADERS.cookie) cookie: string | undefined,
   ): Promise<ItemDetails> {
     if (!isChoosableImageKind(kind)) throw new NotFoundException(`No ${kind} pictures to choose`)
     this.requireItem(id)
     if (!isImageChoice(body)) {
       throw new BadRequestException('Send { source: "tmdb", ref } or { source: "local" }')
     }
-    if (body.source === 'tmdb' && !TMDB_IMAGE_PATH.test(body.ref)) {
+    if (body.source === IMAGE_SOURCES.tmdb && !TMDB_IMAGE_PATH.test(body.ref)) {
       throw new BadRequestException('ref must be a TMDB image path')
     }
     this.stored.chooseImage({
       itemId: id,
       kind,
-      ref: body.source === 'tmdb' ? body.ref : null,
+      ref: body.source === IMAGE_SOURCES.tmdb ? body.ref : null,
     })
     return this.details({ id, cookie })
   }
@@ -306,7 +312,7 @@ export class ItemsController {
     @Res() reply: FastifyReply,
   ): Promise<void> {
     if (!isItemImageKind(kind)) throw new NotFoundException(`No ${kind} pictures`)
-    const local = this.stored.imageFrom({ itemId: id, kind, source: 'local' })
+    const local = this.stored.imageFrom({ itemId: id, kind, source: STORED_IMAGE_SOURCES.local })
     const path =
       local == null
         ? null
@@ -329,17 +335,19 @@ export class ItemsController {
   ): Promise<void> {
     if (!isItemImageKind(kind)) throw new NotFoundException(`No ${kind} pictures`)
     const posterWidth = asked === undefined ? undefined : posterWidthFrom(asked)
-    if (posterWidth === null || (posterWidth !== undefined && kind !== 'poster')) {
+    if (posterWidth === null || (posterWidth !== undefined && kind !== ITEM_IMAGE_KINDS.poster)) {
       throw new BadRequestException(`w must be one of ${POSTER_WIDTHS.join(', ')}, for a poster`)
     }
     const width = posterWidth ?? IMAGE_WIDTHS[kind]
     const image = this.stored.image({ itemId: id, kind })
     const chosen =
-      image?.source === 'chosen' ? await this.images.tmdb({ path: image.ref, width }) : null
+      image?.source === STORED_IMAGE_SOURCES.chosen
+        ? await this.images.tmdb({ path: image.ref, width })
+        : null
     const localRef =
-      image?.source === 'local'
+      image?.source === STORED_IMAGE_SOURCES.local
         ? image.ref
-        : this.stored.imageFrom({ itemId: id, kind, source: 'local' })
+        : this.stored.imageFrom({ itemId: id, kind, source: STORED_IMAGE_SOURCES.local })
     const local =
       chosen == null && localRef != null
         ? await this.images.local({ itemId: id, kind, source: localRef, width })
@@ -347,7 +355,7 @@ export class ItemsController {
     // A picture beside the media that will not decode falls back to TMDB's.
     const tmdbPath =
       chosen == null && local == null
-        ? this.stored.imageFrom({ itemId: id, kind, source: 'tmdb' })
+        ? this.stored.imageFrom({ itemId: id, kind, source: STORED_IMAGE_SOURCES.tmdb })
         : null
     const path =
       chosen ??

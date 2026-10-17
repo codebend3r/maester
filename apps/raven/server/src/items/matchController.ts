@@ -27,9 +27,13 @@ import {
   parseEpisodeName,
   showFolderOf,
   splitCountry,
+  ITEM_TYPES,
+  MATCH_STATES,
+  MATCH_SUBJECT_KINDS,
 } from '@raven/core'
 import type { FastifyReply } from 'fastify'
 import { AdminOnly } from '@/admin/adminGuard'
+import { RAVEN_HEADERS } from '@/http'
 import { isChoosableImageKind } from '@/items/imageKinds'
 import { sendImage } from '@/items/sendImage'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
@@ -91,11 +95,11 @@ const subjectFrom = ({
   }
   if (mediaId != null) {
     if (!WHOLE_NUMBER.test(mediaId)) throw new BadRequestException('mediaId must be a media id')
-    return { kind: 'media', id: Number(mediaId) }
+    return { kind: MATCH_SUBJECT_KINDS.media, id: Number(mediaId) }
   }
   if (itemId != null) {
     if (!WHOLE_NUMBER.test(itemId)) throw new BadRequestException('itemId must be an item id')
-    return { kind: 'item', id: Number(itemId) }
+    return { kind: MATCH_SUBJECT_KINDS.item, id: Number(itemId) }
   }
   return null
 }
@@ -137,7 +141,7 @@ export class MatchController {
     @Query('libraryId') libraryId: string | undefined,
     @Query('mediaId') mediaId: string | undefined,
     @Query('itemId') itemId: string | undefined,
-    @Headers('cookie') cookie: string | undefined,
+    @Headers(RAVEN_HEADERS.cookie) cookie: string | undefined,
   ): Promise<MatchCandidate[]> {
     if (!isMatchItemType(type)) throw new BadRequestException('type must be movie or show')
     const typed = splitCountry(query?.trim() ?? '')
@@ -148,7 +152,7 @@ export class MatchController {
     const parsedYear = Number.parseInt(year ?? '', 10)
     const asked = { query: typed.title, year: Number.isInteger(parsedYear) ? parsedYear : null }
     const results = await (
-      type === 'movie' ? this.tmdb.searchMovies(asked) : this.tmdb.searchShows(asked)
+      type === ITEM_TYPES.movie ? this.tmdb.searchMovies(asked) : this.tmdb.searchShows(asked)
     ).catch(tmdbFailure)
     const rank = (result: SearchResult): number => (fitsTier({ tier: preferred, result }) ? 0 : 1)
     const ordered = results.toSorted((a, b) => rank(a) - rank(b))
@@ -223,24 +227,27 @@ export class MatchController {
     const viewer = this.lock.viewer({ cookie })
     // An extra is never matched (`off`), so a trailer's numbers say nothing of the show.
     const files = this.subjectFiles({ type, subject }).filter(
-      (file) => file.match !== 'off' && viewer.seesLibrary(file.libraryId),
+      (file) => file.match !== MATCH_STATES.off && viewer.seesLibrary(file.libraryId),
     )
     const [first] = files
     if (first == null) return NOTHING_ON_DISK
     switch (type) {
-      case 'movie':
+      case ITEM_TYPES.movie:
         // A cut, extended or director's, runs its own length rather than TMDB's runtime.
         return {
-          onDisk: { type: 'movie', duration: first.edition == null ? first.duration : null },
+          onDisk: {
+            type: ITEM_TYPES.movie,
+            duration: first.edition == null ? first.duration : null,
+          },
           country: null,
         }
-      case 'show': {
+      case ITEM_TYPES.show: {
         const named = files.map((file) =>
           parseEpisodeName({ fileName: file.fileName, folder: file.folder }),
         )
         return {
           onDisk: {
-            type: 'show',
+            type: ITEM_TYPES.show,
             files: named.map(({ season, episodes, absolute, year }) => ({
               season,
               episodes,
@@ -270,17 +277,17 @@ export class MatchController {
     subject: MatchSubject
   }): SubjectFile[] {
     switch (subject.kind) {
-      case 'media': {
+      case MATCH_SUBJECT_KINDS.media: {
         const file = this.media.get(subject.id)
         if (file == null) return []
-        const showFolder = type === 'show' ? showFolderOf(file) : null
+        const showFolder = type === ITEM_TYPES.show ? showFolderOf(file) : null
         if (showFolder == null) return [file]
         return this.files
           .underFolder({ libraryId: file.libraryId, folder: showFolder })
           .map(asShowFile)
       }
-      case 'item':
-        return type === 'show'
+      case MATCH_SUBJECT_KINDS.item:
+        return type === ITEM_TYPES.show
           ? this.files.under(subject.id).map(asShowFile)
           : this.media.forItem(subject.id)
       default: {

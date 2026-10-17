@@ -6,6 +6,19 @@ export const MEDIA_PLANE_ENV = {
   secret: 'RAVEN_MEDIA_SECRET',
 } as const
 
+/** The schemes an origin may have, each with the port it leaves unsaid. */
+const SCHEMES = { http: 'http', https: 'https' } as const
+
+type Scheme = (typeof SCHEMES)[keyof typeof SCHEMES]
+
+const DEFAULT_PORTS = { http: '80', https: '443' } as const satisfies Record<Scheme, string>
+
+const isScheme = (value: unknown): value is Scheme =>
+  Object.values(SCHEMES).some((scheme) => scheme === value)
+
+/** The one host plain http is allowed for. */
+const HOSTS = { localhost: 'localhost' } as const
+
 /** Tickets are signed with 32 random bytes at least; a shorter key is brute-forceable. */
 const MIN_SECRET_BYTES = 32
 
@@ -29,13 +42,13 @@ const splitList = (value: string | undefined): string[] =>
 /** `scheme`, `host` (lower case) and `port` (null for the scheme's default) of an origin with no path, or null. */
 const splitOrigin = (
   value: string,
-): { scheme: 'http' | 'https'; host: string; port: string | null } | null => {
+): { scheme: Scheme; host: string; port: string | null } | null => {
   const match = /^(https?):\/\/([^/?#:@\s]+)(?::(\d{1,5}))?$/i.exec(value.replace(/\/+$/, ''))
   const scheme = match?.[1]?.toLowerCase()
   const host = match?.[2]?.toLowerCase()
-  if (!match || host === undefined || (scheme !== 'http' && scheme !== 'https')) return null
+  if (!match || host === undefined || !isScheme(scheme)) return null
   const port = match[3] ?? null
-  const isDefaultPort = port === (scheme === 'https' ? '443' : '80')
+  const isDefaultPort = port === DEFAULT_PORTS[scheme]
   return { scheme, host, port: isDefaultPort ? null : port }
 }
 
@@ -50,7 +63,8 @@ const normalisedOrigin = (value: string): string | null => {
     url.username === '' &&
     url.password === ''
   const isAllowedScheme =
-    url.protocol === 'https:' || (url.protocol === 'http:' && url.hostname === 'localhost')
+    url.protocol === `${SCHEMES.https}:` ||
+    (url.protocol === `${SCHEMES.http}:` && url.hostname === HOSTS.localhost)
   return isBare && isAllowedScheme ? url.origin : null
 }
 
@@ -101,7 +115,7 @@ const webOriginProblem = (entry: string): string =>
 const parseWebOrigin = (entry: string): string | null => {
   const parts = splitOrigin(entry)
   if (!parts || !hasValidWildcard(parts.host)) return null
-  if (parts.scheme === 'http' && parts.host !== 'localhost') return null
+  if (parts.scheme === SCHEMES.http && parts.host !== HOSTS.localhost) return null
   return `${parts.scheme}://${parts.host}${parts.port ? `:${parts.port}` : ''}`
 }
 

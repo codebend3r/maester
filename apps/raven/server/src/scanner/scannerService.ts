@@ -5,7 +5,7 @@ import {
   type OnApplicationBootstrap,
   type OnModuleDestroy,
 } from '@nestjs/common'
-import type { ScanStatus } from '@raven/core'
+import { SCAN_STATES, type ScanStatus } from '@raven/core'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { DatabaseService } from '@/db/database'
 import { errorMessage } from '@/errorMessage'
@@ -22,7 +22,7 @@ import { type KnownStats, type WalkResult, isUnder, outermost, walkVideos } from
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
 
 const IDLE: ScanStatus = {
-  state: 'idle',
+  state: SCAN_STATES.idle,
   found: 0,
   processed: 0,
   startedAt: null,
@@ -31,15 +31,17 @@ const IDLE: ScanStatus = {
   error: null,
 }
 
+const SCOPE_KINDS = { library: 'library', quick: 'quick', places: 'places' } as const
+
 /**
  * What a scan looks at: every path of the library, reading every file (a
  * full scan); every path, reading only the files it does not know, and
  * those at `places` (a quick scan); or just the places that changed.
  */
 export type Scope =
-  | { kind: 'library' }
-  | { kind: 'quick'; places: readonly string[] }
-  | { kind: 'places'; places: readonly string[] }
+  | { kind: typeof SCOPE_KINDS.library }
+  | { kind: typeof SCOPE_KINDS.quick; places: readonly string[] }
+  | { kind: typeof SCOPE_KINDS.places; places: readonly string[] }
 
 /**
  * Two scans waiting their turn, as one: a full scan covers anything, a
@@ -48,10 +50,14 @@ export type Scope =
  */
 export const mergeScopes = ({ waiting, scope }: { waiting: Scope | null; scope: Scope }): Scope => {
   if (waiting == null) return scope
-  if (waiting.kind === 'library' || scope.kind === 'library') return { kind: 'library' }
+  if (waiting.kind === SCOPE_KINDS.library || scope.kind === SCOPE_KINDS.library) {
+    return { kind: SCOPE_KINDS.library }
+  }
   const places = outermost([...waiting.places, ...scope.places])
-  if (waiting.kind === 'quick' || scope.kind === 'quick') return { kind: 'quick', places }
-  return { kind: 'places', places }
+  if (waiting.kind === SCOPE_KINDS.quick || scope.kind === SCOPE_KINDS.quick) {
+    return { kind: SCOPE_KINDS.quick, places }
+  }
+  return { kind: SCOPE_KINDS.places, places }
 }
 
 /**
@@ -79,7 +85,8 @@ const inScope = ({
   scope: Scope
   unreadable: readonly string[]
 }): boolean =>
-  (scope.kind !== 'places' || scope.places.some((place) => isUnder({ path, root: place }))) &&
+  (scope.kind !== SCOPE_KINDS.places ||
+    scope.places.some((place) => isUnder({ path, root: place }))) &&
   !unreadable.some((place) => isUnder({ path, root: place }))
 
 /** What a scan found and did, for the log. */
@@ -168,18 +175,18 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
 
   /** Starts a full scan, or queues one behind the scan under way, and returns the status. */
   scan(libraryId: number): ScanStatus {
-    this.request({ libraryId, scope: { kind: 'library' } })
+    this.request({ libraryId, scope: { kind: SCOPE_KINDS.library } })
     return this.status(libraryId)
   }
 
   /** Starts a quick scan, or queues one behind the scan under way. */
   quickScan(libraryId: number): void {
-    this.request({ libraryId, scope: { kind: 'quick', places: [] } })
+    this.request({ libraryId, scope: { kind: SCOPE_KINDS.quick, places: [] } })
   }
 
   /** Looks again at just the places that changed, after any scan of the library under way. */
   refresh({ libraryId, places }: { libraryId: number; places: readonly string[] }): void {
-    this.request({ libraryId, scope: { kind: 'places', places: outermost(places) } })
+    this.request({ libraryId, scope: { kind: SCOPE_KINDS.places, places: outermost(places) } })
   }
 
   /** Resolves once the library has no scan running or waiting. */
@@ -230,11 +237,11 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
     const library = this.libraries.get(libraryId)
     if (!library) return
     switch (scope.kind) {
-      case 'library':
+      case SCOPE_KINDS.library:
         return this.scanLibrary(library)
-      case 'quick':
+      case SCOPE_KINDS.quick:
         return this.quickScanLibrary({ library, places: scope.places })
-      case 'places':
+      case SCOPE_KINDS.places:
         return this.refreshPlaces({ library, places: scope.places })
       default: {
         const unknown: never = scope
@@ -245,28 +252,34 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
 
   /** A full scan: everything under the library's paths, its progress and outcome in the status. */
   private async scanLibrary(library: LibraryRecord): Promise<void> {
-    this.update(library.id, {
-      state: 'walking',
-      found: 0,
-      processed: 0,
-      startedAt: new Date().toISOString(),
-      finishedAt: null,
-      error: null,
+    this.update({
+      libraryId: library.id,
+      patch: {
+        state: SCAN_STATES.walking,
+        found: 0,
+        processed: 0,
+        startedAt: new Date().toISOString(),
+        finishedAt: null,
+        error: null,
+      },
     })
     try {
       const { walk, changes, toProbe } = await this.reindex({
         library,
-        scope: { kind: 'library' },
+        scope: { kind: SCOPE_KINDS.library },
         onFound: (count) =>
           this.update({
             libraryId: library.id,
             patch: { found: this.status(library.id).found + count },
           }),
       })
-      this.update(library.id, {
-        state: 'indexing',
-        found: walk.files.length,
-        processed: walk.files.length - toProbe.length,
+      this.update({
+        libraryId: library.id,
+        patch: {
+          state: SCAN_STATES.indexing,
+          found: walk.files.length,
+          processed: walk.files.length - toProbe.length,
+        },
       })
       // Matching needs only names, so new files are matched while they are
       // probed, and the files that went are cleared up after.
@@ -304,7 +317,10 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
   }): void {
     const at = new Date().toISOString()
     this.libraries.markFullScan({ id: library.id, at })
-    this.update(library.id, { state: 'idle', finishedAt: at, error })
+    this.update({
+      libraryId: library.id,
+      patch: { state: SCAN_STATES.idle, finishedAt: at, error },
+    })
   }
 
   /**
@@ -322,7 +338,7 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
     try {
       const { walk, changes, toProbe } = await this.reindex({
         library,
-        scope: { kind: 'quick', places },
+        scope: { kind: SCOPE_KINDS.quick, places },
       })
       if (changesAnything(changes) || toProbe.length > 0) {
         this.metadata.enqueue(library.id)
@@ -359,7 +375,7 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
     try {
       const { walk, changes, toProbe } = await this.reindex({
         library,
-        scope: { kind: 'places', places },
+        scope: { kind: SCOPE_KINDS.places, places },
       })
       if (!changesAnything(changes) && toProbe.length === 0) return
       this.metadata.enqueue(library.id)
@@ -390,9 +406,12 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
     const indexed = this.index.forLibrary(library.id)
     const walk = await walkVideos({
       roots: library.paths,
-      places: scope.kind === 'places' ? scope.places : library.paths,
+      places: scope.kind === SCOPE_KINDS.places ? scope.places : library.paths,
       onFound,
-      known: scope.kind === 'quick' ? knownOutside({ indexed, places: scope.places }) : undefined,
+      known:
+        scope.kind === SCOPE_KINDS.quick
+          ? knownOutside({ indexed, places: scope.places })
+          : undefined,
     })
     const known = new Map(
       Array.from(indexed).filter(([path]) => inScope({ path, scope, unreadable: walk.unreadable })),
@@ -406,7 +425,7 @@ export class ScannerService implements OnApplicationBootstrap, OnModuleDestroy {
       known,
       found: withTitleRoots({ files: walk.files, kind, layout: folderLayout }),
     })
-    if (scope.kind === 'library') {
+    if (scope.kind === SCOPE_KINDS.library) {
       this.libraries.saveLayouts({
         id: library.id,
         layouts: layoutsOf({

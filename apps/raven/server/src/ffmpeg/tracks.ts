@@ -6,6 +6,7 @@ import {
   isString,
   languageTag,
 } from '@raven/core'
+import { CODEC_TYPES, type CodecType } from '@/ffmpeg/probe'
 
 type Stream = Record<string, unknown>
 
@@ -42,8 +43,7 @@ const TEXT_SUBTITLES: ReadonlySet<string> = new Set([
   'stl',
 ])
 
-export const isTextSubtitle = (codec: string | null): boolean =>
-  codec != null && TEXT_SUBTITLES.has(codec)
+const isTextSubtitle = (codec: string | null): boolean => codec != null && TEXT_SUBTITLES.has(codec)
 
 const flag = ({ stream, name }: { stream: Stream; name: string }): boolean =>
   isRecord(stream.disposition) && stream.disposition[name] === 1
@@ -77,9 +77,10 @@ export const parseTracks = (output: unknown): FileTracks => {
   const streams = (isRecord(output) && Array.isArray(output.streams) ? output.streams : []).filter(
     isRecord,
   )
-  const ofType = (type: string): Stream[] => streams.filter((stream) => stream.codec_type === type)
+  const ofType = (type: CodecType): Stream[] =>
+    streams.filter((stream) => stream.codec_type === type)
 
-  const audio = ofType('audio').map((stream, index): AudioTrack => ({
+  const audio = ofType(CODEC_TYPES.audio).map((stream, index): AudioTrack => ({
     index,
     codec: codecOf(stream),
     channels: isNumber(stream.channels) && stream.channels > 0 ? stream.channels : null,
@@ -87,7 +88,7 @@ export const parseTracks = (output: unknown): FileTracks => {
     title: tag({ stream, name: 'title' }),
     default: flag({ stream, name: 'default' }),
   }))
-  const subtitles = ofType('subtitle').map((stream, index): SubtitleTrack => ({
+  const subtitles = ofType(CODEC_TYPES.subtitle).map((stream, index): SubtitleTrack => ({
     id: `embedded-${index}`,
     source: 'embedded',
     codec: codecOf(stream),
@@ -98,7 +99,7 @@ export const parseTracks = (output: unknown): FileTracks => {
     hearingImpaired: flag({ stream, name: 'hearing_impaired' }),
     supported: isTextSubtitle(codecOf(stream)),
   }))
-  const video = ofType('video').find((stream) => !flag({ stream, name: 'attached_pic' }))
+  const video = ofType(CODEC_TYPES.video).find((stream) => !flag({ stream, name: 'attached_pic' }))
   const defaultAudio = audio.find((track) => track.default)?.index ?? audio[0]?.index ?? null
 
   return { audio, subtitles, defaultAudio, frameRate: frameRateOf(video) }

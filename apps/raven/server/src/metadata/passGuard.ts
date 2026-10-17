@@ -1,13 +1,14 @@
 import type { Logger } from '@nestjs/common'
 import { errorMessage } from '@/errorMessage'
-import { TmdbError } from '@/metadata/tmdbClient'
+import { TMDB_ERROR_KINDS, TmdbError } from '@/metadata/tmdbClient'
 
 /** How many files, shows or items a pass works on at once; TMDB's own limit spaces the calls. */
 export const PASS_CONCURRENCY = 4
 
 /** Whether a TMDB failure means the rest of a pass should wait for the next one. */
-export const stopsThePass = (error: unknown): boolean =>
-  error instanceof TmdbError && (error.kind === 'unavailable' || error.kind === 'unauthorized')
+const stopsThePass = (error: unknown): boolean =>
+  error instanceof TmdbError &&
+  (error.kind === TMDB_ERROR_KINDS.unavailable || error.kind === TMDB_ERROR_KINDS.unauthorized)
 
 type GuardState = { stopped: false } | { stopped: true; error: unknown }
 

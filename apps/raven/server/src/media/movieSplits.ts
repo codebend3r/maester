@@ -3,6 +3,7 @@ import {
   type DuplicateCard,
   type DuplicateFile,
   type Duplicates,
+  SPLIT_HOWS,
   type SplitHow,
   canSplitByCut,
   readCut,
@@ -148,7 +149,7 @@ export class MovieSplits {
     const update = this.db.prepare<[string | null, number]>(
       'UPDATE media SET split = ? WHERE id = ?',
     )
-    if (how === 'apart') {
+    if (how === SPLIT_HOWS.apart) {
       // A file's id outlives a rename, so its card can be named by it.
       this.db.transaction(() => card.forEach((row) => update.run(`file:${row.id}`, row.id)))()
       return this.list(libraryId)

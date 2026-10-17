@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common'
-import type { WatchTarget } from '@raven/core'
+import { WATCH_TARGET_KINDS, type WatchTarget } from '@raven/core'
 import { DatabaseService } from '@/db/database'
 import type { Viewer } from '@/lock/lockService'
 import { BEST_FIRST } from '@/media/mediaSql'
@@ -47,9 +47,9 @@ export class WatchedCards {
   resolve({ targets, viewer }: { targets: readonly WatchTarget[]; viewer: Viewer }): WatchCard[] {
     return targets.flatMap((target): WatchCard[] => {
       switch (target.kind) {
-        case 'media':
+        case WATCH_TARGET_KINDS.media:
           return this.ofFile({ id: target.id, viewer })
-        case 'item':
+        case WATCH_TARGET_KINDS.item:
           return this.ofItem({ itemId: target.id, libraryId: target.libraryId, viewer })
         default: {
           const unknown: never = target

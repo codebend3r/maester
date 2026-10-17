@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   type ChoosableImageKind,
-  languageName,
+  IMAGE_SOURCES,
+  ITEM_IMAGE_KINDS,
+  ITEM_TYPES,
   type ImageChoice,
   type ImageOption,
   type ItemDetails,
@@ -79,7 +81,7 @@ const Options = ({
               disabled={busy || option.current}
               onClick={() => onChoose(option)}
             >
-              {kind === 'logo' ? (
+              {kind === ITEM_IMAGE_KINDS.logo ? (
                 <LogoImage
                   src={api.imageOptionUrl({ id: itemId, kind, option })}
                   alt=""

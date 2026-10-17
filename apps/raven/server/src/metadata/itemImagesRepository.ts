@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { Inject, Injectable } from '@nestjs/common'
-import type { ItemImageKind } from '@raven/core'
+import { IMAGE_SOURCES, ITEM_IMAGE_KINDS, type ItemImageKind } from '@raven/core'
 import type Sqlite from 'better-sqlite3'
 import { DatabaseService } from '@/db/database'
 
@@ -9,10 +9,12 @@ export const versionOf = (ref: string): string =>
   createHash('sha1').update(ref).digest('base64url').slice(0, 11)
 
 /** `chosen` is what Edit images picked, a TMDB path; it beats a local picture, which beats TMDB's own. */
-export type ImageSource = 'tmdb' | 'local' | 'chosen'
+export const STORED_IMAGE_SOURCES = { ...IMAGE_SOURCES, chosen: 'chosen' } as const
+
+export type StoredImageSource = (typeof STORED_IMAGE_SOURCES)[keyof typeof STORED_IMAGE_SOURCES]
 
 /** Where an item's picture comes from: a file beside the media wins over TMDB's. */
-export type ImageRef = { source: ImageSource; ref: string }
+export type ImageRef = { source: StoredImageSource; ref: string }
 
 /** The picture each item shows for `kind`: the chosen one first, then local, then TMDB's. */
 const IMAGE_REFS = `
@@ -27,8 +29,8 @@ export type ItemLine = { id: number; parent: number | null; grandparent: number 
 export const lineOf = (line: ItemLine): number[] =>
   [line.id, line.parent, line.grandparent].filter((id): id is number => id != null)
 
-const toImageSource = (source: string): ImageSource =>
-  source === 'local' ? 'local' : source === 'chosen' ? 'chosen' : 'tmdb'
+const toImageSource = (source: string): StoredImageSource =>
+  Object.values(STORED_IMAGE_SOURCES).find((known) => known === source) ?? STORED_IMAGE_SOURCES.tmdb
 
 /**
  * The pictures each item holds, from TMDB, from beside the media and from
@@ -77,7 +79,7 @@ export class ItemImagesRepository {
   }: {
     itemId: number
     kind: ItemImageKind
-    source: ImageSource
+    source: StoredImageSource
   }): string | null {
     return (
       this.db
@@ -98,12 +100,17 @@ export class ItemImagesRepository {
     kind: ItemImageKind
     ref: string | null
   }): void {
-    this.replaceImage({ itemId, kind, source: 'chosen', ref })
+    this.replaceImage({ itemId, kind, source: STORED_IMAGE_SOURCES.chosen, ref })
   }
 
   /** Keeps TMDB's logo for a movie, or, for null, notes that TMDB has none. */
   setTmdbLogo({ itemId, logo }: { itemId: number; logo: string | null }): void {
-    this.replaceImage({ itemId, kind: 'logo', source: 'tmdb', ref: logo })
+    this.replaceImage({
+      itemId,
+      kind: ITEM_IMAGE_KINDS.logo,
+      source: STORED_IMAGE_SOURCES.tmdb,
+      ref: logo,
+    })
   }
 
   /** The item's picture of `source` for `kind` becomes `ref`, or goes for null. */
@@ -115,7 +122,7 @@ export class ItemImagesRepository {
   }: {
     itemId: number
     kind: ItemImageKind
-    source: ImageSource
+    source: StoredImageSource
     ref: string | null
   }): void {
     this.db.transaction(() => {

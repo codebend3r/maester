@@ -1,5 +1,12 @@
 import { dirname, join } from 'node:path'
-import { foldTitle, isExtra, type MatchItemType, parseMovieName, showFolderOf } from '@raven/core'
+import {
+  foldTitle,
+  isExtra,
+  ITEM_TYPES,
+  type MatchItemType,
+  parseMovieName,
+  showFolderOf,
+} from '@raven/core'
 
 /** Where a file sits: its path, and its name and folder inside its library. */
 export type Placed = { path: string; folder: string; fileName: string }
@@ -67,7 +74,7 @@ export const groupPlaceOf = ({
   /** The files in the movie's folder, read only for a movie in a folder. */
   folderFiles: () => ReadonlyArray<{ fileName: string; folder: string }>
 }): string => {
-  if (type === 'show') return showPlace(file)
+  if (type === ITEM_TYPES.show) return showPlace(file)
   return holdsOneMovie({ folder: file.folder, files: file.folder === '' ? [] : folderFiles() })
     ? file.folder
     : filePlace(file)

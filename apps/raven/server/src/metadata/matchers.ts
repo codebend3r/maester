@@ -1,6 +1,8 @@
 import { basename, dirname, join } from 'node:path'
 import {
   isExtra,
+  ITEM_TYPES,
+  MATCH_STATES,
   type MatchItemType,
   type MatchState,
   type ParsedEpisodeName,
@@ -13,8 +15,13 @@ import { groupBy } from '@/groupBy'
 import type { AiDecisions } from '@/metadata/aiDecisions'
 import type { ItemPictures } from '@/metadata/itemPictures'
 import { movieAssets, showAssets } from '@/metadata/localAssets'
-import type { FixMatch, MatchFile, MatchFiles } from '@/metadata/matchFiles'
-import type { MatchPass, SearchTitle } from '@/metadata/matchPass'
+import {
+  FIX_MATCH_KINDS,
+  type FixMatch,
+  type MatchFile,
+  type MatchFiles,
+} from '@/metadata/matchFiles'
+import { type MatchPass, RESOLVED_KINDS, type SearchTitle } from '@/metadata/matchPass'
 import type { MetadataRepository } from '@/metadata/metadataRepository'
 import { filePlace, holdsOneMovie, rootOf, showDirOf, showPlace, stemOf } from '@/metadata/places'
 
@@ -92,7 +99,7 @@ const movieMatcher = (deps: MatcherDeps): KindMatcher => {
   /** The Fix match for a movie file: its own place first, then its folder's when that is one movie. */
   const fixFor = ({ file, own }: { file: MatchFile; own: boolean }): FixMatch => {
     const forFile = deps.files.fixMatchAt({ libraryId: file.libraryId, place: filePlace(file) })
-    if (forFile.kind !== 'none' || !own) return forFile
+    if (forFile.kind !== FIX_MATCH_KINDS.none || !own) return forFile
     return deps.files.fixMatchAt({ libraryId: file.libraryId, place: file.folder })
   }
 
@@ -111,15 +118,15 @@ const movieMatcher = (deps: MatcherDeps): KindMatcher => {
     })
     const parsed = parseMovieName(file)
     const resolved = await pass.resolve({
-      type: 'movie',
+      type: ITEM_TYPES.movie,
       fix: fixFor({ file, own }),
       ids: parsed.ids,
       nfoPath: assets.nfo == null ? null : join(dir, assets.nfo),
       titles: movieSearchTitles({ file, parsed }),
       decided: decidedFor({ file, own }),
     })
-    if (resolved.kind === 'unmatched') {
-      deps.files.settle({ ids: [file.id], itemIds: [], match: 'unmatched' })
+    if (resolved.kind === RESOLVED_KINDS.unmatched) {
+      deps.files.settle({ ids: [file.id], itemIds: [], match: MATCH_STATES.unmatched })
       return
     }
     deps.files.settle({ ids: [file.id], itemIds: [resolved.itemId], match: resolved.match })
@@ -220,15 +227,15 @@ const showMatcher = (deps: MatcherDeps): KindMatcher => {
     const parsed = readShowFile(first)
     const place = showPlace(first)
     const resolved = await pass.resolve({
-      type: 'show',
+      type: ITEM_TYPES.show,
       fix: deps.files.fixMatchAt({ libraryId: first.libraryId, place }),
       ids: parsed.ids,
       nfoPath: assets.nfo == null ? null : join(showDir, assets.nfo),
       titles: showSearchTitles(parsed),
       decided: deps.decisions.highPickAt({ libraryId: first.libraryId, place }),
     })
-    if (resolved.kind === 'unmatched') {
-      deps.files.settle({ ids, itemIds: [], match: 'unmatched' })
+    if (resolved.kind === RESOLVED_KINDS.unmatched) {
+      deps.files.settle({ ids, itemIds: [], match: MATCH_STATES.unmatched })
       return
     }
     const show: ShowContext = {
@@ -246,7 +253,7 @@ const showMatcher = (deps: MatcherDeps): KindMatcher => {
       .catch((error: unknown) => {
         // A folder placed in part, say when TMDB went away fetching a season,
         // would sit under two shows; it waits to be matched whole instead.
-        deps.files.setMatch({ ids, match: 'pending' })
+        deps.files.setMatch({ ids, match: MATCH_STATES.pending })
         throw error
       })
     await deps.pictures.syncLocal({ itemIds: [show.showId, ...touched], folders: pass.folders })

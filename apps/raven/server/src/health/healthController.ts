@@ -1,3 +1,4 @@
+import { HEALTH_STATUSES } from '@raven/core'
 import { Controller, Get, Inject } from '@nestjs/common'
 import type { ServerHealth } from '@raven/core'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
@@ -20,7 +21,7 @@ export class HealthController {
       this.ffmpeg.videoEncoder(),
     ])
     return {
-      status: 'ok',
+      status: HEALTH_STATUSES.ok,
       ffmpeg,
       tonemap,
       encoder: encoder.kind,

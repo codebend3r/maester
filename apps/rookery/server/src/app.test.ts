@@ -3,13 +3,18 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { brotliDecompressSync } from 'node:zlib'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
+import { CONTENT_TYPES, ENCODINGS, HEADERS, CACHE_POLICIES } from '@shared/server'
 import { afterEach, describe, expect, it } from 'vitest'
-import { createApp } from '@/app'
+import { WRITE_ERRORS, createApp } from '@/app'
+import { SESSION_ERRORS } from '@/auth/authController'
+import { PIN_COOKIE, SESSION_COOKIE } from '@/auth/cookies'
+import { CALLBACK_PATH, PAGE_PATHS, SIGN_IN_ERRORS } from '@/auth/signInService'
 import { addMs } from '@/clock'
-import { type ServerConfig, readServerConfig } from '@/config'
+import { ENV_VARS, type ServerConfig, readServerConfig } from '@/config'
 import { DatabaseService } from '@/db/database'
+import { HEALTH_STATUSES } from '@/health/healthController'
 import type { PlexAccount, PlexPin } from '@/plex/plexTv'
-import { hashToken } from '@/sessions/sessionsRepository'
+import { SESSION_KINDS, hashToken } from '@/sessions/sessionsRepository'
 import { FakePlexTv } from '@/test/fakePlexTv'
 
 const ROOKERY = 'https://rookery.maester.example.com'
@@ -57,7 +62,10 @@ const boot = async ({
 } = {}): Promise<Harness> => {
   const root = await mkdtemp(join(tmpdir(), 'rookery-app-'))
   const config: ServerConfig = {
-    ...readServerConfig({ PUBLIC_URL: publicUrl, SERVICE_TOKEN }),
+    ...readServerConfig({
+      [ENV_VARS.publicUrl]: publicUrl,
+      [ENV_VARS.serviceToken]: SERVICE_TOKEN,
+    }),
     dataDir: join(root, 'data'),
     webDir,
     cookieDomain,
@@ -75,7 +83,7 @@ const boot = async ({
 }
 
 const setCookies = (response: Injected): string[] => {
-  const header = response.headers['set-cookie']
+  const header = response.headers[HEADERS.setCookie]
   return header == null ? [] : Array.isArray(header) ? header : [String(header)]
 }
 
@@ -101,8 +109,8 @@ const start = async ({ harness, returnTo }: { harness: Harness; returnTo?: strin
 const callback = ({ harness, pinCookie }: { harness: Harness; pinCookie: string | null }) =>
   harness.app.inject({
     method: 'GET',
-    url: '/auth/plex/callback',
-    headers: pinCookie ? { cookie: `rookery_pin=${pinCookie}` } : {},
+    url: CALLBACK_PATH,
+    headers: pinCookie ? { cookie: `${PIN_COOKIE}=${pinCookie}` } : {},
   })
 
 /** A full sign-in as `account`; returns the callback's response and the session token. */
@@ -121,9 +129,9 @@ const signIn = async ({
   harness.plex.approve({ pin, account })
   const response = await callback({
     harness,
-    pinCookie: valueOf(cookieNamed({ response: started.response, name: 'rookery_pin' })),
+    pinCookie: valueOf(cookieNamed({ response: started.response, name: PIN_COOKIE })),
   })
-  const token = valueOf(cookieNamed({ response, name: 'maester_session' }))
+  const token = valueOf(cookieNamed({ response, name: SESSION_COOKIE }))
   return { response, token }
 }
 
@@ -131,7 +139,7 @@ const me = ({ harness, token }: { harness: Harness; token: string }) =>
   harness.app.inject({
     method: 'GET',
     url: '/api/me',
-    headers: { cookie: `other=1; maester_session=${token}` },
+    headers: { cookie: `other=1; ${SESSION_COOKIE}=${token}` },
   })
 
 const lookup = ({
@@ -168,9 +176,9 @@ describe('starting a sign-in', () => {
     expect(authUrl.searchParams.get('clientID')).toBe('maester')
     expect(authUrl.searchParams.get('code')).toBe(pin?.code ?? 'no pin')
     expect(authUrl.searchParams.get('context[device][product]')).toBe('maester')
-    expect(authUrl.searchParams.get('forwardUrl')).toBe(`${ROOKERY}/auth/plex/callback`)
+    expect(authUrl.searchParams.get('forwardUrl')).toBe(`${ROOKERY}${CALLBACK_PATH}`)
 
-    const cookie = cookieNamed({ response, name: 'rookery_pin' })
+    const cookie = cookieNamed({ response, name: PIN_COOKIE })
     expect(cookie).toContain('Path=/auth/plex')
     expect(cookie).toContain('Max-Age=900')
     expect(cookie).toContain('HttpOnly')
@@ -185,7 +193,7 @@ describe('starting a sign-in', () => {
     harness.plex.down = true
     const { response } = await start({ harness })
     expect(response.statusCode).toBe(503)
-    expect(response.json()).toEqual({ reason: 'plex_unavailable' })
+    expect(response.json()).toEqual({ reason: SIGN_IN_ERRORS.plexUnavailable })
   })
 
   it('prunes sign-ins left unfinished for 15 minutes', async () => {
@@ -204,14 +212,14 @@ describe('the Plex callback', () => {
 
     expect(response.statusCode).toBe(303)
     expect(response.headers.location).toBe(`${LUWIN}/chat`)
-    const cookie = cookieNamed({ response, name: 'maester_session' })
+    const cookie = cookieNamed({ response, name: SESSION_COOKIE })
     expect(cookie).toContain('Path=/')
     expect(cookie).toContain(`Max-Age=${30 * 24 * 60 * 60}`)
     expect(cookie).toContain('HttpOnly')
     expect(cookie).toContain('SameSite=Lax')
     expect(cookie).toContain('Secure')
     expect(cookie).not.toContain('Domain=')
-    expect(cookieNamed({ response, name: 'rookery_pin' })).toContain('Max-Age=0')
+    expect(cookieNamed({ response, name: PIN_COOKIE })).toContain('Max-Age=0')
     expect(count({ harness, table: 'pending_sign_ins' })).toBe(0)
 
     const stored = db(harness).prepare('SELECT token_hash FROM sessions').pluck().all()
@@ -236,7 +244,7 @@ describe('the Plex callback', () => {
       cookieDomain: 'maester.example.com',
     })
     const { response } = await signIn({ harness })
-    const cookie = cookieNamed({ response, name: 'maester_session' })
+    const cookie = cookieNamed({ response, name: SESSION_COOKIE })
     expect(cookie).toContain('Domain=maester.example.com')
     expect(cookie).not.toContain('Secure')
   })
@@ -262,10 +270,10 @@ describe('the Plex callback', () => {
     harness.plex.approve({ pin, account: alice, afterChecks: 2 })
     const done = await callback({
       harness,
-      pinCookie: valueOf(cookieNamed({ response, name: 'rookery_pin' })),
+      pinCookie: valueOf(cookieNamed({ response, name: PIN_COOKIE })),
     })
-    expect(done.headers.location).toBe('/')
-    expect(cookieNamed({ response: done, name: 'maester_session' })).toBeTruthy()
+    expect(done.headers.location).toBe(PAGE_PATHS.home)
+    expect(cookieNamed({ response: done, name: SESSION_COOKIE })).toBeTruthy()
     expect(harness.plex.checksOf(pin)).toBe(3)
   })
 
@@ -274,28 +282,28 @@ describe('the Plex callback', () => {
     const { response, pin } = await start({ harness, returnTo: `${LUWIN}/chat` })
     const done = await callback({
       harness,
-      pinCookie: valueOf(cookieNamed({ response, name: 'rookery_pin' })),
+      pinCookie: valueOf(cookieNamed({ response, name: PIN_COOKIE })),
     })
     expect(done.statusCode).toBe(303)
     expect(done.headers.location).toBe(
-      `/login?error=not_approved&return_to=${encodeURIComponent(`${LUWIN}/chat`)}`,
+      `${PAGE_PATHS.login}?error=${SIGN_IN_ERRORS.notApproved}&return_to=${encodeURIComponent(`${LUWIN}/chat`)}`,
     )
     expect(pin && harness.plex.checksOf(pin)).toBe(5)
-    expect(setCookies(done).some((cookie) => cookie.startsWith('maester_session='))).toBe(false)
+    expect(setCookies(done).some((cookie) => cookie.startsWith(`${SESSION_COOKIE}=`))).toBe(false)
   })
 
   it('calls a missing or stale sign-in expired', async () => {
     const harness = await boot()
     expect((await callback({ harness, pinCookie: null })).headers.location).toBe(
-      '/login?error=expired',
+      `${PAGE_PATHS.login}?error=${SIGN_IN_ERRORS.expired}`,
     )
     const { response } = await start({ harness })
     harness.clock.now = addMs({ date: START, ms: 16 * MINUTE })
     const done = await callback({
       harness,
-      pinCookie: valueOf(cookieNamed({ response, name: 'rookery_pin' })),
+      pinCookie: valueOf(cookieNamed({ response, name: PIN_COOKIE })),
     })
-    expect(done.headers.location).toBe('/login?error=expired')
+    expect(done.headers.location).toBe(`${PAGE_PATHS.login}?error=${SIGN_IN_ERRORS.expired}`)
   })
 
   it('reports plex.tv failing mid-sign-in', async () => {
@@ -304,9 +312,11 @@ describe('the Plex callback', () => {
     harness.plex.down = true
     const done = await callback({
       harness,
-      pinCookie: valueOf(cookieNamed({ response, name: 'rookery_pin' })),
+      pinCookie: valueOf(cookieNamed({ response, name: PIN_COOKIE })),
     })
-    expect(done.headers.location).toBe('/login?error=plex_unavailable')
+    expect(done.headers.location).toBe(
+      `${PAGE_PATHS.login}?error=${SIGN_IN_ERRORS.plexUnavailable}`,
+    )
   })
 
   it('prunes expired sessions when a new one is made', async () => {
@@ -326,12 +336,12 @@ describe('signing out', () => {
     const response = await harness.app.inject({
       method: 'POST',
       url: '/api/auth/logout',
-      headers: { cookie: `maester_session=${token}` },
+      headers: { cookie: `${SESSION_COOKIE}=${token}` },
       payload: { return_to: `${LUWIN}/` },
     })
     expect(response.statusCode).toBe(200)
     expect(response.json()).toEqual({ next: `${LUWIN}/` })
-    const cleared = cookieNamed({ response, name: 'maester_session' })
+    const cleared = cookieNamed({ response, name: SESSION_COOKIE })
     expect(cleared).toContain('Max-Age=0')
     expect(cleared).toContain('Domain=maester.example.com')
 
@@ -346,7 +356,7 @@ describe('signing out', () => {
       url: '/api/auth/logout',
       payload: { return_to: 'https://evil.example/' },
     })
-    expect(response.json()).toEqual({ next: '/login' })
+    expect(response.json()).toEqual({ next: PAGE_PATHS.login })
   })
 
   it('refuses a write that is not JSON', async () => {
@@ -354,11 +364,11 @@ describe('signing out', () => {
     const response = await harness.app.inject({
       method: 'POST',
       url: '/api/auth/logout',
-      headers: { 'content-type': 'text/plain' },
+      headers: { [HEADERS.contentType]: 'text/plain' },
       payload: '{}',
     })
     expect(response.statusCode).toBe(415)
-    expect(response.json()).toEqual({ reason: 'json_required' })
+    expect(response.json()).toEqual({ reason: WRITE_ERRORS.jsonRequired })
   })
 })
 
@@ -367,8 +377,8 @@ describe('/api/me', () => {
     const harness = await boot()
     const response = await harness.app.inject({ method: 'GET', url: '/api/me' })
     expect(response.statusCode).toBe(401)
-    expect(response.json()).toEqual({ reason: 'signed_out' })
-    expect(response.headers['cache-control']).toBe('no-store')
+    expect(response.json()).toEqual({ reason: SESSION_ERRORS.signedOut })
+    expect(response.headers[HEADERS.cacheControl]).toBe(CACHE_POLICIES.noStore)
   })
 })
 
@@ -386,7 +396,7 @@ describe('the internal session lookup', () => {
     const { token } = await signIn({ harness })
     const response = await lookup({ harness, token })
     expect(response.statusCode).toBe(200)
-    expect(response.headers['cache-control']).toBe('no-store')
+    expect(response.headers[HEADERS.cacheControl]).toBe(CACHE_POLICIES.noStore)
     expect(response.json()).toEqual({
       user: {
         id: expect.any(String),
@@ -404,12 +414,12 @@ describe('the internal session lookup', () => {
     const { token } = await signIn({ harness })
     const unknown = await lookup({ harness, token: 'not-a-session' })
     expect(unknown.statusCode).toBe(404)
-    expect(unknown.json()).toEqual({ reason: 'unknown' })
+    expect(unknown.json()).toEqual({ reason: SESSION_KINDS.unknown })
 
     harness.clock.now = addMs({ date: START, ms: 30 * DAY })
     const expired = await lookup({ harness, token })
     expect(expired.statusCode).toBe(404)
-    expect(expired.json()).toEqual({ reason: 'expired' })
+    expect(expired.json()).toEqual({ reason: SESSION_KINDS.expired })
   })
 
   it('moves last_seen_at at most once a minute', async () => {
@@ -449,7 +459,7 @@ describe('serving the web app', () => {
       )
       misses.forEach((missing) => {
         expect(missing.statusCode).toBe(404)
-        expect(missing.headers['content-type']).toContain('application/json')
+        expect(missing.headers[HEADERS.contentType]).toContain(CONTENT_TYPES.json)
       })
     } finally {
       await rm(root, { recursive: true, force: true })
@@ -466,12 +476,12 @@ describe('serving the web app', () => {
     try {
       const get = (headers: Record<string, string>) =>
         harness.app.inject({ method: 'GET', url: '/assets/app.js', headers })
-      const packed = await get({ 'accept-encoding': 'gzip, deflate, br, zstd' })
-      expect(packed.headers['content-encoding']).toBe('br')
-      expect(packed.headers.vary).toContain('accept-encoding')
+      const packed = await get({ [HEADERS.acceptEncoding]: 'gzip, deflate, br, zstd' })
+      expect(packed.headers[HEADERS.contentEncoding]).toBe(ENCODINGS.br)
+      expect(packed.headers.vary).toContain(HEADERS.acceptEncoding)
       expect(brotliDecompressSync(packed.rawPayload).toString()).toBe(script)
       const plain = await get({})
-      expect(plain.headers['content-encoding']).toBeUndefined()
+      expect(plain.headers[HEADERS.contentEncoding]).toBeUndefined()
       expect(plain.body).toBe(script)
     } finally {
       await rm(root, { recursive: true, force: true })
@@ -481,6 +491,6 @@ describe('serving the web app', () => {
   it('answers /health without a session', async () => {
     const harness = await boot()
     const response = await harness.app.inject({ method: 'GET', url: '/health' })
-    expect(response.json()).toEqual({ status: 'ok' })
+    expect(response.json()).toEqual({ status: HEALTH_STATUSES.ok })
   })
 })

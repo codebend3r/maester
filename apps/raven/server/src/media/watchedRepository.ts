@@ -37,14 +37,14 @@ export class WatchedRepository {
         LIMIT 1`,
     )
     const mark = this.db.prepare(
-      `INSERT INTO plays (media_id, played_at, furthest, kind) VALUES (?, ?, ?, 'marked')`,
+      `INSERT INTO plays (media_id, played_at, furthest, kind) VALUES (?, ?, ?, ?)`,
     )
     const dropMarks = this.db.prepare(
-      `DELETE FROM plays WHERE kind = 'marked' AND media_id IN (SELECT value FROM json_each(?))`,
+      `DELETE FROM plays WHERE kind = ? AND media_id IN (SELECT value FROM json_each(?))`,
     )
     const setAside = this.db.prepare(
-      `UPDATE plays SET kind = 'cleared'
-        WHERE kind = 'played' AND media_id IN (SELECT value FROM json_each(?))`,
+      `UPDATE plays SET kind = ?
+        WHERE kind = ? AND media_id IN (SELECT value FROM json_each(?))`,
     )
     const clearSpots = this.db.prepare(
       'DELETE FROM playback_progress WHERE media_id IN (SELECT value FROM json_each(?))',
@@ -56,10 +56,10 @@ export class WatchedRepository {
         const ids = JSON.stringify(card.files.map((file) => file.id))
         if (!!isWatched.get(ids) === watched) return
         if (watched) {
-          mark.run(best.id, at.toISOString(), best.duration ?? 0)
+          mark.run(best.id, at.toISOString(), best.duration ?? 0, PLAY_KINDS.marked)
         } else {
-          dropMarks.run(ids)
-          setAside.run(ids)
+          dropMarks.run(PLAY_KINDS.marked, ids)
+          setAside.run(PLAY_KINDS.cleared, PLAY_KINDS.played, ids)
         }
         clearSpots.run(ids)
       })

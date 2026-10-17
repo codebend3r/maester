@@ -5,6 +5,7 @@ import {
   foldTitle,
   isUnfiltered,
   type ParsedEpisodeName,
+  ITEM_TYPES,
 } from '@raven/core'
 import type { MatchFacts, SearchResult } from '@/metadata/tmdbClient'
 
@@ -13,14 +14,14 @@ export type EpisodeNumbers = Pick<ParsedEpisodeName, 'season' | 'episodes' | 'ab
 
 /** What the folder or file Fix match is for has on disk. */
 export type OnDisk =
-  | { type: 'show'; files: readonly EpisodeNumbers[] }
+  | { type: typeof ITEM_TYPES.show; files: readonly EpisodeNumbers[] }
   | {
-      type: 'movie'
+      type: typeof ITEM_TYPES.movie
       /** Seconds; null until the file has been probed, or for an edition, which runs its own length. */
       duration: number | null
     }
 
-type ShowFacts = Extract<MatchFacts, { type: 'show' }>
+type ShowFacts = Extract<MatchFacts, { type: typeof ITEM_TYPES.show }>
 
 /** The most a title that is not the searched one counts for. */
 const PARTIAL_TITLE = 0.8
@@ -152,9 +153,9 @@ const fitScore = ({
   facts: MatchFacts | undefined
 }): number | null => {
   if (onDisk == null || facts == null) return null
-  if (onDisk.type === 'show' && facts.type === 'show')
+  if (onDisk.type === ITEM_TYPES.show && facts.type === ITEM_TYPES.show)
     return showFit({ files: onDisk.files, facts })
-  if (onDisk.type === 'movie' && facts.type === 'movie') {
+  if (onDisk.type === ITEM_TYPES.movie && facts.type === ITEM_TYPES.movie) {
     return movieFit({ duration: onDisk.duration, runtime: facts.runtime })
   }
   return null

@@ -5,11 +5,14 @@ import {
   isItemType,
   isRatingSource,
   isStringArray,
+  ITEM_IMAGE_KINDS,
+  ITEM_TYPES,
   type ItemDetails,
   type ItemSummary,
   type ItemType,
   type PersonDetails,
   type Rating,
+  RATING_KINDS,
   type RatingSource,
   type Review,
   sortTitle,
@@ -23,11 +26,11 @@ import type { OmdbScore } from '@/metadata/omdbClient'
 import type { FetchedItem, FetchedSaga, MovieExtras } from '@/metadata/tmdbClient'
 
 /** Rotten Tomatoes and Metacritic are critics; TMDB and IMDb are audiences. */
-const RATING_KINDS: Record<RatingSource, Rating['kind']> = {
-  tmdb: 'audience',
-  imdb: 'audience',
-  rottenTomatoes: 'critic',
-  metacritic: 'critic',
+const RATING_KIND_OF: Record<RatingSource, Rating['kind']> = {
+  tmdb: RATING_KINDS.audience,
+  imdb: RATING_KINDS.audience,
+  rottenTomatoes: RATING_KINDS.critic,
+  metacritic: RATING_KINDS.critic,
 }
 
 type ItemRow = {
@@ -424,7 +427,7 @@ export class MetadataRepository {
         if (!isRatingSource(row.source)) return byItem
         const rating: Rating = {
           source: row.source,
-          kind: RATING_KINDS[row.source],
+          kind: RATING_KIND_OF[row.source],
           value: row.value,
           votes: row.votes,
         }
@@ -467,12 +470,12 @@ export class MetadataRepository {
                   ? { id: row.show_id, title: row.show_title }
                   : null,
               season:
-                row.type === 'season'
+                row.type === ITEM_TYPES.season
                   ? row.number
-                  : row.type === 'episode'
+                  : row.type === ITEM_TYPES.episode
                     ? row.parent_number
                     : null,
-              episode: row.type === 'episode' ? row.number : null,
+              episode: row.type === ITEM_TYPES.episode ? row.number : null,
               posterVersion: posters.get(row.id) ?? null,
               backdropVersion: backdrops.get(row.id) ?? null,
               ratings: ratings.get(row.id) ?? [],
@@ -566,9 +569,13 @@ export class MetadataRepository {
       // An episode has a still where the others have a backdrop.
       backdropVersion:
         this.images
-          .versions({ ids: [id], kind: row.type === 'episode' ? 'still' : 'backdrop' })
+          .versions({
+            ids: [id],
+            kind:
+              row.type === ITEM_TYPES.episode ? ITEM_IMAGE_KINDS.still : ITEM_IMAGE_KINDS.backdrop,
+          })
           .get(id) ?? null,
-      logoVersion: this.images.versions({ ids: [id], kind: 'logo' }).get(id) ?? null,
+      logoVersion: this.images.versions({ ids: [id], kind: ITEM_IMAGE_KINDS.logo }).get(id) ?? null,
       credits: this.credits(id),
       reviews: this.reviews(id),
     }

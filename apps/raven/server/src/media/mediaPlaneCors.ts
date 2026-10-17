@@ -1,6 +1,35 @@
 import type { Type } from '@nestjs/common'
+import { HEADERS, HTTP_METHODS } from '@shared/server'
 import type { FastifyInstance } from 'fastify'
+import { RAVEN_HEADERS } from '@/http'
 import { routeMarks } from '@/routeMarks'
+
+/** The CORS headers the media plane reads and sends, in lower case as Node hands incoming ones over. */
+export const CORS_HEADERS = {
+  origin: 'origin',
+  allowOrigin: 'access-control-allow-origin',
+  allowMethods: 'access-control-allow-methods',
+  allowHeaders: 'access-control-allow-headers',
+  allowCredentials: 'access-control-allow-credentials',
+  allowPrivateNetwork: 'access-control-allow-private-network',
+  exposeHeaders: 'access-control-expose-headers',
+  maxAge: 'access-control-max-age',
+  requestMethod: 'access-control-request-method',
+  requestPrivateNetwork: 'access-control-request-private-network',
+} as const
+
+/** What a yes-or-no CORS header says for yes. */
+export const CORS_FLAGS = { true: 'true' } as const
+
+/** The methods the media plane answers cross-origin: GET and HEAD, and the preflight. */
+const MEDIA_PLANE_METHODS = {
+  get: HTTP_METHODS.get,
+  head: HTTP_METHODS.head,
+  options: HTTP_METHODS.options,
+} as const
+
+/** How `Vary` names the header a CORS answer depends on. */
+const VARIES = { origin: 'Origin' } as const
 
 /** The path of every route marked for the media plane. */
 export const mediaPlanePaths = (controllers: readonly Type[]): string[] =>
@@ -23,9 +52,13 @@ export const pathMatcher = (paths: readonly string[]): ((path: string) => boolea
 }
 
 export const responseHeaders = (origin: string): Record<string, string> => ({
-  'access-control-allow-origin': origin,
-  vary: 'Origin',
-  'access-control-expose-headers': 'content-length, content-range, accept-ranges',
+  [CORS_HEADERS.allowOrigin]: origin,
+  [HEADERS.vary]: VARIES.origin,
+  [CORS_HEADERS.exposeHeaders]: [
+    HEADERS.contentLength,
+    HEADERS.contentRange,
+    RAVEN_HEADERS.acceptRanges,
+  ].join(', '),
 })
 
 export const preflightHeaders = ({
@@ -35,19 +68,19 @@ export const preflightHeaders = ({
   origin: string
   wantsPrivateNetwork: boolean
 }): Record<string, string> => ({
-  'access-control-allow-origin': origin,
-  vary: 'Origin',
-  'access-control-allow-methods': 'GET, HEAD, OPTIONS',
-  'access-control-allow-headers': 'range',
-  'access-control-max-age': '600',
-  ...(wantsPrivateNetwork ? { 'access-control-allow-private-network': 'true' } : {}),
+  [CORS_HEADERS.allowOrigin]: origin,
+  [HEADERS.vary]: VARIES.origin,
+  [CORS_HEADERS.allowMethods]: Object.values(MEDIA_PLANE_METHODS).join(', '),
+  [CORS_HEADERS.allowHeaders]: HEADERS.range,
+  [CORS_HEADERS.maxAge]: '600',
+  ...(wantsPrivateNetwork ? { [CORS_HEADERS.allowPrivateNetwork]: CORS_FLAGS.true } : {}),
 })
 
 const withOrigin = (existing: string | number | string[] | undefined): string => {
   const current = Array.isArray(existing) ? existing.join(', ') : String(existing ?? '')
   const names = current.split(',').map((name) => name.trim().toLowerCase())
-  if (names.includes('origin')) return current
-  return current === '' ? 'Origin' : `${current}, Origin`
+  if (names.includes(CORS_HEADERS.origin)) return current
+  return current === '' ? VARIES.origin : `${current}, ${VARIES.origin}`
 }
 
 /**
@@ -69,12 +102,17 @@ export const registerMediaPlaneCors = ({
   fastify.addHook('onRequest', async (request, reply) => {
     const { origin } = request.headers
     if (origin === undefined || !isAllowedOrigin(origin) || !isMediaPlanePath(request.url)) return
-    if (request.method === 'OPTIONS') {
+    if (request.method === MEDIA_PLANE_METHODS.options) {
       const wantsPrivateNetwork =
-        request.headers['access-control-request-private-network'] === 'true'
+        request.headers[CORS_HEADERS.requestPrivateNetwork] === CORS_FLAGS.true
       return reply.headers(preflightHeaders({ origin, wantsPrivateNetwork })).code(204).send()
     }
-    if (request.method !== 'GET' && request.method !== 'HEAD') return
-    reply.headers({ ...responseHeaders(origin), vary: withOrigin(reply.getHeader('vary')) })
+    if (request.method !== MEDIA_PLANE_METHODS.get && request.method !== MEDIA_PLANE_METHODS.head) {
+      return
+    }
+    reply.headers({
+      ...responseHeaders(origin),
+      [HEADERS.vary]: withOrigin(reply.getHeader(HEADERS.vary)),
+    })
   })
 }

@@ -4,6 +4,7 @@ import {
   isNumber,
   isString,
   isTmdbId,
+  ITEM_TYPES,
   type LibraryKind,
   type MatchItemType,
   nullable,
@@ -249,7 +250,7 @@ const factsOf = (group: AiGroup) => ({
   place: group.place,
   files: { count: group.fileCount, names: group.fileNames },
   parsed:
-    group.type === 'show'
+    group.type === ITEM_TYPES.show
       ? { show: group.parsed.title, year: group.parsed.year }
       : { title: group.parsed.title, year: group.parsed.year },
   tried: group.tried,

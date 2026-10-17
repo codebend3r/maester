@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import {
   type Library,
+  MATCH_STATES,
   type MediaItem,
   isItemDetails,
   isItemImageOptions,
@@ -17,9 +18,11 @@ import {
   isSagaList,
   sagaCover,
 } from '@raven/core'
+import { HEADERS } from '@shared/server'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createApp } from '@/app'
 import { DatabaseService } from '@/db/database'
+import { RAVEN_CACHE_POLICIES, RAVEN_CONTENT_TYPES } from '@/http'
 import { ItemRefresher } from '@/metadata/itemRefresher'
 import { MatchFiles } from '@/metadata/matchFiles'
 import { MetadataService } from '@/metadata/metadataService'
@@ -308,7 +311,7 @@ describe('movie metadata', () => {
       url: `/api/items/${heat.item?.id}/images/logo?v=${version}`,
     })
     expect(logo.statusCode).toBe(200)
-    expect(logo.headers['content-type']).toBe('image/png')
+    expect(logo.headers[HEADERS.contentType]).toBe(RAVEN_CONTENT_TYPES.png)
 
     const db = app().get(DatabaseService).db
     db.prepare("DELETE FROM item_images WHERE kind = 'logo'").run()
@@ -480,8 +483,8 @@ describe('movie metadata', () => {
       url: `/api/items/${matrix?.item?.id}/images/poster?v=${matrix?.item?.posterVersion}`,
     })
     expect(poster.statusCode).toBe(200)
-    expect(poster.headers['content-type']).toBe('image/jpeg')
-    expect(poster.headers['cache-control']).toBe('private, max-age=31536000, immutable')
+    expect(poster.headers[HEADERS.contentType]).toBe(RAVEN_CONTENT_TYPES.jpeg)
+    expect(poster.headers[HEADERS.cacheControl]).toBe(RAVEN_CACHE_POLICIES.privateImmutable)
     expect([...poster.rawPayload.subarray(0, 2)]).toEqual([0xff, 0xd8])
     expect(poster.rawPayload.equals(FAKE_JPEG)).toBe(false)
 
@@ -525,7 +528,7 @@ describe('movie metadata', () => {
     const responses = await Promise.all(['&w=185', '&w=342', '&w=500', '', '&w=185'].map(at))
     expect(responses.map((response) => response.statusCode)).toEqual([200, 200, 200, 200, 200])
     expect(responses.every((response) => response.rawPayload.equals(FAKE_JPEG))).toBe(true)
-    expect(responses[0]?.headers['cache-control']).toBe('private, max-age=31536000, immutable')
+    expect(responses[0]?.headers[HEADERS.cacheControl]).toBe(RAVEN_CACHE_POLICIES.privateImmutable)
     expect(fetched()).toEqual(warmed)
   })
 
@@ -865,7 +868,7 @@ describe('movie metadata', () => {
     await setKind('other')
     await settle()
     const other = await list()
-    expect(other.every((item) => item.match === 'off' && item.item === null)).toBe(true)
+    expect(other.every((item) => item.match === MATCH_STATES.off && item.item === null)).toBe(true)
     expect(other.map((item) => item.title)).toContain('Pulp Fiction 1994 1080p BluRay x264')
 
     await setKind('movies')

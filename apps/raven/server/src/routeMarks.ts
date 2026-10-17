@@ -38,7 +38,8 @@ export const routeMarks = (controllers: readonly Type[]): RouteMark[] =>
     const base: unknown = decorators.get(PATH_METADATA, controller)
     return Object.getOwnPropertyNames(prototype).flatMap((name): RouteMark[] => {
       const handler = prototype[name]
-      if (name === 'constructor' || typeof handler !== 'function') return []
+      // A class's prototype holds the class itself as `constructor`.
+      if (handler === controller || typeof handler !== 'function') return []
       const path: unknown = decorators.get(PATH_METADATA, handler)
       if (path == null) return []
       const targets = [handler, controller]
