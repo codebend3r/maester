@@ -43,4 +43,13 @@ describe('readServerConfig', () => {
       }),
     ).toMatchObject({ anthropicApiKey: null, aiMatchEffort: 'low', aiDailyLimit: 1 })
   })
+
+  it('has no media plane until its variables are set', () => {
+    expect(readServerConfig({}).mediaPlane).toEqual({
+      origins: [],
+      webOrigins: [],
+      secret: null,
+      problems: [],
+    })
+  })
 })

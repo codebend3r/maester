@@ -1,6 +1,7 @@
 import { resolve } from 'node:path'
 import type { Anthropic } from '@anthropic-ai/sdk'
 import { type HwAccel, isHwAccel, oneOf } from '@raven/core'
+import { readMediaPlaneConfig, type MediaPlaneConfig } from '@/media/mediaPlaneConfig'
 import { flag, type ListenConfig, readListenConfig, wholeNumber } from '@shared/server'
 
 /** The effort levels the AI lookup can ask for, as `output_config.effort` takes them. */
@@ -61,6 +62,8 @@ export type ServerConfig = ListenConfig & {
   libraryPin: string | null
   /** The password that turns the admin lock off; null, or too weak, keeps it on. Never logged or sent to a client. */
   adminPassword: string | null
+  /** Where the browser fetches media straight from the server, and who may ask: all off until configured. */
+  mediaPlane: MediaPlaneConfig
 }
 
 /** The DI token the config is provided under. */
@@ -102,4 +105,5 @@ export const readServerConfig = (env: NodeJS.ProcessEnv = process.env): ServerCo
   aiDailyLimit: Math.max(1, wholeNumber(env.AI_DAILY_LIMIT) ?? 200),
   libraryPin: env.LIBRARY_PIN?.trim() || null,
   adminPassword: env.ADMIN_PASSWORD?.trim() || null,
+  mediaPlane: readMediaPlaneConfig(env),
 })

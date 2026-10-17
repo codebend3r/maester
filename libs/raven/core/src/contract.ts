@@ -1242,6 +1242,35 @@ export type StreamMode = Infer<typeof isStreamMode>
 
 export const STREAM_MODES = isStreamMode.values
 
+/** How far an origin reaches: the home network, the tailnet or the open internet. */
+export const isMediaOriginKind = oneOf(['lan', 'tailnet', 'public'])
+
+export type MediaOriginKind = Infer<typeof isMediaOriginKind>
+
+/** One address the browser may fetch media from, straight from the server instead of through the web host's proxy. */
+export const isMediaOrigin = object({ kind: isMediaOriginKind, url: isString })
+
+export type MediaOrigin = Infer<typeof isMediaOrigin>
+
+/** What `GET /api/media-origins` returns: the origins raven has, best first. */
+export const isMediaOrigins = object({ origins: listOf(isMediaOrigin) })
+
+export type MediaOrigins = Infer<typeof isMediaOrigins>
+
+/** A signed, expiring pass for one media id; `expiresAt` is in epoch seconds. */
+export const isMediaTicket = object({ ticket: isString, expiresAt: isNumber })
+
+export type MediaTicket = Infer<typeof isMediaTicket>
+
+/** How long a media ticket is valid. */
+export const MEDIA_TICKET_SECONDS = 21_600
+
+/** The player fetches a new ticket this long before the old one expires. */
+export const MEDIA_TICKET_REFRESH_SECONDS = 600
+
+/** How many bytes of a file an origin probe reads. */
+export const MEDIA_PROBE_BYTES = 262_144
+
 /*
  * Request bodies: what a client sends, checked by the server with the same
  * guard the client's call is typed by.
