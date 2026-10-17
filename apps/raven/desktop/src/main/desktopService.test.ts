@@ -719,6 +719,15 @@ describe('describeFile', () => {
     expect(reached).toEqual([{ name: 'noteOpened', input: { fileId: target.fileId } }])
   })
 
+  it('keeps a download out of File > Open Recent', async () => {
+    const { service, spies } = setup({ files: { ...show, [DOWNLOAD_ONE]: {} } })
+    const download = idOf(await service.openPaths([DOWNLOAD_ONE]))
+    await describeFile({ service, fileId: download.fileId })
+    const episode = idOf(await service.openPaths(['/m/Show/Episode 1.mkv']))
+    await describeFile({ service, fileId: episode.fileId })
+    expect(spies.recentDocuments).toEqual(['/m/Show/Episode 1.mkv'])
+  })
+
   it("offers a download's next of its group when its queue is empty, as when opened from the recents", async () => {
     const { service } = setup({ files: { [DOWNLOAD_ONE]: {}, [DOWNLOAD_TWO]: {} } })
     const first = idOf(await service.openPaths([DOWNLOAD_ONE]))

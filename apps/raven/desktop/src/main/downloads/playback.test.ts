@@ -370,9 +370,14 @@ describe('what names a download', () => {
     expect(world.playback.fromLabelOf({ path: VIDEO })).toBe('Downloaded from Vhagar')
     expect(world.playback.fromLabelOf({ path: MOVIE_PATH })).toBeNull()
     expect(world.playback.fromLabelOf({ path: `${DOWNLOADS}/../Movies/x.mkv` })).toBeNull()
-    expect(world.playback.fromLabelOf({ path: videoOf(11, OTHER_SERVER_ID) })).toBeNull()
+    expect(world.playback.fromLabelOf({ path: `${DOWNLOADS}/x.mkv` })).toBeNull()
     world.names.set(SERVER_ID, 'Caraxes')
     expect(world.playback.fromLabelOf({ path: VIDEO })).toBe('Downloaded from Caraxes')
+  })
+
+  it('says only "Downloaded" for a download of a server raven player no longer keeps, never its folder', () => {
+    const world = setup({ entries: [entryFor({ serverId: OTHER_SERVER_ID })] })
+    expect(world.playback.fromLabelOf({ path: videoOf(11, OTHER_SERVER_ID) })).toBe('Downloaded')
   })
 
   it("names a download's video by its title, and nothing for another file", () => {

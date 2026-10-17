@@ -57,7 +57,10 @@ export type DownloadPlayback = {
   nextOf: (input: { fileId: string }) => Promise<Readonly<GrantedFile> | null>
   /** The subtitle files kept beside a granted download's video; none for any other file. */
   sidecarsOf: (fileId: string) => readonly LocalSidecar[]
-  /** "Downloaded from <server>" for a path in the downloads folder, else null. */
+  /**
+   * "Downloaded from <server>" for a path in the downloads folder, or "Downloaded" once raven
+   * player no longer keeps the server; else null.
+   */
   fromLabelOf: (input: { path: string }) => string | null
   /** The title of the download whose video is at `path`, else null. */
   labelOf: (input: { path: string }) => string | null
@@ -216,8 +219,7 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
   const fromLabelOf: DownloadPlayback['fromLabelOf'] = ({ path }) => {
     const [serverId = ''] = relative(downloadsDirFor({ userData: deps.userData }), path).split(sep)
     if (!isOpaqueId(serverId)) return null
-    const serverName = deps.serverNameOf(serverId)
-    return serverName === '' ? null : DOWNLOAD_MESSAGES.downloadedFrom(serverName)
+    return DOWNLOAD_MESSAGES.downloadedFrom(deps.serverNameOf(serverId))
   }
 
   const noteOpened: DownloadPlayback['noteOpened'] = ({ fileId }) => {
