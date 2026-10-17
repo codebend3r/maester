@@ -76,11 +76,19 @@
           "^build"
         ],
         "inputs": [
-          "{projectRoot}/native/**/*",
+          "{projectRoot}/native/sources.lock.json",
+          "{projectRoot}/native/patches/**/*",
           "{projectRoot}/src/build/**/*",
-          "{projectRoot}/package.json",
-          "{workspaceRoot}/bun.lock",
+          "!{projectRoot}/src/build/**/*.test.ts",
+          "!{projectRoot}/src/build/buildAddon.ts",
+          "!{projectRoot}/src/build/auditNative.ts",
+          "!{projectRoot}/src/build/symbols.ts",
           "{workspaceRoot}/tsconfig.base.json",
+          {
+            "externalDependencies": [
+              "node-addon-api"
+            ]
+          },
           {
             "runtime": "xcodebuild -version"
           },
@@ -102,9 +110,19 @@
         ]
       },
       "test:native": {
-        "cache": false,
+        "cache": true,
         "dependsOn": [
           "^build"
+        ],
+        "inputs": [
+          "default",
+          "^production",
+          {
+            "runtime": "xcodebuild -version"
+          },
+          {
+            "runtime": "uname -m"
+          }
         ]
       },
       "audit:native": {
