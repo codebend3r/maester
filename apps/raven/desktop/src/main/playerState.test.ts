@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import {
   EMPTY_STATE,
   END_MARGIN_S,
+  forgetResume,
   RECENTS_CAP,
   RESUME_CAP,
   TRACKS_CAP,
@@ -405,6 +406,24 @@ describe('resumeFor', () => {
       at: 1,
     })
     expect(resumeFor(unknown, { file: facts('/a') })).toBe(40)
+  })
+})
+
+describe('forgetResume', () => {
+  const saved = [facts('/a'), facts('/b')].reduce(
+    (state, file) => savePosition(state, { file, position: 40, duration: 120, at: 1 }),
+    addRecent(EMPTY_STATE, { path: '/a', at: 1 }),
+  )
+
+  it("drops the path's resume spot and keeps the others and the recents", () => {
+    const forgotten = forgetResume(saved, { path: '/a' })
+    expect(forgotten.resume.map((entry) => entry.path)).toEqual(['/b'])
+    expect(resumeFor(forgotten, { file: facts('/a') })).toBe(0)
+    expect(forgotten.recents).toEqual(saved.recents)
+  })
+
+  it('hands back the same state when the path has no spot, so nothing is written', () => {
+    expect(forgetResume(saved, { path: '/other' })).toBe(saved)
   })
 })
 

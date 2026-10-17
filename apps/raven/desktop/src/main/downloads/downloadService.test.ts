@@ -9,6 +9,7 @@ import {
   viewStatusOf,
 } from '@/main/downloads/downloadService'
 import {
+  clearPending,
   EMPTY_DOWNLOADS,
   NO_PENDING,
   type DownloadEntry,
@@ -20,6 +21,14 @@ import { DOWNLOADS_DEBOUNCE_MS } from '@/main/downloads/downloadStore'
 import { EXPAND_MESSAGES } from '@/main/downloads/expand'
 import type { AccessOutcome } from '@/main/downloads/mediaAccess'
 import { SPACE_RESERVE_BYTES } from '@/main/downloads/space'
+import { createGrants } from '@/main/grants'
+import {
+  addRecent,
+  EMPTY_STATE,
+  type FileFacts,
+  type PlayerState,
+  savePosition,
+} from '@/main/playerState'
 import { createJsonStore, type StateFs } from '@/main/stateStore'
 import {
   fakeAccess,
@@ -41,7 +50,13 @@ import {
   show,
   type Reply,
 } from '@/main/test/serverFakes'
-import { SERVER_GONE, type DesktopEvent, type DesktopReply } from '@/shared/protocol'
+import {
+  isOpaqueId,
+  MAX_QUEUE,
+  SERVER_GONE,
+  type DesktopEvent,
+  type DesktopReply,
+} from '@/shared/protocol'
 import { mediaItemFor } from '@/shared/test/mediaItem'
 
 const SERVER_ID = '6f1c1c0e-3b0a-4f4e-8a55-0d2f3c5b7e11'
@@ -94,13 +109,18 @@ const memoryConfig = (): ConfigStore => {
   }
 }
 
-const sequentialIds = (): (() => string) => {
+const sequentialIds = (prefix = '00000000'): (() => string) => {
   const counter = { n: 0 }
   return () => {
     counter.n += 1
-    return `00000000-0000-4000-8000-${String(counter.n).padStart(12, '0')}`
+    return `${prefix}-0000-4000-8000-${String(counter.n).padStart(12, '0')}`
   }
 }
+
+/** When every file on the fake disk was last changed. */
+const MTIME = 1_600_000_000_000
+
+type Video = { size: number; mtimeMs: number }
 
 const libraryCall = keyOf({ name: 'getLibrary', libraryId: 1 })
 const mediaCall = (mediaId: number): string => keyOf({ name: 'getMedia', mediaId })
@@ -151,6 +171,8 @@ const setup = ({
   initial = EMPTY_DOWNLOADS,
   access = NEVER,
   disk = {},
+  videos = {},
+  player = EMPTY_STATE,
 }: {
   replies?: Record<string, Reply>
   free?: number
@@ -158,6 +180,9 @@ const setup = ({
   initial?: DownloadsState
   access?: () => Promise<AccessOutcome>
   disk?: Record<string, number>
+  /** Finished videos by path, kept apart from `disk`, whose seed holds every byte in memory. */
+  videos?: Record<string, Video>
+  player?: PlayerState
 } = {}) => {
   const table: Record<string, Reply> = {
     [libraryCall]: ok(library({ id: 1, watchedPercent: 90 })),
@@ -184,6 +209,34 @@ const setup = ({
   const drive = fakeDisk(disk)
   const network = fakeNetwork()
   const media = fakeAccess(access)
+  const shelf = new Map(Object.entries(videos))
+  const videoAt = (path: string): Video => {
+    const video = shelf.get(path)
+    if (video !== undefined) return video
+    if (drive.files.has(path)) return { size: drive.sizeOf(path), mtimeMs: MTIME }
+    throw missing()
+  }
+  const grants = createGrants({
+    fs: {
+      realpath: async (path) => {
+        videoAt(path)
+        return path
+      },
+      stat: async (path) => ({ isFile: () => true, ...videoAt(path) }),
+    },
+    newId: sequentialIds('20000000'),
+  })
+  const state = createJsonStore({
+    fs: memoryFs(),
+    file: `${USER_DATA}/player-state.json`,
+    initial: player,
+    timers: { set: () => 0, clear: () => undefined },
+    debounceMs: 1000,
+    onError: (error) => {
+      throw error
+    },
+  })
+  const statted: string[] = []
   const service = createDownloadService({
     store,
     config,
@@ -206,10 +259,20 @@ const setup = ({
     showItemInFolder: (path) => shown.push(path),
     ready: Promise.resolve(),
     wasSetAside: false,
+    grants,
+    state,
+    stat: async (path) => {
+      statted.push(path)
+      return videoAt(path)
+    },
   })
   return {
     service,
     store,
+    grants,
+    state,
+    shelf,
+    statted,
     config,
     table,
     log,
@@ -1048,5 +1111,340 @@ describe('the queue', () => {
     world.fire()
     expect(world.sent).toEqual([])
     expect(statusOf(world)).toEqual({ kind: 'downloading', bytes: 0 })
+  })
+})
+
+describe('playing a download', () => {
+  const ID = '0f8fad5b-d9cb-469f-a165-70867728950e'
+  const OTHER_ID = '00000000-0000-4000-8000-0000000000a1'
+  const UNKNOWN_ID = '00000000-0000-4000-8000-0000000000ff'
+  const MOVIE_PATH = '/Movies/x.mkv'
+  const videoOf = (mediaId: number, serverId = SERVER_ID): string =>
+    `${DOWNLOADS}/${serverId}/${mediaId}/video.mkv`
+  const VIDEO = videoOf(11)
+  const FILE: Video = { size: 2 * GIB, mtimeMs: MTIME }
+  const holding = (...entries: DownloadEntry[]): DownloadsState => ({
+    ...EMPTY_DOWNLOADS,
+    entries,
+  })
+  const shelved = (...entries: DownloadEntry[]): Record<string, Video> =>
+    Object.fromEntries(
+      entries.map((entry) => [
+        videoOf(entry.mediaId, entry.serverId),
+        { size: entry.size, mtimeMs: MTIME },
+      ]),
+    )
+  const episodeOf = (n: number, overrides: Partial<DownloadEntry> = {}): DownloadEntry =>
+    entryFor({
+      downloadId: `00000000-0000-4000-9000-${String(n).padStart(12, '0')}`,
+      mediaId: 10 + n,
+      label: `Episode ${n}`,
+      group: { kind: 'season', key: 'show:4', title: 'Severance', order: 10_000 + n },
+      ...overrides,
+    })
+  const factsOf = (path: string, video: Video = FILE): FileFacts => ({ path, ...video })
+  const pathOf = (world: World, fileId: string): string | null =>
+    world.grants.fileOf(fileId)?.path ?? null
+  const targetOf = (reply: DesktopReply) => {
+    if (reply.type !== 'play') throw new Error(`expected play, got ${reply.type}`)
+    return reply.target
+  }
+  const opened = async (world: World, downloadId = ID): Promise<string> =>
+    targetOf(await world.service.open({ downloadId })).fileId
+  /** A grant made outside `open`, as Home's recents, a drop or the open dialog make one. */
+  const granted = async (world: World, path: string): Promise<string> => {
+    const result = await world.grants.grant(path)
+    if (!result.ok) throw new Error(`expected a grant, got ${result.reason}`)
+    return result.file.fileId
+  }
+  const entryOf = (world: World, downloadId = ID) =>
+    world.store.read().entries.find((entry) => entry.downloadId === downloadId) ?? null
+  const lastList = (world: World) => {
+    const last = world.sent.findLast((event) => event.type === 'downloads')
+    if (last?.type !== 'downloads') throw new Error('expected a downloads event')
+    return last.downloads
+  }
+  /** A player state holding a recent and a resume spot at 100 of 3000 for each path. */
+  const remembering = (...paths: string[]): PlayerState =>
+    paths.reduce(
+      (state, path) =>
+        savePosition(addRecent(state, { path, at: 1 }), {
+          file: factsOf(path),
+          position: 100,
+          duration: 3000,
+          at: 1,
+        }),
+      EMPTY_STATE,
+    )
+  const pathsIn = (state: PlayerState) => ({
+    recents: state.recents.flatMap((recent) => (recent.kind === 'file' ? [recent.path] : [])),
+    resume: state.resume.map(({ path }) => path),
+  })
+
+  it("plays a ready download as a local file, with its group's later ready files queued in order", async () => {
+    const movie = entryFor({
+      downloadId: '00000000-0000-4000-9000-0000000000aa',
+      mediaId: 41,
+      label: 'Dune (2021)',
+      group: { kind: 'movie', key: 'movie:41', title: 'Dune (2021)', order: 0 },
+    })
+    const ready = [episodeOf(3), episodeOf(1), episodeOf(2), episodeOf(5), movie]
+    const world = setup({
+      initial: holding(...ready, episodeOf(4, { status: { kind: 'queued' } })),
+      videos: shelved(...ready),
+    })
+    const target = targetOf(await world.service.open({ downloadId: episodeOf(2).downloadId }))
+    expect(isOpaqueId(target.fileId)).toBe(true)
+    expect(pathOf(world, target.fileId)).toBe(videoOf(12))
+    expect(target.queue.map((fileId) => pathOf(world, fileId))).toEqual([videoOf(13), videoOf(15)])
+  })
+
+  it('queues at most MAX_QUEUE files after the one it plays', async () => {
+    const entries = Array.from({ length: MAX_QUEUE + 2 }, (_, index) => episodeOf(index + 1))
+    const world = setup({ initial: holding(...entries), videos: shelved(...entries) })
+    const target = targetOf(await world.service.open({ downloadId: episodeOf(1).downloadId }))
+    expect(target.queue).toHaveLength(MAX_QUEUE)
+    expect(pathOf(world, target.queue.at(-1) ?? '')).toBe(videoOf(11 + MAX_QUEUE))
+  })
+
+  it('refuses a download that is not ready, and one it does not hold', async () => {
+    const world = setup({
+      initial: holding(entryFor({ status: { kind: 'paused', bytes: 7, reason: 'viewer' } })),
+      videos: { [VIDEO]: FILE },
+    })
+    const unknown = { type: 'refused', message: DOWNLOAD_MESSAGES.unknown } as const
+    expect(await world.service.open({ downloadId: ID })).toEqual(unknown)
+    expect(await world.service.open({ downloadId: UNKNOWN_ID })).toEqual(unknown)
+  })
+
+  it('refuses a download whose file has gone, and warns by its title alone', async () => {
+    const world = setup({ initial: holding(entryFor({})) })
+    expect(await world.service.open({ downloadId: ID })).toEqual({
+      type: 'refused',
+      message: DOWNLOAD_MESSAGES.fileGone,
+    })
+    expect(world.warnings).toEqual([expect.stringContaining('S01E01 Good News')])
+    expect(world.warnings.join('\n')).not.toContain('video.mkv')
+  })
+
+  it('leaves out of the queue a file that has gone, and warns by its title alone', async () => {
+    const world = setup({
+      initial: holding(episodeOf(1), episodeOf(2), episodeOf(3)),
+      videos: shelved(episodeOf(1), episodeOf(3)),
+    })
+    const target = targetOf(await world.service.open({ downloadId: episodeOf(1).downloadId }))
+    expect(target.queue.map((fileId) => pathOf(world, fileId))).toEqual([videoOf(13)])
+    expect(world.warnings).toEqual([expect.stringContaining('Episode 2')])
+    expect(world.warnings.join('\n')).not.toContain('video.mkv')
+  })
+
+  it("lists a download's subtitles under its subtitles folder, and none for another file", async () => {
+    const world = setup({
+      initial: holding(
+        entryFor({
+          sidecars: [
+            { trackId: 'external-0', title: 'English', language: 'en' },
+            { trackId: 'external-2', title: 'Forced', language: 'en' },
+          ],
+        }),
+      ),
+      videos: { [VIDEO]: FILE, [MOVIE_PATH]: FILE },
+    })
+    const fileId = await opened(world)
+    expect(world.service.sidecarsOf(fileId)).toEqual([
+      {
+        path: `${DOWNLOADS}/${SERVER_ID}/11/subtitles/external-0.vtt`,
+        title: 'English',
+        language: 'en',
+      },
+      {
+        path: `${DOWNLOADS}/${SERVER_ID}/11/subtitles/external-2.vtt`,
+        title: 'Forced',
+        language: 'en',
+      },
+    ])
+    expect(world.service.sidecarsOf(await granted(world, MOVIE_PATH))).toEqual([])
+    expect(world.service.sidecarsOf(UNKNOWN_ID)).toEqual([])
+  })
+
+  it("says a download came from its server by the server's name now, and nothing for another file", () => {
+    const world = setup({ initial: holding(entryFor({})) })
+    expect(world.service.fromLabelOf({ path: VIDEO })).toBe('Downloaded from Vhagar')
+    expect(world.service.fromLabelOf({ path: MOVIE_PATH })).toBeNull()
+    expect(world.service.fromLabelOf({ path: `${DOWNLOADS}/../Movies/x.mkv` })).toBeNull()
+    expect(world.service.fromLabelOf({ path: videoOf(11, OTHER_SERVER_ID) })).toBeNull()
+    world.config.update((config) => ({
+      ...config,
+      servers: config.servers.map((server) => ({ ...server, name: 'Caraxes' })),
+    }))
+    expect(world.service.fromLabelOf({ path: VIDEO })).toBe('Downloaded from Caraxes')
+  })
+
+  it("names a download's video by its title, and nothing for another file", () => {
+    const world = setup({ initial: holding(entryFor({})) })
+    expect(world.service.labelOf({ path: VIDEO })).toBe('S01E01 Good News')
+    expect(world.service.labelOf({ path: MOVIE_PATH })).toBeNull()
+  })
+
+  it('counts the first position after an open as a play, and notes every position', async () => {
+    const world = setup({ initial: holding(entryFor({})), videos: { [VIDEO]: FILE } })
+    const fileId = await opened(world)
+    world.clock.now = NOW + 1
+    world.service.notePosition({ fileId, position: 100, duration: 3000 })
+    expect(entryOf(world)?.pending).toEqual({ play: true, position: 100, at: NOW + 1 })
+    // What a sync sent is cleared, so a second play would show.
+    world.store.update((state) => clearPending(state, { downloadId: ID, sentPosition: 100 }))
+    world.clock.now = NOW + 2
+    world.service.notePosition({ fileId, position: 200, duration: 3000 })
+    expect(entryOf(world)?.pending).toEqual({ play: false, position: 200, at: NOW + 2 })
+    expect(await opened(world)).toBe(fileId)
+    world.service.notePosition({ fileId, position: 300, duration: 3000 })
+    expect(entryOf(world)?.pending).toEqual({ play: true, position: 300, at: NOW + 2 })
+  })
+
+  it("marks a download watched once a position reaches its library's Watched at, and keeps the first time", async () => {
+    const world = setup({ initial: holding(entryFor({})), videos: { [VIDEO]: FILE } })
+    const fileId = await opened(world)
+    world.service.notePosition({ fileId, position: 2699, duration: null })
+    expect(entryOf(world)?.watchedAt).toBeNull()
+    world.clock.now = NOW + 5
+    world.service.notePosition({ fileId, position: 2700, duration: null })
+    expect(entryOf(world)?.watchedAt).toBe(NOW + 5)
+    world.clock.now = NOW + 9
+    world.service.notePosition({ fileId, position: 2990, duration: 3000 })
+    expect(entryOf(world)?.watchedAt).toBe(NOW + 5)
+  })
+
+  it("reads the player's length before the entry's", async () => {
+    const world = setup({ initial: holding(entryFor({})), videos: { [VIDEO]: FILE } })
+    const fileId = await opened(world)
+    world.service.notePosition({ fileId, position: 900, duration: 1000 })
+    expect(entryOf(world)?.watchedAt).toBe(NOW)
+  })
+
+  it('knows a download opened outside the Downloads page by its path, and counts a play once the page opens it', async () => {
+    const world = setup({
+      initial: holding(
+        entryFor({ sidecars: [{ trackId: 'external-0', title: 'English', language: 'en' }] }),
+      ),
+      videos: { [VIDEO]: FILE },
+    })
+    const fileId = await granted(world, VIDEO)
+    expect(world.service.sidecarsOf(fileId)).toHaveLength(1)
+    world.service.notePosition({ fileId, position: 100, duration: 3000 })
+    expect(entryOf(world)?.pending).toEqual({ play: false, position: 100, at: NOW })
+    world.service.noteOpened({ fileId })
+    world.service.notePosition({ fileId, position: 150, duration: 3000 })
+    expect(entryOf(world)?.pending).toEqual({ play: true, position: 150, at: NOW })
+  })
+
+  it('notes nothing for a file that is not a download', async () => {
+    const world = setup({
+      initial: holding(entryFor({})),
+      videos: { [VIDEO]: FILE, [MOVIE_PATH]: FILE },
+    })
+    const before = world.store.read()
+    const fileId = await granted(world, MOVIE_PATH)
+    world.service.noteOpened({ fileId })
+    world.service.notePosition({ fileId, position: 2900, duration: 3000 })
+    world.service.notePosition({ fileId: UNKNOWN_ID, position: 2900, duration: 3000 })
+    expect(world.store.read()).toBe(before)
+  })
+
+  it.each([
+    ['remove', (world: World) => world.service.remove({ downloadId: ID })],
+    ['removeServer', (world: World) => world.service.removeServer({ serverId: SERVER_ID })],
+    ['removeAll', (world: World) => world.service.removeAll()],
+  ])("drops a download's recent and resume spot through %s", async (_, removing) => {
+    const world = setup({
+      initial: holding(entryFor({})),
+      videos: { [VIDEO]: FILE },
+      player: remembering(VIDEO, MOVIE_PATH),
+    })
+    await opened(world)
+    await removing(world)
+    expect(pathsIn(world.state.read())).toEqual({ recents: [MOVIE_PATH], resume: [MOVIE_PATH] })
+  })
+
+  it('drops at launch the recent and resume spot of a download of a server raven player no longer keeps', async () => {
+    const path = videoOf(11, OTHER_SERVER_ID)
+    const world = setup({
+      initial: holding(entryFor({ serverId: OTHER_SERVER_ID })),
+      player: remembering(path, MOVIE_PATH),
+    })
+    await until(() => world.store.read().entries.length === 0)
+    expect(pathsIn(world.state.read())).toEqual({ recents: [MOVIE_PATH], resume: [MOVIE_PATH] })
+  })
+
+  it('leaves the player state as it was when nothing names the removed download', async () => {
+    const player = remembering(MOVIE_PATH)
+    const world = setup({ initial: holding(entryFor({})), player })
+    await world.service.remove({ downloadId: ID })
+    expect(world.state.read()).toBe(player)
+  })
+
+  it("shows each ready file's share watched, read off its file at launch", async () => {
+    const replaced = videoOf(12)
+    const player = [
+      { file: factsOf(VIDEO), position: 1500 },
+      { file: factsOf(replaced, { size: 2 * GIB, mtimeMs: MTIME - 1 }), position: 1500 },
+      { file: factsOf(videoOf(13)), position: 1500 },
+    ].reduce(
+      (state, { file, position }) => savePosition(state, { file, position, duration: 3000, at: 1 }),
+      EMPTY_STATE,
+    )
+    const ready = [
+      entryFor({}),
+      entryFor({
+        downloadId: OTHER_ID,
+        mediaId: 12,
+        group: { kind: 'season', key: 'show:4', title: 'Severance', order: 10_002 },
+      }),
+    ]
+    const paused = entryFor({
+      downloadId: UNKNOWN_ID,
+      mediaId: 13,
+      group: { kind: 'season', key: 'show:4', title: 'Severance', order: 10_003 },
+      status: { kind: 'paused', bytes: 7, reason: 'viewer' },
+    })
+    const world = setup({
+      initial: holding(...ready, paused),
+      videos: { ...shelved(...ready), [videoOf(13)]: FILE },
+      player,
+    })
+    await until(() => world.service.views()[0]?.watched !== null)
+    expect(world.service.views().map(({ watched }) => watched)).toEqual([0.5, null, null])
+    expect(world.statted.toSorted()).toEqual([VIDEO, replaced])
+    world.fire()
+    expect(lastList(world).map(({ watched }) => watched)).toEqual([0.5, null, null])
+  })
+
+  it('shows the share a noted position leaves, and tells the page', async () => {
+    const world = setup({ initial: holding(entryFor({})), videos: { [VIDEO]: FILE } })
+    await until(() => world.statted.length === 1)
+    const fileId = await opened(world)
+    world.state.update((state) =>
+      savePosition(state, { file: factsOf(VIDEO), position: 750, duration: 3000, at: NOW }),
+    )
+    world.service.notePosition({ fileId, position: 750, duration: 3000 })
+    expect(world.service.views()[0]?.watched).toBe(0.25)
+    world.fire()
+    expect(lastList(world)[0]?.watched).toBe(0.25)
+  })
+
+  it("reads a finished file's facts, so its share shows once a position is saved", async () => {
+    const world = setup({
+      initial: holding(entryFor({ size: 8, status: { kind: 'queued' } })),
+      access: async () => FAR_TICKET,
+      player: savePosition(EMPTY_STATE, {
+        file: factsOf(VIDEO, { size: 8, mtimeMs: MTIME }),
+        position: 1500,
+        duration: 3000,
+        at: 1,
+      }),
+    })
+    world.network.answers.file = serving({ size: 8 })
+    await until(() => world.service.views()[0]?.watched !== null)
+    expect(world.service.views()[0]?.watched).toBe(0.5)
   })
 })

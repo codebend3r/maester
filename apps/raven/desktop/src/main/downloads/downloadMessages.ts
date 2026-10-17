@@ -15,6 +15,8 @@ export const DOWNLOAD_MESSAGES = {
   askGone:
     'That download request has expired. Open the title in raven on the web and choose Download to raven player again.',
   unknown: 'That download is no longer in raven player.',
+  fileGone: "That download's file could not be found.",
+  downloadedFrom: (serverName: string): string => `Downloaded from ${serverName}`,
   queued: ({
     files,
     kind,
