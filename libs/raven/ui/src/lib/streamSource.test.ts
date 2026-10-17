@@ -331,6 +331,101 @@ describe('createStreamSession', () => {
     expect(errors).toEqual(['The server could not convert this video (500).'])
   })
 
+  it('says the origin is unreachable when the fetch rejects, then fails', async () => {
+    const calls: string[] = []
+    createStreamSession({
+      video: fakeVideo(),
+      mime: 'video/mp4',
+      duration: null,
+      start: 0,
+      url: () => 'x',
+      onError: (message) => calls.push(`error: ${message}`),
+      onUnreachable: () => calls.push('unreachable'),
+      environment: {
+        ...setup({}).environment,
+        fetch: async () => {
+          throw new TypeError('Failed to fetch')
+        },
+      },
+    })
+    await settle()
+    expect(calls).toEqual(['unreachable', 'error: Failed to fetch'])
+  })
+
+  it('does not call a server that answers with an error unreachable', async () => {
+    const calls: string[] = []
+    createStreamSession({
+      video: fakeVideo(),
+      mime: 'video/mp4',
+      duration: null,
+      start: 0,
+      url: () => 'x',
+      onError: (message) => calls.push(`error: ${message}`),
+      onUnreachable: () => calls.push('unreachable'),
+      environment: setup({}, false).environment,
+    })
+    await settle()
+    expect(calls).toEqual(['error: The server could not convert this video (500).'])
+  })
+
+  it('does not call an origin unreachable once it has delivered a chunk', async () => {
+    const calls: string[] = []
+    const base = setup({})
+    createStreamSession({
+      video: fakeVideo(),
+      mime: 'video/mp4',
+      duration: null,
+      start: 0,
+      url: () => 'x',
+      onError: (message) => calls.push(`error: ${message}`),
+      onUnreachable: () => calls.push('unreachable'),
+      environment: {
+        ...base.environment,
+        fetch: async () => ({
+          ok: true,
+          status: 200,
+          // Nothing is pulled ahead of a read, so the error comes after the append.
+          body: new ReadableStream<Uint8Array<ArrayBuffer>>(
+            {
+              pull: (controller) => {
+                if (base.bufferState.appended > 0) {
+                  controller.error(new TypeError('network error'))
+                  return
+                }
+                controller.enqueue(new Uint8Array([0, 2]))
+              },
+            },
+            { highWaterMark: 0 },
+          ),
+        }),
+      },
+    })
+    await settle()
+    expect(base.bufferState.appended).toBe(1)
+    expect(calls).toEqual(['error: network error'])
+  })
+
+  it('ignores an aborted fetch', async () => {
+    const calls: string[] = []
+    createStreamSession({
+      video: fakeVideo(),
+      mime: 'video/mp4',
+      duration: null,
+      start: 0,
+      url: () => 'x',
+      onError: (message) => calls.push(`error: ${message}`),
+      onUnreachable: () => calls.push('unreachable'),
+      environment: {
+        ...setup({}).environment,
+        fetch: async () => {
+          throw new DOMException('aborted', 'AbortError')
+        },
+      },
+    })
+    await settle()
+    expect(calls).toEqual([])
+  })
+
   it('reports a browser without Media Source Extensions', async () => {
     const errors: string[] = []
     createStreamSession({

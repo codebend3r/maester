@@ -1,4 +1,4 @@
-import { type ApiClient, type PlaybackMode, streamMimeType } from '@raven/core'
+import { type ApiClient, type MediaAccess, type PlaybackMode, streamMimeType } from '@raven/core'
 import { type RefObject, useEffect, useEffectEvent, useRef } from 'react'
 import { useVideoEvents } from '@/components/Player/useVideoEvents'
 import type { HtmlSource } from '@/components/Player/engine'
@@ -15,6 +15,7 @@ export const sourceFor = ({
   mode,
   audio,
   mime,
+  access,
 }: {
   api: ApiClient
   id: number
@@ -23,10 +24,16 @@ export const sourceFor = ({
   audio: number | null
   /** The converted stream's type; null for direct play, which needs none. */
   mime: string | null
+  /** Read for each URL built, so a stream's next request carries the newest ticket. */
+  access: () => MediaAccess | null
 }): VideoSource =>
   mode === 'direct' || mime == null
-    ? { kind: 'file', url: api.fileUrl({ id }) }
-    : { kind: 'stream', mime, url: (start) => api.streamUrl({ id, mode, start, audio }) }
+    ? { kind: 'file', url: api.fileUrl({ id, access: access() }) }
+    : {
+        kind: 'stream',
+        mime,
+        url: (start) => api.streamUrl({ id, mode, start, audio, access: access() }),
+      }
 
 const failureMessage = (error: MediaError | null): string => {
   if (error?.code === MediaError.MEDIA_ERR_NETWORK) return 'The connection to the server dropped.'
@@ -70,17 +77,30 @@ export const useMediaSource = ({
   const id = htmlSource.kind === 'server' ? htmlSource.media.id : htmlSource.url
   const api = htmlSource.kind === 'server' ? htmlSource.api : null
   const knownDuration = htmlSource.kind === 'server' ? htmlSource.media.duration : null
+  const access = htmlSource.kind === 'server' ? (htmlSource.mediaPlane?.access ?? null) : null
+  const accessRef = useRef(access)
+  useEffect(() => {
+    accessRef.current = access
+  }, [access])
+  const originUrl = access?.origin.url ?? null
+  // A stream reads the newest ticket on its next request; a <video src> holds
+  // its address and would keep asking with the old ticket until it died.
+  const fileTicket = mode === 'direct' ? (access?.ticket ?? null) : null
   // The source this render wants, and the one attached. They differ from
   // the commit that picks a new source until the effect swaps it in, and a
   // failure the browser queued for the old one can land in between; it
-  // must not count against the new one.
-  const wanted = `${id}:${mode}:${audio ?? 'default'}`
+  // must not count against the new one. A file's ticket is part of the
+  // key because a new ticket re-attaches it.
+  const wanted = `${id}:${mode}:${audio ?? 'default'}:${originUrl ?? 'host'}:${fileTicket ?? ''}`
   const attached = useRef<string | null>(null)
   const report = (message: string) => {
     if (attached.current === wanted) onFailure(message)
   }
   // A running stream outlives renders; its failures reach the latest `report`.
   const fail = useEffectEvent((message: string) => report(message))
+  const unreachable = useEffectEvent(() => {
+    if (htmlSource.kind === 'server') htmlSource.mediaPlane?.reportUnreachable()
+  })
 
   useVideoEvents({
     videoRef,
@@ -97,10 +117,13 @@ export const useMediaSource = ({
       element,
       source,
       duration,
+      isRemote,
     }: {
       element: HTMLVideoElement
       source: VideoSource
       duration: number | null
+      /** Whether the media comes from an origin that could prove unreachable. */
+      isRemote: boolean
     }): (() => void) => {
       const from = position.current
       const play = () => {
@@ -126,6 +149,7 @@ export const useMediaSource = ({
         start: from,
         url: source.url,
         onError: (message) => fail(message),
+        onUnreachable: isRemote ? () => unreachable() : undefined,
         environment: browserEnvironment(element),
       })
       play()
@@ -139,8 +163,13 @@ export const useMediaSource = ({
     attached.current = wanted
     const videoSource: VideoSource =
       api != null && typeof id === 'number'
-        ? sourceFor({ api, id, mode, audio, mime })
+        ? sourceFor({ api, id, mode, audio, mime, access: () => accessRef.current })
         : { kind: 'file', url: String(id) }
-    return attach({ element, source: videoSource, duration: knownDuration })
-  }, [videoRef, id, knownDuration, api, mode, audio, mime, wanted])
+    return attach({
+      element,
+      source: videoSource,
+      duration: knownDuration,
+      isRemote: originUrl != null,
+    })
+  }, [videoRef, id, knownDuration, api, mode, audio, mime, wanted, originUrl])
 }
