@@ -341,11 +341,13 @@ export const createPlayerService = ({
   // What the newest load opened, and its ticket, which an ending explains and a server's
   // removal stops.
   let opened: LoadTarget | null = null
-  // mpv's warnings name the file it plays, which the log must not hold (Ruling 12).
+  // mpv's warnings name the file it plays and its sidecars, which the log must not hold
+  // (Ruling 12). Whole paths go first so a name inside one is not replaced on its own.
   const withoutOpenFile = (message: string): string => {
     if (opened === null || opened.kind !== 'file') return message
-    const { path } = opened
-    return message.replaceAll(path, OPEN_FILE).replaceAll(basename(path), OPEN_FILE)
+    const paths = [opened.path, ...opened.sidecars.map(({ path }) => path)]
+    const named = [...paths, ...paths.map((path) => basename(path))].filter((name) => name !== '')
+    return named.reduce((text, name) => text.replaceAll(name, OPEN_FILE), message)
   }
   // These run inside the wrapper's event drain, so nothing they throw may escape.
   const warn = (message: string) => {
@@ -699,8 +701,9 @@ export const createPlayerService = ({
 
   const snapshot = async (token: number) => {
     const toAdd = opened === null ? [] : sidecarsOfTarget(opened)
+    // With nothing to add there is nothing to wait for, so no budget timer is armed.
     const sidecars =
-      opened === null || (opened.kind === 'file' && toAdd.length === 0)
+      opened === null || toAdd.length === 0
         ? { isCurrent: true, pending: null }
         : await sidecarsWithinBudget({ sidecars: toAdd, kind: opened.kind, token })
     if (!sidecars.isCurrent) return
