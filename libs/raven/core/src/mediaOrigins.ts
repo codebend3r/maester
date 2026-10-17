@@ -17,7 +17,8 @@ export const PREFERENCE_BAND = 0.2
 /** Bytes per second for the whole probe body, first byte included, so latency and bandwidth both count. */
 const scoreOf = ({ firstByteMs, bytesPerSecond }: OriginProbe): number => {
   if (!Number.isFinite(bytesPerSecond) || bytesPerSecond <= 0) return 0
-  return MEDIA_PROBE_BYTES / (firstByteMs / 1000 + MEDIA_PROBE_BYTES / bytesPerSecond)
+  const score = MEDIA_PROBE_BYTES / (firstByteMs / 1000 + MEDIA_PROBE_BYTES / bytesPerSecond)
+  return Number.isFinite(score) ? score : 0
 }
 
 const compareProbes = (a: OriginProbe, b: OriginProbe): number =>
@@ -26,10 +27,12 @@ const compareProbes = (a: OriginProbe, b: OriginProbe): number =>
 /**
  * The origin to play from: among those within `PREFERENCE_BAND` of the best
  * score, the nearest kind, then the quickest first byte, then the first listed.
+ * Null when no probe scores above zero.
  */
 export const pickOrigin = (probes: readonly OriginProbe[]): MediaOrigin | null => {
   const scored = probes.map((probe) => ({ probe, score: scoreOf(probe) }))
   const best = scored.reduce((top, { score }) => Math.max(top, score), 0)
+  if (best <= 0) return null
   const [winner] = scored
     .filter(({ score }) => score >= (1 - PREFERENCE_BAND) * best)
     .map(({ probe }) => probe)
