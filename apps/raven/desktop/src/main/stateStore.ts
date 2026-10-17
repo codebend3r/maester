@@ -11,6 +11,9 @@ export type Timers = {
   clear: (handle: unknown) => void
 }
 
+/** Node runs a longer delay at once, so no timer is ever armed for more. */
+export const TIMER_MAX_MS = 2 ** 31 - 1
+
 export type JsonStore<T> = {
   read: () => T
   update: (change: (value: T) => T) => void

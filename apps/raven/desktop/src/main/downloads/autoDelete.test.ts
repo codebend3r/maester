@@ -254,6 +254,51 @@ describe('the clock', () => {
   })
 })
 
+describe('a sleep', () => {
+  it('arms a running clock again from its time, so a deletion due during the sleep runs at once', () => {
+    const world = setup()
+    world.autoDelete.schedule({ downloadId: ID })
+    // A timer stands still while the Mac sleeps, though the clock on the wall does not.
+    world.clock.now += 30 * MINUTE
+    world.autoDelete.rearm()
+    expect(world.removed).toEqual([ID])
+    expect(world.pending.size).toBe(0)
+  })
+
+  it('arms a clock still running again with what is left, and leaves a held one held', () => {
+    const world = setup({
+      entries: [entryFor(), entryFor({ downloadId: OTHER_ID, mediaId: 12, watchedAt: NOW - DAY })],
+    })
+    world.playing.add(OTHER_ID)
+    world.autoDelete.rebuild()
+    expect(world.autoDelete.deletesAt({ downloadId: OTHER_ID })).toBeNull()
+    world.clock.now += 4 * MINUTE
+    world.autoDelete.rearm()
+    expect(world.delays()).toEqual([6 * MINUTE])
+    expect(world.autoDelete.deletesAt({ downloadId: ID })).toBe(NOW + AUTO_DELETE_DELAY_MS)
+    expect(world.removed).toEqual([])
+    world.after(6 * MINUTE)
+    expect(world.removed).toEqual([ID])
+  })
+})
+
+describe('a wait longer than a timer holds', () => {
+  const TIMER_MAX_MS = 2 ** 31 - 1
+
+  it('waits at most what a timer holds, and on from there, never deleting early', () => {
+    // Watched by a clock thirty days ahead, which has since been put right.
+    const world = setup({ entries: [entryFor({ watchedAt: NOW + 30 * DAY })] })
+    world.autoDelete.rebuild()
+    expect(world.delays()).toEqual([TIMER_MAX_MS])
+    world.after(TIMER_MAX_MS)
+    expect(world.removed).toEqual([])
+    const left = 30 * DAY + AUTO_DELETE_DELAY_MS - TIMER_MAX_MS
+    expect(world.delays()).toEqual([left])
+    world.after(left)
+    expect(world.removed).toEqual([ID])
+  })
+})
+
 describe('a deletion that waits', () => {
   it('holds a deletion that comes due while its file plays, and runs it once playback leaves', async () => {
     const world = setup()
