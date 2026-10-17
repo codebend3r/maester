@@ -13,6 +13,8 @@ import {
   type HomeShelf,
   type ItemImageOptions,
   type ItemMetadataState,
+  MEDIA_PROBE_BYTES,
+  type MediaOrigin,
   type MediaStreams,
   type MediaTracks,
   type MetadataHealth,
@@ -407,6 +409,35 @@ describe('playback calls', () => {
       respond({ body: { ...streams, video: { ...streams.video, range: 'hdr' } } }),
     )
     await expect(broken.getStreams(7)).rejects.toBeInstanceOf(ApiError)
+  })
+
+  it('fetches the media origins and checks them', async () => {
+    const origins: MediaOrigin[] = [{ kind: 'lan', url: 'https://raven.home.example' }]
+    const { client, calls } = clientReturning(respond({ body: { origins } }))
+    await expect(client.getMediaOrigins()).resolves.toEqual({ origins })
+    expect(calls[0]?.url).toBe('http://nas:8484/api/media-origins')
+    const { client: broken } = clientReturning(respond({ body: { origins: [{ kind: 'moon' }] } }))
+    await expect(broken.getMediaOrigins()).rejects.toMatchObject({ status: 502 })
+  })
+
+  it('fetches a media ticket and checks it', async () => {
+    const ticket = { ticket: 'abc.def', expiresAt: 1_700_000_000_000 }
+    const { client, calls } = clientReturning(respond({ body: ticket }))
+    await expect(client.getMediaTicket(7)).resolves.toEqual(ticket)
+    expect(calls[0]?.url).toBe('http://nas:8484/api/media/7/ticket')
+    const { client: broken } = clientReturning(respond({ body: { ticket: 'abc.def' } }))
+    await expect(broken.getMediaTicket(7)).rejects.toMatchObject({ status: 502 })
+  })
+
+  it("points a speed probe at an origin's ping, a quarter of a MiB by default", () => {
+    const { client } = clientReturning(respond({}))
+    const origin: MediaOrigin = { kind: 'tailnet', url: 'https://raven.tail.ts.net' }
+    expect(client.pingUrl({ origin })).toBe(
+      `https://raven.tail.ts.net/api/media-origins/ping?bytes=${MEDIA_PROBE_BYTES}`,
+    )
+    expect(client.pingUrl({ origin, bytes: 1000 })).toBe(
+      'https://raven.tail.ts.net/api/media-origins/ping?bytes=1000',
+    )
   })
 
   it('fetches a subtitle window and parses it', async () => {

@@ -4,14 +4,22 @@ import {
   Controller,
   ForbiddenException,
   Get,
+  Header,
   Inject,
   NotFoundException,
   Param,
   ParseIntPipe,
   Query,
   Res,
+  ServiceUnavailableException,
 } from '@nestjs/common'
-import { type MediaStreams, type MediaTracks, STREAM_TIME_SHIFT, isStreamMode } from '@raven/core'
+import {
+  type MediaStreams,
+  type MediaTicket,
+  type MediaTracks,
+  STREAM_TIME_SHIFT,
+  isStreamMode,
+} from '@raven/core'
 import { wholeNumber } from '@shared/server'
 import type { FastifyReply } from 'fastify'
 import { streamArgs } from '@/ffmpeg/args'
@@ -22,6 +30,7 @@ import { PrivateBy } from '@/lock/lockGuard'
 import { SettingsRepository } from '@/settings/settingsRepository'
 import { type MediaFile, MediaIndex } from '@/media/mediaIndex'
 import { MediaPlane } from '@/media/mediaPlaneMark'
+import { MediaTickets } from '@/media/mediaTickets'
 import { SubtitlesService } from '@/playback/subtitlesService'
 import { TracksService } from '@/playback/tracksService'
 
@@ -39,12 +48,27 @@ export class PlaybackController {
     @Inject(TracksService) private readonly tracks: TracksService,
     @Inject(SubtitlesService) private readonly subtitles: SubtitlesService,
     @Inject(FfmpegService) private readonly ffmpeg: FfmpegService,
+    @Inject(MediaTickets) private readonly tickets: MediaTickets,
   ) {}
 
   private fileOf(id: number): MediaFile {
     const file = this.index.fileOf(id)
     if (!file) throw new NotFoundException(`No media ${id}`)
     return file
+  }
+
+  /**
+   * Stands in for the cookie on this video's media requests to another
+   * origin. Not a media plane route: a ticket must never fetch another.
+   */
+  @Header('cache-control', 'no-store')
+  @Get(':id/ticket')
+  ticket(@Param('id', ParseIntPipe) id: number): MediaTicket {
+    this.fileOf(id)
+    if (!this.tickets.isOn) {
+      throw new ServiceUnavailableException('Set RAVEN_MEDIA_SECRET to hand out media tickets.')
+    }
+    return this.tickets.issue({ id })
   }
 
   @Get(':id/tracks')

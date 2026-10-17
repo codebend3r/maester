@@ -24,6 +24,7 @@ import { HomeController } from '@/media/homeController'
 import { MediaArtifacts } from '@/media/mediaArtifacts'
 import { MediaController } from '@/media/mediaController'
 import { MediaIndex } from '@/media/mediaIndex'
+import { MediaOriginsController } from '@/media/mediaOriginsController'
 import { MediaRepository } from '@/media/mediaRepository'
 import { MediaTickets } from '@/media/mediaTickets'
 import { SagaBackdrops } from '@/media/sagaBackdrops'
@@ -61,6 +62,7 @@ import { ThumbnailService } from '@/thumbnails/thumbnailService'
 export const CONTROLLERS = [
   LibrariesController,
   MediaController,
+  MediaOriginsController,
   PlaybackController,
   FavouritesController,
   WatchedController,

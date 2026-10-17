@@ -121,6 +121,7 @@ describe('the lock marks on routes', () => {
       .map((route) => `${route.method} ${route.path}`)
       .toSorted()
     expect(plane).toEqual([
+      'GET /api/media-origins/ping',
       'GET /api/media/:id/file',
       'GET /api/media/:id/stream',
       'GET /api/media/:id/subtitles/:trackId',

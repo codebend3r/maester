@@ -31,6 +31,9 @@ import {
   type MediaItem,
   type UnmatchedFile,
   type MediaLocation,
+  type MediaOrigin,
+  type MediaOrigins,
+  type MediaTicket,
   type MediaStreams,
   type MediaTracks,
   type MetadataHealth,
@@ -66,11 +69,14 @@ import {
   isMediaItem,
   isMediaList,
   isMediaLocation,
+  isMediaOrigins,
   isMediaStreams,
+  isMediaTicket,
   isMediaTracks,
   isPersonDetails,
   isPlaybackSettingsState,
   isPosterEntries,
+  MEDIA_PROBE_BYTES,
   POSTER_OWN_WIDTH,
   POSTER_WIDTHS,
   isSagaBackdrop,
@@ -790,6 +796,23 @@ export const createApiClient = ({
     /** The file's picture and sound in detail, probed afresh each time: profiles, bitrates, sample rates. */
     getStreams: (id: number): Promise<MediaStreams> =>
       expect({ request: send({ path: `/api/media/${id}/streams` }), guard: isMediaStreams }),
+
+    /** The origins a browser may fetch media from directly, best first; none while tickets are off. */
+    getMediaOrigins: (): Promise<MediaOrigins> =>
+      expect({ request: send({ path: '/api/media-origins' }), guard: isMediaOrigins }),
+
+    /** A short-lived ticket that stands in for the cookie on this video's media requests to another origin. */
+    getMediaTicket: (id: number): Promise<MediaTicket> =>
+      expect({ request: send({ path: `/api/media/${id}/ticket` }), guard: isMediaTicket }),
+
+    /** The address of `origin`'s speed probe: `bytes` of noise, never from disk. */
+    pingUrl: ({
+      origin,
+      bytes = MEDIA_PROBE_BYTES,
+    }: {
+      origin: MediaOrigin
+      bytes?: number
+    }): string => `${origin.url}/api/media-origins/ping?bytes=${bytes}`,
 
     /**
      * One subtitle track's cues. Embedded tracks come a window at a time
