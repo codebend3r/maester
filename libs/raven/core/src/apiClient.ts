@@ -31,6 +31,7 @@ import {
   type MediaItem,
   type UnmatchedFile,
   type MediaLocation,
+  type MediaStreams,
   type MediaTracks,
   type MetadataHealth,
   type PersonDetails,
@@ -65,6 +66,7 @@ import {
   isMediaItem,
   isMediaList,
   isMediaLocation,
+  isMediaStreams,
   isMediaTracks,
   isPersonDetails,
   isPlaybackSettingsState,
@@ -784,6 +786,10 @@ export const createApiClient = ({
     /** The audio and subtitle tracks a player can choose between. */
     getTracks: (id: number): Promise<MediaTracks> =>
       expect({ request: send({ path: `/api/media/${id}/tracks` }), guard: isMediaTracks }),
+
+    /** The file's picture and sound in detail, probed afresh each time: profiles, bitrates, sample rates. */
+    getStreams: (id: number): Promise<MediaStreams> =>
+      expect({ request: send({ path: `/api/media/${id}/streams` }), guard: isMediaStreams }),
 
     /**
      * One subtitle track's cues. Embedded tracks come a window at a time

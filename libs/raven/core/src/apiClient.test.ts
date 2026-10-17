@@ -13,6 +13,7 @@ import {
   type HomeShelf,
   type ItemImageOptions,
   type ItemMetadataState,
+  type MediaStreams,
   type MediaTracks,
   type MetadataHealth,
   type PersonDetails,
@@ -383,6 +384,29 @@ describe('playback calls', () => {
     expect(calls[0]?.url).toBe('http://nas:8484/api/media/7/tracks')
     const { client: broken } = clientReturning(respond({ body: { audio: 'eng' } }))
     await expect(broken.getTracks(7)).rejects.toBeInstanceOf(ApiError)
+  })
+
+  it("fetches a file's streams and checks them", async () => {
+    const streams: MediaStreams = {
+      video: { codec: 'h264', profile: 'High', bitrate: 11_100_000, range: 'sdr' },
+      audio: [
+        {
+          index: 0,
+          codec: 'dts',
+          profile: 'DTS-HD MA',
+          channels: 6,
+          bitrate: 1_509_000,
+          sampleRate: 48_000,
+        },
+      ],
+    }
+    const { client, calls } = clientReturning(respond({ body: streams }))
+    await expect(client.getStreams(7)).resolves.toEqual(streams)
+    expect(calls[0]?.url).toBe('http://nas:8484/api/media/7/streams')
+    const { client: broken } = clientReturning(
+      respond({ body: { ...streams, video: { ...streams.video, range: 'hdr' } } }),
+    )
+    await expect(broken.getStreams(7)).rejects.toBeInstanceOf(ApiError)
   })
 
   it('fetches a subtitle window and parses it', async () => {

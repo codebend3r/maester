@@ -1,6 +1,6 @@
 import { type PlaybackMode, STREAM_TIME_SHIFT } from '@raven/core'
 import { useEffect, useRef } from 'react'
-import type { EngineHandle, HtmlSource } from '@/components/Player/engine'
+import type { EngineHandle, EngineStats, HtmlSource } from '@/components/Player/engine'
 import styles from '@/components/Player/Player.module.scss'
 import { usePlayerServices } from '@/components/Player/PlayerServices'
 import { SubtitleOverlay } from '@/components/Player/SubtitleOverlay'
@@ -10,6 +10,8 @@ import type { TrackSelection } from '@/components/Player/useTrackSelection'
 import { useVideoEvents } from '@/components/Player/useVideoEvents'
 import { useVideoState } from '@/components/Player/useVideoState'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
+
+const ENGINE_NAME = 'HTML video'
 
 export const useHtmlEngine = ({
   source,
@@ -98,6 +100,28 @@ export const useHtmlEngine = ({
     setSubtitle: selection.pickSubtitle,
     setSubtitleScale: setCaptionScale,
   }
+  const readStats = (): EngineStats => {
+    const element = videoRef.current
+    if (!element) return { engine: ENGINE_NAME, viewport: null, frame: null, frames: null }
+    // Missing outside a real browser.
+    const quality = element.getVideoPlaybackQuality?.() ?? null
+    return {
+      engine: ENGINE_NAME,
+      viewport:
+        element.clientWidth > 0
+          ? {
+              width: element.clientWidth,
+              height: element.clientHeight,
+              scale: window.devicePixelRatio,
+            }
+          : null,
+      frame:
+        element.videoWidth > 0 ? { width: element.videoWidth, height: element.videoHeight } : null,
+      frames: quality
+        ? { dropped: quality.droppedVideoFrames, total: quality.totalVideoFrames }
+        : null,
+    }
+  }
   const engine: EngineHandle = {
     state: playback.state,
     duration: playback.duration,
@@ -105,6 +129,7 @@ export const useHtmlEngine = ({
     tracks: selection.tracks,
     actions,
     drawsSubtitles: false,
+    readStats,
     focusSurface: () => videoRef.current?.focus(),
     surface: (
       // Subtitles use our themed overlay, including for converted streams.

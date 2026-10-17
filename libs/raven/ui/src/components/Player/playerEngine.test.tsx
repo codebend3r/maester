@@ -177,6 +177,7 @@ describe('PlayerChrome with a fake engine handle', () => {
       focusSurface: mock(() => {}),
       surface: <p>Engine picture</p>,
       drawsSubtitles: true,
+      readStats: () => ({ engine: 'Test engine', viewport: null, frame: null, frames: null }),
     }
     const { container } = renderWithProviders(
       <PlayerServicesProvider services={services}>
@@ -211,6 +212,40 @@ describe('PlayerChrome with a fake engine handle', () => {
   })
 })
 
+describe('PlayerChrome Playback info', () => {
+  it('puts the resume notice away, since the panel opens over it', async () => {
+    const engine: EngineHandle = {
+      state: initialVideoState(20),
+      duration: 120,
+      position: { current: 20 },
+      tracks: null,
+      actions: actionsFor(),
+      focusSurface: mock(() => {}),
+      surface: <p>Engine picture</p>,
+      drawsSubtitles: true,
+      readStats: () => ({ engine: 'Test engine', viewport: null, frame: null, frames: null }),
+    }
+    renderWithProviders(
+      <PlayerServicesProvider services={servicesFor()}>
+        <PlayerChrome
+          engine={engine}
+          onBack={() => {}}
+          mode="direct"
+          selection={selection}
+          subtitleStatus="off"
+          fullscreen={{ fullscreen: false, toggle: () => {} }}
+        />
+      </PlayerServicesProvider>,
+    )
+    expect(screen.getByRole('button', { name: 'Start over' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Playback info' }))
+    expect(screen.getByRole('dialog', { name: 'Playback info' })).toBeInTheDocument()
+    expect(screen.getByText('Test engine')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Start over' })).toBeNull()
+  })
+})
+
 describe('PlayerChrome host actions', () => {
   it('acts on actions the host sends', () => {
     const listeners = new Set<(action: PlayerAction) => void>()
@@ -232,6 +267,7 @@ describe('PlayerChrome host actions', () => {
       focusSurface: mock(() => {}),
       surface: <p>Engine picture</p>,
       drawsSubtitles: true,
+      readStats: () => ({ engine: 'Test engine', viewport: null, frame: null, frames: null }),
     }
     const { unmount } = renderWithProviders(
       <PlayerServicesProvider services={services}>
@@ -322,5 +358,54 @@ describe('HTML engine surface focus', () => {
     expect(() => handle.focusSurface()).not.toThrow()
     unmount()
     expect(() => handle.focusSurface()).not.toThrow()
+  })
+})
+
+describe('HTML engine stats', () => {
+  it('reads the picture from the video element, and nothing once it is gone', () => {
+    const handles: EngineHandle[] = []
+    const Probe = () => {
+      const { engine } = useHtmlEngine({
+        source: { kind: 'file', url: 'blob:local-clip' },
+        mode: 'direct',
+        selection,
+        onFailure: () => {},
+        toggleFullscreen: () => {},
+      })
+      useEffect(() => {
+        handles.push(engine)
+      })
+      return engine.surface
+    }
+    const { container, unmount } = renderWithProviders(
+      <PlayerServicesProvider services={servicesFor()}>
+        <Probe />
+      </PlayerServicesProvider>,
+    )
+    const handle = handles.at(-1)
+    const video = container.querySelector('video')
+    expect(handle).toBeDefined()
+    expect(video).not.toBeNull()
+    if (!handle || !video) return
+    const nothing = { engine: 'HTML video', viewport: null, frame: null, frames: null }
+    expect(handle.readStats()).toEqual(nothing)
+    Object.defineProperty(video, 'clientWidth', { value: 1280 })
+    Object.defineProperty(video, 'clientHeight', { value: 720 })
+    Object.defineProperty(video, 'videoWidth', { value: 1920 })
+    Object.defineProperty(video, 'videoHeight', { value: 800 })
+    video.getVideoPlaybackQuality = () => ({
+      creationTime: 0,
+      droppedVideoFrames: 2,
+      corruptedVideoFrames: 0,
+      totalVideoFrames: 100,
+    })
+    expect(handle.readStats()).toEqual({
+      engine: 'HTML video',
+      viewport: { width: 1280, height: 720, scale: window.devicePixelRatio },
+      frame: { width: 1920, height: 800 },
+      frames: { dropped: 2, total: 100 },
+    })
+    unmount()
+    expect(handle.readStats()).toEqual(nothing)
   })
 })

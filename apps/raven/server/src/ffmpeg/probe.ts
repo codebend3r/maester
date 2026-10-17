@@ -16,7 +16,7 @@ export type ProbeResult = {
 type Stream = Record<string, unknown>
 
 /** ffprobe reports most numbers as strings ("5812.768000"); both shapes are accepted. */
-const numeric = (value: unknown): number | null => {
+export const numeric = (value: unknown): number | null => {
   const parsed = isString(value) ? Number(value) : value
   return isNumber(parsed) && parsed > 0 ? parsed : null
 }
@@ -36,15 +36,19 @@ const bitDepthOf = (stream: Stream): number | null => {
 
 const HDR_TRANSFERS: ReadonlySet<string> = new Set(['smpte2084', 'arib-std-b67'])
 
-/** PQ or HLG transfer, or a Dolby Vision record (profile 5 carries no HDR10 transfer at all). */
-const isHdr = (stream: Stream): boolean => {
-  const transfer = isString(stream.color_transfer) ? stream.color_transfer : ''
+/** Whether the stream carries a Dolby Vision configuration record. */
+export const hasDolbyVision = (stream: Stream): boolean => {
   const sideData = Array.isArray(stream.side_data_list) ? stream.side_data_list : []
-  const dolbyVision = sideData.some(
+  return sideData.some(
     (entry) =>
       isRecord(entry) && isString(entry.side_data_type) && entry.side_data_type.includes('DOVI'),
   )
-  return HDR_TRANSFERS.has(transfer) || dolbyVision
+}
+
+/** PQ or HLG transfer, or a Dolby Vision record (profile 5 carries no HDR10 transfer at all). */
+const isHdr = (stream: Stream): boolean => {
+  const transfer = isString(stream.color_transfer) ? stream.color_transfer : ''
+  return HDR_TRANSFERS.has(transfer) || hasDolbyVision(stream)
 }
 
 /**

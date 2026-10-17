@@ -45,6 +45,22 @@ export const formatChannels = (channels: number | null): string | null => {
   return named[channels] ?? `${channels} ch`
 }
 
+/** Up to `places` after the point, trailing zeros dropped: 23.976, 24, 44.1. */
+const trimmed = ({ value, places }: { value: number; places: number }): string =>
+  String(Number(value.toFixed(places)))
+
+/** "48 kHz", "44.1 kHz"; null when unknown. */
+export const formatSampleRate = (samplesPerSecond: number | null): string | null => {
+  if (samplesPerSecond == null || samplesPerSecond <= 0) return null
+  return `${trimmed({ value: samplesPerSecond / 1000, places: 1 })} kHz`
+}
+
+/** "23.976 fps", "24 fps"; null when unknown. */
+export const formatFrameRate = (framesPerSecond: number | null): string | null => {
+  if (framesPerSecond == null || framesPerSecond <= 0) return null
+  return `${trimmed({ value: framesPerSecond, places: 3 })} fps`
+}
+
 const AGO_UNITS: ReadonlyArray<{ unit: Intl.RelativeTimeFormatUnit; seconds: number }> = [
   { unit: 'year', seconds: 365 * 24 * 3600 },
   { unit: 'month', seconds: 30 * 24 * 3600 },

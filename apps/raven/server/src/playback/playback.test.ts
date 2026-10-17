@@ -151,6 +151,16 @@ describe('playback', () => {
     ])
   })
 
+  it("reads the file's picture and sound in detail, and 404s for media it does not have", async () => {
+    const streams = await api().getStreams(movieId())
+    expect(streams.video).toMatchObject({ codec: 'h264', profile: 'High', range: 'sdr' })
+    expect(streams.audio).toEqual([
+      expect.objectContaining({ index: 0, codec: 'ac3', channels: 1, sampleRate: 44_100 }),
+      expect.objectContaining({ index: 1, codec: 'aac', profile: 'LC', sampleRate: 44_100 }),
+    ])
+    await expect(api().getStreams(movieId() + 1000)).rejects.toMatchObject({ status: 404 })
+  })
+
   it('serves an embedded track window as WebVTT on the file clock', async () => {
     const response = await app().inject({
       method: 'GET',

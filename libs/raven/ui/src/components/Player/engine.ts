@@ -13,6 +13,18 @@ export type EngineActions = {
   setSubtitleScale: (scale: number) => void
 }
 
+/** What the picture is doing right now, for Playback info; null where the engine cannot tell. */
+export type EngineStats = {
+  /** What plays the video: "HTML video". */
+  engine: string
+  /** The player's box in CSS pixels, and the screen's pixels to each. */
+  viewport: { width: number; height: number; scale: number } | null
+  /** The size of the frames being decoded. */
+  frame: { width: number; height: number } | null
+  /** Since the source was last loaded. */
+  frames: { dropped: number; total: number } | null
+}
+
 /** The chrome never reaches into the engine's video element. */
 export type EngineHandle = {
   state: VideoState
@@ -23,6 +35,7 @@ export type EngineHandle = {
   surface: ReactNode
   focusSurface: () => void
   drawsSubtitles: boolean
+  readStats: () => EngineStats
 }
 
 export type HtmlSource =

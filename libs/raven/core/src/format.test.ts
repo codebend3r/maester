@@ -4,7 +4,9 @@ import {
   formatBytes,
   formatChannels,
   formatDuration,
+  formatFrameRate,
   formatRuntime,
+  formatSampleRate,
   timeAgo,
 } from '@/format'
 
@@ -57,6 +59,24 @@ describe('formatChannels', () => {
     expect(formatChannels(6)).toBe('5.1')
     expect(formatChannels(3)).toBe('3 ch')
     expect(formatChannels(null)).toBeNull()
+  })
+})
+
+describe('formatSampleRate', () => {
+  it('reads in kilohertz, a place after the point only when it has one', () => {
+    expect(formatSampleRate(48_000)).toBe('48 kHz')
+    expect(formatSampleRate(44_100)).toBe('44.1 kHz')
+    expect(formatSampleRate(0)).toBeNull()
+    expect(formatSampleRate(null)).toBeNull()
+  })
+})
+
+describe('formatFrameRate', () => {
+  it('keeps the film and NTSC rates exact', () => {
+    expect(formatFrameRate(24_000 / 1001)).toBe('23.976 fps')
+    expect(formatFrameRate(24)).toBe('24 fps')
+    expect(formatFrameRate(0)).toBeNull()
+    expect(formatFrameRate(null)).toBeNull()
   })
 })
 

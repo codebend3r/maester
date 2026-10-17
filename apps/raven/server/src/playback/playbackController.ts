@@ -11,12 +11,13 @@ import {
   Query,
   Res,
 } from '@nestjs/common'
-import { type MediaTracks, STREAM_TIME_SHIFT, isStreamMode } from '@raven/core'
+import { type MediaStreams, type MediaTracks, STREAM_TIME_SHIFT, isStreamMode } from '@raven/core'
 import { wholeNumber } from '@shared/server'
 import type { FastifyReply } from 'fastify'
 import { streamArgs } from '@/ffmpeg/args'
 import { SOFTWARE } from '@/ffmpeg/encoder'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
+import { parseStreams } from '@/ffmpeg/streams'
 import { PrivateBy } from '@/lock/lockGuard'
 import { SettingsRepository } from '@/settings/settingsRepository'
 import { type MediaFile, MediaIndex } from '@/media/mediaIndex'
@@ -48,6 +49,16 @@ export class PlaybackController {
   @Get(':id/tracks')
   async listTracks(@Param('id', ParseIntPipe) id: number): Promise<MediaTracks> {
     return (await this.tracks.tracksFor(this.fileOf(id))).tracks
+  }
+
+  /**
+   * The file's picture and sound in detail, for the player's Playback info.
+   * Probed on each ask rather than stored: only that panel asks, and the
+   * index keeps what playback itself needs.
+   */
+  @Get(':id/streams')
+  async listStreams(@Param('id', ParseIntPipe) id: number): Promise<MediaStreams> {
+    return parseStreams(await this.ffmpeg.probeJson(this.fileOf(id).path))
   }
 
   /** WebVTT for one track; `window` picks the stretch of an embedded one. */

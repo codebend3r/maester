@@ -193,6 +193,30 @@ describe('the player controls', () => {
     expect(within(menu).getByText('Playing the original file')).toBeInTheDocument()
   })
 
+  it('opens Playback info from the settings menu and keeps it over the video until closed', async () => {
+    spies.push(
+      spyOn(api, 'getStreams').mockImplementation(async () => ({ video: null, audio: [] })),
+    )
+    const { container } = renderWithProviders(
+      <TestPlayer media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />,
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    const menu = await screen.findByRole('dialog', { name: 'Settings' })
+    await userEvent.click(within(menu).getByRole('button', { name: 'Playback info' }))
+    expect(screen.queryByRole('dialog', { name: 'Settings' })).toBeNull()
+    const info = screen.getByRole('dialog', { name: 'Playback info' })
+    expect(within(info).getByText('HTML video')).toBeInTheDocument()
+    expect(within(info).getByText('Direct play')).toBeInTheDocument()
+    expect(within(info).getByText('MP4')).toBeInTheDocument()
+    // The menu opens again beside it.
+    await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    expect(await screen.findByRole('dialog', { name: 'Settings' })).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Playback info' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Close playback info' }))
+    expect(screen.queryByRole('dialog', { name: 'Playback info' })).toBeNull()
+    expect(document.activeElement).toBe(container.querySelector('video'))
+  })
+
   it('remembers a subtitle choice for the next video', async () => {
     renderWithProviders(
       <TestPlayer media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />,
@@ -337,6 +361,22 @@ describe('the player’s Back', () => {
 
   it('goes back there on Escape too', async () => {
     renderWithProviders(app(), { route: '/watch/7', behind: ['/movies/3'] })
+    press('Escape')
+    expect(await screen.findByText('The movie')).toBeInTheDocument()
+  })
+
+  it('puts Playback info away on Escape before it goes back', async () => {
+    spies.push(
+      spyOn(api, 'getStreams').mockImplementation(async () => ({ video: null, audio: [] })),
+    )
+    renderWithProviders(app(), { route: '/watch/7', behind: ['/movies/3'] })
+    await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    const menu = await screen.findByRole('dialog', { name: 'Settings' })
+    await userEvent.click(within(menu).getByRole('button', { name: 'Playback info' }))
+    expect(screen.getByRole('dialog', { name: 'Playback info' })).toBeInTheDocument()
+    press('Escape')
+    expect(screen.queryByRole('dialog', { name: 'Playback info' })).toBeNull()
+    expect(screen.queryByText('The movie')).toBeNull()
     press('Escape')
     expect(await screen.findByText('The movie')).toBeInTheDocument()
   })

@@ -28,6 +28,7 @@ export const usePlayerActions = ({
   overlay,
   setOverlay,
   closeMenu,
+  closeInfo,
   leave,
 }: {
   engine: EngineHandle
@@ -37,6 +38,8 @@ export const usePlayerActions = ({
   overlay: Overlay
   setOverlay: (change: (current: Overlay) => Overlay) => void
   closeMenu: () => void
+  /** Puts Playback info away; null while it is not open. */
+  closeInfo: (() => void) | null
   /** Back to where the viewer came from. */
   leave: () => void
 }) => {
@@ -145,6 +148,7 @@ export const usePlayerActions = ({
       case 'escape':
         if (overlay === 'shortcuts') setOverlay(() => 'none')
         else if (overlay === 'settings') closeMenu()
+        else if (closeInfo) closeInfo()
         else if (document.fullscreenElement) void document.exitFullscreen()
         else leave()
         return

@@ -15,6 +15,8 @@ import { Button, ButtonLink } from '@/components/Button/Button'
 import { Bezel } from '@/components/Player/Bezel'
 import { Controls } from '@/components/Player/Controls'
 import styles from '@/components/Player/Player.module.scss'
+import { type PlaybackFile, PlaybackInfo } from '@/components/Player/PlaybackInfo'
+import { playingAudio } from '@/components/Player/selection'
 import { SettingsMenu } from '@/components/Player/SettingsMenu'
 import { ShortcutsDialog } from '@/components/Player/ShortcutsDialog'
 import { type Overlay, usePlayerActions } from '@/components/Player/usePlayerActions'
@@ -63,7 +65,15 @@ const HtmlStage = ({ engine, ...props }: StageProps) => {
     ...props,
     toggleFullscreen: fullscreen.toggle,
   })
-  return <PlayerChrome {...props} {...html} fullscreen={fullscreen} />
+  const source = engine.source
+  return (
+    <PlayerChrome
+      {...props}
+      {...html}
+      file={source.kind === 'server' ? source : null}
+      fullscreen={fullscreen}
+    />
+  )
 }
 
 /** Shared controls consume only the engine handle, never the picture's DOM. */
@@ -75,6 +85,7 @@ export const PlayerChrome = ({
   subtitleStatus,
   renderSubtitles,
   fullscreen,
+  file = null,
 }: {
   engine: EngineHandle
   onBack: () => void
@@ -83,6 +94,8 @@ export const PlayerChrome = ({
   subtitleStatus: SubtitleStatus
   renderSubtitles?: (lifted: boolean) => ReactNode
   fullscreen: ReturnType<typeof useFullscreen>
+  /** The library file playing, for Playback info; null for a local file. */
+  file?: PlaybackFile | null
 }) => {
   const { title, hostActions } = usePlayerServices()
   const label = title.label
@@ -97,6 +110,8 @@ export const PlayerChrome = ({
   const idle = useIdle(IDLE_MS)
   const { bezel, flash } = useBezel()
   const [overlay, setOverlay] = useState<Overlay>('none')
+  // Apart from the overlay: it stays open over the video, menus and all.
+  const [infoOpen, setInfoOpen] = useState(false)
   const [resumedAt, setResumedAt] = useState<number | null>(
     title.resumeAt > 0 ? title.resumeAt : null,
   )
@@ -117,6 +132,18 @@ export const PlayerChrome = ({
     settingsButton.current?.focus()
   }
 
+  const showInfo = () => {
+    closeMenu()
+    // The panel opens where the resume notice sits, over its Start over.
+    setResumedAt(null)
+    setInfoOpen(true)
+  }
+
+  const closeInfo = () => {
+    setInfoOpen(false)
+    engine.focusSurface()
+  }
+
   const controls = usePlayerActions({
     engine,
     selection,
@@ -125,6 +152,7 @@ export const PlayerChrome = ({
     overlay,
     setOverlay,
     closeMenu,
+    closeInfo: infoOpen ? closeInfo : null,
     leave: onBack,
   })
 
@@ -234,6 +262,16 @@ export const PlayerChrome = ({
         onToggleMenu={() => (overlay === 'settings' ? closeMenu() : setOverlay('settings'))}
         onToggleFullscreen={fullscreen.toggle}
       />
+      {infoOpen && (
+        <PlaybackInfo
+          readStats={engine.readStats}
+          mode={mode}
+          file={file}
+          tracks={selection.tracks}
+          audio={playingAudio({ mode, tracks: selection.tracks, audio: selection.audio })}
+          onClose={closeInfo}
+        />
+      )}
       {overlay === 'settings' && (
         <SettingsMenu
           menuRef={menu}
@@ -246,6 +284,7 @@ export const PlayerChrome = ({
           rate={state.rate}
           mode={mode}
           onPickRate={controls.changeRate}
+          onShowInfo={showInfo}
           onClose={closeMenu}
         />
       )}
