@@ -1,0 +1,137 @@
+import { entryById, type DownloadEntry } from '@/main/downloads/downloadState'
+import type { DownloadsStore } from '@/main/downloads/downloadStore'
+import { errorText } from '@/main/log/errorText'
+import { loggable } from '@/main/servers/serverCalls'
+import type { Timers } from '@/main/stateStore'
+
+/** A download set to delete once watched goes this long after it counts as watched. */
+export const AUTO_DELETE_DELAY_MS = 600_000
+
+export type AutoDeleteDeps = {
+  store: DownloadsStore
+  timers: Timers
+  now: () => number
+  /** Whether the player is on this download's video. */
+  isPlaying: (downloadId: string) => boolean
+  /** Whether the player would resume this download partway, short of where it counts as watched. */
+  isMidTitle: (downloadId: string) => boolean
+  /** The download service's removal, which lets the server hear what was watched first. */
+  remove: (downloadId: string) => Promise<void>
+  onDeleted: (entry: DownloadEntry) => void
+  warn: (message: string) => void
+}
+
+export type AutoDelete = {
+  /** At launch: a clock for every ready download set to delete once watched and watched. */
+  rebuild: () => void
+  /**
+   * After a position is noted or the switch is turned on: a download with no clock gets one,
+   * ten minutes from now, and a deletion that waits on the viewer is tried again.
+   */
+  schedule: (input: { downloadId: string }) => void
+  cancel: (input: { downloadId: string }) => void
+  /** The player left a download: any deletion held while its file played is tried again. */
+  playbackLeft: () => void
+  /** When the clock deletes this download, while it runs; null once it waits on the viewer. */
+  deletesAt: (input: { downloadId: string }) => number | null
+  dispose: () => void
+}
+
+/**
+ * Where a download stands with its deletion: its ten minutes running, held once they ran out
+ * while the title played or was left partway, or being deleted.
+ */
+type Clock =
+  | { kind: 'running'; at: number; timer: unknown }
+  | { kind: 'held' }
+  | { kind: 'deleting' }
+
+/** When a download counts as watched, for a ready one set to delete once watched; else null. */
+const watchedAtOf = (entry: DownloadEntry | null): number | null =>
+  entry !== null && entry.status.kind === 'ready' && entry.autoDelete ? entry.watchedAt : null
+
+export const createAutoDelete = (deps: AutoDeleteDeps): AutoDelete => {
+  const { store, timers } = deps
+  const clocks = new Map<string, Clock>()
+  let isDisposed = false
+
+  const entryOf = (downloadId: string): DownloadEntry | null =>
+    entryById(store.read(), { downloadId })
+
+  const cancel: AutoDelete['cancel'] = ({ downloadId }) => {
+    const clock = clocks.get(downloadId)
+    if (clock?.kind === 'running') timers.clear(clock.timer)
+    clocks.delete(downloadId)
+  }
+
+  const deleteNow = async (entry: DownloadEntry): Promise<void> => {
+    const { downloadId } = entry
+    try {
+      await deps.remove(downloadId)
+    } finally {
+      if (clocks.get(downloadId)?.kind === 'deleting') clocks.delete(downloadId)
+    }
+    if (entryOf(downloadId) === null) deps.onDeleted(entry)
+  }
+
+  /** The time came: deletes the download, or holds it while the viewer is still on it. */
+  const due = (downloadId: string): void => {
+    if (isDisposed || clocks.get(downloadId)?.kind === 'deleting') return
+    const entry = entryOf(downloadId)
+    if (entry === null || watchedAtOf(entry) === null) return cancel({ downloadId })
+    if (deps.isPlaying(downloadId) || deps.isMidTitle(downloadId)) {
+      clocks.set(downloadId, { kind: 'held' })
+      return
+    }
+    clocks.set(downloadId, { kind: 'deleting' })
+    deleteNow(entry).catch((error: unknown) => {
+      deps.warn(
+        `raven player could not delete ${loggable(entry.label)} after watching: ${loggable(errorText(error))}`,
+      )
+    })
+  }
+
+  const arm = ({ downloadId, at }: { downloadId: string; at: number }): void => {
+    if (isDisposed) return
+    const wait = at - deps.now()
+    if (wait <= 0) return due(downloadId)
+    clocks.set(downloadId, { kind: 'running', at, timer: timers.set(() => due(downloadId), wait) })
+  }
+
+  const rebuild: AutoDelete['rebuild'] = () => {
+    store.read().entries.forEach((entry) => {
+      const watchedAt = watchedAtOf(entry)
+      if (watchedAt === null || clocks.has(entry.downloadId)) return
+      arm({ downloadId: entry.downloadId, at: watchedAt + AUTO_DELETE_DELAY_MS })
+    })
+  }
+
+  const schedule: AutoDelete['schedule'] = ({ downloadId }) => {
+    const watchedAt = watchedAtOf(entryOf(downloadId))
+    if (watchedAt === null) return cancel({ downloadId })
+    const clock = clocks.get(downloadId)
+    // A title watched before the switch was turned on starts its ten minutes from the switch.
+    if (clock === undefined) {
+      return arm({ downloadId, at: Math.max(watchedAt, deps.now()) + AUTO_DELETE_DELAY_MS })
+    }
+    if (clock.kind === 'held') due(downloadId)
+  }
+
+  const playbackLeft: AutoDelete['playbackLeft'] = () => {
+    ;[...clocks]
+      .filter(([, clock]) => clock.kind === 'held')
+      .forEach(([downloadId]) => due(downloadId))
+  }
+
+  const deletesAt: AutoDelete['deletesAt'] = ({ downloadId }) => {
+    const clock = clocks.get(downloadId)
+    return clock?.kind === 'running' ? clock.at : null
+  }
+
+  const dispose: AutoDelete['dispose'] = () => {
+    isDisposed = true
+    ;[...clocks.keys()].forEach((downloadId) => cancel({ downloadId }))
+  }
+
+  return { rebuild, schedule, cancel, playbackLeft, deletesAt, dispose }
+}

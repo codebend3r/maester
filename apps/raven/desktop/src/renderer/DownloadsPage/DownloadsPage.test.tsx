@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'bun:test'
+import { describe, expect, it, jest } from 'bun:test'
 import { formatBytes } from '@raven/core'
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { watchedLabel } from '@/renderer/desktop/watched'
 import { SERVER_COPY } from '@/renderer/ServerPage/serverServices'
@@ -184,6 +184,62 @@ describe('DownloadsPage', () => {
     const row = await rowOf('The Two Towers (2002)')
     expect(within(row).getByRole('progressbar', { name: watchedLabel(1) })).toBeInTheDocument()
     expect(watchedLabel(1)).toBe('100% watched')
+  })
+
+  const MINUTE = 60_000
+  /** A ready row set to delete once watched, its clock not running yet. */
+  const TOWERS = viewOf({
+    downloadId: DL_5,
+    label: 'The Two Towers (2002)',
+    status: { kind: 'ready' },
+    autoDelete: true,
+  })
+
+  it('says in how many minutes a row set to delete once watched goes', async () => {
+    await openPage({
+      downloads: [
+        { ...TOWERS, deletesAt: Date.now() + 7 * MINUTE },
+        viewOf({
+          downloadId: DL_1,
+          label: 'S01E01 Good News',
+          status: { kind: 'ready' },
+          autoDelete: true,
+          deletesAt: Date.now() + MINUTE / 2,
+        }),
+        viewOf({ downloadId: DL_2, label: 'S01E02 Half Loop', status: { kind: 'ready' } }),
+      ],
+    })
+    expect(
+      within(await rowOf('The Two Towers (2002)')).getByText('Deletes in 7 minutes'),
+    ).toBeInTheDocument()
+    expect(
+      within(await rowOf('S01E01 Good News')).getByText('Deletes in 1 minute'),
+    ).toBeInTheDocument()
+    expect(within(await rowOf('S01E02 Half Loop')).queryByText(/Deletes in/)).toBeNull()
+  })
+
+  it('counts the minutes down while the page stays open', async () => {
+    const { client } = await openPage({ downloads: [TOWERS] })
+    await rowOf('The Two Towers (2002)')
+    jest.useFakeTimers()
+    try {
+      await client.emit({
+        type: 'downloads',
+        downloads: [{ ...TOWERS, deletesAt: Date.now() + 7 * MINUTE }],
+        autoDeleteDefault: false,
+      })
+      // The list reaches the page on the query's next turn.
+      act(() => {
+        jest.advanceTimersByTime(1)
+      })
+      expect(screen.getByText('Deletes in 7 minutes')).toBeInTheDocument()
+      act(() => {
+        jest.advanceTimersByTime(MINUTE)
+      })
+      expect(screen.getByText('Deletes in 6 minutes')).toBeInTheDocument()
+    } finally {
+      jest.useRealTimers()
+    }
   })
 
   it('offers each row the action its status allows', async () => {

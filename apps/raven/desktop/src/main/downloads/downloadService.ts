@@ -1,5 +1,6 @@
 import type { ConfigStore } from '@/main/desktopConfig'
 import { createDownloadAsks, type DownloadAsks } from '@/main/downloads/asks'
+import { createAutoDelete } from '@/main/downloads/autoDelete'
 import { DOWNLOAD_MESSAGES, failedMessage, pausedMessage } from '@/main/downloads/downloadMessages'
 import {
   createDownloadQueue,
@@ -155,7 +156,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
         status: viewStatusOf({ status: entry.status, serverName }),
         autoDelete: entry.autoDelete,
         watched: playback.watchedOf(entry),
-        deletesAt: null,
+        deletesAt: deleteClock.deletesAt({ downloadId: entry.downloadId }),
         needsUnlock: entry.status.kind === 'paused' && entry.status.reason === 'relocked',
       }
     })
@@ -210,7 +211,13 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     serverNameOf,
     change,
     announce,
-    onNoted: sync.touch,
+    // Every position noted may set when the title counts as watched, or clear the spot a held
+    // deletion waits on.
+    onNoted: (input) => {
+      sync.touch(input)
+      deleteClock.schedule(input)
+    },
+    onLeft: () => deleteClock.playbackLeft(),
   })
 
   const queue = createDownloadQueue({
@@ -231,7 +238,10 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
       notice(DOWNLOAD_MESSAGES.downloaded(entry.label))
       playback.readFiles([entry])
     },
-    onRemoved: playback.forget,
+    onRemoved: (entries) => {
+      playback.forget(entries)
+      entries.forEach(({ downloadId }) => deleteClock.cancel({ downloadId }))
+    },
     onFailed: (entry) => {
       const { status } = entry
       if (status.kind !== 'failed') return
@@ -256,6 +266,23 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     warn: deps.warn,
     change,
     list,
+  })
+
+  // The clock removes through `remove`, so what was watched reaches the server first.
+  const deleteClock = createAutoDelete({
+    store,
+    timers: deps.timers,
+    now: deps.now,
+    isPlaying: playback.isPlaying,
+    isMidTitle: playback.isMidTitle,
+    remove: async (downloadId) => {
+      await remove({ downloadId })
+    },
+    onDeleted: (entry) => {
+      notice(DOWNLOAD_MESSAGES.deletedAfterWatching(entry.label))
+      announce()
+    },
+    warn: deps.warn,
   })
 
   // Only the page asking for the list sends what is pending; the list that events and replies carry does not.
@@ -302,6 +329,8 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
   const setAutoDeleteOf: DownloadService['setAutoDelete'] = ({ downloadId, autoDelete }) => {
     if (!isKnown(downloadId)) return unknown()
     change((state) => setAutoDelete(state, { downloadId, autoDelete }))
+    if (autoDelete) deleteClock.schedule({ downloadId })
+    else deleteClock.cancel({ downloadId })
     return list()
   }
 
@@ -348,14 +377,20 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     announcing.timer = undefined
     asks.clear()
     sync.dispose()
+    deleteClock.dispose()
     queue.dispose()
   }
 
   // A launch picks up what the last run left, once the folders no download names are gone,
-  // reads each file it kept for its share watched, and tries again what an outage stopped.
+  // reads each file it kept for its share watched, starts the clocks of what deletes once
+  // watched, and tries again what an outage stopped. A deletion due at once waits for the
+  // network, so the server hears what was watched before the file goes.
   const resumeLaunch = async (): Promise<void> => {
     await Promise.all([queue.sweep({ wasSetAside: deps.wasSetAside }), deps.ready])
     playback.readFiles(store.read().entries.filter(({ status }) => status.kind === 'ready'))
+    deleteClock.rebuild()
+    // The page may have listed the downloads before their clocks ran.
+    if (views().some(({ deletesAt }) => deletesAt !== null)) announce()
     queue.retryOutages()
     await sync.runAll()
   }

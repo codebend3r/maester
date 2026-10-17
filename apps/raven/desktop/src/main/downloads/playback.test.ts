@@ -162,6 +162,7 @@ const setup = ({
   const statted: string[] = []
   const told = { lists: 0 }
   const noted: string[] = []
+  const left = { count: 0 }
   const playback = createDownloadPlayback({
     store,
     userData: USER_DATA,
@@ -180,6 +181,9 @@ const setup = ({
       told.lists += 1
     },
     onNoted: ({ downloadId }) => noted.push(downloadId),
+    onLeft: () => {
+      left.count += 1
+    },
   })
   return {
     playback,
@@ -195,6 +199,7 @@ const setup = ({
     statted,
     told,
     noted,
+    left,
   }
 }
 
@@ -559,6 +564,67 @@ describe('what is playing', () => {
     expect(world.playback.isPlaying(ID)).toBe(true)
     world.playback.notePlaying({ fileId: null })
     expect(world.playback.isPlaying(ID)).toBe(false)
+  })
+
+  it('says each time the player leaves a download, and at no other move', async () => {
+    const world = setup({
+      entries: [entryFor({}), SECOND],
+      videos: { ...shelved(entryFor({}), SECOND), [MOVIE_PATH]: FILE },
+    })
+    const first = await opened(world)
+    const second = await opened(world, SECOND.downloadId)
+    const movie = await granted(world, MOVIE_PATH)
+    world.playback.noteOpened({ fileId: first })
+    world.playback.notePlaying({ fileId: first })
+    world.playback.playbackLeft({ fileId: second })
+    expect(world.left.count).toBe(0)
+    world.playback.noteOpened({ fileId: second })
+    expect(world.left.count).toBe(1)
+    world.playback.notePlaying({ fileId: null })
+    world.playback.notePlaying({ fileId: null })
+    world.playback.noteOpened({ fileId: movie })
+    expect(world.left.count).toBe(2)
+    world.playback.noteOpened({ fileId: first })
+    world.playback.playbackLeft({ fileId: first })
+    expect(world.left.count).toBe(3)
+  })
+})
+
+describe('a title left partway', () => {
+  /** A player state holding a resume spot for the video at `position` of 3000. */
+  const spotAt = (position: number, path = VIDEO): PlayerState =>
+    savePosition(EMPTY_STATE, { file: factsOf(path), position, duration: 3000, at: 1 })
+
+  it('reads a download as left partway while it resumes short of where it counts as watched', () => {
+    const world = setup({ entries: [entryFor({})], player: spotAt(1500) })
+    expect(world.playback.isMidTitle(ID)).toBe(true)
+  })
+
+  it.each([
+    ['resumes past where it counts as watched', spotAt(2800)],
+    ['was played to its end', spotAt(2995)],
+    ['has no resume spot', EMPTY_STATE],
+    ["holds only another file's spot", spotAt(1500, MOVIE_PATH)],
+  ])('reads a download as no longer partway once it %s', (_, player) => {
+    const world = setup({ entries: [entryFor({})], player })
+    expect(world.playback.isMidTitle(ID)).toBe(false)
+  })
+
+  it('reads a download it does not hold as not partway', () => {
+    const world = setup({ entries: [entryFor({})], player: spotAt(1500) })
+    expect(world.playback.isMidTitle(UNKNOWN_ID)).toBe(false)
+  })
+
+  it('reads the spot of a replaced file as none, once its facts are read', async () => {
+    const world = setup({
+      entries: [entryFor({})],
+      videos: { [VIDEO]: { size: 2 * GIB, mtimeMs: MTIME + 1 } },
+      player: spotAt(1500),
+    })
+    world.playback.readFiles([entryFor({})])
+    await until(() => world.statted.length === 1)
+    await ticks(3)
+    expect(world.playback.isMidTitle(ID)).toBe(false)
   })
 })
 
