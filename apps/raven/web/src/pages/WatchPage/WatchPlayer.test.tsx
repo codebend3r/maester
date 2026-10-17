@@ -6,7 +6,7 @@ import {
   playLinkFor,
   type SubtitleTrack,
 } from '@raven/core'
-import { usePlayerPrefs } from '@raven/ui'
+import { useMediaOrigin, usePlayerPrefs } from '@raven/ui'
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router-dom'
@@ -56,6 +56,7 @@ const stubTracks = (tracks: MediaTracks = TRACKS) =>
 
 afterEach(() => {
   spies.splice(0).forEach((spy) => spy.mockRestore())
+  useMediaOrigin.setState({ pick: null, isProbing: false })
 })
 
 describe('Player escape feedback', () => {
@@ -85,6 +86,54 @@ describe('Player escape feedback', () => {
       await screen.findByText(
         `Copy this link: ${new URL('/api/media/7/file', window.location.origin).href}`,
       ),
+    ).toBeInTheDocument()
+  })
+})
+
+describe('Player file link on the media plane', () => {
+  beforeEach(() => setBrowserSupport(() => false))
+
+  const lan = { kind: 'lan', url: 'https://raven.home.example' } as const
+
+  it('copies a ticketed link on the picked origin and says how long it works', async () => {
+    useMediaOrigin.setState({ pick: { origin: lan, at: Date.now() } })
+    spies.push(spyOn(api, 'getMediaOrigins').mockImplementation(async () => ({ origins: [lan] })))
+    spies.push(
+      spyOn(api, 'getMediaTicket').mockImplementation(async () => ({
+        ticket: 'abc.def',
+        expiresAt: Date.now() + 21_600_000,
+      })),
+    )
+    const clipboard = spyOn(navigator.clipboard, 'writeText').mockImplementation(async () => {})
+    spies.push(clipboard)
+    renderWithProviders(<Player media={mediaItem()} upNext={[]} backTo="/libraries/2" />)
+    await waitFor(() => expect(api.getMediaTicket).toHaveBeenCalledWith(7))
+    // The link is built from the ticket, so the click waits until the page holds one.
+    await waitFor(async () => {
+      await userEvent.click(await screen.findByRole('button', { name: 'Copy file link' }))
+      expect(clipboard).toHaveBeenLastCalledWith(
+        'https://raven.home.example/api/media/7/file?t=abc.def',
+      )
+    })
+    expect(
+      await screen.findByText(
+        'Link copied. Paste it into VLC or IINA to play it there; it works for 6 hours.',
+      ),
+    ).toBeInTheDocument()
+  })
+
+  it("copies the web host link without a pick, with today's message", async () => {
+    spies.push(spyOn(api, 'getMediaOrigins').mockImplementation(async () => ({ origins: [] })))
+    const clipboard = spyOn(navigator.clipboard, 'writeText').mockImplementation(async () => {})
+    spies.push(clipboard)
+    renderWithProviders(<Player media={mediaItem()} upNext={[]} backTo="/libraries/2" />)
+    await waitFor(() => expect(api.getMediaOrigins).toHaveBeenCalled())
+    await userEvent.click(await screen.findByRole('button', { name: 'Copy file link' }))
+    expect(clipboard).toHaveBeenCalledWith(
+      new URL('/api/media/7/file', window.location.origin).href,
+    )
+    expect(
+      await screen.findByText('Link copied. Paste it into VLC or IINA to play it there.'),
     ).toBeInTheDocument()
   })
 })
