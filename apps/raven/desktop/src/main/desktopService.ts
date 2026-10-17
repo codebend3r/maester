@@ -231,7 +231,9 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
     const file = grants.fileOf(request.fileId)
     if (file === null) return refused(MESSAGES.notOpen)
     store.update((state) => addRecent(state, { path: file.path, at: now() }))
-    deps.addRecentDocument(file.path)
+    // A download's file is video.<container> in a folder named by its media id, and stays listed
+    // after a delete, so File > Open Recent leaves it to Home's recents.
+    if (deps.downloads.labelOf({ path: file.path }) === null) deps.addRecentDocument(file.path)
     // The page describes a file each time it opens one, so this is where a play begins.
     deps.downloads.noteOpened({ fileId: file.fileId })
     const downloadedFrom = deps.downloads.fromLabelOf({ path: file.path })
