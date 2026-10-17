@@ -1,5 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
-import { type ItemDetails, type SeasonSummary, episodeCode, watchedStateOf } from '@raven/core'
+import {
+  ITEM_TYPES,
+  type ItemDetails,
+  type SeasonSummary,
+  episodeCode,
+  watchedStateOf,
+} from '@raven/core'
 import { useId, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
@@ -28,7 +34,7 @@ import { createdBy, showFacts } from '@/lib/itemFacts'
 import { itemPath, watchLink } from '@/lib/itemLinks'
 import { POSTER_SIZES, posterSources } from '@/lib/posters'
 import { librariesQuery, nextEpisodeQuery } from '@/lib/queries'
-import { useRouteItem } from '@/lib/routeQuery'
+import { ROUTE_STATES, useRouteItem } from '@/lib/routeQuery'
 import { useSelectable } from '@/lib/useSelectable'
 import { useWatchedToggle } from '@/lib/useWatchedChange'
 import styles from '@/pages/ShowPage/ShowPage.module.scss'
@@ -76,7 +82,9 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
   const libraryId = next.data?.libraryId ?? details.versions[0]?.libraryId
   const libraryName = useQuery(librariesQuery).data?.find((entry) => entry.id === libraryId)?.name
   const code = next.data?.item ? episodeCode(next.data.item) : null
-  const seasons = details.children.flatMap((child) => (child.type === 'season' ? [child] : []))
+  const seasons = details.children.flatMap((child) =>
+    child.type === ITEM_TYPES.season ? [child] : [],
+  )
   const episodeCount = seasons.reduce((sum, season) => sum + season.episodeCount, 0)
   const toggle = useWatchedToggle({
     state: watchedStateOf({
@@ -226,7 +234,7 @@ const ShowView = ({ details }: { details: ItemDetails }) => {
  */
 export const ShowPage = () => {
   const page = useRouteItem('show')
-  if (page.state !== 'ready')
+  if (page.state !== ROUTE_STATES.ready)
     return <RouteState state={page} noun="show" shape={<ItemHeaderSkeleton picture="poster" />} />
   return <ShowView details={page.data} />
 }

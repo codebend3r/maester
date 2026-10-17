@@ -11,7 +11,7 @@ import { itemPath } from '@/lib/itemLinks'
 import { plural } from '@/lib/plural'
 import { POSTER_SIZES, posterSources } from '@/lib/posters'
 import { personQuery } from '@/lib/queries'
-import { routeState, useRouteId } from '@/lib/routeQuery'
+import { ROUTE_STATES, routeState, useRouteId } from '@/lib/routeQuery'
 import styles from '@/pages/PersonPage/PersonPage.module.scss'
 
 /** The groups a person's credits fall into, in page order. */
@@ -144,7 +144,7 @@ const PersonView = ({ person }: { person: PersonDetails }) => {
 export const PersonPage = () => {
   const id = useRouteId()
   const page = routeState({ id, query: useQuery(personQuery(id)) })
-  if (page.state !== 'ready')
+  if (page.state !== ROUTE_STATES.ready)
     return <RouteState state={page} noun="page" shape={<PersonSkeleton />} />
   return <PersonView person={page.data} />
 }

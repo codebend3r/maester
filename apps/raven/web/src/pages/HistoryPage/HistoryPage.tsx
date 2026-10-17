@@ -7,18 +7,19 @@ import { MediaTiles, MediaTilesSkeleton } from '@/components/MediaTiles/MediaTil
 import { RouteState } from '@/components/RouteState/RouteState'
 import { Bone, Loading } from '@/components/Skeleton/Skeleton'
 import { historyDays, historyNote } from '@/lib/history'
-import { historyQuery, libraryQuery } from '@/lib/queries'
-import { routeState, useRouteId } from '@/lib/routeQuery'
+import { HISTORY_SHOWS, type HistoryShow, historyQuery, libraryQuery } from '@/lib/queries'
+import { ROUTE_STATES, routeState, useRouteId } from '@/lib/routeQuery'
 import styles from '@/pages/HistoryPage/HistoryPage.module.scss'
 
 /** How many entries a page of history adds. */
 const PAGE = 100
 
-type Show = 'watched' | 'all'
+/** The address's search params this page reads. */
+const SEARCH_PARAMS = { show: 'show' } as const
 
-const SHOWS: ReadonlyArray<{ show: Show; label: string }> = [
-  { show: 'watched', label: 'Watched' },
-  { show: 'all', label: 'All played' },
+const SHOWS: ReadonlyArray<{ show: HistoryShow; label: string }> = [
+  { show: HISTORY_SHOWS.watched, label: 'Watched' },
+  { show: HISTORY_SHOWS.all, label: 'All played' },
 ]
 
 /** One day's videos under its heading, each with how far it got and when. */
@@ -66,7 +67,10 @@ export const HistoryPage = () => {
   const libraryId = useRouteId()
   const ids = { title: useId() }
   const [searchParams, setSearchParams] = useSearchParams()
-  const show: Show = searchParams.get('show') === 'all' ? 'all' : 'watched'
+  const show: HistoryShow =
+    searchParams.get(SEARCH_PARAMS.show) === HISTORY_SHOWS.all
+      ? HISTORY_SHOWS.all
+      : HISTORY_SHOWS.watched
   const [limit, setLimit] = useState(PAGE)
 
   const libraryResult = useQuery(libraryQuery(libraryId))
@@ -76,7 +80,7 @@ export const HistoryPage = () => {
   })
 
   const library = routeState({ id: libraryId, query: libraryResult })
-  if (library.state !== 'ready')
+  if (library.state !== ROUTE_STATES.ready)
     return <RouteState state={library} noun="history" shape={<HistorySkeleton />} />
 
   const { id, name, settings } = library.data
@@ -107,7 +111,12 @@ export const HistoryPage = () => {
             aria-pressed={show === option.show}
             onClick={() => {
               setLimit(PAGE)
-              setSearchParams(option.show === 'all' ? { show: 'all' } : {}, { replace: true })
+              setSearchParams(
+                option.show === HISTORY_SHOWS.all
+                  ? { [SEARCH_PARAMS.show]: HISTORY_SHOWS.all }
+                  : {},
+                { replace: true },
+              )
             }}
           >
             {option.label}
@@ -127,7 +136,7 @@ export const HistoryPage = () => {
       )}
       {history.isSuccess && entries.length === 0 && (
         <p className={styles.message}>
-          {show === 'watched'
+          {show === HISTORY_SHOWS.watched
             ? `Nothing watched in ${name} yet.`
             : `Nothing played in ${name} yet.`}
         </p>

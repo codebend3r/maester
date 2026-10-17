@@ -1,4 +1,5 @@
 import {
+  ITEM_TYPES,
   type MediaItem,
   type PosterEntry,
   cardTitle,
@@ -21,7 +22,7 @@ import styles from '@/pages/HomePage/ContinueWatching.module.scss'
 /** What a tile names: the show, with the episode under it, else the movie and its year. */
 export const tileWords = (media: MediaItem): { title: string; line: string | null } => {
   const { item } = media
-  if (item?.type === 'episode' && item.show) {
+  if (item?.type === ITEM_TYPES.episode && item.show) {
     const line = [episodeCode(item), item.title]
       .filter((part): part is string => part != null && part !== '')
       .join(' · ')

@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import type { MediaItem, MetadataHealth } from '@raven/core'
+import { METADATA_SERVICE_STATES, type MediaItem, type MetadataHealth } from '@raven/core'
 import { useEffect, useRef } from 'react'
 import { afterAiLookups } from '@/lib/invalidate'
 import { metadataHealthQuery } from '@/lib/queries'
@@ -12,8 +12,8 @@ import { POLL_MS, anyPending } from '@/pages/LibraryPage/useMatchingPassDone'
  */
 const isBusy = (health: MetadataHealth | undefined): boolean =>
   health != null &&
-  health.ai !== 'off' &&
-  (health.aiPending > 0 || (health.tmdb === 'ok' && health.pending > 0))
+  health.ai !== METADATA_SERVICE_STATES.off &&
+  (health.aiPending > 0 || (health.tmdb === METADATA_SERVICE_STATES.ok && health.pending > 0))
 
 /**
  * The AI lookups run after a matching pass, once nothing is pending, so the
@@ -36,8 +36,10 @@ export const useAiLookupsDone = ({
     refetchOnMount: 'always',
     refetchInterval: (current) => {
       const last = current.state.data
-      if (last == null || last.ai === 'off') return false
-      return isBusy(last) || (last.tmdb === 'ok' && anyPending(files)) ? POLL_MS : false
+      if (last == null || last.ai === METADATA_SERVICE_STATES.off) return false
+      return isBusy(last) || (last.tmdb === METADATA_SERVICE_STATES.ok && anyPending(files))
+        ? POLL_MS
+        : false
     },
   })
   const isWorking = isBusy(health.data)

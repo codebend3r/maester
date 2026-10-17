@@ -4,7 +4,7 @@ import type { ItemDetails } from '@raven/core'
 import { api } from '@/lib/api'
 import { watchLink } from '@/lib/itemLinks'
 import { type Featured } from '@/pages/HomePage/featured'
-import { HERO_MS, HomeHero, titleSize } from '@/pages/HomePage/HomeHero'
+import { HERO_MS, HomeHero, LESS_MOTION, titleSize } from '@/pages/HomePage/HomeHero'
 import { itemDetails, matchedMovie } from '@/test/fixtures'
 import { held } from '@/test/held'
 import { renderWithProviders } from '@/test/render'
@@ -43,7 +43,7 @@ const passTurns = (turns: number) =>
 const askForLessMotion = () => {
   const real = window.matchMedia.bind(window)
   return spyOn(window, 'matchMedia').mockImplementation((query) =>
-    real(query === '(prefers-reduced-motion: reduce)' ? 'all' : 'not all'),
+    real(query === LESS_MOTION ? 'all' : 'not all'),
   )
 }
 

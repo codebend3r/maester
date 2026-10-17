@@ -1,3 +1,5 @@
+import { URL_PROTOCOLS } from '@raven/core'
+
 export const REPOSITORY = 'https://github.com/codebend3r/maester'
 
 export const RELEASES = `${REPOSITORY}/releases`
@@ -20,7 +22,9 @@ export const webAppAddress = ({ typed, origin }: { typed: string; origin: string
     : `${new URL(origin).protocol}//${trimmed}`
   try {
     const address = new URL(withScheme)
-    return address.protocol === 'http:' || address.protocol === 'https:' ? address.href : home
+    return address.protocol === URL_PROTOCOLS.http || address.protocol === URL_PROTOCOLS.https
+      ? address.href
+      : home
   } catch {
     return home
   }

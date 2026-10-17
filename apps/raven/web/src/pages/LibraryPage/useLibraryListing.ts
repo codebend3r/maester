@@ -8,7 +8,7 @@ import {
   matchTypeFor,
 } from '@raven/core'
 import { mediaListQuery, metadataHealthQuery, showListQuery } from '@/lib/queries'
-import type { Listing, ListingState } from '@/pages/LibraryPage/libraryShape'
+import { LISTING_STATES, type Listing, type ListingState } from '@/pages/LibraryPage/libraryShape'
 import { POLL_MS, anyPending, useMatchingPassDone } from '@/pages/LibraryPage/useMatchingPassDone'
 
 /**
@@ -35,7 +35,7 @@ export const useLibraryListing = ({
     ...metadataHealthQuery,
     enabled: matchTypeFor(settings.kind) != null,
   })
-  const canMatch = metadata.data?.tmdb === 'ok'
+  const canMatch = metadata.data?.tmdb === METADATA_SERVICE_STATES.ok
   const listing = { libraryId, search, sort: settings.sort, seed }
 
   const shows = useQuery({
@@ -50,7 +50,9 @@ export const useLibraryListing = ({
     refetchInterval: (current) =>
       scanning ||
       (current.state.data ?? []).some(
-        (item) => item.thumbnail === 'pending' || (canMatch && item.match === 'pending'),
+        (item) =>
+          item.thumbnail === THUMBNAIL_STATES.pending ||
+          (canMatch && item.match === MATCH_STATES.pending),
       )
         ? POLL_MS
         : false,
@@ -68,7 +70,7 @@ export const useLibraryListing = ({
   useMatchingPassDone({ libraryId, files: listed?.files ?? [] })
 
   // A failed read again keeps what was read before.
-  if (listed) return { state: 'listed', ...listed }
-  if (query.error) return { state: 'failed', error: query.error }
-  return { state: 'pending' }
+  if (listed) return { state: LISTING_STATES.listed, ...listed }
+  if (query.error) return { state: LISTING_STATES.failed, error: query.error }
+  return { state: LISTING_STATES.pending }
 }

@@ -1,5 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
+  SAGA_BACKDROP_TYPES,
+  SLIDESHOW_MOTIONS,
   type Saga,
   type SagaBackdrop,
   sagaCover,

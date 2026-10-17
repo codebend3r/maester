@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import type { MediaItem } from '@raven/core'
+import { MATCH_STATES, type MediaItem } from '@raven/core'
 import { useEffect, useRef } from 'react'
 import { afterMatchingPass } from '@/lib/invalidate'
 
@@ -7,7 +7,7 @@ import { afterMatchingPass } from '@/lib/invalidate'
 export const POLL_MS = 3000
 
 export const anyPending = (items: readonly MediaItem[]): boolean =>
-  items.some((item) => item.match === 'pending')
+  items.some((item) => item.match === MATCH_STATES.pending)
 
 /**
  * Nothing else reads the library again after a matching pass, so once

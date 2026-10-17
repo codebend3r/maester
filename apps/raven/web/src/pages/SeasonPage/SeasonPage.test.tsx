@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { ItemDetails } from '@raven/core'
+import { ITEM_TYPES, type ItemDetails } from '@raven/core'
 import { Route, Routes, useParams } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { SeasonPage } from '@/pages/SeasonPage/SeasonPage'
@@ -87,7 +87,7 @@ describe('SeasonPage', () => {
   const withWatched = (watched: boolean[]): ItemDetails => ({
     ...SEASON_ONE,
     children: SEASON_ONE.children.map((child, index) =>
-      child.type === 'episode' ? { ...child, watched: watched[index] ?? false } : child,
+      child.type === ITEM_TYPES.episode ? { ...child, watched: watched[index] ?? false } : child,
     ),
   })
 

@@ -8,9 +8,9 @@ import { LockedLibrary } from '@/components/LockedLibrary/LockedLibrary'
 import { MediaGridSkeleton } from '@/components/MediaGrid/MediaGrid'
 import { RouteState } from '@/components/RouteState/RouteState'
 import { Bone } from '@/components/Skeleton/Skeleton'
-import { useLibraryLock } from '@/lib/libraryLock'
+import { LIBRARY_LOCK_STATES, useLibraryLock } from '@/lib/libraryLock'
 import { librariesQuery, libraryQuery } from '@/lib/queries'
-import { routeState, useRouteId } from '@/lib/routeQuery'
+import { ROUTE_STATES, routeState, useRouteId } from '@/lib/routeQuery'
 import { LibraryHeader } from '@/pages/LibraryPage/LibraryHeader'
 import { LibraryTabs } from '@/pages/LibraryPage/LibraryTabs'
 import { SectionView } from '@/pages/LibraryPage/SectionViews'
@@ -29,7 +29,7 @@ const LibraryView = ({ library, section }: { library: Library; section: LibraryS
   const titleId = useId()
   // A locked library's videos are not asked for until this browser has the PIN.
   const lock = useLibraryLock(library)
-  const isShut = lock.state !== 'open'
+  const isShut = lock.state !== LIBRARY_LOCK_STATES.open
   const actions = useLibraryActions(library)
 
   return (
@@ -40,7 +40,9 @@ const LibraryView = ({ library, section }: { library: Library; section: LibraryS
 
       <LibraryHeader titleId={titleId} library={library} actions={actions} isShut={isShut} />
 
-      {lock.state === 'shut' && <LockedLibrary name={library.name} available={lock.available} />}
+      {lock.state === LIBRARY_LOCK_STATES.shut && (
+        <LockedLibrary name={library.name} available={lock.available} />
+      )}
 
       {!isShut && (
         <>
@@ -93,7 +95,7 @@ export const LibraryPage = () => {
   })
   const page = routeState({ id: libraryId, query: library })
   if (section == null) return <NotFoundPage />
-  if (page.state !== 'ready') {
+  if (page.state !== ROUTE_STATES.ready) {
     return <RouteState state={page} noun="library" shape={<LibrarySkeleton />} />
   }
   if (!hasSection({ kind: page.data.settings.kind, section })) {
