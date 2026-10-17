@@ -2,6 +2,7 @@ import { isLockState } from '@raven/core'
 import type { ServerEntry } from '@/main/desktopConfig'
 import {
   CALL_NAMES,
+  isPageCall,
   isWrite,
   matchCall,
   requestFor,
@@ -239,7 +240,7 @@ export const createServerCalls = ({
 
   const callFromPage: ServerCalls['callFromPage'] = async ({ serverId, method, path, body }) => {
     const allowed = matchCall({ method, path, body })
-    if (allowed === null) {
+    if (allowed === null || !isPageCall(allowed)) {
       safeWarn(`refused a page call off the allowlist: ${loggable(method)} ${loggable(path)}`)
       return { ok: false, message: CALL_MESSAGES.offList }
     }

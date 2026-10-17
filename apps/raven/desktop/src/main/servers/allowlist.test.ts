@@ -3,6 +3,7 @@ import { SERVER_METHODS } from '@/shared/protocol'
 import {
   MAX_BODY,
   MAX_SECRET,
+  isPageCall,
   isWrite,
   matchCall,
   requestFor,
@@ -213,6 +214,15 @@ describe('isWrite', () => {
     expect(ACCEPTED.filter(({ call }) => isWrite(call)).map(({ call }) => call.name)).toEqual([
       'saveProgress',
       'recordPlay',
+    ])
+  })
+})
+
+describe('isPageCall', () => {
+  it('keeps the origin list and a media ticket to main, and lets the page make the rest', () => {
+    expect(ACCEPTED.filter(({ call }) => !isPageCall(call)).map(({ call }) => call.name)).toEqual([
+      'getMediaOrigins',
+      'getMediaTicket',
     ])
   })
 })

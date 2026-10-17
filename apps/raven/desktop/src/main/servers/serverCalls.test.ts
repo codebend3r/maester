@@ -733,6 +733,39 @@ describe('createServerCalls.callFromPage', () => {
     ).toEqual({ ok: false, message: CALL_MESSAGES.unknownServer })
     expect(sent).toEqual([])
   })
+
+  it.each(['/api/media-origins', '/api/media/7/ticket'])(
+    'refuses GET %s, which only main makes, fetches nothing and warns',
+    async (path) => {
+      const { calls, sent, fetchedFor, warnings } = setup({
+        answer: () => reply({ text: '{"ticket":"t"}' }),
+      })
+      const result = await calls.callFromPage({
+        serverId: SERVER.id,
+        method: 'GET',
+        path,
+        body: null,
+      })
+      expect(result).toEqual({ ok: false, message: CALL_MESSAGES.offList })
+      expect(sent).toEqual([])
+      expect(fetchedFor).toEqual([])
+      expect(warnings).toEqual([`refused a page call off the allowlist: GET ${path}`])
+    },
+  )
+
+  it("still runs main's own origin list and ticket reads", async () => {
+    const { calls, sent } = setup({ answer: () => reply({ text: '{"ticket":"t"}' }) })
+    expect(
+      await calls.call({ serverId: SERVER.id, call: { name: 'getMediaTicket', mediaId: 7 } }),
+    ).toEqual({ ok: true, status: 200, body: '{"ticket":"t"}' })
+    expect((await calls.call({ serverId: SERVER.id, call: { name: 'getMediaOrigins' } })).ok).toBe(
+      true,
+    )
+    expect(sent.map(({ url }) => url)).toEqual([
+      'https://raven.example/api/media/7/ticket',
+      'https://raven.example/api/media-origins',
+    ])
+  })
 })
 
 describe('pending writes', () => {
