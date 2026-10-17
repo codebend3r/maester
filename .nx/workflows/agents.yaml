@@ -1,0 +1,40 @@
+# How each Nx Agent sets itself up before it runs tasks. Nx Cloud's prebuilt
+# templates install with npm, yarn or pnpm only, so this one installs the same
+# toolchain the PR checks used to: Bun, uv and ffmpeg.
+# https://nx.dev/docs/kb/launch-templates
+launch-templates:
+  linux-medium:
+    resource-class: 'docker_linux_amd64/medium'
+    image: 'ubuntu22.04-node24.14-v1'
+    env:
+      # uv runs against the committed lockfiles, never re-resolving them.
+      UV_FROZEN: '1'
+    init-steps:
+      - name: Checkout
+        uses: 'nrwl/nx-cloud-workflows/v6/workflow-steps/checkout/main.yaml'
+      - name: Restore Bun and uv caches
+        uses: 'nrwl/nx-cloud-workflows/v6/workflow-steps/cache/main.yaml'
+        inputs:
+          key: 'bun.lock|**/uv.lock'
+          paths: |
+            ~/.bun/install/cache
+            ~/.cache/uv
+          base-branch: 'main'
+      # raven's server and core tests encode real clips with ffmpeg. Bun's
+      # installer needs unzip.
+      - name: Install ffmpeg and unzip
+        script: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg unzip
+      # Bun's version comes from `packageManager` in package.json. Each Python
+      # project's .python-version picks its interpreter, which uv downloads.
+      - name: Install Bun and uv
+        script: |
+          set -euo pipefail
+          bun_version="$(node -p "require('./package.json').packageManager.split('@')[1]")"
+          curl -fsSL https://bun.sh/install | bash -s "bun-v$bun_version"
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "PATH=$HOME/.bun/bin:$HOME/.local/bin:$PATH" >> $NX_CLOUD_ENV
+      - name: Install
+        script: bun install --frozen-lockfile
