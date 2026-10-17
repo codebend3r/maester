@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, readdir, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createInterface } from 'node:readline'
@@ -21,11 +21,18 @@ export type Marks = {
   watch: (listener: () => void) => () => void
 }
 
+/** Every line main printed so far, on stdout and on stderr, in the order each arrived. */
+export type Output = { lines: () => readonly string[] }
+
 export type Launched = {
   app: ElectronApplication
   page: Page
   marks: Marks
+  output: Output
 }
+
+/** A budget mark's line, which carries only a name and a number. */
+export const isMarkLine = (line: string): boolean => MARK_LINE.test(line)
 
 export const freshUserData = (): Promise<string> => mkdtemp(join(tmpdir(), 'raven-e2e-user-'))
 
@@ -33,6 +40,22 @@ export const freshUserData = (): Promise<string> => mkdtemp(join(tmpdir(), 'rave
 export const removeDir = async (path: string): Promise<void> => {
   if (path === '') return
   await rm(path, { recursive: true, force: true })
+}
+
+const isMissing = (error: unknown): boolean =>
+  error instanceof Error && 'code' in error && error.code === 'ENOENT'
+
+/**
+ * The server session folders Electron keeps under `userData`. Only a missing `Partitions`
+ * folder means none: a missing `userData` is a test that looked too late, and throws.
+ */
+export const serverPartitions = async ({ userData }: { userData: string }): Promise<string[]> => {
+  await stat(userData)
+  const names = await readdir(join(userData, 'Partitions')).catch((error: unknown) => {
+    if (isMissing(error)) return []
+    throw error
+  })
+  return names.filter((name) => name.startsWith('server%3A'))
 }
 
 const hasExited = (app: ElectronApplication): boolean => {
@@ -73,6 +96,20 @@ const readMarks = (app: ElectronApplication): Marks => {
     tell()
   })
   return marks
+}
+
+// Read beside the marks from launch on, so a test can check what main wrote to its logs.
+const readOutput = (app: ElectronApplication): Output => {
+  const lines: string[] = []
+  const { stdout, stderr } = app.process()
+  const streams = [stdout, stderr]
+  streams.forEach((stream) => {
+    if (stream === null) return
+    createInterface({ input: stream }).on('line', (line) => {
+      lines.push(line)
+    })
+  })
+  return { lines: () => [...lines] }
 }
 
 /**
@@ -144,11 +181,12 @@ export const launchApp = async ({
     env: { ...process.env, RAVEN_DESKTOP_USER_DATA: userData, RAVEN_DESKTOP_MPV: mpv },
   })
   const marks = readMarks(app)
+  const output = readOutput(app)
   const page = await app.firstWindow().catch(async (error: unknown) => {
     await closeApp({ app }).catch(() => undefined)
     throw error
   })
-  return { app, page, marks }
+  return { app, page, marks, output }
 }
 
 /** Launches the app, runs `run` against it and always quits it after, so no process outlives a test. */
@@ -183,6 +221,94 @@ export const openFile = async ({
   }, path)
 }
 
+/** The event macOS sends for a `raven://` link, emitted on the running app. */
+export const openUrl = async ({ app, url }: { app: ElectronApplication; url: string }) => {
+  await app.evaluate(({ app: electronApp }, link) => {
+    electronApp.emit('open-url', { preventDefault: () => undefined }, link)
+  }, url)
+}
+
+const TRUST_PROMPTS_KEY = 'ravenE2eTrustPrompts'
+
+/**
+ * Answers main's trust sheet without showing it, and records what it asked. main reads
+ * `dialog.showMessageBox` at each call, so the stand-in takes its place.
+ */
+export const stubTrustPrompt = async ({
+  app,
+  answer,
+}: {
+  app: ElectronApplication
+  answer: 'add' | 'cancel'
+}): Promise<void> => {
+  await app.evaluate(
+    ({ dialog }, { key, response }) => {
+      Reflect.set(globalThis, key, [])
+      const ask = async (...args: unknown[]) => {
+        const options: unknown = args.at(-1)
+        const message =
+          typeof options === 'object' &&
+          options !== null &&
+          'message' in options &&
+          typeof options.message === 'string'
+            ? options.message
+            : ''
+        const asked: unknown = Reflect.get(globalThis, key)
+        const earlier = Array.isArray(asked)
+          ? asked.filter((item): item is string => typeof item === 'string')
+          : []
+        Reflect.set(globalThis, key, [...earlier, message])
+        return { response, checkboxChecked: false }
+      }
+      Reflect.set(dialog, 'showMessageBox', ask)
+    },
+    { key: TRUST_PROMPTS_KEY, response: answer === 'add' ? 0 : 1 },
+  )
+}
+
+/** What main's trust sheet asked since `stubTrustPrompt`, in order. */
+export const trustPrompts = async ({ app }: { app: ElectronApplication }): Promise<string[]> => {
+  const asked = await app.evaluate((_modules, key) => {
+    const value: unknown = Reflect.get(globalThis, key)
+    return value
+  }, TRUST_PROMPTS_KEY)
+  return Array.isArray(asked)
+    ? asked.filter((item): item is string => typeof item === 'string')
+    : []
+}
+
+const BROWSER_OPENS_KEY = 'ravenE2eBrowserOpens'
+
+/**
+ * Records what main hands the browser instead of opening it. main reads
+ * `shell.openExternal` at each call, so the stand-in takes its place.
+ */
+export const stubBrowser = async ({ app }: { app: ElectronApplication }): Promise<void> => {
+  await app.evaluate(({ shell }, key) => {
+    Reflect.set(globalThis, key, [])
+    const open = async (...args: unknown[]) => {
+      const [url] = args
+      const opened: unknown = Reflect.get(globalThis, key)
+      const earlier = Array.isArray(opened)
+        ? opened.filter((item): item is string => typeof item === 'string')
+        : []
+      Reflect.set(globalThis, key, [...earlier, typeof url === 'string' ? url : ''])
+    }
+    Reflect.set(shell, 'openExternal', open)
+  }, BROWSER_OPENS_KEY)
+}
+
+/** What main handed the browser since `stubBrowser`, in order. */
+export const browserOpens = async ({ app }: { app: ElectronApplication }): Promise<string[]> => {
+  const opened = await app.evaluate((_modules, key) => {
+    const value: unknown = Reflect.get(globalThis, key)
+    return value
+  }, BROWSER_OPENS_KEY)
+  return Array.isArray(opened)
+    ? opened.filter((item): item is string => typeof item === 'string')
+    : []
+}
+
 /**
  * A request sent from the page through the preload's bridge, as the renderer sends it,
  * and main's reply narrowed here. null when the page has no bridge or main answered
@@ -193,7 +319,7 @@ export const requestFromPage = async ({
   request,
 }: {
   page: Page
-  request: Record<string, string>
+  request: Record<string, string | null>
 }): Promise<DesktopReply | null> => {
   const reply = await page.evaluate(async (sent) => {
     if (!('ravenDesktop' in window)) return null

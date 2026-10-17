@@ -5,7 +5,7 @@ import { join } from 'node:path'
 
 export type Clips = { folder: string; first: string; second: string }
 
-const CLIP_SECONDS = 30
+export const CLIP_SECONDS = 30
 
 // H.264 in MP4, which Chromium decodes; `-allow_sw 1` lets VideoToolbox fall back to its
 // software encoder on a runner without a hardware one.

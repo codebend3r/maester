@@ -18,8 +18,11 @@ const LOOP_LAG_LIMIT_MS = 40
 // The first lag mark comes five seconds into playback; this only turns a missed one into an error.
 const LOOP_MARK_WAIT_MS = 15_000
 const FIRST_FRAME_WAIT_MS = 10_000
-// Spec Review Focus 5: mpv is destroyed and the app gone within a second of quitting.
+// Spec Review Focus 5: mpv is destroyed and the app gone within a second of quitting, read
+// from main's own mark. The wall clock only guards against a hang.
 const QUIT_LIMIT_MS = 1000
+const QUIT_HANG_MS = 3000
+const QUIT_MARK_WAIT_MS = 1000
 const NEXT_WAIT_MS = 15_000
 // The window's colour on Home and under a video, as Electron reports them: main sets the
 // clear one as `#00000000`, and `getBackgroundColor` leaves the alpha off.
@@ -410,7 +413,8 @@ test.describe.serial('playing a local file through mpv', () => {
   })
 
   test('quits mid-film within a second and leaves no process behind', async () => {
-    const { app, page } = await launchApp({ userData })
+    const launched = await launchApp({ userData })
+    const { app, page } = launched
     try {
       await playNatively({ app, page, path: clips.first, title: 'Clip 01' })
       const pid = app.process().pid
@@ -421,9 +425,13 @@ test.describe.serial('playing a local file through mpv', () => {
 
       const startedAt = performance.now()
       await closeApp({ app })
-      const quitMs = performance.now() - startedAt
-      process.stdout.write(`raven quit ${Math.round(quitMs)} ms, ${tree.length} processes\n`)
+      const wallMs = performance.now() - startedAt
+      const quitMs = await markWithin({ launched, name: 'quit-ms', ms: QUIT_MARK_WAIT_MS })
+      process.stdout.write(
+        `raven quit ${quitMs} ms (main), ${Math.round(wallMs)} ms (test), ${tree.length} processes\n`,
+      )
       expect(quitMs).toBeLessThan(QUIT_LIMIT_MS)
+      expect(wallMs).toBeLessThan(QUIT_HANG_MS)
       await expect.poll(() => tree.filter(isAlive)).toEqual([])
     } finally {
       // Already gone when the test passed; a failure above must not leave the app running,
