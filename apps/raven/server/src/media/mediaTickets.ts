@@ -21,6 +21,7 @@ export class MediaTickets {
   }
 
   issue({ id, now = Date.now() }: { id: number; now?: number }): MediaTicket {
+    if (!Number.isSafeInteger(id) || id <= 0) throw new Error(`${id} is not a media id`)
     const expiresAt = now + MEDIA_TICKET_SECONDS * 1000
     const payload = `${id}.${expiresAt}`
     const signature = this.sign(payload)

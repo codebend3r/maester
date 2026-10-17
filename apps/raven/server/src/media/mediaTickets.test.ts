@@ -50,6 +50,29 @@ describe('MediaTickets', () => {
     expect(tickets.verify({ ticket: forged, id: 7, now: 1 })).toBe(false)
   })
 
+  it('rejects a real signature paired with a later expiry or another id', () => {
+    const tickets = new MediaTickets(config(randomBytes(32)))
+    const { ticket, expiresAt } = tickets.issue({ id: 7, now: 1_000_000 })
+    const [, signature = ''] = ticket.split('.')
+    const paired = (payload: string): string =>
+      `${Buffer.from(payload).toString('base64url')}.${signature}`
+    expect(tickets.verify({ ticket, id: 7, now: expiresAt - 1 })).toBe(true)
+    expect(
+      tickets.verify({ ticket: paired(`7.${expiresAt + 1000}`), id: 7, now: expiresAt + 500 }),
+    ).toBe(false)
+    expect(tickets.verify({ ticket: paired(`8.${expiresAt}`), id: 8, now: expiresAt - 1 })).toBe(
+      false,
+    )
+  })
+
+  it('refuses to issue for an id that is not a media id', () => {
+    const tickets = new MediaTickets(config(randomBytes(32)))
+    expect(() => tickets.issue({ id: 1.5 })).toThrow('1.5 is not a media id')
+    expect(() => tickets.issue({ id: -1 })).toThrow('-1 is not a media id')
+    expect(() => tickets.issue({ id: 0 })).toThrow('0 is not a media id')
+    expect(() => tickets.issue({ id: Number.NaN })).toThrow('NaN is not a media id')
+  })
+
   it('rejects a ticket signed with another secret', () => {
     const { ticket } = new MediaTickets(config(randomBytes(32))).issue({ id: 7, now: 1_000_000 })
     expect(
