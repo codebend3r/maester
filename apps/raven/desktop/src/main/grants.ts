@@ -29,7 +29,7 @@ export type Grants = {
   fileOf: (fileId: string) => Readonly<GrantedFile> | null
 }
 
-export const ID_DRAWS = 8
+const ID_DRAWS = 8
 
 const refuse = (reason: GrantRefusal): GrantResult => ({ ok: false, reason })
 

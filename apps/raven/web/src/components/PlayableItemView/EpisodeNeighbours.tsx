@@ -18,7 +18,7 @@ const stillOf = (episode: EpisodeSummary): string | null => {
  * its show and season as the season's page reads them; none for the first
  * or last, nor before both are known.
  */
-export const useNeighbours = (
+const useNeighbours = (
   episode: ItemDetails,
 ): Array<{ direction: 'Previous' | 'Next'; episode: EpisodeSummary }> => {
   const show = useQuery(itemQuery(episode.show?.id ?? null))

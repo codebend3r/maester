@@ -182,7 +182,7 @@ export const itemDetails = (overrides: Partial<ItemDetails> = {}): ItemDetails =
  * A stand-in for `canPlayType`: plays any MIME type whose container and
  * every listed codec appear in `supports`.
  */
-export const canPlayFrom =
+const canPlayFrom =
   (supports: readonly string[]): CanPlay =>
   (mimeType) => {
     const [container = '', params = ''] = mimeType.split(';')

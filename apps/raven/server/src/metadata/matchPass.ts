@@ -183,8 +183,6 @@ export class MatchPass {
     if (ids.tvdb != null) {
       return pick(await tmdb.find({ id: ids.tvdb, source: TMDB_EXTERNAL_SOURCES.tvdbId }))
     }
-    if (ids.imdb != null) return pick(await tmdb.find({ id: ids.imdb, source: 'imdb_id' }))
-    if (ids.tvdb != null) return pick(await tmdb.find({ id: ids.tvdb, source: 'tvdb_id' }))
     return null
   }
 

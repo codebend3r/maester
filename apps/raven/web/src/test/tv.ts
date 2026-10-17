@@ -78,7 +78,7 @@ export const EPISODE_TWO = mediaItem({
 })
 
 /** An episode as its season's page lists it: its row, and the file Play starts. */
-export const episodeRow = (media: MediaItem): EpisodeSummary => ({
+const episodeRow = (media: MediaItem): EpisodeSummary => ({
   ...(media.item ?? itemSummary()),
   type: 'episode',
   summary: `${media.item?.title ?? ''} is an episode.`,

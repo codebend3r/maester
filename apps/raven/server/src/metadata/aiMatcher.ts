@@ -39,13 +39,13 @@ const BLOCK_TYPES = { toolUse: 'tool_use' } as const satisfies Record<
 >
 
 /** How many file names a lookup is sent, spread over the group. */
-export const AI_FILE_SAMPLE = 12
+const AI_FILE_SAMPLE = 12
 
 /** How many groups are asked about at once. */
 export const AI_CONCURRENCY = 2
 
 /** Replies Claude gets to choose in; past the last, the lookup has no decision. */
-export const AI_MAX_TURNS = 6
+const AI_MAX_TURNS = 6
 
 /** Room for one reply's thinking and its tool calls. */
 const MAX_TOKENS = 4000

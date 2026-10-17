@@ -130,9 +130,6 @@ export const mediaLocationQuery = (id: number) =>
     staleTime: 0,
   })
 
-/** One window of a subtitle track; fetched windows stay for seeking back. */
-export const subtitlesQuery = playerQueriesFor(api).subtitles
-
 export const itemQuery = (id: number | null) =>
   queryOptions({
     queryKey: queryKeys.item(id),

@@ -3,7 +3,6 @@ import {
   type AiMatch,
   CONFIDENCE_TIERS,
   type ConfidenceTier,
-  confidenceTierOf,
   type MatchCandidate,
   type MatchItemType,
   type MatchSubject,

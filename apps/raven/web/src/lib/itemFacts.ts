@@ -27,12 +27,12 @@ export const runtimeFact = ({
   formatRuntime(file?.duration ?? null) ?? (runtime == null ? null : formatRuntime(runtime * 60))
 
 /** "A", "A and B", "A, B and C". */
-export const joinNames = (names: readonly string[]): string =>
+const joinNames = (names: readonly string[]): string =>
   names.length <= 1
     ? (names[0] ?? '')
     : `${names.slice(0, -1).join(', ')} and ${names.at(-1) ?? ''}`
 
-export const unique = (values: readonly string[]): string[] =>
+const unique = (values: readonly string[]): string[] =>
   values.filter((value, index) => values.indexOf(value) === index)
 
 /** "Directed by Lana Wachowski and Lilly Wachowski", or null without a director. */

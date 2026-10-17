@@ -115,7 +115,6 @@ const ROUTES: readonly Route[] = [
     path: API_PATHS.lock,
     read: bare({ name: CALL_NAMES.getLock }),
   },
-  { kind: 'fixed', method: 'GET', path: '/api/lock', read: bare({ name: 'getLock' }) },
   {
     kind: ROUTE_KINDS.fixed,
     method: SERVER_METHODS.post,
@@ -125,7 +124,6 @@ const ROUTES: readonly Route[] = [
         ? { name: CALL_NAMES.unlock, pin: body.value.pin }
         : null,
   },
-  { kind: 'fixed', method: 'GET', path: '/api/admin', read: bare({ name: 'getAdminLock' }) },
   {
     kind: ROUTE_KINDS.fixed,
     method: SERVER_METHODS.get,

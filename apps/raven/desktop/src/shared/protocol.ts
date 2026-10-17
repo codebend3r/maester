@@ -78,8 +78,6 @@ export const isTrackIndex = (value: unknown): value is number =>
 
 export const isTrackChoice = object({ audio: nullable(isNumber), subtitle: nullable(isString) })
 
-export type TrackChoice = Infer<typeof isTrackChoice>
-
 export const isLocalFile = object({
   fileId: isOpaqueId,
   label: isString,
@@ -100,7 +98,7 @@ export const isRecentView = object({
 
 export type RecentView = Infer<typeof isRecentView>
 
-export const isAudioDevice = object({ name: isString, description: isString })
+const isAudioDevice = object({ name: isString, description: isString })
 
 export type AudioDevice = Infer<typeof isAudioDevice>
 

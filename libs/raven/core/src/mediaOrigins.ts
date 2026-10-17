@@ -6,13 +6,13 @@ export type OriginProbe = {
   bytesPerSecond: number
 }
 
-export const ORIGIN_KIND_RANK = { lan: 0, tailnet: 1, public: 2 } as const satisfies Record<
+const ORIGIN_KIND_RANK = { lan: 0, tailnet: 1, public: 2 } as const satisfies Record<
   MediaOriginKind,
   number
 >
 
 /** How much slower than the best an origin may be and still win on its kind. */
-export const PREFERENCE_BAND = 0.2
+const PREFERENCE_BAND = 0.2
 
 /** Bytes per second for the whole probe body, first byte included, so latency and bandwidth both count. */
 const scoreOf = ({ firstByteMs, bytesPerSecond }: OriginProbe): number => {

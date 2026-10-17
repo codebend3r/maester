@@ -35,7 +35,6 @@
     "@types/react-dom": "19.3.0",
     "@typescript/native-preview": "7.0.0-dev.20260707.2",
     "@vitejs/plugin-react": "6.1.1",
-    "happy-dom": "20.14.5",
     "oxfmt": "0.68.0",
     "oxlint": "1.83.0",
     "sass": "1.104.1",

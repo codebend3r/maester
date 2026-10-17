@@ -97,7 +97,7 @@ export type FixtureServer = {
   close: () => Promise<void>
 }
 
-export const FIXTURE_TRACKS = {
+const FIXTURE_TRACKS = {
   audio: [
     { index: 0, codec: 'aac', channels: 1, language: 'en', title: null, default: true },
     { index: 1, codec: 'aac', channels: 1, language: 'fr', title: null, default: false },
@@ -130,7 +130,7 @@ export const FIXTURE_TRACKS = {
   frameRate: 24,
 } as const satisfies MediaTracks
 
-export const FIXTURE_SIDECAR =
+const FIXTURE_SIDECAR =
   'WEBVTT\n\n00:00.000 --> 00:14.000\nraven fixture sidecar one\n\n00:14.000 --> 00:29.000\nraven fixture sidecar two\n'
 
 const FIXTURE_PAGE = '<!doctype html><html><head><title>Sign in</title></head><body></body></html>'

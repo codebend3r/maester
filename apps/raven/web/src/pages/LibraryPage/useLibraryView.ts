@@ -25,7 +25,7 @@ const dealSeed = (): number => Math.floor(Math.random() * 2 ** 31)
  * shared link lands on the same search, order and layout; what the address
  * leaves out comes from the library's own settings.
  */
-export const viewFromUrl = (params: URLSearchParams): LibraryViewChange => {
+const viewFromUrl = (params: URLSearchParams): LibraryViewChange => {
   const sort = params.get('sort')
   const view = params.get('view')
   const group = params.get('group')
@@ -37,7 +37,7 @@ export const viewFromUrl = (params: URLSearchParams): LibraryViewChange => {
 }
 
 /** The address with `change` written into it. */
-export const writeView = ({
+const writeView = ({
   params,
   change,
 }: {

@@ -1,5 +1,5 @@
 /** The systems the desktop app is offered for, as `?os=` names them. */
-export const OPERATING_SYSTEMS = ['mac', 'windows', 'linux'] as const
+const OPERATING_SYSTEMS = ['mac', 'windows', 'linux'] as const
 
 export type OperatingSystem = (typeof OPERATING_SYSTEMS)[number]
 

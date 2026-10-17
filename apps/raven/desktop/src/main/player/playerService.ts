@@ -66,7 +66,7 @@ export const PLAYER_MESSAGES = {
  * service's stall budget (`SERVER_STALL_MS`) ends the title first.
  * `stream-lavf-o` is applied after mpv's own lavf defaults, so it overrides them.
  */
-export const SERVER_LOAD_OPTIONS = {
+const SERVER_LOAD_OPTIONS = {
   lavf: 'max_redirects=0,reconnect_delay_max=3',
   networkTimeout: 15,
 } as const

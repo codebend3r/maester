@@ -410,7 +410,7 @@ export const MIGRATIONS: readonly string[] = [
 ]
 
 /** The index's file in the data folder. Before raven was renamed it was `weirwood.db`. */
-export const DATABASE_FILE = 'raven.db'
+const DATABASE_FILE = 'raven.db'
 const LEGACY_FILE = 'weirwood.db'
 
 /**

@@ -1,4 +1,3 @@
-import type { DesktopReply, DesktopRequest, ServerView } from '@/shared/protocol'
 import { fakeClient } from '@/renderer/test/render'
 import {
   DESKTOP_REQUESTS,

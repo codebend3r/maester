@@ -26,13 +26,13 @@ export type PlayerConnections = {
 
 export type RendererPort = Pick<MessagePort, 'postMessage' | 'start' | 'close' | 'addEventListener'>
 
-export const REPLY_TIMEOUT_MS = 10_000
+const REPLY_TIMEOUT_MS = 10_000
 export const PLAYER_NO_ANSWER = 'raven player did not answer.'
 export const PLAYER_CLOSED = 'raven player closed its connection to this page.'
 export const PLAYER_NOT_HANDED =
   'raven player could not reach its video engine, so it plays only the videos Chromium can.'
 /** Longer than main waits on its engine (`OPEN_MS`, 5 s), so main's answer normally comes first. */
-export const PLAYER_WAIT_MS = 8000
+const PLAYER_WAIT_MS = 8000
 
 type Pending = {
   resolve: () => void

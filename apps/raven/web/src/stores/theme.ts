@@ -15,7 +15,7 @@ const readTheme = (): ThemeId => {
 }
 
 /** Puts a theme on the page, and its ground on the browser's own chrome. */
-export const applyTheme = (theme: ThemeId) => {
+const applyTheme = (theme: ThemeId) => {
   const root = document.documentElement
   root.dataset.theme = theme
   const ground = getComputedStyle(root).getPropertyValue('--color-night').trim()

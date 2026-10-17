@@ -134,7 +134,7 @@ export const stepSpeed = ({
   return SPEEDS[Math.max(0, Math.min(SPEEDS.length - 1, next))] ?? current
 }
 
-export const CAPTION_SCALES: readonly number[] = [0.75, 1, 1.25, 1.5, 1.75, 2]
+const CAPTION_SCALES: readonly number[] = [0.75, 1, 1.25, 1.5, 1.75, 2]
 
 export const stepCaptionScale = ({
   current,

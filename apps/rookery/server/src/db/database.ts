@@ -56,7 +56,7 @@ const MIGRATIONS: readonly string[] = [
   `,
 ]
 
-export const DATABASE_FILE = 'rookery.db'
+const DATABASE_FILE = 'rookery.db'
 
 /** The one SQLite connection: users, their logins, sessions and sign-ins under way. */
 @Injectable()

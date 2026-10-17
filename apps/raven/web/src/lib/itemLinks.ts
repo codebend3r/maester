@@ -13,7 +13,7 @@ import {
 export type AppPath = `/${string}`
 
 /** A season's page, by its show and number. */
-export const seasonPath = ({ showId, season }: { showId: number; season: number }): AppPath =>
+const seasonPath = ({ showId, season }: { showId: number; season: number }): AppPath =>
   `/shows/${showId}/seasons/${season}`
 
 /** Where an item's page lives, or null for one that has no page of its own. */

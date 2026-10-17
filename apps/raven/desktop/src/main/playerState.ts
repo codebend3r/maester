@@ -35,7 +35,7 @@ const isServerRecent = object({
   openedAt: isNumber,
 })
 
-export const isRecentEntry = union(isFileRecent, isServerRecent)
+const isRecentEntry = union(isFileRecent, isServerRecent)
 
 const isResumeEntry = object({
   path: isString,
@@ -53,7 +53,7 @@ const isTrackPick = object({
   pickedAt: isNumber,
 })
 
-export const isWindowBounds = object({
+const isWindowBounds = object({
   x: isNumber,
   y: isNumber,
   width: isNumber,

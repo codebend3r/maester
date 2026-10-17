@@ -10,7 +10,7 @@ import { join, sep } from 'node:path'
  * `paths`, so it imports nothing from the project.
  */
 
-export const MACH_O_MAGICS = [
+const MACH_O_MAGICS = [
   0xfeedface, 0xcefaedfe, 0xfeedfacf, 0xcffaedfe, 0xcafebabe, 0xbebafeca,
 ] as const
 

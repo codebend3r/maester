@@ -10,7 +10,7 @@ import type { Timers } from '@/main/stateStore'
 
 const OK: PlayerOutcome = { ok: true }
 
-export const NO_SERVERS_MESSAGE = 'This player knows no servers.'
+const NO_SERVERS_MESSAGE = 'This player knows no servers.'
 
 /** Server sources for a player that knows no servers: every server title is refused. */
 export const NO_SERVERS = {

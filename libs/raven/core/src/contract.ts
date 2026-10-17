@@ -146,7 +146,6 @@ export const SORT_FIELDS = {
     descending: MEDIA_SORTS.largest,
     start: SORT_DIRECTIONS.descending,
   },
-  size: { type: 'directed', ascending: 'smallest', descending: 'largest', start: 'descending' },
   bitrate: {
     type: SORT_FIELD_TYPES.directed,
     ascending: MEDIA_SORTS.bitrateLow,
@@ -165,7 +164,6 @@ export const SORT_FIELDS = {
     descending: MEDIA_SORTS.yearNew,
     start: SORT_DIRECTIONS.descending,
   },
-  release: { type: 'directed', ascending: 'year-old', descending: 'year-new', start: 'descending' },
   rating: {
     type: SORT_FIELD_TYPES.directed,
     ascending: MEDIA_SORTS.ratingLow,
@@ -268,7 +266,6 @@ export const MEDIA_GROUPINGS = {
 
 export const isMediaGroupBy = oneOf(Object.values(MEDIA_GROUPINGS))
 
-/** `match` buckets a matched library, of movies or shows, by how far matching got. */
 export type MediaGroupBy = Infer<typeof isMediaGroupBy>
 
 export const RATING_SOURCES = {

@@ -21,6 +21,6 @@ The root entry exports Player, PlayerServicesProvider, engine/services/state typ
 
 ## Tests
 
-Bun uses happy-dom and the shared `tooling/web` SCSS loader. Tests beside the player and helpers exercise UI source with a local API fixture, PlayerServices and query/router harness. Web keeps the browser-host clipboard, progress/history and built-player integration tests. Web mocks the public capability and design-token modules, not UI source paths. The three player query keys are defined once here and reused by web, preserving cache invalidation.
+Bun uses happy-dom and the shared `tooling/web` SCSS loader. Tests beside the player and helpers exercise UI source with a local API fixture, the services store and a query/router harness: `renderWithProviders({ ui, services })` sets the services before the first render, a test host calls `useHostPlayer`, and `test-setup.ts` empties the store after each test. Web keeps the browser-host clipboard, progress/history and built-player integration tests. Web mocks the public capability and design-token modules, not UI source paths. The three player query keys are defined once here and reused by web, preserving cache invalidation.
 
 UI and web each enforce at least 96% total line and 88% function coverage. Test harnesses, tooling and built dependency output are excluded, not production player functions. Hardware, native playback and desktop-specific UI are outside this extraction.

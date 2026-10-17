@@ -380,7 +380,6 @@ describe('parseEpisodeName', () => {
     return parseEpisodeName({
       fileName: parts.at(-1) ?? '',
       folder: parts.slice(0, -1).join('/'),
-      fallbackShow,
     })
   }
 
