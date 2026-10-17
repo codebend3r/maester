@@ -216,9 +216,12 @@ const setup = ({
     if (drive.files.has(path)) return { size: drive.sizeOf(path), mtimeMs: MTIME }
     throw missing()
   }
+  /** What every grant waits on before it reads the file, so a test can hold one. */
+  const granting: { hold: Promise<void> } = { hold: Promise.resolve() }
   const grants = createGrants({
     fs: {
       realpath: async (path) => {
+        await granting.hold
         videoAt(path)
         return path
       },
@@ -270,6 +273,7 @@ const setup = ({
     service,
     store,
     grants,
+    granting,
     state,
     shelf,
     statted,
@@ -1336,6 +1340,34 @@ describe('playing a download', () => {
     world.service.noteOpened({ fileId })
     world.service.notePosition({ fileId, position: 150, duration: 3000 })
     expect(entryOf(world)?.pending).toEqual({ play: true, position: 150, at: NOW })
+  })
+
+  it('reaches a download removed and downloaded again at the same path', async () => {
+    const world = setup({ initial: holding(entryFor({})), videos: { [VIDEO]: FILE } })
+    const fileId = await opened(world)
+    await world.service.remove({ downloadId: ID })
+    const again = entryFor({
+      downloadId: OTHER_ID,
+      sidecars: [{ trackId: 'external-0', title: 'English', language: 'en' }],
+    })
+    world.store.update((state) => ({ ...state, entries: [again] }))
+    world.service.notePosition({ fileId, position: 100, duration: 3000 })
+    expect(entryOf(world, OTHER_ID)?.pending.position).toBe(100)
+    expect(world.service.sidecarsOf(fileId)).toHaveLength(1)
+  })
+
+  it('forgets a file whose download was removed while it was granted', async () => {
+    const world = setup({ initial: holding(entryFor({})), videos: { [VIDEO]: FILE } })
+    const held = Promise.withResolvers<void>()
+    world.granting.hold = held.promise
+    const opening = world.service.open({ downloadId: ID })
+    await world.service.remove({ downloadId: ID })
+    held.resolve()
+    const { fileId } = targetOf(await opening)
+    world.service.notePosition({ fileId, position: 50, duration: 3000 })
+    world.store.update((state) => ({ ...state, entries: [entryFor({ downloadId: OTHER_ID })] }))
+    world.service.notePosition({ fileId, position: 100, duration: 3000 })
+    expect(entryOf(world, OTHER_ID)?.pending.position).toBe(100)
   })
 
   it('notes nothing for a file that is not a download', async () => {

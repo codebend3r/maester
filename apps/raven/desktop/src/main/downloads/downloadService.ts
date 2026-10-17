@@ -192,7 +192,14 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
   /** The download a granted file is the video of; one granted outside `open` is found by its path. */
   const entryOfFile = (fileId: string): DownloadEntry | null => {
     const known = downloadIdByFile.get(fileId)
-    if (known !== undefined) return entryById(store.read(), { downloadId: known })
+    if (known !== undefined) {
+      const knownEntry = entryById(store.read(), { downloadId: known })
+      if (knownEntry !== null) return knownEntry
+      // A grant can land after its download was removed, so a stale mapping gives way to the
+      // path, where the same title downloaded again lives.
+      downloadIdByFile.delete(fileId)
+      freshFiles.delete(fileId)
+    }
     const file = deps.grants.fileOf(fileId)
     const entry = file === null ? null : entryAt(file.path)
     if (entry !== null) downloadIdByFile.set(fileId, entry.downloadId)
