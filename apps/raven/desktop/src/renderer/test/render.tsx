@@ -12,7 +12,7 @@ import { Shell } from '@/renderer/Shell/Shell'
 import { useDesktopBridge } from '@/renderer/stores/desktop'
 import { DESKTOP_REQUESTS, type DesktopEvent, DESKTOP_REPLIES } from '@/shared/protocol'
 
-/** The real Shell and Home, with stand-ins where they send the page, so Play's and Settings' requests stay out. */
+/** The real Shell and Home, with stand-ins where they send the page, so the other pages' requests stay out. */
 export const STUB_ROUTES: RouteObject[] = [
   {
     path: '/',
@@ -22,6 +22,7 @@ export const STUB_ROUTES: RouteObject[] = [
       { path: 'play/:fileId', element: <p>Playing</p> },
       { path: 'server/:serverId/:mediaId', element: <p>Playing from a server</p> },
       { path: 'settings', element: <p>Settings page</p> },
+      { path: 'downloads', element: <p>Downloads page</p> },
     ],
   },
 ]

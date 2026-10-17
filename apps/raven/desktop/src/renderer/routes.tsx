@@ -1,4 +1,5 @@
 import type { RouteObject } from 'react-router-dom'
+import { DownloadsPage } from '@/renderer/DownloadsPage/DownloadsPage'
 import { HomePage } from '@/renderer/HomePage/HomePage'
 import { PlayRoute } from '@/renderer/PlayPage/PlayPage'
 import { ServerRoute } from '@/renderer/ServerPage/ServerPage'
@@ -14,6 +15,7 @@ export const desktopRoutes: RouteObject[] = [
       { path: 'play/:fileId', element: <PlayRoute /> },
       { path: 'server/:serverId/:mediaId', element: <ServerRoute /> },
       { path: 'settings', element: <SettingsPage /> },
+      { path: 'downloads', element: <DownloadsPage /> },
     ],
   },
 ]

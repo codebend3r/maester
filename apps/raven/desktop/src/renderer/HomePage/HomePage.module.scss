@@ -29,7 +29,7 @@
 .bar {
   grid-area: bar;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   gap: var(--space-3);
   align-items: center;
   padding: var(--titlebar-inset) var(--gutter) var(--space-2);
@@ -44,6 +44,34 @@
   button {
     -webkit-app-region: no-drag;
   }
+}
+
+// The badge sits over the button's corner, in the same cell.
+.downloads {
+  display: grid;
+  grid-template-areas: 'stack';
+
+  > button {
+    grid-area: stack;
+  }
+}
+
+.badge {
+  grid-area: stack;
+  display: grid;
+  place-items: center;
+  align-self: start;
+  justify-self: end;
+  min-width: var(--space-3);
+  padding-inline: var(--space-0);
+  border-radius: var(--radius-pill);
+  background: var(--color-leaf);
+  color: var(--color-on-leaf);
+  font-size: var(--font-size-2xs);
+  font-weight: 600;
+  line-height: var(--line-body);
+  pointer-events: none;
+  translate: var(--space-0) calc(-1 * var(--space-0));
 }
 
 .open,

@@ -2,10 +2,11 @@
   --gutter: var(--space-5);
 
   display: grid;
-  grid-template-rows: auto auto auto auto 1fr;
+  grid-template-rows: auto auto auto auto auto 1fr;
   grid-template-areas:
     'bar'
     'servers'
+    'downloads'
     'computer'
     'updates'
     'recents';
@@ -45,6 +46,11 @@
 
 .servers {
   grid-area: servers;
+  padding-inline: var(--gutter);
+}
+
+.downloads {
+  grid-area: downloads;
   padding-inline: var(--gutter);
 }
 

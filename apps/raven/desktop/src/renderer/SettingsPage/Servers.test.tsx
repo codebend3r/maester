@@ -2,12 +2,15 @@ import { describe, expect, it } from 'bun:test'
 import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { RECENTS_KEY } from '@/renderer/Shell/openReply'
+import { DL_1, DL_2, DL_3, viewOf } from '@/renderer/test/downloadFakes'
 import { fakeClient, renderDesktop } from '@/renderer/test/render'
 import { S, VHAGAR } from '@/renderer/test/serverFakes'
 import {
+  DESKTOP_REPLIES,
   DESKTOP_REQUESTS,
   type DesktopReply,
   type DesktopRequest,
+  type DownloadView,
   type ServerView,
 } from '@/shared/protocol'
 
@@ -31,9 +34,11 @@ type Answers = {
 const mainWith = ({
   servers = [VHAGAR, MELEYS],
   answers = {},
+  downloads = [],
 }: {
   servers?: ServerView[]
   answers?: Answers
+  downloads?: DownloadView[]
 } = {}) => {
   const stored = { servers }
   const listed = (): DesktopReply => ({ type: 'servers', servers: stored.servers })
@@ -44,6 +49,8 @@ const mainWith = ({
           return listed()
         case DESKTOP_REQUESTS.listRecents:
           return { type: 'recents', recents: [] }
+        case DESKTOP_REQUESTS.listDownloads:
+          return { type: DESKTOP_REPLIES.downloads, downloads, autoDeleteDefault: false }
         case DESKTOP_REQUESTS.addServer:
           if (answers.addServer !== undefined) return answers.addServer
           stored.servers = [...stored.servers, ADDED]
@@ -283,6 +290,47 @@ describe('Servers', () => {
     ).toBeNull()
     expect(within(section).getByRole('button', { name: 'Remove Vhagar' })).toHaveFocus()
     expect(sentOf({ client, type: 'removeServer' })).toEqual([])
+  })
+
+  it("says the removal deletes the server's downloads, counted by its id", async () => {
+    const { section } = await renderServers({
+      downloads: [
+        viewOf({ downloadId: DL_1, serverId: S }),
+        viewOf({ downloadId: DL_2, serverId: S }),
+        // Named like Vhagar, but another server's: the count goes by id.
+        viewOf({ downloadId: DL_3, serverId: T, serverName: 'Vhagar' }),
+      ],
+    })
+    await userEvent.click(await within(section).findByRole('button', { name: 'Remove Vhagar' }))
+    const question = 'Remove Vhagar? This signs raven player out of it and deletes its 2 downloads.'
+    expect(await within(section).findByText(question)).toBeInTheDocument()
+    expect(within(section).getByRole('button', { name: 'Remove' })).toHaveAccessibleDescription(
+      question,
+    )
+    await userEvent.click(within(section).getByRole('button', { name: 'Keep' }))
+    await userEvent.click(within(section).getByRole('button', { name: 'Remove Meleys' }))
+    expect(
+      within(section).getByText(
+        'Remove Meleys? This signs raven player out of it and deletes its 1 download.',
+      ),
+    ).toBeInTheDocument()
+  })
+
+  it('says nothing of downloads when the server has none', async () => {
+    const { section } = await renderServers({
+      downloads: [viewOf({ downloadId: DL_1, serverId: T })],
+    })
+    await userEvent.click(await within(section).findByRole('button', { name: 'Remove Meleys' }))
+    expect(
+      await within(section).findByText(
+        'Remove Meleys? This signs raven player out of it and deletes its 1 download.',
+      ),
+    ).toBeInTheDocument()
+    await userEvent.click(within(section).getByRole('button', { name: 'Keep' }))
+    await userEvent.click(within(section).getByRole('button', { name: 'Remove Vhagar' }))
+    expect(
+      within(section).getByText('Remove Vhagar? This signs raven player out of it.'),
+    ).toBeInTheDocument()
   })
 
   it('removes a server and says it signed out of it', async () => {

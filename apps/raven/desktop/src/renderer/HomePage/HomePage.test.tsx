@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'bun:test'
 import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { DOWNLOADS_KEY } from '@/renderer/desktop/downloadsApi'
 import { watchedLabel } from '@/renderer/HomePage/HomePage'
+import { DL_1, DL_2, DL_3, DL_4, DL_5, viewOf } from '@/renderer/test/downloadFakes'
 import { fakeClient, renderDesktop, STUB_ROUTES } from '@/renderer/test/render'
 import { DESKTOP_REQUESTS, type DesktopReply, type DesktopRequest } from '@/shared/protocol'
 
@@ -145,6 +147,72 @@ describe('HomePage', () => {
     await settled()
     await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
     expect(router.state.location.pathname).toBe('/settings')
+  })
+
+  it('goes to Downloads', async () => {
+    const { router } = renderDesktop({ client: fakeClient(), routes: STUB_ROUTES })
+    await settled()
+    await userEvent.click(screen.getByRole('button', { name: 'Downloads' }))
+    expect(router.state.location.pathname).toBe('/downloads')
+    expect(await screen.findByText('Downloads page')).toBeInTheDocument()
+  })
+
+  it('counts what is queued or downloading on the Downloads button', async () => {
+    const downloads = [
+      viewOf({ downloadId: DL_1, status: { kind: 'downloading', bytes: 1 } }),
+      viewOf({ downloadId: DL_2, status: { kind: 'queued' } }),
+      viewOf({ downloadId: DL_3, status: { kind: 'queued' } }),
+      viewOf({ downloadId: DL_4, status: { kind: 'paused', bytes: 0, message: null } }),
+      viewOf({ downloadId: DL_5, status: { kind: 'ready' } }),
+    ]
+    renderDesktop({
+      client: fakeClient({
+        request: answering({
+          recents: [],
+          others: { listDownloads: { type: 'downloads', downloads, autoDeleteDefault: false } },
+        }),
+      }),
+      routes: STUB_ROUTES,
+    })
+    expect(
+      await screen.findByRole('button', { name: 'Downloads, 3 in progress' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('3')).toHaveAttribute('aria-hidden', 'true')
+  })
+
+  it('shows no count while nothing is in progress', async () => {
+    const { queryClient } = renderDesktop({
+      client: fakeClient({
+        request: answering({
+          recents: [],
+          others: {
+            listDownloads: {
+              type: 'downloads',
+              downloads: [viewOf({ status: { kind: 'ready' } })],
+              autoDeleteDefault: false,
+            },
+          },
+        }),
+      }),
+      routes: STUB_ROUTES,
+    })
+    await waitFor(() => expect(queryClient.getQueryData(DOWNLOADS_KEY)).toBeDefined())
+    expect(screen.getByRole('button', { name: 'Downloads' })).toBeInTheDocument()
+    expect(screen.queryByText('0')).toBeNull()
+  })
+
+  it('keeps the count as main pushes the downloads', async () => {
+    const client = fakeClient()
+    renderDesktop({ client, routes: STUB_ROUTES })
+    await settled()
+    await client.emit({
+      type: 'downloads',
+      downloads: [viewOf({ status: { kind: 'queued' } })],
+      autoDeleteDefault: false,
+    })
+    expect(
+      await screen.findByRole('button', { name: 'Downloads, 1 in progress' }),
+    ).toBeInTheDocument()
   })
 })
 
