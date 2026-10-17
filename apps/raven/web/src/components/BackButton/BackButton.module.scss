@@ -1,0 +1,13 @@
+// A touch more glass than a pill's own, as it always sits on a picture.
+// No wider than its row, a long name cut short, so it never runs under
+// the theme button or off a phone's edge.
+.back {
+  max-width: 100%;
+  background: var(--color-night-glass);
+}
+
+.backLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
