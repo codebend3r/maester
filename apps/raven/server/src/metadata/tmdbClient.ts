@@ -7,8 +7,13 @@ import {
   isRecord,
   isString,
   type MatchItemType,
+  CREDIT_JOBS,
+  ITEM_TYPES,
 } from '@raven/core'
+import { CONTENT_TYPES, HEADERS } from '@shared/server'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
+import { ERROR_NAMES } from '@/errorMessage'
+import { RAVEN_HEADERS } from '@/http'
 import { type RateLimit, createRateLimit } from '@/scanner/concurrency'
 
 /**
@@ -365,7 +370,7 @@ export const mergeCredits = (credits: readonly FetchedCredit[]): FetchedCredit[]
     (a, b) => JOB_ORDER.indexOf(a.job) - JOB_ORDER.indexOf(b.job),
   )
   const dropped = new Set(
-    ordered.filter((credit) => credit.job === 'producer').slice(PRODUCER_LIMIT),
+    ordered.filter((credit) => credit.job === CREDIT_JOBS.producer).slice(PRODUCER_LIMIT),
   )
   return ordered.filter((credit) => !dropped.has(credit))
 }
@@ -420,7 +425,7 @@ const movieCertification = ({
     }
   }
   const local = forCountry(country)
-  const fallback = country === 'US' ? local : forCountry('US')
+  const fallback = country === COUNTRIES.us ? local : forCountry(COUNTRIES.us)
   return { rating: local.rating ?? fallback.rating, released: local.released }
 }
 
@@ -443,7 +448,7 @@ const showCertification = ({
     results
       .map((entry) => (entry.iso_3166_1 === code ? text(entry.rating) : null))
       .find((value) => value != null) ?? null
-  return forCountry(country) ?? forCountry('US')
+  return forCountry(country) ?? forCountry(COUNTRIES.us)
 }
 
 /** TMDB's statuses for a show that will air no more. */
@@ -693,7 +698,10 @@ export class TmdbClient {
   }): Promise<unknown> {
     const token = this.config.tmdbApiToken
     if (token == null || this.status.refused) {
-      throw new TmdbError({ kind: 'unauthorized', message: 'TMDB is not configured.' })
+      throw new TmdbError({
+        kind: TMDB_ERROR_KINDS.unauthorized,
+        message: 'TMDB is not configured.',
+      })
     }
     // TMDB's settings page shows two credentials; either works here.
     const asKey = API_KEY.test(token)
@@ -704,37 +712,43 @@ export class TmdbClient {
     })
     const url = `${API}${path}?${query.toString()}`
     const headers: Record<string, string> = asKey
-      ? { accept: 'application/json' }
-      : { accept: 'application/json', authorization: `Bearer ${token}` }
+      ? { [HEADERS.accept]: CONTENT_TYPES.json }
+      : {
+          [HEADERS.accept]: CONTENT_TYPES.json,
+          [RAVEN_HEADERS.authorization]: `Bearer ${token}`,
+        }
 
     const attempt = async (retriesLeft: number): Promise<unknown> => {
       const response = await this.limit
         .run(() => this.fetch({ url, init: { headers, signal: AbortSignal.timeout(TIMEOUT_MS) } }))
         .catch((error: unknown) => {
           const reason =
-            error instanceof Error && error.name === 'TimeoutError'
+            error instanceof Error && error.name === ERROR_NAMES.timeoutError
               ? 'TMDB did not answer within 10 seconds.'
               : 'TMDB could not be reached.'
           this.status.error = reason
-          throw new TmdbError({ kind: 'unavailable', message: reason })
+          throw new TmdbError({ kind: TMDB_ERROR_KINDS.unavailable, message: reason })
         })
       if (response.status === 429 && retriesLeft > 0) {
         this.limit.slowDown()
-        await sleep(retryAfterMs(response.headers.get('retry-after')))
+        await sleep(retryAfterMs(response.headers.get(RAVEN_HEADERS.retryAfter)))
         return attempt(retriesLeft - 1)
       }
       if (response.status === 401) {
         this.status.refused = true
         this.status.error = 'TMDB refused the token (401). Check TMDB_API_TOKEN and restart.'
-        throw new TmdbError({ kind: 'unauthorized', message: this.status.error })
+        throw new TmdbError({ kind: TMDB_ERROR_KINDS.unauthorized, message: this.status.error })
       }
       if (response.status === 404) {
         this.markOk()
-        throw new TmdbError({ kind: 'not-found', message: `TMDB has nothing at ${path}.` })
+        throw new TmdbError({
+          kind: TMDB_ERROR_KINDS.notFound,
+          message: `TMDB has nothing at ${path}.`,
+        })
       }
       if (!response.ok) {
         this.status.error = `TMDB answered ${response.status}.`
-        throw new TmdbError({ kind: 'unavailable', message: this.status.error })
+        throw new TmdbError({ kind: TMDB_ERROR_KINDS.unavailable, message: this.status.error })
       }
       const body: unknown = await response.json().catch(() => null)
       this.markOk()
@@ -798,7 +812,7 @@ export class TmdbClient {
     const show = toShow({ body, country: this.config.metadataCountry })
     if (!show) {
       throw new TmdbError({
-        kind: 'unavailable',
+        kind: TMDB_ERROR_KINDS.unavailable,
         message: `TMDB sent an unreadable show ${tmdbId}.`,
       })
     }
@@ -822,7 +836,7 @@ export class TmdbClient {
     const season = toSeason(body)
     if (!season) {
       throw new TmdbError({
-        kind: 'unavailable',
+        kind: TMDB_ERROR_KINDS.unavailable,
         message: `TMDB sent an unreadable season ${seasonNumber} of show ${showTmdbId}.`,
       })
     }
@@ -835,7 +849,7 @@ export class TmdbClient {
     source,
   }: {
     id: string
-    source: 'imdb_id' | 'tvdb_id'
+    source: TmdbExternalSource
   }): Promise<{ movies: string[]; shows: string[] }> {
     const body = record(
       await this.get({
@@ -857,9 +871,9 @@ export class TmdbClient {
     tmdbId: string
   }): Promise<string[]> {
     const body = record(
-      await this.get(
-        `/${type === 'movie' ? 'movie' : 'tv'}/${encodeURIComponent(tmdbId)}/alternative_titles`,
-      ),
+      await this.get({
+        path: `/${TMDB_SEGMENTS[type]}/${encodeURIComponent(tmdbId)}/alternative_titles`,
+      }),
     )
     // A movie's come as `titles`, a show's as `results`.
     return records(body.titles ?? body.results).flatMap((entry) => text(entry.title) ?? [])
@@ -872,8 +886,11 @@ export class TmdbClient {
    */
   async matchFacts({ type, tmdbId }: { type: MatchItemType; tmdbId: string }): Promise<MatchFacts> {
     const body = record(
-      await this.get(`/${type === 'movie' ? 'movie' : 'tv'}/${encodeURIComponent(tmdbId)}`, {
-        append_to_response: 'alternative_titles',
+      await this.get({
+        path: `/${TMDB_SEGMENTS[type]}/${encodeURIComponent(tmdbId)}`,
+        params: {
+          append_to_response: 'alternative_titles',
+        },
       }),
     )
     const titled = record(body.alternative_titles)
@@ -902,8 +919,11 @@ export class TmdbClient {
    */
   async images({ type, tmdbId }: { type: MatchItemType; tmdbId: string }): Promise<TmdbImages> {
     const body = record(
-      await this.get(`/${type === 'movie' ? 'movie' : 'tv'}/${encodeURIComponent(tmdbId)}/images`, {
-        include_image_language: `${this.language},null`,
+      await this.get({
+        path: `/${TMDB_SEGMENTS[type]}/${encodeURIComponent(tmdbId)}/images`,
+        params: {
+          include_image_language: `${this.language},null`,
+        },
       }),
     )
     return {
@@ -940,7 +960,7 @@ export class TmdbClient {
     const movie = toMovie({ body, country: this.config.metadataCountry, language: this.language })
     if (!movie) {
       throw new TmdbError({
-        kind: 'unavailable',
+        kind: TMDB_ERROR_KINDS.unavailable,
         message: `TMDB sent an unreadable movie ${tmdbId}.`,
       })
     }

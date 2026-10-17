@@ -1,5 +1,7 @@
 import { type PlexAccount, type PlexPin, type PlexTv, PlexUnavailable } from '@/plex/plexTv'
 
+const TOKEN_PREFIX = 'token-for-pin-'
+
 /**
  * plex.tv in memory. A test approves a PIN with `approve`, optionally only
  * after a number of checks, to stand in for the token trailing the redirect.
@@ -46,12 +48,12 @@ export class FakePlexTv implements PlexTv {
     this.checks.set(pin.id, seen + 1)
     const approval = this.approvals.get(pin.id)
     if (!approval || seen < approval.afterChecks) return null
-    return `token-for-pin-${pin.id}`
+    return `${TOKEN_PREFIX}${pin.id}`
   }
 
   async account(token: string): Promise<PlexAccount> {
     this.guard()
-    const found = this.approvals.get(token.replace('token-for-pin-', ''))
+    const found = this.approvals.get(token.replace(TOKEN_PREFIX, ''))
     if (!found) throw new PlexUnavailable(`unknown token ${token}`)
     return found.account
   }

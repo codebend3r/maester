@@ -9,14 +9,21 @@ import { type Gate, createGate, mapWithConcurrency } from '@/scanner/concurrency
  * its own thumbnails, #recycle its recycle bin), OS litter, and anything
  * hidden (checked separately, by the leading dot).
  */
-const SKIPPED_FOLDERS: ReadonlySet<string> = new Set([
-  '@eaDir',
-  '#recycle',
-  '#snapshot',
-  '$RECYCLE.BIN',
-  'System Volume Information',
-  'lost+found',
-])
+export const SKIPPED_FOLDERS = {
+  eaDir: '@eaDir',
+  recycle: '#recycle',
+  snapshot: '#snapshot',
+  recycleBin: '$RECYCLE.BIN',
+  systemVolumeInformation: 'System Volume Information',
+  lostAndFound: 'lost+found',
+} as const
+
+const SKIPPED_NAMES: ReadonlySet<string> = new Set(Object.values(SKIPPED_FOLDERS))
+
+/** What a walk finds at a path it can use. */
+const ENTRY_KINDS = { dir: 'dir', file: 'file' } as const
+
+type EntryKind = (typeof ENTRY_KINDS)[keyof typeof ENTRY_KINDS]
 
 /**
  * Every scan's readdir and stat calls, across every library, pass through
@@ -28,7 +35,7 @@ const SKIPPED_FOLDERS: ReadonlySet<string> = new Set([
  */
 export const SCAN_FILESYSTEM: Gate = createGate({ limit: 4 })
 
-const isSkippedName = (name: string): boolean => name.startsWith('.') || SKIPPED_FOLDERS.has(name)
+const isSkippedName = (name: string): boolean => name.startsWith('.') || SKIPPED_NAMES.has(name)
 
 /** Release samples ("movie-sample.mkv", "Sample/sample.mkv") would clutter every movie. */
 const isSample = (fileName: string): boolean => {
@@ -93,12 +100,12 @@ const classify = async ({
   dir: string
   entry: Dirent
   gate: Gate
-}): Promise<'dir' | 'file' | null> => {
-  if (entry.isDirectory()) return 'dir'
-  if (entry.isFile()) return 'file'
+}): Promise<EntryKind | null> => {
+  if (entry.isDirectory()) return ENTRY_KINDS.dir
+  if (entry.isFile()) return ENTRY_KINDS.file
   if (!entry.isSymbolicLink()) return null
   const target = await gate.run(() => stat(join(dir, entry.name))).catch(() => null)
-  return target?.isFile() ? 'file' : null
+  return target?.isFile() ? ENTRY_KINDS.file : null
 }
 
 const list = async ({ dir, gate }: { dir: string; gate: Gate }): Promise<Listing> => {
@@ -110,9 +117,11 @@ const list = async ({ dir, gate }: { dir: string; gate: Gate }): Promise<Listing
         .map(async (entry) => ({ entry, kind: await classify({ dir, entry, gate }) })),
     )
     return {
-      dirs: kinds.filter(({ kind }) => kind === 'dir').map(({ entry }) => join(dir, entry.name)),
+      dirs: kinds
+        .filter(({ kind }) => kind === ENTRY_KINDS.dir)
+        .map(({ entry }) => join(dir, entry.name)),
       files: kinds
-        .filter(({ kind, entry }) => kind === 'file' && isIndexed(entry.name))
+        .filter(({ kind, entry }) => kind === ENTRY_KINDS.file && isIndexed(entry.name))
         .map(({ entry }) => join(dir, entry.name)),
       error: null,
     }
@@ -191,13 +200,13 @@ const kindOf = async ({
   place: string
   root: string
   gate: Gate
-}): Promise<'dir' | 'file' | null> => {
+}): Promise<EntryKind | null> => {
   const info = await gate.run(() => (place === root ? stat(place) : lstat(place))).catch(() => null)
-  if (info?.isDirectory()) return 'dir'
-  if (info?.isFile()) return 'file'
+  if (info?.isDirectory()) return ENTRY_KINDS.dir
+  if (info?.isFile()) return ENTRY_KINDS.file
   if (!info?.isSymbolicLink()) return null
   const target = await gate.run(() => stat(place)).catch(() => null)
-  return target?.isFile() ? 'file' : null
+  return target?.isFile() ? ENTRY_KINDS.file : null
 }
 
 type Look = { files: string[]; errors: string[]; unreadable: string | null }
@@ -222,14 +231,15 @@ const lookAt = async ({
   onFound?: (count: number) => void
 }): Promise<Look> => {
   const kind = await kindOf({ place, root, gate })
-  if (kind === 'dir') {
+  if (kind === ENTRY_KINDS.dir) {
     const tree = await walkTree({ root: place, limit, gate, onFound })
     return { files: tree.files, errors: tree.errors, unreadable: tree.readable ? null : place }
   }
-  if (kind === 'file') {
+  if (kind === ENTRY_KINDS.file) {
     return { files: isIndexed(basename(place)) ? [place] : [], errors: [], unreadable: null }
   }
-  const rootThere = place !== root && (await kindOf({ place: root, root, gate })) === 'dir'
+  const rootThere =
+    place !== root && (await kindOf({ place: root, root, gate })) === ENTRY_KINDS.dir
   return { files: [], errors: [], unreadable: rootThere ? null : root }
 }
 

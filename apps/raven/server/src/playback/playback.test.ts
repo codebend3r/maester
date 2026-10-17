@@ -5,8 +5,10 @@ import { join } from 'node:path'
 import { promisify } from 'node:util'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import { type ApiClient, type MediaItem, STREAM_TIME_SHIFT, type StreamMode } from '@raven/core'
+import { CONTENT_TYPES, HEADERS } from '@shared/server'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '@/app'
+import { RAVEN_CONTENT_TYPES } from '@/http'
 import { ScannerService } from '@/scanner/scannerService'
 import { BROWSER_ENCODINGS, adminCookie, testConfig } from '@/test/app'
 import { encodeRichClip } from '@/test/clips'
@@ -167,7 +169,7 @@ describe('playback', () => {
       url: `/api/media/${movieId()}/subtitles/embedded-0?window=0`,
     })
     expect(response.statusCode).toBe(200)
-    expect(response.headers['content-type']).toContain('text/vtt')
+    expect(response.headers[HEADERS.contentType]).toContain(CONTENT_TYPES.vtt)
     const cues = await api().getSubtitles({ id: movieId(), trackId: 'embedded-0', window: 0 })
     // The source SRT's times, on the same clock as the server's streams.
     expect(
@@ -222,11 +224,11 @@ describe('playback', () => {
       const response = await app().inject({
         method: 'GET',
         url,
-        headers: { 'accept-encoding': BROWSER_ENCODINGS },
+        headers: { [HEADERS.acceptEncoding]: BROWSER_ENCODINGS },
       })
       expect(response.statusCode).toBe(200)
-      expect(response.headers['content-type']).toBe('video/mp4')
-      expect(response.headers['content-encoding']).toBeUndefined()
+      expect(response.headers[HEADERS.contentType]).toBe(RAVEN_CONTENT_TYPES.mp4)
+      expect(response.headers[HEADERS.contentEncoding]).toBeUndefined()
       expect(response.rawPayload.subarray(4, 8).toString()).toBe('ftyp')
       const path = join(state.root, `stream-${Math.random().toString(36).slice(2)}.mp4`)
       await writeFile(path, response.rawPayload)

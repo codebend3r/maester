@@ -12,6 +12,8 @@ import {
 import type { DirectoryEntry, DirectoryListing } from '@raven/core'
 import { AdminOnly } from '@/admin/adminGuard'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
+import { ERROR_CODES } from '@/errorMessage'
+import { SKIPPED_FOLDERS } from '@/scanner/walk'
 
 const isInside = ({ root, path }: { root: string; path: string }): boolean =>
   path === root || path.startsWith(root.endsWith(sep) ? root : `${root}${sep}`)
@@ -48,7 +50,7 @@ export class BrowseController {
     })
     const candidates = await Promise.all(
       entries
-        .filter((entry) => !entry.name.startsWith('.') && entry.name !== '@eaDir')
+        .filter((entry) => !entry.name.startsWith('.') && entry.name !== SKIPPED_FOLDERS.eaDir)
         .map(async (entry): Promise<DirectoryEntry[]> => {
           const path = join(target, entry.name)
           const isFolder =

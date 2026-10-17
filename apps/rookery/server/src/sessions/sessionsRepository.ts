@@ -8,15 +8,18 @@ export const SESSION_MS = 30 * 24 * 60 * 60 * 1000
 /** `last_seen_at` moves at most this often, so a busy page does not write on every request. */
 const TOUCH_MS = 60 * 1000
 
-export type Session = {
+type Session = {
   userId: string
   expiresAt: string
 }
 
+/** What a token turns out to name; `/internal/session` reports the misses as its 404 `reason`. */
+export const SESSION_KINDS = { live: 'live', unknown: 'unknown', expired: 'expired' } as const
+
 export type SessionLookup =
-  | { kind: 'live'; session: Session; touched: boolean }
-  | { kind: 'unknown' }
-  | { kind: 'expired' }
+  | { kind: typeof SESSION_KINDS.live; session: Session; touched: boolean }
+  | { kind: typeof SESSION_KINDS.unknown }
+  | { kind: typeof SESSION_KINDS.expired }
 
 type SessionRow = { user_id: string; expires_at: string; last_seen_at: string }
 
@@ -53,15 +56,19 @@ export class SessionsRepository {
         'SELECT user_id, expires_at, last_seen_at FROM sessions WHERE token_hash = ?',
       )
       .get(hash)
-    if (!row) return { kind: 'unknown' }
-    if (Date.parse(row.expires_at) <= now.getTime()) return { kind: 'expired' }
+    if (!row) return { kind: SESSION_KINDS.unknown }
+    if (Date.parse(row.expires_at) <= now.getTime()) return { kind: SESSION_KINDS.expired }
     const touched = now.getTime() - Date.parse(row.last_seen_at) >= TOUCH_MS
     if (touched) {
       this.db
         .prepare('UPDATE sessions SET last_seen_at = ? WHERE token_hash = ?')
         .run(now.toISOString(), hash)
     }
-    return { kind: 'live', session: { userId: row.user_id, expiresAt: row.expires_at }, touched }
+    return {
+      kind: SESSION_KINDS.live,
+      session: { userId: row.user_id, expiresAt: row.expires_at },
+      touched,
+    }
   }
 
   delete(token: string): void {

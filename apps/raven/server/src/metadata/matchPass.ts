@@ -2,23 +2,31 @@ import type { Logger } from '@nestjs/common'
 import {
   type CandidateTier,
   foldTitle,
+  ITEM_TYPES,
+  MATCH_STATES,
   type MatchItemType,
   type NameIds,
   sortTitle,
 } from '@raven/core'
 import { FolderReader } from '@/metadata/folderReader'
 import { isLocal, localEpisode, localSeason } from '@/metadata/localItems'
-import type { FixMatch, MatchFiles } from '@/metadata/matchFiles'
+import { FIX_MATCH_KINDS, type FixMatch, type MatchFiles } from '@/metadata/matchFiles'
 import { pickByTiers, pickMatch } from '@/metadata/matcher'
 import type { MetadataRepository } from '@/metadata/metadataRepository'
 import { readNfoIds } from '@/metadata/nfo'
 import type { OmdbScores } from '@/metadata/omdbScores'
 import { OnceEach } from '@/metadata/onceEach'
 import { PassGuard } from '@/metadata/passGuard'
-import { type SearchResult, type TmdbClient, TmdbError } from '@/metadata/tmdbClient'
+import {
+  type SearchResult,
+  TMDB_ERROR_KINDS,
+  TMDB_EXTERNAL_SOURCES,
+  type TmdbClient,
+  TmdbError,
+} from '@/metadata/tmdbClient'
 
 export const notFound = (error: unknown): boolean =>
-  error instanceof TmdbError && error.kind === 'not-found'
+  error instanceof TmdbError && error.kind === TMDB_ERROR_KINDS.notFound
 
 /** A stored season, its number, and its episodes by number. */
 export type SeasonData = {
@@ -52,10 +60,17 @@ const aliasTier = ({ result, name }: { result: SearchResult; name: string }): 0 
 /** A title to search TMDB for, with what narrows it. */
 export type SearchTitle = { title: string; year: number | null; country?: string | null }
 
+export const RESOLVED_KINDS = { unmatched: 'unmatched', matched: 'matched' } as const
+
 /** How a movie or show came out: the item it is, and whether a Fix match said so. */
 export type Resolved =
-  | { kind: 'unmatched' }
-  | { kind: 'matched'; itemId: number; tmdbId: string; match: 'manual' | 'matched' }
+  | { kind: typeof RESOLVED_KINDS.unmatched }
+  | {
+      kind: typeof RESOLVED_KINDS.matched
+      itemId: number
+      tmdbId: string
+      match: typeof MATCH_STATES.manual | typeof MATCH_STATES.matched
+    }
 
 export type MatchPassDeps = {
   /** The library's tiers, from `tiersFor`: every search in the pass prefers them in order. */
@@ -114,16 +129,21 @@ export class MatchPass {
     /** The TMDB id the AI lookup chose for the group, being sure; null when it was not asked, unsure, or chose nothing. */
     decided?: string | null
   }): Promise<Resolved> {
-    if (fix.kind === 'not-a-match') return { kind: 'unmatched' }
+    if (fix.kind === FIX_MATCH_KINDS.notAMatch) return { kind: RESOLVED_KINDS.unmatched }
     const tmdbId =
-      fix.kind === 'tmdb'
+      fix.kind === FIX_MATCH_KINDS.tmdb
         ? fix.tmdbId
         : ((await this.fromIds({ type, ids, nfoPath })) ??
           (await this.searchEach({ type, titles })) ??
           decided)
     const itemId = tmdbId == null ? null : await this.ensure({ type, tmdbId })
-    if (tmdbId == null || itemId == null) return { kind: 'unmatched' }
-    return { kind: 'matched', itemId, tmdbId, match: fix.kind === 'tmdb' ? 'manual' : 'matched' }
+    if (tmdbId == null || itemId == null) return { kind: RESOLVED_KINDS.unmatched }
+    return {
+      kind: RESOLVED_KINDS.matched,
+      itemId,
+      tmdbId,
+      match: fix.kind === FIX_MATCH_KINDS.tmdb ? MATCH_STATES.manual : MATCH_STATES.matched,
+    }
   }
 
   /** The id a name gives, or else the NFO beside it. */
@@ -153,9 +173,15 @@ export class MatchPass {
     if (ids.tmdb != null) return ids.tmdb
     const { tmdb } = this.deps
     const pick = (found: { movies: string[]; shows: string[] }): string | null =>
-      (type === 'movie' ? found.movies[0] : found.shows[0]) ?? null
-    if (type === 'show' && ids.tvdb != null) {
-      return pick(await tmdb.find({ id: ids.tvdb, source: 'tvdb_id' }))
+      (type === ITEM_TYPES.movie ? found.movies[0] : found.shows[0]) ?? null
+    if (type === ITEM_TYPES.show && ids.tvdb != null) {
+      return pick(await tmdb.find({ id: ids.tvdb, source: TMDB_EXTERNAL_SOURCES.tvdbId }))
+    }
+    if (ids.imdb != null) {
+      return pick(await tmdb.find({ id: ids.imdb, source: TMDB_EXTERNAL_SOURCES.imdbId }))
+    }
+    if (ids.tvdb != null) {
+      return pick(await tmdb.find({ id: ids.tvdb, source: TMDB_EXTERNAL_SOURCES.tvdbId }))
     }
     if (ids.imdb != null) return pick(await tmdb.find({ id: ids.imdb, source: 'imdb_id' }))
     if (ids.tvdb != null) return pick(await tmdb.find({ id: ids.tvdb, source: 'tvdb_id' }))
@@ -198,7 +224,7 @@ export class MatchPass {
           query: string
           includeAdult?: boolean
         }): Promise<SearchResult[]> =>
-          type === 'movie'
+          type === ITEM_TYPES.movie
             ? tmdb.searchMovies({ query, year, includeAdult })
             : tmdb.searchShows({ query, year })
         const pick = (
@@ -221,7 +247,7 @@ export class MatchPass {
           results: retried,
           aliases: await this.aliasesOf({ type, title, year, results: retried }),
         })
-        if (aliased != null || type !== 'movie') return aliased
+        if (aliased != null || type !== ITEM_TYPES.movie) return aliased
         // TMDB leaves some films out of a search without adult titles though
         // it does not mark them adult, as with "Paprika" (1991). Only the
         // same title counts there, never a lone result of another.
@@ -288,7 +314,8 @@ export class MatchPass {
         const stored = metadata.find({ type, tmdbId })
         if (stored) return stored.id
         try {
-          const item = type === 'movie' ? await tmdb.movie(tmdbId) : await tmdb.show(tmdbId)
+          const item =
+            type === ITEM_TYPES.movie ? await tmdb.movie(tmdbId) : await tmdb.show(tmdbId)
           const id = metadata.save({ item })
           await scores.fetch({ itemId: id, imdbId: item.imdbId })
           return id

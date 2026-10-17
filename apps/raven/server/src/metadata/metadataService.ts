@@ -11,16 +11,28 @@ import {
   matchTypeFor,
   tiersFor,
   type UnmatchedFile,
+  ITEM_TYPES,
+  MATCH_STATES,
 } from '@raven/core'
 import { DatabaseService } from '@/db/database'
 import { errorMessage } from '@/errorMessage'
 import { groupBy } from '@/groupBy'
 import { type LibraryRecord, LibrariesRepository } from '@/libraries/librariesRepository'
 import { AiClient, AiError } from '@/metadata/aiClient'
-import { AiDecisions, type DecisionPlace } from '@/metadata/aiDecisions'
+import {
+  AI_CONFIDENCES,
+  AI_OUTCOME_KINDS,
+  AiDecisions,
+  type DecisionPlace,
+} from '@/metadata/aiDecisions'
 import { AI_CONCURRENCY, aiGroupOf, AiMatcher } from '@/metadata/aiMatcher'
 import { ItemPictures } from '@/metadata/itemPictures'
-import { type FixMatchChoice, type MatchFile, MatchFiles } from '@/metadata/matchFiles'
+import {
+  FIX_MATCH_KINDS,
+  type FixMatchChoice,
+  type MatchFile,
+  MatchFiles,
+} from '@/metadata/matchFiles'
 import { createMatchers, type KindMatcher } from '@/metadata/matchers'
 import { MatchPass } from '@/metadata/matchPass'
 import { MetadataRepository } from '@/metadata/metadataRepository'
@@ -44,7 +56,7 @@ const decisionPlacesOf = ({
   type: MatchItemType
   file: MatchFile
 }): DecisionPlace[] => {
-  if (type === 'show') return [{ libraryId: file.libraryId, place: showPlace(file) }]
+  if (type === ITEM_TYPES.show) return [{ libraryId: file.libraryId, place: showPlace(file) }]
   return [
     { libraryId: file.libraryId, place: filePlace(file) },
     ...(file.folder === '' ? [] : [{ libraryId: file.libraryId, place: file.folder }]),
@@ -161,7 +173,7 @@ export class MetadataService implements OnApplicationBootstrap {
           await this.pass(libraryId)
         },
       }),
-    )
+    })
   }
 
   /**
@@ -190,7 +202,7 @@ export class MetadataService implements OnApplicationBootstrap {
           await this.pass(libraryId)
         },
       }),
-    )
+    })
   }
 
   /**
@@ -264,7 +276,7 @@ export class MetadataService implements OnApplicationBootstrap {
           await this.pass(libraryId)
         },
       }),
-    )
+    })
   }
 
   /** The queue drops a task that throws without a word, so a failure is logged here. */
@@ -313,7 +325,7 @@ export class MetadataService implements OnApplicationBootstrap {
     const placed = files.map((file) => ({
       file,
       place:
-        file.match === 'unmatched'
+        file.match === MATCH_STATES.unmatched
           ? groupPlaceOf({
               type,
               file,
@@ -353,7 +365,7 @@ export class MetadataService implements OnApplicationBootstrap {
       ...new Map(
         this.files
           .under(id)
-          .filter((file) => file.match === 'matched' && sees(file.libraryId))
+          .filter((file) => file.match === MATCH_STATES.matched && sees(file.libraryId))
           .flatMap((file) => decisionPlacesOf({ type, file }))
           .map((place) => [`${place.libraryId}|${place.place}`, place] as const),
       ).values(),
@@ -469,8 +481,9 @@ export class MetadataService implements OnApplicationBootstrap {
       .unmatched(libraryId)
       .filter(
         (file) =>
-          type === 'show' ||
-          this.files.fixMatchAt({ libraryId, place: filePlace(file) }).kind === 'none',
+          type === ITEM_TYPES.show ||
+          this.files.fixMatchAt({ libraryId, place: filePlace(file) }).kind ===
+            FIX_MATCH_KINDS.none,
       )
     const groups = [
       ...groupBy({
@@ -483,7 +496,7 @@ export class MetadataService implements OnApplicationBootstrap {
           }),
       }),
     ].flatMap(([place, files]) =>
-      this.files.fixMatchAt({ libraryId, place }).kind === 'none' &&
+      this.files.fixMatchAt({ libraryId, place }).kind === FIX_MATCH_KINDS.none &&
       !this.decisions.isAsked({ libraryId, place })
         ? [{ place, files }]
         : [],
@@ -547,9 +560,13 @@ export class MetadataService implements OnApplicationBootstrap {
     // A library removed during the lookup keeps no decision.
     if (outcome == null || this.libraries.get(library.id) == null) return
     this.decisions.record({ libraryId: library.id, place, outcome, model: this.aiMatcher.model })
-    if (outcome.kind !== 'chosen' || outcome.confidence !== 'high') return
+    if (outcome.kind !== AI_OUTCOME_KINDS.chosen || outcome.confidence !== AI_CONFIDENCES.high) {
+      return
+    }
     // A Fix match made during the lookup has matched the group already, and wins.
-    if (this.files.fixMatchAt({ libraryId: library.id, place }).kind !== 'none') return
+    if (this.files.fixMatchAt({ libraryId: library.id, place }).kind !== FIX_MATCH_KINDS.none) {
+      return
+    }
     this.files.reset(files.map((file) => file.id))
     await this.matchers[type].match({ files, pass })
   }
@@ -643,7 +660,7 @@ export class MetadataService implements OnApplicationBootstrap {
       const [first] = files
       const kind = first == null ? null : this.libraries.get(first.libraryId)?.settings.kind
       // A library whose type changed away from shows has its files unlinked by that change.
-      return first != null && kind != null && matchTypeFor(kind) === 'show'
+      return first != null && kind != null && matchTypeFor(kind) === ITEM_TYPES.show
         ? [{ first, kind, files }]
         : []
     })
@@ -653,15 +670,15 @@ export class MetadataService implements OnApplicationBootstrap {
           this.pointPlace({
             libraryId: first.libraryId,
             kind,
-            type: 'show',
+            type: ITEM_TYPES.show,
             place: showPlace(first),
-            fix: { kind: 'tmdb', tmdbId },
+            fix: { kind: FIX_MATCH_KINDS.tmdb, tmdbId },
             files,
           }),
         ),
       Promise.resolve(),
     )
     await this.pictures.clearUp()
-    return this.metadata.find({ type: 'show', tmdbId })?.id ?? null
+    return this.metadata.find({ type: ITEM_TYPES.show, tmdbId })?.id ?? null
   }
 }

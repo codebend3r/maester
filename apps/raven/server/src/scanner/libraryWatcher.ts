@@ -21,16 +21,18 @@ export type WatchOptions = {
 /** The DI token the watch options are provided under. */
 export const WATCH_OPTIONS = Symbol('WATCH_OPTIONS')
 
+const WATCH_MODES = { watching: 'watching', unwatched: 'unwatched' } as const
+
 /** A library's folders watched, with the places changed since they were last looked at; or, failing that, left to the quick scan. */
 type Watch =
   | {
-      mode: 'watching'
+      mode: typeof WATCH_MODES.watching
       paths: readonly string[]
       watchers: Watching[]
       changed: Set<string>
       quiet: NodeJS.Timeout | null
     }
-  | { mode: 'unwatched'; paths: readonly string[] }
+  | { mode: typeof WATCH_MODES.unwatched; paths: readonly string[] }
 
 /**
  * Refreshes each library that refreshes automatically as its folders
@@ -71,7 +73,7 @@ export class LibraryWatcher implements OnApplicationBootstrap, OnModuleDestroy {
     Array.from(this.watches.entries())
       .filter(
         ([id, watch]) =>
-          watch.mode === 'unwatched' ||
+          watch.mode === WATCH_MODES.unwatched ||
           !samePaths({ before: watch.paths, after: wanted.get(id)?.paths ?? [] }),
       )
       .forEach(([id]) => this.stop(id))
@@ -82,7 +84,7 @@ export class LibraryWatcher implements OnApplicationBootstrap, OnModuleDestroy {
 
   private start(library: LibraryRecord): void {
     const watch: Watch = {
-      mode: 'watching',
+      mode: WATCH_MODES.watching,
       paths: library.paths,
       watchers: [],
       changed: new Set(),
@@ -105,11 +107,11 @@ export class LibraryWatcher implements OnApplicationBootstrap, OnModuleDestroy {
     const watch = this.watches.get(libraryId)
     if (!watch) return
     switch (watch.mode) {
-      case 'watching':
+      case WATCH_MODES.watching:
         watch.watchers.forEach((watcher) => watcher.close())
         if (watch.quiet) clearTimeout(watch.quiet)
         break
-      case 'unwatched':
+      case WATCH_MODES.unwatched:
         break
       default: {
         const unknown: never = watch
@@ -122,7 +124,7 @@ export class LibraryWatcher implements OnApplicationBootstrap, OnModuleDestroy {
   /** Hidden and NAS folders churn on their own; nothing in them is indexed. */
   private noteChange({ libraryId, root, path }: { libraryId: number; root: string; path: string }) {
     const watch = this.watches.get(libraryId)
-    if (watch?.mode !== 'watching' || isSkippedPlace({ root, path })) return
+    if (watch?.mode !== WATCH_MODES.watching || isSkippedPlace({ root, path })) return
     watch.changed.add(path)
     if (watch.quiet) clearTimeout(watch.quiet)
     watch.quiet = setTimeout(() => this.settle(libraryId), this.options.quietMs)
@@ -131,18 +133,18 @@ export class LibraryWatcher implements OnApplicationBootstrap, OnModuleDestroy {
   /** The folders have been still long enough: the places that changed are looked at again. */
   private settle(libraryId: number): void {
     const watch = this.watches.get(libraryId)
-    if (watch?.mode !== 'watching') return
+    if (watch?.mode !== WATCH_MODES.watching) return
     watch.quiet = null
     this.scanner.refresh({ libraryId, places: [...watch.changed] })
     watch.changed.clear()
   }
 
   private fallBack({ library, error }: { library: LibraryRecord; error: unknown }): void {
-    if (this.watches.get(library.id)?.mode !== 'watching') return
+    if (this.watches.get(library.id)?.mode !== WATCH_MODES.watching) return
     this.logger.warn(
       `Could not watch the folders of "${library.name}" (${errorMessage(error)}); its quick scan will find the changes`,
     )
     this.stop(library.id)
-    this.watches.set(library.id, { mode: 'unwatched', paths: library.paths })
+    this.watches.set(library.id, { mode: WATCH_MODES.unwatched, paths: library.paths })
   }
 }

@@ -13,11 +13,16 @@ import { namedAs } from '@/media/namedAs'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 import type { LayoutRow, RelayoutPlan } from '@/scanner/layout'
 
+export const FIX_MATCH_KINDS = { none: 'none', notAMatch: 'not-a-match', tmdb: 'tmdb' } as const
+
 /** A Fix match kept for a place: none, "this is not a movie or show", or a TMDB id. */
-export type FixMatch = { kind: 'none' } | { kind: 'not-a-match' } | { kind: 'tmdb'; tmdbId: string }
+export type FixMatch =
+  | { kind: typeof FIX_MATCH_KINDS.none }
+  | { kind: typeof FIX_MATCH_KINDS.notAMatch }
+  | { kind: typeof FIX_MATCH_KINDS.tmdb; tmdbId: string }
 
 /** What Fix match can keep for a place. */
-export type FixMatchChoice = Exclude<FixMatch, { kind: 'none' }>
+export type FixMatchChoice = Exclude<FixMatch, { kind: typeof FIX_MATCH_KINDS.none }>
 
 /** A file as matching sees it: its name, where it sits, and how matching went so far. */
 export type MatchFile = {
@@ -182,8 +187,10 @@ export class MatchFiles {
         'SELECT tmdb_id FROM match_overrides WHERE library_id = ? AND place = ?',
       )
       .get(libraryId, place)
-    if (!row) return { kind: 'none' }
-    return row.tmdb_id == null ? { kind: 'not-a-match' } : { kind: 'tmdb', tmdbId: row.tmdb_id }
+    if (!row) return { kind: FIX_MATCH_KINDS.none }
+    return row.tmdb_id == null
+      ? { kind: FIX_MATCH_KINDS.notAMatch }
+      : { kind: FIX_MATCH_KINDS.tmdb, tmdbId: row.tmdb_id }
   }
 
   /** Keeps a Fix match for a place, replacing the one it had. */
@@ -201,7 +208,7 @@ export class MatchFiles {
         `INSERT INTO match_overrides (library_id, place, tmdb_id) VALUES (?, ?, ?)
          ON CONFLICT (library_id, place) DO UPDATE SET tmdb_id = excluded.tmdb_id`,
       )
-      .run(libraryId, place, fix.kind === 'tmdb' ? fix.tmdbId : null)
+      .run(libraryId, place, fix.kind === FIX_MATCH_KINDS.tmdb ? fix.tmdbId : null)
   }
 
   /** How many files wait to be matched in libraries of `kinds`. */
@@ -250,10 +257,14 @@ export class MatchFiles {
     return this.db.transaction(() => {
       const files = this.byIds(this.metadata.mediaUnder(itemId))
       this.metadata.remove(itemId)
-      const manual = files.filter((file) => file.match === 'manual').map((file) => file.id)
-      const automatic = files.filter((file) => file.match !== 'manual').map((file) => file.id)
-      this.setMatch({ ids: manual, match: 'unmatched' })
-      this.setMatch({ ids: automatic, match: 'pending' })
+      const manual = files
+        .filter((file) => file.match === MATCH_STATES.manual)
+        .map((file) => file.id)
+      const automatic = files
+        .filter((file) => file.match !== MATCH_STATES.manual)
+        .map((file) => file.id)
+      this.setMatch({ ids: manual, match: MATCH_STATES.unmatched })
+      this.setMatch({ ids: automatic, match: MATCH_STATES.pending })
       return [...new Set(files.map((file) => file.libraryId))]
     })()
   }
@@ -360,7 +371,7 @@ export class MatchFiles {
       // Compared with the name as the old folder reads it, not the stored
       // title, which may predate the parser and would rematch for no reason.
       const regrouped =
-        matchTypeFor(kind) === 'show'
+        matchTypeFor(kind) === ITEM_TYPES.show
           ? moved
           : moved.filter((file) => {
               const before = namedAs({ kind, fileName: file.fileName, folder: file.was })

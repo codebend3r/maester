@@ -3,6 +3,7 @@ import {
   fitsTier,
   foldTitle,
   isUnfiltered,
+  ITEM_TYPES,
   type MatchItemType,
 } from '@raven/core'
 import type { SearchResult } from '@/metadata/tmdbClient'
@@ -68,7 +69,7 @@ export const pickMatch = ({
   )
 
   if (year == null) {
-    if (type === 'show') return mostPopular(sameTitle)
+    if (type === ITEM_TYPES.show) return mostPopular(sameTitle)
     const [lone] = sameTitle
     return sameTitle.length === 1 ? (lone ?? null) : null
   }

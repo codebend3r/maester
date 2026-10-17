@@ -2,6 +2,7 @@ import { mkdirSync } from 'node:fs'
 import { rename, rm, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Inject, Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common'
+import { THUMBNAIL_STATES } from '@raven/core'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { errorMessage } from '@/errorMessage'
 import { thumbnailArgs, thumbnailSeek } from '@/ffmpeg/args'
@@ -96,7 +97,7 @@ export class ThumbnailService implements OnApplicationBootstrap {
 
   private async generate(id: number): Promise<void> {
     const file = this.index.fileOf(id)
-    if (!file || file.thumbnail === 'ready') return
+    if (!file || file.thumbnail === THUMBNAIL_STATES.ready) return
     const tonemap = file.hdr && (await this.ffmpeg.canTonemap())
     const seek = thumbnailSeek(file.duration)
     try {
@@ -109,7 +110,7 @@ export class ThumbnailService implements OnApplicationBootstrap {
       )
       // Written aside and renamed into place, so a half-written JPEG is never served.
       await rename(temp, this.pathFor(id))
-      this.index.setThumbnail({ id, state: 'ready' })
+      this.index.setThumbnail({ id, state: THUMBNAIL_STATES.ready })
     } catch (error) {
       // A slow share is not a broken file: leave it pending for the next scan.
       const retryLater = error instanceof FfmpegTimeoutError

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { readServerConfig } from '@/config'
+import { RAVEN_HEADERS } from '@/http'
 import {
   type MetadataFetch,
   TmdbClient,

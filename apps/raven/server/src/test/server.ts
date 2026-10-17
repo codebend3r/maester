@@ -1,5 +1,6 @@
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import { type ApiClient, type FetchLike, createApiClient } from '@raven/core'
+import { HEADERS } from '@shared/server'
 import { BROWSER_ENCODINGS, decodedBody } from '@/test/app'
 
 const METHODS = ['GET', 'POST', 'PUT', 'DELETE'] as const
@@ -23,7 +24,7 @@ export const injectFetch =
       method,
       url,
       headers: {
-        'accept-encoding': BROWSER_ENCODINGS,
+        [HEADERS.acceptEncoding]: BROWSER_ENCODINGS,
         ...init.headers,
         ...(cookie ? { cookie } : {}),
       },

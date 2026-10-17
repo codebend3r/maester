@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import {
+  ITEM_TYPES,
   type ItemDetails,
   type MediaItem,
   type ShowListing,
@@ -365,13 +366,17 @@ describe('TV show metadata', () => {
 
   it("gives a show's seasons their episode counts, and a season's episodes what their rows show", async () => {
     const show = await item((await showNamed('Severance')).show.id)
-    const seasons = show.children.flatMap((child) => (child.type === 'season' ? [child] : []))
+    const seasons = show.children.flatMap((child) =>
+      child.type === ITEM_TYPES.season ? [child] : [],
+    )
     expect(seasons.map((season) => [season.season, season.episodeCount])).toEqual([
       [1, 2],
       [2, 1],
     ])
     const season = await item(seasons[0]?.id)
-    const episodes = season.children.flatMap((child) => (child.type === 'episode' ? [child] : []))
+    const episodes = season.children.flatMap((child) =>
+      child.type === ITEM_TYPES.episode ? [child] : [],
+    )
     const first = await byFile('Severance - S01E01 - Good News About Hell.mp4')
     const halfLoop = await byFile('Severance - S01E02 - Half Loop.mp4')
     expect(episodes.map((episode) => [episode.episode, episode.primary?.id ?? null])).toEqual([

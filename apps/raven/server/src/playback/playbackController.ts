@@ -17,15 +17,18 @@ import {
   type MediaStreams,
   type MediaTicket,
   type MediaTracks,
+  PLAYBACK_MODES,
   STREAM_TIME_SHIFT,
+  TRANSCODINGS,
   isStreamMode,
 } from '@raven/core'
-import { wholeNumber } from '@shared/server'
+import { CONTENT_TYPES, HEADERS, wholeNumber, CACHE_POLICIES } from '@shared/server'
 import type { FastifyReply } from 'fastify'
 import { streamArgs } from '@/ffmpeg/args'
 import { SOFTWARE } from '@/ffmpeg/encoder'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import { parseStreams } from '@/ffmpeg/streams'
+import { RAVEN_CACHE_POLICIES, RAVEN_CONTENT_TYPES } from '@/http'
 import { PrivateBy } from '@/lock/lockGuard'
 import { SettingsRepository } from '@/settings/settingsRepository'
 import { type MediaFile, MediaIndex } from '@/media/mediaIndex'
@@ -61,7 +64,7 @@ export class PlaybackController {
    * Stands in for the cookie on this video's media requests to another
    * origin. Not a media plane route: a ticket must never fetch another.
    */
-  @Header('cache-control', 'no-store')
+  @Header(HEADERS.cacheControl, CACHE_POLICIES.noStore)
   @Get(':id/ticket')
   ticket(@Param('id', ParseIntPipe) id: number): MediaTicket {
     this.fileOf(id)
@@ -99,8 +102,8 @@ export class PlaybackController {
     if (part == null) throw new BadRequestException('window must be a whole number')
     const vtt = await this.subtitles.vtt({ file: this.fileOf(id), trackId, window: part })
     await reply
-      .header('content-type', 'text/vtt; charset=utf-8')
-      .header('cache-control', 'private, max-age=300')
+      .header(HEADERS.contentType, CONTENT_TYPES.vtt)
+      .header(HEADERS.cacheControl, RAVEN_CACHE_POLICIES.privateFiveMinutes)
       .send(vtt)
   }
 
@@ -121,10 +124,10 @@ export class PlaybackController {
   ): Promise<void> {
     if (!isStreamMode(mode)) throw new BadRequestException('mode must be remux or transcode')
     const playback = this.settings.playback()
-    if (playback.transcoding === 'off') {
+    if (playback.transcoding === TRANSCODINGS.off) {
       throw new ForbiddenException('Server conversion is off in Settings; only direct play is on.')
     }
-    if (playback.transcoding === 'remuxOnly' && mode === 'transcode') {
+    if (playback.transcoding === TRANSCODINGS.remuxOnly && mode === PLAYBACK_MODES.transcode) {
       throw new ForbiddenException('Transcoding is off in Settings; only remuxing is on.')
     }
     const from = start == null ? 0 : Number(start)
@@ -168,8 +171,8 @@ export class PlaybackController {
     // killing an ffmpeg that already exited does nothing.
     reply.raw.on('close', () => child.kill('SIGKILL'))
     await reply
-      .header('content-type', 'video/mp4')
-      .header('cache-control', 'no-store')
+      .header(HEADERS.contentType, RAVEN_CONTENT_TYPES.mp4)
+      .header(HEADERS.cacheControl, CACHE_POLICIES.noStore)
       .send(child.stdout)
   }
 }
