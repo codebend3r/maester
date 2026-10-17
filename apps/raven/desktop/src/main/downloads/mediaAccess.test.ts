@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import {
   LOCKED_STATUS,
   MEDIA_PROBE_BYTES,
+  MEDIA_TICKET_REFRESH_SECONDS,
   MEDIA_TICKET_SECONDS,
   type MediaOrigin,
 } from '@raven/core'
@@ -15,6 +16,7 @@ import {
   pickReachable,
   PROBE_TIMEOUT_MS,
   sidecarUrlFor,
+  TICKET_RENEW_MS,
   type Access,
   type AccessOutcome,
   type ProbeFetch,
@@ -175,7 +177,7 @@ describe('createMediaAccess', () => {
       kind: 'origin',
       url: LAN.url,
       ticket: 'tkt',
-      expiresAt: 1_000_000,
+      renewAt: TICKET_RENEW_MS,
     })
   })
 
@@ -306,36 +308,26 @@ describe('createMediaAccess', () => {
     })
   })
 
-  it.each([
-    ['in milliseconds', NOW + 6 * HOUR_MS],
-    ['already past', NOW / 1000 - 1],
-    ['due now', NOW / 1000],
-    ['further off than two ticket lives', (NOW + 2 * MEDIA_TICKET_SECONDS * 1000) / 1000 + 1],
-    ['not a number', Number.NaN],
-  ])('answers unreadable for a ticket whose expiry is %s', async (_name, expiresAt) => {
-    const { probe } = answeringProbe({ [LAN.url]: { status: 200, firstByteMs: 3 } })
-    const { access } = run({
-      replies: { ...withOrigins([LAN]), [ticketCall(7)]: ok({ ticket: 'tkt', expiresAt }) },
-      probe,
-      now: NOW,
-    })
-    expect(failed(await access.accessFor({ serverId: SERVER_ID, mediaId: 7 })).reason).toBe(
-      'unreadable',
-    )
-  })
-
-  it('takes a ticket that lapses within two ticket lives, in epoch milliseconds', async () => {
-    const { probe } = answeringProbe({ [LAN.url]: { status: 200, firstByteMs: 3 } })
-    const last = (NOW + 2 * MEDIA_TICKET_SECONDS * 1000) / 1000
-    const { access } = run({
-      replies: { ...withOrigins([LAN]), [ticketCall(7)]: ok({ ticket: 'tkt', expiresAt: last }) },
-      probe,
-      now: NOW,
-    })
-    expect(succeeded(await access.accessFor({ serverId: SERVER_ID, mediaId: 7 }))).toMatchObject({
+  it("renews a ticket a fixed time after it was read, by raven player's clock, whatever its expiry says", async () => {
+    expect(TICKET_RENEW_MS).toBe((MEDIA_TICKET_SECONDS - MEDIA_TICKET_REFRESH_SECONDS) * 1000)
+    const renewAtFor = async (expiresAt: number) => {
+      const { probe } = answeringProbe({ [LAN.url]: { status: 200, firstByteMs: 3 } })
+      const { access } = run({
+        replies: { ...withOrigins([LAN]), [ticketCall(7)]: ok({ ticket: 'tkt', expiresAt }) },
+        probe,
+        now: NOW,
+      })
+      return succeeded(await access.accessFor({ serverId: SERVER_ID, mediaId: 7 }))
+    }
+    const renewed: Access = {
       kind: 'origin',
-      expiresAt: last * 1000,
-    })
+      url: LAN.url,
+      ticket: 'tkt',
+      renewAt: NOW + TICKET_RENEW_MS,
+    }
+    expect(await renewAtFor(NOW + 6 * HOUR_MS)).toEqual(renewed)
+    expect(await renewAtFor(NOW / 1000 + 6 * 3600)).toEqual(renewed)
+    expect(await renewAtFor(NOW - HOUR_MS)).toEqual(renewed)
   })
 
   it('falls back to the cookie path, naming no URL, on a bad origins body', async () => {
@@ -457,7 +449,7 @@ describe('fileUrlFor', () => {
   const origin = 'https://raven.example'
 
   it('puts the encoded ticket on an origin', () => {
-    const access: Access = { kind: 'origin', url: LAN.url, ticket: 'a b/c+d=', expiresAt: 1 }
+    const access: Access = { kind: 'origin', url: LAN.url, ticket: 'a b/c+d=', renewAt: 1 }
     expect(fileUrlFor({ access, origin, mediaId: 7 })).toBe(
       `${LAN.url}/api/media/7/file?t=${encodeURIComponent('a b/c+d=')}`,
     )
@@ -478,7 +470,7 @@ describe('sidecarUrlFor', () => {
   const origin = 'https://raven.example'
 
   it('puts the encoded ticket on an origin', () => {
-    const access: Access = { kind: 'origin', url: LAN.url, ticket: 'a b', expiresAt: 1 }
+    const access: Access = { kind: 'origin', url: LAN.url, ticket: 'a b', renewAt: 1 }
     expect(sidecarUrlFor({ access, origin, mediaId: 7, trackId: 'external-3' })).toBe(
       `${LAN.url}/api/media/7/subtitles/external-3?t=a%20b`,
     )

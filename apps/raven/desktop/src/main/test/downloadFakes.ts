@@ -214,11 +214,11 @@ export const fakeNetwork = () => {
 
 export const ticketFor = ({
   ticket,
-  expiresAt,
+  renewAt,
 }: {
   ticket: string
-  expiresAt: number
-}): AccessOutcome => ({ ok: true, access: { kind: 'origin', url: ORIGIN, ticket, expiresAt } })
+  renewAt: number
+}): AccessOutcome => ({ ok: true, access: { kind: 'origin', url: ORIGIN, ticket, renewAt } })
 
 export const COOKIE_ACCESS: AccessOutcome = { ok: true, access: { kind: 'cookie' } }
 

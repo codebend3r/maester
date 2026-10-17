@@ -55,7 +55,7 @@ const SERVER = { id: SERVER_ID, origin: 'https://vhagar.example', name: 'Vhagar'
 
 const DOWNLOADS = `${USER_DATA}/downloads`
 
-const FAR_TICKET = ticketFor({ ticket: 'one', expiresAt: NOW + 6 * 3_600_000 })
+const FAR_TICKET = ticketFor({ ticket: 'one', renewAt: NOW + 6 * 3_600_000 })
 
 /** An access read that never answers, so a queued file waits where it is. */
 const NEVER = (): Promise<AccessOutcome> => new Promise(() => undefined)

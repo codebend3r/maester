@@ -4,6 +4,7 @@ import {
   isMediaTicket,
   LOCKED_STATUS,
   MEDIA_PROBE_BYTES,
+  MEDIA_TICKET_REFRESH_SECONDS,
   MEDIA_TICKET_SECONDS,
   toQueryString,
   type MediaOrigin,
@@ -18,10 +19,10 @@ import { isSidecarTrackId, SERVER_GONE } from '@/shared/protocol'
 export const PROBE_TIMEOUT_MS = 2000
 
 /**
- * The furthest off a ticket's expiry may be. Past it, or already past, the server's number is
- * not a ticket's: a renewal timed from it would fire at once, on every fetch, for good.
+ * How long after it was read a ticket is renewed, as the web player does: timed from the read by
+ * raven player's own clock, never from `expiresAt`, so a clock off the server's changes nothing.
  */
-export const TICKET_HORIZON_MS = 2 * MEDIA_TICKET_SECONDS * 1000
+export const TICKET_RENEW_MS = (MEDIA_TICKET_SECONDS - MEDIA_TICKET_REFRESH_SECONDS) * 1000
 
 const NOT_FOUND_STATUS = 404
 
@@ -37,8 +38,9 @@ export type ProbeFetch = (input: {
   timeoutMs: number
 }) => Promise<{ status: number; firstByteMs: number }>
 
+/** `renewAt` is when the queue reads a new ticket, in epoch ms by raven player's clock. */
 export type Access =
-  | { kind: 'origin'; url: string; ticket: string; expiresAt: number }
+  | { kind: 'origin'; url: string; ticket: string; renewAt: number }
   | { kind: 'cookie' }
 
 export type AccessOutcome =
@@ -226,19 +228,22 @@ export const createMediaAccess = ({
     if (reply.status >= 500) {
       return { ok: false, reason: 'unreachable', message: CALL_MESSAGES.unreachable(server.name) }
     }
-    const unreadable: AccessOutcome = {
-      ok: false,
-      reason: 'unreadable',
-      message: `${server.name} sent something raven player cannot read.`,
-    }
     const body = reply.status === 200 ? readJson(reply.body) : null
-    if (!isMediaTicket(body)) return unreadable
-    const expiresAt = body.expiresAt * 1000
-    const at = now()
-    if (!(expiresAt > at && expiresAt <= at + TICKET_HORIZON_MS)) return unreadable
+    if (!isMediaTicket(body)) {
+      return {
+        ok: false,
+        reason: 'unreadable',
+        message: `${server.name} sent something raven player cannot read.`,
+      }
+    }
     return {
       ok: true,
-      access: { kind: 'origin', url: origin.url, ticket: body.ticket, expiresAt },
+      access: {
+        kind: 'origin',
+        url: origin.url,
+        ticket: body.ticket,
+        renewAt: now() + TICKET_RENEW_MS,
+      },
     }
   }
 

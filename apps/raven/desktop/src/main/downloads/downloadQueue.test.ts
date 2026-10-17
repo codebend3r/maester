@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { MEDIA_TICKET_REFRESH_SECONDS, type MediaTracks } from '@raven/core'
+import type { MediaTracks } from '@raven/core'
 import type { ServerEntry } from '@/main/desktopConfig'
 import { DOWNLOAD_MESSAGES } from '@/main/downloads/downloadMessages'
 import {
@@ -98,7 +98,7 @@ const memoryStore = (initial: DownloadsState): DownloadsStore => {
   }
 }
 
-const FAR_TICKET = ticketFor({ ticket: 'one', expiresAt: NOW + 6 * HOUR })
+const FAR_TICKET = ticketFor({ ticket: 'one', renewAt: NOW + 6 * HOUR })
 
 const failedUnreachable = { kind: 'failed', bytes: 0, reason: 'unreachable', message: '' } as const
 
@@ -379,7 +379,7 @@ describe('a relock', () => {
       entries: [entryFor(1)],
       access: inTurn([
         Promise.resolve(FAR_TICKET),
-        Promise.resolve(ticketFor({ ticket: 'two', expiresAt: NOW + 6 * HOUR })),
+        Promise.resolve(ticketFor({ ticket: 'two', renewAt: NOW + 6 * HOUR })),
       ]),
     })
     world.network.answers.file = () => refused(423)
@@ -619,34 +619,40 @@ describe('pause, resume and retry', () => {
 })
 
 describe('the ticket', () => {
-  it('is renewed ten minutes before it lapses, and the fetch goes on from the bytes on disk', async () => {
-    const world = setup({
-      entries: [entryFor(1)],
-      access: inTurn([
-        Promise.resolve(ticketFor({ ticket: 'one', expiresAt: NOW + 15 * MINUTE })),
-        Promise.resolve(ticketFor({ ticket: 'two', expiresAt: NOW + 6 * HOUR })),
-      ]),
+  it("renews the server's ticket 5 h 50 m after reading it, and fetches on from the bytes on disk", async () => {
+    const ticketKey = keyOf({ name: 'getMediaTicket', mediaId: 1 })
+    const table: Record<string, Reply> = {
+      [keyOf({ name: 'getMediaOrigins' })]: ok({ origins: [{ kind: 'lan', url: ORIGIN }] }),
+      // As the server writes it: epoch milliseconds, six hours on.
+      [ticketKey]: ok({ ticket: 'one', expiresAt: NOW + 6 * HOUR }),
+    }
+    const media = createMediaAccess({
+      calls: fakeCalls(table).calls,
+      serverOf: (serverId) => SERVERS.find((server) => server.id === serverId) ?? null,
+      probe: async () => ({ status: 200, firstByteMs: 1 }),
+      now: () => NOW,
+      warn: () => undefined,
     })
+    const world = setup({ entries: [entryFor(1)], access: media.accessFor })
     world.network.answers.file = serving({ size: 8, sent: 4, isEnding: false })
     world.queue.kick()
     await until(() => world.drive.sizeOf(partOf(1)) === 4)
-    const refreshMs = 15 * MINUTE - MEDIA_TICKET_REFRESH_SECONDS * 1000
-    expect(refreshMs).toBe(5 * MINUTE)
-    expect([...world.pending.values()].some(({ ms }) => ms === refreshMs)).toBe(true)
-    world.fireAfter(refreshMs)
+    const renewMs = 5 * HOUR + 50 * MINUTE
+    expect([...world.pending.values()].some(({ ms }) => ms === renewMs)).toBe(true)
+    table[ticketKey] = ok({ ticket: 'two', expiresAt: NOW + 12 * HOUR })
+    world.fireAfter(renewMs)
     await until(() => world.network.fileRequests().length === 2)
     const [first, second] = world.network.fileRequests()
     expect(first?.signal.aborted).toBe(true)
     expect(second).toMatchObject({ url: fileUrl(1, 'two'), headers: { Range: 'bytes=4-' } })
-    expect(world.media.asked).toHaveLength(2)
     expect(world.statusOf(1)?.kind).toBe('downloading')
     expect(world.failed).toEqual([])
   })
 
-  it('renews a ticket already that close to lapsing no sooner than a minute on', async () => {
+  it('renews no sooner than a minute on, however soon the renewal is due', async () => {
     const world = setup({
       entries: [entryFor(1)],
-      access: async () => ticketFor({ ticket: 'one', expiresAt: NOW + 5 * MINUTE }),
+      access: async () => ticketFor({ ticket: 'one', renewAt: NOW + 10_000 }),
     })
     world.queue.kick()
     await until(() => world.network.fileRequests().length === 1)
@@ -659,7 +665,7 @@ describe('the ticket', () => {
   it('never arms a renewal past the longest delay a timer keeps', async () => {
     const world = setup({
       entries: [entryFor(1)],
-      access: async () => ticketFor({ ticket: 'one', expiresAt: NOW * 1000 }),
+      access: async () => ticketFor({ ticket: 'one', renewAt: NOW * 1000 }),
     })
     world.queue.kick()
     await until(() => world.network.fileRequests().length === 1)
@@ -673,7 +679,7 @@ describe('the ticket', () => {
       entries: [entryFor(1)],
       access: inTurn([
         Promise.resolve(FAR_TICKET),
-        Promise.resolve(ticketFor({ ticket: 'two', expiresAt: NOW + 6 * HOUR })),
+        Promise.resolve(ticketFor({ ticket: 'two', renewAt: NOW + 6 * HOUR })),
       ]),
     })
     const file = serving({ size: 8 })
@@ -692,14 +698,14 @@ describe('the ticket', () => {
 
   it('gives each renewed ticket its own re-read on a 401', async () => {
     const ticket = (name: string, minutes: number) =>
-      Promise.resolve(ticketFor({ ticket: name, expiresAt: NOW + minutes * MINUTE }))
+      Promise.resolve(ticketFor({ ticket: name, renewAt: NOW + minutes * MINUTE }))
     const world = setup({
       entries: [entryFor(1)],
       access: inTurn([
-        ticket('one', 360),
-        ticket('two', 15),
-        ticket('three', 360),
-        ticket('four', 360),
+        ticket('one', 350),
+        ticket('two', 5),
+        ticket('three', 350),
+        ticket('four', 350),
       ]),
     })
     const next = inTurn([
@@ -727,7 +733,7 @@ describe('the ticket', () => {
       entries: [entryFor(1)],
       access: inTurn([
         Promise.resolve(FAR_TICKET),
-        Promise.resolve(ticketFor({ ticket: 'two', expiresAt: NOW + 6 * HOUR })),
+        Promise.resolve(ticketFor({ ticket: 'two', renewAt: NOW + 6 * HOUR })),
       ]),
     })
     world.network.answers.file = () => refused(401)
