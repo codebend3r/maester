@@ -75,7 +75,7 @@ const ReadyDialog = ({
     if (dialog.current !== null) dialog.current.close()
   }
 
-  // Cancel, Escape and a click away all end here; only Download has already answered.
+  // Cancel, Escape and Download all end here; only Download has already answered.
   const closed = () => {
     if (!isConfirmed.current) {
       void askMain({ client, request: { type: 'declineDownload', askId: ask.askId } })
