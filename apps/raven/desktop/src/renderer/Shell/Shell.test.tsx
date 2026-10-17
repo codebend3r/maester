@@ -1,5 +1,6 @@
 import { describe, expect, it, jest, mock } from 'bun:test'
 import { act, screen } from '@testing-library/react'
+import { NavigationType } from 'react-router-dom'
 import { fakeClient, renderDesktop, STUB_ROUTES } from '@/renderer/test/render'
 
 const ID_A = '11111111-1111-4111-8111-111111111111'
@@ -60,6 +61,73 @@ describe('Shell', () => {
       await router.navigate(-1)
     })
     expect(router.state.location.pathname).toBe('/')
+  })
+
+  it('plays a server title main opens, with its start and queue in the route state', async () => {
+    const client = fakeClient()
+    const { router } = renderDesktop({ client, routes: STUB_ROUTES })
+    await settled()
+    await client.emit({
+      type: 'playServer',
+      target: { serverId: ID_A, mediaId: 7, at: 30, next: [8, 9] },
+    })
+    expect(router.state.location.pathname).toBe(`/server/${ID_A}/7`)
+    expect(router.state.location.state).toEqual({ at: 30, next: [8, 9] })
+  })
+
+  it('replaces whatever plays with a server title, and a server title with a file, so Back returns Home', async () => {
+    const client = fakeClient()
+    const { router } = renderDesktop({ client, routes: STUB_ROUTES })
+    await settled()
+    await client.emit({ type: 'play', target: { fileId: ID_A, queue: [] } })
+    await client.emit({
+      type: 'playServer',
+      target: { serverId: ID_B, mediaId: 7, at: 0, next: [] },
+    })
+    await client.emit({
+      type: 'playServer',
+      target: { serverId: ID_B, mediaId: 8, at: 0, next: [] },
+    })
+    expect(router.state.location.pathname).toBe(`/server/${ID_B}/8`)
+    await client.emit({ type: 'play', target: { fileId: ID_C, queue: [] } })
+    expect(router.state.location.pathname).toBe(`/play/${ID_C}`)
+    await act(async () => {
+      await router.navigate(-1)
+    })
+    expect(router.state.location.pathname).toBe('/')
+  })
+
+  it('replaces a playing file with a server title, its start and next in the route state', async () => {
+    const client = fakeClient()
+    const { router } = renderDesktop({
+      client,
+      routes: STUB_ROUTES,
+      route: `/play/${ID_A}`,
+      state: { queue: [] },
+    })
+    await screen.findByText('Playing')
+    await client.emit({
+      type: 'playServer',
+      target: { serverId: ID_C, mediaId: 7, at: 30, next: [8] },
+    })
+    expect(router.state.location.pathname).toBe(`/server/${ID_C}/7`)
+    expect(router.state.location.state).toEqual({ at: 30, next: [8] })
+    expect(router.state.historyAction).toBe(NavigationType.Replace)
+  })
+
+  it('plays a server title from a reply main gives a drop', async () => {
+    const client = fakeClient({
+      dropFiles: async () => ({
+        type: 'playServer',
+        target: { serverId: ID_A, mediaId: 7, at: 0, next: [] },
+      }),
+    })
+    const { router } = renderDesktop({ client, routes: STUB_ROUTES })
+    await settled()
+    dropOnWindow([new File(['1'], 'one.mkv')])
+    await act(async () => {})
+    expect(router.state.location.pathname).toBe(`/server/${ID_A}/7`)
+    expect(router.state.location.state).toEqual({ at: 0, next: [] })
   })
 
   it('goes where a navigate event says', async () => {

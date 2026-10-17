@@ -4,7 +4,8 @@ import { useNavigate } from 'react-router-dom'
 import { Button } from '@raven/ui'
 import { useDesktop } from '@/renderer/desktop/DesktopContext'
 import styles from '@/renderer/HomePage/HomePage.module.scss'
-import { RECENTS_KEY, useDragging, useOpenReply } from '@/renderer/Shell/Shell'
+import { RECENTS_KEY, useOpenReply } from '@/renderer/Shell/openReply'
+import { useDragging } from '@/renderer/Shell/Shell'
 import type { RecentView } from '@/shared/protocol'
 
 export const watchedLabel = (watched: number | null): string =>

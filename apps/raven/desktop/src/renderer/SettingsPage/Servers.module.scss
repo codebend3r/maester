@@ -1,0 +1,207 @@
+.servers {
+  display: grid;
+  gap: var(--space-3);
+  align-content: start;
+  justify-items: start;
+  min-width: 0;
+
+  h2 {
+    font-family: var(--font-display);
+    font-size: var(--font-size-lg);
+    font-weight: 400;
+  }
+
+  p {
+    max-width: var(--measure);
+  }
+
+  output {
+    color: var(--color-lichen);
+    font-size: var(--font-size-sm);
+  }
+}
+
+.list {
+  display: grid;
+  gap: var(--space-2);
+  justify-self: stretch;
+  max-width: var(--measure);
+  padding: 0;
+  list-style: none;
+}
+
+.server,
+.open {
+  display: grid;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-moss);
+  border-radius: var(--radius-md);
+  background: var(--color-canopy);
+}
+
+.server {
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'name actions'
+    'origin actions';
+  gap: var(--space-0) var(--space-3);
+  align-items: center;
+
+  @media (max-width: 30rem) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'name'
+      'origin'
+      'actions';
+    gap: var(--space-1);
+  }
+}
+
+.name {
+  grid-area: name;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.origin {
+  grid-area: origin;
+  justify-self: start;
+  max-width: 100%;
+  color: var(--color-lichen);
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  grid-area: actions;
+  display: grid;
+  grid-auto-flow: column;
+  gap: var(--space-1);
+  justify-content: end;
+
+  @media (max-width: 30rem) {
+    justify-content: start;
+  }
+}
+
+// The rename form, or the question before a removal, takes the whole row while it is open.
+.open {
+  grid-template-areas: 'body';
+}
+
+.rename {
+  grid-area: body;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'field actions';
+  gap: var(--space-2) var(--space-3);
+  align-items: end;
+
+  @media (max-width: 30rem) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'field'
+      'actions';
+  }
+}
+
+.renameField {
+  grid-area: field;
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+  font-size: var(--font-size-sm);
+  overflow-wrap: anywhere;
+}
+
+.renameActions {
+  grid-area: actions;
+  display: grid;
+  grid-auto-flow: column;
+  gap: var(--space-1);
+  justify-content: start;
+}
+
+.confirm {
+  grid-area: body;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'question actions';
+  gap: var(--space-2) var(--space-3);
+  align-items: center;
+
+  @media (max-width: 30rem) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'question'
+      'actions';
+  }
+}
+
+.question {
+  grid-area: question;
+  overflow-wrap: anywhere;
+}
+
+.confirmActions {
+  grid-area: actions;
+  display: grid;
+  grid-auto-flow: column;
+  gap: var(--space-1);
+  justify-content: start;
+}
+
+.add {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'field button';
+  gap: var(--space-2) var(--space-3);
+  align-items: end;
+  justify-self: stretch;
+  max-width: var(--measure);
+
+  @media (max-width: 30rem) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'field'
+      'button';
+  }
+}
+
+.addField {
+  grid-area: field;
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.addButton {
+  grid-area: button;
+
+  // Held while main answers; still focusable, so focus stays on it.
+  &[aria-disabled='true'] {
+    cursor: progress;
+    opacity: 0.55;
+  }
+
+  @media (max-width: 30rem) {
+    justify-self: start;
+  }
+}
+
+.input {
+  width: 100%;
+  min-width: 0;
+  font-size: var(--font-size-md);
+
+  &:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+.refusal {
+  padding-inline-start: var(--space-2);
+  border-inline-start: var(--border-thick) solid var(--color-leaf-bright);
+  font-size: var(--font-size-sm);
+  overflow-wrap: anywhere;
+}
