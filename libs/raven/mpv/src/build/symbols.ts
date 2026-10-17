@@ -43,8 +43,9 @@ const glslangEntryPoints = ['__ZN7glslang17InitializeProcessEv', '__Z19GetDefaul
 export const symbolPolicies = {
   'lib/libMoltenVK.dylib': { lookups: [], defines: [] },
   'lib/libmpv.2.dylib': { lookups: [], defines: glslangEntryPoints },
-  // An N-API addon links with `-undefined dynamic_lookup`; Node or Electron supplies N-API.
-  'raven_mpv.node': { lookups: ['_napi_', '_node_api_'], defines: [] },
+  // An N-API addon links with `-undefined dynamic_lookup`; Node or Electron supplies N-API,
+  // and libuv for the handle that finishes exit cleanup on the loop thread.
+  'raven_mpv.node': { lookups: ['_napi_', '_node_api_', '_uv_'], defines: [] },
 } as const satisfies Record<string, Policy>
 
 export type AuditedFile = keyof typeof symbolPolicies

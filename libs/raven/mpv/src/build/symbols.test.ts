@@ -124,7 +124,7 @@ describe('symbolProblems', () => {
     ).toEqual(['lib/libMoltenVK.dylib binds _vkFoo to libvulkan, which it does not load'])
   })
 
-  test('lets the addon look up N-API from its host process and nothing else', () => {
+  test('lets the addon look up N-API and libuv from its host process and nothing else', () => {
     const dependencies = ['@rpath/raven_mpv.node', '@rpath/libmpv.2.dylib']
     expect(
       symbolProblems({
@@ -132,6 +132,9 @@ describe('symbolProblems', () => {
         imports: [
           { kind: 'lookup', symbol: '_napi_create_function' },
           { kind: 'lookup', symbol: '_node_api_get_module_file_name' },
+          { kind: 'lookup', symbol: '_uv_async_init' },
+          { kind: 'lookup', symbol: '_uv_async_send' },
+          { kind: 'lookup', symbol: '_uv_close' },
           { kind: 'bound', symbol: '_mpv_create', library: 'libmpv' },
         ],
         definitions: new Set(),
