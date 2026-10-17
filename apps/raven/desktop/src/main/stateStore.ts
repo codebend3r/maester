@@ -2,12 +2,12 @@ import { EMPTY_STATE, isPlayerState, type PlayerState } from '@/main/playerState
 
 export type StateFs = {
   readFile: (path: string) => Promise<string>
-  writeFile: (path: string, data: string) => Promise<void>
-  rename: (from: string, to: string) => Promise<void>
+  writeFile: (input: { path: string; data: string }) => Promise<void>
+  rename: (input: { from: string; to: string }) => Promise<void>
 }
 
 export type Timers = {
-  set: (run: () => void, ms: number) => unknown
+  set: (input: { run: () => void; ms: number }) => unknown
   clear: (handle: unknown) => void
 }
 
@@ -64,7 +64,7 @@ export const loadJson = async <T>({
     if (guard(parsed)) return parsed
   }
   // Keep the unreadable file for a person to inspect; the next save would otherwise replace it.
-  await fs.rename(file, `${file}.corrupt-${now()}`).catch(() => undefined)
+  await fs.rename({ from: file, to: `${file}.corrupt-${now()}` }).catch(() => undefined)
   return empty
 }
 
@@ -106,8 +106,8 @@ export const createJsonStore = <T>({
     if (savedVersion === version) return
     const writing = { value, version }
     try {
-      await fs.writeFile(tmp, JSON.stringify(writing.value))
-      await fs.rename(tmp, file)
+      await fs.writeFile({ path: tmp, data: JSON.stringify(writing.value) })
+      await fs.rename({ from: tmp, to: file })
       savedVersion = writing.version
     } catch (error) {
       report(error)
@@ -135,10 +135,13 @@ export const createJsonStore = <T>({
       value = next
       version += 1
       cancelTimer()
-      timer = timers.set(() => {
-        timer = undefined
-        void enqueue()
-      }, debounceMs)
+      timer = timers.set({
+        run: () => {
+          timer = undefined
+          void enqueue()
+        },
+        ms: debounceMs,
+      })
     },
     flush: () => {
       cancelTimer()

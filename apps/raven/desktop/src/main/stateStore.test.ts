@@ -73,7 +73,7 @@ const createFakeTimers = () => {
   const delays: number[] = []
   const counter = { next: 1 }
   const timers: Timers = {
-    set: (run, ms) => {
+    set: ({ run, ms }) => {
       const handle = counter.next
       counter.next += 1
       pending.set(handle, run)

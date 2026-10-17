@@ -11,12 +11,21 @@ export const LOG_BURST_MS = 10_000
 export type LogLevel = 'info' | 'warn' | 'error'
 
 export type LogFs = {
-  mkdir: (path: string, options: { recursive: true; mode: number }) => Promise<unknown>
+  mkdir: (input: { path: string; options: { recursive: true; mode: number } }) => Promise<unknown>
   size: (path: string) => Promise<number | null>
-  appendFile: (path: string, data: string, options: { mode: number }) => Promise<void>
-  rename: (from: string, to: string) => Promise<void>
+  appendFile: (input: { path: string; data: string; options: { mode: number } }) => Promise<void>
+  rename: (input: { from: string; to: string }) => Promise<void>
   remove: (path: string) => Promise<void>
 }
+
+/** The log's file system calls, which also name what failed in a report. */
+export const LOG_FS_OPS = {
+  mkdir: 'mkdir',
+  size: 'size',
+  appendFile: 'appendFile',
+  rename: 'rename',
+  remove: 'remove',
+} as const satisfies { [K in keyof LogFs]: K }
 
 /**
  * The log's file system over Node's: a missing file has no size and removing one is no
@@ -35,14 +44,14 @@ export const logFsFrom = ({
   rename: (from: string, to: string) => Promise<void>
   rm: (path: string, options: { force: true }) => Promise<void>
 }): LogFs => ({
-  mkdir: (path, options) => mkdir(path, options),
+  mkdir: ({ path, options }) => mkdir(path, options),
   size: (path) =>
     stat(path).then(
       ({ size }) => size,
       () => null,
     ),
-  appendFile: (path, data, options) => appendFile(path, data, options),
-  rename: (from, to) => rename(from, to),
+  appendFile: ({ path, data, options }) => appendFile(path, data, options),
+  rename: ({ from, to }) => rename(from, to),
   remove: (path) => rm(path, { force: true }),
 })
 
@@ -296,8 +305,11 @@ export const createLog = ({
   }
 
   const prepare = async (): Promise<number> => {
-    await attempt({ op: 'mkdir', run: () => fs.mkdir(dir, { recursive: true, mode: 0o700 }) })
-    const size = await attempt({ op: 'size', run: () => fs.size(file) })
+    await attempt({
+      op: LOG_FS_OPS.mkdir,
+      run: () => fs.mkdir({ path: dir, options: { recursive: true, mode: 0o700 } }),
+    })
+    const size = await attempt({ op: LOG_FS_OPS.size, run: () => fs.size(file) })
     return size ?? 0
   }
 
@@ -312,7 +324,7 @@ export const createLog = ({
 
   const move = async ({ from, to }: { from: string; to: string }): Promise<void> => {
     try {
-      await fs.rename(from, to)
+      await fs.rename({ from, to })
     } catch (cause) {
       if (isMissingFile(cause)) return
       const error = new LogWriteError({ op: 'rename', cause })
@@ -381,10 +393,13 @@ export const createLog = ({
   const scheduleDrain = (): void => {
     if (timer !== null) return
     timer = {
-      handle: timers.set(() => {
-        timer = null
-        void startDrain()
-      }, 0),
+      handle: timers.set({
+        run: () => {
+          timer = null
+          void startDrain()
+        },
+        ms: 0,
+      }),
     }
   }
 

@@ -57,10 +57,13 @@ export const createConnector = <T extends { service: PlayerService }, R>({
   // An engine that never settles must not leave the page waiting forever.
   const openWithin = (): Promise<OpenedEngine<T>> => {
     const deadline = Promise.withResolvers<OpenedEngine<T>>()
-    const timer = timers.set(() => {
-      warn(`raven player's video engine did not open within ${OPEN_MS} ms.`)
-      deadline.resolve(UNAVAILABLE)
-    }, OPEN_MS)
+    const timer = timers.set({
+      run: () => {
+        warn(`raven player's video engine did not open within ${OPEN_MS} ms.`)
+        deadline.resolve(UNAVAILABLE)
+      },
+      ms: OPEN_MS,
+    })
     return Promise.race([open(), deadline.promise]).finally(() => timers.clear(timer))
   }
 

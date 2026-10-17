@@ -49,7 +49,7 @@ const RINGS: Saga = {
   ],
 }
 
-const backdropOf = (id: number, version: string) =>
+const backdropOf = ({ id, version }: { id: number; version: string }) =>
   document.querySelector(`img[src*="/api/items/${id}/images/backdrop?v=${version}"]`)
 
 describe('SagaPage', () => {
@@ -110,7 +110,7 @@ describe('SagaPage', () => {
       'Play The Two Towers',
       'Play The Return of the King',
     ])
-    expect(backdropOf(80, 'b1')).not.toBeNull()
+    expect(backdropOf({ id: 80, version: 'b1' })).not.toBeNull()
     expect(screen.getByRole('link', { name: 'Sagas' })).toHaveAttribute(
       'href',
       '/libraries/2/sagas',
@@ -162,15 +162,15 @@ describe('SagaPage', () => {
   it("lays out each movie's backdrop for the slideshow, from the first", async () => {
     open({ backdrop: { type: 'slideshow', motion: 'kenBurns' } })
     await screen.findByRole('heading', { name: 'The Lord of the Rings Collection' })
-    expect(backdropOf(80, 'b1')).not.toBeNull()
-    expect(backdropOf(90, 'b2')).not.toBeNull()
+    expect(backdropOf({ id: 80, version: 'b1' })).not.toBeNull()
+    expect(backdropOf({ id: 90, version: 'b2' })).not.toBeNull()
   })
 
   it('holds still the backdrop picked for it, and only that one', async () => {
     open({ backdrop: { type: 'still', itemId: 90 } })
     await screen.findByRole('heading', { name: 'The Lord of the Rings Collection' })
-    expect(backdropOf(90, 'b2')).not.toBeNull()
-    expect(backdropOf(80, 'b1')).toBeNull()
+    expect(backdropOf({ id: 90, version: 'b2' })).not.toBeNull()
+    expect(backdropOf({ id: 80, version: 'b1' })).toBeNull()
   })
 
   it('plays every movie one after another from Play all', async () => {

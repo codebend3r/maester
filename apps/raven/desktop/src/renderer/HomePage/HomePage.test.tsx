@@ -28,7 +28,7 @@ const answering =
 
 const settled = () => screen.findByText('Nothing opened yet.')
 
-const dragOverWindow = (type: 'dragenter' | 'dragleave', types: string[]) => {
+const dragOverWindow = ({ type, types }: { type: 'dragenter' | 'dragleave'; types: string[] }) => {
   const event = new Event(type)
   Object.defineProperty(event, 'dataTransfer', { value: { types } })
   act(() => {
@@ -114,25 +114,25 @@ describe('HomePage', () => {
     renderDesktop({ client: fakeClient(), routes: STUB_ROUTES })
     await settled()
     expect(screen.queryByText('Drop to play')).not.toBeInTheDocument()
-    dragOverWindow('dragenter', ['Files'])
+    dragOverWindow({ type: 'dragenter', types: ['Files'] })
     expect(screen.getByText('Drop to play')).toBeInTheDocument()
-    dragOverWindow('dragleave', ['Files'])
+    dragOverWindow({ type: 'dragleave', types: ['Files'] })
     expect(screen.queryByText('Drop to play')).not.toBeInTheDocument()
   })
 
   it('keeps Drop to play up while the drag moves between child elements', async () => {
     renderDesktop({ client: fakeClient(), routes: STUB_ROUTES })
     await settled()
-    dragOverWindow('dragenter', ['Files'])
-    dragOverWindow('dragenter', ['Files'])
-    dragOverWindow('dragleave', ['Files'])
+    dragOverWindow({ type: 'dragenter', types: ['Files'] })
+    dragOverWindow({ type: 'dragenter', types: ['Files'] })
+    dragOverWindow({ type: 'dragleave', types: ['Files'] })
     expect(screen.getByText('Drop to play')).toBeInTheDocument()
   })
 
   it('ignores a drag of selected text', async () => {
     renderDesktop({ client: fakeClient(), routes: STUB_ROUTES })
     await settled()
-    dragOverWindow('dragenter', ['text/plain'])
+    dragOverWindow({ type: 'dragenter', types: ['text/plain'] })
     expect(screen.queryByText('Drop to play')).not.toBeInTheDocument()
   })
 

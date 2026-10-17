@@ -218,8 +218,9 @@ describe('the admin lock on SettingsPage', () => {
   const toggle = () => screen.getByRole('checkbox', { name: /^Admin lock/ })
 
   it('ends the page, and turns off only with the password', async () => {
+    const rightPassword = 'Soft-Wing-27'
     spies.unlock.mockImplementation(async (password) => {
-      if (password !== 'Soft-Wing-27') {
+      if (password !== rightPassword) {
         throw new ApiError({ status: 401, message: 'That password is not right.' })
       }
       return { state: 'off' }
@@ -236,11 +237,11 @@ describe('the admin lock on SettingsPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('That password is not right.')
     expect(toggle()).not.toBeChecked()
 
-    await userEvent.type(screen.getByLabelText('Admin password'), 'Soft-Wing-27')
+    await userEvent.type(screen.getByLabelText('Admin password'), rightPassword)
     await userEvent.click(screen.getByRole('button', { name: 'Turn off' }))
     await waitFor(() => expect(screen.queryByLabelText('Admin password')).toBeNull())
     expect(toggle()).not.toBeChecked()
-    expect(spies.unlock.mock.calls).toEqual([['soft-wing-27'], ['Soft-Wing-27']])
+    expect(spies.unlock.mock.calls).toEqual([['soft-wing-27'], [rightPassword]])
   })
 
   it('stays on when the password is not given after all', async () => {

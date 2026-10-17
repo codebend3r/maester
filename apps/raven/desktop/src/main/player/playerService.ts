@@ -491,7 +491,7 @@ export const createPlayerService = ({
     clearStall()
     if (!isOwed()) return
     const token = epoch
-    stallTimer = timers.set(() => onServerStalled(token), serverStallMs)
+    stallTimer = timers.set({ run: () => onServerStalled(token), ms: serverStallMs })
   }
 
   const showBuffered = (ranges: readonly Range[]) => {

@@ -109,7 +109,7 @@ const createFakeTimers = () => {
   const delays: number[] = []
   const counter = { next: 1 }
   const timers: Timers = {
-    set: (run, ms) => {
+    set: ({ run, ms }) => {
       const handle = counter.next
       counter.next += 1
       pending.set(handle, run)
@@ -146,7 +146,8 @@ const setup = ({
   return { ...fake, ...clock, log, errors, time }
 }
 
-const ops = (calls: Call[], wanted: FsOp[]) => calls.filter((call) => wanted.includes(call.op))
+const ops = ({ calls, wanted }: { calls: Call[]; wanted: FsOp[] }) =>
+  calls.filter((call) => wanted.includes(call.op))
 
 const lines = (text: string | undefined): string[] =>
   (text ?? '').split('\n').filter((line) => line !== '')
@@ -567,10 +568,10 @@ describe('createLog', () => {
     log.info('one')
     log.warn('two')
     await log.flush()
-    expect(ops(calls, ['mkdir'])).toEqual([
+    expect(ops({ calls, wanted: [LOG_FS_OPS.mkdir] })).toEqual([
       { op: 'mkdir', args: [DIR, { recursive: true, mode: 0o700 }] },
     ])
-    expect(ops(calls, ['appendFile'])).toEqual([
+    expect(ops({ calls, wanted: [LOG_FS_OPS.appendFile] })).toEqual([
       {
         op: 'appendFile',
         args: [FILE, `${STAMP}info one\n${STAMP}warn two\n`, { mode: 0o600 }],
@@ -585,8 +586,10 @@ describe('createLog', () => {
     await log.flush()
     log.error('two')
     await log.flush()
-    expect(ops(calls, ['mkdir', 'size']).map((call) => call.op)).toEqual(['mkdir', 'size'])
-    expect(ops(calls, ['appendFile'])).toHaveLength(2)
+    expect(
+      ops({ calls, wanted: [LOG_FS_OPS.mkdir, LOG_FS_OPS.size] }).map((call) => call.op),
+    ).toEqual(['mkdir', 'size'])
+    expect(ops({ calls, wanted: [LOG_FS_OPS.appendFile] })).toHaveLength(2)
   })
 
   it('never writes a secret it is handed', async () => {
@@ -620,7 +623,7 @@ describe('createLog', () => {
       `${STAMP}warn three`,
       `${STAMP}error four`,
     ])
-    expect(ops(calls, ['appendFile']).length).toBeLessThanOrEqual(3)
+    expect(ops({ calls, wanted: [LOG_FS_OPS.appendFile] }).length).toBeLessThanOrEqual(3)
   })
 
   it('keeps the timer drain and a flush from overlapping', async () => {
@@ -657,7 +660,11 @@ describe('createLog', () => {
       const { log, calls, disk, errors } = setup({ files: { [FILE]: full(10), ...kept } })
       log.info('r'.repeat(19))
       await log.flush()
-      expect(ops(calls, ['remove', 'rename', 'appendFile']).map((call) => call.args)).toEqual([
+      expect(
+        ops({ calls, wanted: [LOG_FS_OPS.remove, LOG_FS_OPS.rename, LOG_FS_OPS.appendFile] }).map(
+          (call) => call.args,
+        ),
+      ).toEqual([
         [`${FILE}.4`],
         [`${FILE}.3`, `${FILE}.4`],
         [`${FILE}.2`, `${FILE}.3`],
@@ -685,7 +692,7 @@ describe('createLog', () => {
       const { log, calls, disk } = setup({ files: { [FILE]: full(50) } })
       log.info('r'.repeat(19))
       await log.flush()
-      expect(ops(calls, ['remove', 'rename'])).toEqual([])
+      expect(ops({ calls, wanted: [LOG_FS_OPS.remove, LOG_FS_OPS.rename] })).toEqual([])
       expect(bytes(disk.get(FILE) ?? '')).toBe(LOG_MAX_BYTES)
     })
 
@@ -703,7 +710,7 @@ describe('createLog', () => {
       })
       log.info('r'.repeat(19))
       await log.flush()
-      expect(ops(calls, ['rename']).map((call) => call.args)).toEqual([
+      expect(ops({ calls, wanted: [LOG_FS_OPS.rename] }).map((call) => call.args)).toEqual([
         [`${FILE}.3`, `${FILE}.4`],
         [`${FILE}.2`, `${FILE}.3`],
         [`${FILE}.1`, `${FILE}.2`],
@@ -729,9 +736,9 @@ describe('createLog', () => {
         if (index % 50 === 0) await log.flush()
       }, Promise.resolve())
       await log.flush()
-      expect(ops(calls, ['size'])).toHaveLength(1)
-      expect(ops(calls, ['remove'])).toHaveLength(1)
-      expect(ops(calls, ['rename']).at(-1)?.args).toEqual([FILE, `${FILE}.1`])
+      expect(ops({ calls, wanted: [LOG_FS_OPS.size] })).toHaveLength(1)
+      expect(ops({ calls, wanted: [LOG_FS_OPS.remove] })).toHaveLength(1)
+      expect(ops({ calls, wanted: [LOG_FS_OPS.rename] }).at(-1)?.args).toEqual([FILE, `${FILE}.1`])
       expect([...disk.keys()].toSorted()).toEqual([FILE, `${FILE}.1`])
       expect(bytes(disk.get(`${FILE}.1`) ?? '')).toBeLessThanOrEqual(LOG_MAX_BYTES)
       expect(lines(disk.get(`${FILE}.1`))).toHaveLength(total - 1)
@@ -975,7 +982,7 @@ describe('createLog', () => {
       state.refuse = () => null
       log.info('two')
       await log.flush()
-      expect(ops(calls, ['mkdir'])).toHaveLength(2)
+      expect(ops({ calls, wanted: [LOG_FS_OPS.mkdir] })).toHaveLength(2)
       expect(lines(disk.get(FILE))).toEqual([`${STAMP}info two`])
     })
 
@@ -983,7 +990,7 @@ describe('createLog', () => {
       const { log, disk, calls } = setup()
       log.info('one')
       await log.flush()
-      expect(ops(calls, ['remove', 'rename'])).toEqual([])
+      expect(ops({ calls, wanted: [LOG_FS_OPS.remove, LOG_FS_OPS.rename] })).toEqual([])
       expect(disk.get(FILE)).toBe(`${STAMP}info one\n`)
     })
 
@@ -1075,7 +1082,7 @@ describe('logFsFrom over the real file system', () => {
 
   it('rejects a missing file the way the log expects, with ENOENT', async () => {
     const error = await realFs()
-      .rename(join(folder.path, 'gone'), join(folder.path, 'moved'))
+      .rename({ from: join(folder.path, 'gone'), to: join(folder.path, 'moved') })
       .then(
         () => null,
         (reason: unknown) => reason,

@@ -35,17 +35,32 @@ export const TRUST_MESSAGES = {
   unsaved: 'raven player could not keep that server. Try adding it again.',
 } as const
 
+export const TRUST_OUTCOME_KINDS = {
+  trusted: 'trusted',
+  declined: 'declined',
+  full: 'full',
+  busy: 'busy',
+  unreachable: 'unreachable',
+  invalid: 'invalid',
+  unsaved: 'unsaved',
+} as const
+
 export type TrustOutcome =
-  | { kind: 'trusted'; server: ServerEntry; isNew: boolean }
-  | { kind: 'declined' }
-  | { kind: 'full' }
-  | { kind: 'busy' }
-  | { kind: 'unreachable'; origin: string }
-  | { kind: 'invalid' }
-  | { kind: 'unsaved' }
+  | { kind: typeof TRUST_OUTCOME_KINDS.trusted; server: ServerEntry; isNew: boolean }
+  | { kind: typeof TRUST_OUTCOME_KINDS.declined }
+  | { kind: typeof TRUST_OUTCOME_KINDS.full }
+  | { kind: typeof TRUST_OUTCOME_KINDS.busy }
+  | { kind: typeof TRUST_OUTCOME_KINDS.unreachable; origin: string }
+  | { kind: typeof TRUST_OUTCOME_KINDS.invalid }
+  | { kind: typeof TRUST_OUTCOME_KINDS.unsaved }
+
+/** Where a trust request came from: a `raven://` link, or Settings' Add. */
+export const TRUST_SOURCES = { link: 'link', app: 'app' } as const
+
+export type TrustSource = (typeof TRUST_SOURCES)[keyof typeof TRUST_SOURCES]
 
 export type ServerTrust = {
-  trust: (input: { origin: string; from: 'link' | 'app' }) => Promise<TrustOutcome>
+  trust: (input: { origin: string; from: TrustSource }) => Promise<TrustOutcome>
   remove: (serverId: string) => Promise<boolean>
 }
 
@@ -128,7 +143,7 @@ export const createServerTrust = (deps: ServerTrustDeps): ServerTrust => {
   const within = async <T>({ work, late }: { work: Promise<T>; late: () => T }): Promise<T> => {
     const budget: { handle: unknown } = { handle: null }
     const deadline = new Promise<T>((resolve) => {
-      budget.handle = deps.timers.set(() => resolve(late()), TRUST_STEP_MS)
+      budget.handle = deps.timers.set({ run: () => resolve(late()), ms: TRUST_STEP_MS })
     })
     try {
       return await Promise.race([work, deadline])

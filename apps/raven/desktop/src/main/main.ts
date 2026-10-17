@@ -136,7 +136,7 @@ const NIGHT = '#15201e'
 const timers = createNodeTimers()
 
 // No cookie rides along, a redirect away from the releases list fails, and nothing is cached.
-const fetchReleases: UpdateFetch = (url, init) =>
+const fetchReleases: UpdateFetch = ({ url, init }) =>
   net.fetch(url, { ...init, credentials: 'omit', redirect: 'error', cache: 'no-store' })
 
 /** The traffic lights are macOS's; elsewhere there is nothing to show or hide. */
@@ -371,8 +371,8 @@ const startApp = (): void => {
   const stateFile = join(userData, 'player-state.json')
   const stateFs: StateFs = {
     readFile: (path) => readFile(path, 'utf8'),
-    writeFile: (path, data) => writeFile(path, data, 'utf8'),
-    rename: (from, to) => rename(from, to),
+    writeFile: ({ path, data }) => writeFile(path, data, 'utf8'),
+    rename: ({ from, to }) => rename(from, to),
   }
 
   const createService = async (): Promise<DesktopService> => {

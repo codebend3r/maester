@@ -41,14 +41,14 @@ export const createMarks = ({
     if (histogram === null) return
     write(`raven-loop-lag-p99-ms ${Math.round(histogram.percentile(99) / NS_PER_MS)}\n`)
     histogram.reset()
-    timer = timers.set(report, LOOP_LAG_MS)
+    timer = timers.set({ run: report, ms: LOOP_LAG_MS })
   }
 
   const start = () => {
     if (timer !== null) return
     histogram ??= makeHistogram()
     histogram.enable()
-    timer = timers.set(report, LOOP_LAG_MS)
+    timer = timers.set({ run: report, ms: LOOP_LAG_MS })
   }
 
   const stop = () => {

@@ -9,7 +9,7 @@ export const createNodeTimers = (): Timers => {
   let next = 0
 
   return {
-    set: (run, ms) => {
+    set: ({ run, ms }) => {
       next += 1
       const handle = next
       live.set(

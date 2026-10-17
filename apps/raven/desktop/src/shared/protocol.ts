@@ -93,14 +93,16 @@ export const isAudioDevice = object({ name: isString, description: isString })
 
 export type AudioDevice = Infer<typeof isAudioDevice>
 
-export const isMenuPlayerAction = oneOf([
-  'togglePlay',
-  'skipBack',
-  'skipForward',
-  'next',
-  'showShortcuts',
-  'stats',
-])
+export const MENU_PLAYER_ACTIONS = {
+  togglePlay: 'togglePlay',
+  skipBack: 'skipBack',
+  skipForward: 'skipForward',
+  next: 'next',
+  showShortcuts: 'showShortcuts',
+  stats: 'stats',
+} as const
+
+export const isMenuPlayerAction = oneOf(Object.values(MENU_PLAYER_ACTIONS))
 
 export type MenuPlayerAction = Infer<typeof isMenuPlayerAction>
 
@@ -168,6 +170,20 @@ export const isDesktopRequest = union(
 
 export type DesktopRequest = Infer<typeof isDesktopRequest>
 
+export const DESKTOP_REPLIES = {
+  play: 'play',
+  playServer: 'playServer',
+  file: 'file',
+  recents: 'recents',
+  output: 'output',
+  done: 'done',
+  refused: 'refused',
+  serverReply: 'serverReply',
+  serverUnreachable: 'serverUnreachable',
+  servers: 'servers',
+  updates: 'updates',
+} as const
+
 export const isDesktopReply = union(
   object({ type: oneOf(['play']), target: isPlayTarget }),
   object({ type: oneOf(['playServer']), target: isServerTarget }),
@@ -189,18 +205,32 @@ export const isDesktopReply = union(
 
 export type DesktopReply = Infer<typeof isDesktopReply>
 
+export const DESKTOP_EVENTS = {
+  play: 'play',
+  player: 'player',
+  navigate: 'navigate',
+  notice: 'notice',
+  playServer: 'playServer',
+  openLink: 'openLink',
+  updateAvailable: 'updateAvailable',
+} as const
+
+export const NAVIGATION_TARGETS = { settings: 'settings' } as const
+
 /** What main pushes on its own: menu actions (File > Open Link among them), `open-file`, links, notices. */
 export const isDesktopEvent = union(
-  object({ type: oneOf(['play']), target: isPlayTarget }),
-  object({ type: oneOf(['player']), action: isMenuPlayerAction }),
-  object({ type: oneOf(['navigate']), to: oneOf(['settings']) }),
-  object({ type: oneOf(['notice']), message: isString }),
-  object({ type: oneOf(['playServer']), target: isServerTarget }),
-  object({ type: oneOf(['openLink']) }),
-  object({ type: oneOf(['updateAvailable']), version: isString }),
+  object({ type: oneOf([DESKTOP_EVENTS.play]), target: isPlayTarget }),
+  object({ type: oneOf([DESKTOP_EVENTS.player]), action: isMenuPlayerAction }),
+  object({ type: oneOf([DESKTOP_EVENTS.navigate]), to: oneOf(Object.values(NAVIGATION_TARGETS)) }),
+  object({ type: oneOf([DESKTOP_EVENTS.notice]), message: isString }),
+  object({ type: oneOf([DESKTOP_EVENTS.playServer]), target: isServerTarget }),
+  object({ type: oneOf([DESKTOP_EVENTS.openLink]) }),
+  object({ type: oneOf([DESKTOP_EVENTS.updateAvailable]), version: isString }),
 )
 
 export type DesktopEvent = Infer<typeof isDesktopEvent>
+
+export const ENVELOPE_KINDS = { page: 'page', drop: 'drop' } as const
 
 /**
  * What the preload sends on the request channel. The preload builds it, so a
@@ -213,6 +243,8 @@ export const isInvokeEnvelope = union(
 )
 
 export type InvokeEnvelope = Infer<typeof isInvokeEnvelope>
+
+export const PLAYER_CONNECTION_STATUSES = { native: 'native', unavailable: 'unavailable' } as const
 
 export const isPlayerConnection = union(
   object({ status: oneOf(['native']) }),

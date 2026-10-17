@@ -91,11 +91,11 @@ describe('compareVersions', () => {
   const versionOf = (text: string) => parseVersion(text) ?? { major: -1, minor: -1, patch: -1 }
 
   it('compares numbers, not text', () => {
-    expect(compareVersions(versionOf('10.0.0'), versionOf('9.9.9'))).toBeGreaterThan(0)
-    expect(compareVersions(versionOf('0.10.0'), versionOf('0.9.12'))).toBeGreaterThan(0)
-    expect(compareVersions(versionOf('0.9.12'), versionOf('0.10.0'))).toBeLessThan(0)
-    expect(compareVersions(versionOf('1.2.3'), versionOf('1.2.3'))).toBe(0)
-    expect(compareVersions(versionOf('1.2.4'), versionOf('1.2.3'))).toBeGreaterThan(0)
+    expect(compareVersions({ a: versionOf('10.0.0'), b: versionOf('9.9.9') })).toBeGreaterThan(0)
+    expect(compareVersions({ a: versionOf('0.10.0'), b: versionOf('0.9.12') })).toBeGreaterThan(0)
+    expect(compareVersions({ a: versionOf('0.9.12'), b: versionOf('0.10.0') })).toBeLessThan(0)
+    expect(compareVersions({ a: versionOf('1.2.3'), b: versionOf('1.2.3') })).toBe(0)
+    expect(compareVersions({ a: versionOf('1.2.4'), b: versionOf('1.2.3') })).toBeGreaterThan(0)
   })
 })
 
@@ -306,16 +306,16 @@ describe('nextPageUrl', () => {
   })
 })
 
-type Call = Parameters<UpdateFetch>
+type Call = Parameters<UpdateFetch>[0]
 
 type Reply = { status: number; text: string; link?: string }
 
 /** GitHub as a map of URLs to replies; any other URL is a 404. */
 const serving = (pages: Record<string, Reply>) => {
   const calls: Call[] = []
-  const fetch: UpdateFetch = async (...call) => {
+  const fetch: UpdateFetch = async (call) => {
     calls.push(call)
-    const [url] = call
+    const { url } = call
     const { status, text, link = null } = pages[url] ?? { status: 404, text: '' }
     return {
       status,
@@ -343,7 +343,7 @@ describe('checkForUpdates', () => {
     const { fetch, calls } = replying({ status: 200, text: NEWER })
     await check({ fetch })
     expect(calls.length).toBe(1)
-    const [url, init] = calls[0]
+    const { url, init } = calls[0]
     expect(url).toBe(RELEASES_URL)
     expect(init.headers).toEqual({
       accept: 'application/vnd.github+json',
@@ -385,7 +385,7 @@ describe('checkForUpdates', () => {
         },
       })
       expect(await check({ fetch })).toEqual(newer('0.6.0'))
-      expect(calls.map(([url]) => url)).toEqual([RELEASES_URL, pageUrl(2)])
+      expect(calls.map(({ url }) => url)).toEqual([RELEASES_URL, pageUrl(2)])
     })
 
     it('is current only once a later page shows the running release', async () => {
@@ -438,7 +438,7 @@ describe('checkForUpdates', () => {
         [foreign]: { status: 200, text: NEWER },
       })
       expect(await check({ fetch })).toEqual(UNLISTED)
-      expect(calls.map(([url]) => url)).toEqual([RELEASES_URL])
+      expect(calls.map(({ url }) => url)).toEqual([RELEASES_URL])
     })
 
     it(`reads at most ${MAX_RELEASE_PAGES} pages`, async () => {
@@ -460,7 +460,7 @@ describe('checkForUpdates', () => {
         [pageUrl(2)]: { status: 200, text: NEWER },
       })
       await check({ fetch })
-      const [first, second] = calls.map(([, init]) => init)
+      const [first, second] = calls.map(({ init }) => init)
       expect(second).toEqual(first)
     })
 

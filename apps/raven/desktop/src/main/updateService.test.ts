@@ -38,10 +38,10 @@ const fakeFs = () => {
   const files = new Map<string, string>()
   const fs: StateFs = {
     readFile: async (path) => files.get(path) ?? '',
-    writeFile: async (path, data) => {
+    writeFile: async ({ path, data }) => {
       files.set(path, data)
     },
-    rename: async (from, to) => {
+    rename: async ({ from, to }) => {
       files.set(to, files.get(from) ?? '')
       files.delete(from)
     },
@@ -277,7 +277,7 @@ describe('a list with no raven player release in it', () => {
 
   it('still finds the release behind a page of builds', async () => {
     const PAGE_2 = 'https://api.github.com/repositories/1388607730/releases?per_page=100&page=2'
-    const paged: UpdateFetch = async (url) => {
+    const paged: UpdateFetch = async ({ url }) => {
       if (url === PAGE_2) {
         return {
           status: 200,
@@ -293,9 +293,9 @@ describe('a list with no raven player release in it', () => {
             ]),
         }
       }
-      const response = await onlyBuilds(url, {
-        headers: {},
-        signal: AbortSignal.timeout(1000),
+      const response = await onlyBuilds({
+        url,
+        init: { headers: {}, signal: AbortSignal.timeout(1000) },
       })
       return { ...response, headers: { get: () => `<${PAGE_2}>; rel="next"` } }
     }

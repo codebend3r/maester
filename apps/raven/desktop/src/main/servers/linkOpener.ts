@@ -1,6 +1,13 @@
 import type { PlayRequest } from '@raven/core'
 import { loggable } from '@/main/servers/serverCalls'
-import { TRUST_MESSAGES, type ServerTrust, type TrustOutcome } from '@/main/servers/serverTrust'
+import {
+  TRUST_MESSAGES,
+  TRUST_OUTCOME_KINDS,
+  TRUST_SOURCES,
+  type ServerTrust,
+  type TrustOutcome,
+  type TrustSource,
+} from '@/main/servers/serverTrust'
 import { messageOf } from '@/shared/messageOf'
 import { readDownloadLink, readPlayLink } from '@/shared/playLink'
 import type { DesktopReply } from '@/shared/protocol'
@@ -51,7 +58,7 @@ export const replyForTrust = ({
 }
 
 export type LinkOpener = {
-  open: (input: { link: string; from: 'link' | 'app' }) => Promise<DesktopReply>
+  open: (input: { link: string; from: TrustSource }) => Promise<DesktopReply>
   openBatch: (links: readonly string[]) => Promise<DesktopReply>
 }
 

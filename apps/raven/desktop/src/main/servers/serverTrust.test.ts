@@ -38,11 +38,11 @@ const fakeFs = () => {
   const state = { isBroken: false }
   const fs: StateFs = {
     readFile: async (path) => files.get(path) ?? '',
-    writeFile: async (path, data) => {
+    writeFile: async ({ path, data }) => {
       if (state.isBroken) throw new Error('disk full')
       files.set(path, data)
     },
-    rename: async (from, to) => {
+    rename: async ({ from, to }) => {
       files.set(to, files.get(from) ?? '')
       files.delete(from)
     },
