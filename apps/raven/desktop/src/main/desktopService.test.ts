@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import { dirname, basename } from 'node:path'
 import { isOpaqueId, MAX_QUEUE } from '@/shared/protocol'
-import { createGrants } from '@/main/grants'
+import { createGrants, type Grants } from '@/main/grants'
 import { createStateStore, type StateFs, type Timers } from '@/main/stateStore'
 import { EMPTY_STATE } from '@/main/playerState'
 import { createDesktopService, MESSAGES } from '@/main/desktopService'
@@ -73,9 +73,11 @@ const PLAY_REPLY = {
  * `notePosition` found already saved.
  */
 const fakeDownloads = ({
+  grants,
   savedPosition,
   serverPosition,
 }: {
+  grants: Grants
   savedPosition: () => number | null
   serverPosition: number
 }) => {
@@ -94,6 +96,12 @@ const fakeDownloads = ({
       path.startsWith(`${DOWNLOADED}/`) ? 'Downloaded from Vhagar' : null,
     labelOf: ({ path }) => DOWNLOAD_LABELS.get(path) ?? null,
     serverPositionOf: () => serverPosition,
+    // The first download's next is the second, as its group would have it; any other file has none.
+    nextOf: async ({ fileId }) => {
+      if (grants.fileOf(fileId)?.path !== DOWNLOAD_ONE) return null
+      const result = await grants.grant(DOWNLOAD_TWO)
+      return result.ok ? result.file : null
+    },
     noteOpened: (input) => note('noteOpened', input),
     notePosition: (input) => {
       note('notePosition', input)
@@ -327,6 +335,7 @@ const setup = ({
     warn: () => undefined,
   })
   const { downloads, reached, resumeAt } = fakeDownloads({
+    grants,
     savedPosition: () => store.read().resume[0]?.position ?? null,
     serverPosition,
   })
@@ -698,6 +707,33 @@ describe('describeFile', () => {
     })
     expect(reply.file.next).toMatchObject({ label: 'S01E02 Half Loop' })
     expect(reached).toEqual([{ name: 'noteOpened', input: { fileId: target.fileId } }])
+  })
+
+  it("offers a download's next of its group when its queue is empty, as when opened from the recents", async () => {
+    const { service } = setup({ files: { [DOWNLOAD_ONE]: {}, [DOWNLOAD_TWO]: {} } })
+    const first = idOf(await service.openPaths([DOWNLOAD_ONE]))
+    await describeFile({ service, fileId: first.fileId })
+    const listed = await service.handle({ kind: 'page', request: { type: 'listRecents' } })
+    if (listed.type !== 'recents') throw new Error(`expected recents, got ${listed.type}`)
+    const [recent] = listed.recents
+    if (recent === undefined) throw new Error('no recent')
+    const reopened = idOf(
+      await service.handle({
+        kind: 'page',
+        request: { type: 'openRecent', recentId: recent.recentId },
+      }),
+    )
+    expect(reopened.queue).toEqual([])
+    const reply = await describeFile({ service, fileId: reopened.fileId })
+    if (reply.type !== 'file') throw new Error(`expected file, got ${reply.type}`)
+    expect(reply.file.next).toMatchObject({ label: 'S01E02 Half Loop', queue: [] })
+  })
+
+  it('offers no next after the last download of its group', async () => {
+    const { service } = setup({ files: { [DOWNLOAD_ONE]: {}, [DOWNLOAD_TWO]: {} } })
+    const { fileId } = idOf(await service.openPaths([DOWNLOAD_TWO]))
+    const reply = await describeFile({ service, fileId })
+    expect(reply.type === 'file' && reply.file.next).toBeNull()
   })
 })
 

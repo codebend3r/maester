@@ -12,7 +12,7 @@ import {
 } from '@/main/downloads/downloadState'
 import type { DownloadsStore } from '@/main/downloads/downloadStore'
 import { downloadsDirFor, sidecarPathFor, videoPathFor } from '@/main/downloads/space'
-import type { Grants } from '@/main/grants'
+import type { GrantedFile, Grants } from '@/main/grants'
 import { errorText } from '@/main/log/errorText'
 import type { LocalSidecar } from '@/main/player/playerService'
 import {
@@ -49,6 +49,12 @@ export type DownloadPlaybackDeps = {
 export type DownloadPlayback = {
   /** Plays a ready download as a local file, with its group's later ready files queued. */
   open: (input: { downloadId: string }) => Promise<DesktopReply>
+  /**
+   * The next ready download of a granted download's group, granted, for a play whose queue has
+   * run out (opened from Home's recents, or past `MAX_QUEUE`); null after the last, and for any
+   * other file.
+   */
+  nextOf: (input: { fileId: string }) => Promise<Readonly<GrantedFile> | null>
   /** The subtitle files kept beside a granted download's video; none for any other file. */
   sidecarsOf: (fileId: string) => readonly LocalSidecar[]
   /** "Downloaded from <server>" for a path in the downloads folder, else null. */
@@ -129,15 +135,30 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
     return result.file.fileId
   }
 
+  /** The ready downloads after `entry` in its group, in play order. */
+  const laterReady = (entry: DownloadEntry): DownloadEntry[] => {
+    const group = sortDownloads(store.read().entries).filter((other) =>
+      sameGroup({ a: entry, b: other }),
+    )
+    const index = group.findIndex(({ downloadId }) => downloadId === entry.downloadId)
+    return group.slice(index + 1).filter((other) => other.status.kind === 'ready')
+  }
+
+  /** The first of `entries` whose video can still be granted. */
+  const firstGranted = async (
+    entries: readonly DownloadEntry[],
+  ): Promise<Readonly<GrantedFile> | null> => {
+    const [first, ...rest] = entries
+    if (first === undefined) return null
+    const fileId = await grantVideo(first)
+    const file = fileId === null ? null : grants.fileOf(fileId)
+    return file ?? firstGranted(rest)
+  }
+
   const open: DownloadPlayback['open'] = async ({ downloadId }) => {
-    const state = store.read()
-    const entry = entryById(state, { downloadId })
+    const entry = entryById(store.read(), { downloadId })
     if (entry === null || entry.status.kind !== 'ready') return refused(DOWNLOAD_MESSAGES.unknown)
-    const group = sortDownloads(state.entries).filter((other) => sameGroup({ a: entry, b: other }))
-    const later = group
-      .slice(group.indexOf(entry) + 1)
-      .filter((other) => other.status.kind === 'ready')
-      .slice(0, MAX_QUEUE)
+    const later = laterReady(entry).slice(0, MAX_QUEUE)
     const fileId = await grantVideo(entry)
     if (fileId === null) {
       deps.warn(`raven player could not open the file of ${loggable(entry.label)}`)
@@ -162,6 +183,11 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
         queue: queued.flatMap((queuedId) => (queuedId === null ? [] : [queuedId])),
       },
     }
+  }
+
+  const nextOf: DownloadPlayback['nextOf'] = async ({ fileId }) => {
+    const entry = entryOfFile(fileId)
+    return entry === null ? null : firstGranted(laterReady(entry))
   }
 
   const sidecarsOf: DownloadPlayback['sidecarsOf'] = (fileId) => {
@@ -258,6 +284,7 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
 
   return {
     open,
+    nextOf,
     sidecarsOf,
     fromLabelOf,
     labelOf: ({ path }) => entryAt(path)?.label ?? null,

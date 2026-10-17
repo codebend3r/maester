@@ -296,6 +296,44 @@ describe('open', () => {
   })
 })
 
+describe('nextOf', () => {
+  it("offers the group's next ready download after one granted outside the Downloads page", async () => {
+    const ready = [episodeOf(1), episodeOf(3), episodeOf(4)]
+    const world = setup({
+      entries: [...ready, episodeOf(2, { status: { kind: 'queued' } })],
+      videos: shelved(...ready),
+    })
+    const next = await world.playback.nextOf({ fileId: await granted(world, videoOf(11)) })
+    expect(next?.path).toBe(videoOf(13))
+    expect(world.playback.labelOf({ path: next?.path ?? '' })).toBe('Episode 3')
+  })
+
+  it('skips a later download whose file has gone', async () => {
+    const world = setup({
+      entries: [episodeOf(1), episodeOf(2), episodeOf(3)],
+      videos: shelved(episodeOf(1), episodeOf(3)),
+    })
+    const next = await world.playback.nextOf({
+      fileId: await opened(world, episodeOf(1).downloadId),
+    })
+    expect(next?.path).toBe(videoOf(13))
+  })
+
+  it('offers none after the last of its group, nor for a file that is no download', async () => {
+    const movie = entryFor({
+      downloadId: '00000000-0000-4000-9000-0000000000aa',
+      mediaId: 41,
+      label: 'Dune (2021)',
+      group: { kind: 'movie', key: 'movie:41', title: 'Dune (2021)', order: 0 },
+    })
+    const entries = [episodeOf(1), episodeOf(2), movie]
+    const world = setup({ entries, videos: { ...shelved(...entries), [MOVIE_PATH]: FILE } })
+    expect(await world.playback.nextOf({ fileId: await granted(world, videoOf(12)) })).toBeNull()
+    expect(await world.playback.nextOf({ fileId: await granted(world, MOVIE_PATH) })).toBeNull()
+    expect(await world.playback.nextOf({ fileId: UNKNOWN_ID })).toBeNull()
+  })
+})
+
 describe('what names a download', () => {
   it("lists a download's subtitles under its subtitles folder, and none for another file", async () => {
     const world = setup({
