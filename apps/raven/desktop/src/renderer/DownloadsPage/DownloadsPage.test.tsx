@@ -118,6 +118,26 @@ describe('DownloadsPage', () => {
     expect(within(row).getByText('Severance')).toBeInTheDocument()
   })
 
+  const MOVIE_ROW = viewOf({
+    label: 'Dune (2021)',
+    group: { kind: 'movie', key: 'movie:41', title: 'Dune (2021)', order: 0 },
+  })
+
+  it('names only the server under a row whose group is its own title', async () => {
+    await openPage({ downloads: [MOVIE_ROW] })
+    const row = await rowOf('Dune (2021)')
+    expect(within(row).getAllByText('Dune (2021)')).toHaveLength(1)
+    expect(within(row).getByText('Vhagar')).toBeInTheDocument()
+  })
+
+  it('shows no second line for a row that is its own group, from a server that is gone', async () => {
+    await openPage({ downloads: [{ ...MOVIE_ROW, serverName: '' }] })
+    const row = await rowOf('Dune (2021)')
+    expect(within(row).getAllByText('Dune (2021)')).toHaveLength(1)
+    expect(within(row).queryByText('·', { exact: false })).toBeNull()
+    expect(row.querySelector('.from')).toBeNull()
+  })
+
   it('shows each status in its own words', async () => {
     await openPage({
       downloads: [

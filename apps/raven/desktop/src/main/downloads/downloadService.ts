@@ -181,6 +181,8 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     now: deps.now,
     warn: deps.warn,
     onFinished: (entry) => notice(DOWNLOAD_MESSAGES.downloaded(entry.label)),
+    // Nothing else names a download yet, so a removal has nothing more to drop.
+    onRemoved: () => undefined,
     onFailed: (entry) => {
       const { status } = entry
       if (status.kind !== 'failed') return

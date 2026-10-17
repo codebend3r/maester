@@ -176,8 +176,11 @@ export const DownloadRow = ({
     setMode('view')
   }
 
-  const from =
-    view.serverName === '' ? view.group.title : `${view.group.title} · ${view.serverName}`
+  // A movie is its own group, so its row names the server alone rather than its title twice.
+  const from = [
+    ...(view.group.title === label ? [] : [view.group.title]),
+    ...(view.serverName === '' ? [] : [view.serverName]),
+  ].join(' · ')
 
   return (
     <li ref={row} className={mode === 'view' ? styles.row : styles.asking}>
@@ -207,7 +210,7 @@ export const DownloadRow = ({
           <span id={ids.label} className={styles.label}>
             {label}
           </span>
-          <span className={styles.from}>{from}</span>
+          {from !== '' && <span className={styles.from}>{from}</span>}
           <span className={styles.size}>{formatBytes(view.size)}</span>
           <p className={styles.status}>
             <StatusLine view={view} textId={ids.status} />

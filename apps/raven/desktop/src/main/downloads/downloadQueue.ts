@@ -1,10 +1,4 @@
-import { join } from 'node:path'
-import {
-  isMediaId,
-  isMediaTracks,
-  MEDIA_TICKET_REFRESH_SECONDS,
-  type SubtitleTrack,
-} from '@raven/core'
+import { isMediaTracks, MEDIA_TICKET_REFRESH_SECONDS, type SubtitleTrack } from '@raven/core'
 import type { ServerEntry } from '@/main/desktopConfig'
 import { DOWNLOAD_MESSAGES } from '@/main/downloads/downloadMessages'
 import {
@@ -55,10 +49,11 @@ import {
   videoPathFor,
   type SpaceFs,
 } from '@/main/downloads/space'
+import { removeFolder, sweepDownloads } from '@/main/downloads/sweep'
 import { errorText } from '@/main/log/errorText'
 import { loggable, type ServerCalls } from '@/main/servers/serverCalls'
 import { sidecarTracksOf } from '@/main/servers/sidecarTracks'
-import { isMissingFile, type Timers } from '@/main/stateStore'
+import type { Timers } from '@/main/stateStore'
 import { isOpaqueId, SERVER_GONE } from '@/shared/protocol'
 
 export const DOWNLOAD_CONCURRENCY = 2
@@ -109,6 +104,8 @@ export type DownloadQueueDeps = {
   warn: (message: string) => void
   onFinished: (entry: DownloadEntry) => void
   onFailed: (entry: DownloadEntry) => void
+  /** The downloads `remove`, `removeServer`, `removeAll` and the sweep dropped. */
+  onRemoved: (entries: readonly DownloadEntry[]) => void
 }
 
 export type DownloadQueue = {
@@ -132,10 +129,7 @@ export type DownloadQueue = {
   removeServer: (input: { serverId: string }) => Promise<void>
   /** Aborts every file, drops them all and removes the whole downloads folder. */
   removeAll: () => Promise<void>
-  /**
-   * At launch: drops the files of servers no longer kept and removes the folders no file
-   * names, but no media folder when `downloads.json` was set aside. Never rejects.
-   */
+  /** At launch: `sweepDownloads`, holding any kick until it is done. Never rejects. */
   sweep: (input: { wasSetAside: boolean }) => Promise<void>
   /** Aborts every fetch; the entries stay as they are for the next launch. */
   dispose: () => void
@@ -219,10 +213,6 @@ const parseJson = (text: string): unknown => {
     return null
   }
 }
-
-/** A folder name as a media id writes it, so `012` is never taken for `12`'s folder. */
-const isMediaFolder = (name: string): boolean =>
-  /^\d+$/u.test(name) && isMediaId(Number(name)) && String(Number(name)) === name
 
 /** Settles with null as soon as `signal` aborts, so a stopped run never waits on a slow server. */
 const unlessStopped = <T>({
@@ -823,20 +813,17 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     })
   }
 
-  /** Removes a folder; one that stays is swept at the next launch, so a failure is only logged. */
-  const removeFolder = async ({ path, what }: { path: string; what: string }): Promise<void> => {
-    await fs.rm(path).catch((error: unknown) => {
-      deps.warn(`raven player could not remove ${what}: ${loggable(errorText(error))}`)
-    })
-  }
+  const removing = ({ path, what }: { path: string; what: string }): Promise<void> =>
+    removeFolder({ fs, warn: deps.warn, path, what })
 
   const removeOne: DownloadQueue['remove'] = async ({ downloadId }) => {
     const entry = entryById(store.read(), { downloadId })
     if (entry === null) return
     store.update((state) => remove(state, { downloadId }))
+    deps.onRemoved([entry])
     syncOutageRetry()
     await stopOne({ downloadId, reason: 'remove' })
-    await removeFolder({
+    await removing({
       path: entryDirFor(partsOf(entry)),
       what: `the files of ${loggable(entry.label)}`,
     })
@@ -845,11 +832,13 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
 
   const removeServerAll: DownloadQueue['removeServer'] = async ({ serverId }) => {
     if (!isOpaqueId(serverId)) return
+    const dropped = store.read().entries.filter((entry) => entry.serverId === serverId)
     store.update((state) => removeServer(state, { serverId }))
+    if (dropped.length > 0) deps.onRemoved(dropped)
     syncOutageRetry()
     deps.access.forget(serverId)
     await stopRuns({ reason: 'remove', isStopped: ({ run }) => run.serverId === serverId })
-    await removeFolder({
+    await removing({
       path: serverDirFor({ userData, serverId }),
       what: "a removed server's downloads",
     })
@@ -857,72 +846,12 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
   }
 
   const removeEverything: DownloadQueue['removeAll'] = async () => {
+    const dropped = store.read().entries
     store.update(removeAll)
+    if (dropped.length > 0) deps.onRemoved(dropped)
     syncOutageRetry()
     await stopRuns({ reason: 'remove', isStopped: () => true })
-    await removeFolder({ path: downloadsDirFor({ userData }), what: 'its downloads' })
-  }
-
-  /** The names in a folder; none when it does not exist, and none, with a warning, when it cannot be read. */
-  const namesIn = (path: string): Promise<string[]> =>
-    fs.readdir(path).catch((error: unknown) => {
-      if (!isMissingFile(error)) {
-        deps.warn(`raven player could not read its downloads: ${loggable(errorText(error))}`)
-      }
-      return []
-    })
-
-  const sweepFolders = async ({ wasSetAside }: { wasSetAside: boolean }): Promise<void> => {
-    const kept = deps.servers().map(({ id }) => id)
-    // An unreadable config loads empty and is set aside; its servers' downloads must outlive that.
-    const canDropServers = kept.length > 0
-    const isKept = (serverId: string): boolean => kept.includes(serverId)
-    const dropped = canDropServers
-      ? store.read().entries.filter((entry) => !isKept(entry.serverId))
-      : []
-    store.update((state) =>
-      dropped.reduce((next, entry) => remove(next, { downloadId: entry.downloadId }), state),
-    )
-    if (dropped.length > 0) {
-      deps.warn(`raven player dropped ${dropped.length} downloads of servers it no longer keeps`)
-    }
-    const root = downloadsDirFor({ userData })
-    const servers = (await namesIn(root)).filter(isOpaqueId)
-    const goneServers = canDropServers ? servers.filter((serverId) => !isKept(serverId)) : []
-    // Read as each folder is listed, so a file queued meanwhile keeps its folder.
-    const isNamed = ({ serverId, name }: { serverId: string; name: string }): boolean =>
-      store
-        .read()
-        .entries.some((entry) => entry.serverId === serverId && String(entry.mediaId) === name)
-    if (wasSetAside) {
-      deps.warn('raven player kept every download folder: its list of downloads was set aside')
-    }
-    // A set-aside list names nothing, so every folder would look unnamed; they wait for a later launch.
-    const unnamed = (
-      await Promise.all(
-        servers
-          .filter((serverId) => !wasSetAside && isKept(serverId))
-          .map(async (serverId) =>
-            (await namesIn(join(root, serverId)))
-              .filter((name) => isMediaFolder(name) && !isNamed({ serverId, name }))
-              .map((name) => join(root, serverId, name)),
-          ),
-      )
-    ).flat()
-    await Promise.all([
-      ...goneServers.map((serverId) =>
-        removeFolder({ path: join(root, serverId), what: "a removed server's downloads" }),
-      ),
-      ...unnamed.map((path) => removeFolder({ path, what: 'a download folder no download names' })),
-    ])
-    if (goneServers.length > 0) {
-      deps.warn(
-        `raven player removed the downloads of ${goneServers.length} servers it no longer keeps`,
-      )
-    }
-    if (unnamed.length > 0) {
-      deps.warn(`raven player removed ${unnamed.length} download folders no download names`)
-    }
+    await removing({ path: downloadsDirFor({ userData }), what: 'its downloads' })
   }
 
   const dispose: DownloadQueue['dispose'] = () => {
@@ -947,14 +876,18 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     remove: removeOne,
     removeServer: removeServerAll,
     removeAll: removeEverything,
-    sweep: (input) => {
-      const sweeping = sweepFolders(input)
-        .catch((error: unknown) => {
-          deps.warn(`raven player could not sweep its downloads: ${loggable(errorText(error))}`)
-        })
-        .finally(() => {
-          launch.sweeping = null
-        })
+    sweep: ({ wasSetAside }) => {
+      const sweeping = sweepDownloads({
+        store,
+        fs,
+        servers: deps.servers,
+        userData,
+        warn: deps.warn,
+        onRemoved: deps.onRemoved,
+        wasSetAside,
+      }).finally(() => {
+        launch.sweeping = null
+      })
       launch.sweeping = sweeping
       return sweeping
     },
