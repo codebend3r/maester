@@ -35,15 +35,50 @@ const distanceFrom = async ({ page, seconds }: { page: Page; seconds: number }) 
 
 const homeHeading = (page: Page) => page.getByRole('heading', { name: 'raven player' })
 
-/** Drops a File the page made, which main refuses with a notice. */
-const dropForgedFile = ({ page, name }: { page: Page; name: string }) =>
-  page.evaluate((fileName) => {
-    const transfer = new DataTransfer()
-    transfer.items.add(new File(['x'], fileName, { type: 'video/mp4' }))
-    window.dispatchEvent(
-      new DragEvent('drop', { dataTransfer: transfer, bubbles: true, cancelable: true }),
-    )
-  }, name)
+/** Sends the window a drag event carrying a File the page made. */
+const forgedDrag = ({
+  page,
+  type,
+  name,
+}: {
+  page: Page
+  type: 'dragenter' | 'drop'
+  name: string
+}) =>
+  page.evaluate(
+    ({ eventType, fileName }) => {
+      const transfer = new DataTransfer()
+      transfer.items.add(new File(['x'], fileName, { type: 'video/mp4' }))
+      window.dispatchEvent(
+        new DragEvent(eventType, { dataTransfer: transfer, bubbles: true, cancelable: true }),
+      )
+    },
+    { eventType: type, fileName: name },
+  )
+
+const dropOverlay = (page: Page) => page.getByText('Drop to play')
+
+/**
+ * Drags a File the page made over Home until its "Drop to play" shows, which proves the
+ * drop listener is attached, then drops it: main refuses it with a notice.
+ */
+const dropForgedFileOnHome = async ({ page, name }: { page: Page; name: string }) => {
+  await expect(async () => {
+    await forgedDrag({ page, type: 'dragenter', name })
+    await expect(dropOverlay(page)).toBeVisible({ timeout: 500 })
+  }).toPass()
+  await forgedDrag({ page, type: 'drop', name })
+  await expect(dropOverlay(page)).toBeHidden()
+}
+
+/**
+ * Drags and drops a File the page made over a video that has played for a while, so the
+ * window's drop listener is long attached; the watch route shows no overlay to wait for.
+ */
+const dropForgedFile = async ({ page, name }: { page: Page; name: string }) => {
+  await forgedDrag({ page, type: 'dragenter', name })
+  await forgedDrag({ page, type: 'drop', name })
+}
 
 /** A notice over the watch route sits wholly above the controls bar's timeline. */
 const expectNoticeClearOfControls = async (page: Page) => {
@@ -152,7 +187,7 @@ test.describe.serial('playing a local file through the web engine fallback', () 
       run: async ({ page }) => {
         await expect(homeHeading(page)).toBeVisible()
         // Named for a real video, so a path taken from the name would play it.
-        await dropForgedFile({ page, name: clips.first })
+        await dropForgedFileOnHome({ page, name: clips.first })
 
         await expect(page.getByRole('status')).toHaveText('Drop a video file to play it.')
         expect(page.url()).toBe('app://raven/')
