@@ -8,9 +8,11 @@ import {
   SetMetadata,
 } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
-import { LOCKED_STATUS } from '@raven/core'
+import { LOCKED_STATUS, isString } from '@raven/core'
 import { AdminService } from '@/admin/adminService'
 import { LockService, PRIVACIES, type Privacy } from '@/lock/lockService'
+import { isMediaPlaneRoute } from '@/media/mediaPlaneMark'
+import { MediaTickets } from '@/media/mediaTickets'
 import { requestParts } from '@/requestParts'
 import type { MarkTargets, RouteMark } from '@/routeMarks'
 
@@ -62,7 +64,15 @@ const takesId = (path: string): boolean => path.split('/').includes(':id')
  * say whether the lock holds it, and one the lock holds must name its `:id`.
  */
 export const lockMarkProblems = (routes: readonly RouteMark[]): string[] =>
-  routes.flatMap(({ method, path, lock }) => {
+  routes.flatMap(({ method, path, lock, mediaPlane }) => {
+    if (mediaPlane && method !== 'GET') {
+      return [`${method} ${path} is marked MediaPlane but is not a GET`]
+    }
+    if (mediaPlane && isPrivacy(lock) && lock !== 'media') {
+      return [
+        `${method} ${path} is marked MediaPlane but is held by PrivateBy('${lock}') rather than 'media'`,
+      ]
+    }
     if (lock == null && takesParameter(path)) {
       return [`${method} ${path} takes a parameter but is marked neither PrivateBy nor Public`]
     }
@@ -76,22 +86,34 @@ export const lockMarkProblems = (routes: readonly RouteMark[]): string[] =>
  * Answers 423 Locked for a route marked `PrivateBy`, on itself or its
  * controller, whose id sits in a locked library this browser has not
  * unlocked. While the admin lock holds it answers 404 instead, as if there
- * were no such library, so nothing asks for the PIN. `assertRoutesMarked`
+ * were no such library, so nothing asks for the PIN. A media plane route
+ * held by `PrivateBy('media')` also opens to a media ticket for its id in
+ * `?t=`, for the origins a browser sends no cookie to. `assertRoutesMarked`
  * keeps every route with a parameter marked, so the routes that pass
  * unchecked take no id.
  */
 @Injectable()
 export class LockGuard implements CanActivate {
   constructor(
-    @Inject(LockService) private readonly lock: LockService,
-    @Inject(AdminService) private readonly admin: AdminService,
+    @Inject(LockService) private readonly lock: Pick<LockService, 'viewer'>,
+    @Inject(AdminService) private readonly admin: Pick<AdminService, 'isLocked'>,
+    @Inject(MediaTickets) private readonly tickets: Pick<MediaTickets, 'verify'>,
   ) {}
 
   canActivate(context: ExecutionContext): boolean {
     const mark = lockMarkOf([context.getHandler(), context.getClass()])
     if (!isPrivacy(mark)) return true
-    const { params, cookie } = requestParts(context)
+    const { params, query, cookie } = requestParts(context)
     const id = Number(params.id)
+    const ticket = query.t
+    if (
+      mark === 'media' &&
+      isMediaPlaneRoute([context.getHandler(), context.getClass()]) &&
+      isString(ticket) &&
+      this.tickets.verify({ ticket, id })
+    ) {
+      return true
+    }
     if (this.lock.viewer({ cookie }).sees({ privacy: mark, id })) return true
     if (this.admin.isLocked({ cookie })) throw new NotFoundException(`${NOT_FOUND[mark]} ${id}`)
     throw new HttpException('This library is locked.', LOCKED_STATUS)
