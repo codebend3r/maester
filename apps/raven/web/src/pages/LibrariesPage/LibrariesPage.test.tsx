@@ -7,10 +7,13 @@ import { LibrariesPage } from '@/pages/LibrariesPage/LibrariesPage'
 import { useUnlockPrompt } from '@/stores/unlockPrompt'
 import { library, metadataHealth } from '@/test/fixtures'
 import { held } from '@/test/held'
+import { pollFast } from '@/test/polls'
 import { renderWithProviders } from '@/test/render'
 
 /** The picture laid behind a row; the icons carry a style too, for their size. */
 const BACKDROP = '[style*="background-image"]'
+
+const ISO = '2026-10-17T09:00:00.000Z'
 
 describe('LibrariesPage', () => {
   const spies = {
@@ -19,6 +22,7 @@ describe('LibrariesPage', () => {
     lock: spyOn(api, 'getLock'),
     health: spyOn(api, 'getMetadataHealth'),
     match: spyOn(api, 'matchLibrary'),
+    refresh: spyOn(api, 'refreshLibrary'),
   }
 
   beforeEach(() => {
@@ -33,6 +37,7 @@ describe('LibrariesPage', () => {
     spies.lock.mockReset()
     spies.health.mockReset()
     spies.match.mockReset()
+    spies.refresh.mockReset()
   })
 
   it("offers each library's history, a rescan and Edit, each named for its library", async () => {
@@ -296,12 +301,121 @@ describe('LibrariesPage', () => {
     expect(await screen.findByText('Movies · 1,217 videos · 22 not matched')).toBeInTheDocument()
   })
 
-  it('leaves Add library and Rescan out while the admin lock is on, but keeps the pin', async () => {
+  it('refreshes a library, which looks for new files and asks for its ratings again', async () => {
+    const clips = library({ id: 2, name: 'Clips' })
+    spies.list.mockImplementation(async () => [clips])
+    spies.refresh.mockImplementation(async () =>
+      library({
+        id: 2,
+        name: 'Clips',
+        ratingsRefresh: { state: 'running', done: 0, total: 7, startedAt: ISO },
+      }),
+    )
+    renderWithProviders({ ui: <LibrariesPage /> })
+    const button = await screen.findByRole('button', { name: 'Refresh Clips' })
+    expect(button).toHaveAttribute(
+      'title',
+      "Look for new files and fetch every title's ratings again",
+    )
+    spies.list.mockImplementation(async () => [
+      library({
+        id: 2,
+        name: 'Clips',
+        ratingsRefresh: { state: 'running', done: 0, total: 7, startedAt: ISO },
+      }),
+    ])
+    await userEvent.click(button)
+    expect(spies.refresh).toHaveBeenCalledWith(2)
+    expect(await screen.findByText('Refreshing ratings · 0 of 7')).toBeInTheDocument()
+  })
+
+  it('keeps Refresh enabled while a refresh runs, as pressing it rescans and tries again', async () => {
+    spies.list.mockImplementation(async () => [
+      library({
+        id: 2,
+        name: 'Clips',
+        ratingsRefresh: { state: 'running', done: 2, total: 7, startedAt: ISO },
+      }),
+    ])
+    renderWithProviders({ ui: <LibrariesPage /> })
+    expect(await screen.findByRole('button', { name: 'Refresh Clips' })).toBeEnabled()
+  })
+
+  it('shows nothing new when the answer is already idle', async () => {
+    spies.list.mockImplementation(async () => [library({ id: 2, name: 'Clips' })])
+    spies.refresh.mockImplementation(async () =>
+      library({ id: 2, name: 'Clips', ratingsRefresh: { state: 'idle', finishedAt: ISO } }),
+    )
+    renderWithProviders({ ui: <LibrariesPage /> })
+    await userEvent.click(await screen.findByRole('button', { name: 'Refresh Clips' }))
+    await waitFor(() => expect(spies.refresh).toHaveBeenCalled())
+    expect(screen.queryByText(/ratings/i)).toBeNull()
+  })
+
+  it('shows a waiting refresh and why', async () => {
+    spies.list.mockImplementation(async () => [
+      library({
+        id: 2,
+        name: 'Clips',
+        ratingsRefresh: {
+          state: 'waiting',
+          done: 5,
+          total: 7,
+          startedAt: ISO,
+          reason: 'budget',
+          resumesAt: '2999-01-01T00:00:00.000Z',
+        },
+      }),
+    ])
+    renderWithProviders({ ui: <LibrariesPage /> })
+    expect(
+      await screen.findByText('Ratings: 5 of 7 · the rest after midnight UTC (daily limit)'),
+    ).toBeInTheDocument()
+  })
+
+  it('reads the libraries again while a refresh runs, so its count climbs', async () => {
+    pollFast()
+    spies.list.mockImplementation(async () => [
+      library({
+        id: 2,
+        name: 'Clips',
+        ratingsRefresh: { state: 'running', done: 2, total: 7, startedAt: ISO },
+      }),
+    ])
+    renderWithProviders({ ui: <LibrariesPage /> })
+    await screen.findByText('Refreshing ratings · 2 of 7')
+    await waitFor(() => expect(spies.list.mock.calls.length).toBeGreaterThan(2))
+  })
+
+  it('does not read the libraries on a clock while a refresh waits, only when it resumes', async () => {
+    pollFast()
+    spies.list.mockImplementation(async () => [
+      library({
+        id: 2,
+        name: 'Clips',
+        ratingsRefresh: {
+          state: 'waiting',
+          done: 5,
+          total: 7,
+          startedAt: ISO,
+          reason: 'unavailable',
+          resumesAt: '2999-01-01T00:00:00.000Z',
+        },
+      }),
+    ])
+    renderWithProviders({ ui: <LibrariesPage /> })
+    await screen.findByText('Ratings: 5 of 7 · waiting for the ratings service')
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    expect(spies.list).toHaveBeenCalledTimes(1)
+  })
+
+  it('leaves Add library, Rescan and Refresh out while the admin lock is on, but keeps the pin', async () => {
     spies.list.mockImplementation(async () => [library({ name: 'Clips' })])
     renderWithProviders({ ui: <LibrariesPage />, adminLock: { state: 'on', available: true } })
     expect(await screen.findByRole('button', { name: 'Pin Clips' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Add library' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Rescan' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Refresh/ })).toBeNull()
   })
 
   it('shows the folders only while the admin lock is off, even in a list cached with them', async () => {

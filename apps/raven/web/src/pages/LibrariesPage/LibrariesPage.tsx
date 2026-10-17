@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { type Library, isScanning } from '@raven/core'
+import type { Library } from '@raven/core'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
@@ -8,6 +8,7 @@ import { Button } from '@raven/ui'
 import { LibraryActions, useLibraryActions } from '@/components/LibraryActions/LibraryActions'
 import { LibraryDialog } from '@/components/LibraryDialog/LibraryDialog'
 import { LibraryIcon } from '@/components/LibraryIcon/LibraryIcon'
+import { RatingsStatus } from '@/components/RatingsStatus/RatingsStatus'
 import { ScanStatus } from '@/components/ScanStatus/ScanStatus'
 import { Bone, Loading } from '@/components/Skeleton/Skeleton'
 import { useCanManage } from '@/lib/adminLock'
@@ -15,6 +16,7 @@ import { api } from '@/lib/api'
 import { librarySettingsEdits } from '@/lib/edits'
 import { foldersByParent } from '@/lib/folders'
 import { afterPins } from '@/lib/invalidate'
+import { libraryPollDelay } from '@/lib/libraryPolling'
 import { KINDS } from '@/lib/libraryKinds'
 import { LIBRARY_LOCK_STATES, lockState } from '@/lib/libraryLock'
 import { useOptimisticMutation } from '@/lib/optimistic'
@@ -114,6 +116,7 @@ const LibraryRow = ({ library, isShut }: { library: Library; isShut: boolean }) 
         )}
         <div className={styles.status}>
           <ScanStatus scan={library.scan} />
+          <RatingsStatus refresh={library.ratingsRefresh} />
           {actions.rematch.isError && (
             <p className={styles.error} role="alert">
               Could not match again: {actions.rematch.error.message}
@@ -155,9 +158,8 @@ export const LibrariesPage = () => {
   const canManage = useCanManage()
   const libraries = useQuery({
     ...librariesQuery,
-    // Poll only while something is scanning, so the counts climb live.
-    refetchInterval: (query) =>
-      query.state.data?.some((library) => isScanning(library.scan)) ? 1500 : false,
+    // Poll only while something is scanning or a Refresh runs, so the counts climb live.
+    refetchInterval: (query) => libraryPollDelay({ libraries: query.state.data ?? [] }),
   })
 
   // Whether this browser holds the PIN, asked only when some library is locked.

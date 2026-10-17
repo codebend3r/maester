@@ -408,7 +408,8 @@ export const LibraryDialog = ({ library, onClose }: { library?: Library; onClose
                 <p id={`${ids.settings}-ratings-hint`} className={styles.settingHint}>
                   The score on cards, and the one the rating sorts use. Where that source has none,
                   TMDB's stands in. IMDb, Rotten Tomatoes and Metacritic need{' '}
-                  <code>OMDB_API_KEY</code>.
+                  <code>MDBLIST_API_KEY</code> or <code>OMDB_API_KEY</code>; shows get Rotten
+                  Tomatoes and Metacritic only from MDBList.
                 </p>
               </div>
             )}

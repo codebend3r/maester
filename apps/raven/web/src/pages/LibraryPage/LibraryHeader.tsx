@@ -4,6 +4,7 @@ import { Button } from '@raven/ui'
 import { BackButton } from '@/components/BackButton/BackButton'
 import { LibraryActions, type useLibraryActions } from '@/components/LibraryActions/LibraryActions'
 import { LibraryIcon } from '@/components/LibraryIcon/LibraryIcon'
+import { RatingsStatus } from '@/components/RatingsStatus/RatingsStatus'
 import { ScanStatus } from '@/components/ScanStatus/ScanStatus'
 import { api } from '@/lib/api'
 import { KINDS } from '@/lib/libraryKinds'
@@ -13,7 +14,7 @@ const count = new Intl.NumberFormat()
 
 /**
  * The library's name, type and counts, how its scan stands, and at their
- * right what can be done to it: its history, Rescan, Match again, Edit, and
+ * right what can be done to it: its history, Refresh, Rescan, Match again, Edit, and
  * Lock once open.
  */
 export const LibraryHeader = ({
@@ -50,6 +51,7 @@ export const LibraryHeader = ({
         </p>
         <div className={styles.status}>
           <ScanStatus scan={library.scan} />
+          <RatingsStatus refresh={library.ratingsRefresh} />
         </div>
         <div className={styles.actions}>
           <LibraryActions library={library} isShut={isShut} actions={actions} />

@@ -16,6 +16,8 @@ import { held } from '@/test/held'
 import { renderLibraryPage } from '@/test/libraryPage'
 import { pollFast } from '@/test/polls'
 
+const ISO = '2026-10-17T09:00:00.000Z'
+
 const WIDE = mediaItem({ id: 1, title: 'Wide', width: 3840, height: 2160 })
 const FULL = mediaItem({ id: 2, title: 'Full', width: 1920, height: 1080 })
 const ITEMS = [WIDE, FULL, mediaItem({ id: 3, title: 'Also full', width: 1920, height: 800 })]
@@ -319,9 +321,66 @@ describe('LibraryPage', () => {
     )
   })
 
+  it('refreshes the library from its header, and shows how far the refresh has got', async () => {
+    const running = library({
+      id: 2,
+      ratingsRefresh: { state: 'running', done: 1200, total: 3400, startedAt: ISO },
+    })
+    const refresh = spyOn(api, 'refreshLibrary').mockImplementation(async () => running)
+    serve()
+    await userEvent.click(await screen.findByRole('button', { name: 'Refresh Movies' }))
+    expect(refresh).toHaveBeenCalledWith(2)
+    refresh.mockRestore()
+  })
+
+  it('shows a running refresh under the scan status, while the admin lock is off', async () => {
+    spies.get.mockImplementation(async () =>
+      library({
+        id: 2,
+        ratingsRefresh: { state: 'running', done: 1200, total: 3400, startedAt: ISO },
+      }),
+    )
+    spies.list.mockImplementation(async () => ITEMS)
+    renderLibraryPage()
+    expect(await screen.findByText('Refreshing ratings · 1,200 of 3,400')).toBeInTheDocument()
+  })
+
+  it('shows no refresh status while the admin lock is on', async () => {
+    spies.get.mockImplementation(async () =>
+      library({
+        id: 2,
+        ratingsRefresh: { state: 'running', done: 1200, total: 3400, startedAt: ISO },
+      }),
+    )
+    spies.list.mockImplementation(async () => ITEMS)
+    renderLibraryPage({ adminLock: { state: 'on', available: true } })
+    await screen.findByRole('link', { name: /^History/ })
+    expect(screen.queryByText(/Refreshing ratings/)).toBeNull()
+  })
+
+  it('reads the listings again once the refresh finishes, as scores change with no event', async () => {
+    pollFast()
+    spies.get.mockImplementationOnce(async () =>
+      library({
+        id: 2,
+        ratingsRefresh: { state: 'running', done: 1, total: 3, startedAt: ISO },
+      }),
+    )
+    spies.get.mockImplementation(async () =>
+      library({ id: 2, ratingsRefresh: { state: 'idle', finishedAt: ISO } }),
+    )
+    spies.list.mockImplementation(async () => ITEMS)
+    renderLibraryPage()
+    await screen.findByText('Refreshing ratings · 1 of 3')
+    // A boolean, as a failed match on an element prints its whole DOM and starves the poll.
+    await waitFor(() => expect(!!screen.queryByText(/Refreshing ratings/)).toBe(false))
+    await waitFor(() => expect(spies.list.mock.calls.length).toBeGreaterThan(1))
+  })
+
   it('leaves Rescan, Match again and Edit out while the admin lock is on', async () => {
     serve({ settings: { kind: 'movies' }, adminLock: { state: 'on', available: true } })
     expect(await screen.findByRole('link', { name: /^History/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Refresh/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /^Rescan/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /^Match again/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /^Edit/ })).toBeNull()
