@@ -1,9 +1,11 @@
-import { mkdtemp, readdir, rm, stat } from 'node:fs/promises'
+import { mkdtemp, readdir, readFile, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createInterface } from 'node:readline'
 import { setTimeout as delay } from 'node:timers/promises'
 import { _electron, type ElectronApplication, type Page } from '@playwright/test'
+import { withoutTestHooks } from '@/build/smokeVerdict'
+import { LOG_FILE } from '@/main/log/log'
 import { type DesktopReply, isDesktopReply } from '@/shared/protocol'
 
 // `cwd` with `args: ['.']` runs the built app the way `electron .` does: package.json's `main`.
@@ -11,7 +13,7 @@ const PROJECT_DIR = join(import.meta.dirname, '..')
 // A quit that hangs is a bug (the quit gate gives up flushing after a second), not a slow test.
 const QUIT_MS = 10_000
 // Every budget mark main prints on stdout (Ruling 14): `raven-<name> <n>` on a line of its own.
-const MARK_LINE = /^raven-([a-z][a-z0-9-]*) (\d+)$/
+const MARK_LINE = /^raven-([a-z][a-z0-9-]*) (\d+(?:\.\d+)?)$/
 
 /** The marks main has printed so far, in order, and whether its stdout has closed. */
 export type Marks = {
@@ -56,6 +58,19 @@ export const serverPartitions = async ({ userData }: { userData: string }): Prom
     throw error
   })
   return names.filter((name) => name.startsWith('server%3A'))
+}
+
+/** main's log under the test hook's userData (Ruling 11). */
+export const logPathFor = ({ userData }: { userData: string }): string =>
+  join(userData, 'logs', LOG_FILE)
+
+/** The lines main has written to its log so far; none before it has made the file. */
+export const readLog = async ({ userData }: { userData: string }): Promise<string[]> => {
+  const text = await readFile(logPathFor({ userData }), 'utf8').catch((error: unknown) => {
+    if (isMissing(error)) return ''
+    throw error
+  })
+  return text.split('\n').filter((line) => line !== '')
 }
 
 const hasExited = (app: ElectronApplication): boolean => {
@@ -168,17 +183,26 @@ export type MpvMode = 'headless' | 'off'
 export const launchApp = async ({
   userData,
   mpv = 'headless',
+  env = {},
 }: {
   userData: string
   mpv?: MpvMode
+  /** Extra variables for main, such as a test hook, merged last. */
+  env?: Readonly<Record<string, string>>
 }): Promise<Launched> => {
   const app = await _electron.launch({
     // Chromium's fake audio sink: playback is clocked by the audio output, so a real device
     // whose clock has stalled (an asleep USB interface) would freeze `currentTime` at 0.
     args: ['--disable-audio-output', '.'],
     cwd: PROJECT_DIR,
-    // e2e never drives the window surface (Ruling 15).
-    env: { ...process.env, RAVEN_DESKTOP_USER_DATA: userData, RAVEN_DESKTOP_MPV: mpv },
+    // e2e never drives the window surface (Ruling 15). A hook exported in the developer's
+    // shell is dropped, so only the hooks a test names reach the app.
+    env: {
+      ...withoutTestHooks({ env: process.env }),
+      RAVEN_DESKTOP_USER_DATA: userData,
+      RAVEN_DESKTOP_MPV: mpv,
+      ...env,
+    },
   })
   const marks = readMarks(app)
   const output = readOutput(app)
@@ -193,13 +217,15 @@ export const launchApp = async ({
 export const withApp = async <T>({
   userData,
   mpv,
+  env,
   run,
 }: {
   userData: string
   mpv?: MpvMode
+  env?: Readonly<Record<string, string>>
   run: (launched: Launched) => Promise<T>
 }): Promise<T> => {
-  const launched = await launchApp({ userData, mpv })
+  const launched = await launchApp({ userData, mpv, env })
   const result = await run(launched).catch(async (error: unknown) => {
     await closeApp({ app: launched.app }).catch(() => undefined)
     throw error

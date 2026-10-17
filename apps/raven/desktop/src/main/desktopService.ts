@@ -24,6 +24,7 @@ import { CALL_MESSAGES, type ServerCalls } from '@/main/servers/serverCalls'
 import { cleanName, renameServer, serverById } from '@/main/servers/serverList'
 import { TRUST_MESSAGES, type ServerTrust, type TrustOutcome } from '@/main/servers/serverTrust'
 import type { StateStore, Timers } from '@/main/stateStore'
+import { UPDATE_COPY, type UpdateService } from '@/main/updateService'
 import { serverOriginOf, watchUrlFor } from '@/shared/playLink'
 import {
   type AudioDevice,
@@ -74,6 +75,7 @@ export type DesktopServiceDeps = {
   trust: ServerTrust
   links: LinkOpener
   openExternal: (url: string) => Promise<void>
+  updates: UpdateService
 }
 
 export type DesktopService = {
@@ -468,6 +470,14 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
     return DONE
   }
 
+  const checkForUpdates = async (): Promise<DesktopReply> => {
+    await deps.updates.checkNow()
+    return { type: 'updates', status: deps.updates.status() }
+  }
+
+  const openRelease = async (): Promise<DesktopReply> =>
+    (await deps.updates.openRelease()) ? DONE : refused(UPDATE_COPY.noRelease)
+
   const handleRequest = async (request: DesktopRequest): Promise<DesktopReply> => {
     switch (request.type) {
       case 'ready':
@@ -513,6 +523,14 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
         return openInBrowser({ serverId: request.serverId, mediaId: request.mediaId })
       case 'noteServerTitle':
         return noteServerTitle(request)
+      case 'readUpdates':
+        return { type: 'updates', status: deps.updates.status() }
+      case 'setUpdateCheck':
+        return { type: 'updates', status: deps.updates.setEnabled(request.isEnabled) }
+      case 'checkForUpdates':
+        return checkForUpdates()
+      case 'openRelease':
+        return openRelease()
       default: {
         const unreachable: never = request
         return unreachable

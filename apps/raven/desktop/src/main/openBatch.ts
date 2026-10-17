@@ -81,6 +81,7 @@ export const eventForOpen = (reply: DesktopReply): DesktopEvent | null => {
     case 'servers':
     case 'serverReply':
     case 'serverUnreachable':
+    case 'updates':
       return null
     default: {
       const unreachable: never = reply

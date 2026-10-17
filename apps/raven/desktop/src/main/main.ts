@@ -1,6 +1,16 @@
 import { randomUUID } from 'node:crypto'
 import { createReadStream } from 'node:fs'
-import { readdir, readFile, realpath, rename, rm, stat, writeFile } from 'node:fs/promises'
+import {
+  appendFile,
+  mkdir,
+  readdir,
+  readFile,
+  realpath,
+  rename,
+  rm,
+  stat,
+  writeFile,
+} from 'node:fs/promises'
 import { join } from 'node:path'
 import { monitorEventLoopDelay } from 'node:perf_hooks'
 import { Readable } from 'node:stream'
@@ -10,11 +20,14 @@ import { type Mpv, type MpvSurface, openMpv } from '@raven/mpv'
 import {
   app,
   BrowserWindow,
+  clipboard,
+  crashReporter,
   dialog,
   ipcMain,
   Menu,
   MessageChannelMain,
   type MessagePortMain,
+  net,
   type OpenDialogOptions,
   powerSaveBlocker,
   protocol,
@@ -23,22 +36,40 @@ import {
   shell,
 } from 'electron'
 import { createAppHandler } from '@/main/appProtocol'
+import {
+  BUDGET_WINDOW_MS,
+  budgetWindowFrom,
+  createBudgets,
+  PLAYING_SAMPLE_MS,
+} from '@/main/budgets'
 import { CONFIG_FILE, type ConfigStore, loadConfig, setOutput } from '@/main/desktopConfig'
 import { createDesktopService, type DesktopService } from '@/main/desktopService'
+import { diagnosticsText, readEngineDiagnostics, unavailableReason } from '@/main/diagnostics'
 import { createFileHandler } from '@/main/fileProtocol'
 import { createGrants, type Grants } from '@/main/grants'
+import { createHelpActions } from '@/main/help'
+import { errorText } from '@/main/log/errorText'
+import { createLog, logFsFrom, SILENT_LOG } from '@/main/log/log'
+import { describedFileId, logsDirFor, openLine } from '@/main/log/opens'
 import { menuTemplate } from '@/main/menu'
 import { createOpenBatch, eventForOpen, launchPaths } from '@/main/openBatch'
 import { CLEAR, createActivity } from '@/main/player/activity'
 import { createConnector } from '@/main/player/connector'
 import { displayReading } from '@/main/player/displayOptions'
-import { addonPathFor, engineModeFrom, engineOptionsFor, openEngine } from '@/main/player/engine'
+import {
+  addonPathFor,
+  ENGINE_MESSAGES,
+  engineModeFrom,
+  engineOptionsFor,
+  openEngine,
+} from '@/main/player/engine'
 import { createEngineSlot, watchService } from '@/main/player/engineSlot'
 import { createMarks } from '@/main/player/marks'
 import { readDevices } from '@/main/player/outputOptions'
 import type { PortLike } from '@/main/player/playerPort'
 import {
   createPlayerService,
+  type PlayerActivity,
   type PlayerService,
   resolveSourceWith,
 } from '@/main/player/playerService'
@@ -63,6 +94,7 @@ import {
   closeTimeoutFor,
   createShutdown,
   DESTROY_MS,
+  endAfterLog,
   hardExitFor,
   QUIT_FLUSH_MS,
 } from '@/main/shutdown'
@@ -74,6 +106,8 @@ import {
   type StateStore,
 } from '@/main/stateStore'
 import { createNodeTimers } from '@/main/timers'
+import { createMenuCheck, createUpdateService, updateSourceFrom } from '@/main/updateService'
+import { checkForUpdates, type UpdateFetch } from '@/main/updates'
 import { placeWindow } from '@/main/windowBounds'
 import {
   APP_ORIGIN,
@@ -85,7 +119,6 @@ import {
   PLAYER_PORT_CHANNEL,
   REQUEST_CHANNEL,
 } from '@/shared/protocol'
-import { messageOf } from '@/shared/messageOf'
 
 const launchedAt = performance.now()
 
@@ -102,6 +135,10 @@ const NIGHT = '#15201e'
 
 const timers = createNodeTimers()
 
+// No cookie rides along, a redirect away from the releases list fails, and nothing is cached.
+const fetchReleases: UpdateFetch = (url, init) =>
+  net.fetch(url, { ...init, credentials: 'omit', redirect: 'error', cache: 'no-store' })
+
 /** The traffic lights are macOS's; elsewhere there is nothing to show or hide. */
 const showWindowButtons = ({
   window,
@@ -114,20 +151,57 @@ const showWindowButtons = ({
   window.setWindowButtonVisibility(isVisible)
 }
 
-const warn = (message: string): void => {
-  console.warn(message)
-}
-
-const userDataDir = (): string => {
-  // A test hook: a packaged app never reads it, so the environment cannot move its data.
+// A test hook: a packaged app never reads it, so the environment cannot move its data.
+const userDataOverrideOf = (): string | null => {
   const override = app.isPackaged ? undefined : process.env.RAVEN_DESKTOP_USER_DATA
-  if (override !== undefined && override !== '') return override
-  return join(app.getPath('appData'), 'raven')
+  return override === undefined || override === '' ? null : override
 }
 
-const userData = userDataDir()
+const userDataOverride = userDataOverrideOf()
+const userData = userDataOverride ?? join(app.getPath('appData'), 'raven')
 // Before the single instance lock, which is keyed by the userData directory.
 app.setPath('userData', userData)
+// Before the reporter starts, which reads the path once (Ruling 11). Nothing is uploaded.
+app.setPath('crashDumps', join(userData, 'Crashpad'))
+crashReporter.start({ uploadToServer: false })
+app.setAppLogsPath(logsDirFor({ home: app.getPath('home'), userDataOverride }))
+
+// A second instance hands its files to the first and quits. It keeps no log: it would write
+// a false launch into the first one's file and rotate that file from two processes.
+const isPrimary = app.requestSingleInstanceLock()
+
+const log = isPrimary
+  ? createLog({
+      dir: app.getPath('logs'),
+      fs: logFsFrom({ mkdir, stat, appendFile, rename, rm }),
+      now: Date.now,
+      timers,
+      onError: (error) => {
+        console.error('raven player could not write its log.', error)
+      },
+    })
+  : SILENT_LOG
+
+const warn = (message: string): void => {
+  log.warn(message)
+  if (!app.isPackaged) console.warn(message)
+}
+
+const reportError = ({ text, error }: { text: string; error: unknown }): void => {
+  const message = `${text} ${errorText(error)}`
+  log.error(message)
+  if (!app.isPackaged) console.error(message)
+}
+
+const reportEndFailure = (error: unknown): void => {
+  console.error('raven player could not end.', error)
+}
+
+/** A budget mark (Ruling 13): always logged, and on stdout unpackaged, where e2e reads it. */
+const mark = (line: string): void => {
+  log.mark(line.trim())
+  if (!app.isPackaged) process.stdout.write(line)
+}
 
 const startApp = (): void => {
   app.enableSandbox()
@@ -148,15 +222,22 @@ const startApp = (): void => {
     },
   ])
 
-  const quitMark = createQuitMark({
-    isEnabled: !app.isPackaged,
-    now: () => performance.now(),
-    write: (line) => {
-      process.stdout.write(line)
-    },
-  })
+  const quitMark = createQuitMark({ isEnabled: true, now: () => performance.now(), write: mark })
   app.on('before-quit', quitMark.started)
-  app.on('quit', quitMark.ended)
+  // Not on `quit`, after which nothing waits for a write: ahead of the quit gate's own
+  // `will-quit`, which then finds the mark in the log and holds the quit while it writes.
+  // So `raven-quit-ms` ends before that last flush of the log, which it does not count.
+  app.on('will-quit', quitMark.ended)
+
+  const marks = createMarks({
+    isEnabled: true,
+    now: () => performance.now(),
+    write: mark,
+    timers,
+    histogram: () => monitorEventLoopDelay({ resolution: 10 }),
+  })
+  // A file opened before the window is ready is a cold "Open With", timed to its first frame.
+  const launch = { isWindowReady: false }
 
   const windows: { current: BrowserWindow | null } = { current: null }
   const players: { current: WindowPlayer | null } = { current: null }
@@ -171,7 +252,7 @@ const startApp = (): void => {
     try {
       window.webContents.send(EVENT_CHANNEL, event)
     } catch (error) {
-      console.warn('raven player could not reach its window.', error)
+      warn(`raven player could not reach its window. ${errorText(error)}`)
     }
   }
   const liveWindow = (): BrowserWindow | null => {
@@ -188,6 +269,34 @@ const startApp = (): void => {
       return
     }
     webContents.openDevTools({ mode: 'detach' })
+  }
+  const readDiagnostics = async (): Promise<string> => {
+    const window = liveWindow()
+    // Read before mpv is asked anything: the window may close while its reads are out.
+    const displayHz =
+      window === null ? null : screen.getDisplayMatching(window.getBounds()).displayFrequency
+    const player = players.current
+    const engine = currentEngine()
+    return diagnosticsText({
+      app: { version: app.getVersion(), isPackaged: app.isPackaged, arch: process.arch },
+      os: process.getSystemVersion(),
+      versions: {
+        electron: process.versions.electron,
+        chrome: process.versions.chrome,
+        node: process.versions.node,
+      },
+      engine:
+        engine === null
+          ? {
+              kind: 'unavailable',
+              reason: unavailableReason({
+                mode: engineMode(),
+                note: player === null ? null : player.engineNote(),
+              }),
+            }
+          : await readEngineDiagnostics({ mpv: engine.mpv }),
+      displayHz,
+    })
   }
   const reveal = (): void => {
     const window = liveWindow()
@@ -216,7 +325,7 @@ const startApp = (): void => {
     timers,
     deliver: (paths) => {
       openFromMain(paths).catch((error: unknown) => {
-        console.error('raven player could not open those files.', error)
+        reportError({ text: 'raven player could not open those files.', error })
       })
     },
   })
@@ -235,7 +344,7 @@ const startApp = (): void => {
     timers,
     deliver: (links) => {
       openLinksFromMain(links).catch((error: unknown) => {
-        console.error('raven player could not open that link.', error)
+        reportError({ text: 'raven player could not open that link.', error })
       })
     },
   })
@@ -249,6 +358,7 @@ const startApp = (): void => {
   app.on('will-finish-launching', () => {
     app.on('open-file', (event, path) => {
       event.preventDefault()
+      if (!launch.isWindowReady) marks.opened()
       fileBatch.push(path)
     })
     app.on('open-url', (event, url) => {
@@ -273,7 +383,7 @@ const startApp = (): void => {
       timers,
       debounceMs: STATE_DEBOUNCE_MS,
       onError: (error) => {
-        console.error('raven player could not save its state.', error)
+        reportError({ text: 'raven player could not save its state.', error })
         send({ type: 'notice', message: STORE_NOTICES.state })
       },
     })
@@ -286,7 +396,7 @@ const startApp = (): void => {
       timers,
       debounceMs: 0,
       onError: (error) => {
-        console.error('raven player could not save its settings.', error)
+        reportError({ text: 'raven player could not save its settings.', error })
         send({ type: 'notice', message: STORE_NOTICES.config })
       },
     })
@@ -303,7 +413,7 @@ const startApp = (): void => {
       warn,
     })
     orphans.removing.catch((error: unknown) => {
-      warn(`raven player could not clear its old server sessions: ${messageOf(error)}`)
+      warn(`raven player could not clear its old server sessions: ${errorText(error)}`)
     })
     const grants = createGrants({ fs: { realpath, stat }, newId: randomUUID })
     const serverOf = (serverId: string) => serverById(config.read(), { serverId })
@@ -340,7 +450,7 @@ const startApp = (): void => {
           const engine = currentEngine()
           if (engine === null) return
           engine.service.resetIfServer(serverId).catch((error: unknown) => {
-            warn(`raven player could not stop a removed server's title: ${messageOf(error)}`)
+            warn(`raven player could not stop a removed server's title: ${errorText(error)}`)
           })
         },
         newId: randomUUID,
@@ -350,6 +460,27 @@ const startApp = (): void => {
       }),
       warn,
     })
+
+    const updateSource = updateSourceFrom({ isPackaged: app.isPackaged, env: process.env })
+    const updates = createUpdateService({
+      config,
+      check: () =>
+        checkForUpdates({ fetch: fetchReleases, url: updateSource.url, current: app.getVersion() }),
+      current: app.getVersion(),
+      now: Date.now,
+      openExternal: (url) => shell.openExternal(url),
+      announce: (version) => send({ type: 'updateAvailable', version }),
+      warn,
+    })
+    // Once, on the first page's `ready`, so the page is listening for the announcement.
+    const launchCheck = { isPending: updateSource.isLaunchCheckAllowed }
+    const checkAtLaunch = (): void => {
+      if (!launchCheck.isPending) return
+      launchCheck.isPending = false
+      updates.atLaunch().catch((error: unknown) => {
+        warn(`raven player could not check for updates: ${errorText(error)}`)
+      })
+    }
 
     const showOpenDialog = async (): Promise<string[]> => {
       const options = {
@@ -378,14 +509,15 @@ const startApp = (): void => {
       onReady: () => {
         fileBatch.ready()
         linkBatch.ready()
+        checkAtLaunch()
         const player = players.current
         if (player === null) return
         player.connect().catch((error: unknown) => {
-          warn(`raven player could not hand the page its player: ${messageOf(error)}`)
+          warn(`raven player could not hand the page its player: ${errorText(error)}`)
         })
       },
       onError: (error) => {
-        console.error('raven player failed to answer a request.', error)
+        reportError({ text: 'raven player failed to answer a request.', error })
       },
       newId: randomUUID,
       now: Date.now,
@@ -415,6 +547,7 @@ const startApp = (): void => {
       trust,
       links: createLinkOpener({ trust, warn }),
       openExternal: (url) => shell.openExternal(url),
+      updates,
     })
 
     // mpv stops before the stores flush and before Electron tears the window down.
@@ -426,6 +559,7 @@ const startApp = (): void => {
       },
       stores: [store, config],
       writes: { hasPending: serverCalls.hasPendingWrites, settle: serverCalls.settleWrites },
+      log,
       warn,
       wait: (ms) => sleep(ms),
     })
@@ -439,19 +573,24 @@ const startApp = (): void => {
       exit: () => {
         const isEngineAlive = players.current !== null && players.current.engine.isAlive()
         const ending = hardExitFor({ isEngineAlive })
-        quitMark.ended()
-        switch (ending) {
-          case 'kill':
-            process.kill(process.pid, 'SIGKILL')
-            return
-          case 'exit':
-            app.exit(0)
-            return
-          default: {
-            const unreachable: never = ending
-            return unreachable
+        const end = () => {
+          switch (ending) {
+            case 'kill':
+              process.kill(process.pid, 'SIGKILL')
+              return
+            case 'exit':
+              app.exit(0)
+              return
+            default: {
+              const unreachable: never = ending
+              return unreachable
+            }
           }
         }
+        quitMark.ended()
+        // Neither ending runs `will-quit`, so the quit mark is written here, for as long as
+        // the log is given on a normal quit.
+        endAfterLog({ log, wait: (ms) => sleep(ms), end }).catch(reportEndFailure)
       },
       wait: (ms) => sleep(ms),
     })
@@ -462,7 +601,38 @@ const startApp = (): void => {
     await app.whenReady()
     serveSchemes({ grants })
     secureContents()
-    answerRequests({ service })
+    answerRequests({ service, grants })
+
+    const help = createHelpActions({
+      folders: { logs: app.getPath('logs'), crashDumps: app.getPath('crashDumps') },
+      mkdir: (path) => mkdir(path, { recursive: true, mode: 0o700 }),
+      openPath: (path) => shell.openPath(path),
+      writeClipboard: (text) => clipboard.writeText(text),
+      diagnostics: readDiagnostics,
+      notify: (message) => send({ type: 'notice', message }),
+      warn,
+    })
+    // The actions settle every failure themselves; this only keeps a surprise off the floor.
+    const fromMenu = (action: () => Promise<void>) => () => {
+      action().catch((error: unknown) => {
+        reportError({ text: 'raven player could not finish a Help item.', error })
+      })
+    }
+
+    // The menu's check always runs, switched off or not (Ruling 9).
+    const checkFromMenu = createMenuCheck({
+      updates,
+      current: app.getVersion(),
+      announce: (version) => send({ type: 'updateAvailable', version }),
+      show: async (options) => {
+        const window = liveWindow()
+        const { response } =
+          window === null
+            ? await dialog.showMessageBox(options)
+            : await dialog.showMessageBox(window, options)
+        return response
+      },
+    })
 
     Menu.setApplicationMenu(
       Menu.buildFromTemplate(
@@ -475,11 +645,19 @@ const startApp = (): void => {
                 .openDialog()
                 .then(announce)
                 .catch((error: unknown) => {
-                  console.error('raven player could not show the open dialog.', error)
+                  reportError({ text: 'raven player could not show the open dialog.', error })
                 })
             },
             send,
             toggleDevTools,
+            showLogs: fromMenu(help.showLogs),
+            showCrashReports: fromMenu(help.showCrashReports),
+            copyDiagnostics: fromMenu(help.copyDiagnostics),
+            checkForUpdates: () => {
+              checkFromMenu().catch((error: unknown) => {
+                reportError({ text: 'raven player could not check for updates.', error })
+              })
+            },
           },
         }),
       ),
@@ -490,18 +668,33 @@ const startApp = (): void => {
     })
 
     const window = openWindow({ store })
+    window.once('ready-to-show', () => {
+      launch.isWindowReady = true
+    })
     windows.current = window
-    players.current = attachPlayer({ window, grants, config, sources })
+    // A test hook shortens both periods; a packaged app never reads it (Ruling 13).
+    const budgetWindow = budgetWindowFrom({ isPackaged: app.isPackaged, env: process.env })
+    const budgets = createBudgets({
+      metrics: () => app.getAppMetrics(),
+      timers,
+      mark,
+      windowMs: budgetWindow ?? BUDGET_WINDOW_MS,
+      sampleMs: budgetWindow ?? PLAYING_SAMPLE_MS,
+    })
+    players.current = attachPlayer({ window, grants, config, sources, marks, budgets })
+    // A quit holds the window open while it flushes, so no budget timer may fire meanwhile.
+    app.once('before-quit', () => budgets.dispose())
     window.on('closed', () => {
       windows.current = null
+      budgets.dispose()
     })
     return service
   }
 
   services.ready = createService()
   services.ready.catch((error: unknown) => {
-    console.error('raven player could not start.', error)
-    app.exit(1)
+    reportError({ text: 'raven player could not start.', error })
+    endAfterLog({ log, wait: (ms) => sleep(ms), end: () => app.exit(1) }).catch(reportEndFailure)
   })
 
   // One window: closing it quits, which runs the quit gate.
@@ -547,7 +740,7 @@ const secureContents = (): void => {
       const decision = windowOpenFor(url)
       if (decision.shouldOpenExternally) {
         shell.openExternal(url).catch((error: unknown) => {
-          console.warn('raven player could not open a link in the browser.', error)
+          warn(`raven player could not open a link in the browser. ${errorText(error)}`)
         })
       }
       return { action: decision.action }
@@ -555,13 +748,17 @@ const secureContents = (): void => {
   })
 }
 
-const answerRequests = ({ service }: { service: DesktopService }): void => {
+const answerRequests = ({ service, grants }: { service: DesktopService; grants: Grants }) => {
   const answer = createRequestHandler({
     isTrustedSender,
-    handle: service.handle,
-    warn: (message) => {
-      console.warn(message)
+    // The page describes a file as it opens it, so this is where a local open is logged.
+    handle: (envelope) => {
+      const fileId = describedFileId(envelope)
+      const file = fileId === null ? null : grants.fileOf(fileId)
+      if (file !== null) log.info(openLine({ kind: 'file', path: file.path }))
+      return service.handle(envelope)
     },
+    warn,
   })
   ipcMain.handle(REQUEST_CHANNEL, (event, payload: unknown) =>
     answer({ frameUrl: event.senderFrame?.url ?? null, payload }),
@@ -594,9 +791,7 @@ const openWindow = ({ store }: { store: StateStore }): BrowserWindow => {
 
   window.once('ready-to-show', () => {
     window.show()
-    if (!app.isPackaged) {
-      process.stdout.write(`raven-launch-ms ${Math.round(performance.now() - launchedAt)}\n`)
-    }
+    mark(`raven-launch-ms ${Math.round(performance.now() - launchedAt)}\n`)
   })
 
   const remember = (): void => {
@@ -610,7 +805,7 @@ const openWindow = ({ store }: { store: StateStore }): BrowserWindow => {
   window.on('resized', remember)
 
   window.loadURL(`${APP_ORIGIN}/`).catch((error: unknown) => {
-    console.error('raven player could not load its page.', error)
+    reportError({ text: 'raven player could not load its page.', error })
   })
   return window
 }
@@ -669,34 +864,45 @@ const attachPlayer = ({
   grants,
   config,
   sources,
+  marks,
+  budgets,
 }: {
   window: BrowserWindow
   grants: Grants
   config: ConfigStore
   sources: ReturnType<typeof createServerSources>
+  marks: ReturnType<typeof createMarks>
+  budgets: ReturnType<typeof createBudgets>
 }) => {
   const mode = engineMode()
   // mpv's events arrive from the moment it opens; the service exists a moment later.
   const sink: { service: PlayerService | null } = { service: null }
-  const marks = createMarks({
-    isEnabled: !app.isPackaged,
-    now: () => performance.now(),
-    write: (line) => {
-      process.stdout.write(line)
+  const servers = {
+    resolve: async (source: Parameters<typeof sources.resolve>[0]) => {
+      const resolved = await sources.resolve(source)
+      const server = serverById(config.read(), { serverId: source.serverId })
+      if (resolved.ok && server !== null) {
+        log.info(openLine({ kind: 'server', serverName: server.name, mediaId: source.mediaId }))
+      }
+      return resolved
     },
-    timers,
-    histogram: () => monitorEventLoopDelay({ resolution: 10 }),
-  })
+  }
   const sleepGuard = createSleepGuard({
     start: () => powerSaveBlocker.start('prevent-display-sleep'),
     stop: (id) => powerSaveBlocker.stop(id),
   })
+  // The budgets read both halves of the activity, which arrive one callback at a time.
+  let latest: PlayerActivity = { isPlaying: false, isShowing: false }
   const activity = createActivity({
     onPlaying: (isPlaying) => {
       sleepGuard.set(isPlaying)
       marks.playing(isPlaying)
+      latest = { ...latest, isPlaying }
+      budgets.report(latest)
     },
     onShowing: (isShowing) => {
+      latest = { ...latest, isShowing }
+      budgets.report(latest)
       if (window.isDestroyed()) return
       window.setBackgroundColor(isShowing ? CLEAR : NIGHT)
       // Home always shows the traffic lights, whatever the watch route last asked for.
@@ -725,7 +931,7 @@ const attachPlayer = ({
       // Made before anything can load: it hardens mpv first and refuses loads if that fails.
       const service = createPlayerService({
         mpv,
-        resolveSource: resolveSourceWith({ grants, servers: sources }),
+        resolveSource: resolveSourceWith({ grants, servers }),
         explain: sources.explain,
         canChooseAo: mode === 'window',
         timers,
@@ -744,19 +950,44 @@ const attachPlayer = ({
     }
   }
 
+  const openLogged = async (surface: MpvSurface): Promise<NativeEngine> => {
+    const opened = await openNative(surface)
+    const ffmpeg = await opened.mpv.read({ name: 'ffmpeg-version' }).catch(() => 'unknown')
+    log.info(`video engine ready: ${opened.mpv.version}, FFmpeg ${ffmpeg}`)
+    return opened
+  }
+
+  // Why there is no engine, for Copy Diagnostics. The message the engine fell back with, not
+  // the error behind it, which the log keeps: a failed dlopen names the addon's path.
+  let engineNote: string | null = null
   const engine = createEngineSlot<NativeEngine>({
-    open: () =>
-      openEngine({
-        mode,
-        surfaceFor,
-        open: openNative,
-        warn: (message) => warn(`raven player could not open its video engine: ${message}`),
-      }),
+    open: async () => {
+      try {
+        const opened = await openEngine({
+          mode,
+          surfaceFor,
+          open: openLogged,
+          warn: (message) => warn(`raven player could not open its video engine: ${message}`),
+        })
+        if (opened.status === 'unavailable') engineNote = opened.message
+        return opened
+      } catch (error) {
+        engineNote = ENGINE_MESSAGES.unavailable
+        throw error
+      }
+    },
     destroyOf: ({ mpv, service }) => {
       service.dispose()
       return mpv.destroy()
     },
-    watch: watchService,
+    watch: ({ engine: opened, onDied }) =>
+      watchService({
+        engine: opened,
+        onDied: () => {
+          engineNote = ENGINE_MESSAGES.unavailable
+          onDied()
+        },
+      }),
     warn,
   })
 
@@ -776,7 +1007,7 @@ const attachPlayer = ({
 
   const startEngine = () => {
     engine.get().catch((error: unknown) => {
-      warn(`raven player could not open its video engine: ${messageOf(error)}`)
+      warn(`raven player could not open its video engine: ${errorText(error)}`)
     })
   }
   // Whichever comes first of this and the page's `ready` (through the connector).
@@ -786,7 +1017,7 @@ const attachPlayer = ({
     const current = engine.current()
     if (current === null) return
     applyDisplayTo({ window, engine: current }).catch((error: unknown) => {
-      warn(`raven player could not follow the display: ${messageOf(error)}`)
+      warn(`raven player could not follow the display: ${errorText(error)}`)
     })
   }
   window.on('moved', followDisplay)
@@ -845,10 +1076,13 @@ const attachPlayer = ({
     screen.off('display-metrics-changed', followDisplay)
   })
 
-  return { engine, connect }
+  return { engine, connect, engineNote: () => engineNote }
 }
 
-if (app.requestSingleInstanceLock()) {
+if (isPrimary) {
+  log.info(
+    `launch raven player ${app.getVersion()} (${app.isPackaged ? 'packaged' : 'unpackaged'}), Electron ${process.versions.electron}, macOS ${process.getSystemVersion()}`,
+  )
   startApp()
 } else {
   // Another raven player is running; it receives this launch's files through `second-instance`.

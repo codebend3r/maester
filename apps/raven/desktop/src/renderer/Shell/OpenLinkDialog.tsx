@@ -30,6 +30,7 @@ const outcomeOf = (reply: DesktopReply | null): Outcome => {
     case 'servers':
     case 'serverReply':
     case 'serverUnreachable':
+    case 'updates':
       return { kind: 'stay', message: UNOPENED }
     default: {
       const unreachable: never = reply

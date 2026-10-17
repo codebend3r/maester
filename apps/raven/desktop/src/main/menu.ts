@@ -5,6 +5,10 @@ export type MenuActions = {
   openDialog: () => void
   send: (event: DesktopEvent) => void
   toggleDevTools: () => void
+  showLogs: () => void
+  showCrashReports: () => void
+  copyDiagnostics: () => void
+  checkForUpdates: () => void
 }
 
 /**
@@ -53,6 +57,7 @@ export const menuTemplate = ({
           accelerator: 'CommandOrControl+,',
           click: () => actions.send({ type: 'navigate', to: 'settings' }),
         },
+        { label: 'Check for Updates…', id: 'check-for-updates', click: actions.checkForUpdates },
         SEPARATOR,
         { role: 'hide' },
         { role: 'hideOthers' },
@@ -104,7 +109,13 @@ export const menuTemplate = ({
     {
       label: 'Help',
       role: 'help',
-      submenu: [{ label: 'Keyboard Shortcuts', click: player('showShortcuts') }],
+      submenu: [
+        { label: 'Keyboard Shortcuts', click: player('showShortcuts') },
+        SEPARATOR,
+        { label: 'Show Logs', id: 'show-logs', click: actions.showLogs },
+        { label: 'Show Crash Reports', id: 'show-crash-reports', click: actions.showCrashReports },
+        { label: 'Copy Diagnostics', id: 'copy-diagnostics', click: actions.copyDiagnostics },
+      ],
     },
   ]
 }

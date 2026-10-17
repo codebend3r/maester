@@ -4,7 +4,9 @@ import {
   closeTimeoutFor,
   createShutdown,
   DESTROY_MS,
+  endAfterLog,
   hardExitFor,
+  LOG_FLUSH_MS,
   QUIT_FLUSH_MS,
 } from '@/main/shutdown'
 
@@ -16,10 +18,18 @@ type ShutdownDeps = Parameters<typeof createShutdown>[0]
 
 const noWrites: ShutdownDeps['writes'] = { hasPending: () => false, settle: async () => {} }
 
-/** A shutdown whose deadlines never pass unless the test says so, with no saves in flight unless given. */
+const cleanLog: ShutdownDeps['log'] = { isDirty: () => false, flush: async () => {} }
+
+/**
+ * A shutdown whose deadlines never pass unless the test says so, with no saves in flight
+ * and nothing left to log unless given.
+ */
 const shutdownOf = (
-  input: Omit<ShutdownDeps, 'wait' | 'writes'> & { writes?: ShutdownDeps['writes'] },
-) => createShutdown({ wait: never, writes: noWrites, ...input })
+  input: Omit<ShutdownDeps, 'wait' | 'writes' | 'log'> & {
+    writes?: ShutdownDeps['writes']
+    log?: ShutdownDeps['log']
+  },
+) => createShutdown({ wait: never, writes: noWrites, log: cleanLog, ...input })
 
 const fakeEngine = ({
   log,
@@ -177,6 +187,7 @@ describe('a destroy that never settles', () => {
       engine,
       stores: [fakeStore({ log, name: 'state', isDirty: true }).store],
       writes: noWrites,
+      log: cleanLog,
       warn,
       wait: (ms) => {
         waits.push(ms)
@@ -209,6 +220,7 @@ describe('a destroy that never settles', () => {
       engine,
       stores: [store.store],
       writes: noWrites,
+      log: cleanLog,
       warn: () => {},
       wait: (ms) => {
         waits.push(ms)
@@ -269,6 +281,7 @@ describe('saves in flight', () => {
       engine,
       stores: [fakeStore({ log, name: 'state', isDirty: false }).store],
       writes: noWrites,
+      log: cleanLog,
       warn: () => {},
     })
     expect(shutdown.isPending()).toBe(false)
@@ -308,6 +321,7 @@ describe('saves in flight', () => {
       engine,
       stores: [fakeStore({ log, name: 'state', isDirty: true }).store],
       writes: fakeWrites({ log }).writes,
+      log: cleanLog,
       warn,
       wait: (ms) => {
         waits.push(ms)
@@ -338,6 +352,7 @@ describe('saves in flight', () => {
       engine,
       stores: [fakeStore({ log, name: 'state', isDirty: true }).store],
       writes: noWrites,
+      log: cleanLog,
       warn: () => {},
       wait: (ms) => {
         waits.push(ms)
@@ -347,6 +362,208 @@ describe('saves in flight', () => {
     await shutdown.settle()
     expect(waits).toEqual([])
     expect(log).toEqual(['flush state'])
+  })
+})
+
+/** The log: dirty until a flush that `finish` settles, or at once when given no hold. */
+const fakeLog = ({ log, isHeld = false }: { log: string[]; isHeld?: boolean }) => {
+  const done = Promise.withResolvers<void>()
+  const state = { isDirty: true }
+  return {
+    state,
+    finish: () => {
+      state.isDirty = false
+      done.resolve()
+    },
+    log: {
+      isDirty: () => state.isDirty,
+      flush: async () => {
+        log.push('flush log')
+        if (isHeld) {
+          await done.promise
+          return
+        }
+        state.isDirty = false
+      },
+    },
+  }
+}
+
+describe('the log', () => {
+  test('keeps the quit pending while it has lines to write', () => {
+    const order: string[] = []
+    const { engine, state } = fakeEngine({ log: order })
+    state.isAlive = false
+    const shutdown = shutdownOf({
+      engine,
+      stores: [fakeStore({ log: order, name: 'state', isDirty: false }).store],
+      log: fakeLog({ log: order }).log,
+      warn: () => {},
+    })
+    expect(shutdown.isPending()).toBe(true)
+  })
+
+  test('flushes last, after mpv stopped and every store wrote, so their failures reach it', async () => {
+    const order: string[] = []
+    const { engine } = fakeEngine({ log: order })
+    const written = fakeLog({ log: order })
+    const shutdown = shutdownOf({
+      engine,
+      stores: [fakeStore({ log: order, name: 'state', isDirty: true }).store],
+      log: written.log,
+      warn: () => {},
+    })
+    await shutdown.settle()
+    expect(order).toEqual(['destroy', 'flush state', 'flush log'])
+    expect(shutdown.isPending()).toBe(false)
+  })
+
+  test('a clean log is not waited on', async () => {
+    const order: string[] = []
+    const waits: number[] = []
+    const { engine, state } = fakeEngine({ log: order })
+    state.isAlive = false
+    const shutdown = createShutdown({
+      engine,
+      stores: [fakeStore({ log: order, name: 'state', isDirty: true }).store],
+      writes: noWrites,
+      log: cleanLog,
+      warn: () => {},
+      wait: (ms) => {
+        waits.push(ms)
+        return never()
+      },
+    })
+    await shutdown.settle()
+    expect(waits).toEqual([])
+    expect(order).toEqual(['flush state'])
+  })
+
+  test('a flush that never settles is given LOG_FLUSH_MS, warned, and then gives up the quit', async () => {
+    const order: string[] = []
+    const warn = mock((_message: string) => {})
+    const deadline = Promise.withResolvers<void>()
+    const waits: number[] = []
+    const { engine, state } = fakeEngine({ log: order })
+    state.isAlive = false
+    const hung = fakeLog({ log: order, isHeld: true })
+    const shutdown = createShutdown({
+      engine,
+      stores: [fakeStore({ log: order, name: 'state', isDirty: true }).store],
+      writes: noWrites,
+      log: hung.log,
+      warn,
+      wait: (ms) => {
+        waits.push(ms)
+        return deadline.promise
+      },
+    })
+    const settling = shutdown.settle()
+    await settle()
+    expect(order).toEqual(['flush state', 'flush log'])
+    expect(waits).toEqual([LOG_FLUSH_MS])
+    deadline.resolve()
+    await settling
+    expect(warn).toHaveBeenCalledTimes(1)
+    expect(warn.mock.calls[0]?.[0] ?? '').toContain('log')
+    // Still dirty, but given up on: the quit gate quits rather than exiting hard.
+    expect(hung.state.isDirty).toBe(true)
+    expect(shutdown.isPending()).toBe(false)
+    // The stores flush again; the log is neither flushed nor waited on again.
+    await shutdown.settle()
+    expect(waits).toEqual([LOG_FLUSH_MS])
+    expect(order).toEqual(['flush state', 'flush log', 'flush state'])
+  })
+
+  test('fits in the quit gate after mpv has had its DESTROY_MS', () => {
+    expect(DESTROY_MS + LOG_FLUSH_MS).toBeLessThan(QUIT_FLUSH_MS)
+  })
+
+  test('a quit gate over a hung log still quits within its bound', async () => {
+    const order: string[] = []
+    const { engine } = fakeEngine({ log: order })
+    const deadline = Promise.withResolvers<void>()
+    const shutdown = createShutdown({
+      engine,
+      stores: [fakeStore({ log: order, name: 'state', isDirty: true }).store],
+      writes: noWrites,
+      log: fakeLog({ log: order, isHeld: true }).log,
+      warn: () => {},
+      wait: () => deadline.promise,
+    })
+    const ended = Promise.withResolvers<string>()
+    const gate = createQuitGate({
+      isDirty: shutdown.isPending,
+      flush: shutdown.settle,
+      timeoutMs: QUIT_FLUSH_MS,
+      quit: () => ended.resolve('quit'),
+      exit: () => ended.resolve('exit'),
+      wait: never,
+    })
+    gate({ preventDefault: () => {} })
+    await settle()
+    deadline.resolve()
+    expect(await ended.promise).toBe('quit')
+    expect(order).toEqual(['destroy', 'flush state', 'flush log'])
+  })
+})
+
+describe('endAfterLog', () => {
+  test('ends once the log has written, without waiting out the bound', async () => {
+    const order: string[] = []
+    await endAfterLog({
+      log: {
+        flush: async () => {
+          order.push('flush')
+        },
+      },
+      wait: never,
+      end: () => order.push('end'),
+    })
+    expect(order).toEqual(['flush', 'end'])
+  })
+
+  test('does not end while the log writes within its bound', async () => {
+    const order: string[] = []
+    const written = Promise.withResolvers<void>()
+    const ending = endAfterLog({
+      log: { flush: () => written.promise },
+      wait: never,
+      end: () => order.push('end'),
+    })
+    await settle()
+    expect(order).toEqual([])
+    written.resolve()
+    await ending
+    expect(order).toEqual(['end'])
+  })
+
+  test('ends after LOG_FLUSH_MS when the log never writes', async () => {
+    const order: string[] = []
+    const waits: number[] = []
+    await endAfterLog({
+      log: { flush: never },
+      wait: async (ms) => {
+        waits.push(ms)
+      },
+      end: () => order.push('end'),
+    })
+    expect(waits).toEqual([LOG_FLUSH_MS])
+    expect(order).toEqual(['end'])
+  })
+
+  test('ends when the flush rejects', async () => {
+    const order: string[] = []
+    await endAfterLog({
+      log: {
+        flush: async () => {
+          throw new Error('disk gone')
+        },
+      },
+      wait: never,
+      end: () => order.push('end'),
+    })
+    expect(order).toEqual(['end'])
   })
 })
 

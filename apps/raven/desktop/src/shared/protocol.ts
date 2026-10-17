@@ -104,6 +104,17 @@ export const isMenuPlayerAction = oneOf([
 
 export type MenuPlayerAction = Infer<typeof isMenuPlayerAction>
 
+/** The release check as Settings shows it: the switch, the running version and the last answer. */
+export const isUpdateStatus = object({
+  isEnabled: isBoolean,
+  current: isString,
+  checkedAt: nullable(isNumber),
+  latest: nullable(isString),
+  problem: nullable(isString),
+})
+
+export type UpdateStatus = Infer<typeof isUpdateStatus>
+
 /** What the page asks main for. No variant carries a file path; a server call names its server by id. */
 export const isDesktopRequest = union(
   object({ type: oneOf(['ready']) }),
@@ -148,6 +159,11 @@ export const isDesktopRequest = union(
     label: isString,
     watched: nullable(isNumber),
   }),
+  object({ type: oneOf(['readUpdates']) }),
+  object({ type: oneOf(['setUpdateCheck']), isEnabled: isBoolean }),
+  object({ type: oneOf(['checkForUpdates']) }),
+  // No URL: main opens the release page it built from the tag (Ruling 19).
+  object({ type: oneOf(['openRelease']) }),
 )
 
 export type DesktopRequest = Infer<typeof isDesktopRequest>
@@ -168,6 +184,7 @@ export const isDesktopReply = union(
   object({ type: oneOf(['serverReply']), status: isNumber, body: isString }),
   object({ type: oneOf(['serverUnreachable']), message: isString }),
   object({ type: oneOf(['servers']), servers: listOf(isServerView) }),
+  object({ type: oneOf(['updates']), status: isUpdateStatus }),
 )
 
 export type DesktopReply = Infer<typeof isDesktopReply>
@@ -180,6 +197,7 @@ export const isDesktopEvent = union(
   object({ type: oneOf(['notice']), message: isString }),
   object({ type: oneOf(['playServer']), target: isServerTarget }),
   object({ type: oneOf(['openLink']) }),
+  object({ type: oneOf(['updateAvailable']), version: isString }),
 )
 
 export type DesktopEvent = Infer<typeof isDesktopEvent>
