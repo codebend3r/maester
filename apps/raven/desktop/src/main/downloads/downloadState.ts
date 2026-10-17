@@ -23,6 +23,10 @@ export const DOWNLOADS_FILE = 'downloads.json'
 /** A subtitle file kept beside the video: `trackId` is the server's `external-<n>`. */
 const isSidecar = object({ trackId: isSidecarTrackId, title: isString, language: isString })
 
+/** A file's size as the server gives it: a whole number of bytes above 0, or nothing to fetch. */
+export const isFileSize = (value: unknown): value is number =>
+  isNumber(value) && Number.isSafeInteger(value) && value > 0
+
 /** What the server has not heard yet: a play to record, and the last position to report. */
 const isPending = object({ play: isBoolean, position: nullable(isNumber), at: isNumber })
 
@@ -33,7 +37,7 @@ export const isDownloadEntry = object({
   label: isString,
   group: isDownloadGroup,
   container: isContainerName,
-  size: isNumber,
+  size: isFileSize,
   duration: nullable(isNumber),
   watchedPercent: isNumber,
   sidecars: listOf(isSidecar),

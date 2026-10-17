@@ -3,6 +3,7 @@ import type { ConfigStore } from '@/main/desktopConfig'
 import { DOWNLOAD_MESSAGES } from '@/main/downloads/downloadMessages'
 import {
   entryByMedia,
+  isFileSize,
   NO_PENDING,
   queue,
   setAutoDeleteDefault,
@@ -62,9 +63,12 @@ type Server = { serverId: string; serverName: string }
 
 const refused = (message: string): DesktopReply => ({ type: 'refused', message })
 
-/** Each file becomes `<mediaId>/video.<container>` on disk, so both must be safe to name a file by. */
+/**
+ * Each file becomes `<mediaId>/video.<container>` on disk, so both must be safe to name a file
+ * by, and its size must be bytes a fetch can end at.
+ */
 const isStorable = ({ media }: ExpandedFile): boolean =>
-  isMediaId(media.id) && isContainerName(media.container)
+  isMediaId(media.id) && isContainerName(media.container) && isFileSize(media.size)
 
 const entryOf = ({
   file,

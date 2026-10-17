@@ -2,7 +2,11 @@ import { describe, expect, it } from 'bun:test'
 import { MEDIA_TICKET_REFRESH_SECONDS, type MediaTracks } from '@raven/core'
 import type { ServerEntry } from '@/main/desktopConfig'
 import { DOWNLOAD_MESSAGES } from '@/main/downloads/downloadMessages'
-import { createDownloadQueue, DOWNLOAD_CONCURRENCY } from '@/main/downloads/downloadQueue'
+import {
+  createDownloadQueue,
+  DOWNLOAD_CONCURRENCY,
+  RENEWAL_MIN_MS,
+} from '@/main/downloads/downloadQueue'
 import {
   EMPTY_DOWNLOADS,
   entryById,
@@ -13,7 +17,7 @@ import {
 import type { DownloadsStore } from '@/main/downloads/downloadStore'
 import { EXPAND_MESSAGES } from '@/main/downloads/expand'
 import { DOWNLOAD_STALL_MS } from '@/main/downloads/fetchFile'
-import type { AccessOutcome } from '@/main/downloads/mediaAccess'
+import { createMediaAccess, type AccessOutcome } from '@/main/downloads/mediaAccess'
 import { SPACE_RESERVE_BYTES } from '@/main/downloads/space'
 import { CALL_MESSAGES } from '@/main/servers/serverCalls'
 import {
@@ -403,6 +407,59 @@ describe('an outage', () => {
     expect(world.network.fileRequests()[0]?.serverId).toBe(OTHER_SERVER_ID)
     expect(world.failed).toHaveLength(1)
   })
+
+  it('pauses the rest of the server when its ticket read answers 502', async () => {
+    const { calls } = fakeCalls({
+      [keyOf({ name: 'getMediaOrigins' })]: ok({ origins: [{ kind: 'lan', url: ORIGIN }] }),
+      ...Object.fromEntries(
+        [1, 2, 3].map((mediaId) => [
+          keyOf({ name: 'getMediaTicket', mediaId }),
+          { status: 502, body: '' },
+        ]),
+      ),
+    })
+    const media = createMediaAccess({
+      calls,
+      serverOf: (serverId) => SERVERS.find((server) => server.id === serverId) ?? null,
+      probe: async () => ({ status: 200, firstByteMs: 1 }),
+      now: () => NOW,
+      warn: () => undefined,
+    })
+    const world = setup({
+      entries: [entryFor(1), entryFor(2), entryFor(3), entryFor(5, { serverId: OTHER_SERVER_ID })],
+      access: (input) =>
+        input.serverId === SERVER_ID ? media.accessFor(input) : Promise.resolve(FAR_TICKET),
+    })
+    world.queue.kick()
+    await until(() => world.network.fileRequests().length === 1)
+    expect(world.statusOf(1)).toEqual({
+      kind: 'failed',
+      bytes: 0,
+      message: CALL_MESSAGES.unreachable('Vhagar'),
+    })
+    expect(world.statusOf(2)).toEqual(waiting)
+    expect(world.statusOf(3)).toEqual(waiting)
+    expect(world.network.fileRequests()[0]?.serverId).toBe(OTHER_SERVER_ID)
+  })
+
+  it('fails the file a 503 answers, forgets the origin and pauses the rest of its server', async () => {
+    const world = setup({
+      entries: [entryFor(1), entryFor(2), entryFor(3), entryFor(5, { serverId: OTHER_SERVER_ID })],
+    })
+    world.network.answers.file = (request) =>
+      request.serverId === SERVER_ID ? refused(503) : serving({ size: 8 })(request)
+    world.queue.kick()
+    await until(() => world.statusOf(5)?.kind === 'ready')
+    expect(world.statusOf(1)).toEqual({
+      kind: 'failed',
+      bytes: 0,
+      message: CALL_MESSAGES.unreachable('Vhagar'),
+    })
+    expect(world.statusOf(2)).toEqual(waiting)
+    expect(world.statusOf(3)).toEqual(waiting)
+    expect(world.media.forgotten).toEqual([SERVER_ID])
+    expect(world.failed.map(({ downloadId }) => downloadId)).toEqual([idOf(1)])
+  })
 })
 
 describe('pause, resume and retry', () => {
@@ -478,14 +535,29 @@ describe('the ticket', () => {
     expect(world.failed).toEqual([])
   })
 
-  it('sets no renewal for a ticket already that close to lapsing', async () => {
+  it('renews a ticket already that close to lapsing no sooner than a minute on', async () => {
     const world = setup({
       entries: [entryFor(1)],
       access: async () => ticketFor({ ticket: 'one', expiresAt: NOW + 5 * MINUTE }),
     })
     world.queue.kick()
     await until(() => world.network.fileRequests().length === 1)
-    expect([...world.pending.values()].filter(({ ms }) => ms > 30_000)).toEqual([])
+    expect(RENEWAL_MIN_MS).toBe(60_000)
+    expect(
+      [...world.pending.values()].filter(({ ms }) => ms > DOWNLOAD_STALL_MS).map(({ ms }) => ms),
+    ).toEqual([RENEWAL_MIN_MS])
+  })
+
+  it('never arms a renewal past the longest delay a timer keeps', async () => {
+    const world = setup({
+      entries: [entryFor(1)],
+      access: async () => ticketFor({ ticket: 'one', expiresAt: NOW * 1000 }),
+    })
+    world.queue.kick()
+    await until(() => world.network.fileRequests().length === 1)
+    expect(
+      [...world.pending.values()].filter(({ ms }) => ms > DOWNLOAD_STALL_MS).map(({ ms }) => ms),
+    ).toEqual([2 ** 31 - 1])
   })
 
   it('is read again once on a 401, and the file goes on', async () => {
@@ -639,8 +711,8 @@ describe('a failed file', () => {
     ['gone', (): Answer => refused(404), EXPAND_MESSAGES.gone('Vhagar')],
     [
       'refused',
-      (): Answer => refused(500),
-      DOWNLOAD_MESSAGES.answered({ serverName: 'Vhagar', status: 500 }),
+      (): Answer => refused(403),
+      DOWNLOAD_MESSAGES.answered({ serverName: 'Vhagar', status: 403 }),
     ],
   ])('fails as %s with why, keeps going, and is told', async (_name, answer, message) => {
     const world = setup({ entries: [entryFor(1), entryFor(2), entryFor(3)] })
@@ -665,6 +737,25 @@ describe('a failed file', () => {
       message: CALL_MESSAGES.unreachable('Vhagar'),
     })
     expect(world.media.forgotten).toEqual([SERVER_ID])
+  })
+
+  it('fails the file whose title the ticket read finds gone, and goes on', async () => {
+    const world = setup({
+      entries: [entryFor(1), entryFor(2)],
+      access: async ({ mediaId }) =>
+        mediaId === 1
+          ? { ok: false, reason: 'gone', message: EXPAND_MESSAGES.gone('Vhagar') }
+          : FAR_TICKET,
+    })
+    world.network.answers.file = serving({ size: 8 })
+    world.queue.kick()
+    await until(() => world.statusOf(2)?.kind === 'ready')
+    expect(world.statusOf(1)).toEqual({
+      kind: 'failed',
+      bytes: 0,
+      message: EXPAND_MESSAGES.gone('Vhagar'),
+    })
+    expect(world.failed.map(({ downloadId }) => downloadId)).toEqual([idOf(1)])
   })
 
   it('fails with why the access could not be read', async () => {
@@ -766,7 +857,7 @@ describe('a relaunch', () => {
         [`${DOWNLOADS}/${SERVER_ID}/notes`]: 1,
       },
     })
-    await world.queue.sweep()
+    await world.queue.sweep({ wasSetAside: false })
     expect(world.drive.removed.toSorted()).toEqual(
       [`${DOWNLOADS}/${GONE_SERVER_ID}`, dirOf(7)].toSorted(),
     )
@@ -789,17 +880,32 @@ describe('a relaunch', () => {
         [`${dirOf(3, GONE_SERVER_ID)}/video.mkv`]: 8,
       },
     })
-    await world.queue.sweep()
+    await world.queue.sweep({ wasSetAside: false })
     expect(world.drive.removed).toEqual([])
     expect(world.store.read().entries).toHaveLength(2)
     expect(world.warnings).toEqual([])
+  })
+
+  it('keeps every media folder, saying so once, when the downloads list was set aside', async () => {
+    const world = setup({
+      disk: {
+        [partOf(1)]: 4,
+        [`${dirOf(7)}/video.mkv`]: 8,
+        [`${dirOf(3, OTHER_SERVER_ID)}/video.mkv`]: 8,
+      },
+    })
+    await world.queue.sweep({ wasSetAside: true })
+    expect(world.drive.removed).toEqual([])
+    expect(world.drive.sizeOf(`${dirOf(7)}/video.mkv`)).toBe(8)
+    expect(world.warnings).toHaveLength(1)
+    expect(world.warnings[0]).not.toContain(DOWNLOADS)
   })
 
   it('holds a kick made while the sweep runs until it is done', async () => {
     const world = setup({ entries: [entryFor(1)] })
     const listing = Promise.withResolvers<void>()
     world.drive.listing.hold = listing.promise
-    const sweeping = world.queue.sweep()
+    const sweeping = world.queue.sweep({ wasSetAside: false })
     world.queue.kick()
     await ticks(10)
     expect(world.network.fileRequests()).toEqual([])
@@ -811,7 +917,7 @@ describe('a relaunch', () => {
 
   it('sweeps nothing when there is no downloads folder yet', async () => {
     const world = setup({ entries: [entryFor(1)] })
-    await world.queue.sweep()
+    await world.queue.sweep({ wasSetAside: false })
     expect(world.drive.removed).toEqual([])
     expect(world.warnings).toEqual([])
   })

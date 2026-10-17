@@ -373,6 +373,16 @@ describe('a part that is already whole', () => {
     expect(sizeOf(chunks)).toBe(10)
     expect(flags.closes).toBe(1)
   })
+
+  it('is changed, with no request, when the part is still too large after one restart', async () => {
+    const { fetch, calls } = fakeFetch({ replies: [] })
+    const { part, flags } = fakePart()
+    const outcome = await run({ fetch, part, expectedSize: -1 })
+    expect(outcome).toEqual({ ok: false, reason: 'changed', status: null, bytes: 0 })
+    expect(calls).toHaveLength(0)
+    expect(flags.truncates).toBe(2)
+    expect(flags.closes).toBe(1)
+  })
 })
 
 describe('the size', () => {
